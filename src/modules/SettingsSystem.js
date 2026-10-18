@@ -147,6 +147,25 @@ class SettingsSystem {
         this.values[categoryId][key] = this.normalizeValue(field, value);
       });
     });
+
+    this.migrateShiftFromShieldToDash(stored.controls);
+  }
+
+  // Before 17/10 Shift raised the shield; it is the dash now. A save from
+  // then has no dash binding, so Shift leaves the shield (the dash default
+  // has it). Once the save holds a dash binding this is a no-op.
+  migrateShiftFromShieldToDash(storedControls) {
+    if (!storedControls || storedControls.dash) {
+      return;
+    }
+    const shield = this.values.controls.activateShield;
+    const kept = shield.keyboard.filter(
+      (code) => !code.toLowerCase().startsWith('shift')
+    );
+    if (kept.length === shield.keyboard.length) {
+      return;
+    }
+    shield.keyboard = kept.length > 0 ? kept : ['KeyE'];
   }
 
   loadFromStorage() {

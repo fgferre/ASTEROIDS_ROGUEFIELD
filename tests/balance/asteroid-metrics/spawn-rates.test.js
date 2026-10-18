@@ -76,21 +76,21 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
       expect(snapshot).toMatchInlineSnapshot(`
 [
   {
-    "asteroidsKilled": 4,
-    "asteroidsSpawned": 4,
-    "totalAsteroids": 4,
+    "asteroidsKilled": 6,
+    "asteroidsSpawned": 6,
+    "totalAsteroids": 6,
     "wave": 1,
   },
   {
-    "asteroidsKilled": 9,
-    "asteroidsSpawned": 9,
-    "totalAsteroids": 9,
+    "asteroidsKilled": 11,
+    "asteroidsSpawned": 11,
+    "totalAsteroids": 11,
     "wave": 5,
   },
   {
-    "asteroidsKilled": 15,
-    "asteroidsSpawned": 15,
-    "totalAsteroids": 15,
+    "asteroidsKilled": 17,
+    "asteroidsSpawned": 17,
+    "totalAsteroids": 17,
     "wave": 10,
   },
 ]`);

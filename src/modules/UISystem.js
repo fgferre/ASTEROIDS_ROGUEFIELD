@@ -10,12 +10,23 @@ import {
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
+import { directorFor } from '../data/layers.js';
+import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
+import {
+  applyCanvasResolution,
+  resolveDevicePixelRatio,
+} from '../core/viewport.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { PICKUP_KINDS } from '../data/pickups.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
+const LEVEL_UP_LOCKOUT_MS = 400;
+const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
+const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
+const CONTROLS_TOAST_MS = 8000;
 
 const COLOR_ASSIST_ACCENTS = {
   offense: '#3366CC',
@@ -24,28 +35,6 @@ const COLOR_ASSIST_ACCENTS = {
   utility: '#8E6CFF',
   default: '#4C6EF5',
 };
-
-const MINIMAP_ENTITY_COLORS = {
-  asteroid: '#A0AEC0',
-  drone: '#63B3ED',
-  mine: '#F6AD55',
-  hunter: '#B794F4',
-  boss: '#F56565',
-  default: '#E2E8F0',
-};
-
-const THREAT_ICON_LOOKUP = {
-  boss: '☠',
-  hunter: '✦',
-  drone: '▲',
-  mine: '✸',
-  asteroid: '●',
-  default: '•',
-};
-
-const DEFAULT_MINIMAP_RANGE = 300;
-const DEFAULT_MINIMAP_DETECTION_MULTIPLIER = 1.5;
-const MAX_THREAT_INDICATORS = 8;
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -59,6 +48,8 @@ class UISystem extends BaseSystem {
         transitions: 'ui.transitions',
       },
     });
+    // `?replay=` runs without the first-run controls toast.
+    this.controlsToastDisabled = false;
   }
 
   initialize() {
@@ -74,7 +65,8 @@ class UISystem extends BaseSystem {
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
     this.currentCanvasScale = 1;
-    this.canvasBaseSize = { width: 0, height: 0 };
+    this.currentCanvasDpr = 0;
+    this.canvasBaseSize = { width: GAME_WIDTH, height: GAME_HEIGHT };
     this.handleResize = this.handleResize.bind(this);
 
     // Force AAA Tactical HUD
@@ -156,7 +148,11 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      level: null,
+      lockedUntil: 0,
+      banishMode: false,
     };
+    this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.currentVisualPreferences = {
       accessibility: {},
       video: {},
@@ -169,9 +165,6 @@ class UISystem extends BaseSystem {
       threats: new Map(),
       isReady: false,
     };
-    this.handleMenuShipSelectorVisualReady = () => {
-      this.requestMenuShipSelectorRefresh();
-    };
 
     this.initializeSettingsMetadata();
 
@@ -182,6 +175,7 @@ class UISystem extends BaseSystem {
     this.updateAAATacticalHudFromServices({ force: true });
 
     this.bindPauseControls();
+    this.bindLevelUpControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
     this.bindMainMenuControls();
@@ -216,12 +210,30 @@ class UISystem extends BaseSystem {
       levelUp: {
         container: document.getElementById('upgrades-container') || null,
         text: document.getElementById('levelup-text') || null,
+        rerollBtn: document.getElementById('levelup-reroll-btn') || null,
+        banishBtn: document.getElementById('levelup-banish-btn') || null,
+        banishHint: document.getElementById('levelup-banish-hint') || null,
       },
       gameOver: {
-        level: document.getElementById('final-level') || null,
-        kills: document.getElementById('final-kills') || null,
-        waves: document.getElementById('final-waves') || null,
-        time: document.getElementById('final-time') || null,
+        time: document.getElementById('gameover-time') || null,
+        wave: document.getElementById('gameover-wave') || null,
+        kills: document.getElementById('gameover-kills') || null,
+        combo: document.getElementById('gameover-combo') || null,
+        level: document.getElementById('gameover-level') || null,
+        build: document.getElementById('gameover-build') || null,
+        retryBtn: document.getElementById('retry-game-btn') || null,
+        restartBtn: document.getElementById('restart-game-btn') || null,
+        quitBtn: document.getElementById('quit-game-btn') || null,
+      },
+      victory: {
+        time: document.getElementById('victory-time') || null,
+        wave: document.getElementById('victory-wave') || null,
+        kills: document.getElementById('victory-kills') || null,
+        combo: document.getElementById('victory-combo') || null,
+        level: document.getElementById('victory-level') || null,
+        build: document.getElementById('victory-build') || null,
+        synergies: document.getElementById('victory-synergies') || null,
+        restartBtn: document.getElementById('victory-restart-btn') || null,
       },
       pause: {
         container: document.getElementById('pause-screen') || null,
@@ -345,6 +357,7 @@ class UISystem extends BaseSystem {
 
     switch (eventName) {
       case 'boss-wave-started':
+        this.aaaTacticalHud?.holdBossBar();
         next.active = false;
         next.upcoming = true;
         next.defeated = false;
@@ -352,6 +365,13 @@ class UISystem extends BaseSystem {
         next.maxHealth = Number(data?.maxHealth ?? next.maxHealth ?? 0) || 0;
         break;
       case 'boss-spawned':
+        if (!current.active) {
+          this.aaaTacticalHud?.showBossIntro(data?.enemy?.displayName);
+        }
+        next.active = true;
+        next.upcoming = false;
+        next.defeated = false;
+        break;
       case 'boss-phase-changed':
       case 'boss-invulnerability-changed':
         next.active = true;
@@ -397,17 +417,34 @@ class UISystem extends BaseSystem {
     return this.getBossHudState();
   }
 
+  handleLayerStarted(payload = {}) {
+    const hud = this.aaaTacticalHud;
+    if (!hud) {
+      return;
+    }
+    const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
+    const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
+    // The first-run controls toast opens right after layer 1 starts.
+    const toastShowing =
+      layer === 1 &&
+      (this.isControlsToastPending() ||
+        Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
+    const biome = biomeForLayer(layer);
+    hud.showLayerBanner(layer, {
+      boss,
+      delayMs: toastShowing ? 1000 : 0,
+      chapter: biome.layers[0] === layer ? biome.title : '',
+    });
+  }
+
   handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
     const state = this.getBossHudState();
     const completedWave = Number.isFinite(Number(payload?.wave))
       ? Math.max(1, Math.floor(Number(payload.wave)))
       : null;
-    const bossInterval = Number(WAVE_BOSS_INTERVAL) || 0;
     const isBossWave =
       Boolean(payload?.isBossWave) ||
-      (bossInterval > 0 &&
-        completedWave !== null &&
-        completedWave % bossInterval === 0);
+      (completedWave !== null && directorFor(completedWave).warden);
     const hasBossContext =
       Boolean(this.cachedValues.boss?.visible) ||
       Boolean(state.bossId) ||
@@ -481,13 +518,6 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (!this.canvasBaseSize.width || !this.canvasBaseSize.height) {
-      this.canvasBaseSize.width =
-        Number(canvas.width) || canvas.getBoundingClientRect().width || 800;
-      this.canvasBaseSize.height =
-        Number(canvas.height) || canvas.getBoundingClientRect().height || 600;
-    }
-
     const baseWidth = this.canvasBaseSize.width;
     const baseHeight = this.canvasBaseSize.height;
 
@@ -529,15 +559,24 @@ class UISystem extends BaseSystem {
 
     const scale = Math.min(heightScale, widthScale);
 
-    if (!options.force && Math.abs(scale - this.currentCanvasScale) < 0.005) {
+    const dpr = resolveDevicePixelRatio();
+    if (
+      !options.force &&
+      dpr === this.currentCanvasDpr &&
+      Math.abs(scale - this.currentCanvasScale) < 0.005
+    ) {
       return;
     }
 
     this.currentCanvasScale = scale;
+    this.currentCanvasDpr = dpr;
 
     const scaledWidth = Math.round(baseWidth * scale);
     const scaledHeight = Math.round(baseHeight * scale);
 
+    // Backing store at native resolution; drawing stays in 800×600 logical
+    // units through the base transform the renderer applies each frame.
+    applyCanvasResolution(canvas, scaledWidth, scaledHeight, dpr);
     canvas.style.width = `${scaledWidth}px`;
     canvas.style.height = `${scaledHeight}px`;
     canvas.style.maxWidth = '100%';
@@ -755,9 +794,27 @@ class UISystem extends BaseSystem {
         const hullDefinition = getShipModelById(button.dataset.hullId);
         player.renderHullPreview(context, hullDefinition, {
           padding: 12,
-          onVisualReady: this.handleMenuShipSelectorVisualReady,
         });
       });
+  }
+
+  bindLevelUpControls() {
+    const { rerollBtn, banishBtn } = this.domRefs.levelUp;
+    rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
+    banishBtn?.addEventListener('click', () => this.toggleBanishMode());
+
+    document.addEventListener('keydown', (event) => {
+      if (!this.levelUpState.isVisible || event.repeat) {
+        return;
+      }
+      if (event.code === 'KeyR') {
+        this.rerollLevelUpOptions();
+      } else if (event.code === 'KeyB') {
+        this.toggleBanishMode();
+      } else if (event.key === 'Escape' && this.levelUpState.banishMode) {
+        this.setBanishMode(false);
+      }
+    });
   }
 
   bindPauseControls() {
@@ -810,11 +867,60 @@ class UISystem extends BaseSystem {
           return;
         }
 
+        if (!this.confirmQuit(pauseRefs.exitBtn)) {
+          return;
+        }
+
         this.eventBus?.emit?.('exit-to-menu-requested', {
           source: 'pause-menu',
         });
       });
     }
+
+    const quitBtn = this.domRefs.gameOver?.quitBtn;
+    if (quitBtn) {
+      // Runs before GameSessionService's document-level click handler.
+      quitBtn.addEventListener('click', (event) => {
+        if (!this.confirmQuit(quitBtn)) {
+          event.stopPropagation();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        this.cancelQuitConfirm();
+      }
+    });
+  }
+
+  confirmQuit(button) {
+    const state = this.quitConfirm;
+    if (state.button === button) {
+      this.cancelQuitConfirm();
+      return true;
+    }
+
+    this.cancelQuitConfirm();
+    state.button = button;
+    state.label = button.textContent;
+    button.textContent = 'Quit? Press again';
+    button.classList.add('is-confirming');
+    button.setAttribute('aria-live', 'polite');
+    state.timeoutId = setTimeout(() => this.cancelQuitConfirm(), 3000);
+    return false;
+  }
+
+  cancelQuitConfirm() {
+    const state = this.quitConfirm;
+    clearTimeout(state.timeoutId);
+    if (state.button) {
+      state.button.textContent = state.label;
+      state.button.classList.remove('is-confirming');
+      state.button.removeAttribute('aria-live');
+    }
+    state.button = null;
+    state.timeoutId = null;
   }
 
   bindSettingsControls() {
@@ -983,6 +1089,7 @@ class UISystem extends BaseSystem {
               source = 'settings-menu';
             else if (target.closest('#gameover-screen'))
               source = 'gameover-menu';
+            else if (target.closest('#victory-screen')) source = 'victory-menu';
             else if (target.closest('#levelup-screen')) source = 'levelup-menu';
 
             this.eventBus?.emit?.('ui-hover', {
@@ -1100,17 +1207,6 @@ class UISystem extends BaseSystem {
           ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
           : { x: 0, y: 0 };
 
-    const playerVelocity =
-      player && typeof player.getVelocity === 'function'
-        ? player.getVelocity()
-        : player?.velocity && typeof player.velocity === 'object'
-          ? player.velocity
-          : { vx: 0, vy: 0 };
-
-    const velocityX = Number(playerVelocity.vx ?? playerVelocity.x ?? 0) || 0;
-    const velocityY = Number(playerVelocity.vy ?? playerVelocity.y ?? 0) || 0;
-    const speed = Math.hypot(velocityX, velocityY);
-
     if (player || force) {
       const hull = Number(player?.health ?? 0) || 0;
       const maxHull = Number(player?.maxHealth ?? 0) || 0;
@@ -1129,11 +1225,9 @@ class UISystem extends BaseSystem {
       }
 
       hud.updateVitals(shield, maxShield, hull, maxHull);
-      hud.updateTelemetry(
-        Number(playerPosition.x ?? 0) || 0,
-        Number(playerPosition.y ?? 0) || 0,
-        speed
-      );
+      if (player) {
+        hud.updateDashCooldown(player.getDashCooldownFraction());
+      }
     }
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
@@ -1152,7 +1246,7 @@ class UISystem extends BaseSystem {
     if (progression && typeof progression.getComboState === 'function') {
       const comboState = progression.getComboState() || {};
       const comboCount = Number(comboState.comboCount ?? 0) || 0;
-      hud.updateStats(null, undefined, comboCount);
+      hud.updateStats(null, undefined, comboCount, comboState.multiplier);
     }
 
     // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
@@ -1321,6 +1415,34 @@ class UISystem extends BaseSystem {
       'boss-defeated',
     ].forEach(registerBossEvent);
 
+    this.registerEventListener('wave-started', (payload = {}) => {
+      this.handleLayerStarted(payload);
+    });
+
+    this.registerEventListener('surge-started', (payload = {}) => {
+      this.aaaTacticalHud?.showSurgeBanner(payload.label);
+    });
+
+    this.registerEventListener('enemy-destroyed', (payload = {}) => {
+      this.aaaTacticalHud?.addKillFeed(
+        payload.enemy?.type,
+        payload.enemy?.elite
+      );
+    });
+
+    this.registerEventListener('xp-orb-collected', (payload = {}) => {
+      this.aaaTacticalHud?.addXpFeed(Number(payload.value));
+    });
+
+    this.registerEventListener('pickup-collected', ({ kind } = {}) => {
+      const pickup = PICKUP_KINDS[kind];
+      this.aaaTacticalHud?.addPickupFeed(
+        pickup.label,
+        pickup.detail,
+        pickup.color
+      );
+    });
+
     this.registerEventListener('pause-state-changed', (data) => {
       this.updatePauseScreen(Boolean(data?.isPaused));
     });
@@ -1351,8 +1473,20 @@ class UISystem extends BaseSystem {
       }
     });
 
+    this.registerEventListener('run-won', () => {
+      this.runWon = true;
+    });
+    this.registerEventListener('game-started', () => {
+      this.runWon = false;
+    });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
+    });
+    this.registerEventListener('upgrade-rerolled', (payload = {}) => {
+      this.refreshLevelUpOptions(payload);
+    });
+    this.registerEventListener('upgrade-banished', (payload = {}) => {
+      this.refreshLevelUpOptions(payload);
     });
 
     this.registerEventListener('settings-menu-requested', (payload = {}) => {
@@ -1876,6 +2010,7 @@ class UISystem extends BaseSystem {
     container.innerHTML = '';
 
     if (!category) {
+      const message = document.createElement('p');
       message.className = 'settings-empty-state';
       message.textContent = 'Settings category unavailable.';
       container.appendChild(message);
@@ -2487,9 +2622,27 @@ class UISystem extends BaseSystem {
       return;
     }
 
+    if (screenName === 'levelup') {
+      this.showScreen('levelup', {
+        overlay: true,
+        show: true,
+        emitEvent: false,
+      });
+      return;
+    }
+
     if (screenName === 'gameover') {
       this.showGameOverScreen(payload);
       return;
+    }
+
+    if (screenName === 'victory') {
+      this.showVictoryScreen(payload);
+      return;
+    }
+
+    if (screenName === 'playing') {
+      this.maybeShowControlsToast();
     }
 
     this.showScreen(screenName, { emitEvent: false });
@@ -2506,10 +2659,21 @@ class UISystem extends BaseSystem {
           target.classList.toggle('hidden', !show);
         }
 
-        // Keep game-ui visible for pause and gameover overlays
-        if ((screenName === 'pause' || screenName === 'gameover') && show) {
+        // Keep game-ui visible for pause, level-up and gameover overlays
+        if (
+          (screenName === 'pause' ||
+            screenName === 'levelup' ||
+            screenName === 'gameover' ||
+            screenName === 'victory') &&
+          show
+        ) {
           const gameUI = document.getElementById('game-ui');
           if (gameUI) gameUI.classList.remove('hidden');
+        }
+
+        // The session service pauses the game on any non-'playing' screen.
+        if (screenName === 'levelup' && show && emitEvent) {
+          this.eventBus?.emit?.('screen-changed', { screen: screenName });
         }
         return;
       }
@@ -2577,6 +2741,14 @@ class UISystem extends BaseSystem {
     this.currentPauseState = shouldPause;
     this.showScreen('pause', { overlay: true, show: shouldPause });
 
+    const resumeBtn = this.domRefs.pause?.resumeBtn;
+    if (shouldPause) {
+      resumeBtn?.focus({ preventScroll: true });
+    } else {
+      this.cancelQuitConfirm();
+      resumeBtn?.blur();
+    }
+
     document.body?.classList.toggle('is-paused', shouldPause);
 
     if (
@@ -2606,25 +2778,35 @@ class UISystem extends BaseSystem {
         : null;
 
     this.levelUpState.isVisible = true;
+    this.levelUpState.level = levelValue;
+    this.showScreen('levelup', { overlay: true, show: true });
+    this.renderLevelUpOptions(options, data.poolSize);
+  }
+
+  // Cards, subtitle and reroll/banish buttons for the offered options; new
+  // cards restart the input lockout so a held key can't pick one unseen.
+  renderLevelUpOptions(options, offeredPoolSize) {
+    const levelValue = this.levelUpState.level;
     this.levelUpState.options = options;
-    this.levelUpState.poolSize = Number.isFinite(Number(data.poolSize))
-      ? Number(data.poolSize)
+    this.levelUpState.poolSize = Number.isFinite(Number(offeredPoolSize))
+      ? Number(offeredPoolSize)
       : options.length;
     this.levelUpState.focusIndex = -1;
-
-    this.showScreen('levelup');
+    this.levelUpState.lockedUntil = Date.now() + LEVEL_UP_LOCKOUT_MS;
+    this.setBanishMode(false);
+    this.updateLevelUpActionButtons();
 
     if (this.domRefs.levelUp.text) {
       const optionCount = options.length;
       const poolSize = this.levelUpState.poolSize;
-      const optionLabel = optionCount === 1 ? 'opção' : 'opções';
+      const optionLabel = optionCount === 1 ? 'option' : 'options';
       let suffix = ` (${optionCount} ${optionLabel})`;
       if (poolSize > optionCount) {
-        suffix = ` (${optionCount} de ${poolSize} ${optionLabel})`;
+        suffix = ` (${optionCount} of ${poolSize} ${optionLabel})`;
       }
       const prefix = Number.isFinite(levelValue)
-        ? `Level ${levelValue} - Escolha sua tecnologia`
-        : 'Escolha sua tecnologia';
+        ? `Level ${levelValue} - Choose your technology`
+        : 'Choose your technology';
       this.domRefs.levelUp.text.textContent = `${prefix}${suffix}:`;
     }
 
@@ -2648,16 +2830,84 @@ class UISystem extends BaseSystem {
     }
   }
 
+  // After a reroll or banish: redraw the cards, or close if none are left.
+  refreshLevelUpOptions(payload = {}) {
+    if (!this.levelUpState.isVisible) {
+      return;
+    }
+    const options = ensureArray(payload.options);
+    if (!options.length) {
+      this.resetLevelUpState();
+      this.showGameUI();
+      return;
+    }
+    this.renderLevelUpOptions(options, payload.poolSize);
+  }
+
+  updateLevelUpActionButtons() {
+    const progression = this.getService('progression');
+    const { rerollBtn, banishBtn } = this.domRefs.levelUp;
+    [
+      [rerollBtn, progression?.rerollsLeft ?? 0],
+      [banishBtn, progression?.banishesLeft ?? 0],
+    ].forEach(([button, left]) => {
+      if (!button) {
+        return;
+      }
+      button.disabled = left <= 0;
+      const count = button.querySelector('[data-count]');
+      if (count) {
+        count.textContent = `${left} left`;
+      }
+    });
+  }
+
+  isLevelUpLocked() {
+    return Date.now() < this.levelUpState.lockedUntil;
+  }
+
+  rerollLevelUpOptions() {
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
+      return;
+    }
+    this.getService('progression')?.rerollUpgradeOptions();
+  }
+
+  toggleBanishMode() {
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
+      return;
+    }
+    const progression = this.getService('progression');
+    if (!this.levelUpState.banishMode && !(progression?.banishesLeft > 0)) {
+      return;
+    }
+    this.setBanishMode(!this.levelUpState.banishMode);
+  }
+
+  // Banish pick mode: the next card chosen is banished instead of taken.
+  setBanishMode(active) {
+    this.levelUpState.banishMode = active;
+    const { banishBtn, banishHint } = this.domRefs?.levelUp || {};
+    banishBtn?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    banishHint?.classList.toggle('hidden', !active);
+    document
+      .getElementById('levelup-screen')
+      ?.classList.toggle('is-banishing', active);
+  }
+
   createUpgradeOptionButton(option, index) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'upgrade-option';
+    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}`;
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
 
     const accentColors = this.resolveAccentColors(option);
     button.style.setProperty('--upgrade-accent', accentColors.accent);
     button.style.setProperty('--upgrade-accent-soft', accentColors.soft);
+    if (option.family) {
+      button.style.setProperty('--family-color', option.family.color);
+    }
 
     button.innerHTML = this.buildUpgradeOptionMarkup(option);
     button.addEventListener('click', () => this.selectUpgrade(option.id));
@@ -2687,14 +2937,16 @@ class UISystem extends BaseSystem {
       : [];
     const prerequisites = ensureArray(option.prerequisites);
 
+    const familySection = this.buildFamilyProgressMarkup(option.family);
+
     const categoryIcon = category.icon
       ? `<span class="upgrade-option__category-icon" aria-hidden="true">${category.icon}</span>`
       : '';
 
     const nextLevelSection = nextLevel
       ? `<section class="upgrade-option__next">
-          <p class="upgrade-option__next-label">Próximo: ${
-            nextLevel.title || `Nível ${currentLevel + 1}`
+          <p class="upgrade-option__next-label">Next: ${
+            nextLevel.title || `Level ${currentLevel + 1}`
           }</p>
           <p class="upgrade-option__description">${
             nextLevel.description || ''
@@ -2707,7 +2959,7 @@ class UISystem extends BaseSystem {
               : ''
           }
         </section>`
-      : '<p class="upgrade-option__maxed">Tecnologia já maximizada.</p>';
+      : '<p class="upgrade-option__maxed">Technology maxed out.</p>';
 
     const prerequisitesSection = prerequisites.length
       ? `<footer class="upgrade-option__footer">
@@ -2727,17 +2979,27 @@ class UISystem extends BaseSystem {
         </footer>`
       : '';
 
+    const rarity = option.rarity || 'common';
+
     return `
+      <p class="upgrade-option__rarity">${UPGRADE_RARITY_LABELS[rarity]}</p>
       <header class="upgrade-option__header">
         <span class="upgrade-icon" aria-hidden="true">${
           option.icon || '✨'
         }</span>
         <div class="upgrade-option__meta">
-          <span class="upgrade-option__category">
-            ${categoryIcon}
-            ${category.label || 'Tecnologia'}
-          </span>
-          <span class="upgrade-option__level">Nv. atual: ${currentLevel}/${
+          <div class="upgrade-option__chips">
+            <span class="upgrade-option__category">
+              ${categoryIcon}
+              ${category.label || 'Tecnologia'}
+            </span>
+            ${
+              option.family
+                ? `<span class="upgrade-option__family">${option.family.name}</span>`
+                : ''
+            }
+          </div>
+          <span class="upgrade-option__level">Lv. ${currentLevel}/${
             maxLevel || Math.max(1, currentLevel)
           }</span>
         </div>
@@ -2745,10 +3007,38 @@ class UISystem extends BaseSystem {
       <div class="upgrade-option__body">
         <h3 class="upgrade-option__title">${option.name || option.id}</h3>
         ${summary ? `<p class="upgrade-option__summary">${summary}</p>` : ''}
+        ${familySection}
         ${nextLevelSection}
       </div>
       ${prerequisitesSection}
     `;
+  }
+
+  // Pips for distinct upgrades held in the family; names the bonus a pick unlocks.
+  buildFamilyProgressMarkup(family) {
+    if (!family) {
+      return '';
+    }
+    const pips = Array.from(
+      { length: family.required },
+      (_, index) =>
+        `<span class="family-pip${index < family.owned ? ' is-filled' : ''}"></span>`
+    ).join('');
+    let state = '';
+    let label = `${family.name} ${Math.min(family.owned, family.required)}/${family.required} · ${family.bonusName}`;
+    if (family.active) {
+      state = ' is-active';
+      label = `${family.bonusName} online`;
+    } else if (family.completesSynergy) {
+      state = ' is-unlocking';
+      label = `Unlocks: ${family.bonusName} — ${family.bonusDescription}`;
+    } else if (family.owned > 0) {
+      state = ' is-building';
+    }
+    return `<p class="upgrade-option__family-progress${state}">
+        <span class="family-pips" aria-hidden="true">${pips}</span>
+        <span>${label}</span>
+      </p>`;
   }
 
   selectUpgrade(upgradeId) {
@@ -2756,7 +3046,16 @@ class UISystem extends BaseSystem {
       return;
     }
 
+    if (this.isLevelUpLocked()) {
+      return;
+    }
+
     const progression = this.getService('progression');
+
+    if (this.levelUpState.banishMode) {
+      progression?.banishUpgrade(upgradeId);
+      return;
+    }
 
     if (!progression || typeof progression.applyUpgrade !== 'function') {
       this.showGameUI();
@@ -2773,6 +3072,10 @@ class UISystem extends BaseSystem {
   }
 
   handleUpgradeOptions(payload = {}) {
+    if (this.runWon) {
+      return;
+    }
+
     const options = ensureArray(payload.options || payload.availableUpgrades);
     this.levelUpState.poolSize = Number.isFinite(Number(payload.poolSize))
       ? Number(payload.poolSize)
@@ -2864,7 +3167,7 @@ class UISystem extends BaseSystem {
     }
   }
 
-  updateLevelDisplay(level, options = {}) {
+  updateLevelDisplay() {
     // Standard HUD legacy method.
     // AAA HUD updates via updateAAATacticalHudFromServices.
     // Kept as stub for shared logic calls.
@@ -2913,6 +3216,7 @@ class UISystem extends BaseSystem {
         button.disabled = false;
       }
     });
+    this.setBanishMode(false);
 
     this.levelUpState = {
       isVisible: false,
@@ -2920,6 +3224,9 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      level: null,
+      lockedUntil: 0,
+      banishMode: false,
     };
   }
 
@@ -3006,10 +3313,149 @@ class UISystem extends BaseSystem {
     return `rgba(51, 153, 255, ${clampedAlpha})`;
   }
 
-  showGameOverScreen(data) {
+  showVictoryScreen(payload) {
+    this.showScreen('victory', { overlay: true, show: true });
+
+    const data = payload?.data || {};
+    const refs = this.domRefs.victory;
+    const setText = (node, value) => {
+      if (node) node.textContent = value;
+    };
+
+    const totalSeconds = Math.max(
+      0,
+      Math.floor(Number(data.stats?.timeElapsed) || 0)
+    );
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
+    const level = data.player?.level ?? data.level;
+
+    setText(refs.time, `${minutes}:${seconds}`);
+    setText(refs.wave, `${wave ?? '—'}`);
+    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
+    setText(refs.combo, `x${data.maxCombo ?? 0}`);
+    setText(refs.level, `${level ?? '—'}`);
+
+    if (refs.build) {
+      refs.build.innerHTML = '';
+      const upgrades = ensureArray(data.upgrades);
+      if (!upgrades.length) {
+        const empty = document.createElement('li');
+        empty.className = 'gameover-build__empty';
+        empty.textContent = 'No upgrades';
+        refs.build.appendChild(empty);
+      }
+      upgrades.forEach(({ name, id, level: rank }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.append(`${name || id} `);
+        const rankNode = document.createElement('span');
+        rankNode.className = 'gameover-build__rank';
+        rankNode.textContent = `Lv.${rank}`;
+        item.appendChild(rankNode);
+        refs.build.appendChild(item);
+      });
+    }
+
+    if (refs.synergies) {
+      refs.synergies.innerHTML = '';
+      ensureArray(data.synergies).forEach(({ name, family }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.textContent = name || family;
+        refs.synergies.appendChild(item);
+      });
+    }
+
+    refs.restartBtn?.focus({ preventScroll: true });
+  }
+
+  showGameOverScreen(payload) {
     // Show gameover as overlay so game canvas stays visible with asteroids wandering
     this.showScreen('gameover', { overlay: true, show: true });
-    // Simplified game over screen - no stats display
+
+    const data = payload?.data || {};
+    const refs = this.domRefs.gameOver;
+    const setText = (node, value) => {
+      if (node) node.textContent = value;
+    };
+
+    const totalSeconds = Math.max(
+      0,
+      Math.floor(Number(data.stats?.timeElapsed) || 0)
+    );
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
+    const level = data.player?.level ?? data.level;
+
+    setText(refs.time, `${minutes}:${seconds}`);
+    setText(refs.wave, `${wave ?? '—'}`);
+    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
+    setText(refs.combo, `x${data.maxCombo ?? 0}`);
+    setText(refs.level, `${level ?? '—'}`);
+
+    if (refs.build) {
+      refs.build.innerHTML = '';
+      const upgrades = ensureArray(data.upgrades);
+      if (!upgrades.length) {
+        const empty = document.createElement('li');
+        empty.className = 'gameover-build__empty';
+        empty.textContent = 'No upgrades';
+        refs.build.appendChild(empty);
+      }
+      upgrades.forEach(({ name, id, level: rank }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.append(`${name || id} `);
+        const rankNode = document.createElement('span');
+        rankNode.className = 'gameover-build__rank';
+        rankNode.textContent = `Lv.${rank}`;
+        item.appendChild(rankNode);
+        refs.build.appendChild(item);
+      });
+    }
+
+    const focusTarget = refs.retryBtn?.disabled
+      ? refs.restartBtn
+      : refs.retryBtn || refs.restartBtn;
+    focusTarget?.focus({ preventScroll: true });
+  }
+
+  isControlsToastPending() {
+    if (this.controlsToastDisabled) {
+      return false;
+    }
+    try {
+      return !localStorage.getItem(CONTROLS_SEEN_KEY);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  maybeShowControlsToast() {
+    if (!this.isControlsToastPending()) {
+      return;
+    }
+    try {
+      localStorage.setItem(CONTROLS_SEEN_KEY, '1');
+    } catch (error) {
+      return;
+    }
+
+    const gameUi = this.domRefs.gameUi;
+    if (!gameUi) {
+      return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'controls-toast';
+    toast.textContent =
+      'A/D turn · W thrust · shooting is automatic · Shift dash · E shield';
+    gameUi.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+    setTimeout(() => toast.remove(), CONTROLS_TOAST_MS);
   }
 }
 

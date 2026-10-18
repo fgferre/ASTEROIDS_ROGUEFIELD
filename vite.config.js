@@ -39,6 +39,10 @@ export default defineConfig(({ mode }) => ({
       'node_modules/**',
     ],
     environment: 'node',
+    // Headless scenario tests boot the real manifest and step hundreds of
+    // frames; under a loaded machine (parallel workers) they passed alone but
+    // tripped the 5 s default. Proposta 18/10.
+    testTimeout: 20000,
     globals: true,
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
     setupFiles: ['tests/__helpers__/global-setup.js'],

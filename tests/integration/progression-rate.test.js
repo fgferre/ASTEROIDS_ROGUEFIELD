@@ -28,7 +28,7 @@ import * as CONSTANTS from '../../src/core/GameConstants.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 
 // Distinct from AIM_REGRESSION_SEED (0xA1A1) per D-05 / D-13 convention.
-const PROGRESSION_FIX03_SEED = 0xF003;
+const PROGRESSION_FIX03_SEED = 0xf003;
 
 // FIX-03 recalibration (2026-05-13 — post-live-playtest correction):
 //
@@ -88,7 +88,9 @@ const noop = () => {};
  * @param {string} seedScope - Seed scope label forwarded to createTestContainer.
  * @returns {Map<string, number>} Final appliedUpgrades map.
  */
-function runWave5Simulation(seedScope = `progression-fix03-${PROGRESSION_FIX03_SEED}`) {
+function runWave5Simulation(
+  seedScope = `progression-fix03-${PROGRESSION_FIX03_SEED}`
+) {
   const container = createTestContainer(seedScope);
   const eventBus = container.resolve('event-bus');
   const random = container.resolve('random');
@@ -124,6 +126,8 @@ function runWave5Simulation(seedScope = `progression-fix03-${PROGRESSION_FIX03_S
     const chunk = Math.max(1, Math.floor(totalXp / 10));
     for (let i = 0; i < 10; i += 1) {
       progression.collectXP(chunk);
+      // The pick screen opens after the level-up delay (simulation time).
+      progression.update(CONSTANTS.LEVEL_UP_SCREEN_DELAY_SECONDS);
       while (pendingOptions && pendingOptions.length > 0) {
         const optionId = pendingOptions[0]?.id;
         pendingOptions = null;
@@ -163,15 +167,10 @@ describe('Progression rate harness (FIX-03)', () => {
     const size = upgrades.size;
     // Diagnostic line — Task 2 reads this to iterate the constants.
     // eslint-disable-next-line no-console
-    console.log(
-      '[FIX-03] appliedUpgrades.size:',
-      size,
-      'with constants:',
-      {
-        LEVEL_SCALING: CONSTANTS.PROGRESSION_LEVEL_SCALING,
-        INITIAL_XP: CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT,
-      }
-    );
+    console.log('[FIX-03] appliedUpgrades.size:', size, 'with constants:', {
+      LEVEL_SCALING: CONSTANTS.PROGRESSION_LEVEL_SCALING,
+      INITIAL_XP: CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT,
+    });
     expect(size).toBeGreaterThanOrEqual(TARGET_MIN);
     expect(size).toBeLessThanOrEqual(TARGET_MAX);
   });

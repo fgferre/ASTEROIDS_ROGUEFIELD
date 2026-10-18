@@ -1,6 +1,6 @@
 # Balance Retune — 2026-05-12
 
-Phase 0 (M1 Stabilization) retune log. Each FIX-* contributes its own section.
+Phase 0 (M1 Stabilization) retune log. Each FIX-\* contributes its own section.
 
 ## FIX-02 — Mobility Brake Bug
 
@@ -21,14 +21,14 @@ only when `!isMainManual && !isAuxManual`; during active thrust only
 **Numerical values after max-rank braking_system (ranks 1.30 → 1.231 → 1.25,
 cumulative):**
 
-| Field                  | Value         | Notes                                                                      |
-| ---------------------- | ------------- | -------------------------------------------------------------------------- |
-| `baseLinearDamping`    | 3.1           | Invariant; equals `SHIP_LINEAR_DAMPING`                                    |
-| `brakingDamping` (r1)  | 0.93          | Additive component after rank 1 (1.30x multiplier)                         |
-| `brakingDamping` (r2)  | 1.86093       | Additive component after rank 2 cumulative (1.30 × 1.231)                  |
-| `brakingDamping` (r3)  | 3.1011625     | Additive component after rank 3 cumulative (1.30 × 1.231 × 1.25)           |
-| Effective during burn  | 3.1           | Only `baseLinearDamping` applies during thrust                             |
-| Effective during coast | 6.2011625 (r3) | `baseLinearDamping + brakingDamping`; matches catalog "Total 2.00x"        |
+| Field                  | Value          | Notes                                                               |
+| ---------------------- | -------------- | ------------------------------------------------------------------- |
+| `baseLinearDamping`    | 3.1            | Invariant; equals `SHIP_LINEAR_DAMPING`                             |
+| `brakingDamping` (r1)  | 0.93           | Additive component after rank 1 (1.30x multiplier)                  |
+| `brakingDamping` (r2)  | 1.86093        | Additive component after rank 2 cumulative (1.30 × 1.231)           |
+| `brakingDamping` (r3)  | 3.1011625      | Additive component after rank 3 cumulative (1.30 × 1.231 × 1.25)    |
+| Effective during burn  | 3.1            | Only `baseLinearDamping` applies during thrust                      |
+| Effective during coast | 6.2011625 (r3) | `baseLinearDamping + brakingDamping`; matches catalog "Total 2.00x" |
 
 **Regression lock:** `tests/modules/PlayerSystem.brake.test.js` asserts:
 
@@ -40,11 +40,11 @@ All three cases pass on first run; full Vitest suite (45 files, 317 tests) green
 
 ### Other mobility upgrades audited (per D-11)
 
-| Upgrade        | Event(s)                                                                                          | PlayerSystem handler              | Fights thrust?                                                                                                                                                                                                                                                                                                                                                                              | Action                                              |
-| -------------- | ------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| propulsors     | upgrade-acceleration-boost, upgrade-speed-boost, upgrade-thruster-visual, upgrade-ion-trail        | lines 342-352, 337-340            | **No** — multiplies `this.acceleration` (consumed inside the per-tick thrust block as `accelStep = this.acceleration * deltaTime`) and `this.maxSpeed` (a velocity ceiling clamp, not a per-tick drag). Neither field is added to the damping term.                                                                                                                                          | None                                                |
-| rcs_system     | upgrade-rotation-boost, upgrade-angular-damping, upgrade-rcs-visual, upgrade-strafe-movement       | lines 347-352, 355-361            | **No** — angular axis is gated separately at line 781 (`Math.exp(-this.angularDamping * deltaTime)`); rotation input always overrides because `this.angularVelocity += angularAccel` is applied **before** the damping term (line 778). Strafe-movement (rank 5) is not yet wired into PlayerSystem — pre-existing TODO, NOT a Phase 0 bug.                                                  | None for Phase 0. Strafe wiring → `backlog.md`     |
-| braking_system | upgrade-linear-damping, upgrade-braking-visual, upgrade-emergency-brake                            | lines 363-376 (fixed), 384-389    | **YES** (the FIX-02 bug). Emergency-brake (rank 3) wiring TBD; not exercised by current tests.                                                                                                                                                                                                                                                                                              | Fixed above. Emergency-brake → `backlog.md` if not already wired |
+| Upgrade        | Event(s)                                                                                     | PlayerSystem handler           | Fights thrust?                                                                                                                                                                                                                                                                                                                              | Action                                                           |
+| -------------- | -------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| propulsors     | upgrade-acceleration-boost, upgrade-speed-boost, upgrade-thruster-visual, upgrade-ion-trail  | lines 342-352, 337-340         | **No** — multiplies `this.acceleration` (consumed inside the per-tick thrust block as `accelStep = this.acceleration * deltaTime`) and `this.maxSpeed` (a velocity ceiling clamp, not a per-tick drag). Neither field is added to the damping term.                                                                                         | None                                                             |
+| rcs_system     | upgrade-rotation-boost, upgrade-angular-damping, upgrade-rcs-visual, upgrade-strafe-movement | lines 347-352, 355-361         | **No** — angular axis is gated separately at line 781 (`Math.exp(-this.angularDamping * deltaTime)`); rotation input always overrides because `this.angularVelocity += angularAccel` is applied **before** the damping term (line 778). Strafe-movement (rank 5) is not yet wired into PlayerSystem — pre-existing TODO, NOT a Phase 0 bug. | None for Phase 0. Strafe wiring → `backlog.md`                   |
+| braking_system | upgrade-linear-damping, upgrade-braking-visual, upgrade-emergency-brake                      | lines 363-376 (fixed), 384-389 | **YES** (the FIX-02 bug). Emergency-brake (rank 3) wiring TBD; not exercised by current tests.                                                                                                                                                                                                                                              | Fixed above. Emergency-brake → `backlog.md` if not already wired |
 
 **Conclusion:** The other mobility upgrades do NOT exhibit the same thrust-fighting
 pathology. FIX-02 is scoped to the `braking_system` / `upgrade-linear-damping`
@@ -93,18 +93,18 @@ Asteroids use an **orb-based** system: `XP_per_kill = orbCount × ORB_VALUE` whe
 derives from `baseOrbs × sizeFactor × variantMultiplier + waveBonus`. Non-asteroid
 enemies use a fixed `totalXP` per kill.
 
-| Enemy / variant | baseOrbs | sizeFactor / multiplier | XP per kill (wave 1, no bonus) | Source |
-|---|---|---|---|---|
-| asteroid_small_common | 1 | 1.0 × 1.0 | 5 (1 orb × 5 XP) | `src/data/enemies/asteroid-configs.js:651-668` + `RewardManager.js:164-183` |
-| asteroid_medium_common | 1 | 2.0 × 1.0 | 10 (2 orbs × 5 XP) | same |
-| asteroid_large_common | 1 | 3.0 × 1.0 | 15 (3 orbs × 5 XP) | same |
-| asteroid_small_iron | 1 | 1.0 × 2.53 ≈ 2.53 → round 3 | 15 (3 orbs × 5 XP) | `ASTEROID_VARIANTS.iron.orbMultiplier=2.53` |
-| asteroid_small_volatile | 1 | 1.0 × 5.46 → round 5 | 25 (5 orbs × 5 XP) | `ASTEROID_VARIANTS.volatile.orbMultiplier=5.46` |
-| asteroid_small_parasite | 1 | 1.0 × 8.1 → round 8 | 40 (8 orbs × 5 XP) | `ASTEROID_VARIANTS.parasite.orbMultiplier=8.1` |
-| drone | 2 | totalXP=30 | 30 | `src/data/enemies/drone.js DRONE_REWARDS` (RewardManager.js:188) |
-| mine | 1-2 | totalXP=25 | 25 | `src/data/enemies/mine.js MINE_REWARDS` (RewardManager.js:197) |
-| hunter | 3 | totalXP=50 | 50 | `src/data/enemies/hunter.js HUNTER_REWARDS` (RewardManager.js:214) |
-| boss | 10 | totalXP=500 | 500 | `src/data/enemies/boss.js BOSS_REWARDS` (RewardManager.js:223) |
+| Enemy / variant         | baseOrbs | sizeFactor / multiplier     | XP per kill (wave 1, no bonus) | Source                                                                      |
+| ----------------------- | -------- | --------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| asteroid_small_common   | 1        | 1.0 × 1.0                   | 5 (1 orb × 5 XP)               | `src/data/enemies/asteroid-configs.js:651-668` + `RewardManager.js:164-183` |
+| asteroid_medium_common  | 1        | 2.0 × 1.0                   | 10 (2 orbs × 5 XP)             | same                                                                        |
+| asteroid_large_common   | 1        | 3.0 × 1.0                   | 15 (3 orbs × 5 XP)             | same                                                                        |
+| asteroid_small_iron     | 1        | 1.0 × 2.53 ≈ 2.53 → round 3 | 15 (3 orbs × 5 XP)             | `ASTEROID_VARIANTS.iron.orbMultiplier=2.53`                                 |
+| asteroid_small_volatile | 1        | 1.0 × 5.46 → round 5        | 25 (5 orbs × 5 XP)             | `ASTEROID_VARIANTS.volatile.orbMultiplier=5.46`                             |
+| asteroid_small_parasite | 1        | 1.0 × 8.1 → round 8         | 40 (8 orbs × 5 XP)             | `ASTEROID_VARIANTS.parasite.orbMultiplier=8.1`                              |
+| drone                   | 2        | totalXP=30                  | 30                             | `src/data/enemies/drone.js DRONE_REWARDS` (RewardManager.js:188)            |
+| mine                    | 1-2      | totalXP=25                  | 25                             | `src/data/enemies/mine.js MINE_REWARDS` (RewardManager.js:197)              |
+| hunter                  | 3        | totalXP=50                  | 50                             | `src/data/enemies/hunter.js HUNTER_REWARDS` (RewardManager.js:214)          |
+| boss                    | 10       | totalXP=500                 | 500                            | `src/data/enemies/boss.js BOSS_REWARDS` (RewardManager.js:223)              |
 
 **Wave bonus per kill:** `RewardManager.js:271` — `wave ≤ 10 ? Math.floor(wave / 5) : ...`. Waves 1-4 add 0 extra orbs; Wave 5 adds +1 orb (= +5 XP per asteroid kill).
 
@@ -114,13 +114,13 @@ enemies use a fixed `totalXP` per kill.
 
 Source: `src/modules/enemies/managers/WaveManager.js:160-196` (waves 1-6 are static-config; waves 7+ are procedural). Waves 1-5 baseline configuration:
 
-| Wave | Composition | Per-enemy XP (common, no wave bonus) | Wave kill XP | Wave-complete bonus | Total expected XP |
-|---|---|---|---|---|---|
-| 1 | 4× small common asteroids | 5 | 20 | 60 | **80** |
-| 2 | 5× small common asteroids | 5 | 25 | 70 | **95** |
-| 3 | 6× small common asteroids | 5 | 30 | 80 | **110** |
-| 4 | 6× medium + 2× small common asteroids | 10 / 5 | 70 | 90 | **160** |
-| 5 | 7× medium + 2× small common asteroids | 15 / 10 (Wave-5 +1 orb bonus) | 125 | 100 | **225** |
+| Wave | Composition                           | Per-enemy XP (common, no wave bonus) | Wave kill XP | Wave-complete bonus | Total expected XP |
+| ---- | ------------------------------------- | ------------------------------------ | ------------ | ------------------- | ----------------- |
+| 1    | 4× small common asteroids             | 5                                    | 20           | 60                  | **80**            |
+| 2    | 5× small common asteroids             | 5                                    | 25           | 70                  | **95**            |
+| 3    | 6× small common asteroids             | 5                                    | 30           | 80                  | **110**           |
+| 4    | 6× medium + 2× small common asteroids | 10 / 5                               | 70           | 90                  | **160**           |
+| 5    | 7× medium + 2× small common asteroids | 15 / 10 (Wave-5 +1 orb bonus)        | 125          | 100                 | **225**           |
 
 Wave-5 medium asteroid XP = (2 base + 1 wave bonus) × 5 = 15 XP. Wave-5 small asteroid XP = (1 base + 1 wave bonus) × 5 = 10 XP. Totals: 7×15 + 2×10 = 125 enemy-kill XP, + 100 wave bonus = 225 XP.
 
@@ -128,14 +128,14 @@ Wave-5 medium asteroid XP = (2 base + 1 wave bonus) × 5 = 15 XP. Wave-5 small a
 
 ### Schedule comparison (proposed vs live-derived, common-only baseline)
 
-| Wave | Proposed | Live-derived (common baseline) | Variance |
-|---|---|---|---|
-| 1 | 60 | 80 | 33.3% |
-| 2 | 90 | 95 | 5.6% |
-| 3 | 130 | 110 | 15.4% |
-| 4 | 180 | 160 | 11.1% |
-| 5 | 240 | 225 | 6.3% |
-| **total** | **700** | **670** | **4.3%** |
+| Wave      | Proposed | Live-derived (common baseline) | Variance |
+| --------- | -------- | ------------------------------ | -------- |
+| 1         | 60       | 80                             | 33.3%    |
+| 2         | 90       | 95                             | 5.6%     |
+| 3         | 130      | 110                            | 15.4%    |
+| 4         | 180      | 160                            | 11.1%    |
+| 5         | 240      | 225                            | 6.3%     |
+| **total** | **700**  | **670**                        | **4.3%** |
 
 If variant procs are included (15% chance × expected orb-bonus), the live total rises toward ~720, total variance ≈ 2.9%. Either way the total is within ±15% of proposed.
 
@@ -169,14 +169,14 @@ doesn't model.
 ~1.5x multiplier to the common-only baseline to model the average combo
 state and conditional wave bonuses across a typical Wave 1-5 run:
 
-| Wave | common-only baseline | × 1.5 effective | rounded harness value |
-|---|---|---|---|
-| 1 | 80 | 120 | 120 |
-| 2 | 95 | 143 | 140 |
-| 3 | 110 | 165 | 165 |
-| 4 | 160 | 240 | 240 |
-| 5 | 225 | 338 | 335 |
-| **total** | **670** | **1006** | **1000** |
+| Wave      | common-only baseline | × 1.5 effective | rounded harness value |
+| --------- | -------------------- | --------------- | --------------------- |
+| 1         | 80                   | 120             | 120                   |
+| 2         | 95                   | 143             | 140                   |
+| 3         | 110                  | 165             | 165                   |
+| 4         | 160                  | 240             | 240                   |
+| 5         | 225                  | 338             | 335                   |
+| **total** | **670**              | **1006**        | **1000**              |
 
 **Refined Decision:** Task 1's harness uses `XP_PER_WAVE = [120, 140, 165, 240, 335]` (sum 1000 XP) — the common-only baseline ×1.5 to model the combo + conditional-bonus throughput that the deterministic scripted-grant path cannot reproduce. This is still LIVE-DERIVED (per Concern 1) — the 1.5x multiplier is the time-averaged effective XP-multiplier observed in `ProgressionSystem.collectXP` + `RewardManager.handleWaveRewards` over a typical Wave 1-5 run.
 
@@ -193,23 +193,23 @@ variability per D-13).
 
 ### Tuning iterations
 
-| Attempt | LEVEL_SCALING | INITIAL_XP | observedUpgrades | level-ups | decision |
-|---|---|---|---|---|---|
-| 0 (baseline, pre-fix, common-only 670 XP schedule) | 1.20 | 100 | 3 | 4 | Below band → reveal effective-XP gap; refine schedule to 1000 XP (combo + bonuses) |
-| 0b (baseline with refined 1000 XP schedule) | 1.20 | 100 | 4 | 6 | Below band; CONTEXT seeds are wrong-direction for harness (which lacks combo multiplier) |
-| 1 (CONTEXT seed) | 1.40 | 150 | 2 | 3 | Below band; CONTEXT seed bumps knobs UPWARD but harness needs DOWNWARD; reverse direction |
-| 2 (plan lower-bound bounds) | 1.30 | 120 | 3 | 4 | Below band; need to go below plan bounds — document override |
-| 3 | 1.20 | 80 | 4 | 6 | Below band; lower more |
-| 4 | 1.20 | 60 | 4 | 8 | Below band — level-ups happen but first-card-pick keeps hitting same upgrades |
-| 5 | 1.10 | 40 | 6 | 12 | **In band**; very low knob values — push slightly upward for live-play margin |
-| 6 | 1.15 | 40 | 6 | 11 | **In band** at low edge; observed distinct picks: Propulsores Principais, Sistema RCS, Plasma Gun, Multishot, Magnetic Field, Energy Shield |
-| 7 | 1.20 | 45 | 5 | 9 | Below band; revert to attempt 6 |
-| 8 | 1.20 | 40 | 5 | 9 | Below band |
-| 9 | 1.18 | 45 | 5 | 9 | Below band |
-| 10 | 1.10 | 50 | 6 | 11 | **In band** — alternative equilibrium |
-| ~~Final-v1~~ | ~~1.15~~ | ~~40~~ | ~~6~~ | ~~11~~ | ~~LOCKED~~ — **overridden 2026-05-13**, see post-playtest correction below |
-| 11 | 1.40 | 150 | 2 | ~6 | **In harness band [2,3] after recalibration** — projects live ≈ 6 via 3x ratio |
-| **Final-v2** | **1.40** | **150** | **2 (harness)** | **in band (live)** | **LOCKED — live verified 2026-05-13** |
+| Attempt                                            | LEVEL_SCALING | INITIAL_XP | observedUpgrades | level-ups          | decision                                                                                                                                    |
+| -------------------------------------------------- | ------------- | ---------- | ---------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 (baseline, pre-fix, common-only 670 XP schedule) | 1.20          | 100        | 3                | 4                  | Below band → reveal effective-XP gap; refine schedule to 1000 XP (combo + bonuses)                                                          |
+| 0b (baseline with refined 1000 XP schedule)        | 1.20          | 100        | 4                | 6                  | Below band; CONTEXT seeds are wrong-direction for harness (which lacks combo multiplier)                                                    |
+| 1 (CONTEXT seed)                                   | 1.40          | 150        | 2                | 3                  | Below band; CONTEXT seed bumps knobs UPWARD but harness needs DOWNWARD; reverse direction                                                   |
+| 2 (plan lower-bound bounds)                        | 1.30          | 120        | 3                | 4                  | Below band; need to go below plan bounds — document override                                                                                |
+| 3                                                  | 1.20          | 80         | 4                | 6                  | Below band; lower more                                                                                                                      |
+| 4                                                  | 1.20          | 60         | 4                | 8                  | Below band — level-ups happen but first-card-pick keeps hitting same upgrades                                                               |
+| 5                                                  | 1.10          | 40         | 6                | 12                 | **In band**; very low knob values — push slightly upward for live-play margin                                                               |
+| 6                                                  | 1.15          | 40         | 6                | 11                 | **In band** at low edge; observed distinct picks: Propulsores Principais, Sistema RCS, Plasma Gun, Multishot, Magnetic Field, Energy Shield |
+| 7                                                  | 1.20          | 45         | 5                | 9                  | Below band; revert to attempt 6                                                                                                             |
+| 8                                                  | 1.20          | 40         | 5                | 9                  | Below band                                                                                                                                  |
+| 9                                                  | 1.18          | 45         | 5                | 9                  | Below band                                                                                                                                  |
+| 10                                                 | 1.10          | 50         | 6                | 11                 | **In band** — alternative equilibrium                                                                                                       |
+| ~~Final-v1~~                                       | ~~1.15~~      | ~~40~~     | ~~6~~            | ~~11~~             | ~~LOCKED~~ — **overridden 2026-05-13**, see post-playtest correction below                                                                  |
+| 11                                                 | 1.40          | 150        | 2                | ~6                 | **In harness band [2,3] after recalibration** — projects live ≈ 6 via 3x ratio                                                              |
+| **Final-v2**                                       | **1.40**      | **150**    | **2 (harness)**  | **in band (live)** | **LOCKED — live verified 2026-05-13**                                                                                                       |
 
 ---
 
@@ -235,6 +235,7 @@ The v1 OVERRIDE rationale (lines 219–236) argued the harness was UNDER-countin
 - Full Vitest suite at HEAD: 47 files / 328 tests pass.
 
 **Final values:**
+
 - `PROGRESSION_LEVEL_SCALING = 1.15` (was 1.20)
 - `PROGRESSION_INITIAL_XP_REQUIREMENT = 40` (was 100)
 
@@ -305,6 +306,7 @@ if the live Wave-5 distinct-upgrade count falls outside [6, 8].**
 ### Count to report
 
 **Count the distinct UPGRADE CARDS picked, NOT the total level-ups.**
+
 - If you picked Propulsores Principais three times (ranks 1, 2, 3), that's
   **ONE** distinct upgrade.
 - If you picked Multishot once and Plasma Gun twice, that's **TWO** distinct
@@ -326,6 +328,7 @@ the observed count):
   BLOCKING, not deferred).
 
 After reporting `live-out-of-band: live_count=N`:
+
 - The executor will be resumed and will iterate the constants (typically
   UPWARD if N > 8, since the live game has more XP than the harness models).
 - The new constants will land in a follow-up commit on the same worktree
@@ -343,9 +346,6 @@ upgrade count falls outside [6, 8].
 - verdict: **(to be filled: LIVE_IN_BAND | LIVE_PARTIAL_RE-TUNE | LIVE_FAIL_RE-TUNE)**
 - follow-up action: **(to be filled: none | "re-tune knobs and re-run this checkpoint" | "re-tune knobs OR refine XP_PER_WAVE and re-run this checkpoint")**
 
-
-
-
 ---
 
 ## FIX-04 — Boss Curve
@@ -358,10 +358,10 @@ ROADMAP SC4.
 multiplied on top of the existing per-wave `healthScaling`. Two new constants
 added to `src/core/GameConstants.js`:
 
-| Constant | Starting value | Final value |
-|---|---|---|
-| `UPGRADE_BOSS_HEALTH_SCALAR` | 0.10 | **0.18** |
-| `UPGRADE_BOSS_DAMAGE_SCALAR` | 0.05 | **0.05** (unchanged) |
+| Constant                     | Starting value | Final value          |
+| ---------------------------- | -------------- | -------------------- |
+| `UPGRADE_BOSS_HEALTH_SCALAR` | 0.10           | **0.18**             |
+| `UPGRADE_BOSS_DAMAGE_SCALAR` | 0.05           | **0.05** (unchanged) |
 
 Injection site: `BossEnemy.initialize` (lines ~214-232 of
 `src/modules/enemies/types/BossEnemy.js`). Helper `_resolveUpgradeLevelSum`
@@ -370,12 +370,12 @@ explicit `config.upgradeLevelSum` for tests).
 
 ### Calibration iterations (headless harness `tests/integration/boss-curve.test.js`)
 
-| Attempt | HEALTH_SCALAR | DAMAGE_SCALAR | Stub fire rate | sum=6 killTime (s) | invulnSkipCount | sum=15 phases at 45s | Decision |
-|---|---|---|---|---|---|---|---|
-| 1 (D-17 seeds) | 0.10 | 0.05 | 15 Hz (`FIRE_INTERVAL_TICKS=4`) | 6.4 | 0 | 0 | Boss dies 10× too fast; stub fire rate is the dominant DPS lever, not the scalar. |
-| 2 | 0.10 | 0.05 | **2 Hz** (`FIRE_INTERVAL_TICKS=30`) | 48.0 | 0 | 1 | Realistic fire cadence; sum=6 now in the right order of magnitude, still 12s below band. |
-| 3 | **0.18** | 0.05 | 2 Hz | 62.5 | 0 | 1 | In band, but `invulnSkipCount=0` → stub wasn't ticking the boss (no phase transitions). |
-| 4 (Final) | **0.18** | 0.05 | 2 Hz | **66.5** | **8** | **2** | **LOCKED**. Stub now calls `boss.evaluatePhaseTransition()` + `boss.updateInvulnerability(dt)` per tick → real phase transitions, real invulnerability windows. |
+| Attempt        | HEALTH_SCALAR | DAMAGE_SCALAR | Stub fire rate                      | sum=6 killTime (s) | invulnSkipCount | sum=15 phases at 45s | Decision                                                                                                                                                        |
+| -------------- | ------------- | ------------- | ----------------------------------- | ------------------ | --------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 (D-17 seeds) | 0.10          | 0.05          | 15 Hz (`FIRE_INTERVAL_TICKS=4`)     | 6.4                | 0               | 0                    | Boss dies 10× too fast; stub fire rate is the dominant DPS lever, not the scalar.                                                                               |
+| 2              | 0.10          | 0.05          | **2 Hz** (`FIRE_INTERVAL_TICKS=30`) | 48.0               | 0               | 1                    | Realistic fire cadence; sum=6 now in the right order of magnitude, still 12s below band.                                                                        |
+| 3              | **0.18**      | 0.05          | 2 Hz                                | 62.5               | 0               | 1                    | In band, but `invulnSkipCount=0` → stub wasn't ticking the boss (no phase transitions).                                                                         |
+| 4 (Final)      | **0.18**      | 0.05          | 2 Hz                                | **66.5**           | **8**           | **2**                | **LOCKED**. Stub now calls `boss.evaluatePhaseTransition()` + `boss.updateInvulnerability(dt)` per tick → real phase transitions, real invulnerability windows. |
 
 **Stub tuning rationale:** `FIRE_INTERVAL_TICKS` was lowered from `4` to `30` in
 `tests/__helpers__/scriptedPlayer.js`. The original 15 Hz value was an order of

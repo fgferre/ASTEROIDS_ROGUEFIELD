@@ -49,10 +49,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const RESEARCH_DIR = path.join(PROJECT_ROOT, '.planning', 'research');
 const SCENARIOS = ['cold-open', 'mid-game', 'boss-arena', 'late-stress'];
 const ISO_DATE = new Date().toISOString().slice(0, 10);
-const OUTPUT_MD = path.join(
-  RESEARCH_DIR,
-  `profile-baseline-${ISO_DATE}.md`
-);
+const OUTPUT_MD = path.join(RESEARCH_DIR, `profile-baseline-${ISO_DATE}.md`);
 
 // Frame-budget verdict bands per CONTEXT D-11.
 // IMPORTANT: these are ADVISORY baselines for Phase 1, NOT gate values.
@@ -248,14 +245,16 @@ function verdict(avgFps) {
  * present" sentinel otherwise (CONTEXT D-14).
  */
 function extractFingerprint(sessionLogs) {
-  const first = Array.isArray(sessionLogs) && sessionLogs[0] ? sessionLogs[0] : null;
+  const first =
+    Array.isArray(sessionLogs) && sessionLogs[0] ? sessionLogs[0] : null;
   if (!first || typeof first !== 'object') return null;
   const hardware = first.hardware || first.fingerprint || null;
   const userAgent = first.userAgent || (hardware && hardware.userAgent) || null;
   const screen = first.screen || (hardware && hardware.screen) || null;
   const devicePixelRatio =
     first.devicePixelRatio || (hardware && hardware.devicePixelRatio) || null;
-  const initialHeap = first.initialHeap || (hardware && hardware.initialHeap) || null;
+  const initialHeap =
+    first.initialHeap || (hardware && hardware.initialHeap) || null;
 
   if (!userAgent && !screen && !devicePixelRatio && !initialHeap) {
     return null;
@@ -385,7 +384,7 @@ function emitMarkdown(reports) {
   lines.push('## Top-5 hot paths across all scenarios');
   lines.push('');
   lines.push(
-    'Aggregate of each phase\'s avg across every scenario that captured it. Per CONTEXT D-11 this is the overall hot-path inventory Phase 4.5 / 6a / 6b read.'
+    "Aggregate of each phase's avg across every scenario that captured it. Per CONTEXT D-11 this is the overall hot-path inventory Phase 4.5 / 6a / 6b read."
   );
   lines.push('');
   const overall = crossScenarioTop5(reports);

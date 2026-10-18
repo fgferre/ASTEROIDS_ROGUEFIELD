@@ -265,7 +265,7 @@ class GradientCache {
       key,
       radius * 2.5,
       radius * 2.5,
-      (canvasCtx, width, height) => {
+      (canvasCtx, width) => {
         const center = width / 2;
         const gradient = canvasCtx.createRadialGradient(
           center,
@@ -439,7 +439,7 @@ class GradientCache {
   preloadGradients(ctx) {
     const commonScales = [0.5, 1, 1.5, 2];
 
-    for (const [name, preset] of Object.entries(this.presets)) {
+    for (const [name] of Object.entries(this.presets)) {
       for (const scale of commonScales) {
         this.getPresetGradient(ctx, name, scale);
       }

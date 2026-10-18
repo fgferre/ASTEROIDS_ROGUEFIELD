@@ -1,8 +1,18 @@
 import {
   PROGRESSION_UPGRADE_ROLL_COUNT,
   PROGRESSION_UPGRADE_FALLBACK_COUNT,
+  PROGRESSION_UPGRADE_REROLLS_PER_RUN,
+  PROGRESSION_UPGRADE_BANISHES_PER_RUN,
+  UPGRADE_RARITIES,
+  UPGRADE_RARITY_BASE_WEIGHTS,
+  UPGRADE_RARITY_WEIGHT_PER_LEVEL,
+  UPGRADE_RARITY_WEIGHT_CAPS,
 } from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
+import {
+  UPGRADE_FAMILIES,
+  FAMILY_SYNERGY_THRESHOLD,
+} from '../data/upgrades/families.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
   MAGNETISM_FORCE,
@@ -18,6 +28,14 @@ const DEFAULT_UPGRADE_CATEGORY = {
   icon: '✨',
   themeColor: '#3399FF',
 };
+
+// Progression-owned numbers an upgrade effect may change directly.
+const PROGRESSION_SELF_PROPERTIES = new Set([
+  'comboTimeout',
+  'comboMultiplierStep',
+  'comboMultiplierCap',
+  'xpGainMultiplier',
+]);
 
 class UpgradeSystem extends BaseSystem {
   constructor(dependencies = {}, options = {}) {
@@ -48,12 +66,25 @@ class UpgradeSystem extends BaseSystem {
 
   initialize() {
     this.appliedUpgrades = new Map();
+    this.activeSynergies = new Set();
     this.pendingUpgradeOptions = [];
+    this.resetRunUpgradeActions();
     this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
     this.upgradeLookup = this.buildUpgradeLookup(this.upgradeDefinitions);
     this.upgradeCategoryMap = this.buildUpgradeCategoryMap(UPGRADE_CATEGORIES);
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.refreshInjectedServices({ force: true });
+  }
+
+  onReset() {
+    this.resetRunUpgradeActions();
+  }
+
+  // Per-run reroll/banish budget and the upgrades banished this run.
+  resetRunUpgradeActions() {
+    this.rerollsLeft = PROGRESSION_UPGRADE_REROLLS_PER_RUN;
+    this.banishesLeft = PROGRESSION_UPGRADE_BANISHES_PER_RUN;
+    this.banishedUpgrades = new Set();
   }
 
   refreshInjectedServices(options = {}) {
@@ -74,11 +105,11 @@ class UpgradeSystem extends BaseSystem {
   setupEventListeners() {
     this.refreshInjectedServices();
 
-    this.registerEventListener('progression-reset', (payload = {}) => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    this.registerEventListener('player-reset', (payload = {}) => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
   }
@@ -96,10 +127,12 @@ class UpgradeSystem extends BaseSystem {
   }
 
   // === SISTEMA DE UPGRADES ===
-  prepareUpgradeOptions(count = PROGRESSION_UPGRADE_ROLL_COUNT) {
-    const eligible = asArray(this.upgradeDefinitions).filter((definition) =>
-      this.isUpgradeSelectable(definition)
-    );
+  // `exclude`: ids drawn only if the rest of the pool runs out (reroll).
+  prepareUpgradeOptions(
+    count = PROGRESSION_UPGRADE_ROLL_COUNT,
+    { exclude = [] } = {}
+  ) {
+    const eligible = this.getEligibleUpgradeDefinitions();
 
     const fallbackCount = Number.isFinite(PROGRESSION_UPGRADE_FALLBACK_COUNT)
       ? Math.max(1, Math.floor(PROGRESSION_UPGRADE_FALLBACK_COUNT))
@@ -120,17 +153,18 @@ class UpgradeSystem extends BaseSystem {
       };
     }
 
-    let rng = this.randomForks?.selection || this.random;
-    if (!rng || typeof rng.int !== 'function') {
-      rng = this.random;
+    const preferred = eligible.filter(
+      (definition) => !exclude.includes(definition.id)
+    );
+    const selection = this.rollUpgradeDefinitions(preferred, cappedCount);
+    if (selection.length < cappedCount) {
+      const repeats = eligible.filter((definition) =>
+        exclude.includes(definition.id)
+      );
+      selection.push(
+        ...this.rollUpgradeDefinitions(repeats, cappedCount - selection.length)
+      );
     }
-
-    const pool = [...eligible];
-    for (let index = pool.length - 1; index > 0; index -= 1) {
-      const swapIndex = rng.int(0, index);
-      [pool[index], pool[swapIndex]] = [pool[swapIndex], pool[index]];
-    }
-    const selection = pool.slice(0, cappedCount);
     const options = selection
       .map((definition) => this.buildUpgradeOption(definition))
       .filter(Boolean);
@@ -144,6 +178,110 @@ class UpgradeSystem extends BaseSystem {
     };
   }
 
+  getEligibleUpgradeDefinitions() {
+    return asArray(this.upgradeDefinitions).filter((definition) =>
+      this.isUpgradeSelectable(definition)
+    );
+  }
+
+  // Chance of each rarity tier at a pilot level; sums to 1.
+  getRarityWeights(level = this.level) {
+    const levelsGained = Math.max(0, Math.floor(Number(level) || 1) - 1);
+    const shifted = (tier) =>
+      Math.min(
+        UPGRADE_RARITY_WEIGHT_CAPS[tier],
+        UPGRADE_RARITY_BASE_WEIGHTS[tier] +
+          UPGRADE_RARITY_WEIGHT_PER_LEVEL[tier] * levelsGained
+      );
+    const rare = shifted('rare');
+    const epic = shifted('epic');
+    return { common: 1 - rare - epic, rare, epic };
+  }
+
+  // Draws up to `count` distinct definitions: a tier by its rarity weight,
+  // then a card within it, so a tier's chance doesn't depend on its size.
+  rollUpgradeDefinitions(pool, count) {
+    let rng = this.randomForks?.selection || this.random;
+    if (!rng || typeof rng.weightedPick !== 'function') {
+      rng = this.random;
+    }
+
+    const weights = this.getRarityWeights();
+    const remaining = [...pool];
+    const picks = [];
+    while (picks.length < count && remaining.length > 0) {
+      const tierSizes = {};
+      remaining.forEach(({ rarity }) => {
+        tierSizes[rarity] = (tierSizes[rarity] || 0) + 1;
+      });
+      const index = rng.weightedPick(
+        remaining.map(({ rarity }, value) => ({
+          value,
+          weight: weights[rarity] / tierSizes[rarity],
+        }))
+      );
+      picks.push(remaining.splice(index, 1)[0]);
+    }
+    return picks;
+  }
+
+  // Replaces the offered cards with a fresh roll, avoiding the current ones
+  // when the pool allows. Returns the new options, or null when not allowed.
+  rerollUpgradeOptions() {
+    const current = asArray(this.pendingUpgradeOptions);
+    if (this.rerollsLeft <= 0 || current.length === 0) {
+      return null;
+    }
+
+    const { options, poolSize } = this.prepareUpgradeOptions(current.length, {
+      exclude: current.map((option) => option.id),
+    });
+    this.rerollsLeft -= 1;
+    this.eventBus?.emit?.('upgrade-rerolled', {
+      options,
+      poolSize,
+      rerollsLeft: this.rerollsLeft,
+      banishesLeft: this.banishesLeft,
+    });
+    return options;
+  }
+
+  // Removes an offered upgrade from the pool for the rest of the run and
+  // rerolls only its slot. Returns the new options, or null when not allowed.
+  banishUpgrade(upgradeId) {
+    const current = asArray(this.pendingUpgradeOptions);
+    const slot = current.findIndex((option) => option.id === upgradeId);
+    if (this.banishesLeft <= 0 || slot < 0) {
+      return null;
+    }
+
+    this.banishedUpgrades.add(upgradeId);
+    this.banishesLeft -= 1;
+
+    const eligible = this.getEligibleUpgradeDefinitions();
+    const offeredIds = current.map((option) => option.id);
+    const [replacement] = this.rollUpgradeDefinitions(
+      eligible.filter((definition) => !offeredIds.includes(definition.id)),
+      1
+    );
+    const options = [...current];
+    if (replacement) {
+      options[slot] = this.buildUpgradeOption(replacement);
+    } else {
+      options.splice(slot, 1);
+    }
+    this.pendingUpgradeOptions = options;
+
+    this.eventBus?.emit?.('upgrade-banished', {
+      upgradeId,
+      options,
+      poolSize: eligible.length,
+      rerollsLeft: this.rerollsLeft,
+      banishesLeft: this.banishesLeft,
+    });
+    return options;
+  }
+
   getRandomUpgrades(count = 3) {
     const { options } = this.prepareUpgradeOptions(count);
     return options;
@@ -151,6 +289,10 @@ class UpgradeSystem extends BaseSystem {
 
   isUpgradeSelectable(definition) {
     if (!definition || typeof definition !== 'object') {
+      return false;
+    }
+
+    if (this.banishedUpgrades.has(definition.id)) {
       return false;
     }
 
@@ -437,7 +579,9 @@ class UpgradeSystem extends BaseSystem {
       icon: definition.icon || '✨',
       themeColor: definition.themeColor || category.themeColor,
       category,
+      rarity: definition.rarity,
       tags: asArray(definition.tags),
+      family: this.describeFamilyProgress(definition),
       currentLevel,
       maxLevel,
       unlockLevel: definition.unlockLevel ?? null,
@@ -567,6 +711,10 @@ class UpgradeSystem extends BaseSystem {
     return {
       id,
       category: entry.category || entry.type || DEFAULT_UPGRADE_CATEGORY.id,
+      family: entry.family || null,
+      rarity: UPGRADE_RARITIES.includes(entry.rarity)
+        ? entry.rarity
+        : UPGRADE_RARITIES[0],
       icon: entry.icon || '✨',
       themeColor:
         entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,
@@ -671,7 +819,7 @@ class UpgradeSystem extends BaseSystem {
       summary: text.summary || '',
       lore: text.lore || '',
       levelText: {
-        title: levelText.title || levelData.title || `Nível ${levelIndex + 1}`,
+        title: levelText.title || levelData.title || `Level ${levelIndex + 1}`,
         description: levelText.description || levelData.description || '',
         highlights: asArray(
           levelText.highlights || levelData.highlights
@@ -786,9 +934,16 @@ class UpgradeSystem extends BaseSystem {
   }
 
   applyUpgradeEffects(definition, levelDefinition, newLevel) {
-    const effects = asArray(levelDefinition?.effects);
+    this.applyEffectList(levelDefinition?.effects, {
+      upgradeId: definition.id,
+      level: newLevel,
+      category: definition.category,
+    });
+    this.syncSynergies();
+  }
 
-    effects.forEach((effect) => {
+  applyEffectList(effects, context) {
+    asArray(effects).forEach((effect) => {
       if (!effect || typeof effect !== 'object') {
         return;
       }
@@ -801,13 +956,10 @@ class UpgradeSystem extends BaseSystem {
       }
 
       if (type === 'event' && typeof effect.event === 'string') {
-        const payload = {
+        this.eventBus?.emit?.(effect.event, {
           ...(effect.payload || {}),
-          upgradeId: definition.id,
-          level: newLevel,
-          category: definition.category,
-        };
-        this.eventBus?.emit?.(effect.event, payload);
+          ...context,
+        });
         return;
       }
 
@@ -816,6 +968,69 @@ class UpgradeSystem extends BaseSystem {
         type
       );
     });
+  }
+
+  // === FAMILIES AND SYNERGIES ===
+  getFamilyCounts() {
+    const counts = {};
+    Object.keys(UPGRADE_FAMILIES).forEach((id) => {
+      counts[id] = 0;
+    });
+    this.appliedUpgrades.forEach((level, upgradeId) => {
+      const family = this.upgradeLookup?.get(upgradeId)?.family;
+      if (level > 0 && family in counts) {
+        counts[family] += 1;
+      }
+    });
+    return counts;
+  }
+
+  // Switches on every family bonus whose threshold is met and is not on yet.
+  syncSynergies() {
+    const counts = this.getFamilyCounts();
+    Object.values(UPGRADE_FAMILIES).forEach((family) => {
+      if (
+        counts[family.id] < FAMILY_SYNERGY_THRESHOLD ||
+        this.activeSynergies.has(family.id)
+      ) {
+        return;
+      }
+      this.activeSynergies.add(family.id);
+      this.applyEffectList(family.bonus.effects, {
+        synergy: family.id,
+        level: 1,
+      });
+      this.eventBus?.emit?.('synergy-unlocked', {
+        family: family.id,
+        familyName: family.name,
+        name: family.bonus.name,
+        description: family.bonus.description,
+        color: family.color,
+      });
+    });
+  }
+
+  describeFamilyProgress(definition) {
+    const family = UPGRADE_FAMILIES[definition.family];
+    if (!family) {
+      return null;
+    }
+    const owned = this.getFamilyCounts()[family.id];
+    const isNewToFamily = this.getUpgradeCount(definition.id) === 0;
+    return {
+      id: family.id,
+      name: family.name,
+      color: family.color,
+      bonusName: family.bonus.name,
+      bonusDescription: family.bonus.description,
+      owned,
+      required: FAMILY_SYNERGY_THRESHOLD,
+      active: this.activeSynergies.has(family.id),
+      completesSynergy:
+        isNewToFamily &&
+        !this.activeSynergies.has(family.id) &&
+        owned + 1 === FAMILY_SYNERGY_THRESHOLD,
+    };
   }
 
   applyProgressionEffect(effect) {
@@ -830,13 +1045,6 @@ class UpgradeSystem extends BaseSystem {
     }
 
     const operation = effect.operation || 'set';
-    this.refreshInjectedServices();
-    const xpSystem = this.xpOrbsService;
-
-    if (!xpSystem) {
-      return;
-    }
-
     const applyNumericOperation = (current, modifier) => {
       switch (operation) {
         case 'multiply':
@@ -848,6 +1056,18 @@ class UpgradeSystem extends BaseSystem {
           return modifier;
       }
     };
+
+    if (PROGRESSION_SELF_PROPERTIES.has(property)) {
+      this[property] = applyNumericOperation(this[property], value);
+      return;
+    }
+
+    this.refreshInjectedServices();
+    const xpSystem = this.xpOrbsService;
+
+    if (!xpSystem) {
+      return;
+    }
 
     if (property === 'orbMagnetismRadius') {
       const current =
@@ -883,7 +1103,19 @@ class UpgradeSystem extends BaseSystem {
     return Array.from(this.appliedUpgrades.entries()).map(([id, level]) => ({
       id,
       level,
+      family: this.upgradeLookup?.get(id)?.family || null,
     }));
+  }
+
+  // Distinct upgrades per family and the bonuses already on (game over build list).
+  getSynergySnapshot() {
+    return {
+      families: this.getFamilyCounts(),
+      synergies: Array.from(this.activeSynergies).map((id) => ({
+        family: id,
+        name: UPGRADE_FAMILIES[id].bonus.name,
+      })),
+    };
   }
 }
 

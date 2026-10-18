@@ -1,51 +1,6 @@
 // src/data/enemies/boss.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
-import retroSaucerSvgRaw from '../../../assets/inpirational mockups/retro saucer.svg?raw';
-
-// === BOSS VISUAL VARIANT ===
-// Single source of truth for boss visual selection.
-// 'retro-saucer' — SVG sprite (default)
-// 'procedural'   — legacy procedural circles
-export const BOSS_VISUAL_VARIANT = 'retro-saucer';
-
-// --- SVG sanitization & data URL (mirrors shipModels.js pattern) ---
-
-const sanitizeSvgMarkup = (raw) => {
-  if (typeof raw !== 'string') return '';
-  return raw.replace(/^<\?xml[^>]*>\s*/i, '').trim().replace(/\r\n/g, '\n');
-};
-
-const createBossSvgDataUrl = (svgMarkup) => {
-  const sanitized = sanitizeSvgMarkup(svgMarkup);
-  if (!sanitized) return '';
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sanitized)}`;
-};
-
-const _bossSvgDataUrl = createBossSvgDataUrl(retroSaucerSvgRaw);
-
-/**
- * SVG sprite visual config for the retro saucer boss.
- * Only consumed when BOSS_VISUAL_VARIANT === 'retro-saucer'.
- */
-export const BOSS_VISUAL_CONFIG = deepFreeze({
-  type: 'svg-sprite',
-  source: _bossSvgDataUrl,
-  // Tuned to match boss radius=60 footprint (~120px collision diameter).
-  // SVG viewBox is 636×698 (aspect ~0.911). Sprite slightly exceeds hitbox for visual presence.
-  width: 140,
-  height: 154,
-  rotation: 0,
-  offset: { x: 0, y: 0 },
-  // Normalized crop — the SVG has no opaque background but may have margin from the clip-path.
-  // TBD: fine-tune after runtime visual inspection.
-  sourceBounds: { x: 0.0, y: 0.0, width: 1.0, height: 1.0 },
-  glowColor: 'rgba(255, 120, 90, 0.25)',
-  shadowBlur: 14,
-});
-
-const _resolvedRenderStrategy =
-  BOSS_VISUAL_VARIANT === 'retro-saucer' ? 'svg-sprite-boss' : 'procedural-boss';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -106,7 +61,7 @@ const _resolvedRenderStrategy =
  */
 const _bossConfigBase = {
   key: 'boss',
-  displayName: 'Apex Overlord',
+  displayName: 'Warden Prime',
   radius: 60,
   safeDistance: 240,
   entryPadding: 24,
@@ -153,13 +108,12 @@ export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
 
 /**
  * Component configuration that assembles the boss enemy from modular behaviors.
- * Movement, weapon patterns, rendering, collision and health management are
- * delegated to reusable components defined here so the boss class can focus on
- * phase orchestration and minion control.
+ * Movement, rendering, collision and health management are delegated to
+ * reusable components defined here; the boss class owns its attacks (fan,
+ * volley, charge with telegraphs) and minion control per phase.
  *
  * @typedef {object} BossComponents
  * @property {object} movement - Seeking movement strategy configuration
- * @property {object} weapon - Multi-pattern weapon configuration
  * @property {object} render - Procedural boss renderer tuning
  * @property {object} collision - Collision radius/response parameters
  * @property {object} health - Health/armor/phase configuration
@@ -194,32 +148,11 @@ export const BOSS_COMPONENTS = deepFreeze({
       minDistance: 90,
     },
   ],
-  weapon: {
-    patterns: ['spread', 'volley'],
-    spread: {
-      projectileCount: 7,
-      speed: 260,
-      cooldown: 2.4,
-      variance: 0.45,
-      arc: 0.85,
-      angleVariance: 0.12,
-    },
-    volley: {
-      burstSize: 5,
-      shotDelay: 0.16,
-      cooldown: 1.35,
-      variance: 0.2,
-      speed: 320,
-      spread: 0.12,
-    },
-    damage: 35,
-  },
+  // Warden Prime (docs/NORTE.md §3): segmented ring around a violet core,
+  // drawn by RenderComponent's 'boss' look.
   render: {
-    strategy: _resolvedRenderStrategy,
+    strategy: 'procedural-boss',
     shape: 'boss',
-    showAura: true,
-    showPhaseColor: true,
-    visual: BOSS_VISUAL_VARIANT === 'retro-saucer' ? BOSS_VISUAL_CONFIG : null,
   },
   collision: {
     shape: 'circle',

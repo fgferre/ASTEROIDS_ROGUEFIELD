@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties -- benchmark/validation script: synthetic load data, not gameplay; determinism not required */
 // Performance baseline measurement script
 // Run this before implementing Phase 1 optimizations
 
@@ -405,7 +406,7 @@ if (typeof window !== 'undefined') {
 if (typeof require !== 'undefined' && require.main === module) {
   (async () => {
     const baseline = new PerformanceBaseline();
-    const results = await baseline.runAllBenchmarks();
+    await baseline.runAllBenchmarks();
     baseline.saveResults();
 
     console.log('\n🎯 PERFORMANCE TARGETS FOR PHASE 1:');

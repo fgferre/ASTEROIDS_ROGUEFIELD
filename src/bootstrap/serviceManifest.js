@@ -6,12 +6,15 @@ import { EnemySystem } from '../modules/EnemySystem.js';
 import PhysicsSystem from '../modules/PhysicsSystem.js';
 import XPOrbSystem from '../modules/XPOrbSystem.js';
 import HealthHeartSystem from '../modules/collectibles/HealthHeartSystem.js';
+import PickupSystem from '../modules/collectibles/PickupSystem.js';
 import ProgressionSystem from '../modules/ProgressionSystem.js';
 import UISystem from '../modules/UISystem.js';
 import EffectsSystem from '../modules/EffectsSystem.js';
 import AudioSystem from '../modules/AudioSystem.js';
 import WorldSystem from '../modules/WorldSystem.js';
 import RenderingSystem from '../modules/RenderingSystem.js';
+import Renderer3D from '../modules/render3d/Renderer3D.js';
+import { getRendererMode } from '../modules/render3d/rendererMode.js';
 import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
@@ -504,6 +507,28 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
+      name: 'pickups',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'xp-orbs',
+        'enemies',
+        'effects',
+        'random',
+      ],
+      factory: ({ resolved }) =>
+        new PickupSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          'xp-orbs': resolved['xp-orbs'],
+          enemies: resolved['enemies'],
+          effects: resolved['effects'],
+          random: resolved['random'],
+        }),
+    },
+    {
       name: 'enemy-spawn',
       singleton: true,
       lazy: true,
@@ -645,34 +670,6 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
-      name: 'renderer',
-      singleton: true,
-      lazy: false,
-      dependencies: [
-        'event-bus',
-        'player',
-        'progression',
-        'xp-orbs',
-        'healthHearts',
-        'effects',
-        'combat',
-        'enemies',
-        'random',
-      ],
-      factory: ({ resolved }) =>
-        new RenderingSystem({
-          eventBus: resolved['event-bus'],
-          player: resolved['player'],
-          progression: resolved['progression'],
-          'xp-orbs': resolved['xp-orbs'],
-          healthHearts: resolved['healthHearts'],
-          effects: resolved['effects'],
-          combat: resolved['combat'],
-          enemies: resolved['enemies'],
-          random: resolved['random'],
-        }),
-    },
-    {
       name: 'menu-background',
       singleton: true,
       lazy: false,
@@ -684,6 +681,44 @@ export function createServiceManifest(context = {}) {
           settings: resolved['settings'],
           random: resolved['random'],
           serviceResolver,
+        });
+      },
+    },
+    {
+      name: 'renderer',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'progression',
+        'xp-orbs',
+        'healthHearts',
+        'pickups',
+        'effects',
+        'combat',
+        'enemies',
+        'random',
+        'menu-background',
+      ],
+      // docs/NORTE.md §4b: Three.js by default, `?renderer=2d` for Canvas 2D.
+      factory: ({ resolved }) => {
+        const Renderer =
+          (context.rendererMode ?? getRendererMode()) === '3d'
+            ? Renderer3D
+            : RenderingSystem;
+        return new Renderer({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          progression: resolved['progression'],
+          'xp-orbs': resolved['xp-orbs'],
+          healthHearts: resolved['healthHearts'],
+          pickups: resolved['pickups'],
+          effects: resolved['effects'],
+          combat: resolved['combat'],
+          enemies: resolved['enemies'],
+          random: resolved['random'],
+          'menu-background': resolved['menu-background'],
         });
       },
     },

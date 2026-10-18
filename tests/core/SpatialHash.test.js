@@ -1,6 +1,9 @@
 // src/__tests__/core/SpatialHash.test.js
 import { describe, it, expect, beforeAll } from 'vitest';
 import { SpatialHash } from '../../src/core/SpatialHash.js';
+import RandomService from '../../src/core/RandomService.js';
+
+const testRandom = new RandomService('spatial-hash-test');
 
 describe('SpatialHash', () => {
   const createFixture = () => ({
@@ -569,7 +572,7 @@ describe('SpatialHash', () => {
       }
 
       const startTime = performance.now();
-      const collisions = spatialHash.findAllCollisions();
+      spatialHash.findAllCollisions();
       const endTime = performance.now();
 
       expect(endTime - startTime).toBeLessThan(50); // Should be fast
@@ -584,8 +587,8 @@ describe('SpatialHash', () => {
       for (let i = 0; i < 1000; i++) {
         spatialHash.insert(
           { id: `obj${i}` },
-          Math.random() * 1000,
-          Math.random() * 1000,
+          testRandom.float() * 1000,
+          testRandom.float() * 1000,
           5
         );
       }

@@ -1,465 +1,830 @@
+// Enemy looks (docs/NORTE.md §3): matte machines of the Ring, lit by the
+// fixed key light, whose only light is energy — eyes, lenses, arcs, the
+// Warden core — plus a 1 px threat rim drawn into the bloom layer only (the
+// readability exception in NORTE §2).
+//
+// Each look bakes its matte body and its static light once per
+// (shape, size, phase, render scale) into shared offscreen canvases; what
+// moves (lens telegraph, arcs, core pulse, shield) is drawn live on top.
+
+import { getRenderScale } from '../../../core/viewport.js';
+import { getEmissive } from '../../../core/bloomLayer.js';
 import {
-  ENEMY_EFFECT_COLORS,
-  ENEMY_RENDER_PRESETS,
-} from '../../../data/constants/visual.js';
+  KEY_LIGHT_ANGLE,
+  KEY_LIGHT_DIR,
+  LINE,
+  PALETTE,
+  withAlpha,
+} from '../../../data/constants/palette.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
 
 const TAU = Math.PI * 2;
-
-const resolvePalette = (enemy) => {
-  if (!enemy?.type) {
-    return {};
-  }
-  const colors = ENEMY_EFFECT_COLORS?.[enemy.type];
-  return colors ?? {};
-};
-
-const resolvePresets = (enemy) => {
-  if (!enemy?.type) {
-    return {};
-  }
-  const presets = ENEMY_RENDER_PRESETS?.[enemy.type];
-  return presets ?? {};
-};
 
 const clamp01 = (value) =>
   Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 
-const resolveBossPhaseColor = ({ enemy, colors, presets, config }) => {
-  const showPhaseColor = config?.showPhaseColor !== false;
-  if (!showPhaseColor) {
-    return null;
-  }
+const enemyTime = (enemy) => enemy?.system?.time ?? performance.now() / 1000;
 
-  const rawPhaseIndex =
+// Hit flash (docs/NORTE.md §2): the body goes white on damage and fades,
+// with a fainter copy in the bloom layer. PROPOSAL 17/10 (was none).
+export const HIT_FLASH_BODY_ALPHA = 0.85;
+export const HIT_FLASH_EMISSIVE_ALPHA = 0.4;
+
+// A white copy of a baked body, same size and alpha mask.
+export const whiteSilhouette = (source) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(source, 0, 0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = PALETTE.text;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  return canvas;
+};
+
+// Matte metal lit from the key light: bright toward it, dark opposite.
+const litFill = (ctx, radius) => {
+  const gradient = ctx.createRadialGradient(
+    KEY_LIGHT_DIR.x * radius * 0.5,
+    KEY_LIGHT_DIR.y * radius * 0.5,
+    0,
+    0,
+    0,
+    radius * 1.15
+  );
+  gradient.addColorStop(0, PALETTE.hullLit);
+  gradient.addColorStop(0.55, PALETTE.hull);
+  gradient.addColorStop(1, PALETTE.rockShadow);
+  return gradient;
+};
+
+// Bevel: a lit arc on the key side of a round edge.
+const bevel = (ctx, radius, alpha = 0.7) => {
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, KEY_LIGHT_ANGLE - 1.1, KEY_LIGHT_ANGLE + 1.1);
+  ctx.strokeStyle = withAlpha(PALETTE.rockLit, alpha);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+};
+
+const darkEdge = (ctx) => {
+  ctx.strokeStyle = PALETTE.rockShadow;
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+};
+
+// An elite's energy burns gold instead of threat red (docs/NORTE.md §2).
+const accentOf = (enemy) => (enemy?.elite ? PALETTE.xp : PALETTE.threat);
+
+const threatRim = (ctx, color = PALETTE.threat) => {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+};
+
+// Deterministic flicker without touching any gameplay random stream.
+const hash = (n) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// --- Mote (drone): matte disc with one red eye --------------------------
+
+const mote = {
+  facing: () => 0, // round body: keep the baked light fixed, turn the eye
+  body(ctx, size) {
+    const r = size * 0.85;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fillStyle = litFill(ctx, r);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, r - 0.9);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.58, 0, TAU);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.7);
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+    bevel(ctx, r * 0.58 + 0.75, 0.35);
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.85 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const r = size * 0.85;
+    const angle = enemy.rotation ?? 0;
+    const ex = Math.cos(angle) * r * 0.38;
+    const ey = Math.sin(angle) * r * 0.38;
+    const eye = r * 0.2;
+    if (!emissive) {
+      ctx.beginPath();
+      ctx.arc(ex, ey, eye * 1.5, 0, TAU);
+      ctx.fillStyle = PALETTE.rockShadow;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(ex, ey, emissive ? eye * 1.4 : eye, 0, TAU);
+    ctx.fillStyle = accentOf(enemy);
+    ctx.fill();
+  },
+};
+
+// --- Seeker (hunter): elongated hull, frontal lens telegraphs the burst --
+
+const seekerHull = (ctx, size) => {
+  const half = size * 0.75; // 24 px long at the default radius of 16
+  const w = size * 0.375; // 12 px wide
+  ctx.beginPath();
+  ctx.moveTo(half, 0);
+  ctx.quadraticCurveTo(half * 0.55, w, half * 0.05, w);
+  ctx.lineTo(-half, w * 0.62);
+  ctx.lineTo(-half * 0.74, 0);
+  ctx.lineTo(-half, -w * 0.62);
+  ctx.lineTo(half * 0.05, -w);
+  ctx.quadraticCurveTo(half * 0.55, -w, half, 0);
+  ctx.closePath();
+};
+
+const seeker = {
+  facing: (enemy) => enemy.aimAngle ?? enemy.rotation ?? 0,
+  body(ctx, size) {
+    const half = size * 0.75;
+    const w = size * 0.375;
+    seekerHull(ctx, size);
+    ctx.fillStyle = litFill(ctx, half);
+    ctx.fill();
+    darkEdge(ctx);
+    // spine and a lit dorsal panel
+    ctx.beginPath();
+    ctx.moveTo(-half * 0.7, 0);
+    ctx.lineTo(half * 0.3, 0);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-half * 0.85, -w * 0.5);
+    ctx.lineTo(half * 0.05, -w * 0.82);
+    ctx.strokeStyle = withAlpha(PALETTE.rockLit, 0.45);
+    ctx.stroke();
+    // lens socket
+    ctx.beginPath();
+    ctx.arc(half * 0.48, 0, w * 0.3, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    seekerHull(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const half = size * 0.75;
+    const w = size * 0.375;
+    const charge = clamp01(enemy.telegraphRatio);
+    const lens = w * 0.2;
+    ctx.beginPath();
+    ctx.arc(half * 0.48, 0, lens * (emissive ? 1 + charge * 1.6 : 1), 0, TAU);
+    ctx.fillStyle = withAlpha(accentOf(enemy), 0.3 + charge * 0.7);
+    ctx.fill();
+    if (charge > 0.5) {
+      ctx.beginPath();
+      ctx.arc(half * 0.48, 0, lens * 0.5, 0, TAU);
+      ctx.fillStyle = withAlpha(PALETTE.text, (charge - 0.5) * 1.6);
+      ctx.fill();
+    }
+  },
+};
+
+// --- Tether (mine): dark core, three struts, arcs between tips when armed --
+
+const STRUT_ANGLES = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6];
+
+const strutTip = (size, angle) => ({
+  x: Math.cos(angle) * size * 0.95,
+  y: Math.sin(angle) * size * 0.95,
+});
+
+const tether = {
+  facing: () => 0,
+  body(ctx, size) {
+    const core = size * 0.42;
+    for (const angle of STRUT_ANGLES) {
+      const tip = strutTip(size, angle);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * core * 0.8, Math.sin(angle) * core * 0.8);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.strokeStyle = PALETTE.rockShadow;
+      ctx.lineWidth = 3.2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.strokeStyle = PALETTE.hullLit;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 1.9, 0, TAU);
+      ctx.fillStyle = PALETTE.hull;
+      ctx.fill();
+      darkEdge(ctx);
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, core, 0, TAU);
+    ctx.fillStyle = litFill(ctx, core);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, core - 0.8);
+    ctx.beginPath();
+    ctx.arc(0, 0, core * 0.35, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+    for (const angle of STRUT_ANGLES) {
+      const tip = strutTip(size, angle);
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 2.4, 0, TAU);
+      threatRim(ctx, accentOf(enemy));
+    }
+  },
+  live(ctx, size, enemy, emissive) {
+    const pulse = 0.5 + 0.5 * Math.sin(enemy.pulsePhase ?? 0);
+    const armed = Boolean(enemy.armed);
+    const accent = accentOf(enemy);
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42 * 0.22, 0, TAU);
+    ctx.fillStyle = withAlpha(accent, armed ? 0.6 + pulse * 0.4 : 0.25);
+    ctx.fill();
+    if (!armed) return;
+
+    const frame = Math.floor(enemyTime(enemy) * 18);
+    const seed = (enemy.id ? String(enemy.id).length * 7 : 0) + frame;
+    ctx.strokeStyle = withAlpha(accent, 0.45 + pulse * 0.55);
+    ctx.lineWidth = emissive ? 1.4 : 0.9;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < STRUT_ANGLES.length; i += 1) {
+      const a = strutTip(size, STRUT_ANGLES[i]);
+      const b = strutTip(size, STRUT_ANGLES[(i + 1) % STRUT_ANGLES.length]);
+      const nx = -(b.y - a.y);
+      const ny = b.x - a.x;
+      const len = Math.hypot(nx, ny) || 1;
+      const segments = 2 + Math.floor(hash(seed + i * 13) * 2);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      for (let s = 1; s < segments; s += 1) {
+        const t = s / segments;
+        // bow the arc outward a little, then jitter it
+        const off = (0.12 + (hash(seed + i * 31 + s) - 0.5) * 0.35) * len;
+        ctx.lineTo(
+          a.x + (b.x - a.x) * t + (nx / len) * off * 0.5,
+          a.y + (b.y - a.y) * t + (ny / len) * off * 0.5
+        );
+      }
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  },
+};
+
+// --- Husk: cracked matte shell, red seams brighten as it nears death -----
+
+// Shell outline (radius factors) and seam polylines, in units of size.
+const HUSK_SHELL = [1, 0.9, 0.97, 0.86, 0.95, 0.9, 1, 0.87, 0.94];
+const HUSK_SEAMS = [
+  [
+    [0.05, -0.1],
+    [0.32, -0.28],
+    [0.48, -0.22],
+    [0.8, -0.45],
+  ],
+  [
+    [0.02, 0.05],
+    [-0.25, 0.3],
+    [-0.3, 0.55],
+    [-0.52, 0.72],
+  ],
+  [
+    [-0.05, -0.02],
+    [-0.38, -0.12],
+    [-0.62, -0.38],
+  ],
+  [
+    [0.1, 0.12],
+    [0.42, 0.34],
+    [0.58, 0.66],
+  ],
+];
+
+const huskShell = (ctx, size) => {
+  const r = size * 0.95;
+  ctx.beginPath();
+  HUSK_SHELL.forEach((k, i) => {
+    const a = (i / HUSK_SHELL.length) * TAU;
+    const x = Math.cos(a) * r * k;
+    const y = Math.sin(a) * r * k;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+};
+
+const huskSeams = (ctx, size) => {
+  ctx.beginPath();
+  for (const seam of HUSK_SEAMS) {
+    seam.forEach(([x, y], i) => {
+      if (i === 0) ctx.moveTo(x * size, y * size);
+      else ctx.lineTo(x * size, y * size);
+    });
+  }
+};
+
+const husk = {
+  facing: () => 0,
+  body(ctx, size) {
+    huskShell(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, size * 0.86, 0.5);
+    huskSeams(ctx, size);
+    ctx.strokeStyle = PALETTE.rockShadow;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  },
+  glow(ctx, size, enemy) {
+    huskShell(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const heat = clamp01(enemy.damageRatio);
+    huskSeams(ctx, size);
+    ctx.strokeStyle = withAlpha(accentOf(enemy), 0.15 + heat * 0.85);
+    ctx.lineWidth = emissive ? 1 + heat * 1.6 : 0.8;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  },
+};
+
+// --- Ram: arrowhead hull, one lens that brightens through the windup -----
+
+const ramHull = (ctx, size) => {
+  ctx.beginPath();
+  ctx.moveTo(size * 1.1, 0);
+  ctx.lineTo(-size * 0.8, size * 0.75);
+  ctx.lineTo(-size * 0.42, 0);
+  ctx.lineTo(-size * 0.8, -size * 0.75);
+  ctx.closePath();
+};
+
+const ram = {
+  facing: (enemy) => enemy.rotation ?? 0,
+  body(ctx, size) {
+    ramHull(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    darkEdge(ctx);
+    // keel line and the lens socket
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.42, 0);
+    ctx.lineTo(size * 0.25, 0);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(size * 0.45, 0, size * 0.18, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ramHull(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const charge = clamp01(enemy.telegraphRatio);
+    const lens = size * 0.12;
+    ctx.beginPath();
+    ctx.arc(size * 0.45, 0, lens * (emissive ? 1 + charge * 1.8 : 1), 0, TAU);
+    ctx.fillStyle = withAlpha(accentOf(enemy), 0.3 + charge * 0.7);
+    ctx.fill();
+    if (charge > 0.5) {
+      ctx.beginPath();
+      ctx.arc(size * 0.45, 0, lens * 0.5, 0, TAU);
+      ctx.fillStyle = withAlpha(PALETTE.text, (charge - 0.5) * 1.6);
+      ctx.fill();
+    }
+  },
+};
+
+// --- Weaver: small hub, three thin arms that spin; tips flare on laying --
+
+const WEAVER_ARMS = 3;
+
+const weaverArm = (ctx, size, angle) => {
+  const bend = 0.55; // arms trail the spin a little
+  ctx.beginPath();
+  ctx.moveTo(Math.cos(angle) * size * 0.3, Math.sin(angle) * size * 0.3);
+  ctx.quadraticCurveTo(
+    Math.cos(angle - bend * 0.5) * size * 0.75,
+    Math.sin(angle - bend * 0.5) * size * 0.75,
+    Math.cos(angle - bend) * size,
+    Math.sin(angle - bend) * size
+  );
+};
+
+const weaver = {
+  facing: () => 0, // the hub is round; the arms turn in live()
+  body(ctx, size) {
+    const hub = size * 0.34;
+    ctx.beginPath();
+    ctx.arc(0, 0, hub, 0, TAU);
+    ctx.fillStyle = litFill(ctx, hub);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, hub - 0.8);
+    ctx.beginPath();
+    ctx.arc(0, 0, hub * 0.4, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.34 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const accent = accentOf(enemy);
+    const lay = clamp01(enemy.layGlow);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < WEAVER_ARMS; i += 1) {
+      const angle = (enemy.spin ?? 0) + (i * TAU) / WEAVER_ARMS;
+      const tipAngle = angle - 0.55;
+      const tx = Math.cos(tipAngle) * size;
+      const ty = Math.sin(tipAngle) * size;
+      if (!emissive) {
+        weaverArm(ctx, size, angle);
+        ctx.strokeStyle = PALETTE.rockShadow;
+        ctx.lineWidth = 2.6;
+        ctx.stroke();
+        ctx.strokeStyle = PALETTE.hullLit;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      if (lay > 0) {
+        weaverArm(ctx, size, angle);
+        ctx.strokeStyle = withAlpha(accent, lay * 0.85);
+        ctx.lineWidth = emissive ? 1.6 : 0.8;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(tx, ty, emissive ? 1.8 + lay * 1.5 : 1.3, 0, TAU);
+      ctx.fillStyle = withAlpha(accent, 0.4 + lay * 0.6);
+      ctx.fill();
+    }
+  },
+};
+
+// --- Bulwark: squat hull behind a wide frontal plate; only the rim glows --
+
+const bulwarkPlate = (ctx, size, halfArc) => {
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 1.02, -halfArc, halfArc);
+  ctx.arc(0, 0, size * 0.8, halfArc, -halfArc, true);
+  ctx.closePath();
+};
+
+const bulwark = {
+  facing: () => 0, // the hull is round; the plate turns in live()
+  body(ctx, size) {
+    const r = size * 0.72;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fillStyle = litFill(ctx, r);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, r - 0.9);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, 0, TAU);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.72 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const broken = Boolean(enemy.shieldBroken);
+    ctx.save();
+    ctx.rotate(enemy.facing ?? 0);
+    if (!emissive) {
+      bulwarkPlate(ctx, size, BULWARK_SHIELD_HALF_ARC);
+      ctx.fillStyle = broken ? PALETTE.hull : PALETTE.hullLit;
+      ctx.fill();
+      darkEdge(ctx);
+      if (broken) {
+        // the dead plate shows its fracture
+        ctx.beginPath();
+        ctx.moveTo(size * 1.0, -size * 0.18);
+        ctx.lineTo(size * 0.88, size * 0.05);
+        ctx.lineTo(size * 0.97, size * 0.3);
+        ctx.strokeStyle = PALETTE.rockShadow;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+    }
+    if (!broken) {
+      const ratio =
+        enemy.maxShieldHealth > 0
+          ? clamp01(enemy.shieldHealth / enemy.maxShieldHealth)
+          : 1;
+      ctx.beginPath();
+      ctx.arc(
+        0,
+        0,
+        size * 1.02,
+        -BULWARK_SHIELD_HALF_ARC,
+        BULWARK_SHIELD_HALF_ARC
+      );
+      ctx.strokeStyle = withAlpha(accentOf(enemy), 0.35 + ratio * 0.6);
+      ctx.lineWidth = emissive ? LINE.base : LINE.hair;
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+};
+
+// --- Warden Prime (boss): six matte segments around a violet core ---------
+
+const WARDEN_SEGMENTS = 6;
+// phase 0: all six, phase 1: four, phase 2: two — the core shows more each time
+const WARDEN_VISIBLE = [
+  [0, 1, 2, 3, 4, 5],
+  [0, 1, 3, 4],
+  [0, 3],
+];
+
+const wardenPhase = (enemy) => {
+  const raw =
     typeof enemy?.getPhaseIndex === 'function'
       ? enemy.getPhaseIndex()
-      : enemy?.currentPhase ?? enemy?.phase ?? null;
-
-  if (
-    rawPhaseIndex === null ||
-    rawPhaseIndex === undefined ||
-    Number.isNaN(rawPhaseIndex)
-  ) {
-    return null;
-  }
-
-  const palettes = [
-    config?.phaseColors,
-    presets?.phaseColors,
-    colors?.phaseColors,
-    enemy?.phaseColors,
-    enemy?.renderPayload?.phaseColors,
-  ].find((candidate) => Array.isArray(candidate) && candidate.length > 0);
-
-  if (!palettes) {
-    return null;
-  }
-
-  const index = Math.max(
+      : enemy?.currentPhase;
+  return Math.max(
     0,
-    Math.min(palettes.length - 1, Math.round(rawPhaseIndex))
+    Math.min(WARDEN_VISIBLE.length - 1, Math.round(Number(raw) || 0))
   );
-  return palettes[index] ?? null;
 };
 
-const drawBossShieldOverlay = (ctx, enemy, radius, phaseColor) => {
-  if (!ctx || !enemy?.invulnerable) {
-    return;
-  }
-
-  const effectiveRadius = Number.isFinite(radius) ? radius : 60;
-  const time = enemy.system?.time ?? performance.now() / 1000;
-  const shieldColor = phaseColor || '#9be7ff';
-  const invulnerabilityDuration =
-    Number.isFinite(enemy.invulnerabilityDuration) &&
-    enemy.invulnerabilityDuration > 0
-      ? enemy.invulnerabilityDuration
-      : 1;
-  const invulnerabilityTimer = Number.isFinite(enemy.invulnerabilityTimer)
-    ? enemy.invulnerabilityTimer
-    : invulnerabilityDuration;
-  const normalizedTimer = clamp01(
-    invulnerabilityTimer / invulnerabilityDuration
-  );
-  const shellRadius = effectiveRadius * (1.13 + Math.sin(time * 8.5) * 0.015);
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-
-  const shellGradient = ctx.createRadialGradient(
-    0,
-    0,
-    effectiveRadius * 0.72,
-    0,
-    0,
-    shellRadius * 1.15
-  );
-  shellGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-  shellGradient.addColorStop(0.78, shieldColor);
-  shellGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-  ctx.globalAlpha = 0.1 + normalizedTimer * 0.08;
-  ctx.fillStyle = shellGradient;
+const segmentPath = (ctx, size, index) => {
+  const inner = size * 0.6;
+  const outer = size;
+  const span = TAU / WARDEN_SEGMENTS;
+  const gap = 0.07;
+  const a0 = index * span - Math.PI / 2 + gap;
+  const a1 = (index + 1) * span - Math.PI / 2 - gap;
   ctx.beginPath();
-  ctx.arc(0, 0, shellRadius * 1.15, 0, TAU);
-  ctx.fill();
-
-  ctx.globalAlpha = Math.max(
-    0.28,
-    0.38 + Math.sin(time * 12) * 0.05 + normalizedTimer * 0.08
-  );
-  ctx.strokeStyle = shieldColor;
-  ctx.lineWidth = Math.max(3, effectiveRadius * 0.055);
-  ctx.beginPath();
-  ctx.arc(0, 0, shellRadius, 0, TAU);
-  ctx.stroke();
-
-  ctx.globalAlpha = 0.28 + normalizedTimer * 0.08;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = Math.max(1.5, effectiveRadius * 0.02);
-  ctx.beginPath();
-  ctx.arc(0, 0, shellRadius * 0.98, 0, TAU);
-  ctx.stroke();
-
-  const shieldImpactTimer = Number.isFinite(enemy.shieldImpactTimer)
-    ? enemy.shieldImpactTimer
-    : 0;
-  const shieldImpactDuration =
-    Number.isFinite(enemy.shieldImpactDuration) &&
-    enemy.shieldImpactDuration > 0
-      ? enemy.shieldImpactDuration
-      : 0;
-
-  if (shieldImpactTimer > 0 && shieldImpactDuration > 0) {
-    const impactRatio = clamp01(shieldImpactTimer / shieldImpactDuration);
-    const impactAngle = Number.isFinite(enemy.shieldImpactAngle)
-      ? enemy.shieldImpactAngle
-      : 0;
-    const span = 0.22 + (1 - impactRatio) * 0.42;
-
-    ctx.globalAlpha = 0.4 + impactRatio * 0.55;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = Math.max(5, effectiveRadius * 0.09);
-    ctx.shadowColor = shieldColor;
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.arc(0, 0, shellRadius, impactAngle - span, impactAngle + span);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 0.18 + impactRatio * 0.22;
-    ctx.strokeStyle = shieldColor;
-    ctx.lineWidth = Math.max(8, effectiveRadius * 0.14);
-    ctx.beginPath();
-    ctx.arc(
-      0,
-      0,
-      shellRadius * (1.02 + (1 - impactRatio) * 0.08),
-      impactAngle - span * 1.15,
-      impactAngle + span * 1.15
-    );
-    ctx.stroke();
-  }
-
-  ctx.restore();
+  ctx.arc(0, 0, outer, a0 + 0.03, a1 - 0.03);
+  ctx.lineTo(Math.cos(a1) * outer * 0.93, Math.sin(a1) * outer * 0.93);
+  ctx.arc(0, 0, inner, a1, a0, true);
+  ctx.lineTo(Math.cos(a0) * outer * 0.93, Math.sin(a0) * outer * 0.93);
+  ctx.closePath();
+  return (a0 + a1) / 2;
 };
 
-const drawBossDamageFlash = (ctx, enemy, radius, phaseColor) => {
-  if (!ctx) {
-    return;
-  }
-
-  const damageFlashTimer = Number.isFinite(enemy?.damageFlashTimer)
-    ? enemy.damageFlashTimer
-    : 0;
-  const damageFlashDuration =
-    Number.isFinite(enemy?.damageFlashDuration) && enemy.damageFlashDuration > 0
-      ? enemy.damageFlashDuration
-      : 0;
-
-  if (damageFlashTimer <= 0 || damageFlashDuration <= 0) {
-    return;
-  }
-
-  const effectiveRadius = Number.isFinite(radius) ? radius : 60;
-  const flashRatio = clamp01(damageFlashTimer / damageFlashDuration);
-  const flashStrength = clamp01(enemy?.damageFlashStrength || 1);
-  const flashAlpha = flashRatio * flashStrength;
-  const flashColor = phaseColor || '#ffffff';
-  const flashRadius = effectiveRadius * (1.02 + (1 - flashRatio) * 0.08);
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-
-  const flashGradient = ctx.createRadialGradient(
-    0,
-    0,
-    effectiveRadius * 0.18,
-    0,
-    0,
-    flashRadius
-  );
-  flashGradient.addColorStop(0, '#ffffff');
-  flashGradient.addColorStop(0.45, flashColor);
-  flashGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-  ctx.globalAlpha = 0.12 + flashAlpha * 0.28;
-  ctx.fillStyle = flashGradient;
-  ctx.beginPath();
-  ctx.arc(0, 0, flashRadius, 0, TAU);
-  ctx.fill();
-
-  ctx.globalAlpha = 0.18 + flashAlpha * 0.2;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = Math.max(2, effectiveRadius * 0.03);
-  ctx.beginPath();
-  ctx.arc(0, 0, effectiveRadius * (0.96 + (1 - flashRatio) * 0.04), 0, TAU);
-  ctx.stroke();
-
-  ctx.restore();
-};
-
-const shapeRenderers = {
-  triangle: ({ enemy, ctx, colors, presets, size, config }) => {
-    const effectiveSize = size ?? 12;
-    const hullPreset = presets.hull ?? {};
-    const finPreset = presets.fins ?? {};
-    const accentPreset = presets.accents ?? {};
-    const exhaustPreset = presets.exhaust ?? {};
-
-    const thrust =
-      typeof enemy.getThrustIntensity === 'function'
-        ? enemy.getThrustIntensity()
-        : enemy.thrustIntensity ?? enemy._renderThrust ?? 0;
-    const showThrust = config?.showThrust !== false;
-
-    if (showThrust && exhaustPreset.enabled !== false && thrust > 0) {
-      const exhaustColor =
-        exhaustPreset.color ?? colors.exhaust ?? 'rgba(255, 200, 120, 0.65)';
-      ctx.beginPath();
-      ctx.moveTo(-effectiveSize * 0.2, effectiveSize * 0.65);
-      ctx.lineTo(-effectiveSize * (0.7 + thrust * 0.5), 0);
-      ctx.lineTo(-effectiveSize * 0.2, -effectiveSize * 0.65);
-      ctx.closePath();
-      ctx.fillStyle = exhaustColor;
-      ctx.globalAlpha = 0.6 + thrust * 0.4;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-
+const warden = {
+  facing: () => 0, // ring is symmetric: keep the key light where it belongs
+  key: (enemy) => wardenPhase(enemy),
+  body(ctx, size, enemy) {
+    // the cavity the core sits in
     ctx.beginPath();
-    ctx.moveTo(effectiveSize, 0);
-    ctx.lineTo(-effectiveSize * 0.4, effectiveSize * 0.75);
-    ctx.lineTo(-effectiveSize * 0.4, -effectiveSize * 0.75);
-    ctx.closePath();
-    ctx.fillStyle = hullPreset.fill ?? colors.body ?? '#6cf9ff';
-    ctx.strokeStyle = hullPreset.stroke ?? colors.outline ?? '#0b2d33';
-    ctx.lineWidth = hullPreset.strokeWidth ?? 2;
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(effectiveSize * 0.2, 0);
-    ctx.lineTo(-effectiveSize * 0.35, effectiveSize * 0.45);
-    ctx.lineTo(-effectiveSize * 0.35, -effectiveSize * 0.45);
-    ctx.closePath();
-    ctx.fillStyle = finPreset.fill ?? colors.accents ?? '#2ad0ff';
-    ctx.globalAlpha = 0.85;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    if (accentPreset?.enabled !== false) {
-      ctx.beginPath();
-      ctx.arc(effectiveSize * 0.4, 0, effectiveSize * 0.25, 0, TAU);
-      ctx.fillStyle = accentPreset.fill ?? colors.cockpit ?? '#ffffff';
-      ctx.globalAlpha = 0.7;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-  },
-  diamond: ({ enemy, ctx, colors, presets, size, config }) => {
-    const effectiveSize = size ?? 16;
-    const hullPreset = presets.hull ?? {};
-    const accentPreset = presets.accents ?? {};
-    const turretPreset = presets.turret ?? {};
-    const turretAngle = enemy.turretAngle ?? enemy.rotation ?? 0;
-    const showTurret = config?.showTurret !== false;
-
-    ctx.beginPath();
-    ctx.moveTo(0, -effectiveSize);
-    ctx.lineTo(effectiveSize, 0);
-    ctx.lineTo(0, effectiveSize);
-    ctx.lineTo(-effectiveSize, 0);
-    ctx.closePath();
-    ctx.fillStyle = hullPreset.fill ?? colors.body ?? '#ffdd63';
-    ctx.strokeStyle = hullPreset.stroke ?? colors.outline ?? '#413005';
-    ctx.lineWidth = hullPreset.strokeWidth ?? 2;
-    ctx.fill();
-    ctx.stroke();
-
-    if (accentPreset?.enabled !== false) {
-      ctx.beginPath();
-      ctx.moveTo(0, -effectiveSize * 0.6);
-      ctx.lineTo(effectiveSize * 0.6, 0);
-      ctx.lineTo(0, effectiveSize * 0.6);
-      ctx.lineTo(-effectiveSize * 0.6, 0);
-      ctx.closePath();
-      ctx.fillStyle = accentPreset.fill ?? colors.accents ?? '#ffb347';
-      ctx.globalAlpha = 0.8;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-
-    if (showTurret && turretPreset?.enabled !== false) {
-      ctx.save();
-      ctx.rotate(turretAngle - (enemy.rotation ?? 0));
-      ctx.beginPath();
-      ctx.roundRect(
-        effectiveSize * 0.2,
-        -effectiveSize * 0.15,
-        effectiveSize * 0.9,
-        effectiveSize * 0.3,
-        effectiveSize * 0.1
-      );
-      ctx.fillStyle = turretPreset.fill ?? colors.turret ?? '#ffe6a6';
-      ctx.fill();
-      ctx.restore();
-    }
-  },
-  sphere: ({ enemy, ctx, colors, presets, size, config }) => {
-    const effectiveSize = size ?? 18;
-    const bodyPreset = presets.body ?? {};
-    const pulsePreset = presets.pulse ?? {};
-    const showPulse = config?.showPulse !== false;
-
-    const pulseSpeed =
-      config?.pulseSpeed ?? pulsePreset.speed ?? enemy.pulseSpeed ?? 2.2;
-    const pulseAmount =
-      config?.pulseAmount ?? pulsePreset.amount ?? enemy.pulseAmount ?? 0.25;
-    const time = enemy.system?.time ?? performance.now() / 1000;
-    const pulse = 1 + Math.sin(time * pulseSpeed) * pulseAmount;
-
-    const gradient = ctx.createRadialGradient(
-      0,
-      0,
-      effectiveSize * 0.2,
-      0,
-      0,
-      effectiveSize * pulse
-    );
-    gradient.addColorStop(0, bodyPreset.core ?? colors.core ?? '#fff1b8');
-    gradient.addColorStop(1, bodyPreset.edge ?? colors.body ?? '#ffad33');
-    ctx.fillStyle = gradient;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, effectiveSize * pulse, 0, TAU);
+    ctx.arc(0, 0, size * 0.62, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
     ctx.fill();
 
-    if (showPulse && pulsePreset?.enabled !== false) {
+    for (const index of WARDEN_VISIBLE[wardenPhase(enemy)]) {
+      const mid = segmentPath(ctx, size, index);
+      const facing = Math.cos(mid - KEY_LIGHT_ANGLE);
+      ctx.fillStyle = litFill(ctx, size);
+      ctx.fill();
+      ctx.fillStyle =
+        facing >= 0
+          ? withAlpha(PALETTE.hullLit, facing * 0.35)
+          : withAlpha(PALETTE.rockShadow, -facing * 0.45);
+      ctx.fill();
+      darkEdge(ctx);
+
+      // panel groove and two rivets
+      const span = TAU / WARDEN_SEGMENTS;
       ctx.beginPath();
-      ctx.arc(0, 0, effectiveSize * (pulse + 0.25), 0, TAU);
-      ctx.strokeStyle =
-        pulsePreset.stroke ?? colors.halo ?? 'rgba(255, 200, 120, 0.35)';
-      ctx.lineWidth = pulsePreset.strokeWidth ?? 2;
-      ctx.globalAlpha = 0.7;
+      ctx.arc(0, 0, size * 0.8, mid - span * 0.36, mid + span * 0.36);
+      ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.85);
+      ctx.lineWidth = LINE.thin;
       ctx.stroke();
-      ctx.globalAlpha = 1;
+      for (const side of [-1, 1]) {
+        const a = mid + side * span * 0.25;
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(a) * size * 0.9,
+          Math.sin(a) * size * 0.9,
+          1.3,
+          0,
+          TAU
+        );
+        ctx.fillStyle = withAlpha(PALETTE.rockLit, 0.5 + facing * 0.3);
+        ctx.fill();
+      }
+      // outer edge catches the key light
+      if (facing > 0.1) {
+        ctx.beginPath();
+        ctx.arc(0, 0, size - 1, mid - span * 0.4, mid + span * 0.4);
+        ctx.strokeStyle = withAlpha(PALETTE.rockLit, 0.6 * facing);
+        ctx.lineWidth = LINE.thin;
+        ctx.stroke();
+      }
     }
   },
-  boss: ({ enemy, ctx, colors, presets, size, config }) => {
-    const effectiveSize = size ?? 60;
-    const auraPreset = presets.aura ?? {};
-    const hullPreset = presets.hull ?? {};
-    const corePreset = presets.core ?? {};
-    const showAura = config?.showAura !== false;
-    const showPhaseColor = config?.showPhaseColor !== false;
-
-    const auraPulse = config?.auraPulse ?? auraPreset.pulse ?? 0.18;
-    const pulseSpeed = config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
-    const time = enemy.system?.time ?? performance.now() / 1000;
-    const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
-    const phaseColor = showPhaseColor
-      ? resolveBossPhaseColor({ enemy, colors, presets, config })
-      : null;
-
-    if (showAura && auraPreset?.enabled !== false) {
-      const gradient = ctx.createRadialGradient(
-        0,
-        0,
-        effectiveSize,
-        0,
-        0,
-        effectiveSize * (1.5 * pulse)
-      );
-      const innerColor =
-        auraPreset.inner ?? colors.aura ?? 'rgba(255, 120, 90, 0.4)';
-      const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
-      gradient.addColorStop(0, innerColor);
-      gradient.addColorStop(1, outerColor);
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, effectiveSize * 1.5 * pulse, 0, TAU);
-      ctx.fill();
+  glow(ctx, size, enemy) {
+    for (const index of WARDEN_VISIBLE[wardenPhase(enemy)]) {
+      segmentPath(ctx, size, index);
+      threatRim(ctx);
     }
+  },
+  live(ctx, size, enemy, emissive) {
+    const phase = wardenPhase(enemy);
+    const time = enemyTime(enemy);
+    const flash = enemy.getHitFlash();
+    const pulse = 0.5 + 0.5 * Math.sin(time * (2 + phase));
+    const core = size * (0.4 + phase * 0.06) * (1 + pulse * 0.04);
 
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, core);
+    gradient.addColorStop(0, withAlpha(PALETTE.text, 0.75 + flash * 0.25));
+    gradient.addColorStop(0.35, PALETTE.boss);
+    gradient.addColorStop(1, withAlpha(PALETTE.boss, emissive ? 0 : 0.15));
+    ctx.globalAlpha = emissive ? 0.65 + pulse * 0.25 + flash * 0.35 : 1;
+    ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(0, 0, effectiveSize, 0, TAU);
-    const baseHullFill = hullPreset.fill ?? colors.body ?? '#8c4cff';
-    ctx.fillStyle = phaseColor ?? baseHullFill;
-    ctx.strokeStyle = hullPreset.stroke ?? colors.outline ?? '#2d0a57';
-    ctx.lineWidth = hullPreset.strokeWidth ?? 6;
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, effectiveSize * 0.55, 0, TAU);
-    const baseCoreFill = corePreset.fill ?? colors.core ?? '#ffffff';
-    ctx.fillStyle = phaseColor ? corePreset.fill ?? phaseColor : baseCoreFill;
-    ctx.globalAlpha = 0.85;
+    ctx.arc(0, 0, core, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    if (config?.showShield !== false) {
-      drawBossShieldOverlay(ctx, enemy, effectiveSize, phaseColor);
-    }
-
-    if (config?.showDamageFlash !== false) {
-      drawBossDamageFlash(ctx, enemy, effectiveSize, phaseColor);
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
     }
   },
 };
 
-const proceduralStrategy = ({ enemy, ctx, colors, presets, config }) => {
+// Thin violet hexagonal barrier while the Warden is invulnerable.
+const drawWardenBarrier = (ctx, size, enemy, time, emissive) => {
+  const duration =
+    enemy.invulnerabilityDuration > 0 ? enemy.invulnerabilityDuration : 1;
+  const remaining = clamp01(
+    (enemy.invulnerabilityTimer ?? duration) / duration
+  );
+  const impact =
+    enemy.shieldImpactDuration > 0
+      ? clamp01((enemy.shieldImpactTimer ?? 0) / enemy.shieldImpactDuration)
+      : 0;
+  const radius = size * 1.16;
+  const spin = time * 0.35;
+
+  ctx.beginPath();
+  for (let i = 0; i < 6; i += 1) {
+    const a = spin + (i * TAU) / 6;
+    const x = Math.cos(a) * radius;
+    const y = Math.sin(a) * radius;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  if (!emissive) {
+    ctx.fillStyle = withAlpha(PALETTE.boss, 0.05 + impact * 0.08);
+    ctx.fill();
+  }
+  ctx.strokeStyle = withAlpha(
+    PALETTE.boss,
+    0.35 + remaining * 0.3 + impact * 0.35
+  );
+  ctx.lineWidth = LINE.thin + impact * 1.5;
+  ctx.stroke();
+};
+
+const LOOKS = {
+  triangle: mote,
+  diamond: seeker,
+  sphere: tether,
+  husk,
+  ram,
+  weaver,
+  bulwark,
+  boss: warden,
+};
+
+const lookSize = (enemy, shape) =>
+  shape === 'boss' ? enemy.radius ?? 60 : enemy.radius ?? enemy.size ?? 16;
+
+// Shared bakes: every Mote looks the same, so they share one canvas pair.
+const BAKES = new Map();
+
+const bakeLook = (look, shape, size, enemy) => {
+  if (typeof document === 'undefined') return null;
+  const scale = getRenderScale();
+  const variant = look.key ? look.key(enemy) : 0;
+  const key = `${shape}|${size}|${variant}|${scale}|${Boolean(enemy?.elite)}`;
+  const cached = BAKES.get(key);
+  if (cached) return cached;
+
+  const canvasSize = Math.ceil((size * 1.1 + 4) * 2);
+  const offset = canvasSize / 2;
+  const layer = (draw) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(canvasSize * scale);
+    canvas.height = Math.ceil(canvasSize * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.translate(offset, offset);
+    draw(ctx);
+    return canvas;
+  };
+
+  const body = layer((ctx) => look.body(ctx, size, enemy));
+  const glow = layer((ctx) => look.glow(ctx, size, enemy));
+  if (!body || !glow) return null;
+  const entry = { body, glow, offset, canvasSize };
+  BAKES.set(key, entry);
+  return entry;
+};
+
+const drawLayer = (ctx, enemy, angle, draw) => {
+  ctx.save();
+  ctx.translate(enemy.x, enemy.y);
+  if (angle) ctx.rotate(angle);
+  draw();
+  ctx.restore();
+};
+
+// Thin gold ring just outside an elite's silhouette.
+const eliteRing = (ctx, size, emissive) => {
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 1.18 + 2, 0, TAU);
+  ctx.strokeStyle = withAlpha(PALETTE.xp, emissive ? 0.8 : 0.55);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+};
+
+const proceduralStrategy = ({ enemy, ctx, config }) => {
   if (!ctx) return;
 
-  const palette = colors || resolvePalette(enemy);
-  const renderPreset = presets || resolvePresets(enemy);
-  const size = enemy.radius ?? enemy.size;
   const shape = config?.shape ?? enemy.renderShape ?? 'triangle';
-  const renderer = shapeRenderers[shape];
-
-  if (!renderer) {
+  const look = LOOKS[shape];
+  if (!look) {
     console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);
     return;
   }
 
-  ctx.save();
-  ctx.translate(enemy.x, enemy.y);
-  const rotation = enemy.rotation ?? 0;
-  if (rotation) {
-    ctx.rotate(rotation);
-  }
+  const size = lookSize(enemy, shape);
+  const angle = look.facing(enemy);
+  const sprite = bakeLook(look, shape, size, enemy);
+  const blit = (target, canvas) =>
+    target.drawImage(
+      canvas,
+      -sprite.offset,
+      -sprite.offset,
+      sprite.canvasSize,
+      sprite.canvasSize
+    );
 
-  renderer({
-    enemy,
-    ctx,
-    colors: palette,
-    presets: renderPreset,
-    size,
-    config,
+  const flash = sprite ? enemy.getHitFlash() : 0;
+  const blitFlash = (target, alpha) => {
+    sprite.flash ??= whiteSilhouette(sprite.body);
+    if (!sprite.flash) return;
+    target.globalAlpha = alpha * flash;
+    blit(target, sprite.flash);
+    target.globalAlpha = 1;
+  };
+
+  drawLayer(ctx, enemy, angle, () => {
+    if (sprite) blit(ctx, sprite.body);
+    else look.body(ctx, size, enemy);
+    look.live(ctx, size, enemy, false);
+    if (enemy.elite) eliteRing(ctx, size, false);
+    if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
   });
 
-  ctx.restore();
+  const emissive = getEmissive();
+  if (!emissive) return;
+  drawLayer(emissive, enemy, angle, () => {
+    if (sprite) blit(emissive, sprite.glow);
+    else look.glow(emissive, size, enemy);
+    look.live(emissive, size, enemy, true);
+    if (enemy.elite) eliteRing(emissive, size, true);
+    if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
+  });
 };
 
 const delegateStrategy = ({ enemy, ctx }) => {
@@ -469,190 +834,13 @@ const delegateStrategy = ({ enemy, ctx }) => {
 };
 
 function createProceduralAlias(shape) {
-  return ({ enemy, ctx, colors, presets, config }) => {
+  return ({ enemy, ctx, config }) => {
     const aliasConfig =
       config?.shape === undefined ? { ...(config || {}), shape } : config;
 
-    return proceduralStrategy({
-      enemy,
-      ctx,
-      colors,
-      presets,
-      config: aliasConfig,
-    });
+    return proceduralStrategy({ enemy, ctx, config: aliasConfig });
   };
 }
-
-// Shared image cache for SVG sprite strategies (pool-safe, keyed by source URL)
-const _svgSpriteCache = new Map();
-
-const ensureSvgSpriteImage = (source) => {
-  if (!source || typeof source !== 'string') return null;
-
-  let entry = _svgSpriteCache.get(source);
-  if (entry) return entry;
-
-  if (typeof Image !== 'function') return null;
-
-  const image = new Image();
-  entry = { image, status: 'loading' };
-  _svgSpriteCache.set(source, entry);
-
-  image.decoding = 'async';
-  image.onload = () => {
-    entry.status = 'loaded';
-  };
-  image.onerror = () => {
-    entry.status = 'error';
-  };
-  image.src = source;
-
-  return entry;
-};
-
-const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
-  if (!ctx || !enemy) return;
-
-  const visual = config?.visual;
-  if (!visual || visual.type !== 'svg-sprite' || !visual.source) {
-    // Fallback to procedural boss if visual config missing
-    const fallback = shapeRenderers.boss;
-    if (fallback) {
-      ctx.save();
-      ctx.translate(enemy.x, enemy.y);
-      if (enemy.rotation) ctx.rotate(enemy.rotation);
-      fallback({
-        enemy,
-        ctx,
-        colors: colors || resolvePalette(enemy),
-        presets: presets || resolvePresets(enemy),
-        size: enemy.radius ?? 60,
-        config: { ...config, shape: 'boss' },
-      });
-      ctx.restore();
-    }
-    return;
-  }
-
-  const entry = ensureSvgSpriteImage(visual.source);
-  if (!entry || entry.status !== 'loaded' || !entry.image) {
-    // Image still loading — draw procedural boss as placeholder
-    const fallback = shapeRenderers.boss;
-    if (fallback) {
-      ctx.save();
-      ctx.translate(enemy.x, enemy.y);
-      if (enemy.rotation) ctx.rotate(enemy.rotation);
-      fallback({
-        enemy,
-        ctx,
-        colors: colors || resolvePalette(enemy),
-        presets: presets || resolvePresets(enemy),
-        size: enemy.radius ?? 60,
-        config: { ...config, shape: 'boss' },
-      });
-      ctx.restore();
-    }
-    return;
-  }
-
-  const image = entry.image;
-  const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
-  const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
-  if (width <= 0 || height <= 0) return;
-
-  // Resolve source bounds for cropping (normalized 0-1 ratios)
-  const sb = visual.sourceBounds;
-  const naturalW = image.naturalWidth || 0;
-  const naturalH = image.naturalHeight || 0;
-  let sx = 0,
-    sy = 0,
-    sw = naturalW,
-    sh = naturalH;
-
-  if (
-    sb &&
-    naturalW > 0 &&
-    naturalH > 0 &&
-    Number.isFinite(sb.x) &&
-    Number.isFinite(sb.y) &&
-    Number.isFinite(sb.width) &&
-    Number.isFinite(sb.height) &&
-    sb.width > 0 &&
-    sb.height > 0
-  ) {
-    sx = naturalW * Math.min(Math.max(sb.x, 0), 1);
-    sy = naturalH * Math.min(Math.max(sb.y, 0), 1);
-    sw = naturalW * Math.min(sb.width, 1 - Math.min(Math.max(sb.x, 0), 1));
-    sh = naturalH * Math.min(sb.height, 1 - Math.min(Math.max(sb.y, 0), 1));
-  }
-
-  ctx.save();
-  ctx.translate(enemy.x, enemy.y);
-  if (enemy.rotation) ctx.rotate(enemy.rotation);
-
-  // Dynamic boss aura — sized by enemy.radius, NOT sprite dimensions
-  const effectiveRadius = enemy.radius ?? 60;
-  const palette = colors || resolvePalette(enemy);
-  const renderPreset = presets || resolvePresets(enemy);
-  const auraPreset = renderPreset.aura ?? {};
-
-  if (config?.showAura !== false && auraPreset?.enabled !== false) {
-    const auraPulse = config?.auraPulse ?? auraPreset.pulse ?? 0.18;
-    const pulseSpeed = config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
-    const time = enemy.system?.time ?? performance.now() / 1000;
-    const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
-
-    const gradient = ctx.createRadialGradient(
-      0,
-      0,
-      effectiveRadius,
-      0,
-      0,
-      effectiveRadius * (1.5 * pulse)
-    );
-    const innerColor =
-      auraPreset.inner ?? palette.aura ?? 'rgba(255, 120, 90, 0.4)';
-    const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
-    gradient.addColorStop(0, innerColor);
-    gradient.addColorStop(1, outerColor);
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(0, 0, effectiveRadius * 1.5 * pulse, 0, TAU);
-    ctx.fill();
-  }
-
-  // Draw SVG sprite
-  const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
-  const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
-  const spriteRotation = Number.isFinite(visual.rotation) ? visual.rotation : 0;
-
-  ctx.save();
-  ctx.translate(offsetX, offsetY);
-  if (spriteRotation !== 0) ctx.rotate(spriteRotation);
-  if (typeof visual.glowColor === 'string' && visual.glowColor) {
-    ctx.shadowColor = visual.glowColor;
-  }
-  if (Number.isFinite(visual.shadowBlur)) {
-    ctx.shadowBlur = Math.max(0, visual.shadowBlur);
-  }
-  ctx.drawImage(image, sx, sy, sw, sh, -width / 2, -height / 2, width, height);
-
-  const phaseColor = resolveBossPhaseColor({
-    enemy,
-    colors: palette,
-    presets: renderPreset,
-    config,
-  });
-  if (config?.showShield !== false) {
-    drawBossShieldOverlay(ctx, enemy, effectiveRadius, phaseColor);
-  }
-  if (config?.showDamageFlash !== false) {
-    drawBossDamageFlash(ctx, enemy, effectiveRadius, phaseColor);
-  }
-  ctx.restore();
-
-  ctx.restore();
-};
 
 const defaultStrategies = {
   procedural: proceduralStrategy,
@@ -660,7 +848,6 @@ const defaultStrategies = {
   'procedural-diamond': createProceduralAlias('diamond'),
   'procedural-sphere': createProceduralAlias('sphere'),
   'procedural-boss': createProceduralAlias('boss'),
-  'svg-sprite-boss': svgSpriteBossStrategy,
   delegate: delegateStrategy,
 };
 
@@ -689,258 +876,22 @@ export class RenderComponent {
       return;
     }
 
-    // [NEO-ARCADE] Per-Instance Baking: Check/Create Cache
     const strategyName = enemy.renderStrategy || this.strategy;
-    if (
-      strategyName.startsWith('procedural') &&
-      typeof document !== 'undefined'
-    ) {
-      const sprite = this.ensureSpriteCache(enemy, context, strategyName);
-      if (sprite) {
-        ctx.save();
-        ctx.translate(enemy.x, enemy.y);
-        ctx.rotate(enemy.rotation || 0);
-
-        // Draw Baked Sprite
-        ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
-
-        // [Dynamic Overlays that can't be baked]
-        // 1. Thrust (Variable)
-        if (strategyName.includes('triangle')) {
-          this.drawDynamicThrust(ctx, enemy, context);
-        }
-        // 2. Turret (Independent Rotation)
-        if (strategyName.includes('diamond')) {
-          this.drawDynamicTurret(ctx, enemy, context, sprite.size);
-        }
-        // 3. Pulse (Scale Animation for Mines) - Baked sprite is static, we scale the IMAGE
-        if (strategyName.includes('sphere')) {
-          // Sphere is special: The sprite is the orb. We pulse-scale it here.
-          // The base drawImage above drew it at 1.0 scale. We might need to redraw or
-          // adjust the sprite drawing logic for spheres.
-          // Actually, for Sphere, let's skip the generic draw above and handle custom scaling.
-        } else if (strategyName.includes('boss')) {
-          // Boss Aura is dynamic
-          this.drawDynamicBossAura(ctx, enemy, context, sprite.size);
-        }
-
-        ctx.restore();
-
-        if (this.config.debug) {
-          drawDebugInfo({ enemy, ctx });
-        }
-        return;
-      }
-    }
-
-    // Fallback: Real-time rendering
     const handler =
       this.strategies.get(strategyName) || this.strategies.get('delegate');
 
-    const colors = context.colors ?? resolvePalette(enemy);
-    const presets = context.presets ?? resolvePresets(enemy);
-
-    handler?.({ enemy, ctx, colors, presets, config: this.config });
+    handler?.({ enemy, ctx, config: this.config });
 
     if (this.config.debug) {
-      drawDebugInfo({ enemy, ctx, colors });
+      drawDebugInfo({ enemy, ctx });
     }
-  }
-
-  ensureSpriteCache(enemy, context, strategyName) {
-    // 1. Invalidations
-    // Boss: Phase change changes colors -> invalidate
-    if (strategyName.includes('boss')) {
-      const phase = enemy.currentPhase || 0;
-      if (enemy.spriteCachePhase !== phase) {
-        enemy.spriteCache = null;
-        enemy.spriteCachePhase = phase;
-      }
-    }
-
-    if (enemy.spriteCache) {
-      return enemy.spriteCache;
-    }
-
-    // 2. Determine Size
-    let size = enemy.radius ?? enemy.size ?? 16;
-    if (strategyName.includes('boss')) size = 60; // Boss base size
-
-    // Padding for glows/strokes
-    const padding = size * 1.5;
-    const canvasSize = Math.ceil((size + padding) * 2);
-    const offset = canvasSize / 2;
-
-    const offscreen = document.createElement('canvas');
-    offscreen.width = canvasSize;
-    offscreen.height = canvasSize;
-    const ctx = offscreen.getContext('2d');
-
-    // 3. Bake
-    ctx.translate(offset, offset);
-
-    // Resolve props
-    const colors = context.colors ?? resolvePalette(enemy);
-    const presets = context.presets ?? resolvePresets(enemy);
-
-    // We use the existing renderers but strip dynamic parts like Thrust/Turret/Pulse/Aura
-    // Those are drawn real-time on top.
-    const shape =
-      this.config?.shape ??
-      enemy.renderShape ??
-      (strategyName.includes('triangle')
-        ? 'triangle'
-        : strategyName.includes('diamond')
-          ? 'diamond'
-          : strategyName.includes('sphere')
-            ? 'sphere'
-            : strategyName.includes('boss')
-              ? 'boss'
-              : 'triangle');
-
-    const renderer = shapeRenderers[shape];
-    if (renderer) {
-      // Disable dynamic flags for baking
-      const bakeConfig = {
-        ...this.config,
-        showThrust: false, // Dynamic
-        showTurret: false, // Dynamic rotation
-        showPulse: false, // Dynamic scaling
-        showAura: false, // Dynamic animation
-        showShield: false, // Dynamic shield / invulnerability
-        showDamageFlash: false, // Dynamic damage reaction
-        showPhaseColor: true, // Baked into boss hull
-      };
-
-      // Mock enemy for static rotation
-      const mockEnemy = {
-        ...enemy,
-        rotation: 0,
-        turretAngle: 0,
-        system: { time: 0 }, // Fix time for consistent bake
-      };
-
-      renderer({
-        enemy: mockEnemy,
-        ctx,
-        colors: colors || {},
-        presets: presets || {},
-        size,
-        config: bakeConfig,
-      });
-    }
-
-    enemy.spriteCache = {
-      canvas: offscreen,
-      offset,
-      size,
-      strategy: strategyName,
-    };
-
-    return enemy.spriteCache;
-  }
-
-  drawDynamicThrust(ctx, enemy, context) {
-    const size = enemy.radius ?? 12;
-    const presets = context.presets ?? resolvePresets(enemy);
-    const colors = context.colors ?? resolvePalette(enemy);
-
-    // Extracted from 'triangle' renderer
-    const thrust =
-      typeof enemy.getThrustIntensity === 'function'
-        ? enemy.getThrustIntensity()
-        : enemy.thrustIntensity ?? enemy._renderThrust ?? 0;
-
-    const exhaustPreset = presets.exhaust ?? {};
-    if (exhaustPreset.enabled !== false && thrust > 0) {
-      const exhaustColor =
-        exhaustPreset.color ?? colors.exhaust ?? 'rgba(255, 200, 120, 0.65)';
-      ctx.beginPath();
-      ctx.moveTo(-size * 0.2, size * 0.65);
-      ctx.lineTo(-size * (0.7 + thrust * 0.5), 0);
-      ctx.lineTo(-size * 0.2, -size * 0.65);
-      ctx.closePath();
-      ctx.fillStyle = exhaustColor;
-      ctx.globalAlpha = 0.6 + thrust * 0.4;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  drawDynamicTurret(ctx, enemy, context, size) {
-    const effectiveSize = size ?? 16;
-    const presets = context.presets ?? resolvePresets(enemy);
-    const colors = context.colors ?? resolvePalette(enemy);
-    const turretPreset = presets.turret ?? {};
-
-    // Relative rotation
-    const turretAngle = enemy.turretAngle ?? enemy.rotation ?? 0;
-    const relRotation = turretAngle - (enemy.rotation ?? 0);
-
-    if (turretPreset?.enabled !== false) {
-      ctx.save();
-      ctx.rotate(relRotation);
-      ctx.beginPath();
-      ctx.roundRect(
-        effectiveSize * 0.2,
-        -effectiveSize * 0.15,
-        effectiveSize * 0.9,
-        effectiveSize * 0.3,
-        effectiveSize * 0.1
-      );
-      ctx.fillStyle = turretPreset.fill ?? colors.turret ?? '#ffe6a6';
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  drawDynamicBossAura(ctx, enemy, context, size) {
-    // Extracted from 'boss' renderer
-    const effectiveSize = size ?? 60;
-    const presets = context.presets ?? resolvePresets(enemy);
-    const colors = context.colors ?? resolvePalette(enemy);
-    const auraPreset = presets.aura ?? {};
-
-    const auraPulse = this.config?.auraPulse ?? auraPreset.pulse ?? 0.18;
-    const pulseSpeed = this.config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
-    const time = enemy.system?.time ?? performance.now() / 1000;
-    const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
-
-    if (auraPreset?.enabled !== false) {
-      const gradient = ctx.createRadialGradient(
-        0,
-        0,
-        effectiveSize,
-        0,
-        0,
-        effectiveSize * (1.5 * pulse)
-      );
-      const innerColor =
-        auraPreset.inner ?? colors.aura ?? 'rgba(255, 120, 90, 0.4)';
-      const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
-      gradient.addColorStop(0, innerColor);
-      gradient.addColorStop(1, outerColor);
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, effectiveSize * 1.5 * pulse, 0, TAU);
-      ctx.fill();
-    }
-
-    const phaseColor = resolveBossPhaseColor({
-      enemy,
-      colors,
-      presets,
-      config: this.config,
-    });
-    drawBossShieldOverlay(ctx, enemy, effectiveSize, phaseColor);
-    drawBossDamageFlash(ctx, enemy, effectiveSize, phaseColor);
   }
 }
 
 const drawDebugInfo = ({ enemy, ctx }) => {
   ctx.save();
   ctx.translate(enemy.x, enemy.y);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.strokeStyle = withAlpha(PALETTE.text, 0.35);
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.arc(0, 0, enemy.radius ?? 16, 0, TAU);

@@ -1,3 +1,4 @@
+import { IS_DEV } from './env.js';
 /**
  * Generic Object Pool for managing object lifecycle and reducing garbage collection.
  *
@@ -67,12 +68,7 @@ export class ObjectPool {
     this.expand(initialSize);
 
     // Track pool for debugging
-    if (
-      typeof window !== 'undefined' &&
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (typeof window !== 'undefined' && IS_DEV) {
       if (!window.__objectPools) {
         window.__objectPools = [];
       }
@@ -97,16 +93,6 @@ export class ObjectPool {
       // Pool exhausted, create new object
       obj = this.createFn();
       this.totalCreated++;
-
-      if (
-        typeof process !== 'undefined' &&
-        process.env &&
-        process.env.NODE_ENV === 'development'
-      ) {
-        console.debug(
-          `[ObjectPool] Created new object (total: ${this.totalCreated})`
-        );
-      }
     }
 
     this.inUse.add(obj);
@@ -126,11 +112,7 @@ export class ObjectPool {
    */
   release(obj) {
     if (!this.inUse.has(obj)) {
-      if (
-        typeof process !== 'undefined' &&
-        process.env &&
-        process.env.NODE_ENV === 'development'
-      ) {
+      if (IS_DEV) {
         console.warn(
           '[ObjectPool] Attempted to release object not acquired from this pool'
         );
@@ -282,11 +264,7 @@ export class ObjectPool {
       );
       this.expand(expansion);
 
-      if (
-        typeof process !== 'undefined' &&
-        process.env &&
-        process.env.NODE_ENV === 'development'
-      ) {
+      if (IS_DEV) {
         console.debug(`[ObjectPool] Auto-expanded by ${expansion} objects`);
       }
     } else if (
@@ -300,11 +278,7 @@ export class ObjectPool {
       );
       this.shrink(shrinkage);
 
-      if (
-        typeof process !== 'undefined' &&
-        process.env &&
-        process.env.NODE_ENV === 'development'
-      ) {
+      if (IS_DEV) {
         console.debug(`[ObjectPool] Auto-shrunk by ${shrinkage} objects`);
       }
     }
@@ -494,12 +468,7 @@ export class TTLObjectPool extends ObjectPool {
 
     this.lastCleanup = currentTime;
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development' &&
-      expiredObjects.length > 0
-    ) {
+    if (IS_DEV && expiredObjects.length > 0) {
       console.debug(
         `[TTLObjectPool] Released ${expiredObjects.length} expired objects`
       );
@@ -554,12 +523,7 @@ export class TTLObjectPool extends ObjectPool {
 }
 
 // Development tools
-if (
-  typeof window !== 'undefined' &&
-  typeof process !== 'undefined' &&
-  process.env &&
-  process.env.NODE_ENV === 'development'
-) {
+if (typeof window !== 'undefined' && IS_DEV) {
   window.__poolDebug = {
     getAllPools: () => window.__objectPools || [],
     getPoolStats: () =>

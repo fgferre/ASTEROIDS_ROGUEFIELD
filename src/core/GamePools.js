@@ -20,6 +20,11 @@ import { Drone } from '../modules/enemies/types/Drone.js';
 import { Mine } from '../modules/enemies/types/Mine.js';
 import { Hunter } from '../modules/enemies/types/Hunter.js';
 import { BossEnemy } from '../modules/enemies/types/BossEnemy.js';
+import { Husk } from '../modules/enemies/types/Husk.js';
+import { Ram } from '../modules/enemies/types/Ram.js';
+import { Weaver } from '../modules/enemies/types/Weaver.js';
+import { Bulwark } from '../modules/enemies/types/Bulwark.js';
+import { IS_DEV } from './env.js';
 
 /**
  * Game object pool registry.
@@ -38,6 +43,10 @@ export class GamePools {
   static mines = null;
   static hunters = null;
   static bosses = null;
+  static husks = null;
+  static rams = null;
+  static weavers = null;
+  static bulwarks = null;
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
@@ -63,6 +72,10 @@ export class GamePools {
       mines: { initial: 5, max: 15 },
       hunters: { initial: 5, max: 12 },
       bosses: { initial: 1, max: 3 },
+      husks: { initial: 3, max: 12 },
+      rams: { initial: 3, max: 12 },
+      weavers: { initial: 2, max: 8 },
+      bulwarks: { initial: 2, max: 8 },
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
@@ -78,6 +91,10 @@ export class GamePools {
     this.initializeMinePool(config.mines);
     this.initializeHunterPool(config.hunters);
     this.initializeBossPool(config.bosses);
+    this.husks = this.createEnemyPool(Husk, config.husks);
+    this.rams = this.createEnemyPool(Ram, config.rams);
+    this.weavers = this.createEnemyPool(Weaver, config.weavers);
+    this.bulwarks = this.createEnemyPool(Bulwark, config.bulwarks);
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);
     this.initializeTempObjectPool(config.tempObjects);
@@ -86,11 +103,7 @@ export class GamePools {
     this.lastAutoManageTime = performance.now();
 
     debugLog('[GamePools] All pools initialized successfully');
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       debugLog('Pool configuration:', this.getPoolStats());
     }
   }
@@ -183,47 +196,6 @@ export class GamePools {
           this.vy *= friction;
 
           return this.life > 0;
-        };
-
-        particle.draw = function (ctx) {
-          if (this.alpha <= 0) return;
-
-          ctx.save();
-          ctx.globalAlpha = this.alpha;
-          ctx.translate(this.x, this.y);
-          ctx.rotate(this.rotation);
-
-          if (this.type === 'spark') {
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = this.size * this.alpha;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(-this.size, 0);
-            ctx.lineTo(this.size, 0);
-            ctx.stroke();
-          } else if (this.type === 'crack') {
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = Math.max(0.6, this.size * 0.4);
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            const length = this.size * 3.2;
-            ctx.moveTo(-length * 0.5, 0);
-            ctx.lineTo(length * 0.5, 0);
-            ctx.stroke();
-          } else if (this.type === 'debris') {
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            const s = this.size * this.alpha;
-            ctx.rect(-s / 2, -s / 2, s, s);
-            ctx.fill();
-          } else {
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          ctx.restore();
         };
 
         return particle;
@@ -433,6 +405,24 @@ export class GamePools {
         }
       },
 
+      config.initial,
+      config.max
+    );
+  }
+
+  /**
+   * Pool for an enemy class that resets itself with resetForPool().
+   *
+   * @private
+   */
+  static createEnemyPool(EnemyClass, config) {
+    return new ObjectPool(
+      () => {
+        const enemy = new EnemyClass();
+        enemy.resetForPool();
+        return enemy;
+      },
+      (enemy) => enemy?.resetForPool(),
       config.initial,
       config.max
     );
@@ -672,7 +662,7 @@ export class GamePools {
    *
    * @param {number} [deltaTime] - Time since last update
    */
-  static update(deltaTime) {
+  static update() {
     if (!this.initialized) {
       console.warn(
         '[GamePools] Not initialized - call GamePools.initialize() first'
@@ -707,6 +697,10 @@ export class GamePools {
       this.mines,
       this.hunters,
       this.bosses,
+      this.husks,
+      this.rams,
+      this.weavers,
+      this.bulwarks,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -734,6 +728,10 @@ export class GamePools {
       this.mines,
       this.hunters,
       this.bosses,
+      this.husks,
+      this.rams,
+      this.weavers,
+      this.bulwarks,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -767,6 +765,10 @@ export class GamePools {
       mines: this.mines?.getStats() || null,
       hunters: this.hunters?.getStats() || null,
       bosses: this.bosses?.getStats() || null,
+      husks: this.husks?.getStats() || null,
+      rams: this.rams?.getStats() || null,
+      weavers: this.weavers?.getStats() || null,
+      bulwarks: this.bulwarks?.getStats() || null,
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
       tempObjects: this.tempObjects?.getStats() || null,
@@ -799,6 +801,10 @@ export class GamePools {
       mines: this.mines,
       hunters: this.hunters,
       bosses: this.bosses,
+      husks: this.husks,
+      rams: this.rams,
+      weavers: this.weavers,
+      bulwarks: this.bulwarks,
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
       tempObjects: this.tempObjects,
@@ -837,6 +843,10 @@ export class GamePools {
     this.mines = null;
     this.hunters = null;
     this.bosses = null;
+    this.husks = null;
+    this.rams = null;
+    this.weavers = null;
+    this.bulwarks = null;
     this.xpOrbs = null;
     this.shockwaves = null;
     this.tempObjects = null;
@@ -882,7 +892,7 @@ export class GamePools {
 }
 
 // Development tools
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (typeof window !== 'undefined' && IS_DEV) {
   window.GamePools = GamePools;
 
   // Add global debug commands

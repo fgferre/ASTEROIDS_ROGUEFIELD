@@ -23,6 +23,19 @@
 
 import { debugLog } from '../core/debugLogging.js';
 
+/** Saves a JSON string as a file download (browser only). */
+export function downloadJSON(filename, json) {
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export class PerformanceMonitor {
   constructor() {
     // FPS tracking
@@ -176,16 +189,7 @@ export class PerformanceMonitor {
    * @param {string} filename - Filename (default: performance-log.json)
    */
   downloadLogs(filename = 'performance-log.json') {
-    const json = this.exportLogs();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadJSON(filename, this.exportLogs());
     debugLog(`[PerformanceMonitor] Downloaded ${filename}`);
   }
 

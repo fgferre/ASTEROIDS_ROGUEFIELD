@@ -26,20 +26,18 @@
  */
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
-  USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  ASTEROIDS_PER_WAVE_BASE,
   ASTEROID_ENTRY_ANGLE_VARIANCE,
   ASTEROID_OFFSCREEN_RECOVERY_TIME,
-  MAX_ASTEROIDS_ON_SCREEN,
   WAVE_DURATION,
   WAVE_BREAK_TIME,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
   COLLISION_BOUNCE,
 } from '../../../data/constants/gameplay.js';
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
+import { directorFor } from '../../../data/layers.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { IS_DEV } from '../../../core/env.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 export class EnemyUpdateSystem {
   /**
@@ -108,36 +106,9 @@ export class EnemyUpdateSystem {
       this.ctx.refreshServiceState();
     }
 
-    const overrideValue =
-      typeof globalThis !== 'undefined'
-        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
-        : undefined;
-
-    const constantsFlag =
-      typeof USE_WAVE_MANAGER === 'boolean' ? USE_WAVE_MANAGER : false;
-
-    let waveManagerEnabled = constantsFlag;
-    if (overrideValue === true) {
-      waveManagerEnabled = true;
-    } else if (overrideValue === false) {
-      waveManagerEnabled = false;
-    }
-
-    if (!facade._waveSystemDebugLogged) {
-      console.debug(
-        `[EnemySystem] Wave system: ${waveManagerEnabled ? 'WaveManager' : 'Legacy'}`
-      );
-      facade._waveSystemDebugLogged = true;
-    }
-
-    facade._waveManagerRuntimeEnabled = waveManagerEnabled;
-
-    const waveManagerHandlesSpawnFlag =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled;
     const waveManagerInstance = this.ctx?.waveManager;
     const waveManagerControlsSpawn = Boolean(
-      waveManagerHandlesSpawnFlag &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
         waveManagerInstance &&
         !facade._waveManagerFallbackWarningIssued &&
         !facade._waveManagerInvalidStateWarningIssued
@@ -157,13 +128,8 @@ export class EnemyUpdateSystem {
       sessionStats.timeElapsed += deltaTime;
     }
 
-    if (waveManagerEnabled) {
-      this.updateWaveManagerLogic(deltaTime);
-      this.updateAsteroids(deltaTime);
-    } else {
-      this.updateAsteroids(deltaTime);
-      this.updateWaveLogic(deltaTime);
-    }
+    this.updateWaveManagerLogic(deltaTime);
+    this.updateAsteroids(deltaTime);
 
     this.updateSupportEnemies(deltaTime);
     this.cleanupDestroyed();
@@ -192,8 +158,7 @@ export class EnemyUpdateSystem {
     let spawnHandled = false;
 
     const waveManagerHandlesSpawn =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       this.ctx?.waveManager &&
       !facade._waveManagerFallbackWarningIssued &&
       !facade._waveManagerInvalidStateWarningIssued;
@@ -257,7 +222,7 @@ export class EnemyUpdateSystem {
     if (!waveManager) {
       if (!facade._waveManagerFallbackWarningIssued) {
         console.warn(
-          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
+          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic().'
         );
         facade._waveManagerFallbackWarningIssued = true;
       }
@@ -265,8 +230,7 @@ export class EnemyUpdateSystem {
     }
 
     const waveManagerHandlesAsteroids =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       !facade._waveManagerFallbackWarningIssued &&
       !facade._waveManagerInvalidStateWarningIssued;
 
@@ -295,7 +259,7 @@ export class EnemyUpdateSystem {
     if (!managerStateValid) {
       if (!facade._waveManagerInvalidStateWarningIssued) {
         console.warn(
-          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
+          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic().'
         );
         facade._waveManagerInvalidStateWarningIssued = true;
       }
@@ -332,21 +296,7 @@ export class EnemyUpdateSystem {
     }
 
     if (becameActive) {
-      const baseMultiplier = Number.isFinite(ASTEROIDS_PER_WAVE_MULTIPLIER)
-        ? ASTEROIDS_PER_WAVE_MULTIPLIER
-        : 1.3;
-      const baseCountValue = Number.isFinite(ASTEROIDS_PER_WAVE_BASE)
-        ? ASTEROIDS_PER_WAVE_BASE
-        : 4;
-      const normalizedWaveIndex = Math.max(0, resolvedWaveNumber - 1);
-      const computedTotal = Math.floor(
-        baseCountValue * Math.pow(baseMultiplier, normalizedWaveIndex)
-      );
-      const capValue = Number.isFinite(MAX_ASTEROIDS_ON_SCREEN)
-        ? MAX_ASTEROIDS_ON_SCREEN
-        : 25;
-
-      wave.totalAsteroids = Math.max(0, Math.min(computedTotal, capValue));
+      wave.totalAsteroids = directorFor(resolvedWaveNumber).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = Number.isFinite(Number(WAVE_DURATION))
@@ -365,23 +315,12 @@ export class EnemyUpdateSystem {
       }
     }
 
-    const legacyCompatibilityEnabled =
-      (PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-      waveManagerHandlesAsteroids;
-
     const totals = managerState.totals || {};
     const counts = managerState.counts || {};
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
-    const resolvedCompatibilityMode =
-      managerState.compatibilityMode ??
-      (!waveManagerHandlesAsteroids || legacyCompatibilityEnabled);
-    const resolvedFallbackActive =
-      managerState.legacyFallbackActive ?? !waveManagerHandlesAsteroids;
-
-    wave.compatibilityMode = Boolean(resolvedCompatibilityMode);
-    wave.legacyFallbackActive = Boolean(resolvedFallbackActive);
+    wave.compatibilityMode = Boolean(managerState.compatibilityMode ?? true);
 
     const coerceFiniteNumber = (value) => {
       const numeric = Number(value);
@@ -420,12 +359,9 @@ export class EnemyUpdateSystem {
     };
 
     if (waveManagerHandlesAsteroids) {
-      const managerSpawnedValue = legacyCompatibilityEnabled
-        ? spawnedBreakdown.asteroids ?? managerState.spawned
-        : managerState.spawned;
-      const managerTotalValue = legacyCompatibilityEnabled
-        ? totals.asteroids ?? managerState.total
-        : managerState.total;
+      const managerSpawnedValue =
+        spawnedBreakdown.asteroids ?? managerState.spawned;
+      const managerTotalValue = totals.asteroids ?? managerState.total;
 
       nextSpawned = selectManagerValue(managerSpawnedValue, previousSpawned);
       nextTotal = selectManagerValue(managerTotalValue, previousTotal);
@@ -463,10 +399,7 @@ export class EnemyUpdateSystem {
       );
     }
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       const managerKilled = managerState.killed ?? 0;
       const systemKilled = wave.asteroidsKilled ?? 0;
       if (Math.abs(managerKilled - systemKilled) > 1) {
@@ -594,7 +527,6 @@ export class EnemyUpdateSystem {
    * @param {number} deltaTime
    */
   updateSupportEnemies(deltaTime) {
-    const facade = this.facade;
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
@@ -651,11 +583,10 @@ export class EnemyUpdateSystem {
 
     const velocitySpeed = Math.hypot(asteroid.vx ?? 0, asteroid.vy ?? 0);
     const fallbackSpeed =
-      ASTEROID_SPEEDS?.[asteroid.size] ||
-      ASTEROID_SPEEDS?.medium ||
-      45;
+      ASTEROID_SPEEDS?.[asteroid.size] || ASTEROID_SPEEDS?.medium || 45;
     const speed = velocitySpeed > 0 ? velocitySpeed : fallbackSpeed;
-    const travelTime = (margin + (Number(asteroid.radius) || 0)) / Math.max(speed, 1);
+    const travelTime =
+      (margin + (Number(asteroid.radius) || 0)) / Math.max(speed, 1);
     const recoveryTime = Math.max(
       Number(ASTEROID_OFFSCREEN_RECOVERY_TIME) || 4,
       travelTime + 0.5
@@ -675,7 +606,10 @@ export class EnemyUpdateSystem {
     const offset =
       random && typeof random.range === 'function'
         ? random.range(-variance, variance)
-        : (random?.float?.() ?? Math.random()) * 2 * variance - variance;
+        : requireRandom(random, 'enemy.asteroid.entry-angle').float() *
+            2 *
+            variance -
+          variance;
 
     const angle = Math.atan2(height / 2 - asteroid.y, width / 2 - asteroid.x);
     const nextVx = Math.cos(angle + offset) * speed;
@@ -691,7 +625,6 @@ export class EnemyUpdateSystem {
    * Performs asteroid-asteroid collision handling using a reusable buffer.
    */
   handleAsteroidCollisions() {
-    const facade = this.facade;
     const buffer = this._activeAsteroidsBuffer;
     buffer.length = 0;
 

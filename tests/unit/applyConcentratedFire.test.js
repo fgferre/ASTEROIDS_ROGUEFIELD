@@ -22,7 +22,7 @@ import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
 import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 
-const TEST_SEED = 0xCF01;
+const TEST_SEED = 0xcf01;
 
 function makeCombat() {
   const container = createTestContainer(String(TEST_SEED));
@@ -33,12 +33,27 @@ function makeCombat() {
     isDead: false,
     isRetrying: false,
     _quitExplosionHidden: false,
-    getPosition() { return { ...playerPos }; },
-    getVelocity() { return { x: 0, y: 0 }; },
-    getAngle() { return 0; },
-    getRotation() { return 0; },
-    getHullBoundingRadius() { return 16; },
-    getStats() { return { multishot: 1, damage: 10 }; },
+    getPosition() {
+      return { ...playerPos };
+    },
+    getVelocity() {
+      return { x: 0, y: 0 };
+    },
+    getAngle() {
+      return 0;
+    },
+    getRotation() {
+      return 0;
+    },
+    getHullBoundingRadius() {
+      return 16;
+    },
+    getShieldRadius() {
+      return 16;
+    },
+    getStats() {
+      return { multishot: 1, damage: 10 };
+    },
   };
   const enemies = { forEachActiveEnemy: () => {} };
   const physics = { forEachBulletCollision: () => {} };
@@ -134,7 +149,9 @@ describe('applyConcentratedFire', () => {
       });
 
       // Three lanes ordered along the y axis (perpendicular to +x).
-      const ys = result.map((entry) => entry.fireOrigin.y).sort((a, b) => a - b);
+      const ys = result
+        .map((entry) => entry.fireOrigin.y)
+        .sort((a, b) => a - b);
       expect(ys[0]).toBeLessThan(ys[1]);
       expect(ys[1]).toBeLessThan(ys[2]);
       // Middle lane has zero offset (shotCount 3 → indices -1, 0, +1).
@@ -159,7 +176,9 @@ describe('applyConcentratedFire', () => {
       });
 
       // Two lanes ordered along x axis (perpendicular to +y).
-      const xs = result.map((entry) => entry.fireOrigin.x).sort((a, b) => a - b);
+      const xs = result
+        .map((entry) => entry.fireOrigin.x)
+        .sort((a, b) => a - b);
       expect(xs[0]).toBeLessThan(xs[1]);
       // Symmetric around 0 (shotCount 2 → indices -0.5, +0.5).
       expect(xs[0]).toBeCloseTo(-xs[1], 5);
@@ -199,11 +218,10 @@ describe('applyConcentratedFire', () => {
     it('throws on invalid kind discriminator', () => {
       const combat = makeCombat();
       expect(() => {
-        combat.applyConcentratedFire(
-          { kind: 'invalid' },
-          2,
-          { damage: 10, multishot: 2 }
-        );
+        combat.applyConcentratedFire({ kind: 'invalid' }, 2, {
+          damage: 10,
+          multishot: 2,
+        });
       }).toThrow();
     });
   });

@@ -41,7 +41,7 @@ if (MATH_RANDOM_LEAK_DETECTED) {
   );
 }
 
-const BOSS_CURVE_SEED = 0xB055;
+const BOSS_CURVE_SEED = 0xb055;
 const TICK = 1 / 60;
 const HARD_TIMEOUT_SECONDS = 90;
 const KILL_TIME_MIN = 60;
@@ -129,10 +129,7 @@ function createMinimalPlayer() {
   };
 }
 
-function setupBossFight(
-  appliedUpgrades,
-  seedScope = String(BOSS_CURVE_SEED)
-) {
+function setupBossFight(appliedUpgrades, seedScope = String(BOSS_CURVE_SEED)) {
   const container = createTestContainer(seedScope);
   const eventBus = container.resolve('event-bus');
   const random = container.resolve('random');

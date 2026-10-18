@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties -- this dev guard wraps the global Math.random to report callers; it must read and replace it */
 const guardState = {
   installed: false,
   activate: null,

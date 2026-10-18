@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties -- benchmark/validation script: synthetic load data, not gameplay; determinism not required */
 // Validation script for Object Pooling implementation
 import { GamePools } from '../src/core/GamePools.js';
 import { ObjectPool } from '../src/core/ObjectPool.js';

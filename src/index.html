@@ -104,6 +104,16 @@
                 Credits
               </button>
             </nav>
+            <ul class="controls-hints" aria-label="Controls">
+              <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+              <li><kbd>A</kbd><kbd>D</kbd> turn</li>
+              <li><kbd>Shift</kbd> dash</li>
+              <li><kbd>E</kbd> shield</li>
+              <li><kbd>G</kbd> spread mode</li>
+              <li><kbd>T</kbd> aim mode</li>
+              <li><kbd>Esc</kbd> pause</li>
+              <li class="controls-hints__note">Shooting is automatic</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -118,6 +128,28 @@
           <div id="upgrades-container" class="upgrades-grid">
             <!-- Upgrades will be inserted here dynamically -->
           </div>
+          <div class="levelup-actions">
+            <button
+              id="levelup-reroll-btn"
+              class="btn btn--secondary levelup-action"
+              type="button"
+            >
+              Reroll (R)
+              <span class="levelup-action__count" data-count>1 left</span>
+            </button>
+            <button
+              id="levelup-banish-btn"
+              class="btn btn--danger levelup-action"
+              type="button"
+              aria-pressed="false"
+            >
+              Banish (B)
+              <span class="levelup-action__count" data-count>1 left</span>
+            </button>
+          </div>
+          <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
+            Pick a card to banish it for the rest of the run. Esc cancels.
+          </p>
         </div>
       </div>
 
@@ -157,9 +189,16 @@
             </button>
           </div>
           <div class="pause-hints">
-            <p class="pause-hint">
-              Use this break to adjust settings or plan your next wave.
-            </p>
+            <ul class="controls-hints" aria-label="Controls">
+              <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+              <li><kbd>A</kbd><kbd>D</kbd> turn</li>
+              <li><kbd>Shift</kbd> dash</li>
+              <li><kbd>E</kbd> shield</li>
+              <li><kbd>G</kbd> spread mode</li>
+              <li><kbd>T</kbd> aim mode</li>
+              <li><kbd>Esc</kbd> pause</li>
+              <li class="controls-hints__note">Shooting is automatic</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -275,6 +314,33 @@
       <div id="gameover-screen" class="screen screen--overlay hidden">
         <div class="gameover-content">
           <h1 class="gameover-title">GAME OVER</h1>
+          <dl id="gameover-stats" class="gameover-stats">
+            <div class="gameover-stat">
+              <dt>Time</dt>
+              <dd id="gameover-time">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Layer</dt>
+              <dd id="gameover-wave">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Kills</dt>
+              <dd id="gameover-kills">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Max combo</dt>
+              <dd id="gameover-combo">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Level</dt>
+              <dd id="gameover-level">—</dd>
+            </div>
+          </dl>
+          <ul
+            id="gameover-build"
+            class="gameover-build"
+            aria-label="Upgrades this run"
+          ></ul>
           <div class="gameover-actions">
             <button id="restart-game-btn" class="btn btn--primary">
               New Mission
@@ -283,6 +349,54 @@
               Retry (<span id="retry-count">1</span>/1)
             </button>
             <button id="quit-game-btn" class="btn btn--outline">
+              Quit to Menu
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Victory Overlay -->
+      <div id="victory-screen" class="screen screen--overlay victory hidden">
+        <div class="gameover-content">
+          <h1 class="gameover-title">FIELD CLEARED</h1>
+          <p class="victory-subtitle">The Ring is quiet.</p>
+          <dl id="victory-stats" class="gameover-stats">
+            <div class="gameover-stat">
+              <dt>Time</dt>
+              <dd id="victory-time">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Layer</dt>
+              <dd id="victory-wave">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Kills</dt>
+              <dd id="victory-kills">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Max combo</dt>
+              <dd id="victory-combo">—</dd>
+            </div>
+            <div class="gameover-stat">
+              <dt>Level</dt>
+              <dd id="victory-level">—</dd>
+            </div>
+          </dl>
+          <ul
+            id="victory-build"
+            class="gameover-build"
+            aria-label="Upgrades this run"
+          ></ul>
+          <ul
+            id="victory-synergies"
+            class="gameover-build"
+            aria-label="Unlocked synergies"
+          ></ul>
+          <div class="gameover-actions">
+            <button id="victory-restart-btn" class="btn btn--primary">
+              New Mission
+            </button>
+            <button id="victory-quit-btn" class="btn btn--outline">
               Quit to Menu
             </button>
           </div>

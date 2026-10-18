@@ -24,8 +24,8 @@
 
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
-import { USE_WAVE_MANAGER } from '../../../data/constants/gameplay.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 class EnemyDamageSystem {
   /**
@@ -96,7 +96,8 @@ class EnemyDamageSystem {
       return { killed: false, remainingHealth: 0, fragments: [] };
     }
 
-    const killed = asteroid.takeDamage(damage);
+    // options.source carries the hit position for direction-aware enemies (Bulwark).
+    const killed = asteroid.takeDamage(damage, options.source);
     const remainingHealth = Math.max(0, asteroid.health);
 
     if (killed) {
@@ -275,9 +276,7 @@ class EnemyDamageSystem {
         activeCount === 0;
 
       const usingWaveManager =
-        this.facade.useManagers &&
-        Boolean(USE_WAVE_MANAGER) &&
-        this.facade.waveManager;
+        this.facade.useManagers && this.facade.waveManager;
 
       if (
         !usingWaveManager &&
@@ -685,7 +684,12 @@ class EnemyDamageSystem {
         const rotationImpulse =
           rotationSource && typeof rotationSource.range === 'function'
             ? rotationSource.range(-1.5, 1.5)
-            : (rotationSource?.float?.() ?? Math.random()) * 3 - 1.5;
+            : requireRandom(
+                rotationSource,
+                'enemy.collision.rotation'
+              ).float() *
+                3 -
+              1.5;
         asteroid.rotationSpeed += rotationImpulse * falloff;
       }
     }

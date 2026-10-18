@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 /**
  * HV-06 — Same seed must produce exactly the same thruster particles.
@@ -10,16 +11,29 @@ describe('HV-06: Thruster particle determinism', () => {
   function createEffectsSystem(seed) {
     const container = createTestContainer(seed);
     const random = container.resolve('random');
-    const system = new EffectsSystem({ random });
+    const system = new EffectsSystem({
+      random,
+      settings: createSettingsStub(),
+    });
     system.particleDensity = 1;
 
     // Stub createParticle to avoid GamePools dependency — returns plain object
     // Must NOT consume any random numbers to avoid contaminating fork state
     system.createParticle = function (x, y, vx, vy, color, size, life, type) {
       return {
-        x, y, vx, vy, color, size, life, maxLife: life,
-        alpha: 1, type: type || 'normal',
-        rotation: 0, rotationSpeed: 0, active: true,
+        x,
+        y,
+        vx,
+        vy,
+        color,
+        size,
+        life,
+        maxLife: life,
+        alpha: 1,
+        type: type || 'normal',
+        rotation: 0,
+        rotationSpeed: 0,
+        active: true,
       };
     };
 
@@ -30,9 +44,12 @@ describe('HV-06: Thruster particle determinism', () => {
     system.particles = [];
     system.spawnThrusterVFX(...args);
     return system.particles.map((p) => ({
-      x: p.x, y: p.y,
-      vx: p.vx, vy: p.vy,
-      size: p.size, life: p.life,
+      x: p.x,
+      y: p.y,
+      vx: p.vx,
+      vy: p.vy,
+      size: p.size,
+      life: p.life,
       color: p.color,
     }));
   }

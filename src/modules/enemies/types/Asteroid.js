@@ -22,7 +22,22 @@ import {
   ASTEROID_VARIANTS,
 } from '../../../data/enemies/asteroid-configs.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
-import { NeonGraphics } from '../../../utils/NeonGraphics.js';
+import { getRenderScale } from '../../../core/viewport.js';
+import { getEmissive } from '../../../core/bloomLayer.js';
+import {
+  HIT_FLASH_BODY_ALPHA,
+  HIT_FLASH_EMISSIVE_ALPHA,
+  whiteSilhouette,
+} from '../components/RenderComponent.js';
+import {
+  FILL_LIGHT,
+  KEY_LIGHT_ANGLE,
+  KEY_LIGHT_DIR,
+  LINE,
+  PALETTE,
+  withAlpha,
+} from '../../../data/constants/palette.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 /**
  * Asteroid Enemy Type
@@ -294,7 +309,12 @@ export class Asteroid extends BaseEnemy {
       const angleOffset =
         typeof movementRandom.range === 'function'
           ? movementRandom.range(-angleVariance, angleVariance)
-          : (movementRandom.float?.() ?? Math.random()) * 2 * angleVariance -
+          : requireRandom(
+              movementRandom,
+              'enemy.asteroid.entry-angle'
+            ).float() *
+              2 *
+              angleVariance -
             angleVariance;
       const targetAngle = Math.atan2(
         GAME_HEIGHT / 2 - this.y,
@@ -391,7 +411,6 @@ export class Asteroid extends BaseEnemy {
     this.randomScopes = null;
     this.randomScopeSeeds = null;
     this.spriteCache = null;
-    this.spriteCacheStage = -1;
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -1019,17 +1038,16 @@ export class Asteroid extends BaseEnemy {
 
     this.health = Math.max(0, this.health - appliedDamage);
     this.lastDamageTime = 0.12;
+    this.markHit();
     this.updateCrackStage();
     return this.health <= 0;
   }
 
   getVariantColors() {
     const fallback = {
-      fill:
-        { large: '#8B4513', medium: '#A0522D', small: '#CD853F' }[this.size] ||
-        '#8B4513',
-      stroke: '#654321',
-      cracks: 'rgba(255, 255, 255, 0.45)',
+      fill: PALETTE.rock,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.shot,
     };
 
     const colors = this.variantConfig?.colors;
@@ -1044,106 +1062,415 @@ export class Asteroid extends BaseEnemy {
       glow: colors.glow,
       innerGlow: colors.innerGlow,
       pulse: colors.pulse,
+      tint: colors.tint,
+      veins: colors.veins,
+      rim: colors.rim,
     };
+  }
+
+  invalidateCache() {
+    this.spriteCache = null;
+  }
+
+  /**
+   * Bakes the Ring fragment (docs/NORTE.md §3): matte faceted stone lit by the
+   * key light, crater pits, a dark 1 px edge, and cracks/veins as amber light.
+   * Two canvases: `canvas` (the stone, cracks included) and `glow` (only the
+   * light sources, drawn into the bloom layer every frame). Baked in local
+   * space and rotated at draw time, so the key light turns with the rock —
+   * accepted at this size.
+   */
+  ensureSpriteCache() {
+    const scale = getRenderScale();
+    const key = `${this.variant}|${this.size}|${this.crackStage}|${scale}`;
+    if (this.spriteCache && this.spriteCache.key === key) {
+      return this.spriteCache;
+    }
+
+    const padding = 10;
+    const size = Math.ceil((this.radius + padding) * 2);
+    const offset = size / 2;
+    const makeLayer = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(size * scale);
+      canvas.height = Math.ceil(size * scale);
+      const layerCtx = canvas.getContext('2d');
+      if (!layerCtx) return null;
+      layerCtx.scale(scale, scale);
+      layerCtx.translate(offset, offset);
+      return { canvas, ctx: layerCtx };
+    };
+
+    const body = makeLayer();
+    if (!body) return null;
+    const colors = this.getVariantColors();
+    const lights = this.collectLightStrokes(colors);
+    const glow = lights.length > 0 || colors.rim ? makeLayer() : null;
+
+    this.bakeStone(body.ctx, colors, scale);
+    this.bakeLights(body.ctx, glow?.ctx ?? null, colors, lights, scale);
+
+    this.spriteCache = {
+      key,
+      canvas: body.canvas,
+      glow: glow?.canvas ?? null,
+      offset,
+      size,
+      scale,
+    };
+    return this.spriteCache;
+  }
+
+  traceOutline(ctx) {
+    ctx.beginPath();
+    this.vertices.forEach((v, i) => {
+      if (i === 0) ctx.moveTo(v.x, v.y);
+      else ctx.lineTo(v.x, v.y);
+    });
+    ctx.closePath();
+  }
+
+  bakeStone(ctx, colors, scale) {
+    const vertices = this.vertices;
+    if (!Array.isArray(vertices) || vertices.length < 3) return;
+    const r = this.radius;
+    const rand = this.createSeededRandom(this.crackSeed ^ 0x51ed27);
+    const translucent = Boolean(colors.rim);
+    const base = colors.tint
+      ? this.mixColor(colors.fill, colors.tint, 0.18)
+      : colors.fill;
+    const tone = (shade) =>
+      shade >= 0
+        ? this.mixColor(base, PALETTE.rockLit, Math.min(1, shade * 0.75))
+        : this.mixColor(base, PALETTE.rockShadow, Math.min(1, -shade * 0.85));
+
+    // Facet planes: the outline split into 3–6 fans around a jittered center.
+    const n = vertices.length;
+    const cx = (rand() - 0.5) * r * 0.3;
+    const cy = (rand() - 0.5) * r * 0.3;
+    const facetCount = Math.min(n, 3 + Math.floor(rand() * 4));
+    const start = Math.floor(rand() * n);
+    const cuts = [];
+    for (let i = 0; i < facetCount; i += 1) {
+      const jitter = i === 0 ? 0 : Math.round((rand() - 0.5) * 0.8);
+      cuts.push((start + Math.round((i * n) / facetCount) + jitter + n) % n);
+    }
+
+    ctx.save();
+    this.traceOutline(ctx);
+    ctx.clip();
+    ctx.globalAlpha = translucent ? 0.55 : 1;
+    for (let i = 0; i < facetCount; i += 1) {
+      const from = cuts[i];
+      const to = cuts[(i + 1) % facetCount];
+      const span = (to - from + n) % n || n;
+      let sx = 0;
+      let sy = 0;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      for (let k = 0; k <= span; k += 1) {
+        const v = vertices[(from + k) % n];
+        ctx.lineTo(v.x, v.y);
+        sx += v.x;
+        sy += v.y;
+      }
+      ctx.closePath();
+      const len = Math.hypot(sx, sy) || 1;
+      const facing =
+        (sx / len) * KEY_LIGHT_DIR.x + (sy / len) * KEY_LIGHT_DIR.y;
+      ctx.fillStyle = tone(facing * 0.8 + (rand() - 0.5) * 0.3);
+      ctx.fill();
+      ctx.strokeStyle = translucent
+        ? withAlpha(colors.rim, 0.3)
+        : withAlpha(PALETTE.rockShadow, 0.45);
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
+
+    // Volume: lit toward the key light, falling into shadow opposite.
+    const light = ctx.createRadialGradient(
+      KEY_LIGHT_DIR.x * r * 0.4,
+      KEY_LIGHT_DIR.y * r * 0.4,
+      0,
+      KEY_LIGHT_DIR.x * r * 0.2,
+      KEY_LIGHT_DIR.y * r * 0.2,
+      r * 1.25
+    );
+    light.addColorStop(0, withAlpha(PALETTE.rockLit, 0.22));
+    light.addColorStop(0.5, withAlpha(PALETTE.rockShadow, 0));
+    light.addColorStop(1, withAlpha(PALETTE.rockShadow, 0.75));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = light;
+    ctx.fillRect(-r * 1.3, -r * 1.3, r * 2.6, r * 2.6);
+
+    // Cool fill light bouncing from below-right.
+    const fill = ctx.createLinearGradient(
+      KEY_LIGHT_DIR.x * r * 0.1,
+      KEY_LIGHT_DIR.y * r * 0.1,
+      -KEY_LIGHT_DIR.x * r,
+      -KEY_LIGHT_DIR.y * r
+    );
+    fill.addColorStop(0.45, withAlpha(PALETTE.background, 0));
+    fill.addColorStop(1, FILL_LIGHT);
+    ctx.fillStyle = fill;
+    ctx.fillRect(-r * 1.3, -r * 1.3, r * 2.6, r * 2.6);
+
+    // Crater pits: dark ellipse, thin lit lip on the key side.
+    const surface = r * 0.78;
+    const sizeRatio = Math.max(0, Math.min(1, (r - 12) / 23));
+    const craters = Math.round(10 + 15 * sizeRatio);
+    for (let i = 0; i < craters; i += 1) {
+      const angle = rand() * Math.PI * 2;
+      const dist = Math.sqrt(rand()) * surface * 0.88;
+      const pitRadius = Math.max(0.7, r * (0.03 + rand() * 0.08));
+      const squash = 1 - (dist / r) * 0.45;
+      const x = Math.cos(angle) * dist;
+      const y = Math.sin(angle) * dist;
+      ctx.beginPath();
+      ctx.ellipse(x, y, pitRadius * squash, pitRadius, angle, 0, Math.PI * 2);
+      ctx.fillStyle = withAlpha(PALETTE.rockShadow, 0.6);
+      ctx.fill();
+      const lip = KEY_LIGHT_ANGLE - angle;
+      ctx.beginPath();
+      ctx.ellipse(
+        x,
+        y,
+        pitRadius * squash,
+        pitRadius,
+        angle,
+        lip - 1.1,
+        lip + 1.1
+      );
+      ctx.strokeStyle = withAlpha(PALETTE.rockLit, 0.45);
+      ctx.lineWidth = Math.min(0.8, pitRadius * 0.45);
+      ctx.stroke();
+    }
+
+    // Edges facing the key light catch it.
+    for (let i = 0; i < n; i += 1) {
+      const a = vertices[i];
+      const b = vertices[(i + 1) % n];
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = (b.y - a.y) / len;
+      const ny = -(b.x - a.x) / len;
+      const facing = nx * KEY_LIGHT_DIR.x + ny * KEY_LIGHT_DIR.y;
+      if (facing <= 0.15) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = withAlpha(PALETTE.rockLit, 0.55 * facing);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    this.traceOutline(ctx);
+    ctx.strokeStyle = colors.stroke;
+    ctx.lineWidth = LINE.hair;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    if (translucent) {
+      ctx.save();
+      ctx.shadowBlur = 3 * scale;
+      ctx.shadowColor = withAlpha(colors.rim, 0.6);
+      ctx.strokeStyle = withAlpha(colors.rim, 0.55);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /** Crack segments up to the current stage, plus variant veins. */
+  collectLightStrokes(colors) {
+    const strokes = [];
+    if (colors.veins) {
+      const rand = this.createSeededRandom(this.crackSeed ^ 0x7e1a5);
+      const reach = Math.max(this.radius * 0.5, this.minSurfaceRadius || 0);
+      const veinCount = 2 + Math.floor(rand() * 3);
+      for (let v = 0; v < veinCount; v += 1) {
+        let angle = rand() * Math.PI * 2;
+        let dist = reach * (0.05 + rand() * 0.2);
+        let x = Math.cos(angle) * dist;
+        let y = Math.sin(angle) * dist;
+        const steps = 3 + Math.floor(rand() * 3);
+        for (let s = 0; s < steps; s += 1) {
+          dist = Math.min(reach * 0.85, dist + reach * (0.15 + rand() * 0.12));
+          angle += (rand() - 0.5) * 0.7;
+          const nx = Math.cos(angle) * dist;
+          const ny = Math.sin(angle) * dist;
+          strokes.push({ x1: x, y1: y, x2: nx, y2: ny, width: 1.1 - s * 0.12 });
+          x = nx;
+          y = ny;
+        }
+      }
+    }
+
+    for (let stage = 0; stage < this.crackStage; stage += 1) {
+      const layer = this.crackLayers[stage];
+      const segments = layer?.segments || layer?.lines || [];
+      segments.forEach((line) => {
+        strokes.push({
+          x1: line.x1 ?? line.start?.x ?? 0,
+          y1: line.y1 ?? line.start?.y ?? 0,
+          x2: line.x2 ?? line.end?.x ?? 0,
+          y2: line.y2 ?? line.end?.y ?? 0,
+          width: Number.isFinite(line.width) ? line.width : 1,
+        });
+      });
+    }
+    return strokes;
+  }
+
+  bakeLights(ctx, glowCtx, colors, strokes, scale) {
+    const light = colors.veins || colors.cracks;
+    const core = this.mixColor(light, PALETTE.text, 0.45);
+    const strokeAll = (target, color, widthScale, minWidth) => {
+      target.strokeStyle = color;
+      for (const s of strokes) {
+        target.lineWidth = Math.max(minWidth, s.width * widthScale);
+        target.beginPath();
+        target.moveTo(s.x1, s.y1);
+        target.lineTo(s.x2, s.y2);
+        target.stroke();
+      }
+    };
+
+    // cracks are light inside the stone: keep them within the silhouette
+    if (strokes.length > 0) {
+      ctx.save();
+      this.traceOutline(ctx);
+      ctx.clip();
+      ctx.lineCap = 'round';
+      ctx.shadowBlur = 5 * scale;
+      ctx.shadowColor = light;
+      strokeAll(ctx, withAlpha(light, 0.75), 0.7, 0.7);
+      ctx.shadowBlur = 0;
+      strokeAll(ctx, core, 0.35, 0.4);
+      ctx.restore();
+    }
+
+    if (!glowCtx) return;
+    glowCtx.save();
+    this.traceOutline(glowCtx);
+    glowCtx.clip();
+    glowCtx.lineCap = 'round';
+    strokeAll(glowCtx, light, 1.2, 1);
+    glowCtx.restore();
+    if (colors.rim) {
+      this.traceOutline(glowCtx);
+      glowCtx.strokeStyle = withAlpha(colors.rim, 0.45);
+      glowCtx.lineWidth = LINE.hair;
+      glowCtx.stroke();
+    }
+  }
+
+  /** Light intensity (0..~1.6) for veins and cracks this frame. */
+  getLightIntensity() {
+    const pulse = this.variantConfig?.visual?.pulse;
+    if (!pulse) return 1;
+    const wave = 0.5 + 0.5 * Math.sin(this.visualState?.glowTime ?? 0);
+    const amount = Math.max(0, Math.min(1, pulse.amount ?? 0.4));
+    let intensity = 1 - amount + amount * wave;
+    if (this.behavior?.type === 'volatile') {
+      intensity *= 1 + (pulse.fuseBoost ?? 0) * this.getVolatileFuseProgress();
+      if (this.variantState?.armed) {
+        intensity *= 1 + (pulse.armedBoost ?? 0);
+      }
+    }
+    return intensity;
   }
 
   /**
    * Renders the asteroid.
    * Overrides BaseEnemy.draw() to provide asteroid-specific rendering.
    */
-  invalidateCache() {
-    this.spriteCache = null;
-    this.spriteCacheStage = -1;
-  }
-
-  ensureSpriteCache() {
-    if (this.spriteCache && this.spriteCacheStage === this.crackStage) {
-      return this.spriteCache;
-    }
-
-    const padding = 20;
-    const diameter = Math.ceil((this.radius + padding) * 2);
-    const offset = Math.ceil(this.radius + padding);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = diameter;
-    canvas.height = diameter;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) return null;
-
-    ctx.translate(offset, offset);
-
-    const path = new Path2D();
-    if (this.vertices.length > 0) {
-      this.vertices.forEach((v, i) => {
-        if (i === 0) path.moveTo(v.x, v.y);
-        else path.lineTo(v.x, v.y);
-      });
-      path.closePath();
-    }
-
-    const colors = this.getVariantColors();
-    const neonColor = colors.stroke || '#8B4513';
-
-    NeonGraphics.drawShape(ctx, path, neonColor, 2.0, true);
-
-    if (this.crackStage > 0) {
-      for (let stage = 0; stage < this.crackStage; stage += 1) {
-        const layer = this.crackLayers[stage];
-        if (!layer) continue;
-        const segments = layer.segments || layer.lines || [];
-
-        segments.forEach((line) => {
-          const crackPath = new Path2D();
-          const x1 = line.x1 ?? line.start?.x ?? 0;
-          const y1 = line.y1 ?? line.start?.y ?? 0;
-          const x2 = line.x2 ?? line.end?.x ?? 0;
-          const y2 = line.y2 ?? line.end?.y ?? 0;
-          crackPath.moveTo(x1, y1);
-          crackPath.lineTo(x2, y2);
-          NeonGraphics.drawPath(ctx, crackPath, '#FFFFFF', 1.0, 1.5);
-        });
-      }
-    }
-
-    this.spriteCache = { canvas, offset };
-    this.spriteCacheStage = this.crackStage;
-    return this.spriteCache;
-  }
-
   draw(ctx) {
     if (!ctx) return;
 
     const sprite = this.ensureSpriteCache();
+    if (!sprite) return;
 
-    if (sprite) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.rotation);
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.drawImage(
+      sprite.canvas,
+      -sprite.offset,
+      -sprite.offset,
+      sprite.size,
+      sprite.size
+    );
 
-      // [NEO-ARCADE] Use additive blending for cached neon sprites to maintain brightness
+    const pulsing = Boolean(this.variantConfig?.visual?.pulse);
+    const intensity = this.getLightIntensity();
+    if (sprite.glow && pulsing) {
+      // the pulse lives in the light, not in a re-bake
       ctx.globalCompositeOperation = 'lighter';
-      ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
-
-      const isVolatile = this.behavior?.type === 'volatile';
-      if (isVolatile && this.variantState?.armed) {
-        const blink = Math.sin(Date.now() * 0.02) > 0;
-        if (blink) {
-          const path = new Path2D();
-          if (this.vertices.length > 0) {
-            this.vertices.forEach((v, i) => {
-              if (i === 0) path.moveTo(v.x, v.y);
-              else path.lineTo(v.x, v.y);
-            });
-            path.closePath();
-          }
-          NeonGraphics.drawShape(ctx, path, '#FF0000', 4.0, false);
-        }
-      }
-
-      ctx.restore();
+      ctx.globalAlpha = Math.min(1, Math.max(0, (intensity - 0.4) * 0.6));
+      ctx.drawImage(
+        sprite.glow,
+        -sprite.offset,
+        -sprite.offset,
+        sprite.size,
+        sprite.size
+      );
     }
+
+    const flash = this.getHitFlash();
+    const blitFlash = (target, alpha) => {
+      sprite.flash ??= whiteSilhouette(sprite.canvas);
+      if (!sprite.flash) return;
+      target.globalCompositeOperation = 'source-over';
+      target.globalAlpha = alpha * flash;
+      target.drawImage(
+        sprite.flash,
+        -sprite.offset,
+        -sprite.offset,
+        sprite.size,
+        sprite.size
+      );
+    };
+    if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
+
+    const blink =
+      this.behavior?.type === 'volatile' &&
+      this.variantState?.armed &&
+      Math.sin(Date.now() * 0.02) > 0;
+    if (blink) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      this.traceOutline(ctx);
+      ctx.strokeStyle = PALETTE.threat;
+      ctx.lineWidth = LINE.thin;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const emissive = getEmissive();
+    if (!emissive || (!sprite.glow && !blink && flash <= 0)) return;
+    emissive.save();
+    emissive.translate(this.x, this.y);
+    emissive.rotate(this.rotation);
+    if (sprite.glow) {
+      emissive.globalAlpha = Math.min(1, intensity);
+      emissive.drawImage(
+        sprite.glow,
+        -sprite.offset,
+        -sprite.offset,
+        sprite.size,
+        sprite.size
+      );
+    }
+    if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
+    if (blink) {
+      emissive.globalAlpha = 1;
+      this.traceOutline(emissive);
+      emissive.strokeStyle = PALETTE.threat;
+      emissive.lineWidth = LINE.base;
+      emissive.stroke();
+    }
+    emissive.restore();
   }
 
   parseColor(color) {
@@ -1179,12 +1506,6 @@ export class Asteroid extends BaseEnemy {
     }
 
     return { r: 255, g: 255, b: 255 };
-  }
-
-  withAlpha(color, alpha) {
-    const parsed = this.parseColor(color);
-    const clamped = Math.max(0, Math.min(1, alpha));
-    return `rgba(${parsed.r}, ${parsed.g}, ${parsed.b}, ${clamped})`;
   }
 
   mixColor(baseColor, overlayColor, factor) {

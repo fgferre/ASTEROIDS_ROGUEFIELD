@@ -1,3 +1,5 @@
+import { IS_DEV } from '../../core/env.js';
+
 const MAX_LOG_ENTRIES = 50000;
 const TRIM_BATCH_SIZE = 10000;
 const STORAGE_KEY = 'game-debug-log';
@@ -19,18 +21,7 @@ const safeStringify = (value) => {
 };
 
 export function isDevEnvironment() {
-  if (
-    typeof process !== 'undefined' &&
-    process?.env?.NODE_ENV === 'development'
-  ) {
-    return true;
-  }
-
-  try {
-    return Boolean(import.meta && import.meta.env && import.meta.env.DEV);
-  } catch (error) {
-    return false;
-  }
+  return IS_DEV;
 }
 
 export class GameDebugLogger {

@@ -6,8 +6,9 @@ import { withWaveOverrides } from '../__helpers__/setup.js';
 /**
  * D-04 (02-CONTEXT): WaveManager must emit a NEW `boss-warning` event exactly
  * one wave BEFORE each boss wave so the MusicIntensityResolver (plan 02.05) can
- * raise tension pre-boss. Bosses spawn every WAVE_BOSS_INTERVAL=5, so pre-boss
- * waves are 4, 9, 14, ... This producer-only change has no consumer yet; these
+ * raise tension pre-boss. Wardens sit on layers 5, 10 and 15
+ * (src/data/layers.js), so pre-boss waves are 4, 9, 14. This producer-only
+ * change has no consumer yet; these
  * tests lock the emit TIMING and PAYLOAD via the observable emit stream.
  *
  * Phase 1 LEARNINGS: assert on OBSERVABLE event emission (recorded emit array),
@@ -99,7 +100,7 @@ const findEmit = (emits, eventName) =>
 
 describe('WaveManager boss-warning timing (D-04)', () => {
   it('emits boss-warning on wave 4 (one wave before boss wave 5) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(4);
 
       const bossWarning = findEmit(emits, 'boss-warning');
@@ -112,7 +113,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   });
 
   it('emits boss-warning on wave 9 (one wave before boss wave 10) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(9);
 
       const bossWarning = findEmit(emits, 'boss-warning');
@@ -126,7 +127,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   it.each([1, 2, 3])(
     'does NOT emit boss-warning on non-pre-boss wave %i',
     async (wave) => {
-      await withWaveOverrides({ useManager: true }, () => {
+      await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
         const emits = startWaveAndRecord(wave);
 
         expect(findEmit(emits, 'boss-warning')).toBeUndefined();
@@ -137,7 +138,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   );
 
   it('does NOT emit boss-warning on boss wave 5 itself (that is the boss-spawn path)', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(5);
 
       expect(findEmit(emits, 'boss-warning')).toBeUndefined();
@@ -148,7 +149,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   });
 
   it('does NOT emit boss-warning on wave 10 (post-boss, not pre-boss)', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(10);
 
       expect(findEmit(emits, 'boss-warning')).toBeUndefined();

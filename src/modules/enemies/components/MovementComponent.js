@@ -8,6 +8,7 @@ import {
   length,
   normalizeSimple as normalize,
 } from '../../../utils/vectorHelpers.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 const DEFAULT_BOUNDS = Object.freeze({
   left: 0,
@@ -66,7 +67,10 @@ const createDefaultStrategies = () => ({
     const distance = length(desired.x, desired.y);
     if (distance > 1e-6 && distance <= stats.targetingRange) {
       const dir = normalize(desired.x, desired.y);
-      const variance = (random?.float?.() ?? random?.() ?? Math.random()) - 0.5;
+      const variance =
+        (typeof random === 'function'
+          ? random()
+          : requireRandom(random, 'enemy.movement.tracking').float()) - 0.5;
       const acceleration =
         stats.acceleration + variance * (config.variance ?? 12);
       movement.vx += dir.x * acceleration * deltaTime;
@@ -114,7 +118,8 @@ const createDefaultStrategies = () => ({
 
     if (enemy.orbitDirection == null) {
       const directionSeed =
-        random?.range?.(-1, 1) ?? random?.float?.() ?? Math.random();
+        random?.range?.(-1, 1) ??
+        requireRandom(random, 'enemy.movement.orbit').float();
       enemy.orbitDirection = directionSeed > 0.5 ? 1 : -1;
     }
 
@@ -181,7 +186,8 @@ const createDefaultStrategies = () => ({
     state.elapsed = (state.elapsed || 0) + deltaTime;
 
     if (!state.velocity) {
-      const angle = (random?.float?.() ?? Math.random()) * Math.PI * 2;
+      const angle =
+        requireRandom(random, 'enemy.movement.proximity').float() * Math.PI * 2;
       const speed = options.driftSpeed > 0 ? options.driftSpeed : 0;
       state.velocity = {
         x: Math.cos(angle) * speed,
@@ -231,8 +237,9 @@ const createDefaultStrategies = () => ({
       desiredSpeed = lerp(0, options.maxSpeed, ratio);
     }
 
-    const jitterAngle = (random?.float?.() ?? Math.random()) * Math.PI * 2;
-    const jitterAmount = (random?.float?.() ?? Math.random()) * options.jitter;
+    const jitterRandom = requireRandom(random, 'enemy.movement.jitter');
+    const jitterAngle = jitterRandom.float() * Math.PI * 2;
+    const jitterAmount = jitterRandom.float() * options.jitter;
     const jitter = {
       x: Math.cos(jitterAngle) * jitterAmount,
       y: Math.sin(jitterAngle) * jitterAmount,
@@ -285,15 +292,7 @@ const createDefaultStrategies = () => ({
 
   // Parasite movement: tracking with repulsion when too close
   // Ported from AsteroidMovement.parasiteMovement (lines 89-131)
-  parasite: ({
-    enemy,
-    deltaTime,
-    player,
-    playerPosition,
-    random,
-    config,
-    bounds,
-  }) => {
+  parasite: ({ enemy, deltaTime, player, playerPosition, config, bounds }) => {
     // Initialize velocity properties to prevent NaN
     enemy.vx = enemy.vx ?? 0;
     enemy.vy = enemy.vy ?? 0;
@@ -357,15 +356,7 @@ const createDefaultStrategies = () => ({
 
   // Volatile movement: linear with rotation jitter when armed
   // Ported from AsteroidMovement.volatileMovement (lines 141-161)
-  volatile: ({
-    enemy,
-    deltaTime,
-    player,
-    playerPosition,
-    random,
-    config,
-    bounds,
-  }) => {
+  volatile: ({ enemy, deltaTime, random, bounds }) => {
     // Initialize velocity properties to prevent NaN
     enemy.vx = enemy.vx ?? 0;
     enemy.vy = enemy.vy ?? 0;

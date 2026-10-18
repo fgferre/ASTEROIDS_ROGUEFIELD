@@ -33,6 +33,9 @@ import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { getRenderScale } from '../core/viewport.js';
+import { getEmissive } from '../core/bloomLayer.js';
+import { PALETTE, withAlpha } from '../data/constants/palette.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -111,6 +114,23 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
 
 const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
 
+// Per-frame displacement above this is a respawn/teleport, not motion.
+const SPARK_JUMP_DISTANCE = 30;
+
+// Stable per-orb phase so sparks don't pulse in lockstep.
+const sparkPhase = (orb) => {
+  if (orb.sparkPhaseId !== orb.id) {
+    const id = String(orb.id);
+    let hash = 0;
+    for (let i = 0; i < id.length; i += 1) {
+      hash = (hash * 31 + id.charCodeAt(i)) | 0;
+    }
+    orb.sparkPhase = ((hash >>> 0) % 628) / 100;
+    orb.sparkPhaseId = orb.id;
+  }
+  return orb.sparkPhase;
+};
+
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
   cachedProgression: 'progression',
@@ -177,6 +197,7 @@ class XPOrbSystem extends BaseSystem {
         : 0.3;
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
+    this.globalPull = null;
 
     this.orbClusterRadius = 0;
     this.orbClusterForce = 0;
@@ -483,9 +504,9 @@ class XPOrbSystem extends BaseSystem {
     this.xpOrbs.length = 0;
   }
 
-  createOffscreenCanvas(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
+  createOffscreenCanvas(width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
+    const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
 
     if (
       typeof document !== 'undefined' &&
@@ -504,51 +525,65 @@ class XPOrbSystem extends BaseSystem {
     return null;
   }
 
+  // Gold spark (docs/NORTE.md §3): four rays (eight from tier 3) with a soft
+  // halo, plus a separate core for the emissive layer.
   createOrbSprite(visual) {
-    const diameter = Math.ceil(visual.glowRadius * 2 + 6);
-    const canvas = this.createOffscreenCanvas(diameter, diameter);
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      return null;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return null;
-    }
-
-    ctx.save();
-    ctx.translate(diameter / 2, diameter / 2);
-
-    const gradient = ctx.createRadialGradient(
-      0,
-      0,
-      visual.baseRadius * 0.4,
-      0,
-      0,
-      visual.glowRadius
-    );
-    gradient.addColorStop(0, visual.baseColor);
-    gradient.addColorStop(0.6, visual.glowColor);
-    gradient.addColorStop(1, 'transparent');
-
-    ctx.fillStyle = gradient;
-    ctx.fill(visual.glowPath);
-
-    ctx.fillStyle = visual.baseColor;
-    ctx.fill(visual.basePath);
-
-    ctx.fillStyle = visual.highlightColor;
-    ctx.fill(visual.highlightPath);
-
-    ctx.restore();
-
-    return {
-      canvas,
-      width: diameter,
-      height: diameter,
-      halfWidth: diameter / 2,
-      halfHeight: diameter / 2,
+    const diameter = Math.ceil(visual.haloRadius * 2 + 2);
+    const scale = getRenderScale();
+    const bake = (draw) => {
+      const canvas = this.createOffscreenCanvas(diameter, diameter, scale);
+      const ctx = canvas?.getContext?.('2d');
+      if (!ctx) return null;
+      ctx.scale(scale, scale);
+      ctx.translate(diameter / 2, diameter / 2);
+      draw(ctx);
+      return canvas;
     };
+
+    const canvas = bake((ctx) => {
+      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, visual.haloRadius);
+      halo.addColorStop(0, withAlpha(PALETTE.xp, 0.3));
+      halo.addColorStop(1, withAlpha(PALETTE.xp, 0));
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(0, 0, visual.haloRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      const ray = visual.rayLength;
+      const points = visual.rays * 2;
+      ctx.beginPath();
+      for (let k = 0; k < points; k += 1) {
+        const angle = (k / points) * Math.PI * 2;
+        let radius = ray * 0.2;
+        if (k % 2 === 0) {
+          radius = visual.rays > 4 && k % 4 === 2 ? ray * 0.55 : ray;
+        }
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      }
+      ctx.closePath();
+      const body = ctx.createRadialGradient(0, 0, 0, 0, 0, ray);
+      body.addColorStop(0, PALETTE.text);
+      body.addColorStop(0.25, PALETTE.xp);
+      body.addColorStop(1, withAlpha(PALETTE.xp, 0.35));
+      ctx.fillStyle = body;
+      ctx.fill();
+    });
+    const core = bake((ctx) => {
+      const radius = visual.rayLength * 0.55;
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+      glow.addColorStop(0, PALETTE.text);
+      glow.addColorStop(0.35, PALETTE.xp);
+      glow.addColorStop(1, withAlpha(PALETTE.xp, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    if (!canvas || !core) {
+      return null;
+    }
+
+    return { canvas, core, size: diameter, half: diameter / 2, scale };
   }
 
   ensureOrbSprite(visual) {
@@ -556,11 +591,11 @@ class XPOrbSystem extends BaseSystem {
       return null;
     }
 
-    if (visual.sprite) {
+    if (visual.sprite && visual.sprite.scale === getRenderScale()) {
       return visual.sprite;
     }
 
-    if (visual.spriteAttempted) {
+    if (!visual.sprite && visual.spriteAttempted) {
       return null;
     }
 
@@ -772,8 +807,6 @@ class XPOrbSystem extends BaseSystem {
       class: orb.class,
       tier: orb.tier,
       source: options.source || 'drop',
-      color: resolvedConfig.baseColor,
-      glow: resolvedConfig.glowColor,
     });
 
     return orb;
@@ -804,6 +837,10 @@ class XPOrbSystem extends BaseSystem {
   }
 
   update(deltaTime) {
+    if (this.globalPull) {
+      this.updateGlobalPull(deltaTime);
+    }
+
     if (!this.xpOrbs.length && this.activeFusionAnimations.length === 0) {
       return;
     }
@@ -966,6 +1003,35 @@ class XPOrbSystem extends BaseSystem {
     this.spatialIndex = index;
     this.spatialIndexDirty = false;
     return index;
+  }
+
+  // Magnet pickup: every orb flies to the ship, faster each second; the
+  // ship magnetism below collects them on arrival.
+  startGlobalPull(duration, speed, acceleration) {
+    this.globalPull = { remaining: duration, elapsed: 0, speed, acceleration };
+  }
+
+  updateGlobalPull(deltaTime) {
+    const pull = this.globalPull;
+    pull.remaining -= deltaTime;
+    pull.elapsed += deltaTime;
+    const target = this.cachedPlayer?.getPosition();
+    if (pull.remaining <= 0 || !target) {
+      this.globalPull = null;
+      return;
+    }
+    const step = (pull.speed + pull.acceleration * pull.elapsed) * deltaTime;
+    for (const orb of this.xpOrbs) {
+      if (!this.isOrbActive(orb) || orb.isFusing) continue;
+      const dx = target.x - orb.x;
+      const dy = target.y - orb.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) continue;
+      const move = Math.min(step, distance) / distance;
+      orb.x += dx * move;
+      orb.y += dy * move;
+    }
+    this.invalidateSpatialIndex();
   }
 
   updateShipMagnetism(deltaTime) {
@@ -1760,36 +1826,11 @@ class XPOrbSystem extends BaseSystem {
       return this.visualCache.get(key);
     }
 
-    const config = this.getOrbConfig(className);
     const baseRadius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
-    const glowRadius = baseRadius * 2.1;
-    const highlightRadius = baseRadius * 0.35;
-
-    const basePath = new Path2D();
-    basePath.arc(0, 0, baseRadius, 0, Math.PI * 2);
-
-    const glowPath = new Path2D();
-    glowPath.arc(0, 0, glowRadius, 0, Math.PI * 2);
-
-    const highlightPath = new Path2D();
-    highlightPath.arc(
-      -baseRadius * 0.35,
-      -baseRadius * 0.35,
-      highlightRadius,
-      0,
-      Math.PI * 2
-    );
-
     const visual = {
-      baseRadius,
-      glowRadius,
-      highlightRadius,
-      basePath,
-      glowPath,
-      highlightPath,
-      baseColor: config.baseColor,
-      glowColor: config.glowColor,
-      highlightColor: config.highlightColor,
+      rayLength: baseRadius * 0.95,
+      haloRadius: baseRadius * 1.5,
+      rays: tier >= 3 ? 8 : 4,
     };
 
     this.ensureOrbSprite(visual);
@@ -1805,50 +1846,49 @@ class XPOrbSystem extends BaseSystem {
       return;
     }
 
+    const emissive = getEmissive();
     activeOrbs.forEach((orb) => {
-      const visual = this.getOrbVisualConfig(orb.class, orb.tier);
-      const sprite = this.ensureOrbSprite(visual);
+      const sprite = this.ensureOrbSprite(
+        this.getOrbVisualConfig(orb.class, orb.tier)
+      );
+      if (!sprite) return;
 
-      if (sprite && (sprite.canvas || sprite.bitmap)) {
-        const image = sprite.bitmap || sprite.canvas;
-        const offsetX = sprite.halfWidth || sprite.width / 2 || 0;
-        const offsetY = sprite.halfHeight || sprite.height / 2 || 0;
+      const phase = sparkPhase(orb);
+      const age = Number.isFinite(orb.age) ? orb.age : 0;
+      const pulse = 1 + 0.15 * Math.sin(age * 4 + phase);
+      const dx = orb.x - (orb.sparkPrevX ?? orb.x);
+      const dy = orb.y - (orb.sparkPrevY ?? orb.y);
+      orb.sparkPrevX = orb.x;
+      orb.sparkPrevY = orb.y;
 
-        ctx.drawImage(
-          image,
-          orb.x - offsetX,
-          orb.y - offsetY,
-          sprite.width || image.width,
-          sprite.height || image.height
-        );
-        return;
+      // magnetized sparks stretch along their motion; idle ones spin
+      const moved = Math.hypot(dx, dy);
+      let rotation = age * 0.9 + phase;
+      let scaleX = pulse;
+      let scaleY = pulse;
+      if (moved > 0.4 && moved < SPARK_JUMP_DISTANCE) {
+        const stretch = Math.min(1.5, moved * 0.25);
+        rotation = Math.atan2(dy, dx);
+        scaleX = pulse * (1 + stretch);
+        scaleY = pulse / (1 + stretch * 0.5);
       }
 
-      ctx.save();
-      ctx.translate(orb.x, orb.y);
-
-      const gradient = ctx.createRadialGradient(
-        0,
-        0,
-        visual.baseRadius * 0.4,
-        0,
-        0,
-        visual.glowRadius
-      );
-      gradient.addColorStop(0, visual.baseColor);
-      gradient.addColorStop(0.6, visual.glowColor);
-      gradient.addColorStop(1, 'transparent');
-
-      ctx.fillStyle = gradient;
-      ctx.fill(visual.glowPath);
-
-      ctx.fillStyle = visual.baseColor;
-      ctx.fill(visual.basePath);
-
-      ctx.fillStyle = visual.highlightColor;
-      ctx.fill(visual.highlightPath);
-
-      ctx.restore();
+      const draw = (target, image) => {
+        target.save();
+        target.translate(orb.x, orb.y);
+        target.rotate(rotation);
+        target.scale(scaleX, scaleY);
+        target.drawImage(
+          image,
+          -sprite.half,
+          -sprite.half,
+          sprite.size,
+          sprite.size
+        );
+        target.restore();
+      };
+      draw(ctx, sprite.canvas);
+      if (emissive) draw(emissive, sprite.core);
     });
   }
 
@@ -1965,6 +2005,7 @@ class XPOrbSystem extends BaseSystem {
     this.xpOrbPools = this.createEmptyOrbPools();
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
+    this.globalPull = null;
     this.spatialIndex.clear();
     this.spatialIndexDirty = true;
     this.visualCache.clear();

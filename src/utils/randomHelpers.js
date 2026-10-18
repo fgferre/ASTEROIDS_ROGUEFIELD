@@ -1,4 +1,32 @@
 import RandomService from '../core/RandomService.js';
+import { IS_DEV } from '../core/env.js';
+
+const missingRandomFallbacks = new Map();
+
+/**
+ * Returns `random` when it is a seeded generator. A missing generator is a
+ * wiring bug: dev throws so it gets fixed; production falls back to a seeded
+ * RandomService per label so the game never crashes.
+ * @param {Object|null|undefined} random
+ * @param {string} label - stable call-site label, e.g. 'enemy.drone.spawn'
+ * @returns {RandomService}
+ */
+export function requireRandom(random, label) {
+  if (random && typeof random.float === 'function') {
+    return random;
+  }
+  if (IS_DEV) {
+    throw new Error(
+      `[Random] Missing seeded generator for '${label}': wire the 'random' service.`
+    );
+  }
+  let fallback = missingRandomFallbacks.get(label);
+  if (!fallback) {
+    fallback = new RandomService(`fallback:${label}`);
+    missingRandomFallbacks.set(label, fallback);
+  }
+  return fallback;
+}
 
 function assertGetRandomFork(getRandomFork) {
   if (typeof getRandomFork !== 'function') {
@@ -140,4 +168,3 @@ export function createRandomHelpers({
 
   return Object.freeze(boundHelpers);
 }
-

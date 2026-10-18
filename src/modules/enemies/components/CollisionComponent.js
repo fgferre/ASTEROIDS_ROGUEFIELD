@@ -48,7 +48,7 @@ export class CollisionComponent {
   }
 
   handleCollision(context) {
-    const { enemy, other } = context;
+    const { enemy } = context;
     const handler = this.responses.get(
       enemy.collisionResponse || this.response
     );

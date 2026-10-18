@@ -204,7 +204,7 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   enemySystem.waveState.initialSpawnDone = false;
   enemySystem.asteroids = [];
 
-  enemySystem.refreshInjectedServices({ force: true, suppressWarnings: true });
+  enemySystem.refreshServiceState({ force: true });
   enemySystem.reseedRandomScopes({ seed, resetSequences: true });
 
   return { enemySystem, container };
@@ -257,7 +257,6 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
   enemySystem.asteroids.length = 0;
   enemySystem.spawnTimer = 0;
   enemySystem.sessionActive = true;
-  enemySystem._waveSystemDebugLogged = false;
   enemySystem._asteroidSpawnDebugLogged = false;
   enemySystem.invalidateActiveEnemyCache?.();
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
@@ -279,14 +278,17 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
  */
 export function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
   let resultState = null;
+  // EnemySystem drives the wave itself only when no WaveManager is attached.
+  const waveManager = enemySystem.waveManager;
+  enemySystem.waveManager = null;
 
-  withWaveOverrides({ useManager: false }, () => {
+  withWaveOverrides({ managerHandlesAsteroids: false }, () => {
     prepareWave(enemySystem, waveNumber);
 
     const deltaTime = 0.5;
     let iterations = 0;
 
-    // Prime the wave state so the legacy system can start the wave
+    // Prime the wave state so the fallback wave flow can start the wave
     enemySystem.update(0);
 
     while (enemySystem.waveState.isActive && iterations < maxIterations) {
@@ -333,6 +335,7 @@ export function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
     enemySystem.update(0);
   });
 
+  enemySystem.waveManager = waveManager;
   return { waveState: resultState };
 }
 

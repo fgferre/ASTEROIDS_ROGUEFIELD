@@ -41,6 +41,7 @@ import { DRONE_REWARDS } from '../../../data/enemies/drone.js';
 import { HUNTER_REWARDS } from '../../../data/enemies/hunter.js';
 import { MINE_REWARDS } from '../../../data/enemies/mine.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
+import { ELITE_MODIFIERS } from '../../../data/enemies/elite.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import RandomService from '../../../core/RandomService.js';
@@ -217,13 +218,24 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
+    // Husk, Ram, Weaver, Bulwark: fixed base orbs with a total XP target.
+    for (const type of ['husk', 'ram', 'weaver', 'bulwark']) {
+      const rewards = ENEMY_REWARDS[type];
+      configs.set(type, {
+        totalXP: rewards.totalXP,
+        baseOrbs: () => rewards.baseOrbs,
+        sizeFactor: () => 1.0,
+        variantMultiplier: () => 1.0,
+      });
+    }
+
     const bossRewards = BOSS_REWARDS;
     // Boss rewards: base orb count configured with total XP target.
     configs.set('boss', {
       totalXP: bossRewards?.totalXP ?? 500,
       baseOrbs: () => bossRewards?.baseOrbs ?? 10,
       sizeFactor: () => 1.0,
-      variantMultiplier: (variant) => {
+      variantMultiplier: () => {
         // Boss phases could have different multipliers in the future
         return 1.0;
       },
@@ -263,7 +275,9 @@ export class RewardManager {
         ? config.variantMultiplier(enemy.variant, enemy)
         : 1.0;
 
-    const baseOrbProduct = (baseOrbsRaw ?? 1) * sizeFactor * variantMultiplier;
+    const eliteMultiplier = enemy.elite ? ELITE_MODIFIERS.rewards : 1;
+    const baseOrbProduct =
+      (baseOrbsRaw ?? 1) * sizeFactor * variantMultiplier * eliteMultiplier;
     const baseOrbCount = Math.max(1, Math.round(baseOrbProduct));
 
     // Wave scaling: +1 orb per 5 waves (same as XPOrbSystem)
@@ -275,9 +289,9 @@ export class RewardManager {
     const orbCount = Math.max(1, baseOrbCount + Math.max(0, waveBonus));
 
     const resolvedTotalXP =
-      typeof config.totalXP === 'function'
+      (typeof config.totalXP === 'function'
         ? config.totalXP(enemy, baseOrbCount)
-        : config.totalXP;
+        : config.totalXP) * eliteMultiplier;
     const fallbackOrbValue = config.orbValue ?? ORB_VALUE ?? 5;
 
     const xpDistribution = this.buildXPDistribution({
@@ -654,11 +668,11 @@ export class RewardManager {
             ? rewardConfig.heartDrop.chance
             : 0;
 
-      if (chance <= 0) {
+      dropChance =
+        chance + (enemy.elite ? ELITE_MODIFIERS.heartChanceBonus : 0);
+      if (dropChance <= 0) {
         return;
       }
-
-      dropChance = chance;
     }
 
     const sizeLabel = enemy.size || 'N/A';

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, beforeEach, afterEach } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import {
   setupGlobalMocks,
@@ -37,7 +37,7 @@ describe('Asteroid Metrics - Size Distribution', () => {
     'spawned asteroids follow 50/30/20 distribution',
     { timeout: 15000 },
     () =>
-      withWaveOverrides({ useManager: false }, () => {
+      withWaveOverrides({ managerHandlesAsteroids: false }, () => {
         prepareWave(harness.enemySystem, 1);
         harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
         const spawnLog = [];

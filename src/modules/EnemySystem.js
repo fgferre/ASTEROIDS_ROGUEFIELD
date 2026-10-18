@@ -1,19 +1,22 @@
 // src/modules/EnemySystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
-import {
-  ASTEROID_SIZES,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  SHIP_SIZE,
-} from '../core/GameConstants.js';
+import { ASTEROID_SIZES, SHIP_SIZE } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
-import { resolveEventBus, resolveService } from '../core/serviceUtils.js';
+import {
+  requireService,
+  resolveEventBus,
+  resolveService,
+} from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { Drone } from './enemies/types/Drone.js';
 import { Mine } from './enemies/types/Mine.js';
 import { Hunter } from './enemies/types/Hunter.js';
 import { BossEnemy } from './enemies/types/BossEnemy.js';
+import { Husk } from './enemies/types/Husk.js';
+import { Ram } from './enemies/types/Ram.js';
+import { Weaver } from './enemies/types/Weaver.js';
+import { Bulwark } from './enemies/types/Bulwark.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
@@ -37,46 +40,24 @@ import {
   validateSnapshot,
 } from '../utils/StateManager.js';
 import {
-  ASTEROIDS_PER_WAVE_BASE,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  ASTEROID_EDGE_SPAWN_MARGIN,
-  COLLISION_BOUNCE,
-  MAX_ASTEROIDS_ON_SCREEN,
-  PRESERVE_LEGACY_POSITIONING,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
-  USE_WAVE_MANAGER,
   WAVE_BREAK_TIME,
   WAVE_DURATION,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
+import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
 import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
 import { MINE_COMPONENTS } from '../data/enemies/mine.js';
 import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
-import {
-  ASTEROID_VARIANTS,
-  ASTEROID_VARIANT_CHANCES,
-  ORB_VALUE,
-} from '../data/enemies/asteroid-configs.js';
-
-const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
-
-const ENEMY_SERVICE_MAP = {
-  player: 'player',
-  world: 'world',
-  progression: 'progression',
-  xpOrbs: 'xp-orbs',
-  physics: 'physics',
-  combat: 'combat',
-  healthHearts: 'healthHearts',
-  random: 'random',
-  effects: 'effects',
-  audio: 'audio',
-  ui: 'ui',
-};
+import { HUSK_COMPONENTS } from '../data/enemies/husk.js';
+import { RAM_COMPONENTS } from '../data/enemies/ram.js';
+import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
+import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
+import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
+import { directorFor } from '../data/layers.js';
+import { IS_DEV } from '../core/env.js';
 
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
@@ -103,7 +84,6 @@ class EnemySystem extends BaseSystem {
     this.bossHudState = this.createInitialBossHudState();
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
-    this.pendingEnemyProjectiles = [];
     this.availableBossMinionTypes = [];
 
     // Legacy wave state (for backward compatibility during migration)
@@ -123,16 +103,11 @@ class EnemySystem extends BaseSystem {
       warningFlag: '_snapshotFallbackWarningIssued',
       onFallback: this.reset.bind(this),
     });
-    this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this._asteroidSpawnDebugLogged = false;
-    this._waveManagerRuntimeEnabled = false;
     this._lastEnemyUpdateLog = 0;
-    this._playerCacheLogged = false;
-    this._playerServiceRefreshWarning = false;
-    this._playerLazyResolveLogEmitted = false;
     this._lastBossHudDamageUpdate = 0;
 
     // Factory (optional - new architecture)
@@ -160,24 +135,36 @@ class EnemySystem extends BaseSystem {
     this.damageSystem = null;
     this.updateSystem = null;
 
-    this.eventBus = resolveEventBus(this.dependencies);
+    this.eventBus =
+      resolveEventBus(this.dependencies) ||
+      requireService('event-bus', this.dependencies, 'EnemySystem');
 
-    this.missingDependencyWarnings = new Set();
-    this.deferredDependencyWarnings = new Set([
-      'world',
-      'combat',
-      'effects',
-      'audio',
-      'ui',
-    ]);
+    // Required services: the manifest builds them before enemies.
+    this.player = requireService('player', this.dependencies, 'EnemySystem');
+    this.xpOrbs = requireService('xp-orbs', this.dependencies, 'EnemySystem');
+    this.progression = requireService(
+      'progression',
+      this.dependencies,
+      'EnemySystem'
+    );
+    this.physics = requireService('physics', this.dependencies, 'EnemySystem');
+    this.healthHearts = requireService(
+      'healthHearts',
+      this.dependencies,
+      'EnemySystem'
+    );
+    // Late-bound: world is attached by the manifest right after construction
+    // and combat is built after enemies (resolved on first use). Effects,
+    // audio and ui are optional presentation hooks, absent in headless runs.
+    this.world = this.dependencies.world || null;
+    this.combat = null;
+    this.effects = null;
+    this.audio = null;
+    this.ui = null;
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
-    this.refreshServiceState({ force: true, suppressWarnings: true });
-    GameDebugLogger.log('INIT', 'EnemySystem player service', {
-      hasPlayerDependency: !!this.dependencies.player,
-      hasPlayerService: !!this.player,
-    });
+    this.refreshServiceState({ force: true });
     this.setupRandomGenerators();
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
@@ -197,33 +184,15 @@ class EnemySystem extends BaseSystem {
   }
 
   attachProgression(progressionSystem) {
-    if (!progressionSystem) {
-      this.logMissingDependency('progression');
-      return;
-    }
-
+    this.progression = progressionSystem;
     this.dependencies.progression = progressionSystem;
     this.refreshServiceState({ force: true });
   }
 
   attachWorld(worldSystem) {
-    if (!worldSystem) {
-      this.logMissingDependency('world');
-      return;
-    }
-
+    this.world = worldSystem;
     this.dependencies.world = worldSystem;
-    this.deferredDependencyWarnings.delete('world');
     this.refreshServiceState({ force: true });
-  }
-
-  logMissingDependency(name) {
-    if (this.missingDependencyWarnings.has(name)) {
-      return;
-    }
-
-    this.missingDependencyWarnings.add(name);
-    console.warn(`[EnemySystem] Missing dependency: ${name}`);
   }
 
   setupEventListeners() {
@@ -245,7 +214,7 @@ class EnemySystem extends BaseSystem {
     });
 
     this.registerEventListener('wave-started', () => {
-      this.refreshServiceState({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true });
     });
 
     this.registerEventListener('physics-reset', () => {
@@ -309,7 +278,7 @@ class EnemySystem extends BaseSystem {
 
       if (this.waveManager) {
         this.registerEventListener('wave-complete', (data = {}) => {
-          if (Boolean(USE_WAVE_MANAGER) && this.waveState) {
+          if (this.waveState) {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
               : Number.isFinite(this.waveState.current)
@@ -339,12 +308,12 @@ class EnemySystem extends BaseSystem {
     }
 
     this.registerEventListener('boss-wave-started', (data) => {
-      this.refreshServiceState({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true });
       this.handleBossWaveStarted(data);
     });
 
     this.registerEventListener('boss-spawned', (data) => {
-      this.refreshServiceState({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true });
       this.handleBossSpawned(data);
     });
 
@@ -365,143 +334,17 @@ class EnemySystem extends BaseSystem {
     });
   }
 
-  refreshInjectedServices(options = {}) {
-    const force =
-      typeof options === 'boolean' ? options : Boolean(options.force);
-    const suppressWarnings =
-      typeof options === 'object' && options !== null
-        ? Boolean(options.suppressWarnings)
-        : false;
-
-    this.refreshServiceState({ force, suppressWarnings });
-  }
-
-  refreshServiceState({ force = false, suppressWarnings = false } = {}) {
-    if (force) {
-      this._playerCacheLogged = false;
-      this._playerLazyResolveLogEmitted = false;
-    }
-
-    const previousPlayer = this.player;
-    const previousRandom = this.random;
-    const globalEventBus = resolveEventBus(this.dependencies);
-
-    this.resolveCachedServices(ENEMY_SERVICE_MAP, { force });
-
-    if (force || !this.eventBus) {
-      this.eventBus = globalEventBus;
-    }
-
-    Object.entries(ENEMY_SERVICE_MAP).forEach(([property, serviceName]) => {
-      const resolved = this[property] ?? null;
-
-      if (resolved) {
-        this.dependencies[serviceName] = resolved;
-        this.missingDependencyWarnings.delete(serviceName);
-        return;
-      }
-
-      if (
-        !suppressWarnings &&
-        !this.deferredDependencyWarnings.has(serviceName)
-      ) {
-        this.logMissingDependency(serviceName);
-      }
-    });
-
-    let playerRefreshLogged = false;
-    if (this.player && this.player !== previousPlayer) {
-      GameDebugLogger.log('STATE', 'Player service refreshed', {
-        success: true,
-        source: 'dependency-cache',
-        forced: Boolean(force),
-        changed: true,
-      });
-      this._playerCacheLogged = false;
-      this._playerLazyResolveLogEmitted = false;
-      this._playerServiceRefreshWarning = false;
-      playerRefreshLogged = true;
-    }
-
-    if (force && this.player && !playerRefreshLogged) {
-      this._playerServiceRefreshWarning = false;
-    }
-
-    if (!this.player) {
-      let resolvedPlayer = null;
-      let resolvedSource = null;
-
-      const fallbackResolved = resolveService('player', this.dependencies);
-      if (fallbackResolved) {
-        resolvedPlayer = fallbackResolved;
-        resolvedSource = 'resolveService';
-      }
-
-      if (resolvedPlayer) {
-        const changed = this.player !== resolvedPlayer;
-        this.player = resolvedPlayer;
-        this.dependencies.player = resolvedPlayer;
-        this._playerCacheLogged = false;
-        this._playerLazyResolveLogEmitted = false;
-        this._playerServiceRefreshWarning = false;
-        GameDebugLogger.log('STATE', 'Player service refreshed', {
-          success: true,
-          source: resolvedSource || 'player-fallback',
-          forced: Boolean(force),
-          changed,
-        });
-      } else if (!suppressWarnings && !this._playerServiceRefreshWarning) {
-        GameDebugLogger.log('STATE', 'Player service refreshed', {
-          success: false,
-          source: 'player-fallback',
-          forced: Boolean(force),
-        });
-        this._playerServiceRefreshWarning = true;
-      }
-    }
-
-    const randomServiceChanged = previousRandom !== this.random;
-
-    if (randomServiceChanged) {
-      this.randomScopes = null;
-      this.randomSequences = null;
-    }
-
+  // Forced refreshes (resets, wave starts, attach*) reseed the random scopes.
+  refreshServiceState({ force = false } = {}) {
     this.setupRandomGenerators();
 
-    if (force || randomServiceChanged) {
-      this.reseedRandomScopes({
-        resetSequences: force || randomServiceChanged,
-      });
-    }
-
-    if (this.pendingEnemyProjectiles.length > 0) {
-      const combat = this.combat;
-      if (combat) {
-        const pending = [...this.pendingEnemyProjectiles];
-        this.pendingEnemyProjectiles = [];
-        pending.forEach((payload) => this.handleEnemyProjectile(payload));
-        if (
-          typeof process !== 'undefined' &&
-          process.env &&
-          process.env.NODE_ENV === 'development'
-        ) {
-          console.debug(
-            '[EnemySystem] Flushed pending projectiles',
-            pending.length
-          );
-        }
-      }
+    if (force) {
+      this.reseedRandomScopes({ resetSequences: true });
     }
   }
 
   syncPhysicsIntegration(force = false) {
-    const physics = this.getCachedPhysics();
-    if (!physics || typeof physics.bootstrapFromEnemySystem !== 'function') {
-      return;
-    }
-
-    physics.bootstrapFromEnemySystem(this, { force });
+    this.physics.bootstrapFromEnemySystem(this, { force });
   }
 
   setupRandomGenerators() {
@@ -697,17 +540,12 @@ class EnemySystem extends BaseSystem {
       });
     }
 
-    if (
-      this.waveManager &&
-      typeof this.waveManager.reseedRandomScopes === 'function'
-    ) {
+    // Managers are built after the first (constructor) reseed.
+    if (this.waveManager) {
       this.waveManager.reseedRandomScopes({ resetSequences });
     }
 
-    if (
-      this.rewardManager &&
-      typeof this.rewardManager.reseedRandom === 'function'
-    ) {
+    if (this.rewardManager) {
       const rewardRandom = this.randomScopes?.['enemy-rewards'];
       this.rewardManager.reseedRandom(rewardRandom);
     }
@@ -819,6 +657,27 @@ class EnemySystem extends BaseSystem {
         });
       }
 
+      const supportKinds = [
+        ['husk', Husk, GamePools?.husks, HUSK_COMPONENTS, ['splitter']],
+        ['ram', Ram, GamePools?.rams, RAM_COMPONENTS, ['charger']],
+        ['weaver', Weaver, GamePools?.weavers, WEAVER_COMPONENTS, ['layer']],
+        [
+          'bulwark',
+          Bulwark,
+          GamePools?.bulwarks,
+          BULWARK_COMPONENTS,
+          ['armored'],
+        ],
+      ];
+      for (const [type, EnemyClass, pool, components, tags] of supportKinds) {
+        this.factory.registerType(type, {
+          class: EnemyClass,
+          pool: pool || null,
+          defaults: { ...ENEMY_TYPES[type], components },
+          tags: ['enemy', 'hostile', ...tags],
+        });
+      }
+
       if (BOSS_CONFIG) {
         const bossDefaults = { ...BOSS_CONFIG };
         const sanitizedMinions = this.getAvailableBossMinionTypes(
@@ -854,29 +713,24 @@ class EnemySystem extends BaseSystem {
 
       this.waveManager = new WaveManager({
         enemySystem: this,
-        eventBus: this.eventBus || resolveEventBus(this.dependencies),
+        eventBus: this.eventBus,
         random: waveManagerRandom,
         serviceResolver,
       });
 
       // Initialize RewardManager
-      this.refreshServiceState();
-      const xpOrbSystem = this.getCachedXPOrbs();
-      const healthHeartSystem = this.getCachedHealthHearts();
-      if (xpOrbSystem) {
-        const rewardRandom = this.getRandomScope('enemy-rewards', {
-          parentScope: 'fragments',
-          label: 'enemy-rewards',
-        });
+      const rewardRandom = this.getRandomScope('enemy-rewards', {
+        parentScope: 'fragments',
+        label: 'enemy-rewards',
+      });
 
-        this.rewardManager = new RewardManager({
-          enemySystem: this,
-          xpOrbSystem,
-          healthHearts: healthHeartSystem,
-          random: rewardRandom,
-          serviceResolver,
-        });
-      }
+      this.rewardManager = new RewardManager({
+        enemySystem: this,
+        xpOrbSystem: this.xpOrbs,
+        healthHearts: this.healthHearts,
+        random: rewardRandom,
+        serviceResolver,
+      });
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize managers', error);
       this.waveManager = null;
@@ -1193,60 +1047,7 @@ class EnemySystem extends BaseSystem {
   }
 
   getCachedPlayer() {
-    this.refreshServiceState();
-    let player = this.player || null;
-
-    if (!player) {
-      const resolved = resolveService('player', this.dependencies);
-      if (resolved) {
-        this.player = resolved;
-        this.dependencies.player = resolved;
-        player = resolved;
-        this._playerCacheLogged = false;
-        if (this._playerLazyResolveLogEmitted !== 'success') {
-          GameDebugLogger.log(
-            'STATE',
-            'getCachedPlayer lazy-resolved player service',
-            {
-              source: 'resolveService',
-              success: true,
-              fallback: true,
-            }
-          );
-          this._playerLazyResolveLogEmitted = 'success';
-        }
-      } else if (this._playerLazyResolveLogEmitted !== 'failure') {
-        GameDebugLogger.log('WARN', 'getCachedPlayer lazy resolve failed', {
-          source: 'resolveService',
-          success: false,
-          fallback: true,
-        });
-        this._playerLazyResolveLogEmitted = 'failure';
-      }
-    } else if (this._playerLazyResolveLogEmitted) {
-      GameDebugLogger.log(
-        'STATE',
-        'getCachedPlayer player reference confirmed after fallback',
-        {
-          playerPosition: this.getPlayerPositionSnapshot(player),
-          lastState: this._playerLazyResolveLogEmitted,
-        }
-      );
-      this._playerLazyResolveLogEmitted = false;
-    }
-
-    if (!this._playerCacheLogged) {
-      GameDebugLogger.log('STATE', 'getCachedPlayer called', {
-        hasPlayerService: !!this.player,
-        hasPlayer: !!player,
-        playerPosition: player?.position || null,
-        playerX: Number.isFinite(player?.x) ? player.x : null,
-        playerY: Number.isFinite(player?.y) ? player.y : null,
-      });
-      this._playerCacheLogged = true;
-    }
-
-    return player;
+    return this.player;
   }
 
   getPlayerPositionSnapshot(player) {
@@ -1298,48 +1099,42 @@ class EnemySystem extends BaseSystem {
   }
 
   getCachedWorld() {
-    this.refreshServiceState();
     return this.world;
   }
 
   getCachedProgression() {
-    this.refreshServiceState();
     return this.progression;
   }
 
   getCachedXPOrbs() {
-    this.refreshServiceState();
     return this.xpOrbs;
   }
 
   getCachedPhysics() {
-    this.refreshServiceState();
     return this.physics;
   }
 
   getCachedCombat() {
-    this.refreshServiceState();
+    if (!this.combat) {
+      this.combat = requireService('combat', this.dependencies, 'EnemySystem');
+    }
     return this.combat;
   }
 
   getCachedHealthHearts() {
-    this.refreshServiceState();
     return this.healthHearts;
   }
 
   getCachedEffects() {
-    this.refreshServiceState();
-    return this.effects;
+    return this.getCachedService('effects', 'effects');
   }
 
   getCachedAudio() {
-    this.refreshServiceState();
-    return this.audio;
+    return this.getCachedService('audio', 'audio');
   }
 
   getCachedUI() {
-    this.refreshServiceState();
-    return this.ui;
+    return this.getCachedService('ui', 'ui');
   }
 
   /**
@@ -1449,21 +1244,11 @@ class EnemySystem extends BaseSystem {
   }
 
   registerEnemyWithPhysics(enemy) {
-    const physics = this.getCachedPhysics();
-    if (!physics || typeof physics.registerEnemy !== 'function') {
-      return;
-    }
-
-    physics.registerEnemy(enemy);
+    this.physics.registerEnemy(enemy);
   }
 
   unregisterEnemyFromPhysics(enemy) {
-    const physics = this.getCachedPhysics();
-    if (!physics || typeof physics.unregisterEnemy !== 'function') {
-      return;
-    }
-
-    physics.unregisterEnemy(enemy);
+    this.physics.unregisterEnemy(enemy);
   }
 
   removeActiveEnemy(enemy) {
@@ -1619,21 +1404,16 @@ class EnemySystem extends BaseSystem {
       this.bossHudState.invulnerabilityTimer = null;
     }
 
-    const ui = this.getCachedUI();
-    if (ui) {
-      if (typeof ui.updateBossHud === 'function') {
-        ui.updateBossHud({ ...this.bossHudState });
-      } else if (typeof ui.handleBossEvent === 'function') {
-        ui.handleBossEvent('boss-hud-update', { ...this.bossHudState });
-      }
-    }
+    this.getCachedUI()?.handleBossEvent('boss-hud-update', {
+      ...this.bossHudState,
+    });
 
     this.emitBossSystemEvent('ui', 'boss-hud-update', { ...this.bossHudState });
 
     return this.bossHudState;
   }
 
-  forwardBossEvent(eventName, payload = {}) {
+  forwardBossEvent() {
     // Raw boss events (boss-spawned, boss-phase-changed, boss-defeated) are
     // already emitted by BossEnemy / EnemySpawnSystem and consumed directly
     // by EffectsSystem, AudioSystem and UISystem via their own listeners.
@@ -1642,118 +1422,12 @@ class EnemySystem extends BaseSystem {
     // Kept as a no-op hook for any future per-event bookkeeping in EnemySystem.
   }
 
-  applyBossEffectsFallback(effects, eventName, payload) {
-    const target = effects || this.getCachedEffects();
-
-    if (!target) {
-      return;
-    }
-
-    const flash =
-      typeof target.addScreenFlash === 'function'
-        ? target.addScreenFlash.bind(target)
-        : null;
-    const shake =
-      typeof target.addScreenShake === 'function'
-        ? target.addScreenShake.bind(target)
-        : null;
-    const shockwave =
-      typeof target.createShockwaveEffect === 'function'
-        ? target.createShockwaveEffect.bind(target)
-        : null;
-
-    switch (eventName) {
-      case 'boss-wave-started':
-        if (flash) {
-          flash('rgba(255, 140, 0, 0.25)', 0.35, 0.2);
-        }
-        break;
-      case 'boss-spawned':
-        if (shake) {
-          shake(14, 0.55);
-        }
-        if (flash) {
-          flash('rgba(255, 80, 80, 0.35)', 0.45, 0.3);
-        }
-        break;
-      case 'boss-phase-changed':
-        if (flash) {
-          flash('rgba(255, 255, 255, 0.25)', 0.25, 0.18);
-        }
-        break;
-      case 'boss-defeated':
-        if (shake) {
-          shake(18, 0.75);
-        }
-        if (flash) {
-          flash('rgba(255, 215, 0, 0.45)', 0.5, 0.45);
-        }
-        if (shockwave) {
-          const enemy = payload?.enemy;
-          const position =
-            payload?.position ||
-            (enemy ? { x: enemy.x ?? 0, y: enemy.y ?? 0 } : null);
-          if (position) {
-            shockwave({
-              position,
-              radius: Math.max(240, (enemy?.radius || 60) * 3),
-              color: 'rgba(255, 200, 80, 0.55)',
-            });
-          }
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
-  applyBossAudioFallback(audio, eventName, payload) {
-    const target = audio || this.getCachedAudio();
-    if (!target) {
-      return;
-    }
-
-    switch (eventName) {
-      case 'boss-wave-started':
-        if (typeof target.playShieldShockwave === 'function') {
-          target.playShieldShockwave();
-        } else if (typeof target.playGoldSpawn === 'function') {
-          target.playGoldSpawn();
-        }
-        break;
-      case 'boss-spawned':
-        if (typeof target.playGoldSpawn === 'function') {
-          target.playGoldSpawn(payload?.enemy);
-        } else if (typeof target.playBigExplosion === 'function') {
-          target.playBigExplosion();
-        }
-        break;
-      case 'boss-phase-changed':
-        if (typeof target.playShieldActivate === 'function') {
-          target.playShieldActivate();
-        } else if (typeof target.playTargetLock === 'function') {
-          target.playTargetLock(payload || {});
-        }
-        break;
-      case 'boss-defeated':
-        if (typeof target.playBigExplosion === 'function') {
-          target.playBigExplosion();
-        } else if (typeof target.playGoldJackpot === 'function') {
-          target.playGoldJackpot();
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
   emitBossSystemEvent(channel, eventName, payload) {
-    const bus = this.eventBus || resolveEventBus(this.dependencies);
-    if (!bus || !eventName || !channel) {
+    if (!eventName || !channel) {
       return;
     }
 
-    bus.emit(`${channel}-${eventName}`, payload);
+    this.eventBus.emit(`${channel}-${eventName}`, payload);
   }
 
   mergeBossRewards(boss, override = {}) {
@@ -1787,18 +1461,9 @@ class EnemySystem extends BaseSystem {
       this.spawnBossXPOrbs(boss, xpReward);
     }
 
-    if (
-      this.rewardManager &&
-      this.rewardManager.rewardConfigs &&
-      typeof this.rewardManager.rewardConfigs.has === 'function' &&
-      this.rewardManager.rewardConfigs.has('boss') &&
-      typeof this.rewardManager.dropRewards === 'function'
-    ) {
+    if (this.rewardManager.rewardConfigs.has('boss')) {
       this.rewardManager.dropRewards(boss);
-    } else if (
-      this.rewardManager &&
-      typeof this.rewardManager.createMilestoneReward === 'function'
-    ) {
+    } else {
       this.rewardManager.createMilestoneReward(
         boss.x ?? 0,
         boss.y ?? 0,
@@ -1825,11 +1490,7 @@ class EnemySystem extends BaseSystem {
       return;
     }
 
-    const xpOrbs = this.getCachedXPOrbs();
-    if (!xpOrbs || typeof xpOrbs.createXPOrb !== 'function') {
-      return;
-    }
-
+    const xpOrbs = this.xpOrbs;
     const baseValue = ORB_VALUE || 5;
     const safeBaseValue = Math.max(1, baseValue);
     const orbCount = Math.max(1, Math.round(xpAmount / safeBaseValue));
@@ -1919,47 +1580,6 @@ class EnemySystem extends BaseSystem {
     return payload;
   }
 
-  isBossProjectile(payload) {
-    if (!payload) {
-      return false;
-    }
-
-    const enemyType =
-      typeof payload.enemyType === 'string'
-        ? payload.enemyType.toLowerCase()
-        : null;
-    if (enemyType === 'boss') {
-      return true;
-    }
-
-    const sourceType =
-      typeof payload.source?.type === 'string'
-        ? payload.source.type.toLowerCase()
-        : null;
-    if (sourceType === 'boss') {
-      return true;
-    }
-
-    if (payload.enemy && this.isBossEnemy(payload.enemy)) {
-      return true;
-    }
-
-    if (payload.projectile?.pattern) {
-      return true;
-    }
-
-    if (
-      payload.meta &&
-      (payload.meta.pattern ||
-        payload.meta.phase != null ||
-        payload.meta.stage != null)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
   invalidateActiveEnemyCache() {
     this.activeEnemyCacheDirty = true;
   }
@@ -2000,22 +1620,13 @@ class EnemySystem extends BaseSystem {
 
   // Backward compatibility with legacy API
   forEachActiveAsteroid(callback) {
-    if (
-      typeof process !== 'undefined' &&
-      process?.env?.NODE_ENV === 'development'
-    ) {
-      console.warn(
-        '[EnemySystem] forEachActiveAsteroid is deprecated. Use forEachActiveEnemy instead.'
-      );
-    }
-
     this.forEachActiveEnemy(callback);
   }
 
   createInitialWaveState() {
     return {
       current: 1,
-      totalAsteroids: ASTEROIDS_PER_WAVE_BASE,
+      totalAsteroids: directorFor(1).rocks,
       asteroidsSpawned: 0,
       asteroidsKilled: 0,
       isActive: true,
@@ -2031,7 +1642,6 @@ class EnemySystem extends BaseSystem {
         killed: { all: 0, asteroids: 0 },
       },
       compatibilityMode: false,
-      legacyFallbackActive: false,
     };
   }
 
@@ -2064,7 +1674,6 @@ class EnemySystem extends BaseSystem {
           timeRemaining: Math.max(0, this.waveState.timeRemaining),
           managerTotals: normalizedManagerTotals,
           compatibilityMode: Boolean(this.waveState.compatibilityMode),
-          legacyFallbackActive: Boolean(this.waveState.legacyFallbackActive),
         }
       : null;
 
@@ -2093,7 +1702,6 @@ class EnemySystem extends BaseSystem {
         : 0,
       managerAllEnemiesTotal: normalizedManagerTotals?.all ?? 0,
       compatibilityMode: Boolean(this.waveState?.compatibilityMode),
-      legacyFallbackActive: Boolean(this.waveState?.legacyFallbackActive),
     };
 
     if (!force && this.lastWaveBroadcast) {
@@ -2109,8 +1717,7 @@ class EnemySystem extends BaseSystem {
         prev.totalKills === snapshot.totalKills &&
         prev.sessionTimeSeconds === snapshot.sessionTimeSeconds &&
         prev.managerAllEnemiesTotal === snapshot.managerAllEnemiesTotal &&
-        prev.compatibilityMode === snapshot.compatibilityMode &&
-        prev.legacyFallbackActive === snapshot.legacyFallbackActive;
+        prev.compatibilityMode === snapshot.compatibilityMode;
 
       if (unchanged) {
         return;
@@ -2119,14 +1726,10 @@ class EnemySystem extends BaseSystem {
 
     this.lastWaveBroadcast = snapshot;
 
-    const bus = this.eventBus || resolveEventBus(this.dependencies);
-
-    if (bus && typeof bus.emit === 'function') {
-      bus.emit('wave-state-updated', {
-        wave,
-        session,
-      });
-    }
+    this.eventBus.emit('wave-state-updated', {
+      wave,
+      session,
+    });
   }
 
   // === UPDATE PRINCIPAL ===
@@ -2476,10 +2079,6 @@ class EnemySystem extends BaseSystem {
         typeof wave.compatibilityMode === 'boolean'
           ? wave.compatibilityMode
           : base.compatibilityMode,
-      legacyFallbackActive:
-        typeof wave.legacyFallbackActive === 'boolean'
-          ? wave.legacyFallbackActive
-          : base.legacyFallbackActive,
     };
   }
 
@@ -2812,7 +2411,6 @@ class EnemySystem extends BaseSystem {
       boss.invulnerabilityTimer = 0;
     }
 
-    boss.applyPhaseLoadout(true);
     boss.applyPhaseMovement(true);
 
     return boss;
@@ -2825,7 +2423,11 @@ class EnemySystem extends BaseSystem {
 
     const snapshotType =
       typeof snapshot.type === 'string' ? snapshot.type.toLowerCase() : null;
-    if (!snapshotType || snapshotType === 'asteroid' || snapshotType === 'boss') {
+    if (
+      !snapshotType ||
+      snapshotType === 'asteroid' ||
+      snapshotType === 'boss'
+    ) {
       return null;
     }
 
@@ -3051,10 +2653,7 @@ class EnemySystem extends BaseSystem {
           defeated: false,
           bossId: boss.id ?? this.bossHudState?.bossId ?? null,
           name:
-            boss.displayName ||
-            boss.name ||
-            this.bossHudState?.name ||
-            'Boss',
+            boss.displayName || boss.name || this.bossHudState?.name || 'Boss',
           phase,
           phaseCount: boss.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
           health: boss.health ?? this.bossHudState?.health ?? 0,
@@ -3068,7 +2667,8 @@ class EnemySystem extends BaseSystem {
           invulnerabilityTimer: Number.isFinite(boss.invulnerabilityTimer)
             ? Math.max(0, Number(boss.invulnerabilityTimer))
             : null,
-          invulnerabilitySource: this.bossHudState?.invulnerabilitySource ?? null,
+          invulnerabilitySource:
+            this.bossHudState?.invulnerabilitySource ?? null,
         });
       }
 
@@ -3134,24 +2734,19 @@ class EnemySystem extends BaseSystem {
     this._snapshotFallbackWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this._lastBossHudDamageUpdate = 0;
-    this.pendingEnemyProjectiles = [];
-
     this.refreshServiceState({ force: true });
     this.syncPhysicsIntegration(true);
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     if (waveManagerActive) {
-      if (typeof this.waveManager.reset === 'function') {
-        try {
-          this.waveManager.reset();
-        } catch (error) {
-          console.error(
-            '[EnemySystem] Failed to reset WaveManager during system reset:',
-            error
-          );
-        }
+      try {
+        this.waveManager.reset();
+      } catch (error) {
+        console.error(
+          '[EnemySystem] Failed to reset WaveManager during system reset:',
+          error
+        );
       }
 
       if (this.waveState) {
@@ -3214,27 +2809,17 @@ class EnemySystem extends BaseSystem {
     wave.spawnTimer = 0;
     wave.initialSpawnDone = false;
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     if (!waveManagerActive) {
       this.grantWaveRewards();
 
-      const bus = this.eventBus || resolveEventBus(this.dependencies);
-
-      if (bus && typeof bus.emit === 'function') {
-        bus.emit('wave-completed', {
-          wave: wave.current,
-          completedWaves: wave.completedWaves,
-          breakTimer: wave.breakTimer,
-        });
-      }
-    } else if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development' &&
-      typeof console !== 'undefined' &&
-      typeof console.debug === 'function'
-    ) {
+      this.eventBus.emit('wave-completed', {
+        wave: wave.current,
+        completedWaves: wave.completedWaves,
+        breakTimer: wave.breakTimer,
+      });
+    } else if (IS_DEV) {
       console.debug(
         '[EnemySystem] WaveManager active - skipping legacy wave-completed emit for Wave',
         wave.current
@@ -3247,8 +2832,7 @@ class EnemySystem extends BaseSystem {
   startNextWave() {
     if (!this.waveState) return;
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     let waveStarted = false;
 
@@ -3256,13 +2840,7 @@ class EnemySystem extends BaseSystem {
       if (!this.waveManager.waveInProgress) {
         waveStarted = this.waveManager.startNextWave();
 
-        if (
-          !waveStarted &&
-          typeof process !== 'undefined' &&
-          process.env?.NODE_ENV === 'development' &&
-          typeof console !== 'undefined' &&
-          typeof console.debug === 'function'
-        ) {
+        if (!waveStarted && IS_DEV) {
           console.debug('[EnemySystem] WaveManager refused to start next wave');
         }
       } else {
@@ -3285,11 +2863,7 @@ class EnemySystem extends BaseSystem {
 
     if (!waveManagerActive) {
       wave.current += 1;
-      wave.totalAsteroids = Math.floor(
-        ASTEROIDS_PER_WAVE_BASE *
-          Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, wave.current - 1)
-      );
-      wave.totalAsteroids = Math.min(wave.totalAsteroids, 25);
+      wave.totalAsteroids = directorFor(wave.current).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = WAVE_DURATION;
@@ -3299,14 +2873,10 @@ class EnemySystem extends BaseSystem {
 
       this.spawnInitialAsteroids(4);
 
-      const bus = this.eventBus || resolveEventBus(this.dependencies);
-
-      if (bus && typeof bus.emit === 'function') {
-        bus.emit('wave-started', {
-          wave: wave.current,
-          totalAsteroids: wave.totalAsteroids,
-        });
-      }
+      this.eventBus.emit('wave-started', {
+        wave: wave.current,
+        totalAsteroids: wave.totalAsteroids,
+      });
     }
 
     this.emitWaveStateUpdate(true);
@@ -3320,10 +2890,8 @@ class EnemySystem extends BaseSystem {
   }
 
   grantWaveRewards() {
-    const xpOrbs = this.getCachedXPOrbs();
-    const player = this.getCachedPlayer();
-
-    if (!xpOrbs || !player) return;
+    const xpOrbs = this.xpOrbs;
+    const player = this.player;
 
     const orbCount = 4 + Math.floor(this.waveState.current / 2);
 
@@ -3396,18 +2964,12 @@ class EnemySystem extends BaseSystem {
 
     // boss-wave-started has no raw listeners in EffectsSystem/AudioSystem
     // (unlike boss-spawned/phase-changed/defeated), so apply feedback here.
-    const effects = this.getCachedEffects();
-    if (effects && typeof effects.addScreenFlash === 'function') {
-      effects.addScreenFlash('rgba(255, 140, 0, 0.25)', 0.35, 0.2);
-    }
-    const audio = this.getCachedAudio();
-    if (audio) {
-      if (typeof audio.playShieldShockwave === 'function') {
-        audio.playShieldShockwave();
-      } else if (typeof audio.playGoldSpawn === 'function') {
-        audio.playGoldSpawn();
-      }
-    }
+    this.getCachedEffects()?.addScreenFlash(
+      withAlpha(PALETTE.boss, 0.25),
+      0.35,
+      0.2
+    );
+    this.getCachedAudio()?.playShieldShockwave();
   }
 
   handleBossSpawned(data = {}) {
@@ -3578,10 +3140,7 @@ class EnemySystem extends BaseSystem {
       return;
     }
 
-    const physics = this.getCachedPhysics();
-    if (physics && typeof physics.clearBossPhysicsState === 'function') {
-      physics.clearBossPhysicsState(boss);
-    }
+    this.physics.clearBossPhysicsState(boss);
 
     const waveNumber = Number.isFinite(data.wave)
       ? data.wave
@@ -3715,8 +3274,7 @@ class EnemySystem extends BaseSystem {
     }
 
     const enemyType = data.enemyType || data.type || data.enemy?.type || null;
-    const isBoss =
-      enemyType === 'boss' || this.isBossEnemy(data.enemy || null);
+    const isBoss = enemyType === 'boss' || this.isBossEnemy(data.enemy || null);
 
     if (!isBoss) {
       return;
@@ -3732,7 +3290,10 @@ class EnemySystem extends BaseSystem {
       typeof performance.now === 'function'
         ? performance.now()
         : Date.now();
-    if (this._lastBossHudDamageUpdate && now - this._lastBossHudDamageUpdate < 80) {
+    if (
+      this._lastBossHudDamageUpdate &&
+      now - this._lastBossHudDamageUpdate < 80
+    ) {
       return;
     }
 
@@ -3787,11 +3348,7 @@ class EnemySystem extends BaseSystem {
       return;
     }
 
-    const physics = this.getCachedPhysics();
-    if (!physics) {
-      return;
-    }
-
+    const physics = this.physics;
     const attackType =
       data.type ||
       data.attackType ||
@@ -3819,32 +3376,22 @@ class EnemySystem extends BaseSystem {
       case 'charge-impact':
       case 'charge-collision':
       case 'boss-charge':
-        if (typeof physics.handleBossChargeCollision === 'function') {
-          physics.handleBossChargeCollision(payload);
-        }
+        physics.handleBossChargeCollision(payload);
         break;
       case 'area':
       case 'area-damage':
       case 'nova':
       case 'shockwave':
       case 'boss-area':
-        if (typeof physics.applyBossAreaDamage === 'function') {
-          physics.applyBossAreaDamage(payload);
-        }
+        physics.applyBossAreaDamage(payload);
         break;
       default:
-        if (
-          payload.collisionType === 'boss-charge' &&
-          typeof physics.handleBossChargeCollision === 'function'
-        ) {
+        if (payload.collisionType === 'boss-charge') {
           physics.handleBossChargeCollision(payload);
           break;
         }
 
-        if (
-          payload.radius &&
-          typeof physics.applyBossAreaDamage === 'function'
-        ) {
+        if (payload.radius) {
           physics.applyBossAreaDamage(payload);
         }
         break;
@@ -3857,48 +3404,8 @@ class EnemySystem extends BaseSystem {
     }
 
     const payload = this.normalizeEnemyProjectilePayload(data);
-    const combat = this.getCachedCombat();
-
-    if (combat) {
-      if (
-        this.isBossProjectile(payload) &&
-        typeof combat.handleBossProjectile === 'function'
-      ) {
-        combat.handleBossProjectile(payload);
-        return true;
-      }
-
-      if (typeof combat.handleEnemyProjectile === 'function') {
-        combat.handleEnemyProjectile(payload);
-        return true;
-      }
-
-      if (typeof combat.queueEnemyProjectile === 'function') {
-        combat.queueEnemyProjectile(payload);
-        return true;
-      }
-
-      if (typeof combat.spawnEnemyProjectile === 'function') {
-        combat.spawnEnemyProjectile(payload);
-        return true;
-      }
-    }
-
-    const bus = this.eventBus || resolveEventBus(this.dependencies);
-    if (bus) {
-      bus.emit('combat-enemy-projectile', payload);
-      return true;
-    }
-
-    // Last-resort: queue payload when both combat and bus are unavailable
-    this.pendingEnemyProjectiles.push(payload);
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(
-        '[EnemySystem] Queued enemy projectile (combat/bus unavailable)',
-        payload
-      );
-    }
-    return false;
+    this.getCachedCombat().handleEnemyProjectile(payload);
+    return true;
   }
 
   /**
@@ -3937,15 +3444,7 @@ class EnemySystem extends BaseSystem {
     const originX = data.position.x;
     const originY = data.position.y;
 
-    const physics = this.getCachedPhysics();
-    let nearbyEnemies = null;
-    if (physics) {
-      if (typeof physics.getNearbyEnemies === 'function') {
-        nearbyEnemies = physics.getNearbyEnemies(originX, originY, radius);
-      } else if (typeof physics.getNearbyAsteroids === 'function') {
-        nearbyEnemies = physics.getNearbyAsteroids(originX, originY, radius);
-      }
-    }
+    let nearbyEnemies = this.physics.getNearbyEnemies(originX, originY, radius);
 
     if (!nearbyEnemies || nearbyEnemies.length === 0) {
       nearbyEnemies = this.asteroids;

@@ -1,6 +1,7 @@
 // src/data/enemies/asteroid-configs.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
+import { PALETTE, withAlpha } from '../constants/palette.js';
 
 /**
  * Asteroid configurations use a variant-based system rather than the
@@ -671,7 +672,7 @@ export const ASTEROID_ORB_DROP_MULTIPLIER = Object.freeze({
 export const ASTEROID_VARIANTS = deepFreeze({
   common: {
     key: 'common',
-    displayName: 'Padrão',
+    displayName: 'Standard',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 1.0,
     speedMultiplier: 1.0,
@@ -686,9 +687,10 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'default',
     fragmentProfile: 'default',
     colors: {
-      fill: '#8B4513',
-      stroke: '#654321',
-      cracks: 'rgba(255, 255, 255, 0.45)',
+      fill: PALETTE.rock,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.shot,
+      glow: withAlpha(PALETTE.shot, 0.6),
     },
     drops: {
       baseSplit: 1,
@@ -697,7 +699,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   iron: {
     key: 'iron',
-    displayName: 'Blindado',
+    displayName: 'Armored',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 1.3,
     speedMultiplier: 0.85,
@@ -712,10 +714,10 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'default',
     fragmentProfile: 'default',
     colors: {
-      fill: '#5A6F7F',
-      stroke: '#3A4A57',
-      cracks: 'rgba(180, 200, 220, 0.5)',
-      innerGlow: 'rgba(120, 140, 160, 0.25)',
+      fill: PALETTE.hullLit,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.shot,
+      innerGlow: withAlpha(PALETTE.shot, 0.3),
     },
     drops: {
       baseSplit: 1,
@@ -724,7 +726,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   denseCore: {
     key: 'denseCore',
-    displayName: 'Núcleo Denso',
+    displayName: 'Dense Core',
     allowedSizes: ['large', 'medium'],
     hpMultiplier: 1.8,
     speedMultiplier: 0.65,
@@ -739,10 +741,11 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'denseCore',
     fragmentProfile: 'denseCore',
     colors: {
-      fill: 'rgba(47, 140, 163, 0.15)', // [NEO-ARCADE] Holographic Transparency
-      stroke: 'rgba(31, 94, 111, 0.9)', // Solid Frame
-      cracks: 'rgba(163, 227, 255, 0.8)', // Bright Cracks
-      innerGlow: 'rgba(90, 220, 255, 0.4)',
+      fill: PALETTE.hull, // cooler and darker than plain rock
+      tint: PALETTE.neutral,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.shot,
+      innerGlow: withAlpha(PALETTE.shot, 0.4),
     },
     drops: {
       baseSplit: 2,
@@ -751,7 +754,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   gold: {
     key: 'gold',
-    displayName: 'Tesouro Dourado 💰',
+    displayName: 'Golden Treasure 💰',
     allowedSizes: ['medium', 'small'],
     hpMultiplier: 0.4, // ULTRA FRÁGIL (vidro!)
     speedMultiplier: 1.8, // ULTRA RÁPIDO (foge!)
@@ -766,16 +769,16 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
     colors: {
-      fill: '#FFD700',
-      stroke: '#FFFFFF', // [NEO-ARCADE] White stroke for pop
-      cracks: 'rgba(255, 255, 255, 0.9)', // Brighter cracks
-      glow: 'rgba(255, 223, 0, 0.9)', // Intense glow
+      fill: PALETTE.rock,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.xp,
+      veins: PALETTE.xp,
+      glow: withAlpha(PALETTE.xp, 0.9),
     },
     visual: {
       pulse: {
         speed: 4.0, // Faster pulse
         amount: 0.8,
-        color: 'rgba(255, 250, 200, 1.0)', // Brighter pulse
       },
       glow: {
         baseBlur: 25,
@@ -792,7 +795,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   volatile: {
     key: 'volatile',
-    displayName: 'Fragmento Volátil',
+    displayName: 'Volatile Fragment',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.6,
     speedMultiplier: 1.4,
@@ -807,12 +810,13 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'volatile',
     fragmentProfile: 'volatile',
     colors: {
-      fill: '#B64220',
-      stroke: '#5E1A0D',
-      cracks: 'rgba(255, 200, 120, 0.7)',
-      pulse: 'rgba(255, 120, 30, 0.45)',
-      glow: 'rgba(255, 180, 90, 0.6)',
-      innerGlow: 'rgba(255, 120, 45, 0.5)',
+      fill: PALETTE.rock,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.shot,
+      veins: PALETTE.shot,
+      pulse: withAlpha(PALETTE.shot, 0.45),
+      glow: withAlpha(PALETTE.shot, 0.6),
+      innerGlow: withAlpha(PALETTE.shot, 0.5),
     },
     behavior: {
       type: 'volatile',
@@ -829,7 +833,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
         amount: 0.75,
         fuseBoost: 0.6,
         armedBoost: 0.25,
-        color: 'rgba(255, 160, 70, 0.9)',
       },
       glow: {
         baseBlur: 18,
@@ -865,7 +868,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   parasite: {
     key: 'parasite',
-    displayName: 'Parásita',
+    displayName: 'Parasite',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.8,
     speedMultiplier: 1.2,
@@ -885,10 +888,11 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'parasite',
     fragmentProfile: 'parasite',
     colors: {
-      fill: '#612E83',
-      stroke: '#37154D',
-      cracks: 'rgba(190, 120, 255, 0.65)',
-      glow: 'rgba(90, 255, 180, 0.35)',
+      fill: PALETTE.rock,
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.threat,
+      veins: PALETTE.threat,
+      glow: withAlpha(PALETTE.threat, 0.35),
     },
     behavior: {
       type: 'parasite',
@@ -902,7 +906,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
       pulse: {
         speed: 1.7,
         amount: 0.38,
-        color: 'rgba(190, 120, 255, 0.75)',
       },
       colors: {
         fill: 'rgba(120, 120, 130, 0.12)', // [NEO-ARCADE] Darker Hologram
@@ -926,7 +929,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   crystal: {
     key: 'crystal',
-    displayName: 'Cristal Energético',
+    displayName: 'Energy Crystal',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.7,
     speedMultiplier: 1.3, // AUMENTADO de 0.8 para 1.3 (ágil!)
@@ -941,16 +944,16 @@ export const ASTEROID_VARIANTS = deepFreeze({
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
     colors: {
-      fill: '#4FD0FF',
-      stroke: '#2A8FB4',
-      cracks: 'rgba(240, 255, 255, 0.85)',
-      glow: 'rgba(120, 240, 255, 0.55)',
+      fill: PALETTE.neutral, // translucent cold facets
+      stroke: PALETTE.rockShadow,
+      cracks: PALETTE.text,
+      rim: PALETTE.text,
+      glow: withAlpha(PALETTE.text, 0.55),
     },
     visual: {
       pulse: {
         speed: 1.9,
         amount: 0.35,
-        color: 'rgba(220, 255, 255, 0.8)',
       },
       glow: {
         baseBlur: 12,

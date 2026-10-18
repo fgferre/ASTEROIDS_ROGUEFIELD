@@ -36,15 +36,17 @@ function createEnemySystemStub(random) {
 
   const enemySystem = {
     created,
-    factory: {
-      create(type, config) {
-        created.push({
-          type,
-          x: Number(config.x.toFixed(4)),
-          y: Number(config.y.toFixed(4)),
-        });
-        return { type, ...config };
-      },
+    acquireEnemyViaFactory(type, config) {
+      created.push({
+        type,
+        x: Number(config.x.toFixed(4)),
+        y: Number(config.y.toFixed(4)),
+      });
+      return { type, ...config };
+    },
+    registerActiveEnemy() {},
+    getPlayerPositionSnapshot() {
+      return null;
     },
     getCachedWorld() {
       return world;
@@ -67,7 +69,7 @@ function captureWaveSpawnSnapshot(seed) {
   const container = createTestContainer(seed);
   const random = container.resolve('random');
   const enemySystem = createEnemySystemStub(random);
-  const eventBus = { emit: vi.fn() };
+  const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
 
   const waveManager = new WaveManager({
     random,

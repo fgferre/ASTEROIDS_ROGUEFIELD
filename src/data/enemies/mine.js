@@ -71,7 +71,6 @@ export const MINE_COMPONENTS = deepFreeze({
   render: {
     strategy: 'procedural',
     shape: 'sphere',
-    showPulse: true,
     pulseSpeed: 2.6,
     pulseAmount: 0.32,
   },

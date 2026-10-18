@@ -1,15 +1,5 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
-import {
-  setupGlobalMocks,
-  cleanupGlobalState,
-} from '../__helpers__/setup.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import { mobileGuard } from '../../src/bootstrap/mobileGuard.js';
 
 // A11Y-08 detection contract lock per CONTEXT D-07.
@@ -21,9 +11,10 @@ import { mobileGuard } from '../../src/bootstrap/mobileGuard.js';
 //
 // Four device profiles covered (D-07):
 //   1. desktop-mouse  → ontouchstart absent, maxTouchPoints=0, pointer:coarse false  → blocked: false
-//   2. laptop+touch   → ontouchstart present, maxTouchPoints=5, pointer:coarse false → blocked: true
+//   2. laptop+touch   → ontouchstart present, maxTouchPoints=5, pointer:coarse false → blocked: false
 //   3. phone          → ontouchstart present, maxTouchPoints=5, pointer:coarse true  → blocked: true
-//   4. tablet         → ontouchstart absent, maxTouchPoints=10, pointer:coarse false → blocked: true (OR-not-AND)
+//   4. tablet         → ontouchstart absent, maxTouchPoints=10, pointer:coarse true  → blocked: true
+//   5. windows laptop → ontouchstart absent, maxTouchPoints=10, pointer:coarse false → blocked: false
 // Plus:
 //   - ?desktop=force override on a phone-shaped profile → blocked: false
 //   - Defensive null-canvas branch (document.getElementById returns null) → blocked: true
@@ -104,13 +95,30 @@ function stubDeviceProfile({
         getContext: vi.fn(() => ctxStub),
       };
 
+  const loadingScreen = { classList: { add: vi.fn() } };
+  const container = { appendChild: vi.fn() };
+  const elements = {
+    'game-canvas': canvasStub,
+    'loading-screen': loadingScreen,
+    'game-container': container,
+  };
+  const noticeStub = { setAttribute: vi.fn() };
+
   vi.stubGlobal('document', {
-    getElementById: vi.fn((id) =>
-      id === 'game-canvas' ? canvasStub : null
-    ),
+    getElementById: vi.fn((id) => elements[id] ?? null),
+    createElement: vi.fn(() => noticeStub),
   });
 
-  return { ctxStub, canvasStub, fillRectMock, fillTextMock, measureTextMock };
+  return {
+    ctxStub,
+    canvasStub,
+    fillRectMock,
+    fillTextMock,
+    measureTextMock,
+    loadingScreen,
+    container,
+    noticeStub,
+  };
 }
 
 describe('mobileGuard', () => {
@@ -133,34 +141,45 @@ describe('mobileGuard', () => {
       expect(mobileGuard()).toEqual({ blocked: false });
     });
 
-    it('returns { blocked: true } on laptop with touchscreen', () => {
-      const { fillTextMock } = stubDeviceProfile({
+    it('returns { blocked: false } on laptop with touchscreen (pointer is fine)', () => {
+      stubDeviceProfile({
         ontouchstart: true,
         maxTouchPoints: 5,
         pointerCoarse: false,
       });
-      expect(mobileGuard()).toEqual({ blocked: true });
-      // Notice was painted — both EN and PT-BR lines.
-      expect(fillTextMock).toHaveBeenCalledTimes(2);
+      expect(mobileGuard()).toEqual({ blocked: false });
     });
 
     it('returns { blocked: true } on phone (pointer: coarse)', () => {
-      const { fillTextMock } = stubDeviceProfile({
-        ontouchstart: true,
-        maxTouchPoints: 5,
+      const { fillTextMock, loadingScreen, container, noticeStub } =
+        stubDeviceProfile({
+          ontouchstart: true,
+          maxTouchPoints: 5,
+          pointerCoarse: true,
+        });
+      expect(mobileGuard()).toEqual({ blocked: true });
+      expect(fillTextMock).toHaveBeenCalledTimes(1);
+      expect(loadingScreen.classList.add).toHaveBeenCalledWith('hidden');
+      expect(container.appendChild).toHaveBeenCalledWith(noticeStub);
+      expect(noticeStub.setAttribute).toHaveBeenCalledWith('role', 'alert');
+    });
+
+    it('returns { blocked: true } on tablet (maxTouchPoints + pointer: coarse)', () => {
+      stubDeviceProfile({
+        ontouchstart: false,
+        maxTouchPoints: 10,
         pointerCoarse: true,
       });
       expect(mobileGuard()).toEqual({ blocked: true });
-      expect(fillTextMock).toHaveBeenCalledTimes(2);
     });
 
-    it('returns { blocked: true } on tablet (maxTouchPoints alone — OR-not-AND)', () => {
+    it('returns { blocked: false } when maxTouchPoints is the only signal (Windows laptop)', () => {
       stubDeviceProfile({
         ontouchstart: false,
         maxTouchPoints: 10,
         pointerCoarse: false,
       });
-      expect(mobileGuard()).toEqual({ blocked: true });
+      expect(mobileGuard()).toEqual({ blocked: false });
     });
   });
 

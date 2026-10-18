@@ -8,15 +8,28 @@ import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
+import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
+import * as bloomLayer from '../core/bloomLayer.js';
+import { BiomeTransition } from '../data/biomes.js';
+import { cameraDisabledByUrl, createCamera } from '../core/camera.js';
+import {
+  FILL_LIGHT,
+  KEY_LIGHT_DIR,
+  LINE,
+  PALETTE,
+  withAlpha,
+} from '../data/constants/palette.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
-// [NEO-ARCADE] Shield Visual Constants
-const SHIELD_HEX_SIZE = 24;
+// Player shield: a field-generator barrier around the hull outline.
+const SHIELD_SWEEP_SPEED = 0.35; // perimeters per second
+const SHIELD_SWEEP_SHARE = 0.18; // fraction of the perimeter lit by the sweep
+const SHIELD_IMPACT_FLASH_MS = 80;
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
 const MIN_OUTLINE_POINTS = 3;
 const EPSILON = 1e-6;
-const NEBULA_UPDATE_INTERVAL_MS = 120;
 
 // Graphics Settings Defaults
 const DEFAULT_GRAPHICS_SETTINGS = {
@@ -150,68 +163,170 @@ function computeOutlineRadius(points) {
   }, 0);
 }
 
-const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
-
-function resolveDevicePixelRatio() {
-  if (typeof window === 'undefined') {
-    return 1;
-  }
-
-  const ratio = Number(window.devicePixelRatio) || 1;
-  return Math.max(1, Math.min(2, ratio));
+// Elongated hexagon around the padded hull: the box corners become its side
+// vertices and the tips sit past the nose and the tail.
+function hexagonAround(points) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const hx = (maxX - minX) / 2;
+  const hy = (maxY - minY) / 2;
+  const tip = hx + hy * 0.6;
+  return [
+    { x: cx + tip, y: cy },
+    { x: cx + hx, y: cy + hy },
+    { x: cx - hx, y: cy + hy },
+    { x: cx - tip, y: cy },
+    { x: cx - hx, y: cy - hy },
+    { x: cx + hx, y: cy - hy },
+  ];
 }
 
-// [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
-// Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
+function computePerimeter(points) {
+  let total = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    total += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return total;
+}
+
+const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
+
+// 'rgba(r, g, b, a)' → [r, g, b, a], parsed once per string.
+const tintCache = new Map();
+function parseTint(css) {
+  let rgba = tintCache.get(css);
+  if (!rgba) {
+    rgba = css.match(/[\d.]+/g).map(Number);
+    tintCache.set(css, rgba);
+  }
+  return rgba;
+}
+
+// `?bloom=0` turns the post pass off for A/B and for slow machines.
+function bloomDisabledByUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('bloom') === '0';
+  } catch {
+    return false;
+  }
+}
+
+// The Field (docs/NORTE.md §2): two haze layers, drifting dust, ~120 white
+// stars and the broken Ring far back. Everything is baked once (on resize or
+// render-scale change) and drawn as wrapped tiles, so a frame costs ~31 draws.
+const HAZE_SCALE = 0.25;
+const HAZE_BLUR = 5;
+const VIGNETTE_SCALE = 0.25;
+const RING_MARGIN = 16;
+const MAX_GLINTS = 8;
+
+// Far fragments: dark Ring shards drifting between the haze and the stars,
+// baked into one wrapped tile. PROPOSAL from 17/10 (was: none), judged by the
+// owner playing.
+const FAR_FRAGMENTS = Object.freeze({
+  count: 14,
+  speed: 0.15, // parallax factor
+  verticesMin: 7,
+  verticesMax: 10,
+  radiusMin: 5, // logical px → 10–28 px across
+  radiusMax: 14,
+  driftMax: 2.5, // px/s of their own slow drift
+  alphaMin: 0.55, // kept below the gameplay rocks so they never read as targets
+  alphaMax: 0.85,
+  rimAlpha: 0.3,
+});
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function mixRgb(a, b, t) {
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+}
+
+function rgba(rgb, alpha) {
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+const COLD_BLUE = FILL_LIGHT.match(/\d+/g).slice(0, 3).map(Number);
+const STAR_COOL = hexToRgb(PALETTE.text);
+const STAR_WARM = mixRgb(STAR_COOL, hexToRgb(PALETTE.shot), 0.18);
+
 class SpaceSkyBackground {
   constructor(randomGenerator = null) {
     this.random = this.resolveRandomGenerator(randomGenerator);
     this.width = 0;
     this.height = 0;
 
-    // Configuration
+    // Star layers, far to near. `speed` is the parallax factor.
     this.layers = [
-      {
-        speed: 0.1,
-        count: 150,
-        sizeMin: 1.5,
-        sizeMax: 2.5,
-        colorRate: 0.1,
-        stars: [],
-      }, // Background (Slow, Small)
-      {
-        speed: 0.3,
-        count: 200,
-        sizeMin: 2.5,
-        sizeMax: 4.0,
-        colorRate: 0.3,
-        stars: [],
-      }, // Midground
-      {
-        speed: 0.6,
-        count: 100,
-        sizeMin: 4.0,
-        sizeMax: 6.0,
-        colorRate: 0.6,
-        stars: [],
-      }, // Foreground (Fast, Big)
-    ];
+      { speed: 0.04, count: 60, sizeMin: 1, sizeMax: 1.3, alpha: 0.5 },
+      { speed: 0.12, count: 40, sizeMin: 1.1, sizeMax: 1.6, alpha: 0.7 },
+      { speed: 0.24, count: 20, sizeMin: 1.4, sizeMax: 2, alpha: 0.85 },
+    ].map((layer) => ({
+      ...layer,
+      stars: [],
+      phase: 0,
+      breath: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    }));
 
-    this.stars = [];
-    this.starSpriteCache = new Map();
+    this.hazeLayers = [
+      { speed: 0.02, grid: 2, octaves: 4, alpha: 0.16, threshold: 0.4 },
+      { speed: 0.09, grid: 3, octaves: 4, alpha: 0.09, threshold: 0.48 },
+    ].map((layer) => ({
+      ...layer,
+      lattices: [],
+      tint: [],
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    }));
+
+    this.dust = {
+      speed: 0.16,
+      count: 40,
+      motes: [],
+      driftX: 0,
+      driftY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    };
+
+    this.fragments = {
+      speed: FAR_FRAGMENTS.speed,
+      shards: [],
+      driftX: 0,
+      driftY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    };
+
+    this.ring = {
+      segments: [],
+      debris: [],
+      shiftX: 0,
+      shiftY: 0,
+      buffer: null,
+    };
+    this.vignette = null;
+    this.cameraShiftX = 0;
+    this.cameraShiftY = 0;
+    this.bakedScale = 0;
     this.initialized = false;
-    this.atmosphereBuffer = {
-      canvas: null,
-      width: 0,
-      height: 0,
-    };
-    this.nebulaBuffer = {
-      canvas: null,
-      ctx: null,
-      width: 0,
-      height: 0,
-      lastUpdate: 0,
-    };
   }
 
   resolveRandomGenerator(randomGenerator) {
@@ -222,10 +337,7 @@ class SpaceSkyBackground {
   }
 
   randomFloat() {
-    if (this.random && typeof this.random.float === 'function') {
-      return this.random.float();
-    }
-    return Math.random();
+    return requireRandom(this.random, 'rendering.space-sky').float();
   }
 
   randomRange(min, max) {
@@ -272,15 +384,15 @@ class SpaceSkyBackground {
     }
   }
 
+  // Generates the layout from the seeded RNG, then bakes it.
   rebuild() {
-    // Use actual dimensions with fallback
     const w = this.width > 0 ? this.width : 800;
     const h = this.height > 0 ? this.height : 600;
 
-    // 1. Rebuild Stars
-    this.stars = [];
-    this.starSpriteCache.clear();
+    let glints = 0;
     this.layers.forEach((layer, layerIndex) => {
+      layer.phase = this.randomFloat() * Math.PI * 2;
+      layer.breath = 0.15 + this.randomFloat() * 0.2;
       layer.stars = [];
       for (let i = 0; i < layer.count; i++) {
         const star = {
@@ -289,60 +401,455 @@ class SpaceSkyBackground {
           size:
             layer.sizeMin +
             this.randomFloat() * (layer.sizeMax - layer.sizeMin),
-          speed: layer.speed,
-          layerIndex,
-          color: this.pickNeonColor(layer.colorRate),
           phase: this.randomFloat() * Math.PI * 2,
-          blinkSpeed: 1 + this.randomFloat() * 2,
           jitter: this.randomFloat(),
+          glint: false,
         };
-        star.sprite = this.getStarSprite(star.size, star.color);
+        if (layerIndex > 0 && glints < MAX_GLINTS && this.randomChance(0.12)) {
+          star.glint = true;
+          glints += 1;
+        }
         layer.stars.push(star);
-        this.stars.push(star);
       }
     });
 
-    // 2. Generate Nebula Clouds (Deep Atmosphere)
-    this.nebulaClouds = [];
-    const cloudCount = 20;
-    const colors = [
-      'rgba(60, 0, 100, 0.14)', // Deep Purple
-      'rgba(0, 40, 100, 0.12)', // Deep Blue
-      'rgba(100, 0, 60, 0.1)', // Magenta Haze
-      'rgba(0, 80, 80, 0.1)', // Cyan Haze
-    ];
+    // Tileable value-noise lattices for the haze (base grid keeps 4:3).
+    this.hazeLayers.forEach((layer) => {
+      layer.lattices = [];
+      for (let o = 0; o < layer.octaves; o++) {
+        const gx = layer.grid * 4 * 2 ** o;
+        const gy = layer.grid * 3 * 2 ** o;
+        const values = new Float32Array(gx * gy);
+        for (let i = 0; i < values.length; i++) values[i] = this.randomFloat();
+        layer.lattices.push({ gx, gy, values });
+      }
+      const tint = new Float32Array(4 * 3);
+      for (let i = 0; i < tint.length; i++) tint[i] = this.randomFloat();
+      layer.tint = { gx: 4, gy: 3, values: tint };
+    });
 
-    for (let i = 0; i < cloudCount; i++) {
-      this.nebulaClouds.push({
+    this.dust.motes = [];
+    for (let i = 0; i < this.dust.count; i++) {
+      this.dust.motes.push({
         x: this.randomRange(0, w),
         y: this.randomRange(0, h),
-        radius: 220 + this.randomFloat() * 360,
-        color: colors[this.randomInt(0, colors.length - 1)],
-        vx: (this.randomFloat() - 0.5) * 5, // Very slow drift
-        vy: (this.randomFloat() - 0.5) * 5,
-        phase: this.randomFloat() * Math.PI * 2,
+        radius: this.randomRange(1, 2),
+        alpha: this.randomRange(0.1, 0.25),
       });
     }
+    this.dust.driftX = this.randomRange(-3, 3);
+    this.dust.driftY = this.randomRange(-2, 2);
 
-    this.buildAtmosphereLayer(w, h);
-    this.ensureNebulaBuffer(w, h);
-    this.nebulaBuffer.lastUpdate = 0;
+    this.buildRing();
+    // Generated after everything else so the older layers keep their layout.
+    this.buildFragments(w, h);
+    this.bake();
     this.initialized = true;
   }
 
-  // Generate neon colors with Math.random() to avoid RandomService issues
-  pickNeonColor(vibranceChance) {
-    if (this.randomChance(vibranceChance)) {
-      const palette = [
-        { r: 0, g: 255, b: 255 }, // Cyan
-        { r: 255, g: 0, b: 255 }, // Magenta
-        { r: 100, g: 255, b: 100 }, // Neon Green
-        { r: 255, g: 200, b: 50 }, // Gold
-      ];
-      return palette[this.randomInt(0, palette.length - 1)];
+  // The far side of a huge ring seen almost edge-on, cracked into segments.
+  buildRing() {
+    const count = this.randomInt(3, 5);
+    const start = Math.PI * 1.5 - 0.8;
+    const end = Math.PI * 1.5 + 0.8;
+    const span = (end - start) / count;
+    this.ring.segments = [];
+    this.ring.debris = [];
+    for (let i = 0; i < count; i++) {
+      const gapA = i === 0 ? 0 : this.randomRange(0.025, 0.06);
+      const gapB = i === count - 1 ? 0 : this.randomRange(0.025, 0.06);
+      const jag = () => [0, 1, 2].map(() => this.randomRange(-0.012, 0.012));
+      this.ring.segments.push({
+        a0: start + span * i + gapA,
+        a1: start + span * (i + 1) - gapB,
+        jag0: jag(),
+        jag1: jag(),
+      });
+      if (i > 0) {
+        for (let d = 0; d < 3; d++) {
+          this.ring.debris.push({
+            angle: start + span * i + this.randomRange(-0.05, 0.05),
+            depth: this.randomRange(0.88, 1.02),
+            size: this.randomRange(2, 5),
+            rotation: this.randomRange(0, Math.PI * 2),
+          });
+        }
+      }
     }
-    // White/blue tinted stars
-    return { r: 220, g: 235, b: 255 };
+  }
+
+  buildFragments(w, h) {
+    const f = FAR_FRAGMENTS;
+    this.fragments.shards = [];
+    for (let i = 0; i < f.count; i++) {
+      const radius = this.randomRange(f.radiusMin, f.radiusMax);
+      const vertices = this.randomInt(f.verticesMin, f.verticesMax);
+      const squash = this.randomRange(0.55, 1);
+      const rotation = this.randomRange(0, Math.PI * 2);
+      const points = [];
+      for (let v = 0; v < vertices; v++) {
+        const angle =
+          ((v + this.randomRange(-0.3, 0.3)) / vertices) * Math.PI * 2;
+        const r = radius * this.randomRange(0.6, 1);
+        const px = Math.cos(angle) * r;
+        const py = Math.sin(angle) * r * squash;
+        points.push([
+          px * Math.cos(rotation) - py * Math.sin(rotation),
+          px * Math.sin(rotation) + py * Math.cos(rotation),
+        ]);
+      }
+      this.fragments.shards.push({
+        x: this.randomRange(0, w),
+        y: this.randomRange(0, h),
+        radius,
+        points,
+        alpha: this.randomRange(f.alphaMin, f.alphaMax),
+      });
+    }
+    this.fragments.driftX = this.randomRange(-f.driftMax, f.driftMax);
+    this.fragments.driftY = this.randomRange(-f.driftMax, f.driftMax);
+  }
+
+  // Matte silhouette, a faint lit face and a rim on the key-light side.
+  paintFragment(ctx, x, y, shard) {
+    const pts = shard.points;
+    const r = shard.radius;
+    ctx.globalAlpha = shard.alpha;
+    ctx.beginPath();
+    pts.forEach(([px, py], i) =>
+      i === 0 ? ctx.moveTo(x + px, y + py) : ctx.lineTo(x + px, y + py)
+    );
+    ctx.closePath();
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+    const face = ctx.createLinearGradient(
+      x + KEY_LIGHT_DIR.x * r,
+      y + KEY_LIGHT_DIR.y * r,
+      x - KEY_LIGHT_DIR.x * r,
+      y - KEY_LIGHT_DIR.y * r
+    );
+    face.addColorStop(0, withAlpha(PALETTE.rock, 0.75));
+    face.addColorStop(0.6, withAlpha(PALETTE.rock, 0));
+    ctx.fillStyle = face;
+    ctx.fill();
+
+    ctx.lineWidth = LINE.hair * 0.8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = withAlpha(PALETTE.rockLit, FAR_FRAGMENTS.rimAlpha);
+    ctx.beginPath();
+    pts.forEach(([ax, ay], i) => {
+      const [bx, by] = pts[(i + 1) % pts.length];
+      // outward edge normal (points sit around the origin)
+      let nx = by - ay;
+      let ny = ax - bx;
+      if (nx * (ax + bx) + ny * (ay + by) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const len = Math.hypot(nx, ny) || 1;
+      if ((nx * KEY_LIGHT_DIR.x + ny * KEY_LIGHT_DIR.y) / len > 0.25) {
+        ctx.moveTo(x + ax, y + ay);
+        ctx.lineTo(x + bx, y + by);
+      }
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Paints every buffer from the generated layout at the current render scale.
+  bake() {
+    const w = this.width > 0 ? this.width : 800;
+    const h = this.height > 0 ? this.height : 600;
+    const scale = getRenderScale() || 1;
+    this.bakedScale = scale;
+
+    this.layers.forEach((layer) => {
+      layer.tile = this.bakeLayer(w, h, scale, (ctx) => {
+        layer.stars.forEach((star) =>
+          this.forWrapped(star.x, star.y, 6, w, h, (x, y) =>
+            this.paintStar(ctx, x, y, star, layer.alpha)
+          )
+        );
+      });
+    });
+
+    this.dust.tile = this.bakeLayer(w, h, scale, (ctx) => {
+      this.dust.motes.forEach((mote) =>
+        this.forWrapped(mote.x, mote.y, 4, w, h, (x, y) => {
+          const glow = ctx.createRadialGradient(x, y, 0, x, y, mote.radius);
+          glow.addColorStop(0, withAlpha(PALETTE.text, mote.alpha));
+          glow.addColorStop(1, withAlpha(PALETTE.neutral, 0));
+          ctx.fillStyle = glow;
+          ctx.fillRect(
+            x - mote.radius,
+            y - mote.radius,
+            mote.radius * 2,
+            mote.radius * 2
+          );
+        })
+      );
+    });
+
+    this.fragments.tile = this.bakeLayer(w, h, scale, (ctx) => {
+      this.fragments.shards.forEach((shard) =>
+        this.forWrapped(shard.x, shard.y, shard.radius + 2, w, h, (x, y) =>
+          this.paintFragment(ctx, x, y, shard)
+        )
+      );
+    });
+
+    this.hazeLayers.forEach((layer) => {
+      layer.tile = this.bakeHaze(layer, w, h);
+    });
+
+    this.ring.buffer = this.bakeRing(w, h, scale);
+    this.vignette = this.bakeVignette(w, h);
+  }
+
+  bakeLayer(w, h, scale, paint) {
+    const canvas = this.createOffscreenCanvas(w, h, scale);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    paint(ctx);
+    return canvas;
+  }
+
+  forWrapped(x, y, margin, w, h, draw) {
+    const xs = [x];
+    const ys = [y];
+    if (x < margin) xs.push(x + w);
+    if (x > w - margin) xs.push(x - w);
+    if (y < margin) ys.push(y + h);
+    if (y > h - margin) ys.push(y - h);
+    xs.forEach((px) => ys.forEach((py) => draw(px, py)));
+  }
+
+  paintStar(ctx, x, y, star, layerAlpha) {
+    const rgb = star.jitter < 0.5 ? STAR_WARM : STAR_COOL;
+    const alpha = layerAlpha * (0.55 + 0.45 * star.jitter);
+    const r = star.size / 2;
+
+    const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
+    halo.addColorStop(0, rgba(rgb, alpha * 0.25));
+    halo.addColorStop(1, rgba(rgb, 0));
+    ctx.fillStyle = halo;
+    ctx.fillRect(x - r * 2.5, y - r * 2.5, r * 5, r * 5);
+
+    ctx.fillStyle = rgba(rgb, alpha);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (!star.glint) return;
+    const reach = 3 + star.size * 2;
+    ctx.lineWidth = LINE.hair * 0.6;
+    [
+      [reach, 0],
+      [0, reach],
+    ].forEach(([dx, dy]) => {
+      const spike = ctx.createLinearGradient(x - dx, y - dy, x + dx, y + dy);
+      spike.addColorStop(0, rgba(rgb, 0));
+      spike.addColorStop(0.5, rgba(rgb, alpha * 0.7));
+      spike.addColorStop(1, rgba(rgb, 0));
+      ctx.strokeStyle = spike;
+      ctx.beginPath();
+      ctx.moveTo(x - dx, y - dy);
+      ctx.lineTo(x + dx, y + dy);
+      ctx.stroke();
+    });
+  }
+
+  sampleNoise(lattice, u, v) {
+    const { gx, gy, values } = lattice;
+    const fx = u * gx;
+    const fy = v * gy;
+    const x0 = Math.floor(fx);
+    const y0 = Math.floor(fy);
+    const tx = fx - x0;
+    const ty = fy - y0;
+    const sx = tx * tx * (3 - 2 * tx);
+    const sy = ty * ty * (3 - 2 * ty);
+    const xa = ((x0 % gx) + gx) % gx;
+    const xb = (xa + 1) % gx;
+    const ya = ((y0 % gy) + gy) % gy;
+    const yb = (ya + 1) % gy;
+    const top = values[ya * gx + xa] * (1 - sx) + values[ya * gx + xb] * sx;
+    const bottom = values[yb * gx + xa] * (1 - sx) + values[yb * gx + xb] * sx;
+    return top * (1 - sy) + bottom * sy;
+  }
+
+  bakeHaze(layer, w, h) {
+    const canvas = this.createOffscreenCanvas(w, h, HAZE_SCALE);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const image = ctx.createImageData(cw, ch);
+    const data = image.data;
+    const neutral = hexToRgb(PALETTE.neutral);
+    let norm = 0;
+    for (let o = 0; o < layer.octaves; o++) norm += 0.5 ** o;
+
+    for (let py = 0; py < ch; py++) {
+      const v = py / ch;
+      for (let px = 0; px < cw; px++) {
+        const u = px / cw;
+        let n = 0;
+        for (let o = 0; o < layer.octaves; o++) {
+          n += this.sampleNoise(layer.lattices[o], u, v) * 0.5 ** o;
+        }
+        n /= norm;
+        const d = Math.min(1, Math.max(0, (n - layer.threshold) / 0.35));
+        const rgb = mixRgb(
+          neutral,
+          COLD_BLUE,
+          this.sampleNoise(layer.tint, u, v)
+        );
+        const i = (py * cw + px) * 4;
+        data[i] = rgb[0];
+        data[i + 1] = rgb[1];
+        data[i + 2] = rgb[2];
+        data[i + 3] = Math.round(d * d * layer.alpha * 255);
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return this.blurTile(canvas, HAZE_BLUR);
+  }
+
+  // Softens a wrapped tile without seams: blur a 3×3 mosaic, keep the middle.
+  blurTile(tile, radius) {
+    const cw = tile.width;
+    const ch = tile.height;
+    const out = this.createOffscreenCanvas(cw, ch);
+    const ctx = out?.getContext?.('2d');
+    if (!ctx) return tile;
+    ctx.filter = `blur(${radius}px)`;
+    for (let x = -1; x <= 1; x++) {
+      for (let y = -1; y <= 1; y++) ctx.drawImage(tile, x * cw, y * ch);
+    }
+    ctx.filter = 'none';
+    return out;
+  }
+
+  ringPoint(cx, cy, rx, ry, rot, k, angle) {
+    const ex = Math.cos(angle) * rx * k;
+    const ey = Math.sin(angle) * ry * k;
+    return [
+      cx + ex * Math.cos(rot) - ey * Math.sin(rot),
+      cy + ex * Math.sin(rot) + ey * Math.cos(rot),
+    ];
+  }
+
+  bakeRing(w, h, scale) {
+    const m = RING_MARGIN;
+    const canvas = this.createOffscreenCanvas(w + m * 2, h + m * 2, scale);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.translate(m, m);
+
+    const cx = w * 0.55;
+    const cy = h * 1.45;
+    const rx = w * 1.3;
+    const ry = h * 1.22;
+    const rot = -0.14;
+    const inner = 0.95;
+    const at = (k, a) => this.ringPoint(cx, cy, rx, ry, rot, k, a);
+    const steps = 48;
+
+    const band = new Path2D();
+    const rim = new Path2D();
+    this.ring.segments.forEach((seg) => {
+      const crack = (angle, jag, fromOuter) =>
+        jag.forEach((j, idx) => {
+          const t = fromOuter ? (idx + 1) / 4 : 1 - (idx + 1) / 4;
+          band.lineTo(...at(1 - (1 - inner) * t, angle + j));
+        });
+      band.moveTo(...at(1, seg.a0));
+      rim.moveTo(...at(1, seg.a0));
+      for (let s = 1; s <= steps; s++) {
+        const a = seg.a0 + ((seg.a1 - seg.a0) * s) / steps;
+        band.lineTo(...at(1, a));
+        rim.lineTo(...at(1, a));
+      }
+      crack(seg.a1, seg.jag1, true);
+      for (let s = steps; s >= 0; s--) {
+        band.lineTo(...at(inner, seg.a0 + ((seg.a1 - seg.a0) * s) / steps));
+      }
+      crack(seg.a0, seg.jag0, false);
+      band.closePath();
+    });
+
+    // Occlude what lies behind, then lift the mass just above the void.
+    ctx.fillStyle = withAlpha(PALETTE.background, 0.65);
+    ctx.fill(band);
+    const topY = at(1, Math.PI * 1.5)[1];
+    const mass = ctx.createLinearGradient(0, topY - h * 0.1, 0, h);
+    mass.addColorStop(0, withAlpha(PALETTE.hull, 0.3));
+    mass.addColorStop(1, withAlpha(PALETTE.hull, 0.12));
+    ctx.fillStyle = mass;
+    ctx.fill(band);
+
+    // A dark lane inside the band reads as ring structure.
+    ctx.lineWidth = LINE.thin;
+    ctx.strokeStyle = withAlpha(PALETTE.background, 0.45);
+    this.ring.segments.forEach((seg) => {
+      ctx.beginPath();
+      for (let s = 0; s <= steps; s++) {
+        const p = at(0.97, seg.a0 + ((seg.a1 - seg.a0) * s) / steps);
+        if (s === 0) ctx.moveTo(...p);
+        else ctx.lineTo(...p);
+      }
+      ctx.stroke();
+    });
+
+    // Key light from the upper left catches the outer edge.
+    const light = ctx.createLinearGradient(0, 0, w, 0);
+    light.addColorStop(0, withAlpha(PALETTE.rockLit, 0.2));
+    light.addColorStop(0.5, withAlpha(PALETTE.rockLit, 0.1));
+    light.addColorStop(1, withAlpha(PALETTE.rockLit, 0.04));
+    ctx.lineWidth = LINE.hair;
+    ctx.strokeStyle = light;
+    ctx.stroke(rim);
+
+    this.ring.debris.forEach((chunk) => {
+      const [x, y] = at(chunk.depth, chunk.angle);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(chunk.rotation);
+      ctx.fillStyle = withAlpha(PALETTE.hull, 0.45);
+      ctx.fillRect(
+        -chunk.size / 2,
+        -chunk.size / 3,
+        chunk.size,
+        chunk.size / 1.5
+      );
+      ctx.restore();
+    });
+
+    return canvas;
+  }
+
+  bakeVignette(w, h) {
+    const canvas = this.createOffscreenCanvas(w, h, VIGNETTE_SCALE);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(VIGNETTE_SCALE, VIGNETTE_SCALE);
+    const gradient = ctx.createRadialGradient(
+      w / 2,
+      h / 2,
+      Math.min(w, h) * 0.35,
+      w / 2,
+      h / 2,
+      Math.hypot(w, h) * 0.62
+    );
+    gradient.addColorStop(0, withAlpha(PALETTE.background, 0));
+    gradient.addColorStop(1, withAlpha(PALETTE.background, 0.7));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+    return canvas;
   }
 
   render(ctx, options = {}) {
@@ -354,17 +861,10 @@ class SpaceSkyBackground {
     if (!this.initialized || this.width !== width || this.height !== height) {
       this.resize(width, height);
     }
+    if (this.bakedScale !== (getRenderScale() || 1)) {
+      this.bake();
+    }
 
-    // 1. Clear background - deep space
-    ctx.fillStyle = '#030810';
-    ctx.fillRect(0, 0, width, height);
-
-    this.drawAtmosphere(ctx, width, height);
-
-    // 2. Draw subtle nebula clouds
-    this.drawNebula(ctx);
-
-    // 3. Update & draw stars
     // Safeguard against NaN velocity - check both {vx,vy} and {x,y} formats
     const rawVelocity = options.velocity || {};
     const vx = Number.isFinite(rawVelocity.vx)
@@ -378,136 +878,131 @@ class SpaceSkyBackground {
         ? rawVelocity.y
         : 0;
 
+    // The camera pans over the field; each layer follows at its parallax
+    // rate (`speed`), so far layers barely move and dust moves most.
+    this.cameraShiftX = Number.isFinite(options.cameraX)
+      ? options.cameraX - width / 2
+      : 0;
+    this.cameraShiftY = Number.isFinite(options.cameraY)
+      ? options.cameraY - height / 2
+      : 0;
+
     const dt = 16 / 1000;
-    const time = Date.now() / 1000;
+    const time = performance.now() / 1000;
+    const scroll = (layer) => {
+      layer.offsetX -= vx * layer.speed * dt;
+      layer.offsetY -= vy * layer.speed * dt;
+    };
+    this.layers.forEach(scroll);
+    this.hazeLayers.forEach(scroll);
+    scroll(this.dust);
+    scroll(this.fragments);
+
+    // The Ring barely moves: it leans against the motion and settles back.
+    const ring = this.ring;
+    ring.shiftX += (-vx * 0.03 - ring.shiftX) * 0.02;
+    ring.shiftY += (-vy * 0.03 - ring.shiftY) * 0.02;
 
     ctx.save();
-    if (this.bloomEnabled) {
-      ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
-    }
+    ctx.fillStyle = PALETTE.background;
+    ctx.fillRect(0, 0, width, height);
 
-    this.stars.forEach((star) => {
-      // Parallax movement - opposite to player velocity
-      star.x -= vx * star.speed * dt;
-      star.y -= vy * star.speed * dt;
+    const [farHaze, nearHaze] = this.hazeLayers;
+    const [farStars, midStars, nearStars] = this.layers;
+    const breathe = (layer) =>
+      0.85 + 0.15 * Math.sin(time * layer.breath + layer.phase);
 
-      // Wrap around screen edges
-      if (star.x < -10) star.x += width + 20;
-      if (star.x > width + 10) star.x -= width + 20;
-      if (star.y < -10) star.y += height + 20;
-      if (star.y > height + 10) star.y -= height + 20;
-
-      // Twinkle effect
-      const blink = Math.sin(time * star.blinkSpeed + star.phase);
-      const alpha = 0.6 + 0.4 * blink;
-
-      const sprite = star.sprite;
-      if (sprite && sprite.canvas) {
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(
-          sprite.canvas,
-          star.x - sprite.halfSize,
-          star.y - sprite.halfSize
-        );
-        ctx.globalAlpha = 1;
-        return;
-      }
-
-      // Neon color with glow (fallback path)
+    this.drawTiled(ctx, farHaze.tile, farHaze, width, height, 1);
+    this.drawTiled(
+      ctx,
+      farStars.tile,
+      farStars,
+      width,
+      height,
+      breathe(farStars)
+    );
+    if (ring.buffer) {
+      const m = RING_MARGIN;
+      const sx = Math.max(
+        -m,
+        Math.min(m, ring.shiftX - this.cameraShiftX * 0.01)
+      );
+      const sy = Math.max(
+        -m,
+        Math.min(m, ring.shiftY - this.cameraShiftY * 0.01)
+      );
       ctx.globalAlpha = 1;
-      const c = star.color;
-      ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
+      ctx.drawImage(ring.buffer, sx - m, sy - m, width + m * 2, height + m * 2);
+    }
+    this.drawTiled(ctx, nearHaze.tile, nearHaze, width, height, 1);
+    this.drawTiled(
+      ctx,
+      this.fragments.tile,
+      {
+        speed: this.fragments.speed,
+        offsetX: this.fragments.offsetX + this.fragments.driftX * time,
+        offsetY: this.fragments.offsetY + this.fragments.driftY * time,
+      },
+      width,
+      height,
+      1
+    );
+    this.drawTiled(
+      ctx,
+      midStars.tile,
+      midStars,
+      width,
+      height,
+      breathe(midStars)
+    );
+    this.drawTiled(
+      ctx,
+      this.dust.tile,
+      {
+        speed: this.dust.speed,
+        offsetX: this.dust.offsetX + this.dust.driftX * time,
+        offsetY: this.dust.offsetY + this.dust.driftY * time,
+      },
+      width,
+      height,
+      1
+    );
+    this.drawTiled(
+      ctx,
+      nearStars.tile,
+      nearStars,
+      width,
+      height,
+      breathe(nearStars)
+    );
 
-      // Draw diamond shape
-      const r = star.size / 2;
-      ctx.beginPath();
-      ctx.moveTo(star.x, star.y - r);
-      ctx.lineTo(star.x + r, star.y);
-      ctx.lineTo(star.x, star.y + r);
-      ctx.lineTo(star.x - r, star.y);
-      ctx.closePath();
-      ctx.fill();
-    });
-
+    if (this.vignette) {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(this.vignette, 0, 0, width, height);
+    }
     ctx.restore();
-
-    // 4. Vignette overlay
-    this.drawVignette(ctx, width, height);
   }
 
-  drawNebula(ctx) {
-    if (!this.nebulaClouds) return;
-
-    const width = this.width;
-    const height = this.height;
-    const now = performance.now();
-    const time = now / 1000;
-
-    if (this.ensureNebulaBuffer(width, height)) {
-      if (
-        !this.nebulaBuffer.lastUpdate ||
-        now - this.nebulaBuffer.lastUpdate >= NEBULA_UPDATE_INTERVAL_MS
-      ) {
-        this.renderNebulaLayer(
-          this.nebulaBuffer.ctx,
-          time,
-          width,
-          height,
-          true
-        );
-        this.nebulaBuffer.lastUpdate = now;
+  // Draws a full-field tile scrolled by the layer offset (≤4 drawImage).
+  drawTiled(ctx, tile, layer, width, height, alpha) {
+    if (!tile) return;
+    const scale = this.bakedScale;
+    const offsetX = layer.offsetX - this.cameraShiftX * layer.speed;
+    const offsetY = layer.offsetY - this.cameraShiftY * layer.speed;
+    const ox =
+      Math.round((((offsetX % width) + width) % width) * scale) / scale;
+    const oy =
+      Math.round((((offsetY % height) + height) % height) * scale) / scale;
+    ctx.globalAlpha = alpha;
+    for (const x of ox > 0 ? [ox - width, ox] : [0]) {
+      for (const y of oy > 0 ? [oy - height, oy] : [0]) {
+        ctx.drawImage(tile, x, y, width, height);
       }
-
-      ctx.drawImage(this.nebulaBuffer.canvas, 0, 0, width, height);
-      return;
     }
-
-    this.renderNebulaLayer(ctx, time, width, height, false);
   }
-
-  drawAtmosphere(ctx, width, height) {
-    const buffer = this.atmosphereBuffer?.canvas;
-    if (!buffer) {
-      return;
-    }
-
-    ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.drawImage(buffer, 0, 0, width, height);
-    ctx.restore();
-  }
-
-  renderNebulaLayer(ctx, time, width, height, clearFirst) {
-    if (!ctx) return;
-    if (clearFirst) {
-      ctx.clearRect(0, 0, width, height);
-    }
-
-    this.nebulaClouds.forEach((cloud) => {
-      // Slow drift
-      let x = cloud.x + cloud.vx * time;
-      let y = cloud.y + cloud.vy * time;
-
-      // Wrap
-      x = ((x % width) + width) % width;
-      y = ((y % height) + height) % height;
-
-      // Pulse size slightly
-      const r = cloud.radius * (0.9 + 0.2 * Math.sin(time * 0.2 + cloud.phase));
-
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, cloud.color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-
-      ctx.fillStyle = grad;
-      // Draw larger rect to cover gradient area
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    });
-  }
-
-  createOffscreenCanvas(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
+  createOffscreenCanvas(width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
+    const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
 
     if (
       typeof document !== 'undefined' &&
@@ -524,173 +1019,6 @@ class SpaceSkyBackground {
     }
 
     return null;
-  }
-
-  buildAtmosphereLayer(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
-
-    let canvas = this.atmosphereBuffer.canvas;
-    if (
-      !canvas ||
-      this.atmosphereBuffer.width !== safeWidth ||
-      this.atmosphereBuffer.height !== safeHeight
-    ) {
-      canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
-    }
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      this.atmosphereBuffer.canvas = null;
-      this.atmosphereBuffer.width = 0;
-      this.atmosphereBuffer.height = 0;
-      return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      this.atmosphereBuffer.canvas = null;
-      this.atmosphereBuffer.width = 0;
-      this.atmosphereBuffer.height = 0;
-      return;
-    }
-
-    ctx.clearRect(0, 0, safeWidth, safeHeight);
-    const gradient = ctx.createLinearGradient(0, 0, safeWidth, safeHeight);
-    gradient.addColorStop(0, 'rgba(20, 60, 110, 0.22)');
-    gradient.addColorStop(1, 'rgba(90, 30, 70, 0.18)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, safeWidth, safeHeight);
-
-    const glowCount = 4;
-    for (let i = 0; i < glowCount; i += 1) {
-      const x = this.randomRange(0, safeWidth);
-      const y = this.randomRange(0, safeHeight);
-      const radius = 160 + this.randomFloat() * 240;
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      glow.addColorStop(0, 'rgba(90, 160, 200, 0.12)');
-      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    }
-
-    this.atmosphereBuffer.canvas = canvas;
-    this.atmosphereBuffer.width = safeWidth;
-    this.atmosphereBuffer.height = safeHeight;
-  }
-
-  getStarSprite(size, color) {
-    if (!Number.isFinite(size) || !color) {
-      return null;
-    }
-
-    const sizeKey = Number(size).toFixed(2);
-    const r = Number.isFinite(color.r) ? color.r : 255;
-    const g = Number.isFinite(color.g) ? color.g : 255;
-    const b = Number.isFinite(color.b) ? color.b : 255;
-    const key = `${sizeKey}:${r},${g},${b}`;
-
-    if (this.starSpriteCache.has(key)) {
-      return this.starSpriteCache.get(key);
-    }
-
-    const sprite = this.createStarSprite(Number(sizeKey), { r, g, b });
-    if (sprite) {
-      this.starSpriteCache.set(key, sprite);
-    }
-
-    return sprite;
-  }
-
-  createStarSprite(size, color) {
-    const radius = Math.max(0.5, size / 2);
-    const diameter = Math.max(2, Math.ceil(radius * 2 + 2));
-    const canvas = this.createOffscreenCanvas(diameter, diameter);
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      return null;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return null;
-    }
-
-    const half = diameter / 2;
-    ctx.save();
-    ctx.translate(half, half);
-    ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-    ctx.beginPath();
-    ctx.moveTo(0, -radius);
-    ctx.lineTo(radius, 0);
-    ctx.lineTo(0, radius);
-    ctx.lineTo(-radius, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    return {
-      canvas,
-      halfSize: half,
-      size: diameter,
-    };
-  }
-
-  ensureNebulaBuffer(width, height) {
-    if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      return false;
-    }
-
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
-
-    if (
-      this.nebulaBuffer.canvas &&
-      this.nebulaBuffer.ctx &&
-      this.nebulaBuffer.width === safeWidth &&
-      this.nebulaBuffer.height === safeHeight
-    ) {
-      return true;
-    }
-
-    const canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      this.nebulaBuffer.canvas = null;
-      this.nebulaBuffer.ctx = null;
-      this.nebulaBuffer.width = 0;
-      this.nebulaBuffer.height = 0;
-      this.nebulaBuffer.lastUpdate = 0;
-      return false;
-    }
-
-    const bufferCtx = canvas.getContext('2d');
-    if (!bufferCtx) {
-      this.nebulaBuffer.canvas = null;
-      this.nebulaBuffer.ctx = null;
-      this.nebulaBuffer.width = 0;
-      this.nebulaBuffer.height = 0;
-      this.nebulaBuffer.lastUpdate = 0;
-      return false;
-    }
-
-    this.nebulaBuffer.canvas = canvas;
-    this.nebulaBuffer.ctx = bufferCtx;
-    this.nebulaBuffer.width = safeWidth;
-    this.nebulaBuffer.height = safeHeight;
-    this.nebulaBuffer.lastUpdate = 0;
-    return true;
-  }
-
-  drawVignette(ctx, width, height) {
-    const gradient = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      Math.min(width, height) * 0.4,
-      width / 2,
-      height / 2,
-      Math.hypot(width, height) * 0.7
-    );
-    gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
   }
 }
 
@@ -727,6 +1055,7 @@ class RenderingSystem extends BaseSystem {
     this.cachedProgression = null;
     this.cachedXPOrbs = null;
     this.cachedHealthHearts = null;
+    this.cachedPickups = null;
     this.cachedEffects = null;
     this.cachedCombat = null;
     this.cachedEnemies = null;
@@ -739,18 +1068,17 @@ class RenderingSystem extends BaseSystem {
 
     this.shieldVisualCache = {
       signature: '',
-      patternCanvas: null, // [NEO-ARCADE] Cache for hex pattern
       path: null,
+      perimeter: 0,
       radius: SHIP_SIZE,
       padding: 0,
     };
-    this.shieldGradientCache = {
-      radius: 0,
-      ratio: 0,
-      canvas: null,
-      context: null,
-      size: 0,
-    };
+    this.shieldImpactAt = -Infinity;
+
+    // docs/NORTE.md §2 "Câmera"; `?camera=0` keeps the fixed full-field view.
+    this.camera = createCamera();
+    this.camera.setEnabled(!cameraDisabledByUrl());
+    this.lastRenderTime = null;
 
     // Initialize state manager with common presets
     this.stateManager.createPreset('starfield', {
@@ -766,6 +1094,7 @@ class RenderingSystem extends BaseSystem {
         cachedProgression: 'progression',
         cachedXPOrbs: 'xp-orbs',
         cachedHealthHearts: 'healthHearts',
+        cachedPickups: 'pickups',
         cachedEffects: 'effects',
         cachedCombat: 'combat',
         cachedEnemies: 'enemies',
@@ -779,6 +1108,16 @@ class RenderingSystem extends BaseSystem {
     this.postProcessingEnabled = DEFAULT_GRAPHICS_SETTINGS.postProcessing;
 
     this.setupSettingsIntegration();
+    this.registerEventListener('shield-hit', () => {
+      this.shieldImpactAt = performance.now();
+    });
+    this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
+      this.camera.pulseZoom(zoom, duration);
+    });
+    this.biome = new BiomeTransition();
+    this.registerEventListener('wave-started', (payload = {}) => {
+      this.biome.enterLayer(payload.wave);
+    });
   }
 
   setupSettingsIntegration() {
@@ -801,17 +1140,33 @@ class RenderingSystem extends BaseSystem {
       }
     });
 
-    // Also listen for general settings changes if needed, but specific category event is better
-    // if SettingsSystem broadcasts it.
+    // SettingsSystem emits 'settings-graphics-changed' only at startup; live
+    // edits arrive as 'settings-changed' with the category.
+    this.registerEventListener('settings-changed', (change = {}) => {
+      if (
+        this.settings &&
+        (change.category === 'graphics' || change.type === 'reset-all')
+      ) {
+        this.applyGraphicsPreferences(
+          this.settings.getCategoryValues('graphics')
+        );
+      }
+    });
   }
 
   applyGraphicsPreferences(values = {}) {
     this.chromaticAberrationEnabled = values.chromaticAberration !== false;
     this.bloomEnabled = values.bloom !== false;
     this.postProcessingEnabled = values.postProcessing !== false;
+    bloomLayer.configure({
+      enabled:
+        this.bloomEnabled &&
+        this.postProcessingEnabled &&
+        !bloomDisabledByUrl(),
+    });
 
-    // Antialiasing implementation: 'SMAA' (Standard) vs 'Nenhum' (Pixelated)
-    this.antialiasingMode = values.antialiasing !== 'Nenhum';
+    // Antialiasing: 'SMAA' (smoothed) vs 'None' (pixelated), per settingsSchema
+    this.antialiasingMode = values.antialiasing !== 'None';
   }
 
   onReset() {
@@ -819,12 +1174,18 @@ class RenderingSystem extends BaseSystem {
       const starfieldRandom = this.getRandomFork('starfield');
       this.spaceSky.reseed(starfieldRandom);
     }
+    this.camera.reset();
+    this.lastRenderTime = null;
+    this.biome.reset();
   }
 
   render(ctx) {
     if (!ctx) return;
 
     const frameStart = performance.now();
+
+    // Logical 800×600 → native canvas pixels (see src/core/viewport.js).
+    applyBaseTransform(ctx);
 
     // Initialize state manager if needed
     if (!this.stateManager.currentState.fillStyle) {
@@ -846,6 +1207,7 @@ class RenderingSystem extends BaseSystem {
         cachedProgression: 'progression',
         cachedXPOrbs: 'xp-orbs',
         cachedHealthHearts: 'healthHearts',
+        cachedPickups: 'pickups',
         cachedEffects: 'effects',
         cachedCombat: 'combat',
         cachedEnemies: 'enemies',
@@ -863,23 +1225,77 @@ class RenderingSystem extends BaseSystem {
           ? player.getVelocity()
           : player?.velocity || null;
 
+      this.updateCamera(player, frameStart);
+
+      // The sky is far away: drawn unzoomed, shifted by the camera at
+      // parallax rates.
+      this.stateManager.transitionToPhase(ctx, 'background');
+      this.drawBackground(ctx, playerVelocity);
+
+      this.camera.applyTransform(ctx);
+
+      // Light sources drawn into the emissive layer this frame get bloomed
+      // in composite() below (docs/NORTE.md §2).
+      bloomLayer.beginFrame(ctx);
+
       // Optimized rendering with batching
-      this.renderOptimized(ctx, player, playerVelocity);
+      this.renderOptimized(ctx, player);
+      bloomLayer.composite(ctx);
     } finally {
       ctx.restore();
     }
+    this.drawBiomeTint(ctx);
 
     // Update performance stats
     this.updateRenderStats(frameStart);
   }
 
-  renderOptimized(ctx, player, playerVelocity) {
-    // Background phase
-    this.stateManager.transitionToPhase(ctx, 'background');
-    this.drawBackground(ctx, playerVelocity);
+  // The biome's colour over the whole field, cross-faded with the biome;
+  // screen, because soft-light and multiply vanish on a near-black field.
+  drawBiomeTint(ctx) {
+    const { from, to, mix } = this.biome;
+    const a = parseTint(from.tint);
+    const b = parseTint(to.tint);
+    const alpha = a[3] + (b[3] - a[3]) * mix;
+    if (alpha < 0.002) return;
+    const rgb = [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * mix));
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = `rgba(${rgb.join(', ')}, ${alpha})`;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.restore();
+  }
 
+  updateCamera(player, now) {
+    const dt =
+      this.lastRenderTime === null
+        ? 0
+        : Math.min(0.1, Math.max(0, (now - this.lastRenderTime) / 1000));
+    const firstFrame = this.lastRenderTime === null;
+    this.lastRenderTime = now;
+    this.biome.update(dt);
+
+    const position =
+      typeof player?.getPosition === 'function'
+        ? player.getPosition()
+        : player?.position;
+    if (!position) return;
+    if (firstFrame) {
+      this.camera.snapTo(position.x, position.y);
+    } else {
+      this.camera.update(position.x, position.y, dt);
+    }
+  }
+
+  renderOptimized(ctx, player) {
     // Objects phase - batch similar objects
     this.stateManager.transitionToPhase(ctx, 'objects');
+
+    // Ambient chips and motes sit under every entity, kept around the view.
+    const effects = this.cachedEffects;
+    if (effects && typeof effects.drawAmbient === 'function') {
+      effects.drawAmbient(ctx, this.camera.getView());
+    }
 
     // XP Orbs
     const xpOrbs = this.cachedXPOrbs;
@@ -892,6 +1308,9 @@ class RenderingSystem extends BaseSystem {
     if (healthHearts && typeof healthHearts.render === 'function') {
       healthHearts.render(ctx);
     }
+
+    // Field pickups
+    this.cachedPickups?.render(ctx);
 
     // Combat (bullets)
     const combat = this.cachedCombat;
@@ -921,7 +1340,6 @@ class RenderingSystem extends BaseSystem {
 
     // Effects phase
     this.stateManager.transitionToPhase(ctx, 'effects');
-    const effects = this.cachedEffects;
     if (effects && typeof effects.draw === 'function') {
       effects.draw(ctx);
     }
@@ -1220,15 +1638,15 @@ class RenderingSystem extends BaseSystem {
     // The background also clears the viewport, so it must ignore screen shake.
     ctx.save();
     try {
-      if (typeof ctx.setTransform === 'function') {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-      }
+      applyBaseTransform(ctx);
 
       if (this.spaceSky) {
         this.spaceSky.render(ctx, {
-          width: ctx.canvas?.width ?? GAME_WIDTH,
-          height: ctx.canvas?.height ?? GAME_HEIGHT,
+          width: GAME_WIDTH,
+          height: GAME_HEIGHT,
           velocity: playerVelocity,
+          cameraX: this.camera.x,
+          cameraY: this.camera.y,
         });
         return;
       }
@@ -1330,154 +1748,83 @@ class RenderingSystem extends BaseSystem {
         0,
         Math.min(1, shieldState.currentHits / shieldState.maxHits)
       );
-      const position =
-        typeof player.getPosition === 'function'
-          ? player.getPosition()
-          : player.position;
-
-      if (position) {
-        const padding = Math.max(
-          0,
-          typeof player.getShieldPadding === 'function'
-            ? player.getShieldPadding()
-            : 0
-        );
-
-        const visuals = this.resolveShieldVisual(player, padding);
-        const shieldPath = visuals.path;
-        const radiusForGradient = visuals.radius;
-
-        if (shieldPath && radiusForGradient > 0) {
-          const angle =
-            typeof player.getAngle === 'function'
-              ? player.getAngle()
-              : player.angle || 0;
-
-          ctx.save();
-          ctx.translate(position.x, position.y);
-          // [NEO-ARCADE] Rotate shield slightly independently for "floating field" feel
-          const time = Date.now() / 1000;
-          ctx.rotate(angle);
-
-          // Counter-rotate pattern for stability or rotate for effect?
-          // Let's rotate the field slowly
-          const fieldRotation = Math.sin(time * 0.5) * 0.1;
-
-          if (tilt !== 0) {
-            ctx.transform(1, 0, tilt, 1, 0, 0);
-          }
-
-          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
-
-          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
-
-          ctx.globalCompositeOperation = this.bloomEnabled
-            ? 'lighter'
-            : 'source-over';
-          if (!this.bloomEnabled) ctx.globalAlpha = 0.8; // Adjust alpha if not adding
-
-          // 1. Base Bubble (Oil Slick Fill)
-          const bubbleRadius = radiusForGradient;
-          const oilGrad = ctx.createRadialGradient(
-            bubbleRadius * 0.3,
-            -bubbleRadius * 0.3,
-            0,
-            0,
-            0,
-            bubbleRadius
-          );
-          // Stronger colors for "Rainbow Effect"
-          oilGrad.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-          oilGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.15)'); // Cyan
-          oilGrad.addColorStop(0.5, 'rgba(255, 0, 255, 0.15)'); // Magenta
-          oilGrad.addColorStop(0.7, 'rgba(255, 255, 0, 0.12)'); // Yellow
-          oilGrad.addColorStop(
-            0.95,
-            `rgba(255, 255, 255, ${0.2 + ratio * 0.2})`
-          ); // Rim catch
-
-          ctx.beginPath();
-          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-          ctx.fillStyle = oilGrad;
-          ctx.fill();
-
-          // 2. The RIM (Rainbow Ring)
-          const rimGrad = ctx.createLinearGradient(
-            -bubbleRadius,
-            -bubbleRadius,
-            bubbleRadius,
-            bubbleRadius
-          );
-          rimGrad.addColorStop(0, 'rgba(0, 255, 255, 0.8)');
-          rimGrad.addColorStop(0.33, 'rgba(255, 0, 255, 0.8)');
-          rimGrad.addColorStop(0.66, 'rgba(255, 255, 0, 0.8)');
-          rimGrad.addColorStop(1, 'rgba(0, 255, 255, 0.8)');
-
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = rimGrad;
-          ctx.beginPath();
-          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 3. Window Reflection (Primary Top Left)
-          ctx.save();
-          ctx.translate(-bubbleRadius * 0.5, -bubbleRadius * 0.5);
-          ctx.rotate(-Math.PI / 6);
-
-          ctx.beginPath();
-          // Softbox shape
-          ctx.ellipse(
-            0,
-            0,
-            bubbleRadius * 0.35,
-            bubbleRadius * 0.2,
-            0,
-            0,
-            Math.PI * 2
-          );
-
-          const windowGrad = ctx.createLinearGradient(0, -20, 0, 20);
-          windowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-          windowGrad.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
-
-          ctx.fillStyle = windowGrad;
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-          ctx.shadowBlur = 10;
-          ctx.fill();
-          ctx.restore();
-
-          // 4. Bottom Reflection (Bounce Light)
-          ctx.save();
-          ctx.translate(bubbleRadius * 0.5, bubbleRadius * 0.5);
-          ctx.rotate(Math.PI / 6);
-          ctx.beginPath();
-          ctx.ellipse(
-            0,
-            0,
-            bubbleRadius * 0.25,
-            bubbleRadius * 0.1,
-            0,
-            0,
-            Math.PI * 2
-          );
-
-          const botGrad = ctx.createLinearGradient(0, -10, 0, 10);
-          botGrad.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
-          botGrad.addColorStop(1, 'rgba(0, 255, 255, 0.5)');
-
-          ctx.fillStyle = botGrad;
-          ctx.filter = 'blur(4px)';
-          ctx.fill();
-          ctx.restore();
-
-          ctx.restore();
-        }
-      }
+      this.drawPlayerShield(ctx, player, ratio, tilt);
     }
 
     player.render(ctx, { tilt });
 
     // Restore context (remove recoil transform)
+    ctx.restore();
+  }
+
+  // Field-generator barrier (docs/NORTE.md §2): a thin line following the
+  // padded hull, a faint fill, and a brighter segment sweeping around it.
+  // Lit by the hit ratio; flashes white for a moment when it absorbs a hit.
+  drawPlayerShield(ctx, player, ratio, tilt) {
+    const position =
+      typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : player.position;
+    if (!position) return;
+
+    const padding = Math.max(
+      0,
+      typeof player.getShieldPadding === 'function'
+        ? player.getShieldPadding()
+        : 0
+    );
+    const { path, perimeter } = this.resolveShieldVisual(player, padding);
+    if (!path) return;
+
+    const angle =
+      typeof player.getAngle === 'function'
+        ? player.getAngle()
+        : player.angle || 0;
+    const now = performance.now();
+    const impact = now - this.shieldImpactAt < SHIELD_IMPACT_FLASH_MS;
+    const strokeColor = impact
+      ? PALETTE.text
+      : withAlpha(PALETTE.player, 0.2 + 0.35 * ratio);
+    const sweepLength = perimeter * SHIELD_SWEEP_SHARE;
+    const sweepOffset = -((now / 1000) * SHIELD_SWEEP_SPEED * perimeter);
+
+    // The emissive copy lights the sweep fully but the barrier line only
+    // faintly, so the bloom does not thicken the 1.5 px line.
+    const drawBarrier = (target, isMain) => {
+      if (isMain) {
+        target.fillStyle = withAlpha(PALETTE.player, 0.06);
+        target.fill(path);
+      }
+      target.lineJoin = 'round';
+      target.lineWidth = LINE.thin;
+      target.strokeStyle =
+        isMain || impact ? strokeColor : withAlpha(PALETTE.player, 0.15);
+      target.stroke(path);
+      if (perimeter > 0) {
+        target.lineWidth = LINE.base;
+        target.strokeStyle = withAlpha(PALETTE.player, 0.5 + 0.5 * ratio);
+        target.setLineDash([sweepLength, perimeter - sweepLength]);
+        target.lineDashOffset = sweepOffset;
+        target.stroke(path);
+        target.setLineDash([]);
+      }
+    };
+
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    if (tilt !== 0) {
+      ctx.transform(1, 0, tilt, 1, 0, 0);
+    }
+    drawBarrier(ctx, true);
+
+    const emissive = bloomLayer.getEmissive();
+    if (emissive) {
+      emissive.save();
+      emissive.setTransform(ctx.getTransform());
+      drawBarrier(emissive, false);
+      emissive.restore();
+    }
     ctx.restore();
   }
 
@@ -1514,14 +1861,17 @@ class RenderingSystem extends BaseSystem {
           expanded && expanded.length >= MIN_OUTLINE_POINTS
             ? expanded
             : hullOutline.map((vertex) => ({ ...vertex }));
-        const outlinePath = buildPathFromPoints(outlineToUse);
-        const outlineRadius = computeOutlineRadius(outlineToUse);
+        const barrier = hexagonAround(outlineToUse);
+        const outlinePath = buildPathFromPoints(barrier);
+        const outlineRadius = computeOutlineRadius(barrier);
         cache.path = outlinePath || null;
+        cache.perimeter = computePerimeter(barrier);
         cache.radius = Math.max(outlineRadius, fallbackRadius);
       } else {
         const path = new Path2D();
         path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
         cache.path = path;
+        cache.perimeter = Math.PI * 2 * fallbackRadius;
         cache.radius = fallbackRadius;
       }
 
@@ -1534,6 +1884,7 @@ class RenderingSystem extends BaseSystem {
       const path = new Path2D();
       path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
       cache.path = path;
+      cache.perimeter = Math.PI * 2 * fallbackRadius;
       cache.radius = fallbackRadius;
     }
 
@@ -1550,11 +1901,6 @@ class RenderingSystem extends BaseSystem {
         ? player.getShieldRadius()
         : hullRadius + padding;
     return Math.max(fallback, SHIP_SIZE);
-  }
-
-  ensureShieldGradientCanvas(radius, ratio) {
-    // Use the new gradient cache system for better performance
-    return this.gradientCache.createShieldGradient(null, radius, ratio);
   }
 
   /**
@@ -1626,7 +1972,7 @@ class RenderingSystem extends BaseSystem {
   renderBatchedCircles(ctx, circles, fillStyle, strokeStyle = null) {
     if (!circles || circles.length === 0) return;
 
-    const batch = this.renderBatch.beginBatch('circles', {
+    this.renderBatch.beginBatch('circles', {
       fillStyle,
       strokeStyle,
       globalAlpha: 1,
@@ -1651,7 +1997,7 @@ class RenderingSystem extends BaseSystem {
   renderBatchedLines(ctx, lines, strokeStyle, lineWidth = 1) {
     if (!lines || lines.length === 0) return;
 
-    const batch = this.renderBatch.beginBatch('lines', {
+    this.renderBatch.beginBatch('lines', {
       strokeStyle,
       lineWidth,
     });
@@ -1686,35 +2032,6 @@ class RenderingSystem extends BaseSystem {
     this.gradientCache.reset();
 
     console.log('[RenderingSystem] Performance tracking reset');
-  }
-
-  // [NEO-ARCADE] Procedural Hexagon Pattern Generation
-  createHexagonPattern() {
-    const size = SHIELD_HEX_SIZE;
-    const canvas = document.createElement('canvas');
-    canvas.width = size * 2;
-    canvas.height = size * Math.sqrt(3);
-    const tempCtx = canvas.getContext('2d');
-
-    tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Very subtle white/cyan
-    tempCtx.lineWidth = 1;
-    tempCtx.lineCap = 'round';
-
-    // Draw Hexagon (approximated for tiling)
-    tempCtx.beginPath();
-    const w = size;
-    const h = (size * Math.sqrt(3)) / 2;
-
-    tempCtx.moveTo(0, h);
-    tempCtx.lineTo(w / 2, 0);
-    tempCtx.lineTo(w * 1.5, 0);
-    tempCtx.lineTo(w * 2, h);
-    tempCtx.lineTo(w * 1.5, h * 2);
-    tempCtx.lineTo(w / 2, h * 2);
-    tempCtx.lineTo(0, h);
-    tempCtx.stroke();
-
-    return canvas;
   }
 }
 

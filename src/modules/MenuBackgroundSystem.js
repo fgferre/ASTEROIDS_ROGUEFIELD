@@ -6,6 +6,11 @@ import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
+import { IS_DEV } from '../core/env.js';
+import {
+  createAsteroidGeometry,
+  createSeededRandom,
+} from './render3d/asteroidMesh.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService(
   'menu-background:simplex-default'
@@ -75,9 +80,9 @@ class MenuBackgroundSystem extends BaseSystem {
       originalMathUtils: null,
       originalMath: undefined,
       originalMathRandom: undefined,
+      seededMathRandomDepth: 0,
       deterministicMathUtils: null,
       deterministicUuidGenerator: null,
-      deterministicMathRandom: null,
       generateUuidDescriptors: new Map(),
       patchedMathUtilsTargets: new Set(),
     };
@@ -197,9 +202,11 @@ class MenuBackgroundSystem extends BaseSystem {
     this.animate = this.animate.bind(this);
 
     if (this.ready) {
-      this.applyDeterministicThreeUuidGenerator();
-      this.setupLoadingScreen(); // Setup loading UI callbacks
-      this.bootstrapScene();
+      this.withSeededMathRandom(() => {
+        this.applyDeterministicThreeUuidGenerator();
+        this.setupLoadingScreen(); // Setup loading UI callbacks
+        this.bootstrapScene();
+      });
       this.registerEventHooks();
       this.setupSettingsSubscription();
       // Note: syncInitialState is now called from preloadAssets when complete
@@ -310,42 +317,6 @@ class MenuBackgroundSystem extends BaseSystem {
     const mathUtilsCandidate = three.MathUtils ?? three.Math;
     if (!mathUtilsCandidate || typeof mathUtilsCandidate !== 'object') {
       return;
-    }
-
-    if (state.originalMathRandom === undefined) {
-      state.originalMathRandom =
-        typeof Math.random === 'function' ? Math.random : null;
-    }
-
-    if (!state.deterministicMathRandom) {
-      const deterministicRandom = () => {
-        const fork = this.ensureThreeUuidRandom();
-        if (fork && typeof fork.float === 'function') {
-          return fork.float();
-        }
-        if (typeof state.originalMathRandom === 'function') {
-          return state.originalMathRandom();
-        }
-        return SIMPLEX_DEFAULT_RANDOM.float();
-      };
-
-      try {
-        Object.defineProperty(deterministicRandom, 'name', {
-          value: 'MenuBackgroundDeterministicRandom',
-          configurable: true,
-        });
-      } catch (error) {
-        // Ignore failure to label the function
-      }
-
-      state.deterministicMathRandom = deterministicRandom;
-    }
-
-    if (
-      state.deterministicMathRandom &&
-      Math.random !== state.deterministicMathRandom
-    ) {
-      Math.random = state.deterministicMathRandom;
     }
 
     const aliasCandidate =
@@ -472,13 +443,47 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     state.deterministicMathUtils = null;
+  }
 
-    if (state.deterministicMathRandom) {
-      if (typeof state.originalMathRandom === 'function') {
-        Math.random = state.originalMathRandom;
-      }
-      state.deterministicMathRandom = null;
+  /**
+   * Three.js draws its internal UUIDs (and its rand* helpers) from the global
+   * Math.random, bypassing MathUtils.generateUUID. While `fn` runs (the async
+   * scene build, or a runtime Three allocation) the global is swapped for the
+   * menu's seeded fork, so the menu stays reproducible and the dev
+   * Math.random guard stays quiet. The original is restored when the
+   * outermost call settles (awaited when `fn` returns a promise).
+   */
+  withSeededMathRandom(fn) {
+    const state = this._threeMathUtilsState;
+    if (state.seededMathRandomDepth === 0) {
+      // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+      state.originalMathRandom = Math.random;
+      // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+      Math.random = () => this.ensureThreeUuidRandom().float();
     }
+    state.seededMathRandomDepth += 1;
+
+    const release = () => {
+      state.seededMathRandomDepth -= 1;
+      if (state.seededMathRandomDepth === 0) {
+        // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+        Math.random = state.originalMathRandom;
+        state.originalMathRandom = undefined;
+      }
+    };
+
+    let result;
+    try {
+      result = fn();
+    } catch (error) {
+      release();
+      throw error;
+    }
+    if (result && typeof result.then === 'function') {
+      return result.finally(release);
+    }
+    release();
+    return result;
   }
 
   destroy() {
@@ -928,7 +933,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.setupImpactEffects();
 
     // Start async preloading for heavy assets
-    this.preloadAssets();
+    this.withSeededMathRandom(() => this.preloadAssets());
   }
 
   /**
@@ -1711,7 +1716,6 @@ class MenuBackgroundSystem extends BaseSystem {
         return lo; // 0..LAYER_COUNT-1
       };
 
-      const clamp01 = (t) => Math.max(0, Math.min(1, t));
       const radiiByLayer = Array.from({ length: LAYER_COUNT }, (_, idx) => {
         const x = LAYER_COUNT > 1 ? idx / (LAYER_COUNT - 1) : 0;
         return MIN_SKY_RADIUS + (MAX_SKY_RADIUS - MIN_SKY_RADIUS) * x;
@@ -1880,11 +1884,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
       this._nasaStarfieldLoaded = true;
 
-      if (
-        typeof import.meta !== 'undefined' &&
-        import.meta.env &&
-        import.meta.env.DEV
-      ) {
+      if (IS_DEV) {
         debugLog(
           `[MenuBackgroundSystem] NASA starfield loaded (${totalStars} stars)`
         );
@@ -1893,16 +1893,6 @@ class MenuBackgroundSystem extends BaseSystem {
       console.warn('[MenuBackgroundSystem] NASA starfield load failed:', error);
     } finally {
       this._nasaStarfieldLoading = false;
-    }
-  }
-
-  createBaseAssets(count = 5) {
-    for (let i = 0; i < count; i += 1) {
-      const geometry = this.createDeformedIcosahedron();
-      this.baseGeometries.push(geometry);
-      this.baseMaterials.push(
-        this.createProceduralMaterial(this.randomFloat('assets') * 100)
-      );
     }
   }
 
@@ -1930,541 +1920,20 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   createRandomGenerator(seed = this.randomFloat('assets') * 1000) {
-    let value = Math.floor(seed * 1000) % 2147483647;
-    if (value <= 0) {
-      value += 2147483646;
-    }
-
-    return () => {
-      value = (value * 16807) % 2147483647;
-      return (value - 1) / 2147483646;
-    };
+    return createSeededRandom(seed);
   }
 
-  /**
-   * Creates an asteroid base geometry for GPU displacement.
-   *
-   * The "Monolith" look is now produced in the procedural vertex shader via
-   * RawShaderMaterial (GLSL300). Keeping the geometry itself spherical avoids
-   * double-displacement and keeps the pipeline closer to the standalone study.
-   */
   createDeformedIcosahedron(detailSeed = this.randomFloat('assets') * 100) {
-    const { THREE } = this;
-    const rng = this.createRandomGenerator(detailSeed);
+    // CPU-deformed geometry needs enough tessellation to read as "rock" and
+    // not a low-poly blob. Keep detail ~5 and reduce asteroid count instead.
+    const baseDetailByQuality = [4, 5, 6, 6];
     const qualityLevel =
       typeof this.adaptiveQuality?.currentLevel === 'number'
         ? this.adaptiveQuality.currentLevel
         : 2;
-
-    // CPU-deformed geometry needs enough tessellation to read as "rock" and not a
-    // low-poly blob. Keep detail ~5 and reduce asteroid count instead.
-    const baseDetailByQuality = [4, 5, 6, 6];
-    const baseDetail =
+    const detail =
       baseDetailByQuality[Math.max(0, Math.min(3, qualityLevel))] ?? 5;
-    const detail = baseDetail;
-
-    let geometry = new THREE.IcosahedronGeometry(1, detail);
-
-    // --- Macro shape in geometry (PDF: "stamping" crater hemispheres + noise) ---
-    // This avoids per-vertex displacement artifacts in shaders and produces
-    // smooth, eroded silhouettes even at grazing angles.
-    const simplex = new SimplexNoise(
-      this.createRandomGenerator(detailSeed + 101)
-    );
-    const craterRng = this.createRandomGenerator(detailSeed + 202);
-    const axisScale = new THREE.Vector3(
-      0.78 + rng() * 0.44,
-      0.78 + rng() * 0.44,
-      0.78 + rng() * 0.44
-    );
-
-    const craterCount = 22 + Math.floor(craterRng() * 22);
-    const craters = Array.from({ length: craterCount }, () => {
-      const u = craterRng();
-      const v = craterRng();
-      const theta = 2 * Math.PI * u;
-      const phi = Math.acos(2 * v - 1);
-      const center = new THREE.Vector3(
-        Math.sin(phi) * Math.cos(theta),
-        Math.cos(phi),
-        Math.sin(phi) * Math.sin(theta)
-      ).normalize();
-      const radius = 0.12 + craterRng() * 0.3; // angular-ish radius (unit sphere)
-      const depth = 0.07 + craterRng() * 0.14;
-      const rim = 0.012 + craterRng() * 0.035;
-      return { center, radius, depth, rim };
-    });
-
-    const positionAttr = geometry.getAttribute('position');
-    const vertexCount = positionAttr.count;
-    const heights = new Float32Array(vertexCount);
-
-    const smoothstep = (a, b, x) => {
-      const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-      return t * t * (3 - 2 * t);
-    };
-
-    for (let i = 0; i < vertexCount; i += 1) {
-      const x = positionAttr.getX(i);
-      const y = positionAttr.getY(i);
-      const z = positionAttr.getZ(i);
-      const pBase = new THREE.Vector3(x, y, z).normalize();
-      const p = new THREE.Vector3(
-        pBase.x * axisScale.x,
-        pBase.y * axisScale.y,
-        pBase.z * axisScale.z
-      ).normalize();
-
-      const base =
-        simplex.fbm(
-          p.x * 0.45 + detailSeed * 0.07,
-          p.y * 0.45 + detailSeed * 0.11,
-          p.z * 0.45,
-          4
-        ) * 0.38;
-      const ridges =
-        simplex.ridgedMF(
-          p.x * 1.2 + 12.3,
-          p.y * 1.2 + 45.6,
-          p.z * 1.2 + detailSeed * 0.03,
-          4,
-          2.0,
-          0.55
-        ) * 0.3;
-      const cutNoise = simplex.noise3d(
-        p.x * 0.65 + 12.0,
-        p.y * 0.65 + 2.0,
-        p.z * 0.65 + detailSeed * 0.02
-      );
-      const cuts = smoothstep(0.35, 0.9, cutNoise) * 0.2;
-
-      let craterShape = 0;
-      for (let c = 0; c < craters.length; c += 1) {
-        const crater = craters[c];
-        const dot = p.dot(crater.center);
-        const d = Math.sqrt(Math.max(0, 2 * (1 - dot))); // chord distance on unit sphere
-        if (d >= crater.radius) continue;
-        const t = d / crater.radius;
-        const bowl = -(1 - t * t) * crater.depth;
-        const rimBand =
-          smoothstep(0.7, 1.0, t) * smoothstep(1.0, 0.92, t) * crater.rim;
-        craterShape += bowl + rimBand;
-      }
-
-      let h = base + ridges - cuts + craterShape;
-      // Erosion-like conditioning: compress peaks hard, keep valleys.
-      h = Math.max(-0.75, Math.min(0.45, h));
-      h = h < 0 ? h * 1.2 : h * 0.65;
-      heights[i] = h;
-    }
-
-    // 1 pass of neighbor smoothing to kill any remaining spikes.
-    const indexAttr = geometry.getIndex();
-    if (indexAttr) {
-      const idx = indexAttr.array;
-      const neighbors = Array.from({ length: vertexCount }, () => []);
-      for (let t = 0; t < idx.length; t += 3) {
-        const a = idx[t];
-        const b = idx[t + 1];
-        const c = idx[t + 2];
-        neighbors[a].push(b, c);
-        neighbors[b].push(a, c);
-        neighbors[c].push(a, b);
-      }
-      for (let pass = 0; pass < 2; pass += 1) {
-        const smoothed = new Float32Array(vertexCount);
-        for (let i = 0; i < vertexCount; i += 1) {
-          const nb = neighbors[i];
-          if (!nb.length) {
-            smoothed[i] = heights[i];
-            continue;
-          }
-          let sum = 0;
-          for (let j = 0; j < nb.length; j += 1) sum += heights[nb[j]];
-          const avg = sum / nb.length;
-          smoothed[i] = heights[i] * 0.68 + avg * 0.32;
-        }
-        heights.set(smoothed);
-      }
-    }
-
-    for (let i = 0; i < vertexCount; i += 1) {
-      const x = positionAttr.getX(i);
-      const y = positionAttr.getY(i);
-      const z = positionAttr.getZ(i);
-      const pBase = new THREE.Vector3(x, y, z).normalize();
-      const p = new THREE.Vector3(
-        pBase.x * axisScale.x,
-        pBase.y * axisScale.y,
-        pBase.z * axisScale.z
-      ).normalize();
-      const r = 1 + heights[i];
-      positionAttr.setXYZ(i, p.x * r, p.y * r, p.z * r);
-    }
-
-    positionAttr.needsUpdate = true;
-
-    // Triplanar shading does not need UVs; remove them and weld duplicated
-    // vertices (UV seams) to avoid visible faceting/hard edges.
-    if (geometry.getAttribute('uv')) geometry.deleteAttribute('uv');
-    if (geometry.getAttribute('uv2')) geometry.deleteAttribute('uv2');
-    geometry = this.weldGeometryPositions(geometry, 1e-4);
-    geometry.computeVertexNormals();
-    if (typeof geometry.normalizeNormals === 'function') {
-      geometry.normalizeNormals();
-    }
-
-    return geometry;
-  }
-
-  /**
-   * Welds vertices by quantized position so normals can smooth across seams.
-   * Three's polyhedra often duplicate vertices for UVs, which reads as faceting.
-   */
-  weldGeometryPositions(geometry, tolerance = 1e-4) {
-    const { THREE } = this;
-    if (!geometry?.getAttribute || !THREE) {
-      return geometry;
-    }
-
-    const position = geometry.getAttribute('position');
-    if (!position) {
-      return geometry;
-    }
-
-    const srcIndex = geometry.getIndex();
-    const srcIndices = srcIndex ? Array.from(srcIndex.array) : null;
-    const vertexCount = position.count;
-
-    const invTol = 1 / Math.max(1e-12, tolerance);
-    const keyFor = (x, y, z) =>
-      `${Math.round(x * invTol)},${Math.round(y * invTol)},${Math.round(
-        z * invTol
-      )}`;
-
-    const map = new Map();
-    const newPositions = [];
-    const remap = new Array(vertexCount);
-
-    for (let i = 0; i < vertexCount; i += 1) {
-      const x = position.getX(i);
-      const y = position.getY(i);
-      const z = position.getZ(i);
-      const key = keyFor(x, y, z);
-
-      let newIndex = map.get(key);
-      if (newIndex === undefined) {
-        newIndex = newPositions.length / 3;
-        map.set(key, newIndex);
-        newPositions.push(x, y, z);
-      }
-      remap[i] = newIndex;
-    }
-
-    const newIndices = srcIndices
-      ? srcIndices.map((idx) => remap[idx])
-      : remap.map((idx) => idx);
-
-    const welded = new THREE.BufferGeometry();
-    welded.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(newPositions, 3)
-    );
-    welded.setIndex(newIndices);
-    welded.computeBoundingSphere();
-
-    return welded;
-  }
-
-  /**
-   * Attempt to match GPU smoothstep behavior in JS
-   */
-  smoothstep(edge0, edge1, x) {
-    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-    return t * t * (3 - 2 * t);
-  }
-
-  /**
-   * Linear interpolation helper
-   */
-  lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-
-  /**
-   * 2D Worley noise for texture generation
-   * Returns [closestDist, cellId]
-   */
-  worley2d(x, y, simplex) {
-    const px = Math.floor(x);
-    const py = Math.floor(y);
-    const fx = x - px;
-    const fy = y - py;
-
-    let minDist = 8.0;
-    let cellId = 0.0;
-
-    // Search 3x3 neighborhood
-    for (let j = -1; j <= 1; j++) {
-      for (let i = -1; i <= 1; i++) {
-        const cx = px + i;
-        const cy = py + j;
-
-        // Hash for cell point
-        const hash = this.hash2d(cx, cy);
-
-        // Random point within cell
-        const rx = i - fx + hash * 0.7;
-        const ry = j - fy + this.hash2d(cx + 127, cy) * 0.7;
-
-        const dist = rx * rx + ry * ry;
-
-        if (dist < minDist) {
-          minDist = dist;
-          cellId = hash;
-        }
-      }
-    }
-
-    return [Math.sqrt(minDist), cellId];
-  }
-
-  /**
-   * Simple 2D hash function for worley noise
-   */
-  hash2d(x, y) {
-    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return n - Math.floor(n);
-  }
-
-  /**
-   * Creates an enhanced procedural material with techniques from the study.
-   * Phase 2 improvements:
-   * - 512px textures for higher detail
-   * - Worley noise for mineral spots (mottled appearance)
-   * - Crack network pattern
-   * - Multi-scale normal map
-   * - Varied color palette (dust, rock, mineral, metal)
-   */
-  createProceduralMaterial(seed) {
-    const { THREE } = this;
-    const canvas = document.createElement('canvas');
-    const size = 512; // Phase 2: Increased from 256 for better detail
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(size, size);
-    const simplex = new SimplexNoise(this.createRandomGenerator(seed));
-    const heightData = new Float32Array(size * size);
-
-    // Color palette - brightened for better visibility while maintaining realism
-    const palette = {
-      regolith: { r: 35, g: 33, b: 38 }, // Dark dust (brightened)
-      rockBase: { r: 95, g: 90, b: 85 }, // Medium grey/brown (was 51,49,46)
-      rockVar: { r: 140, g: 135, b: 125 }, // Lighter grey (was 89,87,82)
-      mineral: { r: 160, g: 150, b: 135 }, // Brownish mineral spot (brightened)
-      metal: { r: 200, g: 205, b: 215 }, // Silver metallic (brightened)
-    };
-
-    // Per-material variation
-    const rng = this.createRandomGenerator(seed + 1000);
-    const materialParams = {
-      patchiness: rng() * 0.4 + 0.4, // Mineral spot intensity
-      metalAmount: rng() * 0.25 + 0.15, // Metal visibility (slightly increased)
-      darkness: rng() * 0.15 + 0.25, // Overall darkness (reduced range: 0.25-0.4 instead of 0.7-1.0)
-      crackIntensity: rng() * 0.6 + 0.4, // Crack visibility
-    };
-
-    for (let x = 0; x < size; x += 1) {
-      for (let y = 0; y < size; y += 1) {
-        const u = x / size;
-        const v = y / size;
-
-        // 1. BASE HEIGHT - Multi-octave FBM
-        let heightValue = 0;
-        let amplitude = 1;
-        let frequency = 1;
-        let totalAmplitude = 0;
-
-        for (let octave = 0; octave < 5; octave += 1) {
-          heightValue +=
-            simplex.noise3d(
-              u * frequency * 4 + seed * 0.37,
-              v * frequency * 4 + seed * 0.53,
-              seed * 0.19 + octave * 13.37
-            ) * amplitude;
-          totalAmplitude += amplitude;
-          amplitude *= 0.5;
-          frequency *= 2;
-        }
-        heightValue = (heightValue / totalAmplitude) * 0.5 + 0.5;
-
-        // 2. WORLEY NOISE - Mineral spots (mottled appearance)
-        const [cellDist, cellId] = this.worley2d(
-          u * 6 + seed,
-          v * 6 + seed * 0.7,
-          simplex
-        );
-        const mineralSpot =
-          this.smoothstep(0.6, 0.2, cellDist) * materialParams.patchiness;
-
-        // 3. CRACK NETWORK - Voronoi cell edges
-        const [crackDist] = this.worley2d(
-          u * 12 + seed * 1.3,
-          v * 12 + seed * 0.9,
-          simplex
-        );
-        const crackMask =
-          1 -
-          this.smoothstep(0.0, 0.08, crackDist) * materialParams.crackIntensity;
-
-        // 4. MACRO COLOR VARIATION - Large scale color shifts
-        const macroVar = simplex.fbm(
-          u * 2 + seed + 10,
-          v * 2 + seed + 10,
-          seed,
-          3,
-          0.5,
-          2.0
-        );
-        const macroNorm = macroVar * 0.5 + 0.5;
-
-        // 5. LAYER MASKS
-        const dustMask = this.smoothstep(0.4, 0.0, heightValue) * 0.6;
-        const metalThreshold = 1.0 - materialParams.metalAmount;
-        const metalMask = this.smoothstep(metalThreshold, 1.0, heightValue);
-
-        // 6. COMBINE COLORS
-        // Start with base rock (varied by macro noise)
-        let r = this.lerp(palette.rockBase.r, palette.rockVar.r, macroNorm);
-        let g = this.lerp(palette.rockBase.g, palette.rockVar.g, macroNorm);
-        let b = this.lerp(palette.rockBase.b, palette.rockVar.b, macroNorm);
-
-        // Add mineral spots
-        r = this.lerp(r, palette.mineral.r, mineralSpot);
-        g = this.lerp(g, palette.mineral.g, mineralSpot);
-        b = this.lerp(b, palette.mineral.b, mineralSpot);
-
-        // Add metallic highlights
-        r = this.lerp(r, palette.metal.r, metalMask);
-        g = this.lerp(g, palette.metal.g, metalMask);
-        b = this.lerp(b, palette.metal.b, metalMask);
-
-        // Add dust in low areas
-        r = this.lerp(r, palette.regolith.r, dustMask);
-        g = this.lerp(g, palette.regolith.g, dustMask);
-        b = this.lerp(b, palette.regolith.b, dustMask);
-
-        // Darken cracks
-        r *= crackMask;
-        g *= crackMask;
-        b *= crackMask;
-
-        // Apply overall darkness
-        const darknessFactor = 1.5 - materialParams.darkness;
-        r *= darknessFactor;
-        g *= darknessFactor;
-        b *= darknessFactor;
-
-        // Store height for normal map (include crack depth)
-        heightData[x + y * size] = heightValue * crackMask;
-
-        const index = (x + y * size) * 4;
-        imageData.data[index] = Math.max(0, Math.min(255, Math.round(r)));
-        imageData.data[index + 1] = Math.max(0, Math.min(255, Math.round(g)));
-        imageData.data[index + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        imageData.data[index + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    const albedoTexture = new THREE.CanvasTexture(canvas);
-    albedoTexture.wrapS = THREE.RepeatWrapping;
-    albedoTexture.wrapT = THREE.RepeatWrapping;
-    albedoTexture.anisotropy = Math.min(
-      8,
-      this.renderer?.capabilities?.getMaxAnisotropy?.() || 1
-    );
-    albedoTexture.generateMipmaps = true;
-    albedoTexture.needsUpdate = true;
-    if (typeof albedoTexture.encoding !== 'undefined') {
-      albedoTexture.encoding = THREE.sRGBEncoding;
-    }
-
-    // ENHANCED NORMAL MAP - Multi-scale detail
-    const normalData = new Uint8Array(size * size * 4);
-    const sampleHeight = (sx, sy) => {
-      const xIndex = Math.max(0, Math.min(size - 1, sx));
-      const yIndex = Math.max(0, Math.min(size - 1, sy));
-      return heightData[xIndex + yIndex * size];
-    };
-
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        // Multi-scale normal calculation (central differences at multiple scales)
-        let nx = 0;
-        let ny = 0;
-        const scales = [1, 2, 4]; // Sample at different distances
-        const weights = [0.5, 0.3, 0.2]; // Weight each scale
-
-        for (let s = 0; s < scales.length; s++) {
-          const scale = scales[s];
-          const weight = weights[s];
-
-          const left = sampleHeight(x - scale, y);
-          const right = sampleHeight(x + scale, y);
-          const up = sampleHeight(x, y - scale);
-          const down = sampleHeight(x, y + scale);
-
-          nx += ((left - right) / (2 * scale)) * weight;
-          ny += ((up - down) / (2 * scale)) * weight;
-        }
-
-        // Normalize
-        const nz = 0.15; // Controls overall normal intensity
-        const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-
-        const index = (x + y * size) * 4;
-        normalData[index] = Math.round(((nx / length) * 0.5 + 0.5) * 255);
-        normalData[index + 1] = Math.round(((ny / length) * 0.5 + 0.5) * 255);
-        normalData[index + 2] = Math.round(((nz / length) * 0.5 + 0.5) * 255);
-        normalData[index + 3] = 255;
-      }
-    }
-
-    const normalTexture = new THREE.DataTexture(
-      normalData,
-      size,
-      size,
-      THREE.RGBAFormat,
-      THREE.UnsignedByteType
-    );
-    normalTexture.wrapS = THREE.RepeatWrapping;
-    normalTexture.wrapT = THREE.RepeatWrapping;
-    normalTexture.anisotropy = Math.min(
-      8,
-      this.renderer?.capabilities?.getMaxAnisotropy?.() || 1
-    );
-    normalTexture.generateMipmaps = true;
-    normalTexture.needsUpdate = true;
-    if (typeof normalTexture.encoding !== 'undefined') {
-      normalTexture.encoding = THREE.LinearEncoding;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      map: albedoTexture,
-      normalMap: normalTexture,
-      roughness: 0.85, // Slightly more reflective for mineral spots
-      metalness: 0.08, // Slight metalness for silver deposits
-    });
-    material.normalMapType = THREE.TangentSpaceNormalMap;
-    material.dithering = true;
-    material.userData = material.userData || {};
-    material.userData.normalTexture = normalTexture;
-    material.userData.albedoTexture = albedoTexture;
-    this.applyNormalIntensityToMaterial(material);
-    return material;
+    return createAsteroidGeometry(this.THREE, detailSeed, { detail });
   }
 
   applyNormalIntensityToMaterial(
@@ -3613,7 +3082,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     }
 
     if (this.asteroidPool.length < this.config.maxAsteroids) {
-      this.createPoolableAsteroid();
+      this.withSeededMathRandom(() => this.createPoolableAsteroid());
       return this.asteroidPool[this.asteroidPool.length - 1];
     }
 
@@ -3672,7 +3141,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       // that share the same baseMaterials[] entry.
       if (asteroid.material && !asteroid._fadeClonedMaterial) {
         asteroid._sharedMaterial = asteroid.material;
-        const cloned = asteroid.material.clone();
+        const cloned = this.withSeededMathRandom(() =>
+          asteroid.material.clone()
+        );
         cloned.transparent = true;
         cloned.opacity = 1;
         asteroid.material = cloned;
@@ -3765,7 +3236,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     if (!light) {
       // Pool exhausted — fall back to allocation (rare)
       const { THREE } = this;
-      light = new THREE.PointLight(0xffaa66, 3.5, 140, 2);
+      light = this.withSeededMathRandom(
+        () => new THREE.PointLight(0xffaa66, 3.5, 140, 2)
+      );
       this.scene.add(light);
     } else {
       light.intensity = 3.5;
@@ -4218,17 +3691,6 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     this.animationFrame = requestAnimationFrame(this.animate);
   }
 
-  /**
-   * Called when preloading completes to sync the initial state.
-   * Starts animation if a start was pending during loading.
-   */
-  syncInitialState() {
-    if (this.loadingState.pendingStart) {
-      this.loadingState.pendingStart = false;
-      this.start();
-    }
-  }
-
   stop() {
     if (!this.isActive) {
       return;
@@ -4314,272 +3776,5 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     return height === 0 ? 1 : width / height;
   }
 }
-
-// Simplex noise implementation adapted for procedural asteroid generation
-class SimplexNoise {
-  constructor(randomFn = () => SIMPLEX_DEFAULT_RANDOM.float()) {
-    this.p = new Uint8Array(256);
-    this.perm = new Uint8Array(512);
-    this.permMod12 = new Uint8Array(512);
-
-    for (let i = 0; i < 256; i += 1) {
-      this.p[i] = i;
-    }
-
-    for (let i = 255; i > 0; i -= 1) {
-      const n = Math.floor((i + 1) * randomFn());
-      const temp = this.p[i];
-      this.p[i] = this.p[n];
-      this.p[n] = temp;
-    }
-
-    for (let i = 0; i < 512; i += 1) {
-      this.perm[i] = this.p[i & 255];
-      this.permMod12[i] = this.perm[i] % 12;
-    }
-  }
-
-  noise3d(xin, yin, zin) {
-    const perm = this.perm;
-    const permMod12 = this.permMod12;
-    const grad3 = SimplexNoise.grad3;
-
-    const F3 = 1 / 3;
-    const G3 = 1 / 6;
-
-    const s = (xin + yin + zin) * F3;
-    const i = Math.floor(xin + s);
-    const j = Math.floor(yin + s);
-    const k = Math.floor(zin + s);
-    const t = (i + j + k) * G3;
-    const X0 = i - t;
-    const Y0 = j - t;
-    const Z0 = k - t;
-    const x0 = xin - X0;
-    const y0 = yin - Y0;
-    const z0 = zin - Z0;
-
-    let i1;
-    let j1;
-    let k1;
-    let i2;
-    let j2;
-    let k2;
-
-    if (x0 >= y0) {
-      if (y0 >= z0) {
-        i1 = 1;
-        j1 = 0;
-        k1 = 0;
-        i2 = 1;
-        j2 = 1;
-        k2 = 0;
-      } else if (x0 >= z0) {
-        i1 = 1;
-        j1 = 0;
-        k1 = 0;
-        i2 = 1;
-        j2 = 0;
-        k2 = 1;
-      } else {
-        i1 = 0;
-        j1 = 0;
-        k1 = 1;
-        i2 = 1;
-        j2 = 0;
-        k2 = 1;
-      }
-    } else if (y0 < z0) {
-      i1 = 0;
-      j1 = 0;
-      k1 = 1;
-      i2 = 0;
-      j2 = 1;
-      k2 = 1;
-    } else if (x0 < z0) {
-      i1 = 0;
-      j1 = 1;
-      k1 = 0;
-      i2 = 0;
-      j2 = 1;
-      k2 = 1;
-    } else {
-      i1 = 0;
-      j1 = 1;
-      k1 = 0;
-      i2 = 1;
-      j2 = 1;
-      k2 = 0;
-    }
-
-    const x1 = x0 - i1 + G3;
-    const y1 = y0 - j1 + G3;
-    const z1 = z0 - k1 + G3;
-    const x2 = x0 - i2 + 2 * G3;
-    const y2 = y0 - j2 + 2 * G3;
-    const z2 = z0 - k2 + 2 * G3;
-    const x3 = x0 - 1 + 3 * G3;
-    const y3 = y0 - 1 + 3 * G3;
-    const z3 = z0 - 1 + 3 * G3;
-
-    const ii = i & 255;
-    const jj = j & 255;
-    const kk = k & 255;
-
-    const gi0 = permMod12[ii + perm[jj + perm[kk]]];
-    const gi1 = permMod12[ii + i1 + perm[jj + j1 + perm[kk + k1]]];
-    const gi2 = permMod12[ii + i2 + perm[jj + j2 + perm[kk + k2]]];
-    const gi3 = permMod12[ii + 1 + perm[jj + 1 + perm[kk + 1]]];
-
-    let n0 = 0;
-    let n1 = 0;
-    let n2 = 0;
-    let n3 = 0;
-
-    let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
-    if (t0 >= 0) {
-      t0 *= t0;
-      n0 = t0 * t0 * this.dot(grad3, gi0, x0, y0, z0);
-    }
-
-    let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
-    if (t1 >= 0) {
-      t1 *= t1;
-      n1 = t1 * t1 * this.dot(grad3, gi1, x1, y1, z1);
-    }
-
-    let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
-    if (t2 >= 0) {
-      t2 *= t2;
-      n2 = t2 * t2 * this.dot(grad3, gi2, x2, y2, z2);
-    }
-
-    let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
-    if (t3 >= 0) {
-      t3 *= t3;
-      n3 = t3 * t3 * this.dot(grad3, gi3, x3, y3, z3);
-    }
-
-    return 32 * (n0 + n1 + n2 + n3);
-  }
-
-  dot(grad3, index, x, y, z) {
-    const offset = index * 3;
-    return grad3[offset] * x + grad3[offset + 1] * y + grad3[offset + 2] * z;
-  }
-
-  /**
-   * Fractal Brownian Motion - layered noise for natural variation
-   */
-  fbm(x, y, z, octaves = 4, persistence = 0.5, lacunarity = 2.0) {
-    let amplitude = 0.5;
-    let frequency = 1.0;
-    let total = 0.0;
-    let normalization = 0.0;
-
-    for (let i = 0; i < octaves; i++) {
-      total +=
-        this.noise3d(x * frequency, y * frequency, z * frequency) * amplitude;
-      normalization += amplitude;
-      amplitude *= persistence;
-      frequency *= lacunarity;
-    }
-
-    return total / normalization;
-  }
-
-  /**
-   * Ridge function - creates sharp ridges from noise
-   */
-  ridge(h, offset = 1.0) {
-    h = Math.abs(h);
-    h = offset - h;
-    h = h * h;
-    return h;
-  }
-
-  /**
-   * Ridged Multifractal - creates sharp mountain-like ridges
-   * Based on the study's ridgedMF implementation
-   */
-  ridgedMF(x, y, z, octaves = 4, lacunarity = 2.2, gain = 0.5) {
-    let sum = 0.0;
-    let amp = 0.5;
-    let freq = 1.0;
-    let prev = 1.0;
-
-    for (let i = 0; i < octaves; i++) {
-      const n = this.noise3d(x * freq, y * freq, z * freq);
-      const r = this.ridge(n, 1.0);
-      sum += r * amp * prev;
-      prev = r;
-      freq *= lacunarity;
-      amp *= gain;
-    }
-
-    return sum;
-  }
-
-  /**
-   * 3D Voronoi/Cellular noise - returns [closestDist, cellId, secondClosestDist]
-   * Used for craters and rock protrusions
-   */
-  voronoi3d(x, y, z) {
-    const px = Math.floor(x);
-    const py = Math.floor(y);
-    const pz = Math.floor(z);
-    const fx = x - px;
-    const fy = y - py;
-    const fz = z - pz;
-
-    let minDist = 8.0;
-    let secondMinDist = 8.0;
-    let cellId = 0.0;
-
-    // Search 3x3x3 neighborhood
-    for (let k = -1; k <= 1; k++) {
-      for (let j = -1; j <= 1; j++) {
-        for (let i = -1; i <= 1; i++) {
-          const cx = px + i;
-          const cy = py + j;
-          const cz = pz + k;
-
-          // Hash function for cell point position
-          const hash = this.hashVoronoi(cx, cy, cz);
-
-          // Random point within cell (0.0 to 0.7 range for variation)
-          const rx = i - fx + hash * 0.7;
-          const ry = j - fy + this.hashVoronoi(cx + 127, cy, cz) * 0.7;
-          const rz = k - fz + this.hashVoronoi(cx, cy + 127, cz) * 0.7;
-
-          const dist = rx * rx + ry * ry + rz * rz;
-
-          if (dist < minDist) {
-            secondMinDist = minDist;
-            minDist = dist;
-            cellId = hash;
-          } else if (dist < secondMinDist) {
-            secondMinDist = dist;
-          }
-        }
-      }
-    }
-
-    return [Math.sqrt(minDist), cellId, Math.sqrt(secondMinDist)];
-  }
-
-  /**
-   * Simple hash function for voronoi cell IDs
-   */
-  hashVoronoi(x, y, z) {
-    const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
-    return n - Math.floor(n);
-  }
-}
-
-SimplexNoise.grad3 = new Float32Array([
-  1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0,
-  -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
-]);
 
 export default MenuBackgroundSystem;

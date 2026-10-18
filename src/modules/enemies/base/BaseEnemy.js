@@ -31,6 +31,10 @@ import {
 } from '../../../data/constants/visual.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
+import RandomService from '../../../core/RandomService.js';
+
+// docs/NORTE.md §2: a white flash on any damage. PROPOSAL 17/10 (was none).
+export const HIT_FLASH_SECONDS = 0.06;
 
 let fallbackEnemyIdSequence = 0;
 
@@ -39,9 +43,8 @@ export class BaseEnemy {
    * Creates a base enemy instance.
    *
    * @param {Object} system - Reference to parent EnemySystem
-   * @param {Object} config - Configuration options
    */
-  constructor(system, config = {}) {
+  constructor(system) {
     // System reference
     this.system = system;
 
@@ -77,6 +80,7 @@ export class BaseEnemy {
     this.rotation = 0;
     this.rotationSpeed = 0;
     this.visible = true;
+    this.lastHitTime = -Infinity; // performance.now() of the last damage taken
 
     // Components (to be set by subclasses)
     this.components = new Map();
@@ -111,6 +115,7 @@ export class BaseEnemy {
     this.alive = true;
     this.initialized = true;
     this.age = 0;
+    this.lastHitTime = -Infinity;
 
     // Rotation
     this.rotation = config.rotation || 0;
@@ -155,7 +160,7 @@ export class BaseEnemy {
    *
    * @param {number} deltaTime - Time elapsed
    */
-  onUpdate(deltaTime) {
+  onUpdate() {
     // Override in subclasses
   }
 
@@ -197,7 +202,7 @@ export class BaseEnemy {
    *
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    */
-  onDraw(ctx) {
+  onDraw() {
     // Override in subclasses
   }
 
@@ -213,7 +218,9 @@ export class BaseEnemy {
 
     const healthComponent = this.getComponent('health');
     if (healthComponent && typeof healthComponent.takeDamage === 'function') {
+      const before = this.health;
       healthComponent.takeDamage(this, amount, source);
+      if (this.health < before) this.markHit();
       return this.health <= 0;
     }
 
@@ -221,6 +228,7 @@ export class BaseEnemy {
     const actualDamage = Math.max(0, amount - this.armor);
 
     this.health -= actualDamage;
+    if (actualDamage > 0) this.markHit();
 
     // Hook for damage reactions
     this.onDamaged(actualDamage, source);
@@ -234,13 +242,36 @@ export class BaseEnemy {
     return false;
   }
 
+  markHit() {
+    this.lastHitTime = performance.now();
+  }
+
+  /**
+   * Hit-flash strength, 1 right after damage fading to 0. The Warden keeps its
+   * own timed, damage-scaled flash (BossEnemy.triggerDamageFlash).
+   *
+   * @returns {number} 0-1
+   */
+  getHitFlash() {
+    if (this.damageFlashDuration > 0) {
+      return (
+        Math.min(
+          1,
+          Math.max(0, this.damageFlashTimer / this.damageFlashDuration)
+        ) * Math.min(1, Math.max(0, this.damageFlashStrength || 1))
+      );
+    }
+    const elapsed = (performance.now() - this.lastHitTime) / 1000;
+    return Math.min(1, Math.max(0, 1 - elapsed / HIT_FLASH_SECONDS));
+  }
+
   /**
    * Hook called when enemy takes damage.
    *
    * @param {number} amount - Damage taken
    * @param {Object} source - Damage source
    */
-  onDamaged(amount, source) {
+  onDamaged() {
     // Override in subclasses for reactions
   }
 
@@ -378,6 +409,7 @@ export class BaseEnemy {
     this.alive = false;
     this.initialized = false;
     this.visible = true;
+    this.lastHitTime = -Infinity;
     this.useComponents = false;
 
     // Reset position & velocity
@@ -519,6 +551,53 @@ export class BaseEnemy {
         component.update(context);
       }
     }
+  }
+
+  /**
+   * Seeded random for this enemy: the spawn's own stream when given, else a
+   * fork of the system's scope for this type.
+   */
+  resolveRandom(config = {}) {
+    if (config.random && typeof config.random.float === 'function') {
+      return config.random;
+    }
+
+    if (this.system && typeof this.system.getRandomScope === 'function') {
+      const generator = this.system.getRandomScope(
+        config.randomScope || this.type,
+        {
+          parentScope: config.randomParentScope || 'spawn',
+          label: `enemy:${this.type}:${config.id || this.id || 'spawn'}`,
+        }
+      );
+      return generator?.fork ? generator.fork(`${this.type}:core`) : generator;
+    }
+
+    return new RandomService(`enemy:${this.type}`);
+  }
+
+  /**
+   * Spawns an enemy this one releases (Husk Motes, Weaver Tethers) through the
+   * same path as the Warden's minions: factory acquire, then counted in the
+   * running wave.
+   */
+  spawnChild(type, config = {}) {
+    const system = this.system;
+    const child = system?.acquireEnemyViaFactory?.(type, {
+      wave: this.wave,
+      spawnedBy: this.id,
+      randomParentScope: `${this.type}:${this.id}`,
+      ...config,
+    });
+    if (!child) return null;
+    // A pooled child keeps its last velocity object; rebuild it from vx/vy.
+    child.velocity = null;
+    child[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+    system.waveManager?.registerDynamicMinion?.(child, {
+      parentId: this.id,
+      minionType: type,
+    });
+    return child;
   }
 
   getEventBus() {

@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties -- benchmark/validation script: synthetic load data, not gameplay; determinism not required */
 /**
  * Quick Performance Validation Script
  *
@@ -203,12 +204,10 @@ function validate60FPS() {
     }
 
     // Collision detection (simulate multiple queries per frame)
-    let collisions = 0;
     for (let i = 0; i < 20; i++) { // Multiple queries per frame
       const x = Math.random() * 1500;
       const y = Math.random() * 1500;
-      const nearby = spatialHash.query(x, y, 30);
-      collisions += nearby.length;
+      spatialHash.query(x, y, 30);
     }
 
     const frameTime = performance.now() - frameStart;

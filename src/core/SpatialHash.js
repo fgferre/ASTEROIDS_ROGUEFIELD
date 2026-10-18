@@ -1,3 +1,4 @@
+import { IS_DEV } from './env.js';
 /**
  * Spatial Hash for efficient collision detection in 2D space.
  *
@@ -69,12 +70,7 @@ export class SpatialHash {
     };
 
     // Development debugging
-    if (
-      typeof window !== 'undefined' &&
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (typeof window !== 'undefined' && IS_DEV) {
       if (!window.__spatialHashes) {
         window.__spatialHashes = [];
       }
@@ -317,7 +313,7 @@ export class SpatialHash {
     const collisions = [];
     const checked = new Set();
 
-    for (const [cellKey, cell] of this.grid.entries()) {
+    for (const [, cell] of this.grid.entries()) {
       if (cell.size < 2) continue;
 
       const objects = Array.from(cell);
@@ -510,10 +506,7 @@ export class SpatialHash {
 
     this.stats.dynamicResizes++;
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       console.debug(
         `[SpatialHash] Resized to cell size ${newCellSize} (objects: ${this.objectCount})`
       );
@@ -621,11 +614,7 @@ export class SpatialHash {
 }
 
 // Development tools
-if (
-  typeof window !== 'undefined' &&
-  typeof process !== 'undefined' &&
-  process.env.NODE_ENV === 'development'
-) {
+if (typeof window !== 'undefined' && IS_DEV) {
   window.__spatialHashDebug = {
     getAllHashes: () => window.__spatialHashes || [],
     getHashStats: () =>

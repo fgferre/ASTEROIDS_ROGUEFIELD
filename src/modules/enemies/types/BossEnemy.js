@@ -1,8 +1,4 @@
-import {
-  BOSS_COMPONENTS,
-  BOSS_CONFIG,
-  BOSS_VISUAL_VARIANT,
-} from '../../../data/enemies/boss.js';
+import { BOSS_COMPONENTS, BOSS_CONFIG } from '../../../data/enemies/boss.js';
 import {
   UPGRADE_BOSS_HEALTH_SCALAR,
   UPGRADE_BOSS_DAMAGE_SCALAR,
@@ -10,12 +6,13 @@ import {
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 const SOURCE_CONFIG = BOSS_CONFIG || {};
 
 const BASE_CONFIG = {
   key: 'boss',
-  displayName: 'Apex Overlord',
+  displayName: 'Warden Prime',
   radius: 60,
   safeDistance: 220,
   entryPadding: 24,
@@ -49,6 +46,9 @@ const BASE_CONFIG = {
   chargeProjectileSpeed: 420,
   chargeProjectileVariance: 0.08,
   chargeAimVariance: 0.18,
+  // Telegraphs: the boss shows where it will strike before it strikes.
+  chargeWindup: 0.6,
+  spreadWindup: 0.35,
   phaseThresholds: [0.66, 0.33],
   phaseCount: 3,
   invulnerabilityDuration: 2.0,
@@ -121,6 +121,8 @@ export class BossEnemy extends BaseEnemy {
     this.chargeProjectileSpeed = BOSS_DEFAULTS.chargeProjectileSpeed ?? 420;
     this.chargeProjectileVariance = BOSS_DEFAULTS.chargeProjectileVariance ?? 0;
     this.chargeAimVariance = BOSS_DEFAULTS.chargeAimVariance ?? 0;
+    this.chargeWindup = BOSS_DEFAULTS.chargeWindup ?? 0.6;
+    this.spreadWindup = BOSS_DEFAULTS.spreadWindup ?? 0.35;
 
     this.projectileDamage = BOSS_DEFAULTS.projectileDamage ?? 30;
     this.contactDamage = BOSS_DEFAULTS.contactDamage ?? 40;
@@ -133,6 +135,9 @@ export class BossEnemy extends BaseEnemy {
     this.chargeTimer = 0;
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
+    this.chargeAimAngle = 0;
+    this.spreadWindupTimer = 0;
+    this.telegraph = null;
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
@@ -156,7 +161,6 @@ export class BossEnemy extends BaseEnemy {
     this._lastFallbackReason = null;
     this._invulnLog = 0;
     this._lastInvulnerabilityState = null;
-    this.weaponState = {};
     this.movementStrategy = 'seeking';
     this.movementConfig = null;
     this.movementPhases = null;
@@ -176,17 +180,9 @@ export class BossEnemy extends BaseEnemy {
 
     const componentConfig = config.components ?? BOSS_COMPONENTS;
     if (componentConfig) {
-      this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
       this.renderStrategy =
         componentConfig?.render?.strategy || 'procedural-boss';
-      if (Array.isArray(componentConfig?.weapon?.patterns)) {
-        this.weaponPatterns = [...componentConfig.weapon.patterns];
-        this.weaponPattern =
-          this.weaponPattern || componentConfig.weapon.patterns[0];
-      } else if (componentConfig?.weapon?.pattern) {
-        this.weaponPattern = componentConfig.weapon.pattern;
-      }
 
       if (Array.isArray(componentConfig?.movementPhases)) {
         this.movementPhases = componentConfig.movementPhases.map((phase) => ({
@@ -200,6 +196,7 @@ export class BossEnemy extends BaseEnemy {
     const defaults = BOSS_DEFAULTS;
 
     this.type = 'boss';
+    this.displayName = config.displayName ?? defaults.displayName;
     this.addTag('boss');
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
@@ -220,7 +217,8 @@ export class BossEnemy extends BaseEnemy {
     const waveScaled =
       baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     const upgradeLevelSum = this._resolveUpgradeLevelSum(config);
-    const upgradeHealthFactor = 1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
+    const upgradeHealthFactor =
+      1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
     this.upgradeLevelSum = upgradeLevelSum;
     this.maxHealth = Math.ceil(waveScaled * upgradeHealthFactor);
     this.health = config.currentHealth ?? this.maxHealth;
@@ -232,7 +230,8 @@ export class BossEnemy extends BaseEnemy {
       config.contactDamage ?? defaults.contactDamage ?? 45;
     const baseProjectileDamage =
       config.projectileDamage ?? defaults.projectileDamage ?? 35;
-    const upgradeDamageFactor = 1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
+    const upgradeDamageFactor =
+      1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
     this.contactDamage = Math.round(baseContactDamage * upgradeDamageFactor);
     this.projectileDamage = Math.round(
       baseProjectileDamage * upgradeDamageFactor
@@ -301,6 +300,8 @@ export class BossEnemy extends BaseEnemy {
       config.chargeProjectileVariance ?? defaults.chargeProjectileVariance ?? 0;
     this.chargeAimVariance =
       config.chargeAimVariance ?? defaults.chargeAimVariance ?? 0;
+    this.chargeWindup = config.chargeWindup ?? defaults.chargeWindup ?? 0.6;
+    this.spreadWindup = config.spreadWindup ?? defaults.spreadWindup ?? 0.35;
 
     this.invulnerabilityDuration =
       config.invulnerabilityDuration ?? defaults.invulnerabilityDuration ?? 2;
@@ -355,7 +356,6 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
     this.resetFeedbackState();
-    this.applyPhaseLoadout(true);
     this.applyPhaseMovement(true);
 
     this.renderPayload = this.buildRenderPayload();
@@ -417,11 +417,12 @@ export class BossEnemy extends BaseEnemy {
     }
     const services = this.system?.dependencies ?? this.system ?? {};
     const progression = services.progression ?? services.progressionService;
-    const upgrades = (typeof progression?.getAllUpgrades === 'function')
-      ? progression.getAllUpgrades()
-      : (progression?.appliedUpgrades instanceof Map
-        ? progression.appliedUpgrades
-        : null);
+    const upgrades =
+      typeof progression?.getAllUpgrades === 'function'
+        ? progression.getAllUpgrades()
+        : progression?.appliedUpgrades instanceof Map
+          ? progression.appliedUpgrades
+          : null;
     if (!upgrades || typeof upgrades.values !== 'function') {
       return 0;
     }
@@ -482,25 +483,6 @@ export class BossEnemy extends BaseEnemy {
       Math.max(0, this.currentPhase || 0),
       this.phaseHealthThresholds.length
     );
-  }
-
-  applyPhaseLoadout(force = false) {
-    const patterns = Array.isArray(this.weaponPatterns)
-      ? this.weaponPatterns
-      : [];
-    if (!patterns.length) {
-      return;
-    }
-
-    const index = Math.min(
-      Math.max(0, this.currentPhase || 0),
-      patterns.length - 1
-    );
-    const nextPattern = patterns[index];
-    if (!force && this.weaponPattern === nextPattern) {
-      return;
-    }
-    this.weaponPattern = nextPattern;
   }
 
   applyPhaseMovement(force = false) {
@@ -583,19 +565,74 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseIntro(deltaTime, target) {
-    if (!(this.useComponents && this.components?.size > 0)) {
-      this.spreadTimer -= deltaTime;
-      if (this.spreadTimer <= 0 && target?.position) {
-        this.fireSpreadPattern(target.position);
+    this.updateSpreadCycle(deltaTime, target);
+  }
+
+  // The fan is announced by a wedge for `spreadWindup` seconds, then fired
+  // at the player's position at that moment.
+  updateSpreadCycle(deltaTime, target) {
+    if (this.spreadWindupTimer > 0) {
+      this.spreadWindupTimer -= deltaTime;
+      if (target?.position) {
+        this.chargeAimAngle = this.angleTo(target.position);
+        if (this.telegraph?.type === 'fan') {
+          this.telegraph.angle = this.chargeAimAngle;
+          this.telegraph.timer = Math.max(0, this.spreadWindupTimer);
+        }
+      }
+      if (this.spreadWindupTimer <= 0) {
+        this.clearTelegraph();
+        if (target?.position) {
+          this.fireSpreadPattern(target.position);
+        }
         this.spreadTimer = this.computeSpreadCooldown();
       }
+      return;
+    }
+
+    this.spreadTimer -= deltaTime;
+    if (this.spreadTimer <= 0 && target?.position) {
+      const windup = Math.max(0, this.spreadWindup || 0);
+      if (windup <= 0) {
+        this.fireSpreadPattern(target.position);
+        this.spreadTimer = this.computeSpreadCooldown();
+        return;
+      }
+      this.spreadWindupTimer = windup;
+      this.chargeAimAngle = this.angleTo(target.position);
+      this.setTelegraph({
+        type: 'fan',
+        angle: this.chargeAimAngle,
+        arc: Math.max(0, this.spreadArc ?? 0),
+        length: 180,
+        duration: windup,
+        timer: windup,
+      });
     }
   }
 
-  handlePhaseAssault(deltaTime, target) {
-    if (!(this.useComponents && this.components?.size > 0)) {
-      this.updateVolleyCycle(deltaTime, target);
+  angleTo(position) {
+    return Math.atan2(position.y - this.y, position.x - this.x);
+  }
+
+  setTelegraph(telegraph) {
+    this.telegraph = telegraph;
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('boss-telegraph', {
+        enemy: this,
+        enemyId: this.id,
+        telegraph,
+      });
     }
+  }
+
+  clearTelegraph() {
+    this.telegraph = null;
+  }
+
+  handlePhaseAssault(deltaTime, target) {
+    this.updateVolleyCycle(deltaTime, target);
     this.updateMinionSpawns(deltaTime);
   }
 
@@ -726,11 +763,31 @@ export class BossEnemy extends BaseEnemy {
 
   updateChargeState(deltaTime, target) {
     switch (this.chargeState) {
+      case 'windup':
+        // Slow to a near stop, keep tracking the player, show the lane.
+        this.vx *= Math.max(0, 1 - 6 * deltaTime);
+        this.vy *= Math.max(0, 1 - 6 * deltaTime);
+        if (target?.position) {
+          this.chargeAimAngle = this.angleTo(target.position);
+          this.rotation = this.chargeAimAngle;
+          if (this.telegraph?.type === 'charge') {
+            this.telegraph.angle = this.chargeAimAngle;
+          }
+        }
+        this.chargeStateTimer -= deltaTime;
+        if (this.telegraph?.type === 'charge') {
+          this.telegraph.timer = Math.max(0, this.chargeStateTimer);
+        }
+        if (this.chargeStateTimer <= 0) {
+          this.launchCharge();
+        }
+        break;
       case 'charging':
         this.chargeStateTimer -= deltaTime;
         if (this.chargeStateTimer <= 0) {
           this.chargeState = 'recover';
           this.chargeStateTimer = this.chargeRecovery;
+          this.applyPhaseMovement(true);
           this.triggerChargeBurst('end');
         }
         break;
@@ -752,15 +809,35 @@ export class BossEnemy extends BaseEnemy {
 
   beginCharge(target) {
     const aimPosition = target?.position || null;
-    let angle = 0;
+    this.chargeAimAngle = aimPosition ? this.angleTo(aimPosition) : 0;
 
-    if (aimPosition) {
-      const dx = aimPosition.x - this.x;
-      const dy = aimPosition.y - this.y;
-      angle = Math.atan2(dy, dx);
+    // The phase movement would steer and cap the dash; drift on vx/vy instead
+    // until the charge ends.
+    this.movementStrategy = 'linear';
+
+    const windup = Math.max(0, this.chargeWindup || 0);
+    if (windup <= 0) {
+      this.launchCharge();
+      return;
     }
 
-    angle += this.sampleVariance(this.chargeAimVariance);
+    const chargeSpeed = (this.speed || 0) * (this.chargeSpeedMultiplier || 3);
+    this.chargeState = 'windup';
+    this.chargeStateTimer = windup;
+    this.rotation = this.chargeAimAngle;
+    this.setTelegraph({
+      type: 'charge',
+      angle: this.chargeAimAngle,
+      length: chargeSpeed * (this.chargeDuration || 1),
+      duration: windup,
+      timer: windup,
+    });
+  }
+
+  launchCharge() {
+    this.clearTelegraph();
+    const angle =
+      this.chargeAimAngle + this.sampleVariance(this.chargeAimVariance);
 
     const chargeSpeed = (this.speed || 0) * (this.chargeSpeedMultiplier || 3);
     this.vx = Math.cos(angle) * chargeSpeed;
@@ -896,9 +973,10 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    const angle = this.patternRandom?.float
-      ? this.patternRandom.float() * Math.PI * 2
-      : Math.random() * Math.PI * 2;
+    const angle =
+      requireRandom(this.patternRandom, 'enemy.boss.pattern').float() *
+      Math.PI *
+      2;
     const distance = this.radius + 40;
 
     const spawnConfig = {
@@ -1019,12 +1097,10 @@ export class BossEnemy extends BaseEnemy {
       return null;
     }
 
-    if (this.minionRandom && typeof this.minionRandom.int === 'function') {
-      const index = this.minionRandom.int(0, this.minionTypes.length - 1);
-      return this.minionTypes[index] || null;
-    }
-
-    const index = Math.floor(Math.random() * this.minionTypes.length);
+    const index = requireRandom(this.minionRandom, 'enemy.boss.minion').int(
+      0,
+      this.minionTypes.length - 1
+    );
     return this.minionTypes[index] || null;
   }
 
@@ -1135,11 +1211,10 @@ export class BossEnemy extends BaseEnemy {
       return randomSource.range(-value, value);
     }
 
-    if (randomSource && typeof randomSource.float === 'function') {
-      return (randomSource.float() * 2 - 1) * value;
-    }
-
-    return (Math.random() * 2 - 1) * value;
+    return (
+      (requireRandom(randomSource, 'enemy.boss.pattern').float() * 2 - 1) *
+      value
+    );
   }
 
   takeDamage(amount, source = null) {
@@ -1260,7 +1335,6 @@ export class BossEnemy extends BaseEnemy {
     const previousPhase = this.currentPhase;
     this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
     this.nextPhaseIndex += 1;
-    this.applyPhaseLoadout(true);
     this.applyPhaseMovement(true);
 
     this.invulnerable = true;
@@ -1358,7 +1432,7 @@ export class BossEnemy extends BaseEnemy {
     }
   }
 
-  onDraw(ctx) {
+  onDraw() {
     if (!this.useComponents || !this.components?.size) {
       console.error(
         '[BossEnemy] Components not initialized. Boss cannot render.'
@@ -1421,8 +1495,6 @@ export class BossEnemy extends BaseEnemy {
     this.phaseCount = BOSS_DEFAULTS.phaseCount ?? 3;
     this.nextPhaseIndex = 0;
     this._phaseThresholdMaxHealth = null;
-    this.weaponPattern = null;
-    this.weaponPatterns = null;
     this.movementConfig = null;
     this.movementPhases = null;
     this._lastMovementPhase = null;
@@ -1435,6 +1507,9 @@ export class BossEnemy extends BaseEnemy {
     this.chargeTimer = 0;
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
+    this.chargeAimAngle = 0;
+    this.spreadWindupTimer = 0;
+    this.telegraph = null;
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;

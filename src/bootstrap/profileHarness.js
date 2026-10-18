@@ -33,6 +33,11 @@
  *      and paints a one-line on-canvas overlay so the developer knows the
  *      capture is on disk.
  *
+ * Scenario-only aids (never gameplay changes): live enemies are cleared before
+ * the forced wave start, the player gets a 45s invulnerability window at
+ * scenario start so boss telegraphs can be photographed, and the driver
+ * steers the ship in a slow circle so the camera and telegraphs get exercised.
+ *
  * Per CONTEXT D-08 the existing `scripts/benchmarks/performance-baseline.js`
  * Node bench is NOT replaced — it's a synthetic micro-bench. INFRA-01's
  * baseline IS this in-browser harness output.
@@ -47,6 +52,8 @@
  */
 
 import { debugLog } from '../core/debugLogging.js';
+import { GAME_WIDTH } from '../core/GameConstants.js';
+import { applyBaseTransform } from '../core/viewport.js';
 
 // CONTEXT D-09: deterministic seed forced across all scenarios.
 const PROFILE_HARNESS_SEED = 0xb45e;
@@ -58,6 +65,8 @@ const SCENARIOS = Object.freeze({
   'mid-game': { wave: 5, upgrades: 7, durationSec: 60 },
   'boss-arena': { wave: 'boss', upgrades: 7, durationSec: 90 },
   'late-stress': { wave: 10, upgrades: 15, durationSec: 60 },
+  // `?scene=hero` — fixed art-review picture on real entities (no capture).
+  hero: { wave: 1, upgrades: 0, durationSec: 60, hero: true },
 });
 
 const SCENARIO_NAMES = Object.keys(SCENARIOS);
@@ -103,6 +112,9 @@ function getScenarioFromURL() {
 
   try {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('scene') === 'hero') {
+      return 'hero';
+    }
     if (!params.has('profile')) {
       return null;
     }
@@ -159,28 +171,93 @@ function forceProgressionUpgrades(progressionService, targetCount) {
 
 /**
  * Force-advances the wave counter on a WaveManager-shaped service. The exact
- * field is `currentWave`; `wave: 'boss'` advances to the next multiple of
- * `WAVE_BOSS_INTERVAL` (5 per `src/data/constants/gameplay.js:248`). Failures
+ * field is `currentWave`; `wave: 'boss'` jumps to layer 5, the first Warden
+ * layer in `src/data/layers.js`. Failures
  * are debug-logged, not thrown — the harness still measures real frames.
  */
 function forceWaveNumber(enemiesService, requestedWave) {
   if (!enemiesService) return;
   const waveManager = enemiesService.waveManager;
   if (!waveManager) {
-    debugLog('[profileHarness] enemies.waveManager unavailable — skipping wave force');
+    debugLog(
+      '[profileHarness] enemies.waveManager unavailable — skipping wave force'
+    );
     return;
   }
   const numericWave =
-    requestedWave === 'boss' ? 5 : Number.isFinite(requestedWave) ? requestedWave : 1;
+    requestedWave === 'boss'
+      ? 5
+      : Number.isFinite(requestedWave)
+        ? requestedWave
+        : 1;
   try {
     // Mutate the field directly. If a future refactor adds a setter, the
     // field assignment still works because Object property writes call the
     // setter transparently.
     waveManager.currentWave = numericWave;
+    if (numericWave > 1) {
+      // Drop wave-1 asteroids so the forced wave starts on a clear arena.
+      enemiesService.releaseAllAsteroidsToPool();
+      // The run already started wave 1: restart as the requested wave.
+      waveManager.currentWave = numericWave - 1;
+      waveManager.waveInProgress = false;
+      enemiesService.startNextWave();
+    }
     debugLog(`[profileHarness] Forced wave currentWave=${numericWave}`);
   } catch (error) {
     debugLog('[profileHarness] Failed to force wave number:', error);
   }
+}
+
+// `?scene=hero` layout, logical 800x600 field.
+const HERO_ASTEROIDS = Object.freeze([
+  { size: 'large', variant: 'common', x: 330, y: 170, vx: 5, vy: 3 },
+  { size: 'medium', variant: 'volatile', x: 560, y: 420, vx: -4, vy: -3 },
+  { size: 'small', variant: 'common', x: 680, y: 130, vx: -3, vy: 4 },
+]);
+const HERO_ORBS = Object.freeze([
+  [640, 380],
+  [700, 400],
+  [720, 440],
+  [660, 450],
+  [690, 470],
+  [640, 420],
+]);
+const HERO_PLAYER = Object.freeze({ x: 300, y: 300, driftSpeed: 14 });
+const HERO_XP_REQUIREMENT = 1e9;
+
+/**
+ * Composes the hero scene through the public spawn paths: factory-backed
+ * enemies, createXPOrb, a frozen wave manager and an unreachable level-up.
+ */
+function composeHeroScene({ player, enemies, progression, xpOrbs }) {
+  enemies.releaseAllAsteroidsToPool();
+  // Freeze spawning: waves start from waveManager.update() and the legacy
+  // timer spawns from spawnSystem.handleSpawning().
+  enemies.waveManager.update = () => {};
+  enemies.spawnSystem.handleSpawning = () => {};
+  enemies.waveManager.spawnQueue = [];
+  progression.experienceToNext = HERO_XP_REQUIREMENT;
+
+  const spawn = (type, config) => {
+    const enemy = enemies.acquireEnemyViaFactory(type, {
+      wave: 1,
+      ...config,
+    });
+    if (enemy) {
+      enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+    }
+    return enemy;
+  };
+  HERO_ASTEROIDS.forEach((config) => spawn('asteroid', config));
+  spawn('drone', { x: 690, y: 100 });
+  spawn('hunter', { x: 520, y: 250 });
+  HERO_ORBS.forEach(([x, y]) => xpOrbs.createXPOrb(x, y, 5));
+
+  player.position.x = HERO_PLAYER.x;
+  player.position.y = HERO_PLAYER.y;
+  player.angle = 0;
+  player.setInvulnerableTimer(60);
 }
 
 /**
@@ -195,13 +272,14 @@ function paintCompletionOverlay(scenario, filename) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const text = `scenario complete — ${filename}`;
+    applyBaseTransform(ctx);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width || 800, 28);
+    ctx.fillRect(0, 0, GAME_WIDTH, 28);
     ctx.fillStyle = '#0f0';
     ctx.font = '14px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, (canvas.width || 800) / 2, 14);
+    ctx.fillText(text, GAME_WIDTH / 2, 14);
   } catch (error) {
     debugLog('[profileHarness] Could not paint completion overlay:', error);
   }
@@ -214,15 +292,12 @@ function paintCompletionOverlay(scenario, filename) {
  * auto-log capture runs regardless (real-frame data is still gathered when
  * the developer drives the game manually).
  */
-function pollForGameServices() {
+function pollForGameServices(getServices) {
   return new Promise((resolve) => {
     let attempts = 0;
     const tick = () => {
       attempts += 1;
-      const candidate =
-        (typeof window !== 'undefined' &&
-          (window.__gameSystemServices || window.gameSystemServices)) ||
-        null;
+      const candidate = getServices?.() || null;
       if (candidate) {
         resolve(candidate);
         return;
@@ -238,15 +313,48 @@ function pollForGameServices() {
 }
 
 /**
+ * Clicks the menu start button and waits for the first wave to begin, so the
+ * scenario runs without manual input. Bounded wait; failures are debug-logged.
+ */
+export async function startRun(enemiesService) {
+  // Clicking before the menu loader finishes lets it re-show the menu over
+  // the running game.
+  const loadingScreen = document.getElementById('loading-screen');
+  for (let i = 0; i < 240 && loadingScreen; i++) {
+    if (loadingScreen.classList.contains('hidden')) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  document.getElementById('start-game-btn')?.click();
+  for (let i = 0; i < 80; i++) {
+    if (enemiesService?.waveManager?.waveInProgress) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  debugLog('[profileHarness] Run did not start within 20s');
+}
+
+/**
  * Runs the scripted-player driver for `durationSec` simulated seconds, or
  * until `driver.bossKilled === true` for boss-arena. Uses setInterval at
  * 60Hz cadence. Resolves when the timer or kill condition trips.
  */
-function runScenarioDriver(driver, scenario, durationSec) {
+function runScenarioDriver(driver, scenario, durationSec, player) {
   return new Promise((resolve) => {
     let simulatedSeconds = 0;
     const intervalId = setInterval(() => {
       try {
+        if (scenario === 'hero' && player?.velocity) {
+          // Gentle rightward drift with the main thruster lit.
+          player.angle = 0;
+          player.velocity.vx = HERO_PLAYER.driftSpeed;
+          player.velocity.vy = 0;
+          if (player.cachedMovementInput) player.cachedMovementInput.up = true;
+        } else if (player?.velocity) {
+          // Slow circular drift (scenario-only) to exercise camera/telegraphs.
+          const heading = simulatedSeconds * 0.6;
+          player.velocity.vx = Math.cos(heading) * 40;
+          player.velocity.vy = Math.sin(heading) * 40;
+          player.angle = heading;
+        }
         driver.update(DRIVER_TICK_DT);
       } catch (error) {
         debugLog('[profileHarness] driver.update threw:', error);
@@ -270,7 +378,11 @@ function runScenarioDriver(driver, scenario, durationSec) {
  * @param {{ gameState: object, performanceMonitor: object }} deps
  * @returns {{ active: boolean, scenario?: string }}
  */
-export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
+export function activateProfileHarness({
+  gameState,
+  performanceMonitor,
+  getServices,
+} = {}) {
   const scenario = getScenarioFromURL();
   if (!scenario) {
     return { active: false };
@@ -298,6 +410,7 @@ export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
       scenario,
       config,
       performanceMonitor,
+      getServices,
     });
   }, 0);
 
@@ -309,14 +422,19 @@ export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
  * so its async path doesn't affect the synchronous return shape (which
  * src/app.js wiring depends on).
  */
-async function runDeferredScenario({ scenario, config, performanceMonitor }) {
+async function runDeferredScenario({
+  scenario,
+  config,
+  performanceMonitor,
+  getServices,
+}) {
   try {
     performanceMonitor.enableAutoLog(1000);
     debugLog(
       `[profileHarness] Auto-log enabled at 1000ms cadence; awaiting scenario "${scenario}"`
     );
 
-    const services = await pollForGameServices();
+    const services = await pollForGameServices(getServices);
     let driver = null;
 
     if (services) {
@@ -327,17 +445,25 @@ async function runDeferredScenario({ scenario, config, performanceMonitor }) {
           '../../tests/__helpers__/scriptedPlayer.js'
         );
 
-        const player =
-          services['player'] || services.player || null;
-        const combat =
-          services['combat'] || services.combat || null;
-        const enemies =
-          services['enemies'] || services.enemies || null;
+        const player = services['player'] || services.player || null;
+        const combat = services['combat'] || services.combat || null;
+        const enemies = services['enemies'] || services.enemies || null;
         const progression =
           services['progression'] || services.progression || null;
 
-        forceProgressionUpgrades(progression, config.upgrades);
-        forceWaveNumber(enemies, config.wave);
+        await startRun(enemies);
+        if (config.hero) {
+          composeHeroScene({
+            player,
+            enemies,
+            progression,
+            xpOrbs: services['xp-orbs'],
+          });
+        } else {
+          forceProgressionUpgrades(progression, config.upgrades);
+          forceWaveNumber(enemies, config.wave);
+          player?.setInvulnerableTimer?.(45);
+        }
 
         if (player && combat) {
           driver = createScriptedPlayer({ player, combat, enemies });
@@ -362,7 +488,12 @@ async function runDeferredScenario({ scenario, config, performanceMonitor }) {
     }
 
     if (driver) {
-      await runScenarioDriver(driver, scenario, config.durationSec);
+      await runScenarioDriver(
+        driver,
+        scenario,
+        config.durationSec,
+        services.player
+      );
     } else {
       // No driver: still hold for the scenario duration so the auto-log
       // captures the full target window. The developer can play manually

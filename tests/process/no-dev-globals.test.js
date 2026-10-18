@@ -147,8 +147,6 @@ describe('INFRA-03 — no reachable dev globals in production build', () => {
       vi.stubGlobal('__AUDIO_DEBUG_BUILD__', true);
       const win = {};
       vi.stubGlobal('window', win);
-      const realNodeEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development'; // makes isDevEnvironment() → DEV_MODE true
       try {
         const instance = Object.create(AudioSystem.prototype);
         instance.random = { seed: 7, debugSnapshot: () => ({ s: 7 }) };
@@ -159,8 +157,6 @@ describe('INFRA-03 — no reachable dev globals in production build', () => {
         expect(win.__AUDIO_RANDOM_DEBUG__).toBeDefined();
         expect(win.__AUDIO_RANDOM_DEBUG__.seed).toBe(7);
       } finally {
-        if (realNodeEnv === undefined) delete process.env.NODE_ENV;
-        else process.env.NODE_ENV = realNodeEnv;
         vi.unstubAllGlobals();
       }
     });
@@ -174,8 +170,11 @@ describe('INFRA-03 — no reachable dev globals in production build', () => {
     beforeAll(async () => {
       // Hermetic: rebuild so the canary always reflects current source, never a
       // stale dist/. `--mode production` is vite build's default but explicit is safer.
+      // NODE_ENV is forced: Vitest sets it to 'test', which would make Vite
+      // build with import.meta.env.DEV = true (and so IS_DEV-gated code live).
       execFileSync('npm', ['run', 'build'], {
         cwd: REPO_ROOT,
+        env: { ...process.env, NODE_ENV: 'production' },
         stdio: 'ignore',
         timeout: BUILD_TIMEOUT_MS,
         shell: process.platform === 'win32', // npm is npm.cmd on Windows

@@ -415,6 +415,7 @@ describe('GameSessionService lifecycle flows', () => {
     let roster = [];
     const enemySystem = {
       activeBosses: new Map(),
+      forEachActiveEnemy: (callback) => roster.forEach(callback),
       getAllAsteroids: () => roster,
       restoreSnapshotState: vi.fn(() => {
         roster = [restoredBoss];
@@ -443,7 +444,9 @@ describe('GameSessionService lifecycle flows', () => {
         },
         progression: { level: 3 },
         enemies: {
-          bosses: [{ id: restoredBoss.id, poolId: restoredBoss[ASTEROID_POOL_ID] }],
+          bosses: [
+            { id: restoredBoss.id, poolId: restoredBoss[ASTEROID_POOL_ID] },
+          ],
           supportEnemies: [],
           waves: [],
         },

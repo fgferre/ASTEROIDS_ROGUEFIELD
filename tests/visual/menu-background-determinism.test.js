@@ -9,6 +9,7 @@ function createFrozenMathUtilsStub() {
   };
 
   const originalGenerator = vi.fn(
+    // eslint-disable-next-line no-restricted-properties -- stub mimics Three's Math.random-based generateUUID; tests spy on Math.random to tell original from patched
     () => `cdn-${Math.random().toString(16).slice(2)}`
   );
 
@@ -31,6 +32,7 @@ function createConfigurableMathUtilsStub() {
   };
 
   const originalGenerator = vi.fn(
+    // eslint-disable-next-line no-restricted-properties -- stub mimics Three's Math.random-based generateUUID; tests spy on Math.random to tell original from patched
     () => `module-${Math.random().toString(16).slice(2)}`
   );
 
@@ -125,6 +127,31 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
       mathRandomSpy.mockRestore();
     }
   });
+  it('swaps Math.random for the seeded fork only while withSeededMathRandom runs', async () => {
+    // eslint-disable-next-line no-restricted-properties -- asserting the global is restored
+    const original = Math.random;
+    const draw = (seed) => {
+      const random = createTestContainer(seed).resolve('random');
+      const system = new MenuBackgroundSystem({ random });
+      // eslint-disable-next-line no-restricted-properties -- reading the swapped global
+      return system.withSeededMathRandom(() => [Math.random(), Math.random()]);
+    };
+
+    expect(draw(7)).toEqual(draw(7));
+    // eslint-disable-next-line no-restricted-properties -- asserting the global is restored
+    expect(Math.random).toBe(original);
+
+    const system = new MenuBackgroundSystem({
+      random: createTestContainer(7).resolve('random'),
+    });
+    const pending = system.withSeededMathRandom(async () => {});
+    // eslint-disable-next-line no-restricted-properties -- swapped until the build settles
+    expect(Math.random).not.toBe(original);
+    await pending;
+    // eslint-disable-next-line no-restricted-properties -- asserting the global is restored
+    expect(Math.random).toBe(original);
+  });
+
   it('patches configurable MathUtils.generateUUID in place without using Math.random', () => {
     const container = createTestContainer(424242);
     const random = container.resolve('random');
@@ -176,14 +203,24 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
 
 function createAtmosphereTHREEStub() {
   class Vector3 {
-    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    constructor(x = 0, y = 0, z = 0) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+    }
   }
 
   return {
     AdditiveBlending: 2,
-    Color: class { constructor() {} },
-    PlaneGeometry: class { constructor() {} },
-    ShaderMaterial: class { constructor() {} },
+    Color: class {
+      constructor() {}
+    },
+    PlaneGeometry: class {
+      constructor() {}
+    },
+    ShaderMaterial: class {
+      constructor() {}
+    },
     Mesh: class {
       constructor() {
         this.position = new Vector3();
@@ -192,15 +229,26 @@ function createAtmosphereTHREEStub() {
       }
     },
     BufferGeometry: class {
-      constructor() { this._attrs = {}; }
-      setAttribute(name, attr) { this._attrs[name] = attr; }
+      constructor() {
+        this._attrs = {};
+      }
+      setAttribute(name, attr) {
+        this._attrs[name] = attr;
+      }
     },
     BufferAttribute: class {
-      constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; }
+      constructor(array, itemSize) {
+        this.array = array;
+        this.itemSize = itemSize;
+      }
     },
-    PointsMaterial: class { constructor() {} },
+    PointsMaterial: class {
+      constructor() {}
+    },
     Points: class {
-      constructor(geometry) { this.geometry = geometry; }
+      constructor(geometry) {
+        this.geometry = geometry;
+      }
     },
   };
 }

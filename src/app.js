@@ -1,21 +1,29 @@
 import { GamePools } from './core/GamePools.js';
-import {
-  USE_WAVE_MANAGER,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-  WAVE_BOSS_INTERVAL,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
-  PRESERVE_LEGACY_POSITIONING,
-  STRICT_LEGACY_SPAWN_SEQUENCE,
-} from './data/constants/gameplay.js';
+import { WAVEMANAGER_HANDLES_ASTEROID_SPAWN } from './data/constants/gameplay.js';
 import {
   debugLog,
   resolveDebugPreference,
   applyDebugPreference,
 } from './core/debugLogging.js';
-import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
+import {
+  PerformanceMonitor,
+  downloadJSON,
+} from './utils/PerformanceMonitor.js';
+import { createFixedStepper } from './core/fixedStep.js';
+import { createStatsOverlay } from './core/statsOverlay.js';
+import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
-import { activateProfileHarness } from './bootstrap/profileHarness.js';
+import { getRendererMode } from './modules/render3d/rendererMode.js';
+import {
+  activateProfileHarness,
+  startRun,
+} from './bootstrap/profileHarness.js';
+import {
+  createReplayController,
+  fetchRecording,
+  getReplayUrl,
+} from './bootstrap/replaySession.js';
 import {
   DEFAULT_POOL_CONFIG,
   DEFAULT_GC_OPTIONS,
@@ -55,6 +63,12 @@ let garbageCollectionManager = null;
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
 
+// Simulation runs in fixed 1/60 s steps; render once per animation frame.
+const fixedStepper = createFixedStepper();
+// Fixed steps simulated since boot; recordings index input by it.
+let simulationStep = 0;
+let replayController = null;
+
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
 let mathRandomGuard = null;
@@ -72,83 +86,14 @@ let servicesCache = {
   combat: null,
   'xp-orbs': null,
   healthHearts: null,
+  pickups: null,
   progression: null,
   world: null,
   ui: null,
 };
 let servicesCacheInitialized = false;
-let stateDirty = false;
-let lastSyncTime = 0;
 
 const DEV_MODE = isDevEnvironment();
-
-function loadExternalScript(src) {
-  return new Promise((resolve, reject) => {
-    if (typeof document === 'undefined') {
-      reject(new Error('document is not available'));
-      return;
-    }
-
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === 'true') {
-        resolve();
-        return;
-      }
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener(
-        'error',
-        () => reject(new Error(`Failed to load script: ${src}`)),
-        { once: true }
-      );
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = false;
-    script.addEventListener(
-      'load',
-      () => {
-        script.dataset.loaded = 'true';
-        resolve();
-      },
-      { once: true }
-    );
-    script.addEventListener(
-      'error',
-      () => reject(new Error(`Failed to load script: ${src}`)),
-      { once: true }
-    );
-    document.head.appendChild(script);
-  });
-}
-
-async function initializeDevStatsPanel() {
-  if (!DEV_MODE || typeof window === 'undefined' || window.stats) {
-    return;
-  }
-
-  try {
-    if (typeof window.Stats !== 'function') {
-      await loadExternalScript('/libs/Stats.min.js');
-    }
-
-    if (typeof window.Stats !== 'function' || window.stats) {
-      return;
-    }
-
-    const statsPanel = new window.Stats();
-    statsPanel.showPanel(0);
-    const statsElement = statsPanel.dom || statsPanel.domElement;
-    if (statsElement instanceof Node) {
-      document.body.appendChild(statsElement);
-      window.stats = statsPanel;
-    }
-  } catch (error) {
-    console.warn('[bootstrap] Failed to initialize dev stats panel:', error);
-  }
-}
 
 function initializeDependencyInjection(manifestContext) {
   debugLog('[App] Initializing Dependency Injection system...');
@@ -197,93 +142,33 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
-function synchronizeSessionState(currentTime, session) {
-  if (!session) {
-    return;
-  }
+const statsOverlay = createStatsOverlay();
 
-  if (typeof session.synchronizeLegacyState === 'function') {
-    const shouldSync = stateDirty || currentTime - lastSyncTime > 100;
-    if (!shouldSync) {
+function installStatsShortcut() {
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'F8') {
+      event.preventDefault();
+      statsOverlay.toggle();
+    }
+  });
+}
+
+function installReplayDownloadShortcut() {
+  window.addEventListener('keydown', (event) => {
+    const recorder = gameSessionService?.replayRecorder;
+    if (event.key !== 'F9' || !recorder) {
       return;
     }
-
-    try {
-      session.synchronizeLegacyState();
-      stateDirty = false;
-      lastSyncTime = currentTime;
-    } catch (syncError) {
-      console.warn('[App] Failed to synchronize legacy state:', syncError);
-    }
-    return;
-  }
-
-  try {
-    const screen =
-      typeof session.getScreen === 'function' ? session.getScreen() : undefined;
-    if (typeof screen === 'string') {
-      gameState.screen = screen;
-    }
-
-    const paused =
-      typeof session.isPaused === 'function' ? session.isPaused() : undefined;
-    if (typeof paused === 'boolean') {
-      gameState.isPaused = paused;
-    }
-  } catch (syncError) {
-    console.warn('[App] Failed to mirror session state:', syncError);
-  }
-}
-
-function getSessionFrameState(session) {
-  const snapshot = {
-    screen: gameState.screen,
-    isPaused: gameState.isPaused,
-    isRunning: gameState.screen === 'playing' && !gameState.isPaused,
-  };
-
-  if (!session) {
-    return snapshot;
-  }
-
-  try {
-    const screen =
-      typeof session.getScreen === 'function'
-        ? session.getScreen()
-        : snapshot.screen;
-    if (typeof screen === 'string') {
-      snapshot.screen = screen;
-      gameState.screen = screen;
-    }
-
-    const paused =
-      typeof session.isPaused === 'function'
-        ? session.isPaused()
-        : snapshot.isPaused;
-    if (typeof paused === 'boolean') {
-      snapshot.isPaused = paused;
-      gameState.isPaused = paused;
-    }
-
-    if (typeof session.isRunning === 'function') {
-      const running = session.isRunning();
-      if (typeof running === 'boolean') {
-        snapshot.isRunning = running;
-      }
-    } else {
-      snapshot.isRunning = snapshot.screen === 'playing' && !snapshot.isPaused;
-    }
-  } catch (stateError) {
-    console.warn(
-      '[App] Failed to read current session frame state:',
-      stateError
+    event.preventDefault();
+    const recording = recorder.toJSON();
+    downloadJSON(
+      `roguefield-replay-${recording.seed}.json`,
+      serialize(recording)
     );
-  }
-
-  return snapshot;
+  });
 }
 
-function init() {
+function init(recording = null) {
   if (DEV_MODE) {
     GameDebugLogger.init();
     GameDebugLogger.log('INIT', 'Game starting', {
@@ -300,20 +185,30 @@ function init() {
 
     gameState.canvas = document.getElementById('game-canvas');
     if (!gameState.canvas) {
-      throw new Error('Canvas não encontrado');
+      throw new Error('Canvas not found');
     }
 
     gameState.gameUI = document.getElementById('game-ui');
-    gameState.ctx = gameState.canvas.getContext('2d');
-    if (!gameState.ctx) {
-      throw new Error('Contexto 2D não disponível');
+    // The 3D renderer takes the canvas for WebGL: a 2D context would lock it.
+    gameState.rendererMode = getRendererMode();
+    if (gameState.rendererMode === '2d') {
+      gameState.ctx = gameState.canvas.getContext('2d');
+      if (!gameState.ctx) {
+        throw new Error('2D context unavailable');
+      }
     }
 
-    const { seed: initialSeed, source: seedSource } =
-      GameSessionService.deriveInitialSeed();
+    const { seed: initialSeed, source: seedSource } = recording
+      ? { seed: recording.seed, source: 'replay' }
+      : gameState.randomSeedSource === 'profile-harness'
+        ? { seed: gameState.randomSeed, source: gameState.randomSeedSource }
+        : GameSessionService.deriveInitialSeed();
     const seedInfo = { seed: initialSeed, source: seedSource };
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
+    if (DEV_MODE) {
+      console.info(`[Seed] using ${initialSeed} (${seedSource})`);
+    }
 
     const manifestContext = {
       gameState,
@@ -327,16 +222,12 @@ function init() {
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
+      rendererMode: gameState.rendererMode,
     };
 
     if (DEV_MODE) {
       GameDebugLogger.log('INIT', 'Feature Flags', {
-        USE_WAVE_MANAGER,
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-        WAVE_BOSS_INTERVAL,
-        PRESERVE_LEGACY_SIZE_DISTRIBUTION,
-        PRESERVE_LEGACY_POSITIONING,
-        STRICT_LEGACY_SPAWN_SEQUENCE,
       });
     }
 
@@ -348,7 +239,7 @@ function init() {
       if (DEV_MODE) {
         GameDebugLogger.log('ERROR', 'DI bootstrap failed; aborting init');
       }
-      alert('Falha na inicialização dos serviços. Recarregue a página.');
+      alert('Service initialization failed. Reload the page.');
 
       return;
     }
@@ -371,6 +262,7 @@ function init() {
         'combat',
         'xp-orbs',
         'healthHearts',
+        'pickups',
         'progression',
         'world',
         'ui',
@@ -438,6 +330,24 @@ function init() {
     const ui = services['ui'];
     if (ui) ui.showScreen('menu');
 
+    replayController = createReplayController({
+      eventBus: diContainer.resolve('event-bus'),
+      input: services['input'],
+      session: gameSessionService,
+      progression: services['progression'],
+      ui,
+      getStep: () => simulationStep,
+    });
+    if (recording) {
+      replayController.arm(recording);
+      ui.controlsToastDisabled = true;
+      void startRun(services['enemies']);
+    }
+    if (DEV_MODE) {
+      installReplayDownloadShortcut();
+      installStatsShortcut();
+    }
+
     if (DEV_MODE) {
       const playerSystem = services['player'];
       const enemySystem = services['enemies'];
@@ -491,14 +401,7 @@ function init() {
         const gameEvents = diContainer.resolve('event-bus');
         if (gameEvents && typeof gameEvents.on === 'function') {
           gameEvents.on('screen-changed', () => {
-            stateDirty = true;
             servicesCacheInitialized = false;
-          });
-          gameEvents.on('pause-state-changed', () => {
-            stateDirty = true;
-          });
-          gameEvents.on('session-state-changed', () => {
-            stateDirty = true;
           });
         }
       } catch (error) {
@@ -526,48 +429,50 @@ function init() {
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Erro ao inicializar o jogo. Recarregue a página.');
+    alert('Game failed to start. Reload the page.');
   }
 }
 
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
+  statsOverlay.begin();
   // Start performance monitoring
   performanceMonitor.startFrame();
 
-  const deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.016);
+  const frameSeconds =
+    gameState.lastTime > 0 ? (currentTime - gameState.lastTime) / 1000 : 0;
   gameState.lastTime = currentTime;
 
   try {
-    const session = gameSessionService;
-    synchronizeSessionState(currentTime, session);
-    const sessionState = getSessionFrameState(session);
-    const currentScreen = sessionState.screen;
-    const shouldUpdateGame = sessionState.isRunning;
+    replayController.tick();
+
+    const currentScreen = gameSessionService.getScreen();
+    const shouldUpdateGame = gameSessionService.isRunning();
 
     const shouldRenderGame = gameState.gameUI
       ? !gameState.gameUI.classList.contains('hidden')
       : currentScreen === 'playing' || currentScreen === 'gameover';
 
-    if (shouldUpdateGame) {
-      GamePools.update(deltaTime);
-      if (
-        garbageCollectionManager &&
-        typeof garbageCollectionManager.update === 'function'
-      ) {
-        garbageCollectionManager.update(deltaTime);
-      }
-    }
-
-    let adjustedDelta = deltaTime;
     const effects = gameSystemServices?.['effects'];
-    if (effects && typeof effects.update === 'function') {
-      adjustedDelta = effects.update(shouldUpdateGame ? deltaTime : 0);
-    }
+    const stepSeconds = fixedStepper.step;
 
     if (shouldUpdateGame) {
-      updateGame(adjustedDelta);
+      const steps = fixedStepper.advance(frameSeconds);
+      // Stop mid-frame when a step pauses the run (level-up, pause): the
+      // remaining steps must not depend on how frames were batched.
+      for (let i = 0; i < steps && gameSessionService.isRunning(); i += 1) {
+        GamePools.update(stepSeconds);
+        garbageCollectionManager.update(stepSeconds);
+        // Effects own freeze frames and time dilation: they return the
+        // simulation delta the game systems should actually advance by.
+        const adjustedDelta = effects.update(stepSeconds);
+        updateGame(adjustedDelta);
+        simulationStep += 1;
+      }
+    } else {
+      fixedStepper.reset();
+      effects.update(0);
     }
 
     // OPTIMIZATION #1: PerformanceMonitor Cache - recalculate only every 5 frames
@@ -577,10 +482,7 @@ function gameLoop(currentTime) {
         const combat = gameSystemServices?.['combat'];
         const xpOrbs = gameSystemServices?.['xp-orbs'];
         const effects = gameSystemServices?.['effects'];
-        const projectilePerf =
-          combat && typeof combat.getProjectilePerfSnapshot === 'function'
-            ? combat.getProjectilePerfSnapshot()
-            : null;
+        const projectilePerf = combat.getProjectilePerfSnapshot();
 
         metricsCache = {
           enemies: enemies?.asteroids?.length || 0,
@@ -609,10 +511,7 @@ function gameLoop(currentTime) {
     // Capture render timing AFTER render completes
     if (shouldUpdateGame && metricsCacheFrameCount % 5 === 1) {
       const combat = gameSystemServices?.['combat'];
-      const projectilePerf =
-        combat && typeof combat.getProjectilePerfSnapshot === 'function'
-          ? combat.getProjectilePerfSnapshot()
-          : null;
+      const projectilePerf = combat.getProjectilePerfSnapshot();
       if (projectilePerf && metricsCache) {
         metricsCache.projectileRenderMs =
           projectilePerf.projectileRenderMs || 0;
@@ -629,6 +528,7 @@ function gameLoop(currentTime) {
 
   // End performance monitoring
   performanceMonitor.endFrame();
+  statsOverlay.end();
 
   requestAnimationFrame(gameLoop);
 }
@@ -643,75 +543,34 @@ function updateGame(deltaTime) {
     servicesCache.combat = gameSystemServices?.['combat'];
     servicesCache['xp-orbs'] = gameSystemServices?.['xp-orbs'];
     servicesCache.healthHearts = gameSystemServices?.['healthHearts'];
+    servicesCache.pickups = gameSystemServices?.['pickups'];
     servicesCache.progression = gameSystemServices?.['progression'];
     servicesCache.world = gameSystemServices?.['world'];
     servicesCache.ui = gameSystemServices?.['ui'];
     servicesCacheInitialized = true;
   }
 
-  // Use cached service references directly (10 direct lookups instead of forEach)
-  if (servicesCache.input && typeof servicesCache.input.update === 'function') {
-    servicesCache.input.update(deltaTime);
-  }
-  if (
-    servicesCache.player &&
-    typeof servicesCache.player.update === 'function'
-  ) {
-    servicesCache.player.update(deltaTime);
-  }
-  if (
-    servicesCache.enemies &&
-    typeof servicesCache.enemies.update === 'function'
-  ) {
-    servicesCache.enemies.update(deltaTime);
-  }
-  if (
-    servicesCache.physics &&
-    typeof servicesCache.physics.update === 'function'
-  ) {
-    servicesCache.physics.update(deltaTime);
-  }
-  if (
-    servicesCache.combat &&
-    typeof servicesCache.combat.update === 'function'
-  ) {
-    servicesCache.combat.update(deltaTime);
-  }
-  if (
-    servicesCache['xp-orbs'] &&
-    typeof servicesCache['xp-orbs'].update === 'function'
-  ) {
-    servicesCache['xp-orbs'].update(deltaTime);
-  }
-  if (
-    servicesCache.healthHearts &&
-    typeof servicesCache.healthHearts.update === 'function'
-  ) {
-    servicesCache.healthHearts.update(deltaTime);
-  }
-  if (
-    servicesCache.progression &&
-    typeof servicesCache.progression.update === 'function'
-  ) {
-    servicesCache.progression.update(deltaTime);
-  }
-  if (servicesCache.world && typeof servicesCache.world.update === 'function') {
-    servicesCache.world.update(deltaTime);
-  }
-  if (servicesCache.ui && typeof servicesCache.ui.update === 'function') {
-    servicesCache.ui.update(deltaTime);
-  }
+  // Use cached service references directly (10 direct lookups instead of forEach).
+  // The manifest guarantees every one of these services and its update().
+  servicesCache.input.update(deltaTime);
+  servicesCache.player.update(deltaTime);
+  servicesCache.enemies.update(deltaTime);
+  servicesCache.physics.update(deltaTime);
+  servicesCache.combat.update(deltaTime);
+  servicesCache['xp-orbs'].update(deltaTime);
+  servicesCache.healthHearts.update(deltaTime);
+  servicesCache.pickups.update(deltaTime);
+  servicesCache.progression.update(deltaTime);
+  servicesCache.world.update(deltaTime);
+  servicesCache.ui.update(deltaTime);
 }
 
 function renderGame() {
-  if (!gameState.ctx) return;
+  if (gameState.rendererMode === '2d' && !gameState.ctx) return;
 
-  const renderer = gameSystemServices?.['renderer'];
-  if (renderer && typeof renderer.render === 'function') {
-    performanceMonitor.startMeasure('render');
-    renderer.render(gameState.ctx);
-    performanceMonitor.endMeasure('render');
-  }
+  performanceMonitor.startMeasure('render');
+  gameSystemServices.renderer.render(gameState.ctx);
+  performanceMonitor.endMeasure('render');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -725,12 +584,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    await initializeDevStatsPanel();
-
     // INFRA-01: ?profile=<scenario> activates the in-browser performance harness.
     // No-op when the URL flag is absent. Mutates gameState.randomSeed when active.
-    activateProfileHarness({ gameState, performanceMonitor });
+    activateProfileHarness({
+      gameState,
+      performanceMonitor,
+      getServices: () => gameSystemServices,
+    });
 
-    init();
+    // ?replay=<url>: the recording's seed must be known before init().
+    const replayUrl = getReplayUrl();
+    let recording = null;
+    if (replayUrl) {
+      try {
+        recording = await fetchRecording(replayUrl);
+      } catch (error) {
+        console.error('[replay] Could not load recording:', error);
+      }
+    }
+
+    init(recording);
   })();
 });

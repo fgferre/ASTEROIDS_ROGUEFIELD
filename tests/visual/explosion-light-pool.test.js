@@ -29,7 +29,16 @@ describe('F9: Explosion light pool', () => {
           this.distance = distance;
           this.decay = decay;
           this.visible = true;
-          this.position = { copy(p) { this.x = p.x; this.y = p.y; this.z = p.z; }, x: 0, y: 0, z: 0 };
+          this.position = {
+            copy(p) {
+              this.x = p.x;
+              this.y = p.y;
+              this.z = p.z;
+            },
+            x: 0,
+            y: 0,
+            z: 0,
+          };
         }
       },
     };
@@ -68,7 +77,8 @@ describe('F9: Explosion light pool', () => {
     expect(system.explosions.length).toBe(0);
     expect(system._explosionLightPool.length).toBe(4);
     // Returned light should be invisible
-    const returned = system._explosionLightPool[system._explosionLightPool.length - 1];
+    const returned =
+      system._explosionLightPool[system._explosionLightPool.length - 1];
     expect(returned.visible).toBe(false);
     expect(returned.intensity).toBe(0);
   });

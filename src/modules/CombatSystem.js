@@ -1,5 +1,6 @@
 // src/modules/CombatSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
+import { requireService } from '../core/serviceUtils.js';
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -30,6 +31,9 @@ import {
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 const VALID_AIM_MODES = new Set(['auto', 'manual']);
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
+import { getRenderScale } from '../core/viewport.js';
+import { getEmissive } from '../core/bloomLayer.js';
+import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
 import {
   ASTEROID_VARIANTS,
   ASTEROID_BASE_ORBS,
@@ -37,12 +41,11 @@ import {
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
 
-const COMBAT_SERVICE_MAP = {
-  cachedPlayer: 'player',
-  cachedEnemies: 'enemies',
-  cachedPhysics: 'physics',
-  commandQueue: 'command-queue',
-};
+const LANCE_SPRITE = { width: 16, height: 8, originX: 12 };
+// Trail alpha ramp, tail → head (precomputed: one string per step).
+const LANCE_TRAIL_STYLES = Array.from({ length: 8 }, (_, i) =>
+  withAlpha(PALETTE.shot, (0.65 * i) / 7)
+);
 
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -52,8 +55,6 @@ class CombatSystem extends BaseSystem {
       enableRandomManagement: false,
     });
 
-    this.commandQueue = null;
-    this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
     this.enemyBullets = [];
@@ -146,10 +147,22 @@ class CombatSystem extends BaseSystem {
     this.resetAimingBranchState();
 
     // === CACHES DE SERVIÇOS ===
-    this.cachedPlayer = null;
-    this.cachedEnemies = null;
-    this.cachedPhysics = null;
-    this.bulletGlowCache = null;
+    this.cachedPlayer = requireService(
+      'player',
+      this.dependencies,
+      'CombatSystem'
+    );
+    this.cachedEnemies = requireService(
+      'enemies',
+      this.dependencies,
+      'CombatSystem'
+    );
+    this.cachedPhysics = requireService(
+      'physics',
+      this.dependencies,
+      'CombatSystem'
+    );
+    this.lanceSprite = null;
     this.projectilePerf = {
       projectileUpdateMs: 0,
       projectileRenderMs: 0,
@@ -158,13 +171,10 @@ class CombatSystem extends BaseSystem {
       projectilePlayerTrailPoints: 0,
       projectileEnemyTrailPoints: 0,
     };
-
-    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
   }
 
   setupEventListeners() {
     this.registerEventListener('player-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.currentTarget = null;
       this.currentTargetLocks = [];
       this.currentLockAssignments = [];
@@ -182,14 +192,12 @@ class CombatSystem extends BaseSystem {
     });
 
     this.registerEventListener('progression-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.resetAimingBranchState();
       this.targetThreatCache.clear();
       this.clearEnemyBullets();
     });
 
     this.registerEventListener('physics-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.clearEnemyBullets();
     });
 
@@ -209,6 +217,10 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('upgrade-aiming-suite', (data) => {
       this.applyAimingUpgrade(data || {});
+    });
+
+    this.registerEventListener('upgrade-weapon-tuning', (data) => {
+      this.applyWeaponTuning(data);
     });
 
     // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
@@ -243,31 +255,19 @@ class CombatSystem extends BaseSystem {
   }
 
   getCachedPlayer() {
-    if (!this.cachedPlayer) {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP);
-    }
     return this.cachedPlayer;
   }
 
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
-    this.resolveCachedServices(COMBAT_SERVICE_MAP);
-
     const player = this.cachedPlayer;
-    const playerStats =
-      player && typeof player.getStats === 'function'
-        ? player.getStats()
-        : null;
+    const playerStats = player.getStats();
     this.lastKnownPlayerStats = playerStats || null;
 
     // Only target and shoot when ship hull exists (visible and alive)
-    if (
-      player &&
-      !player.isDead &&
-      !player.isRetrying &&
-      !player._quitExplosionHidden
-    ) {
+    if (!player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
       this.updateTargeting(deltaTime);
+      player.setAimPoint(this.getPrimaryAimPoint());
 
       if (playerStats) {
         this.handleShooting(deltaTime, playerStats);
@@ -284,22 +284,15 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileEnemyCount = this.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
-    const physics = this.cachedPhysics;
-
-    if (
-      physics &&
-      enemies &&
-      typeof physics.forEachBulletCollision === 'function'
-    ) {
-      physics.forEachBulletCollision(this.bullets, (bullet, asteroid) => {
+    this.cachedPhysics.forEachBulletCollision(
+      this.bullets,
+      (bullet, asteroid) => {
         if (!asteroid || bullet.hit) {
           return;
         }
         this.processBulletHit(bullet, asteroid, enemies);
-      });
-    } else if (enemies) {
-      this.checkBulletCollisions(enemies);
-    }
+      }
+    );
   }
 
   // === SISTEMA DE TARGETING ===
@@ -373,33 +366,16 @@ class CombatSystem extends BaseSystem {
   }
 
   findBestTarget() {
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      this.currentTarget = null;
-      this.currentTargetLocks = [];
-      this.currentLockAssignments = [];
-      this.targetingPriorityList = [];
-      return;
-    }
-
+    const player = this.cachedPlayer;
     const playerPos = player.getPosition();
     if (!playerPos) {
       return;
     }
 
-    const playerVelocity =
-      typeof player.getVelocity === 'function' ? player.getVelocity() : null;
-    const playerRadius =
-      typeof player.getShieldRadius === 'function'
-        ? player.getShieldRadius()
-        : typeof player.getHullBoundingRadius === 'function'
-          ? player.getHullBoundingRadius()
-          : SHIP_SIZE || 24;
+    const playerVelocity = player.getVelocity();
+    const playerRadius = player.getShieldRadius();
 
     const enemies = this.cachedEnemies;
-    if (!enemies) {
-      return;
-    }
 
     const candidates = [];
     const scoringEnabled = this.dangerScoreEnabled;
@@ -458,21 +434,7 @@ class CombatSystem extends BaseSystem {
       candidates.push(candidateEntry);
     };
 
-    if (typeof enemies.forEachActiveEnemy === 'function') {
-      enemies.forEachActiveEnemy(processEnemy);
-    } else if (typeof enemies.forEachActiveAsteroid === 'function') {
-      enemies.forEachActiveAsteroid(processEnemy);
-    } else if (typeof enemies.getActiveEnemies === 'function') {
-      const activeEnemies = enemies.getActiveEnemies();
-      for (let i = 0; i < activeEnemies.length; i += 1) {
-        processEnemy(activeEnemies[i]);
-      }
-    } else if (typeof enemies.getAsteroids === 'function') {
-      const asteroids = enemies.getAsteroids();
-      for (let i = 0; i < asteroids.length; i += 1) {
-        processEnemy(asteroids[i]);
-      }
-    }
+    enemies.forEachActiveEnemy(processEnemy);
 
     if (!candidates.length) {
       if (this.currentTarget) {
@@ -521,12 +483,7 @@ class CombatSystem extends BaseSystem {
   isValidTarget(target) {
     if (!target || target.destroyed) return false;
 
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      return false;
-    }
-
-    const playerPos = player.getPosition();
+    const playerPos = this.cachedPlayer.getPosition();
     const dx = target.x - playerPos.x;
     const dy = target.y - playerPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -540,34 +497,17 @@ class CombatSystem extends BaseSystem {
 
     if (!this.canShoot()) return;
 
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') return;
-
+    const player = this.cachedPlayer;
     const playerPos = player.getPosition();
     if (!playerPos) return;
 
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
     // and fires from the ship nose in the ship's current rotation direction.
     if (this.aimMode === 'manual') {
-      // Fix-pass (F5): the prior `|| 0` silent fallback hid the case where
-      // PlayerSystem doesn't expose the angle accessor — manual fire would
-      // silently shoot right (angle 0). Surface the gap with a one-shot
-      // warning instead, so test harnesses / future refactors detect it.
-      // PlayerSystem.js:1285 exposes `getAngle()` as the canonical accessor.
-      let rotation = 0;
-      if (typeof player.getAngle === 'function') {
-        rotation = player.getAngle();
-      } else if (!this._warnedManualAimNoAngle) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[CombatSystem] manual aim requires player.getAngle() — falling back to rotation 0 (this will silently shoot right)'
-        );
-        this._warnedManualAimNoAngle = true;
-      }
-      const nose =
-        typeof player.getNosePosition === 'function'
-          ? player.getNosePosition(rotation)
-          : playerPos;
+      // Fix-pass (F5): `getAngle()` is PlayerSystem's canonical accessor; a
+      // player without it is a wiring bug and throws instead of shooting right.
+      const rotation = player.getAngle();
+      const nose = player.getNosePosition(rotation);
       this.fireForward(playerPos, rotation, playerStats, {
         originOverride: nose,
       });
@@ -584,9 +524,7 @@ class CombatSystem extends BaseSystem {
 
     // [SMART AUTO-FIRE] Fallback to forward fire if no lock
     if (!lockTargets.length) {
-      const rotation =
-        typeof player.getAngle === 'function' ? player.getAngle() : 0;
-      this.fireForward(playerPos, rotation, playerStats);
+      this.fireForward(playerPos, player.getAngle(), playerStats);
       return;
     }
 
@@ -909,12 +847,7 @@ class CombatSystem extends BaseSystem {
   getPredictedTargetPosition(enemy = this.currentTarget, playerPos = null) {
     if (!enemy) return null;
 
-    const player = this.getCachedPlayer();
-    const origin =
-      playerPos ||
-      (player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : null);
+    const origin = playerPos || this.cachedPlayer.getPosition();
 
     if (!origin) {
       return null;
@@ -1071,6 +1004,36 @@ class CombatSystem extends BaseSystem {
     return settings;
   }
 
+  // Fire rate, projectile speed/lifetime and lock range from upgrades. Keyed
+  // by upgrade rank so re-applying a rank (Retry) does not compound it.
+  applyWeaponTuning(data = {}) {
+    this.weaponTuningSources.set(`${data.upgradeId}:${data.level}`, data);
+    const product = (field) => {
+      let value = 1;
+      this.weaponTuningSources.forEach((entry) => {
+        const factor = Number(entry[field]);
+        if (factor > 0) {
+          value *= factor;
+        }
+      });
+      return value;
+    };
+    this.cooldownTuning = product('cooldownMultiplier');
+    this.bulletSpeed = BULLET_SPEED * product('bulletSpeedMultiplier');
+    this.bulletLifetime =
+      COMBAT_BULLET_LIFETIME * product('bulletLifetimeMultiplier');
+    this.setTargetingRange(
+      COMBAT_TARGETING_RANGE * product('targetingRangeMultiplier')
+    );
+    this.refreshShootCooldown();
+  }
+
+  refreshShootCooldown() {
+    this.setShootCooldown(
+      this.baseShootCooldown * this.aimCooldownMultiplier * this.cooldownTuning
+    );
+  }
+
   resetAimingBranchState() {
     this.dangerWeights = this.cloneDangerWeights(this.defaultDangerWeights);
     this.dynamicPredictionSettings = {
@@ -1097,6 +1060,12 @@ class CombatSystem extends BaseSystem {
     this.targetThreatCache.clear();
     this.lastPrimaryTargetId = null;
     this.shootCooldown = this.baseShootCooldown;
+    this.aimCooldownMultiplier = 1;
+    this.cooldownTuning = 1;
+    this.weaponTuningSources = new Map();
+    this.bulletSpeed = BULLET_SPEED;
+    this.bulletLifetime = COMBAT_BULLET_LIFETIME;
+    this.targetingRange = COMBAT_TARGETING_RANGE;
   }
 
   applyAimingUpgrade(data = {}) {
@@ -1140,14 +1109,14 @@ class CombatSystem extends BaseSystem {
 
       const cooldownMultiplier = Number(data?.cooldownMultiplier);
       if (Number.isFinite(cooldownMultiplier) && cooldownMultiplier > 0) {
-        this.setShootCooldown(this.baseShootCooldown * cooldownMultiplier);
+        this.aimCooldownMultiplier = cooldownMultiplier;
+        this.refreshShootCooldown();
       } else if (
         Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)
       ) {
-        this.setShootCooldown(
-          this.baseShootCooldown *
-            this.aimingConfig.multiLock.cooldownMultiplier
-        );
+        this.aimCooldownMultiplier =
+          this.aimingConfig.multiLock.cooldownMultiplier;
+        this.refreshShootCooldown();
       }
     }
 
@@ -1395,11 +1364,12 @@ class CombatSystem extends BaseSystem {
 
     const healthRaw = Number(enemy?.health);
     const maxHealthRaw = Number(enemy?.maxHealth);
-    const targetHealth = Number.isFinite(healthRaw) && healthRaw > 0
-      ? healthRaw
-      : Number.isFinite(maxHealthRaw) && maxHealthRaw > 0
-        ? maxHealthRaw
-        : 1;
+    const targetHealth =
+      Number.isFinite(healthRaw) && healthRaw > 0
+        ? healthRaw
+        : Number.isFinite(maxHealthRaw) && maxHealthRaw > 0
+          ? maxHealthRaw
+          : 1;
 
     const needed = Math.max(1, Math.ceil(targetHealth / volleyDamage));
     return Math.min(shotCount, needed);
@@ -1673,9 +1643,8 @@ class CombatSystem extends BaseSystem {
       }
       if (!perEnemyCap.has(id)) {
         const allocated = this.computeAllocatedShots(enemy, playerStats);
-        const cap = Number.isFinite(allocated) && allocated > 0
-          ? allocated
-          : Infinity;
+        const cap =
+          Number.isFinite(allocated) && allocated > 0 ? allocated : Infinity;
         perEnemyCap.set(id, cap);
       }
       const cap = perEnemyCap.get(id);
@@ -1689,12 +1658,7 @@ class CombatSystem extends BaseSystem {
   }
 
   refreshPredictedAimPoints() {
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      return;
-    }
-
-    const playerPos = player.getPosition();
+    const playerPos = this.cachedPlayer.getPosition();
     if (!playerPos) {
       return;
     }
@@ -1854,9 +1818,11 @@ class CombatSystem extends BaseSystem {
    * @param {object} [playerStats] — reserved for future damage-aware behavior; not consumed here.
    * @returns {Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>}
    */
-  applyConcentratedFire(input, shotCount, playerStats) {
+  applyConcentratedFire(input, shotCount) {
     if (!input || typeof input !== 'object') {
-      throw new Error('[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind');
+      throw new Error(
+        '[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind'
+      );
     }
 
     const count = Math.max(0, Math.floor(Number(shotCount) || 0));
@@ -1873,12 +1839,7 @@ class CombatSystem extends BaseSystem {
       }
 
       const predicted = input.predictedAim || { x: enemy.x, y: enemy.y };
-      const player = this.getCachedPlayer();
-      const playerPos =
-        input.fireOrigin ||
-        (player && typeof player.getPosition === 'function'
-          ? player.getPosition()
-          : { x: 0, y: 0 });
+      const playerPos = input.fireOrigin || this.cachedPlayer.getPosition();
 
       const baseAimX = predicted.x;
       const baseAimY = predicted.y;
@@ -1914,13 +1875,19 @@ class CombatSystem extends BaseSystem {
       for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
         const offsetIndex = shotIndex - slotCenter;
         const rawMagnitude = offsetIndex * spacing;
-        const magnitude = Math.max(-clampLimit, Math.min(clampLimit, rawMagnitude));
+        const magnitude = Math.max(
+          -clampLimit,
+          Math.min(clampLimit, rawMagnitude)
+        );
 
         const shotPerpX = perpX * magnitude;
         const shotPerpY = perpY * magnitude;
 
         results.push({
-          fireOrigin: { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY },
+          fireOrigin: {
+            x: baseOriginX + shotPerpX,
+            y: baseOriginY + shotPerpY,
+          },
           aimPoint: { x: baseAimX + shotPerpX, y: baseAimY + shotPerpY },
         });
       }
@@ -1979,7 +1946,9 @@ class CombatSystem extends BaseSystem {
       return results;
     }
 
-    throw new Error(`[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`);
+    throw new Error(
+      `[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`
+    );
   }
 
   calculateDangerScore(
@@ -2712,12 +2681,7 @@ class CombatSystem extends BaseSystem {
 
       if (playerAlive && bullet.life > 0 && !bullet.hit) {
         if (!playerPosition) {
-          const candidatePosition =
-            (typeof player.getPosition === 'function'
-              ? player.getPosition()
-              : null) ||
-            player.position ||
-            null;
+          const candidatePosition = player.getPosition();
 
           if (
             candidatePosition &&
@@ -2729,42 +2693,25 @@ class CombatSystem extends BaseSystem {
         }
 
         if (playerPosition) {
-          if (
-            !collisionContext &&
-            physics &&
-            physics.buildPlayerCollisionContext
-          ) {
+          if (!collisionContext) {
             collisionContext = physics.buildPlayerCollisionContext(player);
           }
 
-          const collisionRadius = Number.isFinite(
-            collisionContext?.collisionRadius
-          )
-            ? collisionContext.collisionRadius
-            : typeof player.getHullBoundingRadius === 'function'
-              ? player.getHullBoundingRadius()
-              : SHIP_SIZE || 0;
+          const collisionRadius = collisionContext.collisionRadius;
 
           const bulletRadius = Number.isFinite(bullet.radius)
             ? bullet.radius
             : defaultBulletRadius;
 
           if (collisionRadius > 0) {
-            if (physics && typeof physics.checkCircleCollision === 'function') {
-              collided = physics.checkCircleCollision(
-                bullet.x,
-                bullet.y,
-                bulletRadius,
-                playerPosition.x,
-                playerPosition.y,
-                collisionRadius
-              );
-            } else {
-              const dx = bullet.x - playerPosition.x;
-              const dy = bullet.y - playerPosition.y;
-              const totalRadius = bulletRadius + collisionRadius;
-              collided = dx * dx + dy * dy <= totalRadius * totalRadius;
-            }
+            collided = physics.checkCircleCollision(
+              bullet.x,
+              bullet.y,
+              bulletRadius,
+              playerPosition.x,
+              playerPosition.y,
+              collisionRadius
+            );
           }
         }
       }
@@ -2952,50 +2899,6 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectilePlayerTrailPoints = trailPoints;
   }
 
-  // === DETECÇÃO DE COLISÃO ===
-  checkBulletCollisions(enemiesSystem) {
-    const iterateAsteroids = (handler) => {
-      if (typeof enemiesSystem.forEachActiveEnemy === 'function') {
-        enemiesSystem.forEachActiveEnemy(handler);
-      } else if (typeof enemiesSystem.forEachActiveAsteroid === 'function') {
-        enemiesSystem.forEachActiveAsteroid(handler);
-      } else if (typeof enemiesSystem.getActiveEnemies === 'function') {
-        const enemies = enemiesSystem.getActiveEnemies();
-        for (let i = 0; i < enemies.length; i += 1) {
-          handler(enemies[i]);
-        }
-      } else if (typeof enemiesSystem.getAsteroids === 'function') {
-        const asteroids = enemiesSystem.getAsteroids();
-        for (let i = 0; i < asteroids.length; i += 1) {
-          handler(asteroids[i]);
-        }
-      }
-    };
-
-    for (const bullet of this.bullets) {
-      if (bullet.hit) continue;
-
-      iterateAsteroids((enemy) => {
-        if (!enemy || enemy.destroyed || bullet.hit) {
-          return;
-        }
-
-        const dx = bullet.x - enemy.x;
-        const dy = bullet.y - enemy.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const collisionRadius =
-          this.cachedPhysics &&
-          typeof this.cachedPhysics.resolveEnemyCollisionRadius === 'function'
-            ? this.cachedPhysics.resolveEnemyCollisionRadius(enemy)
-            : enemy.radius;
-
-        if (distance < BULLET_SIZE + collisionRadius) {
-          this.processBulletHit(bullet, enemy, enemiesSystem);
-        }
-      });
-    }
-  }
-
   processBulletHit(bullet, enemy, enemiesSystem) {
     if (!bullet || !enemy || bullet.hit) {
       return;
@@ -3005,12 +2908,12 @@ class CombatSystem extends BaseSystem {
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
     const requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
 
-    const damageResult = enemiesSystem
-      ? this.applyDamageToEnemy(enemiesSystem, enemy, requestedDamage)
-      : {
-          killed: Boolean(enemy.destroyed),
-          remainingHealth: Math.max(0, enemy.health ?? 0),
-        };
+    const damageResult = this.applyDamageToEnemy(
+      enemiesSystem,
+      enemy,
+      requestedDamage,
+      { hitPosition: { x: bullet.x, y: bullet.y } }
+    );
     const remainingHealth = Number.isFinite(damageResult.remainingHealth)
       ? damageResult.remainingHealth
       : enemy.health ?? null;
@@ -3079,25 +2982,15 @@ class CombatSystem extends BaseSystem {
     return damageResult;
   }
 
-  applyDamageToEnemy(enemiesSystem, enemy, damage) {
-    if (typeof enemiesSystem.applyDamage === 'function') {
-      const result = enemiesSystem.applyDamage(enemy, damage);
-      return {
-        killed: !!result?.killed,
-        remainingHealth: Math.max(
-          0,
-          result?.remainingHealth ?? enemy.health ?? 0
-        ),
-      };
-    }
-
-    const killed = enemy.takeDamage(damage);
-    if (killed) {
-      enemy.destroyed = true;
-      return { killed: true, remainingHealth: 0 };
-    }
-
-    return { killed: false, remainingHealth: Math.max(0, enemy.health ?? 0) };
+  applyDamageToEnemy(enemiesSystem, enemy, damage, source) {
+    const result = enemiesSystem.applyDamage(enemy, damage, { source });
+    return {
+      killed: !!result?.killed,
+      remainingHealth: Math.max(
+        0,
+        result?.remainingHealth ?? enemy.health ?? 0
+      ),
+    };
   }
 
   // === GETTERS PÚBLICOS ===
@@ -3109,6 +3002,16 @@ class CombatSystem extends BaseSystem {
     return this.currentTarget;
   }
 
+  /** Where the primary lock is aimed (lead included), or null. */
+  getPrimaryAimPoint() {
+    const target = this.currentTarget;
+    if (!target) return null;
+    const predicted = this.predictedAimPointsMap.get(target.id);
+    return predicted
+      ? { x: predicted.x, y: predicted.y }
+      : { x: target.x, y: target.y };
+  }
+
   getBulletCount() {
     return this.bullets.length;
   }
@@ -3117,198 +3020,120 @@ class CombatSystem extends BaseSystem {
     return { ...this.projectilePerf };
   }
 
-  ensureBulletTrailSegmentCache() {
-    // "Laser Beam" Technique: Bake a glowing dot and stretch it
-    const size = 32; // Square canvas
-    const center = size / 2;
-
-    if (this.bulletTrailCache && this.bulletTrailCache.canvas) {
-      return this.bulletTrailCache;
+  // Lance shot (docs/NORTE.md §3): 8×2 amber core behind a 4 px white-hot
+  // head, axis +x, origin at the head. `head` is the emissive copy.
+  ensureLanceSprite() {
+    const scale = getRenderScale();
+    if (this.lanceSprite && this.lanceSprite.scale === scale) {
+      return this.lanceSprite;
     }
-
     if (typeof document === 'undefined') {
       return null;
     }
 
-    const offscreen = document.createElement('canvas');
-    offscreen.width = size;
-    offscreen.height = size;
-    const ctx = offscreen.getContext('2d');
-
-    if (!ctx) return null;
-
-    // 1. Bake the Glow (Gold/Yellow)
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = '#FFFF00';
-    ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
-
-    ctx.beginPath();
-    ctx.arc(center, center, 3, 0, Math.PI * 2); // Radius 3 (Width 6)
-    ctx.fill();
-
-    // 2. Bake the Core (White)
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#FFFFFF';
-
-    ctx.beginPath();
-    ctx.arc(center, center, 1.5, 0, Math.PI * 2); // Radius 1.5 (Width 3)
-    ctx.fill();
-
-    this.bulletTrailCache = {
-      canvas: offscreen,
-      width: size,
-      height: size,
-      radius: center,
+    const bake = (drawHead, drawCore) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(LANCE_SPRITE.width * scale);
+      canvas.height = Math.ceil(LANCE_SPRITE.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.scale(scale, scale);
+      ctx.translate(LANCE_SPRITE.originX, LANCE_SPRITE.height / 2);
+      if (drawCore) {
+        const core = ctx.createLinearGradient(-8, 0, 0, 0);
+        core.addColorStop(0, withAlpha(PALETTE.shot, 0));
+        core.addColorStop(0.45, withAlpha(PALETTE.shot, 0.9));
+        core.addColorStop(1, PALETTE.shot);
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(-1, -1);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(-1, 1);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (drawHead) {
+        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 3.5);
+        halo.addColorStop(0, withAlpha(PALETTE.shot, 0.55));
+        halo.addColorStop(1, withAlpha(PALETTE.shot, 0));
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = PALETTE.text;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 2, 1.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return canvas;
     };
 
-    return this.bulletTrailCache;
+    const lance = bake(true, true);
+    const head = bake(true, false);
+    this.lanceSprite = lance && head ? { lance, head, scale } : null;
+    return this.lanceSprite;
   }
 
-  ensureBulletGlowCache() {
-    const glowRadius = (BULLET_SIZE || 0) * 3;
-
-    if (!Number.isFinite(glowRadius) || glowRadius <= 0) {
-      this.bulletGlowCache = null;
-      return null;
+  drawLanceTrail(ctx, bullet) {
+    const trail = bullet.trail;
+    const count = trail.length + 1;
+    ctx.lineCap = 'round';
+    let prev = trail[0];
+    for (let k = 1; k < count; k += 1) {
+      const point = k < trail.length ? trail[k] : bullet;
+      const f = k / (count - 1);
+      ctx.strokeStyle =
+        LANCE_TRAIL_STYLES[Math.round(f * (LANCE_TRAIL_STYLES.length - 1))];
+      ctx.lineWidth = 0.3 + 1.7 * f;
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+      prev = point;
     }
-
-    if (
-      this.bulletGlowCache &&
-      this.bulletGlowCache.radius === glowRadius &&
-      this.bulletGlowCache.canvas
-    ) {
-      return this.bulletGlowCache;
-    }
-
-    if (typeof document === 'undefined') {
-      return null;
-    }
-
-    const diameter = Math.ceil(glowRadius * 2);
-    const offscreen = document.createElement('canvas');
-    offscreen.width = diameter;
-    offscreen.height = diameter;
-    const offscreenCtx = offscreen.getContext('2d');
-
-    if (!offscreenCtx) {
-      return null;
-    }
-
-    const gradient = offscreenCtx.createRadialGradient(
-      glowRadius,
-      glowRadius,
-      0,
-      glowRadius,
-      glowRadius,
-      glowRadius
-    );
-    gradient.addColorStop(0, '#FFFF00');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
-    gradient.addColorStop(1, 'transparent');
-
-    offscreenCtx.clearRect(0, 0, diameter, diameter);
-    offscreenCtx.fillStyle = gradient;
-    offscreenCtx.beginPath();
-    offscreenCtx.arc(glowRadius, glowRadius, glowRadius, 0, Math.PI * 2);
-    offscreenCtx.fill();
-
-    this.bulletGlowCache = {
-      canvas: offscreen,
-      radius: glowRadius,
-    };
-
-    return this.bulletGlowCache;
   }
 
   render(ctx) {
     if (!ctx) return;
 
-    const player = this.getCachedPlayer();
+    const player = this.cachedPlayer;
+    const emissive = getEmissive();
+    const sprite = this.ensureLanceSprite();
 
-    // [NEO-ARCADE] Additive Blending for Bullet Glow
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
     // Always render bullets - they keep flying
     const projectileRenderStart = performance.now();
+    emissive?.save();
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
 
-      if (bullet.trail.length > 1) {
-        const trailCache = this.ensureBulletTrailSegmentCache();
-
-        if (trailCache) {
-          ctx.save();
-          // [NEO-ARCADE] Baked Trail Glow (High Performance)
-          // Draw stretched segments using the baked "Dot" cache
-          for (let i = 1; i < bullet.trail.length; i++) {
-            const p1 = bullet.trail[i - 1];
-            const p2 = bullet.trail[i];
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist < 1) continue;
-
-            const angle = Math.atan2(dy, dx);
-            const alpha = i / bullet.trail.length; // Fade in tail
-
-            ctx.translate(p1.x, p1.y);
-            ctx.rotate(angle);
-            ctx.globalAlpha = alpha;
-
-            // Stretch the dot into a glowing line segment
-            // Overlap slightly (-3 start, +6 length) to ensure smooth joins
-            ctx.drawImage(
-              trailCache.canvas,
-              -3,
-              -trailCache.radius,
-              dist + 6,
-              trailCache.height
-            );
-
-            // Undo transform for next segment
-            ctx.rotate(-angle);
-            ctx.translate(-p1.x, -p1.y);
-          }
-          ctx.restore();
-        }
+      if (bullet.trail.length > 0) {
+        this.drawLanceTrail(ctx, bullet);
+        if (emissive) this.drawLanceTrail(emissive, bullet);
       }
 
-      const glowSprite = this.ensureBulletGlowCache();
-
-      if (glowSprite) {
-        ctx.drawImage(
-          glowSprite.canvas,
-          bullet.x - glowSprite.radius,
-          bullet.y - glowSprite.radius
+      if (!sprite) return;
+      const angle = Math.atan2(bullet.vy || 0, bullet.vx || 1);
+      const draw = (target, image) => {
+        target.save();
+        target.translate(bullet.x, bullet.y);
+        target.rotate(angle);
+        target.drawImage(
+          image,
+          -LANCE_SPRITE.originX,
+          -LANCE_SPRITE.height / 2,
+          LANCE_SPRITE.width,
+          LANCE_SPRITE.height
         );
-      } else {
-        const gradient = ctx.createRadialGradient(
-          bullet.x,
-          bullet.y,
-          0,
-          bullet.x,
-          bullet.y,
-          BULLET_SIZE * 4 // Larger bloom
-        );
-        gradient.addColorStop(0, '#FFFFFF'); // Hot core
-        gradient.addColorStop(0.3, '#FFFF00'); // Inner yellow
-        gradient.addColorStop(0.6, 'rgba(255, 100, 0, 0.4)'); // Outer orange
-        gradient.addColorStop(1, 'transparent');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Solid White Core
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, BULLET_SIZE, 0, Math.PI * 2);
-      ctx.fill();
+        target.restore();
+      };
+      draw(ctx, sprite.lance);
+      if (emissive) draw(emissive, sprite.head);
     });
+    emissive?.restore();
 
     ctx.restore(); // End 'lighter' mode
 
@@ -3326,11 +3151,7 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileRenderMs =
       performance.now() - projectileRenderStart;
 
-    const playerPosition =
-      (player && player.position) ||
-      (player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : null);
+    const playerPosition = player.getPosition();
 
     const lockAssignments =
       Array.isArray(this.currentLockAssignments) &&
@@ -3396,7 +3217,6 @@ class CombatSystem extends BaseSystem {
         }
 
         const duplicateIndex = assignment.duplicateIndex || 0;
-        const duplicateCount = duplicateTotals.get(target.id || index) || 1;
         // Fix-pass-3 Finding 4: ring color follows THREAT TIER, not
         // assignment index. Plan visual-direction palette: low = thruster
         // cyan (#00F2FF), high = alert red (#FF3131), medium = warning
@@ -3414,8 +3234,8 @@ class CombatSystem extends BaseSystem {
           pulseRatio * (index === 0 ? 6 : 3.5);
 
         ctx.save();
-        ctx.setLineDash([4, 3]);
-        ctx.lineWidth = index === 0 ? 2.6 + pulseRatio * 1.4 : 2.1;
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = index === 0 ? LINE.thin : LINE.hair;
         ctx.strokeStyle = ringColor.ring(lineAlpha);
         ctx.beginPath();
         ctx.arc(target.x, target.y, arcRadius, 0, Math.PI * 2);
@@ -3423,8 +3243,8 @@ class CombatSystem extends BaseSystem {
         ctx.restore();
 
         ctx.save();
-        ctx.lineWidth = 1.8;
-        ctx.strokeStyle = ringColor.line(lineAlpha * 0.7);
+        ctx.lineWidth = LINE.hair;
+        ctx.strokeStyle = ringColor.line(lineAlpha * 0.35);
         ctx.beginPath();
         ctx.moveTo(playerPosition.x, playerPosition.y);
         ctx.lineTo(target.x, target.y);
@@ -3434,15 +3254,14 @@ class CombatSystem extends BaseSystem {
     }
 
     // Predicted-impact marker — rank 2+.
-    const renderPredicted =
-      this.aimMode !== 'manual' && targetingRank >= 2;
+    const renderPredicted = this.aimMode !== 'manual' && targetingRank >= 2;
     if (
       renderPredicted &&
       this.predictedAimPoints.length &&
       this.usingDynamicPrediction()
     ) {
       this.predictedAimPoints.forEach(
-        ({ enemy, position, index, duplicateIndex, duplicateCount }) => {
+        ({ enemy, position, index, duplicateIndex }) => {
           if (!position) {
             return;
           }
@@ -3462,7 +3281,7 @@ class CombatSystem extends BaseSystem {
 
           ctx.save();
           ctx.setLineDash([]);
-          ctx.lineWidth = 2;
+          ctx.lineWidth = LINE.hair;
           ctx.strokeStyle = markerColor.ring(alpha);
           ctx.beginPath();
           ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
@@ -3598,8 +3417,12 @@ class CombatSystem extends BaseSystem {
     } else if (value === 'auto' && previousMode === 'manual') {
       // Restore behavioral flag snapshot (or re-enable from upgrade rank if no snapshot).
       if (this._aimModeFlagSnapshot) {
-        this.dangerScoreEnabled = this._aimModeFlagSnapshot.dangerScoreEnabled ?? (this.targetingUpgradeLevel >= 1);
-        this.dynamicPredictionEnabled = this._aimModeFlagSnapshot.dynamicPredictionEnabled ?? (this.targetingUpgradeLevel >= 2);
+        this.dangerScoreEnabled =
+          this._aimModeFlagSnapshot.dangerScoreEnabled ??
+          this.targetingUpgradeLevel >= 1;
+        this.dynamicPredictionEnabled =
+          this._aimModeFlagSnapshot.dynamicPredictionEnabled ??
+          this.targetingUpgradeLevel >= 2;
         this._aimModeFlagSnapshot = null;
       } else {
         this.dangerScoreEnabled = this.targetingUpgradeLevel >= 1;
@@ -3669,7 +3492,6 @@ class CombatSystem extends BaseSystem {
     // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
     // starts at concentrated + auto regardless of how the previous run ended.
     this.resetModeState();
-    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
     console.log('[CombatSystem] Reset');
   }
 

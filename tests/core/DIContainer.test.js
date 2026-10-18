@@ -4,6 +4,9 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
+import RandomService from '../../src/core/RandomService.js';
+
+const testRandom = new RandomService('di-container-test');
 
 describe('DIContainer', () => {
   const createContainer = () => {
@@ -74,7 +77,7 @@ describe('DIContainer', () => {
 
     it('should return singleton instance on multiple resolves', () => {
       const container = createContainer();
-      container.register('test', () => ({ value: Math.random() }), {
+      container.register('test', () => ({ value: testRandom.float() }), {
         singleton: true,
       });
 
@@ -328,7 +331,7 @@ describe('DIContainer', () => {
 
     it('should have separate singleton instances in child', () => {
       const container = createContainer();
-      container.register('test', () => ({ id: Math.random() }));
+      container.register('test', () => ({ id: testRandom.float() }));
 
       const parentInstance = container.resolve('test');
       const child = container.createChildContainer();

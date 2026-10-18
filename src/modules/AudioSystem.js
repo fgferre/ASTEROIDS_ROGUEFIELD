@@ -1,5 +1,8 @@
 import { BaseSystem } from '../core/BaseSystem.js';
-import SFXBus from './audio/SFXBus.js';
+import SFXBus, {
+  resolveExplosionSize,
+  resolveStereoPan,
+} from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
@@ -7,15 +10,16 @@ import FileTrackManager, {
 import DuckingController from './audio/DuckingController.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
 import {
-  GameDebugLogger,
-  isDevEnvironment,
-} from '../utils/dev/GameDebugLogger.js';
-import {
+  AUDIO_BIG_MOMENT_DUCK,
+  AUDIO_MASTER_LIMITER,
+  AUDIO_REVERB_SEND_DB,
   BOSS_AUDIO_FREQUENCY_PRESETS,
+  GAME_WIDTH,
   MUSIC_LAYER_CONFIG,
 } from '../core/GameConstants.js';
-import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
 const DEV_MODE = isDevEnvironment();
 
@@ -27,6 +31,7 @@ class AudioSystem extends BaseSystem {
     });
     this.context = null;
     this.masterGain = null;
+    this.masterLimiter = null;
     this.musicGain = null;
     this.effectsGain = null;
     this.initialized = false;
@@ -80,6 +85,12 @@ class AudioSystem extends BaseSystem {
 
     // Low health warning state
     this.lowHealthWarning = false;
+
+    // Run-following music inputs: the player's x (pan reference for enemy-side
+    // cues) and the wave's enemies alive or still to spawn (density proxy:
+    // wave-started totalEnemies + enemy-spawned + fragments − enemy-destroyed).
+    this.listenerX = GAME_WIDTH / 2;
+    this.runEnemyCount = 0;
 
     // UI sound debouncing
     this.lastUIHoverTime = 0;
@@ -304,19 +315,27 @@ class AudioSystem extends BaseSystem {
       this.masterGain = this.context.createGain();
       this.masterGain.connect(this.context.destination);
 
+      // Soft limiter on the summed buses: music + effects → limiter → master.
+      this.masterLimiter = this.context.createDynamicsCompressor();
+      this.masterLimiter.threshold.value = AUDIO_MASTER_LIMITER.thresholdDb;
+      this.masterLimiter.knee.value = AUDIO_MASTER_LIMITER.kneeDb;
+      this.masterLimiter.ratio.value = AUDIO_MASTER_LIMITER.ratio;
+      this.masterLimiter.attack.value = AUDIO_MASTER_LIMITER.attackSeconds;
+      this.masterLimiter.release.value = AUDIO_MASTER_LIMITER.releaseSeconds;
+      this.masterLimiter.connect(this.masterGain);
+
       this.musicGain = this.context.createGain();
       this.effectsGain = this.context.createGain();
 
-      this.musicGain.connect(this.masterGain);
-      this.effectsGain.connect(this.masterGain);
+      this.musicGain.connect(this.masterLimiter);
+      this.effectsGain.connect(this.masterLimiter);
 
       this.applyVolumeToNodes();
       // AUDIO-01: the adaptive 4-layer music now lives in MusicMixer. It builds
       // its graph here (after the context + buses exist) and connects its
       // pauseFadeGain straight to musicGain (the slider stage). 02.06 re-splices
-      // the duck node between pauseFadeGain and musicGain. The legacy
-      // initializeMusicController() wave-number heuristic is bypassed — ONLY the
-      // boss arc drives music (D-04).
+      // the duck node between pauseFadeGain and musicGain. The run (wave,
+      // density, HP) drives its intensity; the boss arc overrides upwards.
       this.musicMixer.init(this.context, this.musicGain);
 
       // AUDIO-03 (D-11): splice the DEDICATED duck nodes. The controller creates
@@ -392,6 +411,7 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('weapon-fired', (data) => {
+      this._trackListenerPosition(data?.position);
       this.playLaserShot(data || {});
     });
 
@@ -410,18 +430,31 @@ class AudioSystem extends BaseSystem {
         this.playGoldJackpot();
       }
 
-      this.playAsteroidBreak(data.size);
-      if (data.size === 'large') {
-        this.playBigExplosion();
+      if (data.size) {
+        this.playAsteroidBreak(data.size);
       }
+      const size = resolveExplosionSize(data);
+      if (size) {
+        this.playExplosion(size, { pan: this._resolveSourcePan(data) });
+        if (size === 'large') {
+          this._duckBigMoment();
+        }
+      }
+
+      const fragments = Array.isArray(data.fragments)
+        ? data.fragments.length
+        : 0;
+      this._setRunEnemyCount(this.runEnemyCount - 1 + fragments);
     });
 
-    this.registerEventListener('asteroid-volatile-exploded', () => {
-      this.playBigExplosion();
+    this.registerEventListener('asteroid-volatile-exploded', (data = {}) => {
+      this.playExplosion('large', { pan: this._resolveSourcePan(data) });
+      this._duckBigMoment();
     });
 
     this.registerEventListener('player-leveled-up', () => {
       this.playLevelUp();
+      this._duckBigMoment();
     });
 
     this.registerEventListener('xp-collected', () => {
@@ -439,6 +472,38 @@ class AudioSystem extends BaseSystem {
       if (data?.enemy?.variant === 'gold') {
         this.playGoldSpawn();
       }
+      this._setRunEnemyCount(this.runEnemyCount + 1);
+    });
+
+    // Cues later enemy slices emit (harmless until they do).
+    this.registerEventListener('enemy-telegraph', (data = {}) => {
+      this.playEnemyTelegraph({ pan: this._resolveSourcePan(data) });
+    });
+
+    this.registerEventListener('elite-spawned', () => {
+      this.playEliteSpawned();
+    });
+
+    this.registerEventListener('surge-started', () => {
+      this.playSurgeSting();
+    });
+
+    // The Ram shares the Warden's telegraph event; only non-bosses get the
+    // enemy cue (the boss keeps its EffectsSystem/roar handling).
+    this.registerEventListener('boss-telegraph', (data = {}) => {
+      if (data?.enemy?.type && data.enemy.type !== 'boss') {
+        this.playEnemyTelegraph({ pan: this._resolveSourcePan(data) });
+      }
+    });
+
+    this.registerEventListener('pickup-collected', (data = {}) => {
+      this.playPickupCollected(data?.kind);
+    });
+
+    this.registerEventListener('pickup-spawned', (data = {}) => {
+      this.playPickupSpawned({
+        pan: resolveStereoPan(data?.x, this.listenerX),
+      });
     });
 
     // Enemy modules fire projectiles/explosions exclusively through events so
@@ -451,27 +516,26 @@ class AudioSystem extends BaseSystem {
       ).toLowerCase();
 
       if (enemyType === 'drone') {
-        this.playDroneFire(data);
+        this.playDroneFire({ ...data, pan: this._resolveSourcePan(data) });
         return;
       }
 
       if (enemyType === 'hunter') {
-        this.playHunterBurst(data);
+        this.playHunterBurst({ ...data, pan: this._resolveSourcePan(data) });
         return;
       }
     });
 
-    // wave-started no longer drives music (D-04: ONLY the boss arc does). The
-    // pre-boss tension now comes from the `boss-warning` event (02.03) above.
-    // The listener stays registered (audio may use wave context later) but the
-    // legacy wave-number intensity heuristic is intentionally bypassed.
-    this.registerEventListener('wave-started', () => {});
-
-    this.registerEventListener('mine-exploded', (data = {}) => {
-      this.playMineExplosion(data);
+    // Wave start feeds the run-following music (progress + wave enemy total).
+    this.registerEventListener('wave-started', (data = {}) => {
+      this.updateWaveMusicIntensity(data);
     });
 
-    // Boss arc → MusicMixer (D-04): the ONLY driver of music intensity. The
+    this.registerEventListener('mine-exploded', (data = {}) => {
+      this.playMineExplosion({ ...data, pan: this._resolveSourcePan(data) });
+    });
+
+    // Boss arc → MusicMixer (D-04): overrides the run intensity upwards. The
     // roar/phase/defeat SFX stay on the facade (BossAudio lands in a later plan).
     this.registerEventListener('boss-warning', (data = {}) => {
       this.musicMixer.setIntensityFromBossEvent('boss-warning', data);
@@ -585,6 +649,7 @@ class AudioSystem extends BaseSystem {
     // events while already below 25% must NOT machine-gun retrigger the duck.
     this.registerEventListener('player-health-changed', (data) => {
       const healthPercent = data?.health / data?.maxHealth;
+      this.musicMixer.setRunState({ healthRatio: healthPercent });
       const belowThreshold = healthPercent <= 0.25 && healthPercent > 0;
 
       if (belowThreshold) {
@@ -607,113 +672,40 @@ class AudioSystem extends BaseSystem {
 
     // Thruster sounds (continuous loops)
     this.registerEventListener('thruster-effect', (data) => {
+      this._trackListenerPosition(data?.position);
       this.handleThrusterEffect(data || {});
     });
   }
 
   updateWaveMusicIntensity(waveEvent = {}) {
-    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
-    if (!intensities.length) {
+    const wave = Number(waveEvent?.wave);
+    if (!Number.isFinite(wave) || wave <= 0) {
       return;
     }
-
-    const waveNumber = Number(waveEvent?.wave);
-    if (!Number.isFinite(waveNumber) || waveNumber <= 0) {
-      return;
-    }
-
-    const isBossWave = this._isBossWaveEvent(waveEvent, waveNumber);
-    const targetLevel = this._calculateWaveIntensityLevel(waveNumber);
-
-    if (isBossWave) {
-      this.musicController.pendingNonBossIntensity = null;
-      return;
-    }
-
-    this.musicController.lastNonBossIntensity = targetLevel;
-
-    if (this.musicController.bossActive) {
-      this.musicController.pendingNonBossIntensity = targetLevel;
-      return;
-    }
-
-    if (
-      targetLevel === this.musicController.targetLevel &&
-      targetLevel === this.musicController.intensityLevel
-    ) {
-      this.musicController.pendingNonBossIntensity = null;
-      return;
-    }
-
-    this.musicController.pendingNonBossIntensity = null;
-
-    const gentleRamp =
-      this.musicController?.rampDurations?.rise ??
-      this.musicController?.rampDurations?.fall ??
-      1.2;
-
-    this.setMusicIntensity(targetLevel, {
-      rampDuration: gentleRamp,
-    });
+    const total = Number(waveEvent?.totalEnemies);
+    this.runEnemyCount = Number.isFinite(total) ? Math.max(0, total) : 0;
+    this.musicMixer.setRunState({ wave, enemyCount: this.runEnemyCount });
   }
 
-  _isBossWaveEvent(waveEvent = {}, waveNumber = null) {
-    if (typeof waveEvent?.isBossWave === 'boolean') {
-      return waveEvent.isBossWave;
-    }
-
-    const configFlag = waveEvent?.config?.isBossWave;
-    if (typeof configFlag === 'boolean') {
-      return configFlag;
-    }
-
-    const resolvedWaveNumber = Number.isFinite(waveNumber)
-      ? waveNumber
-      : Number(waveEvent?.wave);
-    if (!Number.isFinite(resolvedWaveNumber) || resolvedWaveNumber <= 0) {
-      return false;
-    }
-
-    const rawInterval = Number(WAVE_BOSS_INTERVAL);
-    if (!Number.isFinite(rawInterval) || rawInterval <= 0) {
-      return false;
-    }
-
-    const normalizedInterval = Math.max(1, Math.floor(rawInterval));
-    if (normalizedInterval <= 0) {
-      return false;
-    }
-
-    return resolvedWaveNumber % normalizedInterval === 0;
+  _setRunEnemyCount(count) {
+    this.runEnemyCount = Math.max(0, count);
+    this.musicMixer.setRunState({ enemyCount: this.runEnemyCount });
   }
 
-  _calculateWaveIntensityLevel(waveNumber) {
-    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
-    const stepCount = intensities.length - 1;
-
-    if (stepCount <= 0) {
-      return 0;
+  _trackListenerPosition(position) {
+    if (Number.isFinite(position?.x)) {
+      this.listenerX = position.x;
     }
+  }
 
-    const normalizedWave = Math.max(1, Math.floor(Number(waveNumber) || 0));
+  _resolveSourcePan(data = {}) {
+    const position = data?.position || data?.enemy || null;
+    return resolveStereoPan(position?.x, this.listenerX);
+  }
 
-    const configuredStep = Number(MUSIC_LAYER_CONFIG?.wavesPerIntensityStep);
-    const progressionWindow = Number(
-      MUSIC_LAYER_CONFIG?.intensityProgressionWindow
-    );
-
-    let wavesPerStep = Number.isFinite(configuredStep) ? configuredStep : null;
-
-    if (!wavesPerStep || wavesPerStep <= 0) {
-      const fallbackWindow =
-        Number.isFinite(progressionWindow) && progressionWindow > 0
-          ? progressionWindow
-          : stepCount * 3;
-      wavesPerStep = Math.max(1, Math.round(fallbackWindow / stepCount));
-    }
-
-    const level = Math.floor((normalizedWave - 1) / wavesPerStep);
-    return Math.min(stepCount, Math.max(0, level));
+  /** Short music duck on big moments (level-up, large explosions). */
+  _duckBigMoment() {
+    this.duckingController?.duck({ bus: 'music', ...AUDIO_BIG_MOMENT_DUCK });
   }
 
   _randomBetween(min, max) {
@@ -729,8 +721,7 @@ class AudioSystem extends BaseSystem {
       }
     }
 
-    const [low, high] = max >= min ? [min, max] : [max, min];
-    return low + (high - low) * Math.random();
+    return requireRandom(null, 'audio.music').range(min, max);
   }
 
   bootstrapSettings() {
@@ -1287,7 +1278,7 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  _onBossDefeated(payload = {}) {
+  _onBossDefeated() {
     this.musicController.bossActive = false;
     this.bossAudioState.lastPhase = null;
 
@@ -1447,8 +1438,28 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playAsteroidBreak(size);
   }
 
-  playBigExplosion() {
-    this.sfxBus.playBigExplosion();
+  playExplosion(size, options = {}) {
+    this.sfxBus.playExplosion(size, options);
+  }
+
+  playEnemyTelegraph(options = {}) {
+    this.sfxBus.playEnemyTelegraph(options);
+  }
+
+  playEliteSpawned() {
+    this.sfxBus.playEliteSpawned();
+  }
+
+  playSurgeSting() {
+    this.sfxBus.playSurgeSting();
+  }
+
+  playPickupCollected(kind) {
+    this.sfxBus.playPickupCollected(kind);
+  }
+
+  playPickupSpawned(options = {}) {
+    this.sfxBus.playPickupSpawned(options);
   }
 
   playXPCollect() {
@@ -1503,7 +1514,7 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playGoldJackpot();
   }
 
-  playBossRoar(payload = {}) {
+  playBossRoar() {
     this._trackPerformance('playBossRoar');
 
     this.safePlay(() => {
@@ -1545,6 +1556,7 @@ class AudioSystem extends BaseSystem {
       baseOsc.connect(filter);
       filter.connect(baseGain);
       this.connectGainNode(baseGain);
+      this.sfxBus._sendToReverb(baseGain, AUDIO_REVERB_SEND_DB.boss);
 
       baseOsc.start(now);
       baseOsc.stop(now + duration);
@@ -1577,6 +1589,7 @@ class AudioSystem extends BaseSystem {
 
           osc.connect(gain);
           this.connectGainNode(gain);
+          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
 
           osc.start(startTime);
           osc.stop(now + duration);
@@ -1604,6 +1617,7 @@ class AudioSystem extends BaseSystem {
 
         tailOsc.connect(tailGain);
         this.connectGainNode(tailGain);
+        this.sfxBus._sendToReverb(tailGain, AUDIO_REVERB_SEND_DB.boss);
 
         tailOsc.start(tailStart);
         tailOsc.stop(tailStart + tailDuration);
@@ -1638,6 +1652,7 @@ class AudioSystem extends BaseSystem {
 
       sweepOsc.connect(sweepGain);
       this.connectGainNode(sweepGain);
+      this.sfxBus._sendToReverb(sweepGain, AUDIO_REVERB_SEND_DB.boss);
 
       sweepOsc.start(now);
       sweepOsc.stop(now + duration + 0.25);
@@ -1671,6 +1686,7 @@ class AudioSystem extends BaseSystem {
 
           osc.connect(gain);
           this.connectGainNode(gain);
+          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
 
           osc.start(startTime);
           osc.stop(startTime + shimmerDuration);
@@ -1698,6 +1714,7 @@ class AudioSystem extends BaseSystem {
 
         swellOsc.connect(swellGain);
         this.connectGainNode(swellGain);
+        this.sfxBus._sendToReverb(swellGain, AUDIO_REVERB_SEND_DB.boss);
 
         swellOsc.start(now);
         swellOsc.stop(now + swellDuration);
@@ -1705,7 +1722,7 @@ class AudioSystem extends BaseSystem {
     });
   }
 
-  playBossDefeated(payload = {}) {
+  playBossDefeated() {
     this._trackPerformance('playBossDefeated');
 
     this.safePlay(() => {
@@ -1742,6 +1759,7 @@ class AudioSystem extends BaseSystem {
 
           osc.connect(gain);
           this.connectGainNode(gain);
+          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
 
           osc.start(startTime);
           osc.stop(startTime + Math.max(0.4, noteDuration));
@@ -1763,6 +1781,7 @@ class AudioSystem extends BaseSystem {
           );
 
           this.connectGainNode(harmonyGain);
+          this.sfxBus._sendToReverb(harmonyGain, AUDIO_REVERB_SEND_DB.boss);
 
           fanfare.harmony.frequencies.forEach((frequency) => {
             const osc = this.context.createOscillator();
@@ -1800,6 +1819,7 @@ class AudioSystem extends BaseSystem {
 
         choirOsc.connect(choirGain);
         this.connectGainNode(choirGain);
+        this.sfxBus._sendToReverb(choirGain, AUDIO_REVERB_SEND_DB.boss);
 
         choirOsc.start(choirStart);
         choirOsc.stop(choirStart + choirDuration);
@@ -1827,6 +1847,7 @@ class AudioSystem extends BaseSystem {
 
           osc.connect(gain);
           this.connectGainNode(gain);
+          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
 
           osc.start(startTime);
           osc.stop(startTime + sparkleDuration);
@@ -2238,7 +2259,6 @@ class AudioSystem extends BaseSystem {
     }
 
     const currentIntensity = intensity;
-    const lastIntensity = this.thrusterState.lastIntensity[thrusterKey] || 0;
     const isActive = this.sfxBus.isThrusterActive(thrusterKey);
     const now = performance.now();
 
@@ -2387,11 +2407,13 @@ class AudioSystem extends BaseSystem {
 
     this.setMusicIntensity(initialIntensityLevel, { immediate: true });
 
-    // AUDIO-01: the adaptive music now lives in MusicMixer — reset it back to
-    // base intensity (D-04 maps boss-defeated → base) on a fresh run/replay.
+    // AUDIO-01: the adaptive music now lives in MusicMixer — back to a fresh
+    // run (no wave, no density, no boss floor) on a new run/replay.
     if (this.musicMixer) {
-      this.musicMixer.setIntensityFromBossEvent('boss-defeated');
+      this.musicMixer.resetRun();
     }
+    this.runEnemyCount = 0;
+    this.listenerX = GAME_WIDTH / 2;
 
     // Re-arm the low-HP edges so the first dip below 25% in the new run ducks.
     this.lowHealthWarning = false;
@@ -2449,7 +2471,7 @@ class AudioSystem extends BaseSystem {
   /**
    * Tracked de chamadas de áudio para performance
    */
-  _trackPerformance(methodName) {
+  _trackPerformance() {
     if (!this.performanceMonitor.enabled) return;
 
     this.performanceMonitor.audioCallsPerFrame++;

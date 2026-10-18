@@ -1,7 +1,6 @@
 import {
   ASTEROID_EDGE_SPAWN_MARGIN,
   MAX_ASTEROIDS_ON_SCREEN,
-  USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
@@ -14,6 +13,7 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { BossEnemy } from '../types/BossEnemy.js';
+import { IS_DEV } from '../../../core/env.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 const FACTORY_REGISTERED_FLAG = Symbol.for(
@@ -225,10 +225,7 @@ export class EnemySpawnSystem {
 
     const shouldApplyLegacyWaveAccounting =
       config?.skipWaveAccounting !== true &&
-      (!facade.useManagers ||
-        !facade._waveManagerRuntimeEnabled ||
-        !Boolean(USE_WAVE_MANAGER) ||
-        WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
+      (!facade.useManagers || WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
 
     if (
       facade.waveState &&
@@ -371,10 +368,7 @@ export class EnemySpawnSystem {
     }
 
     const shouldApplyLegacyWaveAccounting =
-      !facade.useManagers ||
-      !facade._waveManagerRuntimeEnabled ||
-      !Boolean(USE_WAVE_MANAGER) ||
-      WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
+      !facade.useManagers || WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
 
     if (
       facade.waveState &&
@@ -529,9 +523,7 @@ export class EnemySpawnSystem {
     const shouldBridgeToWaveManager =
       facade.useManagers &&
       facade.waveManager &&
-      facade._waveManagerRuntimeEnabled &&
-      Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       typeof facade.waveManager.registerActiveEnemy === 'function';
 
     let waveManagerRegistered = true;
@@ -568,15 +560,10 @@ export class EnemySpawnSystem {
 
     const waveManagerEnabled =
       facade.useManagers &&
-      facade._waveManagerRuntimeEnabled &&
-      Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       facade.waveManager;
 
-    const isDevelopment =
-      typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-
-    if (!waveManagerEnabled || !isDevelopment) {
+    if (!waveManagerEnabled || !IS_DEV) {
       return;
     }
 

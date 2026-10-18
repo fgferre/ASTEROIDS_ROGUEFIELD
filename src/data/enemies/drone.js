@@ -80,7 +80,6 @@ export const DRONE_COMPONENTS = deepFreeze({
   render: {
     strategy: 'procedural',
     shape: 'triangle',
-    showThrust: true,
   },
   collision: {
     shape: 'circle',

@@ -79,8 +79,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveUp',
         type: 'binding',
-        label: 'Move Up',
-        description: 'Accelerate ship forward.',
+        label: 'Thrust Forward',
+        description: 'Thrust along the nose.',
         default: {
           keyboard: ['KeyW', 'ArrowUp'],
           gamepad: ['axis:1:-', 'button:12'],
@@ -93,8 +93,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveDown',
         type: 'binding',
-        label: 'Move Down',
-        description: 'Engage rear thrusters to decelerate.',
+        label: 'Thrust Back',
+        description: 'Reverse thrust along the nose.',
         default: {
           keyboard: ['KeyS', 'ArrowDown'],
           gamepad: ['axis:1:+', 'button:13'],
@@ -108,7 +108,7 @@ const SETTINGS_SCHEMA = [
         key: 'moveLeft',
         type: 'binding',
         label: 'Strafe Left',
-        description: 'Lateral control for aiming adjustment.',
+        description: 'Slide to port; the nose stays on the target.',
         default: {
           keyboard: ['KeyA', 'ArrowLeft'],
           gamepad: ['axis:0:-', 'button:14'],
@@ -122,7 +122,7 @@ const SETTINGS_SCHEMA = [
         key: 'moveRight',
         type: 'binding',
         label: 'Strafe Right',
-        description: 'Lateral thrust towards target.',
+        description: 'Slide to starboard; the nose stays on the target.',
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
           gamepad: ['axis:0:+', 'button:15'],
@@ -138,8 +138,22 @@ const SETTINGS_SCHEMA = [
         label: 'Activate Shield',
         description: 'Deploys energy protection when available.',
         default: {
-          keyboard: ['KeyE', 'ShiftLeft'],
+          keyboard: ['KeyE'],
           gamepad: ['button:2', 'button:4'],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'dash',
+        type: 'binding',
+        label: 'Dash',
+        description: 'Short burst forward (or backward while braking).',
+        default: {
+          keyboard: ['ShiftLeft', 'ShiftRight'],
+          gamepad: ['button:5'],
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -192,7 +206,8 @@ const SETTINGS_SCHEMA = [
         key: 'toggleSpreadMode',
         type: 'binding',
         label: 'Toggle Spread Mode',
-        description: 'Switch between concentrated and fan burst shape (FIX-05).',
+        description:
+          'Switch between concentrated and fan burst shape (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD],
           gamepad: [],
@@ -206,7 +221,8 @@ const SETTINGS_SCHEMA = [
         key: 'toggleAimMode',
         type: 'binding',
         label: 'Toggle Aim Mode',
-        description: 'Switch between auto-aim and manual ship-nose aim (FIX-05).',
+        description:
+          'Switch between auto-aim and manual ship-nose aim (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM],
           gamepad: [],

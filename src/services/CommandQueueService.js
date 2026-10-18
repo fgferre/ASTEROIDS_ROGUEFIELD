@@ -39,7 +39,6 @@ export default class CommandQueueService {
       lastFrameTagged: this.frameCounter,
     };
     this.nextDefaultFrame = this.frameCounter;
-
   }
 
   defaultClock() {

@@ -24,6 +24,12 @@
 import RandomService from '../core/RandomService.js';
 import { debugLog } from '../core/debugLogging.js';
 
+// Juice proposal 17/10 (docs/NORTE.md §2: translation + 1° max rotation);
+// the owner judges by playing.
+export const SHAKE_MAX_OFFSET = 12; // px at full trauma (was 8)
+export const SHAKE_MAX_ANGLE = Math.PI / 180; // 1° at full trauma (was 0, off)
+export const SHAKE_TRAUMA_EXPONENT = 1.6; // more mid-range punch (was 2)
+
 export class ScreenShake {
   constructor(randomGenerator = null) {
     this._fallbackRandom = new RandomService('screen-shake:fallback');
@@ -34,8 +40,8 @@ export class ScreenShake {
     // Trauma system
     this.trauma = 0; // 0-1 range
     this.traumaDecay = 1.5; // How fast trauma decays per second
-    this.maxOffset = 8; // Maximum pixel offset
-    this.maxAngle = 0; // Maximum rotation in radians (DISABLED - user feedback: confusing)
+    this.maxOffset = SHAKE_MAX_OFFSET;
+    this.maxAngle = SHAKE_MAX_ANGLE;
 
     // Current shake offset
     this.offsetX = 0;
@@ -184,8 +190,7 @@ export class ScreenShake {
     // Update time for noise
     this.time += deltaTime;
 
-    // Calculate shake intensity (trauma^2 for smoother falloff)
-    const shake = this.trauma * this.trauma;
+    const shake = Math.pow(this.trauma, SHAKE_TRAUMA_EXPONENT);
 
     if (shake > 0.001) {
       // Use Perlin-like noise for smooth shake

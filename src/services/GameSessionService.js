@@ -5,7 +5,7 @@ import {
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../core/GameConstants.js';
 import {
-  USE_WAVE_MANAGER,
+  RUN_FINAL_LAYER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
@@ -24,6 +24,7 @@ const RANDOM_STORAGE_KEYS = {
 };
 
 const GAME_OVER_SCREEN_DELAY_MS = 3000;
+const VICTORY_SCREEN_DELAY_MS = 2500; // boss death effects play first
 
 export default class GameSessionService {
   /**
@@ -60,6 +61,9 @@ export default class GameSessionService {
     this.currentRandomScope = 'uninitialized';
     this.randomSnapshot = null;
     this.deathSnapshot = null;
+    // Recording of the current/last run (src/core/replay.js); set by the
+    // replay controller, read by the F9 download.
+    this.replayRecorder = null;
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
     this.gameOverScreenTimeoutId = null;
@@ -83,6 +87,7 @@ export default class GameSessionService {
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
+      bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
     };
 
     this.initializeSessionState();
@@ -329,36 +334,6 @@ export default class GameSessionService {
     return this.sessionState;
   }
 
-  synchronizeLegacyState() {
-    if (!this.gameState || typeof this.gameState !== 'object') {
-      return;
-    }
-
-    const screen = this.getScreen();
-    if (typeof screen === 'string') {
-      this.gameState.screen = screen;
-    }
-
-    this.gameState.isPaused = this.isPaused();
-    this.gameState.sessionState = this.sessionState;
-
-    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'seed')) {
-      this.gameState.randomSeed = this.seedInfo.seed;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'source')) {
-      this.gameState.randomSeedSource = this.seedInfo.source;
-    }
-
-    if (this.currentRandomSnapshot) {
-      this.gameState.randomSnapshot = this.currentRandomSnapshot;
-    }
-
-    if (typeof this.currentRandomScope === 'string') {
-      this.gameState.randomScope = this.currentRandomScope;
-    }
-  }
-
   emitSessionRetryCountdown(payload = {}) {
     if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
       return;
@@ -438,7 +413,8 @@ export default class GameSessionService {
 
     switch (id) {
       case 'start-game-btn':
-      case 'restart-game-btn': {
+      case 'restart-game-btn':
+      case 'victory-restart-btn': {
         preventDefault();
         this.emitCreditsMenuRequest({ open: false, source: id });
         this.startNewRun({ source: id });
@@ -451,7 +427,8 @@ export default class GameSessionService {
         }
         break;
       }
-      case 'quit-game-btn': {
+      case 'quit-game-btn':
+      case 'victory-quit-btn': {
         preventDefault();
         this.exitToMenu({ source: 'gameover' });
         break;
@@ -533,6 +510,7 @@ export default class GameSessionService {
       this.globalEventHandlers.activateShieldPressed
     );
     register('progression-reset', this.globalEventHandlers.progressionReset);
+    register('boss-defeated', this.globalEventHandlers.bossDefeated);
   }
 
   teardownGlobalEventListeners() {
@@ -588,6 +566,28 @@ export default class GameSessionService {
     this.handlePlayerDeath(data);
   }
 
+  handleBossDefeatedEvent(payload = {}) {
+    if (
+      payload?.wave !== RUN_FINAL_LAYER ||
+      this.getSessionState() === 'victory'
+    ) {
+      return;
+    }
+
+    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
+    this.setSessionState('victory', { reason: 'final-boss-defeated' });
+    this.eventBus.emit('run-won', { wave: payload.wave });
+
+    this.clearPendingGameOverTransition();
+    this.gameOverScreenTimeoutId = setTimeout(() => {
+      this.gameOverScreenTimeoutId = null;
+      const data =
+        this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
+      this.setScreen('victory');
+      this.emitScreenChanged('victory', { source: 'run-won', data });
+    }, VICTORY_SCREEN_DELAY_MS);
+  }
+
   handleTogglePauseEvent(payload = {}) {
     this.togglePause({ source: payload?.source || 'toggle-pause' });
   }
@@ -614,7 +614,7 @@ export default class GameSessionService {
     this.ensureWaveKickoff({ reason: 'progression-reset', payload });
   }
 
-  ensureWaveKickoff({ reason = 'unknown', payload = null } = {}) {
+  ensureWaveKickoff({ reason = 'unknown' } = {}) {
     if (this._suppressWaveKickoff) {
       return false;
     }
@@ -624,8 +624,7 @@ export default class GameSessionService {
       return false;
     }
 
-    const waveManagerActive =
-      enemies.useManagers && Boolean(USE_WAVE_MANAGER) && enemies.waveManager;
+    const waveManagerActive = enemies.useManagers && enemies.waveManager;
 
     if (!waveManagerActive) {
       return false;
@@ -759,6 +758,10 @@ export default class GameSessionService {
   }
 
   handlePlayerDeath(data = {}) {
+    if (this.getSessionState() === 'victory') {
+      return;
+    }
+
     if (this.isPaused()) {
       this.setPaused(false);
       this.emitPauseState({ source: 'player-died' });
@@ -970,6 +973,10 @@ export default class GameSessionService {
 
   togglePause({ source = 'toggle-pause' } = {}) {
     const currentScreen = this.getScreen();
+
+    if (this.getSessionState() === 'victory') {
+      return false;
+    }
 
     if (currentScreen !== 'playing') {
       const wasPaused = this.isPaused();
@@ -2012,8 +2019,8 @@ export default class GameSessionService {
           ? enemies.getAsteroids()
           : [];
 
-    const width = Number.isFinite(canvas.width) ? canvas.width : GAME_WIDTH;
-    const height = Number.isFinite(canvas.height) ? canvas.height : GAME_HEIGHT;
+    const width = GAME_WIDTH;
+    const height = GAME_HEIGHT;
 
     const safeDistance =
       PLAYER_SAFE_SPAWN_DISTANCE ?? DEFAULT_SAFE_SPAWN_DISTANCE ?? 300;
@@ -2165,8 +2172,8 @@ export default class GameSessionService {
       }
     }
 
-    source = 'math-random';
-    seed = Math.floor(Math.random() * 0xffffffff);
+    source = 'clock';
+    seed = Date.now() >>> 0;
     return { seed, source };
   }
 

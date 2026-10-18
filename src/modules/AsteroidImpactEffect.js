@@ -4,6 +4,7 @@
 
 import { DustParticleShader } from './DustParticleShader.js';
 import { debugLog } from '../core/debugLogging.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
 // Configuração de pools (pré-alocados)
 const POOL_CONFIG = {
@@ -29,7 +30,10 @@ export class AsteroidImpactEffect {
     };
 
     this.currentQualityLevel = config.initialQualityLevel || 2;
-    this.randomFloat = config.randomFloat || Math.random.bind(Math);
+    const fallbackRandom = config.randomFloat
+      ? null
+      : requireRandom(null, 'menu.impact-effect');
+    this.randomFloat = config.randomFloat || (() => fallbackRandom.float());
 
     // Estado de efeitos ativos (índices nos pools)
     this.activeFlashes = [];
@@ -333,8 +337,6 @@ export class AsteroidImpactEffect {
    * Ativa um campo de detritos do pool
    */
   activateDebrisField(position, impactVelocity, count) {
-    const { THREE } = this;
-
     // Encontrar campo disponível no pool
     const field = this.debrisPool.find((f) => !f.inUse);
     if (!field) return;
@@ -406,8 +408,6 @@ export class AsteroidImpactEffect {
    * Ativa uma nuvem de poeira do pool
    */
   activateDustCloud(position, count) {
-    const { THREE } = this;
-
     // Encontrar nuvem disponível no pool
     const cloud = this.dustPool.find((c) => !c.inUse);
     if (!cloud) return;

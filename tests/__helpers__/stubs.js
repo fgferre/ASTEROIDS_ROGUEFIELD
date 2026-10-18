@@ -382,6 +382,16 @@ export function createAudioContextStub(options = {}) {
       connect: vi.fn(),
       disconnect: vi.fn(),
     })),
+    // DynamicsCompressorNode stub — the master soft limiter sets its params.
+    createDynamicsCompressor: vi.fn(() => ({
+      threshold: { value: -24 },
+      knee: { value: 30 },
+      ratio: { value: 12 },
+      attack: { value: 0.003 },
+      release: { value: 0.25 },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    })),
     resume: vi.fn(async () => {
       context.state = 'running';
       return undefined;

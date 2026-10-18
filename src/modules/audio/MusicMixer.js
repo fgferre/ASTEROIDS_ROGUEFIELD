@@ -1,4 +1,8 @@
-import { MUSIC_LAYER_CONFIG } from '../../core/GameConstants.js';
+import {
+  MUSIC_LAYER_CONFIG,
+  MUSIC_RUN_INTENSITY,
+  RUN_FINAL_LAYER,
+} from '../../core/GameConstants.js';
 
 /**
  * MusicMixer — adaptive 4-layer synth music (AUDIO-01 / INFRA-02).
@@ -22,8 +26,9 @@ import { MUSIC_LAYER_CONFIG } from '../../core/GameConstants.js';
  *        mixer routes INTO this node but NEVER schedules on its gain param).
  *
  * MusicIntensityResolver lives INSIDE this class (PROJECT.md lock — not a 7th
- * manager): setIntensityFromBossEvent maps the boss arc to an intensity level
- * (D-04: ONLY the boss arc drives music; HP/combo/density do NOT).
+ * manager): the run (wave progress, enemy density, low HP) drives a smoothed
+ * 0..1 intensity whose thresholds pick the level (setRunState); the boss arc
+ * (setIntensityFromBossEvent) overrides upwards while it is active.
  */
 
 // Lowpass bypass cutoff — effectively "open" so the filter is permanently in
@@ -34,7 +39,7 @@ const LOWPASS_BYPASS_FREQUENCY = 20000;
 // tunable constant inside that window — the browser-check calibrates the feel.
 const SLOW_RISE_SECONDS = 11;
 
-// Boss-arc → intensity-level map (D-04). The ONLY events that drive music.
+// Boss-arc → intensity-level floor (D-04); the run intensity drives the rest.
 //   boss-warning      → tension  (pre-boss wave)
 //   boss-spawned      → danger   (the alert)
 //   boss-phase-changed→ climax   (the fight intensifies)
@@ -64,6 +69,64 @@ const PULSE_DURATION_SECONDS = 0.12; // short percussive blip per onset
 const PAUSE_LOWPASS_FREQUENCY = 700; // ~600-1000 Hz underwater cutoff
 const PAUSE_FADE_GAIN = 0.5; // ~50% on pause
 const PAUSE_RAMP_SECONDS = 0.25; // smooth (click-safe) pause transition
+
+const RUN_INTENSITY_EPSILON = 0.002; // smoothing stops once this close to target
+
+const clamp01 = (value) =>
+  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+
+/**
+ * Raw (unsmoothed) run intensity 0..1 from run progress, enemy density and HP.
+ *
+ * @param {{wave?: number, enemyCount?: number, healthRatio?: number}} [state]
+ * @param {number} [finalLayer=RUN_FINAL_LAYER]
+ * @returns {number}
+ */
+export function computeRunIntensity(state = {}, finalLayer = RUN_FINAL_LAYER) {
+  const config = MUSIC_RUN_INTENSITY;
+  const wave = Number(state.wave) || 0;
+  const progress = clamp01(wave / Math.max(1, finalLayer));
+  const density = clamp01(
+    (Number(state.enemyCount) || 0) / config.densityFullCount
+  );
+  const healthRatio = Number(state.healthRatio);
+  const lowHealth =
+    Number.isFinite(healthRatio) &&
+    healthRatio > 0 &&
+    healthRatio < config.lowHealthRatio;
+
+  return clamp01(
+    progress * config.waveWeight +
+      density * config.densityWeight +
+      (lowHealth ? config.lowHealthBonus : 0)
+  );
+}
+
+/** Level (index into MUSIC_LAYER_CONFIG.intensities) for an intensity 0..1. */
+export function intensityToLevel(intensity) {
+  return MUSIC_RUN_INTENSITY.levelThresholds.filter(
+    (threshold) => intensity >= threshold
+  ).length;
+}
+
+/** Final level: the run level, raised to the boss-arc level when one is set. */
+export function resolveMusicLevel(intensity, bossLevel = null) {
+  const runLevel = intensityToLevel(intensity);
+  return Number.isFinite(bossLevel) ? Math.max(runLevel, bossLevel) : runLevel;
+}
+
+/**
+ * One-pole step of `current` toward `target` over `dtSeconds`: attack time
+ * constant when rising, release when falling.
+ */
+export function smoothIntensity(current, target, dtSeconds) {
+  const tau =
+    target > current
+      ? MUSIC_RUN_INTENSITY.attackSeconds
+      : MUSIC_RUN_INTENSITY.releaseSeconds;
+  const alpha = 1 - Math.exp(-Math.max(0, dtSeconds) / tau);
+  return current + (target - current) * alpha;
+}
 
 class MusicMixer {
   /**
@@ -102,6 +165,12 @@ class MusicMixer {
     this._lookaheadHandle = null; // setInterval handle for the lookahead
     this._nextBarTime = 0; // next pulse onset (context.currentTime domain)
     this._isPaused = false;
+
+    // --- run-following intensity (raw inputs → smoothed 0..1) + boss override ---
+    this.runState = { wave: 0, enemyCount: 0, healthRatio: 1 };
+    this.runIntensity = 0;
+    this.bossLevel = null;
+    this._smoothHandle = null;
 
     this.initialized = false;
   }
@@ -258,9 +327,9 @@ class MusicMixer {
   }
 
   /**
-   * MusicIntensityResolver (D-04): map a boss-arc event to an intensity level
-   * and crossfade. Non-boss events are ignored — ONLY the boss arc drives music
-   * (HP, combo, enemy density explicitly do NOT).
+   * Boss arc override: map a boss-arc event to a level floor and crossfade.
+   * boss-defeated clears the floor (the run intensity takes over again).
+   * Non-boss events are ignored.
    *
    * @param {string} eventName
    */
@@ -268,8 +337,77 @@ class MusicMixer {
     if (!Object.prototype.hasOwnProperty.call(BOSS_ARC_INTENSITY, eventName)) {
       return; // non-boss event — leave targetLevel unchanged
     }
-    const level = BOSS_ARC_INTENSITY[eventName];
-    this._applyIntensity(level);
+    this.bossLevel =
+      eventName === 'boss-defeated' ? null : BOSS_ARC_INTENSITY[eventName];
+    this._applyIntensity(resolveMusicLevel(this.runIntensity, this.bossLevel));
+  }
+
+  /**
+   * Update the run inputs (any subset of wave / enemyCount / healthRatio). The
+   * smoothed intensity follows on a low-rate tick that stops once converged.
+   *
+   * @param {{wave?: number, enemyCount?: number, healthRatio?: number}} partial
+   */
+  setRunState(partial = {}) {
+    Object.entries(partial).forEach(([key, value]) => {
+      if (key in this.runState && Number.isFinite(value)) {
+        this.runState[key] = value;
+      }
+    });
+    this._startSmoothing();
+  }
+
+  /** Back to a fresh run: inputs, smoothed intensity and boss floor cleared. */
+  resetRun() {
+    this._stopSmoothing();
+    this.runState = { wave: 0, enemyCount: 0, healthRatio: 1 };
+    this.runIntensity = 0;
+    this.bossLevel = null;
+    this._applyIntensity(0, {
+      rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,
+    });
+  }
+
+  /** @private */
+  _startSmoothing() {
+    if (this._smoothHandle) return;
+    this._smoothHandle = setInterval(
+      () => this._smoothTick(),
+      MUSIC_RUN_INTENSITY.tickMs
+    );
+  }
+
+  /** @private */
+  _stopSmoothing() {
+    if (this._smoothHandle) {
+      clearInterval(this._smoothHandle);
+      this._smoothHandle = null;
+    }
+  }
+
+  /**
+   * One smoothing step (nominal tick dt, frozen while paused). Crossfades only
+   * when the resolved level changes.
+   * @private
+   */
+  _smoothTick() {
+    if (this._isPaused) return;
+    const target = computeRunIntensity(this.runState);
+    this.runIntensity = smoothIntensity(
+      this.runIntensity,
+      target,
+      MUSIC_RUN_INTENSITY.tickMs / 1000
+    );
+    if (Math.abs(target - this.runIntensity) < RUN_INTENSITY_EPSILON) {
+      this.runIntensity = target;
+      this._stopSmoothing();
+    }
+    const level = resolveMusicLevel(this.runIntensity, this.bossLevel);
+    if (level !== this.targetLevel) {
+      this._applyIntensity(level, {
+        rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,
+      });
+    }
   }
 
   /**
@@ -296,8 +434,9 @@ class MusicMixer {
       return;
     }
 
-    const { immediate = false } = options;
-    const rampDuration = Math.max(0.05, this.rampDurations.rise);
+    const { immediate = false, rampSeconds = this.rampDurations.rise } =
+      options;
+    const rampDuration = Math.max(0.05, rampSeconds);
     const now = this.context.currentTime;
 
     Object.entries(this.layers).forEach(([key, layer]) => {
@@ -588,6 +727,7 @@ class MusicMixer {
    * pauseFade, and nulls refs. Idempotent (second call no-op via the guard).
    */
   dispose() {
+    this._stopSmoothing();
     if (!this.initialized) return;
 
     const now = this.context?.currentTime ?? 0;

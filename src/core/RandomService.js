@@ -164,7 +164,7 @@ export default class RandomService {
         weight,
       }));
     } else if (Array.isArray(weights)) {
-      entries = weights.map((item, index) => {
+      entries = weights.map((item) => {
         if (Array.isArray(item)) {
           const [value, weight] = item;
           return { value, weight };

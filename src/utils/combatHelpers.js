@@ -1,3 +1,4 @@
+import { requireRandom } from './randomHelpers.js';
 // Combat utility functions for predictive aiming and velocity resolution
 // Used by WeaponComponent weapon patterns (single, burst, volley)
 
@@ -115,7 +116,10 @@ const applySpread = (angle, spread, random) => {
   if (!spread) {
     return angle;
   }
-  const variance = (random?.float?.() ?? random?.() ?? Math.random()) - 0.5;
+  const variance =
+    (typeof random === 'function'
+      ? random()
+      : requireRandom(random, 'combat.spread').float()) - 0.5;
   return angle + variance * spread;
 };
 

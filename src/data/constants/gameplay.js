@@ -112,6 +112,16 @@ export const SHIELD_IMPACT_DAMAGE_BASE = 15; // [NEO-ARCADE] Buffed impact (was 
 
 export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
+// === DASH === (PLAN.md step 6) PROPOSAL 17/10 ("proposta 17/10"), judged by playing.
+export const DASH_IMPULSE = 520; // px/s added along the dash direction at start
+export const DASH_DURATION = 0.14; // s with no damping and a raised speed cap
+export const DASH_SPEED_CAP_MULTIPLIER = 1.9; // × max speed while dashing
+export const DASH_INVULNERABILITY = 0.22; // s from dash start
+export const DASH_COOLDOWN = 1.6; // s
+export const DASH_GHOST_COUNT = 5; // afterimages dropped during the dash
+export const DASH_GHOST_LIFE = 0.25; // s each afterimage fades over
+export const DASH_SHAKE = Object.freeze({ intensity: 3, duration: 0.12 });
+
 // === COMBAT ===
 
 // Plan 01.07 FIX-05 — spread + aim mode defaults.
@@ -252,9 +262,12 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
 
 // === WAVE SYSTEM ===
 
-export const ASTEROIDS_PER_WAVE_BASE = 4;
+// Field density (docs/NORTE.md §2): PROPOSAL from 17/10, to be judged by the
+// owner playing. Was base 4, growth 1.3, cap 35: under the 1.3× camera the
+// first waves read as an empty field.
+export const ASTEROIDS_PER_WAVE_BASE = 6; // was 4
 
-export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
+export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.26; // was 1.3
 
 export const WAVE_DURATION = 60; // segundos
 
@@ -262,45 +275,11 @@ export const WAVE_BREAK_TIME = 5; // segundos
 
 export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legado
 
-export const WAVE_BOSS_INTERVAL = 5;
+export const RUN_FINAL_LAYER = 15; // PROPOSAL 17/10 (docs/NORTE.md section 4): defeating this layer's Warden Prime clears the Field
 
-export const MAX_ASTEROIDS_ON_SCREEN = 35; // [NEO-ARCADE] Increased density (was 20)
+export const MAX_ASTEROIDS_ON_SCREEN = 40; // PROPOSAL 17/10 (was 35; 20 before NEO-ARCADE)
 
-export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
-  drone: deepFreeze({
-    startWave: 8,
-
-    baseWeight: 1,
-
-    weightScaling: 0.08,
-  }),
-
-  mine: deepFreeze({
-    startWave: 10,
-
-    baseWeight: 1,
-
-    weightScaling: 0.07,
-  }),
-
-  hunter: deepFreeze({
-    startWave: 13,
-
-    baseWeight: 1,
-
-    weightScaling: 0.1,
-  }),
-});
-
-export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/validation/asteroid-baseline-metrics.md para critérios de compatibilidade.
-
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
-
-export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
-
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
-
-export const WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED = false; // WAVE-004: Emite evento legado 'wave-completed' somente quando compatibilidade for necessária
+export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager
 
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
 
@@ -308,4 +287,3 @@ export const ASTEROID_SAFE_SPAWN_DISTANCE = 200; // Distância mínima do jogado
 
 export const ASTEROID_ENTRY_ANGLE_VARIANCE = Math.PI / 4; // Ajuste direcional para entrada (45°)
 export const ASTEROID_OFFSCREEN_RECOVERY_TIME = 4.0; // Tempo fora da tela antes de reorientar o asteroide
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização

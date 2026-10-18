@@ -1,15 +1,5 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
-import {
-  setupGlobalMocks,
-  cleanupGlobalState,
-} from '../__helpers__/setup.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import { activateProfileHarness } from '../../src/bootstrap/profileHarness.js';
 
 // INFRA-01 (Phase 1, Plan 01.02) — URL-flag activation contract for the

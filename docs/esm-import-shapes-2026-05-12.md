@@ -38,12 +38,12 @@ of the default-export form).
 
 ## Recommended import form per module
 
-| Module | Default export? | Named exports | Recommended form for test files |
-|---|---|---|---|
-| PlayerSystem      | Y | (none) | `import PlayerSystem from '../../src/modules/PlayerSystem.js';` |
-| CombatSystem      | Y | (none) | `import CombatSystem from '../../src/modules/CombatSystem.js';` |
-| ProgressionSystem | Y | (none) | `import ProgressionSystem from '../../src/modules/ProgressionSystem.js';` |
-| BossEnemy         | Y | (none) | `import BossEnemy from '../../src/modules/enemies/types/BossEnemy.js';` |
+| Module            | Default export? | Named exports | Recommended form for test files                                           |
+| ----------------- | --------------- | ------------- | ------------------------------------------------------------------------- |
+| PlayerSystem      | Y               | (none)        | `import PlayerSystem from '../../src/modules/PlayerSystem.js';`           |
+| CombatSystem      | Y               | (none)        | `import CombatSystem from '../../src/modules/CombatSystem.js';`           |
+| ProgressionSystem | Y               | (none)        | `import ProgressionSystem from '../../src/modules/ProgressionSystem.js';` |
+| BossEnemy         | Y               | (none)        | `import BossEnemy from '../../src/modules/enemies/types/BossEnemy.js';`   |
 
 Plans 02/03/04 use these forms verbatim.
 

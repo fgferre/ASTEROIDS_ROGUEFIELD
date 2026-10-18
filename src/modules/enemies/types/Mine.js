@@ -227,7 +227,7 @@ export class Mine extends BaseEnemy {
     });
   }
 
-  onDraw(ctx) {
+  onDraw() {
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Generate payload without components (for testing)
       const pulse = Math.sin(this.pulsePhase || 0);

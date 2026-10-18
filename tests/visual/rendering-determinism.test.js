@@ -3,6 +3,7 @@ import RandomService from '../../src/core/RandomService.js';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import RenderingSystem from '../../src/modules/RenderingSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 function captureStarfieldSnapshot(renderingSystem) {
   const layers = renderingSystem.spaceSky.layers.map((layer) => ({
@@ -64,6 +65,7 @@ describe('RenderingSystem RNG determinism', () => {
     const effects = new EffectsSystem({
       random: new RandomService('effects-hv11'),
       eventBus,
+      settings: createSettingsStub(),
     });
 
     rendering.resolveCachedServices = () => {};
@@ -121,8 +123,7 @@ describe('RenderingSystem RNG determinism', () => {
     );
     const bossOverlayFill = ctx.ops.find(
       (op) =>
-        op.type === 'fillRect' &&
-        op.fillStyle === 'rgba(255, 105, 140, 0.95)'
+        op.type === 'fillRect' && op.fillStyle === 'rgba(255, 105, 140, 0.95)'
     );
 
     expect(backgroundFill).toMatchObject({ tx: 0, ty: 0, angle: 0 });
@@ -260,6 +261,7 @@ function createTrackedContext() {
     rotate(angle) {
       state.angle += angle;
     },
+    scale() {},
     setTransform(a, b, c, d, e, f) {
       state.tx = e;
       state.ty = f;

@@ -32,12 +32,10 @@ export const ASTEROID_BASE_HEALTH = {
 
 export const ASTEROID_HEALTH_SCALING = {
   perWave: 0.12,
-  maxMultiplier: 2.2, // Only applies up to wave 10
-  // Infinite scaling formula for wave 11+:
-  // multiplier = 2.2 + (wave - 10) * 0.08 (logarithmic slow growth)
-  // Wave 15: 2.2 + 5*0.08 = 2.6x
-  // Wave 20: 2.2 + 10*0.08 = 3.0x
-  // Wave 30: 2.2 + 20*0.08 = 3.8x
+  maxMultiplier: 2.2, // Waves 1-10: 1 + perWave * (wave - 1), clamped here (wave 10 = 2.08x); also the base at wave 11
+  // Waves 11+ (infiniteScaling): multiplier = 2.2 + (wave - 11) * 0.08, linear until softCapWave
+  // Wave 11: 2.2x, wave 15: 2.52x, wave 20: 2.92x, wave 30: 3.72x
+  // From softCapWave on, growth is log2 (diminishing); hard cap at infiniteScaling.maxMultiplier
   infiniteScaling: {
     enabled: true,
     startWave: 11,
@@ -55,9 +53,32 @@ export const PHYSICS_CELL_SIZE = 96;
 // === PROGRESSÃO ===
 export const PROGRESSION_INITIAL_LEVEL = 1;
 export const PROGRESSION_INITIAL_XP_REQUIREMENT = 150;
-export const PROGRESSION_LEVEL_SCALING = 1.40;
+export const PROGRESSION_LEVEL_SCALING = 1.4;
+// Simulation seconds between the level-up event and the pick screen opening,
+// so the slow-mo + zoom pulse play first (proposta 17/10).
+export const LEVEL_UP_SCREEN_DELAY_SECONDS = 0.12; // proposta 17/10: tempo de simulação; durante o slow-mo de 0.35x vale ~0.34 s reais, a tela abre a um terço do pulso
 export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
 export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
+// Level-up card rarity (proposta 18/10): chance of each tier at pilot level 1,
+// what each level above 1 adds to rare/epic, and their caps; common takes the
+// rest. Within a tier every eligible card is equally likely.
+export const UPGRADE_RARITIES = Object.freeze(['common', 'rare', 'epic']);
+export const UPGRADE_RARITY_BASE_WEIGHTS = Object.freeze({
+  common: 0.7,
+  rare: 0.25,
+  epic: 0.05,
+});
+export const UPGRADE_RARITY_WEIGHT_PER_LEVEL = Object.freeze({
+  rare: 0.01,
+  epic: 0.01,
+});
+export const UPGRADE_RARITY_WEIGHT_CAPS = Object.freeze({
+  rare: 0.35,
+  epic: 0.2,
+});
+// Per-run level-up rerolls and banishes (proposta 18/10).
+export const PROGRESSION_UPGRADE_REROLLS_PER_RUN = 1;
+export const PROGRESSION_UPGRADE_BANISHES_PER_RUN = 1;
 export const PROGRESSION_COMBO_TIMEOUT = 3.0;
 export const PROGRESSION_COMBO_MULTIPLIER_STEP = 0.1;
 export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;
@@ -74,7 +95,7 @@ export const UPGRADE_BOSS_HEALTH_SCALAR = 0.18;
 // reflected as a lethality risk. HP scaling alone meets the "boss not melted
 // by 15-upgrade builds" goal; damage scaling can be re-introduced in a later
 // phase if 15-upgrade builds trivialize the boss after HP scaling is in place.
-export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.00;
+export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.0;
 
 // Re-export all constants from focused files for backward compatibility
 export * from '../data/constants/physics.js';
@@ -230,4 +251,127 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     bossRise: 0.6,
     bossFall: 2.8,
   }),
+});
+
+// === MASTER CHAIN ("studio" bus) ===
+// Soft limiter on the summed music + effects buses, right before masterGain.
+export const AUDIO_MASTER_LIMITER = Object.freeze({
+  thresholdDb: -6,
+  kneeDb: 12,
+  ratio: 8,
+  attackSeconds: 0.003,
+  releaseSeconds: 0.15,
+});
+
+// Shared reverb send: procedural stereo IR (exponentially decaying noise,
+// darkened over time by a one-pole lowpass), generated once at init.
+export const AUDIO_REVERB = Object.freeze({
+  durationSeconds: 1.6,
+  preDelaySeconds: 0.012,
+  decayDb: 60, // level drop across durationSeconds (RT60-style)
+  dampingCoefficient: 0.35, // one-pole lowpass on the IR noise (0 = bright)
+  returnGain: 1,
+  seed: 'audio:reverb-ir',
+});
+
+// Send levels (dB) per cue family. UI, thrusters and the laser never send.
+export const AUDIO_REVERB_SEND_DB = Object.freeze({
+  explosionSmall: -14,
+  explosionMedium: -12,
+  explosionLarge: -10,
+  mine: -12,
+  shield: -13,
+  levelUp: -12,
+  boss: -10,
+  elite: -11,
+});
+
+// Enemy-side cues pan by source x relative to the player.
+export const AUDIO_STEREO_PAN_MAX = 0.6;
+
+// Explosions in three sizes: sub thump, mid crack, filtered noise/air tail.
+// Times in seconds. `minIntervalMs` throttles same-size pile-ups.
+export const EXPLOSION_PROFILES = Object.freeze({
+  small: Object.freeze({
+    sub: Object.freeze({ start: 160, end: 60, gain: 0.4, duration: 0.16 }),
+    mid: Object.freeze({ start: 520, end: 170, gain: 0.2, duration: 0.09 }),
+    noise: Object.freeze({
+      gain: 0.3,
+      duration: 0.22,
+      filterStart: 3400,
+      filterEnd: 800,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionSmall,
+    minIntervalMs: 40,
+  }),
+  medium: Object.freeze({
+    sub: Object.freeze({ start: 135, end: 42, gain: 0.7, duration: 0.36 }),
+    mid: Object.freeze({ start: 330, end: 85, gain: 0.32, duration: 0.2 }),
+    noise: Object.freeze({
+      gain: 0.45,
+      duration: 0.48,
+      filterStart: 2300,
+      filterEnd: 320,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionMedium,
+    minIntervalMs: 60,
+  }),
+  large: Object.freeze({
+    sub: Object.freeze({ start: 120, end: 30, gain: 1.0, duration: 0.6 }),
+    mid: Object.freeze({ start: 250, end: 60, gain: 0.4, duration: 0.3 }),
+    noise: Object.freeze({
+      gain: 0.6,
+      duration: 0.8,
+      filterStart: 1500,
+      filterEnd: 200,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionLarge,
+    minIntervalMs: 100,
+  }),
+});
+
+// enemy-destroyed → explosion size. Asteroids use their own `size`; mines have
+// their own cue (mine-exploded); unknown types fall back to the default; an
+// `elite` flag bumps one size up. Types not in this checkout yet are listed so
+// they work when they land.
+export const EXPLOSION_SIZE_BY_ENEMY_TYPE = Object.freeze({
+  mote: 'small',
+  drone: 'small',
+  seeker: 'medium',
+  hunter: 'medium',
+  husk: 'medium',
+  ram: 'medium',
+  weaver: 'medium',
+  bulwark: 'large',
+  warden: 'large',
+  boss: 'large',
+  mine: null,
+});
+export const EXPLOSION_DEFAULT_SIZE = 'medium';
+
+// Short music duck on big moments (level-up, large explosions).
+export const AUDIO_BIG_MOMENT_DUCK = Object.freeze({
+  depthDb: 6,
+  attackMs: 30,
+  holdMs: 70,
+  releaseMs: 150,
+});
+
+// Run-following music intensity (0..1). Weighted sum of run progress (wave /
+// RUN_FINAL_LAYER), enemy density and a low-HP bump, smoothed with separate
+// attack/release time constants; each level fades in when the smoothed value
+// crosses its threshold (levels index MUSIC_LAYER_CONFIG.intensities). Boss
+// arc levels still override upwards.
+export const MUSIC_RUN_INTENSITY = Object.freeze({
+  waveWeight: 0.5,
+  densityWeight: 0.35,
+  densityFullCount: 20, // enemies alive/pending in the wave for full weight
+  lowHealthRatio: 0.3,
+  lowHealthBonus: 0.2,
+  attackSeconds: 1.5,
+  releaseSeconds: 4,
+  // [level 1 (base+tension), level 2 (+danger), level 3 (+climax)]
+  levelThresholds: Object.freeze([0.1, 0.45, 0.8]),
+  layerFadeSeconds: 2.5,
+  tickMs: 200,
 });

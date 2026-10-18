@@ -34,7 +34,7 @@ class WorldSystem extends BaseSystem {
     });
   }
 
-  update(deltaTime) {
+  update() {
     // DON'T return early - let game keep running even when player is dead
     // This allows asteroids to keep wandering while player is in death state
 
@@ -121,6 +121,33 @@ class WorldSystem extends BaseSystem {
     }
   }
 
+  // Stats shared by the game over and victory screens.
+  buildRunSummary() {
+    this.resolveCachedServices(WORLD_SERVICE_MAP);
+    const progression = this.progression;
+    const enemies = this.enemies;
+
+    return {
+      player: { level: progression ? progression.getLevel() : 1 },
+      stats: enemies
+        ? enemies.getSessionStats()
+        : { totalKills: 0, timeElapsed: 0 },
+      wave: enemies ? enemies.getWaveState() : { completedWaves: 0 },
+      maxCombo: progression ? progression.getMaxCombo() : 0,
+      upgrades: progression
+        ? progression.getUpgradeProgressSnapshot().map(({ id, level }) => {
+            const definition = progression.upgradeLookup?.get(id) || {};
+            return {
+              id,
+              level,
+              name: definition.text?.name || definition.name || id,
+            };
+          })
+        : [],
+      synergies: progression?.getSynergySnapshot?.().synergies ?? [],
+    };
+  }
+
   handlePlayerDeath() {
     if (!this.playerAlive) return;
 
@@ -129,8 +156,6 @@ class WorldSystem extends BaseSystem {
     this.resolveCachedServices(WORLD_SERVICE_MAP);
 
     const player = this.player;
-    const progression = this.progression;
-    const enemies = this.enemies;
 
     // Get player position BEFORE marking as dead
     const playerPosition =
@@ -146,11 +171,7 @@ class WorldSystem extends BaseSystem {
     }
 
     const data = {
-      player: { level: progression ? progression.getLevel() : 1 },
-      stats: enemies
-        ? enemies.getSessionStats()
-        : { totalKills: 0, timeElapsed: 0 },
-      wave: enemies ? enemies.getWaveState() : { completedWaves: 0 },
+      ...this.buildRunSummary(),
       position: playerPosition, // CRITICAL: Add position for explosion!
     };
 

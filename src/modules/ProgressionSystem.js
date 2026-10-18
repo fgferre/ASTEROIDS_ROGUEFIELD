@@ -6,6 +6,7 @@ import {
   PROGRESSION_COMBO_MULTIPLIER_CAP,
   PROGRESSION_LEVEL_SCALING,
   PROGRESSION_UPGRADE_ROLL_COUNT,
+  LEVEL_UP_SCREEN_DELAY_SECONDS,
 } from '../core/GameConstants.js';
 import UpgradeSystem from './UpgradeSystem.js';
 import {
@@ -53,6 +54,8 @@ class ProgressionSystem extends UpgradeSystem {
       : 100;
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
+    this.pendingLevelUpScreens = [];
+    this.levelUpScreenTimer = 0;
 
     const comboTimeout = Number.isFinite(PROGRESSION_COMBO_TIMEOUT)
       ? Math.max(0, Number(PROGRESSION_COMBO_TIMEOUT))
@@ -68,11 +71,13 @@ class ProgressionSystem extends UpgradeSystem {
     this.defaultComboMultiplierStep = comboStep;
     this.defaultComboMultiplierCap = comboCap;
     this.currentCombo = 0;
+    this.maxCombo = 0;
     this.comboTimer = 0;
     this.comboTimeout = comboTimeout;
     this.comboMultiplier = 1;
     this.comboMultiplierStep = comboStep;
     this.comboMultiplierCap = comboCap;
+    this.xpGainMultiplier = 1;
 
     this.xpOrbsService = null;
     this.playerService = null;
@@ -113,7 +118,7 @@ class ProgressionSystem extends UpgradeSystem {
       this.handleEnemyDestroyed(data);
     });
 
-    this.registerEventListener('progression-reset', (payload = {}) => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({
         reason: 'progression-reset',
@@ -122,12 +127,12 @@ class ProgressionSystem extends UpgradeSystem {
       });
     });
 
-    this.registerEventListener('player-reset', (payload = {}) => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'player-reset', silent: true, force: true });
     });
 
-    this.registerEventListener('player-died', (payload = {}) => {
+    this.registerEventListener('player-died', () => {
       this.resetCombo({ reason: 'player-died', silent: false, force: true });
     });
   }
@@ -206,6 +211,7 @@ class ProgressionSystem extends UpgradeSystem {
 
   incrementCombo(context = {}) {
     this.currentCombo = Math.max(0, Math.floor(this.currentCombo)) + 1;
+    this.maxCombo = Math.max(this.maxCombo, this.currentCombo);
     this.comboTimer = this.comboTimeout;
     this.updateComboMultiplier();
 
@@ -301,7 +307,10 @@ class ProgressionSystem extends UpgradeSystem {
     const multiplier = Number.isFinite(this.comboMultiplier)
       ? Math.max(1, this.comboMultiplier)
       : 1;
-    const adjustedValue = Math.max(1, Math.round(value * multiplier));
+    const adjustedValue = Math.max(
+      1,
+      Math.round(value * multiplier * this.xpGainMultiplier)
+    );
 
     this.totalExperience += adjustedValue;
 
@@ -331,6 +340,8 @@ class ProgressionSystem extends UpgradeSystem {
       return;
     }
 
+    this.updatePendingLevelUpScreens(dt);
+
     if (this.currentCombo <= 0 || this.comboTimer <= 0) {
       return;
     }
@@ -341,6 +352,23 @@ class ProgressionSystem extends UpgradeSystem {
     if (previousTimer > 0 && this.comboTimer <= 0) {
       this.resetCombo({ reason: 'timeout', force: true });
     }
+  }
+
+  updatePendingLevelUpScreens(dt) {
+    if (this.pendingLevelUpScreens.length === 0) {
+      return;
+    }
+
+    this.levelUpScreenTimer -= dt;
+    if (this.levelUpScreenTimer > 0) {
+      return;
+    }
+
+    const ready = this.pendingLevelUpScreens;
+    this.pendingLevelUpScreens = [];
+    ready.forEach((payload) => {
+      this.eventBus?.emit?.('upgrade-options-ready', payload);
+    });
   }
 
   applyLevelUp() {
@@ -371,12 +399,17 @@ class ProgressionSystem extends UpgradeSystem {
       nextRequirement: context.nextRequirement,
     });
 
-    this.eventBus?.emit?.('upgrade-options-ready', {
+    // The pick screen opens after a short delay so the level-up slow-mo plays first.
+    if (this.pendingLevelUpScreens.length === 0) {
+      this.levelUpScreenTimer = LEVEL_UP_SCREEN_DELAY_SECONDS;
+    }
+    this.pendingLevelUpScreens.push({
       level: context.level,
       options: context.options || [],
       poolSize: context.poolSize ?? 0,
       totalDefinitions: context.totalDefinitions ?? 0,
       inventory: this.getUpgradeProgressSnapshot(),
+      synergies: this.getSynergySnapshot(),
       autoResolved: (context.options || []).length === 0,
     });
   }
@@ -387,6 +420,10 @@ class ProgressionSystem extends UpgradeSystem {
   // === GETTERS PÚBLICOS ===
   getLevel() {
     return this.level;
+  }
+
+  getMaxCombo() {
+    return this.maxCombo;
   }
 
   getExperience() {
@@ -432,7 +469,11 @@ class ProgressionSystem extends UpgradeSystem {
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
+    this.activeSynergies.clear();
+    this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
+    this.pendingLevelUpScreens = [];
+    this.levelUpScreenTimer = 0;
     this._snapshotFallbackWarningIssued = false;
 
     if (Number.isFinite(this.defaultComboTimeout)) {
@@ -446,6 +487,7 @@ class ProgressionSystem extends UpgradeSystem {
     }
 
     this.resetCombo({ reason: 'progression-reset', silent: true, emit: false });
+    this.maxCombo = 0;
 
     this.refreshInjectedServices({ force: true });
     this.emitExperienceChanged();
@@ -486,6 +528,10 @@ class ProgressionSystem extends UpgradeSystem {
       ? snapshot.appliedUpgrades
       : [];
     this.appliedUpgrades = new Map(entries);
+    // Upgrade-driven numbers start clean: the caller re-applies every rank
+    // (GameSessionService.reapplyProgressionUpgrades), synergies included.
+    this.activeSynergies.clear();
+    this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
 
     if (Number.isFinite(this.defaultComboTimeout)) {
@@ -508,12 +554,6 @@ class ProgressionSystem extends UpgradeSystem {
     }
 
     const comboData = deepClone(snapshot.comboState) || {};
-    if (
-      Number.isFinite(comboData?.comboTimeout) &&
-      comboData.comboTimeout >= 0
-    ) {
-      this.comboTimeout = comboData.comboTimeout;
-    }
 
     const restoredCombo = Number.isFinite(comboData?.comboCount)
       ? Math.max(0, Math.floor(comboData.comboCount))
