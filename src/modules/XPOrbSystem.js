@@ -198,6 +198,7 @@ class XPOrbSystem extends BaseSystem {
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
     this.globalPull = null;
+    this.drift = null;
 
     this.orbClusterRadius = 0;
     this.orbClusterForce = 0;
@@ -465,6 +466,7 @@ class XPOrbSystem extends BaseSystem {
     orb.source = 'drop';
     orb.pendingRemoval = false;
     orb.active = false;
+    orb.driftHeading = null;
   }
 
   acquireOrb() {
@@ -849,6 +851,7 @@ class XPOrbSystem extends BaseSystem {
 
     if (this.xpOrbs.length) {
       this.advanceOrbAges(deltaTime);
+      if (this.drift) this.updateDrift(deltaTime);
       this.updateShipMagnetism(deltaTime);
       this.updateOrbSoftBounds(deltaTime);
       this.updateOrbClustering(deltaTime);
@@ -1046,6 +1049,27 @@ class XPOrbSystem extends BaseSystem {
     this.invalidateSpatialIndex();
   }
 
+  // Magnetic Storm (layer modifier): `params` {driftSpeed, driftTurn,
+  // pullScale} sets every orb drifting on a heading that turns at random
+  // (`random`, seeded per layer) and weakens the ship's pull; null ends it.
+  setDrift(params, random = null) {
+    this.drift = params ? { ...params, random } : null;
+  }
+
+  updateDrift(deltaTime) {
+    const { driftSpeed, driftTurn, random } = this.drift;
+    const step = driftSpeed * deltaTime;
+    for (const orb of this.xpOrbs) {
+      if (!this.isOrbActive(orb) || orb.isFusing) continue;
+      orb.driftHeading =
+        (orb.driftHeading ?? random.range(0, Math.PI * 2)) +
+        random.range(-driftTurn, driftTurn) * deltaTime;
+      orb.x += Math.cos(orb.driftHeading) * step;
+      orb.y += Math.sin(orb.driftHeading) * step;
+    }
+    this.invalidateSpatialIndex();
+  }
+
   updateShipMagnetism(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
@@ -1095,7 +1119,8 @@ class XPOrbSystem extends BaseSystem {
 
     const playerX = playerPos.x;
     const playerY = playerPos.y;
-    const magnetismForce = this.magnetismForce || 0;
+    const magnetismForce =
+      (this.magnetismForce || 0) * (this.drift?.pullScale ?? 1);
     const boostMultiplier =
       Number.isFinite(this.magnetismBoost) && this.magnetismBoost >= 0
         ? this.magnetismBoost
@@ -2018,6 +2043,7 @@ class XPOrbSystem extends BaseSystem {
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
     this.globalPull = null;
+    this.drift = null;
     this.spatialIndex.clear();
     this.spatialIndexDirty = true;
     this.visualCache.clear();

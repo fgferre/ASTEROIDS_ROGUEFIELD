@@ -159,6 +159,51 @@ describe('AAAHudLayout radar jam', () => {
   });
 });
 
+describe('AAAHudLayout layer modifier', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'performance'],
+    });
+    vi.stubGlobal('window', {
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (id) => clearTimeout(id),
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the MODIFIER banner in its colour once the LAYER banner ends', () => {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      layerBanner: fakeElement(),
+      layerBannerTitle: fakeElement(),
+      layerBannerSub: fakeElement(),
+    };
+    hud.showLayerBanner(17);
+    hud.showModifierBanner('Glass Field', '#5eead4');
+    vi.advanceTimersByTime(0);
+    expect(hud.els.layerBannerTitle.textContent).toBe('LAYER 17');
+
+    vi.advanceTimersByTime(1250);
+
+    const banner = hud.els.layerBanner;
+    expect(hud.els.layerBannerTitle.textContent).toBe('MODIFIER');
+    expect(hud.els.layerBannerSub.textContent).toBe('Glass Field');
+    expect(banner.classList.contains('is-modifier')).toBe(true);
+    expect(banner.style['--modifier-color']).toBe('#5eead4');
+  });
+
+  it('scales the radar range for Dense Fog and back', () => {
+    const hud = new AAAHudLayout();
+    hud.setRadarRange(0.5);
+    expect(hud.radarRangeFactor).toBe(0.5);
+    hud.setRadarRange(1);
+    expect(hud.radarRangeFactor).toBe(1);
+  });
+});
+
 describe('AAAHudLayout radar glyphs', () => {
   it('picks the blip glyph by enemy type and elite flag', () => {
     const glyphs = [

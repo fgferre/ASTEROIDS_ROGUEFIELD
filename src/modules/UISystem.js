@@ -10,7 +10,7 @@ import {
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { directorFor } from '../data/layers.js';
+import { LAYER_MODIFIERS, directorFor } from '../data/layers.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
@@ -1517,7 +1517,10 @@ class UISystem extends BaseSystem {
       (enemies && typeof enemies.getActiveEnemies === 'function' && player)
     ) {
       const pluginConfig = this.aaaTacticalHudDefinition?.plugin || {};
-      const radarRange = Math.max(1, Number(pluginConfig.radarRange) || 1500);
+      const radarRange = Math.max(
+        1,
+        (Number(pluginConfig.radarRange) || 1500) * hud.radarRangeFactor
+      );
 
       let radarEnemies = [];
       if (physics && typeof physics.getNearbyEnemies === 'function') {
@@ -1727,6 +1730,20 @@ class UISystem extends BaseSystem {
       }
     });
 
+    // A layer modifier's banner follows the LAYER one; Dense Fog shortens
+    // the radar until the layer ends.
+    this.registerEventListener('layer-modifier-started', (payload = {}) => {
+      this.aaaTacticalHud?.showModifierBanner(payload.label, payload.color);
+      if (payload.id === 'dense-fog') {
+        this.aaaTacticalHud?.setRadarRange(
+          LAYER_MODIFIERS['dense-fog'].radarRange
+        );
+      }
+    });
+    this.registerEventListener('layer-modifier-ended', (payload = {}) => {
+      if (payload.id === 'dense-fog') this.aaaTacticalHud?.setRadarRange(1);
+    });
+
     // A Herald arrives under a violet banner; Silence jams the radar while it
     // lives (a new run clears it).
     this.registerEventListener('herald-spawned', ({ kind } = {}) => {
@@ -1745,6 +1762,7 @@ class UISystem extends BaseSystem {
     });
     this.registerEventListener('game-started', () => {
       this.aaaTacticalHud?.setRadarJammed(false);
+      this.aaaTacticalHud?.setRadarRange(1);
       this.aaaTacticalHud?.setAimStick(false);
     });
     this.registerEventListener('aim-stick-changed', ({ active } = {}) => {

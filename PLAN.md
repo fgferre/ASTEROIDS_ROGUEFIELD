@@ -269,7 +269,7 @@ Qualidade:
       CanvasStateManager, teste scope-freeze de `.planning/`, cópias de resolveRandom, pools duplicados), unificar os
       dois painéis de desempenho, passe de verdade em `docs/plans` e `docs/validation`.
       Conteúdo:
-- [ ] **R7.4 Modificadores de camada no infinito.** A partir da 16, cada camada sorteia um modificador visível
+- [x] **R7.4 Modificadores de camada no infinito.** A partir da 16, cada camada sorteia um modificador visível
       ("Dense fog" alcance de radar menor, "Magnetic storm" fagulhas erráticas, "Hunters' moon" só Seekers e Rams,
       "Glass field" rochas voláteis) com banner e cue.
 

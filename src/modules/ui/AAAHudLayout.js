@@ -160,8 +160,10 @@ export class AAAHudLayout {
     this._radarJammed = false;
     this._radarNoise = new RandomService('radar-jam');
     this._radarNoiseAt = -Infinity;
+    this.radarRangeFactor = 1;
     this._timers = new Set();
     this._bannerTimer = null;
+    this._modifierBannerTimer = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -255,9 +257,11 @@ export class AAAHudLayout {
     this._panelCorners = null;
     this._aimStick = false;
     this._radarJammed = false;
+    this.radarRangeFactor = 1;
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
     this._bannerTimer = null;
+    this._modifierBannerTimer = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -313,6 +317,19 @@ export class AAAHudLayout {
     this._showBanner('EVENT', { tone: 'event', subtitle: label });
   }
 
+  /**
+   * "MODIFIER" banner with the layer modifier's label underneath, in its
+   * `color`; it waits for the banner on screen (the LAYER one) to end.
+   */
+  showModifierBanner(label, color) {
+    const delayMs = Math.max(0, this._bannerEndsAt - performance.now());
+    this._modifierBannerTimer = this._later(() => {
+      this._modifierBannerTimer = null;
+      this.els?.layerBanner?.style.setProperty('--modifier-color', color);
+      this._showBanner('MODIFIER', { tone: 'modifier', subtitle: label });
+    }, delayMs);
+  }
+
   /** Violet "HERALD OF …" banner with the Herald's line underneath. */
   showHeraldBanner(name, subtitle) {
     this._showBanner(String(name).toUpperCase(), {
@@ -323,7 +340,8 @@ export class AAAHudLayout {
 
   /**
    * The centered banner, shown for `durationMs`, the last FADE_OUT_MS
-   * fading. `tone` 'boss', 'surge', 'event' or 'herald' recolours it.
+   * fading. `tone` 'boss', 'surge', 'event', 'herald' or 'modifier'
+   * recolours it.
    */
   _showBanner(
     title,
@@ -349,6 +367,7 @@ export class AAAHudLayout {
       banner.classList.toggle('is-surge', tone === 'surge');
       banner.classList.toggle('is-event', tone === 'event');
       banner.classList.toggle('is-herald', tone === 'herald');
+      banner.classList.toggle('is-modifier', tone === 'modifier');
       banner.classList.remove('is-leaving');
       this._replay(banner, 'is-showing');
       this._bannerTimer = this._later(() => {
@@ -366,6 +385,10 @@ export class AAAHudLayout {
     if (this._bannerTimer) {
       this._cancel(this._bannerTimer);
       this._bannerTimer = null;
+    }
+    if (this._modifierBannerTimer) {
+      this._cancel(this._modifierBannerTimer);
+      this._modifierBannerTimer = null;
     }
     this._bannerEndsAt = 0;
     this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
@@ -1180,6 +1203,11 @@ export class AAAHudLayout {
     }
   }
 
+  /** Dense Fog: the radar reaches `factor` of its usual range (1 = normal). */
+  setRadarRange(factor) {
+    this.radarRangeFactor = factor;
+  }
+
   /** Sensor Jam: noise instead of blips and a "NO SIGNAL" label while on. */
   setRadarJammed(jammed) {
     this._radarJammed = Boolean(jammed);
@@ -1693,6 +1721,9 @@ export class AAAHudLayout {
             .layer-banner.is-event .layer-banner__sub { color: var(--xp); }
             .layer-banner.is-herald .layer-banner__title { color: var(--text); text-shadow: 0 0 18px var(--boss), 0 0 4px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-herald .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+            .layer-banner.is-modifier .layer-banner__title { color: var(--modifier-color); text-shadow: 0 0 18px var(--modifier-color), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-modifier .layer-banner__line { background: linear-gradient(90deg, transparent, var(--modifier-color) 20%, var(--modifier-color) 80%, transparent); box-shadow: 0 0 12px var(--modifier-color); }
+            .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
             .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }

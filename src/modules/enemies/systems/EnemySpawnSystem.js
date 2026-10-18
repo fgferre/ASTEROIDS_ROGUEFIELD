@@ -536,6 +536,15 @@ export class EnemySpawnSystem {
       facade.asteroids.push(enemy);
       facade.invalidateActiveEnemyCache();
       facade.registerEnemyWithPhysics(enemy);
+      // Glass Field (layer modifier): every new rock, not its fragments,
+      // comes in Volatile.
+      if (
+        facade.waveManager?.layerModifier === 'glass-field' &&
+        enemy.type === 'asteroid' &&
+        !enemy.generation
+      ) {
+        enemy.ignite();
+      }
     }
 
     enemy.destroyed = false;
