@@ -1,20 +1,17 @@
 // src/modules/CombatSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
 import { requireService } from '../core/serviceUtils.js';
-import { SHIP_SIZE, TRAIL_LENGTH } from '../core/GameConstants.js';
+import { SHIP_SIZE } from '../core/GameConstants.js';
 import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { Targeting } from './combat/Targeting.js';
 import { Projectiles } from './combat/Projectiles.js';
+import { Weapons } from './combat/Weapons.js';
 import {
-  COMBAT_SHOOT_COOLDOWN,
   COMBAT_TARGETING_RANGE,
   BULLET_SPEED,
   COMBAT_BULLET_LIFETIME,
   COMBAT_AIMING_UPGRADE_CONFIG,
-  COMBAT_MULTISHOT_SPREAD_STEP,
-  COMBAT_SPREAD_MODE_DEFAULT,
-  COMBAT_BULLET_RADIUS,
   KNOCKBACK_BASE,
   KNOCKBACK_HEAVY_FACTOR,
   KNOCKBACK_MAX,
@@ -28,24 +25,13 @@ export function knockbackSpeed(damage) {
   const speed = KNOCKBACK_BASE * (damage / KNOCKBACK_REFERENCE_DAMAGE);
   return Math.min(KNOCKBACK_MAX, Math.max(KNOCKBACK_MIN, speed));
 }
-
-// Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
-const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 import { getRenderScale } from '../core/viewport.js';
 import { getEmissive } from '../core/bloomLayer.js';
 import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
-import {
-  LANCE_BASE_LOOK,
-  WEAPONS,
-  WEAPON_APEX,
-  WEAPON_EVOLUTIONS,
-} from '../data/weapons.js';
+import { WEAPONS, WEAPON_APEX, WEAPON_EVOLUTIONS } from '../data/weapons.js';
 
 const LANCE_SPRITE = { width: 16, height: 8, originX: 12 };
-// Trail alpha ramp, tail → head (precomputed: one string per step).
-const lanceTrailStyles = (color) =>
-  Array.from({ length: 8 }, (_, i) => withAlpha(color, (0.65 * i) / 7));
 const HARMONIC_BEAM = WEAPONS.harmonic.beam;
 const BEAM_COLORS = WEAPONS.harmonic.colors;
 const FLAK = WEAPONS.scatter.flak;
@@ -77,27 +63,6 @@ class CombatSystem extends BaseSystem {
       enableRandomManagement: false,
     });
 
-    // === ESTADO DO SISTEMA DE COMBATE ===
-    this.lastShotTime = 0;
-    this.shootCooldown = Number.isFinite(COMBAT_SHOOT_COOLDOWN)
-      ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
-      : 0.3;
-
-    // Plan 01.07 FIX-05 — spread mode state (the aim mode lives in Targeting).
-    // Default = concentrated + auto so the centerline fix lands silently for
-    // existing M1 players.
-    this.spreadMode = VALID_SPREAD_MODES.has(COMBAT_SPREAD_MODE_DEFAULT)
-      ? COMBAT_SPREAD_MODE_DEFAULT
-      : 'concentrated';
-
-    // === CONFIGURAÇÕES ===
-    this.bulletSpeed = BULLET_SPEED;
-    this.bulletLifetime = Number.isFinite(COMBAT_BULLET_LIFETIME)
-      ? Math.max(0, COMBAT_BULLET_LIFETIME)
-      : 1.8;
-    this.trailLength = TRAIL_LENGTH;
-    this.baseShootCooldown = this.shootCooldown;
-
     // === CONFIGURAÇÕES DE MIRA AVANÇADA ===
     this.aimingConfig = COMBAT_AIMING_UPGRADE_CONFIG || {};
     this.lockLineAlpha = this.aimingConfig?.feedback?.lockLineAlpha ?? 0.35;
@@ -107,30 +72,46 @@ class CombatSystem extends BaseSystem {
       this.aimingConfig?.feedback?.predictedMarkerRadius ?? 12;
 
     this.lastKnownPlayerStats = null;
+    // Built first: Targeting reads the lance speed while it sets up.
+    this.weapons = new Weapons({
+      player: () => this.cachedPlayer,
+      enemies: () => this.cachedEnemies,
+      targeting: () => this.targeting,
+      createBullet: (...args) => this.projectiles.createBullet(...args),
+      hitEnemy: (hit, enemy) =>
+        this.processBulletHit(hit, enemy, this.cachedEnemies),
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      cardEffects: () => this.cardEffects,
+      tuning: () => ({
+        aimCooldownMultiplier: this.aimCooldownMultiplier,
+        cooldownTuning: this.cooldownTuning,
+      }),
+    });
     this.targeting = new Targeting({
       player: () => this.cachedPlayer,
       enemies: () => this.cachedEnemies,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       playerStats: () => this.lastKnownPlayerStats,
-      bulletSpeed: () => this.bulletSpeed,
-      spreadMode: () => this.spreadMode,
-      computeParallelOffset: (...args) => this.computeParallelOffset(...args),
+      bulletSpeed: () => this.weapons.bulletSpeed,
+      spreadMode: () => this.weapons.spreadMode,
+      computeParallelOffset: (...args) =>
+        this.weapons.computeParallelOffset(...args),
     });
     this.projectiles = new Projectiles({
       physics: () => this.cachedPhysics,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       weapon: () => ({
-        weaponId: this.weaponId,
-        bulletSpeed: this.bulletSpeed,
-        bulletLifetime: this.bulletLifetime,
-        trailLength: this.trailLength,
+        weaponId: this.weapons.weaponId,
+        bulletSpeed: this.weapons.bulletSpeed,
+        bulletLifetime: this.weapons.bulletLifetime,
+        trailLength: this.weapons.trailLength,
         thermalLens: this.cardEffects.thermalLens,
         lanceDamageTuning: this.lanceDamageTuning,
-        lanceApexDamage: this.lanceApexDamage,
-        lancePierce: this.lancePierce,
+        lanceApexDamage: this.weapons.lanceApexDamage,
+        lancePierce: this.weapons.lancePierce,
         pierceBonus: this.pierceBonus,
       }),
-      burstFlak: (bolt) => this.burstFlak(bolt),
+      burstFlak: (bolt) => this.weapons.burstFlak(bolt),
     });
     this.resetWeaponTuning();
 
@@ -193,7 +174,7 @@ class CombatSystem extends BaseSystem {
 
     // A weapon card names its weapon (data/weapons.js); an unknown id is ignored.
     const takeWeapon = (data = {}) => {
-      if (WEAPONS[data.weaponId]) this.weaponId = data.weaponId;
+      if (WEAPONS[data.weaponId]) this.weapons.weaponId = data.weaponId;
     };
     this.registerEventListener('upgrade-weapon-harmonic', takeWeapon);
     this.registerEventListener('upgrade-weapon-scatter', takeWeapon);
@@ -242,7 +223,7 @@ class CombatSystem extends BaseSystem {
       this.evolveWeapon(data.family);
     });
     this.registerEventListener('apex-unlocked', (data = {}) => {
-      this.apexWeapon(data.family);
+      this.weapons.apexWeapon(data.family);
     });
 
     // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
@@ -449,7 +430,7 @@ class CombatSystem extends BaseSystem {
       player.setAimPoint(this.targeting.getPrimaryAimPoint());
 
       if (playerStats) {
-        this.handleShooting(deltaTime, playerStats);
+        this.weapons.handleShooting(deltaTime, playerStats);
       }
     }
 
@@ -475,417 +456,105 @@ class CombatSystem extends BaseSystem {
     this.updateWeaponEffects(deltaTime);
   }
 
-  // === SISTEMA DE TIRO ===
+  // === WEAPONS (combat/Weapons.js) ===
+  // Weapons owns the guns. Both renderers, the 2D draw, the card effects and
+  // the weapons, upgrade and aim suites read these fields on the combat
+  // object; the setters exist because the weapon tuning and the aim suite
+  // write them.
+  get weaponId() {
+    return this.weapons.weaponId;
+  }
+
+  get spreadMode() {
+    return this.weapons.spreadMode;
+  }
+
+  get evolutions() {
+    return this.weapons.evolutions;
+  }
+
+  get apexes() {
+    return this.weapons.apexes;
+  }
+
+  get lanceLook() {
+    return this.weapons.lanceLook;
+  }
+
+  get trailLength() {
+    return this.weapons.trailLength;
+  }
+
+  get beams() {
+    return this.weapons.beams;
+  }
+
+  get flakBursts() {
+    return this.weapons.flakBursts;
+  }
+
+  get bulletSpeed() {
+    return this.weapons.bulletSpeed;
+  }
+
+  set bulletSpeed(value) {
+    this.weapons.bulletSpeed = value;
+  }
+
+  get bulletLifetime() {
+    return this.weapons.bulletLifetime;
+  }
+
+  set bulletLifetime(value) {
+    this.weapons.bulletLifetime = value;
+  }
+
+  get shootCooldown() {
+    return this.weapons.shootCooldown;
+  }
+
+  set shootCooldown(value) {
+    this.weapons.shootCooldown = value;
+  }
+
+  get baseShootCooldown() {
+    return this.weapons.baseShootCooldown;
+  }
+
+  get lastShotTime() {
+    return this.weapons.lastShotTime;
+  }
+
+  set lastShotTime(value) {
+    this.weapons.lastShotTime = value;
+  }
+
+  // Called on the combat object: the HUD and the run recap read the weapon
+  // state, the test helpers and suites fire, lay lanes and evolve, the hit
+  // path bursts flak, and the card effects reach enemies through
+  // forEachSolidEnemy.
   handleShooting(deltaTime, playerStats) {
-    this.lastShotTime += deltaTime;
-
-    if (!this.canShoot()) return;
-
-    const player = this.cachedPlayer;
-    const playerPos = player.getPosition();
-    if (!playerPos) return;
-
-    if (this.weaponId === 'harmonic') {
-      this.harmonicShots += 1;
-      if (this.harmonicShots % HARMONIC_BEAM.every === 0) {
-        this.fireBeam(playerPos, playerStats);
-        return;
-      }
-    }
-    if (this.weaponId === 'scatter') {
-      this.fireFlak(playerPos, playerStats);
-      return;
-    }
-
-    // Every shot leaves the turret's muzzle (R5.11). Without a lock the
-    // turret has turned back onto the nose.
-    const muzzle = player.getMuzzlePoint();
-
-    if (this.stickAim) {
-      this.fireForward(
-        playerPos,
-        Math.atan2(this.stickAim.y, this.stickAim.x),
-        playerStats,
-        { originOverride: muzzle }
-      );
-      return;
-    }
-
-    // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
-    // and fires from the muzzle along the turret.
-    if (this.aimMode === 'manual') {
-      // Fix-pass (F5): `getTurretAngle()` is PlayerSystem's canonical weapon
-      // heading; a player without it is a wiring bug and throws.
-      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
-        originOverride: muzzle,
-      });
-      return;
-    }
-
-    // [SMART AUTO-FIRE] If no targets locked, fire forward!
-    const lockTargets =
-      this.currentTargetLocks && this.currentTargetLocks.length
-        ? this.currentTargetLocks
-        : this.currentTarget
-          ? [this.currentTarget]
-          : [];
-
-    // [SMART AUTO-FIRE] Fallback to forward fire if no lock
-    if (!lockTargets.length) {
-      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
-        originOverride: muzzle,
-      });
-      return;
-    }
-
-    const requestedShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
-    const usingAdvancedBattery = this.targetingUpgradeLevel >= 3;
-
-    // Fix-pass (F1): wire the damage-aware overkill cap into the real fire
-    // path. In Mode 2 (non-rank-3, single-target multishot) every shot in the
-    // volley hits the SAME enemy, so the burst cap = ceil(targetHP /
-    // volleyDamage). Rank-3 advanced battery is capped PER-ENEMY further
-    // down (C1) once we know how the lock slots distributed.
-    let totalShots = requestedShots;
-    if (!usingAdvancedBattery && requestedShots > 1) {
-      const capTarget = lockTargets[0] || null;
-      if (capTarget) {
-        const allocated = this.targeting.computeAllocatedShots(
-          capTarget,
-          playerStats
-        );
-        if (Number.isFinite(allocated) && allocated > 0) {
-          totalShots = Math.min(requestedShots, allocated);
-        }
-      }
-    }
-
-    let assignments = usingAdvancedBattery
-      ? Array.isArray(this.currentLockAssignments) &&
-        this.currentLockAssignments.length
-        ? this.currentLockAssignments
-        : lockTargets.map((enemy, index) => ({
-            enemy,
-            predictedAim: this.predictedAimPointsMap.get(enemy.id) ||
-              this.targeting.getPredictedTargetPosition(enemy, playerPos) || {
-                x: enemy.x,
-                y: enemy.y,
-              },
-            fireOrigin: { ...playerPos },
-            fireOffset: { x: 0, y: 0 },
-            duplicateIndex: index,
-            duplicateCount: lockTargets.length,
-            index,
-          }))
-      : lockTargets.map((enemy, index) => ({
-          enemy,
-          predictedAim: this.predictedAimPointsMap.get(enemy.id) ||
-            this.targeting.getPredictedTargetPosition(enemy, playerPos) || {
-              x: enemy.x,
-              y: enemy.y,
-            },
-          fireOrigin: { ...playerPos },
-          fireOffset: { x: 0, y: 0 },
-          duplicateIndex: index,
-          duplicateCount: lockTargets.length,
-          index,
-        }));
-
-    if (!assignments.length) {
-      // Should not happen due to check above, but safely fire forward just in case
-      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
-        originOverride: muzzle,
-      });
-      return;
-    }
-
-    // Fix-pass-3 Finding 1+2: the per-enemy overkill cap moved UPSTREAM into
-    // buildLockAssignments (via applyPerEnemyOverkillCap), so
-    // `currentLockAssignments` is already correctly sized — render,
-    // multi-lock indicators, predictedAimPoints, and weapon-fired all see
-    // the post-cap layout. Finding 2 (stale per-lane geometry on filtered
-    // assignments) also dissolves: the cap now runs BEFORE the duplicate-
-    // index/duplicateCount re-key inside buildLockAssignments, so the
-    // surviving lanes get their N-lane offsets computed correctly the first
-    // time. handleShooting now only adjusts `totalShots` to assignments.length
-    // — no need to filter/re-key here.
-    if (usingAdvancedBattery && assignments.length < totalShots) {
-      totalShots = Math.min(requestedShots, assignments.length);
-    }
-
-    const multiLockActive = usingAdvancedBattery && lockTargets.length > 1;
-
-    const firedTargets = [];
-
-    for (let shotIndex = 0; shotIndex < totalShots; shotIndex += 1) {
-      const assignment = usingAdvancedBattery
-        ? assignments[Math.min(assignments.length - 1, shotIndex)] ||
-          assignments[assignments.length - 1]
-        : assignments[Math.min(assignments.length - 1, 0)];
-
-      if (!assignment || !assignment.enemy) {
-        continue;
-      }
-
-      const duplicateCount = Math.max(1, assignment.duplicateCount || 1);
-      const duplicateIndex = assignment.duplicateIndex || 0;
-
-      let fireOrigin = assignment.fireOrigin
-        ? { ...assignment.fireOrigin }
-        : { ...playerPos };
-      let aimPoint = assignment.predictedAim
-        ? { ...assignment.predictedAim }
-        : null;
-
-      if (!aimPoint) {
-        const predicted = this.targeting.getPredictedTargetPosition(
-          assignment.enemy,
-          playerPos
-        ) || { x: assignment.enemy.x, y: assignment.enemy.y };
-        if (usingAdvancedBattery) {
-          const offset = this.computeParallelOffset(
-            playerPos,
-            predicted,
-            duplicateIndex,
-            duplicateCount,
-            assignment.enemy
-          );
-          fireOrigin = {
-            x: playerPos.x + offset.x,
-            y: playerPos.y + offset.y,
-          };
-          aimPoint = {
-            x: predicted.x + offset.x,
-            y: predicted.y + offset.y,
-          };
-        } else {
-          aimPoint = predicted;
-          fireOrigin = { ...playerPos };
-        }
-      }
-
-      if (usingAdvancedBattery && assignment.fireOffset) {
-        fireOrigin = {
-          x: playerPos.x + assignment.fireOffset.x,
-          y: playerPos.y + assignment.fireOffset.y,
-        };
-        aimPoint = {
-          x: assignment.predictedAim?.x ?? aimPoint.x,
-          y: assignment.predictedAim?.y ?? aimPoint.y,
-        };
-      }
-
-      if (!usingAdvancedBattery && totalShots > 1) {
-        const shouldApplySpread =
-          totalShots > assignments.length || assignments.length <= 1;
-        if (shouldApplySpread) {
-          if (this.spreadMode === 'concentrated') {
-            // Plan 01.07 Task 4: route Mode 2 multishot through the
-            // concentrated-fire helper. Compute the full lane set ONCE on
-            // shotIndex 0, cache it on the loop closure, and read per-shot
-            // from the cache. The cache is populated when shotIndex === 0
-            // and the same lane group is used for all subsequent shots in
-            // the volley.
-            if (shotIndex === 0) {
-              const enemy = assignment.enemy;
-              this._concentratedLanes = this.applyConcentratedFire(
-                {
-                  kind: 'target',
-                  enemy,
-                  predictedAim: aimPoint,
-                  fireOrigin: playerPos,
-                },
-                totalShots,
-                playerStats
-              );
-            }
-            const lane = this._concentratedLanes?.[shotIndex];
-            if (lane) {
-              fireOrigin = { ...lane.fireOrigin };
-              aimPoint = { ...lane.aimPoint };
-            }
-          } else {
-            aimPoint = this.applyMultishotSpread(
-              playerPos,
-              aimPoint,
-              shotIndex,
-              totalShots
-            );
-          }
-        }
-      }
-
-      // Lanes are laid out around the hull centre; shift them to the muzzle.
-      this.projectiles.createBullet(
-        {
-          x: fireOrigin.x + muzzle.x - playerPos.x,
-          y: fireOrigin.y + muzzle.y - playerPos.y,
-        },
-        aimPoint,
-        playerStats.damage
-      );
-      firedTargets.push({
-        enemyId: assignment.enemy?.id ?? null,
-        position: { ...aimPoint },
-      });
-    }
-    this._concentratedLanes = null;
-
-    this.lastShotTime = 0;
-
-    if (firedTargets.length) {
-      const firstTarget = firedTargets[0]?.position || null;
-      // Plan 01.07 Task 2: emit the centerline (logical aim point of the
-      // primary locked target) so recoil listeners can react to the centerline
-      // direction rather than the first projectile's lane-offset aim.
-      let centerlineTarget = null;
-      const primaryTarget = this.currentTarget;
-      if (primaryTarget) {
-        const predicted = this.predictedAimPointsMap?.get(primaryTarget.id);
-        if (predicted) {
-          centerlineTarget = { x: predicted.x, y: predicted.y };
-        } else {
-          const fallbackPredicted = this.targeting.getPredictedTargetPosition(
-            primaryTarget,
-            playerPos
-          );
-          centerlineTarget = fallbackPredicted
-            ? { x: fallbackPredicted.x, y: fallbackPredicted.y }
-            : { x: primaryTarget.x, y: primaryTarget.y };
-        }
-      }
-      this.eventBus?.emit?.('weapon-fired', {
-        position: playerPos,
-        target: firstTarget,
-        centerlineTarget,
-        weaponType: 'basic',
-        primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
-        targeting: {
-          dynamicPrediction: this.targeting.usingDynamicPrediction(),
-          lockCount: lockTargets.length,
-          multiLockActive,
-          predictedPoints: firedTargets.map((entry) => ({
-            enemyId: entry.enemyId,
-            position: entry.position,
-          })),
-        },
-      });
-    }
+    this.weapons.handleShooting(deltaTime, playerStats);
   }
 
-  canShoot() {
-    // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
-    // We no longer require a forced target lock.
-    return this.lastShotTime >= this.shootCooldown;
+  applyConcentratedFire(input, shotCount) {
+    return this.weapons.applyConcentratedFire(input, shotCount);
   }
 
-  // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
-  fireForward(playerPos, rotation, playerStats, options = {}) {
-    const totalShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
-    const angle = Number.isFinite(rotation) ? rotation : 0;
-
-    // Plan 01.07 Task 6: manual-aim path passes originOverride = ship-nose
-    // position; the centerline math still uses ship rotation but lanes
-    // spawn from the nose rather than the ship center.
-    const originPos = options?.originOverride
-      ? { ...options.originOverride }
-      : { ...playerPos };
-
-    // Calculate a point far in front of the firing origin
-    const range = 1000;
-    const baseAim = {
-      x: originPos.x + Math.cos(angle) * range,
-      y: originPos.y + Math.sin(angle) * range,
-    };
-
-    const firedTargets = [];
-
-    // Plan 01.07 Task 4: precompute concentrated lanes when totalShots > 1.
-    // Fix-pass (F6): in manual aim mode we keep every shot's fireOrigin at
-    // the ship nose (the originPos passed in via options.originOverride);
-    // perpendicular offset applies only to the aim point. This realizes the
-    // plan must_have "shots leave from the SHIP NOSE in the ship's CURRENT
-    // rotation direction" for the manual + concentrated + N>1 combo.
-    const sharedOrigin = this.aimMode === 'manual';
-    const concentratedLanes =
-      totalShots > 1 && this.spreadMode === 'concentrated'
-        ? this.applyConcentratedFire(
-            { kind: 'direction', angle, originPos, sharedOrigin },
-            totalShots,
-            playerStats
-          )
-        : null;
-
-    for (let shotIndex = 0; shotIndex < totalShots; shotIndex++) {
-      let aimPoint = { ...baseAim };
-      let shotOrigin = { ...originPos };
-
-      if (totalShots > 1) {
-        if (concentratedLanes && concentratedLanes[shotIndex]) {
-          const lane = concentratedLanes[shotIndex];
-          shotOrigin = { ...lane.fireOrigin };
-          aimPoint = { ...lane.aimPoint };
-        } else {
-          aimPoint = this.applyMultishotSpread(
-            originPos,
-            aimPoint,
-            shotIndex,
-            totalShots
-          );
-        }
-      }
-
-      this.projectiles.createBullet(shotOrigin, aimPoint, playerStats.damage);
-      firedTargets.push({
-        enemyId: null,
-        position: { ...aimPoint },
-      });
-    }
-
-    this.lastShotTime = 0;
-
-    if (firedTargets.length) {
-      // Plan 01.07 Task 2: centerline = the on-axis aim point at fixed range
-      // along ship rotation (range = 1000 matching the baseline above).
-      const centerlineTarget = { ...baseAim };
-      this.eventBus?.emit?.('weapon-fired', {
-        position: originPos,
-        target: firedTargets[0].position,
-        centerlineTarget,
-        weaponType: 'basic',
-        primaryTargetId: null,
-        targeting: {
-          dynamicPrediction: false,
-          lockCount: 0,
-          multiLockActive: false,
-          predictedPoints: firedTargets.map((entry) => ({
-            enemyId: null,
-            position: entry.position,
-          })),
-        },
-      });
-    }
+  evolveWeapon(family) {
+    this.weapons.evolveWeapon(family);
   }
 
-  applyMultishotSpread(playerPos, targetPos, shotIndex, totalShots) {
-    const spreadStep = Number.isFinite(COMBAT_MULTISHOT_SPREAD_STEP)
-      ? COMBAT_MULTISHOT_SPREAD_STEP
-      : 0.3;
-    const spreadAngle = (shotIndex - (totalShots - 1) / 2) * spreadStep;
+  getWeaponState() {
+    return this.weapons.getWeaponState();
+  }
 
-    const dx = targetPos.x - playerPos.x;
-    const dy = targetPos.y - playerPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+  burstFlak(bolt) {
+    this.weapons.burstFlak(bolt);
+  }
 
-    if (distance === 0) return targetPos;
-
-    const baseAngle = Math.atan2(dy, dx);
-    const finalAngle = baseAngle + spreadAngle;
-
-    return {
-      x: playerPos.x + Math.cos(finalAngle) * distance,
-      y: playerPos.y + Math.sin(finalAngle) * distance,
-    };
+  forEachSolidEnemy(callback) {
+    this.weapons.forEachSolidEnemy(callback);
   }
 
   // Fire rate, projectile speed/lifetime and lock range from upgrades. Keyed
@@ -914,13 +583,7 @@ class CombatSystem extends BaseSystem {
     this.setTargetingRange(
       COMBAT_TARGETING_RANGE * product('targetingRangeMultiplier')
     );
-    this.refreshShootCooldown();
-  }
-
-  refreshShootCooldown() {
-    this.setShootCooldown(
-      this.baseShootCooldown * this.aimCooldownMultiplier * this.cooldownTuning
-    );
+    this.weapons.refreshShootCooldown();
   }
 
   // The weapon half of the aiming branch reset (Targeting resets its own half).
@@ -979,13 +642,13 @@ class CombatSystem extends BaseSystem {
       const cooldownMultiplier = Number(data?.cooldownMultiplier);
       if (Number.isFinite(cooldownMultiplier) && cooldownMultiplier > 0) {
         this.aimCooldownMultiplier = cooldownMultiplier;
-        this.refreshShootCooldown();
+        this.weapons.refreshShootCooldown();
       } else if (
         Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)
       ) {
         this.aimCooldownMultiplier =
           this.aimingConfig.multiLock.cooldownMultiplier;
-        this.refreshShootCooldown();
+        this.weapons.refreshShootCooldown();
       }
     }
 
@@ -1009,210 +672,6 @@ class CombatSystem extends BaseSystem {
       Number.isFinite(data?.targetUpdateInterval)
         ? Math.max(0.05, Number(data.targetUpdateInterval))
         : targeting.resolveTargetUpdateInterval()
-    );
-  }
-
-  computeParallelOffset(
-    playerPos,
-    aimPoint,
-    duplicateIndex,
-    duplicateCount,
-    enemy
-  ) {
-    if (!Number.isFinite(duplicateCount) || duplicateCount <= 1) {
-      return { x: 0, y: 0 };
-    }
-
-    const dx = aimPoint.x - playerPos.x;
-    const dy = aimPoint.y - playerPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance === 0) {
-      return { x: 0, y: 0 };
-    }
-
-    const slotCenter = (duplicateCount - 1) / 2;
-    const offsetIndex = duplicateIndex - slotCenter;
-    if (Math.abs(offsetIndex) < 0.0001) {
-      return { x: 0, y: 0 };
-    }
-
-    const spacing = this.aimingConfig?.multiLock?.parallelSpacing ?? 10;
-
-    let magnitude = offsetIndex * spacing;
-    const targetRadius = enemy?.radius || 16;
-    // Lane clamp per FIX-05 (plan 01.07 Task 3): keep lanes inside the target's
-    // effective hit radius (radius + bullet radius). Tighter than the legacy
-    // `Math.max(spacing, targetRadius * radiusMultiplier)`. Fix-pass-2 (C7b):
-    // use the gameplay-domain alias COMBAT_BULLET_RADIUS (mirrors BULLET_SIZE
-    // numerically; pinned by the F10 test). The artifact contract in
-    // 01.07-aim-centerline-toggles-PLAN.md promises this name as the source
-    // of truth for combat clamp math.
-    const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
-    magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
-
-    const perpX = (-dy / distance) * magnitude;
-    const perpY = (dx / distance) * magnitude;
-
-    return { x: perpX, y: perpY };
-  }
-
-  /**
-   * Concentrated-fire helper extracted from the rank-3 parallel offset code path.
-   *
-   * Two discriminator shapes:
-   *   - `{ kind: 'target', enemy, predictedAim?, fireOrigin? }` — concentrated fire on a specific enemy.
-   *   - `{ kind: 'direction', angle, originPos }` — concentrated fire in a direction from an origin.
-   *
-   * Returns: `Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>` of length `shotCount`.
-   * For shotCount=1, returns a single entry with zero perpendicular offset.
-   *
-   * For `kind:'target'`, both `fireOrigin` and `aimPoint` are shifted by the same
-   * perpendicular vector (parallel lanes). Lane magnitude is clamped to
-   * `Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS)` so outer lanes never
-   * exceed the target's effective hit radius.
-   *
-   * For `kind:'direction'`, the helper does NOT consult a target — perpendicular
-   * offsets use the fixed `spacing` only; aim points sit at +1000 along the angle
-   * from each fireOrigin (matching the fixed-range baseline used by `fireForward`).
-   *
-   * Caller spawns the bullets — this helper returns positions only.
-   *
-   * @param {{kind: 'target', enemy: object, predictedAim?: {x,y}, fireOrigin?: {x,y}} | {kind: 'direction', angle: number, originPos: {x,y}}} input
-   * @param {number} shotCount
-   * @param {object} [playerStats] — reserved for future damage-aware behavior; not consumed here.
-   * @returns {Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>}
-   */
-  applyConcentratedFire(input, shotCount) {
-    if (!input || typeof input !== 'object') {
-      throw new Error(
-        '[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind'
-      );
-    }
-
-    const count = Math.max(0, Math.floor(Number(shotCount) || 0));
-    if (count <= 0) {
-      return [];
-    }
-
-    const spacing = this.aimingConfig?.multiLock?.parallelSpacing ?? 10;
-
-    if (input.kind === 'target') {
-      const enemy = input.enemy;
-      if (!enemy) {
-        return [];
-      }
-
-      const predicted = input.predictedAim || { x: enemy.x, y: enemy.y };
-      const playerPos = input.fireOrigin || this.cachedPlayer.getPosition();
-
-      const baseAimX = predicted.x;
-      const baseAimY = predicted.y;
-      const baseOriginX = playerPos.x;
-      const baseOriginY = playerPos.y;
-
-      const dx = baseAimX - baseOriginX;
-      const dy = baseAimY - baseOriginY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance === 0 || count === 1) {
-        const results = [];
-        for (let i = 0; i < count; i += 1) {
-          results.push({
-            fireOrigin: { x: baseOriginX, y: baseOriginY },
-            aimPoint: { x: baseAimX, y: baseAimY },
-          });
-        }
-        return results;
-      }
-
-      const perpX = -dy / distance;
-      const perpY = dx / distance;
-
-      const targetRadius = enemy.radius || 16;
-      // Fix-pass-2 (C7b): use the gameplay-domain alias COMBAT_BULLET_RADIUS
-      // here too (mirrors the computeParallelOffset clamp). Mirrors BULLET_SIZE
-      // numerically; pinned by the F10 test.
-      const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
-
-      const slotCenter = (count - 1) / 2;
-      const results = [];
-      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
-        const offsetIndex = shotIndex - slotCenter;
-        const rawMagnitude = offsetIndex * spacing;
-        const magnitude = Math.max(
-          -clampLimit,
-          Math.min(clampLimit, rawMagnitude)
-        );
-
-        const shotPerpX = perpX * magnitude;
-        const shotPerpY = perpY * magnitude;
-
-        results.push({
-          fireOrigin: {
-            x: baseOriginX + shotPerpX,
-            y: baseOriginY + shotPerpY,
-          },
-          aimPoint: { x: baseAimX + shotPerpX, y: baseAimY + shotPerpY },
-        });
-      }
-      return results;
-    }
-
-    if (input.kind === 'direction') {
-      const angle = Number.isFinite(input.angle) ? input.angle : 0;
-      const originPos = input.originPos || { x: 0, y: 0 };
-      const baseOriginX = originPos.x;
-      const baseOriginY = originPos.y;
-      // Fix-pass (F6): `sharedOrigin` mode keeps every shot's fireOrigin
-      // anchored at `originPos` and applies the perpendicular offset only to
-      // the aimPoint. Used by manual aim so all multishot lanes leave from
-      // the SHIP NOSE (plan must_have), fanning out to slightly offset aim
-      // points rather than sliding the spawn position laterally.
-      const sharedOrigin = input.sharedOrigin === true;
-
-      const dxUnit = Math.cos(angle);
-      const dyUnit = Math.sin(angle);
-
-      // Perpendicular unit vector (no targetRadius reference — clamp is not used).
-      const perpX = -dyUnit;
-      const perpY = dxUnit;
-
-      const range = 1000;
-      const slotCenter = (count - 1) / 2;
-      const results = [];
-
-      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
-        const offsetIndex = shotIndex - slotCenter;
-        const magnitude = offsetIndex * spacing;
-        const shotPerpX = perpX * magnitude;
-        const shotPerpY = perpY * magnitude;
-
-        const fireOrigin = sharedOrigin
-          ? { x: baseOriginX, y: baseOriginY }
-          : { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY };
-        const aimAnchorX = sharedOrigin ? baseOriginX : fireOrigin.x;
-        const aimAnchorY = sharedOrigin ? baseOriginY : fireOrigin.y;
-        const aimPoint = sharedOrigin
-          ? {
-              // Aim point fans perpendicular from the on-axis projection so
-              // bullets share the origin but fly toward different lateral
-              // targets. Keeping the same `range` projection as the legacy
-              // path preserves muzzle-velocity magnitude per shot.
-              x: aimAnchorX + dxUnit * range + shotPerpX,
-              y: aimAnchorY + dyUnit * range + shotPerpY,
-            }
-          : {
-              x: aimAnchorX + dxUnit * range,
-              y: aimAnchorY + dyUnit * range,
-            };
-        results.push({ fireOrigin, aimPoint });
-      }
-      return results;
-    }
-
-    throw new Error(
-      `[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`
     );
   }
 
@@ -1392,14 +851,9 @@ class CombatSystem extends BaseSystem {
     }
   }
 
-  // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===
+  // The card effects' state; the weapon's own resets in Weapons.
   resetWeaponState() {
-    this.weaponId = WEAPONS.lance.id;
-    this.harmonicShots = 0;
-    this.evolutions = [];
-    this.apexes = [];
-    this.beams = [];
-    this.flakBursts = [];
+    this.weapons.resetWeaponState();
     this.arcs = [];
     this.wells = [];
     this.arcSeed = 0;
@@ -1417,299 +871,6 @@ class CombatSystem extends BaseSystem {
     this.afterburnTimer = 0;
     this.afterburnDashing = false;
     this.staticShellPending = false;
-    this.refreshLanceLook();
-  }
-
-  /** A family's "3 of a kind" synergy evolves the lance for the rest of the run. */
-  evolveWeapon(family) {
-    const evolution = WEAPON_EVOLUTIONS[family];
-    if (!evolution || this.evolutions.includes(family)) {
-      return;
-    }
-    this.evolutions.push(family);
-    this.refreshLanceLook();
-    this.eventBus?.emit?.('weapon-evolved', {
-      family,
-      id: evolution.id,
-      name: evolution.name,
-      description: evolution.description,
-      weaponId: this.weaponId,
-    });
-  }
-
-  /** Five cards of a family raise its evolution to the Apex for the run. */
-  apexWeapon(family) {
-    if (!WEAPON_APEX[family] || this.apexes.includes(family)) {
-      return;
-    }
-    this.evolveWeapon(family);
-    this.apexes.push(family);
-    this.refreshLanceLook();
-  }
-
-  // Colours override in unlock order (the last one wins); sizes multiply.
-  // Apex looks go on top of every evolution: `outer` is a second, wider
-  // ribbon, `sparkle` a glint trail, and any Apex adds a white core.
-  refreshLanceLook() {
-    const look = {
-      ...LANCE_BASE_LOOK,
-      arc: null,
-      outer: null,
-      sparkle: null,
-      apex: this.apexes.length > 0,
-    };
-    const deltas = [
-      ...this.evolutions.map((family) => WEAPON_EVOLUTIONS[family].look),
-      ...this.apexes.map((family) => WEAPON_APEX[family].look),
-    ];
-    deltas.forEach((delta) => {
-      ['body', 'trail', 'head', 'arc', 'outer', 'sparkle'].forEach((key) => {
-        if (delta[key]) look[key] = delta[key];
-      });
-      ['trailLength', 'width', 'headLength'].forEach((key) => {
-        if (delta[key]) look[key] *= delta[key];
-      });
-    });
-    look.trailStyles = lanceTrailStyles(look.trail);
-    this.lanceLook = look;
-    this.trailLength = Math.round(TRAIL_LENGTH * look.trailLength);
-    const coilgun = this.apexes.includes('kinetic');
-    this.lancePierce = coilgun
-      ? WEAPON_APEX.kinetic.pierce
-      : this.evolutions.includes('kinetic')
-        ? WEAPON_EVOLUTIONS.kinetic.pierce
-        : 0;
-    this.lanceApexDamage = coilgun ? WEAPON_APEX.kinetic.damageMultiplier : 1;
-  }
-
-  /** What the HUD shows: the weapon and its evolutions, in unlock order. */
-  getWeaponState() {
-    const every = HARMONIC_BEAM.every;
-    return {
-      weaponId: this.weaponId,
-      name: WEAPONS[this.weaponId].name,
-      chip: WEAPONS[this.weaponId].chip,
-      shotsToBeam:
-        this.weaponId === 'harmonic'
-          ? every - (this.harmonicShots % every)
-          : null,
-      evolutions: this.evolutions.map((family) => {
-        const apex = this.apexes.includes(family) ? WEAPON_APEX[family] : null;
-        const evolution = apex || WEAPON_EVOLUTIONS[family];
-        return {
-          family,
-          id: evolution.id,
-          name: evolution.name,
-          description: evolution.description,
-          apex: Boolean(apex),
-          short: apex ? apex.short : evolution.id.toUpperCase(),
-        };
-      }),
-    };
-  }
-
-  // Every enemy a weapon effect can reach: a phased Shade (`intangible`) is
-  // out of the Field for beams, arcs, burns, pulls and shoves, as for the lock.
-  forEachSolidEnemy(callback) {
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (enemy && !enemy.destroyed && !enemy.intangible) callback(enemy);
-    });
-  }
-
-  // Where a beam or a flak volley goes from `origin` (the muzzle): along the
-  // right stick, onto the primary lock's lead point in auto, along the turret
-  // otherwise.
-  getWeaponAngle(origin) {
-    const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
-    if (this.stickAim) return Math.atan2(this.stickAim.y, this.stickAim.x);
-    return aim
-      ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
-      : this.cachedPlayer.getTurretAngle();
-  }
-
-  // Harmonic beam: damage lands on everything in the segment on the firing
-  // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
-  // lances: from the muzzle onto the primary lock's lead point in auto, along
-  // the turret otherwise.
-  fireBeam(playerPos, playerStats) {
-    const origin = this.cachedPlayer.getMuzzlePoint();
-    const angle = this.getWeaponAngle(origin);
-    const dirX = Math.cos(angle);
-    const dirY = Math.sin(angle);
-    const { width, duration } = HARMONIC_BEAM;
-    const length =
-      HARMONIC_BEAM.length *
-      (this.cardEffects.thermalLens?.beamLengthMultiplier ?? 1);
-    const end = { x: origin.x + dirX * length, y: origin.y + dirY * length };
-    const damage =
-      (Number(playerStats?.damage) || 0) * HARMONIC_BEAM.damageMultiplier;
-
-    const struck = [];
-    this.forEachSolidEnemy((enemy) => {
-      const along = Math.max(
-        0,
-        Math.min(
-          length,
-          (enemy.x - origin.x) * dirX + (enemy.y - origin.y) * dirY
-        )
-      );
-      const offX = origin.x + dirX * along - enemy.x;
-      const offY = origin.y + dirY * along - enemy.y;
-      const radius = enemy.radius || 0;
-      const reach = radius + width / 2;
-      if (offX * offX + offY * offY > reach * reach) return;
-      // Hit point on the rim facing the beam (sparks need a normal).
-      const off = Math.hypot(offX, offY);
-      struck.push({
-        enemy,
-        x:
-          off > 0.5 ? enemy.x + (offX / off) * radius : enemy.x - dirX * radius,
-        y:
-          off > 0.5 ? enemy.y + (offY / off) * radius : enemy.y - dirY * radius,
-      });
-    });
-
-    const vx = dirX * this.bulletSpeed;
-    const vy = dirY * this.bulletSpeed;
-    struck.forEach(({ enemy, x, y }) => {
-      if (enemy.destroyed) return;
-      this.processBulletHit(
-        { kind: 'beam', x, y, vx, vy, damage, hit: false },
-        enemy,
-        this.cachedEnemies
-      );
-    });
-
-    this.beams.push({
-      x: origin.x,
-      y: origin.y,
-      ex: end.x,
-      ey: end.y,
-      angle,
-      width,
-      life: duration,
-      maxLife: duration,
-      maxRadius: HARMONIC_BEAM.flashRadius,
-    });
-    this.lastShotTime = -HARMONIC_BEAM.cooldownPenalty;
-
-    this.eventBus?.emit?.('weapon-beam-fired', {
-      position: origin,
-      end,
-      angle,
-      damage,
-      hits: struck.length,
-    });
-    this.eventBus?.emit?.('weapon-fired', {
-      position: playerPos,
-      target: end,
-      centerlineTarget: end,
-      weaponType: 'harmonic-beam',
-      primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
-      targeting: {
-        dynamicPrediction: this.usingDynamicPrediction(),
-        lockCount: this.currentTargetLocks.length,
-        multiLockActive: false,
-        predictedPoints: [],
-      },
-    });
-  }
-
-  // Scatter Coil: a fan of flak bolts from the muzzle, aimed like the beam.
-  // Multishot adds bolts to the fan; the volley waits FLAK.cooldownMultiplier
-  // × the lance's cooldown.
-  fireFlak(playerPos, playerStats) {
-    const origin = this.cachedPlayer.getMuzzlePoint();
-    const angle = this.getWeaponAngle(origin);
-    const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
-    const bolts = Math.min(FLAK.maxBolts, FLAK.bolts + extra);
-    const fan = (FLAK.fan * Math.PI) / 180;
-    // Shared by the volley's bolts: who its shrapnel already hit, and how
-    // many bursts it has had (only the first lights the 3D scene).
-    const volley = { struck: [], bursts: 0 };
-    const predictedPoints = [];
-    for (let i = 0; i < bolts; i += 1) {
-      const a = angle + fan * (i / (bolts - 1) - 0.5);
-      const end = {
-        x: origin.x + Math.cos(a) * FLAK.range,
-        y: origin.y + Math.sin(a) * FLAK.range,
-      };
-      this.projectiles.createBullet(origin, end, playerStats.damage, volley);
-      predictedPoints.push({ enemyId: null, position: end });
-    }
-    this.lastShotTime = -this.shootCooldown * (FLAK.cooldownMultiplier - 1);
-
-    const centre = {
-      x: origin.x + Math.cos(angle) * FLAK.range,
-      y: origin.y + Math.sin(angle) * FLAK.range,
-    };
-    this.eventBus?.emit?.('weapon-fired', {
-      position: playerPos,
-      target: centre,
-      centerlineTarget: centre,
-      weaponType: 'scatter',
-      primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
-      targeting: {
-        dynamicPrediction: this.usingDynamicPrediction(),
-        lockCount: this.currentTargetLocks.length,
-        multiLockActive: false,
-        predictedPoints,
-      },
-    });
-  }
-
-  // A flak burst: shrapnel hits every solid enemy whose rim is within
-  // FLAK.burstRadius, at most once per volley, through the same hit path as
-  // the bolts (so the evolutions apply).
-  burstFlak(bolt) {
-    const { x, y, volley } = bolt;
-    const struck = [];
-    this.forEachSolidEnemy((enemy) => {
-      if (volley.struck.includes(enemy)) return;
-      const reach = FLAK.burstRadius + (enemy.radius || 0);
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
-        struck.push(enemy);
-      }
-    });
-    volley.struck.push(...struck);
-    struck.forEach((enemy) => {
-      if (enemy.destroyed) return;
-      const dx = enemy.x - x;
-      const dy = enemy.y - y;
-      const distance = Math.hypot(dx, dy) || 1;
-      const radius = Math.min(enemy.radius || 0, distance);
-      this.processBulletHit(
-        {
-          kind: 'shrapnel',
-          x: enemy.x - (dx / distance) * radius,
-          y: enemy.y - (dy / distance) * radius,
-          vx: (dx / distance) * this.bulletSpeed,
-          vy: (dy / distance) * this.bulletSpeed,
-          damage: bolt.shrapnel,
-          hit: false,
-        },
-        enemy,
-        this.cachedEnemies
-      );
-    });
-
-    const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
-    this.flakBursts.push({
-      x,
-      y,
-      angle,
-      life: FLAK.burstDuration,
-      maxLife: FLAK.burstDuration,
-      maxRadius: FLAK.burstRadius,
-      lit: volley.bursts === 0,
-    });
-    volley.bursts += 1;
-    this.eventBus?.emit?.('flak-burst', {
-      position: { x, y },
-      radius: FLAK.burstRadius,
-      angle,
-      hits: struck.length,
-    });
   }
 
   // One more fragment from a beam kill, turned half a step from the first
@@ -2812,16 +1973,11 @@ class CombatSystem extends BaseSystem {
 
   // === MODE STATE (plan 01.07 FIX-05) ===
   getSpreadMode() {
-    return this.spreadMode;
+    return this.weapons.getSpreadMode();
   }
 
   setSpreadMode(value) {
-    if (!VALID_SPREAD_MODES.has(value)) {
-      // Defensive: ignore invalid value (T-07-02 tampering surface).
-      console.warn(`[CombatSystem] Ignoring invalid spreadMode "${value}"`);
-      return;
-    }
-    this.spreadMode = value;
+    this.weapons.setSpreadMode(value);
   }
 
   getAimMode() {
@@ -2833,10 +1989,6 @@ class CombatSystem extends BaseSystem {
   }
 
   // === CONFIGURAÇÃO ===
-  setShootCooldown(cooldown) {
-    this.shootCooldown = Math.max(0.1, cooldown);
-  }
-
   setTargetingRange(range) {
     this.targeting.setTargetingRange(range);
   }
@@ -2850,9 +2002,7 @@ class CombatSystem extends BaseSystem {
    * defensively so a constant file mis-edit can't silently corrupt state.
    */
   resetModeState() {
-    this.spreadMode = VALID_SPREAD_MODES.has(COMBAT_SPREAD_MODE_DEFAULT)
-      ? COMBAT_SPREAD_MODE_DEFAULT
-      : 'concentrated';
+    this.weapons.resetSpreadMode();
     this.targeting.resetAimMode();
   }
 
