@@ -11,6 +11,7 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { directorFor } from '../data/layers.js';
+import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
@@ -1596,6 +1597,26 @@ class UISystem extends BaseSystem {
       if (payload.kind === 'sensor-jam') {
         this.aaaTacticalHud?.setRadarJammed(false);
       }
+    });
+
+    // A Herald arrives under a violet banner; Silence jams the radar while it
+    // lives (a new run clears it).
+    this.registerEventListener('herald-spawned', ({ kind } = {}) => {
+      const herald = HERALD_KINDS[kind];
+      if (!herald) return;
+      this.aaaTacticalHud?.showHeraldBanner(
+        herald.displayName,
+        herald.subtitle
+      );
+      if (herald.jamsRadar) this.aaaTacticalHud?.setRadarJammed(true);
+    });
+    this.registerEventListener('herald-defeated', ({ kind } = {}) => {
+      if (HERALD_KINDS[kind]?.jamsRadar) {
+        this.aaaTacticalHud?.setRadarJammed(false);
+      }
+    });
+    this.registerEventListener('game-started', () => {
+      this.aaaTacticalHud?.setRadarJammed(false);
     });
 
     this.registerEventListener('enemy-destroyed', (payload = {}) => {

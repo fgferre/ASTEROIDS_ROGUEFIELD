@@ -18,6 +18,7 @@ import { Husk } from './enemies/types/Husk.js';
 import { Ram } from './enemies/types/Ram.js';
 import { Weaver } from './enemies/types/Weaver.js';
 import { Bulwark } from './enemies/types/Bulwark.js';
+import { Herald } from './enemies/types/Herald.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
@@ -60,6 +61,7 @@ import { HUSK_COMPONENTS } from '../data/enemies/husk.js';
 import { RAM_COMPONENTS } from '../data/enemies/ram.js';
 import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
 import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
+import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { directorFor } from '../data/layers.js';
 import { IS_DEV } from '../core/env.js';
@@ -688,6 +690,14 @@ class EnemySystem extends BaseSystem {
           tags: ['enemy', 'hostile', ...tags],
         });
       }
+
+      // Heralds: one per layer at most, unpooled like the Wardens; the kind
+      // (`heraldKind`) comes with each spawn.
+      this.factory.registerType('herald', {
+        class: Herald,
+        defaults: { components: HERALD_COMPONENTS },
+        tags: ['enemy', 'hostile', 'herald'],
+      });
 
       if (BOSS_CONFIG) {
         const bossDefaults = { ...BOSS_CONFIG };

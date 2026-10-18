@@ -28,6 +28,18 @@ describe('layer table', () => {
     expect(wardens).toEqual([5, 10, 15]);
   });
 
+  it('sends one Herald per biome: Dust on 3, Heat on 8, Silence on 13', () => {
+    const heralds = LAYERS.flatMap((layer, i) =>
+      layer.herald ? [[i + 1, layer.herald]] : []
+    );
+    expect(heralds).toEqual([
+      [3, 'dust'],
+      [8, 'heat'],
+      [13, 'silence'],
+    ]);
+    expect(directorFor(18).herald).toBeUndefined();
+  });
+
   it('lists only registered kinds, support kinds in rosters', () => {
     const restoreDom = installDomStubs();
     try {
@@ -42,6 +54,7 @@ describe('layer table', () => {
             expect(factory.hasType(kind)).toBe(true);
           }
         }
+        if (layer.herald) expect(factory.hasType('herald')).toBe(true);
       }
     } finally {
       GamePools.releaseAll();

@@ -1,8 +1,9 @@
 /**
  * Pickup System
  *
- * Field pickups (Magnet, Pulse, Overcharge) dropped by Elites and Wardens.
- * They drift, blink before expiring and apply their effect on contact.
+ * Field pickups (Magnet, Pulse, Overcharge) dropped by Elites, Heralds and
+ * Wardens. They drift, blink before expiring and apply their effect on
+ * contact.
  * Catalogue and drop rules: src/data/pickups.js.
  */
 
@@ -66,6 +67,12 @@ export class PickupSystem extends BaseSystem {
       const half = PICKUP_TOKEN.wardenSpread / 2;
       this.spawnPickup(PICKUP_DROPS.wardenGuaranteed, x - half, y);
       this.spawnPickup(this.rollKind(), x + half, y);
+    });
+
+    // A Herald always drops one.
+    this.registerEventListener('herald-defeated', ({ x, y } = {}) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      this.spawnPickup(this.rollKind(), x, y);
     });
 
     this.registerEventListener('upgrade-lucky-fragment', (data) => {

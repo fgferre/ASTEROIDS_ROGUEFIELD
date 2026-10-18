@@ -218,8 +218,9 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    // Husk, Ram, Weaver, Bulwark: fixed base orbs with a total XP target.
-    for (const type of ['husk', 'ram', 'weaver', 'bulwark']) {
+    // Husk, Ram, Weaver, Bulwark, Herald: fixed base orbs with a total XP
+    // target.
+    for (const type of ['husk', 'ram', 'weaver', 'bulwark', 'herald']) {
       const rewards = ENEMY_REWARDS[type];
       configs.set(type, {
         totalXP: rewards.totalXP,

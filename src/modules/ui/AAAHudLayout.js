@@ -204,9 +204,17 @@ export class AAAHudLayout {
     this._showBanner('EVENT', { tone: 'event', subtitle: label });
   }
 
+  /** Violet "HERALD OF …" banner with the Herald's line underneath. */
+  showHeraldBanner(name, subtitle) {
+    this._showBanner(String(name).toUpperCase(), {
+      tone: 'herald',
+      subtitle,
+    });
+  }
+
   /**
    * The centered banner, shown for `durationMs`, the last FADE_OUT_MS
-   * fading. `tone` 'boss', 'surge' or 'event' recolours it.
+   * fading. `tone` 'boss', 'surge', 'event' or 'herald' recolours it.
    */
   _showBanner(
     title,
@@ -231,6 +239,7 @@ export class AAAHudLayout {
       banner.classList.toggle('is-boss', tone === 'boss');
       banner.classList.toggle('is-surge', tone === 'surge');
       banner.classList.toggle('is-event', tone === 'event');
+      banner.classList.toggle('is-herald', tone === 'herald');
       banner.classList.remove('is-leaving');
       this._replay(banner, 'is-showing');
       this._bannerTimer = this._later(() => {
@@ -1382,6 +1391,12 @@ export class AAAHudLayout {
             .layer-banner.is-event .layer-banner__title { color: var(--xp); text-shadow: 0 0 18px var(--xp), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-event .layer-banner__line { background: linear-gradient(90deg, transparent, var(--xp) 20%, var(--xp) 80%, transparent); box-shadow: 0 0 12px var(--xp); }
             .layer-banner.is-event .layer-banner__sub { color: var(--xp); }
+            .layer-banner.is-herald .layer-banner__title { color: var(--text); text-shadow: 0 0 18px var(--boss), 0 0 4px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-herald .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+            .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
+
+            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
+            .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }

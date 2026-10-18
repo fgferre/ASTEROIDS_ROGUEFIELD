@@ -22,6 +22,9 @@ import {
 //   layer), announced by an amber "EVENT" banner with the event's label; what
 //   each does and for how long is in FIELD_EVENTS.
 // warden: the layer's boss; it brings its own minions.
+// herald: (layers 3, 8, 13) the kind of Herald (src/data/enemies/herald.js)
+//   that arrives HERALD_SPAWN_AT seconds into the layer; the layer holds
+//   until it dies.
 // A layer ends once everything listed has spawned and died; when the field
 // empties early, the next scheduled spawn comes at once.
 
@@ -85,6 +88,7 @@ export const LAYERS = deepFreeze([
     surges: [ROCKFALL],
     events: [],
     warden: false,
+    herald: 'dust',
   },
   // 4: the first Motes, in small swarms.
   {
@@ -133,6 +137,7 @@ export const LAYERS = deepFreeze([
     surges: [{ at: 30, kinds: ['ram'], count: 3, label: 'Ram pack' }],
     events: [],
     warden: false,
+    herald: 'heat',
   },
   {
     rocks: rockCurve(9),
@@ -205,6 +210,7 @@ export const LAYERS = deepFreeze([
     ],
     events: [fieldEvent('gravity-well', 25)],
     warden: false,
+    herald: 'silence',
   },
   {
     rocks: rockCurve(14),

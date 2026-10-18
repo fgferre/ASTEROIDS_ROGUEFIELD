@@ -6,6 +6,7 @@ import {
   EnemyMirror,
   KNOWN_KINDS,
   VARIANT_LOOKS,
+  VIEW_KINDS,
 } from '../../../src/modules/render3d/enemyMirror.js';
 
 // The vendored r128 build is UMD: evaluated with an `exports` object it
@@ -81,5 +82,52 @@ describe('EnemyMirror', () => {
       mirror.update([], 0);
     }
     expect(colors.size).toBe(Object.keys(ASTEROID_VARIANTS).length);
+  });
+
+  it('rebinds a rock that turns Volatile while alive (the Herald of Heat)', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const rock = {
+      id: 'rock',
+      type: 'asteroid',
+      variant: 'common',
+      x: 0,
+      y: 0,
+      radius: 12,
+      getHitFlash: () => 0,
+    };
+    mirror.update([rock], 0);
+    rock.variant = 'volatile';
+    mirror.update([rock], 0.1);
+
+    expect(mirror.views.get('rock').look).toBe(VARIANT_LOOKS.volatile);
+  });
+
+  it('draws each Herald kind with its own view; Silence rings its blink point', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const herald = (heraldKind, extra = {}) => ({
+      id: heraldKind,
+      type: 'herald',
+      heraldKind,
+      x: 400,
+      y: 300,
+      radius: 32,
+      telegraphRatio: 0.5,
+      blinkTarget: null,
+      getHitFlash: () => 0,
+      ...extra,
+    });
+    const silence = herald('silence', { blinkTarget: { x: 600, y: 300 } });
+
+    expect(mirror.update([herald('dust'), herald('heat'), silence], 0)).toBe(
+      null
+    );
+
+    for (const kind of ['dust', 'heat', 'silence']) {
+      expect(VIEW_KINDS).toContain(`herald-${kind}`);
+      expect(mirror.views.get(kind).kind).toBe(`herald-${kind}`);
+    }
+    const { telegraph } = mirror.views.get('silence');
+    expect(telegraph.group.visible).toBe(true);
+    expect(telegraph.target.position.x).toBe(200);
   });
 });

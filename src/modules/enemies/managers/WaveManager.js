@@ -37,6 +37,7 @@ import {
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
 import { FIELD_EVENTS, directorFor } from '../../../data/layers.js';
+import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
 import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
 
 // Support kinds the layer table can list; they spawn at a safe distance from
@@ -1006,7 +1007,9 @@ export class WaveManager {
           ? enemyGroup.type.toLowerCase()
           : '';
       const isAsteroid = typeKey === 'asteroid';
-      const isTacticalEnemy = SUPPORT_KINDS.includes(typeKey);
+      // Heralds appear in the field like support enemies (never Elite).
+      const isTacticalEnemy =
+        SUPPORT_KINDS.includes(typeKey) || typeKey === 'herald';
       // Legacy mode: the bridge (registerActiveEnemy) counts asteroids.
       const countedByBridge = isAsteroid && !waveManagerSpawnsAsteroids;
 
@@ -1259,6 +1262,17 @@ export class WaveManager {
       schedule.push({ at: event.at, groups: [], elite: 0, surge: null, event });
     }
 
+    // The Herald counts as one scheduled enemy: the layer holds until it dies.
+    if (director.herald) {
+      schedule.push({
+        at: HERALD_SPAWN_AT,
+        groups: [{ kind: 'herald', count: 1 }],
+        elite: 0,
+        surge: null,
+        herald: director.herald,
+      });
+    }
+
     // Stable: entries due at the same time keep table order.
     return schedule.sort((a, b) => a.at - b.at);
   }
@@ -1286,9 +1300,17 @@ export class WaveManager {
     this.checkWaveCompletion();
   }
 
-  spawnScheduled({ groups, elite, surge, event }) {
+  spawnScheduled({ groups, elite, surge, event, herald }) {
     if (event) {
       this.startFieldEvent(event);
+      return;
+    }
+
+    if (herald) {
+      this.spawnWave({
+        enemies: [{ type: 'herald', count: 1, heraldKind: herald }],
+        spawnDelayMultiplier: this.spawnDelayMultiplier,
+      });
       return;
     }
 

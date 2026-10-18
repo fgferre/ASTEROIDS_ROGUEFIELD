@@ -203,7 +203,7 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
 
 - [x] **R5.1 Cinema.** Intro de 3 s (câmera desce do Anel até a nave, cartão "LAYER 1 — THE OUTER RING", pulável) e
       epílogo da vitória (câmera recua, o Anel acende).
-- [ ] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
+- [x] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
       voláteis; Silence: embaralha o radar), intro curta, drop garantido.
 - [x] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
       do bioma, inimigos atordoados 1 s), Sensor Jam (radar fora 10 s); banner e cue.

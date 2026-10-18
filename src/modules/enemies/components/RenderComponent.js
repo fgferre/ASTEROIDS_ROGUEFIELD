@@ -974,6 +974,226 @@ const wardenNull = {
   },
 };
 
+// --- Heralds: drawn live; `telegraphRatio` lights the part that acts -----
+
+// Matte fill lit from the key light, for a body turned by `angle`.
+const turnedLitFill = (ctx, radius, angle) => {
+  const kx = Math.cos(KEY_LIGHT_ANGLE - angle) * radius;
+  const ky = Math.sin(KEY_LIGHT_ANGLE - angle) * radius;
+  const gradient = ctx.createLinearGradient(kx, ky, -kx, -ky);
+  gradient.addColorStop(0, PALETTE.hullLit);
+  gradient.addColorStop(0.5, PALETTE.hull);
+  gradient.addColorStop(1, PALETTE.rockShadow);
+  return gradient;
+};
+
+const heraldRim = (ctx, emissive) => {
+  ctx.strokeStyle = withAlpha(PALETTE.boss, emissive ? 0.9 : 0.55);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+};
+
+// Dust: a chamfered slab turned broadside to the ship, in a haze of dust;
+// three amber slits along its face light before the wall.
+const DUST_MOTES = 10;
+
+const dustSlab = (ctx, hx, hy) => {
+  const c = Math.min(hx, hy) * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(-hx + c, -hy);
+  ctx.lineTo(hx - c, -hy);
+  ctx.lineTo(hx, -hy + c);
+  ctx.lineTo(hx, hy - c);
+  ctx.lineTo(hx - c, hy);
+  ctx.lineTo(-hx + c, hy);
+  ctx.lineTo(-hx, hy - c);
+  ctx.lineTo(-hx, -hy + c);
+  ctx.closePath();
+};
+
+const heraldDust = {
+  facing: () => 0,
+  bake: false,
+  body() {},
+  glow() {},
+  live(ctx, size, enemy, emissive) {
+    const time = enemyTime(enemy);
+    const charge = clamp01(enemy.telegraphRatio);
+    if (!emissive) {
+      for (let i = 0; i < DUST_MOTES; i += 1) {
+        const a = hash(i) * TAU + time * (0.12 + 0.1 * hash(i + 11));
+        const r = size * (0.9 + 0.55 * hash(i + 3));
+        ctx.beginPath();
+        ctx.arc(
+          Math.cos(a) * r,
+          Math.sin(a) * r * 0.8,
+          size * (0.14 + 0.18 * hash(i + 7)),
+          0,
+          TAU
+        );
+        ctx.fillStyle = withAlpha(
+          PALETTE.rockLit,
+          (0.07 + 0.07 * hash(i + 5)) * (1 + charge)
+        );
+        ctx.fill();
+      }
+    }
+    const angle = enemy.rotation ?? 0;
+    const hx = size * 0.55;
+    const hy = size * 1.0;
+    ctx.save();
+    ctx.rotate(angle);
+    dustSlab(ctx, hx, hy);
+    if (emissive) {
+      heraldRim(ctx, true);
+    } else {
+      ctx.fillStyle = turnedLitFill(ctx, hy, angle);
+      ctx.fill();
+      darkEdge(ctx);
+      dustSlab(ctx, hx * 0.72, hy * 0.86);
+      ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+      dustSlab(ctx, hx + 0.5, hy + 0.5);
+      heraldRim(ctx, false);
+    }
+    const lit = 0.18 + 0.82 * charge;
+    for (let i = -1; i <= 1; i += 1) {
+      const y = i * hy * 0.55;
+      ctx.beginPath();
+      ctx.rect(hx * 0.22, y - hy * 0.18, hx * 0.18, hy * 0.36);
+      ctx.fillStyle = withAlpha(
+        PALETTE.shot,
+        emissive ? lit : 0.15 + 0.85 * lit
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
+    }
+  },
+};
+
+// Heat: a dark core inside a matte shell; the orange seam between them
+// brightens before it ignites the rocks.
+const heraldHeat = {
+  facing: () => 0,
+  bake: false,
+  body() {},
+  glow() {},
+  live(ctx, size, enemy, emissive) {
+    const time = enemyTime(enemy);
+    const charge = clamp01(enemy.telegraphRatio);
+    const shell = size * 0.95;
+    const seam = size * 0.66;
+    if (!emissive) {
+      ctx.beginPath();
+      ctx.arc(0, 0, shell, 0, TAU);
+      ctx.fillStyle = litFill(ctx, shell);
+      ctx.fill();
+      darkEdge(ctx);
+      bevel(ctx, shell - 0.9);
+      ctx.beginPath();
+      ctx.arc(0, 0, seam - 1.5, 0, TAU);
+      ctx.fillStyle = PALETTE.background;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, shell + 0.5, 0, TAU);
+    heraldRim(ctx, emissive);
+    const breathe = 0.5 + 0.5 * Math.sin(time * 2.2);
+    const heat = 0.35 + 0.15 * breathe + 0.5 * charge;
+    ctx.beginPath();
+    ctx.arc(0, 0, seam, 0, TAU);
+    ctx.strokeStyle = withAlpha(PALETTE.shot, Math.min(1, heat));
+    ctx.lineWidth = (emissive ? LINE.bold : LINE.base) + charge * 1.5;
+    ctx.stroke();
+    if (charge > 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (1.25 + 0.2 * (1 - charge)), 0, TAU);
+      ctx.strokeStyle = withAlpha(PALETTE.shot, 0.5 * charge);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+    }
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
+    }
+  },
+};
+
+// Silence: a tall, thin prism, nearly black, with one white eye. Before it
+// blinks a ring closes on the point it will appear at.
+const silencePrism = (ctx, size) => {
+  const w = size * 0.36;
+  const h = size * 1.25;
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(w, -h * 0.35);
+  ctx.lineTo(w, h * 0.6);
+  ctx.lineTo(0, h);
+  ctx.lineTo(-w, h * 0.6);
+  ctx.lineTo(-w, -h * 0.35);
+  ctx.closePath();
+};
+
+const heraldSilence = {
+  facing: () => 0,
+  bake: false,
+  body() {},
+  glow() {},
+  live(ctx, size, enemy, emissive) {
+    const time = enemyTime(enemy);
+    const charge = clamp01(enemy.telegraphRatio);
+    const target = enemy.blinkTarget;
+    if (target) {
+      const dx = target.x - enemy.x;
+      const dy = target.y - enemy.y;
+      ctx.beginPath();
+      ctx.arc(dx, dy, size * (2.2 - 1.2 * charge), 0, TAU);
+      ctx.strokeStyle = withAlpha(PALETTE.boss, 0.3 + 0.6 * charge);
+      ctx.lineWidth = emissive ? LINE.base : LINE.thin;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (1.3 + 0.4 * charge), 0, TAU);
+      ctx.strokeStyle = withAlpha(PALETTE.text, 0.25 * charge);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+    }
+    silencePrism(ctx, size);
+    if (emissive) {
+      heraldRim(ctx, true);
+    } else {
+      ctx.fillStyle = PALETTE.background;
+      ctx.fill();
+      ctx.fillStyle = withAlpha(PALETTE.boss, 0.16);
+      ctx.fill();
+      heraldRim(ctx, false);
+      // the key-lit facet, upper left
+      ctx.beginPath();
+      ctx.moveTo(0, -size * 1.25);
+      ctx.lineTo(-size * 0.36, -size * 0.44);
+      ctx.lineTo(-size * 0.36, size * 0.75);
+      ctx.lineTo(0, size * 1.25);
+      ctx.closePath();
+      ctx.fillStyle = withAlpha(PALETTE.hullLit, 0.35);
+      ctx.fill();
+    }
+    const flash = enemy.getHitFlash?.() ?? 0;
+    const eye = size * (0.12 + 0.05 * charge);
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.2, emissive ? eye * 1.6 : eye, 0, TAU);
+    ctx.fillStyle = withAlpha(
+      PALETTE.text,
+      Math.min(1, 0.75 + 0.15 * Math.sin(time * 3) + flash * 0.3)
+    );
+    ctx.fill();
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
+    }
+  },
+};
+
 const LOOKS = {
   triangle: mote,
   diamond: seeker,
@@ -985,10 +1205,19 @@ const LOOKS = {
   boss: warden,
   'warden-choir': wardenChoir,
   'warden-null': wardenNull,
+  'herald-dust': heraldDust,
+  'herald-heat': heraldHeat,
+  'herald-silence': heraldSilence,
 };
 
-// The three Wardens share the 'boss' shape; the kind picks the look.
+// The three Wardens share the 'boss' shape, the three Heralds 'herald'; the
+// kind picks the look.
 const BOSS_LOOKS = { choir: 'warden-choir', null: 'warden-null' };
+const HERALD_LOOKS = {
+  dust: 'herald-dust',
+  heat: 'herald-heat',
+  silence: 'herald-silence',
+};
 
 const lookSize = (enemy, shape) =>
   shape === 'boss' ? enemy.radius ?? 60 : enemy.radius ?? enemy.size ?? 16;
@@ -1048,7 +1277,11 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
 
   const requested = config?.shape ?? enemy.renderShape ?? 'triangle';
   const shape =
-    requested === 'boss' ? BOSS_LOOKS[enemy.bossKind] ?? requested : requested;
+    requested === 'boss'
+      ? BOSS_LOOKS[enemy.bossKind] ?? requested
+      : requested === 'herald'
+        ? HERALD_LOOKS[enemy.heraldKind] ?? HERALD_LOOKS.dust
+        : requested;
   const look = LOOKS[shape];
   if (!look) {
     console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);

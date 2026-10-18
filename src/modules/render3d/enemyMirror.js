@@ -1,8 +1,9 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
 // damage, and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
-// Bulwark) and the three Wardens (Prime, Choir, Null; one view kind each,
-// picked by `bossKind`). Views are pooled per kind and keyed by entity id; a
+// Bulwark), the three Wardens (Prime, Choir, Null; one view kind each,
+// picked by `bossKind`) and the three Heralds (Dust, Heat, Silence, picked by
+// `heraldKind`). Views are pooled per kind and keyed by entity id; a
 // view not seen in a frame is hidden and returned to its pool, unless its
 // enemy was killed (`markDead`): then it burns away first (dissolve.js).
 
@@ -10,6 +11,7 @@ import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
 import { WARDEN_KINDS } from '../../data/enemies/boss.js';
+import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
@@ -38,6 +40,10 @@ const TAU = Math.PI * 2;
 const BURST_MIN = 6;
 const BURST_MAX = 12;
 const WARDEN_BURST = 24;
+// Heralds: dust motes around the Dust slab; the Silence blink ring starts
+// this many radii wide and closes to one.
+const DUST_MOTES = 10;
+const BLINK_RING_START = 2.2;
 export const KNOWN_KINDS = new Set([
   'asteroid',
   'drone',
@@ -49,8 +55,17 @@ export const KNOWN_KINDS = new Set([
   'bulwark',
   'boss',
 ]);
-// Every view kind create() builds: a Warden's `bossKind` splits 'boss' in three.
-export const VIEW_KINDS = [...KNOWN_KINDS, 'boss-choir', 'boss-null'];
+// Every view kind create() builds: a Warden's `bossKind` splits 'boss' in
+// three; a Herald's `heraldKind` names its view.
+export const HERALD_VIEW_KINDS = Object.keys(HERALD_KINDS).map(
+  (kind) => `herald-${kind}`
+);
+export const VIEW_KINDS = [
+  ...KNOWN_KINDS,
+  'boss-choir',
+  'boss-null',
+  ...HERALD_VIEW_KINDS,
+];
 
 // Variant looks (§3 "Fragmento do Anel"): `base` (sRGB) multiplies the baked
 // rock color; veins are the light inside, glowing between `floor` and
@@ -602,6 +617,77 @@ export class EnemyMirror {
     this.bulwarkEdge.rotateX(-Math.PI / 2);
     this.bulwarkEdge.translate(0, 0.37, 0);
 
+    // Heralds. Dust: a chamfered slab, broadside to the ship (local +x),
+    // three slits along its face.
+    const outline = (points) => {
+      const shape = new THREE.Shape();
+      points.forEach(([x, y], i) =>
+        i ? shape.lineTo(x, y) : shape.moveTo(x, y)
+      );
+      shape.closePath();
+      return shape;
+    };
+    const slabC = 0.19;
+    const slabOutline = [
+      [-0.55 + slabC, -1],
+      [0.55 - slabC, -1],
+      [0.55, -1 + slabC],
+      [0.55, 1 - slabC],
+      [0.55 - slabC, 1],
+      [-0.55 + slabC, 1],
+      [-0.55, 1 - slabC],
+      [-0.55, -1 + slabC],
+    ];
+    this.dustSlab = new THREE.ExtrudeGeometry(outline(slabOutline), {
+      depth: 0.36,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.05,
+      bevelSegments: 1,
+    });
+    this.dustSlab.rotateX(-Math.PI / 2);
+    this.dustSlab.translate(0, -0.18, 0);
+    this.dustRim = new THREE.BufferGeometry().setFromPoints(
+      slabOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.24, -y * 1.04))
+    );
+    this.dustSlit = new THREE.BoxGeometry(0.1, 0.04, 0.36);
+    // Silence: a tall thin prism with a raised spine (the 2D outline).
+    const prismOutline = [
+      [0, -1.25],
+      [0.36, -0.44],
+      [0.36, 0.75],
+      [0, 1.25],
+      [-0.36, 0.75],
+      [-0.36, -0.44],
+    ];
+    this.silencePrism = new THREE.ExtrudeGeometry(outline(prismOutline), {
+      depth: 0.3,
+      bevelEnabled: true,
+      bevelThickness: 0.05,
+      bevelSize: 0.04,
+      bevelSegments: 1,
+    });
+    const prism = this.silencePrism.getAttribute('position');
+    for (let i = 0; i < prism.count; i += 1) {
+      const z = prism.getZ(i);
+      if (z > 0)
+        prism.setZ(
+          i,
+          z * (1.6 - 1.2 * Math.min(1, Math.abs(prism.getX(i)) / 0.36))
+        );
+    }
+    this.silencePrism.rotateX(-Math.PI / 2);
+    this.silencePrism.computeVertexNormals();
+    this.silenceRim = new THREE.BufferGeometry().setFromPoints(
+      prismOutline.map(([x, y]) => new THREE.Vector3(x * 1.08, 0.02, -y * 1.04))
+    );
+    // Heat: a matte ring around a dark core, the seam between them.
+    this.heatShell = new THREE.TorusGeometry(0.74, 0.22, 8, 40);
+    this.heatShell.rotateX(Math.PI / 2);
+    this.heatShell.scale(1, 0.7, 1);
+    this.heatSeam = new THREE.TorusGeometry(0.5, 0.05, 6, 48);
+    this.heatSeam.rotateX(Math.PI / 2);
+
     // A kind with no look yet: visible, obviously unfinished.
     this.unknownShape = new THREE.OctahedronGeometry(1, 0);
     this.unknownWarned = new Set();
@@ -639,6 +725,12 @@ export class EnemyMirror {
       case 'boss-choir':
       case 'boss-null':
         return this.createWarden(kind);
+      case 'herald-dust':
+        return this.createDust();
+      case 'herald-heat':
+        return this.createHeat();
+      case 'herald-silence':
+        return this.createSilence();
       default:
         return this.createUnknown();
     }
@@ -654,7 +746,7 @@ export class EnemyMirror {
     const looks =
       kind === 'asteroid'
         ? Object.keys(VARIANT_LOOKS)
-        : kind.startsWith('boss')
+        : kind.startsWith('boss') || kind.startsWith('herald')
           ? [false]
           : [false, true];
     const views = looks.map((look, i) => {
@@ -673,9 +765,12 @@ export class EnemyMirror {
     return views;
   }
 
-  kindOf(type, bossKind) {
+  kindOf(type, bossKind, heraldKind) {
     if (type === 'boss' && (bossKind === 'choir' || bossKind === 'null')) {
       return `boss-${bossKind}`;
+    }
+    if (type === 'herald') {
+      return `herald-${HERALD_KINDS[heraldKind] ? heraldKind : 'dust'}`;
     }
     if (KNOWN_KINDS.has(type)) return type;
     if (IS_DEV && !this.unknownWarned.has(type)) {
@@ -1000,6 +1095,181 @@ export class EnemyMirror {
     });
   }
 
+  // --- Heralds ----------------------------------------------------------------
+
+  // Herald rims glow violet: officials of the Ring, not Wardens.
+  heraldRim(geometry) {
+    return new this.THREE.LineLoop(geometry, this.bossRimMaterial);
+  }
+
+  createDust() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const slab = new THREE.Mesh(this.dustSlab, this.darkMaterial);
+    const slitMaterial = this.emissive(PALETTE.shot, 0.3);
+    const slits = [-0.55, 0, 0.55].map((z) => {
+      const slit = new THREE.Mesh(this.dustSlit, slitMaterial);
+      slit.position.set(0.24, 0.27, z);
+      return slit;
+    });
+    const rim = this.heraldRim(this.dustRim);
+    // the haze: a slow ring of faint dust motes, never in the bloom
+    const haze = new THREE.Group();
+    const hazeMaterial = new THREE.MeshBasicMaterial({
+      color: colorOf(THREE, PALETTE.rockLit),
+      transparent: true,
+      opacity: 0.1,
+      depthWrite: false,
+    });
+    const random = createSeededRandom(31.7);
+    for (let i = 0; i < DUST_MOTES; i += 1) {
+      const mote = new THREE.Mesh(this.smallSphere, hazeMaterial);
+      const angle = (i / DUST_MOTES) * TAU + random() * 0.5;
+      const reach = 1.0 + random() * 0.5;
+      mote.position.set(
+        Math.cos(angle) * reach,
+        -0.1 + random() * 0.3,
+        Math.sin(angle) * reach
+      );
+      const size = 0.12 + random() * 0.16;
+      mote.scale.set(size, size * 0.5, size);
+      haze.add(mote);
+    }
+    group.add(slab, ...slits, rim, haze);
+    this.scene.add(group);
+    return this.view('herald-dust', group, {
+      slitMaterial,
+      hazeMaterial,
+      haze,
+      accents: [slitMaterial],
+    });
+  }
+
+  createHeat() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const shell = new THREE.Mesh(this.heatShell, this.plateMaterial);
+    const core = new THREE.Mesh(this.sphere, this.darkMaterial);
+    core.scale.set(0.5, 0.3, 0.5);
+    const seamMaterial = this.emissive(PALETTE.shot, 0.8);
+    const seam = new THREE.Mesh(this.heatSeam, seamMaterial);
+    seam.position.y = 0.08;
+    const warnMaterial = new THREE.MeshBasicMaterial({
+      color: colorOf(THREE, PALETTE.shot),
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    const warn = new THREE.Mesh(this.warnRing, warnMaterial);
+    warn.visible = false;
+    const rim = this.heraldRim(this.circleRim);
+    group.add(shell, core, seam, warn, rim);
+    this.scene.add(group);
+    return this.view('herald-heat', group, {
+      seam,
+      seamMaterial,
+      warn,
+      accents: [seamMaterial],
+    });
+  }
+
+  createSilence() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const prismMaterial = new THREE.MeshStandardMaterial({
+      color: colorOf(THREE, '#120a1a'),
+      emissive: colorOf(THREE, PALETTE.boss),
+      emissiveIntensity: 0.06,
+      metalness: 0.5,
+      roughness: 0.38,
+      flatShading: true,
+    });
+    const prism = new THREE.Mesh(this.silencePrism, prismMaterial);
+    const eyeMaterial = this.emissive(PALETTE.text, 1.6);
+    const eye = new THREE.Mesh(this.smallSphere, eyeMaterial);
+    eye.scale.setScalar(0.12);
+    eye.position.set(0, 0.58, -0.2);
+    const rim = this.heraldRim(this.silenceRim);
+    group.add(prism, eye, rim);
+    this.scene.add(group);
+    // the blink rings live in field pixels, outside the scaled body
+    const ring = () =>
+      new THREE.Mesh(
+        this.warnRing,
+        new THREE.MeshBasicMaterial({
+          color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.4),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+        })
+      );
+    const telegraph = {
+      group: new THREE.Group(),
+      target: ring(),
+      self: ring(),
+    };
+    telegraph.group.add(telegraph.target, telegraph.self);
+    telegraph.group.visible = false;
+    this.scene.add(telegraph.group);
+    return this.view('herald-silence', group, {
+      eye,
+      eyeMaterial,
+      prismMaterial,
+      telegraph,
+      accents: [eyeMaterial],
+    });
+  }
+
+  // `telegraphRatio` lights what acts: the Dust slits, the Heat seam (and a
+  // ring), the Silence eye with the blink rings.
+  updateHerald(view, herald, time, flash) {
+    const { object } = view;
+    const radius = herald.radius || 30;
+    const charge = clamp01(herald.telegraphRatio || 0);
+    object.scale.setScalar(radius);
+    if (view.kind === 'herald-dust') {
+      object.rotation.y = -(herald.rotation || 0);
+      this.setGain(view.slitMaterial, 0.2 + 1.4 * charge + flash * 0.6);
+      view.haze.rotation.y = time * 0.15 + (herald.rotation || 0);
+      view.hazeMaterial.opacity = 0.08 + 0.1 * charge;
+    } else if (view.kind === 'herald-heat') {
+      object.rotation.y = 0;
+      const breathe = 0.5 + 0.5 * Math.sin(time * 2.2);
+      this.setGain(
+        view.seamMaterial,
+        0.7 + 0.25 * breathe + 2.2 * charge + flash * 0.6
+      );
+      view.warn.visible = charge > 0;
+      const ring = 1.25 + 0.2 * (1 - charge);
+      view.warn.scale.set(ring, 1, ring);
+      view.warn.material.opacity = 0.6 * charge;
+    } else {
+      object.rotation.y = 0;
+      view.eye.scale.setScalar(0.12 + 0.05 * charge);
+      this.setGain(
+        view.eyeMaterial,
+        1.4 + 0.25 * Math.sin(time * 3) + flash * 0.8 + charge
+      );
+      const t = view.telegraph;
+      const to = herald.blinkTarget;
+      t.group.visible = Boolean(to);
+      if (to) {
+        t.group.position.set(herald.x - HALF_W, 1, herald.y - HALF_H);
+        t.target.position.set(to.x - herald.x, 0, to.y - herald.y);
+        const r = radius * (BLINK_RING_START - (BLINK_RING_START - 1) * charge);
+        t.target.scale.set(r, 1, r);
+        t.target.material.opacity = 0.3 + 0.6 * charge;
+        const s = radius * (1.3 + 0.4 * charge);
+        t.self.scale.set(s, 1, s);
+        t.self.material.opacity = 0.3 * charge;
+      }
+    }
+  }
+
   createUnknown() {
     const mesh = new this.THREE.Mesh(this.unknownShape, this.darkMaterial);
     this.scene.add(mesh);
@@ -1222,7 +1492,7 @@ export class EnemyMirror {
       const enemy = enemies[i];
       if (!enemy || enemy.destroyed) continue;
       const key = enemy.id || enemy;
-      const kind = this.kindOf(enemy.type, enemy.bossKind);
+      const kind = this.kindOf(enemy.type, enemy.bossKind, enemy.heraldKind);
       let view = this.views.get(key);
       if (view && view.kind !== kind) {
         this.release(key, view);
@@ -1244,6 +1514,8 @@ export class EnemyMirror {
       else if (kind.startsWith('boss')) {
         this.updateWarden(view, enemy, time);
         warden = view;
+      } else if (kind.startsWith('herald')) {
+        this.updateHerald(view, enemy, time, flash);
       } else this.updateMachine(view, enemy, kind, time, flash);
     }
 
@@ -1289,7 +1561,9 @@ export class EnemyMirror {
   }
 
   accentOf(view) {
-    if (view.kind.startsWith('boss')) return this.bossColor;
+    if (view.kind.startsWith('boss') || view.kind === 'herald-silence') {
+      return this.bossColor;
+    }
     if (view.accents?.length) return view.accents[0].userData.base;
     if (view.material) return view.material.userData.rockUniforms.uVein.value;
     return this.threatColor;
@@ -1456,6 +1730,10 @@ export class EnemyMirror {
   }
 
   updateRock(view, enemy, time, flash) {
+    // a rock can change variant alive (the Herald of Heat ignites it)
+    if (view.look !== (VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common)) {
+      this.bind(view, enemy);
+    }
     const { object, look } = view;
     object.scale.setScalar((enemy.radius || 12) * ROCK_SCALE);
     object.rotation.y = -(enemy.rotation || 0);

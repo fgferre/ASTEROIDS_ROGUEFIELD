@@ -162,6 +162,30 @@ describe('WaveManager layer director', () => {
   });
 });
 
+describe('WaveManager Heralds', () => {
+  it('brings the layer 3 Herald of Dust at 15 s and holds the layer until it dies', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 3);
+      const { manager, active } = field;
+      active.push({ type: 'asteroid', destroyed: false });
+
+      manager.update(14.9);
+      expect(ofType(active, 'herald')).toHaveLength(0);
+      manager.update(0.2);
+      const [herald] = ofType(active, 'herald');
+      expect(herald).toMatchObject({ heraldKind: 'dust', elite: false });
+
+      manager.update(60); // the Rockfall surge too
+      active.filter((e) => e !== herald && !e.destroyed).forEach(field.kill);
+      expect(manager.waveInProgress).toBe(true);
+
+      field.kill(herald);
+      expect(manager.waveInProgress).toBe(false);
+    });
+  });
+});
+
 describe('WaveManager field events', () => {
   const eventsOf = (field, name) =>
     field.emits.filter((e) => e.event === name).map((e) => e.payload);

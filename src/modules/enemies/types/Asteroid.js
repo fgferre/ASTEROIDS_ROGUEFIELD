@@ -456,6 +456,21 @@ export class Asteroid extends BaseEnemy {
     return Math.min(multiplier, hardCap);
   }
 
+  /**
+   * The Herald of Heat sets this rock alight: it turns Volatile, its fuse
+   * starting now. Returns false when it already was.
+   */
+  ignite() {
+    if (this.variant === 'volatile') return false;
+    this.variant = 'volatile';
+    this.variantConfig = ASTEROID_VARIANTS.volatile;
+    this.behavior = this.variantConfig.behavior;
+    this.movementStrategy = this.variantConfig.movementStrategy;
+    this.variantState = this.initializeVariantState();
+    this.visualState = this.initializeVisualState();
+    return true;
+  }
+
   initializeVariantState() {
     if (!this.behavior) {
       return {};

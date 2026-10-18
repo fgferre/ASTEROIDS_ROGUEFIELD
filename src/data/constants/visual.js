@@ -8,6 +8,7 @@ import { HUSK_CONFIG, HUSK_REWARDS } from '../enemies/husk.js';
 import { RAM_CONFIG, RAM_REWARDS } from '../enemies/ram.js';
 import { WEAVER_CONFIG, WEAVER_REWARDS } from '../enemies/weaver.js';
 import { BULWARK_CONFIG, BULWARK_REWARDS } from '../enemies/bulwark.js';
+import { HERALD_REWARDS } from '../enemies/herald.js';
 import {
   BOSS_CONFIG,
   BOSS_PHYSICS_CONFIG,
@@ -63,6 +64,7 @@ export const ENEMY_REWARDS = deepFreeze({
   ram: RAM_REWARDS,
   weaver: WEAVER_REWARDS,
   bulwark: BULWARK_REWARDS,
+  herald: HERALD_REWARDS,
   boss: BOSS_REWARDS,
 });
 
