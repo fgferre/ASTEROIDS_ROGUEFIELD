@@ -42,7 +42,7 @@ describe('Codex tabs', () => {
     const cards = view.markup.match(/<li [^>]*>/g);
 
     expect(cards).toHaveLength(18);
-    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(13);
+    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(17);
     expect(view.markup).toMatch(
       /is-unlocked" data-achievement="ring-breaker"[\s\S]*?Unlocked 18 Oct 2026/
     );
