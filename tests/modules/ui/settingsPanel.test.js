@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
-import UISystem from '../../../src/modules/UISystem.js';
+import { SettingsPanel } from '../../../src/modules/ui/SettingsPanel.js';
 import SETTINGS_SCHEMA from '../../../src/data/settingsSchema.js';
 import { settingPreview } from '../../../src/modules/ui/settingsPreview.js';
 
@@ -44,13 +44,13 @@ const defaultsOf = (category) =>
 
 function renderCategory(category) {
   const container = fakeElement('div');
-  const ui = Object.assign(Object.create(UISystem.prototype), {
-    domRefs: { settings: { container } },
-    schemaByCategory: new Map(SETTINGS_SCHEMA.map((c) => [c.id, c])),
+  const panel = new SettingsPanel({
+    refs: { container },
     settings: { getCategoryValues: () => defaultsOf(category) },
-    liveQualityPreset: null,
+    schema: SETTINGS_SCHEMA,
+    livePreset: () => null,
   });
-  ui.renderSettingsPanel(category.id);
+  panel.renderSettingsPanel(category.id);
   return container.children;
 }
 
@@ -108,12 +108,11 @@ describe('Settings panel', () => {
 
   it('closes on Esc when opened from the menu, not over pause or mid-binding', () => {
     const escFor = (state) => {
-      const ui = Object.assign(Object.create(UISystem.prototype), {
-        settingsState: { isOpen: true, capture: null, ...state },
-        closeSettingsPanel: vi.fn(),
-      });
-      ui.handleSettingsKeyDown({ key: 'Escape', preventDefault() {} });
-      return ui.closeSettingsPanel.mock.calls.length;
+      const panel = new SettingsPanel({ schema: SETTINGS_SCHEMA });
+      Object.assign(panel.settingsState, { isOpen: true, ...state });
+      panel.closeSettingsPanel = vi.fn();
+      panel.handleSettingsKeyDown({ key: 'Escape', preventDefault() {} });
+      return panel.closeSettingsPanel.mock.calls.length;
     };
     expect(escFor({ source: 'menu' })).toBe(1);
     expect(escFor({ source: 'pause' })).toBe(0);
@@ -146,8 +145,8 @@ describe('Accessibility settings on the page', () => {
   afterEach(() => restoreDom());
 
   it('sets text scale, contrast, flashing and subtitle hooks, and clears them live', () => {
-    const apply = (values) =>
-      UISystem.prototype.applyAccessibilitySettings.call({}, values);
+    const panel = new SettingsPanel({ schema: SETTINGS_SCHEMA });
+    const apply = (values) => panel.applyAccessibilitySettings(values);
     const { body, documentElement: root } = document;
 
     apply({

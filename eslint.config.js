@@ -25,6 +25,7 @@ export default [
       'exported-assets/**',
       'src/public/libs/**',
       '.planning/**',
+      '.claude/**',
     ],
   },
   {

@@ -61,7 +61,7 @@ describe('UISystem gamepad navigation', () => {
       querySelectorAll: () => buttons,
     };
     document.getElementById = (id) => (id === 'menu-screen' ? screen : null);
-    const ui = { settingsState: { capture: null } };
+    const ui = { settingsPanel: { capturing: false } };
     Object.setPrototypeOf(ui, UISystem.prototype);
     return { ui, clicks };
   }
