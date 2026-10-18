@@ -2364,6 +2364,20 @@ class UISystem extends BaseSystem {
         this.renderHangar();
       }
     });
+    // The 3D hull preview follows the hovered or focused hull button.
+    const previewHull = (event) => {
+      const hull = event.target.closest?.('[data-hangar-hull]:enabled');
+      this.eventBus.emit('hangar-hull-hovered', {
+        hullId: hull?.dataset.hangarHull ?? null,
+      });
+    };
+    refs.hulls?.addEventListener('pointerover', previewHull);
+    refs.hulls?.addEventListener('focusin', previewHull);
+    ['pointerleave', 'focusout'].forEach((type) =>
+      refs.hulls?.addEventListener(type, () =>
+        this.eventBus.emit('hangar-hull-hovered', { hullId: null })
+      )
+    );
     document.addEventListener('keydown', (event) => {
       if (this.hangarState.isOpen && event.key === 'Escape') {
         event.preventDefault();

@@ -787,14 +787,16 @@ export class WaveManager {
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    // Same scaling as EnemySystem.layerDirector (difficulty spawnCount).
+    // Same scaling as EnemySystem.layerDirector (difficulty spawnCount); the
+    // endless modifiers roll from the run seed, so each run gets its own.
+    const difficulty = resolveService(
+      'difficulty',
+      this.enemySystem.dependencies
+    );
     const director = this.applyHuntersMoon(
       scaleDirector(
-        directorFor(waveNumber, this.getRandomService().seed),
-        resolveService(
-          'difficulty',
-          this.enemySystem.dependencies
-        )?.getModifiers().spawnCount ?? 1
+        directorFor(waveNumber, difficulty?.getRunSeed() ?? 0),
+        difficulty?.getModifiers().spawnCount ?? 1
       )
     );
     let config;

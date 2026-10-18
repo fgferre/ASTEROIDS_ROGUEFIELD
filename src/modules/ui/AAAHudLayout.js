@@ -39,6 +39,8 @@ const DAMAGE_ARC_RY = GAME_HEIGHT * 0.44;
 // Off-screen arrows: pooled, inset from the edge, distance rounded to 10.
 const EDGE_ARROW_MAX = 8;
 const EDGE_ARROW_MARGIN = 28;
+const EDGE_ARROW_GAP = 28;
+const EDGE_ARROW_STEP = 30;
 
 /** Screen angle (rad) from the ship to the damage source; null when unknown. */
 export function damageArcAngle(ship, source) {
@@ -95,6 +97,38 @@ export function edgeArrow(
     }
   }
   return { x, y, angle: Math.atan2(dy, dx), edge };
+}
+
+/**
+ * Keeps edgeArrow results from stacking: nearest first (`distance`, missing
+ * = farthest), an arrow within EDGE_ARROW_GAP px of a placed one on the
+ * same edge steps EDGE_ARROW_STEP px along it, toward the edge's middle
+ * (away from the corner panel it was pushed against). Mutates the arrows.
+ */
+export function spreadEdgeArrows(
+  arrows,
+  width = GAME_WIDTH,
+  height = GAME_HEIGHT
+) {
+  const near = (arrow) =>
+    Number.isFinite(arrow.distance) ? arrow.distance : Infinity;
+  const placed = [];
+  for (const arrow of [...arrows].sort((a, b) => near(a) - near(b) || 0)) {
+    const axis = arrow.edge === 'left' || arrow.edge === 'right' ? 'y' : 'x';
+    const middle = axis === 'y' ? height / 2 : width / 2;
+    const step = arrow[axis] <= middle ? EDGE_ARROW_STEP : -EDGE_ARROW_STEP;
+    while (
+      placed.some(
+        (other) =>
+          other.edge === arrow.edge &&
+          Math.abs(other[axis] - arrow[axis]) < EDGE_ARROW_GAP
+      )
+    ) {
+      arrow[axis] += step;
+    }
+    placed.push(arrow);
+  }
+  return arrows;
 }
 
 /** Radar blip glyph for an enemy: rock, machine, elite, herald or warden. */
@@ -1300,25 +1334,31 @@ export class AAAHudLayout {
     if (!this._panelCorners) {
       this._panelCorners = this._measurePanelCorners();
     }
-    let used = 0;
+    const shown = [];
     for (
       let i = 0;
-      i < targets.length && used < this._arrowPool.length;
+      i < targets.length && shown.length < this._arrowPool.length;
       i += 1
     ) {
-      const target = targets[i];
       const arrow = edgeArrow(
-        target,
+        targets[i],
         GAME_WIDTH,
         GAME_HEIGHT,
         EDGE_ARROW_MARGIN,
         this._panelCorners
       );
-      if (!arrow) {
-        continue;
+      if (arrow) {
+        arrow.target = targets[i];
+        arrow.distance = targets[i].distance;
+        shown.push(arrow);
       }
-      const slot = this._arrowPool[used];
-      used += 1;
+    }
+    spreadEdgeArrows(shown);
+    const used = shown.length;
+    for (let i = 0; i < used; i += 1) {
+      const arrow = shown[i];
+      const { target } = arrow;
+      const slot = this._arrowPool[i];
       const { el } = slot;
       if (slot.kind !== target.kind || slot.color !== target.color) {
         slot.kind = target.kind;
