@@ -4,34 +4,39 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~08h30) — RODADA 6 (PRIMEIRA METADE) MESCLADA NA `main` + CORREÇÃO
+## O BASTÃO — onde a rodada parou (18/10, ~09h40) — RODADA 6 COMPLETA E MESCLADA NA `main` (publicado)
 
 **Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
-(contém PRs #247–#251 e o sexto). Ler este BASTÃO, `PLAN.md` (Rodadas 2–6) e `docs/NORTE.md` (§7 + regra dos dois
-eixos); `npm ci && npm run done` (~900 testes).
-
-**Correção importante (18/10):** a `main` do PR #251 tinha um erro de render em 3D (`Cannot read properties of null
-(reading 'state')`, frame a frame depois de alguns segundos): o shadow map era reconstruído fora de um frame quando o
-preset de qualidade mudava. Corrigido em `66cb870` com teste de regressão; sonda headless de 20 s: 0 erros.
+(PRs #247–#252 e o sétimo). Ler este BASTÃO, `PLAN.md` (Rodadas 2–6) e `docs/NORTE.md` (§7 + regra dos dois eixos);
+`npm ci && npm run done` (938 testes). **Antes de qualquer junção:** `scratchpad/errprobe.mjs` (20 s de cena hero
+headless) deve dar `errors: 0` — o gate não pega erro de runtime no render.
 
 **Regra dele:** toda rodada melhora também gráficos, efeitos, câmera, jogabilidade e UX, não só conteúdo.
 
-**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5 (espaço procedural sem chão; casco segue o movimento, arma é
-torreta). Ainda sem veredito sobre a Rodada 5 em si.
+**Vereditos dele até agora (itens 7 e 8):** fundo como textura + sombra no chão → espaço procedural com sombras só
+entre objetos (Rodada 5); nave virando para a mira → casco segue o movimento, arma é torreta (Rodada 5). Sem veredito
+ainda sobre as Rodadas 5 e 6 em si.
 
-**Rodada 6 feita:** gamepad twin-stick (stick direito mira a torreta, rumble, menus pelo controle, replay v4);
-afixos de Elite (Shielded, Swift, Volatile, Splitter, Warded) com badges e nomes; HUD direcional (arcos de dano,
-setas de fora de tela, barra de chefe por fase, ícones no radar). **Rodada 6 pendente:** dificuldade + seed diária
-(R6.3), Solar Slicer de verdade (R6.4), rochas instanciadas/orçamento de sombra (R6.6), áudio espacial (R6.7).
+**Rodada 6 (completa):** gamepad twin-stick com rumble e menus pelo controle (replay v4); afixos de Elite (Shielded,
+Swift, Volatile, Splitter, Warded); HUD direcional (arcos de dano, setas de fora de tela, barra de chefe por fase,
+ícones no radar); dificuldade Pilot/Veteran/Warden, seed visível e compartilhável (`?seed=`), Daily Field com recorde
+próprio (replay v5); Solar Slicer como nave de verdade (casco, lâminas, stats); rochas instanciadas + orçamento de
+sombra (205 → ~155 draw calls na cena carregada, meta < 80 ainda aberta); áudio com distância, percussão por bioma e
+voz dos Wardens. Correção importante: erro de render do shadow map (publicado na #251) corrigido em `66cb870`.
 
 **Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais; `graphics.quality` em Settings.
 
-**O que só ele pode responder, jogando:** fundo/sombras/torreta da Rodada 5; se o controle twin-stick responde bem
-(deadzone 0,2, mira manual acima de 0,35); se os afixos leem à distância; setas e arcos da HUD atrapalham ou ajudam.
+**O que só ele pode responder, jogando:** Rodadas 5 e 6 inteiras — fundo/sombras/torreta; controle twin-stick;
+afixos legíveis?; HUD direcional ajuda ou polui?; dificuldade e Daily Field; Slicer vs Interceptor; som com distância
+e percussão; todas as "propostas" nomeadas no código.
 
-**Avisos de processo (18/10):** sempre rodar a sonda headless de erros (`scratchpad/errprobe.mjs`, 20 s de cena hero)
-antes de mesclar — o gate não pega erro de runtime no render; o container pode reiniciar e derrubar workers (o
-trabalho em disco sobrevive); `pgrep -f` mata o próprio shell do worker.
+**Próxima rodada (sem veredito dele):** `BACKLOG.md` (30 linhas, triado) — candidatos de maior impacto: fundir/instanciar
+as máquinas para a meta de draw calls; HUD AIM MANUAL; linha de lock 3D a partir da torreta; salvage por dificuldade;
+voz/percussão só ouvidas em teste.
+
+**Avisos de processo (18/10):** o container pode reiniciar e derrubar workers (o trabalho em disco sobrevive;
+relançar com "continue do que está na árvore"); `pgrep -f` mata o próprio shell do worker; dois workers no mesmo
+arquivo exigem separar hunks no commit; desligar temporizadores antigos ao rearmar.
 
 ## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
 
