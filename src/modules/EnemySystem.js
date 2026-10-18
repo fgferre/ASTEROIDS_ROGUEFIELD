@@ -727,14 +727,14 @@ class EnemySystem extends BaseSystem {
           delete bossDefaults.minionTypes;
         }
 
+        // Wardens are unpooled: releaseAsteroid never returns a boss, so a
+        // pooled one would stay in the pool's in-use set after its fight.
         this.factory.registerType('boss', {
           class: BossEnemy,
-          pool: GamePools?.bosses || null,
           defaults: { ...bossDefaults, components: BOSS_COMPONENTS },
           tags: ['enemy', 'boss', 'elite'],
         });
-        // Choir and Null: their own classes, unpooled (bosses are never
-        // released back to a pool).
+        // Choir and Null: their own classes.
         for (const kind of Object.keys(WARDEN_KINDS)) {
           if (kind === 'prime') continue;
           this.factory.registerType(wardenFactoryKey(kind), {
@@ -1675,15 +1675,16 @@ class EnemySystem extends BaseSystem {
 
   /**
    * The layer's director (Boss Rush's on a Boss Rush run) with spawn counts
-   * scaled by the difficulty.
+   * scaled by the difficulty; past the table it rolls from the run seed, as
+   * WaveManager's does.
    */
   layerDirector(layer) {
+    const difficulty = resolveService('difficulty', this.dependencies);
     return scaleDirector(
       this.waveManager?.bossRush
         ? bossRushDirectorFor(layer)
-        : directorFor(layer),
-      resolveService('difficulty', this.dependencies)?.getModifiers()
-        .spawnCount ?? 1
+        : directorFor(layer, difficulty?.getRunSeed() ?? 0),
+      difficulty?.getModifiers().spawnCount ?? 1
     );
   }
 

@@ -6,6 +6,7 @@ import {
   directorFor,
   modifierFor,
 } from '../../src/data/layers.js';
+import Husk from '../../src/modules/enemies/types/Husk.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 import { withWaveOverrides } from '../__helpers__/setup.js';
 
@@ -172,6 +173,86 @@ describe('WaveManager layer director', () => {
       expect(emits).toContainEqual({
         event: 'wave-complete',
         payload: expect.objectContaining({ wave: 10, enemiesKilled: 5 }),
+      });
+    });
+  });
+});
+
+describe('WaveManager accounting', () => {
+  // EnemySystem's rock counters as EnemySpawnSystem leaves them mid-layer.
+  const startWithRocks = (layer) => {
+    const field = createField();
+    startLayer(field, layer);
+    field.enemySystem.waveState = {
+      isActive: true,
+      totalAsteroids: 9,
+      asteroidsSpawned: 0,
+    };
+    return field;
+  };
+
+  it('keeps the rock counts in step when a Husk splits mid-wave', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const field = startWithRocks(6);
+      Object.assign(field.enemySystem, {
+        eventBus: { emit: vi.fn() },
+        waveManager: field.manager,
+      });
+      const husk = new Husk(field.enemySystem, { id: 'husk', x: 400, y: 200 });
+
+      husk.takeDamage(husk.maxHealth);
+      const motes = ofType(field.active, 'drone');
+      field.kill(motes[0]);
+
+      expect(motes).toHaveLength(3);
+      expect(field.enemySystem.waveState.asteroidsSpawned).toBe(0);
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Accounting discrepancy')
+      );
+      warn.mockRestore();
+    });
+  });
+
+  it('registers a pooled rock again when it comes back as a new life', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const { manager } = startWithRocks(1);
+      const rock = { type: 'asteroid', id: 'first-life' };
+
+      expect(manager.registerActiveEnemy(rock)).toBe(true);
+      expect(manager.registerActiveEnemy(rock)).toBe(false);
+      rock.id = 'second-life';
+      expect(manager.registerActiveEnemy(rock)).toBe(true);
+      expect(manager.asteroidsSpawnedThisWave).toBe(2);
+    });
+  });
+
+  it('counts a Herald wall rock once on each side', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = startWithRocks(3);
+      const { manager } = field;
+      const rock = { type: 'asteroid', id: 'wall-rock' };
+
+      // spawnChild: the factory bridge registers it, then the minion path.
+      manager.registerActiveEnemy(rock);
+      manager.registerDynamicMinion(rock, { minionType: 'asteroid' });
+
+      expect(manager.enemiesSpawnedThisWave).toBe(1);
+      expect(manager.asteroidsSpawnedThisWave).toBe(1);
+      expect(field.enemySystem.waveState.asteroidsSpawned).toBe(1);
+    });
+  });
+
+  it("adds legacy surge rocks to EnemySystem's rock counts", async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = startWithRocks(1);
+      field.active.push({ type: 'asteroid', destroyed: false });
+
+      field.manager.update(40); // the Rockfall surge: six rocks
+
+      expect(field.enemySystem.waveState).toMatchObject({
+        totalAsteroids: 15,
+        asteroidsSpawned: 6,
       });
     });
   });

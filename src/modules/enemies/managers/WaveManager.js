@@ -71,6 +71,11 @@ const SURGE_INSET = 40;
 const GRAVITY_WELL_INSET = 40;
 const SOLAR_FLARE_FLASH = { alpha: 0.5, duration: 0.6, intensity: 0.45 };
 
+// A pool hands the same object back as a new life (a new id) within a wave,
+// so a wave registration is remembered per life, not per object.
+const isRegisteredLife = (lives, enemy) =>
+  lives.has(enemy) && lives.get(enemy) === enemy.id;
+
 export class WaveManager {
   /**
    * Creates a new Wave Manager.
@@ -151,8 +156,8 @@ export class WaveManager {
     this.asteroidsSpawnedThisWave = 0;
     this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
-    this._legacyRegisteredEnemies = new WeakSet();
-    this._trackedDynamicMinions = new WeakSet();
+    this._legacyRegisteredEnemies = new WeakMap();
+    this._trackedDynamicMinions = new WeakMap();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
 
@@ -546,18 +551,21 @@ export class WaveManager {
     }
 
     if (!this._legacyRegisteredEnemies) {
-      this._legacyRegisteredEnemies = new WeakSet();
+      this._legacyRegisteredEnemies = new WeakMap();
     }
 
     const bypassDuplicateCheck = Boolean(skipDuplicateCheck);
-    const alreadyRegistered = this._legacyRegisteredEnemies.has(enemy);
+    const alreadyRegistered = isRegisteredLife(
+      this._legacyRegisteredEnemies,
+      enemy
+    );
 
     if (!bypassDuplicateCheck && alreadyRegistered) {
       return false;
     }
 
     if (!alreadyRegistered) {
-      this._legacyRegisteredEnemies.add(enemy);
+      this._legacyRegisteredEnemies.set(enemy, enemy.id);
     }
 
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
@@ -652,26 +660,31 @@ export class WaveManager {
     }
 
     if (!this._trackedDynamicMinions) {
-      this._trackedDynamicMinions = new WeakSet();
+      this._trackedDynamicMinions = new WeakMap();
     }
 
-    if (this._trackedDynamicMinions.has(enemy)) {
+    if (isRegisteredLife(this._trackedDynamicMinions, enemy)) {
       return false;
     }
 
-    this._trackedDynamicMinions.add(enemy);
+    this._trackedDynamicMinions.set(enemy, enemy.id);
 
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
     const normalizedType = this.getNormalizedEnemyType(enemy);
     const isAsteroid = this.isAsteroidType(normalizedType);
 
-    this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
-    this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
+    // A rock the legacy bridge (registerActiveEnemy) already counted on
+    // acquire (a Herald's wall) would hold the layer open if counted twice.
+    if (!isRegisteredLife(this._legacyRegisteredEnemies, enemy)) {
+      this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
+      this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
 
-    if (isAsteroid) {
-      this.totalAsteroidEnemiesThisWave =
-        coerce(this.totalAsteroidEnemiesThisWave) + 1;
-      this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
+      if (isAsteroid) {
+        this.totalAsteroidEnemiesThisWave =
+          coerce(this.totalAsteroidEnemiesThisWave) + 1;
+        this.asteroidsSpawnedThisWave =
+          coerce(this.asteroidsSpawnedThisWave) + 1;
+      }
     }
 
     if (this.managerTotalsForWave) {
@@ -690,7 +703,9 @@ export class WaveManager {
       };
     }
 
-    if (this.enemySystem?.waveState && this.enemySystem.waveState.isActive) {
+    // EnemySystem's waveState counts rocks only (its kills sync from
+    // asteroidsKilledThisWave), so a drone or mine minion stays out of it.
+    if (isAsteroid && this.enemySystem?.waveState?.isActive) {
       const state = this.enemySystem.waveState;
       state.totalAsteroids = coerce(state.totalAsteroids) + 1;
       state.asteroidsSpawned = coerce(state.asteroidsSpawned) + 1;
@@ -793,8 +808,8 @@ export class WaveManager {
     this.asteroidsKilledThisWave = 0;
     this.totalAsteroidEnemiesThisWave = 0;
     this.spawnQueue = [];
-    this._legacyRegisteredEnemies = new WeakSet();
-    this._trackedDynamicMinions = new WeakSet();
+    this._legacyRegisteredEnemies = new WeakMap();
+    this._trackedDynamicMinions = new WeakMap();
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
@@ -1256,6 +1271,14 @@ export class WaveManager {
           if (compatibilityMode && isAsteroid) {
             this.asteroidsSpawnedThisWave++;
           }
+        }
+
+        // The bridge counts a surge rock here; EnemySystem's waveState only
+        // planned the layer's own rocks, so it counts it too.
+        const rockState = this.enemySystem.waveState;
+        if (enemy && countedByBridge && rockState?.isActive) {
+          rockState.totalAsteroids += 1;
+          rockState.asteroidsSpawned += 1;
         }
       }
     }
@@ -2459,8 +2482,12 @@ export class WaveManager {
     const enemySystemTotal = this.enemySystem.waveState.totalAsteroids;
     const enemySystemSpawned = this.enemySystem.waveState.asteroidsSpawned;
 
-    // Allow small discrepancies during spawn/death timing
-    const totalDelta = Math.abs(waveManagerTotal - enemySystemTotal);
+    // Allow small discrepancies during spawn/death timing. When EnemySystem
+    // spawns the rocks it plans the layer's total up front, while WaveManager
+    // counts them as they register: only the spawned counts compare.
+    const totalDelta = this.shouldWaveManagerSpawnAsteroids()
+      ? Math.abs(waveManagerTotal - enemySystemTotal)
+      : 0;
     const spawnedDelta = Math.abs(waveManagerSpawned - enemySystemSpawned);
 
     if (totalDelta > 1 || spawnedDelta > 1) {
@@ -2498,8 +2525,8 @@ export class WaveManager {
       isBossWave: this.isBossWave(this.currentWave),
     });
 
-    this._legacyRegisteredEnemies = new WeakSet();
-    this._trackedDynamicMinions = new WeakSet();
+    this._legacyRegisteredEnemies = new WeakMap();
+    this._trackedDynamicMinions = new WeakMap();
     this.endFieldEvents();
     this.endLayerModifier();
 
@@ -2598,8 +2625,8 @@ export class WaveManager {
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;
-    this._legacyRegisteredEnemies = new WeakSet();
-    this._trackedDynamicMinions = new WeakSet();
+    this._legacyRegisteredEnemies = new WeakMap();
+    this._trackedDynamicMinions = new WeakMap();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
     if (this.randomSequences) {
