@@ -325,7 +325,7 @@ Conteúdo:
       campo — anel de impacto encolhe, explosão em área) e _Shade_ (some com dissolve, reaparece no flanco do jogador,
       dispara um leque de 3 e some de novo). Entram no roster/surtos das camadas 6+, no Códice, nos afixos de Elite,
       no 2D e no 3D (`enemyMirror`). Corrigir a linha do Mote no Códice (tiro único, não rajada).
-- [ ] **R11.2 Boss Rush.** Botão no menu: os três Wardens em sequência, com respiro e carta entre eles, sem camadas;
+- [x] **R11.2 Boss Rush.** Botão no menu: os três Wardens em sequência, com respiro e carta entre eles, sem camadas;
       recorde próprio; Salvage próprio.
 - [x] **R11.3 Terceiro casco: _Bastion_.** Casco pesado (vida +, aceleração/velocidade −, dash −), placas blindadas e
       torreta alta, visual distinto no 3D, no 2D e no preview do Hangar; item do Hangar que o desbloqueia.
