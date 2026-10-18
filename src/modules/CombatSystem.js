@@ -477,7 +477,8 @@ class CombatSystem extends BaseSystem {
     this.targetThreatCache.clear();
 
     const processEnemy = (enemy) => {
-      if (!enemy || enemy.destroyed) {
+      // a phased Shade (`intangible`) cannot be locked
+      if (!enemy || enemy.destroyed || enemy.intangible) {
         return;
       }
 
@@ -576,7 +577,7 @@ class CombatSystem extends BaseSystem {
   }
 
   isValidTarget(target) {
-    if (!target || target.destroyed) return false;
+    if (!target || target.destroyed || target.intangible) return false;
 
     const playerPos = this.cachedPlayer.getPosition();
     const dx = target.x - playerPos.x;

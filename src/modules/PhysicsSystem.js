@@ -1348,8 +1348,8 @@ class PhysicsSystem extends BaseSystem {
     const searchRadius = Math.max(radius, this.maxEnemyRadius);
     const candidates = this.spatialHash.query(x, y, searchRadius, {
       filter: (obj) => {
-        // Filter for active enemies only
-        return this.activeEnemies.has(obj) && !obj.destroyed;
+        // Active enemies only; a phased Shade (`intangible`) touches nothing.
+        return this.activeEnemies.has(obj) && !obj.destroyed && !obj.intangible;
       },
       sorted: false,
     });

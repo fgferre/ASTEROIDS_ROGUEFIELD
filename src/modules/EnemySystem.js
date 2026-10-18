@@ -18,6 +18,8 @@ import { Husk } from './enemies/types/Husk.js';
 import { Ram } from './enemies/types/Ram.js';
 import { Weaver } from './enemies/types/Weaver.js';
 import { Bulwark } from './enemies/types/Bulwark.js';
+import { Caster } from './enemies/types/Caster.js';
+import { Shade } from './enemies/types/Shade.js';
 import { Herald } from './enemies/types/Herald.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -61,6 +63,8 @@ import { HUSK_COMPONENTS } from '../data/enemies/husk.js';
 import { RAM_COMPONENTS } from '../data/enemies/ram.js';
 import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
 import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
+import { CASTER_COMPONENTS } from '../data/enemies/caster.js';
+import { SHADE_COMPONENTS } from '../data/enemies/shade.js';
 import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { directorFor } from '../data/layers.js';
@@ -682,6 +686,14 @@ class EnemySystem extends BaseSystem {
           BULWARK_COMPONENTS,
           ['armored'],
         ],
+        [
+          'caster',
+          Caster,
+          GamePools?.casters,
+          CASTER_COMPONENTS,
+          ['ranged', 'artillery'],
+        ],
+        ['shade', Shade, GamePools?.shades, SHADE_COMPONENTS, ['phasing']],
       ];
       for (const [type, EnemyClass, pool, components, tags] of supportKinds) {
         this.factory.registerType(type, {

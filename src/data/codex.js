@@ -25,6 +25,10 @@ const GLYPHS = {
     '<path d="M5 -13 A13 13 0 0 1 5 13 L1 9 A9 9 0 0 0 1 -9 Z"/><circle cx="-5" r="7"/><circle class="eye" cx="-5" r="2"/>',
   weaver:
     '<circle r="12" fill="none" stroke-dasharray="3 3"/><circle r="5"/><circle class="eye" r="2"/>',
+  caster:
+    '<circle r="8"/><rect x="3" y="-3.5" width="11" height="7" rx="1"/><circle class="eye" cx="11" r="2"/>',
+  shade:
+    '<polygon points="14,0 1,-6 -11,-12 -6,-3 -9,0 -6,3 -11,12 1,6"/><circle class="eye" cx="5" r="2"/>',
   'warden-prime':
     '<circle r="11" fill="none" stroke-width="5" stroke-dasharray="9.5 2"/><circle class="eye" r="4.5"/>',
   'warden-choir':
@@ -116,7 +120,7 @@ export const CODEX_ENTRIES = deepFreeze(
     support(
       'drone',
       'The smallest of the Ring’s keepers. It wakes in swarms and never alone.',
-      'Fast and fragile. Fires short bursts; keep moving.'
+      'Fast and fragile. Fires one shot at a time, aimed ahead of you; change course.'
     ),
     warden(
       'prime',
@@ -129,6 +133,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'Slow and heavy. Splits into drones when destroyed.'
     ),
     support(
+      'caster',
+      'It once lit the beacons that marked the Ring’s lanes. It still marks them. You are standing on one.',
+      'A ring marks where its shell will land. Be gone before it closes.'
+    ),
+    support(
       'mine',
       'A Ring seal that arms when anything warm comes near.',
       'Detonates on approach. Shoot it from range.'
@@ -137,6 +146,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'ram',
       'Built to clear debris from the Ring’s lanes. It still does.',
       'Stops, winds up, then charges straight. Step aside.'
+    ),
+    support(
+      'shade',
+      'A keeper that learned to step half out of the Field. Only its edges stay behind.',
+      'Cannot be hit while faded. It returns at your side and fires a fan.'
     ),
     herald(
       'heat',

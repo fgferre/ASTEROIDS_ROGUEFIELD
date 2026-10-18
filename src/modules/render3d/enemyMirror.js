@@ -1,7 +1,7 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
 // damage (drawn instanced, rockInstances.js), and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
-// Bulwark), the three Wardens (Prime, Choir, Null; one view kind each,
+// Bulwark, Caster, Shade), the three Wardens (Prime, Choir, Null; one view kind each,
 // picked by `bossKind`) and the three Heralds (Dust, Heat, Silence, picked by
 // `heraldKind`). Views are pooled per kind and keyed by entity id; a
 // view not seen in a frame is hidden and returned to its pool, unless its
@@ -10,6 +10,11 @@
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
+import {
+  CASTER_SCORCH_SECONDS,
+  CASTER_SHELL_APEX,
+  CASTER_SHELL_RADIUS,
+} from '../../data/enemies/caster.js';
 import { AFFIX_IDS, ELITE_AFFIXES } from '../../data/enemies/affixes.js';
 import { drawAffixBadge } from '../enemies/components/affixGlyphs.js';
 import { WARDEN_KINDS } from '../../data/enemies/boss.js';
@@ -54,6 +59,14 @@ const WARDEN_BURST = 24;
 // this many radii wide and closes to one.
 const DUST_MOTES = 10;
 const BLINK_RING_START = 2.2;
+// proposta 18/10: the Caster's shell (px across, glow gain) and the Shade
+// fully phased — its dissolve threshold (a few flecks stay, dissolve.js noise
+// tops out near 0.85), their edge glow and the noise cells per radius.
+const CASTER_SHELL_PX = 5;
+const CASTER_SHELL_GAIN = 1.8;
+const SHADE_PHASED_THRESHOLD = 0.76;
+const SHADE_FLECK_GLOW = 2;
+const SHADE_NOISE_CELLS = 2.4;
 export const KNOWN_KINDS = new Set([
   'asteroid',
   'drone',
@@ -63,6 +76,8 @@ export const KNOWN_KINDS = new Set([
   'ram',
   'weaver',
   'bulwark',
+  'caster',
+  'shade',
   'boss',
 ]);
 // Every view kind create() builds: a Warden's `bossKind` splits 'boss' in
@@ -801,6 +816,50 @@ export class EnemyMirror {
     this.bulwarkEdge.rotateX(-Math.PI / 2);
     this.bulwarkEdge.translate(0, 0.37, 0);
 
+    // Caster: a short mortar tilted 30° up, its breech at the turret's top.
+    this.casterBarrel = new THREE.CylinderGeometry(0.2, 0.26, 0.95, 10);
+    this.casterBarrel.rotateZ(-Math.PI / 3);
+    this.casterBarrel.translate(0.56, 0.34, 0);
+
+    // Shade: a swept blade (RenderComponent SHADE_OUTLINE), a ridge along
+    // the spine.
+    const shadeOutline = [
+      [1.2, 0],
+      [0.1, -0.5],
+      [-0.95, -0.95],
+      [-0.5, -0.2],
+      [-0.75, 0],
+      [-0.5, 0.2],
+      [-0.95, 0.95],
+      [0.1, 0.5],
+    ];
+    const shadeShape = new THREE.Shape();
+    shadeOutline.forEach(([x, y], i) =>
+      i ? shadeShape.lineTo(x, y) : shadeShape.moveTo(x, y)
+    );
+    shadeShape.closePath();
+    this.shadeHull = new THREE.ExtrudeGeometry(shadeShape, {
+      depth: 0.26,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.04,
+      bevelSegments: 1,
+    });
+    const blade = this.shadeHull.getAttribute('position');
+    for (let i = 0; i < blade.count; i += 1) {
+      const z = blade.getZ(i);
+      if (z > 0)
+        blade.setZ(
+          i,
+          z * (1 - 0.6 * Math.min(1, Math.abs(blade.getY(i)) / 0.5))
+        );
+    }
+    this.shadeHull.rotateX(-Math.PI / 2);
+    this.shadeHull.computeVertexNormals();
+    this.shadeRim = rimLoop(
+      shadeOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.05, y * 1.06))
+    );
+
     // Heralds. Dust: a chamfered slab, broadside to the ship (local +x),
     // three slits along its face.
     const outline = (points) => {
@@ -940,6 +999,10 @@ export class EnemyMirror {
         return this.createWeaver();
       case 'bulwark':
         return this.createBulwark();
+      case 'caster':
+        return this.createCaster();
+      case 'shade':
+        return this.createShade();
       case 'boss':
       case 'boss-choir':
       case 'boss-null':
@@ -1250,7 +1313,8 @@ export class EnemyMirror {
       const { position } = view.object;
       view.shadowDistance = Math.hypot(position.x - x, position.z - z);
       view.casters.forEach((mesh) => (mesh.castShadow = false));
-      if (view.shadowDistance <= SHADOW_RADIUS) near.push(view);
+      // a phased Shade casts none: the depth pass ignores its dissolve
+      if (view.shadowDistance <= SHADOW_RADIUS && !view.phased) near.push(view);
     };
     this.views.forEach(consider);
     this.dissolve.slots.forEach((slot) => consider(slot.view));
@@ -1539,6 +1603,158 @@ export class EnemyMirror {
       accents: [edgeMaterial],
       rims: [this.rim(group, this.circleRim, 0.74)],
     });
+  }
+
+  createCaster() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const body = this.body('caster', () => [
+      {
+        geometry: this.sphere,
+        color: this.tones.hull,
+        scale: [0.78, 0.42, 0.78],
+      },
+      {
+        geometry: this.smallSphere,
+        color: this.tones.dark,
+        scale: [0.34, 0.08, 0.34],
+        position: [0, 0.37, 0],
+      },
+      { geometry: this.casterBarrel, color: this.tones.hull },
+    ]);
+    const lensTone = this.tone(PALETTE.threat, 0.4);
+    const lens = this.glow(
+      group,
+      lensTone,
+      0.15,
+      new THREE.Vector3(1.0, 0.6, 0)
+    );
+    group.add(body);
+    this.scene.add(group);
+    // the aim ring, the blast ring (and its faint fill) and the one closing on
+    // the landing, the shell and the embers it leaves: field pixels, outside
+    // the body
+    const fieldMaterial = () =>
+      new THREE.MeshBasicMaterial({
+        color: this.threatColor.clone(),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
+    const shellMaterial = this.emissive(PALETTE.threat, CASTER_SHELL_GAIN);
+    const telegraph = {
+      group: new THREE.Group(),
+      aim: new THREE.Mesh(this.fuseRing, fieldMaterial()),
+      blast: new THREE.Mesh(this.fuseRing, fieldMaterial()),
+      fill: new THREE.Mesh(this.ghostDisc, fieldMaterial()),
+      closing: new THREE.Mesh(this.fuseRing, fieldMaterial()),
+      shell: new THREE.Mesh(this.smallSphere, shellMaterial),
+      scorch: new THREE.Mesh(this.ghostDisc, fieldMaterial()),
+    };
+    telegraph.shell.scale.setScalar(CASTER_SHELL_PX);
+    const { aim, blast, fill, closing, shell, scorch } = telegraph;
+    telegraph.group.add(scorch, fill, aim, blast, closing, shell);
+    telegraph.group.position.set(-HALF_W, 1, -HALF_H);
+    telegraph.group.visible = false;
+    this.scene.add(telegraph.group);
+    return this.view('caster', group, {
+      lens: lens.anchor,
+      lensTone,
+      telegraph,
+      accents: [lensTone, shellMaterial],
+      rims: [this.rim(group, this.circleRim, 0.8)],
+      glows: [lens],
+    });
+  }
+
+  // `telegraphRatio` lights the lens and grows the aim ring; in flight the
+  // blast ring holds, an inner ring closes on the landing and the shell
+  // rises to CASTER_SHELL_APEX and falls; the landing leaves faint embers.
+  updateCaster(view, caster) {
+    const charge = clamp01(caster.telegraphRatio || 0);
+    this.setGain(view.lensTone, 0.4 + 1.8 * charge);
+    view.lens.scale.setScalar(0.15 * (1 + 0.8 * charge));
+    const { aim, shell, scorch } = caster;
+    const t = view.telegraph;
+    t.group.visible = Boolean(aim || shell || scorch);
+    if (!t.group.visible) return;
+    const accent = this.accentOf(view);
+    const ring = (mesh, at, radius, opacity) => {
+      mesh.visible = Boolean(at);
+      if (!at) return;
+      mesh.position.set(at.x, 0, at.y);
+      mesh.scale.set(Math.max(1, radius), 1, Math.max(1, radius));
+      mesh.material.color.copy(accent);
+      mesh.material.opacity = opacity;
+    };
+    ring(t.aim, aim, CASTER_SHELL_RADIUS * charge, 0.3 + 0.6 * charge);
+    const progress = clamp01(caster.shellProgress || 0);
+    ring(t.blast, shell, CASTER_SHELL_RADIUS, 0.5 + 0.4 * progress);
+    // additive in linear light: a few percent already reads as a tint
+    ring(t.fill, shell, CASTER_SHELL_RADIUS, 0.005 + 0.015 * progress);
+    ring(t.closing, shell, CASTER_SHELL_RADIUS * (1 - progress), 0.9);
+    const left = scorch ? 1 - scorch.age / CASTER_SCORCH_SECONDS : 0;
+    ring(t.scorch, scorch, CASTER_SHELL_RADIUS * 0.4, 0.015 * clamp01(left));
+    t.shell.visible = Boolean(shell);
+    if (shell) {
+      t.shell.position.set(
+        shell.fromX + (shell.x - shell.fromX) * progress,
+        CASTER_SHELL_APEX * 4 * progress * (1 - progress),
+        shell.fromY + (shell.y - shell.fromY) * progress
+      );
+    }
+  }
+
+  createShade() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const body = this.body('shade', () => [
+      { geometry: this.shadeHull, color: this.tones.hull },
+    ]);
+    const eyeTone = this.tone(PALETTE.threat, 1.3);
+    group.add(body);
+    this.scene.add(group);
+    return this.view('shade', group, {
+      body,
+      eyeTone,
+      phased: false,
+      accents: [eyeTone],
+      rims: [this.rim(group, this.shadeRim)],
+      glows: [
+        this.glow(group, eyeTone, 0.13, new THREE.Vector3(0.45, 0.22, 0)),
+      ],
+    });
+  }
+
+  // The Shade out of the Field (`ghost` 0..1): its body takes its own dissolve
+  // twin (dissolve.js) held at a live threshold, so fully out a few accent
+  // flecks stay; the outline and the eye fade with it.
+  phaseShade(view, ghost) {
+    const phased = ghost > 0;
+    if (phased !== view.phased) {
+      view.phased = phased;
+      const parts = this.dissolve.partsOf(view);
+      view.body.material = phased
+        ? this.dissolve.twinOf(parts, this.machineMaterial)
+        : this.machineMaterial;
+    }
+    view.rims[0].anchor.visible = ghost < 0.5;
+    if (view.eliteRing) view.eliteRing.visible = view.elite && ghost < 0.5;
+    this.setGain(view.eyeTone, 1.3 * (1 - ghost));
+    if (!phased) return;
+    const u = view.dissolve.uniforms;
+    const seed = view.seed || 0;
+    u.uDissolve.value = SHADE_PHASED_THRESHOLD * ghost;
+    u.uDissolveGlow.value = SHADE_FLECK_GLOW;
+    u.uDissolveScale.value = SHADE_NOISE_CELLS / Math.max(4, view.radius || 12);
+    u.uDissolveEdge.value.copy(this.accentOf(view));
+    u.uDissolveSeed.value.set(
+      (seed % 997) * 0.37,
+      ((seed >>> 10) % 991) * 0.41,
+      ((seed >>> 20) % 983) * 0.43
+    );
   }
 
   // --- Heralds ----------------------------------------------------------------
@@ -2040,6 +2256,7 @@ export class EnemyMirror {
   // breaks have their own pieces: only its final death bursts, bigger, lit.
   die(key, view) {
     this.views.delete(key);
+    if (view.phased) this.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
     const accent = this.accentOf(view);
@@ -2115,6 +2332,10 @@ export class EnemyMirror {
       for (let i = 0; i < view.tips.length; i += 1) {
         view.tips[i].scale.setScalar(0.09 + 0.07 * lay);
       }
+    } else if (kind === 'caster') {
+      this.updateCaster(view, enemy);
+    } else if (kind === 'shade') {
+      this.phaseShade(view, 1 - clamp01(enemy.visibility ?? 1));
     } else if (kind === 'bulwark') {
       object.rotation.y = 0;
       view.plate.rotation.y = -(enemy.facing || 0);
@@ -2638,6 +2859,7 @@ export class EnemyMirror {
 
   release(key, view) {
     view.object.visible = false;
+    if (view.phased) this.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
     this.views.delete(key);

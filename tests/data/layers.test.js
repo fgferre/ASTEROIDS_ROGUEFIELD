@@ -15,6 +15,8 @@ const SUPPORT_KINDS = [
   'ram',
   'bulwark',
   'weaver',
+  'caster',
+  'shade',
 ];
 
 const scheduledCount = (layer) =>
@@ -112,6 +114,16 @@ describe('directorFor', () => {
       at: 30,
       label: 'Full field',
     });
+  });
+
+  it('brings Casters from 6 and Shades from 8, never to a Warden layer', () => {
+    const kindsOn = (n) => directorFor(n).roster.map((entry) => entry.kind);
+    expect(kindsOn(5)).not.toContain('caster');
+    expect(kindsOn(6)).toContain('caster');
+    expect(kindsOn(7)).not.toContain('shade');
+    expect(kindsOn(8)).toEqual(expect.arrayContaining(['caster', 'shade']));
+    expect(kindsOn(10)).not.toContain('caster');
+    expect(kindsOn(14)).toEqual(expect.arrayContaining(['caster', 'shade']));
   });
 
   it('escorts the final Warden with Seekers', () => {
