@@ -472,7 +472,8 @@ class Renderer3D extends BaseSystem {
   // The key light's shadow map, `size` texels square (0 = off). Toggling it
   // changes the lit programs, so a preset change recompiles them once. A
   // new map is drawn once here, seeded: three names it with a Math.random
-  // UUID.
+  // UUID. Through a whole render(): shadowMap.render alone reads the
+  // renderer's per-frame light state, which is null between frames.
   applyShadows(size) {
     const { renderer, key, scene, camera } = this.three;
     const on = size > 0;
@@ -482,7 +483,7 @@ class Renderer3D extends BaseSystem {
       key.shadow.mapSize.set(size, size);
       key.shadow.map?.dispose();
       key.shadow.map = null;
-      this.seeded(() => renderer.shadowMap.render([key], scene, camera));
+      this.seeded(() => renderer.render(scene, camera));
     }
   }
 
