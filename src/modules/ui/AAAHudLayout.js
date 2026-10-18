@@ -39,6 +39,8 @@ const DAMAGE_ARC_RY = GAME_HEIGHT * 0.44;
 // Off-screen arrows: pooled, inset from the edge, distance rounded to 10.
 const EDGE_ARROW_MAX = 8;
 const EDGE_ARROW_MARGIN = 28;
+const EDGE_ARROW_GAP = 28;
+const EDGE_ARROW_STEP = 30;
 
 /** Screen angle (rad) from the ship to the damage source; null when unknown. */
 export function damageArcAngle(ship, source) {
@@ -95,6 +97,38 @@ export function edgeArrow(
     }
   }
   return { x, y, angle: Math.atan2(dy, dx), edge };
+}
+
+/**
+ * Keeps edgeArrow results from stacking: nearest first (`distance`, missing
+ * = farthest), an arrow within EDGE_ARROW_GAP px of a placed one on the
+ * same edge steps EDGE_ARROW_STEP px along it, toward the edge's middle
+ * (away from the corner panel it was pushed against). Mutates the arrows.
+ */
+export function spreadEdgeArrows(
+  arrows,
+  width = GAME_WIDTH,
+  height = GAME_HEIGHT
+) {
+  const near = (arrow) =>
+    Number.isFinite(arrow.distance) ? arrow.distance : Infinity;
+  const placed = [];
+  for (const arrow of [...arrows].sort((a, b) => near(a) - near(b) || 0)) {
+    const axis = arrow.edge === 'left' || arrow.edge === 'right' ? 'y' : 'x';
+    const middle = axis === 'y' ? height / 2 : width / 2;
+    const step = arrow[axis] <= middle ? EDGE_ARROW_STEP : -EDGE_ARROW_STEP;
+    while (
+      placed.some(
+        (other) =>
+          other.edge === arrow.edge &&
+          Math.abs(other[axis] - arrow[axis]) < EDGE_ARROW_GAP
+      )
+    ) {
+      arrow[axis] += step;
+    }
+    placed.push(arrow);
+  }
+  return arrows;
 }
 
 /** Radar blip glyph for an enemy: rock, machine, elite, herald or warden. */
@@ -755,13 +789,14 @@ export class AAAHudLayout {
         this._evolutionChips.delete(id);
       }
     }
-    for (const { id, family } of state.evolutions) {
+    for (const { id, family, apex, short } of state.evolutions) {
       if (this._evolutionChips.has(id)) {
         continue;
       }
       const chip = document.createElement('span');
       chip.className = 'evo-chip';
-      chip.textContent = id.toUpperCase();
+      chip.classList.toggle('is-apex', Boolean(apex));
+      chip.textContent = apex ? `APEX ${short}` : id.toUpperCase();
       chip.style.setProperty('--family-color', UPGRADE_FAMILIES[family].color);
       this.els.evolutions.appendChild(chip);
       this._evolutionChips.set(id, chip);
@@ -1300,25 +1335,31 @@ export class AAAHudLayout {
     if (!this._panelCorners) {
       this._panelCorners = this._measurePanelCorners();
     }
-    let used = 0;
+    const shown = [];
     for (
       let i = 0;
-      i < targets.length && used < this._arrowPool.length;
+      i < targets.length && shown.length < this._arrowPool.length;
       i += 1
     ) {
-      const target = targets[i];
       const arrow = edgeArrow(
-        target,
+        targets[i],
         GAME_WIDTH,
         GAME_HEIGHT,
         EDGE_ARROW_MARGIN,
         this._panelCorners
       );
-      if (!arrow) {
-        continue;
+      if (arrow) {
+        arrow.target = targets[i];
+        arrow.distance = targets[i].distance;
+        shown.push(arrow);
       }
-      const slot = this._arrowPool[used];
-      used += 1;
+    }
+    spreadEdgeArrows(shown);
+    const used = shown.length;
+    for (let i = 0; i < used; i += 1) {
+      const arrow = shown[i];
+      const { target } = arrow;
+      const slot = this._arrowPool[i];
       const { el } = slot;
       if (slot.kind !== target.kind || slot.color !== target.color) {
         slot.kind = target.kind;
@@ -1670,6 +1711,7 @@ export class AAAHudLayout {
             .evo-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 1px var(--space-1, 4px); color: var(--family-color); background: var(--surface); border: 1px solid color-mix(in srgb, var(--family-color) 55%, transparent); border-radius: var(--radius-sm); }
             .buff-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
             .buff-row:empty { display: none; }
+            .evo-chip.is-apex { color: color-mix(in srgb, var(--family-color) 55%, white); border-color: var(--family-color); box-shadow: 0 0 6px color-mix(in srgb, var(--family-color) 45%, transparent); font-weight: 700; }
             .evo-row:empty { display: none; }
             .buff-chip { display: flex; align-items: center; gap: var(--space-2, 8px); color: var(--buff-color); border-color: color-mix(in srgb, var(--buff-color) 55%, transparent); }
             .buff-meter { width: 36px; height: 4px; background: var(--surface-strong); border-radius: var(--radius-sm); overflow: hidden; }
@@ -1745,6 +1787,15 @@ export class AAAHudLayout {
             .transmission__rule { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent); }
             .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
+            /* Settings → Accessibility: Large Subtitles stacks on Text Size; Reduce Flashing stops the flicker */
+            body.subtitles-large .transmission { width: min(760px, 90%); }
+            body.subtitles-large .transmission__speaker { font-size: calc(var(--text-xs) * 1.35); }
+            body.subtitles-large .transmission__line { font-size: calc(var(--text-md) * 1.35); }
+            body.flashing-reduced .transmission.is-showing { animation: none; }
+
+            /* High Contrast HUD: opaque panels and 2 px outlines (tokens in style.css) */
+            body.hud-high-contrast :is(.stat-block, .feed-row, .transmission) { background: var(--surface); outline: 2px solid var(--line); }
+            body.hud-high-contrast :is(.mode-chip, .xp-bar-container, .bar-segment, .boss-bar-container, .onboarding-tip) { border-width: 2px; }
 
             /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
             .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }

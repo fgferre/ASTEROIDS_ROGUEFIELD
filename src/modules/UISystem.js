@@ -2364,6 +2364,20 @@ class UISystem extends BaseSystem {
         this.renderHangar();
       }
     });
+    // The 3D hull preview follows the hovered or focused hull button.
+    const previewHull = (event) => {
+      const hull = event.target.closest?.('[data-hangar-hull]:enabled');
+      this.eventBus.emit('hangar-hull-hovered', {
+        hullId: hull?.dataset.hangarHull ?? null,
+      });
+    };
+    refs.hulls?.addEventListener('pointerover', previewHull);
+    refs.hulls?.addEventListener('focusin', previewHull);
+    ['pointerleave', 'focusout'].forEach((type) =>
+      refs.hulls?.addEventListener(type, () =>
+        this.eventBus.emit('hangar-hull-hovered', { hullId: null })
+      )
+    );
     document.addEventListener('keydown', (event) => {
       if (this.hangarState.isOpen && event.key === 'Escape') {
         event.preventDefault();
@@ -2427,13 +2441,21 @@ class UISystem extends BaseSystem {
         ? 'assist'
         : 'standard';
 
+    const textScale = Number(values.textScale);
+
     if (body) {
       body.classList.toggle('hud-high-contrast', highContrast);
       body.classList.toggle('motion-reduced', reducedMotion);
       body.classList.toggle('color-assist-mode', colorVision === 'assist');
+      body.classList.toggle('flashing-reduced', Boolean(values.reduceFlashing));
+      body.classList.toggle('subtitles-large', Boolean(values.largeSubtitles));
     }
 
     if (root) {
+      root.style.setProperty(
+        '--text-scale',
+        String(Number.isFinite(textScale) && textScale > 0 ? textScale : 1)
+      );
       root.dataset.contrast = highContrast ? 'high' : 'normal';
       root.dataset.motion = reducedMotion ? 'reduced' : 'standard';
       root.dataset.colorVision = colorVision;

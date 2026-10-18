@@ -273,6 +273,23 @@ Qualidade:
       ("Dense fog" alcance de radar menor, "Magnetic storm" fagulhas erráticas, "Hunters' moon" só Seekers e Rams,
       "Glass field" rochas voláteis) com banner e cue.
 
+## Rodada 8 (18/10, fim da manhã) — dois eixos, ainda sem veredito dele
+
+Conteúdo:
+
+- [x] **R8.1 Evoluções Apex.** Cinco cartas da mesma família (além da sinergia em três) elevam a evolução da arma a
+      um segundo estágio visível (Incendiary → Solar Flare Lance; Railshot → Coilgun; Chain → Storm Lance; Gravitic →
+      Singularity Lance; Prospector → Motherlode), com look próprio em 3D/2D, chip na HUD e conquista.
+      Qualidade:
+- [~] **R8.2 Decisão de draw calls.** Rims de todas as máquinas num LineSegments só, olhos/lentes/esferas emissivas num
+  InstancedMesh, bloom com menos mips no preset alto; Dense Fog escurece rochas distantes no 3D; meta < 100 no
+  ultra na cena carregada.
+- [x] **R8.3 BACKLOG curto.** Seed do wave-manager por run (modificadores variam entre runs); prévia 3D do casco no
+      Hangar; dois arrows no mesmo painel não se empilham.
+- [x] **R8.4 Acessibilidade.** Escala de texto da HUD (Settings), modo alto contraste da HUD, redução de flashes
+      (Solar Flare/lens-kick/flash de dano respeitam uma opção "reduce flashing"), legendas de transmissão maiores,
+      tudo persistido e coberto por teste.
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de

@@ -9,7 +9,7 @@ import { createDeterministicRandom } from '../__helpers__/stubs.js';
 import { withWaveOverrides } from '../__helpers__/setup.js';
 
 // Field mock: every factory spawn lands in `active`, in spawn order.
-function createField({ player = { x: 400, y: 300 } } = {}) {
+function createField({ player = { x: 400, y: 300 }, runSeed } = {}) {
   const random = createDeterministicRandom({ floatValue: 0.5 });
   const active = [];
   const emits = [];
@@ -21,6 +21,15 @@ function createField({ player = { x: 400, y: 300 } } = {}) {
     emit: vi.fn((event, payload) => emits.push({ event, payload })),
   };
   const enemySystem = {
+    dependencies:
+      runSeed === undefined
+        ? {}
+        : {
+            difficulty: {
+              getRunSeed: () => runSeed,
+              getModifiers: () => ({ spawnCount: 1 }),
+            },
+          },
     asteroids: active,
     getRandomScope: () => random,
     getCachedWorld: () => ({
@@ -290,7 +299,7 @@ describe('WaveManager field events', () => {
 describe('WaveManager layer modifiers', () => {
   const eventsOf = (field, name) =>
     field.emits.filter((e) => e.event === name).map((e) => e.payload);
-  // The stub random has no seed: the run seed is 0.
+  // No difficulty service in the stub field: the run seed is 0.
   const firstFieldLayerWith = (id) => {
     let n = 16;
     while (modifierFor(n, 0) !== id || n % 5 === 0) n += 1;
@@ -360,6 +369,24 @@ describe('WaveManager layer modifiers', () => {
       field.manager.completeWave();
 
       expect(field.xpOrbs.setDrift).toHaveBeenLastCalledWith(null);
+    });
+  });
+
+  it('rolls the endless modifiers from the run seed', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const modifiersFor = (runSeed) =>
+        Array.from({ length: 12 }, (_, i) => {
+          const field = createField({ runSeed });
+          startLayer(field, 16 + i);
+          return field.manager.layerModifier;
+        });
+      const runA = modifiersFor(1234);
+
+      expect(runA).toEqual(
+        Array.from({ length: 12 }, (_, i) => modifierFor(16 + i, 1234))
+      );
+      expect(modifiersFor(1234)).toEqual(runA);
+      expect(modifiersFor(98765)).not.toEqual(runA);
     });
   });
 

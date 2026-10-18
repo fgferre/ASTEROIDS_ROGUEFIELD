@@ -31,6 +31,7 @@ describe('AchievementService', () => {
     ['null-and-void', ['run-won', { wave: 15 }]],
     ['deep-field', ['wave-started', { wave: 20 }]],
     ['full-set', ['synergy-unlocked', { family: 'kinetic' }]],
+    ['apex-predator', ['apex-unlocked', { family: 'arc' }]],
   ])('unlocks %s on its event', (id, [event, payload]) => {
     const { eventBus, unlocked } = setup();
     eventBus.emit('player-took-damage', { damage: 5 });

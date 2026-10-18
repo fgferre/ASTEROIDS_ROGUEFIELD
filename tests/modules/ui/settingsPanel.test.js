@@ -120,3 +120,64 @@ describe('Settings panel', () => {
     expect(escFor({ source: 'menu', capture: { device: 'keyboard' } })).toBe(0);
   });
 });
+
+describe('Accessibility settings on the page', () => {
+  const fakeNode = () => {
+    const classes = new Set();
+    return {
+      dataset: {},
+      style: {
+        setProperty(name, value) {
+          this[name] = value;
+        },
+      },
+      classList: {
+        toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+        contains: (name) => classes.has(name),
+      },
+    };
+  };
+  let restoreDom;
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+    document.body = fakeNode();
+    document.documentElement = fakeNode();
+  });
+  afterEach(() => restoreDom());
+
+  it('sets text scale, contrast, flashing and subtitle hooks, and clears them live', () => {
+    const apply = (values) =>
+      UISystem.prototype.applyAccessibilitySettings.call({}, values);
+    const { body, documentElement: root } = document;
+
+    apply({
+      textScale: '1.3',
+      highContrastHud: true,
+      reduceFlashing: true,
+      largeSubtitles: true,
+    });
+    expect(root.style['--text-scale']).toBe('1.3');
+    expect(root.dataset.contrast).toBe('high');
+    expect(body.classList.contains('hud-high-contrast')).toBe(true);
+    expect(body.classList.contains('flashing-reduced')).toBe(true);
+    expect(body.classList.contains('subtitles-large')).toBe(true);
+
+    apply({ textScale: '1' });
+    expect(root.style['--text-scale']).toBe('1');
+    expect(root.dataset.contrast).toBe('normal');
+    expect(body.classList.contains('flashing-reduced')).toBe(false);
+    expect(body.classList.contains('subtitles-large')).toBe(false);
+  });
+
+  it('offers the four text sizes as a segmented choice in Accessibility', () => {
+    const accessibility = SETTINGS_SCHEMA.find((c) => c.id === 'accessibility');
+    const field = accessibility.fields.find((f) => f.key === 'textScale');
+    expect(field.options.map(Number)).toEqual([0.9, 1, 1.15, 1.3]);
+    expect(field.options.map((o) => field.optionLabels[o])).toEqual([
+      '90%',
+      '100%',
+      '115%',
+      '130%',
+    ]);
+  });
+});

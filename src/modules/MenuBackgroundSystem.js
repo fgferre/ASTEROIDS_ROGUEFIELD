@@ -933,6 +933,12 @@ class MenuBackgroundSystem extends BaseSystem {
     this.scene.add(this.camera);
     this.hullPreview = new MenuHullPreview(THREE, this.camera);
     this.hullStage = document.getElementById('menu-hull-stage');
+    // While the Hangar is open the hull frames into its stage instead, and
+    // that patch of the menu canvas is copied into it (the overlay hides the
+    // canvas). A hovered hull button previews its hull.
+    this.hangarStage = document.getElementById('hangar-hull-stage');
+    this.hangarOpen = false;
+    this.hoveredHull = null;
     this.createStarLayers();
     this.createAtmosphere();
     this.setupPostProcessing();
@@ -2067,7 +2073,8 @@ class MenuBackgroundSystem extends BaseSystem {
   // The selected hull (if the Hangar has unlocked it) and reduced motion.
   syncHullPreview() {
     const settings = this.getSettingsService();
-    const hull = settings.getCategoryValues('gameplay')?.selectedHull;
+    const hull =
+      this.hoveredHull ?? settings.getCategoryValues('gameplay')?.selectedHull;
     // New meshes draw Three's UUIDs: from the seeded stream.
     this.withSeededMathRandom(() =>
       this.hullPreview.setHull(this.getService('hangar').hullFor(hull))
@@ -3626,7 +3633,11 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
 
     this.camera.lookAt(0, 0, 0);
 
-    this.hullPreview.update(delta, this.hullStage, this.hullReducedMotion);
+    this.hullPreview.update(
+      delta,
+      this.hangarOpen ? this.hangarStage : this.hullStage,
+      this.hullReducedMotion
+    );
 
     // Update Atmosphere
     if (this.nebulas) {
@@ -3686,6 +3697,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);
+    }
+    if (this.hangarOpen) {
+      this.copyHangarStage();
     }
 
     if (this.stats) {
@@ -3765,10 +3779,48 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     }
   }
 
+  // Same frame as the render, so the drawing buffer still holds it.
+  copyHangarStage() {
+    const target = this.hangarStage;
+    const source = this.renderer.domElement;
+    const stage = target?.getBoundingClientRect();
+    const view = source.getBoundingClientRect();
+    if (!stage?.width || !view.width) return;
+    const scale = source.width / view.width;
+    const width = Math.round(stage.width * scale);
+    const height = Math.round(stage.height * scale);
+    if (target.width !== width || target.height !== height) {
+      target.width = width;
+      target.height = height;
+    }
+    this.hangarStageContext ??= target.getContext('2d');
+    this.hangarStageContext.drawImage(
+      source,
+      (stage.left - view.left) * scale,
+      (stage.top - view.top) * scale,
+      width,
+      height,
+      0,
+      0,
+      width,
+      height
+    );
+  }
+
   registerEventHooks() {
     window.addEventListener('resize', this.handleResize, { passive: true });
 
     this.registerEventListener('screen-changed', this.handleScreenChanged);
+    this.registerEventListener('ui-overlay-visibility-changed', (event) => {
+      if (event?.overlay !== 'hangar') return;
+      this.hangarOpen = event.isOpen;
+      this.hoveredHull = null;
+      this.syncHullPreview();
+    });
+    this.registerEventListener('hangar-hull-hovered', (event) => {
+      this.hoveredHull = event?.hullId ?? null;
+      this.syncHullPreview();
+    });
     this.registerEventListener(
       'settings-video-changed',
       this.handleVideoSettingsChanged

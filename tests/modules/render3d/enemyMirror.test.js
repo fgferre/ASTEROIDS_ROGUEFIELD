@@ -2,8 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ENEMY_TYPES } from '../../../src/data/constants/visual.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
+import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import {
   EnemyMirror,
+  FOG_DIM,
+  FOG_FADE_SECONDS,
   KNOWN_KINDS,
   SHADOW_CASTERS,
   SHADOW_RADIUS,
@@ -120,6 +123,10 @@ describe('EnemyMirror', () => {
     expect(matrix.elements[12]).toBe(100);
   });
 
+  // batch colours are stored as float32
+  const expectColor = (rgb, color) =>
+    color.toArray().forEach((c, i) => expect(rgb[i]).toBeCloseTo(c, 5));
+
   // drawables (meshes + outlines) of a fresh view, plain and Elite
   const draws = (object) => {
     let n = 0;
@@ -131,19 +138,20 @@ describe('EnemyMirror', () => {
 
   it('draws each machine’s static matte parts as one vertex-coloured mesh', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
-    // was 3, 3, 9, 2, 5, 9, 5, Prime 8, Dust 15, Heat 4, Silence 3
+    // was 3, 3, 9, 2, 5, 9, 5, Prime 8, Dust 15, Heat 4, Silence 3; outlines
+    // and eyes/lenses/nodes now draw in the two batches
     const expected = {
-      drone: 3,
-      hunter: 3,
-      mine: 4,
-      husk: 2,
-      ram: 4,
-      weaver: 6,
-      bulwark: 4,
-      boss: 3,
-      'herald-dust': 4,
-      'herald-heat': 3,
-      'herald-silence': 3,
+      drone: 1,
+      hunter: 1,
+      mine: 1,
+      husk: 1,
+      ram: 1,
+      weaver: 2,
+      bulwark: 3,
+      boss: 2,
+      'herald-dust': 3,
+      'herald-heat': 2,
+      'herald-silence': 1,
     };
     for (const [kind, count] of Object.entries(expected)) {
       const view = mirror.acquire(kind);
@@ -160,7 +168,107 @@ describe('EnemyMirror', () => {
     // the Elite ring is one mesh of dashes
     const ram = mirror.acquire('ram');
     mirror.applyElite(ram, true);
-    expect(draws(ram.object)).toBe(5);
+    expect(draws(ram.object)).toBe(2);
+  });
+
+  it('draws every live outline in one rim batch, in the view’s colour', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const machine = (id, type, extra = {}) => ({
+      id,
+      type,
+      x: 400,
+      y: 300,
+      radius: 12,
+      getHitFlash: () => 0,
+      ...extra,
+    });
+    mirror.update(
+      [
+        machine('a', 'drone'),
+        machine('b', 'drone', { elite: true, affixes: [] }),
+        machine('c', 'hunter'),
+      ],
+      0
+    );
+    const batch = mirror.rimBatch;
+    // two 48-point circles and the Seeker's 6-point outline
+    expect(batch.count).toBe(48 * 2 + 6);
+    expect(batch.object.visible).toBe(true);
+    expect(batch.object.geometry.drawRange.count).toBe(batch.count * 2);
+    const colorAt = (segment) =>
+      Array.from(batch.colors.array.slice(segment * 6, segment * 6 + 3));
+    expectColor(colorAt(0), mirror.rimColors.threat);
+    expectColor(colorAt(48), mirror.rimColors.elite);
+    // world space: the first point of mote a's circle, radius 12 × 1.04
+    expect(batch.positions.getX(0)).toBeCloseTo(12 * 1.04);
+
+    mirror.update([], 0);
+    expect(batch.count).toBe(0);
+    expect(batch.object.visible).toBe(false);
+  });
+
+  it('draws every eye, lens and node in one glow batch; a burn shrinks them', () => {
+    const bursts = { spawn: () => {} };
+    const mirror = new EnemyMirror(
+      THREE,
+      new THREE.Scene(),
+      (fn) => fn(),
+      bursts
+    );
+    const mine = {
+      id: 'm',
+      type: 'mine',
+      x: 400,
+      y: 300,
+      radius: 14,
+      armed: false,
+      getHitFlash: () => 0,
+    };
+    const ram = { ...mine, id: 'r', type: 'ram', telegraphRatio: 0 };
+    mirror.update([mine, ram], 0);
+    const { mesh } = mirror.glows;
+    // three Tether nodes and the Ram's lens (its core shows only charging)
+    expect(mesh.count).toBe(4);
+    expect(mesh.visible).toBe(true);
+    expectColor(
+      Array.from(mesh.instanceColor.array.slice(0, 3)),
+      mirror.views.get('m').nodeTone.color
+    );
+    const size = (i) => {
+      const matrix = new THREE.Matrix4();
+      mesh.getMatrixAt(i, matrix);
+      return new THREE.Vector3().setFromMatrixScale(matrix).x;
+    };
+    const lens = size(3);
+    expect(lens).toBeCloseTo(14 * 0.12);
+
+    mirror.markDead(ram);
+    mirror.update([mine], 0, 0); // the burn starts
+    mirror.update([mine], 0, DISSOLVE_SECONDS / 4);
+    expect(mesh.count).toBe(4);
+    expect(size(3)).toBeCloseTo(lens * 0.75);
+
+    mirror.update([], 0, DISSOLVE_SECONDS);
+    expect(mesh.count).toBe(0);
+    expect(mesh.visible).toBe(false);
+  });
+
+  it('fades Dense Fog in and out over a second on the shared rock uniform', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const { stone, crystal } = mirror.rockFamilies;
+    expect(stone.defines.ROCK_FOG).toBe('');
+    expect(crystal.userData.rockFog).toBe(stone.userData.rockFog);
+    const { uFogDim, uFogCenter } = stone.userData.rockFog;
+
+    expect(mirror.updateFog(FOG_FADE_SECONDS / 2, true, 10, -20)).toBe(0.5);
+    expect(uFogDim.value).toBeCloseTo(FOG_DIM / 2);
+    expect(uFogCenter.value.toArray()).toEqual([10, -20]);
+    mirror.updateFog(FOG_FADE_SECONDS, true, 0, 0);
+    expect(uFogDim.value).toBeCloseTo(FOG_DIM);
+    mirror.updateFog(FOG_FADE_SECONDS / 4, false, 0, 0);
+    expect(uFogDim.value).toBeCloseTo(FOG_DIM * 0.75);
+    mirror.updateFog(FOG_FADE_SECONDS, false, 0, 0);
+    expect(uFogDim.value).toBe(0);
   });
 
   it('sheds Prime segments by its draw range', () => {

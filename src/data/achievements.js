@@ -51,6 +51,12 @@ export const ACHIEVEMENTS = deepFreeze([
     glyph: '❖',
   },
   {
+    id: 'apex-predator',
+    title: 'Apex Predator',
+    description: 'Raise a weapon evolution to its Apex with five of a kind.',
+    glyph: '✸',
+  },
+  {
     id: 'harmonic',
     title: 'Harmonic',
     description: 'Fire 50 harmonic beams. The Field hums back.',

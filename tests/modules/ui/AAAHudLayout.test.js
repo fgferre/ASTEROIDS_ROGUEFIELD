@@ -6,6 +6,7 @@ import {
   damageArcAngle,
   edgeArrow,
   radarGlyph,
+  spreadEdgeArrows,
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 
@@ -114,6 +115,24 @@ describe('AAAHudLayout weapon and buff chips', () => {
     // A new run clears the evolutions and their chips.
     hud.updateWeapon(state);
     expect(hud.els.evolutions.children).toHaveLength(0);
+  });
+
+  it('swaps the chip for a brighter APEX chip when the family reaches its Apex', () => {
+    const state = { weaponId: 'lance', shotsToBeam: null, evolutions: [] };
+    hud.updateWeapon({
+      ...state,
+      evolutions: [{ family: 'thermal', id: 'incendiary', name: 'x' }],
+    });
+    hud.updateWeapon({
+      ...state,
+      evolutions: [
+        { family: 'thermal', id: 'solar-flare', apex: true, short: 'FLARE' },
+      ],
+    });
+    const chips = hud.els.evolutions.children;
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toBe('APEX FLARE');
+    expect(chips[0].classList.contains('is-apex')).toBe(true);
   });
 
   it('counts the Overcharge chip down and removes it at zero', () => {
@@ -287,6 +306,26 @@ describe('AAAHudLayout off-screen arrows around the panels', () => {
     const below = edgeArrow({ x: 400, y: 900 }, 800, 600, 28, corners);
     expect(below).toMatchObject({ edge: 'bottom', x: 400, y: 572 });
   });
+
+  it('steps the farther of two arrows on one panel along the edge', () => {
+    const far = {
+      ...edgeArrow({ x: -500, y: -400 }, 800, 600, 28, corners),
+      distance: 900,
+    };
+    const near = {
+      ...edgeArrow({ x: -300, y: -600 }, 800, 600, 28, corners),
+      distance: 400,
+    };
+    const other = {
+      ...edgeArrow({ x: 1400, y: 50 }, 800, 600, 28, corners),
+      distance: 1200,
+    };
+    spreadEdgeArrows([far, near, other], 800, 600);
+    expect(near).toMatchObject({ edge: 'top', x: 248, y: 28 });
+    expect(far).toMatchObject({ edge: 'top', x: 278, y: 28 });
+    // Alone on its edge, it stays put.
+    expect(other).toMatchObject({ edge: 'right', x: 772, y: 268 });
+  });
 });
 
 describe('AAAHudLayout AIM chip', () => {
@@ -331,5 +370,17 @@ describe('AAAHudLayout boss bar segments', () => {
     expect(bossSegments(1, 0)).toEqual([
       { left: 0, width: 100, state: 'current' },
     ]);
+  });
+});
+
+describe('AAAHudLayout accessibility styles', () => {
+  it('enlarges transmission lines 1.35× with Large Subtitles and stops their flicker with Reduce Flashing', () => {
+    const css = AAAHudLayout.prototype._getCSS.call({});
+    expect(css).toMatch(
+      /body\.subtitles-large \.transmission__line \{ font-size: calc\(var\(--text-md\) \* 1\.35\); \}/
+    );
+    expect(css).toMatch(
+      /body\.flashing-reduced \.transmission\.is-showing \{ animation: none; \}/
+    );
   });
 });

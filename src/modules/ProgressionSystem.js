@@ -473,6 +473,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.activeSynergies.clear();
+    this.activeApexes.clear();
     this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
     this.pendingLevelUpScreens = [];
@@ -534,6 +535,7 @@ class ProgressionSystem extends UpgradeSystem {
     // Upgrade-driven numbers start clean: the caller re-applies every rank
     // (GameSessionService.reapplyProgressionUpgrades), synergies included.
     this.activeSynergies.clear();
+    this.activeApexes.clear();
     this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
 
