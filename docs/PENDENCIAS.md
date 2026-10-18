@@ -4,34 +4,32 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~12h20) — RODADA 8 MESCLADA NA `main` (publicado)
+## O BASTÃO — onde a rodada parou (18/10, ~13h00) — RODADA 9 MESCLADA NA `main` (publicado)
 
 **Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
-(PRs #247–#254 e o nono). Ler este BASTÃO, `PLAN.md` (Rodadas 2–8) e `docs/NORTE.md` (§7 + regra dos dois eixos);
-`npm ci && npm run done` (984 testes). **Antes de qualquer junção:** sonda headless `scratchpad/errprobe.mjs` → `errors: 0`.
+(PRs #247–#255 e o décimo). Ler este BASTÃO, `PLAN.md` (Rodadas 2–9) e `docs/NORTE.md` (§7 + regra dos dois eixos);
+`npm ci && npm run done` (998 testes). **Antes de qualquer junção:** sonda headless `scratchpad/errprobe.mjs` → `errors: 0`.
 
 **Regra dele:** toda rodada melhora também gráficos, efeitos, câmera, jogabilidade e UX, não só conteúdo.
 
-**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5. **Sem veredito ainda sobre as Rodadas 5–8.**
+**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5. **Sem veredito ainda sobre as Rodadas 5–9.**
 
-**Rodada 8:** evoluções Apex (cinco cartas da família: Solar Flare, Coilgun, Storm, Singularity, Motherlode; chip APEX,
-conquista); batching de draw calls (rims num LineSegments, emissivos instanciados, bloom 3 níveis fora do ultra; cena
-carregada ultra ~155 → ~131; meta < 100 exige fundir a nave ou cortar casters — BACKLOG); Dense Fog escurece o campo
-distante; acessibilidade (escala de texto, HUD alto contraste, reduzir flashes, legendas grandes); modificadores por
-seed de run; prévia 3D do casco no Hangar; setas de fora de tela não se empilham.
+**Rodada 9:** nave fundida numa malha (33 → 12 objetos; cena hero no ultra ~95 → ~66 draw calls) e badges de afixo
+com seed; drift do Magnetic Storm pela seed de run; flash do boss respeita "reduce flashing"; prévia de casco
+bloqueado no Hangar; Heralds falam ao surgir e ao cair, com voz própria; Códice com lore e contagens de Heralds e
+Wardens; conquista Herald Hunter. A meta de draw calls fechou no que dependia da sessão (resta passe de sombra e pós).
 
 **Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais (monitor interno).
 
-**O que só ele pode responder, jogando:** Rodadas 5–8 inteiras; em especial agora: Apex (números), acessibilidade
-(contraste e tamanho de texto), fog do infinito, e todas as "propostas".
+**O que só ele pode responder, jogando:** Rodadas 5–9 inteiras e todas as "propostas" nomeadas no código.
 
-**Próxima rodada sem veredito dele:** BACKLOG (26 linhas): fusão da nave para a meta de draw calls, badges de afixo sem
-seed (guard de Math.random), drift do Magnetic Storm com seed de run, flash de borda do boss com "reduce flashing",
-prévia de casco bloqueado no Hangar.
+**Próxima rodada sem veredito dele:** BACKLOG (26 linhas) — enquadramento do casco no Hangar; teal do banner de
+modificador; chip de buff/evolução na medição dos painéis; linhas de transmissão de morte/vitória atrás das telas;
+2D parity residual.
 
 **Avisos de processo (18/10):** `pgrep -f`/`pkill -f` matam o próprio shell do worker; dois workers no mesmo arquivo
-exigem separar hunks; o container pode reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos ao
-rearmar; pedir ao worker que encerre quando passar de ~60 min medindo.
+exigem separar hunks; o container pode reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos;
+pedir ao worker que encerre quando passar de ~60 min medindo.
 
 ## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
 
