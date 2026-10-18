@@ -7,6 +7,7 @@ Número é identidade, não posição: item novo entra no fim da sua seção. **
 ## O BASTÃO — onde a sessão parou (18/10, ~13h30) — RODADA 10 MESCLADA NA `main`; SESSÃO ENCERRADA POR CONTEXTO (ele pediu nova conversa)
 
 **Como retomar (nova sessão, qualquer máquina):**
+
 1. `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git && cd ASTEROIDS_ROGUEFIELD && git checkout main` — a
    `main` contém tudo (PRs #247–#256 e o décimo primeiro). O ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg` pode ser
    apagado; não tem nada fora da `main`.
