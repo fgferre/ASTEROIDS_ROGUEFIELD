@@ -370,7 +370,7 @@ describe('EnemyMirror', () => {
     expect(telegraph.target.position.x).toBe(200);
   });
 
-  it('marks the Caster’s landing on the field; a phased Shade wears its dissolve twin and burns from its own material', () => {
+  it('marks the Caster’s landing on the field and leaves nothing after it; a phased Shade wears its dissolve twin and burns from its own material', () => {
     const bursts = { spawn: () => {} };
     const mirror = new EnemyMirror(
       THREE,
@@ -396,6 +396,8 @@ describe('EnemyMirror', () => {
     expect(telegraph.group.visible).toBe(true);
     expect(telegraph.blast.position.x).toBe(600);
     expect(telegraph.shell.position.y).toBeGreaterThan(0); // mid-arc
+    mirror.update([{ ...caster, shell: null, shellProgress: null }, shade], 0);
+    expect(telegraph.group.visible).toBe(false); // the landing leaves nothing
 
     const view = mirror.views.get('shade');
     expect(view.body.material).toBe(

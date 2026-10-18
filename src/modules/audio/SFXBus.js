@@ -135,9 +135,10 @@ const BRAKE_SFX = Object.freeze({
   minInterval: 0.25,
 });
 
-// Support machines (Husk, Ram, Weaver, Bulwark): world cues on the ambient
-// bus, panned and distance-mixed by the machine's position; each one is never
-// retriggered within its minInterval s (many machines, one voice per cue).
+// Machines (Husk, Ram, Weaver, Bulwark, Caster, Shade): world cues on the
+// ambient bus, panned and distance-mixed by the machine's position; each one
+// is never retriggered within its minInterval s (many machines, one voice per
+// cue).
 // proposta 18/10: the Ram's windup is a mechanical spin-up — a sawtooth, FM'd
 // by a sub-octave sine, rising fromHz → toHz over `seconds` (its lane
 // telegraph lasts RAM_WINDUP_SECONDS) and swelling to `peak` until `release`
@@ -263,6 +264,82 @@ const BULWARK_PLATE_BREAK_SFX = Object.freeze({
   }),
   minInterval: 0.1,
 });
+// proposta 18/10: the Caster's 0.5 s telegraph is a quiet, hollow charge — a
+// square (odd harmonics only) rising fromHz → toHz, heard through a band on
+// its `bandHarmonic`-th harmonic, swelling to `peak` until `release` s
+// before the end.
+const CASTER_CHARGE_SFX = Object.freeze({
+  seconds: 0.45,
+  release: 0.04,
+  peak: 0.09,
+  fromHz: 150,
+  toHz: 420,
+  bandHarmonic: 3,
+  q: 4,
+  minInterval: 0.15,
+});
+// proposta 18/10: the Caster lobbing its shell is a short low "thoomp" (a
+// sine drop over a muffled puff), then a soft whistle (a narrow noise band
+// gliding down) `whistle.delay` s in; the whole cue pans from the Caster
+// toward the landing over `whistle.delay + whistle.seconds`.
+const CASTER_LAUNCH_SFX = Object.freeze({
+  thoomp: Object.freeze({ fromHz: 160, toHz: 55, peak: 0.22, seconds: 0.16 }),
+  puff: Object.freeze({
+    seconds: 0.09,
+    attack: 0.004,
+    peak: 0.16,
+    fromHz: 600,
+    toHz: 180,
+    q: 0.8,
+  }),
+  whistle: Object.freeze({
+    delay: 0.05,
+    seconds: 0.5,
+    attack: 0.15,
+    peak: 0.3,
+    fromHz: 2600,
+    toHz: 1500,
+    q: 9,
+  }),
+  minInterval: 0.15,
+});
+// proposta 18/10: a Caster shell landing is a compact thud (a sine drop under
+// a short rumble) with a bright amber crack on top: medium level, under a
+// medium explosion (sub 0.7) and with no music duck.
+const CASTER_IMPACT_SFX = Object.freeze({
+  thud: Object.freeze({ fromHz: 120, toHz: 40, peak: 0.4, seconds: 0.24 }),
+  rumble: Object.freeze({
+    seconds: 0.3,
+    attack: 0.006,
+    peak: 0.28,
+    fromHz: 1100,
+    toHz: 200,
+    q: 0.8,
+  }),
+  crack: Object.freeze({
+    seconds: 0.07,
+    attack: 0.002,
+    peak: 0.3,
+    fromHz: 4500,
+    toHz: 1800,
+    q: 1.3,
+  }),
+  minInterval: 0.12,
+});
+// proposta 18/10: a Shade dissolving is a quiet shimmer — a narrow noise band
+// sweeping between lowHz and highHz (down phasing out, up phasing in) under
+// a `flutterHz` tremolo of `flutterDepth`.
+const SHADE_PHASE_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.08,
+  peak: 0.3,
+  highHz: 6000,
+  lowHz: 2800,
+  q: 6,
+  flutterHz: 22,
+  flutterDepth: 0.5,
+  minInterval: 0.12,
+});
 // A struck partial reaches its peak this fast (s); a click is cut after this
 // many of its decay times (e^-5 < 1%).
 const STRIKE_ATTACK = 0.002;
@@ -338,6 +415,10 @@ class SFXBus {
       weaverTether: -Infinity,
       plateHit: -Infinity,
       plateBreak: -Infinity,
+      casterCharge: -Infinity,
+      casterLaunch: -Infinity,
+      casterImpact: -Infinity,
+      shadePhase: -Infinity,
     };
 
     // --- injected facade seams (assigned in init) ---
@@ -1240,6 +1321,130 @@ class SFXBus {
       this._maneuverNoise(destination, now, crack);
       this._strike(destination, now, body);
       this._clickTrain(destination, now, rattle);
+    });
+  }
+
+  /**
+   * The Caster's telegraph (CASTER_CHARGE_SFX): a hollow square rising
+   * through a band on its third harmonic.
+   */
+  playCasterCharge({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playCasterCharge');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const charge = CASTER_CHARGE_SFX;
+      if (!this._claimMachineCue('casterCharge', charge.minInterval, now))
+        return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const end = now + charge.seconds;
+      const osc = this.context.createOscillator();
+      const band = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(charge.fromHz, now);
+      osc.frequency.exponentialRampToValueAtTime(charge.toHz, end);
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(charge.fromHz * charge.bandHarmonic, now);
+      band.frequency.exponentialRampToValueAtTime(
+        charge.toHz * charge.bandHarmonic,
+        end
+      );
+      band.Q.setValueAtTime(charge.q, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(charge.peak, end - charge.release);
+      gain.gain.exponentialRampToValueAtTime(0.001, end);
+      osc.connect(band);
+      band.connect(gain);
+      gain.connect(destination);
+      osc.start(now);
+      osc.stop(end + 0.02);
+    });
+  }
+
+  /**
+   * The Caster lobs a shell (CASTER_LAUNCH_SFX): a thoomp, then a whistle,
+   * panning from `pan` (the Caster) to `toPan` (the landing).
+   * @param {{pan?: number, toPan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playCasterLaunch({ pan = 0, toPan = pan, distance = null } = {}) {
+    this._trackPerformance('playCasterLaunch');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { thoomp, puff, whistle, minInterval } = CASTER_LAUNCH_SFX;
+      if (!this._claimMachineCue('casterLaunch', minInterval, now)) return;
+      const destination = this._ambientInput(0, distance);
+      if (!destination) return;
+
+      const panner = this.context.createStereoPanner();
+      panner.pan.value = pan;
+      panner.pan.setValueAtTime(pan, now);
+      panner.pan.linearRampToValueAtTime(
+        toPan,
+        now + whistle.delay + whistle.seconds
+      );
+      panner.connect(destination);
+      this._maneuverTone(panner, now, thoomp);
+      this._maneuverNoise(panner, now, puff);
+      this._maneuverNoise(panner, now + whistle.delay, whistle);
+    });
+  }
+
+  /**
+   * A Caster shell lands (CASTER_IMPACT_SFX): a thud under a rumble and an
+   * amber crack.
+   */
+  playCasterImpact({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playCasterImpact');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { thud, rumble, crack, minInterval } = CASTER_IMPACT_SFX;
+      if (!this._claimMachineCue('casterImpact', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._maneuverTone(destination, now, thud);
+      this._maneuverNoise(destination, now, rumble);
+      this._maneuverNoise(destination, now, crack);
+    });
+  }
+
+  /**
+   * A Shade dissolves (SHADE_PHASE_SFX): a fluttering high shimmer sweeping
+   * down when it phases `out`, up when it phases back in.
+   * @param {{out?: boolean, pan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playShadePhase({ out = true, pan = 0, distance = null } = {}) {
+    this._trackPerformance('playShadePhase');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const phase = SHADE_PHASE_SFX;
+      if (!this._claimMachineCue('shadePhase', phase.minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const flutter = this.context.createGain();
+      flutter.gain.value = 1 - phase.flutterDepth;
+      const lfo = this.context.createOscillator();
+      const depth = this.context.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(phase.flutterHz, now);
+      depth.gain.value = phase.flutterDepth;
+      lfo.connect(depth);
+      depth.connect(flutter.gain);
+      flutter.connect(destination);
+      lfo.start(now);
+      lfo.stop(now + phase.seconds + 0.02);
+      this._maneuverNoise(flutter, now, {
+        ...phase,
+        fromHz: out ? phase.highHz : phase.lowHz,
+        toHz: out ? phase.lowHz : phase.highHz,
+      });
     });
   }
 

@@ -17,10 +17,7 @@ import {
   withAlpha,
 } from '../../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
-import {
-  CASTER_SCORCH_SECONDS,
-  CASTER_SHELL_RADIUS,
-} from '../../../data/enemies/caster.js';
+import { CASTER_SHELL_RADIUS } from '../../../data/enemies/caster.js';
 import { WARDEN_KINDS } from '../../../data/enemies/boss.js';
 import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import { drawAffixBadge } from './affixGlyphs.js';
@@ -569,21 +566,13 @@ const bulwark = {
 // --- Caster: squat round turret, a short mortar that turns; the lens lights
 // through the telegraph. Its marks live on the field: the aim ring grows
 // through the telegraph; in flight the blast ring holds while an inner ring
-// closes on the landing, and the shell swells toward its apex and back; the
-// scorch it leaves fades.
+// closes on the landing, and the shell swells toward its apex and back.
 
 const CASTER_SHELL_SWELL = 1.4; // proposta 18/10: × shell size at its apex
 
 const casterField = (ctx, enemy, accent, emissive) => {
-  const { aim, shell, scorch } = enemy;
+  const { aim, shell } = enemy;
   const radius = CASTER_SHELL_RADIUS;
-  if (scorch && !emissive) {
-    const left = clamp01(1 - scorch.age / CASTER_SCORCH_SECONDS);
-    ctx.beginPath();
-    ctx.arc(scorch.x - enemy.x, scorch.y - enemy.y, radius * 0.4, 0, TAU);
-    ctx.fillStyle = withAlpha(PALETTE.rockShadow, 0.55 * left);
-    ctx.fill();
-  }
   if (aim) {
     const charge = clamp01(enemy.telegraphRatio);
     ctx.beginPath();

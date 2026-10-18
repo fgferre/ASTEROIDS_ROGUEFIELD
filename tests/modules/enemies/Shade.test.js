@@ -51,6 +51,29 @@ describe('Shade', () => {
     expect(shotsOf(eventBus)).toHaveLength(SHADE_SHOTS * 2);
   });
 
+  it('announces each dissolve as it starts: out after its solid window, in after the phased one', () => {
+    const { eventBus, shade } = setup({ x: 400, y: 100 });
+    const phases = () =>
+      eventBus.emit.mock.calls.filter(([name]) =>
+        name.startsWith('shade-phased')
+      );
+
+    step(shade, SHADE_FADE_SECONDS + SHADE_VISIBLE_SECONDS - 0.05);
+    expect(phases()).toHaveLength(0);
+    step(shade, 0.1);
+    expect(shade.phase).toBe('fade-out');
+    expect(phases().map(([name]) => name)).toEqual(['shade-phased-out']);
+
+    step(shade, SHADE_FADE_SECONDS + SHADE_PHASED_SECONDS);
+    expect(shade.phase).toBe('fade-in');
+    const [, [name, payload]] = phases();
+    expect(name).toBe('shade-phased-in');
+    expect(payload).toMatchObject({
+      enemyId: 'shade-1',
+      position: { x: expect.any(Number), y: expect.any(Number) },
+    });
+  });
+
   it('phased, it takes no damage and slides to the ship’s flank, solid again beside it', () => {
     const { player, shade } = setup({ x: 700, y: 500 });
     player.velocity = { vx: 120, vy: 0 }; // heading +x: flanks are ±y

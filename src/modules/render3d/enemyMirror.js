@@ -11,7 +11,6 @@ import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
 import {
-  CASTER_SCORCH_SECONDS,
   CASTER_SHELL_APEX,
   CASTER_SHELL_RADIUS,
 } from '../../data/enemies/caster.js';
@@ -1632,8 +1631,7 @@ export class EnemyMirror {
     group.add(body);
     this.scene.add(group);
     // the aim ring, the blast ring (and its faint fill) and the one closing on
-    // the landing, the shell and the embers it leaves: field pixels, outside
-    // the body
+    // the landing, and the shell: field pixels, outside the body
     const fieldMaterial = () =>
       new THREE.MeshBasicMaterial({
         color: this.threatColor.clone(),
@@ -1651,11 +1649,10 @@ export class EnemyMirror {
       fill: new THREE.Mesh(this.ghostDisc, fieldMaterial()),
       closing: new THREE.Mesh(this.fuseRing, fieldMaterial()),
       shell: new THREE.Mesh(this.smallSphere, shellMaterial),
-      scorch: new THREE.Mesh(this.ghostDisc, fieldMaterial()),
     };
     telegraph.shell.scale.setScalar(CASTER_SHELL_PX);
-    const { aim, blast, fill, closing, shell, scorch } = telegraph;
-    telegraph.group.add(scorch, fill, aim, blast, closing, shell);
+    const { aim, blast, fill, closing, shell } = telegraph;
+    telegraph.group.add(fill, aim, blast, closing, shell);
     telegraph.group.position.set(-HALF_W, 1, -HALF_H);
     telegraph.group.visible = false;
     this.scene.add(telegraph.group);
@@ -1671,14 +1668,14 @@ export class EnemyMirror {
 
   // `telegraphRatio` lights the lens and grows the aim ring; in flight the
   // blast ring holds, an inner ring closes on the landing and the shell
-  // rises to CASTER_SHELL_APEX and falls; the landing leaves faint embers.
+  // rises to CASTER_SHELL_APEX and falls; nothing stays after the landing.
   updateCaster(view, caster) {
     const charge = clamp01(caster.telegraphRatio || 0);
     this.setGain(view.lensTone, 0.4 + 1.8 * charge);
     view.lens.scale.setScalar(0.15 * (1 + 0.8 * charge));
-    const { aim, shell, scorch } = caster;
+    const { aim, shell } = caster;
     const t = view.telegraph;
-    t.group.visible = Boolean(aim || shell || scorch);
+    t.group.visible = Boolean(aim || shell);
     if (!t.group.visible) return;
     const accent = this.accentOf(view);
     const ring = (mesh, at, radius, opacity) => {
@@ -1695,8 +1692,6 @@ export class EnemyMirror {
     // additive in linear light: a few percent already reads as a tint
     ring(t.fill, shell, CASTER_SHELL_RADIUS, 0.005 + 0.015 * progress);
     ring(t.closing, shell, CASTER_SHELL_RADIUS * (1 - progress), 0.9);
-    const left = scorch ? 1 - scorch.age / CASTER_SCORCH_SECONDS : 0;
-    ring(t.scorch, scorch, CASTER_SHELL_RADIUS * 0.4, 0.015 * clamp01(left));
     t.shell.visible = Boolean(shell);
     if (shell) {
       t.shell.position.set(

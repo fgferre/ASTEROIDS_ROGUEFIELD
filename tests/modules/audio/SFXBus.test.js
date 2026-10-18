@@ -7,6 +7,7 @@ import SFXBus, {
 } from '../../../src/modules/audio/SFXBus.js';
 import {
   AUDIO_DISTANCE_MIX,
+  EXPLOSION_PROFILES,
   TRANSMISSION_VOICE,
 } from '../../../src/core/GameConstants.js';
 import { STORY } from '../../../src/data/story.js';
@@ -303,6 +304,10 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
       'playWeaverTether',
       'playBulwarkPlateHit',
       'playBulwarkPlateBreak',
+      'playCasterCharge',
+      'playCasterLaunch',
+      'playCasterImpact',
+      'playShadePhase',
     ]) {
       const { bus, context } = makeInitializedBus();
       const panners = context.createStereoPanner.mock.results.length;
@@ -405,6 +410,79 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
     expect(
       Math.min(...record.oscillators.map((osc) => osc.frequencyLog[0]))
     ).toBeLessThan(body);
+  });
+
+  // The loudest level any gain created from index `from` on ramps to.
+  const loudestSince = (context, from) =>
+    Math.max(
+      ...context.createGain.mock.results
+        .slice(from)
+        .flatMap(({ value }) =>
+          value.gain.exponentialRampToValueAtTime.mock.calls.map(([v]) => v)
+        )
+    );
+
+  it('the Caster charges with a quiet hollow rise, then lobs a thoomp whose whistle pans to the landing', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    const gains = context.createGain.mock.results.length;
+    bus.playCasterCharge();
+    const [charge] = record.oscillators;
+    expect(charge.type).toBe('square'); // odd harmonics only: hollow
+    const [[to]] = charge.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeGreaterThan(charge.frequencyLog[0]);
+    expect(charge.stop.mock.calls[0][0]).toBeLessThanOrEqual(
+      context.currentTime + 0.5
+    );
+    expect(loudestSince(context, gains)).toBeLessThan(0.1);
+
+    bus.playCasterLaunch({ pan: -0.3, toPan: 0.4 });
+    const panner = context.createStereoPanner.mock.results.at(-1).value;
+    expect(panner.pan.value).toBe(-0.3);
+    expect(panner.pan.linearRampToValueAtTime.mock.calls[0][0]).toBe(0.4);
+    expect(record.oscillators.at(-1).frequencyLog[0]).toBeLessThan(200);
+    const [whistleFrom, whistleTo] = sweep(record.band().frequency);
+    expect(whistleFrom).toBeGreaterThan(1500);
+    expect(whistleTo).toBeLessThan(whistleFrom);
+  });
+
+  it('a Caster shell lands with a low thud and a bright crack, under a medium explosion', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    const gains = context.createGain.mock.results.length;
+    bus.playCasterImpact();
+    expect(record.oscillators).toHaveLength(1);
+    expect(record.oscillators[0].frequencyLog[0]).toBeLessThan(150);
+    expect(record.oscillators[0].stop.mock.calls[0][0]).toBeLessThan(
+      context.currentTime + 0.35
+    );
+    expect(record.newSources()).toBe(2); // rumble + crack
+    expect(sweep(record.band().frequency)[0]).toBeGreaterThan(3000);
+    expect(loudestSince(context, gains)).toBeLessThan(
+      EXPLOSION_PROFILES.medium.sub.gain
+    );
+  });
+
+  it('a Shade shimmers high under a flutter, sweeping down as it phases out and up as it comes back', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playShadePhase({ out: true });
+    const [outFrom, outTo] = sweep(record.band().frequency);
+    const [flutter] = record.oscillators;
+    expect(flutter.frequencyLog[0]).toBeLessThan(40);
+    expect(flutter.stop.mock.calls[0][0]).toBeLessThanOrEqual(
+      context.currentTime + 0.35
+    );
+
+    context.currentTime += 1; // past the cue's throttle
+    bus.playShadePhase({ out: false });
+    const [inFrom, inTo] = sweep(record.band().frequency);
+    expect(outTo).toBeLessThan(outFrom);
+    expect(inTo).toBeGreaterThan(inFrom);
+    expect(Math.min(outTo, inFrom)).toBeGreaterThan(2000);
   });
 });
 
@@ -556,6 +634,10 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playWeaverTether',
   'playBulwarkPlateHit',
   'playBulwarkPlateBreak',
+  'playCasterCharge',
+  'playCasterLaunch',
+  'playCasterImpact',
+  'playShadePhase',
   'playExplosion',
   'playFileTrack',
   'playGoldJackpot',

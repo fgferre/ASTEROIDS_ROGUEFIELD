@@ -566,6 +566,32 @@ class AudioSystem extends BaseSystem {
       this.playBulwarkPlateBreak(this._resolveSourceSpatial(data));
     });
 
+    this.registerEventListener('caster-telegraphed', (data = {}) => {
+      this.playCasterCharge(this._resolveSourceSpatial(data));
+    });
+
+    // The launch pans from the Caster toward where the shell will land.
+    this.registerEventListener('caster-shell-fired', (data = {}) => {
+      this.playCasterLaunch({
+        ...this._resolveSourceSpatial(data),
+        toPan: resolveStereoPan(data?.target?.x, this.listenerX),
+      });
+    });
+
+    // Its own impact, not an explosion: 2-4 Casters land every few seconds,
+    // so no music duck either.
+    this.registerEventListener('caster-shell-landed', (data = {}) => {
+      this.playCasterImpact(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('shade-phased-out', (data = {}) => {
+      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: true });
+    });
+
+    this.registerEventListener('shade-phased-in', (data = {}) => {
+      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: false });
+    });
+
     this.registerEventListener('pickup-collected', (data = {}) => {
       this.playPickupCollected(data?.kind);
     });
@@ -590,7 +616,8 @@ class AudioSystem extends BaseSystem {
         ''
       ).toLowerCase();
 
-      if (enemyType === 'drone') {
+      // The Shade's fan (three shots at once) shares the Mote's shot cue.
+      if (enemyType === 'drone' || enemyType === 'shade') {
         this.playDroneFire({ ...data, ...this._resolveSourceSpatial(data) });
         return;
       }
@@ -1455,6 +1482,22 @@ class AudioSystem extends BaseSystem {
 
   playBulwarkPlateBreak(options = {}) {
     this.sfxBus.playBulwarkPlateBreak(options);
+  }
+
+  playCasterCharge(options = {}) {
+    this.sfxBus.playCasterCharge(options);
+  }
+
+  playCasterLaunch(options = {}) {
+    this.sfxBus.playCasterLaunch(options);
+  }
+
+  playCasterImpact(options = {}) {
+    this.sfxBus.playCasterImpact(options);
+  }
+
+  playShadePhase(options = {}) {
+    this.sfxBus.playShadePhase(options);
   }
 
   playEliteSpawned() {

@@ -7,7 +7,6 @@ import {
   CASTER_HOLD_MAX,
   CASTER_HOLD_MIN,
   CASTER_LEAD_SECONDS,
-  CASTER_SCORCH_SECONDS,
   CASTER_SHELL_DAMAGE,
   CASTER_SHELL_FLIGHT,
   CASTER_SHELL_RADIUS,
@@ -25,7 +24,8 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
  * ship (`aim`, lit by `telegraphRatio` over the telegraph), then lobs a
  * `shell` there: it flies CASTER_SHELL_FLIGHT s over the field, colliding with
  * nothing, and blows on landing — CASTER_SHELL_DAMAGE to the ship alone within
- * CASTER_SHELL_RADIUS — leaving a `scorch`. A shell in the air dies with it.
+ * CASTER_SHELL_RADIUS. A shell in the air dies with it. Emits
+ * `caster-telegraphed`, `caster-shell-fired` and `caster-shell-landed`.
  */
 export class Caster extends BaseEnemy {
   constructor(system, config = {}) {
@@ -35,7 +35,6 @@ export class Caster extends BaseEnemy {
     this.fireTimer = CASTER_FIRE_INTERVAL;
     this.aim = null;
     this.shell = null;
-    this.scorch = null;
     this.destroyed = false;
     this.movementStrategy = 'linear';
     this.renderStrategy = 'procedural';
@@ -84,22 +83,31 @@ export class Caster extends BaseEnemy {
     const player = this.system?.getCachedPlayer?.() ?? null;
     const target = player?.position ?? null;
     this.updateShell(deltaTime);
-    if (this.scorch) {
-      this.scorch.age += deltaTime;
-      if (this.scorch.age >= CASTER_SCORCH_SECONDS) this.scorch = null;
-    }
     this.steer(target);
     if (!target) return;
 
     this.fireTimer -= deltaTime;
     if (this.fireTimer <= CASTER_TELEGRAPH_SECONDS) {
+      const charging = !this.aim;
       this.aim = this.leadPoint(player, target);
       this.rotation = Math.atan2(this.aim.y - this.y, this.aim.x - this.x);
+      if (charging) this.emitEvent('caster-telegraphed', { target: this.aim });
     }
     if (this.fireTimer > 0) return;
     this.fireTimer += CASTER_FIRE_INTERVAL;
     this.shell = { fromX: this.x, fromY: this.y, ...this.aim, age: 0 };
+    this.emitEvent('caster-shell-fired', { target: this.aim });
     this.aim = null;
+  }
+
+  // A Caster event at its own position, plus `extra`.
+  emitEvent(name, extra) {
+    this.getEventBus()?.emit?.(name, {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
+      ...extra,
+    });
   }
 
   // Closes in beyond the band, backs off inside it, holds within; never backs
@@ -155,8 +163,8 @@ export class Caster extends BaseEnemy {
     this.land(shell.x, shell.y);
   }
 
-  // Hurts the ship only (the direct-damage path checks the radius); the blast
-  // looks and sounds like a Volatile rock's.
+  // Hurts the ship only (the direct-damage path checks the radius); its own
+  // impact look and sound, nothing left behind.
   land(x, y) {
     const position = { x, y };
     this.system?.applyDirectDamageToPlayer?.(CASTER_SHELL_DAMAGE, {
@@ -165,21 +173,17 @@ export class Caster extends BaseEnemy {
       radius: CASTER_SHELL_RADIUS,
       source: this,
     });
-    this.getEventBus()?.emit?.('asteroid-volatile-exploded', {
-      enemy: this,
+    this.emitEvent('caster-shell-landed', {
       position,
       radius: CASTER_SHELL_RADIUS,
       damage: CASTER_SHELL_DAMAGE,
-      cause: 'caster-shell',
     });
-    this.scorch = { x, y, age: 0 };
   }
 
   onDestroyed(source, context = {}) {
     this.destroyed = true;
     this.aim = null;
     this.shell = null;
-    this.scorch = null;
     super.onDestroyed(source, context);
   }
 
@@ -189,7 +193,6 @@ export class Caster extends BaseEnemy {
     this.fireTimer = CASTER_FIRE_INTERVAL;
     this.aim = null;
     this.shell = null;
-    this.scorch = null;
     this.destroyed = false;
   }
 }

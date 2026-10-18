@@ -32,6 +32,11 @@ const CYCLE = {
   'fade-out': { seconds: SHADE_FADE_SECONDS, next: 'phased' },
   phased: { seconds: SHADE_PHASED_SECONDS, next: 'fade-in' },
 };
+// The dissolves it announces, by the step that starts them.
+const PHASE_EVENTS = {
+  'fade-out': 'shade-phased-out',
+  'fade-in': 'shade-phased-in',
+};
 
 /**
  * Phase flanker. Cycle: fade-in → visible (one fan of SHADE_SHOTS at the ship,
@@ -41,6 +46,7 @@ const CYCLE = {
  * beside the ship — across the ship's heading on the side it is on, or a
  * seeded side while the ship is still — inside the field; phased, it glides
  * there to arrive as the window ends. `visibility`: 0 phased … 1 solid.
+ * Emits `shade-phased-out` / `shade-phased-in` as each dissolve starts.
  */
 export class Shade extends BaseEnemy {
   constructor(system, config = {}) {
@@ -131,6 +137,13 @@ export class Shade extends BaseEnemy {
       this.phaseTimer += CYCLE[this.phase].seconds;
       if (this.phase === 'visible') this.fired = false;
       if (this.phase === 'phased') this.pickFlank(player, target);
+      if (PHASE_EVENTS[this.phase]) {
+        this.getEventBus()?.emit?.(PHASE_EVENTS[this.phase], {
+          enemy: this,
+          enemyId: this.id,
+          position: { x: this.x, y: this.y },
+        });
+      }
     }
     this.intangible = this.phase === 'phased';
   }

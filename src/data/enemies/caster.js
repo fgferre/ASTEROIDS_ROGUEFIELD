@@ -18,7 +18,6 @@ export const CASTER_SHELL_FLIGHT = 1.1; // proposta 18/10: seconds in the air
 export const CASTER_SHELL_RADIUS = 110; // proposta 18/10: blast radius, px
 export const CASTER_SHELL_DAMAGE = 24; // proposta 18/10
 export const CASTER_SHELL_APEX = 90; // proposta 18/10: px of rise mid-flight
-export const CASTER_SCORCH_SECONDS = 2.5; // proposta 18/10: mark left behind
 export const CASTER_FIELD_MARGIN = 30; // proposta 18/10: never backs off-field
 
 export const CASTER_CONFIG = deepFreeze({

@@ -7,6 +7,7 @@ import {
   CASTER_SHELL_DAMAGE,
   CASTER_SHELL_FLIGHT,
   CASTER_SHELL_RADIUS,
+  CASTER_TELEGRAPH_SECONDS,
 } from '../../../src/data/enemies/caster.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
 
@@ -66,13 +67,19 @@ describe('Caster', () => {
       expect(player.takeDamage).not.toHaveBeenCalled();
       caster.onUpdate(0.1);
       expect(caster.shell).toBeNull();
-      expect(caster.scorch).toMatchObject({ x: landing, y: 300 });
+      expect(caster.scorch).toBeUndefined(); // nothing left on the field
       expect(eventBus.emit).toHaveBeenCalledWith(
-        'asteroid-volatile-exploded',
+        'caster-shell-landed',
         expect.objectContaining({
+          enemyId: 'caster-1',
           position: { x: landing, y: 300 },
           radius: CASTER_SHELL_RADIUS,
+          damage: CASTER_SHELL_DAMAGE,
         })
+      );
+      expect(eventBus.emit).not.toHaveBeenCalledWith(
+        'asteroid-volatile-exploded',
+        expect.anything()
       );
       return player.takeDamage;
     };
@@ -82,5 +89,30 @@ describe('Caster', () => {
       expect.any(Caster)
     );
     expect(lob(CASTER_SHELL_RADIUS + 20)).not.toHaveBeenCalled();
+  });
+
+  it('announces its telegraph once as it starts, then the shell it fires at the aim', () => {
+    const { eventBus, caster } = setup({ x: 430, y: 300 });
+    const sent = (name) =>
+      eventBus.emit.mock.calls.filter(([event]) => event === name);
+
+    caster.onUpdate(CASTER_FIRE_INTERVAL - CASTER_TELEGRAPH_SECONDS - 0.01);
+    expect(sent('caster-telegraphed')).toHaveLength(0);
+    caster.onUpdate(0.02);
+    caster.onUpdate(0.2);
+    expect(sent('caster-telegraphed')).toHaveLength(1);
+    expect(sent('caster-telegraphed')[0][1]).toMatchObject({
+      enemyId: 'caster-1',
+      position: { x: 100, y: 300 },
+      target: { x: 430, y: 300 },
+    });
+    expect(sent('caster-shell-fired')).toHaveLength(0);
+
+    caster.onUpdate(CASTER_TELEGRAPH_SECONDS);
+    expect(sent('caster-shell-fired')).toHaveLength(1);
+    expect(sent('caster-shell-fired')[0][1]).toMatchObject({
+      position: { x: 100, y: 300 },
+      target: { x: 430, y: 300 },
+    });
   });
 });
