@@ -175,7 +175,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
       só, para reverter com um commit.
 - [x] **R3.5 Modo infinito (proposta).** Na vitória do Warden 15, botão "Continue into the deep field": `beyond(n)` da
       tabela de camadas escala rochas/roster/elite; placar de camada máxima.
-- [ ] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
+- [x] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
       visivelmente a cada fase.
 
 ## Rodada 4+ (18/10) — Norte 2, "grandioso" (`docs/NORTE.md` §7)

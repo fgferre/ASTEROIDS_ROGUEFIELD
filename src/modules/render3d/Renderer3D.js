@@ -36,6 +36,7 @@ import {
 } from './batches.js';
 import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
+import { DeathBursts } from './dissolve.js';
 import { DustFloor } from './dustFloor.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
@@ -227,6 +228,12 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('weapon-beam-fired', () => {
       this.impact.kick(WEAPONS.harmonic.beam.kick);
     });
+    // a split asteroid lives on as its fragments: only real deaths burn
+    this.registerEventListener('enemy-destroyed', (data) => {
+      if (data?.enemy && !data.fragments?.length) {
+        this.three?.enemies.markDead(data.enemy);
+      }
+    });
     this.registerEventListener('bullet-hit', (data) => {
       const { position, enemy, bullet } = data || {};
       if (!position || data.blocked) return;
@@ -281,6 +288,7 @@ class Renderer3D extends BaseSystem {
     this.lastRenderTime = null;
     this.dolly = 1;
     this.three?.enemies.clear();
+    this.three?.bursts.clear();
     this.three?.player.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
@@ -391,10 +399,11 @@ class Renderer3D extends BaseSystem {
       floor,
     });
     const flashes = new FlashLights(THREE, scene);
-    const enemies = new EnemyMirror(THREE, scene, this.seeded);
+    const debris = new DebrisChunks(THREE, scene);
+    const bursts = new DeathBursts(debris, flashes);
+    const enemies = new EnemyMirror(THREE, scene, this.seeded, bursts);
     const player = new PlayerMirror(THREE, scene, this.seeded);
     const pickups = new PickupMirror(THREE, scene);
-    const debris = new DebrisChunks(THREE, scene);
 
     const ribbons = new RibbonBatch(THREE, 4000);
     const lances = new CapsuleBatch(THREE, 240);
@@ -473,6 +482,7 @@ class Renderer3D extends BaseSystem {
       matte,
       smoke,
       debris,
+      bursts,
       shockwaves,
       flash,
       flashAlpha: 0,
@@ -568,7 +578,8 @@ class Renderer3D extends BaseSystem {
     t.floor.begin();
     t.debris.begin();
 
-    const warden = t.enemies.update(enemyList, time);
+    const warden = t.enemies.update(enemyList, time, dt);
+    t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);

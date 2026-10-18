@@ -33,13 +33,24 @@ export class FlashLights {
   observe(wave, rgb) {
     if (this.seen.has(wave)) return false;
     this.seen.add(wave);
+    this.light(
+      wave.x,
+      wave.y,
+      rgb[0],
+      rgb[1],
+      rgb[2],
+      PEAK * Math.min(1, Math.max(0.25, (wave.maxRadius || 0) / FULL_RADIUS))
+    );
+    return true;
+  }
+
+  /** Lights the next pooled light at (x, y) logical. */
+  light(x, y, r, g, b, intensity) {
     const light = this.lights[this.next];
     this.next = (this.next + 1) % this.lights.length;
-    light.color.setRGB(rgb[0], rgb[1], rgb[2]);
-    light.position.set(wave.x - HALF_W, LIGHT_HEIGHT, wave.y - HALF_H);
-    light.intensity =
-      PEAK * Math.min(1, Math.max(0.25, (wave.maxRadius || 0) / FULL_RADIUS));
-    return true;
+    light.color.setRGB(r, g, b);
+    light.position.set(x - HALF_W, LIGHT_HEIGHT, y - HALF_H);
+    light.intensity = intensity;
   }
 
   update(dt) {

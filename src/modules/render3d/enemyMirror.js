@@ -3,7 +3,8 @@
 // damage, and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
 // Bulwark) and the three Wardens (Prime, Choir, Null; one view kind each,
 // picked by `bossKind`). Views are pooled per kind and keyed by entity id; a
-// view not seen in a frame is hidden and returned to its pool.
+// view not seen in a frame is hidden and returned to its pool, unless its
+// enemy was killed (`markDead`): then it burns away first (dissolve.js).
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
@@ -12,6 +13,7 @@ import { WARDEN_KINDS } from '../../data/enemies/boss.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
+import { DissolvePool } from './dissolve.js';
 
 const ROCK_SHAPES = 8;
 const ROCK_DETAIL = 4;
@@ -32,6 +34,10 @@ const BREAK_SECONDS = 1.6;
 const WEAVER_ARMS = 3;
 const ELITE_DASHES = 6;
 const TAU = Math.PI * 2;
+// proposta 18/10: chunks a death throws (machines by radius; final Warden).
+const BURST_MIN = 6;
+const BURST_MAX = 12;
+const WARDEN_BURST = 24;
 export const KNOWN_KINDS = new Set([
   'asteroid',
   'drone',
@@ -318,13 +324,22 @@ function paintRock(THREE, geometry, seed) {
 }
 
 export class EnemyMirror {
-  constructor(THREE, scene, seeded) {
+  /** `bursts`: DeathBursts (dissolve.js) for the chunks a death throws. */
+  constructor(THREE, scene, seeded, bursts) {
     this.THREE = THREE;
     this.scene = scene;
     this.seeded = seeded;
+    this.bursts = bursts;
     this.views = new Map();
     this.pools = new Map();
     this.frame = 0;
+    // ids killed since the last frame; their views dissolve instead of
+    // vanishing, and stay out of `views` (a reused id gets a fresh view)
+    this.dead = new Set();
+    this.dissolve = new DissolvePool(THREE, seeded, (view) => this.pool(view));
+    this.pruneDead = (key) => {
+      if (!this.views.has(key)) this.dead.delete(key);
+    };
 
     this.rockGeometries = [];
     for (let i = 0; i < ROCK_SHAPES; i += 1) {
@@ -1133,8 +1148,9 @@ export class EnemyMirror {
   // --- per frame -------------------------------------------------------------
 
   /** Mirrors `enemies`; returns the Warden view (for its light) or null. */
-  update(enemies, time) {
+  update(enemies, time, dt = 0) {
     this.frame += 1;
+    this.dissolve.update(dt);
     let warden = null;
     for (let i = 0; i < enemies.length; i += 1) {
       const enemy = enemies[i];
@@ -1154,6 +1170,7 @@ export class EnemyMirror {
         this.views.set(key, view);
       }
       view.stamp = this.frame;
+      view.radius = enemy.radius || 12;
       const { object } = view;
       object.position.set(enemy.x - HALF_W, 0, enemy.y - HALF_H);
       const flash = enemy.getHitFlash();
@@ -1165,9 +1182,51 @@ export class EnemyMirror {
     }
 
     this.views.forEach((view, key) => {
-      if (view.stamp !== this.frame) this.release(key, view);
+      if (view.stamp !== this.frame) {
+        if (this.dead.delete(key)) this.die(key, view);
+        else this.release(key, view);
+      }
     });
+    if (this.dead.size) this.dead.forEach(this.pruneDead);
     return warden;
+  }
+
+  /** The simulation killed `enemy` (asteroid splits excluded). */
+  markDead(enemy) {
+    this.dead.add(enemy.id || enemy);
+  }
+
+  // The view burns in place; a burst of accent chunks flies out (rocks
+  // already shed stone debris through EffectsSystem). The Warden's phase
+  // breaks have their own pieces: only its final death bursts, bigger, lit.
+  die(key, view) {
+    this.views.delete(key);
+    if (view.telegraph) view.telegraph.group.visible = false;
+    const accent = this.accentOf(view);
+    this.dissolve.start(view, accent, view.radius);
+    if (view.kind === 'asteroid') return;
+    const x = view.object.position.x + HALF_W;
+    const y = view.object.position.z + HALF_H;
+    if (view.kind.startsWith('boss')) {
+      this.bursts.spawn(x, y, view.radius, accent, WARDEN_BURST);
+      this.bursts.flash(x, y, accent);
+    } else {
+      const count = Math.round(view.radius / 2);
+      this.bursts.spawn(
+        x,
+        y,
+        view.radius,
+        accent,
+        Math.max(BURST_MIN, Math.min(BURST_MAX, count))
+      );
+    }
+  }
+
+  accentOf(view) {
+    if (view.kind.startsWith('boss')) return this.bossColor;
+    if (view.accents?.length) return view.accents[0].userData.base;
+    if (view.material) return view.material.userData.rockUniforms.uVein.value;
+    return this.threatColor;
   }
 
   updateMachine(view, enemy, kind, time, flash) {
@@ -1607,6 +1666,10 @@ export class EnemyMirror {
     view.object.visible = false;
     if (view.telegraph) view.telegraph.group.visible = false;
     this.views.delete(key);
+    this.pool(view);
+  }
+
+  pool(view) {
     let pool = this.pools.get(view.kind);
     if (!pool) {
       pool = [];
@@ -1617,5 +1680,7 @@ export class EnemyMirror {
 
   clear() {
     this.views.forEach((view, key) => this.release(key, view));
+    this.dissolve.clear();
+    this.dead.clear();
   }
 }
