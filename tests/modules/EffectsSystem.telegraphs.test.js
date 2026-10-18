@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import EffectsSystem from '../../src/modules/EffectsSystem.js';
+import { Draw2D } from '../../src/modules/effects/draw2d.js';
 import WardenChoir from '../../src/modules/enemies/types/WardenChoir.js';
 
 // A 2D context that records every call.
@@ -24,7 +24,9 @@ const fakeContext = () => {
 
 const drawTelegraph = (boss) => {
   const ctx = fakeContext();
-  EffectsSystem.prototype.drawTelegraphs.call({ telegraphs: [boss] }, ctx);
+  const draw2d = new Draw2D();
+  draw2d.addTelegraph(boss);
+  draw2d.drawTelegraphs(ctx);
   return ctx.calls;
 };
 

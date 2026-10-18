@@ -1,16 +1,9 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
-import { applyBaseTransform } from '../core/viewport.js';
-import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
-import { getEmissive } from '../core/bloomLayer.js';
+import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { GamePools } from '../core/GamePools.js';
-import {
-  DamageText,
-  HitMarker,
-  SpaceParticle,
-  drawParticle,
-} from './EffectEntities.js';
-import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
+import { DamageText, HitMarker, SpaceParticle } from './EffectEntities.js';
+import { ShakePresets } from '../utils/ScreenShake.js';
 import { requireService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
@@ -23,7 +16,13 @@ import {
   BOSS_SCREEN_SHAKES,
 } from '../data/constants/visual.js';
 import { ASTEROID_VARIANTS } from '../data/enemies/asteroid-configs.js';
-import { WARDEN_KINDS } from '../data/enemies/boss.js';
+import { Draw2D } from './effects/draw2d.js';
+import {
+  DEATH_SLOW_MO,
+  GameTime,
+  LEVEL_UP_SLOW_MO,
+} from './effects/GameTime.js';
+import { PLAYER_HIT_SHAKE, ScreenFeedback } from './effects/ScreenFeedback.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
@@ -36,34 +35,6 @@ const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 // their lifetimes. Stone chips are mass, not light, and are unchanged.
 const XP_SPARK_LIFE_SCALE = 1.5; // was 1
 const EXPLOSION_EMBER_LIFE_SCALE = 1.3; // was 1
-
-// Hits feel like hits (PLAN.md step 5). PROPOSAL from 17/10, judged by playing.
-// Numeric shake intensity becomes trauma as intensity / divisor (was 15).
-const SHAKE_INTENSITY_DIVISOR = 10;
-const PLAYER_HIT_SHAKE = { intensity: 7, duration: 0.35 }; // was 8 / 0.3 s; 7 keeps a hit (trauma 0.7) below death/boss (1.0)
-// Hit-stop on every kill: the world runs at `scale` speed, easing back to
-// full speed over `duration` s (freeze frame). Before 17/10 only the large
-// fragment (0.18 s at 24 %) and the Tether blast (0.14-0.26 s at 18 %) had one.
-const HIT_STOP = Object.freeze({
-  small: { duration: 0.05, scale: 0.3 }, // was none
-  medium: { duration: 0.08, scale: 0.25 }, // was none
-  large: { duration: 0.18, scale: 0.24 }, // unchanged
-  drone: { duration: 0.05, scale: 0.3 }, // Mote, was none
-  hunter: { duration: 0.09, scale: 0.25 }, // Seeker, was none
-  mine: { duration: 0.12, scale: 0.18 }, // Tether, was 0.14-0.26 s by radius
-});
-// A kind re-triggers at most once per this many seconds of game time, so a
-// multishot that kills three smalls freezes once.
-const HIT_STOP_COOLDOWN = 0.1;
-// Settings → Accessibility → Reduce Flashing: flashes at 30 % strength, at
-// most one every 0.34 s (under WCAG's three a second); ones too faint to see
-// at that strength are dropped so they never hold the window.
-const REDUCED_FLASH = Object.freeze({ scale: 0.3, gap: 0.34, floor: 0.02 });
-// Slow-motion beats (was: level-up a 0.2 s freeze at 40 %, death none). The
-// scale holds, then eases back to 1 over `ease` s; the camera zoom pulses to
-// `zoom` (base 1.3) and back over the same total time.
-const LEVEL_UP_SLOW_MO = { scale: 0.35, hold: 0.25, ease: 0.2, zoom: 1.42 };
-const DEATH_SLOW_MO = { scale: 0.3, hold: 0.5, ease: 0.4, zoom: 1.5 };
 
 // Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
 // and a few faint amber crystal motes drifting through the camera view, so the
@@ -188,40 +159,23 @@ export default class EffectsSystem extends BaseSystem {
     Object.assign(this, randomHelpers);
     this.particles = [];
     this.shockwaves = [];
-    this.telegraphs = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
-    this.damageIndicators = []; // NEW: Directional damage indicators
     this.bossTransitionEffects = [];
     this.processedMineExplosions = new WeakSet();
     this.muzzleFlashQueue = [];
+    this.draw2d = new Draw2D();
 
-    // Upgraded screen shake (Week 1: Balance & Feel)
-    this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
-    this.screenShakeSeedState =
-      this.screenShake &&
-      typeof this.screenShake.captureSeedState === 'function'
-        ? this.screenShake.captureSeedState()
-        : null;
-    this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
-    this.hitStopClock = 0;
-    this.hitStopReadyAt = {};
-    this.pendingZoomPulse = null;
-    this.screenFlash = {
-      timer: 0,
-      duration: 0,
-      color: PALETTE.text,
-      intensity: 0,
-    };
-    this.timeDilation = {
-      timer: 0,
-      duration: 0,
-      startScale: 1,
-      endScale: 1,
-      holdScale: 1,
-      holdTimer: 0,
-      easing: 'outCubic',
-      active: false,
-    };
+    this.screenFeedback = new ScreenFeedback({
+      random: () => this.getRandomFork('screenShake'),
+      screenShakeScale: () => this.screenShakeScale,
+      motionReduced: () => this.motionReduced,
+      flashingReduced: () => this.flashingReduced,
+      damageFlashEnabled: () => this.damageFlashEnabled,
+    });
+    this.gameTime = new GameTime({
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      motionReduced: () => this.motionReduced,
+    });
     this.activeBoss = { id: null, lastPhase: 0 };
     this.lastAdjustedDelta = 0;
 
@@ -234,7 +188,6 @@ export default class EffectsSystem extends BaseSystem {
     this.damageNumbersEnabled = true;
     this.motionReduced = false;
     this.flashingReduced = false;
-    this.flashGap = 0;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
@@ -463,10 +416,7 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     registerBossEvent('boss-telegraph', (payload = {}) => {
-      const boss = payload.enemy || payload.boss || null;
-      if (boss && !this.telegraphs.includes(boss)) {
-        this.telegraphs.push(boss);
-      }
+      this.draw2d.addTelegraph(payload.enemy || payload.boss || null);
     });
 
     registerBossEvent('boss-spawned', (payload = {}) => {
@@ -556,7 +506,7 @@ export default class EffectsSystem extends BaseSystem {
         typeof data.intensity === 'number' &&
         data.intensity >= MAIN_THRUSTER_FLASH_THRESHOLD
       ) {
-        this.addScreenFlash(
+        this.screenFeedback.addScreenFlash(
           MAIN_THRUSTER_FLASH_COLOR,
           MAIN_THRUSTER_FLASH_DURATION,
           MAIN_THRUSTER_FLASH_INTENSITY
@@ -622,7 +572,11 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('asteroid-volatile-armed', (data) => {
       if (data?.position) {
-        this.addScreenFlash(withAlpha(PALETTE.shot, 0.18), 0.12, 0.08);
+        this.screenFeedback.addScreenFlash(
+          withAlpha(PALETTE.shot, 0.18),
+          0.12,
+          0.08
+        );
         this.spawnVolatileWarning(data.position);
       }
     });
@@ -640,9 +594,9 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('player-leveled-up', () => {
-      this.addScreenShake(6, 0.4);
-      this.playSlowMotion(LEVEL_UP_SLOW_MO);
-      this.addScreenFlash(PALETTE.xp, 0.15, 0.2);
+      this.screenFeedback.addScreenShake(6, 0.4);
+      this.gameTime.playSlowMotion(LEVEL_UP_SLOW_MO);
+      this.screenFeedback.addScreenFlash(PALETTE.xp, 0.15, 0.2);
 
       // Player is built after effects' own dependencies; resolve on use.
       const player = requireService(
@@ -666,20 +620,24 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('player-took-damage', (data) => {
-      this.addScreenShake(
+      this.screenFeedback.addScreenShake(
         PLAYER_HIT_SHAKE.intensity,
         PLAYER_HIT_SHAKE.duration
       );
 
       // Red damage flash
-      this.addScreenFlash(withAlpha(PALETTE.threat, 0.4), 0.25, 0.3);
+      this.screenFeedback.addScreenFlash(
+        withAlpha(PALETTE.threat, 0.4),
+        0.25,
+        0.3
+      );
 
       // Brief freeze frame for impact
-      this.addFreezeFrame(0.12, 0.15);
+      this.gameTime.addFreezeFrame(0.12, 0.15);
 
       // Directional damage indicator
       if (data?.damageSource && data?.playerPosition) {
-        this.createDirectionalDamageIndicator(
+        this.draw2d.createDirectionalDamageIndicator(
           data.damageSource,
           data.playerPosition
         );
@@ -708,8 +666,12 @@ export default class EffectsSystem extends BaseSystem {
       });
 
       // Screen effects
-      this.addScreenShake(12, 0.4);
-      this.addScreenFlash(withAlpha(PALETTE.player, 0.4), 0.3, 0.2);
+      this.screenFeedback.addScreenShake(12, 0.4);
+      this.screenFeedback.addScreenFlash(
+        withAlpha(PALETTE.player, 0.4),
+        0.3,
+        0.2
+      );
 
       // Emit damage event for enemies in radius
       this.eventBus?.emit?.('shield-explosion-damage', {
@@ -741,7 +703,7 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('player-died', (data) => {
-      this.playSlowMotion(DEATH_SLOW_MO);
+      this.gameTime.playSlowMotion(DEATH_SLOW_MO);
       if (data?.position) {
         this.createEpicShipExplosion(data.position);
       }
@@ -750,45 +712,20 @@ export default class EffectsSystem extends BaseSystem {
 
   update(deltaTime) {
     const baseDelta = Number.isFinite(deltaTime) ? Math.max(0, deltaTime) : 0;
-    let effectDelta = baseDelta;
-    let adjustedDelta = baseDelta;
-
-    this.hitStopClock += baseDelta;
-    // Emitted on the first running step: the level-up screen pauses the run
-    // in the same step that queued the pulse, so it plays on resume.
-    if (this.pendingZoomPulse && baseDelta > 0) {
-      this.eventBus?.emit?.('camera-zoom-pulse', this.pendingZoomPulse);
-      this.pendingZoomPulse = null;
-    }
-
-    const freezeMultiplier = this.updateFreezeFrameState(baseDelta);
-    effectDelta *= freezeMultiplier;
-    adjustedDelta *= freezeMultiplier;
-
-    const timeScale = this.updateTimeDilationState(baseDelta);
-    effectDelta *= timeScale;
-    adjustedDelta *= timeScale;
-
-    // Update screen shake (new trauma-based system)
-    this.screenShake.update(effectDelta);
-
-    if (this.screenFlash.timer > 0) {
-      this.screenFlash.timer -= effectDelta;
-      if (this.screenFlash.timer < 0) this.screenFlash.timer = 0;
-    }
-    this.flashGap = Math.max(0, this.flashGap - effectDelta);
+    const effectDelta = this.gameTime.update(baseDelta);
+    this.screenFeedback.update(effectDelta);
 
     this.updateParticles(effectDelta);
     this.updateShockwaves(effectDelta);
-    this.pruneTelegraphs();
+    this.draw2d.pruneTelegraphs();
     this.updateHitMarkers(effectDelta);
     this.updateDamageTexts(effectDelta);
-    this.updateDamageIndicators(effectDelta);
+    this.draw2d.updateDamageIndicators(effectDelta);
     this.updateBossTransitions(effectDelta);
     this.updateAmbient(effectDelta);
 
-    this.lastAdjustedDelta = adjustedDelta;
-    return adjustedDelta;
+    this.lastAdjustedDelta = effectDelta;
+    return effectDelta;
   }
 
   updateHitMarkers(deltaTime) {
@@ -803,116 +740,6 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     markers.length = writeIndex;
-  }
-
-  updateDamageIndicators(deltaTime) {
-    const indicators = this.damageIndicators;
-    let writeIndex = 0;
-
-    for (let i = 0; i < indicators.length; i += 1) {
-      const indicator = indicators[i];
-      if (!indicator) {
-        continue;
-      }
-
-      indicator.life -= deltaTime;
-      indicator.expansion += deltaTime * 30; // Expand at 30px/s
-      if (indicator.life > 0) {
-        indicators[writeIndex++] = indicator;
-      }
-    }
-
-    indicators.length = writeIndex;
-  }
-
-  updateFreezeFrameState(baseDelta) {
-    if (!this.freezeFrame || this.freezeFrame.timer <= 0) {
-      return 1;
-    }
-
-    const frame = this.freezeFrame;
-    frame.timer = Math.max(0, frame.timer - baseDelta);
-
-    const duration =
-      frame.duration > 0 ? frame.duration : Math.max(frame.timer, 0);
-    if (duration <= 0) {
-      frame.timer = 0;
-      return 1;
-    }
-
-    const fade = Math.max(0, Math.min(1, frame.fade ?? 0));
-    if (frame.timer <= 0) {
-      return 1;
-    }
-
-    const remaining = Math.max(0, Math.min(1, frame.timer / duration));
-    const normalized = 1 - remaining;
-    const multiplier = fade + (1 - fade) * normalized;
-
-    return Math.max(0, Math.min(1, multiplier));
-  }
-
-  updateTimeDilationState(baseDelta) {
-    if (!this.timeDilation) {
-      return 1;
-    }
-
-    const state = this.timeDilation;
-
-    if (state.holdTimer > 0) {
-      state.holdTimer = Math.max(0, state.holdTimer - baseDelta);
-      state.timer = Math.max(state.duration, 0);
-      state.active = true;
-      const scale = Math.max(0, Math.min(1, state.holdScale ?? 1));
-      if (state.holdTimer <= 0 && state.duration <= 0) {
-        state.active = false;
-      }
-      return scale;
-    }
-
-    if (state.timer > 0 && state.duration > 0) {
-      state.timer = Math.max(0, state.timer - baseDelta);
-      const progress =
-        state.duration > 0 ? 1 - state.timer / state.duration : 1;
-      const eased = this.easeValue(state.easing, progress);
-      const start = Number.isFinite(state.startScale) ? state.startScale : 1;
-      const end = Number.isFinite(state.endScale) ? state.endScale : 1;
-      const scale = start + (end - start) * eased;
-
-      if (state.timer <= 0) {
-        state.timer = 0;
-        state.duration = 0;
-        state.startScale = 1;
-        state.endScale = 1;
-        state.holdScale = 1;
-        state.active = false;
-      } else {
-        state.active = true;
-      }
-
-      return Math.max(0, Math.min(1, scale));
-    }
-
-    state.timer = 0;
-    state.duration = 0;
-    state.startScale = 1;
-    state.endScale = 1;
-    state.holdScale = 1;
-    state.active = false;
-    return 1;
-  }
-
-  easeValue(easing, t) {
-    const clamped = Math.max(0, Math.min(1, t));
-    switch (easing) {
-      case 'smooth':
-        return clamped * clamped * (3 - 2 * clamped);
-      case 'outQuad':
-        return 1 - Math.pow(1 - clamped, 2);
-      case 'outCubic':
-      default:
-        return 1 - Math.pow(1 - clamped, 3);
-    }
   }
 
   updateParticles(deltaTime) {
@@ -984,16 +811,24 @@ export default class EffectsSystem extends BaseSystem {
     shockwaves.length = writeIndex;
   }
 
+  // === 2D DRAWING (effects/draw2d.js, frozen) ===
+  // RenderingSystem shakes the canvas and draws the effects through these.
   applyScreenShake(ctx) {
-    // Apply trauma-based screen shake
-    const centerX = GAME_WIDTH / 2;
-    const centerY = GAME_HEIGHT / 2;
-    this.screenShake.apply(ctx, centerX, centerY);
+    this.draw2d.applyScreenShake(ctx, this.screenShake);
   }
 
+  // Queued muzzle flashes become particles first; Renderer3D flushes the
+  // queue itself.
   draw(ctx) {
-    this.drawWorld(ctx);
-    this.drawScreenSpace(ctx);
+    this.flushMuzzleFlashQueue();
+    this.draw2d.draw(ctx, {
+      particles: this.particles,
+      shockwaves: this.shockwaves,
+      hitMarkers: this.hitMarkers,
+      damageTexts: this.damageTexts,
+      screenFlash: this.screenFlash,
+      bossTransitionEffects: this.bossTransitionEffects,
+    });
   }
 
   // === AMBIENT FIELD LIFE ===
@@ -1082,262 +917,10 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   // Drawn under the entities; `view` is the camera's visible logical rect.
+  // Renderer3D passes no ctx: it only sets the view.
   drawAmbient(ctx, view) {
     this.ambientView = view;
-    if (!ctx) return;
-    for (let i = 0; i < this.ambientChips.length; i += 1) {
-      drawParticle(ctx, this.ambientChips[i]);
-    }
-
-    const motes = this.ambientMotes;
-    if (!motes.length) return;
-    const paint = (target, radiusScale) => {
-      target.save();
-      target.globalCompositeOperation = 'lighter';
-      target.fillStyle = PALETTE.shot;
-      for (let i = 0; i < motes.length; i += 1) {
-        const mote = motes[i];
-        if (mote.alpha <= 0) continue;
-        target.globalAlpha = mote.alpha;
-        target.beginPath();
-        target.arc(mote.x, mote.y, mote.size * radiusScale, 0, Math.PI * 2);
-        target.fill();
-      }
-      target.restore();
-    };
-    paint(ctx, 0.6);
-    const emissive = getEmissive();
-    if (emissive) paint(emissive, 1.8);
-  }
-
-  drawWorld(ctx) {
-    this.flushMuzzleFlashQueue();
-
-    const emissive = getEmissive();
-    for (let i = 0; i < this.particles.length; i += 1) {
-      drawParticle(ctx, this.particles[i], emissive);
-    }
-
-    this.drawShockwaves(ctx, emissive);
-    this.drawTelegraphs(ctx);
-
-    // Draw hit markers
-    for (let i = 0; i < this.hitMarkers.length; i += 1) {
-      const marker = this.hitMarkers[i];
-      if (marker) {
-        marker.draw(ctx);
-      }
-    }
-
-    // Draw damage numbers
-    for (let i = 0; i < this.damageTexts.length; i += 1) {
-      const text = this.damageTexts[i];
-      if (text) {
-        text.draw(ctx);
-      }
-    }
-  }
-
-  drawScreenSpace(ctx) {
-    if (!ctx) return;
-
-    // Screen-space overlays should stay anchored to the viewport.
-    this.drawScreenSpaceLayer(ctx, () => {
-      this.drawDamageIndicators(ctx);
-
-      if (this.screenFlash.timer > 0) {
-        const alpha =
-          (this.screenFlash.timer / this.screenFlash.duration) *
-          this.screenFlash.intensity;
-        ctx.fillStyle = this.screenFlash.color;
-        ctx.globalAlpha = alpha;
-        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-      }
-
-      this.drawBossTransitions(ctx);
-    });
-  }
-
-  drawScreenSpaceLayer(ctx, drawCallback) {
-    if (!ctx || typeof drawCallback !== 'function') {
-      return;
-    }
-
-    ctx.save();
-    applyBaseTransform(ctx);
-
-    try {
-      drawCallback();
-    } finally {
-      ctx.restore();
-    }
-  }
-
-  pruneTelegraphs() {
-    if (!this.telegraphs.length) return;
-    this.telegraphs = this.telegraphs.filter(
-      (boss) => boss && !boss.destroyed && boss.telegraph
-    );
-  }
-
-  // Boss attack telegraphs: a lane for the charge (dark for the Null), a wedge
-  // for the fan, a line per core for the chorus. They read the boss's live
-  // state each frame, so the owner is the boss itself.
-  drawTelegraphs(ctx) {
-    if (!ctx || !this.telegraphs.length) return;
-
-    for (let i = 0; i < this.telegraphs.length; i += 1) {
-      const boss = this.telegraphs[i];
-      const t = boss?.telegraph;
-      if (!t || boss.destroyed) continue;
-
-      const duration = t.duration > 0 ? t.duration : 1;
-      const progress = Math.min(1, Math.max(0, 1 - t.timer / duration));
-      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
-      // the Choir's fan comes from its singing core, so the ring hugs that
-      const radius = Math.max(
-        20,
-        t.type === 'fan' && boss.bossKind === 'choir'
-          ? WARDEN_KINDS.choir.coreRadius * 1.3
-          : boss.radius || 60
-      );
-      // a telegraph may start off the hull (a Choir core); default the hull
-      const originX = Number.isFinite(t.x) ? t.x : boss.x;
-      const originY = Number.isFinite(t.y) ? t.y : boss.y;
-
-      ctx.save();
-      ctx.translate(originX, originY);
-      ctx.rotate(t.angle || 0);
-      ctx.globalCompositeOperation = 'lighter';
-
-      if (t.type === 'charge' && t.tone === 'dark') {
-        // the Null's lane: a dark band between two violet edges
-        const length = Math.max(radius * 2, t.length || 400);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 0.35 + 0.4 * progress;
-        ctx.fillStyle = PALETTE.background;
-        ctx.fillRect(0, -radius * 0.9, length, radius * 1.8);
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.3 + 0.6 * progress;
-        ctx.strokeStyle = PALETTE.boss;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, -radius * 0.9);
-        ctx.lineTo(length, -radius * 0.9);
-        ctx.moveTo(0, radius * 0.9);
-        ctx.lineTo(length, radius * 0.9);
-        ctx.stroke();
-        ctx.globalAlpha = 0.35 + 0.55 * progress;
-        ctx.setLineDash([14, 10]);
-        ctx.lineDashOffset = -progress * 120;
-        ctx.beginPath();
-        ctx.moveTo(radius * 0.6, 0);
-        ctx.lineTo(length, 0);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      } else if (t.type === 'chorus') {
-        // one line from each living core to the locked focus point
-        ctx.globalAlpha = (0.3 + 0.6 * progress) * (0.7 + 0.3 * pulse);
-        ctx.strokeStyle = PALETTE.threat;
-        ctx.lineWidth = 2 + 4 * progress;
-        ctx.beginPath();
-        for (const line of t.lines || []) {
-          const x = line.x - originX;
-          const y = line.y - originY;
-          ctx.moveTo(x, y);
-          ctx.lineTo(
-            x + Math.cos(line.angle) * line.length,
-            y + Math.sin(line.angle) * line.length
-          );
-        }
-        ctx.stroke();
-      } else if (t.type === 'charge') {
-        const length = Math.max(radius * 2, t.length || 400);
-        // faint lane, widening as the strike nears
-        ctx.globalAlpha = 0.08 + 0.18 * progress;
-        ctx.fillStyle = PALETTE.threat;
-        ctx.fillRect(0, -radius * 0.9, length, radius * 1.8);
-        // sharp dashed centerline
-        ctx.globalAlpha = 0.35 + 0.55 * progress;
-        ctx.strokeStyle = PALETTE.threat;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([14, 10]);
-        ctx.lineDashOffset = -progress * 120;
-        ctx.beginPath();
-        ctx.moveTo(radius * 0.6, 0);
-        ctx.lineTo(length, 0);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // chevron at the end
-        ctx.beginPath();
-        ctx.moveTo(length - 18, -12);
-        ctx.lineTo(length, 0);
-        ctx.lineTo(length - 18, 12);
-        ctx.stroke();
-      } else if (t.type === 'fan') {
-        const arc = Math.max(0.1, t.arc || 0.8);
-        const length = Math.max(radius * 1.5, t.length || 180);
-        ctx.globalAlpha = 0.07 + 0.2 * progress;
-        ctx.fillStyle = PALETTE.threat;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, length, -arc / 2, arc / 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.globalAlpha = 0.3 + 0.6 * progress;
-        ctx.strokeStyle = PALETTE.threat;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-
-      // warning ring around the hull, pulsing faster as it nears
-      ctx.rotate(-(t.angle || 0));
-      ctx.globalAlpha = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
-      ctx.strokeStyle = PALETTE.threat;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * (1.15 + 0.1 * pulse), 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-  }
-
-  // A ring in the source's color with a thin hot core; the bloom layer gives
-  // it the glow that shadowBlur used to fake.
-  drawShockwaves(ctx, emissive = null) {
-    if (!ctx) return;
-
-    for (let i = 0; i < this.shockwaves.length; i += 1) {
-      const wave = this.shockwaves[i];
-      if (!wave || wave.radius <= 0) continue;
-      const color = wave.color || PALETTE.shot;
-
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = wave.alpha;
-      ctx.beginPath();
-      ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(LINE.thin, wave.lineWidth * 0.3);
-      ctx.strokeStyle = color;
-      ctx.stroke();
-      ctx.globalAlpha = wave.alpha * 0.6;
-      ctx.lineWidth = LINE.hair;
-      ctx.strokeStyle = PALETTE.text;
-      ctx.stroke();
-      ctx.restore();
-
-      if (emissive) {
-        emissive.save();
-        emissive.globalAlpha = wave.alpha;
-        emissive.beginPath();
-        emissive.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
-        emissive.lineWidth = Math.max(LINE.base, wave.lineWidth * 0.5);
-        emissive.strokeStyle = color;
-        emissive.stroke();
-        emissive.restore();
-      }
-    }
+    if (ctx) this.draw2d.drawAmbient(ctx, this.ambientChips, this.ambientMotes);
   }
 
   triggerBossTransitionEffect(eventName) {
@@ -1445,7 +1028,7 @@ export default class EffectsSystem extends BaseSystem {
       presetName &&
       Object.prototype.hasOwnProperty.call(ShakePresets, presetName)
     ) {
-      this.addScreenShake(presetName, presetOptions);
+      this.screenFeedback.addScreenShake(presetName, presetOptions);
       return;
     }
 
@@ -1458,18 +1041,21 @@ export default class EffectsSystem extends BaseSystem {
         : null;
 
       if (intensity != null && duration != null) {
-        this.addScreenShake(intensity, duration);
+        this.screenFeedback.addScreenShake(intensity, duration);
       }
     }
   }
 
   applyBossEffectTimings(config = {}, palette = {}) {
     if (config.freezeFrame) {
-      this.addFreezeFrame(config.freezeFrame.duration, config.freezeFrame.fade);
+      this.gameTime.addFreezeFrame(
+        config.freezeFrame.duration,
+        config.freezeFrame.fade
+      );
     }
 
     if (config.slowMotion) {
-      this.applyTimeDilation(config.slowMotion.scale ?? 0.6, {
+      this.gameTime.applyTimeDilation(config.slowMotion.scale ?? 0.6, {
         duration: config.slowMotion.duration,
         holdDuration: Number.isFinite(config.slowMotion.holdDuration)
           ? config.slowMotion.holdDuration
@@ -1487,7 +1073,11 @@ export default class EffectsSystem extends BaseSystem {
       const flashIntensity = Number.isFinite(flashConfig.intensity)
         ? flashConfig.intensity
         : 0.25;
-      this.addScreenFlash(flashColor, flashDuration, flashIntensity);
+      this.screenFeedback.addScreenFlash(
+        flashColor,
+        flashDuration,
+        flashIntensity
+      );
     }
   }
 
@@ -1842,9 +1432,9 @@ export default class EffectsSystem extends BaseSystem {
     const config = this.getBossEffectConfig('defeated') || {};
     const palette = BOSS_FX;
 
-    this.addFreezeFrame(0.5, 0.3);
-    this.addScreenShake(20, 1.0);
-    this.addScreenFlash(PALETTE.text, 0.8, 0.3);
+    this.gameTime.addFreezeFrame(0.5, 0.3);
+    this.screenFeedback.addScreenShake(20, 1.0);
+    this.screenFeedback.addScreenFlash(PALETTE.text, 0.8, 0.3);
 
     const burstColor = palette.core;
     const burstCount = 50;
@@ -2053,320 +1643,51 @@ export default class EffectsSystem extends BaseSystem {
     effects.length = writeIndex;
   }
 
-  drawBossTransitions(ctx) {
-    if (!ctx || !Array.isArray(this.bossTransitionEffects)) {
-      return;
-    }
-
-    const { width, height } = ctx.canvas || {
-      width: GAME_WIDTH || 800,
-      height: GAME_HEIGHT || 600,
-    };
-
-    this.bossTransitionEffects.forEach((effect) => {
-      if (!effect) {
-        return;
-      }
-
-      const progress = Math.min(1, effect.timer / effect.duration);
-      const fadePower = Number.isFinite(effect.fadePower)
-        ? Math.max(0.1, effect.fadePower)
-        : 1.5;
-      const fade = Math.max(0, 1 - Math.pow(progress, fadePower));
-      const pulseFrequency = Number.isFinite(effect.pulseFrequency)
-        ? effect.pulseFrequency
-        : 1.8;
-      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * pulseFrequency);
-      const borderAlpha = effect.maxAlpha * fade * pulse;
-
-      if (borderAlpha > 0.01) {
-        const strokeWidth = effect.borderWidth * (0.85 + 0.15 * pulse);
-        const inset = strokeWidth / 2 + 6;
-
-        ctx.save();
-        ctx.globalAlpha = borderAlpha;
-        ctx.strokeStyle = effect.color || PALETTE.boss;
-        ctx.lineWidth = strokeWidth;
-        ctx.shadowColor = effect.color || PALETTE.boss;
-        ctx.shadowBlur = strokeWidth * 1.4 * fade;
-        ctx.beginPath();
-        ctx.strokeRect(
-          inset,
-          inset,
-          Math.max(0, width - inset * 2),
-          Math.max(0, height - inset * 2)
-        );
-        ctx.restore();
-      }
-
-      const overlayAlpha =
-        effect.overlayAlpha * fade * Math.min(1, pulse + 0.15);
-      if (overlayAlpha > 0.01) {
-        ctx.save();
-        ctx.globalAlpha = overlayAlpha;
-        ctx.fillStyle = effect.color || PALETTE.boss;
-        ctx.fillRect(0, 0, width, height);
-        ctx.restore();
-      }
-    });
+  // === SCREEN FEEDBACK AND GAME TIME (effects/) ===
+  // Renderer3D reads the shake and the flash on the effects object; the 2D
+  // determinism suite sets the flash and the shake suite swaps the seed.
+  get screenShake() {
+    return this.screenFeedback.screenShake;
   }
 
+  get screenFlash() {
+    return this.screenFeedback.screenFlash;
+  }
+
+  set screenFlash(value) {
+    this.screenFeedback.screenFlash = value;
+  }
+
+  get screenShakeSeedState() {
+    return this.screenFeedback.screenShakeSeedState;
+  }
+
+  set screenShakeSeedState(value) {
+    this.screenFeedback.screenShakeSeedState = value;
+  }
+
+  // Called on the effects object: PhysicsSystem, PickupSystem, EnemySystem
+  // and WaveManager shake and flash the screen; the hit-stop suite stops it.
   addScreenShake(presetOrIntensity, durationOrOptions) {
-    const scale = Math.max(0, this.screenShakeScale ?? 1);
-    const motionScale = this.motionReduced ? 0.45 : 1;
-
-    let trauma = 0;
-    let finalDuration = 0;
-
-    const isPlainObject = (value) =>
-      value && typeof value === 'object' && !Array.isArray(value);
-
-    if (typeof presetOrIntensity === 'string') {
-      const preset = ShakePresets[presetOrIntensity];
-      if (!preset) {
-        return;
-      }
-
-      const options = isPlainObject(durationOrOptions) ? durationOrOptions : {};
-      trauma = Number.isFinite(preset.trauma) ? Math.max(0, preset.trauma) : 0;
-      finalDuration = Number.isFinite(preset.duration)
-        ? Math.max(0, preset.duration)
-        : 0;
-
-      if (Number.isFinite(options.trauma)) {
-        trauma = options.trauma;
-      } else {
-        const traumaMultiplier = Number.isFinite(options.traumaMultiplier)
-          ? options.traumaMultiplier
-          : 1;
-        const traumaOffset = Number.isFinite(options.traumaOffset)
-          ? options.traumaOffset
-          : 0;
-        trauma = trauma * traumaMultiplier + traumaOffset;
-      }
-
-      if (Number.isFinite(options.duration)) {
-        finalDuration = options.duration;
-      } else {
-        const durationMultiplier = Number.isFinite(options.durationMultiplier)
-          ? options.durationMultiplier
-          : 1;
-        const durationOffset = Number.isFinite(options.durationOffset)
-          ? options.durationOffset
-          : 0;
-        finalDuration = finalDuration * durationMultiplier + durationOffset;
-      }
-
-      if (Number.isFinite(options.maxTrauma)) {
-        trauma = Math.min(trauma, options.maxTrauma);
-      }
-      if (Number.isFinite(options.minTrauma)) {
-        trauma = Math.max(trauma, options.minTrauma);
-      }
-      if (Number.isFinite(options.maxDuration)) {
-        finalDuration = Math.min(finalDuration, options.maxDuration);
-      }
-      if (Number.isFinite(options.minDuration)) {
-        finalDuration = Math.max(finalDuration, options.minDuration);
-      }
-
-      trauma = Math.max(0, trauma);
-      finalDuration = Math.max(0, finalDuration);
-    } else if (
-      isPlainObject(presetOrIntensity) &&
-      Number.isFinite(presetOrIntensity.trauma) &&
-      Number.isFinite(presetOrIntensity.duration)
-    ) {
-      const options = isPlainObject(durationOrOptions) ? durationOrOptions : {};
-      trauma = Math.max(0, presetOrIntensity.trauma);
-      finalDuration = Math.max(0, presetOrIntensity.duration);
-
-      if (Number.isFinite(options.trauma)) {
-        trauma = options.trauma;
-      }
-      if (Number.isFinite(options.duration)) {
-        finalDuration = options.duration;
-      }
-    } else {
-      const intensity = Number.isFinite(presetOrIntensity)
-        ? presetOrIntensity
-        : 0;
-      const inputDuration = Number.isFinite(durationOrOptions)
-        ? durationOrOptions
-        : 0;
-
-      const finalIntensity = intensity * scale * motionScale;
-
-      if (finalIntensity <= 0) {
-        return;
-      }
-
-      finalDuration = inputDuration;
-      if (this.motionReduced) {
-        finalDuration = Math.min(finalDuration, 0.2);
-      }
-      finalDuration = Math.max(0, finalDuration);
-      if (finalDuration <= 0) {
-        return;
-      }
-
-      const traumaFromIntensity = Math.min(
-        1,
-        finalIntensity / SHAKE_INTENSITY_DIVISOR
-      );
-      this.screenShake.add(traumaFromIntensity, finalDuration);
-      return;
-    }
-
-    trauma *= scale * motionScale;
-
-    if (trauma <= 0) {
-      return;
-    }
-
-    if (this.motionReduced) {
-      finalDuration = Math.min(finalDuration, 0.2);
-    }
-
-    finalDuration = Math.max(0, finalDuration);
-    if (finalDuration <= 0) {
-      return;
-    }
-
-    trauma = Math.min(1, trauma);
-    this.screenShake.add(trauma, finalDuration);
-  }
-
-  addFreezeFrame(duration, fade = 0) {
-    let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
-    let finalFade = Number.isFinite(fade) ? fade : 0;
-
-    if (this.motionReduced) {
-      finalDuration = Math.min(finalDuration, 0.12);
-      finalFade = Math.min(finalFade, 0.2);
-    }
-
-    if (finalDuration <= 0) {
-      return;
-    }
-
-    // A lighter freeze landing on a running one must not lift its floor.
-    this.freezeFrame.fade =
-      this.freezeFrame.timer > 0
-        ? Math.min(this.freezeFrame.fade, finalFade)
-        : finalFade;
-    this.freezeFrame.timer = Math.max(this.freezeFrame.timer, finalDuration);
-    this.freezeFrame.duration = Math.max(
-      this.freezeFrame.duration,
-      finalDuration
-    );
-  }
-
-  addHitStop(kind) {
-    const stop = HIT_STOP[kind];
-    if (this.hitStopClock < (this.hitStopReadyAt[kind] ?? 0)) {
-      return;
-    }
-    this.hitStopReadyAt[kind] = this.hitStopClock + HIT_STOP_COOLDOWN;
-    this.addFreezeFrame(stop.duration, stop.scale);
-  }
-
-  playSlowMotion({ scale, hold, ease, zoom }) {
-    this.applyTimeDilation(scale, { holdDuration: hold, duration: ease });
-    if (!this.motionReduced) {
-      this.pendingZoomPulse = { zoom, duration: hold + ease };
-    }
-  }
-
-  applyTimeDilation(targetScale, options = {}) {
-    if (!this.timeDilation) {
-      this.timeDilation = {
-        timer: 0,
-        duration: 0,
-        startScale: 1,
-        endScale: 1,
-        holdScale: 1,
-        holdTimer: 0,
-        easing: 'outCubic',
-        active: false,
-      };
-    }
-
-    const rawScale = Number.isFinite(targetScale) ? targetScale : 1;
-    let scale = Math.max(0, Math.min(1, rawScale));
-
-    const optionDuration = Number.isFinite(options.duration)
-      ? Math.max(0, options.duration)
-      : Number.isFinite(options.transition)
-        ? Math.max(0, options.transition)
-        : 0.45;
-    const optionHold = Number.isFinite(options.holdDuration)
-      ? Math.max(0, options.holdDuration)
-      : Number.isFinite(options.hold)
-        ? Math.max(0, options.hold)
-        : 0;
-    let duration = optionDuration;
-    let holdDuration = optionHold;
-
-    if (this.motionReduced) {
-      scale = Math.max(scale, 0.7);
-      duration = Math.min(duration, 0.35);
-      holdDuration = Math.min(holdDuration, 0.12);
-    }
-
-    if (scale >= 0.999 && holdDuration <= 0 && duration <= 0) {
-      return;
-    }
-
-    const easing =
-      typeof options.easing === 'string' ? options.easing : 'outCubic';
-
-    this.timeDilation.holdScale = scale;
-    this.timeDilation.holdTimer = holdDuration;
-    this.timeDilation.startScale = scale;
-    this.timeDilation.endScale = 1;
-    this.timeDilation.duration = duration;
-    this.timeDilation.timer = duration;
-    this.timeDilation.easing = easing;
-    this.timeDilation.active = true;
+    this.screenFeedback.addScreenShake(presetOrIntensity, durationOrOptions);
   }
 
   addScreenFlash(color, duration, intensity) {
-    if (!this.damageFlashEnabled) {
-      return;
-    }
+    this.screenFeedback.addScreenFlash(color, duration, intensity);
+  }
 
-    let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
-    let finalIntensity = Number.isFinite(intensity)
-      ? Math.max(0, intensity)
-      : 0;
-
-    if (this.motionReduced) {
-      finalDuration = Math.min(finalDuration, 0.18);
-      finalIntensity *= 0.6;
-    }
-
-    if (finalDuration <= 0 || finalIntensity <= 0) {
-      return;
-    }
-
-    if (this.flashingReduced) {
-      finalIntensity *= REDUCED_FLASH.scale;
-      if (this.flashGap > 0 || finalIntensity < REDUCED_FLASH.floor) return;
-      this.flashGap = REDUCED_FLASH.gap;
-    }
-
-    this.screenFlash.color = color;
-    this.screenFlash.duration = finalDuration;
-    this.screenFlash.timer = finalDuration;
-    this.screenFlash.intensity = finalIntensity;
+  addHitStop(kind) {
+    this.gameTime.addHitStop(kind);
   }
 
   // Dash kick (PLAN.md step 6, proposal 17/10): a short shake and a hard
   // thruster burst out of the tail; the afterimages are the hull's own
   // (PlayerSystem.renderDashGhosts).
   createDashBurst(position, direction) {
-    this.addScreenShake(DASH_SHAKE.intensity, DASH_SHAKE.duration);
+    this.screenFeedback.addScreenShake(
+      DASH_SHAKE.intensity,
+      DASH_SHAKE.duration
+    );
     const tailX = position.x - direction.x * 12;
     const tailY = position.y - direction.y * 12;
     for (let i = 0; i < 4; i += 1) {
@@ -2697,8 +2018,8 @@ export default class EffectsSystem extends BaseSystem {
       );
     }
 
-    this.addScreenFlash(flashColor, 0.08, 0.06);
-    this.addScreenShake(2.2, 0.1);
+    this.screenFeedback.addScreenFlash(flashColor, 0.08, 0.06);
+    this.screenFeedback.addScreenShake(2.2, 0.1);
   }
 
   createHunterBurstEffect(payload = {}) {
@@ -2772,8 +2093,15 @@ export default class EffectsSystem extends BaseSystem {
 
     const flashDuration = finalShot ? 0.12 : 0.09;
     const flashIntensity = finalShot ? 0.12 : 0.08;
-    this.addScreenFlash(flashColor, flashDuration, flashIntensity);
-    this.addScreenShake(finalShot ? 3.8 : 2.6, finalShot ? 0.2 : 0.14);
+    this.screenFeedback.addScreenFlash(
+      flashColor,
+      flashDuration,
+      flashIntensity
+    );
+    this.screenFeedback.addScreenShake(
+      finalShot ? 3.8 : 2.6,
+      finalShot ? 0.2 : 0.14
+    );
   }
 
   createBossAttackEffect(payload = {}) {
@@ -2816,8 +2144,8 @@ export default class EffectsSystem extends BaseSystem {
       );
     }
 
-    this.addScreenFlash(BOSS_FX.flash, 0.14, 0.12);
-    this.addScreenShake('bossAttack');
+    this.screenFeedback.addScreenFlash(BOSS_FX.flash, 0.14, 0.12);
+    this.screenFeedback.addScreenShake('bossAttack');
   }
 
   createMineExplosion(payload = {}) {
@@ -2880,15 +2208,19 @@ export default class EffectsSystem extends BaseSystem {
     const targetDuration = 0.28 + radiusFactor * 0.08;
     const durationOffset = targetDuration - baseDuration;
 
-    this.addScreenShake('mineExplosion', {
+    this.screenFeedback.addScreenShake('mineExplosion', {
       traumaMultiplier,
       durationOffset,
       maxTrauma: 1,
       minDuration: 0.2,
       maxDuration: 1.2,
     });
-    this.addScreenFlash(flashColor, 0.22, 0.2 + radiusFactor * 0.05);
-    this.addHitStop('mine');
+    this.screenFeedback.addScreenFlash(
+      flashColor,
+      0.22,
+      0.2 + radiusFactor * 0.05
+    );
+    this.gameTime.addHitStop('mine');
 
     this.createShockwaveEffect({
       position,
@@ -2991,9 +2323,13 @@ export default class EffectsSystem extends BaseSystem {
       y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
     };
 
-    this.addScreenShake('droneDestroyed');
-    this.addHitStop('drone');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
+    this.screenFeedback.addScreenShake('droneDestroyed');
+    this.gameTime.addHitStop('drone');
+    this.screenFeedback.addScreenFlash(
+      withAlpha(PALETTE.threat, 0.35),
+      0.12,
+      0.1
+    );
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
     for (let i = 0; i < sparkCount; i += 1) {
@@ -3078,9 +2414,13 @@ export default class EffectsSystem extends BaseSystem {
       y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
     };
 
-    this.addScreenShake('hunterDestroyed');
-    this.addHitStop('hunter');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
+    this.screenFeedback.addScreenShake('hunterDestroyed');
+    this.gameTime.addHitStop('hunter');
+    this.screenFeedback.addScreenFlash(
+      withAlpha(PALETTE.threat, 0.38),
+      0.14,
+      0.14
+    );
     this.createShockwaveEffect({
       position,
       radius: radius * 2.4,
@@ -3150,81 +2490,6 @@ export default class EffectsSystem extends BaseSystem {
 
   createHitMarker(position, killed, damage) {
     this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
-  }
-
-  createDirectionalDamageIndicator(damageSourcePos, playerPos) {
-    // Calculate angle from player to damage source
-    const dx = damageSourcePos.x - playerPos.x;
-    const dy = damageSourcePos.y - playerPos.y;
-    const angle = Math.atan2(dy, dx);
-
-    // Calculate screen edge position
-    // Use half screen dimensions to position at edge
-    const halfWidth = GAME_WIDTH / 2;
-    const halfHeight = GAME_HEIGHT / 2;
-
-    // Find intersection with screen edge
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-
-    // Calculate which edge the indicator should appear on
-    let edgeX, edgeY;
-    const tanAngle = Math.abs(sin / cos);
-
-    if (tanAngle < halfHeight / halfWidth) {
-      // Hit left or right edge
-      edgeX = cos > 0 ? GAME_WIDTH - 40 : 40;
-      edgeY = halfHeight + (edgeX - halfWidth) * (sin / cos);
-    } else {
-      // Hit top or bottom edge
-      edgeY = sin > 0 ? GAME_HEIGHT - 40 : 40;
-      edgeX = halfWidth + (edgeY - halfHeight) * (cos / sin);
-    }
-
-    this.damageIndicators.push({
-      x: edgeX,
-      y: edgeY,
-      angle: angle + Math.PI, // Point inward toward threat
-      life: 0.6, // 0.6s visibility
-      maxLife: 0.6,
-      expansion: 0,
-      color: PALETTE.threat,
-    });
-  }
-
-  drawDamageIndicators(ctx) {
-    this.damageIndicators.forEach((indicator) => {
-      ctx.save();
-
-      // Fade out based on remaining life
-      const alpha = indicator.life / indicator.maxLife;
-
-      // Translate to indicator position
-      ctx.translate(indicator.x, indicator.y);
-      ctx.rotate(indicator.angle);
-
-      // Draw chevron (triple arrow: <<<)
-      ctx.globalAlpha = alpha * 0.9;
-      ctx.strokeStyle = indicator.color;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      const size = 15 + indicator.expansion * 0.5; // Slight expansion
-      const spacing = 8;
-
-      // Draw three chevrons (>>>)
-      for (let i = 0; i < 3; i++) {
-        const offsetX = i * spacing;
-        ctx.beginPath();
-        ctx.moveTo(offsetX, -size);
-        ctx.lineTo(offsetX + size, 0);
-        ctx.lineTo(offsetX, size);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    });
   }
 
   createBulletImpact(position, enemyVelocity, killed, options = {}) {
@@ -3371,8 +2636,11 @@ export default class EffectsSystem extends BaseSystem {
     );
     this.particles.push(glow);
 
-    this.addScreenShake(3 + level * 0.6, 0.15 + 0.02 * intensity);
-    this.addScreenFlash(
+    this.screenFeedback.addScreenShake(
+      3 + level * 0.6,
+      0.15 + 0.02 * intensity
+    );
+    this.screenFeedback.addScreenFlash(
       withAlpha(PALETTE.player, 0.22),
       0.12,
       0.18 + 0.04 * level
@@ -3454,21 +2722,21 @@ export default class EffectsSystem extends BaseSystem {
       this.particles.push(particle);
     }
 
-    this.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
-    this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
+    this.screenFeedback.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
+    this.screenFeedback.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
   }
 
   createEpicShipExplosion(position) {
     // EPIC DEATH EXPLOSION - High velocity fragments + massive shockwave
 
     // Huge freeze frame for dramatic impact
-    this.addFreezeFrame(0.35, 0.4);
+    this.gameTime.addFreezeFrame(0.35, 0.4);
 
     // Massive screen shake
-    this.addScreenShake(15, 0.6);
+    this.screenFeedback.addScreenShake(15, 0.6);
 
     // Bright white flash
-    this.addScreenFlash(withAlpha(PALETTE.text, 0.8), 0.4, 0.6);
+    this.screenFeedback.addScreenFlash(withAlpha(PALETTE.text, 0.8), 0.4, 0.6);
 
     // HIGH VELOCITY FRAGMENTS (50-80 particles)
     const fragmentCount = this.getScaledParticleCount(
@@ -3631,8 +2899,8 @@ export default class EffectsSystem extends BaseSystem {
     const speedScale = Math.max(0.85, Math.min(1.8, radius / 24));
 
     if (asteroid.size === 'small') {
-      this.addScreenShake(2 + radius * 0.01, 0.12);
-      this.addHitStop('small');
+      this.screenFeedback.addScreenShake(2 + radius * 0.01, 0.12);
+      this.gameTime.addHitStop('small');
       // Small shockwave
       this.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
@@ -3642,8 +2910,8 @@ export default class EffectsSystem extends BaseSystem {
         baseWidth: 6,
       });
     } else if (asteroid.size === 'medium') {
-      this.addScreenShake(4 + radius * 0.012, 0.18);
-      this.addHitStop('medium');
+      this.screenFeedback.addScreenShake(4 + radius * 0.012, 0.18);
+      this.gameTime.addHitStop('medium');
       // Medium shockwave
       this.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
@@ -3653,9 +2921,9 @@ export default class EffectsSystem extends BaseSystem {
         baseWidth: 10,
       });
     } else if (asteroid.size === 'large') {
-      this.addScreenShake(8 + radius * 0.015, 0.28);
-      this.addHitStop('large');
-      this.addScreenFlash(
+      this.screenFeedback.addScreenShake(8 + radius * 0.015, 0.28);
+      this.gameTime.addHitStop('large');
+      this.screenFeedback.addScreenFlash(
         variantColors?.glow || withAlpha(sparkColor, 0.6),
         0.22,
         0.12
@@ -4201,8 +3469,12 @@ export default class EffectsSystem extends BaseSystem {
     const position = data.position;
     const intensity = Math.min(1.2, radius / 90);
 
-    this.addScreenShake(7 + radius * 0.025, 0.32);
-    this.addScreenFlash(withAlpha(PALETTE.shot, 0.55), 0.26, 0.24);
+    this.screenFeedback.addScreenShake(7 + radius * 0.025, 0.32);
+    this.screenFeedback.addScreenFlash(
+      withAlpha(PALETTE.shot, 0.55),
+      0.26,
+      0.24
+    );
 
     this.createExplosionShockwave({
       position,
@@ -4289,7 +3561,7 @@ export default class EffectsSystem extends BaseSystem {
     const roll = (min, max) =>
       min + this.randomFloat('volatility') * (max - min);
 
-    this.addScreenShake(fx.shake, fx.shakeSeconds);
+    this.screenFeedback.addScreenShake(fx.shake, fx.shakeSeconds);
     this.createExplosionShockwave({
       position,
       radius: radius * fx.shockwaveScale,
@@ -4351,29 +3623,12 @@ export default class EffectsSystem extends BaseSystem {
 
   captureRandomForkSeeds() {
     super.captureRandomForkSeeds();
-
-    if (
-      this.screenShake &&
-      typeof this.screenShake.captureSeedState === 'function'
-    ) {
-      this.screenShakeSeedState = this.screenShake.captureSeedState();
-    }
+    // BaseSystem's constructor calls this before screenFeedback exists.
+    this.screenFeedback?.captureSeedState();
   }
 
   onReset() {
-    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
-      const snapshot = this.screenShake.reseed(
-        this.getRandomFork('screenShake'),
-        {
-          preserveTrauma: true,
-        }
-      );
-      if (snapshot && typeof snapshot === 'object') {
-        this.screenShakeSeedState = { ...snapshot };
-      } else if (typeof this.screenShake.captureSeedState === 'function') {
-        this.screenShakeSeedState = this.screenShake.captureSeedState();
-      }
-    }
+    this.screenFeedback.reseedShake();
   }
 
   reset(options = {}) {
@@ -4399,46 +3654,15 @@ export default class EffectsSystem extends BaseSystem {
     super.reset(normalized);
     this.particles = [];
     this.shockwaves = [];
-    this.telegraphs = [];
     this.hitMarkers = [];
-    this.damageIndicators = [];
     this.damageTexts = [];
     this.bossTransitionEffects = [];
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
     this.ambientMotes = [];
-
-    // Custom ScreenShake reseeding
-    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
-      const snapshot = this.screenShake.reseed(
-        this.getRandomFork('screenShake'),
-        {
-          seedState: this.screenShakeSeedState,
-        }
-      );
-      if (snapshot && typeof snapshot === 'object') {
-        this.screenShakeSeedState = { ...snapshot };
-      } else if (typeof this.screenShake.captureSeedState === 'function') {
-        this.screenShakeSeedState = this.screenShake.captureSeedState();
-      }
-    } else if (
-      this.screenShake &&
-      typeof this.screenShake.reset === 'function'
-    ) {
-      this.screenShake.reset();
-    }
-
-    this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
-    this.hitStopClock = 0;
-    this.hitStopReadyAt = {};
-    this.pendingZoomPulse = null;
-    this.flashGap = 0;
-    this.screenFlash = {
-      timer: 0,
-      duration: 0,
-      color: PALETTE.text,
-      intensity: 0,
-    };
+    this.draw2d.reset();
+    this.screenFeedback.reset();
+    this.gameTime.reset();
   }
 
   createFloatingDamageText(x, y, damage, isCritical = false) {
