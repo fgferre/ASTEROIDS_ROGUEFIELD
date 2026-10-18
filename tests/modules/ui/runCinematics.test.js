@@ -44,7 +44,7 @@ function setup({ plays = true } = {}) {
   const held = [];
   let skipKey = null;
   const ui = {
-    aaaTacticalHud: hud,
+    tacticalHud: { layout: hud },
     transmissionLayer: 1,
     queueTransmission: vi.fn(),
   };

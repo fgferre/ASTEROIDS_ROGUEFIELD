@@ -1,17 +1,12 @@
 // src/modules/UISystem.js
 
 import {
-  DEFAULT_HUD_LAYOUT_ID,
-  getHudLayoutDefinition,
-} from '../data/ui/hudLayout.js';
-import {
   DEFAULT_HULL_ID,
   getAllShipModels,
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import {
-  LAYER_MODIFIERS,
   bossRushStage,
   bossRushStageTitle,
   directorFor,
@@ -26,7 +21,6 @@ import {
 } from '../core/viewport.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { AAAHudLayout, radarGlyph } from './ui/AAAHudLayout.js';
 import { controlSchemeFromUrl } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
@@ -35,6 +29,7 @@ import { LevelUpScreen } from './ui/LevelUpScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
+import { TacticalHud } from './ui/TacticalHud.js';
 import {
   TransmissionQueue,
   bossRushTransmission,
@@ -46,7 +41,6 @@ import {
   victoryTransmission,
   wardenTransmission,
 } from './ui/transmissions.js';
-import { PICKUP_KINDS } from '../data/pickups.js';
 import {
   hangarItemMarkup,
   hullLockText,
@@ -93,9 +87,6 @@ class UISystem extends BaseSystem {
     this.canvasBaseSize = { width: GAME_WIDTH, height: GAME_HEIGHT };
     this.handleResize = this.handleResize.bind(this);
 
-    // Force AAA Tactical HUD
-    this.currentHudLayoutId = DEFAULT_HUD_LAYOUT_ID;
-    this.aaaTacticalHud = null;
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
@@ -104,7 +95,7 @@ class UISystem extends BaseSystem {
     this.cinematics = new RunCinematics({
       eventBus: this.eventBus,
       renderer: () => this.getService('renderer'),
-      hud: () => this.aaaTacticalHud,
+      hud: () => this.tacticalHud.layout,
       // The session's pause flag alone: no pause screen, no fixed steps.
       holdSim: (held) => this.getService('game-state')?.setPaused(held),
       bindSkip: (skip) => {
@@ -121,73 +112,18 @@ class UISystem extends BaseSystem {
       onIntroEnd: () =>
         this.handleLayerStarted({ wave: this.transmissionLayer }),
     });
-    this.aaaTacticalHudDefinition = getHudLayoutDefinition(
-      this.currentHudLayoutId
-    );
-    this.aaaTacticalHudMountTarget = null;
-    this.aaaTacticalHudRestoreState = null;
     this.onboarding = new Onboarding(
       {
         showTip: (id) => this.showOnboardingTip(id),
-        hideTip: () => this.aaaTacticalHud?.hideOnboardingTip(),
+        hideTip: () => this.tacticalHud.layout?.hideOnboardingTip(),
       },
       (id) => this.eventBus?.emit('onboarding-step', { id })
     );
-
-    this.cachedValues = {
-      health: { current: null, max: null },
-      shield: {
-        level: null,
-        maxHP: null,
-        currentHP: null,
-        isActive: null,
-        isUnlocked: null,
-        isOnCooldown: null,
-        cooldownDuration: null,
-        cooldownTimer: null,
-        cooldownRatio: null,
-        hpRatio: null,
-      },
-      level: null,
-      xp: { current: null, needed: null, percentage: null, level: null },
-      sessionKills: null,
-      sessionKillsTextLength: 0,
-      sessionTimeSeconds: null,
-      wave: {
-        current: null,
-        completedWaves: null,
-        totalAsteroids: null,
-        asteroidsKilled: null,
-        isActive: null,
-        timeRemainingSeconds: null,
-        breakTimerSeconds: null,
-        labelLength: 0,
-        enemiesTextLength: 0,
-        managerAllEnemiesTotal: null,
-        compatibilityMode: false,
-      },
-      boss: { visible: false }, // Simplified boss cache
-      combo: {
-        count: 0,
-        multiplier: 1,
-        valueText: '0 Hits',
-        multiplierText: 'x1.0',
-        active: false,
-        high: false,
-      },
-      minimap: {
-        range: 0,
-        detectionRange: 0,
-        width: 0,
-        height: 0,
-      },
-    };
 
     this.settings = this.resolveSettingsService();
     this.liveQualityPreset = null;
     this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
     this.hangarState = { isOpen: false, trigger: null };
-    this.bossHudState = this.createInitialBossHudState();
 
     this.tacticalState = {
       contactsCache: null,
@@ -196,6 +132,16 @@ class UISystem extends BaseSystem {
     };
 
     this.domRefs = this.cacheStaticNodes();
+    this.tacticalHud = new TacticalHud({
+      refs: { gameField: this.domRefs.gameField, gameUi: this.domRefs.gameUi },
+      player: () => this.getService('player'),
+      enemies: () => this.getService('enemies'),
+      progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
+      physics: () => this.getService('physics'),
+      pickups: () => this.getService('pickups'),
+      renderer: () => this.getService('renderer'),
+    });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
       pauseSettingsBtn: this.domRefs.pause.settingsBtn,
@@ -253,8 +199,20 @@ class UISystem extends BaseSystem {
     document.body.dataset.controls = controlSchemeFromUrl();
 
     // Direct AAA HUD Activation
-    this.activateAAATacticalHud(this.aaaTacticalHudDefinition);
-    this.updateAAATacticalHudFromServices({ force: true });
+    this.tacticalHud.activateAAATacticalHud();
+    if (this.tacticalHud.layout) {
+      this.transmissions = new TransmissionQueue(
+        this.tacticalHud.layout,
+        ({ speaker, key, text }) => {
+          this.lastTransmission = { speaker, text };
+          this.eventBus.emit('transmission-shown', { speaker, key });
+        },
+        ({ key }) => {
+          this.eventBus.emit('transmission-finished', { key });
+        }
+      );
+    }
+    this.tacticalHud.updateAAATacticalHudFromServices({ force: true });
 
     this.pauseScreen.bindPauseControls();
     this.runEndScreens.bindCopySeedLink();
@@ -409,118 +367,13 @@ class UISystem extends BaseSystem {
     };
   }
 
-  createInitialBossHudState() {
-    return {
-      active: false,
-      upcoming: false,
-      defeated: false,
-      bossId: null,
-      name: null,
-      health: 0,
-      maxHealth: 0,
-      phase: 0,
-      phaseCount: 0,
-      phaseColors: [],
-      invulnerable: false,
-    };
-  }
-
-  getBossHudState() {
-    const state =
-      this.bossHudState && typeof this.bossHudState === 'object'
-        ? this.bossHudState
-        : this.createInitialBossHudState();
-
-    return {
-      ...this.createInitialBossHudState(),
-      ...state,
-      phaseColors: Array.isArray(state.phaseColors)
-        ? [...state.phaseColors]
-        : [],
-    };
-  }
-
-  handleBossEvent(eventName, data = {}) {
-    if (!eventName) {
-      return this.getBossHudState();
-    }
-
-    const current = this.getBossHudState();
-    const next = {
-      ...current,
-      ...data,
-      phaseColors: Array.isArray(data?.phaseColors)
-        ? [...data.phaseColors]
-        : current.phaseColors,
-    };
-
-    switch (eventName) {
-      case 'boss-wave-started':
-        this.aaaTacticalHud?.holdBossBar();
-        next.active = false;
-        next.upcoming = true;
-        next.defeated = false;
-        next.health = 0;
-        next.maxHealth = Number(data?.maxHealth ?? next.maxHealth ?? 0) || 0;
-        break;
-      case 'boss-spawned':
-        if (!current.active) {
-          this.aaaTacticalHud?.showBossIntro(
-            data?.enemy?.displayName,
-            data?.enemy?.subtitle
-          );
-        }
-        next.active = true;
-        next.upcoming = false;
-        next.defeated = false;
-        break;
-      case 'boss-phase-changed':
-      case 'boss-invulnerability-changed':
-        next.active = true;
-        next.upcoming = false;
-        next.defeated = false;
-        break;
-      case 'boss-defeated':
-        next.active = false;
-        next.upcoming = false;
-        next.defeated = true;
-        next.health = 0;
-        next.invulnerable = false;
-        break;
-      case 'boss-hud-update':
-      default:
-        break;
-    }
-
-    next.phase = Math.max(0, Math.floor(Number(next.phase ?? 0) || 0));
-    next.phaseCount = Math.max(
-      next.phase + 1,
-      Math.floor(Number(next.phaseCount ?? 0) || 0)
-    );
-    next.health = Math.max(0, Number(next.health ?? 0) || 0);
-    next.maxHealth = Math.max(
-      next.health,
-      Number(next.maxHealth ?? next.health ?? 0) || 0
-    );
-    next.wave = Number.isFinite(Number(next.wave))
-      ? Math.max(1, Math.floor(Number(next.wave)))
-      : null;
-    next.invulnerable = Boolean(next.invulnerable);
-    next.name =
-      typeof next.name === 'string' && next.name.trim() ? next.name : 'BOSS';
-
-    this.bossHudState = next;
-    this.cachedValues.boss = {
-      ...(this.cachedValues.boss || {}),
-      visible: Boolean(next.active || next.upcoming || next.defeated),
-    };
-
-    this.updateAAATacticalHudFromServices({ force: true });
-    return this.getBossHudState();
+  /** EnemySystem pushes the boss bar's state to the ui service. */
+  handleBossEvent(eventName, data) {
+    return this.tacticalHud.handleBossEvent(eventName, data);
   }
 
   handleLayerStarted(payload = {}) {
-    const hud = this.aaaTacticalHud;
+    const hud = this.tacticalHud.layout;
     if (!hud) {
       return;
     }
@@ -553,40 +406,6 @@ class UISystem extends BaseSystem {
     }
   }
 
-  handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
-    const state = this.getBossHudState();
-    const completedWave = Number.isFinite(Number(payload?.wave))
-      ? Math.max(1, Math.floor(Number(payload.wave)))
-      : null;
-    const isBossWave =
-      Boolean(payload?.isBossWave) ||
-      (completedWave !== null && directorFor(completedWave).warden);
-    const hasBossContext =
-      Boolean(this.cachedValues.boss?.visible) ||
-      Boolean(state.bossId) ||
-      Boolean(state.defeated);
-    const waveMatches =
-      completedWave === null ||
-      state.wave === null ||
-      state.wave === completedWave;
-
-    if (!hasBossContext || !waveMatches) {
-      return;
-    }
-
-    if (state.active || state.upcoming) {
-      return;
-    }
-
-    if (!isBossWave && !state.defeated && sourceEvent !== 'wave-complete') {
-      return;
-    }
-
-    this.bossHudState = this.createInitialBossHudState();
-    this.cachedValues.boss = { visible: false };
-    this.updateAAATacticalHudFromServices({ force: true });
-  }
-
   initializeViewportScaling() {
     if (typeof window === 'undefined') {
       return;
@@ -597,7 +416,7 @@ class UISystem extends BaseSystem {
   }
 
   handleResize() {
-    this.aaaTacticalHud?.invalidatePanelCorners();
+    this.tacticalHud.layout?.invalidatePanelCorners();
     this.requestViewportScaleUpdate();
   }
 
@@ -733,7 +552,7 @@ class UISystem extends BaseSystem {
       root.style.setProperty('--hud-scale-auto', auto.toFixed(3));
       root.style.setProperty('--hud-scale-effective', effective.toFixed(3));
     }
-    this.aaaTacticalHud?.invalidatePanelCorners();
+    this.tacticalHud.layout?.invalidatePanelCorners();
   }
 
   getSelectedHullId() {
@@ -973,61 +792,6 @@ class UISystem extends BaseSystem {
     }
   }
 
-  resolveAAATacticalMountTarget() {
-    const gameField = this.domRefs.gameField;
-    if (gameField && typeof gameField.querySelector === 'function') {
-      const overlay = gameField.querySelector('.game-field__overlay');
-      if (overlay instanceof HTMLElement) {
-        return overlay;
-      }
-    }
-
-    const gameUi = this.domRefs.gameUi;
-    if (gameUi && typeof gameUi.querySelector === 'function') {
-      const overlay = gameUi.querySelector('.game-field__overlay');
-      if (overlay instanceof HTMLElement) {
-        return overlay;
-      }
-    }
-
-    return null;
-  }
-
-  activateAAATacticalHud(definition = null) {
-    if (this.aaaTacticalHud) {
-      this.aaaTacticalHudDefinition = definition;
-      return;
-    }
-
-    const mountTarget = this.resolveAAATacticalMountTarget();
-    if (!mountTarget) {
-      console.warn('[UISystem] AAA tactical HUD mount target not found.');
-      return;
-    }
-
-    this.aaaTacticalHudRestoreState = {
-      mountTarget,
-      mountPadding: mountTarget.style.padding,
-    };
-
-    mountTarget.style.padding = '0px';
-
-    this.aaaTacticalHud = new AAAHudLayout();
-    this.aaaTacticalHudDefinition = definition;
-    this.aaaTacticalHudMountTarget = mountTarget;
-    this.aaaTacticalHud.mount(mountTarget);
-    this.transmissions = new TransmissionQueue(
-      this.aaaTacticalHud,
-      ({ speaker, key, text }) => {
-        this.lastTransmission = { speaker, text };
-        this.eventBus.emit('transmission-shown', { speaker, key });
-      },
-      ({ key }) => {
-        this.eventBus.emit('transmission-finished', { key });
-      }
-    );
-  }
-
   /** Queues a Warden transmission and keeps the frame loop that plays it. */
   queueTransmission(entry, { interrupt = false } = {}) {
     const queue = this.transmissions;
@@ -1057,313 +821,13 @@ class UISystem extends BaseSystem {
     this.transmissionRaf = window.requestAnimationFrame(tick);
   }
 
-  deactivateAAATacticalHud() {
-    if (
-      this.aaaTacticalHud &&
-      typeof this.aaaTacticalHud.unmount === 'function'
-    ) {
-      this.aaaTacticalHud.unmount();
-    }
-    this.transmissions = null;
-
-    const restore = this.aaaTacticalHudRestoreState;
-    if (restore?.mountTarget instanceof HTMLElement) {
-      restore.mountTarget.style.padding =
-        typeof restore.mountPadding === 'string' ? restore.mountPadding : '';
-    }
-
-    this.aaaTacticalHud = null;
-    this.aaaTacticalHudDefinition = null;
-    this.aaaTacticalHudMountTarget = null;
-    this.aaaTacticalHudRestoreState = null;
-  }
-
-  formatAAATacticalClock(totalSeconds) {
-    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainder = seconds % 60;
-    const pad = (value) => `${Math.max(0, value)}`.padStart(2, '0');
-    return `${pad(hours)}:${pad(minutes)}:${pad(remainder)}`;
-  }
-
-  updateAAATacticalHudFromServices(options = {}) {
-    const hud = this.aaaTacticalHud;
-    if (!hud) {
-      return;
-    }
-
-    const force = Boolean(options.force);
-
-    const player = this.getService('player');
-    const enemies = this.getService('enemies');
-    const progression = this.getService('progression');
-
-    const playerPosition =
-      player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : player?.position && typeof player.position === 'object'
-          ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
-          : { x: 0, y: 0 };
-
-    if (player || force) {
-      const hull = Number(player?.health ?? 0) || 0;
-      const maxHull = Number(player?.maxHealth ?? 0) || 0;
-
-      let shield = 0;
-      let maxShield = 0;
-
-      if (player && typeof player.getShieldState === 'function') {
-        const shieldState = player.getShieldState() || {};
-        shield =
-          Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
-        maxShield = Number(shieldState.maxHP ?? shieldState.maxHits ?? 0) || 0;
-      } else {
-        shield = Number(player?.shieldHP ?? 0) || 0;
-        maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
-      }
-
-      hud.updateVitals(shield, maxShield, hull, maxHull);
-      if (player) {
-        hud.updateDashCooldown(player.getDashCooldownFraction());
-      }
-    }
-
-    if (enemies && typeof enemies.getSessionStats === 'function') {
-      const session = enemies.getSessionStats() || {};
-      const timeElapsed =
-        session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
-      const totalKills = session.totalKills ?? session.kills ?? 0;
-
-      hud.updateStats(
-        this.formatAAATacticalClock(timeElapsed),
-        totalKills,
-        undefined
-      );
-    }
-
-    if (progression && typeof progression.getComboState === 'function') {
-      const comboState = progression.getComboState() || {};
-      const comboCount = Number(comboState.comboCount ?? 0) || 0;
-      hud.updateStats(null, undefined, comboCount, comboState.multiplier);
-    }
-
-    // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
-    // state. Single source of truth: CombatSystem.getSpreadMode() / .getAimMode().
-    const combat = this.getService('combat');
-    if (combat && typeof hud.updateModeIndicators === 'function') {
-      const spreadMode =
-        typeof combat.getSpreadMode === 'function'
-          ? combat.getSpreadMode()
-          : 'concentrated';
-      const aimMode =
-        typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
-      hud.updateModeIndicators(spreadMode, aimMode);
-      hud.updateWeapon(combat.getWeaponState());
-    }
-
-    const waveState =
-      enemies && typeof enemies.getWaveState === 'function'
-        ? enemies.getWaveState() || null
-        : null;
-
-    if (progression) {
-      const level =
-        typeof progression.getLevel === 'function'
-          ? progression.getLevel()
-          : Number(progression.level ?? 1) || 1;
-      const xp =
-        typeof progression.getExperience === 'function'
-          ? progression.getExperience()
-          : null;
-
-      hud.updateExperience(
-        level,
-        xp?.current ?? 0,
-        xp?.needed ?? 1,
-        waveState?.current ?? 1
-      );
-    }
-
-    if (typeof hud.updateNextWaveTimer === 'function') {
-      const isActive = waveState ? Boolean(waveState.isActive ?? true) : true;
-      const breakTimerRaw =
-        waveState?.breakTimer ?? waveState?.breakTimerSeconds ?? 0;
-      const breakSeconds = !isActive
-        ? Math.max(0, Math.ceil(Number(breakTimerRaw) || 0))
-        : 0;
-      hud.updateNextWaveTimer(breakSeconds);
-    }
-
-    const physics = this.getService('physics');
-    if (
-      (physics && typeof physics.getNearbyEnemies === 'function' && player) ||
-      (enemies && typeof enemies.getActiveEnemies === 'function' && player)
-    ) {
-      const pluginConfig = this.aaaTacticalHudDefinition?.plugin || {};
-      const radarRange = Math.max(
-        1,
-        (Number(pluginConfig.radarRange) || 1500) * hud.radarRangeFactor
-      );
-
-      let radarEnemies = [];
-      if (physics && typeof physics.getNearbyEnemies === 'function') {
-        try {
-          // A phased Shade still shows on the radar, dimmed.
-          radarEnemies = physics.getNearbyEnemies(
-            Number(playerPosition.x) || 0,
-            Number(playerPosition.y) || 0,
-            radarRange,
-            { includeIntangible: true }
-          );
-        } catch (error) {
-          radarEnemies = [];
-        }
-      } else if (enemies && typeof enemies.getActiveEnemies === 'function') {
-        radarEnemies = enemies.getActiveEnemies() || [];
-      }
-
-      const blips = [];
-      const originX = Number(playerPosition.x) || 0;
-      const originY = Number(playerPosition.y) || 0;
-      const limit = 80;
-
-      for (let index = 0; index < radarEnemies.length; index += 1) {
-        if (blips.length >= limit) {
-          break;
-        }
-
-        const enemy = radarEnemies[index];
-        if (!enemy) {
-          continue;
-        }
-
-        const enemyX = Number(enemy?.position?.x ?? enemy?.x ?? 0);
-        const enemyY = Number(enemy?.position?.y ?? enemy?.y ?? 0);
-        if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
-          continue;
-        }
-
-        const dx = enemyX - originX;
-        const dy = enemyY - originY;
-        const distance = Math.hypot(dx, dy);
-        if (!Number.isFinite(distance) || distance > radarRange) {
-          continue;
-        }
-
-        blips.push({
-          x: dx / radarRange,
-          y: dy / radarRange,
-          type: radarGlyph(enemy),
-          phased: Boolean(enemy.intangible),
-        });
-      }
-
-      const pickups = this.getService('pickups')?.getActivePickups() || [];
-      for (let i = 0; i < pickups.length && blips.length < limit; i += 1) {
-        const dx = pickups[i].x - originX;
-        const dy = pickups[i].y - originY;
-        if (Math.hypot(dx, dy) <= radarRange) {
-          blips.push({
-            x: dx / radarRange,
-            y: dy / radarRange,
-            type: 'pickup',
-          });
-        }
-      }
-
-      hud.updateRadar(blips);
-    }
-
-    // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
-    const renderer = this.getService('renderer');
-    const arrowTargets = [];
-    let herald = null;
-    if (renderer && player && enemies) {
-      const toTarget = (kind, entity, color, labelled) => {
-        const point = renderer.worldToScreen(entity.x, entity.y);
-        if (!point) return;
-        arrowTargets.push({
-          kind,
-          x: point.x,
-          y: point.y,
-          color,
-          distance: labelled
-            ? Math.hypot(
-                entity.x - playerPosition.x,
-                entity.y - playerPosition.y
-              )
-            : undefined,
-        });
-      };
-      const active = enemies.getActiveEnemies();
-      for (let i = 0; i < active.length; i += 1) {
-        const enemy = active[i];
-        if (enemy.type === 'boss') toTarget('warden', enemy, null, true);
-        if (enemy.type === 'herald') {
-          toTarget('herald', enemy, null, true);
-          herald = herald || enemy;
-        }
-      }
-      const pickups = this.getService('pickups')?.getActivePickups() || [];
-      for (let i = 0; i < pickups.length; i += 1) {
-        toTarget('pickup', pickups[i], pickups[i].color, false);
-      }
-    }
-    hud.updateEdgeArrows(arrowTargets);
-
-    const bossState = this.getBossHudState();
-    const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
-    const bossActive =
-      cachedBossVisible ||
-      Boolean(bossState.active) ||
-      Boolean(bossState.upcoming);
-
-    if (!bossActive && herald) {
-      hud.updateBoss(
-        true,
-        herald.displayName,
-        Math.max(0, Math.min(100, (herald.health / herald.maxHealth) * 100)),
-        {
-          phase: 0,
-          phaseCount: 1,
-          herald: true,
-          invulnerable: Boolean(herald.invulnerable),
-        }
-      );
-    } else if (!bossActive) {
-      hud.updateBoss(false);
-    } else {
-      const bossName = bossState.name || 'BOSS';
-      const maxHealth = Number(bossState.maxHealth ?? 0) || 0;
-      const currentHealth = Number(bossState.health ?? 0) || 0;
-      const percent =
-        maxHealth > 0
-          ? Math.max(0, Math.min(100, (currentHealth / maxHealth) * 100))
-          : 100;
-      const phaseInfo = {
-        phase: bossState.phase ?? 0,
-        phaseCount: bossState.phaseCount ?? 1,
-        phaseColors: bossState.phaseColors || [],
-        invulnerable: Boolean(bossState.invulnerable),
-      };
-      hud.updateBoss(true, bossName, percent, phaseInfo);
-    }
-  }
-
-  // Legacy Standard HUD creation and refresh methods removed.
-
-  refreshHudFromServices(force = false) {
-    this.updateAAATacticalHudFromServices({ force });
-  }
-
   setupEventListeners() {
     const registerBossEvent = (eventName) => {
       this.registerEventListener(eventName, (payload = {}) => {
-        this.handleBossEvent(eventName, payload);
+        this.tacticalHud.handleBossEvent(eventName, payload);
       });
       this.registerEventListener(`ui-${eventName}`, (payload = {}) => {
-        this.handleBossEvent(eventName, payload);
+        this.tacticalHud.handleBossEvent(eventName, payload);
       });
     };
 
@@ -1385,7 +849,7 @@ class UISystem extends BaseSystem {
     this.registerEventListener('boss-warning', (payload = {}) => {
       // Boss Rush: the breather names the next Warden.
       if (this.bossRush) {
-        this.aaaTacticalHud?.showLayerBanner(payload.nextBossWave, {
+        this.tacticalHud.layout?.showLayerBanner(payload.nextBossWave, {
           boss: true,
           bossRush: true,
           chapter: bossRushStageTitle(bossRushStage(payload.nextBossWave)),
@@ -1412,35 +876,23 @@ class UISystem extends BaseSystem {
       );
     });
 
-    this.registerEventListener('surge-started', (payload = {}) => {
-      this.aaaTacticalHud?.showSurgeBanner(payload.label);
+    this.registerEventListener('surge-started', (payload) => {
+      this.tacticalHud.onSurgeStarted(payload);
     });
 
-    this.registerEventListener('field-event-started', (payload = {}) => {
-      this.aaaTacticalHud?.showFieldEventBanner(payload.label);
-      if (payload.kind === 'sensor-jam') {
-        this.aaaTacticalHud?.setRadarJammed(true);
-      }
+    this.registerEventListener('field-event-started', (payload) => {
+      this.tacticalHud.onFieldEventStarted(payload);
     });
 
-    this.registerEventListener('field-event-ended', (payload = {}) => {
-      if (payload.kind === 'sensor-jam') {
-        this.aaaTacticalHud?.setRadarJammed(false);
-      }
+    this.registerEventListener('field-event-ended', (payload) => {
+      this.tacticalHud.onFieldEventEnded(payload);
     });
 
-    // A layer modifier's banner follows the LAYER one; Dense Fog shortens
-    // the radar until the layer ends.
-    this.registerEventListener('layer-modifier-started', (payload = {}) => {
-      this.aaaTacticalHud?.showModifierBanner(payload.label, payload.color);
-      if (payload.id === 'dense-fog') {
-        this.aaaTacticalHud?.setRadarRange(
-          LAYER_MODIFIERS['dense-fog'].radarRange
-        );
-      }
+    this.registerEventListener('layer-modifier-started', (payload) => {
+      this.tacticalHud.onLayerModifierStarted(payload);
     });
-    this.registerEventListener('layer-modifier-ended', (payload = {}) => {
-      if (payload.id === 'dense-fog') this.aaaTacticalHud?.setRadarRange(1);
+    this.registerEventListener('layer-modifier-ended', (payload) => {
+      this.tacticalHud.onLayerModifierEnded(payload);
     });
 
     // A Herald arrives under a violet banner, then speaks; Silence jams the
@@ -1448,17 +900,17 @@ class UISystem extends BaseSystem {
     this.registerEventListener('herald-spawned', ({ kind } = {}) => {
       const herald = HERALD_KINDS[kind];
       if (!herald) return;
-      this.aaaTacticalHud?.showHeraldBanner(
+      this.tacticalHud.layout?.showHeraldBanner(
         herald.displayName,
         herald.subtitle
       );
-      if (herald.jamsRadar) this.aaaTacticalHud?.setRadarJammed(true);
+      if (herald.jamsRadar) this.tacticalHud.layout?.setRadarJammed(true);
       this.queueTransmission(heraldTransmission(kind, 'spawned'));
     });
     this.registerEventListener('herald-defeated', ({ kind } = {}) => {
       this.queueTransmission(heraldTransmission(kind, 'defeated'));
       if (HERALD_KINDS[kind]?.jamsRadar) {
-        this.aaaTacticalHud?.setRadarJammed(false);
+        this.tacticalHud.layout?.setRadarJammed(false);
       }
     });
     // The Ring names a machine the first time it is ever seen; not over the
@@ -1470,61 +922,34 @@ class UISystem extends BaseSystem {
       this.queueTransmission(sightingTransmission(type));
     });
     this.registerEventListener('game-started', () => {
-      this.aaaTacticalHud?.setRadarJammed(false);
-      this.aaaTacticalHud?.setRadarRange(1);
-      this.aaaTacticalHud?.setAimStick(false);
+      this.tacticalHud.onGameStarted();
     });
-    this.registerEventListener('aim-stick-changed', ({ active } = {}) => {
-      this.aaaTacticalHud?.setAimStick(active);
+    this.registerEventListener('aim-stick-changed', (payload) => {
+      this.tacticalHud.onAimStickChanged(payload);
     });
 
-    this.registerEventListener(
-      'player-took-damage',
-      ({ playerPosition, damageSource } = {}) => {
-        const renderer = this.getService('renderer');
-        if (!playerPosition || !damageSource || !renderer) return;
-        this.aaaTacticalHud?.showDamageFrom(
-          renderer.worldToScreen(playerPosition.x, playerPosition.y),
-          renderer.worldToScreen(damageSource.x, damageSource.y)
-        );
-      }
-    );
-
-    this.registerEventListener('enemy-destroyed', (payload = {}) => {
-      this.aaaTacticalHud?.addKillFeed(
-        payload.enemy?.type,
-        payload.enemy?.elite,
-        payload.enemy?.displayName
-      );
+    this.registerEventListener('player-took-damage', (payload) => {
+      this.tacticalHud.onPlayerTookDamage(payload);
     });
 
-    this.registerEventListener('xp-orb-collected', (payload = {}) => {
-      this.aaaTacticalHud?.addXpFeed(Number(payload.value));
+    this.registerEventListener('enemy-destroyed', (payload) => {
+      this.tacticalHud.onEnemyDestroyed(payload);
     });
 
-    this.registerEventListener('pickup-collected', ({ kind } = {}) => {
-      const pickup = PICKUP_KINDS[kind];
-      this.aaaTacticalHud?.addPickupFeed(
-        pickup.label,
-        pickup.detail,
-        pickup.color
-      );
-      if (pickup.duration) {
-        this.aaaTacticalHud?.startBuff(
-          kind,
-          pickup.label,
-          pickup.duration,
-          pickup.color
-        );
-      }
+    this.registerEventListener('xp-orb-collected', (payload) => {
+      this.tacticalHud.onXpOrbCollected(payload);
     });
 
-    this.registerEventListener('achievement-unlocked', ({ title } = {}) => {
-      this.aaaTacticalHud?.addAchievementFeed(title);
+    this.registerEventListener('pickup-collected', (payload) => {
+      this.tacticalHud.onPickupCollected(payload);
+    });
+
+    this.registerEventListener('achievement-unlocked', (payload) => {
+      this.tacticalHud.onAchievementUnlocked(payload);
     });
 
     this.registerEventListener('weapon-beam-fired', () => {
-      this.aaaTacticalHud?.flashBeam();
+      this.tacticalHud.onWeaponBeamFired();
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
@@ -1566,7 +991,7 @@ class UISystem extends BaseSystem {
 
     const registerWaveCompletionListener = (eventName) => {
       this.registerEventListener(eventName, (payload = {}) => {
-        this.handleWaveCompletionEvent(payload, eventName);
+        this.tacticalHud.handleWaveCompletionEvent(payload, eventName);
       });
     };
 
@@ -1596,7 +1021,6 @@ class UISystem extends BaseSystem {
       this.cinematics.stop();
       // After startNewRun has unpaused: the intro holds the first step.
       queueMicrotask(() => this.cinematics.startIntro());
-      this.aaaTacticalHud?.clearBuffs();
       this.removeOnboardingCardsTip();
       if (this.isOnboardingEnabled()) {
         this.onboarding.start();
@@ -2005,16 +1429,13 @@ class UISystem extends BaseSystem {
   }
 
   update(deltaTime) {
-    if (this.aaaTacticalHud) {
-      this.updateAAATacticalHudFromServices({ force: false });
-      this.aaaTacticalHud.tickBuffs(deltaTime);
-    }
+    this.tacticalHud.update(deltaTime);
     if (this.onboarding.current) {
       const moving = this.getService('input').getMovementInput();
       this.onboarding.update(deltaTime, {
         moving: moving.up || moving.down || moving.left || moving.right,
         shieldReady: this.getService('player').getShieldState().maxHits > 0,
-        bannerBusy: Boolean(this.aaaTacticalHud?.isBannerBusy()),
+        bannerBusy: Boolean(this.tacticalHud.layout?.isBannerBusy()),
       });
     }
   }
@@ -2136,7 +1557,7 @@ class UISystem extends BaseSystem {
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
     this.showScreen('playing', options);
-    this.refreshHudFromServices(true);
+    this.tacticalHud.refreshHudFromServices(true);
   }
 
   /** GameSessionService clears the cards when a run starts or ends. */
@@ -2185,7 +1606,7 @@ class UISystem extends BaseSystem {
       this.getService('player')?.controlScheme,
       device
     )[id];
-    this.aaaTacticalHud?.showOnboardingTip(prompt.keys, prompt.text);
+    this.tacticalHud.layout?.showOnboardingTip(prompt.keys, prompt.text);
   }
 
   /** The cards tip in the level-up footer, on the first level-up only. */
