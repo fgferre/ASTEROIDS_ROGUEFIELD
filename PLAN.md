@@ -44,7 +44,7 @@ Conteúdo:
       (dash vira salto curto com onda na chegada). Dash/torreta passam a ter stat escalável.
 - [x] **R12.3 _Leech_ (11ª máquina).** Lenta, vai atrás de orbes de XP e pickups e os come, crescendo (raio/vida até um
       teto); foge quando cheia; ao morrer devolve tudo que comeu (com bônus). Camadas 7+. Códice, afixos, 2D/3D.
-- [ ] **R12.4 Falas que faltam.** Primeiro avistamento de Caster/Shade/Leech (emite `enemy-spawned` para máquinas de
+- [x] **R12.4 Falas que faltam.** Primeiro avistamento de Caster/Shade/Leech (emite `enemy-spawned` para máquinas de
       roster — fecha também o Códice que só descobria no abate), linha de abertura do Boss Rush, linha ao destravar o
       Bastion.
 
