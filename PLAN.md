@@ -58,6 +58,33 @@ Qualidade:
 - [x] **R12.7 Bloom em Settings.** `graphics.bloom` (off/low/normal/high) em vez de só `?bloom=`; multi-lock conferido
       (exige Targeting Suite 3 + multishot ≥ 2 — é desenho, não bug; BACKLOG ajustado).
 
+## Rodada 13 (18/10, noite) — o goal novo dele: os pontos abertos primeiro
+
+Dele (18/10): _"priorizar os pontos concretos ainda abertos: fundo espacial que ainda lê como textura (mais volume
+procedural, sombras só entre objetos 3D), controle do casco ainda acoplado demais à mira (torreta independente),
+medição real de desempenho na máquina do dono, caminhos de áudio mortos, oddities visuais e de paridade 2D/3D, replay
+que não grava o modo, edge cases de pooling/director e arquivos ainda muito grandes."_
+
+- [ ] **R13.1 Espaço com volume.** Estrelas atenuadas pela profundidade + cintilação; nebulosa em três profundidades
+      (a distante assada uma vez por bioma em alvo de baixa resolução, a média viva e barata, filamentos próximos
+      aditivos e fracos); nuvens de poeira a meia profundidade com paralaxe real; nada recebe luz ou sombra; presets
+      cortam camadas no low/medium. Captura antes/depois por bioma.
+- [ ] **R13.2 Casco e torreta como ele quer, em Settings.** Hoje nada no código liga casco à mira; o clássico (A/D
+      gira, W empurra) só existe por `?controls=classic` e trava a torreta no nariz. Opção "Hull control: Modern /
+      Classic" persistida em Settings, torreta automática nos dois, dica de onboarding; câmera "look-ahead" passa a
+      poder seguir o casco em vez da mira (opção) — é a única coisa que pode parecer acoplamento.
+- [ ] **R13.3 Medição na máquina dele, sem fricção.** Botão "Copy performance report" no painel `?stats=1`/F8 e em
+      Settings; benchmark de 20 s que recomenda um preset; relatório em texto para colar na conversa.
+- [ ] **R13.4 Replay grava o modo e o casco.** Boss Rush/Daily/infinito e casco no cabeçalho; playback restaura.
+- [ ] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
+      3D; seed do director igual no EnemySystem e no WaveManager; avisos de "accounting discrepancy" explicados ou
+      eliminados.
+- [ ] **R13.6 Paridade 2D/3D e oddities.** Wardens Choir/Null com visual próprio no 2D; nave 2D sem borrão; pulso de
+      zoom do dash/freio no 2D; anel chapado sob o domo do escudo.
+- [ ] **R13.7 Áudio morto.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
+- [ ] **R13.8 Arquivos grandes.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
+      assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois).
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
