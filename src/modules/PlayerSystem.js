@@ -2018,8 +2018,12 @@ class PlayerSystem extends BaseSystem {
   // === GERENCIAMENTO DE VIDA ===
   // `source`: the enemy (or its snapshot) that dealt the hit; the last one to
   // reach the hull is kept by value (enemies are pooled) for the death recap.
+  // Every hit is scaled by the difficulty preset's enemyDamage.
   takeDamage(amount, source = null) {
-    const damageAmount = Math.max(0, amount);
+    const damageAmount =
+      Math.max(0, amount) *
+      (resolveService('difficulty', this.dependencies)?.getModifiers()
+        .enemyDamage ?? 1);
     if (damageAmount <= 0) {
       return this.health;
     }

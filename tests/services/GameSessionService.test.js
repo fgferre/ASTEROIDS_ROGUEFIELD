@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../src/services/GameSessionService.js';
+import DifficultyService from '../../src/services/DifficultyService.js';
 import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import {
   DEFAULT_HULL_ID,
@@ -48,6 +49,7 @@ function createServiceHarness(options = {}) {
       const values = settingsState[categoryId];
       return values ? { ...values } : null;
     }),
+    getSetting: vi.fn((categoryId, key) => settingsState[categoryId]?.[key]),
   };
 
   const world = { reset: vi.fn() };
@@ -122,6 +124,7 @@ function createServiceHarness(options = {}) {
       effects,
       combat,
       renderer,
+      difficulty: new DifficultyService({ settings, bootSeed: 1 }),
     },
     gameState,
   });

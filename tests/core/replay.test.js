@@ -127,7 +127,7 @@ describe('replay recording', () => {
     frames.forEach((frame, step) => recorder.record(step, frame));
 
     const json = recorder.toJSON();
-    expect(json.version).toBe(4);
+    expect(json.version).toBeGreaterThanOrEqual(4);
     // Step 1 quantizes to the same frame as step 0, so it is not stored.
     expect(json.inputs).toEqual([
       [0, 8, 81, 0, 0, 0],
@@ -148,6 +148,14 @@ describe('replay recording', () => {
     expect([frame.moveX, frame.moveY, frame.aimX, frame.aimY]).toEqual([
       0, 0, 0, 0,
     ]);
+  });
+
+  it('records the difficulty (version 5); older recordings load as Veteran', () => {
+    const json = createRecorder({ seed: 9, difficulty: 'warden' }).toJSON();
+    expect(json.version).toBe(5);
+    expect(deserialize(serialize(json)).difficulty).toBe('warden');
+    const v4 = { version: 4, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+    expect(deserialize(v4).difficulty).toBe('veteran');
   });
 
   it('still reads version 1 recordings, with dash off', () => {

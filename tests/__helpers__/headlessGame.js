@@ -32,6 +32,7 @@ const SIMULATION_SERVICES = [
   'game-pools',
   'garbage-collector',
   'settings',
+  'difficulty',
   'command-queue',
   ...UPDATE_ORDER,
   'effects',

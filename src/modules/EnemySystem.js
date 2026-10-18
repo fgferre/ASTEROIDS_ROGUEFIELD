@@ -64,6 +64,7 @@ import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
 import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { directorFor } from '../data/layers.js';
+import { scaleDirector } from '../data/difficulty.js';
 import { IS_DEV } from '../core/env.js';
 
 // === CLASSE ENEMYSYSTEM ===
@@ -1654,10 +1655,19 @@ class EnemySystem extends BaseSystem {
     this.forEachActiveEnemy(callback);
   }
 
+  /** The layer's director with spawn counts scaled by the difficulty. */
+  layerDirector(layer) {
+    return scaleDirector(
+      directorFor(layer),
+      resolveService('difficulty', this.dependencies)?.getModifiers()
+        .spawnCount ?? 1
+    );
+  }
+
   createInitialWaveState() {
     return {
       current: 1,
-      totalAsteroids: directorFor(1).rocks,
+      totalAsteroids: this.layerDirector(1).rocks,
       asteroidsSpawned: 0,
       asteroidsKilled: 0,
       isActive: true,
@@ -2901,7 +2911,7 @@ class EnemySystem extends BaseSystem {
 
     if (!waveManagerActive) {
       wave.current += 1;
-      wave.totalAsteroids = directorFor(wave.current).rocks;
+      wave.totalAsteroids = this.layerDirector(wave.current).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = WAVE_DURATION;

@@ -26,6 +26,7 @@ import CommandQueueService from '../services/CommandQueueService.js';
 import CodexService from '../services/CodexService.js';
 import AchievementService from '../services/AchievementService.js';
 import HangarService from '../services/HangarService.js';
+import DifficultyService from '../services/DifficultyService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -327,6 +328,17 @@ export function createServiceManifest(context = {}) {
         new HangarService({ eventBus: resolved['event-bus'] }),
     },
     {
+      name: 'difficulty',
+      singleton: true,
+      lazy: false,
+      dependencies: ['settings'],
+      factory: ({ resolved, context: manifestContext }) =>
+        new DifficultyService({
+          settings: resolved['settings'],
+          bootSeed: manifestContext.seed,
+        }),
+    },
+    {
       name: 'audio',
       singleton: true,
       lazy: true,
@@ -370,13 +382,20 @@ export function createServiceManifest(context = {}) {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'input', 'command-queue', 'hangar'],
+      dependencies: [
+        'event-bus',
+        'input',
+        'command-queue',
+        'hangar',
+        'difficulty',
+      ],
       factory: ({ resolved }) =>
         new PlayerSystem({
           eventBus: resolved['event-bus'],
           input: resolved['input'],
           'command-queue': resolved['command-queue'],
           hangar: resolved['hangar'],
+          difficulty: resolved['difficulty'],
         }),
     },
     {
@@ -432,7 +451,7 @@ export function createServiceManifest(context = {}) {
       name: 'ui',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'hangar'],
+      dependencies: ['event-bus', 'settings', 'hangar', 'difficulty'],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
         return new UISystem({
@@ -470,6 +489,7 @@ export function createServiceManifest(context = {}) {
         'effects',
         'random',
         'hangar',
+        'difficulty',
       ],
       factory: ({ resolved }) => {
         const progression = new ProgressionSystem({
@@ -480,6 +500,7 @@ export function createServiceManifest(context = {}) {
           effects: resolved['effects'],
           random: resolved['random'],
           hangar: resolved['hangar'],
+          difficulty: resolved['difficulty'],
         });
 
         const xpOrbSystem = resolved['xp-orbs'];
@@ -505,6 +526,7 @@ export function createServiceManifest(context = {}) {
         'physics',
         'healthHearts',
         'random',
+        'difficulty',
       ],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
@@ -516,6 +538,7 @@ export function createServiceManifest(context = {}) {
           physics: resolved['physics'],
           healthHearts: resolved['healthHearts'],
           random: resolved['random'],
+          difficulty: resolved['difficulty'],
           serviceResolver,
         });
 
@@ -668,6 +691,7 @@ export function createServiceManifest(context = {}) {
         'effects',
         'settings',
         'hangar',
+        'difficulty',
       ],
       factory: ({ resolved, context }) => {
         const instance = new GameSessionService({
@@ -687,6 +711,7 @@ export function createServiceManifest(context = {}) {
             effects: resolved['effects'],
             settings: resolved['settings'],
             hangar: resolved['hangar'],
+            difficulty: resolved['difficulty'],
           },
           gameState: context.gameState,
         });

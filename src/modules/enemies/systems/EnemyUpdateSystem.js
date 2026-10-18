@@ -34,7 +34,6 @@ import {
   COLLISION_BOUNCE,
 } from '../../../data/constants/gameplay.js';
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
-import { directorFor } from '../../../data/layers.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { IS_DEV } from '../../../core/env.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
@@ -296,7 +295,7 @@ export class EnemyUpdateSystem {
     }
 
     if (becameActive) {
-      wave.totalAsteroids = directorFor(resolvedWaveNumber).rocks;
+      wave.totalAsteroids = facade.layerDirector(resolvedWaveNumber).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = Number.isFinite(Number(WAVE_DURATION))

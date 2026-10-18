@@ -417,11 +417,20 @@ export default class GameSessionService {
 
     switch (id) {
       case 'start-game-btn':
+      case 'daily-field-btn':
       case 'restart-game-btn':
       case 'victory-restart-btn': {
         preventDefault();
         this.emitCreditsMenuRequest({ open: false, source: id });
-        this.startNewRun({ source: id });
+        // From the menu, Start flies a normal run and Daily Field today's
+        // field; New Mission keeps the mode of the run that just ended.
+        const daily =
+          id === 'start-game-btn'
+            ? false
+            : id === 'daily-field-btn'
+              ? true
+              : undefined;
+        this.startNewRun({ source: id, daily });
         break;
       }
       case 'retry-game-btn': {
@@ -619,13 +628,18 @@ export default class GameSessionService {
     return true;
   }
 
-  /** Records the layer and time in a run summary; returns the best layer. */
+  /**
+   * Records the layer and time in a run summary (and in today's Daily Field
+   * record on a Daily Field run); returns the best layer.
+   */
   recordRunReached(summary = {}) {
     const wave = summary.wave;
-    return updateRecords({
+    const reached = {
       layer: typeof wave === 'number' ? wave : wave?.current,
       time: summary.stats?.timeElapsed,
-    }).bestLayer;
+    };
+    this.resolveServiceInstance('difficulty').recordRun(reached);
+    return updateRecords(reached).bestLayer;
   }
 
   handleTogglePauseEvent(payload = {}) {
@@ -717,7 +731,14 @@ export default class GameSessionService {
     return true;
   }
 
-  startNewRun({ source = 'unknown' } = {}) {
+  /** `daily`: see DifficultyService.beginRun. */
+  startNewRun({ source = 'unknown', daily } = {}) {
+    const difficulty = this.resolveServiceInstance('difficulty');
+    const seed = difficulty.beginRun({ daily });
+    if (this.gameState) {
+      this.gameState.randomSeed = seed;
+    }
+
     try {
       this.prepareRandomForScope('run.start', { mode: 'reset' });
     } catch (error) {
@@ -782,6 +803,9 @@ export default class GameSessionService {
 
     // Emit game-started event for audio feedback
     this.emitGameStarted({ source, timestamp: Date.now() });
+    if (difficulty.isDaily()) {
+      this.eventBus.emit('daily-started', { seed });
+    }
 
     const wasPaused = this.isPaused();
     this.setPaused(false);

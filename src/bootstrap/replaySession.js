@@ -1,6 +1,8 @@
 // Records every run and plays back `?replay=<url>` recordings.
 //
 // Recording starts when a run starts ('game-started') and stops at death; the
+// run's seed and difficulty come from the difficulty service, and an armed
+// recording sets that service's difficulty before its run begins. The
 // recorder lives on the session (`session.replayRecorder`). Input is captured
 // and substituted at InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
@@ -42,6 +44,7 @@ export function createReplayController({
   let player = null;
   let armedRecording = null;
   let pickPending = false;
+  const difficulty = session.resolveServiceInstance('difficulty');
 
   const runStep = () => getStep() - runStartStep;
 
@@ -75,8 +78,9 @@ export function createReplayController({
 
     player = null;
     recorder = createRecorder({
-      seed: session.getSeedInfo().seed,
+      seed: difficulty.getRunSeed(),
       hull: session.getConfiguredHullId(),
+      difficulty: difficulty.getDifficulty(),
     });
     session.replayRecorder = recorder;
     input.setInputSource(recordSource);
@@ -116,6 +120,7 @@ export function createReplayController({
     /** Plays `recording` on the next run start. */
     arm(recording) {
       armedRecording = recording;
+      difficulty.useReplay(recording);
     },
     /**
      * Once per frame, before the fixed steps: applies a pending replay pick,

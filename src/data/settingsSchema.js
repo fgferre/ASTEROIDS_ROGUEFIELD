@@ -9,6 +9,11 @@ import {
   COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM,
 } from './constants/gameplay.js';
 import { GAMEPAD_BINDINGS } from './constants/gamepad.js';
+import {
+  DEFAULT_DIFFICULTY,
+  DIFFICULTY_IDS,
+  DIFFICULTY_LABELS,
+} from './difficulty.js';
 
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
@@ -43,6 +48,17 @@ const SETTINGS_SCHEMA = [
         default: DEFAULT_HULL_ID,
         options: HULL_OPTION_IDS,
         optionLabels: HULL_OPTION_LABELS,
+      },
+      {
+        key: 'difficulty',
+        type: 'select',
+        control: 'segmented',
+        label: 'Difficulty',
+        description:
+          'Pilot: softer enemies and hits, thinner fields. Warden: tougher, harder-hitting enemies, denser fields, more XP. Applies from the next run.',
+        options: [...DIFFICULTY_IDS],
+        optionLabels: { ...DIFFICULTY_LABELS },
+        default: DEFAULT_DIFFICULTY,
       },
       {
         key: 'damageNumbers',

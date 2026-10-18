@@ -9,6 +9,7 @@ import {
   LEVEL_UP_SCREEN_DELAY_SECONDS,
 } from '../core/GameConstants.js';
 import UpgradeSystem from './UpgradeSystem.js';
+import { resolveService } from '../core/serviceUtils.js';
 import {
   safeNumber,
   safeBoolean,
@@ -307,9 +308,11 @@ class ProgressionSystem extends UpgradeSystem {
     const multiplier = Number.isFinite(this.comboMultiplier)
       ? Math.max(1, this.comboMultiplier)
       : 1;
+    const difficultyXp =
+      resolveService('difficulty', this.dependencies)?.getModifiers().xp ?? 1;
     const adjustedValue = Math.max(
       1,
-      Math.round(value * multiplier * this.xpGainMultiplier)
+      Math.round(value * multiplier * this.xpGainMultiplier * difficultyXp)
     );
 
     this.totalExperience += adjustedValue;

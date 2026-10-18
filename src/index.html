@@ -96,6 +96,14 @@
                 Start
               </button>
               <button
+                id="daily-field-btn"
+                class="menu-screen__button"
+                type="button"
+                title="Today's field: the same seed for everyone, Veteran difficulty"
+              >
+                Daily Field
+              </button>
+              <button
                 id="menu-hangar-btn"
                 class="menu-screen__button"
                 type="button"
@@ -208,6 +216,7 @@
           <header class="pause-header">
             <h2 id="pause-title" class="pause-title">Game Paused</h2>
             <p id="pause-build-location" class="run-recap__location">—</p>
+            <p id="pause-run-seed" class="run-recap__location">—</p>
           </header>
           <section class="pause-build" aria-labelledby="pause-build-title">
             <h3 id="pause-build-title" class="run-build__label">
@@ -490,6 +499,16 @@
             <p id="gameover-killer" class="run-recap__killer">—</p>
             <p id="gameover-location" class="run-recap__location">—</p>
             <p id="gameover-salvage" class="run-recap__salvage">—</p>
+            <p class="run-recap__seed">
+              <span id="gameover-seed" class="run-recap__location">—</span>
+              <button
+                id="gameover-copy-seed-btn"
+                class="btn btn--outline run-recap__copy"
+                type="button"
+              >
+                Copy seed link
+              </button>
+            </p>
             <div id="gameover-build" class="run-build"></div>
           </section>
           <dl id="gameover-stats" class="gameover-stats">

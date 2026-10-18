@@ -10,7 +10,7 @@ import {
 } from '../../../data/enemies/asteroid-configs.js';
 import { GamePools } from '../../../core/GamePools.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
-import { resolveEventBus } from '../../../core/serviceUtils.js';
+import { resolveEventBus, resolveService } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
 import { bossKindForLayer } from '../../../data/enemies/boss.js';
@@ -483,6 +483,7 @@ export class EnemySpawnSystem {
         return null;
       }
 
+      this.applyDifficultyHealth(enemy);
       this.assignAsteroidPoolId(enemy, config?.poolId);
       const registrationResult = this.registerActiveEnemy(enemy, {
         skipDuplicateCheck: true,
@@ -500,6 +501,19 @@ export class EnemySpawnSystem {
       console.error('[EnemySystem] Factory creation failed:', error);
       return null;
     }
+  }
+
+  /** Scales a fresh enemy's health by the difficulty preset's enemyHp. */
+  applyDifficultyHealth(enemy) {
+    const scale =
+      resolveService('difficulty', this.facade.dependencies)?.getModifiers()
+        .enemyHp ?? 1;
+    if (scale === 1 || !Number.isFinite(enemy.maxHealth)) {
+      return;
+    }
+    const ratio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 1;
+    enemy.maxHealth = Math.max(1, Math.round(enemy.maxHealth * scale));
+    enemy.health = enemy.maxHealth * ratio;
   }
 
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {

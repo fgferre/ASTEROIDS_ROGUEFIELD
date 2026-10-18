@@ -246,6 +246,7 @@ class UISystem extends BaseSystem {
     this.updateAAATacticalHudFromServices({ force: true });
 
     this.bindPauseControls();
+    this.bindCopySeedLink();
     this.bindLevelUpControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
@@ -298,6 +299,8 @@ class UISystem extends BaseSystem {
         location: document.getElementById('gameover-location') || null,
         salvage: document.getElementById('gameover-salvage') || null,
         build: document.getElementById('gameover-build') || null,
+        seed: document.getElementById('gameover-seed') || null,
+        copySeedBtn: document.getElementById('gameover-copy-seed-btn') || null,
         retryBtn: document.getElementById('retry-game-btn') || null,
         restartBtn: document.getElementById('restart-game-btn') || null,
         quitBtn: document.getElementById('quit-game-btn') || null,
@@ -324,6 +327,7 @@ class UISystem extends BaseSystem {
         location: document.getElementById('pause-build-location') || null,
         build: document.getElementById('pause-build-block') || null,
         tools: document.getElementById('pause-build-tools') || null,
+        seed: document.getElementById('pause-run-seed') || null,
       },
       codex: {
         overlay: document.getElementById('codex-screen') || null,
@@ -895,6 +899,7 @@ class UISystem extends BaseSystem {
         hangar: this.getService('hangar'),
         codex: this.getService('codex'),
         achievements: this.getService('achievements'),
+        difficulty: this.getService('difficulty'),
         quality: this.settings?.getCategoryValues('graphics')?.quality,
         livePreset: this.liveQualityPreset,
       })
@@ -952,6 +957,30 @@ class UISystem extends BaseSystem {
       } else if (event.key === 'Escape' && this.levelUpState.banishMode) {
         this.setBanishMode(false);
       }
+    });
+  }
+
+  // The death recap's "Copy seed link": this run's seed and difficulty as a
+  // `?seed=&difficulty=` link (clipboard may be missing or refused).
+  bindCopySeedLink() {
+    const button = this.domRefs.gameOver?.copySeedBtn;
+    if (!button) return;
+    button.addEventListener('click', () => {
+      const link = this.getService('difficulty').shareLink(
+        window.location.origin,
+        import.meta.env.BASE_URL
+      );
+      const done = (label) => {
+        button.textContent = label;
+      };
+      if (!navigator.clipboard?.writeText) {
+        done('Copy unavailable');
+        return;
+      }
+      navigator.clipboard.writeText(link).then(
+        () => done('Link copied'),
+        () => done('Copy failed')
+      );
     });
   }
 
@@ -2079,7 +2108,11 @@ class UISystem extends BaseSystem {
       this.requestMenuShipSelectorRefresh();
     }
 
-    if (change.category === 'graphics' || change.type === 'reset-all') {
+    if (
+      change.category === 'graphics' ||
+      change.key === 'difficulty' ||
+      change.type === 'reset-all'
+    ) {
       this.refreshMenuStatus();
     }
 
@@ -3533,6 +3566,7 @@ class UISystem extends BaseSystem {
     );
     refs.location.textContent = runLocationLine(this.transmissionLayer);
     refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
+    refs.seed.textContent = this.getService('difficulty').runLabel();
   }
 
   showLevelUpScreen(data = {}) {
@@ -4216,6 +4250,8 @@ class UISystem extends BaseSystem {
       runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
     );
     setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
+    setText(refs.seed, this.getService('difficulty').runLabel());
+    setText(refs.copySeedBtn, 'Copy seed link');
 
     const progression = this.getService('progression');
     if (refs.build && progression) {
