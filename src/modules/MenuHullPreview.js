@@ -32,6 +32,8 @@ const PLUME_LENGTH = 3.5;
 // strength, added to the hull's own shading only.
 const STUDIO_GLSL = 'vec3(-0.45, 0.7, 0.55)';
 const STUDIO_STRENGTH = '1.1';
+// A locked hull's silhouette: dark slate, a shade above the starfield.
+const SILHOUETTE_COLOR = 0x1c2533;
 
 // Plume: white-hot at the nozzle, fading into the accent toward the tip
 // (cone uv.y runs 0 at the base to 1 at the tip).
@@ -89,18 +91,25 @@ export class MenuHullPreview {
       base: matte(tone(PALETTE.hull, PALETTE.hullLit, 0.2), 0.85),
       fin: matte(tone(PALETTE.hullLit, PALETTE.neutral, 0.15), 0.8),
       body: matte(tone(PALETTE.hullLit, PALETTE.neutral, 0.6), 0.72),
+      // A locked hull: one flat dark tone, no glow or plume.
+      silhouette: new THREE.MeshBasicMaterial({ color: SILHOUETTE_COLOR }),
     };
     this.hullId = null;
+    this.silhouette = false;
     this.hull = null;
     this.plumes = [];
     this.length = 1;
     this.time = 0;
   }
 
-  /** Builds the hull for `hullId` (shipModels.js); no-op when unchanged. */
-  setHull(hullId) {
-    if (hullId === this.hullId) return;
+  /**
+   * Builds the hull for `hullId` (shipModels.js), as a dark silhouette when
+   * `silhouette` (a locked hull); no-op when unchanged.
+   */
+  setHull(hullId, silhouette = false) {
+    if (hullId === this.hullId && silhouette === this.silhouette) return;
     this.hullId = hullId;
+    this.silhouette = silhouette;
     if (this.hull) {
       this.spin.remove(this.hull);
       this.hull.traverse((node) => node.geometry?.dispose());
@@ -130,7 +139,8 @@ export class MenuHullPreview {
       hull.add(mesh);
     };
 
-    plate(definition.outline, BASE_DEPTH, this.materials.base);
+    const dark = this.silhouette && this.materials.silhouette;
+    plate(definition.outline, BASE_DEPTH, dark || this.materials.base);
     visual.panels
       .filter((panel) => !panel.minLevel)
       .forEach((panel) => {
@@ -138,7 +148,7 @@ export class MenuHullPreview {
         plate(
           panel.points,
           fin ? FIN_DEPTH : BODY_DEPTH,
-          fin ? this.materials.fin : this.materials.body,
+          dark || (fin ? this.materials.fin : this.materials.body),
           BASE_DEPTH * 0.5
         );
       });
@@ -165,11 +175,12 @@ export class MenuHullPreview {
         const length = visual.nozzleLength;
         const bell = new THREE.Mesh(
           new THREE.CylinderGeometry(nozzle.r * 1.25, nozzle.r, length, 12),
-          this.materials.base
+          dark || this.materials.base
         );
         bell.rotation.z = Math.PI / 2;
         bell.position.set(nozzle.x - length / 2, nozzle.y, nozzleZ);
         hull.add(bell);
+        if (dark) return;
         const core = new THREE.Mesh(
           new THREE.CircleGeometry(nozzle.r, 16),
           glow

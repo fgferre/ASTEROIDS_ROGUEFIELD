@@ -1435,13 +1435,16 @@ export class WaveManager {
     const { label, color } = LAYER_MODIFIERS[id];
     this.layerModifier = id;
     if (id === 'magnetic-storm') {
+      const runSeed =
+        resolveService(
+          'difficulty',
+          this.enemySystem.dependencies
+        )?.getRunSeed() ?? 0;
       this.enemySystem
         .getCachedXPOrbs?.()
         ?.setDrift(
           LAYER_MODIFIERS[id],
-          new RandomService(
-            `magnetic-storm:${this.getRandomService().seed}:${this.currentWave}`
-          )
+          new RandomService(`magnetic-storm:${runSeed}:${this.currentWave}`)
         );
     }
     this.eventBus.emit('layer-modifier-started', {

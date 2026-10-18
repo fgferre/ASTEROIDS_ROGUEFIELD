@@ -1636,9 +1636,18 @@ class Renderer3D extends BaseSystem {
     let width = 0;
     let color = PALETTE.boss;
     const effects = list || [];
+    // Reduce Flashing: 30 % strength, a steady fade instead of the pulse, and
+    // an effect starting under 0.34 s after another still showing is skipped.
+    const reduced = this.flashScale < 1;
     for (let i = 0; i < effects.length; i += 1) {
       const e = effects[i];
       if (!e) continue;
+      if (
+        reduced &&
+        effects.some((o) => o && o.timer > e.timer && o.timer - e.timer < 0.34)
+      ) {
+        continue;
+      }
       const progress = Math.min(1, e.timer / e.duration);
       const fadePower = Number.isFinite(e.fadePower)
         ? Math.max(0.1, e.fadePower)
@@ -1647,9 +1656,12 @@ class Renderer3D extends BaseSystem {
       const frequency = Number.isFinite(e.pulseFrequency)
         ? e.pulseFrequency
         : 1.8;
-      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * frequency);
-      const b = e.maxAlpha * fade * pulse;
-      const w = e.overlayAlpha * fade * Math.min(1, pulse + 0.15);
+      const pulse = reduced
+        ? 1
+        : 0.65 + 0.35 * Math.sin(progress * Math.PI * frequency);
+      const b = e.maxAlpha * fade * pulse * this.flashScale;
+      const w =
+        e.overlayAlpha * fade * Math.min(1, pulse + 0.15) * this.flashScale;
       if (b > border) {
         border = b;
         width = e.borderWidth * (0.85 + 0.15 * pulse);

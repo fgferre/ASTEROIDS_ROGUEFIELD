@@ -6,6 +6,7 @@ import HangarService, {
 } from '../../../src/services/HangarService.js';
 import {
   hangarItemMarkup,
+  hullLockText,
   salvageBalanceText,
   salvageLine,
 } from '../../../src/modules/ui/hangar.js';
@@ -42,6 +43,10 @@ describe('Hangar screen', () => {
     expect(cardOf(hangar, 'reinforced-plating')).toContain('OWNED');
     expect(cardOf(hangar, 'reinforced-plating')).not.toContain('BUY');
     expect(salvageBalanceText(hangar.salvage)).toBe('Salvage 0');
+  });
+
+  it('prices a locked hull for its preview', () => {
+    expect(hullLockText('solar-slicer')).toBe('🔒 LOCKED · 400 SALVAGE');
   });
 
   it('writes the recap line', () => {

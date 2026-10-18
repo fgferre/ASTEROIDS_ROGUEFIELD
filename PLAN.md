@@ -297,7 +297,7 @@ Qualidade:
 - [ ] **R9.1 Nave em menos malhas + badges com seed.** Fundir as placas estáticas do casco (ambos os cascos) numa
       geometria com cor por vértice (banking/recuo/turret/propulsores continuam separados); `badgeMaterials()` cria
       texturas pela seed (guard de Math.random limpo); medir draw calls da nave antes/depois.
-- [ ] **R9.2 Três ajustes.** Drift do Magnetic Storm pela seed de run; flash de borda/wash do boss respeita "reduce
+- [x] **R9.2 Três ajustes.** Drift do Magnetic Storm pela seed de run; flash de borda/wash do boss respeita "reduce
       flashing"; prévia de casco bloqueado no Hangar (silhueta escura + cadeado).
       Conteúdo:
 - [x] **R9.3 Heralds falam.** Uma linha de transmissão ao surgir e ao cair para cada Herald (voz própria), entradas de

@@ -372,6 +372,20 @@ describe('WaveManager layer modifiers', () => {
     });
   });
 
+  it('seeds the Magnetic Storm drift from the run seed', () => {
+    const driftDraws = (runSeed) => {
+      const field = createField({ runSeed });
+      field.manager.currentWave = 5;
+      field.manager.startLayerModifier('magnetic-storm');
+      const random = field.xpOrbs.setDrift.mock.calls[0][1];
+      return Array.from({ length: 4 }, () => random.range(0, 1));
+    };
+    const runA = driftDraws(1234);
+
+    expect(driftDraws(1234)).toEqual(runA);
+    expect(driftDraws(98765)).not.toEqual(runA);
+  });
+
   it('rolls the endless modifiers from the run seed', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
       const modifiersFor = (runSeed) =>

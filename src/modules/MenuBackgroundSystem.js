@@ -939,6 +939,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.hangarStage = document.getElementById('hangar-hull-stage');
     this.hangarOpen = false;
     this.hoveredHull = null;
+    this.hoveredHullLocked = false;
     this.createStarLayers();
     this.createAtmosphere();
     this.setupPostProcessing();
@@ -2075,9 +2076,14 @@ class MenuBackgroundSystem extends BaseSystem {
     const settings = this.getSettingsService();
     const hull =
       this.hoveredHull ?? settings.getCategoryValues('gameplay')?.selectedHull;
+    // A hovered locked hull previews as its silhouette.
+    const silhouette = Boolean(this.hoveredHull) && this.hoveredHullLocked;
     // New meshes draw Three's UUIDs: from the seeded stream.
     this.withSeededMathRandom(() =>
-      this.hullPreview.setHull(this.getService('hangar').hullFor(hull))
+      this.hullPreview.setHull(
+        silhouette ? hull : this.getService('hangar').hullFor(hull),
+        silhouette
+      )
     );
     this.hullReducedMotion =
       Boolean(settings.getCategoryValues('accessibility')?.reducedMotion) ||
@@ -3819,6 +3825,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     });
     this.registerEventListener('hangar-hull-hovered', (event) => {
       this.hoveredHull = event?.hullId ?? null;
+      this.hoveredHullLocked = Boolean(event?.locked);
       this.syncHullPreview();
     });
     this.registerEventListener(
