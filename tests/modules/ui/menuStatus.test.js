@@ -3,6 +3,7 @@ import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { RECORDS_STORAGE_KEY } from '../../../src/services/runRecords.js';
 import {
+  bossRushBest,
   menuStatusItems,
   menuStatusMarkup,
   qualityLabel,
@@ -32,9 +33,9 @@ describe('Main menu status strip', () => {
   });
   afterEach(() => restoreDom());
 
-  it('reads best layer, Daily best, Salvage, Codex, achievements, difficulty and quality', () => {
+  it('reads best layer, Daily best, Boss Rush, Salvage, Codex, achievements, difficulty and quality', () => {
     const items = menuStatusItems({
-      records: { bestLayer: 7 },
+      records: { bestLayer: 7, bossRushStage: 2, bossRushTime: 0 },
       quality: 'auto',
       ...fakeServices(),
     });
@@ -42,6 +43,7 @@ describe('Main menu status strip', () => {
     expect(items).toEqual([
       ['Best layer', '7'],
       ['Daily best', '3'],
+      ['Boss Rush', 'Warden 2/3'],
       ['Salvage', '470'],
       ['Codex', '2/3'],
       ['Achievements', '2/12'],
@@ -51,6 +53,12 @@ describe('Main menu status strip', () => {
     expect(menuStatusMarkup(items)).toContain(
       'Achievements <span class="menu-status__value">2/12</span>'
     );
+  });
+
+  it('shows the Boss Rush best as the fastest clear, else the furthest Warden', () => {
+    expect(bossRushBest(3, 452)).toBe('7:32');
+    expect(bossRushBest(2, 0)).toBe('Warden 2/3');
+    expect(bossRushBest(0, 0)).toBe('—');
   });
 
   it("names Auto's live preset, or the pinned one", () => {
@@ -74,7 +82,7 @@ describe('Main menu status strip', () => {
 
     const text = strip.innerHTML.replace(/<[^>]+>/g, '');
     expect(text).toBe(
-      'Best layer 4Daily best 3Salvage 470Codex 2/3Achievements 2/12Difficulty WARDENQuality HIGH'
+      'Best layer 4Daily best 3Boss Rush —Salvage 470Codex 2/3Achievements 2/12Difficulty WARDENQuality HIGH'
     );
   });
 });

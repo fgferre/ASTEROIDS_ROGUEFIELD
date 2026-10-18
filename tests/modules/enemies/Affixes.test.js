@@ -28,6 +28,8 @@ const SUPPORT_KINDS = [
   'ram',
   'weaver',
   'bulwark',
+  'caster',
+  'shade',
 ];
 
 const createSystem = (overrides = {}) => ({
@@ -74,6 +76,7 @@ describe('Elite affixes', () => {
     }
     expect(ELITE_AFFIXES.splitter.kinds).not.toContain('husk');
     expect(ELITE_AFFIXES.shielded.kinds).not.toContain('bulwark');
+    expect(ELITE_AFFIXES.splitter.kinds).not.toContain('shade');
   });
 
   it('rolls none before layer 6, one on 6–10, one or two on 11–14, two from 15', () => {

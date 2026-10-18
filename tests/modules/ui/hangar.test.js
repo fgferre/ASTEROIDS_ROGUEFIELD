@@ -21,13 +21,14 @@ describe('Hangar screen', () => {
   const cardOf = (hangar, id) =>
     hangarItemMarkup(hangar.getItems().find((item) => item.id === id));
 
-  it('lists the six upgrades and the Salvage balance', () => {
+  it('lists the seven upgrades and the Salvage balance', () => {
     localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 130 }));
     const hangar = new HangarService({ eventBus: new EventBus() });
     const markup = hangar.getItems().map(hangarItemMarkup).join('');
 
-    expect(markup.match(/<li /g)).toHaveLength(6);
+    expect(markup.match(/<li /g)).toHaveLength(7);
     expect(markup).toContain('Solar Slicer Hull');
+    expect(markup).toContain('Bastion Hull');
     expect(salvageBalanceText(hangar.salvage)).toBe('Salvage 130');
     expect(cardOf(hangar, 'reinforced-plating')).toContain(
       'BUY · 120</button>'
@@ -47,6 +48,7 @@ describe('Hangar screen', () => {
 
   it('prices a locked hull for its preview', () => {
     expect(hullLockText('solar-slicer')).toBe('🔒 LOCKED · 400 SALVAGE');
+    expect(hullLockText('bastion')).toBe('🔒 LOCKED · 520 SALVAGE');
   });
 
   it('writes the recap line', () => {

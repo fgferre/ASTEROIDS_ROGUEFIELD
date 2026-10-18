@@ -17,6 +17,7 @@ import {
   withAlpha,
 } from '../../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
+import { CASTER_SHELL_RADIUS } from '../../../data/enemies/caster.js';
 import { WARDEN_KINDS } from '../../../data/enemies/boss.js';
 import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import { drawAffixBadge } from './affixGlyphs.js';
@@ -558,6 +559,165 @@ const bulwark = {
       ctx.lineWidth = emissive ? LINE.base : LINE.hair;
       ctx.stroke();
     }
+    ctx.restore();
+  },
+};
+
+// --- Caster: squat round turret, a short mortar that turns; the lens lights
+// through the telegraph. Its marks live on the field: the aim ring grows
+// through the telegraph; in flight the blast ring holds while an inner ring
+// closes on the landing, and the shell swells toward its apex and back.
+
+const CASTER_SHELL_SWELL = 1.4; // proposta 18/10: × shell size at its apex
+
+const casterField = (ctx, enemy, accent, emissive) => {
+  const { aim, shell } = enemy;
+  const radius = CASTER_SHELL_RADIUS;
+  if (aim) {
+    const charge = clamp01(enemy.telegraphRatio);
+    ctx.beginPath();
+    ctx.arc(aim.x - enemy.x, aim.y - enemy.y, radius * charge, 0, TAU);
+    ctx.strokeStyle = withAlpha(accent, 0.25 + 0.5 * charge);
+    ctx.lineWidth = emissive ? LINE.base : LINE.thin;
+    ctx.stroke();
+  }
+  if (!shell) return;
+  const progress = clamp01(enemy.shellProgress);
+  const x = shell.x - enemy.x;
+  const y = shell.y - enemy.y;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, TAU);
+  if (!emissive) {
+    ctx.fillStyle = withAlpha(accent, 0.05 + 0.1 * progress);
+    ctx.fill();
+  }
+  ctx.strokeStyle = withAlpha(accent, 0.4 + 0.5 * progress);
+  ctx.lineWidth = LINE.base;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(1, radius * (1 - progress)), 0, TAU);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+  const lift = 4 * progress * (1 - progress);
+  const size = (enemy.radius ?? 15) * 0.22 * (1 + CASTER_SHELL_SWELL * lift);
+  ctx.beginPath();
+  ctx.arc(
+    shell.fromX + (shell.x - shell.fromX) * progress - enemy.x,
+    shell.fromY + (shell.y - shell.fromY) * progress - enemy.y,
+    emissive ? size * 1.6 : size,
+    0,
+    TAU
+  );
+  ctx.fillStyle = emissive ? accent : PALETTE.text;
+  ctx.fill();
+};
+
+const caster = {
+  facing: () => 0, // the turret is round; the barrel turns in live()
+  body(ctx, size) {
+    const r = size * 0.78;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fillStyle = litFill(ctx, r);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, r - 0.9);
+    // the breech
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.45, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.78 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const accent = accentOf(enemy);
+    const charge = clamp01(enemy.telegraphRatio);
+    ctx.save();
+    ctx.rotate(enemy.rotation ?? 0);
+    if (!emissive) {
+      ctx.beginPath();
+      ctx.rect(size * 0.2, -size * 0.26, size * 0.95, size * 0.52);
+      ctx.fillStyle = PALETTE.hullLit;
+      ctx.fill();
+      darkEdge(ctx);
+    }
+    ctx.beginPath();
+    ctx.arc(
+      size * 1.02,
+      0,
+      size * 0.15 * (emissive ? 1 + charge * 1.6 : 1),
+      0,
+      TAU
+    );
+    ctx.fillStyle = withAlpha(accent, 0.3 + charge * 0.7);
+    ctx.fill();
+    ctx.restore();
+    casterField(ctx, enemy, accent, emissive);
+  },
+};
+
+// --- Shade: a swept blade with one eye. It fades out of the Field
+// (`alpha`); while it is out, only a dashed edge stays readable.
+
+const SHADE_OUTLINE = [
+  [1.2, 0],
+  [0.1, -0.5],
+  [-0.95, -0.95],
+  [-0.5, -0.2],
+  [-0.75, 0],
+  [-0.5, 0.2],
+  [-0.95, 0.95],
+  [0.1, 0.5],
+];
+
+const shadeHull = (ctx, size) => {
+  ctx.beginPath();
+  SHADE_OUTLINE.forEach(([x, y], i) => {
+    if (i === 0) ctx.moveTo(x * size, y * size);
+    else ctx.lineTo(x * size, y * size);
+  });
+  ctx.closePath();
+};
+
+const shade = {
+  facing: (enemy) => enemy.rotation ?? 0,
+  alpha: (enemy) => clamp01(enemy.visibility ?? 1),
+  body(ctx, size) {
+    shadeHull(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    darkEdge(ctx);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.75, 0);
+    ctx.lineTo(size * 0.6, 0);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+  },
+  glow(ctx, size, enemy) {
+    shadeHull(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const accent = accentOf(enemy);
+    ctx.beginPath();
+    ctx.arc(size * 0.45, 0, size * (emissive ? 0.16 : 0.11), 0, TAU);
+    ctx.fillStyle = accent;
+    ctx.fill();
+    const ghost = 1 - clamp01(enemy.visibility ?? 1);
+    if (ghost <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    shadeHull(ctx, size * 1.05);
+    ctx.setLineDash([3, 3]);
+    ctx.lineDashOffset = -enemyTime(enemy) * 12;
+    ctx.strokeStyle = withAlpha(accent, (emissive ? 0.3 : 0.2) * ghost);
+    ctx.lineWidth = LINE.hair;
+    ctx.stroke();
     ctx.restore();
   },
 };
@@ -1204,6 +1364,8 @@ const LOOKS = {
   ram,
   weaver,
   bulwark,
+  caster,
+  shade,
   boss: warden,
   'warden-choir': wardenChoir,
   'warden-null': wardenNull,
@@ -1390,9 +1552,12 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
 
   const affixed = enemy.affixes.length > 0;
   const swift = affixed && enemy.hasAffix('swift');
+  // a look may fade its whole body (the Shade leaving the Field)
+  const fade = look.alpha ? look.alpha(enemy) : 1;
   if (swift)
     drawLayer(ctx, enemy, 0, () => swiftTrail(ctx, enemy, size, false));
   drawLayer(ctx, enemy, angle, () => {
+    ctx.globalAlpha = fade;
     if (sprite) blit(ctx, sprite.body);
     else look.body(ctx, size, enemy);
     look.live(ctx, size, enemy, false);
@@ -1410,6 +1575,7 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     );
   }
   drawLayer(emissive, enemy, angle, () => {
+    emissive.globalAlpha = fade;
     if (sprite) blit(emissive, sprite.glow);
     else look.glow(emissive, size, enemy);
     look.live(emissive, size, enemy, true);

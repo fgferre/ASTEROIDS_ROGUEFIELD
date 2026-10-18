@@ -59,12 +59,14 @@ export function victoryTransmission() {
  * One transmission at a time. A line waits while the HUD banner or boss intro
  * is up; a banner that opens mid-line cuts it, and it replays afterwards.
  * `view` is the HUD (isBannerBusy, showTransmission, typeTransmission,
- * hideTransmission); `onShown(entry)` fires each time a line starts.
+ * hideTransmission); `onShown(entry)` fires each time a line starts,
+ * `onFinished(entry)` once it is done for good: held to the end, or dropped.
  */
 export class TransmissionQueue {
-  constructor(view, onShown) {
+  constructor(view, onShown, onFinished = () => {}) {
     this.view = view;
     this.onShown = onShown;
+    this.onFinished = onFinished;
     this.pending = [];
     this.current = null;
   }
@@ -86,11 +88,13 @@ export class TransmissionQueue {
   }
 
   clear() {
-    if (this.current) {
-      this.view.hideTransmission();
-    }
+    const { current } = this;
     this.pending = [];
     this.current = null;
+    if (current) {
+      this.view.hideTransmission();
+      this.onFinished(current.entry);
+    }
   }
 
   update(nowMs, reducedMotion = false) {
@@ -128,6 +132,7 @@ export class TransmissionQueue {
     if (elapsed >= typingMs + TRANSMISSION_HOLD_MS) {
       this.view.hideTransmission();
       this.current = null;
+      this.onFinished(entry);
     }
   }
 }

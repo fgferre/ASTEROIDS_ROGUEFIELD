@@ -30,11 +30,22 @@ export function absorbFrontalHit(enemy, amount, point) {
     enemy.shieldHealth = 0;
     enemy.shieldBroken = true;
   }
-  enemy.getEventBus()?.emit?.('shield-deflected', {
+  const bus = enemy.getEventBus();
+  bus?.emit?.('shield-deflected', {
     position: { x: point.x, y: point.y },
     normal: { x: Math.cos(enemy.facing), y: Math.sin(enemy.facing) },
     level: 0,
     intensity: enemy.shieldBroken ? 2 : 0.8,
   });
+  // The plate's own clang (and crack when it breaks), for the Bulwark and
+  // for Shielded Elites alike.
+  bus?.emit?.(
+    enemy.shieldBroken ? 'bulwark-plate-broken' : 'bulwark-plate-hit',
+    {
+      enemy,
+      enemyId: enemy.id,
+      position: { x: point.x, y: point.y },
+    }
+  );
   return amount - absorbed;
 }

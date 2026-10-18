@@ -109,7 +109,11 @@ export function threatZoomFor(count, base = CAMERA_ZOOM) {
   return base * (1 - (1 - THREAT_BUSY_RATIO) * t);
 }
 
-/** Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin. */
+/**
+ * Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin. The
+ * boss counts with its radius, so a wide Warden's rim stays inside the
+ * margin instead of its centre only.
+ */
 export function frameFor(
   ax,
   ay,
@@ -117,12 +121,15 @@ export function frameFor(
   by,
   out,
   fieldWidth = GAME_WIDTH,
-  fieldHeight = GAME_HEIGHT
+  fieldHeight = GAME_HEIGHT,
+  bossRadius = 0
 ) {
   const mx = ax * FRAME_SHIP_WEIGHT + bx * (1 - FRAME_SHIP_WEIGHT);
   const my = ay * FRAME_SHIP_WEIGHT + by * (1 - FRAME_SHIP_WEIGHT);
-  const hx = Math.max(Math.abs(ax - mx), Math.abs(bx - mx)) + FRAME_MARGIN;
-  const hy = Math.max(Math.abs(ay - my), Math.abs(by - my)) + FRAME_MARGIN;
+  const hx =
+    Math.max(Math.abs(ax - mx), Math.abs(bx - mx) + bossRadius) + FRAME_MARGIN;
+  const hy =
+    Math.max(Math.abs(ay - my), Math.abs(by - my) + bossRadius) + FRAME_MARGIN;
   out.x = mx;
   out.y = my;
   out.zoom = clamp(
@@ -145,6 +152,7 @@ export function createCameraScene() {
     hasBoss: false,
     bossX: 0,
     bossY: 0,
+    bossRadius: 0,
   };
 }
 
@@ -173,6 +181,7 @@ export function readCameraScene(scene, player, combat, enemies) {
       scene.hasBoss = true;
       scene.bossX = e.x;
       scene.bossY = e.y;
+      scene.bossRadius = e.radius || 0;
     }
   }
   return scene;
@@ -204,7 +213,7 @@ export function createCamera({
   const threatZoom = { value: zoom, velocity: 0 };
   const fitZoom = { value: zoom, velocity: 0 };
   let frameBlend = 0;
-  const boss = { x: 0, y: 0 };
+  const boss = { x: 0, y: 0, radius: 0 };
   const goal = { x: 0, y: 0, zoom };
 
   const camera = {
@@ -295,11 +304,15 @@ export function createCamera({
       clampToField();
     },
 
-    // Pushes the zoom to `peak` and back to the base over `duration` s.
+    // Pushes the zoom to `peak` (under the base: pulls out) and back to the
+    // base over `duration` s, leaving from where a running pulse has it. A
+    // pulse weaker than the running one's peak is dropped, even in its first
+    // frames: a dash never cuts the level-up push short.
     pulseZoom(peak, duration) {
-      if (Number.isFinite(peak) && peak > 0 && duration > 0) {
-        pulse = { peak, duration, elapsed: 0 };
-      }
+      if (!(Number.isFinite(peak) && peak > 0 && duration > 0)) return;
+      const strength = (factor) => Math.abs(factor / baseZoom - 1);
+      if (pulse && strength(peak) < strength(pulse.peak)) return;
+      pulse = { peak, duration, elapsed: 0, from: pulseFactor };
     },
 
     snapTo(x, y) {
@@ -343,7 +356,8 @@ export function createCamera({
   };
 
   // The pulse scales whatever zoom the mode wants, so the two never fight:
-  // at base zoom it is base + (peak - base) × envelope.
+  // at base zoom it is base + (peak - base) × envelope. The attack leaves
+  // from the factor the pulse started at (1 unless it replaced another).
   function advancePulse(dt) {
     pulseFactor = 1;
     if (!pulse) return;
@@ -358,7 +372,8 @@ export function createCamera({
         ? Math.sin((t / PULSE_ATTACK) * (Math.PI / 2))
         : 0.5 +
           0.5 * Math.cos(((t - PULSE_ATTACK) / (1 - PULSE_ATTACK)) * Math.PI);
-    pulseFactor = 1 + (pulse.peak / baseZoom - 1) * envelope;
+    const from = t < PULSE_ATTACK ? pulse.from : 1;
+    pulseFactor = from + (pulse.peak / baseZoom - from) * envelope;
   }
 
   // goal.x/y/zoom: ship + look-ahead at the threat zoom, blended over
@@ -381,6 +396,7 @@ export function createCamera({
     if (framing) {
       boss.x = scene.bossX;
       boss.y = scene.bossY;
+      boss.radius = scene.bossRadius;
     }
     // Entering from plain follow, the framing zoom starts where we are.
     if (framing && frameBlend === 0) {
@@ -394,7 +410,18 @@ export function createCamera({
     );
     const w = smoothstep01(frameBlend);
     // Leaving (boss dead or far), frame its last position while blending out.
-    if (w > 0) frameFor(x, y, boss.x, boss.y, goal, fieldWidth, fieldHeight);
+    if (w > 0) {
+      frameFor(
+        x,
+        y,
+        boss.x,
+        boss.y,
+        goal,
+        fieldWidth,
+        fieldHeight,
+        boss.radius
+      );
+    }
     if (w > 0) dampTo(fitZoom, goal.zoom, FRAME_ZOOM_SMOOTH * slow, dt);
     const leadX = x + lookX.value;
     const leadY = y + lookY.value;

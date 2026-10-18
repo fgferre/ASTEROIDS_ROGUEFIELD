@@ -477,7 +477,8 @@ class CombatSystem extends BaseSystem {
     this.targetThreatCache.clear();
 
     const processEnemy = (enemy) => {
-      if (!enemy || enemy.destroyed) {
+      // a phased Shade (`intangible`) cannot be locked
+      if (!enemy || enemy.destroyed || enemy.intangible) {
         return;
       }
 
@@ -576,7 +577,7 @@ class CombatSystem extends BaseSystem {
   }
 
   isValidTarget(target) {
-    if (!target || target.destroyed) return false;
+    if (!target || target.destroyed || target.intangible) return false;
 
     const playerPos = this.cachedPlayer.getPosition();
     const dx = target.x - playerPos.x;
@@ -3330,6 +3331,14 @@ class CombatSystem extends BaseSystem {
     };
   }
 
+  // Every enemy a weapon effect can reach: a phased Shade (`intangible`) is
+  // out of the Field for beams, arcs, burns, pulls and shoves, as for the lock.
+  forEachSolidEnemy(callback) {
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (enemy && !enemy.destroyed && !enemy.intangible) callback(enemy);
+    });
+  }
+
   // Harmonic beam: damage lands on everything in the segment on the firing
   // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
   // lances: from the muzzle onto the primary lock's lead point in auto, along
@@ -3354,8 +3363,7 @@ class CombatSystem extends BaseSystem {
       (Number(playerStats?.damage) || 0) * HARMONIC_BEAM.damageMultiplier;
 
     const struck = [];
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed) return;
+    this.forEachSolidEnemy((enemy) => {
       const along = Math.max(
         0,
         Math.min(
@@ -3533,8 +3541,8 @@ class CombatSystem extends BaseSystem {
   // is a `well`.
   pullToward(target, targetAlive, x, y) {
     const { radius, duration } = WEAPON_APEX.field.pull;
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed || enemy.type === 'boss') return;
+    this.forEachSolidEnemy((enemy) => {
+      if (enemy.type === 'boss') return;
       const inReach =
         enemy === target
           ? targetAlive
@@ -3553,10 +3561,8 @@ class CombatSystem extends BaseSystem {
     const { range } = WEAPON_EVOLUTIONS.arc.chain;
     const rangeSq = range * range + 1e-6;
     const near = [];
-    this.cachedEnemies.forEachActiveEnemy((candidate) => {
-      if (!candidate || visited.includes(candidate) || candidate.destroyed) {
-        return;
-      }
+    this.forEachSolidEnemy((candidate) => {
+      if (visited.includes(candidate)) return;
       const sq = (candidate.x - source.x) ** 2 + (candidate.y - source.y) ** 2;
       if (sq < rangeSq) near.push({ candidate, sq });
     });
@@ -3647,8 +3653,7 @@ class CombatSystem extends BaseSystem {
   burnTrailTouches(list, { damage, radius, bossFactor }) {
     const ion = bossFactor !== undefined;
     const touched = [];
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed) return;
+    this.forEachSolidEnemy((enemy) => {
       if (ion && enemy.type === 'asteroid') return;
       const reach = (enemy.radius || 0) + radius;
       const reachSq = reach * reach;
@@ -3670,8 +3675,7 @@ class CombatSystem extends BaseSystem {
   // Pushes every enemy within `radius` straight away from `origin`.
   shoveFrom(origin, radius, speed) {
     if (!origin) return;
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed) return;
+    this.forEachSolidEnemy((enemy) => {
       const dx = enemy.x - origin.x;
       const dy = enemy.y - origin.y;
       const reach = radius + (enemy.radius || 0);
@@ -3685,8 +3689,7 @@ class CombatSystem extends BaseSystem {
     const { x, y } = this.cachedPlayer.getPosition();
     const origin = { x, y, radius: SHIP_SIZE };
     const struck = [];
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed) return;
+    this.forEachSolidEnemy((enemy) => {
       const reach = radius + (enemy.radius || 0);
       if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
         struck.push(enemy);
@@ -3716,8 +3719,8 @@ class CombatSystem extends BaseSystem {
   applyGravityBrake({ radius, slowFraction }, deltaTime) {
     const { x, y } = this.cachedPlayer.getPosition();
     const drag = slowFraction * deltaTime;
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
-      if (!enemy || enemy.destroyed || enemy.type === 'boss') return;
+    this.forEachSolidEnemy((enemy) => {
+      if (enemy.type === 'boss') return;
       if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 > radius * radius) return;
       enemy.x -= (enemy.vx || 0) * drag;
       enemy.y -= (enemy.vy || 0) * drag;
@@ -3846,11 +3849,9 @@ class CombatSystem extends BaseSystem {
   spreadBurn(source, entry, spreads) {
     const { radius, durationFraction, ticks } = WEAPON_APEX.thermal.spread;
     const { duration } = WEAPON_EVOLUTIONS.thermal.burn;
-    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+    this.forEachSolidEnemy((enemy) => {
       if (
-        !enemy ||
         enemy === source ||
-        enemy.destroyed ||
         this.burns.has(enemy) ||
         entry.spreadTo.includes(enemy) ||
         Math.hypot(enemy.x - source.x, enemy.y - source.y) -

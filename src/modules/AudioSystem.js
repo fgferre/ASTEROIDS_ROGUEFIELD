@@ -448,6 +448,10 @@ class AudioSystem extends BaseSystem {
           this._duckBigMoment();
         }
       }
+      // A Husk hisses open and its drones pop out over the explosion.
+      if ((data.enemyType || data.enemy?.type) === 'husk') {
+        this.playHuskRelease(this._resolveSourceSpatial(data));
+      }
 
       const fragments = Array.isArray(data.fragments)
         ? data.fragments.length
@@ -533,12 +537,59 @@ class AudioSystem extends BaseSystem {
       this.playTipChime();
     });
 
-    // The Ram shares the Warden's telegraph event; only non-bosses get the
-    // enemy cue (the boss keeps its EffectsSystem/roar handling).
+    // The Ram shares the Warden's telegraph event (its lane) but spins up with
+    // its own cue; other non-bosses get the enemy cue (the boss keeps its
+    // EffectsSystem/roar handling).
     this.registerEventListener('boss-telegraph', (data = {}) => {
-      if (data?.enemy?.type && data.enemy.type !== 'boss') {
+      const type = data?.enemy?.type;
+      if (type === 'ram') {
+        this.playRamSpinUp(this._resolveSourceSpatial(data));
+      } else if (type && type !== 'boss') {
         this.playEnemyTelegraph(this._resolveSourceSpatial(data));
       }
+    });
+
+    // Support machines' own cues, at the machine's position.
+    this.registerEventListener('ram-charged', (data = {}) => {
+      this.playRamCharge(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('weaver-tether-laid', (data = {}) => {
+      this.playWeaverTether(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('bulwark-plate-hit', (data = {}) => {
+      this.playBulwarkPlateHit(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('bulwark-plate-broken', (data = {}) => {
+      this.playBulwarkPlateBreak(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('caster-telegraphed', (data = {}) => {
+      this.playCasterCharge(this._resolveSourceSpatial(data));
+    });
+
+    // The launch pans from the Caster toward where the shell will land.
+    this.registerEventListener('caster-shell-fired', (data = {}) => {
+      this.playCasterLaunch({
+        ...this._resolveSourceSpatial(data),
+        toPan: resolveStereoPan(data?.target?.x, this.listenerX),
+      });
+    });
+
+    // Its own impact, not an explosion: 2-4 Casters land every few seconds,
+    // so no music duck either.
+    this.registerEventListener('caster-shell-landed', (data = {}) => {
+      this.playCasterImpact(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('shade-phased-out', (data = {}) => {
+      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: true });
+    });
+
+    this.registerEventListener('shade-phased-in', (data = {}) => {
+      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: false });
     });
 
     this.registerEventListener('pickup-collected', (data = {}) => {
@@ -565,7 +616,8 @@ class AudioSystem extends BaseSystem {
         ''
       ).toLowerCase();
 
-      if (enemyType === 'drone') {
+      // The Shade's fan (three shots at once) shares the Mote's shot cue.
+      if (enemyType === 'drone' || enemyType === 'shade') {
         this.playDroneFire({ ...data, ...this._resolveSourceSpatial(data) });
         return;
       }
@@ -635,6 +687,21 @@ class AudioSystem extends BaseSystem {
 
     this.registerEventListener('player-took-damage', () => {
       this.playShipHit();
+    });
+
+    // The ship's own moves: centred on it (the listener), the dash whoosh
+    // sweeps toward where it goes.
+    this.registerEventListener('player-dashed', (data = {}) => {
+      this.playDash({
+        pan: resolveStereoPan(data?.position?.x, this.listenerX),
+        directionX: data?.direction?.x || 0,
+      });
+    });
+
+    this.registerEventListener('player-braked', (data = {}) => {
+      this.playBrake({
+        pan: resolveStereoPan(data?.position?.x, this.listenerX),
+      });
     });
 
     this.registerEventListener('shield-activated', () => {
@@ -845,17 +912,19 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
+    // Master scales the summed mix once, at masterGain (after the limiter); the
+    // bus sliders carry only the per-bus mix.
     const { master, music, effects, muteAll } = this.volumeState;
     const masterValue = muteAll ? 0 : master;
 
     this.masterGain.gain.value = masterValue;
 
     if (this.musicGain) {
-      this.musicGain.gain.value = muteAll ? 0 : master * music;
+      this.musicGain.gain.value = muteAll ? 0 : music;
     }
 
     if (this.effectsGain) {
-      this.effectsGain.gain.value = muteAll ? 0 : master * effects;
+      this.effectsGain.gain.value = muteAll ? 0 : effects;
     }
   }
 
@@ -1393,6 +1462,46 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playEnemyTelegraph(options);
   }
 
+  playRamSpinUp(options = {}) {
+    this.sfxBus.playRamSpinUp(options);
+  }
+
+  playRamCharge(options = {}) {
+    this.sfxBus.playRamCharge(options);
+  }
+
+  playHuskRelease(options = {}) {
+    this.sfxBus.playHuskRelease(options);
+  }
+
+  playWeaverTether(options = {}) {
+    this.sfxBus.playWeaverTether(options);
+  }
+
+  playBulwarkPlateHit(options = {}) {
+    this.sfxBus.playBulwarkPlateHit(options);
+  }
+
+  playBulwarkPlateBreak(options = {}) {
+    this.sfxBus.playBulwarkPlateBreak(options);
+  }
+
+  playCasterCharge(options = {}) {
+    this.sfxBus.playCasterCharge(options);
+  }
+
+  playCasterLaunch(options = {}) {
+    this.sfxBus.playCasterLaunch(options);
+  }
+
+  playCasterImpact(options = {}) {
+    this.sfxBus.playCasterImpact(options);
+  }
+
+  playShadePhase(options = {}) {
+    this.sfxBus.playShadePhase(options);
+  }
+
   playEliteSpawned() {
     this.sfxBus.playEliteSpawned();
   }
@@ -1861,6 +1970,14 @@ class AudioSystem extends BaseSystem {
 
   playShipHit() {
     this.sfxBus.playShipHit();
+  }
+
+  playDash(options = {}) {
+    this.sfxBus.playDash(options);
+  }
+
+  playBrake(options = {}) {
+    this.sfxBus.playBrake(options);
   }
 
   playShieldActivate() {

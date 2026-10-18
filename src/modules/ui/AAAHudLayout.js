@@ -12,6 +12,8 @@ const RADAR_POOL_SIZE = 80;
 // Sensor Jam: noise dots on the radar, re-rolled every RADAR_NOISE_MS.
 const RADAR_NOISE_DOTS = 28;
 const RADAR_NOISE_MS = 90;
+// A phased Shade's blip (it can't be hit or locked while phased).
+const RADAR_PHASED_ALPHA = 0.35; // proposta 18/10
 const BOSS_FALLBACK_COLOR = '#ff003c';
 const BOSS_FALLBACK_DARK = '#880020';
 const LAYER_BANNER_MS = 1200;
@@ -329,11 +331,17 @@ export class AAAHudLayout {
   }
 
   /**
-   * Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN". A
-   * `chapter` title (a biome's first layer) goes underneath and holds longer.
+   * Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN", Boss
+   * Rush ones "BOSS RUSH". A `chapter` title (a biome's first layer, the
+   * Boss Rush stage) goes underneath and holds longer.
    */
-  showLayerBanner(layer, { boss = false, delayMs = 0, chapter = '' } = {}) {
-    this._showBanner(boss ? `LAYER ${layer} — WARDEN` : `LAYER ${layer}`, {
+  showLayerBanner(
+    layer,
+    { boss = false, bossRush = false, delayMs = 0, chapter = '' } = {}
+  ) {
+    let title = boss ? `LAYER ${layer} — WARDEN` : `LAYER ${layer}`;
+    if (bossRush) title = 'BOSS RUSH';
+    this._showBanner(title, {
       tone: boss ? 'boss' : null,
       subtitle: chapter,
       delayMs,
@@ -1198,8 +1206,8 @@ export class AAAHudLayout {
 
   /**
    * Atualiza Radar
-   * @param {Array} blips - [{x: -1..1, y: -1..1, type}]: type is a
-   *   radarGlyph() name or 'pickup'.
+   * @param {Array} blips - [{x: -1..1, y: -1..1, type, phased}]: type is a
+   *   radarGlyph() name or 'pickup'; a phased blip is dimmed.
    */
   updateRadar(blips) {
     if (!this.els) {
@@ -1233,6 +1241,8 @@ export class AAAHudLayout {
         el.className = 'blip ' + type;
       }
       el.style.display = '';
+      const opacity = b.phased ? String(RADAR_PHASED_ALPHA) : '';
+      if (el.style.opacity !== opacity) el.style.opacity = opacity;
       const x = ((b.x + 1) / 2) * RADAR_SIZE;
       const y = ((b.y + 1) / 2) * RADAR_SIZE;
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;

@@ -30,7 +30,7 @@ describe('Codex tabs', () => {
     expect(adjacentCodexTab('achievements', 1)).toBe('enemies');
   });
 
-  it('renders the fourteen achievements, locked ones greyed, with progress or date', () => {
+  it('renders the eighteen achievements, locked ones greyed, with progress or date', () => {
     localStorage.setItem(
       ACHIEVEMENTS_STORAGE_KEY,
       JSON.stringify({
@@ -41,13 +41,13 @@ describe('Codex tabs', () => {
     const view = codexTabView('achievements', entriesOf());
     const cards = view.markup.match(/<li [^>]*>/g);
 
-    expect(cards).toHaveLength(14);
-    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(13);
+    expect(cards).toHaveLength(18);
+    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(17);
     expect(view.markup).toMatch(
       /is-unlocked" data-achievement="ring-breaker"[\s\S]*?Unlocked 18 Oct 2026/
     );
     expect(view.markup).toContain('7 / 25');
-    expect(view.count).toBe('1 / 14 unlocked');
+    expect(view.count).toBe('1 / 18 unlocked');
   });
 
   it('shows first sighting and defeats on Herald and Warden cards', () => {

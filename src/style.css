@@ -726,6 +726,11 @@ select {
   grid-column: auto;
 }
 
+/* An odd last action spans the row */
+.menu-screen__nav.menu-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .menu-screen__button {
   pointer-events: all;
   padding: var(--space-4) var(--space-5);
@@ -752,6 +757,27 @@ select {
   background: var(--danger-soft);
   border-color: var(--danger);
   box-shadow: none;
+}
+
+/* A label with a line under it (Boss Rush and its lock) */
+.menu-screen__button--stacked {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.menu-screen__lock {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.menu-screen__button:disabled {
+  color: var(--text-dim);
+  border-style: dashed;
+  border-color: var(--line);
+  background: var(--surface-strong);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
@@ -2344,6 +2370,33 @@ kbd {
   font-size: var(--text-sm);
   letter-spacing: 0.08em;
   color: var(--xp);
+}
+
+/* Death/victory quote: the last transmission, labelled like its HUD banner */
+.run-recap__quote {
+  width: min(640px, 100%);
+  margin: var(--space-4) auto 0;
+}
+
+.run-recap__quote:empty {
+  display: none;
+}
+
+.run-recap__quote-speaker {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-line);
+}
+
+.run-recap__quote-line {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 @media (max-width: 640px) {

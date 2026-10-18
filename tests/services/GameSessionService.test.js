@@ -4,11 +4,13 @@ import GameSessionService from '../../src/services/GameSessionService.js';
 import DifficultyService from '../../src/services/DifficultyService.js';
 import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import {
+  BASTION_HULL_ID,
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
   getShipModelById,
 } from '../../src/data/shipModels.js';
 import { BOSS_PHYSICS_CONFIG } from '../../src/data/enemies/boss.js';
+import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
@@ -239,6 +241,29 @@ describe('GameSessionService lifecycle flows', () => {
     ]);
   });
 
+  it('holds the game over screen while the death line plays, up to the cap', () => {
+    const dieDuringLine = () => {
+      const harness = createServiceHarness();
+      harness.service.startNewRun({ source: 'spec' });
+      harness.eventBus.emit('transmission-shown', { key: 'death:0' });
+      harness.service.handlePlayerDeath({ reason: 'spec' });
+      return harness;
+    };
+    vi.useFakeTimers();
+
+    const heard = dieDuringLine();
+    vi.advanceTimersByTime(3000);
+    expect(heard.service.getScreen()).toBe('playing');
+    heard.eventBus.emit('transmission-finished', { key: 'death:0' });
+    expect(heard.service.getScreen()).toBe('gameover');
+
+    const capped = dieDuringLine();
+    vi.advanceTimersByTime(6499);
+    expect(capped.service.getScreen()).toBe('playing');
+    vi.advanceTimersByTime(1);
+    expect(capped.service.getScreen()).toBe('gameover');
+  });
+
   it('restores retry button and player state when snapshot restoration fails', () => {
     const { service, player } = createServiceHarness();
 
@@ -338,18 +363,19 @@ describe('GameSessionService lifecycle flows', () => {
     );
   });
 
-  it('applies the configured hull when starting a new run', () => {
-    const { service, player } = createServiceHarness({
-      selectedHull: SOLAR_SLICER_HULL_ID,
-    });
+  it.each([SOLAR_SLICER_HULL_ID, BASTION_HULL_ID])(
+    'applies the configured hull %s when starting a new run',
+    (hullId) => {
+      const { service, player } = createServiceHarness({
+        selectedHull: hullId,
+      });
 
-    service.startNewRun({ source: 'test' });
+      service.startNewRun({ source: 'test' });
 
-    expect(player.setHull).toHaveBeenCalledWith(
-      getShipModelById(SOLAR_SLICER_HULL_ID)
-    );
-    expect(player.currentHull.id).toBe(SOLAR_SLICER_HULL_ID);
-  });
+      expect(player.setHull).toHaveBeenCalledWith(getShipModelById(hullId));
+      expect(player.currentHull.id).toBe(hullId);
+    }
+  );
 
   it('falls back to the default hull when the selected hull is invalid', () => {
     const { service, player } = createServiceHarness({
@@ -362,6 +388,32 @@ describe('GameSessionService lifecycle flows', () => {
       getShipModelById(DEFAULT_HULL_ID)
     );
     expect(player.currentHull.id).toBe(DEFAULT_HULL_ID);
+  });
+
+  it('names the flown hull in the run-won payload', () => {
+    const { service, eventBus } = createServiceHarness({
+      selectedHull: BASTION_HULL_ID,
+    });
+    vi.useFakeTimers();
+    service.startNewRun({ source: 'test' });
+
+    service.handleBossDefeatedEvent({ wave: RUN_FINAL_LAYER });
+
+    expect(eventBus.emit).toHaveBeenCalledWith('run-won', {
+      wave: RUN_FINAL_LAYER,
+      hullId: BASTION_HULL_ID,
+    });
+  });
+
+  it('clears a transmission left on air when a new run starts', () => {
+    const { service, eventBus } = createServiceHarness();
+    service.startNewRun({ source: 'test' });
+    eventBus.emit('transmission-shown', { key: 'death:0' });
+    expect(service.transmissionOnAir).toBe(true);
+
+    service.startNewRun({ source: 'test' });
+
+    expect(service.transmissionOnAir).toBe(false);
   });
 
   it('restores the snapshot hull before retry state recovery completes', () => {

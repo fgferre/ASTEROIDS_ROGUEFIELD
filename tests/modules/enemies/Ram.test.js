@@ -33,8 +33,16 @@ describe('Ram', () => {
       expect.objectContaining({ enemy: ram })
     );
 
+    expect(eventBus.emit).not.toHaveBeenCalledWith(
+      'ram-charged',
+      expect.anything()
+    );
     ram.onUpdate(RAM_WINDUP_SECONDS + 0.01);
     expect(ram.state).toBe('charge');
+    expect(eventBus.emit).toHaveBeenCalledWith(
+      'ram-charged',
+      expect.objectContaining({ enemy: ram, position: { x: 300, y: 100 } })
+    );
     expect(ram.telegraph).toBeNull();
     expect(ram.vx).toBeGreaterThan(0); // toward the player
     expect(speedOf(ram)).toBeGreaterThan(approachSpeed);

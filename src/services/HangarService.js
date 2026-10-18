@@ -12,7 +12,8 @@ const ITEMS_BY_ID = new Map(HANGAR_ITEMS.map((item) => [item.id, item]));
  * Meta-progression between runs (docs/NORTE.md §7 pillar 7, a proposal):
  * Salvage earned per run, spent in the Hangar on permanent upgrades, kept in
  * localStorage. A run pays out on each death and on victory; a retried run
- * only pays the difference, so it is never paid twice. Systems read
+ * only pays the difference, so it is never paid twice. A Boss Rush run pays
+ * per Warden felled instead of per layer (`runSalvage`). Systems read
  * `getModifiers()` at run start; the hull stays the `selectedHull` setting,
  * gated here by `hullFor()`.
  */
@@ -29,7 +30,10 @@ export default class HangarService {
     );
     this.startRun();
 
-    eventBus.on('game-started', () => this.startRun());
+    eventBus.on('game-started', (payload = {}) => this.startRun(payload));
+    eventBus.on('boss-defeated', () => {
+      if (this.bossRush) this.bossRushWardens += 1;
+    });
     eventBus.on('run-won', () => {
       this.won = true;
     });
@@ -39,8 +43,10 @@ export default class HangarService {
     });
   }
 
-  startRun() {
+  startRun({ bossRush = false } = {}) {
     this.won = false;
+    this.bossRush = bossRush;
+    this.bossRushWardens = 0;
     this.runAwarded = 0;
     this.lastAward = null;
   }
@@ -57,6 +63,7 @@ export default class HangarService {
         layer: typeof wave === 'number' ? wave : wave?.current,
         kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
         won: this.won,
+        bossRushWardens: this.bossRush ? this.bossRushWardens : null,
       }) * multiplier
     );
     const amount = Math.max(0, worth - this.runAwarded);
@@ -80,7 +87,7 @@ export default class HangarService {
     this.salvage -= item.cost;
     this.owned[id] = true;
     this.persist();
-    this.eventBus.emit('hangar-purchased', { id });
+    this.eventBus.emit('hangar-purchased', { id, owned: { ...this.owned } });
     return true;
   }
 

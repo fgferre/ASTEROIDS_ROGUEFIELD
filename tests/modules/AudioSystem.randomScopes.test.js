@@ -333,7 +333,7 @@ describe('AudioSystem random scope synchronization', () => {
     });
 
     expect(audio.masterGain.gain.value).toBe(0.4);
-    expect(audio.musicGain.gain.value).toBeCloseTo(0.12);
+    expect(audio.musicGain.gain.value).toBeCloseTo(0.3);
     expect(trackGain.gain.value).toBe(1);
     // Plan 02.06: file tracks join at the music DUCK node (rests 1.0) so they
     // duck WITH the music; the duck node is itself wired into the musicGain
@@ -355,6 +355,23 @@ describe('AudioSystem random scope synchronization', () => {
     expect(audio.masterGain.gain.value).toBe(0);
     expect(audio.musicGain.gain.value).toBe(0);
     expect(trackGain.gain.value).toBe(1);
+  });
+
+  it('applies master volume once: master 0.5 gives an effective effects gain of 0.5', async () => {
+    const { audio } = createMenuMusicHarness();
+    await audio.init();
+
+    audio.updateVolumeState({
+      masterVolume: 0.5,
+      musicVolume: 1,
+      effectsVolume: 1,
+      muteAll: false,
+    });
+
+    expect(audio.masterGain.gain.value * audio.effectsGain.gain.value).toBe(
+      0.5
+    );
+    expect(audio.masterGain.gain.value * audio.musicGain.gain.value).toBe(0.5);
   });
 
   it('supports explicit warmup for deferred tracks and crossfades handoff', async () => {

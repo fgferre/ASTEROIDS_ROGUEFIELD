@@ -4,19 +4,19 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
-## O BASTÃO — onde a sessão parou (18/10, ~13h30) — RODADA 10 MESCLADA NA `main`; SESSÃO ENCERRADA POR CONTEXTO (ele pediu nova conversa)
+## O BASTÃO — onde a sessão parou (18/10, ~16h30) — RODADA 11 MESCLADA NA `main` (PR #259)
 
 **Como retomar (nova sessão, qualquer máquina):**
 
 1. `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git && cd ASTEROIDS_ROGUEFIELD && git checkout main` — a
-   `main` contém tudo (PRs #247–#256 e o décimo primeiro). O ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg` pode ser
-   apagado; não tem nada fora da `main`.
-2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodadas 2–10, cada etapa marcada); `docs/NORTE.md` (§1 ficção, §2–3 arte,
-   §7 Norte 2 + a regra dos dois eixos); `BACKLOG.md` (19 linhas, conferidas contra o código em 18/10).
-3. `npm ci && npm run done` (1010 testes, build). Para ver o jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`.
+   `main` contém tudo (PRs #247–#259). O ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg` não tem nada fora da `main`.
+2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodadas 2–11, cada etapa marcada); `docs/NORTE.md` (§1 ficção, §2–3 arte,
+   §7 Norte 2 + a regra dos dois eixos); `BACKLOG.md` (24 linhas, conferidas em 18/10).
+3. `npm ci && npm run done` (155 arquivos / 1082 testes, build). Para ver o jogo: `npm run dev` →
+   `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`.
 4. **Antes de qualquer junção na `main`:** rodar a sonda headless de erros de runtime (20 s de cena hero, 3D) — o gate
-   não pega erro de render. O script estava no scratchpad da sessão anterior (perdido); recriar é curto: Playwright
-   abre `?scene=hero&desktop=force&debugLogging=0`, espera `#game-canvas`, 20 s, conta `pageerror` e `console.error`.
+   não pega erro de render. Script curto (Playwright): abre `?scene=hero&desktop=force&debugLogging=0`, espera
+   `#game-canvas`, 20 s, conta `pageerror` e `console.error`; deve imprimir `errors: 0`.
 5. Juntar na `main` sempre via pull request mesclado pela API (`gh api .../pulls` + `PUT .../merge`): o hook bloqueia
    `git push origin main` de propósito. Ele aprovou ("eu aprovo daqui… preciso que tudo seja mergeado na main").
 
@@ -26,25 +26,34 @@ são "proposta" nomeada no código — ele julga jogando; (e) um commit por fati
 
 **Vereditos dele até agora (jogando a Rodada 4):** item (7) fundo como textura e sombra no "chão" → espaço procedural
 com sombras só entre objetos (R5.10); item (8) nave virava para a mira → casco segue o movimento, arma é torreta
-(R5.11). **Ele ainda não deu veredito sobre as Rodadas 5–10.** É a primeira coisa a pedir na nova sessão.
+(R5.11). **Ele ainda não deu veredito sobre as Rodadas 5–11.** É a primeira coisa a pedir na nova sessão.
 
-**O que o jogo tem hoje (10 rodadas):** gameplay em Three.js com pipeline sRGB/ACES, espaço procedural, sombras reais,
-texturas assadas, nave em uma malha, rochas instanciadas, máquinas fundidas, batches de rim/emissivos (cena hero ~66
-draw calls no ultra), presets de qualidade automáticos, interpolação de render, warm-up de shaders, câmera 2.0,
-cinema de intro/epílogo; 8 tipos de inimigo + afixos de Elite, 3 Heralds, 3 Wardens, 15 camadas em 3 biomas com
-surtos, eventos e modificadores no infinito; torreta + twin-stick (gamepad), dash, 2 cascos, 34 cartas com raridade/
-reroll/banish, evoluções e Apex, pickups, Hangar, Códice com lore, conquistas, dificuldade/seed/Daily; áudio com
-limitador, reverb, distância, temas por bioma, percussão, vozes dos Wardens e Heralds; HUD direcional, acessibilidade.
+**Rodada 11 (18/10, tarde) — o que entrou:** duas máquinas novas (_Caster_, artilharia que marca a zona de impacto;
+_Shade_, que some em dissolve e reaparece no flanco), terceiro casco _Bastion_ no Hangar (pesado, blindado, 520
+Salvage), modo **Boss Rush** no menu (os três Wardens em sequência, respiro de 8 s e uma carta entre eles, recorde e
+Salvage próprios, destrava ao vencer o Prime), quatro conquistas; qualidade: dash e freio com som e pulso de câmera,
+som próprio por máquina (Ram, Husk, Weaver, Bulwark, Caster, Shade), telas finais esperam a última fala e o recap a
+guarda como citação, enquadramento de chefe considera o raio do Warden, volume mestre aplicado uma vez (no padrão
+0,7 sai ~3 dB mais alto que antes), radar mostra Shade em fase apagado, revisão independente do diff com 7 achados
+corrigidos ou anotados. Tudo visto só em headless sem GPU; **nada ouvido em browser**.
 
-**Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais; `graphics.quality` em Settings.
+**O que o jogo tem hoje (11 rodadas):** gameplay em Three.js com pipeline sRGB/ACES, espaço procedural, sombras reais,
+texturas assadas, nave em uma malha, rochas instanciadas, máquinas fundidas, batches de rim/emissivos, presets de
+qualidade automáticos, interpolação de render, warm-up de shaders, câmera 2.0, cinema de intro/epílogo; 10 tipos de
+inimigo + afixos de Elite, 3 Heralds, 3 Wardens, 15 camadas em 3 biomas com surtos, eventos e modificadores no
+infinito, Boss Rush; torreta + twin-stick (gamepad), dash, freio, 3 cascos, 34 cartas com raridade/reroll/banish,
+evoluções e Apex, pickups, Hangar, Códice com lore, 18 conquistas, dificuldade/seed/Daily; áudio procedural com
+limitador, reverb, distância, temas por bioma, percussão, vozes dos Wardens e Heralds, cues por máquina; HUD
+direcional, acessibilidade. `?stats=1` mostra fps/ms reais; `graphics.quality` em Settings.
 
-**Próxima rodada:** o que ele disser jogando. Sem veredito: `BACKLOG.md` (19 linhas) — nada grave; candidatos: cue do
-freio, 2D parity residual, chip de buff na medição dos painéis, linhas de transmissão de morte/vitória atrás das telas.
+**Próxima rodada:** o que ele disser jogando (Rodadas 5–11). Sem veredito: `BACKLOG.md` — candidatos: balance do Boss
+Rush (nível 1 + ~1 carta por Warden), replays gravarem o modo, friso âmbar do Bastion no preview, Caster com granadas
+que sobrevivem à morte dele, cue de áudio do Heat/Dust Herald, crossfade de tema.
 
-**Avisos de processo:** workers em paralelo só em arquivos disjuntos (senão separar hunks no commit); `pgrep -f`/
-`pkill -f` matam o próprio shell do worker; o container pode reiniciar (trabalho em disco sobrevive — relançar com
-"continue do que está na árvore"); desligar temporizadores antigos; pedir ao worker que encerre após ~60 min medindo;
-servidores Vite descartáveis por porta para capturas.
+**Avisos de processo:** workers em paralelo só em arquivos disjuntos; `pgrep -f`/`pkill -f` matam o próprio shell do
+worker; nunca `| tail`/`| grep` antes de `&&` em comandos de teste (mascarou uma falha nesta rodada — usar
+`set -o pipefail`); um worker apagou `scratchpad/*.js` de outros — scripts compartilhados em `.mjs`; o container pode
+reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir ao worker que encerre após ~60 min.
 
 ## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
 

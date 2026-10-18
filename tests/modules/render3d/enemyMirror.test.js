@@ -149,6 +149,8 @@ describe('EnemyMirror', () => {
       ram: 1,
       weaver: 2,
       bulwark: 3,
+      caster: 1,
+      shade: 1,
       boss: 2,
       'herald-dust': 3,
       'herald-heat': 2,
@@ -366,6 +368,49 @@ describe('EnemyMirror', () => {
     const { telegraph } = mirror.views.get('silence');
     expect(telegraph.group.visible).toBe(true);
     expect(telegraph.target.position.x).toBe(200);
+  });
+
+  it('marks the Caster’s landing on the field and leaves nothing after it; a phased Shade wears its dissolve twin and burns from its own material', () => {
+    const bursts = { spawn: () => {} };
+    const mirror = new EnemyMirror(
+      THREE,
+      new THREE.Scene(),
+      (fn) => fn(),
+      bursts
+    );
+    const machine = (type, extra) => ({
+      id: type,
+      type,
+      x: 400,
+      y: 300,
+      radius: 14,
+      getHitFlash: () => 0,
+      ...extra,
+    });
+    const shell = { fromX: 400, fromY: 300, x: 600, y: 300, age: 0 };
+    const caster = machine('caster', { shell, shellProgress: 0.5 });
+    const shade = machine('shade', { visibility: 0 });
+    mirror.update([caster, shade], 0);
+
+    const { telegraph } = mirror.views.get('caster');
+    expect(telegraph.group.visible).toBe(true);
+    expect(telegraph.blast.position.x).toBe(600);
+    expect(telegraph.shell.position.y).toBeGreaterThan(0); // mid-arc
+    mirror.update([{ ...caster, shell: null, shellProgress: null }, shade], 0);
+    expect(telegraph.group.visible).toBe(false); // the landing leaves nothing
+
+    const view = mirror.views.get('shade');
+    expect(view.body.material).toBe(
+      view.dissolve.twins.get(mirror.machineMaterial)
+    );
+    mirror.budgetShadows(0, 0);
+    expect(view.casters.some((mesh) => mesh.castShadow)).toBe(false);
+
+    mirror.markDead(shade);
+    mirror.update([caster], 0, 0); // the burn starts from the real material
+    expect(view.dissolve.sources).toEqual([mirror.machineMaterial]);
+    mirror.update([caster], 0, DISSOLVE_SECONDS);
+    expect(view.body.material).toBe(mirror.machineMaterial);
   });
 
   it('bakes the affix badge textures in warm-up, inside the seeded wrapper', () => {

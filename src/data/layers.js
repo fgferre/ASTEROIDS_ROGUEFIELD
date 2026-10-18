@@ -2,6 +2,7 @@
 
 import RandomService from '../core/RandomService.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
+import { bossKindForLayer } from './enemies/boss.js';
 import {
   ASTEROIDS_PER_WAVE_BASE,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
@@ -145,12 +146,13 @@ export const LAYERS = deepFreeze([
   },
   // 5: first Warden.
   { rocks: rockCurve(5), roster: [], surges: [], events: [], warden: true },
-  // 6–7: Motes and Husks; Tethers from 7.
+  // 6–7: Motes, Husks and the first Caster; Tethers and a battery from 7.
   {
     rocks: rockCurve(6),
     roster: [
       { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.05 },
       { kind: 'husk', count: 2, from: 15, every: 12, elite: 0.05 },
+      { kind: 'caster', count: 1, from: 20, every: 1, elite: 0.05 },
     ],
     surges: [{ at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' }],
     events: [],
@@ -162,12 +164,16 @@ export const LAYERS = deepFreeze([
       { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.05 },
       { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.05 },
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.05 },
+      { kind: 'caster', count: 1, from: 18, every: 1, elite: 0.05 },
     ],
-    surges: [{ at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' }],
+    surges: [
+      { at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' },
+      { at: 50, kinds: ['caster'], count: 2, label: 'Battery' },
+    ],
     events: [fieldEvent('solar-flare', 35)],
     warden: false,
   },
-  // 8–9: Rams join.
+  // 8–9: Rams and Shades join.
   {
     rocks: rockCurve(8),
     roster: [
@@ -175,6 +181,8 @@ export const LAYERS = deepFreeze([
       { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.08 },
       { kind: 'ram', count: 2, from: 12, every: 10, elite: 0.08 },
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.08 },
+      { kind: 'caster', count: 2, from: 15, every: 14, elite: 0.08 },
+      { kind: 'shade', count: 1, from: 20, every: 1, elite: 0.08 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 3, label: 'Ram pack' }],
     events: [],
@@ -188,6 +196,8 @@ export const LAYERS = deepFreeze([
       { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.08 },
       { kind: 'ram', count: 3, from: 12, every: 9, elite: 0.08 },
       { kind: 'mine', count: 3, from: 15, every: 10, elite: 0.08 },
+      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.08 },
+      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.08 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 4, label: 'Ram pack' }],
     events: [fieldEvent('sensor-jam', 20), fieldEvent('gravity-well', 45)],
@@ -211,8 +221,13 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.1 },
       { kind: 'hunter', count: 2, from: 10, every: 12, elite: 0.1 },
       { kind: 'bulwark', count: 1, from: 20, every: 1, elite: 0.1 },
+      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.1 },
+      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.1 },
     ],
-    surges: [{ at: 30, kinds: ['drone'], count: 8, label: 'Mote swarm' }],
+    surges: [
+      { at: 30, kinds: ['drone'], count: 8, label: 'Mote swarm' },
+      { at: 50, kinds: ['shade'], count: 3, label: 'Shade raid' },
+    ],
     events: [],
     warden: false,
   },
@@ -225,8 +240,13 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.15 },
       { kind: 'hunter', count: 3, from: 8, every: 10, elite: 0.15 },
       { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.15 },
+      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.15 },
+      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.15 },
     ],
-    surges: [{ at: 30, kinds: ['ram'], count: 5, label: 'Ram pack' }],
+    surges: [
+      { at: 30, kinds: ['ram'], count: 5, label: 'Ram pack' },
+      { at: 50, kinds: ['caster', 'shade'], count: 4, label: 'Crossfire' },
+    ],
     events: [fieldEvent('solar-flare', 30)],
     warden: false,
   },
@@ -241,11 +261,13 @@ export const LAYERS = deepFreeze([
       { kind: 'hunter', count: 3, from: 8, every: 10, elite: 0.2 },
       { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.2 },
       { kind: 'weaver', count: 2, from: 15, every: 12, elite: 0.2 },
+      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.2 },
+      { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.2 },
     ],
     surges: [
       {
         at: 30,
-        kinds: ['drone', 'ram', 'hunter', 'husk'],
+        kinds: ['drone', 'ram', 'hunter', 'husk', 'caster', 'shade'],
         count: 8,
         label: 'Full field',
       },
@@ -264,11 +286,13 @@ export const LAYERS = deepFreeze([
       { kind: 'hunter', count: 4, from: 8, every: 8, elite: 0.3 },
       { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.3 },
       { kind: 'weaver', count: 3, from: 15, every: 10, elite: 0.3 },
+      { kind: 'caster', count: 3, from: 15, every: 10, elite: 0.3 },
+      { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.3 },
     ],
     surges: [
       {
         at: 30,
-        kinds: ['drone', 'ram', 'hunter', 'husk'],
+        kinds: ['drone', 'ram', 'hunter', 'husk', 'caster', 'shade'],
         count: 10,
         label: 'Full field',
       },
@@ -340,4 +364,38 @@ function beyond(layer, runSeed) {
 export function directorFor(layer, runSeed = 0) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
   return n <= LAYERS.length ? LAYERS[n - 1] : beyond(n, runSeed);
+}
+
+// Boss Rush: the three Wardens back to back, each on its own layer (biome,
+// music, Warden kind and HP scaling follow the layer) with only its escort
+// and BOSS_RUSH_ROCKS rocks; GameSessionService.bossRush turns it on.
+export const BOSS_RUSH_LAYERS = deepFreeze([5, 10, 15]);
+const BOSS_RUSH_ROCKS = 3; // proposta 18/10
+// The calm after each Warden but the last (one card pick, the next title).
+export const BOSS_RUSH_BREATHER_SECONDS = 8; // proposta 18/10
+
+/** The Boss Rush stage (1-based) whose Warden holds `layer`, else 0. */
+export function bossRushStage(layer) {
+  return BOSS_RUSH_LAYERS.indexOf(layer) + 1;
+}
+
+/** The Warden layer Boss Rush plays after `layer` (0: the first). */
+export function nextBossRushLayer(layer) {
+  return BOSS_RUSH_LAYERS.find((n) => n > layer);
+}
+
+/** A layer's entry on Boss Rush: no surges or events, BOSS_RUSH_ROCKS rocks. */
+export function bossRushDirectorFor(layer) {
+  return deepFreeze({
+    ...directorFor(layer),
+    rocks: BOSS_RUSH_ROCKS,
+    surges: [],
+    events: [],
+  });
+}
+
+/** 'WARDEN 2 OF 3 — CHOIR' for stage 2. */
+export function bossRushStageTitle(stage) {
+  const kind = bossKindForLayer(BOSS_RUSH_LAYERS[stage - 1]);
+  return `WARDEN ${stage} OF ${BOSS_RUSH_LAYERS.length} — ${kind.toUpperCase()}`;
 }

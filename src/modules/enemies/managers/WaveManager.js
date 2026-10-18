@@ -37,9 +37,12 @@ import {
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
 import {
+  BOSS_RUSH_BREATHER_SECONDS,
   FIELD_EVENTS,
   LAYER_MODIFIERS,
+  bossRushDirectorFor,
   directorFor,
+  nextBossRushLayer,
 } from '../../../data/layers.js';
 import { scaleDirector } from '../../../data/difficulty.js';
 import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
@@ -55,6 +58,8 @@ const SUPPORT_KINDS = [
   'ram',
   'bulwark',
   'weaver',
+  'caster',
+  'shade',
 ];
 // Surge bursts: units spread this far (px) along the edge either side of the
 // burst point; support enemies appear this far inside the field.
@@ -129,6 +134,9 @@ export class WaveManager {
 
     // Wave state
     this.currentWave = 0;
+    // Boss Rush run (set by GameSessionService before the run resets): only
+    // the Warden layers, a breather between them.
+    this.bossRush = false;
     this.waveInProgress = false;
     this.wavePaused = false;
     this.waveStartTime = 0;
@@ -773,7 +781,9 @@ export class WaveManager {
       return false;
     }
 
-    this.currentWave++;
+    this.currentWave = this.bossRush
+      ? nextBossRushLayer(this.currentWave)
+      : this.currentWave + 1;
     this.waveInProgress = true;
     this.waveStartTime = this.getSimulationTimeMs();
     this.enemiesSpawnedThisWave = 0;
@@ -795,7 +805,9 @@ export class WaveManager {
     );
     const director = this.applyHuntersMoon(
       scaleDirector(
-        directorFor(waveNumber, difficulty?.getRunSeed() ?? 0),
+        this.bossRush
+          ? bossRushDirectorFor(waveNumber)
+          : directorFor(waveNumber, difficulty?.getRunSeed() ?? 0),
         difficulty?.getModifiers().spawnCount ?? 1
       )
     );
@@ -875,6 +887,7 @@ export class WaveManager {
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
       compatibilityMode: true,
       managerTotals: { ...rawManagerTotals },
+      bossRush: this.bossRush,
     };
 
     this.eventBus.emit('wave-started', waveEventPayload);
@@ -1378,8 +1391,9 @@ export class WaveManager {
         .getCachedXPOrbs?.()
         ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
     } else if (kind === 'solar-flare') {
+      // A phased Shade (`intangible`) is out of reach of the flare.
       this.enemySystem.forEachActiveEnemy?.((enemy) => {
-        enemy.stunTimer = duration;
+        if (!enemy.intangible) enemy.stunTimer = duration;
       });
       this.enemySystem
         .getCachedEffects?.()
@@ -2497,6 +2511,16 @@ export class WaveManager {
 
     // Start countdown for next wave
     this.waveCountdown = this.waveDelay;
+    const nextWarden = this.bossRush && nextBossRushLayer(this.currentWave);
+    if (nextWarden) {
+      // Boss Rush: the breather, then the next Warden, announced like the
+      // layer before a Warden is.
+      this.waveCountdown = BOSS_RUSH_BREATHER_SECONDS;
+      this.eventBus.emit('boss-warning', {
+        wave: this.currentWave,
+        nextBossWave: nextWarden,
+      });
+    }
 
     debugLog(
       `[WaveManager] Wave ${this.currentWave} complete in ${duration.toFixed(1)}s`

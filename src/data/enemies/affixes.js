@@ -16,7 +16,7 @@ export const ELITE_AFFIXES = deepFreeze({
     color: PALETTE.text,
     shieldHealth: 60, // proposta 18/10: frontal plate, like the Bulwark's
     halfArc: BULWARK_SHIELD_HALF_ARC,
-    kinds: ['drone', 'hunter', 'mine', 'husk', 'ram', 'weaver'],
+    kinds: ['drone', 'hunter', 'mine', 'husk', 'ram', 'weaver', 'caster'],
   },
   swift: {
     id: 'swift',
@@ -24,7 +24,16 @@ export const ELITE_AFFIXES = deepFreeze({
     glyph: 'chevrons',
     color: PALETTE.status,
     speed: 1.45, // proposta 18/10: × top speed and acceleration
-    kinds: ['drone', 'hunter', 'husk', 'ram', 'weaver', 'bulwark'],
+    kinds: [
+      'drone',
+      'hunter',
+      'husk',
+      'ram',
+      'weaver',
+      'bulwark',
+      'caster',
+      'shade',
+    ],
   },
   volatile: {
     id: 'volatile',
@@ -34,7 +43,7 @@ export const ELITE_AFFIXES = deepFreeze({
     fuse: 0.6, // proposta 18/10: seconds from the lethal hit to the blast
     radius: 90, // proposta 18/10
     damage: 25, // proposta 18/10
-    kinds: ['drone', 'hunter', 'husk', 'ram', 'weaver', 'bulwark'],
+    kinds: ['drone', 'hunter', 'husk', 'ram', 'weaver', 'bulwark', 'shade'],
   },
   splitter: {
     id: 'splitter',
@@ -51,7 +60,16 @@ export const ELITE_AFFIXES = deepFreeze({
     glyph: 'ward',
     color: PALETTE.boss,
     immuneSeconds: 1.5, // proposta 18/10: no damage after each hit
-    kinds: ['drone', 'hunter', 'mine', 'husk', 'ram', 'weaver', 'bulwark'],
+    kinds: [
+      'drone',
+      'hunter',
+      'mine',
+      'husk',
+      'ram',
+      'weaver',
+      'bulwark',
+      'caster',
+    ],
   },
 });
 

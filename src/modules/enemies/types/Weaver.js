@@ -75,6 +75,11 @@ export class Weaver extends BaseEnemy {
     if (!mine) return;
     this.tethers.push({ mine, id: mine.id });
     this.layGlow = 1;
+    this.getEventBus()?.emit?.('weaver-tether-laid', {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
+    });
   }
 
   onDestroyed(source, context = {}) {

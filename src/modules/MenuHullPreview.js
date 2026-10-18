@@ -3,7 +3,8 @@
 // The chosen hull on the main menu: the panels of shipModels.js extruded as
 // matte plates (dark base from the outline, fins, raised body and prow),
 // glowing nozzles with a thruster plume in the hull accent (cyan
-// Interceptor, amber Solar Slicer). The menu's key light circles the hull as
+// Interceptor, amber Solar Slicer and Bastion; the Bastion's shoulder armour
+// stacked in two plates on darker steel). The menu's key light circles the hull as
 // the camera orbits, so a fixed screen-space studio light (hull shader only)
 // keeps it readable when the key light is behind it. It hangs off the menu
 // camera, framed into the #menu-hull-stage box, and turns slowly on its
@@ -18,6 +19,10 @@ const BASE_DEPTH = 1.6;
 const FIN_DEPTH = 2.4;
 const BODY_DEPTH = 3.6;
 const BEVEL = 0.4;
+// Armour (proposta 18/10): a plate above the body, a smaller one on top.
+const ARMOR_DEPTH = 4.2;
+const ARMOR_TOP_DEPTH = 1.0;
+const ARMOR_TOP_INSET = 0.55;
 // Camera-space placement: distance in front of the camera (close, so few
 // passing rocks come between), and the plate tilted back so it is seen from
 // above and in front.
@@ -87,10 +92,16 @@ export class MenuHullPreview {
       material.onBeforeCompile = patchHull;
       return material;
     };
+    // Base colours, scaled per hull by its visual's `albedo`.
+    this.tones = {
+      base: tone(PALETTE.hull, PALETTE.hullLit, 0.2),
+      fin: tone(PALETTE.hullLit, PALETTE.neutral, 0.15),
+      body: tone(PALETTE.hullLit, PALETTE.neutral, 0.6),
+    };
     this.materials = {
-      base: matte(tone(PALETTE.hull, PALETTE.hullLit, 0.2), 0.85),
-      fin: matte(tone(PALETTE.hullLit, PALETTE.neutral, 0.15), 0.8),
-      body: matte(tone(PALETTE.hullLit, PALETTE.neutral, 0.6), 0.72),
+      base: matte(this.tones.base.clone(), 0.85),
+      fin: matte(this.tones.fin.clone(), 0.8),
+      body: matte(this.tones.body.clone(), 0.72),
       // A locked hull: one flat dark tone, no glow or plume.
       silhouette: new THREE.MeshBasicMaterial({ color: SILHOUETTE_COLOR }),
     };
@@ -142,11 +153,36 @@ export class MenuHullPreview {
       hull.add(mesh);
     };
 
+    Object.entries(this.tones).forEach(([key, color]) =>
+      this.materials[key].color.copy(color).multiplyScalar(visual.albedo ?? 1)
+    );
     const dark = this.silhouette && this.materials.silhouette;
     plate(definition.outline, BASE_DEPTH, dark || this.materials.base);
     visual.panels
       .filter((panel) => !panel.minLevel)
       .forEach((panel) => {
+        if (panel.armor) {
+          plate(
+            panel.points,
+            ARMOR_DEPTH,
+            dark || this.materials.fin,
+            BASE_DEPTH * 0.5
+          );
+          const cx =
+            panel.points.reduce((n, p) => n + p.x, 0) / panel.points.length;
+          const cy =
+            panel.points.reduce((n, p) => n + p.y, 0) / panel.points.length;
+          plate(
+            panel.points.map((p) => ({
+              x: cx + (p.x - cx) * ARMOR_TOP_INSET,
+              y: cy + (p.y - cy) * ARMOR_TOP_INSET,
+            })),
+            ARMOR_TOP_DEPTH,
+            dark || this.materials.body,
+            BASE_DEPTH * 0.5 + ARMOR_DEPTH + BEVEL * 2
+          );
+          return;
+        }
         const fin = panel.rcsPort !== undefined;
         plate(
           panel.points,

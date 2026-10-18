@@ -317,6 +317,35 @@ Conteúdo:
 - [x] **R10.3 Polimento visual.** Céu-base do Dense Core sem marrom; token próprio para o banner de modificador (não o
       ciano); enquadramento do casco no Hangar (sem transbordar); sombras reais um pouco mais presentes (fill −15 %).
 
+## Rodada 11 (18/10, tarde) — mais máquinas, terceiro casco, Boss Rush; peso no dash/freio, últimas falas, som por máquina
+
+Conteúdo:
+
+- [x] **R11.1 Duas máquinas novas.** _Caster_ (mantém distância e lança projéteis em arco sobre zonas marcadas no
+      campo — anel de impacto encolhe, explosão em área) e _Shade_ (some com dissolve, reaparece no flanco do jogador,
+      dispara um leque de 3 e some de novo). Entram no roster/surtos das camadas 6+, no Códice, nos afixos de Elite,
+      no 2D e no 3D (`enemyMirror`). Corrigir a linha do Mote no Códice (tiro único, não rajada).
+- [x] **R11.2 Boss Rush.** Botão no menu: os três Wardens em sequência, com respiro e carta entre eles, sem camadas;
+      recorde próprio; Salvage próprio.
+- [x] **R11.3 Terceiro casco: _Bastion_.** Casco pesado (vida +, aceleração/velocidade −, dash −), placas blindadas e
+      torreta alta, visual distinto no 3D, no 2D e no preview do Hangar; item do Hangar que o desbloqueia.
+
+Qualidade:
+
+- [x] **R11.4 Dash e freio com peso.** Cue de som para `player-dashed` e `player-braked`, pulso de câmera (zoom-out no
+      dash, pulso curto no freio), anel do freio visível no 3D. Constantes "proposta 18/10".
+- [x] **R11.5 Últimas falas ouvidas.** A tela de morte/vitória espera a transmissão terminar (com teto) e o recap mostra
+      a fala como citação; hoje ~2 s de cada fala ficam atrás da tela.
+- [x] **R11.6 Som por máquina.** Husk, Ram, Weaver, Bulwark, Caster e Shade com cue próprio de telegrafia/ataque/morte
+      (hoje Ram usa o telegrafo do Warden e os outros não têm som próprio).
+- [x] **R11.7 Caster e Shade com peso certo.** A granada do Caster deixa de disparar o tremor/flash de rocha Volátil
+      (evento próprio, mais leve, sem duck) e não deixa "chamusco" no espaço (não há chão); cues próprios de
+      telegrafia/lançamento/impacto do Caster e de fase do Shade.
+- [x] **R11.8 Conquistas do conteúdo novo.** Counter-Battery (20 Casters), Unphased (15 Shades), Iron Escort (vitória
+      com o Bastion), Full Garage (os três cascos).
+- [x] **R11.9 Números de dano no 3D.** Provar por captura que aparecem e na fonte do jogo (Rajdhani); corrigir a menor
+      causa se assarem na fonte reserva.
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de

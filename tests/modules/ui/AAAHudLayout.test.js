@@ -9,6 +9,7 @@ import {
   spreadEdgeArrows,
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
+import { bossRushStageTitle } from '../../../src/data/layers.js';
 
 describe('AAAHudLayout combo tier', () => {
   it('steps the combo color with the multiplier the progression system produces', () => {
@@ -151,7 +152,7 @@ describe('AAAHudLayout weapon and buff chips', () => {
   });
 });
 
-describe('AAAHudLayout radar jam', () => {
+describe('AAAHudLayout radar', () => {
   let hud;
   beforeEach(() => {
     vi.stubGlobal('document', { createElement: fakeElement });
@@ -175,6 +176,14 @@ describe('AAAHudLayout radar jam', () => {
     hud.updateRadar(enemy);
     expect(hud.els.radar.classList.contains('is-jammed')).toBe(false);
     expect(shown().map((el) => el.dataset.type)).toEqual(['machine']);
+  });
+
+  it('dims the blip of a phased Shade and restores it once solid', () => {
+    hud.updateRadar([{ ...enemy[0], phased: true }]);
+    expect(shown()[0].style.opacity).toBe('0.35');
+
+    hud.updateRadar(enemy);
+    expect(shown()[0].style.opacity).toBe('');
   });
 });
 
@@ -212,6 +221,25 @@ describe('AAAHudLayout layer modifier', () => {
     expect(hud.els.layerBannerSub.textContent).toBe('Glass Field');
     expect(banner.classList.contains('is-modifier')).toBe(true);
     expect(banner.style['--modifier-color']).toBe('#5eead4');
+  });
+
+  it('titles a Boss Rush Warden banner BOSS RUSH over its stage', () => {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      layerBanner: fakeElement(),
+      layerBannerTitle: fakeElement(),
+      layerBannerSub: fakeElement(),
+    };
+    hud.showLayerBanner(5, {
+      boss: true,
+      bossRush: true,
+      chapter: bossRushStageTitle(1),
+    });
+    vi.advanceTimersByTime(0);
+
+    expect(hud.els.layerBannerTitle.textContent).toBe('BOSS RUSH');
+    expect(hud.els.layerBannerSub.textContent).toBe('WARDEN 1 OF 3 — PRIME');
+    expect(hud.els.layerBanner.classList.contains('is-boss')).toBe(true);
   });
 
   it('scales the radar range for Dense Fog and back', () => {

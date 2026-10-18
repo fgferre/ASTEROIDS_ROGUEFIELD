@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import AchievementService, {
   ACHIEVEMENTS_STORAGE_KEY,
@@ -44,6 +45,8 @@ describe('AchievementService', () => {
     ['harmonic', 50, ['weapon-beam-fired', {}]],
     ['elite-hunter', 25, ['enemy-destroyed', { enemy: { elite: true } }]],
     ['scrapper', 10, ['pickup-collected', { kind: 'repair' }]],
+    ['counter-battery', 20, ['enemy-destroyed', { enemy: { type: 'caster' } }]],
+    ['unphased', 15, ['enemy-destroyed', { enemy: { type: 'shade' } }]],
     ['survivor', 10, ['game-started', {}]],
   ])('unlocks %s at %i', (id, target, [event, payload]) => {
     const { eventBus, service, unlocked } = setup();
@@ -61,6 +64,30 @@ describe('AchievementService', () => {
     eventBus.emit('enemy-destroyed', { enemy: { type: 'drone' } });
     const entry = service.getEntries().find((e) => e.id === 'elite-hunter');
     expect(entry.progress).toBe(0);
+  });
+
+  it('iron-escort needs a victory flown in the Bastion hull', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('run-won', { wave: 15, hullId: 'solar-slicer' });
+    expect(unlocked).not.toContain('iron-escort');
+
+    eventBus.emit('run-won', { wave: 15, hullId: BASTION_HULL_ID });
+    expect(unlocked).toContain('iron-escort');
+  });
+
+  it('full-garage needs both hull items owned in the Hangar', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('hangar-purchased', {
+      id: 'solar-slicer-hull',
+      owned: { 'solar-slicer-hull': true, 'dash-coils': true },
+    });
+    expect(unlocked).not.toContain('full-garage');
+
+    eventBus.emit('hangar-purchased', {
+      id: 'bastion-hull',
+      owned: { 'solar-slicer-hull': true, 'bastion-hull': true },
+    });
+    expect(unlocked).toContain('full-garage');
   });
 
   it('untouchable needs a Warden layer with no hull damage since it started', () => {

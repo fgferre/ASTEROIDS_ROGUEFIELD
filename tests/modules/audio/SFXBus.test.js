@@ -7,6 +7,7 @@ import SFXBus, {
 } from '../../../src/modules/audio/SFXBus.js';
 import {
   AUDIO_DISTANCE_MIX,
+  EXPLOSION_PROFILES,
   TRANSMISSION_VOICE,
 } from '../../../src/core/GameConstants.js';
 import { STORY } from '../../../src/data/story.js';
@@ -209,6 +210,282 @@ describe('SFXBus per-sound routing (player → protected; world → ambient)', (
   });
 });
 
+describe('SFXBus dash and brake (player moves → protected bus)', () => {
+  function recordManeuver(context) {
+    const oscillators = [];
+    const frequencyLog = [];
+    context.createOscillator = vi.fn(() => {
+      const osc = createOscillatorStub({ frequencyLog });
+      osc.start = vi.fn();
+      oscillators.push(osc);
+      return osc;
+    });
+    const sources = context.createBufferSource.mock.calls.length;
+    return {
+      oscillators,
+      frequencyLog,
+      newSources: () => context.createBufferSource.mock.calls.length - sources,
+      band: () => context.createBiquadFilter.mock.results.at(-1).value,
+      panner: () => context.createStereoPanner.mock.results.at(-1).value,
+    };
+  }
+
+  it('the dash whooshes up and toward its direction over a sub thump, one at a time', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordManeuver(context);
+
+    bus.playDash({ pan: 0, directionX: 1 });
+    bus.playDash({ pan: 0, directionX: 1 }); // same instant: throttled
+
+    expect(record.newSources()).toBe(1);
+    const band = record.band();
+    expect(band.type).toBe('bandpass');
+    const [[from]] = band.frequency.setValueAtTime.mock.calls;
+    const [[to]] = band.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeGreaterThan(from);
+    const panner = record.panner();
+    expect(panner.connect).toHaveBeenCalledWith(bus.protectedBus);
+    expect(panner.pan.linearRampToValueAtTime.mock.calls[0][0]).toBeGreaterThan(
+      0
+    );
+    expect(record.frequencyLog).toHaveLength(1);
+    expect(record.frequencyLog[0]).toBeLessThan(150);
+  });
+
+  it('the brake bursts down and thuds low once the ship is at rest', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordManeuver(context);
+
+    bus.playBrake({ pan: 0 });
+
+    expect(record.newSources()).toBe(1);
+    const band = record.band();
+    const [[from]] = band.frequency.setValueAtTime.mock.calls;
+    const [[to]] = band.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeLessThan(from);
+    expect(record.panner().connect).toHaveBeenCalledWith(bus.protectedBus);
+    expect(record.frequencyLog[0]).toBeLessThan(100);
+    const [[thudAt]] = record.oscillators[0].start.mock.calls;
+    expect(thudAt).toBeGreaterThan(context.currentTime);
+  });
+});
+
+describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
+  function recordCue(context) {
+    const oscillators = [];
+    context.createOscillator = vi.fn(() => {
+      const frequencyLog = [];
+      const osc = createOscillatorStub({ frequencyLog });
+      osc.frequencyLog = frequencyLog;
+      osc.frequency.exponentialRampToValueAtTime = vi.fn();
+      osc.start = vi.fn();
+      osc.stop = vi.fn();
+      oscillators.push(osc);
+      return osc;
+    });
+    const sources = context.createBufferSource.mock.calls.length;
+    return {
+      oscillators,
+      newSources: () => context.createBufferSource.mock.calls.length - sources,
+      band: () => context.createBiquadFilter.mock.results.at(-1).value,
+      startsAt: () => oscillators.map((osc) => osc.start.mock.calls[0][0]),
+    };
+  }
+  const sweep = (param) => [
+    param.setValueAtTime.mock.calls[0][0],
+    param.exponentialRampToValueAtTime.mock.calls[0][0],
+  ];
+
+  it('every machine cue pans into the ambient bus, one voice per instant', () => {
+    for (const cue of [
+      'playRamSpinUp',
+      'playRamCharge',
+      'playHuskRelease',
+      'playWeaverTether',
+      'playBulwarkPlateHit',
+      'playBulwarkPlateBreak',
+      'playCasterCharge',
+      'playCasterLaunch',
+      'playCasterImpact',
+      'playShadePhase',
+    ]) {
+      const { bus, context } = makeInitializedBus();
+      const panners = context.createStereoPanner.mock.results.length;
+      bus[cue]({ pan: -0.4 });
+      const panner = context.createStereoPanner.mock.results.at(-1).value;
+      expect(context.createStereoPanner.mock.results.length, cue).toBe(
+        panners + 1
+      );
+      expect(panner.pan.value, cue).toBe(-0.4);
+      expect(panner.connect, cue).toHaveBeenCalledWith(bus.ambientBus);
+
+      const gains = context.createGain.mock.calls.length;
+      bus[cue]({ pan: -0.4 }); // same instant: throttled
+      expect(context.createGain.mock.calls.length, cue).toBe(gains);
+    }
+  });
+
+  it('the Ram spins up an FM’d saw over a ratchet, then charges with a low whoosh', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playRamSpinUp();
+    const [carrier] = record.oscillators;
+    expect(carrier.type).toBe('sawtooth');
+    const [from] = carrier.frequencyLog;
+    const [[to]] = carrier.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeGreaterThan(from);
+    const fm = context.createGain.mock.results.find(({ value }) =>
+      value.connect.mock.calls.some(([target]) => target === carrier.frequency)
+    );
+    expect(fm).toBeDefined();
+    expect(record.newSources()).toBe(1); // the ratchet clicks
+
+    bus.playRamCharge();
+    const [whooshFrom, whooshTo] = sweep(record.band().frequency);
+    expect(whooshTo).toBeLessThan(whooshFrom);
+    expect(whooshFrom).toBeLessThan(1000);
+    expect(record.oscillators.at(-1).frequencyLog[0]).toBeLessThan(100);
+  });
+
+  it('a dying Husk hisses, then pops three times in a row within 0.4 s', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playHuskRelease();
+
+    expect(record.newSources()).toBe(1);
+    expect(sweep(record.band().frequency)[0]).toBeGreaterThan(2000);
+    const starts = record.startsAt();
+    expect(starts).toHaveLength(3);
+    expect(starts[0]).toBeGreaterThan(context.currentTime);
+    expect(starts[1]).toBeGreaterThan(starts[0]);
+    expect(starts[2]).toBeGreaterThan(starts[1]);
+    for (const osc of record.oscillators) {
+      expect(osc.stop.mock.calls[0][0]).toBeLessThanOrEqual(
+        context.currentTime + 0.4
+      );
+    }
+  });
+
+  it('a Weaver’s Tether is two metallic pings, the second later and lower', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playWeaverTether();
+
+    expect(record.newSources()).toBe(0);
+    const pings = new Map();
+    record.oscillators.forEach((osc, i) => {
+      const at = record.startsAt()[i];
+      pings.set(at, [...(pings.get(at) ?? []), osc.frequencyLog[0]]);
+    });
+    const [first, second] = [...pings.entries()].sort(([a], [b]) => a - b);
+    expect(pings.size).toBe(2);
+    expect(first[1].length).toBeGreaterThan(1); // inharmonic partials
+    expect(Math.min(...second[1])).toBeLessThan(Math.min(...first[1]));
+  });
+
+  it('the Bulwark plate clangs dull and short, and breaks with a crack and a rattle', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playBulwarkPlateHit();
+    const clang = record.oscillators.splice(0);
+    const body = Math.min(...clang.map((osc) => osc.frequencyLog[0]));
+    expect(body).toBeGreaterThanOrEqual(200);
+    expect(body).toBeLessThanOrEqual(400);
+    expect(clang.every((osc) => osc.type !== 'square')).toBe(true); // ≠ hull hit
+    for (const osc of clang) {
+      expect(osc.stop.mock.calls[0][0]).toBeLessThan(
+        context.currentTime + 0.25
+      );
+    }
+
+    bus.playBulwarkPlateBreak();
+    expect(record.newSources()).toBe(3); // knock, then crack + rattle
+    const crack = context.createBiquadFilter.mock.results.at(-2).value;
+    const [crackFrom, crackTo] = sweep(crack.frequency);
+    expect(crackTo).toBeLessThan(crackFrom);
+    expect(
+      Math.min(...record.oscillators.map((osc) => osc.frequencyLog[0]))
+    ).toBeLessThan(body);
+  });
+
+  // The loudest level any gain created from index `from` on ramps to.
+  const loudestSince = (context, from) =>
+    Math.max(
+      ...context.createGain.mock.results
+        .slice(from)
+        .flatMap(({ value }) =>
+          value.gain.exponentialRampToValueAtTime.mock.calls.map(([v]) => v)
+        )
+    );
+
+  it('the Caster charges with a quiet hollow rise, then lobs a thoomp whose whistle pans to the landing', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    const gains = context.createGain.mock.results.length;
+    bus.playCasterCharge();
+    const [charge] = record.oscillators;
+    expect(charge.type).toBe('square'); // odd harmonics only: hollow
+    const [[to]] = charge.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeGreaterThan(charge.frequencyLog[0]);
+    expect(charge.stop.mock.calls[0][0]).toBeLessThanOrEqual(
+      context.currentTime + 0.5
+    );
+    expect(loudestSince(context, gains)).toBeLessThan(0.1);
+
+    bus.playCasterLaunch({ pan: -0.3, toPan: 0.4 });
+    const panner = context.createStereoPanner.mock.results.at(-1).value;
+    expect(panner.pan.value).toBe(-0.3);
+    expect(panner.pan.linearRampToValueAtTime.mock.calls[0][0]).toBe(0.4);
+    expect(record.oscillators.at(-1).frequencyLog[0]).toBeLessThan(200);
+    const [whistleFrom, whistleTo] = sweep(record.band().frequency);
+    expect(whistleFrom).toBeGreaterThan(1500);
+    expect(whistleTo).toBeLessThan(whistleFrom);
+  });
+
+  it('a Caster shell lands with a low thud and a bright crack, under a medium explosion', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    const gains = context.createGain.mock.results.length;
+    bus.playCasterImpact();
+    expect(record.oscillators).toHaveLength(1);
+    expect(record.oscillators[0].frequencyLog[0]).toBeLessThan(150);
+    expect(record.oscillators[0].stop.mock.calls[0][0]).toBeLessThan(
+      context.currentTime + 0.35
+    );
+    expect(record.newSources()).toBe(2); // rumble + crack
+    expect(sweep(record.band().frequency)[0]).toBeGreaterThan(3000);
+    expect(loudestSince(context, gains)).toBeLessThan(
+      EXPLOSION_PROFILES.medium.sub.gain
+    );
+  });
+
+  it('a Shade shimmers high under a flutter, sweeping down as it phases out and up as it comes back', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+
+    bus.playShadePhase({ out: true });
+    const [outFrom, outTo] = sweep(record.band().frequency);
+    const [flutter] = record.oscillators;
+    expect(flutter.frequencyLog[0]).toBeLessThan(40);
+    expect(flutter.stop.mock.calls[0][0]).toBeLessThanOrEqual(
+      context.currentTime + 0.35
+    );
+
+    context.currentTime += 1; // past the cue's throttle
+    bus.playShadePhase({ out: false });
+    const [inFrom, inTo] = sweep(record.band().frequency);
+    expect(outTo).toBeLessThan(outFrom);
+    expect(inTo).toBeGreaterThan(inFrom);
+    expect(Math.min(outTo, inFrom)).toBeGreaterThan(2000);
+  });
+});
+
 describe('SFXBus music stingers', () => {
   function recordOscillators(context) {
     const frequencyLog = [];
@@ -351,6 +628,16 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playDroneFire',
   'playEliteSpawned',
   'playEnemyTelegraph',
+  'playRamSpinUp',
+  'playRamCharge',
+  'playHuskRelease',
+  'playWeaverTether',
+  'playBulwarkPlateHit',
+  'playBulwarkPlateBreak',
+  'playCasterCharge',
+  'playCasterLaunch',
+  'playCasterImpact',
+  'playShadePhase',
   'playExplosion',
   'playFileTrack',
   'playGoldJackpot',
@@ -378,6 +665,8 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playShieldRecharged',
   'playShieldShockwave',
   'playShipHit',
+  'playDash',
+  'playBrake',
   'playSurgeSting',
   'playDeepFieldEntry',
   'playSalvageAwarded',

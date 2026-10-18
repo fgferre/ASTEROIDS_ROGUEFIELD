@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defaultHull, solarSlicer } from '../../../src/data/shipModels.js';
+import {
+  bastion,
+  defaultHull,
+  solarSlicer,
+} from '../../../src/data/shipModels.js';
 import PlayerSystem from '../../../src/modules/PlayerSystem.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
@@ -72,8 +76,41 @@ describe('PlayerMirror', () => {
     expect(slicer.barrels.position.y).toBeLessThan(0);
   });
 
+  it('builds the Bastion with amber-trimmed armour on darker steel', () => {
+    const named = (mirror, name) =>
+      mirror.ship.children.filter((child) => child.name === name);
+    const bastionMirror = mirrorFor(bastion).mirror;
+    const trims = named(bastionMirror, 'bladeEdge');
+    expect(trims).toHaveLength(1);
+    const { r, b } = trims[0].material.color;
+    expect(r).toBeGreaterThan(b);
+    // the trim sits on top of the armour, above every fin plate
+    const position = trims[0].geometry.getAttribute('position');
+    const sides = new Set();
+    for (let i = 0; i < position.count; i += 1) {
+      sides.add(Math.sign(position.getZ(i)));
+      expect(position.getY(i)).toBeGreaterThan(4.5);
+    }
+    expect(sides).toEqual(new Set([-1, 1]));
+    expect(bastionMirror.turretHousing.visible).toBe(true);
+
+    const darkest = (mirror) => {
+      const color = mirror.ship
+        .getObjectByName('hull')
+        .geometry.getAttribute('color');
+      let max = 0;
+      for (let i = 0; i < color.count; i += 1) {
+        max = Math.max(max, color.getX(i));
+      }
+      return max;
+    };
+    expect(darkest(bastionMirror)).toBeLessThan(
+      darkest(mirrorFor(defaultHull).mirror)
+    );
+  });
+
   it("draws each hull's static plates as one vertex-coloured mesh", () => {
-    [defaultHull, solarSlicer].forEach((hull) => {
+    [defaultHull, solarSlicer, bastion].forEach((hull) => {
       const { mirror } = mirrorFor(hull);
       const solids = mirror.ship.children.filter(
         (child) => child.material === mirror.hullMaterial

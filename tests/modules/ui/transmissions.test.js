@@ -7,6 +7,7 @@ import {
   TransmissionQueue,
   deathTransmission,
   heraldTransmission,
+  victoryTransmission,
   wardenTransmission,
 } from '../../../src/modules/ui/transmissions.js';
 
@@ -74,6 +75,27 @@ describe('TransmissionQueue', () => {
     queue.update(2000);
     expect(hud.showing).toBe(STORY.speaker[10]);
     expect(shown).toEqual(['warden:10:warning', 'warden:10:warning']);
+  });
+
+  it('reports a line finished after its hold, or when it is dropped', () => {
+    const hud = fakeHud();
+    const finished = [];
+    const queue = new TransmissionQueue(
+      hud,
+      () => {},
+      (entry) => finished.push(entry.key)
+    );
+    queue.push(wardenTransmission(5, 'warning'));
+    queue.update(0, true);
+    queue.update(TRANSMISSION_HOLD_MS - 1, true);
+    expect(finished).toEqual([]);
+    queue.update(TRANSMISSION_HOLD_MS, true);
+    expect(finished).toEqual(['warden:5:warning']);
+
+    queue.push(wardenTransmission(5, 'defeated'));
+    queue.update(TRANSMISSION_HOLD_MS + 16, true);
+    queue.interrupt(victoryTransmission());
+    expect(finished).toEqual(['warden:5:warning', 'warden:5:defeated']);
   });
 
   it('shows the whole line at once with reduced motion', () => {

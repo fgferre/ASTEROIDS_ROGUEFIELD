@@ -16,6 +16,7 @@ import {
   XP_ORB_SIZE,
 } from '../../core/GameConstants.js';
 import {
+  CAMERA_ZOOM,
   createCamera,
   createCameraScene,
   dampTo,
@@ -103,6 +104,13 @@ const KICK_WAVE_RADIUS = 90;
 const KICK_WAVE_FULL = 200;
 const KICK_WAVE_MIN = 0.25;
 const KICK_WAVE_MAX = 0.8;
+// proposta 18/10: the dash opens the shot for a beat (zoom × DASH_ZOOM_PULSE)
+// and the emergency brake leans in (× BRAKE_ZOOM_PULSE), each over its
+// seconds; none with reduced motion, like the slow-motion pulses.
+const DASH_ZOOM_PULSE = 0.94;
+const DASH_ZOOM_PULSE_SECONDS = 0.3;
+const BRAKE_ZOOM_PULSE = 1.04;
+const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
 // proposta 18/10: the key light's shadow box follows the camera target: the
 // light sits KEY_SHADOW.distance away along its direction, the box spans the
 // shot (`span` × the camera range, clamped) and the biases keep rocks from
@@ -350,6 +358,21 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('player-dashed', () => {
       this.impact.kick(KICK_DASH);
+      if (!this.reducedMotion) {
+        this.camera.pulseZoom(
+          CAMERA_ZOOM * DASH_ZOOM_PULSE,
+          DASH_ZOOM_PULSE_SECONDS
+        );
+      }
+    });
+    // Its ring is an EffectsSystem shockwave: mirrorEffects draws it.
+    this.registerEventListener('player-braked', () => {
+      if (!this.reducedMotion) {
+        this.camera.pulseZoom(
+          CAMERA_ZOOM * BRAKE_ZOOM_PULSE,
+          BRAKE_ZOOM_PULSE_SECONDS
+        );
+      }
     });
     this.registerEventListener('weapon-beam-fired', () => {
       this.impact.kick(WEAPONS.harmonic.beam.kick);

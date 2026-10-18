@@ -228,6 +228,7 @@ const buildHullGeometry = (visual, levels) => {
         path: buildClosedPath(points),
         facing: { x: panel.facing.x / length, y: panel.facing.y / length },
         rcsPort: Number.isInteger(panel.rcsPort) ? points[panel.rcsPort] : null,
+        armor: Boolean(panel.armor),
       };
     });
   const thrusterLevel = levelOf('thruster');
@@ -253,6 +254,7 @@ const buildHullGeometry = (visual, levels) => {
   return {
     accent: PALETTE[visual.accent] || PALETTE.player,
     blades: Boolean(visual.blades),
+    albedo: visual.albedo ?? 1,
     panels,
     nozzles,
     nozzleLength,
@@ -331,14 +333,12 @@ const bakeHullSprites = (geometry, scale) => {
   d.moveTo(cockpit.from.x, cockpit.from.y);
   d.lineTo(cockpit.to.x, cockpit.to.y);
   d.stroke();
-  // blades (Solar Slicer): edged in the hull accent
-  if (geometry.blades) {
-    d.strokeStyle = withAlpha(geometry.accent, 0.8);
-    d.lineWidth = 0.5;
-    geometry.panels
-      .filter((panel) => panel.rcsPort)
-      .forEach((panel) => d.stroke(panel.path));
-  }
+  // blades (Solar Slicer) and armour plates (Bastion): edged in the accent
+  d.strokeStyle = withAlpha(geometry.accent, 0.8);
+  d.lineWidth = 0.5;
+  geometry.panels
+    .filter((panel) => panel.armor || (geometry.blades && panel.rcsPort))
+    .forEach((panel) => d.stroke(panel.path));
 
   // rim: dilate the silhouette by 1 logical px, keep only the ring
   mask.ctx.fillStyle = PALETTE.text;
@@ -1718,7 +1718,7 @@ class PlayerSystem extends BaseSystem {
       const wx = panel.facing.x * cos - panel.facing.y * sin;
       const wy = panel.facing.x * sin + panel.facing.y * cos;
       const light = wx * KEY_LIGHT_DIR.x + wy * KEY_LIGHT_DIR.y;
-      ctx.globalAlpha = 0.12 + 0.88 * Math.max(0, light);
+      ctx.globalAlpha = (0.12 + 0.88 * Math.max(0, light)) * geometry.albedo;
       ctx.fillStyle = PALETTE.hullLit;
       ctx.fill(panel.path);
       if (light < 0) {

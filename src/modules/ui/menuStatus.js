@@ -1,10 +1,12 @@
 // src/modules/ui/menuStatus.js
 
 // The strip under the main menu title: best layer, today's Daily Field best,
-// Salvage, Codex and achievement counts, the difficulty and the 3D quality. Reads the services; UISystem
+// the Boss Rush best, Salvage, Codex and achievement counts, the difficulty and the 3D quality. Reads the services; UISystem
 // redraws it whenever the menu shows or one of them changes.
 
 import { DIFFICULTY_LABELS } from '../../data/difficulty.js';
+import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
+import { formatRunTime } from './runRecap.js';
 
 /** 'AUTO', 'AUTO · HIGH' once Auto has picked a preset, or the pinned preset. */
 export function qualityLabel(mode = 'auto', livePreset = null) {
@@ -12,6 +14,12 @@ export function qualityLabel(mode = 'auto', livePreset = null) {
     return `AUTO · ${livePreset.toUpperCase()}`;
   }
   return String(mode).toUpperCase();
+}
+
+/** The Boss Rush best: the fastest clear, else the furthest Warden, else '—'. */
+export function bossRushBest(stage = 0, time = 0) {
+  if (time > 0) return formatRunTime(time);
+  return stage > 0 ? `Warden ${stage}/${BOSS_RUSH_LAYERS.length}` : '—';
 }
 
 /** [label, value] pairs in strip order. */
@@ -30,6 +38,7 @@ export function menuStatusItems({
   return [
     ['Best layer', String(records.bestLayer)],
     ['Daily best', daily > 0 ? String(daily) : '—'],
+    ['Boss Rush', bossRushBest(records.bossRushStage, records.bossRushTime)],
     ['Salvage', String(hangar.salvage)],
     [
       'Codex',

@@ -406,6 +406,115 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('weapon-evolved', {}, 'playWeaponEvolved');
   });
 
+  it('player-dashed → playDash, sweeping toward the dash', () => {
+    expectDelegates(
+      'player-dashed',
+      { position: { x: 400, y: 300 }, direction: { x: -1, y: 0 } },
+      'playDash',
+      ([options]) => expect(options.directionX).toBe(-1)
+    );
+  });
+
+  it('player-braked → playBrake', () => {
+    expectDelegates(
+      'player-braked',
+      { position: { x: 400, y: 300 }, radius: 110 },
+      'playBrake'
+    );
+  });
+
+  it('boss-telegraph from a Ram → playRamSpinUp, not the shared telegraph', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const spinUp = vi.spyOn(audio.sfxBus, 'playRamSpinUp');
+    const shared = vi.spyOn(audio.sfxBus, 'playEnemyTelegraph');
+
+    eventBus.emit('boss-telegraph', { enemy: { type: 'ram', x: 600, y: 300 } });
+    expect(spinUp).toHaveBeenCalledTimes(1);
+    expect(spinUp.mock.calls[0][0].pan).toBeGreaterThan(0);
+    expect(shared).not.toHaveBeenCalled();
+
+    eventBus.emit('boss-telegraph', { enemy: { type: 'seeker' } });
+    expect(shared).toHaveBeenCalledTimes(1);
+
+    vi.restoreAllMocks();
+    audio.destroy();
+  });
+
+  it('ram-charged → playRamCharge', () => {
+    expectDelegates(
+      'ram-charged',
+      { position: { x: 200, y: 300 } },
+      'playRamCharge'
+    );
+  });
+
+  it('a Husk’s enemy-destroyed → playHuskRelease', () => {
+    expectDelegates(
+      'enemy-destroyed',
+      { enemyType: 'husk', position: { x: 400, y: 300 } },
+      'playHuskRelease'
+    );
+  });
+
+  it('weaver-tether-laid → playWeaverTether', () => {
+    expectDelegates(
+      'weaver-tether-laid',
+      { position: { x: 400, y: 100 } },
+      'playWeaverTether'
+    );
+  });
+
+  it('bulwark-plate-hit → playBulwarkPlateHit; bulwark-plate-broken → playBulwarkPlateBreak', () => {
+    const payload = { position: { x: 400, y: 200 } };
+    expectDelegates('bulwark-plate-hit', payload, 'playBulwarkPlateHit');
+    expectDelegates('bulwark-plate-broken', payload, 'playBulwarkPlateBreak');
+  });
+
+  it('caster-telegraphed → playCasterCharge; caster-shell-fired → playCasterLaunch panning to the landing', () => {
+    expectDelegates(
+      'caster-telegraphed',
+      { position: { x: 100, y: 300 } },
+      'playCasterCharge'
+    );
+    expectDelegates(
+      'caster-shell-fired',
+      { position: { x: 100, y: 300 }, target: { x: 700, y: 300 } },
+      'playCasterLaunch',
+      ([options]) => {
+        expect(options.pan).toBeLessThan(0);
+        expect(options.toPan).toBeGreaterThan(0);
+      }
+    );
+  });
+
+  it('caster-shell-landed → playCasterImpact, with no explosion and no music duck', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const impact = vi.spyOn(audio.sfxBus, 'playCasterImpact');
+    const explosion = vi.spyOn(audio.sfxBus, 'playExplosion');
+    const duck = vi.spyOn(audio, '_duckBigMoment');
+
+    eventBus.emit('caster-shell-landed', {
+      position: { x: 400, y: 300 },
+      radius: 110,
+    });
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(explosion).not.toHaveBeenCalled();
+    expect(duck).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+    audio.destroy();
+  });
+
+  it('shade-phased-out → playShadePhase out; shade-phased-in → playShadePhase in', () => {
+    const payload = { position: { x: 400, y: 200 } };
+    expectDelegates('shade-phased-out', payload, 'playShadePhase', ([o]) =>
+      expect(o.out).toBe(true)
+    );
+    expectDelegates('shade-phased-in', payload, 'playShadePhase', ([o]) =>
+      expect(o.out).toBe(false)
+    );
+  });
+
   it('upgrade-rerolled → playCardReroll', () => {
     expectDelegates('upgrade-rerolled', {}, 'playCardReroll');
   });
@@ -440,14 +549,6 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
         expect(options.distance.gain).toBeLessThan(1);
         expect(options.distance.cutoff).toBeLessThan(18000);
       }
-    );
-  });
-
-  it('boss-telegraph (ram) → playEnemyTelegraph', () => {
-    expectDelegates(
-      'boss-telegraph',
-      { enemy: { type: 'ram', x: 100 } },
-      'playEnemyTelegraph'
     );
   });
 
@@ -492,6 +593,10 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
 
   it('enemy-fired (drone) → playDroneFire', () => {
     expectDelegates('enemy-fired', { enemyType: 'drone' }, 'playDroneFire');
+  });
+
+  it('enemy-fired (shade) → playDroneFire, the Mote’s shot cue', () => {
+    expectDelegates('enemy-fired', { enemyType: 'shade' }, 'playDroneFire');
   });
 
   it('enemy-fired (hunter) → playHunterBurst', () => {

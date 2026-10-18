@@ -1337,7 +1337,7 @@ class PhysicsSystem extends BaseSystem {
     this.performanceMetrics.lastUpdateTime = performance.now();
   }
 
-  getNearbyEnemies(x, y, radius) {
+  getNearbyEnemies(x, y, radius, { includeIntangible = false } = {}) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return [];
     }
@@ -1348,8 +1348,13 @@ class PhysicsSystem extends BaseSystem {
     const searchRadius = Math.max(radius, this.maxEnemyRadius);
     const candidates = this.spatialHash.query(x, y, searchRadius, {
       filter: (obj) => {
-        // Filter for active enemies only
-        return this.activeEnemies.has(obj) && !obj.destroyed;
+        // Active enemies only; a phased Shade (`intangible`) touches nothing
+        // (the radar still asks for it with `includeIntangible`).
+        return (
+          this.activeEnemies.has(obj) &&
+          !obj.destroyed &&
+          (includeIntangible || !obj.intangible)
+        );
       },
       sorted: false,
     });

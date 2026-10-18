@@ -1,7 +1,7 @@
 // src/data/hangar.js
 
 import { deepFreeze } from '../utils/deepFreeze.js';
-import { SOLAR_SLICER_HULL_ID } from './shipModels.js';
+import { BASTION_HULL_ID, SOLAR_SLICER_HULL_ID } from './shipModels.js';
 import { RUN_FINAL_LAYER } from './constants/gameplay.js';
 
 // The Hangar (docs/NORTE.md §7 pillar 7): Salvage earned per run buys small
@@ -12,9 +12,25 @@ export const SALVAGE_PER_LAYER = 10; // proposta 18/10
 export const SALVAGE_KILLS_PER_POINT = 5; // proposta 18/10: 1 Salvage per 5 kills
 export const SALVAGE_VICTORY_BONUS = 150; // proposta 18/10
 export const SALVAGE_PER_ENDLESS_LAYER = 25; // proposta 18/10
+export const BOSS_RUSH_SALVAGE_PER_WARDEN = 15; // proposta 18/10
 
-/** Salvage a run is worth: layers reached, kills, victory and endless depth. */
-export function runSalvage({ layer = 0, kills = 0, won = false } = {}) {
+/**
+ * Salvage a run is worth: layers reached, kills, victory and endless depth.
+ * A Boss Rush run (`bossRushWardens` given) is worth its Wardens killed and
+ * the victory.
+ */
+export function runSalvage({
+  layer = 0,
+  kills = 0,
+  won = false,
+  bossRushWardens = null,
+} = {}) {
+  if (bossRushWardens !== null) {
+    return (
+      bossRushWardens * BOSS_RUSH_SALVAGE_PER_WARDEN +
+      (won ? SALVAGE_VICTORY_BONUS : 0)
+    );
+  }
   const reached = Math.max(0, Math.floor(Number(layer) || 0));
   const base =
     reached * SALVAGE_PER_LAYER +
@@ -79,5 +95,12 @@ export const HANGAR_ITEMS = deepFreeze([
     effect: 'Solar Slicer — lighter blade hull: faster, thinner.',
     cost: 400, // proposta 18/10
     unlocksHull: SOLAR_SLICER_HULL_ID,
+  },
+  {
+    id: 'bastion-hull',
+    name: 'Bastion Hull',
+    effect: 'Bastion — heavy escort hull: tougher, slower.',
+    cost: 520, // proposta 18/10
+    unlocksHull: BASTION_HULL_ID,
   },
 ]);

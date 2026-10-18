@@ -10,7 +10,13 @@ import {
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { LAYER_MODIFIERS, directorFor } from '../data/layers.js';
+import {
+  BOSS_RUSH_LAYERS,
+  LAYER_MODIFIERS,
+  bossRushStage,
+  bossRushStageTitle,
+  directorFor,
+} from '../data/layers.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
@@ -37,9 +43,11 @@ import { PICKUP_KINDS } from '../data/pickups.js';
 import {
   buildBlockMarkup,
   collectBuild,
+  formatRunTime,
   killerName,
   pipsMarkup,
   runLocationLine,
+  transmissionQuoteMarkup,
 } from './ui/runRecap.js';
 import {
   hangarItemMarkup,
@@ -58,8 +66,12 @@ import {
   PAD_STICK_GLYPHS,
 } from '../data/constants/gamepad.js';
 import { settingPreview } from './ui/settingsPreview.js';
-import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
-import { loadRecords } from '../services/runRecords.js';
+import {
+  bossRushBest,
+  menuStatusItems,
+  menuStatusMarkup,
+} from './ui/menuStatus.js';
+import { isBossRushUnlocked, loadRecords } from '../services/runRecords.js';
 import { playLevelUpExit, staggerCardEntry } from './ui/levelUpTransition.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
@@ -115,6 +127,8 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
+    // The line shown since the death or the win, quoted on the end screen.
+    this.lastTransmission = null;
     this.cinematics = new RunCinematics({
       eventBus: this.eventBus,
       renderer: () => this.getService('renderer'),
@@ -260,6 +274,7 @@ class UISystem extends BaseSystem {
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
     this.refreshMenuStatus();
+    this.refreshBossRushLock();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -301,6 +316,7 @@ class UISystem extends BaseSystem {
         combo: document.getElementById('gameover-combo') || null,
         level: document.getElementById('gameover-level') || null,
         killer: document.getElementById('gameover-killer') || null,
+        quote: document.getElementById('gameover-quote') || null,
         location: document.getElementById('gameover-location') || null,
         salvage: document.getElementById('gameover-salvage') || null,
         build: document.getElementById('gameover-build') || null,
@@ -311,11 +327,13 @@ class UISystem extends BaseSystem {
         quitBtn: document.getElementById('quit-game-btn') || null,
       },
       victory: {
+        title: document.getElementById('victory-title') || null,
         time: document.getElementById('victory-time') || null,
         wave: document.getElementById('victory-wave') || null,
         kills: document.getElementById('victory-kills') || null,
         combo: document.getElementById('victory-combo') || null,
         level: document.getElementById('victory-level') || null,
+        quote: document.getElementById('victory-quote') || null,
         build: document.getElementById('victory-build') || null,
         synergies: document.getElementById('victory-synergies') || null,
         best: document.getElementById('victory-best') || null,
@@ -393,6 +411,8 @@ class UISystem extends BaseSystem {
         shipSelectorOptions:
           document.getElementById('menu-ship-selector-options') || null,
         status: document.getElementById('menu-status') || null,
+        bossRushBtn: document.getElementById('boss-rush-btn') || null,
+        bossRushLock: document.getElementById('boss-rush-lock') || null,
       },
     };
   }
@@ -547,13 +567,17 @@ class UISystem extends BaseSystem {
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
+    const stage = this.bossRush ? bossRushStage(layer) : 0;
     hud.showLayerBanner(layer, {
       boss,
-      chapter: firstOfBiome
-        ? biome.title
-        : layer > RUN_FINAL_LAYER
-          ? 'DEEP FIELD'
-          : '',
+      bossRush: this.bossRush,
+      chapter: stage
+        ? bossRushStageTitle(stage)
+        : firstOfBiome
+          ? biome.title
+          : layer > RUN_FINAL_LAYER
+            ? 'DEEP FIELD'
+            : '',
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id));
@@ -913,6 +937,17 @@ class UISystem extends BaseSystem {
         livePreset: this.liveQualityPreset,
       })
     );
+  }
+
+  // Boss Rush stays locked until a run has beaten Warden Prime.
+  refreshBossRushLock() {
+    const { bossRushBtn, bossRushLock } = this.domRefs.menu;
+    if (!bossRushBtn) {
+      return;
+    }
+    const locked = !isBossRushUnlocked();
+    bossRushBtn.disabled = locked;
+    bossRushLock.classList.toggle('hidden', !locked);
   }
 
   renderMenuShipSelectorPreviews() {
@@ -1341,8 +1376,12 @@ class UISystem extends BaseSystem {
     this.aaaTacticalHud.mount(mountTarget);
     this.transmissions = new TransmissionQueue(
       this.aaaTacticalHud,
-      ({ speaker, key }) => {
+      ({ speaker, key, text }) => {
+        this.lastTransmission = { speaker, text };
         this.eventBus.emit('transmission-shown', { speaker, key });
+      },
+      ({ key }) => {
+        this.eventBus.emit('transmission-finished', { key });
       }
     );
   }
@@ -1528,10 +1567,12 @@ class UISystem extends BaseSystem {
       let radarEnemies = [];
       if (physics && typeof physics.getNearbyEnemies === 'function') {
         try {
+          // A phased Shade still shows on the radar, dimmed.
           radarEnemies = physics.getNearbyEnemies(
             Number(playerPosition.x) || 0,
             Number(playerPosition.y) || 0,
-            radarRange
+            radarRange,
+            { includeIntangible: true }
           );
         } catch (error) {
           radarEnemies = [];
@@ -1572,6 +1613,7 @@ class UISystem extends BaseSystem {
           x: dx / radarRange,
           y: dy / radarRange,
           type: radarGlyph(enemy),
+          phased: Boolean(enemy.intangible),
         });
       }
 
@@ -1693,10 +1735,20 @@ class UISystem extends BaseSystem {
     ].forEach(registerBossEvent);
 
     this.registerEventListener('wave-started', (payload = {}) => {
+      // The run's mode rides on every layer start (the intro's end reads it).
+      this.bossRush = Boolean(payload.bossRush);
       this.handleLayerStarted(payload);
     });
 
     this.registerEventListener('boss-warning', (payload = {}) => {
+      // Boss Rush: the breather names the next Warden.
+      if (this.bossRush) {
+        this.aaaTacticalHud?.showLayerBanner(payload.nextBossWave, {
+          boss: true,
+          bossRush: true,
+          chapter: bossRushStageTitle(bossRushStage(payload.nextBossWave)),
+        });
+      }
       this.queueTransmission(
         wardenTransmission(payload.nextBossWave, 'warning')
       );
@@ -1710,6 +1762,7 @@ class UISystem extends BaseSystem {
       if (this.runWon) {
         return;
       }
+      this.lastTransmission = null;
       this.queueTransmission(
         deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
         { interrupt: true }
@@ -1872,6 +1925,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.lastTransmission = null;
       this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
@@ -3594,6 +3648,7 @@ class UISystem extends BaseSystem {
       if (screenName === 'menu') {
         this.requestMenuShipSelectorRefresh();
         this.refreshMenuStatus();
+        this.refreshBossRushLock();
       }
 
       if (emitEvent) {
@@ -4250,13 +4305,25 @@ class UISystem extends BaseSystem {
     const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
     const level = data.player?.level ?? data.level;
 
+    const rush = data.bossRush;
+    setText(refs.title, rush ? 'BOSS RUSH CLEARED' : 'FIELD CLEARED');
     setText(refs.time, `${minutes}:${seconds}`);
     setText(refs.wave, `${wave ?? '—'}`);
     setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
-    setText(refs.best, `Best layer: ${data.bestLayer ?? wave ?? '—'}`);
+    setText(
+      refs.best,
+      rush
+        ? `Cleared in ${formatRunTime(totalSeconds)} · Best ${bossRushBest(rush.bestStage, rush.bestTime)}`
+        : `Best layer: ${data.bestLayer ?? wave ?? '—'}`
+    );
+    // A Boss Rush ends here: no Deep Field after it.
+    refs.continueBtn?.classList.toggle('hidden', Boolean(rush));
     setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
+    if (refs.quote) {
+      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
+    }
 
     if (refs.build) {
       refs.build.innerHTML = '';
@@ -4298,7 +4365,9 @@ class UISystem extends BaseSystem {
       buttons.forEach((button) => {
         if (button) button.disabled = false;
       });
-      refs.continueBtn?.focus({ preventScroll: true });
+      (rush ? refs.restartBtn : refs.continueBtn)?.focus({
+        preventScroll: true,
+      });
     }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
@@ -4327,13 +4396,24 @@ class UISystem extends BaseSystem {
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
     setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
+    const rush = data.bossRush;
     setText(
       refs.location,
-      runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
+      rush
+        ? [
+            'Boss Rush',
+            `Warden ${rush.stage} of ${BOSS_RUSH_LAYERS.length}`,
+            formatRunTime(totalSeconds),
+            `BEST ${bossRushBest(rush.bestStage, rush.bestTime).toUpperCase()}`,
+          ].join(' · ')
+        : runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
     );
     setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
     setText(refs.seed, this.getService('difficulty').runLabel());
     setText(refs.copySeedBtn, 'Copy seed link');
+    if (refs.quote) {
+      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
+    }
 
     const progression = this.getService('progression');
     if (refs.build && progression) {

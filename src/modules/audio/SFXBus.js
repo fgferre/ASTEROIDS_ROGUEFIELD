@@ -101,6 +101,250 @@ const dbToGain = (db) => Math.pow(10, db / 20);
 // under it.
 const TRANSMISSION_SQUELCH_PEAK = 0.09;
 
+// proposta 18/10: the dash is a band-passed noise whoosh sweeping up (and
+// across, toward the dash) over a soft sub thump; quieter than a shot, never
+// retriggered within minInterval s (one voice at a time).
+const DASH_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.03,
+  peak: 0.22,
+  fromHz: 500,
+  toHz: 3200,
+  q: 1.1,
+  sweepPan: 0.35,
+  thump: Object.freeze({ fromHz: 120, toHz: 45, peak: 0.12, seconds: 0.12 }),
+  minInterval: 0.25,
+});
+// proposta 18/10: the emergency brake is a reverse-thruster burst (noise, its
+// band sweeping down) and a low thud once the ship is at rest, `thud.delay`
+// s in (the brake's stopTime, data/upgrades/mobility.js).
+const BRAKE_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.015,
+  peak: 0.2,
+  fromHz: 2400,
+  toHz: 350,
+  q: 0.9,
+  thud: Object.freeze({
+    delay: 0.1,
+    fromHz: 85,
+    toHz: 38,
+    peak: 0.16,
+    seconds: 0.18,
+  }),
+  minInterval: 0.25,
+});
+
+// Machines (Husk, Ram, Weaver, Bulwark, Caster, Shade): world cues on the
+// ambient bus, panned and distance-mixed by the machine's position; each one
+// is never retriggered within its minInterval s (many machines, one voice per
+// cue).
+// proposta 18/10: the Ram's windup is a mechanical spin-up — a sawtooth, FM'd
+// by a sub-octave sine, rising fromHz → toHz over `seconds` (its lane
+// telegraph lasts RAM_WINDUP_SECONDS) and swelling to `peak` until `release`
+// s before the end, under a ratchet of `clicks.count` metallic clicks that
+// speed up and grow from `firstGain` toward the charge.
+const RAM_SPINUP_SFX = Object.freeze({
+  seconds: 0.6,
+  release: 0.05,
+  peak: 0.07,
+  fromHz: 70,
+  toHz: 300,
+  fmRatio: 0.5,
+  fmDepth: 0.6,
+  lowpassHz: 1600,
+  clicks: Object.freeze({
+    count: 9,
+    clickSeconds: 0.004,
+    firstGain: 0.4,
+    bandHz: 3400,
+    q: 4,
+    peak: 0.4,
+  }),
+  minInterval: 0.3,
+});
+// proposta 18/10: the Ram's charge is a low whoosh (noise, its band sweeping
+// down) over a soft sub.
+const RAM_CHARGE_SFX = Object.freeze({
+  seconds: 0.45,
+  attack: 0.04,
+  peak: 0.3,
+  fromHz: 700,
+  toHz: 140,
+  q: 0.8,
+  sub: Object.freeze({ fromHz: 90, toHz: 40, peak: 0.08, seconds: 0.3 }),
+  minInterval: 0.2,
+});
+// proposta 18/10: a dying Husk hisses open and three pops follow, one per
+// released drone, `pops.at` s in (0.4 s in all).
+const HUSK_RELEASE_SFX = Object.freeze({
+  hiss: Object.freeze({
+    seconds: 0.4,
+    attack: 0.01,
+    peak: 0.1,
+    fromHz: 6500,
+    toHz: 3000,
+    q: 0.7,
+  }),
+  pops: Object.freeze({
+    at: Object.freeze([0.1, 0.19, 0.28]),
+    fromHz: Object.freeze([1100, 950, 800]),
+    drop: 0.35,
+    peak: 0.13,
+    seconds: 0.06,
+  }),
+  minInterval: 0.12,
+});
+// proposta 18/10: a Weaver laying a Tether is a quiet metallic click-drop —
+// two short pings, the second `gap` s later and lower. A partial is
+// [frequency ratio, weight].
+const WEAVER_TETHER_SFX = Object.freeze({
+  hz: Object.freeze([2400, 1700]),
+  gap: 0.07,
+  strike: Object.freeze({
+    type: 'sine',
+    partials: Object.freeze([
+      Object.freeze([1, 1]),
+      Object.freeze([2.76, 0.45]),
+    ]),
+    peak: 0.06,
+    seconds: 0.05,
+  }),
+  minInterval: 0.15,
+});
+// proposta 18/10: a hit on the Bulwark's plate is a dull armoured clang — an
+// inharmonic body at 250–590 Hz decaying fast, over a short low knock (the
+// hull keeps the shared hit cue).
+const BULWARK_PLATE_HIT_SFX = Object.freeze({
+  body: Object.freeze({
+    type: 'triangle',
+    hz: 250,
+    partials: Object.freeze([
+      Object.freeze([1, 1]),
+      Object.freeze([1.52, 0.6]),
+      Object.freeze([2.37, 0.35]),
+    ]),
+    peak: 0.08,
+    seconds: 0.16,
+  }),
+  knock: Object.freeze({
+    seconds: 0.05,
+    attack: 0.003,
+    peak: 0.12,
+    fromHz: 900,
+    toHz: 300,
+    q: 1,
+  }),
+  minInterval: 0.07,
+});
+// proposta 18/10: the plate breaking is a crack (a sharp noise burst sweeping
+// down) on a lower clang, then a rattle of loose fragments at `rattle.times`.
+const BULWARK_PLATE_BREAK_SFX = Object.freeze({
+  crack: Object.freeze({
+    seconds: 0.14,
+    attack: 0.002,
+    peak: 0.35,
+    fromHz: 3200,
+    toHz: 700,
+    q: 1.2,
+  }),
+  body: Object.freeze({
+    ...BULWARK_PLATE_HIT_SFX.body,
+    hz: 190,
+    seconds: 0.22,
+  }),
+  rattle: Object.freeze({
+    seconds: 0.4,
+    times: Object.freeze([0.07, 0.12, 0.18, 0.23, 0.3, 0.36]),
+    gains: Object.freeze([1, 0.8, 0.9, 0.6, 0.5, 0.35]),
+    clickSeconds: 0.006,
+    bandHz: 2600,
+    q: 3,
+    peak: 0.4,
+  }),
+  minInterval: 0.1,
+});
+// proposta 18/10: the Caster's 0.5 s telegraph is a quiet, hollow charge — a
+// square (odd harmonics only) rising fromHz → toHz, heard through a band on
+// its `bandHarmonic`-th harmonic, swelling to `peak` until `release` s
+// before the end.
+const CASTER_CHARGE_SFX = Object.freeze({
+  seconds: 0.45,
+  release: 0.04,
+  peak: 0.09,
+  fromHz: 150,
+  toHz: 420,
+  bandHarmonic: 3,
+  q: 4,
+  minInterval: 0.15,
+});
+// proposta 18/10: the Caster lobbing its shell is a short low "thoomp" (a
+// sine drop over a muffled puff), then a soft whistle (a narrow noise band
+// gliding down) `whistle.delay` s in; the whole cue pans from the Caster
+// toward the landing over `whistle.delay + whistle.seconds`.
+const CASTER_LAUNCH_SFX = Object.freeze({
+  thoomp: Object.freeze({ fromHz: 160, toHz: 55, peak: 0.22, seconds: 0.16 }),
+  puff: Object.freeze({
+    seconds: 0.09,
+    attack: 0.004,
+    peak: 0.16,
+    fromHz: 600,
+    toHz: 180,
+    q: 0.8,
+  }),
+  whistle: Object.freeze({
+    delay: 0.05,
+    seconds: 0.5,
+    attack: 0.15,
+    peak: 0.3,
+    fromHz: 2600,
+    toHz: 1500,
+    q: 9,
+  }),
+  minInterval: 0.15,
+});
+// proposta 18/10: a Caster shell landing is a compact thud (a sine drop under
+// a short rumble) with a bright amber crack on top: medium level, under a
+// medium explosion (sub 0.7) and with no music duck.
+const CASTER_IMPACT_SFX = Object.freeze({
+  thud: Object.freeze({ fromHz: 120, toHz: 40, peak: 0.4, seconds: 0.24 }),
+  rumble: Object.freeze({
+    seconds: 0.3,
+    attack: 0.006,
+    peak: 0.28,
+    fromHz: 1100,
+    toHz: 200,
+    q: 0.8,
+  }),
+  crack: Object.freeze({
+    seconds: 0.07,
+    attack: 0.002,
+    peak: 0.3,
+    fromHz: 4500,
+    toHz: 1800,
+    q: 1.3,
+  }),
+  minInterval: 0.12,
+});
+// proposta 18/10: a Shade dissolving is a quiet shimmer — a narrow noise band
+// sweeping between lowHz and highHz (down phasing out, up phasing in) under
+// a `flutterHz` tremolo of `flutterDepth`.
+const SHADE_PHASE_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.08,
+  peak: 0.3,
+  highHz: 6000,
+  lowHz: 2800,
+  q: 6,
+  flutterHz: 22,
+  flutterDepth: 0.5,
+  minInterval: 0.12,
+});
+// A struck partial reaches its peak this fast (s); a click is cut after this
+// many of its decay times (e^-5 < 1%).
+const STRIKE_ATTACK = 0.002;
+const CLICK_TAIL_DECAYS = 5;
+
 /**
  * SFXBus — owns ALL per-event SFX synthesis (INFRA-02).
  *
@@ -161,6 +405,20 @@ class SFXBus {
       small: -Infinity,
       medium: -Infinity,
       large: -Infinity,
+    };
+    this._lastDashTime = -Infinity;
+    this._lastBrakeTime = -Infinity;
+    this._lastMachineCueTime = {
+      ramSpinUp: -Infinity,
+      ramCharge: -Infinity,
+      huskRelease: -Infinity,
+      weaverTether: -Infinity,
+      plateHit: -Infinity,
+      plateBreak: -Infinity,
+      casterCharge: -Infinity,
+      casterLaunch: -Infinity,
+      casterImpact: -Infinity,
+      shadePhase: -Infinity,
     };
 
     // --- injected facade seams (assigned in init) ---
@@ -894,6 +1152,299 @@ class SFXBus {
 
       osc.start(now);
       osc.stop(now + 0.19);
+    });
+  }
+
+  // ===========================================================================
+  // Support machines (world cues → ambient bus, panned + distance-mixed).
+  // ===========================================================================
+
+  /**
+   * Claims the machine cue `key` at `now` unless it played within
+   * `minInterval` s.
+   * @private
+   */
+  _claimMachineCue(key, minInterval, now) {
+    if (now - this._lastMachineCueTime[key] < minInterval) return false;
+    this._lastMachineCueTime[key] = now;
+    return true;
+  }
+
+  /**
+   * Ram windup (RAM_SPINUP_SFX): an FM'd saw spinning up over a ratchet whose
+   * clicks speed up and grow toward the charge.
+   * @param {{pan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playRamSpinUp({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playRamSpinUp');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const spin = RAM_SPINUP_SFX;
+      if (!this._claimMachineCue('ramSpinUp', spin.minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const end = now + spin.seconds;
+      const carrier = this.context.createOscillator();
+      const modulator = this.context.createOscillator();
+      const depth = this.context.createGain();
+      const lowpass = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+      carrier.type = 'sawtooth';
+      carrier.frequency.setValueAtTime(spin.fromHz, now);
+      carrier.frequency.exponentialRampToValueAtTime(spin.toHz, end);
+      modulator.type = 'sine';
+      modulator.frequency.setValueAtTime(spin.fromHz * spin.fmRatio, now);
+      modulator.frequency.exponentialRampToValueAtTime(
+        spin.toHz * spin.fmRatio,
+        end
+      );
+      depth.gain.setValueAtTime(spin.fromHz * spin.fmDepth, now);
+      depth.gain.exponentialRampToValueAtTime(spin.toHz * spin.fmDepth, end);
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(spin.lowpassHz, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(spin.peak, end - spin.release);
+      gain.gain.exponentialRampToValueAtTime(0.001, end);
+      modulator.connect(depth);
+      depth.connect(carrier.frequency);
+      carrier.connect(lowpass);
+      lowpass.connect(gain);
+      gain.connect(destination);
+      carrier.start(now);
+      modulator.start(now);
+      carrier.stop(end + 0.02);
+      modulator.stop(end + 0.02);
+
+      const { clicks } = spin;
+      const times = [];
+      const gains = [];
+      for (let k = 0; k < clicks.count; k += 1) {
+        times.push(spin.seconds * Math.sqrt(k / clicks.count));
+        gains.push(
+          clicks.firstGain + ((1 - clicks.firstGain) * k) / (clicks.count - 1)
+        );
+      }
+      this._clickTrain(destination, now, {
+        ...clicks,
+        seconds: spin.seconds,
+        times,
+        gains,
+      });
+    });
+  }
+
+  /** Ram charge (RAM_CHARGE_SFX): a low whoosh over a soft sub. */
+  playRamCharge({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playRamCharge');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (!this._claimMachineCue('ramCharge', RAM_CHARGE_SFX.minInterval, now))
+        return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._maneuverNoise(destination, now, RAM_CHARGE_SFX);
+      this._maneuverTone(destination, now, RAM_CHARGE_SFX.sub);
+    });
+  }
+
+  /** Husk death (HUSK_RELEASE_SFX): a hiss, then one pop per released drone. */
+  playHuskRelease({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playHuskRelease');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { hiss, pops, minInterval } = HUSK_RELEASE_SFX;
+      if (!this._claimMachineCue('huskRelease', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._maneuverNoise(destination, now, hiss);
+      pops.at.forEach((at, i) => {
+        this._maneuverTone(destination, now + at, {
+          fromHz: pops.fromHz[i],
+          toHz: pops.fromHz[i] * pops.drop,
+          peak: pops.peak,
+          seconds: pops.seconds,
+        });
+      });
+    });
+  }
+
+  /** Weaver lays a Tether (WEAVER_TETHER_SFX): two pings, the second lower. */
+  playWeaverTether({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playWeaverTether');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { hz, gap, strike, minInterval } = WEAVER_TETHER_SFX;
+      if (!this._claimMachineCue('weaverTether', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      hz.forEach((frequency, i) => {
+        this._strike(destination, now + i * gap, { ...strike, hz: frequency });
+      });
+    });
+  }
+
+  /** Hit on the Bulwark's plate (BULWARK_PLATE_HIT_SFX): a dull clang. */
+  playBulwarkPlateHit({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playBulwarkPlateHit');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { body, knock, minInterval } = BULWARK_PLATE_HIT_SFX;
+      if (!this._claimMachineCue('plateHit', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._strike(destination, now, body);
+      this._maneuverNoise(destination, now, knock);
+    });
+  }
+
+  /** The Bulwark's plate breaks (BULWARK_PLATE_BREAK_SFX): crack + rattle. */
+  playBulwarkPlateBreak({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playBulwarkPlateBreak');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { crack, body, rattle, minInterval } = BULWARK_PLATE_BREAK_SFX;
+      if (!this._claimMachineCue('plateBreak', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._maneuverNoise(destination, now, crack);
+      this._strike(destination, now, body);
+      this._clickTrain(destination, now, rattle);
+    });
+  }
+
+  /**
+   * The Caster's telegraph (CASTER_CHARGE_SFX): a hollow square rising
+   * through a band on its third harmonic.
+   */
+  playCasterCharge({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playCasterCharge');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const charge = CASTER_CHARGE_SFX;
+      if (!this._claimMachineCue('casterCharge', charge.minInterval, now))
+        return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const end = now + charge.seconds;
+      const osc = this.context.createOscillator();
+      const band = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(charge.fromHz, now);
+      osc.frequency.exponentialRampToValueAtTime(charge.toHz, end);
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(charge.fromHz * charge.bandHarmonic, now);
+      band.frequency.exponentialRampToValueAtTime(
+        charge.toHz * charge.bandHarmonic,
+        end
+      );
+      band.Q.setValueAtTime(charge.q, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(charge.peak, end - charge.release);
+      gain.gain.exponentialRampToValueAtTime(0.001, end);
+      osc.connect(band);
+      band.connect(gain);
+      gain.connect(destination);
+      osc.start(now);
+      osc.stop(end + 0.02);
+    });
+  }
+
+  /**
+   * The Caster lobs a shell (CASTER_LAUNCH_SFX): a thoomp, then a whistle,
+   * panning from `pan` (the Caster) to `toPan` (the landing).
+   * @param {{pan?: number, toPan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playCasterLaunch({ pan = 0, toPan = pan, distance = null } = {}) {
+    this._trackPerformance('playCasterLaunch');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { thoomp, puff, whistle, minInterval } = CASTER_LAUNCH_SFX;
+      if (!this._claimMachineCue('casterLaunch', minInterval, now)) return;
+      const destination = this._ambientInput(0, distance);
+      if (!destination) return;
+
+      const panner = this.context.createStereoPanner();
+      panner.pan.value = pan;
+      panner.pan.setValueAtTime(pan, now);
+      panner.pan.linearRampToValueAtTime(
+        toPan,
+        now + whistle.delay + whistle.seconds
+      );
+      panner.connect(destination);
+      this._maneuverTone(panner, now, thoomp);
+      this._maneuverNoise(panner, now, puff);
+      this._maneuverNoise(panner, now + whistle.delay, whistle);
+    });
+  }
+
+  /**
+   * A Caster shell lands (CASTER_IMPACT_SFX): a thud under a rumble and an
+   * amber crack.
+   */
+  playCasterImpact({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playCasterImpact');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const { thud, rumble, crack, minInterval } = CASTER_IMPACT_SFX;
+      if (!this._claimMachineCue('casterImpact', minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      this._maneuverTone(destination, now, thud);
+      this._maneuverNoise(destination, now, rumble);
+      this._maneuverNoise(destination, now, crack);
+    });
+  }
+
+  /**
+   * A Shade dissolves (SHADE_PHASE_SFX): a fluttering high shimmer sweeping
+   * down when it phases `out`, up when it phases back in.
+   * @param {{out?: boolean, pan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playShadePhase({ out = true, pan = 0, distance = null } = {}) {
+    this._trackPerformance('playShadePhase');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      const phase = SHADE_PHASE_SFX;
+      if (!this._claimMachineCue('shadePhase', phase.minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const flutter = this.context.createGain();
+      flutter.gain.value = 1 - phase.flutterDepth;
+      const lfo = this.context.createOscillator();
+      const depth = this.context.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(phase.flutterHz, now);
+      depth.gain.value = phase.flutterDepth;
+      lfo.connect(depth);
+      depth.connect(flutter.gain);
+      flutter.connect(destination);
+      lfo.start(now);
+      lfo.stop(now + phase.seconds + 0.02);
+      this._maneuverNoise(flutter, now, {
+        ...phase,
+        fromHz: out ? phase.highHz : phase.lowHz,
+        toHz: out ? phase.lowHz : phase.highHz,
+      });
     });
   }
 
@@ -2272,6 +2823,192 @@ class SFXBus {
       osc.start();
       osc.stop(this.context.currentTime + 0.3);
     });
+  }
+
+  /**
+   * Dash (DASH_SFX): the whoosh pans from `pan` toward `directionX`, the dash
+   * direction's x. Player feedback → protected bus.
+   */
+  playDash({ pan = 0, directionX = 0 } = {}) {
+    this._trackPerformance('playDash');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (now - this._lastDashTime < DASH_SFX.minInterval) return;
+      this._lastDashTime = now;
+
+      const panner = this._protectedPanner(pan);
+      panner.pan.setValueAtTime(pan, now);
+      panner.pan.linearRampToValueAtTime(
+        Math.max(-1, Math.min(1, pan + directionX * DASH_SFX.sweepPan)),
+        now + DASH_SFX.seconds
+      );
+      this._maneuverNoise(panner, now, DASH_SFX);
+      this._maneuverTone(panner, now, DASH_SFX.thump);
+    });
+  }
+
+  /** Emergency brake (BRAKE_SFX). Player feedback → protected bus. */
+  playBrake({ pan = 0 } = {}) {
+    this._trackPerformance('playBrake');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (now - this._lastBrakeTime < BRAKE_SFX.minInterval) return;
+      this._lastBrakeTime = now;
+
+      const panner = this._protectedPanner(pan);
+      this._maneuverNoise(panner, now, BRAKE_SFX);
+      this._maneuverTone(panner, now + BRAKE_SFX.thud.delay, BRAKE_SFX.thud);
+    });
+  }
+
+  /**
+   * A StereoPanner at `pan` into the protected bus.
+   * @private
+   */
+  _protectedPanner(pan) {
+    const panner = this.context.createStereoPanner();
+    panner.pan.value = pan;
+    this._connectProtected(panner);
+    return panner;
+  }
+
+  /**
+   * Noise through a band sweeping fromHz → toHz over `seconds`, rising to
+   * `peak` in `attack` s, into `destination` (dash / brake, the Ram's
+   * whoosh, the Husk's hiss, the Bulwark plate's knock and crack).
+   * @private
+   */
+  _maneuverNoise(destination, now, { seconds, attack, peak, fromHz, toHz, q }) {
+    const end = now + seconds;
+    const noise = this.context.createBufferSource();
+    noise.buffer = this._noiseBuffer(seconds);
+    const band = this.context.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.setValueAtTime(fromHz, now);
+    band.frequency.exponentialRampToValueAtTime(toHz, end);
+    band.Q.setValueAtTime(q, now);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + attack);
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    noise.connect(band);
+    band.connect(gain);
+    gain.connect(destination);
+    noise.start(now);
+    noise.stop(end);
+  }
+
+  /**
+   * A sine dropping fromHz → toHz from `start` over `seconds` (the dash's
+   * thump, the brake's thud, the Ram's sub, the Husk's pops), into
+   * `destination`.
+   * @private
+   */
+  _maneuverTone(destination, start, { fromHz, toHz, peak, seconds }) {
+    const end = start + seconds;
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(fromHz, start);
+    osc.frequency.exponentialRampToValueAtTime(toHz, end);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    osc.connect(gain);
+    gain.connect(destination);
+    osc.start(start);
+    osc.stop(end + 0.02);
+  }
+
+  /**
+   * A fresh `seconds`-long mono white-noise buffer.
+   * @private
+   */
+  _noiseBuffer(seconds) {
+    const rate = this.context.sampleRate;
+    const length = Math.max(1, Math.floor(rate * seconds));
+    const buffer = this.context.createBuffer(1, length, rate);
+    const output = buffer.getChannelData(0);
+    const rng = this._resolveRandom(
+      this.randomScopes?.bufferFamilies?.thruster,
+      this.randomScopes?.families?.thruster,
+      this.randomScopes?.base
+    );
+    for (let i = 0; i < length; i += 1) {
+      output[i] = rng.float() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  /**
+   * A struck metal voice at `hz`: one `type` oscillator per [ratio, weight]
+   * partial, from `peak` × weight decaying over `seconds` (upper partials
+   * sooner, by √ratio), from `start` into `destination`.
+   * @private
+   */
+  _strike(destination, start, { type, hz, partials, peak, seconds }) {
+    for (const [ratio, weight] of partials) {
+      const end = start + seconds / Math.sqrt(ratio);
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(hz * ratio, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(
+        peak * weight,
+        start + STRIKE_ATTACK
+      );
+      gain.gain.exponentialRampToValueAtTime(0.001, end);
+      osc.connect(gain);
+      gain.connect(destination);
+      osc.start(start);
+      osc.stop(end + 0.02);
+    }
+  }
+
+  /**
+   * Metallic clicks `times` s after `now`, each a noise burst weighted by
+   * `gains` and decaying over `clickSeconds`, band-passed at `bandHz` and
+   * played at `peak` from one `seconds`-long buffer into `destination`.
+   * @private
+   */
+  _clickTrain(
+    destination,
+    now,
+    { seconds, times, gains, clickSeconds, bandHz, q, peak }
+  ) {
+    const buffer = this._noiseBuffer(seconds);
+    const data = buffer.getChannelData(0);
+    const decay = clickSeconds * this.context.sampleRate;
+    const envelope = new Float32Array(data.length);
+    times.forEach((at, k) => {
+      const first = Math.floor(at * this.context.sampleRate);
+      const last = Math.min(
+        data.length,
+        first + Math.ceil(decay * CLICK_TAIL_DECAYS)
+      );
+      for (let i = first; i < last; i += 1) {
+        envelope[i] += gains[k] * Math.exp(-(i - first) / decay);
+      }
+    });
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] *= envelope[i];
+    }
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    const band = this.context.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.setValueAtTime(bandHz, now);
+    band.Q.setValueAtTime(q, now);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(peak, now);
+    source.connect(band);
+    band.connect(gain);
+    gain.connect(destination);
+    source.start(now);
+    source.stop(now + seconds);
   }
 
   // ===========================================================================

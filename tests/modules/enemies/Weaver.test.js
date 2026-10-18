@@ -14,8 +14,13 @@ describe('Weaver', () => {
       mines.push(mine);
       return mine;
     });
+    const eventBus = { emit: vi.fn() };
+    const laid = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'weaver-tether-laid'
+      );
     const weaver = new Weaver(
-      { eventBus: { emit: vi.fn() }, acquireEnemyViaFactory },
+      { eventBus, acquireEnemyViaFactory },
       { id: 'weaver-1', x: 300, y: 200 }
     );
     const step = (seconds) => {
@@ -27,9 +32,12 @@ describe('Weaver', () => {
     step(0.5);
     expect(mines).toHaveLength(1);
     expect(mines[0]).toMatchObject({ type: 'mine', x: 300, y: 200 });
+    expect(laid()).toHaveLength(1);
+    expect(laid()[0][1]).toMatchObject({ position: { x: 300, y: 200 } });
 
     step(WEAVER_LAY_INTERVAL * 10);
     expect(mines).toHaveLength(WEAVER_MAX_TETHERS);
+    expect(laid()).toHaveLength(WEAVER_MAX_TETHERS); // silent at the cap
 
     mines[0].alive = false; // one detonates: room for another
     step(WEAVER_LAY_INTERVAL);

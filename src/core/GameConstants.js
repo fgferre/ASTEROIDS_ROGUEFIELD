@@ -746,6 +746,8 @@ export const EXPLOSION_SIZE_BY_ENEMY_TYPE = Object.freeze({
   ram: 'medium',
   weaver: 'medium',
   bulwark: 'large',
+  caster: 'medium',
+  shade: 'medium',
   warden: 'large',
   boss: 'large',
   mine: null,
