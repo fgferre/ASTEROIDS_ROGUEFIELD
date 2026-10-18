@@ -210,7 +210,7 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
 - [x] **R5.4 Catálogo 21 → 34.** Duas cartas novas por família + três "cursed" raras (ganho grande com custo).
 - [x] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
       barra de progresso real.
-- [ ] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
+- [x] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
 
 **Regra dele (18/10, ~04h30): _"além de aumentar conteúdo tem que melhorar tudo em relação a qualidade gráfica e
 efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada tem dois eixos: conteúdo (acima) e

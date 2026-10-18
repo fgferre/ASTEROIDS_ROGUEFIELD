@@ -400,6 +400,13 @@ export class AAAHudLayout {
     });
   }
 
+  /** Gold feed row announcing an achievement the moment it unlocks. */
+  addAchievementFeed(title) {
+    this._pushFeed(`achievement:${title}`, 'achievement', (row) => {
+      row.label.textContent = `ACHIEVEMENT — ${title}`;
+    });
+  }
+
   _pushFeed(key, tone, render) {
     const container = this.els?.feed;
     if (!container) {
@@ -1394,6 +1401,7 @@ export class AAAHudLayout {
             .feed-row--combo[data-tier='xp'] { border-right-color: var(--xp); color: var(--xp); }
             .feed-row--combo[data-tier='boss'] { border-right-color: var(--boss); color: var(--boss); }
             .feed-row--combo .feed-value { color: inherit; }
+            .feed-row--achievement { border-right-color: var(--xp); color: var(--xp); background: linear-gradient(270deg, color-mix(in srgb, var(--xp) 22%, var(--surface)) 0%, transparent 100%); text-shadow: 0 0 8px color-mix(in srgb, var(--xp) 60%, transparent); }
 
             @media (prefers-reduced-motion: no-preference) {
                 .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }

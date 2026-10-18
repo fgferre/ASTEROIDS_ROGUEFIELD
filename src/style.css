@@ -1965,6 +1965,116 @@ kbd {
   color: var(--text-dim);
 }
 
+/* Codex tabs and achievements */
+.codex-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.codex-tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.codex-tab:hover,
+.codex-tab:focus-visible {
+  color: var(--text);
+}
+
+.codex-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.achievement-card {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--xp) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--xp) 6%, var(--panel-inset));
+}
+
+.achievement-card__glyph {
+  flex: 0 0 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--xp);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--xp) 60%, transparent);
+}
+
+.achievement-card__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.achievement-card__desc {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.achievement-card__status {
+  margin-top: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--xp);
+}
+
+.achievement-card__bar {
+  display: block;
+  height: 3px;
+  margin-top: var(--space-1);
+  background: var(--line);
+}
+
+.achievement-card__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--text-dim);
+}
+
+.achievement-card.is-locked {
+  border-color: var(--line);
+  border-style: dashed;
+  background: transparent;
+}
+
+.achievement-card.is-locked .achievement-card__glyph {
+  color: var(--neutral);
+  text-shadow: none;
+  opacity: 0.6;
+}
+
+.achievement-card.is-locked .achievement-card__title,
+.achievement-card.is-locked .achievement-card__desc,
+.achievement-card.is-locked .achievement-card__status {
+  color: var(--text-dim);
+}
+
 /* Hangar */
 .hangar-dialog {
   width: min(760px, 94vw);

@@ -42,32 +42,10 @@ import {
   salvageBalanceText,
   salvageLine,
 } from './ui/hangar.js';
+import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-// One Codex row; an entry never met shows as a dark silhouette, unnamed.
-function codexEntryMarkup(entry) {
-  const known = Boolean(entry.seen);
-  const classes = `codex-entry${known ? '' : ' is-unknown'}${
-    entry.warden ? ' is-warden' : ''
-  }`;
-  const glyph = `<svg class="codex-entry__glyph" viewBox="-16 -16 32 32" aria-hidden="true">${entry.glyph}</svg>`;
-  if (!known) {
-    return `<li class="${classes}">${glyph}
-      <div class="codex-entry__text">
-        <h3 class="codex-entry__name">Unknown signal</h3>
-        <p class="codex-entry__meta">Below layer ${entry.fromLayer}</p>
-        <p class="codex-entry__lore">No contact logged. Go deeper.</p>
-      </div></li>`;
-  }
-  return `<li class="${classes}">${glyph}
-    <div class="codex-entry__text">
-      <h3 class="codex-entry__name">${entry.name}</h3>
-      <p class="codex-entry__meta">From layer ${entry.fromLayer} · First contact: layer ${entry.seen.firstLayer} · Destroyed: ${entry.seen.kills}</p>
-      <p class="codex-entry__lore">${entry.lore}</p>
-      <p class="codex-entry__hint">${entry.hint}</p>
-    </div></li>`;
-}
 // Level-up cards and the victory buttons ignore input this long after showing.
 const SCREEN_INPUT_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
@@ -316,6 +294,7 @@ class UISystem extends BaseSystem {
         openBtn: document.getElementById('menu-codex-btn') || null,
         backBtn: document.getElementById('codex-back-btn') || null,
         closeBtn: document.getElementById('codex-close-btn') || null,
+        tabs: Array.from(document.querySelectorAll('[data-codex-tab]')),
       },
       hangar: {
         overlay: document.getElementById('hangar-screen') || null,
@@ -1622,6 +1601,10 @@ class UISystem extends BaseSystem {
       }
     });
 
+    this.registerEventListener('achievement-unlocked', ({ title } = {}) => {
+      this.aaaTacticalHud?.addAchievementFeed(title);
+    });
+
     this.registerEventListener('weapon-beam-fired', () => {
       this.aaaTacticalHud?.flashBeam();
     });
@@ -1901,21 +1884,53 @@ class UISystem extends BaseSystem {
     refs.overlay.addEventListener('click', (event) => {
       if (event.target === refs.overlay) this.closeCodex();
     });
+    refs.tabs.forEach((button) =>
+      button.addEventListener('click', () =>
+        this.showCodexTab(button.dataset.codexTab)
+      )
+    );
     document.addEventListener('keydown', (event) => {
-      if (this.codexState.isOpen && event.key === 'Escape') {
+      if (!this.codexState.isOpen) return;
+      if (event.key === 'Escape') {
         event.preventDefault();
         this.closeCodex();
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        const step = event.key === 'ArrowLeft' ? -1 : 1;
+        this.showCodexTab(adjacentCodexTab(this.codexState.tab, step), {
+          focusTab: true,
+        });
       }
     });
   }
 
+  showCodexTab(tab, { focusTab = false } = {}) {
+    const refs = this.domRefs.codex;
+    const view = codexTabView(tab, {
+      enemies: this.getService('codex').getEntries(),
+      achievements: this.getService('achievements').getEntries(),
+    });
+    refs.list.innerHTML = view.markup;
+    refs.list.setAttribute('aria-label', view.label);
+    refs.list.scrollTop = 0;
+    refs.count.textContent = view.count;
+    refs.tabs.forEach((button) => {
+      const active = button.dataset.codexTab === tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+      if (active && focusTab) button.focus({ preventScroll: true });
+    });
+    this.codexState.tab = tab;
+  }
+
   openCodex() {
     const refs = this.domRefs.codex;
-    const entries = this.getService('codex').getEntries();
-    refs.list.innerHTML = entries.map(codexEntryMarkup).join('');
-    const found = entries.filter((entry) => entry.seen).length;
-    refs.count.textContent = `${found} / ${entries.length} signals logged`;
-    this.codexState = { isOpen: true, trigger: document.activeElement };
+    this.codexState = {
+      isOpen: true,
+      trigger: document.activeElement,
+      tab: 'enemies',
+    };
+    this.showCodexTab('enemies');
     this.showScreen('codex', { overlay: true, show: true });
     refs.overlay.setAttribute('aria-hidden', 'false');
     this.emitOverlayVisibilityChanged('codex', true, { source: 'menu' });
