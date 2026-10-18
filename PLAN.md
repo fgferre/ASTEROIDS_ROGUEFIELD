@@ -212,6 +212,20 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
       barra de progresso real.
 - [ ] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
 
+**Regra dele (18/10, ~04h30): _"além de aumentar conteúdo tem que melhorar tudo em relação a qualidade gráfica e
+efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada tem dois eixos: conteúdo (acima) e
+**qualidade** (abaixo); nenhuma rodada fecha só com conteúdo.
+
+- [ ] **R5.7 Câmera 2.0.** Antecipação para onde a mira aponta, zoom por densidade de ameaça (afasta com muitos
+      inimigos, aproxima no 1×1), enquadramento de chefe (nave e Warden sempre no quadro), rolagem sutil no strafe,
+      transição suave entre modos; `?camera=1` mantém a atual para A/B.
+- [ ] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
+      cintilam, partículas suaves (fade por profundidade), escudo hexagonal em 3D, marcas de queimadura (decals)
+      nas rochas atingidas, poeira volumétrica no bioma.
+- [ ] **R5.9 Sensação e UX.** Nave inclina no strafe (banking), recuo no tiro, knockback nos inimigos atingidos,
+      i-frames do dash visíveis; menu com a nave 3D em destaque e presets de qualidade visíveis; pausa/settings com
+      o mesmo design das cartas; transição das cartas no level-up; números de dano com peso por tamanho.
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
