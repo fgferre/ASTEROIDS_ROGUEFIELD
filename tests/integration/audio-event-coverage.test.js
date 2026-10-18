@@ -336,6 +336,30 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('elite-spawned', {}, 'playEliteSpawned');
   });
 
+  it('surge-started → playSurgeSting', () => {
+    expectDelegates('surge-started', {}, 'playSurgeSting');
+  });
+
+  it('boss-telegraph (ram) → playEnemyTelegraph', () => {
+    expectDelegates(
+      'boss-telegraph',
+      { enemy: { type: 'ram', x: 100 } },
+      'playEnemyTelegraph'
+    );
+  });
+
+  it('pickup-collected → playPickupCollected', () => {
+    expectDelegates(
+      'pickup-collected',
+      { kind: 'magnet' },
+      'playPickupCollected'
+    );
+  });
+
+  it('pickup-spawned → playPickupSpawned', () => {
+    expectDelegates('pickup-spawned', { x: 100 }, 'playPickupSpawned');
+  });
+
   it('player-leveled-up → playLevelUp', () => {
     expectDelegates('player-leveled-up', {}, 'playLevelUp');
   });

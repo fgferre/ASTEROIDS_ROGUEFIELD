@@ -881,6 +881,143 @@ class SFXBus {
     });
   }
 
+  /** Surge announced: rising two-note brass-like sting with a noise tail, reverb. */
+  playSurgeSting() {
+    this._trackPerformance('playSurgeSting');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(700, now);
+      filter.frequency.exponentialRampToValueAtTime(2600, now + 0.35);
+      const gain = this.context.createGain();
+      filter.connect(gain);
+      gain.connect(destination);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.04);
+      gain.gain.setValueAtTime(0.14, now + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+      [
+        [165, 0],
+        [247, 0.2],
+      ].forEach(([frequency, offset]) => {
+        const osc = this.context.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(frequency, now + offset);
+        osc.connect(filter);
+        osc.start(now + offset);
+        osc.stop(now + 0.82);
+      });
+
+      // Noise tail from the seeded explosion family.
+      const rate = this.context.sampleRate;
+      const length = Math.max(1, Math.floor(rate * 0.6));
+      const buffer = this.context.createBuffer(1, length, rate);
+      const output = buffer.getChannelData(0);
+      const rng = this._resolveRandom(
+        this.randomScopes?.bufferFamilies?.explosion,
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+      for (let i = 0; i < length; i += 1) {
+        output[i] = (rng.float() * 2 - 1) * (1 - i / length);
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = this.context.createBiquadFilter();
+      noiseFilter.type = 'highpass';
+      noiseFilter.frequency.setValueAtTime(2000, now);
+      const noiseGain = this.context.createGain();
+      noiseGain.gain.setValueAtTime(0.06, now + 0.2);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(destination);
+      this._sendToReverb(noiseGain, AUDIO_REVERB_SEND_DB.boss);
+      noise.start(now + 0.2);
+    });
+  }
+
+  /**
+   * Pickup collected: per-kind cue (magnet arpeggio, pulse thump, overcharge zap).
+   * @param {'magnet'|'pulse'|'overcharge'} kind
+   */
+  playPickupCollected(kind) {
+    this._trackPerformance('playPickupCollected');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const tone = (type, start, end, at, duration, peak) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(start, now + at);
+        if (end !== start) {
+          osc.frequency.exponentialRampToValueAtTime(end, now + at + duration);
+        }
+        gain.gain.setValueAtTime(0.0001, now + at);
+        gain.gain.exponentialRampToValueAtTime(peak, now + at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + at + duration);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now + at);
+        osc.stop(now + at + duration + 0.02);
+        return gain;
+      };
+
+      if (kind === 'magnet') {
+        [440, 554, 659, 880].forEach((frequency, index) => {
+          tone('triangle', frequency, frequency, index * 0.05, 0.12, 0.1);
+        });
+      } else if (kind === 'pulse') {
+        const thump = tone('sine', 120, 40, 0, 0.35, 0.3);
+        tone('triangle', 200, 900, 0.02, 0.3, 0.08);
+        this._sendToReverb(thump, AUDIO_REVERB_SEND_DB.explosionMedium);
+      } else if (kind === 'overcharge') {
+        tone('sawtooth', 400, 1800, 0, 0.22, 0.09);
+        tone('square', 800, 2400, 0.04, 0.18, 0.05);
+      }
+    });
+  }
+
+  /**
+   * Pickup appeared: soft chime, panned.
+   * @param {{pan?: number}} [options]
+   */
+  playPickupSpawned({ pan = 0 } = {}) {
+    this._trackPerformance('playPickupSpawned');
+
+    this._safePlay(() => {
+      const destination = this._ambientInput(pan);
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [880, 1320].forEach((frequency, index) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.05 / (index + 1), now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.42);
+      });
+    });
+  }
+
   playXPCollect() {
     this._trackPerformance('playXPCollect');
 

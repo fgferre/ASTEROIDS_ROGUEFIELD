@@ -484,6 +484,28 @@ class AudioSystem extends BaseSystem {
       this.playEliteSpawned();
     });
 
+    this.registerEventListener('surge-started', () => {
+      this.playSurgeSting();
+    });
+
+    // The Ram shares the Warden's telegraph event; only non-bosses get the
+    // enemy cue (the boss keeps its EffectsSystem/roar handling).
+    this.registerEventListener('boss-telegraph', (data = {}) => {
+      if (data?.enemy?.type && data.enemy.type !== 'boss') {
+        this.playEnemyTelegraph({ pan: this._resolveSourcePan(data) });
+      }
+    });
+
+    this.registerEventListener('pickup-collected', (data = {}) => {
+      this.playPickupCollected(data?.kind);
+    });
+
+    this.registerEventListener('pickup-spawned', (data = {}) => {
+      this.playPickupSpawned({
+        pan: resolveStereoPan(data?.x, this.listenerX),
+      });
+    });
+
     // Enemy modules fire projectiles/explosions exclusively through events so
     // the audio layer can orchestrate batching and pooling.
     this.registerEventListener('enemy-fired', (data = {}) => {
@@ -1426,6 +1448,18 @@ class AudioSystem extends BaseSystem {
 
   playEliteSpawned() {
     this.sfxBus.playEliteSpawned();
+  }
+
+  playSurgeSting() {
+    this.sfxBus.playSurgeSting();
+  }
+
+  playPickupCollected(kind) {
+    this.sfxBus.playPickupCollected(kind);
+  }
+
+  playPickupSpawned(options = {}) {
+    this.sfxBus.playPickupSpawned(options);
   }
 
   playXPCollect() {

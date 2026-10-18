@@ -531,6 +531,13 @@ export class EnemyFactory {
       : contactDamage;
     if (!enemy.elite) return;
 
+    enemy.getEventBus?.()?.emit?.('elite-spawned', {
+      type: enemy.type,
+      x: finalConfig.x ?? enemy.x,
+      y: finalConfig.y ?? enemy.y,
+      displayName: enemy.displayName,
+    });
+
     enemy.maxHealth *= ELITE_MODIFIERS.health;
     enemy.health = enemy.maxHealth;
     enemy.radius *= ELITE_MODIFIERS.radius;
