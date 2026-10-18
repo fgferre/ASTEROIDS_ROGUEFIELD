@@ -35,32 +35,65 @@ export const KNOWN_KINDS = new Set([
   'boss',
 ]);
 
-// Variant look: tint multiplies the baked rock color; veins are the light
-// inside (§3 "Fragmento do Anel").
-const ROCK_VARIANTS = {
-  common: { tint: [1, 1, 1] },
-  iron: { tint: [0.86, 0.9, 1], metalness: 0.45, roughness: 0.6 },
-  denseCore: { tint: [0.68, 0.76, 0.95] },
-  gold: { tint: [1.05, 0.96, 0.82], vein: PALETTE.xp, veinGlow: 0.75 },
+// Variant looks (§3 "Fragmento do Anel"): `base` (sRGB) multiplies the baked
+// rock color; veins are the light inside, glowing between `floor` and
+// `veinGlow` at `rate` Hz. A Volatile's veins race at `armedRate` once its
+// fuse arms; a Parasite's quicken toward `nearRate` as it closes on the player.
+// `reveal`/`width` set how much of the crack network the veins light.
+// Crystal swaps to a glossy faceted material with a cold rim (`rim`).
+export const VARIANT_LOOKS = {
+  common: { base: '#ffffff', roughness: 0.94, metalness: 0.04 },
+  iron: { base: '#f4f7ff', roughness: 0.42, metalness: 0.3 },
+  denseCore: { base: '#a4b6dc', roughness: 0.7, metalness: 0.12 },
+  gold: {
+    base: '#ffe6b8',
+    roughness: 0.5,
+    metalness: 0.3,
+    vein: PALETTE.xp,
+    veinGlow: 0.9,
+    reveal: 1,
+    width: 0.03,
+  },
   volatile: {
-    tint: [1, 0.9, 0.84],
+    base: '#f0d2bc',
+    roughness: 0.94,
+    metalness: 0.04,
     vein: PALETTE.shot,
-    veinGlow: 0.95,
-    pulse: 0.35,
+    veinGlow: 1.3,
+    floor: 0.35,
+    rate: 0.9,
+    armedRate: 4,
+    reveal: 0.5,
+    width: 0.065,
   },
   parasite: {
-    tint: [0.95, 0.84, 0.88],
+    base: '#dcbcc4',
+    roughness: 0.9,
+    metalness: 0.06,
     vein: PALETTE.threat,
-    veinGlow: 0.8,
-    pulse: 0.35,
+    veinGlow: 1.2,
+    floor: 0.25,
+    rate: 0.7,
+    nearRate: 2.6,
+    reveal: 0.5,
+    width: 0.05,
   },
   crystal: {
-    tint: [0.8, 0.95, 1.12],
+    base: '#86b8e8',
+    roughness: 0.2,
+    metalness: 0.05,
     vein: '#bfe8ff',
-    veinGlow: 0.55,
-    roughness: 0.4,
+    veinGlow: 0.45,
+    reveal: 0.3,
+    width: 0.03,
+    rim: 0.5,
+    crystal: true,
   },
 };
+// A Parasite's pulse is at its fastest within this many logical pixels.
+const PARASITE_NEAR = 80;
+const PARASITE_FAR = 360;
+const CRYSTAL_RIM = '#9fdcff';
 
 const ROCK_SHADER_HEAD = `
 uniform float uGlow;
@@ -69,6 +102,8 @@ uniform float uWidth;
 uniform float uFlash;
 uniform vec3 uVein;
 uniform vec3 uSeed;
+uniform float uRim;
+uniform vec3 uRimColor;
 varying vec3 vRockPos;
 vec3 rockHash(vec3 p) {
   p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)),
@@ -120,6 +155,10 @@ function patchRockShader(shader) {
           * step(c.y, uReveal);
         diffuseColor.rgb *= 1.0 - 0.7 * crack;
         totalEmissiveRadiance += uVein * crack * uGlow;
+      }
+      if (uRim > 0.001) {
+        float edge = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
+        totalEmissiveRadiance += uRimColor * uRim * pow(edge, 2.2);
       }
       totalEmissiveRadiance += vec3(uFlash);`
     );
@@ -470,26 +509,52 @@ export class EnemyMirror {
     material.color.copy(material.userData.base).multiplyScalar(gain);
   }
 
-  createRock() {
+  // Crack-shader uniforms; a rock's stone and crystal materials share them.
+  rockUniforms(vein) {
     const { THREE } = this;
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.94,
-      metalness: 0.04,
-    });
-    material.userData.rockUniforms = {
+    return {
       uGlow: { value: 0 },
       uReveal: { value: 0 },
       uWidth: { value: 0.05 },
       uFlash: { value: 0 },
-      uVein: { value: colorOf(THREE, PALETTE.shot) },
+      uVein: { value: vein },
       uSeed: { value: new THREE.Vector3() },
+      uRim: { value: 0 },
+      uRimColor: { value: colorOf(THREE, CRYSTAL_RIM) },
     };
+  }
+
+  createRock() {
+    const { THREE } = this;
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true });
+    material.userData.rockUniforms = this.rockUniforms(
+      colorOf(THREE, PALETTE.shot)
+    );
     material.onBeforeCompile = patchRockShader;
     const mesh = new THREE.Mesh(this.rockGeometries[0], material);
     mesh.rotation.order = 'YXZ';
     this.scene.add(mesh);
-    return { kind: 'asteroid', object: mesh, material, id: null };
+    return {
+      kind: 'asteroid',
+      object: mesh,
+      material,
+      stone: material,
+      crystal: null,
+      id: null,
+    };
+  }
+
+  // Crystal: same rock geometry, flat-shaded glossy facets, clear coat.
+  createCrystal(view) {
+    const material = new this.THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      flatShading: true,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+    });
+    material.userData.rockUniforms = view.stone.userData.rockUniforms;
+    material.onBeforeCompile = patchRockShader;
+    return material;
   }
 
   createMote() {
@@ -582,14 +647,9 @@ export class EnemyMirror {
       roughness: 0.88,
       flatShading: true,
     });
-    material.userData.rockUniforms = {
-      uGlow: { value: 0 },
-      uReveal: { value: 0.35 },
-      uWidth: { value: 0.04 },
-      uFlash: { value: 0 },
-      uVein: { value: this.threatColor.clone() },
-      uSeed: { value: new THREE.Vector3() },
-    };
+    material.userData.rockUniforms = this.rockUniforms(
+      this.threatColor.clone()
+    );
     material.onBeforeCompile = patchRockShader;
     const shell = new THREE.Mesh(this.huskShell, material);
     shell.scale.setScalar(0.95);
@@ -919,21 +979,42 @@ export class EnemyMirror {
     view.spinRate = (0.25 + random() * 0.5) * (random() < 0.5 ? -1 : 1);
     view.spinPhase = random() * Math.PI * 2;
     view.lean = (random() - 0.5) * 1.2;
-    const variant = ROCK_VARIANTS[enemy.variant] || ROCK_VARIANTS.common;
-    view.variant = variant;
-    const { material } = view;
-    material.color.setRGB(variant.tint[0], variant.tint[1], variant.tint[2]);
-    material.roughness = variant.roughness ?? 0.94;
-    material.metalness = variant.metalness ?? 0.04;
+    const look = VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common;
+    view.look = look;
+    view.pulse = view.spinPhase;
+    view.lastTime = null;
+    if (look.crystal && !view.crystal)
+      view.crystal = this.seeded(() => this.createCrystal(view));
+    const material = look.crystal ? view.crystal : view.stone;
+    view.material = material;
+    view.object.material = material;
+    material.color.copy(colorOf(this.THREE, look.base));
+    material.roughness = look.roughness;
+    material.metalness = look.metalness;
     const uniforms = material.userData.rockUniforms;
-    uniforms.uVein.value
-      .set(variant.vein || PALETTE.shot)
-      .convertSRGBToLinear();
+    uniforms.uVein.value.copy(colorOf(this.THREE, look.vein || PALETTE.shot));
+    uniforms.uRim.value = look.rim || 0;
     uniforms.uSeed.value.set(random() * 50, random() * 50, random() * 50);
   }
 
+  // Vein pulse rate (Hz) from the live variant state.
+  pulseRate(look, enemy) {
+    if (look.armedRate && enemy.variantState?.armed) return look.armedRate;
+    if (look.nearRate) {
+      const target = enemy.system?.getCachedPlayer?.()?.position;
+      if (target) {
+        const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
+        const near = clamp01(
+          (PARASITE_FAR - distance) / (PARASITE_FAR - PARASITE_NEAR)
+        );
+        return look.rate + (look.nearRate - look.rate) * near;
+      }
+    }
+    return look.rate || 0;
+  }
+
   updateRock(view, enemy, time, flash) {
-    const { object, variant } = view;
+    const { object, look } = view;
     object.scale.setScalar((enemy.radius || 12) * ROCK_SCALE);
     object.rotation.y = -(enemy.rotation || 0);
     object.rotation.x = view.spinPhase + time * view.spinRate;
@@ -941,17 +1022,22 @@ export class EnemyMirror {
     const stage = Math.max(0, Math.min(3, enemy.crackStage || 0));
     let glow = CRACK_GLOW[stage];
     let reveal = CRACK_REVEAL[stage];
-    if (variant.vein) {
-      const pulse = variant.pulse
-        ? 1 + variant.pulse * Math.sin(time * 5 + view.spinPhase)
-        : 1;
-      glow = Math.max(glow, variant.veinGlow * pulse);
-      reveal = Math.max(reveal, 0.45);
+    if (look.vein) {
+      const dt = view.lastTime === null ? 0 : Math.max(0, time - view.lastTime);
+      view.pulse += dt * TAU * this.pulseRate(look, enemy);
+      let veins = look.veinGlow;
+      if (look.floor !== undefined) {
+        const wave = 0.5 + 0.5 * Math.sin(view.pulse);
+        veins = look.floor + (look.veinGlow - look.floor) * wave;
+      }
+      glow = Math.max(glow, veins);
+      reveal = Math.max(reveal, look.reveal);
     }
+    view.lastTime = time;
     const uniforms = view.material.userData.rockUniforms;
     uniforms.uGlow.value = glow;
     uniforms.uReveal.value = reveal;
-    uniforms.uWidth.value = 0.035 + stage * 0.012;
+    uniforms.uWidth.value = Math.max(0.035 + stage * 0.012, look.width || 0);
     uniforms.uFlash.value = flash * 0.45;
   }
 
