@@ -97,3 +97,28 @@ describe('boss attack telegraphs', () => {
     ).toBe(false);
   });
 });
+
+describe('boss minions', () => {
+  it('spawns through spawnChild, tagged to the boss and counted in the wave', () => {
+    const { boss } = createBoss();
+    const minion = { id: 'm1', x: 0, y: 0, addTag: vi.fn() };
+    const spawnChild = vi.spyOn(boss, 'spawnChild').mockReturnValue(minion);
+    boss.system = {};
+    boss.minionTypes = ['drone'];
+    boss.patternRandom = { float: () => 0 };
+    boss.pickMinionType = () => 'drone';
+
+    boss.spawnMinion();
+
+    expect(spawnChild).toHaveBeenCalledWith(
+      'drone',
+      expect.objectContaining({ x: boss.x + boss.radius + 40, y: boss.y })
+    );
+    expect(minion).toMatchObject({
+      isBossMinion: true,
+      spawnedByBossId: 'boss-test',
+      spawnSource: 'boss-minion',
+    });
+    expect(minion.addTag).toHaveBeenCalledWith('minion');
+  });
+});

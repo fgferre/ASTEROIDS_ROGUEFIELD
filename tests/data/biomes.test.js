@@ -44,6 +44,16 @@ describe('biome table', () => {
     });
   });
 
+  it('keeps the Dense Core sky a warm black: the amber lives in veins and haze', () => {
+    const core = BIOMES.find((b) => b.id === 'dense-core');
+    core.sky.forEach((c) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+      expect(r).toBeGreaterThanOrEqual(b);
+      expect(r - b).toBeLessThanOrEqual(3);
+      expect(Math.max(r, g, b)).toBeLessThanOrEqual(0x0c);
+    });
+  });
+
   it('maps layers to biomes, past the table into the last one', () => {
     expect(biomeForLayer(1).id).toBe('outer-ring');
     expect(biomeForLayer(5).id).toBe('outer-ring');

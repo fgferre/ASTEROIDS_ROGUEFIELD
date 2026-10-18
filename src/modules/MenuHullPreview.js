@@ -25,8 +25,8 @@ const STAGE_DISTANCE = 20;
 const TILT = -1.0;
 const SPIN_RADIANS_PER_S = 0.35;
 const REST_ANGLE = 0.7;
-// Share of the stage box the hull may fill.
-const FILL = 0.85;
+// Share of the stage box the hull may fill at its widest turn (12 % margin).
+const FILL = 0.88;
 const PLUME_LENGTH = 3.5;
 // Studio light: view-space direction (upper left, toward the viewer) and
 // strength, added to the hull's own shading only.
@@ -98,7 +98,10 @@ export class MenuHullPreview {
     this.silhouette = false;
     this.hull = null;
     this.plumes = [];
-    this.length = 1;
+    // Hull extent around the spin axis: `radius` in the plate's plane,
+    // `depth` along the axis (hull units, plumes included).
+    this.radius = 1;
+    this.depth = 0;
     this.time = 0;
   }
 
@@ -203,12 +206,24 @@ export class MenuHullPreview {
       });
     hull.userData.materials = [glow, plumeMaterial];
 
-    // Centre the hull on the spin axis; its length sets the framing.
+    // Centre the hull on the spin axis; its farthest point from the axis and
+    // its thickness set the framing.
     const box = new THREE.Box3().setFromObject(hull);
     const center = box.getCenter(new THREE.Vector3());
     hull.children.forEach((child) => child.position.sub(center));
-    const size = box.getSize(new THREE.Vector3());
-    this.length = Math.max(size.x, size.y);
+    hull.updateMatrixWorld(true);
+    const point = new THREE.Vector3();
+    this.radius = 0;
+    this.depth = 0;
+    hull.traverse((node) => {
+      const position = node.geometry?.attributes.position;
+      if (!position) return;
+      for (let i = 0; i < position.count; i += 1) {
+        point.fromBufferAttribute(position, i).applyMatrix4(node.matrixWorld);
+        this.radius = Math.max(this.radius, Math.hypot(point.x, point.y));
+        this.depth = Math.max(this.depth, Math.abs(point.z));
+      }
+    });
     return hull;
   }
 
@@ -232,12 +247,32 @@ export class MenuHullPreview {
     const cy = 1 - ((stage.top + stage.height / 2) / viewport.height) * 2;
     this.root.position.set(cx * halfW, cy * halfH, -STAGE_DISTANCE);
 
-    // Spinning on the tilted plate, the hull is at most its length wide
-    // and its length × cos(tilt) tall on screen.
-    const worldW = (stage.width / viewport.width) * 2 * halfW;
-    const worldH = (stage.height / viewport.height) * 2 * halfH;
-    const span = Math.min(worldW, worldH / Math.cos(TILT)) * FILL;
-    this.root.scale.setScalar(span / this.length);
+    // Spinning on the tilted plate, the hull reaches `radius` sideways,
+    // radius·cos(tilt) + depth·sin(tilt) up and down, and comes
+    // radius·sin(tilt) + depth·cos(tilt) toward the camera, where perspective
+    // enlarges it and pushes it away from the screen centre. Scale s keeps
+    // every point inside the stage half-size T around its centre c:
+    // s·h·D + |c|·s·d ≤ T·(D − s·d).
+    const { radius, depth } = this;
+    const sinT = Math.abs(Math.sin(TILT));
+    const cosT = Math.abs(Math.cos(TILT));
+    const toward = radius * sinT + depth * cosT;
+    const fit = (half, centre, reach) =>
+      (half * STAGE_DISTANCE) /
+      (reach * STAGE_DISTANCE + (Math.abs(centre) + half) * toward);
+    const scale = Math.min(
+      fit(
+        (stage.width / viewport.width) * halfW * FILL,
+        this.root.position.x,
+        radius
+      ),
+      fit(
+        (stage.height / viewport.height) * halfH * FILL,
+        this.root.position.y,
+        radius * cosT + depth * sinT
+      )
+    );
+    this.root.scale.setScalar(scale);
 
     if (reducedMotion) return;
     this.time += dt;

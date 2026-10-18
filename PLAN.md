@@ -303,6 +303,20 @@ Qualidade:
 - [x] **R9.3 Heralds falam.** Uma linha de transmissão ao surgir e ao cair para cada Herald (voz própria), entradas de
       lore no Códice para Heralds e Wardens com "visto em" e "derrotado ×N", conquista "Herald Hunter" (os três).
 
+## Rodada 10 (18/10, tarde) — segunda consolidação: dívidas reais, BACKLOG verdadeiro, polimento visual
+
+Conteúdo:
+
+- [x] **R10.1 Cartas que prometem e não entregam.** `upgrade-emergency-brake` (Braking System 3) vira freio de emergência
+      real (segurar S parado por 0,25 s zera a velocidade com onda de choque leve) e `upgrade-ion-trail` (Propulsors 5)
+      vira rastro iônico que dá dano por contato; dash deixa de cair de 418 → 220 de uma vez (decai em 0,2 s).
+      Qualidade:
+- [x] **R10.2 BACKLOG verdadeiro.** Conferir cada linha contra o código; apagar o que já foi feito (lock da torreta, HUD
+      de arma, chip de Overcharge, menu 2×3…); kill feed com o nome certo de cada Warden; `BossEnemy.spawnMinion` via
+      `spawnChild`; meta ≤ 20 linhas.
+- [x] **R10.3 Polimento visual.** Céu-base do Dense Core sem marrom; token próprio para o banner de modificador (não o
+      ciano); enquadramento do casco no Hangar (sem transbordar); sombras reais um pouco mais presentes (fill −15 %).
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de

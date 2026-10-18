@@ -26,6 +26,8 @@ describe('BiomeController', () => {
     const targets = {
       key: new THREE.DirectionalLight(),
       fill: new THREE.DirectionalLight(),
+      hemi: new THREE.HemisphereLight(),
+      hemiBase: 0.3,
       bloomPass: { strength: 0 },
       bloomBase: 0.9,
       backdrop: { setLook: (look) => looks.push({ ...look }) },
@@ -59,5 +61,33 @@ describe('BiomeController', () => {
     const count = looks.length;
     controller.update(transition);
     expect(looks).toHaveLength(count);
+  });
+
+  it('scales fill and hemisphere by the quality preset, after the biome', () => {
+    const targets = {
+      key: new THREE.DirectionalLight(),
+      fill: new THREE.DirectionalLight(),
+      hemi: new THREE.HemisphereLight(),
+      hemiBase: 0.3,
+      bloomPass: { strength: 0 },
+      bloomBase: 0.9,
+      backdrop: { setLook: () => {} },
+      space: { setLook: () => {} },
+    };
+    const controller = new BiomeController(THREE, targets);
+    const transition = new BiomeTransition();
+    transition.enterLayer(6);
+    controller.update(transition);
+    const core = BIOMES[1];
+    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity);
+    expect(targets.hemi.intensity).toBeCloseTo(0.3);
+
+    controller.targets.fillScale = 0.85;
+    controller.targets.hemiScale = 0.9;
+    controller.applied = null;
+    controller.update(transition);
+    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity * 0.85);
+    expect(targets.hemi.intensity).toBeCloseTo(0.27);
+    expect(targets.key.intensity).toBeCloseTo(core.keyIntensity);
   });
 });

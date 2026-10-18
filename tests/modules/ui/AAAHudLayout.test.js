@@ -384,3 +384,16 @@ describe('AAAHudLayout accessibility styles', () => {
     );
   });
 });
+
+describe('AAAHudLayout kill feed', () => {
+  it('names a Warden by its own displayName, falling back to Warden Prime', () => {
+    const hud = new AAAHudLayout();
+    const keys = [];
+    hud._pushFeed = (key) => keys.push(key);
+
+    hud.addKillFeed('boss', false, 'Warden Choir');
+    hud.addKillFeed('boss', true);
+
+    expect(keys).toEqual(['kill:Warden Choir', 'kill:Elite Warden Prime']);
+  });
+});

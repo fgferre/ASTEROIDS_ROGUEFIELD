@@ -352,8 +352,9 @@ export class AAAHudLayout {
   }
 
   /**
-   * "MODIFIER" banner with the layer modifier's label underneath, in its
-   * `color`; it waits for the banner on screen (the LAYER one) to end.
+   * "MODIFIER" banner (indigo --modifier frame) with the layer modifier's
+   * label underneath in its `color`; it waits for the banner on screen (the
+   * LAYER one) to end.
    */
   showModifierBanner(label, color) {
     const delayMs = Math.max(0, this._bannerEndsAt - performance.now());
@@ -551,12 +552,12 @@ export class AAAHudLayout {
   }
 
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
-  addKillFeed(enemyType, elite = false) {
+  addKillFeed(enemyType, elite = false, displayName = null) {
     const baseName =
       enemyType === 'asteroid'
         ? ASTEROID_FEED_NAME
         : enemyType === 'boss'
-          ? BOSS_CONFIG.displayName
+          ? displayName ?? BOSS_CONFIG.displayName
           : ENEMY_TYPES[enemyType]?.displayName;
     if (!baseName) {
       return;
@@ -1763,8 +1764,8 @@ export class AAAHudLayout {
             .layer-banner.is-event .layer-banner__sub { color: var(--xp); }
             .layer-banner.is-herald .layer-banner__title { color: var(--text); text-shadow: 0 0 18px var(--boss), 0 0 4px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-herald .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
-            .layer-banner.is-modifier .layer-banner__title { color: var(--modifier-color); text-shadow: 0 0 18px var(--modifier-color), 0 2px 0 rgba(0, 0, 0, 0.8); }
-            .layer-banner.is-modifier .layer-banner__line { background: linear-gradient(90deg, transparent, var(--modifier-color) 20%, var(--modifier-color) 80%, transparent); box-shadow: 0 0 12px var(--modifier-color); }
+            .layer-banner.is-modifier .layer-banner__title { color: var(--modifier); text-shadow: 0 0 18px var(--modifier), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-modifier .layer-banner__line { background: linear-gradient(90deg, transparent, var(--modifier) 20%, var(--modifier) 80%, transparent); box-shadow: 0 0 12px var(--modifier); }
             .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 

@@ -23,11 +23,13 @@ const NUMBERS = [
 
 export class BiomeController {
   /**
-   * `targets`: { key, fill } lights, `bloomPass` and its `bloomBase`
-   * strength, `backdrop` and `space` (each with setLook(look)).
+   * `targets`: { key, fill, hemi } lights and the hemisphere's `hemiBase`
+   * intensity, `bloomPass` and its `bloomBase` strength, `backdrop` and
+   * `space` (each with setLook(look)). `fillScale` / `hemiScale` (default 1)
+   * are the quality preset's factors, applied on top of the biome's numbers.
    */
   constructor(THREE, targets) {
-    this.targets = targets;
+    this.targets = { fillScale: 1, hemiScale: 1, ...targets };
     // Linear colours per biome, parsed once.
     this.colors = new Map(
       BIOMES.map((biome) => [
@@ -81,6 +83,10 @@ export class BiomeController {
     const {
       key: keyLight,
       fill,
+      fillScale,
+      hemi,
+      hemiBase,
+      hemiScale,
       bloomPass,
       bloomBase,
       backdrop,
@@ -89,7 +95,8 @@ export class BiomeController {
     keyLight.color.copy(look.keyColor);
     keyLight.intensity = look.keyIntensity;
     fill.color.copy(look.fillColor);
-    fill.intensity = look.fillIntensity;
+    fill.intensity = look.fillIntensity * fillScale;
+    hemi.intensity = hemiBase * hemiScale;
     bloomPass.strength = bloomBase * look.bloomScale;
     backdrop.setLook(look);
     space.setLook(look);

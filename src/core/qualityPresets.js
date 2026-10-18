@@ -11,7 +11,9 @@
 // the ship shadow each other), 0 = off. The polish layers (proposta 18/10):
 // `filmGrain` grain + vignette in the impact pass, `rimLight` on machine
 // hulls, `decals` scorch marks on rocks. `bloomMips`: blur levels of the
-// bloom (5 = the widest halo; each one is two draws).
+// bloom (5 = the widest halo; each one is two draws). `fillScale` /
+// `hemiScale`: the fill and hemisphere lights against the biome's values;
+// lower where shadows exist, so they read.
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
@@ -25,6 +27,8 @@ export const QUALITY_PRESETS = {
     rimLight: true,
     decals: true,
     bloomMips: 5,
+    fillScale: 0.85,
+    hemiScale: 0.9,
   },
   high: {
     bloomScale: 1,
@@ -38,6 +42,8 @@ export const QUALITY_PRESETS = {
     rimLight: true,
     decals: true,
     bloomMips: 3,
+    fillScale: 0.85,
+    hemiScale: 0.9,
   },
   medium: {
     bloomScale: 0.85,
@@ -51,6 +57,8 @@ export const QUALITY_PRESETS = {
     rimLight: true,
     decals: true,
     bloomMips: 3,
+    fillScale: 1,
+    hemiScale: 1,
   },
   low: {
     bloomScale: 0.7,
@@ -64,6 +72,8 @@ export const QUALITY_PRESETS = {
     rimLight: false,
     decals: false,
     bloomMips: 3,
+    fillScale: 1,
+    hemiScale: 1,
   },
 };
 export const QUALITY_LEVELS = Object.keys(QUALITY_PRESETS);

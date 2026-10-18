@@ -40,7 +40,7 @@ export const BIOMES = deepFreeze([
     id: 'dense-core',
     title: 'CHAPTER II — THE DENSE CORE',
     layers: [6, 10],
-    sky: ['#140c06', '#030202'],
+    sky: ['#0b0a09', '#030303'],
     hazeColor: '#5a4a5e',
     hazeDensity: 0.45,
     veinColor: '#d9701c',

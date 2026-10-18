@@ -32,6 +32,7 @@ import {
 import { GAMEPAD_AIM_ENGAGE } from '../data/constants/gamepad.js';
 import {
   DASH_COOLDOWN,
+  DASH_DECAY_SECONDS,
   DASH_DURATION,
   DASH_GHOST_COUNT,
   DASH_GHOST_LIFE,
@@ -442,6 +443,7 @@ class PlayerSystem extends BaseSystem {
     this.magnetismRadius = MAGNETISM_RADIUS;
     this.dashCooldown = DASH_COOLDOWN;
     this.dashAfterInvulnerability = 0;
+    this.emergencyBrake = null;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
     this.currentHull = null;
@@ -744,6 +746,11 @@ class PlayerSystem extends BaseSystem {
       this.dashAfterInvulnerability = data.duration;
     });
 
+    // Braking System 3: the hold-S emergency brake (updateEmergencyBrake).
+    this.registerEventListener('upgrade-emergency-brake', (data) => {
+      this.emergencyBrake = data;
+    });
+
     // Overclocked Core: the hull loses `amount` every `interval` s, never
     // below `floorFraction` of max.
     this.registerEventListener('upgrade-hull-drain', (data) => {
@@ -1006,6 +1013,7 @@ class PlayerSystem extends BaseSystem {
     }
 
     this.updateMovement(deltaTime, movement);
+    this.updateEmergencyBrake(deltaTime, movement);
     this.updatePosition(deltaTime);
     this.updateDash(deltaTime);
     this.updateHullDrain(deltaTime);
@@ -1042,9 +1050,15 @@ class PlayerSystem extends BaseSystem {
   resetDashState() {
     this.dashRequested = false;
     this.dashTimer = 0;
+    this.dashDecayTimer = 0;
     this.dashCooldownTimer = 0;
     this.dashGhosts = [];
     this.dashGhostsDropped = 0;
+    this.brakeHold = 0;
+    this.brakeArmed = false;
+    this.brakeCooldownTimer = 0;
+    this.brakeTimer = 0;
+    this.brakeFrom = null;
   }
 
   /**
@@ -1106,11 +1120,73 @@ class PlayerSystem extends BaseSystem {
       this.dashTimer = Math.max(0, this.dashTimer - deltaTime);
       this.dropDashGhosts();
       if (this.dashTimer === 0) {
+        this.dashDecayTimer = DASH_DECAY_SECONDS;
         this.invulnerableTimer = Math.max(
           this.invulnerableTimer,
           this.dashAfterInvulnerability
         );
       }
+    } else if (this.dashDecayTimer > 0) {
+      this.dashDecayTimer = Math.max(0, this.dashDecayTimer - deltaTime);
+    }
+  }
+
+  /**
+   * Braking System 3: S held alone for `hold` s stops the ship over
+   * `stopTime` s and sends a shove-only shockwave, once per press. Armed only
+   * if S pushed against the motion when pressed, so flying down-screen with S
+   * (modern) never brakes.
+   */
+  updateEmergencyBrake(deltaTime, input) {
+    const brake = this.emergencyBrake;
+    if (!brake) return;
+    if (this.brakeCooldownTimer > 0) {
+      this.brakeCooldownTimer = Math.max(
+        0,
+        this.brakeCooldownTimer - deltaTime
+      );
+    }
+    const held =
+      input.down &&
+      !input.up &&
+      !input.left &&
+      !input.right &&
+      !input.moveX &&
+      !input.moveY;
+    if (!held) {
+      this.brakeHold = 0;
+      this.brakeArmed = false;
+    } else {
+      if (this.brakeHold === 0) {
+        // S pushes down the screen (modern) or against the nose (classic).
+        const push =
+          this.controlScheme === 'modern'
+            ? this.velocity.vy
+            : -(
+                this.velocity.vx * Math.cos(this.angle) +
+                this.velocity.vy * Math.sin(this.angle)
+              );
+        this.brakeArmed = push < -brake.minSpeed;
+      }
+      this.brakeHold += deltaTime;
+      const due = this.brakeArmed && this.brakeHold >= brake.hold - 1e-9;
+      if (due) this.brakeArmed = false; // one try per press
+      if (due && this.brakeCooldownTimer <= 0 && this.dashTimer <= 0) {
+        this.brakeCooldownTimer = brake.cooldown;
+        this.brakeTimer = brake.stopTime;
+        this.brakeFrom = { ...this.velocity };
+        this.eventBus?.emit?.('player-braked', {
+          position: { ...this.position },
+          radius: brake.radius,
+          knockback: brake.knockback,
+        });
+      }
+    }
+    if (this.brakeTimer > 0) {
+      this.brakeTimer = Math.max(0, this.brakeTimer - deltaTime);
+      const k = this.brakeTimer / brake.stopTime;
+      this.velocity.vx = this.brakeFrom.vx * k;
+      this.velocity.vy = this.brakeFrom.vy * k;
     }
   }
 
@@ -1281,10 +1357,12 @@ class PlayerSystem extends BaseSystem {
       this.velocity.vy *= linearDamp;
     }
 
-    // Limitar velocidade máxima
-    const speedCap = dashing
-      ? this.maxSpeed * DASH_SPEED_CAP_MULTIPLIER
-      : this.maxSpeed;
+    // Limitar velocidade máxima — after a dash the cap eases back down.
+    const dashCapFraction = dashing
+      ? 1
+      : this.dashDecayTimer / DASH_DECAY_SECONDS;
+    const speedCap =
+      this.maxSpeed * (1 + (DASH_SPEED_CAP_MULTIPLIER - 1) * dashCapFraction);
     const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
     if (currentSpeed > speedCap) {
       const scale = speedCap / currentSpeed;
@@ -2152,6 +2230,7 @@ class PlayerSystem extends BaseSystem {
     this.dashCooldown =
       DASH_COOLDOWN * hull.dashCooldown * hangar.dashCooldownMultiplier;
     this.dashAfterInvulnerability = 0;
+    this.emergencyBrake = null;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
     this.maxSpeed = SHIP_MAX_SPEED * hull.maxSpeed;

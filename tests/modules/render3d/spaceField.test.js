@@ -62,6 +62,8 @@ describe('SpaceField', () => {
     const controller = new BiomeController(THREE, {
       key: new THREE.DirectionalLight(),
       fill: new THREE.DirectionalLight(),
+      hemi: new THREE.HemisphereLight(),
+      hemiBase: 0.3,
       bloomPass: { strength: 0 },
       bloomBase: 1,
       backdrop: { setLook: () => {} },

@@ -150,6 +150,47 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     expect(rock.health).toBe(100 - 12);
   });
 
+  it('Main Thrusters 5: the ion trail hurts machines it touches, half on bosses, never rocks', () => {
+    const drone = makeEnemy('drone', 200, 300);
+    const boss = makeEnemy('boss', 230, 300, { type: 'boss' });
+    const rock = makeEnemy('rock', 260, 300, { type: 'asteroid' });
+    const { combat, eventBus } = makeCombat([drone, boss, rock]);
+    takeCard(eventBus, 'propulsors', 5);
+    [205, 225, 245, 255].forEach((x) =>
+      eventBus.emit('thruster-effect', {
+        type: 'main',
+        intensity: 1,
+        position: { x, y: 300 },
+      })
+    );
+    combat.updateWeaponEffects(0.2);
+    combat.updateWeaponEffects(0.2);
+    expect(drone.health).toBe(100 - 16);
+    expect(boss.health).toBe(100 - 8);
+    expect(rock.health).toBe(100);
+    // 0.5 s after the thrust the trail is gone.
+    combat.updateWeaponEffects(0.2);
+    combat.updateWeaponEffects(0.2);
+    expect(drone.health).toBe(100 - 16);
+  });
+
+  it('Braking System 3: the brake shoves enemies within 110 px away, without damage', () => {
+    const near = makeEnemy('near', 180, 300);
+    const far = makeEnemy('far', 260, 300);
+    const { eventBus } = makeCombat([near, far]);
+    const brake = card('braking_system').levels[2].effects.find(
+      (e) => e.event === 'upgrade-emergency-brake'
+    ).payload;
+    eventBus.emit('player-braked', {
+      position: { ...PLAYER },
+      radius: brake.radius,
+      knockback: brake.knockback,
+    });
+    expect(near.vx).toBe(brake.knockback);
+    expect(near.health).toBe(100);
+    expect(far.vx).toBe(0);
+  });
+
   it('Static Shell: a hit on the ship arcs into every enemy within 90 px', () => {
     const near = makeEnemy('near', 160, 300);
     const far = makeEnemy('far', 300, 300);

@@ -1001,117 +1001,35 @@ export class BossEnemy extends BaseEnemy {
       2;
     const distance = this.radius + 40;
 
-    const spawnConfig = {
+    const minion = this.spawnChild(type, {
       x: this.x + Math.cos(angle) * distance,
       y: this.y + Math.sin(angle) * distance,
-      wave: this.wave,
-      spawnedBy: this.id,
       randomParentScope: `boss:${this.id}`,
-    };
-
-    let minion = null;
-
-    // Special handling for asteroid type
-    if (
-      type === 'asteroid' &&
-      typeof this.system.acquireAsteroid === 'function'
-    ) {
-      minion = this.system.acquireAsteroid(spawnConfig);
-    } else if (typeof this.system.acquireEnemyViaFactory === 'function') {
-      // Check if factory has the type registered
-      if (
-        this.system.factory &&
-        typeof this.system.factory.hasType === 'function'
-      ) {
-        if (!this.system.factory.hasType(type)) {
-          console.warn(
-            `[BossEnemy] Minion type '${type}' not registered in factory. Minion spawn skipped.`
-          );
-          return;
-        }
-      }
-
-      minion = this.system.acquireEnemyViaFactory(type, spawnConfig);
-
-      if (!minion) {
-        console.warn(
-          `[BossEnemy] Factory failed to create minion of type '${type}'. Check factory configuration.`
-        );
-        return;
-      }
-    } else {
+    });
+    if (!minion) {
       console.warn(
-        `[BossEnemy] Factory not available for spawning minion type '${type}'.`
+        `[BossEnemy] Could not spawn minion of type '${type}'. Check factory configuration.`
       );
       return;
     }
 
-    // Successfully created minion - register and tag it
-    if (minion) {
-      if (typeof minion.addTag === 'function') {
-        minion.addTag('minion');
-      }
+    minion.addTag?.('minion');
+    minion.spawnSource = 'boss-minion';
+    minion.spawnedByBossId = this.id;
+    minion.isBossMinion = true;
+    minion.metadata = {
+      ...minion.metadata,
+      spawnSource: 'boss-minion',
+      spawnedByBossId: this.id,
+    };
 
-      minion.spawnSource = 'boss-minion';
-      minion.spawnedBy = this.id;
-      minion.spawnedByBossId = this.id;
-      minion.isBossMinion = true;
-      minion.wave = this.wave;
-
-      if (minion.metadata && typeof minion.metadata === 'object') {
-        minion.metadata.spawnSource = 'boss-minion';
-        minion.metadata.spawnedByBossId = this.id;
-      } else {
-        minion.metadata = {
-          spawnSource: 'boss-minion',
-          spawnedByBossId: this.id,
-        };
-      }
-
-      const factoryRegistered =
-        minion?.[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] === true;
-      let registered = factoryRegistered;
-
-      if (
-        !registered &&
-        typeof this.system.registerActiveEnemy === 'function'
-      ) {
-        registered = Boolean(
-          this.system.registerActiveEnemy(minion, { skipDuplicateCheck: true })
-        );
-      }
-
-      minion[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
-
-      if (!registered) {
-        GameDebugLogger.log('ERROR', 'Boss minion registration failed', {
-          bossId: this.id,
-          wave: this.wave,
-          minionType: type,
-          hasRegisterFunction:
-            typeof this.system.registerActiveEnemy === 'function',
-        });
-        return;
-      }
-
-      if (
-        this.system.waveManager &&
-        typeof this.system.waveManager.registerDynamicMinion === 'function'
-      ) {
-        this.system.waveManager.registerDynamicMinion(minion, {
-          bossId: this.id,
-          minionType: type,
-        });
-      }
-
-      GameDebugLogger.log('STATE', 'Boss minion spawned', {
-        bossId: this.id,
-        wave: this.wave,
-        minionId: minion.id,
-        minionType: type,
-        position: { x: Math.round(minion.x), y: Math.round(minion.y) },
-      });
-    }
+    GameDebugLogger.log('STATE', 'Boss minion spawned', {
+      bossId: this.id,
+      wave: this.wave,
+      minionId: minion.id,
+      minionType: type,
+      position: { x: Math.round(minion.x), y: Math.round(minion.y) },
+    });
   }
 
   pickMinionType() {

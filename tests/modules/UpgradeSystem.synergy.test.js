@@ -64,16 +64,10 @@ describe('upgrade families', () => {
       ),
       ...Object.values(UPGRADE_FAMILIES).flatMap((f) => f.bonus.effects),
     ];
-    // Known inert ranks, listed in BACKLOG.md.
-    const knownInert = new Set([
-      'upgrade-emergency-brake',
-      'upgrade-ion-trail',
-    ]);
     const events = new Set(
       effects
         .filter((effect) => effect.type === 'event')
         .map((effect) => effect.event)
-        .filter((event) => !knownInert.has(event))
     );
     events.forEach((event) => {
       expect(source.includes(`registerEventListener('${event}'`), event).toBe(

@@ -44,7 +44,9 @@ export const MOBILITY_UPGRADES = deepFreeze([
         {
           title: 'Vector Overload',
           description: 'Acceleration +110% and speed +85% (cumulative).',
-          highlights: ['Extreme performance. Ion trail damages enemies.'],
+          highlights: [
+            'Thrust leaves a 0.5 s ion trail: 8 damage every 0.2 s to machines that touch it.',
+          ],
         },
       ],
     },
@@ -150,7 +152,14 @@ export const MOBILITY_UPGRADES = deepFreeze([
           {
             type: 'event',
             event: 'upgrade-ion-trail',
-            payload: { enabled: true },
+            // proposta 18/10: machines only (rocks pass), bosses take half.
+            payload: {
+              damage: 8,
+              life: 0.5,
+              tickInterval: 0.2,
+              radius: 10,
+              bossFactor: 0.5,
+            },
           },
         ],
       },
@@ -345,9 +354,9 @@ export const MOBILITY_UPGRADES = deepFreeze([
         },
         {
           title: 'Emergency Brake',
-          description: 'Linear damping +100%. Unlocks special ability.',
+          description: 'Linear damping +100%. Unlocks the emergency brake.',
           highlights: [
-            'Dedicated key (Shift) for an instant stop with a shockwave.',
+            'Hold the reverse key (S) against your motion for 0.25 s: full stop and a shockwave that shoves enemies back.',
           ],
         },
       ],
@@ -399,7 +408,16 @@ export const MOBILITY_UPGRADES = deepFreeze([
           {
             type: 'event',
             event: 'upgrade-emergency-brake',
-            payload: { enabled: true },
+            // proposta 18/10: hold S against the motion `hold` s → stop over
+            // `stopTime` s with a shove-only shockwave of `radius` px.
+            payload: {
+              hold: 0.25,
+              minSpeed: 40,
+              stopTime: 0.1,
+              radius: 110,
+              knockback: 160,
+              cooldown: 1.2,
+            },
           },
         ],
       },
