@@ -17,14 +17,13 @@ import DuckingController from './audio/DuckingController.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { IS_DEV } from '../core/env.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import {
   AUDIO_BIG_MOMENT_DUCK,
   AUDIO_MASTER_LIMITER,
   AUDIO_REVERB_SEND_DB,
-  BOSS_AUDIO_FREQUENCY_PRESETS,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-} from '../core/GameConstants.js';
+} from '../data/audio/mix.js';
+import { BOSS_AUDIO_FREQUENCY_PRESETS } from '../data/audio/bossCues.js';
 import { requireRandom } from '../utils/randomHelpers.js';
 
 const DEV_MODE = IS_DEV;

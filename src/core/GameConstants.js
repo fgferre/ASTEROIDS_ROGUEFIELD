@@ -117,10 +117,3 @@ export {
   MineConfigs,
   BossConfigs,
 };
-
-// === AUDIO === the data lives in src/data/audio/; re-exported so importers keep working.
-export * from '../data/audio/bossCues.js';
-export * from '../data/audio/music.js';
-export * from '../data/audio/stingers.js';
-export * from '../data/audio/mix.js';
-export * from '../data/audio/explosions.js';
