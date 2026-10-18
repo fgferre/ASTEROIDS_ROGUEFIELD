@@ -65,7 +65,7 @@ procedural, sombras só entre objetos 3D), controle do casco ainda acoplado dema
 medição real de desempenho na máquina do dono, caminhos de áudio mortos, oddities visuais e de paridade 2D/3D, replay
 que não grava o modo, edge cases de pooling/director e arquivos ainda muito grandes."_
 
-- [ ] **R13.1 Espaço com volume.** Estrelas atenuadas pela profundidade + cintilação; nebulosa em três profundidades
+- [x] **R13.1 Espaço com volume.** Estrelas atenuadas pela profundidade + cintilação; nebulosa em três profundidades
       (a distante assada uma vez por bioma em alvo de baixa resolução, a média viva e barata, filamentos próximos
       aditivos e fracos); nuvens de poeira a meia profundidade com paralaxe real; nada recebe luz ou sombra; presets
       cortam camadas no low/medium. Captura antes/depois por bioma.
