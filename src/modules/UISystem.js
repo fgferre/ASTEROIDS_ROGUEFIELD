@@ -174,7 +174,7 @@ class UISystem extends BaseSystem {
       triggerId: null,
     };
     this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
-    this.codexState = { isOpen: false, trigger: null };
+    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
     this.hangarState = { isOpen: false, trigger: null };
     this.levelUpState = {
       isVisible: false,
@@ -1944,7 +1944,7 @@ class UISystem extends BaseSystem {
     refs.overlay.setAttribute('aria-hidden', 'true');
     this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
     this.codexState.trigger?.focus?.({ preventScroll: true });
-    this.codexState = { isOpen: false, trigger: null };
+    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
   }
 
   bindHangarControls() {
