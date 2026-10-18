@@ -4,34 +4,34 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~10h50) — RODADA 7 (CONSOLIDAÇÃO) MESCLADA NA `main` (publicado)
+## O BASTÃO — onde a rodada parou (18/10, ~12h20) — RODADA 8 MESCLADA NA `main` (publicado)
 
 **Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
-(PRs #247–#253 e o oitavo). Ler este BASTÃO, `PLAN.md` (Rodadas 2–7) e `docs/NORTE.md` (§7 + regra dos dois eixos);
-`npm ci && npm run done`. **Antes de qualquer junção:** sonda headless `scratchpad/errprobe.mjs` com `errors: 0`.
+(PRs #247–#254 e o nono). Ler este BASTÃO, `PLAN.md` (Rodadas 2–8) e `docs/NORTE.md` (§7 + regra dos dois eixos);
+`npm ci && npm run done` (984 testes). **Antes de qualquer junção:** sonda headless `scratchpad/errprobe.mjs` → `errors: 0`.
 
 **Regra dele:** toda rodada melhora também gráficos, efeitos, câmera, jogabilidade e UX, não só conteúdo.
 
-**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5. Sem veredito ainda sobre as Rodadas 5, 6 e 7.
+**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5. **Sem veredito ainda sobre as Rodadas 5–8.**
 
-**Rodada 7 (consolidação):** máquinas desenhadas em menos malhas (vertex colors; cena carregada ultra ~155 → ~134
-draw calls; meta < 80 exige decisões listadas no BACKLOG); sete acabamentos de UX (AIM MANUAL, linha de lock da
-torreta, Esc fecha Settings, setas fora dos painéis, chips de casco, dicas do esquema moderno, salvage por
-dificuldade); dívidas do BACKLOG pagas (RenderBatch/GradientCache, music controller morto, teste órfão, cópias de
-resolveRandom, pools duplicados, dois painéis → um `?stats=1`/F8, serviços não usados no manifesto, getBounds real,
-HUD do boss uma vez; CanvasStateManager e ShakePresets ficaram: estavam em uso); modificadores de camada no infinito
-(Dense Fog, Magnetic Storm, Hunters' Moon, Glass Field).
+**Rodada 8:** evoluções Apex (cinco cartas da família: Solar Flare, Coilgun, Storm, Singularity, Motherlode; chip APEX,
+conquista); batching de draw calls (rims num LineSegments, emissivos instanciados, bloom 3 níveis fora do ultra; cena
+carregada ultra ~155 → ~131; meta < 100 exige fundir a nave ou cortar casters — BACKLOG); Dense Fog escurece o campo
+distante; acessibilidade (escala de texto, HUD alto contraste, reduzir flashes, legendas grandes); modificadores por
+seed de run; prévia 3D do casco no Hangar; setas de fora de tela não se empilham.
 
 **Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais (monitor interno).
 
-**O que só ele pode responder, jogando:** Rodadas 5–7 inteiras (fundo, sombras, torreta, twin-stick, afixos, HUD
-direcional, dificuldade/Daily, Slicer, som com distância, modificadores do infinito) e todas as "propostas".
+**O que só ele pode responder, jogando:** Rodadas 5–8 inteiras; em especial agora: Apex (números), acessibilidade
+(contraste e tamanho de texto), fog do infinito, e todas as "propostas".
 
-**Próxima rodada sem veredito dele:** BACKLOG (26 linhas) — decisão de draw calls (batch de rims/olhos), seed do
-wave-manager por run, Dense Fog no render3d, chips de casco no Hangar com prévia, HUD AIM MANUAL feito.
+**Próxima rodada sem veredito dele:** BACKLOG (26 linhas): fusão da nave para a meta de draw calls, badges de afixo sem
+seed (guard de Math.random), drift do Magnetic Storm com seed de run, flash de borda do boss com "reduce flashing",
+prévia de casco bloqueado no Hangar.
 
 **Avisos de processo (18/10):** `pgrep -f`/`pkill -f` matam o próprio shell do worker; dois workers no mesmo arquivo
-exigem separar hunks; o container pode reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos.
+exigem separar hunks; o container pode reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos ao
+rearmar; pedir ao worker que encerre quando passar de ~60 min medindo.
 
 ## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
 
