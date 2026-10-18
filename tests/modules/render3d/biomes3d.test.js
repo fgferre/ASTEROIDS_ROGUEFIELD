@@ -20,15 +20,16 @@ new Function(
 const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
 
 describe('BiomeController', () => {
-  it('fades lights, bloom and the look onto the next biome in 2 s', () => {
+  it('fades lights, bloom, nebula and dust onto the next biome in 2 s', () => {
     const looks = [];
+    const spaceLooks = [];
     const targets = {
       key: new THREE.DirectionalLight(),
       fill: new THREE.DirectionalLight(),
       bloomPass: { strength: 0 },
       bloomBase: 0.9,
       backdrop: { setLook: (look) => looks.push({ ...look }) },
-      floor: { setLook: () => {} },
+      space: { setLook: (look) => spaceLooks.push({ ...look }) },
     };
     const controller = new BiomeController(THREE, targets);
     const transition = new BiomeTransition();
@@ -50,6 +51,9 @@ describe('BiomeController', () => {
     const last = looks[looks.length - 1];
     expect(last.mix).toBe(1);
     expect(last.veinDensity).toBeCloseTo(core.veinDensity);
+    const space = spaceLooks[spaceLooks.length - 1];
+    expect(space.dustColor.getHex()).toBe(linear(core.dustColor).getHex());
+    expect(space.hazeDensity).toBeCloseTo(core.hazeDensity);
 
     // Settled: nothing is re-applied.
     const count = looks.length;

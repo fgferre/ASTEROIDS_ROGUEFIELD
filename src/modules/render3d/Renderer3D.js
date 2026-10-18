@@ -56,8 +56,7 @@ import {
 import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
-import { DustFloor, FLOOR_DEPTH } from './dustFloor.js';
-import { EnemyMirror, VIEW_KINDS } from './enemyMirror.js';
+import { EnemyMirror, VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
@@ -67,6 +66,7 @@ import { PlayerMirror } from './playerMirror.js';
 import { setRimLight } from './rimLight.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
+import { SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
 import { mirrorWeaponEffects, pushLance } from './weaponMirror.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -93,7 +93,6 @@ const MAX_SHOCKWAVES = 25;
 const MAX_TRAIL_POINTS = 64;
 const MAX_DAMAGE_TEXTS = 16;
 const OVERLAY_H = 9;
-const SHIP_SHADOW_RADIUS = 14;
 const WHITE = [1, 1, 1];
 // proposta 17/10: what kicks the impact pass (strength 0..1). Shockwaves
 // kick only from KICK_WAVE_RADIUS up, full at KICK_WAVE_FULL.
@@ -104,8 +103,24 @@ const KICK_WAVE_RADIUS = 90;
 const KICK_WAVE_FULL = 200;
 const KICK_WAVE_MIN = 0.25;
 const KICK_WAVE_MAX = 0.8;
-// proposta 18/10: soft particles fade over this many units above the floor.
-const SOFT_FLOOR_RANGE = 60;
+// proposta 18/10: the key light's shadow box follows the camera target: the
+// light sits KEY_SHADOW.distance away along its direction, the box spans the
+// shot (`span` × the camera range, clamped) and the biases keep rocks from
+// shadowing themselves in stripes.
+const KEY_SHADOW = {
+  distance: 1000,
+  depth: 500,
+  span: 0.62,
+  min: 380,
+  max: 1400,
+  bias: -0.0006,
+  normalBias: 0.6,
+};
+// The ship's hull panels cast; its turret, nozzles and canopy (radius under
+// this, world units) only receive.
+const SHIP_MIN_CASTER = 5;
+// Point sizes of the star layers are authored for a frame this tall.
+const STAR_FRAME_HEIGHT = 900;
 
 // Last linear → sRGB step of the composer (the passes work in linear; the
 // renderer's outputEncoding only applies when drawing to the screen).
@@ -433,15 +448,28 @@ class Renderer3D extends BaseSystem {
     t.biomes.applied = null;
     t.enemies.setSurfaceMaps(q.surfaceMaps);
     t.player.setSurfaceMaps(q.surfaceMaps);
-    t.floor.shadows.visible = q.shadows;
+    this.applyShadows(q.shadows);
     t.debris.limit = q.debrisCap;
     setRimLight(q.rimLight);
     t.decals.setEnabled(q.decals);
-    const soft = q.softParticles ? SOFT_FLOOR_RANGE : 0;
-    [t.glow, t.matte, t.smoke].forEach((batch) =>
-      batch.setSoftFloor(-FLOOR_DEPTH, soft)
-    );
     this.syncPasses();
+  }
+
+  // The key light's shadow map, `size` texels square (0 = off). Toggling it
+  // changes the lit programs, so a preset change recompiles them once. A
+  // new map is drawn once here, seeded: three names it with a Math.random
+  // UUID.
+  applyShadows(size) {
+    const { renderer, key, scene, camera } = this.three;
+    const on = size > 0;
+    renderer.shadowMap.enabled = on;
+    key.castShadow = on;
+    if (on && key.shadow.mapSize.x !== size) {
+      key.shadow.mapSize.set(size, size);
+      key.shadow.map?.dispose();
+      key.shadow.map = null;
+      this.seeded(() => renderer.shadowMap.render([key], scene, camera));
+    }
   }
 
   /** After every simulation step (app.js): captures poses to interpolate. */
@@ -548,18 +576,25 @@ class Renderer3D extends BaseSystem {
     renderer.info.autoReset = false;
 
     const scene = new THREE.Scene();
-    // Far enough for the sky from the cinematics' high shots.
-    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 7000);
+    // Far enough for the nebula from the cinematics' high shots.
+    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 9000);
 
-    // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in the world.
-    // No shadow maps in this slice (cost); the fill and the environment keep
-    // the unlit sides readable.
+    // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in direction;
+    // on high/ultra it casts shadows between the 3D objects (applyShadows),
+    // its target following the camera (updateCamera). The fill and the
+    // environment keep the unlit sides readable.
     const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
-    key.position.set(
+    const keyDir = new THREE.Vector3(
       KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
       Math.sin(KEY_ELEVATION),
       KEY_LIGHT_DIR.y * Math.cos(KEY_ELEVATION)
     );
+    key.position.copy(keyDir).multiplyScalar(KEY_SHADOW.distance);
+    key.shadow.bias = KEY_SHADOW.bias;
+    key.shadow.normalBias = KEY_SHADOW.normalBias;
+    key.shadow.camera.near = KEY_SHADOW.distance - KEY_SHADOW.depth;
+    key.shadow.camera.far = KEY_SHADOW.distance + KEY_SHADOW.depth;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Fill: cool, from below-right; hemisphere keeps shadows from going void.
     const fill = new THREE.DirectionalLight(
       colorOf(THREE, PALETTE.neutral),
@@ -577,7 +612,7 @@ class Renderer3D extends BaseSystem {
       WARDEN_LIGHT_DISTANCE,
       2
     );
-    scene.add(key, fill, hemi, wardenLight);
+    scene.add(key, key.target, fill, hemi, wardenLight);
     scene.environment = this.buildEnvironment(THREE, renderer);
 
     const width = Math.max(1, canvas.width);
@@ -623,14 +658,14 @@ class Renderer3D extends BaseSystem {
     );
 
     const backdrop = new FieldBackdrop(THREE, scene);
-    const floor = new DustFloor(THREE, scene, TILT);
+    const space = new SpaceField(THREE, scene);
     const biomes = new BiomeController(THREE, {
       key,
       fill,
       bloomPass,
       bloomBase: BLOOM.strength * bloomUrl.scale,
       backdrop,
-      floor,
+      space,
     });
     const flashes = new FlashLights(THREE, scene);
     const debris = new DebrisChunks(THREE, scene);
@@ -709,9 +744,11 @@ class Renderer3D extends BaseSystem {
       texts,
       bossFlash,
       bossFlashKey: '',
+      key,
+      keyDir,
       wardenLight,
       backdrop,
-      floor,
+      space,
       biomes,
       flashes,
       enemies,
@@ -823,6 +860,7 @@ class Renderer3D extends BaseSystem {
   // frame draws them: into the composer's target, or the screen without it.
   compileScene() {
     const t = this.three;
+    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.renderer.setRenderTarget(
       this.graphics.postProcessing ? t.composer.readBuffer : null
     );
@@ -849,7 +887,9 @@ class Renderer3D extends BaseSystem {
     t.bloomPass.enabled = true;
     t.smaaPass.enabled = true;
     t.impactPass.enabled = true;
-    t.composer.render(0);
+    // Seeded: the shadow pass names its depth material with a Math.random
+    // UUID the first time it draws.
+    this.seeded(() => t.composer.render(0));
     t.renderer.render(t.overlay, t.camera);
     t.texts.begin();
     t.texts.end();
@@ -901,7 +941,6 @@ class Renderer3D extends BaseSystem {
     t.matte.begin();
     t.smoke.begin();
     t.texts.begin();
-    t.floor.begin();
     t.debris.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
@@ -911,7 +950,7 @@ class Renderer3D extends BaseSystem {
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
     this.mirrorShield(player, time);
-    this.mirrorShadows(player, enemyList);
+    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
     this.mirrorProjectiles();
     this.mirrorPickups(time);
@@ -925,7 +964,13 @@ class Renderer3D extends BaseSystem {
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     this.biome.update(dt);
     t.biomes.update(this.biome);
-    t.backdrop.update(this.camera.x, this.camera.y, dt, pointScale);
+    const ship = t.player.group.visible && player?.position;
+    t.space.update(this.camera.x, this.camera.y, dt, {
+      ship: ship || null,
+      shipLight: t.player.light.intensity,
+      pointScale,
+      pixel: t.height / STAR_FRAME_HEIGHT,
+    });
     t.ribbons.end();
     t.lances.end();
     t.glow.end(pointScale);
@@ -1053,9 +1098,36 @@ class Renderer3D extends BaseSystem {
     );
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);
+    this.aimKeyShadow(tx, tz, range);
     const roll = this.updateRoll(player, dt);
     const angle = roll + (shaking ? shake.angle : 0);
     if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
+  }
+
+  // The key light's shadow box over the shot: centred on the camera target
+  // (snapped to whole texels so still edges don't crawl), sized by the range.
+  aimKeyShadow(tx, tz, range) {
+    const { key, keyDir } = this.three;
+    if (!key.castShadow) return;
+    const half = Math.min(
+      KEY_SHADOW.max,
+      Math.max(KEY_SHADOW.min, range * KEY_SHADOW.span)
+    );
+    const texel = (2 * half) / key.shadow.mapSize.x;
+    const x = Math.round(tx / texel) * texel;
+    const z = Math.round(tz / texel) * texel;
+    key.target.position.set(x, 0, z);
+    key.position.copy(keyDir).multiplyScalar(KEY_SHADOW.distance);
+    key.position.x += x;
+    key.position.z += z;
+    const cam = key.shadow.camera;
+    if (cam.right !== half) {
+      cam.left = -half;
+      cam.right = half;
+      cam.top = half;
+      cam.bottom = -half;
+      cam.updateProjectionMatrix();
+    }
   }
 
   // Banks the view up to ROLL_MAX with the strafe: the screen-horizontal
@@ -1348,21 +1420,6 @@ class Renderer3D extends BaseSystem {
     scan(this.cachedCombat?.enemyBullets || []);
     scan(this.cachedEnemies?.getActiveEnemies() || []);
     return out;
-  }
-
-  // A shadow on the dust floor under every mass; the ship's light pool.
-  mirrorShadows(player, enemies) {
-    const { floor, player: ship } = this.three;
-    const shadows = floor.shadows.visible;
-    for (let i = 0; i < enemies.length && shadows; i += 1) {
-      const e = enemies[i];
-      if (e && !e.destroyed) floor.shadow(e.x, e.y, e.radius || 12);
-    }
-    const visible = ship.group.visible && player?.position;
-    if (visible && shadows) {
-      floor.shadow(visible.x, visible.y, SHIP_SHADOW_RADIUS);
-    }
-    floor.end(visible || null, ship.light.intensity);
   }
 
   // The 2D overlays (EffectsSystem.drawWorld/drawScreenSpace, the

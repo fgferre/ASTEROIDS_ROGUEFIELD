@@ -222,7 +222,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
 - [x] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
       cintilam, partículas suaves (fade por profundidade), escudo hexagonal em 3D, marcas de queimadura (decals)
       nas rochas atingidas, poeira volumétrica no bioma.
-- [ ] **R5.10 Espaço procedural (veredito dele, 18/10).** O fundo lê como textura de estrelas e as sombras no "chão"
+- [x] **R5.10 Espaço procedural (veredito dele, 18/10).** O fundo lê como textura de estrelas e as sombras no "chão"
       não fazem sentido no espaço. Trocar `dustFloor`/`fieldBackdrop` por: 3–4 camadas de estrelas em pontos 3D a
       profundidades diferentes (paralaxe real com a câmera, cintilação), nebulosa em shader (fbm) num plano distante,
       poeira volumétrica esparsa; **sem chão e sem sombras num plano de fundo**; sombras reais só entre objetos 3D

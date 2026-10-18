@@ -7,21 +7,21 @@
 
 // Best first. `pixelRatio` caps render pixels per CSS pixel (the canvas
 // itself stays at native size; the composer draws smaller and scales up).
-// The polish layers (proposta 18/10): `filmGrain` grain + vignette in the
-// impact pass, `rimLight` on machine hulls, `softParticles` the points'
-// fade near the floor, `decals` scorch marks on rocks.
+// `shadows`: the key light's shadow map size in texels (rocks, machines and
+// the ship shadow each other), 0 = off. The polish layers (proposta 18/10):
+// `filmGrain` grain + vignette in the impact pass, `rimLight` on machine
+// hulls, `decals` scorch marks on rocks.
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
     smaa: true,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 2048,
     debrisCap: 160,
     pixelRatio: 2,
     filmGrain: true,
     rimLight: true,
-    softParticles: true,
     decals: true,
   },
   high: {
@@ -29,12 +29,11 @@ export const QUALITY_PRESETS = {
     smaa: true,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 1024,
     debrisCap: 120,
     pixelRatio: 1.5,
     filmGrain: true,
     rimLight: true,
-    softParticles: true,
     decals: true,
   },
   medium: {
@@ -42,12 +41,11 @@ export const QUALITY_PRESETS = {
     smaa: false,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 0,
     debrisCap: 80,
     pixelRatio: 1.25,
     filmGrain: true,
     rimLight: true,
-    softParticles: true,
     decals: true,
   },
   low: {
@@ -55,12 +53,11 @@ export const QUALITY_PRESETS = {
     smaa: false,
     impactPass: false,
     surfaceMaps: false,
-    shadows: false,
+    shadows: 0,
     debrisCap: 48,
     pixelRatio: 1,
     filmGrain: false,
     rimLight: false,
-    softParticles: false,
     decals: false,
   },
 };

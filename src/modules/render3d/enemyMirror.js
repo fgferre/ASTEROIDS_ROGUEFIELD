@@ -341,6 +341,30 @@ function paintRock(THREE, geometry, seed) {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
+/**
+ * Lit, opaque meshes under `root` cast and receive the key light's shadow
+ * (Renderer3D); glows, lenses and anything see-through stay out of it.
+ * Parts under `minRadius` world units still receive but don't cast: each
+ * caster is one more draw call in the shadow pass.
+ */
+export function markShadowCasters(root, minRadius = 0) {
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    const material = object.material;
+    const lit = material?.isMeshStandardMaterial && !material.transparent;
+    object.receiveShadow = lit;
+    if (!lit || !minRadius) {
+      object.castShadow = lit;
+      return;
+    }
+    const { geometry } = object;
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    object.castShadow =
+      geometry.boundingSphere.radius * object.matrixWorld.getMaxScaleOnAxis() >=
+      minRadius;
+  });
+}
+
 export class EnemyMirror {
   /** `bursts`: DeathBursts (dissolve.js) for the chunks a death throws. */
   constructor(THREE, scene, seeded, bursts) {
@@ -710,6 +734,7 @@ export class EnemyMirror {
     const view =
       pool && pool.length ? pool.pop() : this.seeded(() => this.create(kind));
     view.object.visible = true;
+    markShadowCasters(view.object);
     return view;
   }
 

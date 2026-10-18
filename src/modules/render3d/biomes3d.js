@@ -1,12 +1,12 @@
 // The look of the current biome in 3D (docs/NORTE.md §7 pillar 1): every
 // frame of a BiomeTransition's fade it mixes the two biomes' colours and
-// numbers into one look and hands it to the lights, the bloom, the backdrop
-// and the floor. Outside a fade it does nothing.
+// numbers into one look and hands it to the lights, the bloom, the distant
+// structures and the space behind them (nebula, dust). Outside a fade it does nothing.
 
 import { BIOMES } from '../../data/biomes.js';
 import { colorOf } from './batches.js';
 
-const COLORS = ['hazeColor', 'veinColor', 'keyColor', 'fillColor'];
+const COLORS = ['hazeColor', 'veinColor', 'dustColor', 'keyColor', 'fillColor'];
 const NUMBERS = [
   'hazeDensity',
   'veinDensity',
@@ -15,13 +15,12 @@ const NUMBERS = [
   'bloomScale',
   'debris',
   'structures',
-  'floorGlow',
 ];
 
 export class BiomeController {
   /**
    * `targets`: { key, fill } lights, `bloomPass` and its `bloomBase`
-   * strength, `backdrop` and `floor` (each with setLook(look)).
+   * strength, `backdrop` and `space` (each with setLook(look)).
    */
   constructor(THREE, targets) {
     this.targets = targets;
@@ -76,7 +75,7 @@ export class BiomeController {
       bloomPass,
       bloomBase,
       backdrop,
-      floor,
+      space,
     } = this.targets;
     keyLight.color.copy(look.keyColor);
     keyLight.intensity = look.keyIntensity;
@@ -84,6 +83,6 @@ export class BiomeController {
     fill.intensity = look.fillIntensity;
     bloomPass.strength = bloomBase * look.bloomScale;
     backdrop.setLook(look);
-    floor.setLook(look);
+    space.setLook(look);
   }
 }
