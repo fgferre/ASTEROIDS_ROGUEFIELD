@@ -42,6 +42,7 @@ import { HUNTER_REWARDS } from '../../../data/enemies/hunter.js';
 import { MINE_REWARDS } from '../../../data/enemies/mine.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ELITE_MODIFIERS } from '../../../data/enemies/elite.js';
+import { AFFIX_XP_BONUS } from '../../../data/enemies/affixes.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import RandomService from '../../../core/RandomService.js';
@@ -289,10 +290,13 @@ export class RewardManager {
     // Final orb count including wave bonus
     const orbCount = Math.max(1, baseOrbCount + Math.max(0, waveBonus));
 
+    const affixMultiplier = 1 + AFFIX_XP_BONUS * (enemy.affixes?.length ?? 0);
     const resolvedTotalXP =
       (typeof config.totalXP === 'function'
         ? config.totalXP(enemy, baseOrbCount)
-        : config.totalXP) * eliteMultiplier;
+        : config.totalXP) *
+      eliteMultiplier *
+      affixMultiplier;
     const fallbackOrbValue = config.orbValue ?? ORB_VALUE ?? 5;
 
     const xpDistribution = this.buildXPDistribution({

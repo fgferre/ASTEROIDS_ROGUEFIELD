@@ -367,6 +367,20 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
+   * Logical field (x, y) → 800×600 screen point through the perspective
+   * camera (last rendered pose), for the HUD. Null before the first frame.
+   */
+  worldToScreen(x, y, out = { x: 0, y: 0 }) {
+    const t = this.three;
+    if (!t) return null;
+    const v = this.projected || (this.projected = new t.THREE.Vector3());
+    v.set(x - HALF_W, 0, y - HALF_H).project(t.camera);
+    out.x = ((v.x + 1) / 2) * GAME_WIDTH;
+    out.y = ((1 - v.y) / 2) * GAME_HEIGHT;
+    return out;
+  }
+
+  /**
    * Runs the intro descent over `durationMs`, then hands back to the follow
    * camera. False when nothing would move (WebGL failed, `?camera=0`,
    * reduced motion): the caller skips the cinematic.
@@ -458,7 +472,8 @@ class Renderer3D extends BaseSystem {
   // The key light's shadow map, `size` texels square (0 = off). Toggling it
   // changes the lit programs, so a preset change recompiles them once. A
   // new map is drawn once here, seeded: three names it with a Math.random
-  // UUID.
+  // UUID. Through a whole render(): shadowMap.render alone reads the
+  // renderer's per-frame light state, which is null between frames.
   applyShadows(size) {
     const { renderer, key, scene, camera } = this.three;
     const on = size > 0;
@@ -468,7 +483,7 @@ class Renderer3D extends BaseSystem {
       key.shadow.mapSize.set(size, size);
       key.shadow.map?.dispose();
       key.shadow.map = null;
-      this.seeded(() => renderer.shadowMap.render([key], scene, camera));
+      this.seeded(() => renderer.render(scene, camera));
     }
   }
 

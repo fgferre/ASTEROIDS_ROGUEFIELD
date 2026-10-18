@@ -4,11 +4,11 @@ import {
   BULWARK_SHIELD_HALF_ARC,
 } from '../../../data/enemies/bulwark.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
-
-const angleBetween = (a, b) => {
-  const d = Math.abs(a - b) % (Math.PI * 2);
-  return d > Math.PI ? Math.PI * 2 - d : d;
-};
+import {
+  absorbFrontalHit,
+  faceTarget,
+  hitsFrontalShield,
+} from '../base/frontalShield.js';
 
 /**
  * Slow approach behind a frontal shield plate (±BULWARK_SHIELD_HALF_ARC around
@@ -52,17 +52,7 @@ export class Bulwark extends BaseEnemy {
   }
 
   onUpdate() {
-    const target = this.system?.getCachedPlayer?.()?.position;
-    if (target) {
-      this.facing = Math.atan2(target.y - this.y, target.x - this.x);
-    }
-  }
-
-  /** True when a hit from `point` lands on the intact shield plate. */
-  isShielded(point) {
-    if (this.shieldBroken || !point) return false;
-    const angle = Math.atan2(point.y - this.y, point.x - this.x);
-    return angleBetween(angle, this.facing) <= BULWARK_SHIELD_HALF_ARC;
+    faceTarget(this);
   }
 
   /**
@@ -71,24 +61,16 @@ export class Bulwark extends BaseEnemy {
    */
   takeDamage(amount, source = null) {
     const hit = source?.hitPosition;
-    if (!this.alive || !(amount > 0) || !this.isShielded(hit)) {
+    if (
+      !this.alive ||
+      !(amount > 0) ||
+      this.isDamageBlocked() ||
+      !hitsFrontalShield(this, hit, BULWARK_SHIELD_HALF_ARC)
+    ) {
       return super.takeDamage(amount, source);
     }
 
-    const absorbed = Math.min(this.shieldHealth, amount);
-    this.shieldHealth -= absorbed;
-    if (this.shieldHealth <= 0) {
-      this.shieldHealth = 0;
-      this.shieldBroken = true;
-    }
-    this.getEventBus()?.emit?.('shield-deflected', {
-      position: { x: hit.x, y: hit.y },
-      normal: { x: Math.cos(this.facing), y: Math.sin(this.facing) },
-      level: 0,
-      intensity: this.shieldBroken ? 2 : 0.8,
-    });
-
-    const overflow = amount - absorbed;
+    const overflow = absorbFrontalHit(this, amount, hit);
     return overflow > 0 ? super.takeDamage(overflow, source) : false;
   }
 

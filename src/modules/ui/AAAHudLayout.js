@@ -4,6 +4,7 @@ import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
 import RandomService from '../../core/RandomService.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 
 const COMBO_VISIBLE_MIN = 2;
 const RADAR_SIZE = 220;
@@ -28,6 +29,89 @@ const BEAM_PIPS = WEAPONS.harmonic.beam.every - 1;
 // Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
 const ASTEROID_FEED_NAME = 'Fragment';
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
+// proposta 18/10 (PLAN R6.5): damage arcs on an ellipse just inside the
+// screen edge, one per direction (hits within ~17° refresh the same arc).
+const DAMAGE_ARC_MS = 600;
+const DAMAGE_ARC_MAX = 4;
+const DAMAGE_ARC_MERGE = 0.3;
+const DAMAGE_ARC_RX = GAME_WIDTH * 0.46;
+const DAMAGE_ARC_RY = GAME_HEIGHT * 0.44;
+// Off-screen arrows: pooled, inset from the edge, distance rounded to 10.
+const EDGE_ARROW_MAX = 8;
+const EDGE_ARROW_MARGIN = 28;
+
+/** Screen angle (rad) from the ship to the damage source; null when unknown. */
+export function damageArcAngle(ship, source) {
+  if (!ship || !source) return null;
+  const dx = source.x - ship.x;
+  const dy = source.y - ship.y;
+  if (!(Math.hypot(dx, dy) > 1)) return null;
+  return Math.atan2(dy, dx);
+}
+
+/**
+ * Where an off-screen marker sits for a screen point: null inside the
+ * width×height view, else the point on the inset edge toward it, the
+ * pointing angle and which edge ('left' | 'right' | 'top' | 'bottom').
+ */
+export function edgeArrow(
+  point,
+  width = GAME_WIDTH,
+  height = GAME_HEIGHT,
+  margin = EDGE_ARROW_MARGIN
+) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    return null;
+  }
+  if (point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height) {
+    return null;
+  }
+  const dx = point.x - width / 2;
+  const dy = point.y - height / 2;
+  const sx = (width / 2 - margin) / Math.abs(dx);
+  const sy = (height / 2 - margin) / Math.abs(dy);
+  const scale = Math.min(sx, sy);
+  let edge = dy > 0 ? 'bottom' : 'top';
+  if (sx <= sy) edge = dx > 0 ? 'right' : 'left';
+  return {
+    x: width / 2 + dx * scale,
+    y: height / 2 + dy * scale,
+    angle: Math.atan2(dy, dx),
+    edge,
+  };
+}
+
+/** Radar blip glyph for an enemy: rock, machine, elite, herald or warden. */
+export function radarGlyph(enemy) {
+  if (enemy.type === 'boss') return 'warden';
+  if (enemy.type === 'herald') return 'herald';
+  if (enemy.type === 'asteroid') return 'rock';
+  return enemy.elite ? 'elite' : 'machine';
+}
+
+/**
+ * Boss bar segments left → right ({ left, width } in %, state). Health
+ * drains right to left, so phase 0 is the rightmost segment; segments to
+ * its right are spent, to its left still ahead. Boundaries come from the
+ * Warden's phase thresholds when they match the count, else equal parts.
+ */
+export function bossSegments(
+  phaseCount,
+  phase,
+  thresholds = BOSS_CONFIG.phaseThresholds
+) {
+  const total = Math.max(1, Math.floor(Number(phaseCount) || 1));
+  const bounds =
+    Array.isArray(thresholds) && thresholds.length === total - 1
+      ? [0, ...[...thresholds].sort((a, b) => a - b).map((t) => t * 100), 100]
+      : Array.from({ length: total + 1 }, (_, i) => (i / total) * 100);
+  const current = total - 1 - Math.min(total - 1, Math.max(0, phase || 0));
+  return Array.from({ length: total }, (_, i) => ({
+    left: bounds[i],
+    width: bounds[i + 1] - bounds[i],
+    state: i === current ? 'current' : i > current ? 'spent' : 'ahead',
+  }));
+}
 
 /** Combo color tier: text < 1.3×, status 1.3–1.6×, xp 1.7–1.9×, boss at 2.0×. */
 export function comboTier(multiplier) {
@@ -47,12 +131,14 @@ export class AAAHudLayout {
     this._lastBossHealthPercent = null;
     this._bossHitTimeout = null;
     this._bossCriticalTimeout = null;
-    this._bossPhaseMarkers = [];
-    this._lastBossPhaseMarkerCount = null;
+    this._bossSegmentEls = [];
+    this._bossSegmentKey = null;
     this._lastCombo = null;
     this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
+    this._arcPool = [];
+    this._arrowPool = [];
     this._radarJammed = false;
     this._radarNoise = new RandomService('radar-jam');
     this._radarNoiseAt = -Infinity;
@@ -105,6 +191,7 @@ export class AAAHudLayout {
     this._cacheElements();
     this._initializeBars();
     this._createBlipPool();
+    this._createDirectionPools();
 
     if (
       typeof globalThis !== 'undefined' &&
@@ -139,12 +226,14 @@ export class AAAHudLayout {
       this._bossCriticalTimeout = null;
     }
     this._lastBossHealthPercent = null;
-    this._bossPhaseMarkers = [];
-    this._lastBossPhaseMarkerCount = null;
+    this._bossSegmentEls = [];
+    this._bossSegmentKey = null;
     this._lastCombo = null;
     this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
+    this._arcPool = [];
+    this._arrowPool = [];
     this._radarJammed = false;
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
@@ -506,7 +595,7 @@ export class AAAHudLayout {
       bossPanel: query('#ui-boss-panel'),
       bossName: query('#ui-boss-name'),
       bossFill: query('#ui-boss-fill'),
-      bossMarkers: query('#ui-boss-markers'),
+      bossSegments: query('#ui-boss-segments'),
       radar: query('#ui-radar'),
       radarContainer: query('#ui-radar-blips'),
       shieldRow: query('#ui-shield-row'),
@@ -545,6 +634,7 @@ export class AAAHudLayout {
       onboardingKeys: query('#ui-onboarding-keys'),
       onboardingText: query('#ui-onboarding-text'),
       lowHpVignette: query('#ui-lowhp-vignette'),
+      direction: query('#ui-direction'),
     };
   }
 
@@ -820,7 +910,7 @@ export class AAAHudLayout {
     if (!active) {
       this.els.bossPanel.classList.remove('active');
       this.els.bossPanel.classList.remove('is-hit', 'is-invulnerable');
-      this.els.bossPanel.classList.remove('is-critical');
+      this.els.bossPanel.classList.remove('is-critical', 'is-herald');
       if (this._bossHitTimeout) {
         window.clearTimeout(this._bossHitTimeout);
         this._bossHitTimeout = null;
@@ -830,9 +920,16 @@ export class AAAHudLayout {
         this._bossCriticalTimeout = null;
       }
       this._lastBossHealthPercent = null;
-      this._updateBossPhaseMarkers(0, 0);
+      this._updateBossSegments(0, 0);
       this._resetBossColors();
       return;
+    }
+
+    // A Herald: shorter violet bar, one segment, no phase colours.
+    const herald = Boolean(phaseInfo?.herald);
+    if (herald !== this.els.bossPanel.classList.contains('is-herald')) {
+      this.els.bossPanel.classList.toggle('is-herald', herald);
+      this._resetBossColors();
     }
 
     this.els.bossPanel.classList.toggle(
@@ -889,7 +986,7 @@ export class AAAHudLayout {
       this._lastBossHealthPercent = healthPercent;
     }
 
-    this._updateBossPhaseMarkers(phaseCount, phase);
+    this._updateBossSegments(phaseCount, phase);
   }
 
   /** Reset boss bar colors to default */
@@ -927,38 +1024,34 @@ export class AAAHudLayout {
     }, 280);
   }
 
-  _updateBossPhaseMarkers(phaseCount, phaseIndex) {
-    if (!this.els?.bossMarkers) {
+  _updateBossSegments(phaseCount, phase) {
+    const container = this.els?.bossSegments;
+    if (!container) {
       return;
     }
 
     const total = Number.isFinite(phaseCount) ? Math.floor(phaseCount) : 0;
-    const markerCount = total > 1 ? total - 1 : 0;
-
-    if (markerCount !== this._lastBossPhaseMarkerCount) {
-      this.els.bossMarkers.innerHTML = '';
-      this._bossPhaseMarkers = [];
-      for (let i = 0; i < markerCount; i += 1) {
-        const marker = document.createElement('div');
-        marker.className = 'boss-phase-marker';
-        marker.style.left = `${((i + 1) / total) * 100}%`;
-        this.els.bossMarkers.appendChild(marker);
-        this._bossPhaseMarkers.push(marker);
-      }
-      this._lastBossPhaseMarkerCount = markerCount;
-    }
-
-    if (!markerCount) {
+    const segments = total > 0 ? bossSegments(total, phase) : [];
+    const key = segments.map((seg) => seg.state).join();
+    if (key === this._bossSegmentKey) {
       return;
     }
+    this._bossSegmentKey = key;
 
-    const currentPhase = Number.isFinite(phaseIndex) ? phaseIndex : 0;
-    this._bossPhaseMarkers.forEach((marker, index) => {
-      marker.classList.toggle('passed', currentPhase > index);
-      marker.classList.toggle(
-        'next',
-        currentPhase <= index && currentPhase === index
-      );
+    if (segments.length !== this._bossSegmentEls.length) {
+      container.innerHTML = '';
+      this._bossSegmentEls = segments.map((seg) => {
+        const el = document.createElement('div');
+        el.style.left = `${seg.left}%`;
+        el.style.width = `${seg.width}%`;
+        container.appendChild(el);
+        return el;
+      });
+    }
+    // One segment (a Herald) is just the bar: no pulse.
+    segments.forEach((seg, index) => {
+      const state = segments.length > 1 ? seg.state : 'ahead';
+      this._bossSegmentEls[index].className = `boss-seg is-${state}`;
     });
   }
 
@@ -1021,7 +1114,8 @@ export class AAAHudLayout {
 
   /**
    * Atualiza Radar
-   * @param {Array} blips - [{x: -1..1, y: -1..1, type: 'enemy'|'ally'}]
+   * @param {Array} blips - [{x: -1..1, y: -1..1, type}]: type is a
+   *   radarGlyph() name or 'pickup'.
    */
   updateRadar(blips) {
     if (!this.els) {
@@ -1049,7 +1143,7 @@ export class AAAHudLayout {
         continue;
       }
       const b = list[i];
-      const type = b.type || 'enemy';
+      const type = b.type || 'machine';
       if (el.dataset.type !== type) {
         el.dataset.type = type;
         el.className = 'blip ' + type;
@@ -1072,17 +1166,127 @@ export class AAAHudLayout {
     this._blipPool = [];
     for (let i = 0; i < RADAR_POOL_SIZE; i += 1) {
       const el = document.createElement('div');
-      el.className = 'blip enemy';
-      el.dataset.type = 'enemy';
+      el.className = 'blip machine';
+      el.dataset.type = 'machine';
       el.style.display = 'none';
       this.els.radarContainer.appendChild(el);
       this._blipPool.push(el);
     }
   }
 
+  _createDirectionPools() {
+    const layer = this.els.direction;
+    this._arcPool = Array.from({ length: DAMAGE_ARC_MAX }, () => {
+      const el = document.createElement('div');
+      el.className = 'damage-arc';
+      layer.appendChild(el);
+      return { el, angle: 0, until: 0, timer: null };
+    });
+    this._arrowPool = Array.from({ length: EDGE_ARROW_MAX }, () => {
+      const el = document.createElement('div');
+      el.className = 'edge-arrow';
+      el.style.display = 'none';
+      const glyph = document.createElement('div');
+      glyph.className = 'edge-arrow__glyph';
+      const label = document.createElement('div');
+      label.className = 'edge-arrow__label';
+      el.appendChild(glyph);
+      el.appendChild(label);
+      layer.appendChild(el);
+      return { el, glyph, label, kind: null, color: null, text: '' };
+    });
+  }
+
+  /**
+   * Red arc on the screen edge toward a hit's source (screen points of the
+   * ship and the source), DAMAGE_ARC_MS long; up to DAMAGE_ARC_MAX at once.
+   * Reduced motion: shown without the fade (CSS).
+   */
+  showDamageFrom(ship, source) {
+    const angle = damageArcAngle(ship, source);
+    if (angle === null || !this._arcPool.length) {
+      return;
+    }
+    const now = performance.now();
+    const same = this._arcPool.find(
+      (arc) =>
+        arc.until > now &&
+        Math.abs(
+          Math.atan2(Math.sin(arc.angle - angle), Math.cos(arc.angle - angle))
+        ) < DAMAGE_ARC_MERGE
+    );
+    const arc =
+      same ||
+      this._arcPool.reduce((oldest, entry) =>
+        entry.until < oldest.until ? entry : oldest
+      );
+    arc.angle = angle;
+    arc.until = now + DAMAGE_ARC_MS;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const r = 1 / Math.hypot(cos / DAMAGE_ARC_RX, sin / DAMAGE_ARC_RY);
+    arc.el.style.left = `${(50 + ((cos * r) / GAME_WIDTH) * 100).toFixed(2)}%`;
+    arc.el.style.top = `${(50 + ((sin * r) / GAME_HEIGHT) * 100).toFixed(2)}%`;
+    arc.el.style.transform = `translate(-50%, -50%) rotate(${(angle + Math.PI / 2).toFixed(3)}rad)`;
+    this._replay(arc.el, 'is-on');
+    if (arc.timer) {
+      this._cancel(arc.timer);
+    }
+    arc.timer = this._later(() => {
+      arc.timer = null;
+      arc.el.classList.remove('is-on');
+    }, DAMAGE_ARC_MS);
+  }
+
+  /**
+   * Edge arrows for targets off the screen: [{ kind: 'warden' | 'herald' |
+   * 'pickup', x, y (800×600 screen point), color?, distance? }], in priority
+   * order; the first EDGE_ARROW_MAX off-screen ones get an arrow.
+   */
+  updateEdgeArrows(targets) {
+    let used = 0;
+    for (
+      let i = 0;
+      i < targets.length && used < this._arrowPool.length;
+      i += 1
+    ) {
+      const target = targets[i];
+      const arrow = edgeArrow(target);
+      if (!arrow) {
+        continue;
+      }
+      const slot = this._arrowPool[used];
+      used += 1;
+      const { el } = slot;
+      if (slot.kind !== target.kind || slot.color !== target.color) {
+        slot.kind = target.kind;
+        slot.color = target.color;
+        el.dataset.kind = target.kind;
+        el.style.setProperty('--arrow-color', target.color || '');
+      }
+      el.dataset.edge = arrow.edge;
+      el.style.left = `${((arrow.x / GAME_WIDTH) * 100).toFixed(2)}%`;
+      el.style.top = `${((arrow.y / GAME_HEIGHT) * 100).toFixed(2)}%`;
+      slot.glyph.style.transform = `rotate(${arrow.angle.toFixed(3)}rad)`;
+      const text = Number.isFinite(target.distance)
+        ? `${Math.round(target.distance / 10) * 10}m`
+        : '';
+      if (slot.text !== text) {
+        slot.text = text;
+        slot.label.textContent = text;
+      }
+      if (el.style.display === 'none') el.style.display = '';
+    }
+    for (let i = used; i < this._arrowPool.length; i += 1) {
+      const { el } = this._arrowPool[i];
+      if (el.style.display !== 'none') el.style.display = 'none';
+    }
+  }
+
   _getHTML() {
     return `
             <div class="lowhp-vignette" id="ui-lowhp-vignette"></div>
+            <div class="hud-direction" id="ui-direction"></div>
 
             <!-- STATS (Top Left) -->
             <div class="stats-area hud-panel">
@@ -1108,7 +1312,7 @@ export class AAAHudLayout {
                     <div class="boss-name" id="ui-boss-name">BOSS</div>
                     <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
                     <div class="boss-fill" id="ui-boss-fill"></div>
-                    <div class="boss-phase-markers" id="ui-boss-markers"></div>
+                    <div class="boss-segments" id="ui-boss-segments"></div>
                 </div>
             </div>
 
@@ -1266,10 +1470,14 @@ export class AAAHudLayout {
             .boss-skull { width: 45px; height: 45px; background: var(--bg, #0a0a0f); border: 2px solid var(--boss, #ff003c); position: absolute; left: -22px; display: flex; justify-content: center; align-items: center; clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%); color: var(--boss, #ff003c); z-index: 5; }
             .boss-fill { height: 100%; width: 100%; background: var(--boss, #ff003c); box-shadow: 0 0 20px var(--boss, #ff003c); transition: width 0.3s ease-out; position: relative; }
             .boss-name { position: absolute; top: -24px; width: 100%; text-align: center; font-size: var(--text-md, 16px); letter-spacing: 4px; color: var(--text, #fff); font-weight: 700; }
-            .boss-phase-markers { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
-            .boss-phase-marker { position: absolute; top: -2px; width: 2px; height: calc(100% + 4px); background: var(--line, rgba(255, 255, 255, 0.18)); transform: translateX(-50%); }
-            .boss-phase-marker.passed { background: var(--boss, #ff003c); }
-            .boss-phase-marker.next { background: var(--text, #fff); }
+            .boss-segments { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+            .boss-seg { position: absolute; top: 0; bottom: 0; box-sizing: border-box; }
+            .boss-seg + .boss-seg { border-left: 3px solid var(--bg); }
+            .boss-seg.is-spent { background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--line) 6px 7px); }
+            .boss-seg.is-current { box-shadow: inset 0 0 0 1px var(--text), inset 0 0 12px var(--text-dim); }
+            .boss-area.is-herald .boss-bar-container { width: 42%; height: 20px; border-color: var(--boss); }
+            .boss-area.is-herald .boss-fill { background: var(--boss); box-shadow: 0 0 16px var(--boss); }
+            .boss-area.is-herald .boss-skull { width: 32px; height: 32px; left: -16px; border-color: var(--boss); color: var(--boss); }
             .boss-area.is-hit .boss-fill { animation: boss-hit 0.25s ease-out; }
             .boss-area.is-critical .boss-fill { animation: boss-critical 0.3s ease-out; }
             .boss-area.is-invulnerable .boss-fill { filter: grayscale(0.35) brightness(0.75); opacity: 0.65; }
@@ -1292,8 +1500,12 @@ export class AAAHudLayout {
             .radar-sweep { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 0%, transparent 60%, transparent 80%, var(--glow-accent, rgba(0, 242, 255, 0.35)) 100%); animation: radar-sweep-anim 4s linear infinite; border-radius: 50%; mix-blend-mode: screen; pointer-events: none; }
             .blip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
             .blip { position: absolute; top: 0; left: 0; border-radius: 50%; box-shadow: 0 0 6px 1px currentColor; will-change: transform; }
-            .blip.enemy { width: 6px; height: 6px; background: var(--danger, #ff003c); color: var(--danger, #ff003c); }
-            .blip.boss { width: 10px; height: 10px; background: var(--boss, #ff003c); color: var(--boss, #ff003c); }
+            .blip.rock { width: 5px; height: 5px; background: var(--text-dim); color: var(--text-dim); box-shadow: none; }
+            .blip.machine { width: 8px; height: 7px; border-radius: 0; background: var(--danger); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+            .blip.elite { width: 9px; height: 9px; box-sizing: border-box; border: 2px solid var(--xp); color: var(--xp); }
+            .blip.herald { width: 11px; height: 11px; border-radius: 0; background: var(--boss); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+            .blip.warden { width: 13px; height: 12px; border-radius: 0; background: var(--danger); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+            .blip.pickup { width: 7px; height: 7px; border-radius: 0; background: var(--status); clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
             .blip.ally { width: 6px; height: 6px; background: var(--status, #00ff66); color: var(--status, #00ff66); }
             .blip.noise { width: 3px; height: 3px; background: var(--text-dim); color: var(--text-dim); box-shadow: none; }
             .radar-jam-label { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 20; display: none; text-align: center; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.3em; margin-right: -0.3em; color: var(--xp); text-shadow: 0 0 8px var(--xp), 0 1px 0 rgba(0, 0, 0, 0.8); pointer-events: none; }
@@ -1376,6 +1588,21 @@ export class AAAHudLayout {
             .lowhp-vignette.is-low { opacity: 0.6; }
             .lowhp-vignette.is-critical { opacity: 0.9; box-shadow: inset 0 0 130px 36px var(--danger-line), inset 0 0 28px 3px var(--danger); }
 
+            /* DIRECTION: damage arcs + off-screen arrows, over the field */
+            .hud-direction { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+            .damage-arc { position: absolute; width: 150px; height: 34px; opacity: 0; box-sizing: border-box; border-top: 4px solid var(--danger); border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: radial-gradient(ellipse at 50% 0%, var(--danger-soft), transparent 70%); filter: drop-shadow(0 0 6px var(--danger)); }
+            .damage-arc.is-on { opacity: 0.95; }
+            .edge-arrow { position: absolute; width: 0; height: 0; --arrow-tone: var(--arrow-color, var(--status)); }
+            .edge-arrow[data-kind='warden'] { --arrow-tone: var(--danger); }
+            .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
+            .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
+            .edge-arrow[data-kind='pickup'] .edge-arrow__glyph { transform-origin: 50% 50%; scale: 0.7; }
+            .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); white-space: nowrap; }
+            .edge-arrow[data-edge='left'] .edge-arrow__label { left: 34px; top: 0; }
+            .edge-arrow[data-edge='right'] .edge-arrow__label { left: -34px; top: 0; }
+            .edge-arrow[data-edge='top'] .edge-arrow__label { left: 0; top: 22px; }
+            .edge-arrow[data-edge='bottom'] .edge-arrow__label { left: 0; top: -22px; }
+
             /* LAYER BANNER */
             .layer-banner { position: absolute; top: 28%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
             .layer-banner.is-showing { opacity: 1; visibility: visible; }
@@ -1443,6 +1670,8 @@ export class AAAHudLayout {
                 .evo-chip, .buff-chip { animation: feed-in var(--motion-base) var(--ease-out); }
                 .lowhp-vignette.is-low { animation: lowhp-pulse 0.83s ease-in-out infinite alternate; }
                 .lowhp-vignette.is-critical { animation-name: lowhp-pulse-critical; }
+                html:not([data-motion='reduced']) .damage-arc.is-on { animation: damage-arc-fade ${DAMAGE_ARC_MS}ms ease-in forwards; }
+                .boss-seg.is-current { animation: boss-seg-pulse 0.9s ease-in-out infinite alternate; }
                 .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
                 .layer-banner.is-showing .layer-banner__line { animation: banner-line-draw 600ms var(--ease-out) 120ms both; }
                 .layer-banner.is-leaving, .boss-intro.is-leaving { transition: opacity ${FADE_OUT_MS}ms ease-in; }
@@ -1460,6 +1689,8 @@ export class AAAHudLayout {
             @keyframes combo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
             @keyframes dash-ready { 0% { box-shadow: var(--glow-accent); background: var(--accent-soft); } 100% { box-shadow: none; } }
             @keyframes beam-pip-flash { 0% { background: var(--accent); box-shadow: var(--glow-accent); } 100% { background: transparent; box-shadow: none; } }
+            @keyframes damage-arc-fade { 0% { opacity: 1; } 35% { opacity: 0.9; } 100% { opacity: 0; } }
+            @keyframes boss-seg-pulse { from { background: transparent; } to { background: color-mix(in srgb, var(--text) 18%, transparent); } }
             @keyframes lowhp-pulse { from { opacity: 0.25; } to { opacity: 0.75; } }
             @keyframes lowhp-pulse-critical { from { opacity: 0.55; } to { opacity: 1; } }
             @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }

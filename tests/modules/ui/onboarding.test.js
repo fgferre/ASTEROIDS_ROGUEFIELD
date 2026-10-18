@@ -5,6 +5,7 @@ import SettingsSystem from '../../../src/modules/SettingsSystem.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import {
   CARDS_TIP_TEXT,
+  CARDS_TIP_TEXT_GAMEPAD,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
   ONBOARDING_STORAGE_KEY,
@@ -137,6 +138,26 @@ describe('Onboarding', () => {
       'D',
     ]);
     expect(onboardingPrompts(keys).dash.keys).toEqual(['⇧ Shift']);
+  });
+
+  it('names the pad buttons when the gamepad was used last', () => {
+    const buttons = {
+      moveUp: 'L-Stick ↑',
+      moveDown: 'L-Stick ↓',
+      moveLeft: 'L-Stick ←',
+      moveRight: 'L-Stick →',
+      dash: 'RT',
+      activateShield: 'LT',
+    };
+    const prompts = onboardingPrompts(buttons, 'modern', 'gamepad');
+    expect(prompts.move.keys).toEqual(['L-Stick']);
+    expect(prompts.move.text).toMatch(/right stick/);
+    expect(prompts.dash.keys).toEqual(['RT']);
+    expect(prompts.shield.keys).toEqual(['LT']);
+
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.cardsTip('gamepad')).toBe(CARDS_TIP_TEXT_GAMEPAD);
   });
 
   it('is off when the Settings toggle is off', () => {

@@ -24,6 +24,7 @@
 
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
+import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
 
@@ -314,7 +315,10 @@ class EnemyDamageSystem {
 
     const variant =
       ASTEROID_VARIANTS?.[asteroid.variant] || ASTEROID_VARIANTS?.common;
-    const explosion = variant?.behavior?.explosion;
+    // A Volatile Elite (BaseEnemy.onDestroyed) blows with its affix's numbers.
+    const explosion = asteroid.affixes?.includes('volatile')
+      ? ELITE_AFFIXES.volatile
+      : variant?.behavior?.explosion;
 
     if (!explosion) {
       return;

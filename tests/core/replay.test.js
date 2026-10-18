@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  INPUT_ANALOG_FIELDS,
   INPUT_FRAME_FIELDS,
   REPLAY_VERSION,
   createInputFrame,
@@ -17,7 +18,10 @@ describe('replay recording', () => {
       const frame = createInputFrame({ [field]: true });
       expect(decodeInputFrame(encodeInputFrame(frame))).toEqual(frame);
     }
-    expect(Object.keys(createInputFrame())).toEqual(INPUT_FRAME_FIELDS);
+    expect(Object.keys(createInputFrame())).toEqual([
+      ...INPUT_FRAME_FIELDS,
+      ...INPUT_ANALOG_FIELDS,
+    ]);
   });
 
   it('stores only the steps where the input changes', () => {
@@ -86,7 +90,7 @@ describe('replay recording', () => {
     recorder.recordUpgrade(120, 'multishot');
 
     const player = createPlayer(deserialize(serialize(recorder.toJSON())));
-    expect(REPLAY_VERSION).toBe(3);
+    expect(REPLAY_VERSION).toBeGreaterThanOrEqual(3);
     expect(player.takeUpgrade()).toEqual({ step: 120, action: 'reroll' });
     expect(player.takeUpgrade()).toEqual({
       step: 120,
@@ -110,6 +114,40 @@ describe('replay recording', () => {
   it('records dash presses as bit 7 (version 2)', () => {
     expect(REPLAY_VERSION).toBeGreaterThanOrEqual(2);
     expect(encodeInputFrame(createInputFrame({ dash: true }))).toBe(128);
+  });
+
+  it('records quantized stick values only while a stick is off centre (version 4)', () => {
+    const recorder = createRecorder({ seed: 5 });
+    const frames = [
+      createInputFrame({ right: true, moveX: 0.8123, moveY: -0.004 }),
+      createInputFrame({ right: true, moveX: 0.81 }),
+      createInputFrame({ aimX: -1.5, aimY: 0.333 }),
+      createInputFrame(),
+    ];
+    frames.forEach((frame, step) => recorder.record(step, frame));
+
+    const json = recorder.toJSON();
+    expect(json.version).toBe(4);
+    // Step 1 quantizes to the same frame as step 0, so it is not stored.
+    expect(json.inputs).toEqual([
+      [0, 8, 81, 0, 0, 0],
+      [2, 0, 0, 0, -100, 33],
+      [3, 0],
+    ]);
+    expect(frames[0].moveX).toBe(0.81);
+    const player = createPlayer(deserialize(serialize(json)));
+    frames.forEach((frame, step) => {
+      expect(player.frameAt(step)).toEqual(frame);
+    });
+  });
+
+  it('still reads version 3 recordings, with the sticks centred', () => {
+    const v3 = { version: 3, seed: 3, hull: null, steps: 1, inputs: [[0, 1]] };
+    const frame = createPlayer(deserialize(v3)).frameAt(0);
+    expect(frame.up).toBe(true);
+    expect([frame.moveX, frame.moveY, frame.aimX, frame.aimY]).toEqual([
+      0, 0, 0, 0,
+    ]);
   });
 
   it('still reads version 1 recordings, with dash off', () => {

@@ -9,6 +9,8 @@ import {
   ELITE_EXCLUDED_TYPES,
   ELITE_MODIFIERS,
 } from '../../../data/enemies/elite.js';
+import { ELITE_AFFIXES, rollAffixes } from '../../../data/enemies/affixes.js';
+import RandomService from '../../../core/RandomService.js';
 
 /**
  * Enemy Factory
@@ -519,24 +521,22 @@ export class EnemyFactory {
    * Support enemies carry `elite` and a `displayName` every spawn (pooled
    * instances must not keep the last one's). An elite request scales the
    * enemy by ELITE_MODIFIERS; rewards read `enemy.elite` in RewardManager.
+   * An Elite also gets its affixes: `finalConfig.affixes` when given, else
+   * rolled for its layer from a stream seeded by its id.
    */
   applyElite(enemy, finalConfig) {
     enemy.elite = Boolean(finalConfig.elite);
     const baseName = finalConfig.displayName ?? enemy.type;
-    enemy.displayName = enemy.elite ? `Elite ${baseName}` : baseName;
+    enemy.displayName = baseName;
     // Undefined for kinds without one: PhysicsSystem then uses its base hit.
     const contactDamage = finalConfig.contactDamage;
     enemy.contactDamage = enemy.elite
       ? (contactDamage ?? 12) * ELITE_MODIFIERS.contactDamage
       : contactDamage;
-    if (!enemy.elite) return;
-
-    enemy.getEventBus?.()?.emit?.('elite-spawned', {
-      type: enemy.type,
-      x: finalConfig.x ?? enemy.x,
-      y: finalConfig.y ?? enemy.y,
-      displayName: enemy.displayName,
-    });
+    if (!enemy.elite) {
+      enemy.resetAffixes([]);
+      return;
+    }
 
     enemy.maxHealth *= ELITE_MODIFIERS.health;
     enemy.health = enemy.maxHealth;
@@ -548,6 +548,47 @@ export class EnemyFactory {
     for (const key of ['maxSpeed', 'chargeSpeed']) {
       if (Number.isFinite(movement?.[key])) {
         movement[key] *= ELITE_MODIFIERS.speed;
+      }
+    }
+
+    const affixes =
+      finalConfig.affixes ??
+      rollAffixes(
+        enemy.type,
+        enemy.wave,
+        new RandomService(`affixes:${enemy.type}:${enemy.id}`)
+      );
+    this.applyAffixes(enemy, affixes);
+    enemy.displayName = [
+      'Elite',
+      ...affixes.map((id) => ELITE_AFFIXES[id].label),
+      baseName,
+    ].join(' ');
+
+    enemy.getEventBus?.()?.emit?.('elite-spawned', {
+      type: enemy.type,
+      x: finalConfig.x ?? enemy.x,
+      y: finalConfig.y ?? enemy.y,
+      displayName: enemy.displayName,
+      affixes: [...affixes],
+    });
+  }
+
+  /** Affix stats on an Elite (behaviour: BaseEnemy affix hooks). */
+  applyAffixes(enemy, affixes) {
+    enemy.resetAffixes([...affixes]);
+    if (enemy.hasAffix('shielded')) {
+      enemy.maxShieldHealth = ELITE_AFFIXES.shielded.shieldHealth;
+      enemy.shieldHealth = enemy.maxShieldHealth;
+      enemy.shieldBroken = false;
+      enemy.facing = 0;
+    }
+    if (enemy.hasAffix('swift')) {
+      const movement = enemy.movementConfig;
+      for (const key of ['maxSpeed', 'chargeSpeed', 'acceleration']) {
+        if (Number.isFinite(movement?.[key])) {
+          movement[key] *= ELITE_AFFIXES.swift.speed;
+        }
       }
     }
   }

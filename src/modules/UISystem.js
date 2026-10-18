@@ -21,7 +21,7 @@ import {
 } from '../core/viewport.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { AAAHudLayout, radarGlyph } from './ui/AAAHudLayout.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import {
@@ -45,6 +45,15 @@ import {
   salvageLine,
 } from './ui/hangar.js';
 import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
+import {
+  GAMEPAD_FOCUSABLE_SELECTOR,
+  GAMEPAD_NAV_SCREENS,
+  pickFocusTarget,
+} from './ui/gamepadNav.js';
+import {
+  PAD_BUTTON_GLYPHS,
+  PAD_STICK_GLYPHS,
+} from '../data/constants/gamepad.js';
 import { settingPreview } from './ui/settingsPreview.js';
 import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
 import { loadRecords } from '../services/runRecords.js';
@@ -1505,13 +1514,6 @@ class UISystem extends BaseSystem {
           continue;
         }
 
-        const isBoss =
-          enemy?.type === 'boss' ||
-          (typeof enemy?.hasTag === 'function' && enemy.hasTag('boss')) ||
-          (enemy?.tags && typeof enemy.tags.has === 'function'
-            ? enemy.tags.has('boss')
-            : false);
-
         const dx = enemyX - originX;
         const dy = enemyY - originY;
         const distance = Math.hypot(dx, dy);
@@ -1522,12 +1524,62 @@ class UISystem extends BaseSystem {
         blips.push({
           x: dx / radarRange,
           y: dy / radarRange,
-          type: isBoss ? 'boss' : 'enemy',
+          type: radarGlyph(enemy),
         });
+      }
+
+      const pickups = this.getService('pickups')?.getActivePickups() || [];
+      for (let i = 0; i < pickups.length && blips.length < limit; i += 1) {
+        const dx = pickups[i].x - originX;
+        const dy = pickups[i].y - originY;
+        if (Math.hypot(dx, dy) <= radarRange) {
+          blips.push({
+            x: dx / radarRange,
+            y: dy / radarRange,
+            type: 'pickup',
+          });
+        }
       }
 
       hud.updateRadar(blips);
     }
+
+    // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
+    const renderer = this.getService('renderer');
+    const arrowTargets = [];
+    let herald = null;
+    if (renderer && player && enemies) {
+      const toTarget = (kind, entity, color, labelled) => {
+        const point = renderer.worldToScreen(entity.x, entity.y);
+        if (!point) return;
+        arrowTargets.push({
+          kind,
+          x: point.x,
+          y: point.y,
+          color,
+          distance: labelled
+            ? Math.hypot(
+                entity.x - playerPosition.x,
+                entity.y - playerPosition.y
+              )
+            : undefined,
+        });
+      };
+      const active = enemies.getActiveEnemies();
+      for (let i = 0; i < active.length; i += 1) {
+        const enemy = active[i];
+        if (enemy.type === 'boss') toTarget('warden', enemy, null, true);
+        if (enemy.type === 'herald') {
+          toTarget('herald', enemy, null, true);
+          herald = herald || enemy;
+        }
+      }
+      const pickups = this.getService('pickups')?.getActivePickups() || [];
+      for (let i = 0; i < pickups.length; i += 1) {
+        toTarget('pickup', pickups[i], pickups[i].color, false);
+      }
+    }
+    hud.updateEdgeArrows(arrowTargets);
 
     const bossState = this.getBossHudState();
     const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
@@ -1536,7 +1588,19 @@ class UISystem extends BaseSystem {
       Boolean(bossState.active) ||
       Boolean(bossState.upcoming);
 
-    if (!bossActive) {
+    if (!bossActive && herald) {
+      hud.updateBoss(
+        true,
+        herald.displayName,
+        Math.max(0, Math.min(100, (herald.health / herald.maxHealth) * 100)),
+        {
+          phase: 0,
+          phaseCount: 1,
+          herald: true,
+          invulnerable: Boolean(herald.invulnerable),
+        }
+      );
+    } else if (!bossActive) {
       hud.updateBoss(false);
     } else {
       const bossName = bossState.name || 'BOSS';
@@ -1641,6 +1705,18 @@ class UISystem extends BaseSystem {
     this.registerEventListener('game-started', () => {
       this.aaaTacticalHud?.setRadarJammed(false);
     });
+
+    this.registerEventListener(
+      'player-took-damage',
+      ({ playerPosition, damageSource } = {}) => {
+        const renderer = this.getService('renderer');
+        if (!playerPosition || !damageSource || !renderer) return;
+        this.aaaTacticalHud?.showDamageFrom(
+          renderer.worldToScreen(playerPosition.x, playerPosition.y),
+          renderer.worldToScreen(damageSource.x, damageSource.y)
+        );
+      }
+    );
 
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       this.aaaTacticalHud?.addKillFeed(
@@ -1809,6 +1885,140 @@ class UISystem extends BaseSystem {
     this.registerEventListener('input-confirmed', () => {
       this.handleLevelUpConfirm();
     });
+
+    this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
+      this.handleGamepadNav(payload.action);
+    });
+
+    this.registerEventListener('input-device-changed', (payload = {}) => {
+      this.handleInputDeviceChanged(payload.device);
+    });
+  }
+
+  /** Hints and tips name the keys or pad buttons of the last device used. */
+  handleInputDeviceChanged(device) {
+    document.body.dataset.inputDevice = device;
+    if (this.onboarding.shown && this.onboarding.current) {
+      this.showOnboardingTip(this.onboarding.current);
+    }
+  }
+
+  /** The topmost visible screen a pad can navigate, or null during play. */
+  getGamepadNavScreen() {
+    for (const id of GAMEPAD_NAV_SCREENS) {
+      const element = document.getElementById(`${id}-screen`);
+      if (element && !element.classList.contains('hidden')) {
+        return { id, element };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
+   * the focus, A activates, B goes back, LB/RB switch tabs, X/Y reroll and
+   * banish on the level-up screen (whose cards already follow the move and
+   * confirm bindings).
+   */
+  handleGamepadNav(action) {
+    const screen = this.getGamepadNavScreen();
+    if (!screen || this.settingsState.capture) {
+      return;
+    }
+    const { id, element } = screen;
+
+    if (id === 'levelup') {
+      if (action === 'reroll') this.rerollLevelUpOptions();
+      else if (action === 'banish') this.toggleBanishMode();
+      else if (action === 'back' && this.levelUpState.banishMode) {
+        this.setBanishMode(false);
+      }
+      return;
+    }
+
+    switch (action) {
+      case 'up':
+      case 'down':
+      case 'left':
+      case 'right':
+        this.moveGamepadFocus(element, action);
+        break;
+      case 'confirm': {
+        const active = document.activeElement;
+        if (active && element.contains(active) && active !== element) {
+          active.click();
+        } else {
+          this.moveGamepadFocus(element, null);
+        }
+        break;
+      }
+      case 'back':
+        if (id === 'settings') this.closeSettingsPanel();
+        else if (id === 'codex') this.closeCodex();
+        else if (id === 'hangar') this.closeHangar();
+        else if (id === 'credits') {
+          this.closeCreditsOverlay({ restoreFocus: true });
+        } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
+        break;
+      case 'tabPrev':
+      case 'tabNext': {
+        const step = action === 'tabPrev' ? -1 : 1;
+        if (id === 'codex') {
+          this.showCodexTab(adjacentCodexTab(this.codexState.tab, step), {
+            focusTab: true,
+          });
+        } else if (id === 'settings') {
+          const ids = this.settingsSchema.map((category) => category.id);
+          const index = ids.indexOf(this.settingsState.activeCategory);
+          this.switchSettingsCategory(
+            ids[(index + step + ids.length) % ids.length]
+          );
+          this.domRefs.settings.tabs
+            ?.querySelector('.settings-tab.is-active')
+            ?.focus({ preventScroll: true });
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** Focus the nearest control `direction` of the focused one (null: first). */
+  moveGamepadFocus(root, direction) {
+    const active = document.activeElement;
+    const current = active && root.contains(active) ? active : null;
+    // Sliders and selects take left/right as a value change.
+    if (current && (direction === 'left' || direction === 'right')) {
+      const step = direction === 'left' ? -1 : 1;
+      if (current.type === 'range') {
+        if (step < 0) current.stepDown();
+        else current.stepUp();
+        current.dispatchEvent(new Event('input', { bubbles: true }));
+        current.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      if (current.tagName === 'SELECT') {
+        const count = current.options.length;
+        current.selectedIndex = (current.selectedIndex + step + count) % count;
+        current.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+    const candidates = [
+      ...root.querySelectorAll(GAMEPAD_FOCUSABLE_SELECTOR),
+    ].filter(
+      (candidate) => candidate !== current && candidate.getClientRects().length
+    );
+    const index = pickFocusTarget(
+      current?.getBoundingClientRect() ?? null,
+      candidates.map((candidate) => candidate.getBoundingClientRect()),
+      direction
+    );
+    if (index >= 0) {
+      candidates[index].focus();
+      candidates[index].scrollIntoView?.({ block: 'nearest' });
+    }
   }
 
   handleSettingsMenuRequest(payload = {}) {
@@ -2880,13 +3090,18 @@ class UISystem extends BaseSystem {
 
     if (device === 'gamepad') {
       if (value.startsWith('button:')) {
-        return `Button ${value.split(':')[1]}`;
+        const index = Number(value.split(':')[1]);
+        return PAD_BUTTON_GLYPHS[index] ?? `Button ${index}`;
       }
       if (value.startsWith('axis:')) {
         const [, index, direction] = value.split(':');
-        const symbol =
-          direction === 'negative' || direction === '-' ? '−' : '+';
-        return `Axis ${index} ${symbol}`;
+        const negative = direction === 'negative' || direction === '-';
+        const stick = PAD_STICK_GLYPHS[Math.floor(Number(index) / 2)];
+        if (!stick) {
+          return `Axis ${index} ${negative ? '−' : '+'}`;
+        }
+        const arrows = Number(index) % 2 === 0 ? ['←', '→'] : ['↑', '↓'];
+        return `${stick} ${arrows[negative ? 0 : 1]}`;
       }
     }
 
@@ -4025,10 +4240,11 @@ class UISystem extends BaseSystem {
     );
   }
 
-  /** The in-play tip `id`, naming the keys the player actually bound. */
+  /** The in-play tip `id`, naming the keys or buttons the player bound. */
   showOnboardingTip(id) {
     const controls =
       this.resolveSettingsService()?.getCategoryValues('controls') || {};
+    const device = this.getService('input').getActiveDevice();
     const keys = {};
     [
       'moveUp',
@@ -4039,20 +4255,23 @@ class UISystem extends BaseSystem {
       'activateShield',
     ].forEach((action) => {
       keys[action] = this.formatBindingLabel(
-        controls[action]?.keyboard?.[0],
-        'keyboard'
+        controls[action]?.[device]?.[0],
+        device
       );
     });
     const prompt = onboardingPrompts(
       keys,
-      this.getService('player')?.controlScheme
+      this.getService('player')?.controlScheme,
+      device
     )[id];
     this.aaaTacticalHud?.showOnboardingTip(prompt.keys, prompt.text);
   }
 
   /** The cards tip in the level-up footer, on the first level-up only. */
   showOnboardingCardsTip() {
-    const text = this.onboarding.cardsTip();
+    const text = this.onboarding.cardsTip(
+      this.getService('input').getActiveDevice()
+    );
     const content = document.querySelector('#levelup-screen .levelup-content');
     if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
       return;

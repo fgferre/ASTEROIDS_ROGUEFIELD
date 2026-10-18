@@ -124,7 +124,11 @@
                 Credits
               </button>
             </nav>
-            <ul class="controls-hints" aria-label="Controls">
+            <ul
+              class="controls-hints"
+              data-device="keyboard"
+              aria-label="Controls"
+            >
               <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
               <li><kbd>A</kbd><kbd>D</kbd> turn</li>
               <li><kbd>Shift</kbd> dash</li>
@@ -132,6 +136,20 @@
               <li><kbd>G</kbd> spread mode</li>
               <li><kbd>T</kbd> aim mode</li>
               <li><kbd>Esc</kbd> pause</li>
+              <li class="controls-hints__note">Shooting is automatic</li>
+            </ul>
+            <ul
+              class="controls-hints"
+              data-device="gamepad"
+              aria-label="Gamepad controls"
+            >
+              <li><kbd>L-Stick</kbd> move</li>
+              <li><kbd>R-Stick</kbd> aim</li>
+              <li><kbd>RT</kbd> dash</li>
+              <li><kbd>LT</kbd> shield</li>
+              <li><kbd>X</kbd> spread mode</li>
+              <li><kbd>Y</kbd> aim mode</li>
+              <li><kbd>Start</kbd> pause</li>
               <li class="controls-hints__note">Shooting is automatic</li>
             </ul>
           </div>
@@ -154,7 +172,9 @@
               class="btn btn--secondary levelup-action"
               type="button"
             >
-              Reroll (R)
+              Reroll
+              <span data-device="keyboard">(R)</span>
+              <span data-device="gamepad">(X)</span>
               <span class="levelup-action__count" data-count>1 left</span>
             </button>
             <button
@@ -163,12 +183,16 @@
               type="button"
               aria-pressed="false"
             >
-              Banish (B)
+              Banish
+              <span data-device="keyboard">(B)</span>
+              <span data-device="gamepad">(Y)</span>
               <span class="levelup-action__count" data-count>1 left</span>
             </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
-            Pick a card to banish it for the rest of the run. Esc cancels.
+            Pick a card to banish it for the rest of the run.
+            <span data-device="keyboard">Esc</span>
+            <span data-device="gamepad">B</span> cancels.
           </p>
         </div>
       </div>
@@ -215,7 +239,11 @@
               Quit to Menu
             </button>
           </div>
-          <ul class="controls-hints" aria-label="Controls">
+          <ul
+            class="controls-hints"
+            data-device="keyboard"
+            aria-label="Controls"
+          >
             <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
             <li><kbd>A</kbd><kbd>D</kbd> turn</li>
             <li><kbd>Shift</kbd> dash</li>
@@ -223,6 +251,19 @@
             <li><kbd>G</kbd> spread mode</li>
             <li><kbd>T</kbd> aim mode</li>
             <li><kbd>Esc</kbd> resume</li>
+          </ul>
+          <ul
+            class="controls-hints"
+            data-device="gamepad"
+            aria-label="Gamepad controls"
+          >
+            <li><kbd>L-Stick</kbd> move</li>
+            <li><kbd>R-Stick</kbd> aim</li>
+            <li><kbd>RT</kbd> dash</li>
+            <li><kbd>LT</kbd> shield</li>
+            <li><kbd>X</kbd> spread mode</li>
+            <li><kbd>Y</kbd> aim mode</li>
+            <li><kbd>Start</kbd> resume</li>
           </ul>
         </div>
       </div>

@@ -17,6 +17,13 @@ const VISUAL_CATEGORIES = new Set([
 ]);
 
 const STORAGE_KEY = 'astro:settings:v1';
+// Gamepad defaults before the 18/10 table (src/data/constants/gamepad.js).
+const PRE_1810_PAD_BINDINGS = {
+  activateShield: ['button:2', 'button:4'],
+  dash: ['button:5'],
+  toggleSpreadMode: [],
+  toggleAimMode: [],
+};
 
 function deepClone(value) {
   if (value === undefined) {
@@ -150,6 +157,24 @@ class SettingsSystem {
     });
 
     this.migrateShiftFromShieldToDash(stored.controls);
+    this.migratePadBindings(stored.controls);
+  }
+
+  // Before 18/10 the pad raised the shield on X/LB and dashed on RB, with no
+  // spread/aim buttons. A save from then (no `vibration` key) that still holds
+  // those defaults takes the current table; a remapped action keeps its pick.
+  migratePadBindings(storedControls) {
+    if (!storedControls || 'vibration' in storedControls) {
+      return;
+    }
+    Object.entries(PRE_1810_PAD_BINDINGS).forEach(([action, old]) => {
+      const binding = this.values.controls[action];
+      if (binding && JSON.stringify(binding.gamepad) === JSON.stringify(old)) {
+        binding.gamepad = [
+          ...this.findField('controls', action).default.gamepad,
+        ];
+      }
+    });
   }
 
   // Before 17/10 Shift raised the shield; it is the dash now. A save from

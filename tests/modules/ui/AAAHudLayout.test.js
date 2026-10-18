@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AAAHudLayout,
+  bossSegments,
   comboTier,
+  damageArcAngle,
+  radarGlyph,
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 
@@ -139,7 +142,7 @@ describe('AAAHudLayout radar jam', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const shown = () => hud._blipPool.filter((el) => el.style.display !== 'none');
-  const enemy = [{ x: 0.5, y: 0.5, type: 'enemy' }];
+  const enemy = [{ x: 0.5, y: 0.5, type: 'machine' }];
 
   it('shows noise and NO SIGNAL while jammed, the real blips after', () => {
     hud.setRadarJammed(true);
@@ -151,6 +154,104 @@ describe('AAAHudLayout radar jam', () => {
     hud.setRadarJammed(false);
     hud.updateRadar(enemy);
     expect(hud.els.radar.classList.contains('is-jammed')).toBe(false);
-    expect(shown().map((el) => el.dataset.type)).toEqual(['enemy']);
+    expect(shown().map((el) => el.dataset.type)).toEqual(['machine']);
+  });
+});
+
+describe('AAAHudLayout radar glyphs', () => {
+  it('picks the blip glyph by enemy type and elite flag', () => {
+    const glyphs = [
+      { type: 'asteroid' },
+      { type: 'drone' },
+      { type: 'hunter', elite: true },
+      { type: 'herald', heraldKind: 'dust' },
+      { type: 'boss', bossKind: 'prime' },
+    ].map(radarGlyph);
+    expect(glyphs).toEqual(['rock', 'machine', 'elite', 'herald', 'warden']);
+  });
+});
+
+describe('AAAHudLayout damage direction', () => {
+  it('points the arc from the ship toward the source in screen space', () => {
+    const ship = { x: 400, y: 300 };
+    expect(damageArcAngle(ship, { x: 500, y: 300 })).toBeCloseTo(0);
+    expect(damageArcAngle(ship, { x: 400, y: 200 })).toBeCloseTo(-Math.PI / 2);
+    expect(damageArcAngle(ship, { x: 300, y: 400 })).toBeCloseTo(
+      (3 * Math.PI) / 4
+    );
+    expect(damageArcAngle(ship, { x: 400, y: 300 })).toBeNull();
+    expect(damageArcAngle(ship, null)).toBeNull();
+  });
+});
+
+describe('AAAHudLayout off-screen arrows', () => {
+  let hud;
+  beforeEach(() => {
+    vi.stubGlobal('document', { createElement: fakeElement });
+    hud = new AAAHudLayout();
+    hud.els = { direction: fakeElement() };
+    hud._createDirectionPools();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const visible = () =>
+    hud._arrowPool.filter(({ el }) => el.style.display !== 'none');
+
+  it('hides the arrow while the target is on screen', () => {
+    hud.updateEdgeArrows([{ kind: 'warden', x: 120, y: 80, distance: 300 }]);
+    expect(visible()).toHaveLength(0);
+  });
+
+  it('pins the arrow to the edge facing an off-screen target', () => {
+    hud.updateEdgeArrows([
+      { kind: 'warden', x: 1400, y: 300, distance: 812 },
+      { kind: 'herald', x: 400, y: -500, distance: 640 },
+      { kind: 'pickup', x: -60, y: 320, color: '#ffd700' },
+    ]);
+    const [warden, herald, pickup] = visible();
+    expect(visible()).toHaveLength(3);
+    expect(warden.el.dataset.edge).toBe('right');
+    expect(warden.label.textContent).toBe('810m');
+    expect(herald.el.dataset.edge).toBe('top');
+    expect(herald.el.dataset.kind).toBe('herald');
+    expect(pickup.el.dataset.edge).toBe('left');
+    expect(pickup.el.style['--arrow-color']).toBe('#ffd700');
+    expect(pickup.label.textContent).toBe('');
+
+    // Back on screen: the arrow goes away.
+    hud.updateEdgeArrows([{ kind: 'warden', x: 600, y: 300 }]);
+    expect(visible()).toHaveLength(0);
+  });
+});
+
+describe('AAAHudLayout boss bar segments', () => {
+  it('splits a Warden bar at its phase thresholds and marks the current phase', () => {
+    const at = (phase) => bossSegments(3, phase);
+    expect(at(0).map(({ left, width }) => [left, width])).toEqual([
+      [0, 33],
+      [33, 33],
+      [66, 34],
+    ]);
+    expect(at(0).map((seg) => seg.state)).toEqual([
+      'ahead',
+      'ahead',
+      'current',
+    ]);
+    expect(at(1).map((seg) => seg.state)).toEqual([
+      'ahead',
+      'current',
+      'spent',
+    ]);
+    expect(at(2).map((seg) => seg.state)).toEqual([
+      'current',
+      'spent',
+      'spent',
+    ]);
+  });
+
+  it('gives a Herald one full-width segment', () => {
+    expect(bossSegments(1, 0)).toEqual([
+      { left: 0, width: 100, state: 'current' },
+    ]);
   });
 });

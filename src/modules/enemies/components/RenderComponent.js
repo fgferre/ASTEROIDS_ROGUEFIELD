@@ -18,6 +18,8 @@ import {
 } from '../../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
 import { WARDEN_KINDS } from '../../../data/enemies/boss.js';
+import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
+import { drawAffixBadge } from './affixGlyphs.js';
 
 const TAU = Math.PI * 2;
 
@@ -1272,6 +1274,83 @@ const eliteRing = (ctx, size, emissive) => {
   ctx.stroke();
 };
 
+// --- Elite affixes (src/data/enemies/affixes.js) ---------------------------
+
+const BADGE_RADIUS = 5;
+const BADGE_GAP = 2;
+const SWIFT_GHOSTS = [0.05, 0.1, 0.15]; // seconds behind, along the velocity
+
+// Swift: fading ghosts of the hull behind it, under the body.
+const swiftTrail = (ctx, enemy, size, emissive) => {
+  const speed = Math.hypot(enemy.vx, enemy.vy);
+  if (speed < 20) return;
+  const { color } = ELITE_AFFIXES.swift;
+  SWIFT_GHOSTS.forEach((t, i) => {
+    ctx.beginPath();
+    ctx.arc(-enemy.vx * t, -enemy.vy * t, size * (0.7 - i * 0.15), 0, TAU);
+    ctx.fillStyle = withAlpha(color, (emissive ? 0.3 : 0.16) * (1 - i / 3));
+    ctx.fill();
+  });
+};
+
+// Everything an affix shows on top of the body: the Shielded plate, Warded's
+// pulsing ring while immune, the Volatile fuse's blast ring, the badges.
+const affixOverlay = (ctx, enemy, size, emissive) => {
+  const time = enemyTime(enemy);
+  if (enemy.hasAffix('shielded') && !enemy.shieldBroken) {
+    const { halfArc, color } = ELITE_AFFIXES.shielded;
+    const ratio = clamp01(enemy.shieldHealth / enemy.maxShieldHealth);
+    ctx.save();
+    ctx.rotate(enemy.facing ?? 0);
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.12, -halfArc, halfArc);
+    ctx.strokeStyle = withAlpha(color, 0.35 + ratio * 0.6);
+    ctx.lineWidth = emissive ? LINE.bold : LINE.base;
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (enemy.age < enemy.wardedUntil) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 14);
+    ctx.beginPath();
+    ctx.arc(0, 0, size * (1.3 + 0.08 * pulse) + 2, 0, TAU);
+    ctx.strokeStyle = withAlpha(ELITE_AFFIXES.warded.color, 0.4 + 0.5 * pulse);
+    ctx.lineWidth = emissive ? LINE.base : LINE.thin;
+    ctx.stroke();
+  }
+  if (enemy.volatileFuse !== null) {
+    const { fuse, radius, color } = ELITE_AFFIXES.volatile;
+    const progress = clamp01(1 - enemy.volatileFuse / fuse);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    if (!emissive) {
+      ctx.fillStyle = withAlpha(color, 0.04 + 0.08 * progress);
+      ctx.fill();
+    }
+    ctx.strokeStyle = withAlpha(color, 0.35 + 0.5 * progress);
+    ctx.lineWidth = LINE.base;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * progress, 0, TAU);
+    ctx.lineWidth = LINE.hair;
+    ctx.stroke();
+  }
+  const count = enemy.affixes.length;
+  const y = -(size * 1.18 + 4 + BADGE_RADIUS);
+  for (let i = 0; i < count; i += 1) {
+    const x = (i - (count - 1) / 2) * (BADGE_RADIUS * 2 + BADGE_GAP);
+    ctx.save();
+    ctx.translate(x, y);
+    drawAffixBadge(
+      ctx,
+      ELITE_AFFIXES[enemy.affixes[i]],
+      BADGE_RADIUS,
+      emissive ? LINE.thin : LINE.hair,
+      !emissive
+    );
+    ctx.restore();
+  }
+};
+
 const proceduralStrategy = ({ enemy, ctx, config }) => {
   if (!ctx) return;
 
@@ -1309,6 +1388,10 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     target.globalAlpha = 1;
   };
 
+  const affixed = enemy.affixes.length > 0;
+  const swift = affixed && enemy.hasAffix('swift');
+  if (swift)
+    drawLayer(ctx, enemy, 0, () => swiftTrail(ctx, enemy, size, false));
   drawLayer(ctx, enemy, angle, () => {
     if (sprite) blit(ctx, sprite.body);
     else look.body(ctx, size, enemy);
@@ -1316,9 +1399,16 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     if (enemy.elite) eliteRing(ctx, size, false);
     if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
   });
+  if (affixed)
+    drawLayer(ctx, enemy, 0, () => affixOverlay(ctx, enemy, size, false));
 
   const emissive = getEmissive();
   if (!emissive) return;
+  if (swift) {
+    drawLayer(emissive, enemy, 0, () =>
+      swiftTrail(emissive, enemy, size, true)
+    );
+  }
   drawLayer(emissive, enemy, angle, () => {
     if (sprite) blit(emissive, sprite.glow);
     else look.glow(emissive, size, enemy);
@@ -1326,6 +1416,11 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     if (enemy.elite) eliteRing(emissive, size, true);
     if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
   });
+  if (affixed) {
+    drawLayer(emissive, enemy, 0, () =>
+      affixOverlay(emissive, enemy, size, true)
+    );
+  }
 };
 
 const delegateStrategy = ({ enemy, ctx }) => {
