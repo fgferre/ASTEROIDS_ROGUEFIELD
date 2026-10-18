@@ -94,8 +94,9 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
   - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
-  - [ ] **R13.8.2 Piloto SFXBus**: famílias de sons em módulos de `src/modules/audio/`; dados de áudio saem de
-        `GameConstants` para o domínio de áudio.
+  - [x] **R13.8.2 Piloto SFXBus** (18/10, ramo `claude/inspiring-panini-c21aa9`): nove famílias de sons em `src/modules/audio/sfx/`
+        (fábricas que recebem o kit do barramento, nunca o barramento; `SFXBus.js` 4595 → 1105 linhas, só infraestrutura e
+        delegados de uma linha); dados de áudio em `src/data/audio/` (`GameConstants.js` 783 → 126, reexporta).
   - [ ] **R13.8.3 UISystem** por tela ou responsabilidade, com o padrão do piloto. **R13.8.4** CombatSystem e
         enemyMirror. **R13.8.5** autoridade das ondas; depois escopos de random.
 

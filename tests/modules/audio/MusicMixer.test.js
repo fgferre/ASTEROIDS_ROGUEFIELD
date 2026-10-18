@@ -13,7 +13,7 @@ import {
   MUSIC_PERCUSSION,
   MUSIC_THEME_CROSSFADE,
   MUSIC_THEMES,
-} from '../../../src/core/GameConstants.js';
+} from '../../../src/data/audio/music.js';
 
 // ---------------------------------------------------------------------------
 // Plan 02.05 — MusicMixer (INFRA-02 + AUDIO-01).

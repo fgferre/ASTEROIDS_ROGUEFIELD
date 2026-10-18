@@ -7,7 +7,7 @@ import {
 import {
   MUSIC_LAYER_CONFIG,
   MUSIC_THEMES,
-} from '../../../src/core/GameConstants.js';
+} from '../../../src/data/audio/music.js';
 
 describe('music theme selection (layer → theme)', () => {
   it('follows the biome and hands boss layers to the Warden, beyond 15 too', () => {
