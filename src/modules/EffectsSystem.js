@@ -1,27 +1,20 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { PALETTE, withAlpha } from '../data/constants/palette.js';
-import { GamePools } from '../core/GamePools.js';
-import { DamageText, HitMarker, SpaceParticle } from './EffectEntities.js';
+import { SpaceParticle } from './EffectEntities.js';
 import { ShakePresets } from '../utils/ScreenShake.js';
 import { requireService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
-import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
-import {
-  DASH_SHAKE,
-  SHIELD_SHOCKWAVE_RADIUS,
-} from '../data/constants/gameplay.js';
-import {
-  BOSS_EFFECTS_PRESETS,
-  BOSS_SCREEN_SHAKES,
-} from '../data/constants/visual.js';
+import { DASH_SHAKE } from '../data/constants/gameplay.js';
 import { ASTEROID_VARIANTS } from '../data/enemies/asteroid-configs.js';
+import { BOSS_FX, BossTransitions } from './effects/BossTransitions.js';
 import { Draw2D } from './effects/draw2d.js';
 import {
   DEATH_SLOW_MO,
   GameTime,
   LEVEL_UP_SLOW_MO,
 } from './effects/GameTime.js';
+import { Particles } from './effects/Particles.js';
 import { PLAYER_HIT_SHAKE, ScreenFeedback } from './effects/ScreenFeedback.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
@@ -35,34 +28,6 @@ const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 // their lifetimes. Stone chips are mass, not light, and are unchanged.
 const XP_SPARK_LIFE_SCALE = 1.5; // was 1
 const EXPLOSION_EMBER_LIFE_SCALE = 1.3; // was 1
-
-// Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
-// and a few faint amber crystal motes drifting through the camera view, so the
-// Field is never empty. PROPOSAL from 17/10 (was: none), judged by playing.
-// Kept in their own arrays, not in `particles`, so particle metrics and the
-// determinism suites never see them. Rolls come from the 'colors' fork, which
-// nothing else in this system draws from, so no other sequence shifts.
-const AMBIENT = Object.freeze({
-  fork: 'colors',
-  chipCount: 28,
-  chipSizeMin: 1, // logical px (drawn ~1–3 px)
-  chipSizeMax: 2.5,
-  chipSpeedMin: 3, // px/s
-  chipSpeedMax: 10,
-  chipSpinMax: 0.6, // rad/s either way
-  chipAlphaMin: 0.55,
-  chipAlphaMax: 0.95,
-  moteCount: 6,
-  moteSizeMin: 1.2,
-  moteSizeMax: 2,
-  moteSpeedMin: 1.5,
-  moteSpeedMax: 4,
-  moteAlpha: 0.25,
-  lifeMin: 20, // s
-  lifeMax: 40,
-  fade: 2, // s of fade-in and fade-out
-  margin: 24, // respawn this far outside the view; cull at twice it
-});
 
 // A Caster shell landing: lighter than the Volatile rock's blast it used to
 // borrow (shake 7 + radius × 0.025 for 0.32 s, a full-screen flash, ~110
@@ -94,25 +59,15 @@ const SHELL_IMPACT = Object.freeze({
   glowLife: 0.35, // proposta 18/10: s
 });
 
-const BOSS_EFFECTS = BOSS_EFFECTS_PRESETS || {};
-const BOSS_SHAKES = BOSS_SCREEN_SHAKES || {};
-
 // One light per source (docs/NORTE.md §2). Machine enemies glow threat-red and
-// shed matte hull chips; the boss glows violet. Data-file colors are ignored
-// here on purpose: they predate the palette.
+// shed matte hull chips; the boss glows violet (BOSS_FX, in BossTransitions).
+// Data-file colors are ignored here on purpose: they predate the palette.
 const ENEMY_FX = Object.freeze({
   spark: PALETTE.threat,
   sparkDim: withAlpha(PALETTE.threat, 0.7),
   glow: withAlpha(PALETTE.threat, 0.45),
   chip: PALETTE.hullLit,
   smoke: withAlpha(PALETTE.rock, 0.45),
-});
-const BOSS_FX = Object.freeze({
-  core: PALETTE.boss,
-  accent: PALETTE.text,
-  trail: withAlpha(PALETTE.boss, 0.6),
-  smoke: withAlpha(PALETTE.rock, 0.35),
-  flash: withAlpha(PALETTE.boss, 0.45),
 });
 
 export default class EffectsSystem extends BaseSystem {
@@ -157,13 +112,16 @@ export default class EffectsSystem extends BaseSystem {
     });
     this.randomHelpers = randomHelpers;
     Object.assign(this, randomHelpers);
-    this.particles = [];
-    this.shockwaves = [];
-    this.hitMarkers = []; // NEW: Hit marker tracking
-    this.bossTransitionEffects = [];
     this.processedMineExplosions = new WeakSet();
-    this.muzzleFlashQueue = [];
     this.draw2d = new Draw2D();
+    this.particleEffects = new Particles({
+      randomRange: randomHelpers.randomRange,
+      randomCentered: randomHelpers.randomCentered,
+      createMuzzleFlash: (x, y, dirX, dirY) =>
+        this.createMuzzleFlash(x, y, dirX, dirY),
+      hitMarkersEnabled: () => this.hitMarkersEnabled,
+      damageNumbersEnabled: () => this.damageNumbersEnabled,
+    });
 
     this.screenFeedback = new ScreenFeedback({
       random: () => this.getRandomFork('screenShake'),
@@ -176,7 +134,25 @@ export default class EffectsSystem extends BaseSystem {
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       motionReduced: () => this.motionReduced,
     });
-    this.activeBoss = { id: null, lastPhase: 0 };
+    this.bossTransitions = new BossTransitions({
+      particleEffects: this.particleEffects,
+      randomFloat: randomHelpers.randomFloat,
+      randomRange: randomHelpers.randomRange,
+      randomCentered: randomHelpers.randomCentered,
+      getScaledParticleCount: (count, options) =>
+        this.getScaledParticleCount(count, options),
+      addScreenShake: (presetOrIntensity, durationOrOptions) =>
+        this.screenFeedback.addScreenShake(
+          presetOrIntensity,
+          durationOrOptions
+        ),
+      addScreenFlash: (color, duration, intensity) =>
+        this.screenFeedback.addScreenFlash(color, duration, intensity),
+      addFreezeFrame: (duration, fade) =>
+        this.gameTime.addFreezeFrame(duration, fade),
+      applyTimeDilation: (scale, options) =>
+        this.gameTime.applyTimeDilation(scale, options),
+    });
     this.lastAdjustedDelta = 0;
 
     this.settings = requireService(
@@ -191,97 +167,15 @@ export default class EffectsSystem extends BaseSystem {
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
-    this.damageTexts = []; // NEW: Damage text tracking
-    this.ambientChips = [];
-    this.ambientMotes = [];
-    this.ambientView = null;
 
     this.setupSettingsIntegration();
   }
 
-  // === PARTICLE POOL HELPERS ===
-  createParticle(x, y, vx, vy, color, size, life, type = 'normal') {
-    const particle = GamePools.particles.acquire();
-
-    // Configure particle from pool
-    particle.x = x;
-    particle.y = y;
-    particle.vx = vx;
-    particle.vy = vy;
-    particle.color = color;
-    particle.size = size;
-    particle.life = life;
-    particle.maxLife = life;
-    particle.alpha = 1;
-    particle.type = type;
-    particle.rotation = this.randomRange(0, Math.PI * 2, 'particles');
-    particle.rotationSpeed = this.randomCentered(4, 'particles');
-    particle.active = true;
-
-    return particle;
-  }
-
-  addParticle(x, y, vx, vy, color, size, life, type = 'normal') {
-    const particle = this.createParticle(x, y, vx, vy, color, size, life, type);
-    this.particles.push(particle);
-    return particle;
-  }
-
-  queueMuzzleFlash(x, y, dirX, dirY) {
-    this.muzzleFlashQueue.push(x, y, dirX, dirY);
-  }
-
-  flushMuzzleFlashQueue() {
-    const queue = this.muzzleFlashQueue;
-    if (!queue.length) {
-      return;
-    }
-
-    for (let i = 0; i < queue.length; i += 4) {
-      this.createMuzzleFlash(
-        queue[i],
-        queue[i + 1],
-        queue[i + 2],
-        queue[i + 3]
-      );
-    }
-
-    queue.length = 0;
-  }
-
-  releaseParticle(particle) {
-    if (!particle) {
-      return;
-    }
-
-    if (particle.bossEffectTag) {
-      delete particle.bossEffectTag;
-    }
-
-    if (typeof particle === 'object' && particle !== null) {
-      if (Object.prototype.hasOwnProperty.call(particle, 'active')) {
-        particle.active = false;
-      }
-
-      const ctorName =
-        particle.constructor && typeof particle.constructor.name === 'string'
-          ? particle.constructor.name
-          : null;
-
-      if (ctorName && ctorName !== 'Object') {
-        return;
-      }
-
-      if (particle.active !== undefined) {
-        try {
-          GamePools.particles.release(particle);
-        } catch (error) {
-          console.debug(
-            '[EffectsSystem] Particle not from pool, skipping release'
-          );
-        }
-      }
-    }
+  // === PARTICLES (effects/Particles.js) ===
+  // The per-event builders below draw pooled particles through this; the
+  // thruster determinism suite stubs it on the effects object.
+  createParticle(...args) {
+    return this.particleEffects.createParticle(...args);
   }
 
   setupSettingsIntegration() {
@@ -419,39 +313,17 @@ export default class EffectsSystem extends BaseSystem {
       this.draw2d.addTelegraph(payload.enemy || payload.boss || null);
     });
 
-    registerBossEvent('boss-spawned', (payload = {}) => {
-      this.clearBossEffectsState();
-      this.activeBoss.id = this.resolveBossId(payload);
-      if (Number.isFinite(payload?.phase)) {
-        this.activeBoss.lastPhase = payload.phase;
-      }
-      this.createBossEntranceEffect(payload);
-      this.triggerBossTransitionEffect('boss-spawned');
-    });
+    registerBossEvent('boss-spawned', (payload = {}) =>
+      this.bossTransitions.onSpawned(payload)
+    );
 
-    registerBossEvent('boss-phase-changed', (payload = {}) => {
-      const bossId = this.resolveBossId(payload);
-      if (bossId != null) {
-        this.activeBoss.id = bossId;
-      }
-      if (Number.isFinite(payload?.phase)) {
-        this.activeBoss.lastPhase = payload.phase;
-      }
-      this.createBossPhaseTransition(payload);
-      this.triggerBossTransitionEffect('boss-phase-changed');
-    });
+    registerBossEvent('boss-phase-changed', (payload = {}) =>
+      this.bossTransitions.onPhaseChanged(payload)
+    );
 
-    registerBossEvent('boss-defeated', (payload = {}) => {
-      GameDebugLogger.log('EVENT', 'Boss defeated - creating effects', {
-        bossId: this.resolveBossId(payload),
-        position: this.resolveBossPosition(payload),
-        wave: payload?.wave ?? null,
-      });
-      this.clearBossEffectsState();
-      this.createBossDefeatedExplosion(payload);
-      this.triggerBossTransitionEffect('boss-defeated');
-      this.activeBoss = { id: null, lastPhase: 0 };
-    });
+    registerBossEvent('boss-defeated', (payload = {}) =>
+      this.bossTransitions.onDefeated(payload)
+    );
 
     // Weapon fire feedback (Week 1: Balance & Feel)
     this.registerEventListener('bullet-created', (data) => {
@@ -461,7 +333,7 @@ export default class EffectsSystem extends BaseSystem {
         const vy = data.bullet.vy || 0;
         const speed = Math.sqrt(vx * vx + vy * vy);
         if (speed > 0) {
-          this.queueMuzzleFlash(
+          this.particleEffects.queueMuzzleFlash(
             data.from.x,
             data.from.y,
             vx / speed,
@@ -522,14 +394,12 @@ export default class EffectsSystem extends BaseSystem {
             ? data.damage
             : 0;
         const blocked = Boolean(data?.blocked);
-        if (this.hitMarkersEnabled) {
-          if (!blocked && (effectiveDamage > 0 || data.killed)) {
-            this.createHitMarker(
-              data.position,
-              data.killed || false,
-              effectiveDamage
-            );
-          }
+        if (!blocked && (effectiveDamage > 0 || data.killed)) {
+          this.particleEffects.createHitMarker(
+            data.position,
+            data.killed || false,
+            effectiveDamage
+          );
         }
         this.createBulletImpact(
           data.position,
@@ -646,7 +516,7 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('enemy-took-damage', (data) => {
       if (data?.enemy && Number.isFinite(data.damage)) {
-        this.createFloatingDamageText(
+        this.particleEffects.createFloatingDamageText(
           data.enemy.x,
           data.enemy.y,
           data.damage,
@@ -659,7 +529,7 @@ export default class EffectsSystem extends BaseSystem {
     this.registerEventListener('shield-deflective-explosion', (data) => {
       if (!data?.position) return;
 
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: data.position,
         radius: 200, // AoE damage radius
         color: withAlpha(PALETTE.player, 0.6),
@@ -683,7 +553,7 @@ export default class EffectsSystem extends BaseSystem {
 
     // Emergency brake: a small cyan ring the size of its shove.
     this.registerEventListener('player-braked', (data) => {
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: data?.position,
         radius: data?.radius,
         duration: 0.3,
@@ -715,100 +585,17 @@ export default class EffectsSystem extends BaseSystem {
     const effectDelta = this.gameTime.update(baseDelta);
     this.screenFeedback.update(effectDelta);
 
-    this.updateParticles(effectDelta);
-    this.updateShockwaves(effectDelta);
+    this.particleEffects.updateParticles(effectDelta);
+    this.particleEffects.updateShockwaves(effectDelta);
     this.draw2d.pruneTelegraphs();
-    this.updateHitMarkers(effectDelta);
-    this.updateDamageTexts(effectDelta);
+    this.particleEffects.updateHitMarkers(effectDelta);
+    this.particleEffects.updateDamageTexts(effectDelta);
     this.draw2d.updateDamageIndicators(effectDelta);
-    this.updateBossTransitions(effectDelta);
-    this.updateAmbient(effectDelta);
+    this.bossTransitions.updateBossTransitions(effectDelta);
+    this.particleEffects.updateAmbient(effectDelta);
 
     this.lastAdjustedDelta = effectDelta;
     return effectDelta;
-  }
-
-  updateHitMarkers(deltaTime) {
-    const markers = this.hitMarkers;
-    let writeIndex = 0;
-
-    for (let i = 0; i < markers.length; i += 1) {
-      const marker = markers[i];
-      if (marker && marker.update(deltaTime)) {
-        markers[writeIndex++] = marker;
-      }
-    }
-
-    markers.length = writeIndex;
-  }
-
-  updateParticles(deltaTime) {
-    // Update particles and return expired ones to pool
-    const particles = this.particles;
-    let writeIndex = 0;
-
-    for (let i = 0; i < particles.length; i += 1) {
-      const particle = particles[i];
-      if (
-        particle &&
-        typeof particle.update === 'function' &&
-        particle.update(deltaTime)
-      ) {
-        particles[writeIndex++] = particle;
-      } else if (particle) {
-        this.releaseParticle(particle);
-      }
-    }
-
-    particles.length = writeIndex;
-
-    // Return oldest particles to pool if we have too many
-    if (particles.length > 150) {
-      const toRemove = particles.length - 100;
-      for (let i = 0; i < toRemove; i += 1) {
-        if (particles[i]) {
-          this.releaseParticle(particles[i]);
-        }
-      }
-      if (toRemove > 0) {
-        particles.copyWithin(0, toRemove);
-        particles.length -= toRemove;
-      }
-    }
-  }
-
-  updateShockwaves(deltaTime) {
-    const shockwaves = this.shockwaves;
-    let writeIndex = 0;
-
-    for (let i = 0; i < shockwaves.length; i += 1) {
-      const wave = shockwaves[i];
-      if (!wave) {
-        continue;
-      }
-
-      wave.timer += deltaTime;
-      const progress = Math.min(1, wave.timer / wave.duration);
-      const easingPower =
-        Number.isFinite(wave.easingPower) && wave.easingPower > 0
-          ? wave.easingPower
-          : 1;
-      const easedProgress =
-        easingPower === 1 ? progress : Math.pow(progress, easingPower);
-
-      wave.radius = wave.maxRadius * easedProgress;
-      wave.alpha = Math.max(0, wave.maxAlpha * (1 - easedProgress));
-
-      const widthFade = Number.isFinite(wave.widthFade) ? wave.widthFade : 0.6;
-      const widthFactor = Math.max(0, 1 - easedProgress * widthFade);
-      wave.lineWidth = Math.max(0.35, wave.baseWidth * widthFactor);
-
-      if (wave.timer < wave.duration) {
-        shockwaves[writeIndex++] = wave;
-      }
-    }
-
-    shockwaves.length = writeIndex;
   }
 
   // === 2D DRAWING (effects/draw2d.js, frozen) ===
@@ -820,7 +607,7 @@ export default class EffectsSystem extends BaseSystem {
   // Queued muzzle flashes become particles first; Renderer3D flushes the
   // queue itself.
   draw(ctx) {
-    this.flushMuzzleFlashQueue();
+    this.particleEffects.flushMuzzleFlashQueue();
     this.draw2d.draw(ctx, {
       particles: this.particles,
       shockwaves: this.shockwaves,
@@ -831,816 +618,59 @@ export default class EffectsSystem extends BaseSystem {
     });
   }
 
-  // === AMBIENT FIELD LIFE ===
-  // Spawns inside the view on the first fill, then just outside an edge,
-  // heading for a random point in the view.
-  spawnAmbient(view, mote, inside) {
-    const roll = (min, max) => this.randomRange(min, max, AMBIENT.fork);
-    const m = AMBIENT.margin;
-    let x;
-    let y;
-    let angle;
-    if (inside) {
-      x = view.x + roll(0, view.width);
-      y = view.y + roll(0, view.height);
-      angle = roll(0, Math.PI * 2);
-    } else {
-      const side = Math.floor(roll(0, 4));
-      const along = roll(0, 1);
-      x = side === 1 ? view.x + view.width + m : view.x - m;
-      y = side === 2 ? view.y + view.height + m : view.y - m;
-      if (side === 0 || side === 2) x = view.x + along * view.width;
-      else y = view.y + along * view.height;
-      const tx = view.x + roll(0.2, 0.8) * view.width;
-      const ty = view.y + roll(0.2, 0.8) * view.height;
-      angle = Math.atan2(ty - y, tx - x);
-    }
-    const speed = mote
-      ? roll(AMBIENT.moteSpeedMin, AMBIENT.moteSpeedMax)
-      : roll(AMBIENT.chipSpeedMin, AMBIENT.chipSpeedMax);
-    const life = roll(AMBIENT.lifeMin, AMBIENT.lifeMax);
-    return {
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      rotation: roll(0, Math.PI * 2),
-      rotationSpeed: mote ? 0 : roll(-AMBIENT.chipSpinMax, AMBIENT.chipSpinMax),
-      size: mote
-        ? roll(AMBIENT.moteSizeMin, AMBIENT.moteSizeMax)
-        : roll(AMBIENT.chipSizeMin, AMBIENT.chipSizeMax),
-      color: roll(0, 1) < 0.5 ? PALETTE.rock : PALETTE.rockLit,
-      baseAlpha: mote
-        ? AMBIENT.moteAlpha
-        : roll(AMBIENT.chipAlphaMin, AMBIENT.chipAlphaMax),
-      alpha: 0,
-      life,
-      maxLife: life,
-      type: 'debris',
-    };
-  }
-
-  updateAmbient(deltaTime) {
-    const view = this.ambientView;
-    if (!view) return;
-    const m = AMBIENT.margin * 2;
-    const step = (list, count, mote) => {
-      const firstFill = list.length === 0;
-      while (list.length < count) {
-        list.push(this.spawnAmbient(view, mote, firstFill));
-      }
-      for (let i = 0; i < list.length; i += 1) {
-        const a = list[i];
-        a.x += a.vx * deltaTime;
-        a.y += a.vy * deltaTime;
-        a.rotation += a.rotationSpeed * deltaTime;
-        a.life -= deltaTime;
-        const outside =
-          a.x < view.x - m ||
-          a.x > view.x + view.width + m ||
-          a.y < view.y - m ||
-          a.y > view.y + view.height + m;
-        if (a.life <= 0 || outside) {
-          list[i] = this.spawnAmbient(view, mote, false);
-          continue;
-        }
-        const fade = Math.min(
-          1,
-          (a.maxLife - a.life) / AMBIENT.fade,
-          a.life / AMBIENT.fade
-        );
-        a.alpha = a.baseAlpha * fade;
-      }
-    };
-    step(this.ambientChips, AMBIENT.chipCount, false);
-    step(this.ambientMotes, AMBIENT.moteCount, true);
-  }
-
   // Drawn under the entities; `view` is the camera's visible logical rect.
   // Renderer3D passes no ctx: it only sets the view.
   drawAmbient(ctx, view) {
-    this.ambientView = view;
+    this.particleEffects.ambientView = view;
     if (ctx) this.draw2d.drawAmbient(ctx, this.ambientChips, this.ambientMotes);
   }
 
-  triggerBossTransitionEffect(eventName) {
-    if (!this.bossTransitionEffects) {
-      this.bossTransitionEffects = [];
-    }
-
-    const color = PALETTE.boss;
-    const presets = {
-      'boss-spawned': {
-        duration: 1.65,
-        maxAlpha: 0.65,
-        borderWidth: 30,
-        pulseFrequency: 1.8,
-        overlayAlpha: 0.18,
-        fadePower: 1.5,
-      },
-      'boss-phase-changed': {
-        duration: 1.05,
-        maxAlpha: 0.5,
-        borderWidth: 24,
-        pulseFrequency: 2.4,
-        overlayAlpha: 0.12,
-        fadePower: 1.6,
-      },
-      'boss-defeated': {
-        duration: 2.15,
-        maxAlpha: 0.85,
-        borderWidth: 36,
-        pulseFrequency: 1.1,
-        overlayAlpha: 0.22,
-        fadePower: 1.9,
-      },
-    };
-    const preset = presets[eventName] || presets['boss-phase-changed'];
-    const effect = {
-      event: eventName,
-      color,
-      duration: preset.duration,
-      timer: 0,
-      maxAlpha: preset.maxAlpha,
-      borderWidth: preset.borderWidth,
-      pulseFrequency: preset.pulseFrequency,
-      overlayAlpha: preset.overlayAlpha,
-      fadePower: preset.fadePower,
-    };
-
-    this.bossTransitionEffects.push(effect);
+  // Renderer3D and app.js read these lists on the effects object; the
+  // thruster suite swaps the particles, the 2D determinism suite the borders.
+  get particles() {
+    return this.particleEffects.particles;
   }
 
-  getBossEffectConfig(name) {
-    if (!name) {
-      return null;
-    }
-
-    return BOSS_EFFECTS &&
-      Object.prototype.hasOwnProperty.call(BOSS_EFFECTS, name)
-      ? BOSS_EFFECTS[name]
-      : null;
+  set particles(value) {
+    this.particleEffects.particles = value;
   }
 
-  getBossShakePreset(name) {
-    if (!name) {
-      return null;
-    }
-
-    return BOSS_SHAKES &&
-      Object.prototype.hasOwnProperty.call(BOSS_SHAKES, name)
-      ? BOSS_SHAKES[name]
-      : null;
+  get shockwaves() {
+    return this.particleEffects.shockwaves;
   }
 
-  applyBossScreenShake(name) {
-    const config = this.getBossShakePreset(name);
-    const fallbackMap = {
-      spawn: 'bossSpawn',
-      phaseChange: 'bossPhaseChange',
-      defeated: 'bossDefeated',
-    };
-
-    let presetName = null;
-    let presetOptions;
-
-    if (typeof config === 'string') {
-      presetName = config;
-    } else if (config && typeof config === 'object') {
-      if (typeof config.preset === 'string') {
-        presetName = config.preset;
-      } else if (typeof config.shakePreset === 'string') {
-        presetName = config.shakePreset;
-      }
-
-      if (config.options && typeof config.options === 'object') {
-        presetOptions = config.options;
-      } else if (config.overrides && typeof config.overrides === 'object') {
-        presetOptions = config.overrides;
-      }
-    }
-
-    if (!presetName && fallbackMap[name]) {
-      presetName = fallbackMap[name];
-    }
-
-    if (
-      presetName &&
-      Object.prototype.hasOwnProperty.call(ShakePresets, presetName)
-    ) {
-      this.screenFeedback.addScreenShake(presetName, presetOptions);
-      return;
-    }
-
-    if (config && typeof config === 'object') {
-      const intensity = Number.isFinite(config.intensity)
-        ? config.intensity
-        : null;
-      const duration = Number.isFinite(config.duration)
-        ? config.duration
-        : null;
-
-      if (intensity != null && duration != null) {
-        this.screenFeedback.addScreenShake(intensity, duration);
-      }
-    }
+  get hitMarkers() {
+    return this.particleEffects.hitMarkers;
   }
 
-  applyBossEffectTimings(config = {}, palette = {}) {
-    if (config.freezeFrame) {
-      this.gameTime.addFreezeFrame(
-        config.freezeFrame.duration,
-        config.freezeFrame.fade
-      );
-    }
-
-    if (config.slowMotion) {
-      this.gameTime.applyTimeDilation(config.slowMotion.scale ?? 0.6, {
-        duration: config.slowMotion.duration,
-        holdDuration: Number.isFinite(config.slowMotion.holdDuration)
-          ? config.slowMotion.holdDuration
-          : config.slowMotion.hold,
-        easing: config.slowMotion.easing,
-      });
-    }
-
-    const flashConfig = config.screenFlash;
-    if (flashConfig) {
-      const flashColor = palette.flash;
-      const flashDuration = Number.isFinite(flashConfig.duration)
-        ? flashConfig.duration
-        : 0.35;
-      const flashIntensity = Number.isFinite(flashConfig.intensity)
-        ? flashConfig.intensity
-        : 0.25;
-      this.screenFeedback.addScreenFlash(
-        flashColor,
-        flashDuration,
-        flashIntensity
-      );
-    }
+  get damageTexts() {
+    return this.particleEffects.damageTexts;
   }
 
-  tagBossParticle(particle, tag) {
-    if (particle && tag) {
-      particle.bossEffectTag = tag;
-    }
-    return particle;
+  get ambientChips() {
+    return this.particleEffects.ambientChips;
   }
 
-  clearBossEffectsState(options = {}) {
-    const preserveEvents = Array.isArray(options.preserveEvents)
-      ? new Set(options.preserveEvents)
-      : null;
-
-    if (Array.isArray(this.bossTransitionEffects)) {
-      if (preserveEvents && preserveEvents.size > 0) {
-        this.bossTransitionEffects = this.bossTransitionEffects.filter(
-          (effect) => effect && preserveEvents.has(effect.event)
-        );
-      } else {
-        this.bossTransitionEffects = [];
-      }
-    }
-
-    const preserveTags = Array.isArray(options.preserveTags)
-      ? new Set(options.preserveTags)
-      : null;
-
-    if (!Array.isArray(this.particles) || this.particles.length === 0) {
-      return;
-    }
-
-    const survivors = [];
-    for (const particle of this.particles) {
-      if (particle && particle.bossEffectTag) {
-        if (preserveTags && preserveTags.has(particle.bossEffectTag)) {
-          survivors.push(particle);
-          continue;
-        }
-        this.releaseParticle(particle);
-      } else {
-        survivors.push(particle);
-      }
-    }
-
-    this.particles = survivors;
+  get ambientMotes() {
+    return this.particleEffects.ambientMotes;
   }
 
-  resolveBossId(payload = {}) {
-    if (!payload || typeof payload !== 'object') {
-      return null;
-    }
-
-    const source = payload.enemy || payload.boss || payload.source || null;
-    if (source && source.id != null) {
-      return source.id;
-    }
-
-    if (payload.bossId != null) {
-      return payload.bossId;
-    }
-
-    if (payload.enemyId != null) {
-      return payload.enemyId;
-    }
-
-    if (payload.id != null) {
-      return payload.id;
-    }
-
-    return null;
+  get bossTransitionEffects() {
+    return this.bossTransitions.bossTransitionEffects;
   }
 
-  resolveBossPosition(payload = {}) {
-    if (!payload || typeof payload !== 'object') {
-      return null;
-    }
-
-    const input = payload.position;
-    if (input && Number.isFinite(input.x) && Number.isFinite(input.y)) {
-      return { x: input.x, y: input.y };
-    }
-
-    const source = payload.enemy || payload.boss || payload.target || null;
-    if (source && Number.isFinite(source.x) && Number.isFinite(source.y)) {
-      return { x: source.x, y: source.y };
-    }
-
-    if (Number.isFinite(payload.x) && Number.isFinite(payload.y)) {
-      return { x: payload.x, y: payload.y };
-    }
-
-    return null;
+  set bossTransitionEffects(value) {
+    this.bossTransitions.bossTransitionEffects = value;
   }
 
-  createBossEntranceEffect(payload = {}) {
-    const origin = this.resolveBossPosition(payload);
-    if (!origin) {
-      return;
-    }
-
-    const config = this.getBossEffectConfig('entrance') || {};
-    const palette = BOSS_FX;
-
-    const swirl = config.swirl || {};
-    const swirlCount = this.getScaledParticleCount(swirl.count ?? 48, {
-      allowZero: true,
-    });
-    const innerRadius = Number.isFinite(swirl.innerRadius)
-      ? swirl.innerRadius
-      : 36;
-    const outerRadius = Number.isFinite(swirl.outerRadius)
-      ? swirl.outerRadius
-      : Math.max(innerRadius + 40, 120);
-    const swirlSpeedMin = swirl.speed?.min ?? 80;
-    const swirlSpeedMax = swirl.speed?.max ?? 150;
-    const swirlSizeMin = swirl.size?.min ?? 2.2;
-    const swirlSizeMax = swirl.size?.max ?? 3.4;
-    const swirlLifeMin = swirl.life?.min ?? 0.5;
-    const swirlLifeMax = swirl.life?.max ?? 0.8;
-
-    for (let i = 0; i < swirlCount; i += 1) {
-      const angle = (i / Math.max(1, swirlCount)) * Math.PI * 2;
-      const radius = this.randomRange(innerRadius, outerRadius, 'boss');
-      const offsetX = Math.cos(angle) * radius;
-      const offsetY = Math.sin(angle) * radius;
-      const speed = this.randomRange(swirlSpeedMin, swirlSpeedMax, 'boss');
-      const velocityAngle =
-        angle + Math.PI / 2 + this.randomCentered(0.4, 'boss');
-      const particle = this.createParticle(
-        origin.x + offsetX,
-        origin.y + offsetY,
-        Math.cos(velocityAngle) * speed,
-        Math.sin(velocityAngle) * speed,
-        palette.accent,
-        this.randomRange(swirlSizeMin, swirlSizeMax, 'boss'),
-        this.randomRange(swirlLifeMin, swirlLifeMax, 'boss'),
-        'spark'
-      );
-      particle.rotationSpeed = this.randomCentered(6, 'boss');
-      this.tagBossParticle(particle, 'boss-entrance');
-      this.particles.push(particle);
-    }
-
-    const burst = config.burst || {};
-    const rings = Math.max(1, burst.rings ?? 2);
-    const perRing = Math.max(1, burst.particlesPerRing ?? 24);
-    const radiusStep = Number.isFinite(burst.radiusStep)
-      ? burst.radiusStep
-      : 44;
-    const burstSpeedMin = burst.speed?.min ?? 140;
-    const burstSpeedMax = burst.speed?.max ?? 220;
-    const burstSizeMin = burst.size?.min ?? 2.8;
-    const burstSizeMax = burst.size?.max ?? 4.2;
-    const burstLifeMin = burst.life?.min ?? 0.45;
-    const burstLifeMax = burst.life?.max ?? 0.75;
-
-    for (let ring = 0; ring < rings; ring += 1) {
-      const baseRadius = radiusStep * (ring + 1);
-      for (let i = 0; i < perRing; i += 1) {
-        const angle = (i / perRing) * Math.PI * 2;
-        const speed = this.randomRange(burstSpeedMin, burstSpeedMax, 'boss');
-        const offsetRadius = baseRadius * 0.28;
-        const particle = this.createParticle(
-          origin.x + Math.cos(angle) * offsetRadius,
-          origin.y + Math.sin(angle) * offsetRadius,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          ring % 2 === 0 ? palette.core : palette.trail,
-          this.randomRange(burstSizeMin, burstSizeMax, 'boss'),
-          this.randomRange(burstLifeMin, burstLifeMax, 'boss'),
-          'spark'
-        );
-        particle.rotationSpeed = this.randomCentered(4, 'boss');
-        this.tagBossParticle(particle, 'boss-entrance');
-        this.particles.push(particle);
-      }
-    }
-
-    const dust = config.dust || {};
-    const dustCount = this.getScaledParticleCount(dust.count ?? 28, {
-      allowZero: true,
-    });
-    const dustSpeedMin = dust.speed?.min ?? 40;
-    const dustSpeedMax = dust.speed?.max ?? 90;
-    const dustSizeMin = dust.size?.min ?? 3.2;
-    const dustSizeMax = dust.size?.max ?? 5.2;
-    const dustLifeMin = dust.life?.min ?? 0.8;
-    const dustLifeMax = dust.life?.max ?? 1.4;
-
-    for (let i = 0; i < dustCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(dustSpeedMin, dustSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.smoke,
-        this.randomRange(dustSizeMin, dustSizeMax, 'boss'),
-        this.randomRange(dustLifeMin, dustLifeMax, 'boss'),
-        'smoke'
-      );
-      particle.rotationSpeed = this.randomCentered(1.2, 'boss');
-      this.tagBossParticle(particle, 'boss-entrance');
-      this.particles.push(particle);
-    }
-
-    if (config.shockwave) {
-      this.createShockwaveEffect({
-        position: origin,
-        radius: config.shockwave.radius,
-        duration: config.shockwave.duration,
-        baseWidth: config.shockwave.baseWidth,
-        maxAlpha: config.shockwave.maxAlpha,
-        widthFade: config.shockwave.widthFade,
-        easingPower: config.shockwave.easingPower,
-        color: palette.core,
-      });
-    }
-
-    this.applyBossScreenShake('spawn');
-    this.applyBossEffectTimings(config, palette, 'boss-spawned');
+  // Called on the effects object: Renderer3D flushes the muzzle flashes,
+  // PickupSystem rings a shockwave.
+  flushMuzzleFlashQueue() {
+    this.particleEffects.flushMuzzleFlashQueue();
   }
 
-  createBossPhaseTransition(payload = {}) {
-    const origin = this.resolveBossPosition(payload);
-    if (!origin) {
-      return;
-    }
-
-    const config = this.getBossEffectConfig('phaseTransition') || {};
-    const palette = BOSS_FX;
-
-    const burst = config.burst || {};
-    const burstCount = this.getScaledParticleCount(burst.count ?? 48, {
-      allowZero: true,
-    });
-    const burstSpeedMin = burst.speed?.min ?? 160;
-    const burstSpeedMax = burst.speed?.max ?? 280;
-    const burstSizeMin = burst.size?.min ?? 2.2;
-    const burstSizeMax = burst.size?.max ?? 3.4;
-    const burstLifeMin = burst.life?.min ?? 0.35;
-    const burstLifeMax = burst.life?.max ?? 0.65;
-
-    for (let i = 0; i < burstCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(burstSpeedMin, burstSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.core,
-        this.randomRange(burstSizeMin, burstSizeMax, 'boss'),
-        this.randomRange(burstLifeMin, burstLifeMax, 'boss'),
-        'spark'
-      );
-      particle.rotationSpeed = this.randomCentered(5, 'boss');
-      this.tagBossParticle(particle, 'boss-phase');
-      this.particles.push(particle);
-    }
-
-    const petals = config.petals || {};
-    const petalsCount = this.getScaledParticleCount(petals.count ?? 16, {
-      allowZero: true,
-    });
-    const petalRadius = Number.isFinite(petals.radius) ? petals.radius : 110;
-    const petalAngularJitter = Number.isFinite(petals.angularJitter)
-      ? petals.angularJitter
-      : 0.3;
-    const petalSpeedMin = petals.speed?.min ?? 60;
-    const petalSpeedMax = petals.speed?.max ?? 120;
-    const petalSizeMin = petals.size?.min ?? 2.6;
-    const petalSizeMax = petals.size?.max ?? 3.6;
-    const petalLifeMin = petals.life?.min ?? 0.4;
-    const petalLifeMax = petals.life?.max ?? 0.75;
-
-    for (let i = 0; i < petalsCount; i += 1) {
-      const baseAngle = (i / Math.max(1, petalsCount)) * Math.PI * 2;
-      const jitter = this.randomCentered(petalAngularJitter, 'boss');
-      const angle = baseAngle + jitter;
-      const speed = this.randomRange(petalSpeedMin, petalSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x + Math.cos(angle) * petalRadius * 0.25,
-        origin.y + Math.sin(angle) * petalRadius * 0.25,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.accent,
-        this.randomRange(petalSizeMin, petalSizeMax, 'boss'),
-        this.randomRange(petalLifeMin, petalLifeMax, 'boss'),
-        'spark'
-      );
-      particle.rotationSpeed = this.randomCentered(4, 'boss');
-      this.tagBossParticle(particle, 'boss-phase');
-      this.particles.push(particle);
-    }
-
-    const embers = config.embers || {};
-    const emberCount = this.getScaledParticleCount(embers.count ?? 24, {
-      allowZero: true,
-    });
-    const emberSpeedMin = embers.speed?.min ?? 35;
-    const emberSpeedMax = embers.speed?.max ?? 70;
-    const emberSizeMin = embers.size?.min ?? 2.4;
-    const emberSizeMax = embers.size?.max ?? 3.4;
-    const emberLifeMin = embers.life?.min ?? 1.1;
-    const emberLifeMax = embers.life?.max ?? 1.6;
-
-    for (let i = 0; i < emberCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(emberSpeedMin, emberSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.trail,
-        this.randomRange(emberSizeMin, emberSizeMax, 'boss'),
-        this.randomRange(emberLifeMin, emberLifeMax, 'boss'),
-        'normal'
-      );
-      particle.rotationSpeed = this.randomCentered(1.5, 'boss');
-      this.tagBossParticle(particle, 'boss-phase');
-      this.particles.push(particle);
-    }
-
-    if (config.shockwave) {
-      this.createShockwaveEffect({
-        position: origin,
-        radius: config.shockwave.radius,
-        duration: config.shockwave.duration,
-        baseWidth: config.shockwave.baseWidth,
-        maxAlpha: config.shockwave.maxAlpha,
-        widthFade: config.shockwave.widthFade,
-        easingPower: config.shockwave.easingPower,
-        color: palette.accent,
-      });
-    }
-
-    this.applyBossScreenShake('phaseChange');
-    this.applyBossEffectTimings(config, palette, 'boss-phase-changed');
-  }
-
-  createBossDefeatedExplosion(payload = {}) {
-    const origin = this.resolveBossPosition(payload);
-    if (!origin) {
-      return;
-    }
-
-    const config = this.getBossEffectConfig('defeated') || {};
-    const palette = BOSS_FX;
-
-    this.gameTime.addFreezeFrame(0.5, 0.3);
-    this.screenFeedback.addScreenShake(20, 1.0);
-    this.screenFeedback.addScreenFlash(PALETTE.text, 0.8, 0.3);
-
-    const burstColor = palette.core;
-    const burstCount = 50;
-    const scheduleBurst = typeof setTimeout === 'function';
-
-    for (let i = 0; i < burstCount; i += 1) {
-      const emitBurst = () => {
-        const angle = this.randomFloat('boss') * Math.PI * 2;
-        const speed = this.randomRange(200, 400, 'boss');
-        const particle = this.createParticle(
-          origin.x,
-          origin.y,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          burstColor,
-          this.randomRange(4, 12, 'boss'),
-          this.randomRange(1, 3, 'boss'),
-          'explosion'
-        );
-        if (!particle) {
-          return;
-        }
-        particle.rotationSpeed = this.randomCentered(6, 'boss');
-        this.tagBossParticle(particle, 'boss-defeat');
-        this.particles.push(particle);
-      };
-
-      if (scheduleBurst) {
-        setTimeout(emitBurst, i * 20);
-      } else {
-        emitBurst();
-      }
-    }
-
-    const debris = config.debris || {};
-    const debrisCount = this.getScaledParticleCount(debris.count ?? 60);
-    const debrisSpeedMin = debris.speed?.min ?? 180;
-    const debrisSpeedMax = debris.speed?.max ?? 320;
-    const debrisSizeMin = debris.size?.min ?? 2.8;
-    const debrisSizeMax = debris.size?.max ?? 4.6;
-    const debrisLifeMin = debris.life?.min ?? 0.9;
-    const debrisLifeMax = debris.life?.max ?? 1.4;
-
-    for (let i = 0; i < debrisCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(debrisSpeedMin, debrisSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        PALETTE.hullLit,
-        this.randomRange(debrisSizeMin, debrisSizeMax, 'boss'),
-        this.randomRange(debrisLifeMin, debrisLifeMax, 'boss'),
-        'debris'
-      );
-      particle.rotationSpeed = this.randomCentered(8, 'boss');
-      this.tagBossParticle(particle, 'boss-defeat');
-      this.particles.push(particle);
-    }
-
-    const sparks = config.sparks || {};
-    const sparkCount = this.getScaledParticleCount(sparks.count ?? 90);
-    const sparkSpeedMin = sparks.speed?.min ?? 260;
-    const sparkSpeedMax = sparks.speed?.max ?? 400;
-    const sparkSizeMin = sparks.size?.min ?? 2.4;
-    const sparkSizeMax = sparks.size?.max ?? 3.8;
-    const sparkLifeMin = sparks.life?.min ?? 0.5;
-    const sparkLifeMax = sparks.life?.max ?? 0.85;
-
-    for (let i = 0; i < sparkCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(sparkSpeedMin, sparkSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        i % 3 === 0 ? palette.accent : palette.core,
-        this.randomRange(sparkSizeMin, sparkSizeMax, 'boss'),
-        this.randomRange(sparkLifeMin, sparkLifeMax, 'boss'),
-        'spark'
-      );
-      particle.rotationSpeed = this.randomCentered(7, 'boss');
-      this.tagBossParticle(particle, 'boss-defeat');
-      this.particles.push(particle);
-    }
-
-    const embers = config.embers || {};
-    const emberCount = this.getScaledParticleCount(embers.count ?? 32, {
-      allowZero: true,
-    });
-    const emberSpeedMin = embers.speed?.min ?? 30;
-    const emberSpeedMax = embers.speed?.max ?? 60;
-    const emberSizeMin = embers.size?.min ?? 3.2;
-    const emberSizeMax = embers.size?.max ?? 4.4;
-    const emberLifeMin = embers.life?.min ?? 1.5;
-    const emberLifeMax = embers.life?.max ?? 2.2;
-
-    for (let i = 0; i < emberCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(emberSpeedMin, emberSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.trail,
-        this.randomRange(emberSizeMin, emberSizeMax, 'boss'),
-        this.randomRange(emberLifeMin, emberLifeMax, 'boss'),
-        'normal'
-      );
-      particle.rotationSpeed = this.randomCentered(1.8, 'boss');
-      this.tagBossParticle(particle, 'boss-defeat');
-      this.particles.push(particle);
-    }
-
-    const smoke = config.smoke || {};
-    const smokeCount = this.getScaledParticleCount(smoke.count ?? 26, {
-      allowZero: true,
-    });
-    const smokeSpeedMin = smoke.speed?.min ?? 20;
-    const smokeSpeedMax = smoke.speed?.max ?? 55;
-    const smokeSizeMin = smoke.size?.min ?? 18;
-    const smokeSizeMax = smoke.size?.max ?? 26;
-    const smokeLifeMin = smoke.life?.min ?? 1.6;
-    const smokeLifeMax = smoke.life?.max ?? 2.8;
-
-    for (let i = 0; i < smokeCount; i += 1) {
-      const angle = this.randomFloat('boss') * Math.PI * 2;
-      const speed = this.randomRange(smokeSpeedMin, smokeSpeedMax, 'boss');
-      const particle = this.createParticle(
-        origin.x,
-        origin.y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        palette.smoke,
-        this.randomRange(smokeSizeMin, smokeSizeMax, 'boss'),
-        this.randomRange(smokeLifeMin, smokeLifeMax, 'boss'),
-        'smoke'
-      );
-      particle.rotationSpeed = this.randomCentered(0.9, 'boss');
-      this.tagBossParticle(particle, 'boss-defeat');
-      this.particles.push(particle);
-    }
-
-    if (config.shockwave) {
-      this.createShockwaveEffect({
-        position: origin,
-        radius: config.shockwave.radius,
-        duration: config.shockwave.duration,
-        baseWidth: config.shockwave.baseWidth,
-        maxAlpha: config.shockwave.maxAlpha,
-        widthFade: config.shockwave.widthFade,
-        easingPower: config.shockwave.easingPower,
-        color: palette.core,
-      });
-    }
-
-    if (config.secondaryShockwave) {
-      this.createShockwaveEffect({
-        position: origin,
-        radius: config.secondaryShockwave.radius,
-        duration: config.secondaryShockwave.duration,
-        baseWidth: config.secondaryShockwave.baseWidth,
-        maxAlpha: config.secondaryShockwave.maxAlpha,
-        widthFade: config.secondaryShockwave.widthFade,
-        easingPower: config.secondaryShockwave.easingPower,
-        color: palette.accent,
-      });
-    }
-
-    this.applyBossScreenShake('defeated');
-    this.applyBossEffectTimings(config, palette, 'boss-defeated');
-
-    GameDebugLogger.log('STATE', 'Boss defeat effects created', {
-      freezeDuration: 0.5,
-      shakeIntensity: 20,
-      particleCount: burstCount,
-    });
-  }
-
-  updateBossTransitions(deltaTime) {
-    if (
-      !Array.isArray(this.bossTransitionEffects) ||
-      !this.bossTransitionEffects.length
-    ) {
-      return;
-    }
-
-    const effects = this.bossTransitionEffects;
-    let writeIndex = 0;
-
-    for (let i = 0; i < effects.length; i += 1) {
-      const effect = effects[i];
-      if (!effect) {
-        continue;
-      }
-
-      effect.timer += deltaTime;
-      if (effect.timer < effect.duration) {
-        effects[writeIndex++] = effect;
-      }
-    }
-
-    effects.length = writeIndex;
+  createShockwaveEffect(data) {
+    this.particleEffects.createShockwaveEffect(data);
   }
 
   // === SCREEN FEEDBACK AND GAME TIME (effects/) ===
@@ -2222,7 +1252,7 @@ export default class EffectsSystem extends BaseSystem {
     );
     this.gameTime.addHitStop('mine');
 
-    this.createShockwaveEffect({
+    this.particleEffects.createShockwaveEffect({
       position,
       radius: radius * 1.1,
       duration: 0.55,
@@ -2421,7 +1451,7 @@ export default class EffectsSystem extends BaseSystem {
       0.14,
       0.14
     );
-    this.createShockwaveEffect({
+    this.particleEffects.createShockwaveEffect({
       position,
       radius: radius * 2.4,
       duration: 0.42,
@@ -2488,10 +1518,6 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  createHitMarker(position, killed, damage) {
-    this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
-  }
-
   createBulletImpact(position, enemyVelocity, killed, options = {}) {
     const blocked = Boolean(options?.blocked);
     // More particles if killed, fewer for just a hit
@@ -2542,49 +1568,6 @@ export default class EffectsSystem extends BaseSystem {
           blocked ? 'debris' : 'spark'
         )
       );
-    }
-  }
-
-  createShockwaveEffect(data) {
-    if (!data || !data.position) {
-      return;
-    }
-
-    const radius =
-      typeof data.radius === 'number' ? data.radius : SHIELD_SHOCKWAVE_RADIUS;
-
-    const duration =
-      typeof data.duration === 'number' && data.duration > 0
-        ? data.duration
-        : 0.45;
-    const baseWidth =
-      typeof data.baseWidth === 'number' && data.baseWidth > 0
-        ? data.baseWidth
-        : 10;
-    const maxAlpha =
-      typeof data.maxAlpha === 'number' ? Math.max(0, data.maxAlpha) : 0.6;
-    const widthFade = typeof data.widthFade === 'number' ? data.widthFade : 0.6;
-    const easingPower =
-      typeof data.easingPower === 'number' ? data.easingPower : 1;
-
-    const wave = {
-      x: data.position.x,
-      y: data.position.y,
-      maxRadius: radius,
-      radius: 0,
-      timer: 0,
-      duration,
-      baseWidth,
-      maxAlpha,
-      alpha: maxAlpha,
-      widthFade,
-      easingPower,
-      color: data.color,
-    };
-
-    this.shockwaves.push(wave);
-    if (this.shockwaves.length > 6) {
-      this.shockwaves = this.shockwaves.slice(-6);
     }
   }
 
@@ -2782,7 +1765,7 @@ export default class EffectsSystem extends BaseSystem {
     const maxDimension = Math.max(screenWidth, screenHeight);
     const shockwaveRadius = maxDimension * 0.7; // 70% of screen
 
-    this.createShockwaveEffect({
+    this.particleEffects.createShockwaveEffect({
       position: position,
       radius: shockwaveRadius,
       duration: 0.8, // Longer duration
@@ -2793,7 +1776,7 @@ export default class EffectsSystem extends BaseSystem {
 
     // Secondary inner shockwave (more intense)
     setTimeout(() => {
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: position,
         radius: shockwaveRadius * 0.5,
         duration: 0.5,
@@ -2902,7 +1885,7 @@ export default class EffectsSystem extends BaseSystem {
       this.screenFeedback.addScreenShake(2 + radius * 0.01, 0.12);
       this.gameTime.addHitStop('small');
       // Small shockwave
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
         radius: 60,
         duration: 0.3,
@@ -2913,7 +1896,7 @@ export default class EffectsSystem extends BaseSystem {
       this.screenFeedback.addScreenShake(4 + radius * 0.012, 0.18);
       this.gameTime.addHitStop('medium');
       // Medium shockwave
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
         radius: 120,
         duration: 0.4,
@@ -2929,7 +1912,7 @@ export default class EffectsSystem extends BaseSystem {
         0.12
       );
       // Massive shockwave
-      this.createShockwaveEffect({
+      this.particleEffects.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
         radius: 250,
         duration: 0.6,
@@ -3428,38 +2411,6 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  createExplosionShockwave(data = {}) {
-    if (!data.position) {
-      return;
-    }
-
-    const radius = data.radius ?? 80;
-    this.createShockwaveEffect({
-      position: data.position,
-      radius,
-      duration: data.duration ?? 0.6,
-      baseWidth: data.baseWidth ?? 18,
-      maxAlpha: data.maxAlpha ?? 0.78,
-      widthFade: data.widthFade ?? 0.45,
-      easingPower: data.easingPower ?? 0.8,
-      color: data.color ?? PALETTE.shot,
-    });
-
-    const innerScale = data.innerScale ?? 0.55;
-    if (innerScale > 0) {
-      this.createShockwaveEffect({
-        position: data.position,
-        radius: radius * innerScale,
-        duration: data.innerDuration ?? 0.5,
-        baseWidth: data.innerBaseWidth ?? 10,
-        maxAlpha: data.innerMaxAlpha ?? 0.6,
-        widthFade: data.innerWidthFade ?? 0.7,
-        easingPower: data.innerEasingPower ?? 1.1,
-        color: data.innerColor ?? PALETTE.text,
-      });
-    }
-  }
-
   createVolatileExplosionEffect(data) {
     if (!data || !data.position) {
       return;
@@ -3476,7 +2427,7 @@ export default class EffectsSystem extends BaseSystem {
       0.24
     );
 
-    this.createExplosionShockwave({
+    this.particleEffects.createExplosionShockwave({
       position,
       radius: radius * 1.05,
     });
@@ -3562,7 +2513,7 @@ export default class EffectsSystem extends BaseSystem {
       min + this.randomFloat('volatility') * (max - min);
 
     this.screenFeedback.addScreenShake(fx.shake, fx.shakeSeconds);
-    this.createExplosionShockwave({
+    this.particleEffects.createExplosionShockwave({
       position,
       radius: radius * fx.shockwaveScale,
     });
@@ -3652,35 +2603,10 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     super.reset(normalized);
-    this.particles = [];
-    this.shockwaves = [];
-    this.hitMarkers = [];
-    this.damageTexts = [];
-    this.bossTransitionEffects = [];
-    this.muzzleFlashQueue = [];
-    this.ambientChips = [];
-    this.ambientMotes = [];
+    this.particleEffects.reset();
+    this.bossTransitions.reset();
     this.draw2d.reset();
     this.screenFeedback.reset();
     this.gameTime.reset();
-  }
-
-  createFloatingDamageText(x, y, damage, isCritical = false) {
-    if (!this.damageNumbersEnabled) return;
-    this.damageTexts.push(new DamageText(x, y, damage, isCritical));
-  }
-
-  updateDamageTexts(deltaTime) {
-    const texts = this.damageTexts;
-    let writeIndex = 0;
-
-    for (let i = 0; i < texts.length; i += 1) {
-      const text = texts[i];
-      if (text && text.update(deltaTime)) {
-        texts[writeIndex++] = text;
-      }
-    }
-
-    texts.length = writeIndex;
   }
 }
