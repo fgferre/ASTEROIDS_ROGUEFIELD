@@ -76,7 +76,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 - [ ] **R13.3 Medição na máquina dele, sem fricção.** Botão "Copy performance report" no painel `?stats=1`/F8 e em
       Settings; benchmark de 20 s que recomenda um preset; relatório em texto para colar na conversa.
 - [ ] **R13.4 Replay grava o modo e o casco.** Boss Rush/Daily/infinito e casco no cabeçalho; playback restaura.
-- [ ] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
+- [x] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
       3D; seed do director igual no EnemySystem e no WaveManager; avisos de "accounting discrepancy" explicados ou
       eliminados.
 - [ ] **R13.6 Paridade 2D/3D e oddities.** Wardens Choir/Null com visual próprio no 2D; nave 2D sem borrão; pulso de
