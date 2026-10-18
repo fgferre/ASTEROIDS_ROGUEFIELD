@@ -2,7 +2,7 @@
 
 Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 8.**
 
 ## O BASTÃO — onde a rodada parou (18/10, ~04h00) — RODADAS 2, 3 E 4 COMPLETAS E MESCLADAS NA `main` (publicado)
 
@@ -32,6 +32,13 @@ remove); se o modo infinito vale; todas as "propostas" nomeadas no código.
 **Avisos de processo (18/10):** workers em paralelo no mesmo arquivo (`UISystem.js`) exigiram separar hunks na hora
 do commit — preferir fatias com arquivos disjuntos; `pgrep -f` mata o próprio shell do worker (usar PID da porta);
 `BACKLOG.md` está no limite de 30 linhas — triar antes de adicionar.
+
+## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
+
+- **(7)** _"Tá ficando muito interessante, mas tá um pouco estranho o background ser essas estrelas como se fosse uma
+  textura. Achei que tinha que ser algo mais procedural ali. Além disso, é estranho fazer sombra em cima dessa
+  textura. É espaço, é o espaço atrás."_ → Rodada 5, R5.10: fundo procedural (estrelas em pontos 3D com paralaxe
+  real, nebulosa em shader) e fim das sombras projetadas no "chão". Fecha quando ele disser que o fundo lê como espaço.
 
 ## Jogabilidade e sensação
 

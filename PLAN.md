@@ -222,6 +222,10 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
 - [ ] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
       cintilam, partículas suaves (fade por profundidade), escudo hexagonal em 3D, marcas de queimadura (decals)
       nas rochas atingidas, poeira volumétrica no bioma.
+- [ ] **R5.10 Espaço procedural (veredito dele, 18/10).** O fundo lê como textura de estrelas e as sombras no "chão"
+      não fazem sentido no espaço. Trocar `dustFloor`/`fieldBackdrop` por: 3–4 camadas de estrelas em pontos 3D a
+      profundidades diferentes (paralaxe real com a câmera, cintilação), nebulosa em shader (fbm) num plano distante,
+      poeira volumétrica esparsa; **sem chão e sem sombras projetadas**; a luz da nave só ilumina rochas e poeira.
 - [ ] **R5.9 Sensação e UX.** Nave inclina no strafe (banking), recuo no tiro, knockback nos inimigos atingidos,
       i-frames do dash visíveis; menu com a nave 3D em destaque e presets de qualidade visíveis; pausa/settings com
       o mesmo design das cartas; transição das cartas no level-up; números de dano com peso por tamanho.
