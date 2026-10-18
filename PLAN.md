@@ -190,7 +190,7 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [x] **R4.3 Warden Choir (10) e Warden Null (15).** Dois chefes novos com fases que destroem geometria visível;
       Warden Prime fica no 5.
 - [x] **R4.4 Variantes de rocha em 3D** (Dense Core, Volatile, Golden, Parasite, Crystal) com material próprio.
-- [ ] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
+- [x] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
 - [x] **R4.6 Harmonic Plasma Lance + evoluções por família.**
 - [x] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
 - [x] **R4.8 Tema por bioma, tema de Warden, stingers.**

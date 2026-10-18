@@ -14,6 +14,7 @@ import {
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
+import { bakeHullMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 // Plate heights in hull units: base plate, raised spine (peak at y = 0) and
@@ -39,6 +40,12 @@ const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
 const MUZZLE_LIGHT = 1.6;
 const MUZZLE_LIGHT_FRAMES = 2;
+// Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
+// (the extruded plates' UVs are in hull units). proposta 18/10: strengths.
+const HULL_TILE = 16;
+const HULL_NORMAL_SCALE = 0.5;
+const HULL_AO = 0.8;
+const HULL_MAP_SEED = 3131.9;
 
 // Cyan fresnel rim on the hull (silhouette against the dark field) plus the
 // white invulnerability pulse, both as emissive; the pulse is weighted to the
@@ -91,12 +98,19 @@ export class PlayerMirror {
     // uniforms, so the key light models each panel without a sheen.
     const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
     const blink = { value: 0 };
+    const maps = bakeHullMaps(THREE, HULL_MAP_SEED);
+    Object.values(maps).forEach((map) =>
+      map.repeat.set(1 / HULL_TILE, 1 / HULL_TILE)
+    );
     const hullTone = (from, to, t, roughness) => {
       const material = new THREE.MeshStandardMaterial({
         color: colorOf(THREE, from).lerp(colorOf(THREE, to), t),
         metalness: 0.2,
         roughness,
         flatShading: true,
+        ...maps,
+        normalScale: new THREE.Vector2(HULL_NORMAL_SCALE, HULL_NORMAL_SCALE),
+        aoMapIntensity: HULL_AO,
       });
       material.userData.uRim = rim;
       material.userData.uBlink = blink;
@@ -296,6 +310,7 @@ export class PlayerMirror {
           ),
         this.baseMaterial
       );
+      housing.geometry.setAttribute('uv2', housing.geometry.getAttribute('uv'));
       // Hot throat: a glowing bead at the exit, lit even at idle.
       const throat = new THREE.Mesh(
         new THREE.SphereGeometry(nozzle.r * 0.8, 8, 6).translate(
@@ -366,6 +381,7 @@ export class PlayerMirror {
     }
     solid.rotateX(-Math.PI / 2);
     solid.computeVertexNormals();
+    solid.setAttribute('uv2', solid.getAttribute('uv'));
     this.ship.add(new THREE.Mesh(solid, material));
     return solid;
   }
