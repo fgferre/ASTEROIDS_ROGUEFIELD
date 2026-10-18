@@ -171,8 +171,8 @@ function forceProgressionUpgrades(progressionService, targetCount) {
 
 /**
  * Force-advances the wave counter on a WaveManager-shaped service. The exact
- * field is `currentWave`; `wave: 'boss'` advances to the next multiple of
- * `WAVE_BOSS_INTERVAL` (5 per `src/data/constants/gameplay.js:248`). Failures
+ * field is `currentWave`; `wave: 'boss'` jumps to layer 5, the first Warden
+ * layer in `src/data/layers.js`. Failures
  * are debug-logged, not thrown — the harness still measures real frames.
  */
 function forceWaveNumber(enemiesService, requestedWave) {

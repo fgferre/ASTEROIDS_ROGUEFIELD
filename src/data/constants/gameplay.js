@@ -275,47 +275,9 @@ export const WAVE_BREAK_TIME = 5; // segundos
 
 export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legado
 
-export const WAVE_BOSS_INTERVAL = 5;
-
 export const RUN_FINAL_LAYER = 15; // PROPOSAL 17/10 (docs/NORTE.md section 4): defeating this layer's Warden Prime clears the Field
 
 export const MAX_ASTEROIDS_ON_SCREEN = 40; // PROPOSAL 17/10 (was 35; 20 before NEO-ARCADE)
-
-export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
-  drone: deepFreeze({
-    startWave: 8,
-
-    baseWeight: 1,
-
-    weightScaling: 0.08,
-  }),
-
-  mine: deepFreeze({
-    startWave: 10,
-
-    baseWeight: 1,
-
-    weightScaling: 0.07,
-  }),
-
-  hunter: deepFreeze({
-    startWave: 13,
-
-    baseWeight: 1,
-
-    weightScaling: 0.1,
-  }),
-
-  // proposta 17/10: the four new kinds. Count = 1 at startWave, +1 every
-  // 3 waves (WaveManager.getBaselineSupportCount default).
-  husk: deepFreeze({ startWave: 6, baseWeight: 1, weightScaling: 0.06 }),
-
-  ram: deepFreeze({ startWave: 9, baseWeight: 1, weightScaling: 0.06 }),
-
-  bulwark: deepFreeze({ startWave: 11, baseWeight: 1, weightScaling: 0.05 }),
-
-  weaver: deepFreeze({ startWave: 12, baseWeight: 1, weightScaling: 0.05 }),
-});
 
 export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager
 

@@ -7,10 +7,7 @@ import {
   HUSK_COMPONENTS,
   HUSK_CONFIG,
 } from '../../../src/data/enemies/husk.js';
-import {
-  ELITE_MODIFIERS,
-  eliteChanceForWave,
-} from '../../../src/data/enemies/elite.js';
+import { ELITE_MODIFIERS } from '../../../src/data/enemies/elite.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 
 const createHusk = (config) => {
@@ -54,12 +51,5 @@ describe('Elite modifier', () => {
     const eliteDrop = xpDropped(elite);
     expect(eliteDrop.xp).toBe(normalDrop.xp * ELITE_MODIFIERS.rewards);
     expect(eliteDrop.orbs).toBe(normalDrop.orbs * ELITE_MODIFIERS.rewards);
-  });
-
-  it('starts at wave 6 and caps at 30%', () => {
-    expect(eliteChanceForWave(5)).toBe(0);
-    expect(eliteChanceForWave(6)).toBeCloseTo(0.08, 5);
-    expect(eliteChanceForWave(7)).toBeCloseTo(0.1, 5);
-    expect(eliteChanceForWave(40)).toBe(0.3);
   });
 });

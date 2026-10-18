@@ -6,8 +6,9 @@ import { withWaveOverrides } from '../__helpers__/setup.js';
 /**
  * D-04 (02-CONTEXT): WaveManager must emit a NEW `boss-warning` event exactly
  * one wave BEFORE each boss wave so the MusicIntensityResolver (plan 02.05) can
- * raise tension pre-boss. Bosses spawn every WAVE_BOSS_INTERVAL=5, so pre-boss
- * waves are 4, 9, 14, ... This producer-only change has no consumer yet; these
+ * raise tension pre-boss. Wardens sit on layers 5, 10 and 15
+ * (src/data/layers.js), so pre-boss waves are 4, 9, 14. This producer-only
+ * change has no consumer yet; these
  * tests lock the emit TIMING and PAYLOAD via the observable emit stream.
  *
  * Phase 1 LEARNINGS: assert on OBSERVABLE event emission (recorded emit array),

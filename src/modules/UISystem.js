@@ -10,7 +10,7 @@ import {
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
+import { directorFor } from '../data/layers.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
   applyCanvasResolution,
@@ -415,10 +415,7 @@ class UISystem extends BaseSystem {
       return;
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
-    const bossInterval = Number(WAVE_BOSS_INTERVAL) || 0;
-    const boss =
-      Boolean(payload.isBossWave) ||
-      (bossInterval > 0 && layer % bossInterval === 0);
+    const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     // The first-run controls toast opens right after layer 1 starts.
     const toastShowing =
       layer === 1 &&
@@ -432,12 +429,9 @@ class UISystem extends BaseSystem {
     const completedWave = Number.isFinite(Number(payload?.wave))
       ? Math.max(1, Math.floor(Number(payload.wave)))
       : null;
-    const bossInterval = Number(WAVE_BOSS_INTERVAL) || 0;
     const isBossWave =
       Boolean(payload?.isBossWave) ||
-      (bossInterval > 0 &&
-        completedWave !== null &&
-        completedWave % bossInterval === 0);
+      (completedWave !== null && directorFor(completedWave).warden);
     const hasBossContext =
       Boolean(this.cachedValues.boss?.visible) ||
       Boolean(state.bossId) ||
@@ -1391,6 +1385,10 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('wave-started', (payload = {}) => {
       this.handleLayerStarted(payload);
+    });
+
+    this.registerEventListener('surge-started', (payload = {}) => {
+      this.aaaTacticalHud?.showSurgeBanner(payload.label);
     });
 
     this.registerEventListener('enemy-destroyed', (payload = {}) => {

@@ -164,11 +164,24 @@ export class AAAHudLayout {
     el.classList.add(className);
   }
 
-  /**
-   * Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN".
-   * Shown for LAYER_BANNER_MS, the last FADE_OUT_MS fading.
-   */
+  /** Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN". */
   showLayerBanner(layer, { boss = false, delayMs = 0 } = {}) {
+    this._showBanner(boss ? `LAYER ${layer} — WARDEN` : `LAYER ${layer}`, {
+      tone: boss ? 'boss' : null,
+      delayMs,
+    });
+  }
+
+  /** "SURGE" banner with the burst's label underneath. */
+  showSurgeBanner(label) {
+    this._showBanner('SURGE', { tone: 'surge', subtitle: label });
+  }
+
+  /**
+   * The centered banner, shown for LAYER_BANNER_MS, the last FADE_OUT_MS
+   * fading. `tone` 'boss' or 'surge' recolours it.
+   */
+  _showBanner(title, { tone = null, subtitle = '', delayMs = 0 } = {}) {
     const banner = this.els?.layerBanner;
     if (!banner) {
       return;
@@ -178,10 +191,10 @@ export class AAAHudLayout {
     }
     this._bannerEndsAt = performance.now() + delayMs + LAYER_BANNER_MS;
     this._bannerTimer = this._later(() => {
-      this.els.layerBannerTitle.textContent = boss
-        ? `LAYER ${layer} — WARDEN`
-        : `LAYER ${layer}`;
-      banner.classList.toggle('is-boss', boss);
+      this.els.layerBannerTitle.textContent = title;
+      this.els.layerBannerSub.textContent = subtitle;
+      banner.classList.toggle('is-boss', tone === 'boss');
+      banner.classList.toggle('is-surge', tone === 'surge');
       banner.classList.remove('is-leaving');
       this._replay(banner, 'is-showing');
       this._bannerTimer = this._later(() => {
@@ -358,6 +371,7 @@ export class AAAHudLayout {
       dashFill: query('#ui-dash-fill'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
+      layerBannerSub: query('#ui-layer-banner-sub'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
       feed: query('#ui-feed'),
@@ -841,6 +855,7 @@ export class AAAHudLayout {
             <div class="layer-banner" id="ui-layer-banner" aria-live="polite">
                 <div class="layer-banner__title" id="ui-layer-banner-title">LAYER 1</div>
                 <div class="layer-banner__line"></div>
+                <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
             </div>
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
@@ -1039,6 +1054,11 @@ export class AAAHudLayout {
             .layer-banner__line { width: 420px; max-width: 70%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent); box-shadow: var(--glow-accent); }
             .layer-banner.is-boss .layer-banner__title { color: var(--boss); text-shadow: 0 0 18px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-boss .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+            .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
+            .layer-banner__sub:empty { display: none; }
+            .layer-banner.is-surge .layer-banner__title { color: var(--danger); text-shadow: 0 0 18px var(--danger), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-surge .layer-banner__line { background: linear-gradient(90deg, transparent, var(--danger) 20%, var(--danger) 80%, transparent); box-shadow: 0 0 12px var(--danger); }
+            .layer-banner.is-surge .layer-banner__sub { color: var(--danger); }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }

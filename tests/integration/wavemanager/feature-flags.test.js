@@ -139,6 +139,9 @@ describe('WaveManager Integration', () => {
           spawnedAsteroids.length
         );
         enemySystem.waveState.totalAsteroids = spawnTarget;
+        // Layer 1's Rockfall surge is still scheduled (src/data/layers.js);
+        // this test covers the completion path, not the schedule.
+        enemySystem.waveManager.layerSchedule = [];
 
         expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(0);
 

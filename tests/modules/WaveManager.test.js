@@ -1,234 +1,157 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
-import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 import { withWaveOverrides } from '../__helpers__/setup.js';
-import { createEventBusMock } from '../__helpers__/mocks.js';
 
-function createWaveManager() {
+// Field mock: every factory spawn lands in `active`, in spawn order.
+function createField({ player = { x: 400, y: 300 } } = {}) {
   const random = createDeterministicRandom({ floatValue: 0.5 });
-  const enemySystem = {
-    getRandomScope: () => random,
+  const active = [];
+  const emits = [];
+  const eventBus = {
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn((event, payload) => emits.push({ event, payload })),
   };
-  return new WaveManager({
-    enemySystem,
-    random,
-    eventBus: createEventBusMock(),
-  });
+  const enemySystem = {
+    asteroids: active,
+    getRandomScope: () => random,
+    getCachedWorld: () => ({
+      getBounds: () => ({ width: 800, height: 600 }),
+    }),
+    getCachedPlayer: () => ({ position: player }),
+    getPlayerPositionSnapshot: () => player,
+    spawnBoss: vi.fn((config) => {
+      const boss = { type: 'boss', destroyed: false, wave: config.wave };
+      active.push(boss);
+      return boss;
+    }),
+    acquireEnemyViaFactory: vi.fn((type, config) => {
+      const enemy = { type, ...config, destroyed: false };
+      active.push(enemy);
+      return enemy;
+    }),
+    registerActiveEnemy: vi.fn(() => true),
+  };
+  const manager = new WaveManager({ enemySystem, random, eventBus });
+  const kill = (enemy) => {
+    enemy.destroyed = true;
+    manager.onEnemyDestroyed({ enemy });
+  };
+  return { manager, active, emits, enemySystem, kill };
 }
 
-describe('WaveManager support enemy weights', () => {
-  it('does not return support weights before configured start waves', async () => {
-    const result = await withWaveOverrides(
-      { managerHandlesAsteroids: true },
-      () => {
-        const manager = createWaveManager();
-        const earliestStart = Math.min(
-          ...Object.values(CONSTANTS.SUPPORT_ENEMY_PROGRESSION).map(
-            (rule) => rule.startWave
-          )
-        );
+function startLayer(field, layer) {
+  field.manager.currentWave = layer - 1;
+  expect(field.manager.startNextWave()).toBe(true);
+}
 
-        return manager.computeSupportWeights(earliestStart - 1);
-      }
-    );
+const ofType = (active, type) => active.filter((e) => e.type === type);
 
-    expect(result).toEqual([]);
+describe('WaveManager layer director', () => {
+  it('trickles the layer 4 roster in on its schedule', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 4);
+      // Keep the field busy so the schedule runs on its own clock.
+      field.active.push({ type: 'asteroid', destroyed: false });
+
+      expect(ofType(field.active, 'drone')).toHaveLength(0);
+      field.manager.update(7.9);
+      expect(ofType(field.active, 'drone')).toHaveLength(0);
+      field.manager.update(0.2);
+      expect(ofType(field.active, 'drone')).toHaveLength(1);
+      field.manager.update(8);
+      expect(ofType(field.active, 'drone')).toHaveLength(2);
+    });
   });
 
-  it('applies weight scaling configured in constants for each support enemy', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const manager = createWaveManager();
+  it('fires a surge with its banner event at the far edge from the player', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField({ player: { x: 100, y: 300 } });
+      startLayer(field, 4);
+      field.active.push({ type: 'asteroid', destroyed: false });
 
-      const droneStart = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave;
-      const mineStart = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
-      const hunterStart = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave;
+      field.manager.update(20);
 
-      const waveAtDroneStart = manager.computeSupportWeights(droneStart);
-      expect(waveAtDroneStart.find((entry) => entry.key === 'drone')).toEqual({
-        key: 'drone',
-        weight: 1,
+      const surge = field.emits.find((e) => e.event === 'surge-started');
+      expect(surge.payload).toEqual({
+        layer: 4,
+        label: 'Mote swarm',
+        kinds: ['drone'],
+        count: 4,
       });
-      expect(waveAtDroneStart.map((entry) => entry.key)).not.toContain('mine');
-
-      const waveWithMines = manager.computeSupportWeights(mineStart);
-      const droneAtMineWave = waveWithMines.find(
-        (entry) => entry.key === 'drone'
-      );
-      const mineAtMineWave = waveWithMines.find(
-        (entry) => entry.key === 'mine'
-      );
-
-      expect(droneAtMineWave?.weight).toBeCloseTo(
-        1 +
-          (mineStart - droneStart) *
-            CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.weightScaling,
-        5
-      );
-      expect(mineAtMineWave?.weight).toBeCloseTo(1, 5);
-
-      const waveAllSupports = manager.computeSupportWeights(hunterStart + 2);
-      const droneWeight =
-        waveAllSupports.find((entry) => entry.key === 'drone')?.weight ?? 0;
-      const mineWeight =
-        waveAllSupports.find((entry) => entry.key === 'mine')?.weight ?? 0;
-      const hunterWeight =
-        waveAllSupports.find((entry) => entry.key === 'hunter')?.weight ?? 0;
-
-      expect(droneWeight).toBeCloseTo(
-        1 +
-          (hunterStart + 2 - droneStart) *
-            CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.weightScaling,
-        5
-      );
-      expect(mineWeight).toBeCloseTo(
-        1 +
-          (hunterStart + 2 - mineStart) *
-            CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.weightScaling,
-        5
-      );
-      expect(hunterWeight).toBeCloseTo(
-        1 + 2 * CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.weightScaling,
-        5
-      );
+      const swarm = ofType(field.active, 'drone').slice(-4);
+      expect(swarm).toHaveLength(4);
+      // Player on the left: the burst comes in from the right edge.
+      for (const drone of swarm) expect(drone.x).toBeGreaterThan(700);
     });
   });
 
-  it('still returns support weights when asteroid spawning is legacy-controlled', async () => {
-    const expectedWeights = await withWaveOverrides(
-      { managerHandlesAsteroids: true },
-      () => {
-        const manager = createWaveManager();
-        return manager.computeSupportWeights(20);
-      }
-    );
-
+  it('pulls the next scheduled spawn forward when the field is empty', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-      const manager = createWaveManager();
-      expect(manager.computeSupportWeights(20)).toEqual(expectedWeights);
+      const field = createField();
+      startLayer(field, 4);
+
+      field.manager.update(0.1);
+
+      expect(ofType(field.active, 'drone')).toHaveLength(1);
+      expect(field.manager.layerElapsed).toBe(8);
     });
   });
 
-  it('injects support groups into dynamically generated waves as progression unlocks them', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const manager = createWaveManager();
-      const progression = CONSTANTS.SUPPORT_ENEMY_PROGRESSION;
-
-      const getSupportGroup = (waveConfig, key) => {
-        const expectedType = manager.enemyTypeKeys?.[key] || key;
-        return waveConfig.enemies.find((group) => group.type === expectedType);
-      };
-
-      const droneWave = manager.generateDynamicWave(
-        progression.drone.startWave
-      );
-      const droneAtStart = getSupportGroup(droneWave, 'drone');
-      const mineAtDroneWave = getSupportGroup(droneWave, 'mine');
-      const hunterAtDroneWave = getSupportGroup(droneWave, 'hunter');
-
-      expect(droneAtStart?.count).toBeGreaterThan(0);
-      expect(mineAtDroneWave).toBeUndefined();
-      expect(hunterAtDroneWave).toBeUndefined();
-
-      const mineWave = manager.generateDynamicWave(progression.mine.startWave);
-      const droneAtMineWave = getSupportGroup(mineWave, 'drone');
-      const mineAtStart = getSupportGroup(mineWave, 'mine');
-
-      expect(droneAtMineWave?.count).toBeGreaterThan(0);
-      expect(mineAtStart?.count).toBeGreaterThan(0);
-
-      const hunterWave = manager.generateDynamicWave(
-        progression.hunter.startWave
-      );
-      const droneAtHunterWave = getSupportGroup(hunterWave, 'drone');
-      const mineAtHunterWave = getSupportGroup(hunterWave, 'mine');
-      const hunterAtStart = getSupportGroup(hunterWave, 'hunter');
-
-      expect(droneAtHunterWave?.count).toBeGreaterThan(0);
-      expect(mineAtHunterWave?.count).toBeGreaterThan(0);
-      expect(hunterAtStart?.count).toBeGreaterThan(0);
-    });
-  });
-
-  it('tracks boss-wave enemies and completes when the boss dies last in legacy asteroid fallback mode', async () => {
+  it('rolls elites with the roster entry chance', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-      const random = createDeterministicRandom({ floatValue: 0.5 });
-      const eventBus = {
-        on: vi.fn(),
-        off: vi.fn(),
-        emit: vi.fn(),
-      };
-      const activeEnemies = [];
-      let supportSequence = 0;
+      const field = createField();
+      startLayer(field, 13);
+      const chance = vi.spyOn(field.manager.randomScopes.spawn, 'chance');
 
-      const enemySystem = {
-        asteroids: activeEnemies,
-        getRandomScope: () => random,
-        getCachedWorld: () => ({
-          getBounds: () => ({ width: 800, height: 600 }),
-        }),
-        getCachedPlayer: () => ({
-          position: { x: 400, y: 300 },
-          velocity: { vx: 0, vy: 0 },
-        }),
-        getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
-        spawnBoss: vi.fn((config) => {
-          const boss = {
-            id: 'boss-10',
-            type: 'boss',
-            alive: true,
-            destroyed: false,
-            wave: config.wave,
-          };
-          activeEnemies.push(boss);
-          return boss;
-        }),
-        acquireEnemyViaFactory: vi.fn((type, config) => ({
-          id: `${type}-${supportSequence++}`,
-          type,
-          alive: true,
-          destroyed: false,
-          wave: config.wave,
-        })),
-        registerActiveEnemy: vi.fn((enemy) => {
-          if (!activeEnemies.includes(enemy)) {
-            activeEnemies.push(enemy);
-          }
-          return enemy;
-        }),
-      };
+      field.manager.update(5);
 
-      const manager = new WaveManager({ enemySystem, random, eventBus });
-      manager.currentWave = 9;
+      expect(chance).toHaveBeenCalledWith(0.2);
+    });
+  });
 
-      expect(manager.startNextWave()).toBe(true);
-      expect(manager.currentWave).toBe(10);
-      expect(manager.totalEnemiesThisWave).toBe(4);
+  it('does not complete a layer while scheduled spawns are pending', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 4);
+      field.manager.update(8);
+      const [first] = ofType(field.active, 'drone');
 
-      const boss = activeEnemies.find((enemy) => enemy.type === 'boss');
-      const supports = activeEnemies.filter((enemy) => enemy.type === 'drone');
+      field.kill(first);
 
+      expect(field.manager.waveInProgress).toBe(true);
+      expect(field.manager.layerSchedule.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('tracks the layer 10 Warden and its Motes, completing when the boss dies last', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 10);
+      const { manager, active, emits } = field;
+
+      // Warden at once, 4 Motes on the schedule.
+      expect(manager.totalEnemiesThisWave).toBe(5);
+      const [boss] = ofType(active, 'boss');
       expect(boss).toBeTruthy();
-      expect(supports).toHaveLength(3);
 
-      for (const support of supports) {
-        support.alive = false;
-        support.destroyed = true;
-        manager.onEnemyDestroyed({ enemy: support });
-      }
+      manager.update(60);
+      const motes = ofType(active, 'drone');
+      expect(motes).toHaveLength(4);
 
+      motes.forEach(field.kill);
       expect(manager.waveInProgress).toBe(true);
-      expect(manager.enemiesKilledThisWave).toBe(3);
+      expect(manager.enemiesKilledThisWave).toBe(4);
 
-      boss.alive = false;
-      manager.onEnemyDestroyed({ enemy: boss });
+      field.kill(boss);
 
       expect(manager.waveInProgress).toBe(false);
-      expect(manager.enemiesKilledThisWave).toBe(4);
-      expect(eventBus.emit).toHaveBeenCalledWith(
-        'wave-complete',
-        expect.objectContaining({ wave: 10, enemiesKilled: 4 })
-      );
+      expect(emits).toContainEqual({
+        event: 'wave-complete',
+        payload: expect.objectContaining({ wave: 10, enemiesKilled: 5 }),
+      });
     });
   });
 });

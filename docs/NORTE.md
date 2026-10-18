@@ -59,9 +59,12 @@ cristal exposto, olho de máquina, escudo). A informação é luz; o resto é ma
 
 ## 4. Arco da run (etapa 6, com ele)
 
-Oito a doze minutos. Camadas 1–4 só pedra; 5 primeiro Guardião-Maior; 6–9 Motes e Tethers; 10 Guardião; 11–14
-Seekers; 15 Guardião final → **fim da run com vitória** (a decidir com ele: a run termina no 15 ou vira modo infinito
-com placar). Build: 9 → ~25 upgrades em quatro famílias com um bônus "3 iguais" simples e visível; dash em Shift
+Oito a doze minutos, tudo numa tabela só (`src/data/layers.js`, proposta 17/10). Camadas 1–3 só pedra, com uma
+**surge** "Rockfall" aos 40 s; 4 chegam os Motes, em enxames; 5 primeiro Guardião; 6–7 Motes e Husks, Tethers a partir
+do 7; 8–9 entram os Rams (surge "Ram pack"); 10 Guardião com Motes pingando; 11–12 Seekers e Bulwarks, elites 10–15 %;
+13–14 tudo, Weavers incluídos, surge "Full field" aos 30 s, elites 20–30 %; 15 Guardião final escoltado por Seekers
+→ **fim da run com vitória** (a decidir com ele: a run termina no 15 ou vira modo infinito com placar). Surge = rajada
+vinda da borda longe do jogador, anunciada por uma faixa "SURGE" na tela. Build: 9 → ~25 upgrades em quatro famílias com um bônus "3 iguais" simples e visível; dash em Shift
 (escudo passa para E apenas). **Decidido pela sessão em 17/10 à noite, sob o mandato "reimaginar tudo, segue em frente":
 entram como propostas com os números ao lado; ele aprova ou reverte jogando.** Fim de run: vitória no Warden da
 camada 15 (modo infinito só se ele pedir).

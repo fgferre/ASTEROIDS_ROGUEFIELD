@@ -27,16 +27,14 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  ASTEROIDS_PER_WAVE_BASE,
   ASTEROID_ENTRY_ANGLE_VARIANCE,
   ASTEROID_OFFSCREEN_RECOVERY_TIME,
-  MAX_ASTEROIDS_ON_SCREEN,
   WAVE_DURATION,
   WAVE_BREAK_TIME,
   COLLISION_BOUNCE,
 } from '../../../data/constants/gameplay.js';
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
+import { directorFor } from '../../../data/layers.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { IS_DEV } from '../../../core/env.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
@@ -298,21 +296,7 @@ export class EnemyUpdateSystem {
     }
 
     if (becameActive) {
-      const baseMultiplier = Number.isFinite(ASTEROIDS_PER_WAVE_MULTIPLIER)
-        ? ASTEROIDS_PER_WAVE_MULTIPLIER
-        : 1.3;
-      const baseCountValue = Number.isFinite(ASTEROIDS_PER_WAVE_BASE)
-        ? ASTEROIDS_PER_WAVE_BASE
-        : 4;
-      const normalizedWaveIndex = Math.max(0, resolvedWaveNumber - 1);
-      const computedTotal = Math.floor(
-        baseCountValue * Math.pow(baseMultiplier, normalizedWaveIndex)
-      );
-      const capValue = Number.isFinite(MAX_ASTEROIDS_ON_SCREEN)
-        ? MAX_ASTEROIDS_ON_SCREEN
-        : 25;
-
-      wave.totalAsteroids = Math.max(0, Math.min(computedTotal, capValue));
+      wave.totalAsteroids = directorFor(resolvedWaveNumber).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = Number.isFinite(Number(WAVE_DURATION))

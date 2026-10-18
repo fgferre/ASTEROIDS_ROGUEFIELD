@@ -1,8 +1,5 @@
 import { GamePools } from './core/GamePools.js';
-import {
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-  WAVE_BOSS_INTERVAL,
-} from './data/constants/gameplay.js';
+import { WAVEMANAGER_HANDLES_ASTEROID_SPAWN } from './data/constants/gameplay.js';
 import {
   debugLog,
   resolveDebugPreference,
@@ -287,7 +284,6 @@ function init(recording = null) {
     if (DEV_MODE) {
       GameDebugLogger.log('INIT', 'Feature Flags', {
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-        WAVE_BOSS_INTERVAL,
       });
     }
 

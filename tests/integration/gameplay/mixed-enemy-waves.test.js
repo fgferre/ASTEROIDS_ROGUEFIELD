@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import RandomService from '../../../src/core/RandomService.js';
-import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { WaveManager } from '../../../src/modules/enemies/managers/WaveManager.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
@@ -62,47 +61,13 @@ afterEach(() => {
   cleanupGlobalState();
 });
 
-describe('Wave progression', () => {
-  it('unlocks support enemies at configured progression thresholds', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const manager = createWaveManager({ eventBus });
-      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave;
-      const droneWave = manager.generateDynamicWave(manager.currentWave);
-      expect(droneWave.enemies.some((group) => group.type === 'drone')).toBe(
-        true
-      );
-      expect(droneWave.enemies.some((group) => group.type === 'mine')).toBe(
-        false
-      );
-
-      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
-      const mineWave = manager.generateDynamicWave(manager.currentWave);
-      expect(mineWave.enemies.some((group) => group.type === 'drone')).toBe(
-        true
-      );
-      expect(mineWave.enemies.some((group) => group.type === 'mine')).toBe(
-        true
-      );
-      expect(mineWave.enemies.some((group) => group.type === 'hunter')).toBe(
-        false
-      );
-
-      manager.currentWave =
-        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave;
-      const hunterWave = manager.generateDynamicWave(manager.currentWave);
-      expect(hunterWave.enemies.some((group) => group.type === 'hunter')).toBe(
-        true
-      );
-    });
-  });
-});
-
 describe('Enemy spawning integration', () => {
   it('spawns support groups through the EnemySystem factory pathway', async () => {
     const spawnLog = [];
 
     await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const enemySystem = {
+        asteroids: [],
         getCachedWorld: () => ({
           getBounds: () => ({ width: 800, height: 600 }),
         }),
@@ -117,11 +82,9 @@ describe('Enemy spawning integration', () => {
       };
 
       const manager = createWaveManager({ enemySystem, eventBus });
-      const waveNumber =
-        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 1;
-      manager.currentWave = waveNumber;
-      const config = manager.generateDynamicWave(waveNumber);
-      manager.spawnWave(config);
+      manager.currentWave = 12;
+      manager.startNextWave();
+      manager.update(60);
 
       const spawnedTypes = spawnLog.map((entry) => entry.type);
       expect(spawnedTypes).toContain('drone');
@@ -133,7 +96,7 @@ describe('Enemy spawning integration', () => {
   it('excludes asteroids from manager totals when EnemySystem spawns them', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
       const manager = createWaveManager({ eventBus });
-      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
+      manager.currentWave = 6;
       manager.startNextWave();
 
       const [startedPayload] = getEventPayloads('wave-started');
@@ -301,7 +264,7 @@ describe('Reward handling', () => {
 });
 
 describe('Deterministic wave generation', () => {
-  it('produces identical support group compositions for identical seeds', async () => {
+  it('produces identical support spawns for identical seeds', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const seed = 'mixed-wave-seed';
       const eventBusA = createEventBusMock();
@@ -309,24 +272,35 @@ describe('Deterministic wave generation', () => {
       const randomA = createTestContainer(seed).resolve('random');
       const randomB = createTestContainer(seed).resolve('random');
 
-      const managerA = createWaveManager({
-        eventBus: eventBusA,
-        random: randomA,
-      });
-      const managerB = createWaveManager({
-        eventBus: eventBusB,
-        random: randomB,
-      });
+      const spawnsFor = (bus, random) => {
+        const spawns = [];
+        const manager = createWaveManager({
+          eventBus: bus,
+          random,
+          enemySystem: {
+            asteroids: [],
+            getRandomScope: () => random,
+            getCachedWorld: () => ({
+              getBounds: () => ({ width: 800, height: 600 }),
+            }),
+            getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
+            getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
+            acquireEnemyViaFactory: (type, config) => {
+              spawns.push({ type, x: config.x, y: config.y });
+              return { type, destroyed: false };
+            },
+            registerActiveEnemy: () => true,
+          },
+        });
+        manager.currentWave = 13;
+        manager.startNextWave();
+        manager.update(60);
+        return spawns;
+      };
 
-      const waveNumber =
-        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 3;
-      managerA.currentWave = waveNumber;
-      managerB.currentWave = waveNumber;
-
-      const configA = managerA.generateDynamicWave(waveNumber);
-      const configB = managerB.generateDynamicWave(waveNumber);
-
-      expect(configA.enemies).toEqual(configB.enemies);
+      const spawnsA = spawnsFor(eventBusA, randomA);
+      expect(spawnsA.length).toBeGreaterThan(0);
+      expect(spawnsA).toEqual(spawnsFor(eventBusB, randomB));
     });
   });
 });

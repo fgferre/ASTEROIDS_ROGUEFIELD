@@ -5,10 +5,8 @@
  * Supports multiple enemy types and complex wave compositions.
  *
  * Features:
- * - Wave configuration system
- * - Dynamic difficulty scaling
+ * - Layer table (src/data/layers.js): rocks, timed roster, surges, Warden
  * - Multiple enemy type support
- * - Procedural wave generation
  * - Wave state tracking
  *
  * @example
@@ -32,22 +30,29 @@ import { clamp } from '../../../utils/mathHelpers.js';
 import {
   ASTEROID_EDGE_SPAWN_MARGIN,
   ASTEROID_SAFE_SPAWN_DISTANCE,
-  ASTEROIDS_PER_WAVE_BASE,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  MAX_ASTEROIDS_ON_SCREEN,
-  SUPPORT_ENEMY_PROGRESSION,
-  WAVE_BOSS_INTERVAL,
   WAVE_BREAK_TIME,
   WAVE_SPAWN_DELAY,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
-import { eliteChanceForWave } from '../../../data/enemies/elite.js';
+import { directorFor } from '../../../data/layers.js';
 
-// Support kinds with no hand-tuned wave entries: they join the predefined
-// waves and the dynamic ones from SUPPORT_ENEMY_PROGRESSION alone.
-const ADDED_SUPPORT_KINDS = ['husk', 'ram', 'bulwark', 'weaver'];
+// Support kinds the layer table can list; they spawn at a safe distance from
+// the player (asteroids come in from the edges).
+const SUPPORT_KINDS = [
+  'drone',
+  'mine',
+  'hunter',
+  'husk',
+  'ram',
+  'bulwark',
+  'weaver',
+];
+// Surge bursts: units spread this far (px) along the edge either side of the
+// burst point; support enemies appear this far inside the field.
+const SURGE_SPREAD = 70;
+const SURGE_INSET = 40;
 
 export class WaveManager {
   /**
@@ -138,117 +143,14 @@ export class WaveManager {
     this.waveDelay = WAVE_BREAK_TIME || 10.0; // WAVE-004: Usar WAVE_BREAK_TIME para paridade com sistema legado
     this.waveCountdown = 0;
 
-    // Wave configurations
-    this.waveConfigs = this.loadWaveConfigurations();
+    // Timed spawns for the layer in progress (src/data/layers.js), sorted by
+    // `at` (seconds into the layer).
+    this.layerSchedule = [];
+    this.layerElapsed = 0;
 
     this.connectEventListeners();
 
     debugLog('[WaveManager] Initialized');
-  }
-
-  /**
-   * Loads predefined wave configurations.
-   * Can be extended in the future to support multiple enemy types.
-   *
-   * @returns {Map<number, Object>} Wave configurations by wave number
-   */
-  loadWaveConfigurations() {
-    const configs = new Map();
-
-    // Early waves: Small asteroids
-    for (let i = 1; i <= 3; i++) {
-      configs.set(i, {
-        isBossWave: false,
-        enemies: [
-          {
-            type: 'asteroid',
-            count: 3 + i,
-            size: 'small',
-            variant: 'common',
-          },
-        ],
-      });
-    }
-
-    // Mid waves: Mixed sizes
-    for (let i = 4; i <= 6; i++) {
-      configs.set(i, {
-        isBossWave: false,
-        enemies: [
-          {
-            type: 'asteroid',
-            count: 2 + i,
-            size: 'medium',
-            variant: 'common',
-          },
-          {
-            type: 'asteroid',
-            count: 2,
-            size: 'small',
-            variant: 'common',
-          },
-        ],
-      });
-    }
-
-    // Later waves: Introduce variants and combatants
-    for (let i = 7; i <= 12; i++) {
-      const baseGroups = [
-        {
-          type: 'asteroid',
-          count: 3,
-          size: 'large',
-          variant: 'common',
-        },
-        {
-          type: 'asteroid',
-          count: 2,
-          size: 'medium',
-          variant: 'iron',
-        },
-        {
-          type: 'asteroid',
-          count: Math.floor(i / 3),
-          size: 'small',
-          variant: 'volatile',
-        },
-      ];
-
-      const baseCount = this.computeBaseEnemyCount(i);
-
-      if (i >= 8) {
-        const droneCount = this.computeSupportCount('drone', i, baseCount);
-        const droneGroup = this.createSupportGroup('drone', droneCount);
-        if (droneGroup) {
-          baseGroups.push(droneGroup);
-        }
-      }
-
-      if (i >= 10) {
-        const mineCount = this.computeSupportCount('mine', i, baseCount);
-        const mineGroup = this.createSupportGroup('mine', mineCount);
-        if (mineGroup) {
-          baseGroups.push(mineGroup);
-        }
-      }
-
-      configs.set(i, { isBossWave: false, enemies: baseGroups });
-    }
-
-    for (const [wave, config] of configs) {
-      for (const kind of ADDED_SUPPORT_KINDS) {
-        const group = this.createSupportGroup(
-          kind,
-          this.computeSupportCount(kind, wave)
-        );
-        if (group) config.enemies.push(group);
-      }
-    }
-
-    // Waves 13+: Dynamic generation
-    // (handled by generateDynamicWave)
-
-    return configs;
   }
 
   connectEventListeners() {
@@ -316,85 +218,7 @@ export class WaveManager {
       return false;
     }
 
-    const interval = Number(WAVE_BOSS_INTERVAL) || 0;
-    if (interval <= 0) {
-      return false;
-    }
-
-    const normalizedInterval = Math.max(1, Math.floor(interval));
-    return normalizedInterval > 0 && waveNumber % normalizedInterval === 0;
-  }
-
-  /**
-   * Generates a dynamic wave configuration based on wave number.
-   * Used for waves beyond predefined configurations.
-   *
-   * @param {number} waveNumber - The wave number
-   * @returns {Object} Wave configuration
-   */
-  generateDynamicWave(waveNumber) {
-    const baseCount = this.computeBaseEnemyCount(waveNumber);
-
-    const enemies = [];
-
-    const normalizedBaseCount = Math.max(
-      0,
-      Number.isFinite(baseCount) ? baseCount : 0
-    );
-
-    const metadata = {};
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const distributionWeights = this.getAsteroidDistributionWeights();
-
-    if (waveManagerSpawnsAsteroids && normalizedBaseCount > 0) {
-      const distributionLabel = 'legacy-50-30-20';
-      const groupMetadata = {
-        spawnDistribution: distributionLabel,
-        distributionWeights: { ...distributionWeights },
-      };
-
-      enemies.push({
-        type: 'asteroid',
-        count: normalizedBaseCount,
-        size: null,
-        variant: null,
-        metadata: groupMetadata,
-      });
-
-      // Asteroid size rolls happen during spawn to keep the random call
-      // order deterministic. Consumers must therefore tolerate null/auto
-      // sizes in the wave configuration and rely on spawn-time resolution.
-
-      metadata.spawnDistribution = distributionLabel;
-      metadata.targetAsteroidCount = normalizedBaseCount;
-      metadata.distributionWeights = { ...distributionWeights };
-    }
-
-    const supportWeights = this.computeSupportWeights(waveNumber);
-    for (const support of supportWeights) {
-      const supportCount = this.computeSupportCount(
-        support.key,
-        waveNumber,
-        baseCount,
-        support.weight
-      );
-      const supportGroup = this.createSupportGroup(support.key, supportCount);
-      if (supportGroup) {
-        enemies.push(supportGroup);
-      }
-    }
-
-    if (Object.keys(metadata).length > 0) {
-      metadata.generator = 'dynamic';
-    }
-
-    const config = { isBossWave: false, enemies };
-
-    if (Object.keys(metadata).length > 0) {
-      config.metadata = metadata;
-    }
-
-    return config;
+    return directorFor(waveNumber).warden;
   }
 
   getAsteroidDistributionWeights() {
@@ -521,31 +345,8 @@ export class WaveManager {
     return { ...base, minionTypes };
   }
 
-  generateBossWave(waveNumber) {
+  generateBossWave() {
     const bossDefaults = this.resolveBossDefaults();
-    const baseCount = this.computeBaseEnemyCount(waveNumber);
-
-    const supportGroups = [];
-
-    const droneCount = this.computeSupportCount('drone', waveNumber, baseCount);
-    if (droneCount > 0) {
-      const droneGroup = this.createSupportGroup('drone', droneCount);
-      if (droneGroup) {
-        supportGroups.push(droneGroup);
-      }
-    }
-
-    const hunterCount = this.computeSupportCount(
-      'hunter',
-      waveNumber,
-      baseCount
-    );
-    if (hunterCount > 0) {
-      const hunterGroup = this.createSupportGroup('hunter', hunterCount);
-      if (hunterGroup) {
-        supportGroups.push(hunterGroup);
-      }
-    }
 
     const bossRadius = bossDefaults.radius || 60;
     const safeDistance = Math.max(
@@ -584,18 +385,7 @@ export class WaveManager {
       },
     };
 
-    return {
-      isBossWave: true,
-      boss: bossEntry,
-      enemies: supportGroups,
-      supportGroups: supportGroups.map((group) => ({ ...group })),
-      metadata: {
-        supportSummary: supportGroups.map((group) => ({
-          type: group.type,
-          count: group.count,
-        })),
-      },
-    };
+    return { isBossWave: true, boss: bossEntry, enemies: [] };
   }
 
   computeTotalEnemies(waveConfig) {
@@ -897,135 +687,6 @@ export class WaveManager {
     return true;
   }
 
-  computeBaseEnemyCount(waveNumber) {
-    const baseCount =
-      (ASTEROIDS_PER_WAVE_BASE ?? 4) *
-      Math.pow(
-        ASTEROIDS_PER_WAVE_MULTIPLIER ?? 1.3,
-        Math.max(0, waveNumber - 1)
-      );
-
-    // WAVE-004: Usar parâmetros legados para preservar densidade de ondas (baseline WAVE-001)
-    const normalizedCount = Math.floor(baseCount);
-    const maxOnScreen = MAX_ASTEROIDS_ON_SCREEN ?? 20;
-    return Math.min(normalizedCount, maxOnScreen);
-  }
-
-  computeSupportWeights(waveNumber) {
-    const fallbackRules = {
-      drone: { startWave: 8, baseWeight: 1, weightScaling: 0.08 },
-      mine: { startWave: 10, baseWeight: 1, weightScaling: 0.07 },
-      hunter: { startWave: 13, baseWeight: 1, weightScaling: 0.1 },
-    };
-
-    const configuredRules = SUPPORT_ENEMY_PROGRESSION || {};
-    const ruleKeys = new Set([
-      ...Object.keys(fallbackRules),
-      ...Object.keys(configuredRules),
-    ]);
-
-    const weightedEntries = [];
-
-    for (const key of ruleKeys) {
-      const fallback = fallbackRules[key] || {};
-      const configured = configuredRules[key] || {};
-
-      const startWave = Number.isFinite(configured.startWave)
-        ? configured.startWave
-        : fallback.startWave;
-
-      if (!Number.isFinite(startWave) || waveNumber < startWave) {
-        continue;
-      }
-
-      const baseWeightValue = Number.isFinite(configured.baseWeight)
-        ? configured.baseWeight
-        : fallback.baseWeight ?? 1;
-      const normalizedBaseWeight = Math.max(0, baseWeightValue ?? 1);
-
-      const scalingValue = Number.isFinite(configured.weightScaling)
-        ? configured.weightScaling
-        : fallback.weightScaling ?? 0;
-      const normalizedScaling = Math.max(0, scalingValue);
-
-      const progression = Math.max(0, waveNumber - startWave);
-      const additionalWeight = progression * normalizedScaling;
-      const weight = normalizedBaseWeight + additionalWeight;
-
-      weightedEntries.push({ key, weight, startWave });
-    }
-
-    weightedEntries.sort((a, b) => {
-      if (a.startWave === b.startWave) {
-        return a.key.localeCompare(b.key);
-      }
-      return a.startWave - b.startWave;
-    });
-
-    return weightedEntries.map(({ key, weight }) => ({ key, weight }));
-  }
-
-  getBaselineSupportCount(
-    kind,
-    waveNumber,
-    baseCount = this.computeBaseEnemyCount(waveNumber)
-  ) {
-    switch (kind) {
-      case 'drone':
-        if (waveNumber < 8) return 0;
-        if (waveNumber === 8) return 2;
-        if (waveNumber === 9) return 3;
-        if (waveNumber === 10) return 3;
-        if (waveNumber === 11) return 4;
-        if (waveNumber === 12) return 4;
-        return Math.max(
-          3 + Math.floor((waveNumber - 12) / 2),
-          Math.max(2, Math.round(baseCount * 0.35))
-        );
-      case 'mine':
-        if (waveNumber < 10) return 0;
-        if (waveNumber === 10) return 2;
-        if (waveNumber === 11) return 3;
-        if (waveNumber === 12) return 3;
-        return Math.max(
-          3 + Math.floor((waveNumber - 12) / 3),
-          Math.max(2, Math.round(baseCount * 0.25))
-        );
-      case 'hunter':
-        if (waveNumber < 13) return 0;
-        if (waveNumber === 13) return 1;
-        if (waveNumber === 14) return 1;
-        return Math.max(
-          1 + Math.floor((waveNumber - 13) / 2),
-          Math.max(1, Math.round(baseCount * 0.18))
-        );
-      default: {
-        const startWave = SUPPORT_ENEMY_PROGRESSION[kind]?.startWave;
-        if (!ADDED_SUPPORT_KINDS.includes(kind) || !(waveNumber >= startWave)) {
-          return 0;
-        }
-        return 1 + Math.floor((waveNumber - startWave) / 3);
-      }
-    }
-  }
-
-  computeSupportCount(
-    kind,
-    waveNumber,
-    baseCount = this.computeBaseEnemyCount(waveNumber),
-    weight = 1
-  ) {
-    const baseline = this.getBaselineSupportCount(kind, waveNumber, baseCount);
-    if (baseline <= 0) {
-      return 0;
-    }
-
-    const appliedWeight = Math.max(1, Number.isFinite(weight) ? weight : 1);
-    const weighted = Math.round(baseline * appliedWeight);
-
-    return Math.max(baseline, weighted);
-  }
-
   createSupportGroup(kind, count) {
     if (!count || count <= 0) {
       return null;
@@ -1081,9 +742,7 @@ export class WaveManager {
         };
       }
       default:
-        return ADDED_SUPPORT_KINDS.includes(kind)
-          ? { type: kind, count }
-          : null;
+        return SUPPORT_KINDS.includes(kind) ? { type: kind, count } : null;
     }
   }
 
@@ -1114,29 +773,33 @@ export class WaveManager {
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const director = directorFor(waveNumber);
     let config;
 
-    if (this.isBossWave(waveNumber)) {
+    if (director.warden) {
       GameDebugLogger.log('WAVE', 'Boss wave detected', { wave: waveNumber });
-      config = this.generateBossWave(waveNumber);
-      GameDebugLogger.log('WAVE', 'Boss wave config generated', {
-        hasBoss: !!config?.boss,
-        bossType: config?.boss?.type,
-        supportGroups: config?.supportGroups?.length || 0,
-      });
+      config = this.generateBossWave();
     } else {
-      if (waveManagerSpawnsAsteroids) {
-        config = this.generateDynamicWave(waveNumber);
-      } else {
-        const predefined = this.waveConfigs.get(waveNumber);
-        config = predefined
-          ? this.cloneWaveConfig(predefined)
-          : this.generateDynamicWave(waveNumber);
-      }
-      config.isBossWave = false;
+      config = { isBossWave: false, enemies: [] };
+    }
+
+    if (director.rocks > 0) {
+      // Sizes roll at spawn time (spawnWave) to keep the random call order
+      // deterministic.
+      const distributionWeights = this.getAsteroidDistributionWeights();
+      config.enemies.push({
+        type: 'asteroid',
+        count: director.rocks,
+        size: null,
+        variant: null,
+        metadata: { distributionWeights },
+      });
     }
 
     config.isBossWave = Boolean(config.isBossWave);
+
+    this.layerSchedule = this.buildLayerSchedule(director);
+    this.layerElapsed = 0;
 
     const effectiveConfig = this.filterForLegacyAsteroidFallback(config);
     effectiveConfig.isBossWave = Boolean(effectiveConfig.isBossWave);
@@ -1156,6 +819,17 @@ export class WaveManager {
         Math.floor(computedTotalEnemies - asteroidOnlyTotal)
       );
       asteroidOnlyTotal = 0;
+    }
+
+    // Scheduled spawns count up front; in legacy mode surge rocks register
+    // themselves on spawn (registerActiveEnemy), like the legacy ones.
+    for (const { groups } of this.layerSchedule) {
+      for (const { kind, count } of groups) {
+        const isAsteroid = this.isAsteroidType(kind);
+        if (isAsteroid && !waveManagerSpawnsAsteroids) continue;
+        computedTotalEnemies += count;
+        if (isAsteroid) asteroidOnlyTotal += count;
+      }
     }
 
     const rawManagerTotals = {
@@ -1269,15 +943,18 @@ export class WaveManager {
    * Spawns enemies for the current wave using the factory pattern.
    *
    * @param {Object} waveConfig - Wave configuration
+   * @param {Object} [options]
+   * @param {boolean} [options.surge] - Burst: every unit (asteroids too)
+   *   spawns around one point on the field edge farthest from the player.
    */
-  spawnWave(waveConfig) {
+  spawnWave(waveConfig, { surge = false } = {}) {
     const enemyGroups = Array.isArray(waveConfig?.enemies)
       ? waveConfig.enemies
       : [];
 
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
 
-    if (!waveManagerSpawnsAsteroids) {
+    if (!waveManagerSpawnsAsteroids && !surge) {
       if (enemyGroups.length === 0) {
         return;
       }
@@ -1304,6 +981,9 @@ export class WaveManager {
     const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.compatibilityModeActive;
     const defaultDistributionWeights = this.getAsteroidDistributionWeights();
+    const surgeEdge = surge
+      ? this.calculateSurgeEdge(worldBounds, playerSnapshot)
+      : null;
 
     const spawnDelayMultiplier =
       this.resolveWaveSpawnDelayMultiplier(waveConfig);
@@ -1320,13 +1000,11 @@ export class WaveManager {
           ? enemyGroup.type.toLowerCase()
           : '';
       const isAsteroid = typeKey === 'asteroid';
-      const isDrone = typeKey === 'drone';
-      const isMine = typeKey === 'mine';
-      const isHunter = typeKey === 'hunter';
-      const isTacticalEnemy =
-        isDrone || isMine || isHunter || ADDED_SUPPORT_KINDS.includes(typeKey);
+      const isTacticalEnemy = SUPPORT_KINDS.includes(typeKey);
+      // Legacy mode: the bridge (registerActiveEnemy) counts asteroids.
+      const countedByBridge = isAsteroid && !waveManagerSpawnsAsteroids;
 
-      if (isAsteroid && !waveManagerSpawnsAsteroids) {
+      if (countedByBridge && !surgeEdge) {
         continue;
       }
 
@@ -1341,7 +1019,14 @@ export class WaveManager {
           : this.createScopedRandom('spawn', 'wave-spawn');
 
         let position;
-        if (isAsteroid) {
+        if (surgeEdge) {
+          position = this.calculateSurgePosition(
+            worldBounds,
+            surgeEdge,
+            isAsteroid,
+            spawnContext.random
+          );
+        } else if (isAsteroid) {
           // Asteroids spawn on one of the 4 edges
           position = this.calculateEdgeSpawnPosition(
             worldBounds,
@@ -1438,6 +1123,7 @@ export class WaveManager {
           count: _omittedCount,
           spawnIndexBase: groupSpawnIndexBase,
           metadata: groupMetadata,
+          eliteChance = 0,
           ...groupConfig
         } = enemyGroup;
 
@@ -1499,9 +1185,7 @@ export class WaveManager {
 
         // Rolled after the core fork so the enemy's own stream is unchanged.
         if (isTacticalEnemy) {
-          enemyConfig.elite = spawnContext.random.chance(
-            eliteChanceForWave(this.currentWave)
-          );
+          enemyConfig.elite = spawnContext.random.chance(eliteChance);
         }
 
         // Centralized acquisition path for factory-backed enemies
@@ -1521,12 +1205,137 @@ export class WaveManager {
 
         if (enemy) {
           enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+        }
+
+        if (enemy && !countedByBridge) {
           this.enemiesSpawnedThisWave++;
           if (compatibilityMode && isAsteroid) {
             this.asteroidsSpawnedThisWave++;
           }
         }
       }
+    }
+  }
+
+  /**
+   * Flattens a layer's roster and surges into timed spawns sorted by `at`
+   * (seconds into the layer). Surge kinds are taken in turn.
+   */
+  buildLayerSchedule(director) {
+    const schedule = [];
+
+    for (const { kind, count, from, every, elite } of director.roster) {
+      for (let i = 0; i < count; i += 1) {
+        schedule.push({
+          at: from + i * every,
+          groups: [{ kind, count: 1 }],
+          elite,
+          surge: null,
+        });
+      }
+    }
+
+    for (const surge of director.surges) {
+      const counts = new Map();
+      for (let i = 0; i < surge.count; i += 1) {
+        const kind = surge.kinds[i % surge.kinds.length];
+        counts.set(kind, (counts.get(kind) || 0) + 1);
+      }
+      schedule.push({
+        at: surge.at,
+        groups: [...counts].map(([kind, count]) => ({ kind, count })),
+        elite: 0,
+        surge,
+      });
+    }
+
+    // Stable: entries due at the same time keep table order.
+    return schedule.sort((a, b) => a.at - b.at);
+  }
+
+  /**
+   * Advances the layer clock and spawns what is due. An empty field does not
+   * wait: the next scheduled spawn comes at once.
+   */
+  updateLayerSchedule(deltaTime) {
+    this.layerElapsed += deltaTime;
+
+    const next = this.layerSchedule[0];
+    if (next && next.at > this.layerElapsed && this.isFieldEmpty()) {
+      this.layerElapsed = next.at;
+    }
+
+    while (
+      this.layerSchedule.length > 0 &&
+      this.layerSchedule[0].at <= this.layerElapsed
+    ) {
+      this.spawnScheduled(this.layerSchedule.shift());
+    }
+
+    this.checkWaveCompletion();
+  }
+
+  spawnScheduled({ groups, elite, surge }) {
+    const enemies = [];
+    for (const { kind, count } of groups) {
+      const group = this.isAsteroidType(kind)
+        ? { type: kind, count, size: 'small', variant: 'common' }
+        : this.createSupportGroup(kind, count);
+      if (group) enemies.push({ ...group, eliteChance: elite });
+    }
+
+    this.spawnWave(
+      { enemies, spawnDelayMultiplier: this.spawnDelayMultiplier },
+      { surge: Boolean(surge) }
+    );
+
+    if (surge) {
+      this.eventBus.emit('surge-started', {
+        layer: this.currentWave,
+        label: surge.label,
+        kinds: [...surge.kinds],
+        count: surge.count,
+      });
+    }
+  }
+
+  /** Legacy mode: asteroids the EnemySystem spawner still owes this layer. */
+  legacyRocksPending() {
+    if (this.shouldWaveManagerSpawnAsteroids()) {
+      return false;
+    }
+    const wave = this.enemySystem?.waveState;
+    return (
+      Boolean(wave?.isActive) && wave.asteroidsSpawned < wave.totalAsteroids
+    );
+  }
+
+  isFieldEmpty() {
+    return (
+      this.getRemainingActiveEnemyCount() === 0 && !this.legacyRocksPending()
+    );
+  }
+
+  /**
+   * Completes the layer once everything it scheduled has spawned and every
+   * enemy is gone.
+   */
+  checkWaveCompletion(excludedEnemy = null) {
+    if (
+      !this.waveInProgress ||
+      this.layerSchedule.length > 0 ||
+      this.legacyRocksPending()
+    ) {
+      return;
+    }
+
+    const killsCleared =
+      this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    if (
+      killsCleared &&
+      this.getRemainingActiveEnemyCount(excludedEnemy) === 0
+    ) {
+      this.completeWave();
     }
   }
 
@@ -2244,6 +2053,59 @@ export class WaveManager {
     return { x, y };
   }
 
+  /**
+   * Burst point for a surge: a random spot on the middle half of the field
+   * edge farthest from the player.
+   */
+  calculateSurgeEdge(bounds, player) {
+    const width = bounds?.width || GAME_WIDTH || 800;
+    const height = bounds?.height || GAME_HEIGHT || 600;
+    const px = Number.isFinite(player?.x) ? player.x : width / 2;
+    const py = Number.isFinite(player?.y) ? player.y : height / 2;
+
+    const edges = [
+      { side: 'top', distance: py },
+      { side: 'bottom', distance: height - py },
+      { side: 'left', distance: px },
+      { side: 'right', distance: width - px },
+    ];
+    const { side } = edges.reduce((best, edge) =>
+      edge.distance > best.distance ? edge : best
+    );
+
+    const { random } = this.createScopedRandom('spawn', 'surge-edge');
+    const length = side === 'top' || side === 'bottom' ? width : height;
+    return { side, along: random.range(0.25, 0.75) * length };
+  }
+
+  /**
+   * One surge unit near the burst point: asteroids just outside the edge
+   * (they drift in), support enemies just inside it.
+   */
+  calculateSurgePosition(bounds, edge, isAsteroid, random) {
+    const width = bounds?.width || GAME_WIDTH || 800;
+    const height = bounds?.height || GAME_HEIGHT || 600;
+    const depth = isAsteroid ? -ASTEROID_EDGE_SPAWN_MARGIN : SURGE_INSET;
+    const length =
+      edge.side === 'top' || edge.side === 'bottom' ? width : height;
+    const along = clamp(
+      edge.along + random.range(-SURGE_SPREAD, SURGE_SPREAD),
+      SURGE_INSET,
+      length - SURGE_INSET
+    );
+
+    switch (edge.side) {
+      case 'top':
+        return { x: along, y: depth };
+      case 'bottom':
+        return { x: along, y: height - depth };
+      case 'left':
+        return { x: depth, y: along };
+      default:
+        return { x: width - depth, y: along };
+    }
+  }
+
   resolveScopedRandom(random, scope = 'base', label = scope) {
     if (random && typeof random.float === 'function') {
       return random;
@@ -2318,17 +2180,7 @@ export class WaveManager {
     // Development assertion: verify accounting consistency
     this.assertAccountingConsistency();
 
-    // Check if wave is complete
-    const killsCleared =
-      this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
-    let activeEnemiesCleared = true;
-
-    activeEnemiesCleared =
-      this.getRemainingActiveEnemyCount(destroyedEnemy) === 0;
-
-    if (killsCleared && activeEnemiesCleared) {
-      this.completeWave();
-    }
+    this.checkWaveCompletion(destroyedEnemy);
   }
 
   getRemainingActiveEnemyCount(excludedEnemy = null) {
@@ -2451,6 +2303,11 @@ export class WaveManager {
       return;
     }
 
+    if (this.waveInProgress) {
+      this.updateLayerSchedule(deltaTime);
+      return;
+    }
+
     // Handle wave countdown
     if (!this.waveInProgress && this.waveCountdown > 0) {
       this.waveCountdown -= deltaTime;
@@ -2480,6 +2337,8 @@ export class WaveManager {
     this.asteroidsSpawnedThisWave = 0;
     this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
+    this.layerSchedule = [];
+    this.layerElapsed = 0;
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;

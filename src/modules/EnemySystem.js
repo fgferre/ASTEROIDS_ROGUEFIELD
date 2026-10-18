@@ -40,8 +40,6 @@ import {
   validateSnapshot,
 } from '../utils/StateManager.js';
 import {
-  ASTEROIDS_PER_WAVE_BASE,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
   WAVE_BREAK_TIME,
@@ -58,6 +56,7 @@ import { RAM_COMPONENTS } from '../data/enemies/ram.js';
 import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
 import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
+import { directorFor } from '../data/layers.js';
 import { IS_DEV } from '../core/env.js';
 
 // === CLASSE ENEMYSYSTEM ===
@@ -1627,7 +1626,7 @@ class EnemySystem extends BaseSystem {
   createInitialWaveState() {
     return {
       current: 1,
-      totalAsteroids: ASTEROIDS_PER_WAVE_BASE,
+      totalAsteroids: directorFor(1).rocks,
       asteroidsSpawned: 0,
       asteroidsKilled: 0,
       isActive: true,
@@ -2864,11 +2863,7 @@ class EnemySystem extends BaseSystem {
 
     if (!waveManagerActive) {
       wave.current += 1;
-      wave.totalAsteroids = Math.floor(
-        ASTEROIDS_PER_WAVE_BASE *
-          Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, wave.current - 1)
-      );
-      wave.totalAsteroids = Math.min(wave.totalAsteroids, 25);
+      wave.totalAsteroids = directorFor(wave.current).rocks;
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
       wave.timeRemaining = WAVE_DURATION;
