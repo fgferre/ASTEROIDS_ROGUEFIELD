@@ -277,7 +277,7 @@ Qualidade:
 
 Conteúdo:
 
-- [ ] **R8.1 Evoluções Apex.** Cinco cartas da mesma família (além da sinergia em três) elevam a evolução da arma a
+- [x] **R8.1 Evoluções Apex.** Cinco cartas da mesma família (além da sinergia em três) elevam a evolução da arma a
       um segundo estágio visível (Incendiary → Solar Flare Lance; Railshot → Coilgun; Chain → Storm Lance; Gravitic →
       Singularity Lance; Prospector → Motherlode), com look próprio em 3D/2D, chip na HUD e conquista.
       Qualidade:

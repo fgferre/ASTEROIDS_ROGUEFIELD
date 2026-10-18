@@ -54,6 +54,7 @@ import {
 import {
   LANCE_BASE_LOOK,
   WEAPONS,
+  WEAPON_APEX,
   WEAPON_EVOLUTIONS,
 } from '../data/weapons.js';
 
@@ -291,6 +292,9 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
       this.evolveWeapon(data.family);
+    });
+    this.registerEventListener('apex-unlocked', (data = {}) => {
+      this.apexWeapon(data.family);
     });
 
     // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
@@ -2466,7 +2470,8 @@ class CombatSystem extends BaseSystem {
       this.weaponId !== 'harmonic' && this.cardEffects.thermalLens
         ? this.cardEffects.thermalLens.lanceDamageMultiplier
         : 1;
-    bullet.damage = damage * this.lanceDamageTuning * lens;
+    bullet.damage =
+      damage * this.lanceDamageTuning * lens * this.lanceApexDamage;
     bullet.life = this.bulletLifetime;
     bullet.maxLife = this.bulletLifetime;
     bullet.hit = false;
@@ -3170,7 +3175,7 @@ class CombatSystem extends BaseSystem {
         );
       }
       if (bullet.kind !== 'chain') {
-        this.applyEvolutionHit(enemy, requestedDamage, damageResult);
+        this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
       }
     }
 
@@ -3202,11 +3207,14 @@ class CombatSystem extends BaseSystem {
     this.weaponId = WEAPONS.lance.id;
     this.harmonicShots = 0;
     this.evolutions = [];
+    this.apexes = [];
     this.beams = [];
     this.arcs = [];
+    this.wells = [];
     this.arcSeed = 0;
     this.burns = new Map();
     this.slows = new Map();
+    this.pulls = new Map();
     this.prospectorCarry = 0;
     this.cardEffects = {};
     this.cardRolls = 0;
@@ -3233,12 +3241,33 @@ class CombatSystem extends BaseSystem {
     });
   }
 
+  /** Five cards of a family raise its evolution to the Apex for the run. */
+  apexWeapon(family) {
+    if (!WEAPON_APEX[family] || this.apexes.includes(family)) {
+      return;
+    }
+    this.evolveWeapon(family);
+    this.apexes.push(family);
+    this.refreshLanceLook();
+  }
+
   // Colours override in unlock order (the last one wins); sizes multiply.
+  // Apex looks go on top of every evolution: `outer` is a second, wider
+  // ribbon, `sparkle` a glint trail, and any Apex adds a white core.
   refreshLanceLook() {
-    const look = { ...LANCE_BASE_LOOK, arc: null };
-    this.evolutions.forEach((family) => {
-      const delta = WEAPON_EVOLUTIONS[family].look;
-      ['body', 'trail', 'head', 'arc'].forEach((key) => {
+    const look = {
+      ...LANCE_BASE_LOOK,
+      arc: null,
+      outer: null,
+      sparkle: null,
+      apex: this.apexes.length > 0,
+    };
+    const deltas = [
+      ...this.evolutions.map((family) => WEAPON_EVOLUTIONS[family].look),
+      ...this.apexes.map((family) => WEAPON_APEX[family].look),
+    ];
+    deltas.forEach((delta) => {
+      ['body', 'trail', 'head', 'arc', 'outer', 'sparkle'].forEach((key) => {
         if (delta[key]) look[key] = delta[key];
       });
       ['trailLength', 'width', 'headLength'].forEach((key) => {
@@ -3248,9 +3277,13 @@ class CombatSystem extends BaseSystem {
     look.trailStyles = lanceTrailStyles(look.trail);
     this.lanceLook = look;
     this.trailLength = Math.round(TRAIL_LENGTH * look.trailLength);
-    this.lancePierce = this.evolutions.includes('kinetic')
-      ? WEAPON_EVOLUTIONS.kinetic.pierce
-      : 0;
+    const coilgun = this.apexes.includes('kinetic');
+    this.lancePierce = coilgun
+      ? WEAPON_APEX.kinetic.pierce
+      : this.evolutions.includes('kinetic')
+        ? WEAPON_EVOLUTIONS.kinetic.pierce
+        : 0;
+    this.lanceApexDamage = coilgun ? WEAPON_APEX.kinetic.damageMultiplier : 1;
   }
 
   /** What the HUD shows: the weapon and its evolutions, in unlock order. */
@@ -3264,12 +3297,15 @@ class CombatSystem extends BaseSystem {
           ? every - (this.harmonicShots % every)
           : null,
       evolutions: this.evolutions.map((family) => {
-        const evolution = WEAPON_EVOLUTIONS[family];
+        const apex = this.apexes.includes(family) ? WEAPON_APEX[family] : null;
+        const evolution = apex || WEAPON_EVOLUTIONS[family];
         return {
           family,
           id: evolution.id,
           name: evolution.name,
           description: evolution.description,
+          apex: Boolean(apex),
+          short: apex ? apex.short : evolution.id.toUpperCase(),
         };
       }),
     };
@@ -3417,19 +3453,22 @@ class CombatSystem extends BaseSystem {
     }
   }
 
-  // Prospector: +25 % of the orbs a lance kill dropped, carried across kills
-  // so small rocks (1 orb) still pay out on average.
+  // Prospector: +25 % of the orbs a lance kill dropped (Motherlode: +100 %),
+  // carried across kills so small rocks (1 orb) still pay out on average.
   dropProspectorOrbs(rewards, enemy, dropped) {
-    this.prospectorCarry +=
-      Math.max(0, dropped) * WEAPON_EVOLUTIONS.salvage.orbBonus;
+    const { orbBonus } = this.apexes.includes('salvage')
+      ? WEAPON_APEX.salvage
+      : WEAPON_EVOLUTIONS.salvage;
+    this.prospectorCarry += Math.max(0, dropped) * orbBonus;
     const extra = Math.floor(this.prospectorCarry + 1e-9);
     if (extra <= 0) return;
     this.prospectorCarry -= extra;
     rewards.createXPOrbs(enemy, extra, ORB_VALUE);
   }
 
-  // Burn, slow and chain on a lance or beam hit (chain hits do not chain).
-  applyEvolutionHit(enemy, damage, result) {
+  // Burn, slow and chain on a lance or beam hit (chain hits do not chain);
+  // an Apex replaces its family's first stage.
+  applyEvolutionHit(enemy, damage, result, hit) {
     if (!this.evolutions.length) return;
     const alive = !result.killed && !enemy.destroyed;
     if (alive && this.evolutions.includes('thermal')) {
@@ -3437,12 +3476,20 @@ class CombatSystem extends BaseSystem {
       this.burns.set(enemy, {
         id: enemy.id,
         timer: 0,
+        interval: burn.duration / burn.ticks,
         ticksLeft: burn.ticks,
         damage: damage * burn.damageFraction,
+        spreadTo: this.apexes.includes('thermal') ? [] : null,
       });
     }
-    // Bosses move on scripts, not on velocity: no slow.
-    if (alive && enemy.type !== 'boss' && this.evolutions.includes('field')) {
+    // Bosses move on scripts, not on velocity: no slow and no pull.
+    if (this.apexes.includes('field')) {
+      this.pullToward(enemy, alive, hit.x, hit.y);
+    } else if (
+      alive &&
+      enemy.type !== 'boss' &&
+      this.evolutions.includes('field')
+    ) {
       this.slows.set(enemy, {
         id: enemy.id,
         timer: WEAPON_EVOLUTIONS.field.slow.duration,
@@ -3450,60 +3497,86 @@ class CombatSystem extends BaseSystem {
     }
     if (this.evolutions.includes('arc')) {
       const { chain } = WEAPON_EVOLUTIONS.arc;
+      const storm = this.apexes.includes('arc') ? WEAPON_APEX.arc.chain : null;
       this.chainFrom(
         enemy,
         damage * chain.damageFraction,
-        chain.jumps + (this.cardEffects.chainCapacitor?.extraJumps ?? 0)
+        (storm ? storm.jumps : chain.jumps) +
+          (this.cardEffects.chainCapacitor?.extraJumps ?? 0),
+        [enemy],
+        storm ? storm.fork : 1
       );
     }
   }
 
+  // Singularity: the target (if alive) and every non-boss whose rim is
+  // within reach of the hit point are pulled toward it; the collapsing ring
+  // is a `well`.
+  pullToward(target, targetAlive, x, y) {
+    const { radius, duration } = WEAPON_APEX.field.pull;
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed || enemy.type === 'boss') return;
+      const inReach =
+        enemy === target
+          ? targetAlive
+          : Math.hypot(enemy.x - x, enemy.y - y) - (enemy.radius || 0) <=
+            radius;
+      if (!inReach) return;
+      this.pulls.set(enemy, { id: enemy.id, timer: duration, x, y });
+    });
+    this.wells.push({ x, y, life: duration, maxLife: duration });
+  }
+
   // Chain Lance: `jumps` hops, each to the nearest enemy within range not
-  // yet in this chain.
-  chainFrom(source, damage, jumps = 1, visited = [source]) {
+  // yet in this chain. Storm Lance: the first hop goes to the `fork`
+  // nearest, and each branch keeps jumping.
+  chainFrom(source, damage, jumps = 1, visited = [source], fork = 1) {
     const { range } = WEAPON_EVOLUTIONS.arc.chain;
-    let best = null;
-    let bestSq = range * range + 1e-6;
+    const rangeSq = range * range + 1e-6;
+    const near = [];
     this.cachedEnemies.forEachActiveEnemy((candidate) => {
       if (!candidate || visited.includes(candidate) || candidate.destroyed) {
         return;
       }
-      const dx = candidate.x - source.x;
-      const dy = candidate.y - source.y;
-      const sq = dx * dx + dy * dy;
-      if (sq < bestSq) {
-        best = candidate;
-        bestSq = sq;
-      }
+      const sq = (candidate.x - source.x) ** 2 + (candidate.y - source.y) ** 2;
+      if (sq < rangeSq) near.push({ candidate, sq });
     });
-    if (!best) return;
+    if (!near.length) return;
+    near.sort((a, b) => a.sq - b.sq);
+    const targets = near.slice(0, fork).map((entry) => entry.candidate);
+    visited.push(...targets);
 
-    const dx = best.x - source.x;
-    const dy = best.y - source.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    this.addArc(source, best);
-
-    this.processBulletHit(
-      {
-        kind: 'chain',
-        x: best.x - (dx / distance) * (best.radius || 0),
-        y: best.y - (dy / distance) * (best.radius || 0),
-        vx: (dx / distance) * this.bulletSpeed,
-        vy: (dy / distance) * this.bulletSpeed,
-        damage,
-        hit: false,
-      },
-      best,
-      this.cachedEnemies
-    );
+    const storm = this.apexes.includes('arc');
+    targets.forEach((best) => {
+      const dx = best.x - source.x;
+      const dy = best.y - source.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      this.addArc(source, best, storm ? { heavy: true } : null);
+      this.processBulletHit(
+        {
+          kind: 'chain',
+          x: best.x - (dx / distance) * (best.radius || 0),
+          y: best.y - (dy / distance) * (best.radius || 0),
+          vx: (dx / distance) * this.bulletSpeed,
+          vy: (dy / distance) * this.bulletSpeed,
+          damage,
+          hit: false,
+        },
+        best,
+        this.cachedEnemies
+      );
+    });
     if (jumps > 1) {
-      visited.push(best);
-      this.chainFrom(best, damage, jumps - 1, visited);
+      targets.forEach((best) =>
+        this.chainFrom(best, damage, jumps - 1, visited)
+      );
     }
   }
 
-  // A jagged arc between two circles (Chain Lance, Static Shell).
-  addArc(source, target) {
+  // A jagged arc between two circles (Chain Lance, Static Shell, Solar Flare
+  // spread). `style`: { color } overrides the lance's arc colour, { heavy }
+  // draws the Storm Lance's thicker bolt.
+  addArc(source, target, style = null) {
     const { duration } = WEAPON_EVOLUTIONS.arc.chain;
     const dx = target.x - source.x;
     const dy = target.y - source.y;
@@ -3527,7 +3600,13 @@ class CombatSystem extends BaseSystem {
         y: source.y + uy * along + ux * jitter,
       });
     }
-    this.arcs.push({ points, life: duration, maxLife: duration });
+    this.arcs.push({
+      points,
+      life: duration,
+      maxLife: duration,
+      color: style?.color ?? null,
+      heavy: Boolean(style?.heavy),
+    });
   }
 
   // Deterministic card roll (no game RNG here, like the arc jitter).
@@ -3624,6 +3703,7 @@ class CombatSystem extends BaseSystem {
     fade(this.beams);
     fade(this.arcs);
     fade(this.cinders);
+    fade(this.wells);
 
     const { cinderTrail, staticShell, gravityBrake } = this.cardEffects;
     if (cinderTrail && this.cinders.length) {
@@ -3656,18 +3736,18 @@ class CombatSystem extends BaseSystem {
     }
 
     if (this.burns.size) {
-      const { burn } = WEAPON_EVOLUTIONS.thermal;
-      const interval = burn.duration / burn.ticks;
+      const spreads = [];
       this.burns.forEach((entry, enemy) => {
         entry.timer += deltaTime;
         while (
-          entry.timer >= interval - 1e-9 &&
+          entry.timer >= entry.interval - 1e-9 &&
           entry.ticksLeft > 0 &&
           !enemy.destroyed &&
           enemy.id === entry.id
         ) {
-          entry.timer -= interval;
+          entry.timer -= entry.interval;
           entry.ticksLeft -= 1;
+          if (entry.spreadTo) this.spreadBurn(enemy, entry, spreads);
           this.applyDamageToEnemy(this.cachedEnemies, enemy, entry.damage, {
             hitPosition: { x: enemy.x, y: enemy.y },
           });
@@ -3675,6 +3755,31 @@ class CombatSystem extends BaseSystem {
         if (entry.ticksLeft <= 0 || enemy.destroyed || enemy.id !== entry.id) {
           this.burns.delete(enemy);
         }
+      });
+      // Added after the pass, so a fresh spread burn does not tick this frame.
+      spreads.forEach(([enemy, entry]) => this.burns.set(enemy, entry));
+    }
+
+    if (this.pulls.size) {
+      const { speed } = WEAPON_APEX.field.pull;
+      this.pulls.forEach((entry, enemy) => {
+        if (enemy.destroyed || enemy.id !== entry.id) {
+          this.pulls.delete(enemy);
+          return;
+        }
+        const dx = entry.x - enemy.x;
+        const dy = entry.y - enemy.y;
+        const distance = Math.hypot(dx, dy);
+        const step = Math.min(
+          distance,
+          speed * Math.min(deltaTime, entry.timer)
+        );
+        if (distance > 1e-9) {
+          enemy.x += (dx / distance) * step;
+          enemy.y += (dy / distance) * step;
+        }
+        entry.timer -= deltaTime;
+        if (entry.timer <= 1e-9) this.pulls.delete(enemy);
       });
     }
 
@@ -3693,6 +3798,42 @@ class CombatSystem extends BaseSystem {
         if (entry.timer <= 1e-9) this.slows.delete(enemy);
       });
     }
+  }
+
+  // Solar Flare: a burn tick sets every enemy whose rim is within reach of
+  // the burning one's and is not burning alight, once per source, at half
+  // duration; those do not spread.
+  spreadBurn(source, entry, spreads) {
+    const { radius, durationFraction, ticks } = WEAPON_APEX.thermal.spread;
+    const { duration } = WEAPON_EVOLUTIONS.thermal.burn;
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (
+        !enemy ||
+        enemy === source ||
+        enemy.destroyed ||
+        this.burns.has(enemy) ||
+        entry.spreadTo.includes(enemy) ||
+        Math.hypot(enemy.x - source.x, enemy.y - source.y) -
+          (enemy.radius || 0) -
+          (source.radius || 0) >
+          radius
+      ) {
+        return;
+      }
+      entry.spreadTo.push(enemy);
+      this.addArc(source, enemy, { color: WEAPON_APEX.thermal.look.outer });
+      spreads.push([
+        enemy,
+        {
+          id: enemy.id,
+          timer: 0,
+          interval: (duration * durationFraction) / ticks,
+          ticksLeft: ticks,
+          damage: entry.damage,
+          spreadTo: null,
+        },
+      ]);
+    });
   }
 
   applyDamageToEnemy(enemiesSystem, enemy, damage, source) {
@@ -3802,8 +3943,20 @@ class CombatSystem extends BaseSystem {
   drawLanceTrail(ctx, bullet) {
     const trail = bullet.trail;
     const count = trail.length + 1;
-    const { trailStyles, width } = this.lanceLook;
+    const { trailStyles, width, outer, apex, sparkle } = this.lanceLook;
     ctx.lineCap = 'round';
+    // Apex: a wide halo in `outer` under the trail, a white core over it.
+    const polyline = (color, lineWidth) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(trail[0].x, trail[0].y);
+      for (let k = 1; k < trail.length; k += 1)
+        ctx.lineTo(trail[k].x, trail[k].y);
+      ctx.lineTo(bullet.x, bullet.y);
+      ctx.stroke();
+    };
+    if (outer) polyline(withAlpha(outer, 0.22), 4.5 * width);
     let prev = trail[0];
     for (let k = 1; k < count; k += 1) {
       const point = k < trail.length ? trail[k] : bullet;
@@ -3815,6 +3968,15 @@ class CombatSystem extends BaseSystem {
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
       prev = point;
+    }
+    if (apex) polyline(withAlpha(PALETTE.text, 0.75), 0.6 * width);
+    if (sparkle) {
+      ctx.fillStyle = withAlpha(sparkle, 0.85);
+      for (let k = trail.length % 2; k < trail.length; k += 2) {
+        const g = hashUnit(Math.round(trail[k].x * 7 + trail[k].y * 13));
+        if (g < 0.1) continue;
+        ctx.fillRect(trail[k].x - g, trail[k].y - g, 2 * g, 2 * g);
+      }
     }
   }
 
@@ -3856,6 +4018,29 @@ class CombatSystem extends BaseSystem {
       ctx.arc(enemy.x, enemy.y, (enemy.radius || 12) + 4, 0, Math.PI * 2);
       ctx.stroke();
     });
+    // Singularity: rings on the pulled, a ring collapsing onto each hit point.
+    const singularity = WEAPON_APEX.field;
+    this.pulls.forEach((entry, enemy) => {
+      ctx.lineWidth = LINE.thin;
+      ctx.strokeStyle = withAlpha(singularity.look.outer, 0.6);
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, (enemy.radius || 12) + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    this.wells.forEach((well) => {
+      const k = well.life / well.maxLife;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = withAlpha(singularity.look.outer, 0.8 * (1.2 - k));
+      ctx.beginPath();
+      ctx.arc(
+        well.x,
+        well.y,
+        6 + (singularity.pull.radius - 6) * k,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
+    });
 
     ctx.lineCap = 'round';
     this.arcs.forEach((arc) => {
@@ -3870,8 +4055,12 @@ class CombatSystem extends BaseSystem {
         }
         target.stroke();
       };
-      stroke(ctx, withAlpha(look.arc || PALETTE.player, 0.85 * k), 2.2);
-      stroke(ctx, withAlpha(PALETTE.text, 0.9 * k), 0.8);
+      // Storm Lance bolts are thicker.
+      const scale = arc.heavy ? 1.7 : 1;
+      const color = arc.color || look.arc || PALETTE.player;
+      if (arc.heavy) stroke(ctx, withAlpha(color, 0.3 * k), 6);
+      stroke(ctx, withAlpha(color, 0.85 * k), 2.2 * scale);
+      stroke(ctx, withAlpha(PALETTE.text, 0.9 * k), 0.8 * scale);
       if (emissive) stroke(emissive, withAlpha(PALETTE.text, k), 0.8);
     });
 

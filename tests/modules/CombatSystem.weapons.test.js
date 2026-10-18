@@ -11,7 +11,7 @@ import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
-import { WEAPONS } from '../../src/data/weapons.js';
+import { WEAPONS, WEAPON_APEX } from '../../src/data/weapons.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
@@ -320,5 +320,146 @@ describe('weapon evolutions', () => {
       evolutions: [],
     });
     expect(combat.trailLength).toBe(6);
+  });
+});
+
+describe('Apex evolutions', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => {
+    GamePools.releaseAll();
+    cleanupGlobalState();
+  });
+
+  it('Solar Flare: a burn tick spreads a half burn to enemies within 70 px, once, and it does not spread again', () => {
+    const target = makeEnemy('t', 0, 0);
+    const neighbour = makeEnemy('n', 50, 0); // 30 px rim to rim
+    const beyond = makeEnemy('b', 100, 0); // 80 px from the target's rim
+    const { combat, eventBus } = makeCombat([target, neighbour, beyond]);
+    eventBus.emit('apex-unlocked', { family: 'thermal' });
+
+    combat.processBulletHit(lance(), target, combat.cachedEnemies);
+    combat.updateWeaponEffects(0.4); // target tick 1 sets the neighbour alight
+    expect(target.health).toBeCloseTo(88.5, 6);
+    expect(neighbour.health).toBe(100);
+    expect(combat.burns.size).toBe(2);
+    expect(combat.arcs).toHaveLength(1);
+
+    // The spread burn: 2 ticks of the same 1.5 over 0.6 s.
+    combat.updateWeaponEffects(0.3);
+    expect(neighbour.health).toBeCloseTo(98.5, 6);
+    combat.updateWeaponEffects(0.1);
+    expect(target.health).toBeCloseTo(87, 6);
+    combat.updateWeaponEffects(0.2);
+    expect(neighbour.health).toBeCloseTo(97, 6);
+    combat.updateWeaponEffects(0.2); // target tick 3: no second spread
+    combat.updateWeaponEffects(1);
+    expect(target.health).toBeCloseTo(85.5, 6);
+    expect(neighbour.health).toBeCloseTo(97, 6);
+    expect(beyond.health).toBe(100);
+    expect(combat.burns.size).toBe(0);
+  });
+
+  it('Coilgun: a lance pierces everything on its line for +25% damage', () => {
+    const line = ['a', 'b', 'c', 'd', 'e'].map((id) => makeEnemy(id, 0, 0));
+    const { combat, eventBus } = makeCombat(line);
+    eventBus.emit('apex-unlocked', { family: 'kinetic' });
+    combat.createBullet({ x: 0, y: 0 }, { x: 10, y: 0 }, DAMAGE);
+    const bullet = combat.bullets[0];
+
+    line.forEach((enemy) => {
+      combat.processBulletHit(bullet, enemy, combat.cachedEnemies);
+      combat.processBulletHit(bullet, enemy, combat.cachedEnemies); // still inside
+    });
+    expect(bullet.hit).toBe(false);
+    expect(line.map((enemy) => enemy.health)).toEqual(
+      line.map(() => 100 - DAMAGE * WEAPON_APEX.kinetic.damageMultiplier)
+    );
+  });
+
+  it('Storm Lance: the first jump forks to the two nearest and each branch jumps on, 3 hops deep', () => {
+    const source = makeEnemy('s', 100, 100);
+    const a = makeEnemy('a', 160, 100); // 60 px: first fork
+    const b = makeEnemy('b', 100, 170); // 70 px: second fork
+    const d = makeEnemy('d', 230, 100); // 70 px from a
+    const f = makeEnemy('f', 300, 100); // 70 px from d
+    const e = makeEnemy('e', 100, 280); // 110 px from b
+    const { combat, eventBus } = makeCombat([source, a, b, d, f, e]);
+    eventBus.emit('apex-unlocked', { family: 'arc' });
+
+    combat.processBulletHit(lance(), source, combat.cachedEnemies);
+    expect(source.health).toBe(90);
+    expect([a, b, d, f, e].map((enemy) => enemy.health)).toEqual([
+      95, 95, 95, 95, 95,
+    ]);
+    // a+b (the fork), a→d→f, b→e: one hop per jump past the first.
+    expect(combat.arcs).toHaveLength(5);
+    expect(combat.arcs.every((arc) => arc.heavy)).toBe(true);
+  });
+
+  it('Singularity Lance: a hit pulls the target and enemies within 90 px toward it at 160 px/s for 0.5 s, instead of slowing', () => {
+    const target = makeEnemy('t', 0, 0);
+    const neighbour = makeEnemy('n', 75, 0); // rim 75 px from the hit point
+    const far = makeEnemy('f', 105, 0); // rim 105 px away
+    const boss = makeEnemy('w', 30, 0, { type: 'boss' });
+    const { combat, eventBus } = makeCombat([target, neighbour, far, boss]);
+    eventBus.emit('apex-unlocked', { family: 'field' });
+
+    // A directionless hit at (-10, 0): no knockback.
+    combat.processBulletHit(
+      lance({ x: -10, vx: 0 }),
+      target,
+      combat.cachedEnemies
+    );
+    expect(combat.slows.size).toBe(0);
+    expect(combat.wells).toHaveLength(1);
+
+    for (let i = 0; i < 6; i += 1) combat.updateWeaponEffects(0.1);
+    expect(target.x).toBeCloseTo(-10, 6); // reached the point and stays
+    expect(neighbour.x).toBeCloseTo(-5, 6); // 0.5 s × 160 px/s, then free
+    expect(far.x).toBe(105);
+    expect(boss.x).toBe(30);
+    expect(combat.pulls.size).toBe(0);
+    expect(combat.wells).toHaveLength(0);
+  });
+
+  it('Motherlode: lance kills drop twice the orbs', () => {
+    const enemies = makeEnemies([], 4);
+    enemies.rewardManager = {
+      stats: { totalOrbsDropped: 0 },
+      createXPOrbs: vi.fn(),
+    };
+    const { combat, eventBus } = makeCombat([], { enemies });
+    eventBus.emit('apex-unlocked', { family: 'salvage' });
+
+    const rock = makeEnemy('r', 0, 0, { health: 5 });
+    combat.processBulletHit(lance(), rock, enemies);
+    expect(enemies.rewardManager.createXPOrbs).toHaveBeenCalledWith(
+      rock,
+      4,
+      ORB_VALUE
+    );
+  });
+
+  it('an Apex shows on the HUD state in place of its evolution and a new run clears it', () => {
+    const { combat, eventBus } = makeCombat([]);
+    eventBus.emit('synergy-unlocked', { family: 'arc' });
+    eventBus.emit('apex-unlocked', { family: 'thermal' }); // evolves first
+    expect(combat.getWeaponState().evolutions).toEqual([
+      expect.objectContaining({ family: 'arc', id: 'chain', apex: false }),
+      expect.objectContaining({
+        family: 'thermal',
+        name: 'Solar Flare Lance',
+        apex: true,
+        short: 'FLARE',
+      }),
+    ]);
+    expect(combat.lanceLook.apex).toBe(true);
+
+    eventBus.emit('progression-reset');
+    expect(combat.getWeaponState().evolutions).toEqual([]);
+    expect(combat.lanceLook.apex).toBe(false);
   });
 });

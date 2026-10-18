@@ -57,6 +57,7 @@ export default class AchievementService {
       if (this.cursedHeld) this.unlock('cursed-run');
     });
     eventBus.on('synergy-unlocked', () => this.unlock('full-set'));
+    eventBus.on('apex-unlocked', () => this.unlock('apex-predator'));
     eventBus.on('weapon-beam-fired', () => this.count('harmonic'));
     eventBus.on('enemy-destroyed', (payload = {}) => {
       if (payload.enemy?.elite) this.count('elite-hunter');

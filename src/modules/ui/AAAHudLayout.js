@@ -789,13 +789,14 @@ export class AAAHudLayout {
         this._evolutionChips.delete(id);
       }
     }
-    for (const { id, family } of state.evolutions) {
+    for (const { id, family, apex, short } of state.evolutions) {
       if (this._evolutionChips.has(id)) {
         continue;
       }
       const chip = document.createElement('span');
       chip.className = 'evo-chip';
-      chip.textContent = id.toUpperCase();
+      chip.classList.toggle('is-apex', Boolean(apex));
+      chip.textContent = apex ? `APEX ${short}` : id.toUpperCase();
       chip.style.setProperty('--family-color', UPGRADE_FAMILIES[family].color);
       this.els.evolutions.appendChild(chip);
       this._evolutionChips.set(id, chip);
@@ -1710,6 +1711,7 @@ export class AAAHudLayout {
             .evo-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 1px var(--space-1, 4px); color: var(--family-color); background: var(--surface); border: 1px solid color-mix(in srgb, var(--family-color) 55%, transparent); border-radius: var(--radius-sm); }
             .buff-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
             .buff-row:empty { display: none; }
+            .evo-chip.is-apex { color: color-mix(in srgb, var(--family-color) 55%, white); border-color: var(--family-color); box-shadow: 0 0 6px color-mix(in srgb, var(--family-color) 45%, transparent); font-weight: 700; }
             .evo-row:empty { display: none; }
             .buff-chip { display: flex; align-items: center; gap: var(--space-2, 8px); color: var(--buff-color); border-color: color-mix(in srgb, var(--buff-color) 55%, transparent); }
             .buff-meter { width: 36px; height: 4px; background: var(--surface-strong); border-radius: var(--radius-sm); overflow: hidden; }

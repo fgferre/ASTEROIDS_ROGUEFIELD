@@ -7,6 +7,7 @@ import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import {
   UPGRADE_FAMILIES,
   FAMILY_SYNERGY_THRESHOLD,
+  FAMILY_APEX_THRESHOLD,
   SYNERGY_OVERHEAT_DAMAGE_MULTIPLIER,
   SYNERGY_SCAVENGER_XP_MULTIPLIER,
 } from '../../src/data/upgrades/families.js';
@@ -132,6 +133,35 @@ describe('3-of-a-kind synergy', () => {
       families: { thermal: 4 },
       synergies: [{ family: 'thermal', name: 'Overheat' }],
     });
+  });
+
+  it('emits apex-unlocked once, at the fifth distinct upgrade of a family, after its synergy', () => {
+    const order = [];
+    eventBus.on('synergy-unlocked', ({ family }) =>
+      order.push(`synergy:${family}`)
+    );
+    eventBus.on('apex-unlocked', ({ family }) => order.push(`apex:${family}`));
+    const thermal = [
+      'plasma',
+      'heat_sink',
+      'afterburn_lance',
+      'reactor_bleed',
+      'harmonic_resonator',
+    ];
+    expect(thermal).toHaveLength(FAMILY_APEX_THRESHOLD);
+
+    thermal.slice(0, 4).forEach((id) => progression.applyUpgrade(id));
+    progression.applyUpgrade('plasma'); // a second rank is not a new card
+    expect(order).toEqual(['synergy:thermal']);
+
+    progression.applyUpgrade('harmonic_resonator');
+    progression.applyUpgrade('cinder_trail');
+    expect(order).toEqual(['synergy:thermal', 'apex:thermal']);
+
+    progression.reset();
+    progression.level = 10;
+    thermal.forEach((id) => progression.applyUpgrade(id));
+    expect(order.filter((entry) => entry === 'apex:thermal')).toHaveLength(2);
   });
 
   it('Scavenger raises XP from orbs and a new run clears it', () => {

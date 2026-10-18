@@ -101,3 +101,78 @@ export const WEAPON_EVOLUTIONS = deepFreeze({
     look: { head: PALETTE.xp },
   },
 });
+
+// Apex colours: whiter versions of each evolution's colour, so a second
+// stage reads hotter than the first on the additive trails.
+export const APEX_COLOR_FLARE = '#ffeccc';
+export const APEX_COLOR_COIL = '#c8fbff';
+export const APEX_COLOR_STORM = '#e6ffb0';
+export const APEX_COLOR_SINGULARITY = '#ded0ff';
+export const APEX_COLOR_MOTHERLODE = '#fff0a0';
+
+/**
+ * Family → Apex evolution, switched on at FAMILY_APEX_THRESHOLD cards of the
+ * family and kept for the run. It replaces the family's first-stage
+ * behaviour; `look` is applied on top of the evolved look. `short` is the
+ * HUD chip ("APEX <short>"). Numbers: proposta 18/10.
+ */
+export const WEAPON_APEX = deepFreeze({
+  thermal: {
+    id: 'solar-flare',
+    family: 'thermal',
+    name: 'Solar Flare Lance',
+    short: 'FLARE',
+    description:
+      'Burns spread to enemies within 70 px of a burning one, at half duration.',
+    // `radius`: rim to rim. A spread burn: `ticks` ticks over
+    // durationFraction × the burn's duration, same damage per tick; spread
+    // burns do not spread again.
+    spread: { radius: 70, durationFraction: 0.5, ticks: 2 },
+    look: { trail: APEX_COLOR_FLARE, outer: PALETTE.shot, width: 1.15 },
+  },
+  kinetic: {
+    id: 'coilgun',
+    family: 'kinetic',
+    name: 'Coilgun',
+    short: 'COIL',
+    description: 'Lances pierce everything on their line for +25% damage.',
+    pierce: Infinity,
+    damageMultiplier: 1.25,
+    look: { trail: APEX_COLOR_COIL, outer: PALETTE.player, headLength: 1.25 },
+  },
+  arc: {
+    id: 'storm',
+    family: 'arc',
+    name: 'Storm Lance',
+    short: 'STORM',
+    description:
+      'Hits arc 3 times for 50% damage; the first jump forks into two.',
+    chain: { jumps: 3, fork: 2 },
+    look: {
+      head: APEX_COLOR_STORM,
+      arc: PALETTE.status,
+      outer: PALETTE.status,
+    },
+  },
+  field: {
+    id: 'singularity',
+    family: 'field',
+    name: 'Singularity Lance',
+    short: 'SINGULARITY',
+    description:
+      'Hits pull the target and enemies within 90 px toward the hit for 0.5 s.',
+    pull: { radius: 90, duration: 0.5, speed: 160 }, // radius: to the rim
+    look: { body: APEX_COLOR_SINGULARITY, outer: WEAPON_COLOR_GRAVITIC },
+  },
+  salvage: {
+    id: 'motherlode',
+    family: 'salvage',
+    name: 'Motherlode',
+    short: 'MOTHERLODE',
+    description:
+      'Lance kills drop twice the orbs; Elites always drop a pickup.',
+    orbBonus: 1, // +100 %: orbs ×2
+    eliteAlwaysDrops: true,
+    look: { head: APEX_COLOR_MOTHERLODE, sparkle: PALETTE.xp },
+  },
+});

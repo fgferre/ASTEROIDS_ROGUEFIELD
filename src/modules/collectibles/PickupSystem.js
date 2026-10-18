@@ -17,6 +17,7 @@ import {
   PICKUP_TOKEN,
   PICKUP_DROPS,
 } from '../../data/pickups.js';
+import { WEAPON_APEX } from '../../data/weapons.js';
 
 const TWO_PI = Math.PI * 2;
 // Salt for the pickup stream: a numeric fork leaves the root sequence intact.
@@ -43,16 +44,20 @@ export class PickupSystem extends BaseSystem {
     this.pickups = [];
     this.overchargeRemaining = 0;
     this.rockDropChance = 0;
+    this.eliteAlwaysDrops = false;
     this.reseedRandom();
   }
 
   setupEventListeners() {
-    // Elites drop at their chance; plain rocks only with Lucky Fragment.
+    // Elites drop at their chance (always with Motherlode); plain rocks only
+    // with Lucky Fragment.
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       const enemy = payload.enemy;
       if (!enemy || enemy.type === 'boss') return;
       const chance = enemy.elite
-        ? PICKUP_DROPS.eliteChance
+        ? this.eliteAlwaysDrops
+          ? 1
+          : PICKUP_DROPS.eliteChance
         : enemy.type === 'asteroid'
           ? this.rockDropChance
           : 0;
@@ -78,8 +83,12 @@ export class PickupSystem extends BaseSystem {
     this.registerEventListener('upgrade-lucky-fragment', (data) => {
       this.rockDropChance = data.chance;
     });
+    this.registerEventListener('apex-unlocked', ({ family } = {}) => {
+      if (WEAPON_APEX[family]?.eliteAlwaysDrops) this.eliteAlwaysDrops = true;
+    });
     this.registerEventListener('progression-reset', () => {
       this.rockDropChance = 0;
+      this.eliteAlwaysDrops = false;
     });
 
     this.registerEventListener('game-started', () => this.reset());

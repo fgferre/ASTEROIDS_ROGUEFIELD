@@ -12,6 +12,7 @@ import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
 import {
   UPGRADE_FAMILIES,
   FAMILY_SYNERGY_THRESHOLD,
+  FAMILY_APEX_THRESHOLD,
 } from '../data/upgrades/families.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -69,6 +70,7 @@ class UpgradeSystem extends BaseSystem {
   initialize() {
     this.appliedUpgrades = new Map();
     this.activeSynergies = new Set();
+    this.activeApexes = new Set();
     this.pendingUpgradeOptions = [];
     this.resetRunUpgradeActions();
     this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
@@ -995,28 +997,33 @@ class UpgradeSystem extends BaseSystem {
     return counts;
   }
 
-  // Switches on every family bonus whose threshold is met and is not on yet.
+  // Switches on every family bonus whose threshold is met and is not on
+  // yet; an Apex (five cards) follows the same way, always after its bonus.
   syncSynergies() {
     const counts = this.getFamilyCounts();
     Object.values(UPGRADE_FAMILIES).forEach((family) => {
+      const count = counts[family.id];
       if (
-        counts[family.id] < FAMILY_SYNERGY_THRESHOLD ||
-        this.activeSynergies.has(family.id)
+        count >= FAMILY_SYNERGY_THRESHOLD &&
+        !this.activeSynergies.has(family.id)
       ) {
-        return;
+        this.activeSynergies.add(family.id);
+        this.applyEffectList(family.bonus.effects, {
+          synergy: family.id,
+          level: 1,
+        });
+        this.eventBus?.emit?.('synergy-unlocked', {
+          family: family.id,
+          familyName: family.name,
+          name: family.bonus.name,
+          description: family.bonus.description,
+          color: family.color,
+        });
       }
-      this.activeSynergies.add(family.id);
-      this.applyEffectList(family.bonus.effects, {
-        synergy: family.id,
-        level: 1,
-      });
-      this.eventBus?.emit?.('synergy-unlocked', {
-        family: family.id,
-        familyName: family.name,
-        name: family.bonus.name,
-        description: family.bonus.description,
-        color: family.color,
-      });
+      if (count >= FAMILY_APEX_THRESHOLD && !this.activeApexes.has(family.id)) {
+        this.activeApexes.add(family.id);
+        this.eventBus?.emit?.('apex-unlocked', { family: family.id });
+      }
     });
   }
 

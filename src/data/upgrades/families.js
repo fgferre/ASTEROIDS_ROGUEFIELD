@@ -5,6 +5,8 @@ import { PALETTE } from '../constants/palette.js';
 
 // Three distinct upgrades of one family switch its bonus on.
 export const FAMILY_SYNERGY_THRESHOLD = 3;
+// Five raise the family's weapon evolution to its Apex (data/weapons.js).
+export const FAMILY_APEX_THRESHOLD = 5;
 
 // Family bonuses — proposta 17/10: numbers for the owner to judge by playing.
 export const SYNERGY_OVERHEAT_DAMAGE_MULTIPLIER = 1.2;

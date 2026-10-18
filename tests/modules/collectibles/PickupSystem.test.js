@@ -61,6 +61,20 @@ describe('PickupSystem', () => {
     expect(pickups.getActivePickups().length).toBeGreaterThan(0);
   });
 
+  it('Motherlode: every Elite death drops a pickup until the run resets', () => {
+    const game = startGame();
+    const { pickups } = game.services;
+    game.eventBus.emit('apex-unlocked', { family: 'salvage' });
+
+    for (let i = 0; i < 10; i += 1) {
+      game.eventBus.emit('enemy-destroyed', killPayload(true));
+    }
+    expect(pickups.getActivePickups()).toHaveLength(10);
+
+    game.eventBus.emit('progression-reset');
+    expect(pickups.eliteAlwaysDrops).toBe(false);
+  });
+
   it('expires a pickup at its lifetime', () => {
     const game = startGame();
     const { pickups, player } = game.services;

@@ -30,7 +30,7 @@ describe('Codex tabs', () => {
     expect(adjacentCodexTab('achievements', 1)).toBe('enemies');
   });
 
-  it('renders the twelve achievements, locked ones greyed, with progress or date', () => {
+  it('renders the thirteen achievements, locked ones greyed, with progress or date', () => {
     localStorage.setItem(
       ACHIEVEMENTS_STORAGE_KEY,
       JSON.stringify({
@@ -41,13 +41,13 @@ describe('Codex tabs', () => {
     const view = codexTabView('achievements', entriesOf());
     const cards = view.markup.match(/<li [^>]*>/g);
 
-    expect(cards).toHaveLength(12);
-    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(11);
+    expect(cards).toHaveLength(13);
+    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(12);
     expect(view.markup).toMatch(
       /is-unlocked" data-achievement="ring-breaker"[\s\S]*?Unlocked 18 Oct 2026/
     );
     expect(view.markup).toContain('7 / 25');
-    expect(view.count).toBe('1 / 12 unlocked');
+    expect(view.count).toBe('1 / 13 unlocked');
   });
 
   it('keeps the enemy list on the Enemies tab', () => {
