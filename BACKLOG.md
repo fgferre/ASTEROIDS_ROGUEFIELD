@@ -24,3 +24,4 @@
 - Medição (18/10): existem dois painéis de desempenho — o PERF MONITOR interno (F3, dev) e o Stats.min.js por `?stats=1` (produção). Unificar: expor o painel interno via `?stats=1` e apagar o Stats.min.js, ou o contrário.
 - Cartas (18/10, R3.2): ciano de raridade 'rare' é a mesma cor do foco; em modo banish, hover e foco podem acender duas cartas; contadores de reroll/banish não entram no snapshot de progressão.
 - Biomas (18/10, R4.1): veios âmbar do Dense Core fortes (pode cansar em 5 camadas); em Warden's Reach só as bordas acesas dos arcos leem, vigas e faixas escuras quase não aparecem; o fade de 2 s nunca foi visto num quadro (headless lento).
+- Nave 3D (18/10, R3.1): a luz da nave sob empuxo tinge casco e chão de ciano e abre um halo grande (feel); o blink de invulnerabilidade passou de branco chapado para borda (uBlink·(0.25+rim)) — ele pode preferir o antigo; detalhe de painel só lê no zoom (nave ~60 px no zoom de jogo).

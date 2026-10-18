@@ -1,9 +1,12 @@
-// The Interceptor in 3D (docs/NORTE.md §3): the hull panels of shipModels.js
-// extruded into a faceted gunmetal wedge (ridge along the spine), dark panel
-// seams, a thin cyan rim (line + fresnel), and the only light on it — the
-// thrusters (emissive cones, a cyan point light and a ribbon trail). Dash
-// afterimages, the invulnerability blink and the shield impact flash mirror
-// the 2D PlayerSystem render.
+// The player hull in 3D (docs/NORTE.md §3): the panels of shipModels.js built
+// as layered matte plates — a dark base plate under every panel, a lighter
+// raised spine over the prow and body, bevelled fin plates — with dark seams,
+// a dim canopy, a thin cyan edge on the prow and the fins' trailing edges and
+// a cyan fresnel rim. The only strong light is the thrusters (hull accent:
+// cyan Interceptor, amber Solar Slicer): glowing nozzles, cones with a white
+// core that stretch with thrust, side puffs on strafe, a point light and a
+// ribbon trail. Dash afterimages, the invulnerability blink and the shield
+// impact flash mirror the 2D PlayerSystem render.
 
 import {
   DASH_GHOST_COUNT,
@@ -13,9 +16,20 @@ import { PALETTE } from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
-const HULL_DEPTH = 6;
-// Visual only: collision keeps the 2D outline.
-const SHIP_SCALE = 1.25;
+// Plate heights in hull units: base plate, raised spine (peak at y = 0) and
+// fin plate, each on top of the base.
+const BASE_DEPTH = 2.4;
+const SPINE_DEPTH = 4.2;
+const FIN_DEPTH = 1.1;
+const BEVEL = 0.5;
+const BASE_TOP = BASE_DEPTH + BEVEL;
+// Raised plates are their panel shrunk toward its centroid: the base shows
+// around them as a panel border and a seam down the spine.
+const INSET = 0.8;
+const NOZZLE_HEIGHT = 2.6;
+// Visual only: collision keeps the 2D outline, and effects anchored on the
+// nose (muzzle flash, lances) take their position from the simulation.
+const VISUAL_SCALE = 1.35;
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
 const MAX_BANK = 0.45;
@@ -27,7 +41,8 @@ const MUZZLE_LIGHT = 1.6;
 const MUZZLE_LIGHT_FRAMES = 2;
 
 // Cyan fresnel rim on the hull (silhouette against the dark field) plus the
-// white invulnerability pulse, both as emissive.
+// white invulnerability pulse, both as emissive; the pulse is weighted to the
+// rim so the panels stay readable while it blinks.
 function patchHull(shader) {
   const { uRim, uBlink } = this.userData;
   shader.uniforms.uRim = uRim;
@@ -41,7 +56,7 @@ function patchHull(shader) {
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
       float rim = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
-      totalEmissiveRadiance += uRim * pow(rim, 3.0) + vec3(uBlink);`
+      totalEmissiveRadiance += uRim * pow(rim, 3.0) + vec3(uBlink * (0.25 + rim));`
     );
 }
 
@@ -72,43 +87,54 @@ export class PlayerMirror {
     this.group.add(this.ship);
     scene.add(this.group);
 
-    // Lighter and less metallic than the enemies' plates, so the key light
-    // reads on it at gameplay zoom.
-    this.hullMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit).lerp(
-        colorOf(THREE, PALETTE.neutral),
-        0.3
-      ),
-      metalness: 0.3,
-      roughness: 0.5,
+    // Three matte tones (base plate, fins, spine) sharing the rim and blink
+    // uniforms, so the key light models each panel without a sheen.
+    const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
+    const blink = { value: 0 };
+    const hullTone = (from, to, t, roughness) => {
+      const material = new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, from).lerp(colorOf(THREE, to), t),
+        metalness: 0.2,
+        roughness,
+        flatShading: true,
+      });
+      material.userData.uRim = rim;
+      material.userData.uBlink = blink;
+      material.onBeforeCompile = patchHull;
+      return material;
+    };
+    this.baseMaterial = hullTone(PALETTE.hull, PALETTE.hullLit, 0.2, 0.85);
+    this.finMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.15, 0.8);
+    this.spineMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.6, 0.72);
+    this.blink = blink;
+    this.canopyMaterial = new THREE.MeshStandardMaterial({
+      color: colorOf(THREE, PALETTE.rockShadow),
+      emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
+      metalness: 0.1,
+      roughness: 0.3,
       flatShading: true,
     });
-    this.hullMaterial.userData.uRim = {
-      value: colorOf(THREE, PALETTE.player).multiplyScalar(0.55),
-    };
-    this.hullMaterial.userData.uBlink = { value: 0 };
-    this.hullMaterial.onBeforeCompile = patchHull;
     this.seamMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.rockShadow),
     });
-    this.rimMaterial = new THREE.LineBasicMaterial({
-      color: colorOf(THREE, PALETTE.player).multiplyScalar(0.9),
+    this.edgeMaterial = new THREE.LineBasicMaterial({
+      color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       toneMapped: false,
     });
-    this.flameMaterial = new THREE.MeshBasicMaterial({
-      color: colorOf(THREE, PALETTE.player).multiplyScalar(1.7),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-    });
-    this.coreMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(1.5, 1.6, 1.6),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-    });
+    const glow = () =>
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+    this.flameMaterial = glow();
+    this.coreMaterial = glow();
+    this.coreMaterial.color.setRGB(1.7, 1.7, 1.6);
+    this.puffMaterial = glow();
+    this.nozzleMaterial = glow();
+    this.accent = new THREE.Color();
+    this.warmLight = new THREE.Color(1, 0.85, 0.7);
 
     const cone = new THREE.ConeGeometry(1, 1, 12, 1, true);
     cone.rotateZ(Math.PI / 2);
@@ -154,7 +180,7 @@ export class PlayerMirror {
       );
       ghost.visible = false;
       ghost.rotation.order = 'YXZ';
-      ghost.scale.setScalar(SHIP_SCALE);
+      ghost.scale.setScalar(VISUAL_SCALE);
       scene.add(ghost);
       this.ghosts.push(ghost);
     }
@@ -163,6 +189,7 @@ export class PlayerMirror {
 
     this.hullKey = null;
     this.flames = [];
+    this.puffs = [];
     this.trailX = new Float32Array(TRAIL_LENGTH);
     this.trailY = new Float32Array(TRAIL_LENGTH);
     this.trailCount = 0;
@@ -189,103 +216,193 @@ export class PlayerMirror {
       if (child.geometry !== this.cone) child.geometry.dispose();
     });
     this.flames = [];
+    this.puffs = [];
+
+    // Thrusters take the hull's accent (amber Solar Slicer); the rim and
+    // edges stay player cyan.
+    this.accent = colorOf(THREE, geometry.accent);
+    this.thrustRgb = rgbOf(THREE, geometry.accent);
+    this.flameMaterial.color.copy(this.accent).multiplyScalar(1.8);
+    this.puffMaterial.color.copy(this.accent).multiplyScalar(1.4);
 
     const maxY = geometry.maxY || 1;
-    const solids = [];
+    const bases = [];
     geometry.panels.forEach((panel) => {
-      // Shape in (x, −y) so rotateX(−π/2) puts height up and keeps y → z.
-      const shape = new THREE.Shape();
-      panel.points.forEach((p, i) =>
-        i ? shape.lineTo(p.x, -p.y) : shape.moveTo(p.x, -p.y)
+      const base = this.addPlate(
+        panel.points,
+        BASE_DEPTH,
+        0,
+        0,
+        this.baseMaterial
       );
-      shape.closePath();
-      const solid = new THREE.ExtrudeGeometry(shape, {
-        depth: HULL_DEPTH,
-        bevelEnabled: true,
-        bevelThickness: 1,
-        bevelSize: 0.6,
-        bevelSegments: 1,
-      });
-      // Ridge along the spine: the top slopes down toward the panel edges.
-      const position = solid.getAttribute('position');
-      for (let i = 0; i < position.count; i += 1) {
-        const z = position.getZ(i);
-        if (z <= 0) continue;
-        const ridge = 1 - 0.65 * Math.min(1, Math.abs(position.getY(i)) / maxY);
-        position.setZ(i, z * ridge);
-      }
-      solid.rotateX(-Math.PI / 2);
-      solid.computeVertexNormals();
-      this.ship.add(new THREE.Mesh(solid, this.hullMaterial));
-      solids.push(solid);
+      bases.push(base);
+      // Dark seams on the base plate only: the raised plates read by tone.
       this.ship.add(
         new THREE.LineSegments(
-          new THREE.EdgesGeometry(solid, 30),
+          new THREE.EdgesGeometry(base, 40),
           this.seamMaterial
         )
       );
+      const spine = panel.points.some((p) => p.y === 0);
+      if (!spine && !panel.rcsPort) return;
+      const cx =
+        panel.points.reduce((n, p) => n + p.x, 0) / panel.points.length;
+      const cy =
+        panel.points.reduce((n, p) => n + p.y, 0) / panel.points.length;
+      const inset = panel.points.map((p) => ({
+        x: cx + (p.x - cx) * INSET,
+        y: cy + (p.y - cy) * INSET,
+      }));
+      if (spine) {
+        this.addPlate(inset, SPINE_DEPTH, BASE_TOP, maxY, this.spineMaterial);
+      } else {
+        this.addPlate(inset, FIN_DEPTH, BASE_TOP, 0, this.finMaterial);
+      }
+      this.addEdges(panel, spine, geometry.maxX);
     });
-
-    const outline = player.getHullOutline();
-    if (outline.length > 2) {
-      const rim = new THREE.BufferGeometry().setFromPoints(
-        outline.map((p) => new THREE.Vector3(p.x * 1.1, 0.2, p.y * 1.1))
-      );
-      this.ship.add(new THREE.LineLoop(rim, this.rimMaterial));
-    }
 
     const { cockpit } = geometry;
     if (cockpit) {
       const length = cockpit.to.x - cockpit.from.x;
-      const glass = new THREE.Mesh(
-        new THREE.BoxGeometry(length, 1, cockpit.width * 2),
-        new THREE.MeshBasicMaterial({
-          color: colorOf(THREE, PALETTE.player).multiplyScalar(0.55),
-          toneMapped: false,
-        })
+      const canopy = new THREE.Mesh(
+        new THREE.OctahedronGeometry(1, 0).scale(
+          length / 2,
+          1.6,
+          cockpit.width * 1.3
+        ),
+        this.canopyMaterial
       );
-      glass.position.set(cockpit.from.x + length / 2, HULL_DEPTH + 0.6, 0);
-      this.ship.add(glass);
+      canopy.position.set(
+        cockpit.from.x + length / 2,
+        BASE_TOP + SPINE_DEPTH + BEVEL,
+        0
+      );
+      this.ship.add(canopy);
     }
 
     geometry.nozzles.forEach((nozzle) => {
       const housing = new THREE.Mesh(
         new THREE.CylinderGeometry(
           nozzle.r,
-          nozzle.r * 1.2,
+          nozzle.r * 1.25,
           geometry.nozzleLength,
           8
         )
           .rotateZ(Math.PI / 2)
           .translate(
             nozzle.x - geometry.nozzleLength / 2,
-            HULL_DEPTH * 0.4,
+            NOZZLE_HEIGHT,
             nozzle.y
           ),
-        this.hullMaterial
+        this.baseMaterial
+      );
+      // Hot throat: a glowing bead at the exit, lit even at idle.
+      const throat = new THREE.Mesh(
+        new THREE.SphereGeometry(nozzle.r * 0.8, 8, 6).translate(
+          nozzle.exitX,
+          NOZZLE_HEIGHT,
+          nozzle.y
+        ),
+        this.nozzleMaterial
       );
       const flame = new THREE.Mesh(this.cone, this.flameMaterial);
       const core = new THREE.Mesh(this.cone, this.coreMaterial);
-      flame.position.set(nozzle.exitX, HULL_DEPTH * 0.4, nozzle.y);
+      flame.position.set(nozzle.exitX, NOZZLE_HEIGHT, nozzle.y);
       core.position.copy(flame.position);
-      this.ship.add(housing, flame, core);
+      this.ship.add(housing, throat, flame, core);
       this.flames.push({ flame, core, r: nozzle.r });
     });
 
-    const ghostGeometry = mergePositions(THREE, solids);
+    // Strafe puffs at the fins' RCS ports, pointing outboard (as in 2D).
+    geometry.rcsPorts.forEach((port) => {
+      const puff = new THREE.Mesh(this.cone, this.puffMaterial);
+      puff.position.set(port.x, BASE_TOP, port.y);
+      puff.rotation.y = port.y < 0 ? -Math.PI / 2 : Math.PI / 2;
+      puff.visible = false;
+      this.ship.add(puff);
+      this.puffs.push({ puff, left: port.y < 0 });
+    });
+
+    const ghostGeometry = mergePositions(THREE, bases);
     this.ghosts[0].geometry.dispose();
     this.ghosts.forEach((ghost) => {
       ghost.geometry = ghostGeometry;
     });
 
-    this.ship.scale.setScalar(SHIP_SCALE);
+    this.ship.scale.setScalar(VISUAL_SCALE);
     this.light.position.set(
-      (geometry.minNozzleX - 6) * SHIP_SCALE,
-      HULL_DEPTH + 4,
+      (geometry.minNozzleX - 6) * VISUAL_SCALE,
+      (NOZZLE_HEIGHT + 4) * VISUAL_SCALE,
       0
     );
     this.shield.scale.setScalar(geometry.extent * 1.7);
     return geometry;
+  }
+
+  // One matte plate: `points` (ship-local, y → world z) extruded `depth` up
+  // from `lift`; with `ridge` > 0 its top slopes down away from the spine.
+  addPlate(points, depth, lift, ridge, material) {
+    const { THREE } = this;
+    // Shape in (x, −y) so rotateX(−π/2) puts height up and keeps y → z.
+    const shape = new THREE.Shape();
+    points.forEach((p, i) =>
+      i ? shape.lineTo(p.x, -p.y) : shape.moveTo(p.x, -p.y)
+    );
+    shape.closePath();
+    const solid = new THREE.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: true,
+      bevelThickness: BEVEL,
+      bevelSize: BEVEL,
+      bevelSegments: 1,
+    });
+    const position = solid.getAttribute('position');
+    for (let i = 0; i < position.count; i += 1) {
+      const z = Math.max(0, position.getZ(i));
+      const slope = ridge
+        ? 1 - 0.7 * Math.min(1, Math.abs(position.getY(i)) / ridge)
+        : 1;
+      position.setZ(i, lift + z * slope);
+    }
+    solid.rotateX(-Math.PI / 2);
+    solid.computeVertexNormals();
+    this.ship.add(new THREE.Mesh(solid, material));
+    return solid;
+  }
+
+  // Thin cyan line on the prow's outer edge and on the fins' trailing edges
+  // (edges whose outward normal points aft), just above the base plate.
+  addEdges(panel, spine, noseX) {
+    const { THREE } = this;
+    const { points } = panel;
+    const prow = spine && points.some((p) => p.x === noseX);
+    if (spine && !prow) return;
+    const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
+    const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
+    const segments = [];
+    points.forEach((a, i) => {
+      const b = points[(i + 1) % points.length];
+      const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      let nx = (b.y - a.y) / length;
+      let ny = -(b.x - a.x) / length;
+      if (nx * ((a.x + b.x) / 2 - cx) + ny * ((a.y + b.y) / 2 - cy) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      if (prow ? nx > 0.1 && Math.abs(ny) > 0.1 : nx < -0.6) {
+        segments.push(
+          new THREE.Vector3(a.x, BASE_TOP + 0.05, a.y),
+          new THREE.Vector3(b.x, BASE_TOP + 0.05, b.y)
+        );
+      }
+    });
+    if (!segments.length) return;
+    this.ship.add(
+      new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(segments),
+        this.edgeMaterial
+      )
+    );
   }
 
   /** Mirrors the player; feeds its thruster trail into `ribbons`. */
@@ -319,19 +436,34 @@ export class PlayerMirror {
     this.group.rotation.x = Math.max(-MAX_BANK, Math.min(MAX_BANK, bank));
 
     const main = thrust.main || 0;
-    const length = (5 + 15 * main) * (1 + 0.1 * (levels.thruster || 0));
+    const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
     for (let i = 0; i < this.flames.length; i += 1) {
       const { flame, core, r } = this.flames[i];
       const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
       flame.visible = main > 0.02;
       core.visible = flame.visible;
-      flame.scale.set(length * flicker, r * 0.9, r * 0.9);
-      core.scale.set(length * 0.45, r * 0.4, r * 0.4);
+      flame.scale.set(length * flicker, r * 0.95, r * 0.95);
+      core.scale.set(length * 0.5 * flicker, r * 0.45, r * 0.45);
     }
     this.flameMaterial.opacity = Math.min(1, main * 1.2);
-    this.coreMaterial.opacity = Math.min(1, main);
+    this.coreMaterial.opacity = Math.min(1, main * 1.1);
+    this.nozzleMaterial.color
+      .copy(this.accent)
+      .multiplyScalar(0.5 + 1.3 * main);
+    for (let i = 0; i < this.puffs.length; i += 1) {
+      const { puff, left } = this.puffs[i];
+      const amount = (left ? thrust.sideL : thrust.sideR) || 0;
+      puff.visible = amount > 0.02;
+      puff.scale.set(2 + 6 * amount, 1.2, 1.2);
+    }
+    this.puffMaterial.opacity = Math.min(
+      1,
+      Math.max(thrust.sideL || 0, thrust.sideR || 0)
+    );
+    // Warmer and brighter under thrust; each shot bumps it briefly.
+    this.light.color.copy(this.accent).lerp(this.warmLight, 0.35 * main);
     this.light.intensity =
-      2.4 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+      2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     this.shield.visible = Boolean(player.isShieldActive);
@@ -349,7 +481,7 @@ export class PlayerMirror {
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
     else if (!invulnerable) this.dashGuard = false;
-    this.hullMaterial.userData.uBlink.value =
+    this.blink.value =
       invulnerable && !this.dashGuard
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
@@ -359,8 +491,8 @@ export class PlayerMirror {
     // trail: nozzle exit in logical space, oldest first; longer at speed
     const speed = Math.min(1, Math.hypot(v.vx, v.vy) / SHIP_MAX_SPEED);
     const trailMax = Math.round(TRAIL_MIN + (TRAIL_LENGTH - TRAIL_MIN) * speed);
-    const exitX = x + geometry.minNozzleX * SHIP_SCALE * cos;
-    const exitY = y + geometry.minNozzleX * SHIP_SCALE * sin;
+    const exitX = x + geometry.minNozzleX * VISUAL_SCALE * cos;
+    const exitY = y + geometry.minNozzleX * VISUAL_SCALE * sin;
     this.trailX[this.trailHead] = exitX;
     this.trailY[this.trailHead] = exitY;
     this.trailHead = (this.trailHead + 1) % TRAIL_LENGTH;
@@ -372,7 +504,13 @@ export class PlayerMirror {
         ribbons.px[i] = this.trailX[k];
         ribbons.py[i] = this.trailY[k];
       }
-      ribbons.polyline(n, HULL_DEPTH * 0.4, this.thrustRgb, 5, 1.6 * main);
+      ribbons.polyline(
+        n,
+        NOZZLE_HEIGHT * VISUAL_SCALE,
+        this.thrustRgb,
+        5,
+        1.6 * main
+      );
     }
   }
 
