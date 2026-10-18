@@ -139,7 +139,7 @@ describe('Herald', () => {
     const hud = { showHeraldBanner: vi.fn(), setRadarJammed: vi.fn() };
     const queueTransmission = vi.fn();
     UISystem.prototype.setupEventListeners.call({
-      aaaTacticalHud: hud,
+      tacticalHud: { layout: hud },
       queueTransmission,
       registerEventListener: (name, fn) =>
         handlers.set(name, [...(handlers.get(name) || []), fn]),

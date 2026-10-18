@@ -1,7 +1,7 @@
 // src/modules/ui/menuStatus.js
 
 // The strip under the main menu title: best layer, today's Daily Field best,
-// the Boss Rush best, Salvage, Codex and achievement counts, the difficulty and the 3D quality. Reads the services; UISystem
+// the Boss Rush best, Salvage, Codex and achievement counts, the difficulty and the 3D quality. Reads the services; MainMenu
 // redraws it whenever the menu shows or one of them changes.
 
 import { DIFFICULTY_LABELS } from '../../data/difficulty.js';

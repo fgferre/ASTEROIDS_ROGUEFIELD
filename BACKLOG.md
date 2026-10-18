@@ -27,3 +27,4 @@
 - Scripts Playwright (`scripts/probe.mjs` sonda de erros de runtime, `scripts/capture.mjs` captura) para sessão na nuvem ou automação, onde não há navegador embutido; decisão de 18/10: sem a dependência enquanto a sessão principal captura sozinha.
 - Docs órfãos em `tests/`: `OPTIMIZATION_GUIDE.md` (ninguém referencia) e `__fixtures__/README.md` (diz que fixtures "serão adicionadas"); o lint do `IS_DEV` não pega a forma `const { DEV } = import.meta.env`.
 - Áudio (18/10, R13.8.2): `dbToGain` (uma linha) existe em SFXBus, sfx/stingers e DuckingController.
+- Escape durante a cinemática de abertura: o primeiro Escape some (pula a abertura?) e deixa a pausa um toggle fora da tela de pausa (jogo parado com a tela escondida, depois tela visível com o jogo parado); reproduzido igual na main antes da divisão da UI (18/10), não é regressão.

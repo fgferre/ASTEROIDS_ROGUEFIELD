@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import UISystem from '../../../src/modules/UISystem.js';
+import { LevelUpScreen } from '../../../src/modules/ui/LevelUpScreen.js';
 import {
   CARD_STAGGER_MS,
   LEVELUP_EXIT_MS,
@@ -94,7 +95,7 @@ describe('Level-up card transition', () => {
     expect(screen.classes.size).toBe(0);
   });
 
-  describe('in UISystem', () => {
+  describe('on the level-up screen', () => {
     let restoreDom;
     beforeEach(() => {
       restoreDom = installDomStubs();
@@ -106,19 +107,64 @@ describe('Level-up card transition', () => {
       document.getElementById = (id) =>
         id === 'levelup-screen' ? screen : null;
       const cards = ['a', 'b'].map((id, i) => fakeNode(cardRect(i * 300), id));
-      const ui = {
-        levelUpState: { buttons: cards, lockedUntil: 0 },
+      const levelUp = new LevelUpScreen({
         prefersReducedMotion: () => false,
         showGameUI: vi.fn(),
-      };
-      const locked = () => UISystem.prototype.isLevelUpLocked.call(ui);
+      });
+      levelUp.levelUpState.buttons = cards;
+      const locked = () => levelUp.isLevelUpLocked();
 
-      UISystem.prototype.leaveLevelUp.call(ui, 'b');
+      levelUp.leaveLevelUp('b');
 
       expect(cards[1].classes.has('is-picked')).toBe(true);
       expect(locked()).toBe(true);
       vi.advanceTimersByTime(LEVELUP_EXIT_MS);
-      expect(ui.showGameUI).toHaveBeenCalledTimes(1);
+      expect(levelUp.showGameUI).toHaveBeenCalledTimes(1);
+    });
+
+    it('deals one card per upgrade when UISystem hears the offer', () => {
+      const parent = () => ({
+        children: [],
+        appendChild(child) {
+          this.children.push(...(child.children ?? [child]));
+        },
+      });
+      document.createDocumentFragment = parent;
+      document.createElement = () => ({
+        ...fakeNode(),
+        addEventListener: () => {},
+        focus: () => {},
+      });
+      const container = parent();
+      const showScreen = vi.fn();
+      const handlers = new Map();
+      UISystem.prototype.setupEventListeners.call({
+        levelUpScreen: new LevelUpScreen({
+          refs: { container },
+          progression: () => null,
+          showScreen,
+          showCardsTip: () => {},
+          prefersReducedMotion: () => true,
+          colorVision: () => 'standard',
+        }),
+        registerEventListener: (name, fn) => handlers.set(name, fn),
+      });
+
+      handlers.get('upgrade-options-ready')({
+        level: 3,
+        options: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      });
+
+      expect(showScreen).toHaveBeenCalledWith('levelup', {
+        overlay: true,
+        show: true,
+      });
+      expect(container.children.map((card) => card.dataset.upgradeId)).toEqual([
+        'a',
+        'b',
+        'c',
+      ]);
+      expect(container.children[0].classes.has('is-focused')).toBe(true);
     });
   });
 });
