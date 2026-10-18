@@ -1,10 +1,5 @@
 // src/modules/UISystem.js
 
-import {
-  DEFAULT_HULL_ID,
-  getAllShipModels,
-  getShipModelById,
-} from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import {
   bossRushStage,
@@ -30,6 +25,9 @@ import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
 import { TacticalHud } from './ui/TacticalHud.js';
+import { MainMenu } from './ui/MainMenu.js';
+import { HangarScreen } from './ui/HangarScreen.js';
+import { CodexScreen } from './ui/CodexScreen.js';
 import {
   TransmissionQueue,
   bossRushTransmission,
@@ -42,18 +40,10 @@ import {
   wardenTransmission,
 } from './ui/transmissions.js';
 import {
-  hangarItemMarkup,
-  hullLockText,
-  salvageBalanceText,
-} from './ui/hangar.js';
-import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
-import {
   GAMEPAD_FOCUSABLE_SELECTOR,
   GAMEPAD_NAV_SCREENS,
   pickFocusTarget,
 } from './ui/gamepadNav.js';
-import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
-import { isBossRushUnlocked, loadRecords } from '../services/runRecords.js';
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -78,8 +68,6 @@ class UISystem extends BaseSystem {
     this.killsPulseTimeout = null;
     this.levelPulseTimeout = null;
     this.resizeRaf = null;
-    this.menuShipSelectorRefreshFrame = null;
-    this._lastHoverTarget = null;
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
     this.currentCanvasScale = 1;
@@ -122,8 +110,6 @@ class UISystem extends BaseSystem {
 
     this.settings = this.resolveSettingsService();
     this.liveQualityPreset = null;
-    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
-    this.hangarState = { isOpen: false, trigger: null };
 
     this.tacticalState = {
       contactsCache: null,
@@ -195,6 +181,37 @@ class UISystem extends BaseSystem {
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('credits', isOpen, payload),
     });
+    this.mainMenu = new MainMenu({
+      refs: this.domRefs.menu,
+      settings: this.settings,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      hangar: () => this.getService('hangar'),
+      codex: () => this.getService('codex'),
+      achievements: () => this.getService('achievements'),
+      difficulty: () => this.getService('difficulty'),
+      player: () => this.getService('player'),
+      livePreset: () => this.liveQualityPreset,
+    });
+    this.hangarScreen = new HangarScreen({
+      refs: this.domRefs.hangar,
+      settings: this.settings,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      showScreen: (name, options) => this.showScreen(name, options),
+      announceVisibility: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('hangar', isOpen, payload),
+      hangar: () => this.getService('hangar'),
+      selectedHullId: () => this.mainMenu.getSelectedHullId(),
+      hullName: (hull) => this.mainMenu.getHullDisplayName(hull),
+      refreshShipSelector: () => this.mainMenu.requestMenuShipSelectorRefresh(),
+    });
+    this.codexScreen = new CodexScreen({
+      refs: this.domRefs.codex,
+      showScreen: (name, options) => this.showScreen(name, options),
+      announceVisibility: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('codex', isOpen, payload),
+      codex: () => this.getService('codex'),
+      achievements: () => this.getService('achievements'),
+    });
     // The static keyboard hints show the scheme in use (style.css).
     document.body.dataset.controls = controlSchemeFromUrl();
 
@@ -219,12 +236,12 @@ class UISystem extends BaseSystem {
     this.levelUpScreen.bindLevelUpControls();
     this.settingsPanel.bindSettingsControls();
     this.creditsOverlay.bindCreditsControls();
-    this.bindCodexControls();
-    this.bindHangarControls();
-    this.bindMainMenuControls();
-    this.initializeMenuShipSelector();
-    this.refreshMenuStatus();
-    this.refreshBossRushLock();
+    this.codexScreen.bindCodexControls();
+    this.hangarScreen.bindHangarControls();
+    this.mainMenu.bindMainMenuControls();
+    this.mainMenu.initializeMenuShipSelector();
+    this.mainMenu.refreshMenuStatus();
+    this.mainMenu.refreshBossRushLock();
     this.settingsPanel.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -555,243 +572,6 @@ class UISystem extends BaseSystem {
     this.tacticalHud.layout?.invalidatePanelCorners();
   }
 
-  getSelectedHullId() {
-    const gameplayValues =
-      this.settings && typeof this.settings.getCategoryValues === 'function'
-        ? this.settings.getCategoryValues('gameplay') || null
-        : null;
-    const hullDefinition = getShipModelById(gameplayValues?.selectedHull);
-    return this.getService('hangar').hullFor(
-      hullDefinition?.id || DEFAULT_HULL_ID
-    );
-  }
-
-  getHullDisplayName(hullDefinition) {
-    if (!hullDefinition) {
-      return 'Unknown Hull';
-    }
-
-    return hullDefinition.name || hullDefinition.id;
-  }
-
-  initializeMenuShipSelector() {
-    const menuRefs = this.domRefs.menu;
-    if (!menuRefs?.shipSelector || !menuRefs.shipSelectorOptions) {
-      return;
-    }
-
-    this.buildMenuShipSelectorButtons();
-    this.refreshMenuShipSelector();
-  }
-
-  buildMenuShipSelectorButtons() {
-    const container = this.domRefs.menu?.shipSelectorOptions;
-    if (!container) {
-      return;
-    }
-
-    container.innerHTML = '';
-
-    const fragment = document.createDocumentFragment();
-    getAllShipModels().forEach((hullDefinition) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'menu-ship-selector__option';
-      button.dataset.hullId = hullDefinition.id;
-      button.setAttribute('aria-pressed', 'false');
-
-      const preview = document.createElement('canvas');
-      preview.className = 'menu-ship-selector__preview';
-      preview.width = 112;
-      preview.height = 112;
-      preview.setAttribute('aria-hidden', 'true');
-      button.appendChild(preview);
-
-      const label = document.createElement('span');
-      label.className = 'menu-ship-selector__name';
-      label.textContent = this.getHullDisplayName(hullDefinition);
-      label.title = label.textContent;
-      button.appendChild(label);
-
-      button.addEventListener('click', () => {
-        if (!this.settings || typeof this.settings.setSetting !== 'function') {
-          return;
-        }
-
-        this.settings.setSetting(
-          'gameplay',
-          'selectedHull',
-          hullDefinition.id,
-          {
-            source: 'ui',
-          }
-        );
-      });
-
-      fragment.appendChild(button);
-    });
-
-    container.appendChild(fragment);
-  }
-
-  requestMenuShipSelectorRefresh() {
-    if (this.menuShipSelectorRefreshFrame !== null) {
-      return;
-    }
-
-    const schedule =
-      typeof window !== 'undefined' &&
-      typeof window.requestAnimationFrame === 'function'
-        ? window.requestAnimationFrame.bind(window)
-        : (callback) => setTimeout(callback, 16);
-
-    this.menuShipSelectorRefreshFrame = schedule(() => {
-      this.menuShipSelectorRefreshFrame = null;
-      this.refreshMenuShipSelector();
-    });
-  }
-
-  refreshMenuShipSelector() {
-    const container = this.domRefs.menu?.shipSelectorOptions;
-    if (!container) {
-      return;
-    }
-
-    const selectedHullId = this.getSelectedHullId();
-    const hangar = this.getService('hangar');
-    container
-      .querySelectorAll('.menu-ship-selector__option')
-      .forEach((button) => {
-        if (!(button instanceof HTMLButtonElement)) {
-          return;
-        }
-
-        const isActive = button.dataset.hullId === selectedHullId;
-        button.classList.toggle('is-active', isActive);
-        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        const locked = !hangar.isHullUnlocked(button.dataset.hullId);
-        button.disabled = locked;
-        button.classList.toggle('is-locked', locked);
-        button.title = locked ? 'Unlock in the Hangar' : '';
-      });
-
-    this.renderMenuShipSelectorPreviews();
-  }
-
-  // The records strip under the menu title (ui/menuStatus.js).
-  refreshMenuStatus() {
-    const strip = this.domRefs.menu?.status;
-    if (!strip) {
-      return;
-    }
-    strip.innerHTML = menuStatusMarkup(
-      menuStatusItems({
-        records: loadRecords(),
-        hangar: this.getService('hangar'),
-        codex: this.getService('codex'),
-        achievements: this.getService('achievements'),
-        difficulty: this.getService('difficulty'),
-        quality: this.settings?.getCategoryValues('graphics')?.quality,
-        livePreset: this.liveQualityPreset,
-      })
-    );
-  }
-
-  // Boss Rush stays locked until a run has beaten Warden Prime.
-  refreshBossRushLock() {
-    const { bossRushBtn, bossRushLock } = this.domRefs.menu;
-    if (!bossRushBtn) {
-      return;
-    }
-    const locked = !isBossRushUnlocked();
-    bossRushBtn.disabled = locked;
-    bossRushLock.classList.toggle('hidden', !locked);
-  }
-
-  renderMenuShipSelectorPreviews() {
-    const container = this.domRefs.menu?.shipSelectorOptions;
-    const player = this.getService('player');
-    if (
-      !container ||
-      !player ||
-      typeof player.renderHullPreview !== 'function'
-    ) {
-      return;
-    }
-
-    container
-      .querySelectorAll('.menu-ship-selector__option')
-      .forEach((button) => {
-        if (!(button instanceof HTMLButtonElement)) {
-          return;
-        }
-
-        const preview = button.querySelector('.menu-ship-selector__preview');
-        if (!(preview instanceof HTMLCanvasElement)) {
-          return;
-        }
-
-        const context = preview.getContext('2d');
-        if (!context) {
-          return;
-        }
-
-        const hullDefinition = getShipModelById(button.dataset.hullId);
-        player.renderHullPreview(context, hullDefinition, {
-          padding: 12,
-        });
-      });
-  }
-
-  bindMainMenuControls() {
-    // Generic UI Hover Sound Delegation
-    // Listens for all menu buttons and interactive elements
-    if (typeof document !== 'undefined') {
-      document.addEventListener(
-        'mouseover',
-        (event) => {
-          // Check for common button classes or interactive elements
-          const target = event.target.closest(
-            '.menu-screen__button, .menu-ship-selector__option, .btn, .settings-tab-button, [role="button"]'
-          );
-
-          // Debounce/Check if it's a new hover target to avoid spam
-          if (target && target !== this._lastHoverTarget) {
-            this._lastHoverTarget = target;
-
-            // Determine source based on context
-            let source = 'ui';
-            if (target.closest('#main-menu')) source = 'main-menu';
-            else if (target.closest('#pause-screen')) source = 'pause-menu';
-            else if (target.closest('#settings-screen'))
-              source = 'settings-menu';
-            else if (target.closest('#gameover-screen'))
-              source = 'gameover-menu';
-            else if (target.closest('#victory-screen')) source = 'victory-menu';
-            else if (target.closest('#levelup-screen')) source = 'levelup-menu';
-
-            this.eventBus?.emit?.('ui-hover', {
-              source,
-              button: target.id || target.className || 'unknown',
-            });
-          }
-        },
-        { passive: true }
-      );
-
-      // Reset last hover target when mouse leaves
-      document.addEventListener(
-        'mouseout',
-        (event) => {
-          if (event.target === this._lastHoverTarget) {
-            this._lastHoverTarget = null;
-          }
-        },
-        { passive: true }
-      );
-    }
-  }
-
   /** Queues a Warden transmission and keeps the frame loop that plays it. */
   queueTransmission(entry, { interrupt = false } = {}) {
     const queue = this.transmissions;
@@ -960,25 +740,16 @@ class UISystem extends BaseSystem {
       this.handleScreenChanged(payload);
     });
 
-    // The run's transmission banner is hidden in the menu: the Ring's line
-    // for a purchase shows in the caption under the Hangar's hull stage,
-    // scrolled into view.
     this.registerEventListener('hangar-purchased', ({ id } = {}) => {
-      this.refreshMenuStatus();
-      const line = hangarTransmission(id);
-      const caption = this.domRefs.hangar.hullLock;
-      if (line && caption) {
-        caption.textContent = `${line.speaker}: ${line.text}`;
-        caption.hidden = false;
-        caption.scrollIntoView({ block: 'nearest' });
-      }
+      this.mainMenu.refreshMenuStatus();
+      this.hangarScreen.showPurchaseLine(hangarTransmission(id));
     });
 
     // Renderer3D's Auto quality picked a preset: menu strip and the
     // Graphics preview name it.
     this.registerEventListener('quality-changed', ({ preset } = {}) => {
       this.liveQualityPreset = preset;
-      this.refreshMenuStatus();
+      this.mainMenu.refreshMenuStatus();
       this.settingsPanel.refreshCategory('graphics');
     });
 
@@ -1154,8 +925,8 @@ class UISystem extends BaseSystem {
       }
       case 'back':
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
-        else if (id === 'codex') this.closeCodex();
-        else if (id === 'hangar') this.closeHangar();
+        else if (id === 'codex') this.codexScreen.closeCodex();
+        else if (id === 'hangar') this.hangarScreen.closeHangar();
         else if (id === 'credits') {
           this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
         } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
@@ -1164,9 +935,7 @@ class UISystem extends BaseSystem {
       case 'tabNext': {
         const step = action === 'tabPrev' ? -1 : 1;
         if (id === 'codex') {
-          this.showCodexTab(adjacentCodexTab(this.codexState.tab, step), {
-            focusTab: true,
-          });
+          this.codexScreen.cycleTab(step);
         } else if (id === 'settings') {
           this.settingsPanel.cycleCategory(step);
         }
@@ -1222,7 +991,7 @@ class UISystem extends BaseSystem {
     }
 
     if (change.category === 'gameplay' || change.type === 'reset-all') {
-      this.requestMenuShipSelectorRefresh();
+      this.mainMenu.requestMenuShipSelectorRefresh();
     }
 
     if (
@@ -1230,7 +999,7 @@ class UISystem extends BaseSystem {
       change.key === 'difficulty' ||
       change.type === 'reset-all'
     ) {
-      this.refreshMenuStatus();
+      this.mainMenu.refreshMenuStatus();
     }
 
     if (change.category === 'gameplay' && change.key === 'onboardingTips') {
@@ -1253,179 +1022,6 @@ class UISystem extends BaseSystem {
       isOpen: Boolean(isOpen),
       ...payload,
     });
-  }
-
-  bindCodexControls() {
-    const refs = this.domRefs.codex;
-    if (!refs.overlay) return;
-    refs.openBtn?.addEventListener('click', () => this.openCodex());
-    [refs.backBtn, refs.closeBtn].forEach((button) =>
-      button?.addEventListener('click', () => this.closeCodex())
-    );
-    refs.overlay.addEventListener('click', (event) => {
-      if (event.target === refs.overlay) this.closeCodex();
-    });
-    refs.tabs.forEach((button) =>
-      button.addEventListener('click', () =>
-        this.showCodexTab(button.dataset.codexTab)
-      )
-    );
-    document.addEventListener('keydown', (event) => {
-      if (!this.codexState.isOpen) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.closeCodex();
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        const step = event.key === 'ArrowLeft' ? -1 : 1;
-        this.showCodexTab(adjacentCodexTab(this.codexState.tab, step), {
-          focusTab: true,
-        });
-      }
-    });
-  }
-
-  showCodexTab(tab, { focusTab = false } = {}) {
-    const refs = this.domRefs.codex;
-    const view = codexTabView(tab, {
-      enemies: this.getService('codex').getEntries(),
-      achievements: this.getService('achievements').getEntries(),
-    });
-    refs.list.innerHTML = view.markup;
-    refs.list.setAttribute('aria-label', view.label);
-    refs.list.scrollTop = 0;
-    refs.count.textContent = view.count;
-    refs.tabs.forEach((button) => {
-      const active = button.dataset.codexTab === tab;
-      button.classList.toggle('is-active', active);
-      button.setAttribute('aria-selected', String(active));
-      if (active && focusTab) button.focus({ preventScroll: true });
-    });
-    this.codexState.tab = tab;
-  }
-
-  openCodex() {
-    const refs = this.domRefs.codex;
-    this.codexState = {
-      isOpen: true,
-      trigger: document.activeElement,
-      tab: 'enemies',
-    };
-    this.showCodexTab('enemies');
-    this.showScreen('codex', { overlay: true, show: true });
-    refs.overlay.setAttribute('aria-hidden', 'false');
-    this.emitOverlayVisibilityChanged('codex', true, { source: 'menu' });
-    refs.backBtn?.focus({ preventScroll: true });
-  }
-
-  closeCodex() {
-    if (!this.codexState.isOpen) return;
-    const refs = this.domRefs.codex;
-    this.showScreen('codex', { overlay: true, show: false });
-    refs.overlay.setAttribute('aria-hidden', 'true');
-    this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
-    this.codexState.trigger?.focus?.({ preventScroll: true });
-    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
-  }
-
-  bindHangarControls() {
-    const refs = this.domRefs.hangar;
-    if (!refs.overlay) return;
-    refs.openBtn?.addEventListener('click', () => this.openHangar());
-    [refs.backBtn, refs.closeBtn].forEach((button) =>
-      button?.addEventListener('click', () => this.closeHangar())
-    );
-    refs.overlay.addEventListener('click', (event) => {
-      if (event.target === refs.overlay) {
-        this.closeHangar();
-        return;
-      }
-      const buy = event.target.closest('[data-hangar-buy]');
-      if (buy) {
-        const id = buy.dataset.hangarBuy;
-        this.getService('hangar').buy(id);
-        this.renderHangar();
-        refs.list
-          .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
-          ?.focus({ preventScroll: true });
-        return;
-      }
-      const hull = event.target.closest('[data-hangar-hull]');
-      if (hull) {
-        this.settings.setSetting(
-          'gameplay',
-          'selectedHull',
-          hull.dataset.hangarHull,
-          { source: 'ui' }
-        );
-        this.renderHangar();
-      }
-    });
-    // The 3D hull preview follows the hovered or focused hull button; a
-    // locked hull shows as a silhouette with its price over the stage.
-    const previewHull = (event) => {
-      const hull = event.target.closest?.('[data-hangar-hull]');
-      const hullId = hull?.dataset.hangarHull ?? null;
-      const locked = Boolean(hull?.disabled);
-      refs.hullLock.hidden = !locked;
-      refs.hullLock.textContent = locked ? hullLockText(hullId) : '';
-      this.eventBus.emit('hangar-hull-hovered', { hullId, locked });
-    };
-    refs.hulls?.addEventListener('pointerover', previewHull);
-    refs.hulls?.addEventListener('focusin', previewHull);
-    ['pointerleave', 'focusout'].forEach((type) =>
-      refs.hulls?.addEventListener(type, () => {
-        refs.hullLock.hidden = true;
-        this.eventBus.emit('hangar-hull-hovered', { hullId: null });
-      })
-    );
-    document.addEventListener('keydown', (event) => {
-      if (this.hangarState.isOpen && event.key === 'Escape') {
-        event.preventDefault();
-        this.closeHangar();
-      }
-    });
-  }
-
-  renderHangar() {
-    const refs = this.domRefs.hangar;
-    const hangar = this.getService('hangar');
-    refs.balance.textContent = salvageBalanceText(hangar.salvage);
-    refs.list.innerHTML = hangar.getItems().map(hangarItemMarkup).join('');
-    const selected = this.getSelectedHullId();
-    refs.hulls.innerHTML = getAllShipModels()
-      .map((hull) => {
-        const locked = !hangar.isHullUnlocked(hull.id);
-        const active = hull.id === selected;
-        return `<button type="button" class="hangar-hull${
-          active ? ' is-active' : ''
-        }" data-hangar-hull="${hull.id}" aria-pressed="${active}"${
-          locked ? ' disabled' : ''
-        }>${this.getHullDisplayName(hull)}${locked ? ' · Locked' : ''}</button>`;
-      })
-      .join('');
-  }
-
-  openHangar() {
-    const refs = this.domRefs.hangar;
-    this.renderHangar();
-    refs.hullLock.hidden = true;
-    this.hangarState = { isOpen: true, trigger: document.activeElement };
-    this.showScreen('hangar', { overlay: true, show: true });
-    refs.overlay.setAttribute('aria-hidden', 'false');
-    this.emitOverlayVisibilityChanged('hangar', true, { source: 'menu' });
-    refs.backBtn?.focus({ preventScroll: true });
-  }
-
-  closeHangar() {
-    if (!this.hangarState.isOpen) return;
-    const refs = this.domRefs.hangar;
-    this.showScreen('hangar', { overlay: true, show: false });
-    refs.overlay.setAttribute('aria-hidden', 'true');
-    this.emitOverlayVisibilityChanged('hangar', false, { source: 'menu' });
-    this.requestMenuShipSelectorRefresh();
-    this.hangarState.trigger?.focus?.({ preventScroll: true });
-    this.hangarState = { isOpen: false, trigger: null };
   }
 
   update(deltaTime) {
@@ -1535,15 +1131,15 @@ class UISystem extends BaseSystem {
 
       this.creditsOverlay.markClosed();
 
-      this.closeCodex();
-      this.closeHangar();
+      this.codexScreen.closeCodex();
+      this.hangarScreen.closeHangar();
 
       document.body?.classList.remove('is-credits-open');
 
       if (screenName === 'menu') {
-        this.requestMenuShipSelectorRefresh();
-        this.refreshMenuStatus();
-        this.refreshBossRushLock();
+        this.mainMenu.requestMenuShipSelectorRefresh();
+        this.mainMenu.refreshMenuStatus();
+        this.mainMenu.refreshBossRushLock();
       }
 
       if (emitEvent) {

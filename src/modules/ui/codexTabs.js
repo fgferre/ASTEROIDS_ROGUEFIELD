@@ -1,7 +1,7 @@
 // src/modules/ui/codexTabs.js
 
 // The Codex screen's two tabs, ENEMIES and ACHIEVEMENTS: markup and count
-// line for each. UISystem wires the tab buttons and the keys.
+// line for each. CodexScreen wires the tab buttons and the keys.
 
 export const CODEX_TABS = ['enemies', 'achievements'];
 

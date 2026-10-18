@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
-import UISystem from '../../../src/modules/UISystem.js';
+import { MainMenu } from '../../../src/modules/ui/MainMenu.js';
 import { RECORDS_STORAGE_KEY } from '../../../src/services/runRecords.js';
 import {
   bossRushBest,
@@ -67,18 +67,21 @@ describe('Main menu status strip', () => {
     expect(qualityLabel('high')).toBe('HIGH');
   });
 
-  it('UISystem fills the strip from the services and the stored records', () => {
+  it('MainMenu fills the strip from the services and the stored records', () => {
     localStorage.setItem(RECORDS_STORAGE_KEY, JSON.stringify({ bestLayer: 4 }));
     const services = fakeServices();
     const strip = { innerHTML: '' };
-    const ui = {
-      domRefs: { menu: { status: strip } },
-      getService: (name) => services[name],
+    const menu = new MainMenu({
+      refs: { status: strip },
       settings: { getCategoryValues: () => ({ quality: 'high' }) },
-      liveQualityPreset: null,
-    };
+      hangar: () => services.hangar,
+      codex: () => services.codex,
+      achievements: () => services.achievements,
+      difficulty: () => services.difficulty,
+      livePreset: () => null,
+    });
 
-    UISystem.prototype.refreshMenuStatus.call(ui);
+    menu.refreshMenuStatus();
 
     const text = strip.innerHTML.replace(/<[^>]+>/g, '');
     expect(text).toBe(

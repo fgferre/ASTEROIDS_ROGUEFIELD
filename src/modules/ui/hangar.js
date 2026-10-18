@@ -1,7 +1,7 @@
 // src/modules/ui/hangar.js
 
 // The Hangar screen and the Salvage line of the run recaps (docs/NORTE.md §7
-// pillar 7). Markup only; UISystem wires the buttons.
+// pillar 7). Markup only; HangarScreen wires the buttons.
 
 import { HANGAR_ITEMS } from '../../data/hangar.js';
 
