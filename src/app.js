@@ -11,6 +11,7 @@ import {
   statsRequestedByUrl,
 } from './utils/PerformanceMonitor.js';
 import { createFixedStepper } from './core/fixedStep.js';
+import { IS_DEV } from './core/env.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
@@ -30,10 +31,7 @@ import {
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
-import {
-  GameDebugLogger,
-  isDevEnvironment,
-} from './utils/dev/GameDebugLogger.js';
+import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
 
 // [NEO-ARCADE] Warmup imports
 import { RenderComponent } from './modules/enemies/components/RenderComponent.js';
@@ -93,7 +91,7 @@ let servicesCache = {
 };
 let servicesCacheInitialized = false;
 
-const DEV_MODE = isDevEnvironment();
+const DEV_MODE = IS_DEV;
 
 // The loading bar's last stretch: the 3D renderer compiles its shaders
 // (Renderer3D.warmUp) after the menu's preload, before the menu shows.

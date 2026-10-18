@@ -16,7 +16,7 @@ import FileTrackManager, {
 import DuckingController from './audio/DuckingController.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
+import { IS_DEV } from '../core/env.js';
 import {
   AUDIO_BIG_MOMENT_DUCK,
   AUDIO_MASTER_LIMITER,
@@ -27,7 +27,7 @@ import {
 } from '../core/GameConstants.js';
 import { requireRandom } from '../utils/randomHelpers.js';
 
-const DEV_MODE = isDevEnvironment();
+const DEV_MODE = IS_DEV;
 
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {

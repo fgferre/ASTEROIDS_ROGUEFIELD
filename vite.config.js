@@ -44,6 +44,8 @@ export default defineConfig(({ mode }) => ({
     // tripped the 5 s default. Proposta 18/10.
     testTimeout: 20000,
     globals: true,
+    // The game logs every event; only failing tests print their console.
+    silent: 'passed-only',
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
     setupFiles: ['tests/__helpers__/global-setup.js'],
     coverage: {

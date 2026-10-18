@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 12 em curso — O BASTÃO em docs/PENDENCIAS.md)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 em curso — O BASTÃO em docs/PENDENCIAS.md)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --grep="R11"`, PRs #247–#260). Decisões de produto são do dono,
@@ -90,6 +90,14 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 - [ ] **R13.8 Arquivos grandes.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
+      Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
+  - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
+        portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
+        assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
+  - [ ] **R13.8.2 Piloto SFXBus**: famílias de sons em módulos de `src/modules/audio/`; dados de áudio saem de
+        `GameConstants` para o domínio de áudio.
+  - [ ] **R13.8.3 UISystem** por tela ou responsabilidade, com o padrão do piloto. **R13.8.4** CombatSystem e
+        enemyMirror. **R13.8.5** autoridade das ondas; depois escopos de random.
 
 ## Fora de escopo deste plano
 

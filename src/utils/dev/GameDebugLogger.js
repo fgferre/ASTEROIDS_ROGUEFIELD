@@ -20,10 +20,6 @@ const safeStringify = (value) => {
   }
 };
 
-export function isDevEnvironment() {
-  return IS_DEV;
-}
-
 export class GameDebugLogger {
   static isEnabled = false;
   static entries = [];
@@ -41,7 +37,7 @@ export class GameDebugLogger {
       return;
     }
 
-    if (!isDevEnvironment()) {
+    if (!IS_DEV) {
       return;
     }
 

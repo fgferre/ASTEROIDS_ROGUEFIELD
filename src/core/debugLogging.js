@@ -1,16 +1,16 @@
 // src/core/debugLogging.js
 // Utilidades centralizadas para controlar logs de depuração em todo o jogo.
 
-import { isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
+import { IS_DEV } from './env.js';
 
 export const DEBUG_LOGGING_QUERY_PARAM = 'debugLogging';
 export const DEBUG_LOGGING_STORAGE_KEY = 'asteroids:debugLogging';
-export const DEBUG_LOGGING_DEFAULT = isDevEnvironment();
+export const DEBUG_LOGGING_DEFAULT = IS_DEV;
 export const DEBUG_LOGGING_GLOBAL_FLAG = '__DEBUG_LOGGING_ENABLED__';
 
 const debugControllers = new Map();
 let cachedPreference;
-const DEV_MODE = isDevEnvironment();
+const DEV_MODE = IS_DEV;
 
 function getGlobalScope() {
   if (typeof globalThis !== 'undefined') return globalThis;

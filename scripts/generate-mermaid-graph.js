@@ -213,6 +213,7 @@ async function generateMermaid(options) {
   const graph = JSON.parse(raw);
   const { nodes, included } = prepareNodes(graph.files, options);
   const mermaid = buildMermaid(nodes, included, graph.issues);
+  await fs.mkdir(path.dirname(MERMAID_OUTPUT), { recursive: true });
   await fs.writeFile(MERMAID_OUTPUT, `${mermaid}\n`, 'utf8');
 
   const markdown = `# Dependency Graph\n\n> Generated with \`npm run analyze:deps\`\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`\n`;
