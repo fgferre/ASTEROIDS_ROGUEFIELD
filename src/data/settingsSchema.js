@@ -329,6 +329,17 @@ const SETTINGS_SCHEMA = [
         default: true,
       },
       {
+        key: 'bloomIntensity',
+        type: 'select',
+        control: 'segmented',
+        label: 'Bloom Intensity',
+        description:
+          'How strong the glow is. Turn Bloom off above to remove it.',
+        options: ['low', 'normal', 'high'],
+        optionLabels: { low: 'Low', normal: 'Normal', high: 'High' },
+        default: 'normal',
+      },
+      {
         key: 'chromaticAberration',
         type: 'toggle',
         label: 'Chromatic Aberration',

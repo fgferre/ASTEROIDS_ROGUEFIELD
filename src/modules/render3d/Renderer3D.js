@@ -90,6 +90,9 @@ const CINEMATIC_HANDBACK_MS = 500;
 const FOLLOW_POSE = followPose();
 const COMBAT_RANGE = 140;
 const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
+// proposta 18/10: Settings > Bloom Intensity scales the preset's strength
+// (Bloom off is the toggle, which drops the pass).
+const BLOOM_INTENSITY = { low: 0.6, normal: 1, high: 1.4 };
 // proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
 // toneMapped:false, so they stay hot enough to bloom).
 const EXPOSURE = 1;
@@ -173,17 +176,23 @@ void main() {
   gl_FragColor = vec4(uColor * (core + halo), 1.0);
 }`;
 
-// `?bloom=0` turns the pass off; `?bloom=<n>` (0..3) scales its strength —
-// the same flag the 2D bloomLayer reads.
+// `?bloom=0` turns the pass off; `?bloom=<n>` (0..3) scales its strength and
+// replaces the Bloom Intensity setting (`set`) — the same flag the 2D
+// bloomLayer reads.
 function bloomFromUrl() {
+  const unset = { enabled: true, scale: 1, set: false };
   try {
     const raw = new URLSearchParams(window.location.search).get('bloom');
-    if (raw === null) return { enabled: true, scale: 1 };
+    if (raw === null) return unset;
     const value = Number(raw);
-    if (!Number.isFinite(value)) return { enabled: true, scale: 1 };
-    return { enabled: value > 0, scale: Math.min(3, Math.max(0, value)) };
+    if (!Number.isFinite(value)) return unset;
+    return {
+      enabled: value > 0,
+      scale: Math.min(3, Math.max(0, value)),
+      set: true,
+    };
   } catch {
-    return { enabled: true, scale: 1 };
+    return unset;
   }
 }
 
@@ -234,6 +243,7 @@ class Renderer3D extends BaseSystem {
     this.failed = false;
     this.graphics = {
       bloom: true,
+      bloomLevel: BLOOM_INTENSITY.normal,
       postProcessing: true,
       smaa: true,
       aberration: true,
@@ -507,11 +517,25 @@ class Renderer3D extends BaseSystem {
   applyGraphicsPreferences(values = {}) {
     this.graphics.postProcessing = values.postProcessing !== false;
     this.graphics.bloom = values.bloom !== false;
+    this.graphics.bloomLevel =
+      BLOOM_INTENSITY[values.bloomIntensity] ?? BLOOM_INTENSITY.normal;
     this.graphics.smaa = values.antialiasing !== 'None';
     this.graphics.aberration = values.chromaticAberration !== false;
     if (!this.qualityUrl) this.quality.setMode(values.quality);
     this.camera.setMode(resolveCameraMode(values.cameraMode));
+    this.applyBloomStrength();
     this.syncPasses();
+  }
+
+  // The bloom strength: the preset's scale times Bloom Intensity (or the
+  // `?bloom=<n>` scale when given). biomes.update writes it next frame.
+  applyBloomStrength() {
+    const t = this.three;
+    if (!t) return;
+    const level = t.bloomSet ? t.bloomScale : this.graphics.bloomLevel;
+    t.biomes.targets.bloomBase =
+      BLOOM.strength * level * this.quality.settings.bloomScale;
+    t.biomes.applied = null;
   }
 
   // The current preset (qualityPresets.js) on the live scene. Resolution
@@ -520,10 +544,9 @@ class Renderer3D extends BaseSystem {
     const t = this.three;
     if (!t) return;
     const q = this.quality.settings;
-    t.biomes.targets.bloomBase = BLOOM.strength * t.bloomScale * q.bloomScale;
+    this.applyBloomStrength();
     t.biomes.targets.fillScale = q.fillScale;
     t.biomes.targets.hemiScale = q.hemiScale;
-    t.biomes.applied = null;
     setBloomMips(t.bloomPass, q.bloomMips, t.width, t.height);
     t.enemies.setSurfaceMaps(q.surfaceMaps);
     t.player.setSurfaceMaps(q.surfaceMaps);
@@ -826,6 +849,7 @@ class Renderer3D extends BaseSystem {
       smaaPass,
       bloomUrl: bloomUrl.enabled,
       bloomScale: bloomUrl.scale,
+      bloomSet: bloomUrl.set,
       overlay,
       texts,
       bossFlash,
