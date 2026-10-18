@@ -2,7 +2,7 @@
 
 Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 15.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 16.**
 
 ## O BASTÃO — onde a sessão parou (18/10, ~16h30) — RODADA 11 MESCLADA NA `main` (PR #259)
 
@@ -102,6 +102,16 @@ browser, sem se limitar às referências."_
 - **(13)** edge cases de pooling/director (velocidade velha em inimigos reaproveitados, Heralds/Wardens sem pool, seed
   do director inconsistente, avisos de "accounting discrepancy").
 - **(14)** arquivos ainda muito grandes (UISystem, CombatSystem, PlayerSystem, Renderer3D, SFXBus).
+
+- **(15)** _"Eu olhando bem no fundo aqui, eu percebo uma faixa mais escura no fundo, como se fosse um ribbon, um
+  stripe, que eu não entendo do que se trata. Parece um defeito."_ / _"Ao invés de só tirar, me explica qual era a
+  intenção. Talvez seja algo importante para a história."_ (18/10, noite). É o **Anel partido** (`fieldBackdrop.js`,
+  NORTE §1–2): o campo de jogo é o campo de destroços de uma megaestrutura em anel; a faixa é um pedaço dela, longe
+  abaixo, em silhueta contra a nebulosa, para dar escala e lugar — e no epílogo da vitória ela acende em violeta
+  (`setWake`), o Anel voltando à vida quando os Wardens caem. A intenção é importante; a execução não lê: banda
+  chapada, sem luz, sem espessura. Nada foi mudado em 18/10 (ele não aprovou o paliativo de opacidade). Próxima
+  sessão: modelar o Anel como estrutura iluminada (espessura, segmentos, borda pela luz-chave, névoa de distância),
+  mantendo o acender do epílogo.
 
 ## Desempenho
 
