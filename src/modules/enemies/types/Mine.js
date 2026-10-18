@@ -1,6 +1,5 @@
 import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
 import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
-import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const MINE_DEFAULTS = MINE_CONFIG ?? {};
@@ -74,28 +73,6 @@ export class Mine extends BaseEnemy {
     this.destroyed = false;
 
     return this;
-  }
-
-  resolveRandom(config = {}) {
-    if (config.random && typeof config.random.float === 'function') {
-      return config.random;
-    }
-
-    if (this.system && typeof this.system.getRandomScope === 'function') {
-      const scope = config.randomScope || 'mine';
-      const generator = this.system.getRandomScope(scope, {
-        parentScope: config.randomParentScope || 'spawn',
-        label: `enemy:${this.type}:${config.id || this.id || 'spawn'}`,
-      });
-
-      if (generator && typeof generator.fork === 'function') {
-        return generator.fork(`${this.type}:core`);
-      }
-
-      return generator || null;
-    }
-
-    return new RandomService(`enemy:${this.type}`);
   }
 
   onUpdate(deltaTime) {

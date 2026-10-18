@@ -36,6 +36,11 @@ export function downloadJSON(filename, json) {
   URL.revokeObjectURL(url);
 }
 
+/** True when the URL asks for the frame-time panel (`?stats=1`). */
+export function statsRequestedByUrl(search) {
+  return new URLSearchParams(search).get('stats') === '1';
+}
+
 export class PerformanceMonitor {
   constructor() {
     // FPS tracking

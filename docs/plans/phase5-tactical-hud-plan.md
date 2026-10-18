@@ -1,3 +1,5 @@
+> Describes an earlier phase of the project and may no longer match the code; the current plan is `PLAN.md` at the repo root.
+
 # Plano da Fase 5 – HUD Tático e Feedback de Progressão
 
 ## Objetivo

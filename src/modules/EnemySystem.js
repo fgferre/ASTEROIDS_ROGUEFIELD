@@ -1440,8 +1440,6 @@ class EnemySystem extends BaseSystem {
       ...this.bossHudState,
     });
 
-    this.emitBossSystemEvent('ui', 'boss-hud-update', { ...this.bossHudState });
-
     return this.bossHudState;
   }
 

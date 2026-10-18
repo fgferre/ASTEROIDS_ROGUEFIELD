@@ -323,9 +323,12 @@ export function createServiceManifest(context = {}) {
       name: 'hangar',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus'],
+      dependencies: ['event-bus', 'difficulty'],
       factory: ({ resolved }) =>
-        new HangarService({ eventBus: resolved['event-bus'] }),
+        new HangarService({
+          eventBus: resolved['event-bus'],
+          difficulty: resolved['difficulty'],
+        }),
     },
     {
       name: 'difficulty',
@@ -465,12 +468,11 @@ export function createServiceManifest(context = {}) {
       name: 'effects',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'audio', 'settings', 'random'],
+      dependencies: ['event-bus', 'settings', 'random'],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
         return new EffectsSystem({
           eventBus: resolved['event-bus'],
-          audio: resolved['audio'],
           settings: resolved['settings'],
           random: resolved['random'],
           serviceResolver,
@@ -625,20 +627,13 @@ export function createServiceManifest(context = {}) {
       name: 'combat',
       singleton: true,
       lazy: false,
-      dependencies: [
-        'event-bus',
-        'player',
-        'enemies',
-        'physics',
-        'command-queue',
-      ],
+      dependencies: ['event-bus', 'player', 'enemies', 'physics'],
       factory: ({ resolved }) =>
         new CombatSystem({
           eventBus: resolved['event-bus'],
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
-          'command-queue': resolved['command-queue'],
         }),
     },
     {

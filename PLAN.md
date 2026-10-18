@@ -265,7 +265,7 @@ Qualidade:
 - [ ] **R7.2 Pequenos acabamentos de UX.** Chip AIM MANUAL, linha de lock 3D a partir da torreta, Esc fecha Settings
       aberto do menu, setas de fora de tela não caem sobre painéis, chips de casco com nome em uma linha, dicas estáticas
       de teclado com o esquema moderno, salvage escalado pela dificuldade.
-- [ ] **R7.3 Dívidas.** Apagar código morto listado no BACKLOG (initializeMusicController, RenderBatch/GradientCache/
+- [x] **R7.3 Dívidas.** Apagar código morto listado no BACKLOG (initializeMusicController, RenderBatch/GradientCache/
       CanvasStateManager, teste scope-freeze de `.planning/`, cópias de resolveRandom, pools duplicados), unificar os
       dois painéis de desempenho, passe de verdade em `docs/plans` e `docs/validation`.
       Conteúdo:

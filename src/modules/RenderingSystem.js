@@ -1,7 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
-import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
-import GradientCache from '../core/GradientCache.js';
 import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -1043,17 +1041,14 @@ class RenderingSystem extends BaseSystem {
     this.spaceSky = new SpaceSkyBackground(this.getRandomFork('starfield'));
     // [NEO-ARCADE] New 3D Starfield does not require legacy parallax/velocity configuration
 
-    // Batch rendering optimization systems
-    this.renderBatch = new RenderBatch();
+    // Canvas state transitions between render phases
     this.stateManager = new CanvasStateManager();
-    this.gradientCache = new GradientCache();
 
     // Performance tracking
     this.renderStats = {
       frameCount: 0,
       lastStatsTime: performance.now(),
       avgFrameTime: 0,
-      batchEfficiency: 0,
     };
 
     this.cachedPlayer = null;
@@ -1205,7 +1200,6 @@ class RenderingSystem extends BaseSystem {
     // Initialize state manager if needed
     if (!this.stateManager.currentState.fillStyle) {
       this.stateManager.initialize(ctx);
-      this.gradientCache.preloadGradients(ctx);
     }
 
     // Apply Antialiasing Preference
@@ -1940,10 +1934,6 @@ class RenderingSystem extends BaseSystem {
         this.renderStats.avgFrameTime * (1 - alpha) + frameTime * alpha;
     }
 
-    // Update batch efficiency
-    const batchStats = this.renderBatch.getStats();
-    this.renderStats.batchEfficiency = parseFloat(batchStats.efficiency) || 0;
-
     // Log stats every 5 seconds
     const now = performance.now();
     if (now - this.renderStats.lastStatsTime > 5000) {
@@ -1957,20 +1947,13 @@ class RenderingSystem extends BaseSystem {
    */
   logPerformanceStats() {
     const renderStats = this.renderStats;
-    const batchStats = this.renderBatch.getStats();
     const stateStats = this.stateManager.getStats();
-    const gradientStats = this.gradientCache.getStats();
 
     console.log(
       `[RenderingSystem] Performance Stats - Frames: ${renderStats.frameCount}`
     );
     console.log(`  Avg Frame Time: ${renderStats.avgFrameTime.toFixed(2)}ms`);
-    console.log(`  Batch Efficiency: ${batchStats.efficiency}`);
     console.log(`  State Efficiency: ${stateStats.efficiency}`);
-    console.log(
-      `  Gradient Cache: ${gradientStats.hitRates.gradients} hit rate`
-    );
-    console.log(`  Canvas Cache: ${gradientStats.hitRates.canvases} hit rate`);
   }
 
   /**
@@ -1980,61 +1963,8 @@ class RenderingSystem extends BaseSystem {
     return {
       frameTime: this.renderStats.avgFrameTime,
       frameCount: this.renderStats.frameCount,
-      batchEfficiency: this.renderStats.batchEfficiency,
-      batchStats: this.renderBatch.getStats(),
       stateStats: this.stateManager.getStats(),
-      gradientStats: this.gradientCache.getStats(),
     };
-  }
-
-  /**
-   * Optimize rendering for specific object types
-   */
-  renderBatchedCircles(ctx, circles, fillStyle, strokeStyle = null) {
-    if (!circles || circles.length === 0) return;
-
-    this.renderBatch.beginBatch('circles', {
-      fillStyle,
-      strokeStyle,
-      globalAlpha: 1,
-    });
-
-    for (const circle of circles) {
-      this.renderBatch.addCircle(
-        circle.x,
-        circle.y,
-        circle.radius,
-        fillStyle,
-        strokeStyle
-      );
-    }
-
-    this.renderBatch.flushBatch(ctx);
-  }
-
-  /**
-   * Render batched lines for trails, effects
-   */
-  renderBatchedLines(ctx, lines, strokeStyle, lineWidth = 1) {
-    if (!lines || lines.length === 0) return;
-
-    this.renderBatch.beginBatch('lines', {
-      strokeStyle,
-      lineWidth,
-    });
-
-    for (const line of lines) {
-      this.renderBatch.addLine(
-        line.x1,
-        line.y1,
-        line.x2,
-        line.y2,
-        strokeStyle,
-        lineWidth
-      );
-    }
-
-    this.renderBatch.flushBatch(ctx);
   }
 
   /**
@@ -2045,12 +1975,9 @@ class RenderingSystem extends BaseSystem {
       frameCount: 0,
       lastStatsTime: performance.now(),
       avgFrameTime: 0,
-      batchEfficiency: 0,
     };
 
-    this.renderBatch.resetStats();
     this.stateManager.resetStats();
-    this.gradientCache.reset();
 
     console.log('[RenderingSystem] Performance tracking reset');
   }

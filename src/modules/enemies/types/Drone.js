@@ -5,7 +5,6 @@ import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
 } from '../../../core/GameConstants.js';
-import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
@@ -143,28 +142,6 @@ export class Drone extends BaseEnemy {
     }
 
     return this;
-  }
-
-  resolveRandom(config = {}) {
-    if (config.random && typeof config.random.float === 'function') {
-      return config.random;
-    }
-
-    if (this.system && typeof this.system.getRandomScope === 'function') {
-      const scope = config.randomScope || 'drone';
-      const generator = this.system.getRandomScope(scope, {
-        parentScope: config.randomParentScope || 'spawn',
-        label: `enemy:${this.type}:${config.id || this.id || 'spawn'}`,
-      });
-
-      if (generator && typeof generator.fork === 'function') {
-        return generator.fork(`${this.type}:core`);
-      }
-
-      return generator || null;
-    }
-
-    return new RandomService(`enemy:${this.type}`);
   }
 
   onUpdate(deltaTime) {

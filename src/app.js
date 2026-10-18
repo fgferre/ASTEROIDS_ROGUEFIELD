@@ -8,9 +8,9 @@ import {
 import {
   PerformanceMonitor,
   downloadJSON,
+  statsRequestedByUrl,
 } from './utils/PerformanceMonitor.js';
 import { createFixedStepper } from './core/fixedStep.js';
-import { createStatsOverlay } from './core/statsOverlay.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
@@ -167,13 +167,14 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
-const statsOverlay = createStatsOverlay();
-
 function installStatsShortcut() {
+  if (statsRequestedByUrl(window.location.search)) {
+    performanceMonitor.showOverlay();
+  }
   window.addEventListener('keydown', (event) => {
     if (event.key === 'F8') {
       event.preventDefault();
-      statsOverlay.toggle();
+      performanceMonitor.toggleOverlay();
     }
   });
 }
@@ -465,7 +466,6 @@ function init(recording = null) {
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
-  statsOverlay.begin();
   // Start performance monitoring
   performanceMonitor.startFrame();
 
@@ -567,7 +567,6 @@ function gameLoop(currentTime) {
 
   // End performance monitoring
   performanceMonitor.endFrame();
-  statsOverlay.end();
 
   requestAnimationFrame(gameLoop);
 }

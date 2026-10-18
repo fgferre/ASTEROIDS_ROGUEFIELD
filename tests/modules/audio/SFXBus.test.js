@@ -337,7 +337,6 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'handleBossEvent',
   'handleThrusterEffect',
   'init',
-  'initializeMusicController',
   'normalizeLaserShotOptions',
   'onDestroy',
   'playAsteroidBreak',
