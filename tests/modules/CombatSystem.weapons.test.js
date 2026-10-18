@@ -245,7 +245,8 @@ describe('weapon evolutions', () => {
     const target = makeEnemy('t', 0, 0, { vx: 100 });
     const { combat, eventBus } = makeCombat([target]);
     eventBus.emit('synergy-unlocked', { family: 'field' });
-    combat.processBulletHit(lance(), target, combat.cachedEnemies);
+    // A directionless hit: no knockback, so this measures the slow alone.
+    combat.processBulletHit(lance({ vx: 0 }), target, combat.cachedEnemies);
 
     const step = (dt) => {
       target.x += target.vx * dt; // the enemy's own movement

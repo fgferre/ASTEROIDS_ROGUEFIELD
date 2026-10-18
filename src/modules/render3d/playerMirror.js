@@ -13,7 +13,10 @@ import {
   DASH_GHOST_LIFE,
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
+import {
+  SHIP_MAX_SPEED,
+  SHIP_ROTATION_SPEED,
+} from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
@@ -34,7 +37,18 @@ const NOZZLE_HEIGHT = 2.6;
 const VISUAL_SCALE = 1.35;
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
-const MAX_BANK = 0.45;
+// Banking (PLAN.md R5.9, proposta 18/10): roll into the strafe input and the
+// yaw rate, eased with a time constant so it saturates and relaxes smoothly.
+// Both come from the simulation (input, angular velocity), never from the
+// interpolated pose.
+const BANK_STRAFE = (22 * Math.PI) / 180;
+const BANK_YAW = (8 * Math.PI) / 180;
+const BANK_SMOOTH_S = 0.18;
+// Each shot pushes the hull back along the nose for the muzzle frames.
+const RECOIL_DIP = 2;
+// Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10).
+const DASH_RIM_BOOST = 3;
+const DASH_RING_OPACITY = 0.55;
 const BLINK_HZ = 8;
 const SHIELD_FLASH_S = 0.08;
 const GHOST_ALPHA = 0.5;
@@ -182,6 +196,25 @@ export class PlayerMirror {
     this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
     this.shieldHitAt = -Infinity;
     this.muzzleFrames = 0;
+    this.bank = 0;
+    this.bankTime = null;
+
+    this.rim = rim.value;
+    this.rimRgb = rim.value.clone();
+    this.dashRimRgb = rim.value.clone().multiplyScalar(DASH_RIM_BOOST);
+    this.dashRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.94, 1, 64).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.6),
+        transparent: true,
+        opacity: DASH_RING_OPACITY,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    );
+    this.dashRing.visible = false;
+    this.group.add(this.dashRing);
 
     this.ghosts = [];
     for (let i = 0; i < DASH_GHOST_COUNT; i += 1) {
@@ -367,6 +400,7 @@ export class PlayerMirror {
       0
     );
     this.shield.scale.setScalar(geometry.extent * 1.7);
+    this.dashRing.scale.setScalar(geometry.extent * 1.3);
     return geometry;
   }
 
@@ -463,9 +497,8 @@ export class PlayerMirror {
     this.group.rotation.y = -angle;
     // Bank into turns and strafes (the sim stays flat; this is only visual).
     const v = player.velocity || { vx: 0, vy: 0 };
-    const lateral = (-v.vx * sin + v.vy * cos) / SHIP_MAX_SPEED;
-    const bank = lateral * 0.5 + (player.angularVelocity || 0) * 0.08;
-    this.group.rotation.x = Math.max(-MAX_BANK, Math.min(MAX_BANK, bank));
+    this.group.rotation.x = this.updateBank(player, time);
+    this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
 
     const main = thrust.main || 0;
     const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
@@ -517,6 +550,9 @@ export class PlayerMirror {
       invulnerable && !this.dashGuard
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
+    const dashShield = invulnerable && this.dashGuard;
+    this.rim.copy(dashShield ? this.dashRimRgb : this.rimRgb);
+    this.dashRing.visible = dashShield;
 
     this.updateGhosts(player.dashGhosts);
 
@@ -544,6 +580,30 @@ export class PlayerMirror {
         1.6 * main
       );
     }
+  }
+
+  /**
+   * Roll target: strafe input (modern only; classic A/D is torque) plus the
+   * yaw rate, eased toward with BANK_SMOOTH_S. Returns radians.
+   */
+  updateBank(player, time) {
+    const dt =
+      this.bankTime === null
+        ? 0
+        : Math.min(0.1, Math.max(0, time - this.bankTime));
+    this.bankTime = time;
+    const thrust = player.lastThrusterState || {};
+    const strafe =
+      player.controlScheme === 'modern'
+        ? (thrust.sideL || 0) - (thrust.sideR || 0)
+        : 0;
+    const yaw = Math.max(
+      -1,
+      Math.min(1, (player.angularVelocity || 0) / SHIP_ROTATION_SPEED)
+    );
+    const target = BANK_STRAFE * strafe + BANK_YAW * yaw;
+    this.bank += (target - this.bank) * (1 - Math.exp(-dt / BANK_SMOOTH_S));
+    return this.bank;
   }
 
   updateGhosts(list) {
@@ -596,6 +656,8 @@ export class PlayerMirror {
   reset() {
     this.trailCount = 0;
     this.muzzleFrames = 0;
+    this.bank = 0;
+    this.bankTime = null;
     this.dashGuard = false;
     this.hideGhosts();
   }

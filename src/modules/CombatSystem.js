@@ -25,7 +25,18 @@ import {
   COMBAT_BULLET_RADIUS,
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
+  KNOCKBACK_BASE,
+  KNOCKBACK_HEAVY_FACTOR,
+  KNOCKBACK_MAX,
+  KNOCKBACK_MIN,
+  KNOCKBACK_REFERENCE_DAMAGE,
 } from '../data/constants/gameplay.js';
+
+/** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
+export function knockbackSpeed(damage) {
+  const speed = KNOCKBACK_BASE * (damage / KNOCKBACK_REFERENCE_DAMAGE);
+  return Math.min(KNOCKBACK_MAX, Math.max(KNOCKBACK_MIN, speed));
+}
 
 // Plan 01.07: validate spread/aim mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
@@ -3104,6 +3115,9 @@ class CombatSystem extends BaseSystem {
     });
 
     if (!blockedByInvulnerability) {
+      if (!damageResult.killed && effectiveDamage > 0) {
+        this.applyKnockback(bullet, enemy, effectiveDamage);
+      }
       if (beamSplit && damageResult.killed) {
         this.spawnBeamFragment(enemiesSystem, enemy, beamSplit);
       }
@@ -3120,6 +3134,26 @@ class CombatSystem extends BaseSystem {
     }
 
     return damageResult;
+  }
+
+  // A shove along the bullet, heavier for bigger hits (PLAN.md R5.9). The AI
+  // reasserts its own velocity, so it reads as a short stagger; asteroids
+  // drift linearly and would keep it forever, so they are left alone.
+  applyKnockback(bullet, enemy, damage) {
+    if (enemy.type === 'asteroid') return;
+    const length = Math.hypot(bullet.vx || 0, bullet.vy || 0);
+    if (length === 0) return;
+    const heavy = enemy.type === 'boss' || enemy.type === 'herald';
+    const speed = knockbackSpeed(damage) * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
+    const ix = (bullet.vx / length) * speed;
+    const iy = (bullet.vy / length) * speed;
+    enemy.vx = (enemy.vx ?? 0) + ix;
+    enemy.vy = (enemy.vy ?? 0) + iy;
+    // Steering strategies read `velocity` and write it back to vx/vy.
+    if (enemy.velocity) {
+      enemy.velocity.vx = (enemy.velocity.vx ?? 0) + ix;
+      enemy.velocity.vy = (enemy.velocity.vy ?? 0) + iy;
+    }
   }
 
   // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===

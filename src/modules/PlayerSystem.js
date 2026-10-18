@@ -37,6 +37,7 @@ import {
   SHIELD_COOLDOWN_DURATION,
   SHIELD_IMPACT_DAMAGE_BASE,
   SHIELD_IMPACT_DAMAGE_PER_LEVEL,
+  SHOT_RECOIL_IMPULSE,
 } from '../data/constants/gameplay.js';
 
 const DRIFT_SETTINGS = {
@@ -758,6 +759,9 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
+          // ...and a small kick to the hull, the same path as the dash.
+          this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
+          this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
         }
       }
     });
