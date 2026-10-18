@@ -18,6 +18,7 @@ import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DissolvePool } from './dissolve.js';
+import { mergeStatic } from './mergeStatic.js';
 import { addRimLight } from './rimLight.js';
 import { RockInstances } from './rockInstances.js';
 
@@ -530,6 +531,20 @@ export class EnemyMirror {
         roughness: 0.8,
       })
     );
+    // The static matte parts of a machine, merged per kind (mergeStatic):
+    // their hull/dark/plate tones ride in vertex colours, one draw each.
+    this.machineMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        metalness: 0.2,
+        roughness: 0.85,
+      })
+    );
+    this.tones = {
+      hull: colorOf(THREE, PALETTE.hullLit),
+      dark: colorOf(THREE, PALETTE.hull),
+    };
+    this.mergedGeometries = new Map();
     this.rimMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.threat).multiplyScalar(1.1),
       toneMapped: false,
@@ -975,6 +990,21 @@ export class EnemyMirror {
     material.color.copy(material.userData.base).multiplyScalar(gain);
   }
 
+  // One merged geometry per name, shared by every view of the kind.
+  merged(name, parts) {
+    let geometry = this.mergedGeometries.get(name);
+    if (!geometry) {
+      geometry = mergeStatic(this.THREE, parts());
+      this.mergedGeometries.set(name, geometry);
+    }
+    return geometry;
+  }
+
+  // The static matte body of a machine: one mesh, machineMaterial.
+  body(name, parts) {
+    return new this.THREE.Mesh(this.merged(name, parts), this.machineMaterial);
+  }
+
   // Crack-shader uniforms; a rock's stone and crystal materials share them.
   rockUniforms(vein) {
     const { THREE } = this;
@@ -1183,8 +1213,9 @@ export class EnemyMirror {
   createMote() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const body = new THREE.Mesh(this.sphere, this.hullMaterial);
-    body.scale.set(1, 0.42, 1);
+    const body = this.body('drone', () => [
+      { geometry: this.sphere, color: this.tones.hull, scale: [1, 0.42, 1] },
+    ]);
     const eye = new THREE.Mesh(
       this.smallSphere,
       this.emissive(PALETTE.threat, 1.4)
@@ -1205,7 +1236,9 @@ export class EnemyMirror {
   createSeeker() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const body = new THREE.Mesh(this.seekerHull, this.hullMaterial);
+    const body = this.body('hunter', () => [
+      { geometry: this.seekerHull, color: this.tones.hull },
+    ]);
     const lensMaterial = this.emissive(PALETTE.threat, 0.5);
     const lens = new THREE.Mesh(this.smallSphere, lensMaterial);
     lens.scale.setScalar(0.2);
@@ -1224,21 +1257,31 @@ export class EnemyMirror {
     const { THREE } = this;
     const group = new THREE.Group();
     const spin = new THREE.Group();
-    const core = new THREE.Mesh(this.sphere, this.darkMaterial);
-    core.scale.setScalar(0.5);
-    spin.add(core);
+    const angles = [0, 1, 2].map((i) => (i / 3) * Math.PI * 2);
+    const tips = angles.map(
+      (angle) =>
+        new THREE.Vector3(Math.cos(angle) * 1.05, 0, -Math.sin(angle) * 1.05)
+    );
+    const frame = this.body('mine', () => [
+      { geometry: this.sphere, color: this.tones.dark, scale: 0.5 },
+      ...angles.map((rotationY) => ({
+        geometry: this.strut,
+        color: this.tones.hull,
+        rotationY,
+      })),
+    ]);
     const nodeMaterial = this.emissive(PALETTE.threat, 0.6);
-    const tips = [];
-    for (let i = 0; i < 3; i += 1) {
-      const angle = (i / 3) * Math.PI * 2;
-      const strut = new THREE.Mesh(this.strut, this.hullMaterial);
-      strut.rotation.y = angle;
-      const node = new THREE.Mesh(this.smallSphere, nodeMaterial);
-      node.scale.setScalar(0.15);
-      node.position.set(Math.cos(angle) * 1.05, 0, -Math.sin(angle) * 1.05);
-      tips.push(node.position.clone());
-      spin.add(strut, node);
-    }
+    const nodes = new THREE.Mesh(
+      this.merged('mine-nodes', () =>
+        tips.map((tip) => ({
+          geometry: this.smallSphere,
+          scale: 0.15,
+          position: tip.toArray(),
+        }))
+      ),
+      nodeMaterial
+    );
+    spin.add(frame, nodes);
     const arcMaterial = new THREE.LineBasicMaterial({ toneMapped: false });
     arcMaterial.userData.base = colorOf(THREE, PALETTE.threat);
     const arc = new THREE.LineLoop(
@@ -1287,10 +1330,15 @@ export class EnemyMirror {
   createRam() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const body = new THREE.Mesh(this.ramHull, this.hullMaterial);
-    const socket = new THREE.Mesh(this.smallSphere, this.darkMaterial);
-    socket.scale.set(0.2, 0.06, 0.2);
-    socket.position.set(0.45, 0.38, 0);
+    const body = this.body('ram', () => [
+      { geometry: this.ramHull, color: this.tones.hull },
+      {
+        geometry: this.smallSphere,
+        color: this.tones.dark,
+        scale: [0.2, 0.06, 0.2],
+        position: [0.45, 0.38, 0],
+      },
+    ]);
     const lensMaterial = this.emissive(PALETTE.threat, 0.4);
     const lens = new THREE.Mesh(this.smallSphere, lensMaterial);
     lens.scale.setScalar(0.12);
@@ -1300,7 +1348,7 @@ export class EnemyMirror {
     core.scale.setScalar(0.07);
     core.position.set(0.45, 0.48, 0);
     const rim = new THREE.LineLoop(this.ramRim, this.rimMaterial);
-    group.add(body, socket, lens, core, rim);
+    group.add(body, lens, core, rim);
     this.scene.add(group);
     return this.view('ram', group, {
       lens,
@@ -1316,11 +1364,19 @@ export class EnemyMirror {
   createWeaver() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const hub = new THREE.Mesh(this.sphere, this.hullMaterial);
-    hub.scale.set(0.34, 0.24, 0.34);
-    const socket = new THREE.Mesh(this.smallSphere, this.darkMaterial);
-    socket.scale.set(0.14, 0.06, 0.14);
-    socket.position.y = 0.2;
+    const hub = this.body('weaver', () => [
+      {
+        geometry: this.sphere,
+        color: this.tones.hull,
+        scale: [0.34, 0.24, 0.34],
+      },
+      {
+        geometry: this.smallSphere,
+        color: this.tones.dark,
+        scale: [0.14, 0.06, 0.14],
+        position: [0, 0.2, 0],
+      },
+    ]);
     // matte arms that flush with the accent while laying; the emissive
     // color itself is the accent base the Elite swap rewrites
     const armMaterial = new THREE.MeshStandardMaterial({
@@ -1334,19 +1390,27 @@ export class EnemyMirror {
     addRimLight(armMaterial);
     const tipMaterial = this.emissive(PALETTE.threat, 0.5);
     const spin = new THREE.Group();
-    const tips = [];
-    for (let i = 0; i < WEAVER_ARMS; i += 1) {
-      const arm = new THREE.Group();
-      arm.rotation.y = -(i * TAU) / WEAVER_ARMS;
+    const turns = Array.from(
+      { length: WEAVER_ARMS },
+      (_, i) => -(i * TAU) / WEAVER_ARMS
+    );
+    const arms = new THREE.Mesh(
+      this.merged('weaver-arms', () =>
+        turns.map((rotationY) => ({ geometry: this.weaverArm, rotationY }))
+      ),
+      armMaterial
+    );
+    const tips = turns.map((turn) => {
       const tip = new THREE.Mesh(this.smallSphere, tipMaterial);
-      tip.position.copy(this.weaverTip);
-      arm.add(new THREE.Mesh(this.weaverArm, armMaterial), tip);
-      tips.push(tip);
-      spin.add(arm);
-    }
+      tip.position
+        .copy(this.weaverTip)
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), turn);
+      return tip;
+    });
+    spin.add(arms, ...tips);
     const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
     rim.scale.setScalar(0.36);
-    group.add(hub, socket, spin, rim);
+    group.add(hub, spin, rim);
     this.scene.add(group);
     return this.view('weaver', group, {
       spin,
@@ -1361,11 +1425,19 @@ export class EnemyMirror {
   createBulwark() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const hull = new THREE.Mesh(this.sphere, this.hullMaterial);
-    hull.scale.set(0.72, 0.4, 0.72);
-    const cap = new THREE.Mesh(this.smallSphere, this.darkMaterial);
-    cap.scale.set(0.4, 0.08, 0.4);
-    cap.position.y = 0.34;
+    const hull = this.body('bulwark', () => [
+      {
+        geometry: this.sphere,
+        color: this.tones.hull,
+        scale: [0.72, 0.4, 0.72],
+      },
+      {
+        geometry: this.smallSphere,
+        color: this.tones.dark,
+        scale: [0.4, 0.08, 0.4],
+        position: [0, 0.34, 0],
+      },
+    ]);
     const plate = new THREE.Group();
     const plateMesh = new THREE.Mesh(this.bulwarkPlate, this.plateMaterial);
     const edgeMaterial = this.emissive(PALETTE.threat, 1.2);
@@ -1373,7 +1445,7 @@ export class EnemyMirror {
     plate.add(plateMesh, edge);
     const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
     rim.scale.setScalar(0.74);
-    group.add(hull, cap, plate, rim);
+    group.add(hull, plate, rim);
     this.scene.add(group);
     return this.view('bulwark', group, {
       plate,
@@ -1395,13 +1467,19 @@ export class EnemyMirror {
   createDust() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const slab = new THREE.Mesh(this.dustSlab, this.darkMaterial);
+    const slab = this.body('herald-dust', () => [
+      { geometry: this.dustSlab, color: this.tones.dark },
+    ]);
     const slitMaterial = this.emissive(PALETTE.shot, 0.3);
-    const slits = [-0.55, 0, 0.55].map((z) => {
-      const slit = new THREE.Mesh(this.dustSlit, slitMaterial);
-      slit.position.set(0.24, 0.27, z);
-      return slit;
-    });
+    const slits = new THREE.Mesh(
+      this.merged('herald-dust-slits', () =>
+        [-0.55, 0, 0.55].map((z) => ({
+          geometry: this.dustSlit,
+          position: [0.24, 0.27, z],
+        }))
+      ),
+      slitMaterial
+    );
     const rim = this.heraldRim(this.dustRim);
     // the haze: a slow ring of faint dust motes, never in the bloom
     const haze = new THREE.Group();
@@ -1411,21 +1489,30 @@ export class EnemyMirror {
       opacity: 0.1,
       depthWrite: false,
     });
-    const random = createSeededRandom(31.7);
-    for (let i = 0; i < DUST_MOTES; i += 1) {
-      const mote = new THREE.Mesh(this.smallSphere, hazeMaterial);
-      const angle = (i / DUST_MOTES) * TAU + random() * 0.5;
-      const reach = 1.0 + random() * 0.5;
-      mote.position.set(
-        Math.cos(angle) * reach,
-        -0.1 + random() * 0.3,
-        Math.sin(angle) * reach
-      );
-      const size = 0.12 + random() * 0.16;
-      mote.scale.set(size, size * 0.5, size);
-      haze.add(mote);
-    }
-    group.add(slab, ...slits, rim, haze);
+    haze.add(
+      new THREE.Mesh(
+        this.merged('herald-dust-haze', () => {
+          const random = createSeededRandom(31.7);
+          return Array.from({ length: DUST_MOTES }, (_, i) => {
+            const angle = (i / DUST_MOTES) * TAU + random() * 0.5;
+            const reach = 1.0 + random() * 0.5;
+            const position = [
+              Math.cos(angle) * reach,
+              -0.1 + random() * 0.3,
+              Math.sin(angle) * reach,
+            ];
+            const size = 0.12 + random() * 0.16;
+            return {
+              geometry: this.smallSphere,
+              position,
+              scale: [size, size * 0.5, size],
+            };
+          });
+        }),
+        hazeMaterial
+      )
+    );
+    group.add(slab, slits, rim, haze);
     this.scene.add(group);
     return this.view('herald-dust', group, {
       slitMaterial,
@@ -1438,9 +1525,10 @@ export class EnemyMirror {
   createHeat() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const shell = new THREE.Mesh(this.heatShell, this.plateMaterial);
-    const core = new THREE.Mesh(this.sphere, this.darkMaterial);
-    core.scale.set(0.5, 0.3, 0.5);
+    const shell = this.body('herald-heat', () => [
+      { geometry: this.heatShell, color: this.tones.hull, flat: true },
+      { geometry: this.sphere, color: this.tones.dark, scale: [0.5, 0.3, 0.5] },
+    ]);
     const seamMaterial = this.emissive(PALETTE.shot, 0.8);
     const seam = new THREE.Mesh(this.heatSeam, seamMaterial);
     seam.position.y = 0.08;
@@ -1455,7 +1543,7 @@ export class EnemyMirror {
     const warn = new THREE.Mesh(this.warnRing, warnMaterial);
     warn.visible = false;
     const rim = this.heraldRim(this.circleRim);
-    group.add(shell, core, seam, warn, rim);
+    group.add(shell, seam, warn, rim);
     this.scene.add(group);
     return this.view('herald-heat', group, {
       seam,
@@ -1590,17 +1678,18 @@ export class EnemyMirror {
   createPrime() {
     const { THREE } = this;
     const group = new THREE.Group();
-    const ring = new THREE.Group();
-    const segments = [];
-    for (let i = 0; i < WARDEN_SEGMENTS; i += 1) {
-      const segment = new THREE.Mesh(
-        this.wardenSegment,
-        this.wardenPlateMaterial
-      );
-      segment.rotation.y = (i / WARDEN_SEGMENTS) * Math.PI * 2;
-      segments.push(segment);
-      ring.add(segment);
-    }
+    // one mesh; the phases shed segments by shortening its draw range, so
+    // each Prime owns its geometry
+    const ring = new THREE.Mesh(
+      mergeStatic(
+        THREE,
+        Array.from({ length: WARDEN_SEGMENTS }, (_, i) => ({
+          geometry: this.wardenSegment,
+          rotationY: (i / WARDEN_SEGMENTS) * Math.PI * 2,
+        }))
+      ),
+      this.wardenPlateMaterial
+    );
     const coreMaterial = this.wardenCoreMaterial(1.3);
     const core = new THREE.Mesh(this.sphere, coreMaterial);
     core.scale.setScalar(0.45);
@@ -1619,7 +1708,6 @@ export class EnemyMirror {
       kind: 'boss',
       object: group,
       ring,
-      segments,
       core,
       coreMaterial,
       telegraph: this.createTelegraph(),
@@ -1938,18 +2026,18 @@ export class EnemyMirror {
     const rim = elite ? this.eliteRimMaterial : this.rimMaterial;
     for (let i = 0; i < view.rims.length; i += 1) view.rims[i].material = rim;
     if (elite && !view.eliteRing) {
-      view.eliteRing = this.seeded(() => {
-        const ring = new this.THREE.Group();
-        for (let i = 0; i < ELITE_DASHES; i += 1) {
-          const dash = new this.THREE.Mesh(
-            this.eliteDash,
+      view.eliteRing = this.seeded(
+        () =>
+          new this.THREE.Mesh(
+            this.merged('elite-ring', () =>
+              Array.from({ length: ELITE_DASHES }, (_, i) => ({
+                geometry: this.eliteDash,
+                rotationY: (i * TAU) / ELITE_DASHES,
+              }))
+            ),
             this.eliteDashMaterial
-          );
-          dash.rotation.y = (i * TAU) / ELITE_DASHES;
-          ring.add(dash);
-        }
-        return ring;
-      });
+          )
+      );
       view.object.add(view.eliteRing);
     }
     if (view.eliteRing) view.eliteRing.visible = elite;
@@ -2189,9 +2277,10 @@ export class EnemyMirror {
     view.ring.rotation.y = time * 0.35;
     const phase = Math.max(0, boss.currentPhase || 0);
     const intact = Math.max(1, WARDEN_SEGMENTS - phase * 2);
-    for (let i = 0; i < view.segments.length; i += 1) {
-      view.segments[i].visible = i < intact;
-    }
+    const { geometry } = view.ring;
+    const perSegment =
+      geometry.getAttribute('position').count / WARDEN_SEGMENTS;
+    geometry.setDrawRange(0, perSegment * intact);
     view.core.scale.setScalar(0.45 + phase * 0.08);
     const flash = boss.getHitFlash();
     view.coreMaterial.emissiveIntensity =

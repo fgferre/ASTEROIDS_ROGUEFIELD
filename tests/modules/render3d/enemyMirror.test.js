@@ -120,6 +120,69 @@ describe('EnemyMirror', () => {
     expect(matrix.elements[12]).toBe(100);
   });
 
+  // drawables (meshes + outlines) of a fresh view, plain and Elite
+  const draws = (object) => {
+    let n = 0;
+    object.traverse((o) => {
+      if ((o.isMesh || o.isLine) && o.visible) n += 1;
+    });
+    return n;
+  };
+
+  it('draws each machine’s static matte parts as one vertex-coloured mesh', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    // was 3, 3, 9, 2, 5, 9, 5, Prime 8, Dust 15, Heat 4, Silence 3
+    const expected = {
+      drone: 3,
+      hunter: 3,
+      mine: 4,
+      husk: 2,
+      ram: 4,
+      weaver: 6,
+      bulwark: 4,
+      boss: 3,
+      'herald-dust': 4,
+      'herald-heat': 3,
+      'herald-silence': 3,
+    };
+    for (const [kind, count] of Object.entries(expected)) {
+      const view = mirror.acquire(kind);
+      expect(draws(view.object), kind).toBe(count);
+      const merged = [];
+      view.object.traverse((o) => {
+        if (o.material === mirror.machineMaterial) merged.push(o);
+      });
+      const own = ['husk', 'boss', 'herald-silence'].includes(kind);
+      expect(merged.length, kind).toBe(own ? 0 : 1);
+      if (!own) expect(merged[0].geometry.getAttribute('color')).toBeTruthy();
+    }
+    expect(mirror.machineMaterial.vertexColors).toBe(true);
+    // the Elite ring is one mesh of dashes
+    const ram = mirror.acquire('ram');
+    mirror.applyElite(ram, true);
+    expect(draws(ram.object)).toBe(5);
+  });
+
+  it('sheds Prime segments by its draw range', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const boss = {
+      id: 'prime',
+      type: 'boss',
+      x: 400,
+      y: 300,
+      radius: 60,
+      currentPhase: 0,
+      getHitFlash: () => 0,
+    };
+    mirror.update([boss], 0);
+    const { geometry } = mirror.views.get('prime').ring;
+    const all = geometry.getAttribute('position').count;
+    expect(geometry.drawRange.count).toBe(all);
+    boss.currentPhase = 2;
+    mirror.update([boss], 0.1);
+    expect(geometry.drawRange.count).toBe(all / 3);
+  });
+
   it('lets only the nearest machines cast, up to the caster budget', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const mote = (id, x) => ({

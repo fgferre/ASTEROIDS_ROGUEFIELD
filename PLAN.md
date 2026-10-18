@@ -259,7 +259,7 @@ Conteúdo:
 
 Qualidade:
 
-- [ ] **R7.1 Máquinas em menos malhas.** Fundir as partes estáticas de cada máquina (Mote, Seeker, Tether, Husk, Ram,
+- [~] **R7.1 Máquinas em menos malhas.** Fundir as partes estáticas de cada máquina (Mote, Seeker, Tether, Husk, Ram,
       Weaver, Bulwark, Heralds, placas dos Wardens) numa geometria com cor por vértice; só partes animadas separadas;
       meta < 80 draw calls na cena carregada (40 rochas + 10 máquinas) no ultra.
 - [x] **R7.2 Pequenos acabamentos de UX.** Chip AIM MANUAL, linha de lock 3D a partir da torreta, Esc fecha Settings
