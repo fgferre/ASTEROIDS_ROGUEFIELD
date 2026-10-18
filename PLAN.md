@@ -151,7 +151,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 - [x] **R2.2 Roster.** Quatro tipos novos com comportamento próprio (Husk que se parte em Motes, Ram com investida
       telegrafada, Weaver que semeia Tethers, Bulwark com escudo frontal) + modificador **Elite** (vida, tamanho,
       cor emissiva, recompensa) aplicável a qualquer tipo de apoio. Look 2D no RenderComponent.
-- [ ] **R2.3 Look 3D dos novos** em `render3d/enemyMirror.js` (+ tipo desconhecido não pode virar Mote em silêncio).
+- [x] **R2.3 Look 3D dos novos** em `render3d/enemyMirror.js` (+ tipo desconhecido não pode virar Mote em silêncio).
 - [ ] **R2.4 Diretor de camadas.** Uma tabela só (`src/data/layers.js`) com, por camada: rochas, pesos de variante,
       roster de apoio com cadência, chance de elite, **surtos** (burst com faixa na tela, à la VS) e eventos;
       WaveManager lê dela e as três tabelas de hoje (configs 1–12, pesos hardcoded, geração dinâmica 13+) saem.
