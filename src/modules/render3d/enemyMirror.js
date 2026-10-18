@@ -879,7 +879,7 @@ export class EnemyMirror {
     // Elite affixes: one badge sprite per affix over the enemy (the 2D glyphs
     // baked once into a texture each), and the live parts — the Shielded
     // plate, Swift's ghosts, Warded's ring, the Volatile fuse's blast ring.
-    // Badge textures are baked on the first affixed view (badgeMaterials).
+    // Badge textures are baked once, in warm() (badgeMaterials).
     this.badges = null;
     const glow = (hex, opacity) =>
       new THREE.MeshBasicMaterial({
@@ -978,6 +978,9 @@ export class EnemyMirror {
         view.affix ??= this.seeded(() => this.createAffixParts());
         view.affix.group.visible = true;
         view.affix.group.children.forEach((part) => (part.visible = true));
+        view.affix.badges.forEach(
+          (badge, n) => (badge.material = this.badgeMaterials()[AFFIX_IDS[n]])
+        );
       }
       return view;
     });
@@ -2159,11 +2162,18 @@ export class EnemyMirror {
     if (view.eliteRing) view.eliteRing.visible = elite;
   }
 
-  /** affix id → badge sprite material, baked once. */
+  /**
+   * affix id → badge sprite material, baked once (seeded: three names each
+   * texture and material with Math.random); warm() bakes them ahead of play.
+   */
   badgeMaterials() {
-    if (this.badges) return this.badges;
+    this.badges ??= this.seeded(() => this.bakeBadges());
+    return this.badges;
+  }
+
+  bakeBadges() {
     const { THREE } = this;
-    this.badges = {};
+    const badges = {};
     AFFIX_IDS.forEach((id) => {
       const canvas = document.createElement('canvas');
       canvas.width = BADGE_TEXTURE;
@@ -2173,7 +2183,7 @@ export class EnemyMirror {
       drawAffixBadge(ctx, ELITE_AFFIXES[id], BADGE_TEXTURE * 0.44, 5);
       const texture = new THREE.CanvasTexture(canvas);
       texture.encoding = THREE.sRGBEncoding;
-      this.badges[id] = new THREE.SpriteMaterial({
+      badges[id] = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
         depthTest: false,
@@ -2181,7 +2191,7 @@ export class EnemyMirror {
         toneMapped: false,
       });
     });
-    return this.badges;
+    return badges;
   }
 
   // Parts live in their own field-space group (not under the view, which

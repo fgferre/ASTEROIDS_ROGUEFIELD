@@ -46,20 +46,24 @@ describe('PlayerMirror', () => {
     expect(amber.r).toBeGreaterThan(amber.b);
   });
 
-  it('builds the Solar Slicer with two amber-edged blades and a low turret', () => {
+  it('builds the Solar Slicer with amber-edged blades and a low turret', () => {
     const named = (mirror, name) =>
       mirror.ship.children.filter((child) => child.name === name);
     const interceptor = mirrorFor(defaultHull).mirror;
-    expect(named(interceptor, 'fin')).toHaveLength(2);
-    expect(named(interceptor, 'blade')).toHaveLength(0);
+    expect(named(interceptor, 'bladeEdge')).toHaveLength(0);
     expect(interceptor.turretHousing.visible).toBe(true);
     expect(interceptor.turretHousingLow.visible).toBe(false);
 
     const slicer = mirrorFor(solarSlicer).mirror;
-    expect(named(slicer, 'blade')).toHaveLength(2);
-    expect(named(slicer, 'fin')).toHaveLength(0);
     const edges = named(slicer, 'bladeEdge');
-    expect(edges).toHaveLength(2);
+    expect(edges).toHaveLength(1);
+    // both blades edged: segments on either side of the spine
+    const position = edges[0].geometry.getAttribute('position');
+    const sides = new Set();
+    for (let i = 0; i < position.count; i += 1) {
+      sides.add(Math.sign(position.getZ(i)));
+    }
+    expect(sides).toEqual(new Set([-1, 1]));
     const { r, b } = edges[0].material.color;
     expect(r).toBeGreaterThan(b);
     expect(slicer.flames).toHaveLength(2);
@@ -68,11 +72,52 @@ describe('PlayerMirror', () => {
     expect(slicer.barrels.position.y).toBeLessThan(0);
   });
 
-  it('rim-lights the hull materials and carries no flat shield ring', () => {
-    const { mirror } = mirrorFor(defaultHull);
-    [mirror.baseMaterial, mirror.finMaterial, mirror.spineMaterial].forEach(
-      (material) => expect(material.userData.rimBase).toBeDefined()
+  it("draws each hull's static plates as one vertex-coloured mesh", () => {
+    [defaultHull, solarSlicer].forEach((hull) => {
+      const { mirror } = mirrorFor(hull);
+      const solids = mirror.ship.children.filter(
+        (child) => child.material === mirror.hullMaterial
+      );
+      expect(
+        solids.map((mesh) => mesh.name),
+        hull.id
+      ).toEqual(['hull']);
+      expect(solids[0].geometry.getAttribute('color')).toBeDefined();
+      expect(mirror.hullMaterial.vertexColors).toBe(true);
+      let meshes = 0;
+      let lines = 0;
+      mirror.ship.traverse((object) => {
+        if (object.isMesh) meshes += 1;
+        if (object.isLineSegments) lines += 1;
+      });
+      // hull + canopy + per nozzle (throat, flame, core) + one puff per port
+      const { nozzles, rcsPorts } = mirror.geometry;
+      expect(meshes, hull.id).toBe(2 + 3 * nozzles.length + rcsPorts.length);
+      expect(lines, hull.id).toBeLessThanOrEqual(3);
+    });
+  });
+
+  it('caches the merged hull and shares its buffers with the dash ghosts', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const hull = mirror.ship.getObjectByName('hull').geometry;
+    const ghost = mirror.ghosts[0].geometry;
+    mirror.ghosts.forEach((g) => expect(g.geometry).toBe(ghost));
+    expect(ghost.getAttribute('position')).toBe(hull.getAttribute('position'));
+    expect(ghost.drawRange.count).toBeLessThan(
+      hull.getAttribute('position').count
     );
+
+    player.setHull(solarSlicer);
+    mirror.update(player, ribbons, 0);
+    expect(mirror.ship.getObjectByName('hull').geometry).not.toBe(hull);
+    player.setHull(defaultHull);
+    mirror.update(player, ribbons, 0);
+    expect(mirror.ship.getObjectByName('hull').geometry).toBe(hull);
+  });
+
+  it('rim-lights the hull material and carries no flat shield ring', () => {
+    const { mirror } = mirrorFor(defaultHull);
+    expect(mirror.hullMaterial.userData.rimBase).toBeDefined();
     expect(mirror.shield).toBeUndefined();
     expect(mirror.shieldRadius).toBeGreaterThan(0);
   });
