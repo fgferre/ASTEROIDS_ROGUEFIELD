@@ -155,7 +155,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 - [x] **R2.4 Diretor de camadas.** Uma tabela só (`src/data/layers.js`) com, por camada: rochas, pesos de variante,
       roster de apoio com cadência, chance de elite, **surtos** (burst com faixa na tela, à la VS) e eventos;
       WaveManager lê dela e as três tabelas de hoje (configs 1–12, pesos hardcoded, geração dinâmica 13+) saem.
-- [ ] **R2.5 VFX 3D.** Estilhaços de rocha com rotação, dissolve na morte de inimigo, afterimage do dash,
+- [x] **R2.5 VFX 3D.** Estilhaços de rocha com rotação, dissolve na morte de inimigo, afterimage do dash,
       aberração cromática em impactos grandes, faíscas direcionais; tudo lendo os eventos que já existem.
 - [x] **R2.6 SFX.** Compressor/limitador no master, reverb por bus, cues por inimigo novo (spawn, telegraph, morte),
       explosão em três tamanhos, música que sobe com camada/densidade e não só com boss.

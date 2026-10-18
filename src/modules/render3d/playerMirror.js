@@ -22,6 +22,9 @@ const MAX_BANK = 0.45;
 const BLINK_HZ = 8;
 const SHIELD_FLASH_S = 0.08;
 const GHOST_ALPHA = 0.5;
+// proposta 17/10: each shot bumps the ship light for a couple of frames.
+const MUZZLE_LIGHT = 1.6;
+const MUZZLE_LIGHT_FRAMES = 2;
 
 // Cyan fresnel rim on the hull (silhouette against the dark field) plus the
 // white invulnerability pulse, both as emissive.
@@ -135,6 +138,7 @@ export class PlayerMirror {
     this.shieldRgb = colorOf(THREE, PALETTE.player).multiplyScalar(1.4);
     this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
     this.shieldHitAt = -Infinity;
+    this.muzzleFrames = 0;
 
     this.ghosts = [];
     for (let i = 0; i < DASH_GHOST_COUNT; i += 1) {
@@ -326,7 +330,9 @@ export class PlayerMirror {
     }
     this.flameMaterial.opacity = Math.min(1, main * 1.2);
     this.coreMaterial.opacity = Math.min(1, main);
-    this.light.intensity = 2.4 * main;
+    this.light.intensity =
+      2.4 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+    if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     this.shield.visible = Boolean(player.isShieldActive);
     if (this.shield.visible) {
@@ -398,8 +404,14 @@ export class PlayerMirror {
     this.shieldHitAt = time;
   }
 
+  /** A shot left the nose: bump the ship light for a few frames. */
+  flashMuzzle() {
+    this.muzzleFrames = MUZZLE_LIGHT_FRAMES;
+  }
+
   reset() {
     this.trailCount = 0;
+    this.muzzleFrames = 0;
     this.dashGuard = false;
     this.hideGhosts();
   }

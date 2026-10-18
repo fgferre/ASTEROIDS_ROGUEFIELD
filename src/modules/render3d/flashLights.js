@@ -26,9 +26,12 @@ export class FlashLights {
     }
   }
 
-  /** Lights a flash for each wave not seen before; `rgb` its color. */
+  /**
+   * Lights a flash for each wave not seen before; `rgb` its color. Returns
+   * true the first time a wave is seen.
+   */
   observe(wave, rgb) {
-    if (this.seen.has(wave)) return;
+    if (this.seen.has(wave)) return false;
     this.seen.add(wave);
     const light = this.lights[this.next];
     this.next = (this.next + 1) % this.lights.length;
@@ -36,6 +39,7 @@ export class FlashLights {
     light.position.set(wave.x - HALF_W, LIGHT_HEIGHT, wave.y - HALF_H);
     light.intensity =
       PEAK * Math.min(1, Math.max(0.25, (wave.maxRadius || 0) / FULL_RADIUS));
+    return true;
   }
 
   update(dt) {

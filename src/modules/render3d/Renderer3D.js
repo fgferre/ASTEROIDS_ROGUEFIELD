@@ -33,10 +33,13 @@ import {
   colorOf,
   rgbOf,
 } from './batches.js';
+import { DebrisChunks } from './debrisChunks.js';
 import { DustFloor } from './dustFloor.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
+import { HitSparks, MuzzleFlashes } from './hitSparks.js';
+import { ImpactKick, createImpactPass } from './impactPass.js';
 import { PlayerMirror } from './playerMirror.js';
 import { TextSprites } from './textSprites.js';
 
@@ -58,6 +61,15 @@ const MAX_DAMAGE_TEXTS = 16;
 const OVERLAY_H = 9;
 const SHIP_SHADOW_RADIUS = 14;
 const WHITE = [1, 1, 1];
+// proposta 17/10: what kicks the impact pass (strength 0..1). Shockwaves
+// kick only from KICK_WAVE_RADIUS up, full at KICK_WAVE_FULL.
+const KICK_PLAYER_HIT = 1;
+const KICK_BOSS_PHASE = 1;
+const KICK_DASH = 0.45;
+const KICK_WAVE_RADIUS = 90;
+const KICK_WAVE_FULL = 200;
+const KICK_WAVE_MIN = 0.25;
+const KICK_WAVE_MAX = 0.8;
 
 // Last linear → sRGB step of the composer (the passes work in linear; the
 // renderer's outputEncoding only applies when drawing to the screen).
@@ -130,7 +142,16 @@ class Renderer3D extends BaseSystem {
     this.dolly = 1;
     this.three = null;
     this.failed = false;
-    this.graphics = { bloom: true, postProcessing: true, smaa: true };
+    this.graphics = {
+      bloom: true,
+      postProcessing: true,
+      smaa: true,
+      aberration: true,
+    };
+    this.reducedMotion = false;
+    this.impact = new ImpactKick();
+    this.hitSparks = new HitSparks();
+    this.muzzles = new MuzzleFlashes();
     this.stats = { drawCalls: 0, triangles: 0, frames: 0 };
 
     this.resolveCachedServices(
@@ -155,6 +176,9 @@ class Renderer3D extends BaseSystem {
     const settings = resolveService('settings', this.dependencies);
     if (settings) {
       this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
+      this.applyAccessibilityPreferences(
+        settings.getCategoryValues('accessibility')
+      );
     }
     this.registerEventListener('settings-graphics-changed', (payload = {}) => {
       if (payload?.values) this.applyGraphicsPreferences(payload.values);
@@ -166,6 +190,14 @@ class Renderer3D extends BaseSystem {
       ) {
         this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
       }
+      if (
+        settings &&
+        (change.category === 'accessibility' || change.type === 'reset-all')
+      ) {
+        this.applyAccessibilityPreferences(
+          settings.getCategoryValues('accessibility')
+        );
+      }
     });
     this.registerEventListener('shield-hit', () => {
       this.three?.player.flashShield(performance.now() / 1000);
@@ -173,6 +205,40 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
     });
+    this.registerEventListener('player-took-damage', () => {
+      this.impact.kick(KICK_PLAYER_HIT);
+    });
+    this.registerEventListener('boss-phase-changed', () => {
+      this.impact.kick(KICK_BOSS_PHASE);
+    });
+    this.registerEventListener('player-dashed', () => {
+      this.impact.kick(KICK_DASH);
+    });
+    this.registerEventListener('bullet-hit', (data) => {
+      const { position, enemy, bullet } = data || {};
+      if (!position || data.blocked) return;
+      this.hitSparks.emit(
+        position.x,
+        position.y,
+        enemy ? position.x - enemy.x : 0,
+        enemy ? position.y - enemy.y : 0,
+        bullet?.vx || 0,
+        bullet?.vy || 0,
+        Boolean(data.killed)
+      );
+    });
+    this.registerEventListener('bullet-created', (data) => {
+      const { from, bullet } = data || {};
+      if (!from || !bullet) return;
+      const speed = Math.hypot(bullet.vx || 0, bullet.vy || 0);
+      if (speed <= 0) return;
+      this.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
+    });
+  }
+
+  /** Kicks the lens (aberration + radial blur) by `strength` 0..1. */
+  kick(strength) {
+    this.impact.kick(strength);
   }
 
   // The same flags RenderingSystem reads: postProcessing off skips the
@@ -181,7 +247,12 @@ class Renderer3D extends BaseSystem {
     this.graphics.postProcessing = values.postProcessing !== false;
     this.graphics.bloom = values.bloom !== false;
     this.graphics.smaa = values.antialiasing !== 'None';
+    this.graphics.aberration = values.chromaticAberration !== false;
     this.syncPasses();
+  }
+
+  applyAccessibilityPreferences(values = {}) {
+    this.reducedMotion = Boolean(values.reducedMotion);
   }
 
   syncPasses() {
@@ -198,6 +269,9 @@ class Renderer3D extends BaseSystem {
     this.dolly = 1;
     this.three?.enemies.clear();
     this.three?.player.reset();
+    this.impact.strength = 0;
+    this.hitSparks.clear();
+    this.muzzles.clear();
   }
 
   // --- setup -----------------------------------------------------------------
@@ -277,6 +351,8 @@ class Renderer3D extends BaseSystem {
       rt.texture.type = THREE.HalfFloatType;
     });
     composer.addPass(bloomPass);
+    const impactPass = createImpactPass(THREE);
+    composer.addPass(impactPass);
     composer.addPass(new THREE.ShaderPass(OUTPUT_SHADER));
     const smaaPass = new THREE.SMAAPass(width, height);
     composer.addPass(smaaPass);
@@ -295,6 +371,7 @@ class Renderer3D extends BaseSystem {
     const flashes = new FlashLights(THREE, scene);
     const enemies = new EnemyMirror(THREE, scene, this.seeded);
     const player = new PlayerMirror(THREE, scene, this.seeded);
+    const debris = new DebrisChunks(THREE, scene);
 
     const ribbons = new RibbonBatch(THREE, 4000);
     const lances = new CapsuleBatch(THREE, 240);
@@ -352,6 +429,7 @@ class Renderer3D extends BaseSystem {
       camera,
       composer,
       bloomPass,
+      impactPass,
       smaaPass,
       bloomUrl: bloomUrl.enabled,
       overlay,
@@ -369,6 +447,7 @@ class Renderer3D extends BaseSystem {
       glow,
       matte,
       smoke,
+      debris,
       shockwaves,
       flash,
       flashAlpha: 0,
@@ -462,6 +541,7 @@ class Renderer3D extends BaseSystem {
     t.smoke.begin();
     t.texts.begin();
     t.floor.begin();
+    t.debris.begin();
 
     const warden = t.enemies.update(enemyList, time);
     t.wardenLight.intensity = warden ? 2.6 : 0;
@@ -472,6 +552,10 @@ class Renderer3D extends BaseSystem {
     this.mirrorProjectiles();
     this.mirrorPickups(time);
     this.mirrorEffects(effects);
+    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb);
+    if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
+      t.player.flashMuzzle();
+    }
     this.mirrorOverlays(player, effects);
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
@@ -482,6 +566,17 @@ class Renderer3D extends BaseSystem {
     t.matte.end(pointScale);
     t.smoke.end(pointScale);
     t.texts.end();
+    t.debris.end();
+    this.impact.apply(
+      t.impactPass,
+      t.width,
+      t.height,
+      this.impact.update(
+        dt,
+        this.graphics.postProcessing && !this.reducedMotion,
+        this.graphics.aberration
+      )
+    );
 
     t.renderer.info.reset();
     if (this.graphics.postProcessing) t.composer.render(dt);
@@ -698,7 +793,7 @@ class Renderer3D extends BaseSystem {
       if (!p || !(p.alpha > 0)) continue;
       const rgb = rgbOf(THREE, p.color);
       if (p.type === 'debris') {
-        matte.push(p.x, 2, p.y, rgb, p.size * 1.4, p.alpha);
+        t.debris.push(p, rgb);
       } else if (p.type === 'smoke') {
         t.smoke.push(p.x, 3, p.y, rgb, p.size * 2.8, p.alpha * 0.5);
       } else if (p.type === 'spark') {
@@ -754,7 +849,7 @@ class Renderer3D extends BaseSystem {
         continue;
       }
       const rgb = rgbOf(THREE, wave.color || PALETTE.shot);
-      t.flashes.observe(wave, rgb);
+      if (t.flashes.observe(wave, rgb)) this.kickForWave(wave);
       const alpha = Math.max(0, Math.min(1, wave.alpha)) * 1.6;
       const width = Math.max(1.5, (wave.lineWidth || 4) * 0.3);
       const extent = wave.radius + width * 3 + 2;
@@ -785,6 +880,14 @@ class Renderer3D extends BaseSystem {
       t.flash.style.opacity = String(alpha);
       if (alpha > 0) t.flash.style.background = screenFlash.color;
     }
+  }
+
+  // Only big blasts kick the lens; strength grows with the wave's reach.
+  kickForWave(wave) {
+    const radius = wave.maxRadius || 0;
+    if (radius < KICK_WAVE_RADIUS) return;
+    const k = smoothstep(KICK_WAVE_RADIUS, KICK_WAVE_FULL, radius);
+    this.impact.kick(KICK_WAVE_MIN + (KICK_WAVE_MAX - KICK_WAVE_MIN) * k);
   }
 
   // A shadow on the dust floor under every mass; the ship's light pool.
