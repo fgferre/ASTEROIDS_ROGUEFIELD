@@ -2,7 +2,7 @@
 
 Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 8.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
 ## O BASTÃO — onde a rodada parou (18/10, ~04h00) — RODADAS 2, 3 E 4 COMPLETAS E MESCLADAS NA `main` (publicado)
 
@@ -53,6 +53,14 @@ do commit — preferir fatias com arquivos disjuntos; `pgrep -f` mata o próprio
 
 - **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
   continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
+
+## Controles (palavras dele, 18/10)
+
+- **(8)** _"A nave está sempre virando de forma automática para onde a mira está atirando. No jogo original a gente
+  pilotava a nave independente de onde o tiro ia, como se o tiro saísse de um canhão móvel em volta da nave. O
+  movimento fica muito estranho usando o WASD, porque ela vai em direção para onde está atirando."_ → Rodada 5,
+  R5.11: casco aponta para onde se move (WASD relativo à tela), arma vira torreta que gira sozinha para o alvo.
+  Fecha quando ele disser que pilotar e atirar voltaram a ser independentes.
 
 ## Interface
 
