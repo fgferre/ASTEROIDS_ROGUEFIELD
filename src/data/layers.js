@@ -1,5 +1,6 @@
 // src/data/layers.js
 
+import RandomService from '../core/RandomService.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
 import {
   ASTEROIDS_PER_WAVE_BASE,
@@ -17,6 +18,9 @@ import {
 // surges: a burst of `count` enemies (kinds taken in turn; asteroids are
 //   small rocks) at `at` seconds, from the field edge away from the player,
 //   announced by a "SURGE" banner with `label`.
+// events: field events at `at` seconds into the layer (never on a Warden
+//   layer), announced by an amber "EVENT" banner with the event's label; what
+//   each does and for how long is in FIELD_EVENTS.
 // warden: the layer's boss; it brings its own minions.
 // A layer ends once everything listed has spawned and died; when the field
 // empties early, the next scheduled spawn comes at once.
@@ -32,13 +36,56 @@ function rockCurve(layer) {
   );
 }
 
+/**
+ * Field events (proposta 18/10). Gravity Well: every XP spark drifts to a
+ * point `minDistance`–`maxDistance` px from the ship (`pullSpeed` px/s, faster
+ * by `pullAcceleration` each second). Solar Flare: every enemy stunned for the
+ * duration. Sensor Jam: the radar shows noise.
+ */
+export const FIELD_EVENTS = deepFreeze({
+  'gravity-well': {
+    label: 'Gravity Well',
+    duration: 8,
+    pullSpeed: 40,
+    pullAcceleration: 20,
+    minDistance: 220,
+    maxDistance: 320,
+  },
+  'solar-flare': { label: 'Solar Flare', duration: 1 },
+  'sensor-jam': { label: 'Sensor Jam', duration: 10 },
+});
+
+const fieldEvent = (kind, at) => ({
+  at,
+  kind,
+  label: FIELD_EVENTS[kind].label,
+});
+
 const ROCKFALL = { at: 40, kinds: ['asteroid'], count: 6, label: 'Rockfall' };
 
 export const LAYERS = deepFreeze([
   // 1–3: rock only.
-  { rocks: rockCurve(1), roster: [], surges: [ROCKFALL], warden: false },
-  { rocks: rockCurve(2), roster: [], surges: [ROCKFALL], warden: false },
-  { rocks: rockCurve(3), roster: [], surges: [ROCKFALL], warden: false },
+  {
+    rocks: rockCurve(1),
+    roster: [],
+    surges: [ROCKFALL],
+    events: [],
+    warden: false,
+  },
+  {
+    rocks: rockCurve(2),
+    roster: [],
+    surges: [ROCKFALL],
+    events: [fieldEvent('sensor-jam', 25)],
+    warden: false,
+  },
+  {
+    rocks: rockCurve(3),
+    roster: [],
+    surges: [ROCKFALL],
+    events: [],
+    warden: false,
+  },
   // 4: the first Motes, in small swarms.
   {
     rocks: rockCurve(4),
@@ -47,10 +94,11 @@ export const LAYERS = deepFreeze([
       { at: 20, kinds: ['drone'], count: 4, label: 'Mote swarm' },
       { at: 40, kinds: ['drone'], count: 5, label: 'Mote swarm' },
     ],
+    events: [fieldEvent('gravity-well', 30)],
     warden: false,
   },
   // 5: first Warden.
-  { rocks: rockCurve(5), roster: [], surges: [], warden: true },
+  { rocks: rockCurve(5), roster: [], surges: [], events: [], warden: true },
   // 6–7: Motes and Husks; Tethers from 7.
   {
     rocks: rockCurve(6),
@@ -59,6 +107,7 @@ export const LAYERS = deepFreeze([
       { kind: 'husk', count: 2, from: 15, every: 12, elite: 0.05 },
     ],
     surges: [{ at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' }],
+    events: [],
     warden: false,
   },
   {
@@ -69,6 +118,7 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.05 },
     ],
     surges: [{ at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' }],
+    events: [fieldEvent('solar-flare', 35)],
     warden: false,
   },
   // 8–9: Rams join.
@@ -81,6 +131,7 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.08 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 3, label: 'Ram pack' }],
+    events: [],
     warden: false,
   },
   {
@@ -92,6 +143,7 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 3, from: 15, every: 10, elite: 0.08 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 4, label: 'Ram pack' }],
+    events: [fieldEvent('sensor-jam', 20), fieldEvent('gravity-well', 45)],
     warden: false,
   },
   // 10: Warden, Motes trickling in.
@@ -99,6 +151,7 @@ export const LAYERS = deepFreeze([
     rocks: rockCurve(10),
     roster: [{ kind: 'drone', count: 4, from: 10, every: 8, elite: 0.1 }],
     surges: [],
+    events: [],
     warden: true,
   },
   // 11–12: Seekers and Bulwarks.
@@ -113,6 +166,7 @@ export const LAYERS = deepFreeze([
       { kind: 'bulwark', count: 1, from: 20, every: 1, elite: 0.1 },
     ],
     surges: [{ at: 30, kinds: ['drone'], count: 8, label: 'Mote swarm' }],
+    events: [],
     warden: false,
   },
   {
@@ -126,6 +180,7 @@ export const LAYERS = deepFreeze([
       { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.15 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 5, label: 'Ram pack' }],
+    events: [fieldEvent('solar-flare', 30)],
     warden: false,
   },
   // 13–14: everything, Weavers included.
@@ -148,6 +203,7 @@ export const LAYERS = deepFreeze([
         label: 'Full field',
       },
     ],
+    events: [fieldEvent('gravity-well', 25)],
     warden: false,
   },
   {
@@ -169,6 +225,7 @@ export const LAYERS = deepFreeze([
         label: 'Full field',
       },
     ],
+    events: [fieldEvent('solar-flare', 20), fieldEvent('sensor-jam', 40)],
     warden: false,
   },
   // 15: the final Warden with a Seeker escort.
@@ -176,6 +233,7 @@ export const LAYERS = deepFreeze([
     rocks: rockCurve(15),
     roster: [{ kind: 'hunter', count: 2, from: 3, every: 2, elite: 0.3 }],
     surges: [],
+    events: [],
     warden: true,
   },
 ]);
@@ -185,12 +243,14 @@ const BEYOND_ROCKS_PER_LAYER = 2;
 const BEYOND_ROSTER_GROWTH = 1.08;
 const BEYOND_ELITE_PER_LAYER = 0.03;
 const BEYOND_ELITE_CAP = 0.5;
+const BEYOND_EVENT_AT = 30;
 
 /**
  * Past the last layer (the run turned endless): a Warden every 5th layer with
  * layer 15's escort, the rest built on layer 14. Counted from 14: rocks +2 per
  * layer (capped at the on-screen limit), roster counts ×1.08 per layer, elite
- * chance +0.03 per layer up to 0.5.
+ * chance +0.03 per layer up to 0.5. Non-Warden layers get one field event at
+ * 30 s, its kind rolled from a seed per layer.
  */
 function beyond(layer) {
   const steps = layer - 14;
@@ -210,6 +270,16 @@ function beyond(layer) {
       count: Math.round(entry.count * Math.pow(BEYOND_ROSTER_GROWTH, steps)),
       elite,
     })),
+    events: base.warden
+      ? []
+      : [
+          fieldEvent(
+            new RandomService(`field-event:${layer}`).pick(
+              Object.keys(FIELD_EVENTS)
+            ),
+            BEYOND_EVENT_AT
+          ),
+        ],
   });
 }
 

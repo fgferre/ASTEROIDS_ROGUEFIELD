@@ -36,7 +36,8 @@ import {
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
-import { directorFor } from '../../../data/layers.js';
+import { FIELD_EVENTS, directorFor } from '../../../data/layers.js';
+import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
 
 // Support kinds the layer table can list; they spawn at a safe distance from
 // the player (asteroids come in from the edges).
@@ -53,6 +54,10 @@ const SUPPORT_KINDS = [
 // burst point; support enemies appear this far inside the field.
 const SURGE_SPREAD = 70;
 const SURGE_INSET = 40;
+// Field events: a Gravity Well point stays this far inside the field; the
+// Solar Flare screen flash (color alpha, seconds, intensity). Proposta 18/10.
+const GRAVITY_WELL_INSET = 40;
+const SOLAR_FLARE_FLASH = { alpha: 0.5, duration: 0.6, intensity: 0.45 };
 
 export class WaveManager {
   /**
@@ -146,6 +151,7 @@ export class WaveManager {
     // Timed spawns for the layer in progress (src/data/layers.js), sorted by
     // `at` (seconds into the layer).
     this.layerSchedule = [];
+    this.activeFieldEvents = [];
     this.layerElapsed = 0;
 
     this.connectEventListeners();
@@ -1218,8 +1224,8 @@ export class WaveManager {
   }
 
   /**
-   * Flattens a layer's roster and surges into timed spawns sorted by `at`
-   * (seconds into the layer). Surge kinds are taken in turn.
+   * Flattens a layer's roster, surges and field events into timed entries
+   * sorted by `at` (seconds into the layer). Surge kinds are taken in turn.
    */
   buildLayerSchedule(director) {
     const schedule = [];
@@ -1249,6 +1255,10 @@ export class WaveManager {
       });
     }
 
+    for (const event of director.events) {
+      schedule.push({ at: event.at, groups: [], elite: 0, surge: null, event });
+    }
+
     // Stable: entries due at the same time keep table order.
     return schedule.sort((a, b) => a.at - b.at);
   }
@@ -1259,6 +1269,7 @@ export class WaveManager {
    */
   updateLayerSchedule(deltaTime) {
     this.layerElapsed += deltaTime;
+    this.updateFieldEvents(deltaTime);
 
     const next = this.layerSchedule[0];
     if (next && next.at > this.layerElapsed && this.isFieldEmpty()) {
@@ -1275,7 +1286,12 @@ export class WaveManager {
     this.checkWaveCompletion();
   }
 
-  spawnScheduled({ groups, elite, surge }) {
+  spawnScheduled({ groups, elite, surge, event }) {
+    if (event) {
+      this.startFieldEvent(event);
+      return;
+    }
+
     const enemies = [];
     for (const { kind, count } of groups) {
       const group = this.isAsteroidType(kind)
@@ -1296,6 +1312,97 @@ export class WaveManager {
         kinds: [...surge.kinds],
         count: surge.count,
       });
+    }
+  }
+
+  /**
+   * Starts a field event: applies its gameplay effect and emits
+   * 'field-event-started' {layer, kind, label, duration, x, y}; (x, y) is the
+   * Gravity Well point, else the ship. 'field-event-ended' {kind} follows
+   * `duration` seconds later (or when the layer ends).
+   */
+  startFieldEvent({ kind, label }) {
+    const { duration } = FIELD_EVENTS[kind];
+    const player = this.enemySystem.getPlayerPositionSnapshot(
+      this.enemySystem.getCachedPlayer()
+    );
+    let point = player ? { x: player.x, y: player.y } : { x: 0, y: 0 };
+
+    if (kind === 'gravity-well') {
+      point = this.pickGravityWellPoint(point);
+      const { pullSpeed, pullAcceleration } = FIELD_EVENTS[kind];
+      this.enemySystem
+        .getCachedXPOrbs?.()
+        ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
+    } else if (kind === 'solar-flare') {
+      this.enemySystem.forEachActiveEnemy?.((enemy) => {
+        enemy.stunTimer = duration;
+      });
+      this.enemySystem
+        .getCachedEffects?.()
+        ?.addScreenFlash(
+          withAlpha(PALETTE.xp, SOLAR_FLARE_FLASH.alpha),
+          SOLAR_FLARE_FLASH.duration,
+          SOLAR_FLARE_FLASH.intensity
+        );
+    }
+
+    this.activeFieldEvents.push({ kind, remaining: duration });
+    this.eventBus.emit('field-event-started', {
+      layer: this.currentWave,
+      kind,
+      label,
+      duration,
+      x: point.x,
+      y: point.y,
+    });
+  }
+
+  /** A point at a seeded angle and distance from the ship, inside the field. */
+  pickGravityWellPoint(origin) {
+    const { minDistance, maxDistance } = FIELD_EVENTS['gravity-well'];
+    const { random } = this.createScopedRandom('spawn', 'gravity-well');
+    const angle = random.range(0, Math.PI * 2);
+    const distance = random.range(minDistance, maxDistance);
+    const bounds = this.enemySystem.getCachedWorld?.()?.getBounds?.() || {
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+    };
+    return {
+      x: clamp(
+        origin.x + Math.cos(angle) * distance,
+        GRAVITY_WELL_INSET,
+        bounds.width - GRAVITY_WELL_INSET
+      ),
+      y: clamp(
+        origin.y + Math.sin(angle) * distance,
+        GRAVITY_WELL_INSET,
+        bounds.height - GRAVITY_WELL_INSET
+      ),
+    };
+  }
+
+  /** Counts active field events down on the layer's own time. */
+  updateFieldEvents(deltaTime) {
+    for (const event of this.activeFieldEvents) {
+      event.remaining -= deltaTime;
+    }
+    const ended = this.activeFieldEvents.filter((e) => e.remaining <= 0);
+    if (ended.length === 0) return;
+    this.activeFieldEvents = this.activeFieldEvents.filter(
+      (e) => e.remaining > 0
+    );
+    for (const { kind } of ended) {
+      this.eventBus.emit('field-event-ended', { kind });
+    }
+  }
+
+  /** Ends every active field event at once (layer over, run reset). */
+  endFieldEvents() {
+    const ended = this.activeFieldEvents;
+    this.activeFieldEvents = [];
+    for (const { kind } of ended) {
+      this.eventBus.emit('field-event-ended', { kind });
     }
   }
 
@@ -1321,9 +1428,10 @@ export class WaveManager {
    * enemy is gone.
    */
   checkWaveCompletion(excludedEnemy = null) {
+    // Field events still to come do not hold the layer open.
     if (
       !this.waveInProgress ||
-      this.layerSchedule.length > 0 ||
+      this.layerSchedule.some((entry) => !entry.event) ||
       this.legacyRocksPending()
     ) {
       return;
@@ -2269,6 +2377,7 @@ export class WaveManager {
 
     this._legacyRegisteredEnemies = new WeakSet();
     this._trackedDynamicMinions = new WeakSet();
+    this.endFieldEvents();
 
     // Emit wave complete event
     this.eventBus.emit('wave-complete', {
@@ -2350,6 +2459,7 @@ export class WaveManager {
     this.spawnQueue = [];
     this.layerSchedule = [];
     this.layerElapsed = 0;
+    this.endFieldEvents();
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;

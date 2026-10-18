@@ -8,6 +8,8 @@ function createField({ player = { x: 400, y: 300 } } = {}) {
   const random = createDeterministicRandom({ floatValue: 0.5 });
   const active = [];
   const emits = [];
+  const xpOrbs = { startGlobalPull: vi.fn() };
+  const effects = { addScreenFlash: vi.fn() };
   const eventBus = {
     on: vi.fn(),
     off: vi.fn(),
@@ -32,13 +34,17 @@ function createField({ player = { x: 400, y: 300 } } = {}) {
       return enemy;
     }),
     registerActiveEnemy: vi.fn(() => true),
+    forEachActiveEnemy: (callback) =>
+      active.filter((e) => !e.destroyed).forEach(callback),
+    getCachedXPOrbs: () => xpOrbs,
+    getCachedEffects: () => effects,
   };
   const manager = new WaveManager({ enemySystem, random, eventBus });
   const kill = (enemy) => {
     enemy.destroyed = true;
     manager.onEnemyDestroyed({ enemy });
   };
-  return { manager, active, emits, enemySystem, kill };
+  return { manager, active, emits, enemySystem, kill, xpOrbs, effects };
 }
 
 function startLayer(field, layer) {
@@ -152,6 +158,102 @@ describe('WaveManager layer director', () => {
         event: 'wave-complete',
         payload: expect.objectContaining({ wave: 10, enemiesKilled: 5 }),
       });
+    });
+  });
+});
+
+describe('WaveManager field events', () => {
+  const eventsOf = (field, name) =>
+    field.emits.filter((e) => e.event === name).map((e) => e.payload);
+
+  it('starts the layer 2 Sensor Jam at 25 s and ends it 10 s later', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 2);
+      field.active.push({ type: 'asteroid', destroyed: false });
+
+      field.manager.update(24.9);
+      expect(eventsOf(field, 'field-event-started')).toHaveLength(0);
+      field.manager.update(0.2);
+      expect(eventsOf(field, 'field-event-started')).toEqual([
+        {
+          layer: 2,
+          kind: 'sensor-jam',
+          label: 'Sensor Jam',
+          duration: 10,
+          x: 400,
+          y: 300,
+        },
+      ]);
+
+      field.manager.update(9.9);
+      expect(eventsOf(field, 'field-event-ended')).toHaveLength(0);
+      field.manager.update(0.2);
+      expect(eventsOf(field, 'field-event-ended')).toEqual([
+        { kind: 'sensor-jam' },
+      ]);
+    });
+  });
+
+  it('pulls the XP sparks to a Gravity Well point 220-320 px from the ship', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 4);
+      field.active.push({ type: 'asteroid', destroyed: false });
+
+      field.manager.update(30);
+
+      const [well] = eventsOf(field, 'field-event-started');
+      expect(well.kind).toBe('gravity-well');
+      // The stub rolls the range minimum: angle 0, 220 px.
+      expect({ x: well.x, y: well.y }).toEqual({ x: 620, y: 300 });
+      expect(field.xpOrbs.startGlobalPull).toHaveBeenCalledWith(
+        8,
+        expect.any(Number),
+        expect.any(Number),
+        1,
+        { x: 620, y: 300 }
+      );
+    });
+  });
+
+  it('stuns every enemy and flashes the screen on a Solar Flare', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 7);
+      field.active.push({ type: 'asteroid', destroyed: false });
+
+      field.manager.update(35);
+
+      expect(eventsOf(field, 'field-event-started')[0].kind).toBe(
+        'solar-flare'
+      );
+      const drones = ofType(field.active, 'drone');
+      expect(drones.length).toBeGreaterThan(0);
+      for (const drone of drones) expect(drone.stunTimer).toBe(1);
+      expect(field.effects.addScreenFlash).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not hold a cleared layer open for an event still to come', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 9);
+      field.active.push({ type: 'asteroid', destroyed: false });
+      field.manager.update(20);
+      field.manager.update(20);
+      // Everything spawned by 40 s; the Gravity Well (45 s) is still pending.
+      expect(field.manager.layerSchedule.map((e) => e.event?.kind)).toEqual([
+        'gravity-well',
+      ]);
+
+      field.active.forEach((enemy) => field.kill(enemy));
+      field.manager.update(0.1);
+
+      expect(field.manager.waveInProgress).toBe(false);
+      expect(eventsOf(field, 'field-event-ended')).toEqual([
+        { kind: 'sensor-jam' },
+      ]);
     });
   });
 });

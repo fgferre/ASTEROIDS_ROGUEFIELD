@@ -1581,6 +1581,19 @@ class UISystem extends BaseSystem {
       this.aaaTacticalHud?.showSurgeBanner(payload.label);
     });
 
+    this.registerEventListener('field-event-started', (payload = {}) => {
+      this.aaaTacticalHud?.showFieldEventBanner(payload.label);
+      if (payload.kind === 'sensor-jam') {
+        this.aaaTacticalHud?.setRadarJammed(true);
+      }
+    });
+
+    this.registerEventListener('field-event-ended', (payload = {}) => {
+      if (payload.kind === 'sensor-jam') {
+        this.aaaTacticalHud?.setRadarJammed(false);
+      }
+    });
+
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       this.aaaTacticalHud?.addKillFeed(
         payload.enemy?.type,
@@ -3244,7 +3257,9 @@ class UISystem extends BaseSystem {
   createUpgradeOptionButton(option, index) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}`;
+    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}${
+      option.cursed ? ' upgrade-option--cursed' : ''
+    }`;
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
 
@@ -3328,7 +3343,9 @@ class UISystem extends BaseSystem {
     const rarity = option.rarity || 'common';
 
     return `
-      <p class="upgrade-option__rarity">${UPGRADE_RARITY_LABELS[rarity]}</p>
+      <p class="upgrade-option__rarity">${
+        option.cursed ? 'Cursed' : UPGRADE_RARITY_LABELS[rarity]
+      }</p>
       <header class="upgrade-option__header">
         <span class="upgrade-icon" aria-hidden="true">${
           option.icon || '✨'

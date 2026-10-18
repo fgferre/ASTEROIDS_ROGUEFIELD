@@ -70,6 +70,8 @@ export class BaseEnemy {
     this.health = 100;
     this.maxHealth = 100;
     this.armor = 0;
+    // Seconds left frozen (Solar Flare): EnemyUpdateSystem skips the update.
+    this.stunTimer = 0;
 
     // Lifecycle
     this.age = 0; // Time since spawn
@@ -116,6 +118,7 @@ export class BaseEnemy {
     this.initialized = true;
     this.age = 0;
     this.lastHitTime = -Infinity;
+    this.stunTimer = 0;
 
     // Rotation
     this.rotation = config.rotation || 0;
@@ -422,6 +425,7 @@ export class BaseEnemy {
     this.health = 0;
     this.maxHealth = 100;
     this.armor = 0;
+    this.stunTimer = 0;
 
     // Reset lifecycle
     this.age = 0;

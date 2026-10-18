@@ -205,7 +205,7 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
       epílogo da vitória (câmera recua, o Anel acende).
 - [ ] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
       voláteis; Silence: embaralha o radar), intro curta, drop garantido.
-- [ ] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
+- [x] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
       do bioma, inimigos atordoados 1 s), Sensor Jam (radar fora 10 s); banner e cue.
 - [ ] **R5.4 Catálogo 21 → 30.** Duas cartas novas por família + três "cursed" raras (ganho grande com custo).
 - [ ] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
