@@ -95,7 +95,8 @@ function urlParam(name) {
  * the setting mid-run applies from the next run. The seed is the boot seed
  * (`?seed=`, else the random source; see GameSessionService) for the first
  * normal run and a fresh one for each later run, unless the boot seed was
- * pinned; or, on the Daily Field, the hash of today's UTC date.
+ * pinned; or, on the Daily Field, the hash of today's UTC date (a replay's
+ * recorded day).
  */
 export default class DifficultyService {
   constructor({ settings, bootSeed, bootSeedSource, now = () => new Date() }) {
@@ -106,6 +107,7 @@ export default class DifficultyService {
     this.now = now;
     this.urlDifficulty = difficultyId(urlParam('difficulty'));
     this.replayDifficulty = null;
+    this.replayDateKey = null;
     this.daily = false;
     this.dateKey = null;
     this.runDifficulty = null;
@@ -131,10 +133,14 @@ export default class DifficultyService {
     return DIFFICULTY_PRESETS[this.getDifficulty()];
   }
 
-  /** A replay plays at the difficulty it was recorded at. */
+  /**
+   * A replay plays at the difficulty it was recorded at, and a Daily Field
+   * replay on the day it was recorded.
+   */
   useReplay(recording) {
     this.replayDifficulty =
       difficultyId(recording.difficulty) ?? DEFAULT_DIFFICULTY;
+    this.replayDateKey = recording.date ?? null;
   }
 
   /**
@@ -144,7 +150,7 @@ export default class DifficultyService {
    */
   beginRun({ daily } = {}) {
     if (daily !== undefined) this.daily = daily;
-    this.dateKey = this.daily ? this.todayKey() : null;
+    this.dateKey = this.daily ? this.replayDateKey ?? this.todayKey() : null;
     this.runDifficulty = this.getSelectedDifficulty();
     if (!this.daily) {
       if (this.bootSeedSpent && !this.pinnedSeed) {
@@ -180,9 +186,12 @@ export default class DifficultyService {
     return seedLink(origin, base, this.getRunSeed(), this.getDifficulty());
   }
 
-  /** Raises today's record when the run was a Daily Field. */
+  /**
+   * Raises today's record when the run was a Daily Field. A replayed Daily
+   * Field may be another day's: it leaves the record alone.
+   */
   recordRun({ layer, time }) {
-    if (!this.daily) return null;
+    if (!this.daily || this.replayDateKey) return null;
     return updateDailyRecord({ dateKey: this.dateKey, layer, time });
   }
 

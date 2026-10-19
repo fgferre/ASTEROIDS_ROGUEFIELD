@@ -18,6 +18,7 @@ import {
 } from '../__helpers__/headlessGame.js';
 import { deserialize, serialize } from '../../src/core/replay.js';
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
+import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 
 const STEPS = 600; // 10 s at 60 Hz
@@ -76,10 +77,20 @@ describe('run replay', () => {
 
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
-  function recordRun(beforePick = () => {}, difficulty = 'veteran') {
+  // `hull` is flown unlocked; `bossRush` starts a Boss Rush.
+  function recordRun(
+    beforePick = () => {},
+    difficulty = 'veteran',
+    { hull, bossRush } = {}
+  ) {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
-    live.session.startNewRun({ source: 'test' });
+    if (hull) {
+      live.session.resolveServiceInstance('hangar').owned[`${hull}-hull`] =
+        true;
+      live.services.settings.setSetting('gameplay', 'selectedHull', hull);
+    }
+    live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
     progression.experienceToNext = TEST_XP_TO_LEVEL;
     const input = live.services.input;
@@ -115,10 +126,17 @@ describe('run replay', () => {
   }
 
   // Replays `recording` in a fresh instance: no key events, only the recording.
-  function replayRun(recording) {
+  // `start` is what starts the run (the browser clicks Start).
+  function replayRun(recording, start = { source: 'test' }) {
     const replay = createHeadlessGame();
+    // The hull setting is shared storage: the replay must ignore it.
+    replay.services.settings.setSetting(
+      'gameplay',
+      'selectedHull',
+      DEFAULT_HULL_ID
+    );
     replay.controller.arm(recording);
-    replay.session.startNewRun({ source: 'test' });
+    replay.session.startNewRun(start);
     replay.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
     for (let step = 0; step < STEPS; step += 1) {
       replay.controller.tick();
@@ -219,6 +237,63 @@ describe('run replay', () => {
       replay.step();
     }
     expect(replay.services.difficulty.getDifficulty()).toBe('warden');
+    expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it('replays a Boss Rush as a Boss Rush in its hull, whatever started it', () => {
+    const { live, recording } = recordRun(() => {}, 'veteran', {
+      hull: BASTION_HULL_ID,
+      bossRush: true,
+    });
+    const recorded = live.snapshot();
+    expect(recording).toMatchObject({
+      mode: 'bossRush',
+      date: null,
+      hull: BASTION_HULL_ID,
+    });
+
+    // Bastion is locked in this instance's Hangar; the browser clicks Start.
+    const replay = replayRun(recording, {
+      source: 'start-game-btn',
+      daily: false,
+      bossRush: false,
+    });
+    expect(replay.session.bossRush).toBe(true);
+    expect(replay.services.enemies.waveManager.bossRush).toBe(true);
+    expect(replay.services.player.currentHull.id).toBe(BASTION_HULL_ID);
+    expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it('replays a Daily Field on the day it was recorded', () => {
+    const live = createHeadlessGame();
+    live.services.difficulty.now = () => new Date('2026-10-17T12:00:00Z');
+    live.session.startNewRun({ source: 'daily-field-btn', daily: true });
+    const recording = deserialize(
+      serialize(live.session.replayRecorder.toJSON())
+    );
+    expect(recording).toMatchObject({ mode: 'daily', date: '2026-10-17' });
+
+    const replay = createHeadlessGame();
+    replay.services.difficulty.now = () => new Date('2026-10-18T12:00:00Z');
+    replay.controller.arm(recording);
+    replay.session.startNewRun({
+      source: 'start-game-btn',
+      daily: false,
+      bossRush: false,
+    });
+    expect(replay.services.difficulty.isDaily()).toBe(true);
+    expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
+  });
+
+  it('plays a recording without a mode (version 5) as a normal run', () => {
+    const { live, recording } = recordRun();
+    const recorded = live.snapshot();
+    const { mode, date, ...v5 } = recording;
+    expect([mode, date]).toEqual(['normal', null]);
+
+    const replay = replayRun(deserialize({ ...v5, version: 5 }));
+    expect(replay.session.bossRush).toBe(false);
+    expect(replay.services.difficulty.isDaily()).toBe(false);
     expect(replay.snapshot()).toEqual(recorded);
   });
 });

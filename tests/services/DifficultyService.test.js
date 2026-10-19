@@ -150,4 +150,15 @@ describe('DifficultyService', () => {
     service.beginRun();
     expect(service.getDifficulty()).toBe('veteran');
   });
+
+  it("flies a Daily Field replay on its recorded day and leaves today's record alone", () => {
+    const service = new DifficultyService({
+      settings: settingsWith('pilot'),
+      now: at('2026-10-18T12:00:00.000Z'),
+    });
+    service.useReplay({ difficulty: 'veteran', date: '2026-10-17' });
+    expect(service.beginRun({ daily: true })).toBe(dailySeed('2026-10-17'));
+    expect(service.recordRun({ layer: 4, time: 120 })).toBeNull();
+    expect(service.getDailyRecord().bestLayer).toBe(0);
+  });
 });

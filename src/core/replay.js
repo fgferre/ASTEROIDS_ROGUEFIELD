@@ -1,7 +1,7 @@
 // Run recording and replay.
 //
-// A run is reproducible from its seed, hull, difficulty and the input the simulation
-// consumed at each fixed step (see fixedStep.js). The recording stores that
+// A run is reproducible from its seed, hull, difficulty, mode and the input the
+// simulation consumed at each fixed step (see fixedStep.js). The recording stores that
 // per-step input run-length encoded (only the steps where it changes) plus the
 // upgrade picked at each level-up, in pick order, with any reroll or banish
 // made on the level-up screen before the pick. Analog stick values (gamepad)
@@ -9,7 +9,7 @@
 // replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 5;
+export const REPLAY_VERSION = 6;
 // Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
 // Versions 1-2 had no level-up rerolls/banishes (version 3); their picks are
 // ids only and load unchanged.
@@ -17,8 +17,11 @@ export const REPLAY_VERSION = 5;
 // [step, mask] only and decode with the sticks centred.
 // Versions 1-4 had no difficulty (version 5); they load as Veteran, the only
 // difficulty there was.
-const READABLE_VERSIONS = new Set([1, 2, 3, 4, REPLAY_VERSION]);
+// Versions 1-5 had no mode (version 6); they load as a normal run, the way
+// they always played back.
+const READABLE_VERSIONS = new Set([1, 2, 3, 4, 5, REPLAY_VERSION]);
 const LEGACY_DIFFICULTY = 'veteran';
+const LEGACY_MODE = 'normal';
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -95,12 +98,16 @@ export function decodeInputFrame(mask, analog = []) {
 
 /**
  * Records a run. `record(step, frame)` must be called with increasing steps,
- * starting at 0 for the first simulated step of the run.
+ * starting at 0 for the first simulated step of the run. `mode` is 'normal',
+ * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
+ * which its seed is drawn from, and null on any other run.
  */
 export function createRecorder({
   seed,
   hull = null,
   difficulty = LEGACY_DIFFICULTY,
+  mode = LEGACY_MODE,
+  date = null,
   version = REPLAY_VERSION,
 }) {
   const inputs = [];
@@ -140,6 +147,8 @@ export function createRecorder({
         seed,
         hull,
         difficulty,
+        mode,
+        date,
         steps,
         inputs: inputs.map((entry) => [...entry]),
         upgrades: upgrades.map(([step, entry]) => [
@@ -214,6 +223,8 @@ export function deserialize(text) {
     seed: data.seed,
     hull: data.hull ?? null,
     difficulty: data.difficulty ?? LEGACY_DIFFICULTY,
+    mode: data.mode ?? LEGACY_MODE,
+    date: data.date ?? null,
     steps: data.steps,
     inputs: data.inputs,
     upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],

@@ -66,6 +66,9 @@ export default class GameSessionService {
     // Recording of the current/last run (src/core/replay.js); set by the
     // replay controller, read by the F9 download.
     this.replayRecorder = null;
+    // `{ daily, bossRush }` of the replay armed for the next run; set by the
+    // replay controller, it wins over the mode the run is started with.
+    this.replayStart = null;
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
     this.gameOverScreenTimeoutId = null;
@@ -780,9 +783,14 @@ export default class GameSessionService {
 
   /**
    * `daily`: see DifficultyService.beginRun. `bossRush` true starts a Boss
-   * Rush, false any other run; undefined keeps the last mode.
+   * Rush, false any other run; undefined keeps the last mode. An armed replay
+   * (`replayStart`) starts in its recorded mode, whatever started the run.
    */
   startNewRun({ source = 'unknown', daily, bossRush } = {}) {
+    if (this.replayStart) {
+      ({ daily, bossRush } = this.replayStart);
+      this.replayStart = null;
+    }
     if (bossRush !== undefined) this.bossRush = bossRush;
     const difficulty = this.resolveServiceInstance('difficulty');
     const seed = difficulty.beginRun({ daily });
