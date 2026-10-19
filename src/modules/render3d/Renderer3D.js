@@ -320,9 +320,14 @@ class Renderer3D extends BaseSystem {
       this.applyAccessibilityPreferences(
         settings.getCategoryValues('accessibility')
       );
+      this.camera.setLead(settings.getCategoryValues('controls')?.cameraLead);
     }
     this.registerEventListener('settings-graphics-changed', (payload = {}) => {
       if (payload?.values) this.applyGraphicsPreferences(payload.values);
+    });
+    // Controls → Camera Lead; this event covers live edits and resets too.
+    this.registerEventListener('settings-controls-changed', (payload = {}) => {
+      if (payload?.values) this.camera.setLead(payload.values.cameraLead);
     });
     this.registerEventListener('settings-changed', (change = {}) => {
       if (

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PlayerSystem from '../../src/modules/PlayerSystem.js';
+import PlayerSystem, {
+  resolveControlScheme,
+} from '../../src/modules/PlayerSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -12,6 +14,7 @@ describe('PlayerSystem control schemes', () => {
 
   afterEach(() => {
     cleanupGlobalState();
+    vi.unstubAllGlobals();
   });
 
   function makePlayer(held = {}, controlScheme = 'modern') {
@@ -92,6 +95,33 @@ describe('PlayerSystem control schemes', () => {
 
     expect(player.angle).toBeGreaterThan(0.3);
     expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(1);
-    expect(player.getTurretAngle()).toBe(player.angle);
+  });
+
+  it('classic turns the turret onto the aim point, not the nose', () => {
+    const player = makePlayer({ right: true }, 'classic');
+    player.angle = 0;
+    player.setAimPoint({ x: 400, y: -1e6 }); // straight up: -PI/2
+    steps(player, 30);
+
+    expect(player.angle).toBeGreaterThan(0.3); // the hull turned clockwise
+    expect(player.getTurretAngle()).toBeCloseTo(-Math.PI / 2, 2);
+  });
+
+  it('flies the Hull Control setting, and ?controls=classic wins over it', () => {
+    const settings = (hullControl) => ({
+      getCategoryValues: (id) => (id === 'controls' ? { hullControl } : null),
+    });
+    const player = new PlayerSystem({
+      eventBus: createEventBusMock(),
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      settings: settings('classic'),
+    });
+    expect(player.controlScheme).toBe('classic');
+    expect(resolveControlScheme(undefined)).toBe('modern');
+    expect(resolveControlScheme('modern')).toBe('modern');
+
+    vi.stubGlobal('window', { location: { search: '?controls=classic' } });
+    expect(resolveControlScheme('modern')).toBe('classic');
   });
 });

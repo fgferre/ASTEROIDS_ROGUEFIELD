@@ -4,7 +4,8 @@
 // is ever visible (boss framing may pull out past it, down to 0.85×).
 //
 // Modes (PLAN R5.7, proposta 18/10): 'dynamic' (default) leads toward the
-// aim, breathes the zoom with the threat count and frames ship + boss;
+// aim (or along the hull with Settings → Controls → Camera Lead), breathes
+// the zoom with the threat count and frames ship + boss;
 // 'classic' is the plain follow (`?camera=1`, or Settings → Graphics);
 // 'static' is the fixed full-field view (`?camera=0`).
 //
@@ -19,7 +20,8 @@ const FOLLOW_TIME_CONSTANT = 0.25;
 // Share of a zoom pulse spent pushing in; the rest eases back out.
 const PULSE_ATTACK = 0.3;
 
-// Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX.
+// Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX;
+// a full LOOK_AHEAD_MAX along the nose when it leads on the hull.
 export const LOOK_AHEAD_MAX = 90;
 const LOOK_AHEAD_GAIN = 0.5;
 const LOOK_AHEAD_SMOOTH = 0.35;
@@ -83,12 +85,19 @@ export function dampTo(d, target, smoothTime, dt) {
   return d.value;
 }
 
-/** The look-ahead offset (out.x/y) the scene asks for at ship (x, y). */
-export function lookAheadFor(scene, x, y, out) {
+/**
+ * The look-ahead offset (out.x/y) the scene asks for at ship (x, y). `lead`
+ * 'hull' looks along the hull heading, 'aim' toward the aim point.
+ */
+export function lookAheadFor(scene, x, y, out, lead = 'aim') {
   let dx = 0;
   let dy = 0;
   let length = 0;
-  if (scene.hasAim) {
+  if (lead === 'hull') {
+    dx = Math.cos(scene.heading);
+    dy = Math.sin(scene.heading);
+    length = LOOK_AHEAD_MAX;
+  } else if (scene.hasAim) {
     dx = scene.aimX - x;
     dy = scene.aimY - y;
     length = Math.min(LOOK_AHEAD_MAX, Math.hypot(dx, dy) * LOOK_AHEAD_GAIN);
@@ -148,6 +157,7 @@ export function createCameraScene() {
     aimY: 0,
     vx: 0,
     vy: 0,
+    heading: 0,
     threats: 0,
     hasBoss: false,
     bossX: 0,
@@ -164,6 +174,7 @@ export function readCameraScene(scene, player, combat, enemies) {
   scene.aimY = aim ? aim.y : 0;
   scene.vx = player?.velocity?.vx || 0;
   scene.vy = player?.velocity?.vy || 0;
+  scene.heading = player?.angle || 0;
   scene.threats = 0;
   scene.hasBoss = false;
   if (!position) return scene;
@@ -201,6 +212,7 @@ export function createCamera({
 } = {}) {
   let enabled = true;
   let mode = 'dynamic';
+  let lead = 'aim';
   let reducedMotion = false;
   let lastTarget = null;
   let baseZoom = zoom;
@@ -346,6 +358,11 @@ export function createCamera({
       resetDynamic();
     },
 
+    /** 'aim' | 'hull': what the dynamic look-ahead follows. */
+    setLead(next) {
+      lead = next === 'hull' ? 'hull' : 'aim';
+    },
+
     setReducedMotion(flag) {
       reducedMotion = Boolean(flag);
     },
@@ -380,7 +397,7 @@ export function createCamera({
   // MODE_BLEND_SECONDS toward the boss framing.
   function dynamicGoal(x, y, dt, scene) {
     const slow = reducedMotion ? REDUCED_MOTION_ZOOM_SLOWDOWN : 1;
-    lookAheadFor(scene, x, y, goal);
+    lookAheadFor(scene, x, y, goal, lead);
     dampTo(lookX, goal.x, LOOK_AHEAD_SMOOTH, dt);
     dampTo(lookY, goal.y, LOOK_AHEAD_SMOOTH, dt);
     dampTo(

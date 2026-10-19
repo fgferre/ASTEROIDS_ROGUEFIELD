@@ -1,7 +1,7 @@
 // src/modules/ui/settingsPreview.js
 
-// The live line under a Graphics setting: what its current value does on
-// screen, read from the same data the renderer uses (qualityPresets.js:
+// The live line under a Graphics or Controls setting: what its current value
+// does on screen, read from the same data the renderer uses (qualityPresets.js:
 // every key of the preset is listed, so new toggles show up on their own).
 // UISystem renders it under the field and redraws it on every change.
 
@@ -56,6 +56,22 @@ export function settingPreview(key, value, context = {}) {
         value === 'classic'
           ? 'Classic: the plain follow, no look-ahead or zoom.'
           : 'Dynamic: leads your aim, zooms out in crowds, frames bosses.',
+    };
+  }
+  if (key === 'hullControl') {
+    return {
+      text:
+        value === 'classic'
+          ? 'Classic: A/D turn, W thrusts along the nose; the turret still aims on its own.'
+          : 'Modern: WASD moves on the screen, the turret aims on its own.',
+    };
+  }
+  if (key === 'cameraLead') {
+    return {
+      text:
+        value === 'hull'
+          ? 'Hull: the camera looks ahead along the nose.'
+          : 'Aim: the camera looks ahead toward your target.',
     };
   }
   if (key === 'bloom') {

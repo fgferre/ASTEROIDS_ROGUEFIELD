@@ -390,6 +390,7 @@ export function createServiceManifest(context = {}) {
         'command-queue',
         'hangar',
         'difficulty',
+        'settings',
       ],
       factory: ({ resolved }) =>
         new PlayerSystem({
@@ -398,6 +399,7 @@ export function createServiceManifest(context = {}) {
           'command-queue': resolved['command-queue'],
           hangar: resolved['hangar'],
           difficulty: resolved['difficulty'],
+          settings: resolved['settings'],
         }),
     },
     {

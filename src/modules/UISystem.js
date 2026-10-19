@@ -16,7 +16,7 @@ import {
 } from '../core/viewport.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { controlSchemeFromUrl } from './PlayerSystem.js';
+import { resolveControlScheme } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
@@ -213,7 +213,9 @@ class UISystem extends BaseSystem {
       achievements: () => this.getService('achievements'),
     });
     // The static keyboard hints show the scheme in use (style.css).
-    document.body.dataset.controls = controlSchemeFromUrl();
+    document.body.dataset.controls = resolveControlScheme(
+      this.resolveSettingsService()?.getCategoryValues('controls')?.hullControl
+    );
 
     // Direct AAA HUD Activation
     this.tacticalHud.activateAAATacticalHud();
@@ -844,6 +846,9 @@ class UISystem extends BaseSystem {
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
       if (payload?.values) {
         this.settingsPanel.refreshCategory('controls');
+        document.body.dataset.controls = resolveControlScheme(
+          payload.values.hullControl
+        );
       }
     });
 

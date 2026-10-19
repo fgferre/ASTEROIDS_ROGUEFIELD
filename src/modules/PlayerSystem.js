@@ -120,19 +120,27 @@ const PREVIEW_THRUST = 0.35;
 const PREVIEW_ANGLE = -Math.PI / 2;
 const IDLE_THRUST = Object.freeze({ main: 0, aux: 0, sideL: 0, sideR: 0 });
 
-// 'modern' (NORTE §4b): WASD moves on the screen axes, the hull faces the
-// motion and the turret aims on its own.
-// 'classic' (?controls=classic): A/D rotate, Asteroids-style.
-export const controlSchemeFromUrl = () => {
+// 'modern' (NORTE §4b): WASD moves on the screen axes and the hull faces the
+// motion. 'classic': A/D rotate, W thrusts, Asteroids-style. The turret aims
+// on its own in both. Settings → Controls → Hull Control, or ?controls=classic.
+
+// 'classic' for `?controls=classic`, else null.
+function controlSchemeFromUrl() {
   try {
-    return new URLSearchParams(window.location.search).get('controls') ===
-      'classic'
-      ? 'classic'
-      : 'modern';
+    const value = new URLSearchParams(window.location.search).get('controls');
+    if (value === 'classic') return 'classic';
   } catch {
-    return 'modern';
+    // no window (Node tests)
   }
-};
+  return null;
+}
+
+/** The scheme to fly: the URL flag wins over the Hull Control setting. */
+export function resolveControlScheme(setting) {
+  return (
+    controlSchemeFromUrl() || (setting === 'classic' ? 'classic' : 'modern')
+  );
+}
 
 const coneLength = (thrust, thrusterLevel) =>
   (4 + 12 * thrust) * (1 + 0.1 * thrusterLevel);
@@ -393,7 +401,13 @@ class PlayerSystem extends BaseSystem {
       resolveService('command-queue', this.dependencies) ||
       null;
     this.commandQueueConsumerId = 'player-system';
-    this.controlScheme = config?.controlScheme || controlSchemeFromUrl();
+    this.controlScheme =
+      config?.controlScheme ||
+      resolveControlScheme(
+        resolveService('settings', this.dependencies)?.getCategoryValues(
+          'controls'
+        )?.hullControl
+      );
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
     // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
@@ -407,7 +421,7 @@ class PlayerSystem extends BaseSystem {
     this.position = { x: startX, y: startY };
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
-    // Weapon heading: on the aim point in modern, the hull's in classic.
+    // Weapon heading: the turret's, on the aim point in both schemes.
     this.turretAngle = 0;
     this.targetAngle = 0; // Para rotação suave (futuro)
     this.angularVelocity = 0;
@@ -660,6 +674,13 @@ class PlayerSystem extends BaseSystem {
     // Applied in the next update, once this step's movement input is known.
     this.registerEventListener('dash-pressed', () => {
       this.dashRequested = true;
+    });
+
+    // Hull Control applies live, mid-run too.
+    this.registerEventListener('settings-controls-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.controlScheme = resolveControlScheme(payload.values.hullControl);
+      }
     });
 
     this.registerEventListener('upgrade-damage-boost', (data) => {
@@ -1587,12 +1608,12 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = step / deltaTime;
   }
 
-  /** Modern only: the right stick's unit direction past the engage, or null. */
+  /** The right stick's unit direction past the engage, or null. */
   getAimStickDirection(input) {
     const x = Number(input.aimX) || 0;
     const y = Number(input.aimY) || 0;
     const magnitude = Math.hypot(x, y);
-    if (this.controlScheme !== 'modern' || magnitude <= GAMEPAD_AIM_ENGAGE) {
+    if (magnitude <= GAMEPAD_AIM_ENGAGE) {
       return null;
     }
     return { x: x / magnitude, y: y / magnitude };
@@ -1603,14 +1624,10 @@ class PlayerSystem extends BaseSystem {
     return this.aimStick;
   }
 
-  // Modern: the turret turns along the right stick while it is held, else
-  // onto the aim point (CombatSystem's lead point) on its own, and back onto
-  // the nose without one. Classic: it is the nose.
+  // Both schemes: the turret turns along the right stick while it is held,
+  // else onto the aim point (CombatSystem's lead point) on its own, and back
+  // onto the nose without one.
   updateTurret(deltaTime) {
-    if (this.controlScheme !== 'modern') {
-      this.turretAngle = this.angle;
-      return;
-    }
     const pivot = this.getTurretPivot();
     const goal = this.aimStick
       ? Math.atan2(this.aimStick.y, this.aimStick.x)
@@ -2133,7 +2150,7 @@ class PlayerSystem extends BaseSystem {
       thrust,
       emissive: getEmissive(),
     });
-    if (this.controlScheme === 'modern') this.renderTurret(ctx);
+    this.renderTurret(ctx);
 
     ctx.restore();
   }

@@ -143,6 +143,29 @@ describe('createCamera', () => {
     expect(camera.x).toBeCloseTo(2000 + LOOK_AHEAD_MAX - 30, 1);
   });
 
+  it('leads along the hull heading, not the aim, on Camera Lead: Hull', () => {
+    // Aim to the right, nose straight down the screen.
+    const scene = {
+      ...createCameraScene(),
+      hasAim: true,
+      aimX: 3000,
+      aimY: 1500,
+      heading: Math.PI / 2,
+    };
+    const lead = lookAheadFor(scene, 2000, 1500, {}, 'hull');
+    expect(lead.x).toBeCloseTo(0, 6);
+    expect(lead.y).toBeCloseTo(LOOK_AHEAD_MAX, 6);
+    const camera = createCamera({ fieldWidth: 4000, fieldHeight: 3000 });
+    camera.setLead('hull');
+    camera.snapTo(2000, 1500);
+    for (let t = 0; t < 5; t += 1 / 60) {
+      camera.update(2000, 1500, 1 / 60, scene);
+    }
+    // The dead zone (22.5 px tall) eats the first part of the 90 px lead.
+    expect(camera.x).toBeCloseTo(2000, 1);
+    expect(camera.y).toBeCloseTo(1500 + LOOK_AHEAD_MAX - 22.5, 1);
+  });
+
   it('zooms out monotonically with the threat count', () => {
     const zooms = [0, 1, 2, 4, 6, 8, 10, 14].map((n) => threatZoomFor(n));
     expect(zooms[0]).toBeCloseTo(1.3, 6);
