@@ -26,8 +26,12 @@ liga os dois; quem adiciona conteúdo não toca no motor.** Hoje um inimigo novo
 linhas; uma arma, 8 arquivos com ids à mão; testes enumeram tipos à mão. As duas metades abaixo correm em paralelo
 (arquivos disjuntos), um commit por fatia, comportamento igual antes e depois (mesmos testes verdes).
 
-**Regra que vira verificação (primeira fatia de todas):** teto de **1.200 linhas por arquivo** no ESLint (`max-lines`),
-com lista de exceções nomeadas que só pode diminuir — a lista é o placar da dívida. Hoje acima do teto: 13 arquivos.
+- [x] **Regra que vira verificação (primeira fatia de todas; feita 19/10, ramo `r0/teto-de-linhas`):** teto de **1.200
+      linhas por arquivo** no ESLint (`max-lines`), com lista de exceções nomeadas que só pode diminuir — a lista é o
+      placar da dívida (`OVER_THE_CAP` em `eslint.config.js`; `tests/process/max-lines.test.js` falha num nome cujo
+      arquivo voltou para baixo do teto). Medido em 19/10: **17 arquivos**, não 13. Além dos nove de 0b, a fábrica deve
+      encolher EnemySystem (3.159), WaveManager (2.749), Targeting (1.619), EnemyEffects (1.512) e BossEnemy (1.372);
+      SettingsPanel (1.328), UISystem (1.253) e o teste `aim-regression` (2.715) não têm etapa ainda.
 
 ### 0a — a fábrica de conteúdo
 
@@ -158,6 +162,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
+
   - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
