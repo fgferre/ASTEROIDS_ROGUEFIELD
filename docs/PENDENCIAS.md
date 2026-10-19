@@ -85,7 +85,8 @@ R13.6–R13.8 no PLAN.
 dias de desafio"_ (Rodadas 5–13 aprovadas; itens 1, 3, 7, 8 fechados); _"tudo roda bem a 60 fps num Mac M1, podemos
 até aumentar qualidade, detalhe e elementos 3D"_ (itens 6 e 9 fechados); a faixa escura (item 15) segue aberta; sobre
 as dívidas (arquivos grandes etc.): _"analise se ainda está assim mesmo, mas temos que melhorar isso"_. Goal
-seguinte sugerido a ele: longevidade estilo Vampire Survivors + qualidade por padrão mais alta + dívidas pagas.
+seguinte **decidido** (19/10, ele: "você sabe o que é melhor fazer"): **Rodada 0 — fábrica de conteúdo + teto de
+linhas** (PLAN.md), e só depois o goal de longevidade estilo Vampire Survivors.
 
 **Tudo visto só em headless sem GPU (1–4 fps); nada ouvido em browser.** `?stats=1`/F8 mostra fps/ms reais.
 
