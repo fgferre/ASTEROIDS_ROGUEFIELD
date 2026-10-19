@@ -1,5 +1,5 @@
 # AGENTS.md
-Asteroid Roguefield: a browser asteroid-arena roguelite — Canvas 2D gameplay, a Three.js menu, vanilla JS ES modules, Vite, Vitest. Built for its owner, who does not program and judges by playing and by screenshots; published on GitHub Pages (`/ASTEROIDS_ROGUEFIELD/`).
+Asteroid Roguefield: a browser asteroid-arena roguelite — gameplay and menu in Three.js (the original Canvas 2D game survives only as a static museum build at `/classic/`, built from the tag `classic-2d`), vanilla JS ES modules, Vite, Vitest. Built for its owner, who does not program and judges by playing and by screenshots; published on GitHub Pages (`/ASTEROIDS_ROGUEFIELD/`).
 Keep this file under 50 lines; every agent reads every line, every session. Add a line only after the same mistake happens twice; when a line can become a check (lint rule, test, hook), do that and delete the line.
 
 Commands
