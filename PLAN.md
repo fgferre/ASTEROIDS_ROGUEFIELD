@@ -96,7 +96,8 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
 - [x] **AAAHudLayout** (1.892 → 889, 19/10): um módulo por painel em `src/modules/ui/hud/` (mesmas 976 operações de DOM
       num DOM falso, antes e depois); HUD visto numa partida.
-- [ ] **0b.7 Renderer3D (1.791)** — cena/espelhos/pós.
+- [x] **0b.7 Renderer3D** (1.791 → 839, 19/10): montagem da cena, câmera, espelhos do campo e sobreposições em
+      `src/modules/render3d/`; cena hero vista no navegador.
 - [x] **SettingsPanel** (1.328 → 868) e **UISystem** (1.253 → 964), 19/10: construtores de campo e textos de tecla em
       `src/modules/ui/settings/`; busca no DOM e escala da tela em `src/modules/ui/`; painel e teclas vistos no navegador.
 - [x] **Trace de comparação** (19/10): 19 partidas de 60 s (camadas 1–15, 17, Boss Rush, harmonic e scatter na 9); pega
