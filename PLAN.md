@@ -93,48 +93,13 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       padrões para um inimigo novo (registros de efeitos e de sons idênticos para os dez).
 - [ ] **0a.7 `CONTENT.md`** de uma página: como adicionar inimigo, arma, carta, casco, fase. O brief de um worker vira
       "adicione X seguindo CONTENT.md" — 1–2 arquivos, cinco em paralelo sem conflito.
-- [ ] **0a.8 Motor de horda** — medição de partida (19/10, neste Mac M1, Chromium com a GPU real via ANGLE Metal,
-      `?content=drone&count=N&quality=ultra`, 300 quadros após 25 s): a simulação de 200 Motes custa 0,38 ms/quadro
-      (Node); na tela 1×, 200 Motes = 60,0 fps e 300 atirando = 58,8; **na densidade Retina (2×) com a nave atirando, 200
-      Motes = 55,4 fps, p95 33 ms** (1 Mote: 60,0 / 18,3). O custo é de desenho, não de lógica. Script de medida no
-      scratchpad da sessão (Playwright global, sem dependência no repo). Pedido original: Inimigos por instância (como as rochas), balas e partículas em GPU, orçamentos por
-      quadro; meta: **200 Motes a 60 fps no Mac M1**, medido por ele.
-
-### 0b — os arquivos gigantes que a fábrica não encolhe
-
-- [x] **0b.1 AudioSystem** (2.370 → 911, 19/10): `src/data/audio/eventCues.js` (91 linhas evento → som) lida por um
-      despachante; lógica, propulsor, voz do chefe e random em `src/modules/audio/`; registro de 2.737 chamadas de som
-      idêntico. Os 67 atalhos `play*` saíram depois: quem chamava usa o barramento.
-- [x] **0b.2 MenuBackgroundSystem** (3.864 → 1.163, 19/10): onze partes da cena em `src/modules/menu/`; num rascunho
-      contra o original, os mesmos 16.741 sorteios e o mesmo estado da cena em cada quadro; menu visto no navegador.
-- [x] **0b.3 PlayerSystem** (2.444 → 918, 19/10): desenho 2D morto apagado; arte e forma do casco, escudo, entrada,
-      propulsores, manobras e voo em `src/modules/player/`; trace com a nave voando igual a cada passo.
-- [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
-      do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
-- [x] **0b.5 PhysicsSystem** (2.223 → 945, 19/10): tiros, contato com a nave, minas, carga e explosão do Warden,
-      impacto e números do chefe em `src/modules/physics/`; trace igual a cada passo.
-- [x] **Targeting** (1.619 → 724) e **BossEnemy** (1.372 → 827), 19/10: perigo, mira à frente e travas em
-      `src/modules/combat/targeting/`; fases e ataques do Warden em `src/modules/enemies/boss/` (quebrar o leque ou a
-      carga de propósito derruba o trace).
-- [x] **EnemySystem** (3.159 → 1.183, 19/10): registro dos tipos numa função só (`enemyTypeRegistry.js`), chefes,
-      recompensas, fotos, consultas e acertos em `src/modules/enemies/{base,systems}/`; trace igual a cada passo.
-- [x] **EnemyEffects** (1.512 → 665, 19/10): tiro, rachaduras e Volatile em módulos; o despacho de morte por tipo
-      ficou num lugar só.
-- [x] **WaveManager** (2.749 → 1.081, 19/10): agenda da camada, spawner, onda de chefe, eventos e random em
-      `src/modules/enemies/waves/`; a agenda (tipos de apoio, grupos por tipo) num módulo só, para o diretor por papéis.
-- [x] **0b.6 XPOrbSystem** (2.077 → 678, 19/10): desenho 2D morto apagado; campo, fusão, espaçamento, ímã e números
-      em `src/modules/xp/`; hash por quadro de cada orbe igual em cinco partidas.
-- [x] **AAAHudLayout** (1.892 → 889, 19/10): um módulo por painel em `src/modules/ui/hud/` (mesmas 976 operações de DOM
-      num DOM falso, antes e depois); HUD visto numa partida.
-- [x] **0b.7 Renderer3D** (1.791 → 839, 19/10): montagem da cena, câmera, espelhos do campo e sobreposições em
-      `src/modules/render3d/`; cena hero vista no navegador.
-- [x] **SettingsPanel** (1.328 → 868) e **UISystem** (1.253 → 964), 19/10: construtores de campo e textos de tecla em
-      `src/modules/ui/settings/`; busca no DOM e escala da tela em `src/modules/ui/`; painel e teclas vistos no navegador.
-- [x] **Trace de comparação** (19/10): 19 partidas de 60 s (camadas 1–15, 17, Boss Rush, harmonic e scatter na 9); pega
-      a velocidade de um inimigo de 180 para 181 em 14 das 19. Depois (19/10) mais duas em que a nave voa: move, dash, freio e escudo, uma com o Bastion.
-- [x] **InputSystem** (1.386 → 1.184, 19/10): montagem dos comandos em `src/modules/input/commandPayloads.js`.
-- [x] **Teste `aim-regression`** (2.715, 19/10): quatro arquivos por assunto em `tests/integration/aim/`, os mesmos 80
-      testes.
+- [x] **0a.8 Motor de horda** (19/10, neste Mac M1, Chromium com a GPU real via ANGLE Metal, densidade Retina,
+      `?content=drone&count=N&quality=ultra&fire=1`, 300 quadros após 25 s): **200 Motes = 60,0 fps, p95 18 ms** (antes
+      55,9 / 33); 300 = 57,3 / 18,5. Medido antes de mexer: a simulação de 200 custa 0,38 ms/quadro e as chamadas de
+      desenho não eram o custo (encolher os Motes não mudava nada); eram os pixels acesos e as passadas de tela cheia. O
+      bloom final entra na passada seguinte, a de impacto termina no sRGB e a de saída só roda sem ela, luzes zeradas
+      pulam o cálculo. Sem instancing: os números não pediam. Imagem igual (diferenças dentro do ruído entre execuções).
+      Falta ele medir na tela dele (o script mede headless com a GPU; o painel do app estava escondido).
 
 **Pronto quando:** um inimigo e uma arma novos entram com um arquivo cada e zero linhas no motor; os 11 inimigos e 3
 armas migrados com comportamento igual; nenhum arquivo acima do teto fora da lista de exceções, e a lista com no máximo
