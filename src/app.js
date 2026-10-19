@@ -1,5 +1,4 @@
 import { GamePools } from './core/GamePools.js';
-import { WAVEMANAGER_HANDLES_ASTEROID_SPAWN } from './data/constants/gameplay.js';
 import {
   debugLog,
   resolveDebugPreference,
@@ -248,12 +247,6 @@ function init(recording = null) {
       randomSeedSource: seedSource,
       rendererMode: gameState.rendererMode,
     };
-
-    if (DEV_MODE) {
-      GameDebugLogger.log('INIT', 'Feature Flags', {
-        WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-      });
-    }
 
     // Initialize DI system first (Phase 2.1)
     const diInitialized = initializeDependencyInjection(manifestContext);

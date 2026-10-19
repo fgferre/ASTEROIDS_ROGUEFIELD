@@ -1,7 +1,7 @@
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { EnemySystem } from '../../src/modules/EnemySystem.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import { createTestContainer, withWaveOverrides } from './setup.js';
+import { createTestContainer } from './setup.js';
 
 export const TEST_SEED = 123456;
 export const SAMPLE_ASTEROID_COUNT = 1000;
@@ -195,13 +195,8 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   });
 
   enemySystem.sessionActive = true;
-  enemySystem.waveState = enemySystem.createInitialWaveState();
-  enemySystem.waveState.current = 0;
-  enemySystem.waveState.isActive = false;
-  enemySystem.waveState.totalAsteroids = 0;
-  enemySystem.waveState.asteroidsSpawned = 0;
-  enemySystem.waveState.asteroidsKilled = 0;
-  enemySystem.waveState.initialSpawnDone = false;
+  // No layer yet: waveState reports layer 0 with no rocks counting.
+  enemySystem.waveManager.rockLayer = 0;
   enemySystem.asteroids = [];
 
   enemySystem.refreshServiceState({ force: true });
@@ -211,17 +206,17 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
 }
 
 /**
- * Prepare an EnemySystem instance to run the specified wave.
+ * Prepare an EnemySystem instance to run the specified wave: its WaveManager
+ * plays a layer with only the rock trickle (no schedule) and the legacy
+ * per-wave rock count.
  *
  * @param {EnemySystem} enemySystem - The system under test.
  * @param {number} waveNumber - Target wave to prepare.
- * @param {{ spawnInitial?: boolean }} [options] - Additional setup options.
  * @returns {void}
  * @example
- * prepareWave(enemySystem, 3, { spawnInitial: true });
+ * prepareWave(enemySystem, 3);
  */
-export function prepareWave(enemySystem, waveNumber, options = {}) {
-  const baseState = enemySystem.createInitialWaveState();
+export function prepareWave(enemySystem, waveNumber) {
   const normalizedWave = Math.max(1, waveNumber);
 
   const baseCount = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_BASE)
@@ -238,32 +233,21 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
   );
   const clampedTotal = Math.min(computedTotal, 25);
 
-  const spawnDelay = Math.max(0.8, 2.0 - normalizedWave * 0.1);
-
-  enemySystem.waveState = {
-    ...baseState,
-    current: normalizedWave,
-    isActive: true,
-    totalAsteroids: clampedTotal,
-    asteroidsSpawned: 0,
-    asteroidsKilled: 0,
-    initialSpawnDone: false,
-    spawnTimer: 0,
-    spawnDelay,
-    timeRemaining: CONSTANTS.WAVE_DURATION,
+  const { waveManager } = enemySystem;
+  waveManager.reset();
+  Object.assign(waveManager, {
+    currentWave: normalizedWave,
+    waveInProgress: true,
+    rockLayer: normalizedWave,
+    rocksActive: true,
+    rocksTotal: clampedTotal,
     completedWaves: Math.max(0, normalizedWave - 1),
-  };
+  });
 
   enemySystem.asteroids.length = 0;
-  enemySystem.spawnTimer = 0;
   enemySystem.sessionActive = true;
-  enemySystem._asteroidSpawnDebugLogged = false;
   enemySystem.invalidateActiveEnemyCache?.();
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
-
-  if (options.spawnInitial) {
-    enemySystem.spawnInitialAsteroids?.(4);
-  }
 }
 
 /**
@@ -272,70 +256,64 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
  * @param {EnemySystem} enemySystem - The system to simulate.
  * @param {number} waveNumber - Wave identifier.
  * @param {number} [maxIterations=1500] - Safety cap for the update loop.
- * @returns {{ waveState: ReturnType<EnemySystem['createInitialWaveState']> }}
+ * @returns {{ waveState: EnemySystem['waveState'] }}
  * @example
  * const { waveState } = simulateWave(enemySystem, 1, 600);
  */
 export function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
   let resultState = null;
-  // EnemySystem drives the wave itself only when no WaveManager is attached.
-  const waveManager = enemySystem.waveManager;
-  enemySystem.waveManager = null;
 
-  withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-    prepareWave(enemySystem, waveNumber);
+  prepareWave(enemySystem, waveNumber);
 
-    const deltaTime = 0.5;
-    let iterations = 0;
+  const deltaTime = 0.5;
+  let iterations = 0;
 
-    // Prime the wave state so the fallback wave flow can start the wave
-    enemySystem.update(0);
+  // Prime the wave state before the trickle runs
+  enemySystem.update(0);
 
-    while (enemySystem.waveState.isActive && iterations < maxIterations) {
-      enemySystem.update(deltaTime);
+  while (enemySystem.waveState.isActive && iterations < maxIterations) {
+    enemySystem.update(deltaTime);
 
-      if (
-        enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
-      ) {
-        throw new Error('Active asteroid count exceeded screen limit.');
-      }
-
-      const activeEnemies =
-        typeof enemySystem.getActiveEnemies === 'function'
-          ? enemySystem.getActiveEnemies()
-          : enemySystem.asteroids.filter((asteroid) => !asteroid.isDestroyed);
-
-      if (activeEnemies.length > 0) {
-        enemySystem.destroyAsteroid(activeEnemies[0], {
-          createFragments: false,
-          triggerExplosion: false,
-        });
-      }
-
-      iterations += 1;
+    if (
+      enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+    ) {
+      throw new Error('Active asteroid count exceeded screen limit.');
     }
 
-    if (iterations >= maxIterations) {
-      throw new Error('Wave simulation exceeded iteration cap.');
-    }
+    const activeEnemies =
+      typeof enemySystem.getActiveEnemies === 'function'
+        ? enemySystem.getActiveEnemies()
+        : enemySystem.asteroids.filter((asteroid) => !asteroid.isDestroyed);
 
-    resultState = { ...enemySystem.waveState };
-
-    const remaining =
-      typeof enemySystem.getAllEnemies === 'function'
-        ? enemySystem.getAllEnemies()
-        : enemySystem.asteroids.slice();
-    for (const asteroid of remaining) {
-      enemySystem.destroyAsteroid(asteroid, {
+    if (activeEnemies.length > 0) {
+      enemySystem.destroyAsteroid(activeEnemies[0], {
         createFragments: false,
         triggerExplosion: false,
       });
     }
 
-    enemySystem.update(0);
-  });
+    iterations += 1;
+  }
 
-  enemySystem.waveManager = waveManager;
+  if (iterations >= maxIterations) {
+    throw new Error('Wave simulation exceeded iteration cap.');
+  }
+
+  resultState = { ...enemySystem.waveState };
+
+  const remaining =
+    typeof enemySystem.getAllEnemies === 'function'
+      ? enemySystem.getAllEnemies()
+      : enemySystem.asteroids.slice();
+  for (const asteroid of remaining) {
+    enemySystem.destroyAsteroid(asteroid, {
+      createFragments: false,
+      triggerExplosion: false,
+    });
+  }
+
+  enemySystem.update(0);
+
   return { waveState: resultState };
 }
 
@@ -376,7 +354,7 @@ export function collectSpawnMetrics(spawnLog) {
  * const samples = sampleVariants(enemySystem, 'medium', 4, 1000);
  */
 export function sampleVariants(enemySystem, size, wave, count) {
-  enemySystem.waveState.current = wave;
+  enemySystem.waveManager.rockLayer = wave;
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
 
   const results = {};
@@ -473,9 +451,10 @@ export function computeExpectedVariantBreakdown(enemySystem, size, wave) {
 export function computeAverageFragmentsForSize(enemySystem, size, wave, count) {
   let totalFragments = 0;
 
-  enemySystem.waveState = enemySystem.createInitialWaveState();
-  enemySystem.waveState.current = wave;
-  enemySystem.waveState.isActive = true;
+  Object.assign(enemySystem.waveManager, {
+    rockLayer: wave,
+    rocksActive: true,
+  });
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
 
   for (let index = 0; index < count; index += 1) {

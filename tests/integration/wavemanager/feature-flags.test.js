@@ -5,10 +5,7 @@ import {
   setupGlobalMocks,
   cleanupGlobalState,
 } from '../../__helpers__/setup.js';
-import {
-  createEnemySystemHarness,
-  prepareWave,
-} from '../../__helpers__/asteroid-helpers.js';
+import { createEnemySystemHarness } from '../../__helpers__/asteroid-helpers.js';
 
 describe('WaveManager Integration', () => {
   /** @type {{ enemySystem: any, container: any }} */
@@ -33,40 +30,11 @@ describe('WaveManager Integration', () => {
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
 
   describe('EnemySystem wave flow', () => {
-    test('EnemySystem gracefully handles missing WaveManager', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
-      if (harness.enemySystem.updateSystem) {
-        legacySpies.push(
-          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
-        );
-      }
-
-      harness.enemySystem.waveManager = null;
-      prepareWave(harness.enemySystem, 1);
-
-      try {
-        expect(() => harness.enemySystem.update(0.5)).not.toThrow();
-        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
-        expect(legacyCalled).toBe(true);
-
-        const warningEmitted = warnSpy.mock.calls.some(([message]) =>
-          String(message).includes('WaveManager indisponível')
-        );
-        expect(warningEmitted).toBe(true);
-      } finally {
-        legacySpies.forEach((spy) => spy.mockRestore());
-        warnSpy.mockRestore();
-      }
-    });
-
-    test('WaveManager completion event schedules break timer and suppresses legacy emit', async () => {
+    test('WaveManager completion closes the rocks and schedules the break timer', async () => {
       const eventBus = harness?.container?.resolve('event-bus');
       expect(eventBus).toBeTruthy();
 
       const emitSpy = vi.spyOn(eventBus, 'emit');
-      const legacyListener = vi.fn();
-      eventBus.on('wave-completed', legacyListener);
 
       const waitForWaveComplete = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -87,16 +55,6 @@ describe('WaveManager Integration', () => {
 
       try {
         enemySystem.sessionActive = true;
-        enemySystem.waveState = enemySystem.createInitialWaveState();
-        enemySystem.waveState.current = 0;
-        enemySystem.waveState.isActive = false;
-        enemySystem.waveState.breakTimer = 0;
-        enemySystem.waveState.totalAsteroids = 0;
-        enemySystem.waveState.asteroidsSpawned = 0;
-        enemySystem.waveState.asteroidsKilled = 0;
-        enemySystem.waveState.completedWaves = 0;
-        enemySystem.waveState.initialSpawnDone = false;
-        enemySystem.spawnTimer = 0;
 
         enemySystem.update(0);
 
@@ -112,12 +70,16 @@ describe('WaveManager Integration', () => {
         const currentWave = enemySystem.waveManager.currentWave;
         expect(currentWave).toBeGreaterThan(0);
 
-        enemySystem.waveState.current = currentWave;
-        enemySystem.waveState.isActive = true;
-        enemySystem.waveState.breakTimer = 0;
-        enemySystem.waveState.totalAsteroids = 0;
-        enemySystem.waveState.asteroidsSpawned = 0;
-        enemySystem.waveState.asteroidsKilled = 0;
+        Object.assign(enemySystem.waveManager, {
+          rocksTotal: 0,
+          rocksSpawned: 0,
+        });
+        expect(enemySystem.waveState).toMatchObject({
+          current: currentWave,
+          isActive: true,
+          breakTimer: 0,
+          asteroidsKilled: 0,
+        });
 
         const spawnedAsteroids = [];
         const spawnTarget = 4;
@@ -138,7 +100,7 @@ describe('WaveManager Integration', () => {
         expect(enemySystem.waveManager.enemiesSpawnedThisWave).toBe(
           spawnedAsteroids.length
         );
-        enemySystem.waveState.totalAsteroids = spawnTarget;
+        enemySystem.waveManager.rocksTotal = spawnTarget;
         // Layer 1's Rockfall surge is still scheduled (src/data/layers.js);
         // this test covers the completion path, not the schedule.
         enemySystem.waveManager.layerSchedule = [];
@@ -169,62 +131,8 @@ describe('WaveManager Integration', () => {
           ([eventName]) => eventName === 'wave-complete'
         );
         expect(waveCompleteEmits.length).toBeGreaterThan(0);
-
-        const waveCompletedEmits = emitSpy.mock.calls.filter(
-          ([eventName]) => eventName === 'wave-completed'
-        );
-        expect(waveCompletedEmits.length).toBe(0);
-        expect(legacyListener).not.toHaveBeenCalled();
       } finally {
-        eventBus.off('wave-completed', legacyListener);
         emitSpy.mockRestore();
-      }
-    });
-
-    test('WaveManager counters sync into legacy waveState when enabled', () => {
-      const stubState = {
-        currentWave: 7,
-        inProgress: true,
-        spawned: 5,
-        killed: 3,
-        total: 11,
-      };
-
-      prepareWave(harness.enemySystem, 2);
-
-      harness.enemySystem.waveManager = {
-        update: vi.fn(),
-        getState: vi.fn(() => ({ ...stubState })),
-      };
-
-      const initialWaveState = { ...harness.enemySystem.waveState };
-
-      try {
-        harness.enemySystem.update(0.25);
-
-        expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(
-          0.25
-        );
-
-        const syncedState = harness.enemySystem.waveState;
-        expect(syncedState.current).not.toBe(initialWaveState.current);
-        expect(syncedState.current).toBe(stubState.currentWave);
-        expect(syncedState.isActive).toBe(stubState.inProgress);
-        const managerHandlesSpawn = Boolean(
-          CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
-        );
-
-        if (managerHandlesSpawn) {
-          expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
-          expect(syncedState.totalAsteroids).toBe(stubState.total);
-        } else {
-          expect(syncedState.asteroidsSpawned).not.toBe(stubState.spawned);
-          expect(syncedState.totalAsteroids).not.toBe(stubState.total);
-        }
-
-        expect(syncedState.asteroidsKilled).toBe(stubState.killed);
-      } finally {
-        harness.enemySystem.waveManager = null;
       }
     });
   });

@@ -36,11 +36,12 @@ describe('Asteroid Metrics - Determinism', () => {
       const harnessB = createEnemySystemHarness(TEST_SEED);
 
       const setupHarness = (h) => {
-        h.enemySystem.waveState = h.enemySystem.createInitialWaveState();
-        h.enemySystem.waveState.current = 1;
-        h.enemySystem.waveState.isActive = true;
-        h.enemySystem.waveState.totalAsteroids = 10;
-        h.enemySystem.waveState.asteroidsSpawned = 0;
+        Object.assign(h.enemySystem.waveManager, {
+          rockLayer: 1,
+          rocksActive: true,
+          rocksTotal: 10,
+          rocksSpawned: 0,
+        });
         h.enemySystem.reseedRandomScopes?.({ resetSequences: true });
         return h;
       };

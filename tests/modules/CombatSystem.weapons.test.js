@@ -135,12 +135,8 @@ describe('Harmonic Plasma Lance', () => {
       ],
     });
     const enemies = makeEnemies([rock]);
-    enemies.waveState = {
-      current: 2,
-      isActive: true,
-      totalAsteroids: 4,
-      asteroidsSpawned: 4,
-    };
+    enemies.waveState = { current: 2 };
+    enemies.waveManager = { addExtraRocks: vi.fn() };
     enemies.assignVariantsToFragments = vi.fn(() => ['common']);
     enemies.acquireAsteroid = vi.fn((config) => ({ ...config }));
     enemies.registerActiveEnemy = vi.fn(() => ({ registered: true }));
@@ -156,13 +152,14 @@ describe('Harmonic Plasma Lance', () => {
     // Turned a quarter turn (π / 2 fragments) from the first seam.
     expect(fragment.x).toBeCloseTo(200, 6);
     expect(fragment.y).toBeCloseTo(310, 6);
-    expect(enemies.waveState.totalAsteroids).toBe(5);
+    expect(enemies.waveManager.addExtraRocks).toHaveBeenCalledWith(1);
 
     // A lance kill splits normally.
     rock.destroyed = false;
     rock.health = 5;
     combat.processBulletHit(lance(), rock, enemies);
     expect(enemies.acquireAsteroid).toHaveBeenCalledTimes(1);
+    expect(enemies.waveManager.addExtraRocks).toHaveBeenCalledTimes(1);
   });
 
   it('passes through a phased Shade: no hit, no burn, no chain hop through it', () => {

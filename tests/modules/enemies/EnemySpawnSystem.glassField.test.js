@@ -9,7 +9,6 @@ function spawnSystem(layerModifier) {
   return new EnemySpawnSystem({
     facade: {
       asteroids: [],
-      useManagers: false,
       waveManager: { layerModifier },
       isBossEnemy: () => false,
       invalidateActiveEnemyCache() {},

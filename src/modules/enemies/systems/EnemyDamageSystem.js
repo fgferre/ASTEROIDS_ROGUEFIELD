@@ -69,10 +69,7 @@ class EnemyDamageSystem {
       getPlayerHullRadius: (...args) => facade.getPlayerHullRadius?.(...args),
       invalidateActiveEnemyCache: (...args) =>
         facade.invalidateActiveEnemyCache?.(...args),
-      emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
-      completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
       emitEvent: (...args) => facade.emitEvent?.(...args),
-      getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
     };
 
     GameDebugLogger.log('INIT', 'EnemyDamageSystem initialized', {
@@ -219,14 +216,7 @@ class EnemyDamageSystem {
         fragments.push(fragment);
       });
 
-      if (this.context.waveState && this.context.waveState.isActive) {
-        this.context.waveState.totalAsteroids += fragments.length;
-        this.context.waveState.asteroidsSpawned += fragments.length;
-      }
-    }
-
-    if (this.context.waveState) {
-      this.context.waveState.asteroidsKilled += 1;
+      this.facade.waveManager.addExtraRocks(fragments.length);
     }
 
     if (this.context.sessionStats) {
@@ -260,32 +250,6 @@ class EnemyDamageSystem {
       bus.emit('enemy-destroyed', payload);
     } else if (typeof this.context.emitEvent === 'function') {
       this.context.emitEvent('enemy-destroyed', payload);
-    }
-
-    this.context.emitWaveStateUpdate?.();
-
-    const waveState = this.context.waveState;
-    if (waveState && waveState.isActive) {
-      const getActiveEnemyCount = this.context.getActiveEnemyCount;
-      const activeCount =
-        typeof getActiveEnemyCount === 'function'
-          ? getActiveEnemyCount()
-          : this.facade.getActiveEnemyCount?.() ?? 0;
-
-      const allAsteroidsKilled =
-        waveState.asteroidsKilled >= waveState.totalAsteroids &&
-        activeCount === 0;
-
-      const usingWaveManager =
-        this.facade.useManagers && this.facade.waveManager;
-
-      if (
-        !usingWaveManager &&
-        allAsteroidsKilled &&
-        waveState.timeRemaining > 0
-      ) {
-        this.context.completeCurrentWave?.();
-      }
     }
 
     return fragments;
@@ -705,9 +669,9 @@ class EnemyDamageSystem {
  * Extra fragments from a Harmonic beam kill: `count` copies of the first
  * seam in `split.descriptors` (generateFragments, read before the kill), each
  * turned half a step from it so it does not overlap its siblings, given a
- * variant, taken from the pool, registered, and counted +1 per fragment while
- * the wave is active. `enemies` is the enemy service; `split` is
- * { x, y, wave, descriptors }.
+ * variant, taken from the pool, registered, and added to the layer's rock
+ * plan (WaveManager.addExtraRocks). `enemies` is the enemy service; `split`
+ * is { x, y, wave, descriptors }.
  *
  * Mirrors the fragment half of destroyAsteroid one fragment at a time;
  * unifying the two pipelines is a later cleanup.
@@ -748,11 +712,7 @@ function spawnBeamFragments(enemies, parent, split, count) {
       'fragment-spawn',
       fragment
     );
-    const waveState = enemies.waveState;
-    if (waveState?.isActive) {
-      waveState.totalAsteroids += 1;
-      waveState.asteroidsSpawned += 1;
-    }
+    enemies.waveManager.addExtraRocks(1);
   }
 }
 

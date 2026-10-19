@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
-import { withWaveOverrides } from '../__helpers__/setup.js';
 
 /**
  * D-04 (02-CONTEXT): WaveManager must emit a NEW `boss-warning` event exactly
@@ -99,61 +98,51 @@ const findEmit = (emits, eventName) =>
   emits.find((entry) => entry.event === eventName);
 
 describe('WaveManager boss-warning timing (D-04)', () => {
-  it('emits boss-warning on wave 4 (one wave before boss wave 5) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const emits = startWaveAndRecord(4);
+  it('emits boss-warning on wave 4 (one wave before boss wave 5) with { wave, nextBossWave }', () => {
+    const emits = startWaveAndRecord(4);
 
-      const bossWarning = findEmit(emits, 'boss-warning');
-      expect(bossWarning).toBeTruthy();
-      expect(bossWarning.payload).toMatchObject({ wave: 4, nextBossWave: 5 });
+    const bossWarning = findEmit(emits, 'boss-warning');
+    expect(bossWarning).toBeTruthy();
+    expect(bossWarning.payload).toMatchObject({ wave: 4, nextBossWave: 5 });
 
-      // Regression guard: wave-started still fires on this (and every) wave.
-      expect(findEmit(emits, 'wave-started')).toBeTruthy();
-    });
+    // Regression guard: wave-started still fires on this (and every) wave.
+    expect(findEmit(emits, 'wave-started')).toBeTruthy();
   });
 
-  it('emits boss-warning on wave 9 (one wave before boss wave 10) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const emits = startWaveAndRecord(9);
+  it('emits boss-warning on wave 9 (one wave before boss wave 10) with { wave, nextBossWave }', () => {
+    const emits = startWaveAndRecord(9);
 
-      const bossWarning = findEmit(emits, 'boss-warning');
-      expect(bossWarning).toBeTruthy();
-      expect(bossWarning.payload).toMatchObject({ wave: 9, nextBossWave: 10 });
+    const bossWarning = findEmit(emits, 'boss-warning');
+    expect(bossWarning).toBeTruthy();
+    expect(bossWarning.payload).toMatchObject({ wave: 9, nextBossWave: 10 });
 
-      expect(findEmit(emits, 'wave-started')).toBeTruthy();
-    });
+    expect(findEmit(emits, 'wave-started')).toBeTruthy();
   });
 
   it.each([1, 2, 3])(
     'does NOT emit boss-warning on non-pre-boss wave %i',
-    async (wave) => {
-      await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-        const emits = startWaveAndRecord(wave);
+    (wave) => {
+      const emits = startWaveAndRecord(wave);
 
-        expect(findEmit(emits, 'boss-warning')).toBeUndefined();
-        // wave-started still fires every wave (regression guard).
-        expect(findEmit(emits, 'wave-started')).toBeTruthy();
-      });
+      expect(findEmit(emits, 'boss-warning')).toBeUndefined();
+      // wave-started still fires every wave (regression guard).
+      expect(findEmit(emits, 'wave-started')).toBeTruthy();
     }
   );
 
-  it('does NOT emit boss-warning on boss wave 5 itself (that is the boss-spawn path)', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const emits = startWaveAndRecord(5);
+  it('does NOT emit boss-warning on boss wave 5 itself (that is the boss-spawn path)', () => {
+    const emits = startWaveAndRecord(5);
 
-      expect(findEmit(emits, 'boss-warning')).toBeUndefined();
-      // Boss waves emit boss-wave-started + wave-started, never boss-warning.
-      expect(findEmit(emits, 'boss-wave-started')).toBeTruthy();
-      expect(findEmit(emits, 'wave-started')).toBeTruthy();
-    });
+    expect(findEmit(emits, 'boss-warning')).toBeUndefined();
+    // Boss waves emit boss-wave-started + wave-started, never boss-warning.
+    expect(findEmit(emits, 'boss-wave-started')).toBeTruthy();
+    expect(findEmit(emits, 'wave-started')).toBeTruthy();
   });
 
-  it('does NOT emit boss-warning on wave 10 (post-boss, not pre-boss)', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const emits = startWaveAndRecord(10);
+  it('does NOT emit boss-warning on wave 10 (post-boss, not pre-boss)', () => {
+    const emits = startWaveAndRecord(10);
 
-      expect(findEmit(emits, 'boss-warning')).toBeUndefined();
-      expect(findEmit(emits, 'wave-started')).toBeTruthy();
-    });
+    expect(findEmit(emits, 'boss-warning')).toBeUndefined();
+    expect(findEmit(emits, 'wave-started')).toBeTruthy();
   });
 });

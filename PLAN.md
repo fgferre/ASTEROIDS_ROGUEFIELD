@@ -109,7 +109,23 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         A fragmentação do feixe voltou ao domínio de inimigos (`spawnBeamFragments`, mesma contagem). Medição: dez
         ajudantes (nove opus, um sonnet; 60 a 290 mil tokens cada), três comparações roteirizadas byte a byte (visual,
         efeitos ×2), portão de primeira em todos os recortes; sessão principal em 59% da janela (590 mil tokens) ao fim.
-  - [ ] **R13.8.5** autoridade das ondas; depois escopos de random. Parar antes de mesclar: o dono joga.
+  - [ ] **R13.8.5 Autoridade das ondas** (ramo `r13/ondas-uma-autoridade`, aberto 18/10). Decisão: NÃO virar a chave
+        `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (o caminho "true" soltava todas as rochas de uma vez, sem cadência nem limite);
+        o WaveManager vira dono único herdando a cadência atual. Prova em cada recorte: sonda headless (3 sementes ×
+        1500/7200/3000 quadros) comparando spawns, eventos e contadores entre a main e o ramo, byte a byte.
+    - [x] 5.1 Subtração: chave, override, caminho "tudo de uma vez", espelho e rajada do caminho morto removidos (commit
+          798bed6; 35.100 quadros idênticos).
+    - [x] 5.2 Dono único (commit fbf852c; 44.100 quadros idênticos, camadas 1 a 5 e Boss Rush): cadência das rochas e rajada inicial no WaveManager; `waveState` vira snapshot derivado; espelho do
+          EnemyUpdateSystem e modo legado sem WaveManager removidos. Achado: a rajada de 4 rochas no início nunca
+          disparava (antes nem depois); ligá-la seria mudança de sensação, decisão do dono.
+    - [x] 5.3 Faxina e escopos de random (commit fef84c9; 87.300 quadros × 2 modos idênticos ao ramo; contra a main só 67
+          linhas de payload de depuração com `metadata` em outro lugar, vindas do 5.1, sem leitor): rajada de 4 rochas,
+          `getState`/`managerTotalsForWave`/`compatibilityModeActive`, `wave-state-updated` e a cópia de `layerDirector`
+          apagados; `layerDirector` mora no WaveManager. De random só a captura repetida de sementes saiu; rótulos,
+          escopos pai e fork legado ficam (fazem parte dos replays). Medição: 1 ajudante opus, 1 tentativa, 181k tokens,
+          17 min; revisão aqui.
+    - [x] Fechamento (19/10): `npm run done` verde (173 arquivos, 1161 testes, build), sonda no navegador (partida, arena de
+          chefe, easter egg 2D, zero erros), PR #267 aberto. **Parado: o dono joga antes de mesclar.**
 
 ## Fora de escopo deste plano
 

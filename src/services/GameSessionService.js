@@ -4,10 +4,7 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../core/GameConstants.js';
-import {
-  RUN_FINAL_LAYER,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-} from '../data/constants/gameplay.js';
+import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 import { BOSS_RUSH_LAYERS, bossRushStage } from '../data/layers.js';
@@ -747,12 +744,6 @@ export default class GameSessionService {
       return false;
     }
 
-    const waveManagerActive = enemies.useManagers && enemies.waveManager;
-
-    if (!waveManagerActive) {
-      return false;
-    }
-
     if (reason === 'progression-reset') {
       const screen = this.getScreen();
       if (screen !== 'playing') {
@@ -764,37 +755,14 @@ export default class GameSessionService {
       return false;
     }
 
-    let started = false;
     try {
-      started = enemies.startNextWave();
+      enemies.startNextWave();
     } catch (error) {
       console.error(
         '[GameSessionService] Failed to start wave via WaveManager:',
         error
       );
       return false;
-    }
-
-    if (!started) {
-      return false;
-    }
-
-    const managerHandlesAsteroids = Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
-    const waveState = enemies.waveState || null;
-
-    if (
-      !managerHandlesAsteroids &&
-      typeof enemies.spawnInitialAsteroids === 'function' &&
-      !(waveState && waveState.initialSpawnDone)
-    ) {
-      try {
-        enemies.spawnInitialAsteroids(4);
-      } catch (error) {
-        console.error(
-          '[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:',
-          error
-        );
-      }
     }
 
     return true;

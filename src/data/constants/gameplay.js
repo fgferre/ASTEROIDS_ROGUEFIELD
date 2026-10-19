@@ -295,8 +295,6 @@ export const RUN_FINAL_LAYER = 15; // PROPOSAL 17/10 (docs/NORTE.md section 4): 
 
 export const MAX_ASTEROIDS_ON_SCREEN = 40; // PROPOSAL 17/10 (was 35; 20 before NEO-ARCADE)
 
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager
-
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
 
 export const ASTEROID_SAFE_SPAWN_DISTANCE = 200; // Distância mínima do jogador ao spawn de asteroides
