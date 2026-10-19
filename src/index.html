@@ -2,6 +2,34 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Classic build (the 2D game as it was on 17/10/2026), served next to
+      // the current game on the same origin: its saved data lives under its
+      // own prefix so the two never read or overwrite each other's keys.
+      (function () {
+        try {
+          var PREFIX = 'classic:';
+          var real = window.localStorage;
+          var names = function () {
+            var out = [];
+            for (var i = 0; i < real.length; i++) {
+              var name = real.key(i);
+              if (name.indexOf(PREFIX) === 0) out.push(name.slice(PREFIX.length));
+            }
+            return out;
+          };
+          var shim = {
+            getItem: function (k) { return real.getItem(PREFIX + k); },
+            setItem: function (k, v) { real.setItem(PREFIX + k, String(v)); },
+            removeItem: function (k) { real.removeItem(PREFIX + k); },
+            key: function (n) { return names()[n] === undefined ? null : names()[n]; },
+            clear: function () { names().forEach(function (k) { real.removeItem(PREFIX + k); }); },
+          };
+          Object.defineProperty(shim, 'length', { get: function () { return names().length; } });
+          Object.defineProperty(window, 'localStorage', { value: shim, configurable: true });
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asteroid Roguefield</title>
     <link
