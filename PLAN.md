@@ -1,8 +1,36 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 em curso — O BASTÃO em docs/PENDENCIAS.md)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 em curso — passagem de bastão abaixo, 19/10)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --grep="R11"`, PRs #247–#260). Decisões de produto são do dono,
 por imagem e jogando — nunca por teste.
+
+## Passagem de bastão (19/10, manhã; conversa local encerrada por tamanho)
+
+- **Na `main` (9f5d768):** R13.8 inteiro (PRs #263 a #267: tooling, SFXBus, UI por tela, combate e efeitos por assunto,
+  WaveManager dono único das ondas) e R14 (PR #269: o desenho Canvas 2D saiu; a versão 2D original é build estático em
+  `/classic/`, gerado na publicação a partir da tag `classic-2d`, com link nos créditos). Também #270 (plano), #271
+  (`node_modules` nunca versionado), #272 (AGENTS.md). Nenhum ramo ou pasta de trabalho desta conversa sobrou.
+- **Em andamento em OUTRA conversa** ("Bugs verificados na main", worktree `../ASTEROIDS_ROGUEFIELD-bugs`, ramo
+  `fix/bugs-retry-e-sessao`): os 8 bugs do relatório, entre eles o retry que deixa a camada aberta com o campo vazio (as
+  rochas restauradas são contadas de novo e os contadores da camada não voltam). Arquivos dela: GameSessionService,
+  DifficultyService, InputSystem, ProgressionSystem, UpgradeSystem, XPOrbSystem, PlayerSystem, UISystem, LevelUpScreen,
+  EnemySystem, WaveManager, serviceManifest, profileHarness e testes. **Não tocar neles até ela mesclar.**
+- **Livres agora:** R13.6 (anel chapado no 3D; visual, captura e o dono julga), R13.7 (áudio morto; mecânico), R12.5
+  (entrada do Warden; sensação). R13.2, R13.3 e R13.4 esperam a mesclagem acima.
+- **Para o dono decidir** (a outra conversa cita no relatório dela): mina Warded que nunca explode (`Mine.js` marca
+  `detonated` antes do `takeDamage`, que devolve 0 na janela Warded) e filhos nascidos no abate que fecha a camada passam
+  sem contar (WaveManager recusa fora de camada). Restos da era 2D fora do desenho: uma linha no BACKLOG.
+- **Método que funcionou** (seção 5 de `docs/analise-estrutura-ia-2026-10-18.md`): um ajudante por recorte, brief
+  fechado, revisão das costuras na sessão principal, prova byte a byte com a sonda headless
+  (`tests/__helpers__/headlessGame.js`, 3 sementes) para o que muda ondas ou efeitos, `npm run done` e sonda no
+  navegador antes de mesclar (menu, partida, `?profile=boss-arena`, `?profile=late-stress`, créditos). Quando a janela do
+  app está escondida o jogo congela sem quadros: o Chromium headless do Playwright global (`/opt/homebrew`) serve para a
+  sonda, sem adicionar dependência. O easter egg 2D não existe mais: nada de `?renderer=2d`.
+- **Armadilhas novas:** em worktree com `node_modules` symlink, nunca `git add -A` (o .gitignore agora cobre o symlink);
+  PR empilhado sobre ramo que será apagado fecha sozinho no GitHub e não reabre (aconteceu com o #268): apontar para a
+  `main` antes de apagar a base.
+- A seção O BASTÃO de `docs/PENDENCIAS.md` é de 18/10 à noite (PR #261) e é do dono, nas palavras dele; este bloco é a
+  passagem atual.
 
 ## O pedido do dono (palavras dele, 17/10)
 
