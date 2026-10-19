@@ -1,12 +1,13 @@
 /**
- * One fan of `shots` aimed at the ship, `arc` radians outer to outer, `delay`
- * s into each solid (`visible`) window of the phase cycle (phase.js re-arms
- * it): `speed` px/s, `damage`, `lifetime` s, tagged `pattern`.
+ * One fan of `shots` aimed at the ship (one shot flies straight at it), `arc`
+ * radians outer to outer, `delay` s into each solid (`visible`) window of the
+ * phase cycle (phase.js re-arms it): `speed` px/s, `damage`, `lifetime` s,
+ * tagged `pattern`.
  */
 export default {
   params: {
     delay: 'number',
-    shots: 'number',
+    shots: 'count',
     arc: 'number',
     speed: 'number',
     damage: 'number',
@@ -27,7 +28,7 @@ export default {
     const { shots, arc, speed, damage, lifetime, pattern } = params;
     const base = Math.atan2(target.y - enemy.y, target.x - enemy.x);
     for (let i = 0; i < shots; i += 1) {
-      const angle = base + (i / (shots - 1) - 0.5) * arc;
+      const angle = shots === 1 ? base : base + (i / (shots - 1) - 0.5) * arc;
       enemy.getEventBus()?.emit?.('enemy-fired', {
         enemy,
         enemyId: enemy.id,

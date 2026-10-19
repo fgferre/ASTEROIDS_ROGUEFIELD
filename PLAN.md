@@ -29,8 +29,11 @@ dado, comportamento é biblioteca pequena, um registro liga os dois; quem adicio
   (menu, inimigos, ondas, sessão, nave, física, orbes, áudio — a tabela evento → som virou dado —, HUD, renderizador,
   mira, chefe, efeitos, configurações, interface, entrada, teste da mira) e a lista de exceções chegou a zero.
 - **Prova de comportamento igual:** `tests/integration/golden-trace.test.js` (21 partidas headless de 60 s, hash por
-  segundo do estado e dos eventos; duas voam a nave). Toda fatia de refatoração passou com o fixture intacto; replays
-  gravados na `main` tocam iguais no ramo.
+  segundo do estado e dos eventos; duas voam a nave). Toda fatia de refatoração passou com o fixture intacto, salvo uma
+  mudança de propósito: em `21de1fb` a carta de arma passou a emitir um evento só (`upgrade-weapon`), e mudaram os hashes
+  de eventos de Harmonic e Scatter, não os de estado. Replays gravados na `main` tocam iguais no ramo. Limites: o trace
+  não desenha nem toca som (imagem, som e fps foram conferidos à parte), guarda nomes de eventos e não os dados, e em
+  outra arquitetura (CI x64) compara duas partidas atuais entre si, não com o fixture.
 - **Registro** (`src/content/registry.js`): inimigos, chefes, armas, cartas, cascos, camadas, biomas — um arquivo cada.
   O motor não nomeia inimigo nem arma: tipos, pools, agenda, recompensas, afixos, efeitos, sons, Códice, falas e
   aparência vêm do arquivo. Um teste trava a regra de import dos arquivos de conteúdo.

@@ -1,5 +1,7 @@
 # Análise estrutural para desenvolvimento com IA — 18/10/2026
 
+> **Histórico:** este relatório descreve o projeto antes da Rodada 0. A avaliação atual está na [revisão de 19/10/2026](/Users/fgferre/Github/ASTEROIDS_ROGUEFIELD/docs/revisao-estrutura-ia-2026-10-19.md). Não use as contagens e pendências abaixo como estado atual.
+
 **Parecer:** vale fazer uma refatoração localizada. A base tem uma arquitetura reconhecível e várias boas separações, mas alguns arquivos concentram responsabilidades e mudanças demais. O maior ganho provável vem de tornar a localização de código confiável, reduzir o contexto necessário por funcionalidade e encerrar sobreposições específicas. Não há evidência que justifique uma reescrita geral.
 
 Análise solicitada pelo dono, sem implementação. Este relatório é o único arquivo criado por esta análise. Não alterei código, configurações, planos ou backlog; não fiz commit ou publicação.

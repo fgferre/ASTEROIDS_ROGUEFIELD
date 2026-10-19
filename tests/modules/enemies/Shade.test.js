@@ -56,6 +56,33 @@ describe('Shade', () => {
     expect(shotsOf(eventBus)).toHaveLength(SHADE_SHOTS * 2);
   });
 
+  it('a fan of one shot flies straight at the ship', () => {
+    const shade = getContent('enemies', 'shade');
+    const Lone = recipeEnemyClass({
+      ...shade,
+      behaviors: { ...shade.behaviors, 'fan-shot': { ...fan, shots: 1 } },
+    });
+    const player = { position: { x: 400, y: 300 } };
+    const eventBus = { emit: vi.fn() };
+    const lone = new Lone(
+      { eventBus, getCachedPlayer: () => player },
+      { id: 'shade-1', x: 400, y: 100 }
+    );
+
+    step(lone, SHADE_FADE_SECONDS + SHADE_FIRE_DELAY + 0.05);
+    const shots = shotsOf(eventBus);
+    expect(shots).toHaveLength(1);
+    const [, { position, velocity, projectile }] = shots[0];
+    expect(Number.isFinite(velocity.x) && Number.isFinite(velocity.y)).toBe(
+      true
+    );
+    expect(projectile.angle).toBeCloseTo(
+      Math.atan2(300 - position.y, 400 - position.x),
+      9
+    );
+    expect(Math.hypot(velocity.x, velocity.y)).toBeCloseTo(fan.speed, 6);
+  });
+
   it('announces each dissolve as it starts: out after its solid window, in after the phased one', () => {
     const { eventBus, shade } = setup({ x: 400, y: 100 });
     const phases = () =>

@@ -6,7 +6,7 @@ const TAU = Math.PI * 2;
  * stream. After the base death, so a Volatile blast spares them.
  */
 export default {
-  params: { type: 'string', count: 'number', speed: 'number' },
+  params: { type: 'string', count: 'count', speed: 'number' },
   usesRandom: true,
   died(enemy, { type, count, speed }) {
     const offset = enemy.random.range(0, TAU);

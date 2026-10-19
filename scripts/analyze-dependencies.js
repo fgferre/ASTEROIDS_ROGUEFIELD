@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { importTargets } from './tocados.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +14,6 @@ const OUTPUT_JSON = path.join(PROJECT_ROOT, 'dependency-graph.json');
 const OUTPUT_DOT = path.join(PROJECT_ROOT, 'dependency-graph.dot');
 const OUTPUT_ISSUES = path.join(PROJECT_ROOT, 'dependency-issues.json');
 
-const IMPORT_REGEX = /import\s+[^'";]+['"]([^'";]+)['"];?/g;
 const SCRIPT_TAG_REGEX = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/g;
 const JS_SCRIPT_REFERENCE_REGEX =
   /\bloadExternalScript\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -116,36 +116,6 @@ async function exists(targetPath) {
   }
 }
 
-function resolveImportPath(filePath, importPath, knownFiles) {
-  if (!importPath.startsWith('.')) {
-    return null;
-  }
-
-  const dir = path.dirname(filePath);
-  const resolved = path.resolve(dir, importPath);
-  const candidates = [
-    `${resolved}.js`,
-    `${resolved}.mjs`,
-    `${resolved}.cjs`,
-    path.join(resolved, 'index.js'),
-    path.join(resolved, 'index.mjs'),
-    resolved,
-  ];
-
-  for (const candidate of candidates) {
-    const withExt = path.extname(candidate) ? candidate : `${candidate}.js`;
-    if (!withExt.startsWith(PROJECT_ROOT)) {
-      continue;
-    }
-    const relative = normalizePath(path.relative(PROJECT_ROOT, withExt));
-    if (knownFiles.has(relative)) {
-      return relative;
-    }
-  }
-
-  return null;
-}
-
 function resolveScriptPath(filePath, scriptPath, knownFiles) {
   const candidates = [];
 
@@ -171,16 +141,6 @@ function resolveScriptPath(filePath, scriptPath, knownFiles) {
 
 function stripComments(content) {
   return content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-}
-
-function extractImports(content) {
-  const imports = [];
-  const source = stripComments(content);
-  let match;
-  while ((match = IMPORT_REGEX.exec(source))) {
-    imports.push(match[1]);
-  }
-  return imports;
 }
 
 function extractExports(content) {
@@ -279,20 +239,15 @@ async function analyze({ includeTests }) {
     );
     const content = await readFileContent(absolutePath);
     const isHtmlFile = absolutePath.endsWith('.html');
-    const imports = isHtmlFile ? [] : extractImports(content);
     const scriptReferences = isHtmlFile
       ? extractHtmlScripts(content)
       : extractScriptReferences(content);
     const exports = isHtmlFile ? [] : extractExports(content);
     const allowOrphan = ORPHAN_IGNORE_PRAGMA.test(content);
 
-    const resolvedImports = [];
-    for (const importPath of imports) {
-      const resolved = resolveImportPath(absolutePath, importPath, knownFiles);
-      if (resolved) {
-        resolvedImports.push(resolved);
-      }
-    }
+    const resolvedImports = isHtmlFile
+      ? []
+      : importTargets(relativePath, content, knownFiles);
 
     for (const scriptPath of scriptReferences) {
       const resolved = resolveScriptPath(absolutePath, scriptPath, knownFiles);
