@@ -14,7 +14,6 @@ import { IS_DEV } from './core/env.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
-import { getRendererMode } from './modules/render3d/rendererMode.js';
 import {
   activateProfileHarness,
   startRun,
@@ -31,10 +30,6 @@ import {
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
 import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
-
-// [NEO-ARCADE] Warmup imports
-import { RenderComponent } from './modules/enemies/components/RenderComponent.js';
-import { warmupProjectileCache } from './utils/drawEnemyProjectile.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -212,14 +207,6 @@ function init(recording = null) {
     }
 
     gameState.gameUI = document.getElementById('game-ui');
-    // The 3D renderer takes the canvas for WebGL: a 2D context would lock it.
-    gameState.rendererMode = getRendererMode();
-    if (gameState.rendererMode === '2d') {
-      gameState.ctx = gameState.canvas.getContext('2d');
-      if (!gameState.ctx) {
-        throw new Error('2D context unavailable');
-      }
-    }
 
     const { seed: initialSeed, source: seedSource } = recording
       ? { seed: recording.seed, source: 'replay' }
@@ -245,7 +232,6 @@ function init(recording = null) {
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
-      rendererMode: gameState.rendererMode,
     };
 
     // Initialize DI system first (Phase 2.1)
@@ -269,9 +255,7 @@ function init(recording = null) {
     // Store services for use in game loop
     gameSystemServices = services;
 
-    if (gameState.rendererMode === '3d') {
-      holdLoadingForWarmUp(services['menu-background'], services.renderer);
-    }
+    holdLoadingForWarmUp(services['menu-background'], services.renderer);
 
     // Validate that all required services exist (DEV_MODE only)
     if (DEV_MODE) {
@@ -433,20 +417,6 @@ function init(recording = null) {
       }
     }
 
-    // [NEO-ARCADE] OPTIMIZATION: Warmup Caches to prevent lag spikes
-    try {
-      debugLog('[App] Warming up render caches...');
-      if (typeof RenderComponent.warmup === 'function') {
-        RenderComponent.warmup();
-      }
-      if (typeof warmupProjectileCache === 'function') {
-        warmupProjectileCache();
-      }
-      debugLog('[App] Render caches warmed up.');
-    } catch (e) {
-      console.warn('[App] Cache warmup failed (non-fatal):', e);
-    }
-
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
@@ -595,8 +565,6 @@ function updateGame(deltaTime) {
 }
 
 function renderGame(alpha) {
-  if (gameState.rendererMode === '2d' && !gameState.ctx) return;
-
   performanceMonitor.startMeasure('render');
   gameSystemServices.renderer.render(gameState.ctx, alpha);
   performanceMonitor.endMeasure('render');

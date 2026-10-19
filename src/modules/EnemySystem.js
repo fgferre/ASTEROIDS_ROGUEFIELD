@@ -26,8 +26,6 @@ import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
-import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
-import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
 import { EnemySpawnSystem } from './enemies/systems/EnemySpawnSystem.js';
 import { EnemyDamageSystem } from './enemies/systems/EnemyDamageSystem.js';
 import { EnemyUpdateSystem } from './enemies/systems/EnemyUpdateSystem.js';
@@ -123,7 +121,6 @@ class EnemySystem extends BaseSystem {
     // Components (new architecture)
     this.movementComponent = null;
     this.collisionComponent = null;
-    this.rendererComponent = null;
     this.genericMovement = null;
     this.genericWeapon = null;
     this.genericRender = null;
@@ -131,7 +128,6 @@ class EnemySystem extends BaseSystem {
     this.genericHealth = null;
     this.useComponents = true; // Feature flag to enable component system
 
-    this.renderSystem = null;
     this.spawnSystem = null;
     this.damageSystem = null;
     this.updateSystem = null;
@@ -169,7 +165,6 @@ class EnemySystem extends BaseSystem {
     this.setupRandomGenerators();
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
-    this.setupRenderSystem(); // Initialize render sub-system
     this.setupSpawnSystem(); // Initialize spawn sub-system
     this.setupDamageSystem(); // Initialize damage sub-system
     this.setupUpdateSystem(); // Initialize update sub-system
@@ -767,9 +762,6 @@ class EnemySystem extends BaseSystem {
       // Initialize collision component
       this.collisionComponent = new AsteroidCollision();
 
-      // Initialize renderer component
-      this.rendererComponent = new AsteroidRenderer();
-
       this.genericMovement = new MovementComponent();
       this.genericWeapon = new WeaponComponent();
       this.genericRender = new RenderComponent();
@@ -778,36 +770,12 @@ class EnemySystem extends BaseSystem {
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize components', error);
       this.collisionComponent = null;
-      this.rendererComponent = null;
       this.genericMovement = null;
       this.genericWeapon = null;
       this.genericRender = null;
       this.genericCollision = null;
       this.genericHealth = null;
       this.useComponents = false;
-    }
-  }
-
-  setupRenderSystem() {
-    try {
-      const facade = this;
-      const context = {
-        facade,
-        get asteroids() {
-          return facade.asteroids;
-        },
-        get rendererComponent() {
-          return facade.rendererComponent;
-        },
-        get useComponents() {
-          return facade.useComponents;
-        },
-      };
-
-      this.renderSystem = new EnemyRenderSystem(context);
-    } catch (error) {
-      console.warn('[EnemySystem] Failed to initialize render system', error);
-      this.renderSystem = null;
     }
   }
 
@@ -1897,20 +1865,6 @@ class EnemySystem extends BaseSystem {
 
   getAsteroidCount() {
     return this.getActiveEnemyCount();
-  }
-
-  /**
-   * Renders all registered enemies through the render sub-system.
-   * Throws if the render sub-system is not initialized.
-   *
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  render(ctx) {
-    if (!ctx) return;
-    if (!this.renderSystem) {
-      throw new Error('[EnemySystem] RenderSystem not initialized');
-    }
-    return this.renderSystem.render(ctx);
   }
 
   cloneSessionStatsForSnapshot(stats = this.sessionStats) {

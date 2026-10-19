@@ -6,7 +6,6 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
-import { CombatDraw2D } from './combat/draw2d.js';
 import { COMBAT_AIMING_UPGRADE_CONFIG } from '../data/constants/gameplay.js';
 // The knockback suite imports it from here.
 export { knockbackSpeed } from './combat/HitResolution.js';
@@ -100,7 +99,6 @@ class CombatSystem extends BaseSystem {
       this.dependencies,
       'CombatSystem'
     );
-    this.draw2d = new CombatDraw2D();
     this.resetWeaponState();
   }
 
@@ -563,42 +561,6 @@ class CombatSystem extends BaseSystem {
   /** Where the primary lock is aimed (lead included), or null. */
   getPrimaryAimPoint() {
     return this.targeting.getPrimaryAimPoint();
-  }
-
-  // === 2D DRAWING (combat/draw2d.js, frozen) ===
-  // RenderingSystem draws the shots, the weapon effects and the lock
-  // feedback through this; the draw reads the combat state as `fx`.
-  render(ctx) {
-    this.draw2d.render(ctx, {
-      player: this.cachedPlayer,
-      bullets: this.bullets,
-      enemyBullets: this.enemyBullets,
-      projectilePerf: this.projectilePerf,
-      lanceLook: this.lanceLook,
-      beams: this.beams,
-      flakBursts: this.flakBursts,
-      arcs: this.arcs,
-      wells: this.wells,
-      burns: this.burns,
-      slows: this.slows,
-      pulls: this.pulls,
-      cinders: this.cinders,
-      ions: this.ions,
-      afterburnTrail: this.afterburnTrail,
-      currentTarget: this.currentTarget,
-      currentLockAssignments: this.currentLockAssignments,
-      predictedAimPoints: this.predictedAimPoints,
-      usingDynamicPrediction: this.usingDynamicPrediction(),
-      targetingUpgradeLevel: this.targetingUpgradeLevel,
-      aimMode: this.aimMode,
-      targetPulseDuration: this.targetPulseDuration,
-      targetIndicatorPulse: this.targetIndicatorPulse,
-      targetThreatCache: this.targetThreatCache,
-      aimingConfig: this.aimingConfig,
-      lockHighlightAlpha: this.lockHighlightAlpha,
-      lockLineAlpha: this.lockLineAlpha,
-      predictedMarkerRadius: this.predictedMarkerRadius,
-    });
   }
 
   // === MODE STATE (plan 01.07 FIX-05) ===

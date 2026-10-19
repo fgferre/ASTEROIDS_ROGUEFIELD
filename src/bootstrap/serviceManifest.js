@@ -12,9 +12,7 @@ import UISystem from '../modules/UISystem.js';
 import EffectsSystem from '../modules/EffectsSystem.js';
 import AudioSystem from '../modules/AudioSystem.js';
 import WorldSystem from '../modules/WorldSystem.js';
-import RenderingSystem from '../modules/RenderingSystem.js';
 import Renderer3D from '../modules/render3d/Renderer3D.js';
-import { getRendererMode } from '../modules/render3d/rendererMode.js';
 import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
@@ -613,16 +611,6 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
-      name: 'enemy-render',
-      singleton: true,
-      lazy: true,
-      dependencies: ['enemies'],
-      factory: ({ resolved }) => {
-        const enemySystem = resolved['enemies'];
-        return enemySystem ? enemySystem.renderSystem : null;
-      },
-    },
-    {
       name: 'combat',
       singleton: true,
       lazy: false,
@@ -753,13 +741,8 @@ export function createServiceManifest(context = {}) {
         'menu-background',
         'settings',
       ],
-      // docs/NORTE.md §4b: Three.js by default, `?renderer=2d` for Canvas 2D.
       factory: ({ resolved }) => {
-        const Renderer =
-          (context.rendererMode ?? getRendererMode()) === '3d'
-            ? Renderer3D
-            : RenderingSystem;
-        return new Renderer({
+        return new Renderer3D({
           eventBus: resolved['event-bus'],
           player: resolved['player'],
           progression: resolved['progression'],
