@@ -958,7 +958,7 @@ export class Weapons {
     const volley = { struck: [], bursts: 0 };
     const predictedPoints = [];
     for (let i = 0; i < bolts; i += 1) {
-      const a = angle + spread * (i / (bolts - 1) - 0.5);
+      const a = bolts === 1 ? angle : angle + spread * (i / (bolts - 1) - 0.5);
       const end = {
         x: origin.x + Math.cos(a) * reach,
         y: origin.y + Math.sin(a) * reach,

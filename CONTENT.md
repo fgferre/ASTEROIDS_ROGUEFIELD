@@ -58,7 +58,7 @@ export default {
 
 ## Behaviors: `src/modules/enemies/behaviors/`
 
-A recipe passes exactly a behavior's params (the test compares the key sets). Params are numbers unless named as strings; `*` = draws random. Event names: reuse the donor's (a new name plays no sound).
+A recipe passes exactly a behavior's params (the test compares the key sets). Params are numbers unless named as strings; `shots` and `count` are whole numbers of at least 1 (a fan of one shot flies straight at the ship); `*` = draws random. Event names: reuse the donor's (a new name plays no sound).
 
 | Behavior             | Does                                                                            | Params                                                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -120,7 +120,7 @@ A new enemy writes no render code. Give it one of:
 
 ## Gotchas (found by the first worker who followed this page)
 
-- Next free `order`: the highest in the kind plus one — `grep -h "^  order:" src/content/<kind>/*.js | sort -n | tail -1`; card orders also live in each weapon's `card`.
+- Next free `order`: the highest in the kind plus one — `sed -n 's/^  order: \([0-9]*\).*/\1/p' src/content/<kind>/*.js | sort -n | tail -1` (the number alone: `sort -n` on whole lines sorts them as text). Card orders also live in each weapon's `card`, four spaces in: for cards, add `sed -n 's/^    order: \([0-9]*\).*/\1/p' src/content/weapons/*.js` to the list.
 - Ids: enemies, weapons, hulls, stages, biomes in kebab-case (`needle-array`); card ids in snake_case (`needle_array`). The id is the file name.
 - Layers past 15 copy layer 14's roster and surges (`beyond()` in `src/data/layers.js`): an enemy with `fromLayer` ≥ 16 spawns only if its role is one layer 14 asks for.
 - Movement params are read by each strategy in `src/modules/enemies/components/MovementComponent.js` (orbit: `acceleration`, `maxSpeed`, `preferredDistance`, `orbitDirection`). Behaviors that set velocity themselves (`hold-range`, `charge`) need `strategy: 'linear'`.

@@ -278,6 +278,21 @@ describe('Scatter Coil', () => {
     expect(combat.bullets).toHaveLength(FAN.maxBolts);
   });
 
+  it('a fan of one bolt flies along the aim', () => {
+    const { combat } = scatter([]);
+
+    combat.weapons.fireFan(
+      { ...FAN, bolts: 1 },
+      { x: 100, y: 300 },
+      { multishot: 1, damage: DAMAGE }
+    );
+    expect(combat.bullets).toHaveLength(1);
+    const [bolt] = combat.bullets;
+    expect(Number.isFinite(bolt.vx) && Number.isFinite(bolt.vy)).toBe(true);
+    expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(0, 9);
+    expect(Number.isFinite(bolt.x) && Number.isFinite(bolt.y)).toBe(true);
+  });
+
   it('a bolt that hits nothing bursts at the end of its range; shrapnel hits each enemy in reach once per volley', () => {
     // Muzzle at (116, 300), aimed along +x: the centre bolt ends at x 296.
     const end = 116 + BOLT.range;
