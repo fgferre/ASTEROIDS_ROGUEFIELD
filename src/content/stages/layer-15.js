@@ -5,7 +5,7 @@ export default {
   id: 'layer-15',
   order: 15,
   rocks: rockCurve(15),
-  roster: [{ kind: 'hunter', count: 2, from: 3, every: 2, elite: 0.3 }],
+  roster: [{ role: 'sniper', count: 2, from: 3, every: 2, elite: 0.3 }],
   surges: [],
   events: [],
   warden: true,

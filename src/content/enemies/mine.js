@@ -91,6 +91,7 @@ export const MINE_REWARDS = deepFreeze({
 export default {
   id: 'mine',
   order: 2,
+  roles: ['hazard'],
   config: MINE_CONFIG,
   components: MINE_COMPONENTS,
   rewards: MINE_REWARDS,

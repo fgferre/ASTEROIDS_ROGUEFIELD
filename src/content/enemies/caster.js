@@ -16,6 +16,7 @@ export const CASTER_SHELL_APEX = 90; // proposta 18/10: px of rise mid-flight
 export default {
   id: 'caster',
   order: 8,
+  roles: ['artillery'],
   config: deepFreeze({
     key: 'caster',
     displayName: 'Caster',

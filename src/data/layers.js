@@ -13,10 +13,11 @@ export { FIELD_EVENTS };
 // number here is a proposta 17/10 — the owner's play decides.
 //
 // rocks: asteroids the legacy spawner feeds in over the layer.
-// roster: support enemies trickling in; the first at `from` seconds into the
-//   layer, then one every `every` seconds until `count` have spawned; each
-//   rolls Elite with chance `elite`.
-// surges: a burst of `count` enemies (kinds taken in turn; asteroids are
+// roster: support enemies trickling in, each entry asking for a `role`
+//   (enemiesFor); the first at `from` seconds into the layer, then one every
+//   `every` seconds until `count` have spawned; each rolls Elite with chance
+//   `elite`.
+// surges: a burst of `count` enemies (roles taken in turn; 'asteroid' is
 //   small rocks) at `at` seconds, from the field edge away from the player,
 //   announced by a "SURGE" banner with `label`.
 // events: field events at `at` seconds into the layer (never on a Warden
@@ -35,8 +36,8 @@ export { FIELD_EVENTS };
  * radar reaches `radarRange` of its usual range. Magnetic Storm: every XP
  * spark drifts at `driftSpeed` px/s, turning up to `driftTurn` rad/s at
  * random, and the ship's pull is ×`pullScale`. Hunters' Moon: the roster is
- * only `kinds` (Seekers and Rams), each count ×`countScale`; surges keep their
- * size with those kinds. Glass Field: every rock spawns Volatile.
+ * only `roles` (Seekers' and Rams'), each count ×`countScale`; surges keep
+ * their size with those roles. Glass Field: every rock spawns Volatile.
  */
 export const MODIFIER_FROM = 16;
 export const LAYER_MODIFIERS = deepFreeze({
@@ -51,7 +52,7 @@ export const LAYER_MODIFIERS = deepFreeze({
   'hunters-moon': {
     label: "Hunters' Moon",
     color: '#a5b4fc',
-    kinds: ['hunter', 'ram'],
+    roles: ['sniper', 'charger'],
     countScale: 1.3,
   },
   'glass-field': { label: 'Glass Field', color: '#5eead4' },
@@ -77,6 +78,18 @@ export function modifierFor(layer, runSeed = 0) {
 export const LAYERS = deepFreeze(
   listContent('stages').map(({ id: _id, order: _order, ...layer }) => layer)
 );
+
+/**
+ * The enemies that fill a `role` on `layer`: every src/content/enemies item
+ * whose `roles` name it and whose `fromLayer` (default 1) has come, in
+ * registry order. When there are several, the director draws one by `weight`
+ * (default 1) for each spawn (LayerSchedule).
+ */
+export function enemiesFor(role, layer) {
+  return listContent('enemies').filter(
+    ({ roles, fromLayer = 1 }) => roles.includes(role) && fromLayer <= layer
+  );
+}
 
 /** Endless-run growth per layer past 14 (proposta 18/10). */
 const BEYOND_ROCKS_PER_LAYER = 2;

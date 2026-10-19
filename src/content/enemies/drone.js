@@ -105,6 +105,7 @@ export const DRONE_REWARDS = deepFreeze({
 export default {
   id: 'drone',
   order: 1,
+  roles: ['skirmisher'],
   config: DRONE_CONFIG,
   components: DRONE_COMPONENTS,
   rewards: DRONE_REWARDS,

@@ -110,6 +110,7 @@ export const HUNTER_REWARDS = deepFreeze({
 export default {
   id: 'hunter',
   order: 3,
+  roles: ['sniper'],
   config: HUNTER_CONFIG,
   components: HUNTER_COMPONENTS,
   rewards: HUNTER_REWARDS,

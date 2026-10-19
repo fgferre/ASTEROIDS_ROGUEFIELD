@@ -49,7 +49,7 @@ export const fieldEvent = (kind, at) => ({
 
 export const ROCKFALL = {
   at: 40,
-  kinds: ['asteroid'],
+  roles: ['asteroid'],
   count: 6,
   label: 'Rockfall',
 };

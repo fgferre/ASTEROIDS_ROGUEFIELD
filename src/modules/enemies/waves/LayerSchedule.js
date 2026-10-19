@@ -8,6 +8,7 @@
 
 import { listContent } from '../../../content/registry.js';
 import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
+import { enemiesFor } from '../../../data/layers.js';
 
 // Support kinds the layer table can list (every src/content/enemies item);
 // they spawn at a safe distance from the player (asteroids come in from the
@@ -18,7 +19,8 @@ export class LayerSchedule {
   /**
    * @param {Object} kit
    * @param {Object} kit.eventBus - Announces surges
-   * @param {Object} kit.spawner - Puts the due groups on the field (WaveSpawner)
+   * @param {Object} kit.spawner - Puts the due groups on the field (WaveSpawner);
+   *   its `waveRandom` draws between enemies sharing a role
    * @param {Object} kit.layerEvents - Starts and counts down field events
    * @param {Function} kit.getLayer - The layer in progress (currentWave)
    * @param {Function} kit.isFieldEmpty - No enemy left and no rock owed
@@ -74,13 +76,30 @@ export class LayerSchedule {
 
   /**
    * Flattens a layer's roster, surges and field events into timed entries
-   * sorted by `at` (seconds into the layer). Surge kinds are taken in turn.
+   * sorted by `at` (seconds into the layer). Surge roles are taken in turn.
+   * Each enemy spawn gets an enemy for its role on this layer (enemiesFor):
+   * the only one, with no draw, or one drawn by `weight` for that spawn from
+   * the layer's role stream, made at the first such draw. A role no enemy
+   * fills yet spawns nothing.
    */
   buildLayerSchedule(director) {
+    const layer = this.getLayer();
+    let random = null;
+    const enemyFor = (role) => {
+      if (this.isAsteroidType(role)) return role;
+      const enemies = enemiesFor(role, layer);
+      if (enemies.length <= 1) return enemies[0]?.id;
+      random ??= this.spawner.waveRandom.createRoleRandom(layer);
+      return random.weightedPick(
+        enemies.map(({ id, weight = 1 }) => [id, weight])
+      );
+    };
     const schedule = [];
 
-    for (const { kind, count, from, every, elite } of director.roster) {
+    for (const { role, count, from, every, elite } of director.roster) {
       for (let i = 0; i < count; i += 1) {
+        const kind = enemyFor(role);
+        if (!kind) continue;
         schedule.push({
           at: from + i * every,
           groups: [{ kind, count: 1 }],
@@ -93,7 +112,8 @@ export class LayerSchedule {
     for (const surge of director.surges) {
       const counts = new Map();
       for (let i = 0; i < surge.count; i += 1) {
-        const kind = surge.kinds[i % surge.kinds.length];
+        const kind = enemyFor(surge.roles[i % surge.roles.length]);
+        if (!kind) continue;
         counts.set(kind, (counts.get(kind) || 0) + 1);
       }
       schedule.push({
@@ -177,7 +197,7 @@ export class LayerSchedule {
       this.eventBus.emit('surge-started', {
         layer: this.getLayer(),
         label: surge.label,
-        kinds: [...surge.kinds],
+        kinds: groups.map(({ kind }) => kind),
         count: surge.count,
       });
     }

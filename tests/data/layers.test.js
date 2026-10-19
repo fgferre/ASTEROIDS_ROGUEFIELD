@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { listContent } from '../../src/content/registry.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import {
@@ -10,6 +9,7 @@ import {
   bossRushStage,
   bossRushStageTitle,
   directorFor,
+  enemiesFor,
   nextBossRushLayer,
 } from '../../src/data/layers.js';
 import {
@@ -17,7 +17,16 @@ import {
   installDomStubs,
 } from '../__helpers__/headlessGame.js';
 
-const SUPPORT_KINDS = listContent('enemies').map(({ id }) => id);
+const rolesOf = (layer) => [
+  ...layer.roster.map(({ role }) => role),
+  ...layer.surges.flatMap(({ roles }) => roles),
+];
+
+// The enemies layer n's roster can bring (each roster role's enemies).
+const kindsOn = (n) =>
+  directorFor(n).roster.flatMap(({ role }) =>
+    enemiesFor(role, n).map(({ id }) => id)
+  );
 
 const scheduledCount = (layer) =>
   layer.roster.reduce((sum, entry) => sum + entry.count, 0) +
@@ -42,22 +51,21 @@ describe('layer table', () => {
     expect(directorFor(18).herald).toBeUndefined();
   });
 
-  it('lists only registered kinds, support kinds in rosters', () => {
+  it('asks for roles some enemy fills on that layer, enemies the factory builds', () => {
     const restoreDom = installDomStubs();
     try {
       const { factory } = createHeadlessGame().services.enemies;
-      for (const layer of LAYERS) {
-        for (const { kind } of layer.roster) {
-          expect(SUPPORT_KINDS).toContain(kind);
-          expect(factory.hasType(kind)).toBe(true);
-        }
-        for (const surge of layer.surges) {
-          for (const kind of surge.kinds) {
-            expect(factory.hasType(kind)).toBe(true);
-          }
+      LAYERS.forEach((layer, i) => {
+        for (const role of rolesOf(layer)) {
+          const kinds =
+            role === 'asteroid'
+              ? [role]
+              : enemiesFor(role, i + 1).map(({ id }) => id);
+          expect(kinds.length, `${role} on layer ${i + 1}`).toBeGreaterThan(0);
+          for (const kind of kinds) expect(factory.hasType(kind)).toBe(true);
         }
         if (layer.herald) expect(factory.hasType('herald')).toBe(true);
-      }
+      });
     } finally {
       GamePools.releaseAll();
       restoreDom();
@@ -98,13 +106,12 @@ describe('directorFor', () => {
     const first = directorFor(1);
     expect(first.roster).toEqual([]);
     expect(first.surges).toEqual([
-      { at: 40, kinds: ['asteroid'], count: 6, label: 'Rockfall' },
+      { at: 40, roles: ['asteroid'], count: 6, label: 'Rockfall' },
     ]);
     expect(first.rocks).toBe(6);
   });
 
   it('brings Motes on 4, Seekers and Bulwarks from 11, Weavers from 13', () => {
-    const kindsOn = (n) => directorFor(n).roster.map((entry) => entry.kind);
     expect(kindsOn(4)).toEqual(['drone']);
     expect(kindsOn(10)).toEqual(['drone']);
     expect(kindsOn(11)).toEqual(expect.arrayContaining(['hunter', 'bulwark']));
@@ -117,7 +124,6 @@ describe('directorFor', () => {
   });
 
   it('brings Casters from 6 and Shades from 8, never to a Warden layer', () => {
-    const kindsOn = (n) => directorFor(n).roster.map((entry) => entry.kind);
     expect(kindsOn(5)).not.toContain('caster');
     expect(kindsOn(6)).toContain('caster');
     expect(kindsOn(7)).not.toContain('shade');
@@ -127,25 +133,22 @@ describe('directorFor', () => {
   });
 
   it('brings Leeches from 7, never to a Warden layer, and Scavengers on 9', () => {
-    const kindsOn = (n) => directorFor(n).roster.map((entry) => entry.kind);
     expect(kindsOn(6)).not.toContain('leech');
     expect(kindsOn(7)).toContain('leech');
     expect(kindsOn(10)).not.toContain('leech');
     expect(kindsOn(14)).toContain('leech');
-    expect(directorFor(15).roster.map((entry) => entry.kind)).not.toContain(
-      'leech'
-    );
+    expect(kindsOn(15)).not.toContain('leech');
     const scavengers = directorFor(9).surges.find(
       (surge) => surge.label === 'Scavengers'
     );
-    expect(scavengers.kinds).toEqual(['leech', 'asteroid']);
+    expect(scavengers.roles).toEqual(['scavenger', 'asteroid']);
     expect(scavengers.count).toBe(4); // two Leeches, two rocks to feed them
   });
 
   it('escorts the final Warden with Seekers', () => {
     const final = directorFor(15);
     expect(final.warden).toBe(true);
-    expect(final.roster.map((entry) => entry.kind)).toEqual(['hunter']);
+    expect(kindsOn(15)).toEqual(['hunter']);
   });
 
   it('continues past the table: Wardens every fifth layer, rosters growing', () => {

@@ -39,6 +39,7 @@ const WEAVER_REWARDS = deepFreeze({
 export default {
   id: 'weaver',
   order: 6,
+  roles: ['minelayer'],
   config: WEAVER_CONFIG,
   components: WEAVER_COMPONENTS,
   rewards: WEAVER_REWARDS,

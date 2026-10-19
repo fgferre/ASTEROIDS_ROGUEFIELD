@@ -12,6 +12,7 @@ const CONTACT_DAMAGE = 10; // proposta 18/10
 export default {
   id: 'shade',
   order: 9,
+  roles: ['flanker'],
   config: deepFreeze({
     key: 'shade',
     displayName: 'Shade',

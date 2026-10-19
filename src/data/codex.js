@@ -4,7 +4,7 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
 import { BOSS_BY_LAYER, WARDEN_KINDS } from './enemies/boss.js';
 import { HERALD_KINDS } from './enemies/herald.js';
-import { LAYERS } from './layers.js';
+import { LAYERS, enemiesFor } from './layers.js';
 
 // The Codex (docs/NORTE.md §7 pillar 5): every enemy the pilot can meet, in
 // the order the descent brings them. Names come from the enemy data; the
@@ -41,12 +41,15 @@ export function codexIdOf(entity) {
   return entity.type;
 }
 
+// The first layer that asks for one of the enemy's roles once it can come.
 function firstLayerOf(kind) {
   const index = LAYERS.findIndex(
-    (layer) =>
+    (layer, i) =>
       (kind === 'asteroid' && layer.rocks > 0) ||
-      layer.roster.some((entry) => entry.kind === kind) ||
-      layer.surges.some((surge) => surge.kinds.includes(kind))
+      [
+        ...layer.roster.map(({ role }) => role),
+        ...layer.surges.flatMap(({ roles }) => roles),
+      ].some((role) => enemiesFor(role, i + 1).some(({ id }) => id === kind))
   );
   return index + 1;
 }

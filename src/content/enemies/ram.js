@@ -47,6 +47,7 @@ const RAM_REWARDS = deepFreeze({
 export default {
   id: 'ram',
   order: 5,
+  roles: ['charger'],
   config: RAM_CONFIG,
   components: RAM_COMPONENTS,
   rewards: RAM_REWARDS,

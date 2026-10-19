@@ -4,6 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getContent } from '../../../src/content/registry.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import {
   createHeadlessGame,
@@ -12,8 +13,9 @@ import {
 
 const SPAWN_STEPS = 10 * 60;
 
-/** Layer 7 whose whole plan is one `kind`: no rocks, surges or events. */
+/** Layer 7 whose whole plan is one `kind` (its role): no rocks, surges or events. */
 function layerOfOne(kind) {
+  const [role] = getContent('enemies', kind).roles;
   const game = createHeadlessGame();
   game.session.startNewRun({ source: 'test' });
   const { player, enemies } = game.services;
@@ -22,7 +24,7 @@ function layerOfOne(kind) {
   enemies.releaseAllAsteroidsToPool();
   vi.spyOn(wm, 'layerDirector').mockReturnValue({
     ...wm.layerDirector(7),
-    roster: [{ kind, count: 1, from: 0, every: 1, elite: 0 }],
+    roster: [{ role, count: 1, from: 0, every: 1, elite: 0 }],
     surges: [],
     events: [],
     herald: null,

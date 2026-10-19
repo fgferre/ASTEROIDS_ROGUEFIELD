@@ -81,16 +81,16 @@ export class LayerEvents {
   }
 
   /**
-   * Hunters' Moon: the roster keeps only its kinds, each count scaled;
-   * surges keep their size, spawning only those kinds.
+   * Hunters' Moon: the roster keeps only its roles, each count scaled;
+   * surges keep their size, spawning only those roles.
    */
   applyHuntersMoon(director) {
     if (director.modifier !== 'hunters-moon') return director;
-    const { kinds, countScale } = LAYER_MODIFIERS['hunters-moon'];
+    const { roles, countScale } = LAYER_MODIFIERS['hunters-moon'];
     return {
       ...director,
       roster: director.roster
-        .filter((entry) => kinds.includes(entry.kind))
+        .filter((entry) => roles.includes(entry.role))
         .map((entry) => ({
           ...entry,
           count: Math.round(entry.count * countScale),
@@ -98,9 +98,9 @@ export class LayerEvents {
       surges: director.surges
         .map((surge) => ({
           ...surge,
-          kinds: surge.kinds.filter((kind) => kinds.includes(kind)),
+          roles: surge.roles.filter((role) => roles.includes(role)),
         }))
-        .filter((surge) => surge.kinds.length > 0),
+        .filter((surge) => surge.roles.length > 0),
     };
   }
 

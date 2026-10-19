@@ -144,6 +144,18 @@ export class WaveRandom {
     };
   }
 
+  /**
+   * The stream that draws between enemies sharing a role on `layer`
+   * (LayerSchedule), seeded from the base's seed and the layer without
+   * drawing from any stream. It is made only when a role has more than one
+   * enemy, so a layer whose roles have one enemy each leaves every stream as
+   * it was.
+   */
+  createRoleRandom(layer) {
+    const seed = this.getRandomService().seed >>> 0;
+    return new RandomService(`wave-manager:roles:${seed}:${layer}`);
+  }
+
   captureRandomScopeSeed(scope, generator) {
     if (!generator || typeof generator.seed !== 'number') {
       return;

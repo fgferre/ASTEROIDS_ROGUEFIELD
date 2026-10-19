@@ -410,11 +410,11 @@ describe('WaveManager layer modifiers', () => {
       }
     }
     const base = directorFor(layer).roster;
-    const scaled = (kind) =>
-      Math.round(base.find((e) => e.kind === kind).count * 1.3);
+    const scaled = (role) =>
+      Math.round(base.find((e) => e.role === role).count * 1.3);
     expect(Object.fromEntries(trickled)).toEqual({
-      ram: scaled('ram'),
-      hunter: scaled('hunter'),
+      ram: scaled('charger'),
+      hunter: scaled('sniper'),
     });
     const surgeKinds = field.manager.layerSchedule
       .filter((entry) => entry.surge)

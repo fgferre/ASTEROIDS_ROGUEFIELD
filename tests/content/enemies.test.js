@@ -2,14 +2,19 @@
 // factory, its pool, the rewards, the Elite affixes, mine blasts and enemy
 // shots read, and a recipe to build it from: behaviors the library has, with
 // the params each reads. Its look and sound, when it names them, are effects,
-// cues and sizes the engine has. Every kind a layer asks for, and every enemy
-// one spawns, is one of these items.
+// cues and sizes the engine has. Its roles are ones the layers ask for, on a
+// layer it can come to; every enemy one spawns is one of these items.
 import { describe, expect, it } from 'vitest';
 import { getContent, listContent } from '../../src/content/registry.js';
 import { AUDIO_EVENT_CUES } from '../../src/data/audio/eventCues.js';
 import { EXPLOSION_PROFILES } from '../../src/data/audio/explosions.js';
 import { AFFIX_IDS, ELITE_AFFIXES } from '../../src/data/enemies/affixes.js';
-import { LAYERS, LAYER_MODIFIERS } from '../../src/data/layers.js';
+import {
+  LAYER_MODIFIERS,
+  MODIFIER_FROM,
+  directorFor,
+  enemiesFor,
+} from '../../src/data/layers.js';
 import SFXBus from '../../src/modules/audio/SFXBus.js';
 import { DEATH_EFFECTS } from '../../src/modules/effects/EnemyEffects.js';
 import { FIRE_EFFECTS } from '../../src/modules/effects/EnemyFireEffects.js';
@@ -26,6 +31,17 @@ const isKind = {
 };
 // The cue kinds the event table reads from an enemy file (`cueOf` rows).
 const CUE_KINDS = AUDIO_EVENT_CUES.flatMap(({ cueOf }) => cueOf ?? []);
+// The roles layer n asks for, roster and surges.
+const rolesOn = (n) => {
+  const { roster, surges } = directorFor(n);
+  return [
+    ...roster.map(({ role }) => role),
+    ...surges.flatMap(({ roles }) => roles),
+  ];
+};
+// From an enemy's first layer: the rest of the table and the endless layers
+// after it, which repeat layers 14 and 15.
+const LAYERS_SCANNED = 20;
 
 describe('enemy content', () => {
   it.each(enemies)('$id has the stats, components and rewards', (enemy) => {
@@ -130,15 +146,34 @@ describe('enemy content', () => {
     }
   });
 
-  it('every kind a layer asks for is an enemy item', () => {
-    const kinds = [
-      ...LAYERS.flatMap((layer) => layer.roster.map(({ kind }) => kind)),
-      ...LAYERS.flatMap((layer) => layer.surges.flatMap(({ kinds }) => kinds)),
-      ...Object.values(LAYER_MODIFIERS).flatMap(({ kinds = [] }) => kinds),
-    ].filter((kind) => kind !== 'asteroid');
-    expect(kinds.length).toBeGreaterThan(0);
-    for (const kind of kinds) {
-      expect(getContent('enemies', kind), kind).toBeDefined();
+  it.each(enemies)(
+    '$id has roles, and a weight and first layer when it sets them',
+    ({ roles, weight = 1, fromLayer = 1 }) => {
+      expect(isStringList(roles)).toBe(true);
+      expect(roles.length).toBeGreaterThan(0);
+      expect(roles).not.toContain('asteroid');
+      expect(Number.isFinite(weight) && weight > 0).toBe(true);
+      expect(isCount(fromLayer)).toBe(true);
+    }
+  );
+
+  it.each(enemies)(
+    '$id fills roles a layer asks for once it can come',
+    ({ roles, fromLayer = 1 }) => {
+      const asked = Array.from({ length: LAYERS_SCANNED }, (_, i) =>
+        rolesOn(fromLayer + i)
+      ).flat();
+      for (const role of roles) expect(asked, role).toContain(role);
+    }
+  );
+
+  it('every role a modifier keeps has an enemy from the first modifier on', () => {
+    const roles = Object.values(LAYER_MODIFIERS).flatMap(
+      ({ roles = [] }) => roles
+    );
+    expect(roles.length).toBeGreaterThan(0);
+    for (const role of roles) {
+      expect(enemiesFor(role, MODIFIER_FROM).length, role).toBeGreaterThan(0);
     }
   });
 });

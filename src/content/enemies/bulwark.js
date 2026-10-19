@@ -13,6 +13,7 @@ export const BULWARK_SHIELD_HALF_ARC = Math.PI / 3; // proposta 17/10: ±60°
 export default {
   id: 'bulwark',
   order: 7,
+  roles: ['tank'],
   config: deepFreeze({
     key: 'bulwark',
     displayName: 'Bulwark',

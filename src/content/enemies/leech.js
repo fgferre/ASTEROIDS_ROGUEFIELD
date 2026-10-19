@@ -14,6 +14,7 @@ const CONTACT_DAMAGE = 10; // proposta 18/10
 export default {
   id: 'leech',
   order: 10,
+  roles: ['scavenger'],
   config: deepFreeze({
     key: 'leech',
     displayName: 'Leech',

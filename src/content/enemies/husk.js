@@ -11,6 +11,7 @@ const CONTACT_DAMAGE = 15; // proposta 17/10
 export default {
   id: 'husk',
   order: 4,
+  roles: ['carrier'],
   config: deepFreeze({
     key: 'husk',
     displayName: 'Husk',
