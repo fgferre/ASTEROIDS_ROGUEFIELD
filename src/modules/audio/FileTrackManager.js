@@ -135,11 +135,6 @@ class FileTrackManager {
     });
   }
 
-  /** Update the duck-stage target (02.06 re-points trackGains after splicing). */
-  setTargetNode(targetNode) {
-    this.targetNode = targetNode || null;
-  }
-
   /** @private */
   _getConfig(trackId) {
     if (!trackId) return null;

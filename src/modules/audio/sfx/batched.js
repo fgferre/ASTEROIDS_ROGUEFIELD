@@ -741,7 +741,6 @@ export function createBatchedCues(sfx) {
     });
   }
   return {
-    normalizeLaserShotOptions,
     playLaserShot,
     playDroneFire,
     playHunterBurst,

@@ -115,34 +115,6 @@ class AudioCache {
   }
 
   /**
-   * Obtém um buffer customizado com uma função geradora
-   */
-  getCustomBuffer(key, duration, generatorFn) {
-    if (this.customBuffers.has(key)) {
-      this._updateAccessOrder(key);
-      this.stats.hits++;
-      return this.customBuffers.get(key);
-    }
-
-    // Create new buffer
-    const bufferSize = this.context.sampleRate * duration;
-    const buffer = this.context.createBuffer(
-      1,
-      bufferSize,
-      this.context.sampleRate
-    );
-    const output = buffer.getChannelData(0);
-
-    generatorFn(output, bufferSize);
-
-    this._cacheBuffer(key, buffer, this.customBuffers);
-    this.stats.misses++;
-    this.stats.created++;
-
-    return buffer;
-  }
-
-  /**
    * Pregenera buffers comuns para reduzir latência
    */
   _pregenerateCommonBuffers() {
@@ -238,15 +210,6 @@ class AudioCache {
       this.accessOrder.splice(index, 1);
       this.accessOrder.push(key);
     }
-  }
-
-  /**
-   * Cria um novo AudioBufferSourceNode com o buffer
-   */
-  createSourceWithBuffer(buffer) {
-    const source = this.context.createBufferSource();
-    source.buffer = buffer;
-    return source;
   }
 
   /**

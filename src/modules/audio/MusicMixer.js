@@ -171,17 +171,14 @@ class MusicMixer {
    * @param {object} [config]
    * @param {object} [config.randomScope] - Seeded RNG scope (range/float) for
    *   detune + pulse variation. NEVER Math.random.
-   * @param {object} [config.rampDurations] - Optional override of the rise/fall
-   *   ramp windows (relocated from the legacy musicController state model).
+   * @param {object} [config.rampDurations] - Optional override of the rise
+   *   ramp window (relocated from the legacy musicController state model).
    */
   constructor(config = {}) {
     // --- config only (NO AudioContext work) ---
     this.randomScope = config.randomScope || null;
     this.rampDurations = {
       rise: SLOW_RISE_SECONDS,
-      fall: SLOW_RISE_SECONDS,
-      bossRise: SLOW_RISE_SECONDS,
-      bossFall: SLOW_RISE_SECONDS,
       ...(config.rampDurations || {}),
     };
 
@@ -955,21 +952,6 @@ class MusicMixer {
       // grid to fresh currentTime (zero accumulated offset).
       this._applyIntensity(this.intensityLevel);
     }
-  }
-
-  /**
-   * D-12 death-fade hook: click-safe ramp of musicPauseFadeGain to `targetGain`
-   * over `durationSeconds`. Writes the pauseFade stage ONLY — never the slider
-   * stage. This is the parameterized fade Phase 4's cinematic death uses.
-   *
-   * @param {number} targetGain
-   * @param {number} durationSeconds
-   */
-  fade(targetGain, durationSeconds) {
-    if (!this.initialized || !this.context || !this.musicPauseFadeGain) return;
-    const now = this.context.currentTime;
-    const duration = Math.max(0, Number(durationSeconds) || 0);
-    this._rampParam(this.musicPauseFadeGain.gain, targetGain, now, duration);
   }
 
   /**

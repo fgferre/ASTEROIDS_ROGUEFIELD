@@ -546,31 +546,6 @@ describe('MusicMixer — Task 2: transport + pause-freeze + fade', () => {
     });
   });
 
-  describe('fade(targetGain, durationSeconds) — D-12 death-fade hook', () => {
-    it('ramps musicPauseFadeGain ending at now + duration; slider untouched', () => {
-      const { context } = makeSchedulingContext();
-      const slider = makeSliderNode();
-      const mixer = makeMixer();
-      mixer.init(context, slider);
-
-      const fadeRamp = vi.spyOn(
-        mixer.musicPauseFadeGain.gain,
-        'linearRampToValueAtTime'
-      );
-      const now = context.currentTime;
-      mixer.fade(0, 0.5);
-
-      expect(fadeRamp).toHaveBeenCalled();
-      const [target, endTime] = fadeRamp.mock.calls.at(-1);
-      expect(endTime).toBeCloseTo(now + 0.5, 6);
-      expect(target).toBeGreaterThanOrEqual(0);
-
-      // The fade writes the pauseFade stage, NEVER the slider stage.
-      expect(slider.gain.setValueAtTime).not.toHaveBeenCalled();
-      expect(slider.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
-    });
-  });
-
   describe('lifecycle — transport teardown', () => {
     it('dispose() clears the lookahead — no pulse scheduled after dispose', () => {
       const harness = makeSchedulingContext();
