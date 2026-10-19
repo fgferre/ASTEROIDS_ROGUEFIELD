@@ -99,18 +99,26 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       travessia da borda por corte rápido (proposta) ou deslizar. **Aprovada por ele em 19/10:** _"1) ok 2) deslizar a
       camera rapidamente"_ — os oito momentos, pesos, regras e números de partida ficam como na página; na travessia
       da borda a câmera desliza rápido até o outro lado (não corta; a rapidez é número de ajuste).
-      **(3) Feito 19/10 no ramo `r14/diretor`** (ele disse _"vamos seguir em frente"_). O modo dinâmico entrega o quadro
-      ao diretor (`src/core/cameraDirector.js`): momentos com prioridade e tempo mínimo, pesos, caixa, zoom por bisseção,
-      molas, deslize na borda; as regras valem depois das molas (nunca além da borda, nem com giro, inclinação, rolagem
-      ou tremida; o que bate em menos de 1,5 s na tela; a nave inteira na tela; nessa ordem). Geometria do quadro
-      inclinado em `src/core/cameraShot.js`; todos os números em `src/data/constants/camera.js`. Cena de teste por
-      momento: `?moment=calm|pressure|danger|cleared|bossEntrance|boss|death|victory` (só em dev), com `?content=` ou
-      `?scene=hero`. Eventos: `boss-spawned` (via `playArrival`), `boss-defeated`, `player-died`, `wave-complete`. A
-      visita ao Warden com zoom 1,7 saiu (a entrada aprovada abre e inclina); as faixas pretas e a câmera lenta ficam. O
-      modo clássico segue igual (sem visita ao Warden). Mini-chefe = Herald, alvo valioso = inimigo elite (o jogo não
-      tem outro marcador). Medido: 0,08 ms por quadro com 190 inimigos e 12 tiros. Limite visto: com o quadro
-      inclinado, a parte de baixo da tela é mais estreita, então uma faixa junto às bordas laterais nunca aparece ali
-      (já era assim); a nave nessa faixa deixa de ser exigida em vez de abrir o zoom. Falta: (4) ele joga e ajusta.
+      **(3) Primeira versão (19/10, ramo `r14/diretor`, commit `a65b28f`, PR #288): rejeitada.** Diretor contínuo com
+      oito momentos, pesos e zoom por bisseção, preso dentro do campo. Dele, vendo as capturas: _"acho q ficou ruim, o
+      zoom out para dar amplitude do enquadramento nao está funcionando direito... em momento algum conseguimos ver todo
+      o battlefield na tela... as vezes menos é mais. talvez estejamos overengineering algo que é simples"_. Causa: a
+      regra antiga (nunca além da borda) com o campo 4:3 e a inclinação; em 16:9 a altura inteira nunca cabe. Ele pediu
+      uma análise ao ChatGPT (relatório fora do repo, 19/10): nave obrigatória acima da ameaça, perigo quase de cima,
+      sem girar enquanto se joga (os controles não giram com a câmera), borda atravessável e visível, preparar a
+      travessia, ler ataques anunciados, separar `boss-defeated` de `run-won`, flutuação sutil, conferir o quadro final.
+      **Segunda versão aprovada 19/10:** https://claude.ai/artifact/DXgVoUtHcjcEob5er2Q69e. Dele: _"Aprovo: de cima
+      enquanto jogo, cena viva só na chegada do chefe, vitória final e morte, véu de luz na borda, e perto com a
+      inclinação leve de hoje."_ Também dele: _"não acho q tem problema mostrar a borda"_; pausar a cena não (_"a gente
+      quer ver o inimigo chegando"_); jogo inteiro com câmera baixa fica como ideia futura. Passos da segunda versão:
+      (a) câmera de jogo em dois estados de cima: perto (a inclinação de hoje, segue a nave, pode passar da borda) e
+      aberta (quase de cima, campo inteiro e entorno; no fim da fase, ameaça fora da tela ou de vários lados, ataque
+      anunciado, travessia prevista, elite ou onda grande fora da vista; tempo mínimo); nave sempre na tela; flutuação
+      sutil na calma; reduzir movimento; (b) véu de luz nas bordas e espaço mais escuro além delas; (c) fundo de
+      estrelas sem emendas visto de baixo; (d) chegada animada de cada chefe atravessando a borda; (e) cena viva
+      (câmera lenta forte, jogador protegido e sem controle 2–3 s, câmera baixa que pode girar, sobe antes de devolver o
+      controle) só na chegada do chefe, `run-won` e morte; queda de chefe no meio = destaque curto de cima. Ordem: (a) e
+      (b) primeiro; (c) e (d) podem correr em paralelo; (e) depois deles. (4) ele joga e ajusta.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.
