@@ -66,6 +66,16 @@ describe('AchievementService', () => {
     expect(entry.progress).toBe(0);
   });
 
+  it('ignores an Elite Tether that blows itself up for elite-hunter', () => {
+    const { eventBus, service } = setup();
+    eventBus.emit('enemy-destroyed', {
+      enemy: { type: 'mine', elite: true },
+      source: { cause: 'mine-detonation' },
+    });
+    const entry = service.getEntries().find((e) => e.id === 'elite-hunter');
+    expect(entry.progress).toBe(0);
+  });
+
   it('iron-escort needs a victory flown in the Bastion hull', () => {
     const { eventBus, unlocked } = setup();
     eventBus.emit('run-won', { wave: 15, hullId: 'solar-slicer' });

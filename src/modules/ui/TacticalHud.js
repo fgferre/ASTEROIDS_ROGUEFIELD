@@ -561,6 +561,7 @@ export class TacticalHud {
   }
 
   onEnemyDestroyed(payload = {}) {
+    if (payload.source?.cause === 'mine-detonation') return;
     this.layout?.addKillFeed(
       payload.enemy?.type,
       payload.enemy?.elite,
