@@ -3,7 +3,7 @@
 Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo veredito dele jogando (Mac M1, 60 fps):
 1, 3, 6, 7, 8, 9 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 16.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 17.**
 
 ## O BASTÃO — onde a sessão parou (18/10, noite) — RODADAS 12 E 13 (PARCIAL) MESCLADAS NA `main` (PR #261); SESSÃO NA NUVEM ENCERRADA, ELE SEGUE EM CONVERSA LOCAL
 
@@ -85,8 +85,8 @@ R13.6–R13.8 no PLAN.
 dias de desafio"_ (Rodadas 5–13 aprovadas; itens 1, 3, 7, 8 fechados); _"tudo roda bem a 60 fps num Mac M1, podemos
 até aumentar qualidade, detalhe e elementos 3D"_ (itens 6 e 9 fechados); a faixa escura (item 15) segue aberta; sobre
 as dívidas (arquivos grandes etc.): _"analise se ainda está assim mesmo, mas temos que melhorar isso"_. Goal
-seguinte **decidido** (19/10, ele: "você sabe o que é melhor fazer"): **Rodada 0 — fábrica de conteúdo + teto de
-linhas** (PLAN.md), e só depois o goal de longevidade estilo Vampire Survivors.
+seguinte **decidido** (19/10, ele: "você sabe o que é melhor fazer"): **Rodada 0** (feita na conversa local, PR #280); em seguida, decidido com ele em 19/10 de manhã,
+**Rodada 14 — janela inteira, HUD de instrumento, guardas no gate** (PLAN.md), e só depois a **Rodada 15 — longevidade**.
 
 **Tudo visto só em headless sem GPU (1–4 fps); nada ouvido em browser.** `?stats=1`/F8 mostra fps/ms reais.
 
@@ -98,6 +98,12 @@ container pode reiniciar; apagar/arquivar refs remotas em massa é bloqueado na 
 ## Jogabilidade e sensação
 
 - **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
+
+## HUD e janela (palavras dele, 19/10, manhã)
+
+- **(16)** _"O radar está muito básico… todos os instrumentos do painel não condizem com a realidade nova de um projeto
+  AAA."_ / _"O app tem uma janela dinâmica… precisa se adaptar a isso também."_ → Rodada 14 no PLAN (janela inteira,
+  `HUD.md`, instrumentos por maquete aprovada por ele). Fecha quando ele disser que o painel está à altura do jogo.
 
 ## Goal novo (palavras dele, 18/10, fim de tarde)
 

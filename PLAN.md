@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 0 na `main` desde 19/10, PR #280)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 0 na `main` desde 19/10, PR #280; Rodada 14 decidida 19/10)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --merges main`, PRs até #280). Decisões de produto são do dono,
@@ -48,10 +48,49 @@ inimigos e 3 armas migrados com comportamento igual (trace); nenhum arquivo acim
 **O que ficou de fora, de propósito:** Wardens e Heralds continuam classes (só os dados viraram conteúdo); padrões de
 arma orbital/aura/cadeia nascem quando uma arma pedir; instancing de inimigos não foi feito porque a medida não pediu.
 
-## Próximo goal (proposto 19/10; ele decide)
+## Rodada 14 (decidida 19/10, manhã, com ele) — a janela inteira, um HUD de instrumento, e guardas no gate
 
-Longevidade estilo Vampire Survivors sobre a fábrica: 12+ armas, 30+ inimigos, 6 biomas, árvore de desbloqueios. Cada
-item novo é um brief "adicione X seguindo CONTENT.md"; números são proposta, ele joga.
+Dele (19/10): _"o radar está muito básico… todos os instrumentos do painel não condizem com a realidade nova de um
+projeto AAA"_; _"o app tem uma janela dinâmica… precisa se adaptar"_; _"vocês acham que esse box fixo é a melhor
+solução para um browser?"_ (não é: herança do Canvas 800×600; nenhuma razão de estilo). Liberdade no **como** (estilo,
+movimento, instrumentos); o **o quê** fica travado por critérios verificáveis. Nada aqui muda balance: a arena segue
+800×600 lógicos com wrap; a câmera segue presa dentro do campo.
+
+- [ ] **14.1 Conferir antes de mexer (Explore, 10 min).** Como `viewport.js`/UISystem dimensionam o campo hoje; se o
+      renderer usa a densidade real de pixels (`setPixelRatio` e teto); como o HUD escala entre 1280×720 e 2560×1440;
+      se menu/Hangar/Códice estão na mesma caixa 4:3. Registrar os fatos no topo desta rodada.
+- [ ] **14.2 A janela inteira.** O jogo ocupa toda a janela em qualquer proporção (16:9, 16:10, 21:9, 4:3) e densidade;
+      a vista é uma fatia da arena com a proporção da janela, **nunca além da borda do campo** (teste: em 21:9 a câmera
+      presa ao campo não expõe o wrap); canvas 3D na densidade real com teto por preset (Retina do M1 a 60 fps); botão
+      e tecla de tela cheia; áreas seguras; nenhum texto cortado em 1280×720. Captura em quatro proporções.
+- [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
+      agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
+      entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.
+- [ ] **14.4 Maquete antes de código.** Cada instrumento novo nasce como imagem (HTML estático sobre captura real),
+      ele aprova, só então implementa. Começar pelo **radar tático**: anéis de distância em escala real, blips com
+      forma por tipo (rocha, máquina, Elite, Warden, pickup/orbe), direção das ameaças rápidas, marcas de pouso do
+      Caster, zoom acompanhando a câmera, bordas que apontam o que está fora. Em seguida: recargas (dash, escudo,
+      arma) como anéis ancorados na nave; barras de casco/escudo/XP com hierarquia e pulso; chips de arma/mira/dash
+      como ícones; barra de chefe com fases; feed de abates. Menos instrumentos, mais densos.
+- [ ] **14.5 Menu, Hangar, Códice e Settings na mesma linguagem** do `HUD.md`, na janela inteira.
+- [ ] **14.6 Legibilidade em horda.** Com 200 inimigos (`?content=drone&count=200`), telegrafias, silhuetas e cores de
+      ameaça lidas em meio segundo; passe de contraste e de prioridade visual (ameaça > pickup > decoração).
+- [ ] **14.7 Guardas no gate.** Orçamento de quadro por cena (`?content=` e hero: tempo de quadro medido em headless
+      com limite; falha se estourar) e capturas de referência por cena (diferença acima do limite exige aprovação dele
+      — o teste não passa sozinho). Golden trace segue verde em toda fatia.
+
+**Pronto quando:** sem faixas pretas em 16:9 e 21:9; 60 fps em Retina no M1 na horda; radar e instrumentos
+implementados a partir de maquetes que ele aprovou; menu/Hangar/Códice na mesma linguagem; as duas guardas no gate;
+golden trace verde. **Fora de escopo:** conteúdo novo (Rodada 15).
+
+## Rodada 15 (próxima; texto do goal já redigido) — longevidade
+
+Longevidade estilo Vampire Survivors sobre a fábrica e sobre o HUD novo: 12+ armas com evolução e Apex próprios, 30+
+inimigos com papéis distintos, 6 biomas com segredos, eventos e chefes próprios, roster de cascos com habilidade única,
+árvore de desbloqueios e desafios que atravessam dias, runs de 20–30 min com centenas de inimigos a 60 fps, infinito
+que escala; qualidade por padrão mais alta (volumetria, feixes na poeira, Anel partido modelado, herói e chefes com
+material de próxima geração). Cada item novo é um brief "adicione X seguindo CONTENT.md"; até cinco ajudantes em
+paralelo; números são proposta; ele joga.
 
 ## Decisões já tomadas
 
