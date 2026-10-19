@@ -66,8 +66,9 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       nomes); sobra só o mapa `TYPE_CLASSES` até 0a.3. `tests/content/{registry,enemies}.test.js` validam cada item.
       Regra: arquivo de conteúdo importa só constantes (`src/data/constants/`) e outros arquivos de conteúdo — nunca
       `GameConstants` nem um módulo que lê o registro (ciclo de import que derruba tudo ao carregar).
-- [ ] **0a.2 Cena de conteúdo.** `?content=<id>` coloca qualquer item do registro diante da nave (hero generalizada);
-      acaba o script de captura sob medida por worker.
+- [x] **0a.2 Cena de conteúdo** (19/10): `?content=<id>` (ou `<tipo>/<id>`) põe inimigo (`&count=` até 300), chefe,
+      arma, casco, carta ou camada diante da nave numa partida real, spawner parado, nave invulnerável; inimigo e chefe
+      sem a nave atirar, a não ser com `&fire=1`. `src/bootstrap/contentScene.js`; visto no navegador (Caster).
 - [ ] **0a.3 Inimigo = receita.** Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
       investida, fase) e de mortes (dividir, filhotes, devolver orbes, explodir) sobre as estratégias de movimento que
       já existem; a receita declara stats, move, attack, onDeath, afixos, drops, cues, Códice e **papéis** para o
@@ -80,7 +81,11 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       `scavenger`, `fromLayer`), não por nome.
 - [ ] **0a.7 `CONTENT.md`** de uma página: como adicionar inimigo, arma, carta, casco, fase. O brief de um worker vira
       "adicione X seguindo CONTENT.md" — 1–2 arquivos, cinco em paralelo sem conflito.
-- [ ] **0a.8 Motor de horda.** Inimigos por instância (como as rochas), balas e partículas em GPU, orçamentos por
+- [ ] **0a.8 Motor de horda** — medição de partida (19/10, neste Mac M1, Chromium com a GPU real via ANGLE Metal,
+      `?content=drone&count=N&quality=ultra`, 300 quadros após 25 s): a simulação de 200 Motes custa 0,38 ms/quadro
+      (Node); na tela 1×, 200 Motes = 60,0 fps e 300 atirando = 58,8; **na densidade Retina (2×) com a nave atirando, 200
+      Motes = 55,4 fps, p95 33 ms** (1 Mote: 60,0 / 18,3). O custo é de desenho, não de lógica. Script de medida no
+      scratchpad da sessão (Playwright global, sem dependência no repo). Pedido original: Inimigos por instância (como as rochas), balas e partículas em GPU, orçamentos por
       quadro; meta: **200 Motes a 60 fps no Mac M1**, medido por ele.
 
 ### 0b — os arquivos gigantes que a fábrica não encolhe
