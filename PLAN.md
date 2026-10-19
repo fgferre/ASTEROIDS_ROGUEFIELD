@@ -140,12 +140,15 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         desenhado no 3D; saiu com `renderStrategy`, os blocos `render` dos 12 dados (nenhum campo lido pelo 3D), o
         desenho base dos inimigos e a esculpida do sprite da rocha. Medição: 1 ajudante opus, 1 tentativa, 131k tokens,
         10 min.
-    - [ ] 3 Separar a lógica dos avisos e indicadores do desenho 2D em `effects/draw2d.js`; campos do combate que só
-          alimentavam o desenho; `ctx` nulo no app; comentários e script de benchmark órfãos; `src/README.md`,
-          `tests/README.md`, BACKLOG.
-  - [ ] 4 Museu: passo em `deploy.yml` que gera a tag em `dist/classic/`, tag publicada, botão "Jogar a versão 2D
-        original" nos créditos, captura.
-  - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
+    - [x] 3 Restos (commit f142116; portão verde, 1134 testes): as listas de avisos e indicadores do arquivo de efeitos 2D só
+          alimentavam o próprio desenho (o 3D lê o estado do chefe e o HUD desenha os próprios chevrons), então o arquivo
+          saiu inteiro; `ctx` nulo, getters do combate, schema, presets, payload do chefe, pulso da mina e script de
+          benchmark órfão também. Medição: 1 ajudante opus, 1 tentativa, 190k tokens, 14 min. Restos da era 2D fora do
+          desenho ficaram em uma linha do BACKLOG.
+    - [x] 4 Museu (commits 469bcb5, 0124f96): `deploy.yml` faz checkout da tag `classic-2d` e a compila em `dist/classic/`;
+          link "Play the original 2D game" nos créditos, acima da dobra (só resolve no site publicado). Tag e ramo
+          `classic` criados localmente (bc1ad27 + prefixo `classic:` nos dados salvos, conferido no navegador).
+    - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
 
 ## Fora de escopo deste plano
 
