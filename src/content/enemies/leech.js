@@ -56,4 +56,7 @@ export default {
   config: LEECH_CONFIG,
   components: LEECH_COMPONENTS,
   rewards: LEECH_REWARDS,
+  pool: { initial: 2, max: 8 },
+  tags: ['enemy', 'hostile', 'scavenger'],
+  affixes: ['shielded', 'swift'],
 };

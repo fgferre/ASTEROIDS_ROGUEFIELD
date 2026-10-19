@@ -48,4 +48,7 @@ export default {
   config: BULWARK_CONFIG,
   components: BULWARK_COMPONENTS,
   rewards: BULWARK_REWARDS,
+  pool: { initial: 2, max: 8 },
+  tags: ['enemy', 'hostile', 'armored'],
+  affixes: ['swift', 'volatile', 'splitter', 'warded'],
 };

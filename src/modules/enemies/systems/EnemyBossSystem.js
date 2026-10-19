@@ -4,7 +4,8 @@
 // and which kinds a boss may summon.
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
-import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { getContent } from '../../../content/registry.js';
 
 export class EnemyBossSystem {
   /**
@@ -251,7 +252,7 @@ export class EnemyBossSystem {
         return false;
       }
 
-      if (!ENEMY_TYPES?.[candidate] && candidate !== 'asteroid') {
+      if (!getContent('enemies', candidate) && candidate !== 'asteroid') {
         return false;
       }
 
@@ -269,20 +270,15 @@ export class EnemyBossSystem {
       normalized.push(key);
     }
 
+    // None available: the first of the base Warden's minion kinds, then of
+    // every registered kind, that is.
     if (!normalized.length) {
-      if (isTypeAvailable('drone')) {
-        normalized.push('drone');
-      } else if (isTypeAvailable('hunter')) {
-        normalized.push('hunter');
-      } else if (hasFactoryCheck) {
-        const fallback = factory.getRegisteredTypes?.() || [];
-        for (let i = 0; i < fallback.length; i += 1) {
-          const candidate = fallback[i];
-          if (candidate && candidate !== 'boss' && isTypeAvailable(candidate)) {
-            normalized.push(String(candidate).trim().toLowerCase());
-            break;
-          }
-        }
+      const fallback = [
+        ...(BOSS_CONFIG?.minionTypes ?? []),
+        ...(hasFactoryCheck ? factory.getRegisteredTypes?.() || [] : []),
+      ].find(isTypeAvailable);
+      if (fallback) {
+        normalized.push(String(fallback).trim().toLowerCase());
       }
     }
 

@@ -108,4 +108,8 @@ export default {
   config: DRONE_CONFIG,
   components: DRONE_COMPONENTS,
   rewards: DRONE_REWARDS,
+  pool: { initial: 10, max: 30 },
+  tags: ['enemy', 'hostile', 'ranged'],
+  affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
+  projectileColor: 'rgba(255, 96, 64, 0.92)',
 };

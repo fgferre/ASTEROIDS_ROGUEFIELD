@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { listContent } from '../../../src/content/registry.js';
 import RandomService from '../../../src/core/RandomService.js';
 import {
   AFFIX_IDS,
@@ -28,18 +29,7 @@ import Mine from '../../../src/modules/enemies/types/Mine.js';
 import Ram from '../../../src/modules/enemies/types/Ram.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 
-const SUPPORT_KINDS = [
-  'drone',
-  'hunter',
-  'mine',
-  'husk',
-  'ram',
-  'weaver',
-  'bulwark',
-  'caster',
-  'shade',
-  'leech',
-];
+const SUPPORT_KINDS = listContent('enemies').map(({ id }) => id);
 
 const createSystem = (overrides = {}) => ({
   eventBus: { emit: vi.fn() },

@@ -16,7 +16,8 @@ import {
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../../data/constants/gameplay.js';
-import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
+import { BOSS_CONFIG } from '../../data/constants/visual.js';
+import { getContent } from '../../content/registry.js';
 import { WEAPONS } from '../../data/weapons.js';
 
 const FLAK = WEAPONS.scatter.flak;
@@ -309,16 +310,10 @@ export class Projectiles {
     const enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
 
-    switch (enemyType) {
-      case 'hunter':
-        return 'rgba(80, 220, 255, 0.9)';
-      case 'mine':
-        return 'rgba(255, 204, 102, 0.9)';
-      case 'drone':
-        return 'rgba(255, 96, 64, 0.92)';
-      default:
-        return 'rgba(255, 120, 80, 0.9)';
-    }
+    return (
+      getContent('enemies', enemyType)?.projectileColor ??
+      'rgba(255, 120, 80, 0.9)'
+    );
   }
 
   resolveEnemyProjectileDamage(data = {}, projectile = {}) {
@@ -343,7 +338,9 @@ export class Projectiles {
       return bossProjectileDamage;
     }
 
-    const enemyConfig = enemyType ? ENEMY_TYPES?.[enemyType] : null;
+    const enemyConfig = enemyType
+      ? getContent('enemies', enemyType)?.config
+      : null;
     if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
       return enemyConfig.projectileDamage;
     }

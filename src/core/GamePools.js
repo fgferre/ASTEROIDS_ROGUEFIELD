@@ -16,16 +16,8 @@
 
 import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
 import { debugLog } from './debugLogging.js';
-import { Drone } from '../modules/enemies/types/Drone.js';
-import { Mine } from '../modules/enemies/types/Mine.js';
-import { Hunter } from '../modules/enemies/types/Hunter.js';
-import { Husk } from '../modules/enemies/types/Husk.js';
-import { Ram } from '../modules/enemies/types/Ram.js';
-import { Weaver } from '../modules/enemies/types/Weaver.js';
-import { Bulwark } from '../modules/enemies/types/Bulwark.js';
-import { Caster } from '../modules/enemies/types/Caster.js';
-import { Shade } from '../modules/enemies/types/Shade.js';
-import { Leech } from '../modules/enemies/types/Leech.js';
+import { listContent } from '../content/registry.js';
+import { TYPE_CLASSES } from '../modules/enemies/base/enemyTypeRegistry.js';
 import { IS_DEV } from './env.js';
 
 /**
@@ -41,16 +33,8 @@ export class GamePools {
   static bullets = null;
   static particles = null;
   static asteroids = null;
-  static drones = null;
-  static mines = null;
-  static hunters = null;
-  static husks = null;
-  static rams = null;
-  static weavers = null;
-  static bulwarks = null;
-  static casters = null;
-  static shades = null;
-  static leeches = null;
+  // One pool per roster enemy, by content id, sized by its `pool` field.
+  static enemyPools = new Map();
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
@@ -72,16 +56,6 @@ export class GamePools {
       bullets: { initial: 20, max: 100 },
       particles: { initial: 50, max: 300 },
       asteroids: { initial: 15, max: 80 },
-      drones: { initial: 10, max: 30 },
-      mines: { initial: 5, max: 15 },
-      hunters: { initial: 5, max: 12 },
-      husks: { initial: 3, max: 12 },
-      rams: { initial: 3, max: 12 },
-      weavers: { initial: 2, max: 8 },
-      bulwarks: { initial: 2, max: 8 },
-      casters: { initial: 2, max: 8 },
-      shades: { initial: 2, max: 8 },
-      leeches: { initial: 2, max: 8 },
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
@@ -93,16 +67,9 @@ export class GamePools {
     this.initializeBulletPool(config.bullets);
     this.initializeParticlePool(config.particles);
     this.initializeAsteroidPool(config.asteroids);
-    this.drones = this.createEnemyPool(Drone, config.drones);
-    this.mines = this.createEnemyPool(Mine, config.mines);
-    this.hunters = this.createEnemyPool(Hunter, config.hunters);
-    this.husks = this.createEnemyPool(Husk, config.husks);
-    this.rams = this.createEnemyPool(Ram, config.rams);
-    this.weavers = this.createEnemyPool(Weaver, config.weavers);
-    this.bulwarks = this.createEnemyPool(Bulwark, config.bulwarks);
-    this.casters = this.createEnemyPool(Caster, config.casters);
-    this.shades = this.createEnemyPool(Shade, config.shades);
-    this.leeches = this.createEnemyPool(Leech, config.leeches);
+    for (const { id, pool } of listContent('enemies')) {
+      this.enemyPools.set(id, this.createEnemyPool(TYPE_CLASSES[id], pool));
+    }
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);
     this.initializeTempObjectPool(config.tempObjects);
@@ -569,16 +536,7 @@ export class GamePools {
       this.bullets,
       this.particles,
       this.asteroids,
-      this.drones,
-      this.mines,
-      this.hunters,
-      this.husks,
-      this.rams,
-      this.weavers,
-      this.bulwarks,
-      this.casters,
-      this.shades,
-      this.leeches,
+      ...this.enemyPools.values(),
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -602,16 +560,7 @@ export class GamePools {
       this.bullets,
       this.particles,
       this.asteroids,
-      this.drones,
-      this.mines,
-      this.hunters,
-      this.husks,
-      this.rams,
-      this.weavers,
-      this.bulwarks,
-      this.casters,
-      this.shades,
-      this.leeches,
+      ...this.enemyPools.values(),
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -641,16 +590,9 @@ export class GamePools {
       bullets: this.bullets?.getStats() || null,
       particles: this.particles?.getStats() || null,
       asteroids: this.asteroids?.getStats() || null,
-      drones: this.drones?.getStats() || null,
-      mines: this.mines?.getStats() || null,
-      hunters: this.hunters?.getStats() || null,
-      husks: this.husks?.getStats() || null,
-      rams: this.rams?.getStats() || null,
-      weavers: this.weavers?.getStats() || null,
-      bulwarks: this.bulwarks?.getStats() || null,
-      casters: this.casters?.getStats() || null,
-      shades: this.shades?.getStats() || null,
-      leeches: this.leeches?.getStats() || null,
+      ...Object.fromEntries(
+        [...this.enemyPools].map(([id, pool]) => [id, pool.getStats()])
+      ),
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
       tempObjects: this.tempObjects?.getStats() || null,
@@ -679,16 +621,7 @@ export class GamePools {
       bullets: this.bullets,
       particles: this.particles,
       asteroids: this.asteroids,
-      drones: this.drones,
-      mines: this.mines,
-      hunters: this.hunters,
-      husks: this.husks,
-      rams: this.rams,
-      weavers: this.weavers,
-      bulwarks: this.bulwarks,
-      casters: this.casters,
-      shades: this.shades,
-      leeches: this.leeches,
+      ...Object.fromEntries(this.enemyPools),
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
       tempObjects: this.tempObjects,
@@ -723,16 +656,7 @@ export class GamePools {
     this.bullets = null;
     this.particles = null;
     this.asteroids = null;
-    this.drones = null;
-    this.mines = null;
-    this.hunters = null;
-    this.husks = null;
-    this.rams = null;
-    this.weavers = null;
-    this.bulwarks = null;
-    this.casters = null;
-    this.shades = null;
-    this.leeches = null;
+    this.enemyPools.clear();
     this.xpOrbs = null;
     this.shockwaves = null;
     this.tempObjects = null;
@@ -796,9 +720,6 @@ export const {
   bullets: BulletPool,
   particles: ParticlePool,
   asteroids: AsteroidPool,
-  drones: DronePool,
-  mines: MinePool,
-  hunters: HunterPool,
   xpOrbs: XPOrbPool,
   shockwaves: ShockwavePool,
   tempObjects: TempObjectPool,

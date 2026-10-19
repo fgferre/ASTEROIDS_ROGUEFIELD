@@ -52,4 +52,7 @@ export default {
   config: CASTER_CONFIG,
   components: CASTER_COMPONENTS,
   rewards: CASTER_REWARDS,
+  pool: { initial: 2, max: 8 },
+  tags: ['enemy', 'hostile', 'ranged', 'artillery'],
+  affixes: ['shielded', 'swift', 'warded'],
 };

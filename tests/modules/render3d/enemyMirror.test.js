@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { ENEMY_TYPES } from '../../../src/data/constants/visual.js';
+import { listContent } from '../../../src/content/registry.js';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
 import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
@@ -30,7 +30,8 @@ new Function(
 describe('EnemyMirror', () => {
   it('has a dedicated 3D look for every registered enemy type', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
-    for (const type of [...Object.keys(ENEMY_TYPES), 'asteroid', 'boss']) {
+    const roster = listContent('enemies').map(({ id }) => id);
+    for (const type of [...roster, 'asteroid', 'boss']) {
       expect(KNOWN_KINDS.has(type), type).toBe(true);
       expect(mirror.create(type).kind, type).toBe(type);
     }

@@ -13,7 +13,8 @@ import {
   createFallbackHandler,
   validateSnapshot,
 } from '../utils/StateManager.js';
-import { BOSS_CONFIG, ENEMY_TYPES } from '../data/constants/visual.js';
+import { BOSS_CONFIG } from '../data/constants/visual.js';
+import { getContent, listContent } from '../content/registry.js';
 import { IS_DEV } from '../core/env.js';
 import {
   getBossCollisionPadding,
@@ -154,12 +155,7 @@ class PhysicsSystem extends BaseSystem {
       }
     }
 
-    const enemyTypes = ENEMY_TYPES || {};
-    for (const config of Object.values(enemyTypes)) {
-      if (!config || typeof config !== 'object') {
-        continue;
-      }
-
+    for (const { config } of listContent('enemies')) {
       if (Number.isFinite(config.radius)) {
         radii.push(config.radius);
       }
@@ -218,7 +214,7 @@ class PhysicsSystem extends BaseSystem {
       if (enemy) {
         this.unregisterEnemy(enemy);
         if (
-          enemy.type === 'mine' &&
+          getContent('enemies', enemy.type)?.explodesOnDeath &&
           data.triggerMineExplosion !== false &&
           !this.mines.hasMineExplosionBeenHandled(enemy, data.enemyId)
         ) {

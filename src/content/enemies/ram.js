@@ -50,4 +50,7 @@ export default {
   config: RAM_CONFIG,
   components: RAM_COMPONENTS,
   rewards: RAM_REWARDS,
+  pool: { initial: 3, max: 12 },
+  tags: ['enemy', 'hostile', 'charger'],
+  affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
 };

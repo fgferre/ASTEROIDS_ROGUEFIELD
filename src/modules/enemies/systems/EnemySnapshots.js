@@ -3,10 +3,8 @@
 // field, and the whole system around them (exportState / importState).
 import RandomService from '../../../core/RandomService.js';
 import { ASTEROID_SIZES } from '../../../core/GameConstants.js';
-import { Drone } from '../types/Drone.js';
-import { Mine } from '../types/Mine.js';
-import { Hunter } from '../types/Hunter.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
+import { TYPE_CLASSES } from '../base/enemyTypeRegistry.js';
 import {
   safeNumber,
   deepClone,
@@ -516,15 +514,11 @@ export class EnemySnapshots {
       }
     }
 
-    if (!enemy) {
+    // Off the factory path: a roster enemy is built from its class.
+    const EnemyClass = TYPE_CLASSES[snapshotType];
+    if (!enemy && EnemyClass) {
       try {
-        if (snapshotType === 'drone') {
-          enemy = this.createEnemy(Drone, config);
-        } else if (snapshotType === 'mine') {
-          enemy = this.createEnemy(Mine, config);
-        } else if (snapshotType === 'hunter') {
-          enemy = this.createEnemy(Hunter, config);
-        }
+        enemy = this.createEnemy(EnemyClass, config);
       } catch (error) {
         console.error(
           '[EnemySystem] Failed to restore support enemy snapshot:',

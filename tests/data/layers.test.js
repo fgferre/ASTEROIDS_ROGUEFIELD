@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { listContent } from '../../src/content/registry.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import {
@@ -16,18 +17,7 @@ import {
   installDomStubs,
 } from '../__helpers__/headlessGame.js';
 
-const SUPPORT_KINDS = [
-  'drone',
-  'mine',
-  'hunter',
-  'husk',
-  'ram',
-  'bulwark',
-  'weaver',
-  'caster',
-  'shade',
-  'leech',
-];
+const SUPPORT_KINDS = listContent('enemies').map(({ id }) => id);
 
 const scheduledCount = (layer) =>
   layer.roster.reduce((sum, entry) => sum + entry.count, 0) +

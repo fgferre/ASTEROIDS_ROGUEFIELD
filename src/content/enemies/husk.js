@@ -47,4 +47,7 @@ export default {
   config: HUSK_CONFIG,
   components: HUSK_COMPONENTS,
   rewards: HUSK_REWARDS,
+  pool: { initial: 3, max: 12 },
+  tags: ['enemy', 'hostile', 'splitter'],
+  affixes: ['shielded', 'swift', 'volatile', 'warded'],
 };

@@ -65,11 +65,14 @@ export class BossWave {
       result.push(key);
     }
 
+    // None available: the first of the base Warden's minion kinds the field
+    // has.
     if (!result.length) {
-      if (availableKeys.has('drone')) {
-        result.push('drone');
-      } else if (availableKeys.has('hunter')) {
-        result.push('hunter');
+      const fallback = (BOSS_CONFIG?.minionTypes ?? []).find((key) =>
+        availableKeys.has(key)
+      );
+      if (fallback) {
+        result.push(fallback);
       }
     }
 

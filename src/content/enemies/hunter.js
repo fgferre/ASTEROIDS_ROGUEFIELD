@@ -113,4 +113,8 @@ export default {
   config: HUNTER_CONFIG,
   components: HUNTER_COMPONENTS,
   rewards: HUNTER_REWARDS,
+  pool: { initial: 5, max: 12 },
+  tags: ['enemy', 'hostile', 'ranged', 'elite'],
+  affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
+  projectileColor: 'rgba(80, 220, 255, 0.9)',
 };

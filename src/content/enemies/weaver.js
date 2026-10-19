@@ -42,4 +42,7 @@ export default {
   config: WEAVER_CONFIG,
   components: WEAVER_COMPONENTS,
   rewards: WEAVER_REWARDS,
+  pool: { initial: 2, max: 8 },
+  tags: ['enemy', 'hostile', 'layer'],
+  affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
 };

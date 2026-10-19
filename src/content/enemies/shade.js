@@ -60,4 +60,7 @@ export default {
   config: SHADE_CONFIG,
   components: SHADE_COMPONENTS,
   rewards: SHADE_REWARDS,
+  pool: { initial: 2, max: 8 },
+  tags: ['enemy', 'hostile', 'phasing'],
+  affixes: ['swift', 'volatile'],
 };

@@ -1,11 +1,12 @@
 // src/modules/physics/MineExplosions.js
 //
-// A mine's blast: when a mine dies, physics builds the explosion (where, how
-// wide, how hard) and hands it to the enemy system, once per mine. The
+// A mine's blast: when an enemy whose content file has `explodesOnDeath` (a
+// mine) dies, physics builds the explosion (where, how wide, how hard) from it
+// and its content config and hands it to the enemy system, once per mine. The
 // handled marks keep a mine that announced its own blast from going off
 // twice; PhysicsSystem clears a mine's marks when the pool brings it back.
 
-import { ENEMY_TYPES } from '../../data/constants/visual.js';
+import { getContent } from '../../content/registry.js';
 
 export class MineExplosions {
   /**
@@ -64,7 +65,7 @@ export class MineExplosions {
       return null;
     }
 
-    const defaults = (ENEMY_TYPES && ENEMY_TYPES.mine) || {};
+    const defaults = getContent('enemies', enemy.type)?.config ?? {};
     const position = data.position || {
       x: Number.isFinite(enemy.x) ? enemy.x : 0,
       y: Number.isFinite(enemy.y) ? enemy.y : 0,
@@ -112,7 +113,7 @@ export class MineExplosions {
     return {
       enemy,
       enemyId: enemy.id,
-      enemyType: enemy.type || 'mine',
+      enemyType: enemy.type,
       wave: data.wave ?? enemy.wave,
       position,
       velocity,

@@ -3,26 +3,16 @@
  *
  * The layer director's timed spawns (src/data/layers.js): the roster, surges,
  * field events and Herald flattened into one schedule and run on the layer's
- * clock, with the support kinds, their type keys and their defaults.
+ * clock, with the support kinds and their type keys.
  */
 
-import { ENEMY_TYPES } from '../../../data/constants/visual.js';
+import { listContent } from '../../../content/registry.js';
 import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
 
-// Support kinds the layer table can list; they spawn at a safe distance from
-// the player (asteroids come in from the edges).
-export const SUPPORT_KINDS = [
-  'drone',
-  'mine',
-  'hunter',
-  'husk',
-  'ram',
-  'bulwark',
-  'weaver',
-  'caster',
-  'shade',
-  'leech',
-];
+// Support kinds the layer table can list (every src/content/enemies item);
+// they spawn at a safe distance from the player (asteroids come in from the
+// edges).
+export const SUPPORT_KINDS = listContent('enemies').map(({ id }) => id);
 
 export class LayerSchedule {
   /**
@@ -49,17 +39,9 @@ export class LayerSchedule {
     this.isFieldEmpty = isFieldEmpty;
     this.checkWaveCompletion = checkWaveCompletion;
 
-    const enemyTypes = ENEMY_TYPES || {};
     this.enemyTypeKeys = {
       asteroid: 'asteroid',
-      drone: enemyTypes.drone?.key || 'drone',
-      mine: enemyTypes.mine?.key || 'mine',
-      hunter: enemyTypes.hunter?.key || 'hunter',
-    };
-    this.enemyTypeDefaults = {
-      drone: enemyTypes.drone || {},
-      mine: enemyTypes.mine || {},
-      hunter: enemyTypes.hunter || {},
+      ...Object.fromEntries(SUPPORT_KINDS.map((kind) => [kind, kind])),
     };
 
     // Timed spawns for the layer in progress (src/data/layers.js), sorted by
@@ -80,61 +62,14 @@ export class LayerSchedule {
     return String(type).toLowerCase() === asteroidKey;
   }
 
+  // The group carries only the kind and count: the factory fills in the
+  // rest from the kind's content file.
   createSupportGroup(kind, count) {
     if (!count || count <= 0) {
       return null;
     }
 
-    const defaults = this.enemyTypeDefaults || {};
-
-    switch (kind) {
-      case 'drone': {
-        const droneDefaults = defaults.drone || {};
-        return {
-          type: this.enemyTypeKeys?.drone || 'drone',
-          count,
-          fireRate: droneDefaults.fireRate,
-          fireVariance: droneDefaults.fireVariance,
-          fireSpread: droneDefaults.fireSpread,
-          projectileSpeed: droneDefaults.projectileSpeed,
-          projectileDamage: droneDefaults.projectileDamage,
-          targetingRange: droneDefaults.targetingRange,
-          speed: droneDefaults.speed,
-          acceleration: droneDefaults.acceleration,
-        };
-      }
-      case 'mine': {
-        const mineDefaults = defaults.mine || {};
-        return {
-          type: this.enemyTypeKeys?.mine || 'mine',
-          count,
-          armTime: mineDefaults.armTime,
-          proximityRadius: mineDefaults.proximityRadius,
-          explosionRadius: mineDefaults.explosionRadius,
-          explosionDamage: mineDefaults.explosionDamage,
-          lifetime: mineDefaults.lifetime,
-        };
-      }
-      case 'hunter': {
-        const hunterDefaults = defaults.hunter || {};
-        return {
-          type: this.enemyTypeKeys?.hunter || 'hunter',
-          count,
-          preferredDistance: hunterDefaults.preferredDistance,
-          burstCount: hunterDefaults.burstCount,
-          burstInterval: hunterDefaults.burstInterval,
-          burstDelay: hunterDefaults.burstDelay,
-          fireSpread: hunterDefaults.fireSpread,
-          projectileSpeed: hunterDefaults.projectileSpeed,
-          projectileDamage: hunterDefaults.projectileDamage,
-          fireRange: hunterDefaults.fireRange,
-          speed: hunterDefaults.speed,
-          acceleration: hunterDefaults.acceleration,
-        };
-      }
-      default:
-        return SUPPORT_KINDS.includes(kind) ? { type: kind, count } : null;
-    }
+    return SUPPORT_KINDS.includes(kind) ? { type: kind, count } : null;
   }
 
   /**

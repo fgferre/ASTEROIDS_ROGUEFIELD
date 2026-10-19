@@ -94,4 +94,9 @@ export default {
   config: MINE_CONFIG,
   components: MINE_COMPONENTS,
   rewards: MINE_REWARDS,
+  pool: { initial: 5, max: 15 },
+  tags: ['enemy', 'explosive', 'area-of-effect'],
+  affixes: ['shielded', 'splitter', 'warded'],
+  explodesOnDeath: true,
+  projectileColor: 'rgba(255, 204, 102, 0.9)',
 };

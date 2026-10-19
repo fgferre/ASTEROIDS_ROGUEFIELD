@@ -37,9 +37,7 @@ import {
   ASTEROID_VARIANTS,
   ORB_VALUE,
 } from '../../../data/enemies/asteroid-configs.js';
-import { DRONE_REWARDS } from '../../../content/enemies/drone.js';
-import { HUNTER_REWARDS } from '../../../content/enemies/hunter.js';
-import { MINE_REWARDS } from '../../../content/enemies/mine.js';
+import { listContent } from '../../../content/registry.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ELITE_MODIFIERS } from '../../../data/enemies/elite.js';
 import { AFFIX_XP_BONUS } from '../../../data/enemies/affixes.js';
@@ -184,61 +182,11 @@ export class RewardManager {
       },
     });
 
-    const droneRewards = DRONE_REWARDS;
-    // Drone rewards: base orb count configured with total XP target
-    configs.set('drone', {
-      totalXP: droneRewards?.totalXP ?? 30,
-      baseOrbs: () => droneRewards?.baseOrbs ?? 2,
-      sizeFactor: () => 1.0,
-      variantMultiplier: () => 1.0, // No variant scaling (yet)
-    });
-
-    const mineRewards = MINE_REWARDS;
-    // Mine rewards: randomized base orb count with total XP target
-    configs.set('mine', {
-      totalXP: mineRewards?.totalXP ?? 25,
-      baseOrbs: () => {
-        const min = mineRewards?.baseOrbsMin ?? 1;
-        const max = mineRewards?.baseOrbsMax ?? min;
-        const random = this.getRandomService();
-        if (random && typeof random.int === 'function') {
-          return random.int(min, max);
-        }
-        return min;
-      },
-      sizeFactor: () => 1.0,
-      variantMultiplier: () => 1.0,
-    });
-
-    const hunterRewards = HUNTER_REWARDS;
-    // Hunter rewards: base orb count configured with total XP target
-    configs.set('hunter', {
-      totalXP: hunterRewards?.totalXP ?? 50,
-      baseOrbs: () => hunterRewards?.baseOrbs ?? 3,
-      sizeFactor: () => 1.0,
-      variantMultiplier: () => 1.0, // No variant scaling (yet)
-    });
-
-    // Husk, Ram, Weaver, Bulwark, Caster, Shade, Leech, Herald: fixed base
-    // orbs with a total XP target (a Leech's hoard comes back on its own).
-    for (const type of [
-      'husk',
-      'ram',
-      'weaver',
-      'bulwark',
-      'caster',
-      'shade',
-      'leech',
-      'herald',
-    ]) {
-      const rewards = ENEMY_REWARDS[type];
-      configs.set(type, {
-        totalXP: rewards.totalXP,
-        baseOrbs: () => rewards.baseOrbs,
-        sizeFactor: () => 1.0,
-        variantMultiplier: () => 1.0,
-      });
+    // Roster enemies (src/content/enemies) and the Herald.
+    for (const { id, rewards } of listContent('enemies')) {
+      configs.set(id, this.orbRewardConfig(rewards));
     }
+    configs.set('herald', this.orbRewardConfig(ENEMY_REWARDS.herald));
 
     const bossRewards = BOSS_REWARDS;
     // Boss rewards: base orb count configured with total XP target.
@@ -253,6 +201,31 @@ export class RewardManager {
     });
 
     return configs;
+  }
+
+  /**
+   * A total XP target over a base orb count, fixed (`baseOrbs`) or rolled
+   * between `baseOrbsMin` and `baseOrbsMax` (a Leech's hoard comes back on
+   * its own).
+   */
+  orbRewardConfig(rewards) {
+    return {
+      totalXP: rewards.totalXP,
+      baseOrbs:
+        rewards.baseOrbsMin === undefined
+          ? () => rewards.baseOrbs
+          : () => {
+              const min = rewards.baseOrbsMin;
+              const max = rewards.baseOrbsMax ?? min;
+              const random = this.getRandomService();
+              if (random && typeof random.int === 'function') {
+                return random.int(min, max);
+              }
+              return min;
+            },
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0,
+    };
   }
 
   /**

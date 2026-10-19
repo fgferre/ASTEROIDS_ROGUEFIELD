@@ -1,6 +1,8 @@
 // src/modules/enemies/base/enemyTypeRegistry.js
-// Every enemy type the factory can build: class, pool, defaults and tags.
+// Every enemy type the factory can build: class, pool, defaults and tags. The
+// roster's data is its src/content/enemies file; only its class is named here.
 import { GamePools } from '../../../core/GamePools.js';
+import { listContent } from '../../../content/registry.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { Drone } from '../types/Drone.js';
 import { Mine } from '../types/Mine.js';
@@ -15,23 +17,29 @@ import { Caster } from '../types/Caster.js';
 import { Shade } from '../types/Shade.js';
 import { Leech } from '../types/Leech.js';
 import { Herald } from '../types/Herald.js';
-import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
-import { DRONE_COMPONENTS } from '../../../content/enemies/drone.js';
-import { HUNTER_COMPONENTS } from '../../../content/enemies/hunter.js';
-import { MINE_COMPONENTS } from '../../../content/enemies/mine.js';
+import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 import {
   BOSS_COMPONENTS,
   WARDEN_KINDS,
   wardenComponents,
 } from '../../../data/enemies/boss.js';
-import { HUSK_COMPONENTS } from '../../../content/enemies/husk.js';
-import { RAM_COMPONENTS } from '../../../content/enemies/ram.js';
-import { WEAVER_COMPONENTS } from '../../../content/enemies/weaver.js';
-import { BULWARK_COMPONENTS } from '../../../content/enemies/bulwark.js';
-import { CASTER_COMPONENTS } from '../../../content/enemies/caster.js';
-import { SHADE_COMPONENTS } from '../../../content/enemies/shade.js';
-import { LEECH_COMPONENTS } from '../../../content/enemies/leech.js';
 import { HERALD_COMPONENTS } from '../../../data/enemies/herald.js';
+
+// The class behind each roster enemy, by content id (GamePools builds its
+// pools from it too). The next step of the content factory replaces these
+// classes with recipes.
+export const TYPE_CLASSES = Object.freeze({
+  drone: Drone,
+  mine: Mine,
+  hunter: Hunter,
+  husk: Husk,
+  ram: Ram,
+  weaver: Weaver,
+  bulwark: Bulwark,
+  caster: Caster,
+  shade: Shade,
+  leech: Leech,
+});
 
 /**
  * Registers every enemy type with the factory. The boss minion list is
@@ -50,54 +58,13 @@ export function registerEnemyTypes(factory, { getAvailableBossMinionTypes }) {
     tags: ['destructible', 'enemy'],
   });
 
-  if (ENEMY_TYPES?.drone) {
-    factory.registerType('drone', {
-      class: Drone,
-      pool: GamePools?.drones || null,
-      defaults: { ...ENEMY_TYPES.drone, components: DRONE_COMPONENTS },
-      tags: ['enemy', 'hostile', 'ranged'],
-    });
-  }
-
-  if (ENEMY_TYPES?.mine) {
-    factory.registerType('mine', {
-      class: Mine,
-      pool: GamePools?.mines || null,
-      defaults: { ...ENEMY_TYPES.mine, components: MINE_COMPONENTS },
-      tags: ['enemy', 'explosive', 'area-of-effect'],
-    });
-  }
-
-  if (ENEMY_TYPES?.hunter) {
-    factory.registerType('hunter', {
-      class: Hunter,
-      pool: GamePools?.hunters || null,
-      defaults: { ...ENEMY_TYPES.hunter, components: HUNTER_COMPONENTS },
-      tags: ['enemy', 'hostile', 'ranged', 'elite'],
-    });
-  }
-
-  const supportKinds = [
-    ['husk', Husk, GamePools?.husks, HUSK_COMPONENTS, ['splitter']],
-    ['ram', Ram, GamePools?.rams, RAM_COMPONENTS, ['charger']],
-    ['weaver', Weaver, GamePools?.weavers, WEAVER_COMPONENTS, ['layer']],
-    ['bulwark', Bulwark, GamePools?.bulwarks, BULWARK_COMPONENTS, ['armored']],
-    [
-      'caster',
-      Caster,
-      GamePools?.casters,
-      CASTER_COMPONENTS,
-      ['ranged', 'artillery'],
-    ],
-    ['shade', Shade, GamePools?.shades, SHADE_COMPONENTS, ['phasing']],
-    ['leech', Leech, GamePools?.leeches, LEECH_COMPONENTS, ['scavenger']],
-  ];
-  for (const [type, EnemyClass, pool, components, tags] of supportKinds) {
-    factory.registerType(type, {
-      class: EnemyClass,
-      pool: pool || null,
-      defaults: { ...ENEMY_TYPES[type], components },
-      tags: ['enemy', 'hostile', ...tags],
+  // The roster: every src/content/enemies item, in its `order`.
+  for (const { id, config, components, tags } of listContent('enemies')) {
+    factory.registerType(id, {
+      class: TYPE_CLASSES[id],
+      pool: GamePools.enemyPools.get(id) || null,
+      defaults: { ...config, components },
+      tags,
     });
   }
 
