@@ -109,7 +109,18 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         A fragmentação do feixe voltou ao domínio de inimigos (`spawnBeamFragments`, mesma contagem). Medição: dez
         ajudantes (nove opus, um sonnet; 60 a 290 mil tokens cada), três comparações roteirizadas byte a byte (visual,
         efeitos ×2), portão de primeira em todos os recortes; sessão principal em 59% da janela (590 mil tokens) ao fim.
-  - [ ] **R13.8.5** autoridade das ondas; depois escopos de random. Parar antes de mesclar: o dono joga.
+  - [ ] **R13.8.5 Autoridade das ondas** (ramo `r13/ondas-uma-autoridade`, aberto 18/10). Decisão: NÃO virar a chave
+        `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (o caminho "true" soltava todas as rochas de uma vez, sem cadência nem limite);
+        o WaveManager vira dono único herdando a cadência atual. Prova em cada recorte: sonda headless (3 sementes ×
+        1500/7200/3000 quadros) comparando spawns, eventos e contadores entre a main e o ramo, byte a byte.
+    - [x] 5.1 Subtração: chave, override, caminho "tudo de uma vez", espelho e rajada do caminho morto removidos (commit
+          798bed6; 35.100 quadros idênticos).
+    - [ ] 5.2 Dono único: cadência das rochas e rajada inicial no WaveManager; `waveState` vira snapshot derivado; espelho do
+          EnemyUpdateSystem e modo legado sem WaveManager removidos (ajudante em curso em 18/10, mesma prova).
+    - [ ] 5.3 Escopos de random: consolidar só o que a prova mostrar equivalente (rótulos e ordem dos sorteios fazem parte
+          dos replays).
+    - [ ] Fechamento: `npm run done`, sonda no navegador (partida, arena de chefe, easter egg 2D), PR aberto e **parar: o dono
+          joga antes de mesclar**.
 
 ## Fora de escopo deste plano
 
