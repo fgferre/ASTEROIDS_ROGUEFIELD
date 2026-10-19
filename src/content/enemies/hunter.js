@@ -125,4 +125,13 @@ export default {
     // The lens brightens over this window before a burst (docs/NORTE.md §3).
     'weapon-telegraph': { telegraph: 0.4 },
   }),
+  // Its burst flashes and plays as one burst; it dies in a shockwave.
+  effects: { fire: 'burst-flash', death: 'shock-burst' },
+  cues: { fired: 'playHunterBurst' },
+  codex: {
+    lore: 'A long-range keeper. Its lens lights the moment it has you.',
+    hint: 'The lens glows before each shot. Break line of sight.',
+    glyph:
+      '<polygon points="15,0 0,-7 -13,0 0,7"/><circle class="eye" cx="8" r="2.2"/>',
+  },
 };

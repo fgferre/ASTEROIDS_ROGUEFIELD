@@ -1,6 +1,7 @@
 // src/data/story.js
 
 import { deepFreeze } from '../utils/deepFreeze.js';
+import { listContent } from '../content/registry.js';
 
 // What the Wardens say to the pilot (docs/NORTE.md §1, §7 pillar 1). Warden
 // lines are keyed by layer, not by boss class. Each line stays under 90
@@ -25,19 +26,13 @@ export const STORY = deepFreeze({
       "Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.",
   },
   // Spoken by the Ring the first time a support machine is ever seen (the
-  // Codex's first meeting). Machines without a line arrive unannounced.
-  sighting: {
-    husk: 'Dead keeper, still on its route. Its cargo is not dead.',
-    caster:
-      'Beacon keeper, awake. It marks your next position. Choose another.',
-    ram: 'Lane clearer. Its task: remove debris. It has classified you.',
-    leech:
-      'Light keeper, hungry. It eats what you drop. Break it to take it back.',
-    shade:
-      'Phase keeper. Half here, half not. When it returns, it returns close.',
-    bulwark: 'Line keeper. Its face is a wall. Its back is not.',
-    weaver: 'Weaver. It does not fire. It closes the lanes behind you.',
-  },
+  // Codex's first meeting): the `sighting` line of its content file.
+  // Machines without a line arrive unannounced.
+  sighting: Object.fromEntries(
+    listContent('enemies')
+      .filter((enemy) => enemy.sighting)
+      .map((enemy) => [enemy.id, enemy.sighting])
+  ),
   // Warden Prime, as a Boss Rush opens on its gate.
   bossRush:
     'Three gates. Nothing between them. You will be counted at every one.',

@@ -7,15 +7,16 @@
 
 // Hits feel like hits (PLAN.md step 5). PROPOSAL from 17/10, judged by playing.
 // Hit-stop on every kill: the world runs at `scale` speed, easing back to
-// full speed over `duration` s (freeze frame). Before 17/10 only the large
-// fragment (0.18 s at 24 %) and the Tether blast (0.14-0.26 s at 18 %) had one.
+// full speed over `duration` s (freeze frame), by rock size or by the death
+// effect (EnemyEffects' DEATH_EFFECTS). Before 17/10 only the large fragment
+// (0.18 s at 24 %) and the Tether blast (0.14-0.26 s at 18 %) had one.
 const HIT_STOP = Object.freeze({
   small: { duration: 0.05, scale: 0.3 }, // was none
   medium: { duration: 0.08, scale: 0.25 }, // was none
   large: { duration: 0.18, scale: 0.24 }, // unchanged
-  drone: { duration: 0.05, scale: 0.3 }, // Mote, was none
-  hunter: { duration: 0.09, scale: 0.25 }, // Seeker, was none
-  mine: { duration: 0.12, scale: 0.18 }, // Tether, was 0.14-0.26 s by radius
+  'spark-burst': { duration: 0.05, scale: 0.3 }, // the Mote's, was none
+  'shock-burst': { duration: 0.09, scale: 0.25 }, // the Seeker's, was none
+  blast: { duration: 0.12, scale: 0.18 }, // the Tether's, was 0.14-0.26 s by radius
 });
 // A kind re-triggers at most once per this many seconds of game time, so a
 // multishot that kills three smalls freezes once.

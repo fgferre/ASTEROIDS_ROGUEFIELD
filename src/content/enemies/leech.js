@@ -61,4 +61,12 @@ export default {
       burstEvent: 'leech-burst',
     },
   }),
+  codex: {
+    lore: 'The Ring kept its light in small bellies so that none of it was ever lost. This one has forgotten whose light it keeps.',
+    hint: 'Eats loose XP and pickups, grows, and flees when full. Kill it to get it all back, with interest.',
+    glyph:
+      '<ellipse rx="14" ry="10"/><path fill="none" d="M-6 -8.8 Q-4 0 -6 8.8 M5 -9.4 Q7 0 5 9.4"/><ellipse class="eye" cx="-0.5" rx="4.5" ry="3.5"/><circle cx="13" r="2.5"/>',
+  },
+  sighting:
+    'Light keeper, hungry. It eats what you drop. Break it to take it back.',
 };

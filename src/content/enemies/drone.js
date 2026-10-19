@@ -118,4 +118,13 @@ export default {
     'fork-streams': {},
     'spawn-on-field': { margin: 100, spread: 100 },
   }),
+  // How it looks and sounds: its shot flashes and plays the plain shot cue
+  // (the defaults); it dies in a spark burst, with a small explosion.
+  effects: { death: 'spark-burst' },
+  explosion: 'small',
+  codex: {
+    lore: 'The smallest of the Ring’s keepers. It wakes in swarms and never alone.',
+    hint: 'Fast and fragile. Fires one shot at a time, aimed ahead of you; change course.',
+    glyph: '<circle r="9"/><circle class="eye" r="3"/>',
+  },
 };

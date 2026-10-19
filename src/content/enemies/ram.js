@@ -64,4 +64,13 @@ export default {
       chargeEvent: 'ram-charged',
     },
   }),
+  // It shares the Warden's telegraph event but spins up with its own cue.
+  cues: { telegraph: 'playRamSpinUp' },
+  codex: {
+    lore: 'Built to clear debris from the Ring’s lanes. It still does.',
+    hint: 'Stops, winds up, then charges straight. Step aside.',
+    glyph:
+      '<polygon points="14,0 -9,-11 -4,0 -9,11"/><circle class="eye" cx="7" r="2"/>',
+  },
+  sighting: 'Lane clearer. Its task: remove debris. It has classified you.',
 };

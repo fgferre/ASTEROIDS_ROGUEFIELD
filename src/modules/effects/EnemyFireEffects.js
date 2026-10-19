@@ -1,11 +1,19 @@
 // src/modules/effects/EnemyFireEffects.js
 //
-// What the enemies' guns do, as light: the drone, hunter and boss muzzle
-// flashes. EnemyEffects owns it and picks the flash by the shooter's kind.
+// What the enemies' guns do, as light: the muzzle flash, the burst flash and
+// the boss's. EnemyEffects owns it and picks the flash the shooter's content
+// file names.
 
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { BOSS_FX } from './BossTransitions.js';
 import { ENEMY_FX } from './EnemyFx.js';
+
+// The flashes an enemy's content file can name (`effects.fire`), by the
+// method that plays each.
+export const FIRE_EFFECTS = Object.freeze({
+  'muzzle-flash': 'createMuzzleFlash',
+  'burst-flash': 'createBurstFlash',
+});
 
 export class EnemyFireEffects {
   /**
@@ -95,7 +103,7 @@ export class EnemyFireEffects {
     return { x: vx / speed, y: vy / speed, speed };
   }
 
-  createDroneMuzzleFlash(payload = {}) {
+  createMuzzleFlash(payload = {}) {
     const origin = this.resolveEnemyProjectileOrigin(payload);
     if (!origin) {
       return;
@@ -168,7 +176,7 @@ export class EnemyFireEffects {
     this.addScreenShake(2.2, 0.1);
   }
 
-  createHunterBurstEffect(payload = {}) {
+  createBurstFlash(payload = {}) {
     const origin = this.resolveEnemyProjectileOrigin(payload);
     if (!origin) {
       return;

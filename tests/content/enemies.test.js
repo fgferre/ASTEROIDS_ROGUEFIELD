@@ -1,12 +1,18 @@
 // What every enemy item (src/content/enemies) owes the engine: the fields the
 // factory, its pool, the rewards, the Elite affixes, mine blasts and enemy
 // shots read, and a recipe to build it from: behaviors the library has, with
-// the params each reads. Every kind a layer asks for, and every enemy one
-// spawns, is one of these items.
+// the params each reads. Its look and sound, when it names them, are effects,
+// cues and sizes the engine has. Every kind a layer asks for, and every enemy
+// one spawns, is one of these items.
 import { describe, expect, it } from 'vitest';
 import { getContent, listContent } from '../../src/content/registry.js';
+import { AUDIO_EVENT_CUES } from '../../src/data/audio/eventCues.js';
+import { EXPLOSION_PROFILES } from '../../src/data/audio/explosions.js';
 import { AFFIX_IDS, ELITE_AFFIXES } from '../../src/data/enemies/affixes.js';
 import { LAYERS, LAYER_MODIFIERS } from '../../src/data/layers.js';
+import SFXBus from '../../src/modules/audio/SFXBus.js';
+import { DEATH_EFFECTS } from '../../src/modules/effects/EnemyEffects.js';
+import { FIRE_EFFECTS } from '../../src/modules/effects/EnemyFireEffects.js';
 import { BEHAVIORS } from '../../src/modules/enemies/behaviors/index.js';
 import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
 
@@ -18,6 +24,8 @@ const isKind = {
   number: Number.isFinite,
   string: (v) => typeof v === 'string',
 };
+// The cue kinds the event table reads from an enemy file (`cueOf` rows).
+const CUE_KINDS = AUDIO_EVENT_CUES.flatMap(({ cueOf }) => cueOf ?? []);
 
 describe('enemy content', () => {
   it.each(enemies)('$id has the stats, components and rewards', (enemy) => {
@@ -69,6 +77,42 @@ describe('enemy content', () => {
           expect(isKind[kind](params[key]), `${name}.${key}`).toBe(true);
         }
         if (behavior.usesRandom) expect(seeded, name).toBe(true);
+      }
+    }
+  );
+
+  it.each(enemies)(
+    '$id names flashes, deaths, cues and an explosion size the engine has',
+    ({ effects = {}, cues = {}, explosion }) => {
+      expect(['fire', 'death']).toEqual(
+        expect.arrayContaining(Object.keys(effects))
+      );
+      if (effects.fire != null) {
+        expect(Object.keys(FIRE_EFFECTS)).toContain(effects.fire);
+      }
+      if (effects.death !== undefined) {
+        expect(Object.keys(DEATH_EFFECTS)).toContain(effects.death);
+      }
+      for (const [kind, cue] of Object.entries(cues)) {
+        expect(CUE_KINDS).toContain(kind);
+        expect(typeof SFXBus.prototype[cue], cue).toBe('function');
+      }
+      if (explosion !== undefined) {
+        expect([...Object.keys(EXPLOSION_PROFILES), null]).toContain(explosion);
+      }
+    }
+  );
+
+  it.each(enemies)(
+    '$id has Codex text and a sighting line of the right shape',
+    ({ codex = {}, sighting }) => {
+      for (const [key, value] of Object.entries(codex)) {
+        expect(['lore', 'hint', 'glyph']).toContain(key);
+        expect(typeof value, key).toBe('string');
+      }
+      if (sighting !== undefined) {
+        expect(typeof sighting).toBe('string');
+        expect(sighting.length).toBeLessThanOrEqual(90);
       }
     }
   );

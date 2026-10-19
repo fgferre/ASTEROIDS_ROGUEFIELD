@@ -957,23 +957,21 @@ describe('Sound API parity after SFXBus extraction (02.07)', () => {
 });
 
 describe('SFXBus explosion-size routing (enemy-destroyed → small/medium/large)', () => {
-  it('routes rocks by size, enemies by type, bumps elites and skips mines', () => {
+  it('routes rocks by size, enemies by their file, bumps elites and skips mines', () => {
     const route = (payload) => resolveExplosionSize(payload);
     expect(route({ size: 'small' })).toBe('small');
     expect(route({ size: 'medium' })).toBe('medium');
     expect(route({ size: 'large' })).toBe('large');
-    expect(route({ enemyType: 'mote' })).toBe('small');
     expect(route({ enemyType: 'drone' })).toBe('small');
-    expect(route({ enemyType: 'seeker' })).toBe('medium');
-    expect(route({ enemyType: 'husk' })).toBe('medium');
+    expect(route({ enemyType: 'hunter' })).toBe('medium');
+    // no `explosion` in its file: the default
     expect(route({ enemy: { type: 'ram' } })).toBe('medium');
-    expect(route({ enemyType: 'weaver' })).toBe('medium');
     expect(route({ enemyType: 'bulwark' })).toBe('large');
-    expect(route({ enemyType: 'warden' })).toBe('large');
+    expect(route({ enemyType: 'boss' })).toBe('large');
     expect(route({ enemyType: 'something-new' })).toBe('medium');
-    expect(route({ enemyType: 'seeker', elite: true })).toBe('large');
-    expect(route({ enemy: { type: 'mote', elite: true } })).toBe('medium');
-    expect(route({ enemyType: 'warden', elite: true })).toBe('large');
+    expect(route({ enemyType: 'hunter', elite: true })).toBe('large');
+    expect(route({ enemy: { type: 'drone', elite: true } })).toBe('medium');
+    expect(route({ enemyType: 'boss', elite: true })).toBe('large');
     expect(route({ enemyType: 'mine' })).toBeNull();
   });
 });

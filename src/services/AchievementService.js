@@ -19,10 +19,12 @@ const WARDEN_ACHIEVEMENTS = {
   choir: 'choir-silenced',
   null: 'null-and-void',
 };
-const KILL_ACHIEVEMENTS = {
-  caster: 'counter-battery',
-  shade: 'unphased',
-};
+const KILL_ACHIEVEMENTS = Object.fromEntries(
+  ACHIEVEMENTS.filter((entry) => entry.enemy).map((entry) => [
+    entry.enemy,
+    entry.id,
+  ])
+);
 const HULL_ITEM_IDS = HANGAR_ITEMS.filter((item) => item.unlocksHull).map(
   (item) => item.id
 );

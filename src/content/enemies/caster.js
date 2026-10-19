@@ -62,4 +62,12 @@ export default {
       landEvent: 'caster-shell-landed',
     },
   }),
+  codex: {
+    lore: 'It once lit the beacons that marked the Ring’s lanes. It still marks them. You are standing on one.',
+    hint: 'A ring marks where its shell will land. Be gone before it closes.',
+    glyph:
+      '<circle r="8"/><rect x="3" y="-3.5" width="11" height="7" rx="1"/><circle class="eye" cx="11" r="2"/>',
+  },
+  sighting:
+    'Beacon keeper, awake. It marks your next position. Choose another.',
 };

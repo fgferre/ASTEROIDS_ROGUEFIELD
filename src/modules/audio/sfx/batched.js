@@ -50,7 +50,6 @@ export function createBatchedCues(sfx) {
     const intensity = Math.min(1.2, 0.6 + speedRatio * 0.5);
 
     return {
-      type: 'drone',
       frequency: baseFrequency,
       detune,
       duration,
@@ -59,11 +58,6 @@ export function createBatchedCues(sfx) {
       wave,
       pan: Number(data?.pan) || 0,
       distance: data?.distance || null,
-      enemyType: (
-        data?.enemyType ||
-        data?.enemy?.type ||
-        'drone'
-      ).toLowerCase(),
     };
   }
 
@@ -93,7 +87,6 @@ export function createBatchedCues(sfx) {
     const spacing = 0.05;
 
     return {
-      type: 'hunter',
       baseFrequency,
       frequencyJitter,
       shotCount: totalShots,
@@ -107,11 +100,6 @@ export function createBatchedCues(sfx) {
         burst.id !== undefined
           ? `hunter:${burst.id}`
           : `hunter:${data?.enemyId ?? 'unknown'}:${data?.wave ?? 'w0'}`,
-      enemyType: (
-        data?.enemyType ||
-        data?.enemy?.type ||
-        'hunter'
-      ).toLowerCase(),
     };
   }
 
@@ -126,7 +114,6 @@ export function createBatchedCues(sfx) {
     const duration = 0.42 + Math.min(0.16, intensity * 0.12);
 
     return {
-      type: 'mine',
       duration,
       startFrequency: 110 - intensity * 35,
       endFrequency: 38,
@@ -135,20 +122,15 @@ export function createBatchedCues(sfx) {
       intensity,
       pan: Number(data?.pan) || 0,
       distance: data?.distance || null,
-      enemyType: (data?.enemyType || data?.enemy?.type || 'mine').toLowerCase(),
     };
   }
 
-  function resolveEnemySoundPriority(enemyType, data = {}) {
-    const normalizedType =
-      typeof enemyType === 'string' ? enemyType.toLowerCase() : '';
-    const caps = {
-      drone: 2,
-      hunter: 3,
-      mine: 3,
-    };
-
-    const cap = caps[normalizedType] ?? 2;
+  /**
+   * An enemy cue's batch priority: one step per 8 waves up to the cue's `cap`,
+   * at least the cue's own `floor` (how big this shot or blast is) and the
+   * payload's explicit priority, never past the cap.
+   */
+  function enemyCuePriority(cap, floor, data = {}) {
     let priority = 1;
 
     const wave = Number(data?.wave);
@@ -156,25 +138,7 @@ export function createBatchedCues(sfx) {
       priority = Math.max(priority, Math.min(cap, Math.ceil(wave / 8)));
     }
 
-    if (normalizedType === 'drone') {
-      const projectileSpeed = Number(data?.projectile?.speed);
-      const velocityMagnitude = Math.hypot(
-        data?.velocity?.x ?? 0,
-        data?.velocity?.y ?? 0
-      );
-      const speed = Number.isFinite(projectileSpeed)
-        ? projectileSpeed
-        : velocityMagnitude;
-      if (Number.isFinite(speed) && speed > 360) {
-        priority = Math.max(priority, 2);
-      }
-    } else if (normalizedType === 'hunter') {
-      const burst = data?.projectile?.burst || {};
-      const totalShots = Math.max(1, Math.floor(burst.total ?? 1));
-      priority = Math.max(priority, Math.min(cap, totalShots));
-    } else if (normalizedType === 'mine') {
-      priority = cap;
-    }
+    priority = Math.max(priority, floor);
 
     const explicitPriority = Number(data?.priority);
     if (Number.isFinite(explicitPriority)) {
@@ -206,7 +170,16 @@ export function createBatchedCues(sfx) {
     sfx.trackPerformance('playDroneFire');
 
     const params = normalizeDroneFireOptions(data);
-    const priority = resolveEnemySoundPriority(params.enemyType, data);
+    // A fast shot (over 360 px/s) rises to the cap.
+    const projectileSpeed = Number(data?.projectile?.speed);
+    const speed = Number.isFinite(projectileSpeed)
+      ? projectileSpeed
+      : Math.hypot(data?.velocity?.x ?? 0, data?.velocity?.y ?? 0);
+    const priority = enemyCuePriority(
+      2,
+      Number.isFinite(speed) && speed > 360 ? 2 : 1,
+      data
+    );
 
     if (
       sfx.scheduleBatchedSound('playDroneFire', params, {
@@ -228,7 +201,10 @@ export function createBatchedCues(sfx) {
       return;
     }
 
-    const priority = resolveEnemySoundPriority(params.enemyType, data);
+    // One step per shot in the burst.
+    const burst = data?.projectile?.burst || {};
+    const totalShots = Math.max(1, Math.floor(burst.total ?? 1));
+    const priority = enemyCuePriority(3, Math.min(3, totalShots), data);
 
     if (
       sfx.scheduleBatchedSound('playHunterBurst', params, {
@@ -246,7 +222,8 @@ export function createBatchedCues(sfx) {
     sfx.trackPerformance('playMineExplosion');
 
     const params = normalizeMineExplosionOptions(data);
-    const priority = resolveEnemySoundPriority(params.enemyType, data);
+    // A blast always plays at the cap.
+    const priority = enemyCuePriority(3, 3, data);
 
     if (
       sfx.scheduleBatchedSound('playMineExplosion', params, {

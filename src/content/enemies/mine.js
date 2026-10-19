@@ -111,4 +111,14 @@ export default {
       explosionDamage: MINE_CONFIG.explosionDamage,
     },
   }),
+  // It dies in its blast; its blast cue (mine-exploded) is its death sound,
+  // so no generic explosion plays.
+  effects: { death: 'blast' },
+  explosion: null,
+  codex: {
+    lore: 'A Ring seal that arms when anything warm comes near.',
+    hint: 'Detonates on approach. Shoot it from range.',
+    glyph:
+      '<path fill="none" stroke-width="2.5" d="M0 -5 L0 -14 M4.3 2.5 L12 7 M-4.3 2.5 L-12 7"/><circle r="6"/><circle class="eye" r="2"/>',
+  },
 };

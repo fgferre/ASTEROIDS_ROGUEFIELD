@@ -49,4 +49,13 @@ export default {
       speed: 120, // proposta 17/10: outward px/s of each Mote
     },
   }),
+  // It hisses open and its Motes pop out over the explosion.
+  cues: { destroyed: 'playHuskRelease' },
+  codex: {
+    lore: 'A dead keeper still drifting its route, full of sleeping Motes.',
+    hint: 'Slow and heavy. Splits into drones when destroyed.',
+    glyph:
+      '<polygon points="-13,-2 -8,-11 3,-13 12,-6 13,6 4,13 -8,11"/><circle class="eye" cx="-2" cy="1" r="2"/><circle class="eye" cx="5" cy="-4" r="1.5"/>',
+  },
+  sighting: 'Dead keeper, still on its route. Its cargo is not dead.',
 };

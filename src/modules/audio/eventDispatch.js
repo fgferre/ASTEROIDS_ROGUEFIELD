@@ -1,6 +1,7 @@
 // Reads the event → sound table (src/data/audio/eventCues.js; its header
 // documents every row field) and registers one AudioSystem listener per event
 // that runs the event's rows in order.
+import { getContent } from '../../content/registry.js';
 import { AUDIO_EVENT_CUES } from '../../data/audio/eventCues.js';
 import { resolveStereoPan } from './SFXBus.js';
 import { AUDIO_EVENT_HANDLERS, sourceSpatial } from './eventHandlers.js';
@@ -17,6 +18,12 @@ function read(payload, spec) {
 
 function enemyTypeOf(payload) {
   return String(payload?.enemyType || payload?.enemy?.type || '').toLowerCase();
+}
+
+/** A `cueOf` row's cue for the payload's enemy item; undefined for other types. */
+function enemyCue(row, payload) {
+  const enemy = getContent('enemies', enemyTypeOf(payload));
+  return enemy && (enemy.cues?.[row.cueOf] ?? row.cue);
 }
 
 function typeMatches(row, type) {
@@ -88,23 +95,27 @@ export function registerAudioEventCues(audio) {
     audio.registerEventListener(eventName, (payload) => {
       let typePlayed = false;
       eventRows.forEach((row) => {
-        if (row.type !== undefined) {
-          if (typePlayed || !typeMatches(row, enemyTypeOf(payload))) return;
+        const typed = row.type !== undefined || row.cueOf !== undefined;
+        if (typed && typePlayed) return;
+        if (row.type !== undefined && !typeMatches(row, enemyTypeOf(payload))) {
+          return;
         }
+        const cue = row.cueOf ? enemyCue(row, payload) : row.cue;
+        if (row.cueOf && !cue) return;
         if (!conditionsHold(row, payload)) return;
         if (row.throttleMs !== undefined) {
           const now = performance.now();
           if (now - (lastPlayedAt.get(row) ?? 0) <= row.throttleMs) return;
           lastPlayedAt.set(row, now);
         }
-        if (row.type !== undefined) typePlayed = true;
+        if (typed) typePlayed = true;
 
         if (row.run) {
           AUDIO_EVENT_HANDLERS[row.run](audio, payload, eventName);
           return;
         }
         const target = row.facade ? audio : audio.sfxBus;
-        target[row.cue](...cueArgs(audio, row, payload));
+        target[cue](...cueArgs(audio, row, payload));
         if (row.duck) {
           audio._duckBigMoment();
         }

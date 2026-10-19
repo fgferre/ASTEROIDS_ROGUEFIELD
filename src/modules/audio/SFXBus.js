@@ -15,6 +15,7 @@ import {
   EXPLOSION_SIZE_BY_ENEMY_TYPE,
 } from '../../data/audio/explosions.js';
 import { GAME_WIDTH } from '../../core/GameConstants.js';
+import { getContent } from '../../content/registry.js';
 import { createBatchedCues } from './sfx/batched.js';
 import { createExplosionCues } from './sfx/explosions.js';
 import { createMachineCues } from './sfx/machines.js';
@@ -30,8 +31,9 @@ const ASTEROID_SIZES = new Set(EXPLOSION_SIZE_ORDER);
 
 /**
  * Explosion size for an enemy-destroyed payload: asteroids by their `size`,
- * other enemies by EXPLOSION_SIZE_BY_ENEMY_TYPE (unknown → default), `elite`
- * bumps one size up. Returns null when the enemy has its own death cue (mine).
+ * enemy items by their file's `explosion`, other enemies by
+ * EXPLOSION_SIZE_BY_ENEMY_TYPE (unknown → default), `elite` bumps one size
+ * up. Returns null when the enemy has its own death cue (the mine).
  *
  * @param {object} payload
  * @returns {'small'|'medium'|'large'|null}
@@ -42,12 +44,16 @@ export function resolveExplosionSize(payload = {}) {
     payload?.enemyType || enemy.type || (payload?.size ? 'asteroid' : '')
   ).toLowerCase();
 
+  const item = getContent('enemies', type);
   let size;
   if (type === 'asteroid') {
     const asteroidSize = payload?.size ?? enemy.size;
     size = ASTEROID_SIZES.has(asteroidSize)
       ? asteroidSize
       : EXPLOSION_DEFAULT_SIZE;
+  } else if (item) {
+    size =
+      item.explosion === undefined ? EXPLOSION_DEFAULT_SIZE : item.explosion;
   } else if (
     Object.prototype.hasOwnProperty.call(EXPLOSION_SIZE_BY_ENEMY_TYPE, type)
   ) {

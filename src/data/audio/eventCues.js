@@ -1,8 +1,8 @@
 // src/data/audio/eventCues.js
 // Game event → sound. One row per step an event plays, in the order it plays;
 // src/modules/audio/eventDispatch.js registers one listener per event and runs
-// its rows top to bottom. Enemy cues are rows, never code, so an enemy's
-// content file can later bring its own.
+// its rows top to bottom. Enemy cues are rows, never code; an enemy's own cue
+// comes from its content file (`cues`, read by a `cueOf` row).
 //
 // Row fields:
 //   on          the EventBus event.
@@ -15,6 +15,9 @@
 //   type        plays only for this enemy type (payload.enemyType, else
 //               enemy.type, lowercased); among an event's type rows the first
 //               match plays. '*' = any type, but the ones in `except`.
+//   cueOf       a type row for enemy items (src/content/enemies): plays the
+//               cue the enemy's file names under `cues.<cueOf>`, else `cue`
+//               (none → the row plays nothing for that enemy).
 //   duck        true → the big-moment music duck right after the cue.
 //   throttleMs  plays only if more than this many ms passed since it last did.
 // Arguments, in this order (none of them → the cue gets no argument):
@@ -49,8 +52,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     arg: 'size',
   },
   { on: 'enemy-destroyed', run: 'explosion' },
-  // A Husk hisses open and its drones pop out over the explosion.
-  { on: 'enemy-destroyed', type: 'husk', cue: 'playHuskRelease', at: 'source' },
+  // An enemy's own death cue (the Husk's release), over the explosion.
+  { on: 'enemy-destroyed', cueOf: 'destroyed', at: 'source' },
   { on: 'enemy-destroyed', run: 'enemyDestroyed' },
   {
     on: 'asteroid-volatile-exploded',
@@ -84,9 +87,9 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'hangar-purchased', cue: 'playHangarPurchase' },
   { on: 'onboarding-step', cue: 'playTipChime' },
 
-  // The Ram shares the Warden's telegraph event but spins up with its own cue;
-  // other non-bosses get the enemy cue (the boss keeps EffectsSystem's roar).
-  { on: 'boss-telegraph', type: 'ram', cue: 'playRamSpinUp', at: 'source' },
+  // An enemy may bring its own windup (the Ram's spin-up); other non-bosses
+  // get the enemy cue (the boss keeps EffectsSystem's roar).
+  { on: 'boss-telegraph', cueOf: 'telegraph', at: 'source' },
   {
     on: 'boss-telegraph',
     type: '*',
@@ -137,26 +140,12 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'transmission-shown', cue: 'playTransmissionVoice', arg: 'speaker' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },
 
-  // Enemy shots, by the firing machine (the batcher reads the shot's fields).
+  // Enemy shots, by the firing machine (the batcher reads the shot's fields):
+  // its own shot cue, else the Mote's plain shot.
   {
     on: 'enemy-fired',
-    type: 'drone',
+    cueOf: 'fired',
     cue: 'playDroneFire',
-    payload: true,
-    at: 'source',
-  },
-  // The Shade's fan (three shots at once) shares the Mote's shot cue.
-  {
-    on: 'enemy-fired',
-    type: 'shade',
-    cue: 'playDroneFire',
-    payload: true,
-    at: 'source',
-  },
-  {
-    on: 'enemy-fired',
-    type: 'hunter',
-    cue: 'playHunterBurst',
     payload: true,
     at: 'source',
   },

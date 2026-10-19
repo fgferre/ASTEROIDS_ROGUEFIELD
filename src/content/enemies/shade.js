@@ -65,4 +65,15 @@ export default {
       pattern: 'shade-fan',
     },
   }),
+  // Its fan (three shots at once) plays the Mote's shot cue (the default)
+  // but shows no muzzle flash.
+  effects: { fire: null },
+  codex: {
+    lore: 'A keeper that learned to step half out of the Field. Only its edges stay behind.',
+    hint: 'Cannot be hit while faded. It returns at your side and fires a fan.',
+    glyph:
+      '<polygon points="14,0 1,-6 -11,-12 -6,-3 -9,0 -6,3 -11,12 1,6"/><circle class="eye" cx="5" r="2"/>',
+  },
+  sighting:
+    'Phase keeper. Half here, half not. When it returns, it returns close.',
 };

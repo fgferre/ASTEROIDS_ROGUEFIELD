@@ -50,4 +50,12 @@ export default {
       halfArc: BULWARK_SHIELD_HALF_ARC,
     },
   }),
+  explosion: 'large',
+  codex: {
+    lore: 'A wall that walks. The Ring made it to hold the line.',
+    hint: 'Its front plate blocks shots. Flank it, or break the plate.',
+    glyph:
+      '<path d="M5 -13 A13 13 0 0 1 5 13 L1 9 A9 9 0 0 0 1 -9 Z"/><circle cx="-5" r="7"/><circle class="eye" cx="-5" r="2"/>',
+  },
+  sighting: 'Line keeper. Its face is a wall. Its back is not.',
 };

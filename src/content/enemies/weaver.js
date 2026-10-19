@@ -57,4 +57,11 @@ export default {
       event: 'weaver-tether-laid',
     },
   }),
+  codex: {
+    lore: 'It does not attack. It closes the Field around you.',
+    hint: 'Orbits you and lays Tethers behind it. Kill it first.',
+    glyph:
+      '<circle r="12" fill="none" stroke-dasharray="3 3"/><circle r="5"/><circle class="eye" r="2"/>',
+  },
+  sighting: 'Weaver. It does not fire. It closes the lanes behind you.',
 };

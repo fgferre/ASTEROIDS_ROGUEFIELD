@@ -1,19 +1,33 @@
 // src/modules/effects/EnemyEffects.js
 //
 // What the enemies and the field do, as light, split by subject: this file
-// holds the per-kind death effects (mine, drone, hunter, asteroid) and the
-// choice of effect by the enemy's kind; the muzzle flashes live in
+// holds the death effects (spark burst, shock burst, blast, debris) and picks
+// the one an enemy's content file names; the muzzle flashes live in
 // EnemyFireEffects, the crack debris in CrackEffects and the Volatile rock's
 // and Caster shell's blasts in VolatileEffects. EffectsSystem owns it and its
 // enemy listeners land here.
 
+import { getContent } from '../../content/registry.js';
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { ShakePresets } from '../../utils/ScreenShake.js';
 import { SpaceParticle } from '../EffectEntities.js';
 import { CrackEffects } from './CrackEffects.js';
-import { EnemyFireEffects } from './EnemyFireEffects.js';
+import { EnemyFireEffects, FIRE_EFFECTS } from './EnemyFireEffects.js';
 import { ENEMY_FX } from './EnemyFx.js';
 import { VolatileEffects } from './VolatileEffects.js';
+
+// The deaths an enemy's content file can name (`effects.death`), by the
+// method that plays each. `debris` is the rock-chip burst: rocks, Heralds and
+// an enemy that names none die that way.
+export const DEATH_EFFECTS = Object.freeze({
+  'spark-burst': 'createSparkBurst',
+  'shock-burst': 'createShockBurst',
+  blast: 'createDeathBlast',
+  debris: 'createDebris',
+});
+// The flash of an enemy whose file names none (`effects.fire: null` names no
+// flash).
+const DEFAULT_FIRE_EFFECT = 'muzzle-flash';
 
 // Light lingers (docs/NORTE.md §2): PROPOSAL from 17/10, judged by playing.
 // A multiplier on the old lifetimes: asteroid explosion embers were
@@ -85,7 +99,7 @@ export class EnemyEffects {
       addScreenFlash,
     });
 
-    // Mines whose blast already played; a mine leaving the pool again is
+    // Enemies whose blast already played; one leaving the pool again is
     // forgotten in onEnemySpawned.
     this.processedMineExplosions = new WeakSet();
   }
@@ -94,33 +108,25 @@ export class EnemyEffects {
 
   onEnemyFired(payload = {}) {
     const type = this.resolveEnemyType(payload);
-    switch (type) {
-      case 'drone':
-        this.fireEffects.createDroneMuzzleFlash(payload);
-        break;
-      case 'hunter':
-        this.fireEffects.createHunterBurstEffect(payload);
-        break;
-      case 'boss':
-        this.fireEffects.createBossAttackEffect(payload);
-        break;
-      default:
-        break;
+    if (type === 'boss') {
+      this.fireEffects.createBossAttackEffect(payload);
+      return;
+    }
+    const enemy = getContent('enemies', type);
+    if (!enemy) {
+      return;
+    }
+    const fire = enemy.effects?.fire;
+    const effect = fire === undefined ? DEFAULT_FIRE_EFFECT : fire;
+    if (effect) {
+      this.fireEffects[FIRE_EFFECTS[effect]](payload);
     }
   }
 
   onEnemySpawned(payload = {}) {
-    const enemy = payload?.enemy;
-    if (!enemy || !(this.processedMineExplosions instanceof WeakSet)) {
-      return;
+    if (payload?.enemy) {
+      this.processedMineExplosions.delete(payload.enemy);
     }
-
-    const isMine = enemy.type === 'mine' || payload.type === 'mine';
-    if (!isMine) {
-      return;
-    }
-
-    this.processedMineExplosions.delete(enemy);
   }
 
   onVolatileArmed(data) {
@@ -235,7 +241,7 @@ export class EnemyEffects {
       maxDuration: 1.2,
     });
     this.addScreenFlash(flashColor, 0.22, 0.2 + radiusFactor * 0.05);
-    this.addHitStop('mine');
+    this.addHitStop('blast');
 
     this.particleEffects.createShockwaveEffect({
       position,
@@ -310,7 +316,7 @@ export class EnemyEffects {
     }
   }
 
-  createDroneDestructionEffect(enemy, context = {}) {
+  createSparkBurst(enemy, context = {}) {
     if (!enemy) {
       return;
     }
@@ -339,7 +345,7 @@ export class EnemyEffects {
     };
 
     this.addScreenShake('droneDestroyed');
-    this.addHitStop('drone');
+    this.addHitStop('spark-burst');
     this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
@@ -397,7 +403,7 @@ export class EnemyEffects {
     }
   }
 
-  createHunterDestructionEffect(enemy, context = {}) {
+  createShockBurst(enemy, context = {}) {
     if (!enemy) {
       return;
     }
@@ -426,7 +432,7 @@ export class EnemyEffects {
     };
 
     this.addScreenShake('hunterDestroyed');
-    this.addHitStop('hunter');
+    this.addHitStop('shock-burst');
     this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
     this.particleEffects.createShockwaveEffect({
       position,
@@ -495,54 +501,53 @@ export class EnemyEffects {
     }
   }
 
+  // A blast death (the mine's): the blast, once, sized by its explosion
+  // radius.
+  createDeathBlast(enemy, context = {}) {
+    const blastPayload = {
+      ...context,
+      enemy,
+    };
+    if (!blastPayload.position) {
+      blastPayload.position = {
+        x: Number.isFinite(enemy.x) ? enemy.x : 0,
+        y: Number.isFinite(enemy.y) ? enemy.y : 0,
+      };
+    }
+    if (
+      !Number.isFinite(blastPayload.radius) &&
+      Number.isFinite(enemy.explosionRadius)
+    ) {
+      blastPayload.radius = enemy.explosionRadius;
+    }
+    if (!blastPayload.velocity) {
+      blastPayload.velocity = {
+        x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
+        y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
+      };
+    }
+    this.createMineExplosion(blastPayload);
+  }
+
+  // Every enemy-destroyed lands here: the death its content file names, else
+  // debris.
   createAsteroidExplosion(asteroid, context = {}) {
     if (!asteroid) {
       return;
     }
 
     const enemyType = this.resolveEnemyType({ enemy: asteroid });
-    if (enemyType === 'drone') {
-      this.createDroneDestructionEffect(asteroid, context);
-      return;
-    }
-
-    if (enemyType === 'hunter') {
-      this.createHunterDestructionEffect(asteroid, context);
-      return;
-    }
-
-    if (enemyType === 'mine') {
-      const minePayload = {
-        ...context,
-        enemy: asteroid,
-      };
-      if (!minePayload.position) {
-        minePayload.position = {
-          x: Number.isFinite(asteroid.x) ? asteroid.x : 0,
-          y: Number.isFinite(asteroid.y) ? asteroid.y : 0,
-        };
-      }
-      if (
-        !Number.isFinite(minePayload.radius) &&
-        Number.isFinite(asteroid.explosionRadius)
-      ) {
-        minePayload.radius = asteroid.explosionRadius;
-      }
-      if (!minePayload.velocity) {
-        minePayload.velocity = {
-          x: Number.isFinite(asteroid.vx) ? asteroid.vx : 0,
-          y: Number.isFinite(asteroid.vy) ? asteroid.vy : 0,
-        };
-      }
-      this.createMineExplosion(minePayload);
-      return;
-    }
-
     if (enemyType === 'boss') {
       // Boss explosions are handled by dedicated boss events to avoid duplicates.
       return;
     }
 
+    const death = getContent('enemies', enemyType)?.effects?.death ?? 'debris';
+    this[DEATH_EFFECTS[death]](asteroid, context);
+  }
+
+  // Rock chips and embers in the rock's colors, sized by the rock.
+  createDebris(asteroid) {
     const variantColors =
       typeof asteroid.getVariantColors === 'function'
         ? asteroid.getVariantColors()
