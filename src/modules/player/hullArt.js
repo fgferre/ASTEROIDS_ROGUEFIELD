@@ -107,6 +107,8 @@ const buildHullGeometry = (visual, levels) => {
         facing: { x: panel.facing.x / length, y: panel.facing.y / length },
         rcsPort: Number.isInteger(panel.rcsPort) ? points[panel.rcsPort] : null,
         armor: Boolean(panel.armor),
+        // an add-on fin an upgrade level brings in (the 3D tail fins)
+        flap: Boolean(panel.minLevel),
       };
     });
   const thrusterLevel = levelOf('thruster');
@@ -141,6 +143,7 @@ const buildHullGeometry = (visual, levels) => {
     retroPorts: visual.retroPorts,
     rcsPorts: panels.filter((panel) => panel.rcsPort).map((p) => p.rcsPort),
     cockpit: visual.cockpit,
+    form: visual.form,
     minX,
     maxX,
     maxY,

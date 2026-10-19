@@ -9,6 +9,18 @@
 // `minLevel` hides a panel until that upgrade level. An `armor` panel rides
 // on the plates under it as two stacked plates trimmed in the accent; a
 // visual's `albedo` scales its hull tones.
+//
+// A visual's `form` shapes the 3D hull (render3d/hullModel.js), in
+// SHIP_SIZE units: `body` stations [x, half-width, chine height, deck rise,
+// keel drop] from nose to stern, lofted; `deck` and `belly` exponents [m, n]
+// of the cross-section, height share (1 − |t|^m)^(1/n) at lateral fraction
+// t; `spine` and `keel` the shares of the deck and belly in the light and
+// dark tones; `seams` x of dark bands; `prow` where the cyan chine line
+// ends; `wing` (fin panels) and `flap` (panels with a `minLevel`) { lift:
+// root height, cant: degrees, tc: [root, tip] thickness/chord, belly:
+// underside share }; `intake` x of the cheek intakes; `nacelle` fairing
+// length ahead of each nozzle; `pods` wingtip pods; `armor` lift of the
+// armour slabs; `canopy` height of the glass.
 import { SHIP_SIZE } from '../../../data/constants/physics.js';
 
 const S = SHIP_SIZE;

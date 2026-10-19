@@ -1,30 +1,37 @@
 // src/modules/MenuHullPreview.js
 
-// The chosen hull on the main menu: the panels of shipModels.js extruded as
-// matte plates (dark base from the outline, fins, raised body and prow),
-// glowing nozzles with a thruster plume in the hull accent (cyan
-// Interceptor, amber Solar Slicer and Bastion; the Bastion's shoulder armour
-// stacked in two plates on darker steel). The menu's key light circles the hull as
-// the camera orbits, so a fixed screen-space studio light (hull shader only)
-// keeps it readable when the key light is behind it. It hangs off the menu
-// camera, framed into the #menu-hull-stage box, and turns slowly on its
-// own axis (still with reduced motion). A stand-in for the game's
-// render3d/playerMirror.js hull, which has no standalone factory.
+// The chosen hull on the main menu and in the Hangar: the game's own 3D ship
+// (render3d/hullModel.js, laid out as render3d/playerMirror.js draws it, at
+// the hull's base upgrade levels) under menu materials: the matte
+// vertex-coloured hull and turret and the glass canopy, edge lines, glowing
+// throats and a thruster plume in the hull accent (cyan Interceptor, amber
+// Solar Slicer and Bastion). The menu's key light circles the hull as the
+// camera orbits, so a fixed screen-space studio light (hull and canopy
+// shaders only) keeps it readable when the key light is behind it. A locked
+// hull is one dark silhouette, without lines, glows or plume. It hangs off
+// the menu camera, framed into the #menu-hull-stage box (#hangar-hull-stage
+// while the Hangar is open), and turns slowly on its own axis (still with
+// reduced motion).
 
 import { getShipModelById } from '../data/shipModels.js';
 import { PALETTE } from '../data/constants/palette.js';
+import { HullArt } from './player/hullArt.js';
+import { colorOf } from './render3d/batches.js';
+import {
+  NOZZLE_HEIGHT,
+  VISUAL_SCALE,
+  buildHullModel,
+  buildTurret,
+  edgeLines,
+  hullTones,
+  seatTurret,
+  throatGeometry,
+} from './render3d/hullModel.js';
 
-// Plate heights in hull units (base from the outline, fins, body and prow).
-const BASE_DEPTH = 1.6;
-const FIN_DEPTH = 2.4;
-const BODY_DEPTH = 3.6;
-const BEVEL = 0.4;
-// Armour (proposta 18/10): a plate above the body, a smaller one on top.
-const ARMOR_DEPTH = 4.2;
-const ARMOR_TOP_DEPTH = 1.0;
-const ARMOR_TOP_INSET = 0.55;
+// The menu shows each hull as it starts a run.
+const BASE_LEVELS = Object.freeze({ thruster: 0, rcs: 0, braking: 0 });
 // Camera-space placement: distance in front of the camera (close, so few
-// passing rocks come between), and the plate tilted back so it is seen from
+// passing rocks come between), and the hull tilted back so it is seen from
 // above and in front.
 const STAGE_DISTANCE = 20;
 const TILT = -1.0;
@@ -58,7 +65,7 @@ function patchHull(shader) {
   shader.fragmentShader = shader.fragmentShader.replace(
     '#include <emissivemap_fragment>',
     `#include <emissivemap_fragment>
-      // Facing the viewer whatever the derivative sign (flat shading).
+      // Facing the viewer whatever the normal's sign.
       vec3 facing = faceforward(normal, -vViewPosition, normal);
       float studio = max(dot(facing, normalize(${STUDIO_GLSL})), 0.0);
       totalEmissiveRadiance += diffuseColor.rgb * ${STUDIO_STRENGTH} * studio;`
@@ -79,29 +86,38 @@ export class MenuHullPreview {
     this.root.visible = false;
     camera.add(this.root);
 
-    // The game hull's three tones (render3d/playerMirror.js).
-    const tone = (from, to, t) =>
-      new THREE.Color(from).lerp(new THREE.Color(to), t).convertSRGBToLinear();
-    const matte = (color, roughness) => {
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        metalness: 0.2,
-        roughness,
-        flatShading: true,
-      });
+    // The game's hull tones (scaled per hull by its `albedo` in the model)
+    // and its upgrade-applied panels.
+    this.tones = hullTones(THREE);
+    this.hullArt = new HullArt();
+    const studio = (material) => {
       material.onBeforeCompile = patchHull;
       return material;
     };
-    // Base colours, scaled per hull by its visual's `albedo`.
-    this.tones = {
-      base: tone(PALETTE.hull, PALETTE.hullLit, 0.2),
-      fin: tone(PALETTE.hullLit, PALETTE.neutral, 0.15),
-      body: tone(PALETTE.hullLit, PALETTE.neutral, 0.6),
-    };
     this.materials = {
-      base: matte(this.tones.base.clone(), 0.85),
-      fin: matte(this.tones.fin.clone(), 0.8),
-      body: matte(this.tones.body.clone(), 0.72),
+      hull: studio(
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          metalness: 0.2,
+          roughness: 0.8,
+        })
+      ),
+      // Dark glass with a dim cyan glow, as in the game.
+      canopy: studio(
+        new THREE.MeshStandardMaterial({
+          color: colorOf(THREE, PALETTE.rockShadow),
+          emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.14),
+          metalness: 0.1,
+          roughness: 0.3,
+        })
+      ),
+      edge: new THREE.LineBasicMaterial({
+        color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
+      }),
+      // The amber lens (no tone mapping here: no overdrive).
+      lens: new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, PALETTE.shot),
+      }),
       // A locked hull: one flat dark tone, no glow or plume.
       silhouette: new THREE.MeshBasicMaterial({ color: SILHOUETTE_COLOR }),
     };
@@ -134,100 +150,63 @@ export class MenuHullPreview {
   }
 
   build(definition) {
-    const { THREE } = this;
-    const visual = definition.visual;
-    const hull = new THREE.Group();
-    const plate = (points, depth, material, z = 0) => {
-      const shape = new THREE.Shape(
-        points.map((p) => new THREE.Vector2(p.x, p.y))
-      );
-      const geometry = new THREE.ExtrudeGeometry(shape, {
-        depth,
-        bevelEnabled: true,
-        bevelThickness: BEVEL,
-        bevelSize: BEVEL,
-        bevelSegments: 1,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.z = z;
-      hull.add(mesh);
-    };
+    const { THREE, materials } = this;
+    const { visual } = definition;
+    const dark = this.silhouette && materials.silhouette;
+    const geometry = this.hullArt.getHullGeometry(definition, BASE_LEVELS);
+    const model = buildHullModel(THREE, geometry, this.tones);
 
-    Object.entries(this.tones).forEach(([key, color]) =>
-      this.materials[key].color.copy(color).multiplyScalar(visual.albedo ?? 1)
+    // The game's layout: the hull at VISUAL_SCALE, the turret unscaled on
+    // its deck; the ship's up turned onto the spin axis (+z).
+    const layout = new THREE.Group();
+    layout.rotation.x = Math.PI / 2;
+    const ship = new THREE.Group();
+    ship.scale.setScalar(VISUAL_SCALE);
+    const body = new THREE.Mesh(model.hull, dark || materials.hull);
+    body.name = 'hull';
+    ship.add(body, new THREE.Mesh(model.canopy, dark || materials.canopy));
+    const turret = buildTurret(
+      THREE,
+      dark || materials.hull,
+      this.tones,
+      dark || materials.lens
     );
-    const dark = this.silhouette && this.materials.silhouette;
-    plate(definition.outline, BASE_DEPTH, dark || this.materials.base);
-    visual.panels
-      .filter((panel) => !panel.minLevel)
-      .forEach((panel) => {
-        if (panel.armor) {
-          plate(
-            panel.points,
-            ARMOR_DEPTH,
-            dark || this.materials.fin,
-            BASE_DEPTH * 0.5
-          );
-          const cx =
-            panel.points.reduce((n, p) => n + p.x, 0) / panel.points.length;
-          const cy =
-            panel.points.reduce((n, p) => n + p.y, 0) / panel.points.length;
-          plate(
-            panel.points.map((p) => ({
-              x: cx + (p.x - cx) * ARMOR_TOP_INSET,
-              y: cy + (p.y - cy) * ARMOR_TOP_INSET,
-            })),
-            ARMOR_TOP_DEPTH,
-            dark || this.materials.body,
-            BASE_DEPTH * 0.5 + ARMOR_DEPTH + BEVEL * 2
-          );
-          return;
-        }
-        const fin = panel.rcsPort !== undefined;
-        plate(
-          panel.points,
-          fin ? FIN_DEPTH : BODY_DEPTH,
-          dark || (fin ? this.materials.fin : this.materials.body),
-          BASE_DEPTH * 0.5
-        );
+    seatTurret(turret, visual, model);
+    [turret.housing, turret.housingLow]
+      .filter((housing) => !housing.visible)
+      .forEach((housing) => {
+        turret.group.remove(housing);
+        housing.geometry.dispose();
       });
-
-    // Dark nozzle bells with a hot core and a plume in the hull accent.
-    const accent = new THREE.Color(PALETTE[visual.accent] ?? PALETTE.player);
-    const glow = new THREE.MeshBasicMaterial({
-      color: accent.clone().lerp(new THREE.Color(0xffffff), 0.35),
-    });
-    const plumeMaterial = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: accent } },
-      vertexShader: PLUME_VERTEX,
-      fragmentShader: PLUME_FRAGMENT,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
+    layout.add(ship, turret.group);
+    const hull = new THREE.Group();
+    hull.add(layout);
+    hull.userData.materials = [];
     this.plumes = [];
-    const nozzleZ = BASE_DEPTH * 0.5 + FIN_DEPTH * 0.5;
-    visual.nozzles
-      .filter((nozzle) => !nozzle.minLevel)
-      .forEach((nozzle) => {
-        const length = visual.nozzleLength;
-        const bell = new THREE.Mesh(
-          new THREE.CylinderGeometry(nozzle.r * 1.25, nozzle.r, length, 12),
-          dark || this.materials.base
-        );
-        bell.rotation.z = Math.PI / 2;
-        bell.position.set(nozzle.x - length / 2, nozzle.y, nozzleZ);
-        hull.add(bell);
-        if (dark) return;
-        const core = new THREE.Mesh(
-          new THREE.CircleGeometry(nozzle.r, 16),
-          glow
-        );
-        core.rotation.y = -Math.PI / 2;
-        core.position.set(nozzle.x - length - 0.05, nozzle.y, nozzleZ);
-        hull.add(core);
 
+    if (!dark) {
+      const accent = colorOf(THREE, PALETTE[visual.accent] ?? PALETTE.player);
+      const bladeEdge = new THREE.LineBasicMaterial({
+        color: accent.clone().multiplyScalar(1.3),
+      });
+      edgeLines(THREE, model, { edge: materials.edge, bladeEdge }).forEach(
+        (line) => ship.add(line)
+      );
+      // Glowing throats and a plume in the hull accent at every nozzle.
+      const glow = new THREE.MeshBasicMaterial({
+        color: accent.clone().lerp(new THREE.Color(0xffffff), 0.35),
+      });
+      const plumeMaterial = new THREE.ShaderMaterial({
+        uniforms: { uColor: { value: accent } },
+        vertexShader: PLUME_VERTEX,
+        fragmentShader: PLUME_FRAGMENT,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      geometry.nozzles.forEach((nozzle) => {
+        ship.add(new THREE.Mesh(throatGeometry(THREE, nozzle), glow));
         const plumeLength = nozzle.r * PLUME_LENGTH * 2;
         const plume = new THREE.Mesh(
           new THREE.ConeGeometry(nozzle.r * 1.1, plumeLength, 12, 1, true),
@@ -236,11 +215,12 @@ export class MenuHullPreview {
         // Base at the nozzle mouth, tip trailing toward -x.
         plume.geometry.translate(0, plumeLength / 2, 0);
         plume.rotation.z = Math.PI / 2;
-        plume.position.set(nozzle.x - length, nozzle.y, nozzleZ);
-        hull.add(plume);
+        plume.position.set(nozzle.exitX, NOZZLE_HEIGHT, nozzle.y);
+        ship.add(plume);
         this.plumes.push(plume);
       });
-    hull.userData.materials = [glow, plumeMaterial];
+      hull.userData.materials.push(bladeEdge, glow, plumeMaterial);
+    }
 
     // Centre the hull on the spin axis; its farthest point from the axis and
     // its thickness set the framing.

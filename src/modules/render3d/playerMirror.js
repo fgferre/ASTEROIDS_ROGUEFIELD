@@ -1,20 +1,15 @@
-// The player hull in 3D (docs/NORTE.md §3): the panels of shipModels.js built
-// as layered matte plates — a dark base plate under every panel, a lighter
-// raised spine over the prow and body, bevelled fin plates — with dark seams,
-// a dim canopy, a thin cyan edge on the prow and the fins' trailing edges and
-// a cyan fresnel rim. The only strong light is the thrusters (hull accent:
-// cyan Interceptor, amber Solar Slicer): glowing nozzles, cones with a white
-// core that stretch with thrust, side puffs on strafe, a point light and a
+// The player hull in 3D (docs/NORTE.md §3): the ship hullModel.js builds
+// from the hull's art data (lofted fuselage, airfoil wings that grow with
+// the RCS upgrade, tail fins, nacelles, intakes, pods, canopy, edge lines,
+// turret), under one matte vertex-coloured material with baked panel maps
+// and a cyan fresnel rim, cached per hull and upgrade levels. The only
+// strong light is the thrusters (hull accent: cyan Interceptor, amber Solar
+// Slicer): glowing throats, cones with a white core that stretch with
+// thrust, side puffs on strafe at the wingtip ports, a point light and a
 // ribbon trail. Dash afterimages, the invulnerability blink and the shield
-// impact flash mirror the 2D PlayerSystem render. In the modern scheme a
-// dorsal turret (base, twin barrels, amber lens) turns on its own to the
-// simulation's turret heading; its barrel tips sit on the sim's muzzle point.
-// The Solar Slicer's fins are blades edged in its amber accent and its turret
-// sits in a low, wide housing (shipModels.js `blades`, `turret: 'low'`).
-// The Bastion's shoulders carry two stacked armour plates trimmed in its
-// amber accent, on darker steel (shipModels.js `armor`, `albedo`).
-// The static plates and nozzle housings of a hull merge into one
-// vertex-coloured mesh (mergeStatic.js), cached per hull (PLAN.md R9.1).
+// impact flash mirror the 2D PlayerSystem render. In the modern scheme the
+// dorsal turret turns on its own to the simulation's turret heading; its
+// barrel tips sit on the sim's muzzle point.
 
 import {
   DASH_GHOST_COUNT,
@@ -24,35 +19,23 @@ import { PALETTE } from '../../data/constants/palette.js';
 import {
   SHIP_MAX_SPEED,
   SHIP_ROTATION_SPEED,
-  TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
 } from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
-import { mergeStatic } from './mergeStatic.js';
+import {
+  NOZZLE_HEIGHT,
+  VISUAL_SCALE,
+  buildHullModel,
+  buildTurret,
+  edgeLines,
+  hullTones,
+  seatTurret,
+  throatGeometry,
+} from './hullModel.js';
 import { addRimLight } from './rimLight.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
-// Plate heights in hull units: base plate, raised spine (peak at y = 0) and
-// fin plate, each on top of the base.
-const BASE_DEPTH = 2.4;
-const SPINE_DEPTH = 4.2;
-const FIN_DEPTH = 1.1;
-const BEVEL = 0.5;
-const BASE_TOP = BASE_DEPTH + BEVEL;
-// Raised plates are their panel shrunk toward its centroid: the base shows
-// around them as a panel border and a seam down the spine.
-const INSET = 0.8;
-// Armour (proposta 18/10): a lower plate inset like the others and a smaller
-// upper plate stacked on it; the trim runs on the lower plate's top edge.
-const ARMOR_DEPTH = 1.8;
-const ARMOR_TOP_DEPTH = 0.9;
-const ARMOR_TOP_INSET = 0.5;
-const ARMOR_TOP = BASE_TOP + ARMOR_DEPTH + BEVEL;
-const NOZZLE_HEIGHT = 2.6;
-// Visual only: collision keeps the 2D outline, and effects anchored on the
-// nose (muzzle flash, lances) take their position from the simulation.
-const VISUAL_SCALE = 1.35;
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
 // Banking (PLAN.md R5.9, proposta 18/10): roll into the strafe input and the
@@ -71,31 +54,20 @@ const BLINK_HZ = 8;
 const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
 const MUZZLE_LIGHT = 1.6;
-// Turret, in field units (unscaled, so the barrel tips meet the sim muzzle):
-// the base sits on the scaled spine top, the barrels clear the canopy.
-const TURRET_BASE_Y = (BASE_TOP + SPINE_DEPTH) * VISUAL_SCALE;
-const TURRET_BASE_R = 4;
-const TURRET_BASE_H = 2;
-const TURRET_BARREL_Y = TURRET_BASE_Y + TURRET_BASE_H + 0.9;
-const TURRET_BARREL_R = 0.7;
-const TURRET_BARREL_Z = 1.3;
+// Recoil of the barrels along the turret axis per shot (field units).
 const TURRET_RECOIL = 1.2;
-// Low housing (Solar Slicer): wide hexagonal collar, barrels lowered onto it.
-const TURRET_LOW_H = 1.2;
-const TURRET_LOW_R = 5;
-const TURRET_LOW_DROP = TURRET_BASE_H - TURRET_LOW_H;
 const MUZZLE_LIGHT_FRAMES = 2;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
-// (the extruded plates' UVs are in hull units). proposta 18/10: strengths.
+// (the hull's UVs are planar, in hull units). proposta 18/10: strengths.
 const HULL_TILE = 16;
 const HULL_NORMAL_SCALE = 0.5;
 const HULL_AO = 0.8;
 const HULL_MAP_SEED = 3131.9;
 const HULL_ROUGHNESS = 0.8;
 
-// Cyan fresnel rim on the hull (silhouette against the dark field) plus the
-// white invulnerability pulse, both as emissive; the pulse is weighted to the
-// rim so the panels stay readable while it blinks.
+// Cyan fresnel rim on the hull (a tight band on the silhouette against the
+// dark field) plus the white invulnerability pulse, both as emissive; the
+// pulse is weighted to the rim so the panels stay readable while it blinks.
 function patchHull(shader) {
   const { uRim, uBlink } = this.userData;
   shader.uniforms.uRim = uRim;
@@ -109,41 +81,13 @@ function patchHull(shader) {
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
       float rim = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
-      totalEmissiveRadiance += uRim * pow(rim, 3.0) + vec3(uBlink * (0.25 + rim));`
+      totalEmissiveRadiance += uRim * pow(rim, 5.0) + vec3(uBlink * (0.25 + rim));`
     );
-}
-
-// `points` shrunk toward their centroid by `k`.
-function insetOf(points, k) {
-  const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
-  const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
-  return points.map((p) => ({
-    x: cx + (p.x - cx) * k,
-    y: cy + (p.y - cy) * k,
-  }));
 }
 
 // Hull and visual-upgrade levels: what the built geometry depends on.
 function hullKeyOf(hull, levels) {
   return `${hull.id}|${levels.thruster}|${levels.rcs}|${levels.braking}`;
-}
-
-// Line geometries in one non-indexed position buffer (one draw).
-function mergePositions(THREE, geometries) {
-  const parts = geometries.map((g) => (g.index ? g.toNonIndexed() : g));
-  const total = parts.reduce((n, g) => n + g.getAttribute('position').count, 0);
-  const positions = new Float32Array(total * 3);
-  let offset = 0;
-  parts.forEach((g, i) => {
-    const array = g.getAttribute('position').array;
-    positions.set(array, offset);
-    offset += array.length;
-    g.dispose();
-    if (g !== geometries[i]) geometries[i].dispose();
-  });
-  const merged = new THREE.BufferGeometry();
-  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  return merged;
 }
 
 export class PlayerMirror {
@@ -156,9 +100,9 @@ export class PlayerMirror {
     this.group.add(this.ship);
     scene.add(this.group);
 
-    // One matte material for every hull plate; the three tones (base plate,
-    // fins, spine) ride in the vertex colours, so the key light models each
-    // panel without a sheen.
+    // One matte material for every hull part; the tones (dark interiors,
+    // belly, deck and wings, spine) ride in the vertex colours, so the key
+    // light models the curved surfaces without a sheen.
     const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
     const blink = { value: 0 };
     const maps = bakeHullMaps(THREE, HULL_MAP_SEED);
@@ -169,7 +113,6 @@ export class PlayerMirror {
       vertexColors: true,
       metalness: 0.2,
       roughness: HULL_ROUGHNESS,
-      flatShading: true,
       ...maps,
       normalScale: new THREE.Vector2(HULL_NORMAL_SCALE, HULL_NORMAL_SCALE),
       aoMapIntensity: HULL_AO,
@@ -178,12 +121,9 @@ export class PlayerMirror {
     hullMaterial.userData.uBlink = blink;
     hullMaterial.onBeforeCompile = patchHull;
     this.hullMaterial = addRimLight(hullMaterial);
-    const tone = (from, to, t) =>
-      colorOf(THREE, from).lerp(colorOf(THREE, to), t);
-    this.baseTone = tone(PALETTE.hull, PALETTE.hullLit, 0.2);
-    this.finTone = tone(PALETTE.hullLit, PALETTE.neutral, 0.15);
-    this.spineTone = tone(PALETTE.hullLit, PALETTE.neutral, 0.6);
-    // hull key → { hull, ghost } merged geometries, kept for the session
+    this.tones = hullTones(THREE);
+    // hull key → { hull, ghost, canopy, edges, tips, deckY }, kept for the
+    // session
     this.hullCache = new Map();
     this.hullMaps = maps;
     this.surfaceMaps = true;
@@ -191,15 +131,11 @@ export class PlayerMirror {
     this.canopyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
         color: colorOf(THREE, PALETTE.rockShadow),
-        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
+        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.14),
         metalness: 0.1,
         roughness: 0.3,
-        flatShading: true,
       })
     );
-    this.seamMaterial = new THREE.LineBasicMaterial({
-      color: colorOf(THREE, PALETTE.rockShadow),
-    });
     this.edgeMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       toneMapped: false,
@@ -283,74 +219,14 @@ export class PlayerMirror {
     this.trailCount = 0;
     this.trailHead = 0;
     this.thrustRgb = rgbOf(THREE, PALETTE.player);
-    this.buildTurret();
-  }
-
-  buildTurret() {
-    const { THREE } = this;
-    const lit = (geometry, color) => {
-      geometry.setAttribute('uv2', geometry.getAttribute('uv'));
-      return { geometry, color };
-    };
-    const solid = (...parts) =>
-      new THREE.Mesh(mergeStatic(THREE, parts), this.hullMaterial);
-    this.turret = new THREE.Group();
-    this.turretHousing = solid(
-      lit(
-        new THREE.CylinderGeometry(
-          TURRET_BASE_R * 0.85,
-          TURRET_BASE_R,
-          TURRET_BASE_H,
-          10
-        ).translate(0, TURRET_BASE_Y + TURRET_BASE_H / 2, 0),
-        this.spineTone
-      )
-    );
-    this.turretHousing.name = 'turretHousing';
-    this.turretHousingLow = solid(
-      lit(
-        new THREE.CylinderGeometry(
-          TURRET_LOW_R * 0.85,
-          TURRET_LOW_R,
-          TURRET_LOW_H,
-          6
-        ).translate(0, TURRET_BASE_Y + TURRET_LOW_H / 2, 0),
-        this.spineTone
-      )
-    );
-    this.turretHousingLow.name = 'turretHousingLow';
-    this.turretHousingLow.visible = false;
-    // Barrels and their block recoil together along the turret's axis.
-    this.barrels = new THREE.Group();
-    const length = TURRET_BARREL_LENGTH - 1.5;
-    const barrel = (z) =>
-      lit(
-        new THREE.CylinderGeometry(TURRET_BARREL_R, TURRET_BARREL_R, length, 6)
-          .rotateZ(Math.PI / 2)
-          .translate(1.5 + length / 2, TURRET_BARREL_Y, z),
-        this.finTone
-      );
-    const gun = solid(
-      lit(
-        new THREE.BoxGeometry(4.6, 2, 4).translate(0.3, TURRET_BARREL_Y, 0),
-        this.baseTone
-      ),
-      barrel(-TURRET_BARREL_Z),
-      barrel(TURRET_BARREL_Z)
-    );
-    const lens = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 8, 6).translate(
-        2.2,
-        TURRET_BARREL_Y + 0.9,
-        0
-      ),
-      new THREE.MeshBasicMaterial({
-        color: colorOf(THREE, PALETTE.shot).multiplyScalar(2),
-        toneMapped: false,
-      })
-    );
-    this.barrels.add(gun, lens);
-    this.turret.add(this.turretHousing, this.turretHousingLow, this.barrels);
+    // The turret, in the hull material; rebuild() seats it on each hull.
+    this.turretParts = buildTurret(THREE, this.hullMaterial, this.tones);
+    ({
+      group: this.turret,
+      housing: this.turretHousing,
+      housingLow: this.turretHousingLow,
+      barrels: this.barrels,
+    } = this.turretParts);
     this.group.add(this.turret);
   }
 
@@ -397,131 +273,28 @@ export class PlayerMirror {
     this.flameMaterial.color.copy(this.accent).multiplyScalar(1.8);
     this.puffMaterial.color.copy(this.accent).multiplyScalar(1.4);
     this.bladeEdgeMaterial.color.copy(this.accent).multiplyScalar(1.3);
-    const lowTurret = hull.visual.turret === 'low';
-    this.turretHousing.visible = !lowTurret;
-    this.turretHousingLow.visible = lowTurret;
-    this.barrels.position.y = lowTurret ? -TURRET_LOW_DROP : 0;
 
     const key = hullKeyOf(hull, levels);
-    let merged = this.hullCache.get(key);
-    const plates = merged ? null : [];
-    const raised = [];
-    const seams = [];
-    const edges = { edge: [], bladeEdge: [] };
-    const maxY = geometry.maxY || 1;
-    // Darker steel (Bastion) scales the three tones.
-    const [baseTone, finTone, spineTone] = [
-      this.baseTone,
-      this.finTone,
-      this.spineTone,
-    ].map((color) => color.clone().multiplyScalar(geometry.albedo));
-    geometry.panels.forEach((panel) => {
-      // Armour rides on the plates under it: no base plate of its own.
-      if (panel.armor) {
-        if (plates) {
-          raised.push(
-            {
-              geometry: this.plate(
-                insetOf(panel.points, INSET),
-                ARMOR_DEPTH,
-                BASE_TOP,
-                0
-              ),
-              color: finTone,
-            },
-            {
-              geometry: this.plate(
-                insetOf(panel.points, ARMOR_TOP_INSET),
-                ARMOR_TOP_DEPTH,
-                ARMOR_TOP,
-                0
-              ),
-              color: spineTone,
-            }
-          );
-        }
-        this.addEdges(edges, panel, false, geometry.maxX, geometry.blades);
-        return;
-      }
-      const base = this.plate(panel.points, BASE_DEPTH, 0, 0);
-      // Dark seams on the base plate only: the raised plates read by tone.
-      seams.push(new THREE.EdgesGeometry(base, 40));
-      if (plates) plates.push({ geometry: base, color: baseTone });
-      else base.dispose();
-      const spine = panel.points.some((p) => p.y === 0);
-      if (!spine && !panel.rcsPort) return;
-      const inset = insetOf(panel.points, INSET);
-      if (plates) {
-        raised.push(
-          spine
-            ? {
-                geometry: this.plate(inset, SPINE_DEPTH, BASE_TOP, maxY),
-                color: spineTone,
-              }
-            : {
-                geometry: this.plate(inset, FIN_DEPTH, BASE_TOP, 0),
-                color: finTone,
-              }
-        );
-      }
-      this.addEdges(edges, panel, spine, geometry.maxX, geometry.blades);
-    });
-    this.ship.add(
-      new THREE.LineSegments(mergePositions(THREE, seams), this.seamMaterial)
-    );
-    Object.entries(edges).forEach(([name, segments]) => {
-      if (!segments.length) return;
-      const lines = new THREE.LineSegments(
-        new THREE.BufferGeometry().setFromPoints(segments),
-        name === 'edge' ? this.edgeMaterial : this.bladeEdgeMaterial
-      );
-      lines.name = name;
-      this.ship.add(lines);
-    });
-
-    const { cockpit } = geometry;
-    if (cockpit) {
-      const length = cockpit.to.x - cockpit.from.x;
-      const canopy = new THREE.Mesh(
-        new THREE.OctahedronGeometry(1, 0).scale(
-          length / 2,
-          1.6,
-          cockpit.width * 1.3
-        ),
-        this.canopyMaterial
-      );
-      canopy.position.set(
-        cockpit.from.x + length / 2,
-        BASE_TOP + SPINE_DEPTH + BEVEL,
-        0
-      );
-      this.ship.add(canopy);
+    if (!this.hullCache.has(key)) {
+      const model = buildHullModel(THREE, geometry, this.tones);
+      model.hull.userData.cached = true;
+      model.canopy.userData.cached = true;
+      this.hullCache.set(key, model);
     }
+    const built = this.hullCache.get(key);
+    seatTurret(this.turretParts, hull.visual, built);
+
+    const lines = {
+      edge: this.edgeMaterial,
+      bladeEdge: this.bladeEdgeMaterial,
+    };
+    edgeLines(THREE, built, lines).forEach((line) => this.ship.add(line));
+    this.ship.add(new THREE.Mesh(built.canopy, this.canopyMaterial));
 
     geometry.nozzles.forEach((nozzle) => {
-      if (plates) {
-        const housing = new THREE.CylinderGeometry(
-          nozzle.r,
-          nozzle.r * 1.25,
-          geometry.nozzleLength,
-          8
-        )
-          .rotateZ(Math.PI / 2)
-          .translate(
-            nozzle.x - geometry.nozzleLength / 2,
-            NOZZLE_HEIGHT,
-            nozzle.y
-          );
-        housing.setAttribute('uv2', housing.getAttribute('uv'));
-        raised.push({ geometry: housing, color: baseTone });
-      }
-      // Hot throat: a glowing bead at the exit, lit even at idle.
+      // Hot throat: a glowing lens in the bell's mouth, lit even at idle.
       const throat = new THREE.Mesh(
-        new THREE.SphereGeometry(nozzle.r * 0.8, 8, 6).translate(
-          nozzle.exitX,
-          NOZZLE_HEIGHT,
-          nozzle.y
-        ),
+        throatGeometry(THREE, nozzle),
         this.nozzleMaterial
       );
       const flame = new THREE.Mesh(this.cone, this.flameMaterial);
@@ -532,25 +305,21 @@ export class PlayerMirror {
       this.flames.push({ flame, core, r: nozzle.r });
     });
 
-    // Strafe puffs at the fins' RCS ports, pointing outboard (as in 2D).
-    geometry.rcsPorts.forEach((port) => {
+    // Strafe puffs at the wingtip RCS ports, pointing outboard (as in 2D).
+    geometry.rcsPorts.forEach((port, i) => {
       const puff = new THREE.Mesh(this.cone, this.puffMaterial);
-      puff.position.set(port.x, BASE_TOP, port.y);
+      puff.position.fromArray(built.tips[i]);
       puff.rotation.y = port.y < 0 ? -Math.PI / 2 : Math.PI / 2;
       puff.visible = false;
       this.ship.add(puff);
       this.puffs.push({ puff, left: port.y < 0 });
     });
 
-    if (plates) {
-      merged = this.mergeHull(plates, raised);
-      this.hullCache.set(key, merged);
-    }
-    const hullMesh = new THREE.Mesh(merged.hull, this.hullMaterial);
+    const hullMesh = new THREE.Mesh(built.hull, this.hullMaterial);
     hullMesh.name = 'hull';
     this.ship.add(hullMesh);
     this.ghosts.forEach((ghost) => {
-      ghost.geometry = merged.ghost;
+      ghost.geometry = built.ghost;
     });
 
     this.ship.scale.setScalar(VISUAL_SCALE);
@@ -562,99 +331,6 @@ export class PlayerMirror {
     this.shieldRadius = geometry.extent * 1.7;
     this.dashRing.scale.setScalar(geometry.extent * 1.3);
     return geometry;
-  }
-
-  // One matte plate: `points` (ship-local, y → world z) extruded `depth` up
-  // from `lift`; with `ridge` > 0 its top slopes down away from the spine.
-  plate(points, depth, lift, ridge) {
-    const { THREE } = this;
-    // Shape in (x, −y) so rotateX(−π/2) puts height up and keeps y → z.
-    const shape = new THREE.Shape();
-    points.forEach((p, i) =>
-      i ? shape.lineTo(p.x, -p.y) : shape.moveTo(p.x, -p.y)
-    );
-    shape.closePath();
-    const solid = new THREE.ExtrudeGeometry(shape, {
-      depth,
-      bevelEnabled: true,
-      bevelThickness: BEVEL,
-      bevelSize: BEVEL,
-      bevelSegments: 1,
-    });
-    const position = solid.getAttribute('position');
-    for (let i = 0; i < position.count; i += 1) {
-      const z = Math.max(0, position.getZ(i));
-      const slope = ridge
-        ? 1 - 0.7 * Math.min(1, Math.abs(position.getY(i)) / ridge)
-        : 1;
-      position.setZ(i, lift + z * slope);
-    }
-    solid.rotateX(-Math.PI / 2);
-    solid.computeVertexNormals();
-    solid.setAttribute('uv2', solid.getAttribute('uv'));
-    return solid;
-  }
-
-  // The hull's plates and housings as one vertex-coloured geometry, base
-  // plates first: the dash ghosts draw only that range of the same buffers.
-  mergeHull(plates, raised) {
-    const { THREE } = this;
-    const parts = [...plates, ...raised];
-    const hull = mergeStatic(THREE, parts);
-    parts.forEach((part) => part.geometry.dispose());
-    const ghost = new THREE.BufferGeometry();
-    ghost.setAttribute('position', hull.getAttribute('position'));
-    ghost.setDrawRange(
-      0,
-      plates.reduce(
-        (n, part) => n + part.geometry.getAttribute('position').count,
-        0
-      )
-    );
-    ghost.boundingSphere = hull.boundingSphere;
-    hull.userData.cached = true;
-    return { hull, ghost };
-  }
-
-  // Thin cyan line on the prow's outer edge and on the fins' trailing edges
-  // (edges whose outward normal points aft), just above the base plate. A
-  // blade is edged in the accent all round except where it meets the spine;
-  // an armour plate's outboard edges are trimmed in the accent on its lower
-  // plate's top.
-  addEdges(edges, panel, spine, noseX, blades) {
-    const { THREE } = this;
-    const { armor } = panel;
-    const points = armor ? insetOf(panel.points, INSET) : panel.points;
-    const prow = spine && points.some((p) => p.x === noseX);
-    if (spine && !prow) return;
-    const blade = blades && !spine;
-    const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
-    const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
-    const segments = blade || armor ? edges.bladeEdge : edges.edge;
-    const height = (armor ? ARMOR_TOP : BASE_TOP) + 0.05;
-    points.forEach((a, i) => {
-      const b = points[(i + 1) % points.length];
-      const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      let nx = (b.y - a.y) / length;
-      let ny = -(b.x - a.x) / length;
-      if (nx * ((a.x + b.x) / 2 - cx) + ny * ((a.y + b.y) / 2 - cy) < 0) {
-        nx = -nx;
-        ny = -ny;
-      }
-      const keep = armor
-        ? ny * Math.sign(cy) > 0.3
-        : prow
-          ? nx > 0.1 && Math.abs(ny) > 0.1
-          : blade
-            ? ny * Math.sign(cy) > -0.5
-            : nx < -0.6;
-      if (keep) {
-        segments.push(
-          new THREE.Vector3(a.x, height, a.y),
-          new THREE.Vector3(b.x, height, b.y)
-        );
-      }
-    });
   }
 
   /** Mirrors the player; feeds its thruster trail into `ribbons`. */

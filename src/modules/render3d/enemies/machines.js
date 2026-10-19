@@ -16,6 +16,14 @@ import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';
 import { addRimLight } from '../rimLight.js';
 import { patchRockShader, rockUniforms } from './rockShader.js';
+import { createHeavyParts } from './heavyMachines.js';
+import {
+  moteModel,
+  ramModel,
+  seekerModel,
+  shadeModel,
+  tetherModel,
+} from './lightMachines.js';
 
 const WEAVER_ARMS = 3;
 const TAU = Math.PI * 2;
@@ -46,159 +54,26 @@ const LEECH_PULSE_SWELL = 0.08;
  */
 export function createMachineViews(kit) {
   const { THREE } = kit;
-  // Seeker: a dart-shaped hull.
-  const seekerShape = new THREE.Shape();
-  const seekerOutline = [
-    [1.35, 0],
-    [0.35, 0.5],
-    [-0.85, 0.42],
-    [-1.1, 0],
-    [-0.85, -0.42],
-    [0.35, -0.5],
-  ];
-  seekerOutline.forEach(([x, y], i) =>
-    i ? seekerShape.lineTo(x, y) : seekerShape.moveTo(x, y)
-  );
-  seekerShape.closePath();
-  const seekerHull = new THREE.ExtrudeGeometry(seekerShape, {
-    depth: 0.42,
-    bevelEnabled: true,
-    bevelThickness: 0.08,
-    bevelSize: 0.06,
-    bevelSegments: 1,
-  });
-  // ridge along the spine, so the key light breaks the top into facets
-  const hull = seekerHull.getAttribute('position');
-  for (let i = 0; i < hull.count; i += 1) {
-    const z = hull.getZ(i);
-    if (z > 0)
-      hull.setZ(i, z * (1 - 0.6 * Math.min(1, Math.abs(hull.getY(i)) / 0.5)));
-  }
-  seekerHull.rotateX(-Math.PI / 2);
-  seekerHull.computeVertexNormals();
-  const seekerRim = rimLoop(
-    seekerOutline.map(([x, y]) => new THREE.Vector3(x * 1.12, 0.05, y * 1.12))
-  );
+  // The light machines' hulls, eyes and outlines (lightMachines.js).
+  const seeker = seekerModel(kit);
 
-  const strut = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 6);
-  strut.rotateZ(Math.PI / 2);
-  strut.translate(0.72, 0, 0);
+  const mote = moteModel(kit);
+  const tether = tetherModel(kit);
 
-  // Husk: faceted carapace, dented so the facets catch the key light
-  // unevenly; the dent is a function of position, so the duplicated
-  // vertices of the non-indexed polyhedron stay welded.
-  const huskShell = new THREE.IcosahedronGeometry(1, 1);
-  const shell = huskShell.getAttribute('position');
-  for (let i = 0; i < shell.count; i += 1) {
-    const x = shell.getX(i);
-    const y = shell.getY(i);
-    const z = shell.getZ(i);
-    const k =
-      0.95 + 0.07 * Math.sin(x * 7.1 + z * 3.3) * Math.cos(y * 5.7 + x * 2.1);
-    shell.setXYZ(i, x * k, y * k * 0.55, z * k);
-  }
-  huskShell.computeVertexNormals();
+  // The heavy machines' parts: Husk, Weaver, Bulwark, Caster, Leech.
+  const heavy = createHeavyParts(kit);
 
-  // Ram: arrowhead hull with a raised spine, like the Seeker's.
-  const ramOutline = [
-    [1.1, 0],
-    [-0.8, 0.75],
-    [-0.42, 0],
-    [-0.8, -0.75],
-  ];
-  const ramShape = new THREE.Shape();
-  ramOutline.forEach(([x, y], i) =>
-    i ? ramShape.lineTo(x, y) : ramShape.moveTo(x, y)
-  );
-  ramShape.closePath();
-  const ramHull = new THREE.ExtrudeGeometry(ramShape, {
-    depth: 0.34,
-    bevelEnabled: true,
-    bevelThickness: 0.08,
-    bevelSize: 0.05,
-    bevelSegments: 1,
-  });
-  const ram = ramHull.getAttribute('position');
-  for (let i = 0; i < ram.count; i += 1) {
-    const z = ram.getZ(i);
-    if (z > 0)
-      ram.setZ(i, z * (1 - 0.6 * Math.min(1, Math.abs(ram.getY(i)) / 0.75)));
-  }
-  ramHull.rotateX(-Math.PI / 2);
-  ramHull.computeVertexNormals();
-  const ramRim = rimLoop(
-    ramOutline.map(([x, y]) => new THREE.Vector3(x * 1.08, 0.05, y * 1.08))
-  );
+  const ram = ramModel(kit);
 
-  // Weaver: one arm, trailing the spin.
-  const armPoint = (angle, r) =>
-    new THREE.Vector3(Math.cos(angle) * r, 0.06, Math.sin(angle) * r);
-  const weaverArm = new THREE.TubeGeometry(
-    new THREE.QuadraticBezierCurve3(
-      armPoint(0, 0.3),
-      armPoint(-0.275, 0.75),
-      armPoint(-0.55, 1)
-    ),
-    10,
-    0.07,
-    5,
-    false
-  );
-  const weaverTip = armPoint(-0.55, 1);
+  // Weaver, Caster: rotor arms and mortar turret (heavyMachines.js).
 
-  // Caster: a short mortar tilted 30° up, its breech at the turret's top.
-  const casterBarrel = new THREE.CylinderGeometry(0.2, 0.26, 0.95, 10);
-  casterBarrel.rotateZ(-Math.PI / 3);
-  casterBarrel.translate(0.56, 0.34, 0);
+  const shade = shadeModel(kit);
 
-  // Shade: a swept blade, a ridge along the spine.
-  const shadeOutline = [
-    [1.2, 0],
-    [0.1, -0.5],
-    [-0.95, -0.95],
-    [-0.5, -0.2],
-    [-0.75, 0],
-    [-0.5, 0.2],
-    [-0.95, 0.95],
-    [0.1, 0.5],
-  ];
-  const shadeShape = new THREE.Shape();
-  shadeOutline.forEach(([x, y], i) =>
-    i ? shadeShape.lineTo(x, y) : shadeShape.moveTo(x, y)
-  );
-  shadeShape.closePath();
-  const shadeHull = new THREE.ExtrudeGeometry(shadeShape, {
-    depth: 0.26,
-    bevelEnabled: true,
-    bevelThickness: 0.06,
-    bevelSize: 0.04,
-    bevelSegments: 1,
-  });
-  const blade = shadeHull.getAttribute('position');
-  for (let i = 0; i < blade.count; i += 1) {
-    const z = blade.getZ(i);
-    if (z > 0)
-      blade.setZ(i, z * (1 - 0.6 * Math.min(1, Math.abs(blade.getY(i)) / 0.5)));
-  }
-  shadeHull.rotateX(-Math.PI / 2);
-  shadeHull.computeVertexNormals();
-  const shadeRim = rimLoop(
-    shadeOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.05, y * 1.06))
-  );
-
-  // Leech: the pod's outline.
-  const pod = [];
-  for (let i = 0; i < 40; i += 1) {
-    const a = (i / 40) * TAU;
-    pod.push(new THREE.Vector3(Math.cos(a) * 1.08, 0, Math.sin(a) * 0.8));
-  }
-  const leechRim = rimLoop(pod);
+  // Leech: segmented pod (heavyMachines.js).
 
   function createMote(kind) {
     const group = new THREE.Group();
-    const body = kit.body('mote-body', () => [
-      { geometry: kit.sphere, color: kit.tones.hull, scale: [1, 0.42, 1] },
-    ]);
+    const body = kit.body('mote-body', mote.parts);
     const eyeTone = kit.tone(PALETTE.threat, 1.4);
     group.add(body);
     kit.scene.add(group);
@@ -206,42 +81,29 @@ export function createMachineViews(kit) {
       body,
       accents: [eyeTone],
       rims: [kit.rim(group, kit.circleRim, 1.04)],
-      glows: [kit.glow(group, eyeTone, 0.22, new THREE.Vector3(0.7, 0.16, 0))],
+      glows: [kit.glow(group, eyeTone, mote.eyeSize, mote.eye)],
     });
   }
 
   function createSeeker(kind) {
     const group = new THREE.Group();
-    const body = kit.body('seeker-body', () => [
-      { geometry: seekerHull, color: kit.tones.hull },
-    ]);
+    const body = kit.body('seeker-body', seeker.parts);
     const lensTone = kit.tone(PALETTE.threat, 0.5);
     group.add(body);
     kit.scene.add(group);
     return kit.view(kind, group, {
       lensTone,
       accents: [lensTone],
-      rims: [kit.rim(group, seekerRim)],
-      glows: [kit.glow(group, lensTone, 0.2, new THREE.Vector3(1.12, 0.3, 0))],
+      rims: [kit.rim(group, seeker.rim)],
+      glows: [kit.glow(group, lensTone, seeker.lensSize, seeker.lens)],
     });
   }
 
   function createTether(kind) {
     const group = new THREE.Group();
     const spin = new THREE.Group();
-    const angles = [0, 1, 2].map((i) => (i / 3) * Math.PI * 2);
-    const tips = angles.map(
-      (angle) =>
-        new THREE.Vector3(Math.cos(angle) * 1.05, 0, -Math.sin(angle) * 1.05)
-    );
-    const frame = kit.body('tether-frame', () => [
-      { geometry: kit.sphere, color: kit.tones.dark, scale: 0.5 },
-      ...angles.map((rotationY) => ({
-        geometry: strut,
-        color: kit.tones.hull,
-        rotationY,
-      })),
-    ]);
+    const { tips } = tether;
+    const frame = kit.body('tether-frame', tether.parts);
     const nodeTone = kit.tone(PALETTE.threat, 0.6);
     spin.add(frame);
     // the arc between the nodes: a rim in its own (pulsing accent) colour
@@ -256,15 +118,16 @@ export function createMachineViews(kit) {
       arcTone,
       accents: [nodeTone, arcTone],
       rims: [kit.rim(group, kit.circleRim, 1.2), arc],
-      glows: tips.map((tip) => kit.glow(spin, nodeTone, 0.15, tip)),
+      glows: tips.map((tip) => kit.glow(spin, nodeTone, tether.nodeSize, tip)),
     });
   }
 
   function createHusk(kind) {
     const group = new THREE.Group();
-    // the Ring rock's crack shader on a hull plate: seams instead of veins
+    // the Ring rock's crack shader on the carapace: seams instead of veins;
+    // plates and belly keep their hull/dark tones in vertex colours
     const material = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit),
+      vertexColors: true,
       metalness: 0.2,
       roughness: 0.88,
       flatShading: true,
@@ -275,42 +138,25 @@ export function createMachineViews(kit) {
     );
     material.onBeforeCompile = patchRockShader;
     addRimLight(material);
-    const shell = new THREE.Mesh(huskShell, material);
-    shell.scale.setScalar(0.95);
+    const geometry = kit.merged('husk-shell', heavy.huskShell);
+    const shell = new THREE.Mesh(geometry, material);
     group.add(shell);
     kit.scene.add(group);
     return kit.view(kind, group, {
       shell,
       material,
-      rims: [kit.rim(group, kit.circleRim, 0.98)],
+      // its outline at the plates' waist turns with the shell (bindHusk)
+      rims: [kit.rim(shell, heavy.outline(geometry, 0.04))],
     });
   }
 
   function createRam(kind) {
     const group = new THREE.Group();
-    const body = kit.body('ram-body', () => [
-      { geometry: ramHull, color: kit.tones.hull },
-      {
-        geometry: kit.smallSphere,
-        color: kit.tones.dark,
-        scale: [0.2, 0.06, 0.2],
-        position: [0.45, 0.38, 0],
-      },
-    ]);
+    const body = kit.body('ram-body', ram.parts);
     const lensTone = kit.tone(PALETTE.threat, 0.4);
-    const lens = kit.glow(
-      group,
-      lensTone,
-      0.12,
-      new THREE.Vector3(0.45, 0.4, 0)
-    );
+    const lens = kit.glow(group, lensTone, 0.12, ram.lens);
     const coreTone = kit.tone(PALETTE.text, 0);
-    const core = kit.glow(
-      group,
-      coreTone,
-      0.07,
-      new THREE.Vector3(0.45, 0.48, 0)
-    );
+    const core = kit.glow(group, coreTone, 0.07, ram.core);
     group.add(body);
     kit.scene.add(group);
     return kit.view(kind, group, {
@@ -320,30 +166,19 @@ export function createMachineViews(kit) {
       coreTone,
       telegraph: kit.createTelegraph(),
       accents: [lensTone],
-      rims: [kit.rim(group, ramRim)],
+      rims: [kit.rim(group, ram.rim)],
       glows: [lens, core],
     });
   }
 
   function createWeaver(kind) {
     const group = new THREE.Group();
-    const hub = kit.body('weaver-hub', () => [
-      {
-        geometry: kit.sphere,
-        color: kit.tones.hull,
-        scale: [0.34, 0.24, 0.34],
-      },
-      {
-        geometry: kit.smallSphere,
-        color: kit.tones.dark,
-        scale: [0.14, 0.06, 0.14],
-        position: [0, 0.2, 0],
-      },
-    ]);
-    // matte arms that flush with the accent while laying; the emissive
-    // color itself is the accent base the Elite swap rewrites
+    const hub = kit.body('weaver-hub', heavy.weaverHub);
+    // the matte rotor (hull/dark vertex tones) flushes with the accent while
+    // laying; the emissive color itself is the accent base the Elite swap
+    // rewrites
     const armMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit),
+      vertexColors: true,
       metalness: 0.3,
       roughness: 0.7,
       emissive: kit.threatColor.clone(),
@@ -358,14 +193,17 @@ export function createMachineViews(kit) {
       (_, i) => -(i * TAU) / WEAVER_ARMS
     );
     const arms = new THREE.Mesh(
-      kit.merged('weaver-arms', () =>
-        turns.map((rotationY) => ({ geometry: weaverArm, rotationY }))
-      ),
+      kit.merged('weaver-arms', () => heavy.weaverArms(turns)),
       armMaterial
     );
     const up = new THREE.Vector3(0, 1, 0);
     const tips = turns.map((turn) =>
-      kit.glow(spin, tipTone, 1, weaverTip.clone().applyAxisAngle(up, turn))
+      kit.glow(
+        spin,
+        tipTone,
+        1,
+        heavy.weaverTip.clone().applyAxisAngle(up, turn)
+      )
     );
     spin.add(arms);
     group.add(hub, spin);
@@ -376,26 +214,15 @@ export function createMachineViews(kit) {
       tipTone,
       tips: tips.map((tip) => tip.anchor),
       accents: [armMaterial, tipTone],
-      rims: [kit.rim(group, kit.circleRim, 0.36)],
+      rims: [kit.rim(group, kit.circleRim, 0.49)],
       glows: tips,
     });
   }
 
   function createBulwark(kind) {
     const group = new THREE.Group();
-    const hull = kit.body('bulwark-hull', () => [
-      {
-        geometry: kit.sphere,
-        color: kit.tones.hull,
-        scale: [0.72, 0.4, 0.72],
-      },
-      {
-        geometry: kit.smallSphere,
-        color: kit.tones.dark,
-        scale: [0.4, 0.08, 0.4],
-        position: [0, 0.34, 0],
-      },
-    ]);
+    const hull = kit.body('bulwark-hull', heavy.bulwarkHull);
+    // the plate and the body braced behind it turn together to the player
     const plate = new THREE.Group();
     // the arc its recipe's frontal shield hits within, so plate and hit area agree
     const arc = getContent('enemies', kind).behaviors['frontal-shield'].halfArc;
@@ -403,8 +230,8 @@ export function createMachineViews(kit) {
     const plateMesh = new THREE.Mesh(geometries.plate, kit.plateMaterial);
     const edgeMaterial = kit.emissive(PALETTE.threat, 1.2);
     const edge = new THREE.Mesh(geometries.edge, edgeMaterial);
-    plate.add(plateMesh, edge);
-    group.add(hull, plate);
+    plate.add(hull, plateMesh, edge);
+    group.add(plate);
     kit.scene.add(group);
     return kit.view(kind, group, {
       plate,
@@ -412,33 +239,15 @@ export function createMachineViews(kit) {
       edge,
       edgeMaterial,
       accents: [edgeMaterial],
-      rims: [kit.rim(group, kit.circleRim, 0.74)],
+      rims: [kit.rim(plate, heavy.outline(hull.geometry, 0.02))],
     });
   }
 
   function createCaster(kind) {
     const group = new THREE.Group();
-    const body = kit.body('caster-body', () => [
-      {
-        geometry: kit.sphere,
-        color: kit.tones.hull,
-        scale: [0.78, 0.42, 0.78],
-      },
-      {
-        geometry: kit.smallSphere,
-        color: kit.tones.dark,
-        scale: [0.34, 0.08, 0.34],
-        position: [0, 0.37, 0],
-      },
-      { geometry: casterBarrel, color: kit.tones.hull },
-    ]);
+    const body = kit.body('caster-body', heavy.casterBody);
     const lensTone = kit.tone(PALETTE.threat, 0.4);
-    const lens = kit.glow(
-      group,
-      lensTone,
-      0.15,
-      new THREE.Vector3(1.0, 0.6, 0)
-    );
+    const lens = kit.glow(group, lensTone, 0.15, heavy.casterMuzzle);
     group.add(body);
     kit.scene.add(group);
     // the aim ring, the blast ring (and its faint fill) and the one closing on
@@ -472,7 +281,7 @@ export function createMachineViews(kit) {
       lensTone,
       telegraph,
       accents: [lensTone, shellMaterial],
-      rims: [kit.rim(group, kit.circleRim, 0.8)],
+      rims: [kit.rim(group, kit.circleRim, 0.82)],
       glows: [lens],
     });
   }
@@ -515,9 +324,7 @@ export function createMachineViews(kit) {
 
   function createShade(kind) {
     const group = new THREE.Group();
-    const body = kit.body('shade-body', () => [
-      { geometry: shadeHull, color: kit.tones.hull },
-    ]);
+    const body = kit.body('shade-body', shade.parts);
     const eyeTone = kit.tone(PALETTE.threat, 1.3);
     group.add(body);
     kit.scene.add(group);
@@ -526,8 +333,8 @@ export function createMachineViews(kit) {
       eyeTone,
       phased: false,
       accents: [eyeTone],
-      rims: [kit.rim(group, shadeRim)],
-      glows: [kit.glow(group, eyeTone, 0.13, new THREE.Vector3(0.45, 0.22, 0))],
+      rims: [kit.rim(group, shade.rim)],
+      glows: [kit.glow(group, eyeTone, shade.eyeSize, shade.eye)],
     });
   }
 
@@ -560,41 +367,21 @@ export function createMachineViews(kit) {
     );
   }
 
-  // A pod of three plates leaning teal, its dark maw forward; the belly
-  // window on its back is its own emissive material, the maw's lips the
+  // A segmented pod leaning teal, its dark maw forward; the belly window in
+  // the socket on its back is its own emissive material, the maw's lips the
   // accent.
   function createLeech(kind) {
     const group = new THREE.Group();
     const teal = kit.tones.hull
       .clone()
       .lerp(colorOf(THREE, PALETTE.player), LEECH_TEAL_MIX);
-    const body = kit.body('leech-body', () => [
-      {
-        geometry: kit.sphere,
-        color: teal,
-        scale: [0.42, 0.34, 0.5],
-        position: [-0.62, 0, 0],
-      },
-      { geometry: kit.sphere, color: teal, scale: [0.6, 0.46, 0.76] },
-      {
-        geometry: kit.sphere,
-        color: teal,
-        scale: [0.44, 0.38, 0.62],
-        position: [0.52, 0, 0],
-      },
-      {
-        geometry: kit.smallSphere,
-        color: kit.tones.dark,
-        scale: [0.12, 0.2, 0.3],
-        position: [0.9, 0.06, 0],
-      },
-    ]);
+    const body = kit.body('leech-body', () => heavy.leechBody(teal));
     const lime = colorOf(THREE, PALETTE.status);
     const bellyMaterial = kit.emissive(PALETTE.xp, LEECH_BELLY_GAIN[0]);
     bellyMaterial.userData.base.lerp(lime, LEECH_BELLY_LIME);
     kit.setGain(bellyMaterial, LEECH_BELLY_GAIN[0]);
     const belly = new THREE.Mesh(kit.smallSphere, bellyMaterial);
-    belly.position.set(-0.04, 0.4, 0);
+    belly.position.copy(heavy.leechBelly);
     const lipsTone = kit.tone(PALETTE.threat, 1.2);
     group.add(body, belly);
     kit.scene.add(group);
@@ -602,8 +389,8 @@ export function createMachineViews(kit) {
       belly,
       bellyMaterial,
       accents: [lipsTone],
-      rims: [kit.rim(group, leechRim)],
-      glows: [kit.glow(group, lipsTone, 0.1, new THREE.Vector3(1.0, 0.18, 0))],
+      rims: [kit.rim(group, heavy.outline(body.geometry, 0))],
+      glows: [kit.glow(group, lipsTone, 0.1, heavy.leechMaw)],
     });
   }
 
@@ -617,7 +404,7 @@ export function createMachineViews(kit) {
     const gain = dim + (lit - dim) * fullness + LEECH_PULSE_GAIN * pulse;
     kit.setGain(view.bellyMaterial, gain);
     const swell = 1 + LEECH_BELLY_SWELL * fullness + LEECH_PULSE_SWELL * pulse;
-    view.belly.scale.set(0.36 * swell, 0.12 * swell, 0.3 * swell);
+    view.belly.scale.set(0.28 * swell, 0.1 * swell, 0.24 * swell);
   }
 
   // The Husk's seams and turn come from its seed.

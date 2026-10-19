@@ -67,6 +67,36 @@ const visual = {
   nozzleLengthPerLevel: 0.025 * S,
   retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
   cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
+  // a blunt, slab-sided body on a flat belly, thick delta wings, armour
+  // slabs on the shoulders, stabilisers with the braking upgrade
+  form: {
+    body: [
+      [0.985, 0, 0.17, 0, 0],
+      [0.97, 0.05, 0.17, 0.035, 0.03],
+      [0.93, 0.095, 0.172, 0.07, 0.055],
+      [0.84, 0.13, 0.175, 0.1, 0.075],
+      [0.65, 0.185, 0.18, 0.145, 0.095],
+      [0.42, 0.24, 0.183, 0.18, 0.105],
+      [0.1, 0.3, 0.186, 0.205, 0.11],
+      [-0.3, 0.335, 0.186, 0.21, 0.11],
+      [-0.62, 0.34, 0.186, 0.2, 0.11],
+      [-0.78, 0.315, 0.186, 0.19, 0.105],
+      [-0.84, 0.3, 0.186, 0.185, 0.1],
+    ],
+    deck: [6, 1.3],
+    belly: [5, 1.5],
+    spine: 0.4,
+    keel: 0.3,
+    seams: [0.42, -0.1, -0.5],
+    prow: 0.42,
+    wing: { lift: 0.18, cant: 0, tc: [0.19, 0.13], belly: 0.75 },
+    flap: { lift: 0.2, cant: 14, tc: [0.13, 0.11], belly: 1 },
+    intake: 0.6,
+    nacelle: 0.3,
+    pods: true,
+    armor: 0.2,
+    canopy: 0.09,
+  },
 };
 
 export default {

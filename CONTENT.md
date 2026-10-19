@@ -96,7 +96,7 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 
 ## Hull: `src/content/hulls/<id>.js` (+ one entry in `src/data/hangar.js`)
 
-- Fields: `name`, `outline` (collision points), `shieldPadding`, `thrusterPorts` `{ main aux left right }`, `stats` (multipliers: `acceleration maxSpeed maxHealth dashCooldown`), `visual` (panels from `./lib/panels.js`: `pt`, `panelPair`). Copy `default-hull.js`.
+- Fields: `name`, `outline` (collision points), `shieldPadding`, `thrusterPorts` `{ main aux left right }`, `stats` (multipliers: `acceleration maxSpeed maxHealth dashCooldown`), `visual` (panels from `./lib/panels.js`: `pt`, `panelPair`; its `form` shapes the 3D body, documented there). Copy `default-hull.js`.
 - To be flyable it needs a Hangar item with `unlocksHull: '<id>'` in `src/data/hangar.js` (`id name effect cost`).
 
 ## Stage and biome
