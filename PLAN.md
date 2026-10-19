@@ -136,11 +136,13 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       Mapa (19/10): só cai no 2D sozinho se o Three.js não carregar, e aí o menu também não abre: nada real a perder.
   - [x] 1 Desenho, troca de modo, serviços e testes só do 2D (commit 3e66b7d; portão verde, 1141 testes). Os testes de
         mira conferem o estado da mira, não mais o desenho. Medição: 1 ajudante opus, 1 tentativa, 118k tokens, 9 min.
-  - [ ] 2 Componente de desenho dos inimigos (construído nos dois modos, nunca desenhado no 3D), `renderStrategy` e os
-        blocos `render` dos dados que só ele lia.
-  - [ ] 3 Separar a lógica dos avisos e indicadores do desenho 2D em `effects/draw2d.js`; campos do combate que só
-        alimentavam o desenho; `ctx` nulo no app; comentários e script de benchmark órfãos; `src/README.md`,
-        `tests/README.md`, BACKLOG.
+  - [x] 2 Componente de desenho dos inimigos (commit c7d4c83; portão verde, 1137 testes): construído nos dois modos, nunca
+        desenhado no 3D; saiu com `renderStrategy`, os blocos `render` dos 12 dados (nenhum campo lido pelo 3D), o
+        desenho base dos inimigos e a esculpida do sprite da rocha. Medição: 1 ajudante opus, 1 tentativa, 131k tokens,
+        10 min.
+    - [ ] 3 Separar a lógica dos avisos e indicadores do desenho 2D em `effects/draw2d.js`; campos do combate que só
+          alimentavam o desenho; `ctx` nulo no app; comentários e script de benchmark órfãos; `src/README.md`,
+          `tests/README.md`, BACKLOG.
   - [ ] 4 Museu: passo em `deploy.yml` que gera a tag em `dist/classic/`, tag publicada, botão "Jogar a versão 2D
         original" nos créditos, captura.
   - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
