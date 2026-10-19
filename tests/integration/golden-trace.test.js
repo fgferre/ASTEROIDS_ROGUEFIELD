@@ -255,7 +255,11 @@ describe('golden trace', () => {
   const title = SAME_ARCH
     ? '$name plays as recorded'
     : '$name plays the same twice';
-  it.each(SCENARIOS)(title, (scenario) => {
+  it.each(SCENARIOS)(title, async (scenario) => {
+    // Each scenario runs seconds of blocking play; without a turn of the event
+    // loop between them the worker cannot answer Vitest, and a file over 60 s
+    // (CI, playing everything twice) ends in "Timeout calling onTaskUpdate".
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const trace = traceScenario(scenario);
     traced[scenario.name] = trace;
     if (UPDATE) return;
