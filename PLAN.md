@@ -87,10 +87,13 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 
 ### 0b — os arquivos gigantes que a fábrica não encolhe
 
-- [ ] **0b.1 AudioSystem (2.370)** — a tabela evento→cue vira dado (uma tabela de ~200 linhas); fachadas somem.
+- [x] **0b.1 AudioSystem** (2.370 → 911, 19/10): `src/data/audio/eventCues.js` (91 linhas evento → som) lida por um
+      despachante; lógica, propulsor, voz do chefe e random em `src/modules/audio/`; registro de 2.737 chamadas de som
+      idêntico. Os atalhos `play*` ficaram (um teste os exige no protótipo) — BACKLOG.
 - [x] **0b.2 MenuBackgroundSystem** (3.864 → 1.163, 19/10): onze partes da cena em `src/modules/menu/`; num rascunho
       contra o original, os mesmos 16.741 sorteios e o mesmo estado da cena em cada quadro; menu visto no navegador.
-- [ ] **0b.3 PlayerSystem (2.444)** — movimento, dash/freio, torreta, escudo, cascos.
+- [x] **0b.3 PlayerSystem** (2.444 → 918, 19/10): desenho 2D morto apagado; arte e forma do casco, escudo, entrada,
+      propulsores, manobras e voo em `src/modules/player/`; trace com a nave voando igual a cada passo.
 - [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
       do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
 - [x] **0b.5 PhysicsSystem** (2.223 → 945, 19/10): tiros, contato com a nave, minas, carga e explosão do Warden,
