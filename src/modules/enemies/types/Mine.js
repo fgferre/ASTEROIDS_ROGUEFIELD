@@ -145,6 +145,8 @@ export class Mine extends BaseEnemy {
     this.detonated = true;
     this.explosionCause = { cause, context: resolvedContext };
 
+    // Its own blast is never warded off (a Warded mine would sit forever).
+    this.wardedUntil = -Infinity;
     const lethalDamage = Math.max(1, this.health || this.maxHealth || 1);
     this.takeDamage(lethalDamage, {
       cause: 'mine-detonation',

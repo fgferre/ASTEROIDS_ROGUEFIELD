@@ -11,12 +11,17 @@ import {
   HUSK_COMPONENTS,
   HUSK_CONFIG,
 } from '../../../src/data/enemies/husk.js';
+import {
+  MINE_COMPONENTS,
+  MINE_CONFIG,
+} from '../../../src/data/enemies/mine.js';
 import { RAM_COMPONENTS, RAM_CONFIG } from '../../../src/data/enemies/ram.js';
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
 import { AFFIX_GLYPH_NAMES } from '../../../src/modules/enemies/components/affixGlyphs.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
 import Husk from '../../../src/modules/enemies/types/Husk.js';
+import Mine from '../../../src/modules/enemies/types/Mine.js';
 import Ram from '../../../src/modules/enemies/types/Ram.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 
@@ -51,6 +56,10 @@ const create = (type, config = {}, system = createSystem()) => {
   factory.registerType('ram', {
     class: Ram,
     defaults: { ...RAM_CONFIG, components: RAM_COMPONENTS },
+  });
+  factory.registerType('mine', {
+    class: Mine,
+    defaults: { ...MINE_CONFIG, components: MINE_COMPONENTS },
   });
   return factory.create(type, { x: 100, y: 100, wave: 6, ...config });
 };
@@ -239,5 +248,20 @@ describe('Elite affixes', () => {
     husk.update(ELITE_AFFIXES.warded.immuneSeconds + 0.01);
     husk.takeDamage(10);
     expect(husk.health).toBe(hull - 20);
+  });
+
+  it('Warded: a mine that detonates inside the window still blows', () => {
+    const system = createSystem();
+    const mine = create('mine', { elite: true, affixes: ['warded'] }, system);
+    mine.takeDamage(1); // opens the window
+    mine.triggerDetonation({ reason: 'proximity', distance: 40 });
+    expect(mine.alive).toBe(false);
+    expect(system.eventBus.emit).toHaveBeenCalledWith(
+      'mine-exploded',
+      expect.objectContaining({
+        cause: 'proximity',
+        damage: MINE_CONFIG.explosionDamage,
+      })
+    );
   });
 });
