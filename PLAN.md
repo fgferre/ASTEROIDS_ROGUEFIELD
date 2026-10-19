@@ -83,16 +83,19 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       Nenhum id de arma no motor. Trace: estado igual; só o nome do evento da carta mudou (`upgrade-weapon`). Uma
       quarta arma só em arquivo (fixture de teste) entra no catálogo e atira. Orbital, aura e cadeia ficam para quando
       uma arma pedir.
-- [ ] **0a.5 Visual = receita.** Vocabulário curto (partes primitivas, papel de paleta, pontos emissivos, escala, o que
-      anima) lido por um construtor só em `render3d`; inimigo novo não escreve render.
+- [x] **0a.5 Visual = receita** (19/10): `view: '<nome>'` escolhe uma das 10 vistas feitas à mão (agora uma tabela
+      por nome); `visual: {…}` é montado por `src/modules/render3d/enemies/recipes.js` (partes primitivas, materiais
+      hull/trim/glow, cores da paleta, luzes, giro/flutuação/pulso); sem nenhum dos dois, um casulo fosco com um olho
+      vermelho. As 10 vistas saem idênticas (impressão digital de geometria, materiais e lotes). Nenhum id em render3d.
 - [x] **0a.6 Diretor por papéis** (19/10): camadas, surtos e a Lua dos Caçadores pedem papéis (skirmisher, hazard,
       sniper, carrier, charger, minelayer, tank, artillery, flanker, scavenger); cada inimigo declara `roles`, `weight`,
       `fromLayer`. Um candidato: sem sorteio; vários: sorteio por peso por unidade num fluxo de random próprio, criado só
       então — trace igual. Um inimigo de teste com papel existente entra nas camadas a partir do seu `fromLayer`.
       Também 19/10: efeitos de tiro e morte, sons, explosão, Códice e fala de avistamento leem o arquivo do inimigo, com
       padrões para um inimigo novo (registros de efeitos e de sons idênticos para os dez).
-- [ ] **0a.7 `CONTENT.md`** de uma página: como adicionar inimigo, arma, carta, casco, fase. O brief de um worker vira
-      "adicione X seguindo CONTENT.md" — 1–2 arquivos, cinco em paralelo sem conflito.
+- [x] **0a.7 `CONTENT.md`** (19/10, 125 linhas): a regra, cada tipo com campos, padrões e exemplo, a tabela de
+      comportamentos e parâmetros, padrões de arma, o vocabulário visual e como conferir (`?content=`, testes, trace).
+      Conferido contra o código por um teste descartável.
 - [x] **0a.8 Motor de horda** (19/10, neste Mac M1, Chromium com a GPU real via ANGLE Metal, densidade Retina,
       `?content=drone&count=N&quality=ultra&fire=1`, 300 quadros após 25 s): **200 Motes = 60,0 fps, p95 18 ms** (antes
       55,9 / 33); 300 = 57,3 / 18,5. Medido antes de mexer: a simulação de 200 custa 0,38 ms/quadro e as chamadas de
