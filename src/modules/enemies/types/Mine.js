@@ -1,5 +1,4 @@
 import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
-import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const MINE_DEFAULTS = MINE_CONFIG ?? {};
@@ -25,7 +24,6 @@ export class Mine extends BaseEnemy {
     this.destroyed = false;
     this.weaponState = {};
     this.movementStrategy = 'proximity';
-    this.renderStrategy = 'procedural-sphere';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -42,8 +40,6 @@ export class Mine extends BaseEnemy {
       this.weaponState = this.weaponState || {};
       this.movementStrategy =
         componentConfig?.movement?.strategy || 'proximity';
-      this.renderStrategy =
-        componentConfig?.render?.strategy || 'procedural-sphere';
       this.weaponPattern =
         componentConfig?.weapon?.pattern || this.weaponPattern;
     }
@@ -202,30 +198,6 @@ export class Mine extends BaseEnemy {
       },
       __emittedByMine: true,
     });
-  }
-
-  onDraw() {
-    if (!this.useComponents || !this.components?.size) {
-      // Fallback: Generate payload without components (for testing)
-      const pulse = Math.sin(this.pulsePhase || 0);
-
-      return {
-        type: 'mine',
-        id: this.id,
-        x: this.x,
-        y: this.y,
-        radius: this.radius,
-        armed: this.armed,
-        pulse: pulse,
-        colors: {
-          body: ENEMY_EFFECT_COLORS.mine.body,
-          warning: ENEMY_EFFECT_COLORS.mine.warning,
-        },
-      };
-    }
-
-    // RenderComponent handles drawing via BaseEnemy.draw()
-    return;
   }
 
   resetForPool() {

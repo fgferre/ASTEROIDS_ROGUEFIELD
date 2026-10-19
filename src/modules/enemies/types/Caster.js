@@ -37,7 +37,6 @@ export class Caster extends BaseEnemy {
     this.shell = null;
     this.destroyed = false;
     this.movementStrategy = 'linear';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

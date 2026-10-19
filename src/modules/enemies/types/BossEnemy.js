@@ -169,8 +169,6 @@ export class BossEnemy extends BaseEnemy {
     this.movementConfig = null;
     this.movementPhases = null;
     this._lastMovementPhase = null;
-    this.renderStrategy =
-      BOSS_COMPONENTS?.render?.strategy || 'procedural-boss';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -185,8 +183,6 @@ export class BossEnemy extends BaseEnemy {
     const componentConfig = config.components ?? BOSS_COMPONENTS;
     if (componentConfig) {
       this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
-      this.renderStrategy =
-        componentConfig?.render?.strategy || 'procedural-boss';
 
       if (Array.isArray(componentConfig?.movementPhases)) {
         this.movementPhases = componentConfig.movementPhases.map((phase) => ({
@@ -1370,18 +1366,6 @@ export class BossEnemy extends BaseEnemy {
     if (destructionError) {
       throw destructionError;
     }
-  }
-
-  onDraw() {
-    if (!this.useComponents || !this.components?.size) {
-      console.error(
-        '[BossEnemy] Components not initialized. Boss cannot render.'
-      );
-      return;
-    }
-
-    // RenderComponent handles drawing via BaseEnemy.draw()
-    return;
   }
 
   buildRenderPayload() {

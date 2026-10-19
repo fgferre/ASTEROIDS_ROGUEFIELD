@@ -1,7 +1,6 @@
 import { CollisionComponent } from '../components/CollisionComponent.js';
 import { HealthComponent } from '../components/HealthComponent.js';
 import { MovementComponent } from '../components/MovementComponent.js';
-import { RenderComponent } from '../components/RenderComponent.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -660,30 +659,6 @@ export class EnemyFactory {
       }
     }
 
-    if (components.render) {
-      const existingRender = enemy.getComponent?.('render') || null;
-      enemy.renderStrategy =
-        components.render.strategy || enemy.renderStrategy || 'delegate';
-      enemy.renderConfig = { ...components.render };
-
-      if (existingRender) {
-        if (
-          typeof existingRender.setStrategy === 'function' &&
-          components.render.strategy
-        ) {
-          existingRender.setStrategy(components.render.strategy);
-        }
-      } else {
-        const renderComponent = this.createRenderComponent(
-          components.render,
-          enemy,
-          finalConfig
-        );
-        enemy.addComponent('render', renderComponent);
-        attachedCount++;
-      }
-    }
-
     if (components.collision) {
       const existingCollision = enemy.getComponent?.('collision') || null;
       enemy.collisionConfig = { ...components.collision };
@@ -747,14 +722,6 @@ export class EnemyFactory {
 
   createWeaponComponent(config = {}) {
     return new WeaponComponent(config);
-  }
-
-  createRenderComponent(config = {}) {
-    const component = new RenderComponent(config);
-    if (typeof component.setStrategy === 'function' && config.strategy) {
-      component.setStrategy(config.strategy);
-    }
-    return component;
   }
 
   createCollisionComponent(config = {}) {

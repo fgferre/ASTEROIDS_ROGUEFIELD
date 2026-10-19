@@ -32,7 +32,6 @@ import { EnemyUpdateSystem } from './enemies/systems/EnemyUpdateSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
-import { RenderComponent } from './enemies/components/RenderComponent.js';
 import { WeaponComponent } from './enemies/components/WeaponComponent.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import {
@@ -123,7 +122,6 @@ class EnemySystem extends BaseSystem {
     this.collisionComponent = null;
     this.genericMovement = null;
     this.genericWeapon = null;
-    this.genericRender = null;
     this.genericCollision = null;
     this.genericHealth = null;
     this.useComponents = true; // Feature flag to enable component system
@@ -764,7 +762,6 @@ class EnemySystem extends BaseSystem {
 
       this.genericMovement = new MovementComponent();
       this.genericWeapon = new WeaponComponent();
-      this.genericRender = new RenderComponent();
       this.genericCollision = new CollisionComponent();
       this.genericHealth = new HealthComponent();
     } catch (error) {
@@ -772,7 +769,6 @@ class EnemySystem extends BaseSystem {
       this.collisionComponent = null;
       this.genericMovement = null;
       this.genericWeapon = null;
-      this.genericRender = null;
       this.genericCollision = null;
       this.genericHealth = null;
       this.useComponents = false;

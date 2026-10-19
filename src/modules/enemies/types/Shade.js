@@ -59,7 +59,6 @@ export class Shade extends BaseEnemy {
     this.resetShadeState();
     this.destroyed = false;
     this.movementStrategy = 'linear';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

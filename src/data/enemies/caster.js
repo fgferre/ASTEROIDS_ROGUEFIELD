@@ -31,7 +31,6 @@ export const CASTER_CONFIG = deepFreeze({
 export const CASTER_COMPONENTS = deepFreeze({
   // The Caster steers itself (Caster.onUpdate); 'linear' only integrates vx/vy.
   movement: { strategy: 'linear', maxSpeed: CASTER_SPEED },
-  render: { strategy: 'procedural', shape: 'caster' },
   collision: {
     shape: 'circle',
     radius: CASTER_RADIUS,

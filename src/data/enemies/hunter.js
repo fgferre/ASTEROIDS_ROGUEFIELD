@@ -53,13 +53,12 @@ export const HUNTER_CONFIG = deepFreeze({
 /**
  * Component configuration providing reusable behaviors for the hunter frigate
  * enemy. These definitions are consumed by the EnemyFactory when constructing
- * the hunter to attach the appropriate movement, weapon, render, collision and
+ * the hunter to attach the appropriate movement, weapon, collision and
  * health components.
  *
  * @typedef {object} HunterComponents
  * @property {object} movement - Orbit movement tuning
  * @property {object} weapon - Burst weapon behavior
- * @property {object} render - Procedural diamond renderer configuration
  * @property {object} collision - Collision radius/response tuning
  * @property {object} health - Base health and scaling modifiers
  */
@@ -82,10 +81,6 @@ export const HUNTER_COMPONENTS = deepFreeze({
     spread: 0.045,
     fireRange: 520,
     predictive: true,
-  },
-  render: {
-    strategy: 'procedural',
-    shape: 'diamond',
   },
   collision: {
     shape: 'circle',

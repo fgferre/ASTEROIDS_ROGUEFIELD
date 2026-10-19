@@ -1,6 +1,6 @@
 // Elite affix glyphs (src/data/enemies/affixes.js `glyph`): small vector
-// marks drawn the same way in the 2D badges (RenderComponent) and the 3D
-// badge textures (render3d/enemyMirror), centered on 0,0 within radius `r`.
+// marks drawn into the 3D badge textures (render3d/enemies/affixes),
+// centered on 0,0 within radius `r`.
 
 import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
 

@@ -23,7 +23,6 @@ export class Weaver extends BaseEnemy {
     this.orbitDirection = 1;
     this.destroyed = false;
     this.movementStrategy = 'orbit';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

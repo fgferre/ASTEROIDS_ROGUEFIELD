@@ -68,7 +68,6 @@ export const HERALD_KINDS = deepFreeze({
 export const HERALD_COMPONENTS = deepFreeze({
   // The Herald steers itself (Herald.onUpdate); 'linear' only integrates vx/vy.
   movement: { strategy: 'linear' },
-  render: { strategy: 'procedural', shape: 'herald' },
   // Radius and contact damage are the kind's (Herald.initialize); so is
   // health (it sets healthInitialized).
   collision: { shape: 'circle', response: 'damage' },

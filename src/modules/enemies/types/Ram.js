@@ -28,7 +28,6 @@ export class Ram extends BaseEnemy {
     this.telegraph = null;
     this.destroyed = false;
     this.movementStrategy = 'linear';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

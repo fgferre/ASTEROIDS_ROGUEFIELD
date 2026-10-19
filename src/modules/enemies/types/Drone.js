@@ -1,10 +1,5 @@
 import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
-import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
-  ENEMY_EFFECT_COLORS,
-  ENEMY_RENDER_PRESETS,
-} from '../../../core/GameConstants.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
@@ -32,10 +27,8 @@ export class Drone extends BaseEnemy {
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
-    this._renderThrust = 0;
     this.weaponState = {};
     this.movementStrategy = 'tracking';
-    this.renderStrategy = 'procedural-triangle';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -51,8 +44,6 @@ export class Drone extends BaseEnemy {
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'tracking';
-      this.renderStrategy =
-        componentConfig?.render?.strategy || 'procedural-triangle';
       this.weaponPattern =
         componentConfig?.weapon?.pattern || this.weaponPattern;
     }
@@ -91,7 +82,6 @@ export class Drone extends BaseEnemy {
 
     this.fireTimer = 0;
     this.destroyed = false;
-    this._renderThrust = 0;
 
     if (Number.isFinite(config.x)) {
       this.x = config.x;
@@ -210,40 +200,6 @@ export class Drone extends BaseEnemy {
     super.onDestroyed(source, context);
   }
 
-  onDraw() {
-    if (!this.useComponents || !this.components?.size) {
-      // Fallback: Generate payload without components (for testing)
-      const speed = Math.hypot(this.vx || 0, this.vy || 0);
-      const targetSpeedRatio = Math.min(
-        1,
-        speed / Math.max(1, this.maxSpeed || 180)
-      );
-      const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0.15;
-
-      this._renderThrust = this._renderThrust ?? 0;
-      this._renderThrust =
-        this._renderThrust +
-        (targetSpeedRatio - this._renderThrust) * smoothing;
-
-      return {
-        type: 'drone',
-        id: this.id,
-        x: this.x,
-        y: this.y,
-        radius: this.radius,
-        rotation: this.rotation || 0,
-        thrust: this._renderThrust,
-        colors: {
-          body: ENEMY_EFFECT_COLORS.drone.body,
-          thrust: ENEMY_EFFECT_COLORS.drone.thrust,
-        },
-      };
-    }
-
-    // RenderComponent handles drawing via BaseEnemy.draw()
-    return;
-  }
-
   resetForPool() {
     super.resetForPool();
 
@@ -263,7 +219,6 @@ export class Drone extends BaseEnemy {
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
-    this._renderThrust = 0;
   }
 }
 

@@ -50,7 +50,6 @@ export const MINE_CONFIG = deepFreeze({
  * @typedef {object} MineComponents
  * @property {object} movement - Proximity / drift behavior
  * @property {object} weapon - Proximity-triggered explosion behavior
- * @property {object} render - Pulsing sphere renderer tuning
  * @property {object} collision - Collision radius and trigger response
  * @property {object} health - Base health/armor configuration
  */
@@ -67,12 +66,6 @@ export const MINE_COMPONENTS = deepFreeze({
     proximityRadius: 80,
     armTime: 0.5,
     triggerOnProximity: true,
-  },
-  render: {
-    strategy: 'procedural',
-    shape: 'sphere',
-    pulseSpeed: 2.6,
-    pulseAmount: 0.32,
   },
   collision: {
     shape: 'circle',

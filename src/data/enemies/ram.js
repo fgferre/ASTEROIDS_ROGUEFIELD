@@ -29,7 +29,6 @@ export const RAM_COMPONENTS = deepFreeze({
     maxSpeed: RAM_APPROACH_SPEED,
     chargeSpeed: RAM_CHARGE_SPEED,
   },
-  render: { strategy: 'procedural', shape: 'ram' },
   collision: {
     shape: 'circle',
     radius: RAM_RADIUS,

@@ -22,7 +22,7 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
  */
 export function createAffixViews(kit) {
   const { THREE } = kit;
-  // Accent energy: gold on an Elite (RenderComponent accentOf).
+  // Accent energy: gold on an Elite.
   const goldColor = colorOf(THREE, PALETTE.xp);
   // dashed, so the slow turn of the Elite ring reads
   const eliteDash = new THREE.RingGeometry(
