@@ -11,6 +11,12 @@ import {
 
 export const DAILY_STORAGE_KEY = 'roguefield:daily:v1';
 
+/**
+ * Boot seed sources drawn at random. Any other source (`?seed=`, the stored
+ * override, a replay, a harness) pins the seed for every run.
+ */
+const RANDOM_SEED_SOURCES = ['crypto', 'clock'];
+
 const MONTHS = [
   'JAN',
   'FEB',
@@ -87,13 +93,16 @@ function urlParam(name) {
  * being played, the Daily Field (always Veteran), `?difficulty=` and the
  * `gameplay.difficulty` setting. It is locked when a run begins, so changing
  * the setting mid-run applies from the next run. The seed is the boot seed
- * (`?seed=`, else the random source; see GameSessionService) or, on the
- * Daily Field, the hash of today's UTC date.
+ * (`?seed=`, else the random source; see GameSessionService) for the first
+ * normal run and a fresh one for each later run, unless the boot seed was
+ * pinned; or, on the Daily Field, the hash of today's UTC date.
  */
 export default class DifficultyService {
-  constructor({ settings, bootSeed, now = () => new Date() }) {
+  constructor({ settings, bootSeed, bootSeedSource, now = () => new Date() }) {
     this.settings = settings;
-    this.bootSeed = bootSeed;
+    this.pinnedSeed = !RANDOM_SEED_SOURCES.includes(bootSeedSource);
+    this.runSeed = bootSeed;
+    this.bootSeedSpent = false;
     this.now = now;
     this.urlDifficulty = difficultyId(urlParam('difficulty'));
     this.replayDifficulty = null;
@@ -137,11 +146,17 @@ export default class DifficultyService {
     if (daily !== undefined) this.daily = daily;
     this.dateKey = this.daily ? this.todayKey() : null;
     this.runDifficulty = this.getSelectedDifficulty();
+    if (!this.daily) {
+      if (this.bootSeedSpent && !this.pinnedSeed) {
+        this.runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+      }
+      this.bootSeedSpent = true;
+    }
     return this.getRunSeed();
   }
 
   getRunSeed() {
-    return this.daily ? dailySeed(this.dateKey) : this.bootSeed;
+    return this.daily ? dailySeed(this.dateKey) : this.runSeed;
   }
 
   isDaily() {

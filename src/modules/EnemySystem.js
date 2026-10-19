@@ -2339,6 +2339,7 @@ class EnemySystem extends BaseSystem {
       sessionActive: Boolean(this.sessionActive),
       spawnTimer: this.waveManager.spawnTimer,
       waveState: wave,
+      layerProgress: this.waveManager.captureLayerProgress(),
       sessionStats: session,
       asteroids,
       bosses,
@@ -2374,15 +2375,6 @@ class EnemySystem extends BaseSystem {
       this.releaseAllAsteroidsToPool();
       this.asteroids = [];
 
-      this.waveManager.restoreRocks({
-        layer: safeNumber(waveSnapshot.current, 1),
-        active: Boolean(waveSnapshot.isActive),
-        total: safeNumber(waveSnapshot.totalAsteroids, 0),
-        spawned: safeNumber(waveSnapshot.asteroidsSpawned, 0),
-        completedWaves: safeNumber(waveSnapshot.completedWaves, 0),
-        spawnTimer: safeNumber(snapshot.spawnTimer, 0),
-      });
-
       const baseSession = this.createInitialSessionStats();
       this.sessionStats = {
         ...baseSession,
@@ -2401,14 +2393,7 @@ class EnemySystem extends BaseSystem {
       for (let i = 0; i < asteroidSnapshots.length; i += 1) {
         const restored = this.applyAsteroidSnapshot(asteroidSnapshots[i]);
         if (restored) {
-          const registrationResult = this.registerActiveEnemy(restored, {
-            skipDuplicateCheck: true,
-          });
-          this.warnIfWaveManagerRegistrationFailed(
-            registrationResult,
-            'snapshot-restore',
-            restored
-          );
+          this.registerActiveEnemy(restored, { skipDuplicateCheck: true });
         }
       }
 
@@ -2423,6 +2408,17 @@ class EnemySystem extends BaseSystem {
           restoredBosses.push(restoredBoss);
         }
       }
+
+      // After the field: registering its rocks counted them again.
+      this.waveManager.restoreRocks({
+        layer: safeNumber(waveSnapshot.current, 1),
+        active: Boolean(waveSnapshot.isActive),
+        total: safeNumber(waveSnapshot.totalAsteroids, 0),
+        spawned: safeNumber(waveSnapshot.asteroidsSpawned, 0),
+        completedWaves: safeNumber(waveSnapshot.completedWaves, 0),
+        spawnTimer: safeNumber(snapshot.spawnTimer, 0),
+        progress: snapshot.layerProgress,
+      });
 
       if (restoredBosses.length > 0) {
         const boss = restoredBosses[0];

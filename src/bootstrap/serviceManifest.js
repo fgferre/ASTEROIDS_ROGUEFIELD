@@ -326,6 +326,7 @@ export function createServiceManifest(context = {}) {
         new DifficultyService({
           settings: resolved['settings'],
           bootSeed: manifestContext.seed,
+          bootSeedSource: manifestContext.randomSeedSource,
         }),
     },
     {
@@ -671,6 +672,8 @@ export function createServiceManifest(context = {}) {
         'healthHearts',
         'world',
         'effects',
+        'combat',
+        'renderer',
         'settings',
         'hangar',
         'difficulty',
@@ -691,6 +694,8 @@ export function createServiceManifest(context = {}) {
             healthHearts: resolved['healthHearts'],
             world: resolved['world'],
             effects: resolved['effects'],
+            combat: resolved['combat'],
+            renderer: resolved['renderer'],
             settings: resolved['settings'],
             hangar: resolved['hangar'],
             difficulty: resolved['difficulty'],

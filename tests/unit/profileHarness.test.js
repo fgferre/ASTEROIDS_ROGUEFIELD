@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
-import { activateProfileHarness } from '../../src/bootstrap/profileHarness.js';
+import {
+  activateProfileHarness,
+  composeHeroScene,
+} from '../../src/bootstrap/profileHarness.js';
 
 // INFRA-01 (Phase 1, Plan 01.02) — URL-flag activation contract for the
 // in-browser performance harness.
@@ -145,5 +148,30 @@ describe('activateProfileHarness (INFRA-01)', () => {
         expect(gameState.randomSeedSource).toBe('profile-harness');
       });
     }
+  });
+});
+
+describe('composeHeroScene', () => {
+  it('freezes the wave clock and the rock trickle so the picture holds', () => {
+    const update = vi.fn();
+    const updateRockTrickle = vi.fn();
+    const enemies = {
+      releaseAllAsteroidsToPool: vi.fn(),
+      acquireEnemyViaFactory: vi.fn(() => ({})),
+      waveManager: { update, updateRockTrickle, spawnQueue: [1] },
+    };
+
+    composeHeroScene({
+      player: { position: {}, setInvulnerableTimer: vi.fn() },
+      enemies,
+      progression: {},
+      xpOrbs: { createXPOrb: vi.fn() },
+    });
+    enemies.waveManager.update(1);
+    enemies.waveManager.updateRockTrickle(1);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(updateRockTrickle).not.toHaveBeenCalled();
+    expect(enemies.waveManager.spawnQueue).toEqual([]);
   });
 });

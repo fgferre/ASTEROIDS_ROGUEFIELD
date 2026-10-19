@@ -9,9 +9,9 @@ export const GAMEPAD_NAV_SCREENS = Object.freeze([
   'codex',
   'hangar',
   'credits',
+  'gameover',
   'levelup',
   'pause',
-  'gameover',
   'victory',
   'menu',
 ]);

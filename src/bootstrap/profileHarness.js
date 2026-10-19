@@ -230,12 +230,13 @@ const HERO_XP_REQUIREMENT = 1e9;
  * Composes the hero scene through the public spawn paths: factory-backed
  * enemies, createXPOrb, a frozen wave manager and an unreachable level-up.
  */
-function composeHeroScene({ player, enemies, progression, xpOrbs }) {
+export function composeHeroScene({ player, enemies, progression, xpOrbs }) {
   enemies.releaseAllAsteroidsToPool();
-  // Freeze spawning: waves start from waveManager.update() and the legacy
-  // timer spawns from spawnSystem.handleSpawning().
+  // Freeze spawning: rocks trickle in from waveManager.updateRockTrickle()
+  // and the layer clock (machines, surges, the Warden) runs in
+  // waveManager.update().
   enemies.waveManager.update = () => {};
-  enemies.spawnSystem.handleSpawning = () => {};
+  enemies.waveManager.updateRockTrickle = () => {};
   enemies.waveManager.spawnQueue = [];
   progression.experienceToNext = HERO_XP_REQUIREMENT;
 

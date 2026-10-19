@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { LEVEL_UP_SCREEN_DELAY_SECONDS } from '../../../src/core/GameConstants.js';
+import RandomService from '../../../src/core/RandomService.js';
+import ProgressionSystem from '../../../src/modules/ProgressionSystem.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { LevelUpScreen } from '../../../src/modules/ui/LevelUpScreen.js';
 import {
@@ -166,5 +170,119 @@ describe('Level-up card transition', () => {
       ]);
       expect(container.children[0].classes.has('is-focused')).toBe(true);
     });
+  });
+});
+
+describe('Level-up card choices', () => {
+  let restoreDom;
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+  });
+  afterEach(() => restoreDom());
+
+  // A real progression heard by UISystem; the card screen records the levels
+  // it deals, and `screens` where the UI went after them.
+  function cardTable() {
+    const eventBus = createEventBusMock({ withSpies: false });
+    const progression = new ProgressionSystem({
+      random: new RandomService(7),
+      eventBus,
+      player: {},
+      ui: {},
+      effects: {},
+      'xp-orbs': { attachProgression: () => {} },
+    });
+    const dealt = [];
+    const screens = [];
+    const levelUpScreen = {
+      levelUpState: { isVisible: false, options: [] },
+      handleUpgradeOptions(offer) {
+        dealt.push(offer.level);
+        this.levelUpState = { isVisible: true, options: offer.options };
+      },
+      resetLevelUpState() {
+        this.levelUpState = { isVisible: false, options: [] };
+      },
+    };
+    const ui = Object.setPrototypeOf(
+      {
+        levelUpScreen,
+        onboarding: { cardPicked: () => {} },
+        tacticalHud: { refreshHudFromServices: () => {} },
+        queueTransmission: () => {},
+        getRandomFork: () => new RandomService(1),
+        getService: () => progression,
+        showScreen: (name) => screens.push(name),
+        registerEventListener: (name, fn) => eventBus.on(name, fn),
+      },
+      UISystem.prototype
+    );
+    ui.setupEventListeners();
+
+    // Exactly `count` levels from one pickup, then the pick-screen delay.
+    const levelUp = (count) => {
+      let need = progression.experienceToNext;
+      let xp = need - progression.experience;
+      for (let i = 1; i < count; i += 1) {
+        need = Math.floor(need * progression.levelScaling);
+        xp += need;
+      }
+      progression.collectXP(xp);
+      progression.update(LEVEL_UP_SCREEN_DELAY_SECONDS);
+    };
+    // The first card taken; the cards leave through showGameUI.
+    const pick = () => {
+      progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+      ui.showGameUI();
+    };
+    return {
+      eventBus,
+      progression,
+      levelUpScreen,
+      dealt,
+      screens,
+      levelUp,
+      pick,
+    };
+  }
+
+  it('deals one card choice per level, in order, before play resumes', () => {
+    const { progression, levelUpScreen, dealt, screens, levelUp, pick } =
+      cardTable();
+    const start = progression.level;
+
+    levelUp(2);
+    expect(dealt).toEqual([start + 1]);
+
+    pick();
+    expect(dealt).toEqual([start + 1, start + 2]);
+    expect(screens).toEqual([]); // still on the cards: the run stays stopped
+    // Reroll and banish work on the cards now on screen.
+    expect(progression.pendingUpgradeOptions).toEqual(
+      levelUpScreen.levelUpState.options
+    );
+
+    pick();
+    expect(screens).toEqual(['playing']);
+  });
+
+  it('deals no cards once the ship is down, and again after a retry', () => {
+    const { eventBus, progression, levelUpScreen, dealt, screens, levelUp } =
+      cardTable();
+    const start = progression.level;
+
+    // Cards dealt on the step the ship dies close, and the one waiting goes.
+    levelUp(2);
+    eventBus.emit('player-died', {});
+    expect(levelUpScreen.levelUpState.isVisible).toBe(false);
+    expect(screens).toEqual(['playing']);
+    // Nor do cards open while it is down.
+    levelUp(1);
+    expect(dealt).toEqual([start + 1]);
+
+    // After the respawn only new levels deal cards.
+    eventBus.emit('session-retry-countdown', { phase: 'complete' });
+    levelUp(1);
+    expect(dealt).toEqual([start + 1, start + 4]);
   });
 });
