@@ -92,6 +92,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
+
   - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
@@ -133,16 +134,16 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       ramo `classic` e tag `classic-2d` = bc1ad27 (último commit 2D por padrão) + prefixo `classic:` nos dados salvos
       (mesma origem no GitHub Pages), gerada pela publicação a partir da tag em `dist/classic/`, botão nos créditos.
       Mapa (19/10): só cai no 2D sozinho se o Three.js não carregar, e aí o menu também não abre: nada real a perder.
-    - [x] 1 Desenho, troca de modo, serviços e testes só do 2D (commit 3e66b7d; portão verde, 1141 testes). Os testes de
-          mira conferem o estado da mira, não mais o desenho. Medição: 1 ajudante opus, 1 tentativa, 118k tokens, 9 min.
-    - [ ] 2 Componente de desenho dos inimigos (construído nos dois modos, nunca desenhado no 3D), `renderStrategy` e os
-          blocos `render` dos dados que só ele lia.
-    - [ ] 3 Separar a lógica dos avisos e indicadores do desenho 2D em `effects/draw2d.js`; campos do combate que só
-          alimentavam o desenho; `ctx` nulo no app; comentários e script de benchmark órfãos; `src/README.md`,
-          `tests/README.md`, BACKLOG.
-    - [ ] 4 Museu: passo em `deploy.yml` que gera a tag em `dist/classic/`, tag publicada, botão "Jogar a versão 2D
-          original" nos créditos, captura.
-    - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
+  - [x] 1 Desenho, troca de modo, serviços e testes só do 2D (commit 3e66b7d; portão verde, 1141 testes). Os testes de
+        mira conferem o estado da mira, não mais o desenho. Medição: 1 ajudante opus, 1 tentativa, 118k tokens, 9 min.
+  - [ ] 2 Componente de desenho dos inimigos (construído nos dois modos, nunca desenhado no 3D), `renderStrategy` e os
+        blocos `render` dos dados que só ele lia.
+  - [ ] 3 Separar a lógica dos avisos e indicadores do desenho 2D em `effects/draw2d.js`; campos do combate que só
+        alimentavam o desenho; `ctx` nulo no app; comentários e script de benchmark órfãos; `src/README.md`,
+        `tests/README.md`, BACKLOG.
+  - [ ] 4 Museu: passo em `deploy.yml` que gera a tag em `dist/classic/`, tag publicada, botão "Jogar a versão 2D
+        original" nos créditos, captura.
+  - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
 
 ## Fora de escopo deste plano
 
