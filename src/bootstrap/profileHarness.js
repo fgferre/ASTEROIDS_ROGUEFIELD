@@ -38,6 +38,10 @@
  * scenario start so boss telegraphs can be photographed, and the driver
  * steers the ship in a slow circle so the camera and telegraphs get exercised.
  *
+ * `?content=<id>` (contentScene.js) is the same run with any item of the content
+ * registry in front of the ship instead of the fixed hero picture; it records
+ * nothing and has no time limit.
+ *
  * Per CONTEXT D-08 the existing `scripts/benchmarks/performance-baseline.js`
  * Node bench is NOT replaced — it's a synthetic micro-bench. INFRA-01's
  * baseline IS this in-browser harness output.
@@ -54,6 +58,14 @@
 import { debugLog } from '../core/debugLogging.js';
 import { GAME_WIDTH } from '../core/GameConstants.js';
 import { applyBaseTransform } from '../core/viewport.js';
+import {
+  composeContentScene,
+  freezeSpawner,
+  jumpToLayer,
+  NO_LEVEL_UP_XP,
+  readContentScene,
+  spawnViaFactory,
+} from './contentScene.js';
 
 // CONTEXT D-09: deterministic seed forced across all scenarios.
 const PROFILE_HARNESS_SEED = 0xb45e;
@@ -112,6 +124,9 @@ function getScenarioFromURL() {
 
   try {
     const params = new URLSearchParams(window.location.search);
+    if (params.has('content')) {
+      return 'content';
+    }
     if (params.get('scene') === 'hero') {
       return 'hero';
     }
@@ -196,12 +211,9 @@ function forceWaveNumber(enemiesService, requestedWave) {
     // setter transparently.
     waveManager.currentWave = numericWave;
     if (numericWave > 1) {
-      // Drop wave-1 asteroids so the forced wave starts on a clear arena.
-      enemiesService.releaseAllAsteroidsToPool();
-      // The run already started wave 1: restart as the requested wave.
-      waveManager.currentWave = numericWave - 1;
-      waveManager.waveInProgress = false;
-      enemiesService.startNextWave();
+      // The run already started wave 1: restart as the requested wave, on a
+      // clear arena.
+      jumpToLayer(enemiesService, numericWave);
     }
     debugLog(`[profileHarness] Forced wave currentWave=${numericWave}`);
   } catch (error) {
@@ -224,7 +236,6 @@ const HERO_ORBS = Object.freeze([
   [640, 420],
 ]);
 const HERO_PLAYER = Object.freeze({ x: 300, y: 300, driftSpeed: 14 });
-const HERO_XP_REQUIREMENT = 1e9;
 
 /**
  * Composes the hero scene through the public spawn paths: factory-backed
@@ -232,24 +243,10 @@ const HERO_XP_REQUIREMENT = 1e9;
  */
 export function composeHeroScene({ player, enemies, progression, xpOrbs }) {
   enemies.releaseAllAsteroidsToPool();
-  // Freeze spawning: rocks trickle in from waveManager.updateRockTrickle()
-  // and the layer clock (machines, surges, the Warden) runs in
-  // waveManager.update().
-  enemies.waveManager.update = () => {};
-  enemies.waveManager.updateRockTrickle = () => {};
-  enemies.waveManager.spawnQueue = [];
-  progression.experienceToNext = HERO_XP_REQUIREMENT;
+  freezeSpawner(enemies.waveManager);
+  progression.experienceToNext = NO_LEVEL_UP_XP;
 
-  const spawn = (type, config) => {
-    const enemy = enemies.acquireEnemyViaFactory(type, {
-      wave: 1,
-      ...config,
-    });
-    if (enemy) {
-      enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
-    }
-    return enemy;
-  };
+  const spawn = (type, config) => spawnViaFactory(enemies, type, config);
   HERO_ASTEROIDS.forEach((config) => spawn('asteroid', config));
   spawn('drone', { x: 690, y: 100 });
   spawn('hunter', { x: 520, y: 250 });
@@ -387,7 +384,7 @@ export function activateProfileHarness({
   performanceMonitor,
   getServices,
 } = {}) {
-  const scenario = getScenarioFromURL();
+  let scenario = getScenarioFromURL();
   if (!scenario) {
     return { active: false };
   }
@@ -404,7 +401,13 @@ export function activateProfileHarness({
     `[profileHarness] Activating scenario "${scenario}"; seed=0x${PROFILE_HARNESS_SEED.toString(16).toUpperCase()}`
   );
 
-  const config = SCENARIOS[scenario];
+  // An unknown `?content=` id has warned once: the plain hero scene instead.
+  const contentScene =
+    scenario === 'content' ? readContentScene(window.location.search) : null;
+  if (scenario === 'content' && !contentScene) {
+    scenario = 'hero';
+  }
+  const config = SCENARIOS[scenario] ?? {};
 
   // Defer the scenario driver past the synchronous return so init() can
   // run first and populate bootstrapped services. setTimeout(..., 0) yields
@@ -413,6 +416,7 @@ export function activateProfileHarness({
     void runDeferredScenario({
       scenario,
       config,
+      contentScene,
       performanceMonitor,
       getServices,
     });
@@ -429,16 +433,29 @@ export function activateProfileHarness({
 async function runDeferredScenario({
   scenario,
   config,
+  contentScene,
   performanceMonitor,
   getServices,
 }) {
   try {
-    performanceMonitor.enableAutoLog(1000);
-    debugLog(
-      `[profileHarness] Auto-log enabled at 1000ms cadence; awaiting scenario "${scenario}"`
-    );
+    // A content scene has no time limit: an auto-log that grows for as long as
+    // the page is open would cost frames in the very scene meant to measure.
+    if (!contentScene) {
+      performanceMonitor.enableAutoLog(1000);
+      debugLog(
+        `[profileHarness] Auto-log enabled at 1000ms cadence; awaiting scenario "${scenario}"`
+      );
+    }
 
     const services = await pollForGameServices(getServices);
+    if (contentScene) {
+      // Nothing to save to disk; the scene holds until the page is left.
+      if (services) {
+        await startRun(services['enemies']);
+        composeContentScene({ scene: contentScene, services });
+      }
+      return;
+    }
     let driver = null;
 
     if (services) {
