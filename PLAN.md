@@ -64,7 +64,8 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 ### 0a — a fábrica de conteúdo
 
 - [ ] **0a.1 Registro** (em curso 19/10: `src/content/registry.js` + `tests/content/registry.test.js`; feitos biomas,
-      41 cartas, 3 cascos, 3 armas, 15 camadas (`src/data/layerParts.js` evita o ciclo) — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
+      41 cartas, 3 cascos, 3 armas, 15 camadas (`src/data/layerParts.js` evita o ciclo), 10
+      inimigos (`git mv`, exports nomeados mantidos) e 6 chefes (`content/bosses`; `boss.js`/`herald.js` reconstroem) — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
       conteúdo só importa constantes e outros arquivos de conteúdo, nunca um módulo que lê o registro — ciclo de import).
       Pedido original: `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
       `import.meta.glob`; criar o arquivo é registrar. `tests/content.test.js` valida todo item (campos, referências a
@@ -95,7 +96,11 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [ ] **0b.3 PlayerSystem (2.444)** — movimento, dash/freio, torreta, escudo, cascos.
 - [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
       do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
-- [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
+- [x] **0b.5 PhysicsSystem** (2.223 → 945, 19/10): tiros, contato com a nave, minas, carga e explosão do Warden,
+      impacto e números do chefe em `src/modules/physics/`; trace igual a cada passo.
+- [x] **Targeting** (1.619 → 724) e **BossEnemy** (1.372 → 827), 19/10: perigo, mira à frente e travas em
+      `src/modules/combat/targeting/`; fases e ataques do Warden em `src/modules/enemies/boss/` (quebrar o leque ou a
+      carga de propósito derruba o trace).
 - [x] **EnemySystem** (3.159 → 1.183, 19/10): registro dos tipos numa função só (`enemyTypeRegistry.js`), chefes,
       recompensas, fotos, consultas e acertos em `src/modules/enemies/{base,systems}/`; trace igual a cada passo.
 - [x] **EnemyEffects** (1.512 → 665, 19/10): tiro, rachaduras e Volatile em módulos; o despacho de morte por tipo
