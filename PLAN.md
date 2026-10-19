@@ -16,6 +16,58 @@ por imagem e jogando — nunca por teste.
 - **Próximo goal:** os oito pontos do goal de 18/10 fecharam; ele escolhe o próximo. Itens de gosto do BACKLOG foram
   listados para ele com sugestão (19/10); nenhum foi feito.
 
+## Rodada 0 (decidida 19/10, madrugada) — baratear o conteúdo antes de crescê-lo
+
+Dele (19/10): _"vi e aprovei, mas é pouco conteúdo… Vampire Survivors são dias de desafio"_; _"tudo roda bem a 60 fps
+num Mac M1"_; _"repensar a nossa estrutura de forma inteligente para diminuir o custo de todas as melhorias feitas só
+por AIs"_; _"você sabe o que é melhor fazer"_. Referência de estrutura: jogos de conteúdo massivo (dados do Vampire
+Survivors, Shattered Pixel Dungeon, Cataclysm DDA): **conteúdo é dado, comportamento é biblioteca pequena, um registro
+liga os dois; quem adiciona conteúdo não toca no motor.** Hoje um inimigo novo toca 10 arquivos e uma classe de 200–250
+linhas; uma arma, 8 arquivos com ids à mão; testes enumeram tipos à mão. As duas metades abaixo correm em paralelo
+(arquivos disjuntos), um commit por fatia, comportamento igual antes e depois (mesmos testes verdes).
+
+**Regra que vira verificação (primeira fatia de todas):** teto de **1.200 linhas por arquivo** no ESLint (`max-lines`),
+com lista de exceções nomeadas que só pode diminuir — a lista é o placar da dívida. Hoje acima do teto: 13 arquivos.
+
+### 0a — a fábrica de conteúdo
+
+- [ ] **0a.1 Registro.** `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
+      `import.meta.glob`; criar o arquivo é registrar. `tests/content.test.js` valida todo item (campos, referências a
+      comportamentos/cues/paleta, papéis resolvíveis) e substitui os testes que enumeram tipos à mão. Mover os dados
+      atuais (`src/data/enemies`, `upgrades`, `weapons.js`, `shipModels.js`, `layers.js`, `biomes.js`) para lá.
+- [ ] **0a.2 Cena de conteúdo.** `?content=<id>` coloca qualquer item do registro diante da nave (hero generalizada);
+      acaba o script de captura sob medida por worker.
+- [ ] **0a.3 Inimigo = receita.** Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
+      investida, fase) e de mortes (dividir, filhotes, devolver orbes, explodir) sobre as estratégias de movimento que
+      já existem; a receita declara stats, move, attack, onDeath, afixos, drops, cues, Códice e **papéis** para o
+      diretor. Migrar os 11 inimigos um a um (Caster, Shade, Leech viram as primeiras receitas; suas classes somem).
+- [ ] **0a.4 Arma = padrão + projétil.** Padrões: projétil, leque, feixe a cada N, orbital, aura, cadeia; evoluções por
+      família declaradas na arma; o combate executa padrões e não conhece ids. Migrar lance, harmonic e scatter.
+- [ ] **0a.5 Visual = receita.** Vocabulário curto (partes primitivas, papel de paleta, pontos emissivos, escala, o que
+      anima) lido por um construtor só em `render3d`; inimigo novo não escreve render.
+- [ ] **0a.6 Diretor por papéis.** Roster e surtos das camadas sorteiam por papel e peso (`artillery`, `flanker`,
+      `scavenger`, `fromLayer`), não por nome.
+- [ ] **0a.7 `CONTENT.md`** de uma página: como adicionar inimigo, arma, carta, casco, fase. O brief de um worker vira
+      "adicione X seguindo CONTENT.md" — 1–2 arquivos, cinco em paralelo sem conflito.
+- [ ] **0a.8 Motor de horda.** Inimigos por instância (como as rochas), balas e partículas em GPU, orçamentos por
+      quadro; meta: **200 Motes a 60 fps no Mac M1**, medido por ele.
+
+### 0b — os arquivos gigantes que a fábrica não encolhe
+
+- [ ] **0b.1 AudioSystem (2.370)** — a tabela evento→cue vira dado (uma tabela de ~200 linhas); fachadas somem.
+- [ ] **0b.2 MenuBackgroundSystem (3.864)** — dividir por partes da cena do menu.
+- [ ] **0b.3 PlayerSystem (2.444)** — movimento, dash/freio, torreta, escudo, cascos.
+- [ ] **0b.4 GameSessionService (2.394)** — fluxo da run, telas finais, recordes, modos, replay.
+- [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
+- [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
+- [ ] **0b.7 AAAHudLayout (1.892), Renderer3D (1.791), InputSystem (1.386)** — por painel; cena/espelhos/pós; teclado/
+      gamepad/comandos.
+
+**Pronto quando:** um inimigo e uma arma novos entram com um arquivo cada e zero linhas no motor; os 11 inimigos e 3
+armas migrados com comportamento igual; nenhum arquivo acima do teto fora da lista de exceções, e a lista com no máximo
+três nomes; 200 Motes a 60 fps no M1 (ele mede). **Fora de escopo:** conteúdo novo (fica para o goal de longevidade que
+vem depois: 12+ armas, 30+ inimigos, 6 biomas, árvore de desbloqueios).
+
 ## O pedido do dono (palavras dele, 17/10)
 
 - _"revise tudo e vamos melhorar o projeto como um todo, sinto que estamos presos no passado ainda... tudo muito
@@ -106,7 +158,6 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
-
   - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
