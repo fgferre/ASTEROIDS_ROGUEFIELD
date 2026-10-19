@@ -120,7 +120,6 @@ class EnemySystem extends BaseSystem {
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
-    this._asteroidSpawnDebugLogged = false;
     this._lastEnemyUpdateLog = 0;
     this._lastBossHudDamageUpdate = 0;
 

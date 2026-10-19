@@ -1,7 +1,7 @@
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { EnemySystem } from '../../src/modules/EnemySystem.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import { createTestContainer, withWaveOverrides } from './setup.js';
+import { createTestContainer } from './setup.js';
 
 export const TEST_SEED = 123456;
 export const SAMPLE_ASTEROID_COUNT = 1000;
@@ -257,7 +257,6 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
   enemySystem.asteroids.length = 0;
   enemySystem.spawnTimer = 0;
   enemySystem.sessionActive = true;
-  enemySystem._asteroidSpawnDebugLogged = false;
   enemySystem.invalidateActiveEnemyCache?.();
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
 
@@ -282,58 +281,56 @@ export function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
   const waveManager = enemySystem.waveManager;
   enemySystem.waveManager = null;
 
-  withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-    prepareWave(enemySystem, waveNumber);
+  prepareWave(enemySystem, waveNumber);
 
-    const deltaTime = 0.5;
-    let iterations = 0;
+  const deltaTime = 0.5;
+  let iterations = 0;
 
-    // Prime the wave state so the fallback wave flow can start the wave
-    enemySystem.update(0);
+  // Prime the wave state so the fallback wave flow can start the wave
+  enemySystem.update(0);
 
-    while (enemySystem.waveState.isActive && iterations < maxIterations) {
-      enemySystem.update(deltaTime);
+  while (enemySystem.waveState.isActive && iterations < maxIterations) {
+    enemySystem.update(deltaTime);
 
-      if (
-        enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
-      ) {
-        throw new Error('Active asteroid count exceeded screen limit.');
-      }
-
-      const activeEnemies =
-        typeof enemySystem.getActiveEnemies === 'function'
-          ? enemySystem.getActiveEnemies()
-          : enemySystem.asteroids.filter((asteroid) => !asteroid.isDestroyed);
-
-      if (activeEnemies.length > 0) {
-        enemySystem.destroyAsteroid(activeEnemies[0], {
-          createFragments: false,
-          triggerExplosion: false,
-        });
-      }
-
-      iterations += 1;
+    if (
+      enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+    ) {
+      throw new Error('Active asteroid count exceeded screen limit.');
     }
 
-    if (iterations >= maxIterations) {
-      throw new Error('Wave simulation exceeded iteration cap.');
-    }
+    const activeEnemies =
+      typeof enemySystem.getActiveEnemies === 'function'
+        ? enemySystem.getActiveEnemies()
+        : enemySystem.asteroids.filter((asteroid) => !asteroid.isDestroyed);
 
-    resultState = { ...enemySystem.waveState };
-
-    const remaining =
-      typeof enemySystem.getAllEnemies === 'function'
-        ? enemySystem.getAllEnemies()
-        : enemySystem.asteroids.slice();
-    for (const asteroid of remaining) {
-      enemySystem.destroyAsteroid(asteroid, {
+    if (activeEnemies.length > 0) {
+      enemySystem.destroyAsteroid(activeEnemies[0], {
         createFragments: false,
         triggerExplosion: false,
       });
     }
 
-    enemySystem.update(0);
-  });
+    iterations += 1;
+  }
+
+  if (iterations >= maxIterations) {
+    throw new Error('Wave simulation exceeded iteration cap.');
+  }
+
+  resultState = { ...enemySystem.waveState };
+
+  const remaining =
+    typeof enemySystem.getAllEnemies === 'function'
+      ? enemySystem.getAllEnemies()
+      : enemySystem.asteroids.slice();
+  for (const asteroid of remaining) {
+    enemySystem.destroyAsteroid(asteroid, {
+      createFragments: false,
+      triggerExplosion: false,
+    });
+  }
+
+  enemySystem.update(0);
 
   enemySystem.waveManager = waveManager;
   return { waveState: resultState };

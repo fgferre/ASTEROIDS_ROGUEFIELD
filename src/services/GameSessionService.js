@@ -4,10 +4,7 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../core/GameConstants.js';
-import {
-  RUN_FINAL_LAYER,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-} from '../data/constants/gameplay.js';
+import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 import { BOSS_RUSH_LAYERS, bossRushStage } from '../data/layers.js';
@@ -779,11 +776,9 @@ export default class GameSessionService {
       return false;
     }
 
-    const managerHandlesAsteroids = Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
     const waveState = enemies.waveState || null;
 
     if (
-      !managerHandlesAsteroids &&
       typeof enemies.spawnInitialAsteroids === 'function' &&
       !(waveState && waveState.initialSpawnDone)
     ) {

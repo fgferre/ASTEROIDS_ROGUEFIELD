@@ -11,7 +11,6 @@ import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
   setupGlobalMocks,
   cleanupGlobalState,
-  withWaveOverrides,
   createTestContainer,
 } from '../../__helpers__/setup.js';
 
@@ -62,48 +61,44 @@ afterEach(() => {
 });
 
 describe('Enemy spawning integration', () => {
-  it('spawns support groups through the EnemySystem factory pathway', async () => {
+  it('spawns support groups through the EnemySystem factory pathway', () => {
     const spawnLog = [];
 
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const enemySystem = {
-        asteroids: [],
-        getCachedWorld: () => ({
-          getBounds: () => ({ width: 800, height: 600 }),
-        }),
-        getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
-        getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
-        acquireEnemyViaFactory: vi.fn((type, config) => {
-          const enemy = { type, config, destroyed: false };
-          spawnLog.push({ type, config });
-          return enemy;
-        }),
-        registerActiveEnemy: vi.fn(() => true),
-      };
+    const enemySystem = {
+      asteroids: [],
+      getCachedWorld: () => ({
+        getBounds: () => ({ width: 800, height: 600 }),
+      }),
+      getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
+      getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
+      acquireEnemyViaFactory: vi.fn((type, config) => {
+        const enemy = { type, config, destroyed: false };
+        spawnLog.push({ type, config });
+        return enemy;
+      }),
+      registerActiveEnemy: vi.fn(() => true),
+    };
 
-      const manager = createWaveManager({ enemySystem, eventBus });
-      manager.currentWave = 12;
-      manager.startNextWave();
-      manager.update(60);
+    const manager = createWaveManager({ enemySystem, eventBus });
+    manager.currentWave = 12;
+    manager.startNextWave();
+    manager.update(60);
 
-      const spawnedTypes = spawnLog.map((entry) => entry.type);
-      expect(spawnedTypes).toContain('drone');
-      expect(spawnedTypes).toContain('mine');
-      expect(spawnedTypes).toContain('hunter');
-    });
+    const spawnedTypes = spawnLog.map((entry) => entry.type);
+    expect(spawnedTypes).toContain('drone');
+    expect(spawnedTypes).toContain('mine');
+    expect(spawnedTypes).toContain('hunter');
   });
 
-  it('excludes asteroids from manager totals when EnemySystem spawns them', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-      const manager = createWaveManager({ eventBus });
-      manager.currentWave = 6;
-      manager.startNextWave();
+  it('excludes asteroids from manager totals when EnemySystem spawns them', () => {
+    const manager = createWaveManager({ eventBus });
+    manager.currentWave = 6;
+    manager.startNextWave();
 
-      const [startedPayload] = getEventPayloads('wave-started');
-      expect(startedPayload?.asteroidTotal).toBe(0);
-      expect(startedPayload?.managerTotals?.all).toBeGreaterThan(0);
-      expect(startedPayload?.managerTotals?.asteroids).toBe(0);
-    });
+    const [startedPayload] = getEventPayloads('wave-started');
+    expect(startedPayload?.asteroidTotal).toBe(0);
+    expect(startedPayload?.managerTotals?.all).toBeGreaterThan(0);
+    expect(startedPayload?.managerTotals?.asteroids).toBe(0);
   });
 });
 
@@ -194,7 +189,7 @@ describe('Support enemy behaviour', () => {
 });
 
 describe('Combat integration', () => {
-  it('routes enemy-fired payloads to the CombatSystem', async () => {
+  it('routes enemy-fired payloads to the CombatSystem', () => {
     const combat = {
       handleEnemyProjectile: vi.fn(),
     };
@@ -203,35 +198,33 @@ describe('Combat integration', () => {
       bootstrapFromEnemySystem: () => {},
     };
 
-    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
-      const enemySystem = new EnemySystem({
-        combat,
-        physics,
-        eventBus,
-        random: new RandomService('combat'),
-        player: {},
-        'xp-orbs': {},
-        progression: {},
-        healthHearts: {},
-      });
-      activeSystems.push(enemySystem);
-
-      const payload = {
-        enemyType: 'drone',
-        projectile: { damage: 10, speed: 200 },
-      };
-      const routed = enemySystem.handleEnemyProjectile(payload);
-
-      expect(routed).toBe(true);
-      expect(combat.handleEnemyProjectile).toHaveBeenCalled();
-
-      enemySystem.handleMineExplosion({
-        position: { x: 0, y: 0 },
-        radius: 80,
-        damage: 50,
-      });
-      expect(physics.handleMineExplosion).toHaveBeenCalled();
+    const enemySystem = new EnemySystem({
+      combat,
+      physics,
+      eventBus,
+      random: new RandomService('combat'),
+      player: {},
+      'xp-orbs': {},
+      progression: {},
+      healthHearts: {},
     });
+    activeSystems.push(enemySystem);
+
+    const payload = {
+      enemyType: 'drone',
+      projectile: { damage: 10, speed: 200 },
+    };
+    const routed = enemySystem.handleEnemyProjectile(payload);
+
+    expect(routed).toBe(true);
+    expect(combat.handleEnemyProjectile).toHaveBeenCalled();
+
+    enemySystem.handleMineExplosion({
+      position: { x: 0, y: 0 },
+      radius: 80,
+      damage: 50,
+    });
+    expect(physics.handleMineExplosion).toHaveBeenCalled();
   });
 });
 
@@ -264,43 +257,41 @@ describe('Reward handling', () => {
 });
 
 describe('Deterministic wave generation', () => {
-  it('produces identical support spawns for identical seeds', async () => {
-    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
-      const seed = 'mixed-wave-seed';
-      const eventBusA = createEventBusMock();
-      const eventBusB = createEventBusMock();
-      const randomA = createTestContainer(seed).resolve('random');
-      const randomB = createTestContainer(seed).resolve('random');
+  it('produces identical support spawns for identical seeds', () => {
+    const seed = 'mixed-wave-seed';
+    const eventBusA = createEventBusMock();
+    const eventBusB = createEventBusMock();
+    const randomA = createTestContainer(seed).resolve('random');
+    const randomB = createTestContainer(seed).resolve('random');
 
-      const spawnsFor = (bus, random) => {
-        const spawns = [];
-        const manager = createWaveManager({
-          eventBus: bus,
-          random,
-          enemySystem: {
-            asteroids: [],
-            getRandomScope: () => random,
-            getCachedWorld: () => ({
-              getBounds: () => ({ width: 800, height: 600 }),
-            }),
-            getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
-            getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
-            acquireEnemyViaFactory: (type, config) => {
-              spawns.push({ type, x: config.x, y: config.y });
-              return { type, destroyed: false };
-            },
-            registerActiveEnemy: () => true,
+    const spawnsFor = (bus, random) => {
+      const spawns = [];
+      const manager = createWaveManager({
+        eventBus: bus,
+        random,
+        enemySystem: {
+          asteroids: [],
+          getRandomScope: () => random,
+          getCachedWorld: () => ({
+            getBounds: () => ({ width: 800, height: 600 }),
+          }),
+          getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
+          getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
+          acquireEnemyViaFactory: (type, config) => {
+            spawns.push({ type, x: config.x, y: config.y });
+            return { type, destroyed: false };
           },
-        });
-        manager.currentWave = 13;
-        manager.startNextWave();
-        manager.update(60);
-        return spawns;
-      };
+          registerActiveEnemy: () => true,
+        },
+      });
+      manager.currentWave = 13;
+      manager.startNextWave();
+      manager.update(60);
+      return spawns;
+    };
 
-      const spawnsA = spawnsFor(eventBusA, randomA);
-      expect(spawnsA.length).toBeGreaterThan(0);
-      expect(spawnsA).toEqual(spawnsFor(eventBusB, randomB));
-    });
+    const spawnsA = spawnsFor(eventBusA, randomA);
+    expect(spawnsA.length).toBeGreaterThan(0);
+    expect(spawnsA).toEqual(spawnsFor(eventBusB, randomB));
   });
 });

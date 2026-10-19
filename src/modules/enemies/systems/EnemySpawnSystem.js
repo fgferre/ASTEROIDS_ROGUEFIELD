@@ -1,7 +1,6 @@
 import {
   ASTEROID_EDGE_SPAWN_MARGIN,
   MAX_ASTEROIDS_ON_SCREEN,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
@@ -229,14 +228,10 @@ export class EnemySpawnSystem {
 
     boss.destroyed = false;
 
-    const shouldApplyLegacyWaveAccounting =
-      config?.skipWaveAccounting !== true &&
-      (!facade.useManagers || WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
-
     if (
       facade.waveState &&
       facade.waveState.isActive &&
-      shouldApplyLegacyWaveAccounting
+      config?.skipWaveAccounting !== true
     ) {
       facade.waveState.totalAsteroids += 1;
       facade.waveState.asteroidsSpawned += 1;
@@ -373,14 +368,7 @@ export class EnemySpawnSystem {
       );
     }
 
-    const shouldApplyLegacyWaveAccounting =
-      !facade.useManagers || WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
-
-    if (
-      facade.waveState &&
-      facade.waveState.isActive &&
-      shouldApplyLegacyWaveAccounting
-    ) {
+    if (facade.waveState && facade.waveState.isActive) {
       facade.waveState.asteroidsSpawned += 1;
     }
 
@@ -562,7 +550,6 @@ export class EnemySpawnSystem {
     const shouldBridgeToWaveManager =
       facade.useManagers &&
       facade.waveManager &&
-      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       typeof facade.waveManager.registerActiveEnemy === 'function';
 
     let waveManagerRegistered = true;
@@ -597,10 +584,7 @@ export class EnemySpawnSystem {
       return;
     }
 
-    const waveManagerEnabled =
-      facade.useManagers &&
-      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
-      facade.waveManager;
+    const waveManagerEnabled = facade.useManagers && facade.waveManager;
 
     if (!waveManagerEnabled || !IS_DEV) {
       return;

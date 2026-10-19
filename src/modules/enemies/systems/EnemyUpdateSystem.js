@@ -26,7 +26,6 @@
  */
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
   ASTEROID_ENTRY_ANGLE_VARIANCE,
   ASTEROID_OFFSCREEN_RECOVERY_TIME,
   WAVE_DURATION,
@@ -105,23 +104,6 @@ export class EnemyUpdateSystem {
       this.ctx.refreshServiceState();
     }
 
-    const waveManagerInstance = this.ctx?.waveManager;
-    const waveManagerControlsSpawn = Boolean(
-      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
-        waveManagerInstance &&
-        !facade._waveManagerFallbackWarningIssued &&
-        !facade._waveManagerInvalidStateWarningIssued
-    );
-
-    if (!facade._asteroidSpawnDebugLogged) {
-      console.debug(
-        `[EnemySystem] Asteroid spawn: ${
-          waveManagerControlsSpawn ? 'WaveManager' : 'Legacy handleSpawning()'
-        }`
-      );
-      facade._asteroidSpawnDebugLogged = true;
-    }
-
     const sessionStats = this.ctx?.sessionStats;
     if (sessionStats) {
       sessionStats.timeElapsed += deltaTime;
@@ -156,15 +138,9 @@ export class EnemyUpdateSystem {
 
     let spawnHandled = false;
 
-    const waveManagerHandlesSpawn =
-      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
-      this.ctx?.waveManager &&
-      !facade._waveManagerFallbackWarningIssued &&
-      !facade._waveManagerInvalidStateWarningIssued;
-
     if (wave.isActive) {
       wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      if (!skipSpawning && !waveManagerHandlesSpawn) {
+      if (!skipSpawning) {
         this.handleSpawning(deltaTime);
         spawnHandled = true;
       }
@@ -215,7 +191,6 @@ export class EnemyUpdateSystem {
       return false;
     }
 
-    let spawnHandled = false;
     const waveManager = this.ctx?.waveManager ?? null;
 
     if (!waveManager) {
@@ -228,15 +203,7 @@ export class EnemyUpdateSystem {
       return this.updateWaveLogic(deltaTime);
     }
 
-    const waveManagerHandlesAsteroids =
-      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
-      !facade._waveManagerFallbackWarningIssued &&
-      !facade._waveManagerInvalidStateWarningIssued;
-
-    if (!waveManagerHandlesAsteroids) {
-      this.handleSpawning(deltaTime);
-      spawnHandled = true;
-    }
+    this.handleSpawning(deltaTime);
 
     if (typeof waveManager.update === 'function') {
       waveManager.update(deltaTime);
@@ -262,18 +229,13 @@ export class EnemyUpdateSystem {
         );
         facade._waveManagerInvalidStateWarningIssued = true;
       }
-      if (waveManagerHandlesAsteroids) {
-        return spawnHandled;
-      }
-      return this.updateWaveLogic(deltaTime, { skipSpawning: spawnHandled });
+      return this.updateWaveLogic(deltaTime, { skipSpawning: true });
     }
 
     const {
       current: previousCurrent,
       isActive: previousIsActive,
-      asteroidsSpawned: previousSpawned,
       asteroidsKilled: previousKilled,
-      totalAsteroids: previousTotal,
     } = wave;
 
     const nextWaveNumberCandidate = Number(managerState.currentWave);
@@ -304,14 +266,6 @@ export class EnemyUpdateSystem {
       wave.spawnTimer = 0;
       wave.initialSpawnDone = false;
       wave.breakTimer = 0;
-
-      if (waveManagerHandlesAsteroids) {
-        if (typeof this.ctx?.spawnInitialAsteroids === 'function') {
-          this.ctx.spawnInitialAsteroids(4);
-        } else {
-          facade.spawnInitialAsteroids?.(4);
-        }
-      }
     }
 
     const totals = managerState.totals || {};
@@ -331,8 +285,6 @@ export class EnemyUpdateSystem {
       return numeric !== undefined ? numeric : fallback;
     };
 
-    let nextSpawned = previousSpawned;
-    let nextTotal = previousTotal;
     let nextKilled = previousKilled;
 
     wave.managerTotals = {
@@ -356,18 +308,6 @@ export class EnemyUpdateSystem {
         ),
       },
     };
-
-    if (waveManagerHandlesAsteroids) {
-      const managerSpawnedValue =
-        spawnedBreakdown.asteroids ?? managerState.spawned;
-      const managerTotalValue = totals.asteroids ?? managerState.total;
-
-      nextSpawned = selectManagerValue(managerSpawnedValue, previousSpawned);
-      nextTotal = selectManagerValue(managerTotalValue, previousTotal);
-
-      wave.asteroidsSpawned = nextSpawned;
-      wave.totalAsteroids = nextTotal;
-    }
 
     const hasAsteroidKillBreakdown = Object.prototype.hasOwnProperty.call(
       killedBreakdown,
@@ -408,7 +348,7 @@ export class EnemyUpdateSystem {
       }
     }
 
-    return spawnHandled;
+    return true;
   }
 
   /**

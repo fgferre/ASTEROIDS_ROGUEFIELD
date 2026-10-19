@@ -181,7 +181,7 @@ describe('WaveManager Integration', () => {
       }
     });
 
-    test('WaveManager counters sync into legacy waveState when enabled', () => {
+    test("WaveManager kills sync into waveState; spawned and total stay EnemySystem's", () => {
       const stubState = {
         currentWave: 7,
         inProgress: true,
@@ -210,18 +210,8 @@ describe('WaveManager Integration', () => {
         expect(syncedState.current).not.toBe(initialWaveState.current);
         expect(syncedState.current).toBe(stubState.currentWave);
         expect(syncedState.isActive).toBe(stubState.inProgress);
-        const managerHandlesSpawn = Boolean(
-          CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
-        );
-
-        if (managerHandlesSpawn) {
-          expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
-          expect(syncedState.totalAsteroids).toBe(stubState.total);
-        } else {
-          expect(syncedState.asteroidsSpawned).not.toBe(stubState.spawned);
-          expect(syncedState.totalAsteroids).not.toBe(stubState.total);
-        }
-
+        expect(syncedState.asteroidsSpawned).not.toBe(stubState.spawned);
+        expect(syncedState.totalAsteroids).not.toBe(stubState.total);
         expect(syncedState.asteroidsKilled).toBe(stubState.killed);
       } finally {
         harness.enemySystem.waveManager = null;

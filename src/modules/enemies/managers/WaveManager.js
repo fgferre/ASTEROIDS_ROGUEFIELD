@@ -32,7 +32,6 @@ import {
   ASTEROID_SAFE_SPAWN_DISTANCE,
   WAVE_BREAK_TIME,
   WAVE_SPAWN_DELAY,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
@@ -433,103 +432,12 @@ export class WaveManager {
     return supportTotal + bossCount;
   }
 
-  computeAsteroidOnlyTotal(waveConfig) {
-    if (!waveConfig || typeof waveConfig !== 'object') {
-      return 0;
-    }
-
-    const groups = Array.isArray(waveConfig.enemies) ? waveConfig.enemies : [];
-
-    return groups.reduce((sum, group) => {
-      if (!group || group.type !== 'asteroid') {
-        return sum;
-      }
-
-      const count = Number(group.count);
-      return (
-        sum + (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0)
-      );
-    }, 0);
-  }
-
-  filterForLegacyAsteroidFallback(waveConfig = {}) {
-    if (this.shouldWaveManagerSpawnAsteroids()) {
-      return waveConfig;
-    }
-
-    const originalEnemies = Array.isArray(waveConfig.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    if (originalEnemies.length === 0) {
-      if (!waveConfig || typeof waveConfig !== 'object') {
-        return { enemies: [] };
-      }
-
-      return { ...waveConfig, enemies: [] };
-    }
-
-    const filteredEnemies = originalEnemies.filter(
-      (group) => group && group.type !== 'asteroid'
-    );
-
-    if (filteredEnemies.length === originalEnemies.length) {
-      return waveConfig;
-    }
-
-    const filteredConfig = {
-      ...waveConfig,
-      enemies: filteredEnemies.map((group) => ({ ...group })),
-    };
-
-    if (waveConfig.boss && typeof waveConfig.boss === 'object') {
-      filteredConfig.boss = { ...waveConfig.boss };
-    }
-
-    if (Array.isArray(waveConfig.supportGroups)) {
-      filteredConfig.supportGroups = waveConfig.supportGroups
-        .filter((group) => group && group.type !== 'asteroid')
-        .map((group) => ({ ...group }));
-    }
-
-    const filteredCount = originalEnemies.length - filteredEnemies.length;
-    const metadata = {
-      ...(waveConfig.metadata ? { ...waveConfig.metadata } : {}),
-      asteroidFallbackFiltered: true,
-      filteredAsteroidGroups: filteredCount,
-    };
-
-    filteredConfig.metadata = metadata;
-
-    return filteredConfig;
-  }
-
-  shouldWaveManagerSpawnAsteroids() {
-    const handlesOverride =
-      typeof globalThis !== 'undefined'
-        ? globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__
-        : undefined;
-
-    if (handlesOverride === true) {
-      return true;
-    }
-    if (handlesOverride === false) {
-      return false;
-    }
-
-    return Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
-  }
-
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
     if (!enemy) {
       return false;
     }
 
     if (!this.waveInProgress) {
-      return false;
-    }
-
-    if (this.shouldWaveManagerSpawnAsteroids()) {
       return false;
     }
 
@@ -571,15 +479,9 @@ export class WaveManager {
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
 
     this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
-    this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
-    this.totalAsteroidEnemiesThisWave =
-      coerce(this.totalAsteroidEnemiesThisWave) + 1;
     this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
-
-    if (!this.shouldWaveManagerSpawnAsteroids()) {
-      this.totalEnemiesThisWave = this.enemiesSpawnedThisWave;
-      this.totalAsteroidEnemiesThisWave = this.asteroidsSpawnedThisWave;
-    }
+    this.totalEnemiesThisWave = this.enemiesSpawnedThisWave;
+    this.totalAsteroidEnemiesThisWave = this.asteroidsSpawnedThisWave;
 
     return true;
   }
@@ -812,7 +714,6 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakMap();
 
     const waveNumber = this.currentWave;
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     // Same scaling as EnemySystem.layerDirector (difficulty spawnCount); the
     // endless modifiers roll from the run seed, so each run gets its own.
     const difficulty = resolveService(
@@ -836,70 +737,39 @@ export class WaveManager {
       config = { isBossWave: false, enemies: [] };
     }
 
-    if (director.rocks > 0) {
-      // Sizes roll at spawn time (spawnWave) to keep the random call order
-      // deterministic.
-      const distributionWeights = this.getAsteroidDistributionWeights();
-      config.enemies.push({
-        type: 'asteroid',
-        count: director.rocks,
-        size: null,
-        variant: null,
-        metadata: { distributionWeights },
-      });
-    }
-
     config.isBossWave = Boolean(config.isBossWave);
 
     this.layerSchedule = this.buildLayerSchedule(director);
     this.layerElapsed = 0;
 
-    const effectiveConfig = this.filterForLegacyAsteroidFallback(config);
-    effectiveConfig.isBossWave = Boolean(effectiveConfig.isBossWave);
-
     const sharedSpawnDelayMultiplier =
-      this.resolveWaveSpawnDelayMultiplier(effectiveConfig);
-    effectiveConfig.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
+      this.resolveWaveSpawnDelayMultiplier(config);
+    config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
 
-    let computedTotalEnemies = this.computeTotalEnemies(effectiveConfig);
-    let asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
-
-    if (!waveManagerSpawnsAsteroids) {
-      // Legacy fallback only defers asteroid spawning. Bosses and support
-      // enemies are still spawned and completed by WaveManager.
-      computedTotalEnemies = Math.max(
-        0,
-        Math.floor(computedTotalEnemies - asteroidOnlyTotal)
-      );
-      asteroidOnlyTotal = 0;
-    }
-
-    // Scheduled spawns count up front; in legacy mode surge rocks register
-    // themselves on spawn (registerActiveEnemy), like the legacy ones.
+    // The layer's own rocks are EnemySystem's (it trickles them in), so only
+    // the Warden and the scheduled machines count up front; surge rocks
+    // register themselves on spawn (registerActiveEnemy), like its own.
+    let computedTotalEnemies = this.computeTotalEnemies(config);
     for (const { groups } of this.layerSchedule) {
       for (const { kind, count } of groups) {
-        const isAsteroid = this.isAsteroidType(kind);
-        if (isAsteroid && !waveManagerSpawnsAsteroids) continue;
-        computedTotalEnemies += count;
-        if (isAsteroid) asteroidOnlyTotal += count;
+        if (!this.isAsteroidType(kind)) computedTotalEnemies += count;
       }
     }
 
     const rawManagerTotals = {
       all: Math.max(0, Math.floor(computedTotalEnemies)),
-      asteroids: Math.max(0, Math.floor(asteroidOnlyTotal)),
+      asteroids: 0,
     };
 
     this.totalEnemiesThisWave = computedTotalEnemies;
-    this.totalAsteroidEnemiesThisWave = asteroidOnlyTotal;
     this.managerTotalsForWave = { ...rawManagerTotals };
     this.compatibilityModeActive = true;
 
     const waveEventPayload = {
       wave: waveNumber,
       totalEnemies: this.totalEnemiesThisWave,
-      asteroidTotal: asteroidOnlyTotal,
-      isBossWave: effectiveConfig.isBossWave,
+      asteroidTotal: 0,
+      isBossWave: config.isBossWave,
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
       compatibilityMode: true,
       managerTotals: { ...rawManagerTotals },
@@ -922,38 +792,38 @@ export class WaveManager {
     if (IS_DEV) {
       this.eventBus.emit('wave-started-debug', {
         ...waveEventPayload,
-        config: this.cloneWaveConfig(effectiveConfig),
+        config: this.cloneWaveConfig(config),
       });
     }
 
-    if (effectiveConfig.isBossWave) {
-      const supportGroups = Array.isArray(effectiveConfig.supportGroups)
-        ? effectiveConfig.supportGroups.map((group) => ({ ...group }))
-        : Array.isArray(effectiveConfig.enemies)
-          ? effectiveConfig.enemies.map((group) => ({ ...group }))
+    if (config.isBossWave) {
+      const supportGroups = Array.isArray(config.supportGroups)
+        ? config.supportGroups.map((group) => ({ ...group }))
+        : Array.isArray(config.enemies)
+          ? config.enemies.map((group) => ({ ...group }))
           : [];
 
       this.eventBus.emit('boss-wave-started', {
         wave: waveNumber,
         totalEnemies: this.totalEnemiesThisWave,
-        asteroidTotal: asteroidOnlyTotal,
+        asteroidTotal: 0,
         compatibilityMode: true,
         managerTotals: { ...rawManagerTotals },
-        boss: effectiveConfig.boss ? { ...effectiveConfig.boss } : null,
+        boss: config.boss ? { ...config.boss } : null,
         support: supportGroups,
-        config: this.cloneWaveConfig(effectiveConfig),
+        config: this.cloneWaveConfig(config),
       });
     }
 
-    if (effectiveConfig.isBossWave) {
-      this.queueBossWaveSpawns(effectiveConfig);
+    if (config.isBossWave) {
+      this.queueBossWaveSpawns(config);
     } else {
-      this.spawnWave(effectiveConfig);
+      this.spawnWave(config);
     }
 
     debugLog(
       `[WaveManager] Started wave ${waveNumber} (${this.totalEnemiesThisWave} enemies${
-        effectiveConfig.isBossWave ? ', boss wave' : ''
+        config.isBossWave ? ', boss wave' : ''
       })`
     );
     return true;
@@ -1009,9 +879,9 @@ export class WaveManager {
       ? waveConfig.enemies
       : [];
 
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-
-    if (!waveManagerSpawnsAsteroids && !surge) {
+    // Outside a surge the rocks are EnemySystem's: a group of only rocks
+    // spawns nothing here.
+    if (!surge) {
       if (enemyGroups.length === 0) {
         return;
       }
@@ -1036,7 +906,6 @@ export class WaveManager {
     const player = this.enemySystem.getCachedPlayer();
     const playerSnapshot = this.enemySystem.getPlayerPositionSnapshot(player);
     const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const compatibilityMode = this.compatibilityModeActive;
     const defaultDistributionWeights = this.getAsteroidDistributionWeights();
     const surgeEdge = surge
       ? this.calculateSurgeEdge(worldBounds, playerSnapshot)
@@ -1060,10 +929,9 @@ export class WaveManager {
       // Heralds appear in the field like support enemies (never Elite).
       const isTacticalEnemy =
         SUPPORT_KINDS.includes(typeKey) || typeKey === 'herald';
-      // Legacy mode: the bridge (registerActiveEnemy) counts asteroids.
-      const countedByBridge = isAsteroid && !waveManagerSpawnsAsteroids;
-
-      if (countedByBridge && !surgeEdge) {
+      // The bridge (registerActiveEnemy) counts rocks; only a surge spawns
+      // them here.
+      if (isAsteroid && !surgeEdge) {
         continue;
       }
 
@@ -1083,12 +951,6 @@ export class WaveManager {
             worldBounds,
             surgeEdge,
             isAsteroid,
-            spawnContext.random
-          );
-        } else if (isAsteroid) {
-          // Asteroids spawn on one of the 4 edges
-          position = this.calculateEdgeSpawnPosition(
-            worldBounds,
             spawnContext.random
           );
         } else if (isTacticalEnemy) {
@@ -1266,17 +1128,14 @@ export class WaveManager {
           enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
         }
 
-        if (enemy && !countedByBridge) {
+        if (enemy && !isAsteroid) {
           this.enemiesSpawnedThisWave++;
-          if (compatibilityMode && isAsteroid) {
-            this.asteroidsSpawnedThisWave++;
-          }
         }
 
         // The bridge counts a surge rock here; EnemySystem's waveState only
         // planned the layer's own rocks, so it counts it too.
         const rockState = this.enemySystem.waveState;
-        if (enemy && countedByBridge && rockState?.isActive) {
+        if (enemy && isAsteroid && rockState?.isActive) {
           rockState.totalAsteroids += 1;
           rockState.asteroidsSpawned += 1;
         }
@@ -1552,11 +1411,8 @@ export class WaveManager {
     }
   }
 
-  /** Legacy mode: asteroids the EnemySystem spawner still owes this layer. */
+  /** Asteroids the EnemySystem spawner still owes this layer. */
   legacyRocksPending() {
-    if (this.shouldWaveManagerSpawnAsteroids()) {
-      return false;
-    }
     const wave = this.enemySystem?.waveState;
     return (
       Boolean(wave?.isActive) && wave.asteroidsSpawned < wave.totalAsteroids
@@ -2385,19 +2241,6 @@ export class WaveManager {
       return;
     }
 
-    const fragmentCount = Array.isArray(data?.fragments)
-      ? data.fragments.length
-      : 0;
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-
-    if (fragmentCount > 0 && waveManagerSpawnsAsteroids) {
-      this.totalEnemiesThisWave += fragmentCount;
-      this.enemiesSpawnedThisWave += fragmentCount;
-      this.totalAsteroidEnemiesThisWave += fragmentCount;
-      this.asteroidsSpawnedThisWave += fragmentCount;
-    }
-
     this.enemiesKilledThisWave++;
 
     const destroyedEnemy = data?.enemy || null;
@@ -2482,15 +2325,12 @@ export class WaveManager {
     const enemySystemTotal = this.enemySystem.waveState.totalAsteroids;
     const enemySystemSpawned = this.enemySystem.waveState.asteroidsSpawned;
 
-    // Allow small discrepancies during spawn/death timing. When EnemySystem
-    // spawns the rocks it plans the layer's total up front, while WaveManager
-    // counts them as they register: only the spawned counts compare.
-    const totalDelta = this.shouldWaveManagerSpawnAsteroids()
-      ? Math.abs(waveManagerTotal - enemySystemTotal)
-      : 0;
+    // Allow small discrepancies during spawn/death timing. EnemySystem plans
+    // the layer's rock total up front, while WaveManager counts rocks as they
+    // register: only the spawned counts compare.
     const spawnedDelta = Math.abs(waveManagerSpawned - enemySystemSpawned);
 
-    if (totalDelta > 1 || spawnedDelta > 1) {
+    if (spawnedDelta > 1) {
       console.warn(
         `[WaveManager] Accounting discrepancy detected!\n` +
           `  WaveManager: ${waveManagerSpawned}/${waveManagerTotal}\n` +
@@ -2648,9 +2488,7 @@ export class WaveManager {
   getState() {
     const sanitizeCount = (value) => (Number.isFinite(value) ? value : 0);
 
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const compatibilityMode = this.compatibilityModeActive;
-    const preferAsteroidBreakdown = !waveManagerSpawnsAsteroids;
 
     const totals = {
       all: sanitizeCount(
@@ -2672,21 +2510,9 @@ export class WaveManager {
       asteroids: sanitizeCount(this.asteroidsKilledThisWave),
     };
 
-    const totalForState = preferAsteroidBreakdown
-      ? totals.asteroids
-      : compatibilityMode
-        ? totals.asteroids
-        : totals.all;
-    const spawnedForState = preferAsteroidBreakdown
-      ? spawnedCounts.asteroids
-      : compatibilityMode
-        ? spawnedCounts.asteroids
-        : spawnedCounts.all;
-    const killedForState = preferAsteroidBreakdown
-      ? killedCounts.asteroids
-      : compatibilityMode
-        ? killedCounts.asteroids
-        : killedCounts.all;
+    const totalForState = totals.asteroids;
+    const spawnedForState = spawnedCounts.asteroids;
+    const killedForState = killedCounts.asteroids;
 
     const progressDenominator = totalForState > 0 ? totalForState : 0;
 
