@@ -2,12 +2,20 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 import { PALETTE } from '../constants/palette.js';
-import { BULWARK_SHIELD_HALF_ARC } from './bulwark.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../content/enemies/bulwark.js';
+import { listContent } from '../../content/registry.js';
+
+// The support enemies that may roll an affix: those whose content file lists
+// it in `affixes`.
+const kindsFor = (affixId) =>
+  listContent('enemies')
+    .filter(({ affixes }) => affixes.includes(affixId))
+    .map(({ id }) => id);
 
 // Elite affixes (PLAN.md R6.2): an Elite past layer 5 also rolls one or two of
 // these, shown as glyph badges over it and named in the kill feed
 // ("Elite Swift Volatile Ram"). `kinds` are the support enemies that may roll
-// it. Numbers: proposta 18/10 — the owner's play decides.
+// it (kindsFor). Numbers: proposta 18/10 — the owner's play decides.
 export const ELITE_AFFIXES = deepFreeze({
   shielded: {
     id: 'shielded',
@@ -16,16 +24,7 @@ export const ELITE_AFFIXES = deepFreeze({
     color: PALETTE.text,
     shieldHealth: 60, // proposta 18/10: frontal plate, like the Bulwark's
     halfArc: BULWARK_SHIELD_HALF_ARC,
-    kinds: [
-      'drone',
-      'hunter',
-      'mine',
-      'husk',
-      'ram',
-      'weaver',
-      'caster',
-      'leech',
-    ],
+    kinds: kindsFor('shielded'),
   },
   swift: {
     id: 'swift',
@@ -33,17 +32,7 @@ export const ELITE_AFFIXES = deepFreeze({
     glyph: 'chevrons',
     color: PALETTE.status,
     speed: 1.45, // proposta 18/10: × top speed and acceleration
-    kinds: [
-      'drone',
-      'hunter',
-      'husk',
-      'ram',
-      'weaver',
-      'bulwark',
-      'caster',
-      'shade',
-      'leech',
-    ],
+    kinds: kindsFor('swift'),
   },
   volatile: {
     id: 'volatile',
@@ -53,16 +42,17 @@ export const ELITE_AFFIXES = deepFreeze({
     fuse: 0.6, // proposta 18/10: seconds from the lethal hit to the blast
     radius: 90, // proposta 18/10
     damage: 25, // proposta 18/10
-    kinds: ['drone', 'hunter', 'husk', 'ram', 'weaver', 'bulwark', 'shade'],
+    kinds: kindsFor('volatile'),
   },
   splitter: {
     id: 'splitter',
     label: 'Splitter',
     glyph: 'fork',
     color: PALETTE.threat,
+    type: 'drone', // the enemy it releases on death (the Mote)
     count: 2, // proposta 18/10: Motes released on death
     speed: 120, // proposta 18/10: outward px/s of each Mote
-    kinds: ['drone', 'hunter', 'mine', 'ram', 'weaver', 'bulwark'],
+    kinds: kindsFor('splitter'),
   },
   warded: {
     id: 'warded',
@@ -70,16 +60,7 @@ export const ELITE_AFFIXES = deepFreeze({
     glyph: 'ward',
     color: PALETTE.boss,
     immuneSeconds: 1.5, // proposta 18/10: no damage after each hit
-    kinds: [
-      'drone',
-      'hunter',
-      'mine',
-      'husk',
-      'ram',
-      'weaver',
-      'bulwark',
-      'caster',
-    ],
+    kinds: kindsFor('warded'),
   },
 });
 

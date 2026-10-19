@@ -1,5 +1,5 @@
 // src/data/audio/explosions.js
-// Explosion sound profiles by size and the enemy-type to size mapping.
+// Explosion sound profiles by size and the size of what is not an enemy item.
 
 import { AUDIO_REVERB_SEND_DB } from './mix.js';
 
@@ -44,24 +44,13 @@ export const EXPLOSION_PROFILES = Object.freeze({
   }),
 });
 
-// enemy-destroyed → explosion size. Asteroids use their own `size`; mines have
-// their own cue (mine-exploded); unknown types fall back to the default; an
-// `elite` flag bumps one size up. Types not in this checkout yet are listed so
-// they work when they land.
+// enemy-destroyed → explosion size. Asteroids use their own `size`; an enemy
+// item (src/content/enemies) its file's `explosion` (null: it has its own
+// death cue, as the mine's blast), else the default; the types below are not
+// enemy items; unknown types fall back to the default; an `elite` flag bumps
+// one size up.
 export const EXPLOSION_SIZE_BY_ENEMY_TYPE = Object.freeze({
-  mote: 'small',
-  drone: 'small',
-  seeker: 'medium',
-  hunter: 'medium',
-  husk: 'medium',
-  ram: 'medium',
-  weaver: 'medium',
-  bulwark: 'large',
-  caster: 'medium',
-  shade: 'medium',
-  leech: 'medium',
   warden: 'large',
   boss: 'large',
-  mine: null,
 });
 export const EXPLOSION_DEFAULT_SIZE = 'medium';

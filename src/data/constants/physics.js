@@ -1,6 +1,7 @@
 // src/data/constants/physics.js
 
 // === SHIP PHYSICS ===
+export const SHIP_SIZE = 15;
 export const SHIP_ACCELERATION = 280;
 export const SHIP_MAX_SPEED = 220;
 export const SHIP_LINEAR_DAMPING = 3.1; // s^-1

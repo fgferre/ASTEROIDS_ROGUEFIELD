@@ -1,0 +1,51 @@
+// A weapon that is never shipped (tests/content/newWeapon.test.js): one file
+// that reuses the shipped patterns with its own numbers, as a new weapon would.
+export default {
+  id: 'needle',
+  order: 900, // fixtures sit far past real content, so new items never collide
+  name: 'Needle Fan',
+  chip: 'NEEDLE',
+  description: 'A tight fan of fast needles; every 3rd shot is a long beam.',
+  fire: [
+    {
+      pattern: 'beam',
+      every: 3,
+      length: 300,
+      width: 6,
+      duration: 0.1,
+      damageMultiplier: 1.5,
+      extraFragments: 0,
+      cooldownPenalty: 0.1,
+      kick: 0.1,
+      flashRadius: 60,
+    },
+    { pattern: 'fan', bolts: 3, maxBolts: 5, fan: 12, cooldownMultiplier: 1.2 },
+  ],
+  projectile: {
+    look: 'lance',
+    speedMultiplier: 1.5,
+    damageMultiplier: 0.7,
+    range: null,
+    pierce: true,
+    trailPoints: null,
+    burst: null,
+  },
+  colors: { glow: '#88ccff', mid: '#cceeff', core: '#ffffff' },
+  card: {
+    id: 'needle_coil',
+    order: 900,
+    category: 'offense',
+    family: 'kinetic',
+    rarity: 'epic',
+    icon: '🪡',
+    themeColor: '#88ccff',
+    unlockLevel: 3,
+    tags: ['weapon', 'weaponry'],
+    text: {
+      name: 'Needle Coil',
+      summary: 'Swaps the cannon for the Needle Fan.',
+      lore: 'Never shipped.',
+      levels: [{ title: 'Needle Fan', description: '', highlights: [] }],
+    },
+  },
+};

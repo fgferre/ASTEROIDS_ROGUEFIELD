@@ -6,7 +6,8 @@
 // staged or unstaged) + untracked; on main itself, or with no local main, since
 // HEAD. A touched test runs itself; a touched src file runs every test that
 // reaches it by following imports through src/ and the test helpers (tests live
-// under tests/, not beside sources, so coverage is found by following imports).
+// under tests/, not beside sources, so coverage is found by following imports,
+// including the files an import.meta.glob pattern lists).
 // Touching a shared test helper or fixture runs the whole suite. Any src change
 // also runs tests/process/, which watches the whole tree (dev globals leaking to
 // prod). A touched src file with no test is reported, so you know it is unguarded.
@@ -72,11 +73,30 @@ const SPECIFIER_RES = [
   /\bvi\.(?:mock|doMock)\s*\(\s*['"]([^'"]+)['"]/g,
 ];
 
+// import.meta.glob('./kind/*.js'): the file that calls it imports every file
+// the pattern matches. Only `*` (within one path segment) is understood.
+const GLOB_RE = /\bimport\.meta\.glob\s*\(\s*['"]([^'"]+)['"]/g;
+
+function globToRegExp(pattern) {
+  const source = pattern
+    .split('*')
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/]*');
+  return new RegExp(`^${source}$`);
+}
+
 // sources: { [repo-relative path]: source text } -> reverse import graph:
 // Map(path -> Set of the files that import it), one entry per file given.
 export function buildGraph(sources) {
   const importers = new Map(Object.keys(sources).map((p) => [p, new Set()]));
   for (const [file, code] of Object.entries(sources)) {
+    for (const m of code.matchAll(GLOB_RE)) {
+      if (!m[1].startsWith('.')) continue;
+      const matches = globToRegExp(posix.join(posix.dirname(file), m[1]));
+      for (const [candidate, set] of importers) {
+        if (candidate !== file && matches.test(candidate)) set.add(file);
+      }
+    }
     for (const re of SPECIFIER_RES) {
       for (const m of code.matchAll(re)) {
         if (!m[1].startsWith('.')) continue;

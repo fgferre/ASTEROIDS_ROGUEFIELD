@@ -17,7 +17,6 @@
  * ```
  */
 
-import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import {
   normalizeDependencies,
@@ -26,50 +25,24 @@ import {
 } from '../../../core/serviceUtils.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
-import { clamp } from '../../../utils/mathHelpers.js';
 import {
-  ASTEROID_EDGE_SPAWN_MARGIN,
-  ASTEROID_SAFE_SPAWN_DISTANCE,
   MAX_ASTEROIDS_ON_SCREEN,
   WAVE_BREAK_TIME,
-  WAVE_SPAWN_DELAY,
 } from '../../../data/constants/gameplay.js';
-import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
 import {
   BOSS_RUSH_BREATHER_SECONDS,
-  FIELD_EVENTS,
-  LAYER_MODIFIERS,
   bossRushDirectorFor,
   directorFor,
   nextBossRushLayer,
 } from '../../../data/layers.js';
 import { scaleDirector } from '../../../data/difficulty.js';
-import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
-import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
+import { WaveRandom } from '../waves/WaveRandom.js';
+import { WaveSpawner } from '../waves/WaveSpawner.js';
+import { LayerEvents } from '../waves/LayerEvents.js';
+import { LayerSchedule } from '../waves/LayerSchedule.js';
+import { BossWave } from '../waves/BossWave.js';
 
-// Support kinds the layer table can list; they spawn at a safe distance from
-// the player (asteroids come in from the edges).
-const SUPPORT_KINDS = [
-  'drone',
-  'mine',
-  'hunter',
-  'husk',
-  'ram',
-  'bulwark',
-  'weaver',
-  'caster',
-  'shade',
-  'leech',
-];
-// Surge bursts: units spread this far (px) along the edge either side of the
-// burst point; support enemies appear this far inside the field.
-const SURGE_SPREAD = 70;
-const SURGE_INSET = 40;
-// Field events: a Gravity Well point stays this far inside the field; the
-// Solar Flare screen flash (color alpha, seconds, intensity). Proposta 18/10.
-const GRAVITY_WELL_INSET = 40;
-const SOLAR_FLARE_FLASH = { alpha: 0.5, duration: 0.6, intensity: 0.45 };
 // The rock trickle: seconds between rocks, times a 0.5-1 draw.
 const ROCK_TRICKLE_DELAY = 1.0;
 
@@ -114,30 +87,42 @@ export class WaveManager {
       resolvedRandom = new RandomService();
     }
 
-    this.random = resolvedRandom;
-    this.randomScopeLabels = {
-      spawn: 'wave-manager:spawn',
-      variants: 'wave-manager:variants',
-      fragments: 'wave-manager:fragments',
-    };
-    this.randomScopeSeeds = {};
-    this.randomScopes = this.createRandomScopes(this.random);
-    this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
-    this._fallbackRandom = null;
+    this.waveRandom = new WaveRandom(resolvedRandom);
 
-    const enemyTypes = ENEMY_TYPES || {};
-    this.enemyTypeKeys = {
-      asteroid: 'asteroid',
-      drone: enemyTypes.drone?.key || 'drone',
-      mine: enemyTypes.mine?.key || 'mine',
-      hunter: enemyTypes.hunter?.key || 'hunter',
+    // The layer's subjects (src/modules/enemies/waves/), each given what it
+    // needs by name.
+    const getLayer = () => this.currentWave;
+    const countSpawn = () => {
+      this.enemiesSpawnedThisWave += 1;
     };
-    this.bossEnemyKey = (BOSS_CONFIG && BOSS_CONFIG.key) || 'boss';
-    this.enemyTypeDefaults = {
-      drone: enemyTypes.drone || {},
-      mine: enemyTypes.mine || {},
-      hunter: enemyTypes.hunter || {},
-    };
+    this.spawner = new WaveSpawner({
+      enemySystem: this.enemySystem,
+      waveRandom: this.waveRandom,
+      getLayer,
+      countSpawn,
+      addExtraRocks: (count) => this.addExtraRocks(count),
+    });
+    this.layerEvents = new LayerEvents({
+      eventBus: this.eventBus,
+      enemySystem: this.enemySystem,
+      waveRandom: this.waveRandom,
+      getLayer,
+    });
+    this.schedule = new LayerSchedule({
+      eventBus: this.eventBus,
+      spawner: this.spawner,
+      layerEvents: this.layerEvents,
+      getLayer,
+      isFieldEmpty: () => this.isFieldEmpty(),
+      checkWaveCompletion: () => this.checkWaveCompletion(),
+    });
+    this.bossWave = new BossWave({
+      enemySystem: this.enemySystem,
+      waveRandom: this.waveRandom,
+      enemyTypeKeys: this.schedule.enemyTypeKeys,
+      getLayer,
+      countSpawn,
+    });
 
     // Wave state
     this.currentWave = 0;
@@ -174,22 +159,54 @@ export class WaveManager {
 
     // Timers (spawnTimer paces the rock trickle)
     this.spawnTimer = 0;
-    this.spawnDelay = WAVE_SPAWN_DELAY || 1.0;
-    this.spawnDelayMultiplier = 1;
     this.waveDelay = WAVE_BREAK_TIME || 10.0; // WAVE-004: Usar WAVE_BREAK_TIME para paridade com sistema legado
     this.waveCountdown = 0;
-
-    // Timed spawns for the layer in progress (src/data/layers.js), sorted by
-    // `at` (seconds into the layer).
-    this.layerSchedule = [];
-    this.activeFieldEvents = [];
-    this.layerElapsed = 0;
-    // The layer's modifier id (LAYER_MODIFIERS) while it plays, else null.
-    this.layerModifier = null;
 
     this.connectEventListeners();
 
     debugLog('[WaveManager] Initialized');
+  }
+
+  // The schedule, its clock, the modifier and the random scopes live in their
+  // modules; these keep the names EnemySystem, the session and tests use.
+  get layerSchedule() {
+    return this.schedule.layerSchedule;
+  }
+
+  set layerSchedule(entries) {
+    this.schedule.layerSchedule = entries;
+  }
+
+  get layerElapsed() {
+    return this.schedule.layerElapsed;
+  }
+
+  set layerElapsed(seconds) {
+    this.schedule.layerElapsed = seconds;
+  }
+
+  get enemyTypeKeys() {
+    return this.schedule.enemyTypeKeys;
+  }
+
+  get layerModifier() {
+    return this.layerEvents.layerModifier;
+  }
+
+  get randomScopes() {
+    return this.waveRandom.randomScopes;
+  }
+
+  get randomScopeSeeds() {
+    return this.waveRandom.randomScopeSeeds;
+  }
+
+  startLayerModifier(id) {
+    this.layerEvents.startLayerModifier(id);
+  }
+
+  reseedRandomScopes(options) {
+    this.waveRandom.reseedRandomScopes(options);
   }
 
   connectEventListeners() {
@@ -278,173 +295,6 @@ export class WaveManager {
     );
   }
 
-  getAsteroidDistributionWeights() {
-    return { large: 0.5, medium: 0.3, small: 0.2 };
-  }
-
-  normalizeAsteroidDistribution(distribution = {}) {
-    const weights = {
-      large: Math.max(0, Number(distribution.large) || 0),
-      medium: Math.max(0, Number(distribution.medium) || 0),
-      small: Math.max(0, Number(distribution.small) || 0),
-    };
-
-    const total = weights.large + weights.medium + weights.small;
-
-    return { weights, total };
-  }
-
-  resolveAsteroidSpawnSize(
-    random,
-    distribution = this.getAsteroidDistributionWeights()
-  ) {
-    const { weights, total } = this.normalizeAsteroidDistribution(distribution);
-    const fallbackRandom = this.getRandomService();
-
-    let spawnRandom = random;
-    if (
-      !spawnRandom ||
-      (typeof spawnRandom.float !== 'function' &&
-        typeof spawnRandom.range !== 'function')
-    ) {
-      spawnRandom = this.resolveScopedRandom(
-        random,
-        'spawn',
-        'wave-spawn:size'
-      );
-    }
-
-    const drawFloat = () => {
-      if (spawnRandom && typeof spawnRandom.float === 'function') {
-        return spawnRandom.float();
-      }
-      if (spawnRandom && typeof spawnRandom.range === 'function') {
-        return spawnRandom.range(0, 1);
-      }
-      if (fallbackRandom && typeof fallbackRandom.float === 'function') {
-        return fallbackRandom.float();
-      }
-      return 0;
-    };
-
-    const sizeOrder = ['large', 'medium', 'small'];
-    const normalizedTotal = total > 0 ? total : 1;
-    const roll = drawFloat();
-    let cumulative = 0;
-
-    for (const size of sizeOrder) {
-      const weight = weights[size] / normalizedTotal;
-      if (weight <= 0) {
-        continue;
-      }
-
-      cumulative += weight;
-      if (roll < cumulative) {
-        return size;
-      }
-    }
-
-    return sizeOrder[sizeOrder.length - 1];
-  }
-
-  filterAvailableMinionTypes(candidates) {
-    const list = Array.isArray(candidates) ? candidates : [];
-    const seen = new Set();
-    const result = [];
-    const availableKeys = new Set(
-      Object.values(this.enemyTypeKeys || {}).map((value) =>
-        typeof value === 'string'
-          ? value.toLowerCase()
-          : String(value || '').toLowerCase()
-      )
-    );
-
-    for (let i = 0; i < list.length; i += 1) {
-      const value = list[i];
-      if (!value) {
-        continue;
-      }
-
-      const key = String(value).trim().toLowerCase();
-      if (!key || key === 'boss' || seen.has(key)) {
-        continue;
-      }
-
-      if (availableKeys.size > 0 && !availableKeys.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      result.push(key);
-    }
-
-    if (!result.length) {
-      if (availableKeys.has('drone')) {
-        result.push('drone');
-      } else if (availableKeys.has('hunter')) {
-        result.push('hunter');
-      }
-    }
-
-    return result;
-  }
-
-  resolveBossDefaults() {
-    const base = BOSS_CONFIG || {};
-    const enemySystem = this.enemySystem;
-
-    const minionTypes =
-      enemySystem &&
-      typeof enemySystem.getAvailableBossMinionTypes === 'function'
-        ? enemySystem.getAvailableBossMinionTypes(base.minionTypes)
-        : this.filterAvailableMinionTypes(base.minionTypes);
-
-    return { ...base, minionTypes };
-  }
-
-  generateBossWave() {
-    const bossDefaults = this.resolveBossDefaults();
-
-    const bossRadius = bossDefaults.radius || 60;
-    const safeDistance = Math.max(
-      Number.isFinite(bossDefaults.safeDistance)
-        ? bossDefaults.safeDistance
-        : 0,
-      bossRadius * 2.4
-    );
-    const entryPadding = Number.isFinite(bossDefaults.entryPadding)
-      ? Math.max(0, bossDefaults.entryPadding)
-      : Math.max(20, bossRadius * 0.35);
-    const entryDriftSpeed = Number.isFinite(bossDefaults.entryDriftSpeed)
-      ? bossDefaults.entryDriftSpeed
-      : Math.max(45, (bossDefaults.speed || 60) * 0.85);
-
-    const bossEntry = {
-      type: this.bossEnemyKey || bossDefaults.key || 'boss',
-      key: bossDefaults.key || this.bossEnemyKey || 'boss',
-      count: 1,
-      displayName: bossDefaults.displayName || 'Boss',
-      radius: bossDefaults.radius,
-      health: bossDefaults.health,
-      healthScaling: bossDefaults.healthScaling,
-      spawnStrategy: 'scripted-entrance',
-      entrance: 'top-center',
-      safeDistance,
-      entryPadding,
-      entryDriftSpeed,
-      rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
-      randomScope: 'boss-spawn',
-      randomParentScope: 'spawn',
-      metadata: {
-        minionTypes: Array.isArray(bossDefaults.minionTypes)
-          ? [...bossDefaults.minionTypes]
-          : undefined,
-      },
-    };
-
-    return { isBossWave: true, boss: bossEntry, enemies: [] };
-  }
-
   computeTotalEnemies(waveConfig) {
     if (!waveConfig || typeof waveConfig !== 'object') {
       return 0;
@@ -531,18 +381,6 @@ export class WaveManager {
     return typeof rawType === 'string' ? rawType.toLowerCase() : null;
   }
 
-  isAsteroidType(type) {
-    if (!type) {
-      return false;
-    }
-
-    const asteroidKey = this.enemyTypeKeys?.asteroid
-      ? String(this.enemyTypeKeys.asteroid).toLowerCase()
-      : 'asteroid';
-
-    return String(type).toLowerCase() === asteroidKey;
-  }
-
   isBossMinionEnemy(enemy) {
     if (!enemy) {
       return false;
@@ -603,7 +441,7 @@ export class WaveManager {
 
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
     const normalizedType = this.getNormalizedEnemyType(enemy);
-    const isAsteroid = this.isAsteroidType(normalizedType);
+    const isAsteroid = this.schedule.isAsteroidType(normalizedType);
 
     // A rock the legacy bridge (registerActiveEnemy) already counted on
     // acquire (a Herald's wall) would hold the layer open if counted twice.
@@ -638,63 +476,6 @@ export class WaveManager {
     return true;
   }
 
-  createSupportGroup(kind, count) {
-    if (!count || count <= 0) {
-      return null;
-    }
-
-    const defaults = this.enemyTypeDefaults || {};
-
-    switch (kind) {
-      case 'drone': {
-        const droneDefaults = defaults.drone || {};
-        return {
-          type: this.enemyTypeKeys?.drone || 'drone',
-          count,
-          fireRate: droneDefaults.fireRate,
-          fireVariance: droneDefaults.fireVariance,
-          fireSpread: droneDefaults.fireSpread,
-          projectileSpeed: droneDefaults.projectileSpeed,
-          projectileDamage: droneDefaults.projectileDamage,
-          targetingRange: droneDefaults.targetingRange,
-          speed: droneDefaults.speed,
-          acceleration: droneDefaults.acceleration,
-        };
-      }
-      case 'mine': {
-        const mineDefaults = defaults.mine || {};
-        return {
-          type: this.enemyTypeKeys?.mine || 'mine',
-          count,
-          armTime: mineDefaults.armTime,
-          proximityRadius: mineDefaults.proximityRadius,
-          explosionRadius: mineDefaults.explosionRadius,
-          explosionDamage: mineDefaults.explosionDamage,
-          lifetime: mineDefaults.lifetime,
-        };
-      }
-      case 'hunter': {
-        const hunterDefaults = defaults.hunter || {};
-        return {
-          type: this.enemyTypeKeys?.hunter || 'hunter',
-          count,
-          preferredDistance: hunterDefaults.preferredDistance,
-          burstCount: hunterDefaults.burstCount,
-          burstInterval: hunterDefaults.burstInterval,
-          burstDelay: hunterDefaults.burstDelay,
-          fireSpread: hunterDefaults.fireSpread,
-          projectileSpeed: hunterDefaults.projectileSpeed,
-          projectileDamage: hunterDefaults.projectileDamage,
-          fireRange: hunterDefaults.fireRange,
-          speed: hunterDefaults.speed,
-          acceleration: hunterDefaults.acceleration,
-        };
-      }
-      default:
-        return SUPPORT_KINDS.includes(kind) ? { type: kind, count } : null;
-    }
-  }
-
   /**
    * Starts the next wave.
    *
@@ -723,24 +504,26 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakMap();
 
     const waveNumber = this.currentWave;
-    const director = this.applyHuntersMoon(this.layerDirector(waveNumber));
+    const director = this.layerEvents.applyHuntersMoon(
+      this.layerDirector(waveNumber)
+    );
     let config;
 
     if (director.warden) {
       GameDebugLogger.log('WAVE', 'Boss wave detected', { wave: waveNumber });
-      config = this.generateBossWave();
+      config = this.bossWave.generateBossWave();
     } else {
       config = { isBossWave: false, enemies: [] };
     }
 
     config.isBossWave = Boolean(config.isBossWave);
 
-    this.layerSchedule = this.buildLayerSchedule(director);
+    this.layerSchedule = this.schedule.buildLayerSchedule(director);
     this.layerElapsed = 0;
     this.layerRocks = director.rocks;
 
     const sharedSpawnDelayMultiplier =
-      this.resolveWaveSpawnDelayMultiplier(config);
+      this.spawner.resolveWaveSpawnDelayMultiplier(config);
     config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
 
     // The layer's own rocks trickle in (updateRockTrickle), so only the
@@ -749,7 +532,7 @@ export class WaveManager {
     let computedTotalEnemies = this.computeTotalEnemies(config);
     for (const { groups } of this.layerSchedule) {
       for (const { kind, count } of groups) {
-        if (!this.isAsteroidType(kind)) computedTotalEnemies += count;
+        if (!this.schedule.isAsteroidType(kind)) computedTotalEnemies += count;
       }
     }
 
@@ -813,7 +596,7 @@ export class WaveManager {
     if (config.isBossWave) {
       this.queueBossWaveSpawns(config);
     } else {
-      this.spawnWave(config);
+      this.spawner.spawnWave(config);
     }
 
     debugLog(
@@ -822,586 +605,6 @@ export class WaveManager {
       })`
     );
     return true;
-  }
-
-  /**
-   * Resolves a deterministic spawn delay multiplier for the provided wave configuration.
-   * The multiplier is cached on the config object so boss support groups reuse the same pacing.
-   *
-   * @param {Object} waveConfig - Wave configuration
-   * @returns {number} Effective spawn delay multiplier
-   */
-  resolveWaveSpawnDelayMultiplier(waveConfig = {}) {
-    const existingMultiplier = Number(waveConfig?.spawnDelayMultiplier);
-
-    if (Number.isFinite(existingMultiplier) && existingMultiplier > 0) {
-      return existingMultiplier;
-    }
-
-    const spawnDelayRandom = this.resolveScopedRandom(
-      this.randomScopes?.spawn,
-      'spawn',
-      'wave-spawn-delay'
-    );
-
-    const generatedMultiplier =
-      spawnDelayRandom && typeof spawnDelayRandom.range === 'function'
-        ? spawnDelayRandom.range(0.5, 1)
-        : 1;
-
-    const sanitizedMultiplier =
-      Number.isFinite(generatedMultiplier) && generatedMultiplier > 0
-        ? generatedMultiplier
-        : 1;
-
-    if (waveConfig && typeof waveConfig === 'object') {
-      waveConfig.spawnDelayMultiplier = sanitizedMultiplier;
-    }
-
-    return sanitizedMultiplier;
-  }
-
-  /**
-   * Spawns enemies for the current wave using the factory pattern.
-   *
-   * @param {Object} waveConfig - Wave configuration
-   * @param {Object} [options]
-   * @param {boolean} [options.surge] - Burst: every unit (asteroids too)
-   *   spawns around one point on the field edge farthest from the player.
-   */
-  spawnWave(waveConfig, { surge = false } = {}) {
-    const enemyGroups = Array.isArray(waveConfig?.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    // Outside a surge the rocks are EnemySystem's: a group of only rocks
-    // spawns nothing here.
-    if (!surge) {
-      if (enemyGroups.length === 0) {
-        return;
-      }
-
-      const onlyAsteroids = enemyGroups.every(
-        (group) => (group?.type || '').toLowerCase() === 'asteroid'
-      );
-
-      if (onlyAsteroids) {
-        return;
-      }
-    }
-
-    const world = this.enemySystem?.getCachedWorld?.();
-    const worldBounds =
-      world && typeof world.getBounds === 'function'
-        ? world.getBounds()
-        : {
-            width: GAME_WIDTH || 800,
-            height: GAME_HEIGHT || 600,
-          };
-    const player = this.enemySystem.getCachedPlayer();
-    const playerSnapshot = this.enemySystem.getPlayerPositionSnapshot(player);
-    const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const defaultDistributionWeights = this.getAsteroidDistributionWeights();
-    const surgeEdge = surge
-      ? this.calculateSurgeEdge(worldBounds, playerSnapshot)
-      : null;
-
-    const spawnDelayMultiplier =
-      this.resolveWaveSpawnDelayMultiplier(waveConfig);
-    this.spawnDelayMultiplier = spawnDelayMultiplier;
-    const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
-
-    for (const enemyGroup of enemyGroups) {
-      if (!enemyGroup || typeof enemyGroup !== 'object') {
-        continue;
-      }
-
-      const typeKey =
-        typeof enemyGroup.type === 'string'
-          ? enemyGroup.type.toLowerCase()
-          : '';
-      const isAsteroid = typeKey === 'asteroid';
-      // Heralds appear in the field like support enemies (never Elite).
-      const isTacticalEnemy =
-        SUPPORT_KINDS.includes(typeKey) || typeKey === 'herald';
-      // The bridge (registerActiveEnemy) counts rocks; only a surge spawns
-      // them here.
-      if (isAsteroid && !surgeEdge) {
-        continue;
-      }
-
-      const groupCount = Math.max(0, Math.floor(Number(enemyGroup.count) || 0));
-      if (groupCount <= 0) {
-        continue;
-      }
-
-      for (let i = 0; i < groupCount; i++) {
-        const spawnContext = isAsteroid
-          ? this.createLegacyAsteroidScopedRandom()
-          : this.createScopedRandom('spawn', 'wave-spawn');
-
-        let position;
-        if (surgeEdge) {
-          position = this.calculateSurgePosition(
-            worldBounds,
-            surgeEdge,
-            isAsteroid,
-            spawnContext.random
-          );
-        } else if (isTacticalEnemy) {
-          const anchor =
-            playerSnapshot &&
-            Number.isFinite(playerSnapshot.x) &&
-            Number.isFinite(playerSnapshot.y)
-              ? { x: playerSnapshot.x, y: playerSnapshot.y }
-              : {
-                  x: worldBounds.width / 2,
-                  y: worldBounds.height / 2,
-                };
-
-          const tacticalPosition = this.calculatePlayerSafeInboundsPosition(
-            worldBounds,
-            anchor,
-            safeDistance,
-            spawnContext.random
-          );
-
-          position = { x: tacticalPosition.x, y: tacticalPosition.y };
-
-          let isInBounds = this.isPositionWithinBounds(position, worldBounds);
-          let fallbackApplied = false;
-
-          if (!isInBounds) {
-            position = this.calculateCenterBandFallbackPosition(
-              worldBounds,
-              spawnContext.random
-            );
-            isInBounds = this.isPositionWithinBounds(position, worldBounds);
-            fallbackApplied = true;
-          }
-
-          GameDebugLogger.log('SPAWN', `${typeKey} spawn position`, {
-            type: typeKey,
-            position,
-            playerPosition: anchor,
-            safeDistance,
-            isInBounds,
-            usedFallback:
-              fallbackApplied || Boolean(tacticalPosition.usedFallback),
-            clamped: Boolean(tacticalPosition.clamped),
-          });
-        } else {
-          // Modern: spawn at safe distance from player when snapshot is available.
-          // Fall back to edge positioning if we cannot resolve the player snapshot.
-          if (!playerSnapshot) {
-            position = this.calculateEdgeSpawnPosition(
-              worldBounds,
-              spawnContext.random
-            );
-          } else {
-            position = this.calculateSafeSpawnPosition(
-              worldBounds,
-              playerSnapshot,
-              safeDistance,
-              spawnContext.random
-            );
-          }
-        }
-
-        if (
-          !position ||
-          !Number.isFinite(position.x) ||
-          !Number.isFinite(position.y)
-        ) {
-          position = {
-            x: worldBounds.width / 2,
-            y: worldBounds.height / 2,
-          };
-        }
-
-        if (
-          position.x < -100 ||
-          position.x > worldBounds.width + 100 ||
-          position.y < -100 ||
-          position.y > worldBounds.height + 100
-        ) {
-          GameDebugLogger.log('ERROR', 'Enemy spawn position out of bounds', {
-            type: typeKey,
-            position,
-            worldBounds,
-          });
-
-          position.x = worldBounds.width / 2;
-          position.y = worldBounds.height / 2;
-        }
-
-        const {
-          count: _omittedCount,
-          spawnIndexBase: groupSpawnIndexBase,
-          metadata: groupMetadata,
-          eliteChance = 0,
-          ...groupConfig
-        } = enemyGroup;
-
-        const spawnIndexBase = Number.isFinite(groupSpawnIndexBase)
-          ? groupSpawnIndexBase
-          : 0;
-        const spawnIndex = spawnIndexBase + i;
-
-        let resolvedSize = groupConfig.size || enemyGroup.size;
-        if (isAsteroid && (!resolvedSize || resolvedSize === 'auto')) {
-          const distributionForGroup =
-            (groupMetadata && groupMetadata.distributionWeights) ||
-            defaultDistributionWeights;
-
-          resolvedSize = this.resolveAsteroidSpawnSize(
-            spawnContext.random,
-            distributionForGroup
-          );
-        }
-
-        const enemyConfig = {
-          ...groupConfig,
-          type: groupConfig.type || enemyGroup.type,
-          size: resolvedSize,
-          variant: Object.prototype.hasOwnProperty.call(groupConfig, 'variant')
-            ? groupConfig.variant
-            : enemyGroup.variant,
-          x: position.x,
-          y: position.y,
-          wave: this.currentWave,
-          spawnIndex,
-          spawnDelay: effectiveSpawnDelay,
-          spawnDelayMultiplier: this.spawnDelayMultiplier,
-        };
-
-        if (
-          !isAsteroid &&
-          (enemyConfig.size === null ||
-            typeof enemyConfig.size === 'undefined' ||
-            enemyConfig.size === 'auto')
-        ) {
-          delete enemyConfig.size;
-        }
-
-        if (groupMetadata && typeof groupMetadata === 'object') {
-          enemyConfig.metadata = {
-            ...groupMetadata,
-            spawnIndex,
-            resolvedSize,
-          };
-        } else if (isAsteroid) {
-          enemyConfig.metadata = { spawnIndex, resolvedSize };
-        }
-
-        if (spawnContext.random?.fork) {
-          enemyConfig.random = spawnContext.random.fork('asteroid-core');
-          enemyConfig.randomScope = 'spawn';
-        }
-
-        // Rolled after the core fork so the enemy's own stream is unchanged.
-        if (isTacticalEnemy) {
-          enemyConfig.elite = spawnContext.random.chance(eliteChance);
-        }
-
-        // Centralized acquisition path for factory-backed enemies
-        const enemy = this.enemySystem.acquireEnemyViaFactory(
-          enemyGroup.type,
-          enemyConfig
-        );
-
-        if (
-          enemy &&
-          !enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')]
-        ) {
-          this.enemySystem.registerActiveEnemy(enemy, {
-            skipDuplicateCheck: true,
-          });
-        }
-
-        if (enemy) {
-          enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
-        }
-
-        if (enemy && !isAsteroid) {
-          this.enemiesSpawnedThisWave++;
-        }
-
-        // The bridge counts a surge rock here; the rock plan only had the
-        // layer's own rocks, so it joins the plan too.
-        if (enemy && isAsteroid) {
-          this.addExtraRocks(1);
-        }
-      }
-    }
-  }
-
-  /**
-   * Flattens a layer's roster, surges and field events into timed entries
-   * sorted by `at` (seconds into the layer). Surge kinds are taken in turn.
-   */
-  buildLayerSchedule(director) {
-    const schedule = [];
-
-    for (const { kind, count, from, every, elite } of director.roster) {
-      for (let i = 0; i < count; i += 1) {
-        schedule.push({
-          at: from + i * every,
-          groups: [{ kind, count: 1 }],
-          elite,
-          surge: null,
-        });
-      }
-    }
-
-    for (const surge of director.surges) {
-      const counts = new Map();
-      for (let i = 0; i < surge.count; i += 1) {
-        const kind = surge.kinds[i % surge.kinds.length];
-        counts.set(kind, (counts.get(kind) || 0) + 1);
-      }
-      schedule.push({
-        at: surge.at,
-        groups: [...counts].map(([kind, count]) => ({ kind, count })),
-        elite: 0,
-        surge,
-      });
-    }
-
-    for (const event of director.events) {
-      schedule.push({ at: event.at, groups: [], elite: 0, surge: null, event });
-    }
-
-    // The Herald counts as one scheduled enemy: the layer holds until it dies.
-    if (director.herald) {
-      schedule.push({
-        at: HERALD_SPAWN_AT,
-        groups: [{ kind: 'herald', count: 1 }],
-        elite: 0,
-        surge: null,
-        herald: director.herald,
-      });
-    }
-
-    // Stable: entries due at the same time keep table order.
-    return schedule.sort((a, b) => a.at - b.at);
-  }
-
-  /**
-   * Advances the layer clock and spawns what is due. An empty field does not
-   * wait: the next scheduled spawn comes at once.
-   */
-  updateLayerSchedule(deltaTime) {
-    this.layerElapsed += deltaTime;
-    this.updateFieldEvents(deltaTime);
-
-    const next = this.layerSchedule[0];
-    if (next && next.at > this.layerElapsed && this.isFieldEmpty()) {
-      this.layerElapsed = next.at;
-    }
-
-    while (
-      this.layerSchedule.length > 0 &&
-      this.layerSchedule[0].at <= this.layerElapsed
-    ) {
-      this.spawnScheduled(this.layerSchedule.shift());
-    }
-
-    this.checkWaveCompletion();
-  }
-
-  spawnScheduled({ groups, elite, surge, event, herald }) {
-    if (event) {
-      this.startFieldEvent(event);
-      return;
-    }
-
-    if (herald) {
-      this.spawnWave({
-        enemies: [{ type: 'herald', count: 1, heraldKind: herald }],
-        spawnDelayMultiplier: this.spawnDelayMultiplier,
-      });
-      return;
-    }
-
-    const enemies = [];
-    for (const { kind, count } of groups) {
-      const group = this.isAsteroidType(kind)
-        ? { type: kind, count, size: 'small', variant: 'common' }
-        : this.createSupportGroup(kind, count);
-      if (group) enemies.push({ ...group, eliteChance: elite });
-    }
-
-    this.spawnWave(
-      { enemies, spawnDelayMultiplier: this.spawnDelayMultiplier },
-      { surge: Boolean(surge) }
-    );
-
-    if (surge) {
-      this.eventBus.emit('surge-started', {
-        layer: this.currentWave,
-        label: surge.label,
-        kinds: [...surge.kinds],
-        count: surge.count,
-      });
-    }
-  }
-
-  /**
-   * Starts a field event: applies its gameplay effect and emits
-   * 'field-event-started' {layer, kind, label, duration, x, y}; (x, y) is the
-   * Gravity Well point, else the ship. 'field-event-ended' {kind} follows
-   * `duration` seconds later (or when the layer ends).
-   */
-  startFieldEvent({ kind, label }) {
-    const { duration } = FIELD_EVENTS[kind];
-    const player = this.enemySystem.getPlayerPositionSnapshot(
-      this.enemySystem.getCachedPlayer()
-    );
-    let point = player ? { x: player.x, y: player.y } : { x: 0, y: 0 };
-
-    if (kind === 'gravity-well') {
-      point = this.pickGravityWellPoint(point);
-      const { pullSpeed, pullAcceleration } = FIELD_EVENTS[kind];
-      this.enemySystem
-        .getCachedXPOrbs?.()
-        ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
-    } else if (kind === 'solar-flare') {
-      // A phased Shade (`intangible`) is out of reach of the flare.
-      this.enemySystem.forEachActiveEnemy?.((enemy) => {
-        if (!enemy.intangible) enemy.stunTimer = duration;
-      });
-      this.enemySystem
-        .getCachedEffects?.()
-        ?.addScreenFlash(
-          withAlpha(PALETTE.xp, SOLAR_FLARE_FLASH.alpha),
-          SOLAR_FLARE_FLASH.duration,
-          SOLAR_FLARE_FLASH.intensity
-        );
-    }
-
-    this.activeFieldEvents.push({ kind, remaining: duration });
-    this.eventBus.emit('field-event-started', {
-      layer: this.currentWave,
-      kind,
-      label,
-      duration,
-      x: point.x,
-      y: point.y,
-    });
-  }
-
-  /**
-   * Hunters' Moon: the roster keeps only its kinds, each count scaled;
-   * surges keep their size, spawning only those kinds.
-   */
-  applyHuntersMoon(director) {
-    if (director.modifier !== 'hunters-moon') return director;
-    const { kinds, countScale } = LAYER_MODIFIERS['hunters-moon'];
-    return {
-      ...director,
-      roster: director.roster
-        .filter((entry) => kinds.includes(entry.kind))
-        .map((entry) => ({
-          ...entry,
-          count: Math.round(entry.count * countScale),
-        })),
-      surges: director.surges
-        .map((surge) => ({
-          ...surge,
-          kinds: surge.kinds.filter((kind) => kinds.includes(kind)),
-        }))
-        .filter((surge) => surge.kinds.length > 0),
-    };
-  }
-
-  /**
-   * Starts the layer's modifier and emits 'layer-modifier-started'
-   * {layer, id, label, color}; 'layer-modifier-ended' {id} follows when the
-   * layer ends. Glass Field is read on rock spawn (layerModifier); Magnetic
-   * Storm sets the XP sparks drifting, seeded by run and layer.
-   */
-  startLayerModifier(id) {
-    const { label, color } = LAYER_MODIFIERS[id];
-    this.layerModifier = id;
-    if (id === 'magnetic-storm') {
-      const runSeed =
-        resolveService(
-          'difficulty',
-          this.enemySystem.dependencies
-        )?.getRunSeed() ?? 0;
-      this.enemySystem
-        .getCachedXPOrbs?.()
-        ?.setDrift(
-          LAYER_MODIFIERS[id],
-          new RandomService(`magnetic-storm:${runSeed}:${this.currentWave}`)
-        );
-    }
-    this.eventBus.emit('layer-modifier-started', {
-      layer: this.currentWave,
-      id,
-      label,
-      color,
-    });
-  }
-
-  /** Ends the layer's modifier, if any (layer over, run reset). */
-  endLayerModifier() {
-    const id = this.layerModifier;
-    if (!id) return;
-    this.layerModifier = null;
-    if (id === 'magnetic-storm') {
-      this.enemySystem.getCachedXPOrbs?.()?.setDrift(null);
-    }
-    this.eventBus.emit('layer-modifier-ended', { id });
-  }
-
-  /** A point at a seeded angle and distance from the ship, inside the field. */
-  pickGravityWellPoint(origin) {
-    const { minDistance, maxDistance } = FIELD_EVENTS['gravity-well'];
-    const { random } = this.createScopedRandom('spawn', 'gravity-well');
-    const angle = random.range(0, Math.PI * 2);
-    const distance = random.range(minDistance, maxDistance);
-    const bounds = this.enemySystem.getCachedWorld?.()?.getBounds?.() || {
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-    };
-    return {
-      x: clamp(
-        origin.x + Math.cos(angle) * distance,
-        GRAVITY_WELL_INSET,
-        bounds.width - GRAVITY_WELL_INSET
-      ),
-      y: clamp(
-        origin.y + Math.sin(angle) * distance,
-        GRAVITY_WELL_INSET,
-        bounds.height - GRAVITY_WELL_INSET
-      ),
-    };
-  }
-
-  /** Counts active field events down on the layer's own time. */
-  updateFieldEvents(deltaTime) {
-    for (const event of this.activeFieldEvents) {
-      event.remaining -= deltaTime;
-    }
-    const ended = this.activeFieldEvents.filter((e) => e.remaining <= 0);
-    if (ended.length === 0) return;
-    this.activeFieldEvents = this.activeFieldEvents.filter(
-      (e) => e.remaining > 0
-    );
-    for (const { kind } of ended) {
-      this.eventBus.emit('field-event-ended', { kind });
-    }
-  }
-
-  /** Ends every active field event at once (layer over, run reset). */
-  endFieldEvents() {
-    const ended = this.activeFieldEvents;
-    this.activeFieldEvents = [];
-    for (const { kind } of ended) {
-      this.eventBus.emit('field-event-ended', { kind });
-    }
   }
 
   /** Rocks the trickle still owes this layer. */
@@ -1566,7 +769,7 @@ export class WaveManager {
     const queue = [];
 
     const sharedSpawnDelayMultiplier =
-      this.resolveWaveSpawnDelayMultiplier(waveConfig);
+      this.spawner.resolveWaveSpawnDelayMultiplier(waveConfig);
     const baseConfig = {
       ...waveConfig,
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
@@ -1576,7 +779,7 @@ export class WaveManager {
     if (bossConfig) {
       queue.push({
         type: 'boss',
-        execute: () => this.spawnBossEnemy(bossConfig, baseConfig),
+        execute: () => this.bossWave.spawnBossEnemy(bossConfig, baseConfig),
       });
     }
 
@@ -1588,7 +791,8 @@ export class WaveManager {
       queue.push({
         type: 'support-group',
         group,
-        execute: () => this.spawnWave({ ...baseConfig, enemies: [group] }),
+        execute: () =>
+          this.spawner.spawnWave({ ...baseConfig, enemies: [group] }),
       });
     });
 
@@ -1626,723 +830,6 @@ export class WaveManager {
     }
 
     this.spawnQueue = [];
-  }
-
-  spawnBossEnemy(bossConfig = {}, waveConfig = {}) {
-    GameDebugLogger.log('SPAWN', 'Boss spawn attempted', {
-      type: bossConfig.type,
-      entrance: bossConfig.entrance,
-      wave: this.currentWave,
-    });
-
-    const world = this.enemySystem?.getCachedWorld?.();
-    const worldBounds =
-      world && typeof world.getBounds === 'function'
-        ? world.getBounds()
-        : {
-            width: GAME_WIDTH || 800,
-            height: GAME_HEIGHT || 600,
-          };
-
-    const player = this.enemySystem.getCachedPlayer();
-    const playerSnapshot = this.enemySystem.getPlayerPositionSnapshot(player);
-
-    const spawnRandom = this.resolveScopedRandom(
-      this.getRandomScope ? this.getRandomScope('boss-spawn') : null,
-      'spawn',
-      'boss-position'
-    );
-
-    const baseRadius = bossConfig.radius || BOSS_CONFIG?.radius || 60;
-    const requestedSafeDistance = Number.isFinite(bossConfig.safeDistance)
-      ? bossConfig.safeDistance
-      : Number.isFinite(BOSS_CONFIG?.safeDistance)
-        ? BOSS_CONFIG.safeDistance
-        : 0;
-    const safeDistance = Math.max(baseRadius * 2, requestedSafeDistance);
-    const entryPadding = Number.isFinite(bossConfig.entryPadding)
-      ? Math.max(0, bossConfig.entryPadding)
-      : Number.isFinite(BOSS_CONFIG?.entryPadding)
-        ? Math.max(0, BOSS_CONFIG.entryPadding)
-        : Math.max(20, baseRadius * 0.35);
-    const entryDriftSpeed = Number.isFinite(bossConfig.entryDriftSpeed)
-      ? bossConfig.entryDriftSpeed
-      : Number.isFinite(BOSS_CONFIG?.entryDriftSpeed)
-        ? BOSS_CONFIG.entryDriftSpeed
-        : Math.max(45, (bossConfig.speed || BOSS_CONFIG?.speed || 60) * 0.85);
-
-    let spawnPosition;
-    if (
-      bossConfig?.spawnPosition &&
-      Number.isFinite(bossConfig.spawnPosition.x) &&
-      Number.isFinite(bossConfig.spawnPosition.y)
-    ) {
-      spawnPosition = { ...bossConfig.spawnPosition };
-    } else {
-      spawnPosition = this.calculateBossSpawnPosition(
-        worldBounds,
-        bossConfig.entrance || 'top-center',
-        { safeDistance, entryPadding },
-        playerSnapshot,
-        spawnRandom
-      );
-    }
-
-    GameDebugLogger.log('SPAWN', 'Boss position calculated', {
-      x: spawnPosition.x,
-      y: spawnPosition.y,
-      entrance: bossConfig.entrance || 'top-center',
-      worldBounds,
-      safeDistance,
-      entryPadding,
-      entryDriftSpeed,
-    });
-
-    const metadata = {
-      ...(bossConfig.metadata || {}),
-      wave: this.currentWave,
-      isBossWave: true,
-      spawnSource: 'wave-manager',
-      entrance: bossConfig.entrance || 'top-center',
-      supportPlan: Array.isArray(waveConfig.enemies)
-        ? waveConfig.enemies.map((group) => ({
-            type: group.type,
-            count: group.count,
-          }))
-        : undefined,
-    };
-
-    const bossSpawnConfig = {
-      ...bossConfig,
-      x: spawnPosition.x,
-      y: spawnPosition.y,
-      wave: this.currentWave,
-      safeDistance,
-      entryPadding,
-      entryDriftSpeed,
-      spawnStrategy: bossConfig.spawnStrategy || 'scripted-entrance',
-      entrance: bossConfig.entrance || 'top-center',
-      spawnOffset: bossConfig.spawnOffset,
-      randomScope: bossConfig.randomScope || 'boss-spawn',
-      randomParentScope: bossConfig.randomParentScope || 'spawn',
-      metadata,
-    };
-
-    const boss = this.enemySystem.spawnBoss(bossSpawnConfig);
-
-    if (!boss) {
-      GameDebugLogger.log('ERROR', 'Boss spawn failed - no instance returned', {
-        config: bossSpawnConfig,
-      });
-      return null;
-    }
-
-    GameDebugLogger.log('SPAWN', 'Boss spawned successfully', {
-      id: boss.id,
-      type: boss.type,
-      position: { x: boss.x, y: boss.y },
-      health: boss.health,
-      maxHealth: boss.maxHealth,
-      phase: boss.currentPhase,
-    });
-
-    this.enemiesSpawnedThisWave += 1;
-
-    return boss;
-  }
-
-  calculateBossSpawnPosition(
-    worldBounds = { width: 800, height: 600 },
-    entrance = 'top-center',
-    constraints = {},
-    playerSnapshot = null,
-    random = this.getRandomScope('spawn')
-  ) {
-    const bounds = {
-      width: worldBounds?.width || GAME_WIDTH || 800,
-      height: worldBounds?.height || GAME_HEIGHT || 600,
-    };
-
-    const generator = this.resolveScopedRandom(
-      random,
-      'spawn',
-      'boss-position'
-    );
-    const bossRadius = BOSS_CONFIG?.radius || 60;
-    const safeDistance = Math.max(
-      Number(constraints?.safeDistance) || 0,
-      bossRadius * 2
-    );
-    const entryPadding = Math.max(
-      Number(constraints?.entryPadding) || 0,
-      Math.max(20, bossRadius * 0.35)
-    );
-    const horizontalMargin = Math.min(
-      bounds.width / 2,
-      entryPadding + bossRadius
-    );
-    const verticalMargin = Math.min(
-      bounds.height / 2,
-      entryPadding + bossRadius
-    );
-
-    const getRange = (min, max) => generator.range(min, max);
-
-    let x = bounds.width / 2;
-    let y = verticalMargin;
-
-    switch (entrance) {
-      case 'center':
-        x = bounds.width / 2;
-        y = bounds.height / 2;
-        break;
-      case 'bottom-center':
-      case 'bottom':
-        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
-        y = bounds.height - verticalMargin;
-        break;
-      case 'left':
-      case 'left-center':
-        x = horizontalMargin;
-        y = getRange(verticalMargin, bounds.height - verticalMargin);
-        break;
-      case 'right':
-      case 'right-center':
-        x = bounds.width - horizontalMargin;
-        y = getRange(verticalMargin, bounds.height - verticalMargin);
-        break;
-      case 'top-center':
-      default:
-        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
-        y = verticalMargin;
-        break;
-    }
-
-    if (
-      playerSnapshot &&
-      Number.isFinite(playerSnapshot.x) &&
-      Number.isFinite(playerSnapshot.y)
-    ) {
-      const dx = x - playerSnapshot.x;
-      const dy = y - playerSnapshot.y;
-      const distance = Math.hypot(dx, dy);
-
-      if (distance < safeDistance) {
-        if (distance === 0) {
-          x = playerSnapshot.x;
-          y = playerSnapshot.y - safeDistance;
-        } else {
-          const scale = safeDistance / distance;
-          x = playerSnapshot.x + dx * scale;
-          y = playerSnapshot.y + dy * scale;
-        }
-      }
-    }
-
-    const maxX = bounds.width - horizontalMargin;
-    const maxY = bounds.height - verticalMargin;
-    x = clamp(x, horizontalMargin, maxX);
-    y = clamp(y, verticalMargin, maxY);
-
-    if (
-      playerSnapshot &&
-      Number.isFinite(playerSnapshot.x) &&
-      Number.isFinite(playerSnapshot.y) &&
-      safeDistance > 0
-    ) {
-      let dx = x - playerSnapshot.x;
-      let dy = y - playerSnapshot.y;
-      let distance = Math.hypot(dx, dy);
-
-      if (distance < safeDistance) {
-        let dirX = dx;
-        let dirY = dy;
-        if (dirX === 0 && dirY === 0) {
-          dirX = 0;
-          dirY = -1;
-        }
-
-        const magnitude = Math.hypot(dirX, dirY) || 1;
-        dirX /= magnitude;
-        dirY /= magnitude;
-
-        const candidateX = playerSnapshot.x + dirX * safeDistance;
-        const candidateY = playerSnapshot.y + dirY * safeDistance;
-
-        let adjustedX = candidateX;
-        let adjustedY = candidateY;
-
-        const withinBand =
-          adjustedX >= horizontalMargin &&
-          adjustedX <= maxX &&
-          adjustedY >= verticalMargin &&
-          adjustedY <= maxY;
-
-        if (!withinBand) {
-          const boundaryTs = [];
-          if (dirX > 0) {
-            boundaryTs.push((maxX - playerSnapshot.x) / dirX);
-          } else if (dirX < 0) {
-            boundaryTs.push((horizontalMargin - playerSnapshot.x) / dirX);
-          }
-
-          if (dirY > 0) {
-            boundaryTs.push((maxY - playerSnapshot.y) / dirY);
-          } else if (dirY < 0) {
-            boundaryTs.push((verticalMargin - playerSnapshot.y) / dirY);
-          }
-
-          const validTs = boundaryTs.filter(
-            (t) => Number.isFinite(t) && t >= 0
-          );
-          let finalT = safeDistance;
-
-          if (validTs.length > 0) {
-            const sorted = [...validTs].sort((a, b) => a - b);
-            const meetsSafeDistance = sorted.find(
-              (t) => t >= safeDistance - 1e-6
-            );
-            if (Number.isFinite(meetsSafeDistance)) {
-              finalT = meetsSafeDistance;
-            } else {
-              finalT = sorted[sorted.length - 1];
-            }
-          }
-
-          adjustedX = playerSnapshot.x + dirX * finalT;
-          adjustedY = playerSnapshot.y + dirY * finalT;
-        }
-
-        adjustedX = clamp(adjustedX, horizontalMargin, maxX);
-        adjustedY = clamp(adjustedY, verticalMargin, maxY);
-
-        dx = adjustedX - playerSnapshot.x;
-        dy = adjustedY - playerSnapshot.y;
-        distance = Math.hypot(dx, dy);
-
-        if (distance < safeDistance) {
-          const fallbackMagnitude = Math.max(distance, 1e-6);
-          const scale = safeDistance / fallbackMagnitude;
-          adjustedX = playerSnapshot.x + dx * scale;
-          adjustedY = playerSnapshot.y + dy * scale;
-          adjustedX = clamp(adjustedX, horizontalMargin, maxX);
-          adjustedY = clamp(adjustedY, verticalMargin, maxY);
-          distance = Math.hypot(
-            adjustedX - playerSnapshot.x,
-            adjustedY - playerSnapshot.y
-          );
-        }
-
-        x = adjustedX;
-        y = adjustedY;
-
-        const finalDistance = Math.hypot(
-          x - playerSnapshot.x,
-          y - playerSnapshot.y
-        );
-        const safeSatisfied = finalDistance >= safeDistance - 1e-3;
-
-        GameDebugLogger.log(
-          'STATE',
-          safeSatisfied
-            ? 'Boss spawn adjusted after clamp to respect safe distance'
-            : 'Boss spawn constrained by arena bounds',
-          {
-            player: { x: playerSnapshot.x, y: playerSnapshot.y },
-            position: { x, y },
-            safeDistance,
-            distance: finalDistance,
-            safeSatisfied,
-          }
-        );
-      }
-    }
-
-    return { x, y };
-  }
-
-  /**
-   * Calculates a safe spawn position away from player.
-   *
-   * @param {Object} bounds - World bounds
-   * @param {Object} player - Player object
-   * @param {number} safeDistance - Minimum distance from player
-   * @returns {Object} {x, y} position
-   */
-  calculatePlayerSafeInboundsPosition(
-    bounds,
-    player,
-    safeDistance,
-    random = this.getRandomScope('spawn')
-  ) {
-    const width = bounds?.width || GAME_WIDTH || 800;
-    const height = bounds?.height || GAME_HEIGHT || 600;
-    const horizontalMargin = Math.max(40, Math.floor(width * 0.075));
-    const verticalMargin = Math.max(40, Math.floor(height * 0.075));
-    const spawnRandom = this.resolveScopedRandom(
-      random,
-      'spawn',
-      'tactical-position'
-    );
-
-    const anchorX = player && Number.isFinite(player.x) ? player.x : width / 2;
-    const anchorY = player && Number.isFinite(player.y) ? player.y : height / 2;
-
-    const minRadius = Math.max(0, safeDistance);
-    const maxRadius = Math.max(minRadius + 80, minRadius * 1.5 || 120);
-    const attempts = 8;
-    let clamped = false;
-
-    const nextFloat = () => spawnRandom.float();
-    const nextRange = (min, max) => {
-      if (
-        spawnRandom &&
-        typeof spawnRandom.range === 'function' &&
-        Number.isFinite(min) &&
-        Number.isFinite(max)
-      ) {
-        return spawnRandom.range(min, max);
-      }
-      const t = nextFloat();
-      return min + t * (max - min);
-    };
-
-    for (let i = 0; i < attempts; i += 1) {
-      const angle = nextFloat() * Math.PI * 2;
-      const radius = nextRange(minRadius, maxRadius);
-
-      let candidateX = anchorX + Math.cos(angle) * radius;
-      let candidateY = anchorY + Math.sin(angle) * radius;
-
-      const clampedX = clamp(
-        candidateX,
-        horizontalMargin,
-        width - horizontalMargin
-      );
-      const clampedY = clamp(
-        candidateY,
-        verticalMargin,
-        height - verticalMargin
-      );
-
-      if (clampedX !== candidateX || clampedY !== candidateY) {
-        clamped = true;
-      }
-
-      candidateX = clampedX;
-      candidateY = clampedY;
-
-      const dx = candidateX - anchorX;
-      const dy = candidateY - anchorY;
-      const distance = Math.hypot(dx, dy);
-
-      if (distance >= Math.max(0, safeDistance * 0.85)) {
-        return {
-          x: candidateX,
-          y: candidateY,
-          clamped,
-          usedFallback: false,
-        };
-      }
-    }
-
-    const centerMarginX = Math.max(horizontalMargin, Math.floor(width * 0.25));
-    const centerMarginY = Math.max(verticalMargin, Math.floor(height * 0.25));
-    const jitterXRange = Math.max(0, width - centerMarginX * 2);
-    const jitterYRange = Math.max(0, height - centerMarginY * 2);
-
-    const jitter = (range) => (nextFloat() - 0.5) * range * 0.5;
-
-    const fallbackX = clamp(
-      width / 2 + jitter(jitterXRange),
-      centerMarginX,
-      width - centerMarginX
-    );
-    const fallbackY = clamp(
-      height / 2 + jitter(jitterYRange),
-      centerMarginY,
-      height - centerMarginY
-    );
-
-    return {
-      x: fallbackX,
-      y: fallbackY,
-      clamped: true,
-      usedFallback: true,
-    };
-  }
-
-  calculateCenterBandFallbackPosition(
-    bounds,
-    random = this.getRandomScope('spawn')
-  ) {
-    const width = bounds?.width || GAME_WIDTH || 800;
-    const height = bounds?.height || GAME_HEIGHT || 600;
-    const horizontalMargin = Math.max(40, Math.floor(width * 0.25));
-    const verticalMargin = Math.max(40, Math.floor(height * 0.25));
-    const spawnRandom = this.resolveScopedRandom(
-      random,
-      'spawn',
-      'tactical-center-fallback'
-    );
-
-    const nextFloat = () => spawnRandom.float();
-
-    const jitter = (range) => (nextFloat() - 0.5) * range * 0.5;
-    const usableWidth = Math.max(0, width - horizontalMargin * 2);
-    const usableHeight = Math.max(0, height - verticalMargin * 2);
-
-    return {
-      x: clamp(
-        width / 2 + jitter(usableWidth),
-        horizontalMargin,
-        width - horizontalMargin
-      ),
-      y: clamp(
-        height / 2 + jitter(usableHeight),
-        verticalMargin,
-        height - verticalMargin
-      ),
-    };
-  }
-
-  isPositionWithinBounds(position, bounds, extraMargin = 0) {
-    if (
-      !position ||
-      !Number.isFinite(position.x) ||
-      !Number.isFinite(position.y)
-    ) {
-      return false;
-    }
-
-    const width = bounds?.width || GAME_WIDTH || 800;
-    const height = bounds?.height || GAME_HEIGHT || 600;
-
-    const minX = 0 - extraMargin;
-    const maxX = width + extraMargin;
-    const minY = 0 - extraMargin;
-    const maxY = height + extraMargin;
-
-    return (
-      position.x >= minX &&
-      position.x <= maxX &&
-      position.y >= minY &&
-      position.y <= maxY
-    );
-  }
-
-  calculateSafeSpawnPosition(
-    bounds,
-    player,
-    safeDistance,
-    random = this.getRandomScope('spawn')
-  ) {
-    const spawnRandom = this.resolveScopedRandom(
-      random,
-      'spawn',
-      'spawn-position'
-    );
-    const margin = 50;
-    let x,
-      y,
-      attempts = 0;
-    const maxAttempts = 10;
-
-    do {
-      // Random position at screen edges
-      const edge = spawnRandom.int(0, 3);
-
-      switch (edge) {
-        case 0: // Top
-          x = spawnRandom.range(0, bounds.width);
-          y = -margin;
-          break;
-        case 1: // Right
-          x = bounds.width + margin;
-          y = spawnRandom.range(0, bounds.height);
-          break;
-        case 2: // Bottom
-          x = spawnRandom.range(0, bounds.width);
-          y = bounds.height + margin;
-          break;
-        case 3: // Left
-          x = -margin;
-          y = spawnRandom.range(0, bounds.height);
-          break;
-      }
-
-      attempts++;
-
-      // Check distance from player
-      if (player && player.x !== undefined && player.y !== undefined) {
-        const dx = x - player.x;
-        const dy = y - player.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance >= safeDistance) {
-          break;
-        }
-      } else {
-        break; // No player, position is fine
-      }
-    } while (attempts < maxAttempts);
-
-    return { x, y };
-  }
-
-  /**
-   * Calculates spawn position on one of the 4 edges (legacy asteroid behavior).
-   * Replicates EnemySystem.spawnAsteroid() positioning logic (lines 2046-2083).
-   *
-   * @param {Object} worldBounds - World dimensions {width, height}
-   * @param {Object} random - Random service instance
-   * @returns {Object} Position {x, y}
-   */
-  calculateEdgeSpawnPosition(
-    worldBounds,
-    random = this.getRandomScope('spawn')
-  ) {
-    const width = worldBounds?.width || GAME_WIDTH || 800;
-    const height = worldBounds?.height || GAME_HEIGHT || 600;
-    const margin =
-      typeof ASTEROID_EDGE_SPAWN_MARGIN === 'number'
-        ? ASTEROID_EDGE_SPAWN_MARGIN
-        : 80;
-
-    let spawnRandom = this.resolveScopedRandom(
-      random,
-      'spawn',
-      'edge-position'
-    );
-
-    if (!spawnRandom || typeof spawnRandom.float !== 'function') {
-      const scopedFallback = this.createScopedRandom('spawn', 'edge-position');
-      if (
-        scopedFallback?.random &&
-        typeof scopedFallback.random.float === 'function'
-      ) {
-        spawnRandom = scopedFallback.random;
-      } else {
-        const baseRandom = this.getRandomService();
-        if (baseRandom && typeof baseRandom.fork === 'function') {
-          spawnRandom = baseRandom.fork(
-            'wave-manager:spawn:edge-position:fallback'
-          );
-        } else {
-          spawnRandom = new RandomService(0);
-        }
-      }
-    }
-
-    const getRange = (min, max) => {
-      if (typeof spawnRandom.range === 'function') {
-        return spawnRandom.range(min, max);
-      }
-      const span = max - min;
-      const base =
-        typeof spawnRandom.float === 'function' ? spawnRandom.float() : 0;
-      return min + span * base;
-    };
-
-    // Select side: 0=top, 1=right, 2=bottom, 3=left
-    const side =
-      typeof spawnRandom.int === 'function'
-        ? spawnRandom.int(0, 3)
-        : Math.min(3, Math.floor(getRange(0, 4)));
-
-    let x;
-    let y;
-
-    switch (side) {
-      case 0: // Top
-        x = getRange(0, width);
-        y = -margin;
-        break;
-      case 1: // Right
-        x = width + margin;
-        y = getRange(0, height);
-        break;
-      case 2: // Bottom
-        x = getRange(0, width);
-        y = height + margin;
-        break;
-      default: // Left (case 3)
-        x = -margin;
-        y = getRange(0, height);
-        break;
-    }
-
-    return { x, y };
-  }
-
-  /**
-   * Burst point for a surge: a random spot on the middle half of the field
-   * edge farthest from the player.
-   */
-  calculateSurgeEdge(bounds, player) {
-    const width = bounds?.width || GAME_WIDTH || 800;
-    const height = bounds?.height || GAME_HEIGHT || 600;
-    const px = Number.isFinite(player?.x) ? player.x : width / 2;
-    const py = Number.isFinite(player?.y) ? player.y : height / 2;
-
-    const edges = [
-      { side: 'top', distance: py },
-      { side: 'bottom', distance: height - py },
-      { side: 'left', distance: px },
-      { side: 'right', distance: width - px },
-    ];
-    const { side } = edges.reduce((best, edge) =>
-      edge.distance > best.distance ? edge : best
-    );
-
-    const { random } = this.createScopedRandom('spawn', 'surge-edge');
-    const length = side === 'top' || side === 'bottom' ? width : height;
-    return { side, along: random.range(0.25, 0.75) * length };
-  }
-
-  /**
-   * One surge unit near the burst point: asteroids just outside the edge
-   * (they drift in), support enemies just inside it.
-   */
-  calculateSurgePosition(bounds, edge, isAsteroid, random) {
-    const width = bounds?.width || GAME_WIDTH || 800;
-    const height = bounds?.height || GAME_HEIGHT || 600;
-    const depth = isAsteroid ? -ASTEROID_EDGE_SPAWN_MARGIN : SURGE_INSET;
-    const length =
-      edge.side === 'top' || edge.side === 'bottom' ? width : height;
-    const along = clamp(
-      edge.along + random.range(-SURGE_SPREAD, SURGE_SPREAD),
-      SURGE_INSET,
-      length - SURGE_INSET
-    );
-
-    switch (edge.side) {
-      case 'top':
-        return { x: along, y: depth };
-      case 'bottom':
-        return { x: along, y: height - depth };
-      case 'left':
-        return { x: depth, y: along };
-      default:
-        return { x: width - depth, y: along };
-    }
-  }
-
-  resolveScopedRandom(random, scope = 'base', label = scope) {
-    if (random && typeof random.float === 'function') {
-      return random;
-    }
-
-    const scoped = this.createScopedRandom(scope, label);
-    if (scoped?.random && typeof scoped.random.float === 'function') {
-      return scoped.random;
-    }
-
-    if (!this._fallbackRandom) {
-      this._fallbackRandom = new RandomService('wave-manager:fallback');
-    }
-
-    return this._fallbackRandom;
   }
 
   /**
@@ -2471,8 +958,8 @@ export class WaveManager {
 
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
-    this.endFieldEvents();
-    this.endLayerModifier();
+    this.layerEvents.endFieldEvents();
+    this.layerEvents.endLayerModifier();
     this.rocksActive = false;
     this.completedWaves += 1;
 
@@ -2528,7 +1015,7 @@ export class WaveManager {
   update(deltaTime) {
     if (!this.wavePaused) {
       if (this.waveInProgress) {
-        this.updateLayerSchedule(deltaTime);
+        this.schedule.updateLayerSchedule(deltaTime);
       } else {
         // Handle wave countdown
         if (this.waveCountdown > 0) {
@@ -2565,11 +1052,11 @@ export class WaveManager {
     this.spawnQueue = [];
     this.layerSchedule = [];
     this.layerElapsed = 0;
-    this.endFieldEvents();
-    this.endLayerModifier();
+    this.layerEvents.endFieldEvents();
+    this.layerEvents.endLayerModifier();
     this.spawnTimer = 0;
     this.waveCountdown = 0;
-    this.spawnDelayMultiplier = 1;
+    this.spawner.spawnDelayMultiplier = 1;
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
     // The run's first layer starts from the session (startLayerFromSession)
@@ -2580,170 +1067,15 @@ export class WaveManager {
     this.rocksSpawned = 0;
     this.layerRocks = 0;
     this.completedWaves = 0;
-    if (this.randomSequences) {
-      this.randomSequences.spawn = 0;
-      this.randomSequences.variants = 0;
-      this.randomSequences.fragments = 0;
+    const { randomSequences } = this.waveRandom;
+    if (randomSequences) {
+      randomSequences.spawn = 0;
+      randomSequences.variants = 0;
+      randomSequences.fragments = 0;
     }
 
     this.connectEventListeners();
 
     debugLog('[WaveManager] Reset');
-  }
-
-  createRandomScopes(random) {
-    let baseRandom = random;
-    if (!baseRandom || typeof baseRandom.fork !== 'function') {
-      baseRandom = new RandomService();
-      this._fallbackRandom = baseRandom;
-    }
-
-    const spawnLabel = this.randomScopeLabels?.spawn || 'wave-manager:spawn';
-    const variantLabel =
-      this.randomScopeLabels?.variants || 'wave-manager:variants';
-    const fragmentLabel =
-      this.randomScopeLabels?.fragments || 'wave-manager:fragments';
-
-    const scopes = {
-      base: baseRandom,
-      spawn: baseRandom.fork(spawnLabel),
-      variants: baseRandom.fork(variantLabel),
-      fragments: baseRandom.fork(fragmentLabel),
-    };
-
-    this.captureRandomScopeSeeds(scopes);
-
-    return scopes;
-  }
-
-  getRandomService() {
-    return this.getRandomScope('base');
-  }
-
-  // createRandomScopes captures the new scopes' seeds.
-  getRandomScope(scope) {
-    if (!this.randomScopes) {
-      this.randomScopes = this.createRandomScopes(this.random);
-    }
-
-    return this.randomScopes[scope] || this.randomScopes.base;
-  }
-
-  nextRandomSequence(scope) {
-    if (!this.randomSequences) {
-      this.randomSequences = {};
-    }
-
-    if (typeof this.randomSequences[scope] !== 'number') {
-      this.randomSequences[scope] = 0;
-    }
-
-    const sequence = this.randomSequences[scope];
-    this.randomSequences[scope] += 1;
-    return sequence;
-  }
-
-  createLegacyAsteroidScopedRandom() {
-    const generator = this.getRandomScope('spawn');
-    const sequence = this.nextRandomSequence('spawn');
-    const label = `enemy-system:asteroid-spawn:${sequence}`;
-
-    if (generator && typeof generator.fork === 'function') {
-      return {
-        random: generator.fork(label),
-        sequence,
-      };
-    }
-
-    const fallbackBase =
-      this.getRandomService() ||
-      this._fallbackRandom ||
-      new RandomService('wave-manager:fallback');
-
-    if (typeof fallbackBase.fork === 'function') {
-      return {
-        random: fallbackBase.fork(`${label}:fallback`),
-        sequence,
-      };
-    }
-
-    return {
-      random: fallbackBase,
-      sequence,
-    };
-  }
-
-  createScopedRandom(scope = 'spawn', label = scope) {
-    const generator = this.getRandomScope(scope);
-    const sequence = this.nextRandomSequence(scope);
-
-    if (generator && typeof generator.fork === 'function') {
-      return {
-        random: generator.fork(`wave-manager:${label}:${sequence}`),
-        sequence,
-      };
-    }
-
-    const fallback = this._fallbackRandom || new RandomService();
-    this._fallbackRandom = fallback;
-
-    return {
-      random: fallback.fork(`wave-manager:${label}:${sequence}`),
-      sequence,
-    };
-  }
-
-  captureRandomScopeSeed(scope, generator) {
-    if (!generator || typeof generator.seed !== 'number') {
-      return;
-    }
-
-    if (!this.randomScopeSeeds) {
-      this.randomScopeSeeds = {};
-    }
-
-    this.randomScopeSeeds[scope] = generator.seed >>> 0;
-  }
-
-  captureRandomScopeSeeds(scopes = this.randomScopes) {
-    if (!scopes) {
-      return;
-    }
-
-    Object.entries(scopes).forEach(([scope, generator]) => {
-      this.captureRandomScopeSeed(scope, generator);
-    });
-  }
-
-  reseedRandomScopes({ resetSequences = false } = {}) {
-    if (!this.randomScopes) {
-      this.randomScopes = this.createRandomScopes(this.random);
-    }
-
-    if (!this.randomScopeSeeds) {
-      this.randomScopeSeeds = {};
-      this.captureRandomScopeSeeds();
-    }
-
-    Object.entries(this.randomScopes).forEach(([scope, generator]) => {
-      if (
-        scope === 'base' ||
-        !generator ||
-        typeof generator.reset !== 'function'
-      ) {
-        return;
-      }
-
-      const storedSeed = this.randomScopeSeeds?.[scope];
-      if (storedSeed !== undefined) {
-        generator.reset(storedSeed);
-      }
-    });
-
-    if (resetSequences && this.randomSequences) {
-      Object.keys(this.randomSequences).forEach((scope) => {
-        this.randomSequences[scope] = 0;
-      });
-    }
   }
 }

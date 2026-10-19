@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Weaver from '../../../src/modules/enemies/types/Weaver.js';
+import { getContent } from '../../../src/content/registry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import {
   WEAVER_LAY_INTERVAL,
   WEAVER_MAX_TETHERS,
-} from '../../../src/data/enemies/weaver.js';
+} from '../../../src/content/enemies/weaver.js';
+
+const Weaver = recipeEnemyClass(getContent('enemies', 'weaver'));
 
 describe('Weaver', () => {
   it('lays a Tether every interval at its position, up to the live cap', () => {

@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
-import Husk from '../../../src/modules/enemies/types/Husk.js';
-import {
-  HUSK_COMPONENTS,
-  HUSK_CONFIG,
-} from '../../../src/data/enemies/husk.js';
+import { getContent } from '../../../src/content/registry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { ELITE_MODIFIERS } from '../../../src/data/enemies/elite.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
+
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
+const { config: HUSK_CONFIG, components: HUSK_COMPONENTS } = getContent(
+  'enemies',
+  'husk'
+);
 
 const createHusk = (config) => {
   const factory = new EnemyFactory({ eventBus: { emit: vi.fn() } });

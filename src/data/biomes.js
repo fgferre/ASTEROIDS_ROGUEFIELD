@@ -1,5 +1,6 @@
 // src/data/biomes.js
 
+import { listContent } from '../content/registry.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
 
 // The three places the run descends through (docs/NORTE.md §7 pillar 1),
@@ -15,68 +16,9 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // structures: 0..1 opacity of the intact Ring arcs and beams far below.
 // musicTheme: id of the procedural theme MusicMixer plays in this biome.
 // tint: the 2D renderer's full-canvas overlay (screen: lifts the blacks).
-export const BIOMES = deepFreeze([
-  {
-    id: 'outer-ring',
-    title: 'CHAPTER I — THE OUTER RING',
-    layers: [1, 5],
-    sky: ['#0b111c', '#020408'],
-    hazeColor: '#5078c8',
-    hazeDensity: 1,
-    veinColor: '#ffb347',
-    veinDensity: 0.05,
-    dustColor: '#d8dce4',
-    keyColor: '#fff1e2',
-    keyIntensity: 1.6,
-    fillColor: '#64748b',
-    fillIntensity: 0.35,
-    bloomScale: 1,
-    debris: 0.35,
-    structures: 0,
-    musicTheme: 'outer-ring',
-    tint: 'rgba(120, 150, 200, 0)',
-  },
-  {
-    id: 'dense-core',
-    title: 'CHAPTER II — THE DENSE CORE',
-    layers: [6, 10],
-    sky: ['#0b0a09', '#030303'],
-    hazeColor: '#5a4a5e',
-    hazeDensity: 0.45,
-    veinColor: '#d9701c',
-    veinDensity: 0.38,
-    dustColor: '#ffb35c',
-    keyColor: '#ffe2bc',
-    keyIntensity: 1.45,
-    fillColor: '#8a5a3a',
-    fillIntensity: 0.18,
-    bloomScale: 1.2,
-    debris: 1,
-    structures: 0,
-    musicTheme: 'dense-core',
-    tint: 'rgba(255, 140, 50, 0.08)',
-  },
-  {
-    id: 'wardens-reach',
-    title: "CHAPTER III — WARDEN'S REACH",
-    layers: [11, 15],
-    sky: ['#120a2a', '#040212'],
-    hazeColor: '#7a52ff',
-    hazeDensity: 1.25,
-    veinColor: '#3a2aa0',
-    veinDensity: 0.35,
-    dustColor: '#b8b0ff',
-    keyColor: '#e8e4ff',
-    keyIntensity: 1.35,
-    fillColor: '#5a6cff',
-    fillIntensity: 0.45,
-    bloomScale: 1.1,
-    debris: 0.15,
-    structures: 1,
-    musicTheme: 'wardens-reach',
-    tint: 'rgba(110, 80, 255, 0.09)',
-  },
-]);
+//
+// One file per biome in src/content/biomes/, listed by `order`.
+export const BIOMES = deepFreeze(listContent('biomes'));
 
 /** The biome of a layer (1-based); layers past the table stay in the last. */
 export function biomeForLayer(layer) {

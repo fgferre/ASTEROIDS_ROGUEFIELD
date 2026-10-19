@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Ram from '../../../src/modules/enemies/types/Ram.js';
+import { getContent } from '../../../src/content/registry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import {
   RAM_CHARGE_SECONDS,
   RAM_RECOVER_SECONDS,
   RAM_WINDUP_SECONDS,
-} from '../../../src/data/enemies/ram.js';
+} from '../../../src/content/enemies/ram.js';
+
+const Ram = recipeEnemyClass(getContent('enemies', 'ram'));
 
 const speedOf = (enemy) => Math.hypot(enemy.vx, enemy.vy);
 

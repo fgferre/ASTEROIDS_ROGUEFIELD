@@ -1,28 +1,32 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
-// damage (drawn instanced, rockInstances.js), and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
-// Bulwark, Caster, Shade, Leech), the three Wardens (Prime, Choir, Null; one view kind each,
-// picked by `bossKind`) and the three Heralds (Dust, Heat, Silence, picked by
-// `heraldKind`). Views are pooled per kind and keyed by entity id; a
-// view not seen in a frame is hidden and returned to its pool, unless its
-// enemy was killed (`markDead`): then it burns away first (dissolve.js).
+// damage (drawn instanced, rockInstances.js), the Wardens' machines (every
+// enemy of the content registry, in the look its file picks: a hand-made
+// `view`, else one built from its `visual`), the three Wardens (Prime, Choir,
+// Null; one view kind each, picked by `bossKind`) and the three Heralds (Dust,
+// Heat, Silence, picked by `heraldKind`). Views are pooled per kind and keyed
+// by entity id; a view not seen in a frame is hidden and returned to its
+// pool, unless its enemy was killed (`markDead`): then it burns away first
+// (dissolve.js).
 //
 // The looks live in visual families under ./enemies/ (rocks, machines,
-// heralds, wardens, affixes; the telegraph and the rock shader are parts two
-// families share). Each family is a factory over the toolkit (createKit),
+// recipes, heralds, wardens, affixes; the telegraph and the rock shader are
+// parts two families share). Each family is a factory over the toolkit (createKit),
 // never the mirror, and returns the create/update functions the mirror
 // dispatches to; the mirror keeps pooling, the per-frame loop, binding and
 // the toolkit.
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
+import { ELITE_AFFIXES } from '../../data/enemies/affixes.js';
+import { getContent, listContent } from '../../content/registry.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';
 import { createAffixViews } from './enemies/affixes.js';
 import { createHeraldViews } from './enemies/heralds.js';
 import { createMachineViews } from './enemies/machines.js';
+import { createRecipeViews } from './enemies/recipes.js';
 import { VARIANT_LOOKS, createRockViews } from './enemies/rocks.js';
 import { createTelegraphs } from './enemies/telegraph.js';
 import { createWardenViews } from './enemies/wardens.js';
@@ -38,18 +42,11 @@ const WARDEN_BURST = 24;
 // One seed for every baked map set (bakedMaps.js): the rocks' and the
 // Wardens' plates.
 const MAP_SEED = 4242.7;
+// Enemy types with a look: the rocks, every enemy of the content registry
+// (its id is its view kind) and the Wardens.
 export const KNOWN_KINDS = new Set([
   'asteroid',
-  'drone',
-  'hunter',
-  'mine',
-  'husk',
-  'ram',
-  'weaver',
-  'bulwark',
-  'caster',
-  'shade',
-  'leech',
+  ...listContent('enemies').map(({ id }) => id),
   'boss',
 ]);
 // Every view kind create() builds: a Warden's `bossKind` splits 'boss' in
@@ -132,11 +129,13 @@ export function markShadowCasters(root, minRadius = 0) {
  * - plateMaterial, darkMaterial, machineMaterial: the shared matte materials;
  *   tones: the hull/dark vertex tones of merged bodies; rimColors: threat,
  *   Elite and boss outlines; threatColor, bossColor: the accents;
- * - circleRim, sphere, smallSphere, warnRing, bulwarkPlate, bulwarkEdge,
- *   ghostDisc, fuseRing: the geometries two or more families draw;
+ * - circleRim, sphere, smallSphere, warnRing, ghostDisc, fuseRing: the
+ *   geometries two or more families draw; frontalPlate(halfArc): a frontal
+ *   plate's { plate, edge } geometries for that arc, bulwarkPlate and
+ *   bulwarkEdge those of the Shielded affix;
  * - view, emissive, setGain, tone, rim, glow, merged, body: the view helpers
  *   (a view record, accent tones, batched outline/glow anchors, one merged
- *   matte body per kind); accentOf: a view's accent colour;
+ *   matte body per look); accentOf: a view's accent colour;
  * - createTelegraph, updateTelegraph: field-plane telegraphs
  *   (enemies/telegraph.js), for the Ram and the Wardens.
  */
@@ -159,7 +158,7 @@ function createKit(THREE, scene, seeded, dissolve) {
       roughness: 0.8,
     })
   );
-  // The static matte parts of a machine, merged per kind (mergeStatic):
+  // The static matte parts of a machine, merged per look (mergeStatic):
   // their hull/dark/plate tones ride in vertex colours, one draw each.
   const machineMaterial = addRimLight(
     new THREE.MeshStandardMaterial({
@@ -195,32 +194,35 @@ function createKit(THREE, scene, seeded, dissolve) {
   const threatColor = colorOf(THREE, PALETTE.threat);
   const bossColor = colorOf(THREE, PALETTE.boss);
 
-  // Bulwark: wide frontal plate (±BULWARK_SHIELD_HALF_ARC) and its rim
-  // (the Shielded affix wears them too).
-  const half = BULWARK_SHIELD_HALF_ARC;
-  const plate = new THREE.Shape();
-  plate.absarc(0, 0, 1.02, -half, half, false);
-  plate.absarc(0, 0, 0.8, half, -half, true);
-  const bulwarkPlate = new THREE.ExtrudeGeometry(plate, {
-    depth: 0.42,
-    bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.04,
-    bevelSegments: 1,
-    curveSegments: 16,
-  });
-  bulwarkPlate.rotateX(-Math.PI / 2);
-  bulwarkPlate.translate(0, -0.12, 0);
-  const bulwarkEdge = new THREE.RingGeometry(
-    0.99,
-    1.08,
-    16,
-    1,
-    -half,
-    half * 2
+  // A frontal plate (±halfArc) and its rim, one pair per arc: an enemy with a
+  // `frontal-shield` draws the arc its recipe sets, and the Shielded affix the
+  // one in ELITE_AFFIXES.
+  const plates = new Map();
+  function frontalPlate(half) {
+    if (!plates.has(half)) {
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, 1.02, -half, half, false);
+      shape.absarc(0, 0, 0.8, half, -half, true);
+      const plate = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.42,
+        bevelEnabled: true,
+        bevelThickness: 0.05,
+        bevelSize: 0.04,
+        bevelSegments: 1,
+        curveSegments: 16,
+      });
+      plate.rotateX(-Math.PI / 2);
+      plate.translate(0, -0.12, 0);
+      const edge = new THREE.RingGeometry(0.99, 1.08, 16, 1, -half, half * 2);
+      edge.rotateX(-Math.PI / 2);
+      edge.translate(0, 0.37, 0);
+      plates.set(half, { plate, edge });
+    }
+    return plates.get(half);
+  }
+  const { plate: bulwarkPlate, edge: bulwarkEdge } = frontalPlate(
+    ELITE_AFFIXES.shielded.halfArc
   );
-  bulwarkEdge.rotateX(-Math.PI / 2);
-  bulwarkEdge.translate(0, 0.37, 0);
 
   // Swift ghosts and the Caster's fill; Volatile fuse and Caster rings.
   const ghostDisc = new THREE.CircleGeometry(1, 24);
@@ -286,7 +288,7 @@ function createKit(THREE, scene, seeded, dissolve) {
     return { anchor, tone };
   }
 
-  // One merged geometry per name, shared by every view of the kind.
+  // One merged geometry per name, shared by every view that draws it.
   function merged(name, parts) {
     let geometry = mergedGeometries.get(name);
     if (!geometry) {
@@ -330,6 +332,7 @@ function createKit(THREE, scene, seeded, dissolve) {
     sphere,
     smallSphere,
     warnRing,
+    frontalPlate,
     bulwarkPlate,
     bulwarkEdge,
     ghostDisc,
@@ -374,6 +377,7 @@ export class EnemyMirror {
     this.glows = new GlowBatch(THREE, scene);
     this.packView = (view) => this.packLive(view);
     this.machineViews = createMachineViews(this.kit);
+    this.recipeViews = createRecipeViews(this.kit);
     this.heraldViews = createHeraldViews(this.kit);
     this.wardenViews = createWardenViews(this.kit);
     this.affixViews = createAffixViews(this.kit);
@@ -414,26 +418,6 @@ export class EnemyMirror {
         return this.rockViews.createRock();
       case 'asteroid-burn':
         return this.rockViews.createBurnRock();
-      case 'drone':
-        return this.machineViews.createMote();
-      case 'hunter':
-        return this.machineViews.createSeeker();
-      case 'mine':
-        return this.machineViews.createTether();
-      case 'husk':
-        return this.machineViews.createHusk();
-      case 'ram':
-        return this.machineViews.createRam();
-      case 'weaver':
-        return this.machineViews.createWeaver();
-      case 'bulwark':
-        return this.machineViews.createBulwark();
-      case 'caster':
-        return this.machineViews.createCaster();
-      case 'shade':
-        return this.machineViews.createShade();
-      case 'leech':
-        return this.machineViews.createLeech();
       case 'boss':
       case 'boss-choir':
       case 'boss-null':
@@ -445,8 +429,30 @@ export class EnemyMirror {
       case 'herald-silence':
         return this.heraldViews.createSilence();
       default:
-        return this.createUnknown();
+        return this.createEnemy(kind);
     }
+  }
+
+  /**
+   * An enemy of the content registry in the look its file picks: `view`
+   * names a hand-made one (enemies/machines.js), else it is built from its
+   * `visual` (enemies/recipes.js; the default look without one). The view
+   * keeps its look, for the per-frame update and the bind.
+   */
+  createEnemy(kind) {
+    const enemy = getContent('enemies', kind);
+    if (!enemy) return this.createUnknown();
+    const look = enemy.view
+      ? this.machineViews.views[enemy.view]
+      : this.recipeViews.lookOf(enemy.visual);
+    if (!look) {
+      throw new Error(
+        `[EnemyMirror] ${kind}: no hand-made view '${enemy.view}'`
+      );
+    }
+    const view = look.create(kind);
+    view.look = look;
+    return view;
   }
 
   /**
@@ -599,7 +605,7 @@ export class EnemyMirror {
         warden = view;
       } else if (kind.startsWith('herald')) {
         this.heraldViews.updateHerald(view, enemy, time, flash);
-      } else this.updateMachine(view, enemy, kind, time, flash);
+      } else this.updateMachine(view, enemy, time, flash);
     }
 
     this.views.forEach((view, key) => {
@@ -685,8 +691,8 @@ export class EnemyMirror {
   }
 
   // Every machine: its pose, the Elite look and its affixes, then what its
-  // own kind lights or moves (enemies/machines.js updateMachine).
-  updateMachine(view, enemy, kind, time, flash) {
+  // own look lights or moves.
+  updateMachine(view, enemy, time, flash) {
     const { object } = view;
     object.scale.setScalar(enemy.radius || 12);
     object.rotation.y = -(enemy.rotation || 0);
@@ -695,7 +701,7 @@ export class EnemyMirror {
     if (enemy.affixes?.length || view.affix?.group.visible) {
       this.affixViews.updateAffixes(view, enemy, time);
     }
-    this.machineViews.updateMachine(view, enemy, kind, time, flash);
+    view.look?.update?.(view, enemy, time, flash);
   }
 
   // Elite look and affix badges (enemies/affixes.js).
@@ -712,11 +718,12 @@ export class EnemyMirror {
   }
 
   // A fresh or pooled view takes its enemy's seed-driven looks: a rock's
-  // shape, spin and variant, the Husk's seams, a Warden's parts made whole.
+  // shape, spin and variant, a Warden's parts made whole, what a machine's
+  // look takes from it (the Husk's seams).
   bind(view, enemy) {
     if (view.kind === 'asteroid') this.rockViews.bindRock(view, enemy);
-    else if (view.kind === 'husk') this.machineViews.bindHusk(view);
     else if (view.kind.startsWith('boss')) this.wardenViews.bindWarden(view);
+    else view.look?.bind?.(view);
   }
 
   release(key, view) {

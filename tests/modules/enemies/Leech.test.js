@@ -1,28 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GamePools } from '../../../src/core/GamePools.js';
-import {
-  LEECH_BURST_BONUS,
-  LEECH_DIGEST_INTERVAL,
-  LEECH_DRIFT_SPEED,
-  LEECH_FLEE_SPEED,
-  LEECH_FULL_XP,
-  LEECH_HEALTH,
-  LEECH_MAX_GROWTH,
-  LEECH_MAX_HEALTH_GAIN,
-  LEECH_PICKUP_ORBS,
-  LEECH_RADIUS,
-  LEECH_SENSE_RADIUS,
-  LEECH_SPEED,
-} from '../../../src/data/enemies/leech.js';
+import { getContent } from '../../../src/content/registry.js';
 import { ORB_VALUE } from '../../../src/data/enemies/asteroid-configs.js';
-import Leech from '../../../src/modules/enemies/types/Leech.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
+import { grow } from '../../../src/modules/enemies/behaviors/forage.js';
 import {
   createHeadlessGame,
   installDomStubs,
 } from '../../__helpers__/headlessGame.js';
 
 const STEP = 1 / 60;
+
+const Leech = recipeEnemyClass(getContent('enemies', 'leech'));
+const { config, behaviors } = getContent('enemies', 'leech');
+const { health: LEECH_HEALTH, radius: LEECH_RADIUS } = config;
+const {
+  bonus: LEECH_BURST_BONUS,
+  digest: LEECH_DIGEST_INTERVAL,
+  drift: LEECH_DRIFT_SPEED,
+  flee: LEECH_FLEE_SPEED,
+  fullXP: LEECH_FULL_XP,
+  maxGrowth: LEECH_MAX_GROWTH,
+  maxHealthGain: LEECH_MAX_HEALTH_GAIN,
+  pickupOrbs: LEECH_PICKUP_ORBS,
+  sense: LEECH_SENSE_RADIUS,
+  hunt: LEECH_SPEED,
+} = behaviors.forage;
 
 // A field of loose orbs the Leech can see, eat and burst back out.
 const setup = ({ ship = { x: 400, y: 300 }, orbs = [] } = {}) => {
@@ -83,7 +87,7 @@ describe('Leech', () => {
 
   it('caps its growth and its health gain', () => {
     const { leech } = setup();
-    for (let i = 0; i < 100; i += 1) leech.grow(1);
+    for (let i = 0; i < 100; i += 1) grow(leech, behaviors.forage, 1);
     expect(leech.radius).toBe(LEECH_RADIUS + LEECH_MAX_GROWTH);
     expect(leech.maxHealth).toBe(LEECH_HEALTH + LEECH_MAX_HEALTH_GAIN);
     expect(leech.health).toBe(LEECH_HEALTH + LEECH_MAX_HEALTH_GAIN);

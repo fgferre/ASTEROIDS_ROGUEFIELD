@@ -11,7 +11,7 @@ export const BULLET_SPEED = 550; // [NEO-ARCADE] Faster bullets (was 450)
 // the canonical numeric value is mirrored from `core/GameConstants.js`
 // (`BULLET_SIZE = 3`) but inlined here because `core/GameConstants.js`
 // re-exports this module, so importing back would create a circular module
-// load. There is a tests/integration/aim-regression.test.js assertion
+// load. There is a tests/integration/aim/ assertion
 // (F10 RED/GREEN) that pins both exports to the same numeric value.
 export const COMBAT_BULLET_RADIUS = 3;
 

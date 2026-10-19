@@ -1,0 +1,22 @@
+// A biome: three per run, five layers each (field meanings in src/data/biomes.js).
+export default {
+  id: 'wardens-reach',
+  order: 3,
+  title: "CHAPTER III — WARDEN'S REACH",
+  layers: [11, 15],
+  sky: ['#120a2a', '#040212'],
+  hazeColor: '#7a52ff',
+  hazeDensity: 1.25,
+  veinColor: '#3a2aa0',
+  veinDensity: 0.35,
+  dustColor: '#b8b0ff',
+  keyColor: '#e8e4ff',
+  keyIntensity: 1.35,
+  fillColor: '#5a6cff',
+  fillIntensity: 0.45,
+  bloomScale: 1.1,
+  debris: 0.15,
+  structures: 1,
+  musicTheme: 'wardens-reach',
+  tint: 'rgba(110, 80, 255, 0.09)',
+};

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EnemyEffects } from '../../../src/modules/effects/EnemyEffects.js';
 
-const createEnemyEffects = (density = 1) => {
+const createEnemyEffects = (density = 1, hitStops = []) => {
   const particleEffects = {
     particles: [],
     createShockwaveEffect: () => {},
@@ -19,7 +19,7 @@ const createEnemyEffects = (density = 1) => {
     motionReduced: () => false,
     addScreenShake: () => {},
     addScreenFlash: () => {},
-    addHitStop: () => {},
+    addHitStop: (kind) => hitStops.push(kind),
   });
   return { effects, particleEffects };
 };
@@ -35,6 +35,21 @@ describe('EnemyEffects', () => {
 
     effects.createMineExplosion({ enemy: mine, radius: 110 });
     expect(particleEffects.particles).toHaveLength(afterFirst);
+  });
+
+  it('plays the death each enemy file names; one that names none dies as debris', () => {
+    const hitStops = [];
+    const { effects, particleEffects } = createEnemyEffects(1, hitStops);
+    ['drone', 'hunter', 'mine'].forEach((type) =>
+      effects.createAsteroidExplosion({ type, x: 10, y: 10 })
+    );
+    expect(hitStops).toEqual(['spark-burst', 'shock-burst', 'blast']);
+
+    particleEffects.particles.length = 0;
+    effects.createAsteroidExplosion({ type: 'husk', x: 10, y: 10, radius: 20 });
+    // six chips, each with a lit chip beside it, and no hit-stop
+    expect(particleEffects.particles).toHaveLength(12);
+    expect(hitStops).toHaveLength(3);
   });
 
   it('scales an asteroid burst by the particle density it is given', () => {

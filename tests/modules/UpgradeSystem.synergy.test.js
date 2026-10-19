@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import { listContent } from '../../src/content/registry.js';
 import {
   UPGRADE_FAMILIES,
   FAMILY_SYNERGY_THRESHOLD,
@@ -39,7 +40,11 @@ function listSourceFiles(dir) {
 
 describe('upgrade families', () => {
   it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
-    expect(UPGRADE_LIBRARY).toHaveLength(41);
+    // Every card file plus every weapon's own card, nothing else.
+    expect(UPGRADE_LIBRARY).toHaveLength(
+      listContent('cards').length +
+        listContent('weapons').filter((weapon) => weapon.card).length
+    );
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
       if (upgrade.cursed) {

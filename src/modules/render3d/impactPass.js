@@ -1,7 +1,8 @@
 // Big hits kick the lens: a brief radial chromatic aberration (R out, B in,
-// zero at the centre) plus a short radial blur, as a ShaderPass between the
-// bloom and the sRGB output. The same pass lays a fine film grain and a
-// soft vignette over every frame when the quality preset allows them.
+// zero at the centre) plus a short radial blur, as a ShaderPass after the
+// bloom. The same pass lays a fine film grain and a soft vignette over every
+// frame when the quality preset allows them, and it ends in the sRGB step,
+// so the output pass only runs on frames it does not (sceneSetup.js).
 // ImpactKick holds the decaying strength and the grain's per-frame seed
 // (plain JS, so it runs in Node tests); createImpactPass builds the pass.
 
@@ -15,6 +16,21 @@ const IMPACT_FLOOR = 0.02;
 export const FILM_GRAIN = 0.025;
 export const VIGNETTE = 0.3;
 
+/**
+ * GLSL for a pass that reads the composer's scene: `sceneAt(uv)` is the
+ * scene plus the bloom's half-res result (`tBloom`, × `uBloom`: 1 on frames
+ * the bloom ran), the sum UnrealBloomPass's own last draw would have left
+ * in the scene target (additive, × its alpha). sceneSetup.js foldBloom.
+ */
+export const SCENE_READ = `
+uniform sampler2D tDiffuse;
+uniform sampler2D tBloom;
+uniform float uBloom;
+vec3 sceneAt(vec2 uv) {
+  vec4 bloom = texture2D(tBloom, uv);
+  return texture2D(tDiffuse, uv).rgb + uBloom * bloom.a * bloom.rgb;
+}`;
+
 const IMPACT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
@@ -24,6 +40,8 @@ const IMPACT_SHADER = {
     uGrain: { value: 0 },
     uSeed: { value: 0 },
     uVignette: { value: 0 },
+    tBloom: { value: null },
+    uBloom: { value: 0 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -32,7 +50,7 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`,
   fragmentShader: `
-uniform sampler2D tDiffuse;
+${SCENE_READ}
 uniform vec2 uTexel;
 uniform float uAberration;
 uniform float uBlur;
@@ -53,13 +71,13 @@ void main() {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < 6; i++) {
       vec2 uv = vUv - dir * uBlur * float(i) / 5.0;
-      sum.r += texture2D(tDiffuse, uv + shift).r;
-      sum.g += texture2D(tDiffuse, uv).g;
-      sum.b += texture2D(tDiffuse, uv - shift).b;
+      sum.r += sceneAt(uv + shift).r;
+      sum.g += sceneAt(uv).g;
+      sum.b += sceneAt(uv - shift).b;
     }
     color = sum / 6.0;
   } else {
-    color = texture2D(tDiffuse, vUv).rgb;
+    color = sceneAt(vUv);
   }
   // 0 at the centre, 1 in the corners
   color *= 1.0 - uVignette * smoothstep(0.25, 1.0, length(dir) * 1.4142);
@@ -69,7 +87,7 @@ void main() {
     0.0
   );
   color = g * g;
-  gl_FragColor = vec4(color, 1.0);
+  gl_FragColor = LinearTosRGB(vec4(color, 1.0));
 }`,
 };
 

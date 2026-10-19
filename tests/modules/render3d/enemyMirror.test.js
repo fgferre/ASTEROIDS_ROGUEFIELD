@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { ENEMY_TYPES } from '../../../src/data/constants/visual.js';
+import { listContent } from '../../../src/content/registry.js';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
 import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
@@ -28,9 +28,35 @@ new Function(
 )(THREE, {});
 
 describe('EnemyMirror', () => {
-  it('has a dedicated 3D look for every registered enemy type', () => {
+  it('builds every registered enemy in the look its content file picks', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
-    for (const type of [...Object.keys(ENEMY_TYPES), 'asteroid', 'boss']) {
+    const roster = listContent('enemies');
+    for (const { id, view, visual } of roster) {
+      expect(KNOWN_KINDS.has(id), id).toBe(true);
+      const built = mirror.create(id);
+      expect(built.kind, id).toBe(id);
+      expect(built.look, id).toBe(
+        view
+          ? mirror.machineViews.views[view]
+          : mirror.recipeViews.lookOf(visual)
+      );
+    }
+    // the ten machines keep the views drawn by hand for them
+    expect(
+      Object.fromEntries(roster.map(({ id, view }) => [id, view]))
+    ).toMatchObject({
+      drone: 'mote',
+      hunter: 'seeker',
+      mine: 'tether',
+      husk: 'husk',
+      ram: 'ram',
+      weaver: 'weaver',
+      bulwark: 'bulwark',
+      caster: 'caster',
+      shade: 'shade',
+      leech: 'leech',
+    });
+    for (const type of ['asteroid', 'boss']) {
       expect(KNOWN_KINDS.has(type), type).toBe(true);
       expect(mirror.create(type).kind, type).toBe(type);
     }

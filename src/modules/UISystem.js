@@ -10,11 +10,6 @@ import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
-import {
-  applyCanvasResolution,
-  resolveDevicePixelRatio,
-} from '../core/viewport.js';
-import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
@@ -28,6 +23,8 @@ import { TacticalHud } from './ui/TacticalHud.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { HangarScreen } from './ui/HangarScreen.js';
 import { CodexScreen } from './ui/CodexScreen.js';
+import { cacheStaticNodes } from './ui/domRefs.js';
+import { ViewportScaling } from './ui/viewportScaling.js';
 import {
   TransmissionQueue,
   bossRushTransmission,
@@ -67,13 +64,6 @@ class UISystem extends BaseSystem {
     this.timePulseTimeout = null;
     this.killsPulseTimeout = null;
     this.levelPulseTimeout = null;
-    this.resizeRaf = null;
-    this.currentHudBaseScale = 1;
-    this.currentHudAutoScale = 1;
-    this.currentCanvasScale = 1;
-    this.currentCanvasDpr = 0;
-    this.canvasBaseSize = { width: GAME_WIDTH, height: GAME_HEIGHT };
-    this.handleResize = this.handleResize.bind(this);
 
     this.transmissions = null;
     this.transmissionRaf = null;
@@ -117,7 +107,11 @@ class UISystem extends BaseSystem {
       isReady: false,
     };
 
-    this.domRefs = this.cacheStaticNodes();
+    this.domRefs = cacheStaticNodes();
+    this.viewport = new ViewportScaling({
+      refs: this.domRefs,
+      hud: () => this.tacticalHud.layout,
+    });
     this.tacticalHud = new TacticalHud({
       refs: { gameField: this.domRefs.gameField, gameUi: this.domRefs.gameUi },
       player: () => this.getService('player'),
@@ -136,11 +130,7 @@ class UISystem extends BaseSystem {
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('settings', isOpen, payload),
-      setHudBaseScale: (scale) => {
-        this.currentHudBaseScale = scale;
-        this.updateHudScale();
-        this.requestViewportScaleUpdate();
-      },
+      setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
     });
     this.levelUpScreen = new LevelUpScreen({
@@ -245,7 +235,7 @@ class UISystem extends BaseSystem {
     this.mainMenu.refreshMenuStatus();
     this.mainMenu.refreshBossRushLock();
     this.settingsPanel.bootstrapSettingsState();
-    this.initializeViewportScaling();
+    this.viewport.initializeViewportScaling();
   }
 
   getService(name) {
@@ -254,136 +244,6 @@ class UISystem extends BaseSystem {
 
   resolveSettingsService() {
     return this.getService('settings');
-  }
-
-  cacheStaticNodes() {
-    return {
-      gameUi: document.getElementById('game-ui') || null,
-      gameField: document.querySelector('#game-ui .game-field') || null,
-      canvas: document.getElementById('game-canvas') || null,
-      controls: document.querySelector('#game-ui .controls') || null,
-      wave: {
-        container: null,
-        title: null,
-        timerValue: null,
-        progressTrack: null,
-        progressBar: null,
-        enemies: null,
-        totalKills: null,
-      },
-      levelUp: {
-        container: document.getElementById('upgrades-container') || null,
-        text: document.getElementById('levelup-text') || null,
-        rerollBtn: document.getElementById('levelup-reroll-btn') || null,
-        banishBtn: document.getElementById('levelup-banish-btn') || null,
-        banishHint: document.getElementById('levelup-banish-hint') || null,
-      },
-      gameOver: {
-        time: document.getElementById('gameover-time') || null,
-        wave: document.getElementById('gameover-wave') || null,
-        kills: document.getElementById('gameover-kills') || null,
-        combo: document.getElementById('gameover-combo') || null,
-        level: document.getElementById('gameover-level') || null,
-        killer: document.getElementById('gameover-killer') || null,
-        quote: document.getElementById('gameover-quote') || null,
-        location: document.getElementById('gameover-location') || null,
-        salvage: document.getElementById('gameover-salvage') || null,
-        build: document.getElementById('gameover-build') || null,
-        seed: document.getElementById('gameover-seed') || null,
-        copySeedBtn: document.getElementById('gameover-copy-seed-btn') || null,
-        retryBtn: document.getElementById('retry-game-btn') || null,
-        restartBtn: document.getElementById('restart-game-btn') || null,
-        quitBtn: document.getElementById('quit-game-btn') || null,
-      },
-      victory: {
-        title: document.getElementById('victory-title') || null,
-        time: document.getElementById('victory-time') || null,
-        wave: document.getElementById('victory-wave') || null,
-        kills: document.getElementById('victory-kills') || null,
-        combo: document.getElementById('victory-combo') || null,
-        level: document.getElementById('victory-level') || null,
-        quote: document.getElementById('victory-quote') || null,
-        build: document.getElementById('victory-build') || null,
-        synergies: document.getElementById('victory-synergies') || null,
-        best: document.getElementById('victory-best') || null,
-        salvage: document.getElementById('victory-salvage') || null,
-        continueBtn: document.getElementById('victory-continue-btn') || null,
-        restartBtn: document.getElementById('victory-restart-btn') || null,
-        quitBtn: document.getElementById('victory-quit-btn') || null,
-      },
-      pause: {
-        container: document.getElementById('pause-screen') || null,
-        resumeBtn: document.getElementById('pause-resume-btn') || null,
-        settingsBtn: document.getElementById('pause-settings-btn') || null,
-        exitBtn: document.getElementById('pause-exit-btn') || null,
-        location: document.getElementById('pause-build-location') || null,
-        build: document.getElementById('pause-build-block') || null,
-        tools: document.getElementById('pause-build-tools') || null,
-        seed: document.getElementById('pause-run-seed') || null,
-      },
-      codex: {
-        overlay: document.getElementById('codex-screen') || null,
-        list: document.getElementById('codex-list') || null,
-        count: document.getElementById('codex-count') || null,
-        openBtn: document.getElementById('menu-codex-btn') || null,
-        backBtn: document.getElementById('codex-back-btn') || null,
-        closeBtn: document.getElementById('codex-close-btn') || null,
-        tabs: Array.from(document.querySelectorAll('[data-codex-tab]')),
-      },
-      hangar: {
-        overlay: document.getElementById('hangar-screen') || null,
-        list: document.getElementById('hangar-list') || null,
-        hulls: document.getElementById('hangar-hulls') || null,
-        hullLock: document.getElementById('hangar-hull-lock') || null,
-        balance: document.getElementById('hangar-balance') || null,
-        openBtn: document.getElementById('menu-hangar-btn') || null,
-        backBtn: document.getElementById('hangar-back-btn') || null,
-        closeBtn: document.getElementById('hangar-close-btn') || null,
-      },
-      settings: {
-        overlay: document.getElementById('settings-screen') || null,
-        tabs: document.getElementById('settings-tabs') || null,
-        container: document.getElementById('settings-content') || null,
-        resetBtn: document.getElementById('settings-reset-btn') || null,
-        closeButtons: [
-          document.getElementById('settings-close-btn'),
-          document.getElementById('settings-close-footer-btn'),
-        ].filter(Boolean),
-      },
-      credits: {
-        overlay: document.getElementById('credits-screen') || null,
-        primaryAction: document.getElementById('credits-back-btn') || null,
-        closeButtons: [
-          document.getElementById('credits-close-btn'),
-          document.getElementById('credits-back-btn'),
-        ].filter(Boolean),
-      },
-      minimap: {
-        container: document.getElementById('hud-minimap') || null,
-        canvas: document.getElementById('minimap-canvas') || null,
-        range: document.getElementById('minimap-range') || null,
-        context: null,
-      },
-      threatIndicators: {
-        container:
-          document.getElementById('threat-indicators-container') || null,
-        overlay: document.getElementById('threat-indicators-overlay') || null,
-      },
-      combo: {
-        container: document.getElementById('hud-combo') || null,
-        value: document.getElementById('combo-display') || null,
-        multiplier: document.getElementById('combo-multiplier') || null,
-      },
-      menu: {
-        screen: document.getElementById('menu-screen') || null,
-        shipSelector: document.getElementById('menu-ship-selector') || null,
-        shipSelectorOptions:
-          document.getElementById('menu-ship-selector-options') || null,
-        status: document.getElementById('menu-status') || null,
-        bossRushBtn: document.getElementById('boss-rush-btn') || null,
-        bossRushLock: document.getElementById('boss-rush-lock') || null,
-      },
-    };
   }
 
   /** EnemySystem pushes the boss bar's state to the ui service. */
@@ -423,155 +283,6 @@ class UISystem extends BaseSystem {
     if (stage === 1) {
       this.queueTransmission(bossRushTransmission());
     }
-  }
-
-  initializeViewportScaling() {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    this.requestViewportScaleUpdate(true);
-    window.addEventListener('resize', this.handleResize, { passive: true });
-  }
-
-  handleResize() {
-    this.tacticalHud.layout?.invalidatePanelCorners();
-    this.requestViewportScaleUpdate();
-  }
-
-  requestViewportScaleUpdate(force = false) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (force) {
-      if (this.resizeRaf) {
-        window.cancelAnimationFrame(this.resizeRaf);
-        this.resizeRaf = null;
-      }
-      this.updateViewportScaling({ force: true });
-      return;
-    }
-
-    if (this.resizeRaf) {
-      return;
-    }
-
-    this.resizeRaf = window.requestAnimationFrame(() => {
-      this.resizeRaf = null;
-      this.updateViewportScaling();
-    });
-  }
-
-  updateViewportScaling(options = {}) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const { canvas, gameUi, gameField } = this.domRefs;
-    if (!canvas || !gameUi) {
-      return;
-    }
-
-    const baseWidth = this.canvasBaseSize.width;
-    const baseHeight = this.canvasBaseSize.height;
-
-    const viewportHeight =
-      window.innerHeight ||
-      document.documentElement?.clientHeight ||
-      baseHeight;
-    const viewportWidth =
-      window.innerWidth || document.documentElement?.clientWidth || baseWidth;
-
-    const computedStyles = window.getComputedStyle(gameUi);
-    const paddingTop = parseFloat(computedStyles.paddingTop || '0') || 0;
-    const paddingBottom = parseFloat(computedStyles.paddingBottom || '0') || 0;
-    const paddingLeft =
-      parseFloat(
-        computedStyles.paddingLeft || computedStyles.paddingInlineStart || '0'
-      ) || 0;
-    const paddingRight =
-      parseFloat(
-        computedStyles.paddingRight || computedStyles.paddingInlineEnd || '0'
-      ) || 0;
-    // Overlay now lives above the canvas. Do not reserve extra
-    // vertical space for HUD; only account for container paddings.
-    const reservedVertical = paddingTop + paddingBottom;
-    const availableHeight = viewportHeight - reservedVertical;
-    const MIN_SCALE = 0.45;
-    const MAX_SCALE = 1.9;
-    const heightScale = Math.max(
-      MIN_SCALE,
-      Math.min(MAX_SCALE, availableHeight / baseHeight)
-    );
-
-    const horizontalReserve = paddingLeft + paddingRight + 48;
-    const availableWidth = viewportWidth - horizontalReserve;
-    const widthScale = Math.max(
-      MIN_SCALE,
-      Math.min(MAX_SCALE, availableWidth / baseWidth)
-    );
-
-    const scale = Math.min(heightScale, widthScale);
-
-    const dpr = resolveDevicePixelRatio();
-    if (
-      !options.force &&
-      dpr === this.currentCanvasDpr &&
-      Math.abs(scale - this.currentCanvasScale) < 0.005
-    ) {
-      return;
-    }
-
-    this.currentCanvasScale = scale;
-    this.currentCanvasDpr = dpr;
-
-    const scaledWidth = Math.round(baseWidth * scale);
-    const scaledHeight = Math.round(baseHeight * scale);
-
-    // Backing store at native resolution; drawing stays in 800×600 logical
-    // units through the base transform the renderer applies each frame.
-    applyCanvasResolution(canvas, scaledWidth, scaledHeight, dpr);
-    canvas.style.width = `${scaledWidth}px`;
-    canvas.style.height = `${scaledHeight}px`;
-    canvas.style.maxWidth = '100%';
-    canvas.style.maxHeight = '100%';
-
-    if (gameUi && gameUi instanceof HTMLElement) {
-      gameUi.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
-      gameUi.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
-      const hudMaxWidth = Math.max(Math.min(scaledWidth + 320, 1600), 560);
-      gameUi.style.setProperty('--hud-max-width', `${hudMaxWidth}px`);
-    }
-
-    if (gameField && gameField instanceof HTMLElement) {
-      gameField.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
-      gameField.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
-    }
-
-    const hudAutoScale = Math.min(1.25, Math.max(0.82, scale));
-    this.updateHudScale(hudAutoScale);
-  }
-
-  updateHudScale(autoScale = null) {
-    if (Number.isFinite(autoScale)) {
-      this.currentHudAutoScale = autoScale;
-    }
-
-    const baseScale = Number.isFinite(this.currentHudBaseScale)
-      ? this.currentHudBaseScale
-      : 1;
-    const auto = Number.isFinite(this.currentHudAutoScale)
-      ? this.currentHudAutoScale
-      : 1;
-    const effective = Math.max(0.6, Math.min(1.2, baseScale * auto));
-    const root = document.documentElement;
-
-    if (root) {
-      root.style.setProperty('--hud-scale-auto', auto.toFixed(3));
-      root.style.setProperty('--hud-scale-effective', effective.toFixed(3));
-    }
-    this.tacticalHud.layout?.invalidatePanelCorners();
   }
 
   /** Queues a Warden transmission and keeps the frame loop that plays it. */

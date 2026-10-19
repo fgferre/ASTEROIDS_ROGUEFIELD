@@ -1,3 +1,12 @@
+// src/modules/enemies/types/BossEnemy.js
+//
+// Warden Prime, and the base WardenChoir and WardenNull build on: stats from
+// the wave and the upgrades, the three-phase update, the telegraph, the boss
+// projectiles, the pattern draws, damage and defeat. The phases, the attacks
+// (fan, volley, charge, minions), the invulnerability, the damage flash and
+// the player lookup live in ../boss/; the methods the Wardens, EnemySnapshots
+// and the tests call stay here and hand the boss to them.
+
 import {
   BOSS_COMPONENTS,
   BOSS_CONFIG,
@@ -11,6 +20,14 @@ import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
+import * as Phases from '../boss/phases.js';
+import * as Invulnerability from '../boss/invulnerability.js';
+import * as Fan from '../boss/fan.js';
+import * as Volley from '../boss/volley.js';
+import * as Charge from '../boss/charge.js';
+import * as Minions from '../boss/minions.js';
+import * as PlayerTarget from '../boss/playerTarget.js';
+import * as DamageFlash from '../boss/damageFlash.js';
 
 const SOURCE_CONFIG = BOSS_CONFIG || {};
 
@@ -39,7 +56,6 @@ const BASE_CONFIG = {
   volleyVariance: 0.2,
   volleyProjectileSpeed: 320,
   volleySpread: 0.12,
-  minionTypes: ['drone', 'hunter'],
   spawnCooldown: 6.5,
   spawnVariance: 1.1,
   chargeCooldown: 6.2,
@@ -70,11 +86,8 @@ const BOSS_DEFAULTS = {
   phaseColors: Array.isArray(SOURCE_CONFIG?.phaseColors)
     ? [...SOURCE_CONFIG.phaseColors]
     : [...BASE_CONFIG.phaseColors],
-  minionTypes:
-    Array.isArray(SOURCE_CONFIG?.minionTypes) &&
-    SOURCE_CONFIG.minionTypes.length
-      ? [...SOURCE_CONFIG.minionTypes]
-      : [...BASE_CONFIG.minionTypes],
+  // Its content file (src/content/bosses/prime.js) names them.
+  minionTypes: [...(SOURCE_CONFIG.minionTypes ?? [])],
   phaseThresholds:
     Array.isArray(SOURCE_CONFIG?.phaseThresholds) &&
     SOURCE_CONFIG.phaseThresholds.length
@@ -115,7 +128,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.spawnCooldown = BOSS_DEFAULTS.spawnCooldown ?? 8;
     this.spawnVariance = BOSS_DEFAULTS.spawnVariance ?? 0;
-    this.minionTypes = [...(BOSS_DEFAULTS.minionTypes ?? ['drone'])];
+    this.minionTypes = [...BOSS_DEFAULTS.minionTypes];
 
     this.chargeCooldown = BOSS_DEFAULTS.chargeCooldown ?? 6;
     this.chargeDuration = BOSS_DEFAULTS.chargeDuration ?? 1;
@@ -277,7 +290,7 @@ export class BossEnemy extends BaseEnemy {
     this.minionTypes =
       Array.isArray(config.minionTypes) && config.minionTypes.length
         ? [...config.minionTypes]
-        : [...(defaults.minionTypes || ['drone'])];
+        : [...defaults.minionTypes];
     this.spawnCooldown = config.spawnCooldown ?? defaults.spawnCooldown ?? 6.5;
     this.spawnVariance = config.spawnVariance ?? defaults.spawnVariance ?? 0;
 
@@ -352,7 +365,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
-    this.resetFeedbackState();
+    DamageFlash.resetFeedbackState(this);
     this.applyPhaseMovement(true);
 
     GameDebugLogger.log('SPAWN', 'BossEnemy initialized', {
@@ -451,61 +464,11 @@ export class BossEnemy extends BaseEnemy {
   }
 
   syncPhaseThresholds(force = false) {
-    const maxHealth = Number.isFinite(this.maxHealth) ? this.maxHealth : null;
-    if (!Number.isFinite(maxHealth)) {
-      this.phaseHealthThresholds = [];
-      this._phaseThresholdMaxHealth = null;
-      return;
-    }
-
-    if (
-      !force &&
-      this._phaseThresholdMaxHealth === maxHealth &&
-      this.phaseHealthThresholds.length
-    ) {
-      return;
-    }
-
-    const thresholds = Array.isArray(this.phaseThresholds)
-      ? this.phaseThresholds
-      : [];
-    this.phaseHealthThresholds = thresholds.map((ratio) => {
-      const clamped = Math.min(Math.max(ratio, 0), 1);
-      return maxHealth * clamped;
-    });
-    this._phaseThresholdMaxHealth = maxHealth;
-    this.nextPhaseIndex = Math.min(
-      Math.max(0, this.currentPhase || 0),
-      this.phaseHealthThresholds.length
-    );
+    Phases.syncPhaseThresholds(this, force);
   }
 
   applyPhaseMovement(force = false) {
-    if (!Array.isArray(this.movementPhases) || !this.movementPhases.length) {
-      if (force) {
-        this._lastMovementPhase = null;
-      }
-      return;
-    }
-
-    const phaseIndex = Math.min(
-      Math.max(0, this.currentPhase || 0),
-      this.movementPhases.length - 1
-    );
-
-    if (!force && this._lastMovementPhase === phaseIndex) {
-      return;
-    }
-
-    const phaseConfig = this.movementPhases[phaseIndex] || {};
-    const { strategy, ...movementOverrides } = phaseConfig;
-
-    if (strategy) {
-      this.movementStrategy = strategy;
-    }
-
-    this.movementConfig = { ...movementOverrides };
-    this._lastMovementPhase = phaseIndex;
+    Phases.applyPhaseMovement(this, force);
   }
 
   onUpdate(deltaTime) {
@@ -542,7 +505,7 @@ export class BossEnemy extends BaseEnemy {
     this.updateInvulnerability(deltaTime);
     this.updateFeedbackState(deltaTime);
 
-    const target = this.resolvePlayerTarget();
+    const target = PlayerTarget.resolvePlayerTarget(this);
 
     switch (this.currentPhase) {
       case 0:
@@ -561,53 +524,8 @@ export class BossEnemy extends BaseEnemy {
     this.updateSpreadCycle(deltaTime, target);
   }
 
-  // The fan is announced by a wedge for `spreadWindup` seconds, then fired
-  // at the player's position at that moment.
   updateSpreadCycle(deltaTime, target) {
-    if (this.spreadWindupTimer > 0) {
-      this.spreadWindupTimer -= deltaTime;
-      if (target?.position) {
-        this.chargeAimAngle = this.angleTo(target.position);
-        if (this.telegraph?.type === 'fan') {
-          const origin = this.attackOrigin();
-          this.telegraph.x = origin.x;
-          this.telegraph.y = origin.y;
-          this.telegraph.angle = this.chargeAimAngle;
-          this.telegraph.timer = Math.max(0, this.spreadWindupTimer);
-        }
-      }
-      if (this.spreadWindupTimer <= 0) {
-        this.clearTelegraph();
-        if (target?.position) {
-          this.fireSpreadPattern(target.position);
-        }
-        this.spreadTimer = this.computeSpreadCooldown();
-      }
-      return;
-    }
-
-    this.spreadTimer -= deltaTime;
-    if (this.spreadTimer <= 0 && target?.position) {
-      const windup = Math.max(0, this.spreadWindup || 0);
-      if (windup <= 0) {
-        this.fireSpreadPattern(target.position);
-        this.spreadTimer = this.computeSpreadCooldown();
-        return;
-      }
-      this.spreadWindupTimer = windup;
-      this.chargeAimAngle = this.angleTo(target.position);
-      const origin = this.attackOrigin();
-      this.setTelegraph({
-        type: 'fan',
-        x: origin.x,
-        y: origin.y,
-        angle: this.chargeAimAngle,
-        arc: Math.max(0, this.spreadArc ?? 0),
-        length: 180,
-        duration: windup,
-        timer: windup,
-      });
-    }
+    Fan.updateSpreadCycle(this, deltaTime, target);
   }
 
   // Where shots and the fan wedge start: the hull here; a Warden with
@@ -638,8 +556,8 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseAssault(deltaTime, target) {
-    this.updateVolleyCycle(deltaTime, target);
-    this.updateMinionSpawns(deltaTime);
+    Volley.updateVolleyCycle(this, deltaTime, target);
+    Minions.updateMinionSpawns(this, deltaTime);
   }
 
   handlePhaseFinale(deltaTime, target) {
@@ -647,274 +565,19 @@ export class BossEnemy extends BaseEnemy {
   }
 
   updateInvulnerability(deltaTime) {
-    if (!this.invulnerable) {
-      this._invulnLog = 0;
-      return;
-    }
-
-    if (!Number.isFinite(deltaTime)) {
-      return;
-    }
-
-    const oldTimer = this.invulnerabilityTimer;
-    this.invulnerabilityTimer -= deltaTime;
-
-    if (this.invulnerabilityTimer <= 0) {
-      this.invulnerable = false;
-      this.invulnerabilityTimer = 0;
-      this._invulnLog = 0;
-
-      this.emitInvulnerabilityState(false, {
-        reason: 'timer-expired',
-        timer: 0,
-        previous: Number.isFinite(oldTimer)
-          ? Number(oldTimer.toFixed(3))
-          : oldTimer,
-        force: true,
-      });
-    } else if (!this._invulnLog || Date.now() - this._invulnLog > 500) {
-      GameDebugLogger.log('STATE', 'Boss invulnerable', {
-        id: this.id,
-        phase: this.currentPhase,
-        timeRemaining: Number(this.invulnerabilityTimer.toFixed(3)),
-      });
-      this._invulnLog = Date.now();
-    }
-  }
-
-  emitInvulnerabilityState(invulnerable, context = {}) {
-    const force = Boolean(context.force);
-    const timer = Number.isFinite(context.timer)
-      ? Math.max(0, Number(context.timer))
-      : Number.isFinite(this.invulnerabilityTimer)
-        ? Math.max(0, Number(this.invulnerabilityTimer))
-        : null;
-
-    if (!force && this._lastInvulnerabilityState === invulnerable) {
-      return;
-    }
-
-    this._lastInvulnerabilityState = invulnerable;
-
-    const payload = {
-      enemy: this,
-      enemyId: this.id,
-      wave: this.wave,
-      phase: this.currentPhase,
-      invulnerable,
-      invulnerabilityTimer: timer,
-      remaining: timer,
-      reason: context.reason ?? null,
-      invulnerabilitySource: context.reason ?? null,
-      previousTimer: context.previous ?? null,
-    };
-
-    const eventBus = this.getEventBus();
-    if (eventBus?.emit) {
-      eventBus.emit('boss-invulnerability-changed', payload);
-    }
-
-    GameDebugLogger.log('STATE', 'Boss invulnerability state changed', {
-      id: this.id,
-      phase: this.currentPhase,
-      invulnerable,
-      remaining: timer,
-      reason: context.reason ?? null,
-      previous: context.previous ?? null,
-    });
-  }
-
-  updateVolleyCycle(deltaTime, target) {
-    if (this.volleyShotsRemaining > 0) {
-      this.volleyShotTimer -= deltaTime;
-      if (this.volleyShotTimer <= 0 && target?.position) {
-        this.fireVolleyShot(target.position);
-        this.volleyShotsRemaining -= 1;
-        this.volleyShotTimer = this.volleyShotDelay;
-      }
-      return;
-    }
-
-    this.volleyTimer -= deltaTime;
-    if (this.volleyTimer <= 0 && target?.position) {
-      this.startVolley();
-      this.fireVolleyShot(target.position);
-      this.volleyShotsRemaining -= 1;
-      this.volleyShotTimer = this.volleyShotDelay;
-    }
-  }
-
-  startVolley() {
-    this.volleyShotsRemaining = Math.max(0, Math.floor(this.volleyBurstSize));
-    this.volleyTimer = this.computeVolleyCooldown();
-  }
-
-  updateMinionSpawns(deltaTime) {
-    if (!this.minionTypes.length) {
-      return;
-    }
-
-    this.spawnTimer -= deltaTime;
-    if (this.spawnTimer > 0) {
-      return;
-    }
-
-    this.spawnTimer = this.computeSpawnCooldown();
-    this.spawnMinion();
+    Invulnerability.updateInvulnerability(this, deltaTime);
   }
 
   updateChargeState(deltaTime, target) {
-    switch (this.chargeState) {
-      case 'windup':
-        // Slow to a near stop, keep tracking the player, show the lane.
-        this.vx *= Math.max(0, 1 - 6 * deltaTime);
-        this.vy *= Math.max(0, 1 - 6 * deltaTime);
-        if (target?.position) {
-          this.chargeAimAngle = this.angleTo(target.position);
-          this.rotation = this.chargeAimAngle;
-          if (this.telegraph?.type === 'charge') {
-            this.telegraph.angle = this.chargeAimAngle;
-          }
-        }
-        this.chargeStateTimer -= deltaTime;
-        if (this.telegraph?.type === 'charge') {
-          this.telegraph.timer = Math.max(0, this.chargeStateTimer);
-        }
-        if (this.chargeStateTimer <= 0) {
-          this.launchCharge();
-        }
-        break;
-      case 'charging':
-        this.chargeStateTimer -= deltaTime;
-        if (this.chargeStateTimer <= 0) {
-          this.chargeState = 'recover';
-          this.chargeStateTimer = this.chargeRecovery;
-          this.applyPhaseMovement(true);
-          this.triggerChargeBurst('end');
-        }
-        break;
-      case 'recover':
-        this.chargeStateTimer -= deltaTime;
-        if (this.chargeStateTimer <= 0) {
-          this.chargeState = 'idle';
-          this.chargeTimer = this.chargeCooldown;
-        }
-        break;
-      default:
-        this.chargeTimer -= deltaTime;
-        if (this.chargeTimer <= 0) {
-          this.beginCharge(target);
-        }
-        break;
-    }
+    Charge.updateChargeState(this, deltaTime, target);
   }
 
   beginCharge(target) {
-    const aimPosition = target?.position || null;
-    this.chargeAimAngle = aimPosition ? this.angleTo(aimPosition) : 0;
-
-    // The phase movement would steer and cap the dash; drift on vx/vy instead
-    // until the charge ends.
-    this.movementStrategy = 'linear';
-
-    const windup = Math.max(0, this.chargeWindup || 0);
-    if (windup <= 0) {
-      this.launchCharge();
-      return;
-    }
-
-    const chargeSpeed = (this.speed || 0) * (this.chargeSpeedMultiplier || 3);
-    this.chargeState = 'windup';
-    this.chargeStateTimer = windup;
-    this.rotation = this.chargeAimAngle;
-    this.setTelegraph({
-      type: 'charge',
-      angle: this.chargeAimAngle,
-      length: chargeSpeed * (this.chargeDuration || 1),
-      duration: windup,
-      timer: windup,
-    });
-  }
-
-  launchCharge() {
-    this.clearTelegraph();
-    const angle =
-      this.chargeAimAngle + this.sampleVariance(this.chargeAimVariance);
-
-    const chargeSpeed = (this.speed || 0) * (this.chargeSpeedMultiplier || 3);
-    this.vx = Math.cos(angle) * chargeSpeed;
-    this.vy = Math.sin(angle) * chargeSpeed;
-    this.rotation = angle;
-
-    this.chargeState = 'charging';
-    this.chargeStateTimer = this.chargeDuration;
-    this.triggerChargeBurst('start');
-  }
-
-  triggerChargeBurst(stage) {
-    if (!this.chargeProjectileCount || this.chargeProjectileCount <= 0) {
-      return;
-    }
-
-    const count = Math.max(1, Math.floor(this.chargeProjectileCount));
-    const angleStep = (Math.PI * 2) / count;
-    const baseOffset = this.sampleVariance(this.chargeProjectileVariance);
-
-    for (let i = 0; i < count; i += 1) {
-      const angle = baseOffset + i * angleStep;
-      this.emitBossProjectile({
-        angle,
-        speed: this.chargeProjectileSpeed,
-        damage: this.projectileDamage,
-        pattern: 'charge-burst',
-        meta: { stage },
-      });
-    }
+    Charge.beginCharge(this, target);
   }
 
   updateFeedbackState(deltaTime) {
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    if (this.damageFlashTimer > 0) {
-      this.damageFlashTimer = Math.max(0, this.damageFlashTimer - deltaTime);
-      if (this.damageFlashTimer === 0) {
-        this.damageFlashStrength = 0;
-      }
-    }
-  }
-
-  fireSpreadPattern(targetPosition) {
-    const baseAngle = this.angleTo(targetPosition);
-
-    const count = Math.max(1, Math.floor(this.spreadProjectileCount));
-    const arc = Math.max(0, this.spreadArc ?? 0);
-    const startAngle = baseAngle - arc / 2;
-    const step = count > 1 ? arc / (count - 1) : 0;
-
-    for (let i = 0; i < count; i += 1) {
-      const angle =
-        startAngle + step * i + this.sampleVariance(this.spreadAngleVariance);
-      this.emitBossProjectile({
-        angle,
-        speed: this.spreadProjectileSpeed,
-        damage: this.projectileDamage,
-        pattern: 'spread',
-      });
-    }
-  }
-
-  fireVolleyShot(targetPosition) {
-    const angle =
-      this.angleTo(targetPosition) + this.sampleVariance(this.volleySpread);
-
-    this.emitBossProjectile({
-      angle,
-      speed: this.volleyProjectileSpeed,
-      damage: this.projectileDamage,
-      pattern: 'volley',
-    });
+    DamageFlash.updateFeedbackState(this, deltaTime);
   }
 
   emitBossProjectile({
@@ -962,137 +625,11 @@ export class BossEnemy extends BaseEnemy {
   }
 
   spawnMinion() {
-    if (!this.system || !this.minionTypes.length) {
-      return;
-    }
-
-    const type = this.pickMinionType();
-    if (!type) {
-      return;
-    }
-
-    const angle =
-      requireRandom(this.patternRandom, 'enemy.boss.pattern').float() *
-      Math.PI *
-      2;
-    const distance = this.radius + 40;
-
-    const minion = this.spawnChild(type, {
-      x: this.x + Math.cos(angle) * distance,
-      y: this.y + Math.sin(angle) * distance,
-      randomParentScope: `boss:${this.id}`,
-    });
-    if (!minion) {
-      console.warn(
-        `[BossEnemy] Could not spawn minion of type '${type}'. Check factory configuration.`
-      );
-      return;
-    }
-
-    minion.addTag?.('minion');
-    minion.spawnSource = 'boss-minion';
-    minion.spawnedByBossId = this.id;
-    minion.isBossMinion = true;
-    minion.metadata = {
-      ...minion.metadata,
-      spawnSource: 'boss-minion',
-      spawnedByBossId: this.id,
-    };
-
-    GameDebugLogger.log('STATE', 'Boss minion spawned', {
-      bossId: this.id,
-      wave: this.wave,
-      minionId: minion.id,
-      minionType: type,
-      position: { x: Math.round(minion.x), y: Math.round(minion.y) },
-    });
+    Minions.spawnMinion(this);
   }
 
   pickMinionType() {
-    if (!this.minionTypes.length) {
-      return null;
-    }
-
-    const index = requireRandom(this.minionRandom, 'enemy.boss.minion').int(
-      0,
-      this.minionTypes.length - 1
-    );
-    return this.minionTypes[index] || null;
-  }
-
-  resolvePlayerTarget() {
-    const player =
-      this.system && typeof this.system.getCachedPlayer === 'function'
-        ? this.system.getCachedPlayer()
-        : null;
-    let position =
-      this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
-        ? this.system.getPlayerPositionSnapshot(player)
-        : player?.position || null;
-
-    if (
-      (!position ||
-        !Number.isFinite(position.x) ||
-        !Number.isFinite(position.y)) &&
-      player &&
-      Number.isFinite(player.x) &&
-      Number.isFinite(player.y)
-    ) {
-      position = { x: player.x, y: player.y };
-    }
-
-    if (
-      (!position ||
-        !Number.isFinite(position.x) ||
-        !Number.isFinite(position.y)) &&
-      player &&
-      player.position &&
-      Number.isFinite(player.position.x) &&
-      Number.isFinite(player.position.y)
-    ) {
-      position = { x: player.position.x, y: player.position.y };
-    }
-
-    const logPayload = {
-      hasSystem: !!this.system,
-      hasGetCachedPlayer: typeof this.system?.getCachedPlayer === 'function',
-      hasPlayer: !!player,
-      hasPosition: !!position,
-      playerPosition: position || player?.position || null,
-    };
-
-    if (!this._playerResolveLogged) {
-      GameDebugLogger.log('UPDATE', 'Boss resolvePlayerTarget', logPayload);
-      this._playerResolveLogged = true;
-    }
-
-    if (!player && !this._missingPlayerReferenceLogged) {
-      GameDebugLogger.log(
-        'ERROR',
-        'Boss resolvePlayerTarget missing player reference',
-        logPayload
-      );
-      this._missingPlayerReferenceLogged = true;
-    } else if (player && this._missingPlayerReferenceLogged) {
-      GameDebugLogger.log(
-        'STATE',
-        'Boss resolvePlayerTarget player reference restored',
-        {
-          playerPosition: position || player?.position || null,
-        }
-      );
-      this._missingPlayerReferenceLogged = false;
-    }
-
-    if (!position && !this._missingTargetLogged) {
-      GameDebugLogger.log('ERROR', 'Boss could not resolve player position', {
-        ...logPayload,
-        playerKeys: player ? Object.keys(player) : null,
-      });
-      this._missingTargetLogged = true;
-    }
-
-    return { player, position: position || null };
+    return Minions.pickMinionType(this.minionTypes, this.minionRandom);
   }
 
   computeSpreadCooldown() {
@@ -1166,7 +703,7 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    this.triggerDamageFlash(amount);
+    DamageFlash.triggerDamageFlash(this, amount);
 
     GameDebugLogger.log('STATE', 'Boss damaged', {
       id: this.id,
@@ -1180,93 +717,12 @@ export class BossEnemy extends BaseEnemy {
     this.evaluatePhaseTransition();
   }
 
-  triggerDamageFlash(amount = 0) {
-    const normalizedDamage = Number.isFinite(amount) ? Math.max(0, amount) : 0;
-    const maxHealth =
-      Number.isFinite(this.maxHealth) && this.maxHealth > 0
-        ? this.maxHealth
-        : 1;
-    const relativeDamage = Math.min(
-      1,
-      normalizedDamage / Math.max(24, maxHealth * 0.12)
-    );
-
-    this.damageFlashStrength = Math.max(
-      this.damageFlashStrength || 0,
-      0.45 + relativeDamage * 0.55
-    );
-    this.damageFlashTimer = Math.max(
-      this.damageFlashTimer || 0,
-      this.damageFlashDuration
-    );
-  }
-
   evaluatePhaseTransition() {
-    this.syncPhaseThresholds();
-    if (!this.phaseHealthThresholds.length) {
-      return;
-    }
-
-    while (
-      this.nextPhaseIndex < this.phaseHealthThresholds.length &&
-      this.health <= this.phaseHealthThresholds[this.nextPhaseIndex]
-    ) {
-      this.advancePhase();
-    }
+    Phases.evaluatePhaseTransition(this);
   }
 
   advancePhase() {
-    if (this.currentPhase >= this.phaseCount - 1) {
-      this.nextPhaseIndex = this.phaseHealthThresholds.length;
-      return;
-    }
-
-    const previousPhase = this.currentPhase;
-    this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
-    this.nextPhaseIndex += 1;
-    this.applyPhaseMovement(true);
-
-    this.invulnerable = true;
-    this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
-
-    this.emitInvulnerabilityState(true, {
-      reason: 'phase-transition',
-      timer: this.invulnerabilityTimer,
-    });
-
-    this.spreadTimer = this.computeSpreadCooldown();
-    this.volleyTimer = this.computeVolleyCooldown();
-    this.spawnTimer = this.computeSpawnCooldown();
-    this.chargeTimer = this.chargeCooldown;
-    this.chargeState = 'idle';
-    this.chargeStateTimer = 0;
-
-    const eventBus = this.getEventBus();
-    if (eventBus?.emit) {
-      eventBus.emit('boss-phase-changed', {
-        enemy: this,
-        phase: this.currentPhase,
-        wave: this.wave,
-        health: this.health,
-        maxHealth: this.maxHealth,
-      });
-    }
-
-    const healthPercent =
-      Number.isFinite(this.maxHealth) && this.maxHealth > 0
-        ? Number(((this.health / this.maxHealth) * 100).toFixed(1))
-        : null;
-
-    GameDebugLogger.log('STATE', 'Boss phase transition', {
-      id: this.id,
-      oldPhase: previousPhase,
-      newPhase: this.currentPhase,
-      health: this.health,
-      maxHealth: this.maxHealth,
-      healthPercent,
-      invulnerable: !!this.invulnerable,
-      invulnerabilityDuration: this.invulnerabilityTimer,
-    });
+    Phases.advancePhase(this);
   }
 
   onDestroyed(source, context = {}) {
@@ -1288,9 +744,9 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
-    this.resetFeedbackState();
+    DamageFlash.resetFeedbackState(this);
 
-    this.emitInvulnerabilityState(false, {
+    Invulnerability.emitInvulnerabilityState(this, false, {
       reason: 'destroyed',
       timer: 0,
       force: true,
@@ -1317,11 +773,6 @@ export class BossEnemy extends BaseEnemy {
     if (destructionError) {
       throw destructionError;
     }
-  }
-
-  resetFeedbackState() {
-    this.damageFlashTimer = 0;
-    this.damageFlashStrength = 0;
   }
 
   resetForPool() {
@@ -1355,7 +806,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
-    this.resetFeedbackState();
+    DamageFlash.resetFeedbackState(this);
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };

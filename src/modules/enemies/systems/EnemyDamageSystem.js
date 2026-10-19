@@ -666,8 +666,9 @@ class EnemyDamageSystem {
 }
 
 /**
- * Extra fragments from a Harmonic beam kill: `count` copies of the first
- * seam in `split.descriptors` (generateFragments, read before the kill), each
+ * Extra fragments from a beam kill: `count` (the beam's `extraFragments`)
+ * copies of the first seam in `split.descriptors` (generateFragments, read
+ * before the kill), each
  * turned half a step from it so it does not overlap its siblings, given a
  * variant, taken from the pool, registered, and added to the layer's rock
  * plan (WaveManager.addExtraRocks). `enemies` is the enemy service; `split`

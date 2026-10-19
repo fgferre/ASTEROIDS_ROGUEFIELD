@@ -10,7 +10,7 @@ import {
 import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
-import { WEAPONS } from '../../src/data/weapons.js';
+import { WEAPONS, firePattern } from '../../src/data/weapons.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import {
@@ -23,6 +23,16 @@ import {
 const DAMAGE = 10;
 const NOSE = 16;
 const PLAYER = { x: 100, y: 300 };
+const BEAM = firePattern(WEAPONS.harmonic, 'beam');
+// A lance landing at (200, 300), as Projectiles builds it.
+const lanceHit = () => ({
+  kind: 'lance',
+  projectile: WEAPONS.lance.projectile,
+  x: 200,
+  y: 300,
+  damage: DAMAGE,
+  hit: false,
+});
 
 const card = (id) => UPGRADE_LIBRARY.find((entry) => entry.id === id);
 
@@ -123,13 +133,13 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     takeCard(eventBus, 'thermal_lens');
     expect(fireLance(combat).damage).toBeCloseTo(DAMAGE * 1.15, 6);
 
-    const length = WEAPONS.harmonic.beam.length;
+    const length = BEAM.length;
     const far = makeEnemy('far', PLAYER.x + NOSE + length * 1.3, 300);
     const harmonic = makeCombat([far]);
     takeCard(harmonic.eventBus, 'thermal_lens');
-    harmonic.eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'harmonic' });
+    harmonic.eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
     const stats = { multishot: 1, damage: DAMAGE };
-    for (let shot = 0; shot < WEAPONS.harmonic.beam.every; shot += 1) {
+    for (let shot = 0; shot < BEAM.every; shot += 1) {
       harmonic.combat.handleShooting(1, stats);
     }
     expect(harmonic.combat.bullets[0].damage).toBe(DAMAGE);
@@ -208,11 +218,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     const chained = makeCombat(line);
     chained.combat.evolveWeapon('arc');
     takeCard(chained.eventBus, 'chain_capacitor');
-    chained.combat.processBulletHit(
-      { kind: 'lance', x: 200, y: 300, damage: DAMAGE, hit: false },
-      line[0],
-      chained.enemies
-    );
+    chained.combat.processBulletHit(lanceHit(), line[0], chained.enemies);
     expect(line[1].health).toBeLessThan(100);
     expect(line[2].health).toBeLessThan(100);
 
@@ -221,11 +227,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     takeCard(plain.eventBus, 'chain_capacitor');
     const hits = 2000;
     for (let i = 0; i < hits; i += 1) {
-      plain.combat.processBulletHit(
-        { kind: 'lance', x: 200, y: 300, damage: DAMAGE, hit: false },
-        wall,
-        plain.enemies
-      );
+      plain.combat.processBulletHit(lanceHit(), wall, plain.enemies);
     }
     const doubled = (1e9 - wall.health) / DAMAGE - hits;
     expect(doubled / hits).toBeGreaterThan(0.07);

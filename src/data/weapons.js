@@ -1,5 +1,6 @@
 // src/data/weapons.js
 
+import { listContent } from '../content/registry.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { PALETTE } from './constants/palette.js';
 
@@ -11,71 +12,26 @@ import { PALETTE } from './constants/palette.js';
 // read on an additive trail).
 export const WEAPON_COLOR_INCENDIARY = '#ffc98a';
 export const WEAPON_COLOR_GRAVITIC = '#b38cff';
-export const WEAPON_COLOR_BEAM_MID = '#ffe2b0';
-// Scatter Coil: the white-hot core of a flak tracer and the flash of its
-// burst, both warmer than PALETTE.text so they read as the amber family.
-export const WEAPON_COLOR_FLAK_CORE = '#fff3dc';
-export const WEAPON_COLOR_FLAK_BURST = '#ffd28f';
 
 /**
- * The three weapons. `lance` is the default; `harmonic` and `scatter` come
- * from a card each.
+ * The weapons by id, one file each in src/content/weapons/ (lance.js says
+ * what a weapon declares); `order` is the registry's bookkeeping. A run starts
+ * with DEFAULT_WEAPON_ID, the lowest order; the others come from their card.
  */
-export const WEAPONS = deepFreeze({
-  lance: {
-    id: 'lance',
-    name: 'Amber Lance',
-    chip: 'LANCE',
-    description: 'Short amber traces from the nose.',
-  },
-  harmonic: {
-    id: 'harmonic',
-    name: 'Harmonic Plasma Lance',
-    chip: 'HARMONIC',
-    description: 'Every 4th shot is a short plasma beam that splits rocks.',
-    beam: {
-      every: 4, // shots; the 4th is the beam
-      length: 220, // logical px from the nose
-      width: 10, // logical px
-      duration: 0.18, // seconds on screen (damage lands on the first frame)
-      damageMultiplier: 2.2, // × lance damage, to everything in the segment
-      extraFragments: 1, // large/medium rocks killed by the beam
-      cooldownPenalty: 0.25, // seconds added to the next shot's cooldown
-      kick: 0.2, // 3D impact pass
-      flashRadius: 90, // 3D light flash, as a shockwave of this radius
-    },
-    colors: {
-      glow: PALETTE.shot,
-      mid: WEAPON_COLOR_BEAM_MID,
-      core: PALETTE.text,
-    },
-  },
-  scatter: {
-    id: 'scatter',
-    name: 'Scatter Coil',
-    chip: 'SCATTER',
-    description: 'A fan of short flak bolts that burst into shrapnel.',
-    // proposta 18/10: the flak volley, for the owner to judge by playing.
-    flak: {
-      bolts: 5, // per volley; each Multishot shot past the first adds one
-      maxBolts: 9,
-      fan: 26, // degrees, edge bolt to edge bolt
-      speedMultiplier: 0.9, // × lance speed
-      range: 180, // logical px from the muzzle, where a bolt that hit nothing bursts
-      damageMultiplier: 0.45, // × lance damage, a bolt's direct hit
-      burstRadius: 40, // logical px, to the enemy's rim
-      burstDamageMultiplier: 0.6, // × lance damage, once per enemy per volley
-      cooldownMultiplier: 1.6, // × the lance's cooldown between volleys
-      burstDuration: 0.22, // seconds on screen
-      trailPoints: 4, // a short tracer, not a lance trail
-    },
-    colors: {
-      tracer: PALETTE.shot,
-      core: WEAPON_COLOR_FLAK_CORE,
-      burst: WEAPON_COLOR_FLAK_BURST,
-    },
-  },
-});
+export const WEAPONS = deepFreeze(
+  Object.fromEntries(
+    listContent('weapons').map(({ order: _order, ...weapon }) => [
+      weapon.id,
+      weapon,
+    ])
+  )
+);
+export const DEFAULT_WEAPON_ID = listContent('weapons')[0].id;
+
+/** A weapon's first `fire` entry of this pattern ('beam', ...), or null. */
+export function firePattern(weapon, pattern) {
+  return weapon.fire.find((entry) => entry.pattern === pattern) ?? null;
+}
 
 // How a lance looks before any evolution. `trailLength`, `width` and
 // `headLength` are multipliers; an evolution overrides colours and

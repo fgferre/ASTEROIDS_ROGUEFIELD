@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Husk from '../../../src/modules/enemies/types/Husk.js';
-import { HUSK_SPLIT_COUNT } from '../../../src/data/enemies/husk.js';
+import { getContent } from '../../../src/content/registry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
+
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
+const { count: HUSK_SPLIT_COUNT } = getContent('enemies', 'husk').behaviors[
+  'spawn-on-death'
+];
 
 describe('Husk', () => {
   it('splits into three Motes moving outward when it dies', () => {

@@ -1,36 +1,24 @@
 // src/data/codex.js
 
 import { deepFreeze } from '../utils/deepFreeze.js';
-import { ENEMY_TYPES } from './constants/visual.js';
+import { listContent } from '../content/registry.js';
 import { BOSS_BY_LAYER, WARDEN_KINDS } from './enemies/boss.js';
 import { HERALD_KINDS } from './enemies/herald.js';
-import { LAYERS } from './layers.js';
+import { LAYERS, enemiesFor } from './layers.js';
 
 // The Codex (docs/NORTE.md §7 pillar 5): every enemy the pilot can meet, in
 // the order the descent brings them. Names come from the enemy data; the
 // first layer from src/data/layers.js, so the table cannot drift from the run.
 // glyph: SVG body in a -16..16 box; `eye` marks the lit part (the silhouette
 // of an undiscovered entry draws it dark).
+// A roster enemy's lore, hint and glyph come from its content file (`codex`);
+// one without them shows its name and DEFAULT_GLYPH, with no lore or hint.
+
+const DEFAULT_GLYPH = '<circle r="9"/><circle class="eye" r="3"/>';
 
 const GLYPHS = {
   asteroid:
     '<polygon points="-11,-4 -6,-11 4,-12 11,-5 12,5 5,11 -5,12 -12,4"/>',
-  drone: '<circle r="9"/><circle class="eye" r="3"/>',
-  husk: '<polygon points="-13,-2 -8,-11 3,-13 12,-6 13,6 4,13 -8,11"/><circle class="eye" cx="-2" cy="1" r="2"/><circle class="eye" cx="5" cy="-4" r="1.5"/>',
-  mine: '<path fill="none" stroke-width="2.5" d="M0 -5 L0 -14 M4.3 2.5 L12 7 M-4.3 2.5 L-12 7"/><circle r="6"/><circle class="eye" r="2"/>',
-  ram: '<polygon points="14,0 -9,-11 -4,0 -9,11"/><circle class="eye" cx="7" r="2"/>',
-  hunter:
-    '<polygon points="15,0 0,-7 -13,0 0,7"/><circle class="eye" cx="8" r="2.2"/>',
-  bulwark:
-    '<path d="M5 -13 A13 13 0 0 1 5 13 L1 9 A9 9 0 0 0 1 -9 Z"/><circle cx="-5" r="7"/><circle class="eye" cx="-5" r="2"/>',
-  weaver:
-    '<circle r="12" fill="none" stroke-dasharray="3 3"/><circle r="5"/><circle class="eye" r="2"/>',
-  caster:
-    '<circle r="8"/><rect x="3" y="-3.5" width="11" height="7" rx="1"/><circle class="eye" cx="11" r="2"/>',
-  shade:
-    '<polygon points="14,0 1,-6 -11,-12 -6,-3 -9,0 -6,3 -11,12 1,6"/><circle class="eye" cx="5" r="2"/>',
-  leech:
-    '<ellipse rx="14" ry="10"/><path fill="none" d="M-6 -8.8 Q-4 0 -6 8.8 M5 -9.4 Q7 0 5 9.4"/><ellipse class="eye" cx="-0.5" rx="4.5" ry="3.5"/><circle cx="13" r="2.5"/>',
   'warden-prime':
     '<circle r="11" fill="none" stroke-width="5" stroke-dasharray="9.5 2"/><circle class="eye" r="4.5"/>',
   'warden-choir':
@@ -53,12 +41,15 @@ export function codexIdOf(entity) {
   return entity.type;
 }
 
+// The first layer that asks for one of the enemy's roles once it can come.
 function firstLayerOf(kind) {
   const index = LAYERS.findIndex(
-    (layer) =>
+    (layer, i) =>
       (kind === 'asteroid' && layer.rocks > 0) ||
-      layer.roster.some((entry) => entry.kind === kind) ||
-      layer.surges.some((surge) => surge.kinds.includes(kind))
+      [
+        ...layer.roster.map(({ role }) => role),
+        ...layer.surges.flatMap(({ roles }) => roles),
+      ].some((role) => enemiesFor(role, i + 1).some(({ id }) => id === kind))
   );
   return index + 1;
 }
@@ -69,13 +60,13 @@ function wardenLayerOf(kind) {
   );
 }
 
-const support = (type, lore, hint) => ({
-  id: type,
-  name: ENEMY_TYPES[type].displayName,
-  lore,
-  hint,
-  glyph: GLYPHS[type],
-  fromLayer: firstLayerOf(type),
+const support = ({ id, config, codex = {} }) => ({
+  id,
+  name: config.displayName,
+  lore: codex.lore ?? '',
+  hint: codex.hint ?? '',
+  glyph: codex.glyph ?? DEFAULT_GLYPH,
+  fromLayer: firstLayerOf(id),
   warden: false,
   herald: false,
 });
@@ -114,50 +105,17 @@ export const CODEX_ENTRIES = deepFreeze(
       warden: false,
       herald: false,
     },
+    // Before the Heralds: a machine met on a Herald's layer is listed first.
+    ...listContent('enemies').map(support),
     herald(
       'dust',
       'We sent the Dust ahead to speak for us. It speaks in walls. It counts every stone in the Outer Ring and lays them where a pilot must not pass; what it cannot count, it buries.',
       'Every few seconds it raises a wall of rock. The slits light first.'
     ),
-    support(
-      'drone',
-      'The smallest of the Ring’s keepers. It wakes in swarms and never alone.',
-      'Fast and fragile. Fires one shot at a time, aimed ahead of you; change course.'
-    ),
     warden(
       'prime',
       'The first gate of the Ring, six plates around a violet core. It keeps the count of everything that enters: stone, light, pilot. Breaking it does not close the ledger; it turns the page.',
       'Each phase breaks a plate. The red band warns of its charge.'
-    ),
-    support(
-      'husk',
-      'A dead keeper still drifting its route, full of sleeping Motes.',
-      'Slow and heavy. Splits into drones when destroyed.'
-    ),
-    support(
-      'caster',
-      'It once lit the beacons that marked the Ring’s lanes. It still marks them. You are standing on one.',
-      'A ring marks where its shell will land. Be gone before it closes.'
-    ),
-    support(
-      'mine',
-      'A Ring seal that arms when anything warm comes near.',
-      'Detonates on approach. Shoot it from range.'
-    ),
-    support(
-      'ram',
-      'Built to clear debris from the Ring’s lanes. It still does.',
-      'Stops, winds up, then charges straight. Step aside.'
-    ),
-    support(
-      'leech',
-      'The Ring kept its light in small bellies so that none of it was ever lost. This one has forgotten whose light it keeps.',
-      'Eats loose XP and pickups, grows, and flees when full. Kill it to get it all back, with interest.'
-    ),
-    support(
-      'shade',
-      'A keeper that learned to step half out of the Field. Only its edges stay behind.',
-      'Cannot be hit while faded. It returns at your side and fires a fan.'
     ),
     herald(
       'heat',
@@ -168,21 +126,6 @@ export const CODEX_ENTRIES = deepFreeze(
       'choir',
       'Three cores that once sang the Ring closed. They were nine; the rest went quiet in the breaking. The hymn was never finished, and what is left still sings it to whoever comes.',
       'Only the singing core can be hurt. The voice moves on.'
-    ),
-    support(
-      'hunter',
-      'A long-range keeper. Its lens lights the moment it has you.',
-      'The lens glows before each shot. Break line of sight.'
-    ),
-    support(
-      'bulwark',
-      'A wall that walks. The Ring made it to hold the line.',
-      'Its front plate blocks shots. Flank it, or break the plate.'
-    ),
-    support(
-      'weaver',
-      'It does not attack. It closes the Field around you.',
-      'Orbits you and lays Tethers behind it. Kill it first.'
     ),
     herald(
       'silence',

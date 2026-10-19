@@ -6,6 +6,7 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // "proposta 18/10"; AchievementService decides when each one unlocks.
 // glyph: one text symbol (no emoji-presentation characters).
 // target: present only on countable ones; the Codex shows "n / target".
+// enemy: counts one per pilot kill of this enemy type.
 
 export const ACHIEVEMENTS = deepFreeze([
   {
@@ -103,6 +104,7 @@ export const ACHIEVEMENTS = deepFreeze([
     description: 'Destroy 20 Casters, volley or no volley.',
     glyph: '⌖',
     target: 20,
+    enemy: 'caster',
   },
   {
     id: 'unphased',
@@ -110,6 +112,7 @@ export const ACHIEVEMENTS = deepFreeze([
     description: 'Destroy 15 Shades, however they slip out of phase.',
     glyph: '◌',
     target: 15,
+    enemy: 'shade',
   },
   {
     id: 'iron-escort',

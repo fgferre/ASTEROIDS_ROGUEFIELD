@@ -1,22 +1,23 @@
 // src/data/layers.js
 
 import RandomService from '../core/RandomService.js';
+import { listContent } from '../content/registry.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { bossKindForLayer } from './enemies/boss.js';
-import {
-  ASTEROIDS_PER_WAVE_BASE,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  MAX_ASTEROIDS_ON_SCREEN,
-} from './constants/gameplay.js';
+import { MAX_ASTEROIDS_ON_SCREEN } from './constants/gameplay.js';
+import { FIELD_EVENTS, fieldEvent, rockCurve } from './layerParts.js';
+
+export { FIELD_EVENTS };
 
 // What spawns on each layer of the run (docs/NORTE.md section 4). Every
 // number here is a proposta 17/10 — the owner's play decides.
 //
 // rocks: asteroids the legacy spawner feeds in over the layer.
-// roster: support enemies trickling in; the first at `from` seconds into the
-//   layer, then one every `every` seconds until `count` have spawned; each
-//   rolls Elite with chance `elite`.
-// surges: a burst of `count` enemies (kinds taken in turn; asteroids are
+// roster: support enemies trickling in, each entry asking for a `role`
+//   (enemiesFor); the first at `from` seconds into the layer, then one every
+//   `every` seconds until `count` have spawned; each rolls Elite with chance
+//   `elite`.
+// surges: a burst of `count` enemies (roles taken in turn; 'asteroid' is
 //   small rocks) at `at` seconds, from the field edge away from the player,
 //   announced by a "SURGE" banner with `label`.
 // events: field events at `at` seconds into the layer (never on a Warden
@@ -29,50 +30,14 @@ import {
 // A layer ends once everything listed has spawned and died; when the field
 // empties early, the next scheduled spawn comes at once.
 
-/** Today's rock curve, floor(6 × 1.26^(layer − 1)) capped at 40. */
-function rockCurve(layer) {
-  return Math.min(
-    MAX_ASTEROIDS_ON_SCREEN,
-    Math.floor(
-      ASTEROIDS_PER_WAVE_BASE *
-        Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, layer - 1)
-    )
-  );
-}
-
-/**
- * Field events (proposta 18/10). Gravity Well: every XP spark drifts to a
- * point `minDistance`–`maxDistance` px from the ship (`pullSpeed` px/s, faster
- * by `pullAcceleration` each second). Solar Flare: every enemy stunned for the
- * duration. Sensor Jam: the radar shows noise.
- */
-export const FIELD_EVENTS = deepFreeze({
-  'gravity-well': {
-    label: 'Gravity Well',
-    duration: 8,
-    pullSpeed: 40,
-    pullAcceleration: 20,
-    minDistance: 220,
-    maxDistance: 320,
-  },
-  'solar-flare': { label: 'Solar Flare', duration: 1 },
-  'sensor-jam': { label: 'Sensor Jam', duration: 10 },
-});
-
-const fieldEvent = (kind, at) => ({
-  at,
-  kind,
-  label: FIELD_EVENTS[kind].label,
-});
-
 /**
  * Layer modifiers (proposta 18/10): from layer MODIFIER_FROM on, every layer
  * rolls one, announced by a "MODIFIER" banner in its `color`. Dense Fog: the
  * radar reaches `radarRange` of its usual range. Magnetic Storm: every XP
  * spark drifts at `driftSpeed` px/s, turning up to `driftTurn` rad/s at
  * random, and the ship's pull is ×`pullScale`. Hunters' Moon: the roster is
- * only `kinds` (Seekers and Rams), each count ×`countScale`; surges keep their
- * size with those kinds. Glass Field: every rock spawns Volatile.
+ * only `roles` (Seekers' and Rams'), each count ×`countScale`; surges keep
+ * their size with those roles. Glass Field: every rock spawns Volatile.
  */
 export const MODIFIER_FROM = 16;
 export const LAYER_MODIFIERS = deepFreeze({
@@ -87,7 +52,7 @@ export const LAYER_MODIFIERS = deepFreeze({
   'hunters-moon': {
     label: "Hunters' Moon",
     color: '#a5b4fc',
-    kinds: ['hunter', 'ram'],
+    roles: ['sniper', 'charger'],
     countScale: 1.3,
   },
   'glass-field': { label: 'Glass Field', color: '#5eead4' },
@@ -107,219 +72,24 @@ export function modifierFor(layer, runSeed = 0) {
   return modifier;
 }
 
-const ROCKFALL = { at: 40, kinds: ['asteroid'], count: 6, label: 'Rockfall' };
+// One file per layer in src/content/stages/, listed by `order` (index = layer
+// − 1). The registry's `id` and `order` stay out of the entries: the Director
+// reads, and `beyond` copies, only the fields described above.
+export const LAYERS = deepFreeze(
+  listContent('stages').map(({ id: _id, order: _order, ...layer }) => layer)
+);
 
-export const LAYERS = deepFreeze([
-  // 1–3: rock only.
-  {
-    rocks: rockCurve(1),
-    roster: [],
-    surges: [ROCKFALL],
-    events: [],
-    warden: false,
-  },
-  {
-    rocks: rockCurve(2),
-    roster: [],
-    surges: [ROCKFALL],
-    events: [fieldEvent('sensor-jam', 25)],
-    warden: false,
-  },
-  {
-    rocks: rockCurve(3),
-    roster: [],
-    surges: [ROCKFALL],
-    events: [],
-    warden: false,
-    herald: 'dust',
-  },
-  // 4: the first Motes, in small swarms.
-  {
-    rocks: rockCurve(4),
-    roster: [{ kind: 'drone', count: 2, from: 8, every: 8, elite: 0 }],
-    surges: [
-      { at: 20, kinds: ['drone'], count: 4, label: 'Mote swarm' },
-      { at: 40, kinds: ['drone'], count: 5, label: 'Mote swarm' },
-    ],
-    events: [fieldEvent('gravity-well', 30)],
-    warden: false,
-  },
-  // 5: first Warden.
-  { rocks: rockCurve(5), roster: [], surges: [], events: [], warden: true },
-  // 6–7: Motes, Husks and the first Caster; Tethers, a battery and the first
-  // Leech from 7.
-  {
-    rocks: rockCurve(6),
-    roster: [
-      { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.05 },
-      { kind: 'husk', count: 2, from: 15, every: 12, elite: 0.05 },
-      { kind: 'caster', count: 1, from: 20, every: 1, elite: 0.05 },
-    ],
-    surges: [{ at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' }],
-    events: [],
-    warden: false,
-  },
-  {
-    rocks: rockCurve(7),
-    roster: [
-      { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.05 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.05 },
-      { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.05 },
-      { kind: 'caster', count: 1, from: 18, every: 1, elite: 0.05 },
-      { kind: 'leech', count: 1, from: 25, every: 1, elite: 0.05 },
-    ],
-    surges: [
-      { at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' },
-      { at: 50, kinds: ['caster'], count: 2, label: 'Battery' },
-    ],
-    events: [fieldEvent('solar-flare', 35)],
-    warden: false,
-  },
-  // 8–9: Rams and Shades join.
-  {
-    rocks: rockCurve(8),
-    roster: [
-      { kind: 'drone', count: 5, from: 5, every: 5, elite: 0.08 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.08 },
-      { kind: 'ram', count: 2, from: 12, every: 10, elite: 0.08 },
-      { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.08 },
-      { kind: 'caster', count: 2, from: 15, every: 14, elite: 0.08 },
-      { kind: 'shade', count: 1, from: 20, every: 1, elite: 0.08 },
-      { kind: 'leech', count: 1, from: 25, every: 1, elite: 0.08 },
-    ],
-    surges: [{ at: 30, kinds: ['ram'], count: 3, label: 'Ram pack' }],
-    events: [],
-    warden: false,
-    herald: 'heat',
-  },
-  {
-    rocks: rockCurve(9),
-    roster: [
-      { kind: 'drone', count: 5, from: 5, every: 5, elite: 0.08 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.08 },
-      { kind: 'ram', count: 3, from: 12, every: 9, elite: 0.08 },
-      { kind: 'mine', count: 3, from: 15, every: 10, elite: 0.08 },
-      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.08 },
-      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.08 },
-      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.08 },
-    ],
-    surges: [
-      { at: 30, kinds: ['ram'], count: 4, label: 'Ram pack' },
-      { at: 40, kinds: ['leech', 'asteroid'], count: 4, label: 'Scavengers' },
-    ],
-    events: [fieldEvent('sensor-jam', 20), fieldEvent('gravity-well', 45)],
-    warden: false,
-  },
-  // 10: Warden, Motes trickling in.
-  {
-    rocks: rockCurve(10),
-    roster: [{ kind: 'drone', count: 4, from: 10, every: 8, elite: 0.1 }],
-    surges: [],
-    events: [],
-    warden: true,
-  },
-  // 11–12: Seekers and Bulwarks.
-  {
-    rocks: rockCurve(11),
-    roster: [
-      { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.1 },
-      { kind: 'husk', count: 2, from: 10, every: 12, elite: 0.1 },
-      { kind: 'ram', count: 2, from: 12, every: 10, elite: 0.1 },
-      { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.1 },
-      { kind: 'hunter', count: 2, from: 10, every: 12, elite: 0.1 },
-      { kind: 'bulwark', count: 1, from: 20, every: 1, elite: 0.1 },
-      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.1 },
-      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.1 },
-      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.1 },
-    ],
-    surges: [
-      { at: 30, kinds: ['drone'], count: 8, label: 'Mote swarm' },
-      { at: 50, kinds: ['shade'], count: 3, label: 'Shade raid' },
-    ],
-    events: [],
-    warden: false,
-  },
-  {
-    rocks: rockCurve(12),
-    roster: [
-      { kind: 'drone', count: 4, from: 5, every: 6, elite: 0.15 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.15 },
-      { kind: 'ram', count: 2, from: 12, every: 10, elite: 0.15 },
-      { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.15 },
-      { kind: 'hunter', count: 3, from: 8, every: 10, elite: 0.15 },
-      { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.15 },
-      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.15 },
-      { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.15 },
-      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.15 },
-    ],
-    surges: [
-      { at: 30, kinds: ['ram'], count: 5, label: 'Ram pack' },
-      { at: 50, kinds: ['caster', 'shade'], count: 4, label: 'Crossfire' },
-    ],
-    events: [fieldEvent('solar-flare', 30)],
-    warden: false,
-  },
-  // 13–14: everything, Weavers included.
-  {
-    rocks: rockCurve(13),
-    roster: [
-      { kind: 'drone', count: 5, from: 5, every: 5, elite: 0.2 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.2 },
-      { kind: 'ram', count: 3, from: 12, every: 9, elite: 0.2 },
-      { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.2 },
-      { kind: 'hunter', count: 3, from: 8, every: 10, elite: 0.2 },
-      { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.2 },
-      { kind: 'weaver', count: 2, from: 15, every: 12, elite: 0.2 },
-      { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.2 },
-      { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.2 },
-      { kind: 'leech', count: 2, from: 15, every: 15, elite: 0.2 },
-    ],
-    surges: [
-      {
-        at: 30,
-        kinds: ['drone', 'ram', 'hunter', 'husk', 'caster', 'shade'],
-        count: 8,
-        label: 'Full field',
-      },
-    ],
-    events: [fieldEvent('gravity-well', 25)],
-    warden: false,
-    herald: 'silence',
-  },
-  {
-    rocks: rockCurve(14),
-    roster: [
-      { kind: 'drone', count: 6, from: 5, every: 5, elite: 0.3 },
-      { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.3 },
-      { kind: 'ram', count: 3, from: 12, every: 9, elite: 0.3 },
-      { kind: 'mine', count: 3, from: 15, every: 10, elite: 0.3 },
-      { kind: 'hunter', count: 4, from: 8, every: 8, elite: 0.3 },
-      { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.3 },
-      { kind: 'weaver', count: 3, from: 15, every: 10, elite: 0.3 },
-      { kind: 'caster', count: 3, from: 15, every: 10, elite: 0.3 },
-      { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.3 },
-      { kind: 'leech', count: 2, from: 15, every: 15, elite: 0.3 },
-    ],
-    surges: [
-      {
-        at: 30,
-        kinds: ['drone', 'ram', 'hunter', 'husk', 'caster', 'shade'],
-        count: 10,
-        label: 'Full field',
-      },
-    ],
-    events: [fieldEvent('solar-flare', 20), fieldEvent('sensor-jam', 40)],
-    warden: false,
-  },
-  // 15: the final Warden with a Seeker escort.
-  {
-    rocks: rockCurve(15),
-    roster: [{ kind: 'hunter', count: 2, from: 3, every: 2, elite: 0.3 }],
-    surges: [],
-    events: [],
-    warden: true,
-  },
-]);
+/**
+ * The enemies that fill a `role` on `layer`: every src/content/enemies item
+ * whose `roles` name it and whose `fromLayer` (default 1) has come, in
+ * registry order. When there are several, the director draws one by `weight`
+ * (default 1) for each spawn (LayerSchedule).
+ */
+export function enemiesFor(role, layer) {
+  return listContent('enemies').filter(
+    ({ roles, fromLayer = 1 }) => roles.includes(role) && fromLayer <= layer
+  );
+}
 
 /** Endless-run growth per layer past 14 (proposta 18/10). */
 const BEYOND_ROCKS_PER_LAYER = 2;

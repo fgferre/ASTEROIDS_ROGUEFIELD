@@ -1,22 +1,28 @@
 // src/modules/MenuBackgroundSystem.js
+//
+// The Three.js scene behind the main menu: an asteroid belt orbited by a
+// slow camera under the NASA starfield, with the chosen hull framed in
+// front. This file orchestrates (boot, preload, the frame loop, settings,
+// screens, the seeded random) and owns the scene's state; the parts live in
+// ./menu/: rendering (renderer, lights, post), starfield, atmosphere,
+// asteroidMaterials (+ asteroidNoise), asteroidField, adaptiveQuality,
+// cameraOrbit, menuSettings, loadingScreen and threeUuid.
 
 import { BaseSystem } from '../core/BaseSystem.js';
-import { debugLog } from '../core/debugLogging.js';
-import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
 import { MenuHullPreview } from './MenuHullPreview.js';
-import { IS_DEV } from '../core/env.js';
-import {
-  createAsteroidGeometry,
-  createSeededRandom,
-} from './render3d/asteroidMesh.js';
-
-const SIMPLEX_DEFAULT_RANDOM = new RandomService(
-  'menu-background:simplex-default'
-);
-const NASA_FETCH_TIMEOUT_MS = 5000;
+import * as quality from './menu/adaptiveQuality.js';
+import { createMenuAsteroidField } from './menu/asteroidField.js';
+import { createMenuAsteroidMaterials } from './menu/asteroidMaterials.js';
+import * as atmosphere from './menu/atmosphere.js';
+import { orbitCamera } from './menu/cameraOrbit.js';
+import * as loadingScreen from './menu/loadingScreen.js';
+import * as menuSettings from './menu/menuSettings.js';
+import * as rendering from './menu/rendering.js';
+import * as stars from './menu/starfield.js';
+import * as threeUuid from './menu/threeUuid.js';
 
 class MenuBackgroundSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -77,16 +83,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.CANNON = this.ready ? window.CANNON : null;
     this.ready = this.ready && Boolean(this.THREE) && Boolean(this.CANNON);
 
-    this._threeMathUtilsState = {
-      originalMathUtils: null,
-      originalMath: undefined,
-      originalMathRandom: undefined,
-      seededMathRandomDepth: 0,
-      deterministicMathUtils: null,
-      deterministicUuidGenerator: null,
-      generateUuidDescriptors: new Map(),
-      patchedMathUtilsTargets: new Set(),
-    };
+    this._threeMathUtilsState = threeUuid.createThreeMathUtilsState();
 
     this.animationFrame = null;
     this.isActive = false;
@@ -112,8 +109,6 @@ class MenuBackgroundSystem extends BaseSystem {
     this.world = null;
 
     this.starLayers = [];
-    this._nasaStarfieldLoaded = false;
-    this._nasaStarfieldLoading = false;
     this.baseGeometries = [];
     this.baseMaterials = [];
     this.monolithMaterials = [];
@@ -126,9 +121,6 @@ class MenuBackgroundSystem extends BaseSystem {
     // F9: pre-allocated explosion light pool to avoid new PointLight() per explosion
     this._explosionLightPool = [];
     this._explosionLightPoolSize = 4;
-    // F10: reusable temporaries for hot paths (fragmentAsteroid, etc.)
-    this._tmpVec3 = null; // initialized when THREE is available
-    this._tmpCannonVec3 = null;
 
     this.config = {
       // Higher tessellation is required for "Monolith-like" silhouettes.
@@ -143,57 +135,27 @@ class MenuBackgroundSystem extends BaseSystem {
     };
 
     // Phase 3: Adaptive Quality System
-    this.adaptiveQuality = {
-      enabled: true,
-      currentLevel: 2, // 0=low, 1=medium, 2=high, 3=ultra
-      targetFpsMin: 50,
-      targetFpsMax: 58, // Just below v-sync to avoid fluctuation
-      // FPS tracking
-      frameTimesMs: [],
-      frameTimesMaxSamples: 60, // 1 second of samples at 60fps
-      lastFps: 60,
-      // Adjustment cooldown (prevent rapid changes)
-      adjustmentCooldown: 0,
-      adjustmentCooldownDuration: 2.0, // seconds between quality changes
-      // Quality level definitions - reduced chromatic aberration for clarity
-      levels: [
-        // The Monolith study is sharp (no heavy bloom/aberration); keep post FX subtle.
-        {
-          name: 'low',
-          shaderDetail: 0.0,
-          bloomStrength: 0.0,
-          chromaticAberration: 0.0,
-        },
-        {
-          name: 'medium',
-          shaderDetail: 0.5,
-          bloomStrength: 0.05,
-          chromaticAberration: 0.0,
-        },
-        {
-          name: 'high',
-          shaderDetail: 1.0,
-          bloomStrength: 0.1,
-          chromaticAberration: 0.0,
-        },
-        {
-          name: 'ultra',
-          shaderDetail: 1.5,
-          bloomStrength: 0.15,
-          chromaticAberration: 0.0,
-        },
-      ],
-    };
+    this.adaptiveQuality = quality.createAdaptiveQualityState();
     this.currentShaderDetail =
       this.adaptiveQuality.levels[this.adaptiveQuality.currentLevel]
         ?.shaderDetail ?? 1.0;
 
-    this.spawnedBeltAsteroids = 0;
     this.stats = this.resolveStatsPanel();
     this.alphaToCoverageEnabled = false;
 
-    this.normalIntensity = this.resolveInitialNormalIntensity();
+    this.normalIntensity = menuSettings.resolveInitialNormalIntensity(() =>
+      this.getSettingsService()
+    );
     this.unsubscribeFromSettings = null;
+
+    // The scene's parts (./menu/); each reads what it needs through a kit.
+    this.starfield = stars.createMenuStarfield(this._createStarfieldKit());
+    this.asteroidMaterials = createMenuAsteroidMaterials(
+      this._createAsteroidMaterialsKit()
+    );
+    this.asteroidField = createMenuAsteroidField(
+      this._createAsteroidFieldKit()
+    );
 
     this.handleVideoSettingsChanged =
       this.handleVideoSettingsChanged.bind(this);
@@ -261,7 +223,7 @@ class MenuBackgroundSystem extends BaseSystem {
     const parentRandom =
       (this.random && typeof this.random.fork === 'function'
         ? this.random
-        : SIMPLEX_DEFAULT_RANDOM) ?? SIMPLEX_DEFAULT_RANDOM;
+        : threeUuid.SIMPLEX_DEFAULT_RANDOM) ?? threeUuid.SIMPLEX_DEFAULT_RANDOM;
 
     fork = parentRandom.fork(label);
     this.randomForks.threeUuid = fork;
@@ -309,141 +271,18 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   applyDeterministicThreeUuidGenerator() {
-    const state = this._threeMathUtilsState;
-    if (!state || !this.THREE || typeof this.THREE !== 'object') {
-      return;
-    }
-
-    const three = this.THREE;
-    const mathUtilsCandidate = three.MathUtils ?? three.Math;
-    if (!mathUtilsCandidate || typeof mathUtilsCandidate !== 'object') {
-      return;
-    }
-
-    const aliasCandidate =
-      typeof three.Math === 'object' && three.Math !== null ? three.Math : null;
-
-    if (
-      state.deterministicMathUtils &&
-      mathUtilsCandidate === state.deterministicMathUtils
-    ) {
-      if (
-        state.deterministicMathUtils &&
-        aliasCandidate !== state.deterministicMathUtils &&
-        (aliasCandidate !== null ||
-          (state.originalMath !== null && state.originalMath !== undefined))
-      ) {
-        three.Math = state.deterministicMathUtils;
-      }
-      return;
-    }
-
-    state.originalMathUtils = mathUtilsCandidate;
-
-    if (aliasCandidate !== state.deterministicMathUtils) {
-      if (aliasCandidate !== null) {
-        state.originalMath = aliasCandidate;
-      } else if (state.originalMath === undefined) {
-        state.originalMath = null;
-      }
-    }
-
-    if (!state.deterministicUuidGenerator) {
-      state.deterministicUuidGenerator = () => {
-        const fork = this.ensureThreeUuidRandom();
-        if (fork && typeof fork.uuid === 'function') {
-          return fork.uuid('menu-background:three.uuid');
-        }
-        return SIMPLEX_DEFAULT_RANDOM.uuid('menu-background:three.uuid');
-      };
-    }
-
-    const patchedOriginal = this.patchMathUtilsGenerateUuid(
-      mathUtilsCandidate,
-      state.deterministicUuidGenerator
+    threeUuid.applyDeterministicThreeUuidGenerator(
+      this._threeMathUtilsState,
+      this.THREE,
+      () => this.ensureThreeUuidRandom()
     );
-
-    let aliasPatched = false;
-    if (aliasCandidate && aliasCandidate !== mathUtilsCandidate) {
-      aliasPatched = this.patchMathUtilsGenerateUuid(
-        aliasCandidate,
-        state.deterministicUuidGenerator
-      );
-    }
-
-    if (patchedOriginal || aliasPatched) {
-      state.deterministicMathUtils = mathUtilsCandidate;
-      three.MathUtils = mathUtilsCandidate;
-
-      if (
-        aliasCandidate !== null ||
-        (state.originalMath !== null && state.originalMath !== undefined)
-      ) {
-        three.Math = aliasCandidate ?? mathUtilsCandidate;
-      }
-
-      return;
-    }
-
-    const deterministic = this.cloneMathUtilsWithDeterministicUuid(
-      mathUtilsCandidate,
-      state.deterministicUuidGenerator
-    );
-
-    state.deterministicMathUtils = deterministic;
-    three.MathUtils = deterministic;
-
-    if (
-      aliasCandidate !== null ||
-      (state.originalMath !== null && state.originalMath !== undefined)
-    ) {
-      three.Math = deterministic;
-    }
   }
 
   restoreOriginalThreeUuidGenerator() {
-    const state = this._threeMathUtilsState;
-    if (!state || !this.THREE || typeof this.THREE !== 'object') {
-      return;
-    }
-
-    this.restorePatchedMathUtilsTargets();
-
-    const three = this.THREE;
-    if (
-      state.deterministicMathUtils &&
-      three.MathUtils === state.deterministicMathUtils
-    ) {
-      if (state.originalMathUtils) {
-        three.MathUtils = state.originalMathUtils;
-      }
-    }
-
-    if (state.deterministicMathUtils) {
-      const aliasCandidate =
-        typeof three.Math === 'object' && three.Math !== null
-          ? three.Math
-          : null;
-
-      if (aliasCandidate === state.deterministicMathUtils) {
-        if (state.originalMath === null) {
-          const descriptor = Object.getOwnPropertyDescriptor(three, 'Math');
-          if (descriptor && descriptor.configurable === false) {
-            three.Math = undefined;
-          } else if (descriptor) {
-            delete three.Math;
-          } else {
-            three.Math = undefined;
-          }
-        } else if (state.originalMath !== undefined) {
-          three.Math = state.originalMath;
-        } else if (state.originalMathUtils) {
-          three.Math = state.originalMathUtils;
-        }
-      }
-    }
-
-    state.deterministicMathUtils = null;
+    threeUuid.restoreOriginalThreeUuidGenerator(
+      this._threeMathUtilsState,
+      this.THREE
+    );
   }
 
   /**
@@ -507,269 +346,159 @@ class MenuBackgroundSystem extends BaseSystem {
     this.restoreOriginalThreeUuidGenerator();
   }
 
-  cloneMathUtilsWithDeterministicUuid(source, uuidGenerator) {
-    const prototype = Object.getPrototypeOf(source) || Object.prototype;
-    const clone = Object.create(prototype);
-    const keys = Reflect.ownKeys(source);
-
-    keys.forEach((key) => {
-      const descriptor = Object.getOwnPropertyDescriptor(source, key);
-      if (!descriptor) {
-        clone[key] = source[key];
-        return;
-      }
-
-      if (key === 'generateUUID') {
-        const enumerable = descriptor.enumerable ?? false;
-        const configurable = descriptor.configurable ?? true;
-        const writable = Object.prototype.hasOwnProperty.call(
-          descriptor,
-          'writable'
-        )
-          ? Boolean(descriptor.writable)
-          : true;
-
-        Object.defineProperty(clone, key, {
-          configurable,
-          enumerable,
-          writable,
-          value: uuidGenerator,
-        });
-        return;
-      }
-
-      Object.defineProperty(clone, key, descriptor);
+  /**
+   * The kits the scene parts get instead of the system (the SFXBus._createKit
+   * pattern): live getters, so a field replaced later (at boot, or by a test)
+   * is honoured; setters only for values the part updates; the system's own
+   * helpers. Frozen.
+   */
+  _createStarfieldKit() {
+    const system = this;
+    return Object.freeze({
+      get THREE() {
+        return system.THREE;
+      },
+      get scene() {
+        return system.scene;
+      },
+      get camera() {
+        return system.camera;
+      },
+      get renderer() {
+        return system.renderer;
+      },
+      get nebulas() {
+        return system.nebulas;
+      },
+      get dustSystem() {
+        return system.dustSystem;
+      },
+      get starLayers() {
+        return system.starLayers;
+      },
+      set starLayers(layers) {
+        system.starLayers = layers;
+      },
+      randomFloat: (name) => system.randomFloat(name),
+      createStarTexture: () => system.createStarTexture(),
     });
-
-    if (!keys.includes('generateUUID')) {
-      Object.defineProperty(clone, 'generateUUID', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: uuidGenerator,
-      });
-    }
-
-    const isFrozen = Object.isFrozen(source);
-    const isSealed = Object.isSealed(source);
-    const isExtensible = Object.isExtensible(source);
-
-    if (isFrozen) {
-      Object.freeze(clone);
-    } else if (isSealed) {
-      Object.seal(clone);
-    } else if (!isExtensible) {
-      Object.preventExtensions(clone);
-    }
-
-    return clone;
   }
 
-  copyGenerateUuidDescriptor(target) {
-    if (!target || typeof target !== 'object') {
-      return null;
-    }
-
-    const descriptor = Object.getOwnPropertyDescriptor(target, 'generateUUID');
-    if (!descriptor) {
-      return null;
-    }
-
-    const copy = {
-      configurable: descriptor.configurable,
-      enumerable: descriptor.enumerable,
-    };
-
-    if (Object.prototype.hasOwnProperty.call(descriptor, 'writable')) {
-      copy.writable = descriptor.writable;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      copy.value = descriptor.value;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(descriptor, 'get')) {
-      copy.get = descriptor.get;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(descriptor, 'set')) {
-      copy.set = descriptor.set;
-    }
-
-    return copy;
-  }
-
-  overwriteGenerateUuid(target, uuidGenerator) {
-    if (!target || typeof target !== 'object') {
-      return false;
-    }
-
-    const descriptor = Object.getOwnPropertyDescriptor(target, 'generateUUID');
-
-    if (!descriptor) {
-      try {
-        target.generateUUID = uuidGenerator;
-        if (target.generateUUID === uuidGenerator) {
-          return true;
-        }
-      } catch (error) {
-        // Ignore assignment errors and fallback to defineProperty
-      }
-
-      try {
-        Object.defineProperty(target, 'generateUUID', {
-          configurable: true,
-          enumerable: true,
-          writable: true,
-          value: uuidGenerator,
-        });
-        return target.generateUUID === uuidGenerator;
-      } catch (error) {
-        return false;
-      }
-    }
-
-    if (descriptor.configurable !== false) {
-      const nextDescriptor = {
-        configurable: descriptor.configurable,
-        enumerable: descriptor.enumerable,
-      };
-
-      if (Object.prototype.hasOwnProperty.call(descriptor, 'writable')) {
-        nextDescriptor.writable = descriptor.writable;
-      }
-
-      try {
-        Object.defineProperty(target, 'generateUUID', {
-          ...nextDescriptor,
-          value: uuidGenerator,
-        });
-        if (target.generateUUID === uuidGenerator) {
-          return true;
-        }
-      } catch (error) {
-        // Ignore defineProperty failure and fallback to direct assignment
-      }
-    }
-
-    if (descriptor.set && typeof descriptor.set === 'function') {
-      try {
-        descriptor.set.call(target, uuidGenerator);
-        if (target.generateUUID === uuidGenerator) {
-          return true;
-        }
-      } catch (error) {
-        // Ignore setter errors and continue to fallback attempts
-      }
-    }
-
-    if (descriptor.writable) {
-      try {
-        target.generateUUID = uuidGenerator;
-        if (target.generateUUID === uuidGenerator) {
-          return true;
-        }
-      } catch (error) {
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  patchMathUtilsGenerateUuid(target, uuidGenerator) {
-    if (
-      !target ||
-      typeof target !== 'object' ||
-      typeof uuidGenerator !== 'function'
-    ) {
-      return false;
-    }
-
-    const state = this._threeMathUtilsState;
-    if (!state) {
-      return false;
-    }
-
-    if (!state.generateUuidDescriptors) {
-      state.generateUuidDescriptors = new Map();
-    }
-
-    if (!state.generateUuidDescriptors.has(target)) {
-      state.generateUuidDescriptors.set(
-        target,
-        this.copyGenerateUuidDescriptor(target)
-      );
-    }
-
-    const patched = this.overwriteGenerateUuid(target, uuidGenerator);
-
-    if (patched) {
-      if (!state.patchedMathUtilsTargets) {
-        state.patchedMathUtilsTargets = new Set();
-      }
-      state.patchedMathUtilsTargets.add(target);
-    } else {
-      state.generateUuidDescriptors.delete(target);
-    }
-
-    return patched;
-  }
-
-  restoreMathUtilsGenerateUuid(target) {
-    if (!target || typeof target !== 'object') {
-      return;
-    }
-
-    const state = this._threeMathUtilsState;
-    if (!state || !state.generateUuidDescriptors) {
-      return;
-    }
-
-    const descriptor = state.generateUuidDescriptors.get(target) || null;
-
-    if (!descriptor) {
-      if (Object.prototype.hasOwnProperty.call(target, 'generateUUID')) {
-        try {
-          delete target.generateUUID;
-        } catch (error) {
-          try {
-            target.generateUUID = undefined;
-          } catch (innerError) {
-            // Swallow errors restoring missing descriptor
-          }
-        }
-      }
-      state.generateUuidDescriptors.delete(target);
-      return;
-    }
-
-    try {
-      Object.defineProperty(target, 'generateUUID', descriptor);
-    } catch (error) {
-      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-        try {
-          target.generateUUID = descriptor.value;
-        } catch (innerError) {
-          // Ignore assignment errors when restoring descriptor value
-        }
-      }
-    }
-
-    state.generateUuidDescriptors.delete(target);
-  }
-
-  restorePatchedMathUtilsTargets() {
-    const state = this._threeMathUtilsState;
-    if (!state || !state.patchedMathUtilsTargets) {
-      return;
-    }
-
-    state.patchedMathUtilsTargets.forEach((target) => {
-      this.restoreMathUtilsGenerateUuid(target);
+  _createAsteroidMaterialsKit() {
+    const system = this;
+    return Object.freeze({
+      get THREE() {
+        return system.THREE;
+      },
+      get adaptiveQuality() {
+        return system.adaptiveQuality;
+      },
+      get baseMaterials() {
+        return system.baseMaterials;
+      },
+      get monolithMaterials() {
+        return system.monolithMaterials;
+      },
+      get activeAsteroids() {
+        return system.activeAsteroids;
+      },
+      get camera() {
+        return system.camera;
+      },
+      get keyLight() {
+        return system.keyLight;
+      },
+      get elapsedTime() {
+        return system.elapsedTime;
+      },
+      get normalIntensity() {
+        return system.normalIntensity;
+      },
+      set normalIntensity(value) {
+        system.normalIntensity = value;
+      },
+      get currentShaderDetail() {
+        return system.currentShaderDetail;
+      },
+      set currentShaderDetail(value) {
+        system.currentShaderDetail = value;
+      },
+      randomFloat: (name) => system.randomFloat(name),
     });
+  }
 
-    state.patchedMathUtilsTargets.clear();
+  _createAsteroidFieldKit() {
+    const system = this;
+    return Object.freeze({
+      get THREE() {
+        return system.THREE;
+      },
+      get CANNON() {
+        return system.CANNON;
+      },
+      get scene() {
+        return system.scene;
+      },
+      get world() {
+        return system.world;
+      },
+      get config() {
+        return system.config;
+      },
+      get renderer() {
+        return system.renderer;
+      },
+      get camera() {
+        return system.camera;
+      },
+      get composer() {
+        return system.composer;
+      },
+      get customFX() {
+        return system.customFX;
+      },
+      get elapsedTime() {
+        return system.elapsedTime;
+      },
+      get impactEffect() {
+        return system.impactEffect;
+      },
+      get asteroidPool() {
+        return system.asteroidPool;
+      },
+      get activeAsteroids() {
+        return system.activeAsteroids;
+      },
+      get objectsToDeactivate() {
+        return system.objectsToDeactivate;
+      },
+      get baseGeometries() {
+        return system.baseGeometries;
+      },
+      get baseMaterials() {
+        return system.baseMaterials;
+      },
+      get explosions() {
+        return system.explosions;
+      },
+      get explosionLightPool() {
+        return system._explosionLightPool;
+      },
+      get proceduralAsteroidCount() {
+        return system.proceduralAsteroidCount;
+      },
+      set proceduralAsteroidCount(value) {
+        system.proceduralAsteroidCount = value;
+      },
+      get hasProceduralAsteroids() {
+        return system.hasProceduralAsteroids;
+      },
+      set hasProceduralAsteroids(value) {
+        system.hasProceduralAsteroids = value;
+      },
+      randomFloat: (name) => system.randomFloat(name),
+      withSeededMathRandom: (fn) => system.withSeededMathRandom(fn),
+    });
   }
 
   getService(name) {
@@ -788,58 +517,9 @@ class MenuBackgroundSystem extends BaseSystem {
     return this.settingsService;
   }
 
-  /**
-   * Sets up the loading screen UI and connects callbacks.
-   * Automatically updates progress bar and hides loading when complete.
-   */
   setupLoadingScreen() {
-    if (typeof document === 'undefined') return;
-
-    const loadingScreen = document.getElementById('loading-screen');
-    const progressFill = document.getElementById('loading-progress-fill');
-    const progressPercent = document.getElementById('loading-progress-percent');
-    const progressMessage = document.getElementById('loading-progress-message');
-    const menuScreen = document.getElementById('menu-screen');
-
-    if (!loadingScreen) {
-      console.warn('[MenuBackgroundSystem] Loading screen element not found.');
-      return;
-    }
-
-    this.setLoadingCallbacks(
-      // onProgress callback
-      (progress, message) => {
-        const percent = Math.round(progress * 100);
-
-        if (progressFill) {
-          progressFill.style.width = `${percent}%`;
-        }
-
-        if (progressPercent) {
-          progressPercent.textContent = `${percent}%`;
-        }
-
-        if (progressMessage) {
-          progressMessage.textContent = message;
-        }
-      },
-      // onComplete callback
-      () => {
-        // Fade out loading screen
-        loadingScreen.classList.add('hidden');
-
-        // Show menu screen
-        if (menuScreen) {
-          menuScreen.classList.remove('hidden');
-        }
-
-        // Remove loading screen from DOM after transition
-        setTimeout(() => {
-          if (loadingScreen.parentNode) {
-            loadingScreen.parentNode.removeChild(loadingScreen);
-          }
-        }, 600);
-      }
+    loadingScreen.setupLoadingScreen((onProgress, onComplete) =>
+      this.setLoadingCallbacks(onProgress, onComplete)
     );
   }
 
@@ -858,53 +538,7 @@ class MenuBackgroundSystem extends BaseSystem {
     );
     this.camera.position.set(0, 0, 100);
 
-    // WebGL2 upgrade - enables #version 300 es shaders like the study
-    const gl2Context = this.canvas.getContext('webgl2', {
-      antialias: true,
-      alpha: true,
-      premultipliedAlpha: true,
-      powerPreference: 'high-performance',
-    });
-
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      context: gl2Context,
-      antialias: true,
-      alpha: true,
-      premultipliedAlpha: true,
-    });
-
-    // Log WebGL version for debugging
-    const glVersion = this.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
-    debugLog(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
-    const pixelRatio = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(pixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x050916, 1);
-    this.renderer.shadowMap.enabled = true;
-    if (
-      typeof this.renderer.shadowMap.type !== 'undefined' &&
-      THREE?.PCFSoftShadowMap
-    ) {
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    }
-    if (
-      typeof this.renderer.outputEncoding !== 'undefined' &&
-      THREE &&
-      THREE.sRGBEncoding
-    ) {
-      this.renderer.outputEncoding = THREE.sRGBEncoding;
-    }
-    if (
-      typeof this.renderer.toneMapping !== 'undefined' &&
-      THREE &&
-      typeof THREE.NoToneMapping !== 'undefined'
-    ) {
-      // Monolith shader outputs in linear and lets renderer handle encoding.
-      this.renderer.toneMapping = THREE.NoToneMapping;
-      this.renderer.toneMappingExposure = 1.0;
-    }
-
+    this.renderer = rendering.createMenuRenderer(THREE, this.canvas);
     this.enableAlphaToCoverage();
 
     this.world = new CANNON.World();
@@ -915,8 +549,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.clock = new THREE.Clock();
 
     // F10: initialize reusable temporaries
-    this._tmpVec3 = new THREE.Vector3();
-    this._tmpCannonVec3 = new CANNON.Vec3();
+    this.asteroidField.createTemporaries();
 
     // F9: pre-allocate explosion light pool
     for (let i = 0; i < this._explosionLightPoolSize; i++) {
@@ -927,7 +560,7 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     // Quick setup (non-blocking)
-    this.createLighting();
+    this.keyLight = rendering.createLighting(THREE, this.scene);
     // The chosen hull, framed into the menu's stage box (camera children
     // only render with the camera in the scene).
     this.scene.add(this.camera);
@@ -940,7 +573,8 @@ class MenuBackgroundSystem extends BaseSystem {
     this.hangarOpen = false;
     this.hoveredHull = null;
     this.hoveredHullLocked = false;
-    this.createStarLayers();
+    // Lightweight placeholder while NASA starfield loads during preload.
+    this.starfield.createFallbackStarLayers();
     this.createAtmosphere();
     this.setupPostProcessing();
     this.setupImpactEffects();
@@ -993,13 +627,13 @@ class MenuBackgroundSystem extends BaseSystem {
 
     try {
       // Phase 0: Load NASA starfield (matches the standalone mockup).
-      await this.createNasaStarfieldLayers();
+      await this.starfield.createNasaStarfieldLayers();
       updateProgress('Loading NASA starfield');
       await yieldToMain();
 
       // Phase 1: Create geometries (one per frame)
       for (let i = 0; i < geometryCount; i++) {
-        const geometry = this.createDeformedIcosahedron();
+        const geometry = this.asteroidMaterials.createDeformedIcosahedron();
         this.baseGeometries.push(geometry);
         updateProgress(`Creating geometry ${i + 1}/${geometryCount}`);
         await yieldToMain();
@@ -1010,7 +644,8 @@ class MenuBackgroundSystem extends BaseSystem {
       // material pipeline (PBR + 3D noise with triplanar mixing).
       for (let i = 0; i < materialCount; i++) {
         const seed = this.randomFloat('materials') * 100;
-        const material = this.createTriplanarAsteroidMaterial(seed);
+        const material =
+          this.asteroidMaterials.createTriplanarAsteroidMaterial(seed);
         this.baseMaterials.push(material);
         updateProgress(`Creating materials ${i + 1}/${materialCount}`);
         await yieldToMain();
@@ -1026,7 +661,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
         for (let i = chunkStart; i < chunkEnd; i++) {
           if (this.asteroidPool.length < poolSize) {
-            this.createPoolableAsteroid();
+            this.asteroidField.createPoolableAsteroid();
           }
         }
 
@@ -1045,12 +680,12 @@ class MenuBackgroundSystem extends BaseSystem {
 
       // Phase 5: Prepare initial asteroid field so impact warmup renders against
       // the same lit materials that the player sees once the menu is visible.
-      this.prepareInitialField();
+      this.asteroidField.prepareInitialField();
       updateProgress('Preparing asteroid field');
       await yieldToMain();
 
       // Phase 6: Warm the real first-impact path (lights + debris + dust uploads)
-      await this.warmupFirstImpactPath();
+      await this.asteroidField.warmupFirstImpactPath();
       updateProgress('Warming impact pipeline');
 
       // Mark loading complete
@@ -1096,104 +731,16 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   setupPostProcessing() {
-    const { THREE, scene, camera, renderer } = this;
-    if (!THREE || !renderer || !THREE.EffectComposer) return;
-
-    this.composer = new THREE.EffectComposer(renderer);
-
-    const renderPass = new THREE.RenderPass(scene, camera);
-    this.composer.addPass(renderPass);
-
-    const fxConfig =
-      this.adaptiveQuality?.levels?.[this.adaptiveQuality.currentLevel] ?? null;
-    const bloomStrength =
-      typeof fxConfig?.bloomStrength === 'number'
-        ? fxConfig.bloomStrength
-        : 0.1;
-    const chromaticAberration =
-      typeof fxConfig?.chromaticAberration === 'number'
-        ? fxConfig.chromaticAberration
-        : 0.0;
-
-    // 1. Unreal Bloom Pass - reduced for clarity
-    if (THREE.UnrealBloomPass) {
-      this.bloomPass = new THREE.UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        bloomStrength,
-        0.2, // Radius: tighter bloom
-        0.92 // Threshold: only very bright spots bloom
-      );
-      this.composer.addPass(this.bloomPass);
-    }
-
-    // 2. Custom FX: Chromatic Aberration + Filmic Grain
-    if (THREE.ShaderPass) {
-      this.customFX = this.createCustomFXPass();
-      if (this.customFX?.uniforms?.amount) {
-        this.customFX.uniforms.amount.value = chromaticAberration;
-      }
-      // F3: disable pass when both effects are zero (avoids 3 texture samples/pixel for no result)
-      const grainValue = this.customFX?.uniforms?.grainAmount?.value ?? 0;
-      this.customFX.enabled = chromaticAberration !== 0 || grainValue !== 0;
-      this.composer.addPass(this.customFX);
-    }
-
-    // 3. SMAA Anti-aliasing
-    if (THREE.SMAAPass) {
-      const pixelRatio = renderer.getPixelRatio();
-      this.smaaPass = new THREE.SMAAPass(
-        window.innerWidth * pixelRatio,
-        window.innerHeight * pixelRatio
-      );
-      this.composer.addPass(this.smaaPass);
-    }
-  }
-
-  createCustomFXPass() {
-    const { THREE } = this;
-    const shader = {
-      uniforms: {
-        tDiffuse: { value: null },
-        amount: { value: 0.0 },
-        grainAmount: { value: 0.0 }, // Keep sharp by default (study parity)
-        time: { value: 0.0 },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform float amount;
-        uniform float grainAmount;
-        uniform float time;
-        varying vec2 vUv;
-
-        float random(vec2 p) {
-          return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-        }
-
-        void main() {
-          vec2 uv = vUv;
-
-          // Very subtle Chromatic Aberration (R/B shift)
-          float r = texture2D(tDiffuse, uv + vec2(amount, 0.0)).r;
-          float g = texture2D(tDiffuse, uv).g;
-          float b = texture2D(tDiffuse, uv - vec2(amount, 0.0)).b;
-
-          vec3 color = vec3(r, g, b);
-
-          float noise = (random(uv + time * 0.01) - 0.5) * grainAmount;
-          color += noise;
-
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `,
-    };
-    return new THREE.ShaderPass(shader);
+    Object.assign(
+      this,
+      rendering.setupPostProcessing({
+        THREE: this.THREE,
+        scene: this.scene,
+        camera: this.camera,
+        renderer: this.renderer,
+        adaptiveQuality: this.adaptiveQuality,
+      })
+    );
   }
 
   enableAlphaToCoverage() {
@@ -1233,785 +780,28 @@ class MenuBackgroundSystem extends BaseSystem {
     });
   }
 
-  createLighting() {
-    const { THREE } = this;
-
-    // Keep scene lights minimal and dramatic (single distant sun + subtle ambient).
-    const ambient = new THREE.AmbientLight(0x101820, 0.015);
-    this.scene.add(ambient);
-
-    // Distant sun-like directional light (grazing angle for strong terminator).
-    const keyLight = new THREE.DirectionalLight(0xfff0e6, 3.1);
-    keyLight.position.set(560, 130, -240);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(2048, 2048);
-    keyLight.shadow.bias = -0.00008;
-    keyLight.shadow.normalBias = 0.02;
-    const shadowCam = keyLight.shadow.camera;
-    shadowCam.near = 10;
-    shadowCam.far = 1400;
-    shadowCam.left = -320;
-    shadowCam.right = 320;
-    shadowCam.top = 320;
-    shadowCam.bottom = -320;
-    this.scene.add(keyLight);
-    this.keyLight = keyLight;
-
-    // Very subtle cool fill to avoid pure-black crush while keeping contrast.
-    const fill = new THREE.DirectionalLight(0x4466aa, 0.1);
-    fill.position.set(-260, -120, 180);
-    this.scene.add(fill);
-  }
-
   createStarTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-
-    // Radial gradient for soft star look
-    const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.8)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(16, 16, 16, 0, Math.PI * 2);
-    ctx.fill();
-
-    const texture = new this.THREE.CanvasTexture(canvas);
-    return texture;
-  }
-
-  createStarLayers() {
-    // Lightweight placeholder while NASA starfield loads during preload.
-    this.createFallbackStarLayers();
-  }
-
-  createFallbackStarLayers() {
-    const { THREE } = this;
-    const layerConfigs = [
-      { count: 2500, distance: 8000, pixelSize: 0.9, speedFactor: 0.02 },
-      { count: 1800, distance: 6000, pixelSize: 1.2, speedFactor: 0.04 },
-    ];
-
-    this.starLayers = layerConfigs.map((config) => {
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(config.count * 3);
-
-      for (let i = 0; i < config.count; i += 1) {
-        const theta = this.randomFloat('starfield') * Math.PI * 2;
-        const phi = Math.acos(2 * this.randomFloat('starfield') - 1);
-        const radius = config.distance;
-
-        const x = radius * Math.sin(phi) * Math.cos(theta);
-        const y = radius * Math.sin(phi) * Math.sin(theta);
-        const z = radius * Math.cos(phi);
-
-        const offset = i * 3;
-        positions[offset] = x;
-        positions[offset + 1] = y;
-        positions[offset + 2] = z;
-      }
-
-      geometry.setAttribute(
-        'position',
-        new THREE.BufferAttribute(positions, 3)
-      );
-      const material = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: this.computeWorldSpacePointSize(
-          config.distance,
-          config.pixelSize
-        ),
-        map: this.createStarTexture(),
-        transparent: true,
-        opacity: this.randomFloat('starfield') * 0.35 + 0.65,
-        fog: false,
-      });
-      material.sizeAttenuation = true;
-      material.depthWrite = false;
-      material.blending = THREE.AdditiveBlending;
-
-      const mesh = new THREE.Points(geometry, material);
-      this.scene.add(mesh);
-      return { mesh, speedFactor: config.speedFactor, config: { ...config } };
-    });
+    return stars.createStarTexture(this.THREE);
   }
 
   createAtmosphere() {
-    const { THREE } = this;
-    if (!THREE) return;
-    const rng = this.ensureRandom('atmosphere');
-
-    // 1. Nebula Layers (Gaseous backdrops)
-    this.nebulas = [];
-    const nebulaConfigs = [
-      { size: 2000, color: 0x0a1835, opacity: 0.15, z: -1200, speed: 0.02 },
-      { size: 1800, color: 0x1a0a25, opacity: 0.12, z: -1500, speed: -0.015 },
-    ];
-
-    nebulaConfigs.forEach((cfg) => {
-      const geometry = new THREE.PlaneGeometry(cfg.size, cfg.size);
-      const material = new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          color: { value: new THREE.Color(cfg.color) },
-          opacity: { value: cfg.opacity },
-        },
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        vertexShader: `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform float time;
-          uniform float opacity;
-          uniform vec3 color;
-          varying vec2 vUv;
-
-          float noise(vec2 p) {
-            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-          }
-
-          void main() {
-            vec2 uv = (vUv - 0.5) * 2.0;
-            float dist = length(uv);
-            float mask = smoothstep(1.0, 0.2, dist);
-            
-            float n = noise(vUv * 4.0 + time * 0.02);
-            n += noise(vUv * 8.0 - time * 0.01) * 0.5;
-            
-            gl_FragColor = vec4(color * (n * 0.6 + 0.4), mask * opacity);
-          }
-        `,
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.z = cfg.z;
-      mesh.rotation.z = rng.float() * Math.PI * 2;
-      mesh.userData.rotateSpeed = cfg.speed;
-      this.scene.add(mesh);
-      this.nebulas.push(mesh);
+    const created = atmosphere.createAtmosphere({
+      THREE: this.THREE,
+      scene: this.scene,
+      ensureRandom: (name) => this.ensureRandom(name),
+      createStarTexture: () => this.createStarTexture(),
     });
-
-    // 2. Space Dust (Foreground particles)
-    const dustCount = 800;
-    const dustGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(dustCount * 3);
-
-    for (let i = 0; i < dustCount; i++) {
-      positions[i * 3] = (rng.float() - 0.5) * 500;
-      positions[i * 3 + 1] = (rng.float() - 0.5) * 500;
-      positions[i * 3 + 2] = (rng.float() - 0.5) * 500;
-    }
-
-    dustGeometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(positions, 3)
-    );
-
-    const dustMaterial = new THREE.PointsMaterial({
-      size: 0.7,
-      color: 0x66aaff,
-      map: this.createStarTexture(),
-      transparent: true,
-      opacity: 0.35,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
-    this.dustSystem = new THREE.Points(dustGeometry, dustMaterial);
-    this.scene.add(this.dustSystem);
-  }
-
-  computeWorldSpacePointSize(distance, pixelSize = 1) {
-    if (!this.camera) {
-      return pixelSize;
-    }
-
-    const fov = typeof this.camera.fov === 'number' ? this.camera.fov : 60;
-    const height =
-      this.renderer?.domElement?.clientHeight || window.innerHeight || 1;
-    const pixelRatio =
-      (typeof this.renderer?.getPixelRatio === 'function'
-        ? this.renderer.getPixelRatio()
-        : null) ||
-      window.devicePixelRatio ||
-      1;
-
-    const effectivePixelSize = pixelSize * pixelRatio;
-    const fovInRadians = (fov * Math.PI) / 180;
-    const viewHeightAtDistance = 2 * distance * Math.tan(fovInRadians / 2);
-
-    return (
-      (effectivePixelSize / Math.max(1, height)) * viewHeightAtDistance ||
-      pixelSize
-    );
-  }
-
-  updateStarLayerSizes() {
-    this.starLayers.forEach((layer) => {
-      const { mesh, config } = layer;
-      if (!mesh?.material || !config) {
-        return;
-      }
-
-      const shaderUniforms = mesh.material.uniforms;
-      if (shaderUniforms?.particleSize) {
-        shaderUniforms.particleSize.value = this.computeStarParticleSize(
-          config.pixelSize
-        );
-        return;
-      }
-
-      // Legacy PointsMaterial fallback.
-      const newSize = this.computeWorldSpacePointSize(
-        config.distance,
-        config.pixelSize
-      );
-      if (mesh.material.size !== newSize) {
-        mesh.material.size = newSize;
-        mesh.material.needsUpdate = true;
-      }
-    });
-  }
-
-  computeStarParticleSize(pixelSize = 1) {
-    const width =
-      this.renderer?.domElement?.clientWidth || window.innerWidth || 1;
-    const height =
-      this.renderer?.domElement?.clientHeight || window.innerHeight || 1;
-    const pixelRatio =
-      (typeof this.renderer?.getPixelRatio === 'function'
-        ? this.renderer.getPixelRatio()
-        : null) ||
-      window.devicePixelRatio ||
-      1;
-
-    // Match the original study formula: sqrt(maxDim * devicePixelRatio) / 60
-    const viewportScale = Math.sqrt(Math.max(width, height) * pixelRatio) / 60;
-    return Math.max(0.1, viewportScale * pixelSize);
-  }
-
-  async fetchWithTimeout(url, { timeoutMs = NASA_FETCH_TIMEOUT_MS } = {}) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      return await fetch(url, { signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
+    if (created) {
+      Object.assign(this, created);
     }
   }
 
-  async fetchNasaBinaryAsset(
-    filename,
-    baseCandidates = ['/'],
-    timeoutMs = NASA_FETCH_TIMEOUT_MS
-  ) {
-    let lastStatus = null;
-    let lastError = null;
-
-    for (const candidate of baseCandidates) {
-      const url = `${candidate}nasa/${filename}`;
-
-      try {
-        const response = await this.fetchWithTimeout(url, { timeoutMs });
-        lastStatus = response.status;
-        if (response.ok) {
-          return response.arrayBuffer();
-        }
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    const message =
-      lastStatus !== null
-        ? `Failed to fetch NASA ${filename} (last status ${lastStatus})`
-        : `Failed to fetch NASA ${filename}`;
-
-    if (lastError) {
-      throw new Error(message, { cause: lastError });
-    }
-
-    throw new Error(message);
-  }
-
-  async createNasaStarfieldLayers() {
-    const { THREE } = this;
-    if (
-      !THREE ||
-      !this.scene ||
-      this._nasaStarfieldLoaded ||
-      this._nasaStarfieldLoading
-    ) {
-      return;
-    }
-
-    this._nasaStarfieldLoading = true;
-
-    try {
-      const baseUrl =
-        (typeof import.meta !== 'undefined' &&
-          import.meta.env &&
-          typeof import.meta.env.BASE_URL === 'string' &&
-          import.meta.env.BASE_URL) ||
-        '/';
-
-      const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const baseCandidates = Array.from(
-        new Set([normalizedBaseUrl, '/'].filter(Boolean))
-      );
-
-      const nasaFiles = [
-        'stars.0.bin',
-        'stars.1.bin',
-        'stars.2.bin',
-        'stars.3.bin',
-        'stars.4.bin',
-        'stars.5.bin',
-        'galaxies.0.bin',
-      ];
-
-      class BinaryReader {
-        constructor(data) {
-          this.view = new DataView(data);
-          this.offset = 0;
-        }
-        readInt32() {
-          const value = this.view.getInt32(this.offset, true);
-          this.offset += 4;
-          return value;
-        }
-        readFloat32() {
-          const value = this.view.getFloat32(this.offset, true);
-          this.offset += 4;
-          return value;
-        }
-        readByte() {
-          const value = this.view.getUint8(this.offset);
-          this.offset += 1;
-          return value;
-        }
-      }
-
-      const rotateByQuaternion = (x, y, z) => {
-        const cosTheta = 0.9174077;
-        const sinTheta = 0.3979486;
-        return {
-          x,
-          y: y * cosTheta - z * sinTheta,
-          z: y * sinTheta + z * cosTheta,
-        };
-      };
-
-      const buffers = [];
-      let totalStars = 0;
-      for (const file of nasaFiles) {
-        const buf = await this.fetchNasaBinaryAsset(file, baseCandidates);
-        const tmpReader = new BinaryReader(buf);
-        const count = tmpReader.readInt32();
-        buffers.push({ file, buf, count });
-        totalStars += count;
-      }
-
-      // Match the original study conversions.
-      const KM_TO_PARSEC = 1 / 3.086e13;
-      const DISTANCE_SCALE = 206265000.0;
-      const KM_TO_UNITS = KM_TO_PARSEC * DISTANCE_SCALE;
-
-      // Parallax tuning: the NASA mockup uses true 3D distances (and a huge camera far plane).
-      // In the menu we keep stars close enough to create a visible parallax during the
-      // camera orbit by remapping the NASA distances into MANY shells near the scene.
-      // We preserve the NASA photometry (absMag + original distance for brightness),
-      // and only remap the *render-space* radius used for parallax.
-      // More dramatic parallax: many shells closer to the scene + exaggerated
-      // camera-follow factors per layer (including negative for "near" layers).
-      const LAYER_COUNT = 18;
-      const MIN_SKY_RADIUS = 520;
-      const MAX_SKY_RADIUS = 1500;
-      const FOLLOW_MIN = -0.65;
-      const FOLLOW_MAX = 0.92;
-      const FOLLOW_CURVE = 1.15;
-
-      const positions = new Float32Array(totalStars * 3);
-      const starColors = new Float32Array(totalStars * 4);
-      const starDistances = new Float32Array(totalStars);
-
-      let writeIndex = 0;
-      for (const entry of buffers) {
-        const reader = new BinaryReader(entry.buf);
-        const count = reader.readInt32();
-        for (let i = 0; i < count; i += 1) {
-          reader.readFloat32(); // mag (unused by shader)
-          const absMag = reader.readFloat32();
-          const r = reader.readByte();
-          const g = reader.readByte();
-          const b = reader.readByte();
-          const posY = reader.readFloat32();
-          const posZ = reader.readFloat32();
-          const posX = reader.readFloat32();
-
-          const maxComponent = Math.max(r, g, b, 1);
-          const normalizedR = r / maxComponent;
-          const normalizedG = g / maxComponent;
-          const normalizedB = b / maxComponent;
-
-          const rotated = rotateByQuaternion(posX, -posY, posZ);
-
-          const xUnits = rotated.x * KM_TO_UNITS;
-          const yUnits = rotated.y * KM_TO_UNITS;
-          const zUnits = rotated.z * KM_TO_UNITS;
-          const distUnits = Math.sqrt(
-            xUnits * xUnits + yUnits * yUnits + zUnits * zUnits
-          );
-          const inv = distUnits > 0 ? 1 / distUnits : 1;
-
-          const o = writeIndex * 3;
-          // Store unit direction for a second pass (we remap radii using percentiles).
-          positions[o] = xUnits * inv;
-          positions[o + 1] = yUnits * inv;
-          positions[o + 2] = zUnits * inv;
-
-          const c = writeIndex * 4;
-          starColors[c] = normalizedR;
-          starColors[c + 1] = normalizedG;
-          starColors[c + 2] = normalizedB;
-          starColors[c + 3] = absMag;
-
-          starDistances[writeIndex] = distUnits;
-          writeIndex += 1;
-        }
-      }
-
-      const sortedDistances = Array.from(starDistances).filter(
-        (value) =>
-          typeof value === 'number' && Number.isFinite(value) && value > 0
-      );
-      sortedDistances.sort((a, b) => a - b);
-      const totalSorted = sortedDistances.length;
-      const pickPercentile = (p) => {
-        if (!totalSorted) {
-          return 1;
-        }
-        const idx = Math.max(
-          0,
-          Math.min(totalSorted - 1, Math.floor(p * (totalSorted - 1)))
-        );
-        return sortedDistances[idx];
-      };
-
-      const distanceBoundaries = Array.from(
-        { length: Math.max(0, LAYER_COUNT - 1) },
-        (_, i) => pickPercentile((i + 1) / LAYER_COUNT)
-      );
-
-      const findLayerIndex = (distance) => {
-        // upperBound(distanceBoundaries, distance)
-        let lo = 0;
-        let hi = distanceBoundaries.length;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          if (distance < distanceBoundaries[mid]) {
-            hi = mid;
-          } else {
-            lo = mid + 1;
-          }
-        }
-        return lo; // 0..LAYER_COUNT-1
-      };
-
-      const radiiByLayer = Array.from({ length: LAYER_COUNT }, (_, idx) => {
-        const x = LAYER_COUNT > 1 ? idx / (LAYER_COUNT - 1) : 0;
-        return MIN_SKY_RADIUS + (MAX_SKY_RADIUS - MIN_SKY_RADIUS) * x;
-      });
-      const followByLayer = Array.from({ length: LAYER_COUNT }, (_, idx) => {
-        const x = LAYER_COUNT > 1 ? idx / (LAYER_COUNT - 1) : 0;
-        const shaped = Math.pow(x, FOLLOW_CURVE);
-        return FOLLOW_MIN + (FOLLOW_MAX - FOLLOW_MIN) * shaped;
-      });
-
-      const layerCounts = new Array(LAYER_COUNT).fill(0);
-      const layerIndices = new Uint8Array(starDistances.length);
-      for (let i = 0; i < starDistances.length; i += 1) {
-        const d = starDistances[i];
-        const layerIndex = findLayerIndex(d);
-        layerIndices[i] = layerIndex;
-        layerCounts[layerIndex] += 1;
-      }
-
-      const layerPositions = layerCounts.map(
-        (count) => new Float32Array(count * 3)
-      );
-      const layerColors = layerCounts.map(
-        (count) => new Float32Array(count * 4)
-      );
-      const layerDistances = layerCounts.map(
-        (count) => new Float32Array(count)
-      );
-      const layerWrite = new Array(LAYER_COUNT).fill(0);
-
-      for (let i = 0; i < starDistances.length; i += 1) {
-        const layerIndex = layerIndices[i];
-        const outIndex = layerWrite[layerIndex];
-        layerWrite[layerIndex] += 1;
-
-        const radius = radiiByLayer[layerIndex];
-
-        const inPos = i * 3;
-        const outPos = outIndex * 3;
-        layerPositions[layerIndex][outPos] = positions[inPos] * radius;
-        layerPositions[layerIndex][outPos + 1] = positions[inPos + 1] * radius;
-        layerPositions[layerIndex][outPos + 2] = positions[inPos + 2] * radius;
-
-        const inCol = i * 4;
-        const outCol = outIndex * 4;
-        layerColors[layerIndex][outCol] = starColors[inCol];
-        layerColors[layerIndex][outCol + 1] = starColors[inCol + 1];
-        layerColors[layerIndex][outCol + 2] = starColors[inCol + 2];
-        layerColors[layerIndex][outCol + 3] = starColors[inCol + 3];
-
-        layerDistances[layerIndex][outIndex] = starDistances[i];
-      }
-
-      const nasaVertexShader = `
-        #define PI 3.1415926538
-
-        attribute vec4 starColor;
-        attribute float starDist;
-        varying vec4 fColor;
-        uniform float particleSize;
-        uniform float intensity;
-
-        float absoluteMagnitudeToFlux(float absoluteMagnitude, float distance) {
-          float luminosityInWatts = 1.35e18 * pow(10.0, absoluteMagnitude / -2.5);
-          return luminosityInWatts / (4.0 * PI * distance * distance);
-        }
-
-        void main() {
-          vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * viewPosition;
-          fColor = starColor;
-
-          float absMag = starColor.a;
-          float distance = starDist;
-
-          float flux = absoluteMagnitudeToFlux(absMag, distance);
-          float brightness = 2.0 * log(1.0 + flux * 1e4);
-
-          float scaled = brightness * particleSize * intensity;
-          fColor.a = clamp(scaled, 0.05, 1.0);
-          gl_PointSize = clamp(brightness * 4.0 * particleSize * intensity, 5.0, 50.0);
-
-          float nearFade = clamp((distance - 6.684e6) / 6.016e7, 0.0, 1.0);
-          fColor.a = mix(0.0, fColor.a, nearFade);
-        }
-      `;
-
-      const nasaFragmentShader = `
-        precision highp float;
-        varying vec4 fColor;
-
-        void main(void) {
-          float distanceFromEdge = clamp(1.0 - 2.0 * length(gl_PointCoord - vec2(0.5, 0.5)), 0.0, 1.0);
-          float a = pow(distanceFromEdge, 5.0);
-          gl_FragColor.rgb = fColor.rgb;
-          gl_FragColor.a = fColor.a * a;
-        }
-      `;
-
-      const material = new THREE.ShaderMaterial({
-        vertexShader: nasaVertexShader,
-        fragmentShader: nasaFragmentShader,
-        uniforms: {
-          particleSize: { value: this.computeStarParticleSize(1.0) },
-          intensity: { value: 1.0 },
-        },
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      });
-      material.fog = false;
-
-      const nasaPoints = layerPositions
-        .map((posArray, idx) => ({ posArray, idx }))
-        .filter(({ posArray }) => posArray && posArray.length > 0)
-        .map(({ posArray, idx }) => {
-          const geometry = new THREE.BufferGeometry();
-          geometry.setAttribute(
-            'position',
-            new THREE.BufferAttribute(posArray, 3)
-          );
-          geometry.setAttribute(
-            'starColor',
-            new THREE.BufferAttribute(layerColors[idx], 4)
-          );
-          geometry.setAttribute(
-            'starDist',
-            new THREE.BufferAttribute(layerDistances[idx], 1)
-          );
-          geometry.computeBoundingSphere();
-
-          const points = new THREE.Points(geometry, material);
-          points.frustumCulled = false;
-          points.userData.followCamera = false;
-          points.userData.followCameraFactor = followByLayer[idx] ?? 0;
-          points.renderOrder = -1000 - idx;
-          return points;
-        });
-
-      // Replace placeholder star layers.
-      this.starLayers.forEach((layer) => {
-        if (layer?.mesh) {
-          this.scene.remove(layer.mesh);
-          layer.mesh.geometry?.dispose?.();
-          layer.mesh.material?.dispose?.();
-        }
-      });
-
-      this.starLayers = nasaPoints.map((points) => ({
-        mesh: points,
-        speedFactor: 0.0,
-        config: { distance: MAX_SKY_RADIUS, pixelSize: 1.0 },
-      }));
-      nasaPoints.forEach((points) => this.scene.add(points));
-
-      // The NASA standalone is essentially "stars only". Disable extra overlays
-      // so the menu matches the reference more closely.
-      if (this.nebulas) {
-        this.nebulas.forEach((neb) => {
-          neb.visible = false;
-        });
-      }
-      if (this.dustSystem) {
-        this.dustSystem.visible = false;
-      }
-
-      this._nasaStarfieldLoaded = true;
-
-      if (IS_DEV) {
-        debugLog(
-          `[MenuBackgroundSystem] NASA starfield loaded (${totalStars} stars)`
-        );
-      }
-    } catch (error) {
-      console.warn('[MenuBackgroundSystem] NASA starfield load failed:', error);
-    } finally {
-      this._nasaStarfieldLoading = false;
-    }
-  }
-
-  resolveInitialNormalIntensity() {
-    let resolved = 1;
-
-    try {
-      const settings = this.getSettingsService();
-      if (settings && typeof settings.getCategoryValues === 'function') {
-        const videoValues = settings.getCategoryValues('video');
-        const stored = videoValues?.menuAsteroidNormalIntensity;
-        if (typeof stored === 'number' && Number.isFinite(stored)) {
-          resolved = stored;
-        }
-      }
-    } catch (error) {
-      console.warn(
-        '[MenuBackgroundSystem] Unable to resolve initial normal intensity from settings:',
-        error
-      );
-    }
-
-    const numeric = Number(resolved);
-    return Number.isFinite(numeric) ? Math.max(0, Math.min(2.5, numeric)) : 1;
-  }
-
-  createRandomGenerator(seed = this.randomFloat('assets') * 1000) {
-    return createSeededRandom(seed);
-  }
-
-  createDeformedIcosahedron(detailSeed = this.randomFloat('assets') * 100) {
-    // CPU-deformed geometry needs enough tessellation to read as "rock" and
-    // not a low-poly blob. Keep detail ~5 and reduce asteroid count instead.
-    const baseDetailByQuality = [4, 5, 6, 6];
-    const qualityLevel =
-      typeof this.adaptiveQuality?.currentLevel === 'number'
-        ? this.adaptiveQuality.currentLevel
-        : 2;
-    const detail =
-      baseDetailByQuality[Math.max(0, Math.min(3, qualityLevel))] ?? 5;
-    return createAsteroidGeometry(this.THREE, detailSeed, { detail });
-  }
-
-  applyNormalIntensityToMaterial(
-    material,
-    targetIntensity = this.normalIntensity
-  ) {
-    const { THREE } = this;
-    if (!material || !THREE) {
-      return;
-    }
-
-    const intensity = Number.isFinite(targetIntensity)
-      ? Math.max(0, Math.min(2.5, targetIntensity))
-      : 1;
-
-    if (material.userData?.isProceduralAsteroid) {
-      const uniforms =
-        material.uniforms || material.userData?._shader?.uniforms || null;
-
-      if (uniforms?.u_bumpStrength) {
-        const baseStrength =
-          typeof material.userData.baseBumpStrength === 'number'
-            ? material.userData.baseBumpStrength
-            : uniforms.u_bumpStrength?.value ?? 1.0;
-
-        uniforms.u_bumpStrength.value = baseStrength * intensity;
-        if (typeof material.uniformsNeedUpdate !== 'undefined') {
-          material.uniformsNeedUpdate = true;
-        }
-
-        material.userData = material.userData || {};
-        material.userData.menuNormalIntensity = intensity;
-        return;
-      }
-    }
-
-    if (
-      !material.normalScale ||
-      typeof material.normalScale.set !== 'function'
-    ) {
-      material.normalScale = new THREE.Vector2(intensity, intensity);
-    } else {
-      material.normalScale.set(intensity, intensity);
-    }
-
-    material.userData = material.userData || {};
-    material.userData.menuNormalIntensity = intensity;
-    material.needsUpdate = true;
+  fetchNasaBinaryAsset(filename, baseCandidates, timeoutMs) {
+    return stars.fetchNasaBinaryAsset(filename, baseCandidates, timeoutMs);
   }
 
   updateNormalIntensity(rawValue) {
-    const numeric = Number(rawValue);
-    const resolved = Number.isFinite(numeric) ? numeric : this.normalIntensity;
-    const clamped = Math.max(0, Math.min(2.5, resolved));
-    this.normalIntensity = clamped;
-
-    this.baseMaterials.forEach((material) => {
-      this.applyNormalIntensityToMaterial(material, clamped);
-    });
-
-    this.activeAsteroids.forEach((asteroid) => {
-      if (asteroid?.material) {
-        this.applyNormalIntensityToMaterial(asteroid.material, clamped);
-      }
-    });
+    this.asteroidMaterials.updateNormalIntensity(rawValue);
   }
 
   setupSettingsSubscription() {
@@ -2027,40 +817,10 @@ class MenuBackgroundSystem extends BaseSystem {
       }
 
       this.unsubscribeFromSettings = settings.subscribe(
-        (change = {}) => {
-          if (!change) {
-            return;
-          }
-
-          this.syncHullPreview();
-
-          if (change.type === 'snapshot') {
-            const snapshotValue =
-              change.value?.video?.menuAsteroidNormalIntensity;
-            if (typeof snapshotValue === 'number') {
-              this.updateNormalIntensity(snapshotValue);
-            }
-            return;
-          }
-
-          if (change.category === 'video') {
-            if (
-              change.key === 'menuAsteroidNormalIntensity' &&
-              typeof change.value === 'number'
-            ) {
-              this.updateNormalIntensity(change.value);
-              return;
-            }
-
-            if (typeof settings.getCategoryValues === 'function') {
-              const videoValues = settings.getCategoryValues('video');
-              const stored = videoValues?.menuAsteroidNormalIntensity;
-              if (typeof stored === 'number') {
-                this.updateNormalIntensity(stored);
-              }
-            }
-          }
-        },
+        menuSettings.createSettingsListener(settings, {
+          syncHullPreview: () => this.syncHullPreview(),
+          updateNormalIntensity: (value) => this.updateNormalIntensity(value),
+        }),
         { immediate: true }
       );
     } catch (error) {
@@ -2091,1432 +851,52 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   handleVideoSettingsChanged(event = {}) {
-    const { values, change } = event;
-
-    if (values && typeof values.menuAsteroidNormalIntensity === 'number') {
-      this.updateNormalIntensity(values.menuAsteroidNormalIntensity);
-      return;
-    }
-
-    if (
-      change &&
-      change.key === 'menuAsteroidNormalIntensity' &&
-      typeof change.value === 'number'
-    ) {
-      this.updateNormalIntensity(change.value);
-    }
-  }
-
-  /**
-   * GLSL noise functions chunk ported from the original procedural study.
-   * Contains: Simplex 3D, FBM, Ridge, Voronoi/Worley
-   */
-  getNoiseGLSL() {
-    return `
-      // --- Utilities ---
-      vec3 mod289_3(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-      vec4 mod289_4(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-      vec4 permute4(vec4 x) { return mod289_4(((x*34.0)+1.0)*x); }
-      vec4 taylorInvSqrt4(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
-
-      // --- Simplex Noise 3D ---
-      float snoise3(vec3 v) {
-        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-        vec3 i = floor(v + dot(v, C.yyy));
-        vec3 x0 = v - i + dot(i, C.xxx);
-        vec3 g = step(x0.yzx, x0.xyz);
-        vec3 l = 1.0 - g;
-        vec3 i1 = min(g.xyz, l.zxy);
-        vec3 i2 = max(g.xyz, l.zxy);
-        vec3 x1 = x0 - i1 + C.xxx;
-        vec3 x2 = x0 - i2 + C.yyy;
-        vec3 x3 = x0 - D.yyy;
-        i = mod289_3(i);
-        vec4 p = permute4(permute4(permute4(
-                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
-                + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-                + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-        float n_ = 0.142857142857;
-        vec3 ns = n_ * D.wyz - D.xzx;
-        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-        vec4 x_ = floor(j * ns.z);
-        vec4 y_ = floor(j - 7.0 * x_);
-        vec4 x = x_ * ns.x + ns.yyyy;
-        vec4 y = y_ * ns.x + ns.yyyy;
-        vec4 h = 1.0 - abs(x) - abs(y);
-        vec4 b0 = vec4(x.xy, y.xy);
-        vec4 b1 = vec4(x.zw, y.zw);
-        vec4 s0 = floor(b0) * 2.0 + 1.0;
-        vec4 s1 = floor(b1) * 2.0 + 1.0;
-        vec4 sh = -step(h, vec4(0.0));
-        vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-        vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-        vec3 p0 = vec3(a0.xy, h.x);
-        vec3 p1 = vec3(a0.zw, h.y);
-        vec3 p2 = vec3(a1.xy, h.z);
-        vec3 p3 = vec3(a1.zw, h.w);
-        vec4 norm = taylorInvSqrt4(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-        p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-        m = m * m;
-        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-      }
-
-      // --- FBM ---
-      float fbm3(vec3 p, int octaves) {
-        float amplitude = 0.5;
-        float frequency = 1.0;
-        float total = 0.0;
-        float normalization = 0.0;
-        for (int i = 0; i < 6; ++i) {
-          if(i >= octaves) break;
-          total += snoise3(p * frequency) * amplitude;
-          normalization += amplitude;
-          amplitude *= 0.5;
-          frequency *= 2.0;
-        }
-        return total / normalization;
-      }
-
-      // --- Ridge / Ridged Multifractal (study parity) ---
-      float ridge(float h, float offset) {
-        h = abs(h);
-        h = offset - h;
-        h = h * h;
-        return h;
-      }
-
-      float ridgedMF(vec3 p, int octaves, float lacunarity, float gain) {
-        float sum = 0.0;
-        float amp = 0.5;
-        float freq = 1.0;
-        float prev = 1.0;
-
-        for (int i = 0; i < 6; ++i) {
-          if (i >= octaves) break;
-          float n = snoise3(p * freq);
-          float r = ridge(n, 1.0);
-          sum += r * amp * prev;
-          prev = r;
-          freq *= lacunarity;
-          amp *= gain;
-        }
-
-        return sum;
-      }
-
-      // --- Voronoi/Worley ---
-      vec3 voronoiLCSN(vec3 x) {
-        vec3 p = floor(x);
-        vec3 f = fract(x);
-        float id = 0.0;
-        vec2 res = vec2(8.0);
-        for(int k = -1; k <= 1; k++) {
-          for(int j = -1; j <= 1; j++) {
-            for(int i = -1; i <= 1; i++) {
-              vec3 b = vec3(float(i), float(j), float(k));
-              vec3 p_hash = p + b;
-              float hash = fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-              vec3 r = vec3(b) - f + (hash * 0.7);
-              float d = dot(r, r);
-              if(d < res.x) {
-                res.y = res.x;
-                res.x = d;
-                id = hash;
-              } else if(d < res.y) {
-                res.y = d;
-              }
-            }
-          }
-        }
-        return vec3(sqrt(res.x), id, sqrt(res.y));
-      }
-
-      // --- Warped Noise (Flow Texture) ---
-      float warpedNoise(vec3 p) {
-        float q = fbm3(p, 4);
-        float r = fbm3(p + q * 2.5, 4);
-        return fbm3(p + r * 4.0, 4);
-      }
-
-      // --- Crack Network ---
-      float getCracks(vec3 p) {
-        vec3 x = p * 4.0;
-        vec3 cellI = floor(x);
-        vec3 cellF = fract(x);
-        float m_dist = 1.0;
-        for(int k = -1; k <= 1; k++) {
-          for(int j = -1; j <= 1; j++) {
-            for(int l = -1; l <= 1; l++) {
-              vec3 b = vec3(float(l), float(j), float(k));
-              vec3 p_hash = cellI + b;
-              vec3 r = vec3(b) - cellF + fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-              float d = dot(r, r);
-              if(d < m_dist) m_dist = d;
-            }
-          }
-        }
-        return 1.0 - sqrt(m_dist);
-      }
-    `;
-  }
-
-  /**
-   * Procedural asteroid material (single-technique): MeshStandardMaterial with a
-   * shader injection that computes albedo + bump from 3D noise, blended with a
-   * triplanar mix to avoid seam-like artifacts.
-   *
-   * Goals:
-   * - No "pintas"/glitter: metalness is forced to 0 and albedo contrast is low.
-   * - Reads under a single grazing directional light (dramatic terminator).
-   * - Avoids UVs and texture baking entirely (3D procedural).
-   */
-  createTriplanarAsteroidMaterial(seed = this.randomFloat('materials') * 100) {
-    const { THREE } = this;
-    const noiseGLSL = this.getNoiseGLSL();
-
-    const rng = this.createRandomGenerator(seed + 7717);
-    const baseBumpStrength = 0.22 + rng() * 0.28;
-    const texScale = 0.85 + rng() * 0.75;
-    const axisSharpness = 3.0 + rng() * 3.5;
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.95,
-      metalness: 0.0,
-      fog: true,
-    });
-
-    material.userData = material.userData || {};
-    material.userData.isProceduralAsteroid = true;
-    material.userData.baseBumpStrength = baseBumpStrength;
-
-    // Keep a single compiled program; vary appearance via uniforms.
-    material.customProgramCacheKey = () => 'menu-asteroid-triplanar-v1';
-
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.u_seed = { value: seed };
-      shader.uniforms.u_texScale = { value: texScale };
-      shader.uniforms.u_axisSharpness = { value: axisSharpness };
-      shader.uniforms.u_bumpStrength = {
-        value: baseBumpStrength * (material.userData.menuNormalIntensity ?? 1),
-      };
-
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          '#include <common>',
-          `#include <common>
-varying vec3 vObjPos;
-varying vec3 vObjNormal;`
-        )
-        .replace(
-          '#include <begin_vertex>',
-          `#include <begin_vertex>
-  vObjPos = transformed;`
-        )
-        .replace(
-          '#include <beginnormal_vertex>',
-          `#include <beginnormal_vertex>
-  vObjNormal = normalize( objectNormal );`
-        );
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <common>',
-        `#include <common>
-varying vec3 vObjPos;
-varying vec3 vObjNormal;
-uniform float u_seed;
-uniform float u_texScale;
-uniform float u_axisSharpness;
-uniform float u_bumpStrength;
-
-${noiseGLSL}
-
-vec3 perturbNormalArb( vec3 surf_pos, vec3 surf_norm, vec2 dHdxy ) {
-  vec3 vSigmaX = dFdx( surf_pos );
-  vec3 vSigmaY = dFdy( surf_pos );
-  vec3 vN = surf_norm;
-  vec3 R1 = cross( vSigmaY, vN );
-  vec3 R2 = cross( vN, vSigmaX );
-  float fDet = dot( vSigmaX, R1 );
-  vec3 vGrad = sign( fDet ) * ( dHdxy.x * R1 + dHdxy.y * R2 );
-  return normalize( abs( fDet ) * vN - vGrad );
-}
-
-float asteroidMacro( vec3 p ) {
-  vec3 q = p * 0.28 + vec3( u_seed * 0.07, u_seed * 0.11, u_seed * 0.05 );
-  float base = fbm3( q, 4 );
-  float ridges = ridgedMF( q * 2.1 + vec3( 12.3, 45.6, 78.9 ), 4, 2.0, 0.55 );
-  float h = base * 0.7 + (ridges - 0.5) * 0.55;
-  return clamp( h, -1.0, 1.0 );
-}
-
-float asteroidMicro( vec3 p ) {
-  vec3 q = p * 1.75 + vec3( u_seed * 0.9, u_seed * 0.6, u_seed * 1.1 );
-  float m = fbm3( q, 4 );
-  float r = ridgedMF( q * 1.35 + vec3( 7.1, 3.7, 9.2 ), 4, 2.0, 0.55 );
-  return m * 0.55 + (r - 0.5) * 0.35;
-}
-
-float procHeight = 0.0;
-float procCavity = 0.0;
-float procRoughness = 0.95;
-
-void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpHeight, out float cavityOut, out float roughOut ) {
-  vec3 p = objPos * u_texScale;
-  vec3 n = normalize( objNorm );
-  vec3 w = pow( abs( n ), vec3( u_axisSharpness ) );
-  w /= max( 1e-5, w.x + w.y + w.z );
-
-  vec3 px = vec3( p.y, p.z, p.x );
-  vec3 py = vec3( p.x, p.z, p.y );
-  vec3 pz = vec3( p.x, p.y, p.z );
-
-  float macro = asteroidMacro( px ) * w.x + asteroidMacro( py ) * w.y + asteroidMacro( pz ) * w.z;
-  float micro = asteroidMicro( px ) * w.x + asteroidMicro( py ) * w.y + asteroidMicro( pz ) * w.z;
-
-  // Subtle 3D crack network (Voronoi edges). Keep it restrained to avoid
-  // "pintas": only deep crevices get noticeable cracks.
-  vec3 v = voronoiLCSN( p * 1.85 + vec3( u_seed * 0.07, u_seed * 0.11, u_seed * 0.05 ) );
-  float edge = clamp( v.z - v.x, 0.0, 1.0 );
-  float cracks = 1.0 - smoothstep( 0.03, 0.08, edge );
-
-  float t = macro * 0.5 + 0.5;
-  vec3 rockDark = vec3( 0.12, 0.11, 0.11 );
-  vec3 rockLite = vec3( 0.24, 0.22, 0.20 );
-  vec3 rock = mix( rockDark, rockLite, t );
-
-  float cavity = smoothstep( 0.05, 0.55, -macro );
-  float ridge = smoothstep( 0.35, 0.85, macro );
-  vec3 dust = vec3( 0.09, 0.085, 0.09 );
-
-  // Cracks concentrate into cavities (weathering) and gently darken the albedo.
-  cracks *= smoothstep( 0.15, 0.6, cavity ) * 0.55;
-  rock *= 1.0 - cracks * 0.18;
-
-  rock = mix( rock, dust, cavity * 0.55 );
-  rock = mix( rock, rock + vec3( 0.04, 0.035, 0.03 ), ridge * 0.25 );
-
-  rock *= 0.90 + 0.10 * (micro * 0.5 + 0.5);
-  rock *= 1.0 - cavity * 0.22;
-
-  albedo = clamp( rock, 0.0, 0.55 );
-  bumpHeight = micro + macro * 0.18;
-  cavityOut = clamp( cavity + cracks * 0.7, 0.0, 1.0 );
-  roughOut = clamp( 0.96 - ridge * 0.10 + cavityOut * 0.06 + cracks * 0.05, 0.72, 1.0 );
-}
-`
-      );
-
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          'vec4 diffuseColor = vec4( diffuse, opacity );',
-          `vec4 diffuseColor = vec4( diffuse, opacity );
-
-  vec3 procAlbedo = vec3( 1.0 );
-  sampleAsteroid( vObjPos, vObjNormal, procAlbedo, procHeight, procCavity, procRoughness );
-  diffuseColor.rgb = procAlbedo;
-`
-        )
-        .replace(
-          '#include <normal_fragment_maps>',
-          `#include <normal_fragment_maps>
-  vec2 dHdxy = vec2( dFdx( procHeight ), dFdy( procHeight ) );
-  float bumpAtten = 1.0 / ( 1.0 + 10.0 * max( abs( dHdxy.x ), abs( dHdxy.y ) ) );
-  bumpAtten = clamp( bumpAtten, 0.35, 1.0 );
-  normal = perturbNormalArb( -vViewPosition, normal, dHdxy * u_bumpStrength * bumpAtten );
-`
-        )
-        .replace(
-          '#include <roughnessmap_fragment>',
-          `#include <roughnessmap_fragment>
-  roughnessFactor = clamp( procRoughness, 0.05, 1.0 );
-`
-        )
-        .replace(
-          '#include <lights_fragment_end>',
-          `#include <lights_fragment_end>
-  float procOcc = 1.0 - procCavity * 0.38;
-  reflectedLight.directDiffuse *= procOcc;
-  reflectedLight.directSpecular *= procOcc;
-  reflectedLight.indirectDiffuse *= mix( 1.0, procOcc, 0.65 );
-  reflectedLight.indirectSpecular *= mix( 1.0, procOcc, 0.65 );
-`
-        );
-
-      material.userData._shader = shader;
-    };
-
-    material.needsUpdate = true;
-    return material;
-  }
-
-  /**
-   * Creates a fully procedural ShaderMaterial based on the original procedural study.
-   * This bypasses MeshStandardMaterial entirely for guaranteed shader execution.
-   * Uses a self-contained GLSL300 pipeline (RawShaderMaterial) to match the study
-   * and avoid Three.js shader chunk injection (fog/dithering/tonemapping).
-   *
-   * Effects include:
-   * - Procedural warped noise texture (flow patterns)
-   * - Voronoi-based crack network
-   * - Mineral spots (mottled appearance via Worley)
-   * - Central difference bump mapping (7 samples)
-   * - Layered material system (dust, rock, mineral, metal)
-   */
-  createProceduralAsteroidMaterial(seed = this.randomFloat('materials') * 100) {
-    const { THREE } = this;
-
-    const noiseGLSL = this.getNoiseGLSL();
-
-    const rng = this.createRandomGenerator(seed + 1337);
-    // Keep parameters close to the study defaults to avoid "ugly" extremes.
-    const baseBumpStrength = 0.35 + rng() * 0.45; // keep micro detail without glitter
-    const textureScale = 8.0 + rng() * 8.0; // study default: 12.0
-    const crackIntensity = 0.5 + rng() * 0.6; // study default: 0.8
-    const metalAmount = 0.08 + rng() * 0.18; // reduce bright "silver dots"
-    const darkness = 0.6 + rng() * 0.4; // study default: 0.8
-    const patchiness = 0.25 + rng() * 0.35; // reduce "pintas"
-
-    const shapeDisplacement = 0.9 + rng() * 0.6; // study default: 1.2
-    const ridgeStrength = 0.7 + rng() * 0.6; // study default: 1.0
-    const scrapeStrength = 0.4 + rng() * 0.8; // study default: 0.8
-    const craterStrength = 0.4 + rng() * 0.6; // study default: 0.7
-    const craterDensity = 2.5 + rng() * 2.0; // study default: 3.5
-
-    // Use GLSL300 + RawShaderMaterial to avoid Three.js chunk injection.
-    const vertexShader = `
-      precision highp float;
-      precision highp int;
-
-      in vec3 position;
-      in vec3 normal;
-
-      uniform mat4 modelMatrix;
-      uniform mat4 modelViewMatrix;
-      uniform mat4 projectionMatrix;
-      uniform mat3 normalMatrix;
-
-      uniform float u_seed;
-      uniform float u_displacement;
-      uniform float u_ridgeStrength;
-      uniform float u_scrapeStrength;
-      uniform float u_craterStrength;
-      uniform float u_craterDensity;
-      uniform float u_erosion;
-      uniform float u_cpuGeometry;
-      uniform float detailLevel;
-
-      out vec3 v_position;
-      out vec3 v_normal;
-      out vec3 v_objPos;
-      out float v_ao;
-      out float v_cavity;
-
-      ${noiseGLSL}
-
-      float getAsteroidShape(vec3 p) {
-        vec3 pSeed = p + vec3(u_seed * 5.0);
-
-        // Slightly smoother base to avoid needle-like macro spikes.
-        float base = fbm3(pSeed * 0.35, 3);
-
-        // Lower frequency ridges read more like erosion than "spines".
-        float ridges = ridgedMF(pSeed * 1.25, 4, 2.0, 0.55);
-        ridges *= u_ridgeStrength * 0.5;
-
-        float cutNoise = snoise3(pSeed * 0.5 + vec3(12.0));
-        float cuts = smoothstep(0.3, 0.9, cutNoise);
-        cuts *= u_scrapeStrength * 0.6;
-
-        vec3 vData = voronoiLCSN(pSeed * u_craterDensity);
-        float dist = vData.x;
-        float id = vData.y;
-
-        float features = 0.0;
-
-        if (id < 0.4) {
-          float rim = smoothstep(0.7, 0.5, dist);
-          float bowl = smoothstep(0.5, 0.0, dist);
-          float peak = (id < 0.1) ? smoothstep(0.15, 0.0, dist) * 0.3 : 0.0;
-          float shape = (rim * 0.2) - (bowl * 1.2) + peak;
-          features += shape;
-        } else if (id > 0.65) {
-          float rock = smoothstep(0.55, 0.0, dist);
-          rock = pow(rock, 0.7);
-          features += rock * 0.8;
-        }
-
-        features *= u_craterStrength;
-        float total = base + ridges - cuts + features;
-
-        // Erosion-like conditioning: compress peaks, preserve/boost cavities.
-        total = clamp(total, -1.4, 0.8);
-        float valleys = min(total, 0.0) * 1.25;
-        float peaks = max(total, 0.0) * 0.55;
-        total = valleys + peaks;
-
-        return total * u_displacement;
-      }
-
-      void main() {
-        float useCpu = step(0.5, u_cpuGeometry);
-        vec3 p_final = position;
-
-        float h = length(position) - 1.0;
-        v_ao = smoothstep(-0.5, 0.5, h * 0.5 + 0.3);
-        v_cavity = 0.0;
-
-        vec3 n_obj = normalize(normal);
-
-        if (useCpu < 0.5) {
-          vec3 p = normalize(position);
-
-          // Finite Difference Normal (study parity).
-          float eps = 0.015;
-          vec3 t1 = normalize(cross(p, vec3(0.0, 1.0, 0.0)));
-          if (length(t1) < 0.001) {
-            t1 = normalize(cross(p, vec3(0.0, 0.0, 1.0)));
-          }
-          vec3 t2 = normalize(cross(p, t1));
-
-          // Height + erosion smoothing (simple spherical blur).
-          float h0 = getAsteroidShape(p);
-          float h1 = getAsteroidShape(normalize(p + t1 * eps));
-          float h2 = getAsteroidShape(normalize(p + t2 * eps));
-          float hm1 = getAsteroidShape(normalize(p - t1 * eps));
-          float hm2 = getAsteroidShape(normalize(p - t2 * eps));
-
-          float erosion = clamp(u_erosion, 0.0, 1.0);
-          float tunedDetail = clamp(detailLevel, 0.0, 2.0);
-          // On lower quality, reduce erosion to keep the shape more stable/cheap.
-          erosion *= smoothstep(0.25, 1.0, tunedDetail);
-
-          float hAvg = (h0 + h1 + h2 + hm1 + hm2) * 0.2;
-          h = mix(h0, hAvg, erosion);
-          // Second smoothing pass (stronger erosion, fewer spikes).
-          h = mix(h, hAvg, erosion * 0.4);
-
-          // Cavity proxy from Laplacian in height field (macro crevice shading).
-          float lap = hAvg - h0;
-          v_cavity = smoothstep(0.01, 0.08, lap);
-
-          float h1Avg = (h1 + h0 + hm1) / 3.0;
-          float h2Avg = (h2 + h0 + hm2) / 3.0;
-          float h1E = mix(h1, h1Avg, erosion);
-          float h2E = mix(h2, h2Avg, erosion);
-          h1E = mix(h1E, h1Avg, erosion * 0.35);
-          h2E = mix(h2E, h2Avg, erosion * 0.35);
-
-          float radius = max(0.01, 1.0 + h);
-          p_final = p * radius;
-
-          float r1 = max(0.01, 1.0 + h1E);
-          float r2 = max(0.01, 1.0 + h2E);
-
-          vec3 v1 = (p + t1 * eps) * r1 - p_final;
-          vec3 v2 = (p + t2 * eps) * r2 - p_final;
-          n_obj = normalize(cross(v2, v1));
-        }
-
-        v_normal = normalize(normalMatrix * n_obj);
-        v_objPos = p_final;
-
-        vec4 worldPos = modelMatrix * vec4(p_final, 1.0);
-        v_position = worldPos.xyz;
-
-        gl_Position = projectionMatrix * (modelViewMatrix * vec4(p_final, 1.0));
-      }
-     `;
-
-    const fragmentShader = `
-      precision highp float;
-      precision highp int;
-
-      in vec3 v_position;
-      in vec3 v_normal;
-      in vec3 v_objPos;
-      in float v_ao;
-      in float v_cavity;
-
-      out vec4 fragColor;
-
-      uniform vec3 u_lightDir;
-      uniform vec3 u_viewPos;
-
-      uniform float u_seed;
-      uniform float u_textureScale;
-      uniform float u_bumpStrength;
-      uniform float u_crackIntensity;
-      uniform float u_metalAmount;
-      uniform float u_darkness;
-      uniform float u_patchiness;
-      uniform float detailLevel;
-      uniform float time;
-
-      ${noiseGLSL}
-
-      float getSurfaceDetail(vec3 p) {
-        float tunedDetail = clamp(detailLevel, 0.0, 2.0);
-        float flowScale = mix(0.22, 0.3, smoothstep(0.0, 1.0, tunedDetail));
-        float grainScale = mix(3.0, 4.0, smoothstep(0.0, 1.0, tunedDetail));
-        float crackScale = mix(1.6, 2.0, smoothstep(0.0, 1.0, tunedDetail));
-
-        float flow = warpedNoise(p * u_textureScale * flowScale + vec3(u_seed));
-        float grain = snoise3(p * u_textureScale * grainScale) * 0.2;
-        float cells = getCracks(p * crackScale + vec3(u_seed));
-        float cracks = smoothstep(0.05, 0.1, cells);
-        float crackLayer = (1.0 - cracks) * u_crackIntensity * 1.5;
-        return flow + grain - crackLayer;
-      }
-
-      void main() {
-        vec3 N_macro = normalize(v_normal);
-        if (!gl_FrontFacing) {
-          N_macro = -N_macro;
-        }
-
-        vec3 p = v_objPos;
-
-        // --- 1. MICRO BUMP (Central Differences - 7 sample technique from study) ---
-        float eps = 0.005;
-        float h_center = getSurfaceDetail(p);
-
-        float h_x1 = getSurfaceDetail(p + vec3(-eps, 0.0, 0.0));
-        float h_x2 = getSurfaceDetail(p + vec3(eps, 0.0, 0.0));
-        float h_y1 = getSurfaceDetail(p + vec3(0.0, -eps, 0.0));
-        float h_y2 = getSurfaceDetail(p + vec3(0.0, eps, 0.0));
-        float h_z1 = getSurfaceDetail(p + vec3(0.0, 0.0, -eps));
-        float h_z2 = getSurfaceDetail(p + vec3(0.0, 0.0, eps));
-
-        vec3 grad;
-        grad.x = (h_x2 - h_x1) / (2.0 * eps);
-        grad.y = (h_y2 - h_y1) / (2.0 * eps);
-        grad.z = (h_z2 - h_z1) / (2.0 * eps);
-
-        grad -= N_macro * dot(grad, N_macro);
-        vec3 N = normalize(N_macro - grad * u_bumpStrength * 0.22);
-
-        // --- 2. MATERIALS (Mottled & Diverse - from study) ---
-        float h_norm = h_center * 0.5 + 0.5;
-
-        // MINERAL SPOTS (Worley-based patches)
-        vec3 cellData = voronoiLCSN(p * 1.5 + vec3(u_seed));
-        float spots = smoothstep(0.65, 0.25, cellData.x);
-
-        // MACRO COLOR VARIATION
-        float macroVar = fbm3(p * 0.5 + vec3(u_seed + 10.0), 3);
-
-        // --- PALETTE (from study) ---
-        vec3 colRegolith = vec3(0.05, 0.05, 0.06);
-        vec3 colRockBase = vec3(0.20, 0.19, 0.18);
-        vec3 colRockVar  = vec3(0.35, 0.34, 0.32);
-        vec3 colMineral  = vec3(0.40, 0.38, 0.35);
-        vec3 colSilver   = vec3(0.70, 0.72, 0.75);
-
-        vec3 albedo = mix(colRockBase, colRockVar, macroVar);
-        albedo = mix(albedo, colMineral, spots * u_patchiness);
-
-        // Layer Masks
-        float dustMask = smoothstep(0.4, 0.0, h_norm) * (1.0 - v_ao);
-        dustMask = clamp(dustMask, 0.0, 1.0);
-
-        // Avoid "glitter dots": drive metalness from macro variation, not micro height.
-        float metalThreshold = 1.0 - u_metalAmount;
-        float macroNorm = macroVar * 0.5 + 0.5;
-        float metalMask = smoothstep(metalThreshold, 1.0, macroNorm);
-
-        albedo = mix(albedo, colSilver, metalMask);
-        albedo = mix(albedo, colRegolith, dustMask);
-
-        // Cracks darker
-        float crackCells = getCracks(p * 2.0 + vec3(u_seed));
-        float crackVis = (1.0 - smoothstep(0.0, 0.05, crackCells)) * u_crackIntensity;
-        albedo *= (1.0 - crackVis * 0.95);
-
-        // Apply Darkness
-        albedo *= (1.5 - u_darkness);
-
-        float roughness = 0.7;
-        roughness = mix(roughness, 0.25, metalMask);
-        roughness = mix(roughness, 0.98, dustMask);
-        roughness = mix(roughness, 1.0, crackVis);
-        roughness = mix(roughness, 0.8, spots * u_patchiness * 0.5);
-
-        // --- 3. LIGHTING ---
-        vec3 V = normalize(u_viewPos - v_position);
-        vec3 L = normalize(u_lightDir);
-        vec3 H = normalize(L + V);
-
-        float NdotL = max(dot(N, L), 0.0);
-        float NdotH = max(dot(N, H), 0.0);
-        float NdotV = max(dot(N, V), 0.0);
-
-        // Cheap directional self-shadowing using micro heightfield horizon occlusion.
-        float microShadow = 1.0;
-        float tunedDetail = clamp(detailLevel, 0.0, 2.0);
-        if (tunedDetail > 0.75) {
-          vec3 Lt = L - N * dot(L, N);
-          float LtLen = length(Lt);
-          if (LtLen > 1e-4) {
-            Lt /= LtLen;
-            float bias = 0.03;
-            float occ = 0.0;
-            float hs1 = getSurfaceDetail(p + Lt * 0.03);
-            float hs2 = getSurfaceDetail(p + Lt * 0.06);
-            float hs3 = getSurfaceDetail(p + Lt * 0.10);
-            occ += smoothstep(bias, bias + 0.08, hs1 - h_center) * 0.45;
-            occ += smoothstep(bias, bias + 0.08, hs2 - h_center) * 0.35;
-            occ += smoothstep(bias, bias + 0.08, hs3 - h_center) * 0.20;
-            microShadow = clamp(1.0 - occ, 0.2, 1.0);
-          }
-        }
-
-        // Contrast curve for a dramatic terminator (but still readable).
-        float diff = pow(NdotL, 1.55);
-
-        // Limit shininess to avoid glittery specular aliasing on noisy normals.
-        float shininess = mix(8.0, 56.0, clamp(1.0 - roughness, 0.0, 1.0));
-        float spec = pow(NdotH, shininess) * pow(1.0 - roughness, 1.6) * NdotL;
-        spec *= 0.55;
-
-        float specOcc = smoothstep(0.2, 1.0, v_ao);
-        spec *= specOcc;
-
-        float rim = pow(1.0 - NdotV, 3.0) * 0.10 * roughness * smoothstep(0.0, 0.6, NdotL);
-
-        // Keep some ambient so the surface detail reads (menu background).
-        vec3 ambient = vec3(0.006, 0.006, 0.010);
-        vec3 sunColor = vec3(1.15, 1.10, 1.05);
-
-        vec3 finalColor = albedo * ((diff * microShadow) * sunColor + ambient);
-        finalColor += vec3(spec) * sunColor;
-        finalColor += vec3(rim);
-
-        finalColor *= (v_ao * 0.6 + 0.4);
-        // Extra cavity shading to avoid the "flat and bright" look.
-        finalColor *= (1.0 - v_cavity * 0.65);
-
-        fragColor = vec4(finalColor, 1.0);
-      }
-     `;
-
-    const material = new THREE.RawShaderMaterial({
-      glslVersion: THREE.GLSL3,
-      uniforms: {
-        u_lightDir: { value: new THREE.Vector3(1.0, 0.6, 0.4).normalize() },
-        u_viewPos: { value: new THREE.Vector3(0, 0, 100) },
-        u_seed: { value: seed },
-
-        u_displacement: { value: shapeDisplacement },
-        u_ridgeStrength: { value: ridgeStrength },
-        u_scrapeStrength: { value: scrapeStrength },
-        u_craterStrength: { value: craterStrength },
-        u_craterDensity: { value: craterDensity },
-        // Higher erosion removes spikes and reads more like weathered rock.
-        u_erosion: { value: 0.82 + rng() * 0.12 },
-        u_cpuGeometry: { value: 0.0 },
-
-        u_textureScale: { value: textureScale },
-        u_bumpStrength: { value: baseBumpStrength },
-        u_crackIntensity: { value: crackIntensity },
-        u_metalAmount: { value: metalAmount },
-        u_darkness: { value: darkness },
-        u_patchiness: { value: patchiness },
-        detailLevel: { value: this.currentShaderDetail ?? 1.0 },
-        time: { value: 0 },
-      },
-      vertexShader,
-      fragmentShader,
-      side: THREE.FrontSide,
-    });
-
-    material.toneMapped = false;
-    material.fog = false;
-    material.dithering = false;
-
-    material.userData.isProceduralAsteroid = true;
-    material.userData.seed = seed;
-    material.userData.baseBumpStrength = baseBumpStrength;
-    material.userData.shaderUniforms = material.uniforms;
-
-    return material;
-  }
-
-  /**
-   * Updates procedural material uniforms for camera position.
-   */
-  updateProceduralMaterialUniforms() {
-    if (!this.camera) return;
-
-    const viewPos = this.camera.position;
-    const lightDir = this.keyLight
-      ? this.keyLight.position.clone().normalize()
-      : new this.THREE.Vector3(0.9, 0.35, 0.12).normalize();
-
-    this.activeAsteroids.forEach((asteroid) => {
-      const material = asteroid.material;
-      if (!material?.userData?.isProceduralAsteroid) {
-        return;
-      }
-
-      // Support both RawShaderMaterial (has `material.uniforms`) and injected
-      // MeshStandardMaterial shaders (stored at `material.userData._shader`).
-      const uniforms =
-        material.uniforms || material.userData?._shader?.uniforms || null;
-      if (!uniforms) {
-        return;
-      }
-
-      if (uniforms.u_viewPos?.value?.copy) {
-        uniforms.u_viewPos.value.copy(viewPos);
-      }
-      if (uniforms.u_lightDir?.value?.copy) {
-        uniforms.u_lightDir.value.copy(lightDir);
-      }
-
-      // Optional time/detail uniforms (used by the RawShader study material).
-      if (uniforms.time && typeof uniforms.time.value === 'number') {
-        uniforms.time.value = this.elapsedTime;
-      }
-      if (
-        uniforms.detailLevel &&
-        typeof uniforms.detailLevel.value === 'number'
-      ) {
-        uniforms.detailLevel.value = this.currentShaderDetail ?? 1.0;
-      }
-    });
-  }
-
-  /**
-   * Legacy patch method - now creates procedural material instead.
-   */
-  patchAsteroidMaterial(material) {
-    // This method is kept for compatibility but no longer patches
-    // The actual procedural material is created in activateAsteroid
-    return material;
-  }
-
-  ensurePoolSize(size) {
-    while (this.asteroidPool.length < size) {
-      this.createPoolableAsteroid();
-    }
-  }
-
-  createPoolableAsteroid() {
-    const { THREE, CANNON } = this;
-    const mesh = new THREE.Mesh();
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.visible = false;
-    this.scene.add(mesh);
-
-    const body = new CANNON.Body({ mass: 1, shape: new CANNON.Sphere(1) });
-    body.sleep();
-    this.world.addBody(body);
-
-    const asteroid = {
-      mesh,
-      body,
-      active: false,
-      fading: false,
-      fadeElapsed: 0,
-      material: null,
-      fragmentationLevel: 0,
-    };
-
-    body.asteroidRef = asteroid;
-    body.addEventListener('collide', (event) => {
-      this.handleBodyCollision(event, asteroid);
-    });
-
-    this.asteroidPool.push(asteroid);
-  }
-
-  prepareInitialField() {
-    const largeCount = Math.min(20, this.config.baseFieldCount);
-    for (let i = 0; i < this.config.baseFieldCount; i += 1) {
-      this.spawnBeltAsteroid({ forceLarge: i < largeCount });
-    }
-  }
-
-  spawnBeltAsteroid({ forceLarge = false } = {}) {
-    const { THREE, CANNON } = this;
-    this.spawnedBeltAsteroids += 1;
-
-    const belt = { innerRadius: 40, outerRadius: 150, height: 30 };
-    const angle = this.randomFloat('belt') * Math.PI * 2;
-    const radius =
-      belt.innerRadius +
-      this.randomFloat('belt') * (belt.outerRadius - belt.innerRadius);
-    const position = new THREE.Vector3(
-      Math.cos(angle) * radius,
-      (this.randomFloat('belt') - 0.5) * belt.height,
-      Math.sin(angle) * radius
+    menuSettings.applyVideoSettingsChange(event, (value) =>
+      this.updateNormalIntensity(value)
     );
+  }
 
-    const shouldSpawnLarge =
-      forceLarge ||
-      this.spawnedBeltAsteroids <= 20 ||
-      this.randomFloat('belt') < 0.25;
-    const scaleVal = shouldSpawnLarge
-      ? this.randomFloat('belt') * 5 + 5
-      : this.randomFloat('belt') * 3 + 2;
-    const scaleJitter = 1 + (this.randomFloat('belt') - 0.5) * 0.8;
-    const scale = new THREE.Vector3(
-      scaleVal,
-      scaleVal,
-      scaleVal
-    ).multiplyScalar(scaleJitter);
-
-    const velocity = new CANNON.Vec3(
-      (this.randomFloat('belt') - 0.5) * 2,
-      (this.randomFloat('belt') - 0.5) * 2,
-      (this.randomFloat('belt') - 0.5) * 2
-    );
-
-    const angularVelocity = new CANNON.Vec3(
-      (this.randomFloat('belt') - 0.5) * 1,
-      (this.randomFloat('belt') - 0.5) * 1,
-      (this.randomFloat('belt') - 0.5) * 1
-    );
-
-    this.activateAsteroid({
-      position,
-      scale,
-      velocity,
-      angularVelocity,
-    });
+  spawnBeltAsteroid(options) {
+    this.asteroidField.spawnBeltAsteroid(options);
   }
 
   spawnRogueAsteroid() {
-    if (!this.activeAsteroids.length) {
-      return;
-    }
-
-    const { THREE, CANNON } = this;
-    const target =
-      this.activeAsteroids[
-        Math.floor(this.randomFloat('asteroids') * this.activeAsteroids.length)
-      ];
-
-    const spawnDirection = new THREE.Vector3(
-      this.randomFloat('asteroids') - 0.5,
-      this.randomFloat('asteroids') - 0.5,
-      this.randomFloat('asteroids') - 0.5
-    ).normalize();
-
-    const spawnDistance = 300;
-    const position = spawnDirection.multiplyScalar(spawnDistance);
-
-    const velocity = new CANNON.Vec3();
-    target.body.position.vsub(
-      new CANNON.Vec3(position.x, position.y, position.z),
-      velocity
-    );
-    velocity.normalize();
-    velocity.scale(80, velocity);
-
-    // Non-uniform scaling fights the spherical-domain procedural shader and
-    // makes the material look "stretched". Keep uniform scale (study parity).
-    const scaleValue = this.randomFloat('asteroids') * 4 + 4;
-    const scale = new THREE.Vector3(scaleValue, scaleValue, scaleValue);
-
-    const angularVelocity = new CANNON.Vec3(
-      (this.randomFloat('asteroids') - 0.5) * 3,
-      (this.randomFloat('asteroids') - 0.5) * 3,
-      (this.randomFloat('asteroids') - 0.5) * 3
-    );
-
-    this.activateAsteroid({ position, scale, velocity, angularVelocity });
-  }
-
-  activateAsteroid({
-    position,
-    scale,
-    velocity,
-    angularVelocity,
-    fragmentationLevel = 0,
-  }) {
-    const asteroid = this.getAsteroidFromPool();
-    if (!asteroid) {
-      return;
-    }
-
-    const { mesh, body } = asteroid;
-    const geometry =
-      this.baseGeometries[
-        Math.floor(this.randomFloat('asteroids') * this.baseGeometries.length)
-      ];
-
-    mesh.geometry = geometry;
-
-    // Single-technique policy: all menu asteroids use the same procedural PBR
-    // material family (triplanar 3D noise), with seed-driven variations.
-    if (
-      !asteroid.material ||
-      !asteroid.material.userData?.isProceduralAsteroid
-    ) {
-      const material =
-        this.baseMaterials[
-          Math.floor(this.randomFloat('materials') * this.baseMaterials.length)
-        ];
-      asteroid.material = material;
-    }
-
-    mesh.material = asteroid.material;
-    mesh.visible = true;
-    mesh.position.copy(position);
-    mesh.scale.copy(scale);
-    mesh.rotation.set(
-      this.randomFloat('asteroids') * Math.PI,
-      this.randomFloat('asteroids') * Math.PI,
-      this.randomFloat('asteroids') * Math.PI
-    );
-
-    const avgRadius = (scale.x + scale.y + scale.z) / 3;
-    if (body.shapes[0]) {
-      body.shapes[0].radius = avgRadius;
-      body.updateBoundingRadius();
-    }
-
-    body.mass = Math.max(0.5, Math.pow(avgRadius, 3));
-    body.updateMassProperties();
-    body.position.set(position.x, position.y, position.z);
-    body.velocity.set(velocity.x, velocity.y, velocity.z);
-    body.angularVelocity.set(
-      angularVelocity.x,
-      angularVelocity.y,
-      angularVelocity.z
-    );
-    body.force.set(0, 0, 0);
-    body.torque.set(0, 0, 0);
-    body.wakeUp();
-
-    asteroid.active = true;
-    asteroid.fading = false;
-    asteroid.fadeElapsed = 0;
-    asteroid.fragmentationLevel = fragmentationLevel;
-    this.activeAsteroids.push(asteroid);
-    if (asteroid.material?.userData?.isProceduralAsteroid) {
-      this.proceduralAsteroidCount += 1;
-      this.hasProceduralAsteroids = true;
-    }
-  }
-
-  getAsteroidFromPool() {
-    if (this.activeAsteroids.length >= this.config.maxAsteroids) {
-      return null;
-    }
-
-    const idle = this.asteroidPool.find((item) => !item.active);
-    if (idle) {
-      return idle;
-    }
-
-    if (this.asteroidPool.length < this.config.maxAsteroids) {
-      this.withSeededMathRandom(() => this.createPoolableAsteroid());
-      return this.asteroidPool[this.asteroidPool.length - 1];
-    }
-
-    return null;
+    this.asteroidField.spawnRogueAsteroid();
   }
 
   deactivateAsteroid(asteroid) {
-    if (!asteroid?.active) {
-      return;
-    }
-
-    asteroid.active = false;
-    asteroid.fading = false;
-    asteroid.fadeElapsed = 0;
-    asteroid.fragmentationLevel = 0;
-    asteroid.mesh.visible = false;
-    asteroid.mesh.position.set(0, -10000, 0);
-    asteroid.body.sleep();
-    asteroid.body.position.set(0, -10000, 0);
-    asteroid.body.velocity.set(0, 0, 0);
-    asteroid.body.angularVelocity.set(0, 0, 0);
-
-    // Restore shared material and dispose fade clone
-    if (asteroid._fadeClonedMaterial && asteroid._sharedMaterial) {
-      asteroid.material.dispose();
-      asteroid.material = asteroid._sharedMaterial;
-      asteroid.mesh.material = asteroid._sharedMaterial;
-      asteroid._sharedMaterial = null;
-      asteroid._fadeClonedMaterial = false;
-    }
-    if (asteroid.material) {
-      asteroid.material.opacity = 1;
-    }
-
-    if (asteroid.material?.userData?.isProceduralAsteroid) {
-      this.proceduralAsteroidCount = Math.max(
-        0,
-        this.proceduralAsteroidCount - 1
-      );
-    }
-
-    const index = this.activeAsteroids.indexOf(asteroid);
-    if (index >= 0) {
-      this.activeAsteroids.splice(index, 1);
-    }
-
-    this.hasProceduralAsteroids = this.proceduralAsteroidCount > 0;
+    this.asteroidField.deactivateAsteroid(asteroid);
   }
 
   startFadeOut(asteroid) {
-    if (!asteroid.fading) {
-      asteroid.fading = true;
-      asteroid.fadeElapsed = 0;
-
-      // Clone shared material so fade opacity doesn't contaminate other asteroids
-      // that share the same baseMaterials[] entry.
-      if (asteroid.material && !asteroid._fadeClonedMaterial) {
-        asteroid._sharedMaterial = asteroid.material;
-        const cloned = this.withSeededMathRandom(() =>
-          asteroid.material.clone()
-        );
-        cloned.transparent = true;
-        cloned.opacity = 1;
-        asteroid.material = cloned;
-        asteroid.mesh.material = cloned;
-        asteroid._fadeClonedMaterial = true;
-      }
-    }
-  }
-
-  handleBodyCollision(event, asteroid) {
-    if (!asteroid?.active) {
-      return;
-    }
-
-    if (asteroid.fragmentationLevel >= this.config.maxFragmentationLevel) {
-      return;
-    }
-
-    const impact =
-      typeof event?.contact?.getImpactVelocityAlongNormal === 'function'
-        ? event.contact.getImpactVelocityAlongNormal()
-        : 0;
-
-    if (impact <= this.config.fragmentationThreshold) {
-      return;
-    }
-
-    this.createExplosion(asteroid.mesh.position);
-
-    // Disparar efeitos cinematográficos de impacto
-    if (this.impactEffect) {
-      this.impactEffect.trigger(asteroid.mesh.position.clone(), impact);
-    }
-
-    this.fragmentAsteroid(asteroid);
-    this.objectsToDeactivate.push(asteroid);
-  }
-
-  fragmentAsteroid(parent) {
-    const radius = parent.body.shapes[0]?.radius || 1;
-    const fragments = Math.floor(this.randomFloat('fragments') * 3) + 2;
-    // F10: reuse temporaries instead of allocating per fragment
-    const direction = this._tmpVec3;
-    const offset = new this.THREE.Vector3(); // one alloc for the whole loop
-    const impulse = this._tmpCannonVec3;
-
-    for (let i = 0; i < fragments; i += 1) {
-      const scaleMultiplier = this.randomFloat('fragments') * 0.3 + 0.4;
-      const sx = parent.mesh.scale.x * scaleMultiplier;
-      const sy = parent.mesh.scale.y * scaleMultiplier;
-      const sz = parent.mesh.scale.z * scaleMultiplier;
-
-      if (sx < 1 && sy < 1 && sz < 1) {
-        continue;
-      }
-
-      direction
-        .set(
-          this.randomFloat('fragments') - 0.5,
-          this.randomFloat('fragments') - 0.5,
-          this.randomFloat('fragments') - 0.5
-        )
-        .normalize();
-
-      offset.copy(parent.mesh.position).addScaledVector(direction, radius);
-
-      impulse.set(direction.x * 15, direction.y * 15, direction.z * 15);
-
-      const avx = (this.randomFloat('fragments') - 0.5) * 5;
-      const avy = (this.randomFloat('fragments') - 0.5) * 5;
-      const avz = (this.randomFloat('fragments') - 0.5) * 5;
-
-      this.activateAsteroid({
-        position: offset,
-        scale: { x: sx, y: sy, z: sz },
-        velocity: {
-          x: parent.body.velocity.x + impulse.x,
-          y: parent.body.velocity.y + impulse.y,
-          z: parent.body.velocity.z + impulse.z,
-        },
-        angularVelocity: { x: avx, y: avy, z: avz },
-        fragmentationLevel: parent.fragmentationLevel + 1,
-      });
-    }
+    this.asteroidField.startFadeOut(asteroid);
   }
 
   createExplosion(position) {
-    // F9: reuse pooled PointLight instead of allocating new one
-    let light = this._explosionLightPool.pop();
-    if (!light) {
-      // Pool exhausted — fall back to allocation (rare)
-      const { THREE } = this;
-      light = this.withSeededMathRandom(
-        () => new THREE.PointLight(0xffaa66, 3.5, 140, 2)
-      );
-      this.scene.add(light);
-    } else {
-      light.intensity = 3.5;
-      light.distance = 140;
-      light.visible = true;
-    }
-    light.position.copy(position);
-
-    this.explosions.push({
-      light,
-      life: 0.4,
-      maxLife: 0.4,
-      initialIntensity: 3.5,
-      initialDistance: 140,
-    });
-  }
-
-  async warmupFirstImpactPath() {
-    const { THREE } = this;
-    if (
-      !THREE ||
-      !this.impactEffect ||
-      !this.renderer ||
-      !this.scene ||
-      !this.camera ||
-      this.activeAsteroids.length === 0
-    ) {
-      return;
-    }
-
-    const waitForFrame = () =>
-      new Promise((resolve) => requestAnimationFrame(() => resolve()));
-    const warmupPosition = new THREE.Vector3(0, 0, 0);
-
-    try {
-      // Match the expensive first real impact: pooled impact FX plus the
-      // transient explosion light that changes the active light count.
-      this.impactEffect.trigger(
-        warmupPosition,
-        this.config.fragmentationThreshold + 10
-      );
-      this.createExplosion(warmupPosition);
-
-      await waitForFrame();
-      this.renderWarmupFrame();
-      await waitForFrame();
-      this.renderWarmupFrame();
-    } finally {
-      this.impactEffect.cleanup();
-      this.clearActiveExplosions();
-    }
-  }
-
-  renderWarmupFrame() {
-    if (!this.renderer || !this.scene || !this.camera) {
-      return;
-    }
-
-    if (this.customFX?.uniforms?.time) {
-      this.customFX.uniforms.time.value = this.elapsedTime;
-    }
-
-    this.camera.lookAt(0, 0, 0);
-
-    if (this.composer) {
-      this.composer.render();
-      return;
-    }
-
-    this.renderer.render(this.scene, this.camera);
+    this.asteroidField.createExplosion(position);
   }
 
   clearActiveExplosions() {
-    while (this.explosions.length) {
-      const explosion = this.explosions.pop();
-      if (explosion?.light) {
-        explosion.light.intensity = 0;
-        explosion.light.visible = false;
-        this._explosionLightPool.push(explosion.light);
-      }
-    }
+    this.asteroidField.clearActiveExplosions();
   }
 
   updateExplosions(delta) {
-    for (let i = this.explosions.length - 1; i >= 0; i -= 1) {
-      const explosion = this.explosions[i];
-      explosion.life -= delta;
-
-      const progress = Math.max(explosion.life, 0) / explosion.maxLife;
-      explosion.light.intensity = explosion.initialIntensity * progress;
-      explosion.light.distance =
-        explosion.initialDistance * (0.7 + progress * 0.3);
-
-      if (explosion.life <= 0) {
-        // F9: return light to pool instead of removing from scene
-        explosion.light.intensity = 0;
-        explosion.light.visible = false;
-        this._explosionLightPool.push(explosion.light);
-        this.explosions.splice(i, 1);
-      }
-    }
+    this.asteroidField.updateExplosions(delta);
   }
 
-  // ============================================
-  // Phase 3: Adaptive Quality System
-  // ============================================
-
-  /**
-   * Updates FPS tracking and adjusts quality level dynamically.
-   * Called every frame to maintain smooth performance.
-   */
   updateAdaptiveQuality(delta) {
-    const aq = this.adaptiveQuality;
-    if (!aq.enabled) return;
-
-    // Track frame time
-    const frameTimeMs = delta * 1000;
-    aq.frameTimesMs.push(frameTimeMs);
-    if (aq.frameTimesMs.length > aq.frameTimesMaxSamples) {
-      aq.frameTimesMs.shift();
-    }
-
-    // Calculate average FPS (need at least 30 samples)
-    if (aq.frameTimesMs.length < 30) return;
-
-    const avgFrameTime =
-      aq.frameTimesMs.reduce((a, b) => a + b, 0) / aq.frameTimesMs.length;
-    const currentFps = 1000 / avgFrameTime;
-    aq.lastFps = currentFps;
-
-    // Update cooldown
-    if (aq.adjustmentCooldown > 0) {
-      aq.adjustmentCooldown -= delta;
-      return;
-    }
-
-    // Check if we need to adjust quality
-    const maxLevel = aq.levels.length - 1;
-
-    if (currentFps < aq.targetFpsMin && aq.currentLevel > 0) {
-      // FPS too low - decrease quality
-      aq.currentLevel--;
-      aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
-      this.applyQualityLevel(aq.currentLevel);
-      debugLog(
-        `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} < ${aq.targetFpsMin}, ` +
-          `降级 to "${aq.levels[aq.currentLevel].name}"`
-      );
-    } else if (currentFps > aq.targetFpsMax && aq.currentLevel < maxLevel) {
-      // FPS has headroom - try increasing quality
-      aq.currentLevel++;
-      aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
-      this.applyQualityLevel(aq.currentLevel);
-      debugLog(
-        `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} > ${aq.targetFpsMax}, ` +
-          `升级 to "${aq.levels[aq.currentLevel].name}"`
-      );
-    }
+    quality.updateAdaptiveQuality(this.adaptiveQuality, delta, (level) =>
+      this.applyQualityLevel(level)
+    );
   }
 
-  /**
-   * Applies a quality level to all relevant systems.
-   */
   applyQualityLevel(level) {
-    const aq = this.adaptiveQuality;
-    const config = aq.levels[level];
-    if (!config) return;
-
-    // Update bloom pass
-    if (this.bloomPass) {
-      this.bloomPass.strength = config.bloomStrength;
-    }
-
-    // Update chromatic aberration in custom FX + toggle pass enabled state (F3)
-    if (this.customFX && this.customFX.uniforms) {
-      this.customFX.uniforms.amount.value = config.chromaticAberration;
-      const grainValue = this.customFX.uniforms.grainAmount?.value ?? 0;
-      this.customFX.enabled =
-        config.chromaticAberration !== 0 || grainValue !== 0;
-    }
-
-    // Update impact effects quality level
-    if (this.impactEffect) {
-      this.impactEffect.setQualityLevel(level);
-    }
-
-    // Update asteroid material shader detail
-    this.updateAsteroidShaderDetail(config.shaderDetail);
-  }
-
-  /**
-   * Updates the shader detail level for all asteroid materials.
-   * This controls the complexity of fragment shader effects.
-   */
-  updateAsteroidShaderDetail(detailLevel) {
-    // Store current detail level for new asteroids
-    this.currentShaderDetail = detailLevel;
-
-    // Update all active asteroid materials
-    this.activeAsteroids.forEach((asteroid) => {
-      if (asteroid.material && asteroid.material.userData) {
-        asteroid.material.userData.shaderDetail = detailLevel;
-        // Update the uniform directly if shader is compiled
-        const uniforms = asteroid.material.userData.shaderUniforms;
-        if (uniforms && uniforms.detailLevel) {
-          uniforms.detailLevel.value = detailLevel;
-        }
-      }
-    });
-
-    // Update base materials
-    this.baseMaterials.forEach((material) => {
-      if (material.userData) {
-        material.userData.shaderDetail = detailLevel;
-        const uniforms = material.userData.shaderUniforms;
-        if (uniforms && uniforms.detailLevel) {
-          uniforms.detailLevel.value = detailLevel;
-        }
-      }
-    });
-
-    // Update monolith shader materials (if present)
-    this.monolithMaterials?.forEach?.((material) => {
-      if (material?.userData) {
-        material.userData.shaderDetail = detailLevel;
-        const uniforms = material.userData.shaderUniforms;
-        if (uniforms && uniforms.detailLevel) {
-          uniforms.detailLevel.value = detailLevel;
-        }
-      }
-    });
-  }
-
-  /**
-   * Updates time uniform for all asteroid shaders (for animated effects).
-   */
-  updateAsteroidShaderTime(time) {
-    this.activeAsteroids.forEach((asteroid) => {
-      if (asteroid.material && asteroid.material.userData) {
-        const uniforms = asteroid.material.userData.shaderUniforms;
-        if (uniforms && uniforms.time) {
-          uniforms.time.value = time;
-        }
-      }
+    quality.applyQualityLevel(this.adaptiveQuality, level, {
+      bloomPass: this.bloomPass,
+      customFX: this.customFX,
+      impactEffect: this.impactEffect,
+      updateAsteroidShaderDetail: (detail) =>
+        this.asteroidMaterials.updateAsteroidShaderDetail(detail),
     });
   }
 
@@ -3569,68 +949,13 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     // F4: 30Hz fixed step with max 1 catch-up (decorative menu doesn't need 60Hz physics)
     this.world.step(1 / 30, delta, 1);
 
-    for (let i = this.activeAsteroids.length - 1; i >= 0; i -= 1) {
-      const asteroid = this.activeAsteroids[i];
-      const { body, mesh } = asteroid;
-      mesh.position.set(body.position.x, body.position.y, body.position.z);
-      mesh.quaternion.set(
-        body.quaternion.x,
-        body.quaternion.y,
-        body.quaternion.z,
-        body.quaternion.w
-      );
-
-      const distanceSqr =
-        body.position.x * body.position.x +
-        body.position.y * body.position.y +
-        body.position.z * body.position.z;
-
-      if (distanceSqr > this.config.cullingDistanceSqr) {
-        this.startFadeOut(asteroid);
-      }
-
-      if (asteroid.fading) {
-        asteroid.fadeElapsed += delta;
-        const fadeProgress = Math.min(
-          asteroid.fadeElapsed / this.config.fadeOutDuration,
-          1
-        );
-        if (asteroid.material) {
-          asteroid.material.opacity = 1 - fadeProgress;
-          asteroid.material.needsUpdate = true;
-        }
-
-        if (fadeProgress >= 1) {
-          this.objectsToDeactivate.push(asteroid);
-        }
-      }
-    }
-
-    while (this.objectsToDeactivate.length) {
-      this.deactivateAsteroid(this.objectsToDeactivate.pop());
-    }
+    this.asteroidField.updateAsteroids(delta);
 
     while (this.activeAsteroids.length < this.config.baseFieldCount) {
       this.spawnBeltAsteroid();
     }
 
-    // More pronounced camera orbit so parallax is readable without mouse input.
-    const timer = this.elapsedTime * 0.06;
-    const orbitalRadius = 140;
-
-    // Cinematic Damping & Lens Float
-    const driftX = Math.sin(this.elapsedTime * 0.4) * 6;
-    const driftY = Math.cos(this.elapsedTime * 0.25) * 4;
-
-    const targetPosX = Math.cos(timer) * orbitalRadius + driftX;
-    const targetPosZ = Math.sin(timer) * orbitalRadius;
-    const targetPosY = Math.sin(timer * 0.7) * 15 + driftY;
-
-    // Smooth lerp for "weighty" camera feel
-    const camLerp = 0.04;
-    this.camera.position.x += (targetPosX - this.camera.position.x) * camLerp;
-    this.camera.position.y += (targetPosY - this.camera.position.y) * camLerp;
-    this.camera.position.z += (targetPosZ - this.camera.position.z) * camLerp;
+    const timer = orbitCamera(this.camera, this.elapsedTime);
 
     // Aplicar camera shake ANTES do lookAt (offset à posição calculada)
     if (this.impactEffect) {
@@ -3645,40 +970,14 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.hullReducedMotion
     );
 
-    // Update Atmosphere
-    if (this.nebulas) {
-      this.nebulas.forEach((neb) => {
-        neb.material.uniforms.time.value = this.elapsedTime;
-        neb.rotation.z += neb.userData.rotateSpeed * delta;
-      });
-    }
+    atmosphere.updateAtmosphere(
+      this.nebulas,
+      this.dustSystem,
+      this.elapsedTime,
+      delta
+    );
 
-    if (this.dustSystem) {
-      this.dustSystem.rotation.y += delta * 0.02;
-    }
-
-    this.starLayers.forEach((layer) => {
-      layer.mesh.rotation.y = -timer * layer.speedFactor;
-      if (this.camera) {
-        const followFactor = layer.mesh?.userData?.followCameraFactor;
-        if (typeof followFactor === 'number' && Number.isFinite(followFactor)) {
-          layer.mesh.position
-            .copy(this.camera.position)
-            .multiplyScalar(Math.max(-1.25, Math.min(1.25, followFactor)));
-        } else if (layer.mesh?.userData?.followCamera) {
-          layer.mesh.position.copy(this.camera.position);
-        }
-      }
-      const uniforms = layer.mesh?.material?.uniforms;
-      if (uniforms?.particleSize) {
-        uniforms.particleSize.value = this.computeStarParticleSize(
-          layer?.config?.pixelSize ?? 1
-        );
-      }
-      if (uniforms?.time) {
-        uniforms.time.value = this.elapsedTime;
-      }
-    });
+    this.starfield.updateStarLayers(timer, this.elapsedTime);
 
     this.updateExplosions(delta);
 
@@ -3691,8 +990,8 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     // Procedural asteroid shader is optional; menu currently uses PBR materials.
     // Keep calls guarded to avoid unnecessary work.
     if (this.hasProceduralAsteroids) {
-      this.updateProceduralMaterialUniforms();
-      this.updateAsteroidShaderTime(this.elapsedTime);
+      this.asteroidMaterials.updateProceduralMaterialUniforms();
+      this.asteroidMaterials.updateAsteroidShaderTime(this.elapsedTime);
     }
 
     if (this.customFX && this.customFX.uniforms) {
@@ -3770,7 +1069,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.composer.setSize(width, height);
     }
 
-    this.updateStarLayerSizes();
+    this.starfield.updateStarLayerSizes();
   }
 
   handleScreenChanged(event) {

@@ -1,0 +1,22 @@
+// A biome: three per run, five layers each (field meanings in src/data/biomes.js).
+export default {
+  id: 'outer-ring',
+  order: 1,
+  title: 'CHAPTER I — THE OUTER RING',
+  layers: [1, 5],
+  sky: ['#0b111c', '#020408'],
+  hazeColor: '#5078c8',
+  hazeDensity: 1,
+  veinColor: '#ffb347',
+  veinDensity: 0.05,
+  dustColor: '#d8dce4',
+  keyColor: '#fff1e2',
+  keyIntensity: 1.6,
+  fillColor: '#64748b',
+  fillIntensity: 0.35,
+  bloomScale: 1,
+  debris: 0.35,
+  structures: 0,
+  musicTheme: 'outer-ring',
+  tint: 'rgba(120, 150, 200, 0)',
+};

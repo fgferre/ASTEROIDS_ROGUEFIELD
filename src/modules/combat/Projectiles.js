@@ -1,6 +1,6 @@
 // src/modules/combat/Projectiles.js
 //
-// The shots in flight: the ship's lance and flak bolts, and every enemy
+// The shots in flight: the ship's weapon's projectiles, and every enemy
 // projectile. Takes them from the pool, moves them, trims their trails, lets
 // enemy shots hit the player, and returns spent ones to the pool. CombatSystem
 // owns it, ticks it after shooting, then resolves the player shots' hits.
@@ -16,17 +16,16 @@ import {
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../../data/constants/gameplay.js';
-import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
-import { WEAPONS } from '../../data/weapons.js';
-
-const FLAK = WEAPONS.scatter.flak;
+import { BOSS_CONFIG } from '../../data/constants/visual.js';
+import { getContent } from '../../content/registry.js';
+import { WEAPONS, firePattern } from '../../data/weapons.js';
 
 export class Projectiles {
   /**
    * `physics()`: the physics service (buildPlayerCollisionContext, checkCircleCollision).
    * `emit(name, payload)`: sends bullet-created and player-hit-by-projectile.
    * `weapon()`: the ship's shot right now, a fresh plain object: { weaponId, bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceDamageTuning, lanceApexDamage, lancePierce, pierceBonus }.
-   * `burstFlak(bolt)`: bursts a flak bolt at the end of its range (the weapon's hit path).
+   * `burstFlak(bolt)`: bursts a projectile with a `burst` at the end of its range (the weapon's hit path).
    */
   constructor({ physics, emit, weapon, burstFlak }) {
     this.physics = physics;
@@ -47,7 +46,8 @@ export class Projectiles {
     };
   }
 
-  // `volley` (Scatter Coil) makes it a flak bolt of that volley.
+  // The weapon's projectile (its content file). `volley`: the fan's volley it
+  // belongs to; a projectile with a `burst` fired alone is a volley of one.
   createBullet(fromPos, toPos, damage, volley = null) {
     const dx = toPos.x - fromPos.x;
     const dy = toPos.y - fromPos.y;
@@ -56,6 +56,8 @@ export class Projectiles {
     if (distance === 0) return;
 
     const weapon = this.weapon();
+    const definition = WEAPONS[weapon.weaponId];
+    const { projectile } = definition;
 
     // Use object pool instead of creating new object
     const bullet = GamePools.bullets.acquire();
@@ -63,31 +65,36 @@ export class Projectiles {
     // Configure bullet properties
     bullet.x = fromPos.x;
     bullet.y = fromPos.y;
-    const speed = volley
-      ? weapon.bulletSpeed * FLAK.speedMultiplier
-      : weapon.bulletSpeed;
+    const speed = weapon.bulletSpeed * projectile.speedMultiplier;
     bullet.vx = (dx / distance) * speed;
     bullet.vy = (dy / distance) * speed;
-    // Thermal Lens boosts the lance only while the beam is not there to take it.
+    // Thermal Lens boosts the shot only while no beam is there to take it.
     const lens =
-      weapon.weaponId !== 'harmonic' && weapon.thermalLens
+      weapon.thermalLens && !firePattern(definition, 'beam')
         ? weapon.thermalLens.lanceDamageMultiplier
         : 1;
     const shotDamage =
       damage * weapon.lanceDamageTuning * lens * weapon.lanceApexDamage;
-    // A flak bolt lives until the end of its range and does not pierce.
-    const life = volley ? FLAK.range / speed : weapon.bulletLifetime;
-    bullet.damage = volley ? shotDamage * FLAK.damageMultiplier : shotDamage;
-    bullet.shrapnel = volley ? shotDamage * FLAK.burstDamageMultiplier : 0;
-    bullet.volley = volley;
+    // A projectile with a range lives until the end of it.
+    const life = projectile.range
+      ? projectile.range / speed
+      : weapon.bulletLifetime;
+    const { burst } = projectile;
+    bullet.damage = shotDamage * projectile.damageMultiplier;
+    bullet.shrapnel = burst ? shotDamage * burst.damageMultiplier : 0;
+    bullet.volley = volley ?? (burst ? { struck: [], bursts: 0 } : null);
+    bullet.projectile = projectile;
+    bullet.colors = definition.colors;
     bullet.life = life;
     bullet.maxLife = life;
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'player';
-    bullet.kind = volley ? 'flak' : 'lance';
+    bullet.kind = projectile.look;
     bullet.offscreenTimer = 0;
-    bullet.pierceLeft = volley ? 0 : weapon.lancePierce + weapon.pierceBonus;
+    bullet.pierceLeft = projectile.pierce
+      ? weapon.lancePierce + weapon.pierceBonus
+      : 0;
     if (!bullet.pierced) {
       bullet.pierced = [];
     } else {
@@ -309,16 +316,10 @@ export class Projectiles {
     const enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
 
-    switch (enemyType) {
-      case 'hunter':
-        return 'rgba(80, 220, 255, 0.9)';
-      case 'mine':
-        return 'rgba(255, 204, 102, 0.9)';
-      case 'drone':
-        return 'rgba(255, 96, 64, 0.92)';
-      default:
-        return 'rgba(255, 120, 80, 0.9)';
-    }
+    return (
+      getContent('enemies', enemyType)?.projectileColor ??
+      'rgba(255, 120, 80, 0.9)'
+    );
   }
 
   resolveEnemyProjectileDamage(data = {}, projectile = {}) {
@@ -343,7 +344,9 @@ export class Projectiles {
       return bossProjectileDamage;
     }
 
-    const enemyConfig = enemyType ? ENEMY_TYPES?.[enemyType] : null;
+    const enemyConfig = enemyType
+      ? getContent('enemies', enemyType)?.config
+      : null;
     if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
       return enemyConfig.projectileDamage;
     }
@@ -588,8 +591,7 @@ export class Projectiles {
 
       // Atualizar trail
       bullet.trail.push({ x: bullet.x, y: bullet.y });
-      const trailLimit =
-        bullet.kind === 'flak' ? FLAK.trailPoints : trailLength;
+      const trailLimit = bullet.projectile.trailPoints ?? trailLength;
       if (bullet.trail.length > trailLimit) {
         bullet.trail.shift();
       }
@@ -600,9 +602,9 @@ export class Projectiles {
       bullet.y += bullet.vy * deltaTime;
       bullet.life -= deltaTime;
 
-      // A flak bolt that reached the end of its range bursts there (backed
-      // up by the overshoot, so the range does not depend on the frame).
-      if (bullet.kind === 'flak' && bullet.life <= 0) {
+      // A bursting projectile that reached the end of its range bursts there
+      // (backed up by the overshoot, so the range does not depend on the frame).
+      if (bullet.projectile.burst && bullet.life <= 0) {
         bullet.x += bullet.vx * bullet.life;
         bullet.y += bullet.vy * bullet.life;
         bullet.hit = true;
