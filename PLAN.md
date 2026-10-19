@@ -60,14 +60,12 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 
 ### 0a — a fábrica de conteúdo
 
-- [ ] **0a.1 Registro** (em curso 19/10: `src/content/registry.js` + `tests/content/registry.test.js`; feitos biomas,
-      41 cartas, 3 cascos, 3 armas, 15 camadas (`src/data/layerParts.js` evita o ciclo), 10
-      inimigos (`git mv`, exports nomeados mantidos) e 6 chefes (`content/bosses`; `boss.js`/`herald.js` reconstroem) — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
-      conteúdo só importa constantes e outros arquivos de conteúdo, nunca um módulo que lê o registro — ciclo de import).
-      Pedido original: `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
-      `import.meta.glob`; criar o arquivo é registrar. `tests/content.test.js` valida todo item (campos, referências a
-      comportamentos/cues/paleta, papéis resolvíveis) e substitui os testes que enumeram tipos à mão. Mover os dados
-      atuais (`src/data/enemies`, `upgrades`, `weapons.js`, `shipModels.js`, `layers.js`, `biomes.js`) para lá.
+- [x] **0a.1 Registro** (19/10): `src/content/registry.js`; biomas, 41 cartas, 3 cascos, 3 armas, 15 camadas, 10
+      inimigos e 6 chefes, um arquivo cada; os módulos antigos mantêm os exports, lidos do registro. O motor lê os
+      inimigos do registro (registro de tipos, agenda da camada, pools, recompensas, afixos, minas, cores de tiro,
+      nomes); sobra só o mapa `TYPE_CLASSES` até 0a.3. `tests/content/{registry,enemies}.test.js` validam cada item.
+      Regra: arquivo de conteúdo importa só constantes (`src/data/constants/`) e outros arquivos de conteúdo — nunca
+      `GameConstants` nem um módulo que lê o registro (ciclo de import que derruba tudo ao carregar).
 - [ ] **0a.2 Cena de conteúdo.** `?content=<id>` coloca qualquer item do registro diante da nave (hero generalizada);
       acaba o script de captura sob medida por worker.
 - [ ] **0a.3 Inimigo = receita.** Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
