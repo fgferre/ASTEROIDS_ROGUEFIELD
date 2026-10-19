@@ -64,7 +64,7 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 ### 0a — a fábrica de conteúdo
 
 - [ ] **0a.1 Registro** (em curso 19/10: `src/content/registry.js` + `tests/content/registry.test.js`; feitos biomas,
-      41 cartas, 3 cascos, 3 armas — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
+      41 cartas, 3 cascos, 3 armas, 15 camadas (`src/data/layerParts.js` evita o ciclo) — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
       conteúdo só importa constantes e outros arquivos de conteúdo, nunca um módulo que lê o registro — ciclo de import).
       Pedido original: `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
       `import.meta.glob`; criar o arquivo é registrar. `tests/content.test.js` valida todo item (campos, referências a
@@ -96,9 +96,14 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
       do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
 - [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
+- [x] **EnemySystem** (3.159 → 1.183, 19/10): registro dos tipos numa função só (`enemyTypeRegistry.js`), chefes,
+      recompensas, fotos, consultas e acertos em `src/modules/enemies/{base,systems}/`; trace igual a cada passo.
+- [x] **EnemyEffects** (1.512 → 665, 19/10): tiro, rachaduras e Volatile em módulos; o despacho de morte por tipo
+      ficou num lugar só.
 - [x] **WaveManager** (2.749 → 1.081, 19/10): agenda da camada, spawner, onda de chefe, eventos e random em
       `src/modules/enemies/waves/`; a agenda (tipos de apoio, grupos por tipo) num módulo só, para o diretor por papéis.
-- [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
+- [x] **0b.6 XPOrbSystem** (2.077 → 678, 19/10): desenho 2D morto apagado; campo, fusão, espaçamento, ímã e números
+      em `src/modules/xp/`; hash por quadro de cada orbe igual em cinco partidas.
 - [x] **AAAHudLayout** (1.892 → 889, 19/10): um módulo por painel em `src/modules/ui/hud/` (mesmas 976 operações de DOM
       num DOM falso, antes e depois); HUD visto numa partida.
 - [x] **0b.7 Renderer3D** (1.791 → 839, 19/10): montagem da cena, câmera, espelhos do campo e sobreposições em
@@ -106,7 +111,7 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [x] **SettingsPanel** (1.328 → 868) e **UISystem** (1.253 → 964), 19/10: construtores de campo e textos de tecla em
       `src/modules/ui/settings/`; busca no DOM e escala da tela em `src/modules/ui/`; painel e teclas vistos no navegador.
 - [x] **Trace de comparação** (19/10): 19 partidas de 60 s (camadas 1–15, 17, Boss Rush, harmonic e scatter na 9); pega
-      a velocidade de um inimigo de 180 para 181 em 14 das 19. O piloto não se move (movimento quase sem cobertura).
+      a velocidade de um inimigo de 180 para 181 em 14 das 19. Depois (19/10) mais duas em que a nave voa: move, dash, freio e escudo, uma com o Bastion.
 - [x] **InputSystem** (1.386 → 1.184, 19/10): montagem dos comandos em `src/modules/input/commandPayloads.js`.
 - [x] **Teste `aim-regression`** (2.715, 19/10): quatro arquivos por assunto em `tests/integration/aim/`, os mesmos 80
       testes.
