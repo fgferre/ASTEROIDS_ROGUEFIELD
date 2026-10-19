@@ -4,8 +4,7 @@
 // by `tilt`, turned about the vertical by `yaw` and rolled about its own axis
 // by `roll` (radians). Field units, x right and y down; `lens` is the vertical
 // half-angle's tangent (`tanV`) and the screen's width ÷ height (`aspect`).
-// The camera director (cameraDirector.js) frames with it and keeps every
-// shot, at every angle, inside the field.
+// The camera director (cameraDirector.js) frames with it.
 
 const basis = {
   ex: 0, // eye
@@ -169,23 +168,4 @@ const fitExtent = {};
 export function fieldFitDistance(angles, lens, width, height) {
   const e = shotExtent(1, angles, lens, fitExtent);
   return Math.min(width / (e.left + e.right), height / (e.up + e.down));
-}
-
-const clampExtent = {};
-
-/**
- * Moves pose.x / pose.y the least so the whole shot lies inside the field;
- * a shot wider (or taller) than the field is centred on that axis.
- */
-export function clampShotToField(pose, lens, width, height) {
-  const e = shotExtent(pose.distance, pose, lens, clampExtent);
-  pose.x =
-    e.left + e.right >= width
-      ? (e.left + width - e.right) / 2
-      : Math.max(e.left, Math.min(width - e.right, pose.x));
-  pose.y =
-    e.up + e.down >= height
-      ? (e.up + height - e.down) / 2
-      : Math.max(e.up, Math.min(height - e.down, pose.y));
-  return pose;
 }

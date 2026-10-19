@@ -16,6 +16,7 @@ import {
   resolveCameraMode,
 } from '../../core/camera.js';
 import { epiloguePath, introPath } from '../../core/cinematics.js';
+import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
@@ -206,16 +207,26 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('wave-started', (payload = {}) => {
       this.biome.enterLayer(payload.wave);
+      this.camera.trigger('waveStart');
     });
-    // The camera director's event moments (core/cameraDirector.js).
+    // What opens the camera director's wide view (core/cameraDirector.js).
     this.registerEventListener('wave-complete', () => {
       this.camera.trigger('cleared');
     });
-    this.registerEventListener('boss-defeated', () => {
-      this.camera.trigger('victory');
+    this.registerEventListener('elite-spawned', (payload) => {
+      this.camera.trigger('elite', payload);
     });
-    this.registerEventListener('player-died', () => {
-      this.camera.trigger('death');
+    this.registerEventListener('boss-telegraph', () => {
+      this.camera.trigger('telegraph');
+    });
+    // A boss falling mid-run: a short push from above.
+    this.registerEventListener('boss-defeated', () => {
+      if (!this.reducedMotion) {
+        this.camera.pulseZoom(
+          CAMERA_ZOOM * CAMERA_DIRECTOR.bossDown.zoom,
+          CAMERA_DIRECTOR.bossDown.duration
+        );
+      }
     });
     this.registerEventListener('layer-modifier-started', (payload = {}) => {
       if (payload.id === 'dense-fog') this.denseFog = true;
@@ -350,16 +361,16 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * The Warden's arrival: the camera director's boss entrance frames it with
-   * the ship (a cut under reduced motion). False when the letterbox should
-   * not play (no Warden, WebGL failed, not the dynamic camera, reduced
-   * motion): the caller keeps the plain banner.
+   * The Warden's arrival: the camera director opens its wide view on the
+   * whole field (a cut under reduced motion). False when the letterbox
+   * should not play (no Warden, WebGL failed, not the dynamic camera,
+   * reduced motion): the caller keeps the plain banner.
    */
   playArrival(warden) {
     if (!warden || this.failed || this.camera.mode !== 'dynamic') {
       return false;
     }
-    this.camera.trigger('bossEntrance', warden);
+    this.camera.trigger('bossArrival', warden);
     return !this.reducedMotion;
   }
 

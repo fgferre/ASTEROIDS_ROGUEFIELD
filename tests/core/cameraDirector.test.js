@@ -2,18 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   createDirector,
   createDirectorScene,
-  MOMENTS,
   timeToHit,
 } from '../../src/core/cameraDirector.js';
-import { projectToScreen, shotCorners } from '../../src/core/cameraShot.js';
+import { projectToScreen } from '../../src/core/cameraShot.js';
 import { CAMERA_DIRECTOR } from '../../src/data/constants/camera.js';
 import { FOV } from '../../src/modules/render3d/sceneSetup.js';
 
 const W = 800;
 const H = 600;
 const DT = 1 / 60;
+const DEG = Math.PI / 180;
 const tanV = Math.tan((FOV * Math.PI) / 360);
-const M = CAMERA_DIRECTOR.moments;
+const T = CAMERA_DIRECTOR;
+const SHAPES = [9 / 16, 1, 4 / 3, 16 / 9, 21 / 9, 32 / 9];
 
 function director(aspect = 16 / 9) {
   const d = createDirector({ fieldWidth: W, fieldHeight: H });
@@ -27,25 +28,17 @@ function scene(x, y, extra = {}) {
 
 function run(d, s, seconds) {
   let pose = null;
-  for (let t = 0; t < seconds; t += DT) pose = d.update(s, DT);
+  for (let t = 0; t < seconds - 1e-9; t += DT) pose = d.update(s, DT);
   return pose;
 }
 
-function lensOf(aspect) {
-  return { tanV, aspect };
-}
-
-function insideField(pose, aspect) {
-  const { xs, ys } = shotCorners(pose, lensOf(aspect));
-  return xs.every((x, i) => {
-    const px = pose.x + x;
-    const py = pose.y + ys[i];
-    return px >= -1e-6 && px <= W + 1e-6 && py >= -1e-6 && py <= H + 1e-6;
-  });
-}
-
 function screenOf(pose, aspect, x, y) {
-  return projectToScreen(pose, lensOf(aspect), x, y);
+  return projectToScreen(pose, { tanV, aspect }, x, y);
+}
+
+function shown(pose, aspect, x, y, margin = 1) {
+  const p = screenOf(pose, aspect, x, y);
+  return p.front && Math.abs(p.x) <= margin && Math.abs(p.y) <= margin;
 }
 
 // A hostile shot that reaches the ship at (x, y) in `seconds`, from `angle`.
@@ -69,218 +62,199 @@ describe('camera director', () => {
     expect(timeToHit(5, 0, 0, 0, 10)).toBe(0);
   });
 
-  it('when calm, comes close to the ship within the calm zoom and keeps it central', () => {
+  it('follows the ship near, at today’s tilt, with the ship central', () => {
     const d = director();
-    const pose = run(d, scene(400, 300), 4);
-    expect(d.moment).toBe('calm');
-    expect(pose.zoom).toBeGreaterThanOrEqual(M.calm.zoom[0] - 1e-6);
-    expect(pose.zoom).toBeLessThanOrEqual(M.calm.zoom[1] + 1e-6);
-    const p = screenOf(pose, 16 / 9, 400, 300);
-    expect(Math.abs(p.x)).toBeLessThanOrEqual(CAMERA_DIRECTOR.margins.player);
-    expect(Math.abs(p.y)).toBeLessThanOrEqual(CAMERA_DIRECTOR.margins.player);
-  });
-
-  it('leads toward the aim when calm, and not at all with reduced motion', () => {
-    const lead = (reduced) => {
-      const d = director();
-      d.setReducedMotion(reduced);
-      const s = scene(400, 300, { leadX: 90, leadY: 0 });
-      return run(d, s, 4).x;
-    };
-    expect(lead(false)).toBeGreaterThan(400 + 30);
-    expect(lead(true)).toBeCloseTo(400, 0);
-  });
-
-  it('never shows past the field edge, in any moment, window shape or place', () => {
-    const shapes = [9 / 16, 1, 4 / 3, 16 / 9, 21 / 9, 32 / 9];
-    const spots = [
-      [5, 5],
-      [W - 5, 5],
-      [W - 5, H - 5],
-      [5, H - 5],
-      [W / 2, H / 2],
-    ];
-    for (const aspect of shapes) {
-      for (const moment of MOMENTS) {
-        const d = director(aspect);
-        d.force(moment);
-        for (const [x, y] of spots) {
-          const boss = { type: 'boss', x: W - x, y: H - y, radius: 80 };
-          const pose = run(d, scene(x, y, { enemies: [boss] }), 1);
-          expect(
-            insideField(pose, aspect),
-            `${moment} ${aspect} ${x},${y}`
-          ).toBe(true);
-        }
-      }
-    }
-  });
-
-  it('keeps the ship whole on screen in every moment, even flying flat out', () => {
-    for (const moment of MOMENTS) {
-      const d = director();
-      d.force(moment);
-      run(d, scene(200, 300), 2);
-      for (let t = 0; t < 2; t += DT) {
-        // Across the field and back at 300 units/s, clear of the side strips.
-        const x = 200 + 400 * Math.abs(Math.sin(t * 0.75));
-        const pose = d.update(scene(x, 300, { vx: 300 }), DT);
-        const p = screenOf(pose, 16 / 9, x, 300);
-        expect(Math.abs(p.x), `${moment} at ${x}`).toBeLessThanOrEqual(1);
-        expect(Math.abs(p.y), `${moment} at ${x}`).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('keeps what will hit on screen at once, even from below on an ultrawide', () => {
-    // On 32:9 ship and bolt may not both fit: the bolt wins (field, threat,
-    // ship), so the ship is only checked on the others.
-    for (const aspect of [16 / 9, 21 / 9, 32 / 9]) {
-      const d = director(aspect);
-      // Settled close in, calm, at the field's top.
-      run(d, scene(400, 150), 4);
-      const bolt = shotAt(400, 150, 0.6, Math.PI / 2);
-      const pose = d.update(scene(400, 150, { shots: [bolt] }), DT);
-      const p = screenOf(pose, aspect, bolt.x, bolt.y);
-      const margin = CAMERA_DIRECTOR.margins.threat;
-      expect(Math.abs(p.x), `aspect ${aspect}`).toBeLessThanOrEqual(margin);
-      expect(Math.abs(p.y), `aspect ${aspect}`).toBeLessThanOrEqual(margin);
-      if (aspect < 3) {
-        const s = screenOf(pose, aspect, 400, 150);
-        expect(Math.abs(s.y), `aspect ${aspect}`).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('calls danger only after a second of it, and lets go after two calm seconds', () => {
-    const d = director();
-    // Seven enemies on top of the ship: crowd danger.
-    const crowd = Array.from({ length: 7 }, (_, i) => ({
-      type: 'drone',
-      x: 400 + Math.cos(i) * 60,
-      y: 300 + Math.sin(i) * 60,
-      radius: 12,
-    }));
-    run(d, scene(400, 300, { enemies: crowd }), 0.8);
-    expect(d.moment).not.toBe('danger');
-    run(d, scene(400, 300, { enemies: crowd }), 0.4);
-    expect(d.moment).toBe('danger');
-    run(d, scene(400, 300), 1.5);
-    expect(d.moment).toBe('danger');
-    run(d, scene(400, 300), 1);
-    expect(d.moment).not.toBe('danger');
-  });
-
-  it('breathes when the wave is cleared, even straight out of danger', () => {
-    const d = director();
-    const crowd = Array.from({ length: 7 }, (_, i) => ({
-      type: 'drone',
-      x: 400 + Math.cos(i) * 60,
-      y: 300 + Math.sin(i) * 60,
-      radius: 12,
-    }));
-    run(d, scene(400, 300, { enemies: crowd }), 1.5);
-    expect(d.moment).toBe('danger');
-    d.trigger('cleared');
-    run(d, scene(400, 300), DT);
-    expect(d.moment).toBe('cleared');
-    run(d, scene(400, 300), M.cleared.minActive + 0.1);
-    expect(d.moment).toBe('calm');
-  });
-
-  it('feels the pressure of a group close by and opens a little', () => {
-    const d = director();
-    const group = [0, 1, 2].map((i) => ({
-      type: 'hunter',
-      x: 600 + i * 30,
-      y: 300,
-      radius: 14,
-    }));
-    const pose = run(d, scene(400, 300, { enemies: group }), 3);
-    expect(d.moment).toBe('pressure');
-    expect(pose.zoom).toBeLessThanOrEqual(M.pressure.zoom[1] + 1e-6);
-  });
-
-  it('frames the Warden and the ship, wide and tilted, on its entrance', () => {
-    const d = director();
-    run(d, scene(150, 300), 3);
-    const warden = { type: 'boss', x: 600, y: 300, radius: 90 };
-    d.trigger('bossEntrance', warden);
-    const pose = run(d, scene(150, 300, { enemies: [warden] }), 1.5);
-    expect(d.moment).toBe('bossEntrance');
-    expect(pose.zoom).toBeCloseTo(1, 2);
-    expect(pose.tilt).toBeGreaterThan(
-      (18 + M.bossEntrance.tilt * 0.8) * (Math.PI / 180)
-    );
-    for (const [x, y] of [
-      [150, 300],
-      [600, 300],
-    ]) {
-      const p = screenOf(pose, 16 / 9, x, y);
-      expect(Math.abs(p.x)).toBeLessThanOrEqual(1);
-      expect(Math.abs(p.y)).toBeLessThanOrEqual(1);
-    }
-    // Then the fight: the Warden stays a must.
-    run(d, scene(150, 300, { enemies: [warden] }), M.bossEntrance.minActive);
-    expect(d.moment).toBe('boss');
-  });
-
-  it('ranks death over victory over the entrance, and victory turns and ends on its own', () => {
-    const d = director();
-    run(d, scene(400, 300), 1);
-    d.trigger('bossEntrance', { x: 600, y: 300, radius: 80 });
-    d.trigger('victory');
-    run(d, scene(400, 300), DT);
-    expect(d.moment).toBe('victory');
-    const turned = run(d, scene(400, 300), M.victory.minActive - 0.2);
-    expect(turned.yaw).toBeGreaterThan(4 * (Math.PI / 180));
-    d.trigger('death');
-    run(d, scene(400, 300), DT);
-    expect(d.moment).toBe('death');
-    // Death holds until a reset.
-    run(d, scene(400, 300), 10);
-    expect(d.moment).toBe('death');
-    d.reset();
-    run(d, scene(400, 300), DT);
-    expect(d.moment).toBe('calm');
-  });
-
-  it('closes in on the ship as it dies, in about the death spring', () => {
-    const d = director();
-    run(d, scene(400, 300), 4);
-    d.trigger('death');
     const pose = run(d, scene(400, 300), 3);
-    expect(pose.zoom).toBeGreaterThan(M.death.zoom[0] - 0.05);
+    expect(d.moment).toBe('near');
+    expect(pose.tilt).toBeCloseTo(T.near.tilt * DEG, 3);
+    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+    const p = screenOf(pose, 16 / 9, 400, 300);
+    expect(Math.abs(p.x)).toBeLessThan(0.15);
+    expect(Math.abs(p.y)).toBeLessThan(0.15);
   });
 
-  it('with reduced motion: no extra angle, never too close, and the special moments cut', () => {
+  it('near, may show past the field edge, but no more than allowed', () => {
+    const d = director();
+    const pose = run(d, scene(10, 300), 3);
+    expect(d.moment).toBe('near');
+    // Past the edge: the field's left edge is on screen, right of its border.
+    const edge = screenOf(pose, 16 / 9, 0, 300);
+    expect(edge.x).toBeGreaterThan(-1);
+    // But at most `beyondEdge` of the half-view lies past it.
+    expect(edge.x).toBeLessThanOrEqual(-1 + 2 * T.near.beyondEdge * 0.5 + 0.05);
+    expect(shown(pose, 16 / 9, 10, 300, 0.95)).toBe(true);
+  });
+
+  it('wide shows the whole field from nearly above, at every window shape', () => {
+    for (const aspect of SHAPES) {
+      const d = director(aspect);
+      d.force('wide');
+      const pose = run(d, scene(200, 200), 2);
+      expect(pose.tilt, `aspect ${aspect}`).toBeCloseTo(T.wide.tilt * DEG, 2);
+      for (const [x, y] of [
+        [0, 0],
+        [W, 0],
+        [W, H],
+        [0, H],
+      ]) {
+        expect(shown(pose, aspect, x, y), `aspect ${aspect} ${x},${y}`).toBe(
+          true
+        );
+      }
+    }
+  });
+
+  it('opens before something that will hit arrives from off screen', () => {
+    for (const aspect of [16 / 9, 21 / 9]) {
+      const d = director(aspect);
+      run(d, scene(400, 150), 3);
+      // From below, inside the field (shots leaving it are removed).
+      const bolt = shotAt(400, 150, 1.2, Math.PI / 2);
+      d.update(scene(400, 150, { shots: [bolt] }), DT);
+      expect(d.moment, `aspect ${aspect}`).toBe('wide');
+      // It has opened well before the bolt lands.
+      const pose = run(d, scene(400, 150, { shots: [bolt] }), 0.6);
+      expect(shown(pose, aspect, bolt.x, bolt.y), `aspect ${aspect}`).toBe(
+        true
+      );
+    }
+  });
+
+  it('stays near for what is already on screen, even a crowd close by', () => {
+    const d = director();
+    const crowd = [0, 1, 2, 3].map((i) => ({
+      type: 'drone',
+      x: 440 + i * 12,
+      y: 300 + i * 6,
+      radius: 12,
+    }));
+    run(d, scene(400, 300, { enemies: crowd }), 2);
+    expect(d.moment).toBe('near');
+  });
+
+  it('opens when enemies close in from several sides', () => {
+    const d = director();
+    const around = [
+      { type: 'drone', x: 650, y: 300 },
+      { type: 'drone', x: 150, y: 300 },
+      { type: 'drone', x: 400, y: 80 },
+    ];
+    run(d, scene(400, 300, { enemies: around }), 0.5);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('opens just before the ship crosses a field edge', () => {
+    const d = director();
+    run(d, scene(600, 300), 3);
+    d.update(scene(720, 300, { vx: 260 }), DT);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('opens when a boss is off the near shot', () => {
+    const d = director();
+    run(d, scene(100, 300), 3);
+    const boss = { type: 'boss', x: 720, y: 300, radius: 80 };
+    d.update(scene(100, 300, { enemies: [boss] }), DT);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('stays wide at least a while, then eases back near', () => {
+    const d = director();
+    run(d, scene(400, 300), 2);
+    d.trigger('waveStart');
+    run(d, scene(400, 300), T.glance.waveStart + T.wideHold - 0.2);
+    expect(d.moment).toBe('wide');
+    const pose = run(d, scene(400, 300), 3);
+    expect(d.moment).toBe('near');
+    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+  });
+
+  it('opens for the orbs of a cleared wave and closes once they are taken', () => {
+    const d = director();
+    run(d, scene(400, 300), 2);
+    const orbs = [{ x: 700, y: 520, collected: false }];
+    d.trigger('cleared');
+    run(d, scene(400, 300, { orbs }), 1);
+    expect(d.moment).toBe('wide');
+    orbs[0].collected = true;
+    run(d, scene(400, 300, { orbs }), T.wideHold + 0.2);
+    expect(d.moment).toBe('near');
+  });
+
+  it('looks at an elite only when it spawns out of sight', () => {
+    const d = director();
+    run(d, scene(400, 300), 2);
+    d.trigger('elite', { x: 420, y: 300 });
+    d.update(scene(400, 300), DT);
+    expect(d.moment).toBe('near');
+    d.trigger('elite', { x: 790, y: 20 });
+    d.update(scene(400, 300), DT);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('keeps the ship on screen in both states, flying flat out', () => {
+    for (const forced of [null, 'near', 'wide']) {
+      const d = director();
+      d.force(forced);
+      run(d, scene(200, 300), 2);
+      for (let t = 0; t < 3; t += DT) {
+        const x = 40 + 720 * Math.abs(Math.sin(t * 0.9));
+        const pose = d.update(scene(x, 300, { vx: 300 }), DT);
+        expect(shown(pose, 16 / 9, x, 300), `${forced} at ${x}`).toBe(true);
+      }
+    }
+  });
+
+  it('drifts slowly when calm, and holds still with an enemy close', () => {
+    const calm = director();
+    const a = run(calm, scene(400, 300), 2).x;
+    const b = run(calm, scene(400, 300), 2).x;
+    expect(Math.abs(a - b)).toBeGreaterThan(0.05);
+    expect(Math.abs(a - b)).toBeLessThan(10);
+
+    const busy = director();
+    const close = [{ type: 'drone', x: 430, y: 300, radius: 12 }];
+    const c = run(busy, scene(400, 300, { enemies: close }), 2).x;
+    const e = run(busy, scene(400, 300, { enemies: close }), 2).x;
+    expect(Math.abs(c - e)).toBeLessThan(0.01);
+  });
+
+  it('with reduced motion: no drift or lead, and the wide view cuts in', () => {
     const d = director();
     d.setReducedMotion(true);
-    run(d, scene(400, 300), 4);
-    d.trigger('victory');
-    const pose = d.update(scene(400, 300), DT);
-    expect(pose.zoom).toBeLessThanOrEqual(
-      CAMERA_DIRECTOR.reducedMotion.maxZoom + 1e-6
-    );
-    expect(pose.zoom).toBeCloseTo(
-      Math.min(M.victory.zoom[0], CAMERA_DIRECTOR.reducedMotion.maxZoom),
-      6
-    );
-    expect(pose.tilt).toBeCloseTo(18 * (Math.PI / 180), 6);
-    expect(pose.yaw).toBe(0);
-    expect(pose.rollMax).toBe(0);
+    const a = run(d, scene(400, 300, { leadX: 90, leadY: 0 }), 2);
+    expect(a.x).toBeCloseTo(400, 3);
+    expect(a.roll).toBe(0);
+    expect(a.rollMax).toBe(0);
+    d.trigger('waveStart');
+    const cut = d.update(scene(400, 300), DT);
+    expect(d.moment).toBe('wide');
+    expect(cut.tilt).toBeCloseTo(T.wide.tilt * DEG, 6);
   });
 
-  it('slides across the field when the ship wraps, instead of cutting', () => {
+  it('leads toward the aim when near', () => {
     const d = director();
-    run(d, scene(790, 300), 4);
-    const before = d.update(scene(790, 300), DT).x;
-    // A few frames in, it is on its way across, not there.
-    const first = run(d, scene(10, 300), 4 * DT).x;
-    expect(first).toBeLessThan(before - 10);
-    expect(first).toBeGreaterThan(before - 150);
-    const after = run(d, scene(10, 300), 1).x;
-    const settled = run(director(), scene(10, 300), 4).x;
-    expect(after).toBeCloseTo(settled, 0);
+    const pose = run(d, scene(400, 300, { leadX: 90, leadY: 0 }), 3);
+    expect(pose.x).toBeGreaterThan(430);
+  });
+
+  it('keeps the ship on screen through a wrap, then slides; cuts under reduced motion', () => {
+    const d = director();
+    d.force('near');
+    run(d, scene(790, 300), 3);
+    const wrap = d.update(scene(10, 300), DT);
+    expect(shown(wrap, 16 / 9, 10, 300)).toBe(true);
+    const first = wrap.x;
+    const next = run(d, scene(10, 300), 4 * DT).x;
+    const settled = run(d, scene(10, 300), 3).x;
+    expect(next).toBeLessThan(first - 1);
+    expect(next).toBeGreaterThan(settled + 1);
+
+    const r = director();
+    r.force('near');
+    r.setReducedMotion(true);
+    run(r, scene(790, 300), 3);
+    const cut = r.update(scene(10, 300), DT).x;
+    expect(cut).toBeCloseTo(run(r, scene(10, 300), 3).x, 0);
   });
 });

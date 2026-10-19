@@ -41,14 +41,14 @@ describe('Renderer3D dash and brake camera', () => {
   });
 });
 
-describe('Renderer3D camera director moments', () => {
+describe('Renderer3D camera director', () => {
   const ship = { ...createCameraScene(), hasShip: true, x: 300, y: 300 };
-  const momentAfter = (renderer) => {
+  const stateAfter = (renderer) => {
     renderer.camera.update(300, 300, 1 / 60, ship);
     return renderer.camera.moment;
   };
 
-  it('opens the boss entrance on the Warden, with bars only without reduced motion, never on the classic or static camera', () => {
+  it('opens wide on the Warden’s arrival, with bars only without reduced motion, never on the classic or static camera', () => {
     const warden = { x: 500, y: 250, radius: 60 };
     const renderer = new Renderer3D();
     renderer.camera.setMode('static');
@@ -57,24 +57,23 @@ describe('Renderer3D camera director moments', () => {
     expect(renderer.playArrival(warden)).toBe(false);
     renderer.camera.setMode('dynamic');
     renderer.applyAccessibilityPreferences({ reducedMotion: true });
-    // No bars, but the moment still cuts in.
+    // No bars, but the wide view still cuts in.
     expect(renderer.playArrival(warden)).toBe(false);
-    expect(momentAfter(renderer)).toBe('bossEntrance');
+    expect(stateAfter(renderer)).toBe('wide');
     renderer.applyAccessibilityPreferences({ reducedMotion: false });
     expect(renderer.playArrival(warden)).toBe(true);
     renderer.onReset(); // a new run, the menu
-    expect(momentAfter(renderer)).toBe('calm');
+    expect(stateAfter(renderer)).toBe('near');
   });
 
-  it('turns the boss falling, the ship dying and a cleared wave into moments', () => {
-    const eventBus = new EventBus();
-    const renderer = new Renderer3D({ eventBus });
-    eventBus.emit('wave-complete', { wave: 1 });
-    expect(momentAfter(renderer)).toBe('cleared');
-    eventBus.emit('boss-defeated', {});
-    expect(momentAfter(renderer)).toBe('victory');
-    eventBus.emit('player-died', {});
-    expect(momentAfter(renderer)).toBe('death');
+  it('opens wide when a wave starts and when a boss announces an attack', () => {
+    for (const event of ['wave-started', 'boss-telegraph']) {
+      const eventBus = new EventBus();
+      const renderer = new Renderer3D({ eventBus });
+      expect(stateAfter(renderer)).toBe('near');
+      eventBus.emit(event, { wave: 1 });
+      expect(stateAfter(renderer), event).toBe('wide');
+    }
   });
 });
 

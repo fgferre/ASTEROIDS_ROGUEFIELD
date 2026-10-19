@@ -5,12 +5,12 @@
 // (setReach); headless, the flat view is the shot.
 //
 // Modes: 'dynamic' (default) hands the shot to the camera director
-// (cameraDirector.js, PLAN.md 14.2b): moments, weights, zoom and angles, with
-// the edge and the threat about to hit kept on screen; 'classic' is the plain
+// (cameraDirector.js, PLAN.md 14.2b): top-down, near the ship or wide on the
+// whole field, and free to show past the field's edge; 'classic' is the plain
 // follow with a dead zone and a smoothed lag (`?camera=1`, or Settings →
 // Graphics), which is also what the dynamic mode does without a scene;
-// 'static' is the fixed full-field view (`?camera=0`). Dev: `?moment=<name>`
-// holds the director in one moment (MOMENTS in cameraDirector.js).
+// 'static' is the fixed full-field view (`?camera=0`). Dev: `?moment=near` or
+// `?moment=wide` holds the director in that state.
 //
 // Apply order per frame: base transform → screen shake → applyTransform(ctx).
 
@@ -169,15 +169,15 @@ export function createCamera({
     },
 
     /**
-     * The director's shot this frame ({ x, y, distance, tilt, yaw, rollMax,
-     * zoom }, see cameraDirector.js), or null when the camera follows
-     * plainly (classic, static, no scene).
+     * The director's shot this frame ({ x, y, distance, tilt, yaw, roll,
+     * rollMax, zoom }, see cameraDirector.js), or null when the camera
+     * follows plainly (classic, static, no scene).
      */
     get directed() {
       return directed;
     },
 
-    /** The director's moment ('calm', 'danger', … see MOMENTS). */
+    /** The director's state: 'near' or 'wide'. */
     get moment() {
       return director.moment;
     },
@@ -295,8 +295,8 @@ export function createCamera({
     },
 
     /**
-     * A director moment from a game event: 'bossEntrance' (with the boss
-     * to frame), 'victory', 'death' or 'cleared'.
+     * A game event for the director: 'cleared', 'waveStart', 'elite' (with
+     * where it spawned), 'telegraph' or 'bossArrival'.
      */
     trigger(kind, target) {
       if (enabled && mode === 'dynamic') director.trigger(kind, target);

@@ -170,7 +170,7 @@ describe('createCamera', () => {
     const scene = { ...createCameraScene(), hasShip: true, x: 400, y: 300 };
     camera.update(400, 300, 1 / 60, scene);
     expect(camera.directed).not.toBeNull();
-    expect(camera.moment).toBe('calm');
+    expect(camera.moment).toBe('near');
     expect(camera.x).toBe(camera.directed.x);
     camera.setMode('classic');
     camera.update(400, 300, 1 / 60, scene);

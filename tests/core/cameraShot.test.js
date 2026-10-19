@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clampShotToField,
   fieldFitDistance,
   projectToScreen,
   shotCorners,
@@ -53,42 +52,6 @@ describe('cameraShot', () => {
       expect(p.y).toBeCloseTo(expected[i][1], 6);
     }
     expect(projectToScreen(pose, lens, pose.x, pose.y).x).toBeCloseTo(0, 6);
-  });
-
-  it('keeps the whole shot inside the field at any aspect, angle and target', () => {
-    const angles = [
-      { tilt: 18 * DEG, yaw: 0, roll: 0 },
-      { tilt: 28 * DEG, yaw: 0, roll: 0 },
-      { tilt: 26 * DEG, yaw: 8 * DEG, roll: 0 },
-      { tilt: 18 * DEG, yaw: 0, roll: 2.5 * DEG },
-      { tilt: 21 * DEG, yaw: -8 * DEG, roll: -3 * DEG },
-    ];
-    for (const aspect of ASPECTS) {
-      const lens = { tanV, aspect };
-      for (const a of angles) {
-        for (const zoom of [1, 1.3, 1.6]) {
-          const distance = fieldFitDistance(a, lens, W, H) / zoom;
-          for (const [x, y] of [
-            [0, 0],
-            [W, 0],
-            [W, H],
-            [0, H],
-            [W / 2, H / 2],
-          ]) {
-            const pose = { x, y, distance, ...a };
-            clampShotToField(pose, lens, W, H);
-            const { xs, ys } = shotCorners(pose, lens);
-            const shot = `aspect ${aspect} tilt ${a.tilt} yaw ${a.yaw} roll ${a.roll} zoom ${zoom} at ${x},${y}`;
-            for (let i = 0; i < 4; i += 1) {
-              expect(pose.x + xs[i], shot).toBeGreaterThanOrEqual(-1e-6);
-              expect(pose.x + xs[i], shot).toBeLessThanOrEqual(W + 1e-6);
-              expect(pose.y + ys[i], shot).toBeGreaterThanOrEqual(-1e-6);
-              expect(pose.y + ys[i], shot).toBeLessThanOrEqual(H + 1e-6);
-            }
-          }
-        }
-      }
-    }
   });
 
   it('at zoom 1 touches both field edges on the screen long side', () => {

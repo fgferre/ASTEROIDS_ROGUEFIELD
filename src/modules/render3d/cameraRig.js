@@ -1,13 +1,13 @@
 // The gameplay shot around the logical follow camera (core/camera.js), posed
 // on the perspective camera every frame: in the dynamic mode the camera
-// director's shot (core/cameraDirector.js) with the strafe roll and a capped
-// shake, kept inside the field at its every angle (core/cameraShot.js); in
-// the classic mode the dolly and the clamp to the field. Also the key light's
-// shadow box and the run's cinematics.
+// director's shot (core/cameraDirector.js, which may show past the field's
+// edge) with the strafe roll and a capped shake; in the classic mode the
+// dolly and the clamp to the field. Also the key light's shadow box and the
+// run's cinematics.
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { createCameraScene, readCameraScene } from '../../core/camera.js';
-import { clampShotToField, shotExtent } from '../../core/cameraShot.js';
+import { shotExtent } from '../../core/cameraShot.js';
 import {
   blendPose,
   cinematicFreezeFromUrl,
@@ -222,9 +222,9 @@ export class CameraRig {
     if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
   }
 
-  // The director's shot with the strafe roll and the shake (capped, none
-  // under reduced motion), kept inside the field at those angles; then a
-  // running cinematic poses relative to it, as in the classic shot.
+  // The director's shot (which may show past the field's edge) with its calm
+  // lean, the strafe roll and the shake (capped, none under reduced motion);
+  // then a running cinematic poses relative to it, as in the classic shot.
   poseDirected(t, player, effects, directed, dt, reducedMotion) {
     const shot = this.shot;
     const roll = this.updateRoll(player, dt, reducedMotion, directed.rollMax);
@@ -239,8 +239,10 @@ export class CameraRig {
     shot.distance = directed.distance;
     shot.tilt = directed.tilt;
     shot.yaw = directed.yaw;
-    shot.roll = roll + (shaking ? cap(shake.angle, SHAKE.maxAngle * DEG) : 0);
-    clampShotToField(shot, this.lens, GAME_WIDTH, GAME_HEIGHT);
+    shot.roll =
+      directed.roll +
+      roll +
+      (shaking ? cap(shake.angle, SHAKE.maxAngle * DEG) : 0);
 
     // The logical camera's reach and position, for getView and the space.
     const e = shotExtent(shot.distance, shot, this.lens, this.extent);

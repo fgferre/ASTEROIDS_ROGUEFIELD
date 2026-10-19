@@ -119,6 +119,12 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       (câmera lenta forte, jogador protegido e sem controle 2–3 s, câmera baixa que pode girar, sobe antes de devolver o
       controle) só na chegada do chefe, `run-won` e morte; queda de chefe no meio = destaque curto de cima. Ordem: (a) e
       (b) primeiro; (c) e (d) podem correr em paralelo; (e) depois deles. (4) ele joga e ajusta.
+      **(a) e (b) feitos 19/10 no mesmo ramo:** `src/core/cameraDirector.js` reescrito em dois estados (perto/aberta,
+      `?moment=near|wide` em dev), números em `src/data/constants/camera.js`; `src/modules/render3d/fieldVeil.js` (espaço
+      além da borda mais escuro, linha de luz, cortina baixa). Eventos: `wave-started`, `wave-complete`, `elite-spawned`,
+      `boss-telegraph`, `boss-spawned` (via `playArrival`, abre a vista aberta até existir a cena viva), `boss-defeated`
+      (empurrão curto de cima). A cena viva, a morte e a vitória final ainda não têm câmera própria. (c) e (d) estão
+      propostos como sessões à parte.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.
