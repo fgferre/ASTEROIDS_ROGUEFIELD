@@ -15,7 +15,7 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 - `tests/services/`: session, command queue, hangar, codex, difficulty, run records.
 - `tests/data/`: the data tables (layers, bosses per layer, catalogs).
 - `tests/utils/`, `tests/physics/`: helpers in `src/utils/`; collision accuracy.
-- `tests/integration/`: several systems together: headless runs, replay, `determinism/`, `scenarios/`, boss curve, audio event coverage.
+- `tests/integration/`: several systems together: headless runs, replay, `determinism/`, `scenarios/`, boss curve, audio event coverage, golden trace (every layer hashed second by second: a refactor must leave it passing).
 - `tests/balance/`: reward mechanics and asteroid metrics over many waves (numbers, not feel: the owner's play is the judge).
 - `tests/visual/`: determinism of rendering, menu background, shake and audio, measured as numbers, never pixels.
 - `tests/process/`: rules about the repository itself: no dev globals reach production, the test selector picks the right tests.
@@ -25,7 +25,7 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 
 - `tests/__helpers__/headlessGame.js` boots the real service manifest and steps frames without a browser; `scriptedPlayer.js` drives the inputs. Most integration and scenario tests go through them.
 - `global-setup.js` restores mocks after every test; do not add your own `afterEach` for that. `mocks.js` (event bus), `stubs.js` (deterministic random), `fixtures.js`, `assertions.js`, `asteroid-helpers.js`, `fakeGamepad.js`, `audio-manifest-wiring.js` cover the rest.
-- `tests/__fixtures__/` holds data fixtures; `tests/fixtures/audio-event-inventory.json` is the inventory the audio coverage test checks.
+- `tests/__fixtures__/` holds data fixtures (`golden-trace.json` changes only in a commit that means to change behavior); `tests/fixtures/audio-event-inventory.json` is the inventory the audio coverage test checks.
 
 ## Conventions (from AGENTS.md)
 
