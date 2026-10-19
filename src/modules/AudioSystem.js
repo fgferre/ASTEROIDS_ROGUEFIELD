@@ -1,31 +1,32 @@
 import { BaseSystem } from '../core/BaseSystem.js';
-import SFXBus, {
-  resolveDistanceMix,
-  resolveExplosionSize,
-  resolveStereoPan,
-} from './audio/SFXBus.js';
+import SFXBus from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
-import {
-  biomeThemeForLayer,
-  chapterThemeForLayer,
-  musicThemeForLayer,
-} from './audio/MusicThemes.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
 import DuckingController from './audio/DuckingController.js';
+import { registerAudioEventCues } from './audio/eventDispatch.js';
+import { installBusForwarders } from './audio/busForwarders.js';
+import * as bossVoice from './audio/bossVoice.js';
+import {
+  createThrusterState,
+  followThrusterEffect,
+  stopIdleThrusters,
+} from './audio/thrusterEvents.js';
+import {
+  captureRandomScopes,
+  clearRandomDebugControls,
+  createRandomScopes,
+  exposeRandomDebugControls,
+  reseedRandomScopes,
+} from './audio/randomScopes.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { IS_DEV } from '../core/env.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import {
   AUDIO_BIG_MOMENT_DUCK,
   AUDIO_MASTER_LIMITER,
-  AUDIO_REVERB_SEND_DB,
 } from '../data/audio/mix.js';
-import { BOSS_AUDIO_FREQUENCY_PRESETS } from '../data/audio/bossCues.js';
-
-const DEV_MODE = IS_DEV;
 
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -46,7 +47,7 @@ class AudioSystem extends BaseSystem {
       (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
     this.randomScopes = {
-      ...this._createRandomScopes(this.random),
+      ...createRandomScopes(this.random),
       seeds: null,
       cacheSnapshot: null,
       batcherSnapshot: null,
@@ -64,8 +65,8 @@ class AudioSystem extends BaseSystem {
     // src/modules/; only the method bodies + ownership relocated here — AGENTS.md:7).
     // Composed inside the stable `audio` service (RESEARCH A3, no new manifest dep).
     // Construction does NO AudioContext work; init() builds its ambient/protected
-    // buses + instances once the context + effects stages exist. The facade keeps
-    // EventBus listeners + thin delegations; the relocated private bodies are GONE.
+    // buses + instances once the context + effects stages exist. Game events
+    // reach it through the event → sound table (src/data/audio/eventCues.js).
     this.sfxBus = new SFXBus();
     // Wire the bus's facade seams up-front (before init) so its play* delegations
     // route through the centralized ensureRunning gate (which early-returns when
@@ -97,13 +98,10 @@ class AudioSystem extends BaseSystem {
     this.listenerY = GAME_HEIGHT / 2;
     this.runEnemyCount = 0;
 
-    // UI sound debouncing
-    this.lastUIHoverTime = 0;
-
     // MusicMixer (INFRA-02 / AUDIO-01) — composed inside the stable `audio`
     // service (RESEARCH A3). Construction does NO AudioContext work; init() is
-    // called from AudioSystem.init() once the context + buses exist. The facade
-    // keeps the EventBus listeners and DELEGATES the boss arc + pause to it.
+    // called from AudioSystem.init() once the context + buses exist. The event
+    // table's music steps (./audio/eventHandlers.js) drive it.
     this.musicMixer = new MusicMixer({
       randomScope: this.randomScopes?.families?.music || this.random,
     });
@@ -112,8 +110,8 @@ class AudioSystem extends BaseSystem {
     // + rejection-safe, resume-race-hardened, ordered playback starts. Composed
     // inside the stable `audio` service. Construction does NO AudioContext work;
     // init() is called from AudioSystem.init() once the context + buses exist.
-    // The facade keeps the EventBus + screen orchestration and DELEGATES track
-    // play/stop to the manager. `currentScreen` stays on the facade because it is
+    // The facade keeps the screen orchestration and DELEGATES track play/stop
+    // to the manager. `currentScreen` stays on the facade because it is
     // driven by screen/overlay events, not by the media graph.
     this.fileTrackManager = new FileTrackManager();
     this.currentScreen = null;
@@ -129,15 +127,10 @@ class AudioSystem extends BaseSystem {
     // CROSSING into ≤25% HP, re-armed when HP recovers above the threshold.
     this.lowHealthDuckArmed = false;
 
-    // Thruster sound system — the ThrusterLoopManager instance now lives inside
-    // SFXBus; the facade keeps the event-driven state machine + inactivity timer
-    // and delegates the actual loop/burst synthesis into SFXBus.
-    this.thrusterState = {
-      lastEventTime: { main: 0, retro: 0, side: 0 }, // Timestamp of last event per type
-      startThreshold: 0.1, // Intensity threshold to start thruster sound
-      stopThreshold: 0.05, // Hysteresis: lower threshold to stop (prevents flapping)
-      inactivityTimeout: 150, // ms: stop loop if no event received for this duration
-    };
+    // Thruster sound system — the ThrusterLoopManager instance lives inside
+    // SFXBus; the event-driven state machine is ./audio/thrusterEvents.js, its
+    // state and inactivity timer stay here.
+    this.thrusterState = createThrusterState();
     this.thrusterInactivityCheckInterval = null;
 
     this.captureRandomScopes();
@@ -361,431 +354,15 @@ class AudioSystem extends BaseSystem {
   }
 
   /**
-   * Registers listeners for gameplay events that trigger audio feedback.
+   * Registers the gameplay listeners that trigger audio feedback: the event →
+   * sound table (src/data/audio/eventCues.js), read by eventDispatch.js.
    *
-   * Enemy modules should emit `enemy-fired`/`mine-exploded` so that all audio
-   * synthesis stays centralized here instead of touching the AudioSystem
-   * directly. This keeps new enemy types decoupled from the sound pipeline
-   * while still allowing bespoke effects per archetype.
+   * Enemy modules emit events (`enemy-fired`, `mine-exploded`, …) instead of
+   * touching the AudioSystem, so new enemy types stay decoupled from the sound
+   * pipeline: a new cue is a row in the table.
    */
   setupEventListeners() {
-    this.registerEventListener('settings-audio-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.updateVolumeState(payload.values);
-      }
-    });
-
-    this.registerEventListener('weapon-fired', (data) => {
-      this._trackListenerPosition(data?.position);
-      this.playLaserShot(data || {});
-    });
-
-    this.registerEventListener('combat-target-lock', (data) => {
-      if (data?.lost) {
-        return;
-      }
-      this.playTargetLock(data || {});
-    });
-
-    this.registerEventListener('enemy-destroyed', (data) => {
-      if (!data) return;
-
-      // Epic sound when Gold asteroid is destroyed
-      if (data.variant === 'gold') {
-        this.playGoldJackpot();
-      }
-
-      if (data.size) {
-        this.playAsteroidBreak(data.size);
-      }
-      const size = resolveExplosionSize(data);
-      if (size) {
-        this.playExplosion(size, this._resolveSourceSpatial(data));
-        if (size === 'large') {
-          this._duckBigMoment();
-        }
-      }
-      // A Husk hisses open and its drones pop out over the explosion.
-      if ((data.enemyType || data.enemy?.type) === 'husk') {
-        this.playHuskRelease(this._resolveSourceSpatial(data));
-      }
-
-      const fragments = Array.isArray(data.fragments)
-        ? data.fragments.length
-        : 0;
-      this._setRunEnemyCount(this.runEnemyCount - 1 + fragments);
-    });
-
-    this.registerEventListener('asteroid-volatile-exploded', (data = {}) => {
-      this.playExplosion('large', this._resolveSourceSpatial(data));
-      this._duckBigMoment();
-    });
-
-    this.registerEventListener('player-leveled-up', () => {
-      this.playLevelUp();
-      this._duckBigMoment();
-    });
-
-    this.registerEventListener('xp-collected', () => {
-      // All orbs play same sound (all are tier 1 blue)
-      this.playXPCollect();
-    });
-
-    this.registerEventListener('xp-orb-fused', (data) => {
-      // Play fusion sound based on tier
-      this.playOrbFusion(data?.toClass);
-    });
-
-    this.registerEventListener('enemy-spawned', (data) => {
-      // Special sound for Gold spawn
-      if (data?.enemy?.variant === 'gold') {
-        this.playGoldSpawn();
-      }
-      this._setRunEnemyCount(this.runEnemyCount + 1);
-    });
-
-    // Cues later enemy slices emit (harmless until they do).
-    this.registerEventListener('enemy-telegraph', (data = {}) => {
-      this.playEnemyTelegraph(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('elite-spawned', () => {
-      this.playEliteSpawned();
-    });
-
-    this.registerEventListener('weapon-beam-fired', (data = {}) => {
-      this.playHarmonicBeam({ pan: resolveStereoPan(data.x, this.listenerX) });
-    });
-
-    this.registerEventListener('weapon-evolved', () => {
-      this.playWeaponEvolved();
-      this._duckBigMoment();
-    });
-
-    this.registerEventListener('upgrade-rerolled', () => {
-      this.playCardReroll();
-    });
-
-    this.registerEventListener('upgrade-banished', () => {
-      this.playCardBanish();
-    });
-
-    this.registerEventListener('codex-discovered', () => {
-      this.playCodexDiscovered();
-    });
-
-    this.registerEventListener('surge-started', () => {
-      this.playSurgeSting();
-    });
-
-    this.registerEventListener('run-continued', () => {
-      this.playDeepFieldEntry();
-    });
-
-    this.registerEventListener('salvage-awarded', (data = {}) => {
-      this.playSalvageAwarded(data?.amount);
-    });
-
-    this.registerEventListener('hangar-purchased', () => {
-      this.playHangarPurchase();
-    });
-
-    this.registerEventListener('onboarding-step', () => {
-      this.playTipChime();
-    });
-
-    // The Ram shares the Warden's telegraph event (its lane) but spins up with
-    // its own cue; other non-bosses get the enemy cue (the boss keeps its
-    // EffectsSystem/roar handling).
-    this.registerEventListener('boss-telegraph', (data = {}) => {
-      const type = data?.enemy?.type;
-      if (type === 'ram') {
-        this.playRamSpinUp(this._resolveSourceSpatial(data));
-      } else if (type && type !== 'boss') {
-        this.playEnemyTelegraph(this._resolveSourceSpatial(data));
-      }
-    });
-
-    // Support machines' own cues, at the machine's position.
-    this.registerEventListener('ram-charged', (data = {}) => {
-      this.playRamCharge(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('weaver-tether-laid', (data = {}) => {
-      this.playWeaverTether(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('bulwark-plate-hit', (data = {}) => {
-      this.playBulwarkPlateHit(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('bulwark-plate-broken', (data = {}) => {
-      this.playBulwarkPlateBreak(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('caster-telegraphed', (data = {}) => {
-      this.playCasterCharge(this._resolveSourceSpatial(data));
-    });
-
-    // The launch pans from the Caster toward where the shell will land.
-    this.registerEventListener('caster-shell-fired', (data = {}) => {
-      this.playCasterLaunch({
-        ...this._resolveSourceSpatial(data),
-        toPan: resolveStereoPan(data?.target?.x, this.listenerX),
-      });
-    });
-
-    // Its own impact, not an explosion: 2-4 Casters land every few seconds,
-    // so no music duck either.
-    this.registerEventListener('caster-shell-landed', (data = {}) => {
-      this.playCasterImpact(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('shade-phased-out', (data = {}) => {
-      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: true });
-    });
-
-    this.registerEventListener('shade-phased-in', (data = {}) => {
-      this.playShadePhase({ ...this._resolveSourceSpatial(data), out: false });
-    });
-
-    // Each Herald kind arrives with its own cue (its attacks: enemy-fired).
-    this.registerEventListener('herald-spawned', (data = {}) => {
-      this.playHeraldSpawn({
-        ...this._resolveSourceSpatial({ position: data }),
-        kind: data.kind,
-      });
-    });
-
-    this.registerEventListener('flak-burst', (data = {}) => {
-      this.playFlakBurst(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('leech-ate', (data = {}) => {
-      this.playLeechAte(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('leech-burst', (data = {}) => {
-      this.playLeechBurst(this._resolveSourceSpatial(data));
-    });
-
-    this.registerEventListener('pickup-collected', (data = {}) => {
-      this.playPickupCollected(data?.kind);
-    });
-
-    this.registerEventListener('transmission-shown', (data = {}) => {
-      this.playTransmission();
-      this.playTransmissionVoice(data?.speaker);
-    });
-
-    this.registerEventListener('pickup-spawned', (data = {}) => {
-      this.playPickupSpawned({
-        pan: resolveStereoPan(data?.x, this.listenerX),
-      });
-    });
-
-    // Enemy modules fire projectiles/explosions exclusively through events so
-    // the audio layer can orchestrate batching and pooling.
-    this.registerEventListener('enemy-fired', (data = {}) => {
-      const enemyType = (
-        data?.enemyType ||
-        data?.enemy?.type ||
-        ''
-      ).toLowerCase();
-
-      // The Shade's fan (three shots at once) shares the Mote's shot cue.
-      if (enemyType === 'drone' || enemyType === 'shade') {
-        this.playDroneFire({ ...data, ...this._resolveSourceSpatial(data) });
-        return;
-      }
-
-      if (enemyType === 'hunter') {
-        this.playHunterBurst({ ...data, ...this._resolveSourceSpatial(data) });
-        return;
-      }
-
-      // Heat's ignite spread flares; Silence's shard leaves with a vacuum.
-      if (enemyType === 'herald') {
-        this.playHeraldAttack({
-          ...this._resolveSourceSpatial(data),
-          kind: data.enemy?.heraldKind,
-        });
-      }
-    });
-
-    // Wave start feeds the run-following music (progress + wave enemy total),
-    // picks the layer's theme (the Warden's on boss layers) and plays the
-    // chapter stinger on a biome's first layer.
-    this.registerEventListener('wave-started', (data = {}) => {
-      this.updateWaveMusicIntensity(data);
-      const wave = Number(data?.wave);
-      if (!Number.isFinite(wave) || wave <= 0) return;
-      this.musicMixer.setTheme(musicThemeForLayer(wave));
-      const chapterTheme = chapterThemeForLayer(wave);
-      if (chapterTheme) {
-        this.playChapterStinger(chapterTheme);
-      }
-    });
-
-    this.registerEventListener('mine-exploded', (data = {}) => {
-      this.playMineExplosion({ ...data, ...this._resolveSourceSpatial(data) });
-    });
-
-    // Boss arc → MusicMixer (D-04): overrides the run intensity upwards. The
-    // roar/phase/defeat SFX stay on the facade (BossAudio lands in a later plan).
-    this.registerEventListener('boss-warning', (data = {}) => {
-      this.playWardenStinger();
-      this.musicMixer.setIntensityFromBossEvent('boss-warning', data);
-    });
-
-    this.registerEventListener('boss-spawned', (data = {}) => {
-      this.playBossRoar(data);
-      this.musicMixer.setIntensityFromBossEvent('boss-spawned', data);
-    });
-
-    this.registerEventListener('boss-phase-changed', (data = {}) => {
-      this.playBossPhaseChange(data);
-      this.musicMixer.setIntensityFromBossEvent('boss-phase-changed', data);
-    });
-
-    this.registerEventListener('boss-defeated', (data = {}) => {
-      this.playBossDefeated(data);
-      this.musicMixer.setIntensityFromBossEvent('boss-defeated', data);
-      this.musicMixer.setTheme(
-        biomeThemeForLayer(this.musicMixer.runState.wave)
-      );
-    });
-
-    this.registerEventListener('bullet-hit', (data) => {
-      const effectiveDamage = Number.isFinite(data?.effectiveDamage)
-        ? data.effectiveDamage
-        : Number.isFinite(data?.damage)
-          ? data.damage
-          : 0;
-
-      if (data?.blocked && data?.invulnerable) {
-        this.playBossShieldDeflect();
-      } else if (effectiveDamage > 0 || data?.killed) {
-        this.playBulletHit(data?.killed || false);
-      }
-    });
-
-    this.registerEventListener('player-took-damage', () => {
-      this.playShipHit();
-    });
-
-    // The ship's own moves: centred on it (the listener), the dash whoosh
-    // sweeps toward where it goes.
-    this.registerEventListener('player-dashed', (data = {}) => {
-      this.playDash({
-        pan: resolveStereoPan(data?.position?.x, this.listenerX),
-        directionX: data?.direction?.x || 0,
-      });
-    });
-
-    this.registerEventListener('player-braked', (data = {}) => {
-      this.playBrake({
-        pan: resolveStereoPan(data?.position?.x, this.listenerX),
-      });
-    });
-
-    this.registerEventListener('shield-activated', () => {
-      this.playShieldActivate();
-    });
-
-    this.registerEventListener('shield-hit', () => {
-      this.playShieldImpact();
-    });
-
-    this.registerEventListener('shield-broken', () => {
-      this.playShieldBreak();
-    });
-
-    this.registerEventListener('shield-recharged', () => {
-      this.playShieldRecharged();
-    });
-
-    this.registerEventListener('shield-activation-failed', () => {
-      this.playShieldFail();
-    });
-
-    // UI Sound Effects
-    this.registerEventListener('upgrade-applied', (data) => {
-      this.playUpgradeSelect(data?.rarity || 'common');
-    });
-
-    this.registerEventListener('pause-state-changed', (data) => {
-      // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
-      // freeze, SC1 no drift). The pause/resume SFX stay on the facade.
-      this.musicMixer.pause(!!data?.isPaused);
-      if (data?.isPaused) {
-        this.playPauseOpen();
-      } else {
-        this.playPauseClose();
-      }
-    });
-
-    this.registerEventListener('screen-changed', (payload = {}) => {
-      this._handleScreenChanged(payload);
-    });
-
-    this.registerEventListener(
-      'ui-overlay-visibility-changed',
-      (payload = {}) => {
-        this._handleOverlayVisibilityChanged(payload);
-      }
-    );
-
-    this.registerEventListener('input-confirmed', () => {
-      this.playUISelect();
-    });
-
-    // UI hover (debounced to prevent accumulation)
-    this.registerEventListener('ui-hover', () => {
-      const now = performance.now();
-      // Simple debouncing: only play if 80ms have passed since last hover sound
-      if (now - this.lastUIHoverTime > 80) {
-        this.lastUIHoverTime = now;
-        this.playUIHover();
-      }
-    });
-
-    // Game started
-    this.registerEventListener('game-started', () => {
-      this.playUIStartGame();
-    });
-
-    // Low health warning + low-HP duck (AUDIO-03 / SC3, D-11). Both fire on the
-    // CROSSING into ≤25% HP only (edge detection — review fix): repeated health
-    // events while already below 25% must NOT machine-gun retrigger the duck.
-    this.registerEventListener('player-health-changed', (data) => {
-      const healthPercent = data?.health / data?.maxHealth;
-      this.musicMixer.setRunState({ healthRatio: healthPercent });
-      const belowThreshold = healthPercent <= 0.25 && healthPercent > 0;
-
-      if (belowThreshold) {
-        // Only play / duck if we just CROSSED into the low-health state.
-        if (!this.lowHealthWarning) {
-          this.playLowHealthWarning();
-          this.lowHealthWarning = true;
-        }
-        if (!this.lowHealthDuckArmed) {
-          // Crossing edge → one duck on the music bus; re-armed on recovery.
-          this.duckingController?.duck({ bus: 'music' });
-          this.lowHealthDuckArmed = true;
-        }
-      } else {
-        // Above the threshold (or dead) → re-arm both edges for the next dip.
-        this.lowHealthWarning = false;
-        this.lowHealthDuckArmed = false;
-      }
-    });
-
-    // Thruster sounds (continuous loops)
-    this.registerEventListener('thruster-effect', (data) => {
-      this._trackListenerPosition(data?.position);
-      this.handleThrusterEffect(data || {});
-    });
+    registerAudioEventCues(this);
   }
 
   updateWaveMusicIntensity(waveEvent = {}) {
@@ -796,38 +373,6 @@ class AudioSystem extends BaseSystem {
     const total = Number(waveEvent?.totalEnemies);
     this.runEnemyCount = Number.isFinite(total) ? Math.max(0, total) : 0;
     this.musicMixer.setRunState({ wave, enemyCount: this.runEnemyCount });
-  }
-
-  _setRunEnemyCount(count) {
-    this.runEnemyCount = Math.max(0, count);
-    this.musicMixer.setRunState({ enemyCount: this.runEnemyCount });
-  }
-
-  _trackListenerPosition(position) {
-    if (Number.isFinite(position?.x)) {
-      this.listenerX = position.x;
-    }
-    if (Number.isFinite(position?.y)) {
-      this.listenerY = position.y;
-    }
-  }
-
-  /**
-   * Pan + distance mix of an enemy-side cue from its source position; no
-   * distance mix when the position is unknown.
-   */
-  _resolveSourceSpatial(data = {}) {
-    const position = data?.position || data?.enemy || null;
-    const known = Number.isFinite(position?.x) && Number.isFinite(position?.y);
-    return {
-      pan: resolveStereoPan(position?.x, this.listenerX),
-      distance: known
-        ? resolveDistanceMix(
-            position.x - this.listenerX,
-            position.y - this.listenerY
-          )
-        : null,
-    };
   }
 
   /** Short music duck on big moments (level-up, large explosions). */
@@ -1144,1062 +689,56 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  // ===========================================================================
-  // SFX synthesis delegations (INFRA-02 — bodies relocated to SFXBus).
-  //
-  // The public play* methods stay on the facade as thin delegations so every
-  // existing call site / EventBus listener keeps working (API parity). The
-  // relocated synthesis bodies (normalizers, priority resolver, _play*Direct,
-  // _executeBatchedSound) are GONE from this facade — SFXBus is the sole owner
-  // (review: no duplicate ownership). The private _play*Direct delegators below
-  // exist only because the determinism + port regression suites call them
-  // directly and the SfxSynthPort forwards through them.
-  // ===========================================================================
-
-  playLaserShot(options = {}) {
-    this.sfxBus.playLaserShot(options);
-  }
-
-  playDroneFire(data = {}) {
-    this.sfxBus.playDroneFire(data);
-  }
-
-  playHunterBurst(data = {}) {
-    this.sfxBus.playHunterBurst(data);
-  }
-
-  playMineExplosion(data = {}) {
-    this.sfxBus.playMineExplosion(data);
-  }
-
-  playTargetLock(data = {}) {
-    this.sfxBus.playTargetLock(data);
-  }
-
-  playAsteroidBreak(size) {
-    this.sfxBus.playAsteroidBreak(size);
-  }
-
-  playExplosion(size, options = {}) {
-    this.sfxBus.playExplosion(size, options);
-  }
-
-  playEnemyTelegraph(options = {}) {
-    this.sfxBus.playEnemyTelegraph(options);
-  }
-
-  playRamSpinUp(options = {}) {
-    this.sfxBus.playRamSpinUp(options);
-  }
-
-  playRamCharge(options = {}) {
-    this.sfxBus.playRamCharge(options);
-  }
-
-  playHuskRelease(options = {}) {
-    this.sfxBus.playHuskRelease(options);
-  }
-
-  playWeaverTether(options = {}) {
-    this.sfxBus.playWeaverTether(options);
-  }
-
-  playBulwarkPlateHit(options = {}) {
-    this.sfxBus.playBulwarkPlateHit(options);
-  }
-
-  playBulwarkPlateBreak(options = {}) {
-    this.sfxBus.playBulwarkPlateBreak(options);
-  }
-
-  playCasterCharge(options = {}) {
-    this.sfxBus.playCasterCharge(options);
-  }
-
-  playCasterLaunch(options = {}) {
-    this.sfxBus.playCasterLaunch(options);
-  }
-
-  playCasterImpact(options = {}) {
-    this.sfxBus.playCasterImpact(options);
-  }
-
-  playShadePhase(options = {}) {
-    this.sfxBus.playShadePhase(options);
-  }
-
-  playHeraldSpawn(options = {}) {
-    this.sfxBus.playHeraldSpawn(options);
-  }
-
-  playHeraldAttack(options = {}) {
-    this.sfxBus.playHeraldAttack(options);
-  }
-
-  playFlakBurst(options = {}) {
-    this.sfxBus.playFlakBurst(options);
-  }
-
-  playLeechAte(options = {}) {
-    this.sfxBus.playLeechAte(options);
-  }
-
-  playLeechBurst(options = {}) {
-    this.sfxBus.playLeechBurst(options);
-  }
-
-  playEliteSpawned() {
-    this.sfxBus.playEliteSpawned();
-  }
-
-  playSurgeSting() {
-    this.sfxBus.playSurgeSting();
-  }
-
-  playDeepFieldEntry() {
-    this.sfxBus.playDeepFieldEntry();
-  }
-
-  playSalvageAwarded(amount) {
-    this.sfxBus.playSalvageAwarded(amount);
-  }
-
-  playHangarPurchase() {
-    this.sfxBus.playHangarPurchase();
-  }
-
-  playTipChime() {
-    this.sfxBus.playTipChime();
-  }
-
-  playHarmonicBeam(options = {}) {
-    this.sfxBus.playHarmonicBeam(options);
-  }
-
-  playWeaponEvolved() {
-    this.sfxBus.playWeaponEvolved();
-  }
-
-  playCardReroll() {
-    this.sfxBus.playCardReroll();
-  }
-
-  playCardBanish() {
-    this.sfxBus.playCardBanish();
-  }
-
-  playCodexDiscovered() {
-    this.sfxBus.playCodexDiscovered();
-  }
-
-  playPickupCollected(kind) {
-    this.sfxBus.playPickupCollected(kind);
-  }
-
-  playPickupSpawned(options = {}) {
-    this.sfxBus.playPickupSpawned(options);
-  }
-
-  playChapterStinger(themeId) {
-    this.sfxBus.playChapterStinger(themeId);
-  }
-
-  playWardenStinger() {
-    this.sfxBus.playWardenStinger();
-  }
-
-  playTransmission() {
-    this.sfxBus.playTransmission();
-  }
-
-  playTransmissionVoice(speaker) {
-    this.sfxBus.playTransmissionVoice(speaker);
-  }
-
-  playXPCollect() {
-    this.sfxBus.playXPCollect();
-  }
-
-  _playDroneFireDirect(params = {}) {
-    this.sfxBus._playDroneFireDirect(params);
-  }
-
-  _playHunterBurstDirect(params = {}) {
-    this.sfxBus._playHunterBurstDirect(params);
-  }
-
-  _playMineExplosionDirect(params = {}) {
-    this.sfxBus._playMineExplosionDirect(params);
-  }
-
-  playLevelUp() {
-    this.sfxBus.playLevelUp();
-  }
-
-  playOrbFusion(toClass) {
-    this.sfxBus.playOrbFusion(toClass);
-  }
-
-  playGoldSpawn() {
-    this.sfxBus.playGoldSpawn();
-  }
-
-  playGoldJackpot() {
-    this.sfxBus.playGoldJackpot();
-  }
+  // The public play* methods that only forward to the SFXBus are installed
+  // from a list below the class (./audio/busForwarders.js). The boss's own
+  // voice is synthesized by ./audio/bossVoice.js through this facade.
 
   playBossRoar() {
-    this._trackPerformance('playBossRoar');
-
-    this.safePlay(() => {
-      const config = BOSS_AUDIO_FREQUENCY_PRESETS?.roar;
-      if (!config) {
-        return;
-      }
-
-      const now = this.context.currentTime;
-      const duration = config.duration ?? 1.2;
-      const sweepStart = config.sweep?.start ?? 90;
-      const sweepEnd = config.sweep?.end ?? 150;
-      const sweepDuration = config.sweep?.duration ?? duration * 0.6;
-
-      const baseOsc = this.context.createOscillator();
-      const baseGain = this.context.createGain();
-      const filter = this.context.createBiquadFilter();
-
-      baseOsc.type = 'sawtooth';
-      baseOsc.frequency.setValueAtTime(sweepStart, now);
-      baseOsc.frequency.linearRampToValueAtTime(sweepEnd, now + sweepDuration);
-
-      filter.type = config.filter?.type || 'lowpass';
-      filter.frequency.setValueAtTime(config.filter?.frequency ?? 420, now);
-
-      baseGain.gain.setValueAtTime(0, now);
-      baseGain.gain.linearRampToValueAtTime(
-        config.attackGain ?? 0.25,
-        now + 0.12
-      );
-      const sustainTime =
-        now + Math.max(0.2, duration - (config.releaseDuration ?? 0.5));
-      baseGain.gain.linearRampToValueAtTime(
-        config.sustainGain ?? 0.18,
-        sustainTime
-      );
-      baseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-      baseOsc.connect(filter);
-      filter.connect(baseGain);
-      this.connectGainNode(baseGain);
-      this.sfxBus._sendToReverb(baseGain, AUDIO_REVERB_SEND_DB.boss);
-
-      baseOsc.start(now);
-      baseOsc.stop(now + duration);
-
-      if (config.vibrato) {
-        const vibratoOsc = this.context.createOscillator();
-        const vibratoGain = this.context.createGain();
-        vibratoOsc.type = 'sine';
-        vibratoOsc.frequency.setValueAtTime(config.vibrato.speed ?? 5, now);
-        vibratoGain.gain.setValueAtTime(config.vibrato.depth ?? 6, now);
-        vibratoOsc.connect(vibratoGain);
-        vibratoGain.connect(baseOsc.frequency);
-        vibratoOsc.start(now);
-        vibratoOsc.stop(now + duration);
-      }
-
-      if (Array.isArray(config.harmonics)) {
-        config.harmonics.forEach((frequency, index) => {
-          const osc = this.context.createOscillator();
-          const gain = this.context.createGain();
-          const startTime = now + index * 0.05;
-
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(frequency, startTime);
-
-          gain.gain.setValueAtTime(0, startTime);
-          const harmonicGain = (config.sustainGain ?? 0.18) * 0.4;
-          gain.gain.linearRampToValueAtTime(harmonicGain, startTime + 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-          osc.connect(gain);
-          this.connectGainNode(gain);
-          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
-
-          osc.start(startTime);
-          osc.stop(now + duration);
-        });
-      }
-
-      if (config.tail?.frequency) {
-        const tailOsc = this.context.createOscillator();
-        const tailGain = this.context.createGain();
-        const tailStart = now + (config.sweep?.duration ?? duration * 0.6);
-        const tailDuration = config.tail.duration ?? 0.5;
-
-        tailOsc.type = 'sine';
-        tailOsc.frequency.setValueAtTime(config.tail.frequency, tailStart);
-
-        tailGain.gain.setValueAtTime(0, tailStart);
-        tailGain.gain.linearRampToValueAtTime(
-          config.tail.gain ?? 0.12,
-          tailStart + 0.05
-        );
-        tailGain.gain.exponentialRampToValueAtTime(
-          0.001,
-          tailStart + tailDuration
-        );
-
-        tailOsc.connect(tailGain);
-        this.connectGainNode(tailGain);
-        this.sfxBus._sendToReverb(tailGain, AUDIO_REVERB_SEND_DB.boss);
-
-        tailOsc.start(tailStart);
-        tailOsc.stop(tailStart + tailDuration);
-      }
-    });
+    bossVoice.playBossRoar(this);
   }
 
   playBossPhaseChange(payload = {}) {
-    this._trackPerformance('playBossPhaseChange');
-
-    this.safePlay(() => {
-      const config = BOSS_AUDIO_FREQUENCY_PRESETS?.phaseChange;
-      if (!config) {
-        return;
-      }
-
-      const now = this.context.currentTime;
-      const duration = config.duration ?? 0.6;
-      const sweepOsc = this.context.createOscillator();
-      const sweepGain = this.context.createGain();
-
-      const startFreq = config.sweep?.start ?? 220;
-      const endFreq = config.sweep?.end ?? 820;
-
-      sweepOsc.type = 'triangle';
-      sweepOsc.frequency.setValueAtTime(startFreq, now);
-      sweepOsc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
-
-      sweepGain.gain.setValueAtTime(0, now);
-      sweepGain.gain.linearRampToValueAtTime(0.16, now + 0.08);
-      sweepGain.gain.exponentialRampToValueAtTime(0.001, now + duration + 0.25);
-
-      sweepOsc.connect(sweepGain);
-      this.connectGainNode(sweepGain);
-      this.sfxBus._sendToReverb(sweepGain, AUDIO_REVERB_SEND_DB.boss);
-
-      sweepOsc.start(now);
-      sweepOsc.stop(now + duration + 0.25);
-
-      const shimmerConfig = config.shimmer || {};
-      if (Array.isArray(shimmerConfig.frequencies)) {
-        const spacing = shimmerConfig.spacing ?? 0.08;
-        const shimmerDuration = shimmerConfig.duration ?? 0.45;
-        const shimmerGainBase = shimmerConfig.gain ?? 0.1;
-        const phaseIndex =
-          (payload?.phase ?? payload?.nextPhase ?? payload?.newPhase ?? 1) - 1;
-        const intensityScale = 1 + Math.max(0, phaseIndex) * 0.12;
-
-        shimmerConfig.frequencies.forEach((frequency, index) => {
-          const osc = this.context.createOscillator();
-          const gain = this.context.createGain();
-          const startTime = now + 0.1 + index * spacing;
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(frequency, startTime);
-
-          gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(
-            shimmerGainBase * intensityScale,
-            startTime + 0.04
-          );
-          gain.gain.exponentialRampToValueAtTime(
-            0.001,
-            startTime + shimmerDuration
-          );
-
-          osc.connect(gain);
-          this.connectGainNode(gain);
-          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
-
-          osc.start(startTime);
-          osc.stop(startTime + shimmerDuration);
-        });
-      }
-
-      if (config.swell?.frequency) {
-        const swellOsc = this.context.createOscillator();
-        const swellGain = this.context.createGain();
-        const swellDuration = config.swell.duration ?? 0.8;
-
-        swellOsc.type = 'sine';
-        swellOsc.frequency.setValueAtTime(config.swell.frequency, now);
-        swellOsc.frequency.linearRampToValueAtTime(
-          config.swell.frequency * 0.75,
-          now + swellDuration
-        );
-
-        swellGain.gain.setValueAtTime(0, now);
-        swellGain.gain.linearRampToValueAtTime(
-          config.swell.gain ?? 0.12,
-          now + 0.1
-        );
-        swellGain.gain.exponentialRampToValueAtTime(0.001, now + swellDuration);
-
-        swellOsc.connect(swellGain);
-        this.connectGainNode(swellGain);
-        this.sfxBus._sendToReverb(swellGain, AUDIO_REVERB_SEND_DB.boss);
-
-        swellOsc.start(now);
-        swellOsc.stop(now + swellDuration);
-      }
-    });
+    bossVoice.playBossPhaseChange(this, payload);
   }
 
   playBossDefeated() {
-    this._trackPerformance('playBossDefeated');
-
-    this.safePlay(() => {
-      const config = BOSS_AUDIO_FREQUENCY_PRESETS?.defeated;
-      if (!config) {
-        return;
-      }
-
-      const now = this.context.currentTime;
-
-      const fanfare = config.fanfare;
-      if (fanfare?.notes?.length) {
-        fanfare.notes.forEach((note, index) => {
-          const osc = this.context.createOscillator();
-          const gain = this.context.createGain();
-          const noteDelay = Number.isFinite(note.delay)
-            ? note.delay
-            : index * 0.18;
-          const startTime = now + Math.max(0, noteDelay);
-          const noteDuration = note.duration ?? 0.6;
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(note.frequency ?? 440, startTime);
-
-          gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(
-            note.gain ?? 0.18,
-            startTime + 0.05
-          );
-          gain.gain.exponentialRampToValueAtTime(
-            0.001,
-            startTime + Math.max(0.3, noteDuration)
-          );
-
-          osc.connect(gain);
-          this.connectGainNode(gain);
-          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
-
-          osc.start(startTime);
-          osc.stop(startTime + Math.max(0.4, noteDuration));
-        });
-
-        if (Array.isArray(fanfare.harmony?.frequencies)) {
-          const harmonyGain = this.context.createGain();
-          const harmonyStart = now + (fanfare.notes[0]?.delay ?? 0);
-          const harmonyDuration = fanfare.harmony.duration ?? 1.6;
-
-          harmonyGain.gain.setValueAtTime(0, harmonyStart);
-          harmonyGain.gain.linearRampToValueAtTime(
-            fanfare.harmony.gain ?? 0.12,
-            harmonyStart + 0.2
-          );
-          harmonyGain.gain.exponentialRampToValueAtTime(
-            0.001,
-            harmonyStart + harmonyDuration
-          );
-
-          this.connectGainNode(harmonyGain);
-          this.sfxBus._sendToReverb(harmonyGain, AUDIO_REVERB_SEND_DB.boss);
-
-          fanfare.harmony.frequencies.forEach((frequency) => {
-            const osc = this.context.createOscillator();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(frequency, harmonyStart);
-            osc.connect(harmonyGain);
-            osc.start(harmonyStart);
-            osc.stop(harmonyStart + harmonyDuration);
-          });
-        }
-      }
-
-      if (config.choir?.frequency) {
-        const choirOsc = this.context.createOscillator();
-        const choirGain = this.context.createGain();
-        const choirStart = now + 0.2;
-        const choirDuration = config.choir.duration ?? 1.8;
-
-        choirOsc.type = 'sawtooth';
-        choirOsc.frequency.setValueAtTime(config.choir.frequency, choirStart);
-        choirOsc.frequency.linearRampToValueAtTime(
-          config.choir.frequency * 0.75,
-          choirStart + choirDuration
-        );
-
-        choirGain.gain.setValueAtTime(0, choirStart);
-        choirGain.gain.linearRampToValueAtTime(
-          config.choir.gain ?? 0.08,
-          choirStart + 0.25
-        );
-        choirGain.gain.exponentialRampToValueAtTime(
-          0.001,
-          choirStart + choirDuration
-        );
-
-        choirOsc.connect(choirGain);
-        this.connectGainNode(choirGain);
-        this.sfxBus._sendToReverb(choirGain, AUDIO_REVERB_SEND_DB.boss);
-
-        choirOsc.start(choirStart);
-        choirOsc.stop(choirStart + choirDuration);
-      }
-
-      if (Array.isArray(config.sparkle?.frequencies)) {
-        const spacing = config.sparkle.spacing ?? 0.12;
-        const sparkleDuration = config.sparkle.duration ?? 0.5;
-        const sparkleGain = config.sparkle.gain ?? 0.08;
-
-        config.sparkle.frequencies.forEach((frequency, index) => {
-          const osc = this.context.createOscillator();
-          const gain = this.context.createGain();
-          const startTime = now + 0.4 + index * spacing;
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(frequency, startTime);
-
-          gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(sparkleGain, startTime + 0.03);
-          gain.gain.exponentialRampToValueAtTime(
-            0.001,
-            startTime + sparkleDuration
-          );
-
-          osc.connect(gain);
-          this.connectGainNode(gain);
-          this.sfxBus._sendToReverb(gain, AUDIO_REVERB_SEND_DB.boss);
-
-          osc.start(startTime);
-          osc.stop(startTime + sparkleDuration);
-        });
-      }
-    });
+    bossVoice.playBossDefeated(this);
   }
 
-  playBulletHit(killed = false) {
-    this.sfxBus.playBulletHit(killed);
+  // --- Seeded RNG scopes (./audio/randomScopes.js) ---
+
+  captureRandomScopes(options) {
+    return captureRandomScopes(this, options);
   }
 
-  playShipHit() {
-    this.sfxBus.playShipHit();
+  reseedRandomScopes(options) {
+    return reseedRandomScopes(this, options);
   }
 
-  playDash(options = {}) {
-    this.sfxBus.playDash(options);
-  }
-
-  playBrake(options = {}) {
-    this.sfxBus.playBrake(options);
-  }
-
-  playShieldActivate() {
-    this.sfxBus.playShieldActivate();
-  }
-
-  playShieldImpact() {
-    this.sfxBus.playShieldImpact();
-  }
-
-  playBossShieldDeflect() {
-    this.sfxBus.playBossShieldDeflect();
-  }
-
-  playShieldBreak() {
-    this.sfxBus.playShieldBreak();
-  }
-
-  playShieldRecharged() {
-    this.sfxBus.playShieldRecharged();
-  }
-
-  playShieldFail() {
-    this.sfxBus.playShieldFail();
-  }
-
-  playShieldShockwave() {
-    this.sfxBus.playShieldShockwave();
-  }
-
-  _createRandomScopes(baseRandom) {
-    const canFork = baseRandom && typeof baseRandom.fork === 'function';
-    if (!canFork) {
-      return {
-        base: baseRandom,
-        cache: null,
-        families: {},
-        bufferFamilies: {},
-        batcher: null,
-      };
-    }
-
-    const supportsSnapshot =
-      typeof baseRandom?.debugSnapshot === 'function' &&
-      typeof baseRandom?.restore === 'function';
-    const snapshot = supportsSnapshot ? baseRandom.debugSnapshot() : null;
-
-    let families = {};
-    let cacheRandom = null;
-    let bufferFamilies = {};
-    let batcherRandom = null;
-
-    try {
-      families = {
-        laser: baseRandom.fork('audio:family:laser'),
-        explosion: baseRandom.fork('audio:family:explosion'),
-        shield: baseRandom.fork('audio:family:shield'),
-        asteroid: baseRandom.fork('audio:family:asteroid'),
-        xp: baseRandom.fork('audio:family:xp'),
-        impact: baseRandom.fork('audio:family:impact'),
-        music: baseRandom.fork('audio:family:music'),
-        ui: baseRandom.fork('audio:family:ui'),
-        uiHover: baseRandom.fork('audio:family:ui:hover'),
-        uiSelect: baseRandom.fork('audio:family:ui:select'),
-        uiStartGame: baseRandom.fork('audio:family:ui:startgame'),
-        thruster: baseRandom.fork('audio:family:thruster'),
-        thrusterMain: baseRandom.fork('audio:family:thruster:main'),
-        thrusterRetro: baseRandom.fork('audio:family:thruster:retro'),
-        thrusterSide: baseRandom.fork('audio:family:thruster:side'),
-      };
-
-      cacheRandom = baseRandom.fork('audio:cache');
-      batcherRandom = baseRandom.fork('audio:batcher');
-
-      bufferFamilies = Object.fromEntries(
-        Object.entries({
-          ...families,
-          generic: cacheRandom,
-        }).map(([name, rng]) => [
-          name,
-          rng && typeof rng.fork === 'function'
-            ? rng.fork(`audio:buffer:${name}`)
-            : null,
-        ])
-      );
-    } finally {
-      if (snapshot) {
-        try {
-          baseRandom.restore(snapshot);
-        } catch (error) {
-          console.warn(
-            '[Audio] Failed to restore base RNG state after creating audio scopes:',
-            error
-          );
-        }
-      }
-    }
-
-    return {
-      base: baseRandom,
-      cache: cacheRandom,
-      families,
-      bufferFamilies,
-      batcher: batcherRandom,
-    };
-  }
-
-  captureRandomScopes({ refreshForks = false } = {}) {
-    if (!this.random) {
-      return null;
-    }
-
-    if (!this.randomScopes || refreshForks) {
-      const refreshed = this._createRandomScopes(this.random);
-      this.randomScopes = {
-        ...refreshed,
-        seeds: this.randomScopes?.seeds ?? null,
-        cacheSnapshot: this.randomScopes?.cacheSnapshot ?? null,
-        batcherSnapshot: this.randomScopes?.batcherSnapshot ?? null,
-      };
-    }
-
-    if (refreshForks) {
-      if (this.cache) {
-        this.cache.random = this.randomScopes.cache;
-        if (typeof this.cache.clearCache === 'function') {
-          this.cache.clearCache('all');
-        }
-        if (typeof this.cache.resetStats === 'function') {
-          this.cache.resetStats();
-        }
-      }
-
-      if (this.batcher) {
-        this.batcher.random = this.randomScopes.batcher;
-        if (typeof this.batcher._initializeRandomForks === 'function') {
-          this.batcher.randomForks = this.batcher._initializeRandomForks(
-            this.randomScopes.batcher
-          );
-        }
-        if (typeof this.batcher.resetStats === 'function') {
-          this.batcher.resetStats();
-        }
-      }
-    }
-
-    const seeds = {
-      base:
-        typeof this.random.seed === 'number' ? this.random.seed >>> 0 : null,
-      cache:
-        this.randomScopes?.cache &&
-        typeof this.randomScopes.cache.seed === 'number'
-          ? this.randomScopes.cache.seed >>> 0
-          : null,
-      batcher:
-        this.randomScopes?.batcher &&
-        typeof this.randomScopes.batcher.seed === 'number'
-          ? this.randomScopes.batcher.seed >>> 0
-          : null,
-      families: {},
-      bufferFamilies: {},
-    };
-
-    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
-      seeds.families[name] =
-        rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
-    });
-
-    Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
-      ([name, rng]) => {
-        seeds.bufferFamilies[name] =
-          rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
-      }
-    );
-
-    this.randomScopes.seeds = seeds;
-
-    if (this.cache && typeof this.cache.captureNoiseSeeds === 'function') {
-      this.randomScopes.cacheSnapshot = this.cache.captureNoiseSeeds();
-    }
-
-    if (
-      this.batcher &&
-      typeof this.batcher.captureRandomForkSeeds === 'function'
-    ) {
-      this.randomScopes.batcherSnapshot = this.batcher.captureRandomForkSeeds();
-    }
-
-    this._exposeRandomDebugControls();
-    return { ...seeds };
-  }
-
-  reseedRandomScopes({ refreshForks = false } = {}) {
-    if (!this.random) {
-      return null;
-    }
-
-    if (!this.randomScopes || refreshForks) {
-      this.captureRandomScopes({ refreshForks: true });
-    }
-
-    if (!this.randomScopes?.seeds) {
-      this.captureRandomScopes();
-    }
-
-    const seeds = this.randomScopes?.seeds;
-    if (!seeds) {
-      return null;
-    }
-
-    const applySeed = (rng, seed) => {
-      if (rng && typeof rng.reset === 'function' && typeof seed === 'number') {
-        rng.reset(seed);
-      }
-    };
-
-    const canPreserveBaseState =
-      typeof this.random?.debugSnapshot === 'function' &&
-      typeof this.random?.restore === 'function';
-    const baseSnapshot = canPreserveBaseState
-      ? this.random.debugSnapshot()
-      : null;
-
-    try {
-      applySeed(this.randomScopes?.cache, seeds.cache);
-      applySeed(this.randomScopes?.batcher, seeds.batcher);
-
-      Object.entries(this.randomScopes?.families || {}).forEach(
-        ([name, rng]) => {
-          applySeed(rng, seeds.families?.[name]);
-        }
-      );
-
-      Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
-        ([name, rng]) => {
-          applySeed(rng, seeds.bufferFamilies?.[name]);
-        }
-      );
-
-      if (this.cache) {
-        this.cache.random = this.randomScopes?.cache || this.cache.random;
-        if (typeof this.cache.reseedNoiseGenerators === 'function') {
-          this.cache.reseedNoiseGenerators(this.randomScopes?.cacheSnapshot);
-        }
-      }
-
-      if (this.batcher) {
-        this.batcher.random = this.randomScopes?.batcher || this.batcher.random;
-        if (
-          refreshForks &&
-          typeof this.batcher._initializeRandomForks === 'function'
-        ) {
-          this.batcher.randomForks = this.batcher._initializeRandomForks(
-            this.batcher.random
-          );
-        }
-        if (typeof this.batcher.reseedRandomForks === 'function') {
-          this.batcher.reseedRandomForks();
-        }
-      }
-    } finally {
-      if (baseSnapshot) {
-        try {
-          this.random.restore(baseSnapshot);
-        } catch (error) {
-          console.warn(
-            '[Audio] Failed to restore base RNG state after reseeding audio scopes:',
-            error
-          );
-        }
-      }
-    }
-
-    this.captureRandomScopes();
-    return { ...seeds };
-  }
-
-  // INFRA-03: the window.__AUDIO_RANDOM_DEBUG__ global exposes internal RNG state
-  // (Information Disclosure) and must NOT cross into production builds. Defense in
-  // depth: (1) the build-time `__AUDIO_DEBUG_BUILD__` define (false in prod) lets
-  // Vite dead-code-eliminate this whole body — the assignment STRING is removed,
-  // not just unreachable; (2) the runtime `!DEV_MODE` gate below is a second layer.
-  // The gate is the RUNTIME-reachability CI test (tests/process/no-dev-globals.test.js),
-  // NOT a dist string grep — the minified string survives behind a dead gate, so a
-  // grep is a false positive (see 02-RESEARCH Pitfall 3). The `typeof` guard keeps
-  // non-Vite execution (e.g. vitest module eval) from a ReferenceError on the define.
+  // INFRA-03: the dev-only window.__AUDIO_RANDOM_DEBUG__ global, gated at build
+  // time and at runtime (see exposeRandomDebugControls).
   _exposeRandomDebugControls() {
-    // Build-time gate (layer 1): in prod the define folds to `if (false) { ... }`
-    // and Vite drops the entire block, removing the window.__AUDIO_RANDOM_DEBUG__
-    // assignment STRING from the bundle. The `typeof` guard means a non-Vite eval
-    // (no define) treats it as truthy and falls through to the runtime gate.
-    if (typeof __AUDIO_DEBUG_BUILD__ === 'undefined' || __AUDIO_DEBUG_BUILD__) {
-      // Runtime gate (layer 2): even in dev/test the global is only exposed in a
-      // real dev environment with a window present.
-      if (typeof window === 'undefined' || !DEV_MODE) {
-        return;
-      }
-
-      const debugData = {
-        seed: this.random?.seed ?? null,
-        debugSnapshot: () => this.random?.debugSnapshot(),
-        forks: {},
-        seeds: this.randomScopes?.seeds || null,
-      };
-
-      Object.entries(this.randomScopes?.families || {}).forEach(
-        ([name, rng]) => {
-          debugData.forks[name] = {
-            seed: rng?.seed ?? null,
-            debugSnapshot: () => rng?.debugSnapshot(),
-          };
-        }
-      );
-
-      if (!debugData.forks.cache && this.randomScopes?.cache) {
-        debugData.forks.cache = {
-          seed: this.randomScopes.cache.seed ?? null,
-          debugSnapshot: () => this.randomScopes.cache.debugSnapshot(),
-        };
-      }
-
-      window.__AUDIO_RANDOM_DEBUG__ = debugData;
-    }
+    exposeRandomDebugControls(this);
   }
 
-  _clearRandomDebugControls() {
-    if (typeof window === 'undefined') {
-      return;
-    }
+  // === THRUSTER SOUNDS (state machine: ./audio/thrusterEvents.js) ===
 
-    delete window.__AUDIO_RANDOM_DEBUG__;
-  }
-
-  // === UI Sound Effects (INFRA-02 — synthesis relocated to SFXBus) ===
-
-  playUpgradeSelect(rarity = 'common') {
-    this.sfxBus.playUpgradeSelect(rarity);
-  }
-
-  playPauseOpen() {
-    this.sfxBus.playPauseOpen();
-  }
-
-  playPauseClose() {
-    this.sfxBus.playPauseClose();
-  }
-
-  playMenuTransition() {
-    this.sfxBus.playMenuTransition();
-  }
-
-  playLowHealthWarning() {
-    this.sfxBus.playLowHealthWarning();
-  }
-
-  playUIHover() {
-    this.sfxBus.playUIHover();
-  }
-
-  playUISelect() {
-    this.sfxBus.playUISelect();
-  }
-
-  playUIStartGame() {
-    this.sfxBus.playUIStartGame();
-  }
-
-  // === THRUSTER SOUNDS ===
-
-  /**
-   * Handles thruster-effect events from PlayerSystem
-   * Manages start→loop→stop lifecycle based on intensity changes
-   * Uses timestamp-based inactivity detection to stop loops
-   * Distinguishes between manual and automatic thrusters
-   */
   handleThrusterEffect(data) {
-    if (!this.initialized || !this.context) return;
-
-    const { type, intensity, isAutomatic } = data;
-    if (!type || typeof intensity !== 'number') return;
-
-    // Map PlayerSystem event types to internal thruster keys
-    // PlayerSystem emits: 'main', 'aux' (braking), 'side'
-    let thrusterKey = type;
-    if (type === 'aux') {
-      thrusterKey = 'retro'; // Aux thruster = retro/braking thruster
-    }
-
-    const currentIntensity = intensity;
-    const isActive = this.sfxBus.isThrusterActive(thrusterKey);
-    const now = performance.now();
-
-    // Update last event time
-    this.thrusterState.lastEventTime[thrusterKey] = now;
-
-    // State machine: determine action based on intensity thresholds
-    if (currentIntensity > this.thrusterState.startThreshold && !isActive) {
-      // START: intensity crossed start threshold and loop not active
-      this._startThrusterSound(
-        thrusterKey,
-        currentIntensity,
-        isAutomatic || false
-      );
-    } else if (
-      currentIntensity > this.thrusterState.stopThreshold &&
-      isActive
-    ) {
-      // UPDATE: intensity changed but still above stop threshold
-      this._updateThrusterSound(thrusterKey, currentIntensity);
-    } else if (
-      currentIntensity <= this.thrusterState.stopThreshold &&
-      isActive
-    ) {
-      // STOP: intensity dropped below stop threshold (hysteresis)
-      this._stopThrusterSound(thrusterKey);
-    }
+    followThrusterEffect(this, data);
   }
 
-  /**
-   * Starts thruster sound (plays start burst + begins loop)
-   * @param {string} type - Thruster type
-   * @param {number} intensity - Intensity 0-1
-   * @param {boolean} isAutomatic - If true, skip burst (auto-damping thrusters)
-   */
-  /**
-   * Starts thruster sound (plays start burst + begins loop). The actual synthesis
-   * + loop ownership lives in SFXBus; the facade keeps the event-driven state
-   * machine and delegates.
-   * @param {string} type - Thruster type
-   * @param {number} intensity - Intensity 0-1
-   * @param {boolean} isAutomatic - If true, skip burst (auto-damping thrusters)
-   */
-  _startThrusterSound(type, intensity, isAutomatic = false) {
-    if (!this.initialized || !this.context) return;
-    this.sfxBus.startThrusterLoop(type, intensity, isAutomatic || false);
-  }
-
-  /**
-   * Updates thruster loop intensity (delegates to SFXBus).
-   */
-  _updateThrusterSound(type, intensity) {
-    this.sfxBus.updateThrusterLoop(type, intensity);
-  }
-
-  /**
-   * Stops thruster sound (ends loop + plays release for manual thrusters).
-   * @param {string} type - Thruster type
-   * @param {boolean} skipRelease - If true, skip release sound (automatic thrusters)
-   */
-  _stopThrusterSound(type, skipRelease = false) {
-    this.sfxBus.stopThrusterLoop(type, skipRelease);
-  }
-
-  /**
-   * Starts interval to check for thruster inactivity
-   * Stops loops that haven't received events within timeout period
-   */
+  /** Every 50 ms, stops the loops that stopped hearing thruster events. */
   _startThrusterInactivityChecker() {
     if (this.thrusterInactivityCheckInterval) {
       clearInterval(this.thrusterInactivityCheckInterval);
     }
-
-    // Check every 50ms
     this.thrusterInactivityCheckInterval = setInterval(() => {
-      this._checkThrusterInactivity();
+      stopIdleThrusters(this);
     }, 50);
   }
 
-  /**
-   * Checks if any active thruster loops have timed out due to inactivity
-   * Stops loops that haven't received events in the last 150ms
-   */
-  _checkThrusterInactivity() {
-    if (!this.initialized || !this.sfxBus) return;
-
-    const now = performance.now();
-    const timeout = this.thrusterState.inactivityTimeout;
-
-    // Check each thruster type
-    ['main', 'retro', 'side'].forEach((type) => {
-      const isActive = this.sfxBus.isThrusterActive(type);
-      if (!isActive) return;
-
-      const lastEventTime = this.thrusterState.lastEventTime[type] || 0;
-      const timeSinceLastEvent = now - lastEventTime;
-
-      // If no event received within timeout period, stop the loop
-      // Skip release sound since this is typically automatic damping
-      if (timeSinceLastEvent > timeout) {
-        this._stopThrusterSound(type, true); // skipRelease = true
-      }
-    });
-  }
-
   reset() {
-    this._clearRandomDebugControls();
+    clearRandomDebugControls();
     this._evictAllFileTracks({ resetCurrentScreen: true });
 
     // Cleanup the SFX optimization instances + thruster loops (owned by SFXBus).
@@ -2240,7 +779,7 @@ class AudioSystem extends BaseSystem {
 
   onDestroy() {
     this._evictAllFileTracks({ resetCurrentScreen: true });
-    this._clearRandomDebugControls();
+    clearRandomDebugControls();
     if (this.thrusterInactivityCheckInterval) {
       clearInterval(this.thrusterInactivityCheckInterval);
       this.thrusterInactivityCheckInterval = null;
@@ -2366,5 +905,7 @@ class AudioSystem extends BaseSystem {
     if (this.batcher) this.batcher.resetStats();
   }
 }
+
+installBusForwarders(AudioSystem.prototype);
 
 export default AudioSystem;
