@@ -1,8 +1,9 @@
-// Machine views: the Wardens' machines — Mote (drone), Seeker (hunter),
-// Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and Leech: their
-// hulls, outlines and eyes, and what each lights or moves per frame (the
-// Ram's charge, the Caster's landing marks, the Shade's phasing, the Leech's
-// belly).
+// Machine views drawn by hand: the Wardens' machines — Mote (drone), Seeker
+// (hunter), Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and
+// Leech: their hulls, outlines and eyes, and what each lights or moves per
+// frame (the Ram's charge, the Caster's landing marks, the Shade's phasing,
+// the Leech's belly). An enemy's content file picks one by name (`view`); a
+// new enemy is built from its `visual` instead (recipes.js).
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import {
@@ -192,15 +193,15 @@ export function createMachineViews(kit) {
   }
   const leechRim = rimLoop(pod);
 
-  function createMote() {
+  function createMote(kind) {
     const group = new THREE.Group();
-    const body = kit.body('drone', () => [
+    const body = kit.body('mote-body', () => [
       { geometry: kit.sphere, color: kit.tones.hull, scale: [1, 0.42, 1] },
     ]);
     const eyeTone = kit.tone(PALETTE.threat, 1.4);
     group.add(body);
     kit.scene.add(group);
-    return kit.view('drone', group, {
+    return kit.view(kind, group, {
       body,
       accents: [eyeTone],
       rims: [kit.rim(group, kit.circleRim, 1.04)],
@@ -208,15 +209,15 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createSeeker() {
+  function createSeeker(kind) {
     const group = new THREE.Group();
-    const body = kit.body('hunter', () => [
+    const body = kit.body('seeker-body', () => [
       { geometry: seekerHull, color: kit.tones.hull },
     ]);
     const lensTone = kit.tone(PALETTE.threat, 0.5);
     group.add(body);
     kit.scene.add(group);
-    return kit.view('hunter', group, {
+    return kit.view(kind, group, {
       lensTone,
       accents: [lensTone],
       rims: [kit.rim(group, seekerRim)],
@@ -224,7 +225,7 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createTether() {
+  function createTether(kind) {
     const group = new THREE.Group();
     const spin = new THREE.Group();
     const angles = [0, 1, 2].map((i) => (i / 3) * Math.PI * 2);
@@ -232,7 +233,7 @@ export function createMachineViews(kit) {
       (angle) =>
         new THREE.Vector3(Math.cos(angle) * 1.05, 0, -Math.sin(angle) * 1.05)
     );
-    const frame = kit.body('mine', () => [
+    const frame = kit.body('tether-frame', () => [
       { geometry: kit.sphere, color: kit.tones.dark, scale: 0.5 },
       ...angles.map((rotationY) => ({
         geometry: strut,
@@ -247,7 +248,7 @@ export function createMachineViews(kit) {
     const arc = kit.rim(spin, rimLoop(tips), 1, arcTone.color);
     group.add(spin);
     kit.scene.add(group);
-    return kit.view('mine', group, {
+    return kit.view(kind, group, {
       spin,
       nodeTone,
       arc,
@@ -258,7 +259,7 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createHusk() {
+  function createHusk(kind) {
     const group = new THREE.Group();
     // the Ring rock's crack shader on a hull plate: seams instead of veins
     const material = new THREE.MeshStandardMaterial({
@@ -277,16 +278,16 @@ export function createMachineViews(kit) {
     shell.scale.setScalar(0.95);
     group.add(shell);
     kit.scene.add(group);
-    return kit.view('husk', group, {
+    return kit.view(kind, group, {
       shell,
       material,
       rims: [kit.rim(group, kit.circleRim, 0.98)],
     });
   }
 
-  function createRam() {
+  function createRam(kind) {
     const group = new THREE.Group();
-    const body = kit.body('ram', () => [
+    const body = kit.body('ram-body', () => [
       { geometry: ramHull, color: kit.tones.hull },
       {
         geometry: kit.smallSphere,
@@ -311,7 +312,7 @@ export function createMachineViews(kit) {
     );
     group.add(body);
     kit.scene.add(group);
-    return kit.view('ram', group, {
+    return kit.view(kind, group, {
       lens: lens.anchor,
       lensTone,
       core: core.anchor,
@@ -323,9 +324,9 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createWeaver() {
+  function createWeaver(kind) {
     const group = new THREE.Group();
-    const hub = kit.body('weaver', () => [
+    const hub = kit.body('weaver-hub', () => [
       {
         geometry: kit.sphere,
         color: kit.tones.hull,
@@ -368,7 +369,7 @@ export function createMachineViews(kit) {
     spin.add(arms);
     group.add(hub, spin);
     kit.scene.add(group);
-    return kit.view('weaver', group, {
+    return kit.view(kind, group, {
       spin,
       armMaterial,
       tipTone,
@@ -379,9 +380,9 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createBulwark() {
+  function createBulwark(kind) {
     const group = new THREE.Group();
-    const hull = kit.body('bulwark', () => [
+    const hull = kit.body('bulwark-hull', () => [
       {
         geometry: kit.sphere,
         color: kit.tones.hull,
@@ -401,7 +402,7 @@ export function createMachineViews(kit) {
     plate.add(plateMesh, edge);
     group.add(hull, plate);
     kit.scene.add(group);
-    return kit.view('bulwark', group, {
+    return kit.view(kind, group, {
       plate,
       plateMesh,
       edge,
@@ -411,9 +412,9 @@ export function createMachineViews(kit) {
     });
   }
 
-  function createCaster() {
+  function createCaster(kind) {
     const group = new THREE.Group();
-    const body = kit.body('caster', () => [
+    const body = kit.body('caster-body', () => [
       {
         geometry: kit.sphere,
         color: kit.tones.hull,
@@ -462,7 +463,7 @@ export function createMachineViews(kit) {
     telegraph.group.position.set(-HALF_W, 1, -HALF_H);
     telegraph.group.visible = false;
     kit.scene.add(telegraph.group);
-    return kit.view('caster', group, {
+    return kit.view(kind, group, {
       lens: lens.anchor,
       lensTone,
       telegraph,
@@ -508,15 +509,15 @@ export function createMachineViews(kit) {
     }
   }
 
-  function createShade() {
+  function createShade(kind) {
     const group = new THREE.Group();
-    const body = kit.body('shade', () => [
+    const body = kit.body('shade-body', () => [
       { geometry: shadeHull, color: kit.tones.hull },
     ]);
     const eyeTone = kit.tone(PALETTE.threat, 1.3);
     group.add(body);
     kit.scene.add(group);
-    return kit.view('shade', group, {
+    return kit.view(kind, group, {
       body,
       eyeTone,
       phased: false,
@@ -558,12 +559,12 @@ export function createMachineViews(kit) {
   // A pod of three plates leaning teal, its dark maw forward; the belly
   // window on its back is its own emissive material, the maw's lips the
   // accent.
-  function createLeech() {
+  function createLeech(kind) {
     const group = new THREE.Group();
     const teal = kit.tones.hull
       .clone()
       .lerp(colorOf(THREE, PALETTE.player), LEECH_TEAL_MIX);
-    const body = kit.body('leech', () => [
+    const body = kit.body('leech-body', () => [
       {
         geometry: kit.sphere,
         color: teal,
@@ -593,7 +594,7 @@ export function createMachineViews(kit) {
     const lipsTone = kit.tone(PALETTE.threat, 1.2);
     group.add(body, belly);
     kit.scene.add(group);
-    return kit.view('leech', group, {
+    return kit.view(kind, group, {
       belly,
       bellyMaterial,
       accents: [lipsTone],
@@ -626,77 +627,85 @@ export function createMachineViews(kit) {
     view.shell.rotation.y = random() * TAU;
   }
 
-  // What each kind lights or moves per frame, after the pose, the Elite look
+  // What each look lights or moves per frame, after the pose, the Elite look
   // and the affixes every machine shares (EnemyMirror.updateMachine).
-  function updateMachine(view, enemy, kind, time, flash) {
-    const { object } = view;
-    if (kind === 'hunter') {
-      kit.setGain(view.lensTone, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
-    } else if (kind === 'mine') {
-      const armed = Boolean(enemy.armed);
-      const pulse = 0.5 + 0.5 * Math.sin(time * 9 + (view.seed % 7));
-      kit.setGain(view.nodeTone, armed ? 1.1 + 0.6 * pulse : 0.6);
-      view.arc.anchor.visible = armed;
-      kit.setGain(view.arcTone, 1.1 + 0.6 * pulse);
-      view.spin.rotation.y = time * (armed ? 2.4 : 0.8);
-    } else if (kind === 'husk') {
-      object.rotation.y = 0;
-      const heat = clamp01(enemy.damageRatio || 0);
-      const uniforms = view.material.userData.rockUniforms;
-      // reveal stays under 0.6: the fine crack layer is the Ring rock's look
-      uniforms.uGlow.value = 0.15 + 1.2 * heat;
-      uniforms.uReveal.value = 0.35 + 0.2 * heat;
-      uniforms.uWidth.value = 0.04 + 0.025 * heat;
-      uniforms.uFlash.value = flash * 0.45;
-    } else if (kind === 'ram') {
-      const charge = clamp01(enemy.telegraphRatio || 0);
-      kit.setGain(view.lensTone, 0.4 + 1.8 * charge);
-      view.lens.scale.setScalar(0.12 * (1 + 0.8 * charge));
-      view.core.visible = charge > 0.5;
-      kit.setGain(view.coreTone, (charge - 0.5) * 2.4);
-      kit.updateTelegraph(view.telegraph, enemy, enemy.radius || 14);
-    } else if (kind === 'weaver') {
-      object.rotation.y = 0;
-      view.spin.rotation.y = -(enemy.spin || 0);
-      const lay = clamp01(enemy.layGlow || 0);
-      view.armMaterial.emissiveIntensity = 2.2 * lay;
-      kit.setGain(view.tipTone, 0.5 + 1.6 * lay);
-      for (let i = 0; i < view.tips.length; i += 1) {
-        view.tips[i].scale.setScalar(0.09 + 0.07 * lay);
-      }
-    } else if (kind === 'caster') {
-      updateCaster(view, enemy);
-    } else if (kind === 'shade') {
-      phaseShade(view, 1 - clamp01(enemy.visibility ?? 1));
-    } else if (kind === 'leech') {
-      updateLeech(view, enemy, time);
-    } else if (kind === 'bulwark') {
-      object.rotation.y = 0;
-      view.plate.rotation.y = -(enemy.facing || 0);
-      const broken = Boolean(enemy.shieldBroken);
-      view.plateMesh.material = broken ? kit.darkMaterial : kit.plateMaterial;
-      view.edge.visible = !broken;
-      const shield =
-        enemy.maxShieldHealth > 0
-          ? enemy.shieldHealth / enemy.maxShieldHealth
-          : 1;
-      kit.setGain(view.edgeMaterial, 0.5 + 0.9 * clamp01(shield));
+  function updateSeeker(view, enemy) {
+    kit.setGain(view.lensTone, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
+  }
+
+  function updateTether(view, enemy, time) {
+    const armed = Boolean(enemy.armed);
+    const pulse = 0.5 + 0.5 * Math.sin(time * 9 + (view.seed % 7));
+    kit.setGain(view.nodeTone, armed ? 1.1 + 0.6 * pulse : 0.6);
+    view.arc.anchor.visible = armed;
+    kit.setGain(view.arcTone, 1.1 + 0.6 * pulse);
+    view.spin.rotation.y = time * (armed ? 2.4 : 0.8);
+  }
+
+  function updateHusk(view, enemy, time, flash) {
+    view.object.rotation.y = 0;
+    const heat = clamp01(enemy.damageRatio || 0);
+    const uniforms = view.material.userData.rockUniforms;
+    // reveal stays under 0.6: the fine crack layer is the Ring rock's look
+    uniforms.uGlow.value = 0.15 + 1.2 * heat;
+    uniforms.uReveal.value = 0.35 + 0.2 * heat;
+    uniforms.uWidth.value = 0.04 + 0.025 * heat;
+    uniforms.uFlash.value = flash * 0.45;
+  }
+
+  function updateRam(view, enemy) {
+    const charge = clamp01(enemy.telegraphRatio || 0);
+    kit.setGain(view.lensTone, 0.4 + 1.8 * charge);
+    view.lens.scale.setScalar(0.12 * (1 + 0.8 * charge));
+    view.core.visible = charge > 0.5;
+    kit.setGain(view.coreTone, (charge - 0.5) * 2.4);
+    kit.updateTelegraph(view.telegraph, enemy, enemy.radius || 14);
+  }
+
+  function updateWeaver(view, enemy) {
+    view.object.rotation.y = 0;
+    view.spin.rotation.y = -(enemy.spin || 0);
+    const lay = clamp01(enemy.layGlow || 0);
+    view.armMaterial.emissiveIntensity = 2.2 * lay;
+    kit.setGain(view.tipTone, 0.5 + 1.6 * lay);
+    for (let i = 0; i < view.tips.length; i += 1) {
+      view.tips[i].scale.setScalar(0.09 + 0.07 * lay);
     }
   }
 
+  function updateShade(view, enemy) {
+    phaseShade(view, 1 - clamp01(enemy.visibility ?? 1));
+  }
+
+  function updateBulwark(view, enemy) {
+    view.object.rotation.y = 0;
+    view.plate.rotation.y = -(enemy.facing || 0);
+    const broken = Boolean(enemy.shieldBroken);
+    view.plateMesh.material = broken ? kit.darkMaterial : kit.plateMaterial;
+    view.edge.visible = !broken;
+    const shield =
+      enemy.maxShieldHealth > 0
+        ? enemy.shieldHealth / enemy.maxShieldHealth
+        : 1;
+    kit.setGain(view.edgeMaterial, 0.5 + 0.9 * clamp01(shield));
+  }
+
   return {
-    createMote,
-    createSeeker,
-    createTether,
-    createHusk,
-    createRam,
-    createWeaver,
-    createBulwark,
-    createCaster,
-    createShade,
-    createLeech,
-    bindHusk,
-    updateMachine,
+    // The hand-made looks, by the name an enemy's content file gives as
+    // `view`: `create(kind)` builds a view for that enemy kind, `update`
+    // moves it per frame, `bind` gives it its seed's looks (EnemyMirror).
+    views: {
+      mote: { create: createMote },
+      seeker: { create: createSeeker, update: updateSeeker },
+      tether: { create: createTether, update: updateTether },
+      husk: { create: createHusk, update: updateHusk, bind: bindHusk },
+      ram: { create: createRam, update: updateRam },
+      weaver: { create: createWeaver, update: updateWeaver },
+      bulwark: { create: createBulwark, update: updateBulwark },
+      caster: { create: createCaster, update: updateCaster },
+      shade: { create: createShade, update: updateShade },
+      leech: { create: createLeech, update: updateLeech },
+    },
     phaseShade,
   };
 }

@@ -119,6 +119,16 @@ describe('enemy content', () => {
     }
   );
 
+  // Every one is built in the mirror (tests/modules/render3d/enemyMirror.test.js).
+  it.each(enemies)(
+    '$id picks its 3D look by name (`view`) or by recipe (`visual`), not both',
+    ({ view, visual }) => {
+      expect(['undefined', 'string']).toContain(typeof view);
+      expect(['undefined', 'object']).toContain(typeof visual);
+      expect(view !== undefined && visual !== undefined).toBe(false);
+    }
+  );
+
   it.each(enemies)(
     '$id has Codex text and a sighting line of the right shape',
     ({ codex = {}, sighting }) => {

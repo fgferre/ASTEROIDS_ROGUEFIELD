@@ -52,6 +52,8 @@ export default {
   }),
   // It hisses open and its Motes pop out over the explosion.
   cues: { destroyed: 'playHuskRelease' },
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'husk',
   codex: {
     lore: 'A dead keeper still drifting its route, full of sleeping Motes.',
     hint: 'Slow and heavy. Splits into drones when destroyed.',

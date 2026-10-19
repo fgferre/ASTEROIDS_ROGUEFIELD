@@ -58,6 +58,8 @@ export default {
       event: 'weaver-tether-laid',
     },
   }),
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'weaver',
   codex: {
     lore: 'It does not attack. It closes the Field around you.',
     hint: 'Orbits you and lays Tethers behind it. Kill it first.',

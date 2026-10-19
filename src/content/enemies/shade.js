@@ -69,6 +69,8 @@ export default {
   // Its fan (three shots at once) plays the Mote's shot cue (the default)
   // but shows no muzzle flash.
   effects: { fire: null },
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'shade',
   codex: {
     lore: 'A keeper that learned to step half out of the Field. Only its edges stay behind.',
     hint: 'Cannot be hit while faded. It returns at your side and fires a fan.',

@@ -62,6 +62,8 @@ export default {
       burstEvent: 'leech-burst',
     },
   }),
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'leech',
   codex: {
     lore: 'The Ring kept its light in small bellies so that none of it was ever lost. This one has forgotten whose light it keeps.',
     hint: 'Eats loose XP and pickups, grows, and flees when full. Kill it to get it all back, with interest.',

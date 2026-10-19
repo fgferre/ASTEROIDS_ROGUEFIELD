@@ -116,6 +116,8 @@ export default {
   // so no generic explosion plays.
   effects: { death: 'blast' },
   explosion: null,
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'tether',
   codex: {
     lore: 'A Ring seal that arms when anything warm comes near.',
     hint: 'Detonates on approach. Shoot it from range.',

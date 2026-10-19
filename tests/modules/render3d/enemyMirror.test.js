@@ -28,10 +28,35 @@ new Function(
 )(THREE, {});
 
 describe('EnemyMirror', () => {
-  it('has a dedicated 3D look for every registered enemy type', () => {
+  it('builds every registered enemy in the look its content file picks', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
-    const roster = listContent('enemies').map(({ id }) => id);
-    for (const type of [...roster, 'asteroid', 'boss']) {
+    const roster = listContent('enemies');
+    for (const { id, view, visual } of roster) {
+      expect(KNOWN_KINDS.has(id), id).toBe(true);
+      const built = mirror.create(id);
+      expect(built.kind, id).toBe(id);
+      expect(built.look, id).toBe(
+        view
+          ? mirror.machineViews.views[view]
+          : mirror.recipeViews.lookOf(visual)
+      );
+    }
+    // the ten machines keep the views drawn by hand for them
+    expect(
+      Object.fromEntries(roster.map(({ id, view }) => [id, view]))
+    ).toMatchObject({
+      drone: 'mote',
+      hunter: 'seeker',
+      mine: 'tether',
+      husk: 'husk',
+      ram: 'ram',
+      weaver: 'weaver',
+      bulwark: 'bulwark',
+      caster: 'caster',
+      shade: 'shade',
+      leech: 'leech',
+    });
+    for (const type of ['asteroid', 'boss']) {
       expect(KNOWN_KINDS.has(type), type).toBe(true);
       expect(mirror.create(type).kind, type).toBe(type);
     }

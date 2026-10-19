@@ -63,6 +63,8 @@ export default {
       landEvent: 'caster-shell-landed',
     },
   }),
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'caster',
   codex: {
     lore: 'It once lit the beacons that marked the Ring’s lanes. It still marks them. You are standing on one.',
     hint: 'A ring marks where its shell will land. Be gone before it closes.',

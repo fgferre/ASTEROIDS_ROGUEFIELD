@@ -67,6 +67,8 @@ export default {
   }),
   // It shares the Warden's telegraph event but spins up with its own cue.
   cues: { telegraph: 'playRamSpinUp' },
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'ram',
   codex: {
     lore: 'Built to clear debris from the Ring’s lanes. It still does.',
     hint: 'Stops, winds up, then charges straight. Step aside.',

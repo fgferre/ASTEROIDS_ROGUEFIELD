@@ -129,6 +129,8 @@ export default {
   // Its burst flashes and plays as one burst; it dies in a shockwave.
   effects: { fire: 'burst-flash', death: 'shock-burst' },
   cues: { fired: 'playHunterBurst' },
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'seeker',
   codex: {
     lore: 'A long-range keeper. Its lens lights the moment it has you.',
     hint: 'The lens glows before each shot. Break line of sight.',

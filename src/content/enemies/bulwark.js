@@ -52,6 +52,8 @@ export default {
     },
   }),
   explosion: 'large',
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'bulwark',
   codex: {
     lore: 'A wall that walks. The Ring made it to hold the line.',
     hint: 'Its front plate blocks shots. Flank it, or break the plate.',

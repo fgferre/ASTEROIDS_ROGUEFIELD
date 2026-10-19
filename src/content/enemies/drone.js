@@ -123,6 +123,8 @@ export default {
   // (the defaults); it dies in a spark burst, with a small explosion.
   effects: { death: 'spark-burst' },
   explosion: 'small',
+  // Its 3D look, drawn by hand (src/modules/render3d/enemies/machines.js).
+  view: 'mote',
   codex: {
     lore: 'The smallest of the Ring’s keepers. It wakes in swarms and never alone.',
     hint: 'Fast and fragile. Fires one shot at a time, aimed ahead of you; change course.',
