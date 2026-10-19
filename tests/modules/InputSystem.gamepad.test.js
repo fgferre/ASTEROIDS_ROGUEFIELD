@@ -174,4 +174,17 @@ describe('InputSystem gamepad', () => {
     eventBus.emit('player-dashed', {});
     expect(fake.effects).toEqual([]);
   });
+
+  it("keeps the pad quiet through a replayed run, not the viewer's own", () => {
+    step();
+    eventBus.emit('game-started', { replay: true });
+    eventBus.emit('player-took-damage', { damage: 10 });
+    eventBus.emit('boss-spawned', {});
+    eventBus.emit('player-dashed', {});
+    expect(fake.effects).toEqual([]);
+
+    eventBus.emit('game-started', {});
+    eventBus.emit('player-dashed', {});
+    expect(fake.effects).toHaveLength(1);
+  });
 });

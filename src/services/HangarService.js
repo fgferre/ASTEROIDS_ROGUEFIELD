@@ -12,7 +12,8 @@ const ITEMS_BY_ID = new Map(HANGAR_ITEMS.map((item) => [item.id, item]));
  * Meta-progression between runs (docs/NORTE.md §7 pillar 7, a proposal):
  * Salvage earned per run, spent in the Hangar on permanent upgrades, kept in
  * localStorage. A run pays out on each death and on victory; a retried run
- * only pays the difference, so it is never paid twice. A Boss Rush run pays
+ * only pays the difference, so it is never paid twice. A replayed run pays
+ * nothing. A Boss Rush run pays
  * per Warden felled instead of per layer (`runSalvage`). Systems read
  * `getModifiers()` at run start; the hull stays the `selectedHull` setting,
  * gated here by `hullFor()`.
@@ -43,8 +44,9 @@ export default class HangarService {
     });
   }
 
-  startRun({ bossRush = false } = {}) {
+  startRun({ bossRush = false, replay = false } = {}) {
     this.won = false;
+    this.replay = replay;
     this.bossRush = bossRush;
     this.bossRushWardens = 0;
     this.runAwarded = 0;
@@ -56,6 +58,11 @@ export default class HangarService {
    * multiplier, beyond what it was already paid.
    */
   award(runSummary = {}) {
+    if (this.replay) {
+      // A replay pays nothing: the viewer's Salvage stays as it is.
+      this.lastAward = { amount: 0, total: this.salvage, multiplier: 1 };
+      return this.lastAward;
+    }
     const wave = runSummary.wave;
     const multiplier = this.difficulty.getModifiers().salvage;
     const worth = Math.round(

@@ -784,10 +784,13 @@ export default class GameSessionService {
   /**
    * `daily`: see DifficultyService.beginRun. `bossRush` true starts a Boss
    * Rush, false any other run; undefined keeps the last mode. An armed replay
-   * (`replayStart`) starts in its recorded mode, whatever started the run.
+   * (`replayStart`) starts in its recorded mode, whatever started the run, and
+   * announces itself with `replay: true` on 'game-started': a replayed run has
+   * no side effects on the viewer's save (Salvage) or pad (rumble).
    */
   startNewRun({ source = 'unknown', daily, bossRush } = {}) {
-    if (this.replayStart) {
+    const replay = Boolean(this.replayStart);
+    if (replay) {
       ({ daily, bossRush } = this.replayStart);
       this.replayStart = null;
     }
@@ -870,6 +873,7 @@ export default class GameSessionService {
       source,
       timestamp: Date.now(),
       bossRush: this.bossRush,
+      replay,
     });
     if (difficulty.isDaily()) {
       this.eventBus.emit('daily-started', { seed });

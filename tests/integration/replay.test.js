@@ -15,8 +15,14 @@ import {
   createHeadlessGame,
   installDomStubs,
   keyEvent,
+  SEED,
 } from '../__helpers__/headlessGame.js';
-import { deserialize, serialize } from '../../src/core/replay.js';
+import {
+  createInputFrame,
+  createRecorder,
+  deserialize,
+  serialize,
+} from '../../src/core/replay.js';
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
 import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
@@ -314,5 +320,39 @@ describe('run replay', () => {
     expect(replay.session.bossRush).toBe(false);
     expect(replay.services.difficulty.isDaily()).toBe(false);
     expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it("leaves the viewer's Salvage and pad alone, then pays and rumbles for their own run", () => {
+    const fake = installFakeGamepad();
+    try {
+      const recorder = createRecorder({
+        seed: SEED,
+        hull: DEFAULT_HULL_ID,
+        difficulty: 'veteran',
+        mode: 'normal',
+        controls: 'modern',
+      });
+      recorder.record(0, createInputFrame());
+      const replay = createHeadlessGame();
+      const hangar = replay.session.resolveServiceInstance('hangar');
+      const salvage = hangar.salvage;
+
+      replay.controller.arm(deserialize(serialize(recorder.toJSON())));
+      replay.session.startNewRun({ source: 'test' });
+      replay.step(); // the pad is polled
+      const death = { wave: { current: 9 }, stats: { totalKills: 47 } };
+      replay.eventBus.emit('player-took-damage', { damage: 10 });
+      replay.eventBus.emit('player-died', death);
+      expect(hangar.salvage).toBe(salvage);
+      expect(fake.effects).toEqual([]);
+
+      replay.session.startNewRun({ source: 'test' });
+      replay.eventBus.emit('player-took-damage', { damage: 10 });
+      replay.eventBus.emit('player-died', death);
+      expect(hangar.salvage).toBeGreaterThan(salvage);
+      expect(fake.effects).toHaveLength(1);
+    } finally {
+      fake.restore();
+    }
   });
 });
