@@ -310,7 +310,7 @@ export class BaseEnemy {
 
   /**
    * Hit-flash strength, 1 right after damage fading to 0. The Warden keeps its
-   * own timed, damage-scaled flash (BossEnemy.triggerDamageFlash).
+   * own timed, damage-scaled flash (triggerDamageFlash (src/modules/enemies/boss/damageFlash.js)).
    *
    * @returns {number} 0-1
    */

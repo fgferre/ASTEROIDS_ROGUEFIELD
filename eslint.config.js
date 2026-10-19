@@ -31,7 +31,6 @@ export const MAX_LINES = 1200;
 export const OVER_THE_CAP = [
   'src/modules/AudioSystem.js',
   'src/modules/PlayerSystem.js',
-  'src/modules/enemies/types/BossEnemy.js',
 ];
 
 export default [
