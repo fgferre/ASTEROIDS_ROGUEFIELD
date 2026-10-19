@@ -6,7 +6,6 @@ import FileTrackManager, {
 } from './audio/FileTrackManager.js';
 import DuckingController from './audio/DuckingController.js';
 import { registerAudioEventCues } from './audio/eventDispatch.js';
-import { installBusForwarders } from './audio/busForwarders.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -504,7 +503,7 @@ class AudioSystem extends BaseSystem {
       }
     }
 
-    this.playMenuTransition();
+    this.sfxBus.playMenuTransition();
     this._syncMenuTrackForCurrentScreen();
   }
 
@@ -689,8 +688,7 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  // The public play* methods that only forward to the SFXBus are installed
-  // from a list below the class (./audio/busForwarders.js). The boss's own
+  // Sound effects play on the SFXBus (`audio.sfxBus.play*`). The boss's own
   // voice is synthesized by ./audio/bossVoice.js through this facade.
 
   playBossRoar() {
@@ -905,7 +903,5 @@ class AudioSystem extends BaseSystem {
     if (this.batcher) this.batcher.resetStats();
   }
 }
-
-installBusForwarders(AudioSystem.prototype);
 
 export default AudioSystem;

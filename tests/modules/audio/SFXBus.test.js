@@ -763,16 +763,89 @@ describe('SFXBus has zero god-class coupling (T-02-12)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Facade API-PARITY snapshot (plan 02.07, review: facade compatibility beyond
-// EventBus listeners).
+// Sound API parity (plan 02.07, review: compatibility beyond EventBus
+// listeners).
 //
-// The SFX synthesis bodies relocated into SFXBus, but EVERY public method the
-// rest of the game calls on the resolved `audio` service must remain a callable
-// function on the post-extraction facade (no silent surface loss). The baseline
-// below was enumerated from AudioSystem.prototype at commit bf35c23 (the HEAD
-// immediately BEFORE plan 02.07) — non-underscore own function properties,
-// sorted. Drift in either direction fails loudly and forces a conscious update.
+// Every sound the rest of the game plays is a method of the bus
+// (`audio.sfxBus.play*`); the AudioSystem facade no longer carries a forwarder
+// for any of them. The table below is the API the facade used to forward, with
+// the arguments it supplied when the caller left them out: {} for an options
+// object, a value for a default, undefined for "passed as given". Its length is
+// the argument count the bus method must still take. Drift in either direction
+// fails loudly and forces a conscious update.
 // ---------------------------------------------------------------------------
+const BUS_SOUND_DEFAULTS = Object.freeze({
+  playLaserShot: [{}],
+  playDroneFire: [{}],
+  playHunterBurst: [{}],
+  playMineExplosion: [{}],
+  playTargetLock: [{}],
+  playAsteroidBreak: [undefined],
+  playExplosion: [undefined, {}],
+  playEnemyTelegraph: [{}],
+  playRamSpinUp: [{}],
+  playRamCharge: [{}],
+  playHuskRelease: [{}],
+  playWeaverTether: [{}],
+  playBulwarkPlateHit: [{}],
+  playBulwarkPlateBreak: [{}],
+  playCasterCharge: [{}],
+  playCasterLaunch: [{}],
+  playCasterImpact: [{}],
+  playShadePhase: [{}],
+  playHeraldSpawn: [{}],
+  playHeraldAttack: [{}],
+  playFlakBurst: [{}],
+  playLeechAte: [{}],
+  playLeechBurst: [{}],
+  playEliteSpawned: [],
+  playSurgeSting: [],
+  playDeepFieldEntry: [],
+  playSalvageAwarded: [undefined],
+  playHangarPurchase: [],
+  playTipChime: [],
+  playHarmonicBeam: [{}],
+  playWeaponEvolved: [],
+  playCardReroll: [],
+  playCardBanish: [],
+  playCodexDiscovered: [],
+  playPickupCollected: [undefined],
+  playPickupSpawned: [{}],
+  playChapterStinger: [undefined],
+  playWardenStinger: [],
+  playTransmission: [],
+  playTransmissionVoice: [undefined],
+  playXPCollect: [],
+  _playDroneFireDirect: [{}],
+  _playHunterBurstDirect: [{}],
+  _playMineExplosionDirect: [{}],
+  playLevelUp: [],
+  playOrbFusion: [undefined],
+  playGoldSpawn: [],
+  playGoldJackpot: [],
+  playBulletHit: [false],
+  playShipHit: [],
+  playDash: [{}],
+  playBrake: [{}],
+  playShieldActivate: [],
+  playShieldImpact: [],
+  playBossShieldDeflect: [],
+  playShieldBreak: [],
+  playShieldRecharged: [],
+  playShieldFail: [],
+  playShieldShockwave: [],
+  playUpgradeSelect: ['common'],
+  playPauseOpen: [],
+  playPauseClose: [],
+  playMenuTransition: [],
+  playLowHealthWarning: [],
+  playUIHover: [],
+  playUISelect: [],
+  playUIStartGame: [],
+});
+
+// What is left of the facade's own public API, enumerated from
+// AudioSystem.prototype: non-underscore own function properties, sorted.
 const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'applyVolumeToNodes',
   'bootstrapSettings',
@@ -785,74 +858,10 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'handleThrusterEffect',
   'init',
   'onDestroy',
-  'playAsteroidBreak',
   'playBossDefeated',
   'playBossPhaseChange',
   'playBossRoar',
-  'playBossShieldDeflect',
-  'playBulletHit',
-  'playChapterStinger',
-  'playDroneFire',
-  'playEliteSpawned',
-  'playEnemyTelegraph',
-  'playRamSpinUp',
-  'playRamCharge',
-  'playHuskRelease',
-  'playWeaverTether',
-  'playBulwarkPlateHit',
-  'playBulwarkPlateBreak',
-  'playCasterCharge',
-  'playCasterLaunch',
-  'playCasterImpact',
-  'playShadePhase',
-  'playHeraldSpawn',
-  'playHeraldAttack',
-  'playFlakBurst',
-  'playLeechAte',
-  'playLeechBurst',
-  'playExplosion',
   'playFileTrack',
-  'playGoldJackpot',
-  'playGoldSpawn',
-  'playHunterBurst',
-  'playLaserShot',
-  'playLevelUp',
-  'playLowHealthWarning',
-  'playMenuTransition',
-  'playMineExplosion',
-  'playOrbFusion',
-  'playCardBanish',
-  'playCardReroll',
-  'playCodexDiscovered',
-  'playHarmonicBeam',
-  'playWeaponEvolved',
-  'playPauseClose',
-  'playPauseOpen',
-  'playPickupCollected',
-  'playPickupSpawned',
-  'playShieldActivate',
-  'playShieldBreak',
-  'playShieldFail',
-  'playShieldImpact',
-  'playShieldRecharged',
-  'playShieldShockwave',
-  'playShipHit',
-  'playDash',
-  'playBrake',
-  'playSurgeSting',
-  'playDeepFieldEntry',
-  'playSalvageAwarded',
-  'playHangarPurchase',
-  'playTipChime',
-  'playTargetLock',
-  'playTransmission',
-  'playTransmissionVoice',
-  'playUIHover',
-  'playUISelect',
-  'playUIStartGame',
-  'playUpgradeSelect',
-  'playWardenStinger',
-  'playXPCollect',
   'reseedRandomScopes',
   'reset',
   'safePlay',
@@ -875,35 +884,74 @@ function enumerateFacadePublicApi() {
     .sort();
 }
 
-describe('AudioSystem facade API parity after SFXBus extraction (02.07)', () => {
-  it('every pre-extraction public method is still a callable function on the facade', () => {
-    const audio = new AudioSystem({
-      random: new RandomService('facade-parity'),
-      settings: createSettingsStub(),
-    });
+/** What a sound does on a freshly seeded bus: its voices and nodes, in order. */
+function recordSound(name, args) {
+  const { bus, context, pool, gains } = makeInitializedBus();
+  const frequencyLog = [];
+  const makeOscillator = () => createOscillatorStub({ frequencyLog });
+  context.createOscillator = vi.fn(makeOscillator);
+  context.createDelay = vi.fn(() => ({
+    delayTime: createGainStub().gain,
+    connect() {},
+    disconnect() {},
+  }));
+  pool.getOscillator = makeOscillator;
+  bus[name](...args);
+  bus.batcher.flushPendingBatches();
+  return {
+    frequencyLog,
+    poolGains: gains.length,
+    nodes: ['createGain', 'createBufferSource', 'createBiquadFilter'].map(
+      (create) => context[create].mock.calls.length
+    ),
+  };
+}
 
-    for (const name of FACADE_PUBLIC_API_BASELINE) {
+describe('Sound API parity after SFXBus extraction (02.07)', () => {
+  it('every sound the facade used to forward is a bus method taking the same arguments', () => {
+    for (const [name, defaults] of Object.entries(BUS_SOUND_DEFAULTS)) {
       expect(
-        typeof audio[name],
-        `facade lost public method '${name}' (API parity break)`
+        typeof SFXBus.prototype[name],
+        `the bus lost sound '${name}' (API parity break)`
       ).toBe('function');
+      expect(
+        SFXBus.prototype[name].length,
+        `'${name}' no longer takes ${defaults.length} argument(s)`
+      ).toBe(defaults.length);
     }
   });
 
-  it('the live public API surface still equals the captured baseline (no drift either direction)', () => {
+  it('a sound called without arguments plays what the facade defaults played', () => {
+    for (const [name, defaults] of Object.entries(BUS_SOUND_DEFAULTS)) {
+      if (defaults.length === 0) continue;
+      expect(recordSound(name, []), `'${name}' without arguments`).toEqual(
+        recordSound(name, defaults)
+      );
+    }
+  });
+
+  it('the facade carries none of them any more, and its own public API equals the baseline (no drift either direction)', () => {
     const live = new Set(enumerateFacadePublicApi());
     const baseline = new Set(FACADE_PUBLIC_API_BASELINE);
+
+    const forwarded = Object.keys(BUS_SOUND_DEFAULTS).filter(
+      (n) => n in AudioSystem.prototype
+    );
+    expect(
+      forwarded,
+      `the facade forwards sounds to the bus again: ${forwarded.join(', ')}`
+    ).toEqual([]);
 
     const added = [...live].filter((n) => !baseline.has(n));
     expect(
       added,
-      `facade gained public methods absent from the parity baseline (update the snapshot in a reviewed diff): ${added.join(', ')}`
+      `facade gained public methods absent from the baseline (update the snapshot in a reviewed diff): ${added.join(', ')}`
     ).toEqual([]);
 
     const dropped = [...baseline].filter((n) => !live.has(n));
     expect(
       dropped,
-      `facade dropped public methods listed in the parity baseline (a parity break): ${dropped.join(', ')}`
+      `facade dropped public methods listed in the baseline: ${dropped.join(', ')}`
     ).toEqual([]);
   });
 });

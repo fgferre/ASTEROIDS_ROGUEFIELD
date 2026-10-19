@@ -313,7 +313,7 @@ describe('02.04 Suite 1 — output equivalence (port path === direct path)', () 
       // DIRECT PATH: call the private synth method straight, capturing params.
       const direct = createSynthHarness(seed);
       direct.resetSeed();
-      direct.audioSystem[directMethod](payload);
+      direct.audioSystem.sfxBus[directMethod](payload);
       await Promise.resolve();
       const directLog = [...direct.log];
       expect(directLog.length).toBeGreaterThan(0);
@@ -362,7 +362,7 @@ describe('02.04 Suite 1 — output equivalence (port path === direct path)', () 
 
     const direct = createSynthHarness(seed);
     direct.resetSeed();
-    direct.audioSystem._playDroneFireDirect(aggregated);
+    direct.audioSystem.sfxBus._playDroneFireDirect(aggregated);
     await Promise.resolve();
     const directLog = [...direct.log];
 

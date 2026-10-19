@@ -61,7 +61,7 @@ describe('AudioSystem RNG determinism', () => {
         audioSystem.batcher.activeSounds.clear();
       }
       for (let index = 0; index < iterations; index += 1) {
-        audioSystem.playAsteroidBreak('medium');
+        audioSystem.sfxBus.playAsteroidBreak('medium');
       }
       await Promise.resolve();
       await Promise.resolve();

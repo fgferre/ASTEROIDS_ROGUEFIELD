@@ -393,7 +393,7 @@ export class EnemyBossSystem {
       0.35,
       0.2
     );
-    this.getCachedAudio()?.playShieldShockwave();
+    this.getCachedAudio()?.sfxBus.playShieldShockwave();
   }
 
   handleBossSpawned(data = {}) {
