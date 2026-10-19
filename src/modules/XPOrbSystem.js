@@ -1,134 +1,18 @@
 import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  SHIP_SIZE,
-  XP_ORB_SIZE,
-} from '../core/GameConstants.js';
-import {
-  MAGNETISM_RADIUS,
-  MAGNETISM_FORCE,
-  ENHANCED_SHIP_MAGNETISM_FORCE,
-  ORB_MAGNETISM_RADIUS,
-  ORB_MAGNETISM_FORCE,
-  MIN_ORB_DISTANCE,
-  CLUSTER_FUSION_COUNT,
-  XP_ORB_MAX_PER_CLASS,
-  XP_ORB_BASE_VALUE,
-  XP_ORB_MAGNETISM_BOOST,
-  XP_ORB_COLLECTION_RADIUS_PADDING,
-  XP_ORB_FUSION_CHECK_INTERVAL,
-  XP_ORB_FUSION_ANIMATION_DURATION,
-  XP_ORB_OFFSCREEN_MARGIN,
-  XP_ORB_OFFSCREEN_RETURN_DURATION,
-  XP_ORB_CLUSTER_CONFIG,
-} from '../data/constants/gameplay.js';
-import { lerp, easeInOutCubic } from '../utils/mathHelpers.js';
-import {
   ASTEROID_VARIANTS,
   ASTEROID_BASE_ORBS,
   ASTEROID_SIZE_ORB_FACTOR,
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
-import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { getRenderScale } from '../core/viewport.js';
-import { PALETTE, withAlpha } from '../data/constants/palette.js';
-
-const ORB_CLASS_ORDER = [
-  { name: 'blue', tier: 1 },
-  { name: 'green', tier: 2 },
-  { name: 'yellow', tier: 3 },
-  { name: 'purple', tier: 4 },
-  { name: 'red', tier: 5 },
-  { name: 'crystal', tier: 6 },
-];
-
-const ORB_COLOR_PALETTE = {
-  blue: {
-    baseColor: '#00DDFF',
-    glowColor: 'rgba(0, 221, 255, 0.35)',
-    highlightColor: '#E9FCFF',
-    fusionFlash: 'rgba(0, 221, 255, 0.55)',
-  },
-  green: {
-    baseColor: '#00FF00',
-    glowColor: 'rgba(0, 255, 0, 0.35)',
-    highlightColor: '#E6FFE6',
-    fusionFlash: 'rgba(0, 255, 0, 0.55)',
-  },
-  yellow: {
-    baseColor: '#FFFF00',
-    glowColor: 'rgba(255, 255, 0, 0.35)',
-    highlightColor: '#FFFFE6',
-    fusionFlash: 'rgba(255, 255, 0, 0.55)',
-  },
-  purple: {
-    baseColor: '#9932CC',
-    glowColor: 'rgba(153, 50, 204, 0.35)',
-    highlightColor: '#F3E6FF',
-    fusionFlash: 'rgba(153, 50, 204, 0.55)',
-  },
-  red: {
-    baseColor: '#FF0000',
-    glowColor: 'rgba(255, 0, 0, 0.35)',
-    highlightColor: '#FFE6E6',
-    fusionFlash: 'rgba(255, 0, 0, 0.6)',
-  },
-  crystal: {
-    baseColor: '#8DF7FF',
-    glowColor: 'rgba(120, 240, 255, 0.55)',
-    highlightColor: '#F2FFFF',
-    fusionFlash: 'rgba(135, 255, 255, 0.75)',
-  },
-};
-
-const ORB_CLASS_CONFIG = ORB_CLASS_ORDER.map(({ name, tier }) => {
-  const palette = ORB_COLOR_PALETTE[name] || {};
-  return {
-    name,
-    tier,
-    baseColor: palette.baseColor || '#FFFFFF',
-    glowColor: palette.glowColor || 'rgba(255, 255, 255, 0.35)',
-    highlightColor: palette.highlightColor || '#FFFFFF',
-    fusionFlash: palette.fusionFlash || 'rgba(255, 255, 255, 0.55)',
-  };
-});
-
-const ORB_CLASSES = ORB_CLASS_CONFIG.reduce((lookup, config) => {
-  lookup[config.name] = config;
-  return lookup;
-}, {});
-
-const ORB_CLASS_SEQUENCE = ORB_CLASS_CONFIG.map((config) => config.name);
-
-const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
-  (lookup, config, index, array) => {
-    lookup[config.name] = array[index + 1]?.name || null;
-    return lookup;
-  },
-  {}
-);
-
-const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
-
-// Per-frame displacement above this is a respawn/teleport, not motion.
-const SPARK_JUMP_DISTANCE = 30;
-
-// Stable per-orb phase so sparks don't pulse in lockstep.
-const sparkPhase = (orb) => {
-  if (orb.sparkPhaseId !== orb.id) {
-    const id = String(orb.id);
-    let hash = 0;
-    for (let i = 0; i < id.length; i += 1) {
-      hash = (hash * 31 + id.charCodeAt(i)) | 0;
-    }
-    orb.sparkPhase = ((hash >>> 0) % 628) / 100;
-    orb.sparkPhaseId = orb.id;
-  }
-  return orb.sparkPhase;
-};
+import { ORB_CLASSES, ORB_CLASS_CONFIG } from './xp/orbClasses.js';
+import { OrbTuning } from './xp/OrbTuning.js';
+import { OrbField } from './xp/OrbField.js';
+import { OrbFusion } from './xp/OrbFusion.js';
+import { OrbSpacing } from './xp/OrbSpacing.js';
+import { OrbMagnet } from './xp/OrbMagnet.js';
 
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
@@ -156,77 +40,51 @@ class XPOrbSystem extends BaseSystem {
     this._randomForkSource = null;
     this._randomForkSignature = null;
 
-    this.orbClasses = [...ORB_CLASS_SEQUENCE];
-    this.xpOrbs = [];
-    this.xpOrbPools = this.createEmptyOrbPools();
-    this.maxOrbsPerClass = Number.isFinite(XP_ORB_MAX_PER_CLASS)
-      ? XP_ORB_MAX_PER_CLASS
-      : 100;
-    this.baseOrbValue = Number.isFinite(XP_ORB_BASE_VALUE)
-      ? XP_ORB_BASE_VALUE
-      : 5;
-
-    this.orbOffscreenMargin = Number.isFinite(XP_ORB_OFFSCREEN_MARGIN)
-      ? Math.max(0, XP_ORB_OFFSCREEN_MARGIN)
-      : 0;
-    this.orbOffscreenReturnDuration = Number.isFinite(
-      XP_ORB_OFFSCREEN_RETURN_DURATION
-    )
-      ? Math.max(0.05, XP_ORB_OFFSCREEN_RETURN_DURATION)
-      : 0.55;
-    this.orbMagnetismRadius = MAGNETISM_RADIUS;
-    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
-    this.magnetismBoost = Number.isFinite(XP_ORB_MAGNETISM_BOOST)
-      ? XP_ORB_MAGNETISM_BOOST
-      : 2.2;
-    this.minOrbDistance = MIN_ORB_DISTANCE;
-    this.clusterFusionCount = CLUSTER_FUSION_COUNT;
-    this.clusterConfig =
-      typeof XP_ORB_CLUSTER_CONFIG === 'object' ? XP_ORB_CLUSTER_CONFIG : {};
-    this.collectionRadiusPadding = Number.isFinite(
-      XP_ORB_COLLECTION_RADIUS_PADDING
-    )
-      ? XP_ORB_COLLECTION_RADIUS_PADDING
-      : 0.1;
-
-    this.fusionCheckInterval =
-      Number.isFinite(XP_ORB_FUSION_CHECK_INTERVAL) &&
-      XP_ORB_FUSION_CHECK_INTERVAL > 0
-        ? XP_ORB_FUSION_CHECK_INTERVAL
-        : 0.3;
-    this.fusionCheckTimer = 0;
-    this.activeFusionAnimations = [];
     this.globalPull = null;
     this.drift = null;
 
-    this.orbClusterRadius = 0;
-    this.orbClusterForce = 0;
-    this.fusionDetectionRadius = 0;
-    this.fusionDetectionRadiusSq = 0;
-    this.fusionAnimationDuration =
-      Number.isFinite(XP_ORB_FUSION_ANIMATION_DURATION) &&
-      XP_ORB_FUSION_ANIMATION_DURATION > 0
-        ? XP_ORB_FUSION_ANIMATION_DURATION
-        : 0.82;
-
-    this.spatialIndex = new Map();
-    this.spatialIndexDirty = true;
+    this.tuning = new OrbTuning();
+    this.field = new OrbField({ tuning: this.tuning });
+    this.fusion = new OrbFusion({
+      eventBus: this.eventBus,
+      field: this.field,
+      tuning: this.tuning,
+      createOrb: (x, y, value, options) =>
+        this.createXPOrb(x, y, value, options),
+      newAnimationId: (className) => this.generateFusionAnimationId(className),
+    });
+    this.spacing = new OrbSpacing({ field: this.field, tuning: this.tuning });
+    this.magnet = new OrbMagnet({
+      field: this.field,
+      tuning: this.tuning,
+      getPlayer: () => this.resolvePlayer(),
+      getPullScale: () => this.drift?.pullScale ?? 1,
+      collectOrb: (orb) => this.collectOrb(orb),
+    });
 
     this.cachedPlayer = this.dependencies.player || null;
     this.cachedProgression = this.dependencies.progression || null;
-
-    this.visualCache = new Map();
-
-    this.usesOrbPool = false;
-    this.setupOrbPoolIntegration();
-
-    this.configureOrbClustering();
 
     this.ensureRandom({ force: true });
 
     this.missingDependencyWarnings = new Set();
 
     super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+  }
+
+  get xpOrbs() {
+    return this.field.xpOrbs;
+  }
+
+  resolvePlayer() {
+    if (
+      !this.cachedPlayer ||
+      typeof this.cachedPlayer.getPosition !== 'function'
+    ) {
+      super.resolveCachedServices(SERVICE_CACHE_MAP);
+    }
+
+    return this.cachedPlayer;
   }
 
   attachProgression(progressionSystem) {
@@ -281,7 +139,7 @@ class XPOrbSystem extends BaseSystem {
       this._randomForkSource = candidate;
       this._randomForkSignature = signature;
       this.captureRandomForkSeeds();
-      this.fusionCheckTimer = this.generateInitialFusionTimer();
+      this.fusion.fusionCheckTimer = this.generateInitialFusionTimer();
     }
 
     return this.random;
@@ -319,26 +177,26 @@ class XPOrbSystem extends BaseSystem {
 
   generateInitialFusionTimer() {
     if (
-      !Number.isFinite(this.fusionCheckInterval) ||
-      this.fusionCheckInterval <= 0
+      !Number.isFinite(this.tuning.fusionCheckInterval) ||
+      this.tuning.fusionCheckInterval <= 0
     ) {
       return 0;
     }
 
     const clusteringRandom = this.getRandomFork('clustering');
     if (clusteringRandom && typeof clusteringRandom.range === 'function') {
-      return clusteringRandom.range(0, this.fusionCheckInterval);
+      return clusteringRandom.range(0, this.tuning.fusionCheckInterval);
     }
 
     if (this.random && typeof this.random.range === 'function') {
-      return this.random.range(0, this.fusionCheckInterval);
+      return this.random.range(0, this.tuning.fusionCheckInterval);
     }
 
     if (!this._fallbackRandom) {
       this._fallbackRandom = new RandomService();
     }
 
-    return this._fallbackRandom.range(0, this.fusionCheckInterval);
+    return this._fallbackRandom.range(0, this.tuning.fusionCheckInterval);
   }
 
   generateOrbId() {
@@ -397,259 +255,6 @@ class XPOrbSystem extends BaseSystem {
     return `${scopeLabel}:${suffix}`;
   }
 
-  createEmptyOrbPools() {
-    return this.orbClasses.reduce((pools, className) => {
-      pools[className] = [];
-      return pools;
-    }, {});
-  }
-
-  setupOrbPoolIntegration() {
-    if (!GamePools || typeof GamePools.configureXPOrbLifecycle !== 'function') {
-      this.usesOrbPool = false;
-      return;
-    }
-
-    try {
-      GamePools.configureXPOrbLifecycle({
-        create: () => this.createPooledOrb(),
-        reset: (orb) => this.resetOrbForPool(orb),
-      });
-      this.usesOrbPool = true;
-    } catch (error) {
-      this.usesOrbPool = false;
-      console.warn(
-        '[XPOrbSystem] Failed to configure XP orb pool lifecycle',
-        error
-      );
-    }
-  }
-
-  createPooledOrb() {
-    return {
-      id: 0,
-      x: 0,
-      y: 0,
-      value: 0,
-      class: 'blue',
-      tier: 1,
-      collected: false,
-      age: 0,
-      isFusing: false,
-      fusionTimer: 0,
-      pulsePhase: 0,
-      clusterId: null,
-      source: 'drop',
-      pendingRemoval: false,
-      active: false,
-    };
-  }
-
-  resetOrbForPool(orb) {
-    if (!orb) {
-      return;
-    }
-
-    orb.id = 0;
-    orb.x = 0;
-    orb.y = 0;
-    orb.value = 0;
-    orb.class = 'blue';
-    orb.tier = 1;
-    orb.collected = false;
-    orb.age = 0;
-    orb.isFusing = false;
-    orb.fusionTimer = 0;
-    orb.pulsePhase = 0;
-    orb.clusterId = null;
-    orb.source = 'drop';
-    orb.pendingRemoval = false;
-    orb.active = false;
-    orb.driftHeading = null;
-  }
-
-  acquireOrb() {
-    if (
-      this.usesOrbPool &&
-      GamePools?.xpOrbs &&
-      typeof GamePools.xpOrbs.acquire === 'function'
-    ) {
-      return GamePools.xpOrbs.acquire();
-    }
-
-    return this.createPooledOrb();
-  }
-
-  releaseOrb(orb) {
-    if (
-      !orb ||
-      !this.usesOrbPool ||
-      !GamePools?.xpOrbs ||
-      typeof GamePools.xpOrbs.release !== 'function'
-    ) {
-      return false;
-    }
-
-    return GamePools.xpOrbs.release(orb);
-  }
-
-  releaseAllOrbsToPool() {
-    if (!Array.isArray(this.xpOrbs) || this.xpOrbs.length === 0) {
-      return;
-    }
-
-    for (let i = 0; i < this.xpOrbs.length; i += 1) {
-      this.releaseOrb(this.xpOrbs[i]);
-    }
-
-    this.xpOrbs.length = 0;
-  }
-
-  createOffscreenCanvas(width, height, scale = 1) {
-    const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
-    const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
-
-    if (
-      typeof document !== 'undefined' &&
-      typeof document.createElement === 'function'
-    ) {
-      const canvas = document.createElement('canvas');
-      canvas.width = safeWidth;
-      canvas.height = safeHeight;
-      return canvas;
-    }
-
-    if (typeof OffscreenCanvas !== 'undefined') {
-      return new OffscreenCanvas(safeWidth, safeHeight);
-    }
-
-    return null;
-  }
-
-  // Gold spark (docs/NORTE.md §3): four rays (eight from tier 3) with a soft
-  // halo.
-  createOrbSprite(visual) {
-    const diameter = Math.ceil(visual.haloRadius * 2 + 2);
-    const scale = getRenderScale();
-    const bake = (draw) => {
-      const canvas = this.createOffscreenCanvas(diameter, diameter, scale);
-      const ctx = canvas?.getContext?.('2d');
-      if (!ctx) return null;
-      ctx.scale(scale, scale);
-      ctx.translate(diameter / 2, diameter / 2);
-      draw(ctx);
-      return canvas;
-    };
-
-    const canvas = bake((ctx) => {
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, visual.haloRadius);
-      halo.addColorStop(0, withAlpha(PALETTE.xp, 0.3));
-      halo.addColorStop(1, withAlpha(PALETTE.xp, 0));
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(0, 0, visual.haloRadius, 0, Math.PI * 2);
-      ctx.fill();
-
-      const ray = visual.rayLength;
-      const points = visual.rays * 2;
-      ctx.beginPath();
-      for (let k = 0; k < points; k += 1) {
-        const angle = (k / points) * Math.PI * 2;
-        let radius = ray * 0.2;
-        if (k % 2 === 0) {
-          radius = visual.rays > 4 && k % 4 === 2 ? ray * 0.55 : ray;
-        }
-        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-      }
-      ctx.closePath();
-      const body = ctx.createRadialGradient(0, 0, 0, 0, 0, ray);
-      body.addColorStop(0, PALETTE.text);
-      body.addColorStop(0.25, PALETTE.xp);
-      body.addColorStop(1, withAlpha(PALETTE.xp, 0.35));
-      ctx.fillStyle = body;
-      ctx.fill();
-    });
-    if (!canvas) {
-      return null;
-    }
-
-    return { canvas, size: diameter, half: diameter / 2, scale };
-  }
-
-  ensureOrbSprite(visual) {
-    if (!visual) {
-      return null;
-    }
-
-    if (visual.sprite && visual.sprite.scale === getRenderScale()) {
-      return visual.sprite;
-    }
-
-    if (!visual.sprite && visual.spriteAttempted) {
-      return null;
-    }
-
-    visual.spriteAttempted = true;
-    const sprite = this.createOrbSprite(visual);
-    if (sprite) {
-      visual.sprite = sprite;
-    }
-    return visual.sprite || null;
-  }
-
-  configureOrbClustering() {
-    const baseRadius = ORB_MAGNETISM_RADIUS || 35;
-    const baseForce = ORB_MAGNETISM_FORCE || 150;
-
-    const radiusMultiplier = Number.isFinite(
-      this.clusterConfig.radiusMultiplier
-    )
-      ? this.clusterConfig.radiusMultiplier
-      : 1.55;
-    const minRadius = Number.isFinite(this.clusterConfig.minRadius)
-      ? this.clusterConfig.minRadius
-      : 52;
-    const forceMultiplier = Number.isFinite(this.clusterConfig.forceMultiplier)
-      ? this.clusterConfig.forceMultiplier
-      : 2.4;
-
-    this.orbClusterRadius = Math.max(baseRadius * radiusMultiplier, minRadius);
-    this.orbClusterForce = baseForce * forceMultiplier;
-
-    this.refreshFusionParameters();
-  }
-
-  refreshFusionParameters() {
-    const detectionFactor = Number.isFinite(
-      this.clusterConfig.detectionRadiusFactor
-    )
-      ? this.clusterConfig.detectionRadiusFactor
-      : 0.85;
-    const detectionMinRadius = Number.isFinite(
-      this.clusterConfig.detectionMinRadius
-    )
-      ? this.clusterConfig.detectionMinRadius
-      : 48;
-
-    this.fusionDetectionRadius = Math.max(
-      this.orbClusterRadius * detectionFactor,
-      detectionMinRadius
-    );
-    this.fusionDetectionRadiusSq =
-      this.fusionDetectionRadius * this.fusionDetectionRadius;
-    const baseDuration =
-      Number.isFinite(XP_ORB_FUSION_ANIMATION_DURATION) &&
-      XP_ORB_FUSION_ANIMATION_DURATION > 0
-        ? XP_ORB_FUSION_ANIMATION_DURATION
-        : this.fusionAnimationDuration;
-    this.fusionAnimationDuration = baseDuration;
-    this.invalidateSpatialIndex();
-  }
-
-  invalidateSpatialIndex() {
-    this.spatialIndexDirty = true;
-  }
-
   setupEventListeners() {
     // ARCHITECTURE NOTE:
     // XPOrbSystem is responsible for MANAGING orbs (pooling, fusion, magnetism, rendering)
@@ -675,15 +280,15 @@ class XPOrbSystem extends BaseSystem {
   }
 
   isOrbActive(orb) {
-    return Boolean(orb) && !orb.collected;
+    return this.field.isOrbActive(orb);
   }
 
   isOrbEligibleForFusion(orb) {
-    return this.isOrbActive(orb) && !orb.isFusing;
+    return this.field.isOrbEligibleForFusion(orb);
   }
 
-  getOrbConfig(className) {
-    return ORB_CLASSES[className] || ORB_CLASSES.blue;
+  invalidateSpatialIndex() {
+    this.field.invalidateSpatialIndex();
   }
 
   resolveOrbClass(value, options = {}) {
@@ -700,12 +305,14 @@ class XPOrbSystem extends BaseSystem {
       }
     }
 
-    const numericValue = Number.isFinite(value) ? value : this.baseOrbValue;
+    const numericValue = Number.isFinite(value)
+      ? value
+      : this.tuning.baseOrbValue;
     let tier = 1;
-    let threshold = this.baseOrbValue;
+    let threshold = this.tuning.baseOrbValue;
 
     for (let i = 1; i < ORB_CLASS_CONFIG.length; i += 1) {
-      threshold *= this.clusterFusionCount;
+      threshold *= this.tuning.clusterFusionCount;
       if (numericValue >= threshold) {
         tier = i + 1;
       } else {
@@ -719,76 +326,13 @@ class XPOrbSystem extends BaseSystem {
     );
   }
 
-  addOrbToPools(orb) {
-    this.xpOrbs.push(orb);
-    if (!this.xpOrbPools[orb.class]) {
-      this.xpOrbPools[orb.class] = [];
-    }
-    this.xpOrbPools[orb.class].push(orb);
-    this.invalidateSpatialIndex();
-  }
-
-  enforceClassLimit(className) {
-    const pool = this.xpOrbPools[className];
-    if (!Array.isArray(pool)) {
-      return;
-    }
-
-    const active = pool.filter((orb) => this.isOrbEligibleForFusion(orb));
-    const excess = active.length - this.maxOrbsPerClass;
-    if (excess <= 0) {
-      return;
-    }
-
-    const nextClassName = ORB_NEXT_CLASS[className];
-    if (nextClassName) {
-      const groupsNeeded = Math.ceil(
-        excess / Math.max(this.clusterFusionCount - 1, 1)
-      );
-      this.performFusionForClass(
-        className,
-        nextClassName,
-        groupsNeeded,
-        'overflow'
-      );
-    }
-  }
-
-  performFusionForClass(
-    className,
-    nextClassName,
-    maxGroups,
-    reason = 'interval'
-  ) {
-    if (!maxGroups || maxGroups <= 0 || !nextClassName) {
-      return false;
-    }
-
-    const clusters = this.findOrbClusters(className, maxGroups);
-    if (!clusters.length) {
-      return false;
-    }
-
-    let started = false;
-    for (let index = 0; index < clusters.length; index += 1) {
-      started =
-        this.initiateOrbFusion(
-          className,
-          nextClassName,
-          clusters[index],
-          reason
-        ) || started;
-    }
-    return started;
-  }
-
   createXPOrb(x, y, value, options = {}) {
     const resolvedConfig = this.resolveOrbClass(value, options);
-    const orb = this.acquireOrb();
+    const orb = this.field.acquireOrb();
     this.initializeOrbState(orb, x, y, value, resolvedConfig, options);
 
-    this.addOrbToPools(orb);
-    this.enforceClassLimit(orb.class);
+    this.field.addOrbToPools(orb);
+    this.fusion.enforceClassLimit(orb.class);
 
     this.eventBus?.emit?.('xp-orb-created', {
       orb,
@@ -810,7 +354,7 @@ class XPOrbSystem extends BaseSystem {
     orb.id = this.generateOrbId();
     orb.x = x;
     orb.y = y;
-    orb.value = Number.isFinite(value) ? value : this.baseOrbValue;
+    orb.value = Number.isFinite(value) ? value : this.tuning.baseOrbValue;
     orb.class = resolvedConfig.name;
     orb.tier = resolvedConfig.tier;
     orb.collected = false;
@@ -831,22 +375,25 @@ class XPOrbSystem extends BaseSystem {
       this.updateGlobalPull(deltaTime);
     }
 
-    if (!this.xpOrbs.length && this.activeFusionAnimations.length === 0) {
+    if (
+      !this.xpOrbs.length &&
+      this.fusion.activeFusionAnimations.length === 0
+    ) {
       return;
     }
 
-    this.updateFusionAnimations(deltaTime);
+    this.fusion.updateFusionAnimations(deltaTime);
 
     if (this.xpOrbs.length) {
       this.advanceOrbAges(deltaTime);
       if (this.drift) this.updateDrift(deltaTime);
-      this.updateShipMagnetism(deltaTime);
-      this.updateOrbSoftBounds(deltaTime);
-      this.updateOrbClustering(deltaTime);
-      this.checkOrbFusion(deltaTime);
+      this.magnet.updateShipMagnetism(deltaTime);
+      this.spacing.updateOrbSoftBounds(deltaTime);
+      this.spacing.updateOrbClustering(deltaTime);
+      this.fusion.checkOrbFusion(deltaTime);
     }
 
-    this.cleanupCollectedOrbs();
+    this.field.cleanupCollectedOrbs();
   }
 
   advanceOrbAges(deltaTime) {
@@ -867,133 +414,6 @@ class XPOrbSystem extends BaseSystem {
       const currentAge = Number.isFinite(orb.age) ? orb.age : 0;
       orb.age = currentAge + deltaTime;
     }
-  }
-
-  updateFusionAnimations(deltaTime) {
-    if (!this.activeFusionAnimations.length) {
-      return;
-    }
-
-    for (
-      let index = this.activeFusionAnimations.length - 1;
-      index >= 0;
-      index -= 1
-    ) {
-      const animation = this.activeFusionAnimations[index];
-      if (!animation) {
-        this.activeFusionAnimations.splice(index, 1);
-        continue;
-      }
-
-      animation.elapsed = (animation.elapsed || 0) + deltaTime;
-      const progress = Math.min(animation.elapsed / animation.duration, 1);
-      const eased = easeInOutCubic(progress);
-
-      let activeCount = 0;
-
-      for (let orbIndex = 0; orbIndex < animation.orbs.length; orbIndex += 1) {
-        const entry = animation.orbs[orbIndex];
-        const orb = entry?.orb;
-        if (!this.isOrbActive(orb)) {
-          continue;
-        }
-
-        activeCount += 1;
-        orb.x = lerp(entry.startX, animation.center.x, eased);
-        orb.y = lerp(entry.startY, animation.center.y, eased);
-      }
-
-      if (activeCount < this.clusterFusionCount) {
-        this.activeFusionAnimations.splice(index, 1);
-        animation.orbs.forEach(({ orb }) => {
-          if (!orb || orb.collected) {
-            return;
-          }
-          orb.isFusing = false;
-          delete orb.fusionId;
-        });
-        continue;
-      }
-
-      if (progress >= 1) {
-        this.activeFusionAnimations.splice(index, 1);
-        const orbsToFuse = animation.orbs
-          .map((entry) => entry.orb)
-          .filter((orb) => this.isOrbActive(orb));
-        const hasEnoughOrbs = orbsToFuse.length >= this.clusterFusionCount;
-
-        animation.orbs.forEach((entry) => {
-          const orb = entry?.orb;
-          if (!orb) {
-            return;
-          }
-
-          if (!this.isOrbActive(orb) || !hasEnoughOrbs) {
-            orb.isFusing = false;
-            delete orb.fusionId;
-          }
-        });
-
-        if (hasEnoughOrbs) {
-          this.fuseOrbs(
-            animation.className,
-            animation.targetClassName,
-            orbsToFuse,
-            animation.reason,
-            { center: animation.center }
-          );
-        }
-      }
-    }
-  }
-
-  ensureSpatialIndex() {
-    if (!this.spatialIndexDirty) {
-      return this.spatialIndex;
-    }
-
-    const index = new Map();
-    const cellSize = Math.max(this.fusionDetectionRadius, 24);
-    let counter = 0;
-
-    for (let i = 0; i < this.orbClasses.length; i += 1) {
-      const className = this.orbClasses[i];
-      const pool = this.xpOrbPools[className];
-      if (!Array.isArray(pool) || pool.length === 0) {
-        continue;
-      }
-
-      const active = pool.filter((orb) => this.isOrbActive(orb));
-      if (!active.length) {
-        continue;
-      }
-
-      const classData = {
-        cellSize,
-        cells: new Map(),
-        orbs: active,
-      };
-
-      for (let j = 0; j < active.length; j += 1) {
-        const orb = active[j];
-        orb._gridIndex = counter += 1;
-        const cellX = Math.floor(orb.x / cellSize);
-        const cellY = Math.floor(orb.y / cellSize);
-        const key = `${cellX}:${cellY}`;
-        const bucket = classData.cells.get(key);
-        if (bucket) {
-          bucket.push(orb);
-        } else {
-          classData.cells.set(key, [orb]);
-        }
-      }
-
-      index.set(className, classData);
-    }
-
-    this.spatialIndex = index;
-    this.spatialIndexDirty = false;
-    return index;
   }
 
   // Magnet pickup: every orb flies to the ship, faster each second; the
@@ -1058,747 +478,6 @@ class XPOrbSystem extends BaseSystem {
     this.invalidateSpatialIndex();
   }
 
-  updateShipMagnetism(deltaTime) {
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    if (
-      !this.cachedPlayer ||
-      typeof this.cachedPlayer.getPosition !== 'function'
-    ) {
-      super.resolveCachedServices(SERVICE_CACHE_MAP);
-    }
-
-    const player = this.cachedPlayer;
-    if (!player || typeof player.getPosition !== 'function') {
-      return;
-    }
-
-    // A wrecked ship pulls and collects nothing (as with pickups and hearts).
-    if (player.isDead || player.isRetrying || player._quitExplosionHidden) {
-      return;
-    }
-
-    const playerPos = player.getPosition();
-    if (
-      !playerPos ||
-      !Number.isFinite(playerPos.x) ||
-      !Number.isFinite(playerPos.y)
-    ) {
-      return;
-    }
-
-    const magnetismRadius =
-      (typeof player.getMagnetismRadius === 'function'
-        ? player.getMagnetismRadius()
-        : this.orbMagnetismRadius) || this.orbMagnetismRadius;
-
-    if (!Number.isFinite(magnetismRadius) || magnetismRadius <= 0) {
-      return;
-    }
-
-    const magnetismRadiusSq = magnetismRadius * magnetismRadius;
-    const collectionRadius =
-      SHIP_SIZE +
-      XP_ORB_SIZE +
-      this.minOrbDistance * this.collectionRadiusPadding;
-    const collectionRadiusSq = collectionRadius * collectionRadius;
-
-    const spatialIndex = this.ensureSpatialIndex();
-    if (!spatialIndex || spatialIndex.size === 0) {
-      return;
-    }
-
-    const playerX = playerPos.x;
-    const playerY = playerPos.y;
-    const magnetismForce =
-      (this.magnetismForce || 0) * (this.drift?.pullScale ?? 1);
-    const boostMultiplier =
-      Number.isFinite(this.magnetismBoost) && this.magnetismBoost >= 0
-        ? this.magnetismBoost
-        : 2.2;
-
-    let moved = false;
-
-    spatialIndex.forEach((classData) => {
-      if (!classData || !classData.cells || classData.cells.size === 0) {
-        return;
-      }
-
-      const cellSize =
-        Number.isFinite(classData.cellSize) && classData.cellSize > 0
-          ? classData.cellSize
-          : magnetismRadius;
-      if (!Number.isFinite(cellSize) || cellSize <= 0) {
-        return;
-      }
-
-      const searchRange = Math.max(
-        1,
-        Math.ceil((magnetismRadius + this.minOrbDistance) / cellSize)
-      );
-      const centerCellX = Math.floor(playerX / cellSize);
-      const centerCellY = Math.floor(playerY / cellSize);
-
-      for (let offsetX = -searchRange; offsetX <= searchRange; offsetX += 1) {
-        for (let offsetY = -searchRange; offsetY <= searchRange; offsetY += 1) {
-          const key = `${centerCellX + offsetX}:${centerCellY + offsetY}`;
-          const bucket = classData.cells.get(key);
-          if (!bucket || bucket.length === 0) {
-            continue;
-          }
-
-          for (let idx = 0; idx < bucket.length; idx += 1) {
-            const orb = bucket[idx];
-            if (!this.isOrbActive(orb) || orb.isFusing) {
-              continue;
-            }
-
-            const dx = playerX - orb.x;
-            const dy = playerY - orb.y;
-            const distanceSq = dx * dx + dy * dy;
-
-            if (distanceSq <= collectionRadiusSq) {
-              this.collectOrb(orb);
-              moved = true;
-              continue;
-            }
-
-            if (distanceSq <= 0 || distanceSq > magnetismRadiusSq) {
-              continue;
-            }
-
-            const distance = Math.sqrt(distanceSq);
-            if (!Number.isFinite(distance) || distance === 0) {
-              this.collectOrb(orb);
-              moved = true;
-              continue;
-            }
-
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            const proximity = 1 - Math.min(distance / magnetismRadius, 1);
-            const magnetBoost = 1 + proximity * boostMultiplier;
-            const speed = magnetismForce * magnetBoost;
-            const step = speed * deltaTime;
-
-            if (!Number.isFinite(step) || step <= 0) {
-              continue;
-            }
-
-            orb.x += normalizedDx * step;
-            orb.y += normalizedDy * step;
-            moved = true;
-
-            const postDx = playerX - orb.x;
-            const postDy = playerY - orb.y;
-            if (postDx * postDx + postDy * postDy <= collectionRadiusSq) {
-              this.collectOrb(orb);
-            }
-          }
-        }
-      }
-    });
-
-    if (moved) {
-      this.invalidateSpatialIndex();
-    }
-  }
-
-  updateOrbSoftBounds(deltaTime) {
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    if (!this.xpOrbs.length) {
-      return;
-    }
-
-    const width = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : 0;
-    const height = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : 0;
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    const margin = Number.isFinite(this.orbOffscreenMargin)
-      ? this.orbOffscreenMargin
-      : 0;
-    const duration = Number.isFinite(this.orbOffscreenReturnDuration)
-      ? Math.max(0.05, this.orbOffscreenReturnDuration)
-      : 0.55;
-    const ease = 1 - Math.exp(-deltaTime / duration);
-
-    let moved = false;
-
-    for (let i = 0; i < this.xpOrbs.length; i += 1) {
-      const orb = this.xpOrbs[i];
-      if (!this.isOrbActive(orb) || orb.isFusing) {
-        continue;
-      }
-
-      const tier = Number.isFinite(orb.tier) ? Math.max(1, orb.tier) : 1;
-      const radius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
-      const padding = Math.max(0, radius + margin);
-      const minX = padding;
-      const maxX = Math.max(minX, width - padding);
-      const minY = padding;
-      const maxY = Math.max(minY, height - padding);
-
-      const targetX = Math.min(Math.max(orb.x, minX), maxX);
-      const targetY = Math.min(Math.max(orb.y, minY), maxY);
-
-      if (targetX !== orb.x || targetY !== orb.y) {
-        orb.x = lerp(orb.x, targetX, ease);
-        orb.y = lerp(orb.y, targetY, ease);
-        moved = true;
-      }
-    }
-
-    if (moved) {
-      this.invalidateSpatialIndex();
-    }
-  }
-
-  updateOrbClustering(deltaTime) {
-    if (this.orbClusterRadius <= 0 || this.orbClusterForce <= 0) {
-      return;
-    }
-
-    const index = this.ensureSpatialIndex();
-    const clusterRadiusSq = this.orbClusterRadius * this.orbClusterRadius;
-    const comfortableSpacingFactor = Number.isFinite(
-      this.clusterConfig.comfortableSpacingFactor
-    )
-      ? this.clusterConfig.comfortableSpacingFactor
-      : 1.12;
-    const idealSpacingFactor = Number.isFinite(
-      this.clusterConfig.idealSpacingFactor
-    )
-      ? this.clusterConfig.idealSpacingFactor
-      : 0.95;
-    const denseSpacingFactor = Number.isFinite(
-      this.clusterConfig.denseSpacingFactor
-    )
-      ? this.clusterConfig.denseSpacingFactor
-      : 0.75;
-    const comfortableSpacing = this.minOrbDistance * comfortableSpacingFactor;
-    const idealSpacing = this.minOrbDistance * idealSpacingFactor;
-    const denseSpacing = this.minOrbDistance * denseSpacingFactor;
-
-    index.forEach((classData) => {
-      const { orbs, cells, cellSize } = classData;
-      if (!orbs || orbs.length < 2) {
-        return;
-      }
-
-      for (let i = 0; i < orbs.length; i += 1) {
-        const orbA = orbs[i];
-        if (!this.isOrbEligibleForFusion(orbA)) {
-          continue;
-        }
-
-        const cellX = Math.floor(orbA.x / cellSize);
-        const cellY = Math.floor(orbA.y / cellSize);
-
-        for (let gx = 0; gx < ORB_SPATIAL_NEIGHBOURS.length; gx += 1) {
-          for (let gy = 0; gy < ORB_SPATIAL_NEIGHBOURS.length; gy += 1) {
-            const key = `${cellX + ORB_SPATIAL_NEIGHBOURS[gx]}:${cellY + ORB_SPATIAL_NEIGHBOURS[gy]}`;
-            const neighbors = cells.get(key);
-            if (!neighbors) {
-              continue;
-            }
-
-            for (let n = 0; n < neighbors.length; n += 1) {
-              const orbB = neighbors[n];
-              if (
-                orbA === orbB ||
-                !this.isOrbEligibleForFusion(orbB) ||
-                orbB._gridIndex <= orbA._gridIndex
-              ) {
-                continue;
-              }
-
-              const dx = orbB.x - orbA.x;
-              const dy = orbB.y - orbA.y;
-              const distanceSq = dx * dx + dy * dy;
-              if (distanceSq <= 0 || distanceSq > clusterRadiusSq) {
-                continue;
-              }
-
-              const distance = Math.sqrt(distanceSq);
-              const normalizedDx = dx / distance;
-              const normalizedDy = dy / distance;
-              const closeness = Math.max(
-                1 - distance / this.orbClusterRadius,
-                0
-              );
-
-              if (distance > comfortableSpacing) {
-                const forceBase = Number.isFinite(
-                  this.clusterConfig.comfortableForceBase
-                )
-                  ? this.clusterConfig.comfortableForceBase
-                  : 0.5;
-                const forceCloseness = Number.isFinite(
-                  this.clusterConfig.comfortableForceCloseness
-                )
-                  ? this.clusterConfig.comfortableForceCloseness
-                  : 1.5;
-                const forceOffset = Number.isFinite(
-                  this.clusterConfig.comfortableForceOffset
-                )
-                  ? this.clusterConfig.comfortableForceOffset
-                  : 30;
-                const stepClamp = Number.isFinite(
-                  this.clusterConfig.comfortableStepClamp
-                )
-                  ? this.clusterConfig.comfortableStepClamp
-                  : 0.9;
-                const movementFactor = Number.isFinite(
-                  this.clusterConfig.comfortableMovementFactor
-                )
-                  ? this.clusterConfig.comfortableMovementFactor
-                  : 0.5;
-
-                const baseStrength =
-                  this.orbClusterForce *
-                    (forceBase + closeness * forceCloseness) +
-                  forceOffset;
-                const step = Math.min(
-                  baseStrength * deltaTime,
-                  distance * stepClamp
-                );
-                const movement = step * movementFactor;
-
-                orbA.x += normalizedDx * movement;
-                orbA.y += normalizedDy * movement;
-                orbB.x -= normalizedDx * movement;
-                orbB.y -= normalizedDy * movement;
-              } else if (distance > idealSpacing) {
-                const forceBase = Number.isFinite(
-                  this.clusterConfig.idealForceBase
-                )
-                  ? this.clusterConfig.idealForceBase
-                  : 0.3;
-                const forceCloseness = Number.isFinite(
-                  this.clusterConfig.idealForceCloseness
-                )
-                  ? this.clusterConfig.idealForceCloseness
-                  : 1.1;
-                const forceOffset = Number.isFinite(
-                  this.clusterConfig.idealForceOffset
-                )
-                  ? this.clusterConfig.idealForceOffset
-                  : 18;
-                const stepClamp = Number.isFinite(
-                  this.clusterConfig.idealStepClamp
-                )
-                  ? this.clusterConfig.idealStepClamp
-                  : 0.6;
-                const movementFactor = Number.isFinite(
-                  this.clusterConfig.idealMovementFactor
-                )
-                  ? this.clusterConfig.idealMovementFactor
-                  : 0.5;
-
-                const baseStrength =
-                  this.orbClusterForce *
-                    (forceBase + closeness * forceCloseness) +
-                  forceOffset;
-                const step = Math.min(
-                  baseStrength * deltaTime,
-                  distance * stepClamp
-                );
-                const movement = step * movementFactor;
-
-                orbA.x += normalizedDx * movement;
-                orbA.y += normalizedDy * movement;
-                orbB.x -= normalizedDx * movement;
-                orbB.y -= normalizedDy * movement;
-              } else if (distance < denseSpacing) {
-                const overlap = denseSpacing - distance;
-                const pushFactor = Number.isFinite(
-                  this.clusterConfig.densePushFactor
-                )
-                  ? this.clusterConfig.densePushFactor
-                  : 0.5;
-                const push = overlap * pushFactor;
-
-                orbA.x -= normalizedDx * push;
-                orbA.y -= normalizedDy * push;
-                orbB.x += normalizedDx * push;
-                orbB.y += normalizedDy * push;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    this.invalidateSpatialIndex();
-  }
-
-  findOrbClusters(className, maxClusters = 1) {
-    if (!maxClusters || maxClusters <= 0) {
-      return [];
-    }
-
-    const index = this.ensureSpatialIndex();
-    const classData = index.get(className);
-    if (!classData || !Array.isArray(classData.orbs)) {
-      return [];
-    }
-
-    const candidates = classData.orbs.filter((orb) =>
-      this.isOrbEligibleForFusion(orb)
-    );
-    if (candidates.length < this.clusterFusionCount) {
-      return [];
-    }
-
-    const { cellSize, cells } = classData;
-    const detectionRadiusSq = this.fusionDetectionRadiusSq;
-    const visited = new Set();
-    const clusters = [];
-
-    for (let i = 0; i < candidates.length; i += 1) {
-      const seed = candidates[i];
-      if (visited.has(seed)) {
-        continue;
-      }
-
-      const stack = [seed];
-      const component = [];
-      visited.add(seed);
-
-      while (stack.length > 0) {
-        const current = stack.pop();
-        if (!this.isOrbEligibleForFusion(current)) {
-          continue;
-        }
-
-        component.push(current);
-
-        const cellX = Math.floor(current.x / cellSize);
-        const cellY = Math.floor(current.y / cellSize);
-
-        for (let gx = 0; gx < ORB_SPATIAL_NEIGHBOURS.length; gx += 1) {
-          for (let gy = 0; gy < ORB_SPATIAL_NEIGHBOURS.length; gy += 1) {
-            const key = `${cellX + ORB_SPATIAL_NEIGHBOURS[gx]}:${cellY + ORB_SPATIAL_NEIGHBOURS[gy]}`;
-            const neighbors = cells.get(key);
-            if (!neighbors) {
-              continue;
-            }
-
-            for (let n = 0; n < neighbors.length; n += 1) {
-              const neighbor = neighbors[n];
-              if (
-                visited.has(neighbor) ||
-                !this.isOrbEligibleForFusion(neighbor)
-              ) {
-                continue;
-              }
-
-              const dx = neighbor.x - current.x;
-              const dy = neighbor.y - current.y;
-              if (dx * dx + dy * dy <= detectionRadiusSq) {
-                visited.add(neighbor);
-                stack.push(neighbor);
-              }
-            }
-          }
-        }
-      }
-
-      if (component.length < this.clusterFusionCount) {
-        continue;
-      }
-
-      let sumX = 0;
-      let sumY = 0;
-      for (let index = 0; index < component.length; index += 1) {
-        sumX += component[index].x;
-        sumY += component[index].y;
-      }
-
-      const centerX = sumX / component.length;
-      const centerY = sumY / component.length;
-
-      const ordered = component
-        .map((orb) => {
-          const dx = orb.x - centerX;
-          const dy = orb.y - centerY;
-          return {
-            orb,
-            distanceSq: dx * dx + dy * dy,
-            age: orb.age || 0,
-          };
-        })
-        .sort((a, b) => {
-          if (a.distanceSq === b.distanceSq) {
-            return b.age - a.age;
-          }
-          return a.distanceSq - b.distanceSq;
-        })
-        .map((entry) => entry.orb);
-
-      let radiusSq = 0;
-      const sampleCount = Math.min(ordered.length, this.clusterFusionCount);
-      for (let index = 0; index < sampleCount; index += 1) {
-        const orb = ordered[index];
-        const dx = orb.x - centerX;
-        const dy = orb.y - centerY;
-        const distSq = dx * dx + dy * dy;
-        if (distSq > radiusSq) {
-          radiusSq = distSq;
-        }
-      }
-
-      clusters.push({
-        orbs: ordered,
-        center: { x: centerX, y: centerY },
-        radius: Math.sqrt(radiusSq),
-        size: component.length,
-      });
-    }
-
-    clusters.sort((a, b) => {
-      if (a.radius === b.radius) {
-        return b.size - a.size;
-      }
-      return a.radius - b.radius;
-    });
-
-    return clusters.slice(0, maxClusters);
-  }
-
-  initiateOrbFusion(className, targetClassName, cluster, reason = 'interval') {
-    if (!cluster || !Array.isArray(cluster.orbs) || !targetClassName) {
-      return false;
-    }
-
-    const selected = [];
-    for (let index = 0; index < cluster.orbs.length; index += 1) {
-      const orb = cluster.orbs[index];
-      if (!this.isOrbEligibleForFusion(orb)) {
-        continue;
-      }
-
-      selected.push(orb);
-      if (selected.length >= this.clusterFusionCount) {
-        break;
-      }
-    }
-
-    if (selected.length < this.clusterFusionCount) {
-      return false;
-    }
-
-    const animationId = this.generateFusionAnimationId(className);
-    const animation = {
-      id: animationId,
-      className,
-      targetClassName,
-      reason,
-      duration: this.fusionAnimationDuration,
-      elapsed: 0,
-      center: { x: cluster.center.x, y: cluster.center.y },
-      orbs: [],
-    };
-
-    let sumX = 0;
-    let sumY = 0;
-
-    selected.forEach((orb) => {
-      orb.isFusing = true;
-      orb.fusionId = animationId;
-      animation.orbs.push({
-        orb,
-        startX: orb.x,
-        startY: orb.y,
-      });
-      sumX += orb.x;
-      sumY += orb.y;
-    });
-
-    if (animation.orbs.length > 0) {
-      animation.center.x = sumX / animation.orbs.length;
-      animation.center.y = sumY / animation.orbs.length;
-    }
-
-    this.activeFusionAnimations.push(animation);
-    return true;
-  }
-
-  checkOrbFusion(deltaTime) {
-    if (this.clusterFusionCount <= 1) {
-      return;
-    }
-
-    this.fusionCheckTimer += deltaTime;
-    if (this.fusionCheckTimer < this.fusionCheckInterval) {
-      return;
-    }
-
-    this.fusionCheckTimer = 0;
-
-    for (let i = 0; i < this.orbClasses.length; i += 1) {
-      const className = this.orbClasses[i];
-      const nextClassName = ORB_NEXT_CLASS[className];
-      if (!nextClassName) {
-        continue;
-      }
-
-      const clusters = this.findOrbClusters(className, 1);
-      if (!clusters.length) {
-        continue;
-      }
-
-      this.initiateOrbFusion(className, nextClassName, clusters[0], 'interval');
-    }
-  }
-
-  fuseOrbs(
-    className,
-    targetClassName,
-    orbs,
-    reason = 'interval',
-    options = {}
-  ) {
-    if (!Array.isArray(orbs) || orbs.length === 0) {
-      return;
-    }
-
-    const targetConfig = this.getOrbConfig(targetClassName);
-
-    const validOrbs = orbs.filter((orb) => this.isOrbActive(orb));
-    const count = validOrbs.length;
-    if (count < this.clusterFusionCount) {
-      orbs.forEach((orb) => {
-        if (!orb) {
-          return;
-        }
-        orb.isFusing = false;
-        delete orb.fusionId;
-      });
-      return;
-    }
-
-    let totalValue = 0;
-    let centerX = 0;
-    let centerY = 0;
-
-    validOrbs.forEach((orb) => {
-      totalValue += orb.value;
-      centerX += orb.x;
-      centerY += orb.y;
-      orb.collected = true;
-      orb.isFusing = false;
-      delete orb.fusionId;
-    });
-
-    if (options && options.center) {
-      centerX = options.center.x;
-      centerY = options.center.y;
-    } else {
-      centerX /= count;
-      centerY /= count;
-    }
-
-    const fusedOrb = this.createXPOrb(centerX, centerY, totalValue, {
-      className: targetConfig.name,
-      tier: targetConfig.tier,
-      source: 'fusion',
-      age: 0,
-    });
-
-    this.eventBus?.emit?.('xp-orb-fused', {
-      fromClass: className,
-      toClass: fusedOrb.class,
-      consumed: count,
-      value: totalValue,
-      position: { x: centerX, y: centerY },
-      tier: fusedOrb.tier,
-      reason,
-      color: targetConfig.baseColor,
-      glow: targetConfig.glowColor,
-      flash: targetConfig.fusionFlash,
-    });
-
-    this.enforceClassLimit(fusedOrb.class);
-    this.invalidateSpatialIndex();
-  }
-
-  cleanupCollectedOrbs() {
-    if (!this.xpOrbs.length) {
-      return;
-    }
-
-    const remaining = [];
-    const toRelease = [];
-    let removed = 0;
-    let sawNullEntry = false;
-
-    for (let i = 0; i < this.xpOrbs.length; i += 1) {
-      const orb = this.xpOrbs[i];
-      if (!orb) {
-        removed += 1;
-        sawNullEntry = true;
-        continue;
-      }
-
-      if (orb.collected) {
-        orb.active = false;
-        toRelease.push(orb);
-        removed += 1;
-        continue;
-      }
-
-      remaining.push(orb);
-    }
-
-    this.xpOrbs = remaining;
-
-    if (toRelease.length > 0) {
-      const releaseSet = new Set(toRelease);
-      const poolNames = Object.keys(this.xpOrbPools);
-
-      for (let i = 0; i < poolNames.length; i += 1) {
-        const className = poolNames[i];
-        const pool = this.xpOrbPools[className];
-        if (!Array.isArray(pool) || pool.length === 0) {
-          continue;
-        }
-
-        this.xpOrbPools[className] = pool.filter(
-          (candidate) => candidate && !releaseSet.has(candidate)
-        );
-      }
-
-      for (let i = 0; i < toRelease.length; i += 1) {
-        this.releaseOrb(toRelease[i]);
-      }
-    }
-
-    if (sawNullEntry) {
-      const poolNames = Object.keys(this.xpOrbPools);
-      for (let i = 0; i < poolNames.length; i += 1) {
-        const className = poolNames[i];
-        const pool = this.xpOrbPools[className];
-        if (!Array.isArray(pool) || pool.length === 0) {
-          continue;
-        }
-
-        this.xpOrbPools[className] = pool.filter(Boolean);
-      }
-    }
-
-    if (removed > 0) {
-      this.invalidateSpatialIndex();
-    }
-  }
-
   collectOrb(orb) {
     if (!orb || orb.collected) {
       return;
@@ -1823,7 +502,7 @@ class XPOrbSystem extends BaseSystem {
   }
 
   getMagnetismRadius() {
-    return this.orbMagnetismRadius;
+    return this.tuning.orbMagnetismRadius;
   }
 
   setMagnetismRadius(radius) {
@@ -1831,11 +510,11 @@ class XPOrbSystem extends BaseSystem {
     if (!Number.isFinite(next)) {
       return;
     }
-    this.orbMagnetismRadius = Math.max(10, next);
+    this.tuning.orbMagnetismRadius = Math.max(10, next);
   }
 
   getMagnetismForce() {
-    return this.magnetismForce;
+    return this.tuning.magnetismForce;
   }
 
   setMagnetismForce(force) {
@@ -1843,13 +522,11 @@ class XPOrbSystem extends BaseSystem {
     if (!Number.isFinite(next)) {
       return;
     }
-    this.magnetismForce = Math.max(0, next);
+    this.tuning.magnetismForce = Math.max(0, next);
   }
 
-  /** The pull before any upgrade (a run's start, a Retry's re-apply). */
   resetMagnetism() {
-    this.orbMagnetismRadius = MAGNETISM_RADIUS;
-    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.tuning.resetMagnetism();
   }
 
   getActiveOrbs() {
@@ -1877,73 +554,6 @@ class XPOrbSystem extends BaseSystem {
     if (!this.isOrbEligibleForFusion(orb)) return 0;
     orb.collected = true;
     return orb.value;
-  }
-
-  getOrbVisualConfig(className, tier) {
-    const key = `${className}:${tier}`;
-    if (this.visualCache.has(key)) {
-      return this.visualCache.get(key);
-    }
-
-    const baseRadius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
-    const visual = {
-      rayLength: baseRadius * 0.95,
-      haloRadius: baseRadius * 1.5,
-      rays: tier >= 3 ? 8 : 4,
-    };
-
-    this.ensureOrbSprite(visual);
-    this.visualCache.set(key, visual);
-    return visual;
-  }
-
-  render(ctx) {
-    if (!ctx) return;
-
-    const activeOrbs = this.getActiveOrbs();
-    if (!activeOrbs.length) {
-      return;
-    }
-
-    activeOrbs.forEach((orb) => {
-      const sprite = this.ensureOrbSprite(
-        this.getOrbVisualConfig(orb.class, orb.tier)
-      );
-      if (!sprite) return;
-
-      const phase = sparkPhase(orb);
-      const age = Number.isFinite(orb.age) ? orb.age : 0;
-      const pulse = 1 + 0.15 * Math.sin(age * 4 + phase);
-      const dx = orb.x - (orb.sparkPrevX ?? orb.x);
-      const dy = orb.y - (orb.sparkPrevY ?? orb.y);
-      orb.sparkPrevX = orb.x;
-      orb.sparkPrevY = orb.y;
-
-      // magnetized sparks stretch along their motion; idle ones spin
-      const moved = Math.hypot(dx, dy);
-      let rotation = age * 0.9 + phase;
-      let scaleX = pulse;
-      let scaleY = pulse;
-      if (moved > 0.4 && moved < SPARK_JUMP_DISTANCE) {
-        const stretch = Math.min(1.5, moved * 0.25);
-        rotation = Math.atan2(dy, dx);
-        scaleX = pulse * (1 + stretch);
-        scaleY = pulse / (1 + stretch * 0.5);
-      }
-
-      ctx.save();
-      ctx.translate(orb.x, orb.y);
-      ctx.rotate(rotation);
-      ctx.scale(scaleX, scaleY);
-      ctx.drawImage(
-        sprite.canvas,
-        -sprite.half,
-        -sprite.half,
-        sprite.size,
-        sprite.size
-      );
-      ctx.restore();
-    });
   }
 
   getBaseXPValue(size, wave = 1) {
@@ -2053,22 +663,13 @@ class XPOrbSystem extends BaseSystem {
 
   reset() {
     super.reset();
-    this.releaseAllOrbsToPool();
-    this.orbClasses = [...ORB_CLASS_SEQUENCE];
-    this.xpOrbs = [];
-    this.xpOrbPools = this.createEmptyOrbPools();
-    this.fusionCheckTimer = 0;
-    this.activeFusionAnimations = [];
+    this.field.reset();
+    this.fusion.reset();
     this.globalPull = null;
     this.drift = null;
-    this.spatialIndex.clear();
-    this.spatialIndexDirty = true;
-    this.visualCache.clear();
 
-    this.resetMagnetism();
-    this.minOrbDistance = MIN_ORB_DISTANCE;
-    this.clusterFusionCount = CLUSTER_FUSION_COUNT;
-    this.configureOrbClustering();
+    this.tuning.reset();
+    this.field.invalidateSpatialIndex();
 
     super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
   }
