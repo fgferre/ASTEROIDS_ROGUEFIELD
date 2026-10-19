@@ -2,7 +2,7 @@
 // the lock marks, the magnetism field), mirrored every frame into
 // Renderer3D's WebGL kit (`t`) and its DOM boss flash.
 
-import { GAME_WIDTH } from '../../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 
 const OVERLAY_H = 9;
@@ -205,8 +205,12 @@ export function mirrorBossTransitions(t, list, flashScale) {
     style.opacity = '0';
     return;
   }
-  // canvas px are logical px × the CSS stretch
-  const scale = t.canvas.clientWidth / GAME_WIDTH || 1;
+  // canvas px are logical px × the scale of the 800×600 box that fits it
+  const scale =
+    Math.min(
+      t.canvas.clientWidth / GAME_WIDTH,
+      t.canvas.clientHeight / GAME_HEIGHT
+    ) || 1;
   const px = Math.max(1, width * scale);
   style.opacity = '1';
   style.background = withAlpha(color, wash);

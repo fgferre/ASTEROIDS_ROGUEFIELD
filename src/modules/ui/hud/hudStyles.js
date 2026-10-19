@@ -15,7 +15,12 @@ export function getHudCss() {
             #hud-layer {
                 position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
                 box-sizing: border-box;
-                padding: var(--space-4, 16px);
+                /* clear of notches and rounded corners (viewport-fit=cover) */
+                padding:
+                    max(var(--space-4, 16px), env(safe-area-inset-top))
+                    max(var(--space-4, 16px), env(safe-area-inset-right))
+                    max(var(--space-4, 16px), env(safe-area-inset-bottom))
+                    max(var(--space-4, 16px), env(safe-area-inset-left));
                 display: grid;
                 grid-template-columns: 220px 1fr 220px;
                 grid-template-rows: auto 1fr auto;

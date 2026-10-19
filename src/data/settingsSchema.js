@@ -236,6 +236,20 @@ const SETTINGS_SCHEMA = [
         },
       },
       {
+        key: 'toggleFullscreen',
+        type: 'binding',
+        label: 'Toggle Fullscreen',
+        description: 'Enter or leave fullscreen.',
+        default: {
+          keyboard: ['KeyF'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
         key: 'confirm',
         type: 'binding',
         label: 'Confirm / Interact',
@@ -294,6 +308,13 @@ const SETTINGS_SCHEMA = [
     label: 'Interface',
     description: 'Customize HUD layout and scaling.',
     fields: [
+      {
+        key: 'fullscreen',
+        type: 'toggle',
+        label: 'Fullscreen',
+        description: 'Fill the whole screen. Esc leaves it.',
+        default: false,
+      },
       {
         key: 'hudScale',
         type: 'range',

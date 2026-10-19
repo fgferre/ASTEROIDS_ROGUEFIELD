@@ -120,6 +120,9 @@ export class SettingsPanel {
   }
 
   bootstrapSettingsState() {
+    // A saved "on" is stale: a page load never starts fullscreen.
+    this.syncFullscreenSetting();
+
     let accessibility = {};
     let video = {};
 
@@ -185,6 +188,10 @@ export class SettingsPanel {
         }
       });
     }
+
+    document.addEventListener('fullscreenchange', () =>
+      this.syncFullscreenSetting()
+    );
 
     if (settingsRefs.overlay) {
       settingsRefs.overlay.addEventListener('click', (event) => {
@@ -266,10 +273,54 @@ export class SettingsPanel {
     this.openSettingsPanel(source);
   }
 
+  /** The key: flips the toggle, which asks the browser (see below). */
+  toggleFullscreen() {
+    this.settings?.setSetting(
+      'video',
+      'fullscreen',
+      !document.fullscreenElement,
+      { source: 'ui' }
+    );
+  }
+
+  /** The toggle shows what the browser is doing, Esc included. */
+  syncFullscreenSetting() {
+    this.settings?.setSetting(
+      'video',
+      'fullscreen',
+      Boolean(document.fullscreenElement),
+      { source: 'fullscreen' }
+    );
+  }
+
+  /**
+   * Only an edit of the toggle (or a reset) asks the browser, which allows it
+   * from a click or key alone: saved values at boot never do. A refusal puts
+   * the toggle back to what the browser is doing.
+   */
+  followFullscreenChange(change) {
+    const edited =
+      (change.category === 'video' && change.key === 'fullscreen') ||
+      change.type === 'reset-all';
+    if (!edited || change.source === 'fullscreen') {
+      return;
+    }
+    const want = Boolean(this.settings.getSetting('video', 'fullscreen'));
+    if (want === Boolean(document.fullscreenElement)) {
+      return;
+    }
+    (want
+      ? document.documentElement.requestFullscreen()
+      : document.exitFullscreen()
+    ).catch(() => this.syncFullscreenSetting());
+  }
+
   handleSettingsChange(change) {
     if (!change) {
       return;
     }
+
+    this.followFullscreenChange(change);
 
     if (
       this.settingsState.isOpen &&
@@ -345,26 +396,7 @@ export class SettingsPanel {
     const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
     if (root) {
-      root.style.setProperty('--hud-scale', String(baseScale));
       root.dataset.hudScale = String(baseScale);
-    }
-
-    // [NEO-ARCADE] Fullscreen Handling
-    if (values.fullscreen !== undefined) {
-      const shouldBeFullscreen = Boolean(values.fullscreen);
-      const isFullscreen = Boolean(document.fullscreenElement);
-
-      if (shouldBeFullscreen && !isFullscreen) {
-        document.documentElement.requestFullscreen().catch((err) => {
-          console.warn('[SettingsPanel] Fullscreen request failed:', err);
-        });
-      } else if (!shouldBeFullscreen && isFullscreen) {
-        if (document.exitFullscreen) {
-          document.exitFullscreen().catch((err) => {
-            console.warn('[SettingsPanel] Exit fullscreen failed:', err);
-          });
-        }
-      }
     }
 
     this.setHudBaseScale(baseScale);
@@ -373,11 +405,8 @@ export class SettingsPanel {
     if (body) {
       const damageFlashEnabled =
         derived?.damageFlash ?? values.damageFlash !== false;
-      const reducedParticles =
-        derived?.reducedParticles ?? Boolean(values.reducedParticles);
 
       body.classList.toggle('damage-flash-disabled', !damageFlashEnabled);
-      body.classList.toggle('particles-reduced', reducedParticles);
     }
   }
 

@@ -73,6 +73,14 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       a vista é uma fatia da arena com a proporção da janela, **nunca além da borda do campo** (teste: em 21:9 a câmera
       presa ao campo não expõe o wrap); canvas 3D na densidade real com teto por preset (Retina do M1 a 60 fps); botão
       e tecla de tela cheia; áreas seguras; nenhum texto cortado em 1280×720. Captura em quatro proporções.
+      **Feito no ramo `r14/janela-inteira` (19/10); falta ele ver e jogar.** Canvas = janela, densidade = tela (teto 2,
+      presets como estavam). Câmera: altura vista = min(600/zoom, 800/proporção), presa para que o trapézio inclinado
+      caiba no campo; o renderer diz à câmera lógica até onde o quadro alcança, então ela chega às quatro bordas (teste
+      em `cameraRig.test.js`, proporções 1:1 a 32:9). Em zoom 1,3 a vista no alvo é 615×462 em 4:3 (igual a antes),
+      711×400 em 16:9, 711×305 em 21:9. Tela cheia: chave em Settings → Interface e tecla F (nunca pedida ao carregar).
+      Menu comprimido pela altura para caber em 1280×720 (casco em uma linha de três). Medido no painel do app, M1,
+      horda de 200 em ultra com `renderScale=2`: ~61 fps na caixa antiga (2232×1674) e ~52 fps na janela 1440×900
+      (2880×1800) — falta medir na tela dele; um teto de pixels por preset seria decisão dele.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.

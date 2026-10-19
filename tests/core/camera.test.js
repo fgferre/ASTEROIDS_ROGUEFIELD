@@ -53,6 +53,23 @@ describe('createCamera', () => {
     expect(far.y + far.height).toBeCloseTo(H, 6);
   });
 
+  it('frames 4:3 until told the screen aspect, then shows more across, never past the field', () => {
+    const camera = createCamera({ zoom: 1.3 });
+    expect(camera.getView().width).toBeCloseTo(W / 1.3, 6);
+    expect(camera.getView().height).toBeCloseTo(H / 1.3, 6);
+    camera.setAspect(16 / 10);
+    expect(camera.getView().width).toBeCloseTo((H / 1.3) * 1.6, 6);
+    expect(camera.getView().height).toBeCloseTo(H / 1.3, 6);
+    // 21:9: the field's whole width, less height
+    camera.setAspect(21 / 9);
+    expect(camera.getView().width).toBeCloseTo(W, 6);
+    expect(camera.getView().height).toBeCloseTo((W * 9) / 21, 6);
+    // a pull-out stops at the field
+    camera.setAspect(1);
+    camera.setZoom(0.85);
+    expect(camera.getView()).toEqual({ x: 100, y: 0, width: H, height: H });
+  });
+
   it('snaps instead of panning across when the target wraps', () => {
     const camera = createCamera({ fieldWidth: W, fieldHeight: H });
     settle(camera, W - 5, H / 2);

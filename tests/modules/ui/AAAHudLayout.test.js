@@ -290,6 +290,14 @@ describe('AAAHudLayout damage direction', () => {
     expect(damageArcAngle(ship, { x: 400, y: 300 })).toBeNull();
     expect(damageArcAngle(ship, null)).toBeNull();
   });
+
+  it('measures the angle in real screen proportions on a 16:9 screen', () => {
+    // 100 screen points across are 100 × (16/9 ÷ 4/3) as tall ones there
+    const stretch = 16 / 9 / (4 / 3);
+    expect(
+      damageArcAngle({ x: 400, y: 300 }, { x: 500, y: 200 }, stretch)
+    ).toBeCloseTo(Math.atan2(-100, 100 * stretch));
+  });
 });
 
 describe('AAAHudLayout off-screen arrows', () => {
@@ -329,6 +337,23 @@ describe('AAAHudLayout off-screen arrows', () => {
     // Back on screen: the arrow goes away.
     hud.updateEdgeArrows([{ kind: 'warden', x: 600, y: 300 }]);
     expect(visible()).toHaveLength(0);
+  });
+
+  it('points in real screen proportions on a 16:9 screen', () => {
+    const none = { w: 0, h: 0 };
+    hud._panelCorners = {
+      width: (600 * 16) / 9,
+      topLeft: none,
+      topRight: none,
+      bottomLeft: none,
+      bottomRight: none,
+    };
+    // 800 screen points right of the centre and 600 up
+    hud.updateEdgeArrows([{ kind: 'warden', x: 1200, y: -300 }]);
+    const angle = Math.atan2(-600, (800 * 16) / 9 / (4 / 3));
+    expect(visible()[0].glyph.style.transform).toBe(
+      `rotate(${angle.toFixed(3)}rad)`
+    );
   });
 });
 

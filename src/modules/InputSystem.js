@@ -656,6 +656,9 @@ class InputSystem {
           source: context.device || source || 'input',
         });
         break;
+      case 'toggleFullscreen':
+        eventBus?.emit?.('toggle-fullscreen');
+        break;
       case 'confirm':
         eventBus?.emit?.('input-confirmed', {
           source,

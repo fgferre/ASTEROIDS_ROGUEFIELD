@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import InputSystem from '../../src/modules/InputSystem.js';
 import { installDomStubs, keyEvent } from '../__helpers__/headlessGame.js';
@@ -64,5 +64,44 @@ describe('InputSystem focus loss', () => {
     document.hidden = true;
     listeners.visibilitychange();
     expect(input.isActionActive('moveUp')).toBe(false);
+  });
+});
+
+describe('InputSystem fullscreen key', () => {
+  let restoreDom;
+  let eventBus;
+  let input;
+  let toggled;
+
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+    eventBus = new EventBus();
+    toggled = vi.fn();
+    eventBus.on('toggle-fullscreen', toggled);
+    input = new InputSystem({
+      eventBus,
+      settings: {
+        getCategoryValues: () => null,
+        getSetting: () => undefined,
+      },
+    });
+  });
+
+  afterEach(() => restoreDom());
+
+  it('F asks for the toggle once per press, not on key repeat', () => {
+    input.onKeyDown(keyEvent('KeyF'));
+    input.onKeyDown(keyEvent('KeyF'));
+    expect(toggled).toHaveBeenCalledTimes(1);
+
+    input.onKeyUp(keyEvent('KeyF'));
+    input.onKeyDown(keyEvent('KeyF'));
+    expect(toggled).toHaveBeenCalledTimes(2);
+  });
+
+  it('F does nothing while a binding is being captured', () => {
+    eventBus.emit('input-binding-capture', { state: 'start' });
+    input.onKeyDown(keyEvent('KeyF'));
+    expect(toggled).not.toHaveBeenCalled();
   });
 });
