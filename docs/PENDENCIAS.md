@@ -1,6 +1,7 @@
 # Pendências — o que está quebrado e o que falta
 
-Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
+Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo veredito dele jogando (Mac M1, 60 fps):
+1, 3, 6, 7, 8, 9 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 16.**
 
@@ -80,8 +81,11 @@ iniciou.
 uma vez, nuvens com paralaxe; −7 % ultra / −50 % low no quadro headless); R13.5 pooling/director. Restam R13.2–R13.4,
 R13.6–R13.8 no PLAN.
 
-**Vereditos dele:** só sobre a Rodada 4 (itens 7 e 8, implementados em R5.10/R5.11) e, em 18/10 à noite, a faixa escura
-(item 15). **Rodadas 5–13 sem veredito jogando.** Primeira coisa a pedir na nova conversa.
+**Vereditos dele (19/10, madrugada, jogando num Mac M1):** _"vi e aprovei, mas é pouco conteúdo… Vampire Survivors são
+dias de desafio"_ (Rodadas 5–13 aprovadas; itens 1, 3, 7, 8 fechados); _"tudo roda bem a 60 fps num Mac M1, podemos
+até aumentar qualidade, detalhe e elementos 3D"_ (itens 6 e 9 fechados); a faixa escura (item 15) segue aberta; sobre
+as dívidas (arquivos grandes etc.): _"analise se ainda está assim mesmo, mas temos que melhorar isso"_. Goal
+seguinte sugerido a ele: longevidade estilo Vampire Survivors + qualidade por padrão mais alta + dívidas pagas.
 
 **Tudo visto só em headless sem GPU (1–4 fps); nada ouvido em browser.** `?stats=1`/F8 mostra fps/ms reais.
 
@@ -90,33 +94,9 @@ nunca `| tail`/`| grep` antes de `&&` em comandos de teste (usar `set -o pipefai
 escrever nada (R12.5) — conferir o diff antes de dar por feito; um worker apagou `scratchpad/*.js` de outros; o
 container pode reiniciar; apagar/arquivar refs remotas em massa é bloqueado na nuvem.
 
-## Visual (itens 7 e 3; o 7 nas palavras dele, 18/10, jogando a Rodada 4)
-
-- **(7)** _"Tá ficando muito interessante, mas tá um pouco estranho o background ser essas estrelas como se fosse uma
-  textura. Achei que tinha que ser algo mais procedural ali. Além disso, é estranho fazer sombra em cima dessa
-  textura. É espaço, é o espaço atrás."_ → Rodada 5, R5.10: fundo procedural (estrelas em pontos 3D com paralaxe
-  real, nebulosa em shader) e fim das sombras projetadas no "chão". Depois: _"A sombra faz sentido nas coisas que são 3D, né? Se tem uma fonte de luz iluminando, tudo que emite luz fazer
-  sombra é interessante também, mas ter uma sombra refletida embaixo no chão, nas estrelas, como se fosse um chão, é
-  estranho."_ → sombras só entre objetos 3D (shadow map da luz-chave; nave e rochas sombreando rochas), nenhuma num
-  plano de fundo. **Relistado por ele como aberto no goal novo (18/10, fim de tarde; sem confirmação jogando a R5.10):** _"fundo espacial que ainda lê como textura
-  (mais volume procedural, sombras só entre objetos 3D)"_ → ainda aberto; Rodada 13.
-- **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
-  continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
-
 ## Jogabilidade e sensação
 
-- **(1)** _"dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_ (17/10). O que o diagnóstico achou está em
-  `PLAN.md`; este item fecha quando ele disser, jogando, que não está mais amador.
 - **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
-
-## Controles (palavras dele, 18/10)
-
-- **(8)** _"A nave está sempre virando de forma automática para onde a mira está atirando. No jogo original a gente
-  pilotava a nave independente de onde o tiro ia, como se o tiro saísse de um canhão móvel em volta da nave. O
-  movimento fica muito estranho usando o WASD, porque ela vai em direção para onde está atirando."_ → Rodada 5,
-  R5.11: casco aponta para onde se move (WASD relativo à tela), arma vira torreta que gira sozinha para o alvo.
-  **Relistado por ele como aberto no goal novo (18/10, fim de tarde; sem confirmação jogando a R5.11):** _"controle do casco ainda acoplado demais à mira (torreta
-  independente)"_ → Rodada 13: no código nada liga casco à mira (lido 18/10); o esquema clássico (A/D gira, W empurra) só existe por `?controls=classic` e nele a torreta trava no nariz — oferecer em Settings "casco Moderno/Clássico" com torreta automática nos dois.
 
 ## Goal novo (palavras dele, 18/10, fim de tarde)
 
@@ -128,8 +108,6 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 qualidade gráfica, efeitos, câmera, jogabilidade e UX, buscando o polimento de um título AAA de próxima geração no
 browser, sem se limitar às referências."_
 
-- **(9)** medição real de desempenho na máquina dele (ver item 6) — o jogo precisa facilitar: relatório de fps/ms
-  copiável a partir do `?stats=1`/F8.
 - **(10)** caminhos de áudio mortos.
 - **(11)** oddities visuais e de paridade 2D/3D (anel chapado sob o domo do escudo, nave 2D borrada, zoom do dash só no
   3D, Wardens 2D com o visual do Prime…).
@@ -147,10 +125,3 @@ browser, sem se limitar às referências."_
   chapada, sem luz, sem espessura. Nada foi mudado em 18/10 (ele não aprovou o paliativo de opacidade). Próxima
   sessão: modelar o Anel como estrutura iluminada (espessura, segmentos, borda pela luz-chave, névoa de distância),
   mantendo o acender do epílogo.
-
-## Desempenho
-
-- **(6)** Ele abriu o DevTools _"justamente porque estava lento demais"_ (17/10). O trace mostrou `gameLoop` a 377 ms.
-  Em headless (17/10) o jogo fica em 16,7 ms de mediana com picos de 33–50 ms, com ou sem log de depuração — o
-  travamento dele **não reproduziu** aqui. Falta medir na máquina dele: `?debugLogging=0`, DevTools fechado, e o
-  painel F3 do jogo aberto por 60 s; só depois decidir o que otimizar.
