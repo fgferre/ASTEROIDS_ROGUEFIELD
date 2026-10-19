@@ -55,7 +55,6 @@ export class EnemyUpdateSystem {
    *   getActiveEnemyCount?: import('../../EnemySystem.js').EnemySystem['getActiveEnemyCount'],
    *   invalidateActiveEnemyCache?: import('../../EnemySystem.js').EnemySystem['invalidateActiveEnemyCache'],
    *   releaseAsteroid?: import('../../EnemySystem.js').EnemySystem['releaseAsteroid'],
-   *   emitWaveStateUpdate?: import('../../EnemySystem.js').EnemySystem['emitWaveStateUpdate'],
    */
   constructor(context = {}) {
     this.ctx = context;
@@ -105,12 +104,6 @@ export class EnemyUpdateSystem {
 
     this.updateSupportEnemies(deltaTime);
     this.cleanupDestroyed();
-
-    if (typeof this.ctx.emitWaveStateUpdate === 'function') {
-      this.ctx.emitWaveStateUpdate();
-    } else {
-      facade.emitWaveStateUpdate();
-    }
   }
 
   /**
@@ -508,12 +501,6 @@ export class EnemyUpdateSystem {
 
     if (typeof facade?.grantWaveRewards === 'function') {
       facade.grantWaveRewards();
-    }
-
-    if (typeof this.ctx?.emitWaveStateUpdate === 'function') {
-      this.ctx.emitWaveStateUpdate(true);
-    } else if (typeof facade?.emitWaveStateUpdate === 'function') {
-      facade.emitWaveStateUpdate(true);
     }
 
     GameDebugLogger.log('WAVE', 'Wave complete handled by UpdateSystem', {

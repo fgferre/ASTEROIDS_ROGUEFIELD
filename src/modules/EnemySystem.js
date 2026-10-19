@@ -67,8 +67,6 @@ import { SHADE_COMPONENTS } from '../data/enemies/shade.js';
 import { LEECH_COMPONENTS } from '../data/enemies/leech.js';
 import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
-import { bossRushDirectorFor, directorFor } from '../data/layers.js';
-import { scaleDirector } from '../data/difficulty.js';
 
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
@@ -97,7 +95,6 @@ class EnemySystem extends BaseSystem {
 
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
-    this.lastWaveBroadcast = null;
 
     this.activeEnemyCache = [];
     this.activeEnemyCacheDirty = true;
@@ -183,8 +180,6 @@ class EnemySystem extends BaseSystem {
     this.removeAllEventListeners();
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
-
-    this.emitWaveStateUpdate(true);
   }
 
   attachProgression(progressionSystem) {
@@ -891,7 +886,6 @@ class EnemySystem extends BaseSystem {
         getPlayerHullRadius: (...args) => facade.getPlayerHullRadius?.(...args),
         invalidateActiveEnemyCache: (...args) =>
           facade.invalidateActiveEnemyCache?.(...args),
-        emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
         emitEvent: (...args) => facade.emitEvent?.(...args),
         getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
       };
@@ -945,7 +939,6 @@ class EnemySystem extends BaseSystem {
         invalidateActiveEnemyCache: (...args) =>
           facade.invalidateActiveEnemyCache?.(...args),
         releaseAsteroid: (...args) => facade.releaseAsteroid?.(...args),
-        emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
       };
 
       this.updateSystem = new EnemyUpdateSystem(context);
@@ -1638,21 +1631,6 @@ class EnemySystem extends BaseSystem {
   }
 
   /**
-   * The layer's director (Boss Rush's on a Boss Rush run) with spawn counts
-   * scaled by the difficulty; past the table it rolls from the run seed, as
-   * WaveManager's does.
-   */
-  layerDirector(layer) {
-    const difficulty = resolveService('difficulty', this.dependencies);
-    return scaleDirector(
-      this.waveManager?.bossRush
-        ? bossRushDirectorFor(layer)
-        : directorFor(layer, difficulty?.getRunSeed() ?? 0),
-      difficulty?.getModifiers().spawnCount ?? 1
-    );
-  }
-
-  /**
    * The wave as the HUD, snapshots and spawners read it: a read-only copy
    * built from WaveManager, which owns every count (a new object each read).
    */
@@ -1674,54 +1652,6 @@ class EnemySystem extends BaseSystem {
       totalKills: 0,
       timeElapsed: 0,
     };
-  }
-
-  emitWaveStateUpdate(force = false) {
-    const wave = this.waveState;
-
-    const session = this.sessionStats
-      ? {
-          totalKills: this.sessionStats.totalKills,
-          timeElapsed: this.sessionStats.timeElapsed,
-        }
-      : null;
-
-    const snapshot = {
-      current: wave.current,
-      totalAsteroids: wave.totalAsteroids,
-      asteroidsKilled: wave.asteroidsKilled,
-      isActive: wave.isActive,
-      breakTimerSeconds: !wave.isActive ? Math.ceil(wave.breakTimer) : 0,
-      completedWaves: wave.completedWaves,
-      totalKills: session?.totalKills ?? 0,
-      sessionTimeSeconds: session
-        ? Math.max(0, Math.floor(session.timeElapsed ?? 0))
-        : 0,
-    };
-
-    if (!force && this.lastWaveBroadcast) {
-      const prev = this.lastWaveBroadcast;
-      const unchanged =
-        prev.current === snapshot.current &&
-        prev.totalAsteroids === snapshot.totalAsteroids &&
-        prev.asteroidsKilled === snapshot.asteroidsKilled &&
-        prev.isActive === snapshot.isActive &&
-        prev.breakTimerSeconds === snapshot.breakTimerSeconds &&
-        prev.completedWaves === snapshot.completedWaves &&
-        prev.totalKills === snapshot.totalKills &&
-        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds;
-
-      if (unchanged) {
-        return;
-      }
-    }
-
-    this.lastWaveBroadcast = snapshot;
-
-    this.eventBus.emit('wave-state-updated', {
-      wave,
-      session,
-    });
   }
 
   // === UPDATE PRINCIPAL ===
@@ -2584,7 +2514,6 @@ class EnemySystem extends BaseSystem {
 
       this.invalidateActiveEnemyCache();
       this.syncPhysicsIntegration(true);
-      this.emitWaveStateUpdate(true);
       this._snapshotFallbackWarningIssued = false;
       return true;
     } catch (error) {
@@ -2619,7 +2548,6 @@ class EnemySystem extends BaseSystem {
     this._nextAsteroidPoolId = 1;
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
-    this.lastWaveBroadcast = null;
     this._snapshotFallbackWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this._lastBossHudDamageUpdate = 0;
@@ -2635,7 +2563,6 @@ class EnemySystem extends BaseSystem {
       );
     }
 
-    this.emitWaveStateUpdate(true);
     console.log('[EnemySystem] Reset');
   }
 
@@ -2674,7 +2601,6 @@ class EnemySystem extends BaseSystem {
 
   startNextWave() {
     this.waveManager.startLayerFromSession();
-    this.emitWaveStateUpdate(true);
   }
 
   handleWaveManagerWaveComplete(data) {
@@ -2999,8 +2925,6 @@ class EnemySystem extends BaseSystem {
     this.releaseAsteroid(boss);
 
     this.sessionStats.totalKills += 1;
-
-    this.emitWaveStateUpdate(true);
   }
 
   handleBossInvulnerabilityChanged(data = {}) {

@@ -8,7 +8,7 @@ import {
   DEFAULT_HUD_LAYOUT_ID,
   getHudLayoutDefinition,
 } from '../../data/ui/hudLayout.js';
-import { LAYER_MODIFIERS, directorFor } from '../../data/layers.js';
+import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout, radarGlyph } from './AAAHudLayout.js';
 
@@ -482,14 +482,11 @@ export class TacticalHud {
     return this.getBossHudState();
   }
 
-  handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
+  handleWaveCompletionEvent(payload = {}) {
     const state = this.getBossHudState();
     const completedWave = Number.isFinite(Number(payload?.wave))
       ? Math.max(1, Math.floor(Number(payload.wave)))
       : null;
-    const isBossWave =
-      Boolean(payload?.isBossWave) ||
-      (completedWave !== null && directorFor(completedWave).warden);
     const hasBossContext =
       Boolean(this.cachedValues.boss?.visible) ||
       Boolean(state.bossId) ||
@@ -504,10 +501,6 @@ export class TacticalHud {
     }
 
     if (state.active || state.upcoming) {
-      return;
-    }
-
-    if (!isBossWave && !state.defeated && sourceEvent !== 'wave-complete') {
       return;
     }
 

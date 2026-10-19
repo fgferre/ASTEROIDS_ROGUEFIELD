@@ -212,12 +212,11 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
  *
  * @param {EnemySystem} enemySystem - The system under test.
  * @param {number} waveNumber - Target wave to prepare.
- * @param {{ spawnInitial?: boolean }} [options] - Additional setup options.
  * @returns {void}
  * @example
- * prepareWave(enemySystem, 3, { spawnInitial: true });
+ * prepareWave(enemySystem, 3);
  */
-export function prepareWave(enemySystem, waveNumber, options = {}) {
+export function prepareWave(enemySystem, waveNumber) {
   const normalizedWave = Math.max(1, waveNumber);
 
   const baseCount = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_BASE)
@@ -249,10 +248,6 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
   enemySystem.sessionActive = true;
   enemySystem.invalidateActiveEnemyCache?.();
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
-
-  if (options.spawnInitial) {
-    waveManager.spawnLayerStartBurst(4);
-  }
 }
 
 /**

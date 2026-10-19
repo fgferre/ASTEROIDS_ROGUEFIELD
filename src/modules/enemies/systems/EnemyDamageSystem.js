@@ -69,7 +69,6 @@ class EnemyDamageSystem {
       getPlayerHullRadius: (...args) => facade.getPlayerHullRadius?.(...args),
       invalidateActiveEnemyCache: (...args) =>
         facade.invalidateActiveEnemyCache?.(...args),
-      emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
       emitEvent: (...args) => facade.emitEvent?.(...args),
     };
 
@@ -252,8 +251,6 @@ class EnemyDamageSystem {
     } else if (typeof this.context.emitEvent === 'function') {
       this.context.emitEvent('enemy-destroyed', payload);
     }
-
-    this.context.emitWaveStateUpdate?.();
 
     return fragments;
   }

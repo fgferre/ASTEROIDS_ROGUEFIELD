@@ -84,6 +84,16 @@ function startLayer(field, layer) {
 const ofType = (active, type) => active.filter((e) => e.type === type);
 
 describe('WaveManager layer director', () => {
+  it('rolls a layer past the table from the run seed', () => {
+    const runSeed = 3; // seed 0 and seed 3 roll different modifiers on layer 17
+    const director = createField({ runSeed }).manager.layerDirector(17);
+    const seeded = directorFor(17, runSeed);
+
+    expect(seeded.modifier).not.toBe(directorFor(17, 0).modifier);
+    expect(director.modifier).toBe(seeded.modifier);
+    expect(director.rocks).toBe(seeded.rocks);
+  });
+
   it('trickles the layer 4 roster in on its schedule', () => {
     const field = createField();
     startLayer(field, 4);

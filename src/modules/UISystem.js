@@ -761,7 +761,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('wave-complete', (payload = {}) => {
-      this.tacticalHud.handleWaveCompletionEvent(payload, 'wave-complete');
+      this.tacticalHud.handleWaveCompletionEvent(payload);
     });
 
     this.registerEventListener('ui-show-screen', (payload = {}) => {

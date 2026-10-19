@@ -122,7 +122,6 @@ export class WaveManager {
     };
     this.randomScopeSeeds = {};
     this.randomScopes = this.createRandomScopes(this.random);
-    this.captureRandomScopeSeeds();
     this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
     this._fallbackRandom = null;
 
@@ -160,8 +159,6 @@ export class WaveManager {
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
-    this.managerTotalsForWave = { all: 0, asteroids: 0 };
-    this.compatibilityModeActive = false;
 
     // The layer's rocks: EnemySystem builds each one, WaveManager trickles
     // them in and keeps the counts EnemySystem.waveState reports. rockLayer
@@ -172,7 +169,6 @@ export class WaveManager {
     this.rocksActive = false;
     this.rocksTotal = 0;
     this.rocksSpawned = 0;
-    this.rockBurstDone = false;
     this.layerRocks = 0;
     this.completedWaves = 0;
 
@@ -262,6 +258,24 @@ export class WaveManager {
     }
 
     return directorFor(waveNumber).warden;
+  }
+
+  /**
+   * The layer's director (Boss Rush's on a Boss Rush run) with spawn counts
+   * scaled by the difficulty; past the table the endless modifiers roll from
+   * the run seed, so each run gets its own.
+   */
+  layerDirector(layer) {
+    const difficulty = resolveService(
+      'difficulty',
+      this.enemySystem.dependencies
+    );
+    return scaleDirector(
+      this.bossRush
+        ? bossRushDirectorFor(layer)
+        : directorFor(layer, difficulty?.getRunSeed() ?? 0),
+      difficulty?.getModifiers().spawnCount ?? 1
+    );
   }
 
   getAsteroidDistributionWeights() {
@@ -605,22 +619,6 @@ export class WaveManager {
       }
     }
 
-    if (this.managerTotalsForWave) {
-      const managerAll = Number.isFinite(this.managerTotalsForWave.all)
-        ? this.managerTotalsForWave.all
-        : 0;
-      const managerAsteroids = Number.isFinite(
-        this.managerTotalsForWave.asteroids
-      )
-        ? this.managerTotalsForWave.asteroids
-        : 0;
-
-      this.managerTotalsForWave = {
-        all: managerAll + 1,
-        asteroids: managerAsteroids + (isAsteroid ? 1 : 0),
-      };
-    }
-
     // The rock plan counts rocks only: a drone or mine minion stays out.
     if (isAsteroid) {
       this.addExtraRocks(1);
@@ -727,20 +725,7 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakMap();
 
     const waveNumber = this.currentWave;
-    // Same scaling as EnemySystem.layerDirector (difficulty spawnCount); the
-    // endless modifiers roll from the run seed, so each run gets its own.
-    const difficulty = resolveService(
-      'difficulty',
-      this.enemySystem.dependencies
-    );
-    const director = this.applyHuntersMoon(
-      scaleDirector(
-        this.bossRush
-          ? bossRushDirectorFor(waveNumber)
-          : directorFor(waveNumber, difficulty?.getRunSeed() ?? 0),
-        difficulty?.getModifiers().spawnCount ?? 1
-      )
-    );
+    const director = this.applyHuntersMoon(this.layerDirector(waveNumber));
     let config;
 
     if (director.warden) {
@@ -776,8 +761,6 @@ export class WaveManager {
     };
 
     this.totalEnemiesThisWave = computedTotalEnemies;
-    this.managerTotalsForWave = { ...rawManagerTotals };
-    this.compatibilityModeActive = true;
 
     const waveEventPayload = {
       wave: waveNumber,
@@ -1466,27 +1449,6 @@ export class WaveManager {
     }
   }
 
-  /**
-   * The layer's first `count` rocks at once, out of its plan, once per plan
-   * (GameSessionService's run kickoff).
-   */
-  spawnLayerStartBurst(count = 4) {
-    if (this.rockBurstDone) {
-      return;
-    }
-
-    const spawnCount = Math.min(
-      count,
-      Math.max(0, this.rocksTotal - this.rocksSpawned)
-    );
-    for (let i = 0; i < spawnCount; i++) {
-      this.enemySystem.spawnAsteroid();
-    }
-
-    this.rockBurstDone = true;
-    debugLog(`[WaveManager] Spawned ${spawnCount} initial asteroids`);
-  }
-
   /** A rock of the plan spawned (EnemySystem.spawnAsteroid). */
   countPlannedRock() {
     if (this.rocksActive) {
@@ -1521,7 +1483,6 @@ export class WaveManager {
     if (this.waveInProgress && !this.rocksActive) {
       this.rocksTotal = this.layerRocks;
       this.rocksSpawned = 0;
-      this.rockBurstDone = false;
     }
     this.rocksActive = this.waveInProgress;
     this.rockLayer = this.currentWave;
@@ -2425,14 +2386,8 @@ export class WaveManager {
       return;
     }
 
-    const compatibilityMode = this.compatibilityModeActive;
-
-    const waveManagerTotal = compatibilityMode
-      ? this.totalAsteroidEnemiesThisWave
-      : this.totalEnemiesThisWave;
-    const waveManagerSpawned = compatibilityMode
-      ? this.asteroidsSpawnedThisWave
-      : this.enemiesSpawnedThisWave;
+    const waveManagerTotal = this.totalAsteroidEnemiesThisWave;
+    const waveManagerSpawned = this.asteroidsSpawnedThisWave;
 
     // Allow small discrepancies during spawn/death timing. The rock plan has
     // the layer's rock total up front, while the bridge counts rocks as they
@@ -2577,15 +2532,12 @@ export class WaveManager {
     this.spawnDelayMultiplier = 1;
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
-    this.managerTotalsForWave = { all: 0, asteroids: 0 };
-    this.compatibilityModeActive = false;
     // The run's first layer starts from the session (startLayerFromSession)
     // on this plan.
     this.rockLayer = 1;
     this.rocksActive = false;
-    this.rocksTotal = this.enemySystem.layerDirector(1).rocks;
+    this.rocksTotal = this.layerDirector(1).rocks;
     this.rocksSpawned = 0;
-    this.rockBurstDone = false;
     this.layerRocks = 0;
     this.completedWaves = 0;
     if (this.randomSequences) {
@@ -2597,61 +2549,6 @@ export class WaveManager {
     this.connectEventListeners();
 
     debugLog('[WaveManager] Reset');
-  }
-
-  /**
-   * Gets the current wave state.
-   *
-   * @returns {Object} Wave state
-   */
-  getState() {
-    const sanitizeCount = (value) => (Number.isFinite(value) ? value : 0);
-
-    const compatibilityMode = this.compatibilityModeActive;
-
-    const totals = {
-      all: sanitizeCount(
-        this.managerTotalsForWave?.all ?? this.totalEnemiesThisWave
-      ),
-      asteroids: sanitizeCount(
-        this.managerTotalsForWave?.asteroids ??
-          this.totalAsteroidEnemiesThisWave
-      ),
-    };
-
-    const spawnedCounts = {
-      all: sanitizeCount(this.enemiesSpawnedThisWave),
-      asteroids: sanitizeCount(this.asteroidsSpawnedThisWave),
-    };
-
-    const killedCounts = {
-      all: sanitizeCount(this.enemiesKilledThisWave),
-      asteroids: sanitizeCount(this.asteroidsKilledThisWave),
-    };
-
-    const totalForState = totals.asteroids;
-    const spawnedForState = spawnedCounts.asteroids;
-    const killedForState = killedCounts.asteroids;
-
-    const progressDenominator = totalForState > 0 ? totalForState : 0;
-
-    return {
-      currentWave: this.currentWave,
-      inProgress: this.waveInProgress,
-      paused: this.wavePaused,
-      spawned: spawnedForState,
-      killed: killedForState,
-      total: totalForState,
-      totals,
-      counts: {
-        spawned: spawnedCounts,
-        killed: killedCounts,
-      },
-      countdown: this.waveCountdown,
-      progress:
-        progressDenominator > 0 ? killedForState / progressDenominator : 0,
-      compatibilityMode,
-    };
   }
 
   createRandomScopes(random) {
@@ -2680,17 +2577,13 @@ export class WaveManager {
   }
 
   getRandomService() {
-    if (!this.randomScopes) {
-      this.randomScopes = this.createRandomScopes(this.random);
-      this.captureRandomScopeSeeds();
-    }
-    return this.randomScopes.base;
+    return this.getRandomScope('base');
   }
 
+  // createRandomScopes captures the new scopes' seeds.
   getRandomScope(scope) {
     if (!this.randomScopes) {
       this.randomScopes = this.createRandomScopes(this.random);
-      this.captureRandomScopeSeeds();
     }
 
     return this.randomScopes[scope] || this.randomScopes.base;

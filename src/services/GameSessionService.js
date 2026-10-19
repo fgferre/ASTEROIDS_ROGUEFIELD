@@ -755,28 +755,14 @@ export default class GameSessionService {
       return false;
     }
 
-    let started = false;
     try {
-      started = enemies.startNextWave();
+      enemies.startNextWave();
     } catch (error) {
       console.error(
         '[GameSessionService] Failed to start wave via WaveManager:',
         error
       );
       return false;
-    }
-
-    if (!started) {
-      return false;
-    }
-
-    try {
-      enemies.waveManager.spawnLayerStartBurst(4);
-    } catch (error) {
-      console.error(
-        '[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:',
-        error
-      );
     }
 
     return true;
