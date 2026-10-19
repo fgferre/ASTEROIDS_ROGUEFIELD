@@ -99,7 +99,7 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 
 - [x] **0b.1 AudioSystem** (2.370 → 911, 19/10): `src/data/audio/eventCues.js` (91 linhas evento → som) lida por um
       despachante; lógica, propulsor, voz do chefe e random em `src/modules/audio/`; registro de 2.737 chamadas de som
-      idêntico. Os atalhos `play*` ficaram (um teste os exige no protótipo) — BACKLOG.
+      idêntico. Os 67 atalhos `play*` saíram depois: quem chamava usa o barramento.
 - [x] **0b.2 MenuBackgroundSystem** (3.864 → 1.163, 19/10): onze partes da cena em `src/modules/menu/`; num rascunho
       contra o original, os mesmos 16.741 sorteios e o mesmo estado da cena em cada quadro; menu visto no navegador.
 - [x] **0b.3 PlayerSystem** (2.444 → 918, 19/10): desenho 2D morto apagado; arte e forma do casco, escudo, entrada,
