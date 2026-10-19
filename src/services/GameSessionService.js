@@ -95,6 +95,12 @@ export default class GameSessionService {
       screenChanged: (data) => this.handleScreenChangedEvent(data),
       playerDied: (data) => this.handlePlayerDiedEvent(data),
       togglePause: (payload) => this.handleTogglePauseEvent(payload),
+      // The window lost focus mid-run (InputSystem released the keys): pause.
+      inputFocusLost: () => {
+        if (this.isRunning() && !this.isRetryCountdownActive) {
+          this.togglePause({ source: 'focus-lost' });
+        }
+      },
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
@@ -536,6 +542,7 @@ export default class GameSessionService {
     register('screen-changed', this.globalEventHandlers.screenChanged);
     register('player-died', this.globalEventHandlers.playerDied);
     register('toggle-pause', this.globalEventHandlers.togglePause);
+    register('input-focus-lost', this.globalEventHandlers.inputFocusLost);
     register(
       'exit-to-menu-requested',
       this.globalEventHandlers.exitToMenuRequested
@@ -662,6 +669,15 @@ export default class GameSessionService {
 
     this.clearPendingGameOverTransition();
     this.endless = true;
+    // Lost between the final Warden's death and this screen: the run is won,
+    // so the ship comes back the way a Retry brings it (full hull, a safe
+    // spot, a moment of invulnerability).
+    const player = this.resolveServiceInstance('player');
+    if (player.isDead) {
+      player.health = player.maxHealth;
+      player.respawn(this.findSafeSpawnPoint(), 3);
+      this.resolveServiceInstance('world').reset();
+    }
     this.resolveServiceInstance('enemies')?.waveManager?.resumeWaves();
     this.setScreen('playing');
     this.emitScreenChanged('playing', { source: 'run-continued' });
@@ -1848,51 +1864,8 @@ export default class GameSessionService {
     }
 
     this.applyConfiguredPlayerHull({ hullId: payload.player?.hullId });
-
-    if (payload.player) {
-      const { maxHealth, health, position, upgrades } = payload.player;
-
-      const hasValidMaxHealth = Number.isFinite(maxHealth) && maxHealth > 0;
-      if (hasValidMaxHealth) {
-        player.maxHealth = maxHealth;
-      }
-
-      if (Array.isArray(upgrades)) {
-        player.upgrades = [...upgrades];
-      }
-
-      let nextHealth = null;
-      if (hasValidMaxHealth) {
-        nextHealth = maxHealth;
-      } else if (Number.isFinite(health) && health > 0) {
-        nextHealth = health;
-      }
-
-      if (Number.isFinite(nextHealth)) {
-        player.health = nextHealth;
-      } else if (Number.isFinite(player.maxHealth) && player.maxHealth > 0) {
-        player.health = player.maxHealth;
-      }
-
-      if (position && typeof position === 'object') {
-        if (!player.position) {
-          player.position = { x: 0, y: 0 };
-        }
-
-        if (Number.isFinite(position.x)) {
-          player.position.x = position.x;
-        }
-
-        if (Number.isFinite(position.y)) {
-          player.position.y = position.y;
-        }
-      }
-    } else {
-      hadFallback = true;
-      console.warn(
-        '[Retry] Player snapshot missing - player reset to defaults.'
-      );
-    }
+    // The orbs' pull starts from base too: the upgrades are re-applied below.
+    this.resolveServiceInstance('xpOrbs').resetMagnetism();
 
     let progressionRestored = false;
     if (payload.progression && typeof progression.restoreState === 'function') {
@@ -1955,6 +1928,53 @@ export default class GameSessionService {
           );
         }
       }
+    }
+
+    // After the upgrades, which rebuilt every stat from the reset ones: the
+    // hull at death (its max included) comes back as it was, at full health.
+    if (payload.player) {
+      const { maxHealth, health, position, upgrades } = payload.player;
+
+      const hasValidMaxHealth = Number.isFinite(maxHealth) && maxHealth > 0;
+      if (hasValidMaxHealth) {
+        player.maxHealth = maxHealth;
+      }
+
+      if (Array.isArray(upgrades)) {
+        player.upgrades = [...upgrades];
+      }
+
+      let nextHealth = null;
+      if (hasValidMaxHealth) {
+        nextHealth = maxHealth;
+      } else if (Number.isFinite(health) && health > 0) {
+        nextHealth = health;
+      }
+
+      if (Number.isFinite(nextHealth)) {
+        player.health = nextHealth;
+      } else if (Number.isFinite(player.maxHealth) && player.maxHealth > 0) {
+        player.health = player.maxHealth;
+      }
+
+      if (position && typeof position === 'object') {
+        if (!player.position) {
+          player.position = { x: 0, y: 0 };
+        }
+
+        if (Number.isFinite(position.x)) {
+          player.position.x = position.x;
+        }
+
+        if (Number.isFinite(position.y)) {
+          player.position.y = position.y;
+        }
+      }
+    } else {
+      hadFallback = true;
+      console.warn(
+        '[Retry] Player snapshot missing - player reset to defaults.'
+      );
     }
 
     let enemiesRestored = false;

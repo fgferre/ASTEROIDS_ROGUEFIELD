@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 import GameSessionService from '../../src/services/GameSessionService.js';
 import DifficultyService from '../../src/services/DifficultyService.js';
@@ -12,6 +12,11 @@ import {
 import { BOSS_PHYSICS_CONFIG } from '../../src/data/enemies/boss.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
+import { GamePools } from '../../src/core/GamePools.js';
+import {
+  createHeadlessGame,
+  installDomStubs,
+} from '../__helpers__/headlessGame.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
 import { createRandomServiceStatefulStub } from '../__helpers__/stubs.js';
@@ -89,7 +94,7 @@ function createServiceHarness(options = {}) {
     resetLevelUpState: vi.fn(),
   };
 
-  const xpOrbs = { reset: vi.fn() };
+  const xpOrbs = { reset: vi.fn(), resetMagnetism: vi.fn() };
   const healthHearts = { reset: vi.fn() };
   const effects = {
     reset: vi.fn(),
@@ -306,6 +311,19 @@ describe('GameSessionService lifecycle flows', () => {
     expect(resumed).toBe(false);
     expect(service.isPaused()).toBe(false);
     expect(service.getSessionState()).toBe('running');
+  });
+
+  it('pauses a running game when the window loses focus, never unpauses', () => {
+    const { service, eventBus } = createServiceHarness();
+
+    service.setScreen('playing');
+    service.setPaused(false);
+
+    eventBus.emit('input-focus-lost');
+    expect(service.isPaused()).toBe(true);
+
+    eventBus.emit('input-focus-lost');
+    expect(service.isPaused()).toBe(true);
   });
 
   it('schedules quit explosion before returning to menu from pause', () => {
@@ -570,5 +588,29 @@ describe('GameSessionService lifecycle flows', () => {
     const spawnPoint = service.findSafeSpawnPoint();
 
     expect(spawnPoint).toEqual({ x: 600, y: 450 });
+  });
+});
+
+describe('GameSessionService.resetSystems with the real service manifest', () => {
+  let restoreDom;
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    GamePools.releaseAll();
+    restoreDom();
+  });
+
+  it("clears the previous run's player bullets when a new run starts", () => {
+    const game = createHeadlessGame();
+    const { combat } = game.services;
+    game.session.startNewRun({ source: 'test' });
+    combat.createBullet({ x: 100, y: 100 }, { x: 200, y: 100 }, 1);
+    expect(combat.bullets).toHaveLength(1);
+
+    game.session.startNewRun({ source: 'test' });
+
+    expect(combat.bullets).toHaveLength(0);
   });
 });

@@ -261,6 +261,10 @@ class InputSystem {
     document.addEventListener('mousemove', (event) => this.onMouseMove(event));
     document.addEventListener('mousedown', (event) => this.onMouseDown(event));
     document.addEventListener('mouseup', (event) => this.onMouseUp(event));
+    window.addEventListener('blur', () => this.onFocusLost());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.onFocusLost();
+    });
 
     window.addEventListener('gamepadconnected', (event) =>
       this.onGamepadConnected(event)
@@ -489,6 +493,23 @@ class InputSystem {
         pos: { ...this.mousePos },
       });
     }
+  }
+
+  // The keyup of a key held while the window loses focus goes elsewhere:
+  // release every key and button so none stays stuck.
+  onFocusLost() {
+    Array.from(this.activeKeyboardActions).forEach((action) => {
+      this.handleActionRelease(action, 'keyboard', {
+        device: 'keyboard',
+        forced: true,
+      });
+    });
+    this.keys = {};
+    this.codes = {};
+    this.keyboardActionInputs.clear();
+    this.activeKeyboardActions.clear();
+    this.mouseButtons = {};
+    this.getEventBus()?.emit?.('input-focus-lost');
   }
 
   onGamepadConnected(event) {

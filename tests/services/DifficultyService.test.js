@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
 import DifficultyService, {
   DAILY_STORAGE_KEY,
@@ -21,7 +21,10 @@ describe('DifficultyService', () => {
   beforeEach(() => {
     restoreDom = installDomStubs();
   });
-  afterEach(() => restoreDom());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    restoreDom();
+  });
 
   it('reads the preset from the setting, Veteran by default', () => {
     expect(
@@ -57,6 +60,35 @@ describe('DifficultyService', () => {
     expect(service.getDifficulty()).toBe('warden');
     expect(service.runLabel()).toBe('SEED 2229850880 · WARDEN');
   });
+
+  it('keeps the boot seed for the first run, then draws a fresh seed per run', () => {
+    vi.spyOn(crypto, 'getRandomValues')
+      .mockImplementationOnce((buffer) => Object.assign(buffer, [111]))
+      .mockImplementationOnce((buffer) => Object.assign(buffer, [222]));
+    const service = new DifficultyService({
+      settings: settingsWith('veteran'),
+      bootSeed: 7,
+      bootSeedSource: 'crypto',
+    });
+    expect(service.beginRun({ daily: false })).toBe(7);
+    expect(service.beginRun()).toBe(111);
+    expect(service.getRunSeed()).toBe(111);
+    expect(service.beginRun()).toBe(222);
+  });
+
+  it.each(['url', 'localStorage', 'replay', 'profile-harness'])(
+    'keeps a %s boot seed for every run',
+    (bootSeedSource) => {
+      const service = new DifficultyService({
+        settings: settingsWith('veteran'),
+        bootSeed: 7,
+        bootSeedSource,
+      });
+      expect(service.beginRun({ daily: false })).toBe(7);
+      expect(service.beginRun()).toBe(7);
+      expect(service.beginRun()).toBe(7);
+    }
+  );
 
   it('builds the shareable seed link', () => {
     expect(

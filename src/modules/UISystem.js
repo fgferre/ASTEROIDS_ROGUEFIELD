@@ -649,6 +649,10 @@ class UISystem extends BaseSystem {
         return;
       }
       this.pilotDown = true;
+      // Cards dealt on the step the ship died close: the death plays out.
+      if (this.levelUpScreen.levelUpState.isVisible) {
+        this.showGameUI();
+      }
       this.lastTransmission = null;
       this.queueTransmission(
         deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
@@ -794,6 +798,12 @@ class UISystem extends BaseSystem {
         this.onboarding.stop();
       }
     });
+    // A retry's countdown ends in the respawn: the pilot is back.
+    this.registerEventListener('session-retry-countdown', ({ phase } = {}) => {
+      if (phase === 'complete') {
+        this.pilotDown = false;
+      }
+    });
     this.registerEventListener('player-dashed', () => {
       this.onboarding.dashed();
     });
@@ -804,8 +814,9 @@ class UISystem extends BaseSystem {
       this.onboarding.cardPicked();
       this.removeOnboardingCardsTip();
     });
+    // No cards once the run has ended: over the victory or under the game over.
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
-      if (this.runWon) {
+      if (this.runWon || this.pilotDown) {
         return;
       }
       this.levelUpScreen.handleUpgradeOptions(payload);
@@ -1145,8 +1156,16 @@ class UISystem extends BaseSystem {
     }
   }
 
+  /** Back to play; several level-ups at once deal their card choices first. */
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
+    if (
+      !this.runWon &&
+      !this.pilotDown &&
+      this.getService('progression').openNextLevelUpOffer()
+    ) {
+      return;
+    }
     this.showScreen('playing', options);
     this.tacticalHud.refreshHudFromServices(true);
   }

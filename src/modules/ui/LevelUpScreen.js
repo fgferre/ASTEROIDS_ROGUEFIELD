@@ -27,7 +27,7 @@ export class LevelUpScreen {
    * `progression()`: the progression service (offers, rerolls, banishes, picks), or none.
    * `emit(name, payload)`: sends ui-hover.
    * `showScreen(name, options)`: shows the level-up overlay.
-   * `showGameUI()`: back to play; it resets this screen too.
+   * `showGameUI()`: back to play, or to the next card choice waiting; it resets this screen too.
    * `showCardsTip()`: the first-run onboarding tip under the cards.
    * `prefersReducedMotion()`: the cards skip their entry and exit animation.
    * `colorVision()`: 'assist' swaps the card accents for the color-blind palette.

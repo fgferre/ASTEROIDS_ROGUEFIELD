@@ -118,6 +118,35 @@ describe('endless run past the final Warden', () => {
     expect(gameovers[0].data.bestLayer).toBe(20);
   });
 
+  it('brings back a ship lost after the final Warden fell when the run goes on', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player, world } = game.services;
+    player.setInvulnerableTimer(1e9);
+    const won = [];
+    const gameovers = [];
+    game.eventBus.on('run-won', (payload) => {
+      won.push(payload);
+      world.handlePlayerDeath();
+    });
+    game.eventBus.on('screen-changed', (payload) => {
+      if (payload.screen === 'gameover') gameovers.push(payload);
+    });
+
+    startOnLayer(game, 15);
+    killBoss(game);
+    expect(player.isDead).toBe(true);
+    expect(game.session.getScreen()).toBe('victory');
+
+    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(player.isDead).toBe(false);
+    expect(player.health).toBe(player.maxHealth);
+    expect(world.playerAlive).toBe(true);
+    expect(won).toHaveLength(1);
+    expect(gameovers).toHaveLength(0);
+    expect(game.session.getSessionState()).toBe('running');
+  });
+
   it('keeps the best layer across runs and counts each run', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test' });

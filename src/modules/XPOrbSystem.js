@@ -1087,6 +1087,11 @@ class XPOrbSystem extends BaseSystem {
       return;
     }
 
+    // A wrecked ship pulls and collects nothing (as with pickups and hearts).
+    if (player.isDead || player.isRetrying || player._quitExplosionHidden) {
+      return;
+    }
+
     const playerPos = player.getPosition();
     if (
       !playerPos ||
@@ -1853,6 +1858,12 @@ class XPOrbSystem extends BaseSystem {
     this.magnetismForce = Math.max(0, next);
   }
 
+  /** The pull before any upgrade (a run's start, a Retry's re-apply). */
+  resetMagnetism() {
+    this.orbMagnetismRadius = MAGNETISM_RADIUS;
+    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+  }
+
   getActiveOrbs() {
     return this.xpOrbs.filter((orb) => !orb.collected);
   }
@@ -2071,8 +2082,7 @@ class XPOrbSystem extends BaseSystem {
     this.spatialIndexDirty = true;
     this.visualCache.clear();
 
-    this.orbMagnetismRadius = MAGNETISM_RADIUS;
-    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.resetMagnetism();
     this.minOrbDistance = MIN_ORB_DISTANCE;
     this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();

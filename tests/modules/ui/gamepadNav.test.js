@@ -76,4 +76,12 @@ describe('UISystem gamepad navigation', () => {
     ui.handleGamepadNav('confirm');
     expect(clicks).toEqual([3]);
   });
+
+  it('drives the game over, not cards left under it', () => {
+    const shown = { classList: { contains: () => false } };
+    document.getElementById = (id) =>
+      id === 'levelup-screen' || id === 'gameover-screen' ? shown : null;
+    const ui = Object.setPrototypeOf({}, UISystem.prototype);
+    expect(ui.getGamepadNavScreen().id).toBe('gameover');
+  });
 });

@@ -135,6 +135,9 @@ class ProgressionSystem extends UpgradeSystem {
 
     this.registerEventListener('player-died', () => {
       this.resetCombo({ reason: 'player-died', silent: false, force: true });
+      // Card choices still waiting go with the run: a retry restores its own
+      // snapshot.
+      this.pendingLevelUpScreens = [];
     });
   }
 
@@ -367,11 +370,31 @@ class ProgressionSystem extends UpgradeSystem {
       return;
     }
 
-    const ready = this.pendingLevelUpScreens;
-    this.pendingLevelUpScreens = [];
-    ready.forEach((payload) => {
-      this.eventBus?.emit?.('upgrade-options-ready', payload);
+    this.openNextLevelUpOffer();
+  }
+
+  // One card choice per level gained, in order; after a pick the UI opens the
+  // next before play resumes. The cards are rolled when shown, so they follow
+  // the earlier picks. Returns false when none is waiting.
+  openNextLevelUpOffer() {
+    if (this.pendingLevelUpScreens.length === 0) {
+      return false;
+    }
+
+    const level = this.pendingLevelUpScreens.shift();
+    const { options, poolSize, totalDefinitions } = this.prepareUpgradeOptions(
+      PROGRESSION_UPGRADE_ROLL_COUNT
+    );
+    this.eventBus?.emit?.('upgrade-options-ready', {
+      level,
+      options,
+      poolSize,
+      totalDefinitions,
+      inventory: this.getUpgradeProgressSnapshot(),
+      synergies: this.getSynergySnapshot(),
+      autoResolved: options.length === 0,
     });
+    return true;
   }
 
   applyLevelUp() {
@@ -381,17 +404,10 @@ class ProgressionSystem extends UpgradeSystem {
       this.experienceToNext * this.levelScaling
     );
 
-    const upgradeContext = this.prepareUpgradeOptions(
-      PROGRESSION_UPGRADE_ROLL_COUNT
-    );
-
     return {
       level: this.level,
       previousRequirement,
       nextRequirement: this.experienceToNext,
-      options: upgradeContext.options,
-      poolSize: upgradeContext.poolSize,
-      totalDefinitions: upgradeContext.totalDefinitions,
     };
   }
 
@@ -406,15 +422,7 @@ class ProgressionSystem extends UpgradeSystem {
     if (this.pendingLevelUpScreens.length === 0) {
       this.levelUpScreenTimer = LEVEL_UP_SCREEN_DELAY_SECONDS;
     }
-    this.pendingLevelUpScreens.push({
-      level: context.level,
-      options: context.options || [],
-      poolSize: context.poolSize ?? 0,
-      totalDefinitions: context.totalDefinitions ?? 0,
-      inventory: this.getUpgradeProgressSnapshot(),
-      synergies: this.getSynergySnapshot(),
-      autoResolved: (context.options || []).length === 0,
-    });
+    this.pendingLevelUpScreens.push(context.level);
   }
 
   // === SISTEMA DE UPGRADES ===
@@ -538,6 +546,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.activeApexes.clear();
     this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
+    this.pendingLevelUpScreens = [];
 
     if (Number.isFinite(this.defaultComboTimeout)) {
       this.comboTimeout = safeNumber(

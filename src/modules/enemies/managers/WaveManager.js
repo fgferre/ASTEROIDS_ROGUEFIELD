@@ -1486,14 +1486,56 @@ export class WaveManager {
     this.rockLayer = this.currentWave;
   }
 
-  /** Puts back the rock state a snapshot holds (EnemySystem.importState). */
-  restoreRocks({ layer, active, total, spawned, completedWaves, spawnTimer }) {
+  /** The layer's clock, schedule and counts, for a snapshot (exportState). */
+  captureLayerProgress() {
+    return {
+      wave: this.currentWave,
+      inProgress: this.waveInProgress,
+      startTime: this.waveStartTime,
+      countdown: this.waveCountdown,
+      elapsed: this.layerElapsed,
+      schedule: [...this.layerSchedule],
+      enemiesSpawned: this.enemiesSpawnedThisWave,
+      enemiesKilled: this.enemiesKilledThisWave,
+      enemiesTotal: this.totalEnemiesThisWave,
+      asteroidsSpawned: this.asteroidsSpawnedThisWave,
+      asteroidsKilled: this.asteroidsKilledThisWave,
+      asteroidsTotal: this.totalAsteroidEnemiesThisWave,
+    };
+  }
+
+  /**
+   * Puts back the layer a snapshot holds (EnemySystem.importState), once its
+   * enemies are back on the field: registering them counted them again, and
+   * a layer whose counts outgrow its kills never completes.
+   */
+  restoreRocks({
+    layer,
+    active,
+    total,
+    spawned,
+    completedWaves,
+    spawnTimer,
+    progress,
+  }) {
     this.rockLayer = layer;
     this.rocksActive = active;
     this.rocksTotal = total;
     this.rocksSpawned = spawned;
     this.completedWaves = completedWaves;
     this.spawnTimer = spawnTimer;
+    this.currentWave = progress.wave;
+    this.waveInProgress = progress.inProgress;
+    this.waveStartTime = progress.startTime;
+    this.waveCountdown = progress.countdown;
+    this.layerElapsed = progress.elapsed;
+    this.layerSchedule = [...progress.schedule];
+    this.enemiesSpawnedThisWave = progress.enemiesSpawned;
+    this.enemiesKilledThisWave = progress.enemiesKilled;
+    this.totalEnemiesThisWave = progress.enemiesTotal;
+    this.asteroidsSpawnedThisWave = progress.asteroidsSpawned;
+    this.asteroidsKilledThisWave = progress.asteroidsKilled;
+    this.totalAsteroidEnemiesThisWave = progress.asteroidsTotal;
   }
 
   /**
