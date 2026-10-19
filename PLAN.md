@@ -124,8 +124,8 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
           apagados; `layerDirector` mora no WaveManager. De random só a captura repetida de sementes saiu; rótulos,
           escopos pai e fork legado ficam (fazem parte dos replays). Medição: 1 ajudante opus, 1 tentativa, 181k tokens,
           17 min; revisão aqui.
-    - [ ] Fechamento: `npm run done`, sonda no navegador (partida, arena de chefe, easter egg 2D), PR aberto e **parar: o dono
-          joga antes de mesclar**.
+    - [x] Fechamento (19/10): `npm run done` verde (173 arquivos, 1161 testes, build), sonda no navegador (partida, arena de
+          chefe, easter egg 2D, zero erros), PR #267 aberto. **Parado: o dono joga antes de mesclar.**
 
 ## Fora de escopo deste plano
 
