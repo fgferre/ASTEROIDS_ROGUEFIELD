@@ -8,9 +8,9 @@ por imagem e jogando — nunca por teste.
 
 - **Rodada 0 na `main`** (PR #280, 19/10, com o OK dele): `npm run done` e a checagem do GitHub verdes; sonda no
   navegador (menu, configurações, partida, morte → Game Over → Retry, cena hero, `?content=`).
-- **Ramo `r0/prova`** (não é para a `main`): um inimigo (Lancet) e uma arma (Needle Array) novos, escritos por um
-  ajudante só a partir do `CONTENT.md`; o diff é os dois arquivos de conteúdo mais o fixture do trace (a carta nova vira
-  oferta de nível). Conteúdo novo é a próxima meta.
+- **Prova da fábrica** (19/10): um ajudante, só com o `CONTENT.md`, criou um inimigo (Lancet) e uma arma (Needle Array)
+  com um arquivo cada e zero linhas no motor; o ramo foi apagado a pedido dele depois de visto (a carta nova só mudava as
+  ofertas de nível no trace). Recriar é um arquivo cada.
 - **Para o dono conferir:** jogar uma partida no site (nada deve ter mudado); medir a horda na tela dele — abrir
   `?content=drone&count=200&quality=ultra&fire=1&desktop=force` e ler o fps no painel F8 (aqui, com a GPU do M1 em
   Chromium headless, deu 60,0).
@@ -41,7 +41,7 @@ dado, comportamento é biblioteca pequena, um registro liga os dois; quem adicio
   60 fps no M1 em Retina e qualidade ultra (era 56 com engasgos; o custo eram as passadas de tela cheia, não os
   inimigos).
 
-**Pronto quando** — conferido 19/10: inimigo e arma novos com um arquivo cada e zero linhas no motor (`r0/prova`); os 10
+**Pronto quando** — conferido 19/10: inimigo e arma novos com um arquivo cada e zero linhas no motor (prova de 19/10, acima); os 10
 inimigos e 3 armas migrados com comportamento igual (trace); nenhum arquivo acima do teto e nenhuma exceção; 200 Motes a
 60 fps no M1 (medido aqui; falta ele ver na tela dele).
 
