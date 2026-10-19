@@ -46,6 +46,10 @@ const GRID_AREA = Object.freeze({
 });
 const GRID_MAX_SPACING = 70;
 
+// Session states that end the scene: the pilot left to the menu, or the run
+// ended (the Retry and New Mission paths start from these).
+const RUN_END_STATES = Object.freeze(['menu', 'player-died', 'victory']);
+
 // Targets for the weapon, hull and card scenes. Every prefix is spread out.
 const ROCKS = Object.freeze([
   { size: 'large', variant: 'common', x: 440, y: 300, vx: 4, vy: 2 },
@@ -79,11 +83,20 @@ export function parseContentParams(search) {
   };
 }
 
+// The catalog, not the cards folder: weapon cards live in their weapon file.
+function findCard(id) {
+  return UPGRADE_LIBRARY.find((candidate) => candidate.id === id);
+}
+
+function findContent(kind, id) {
+  return kind === 'cards' ? findCard(id) : getContent(kind, id);
+}
+
 /**
  * Looks `<id>` up in CONTENT_KINDS in order, or `<kind>/<id>` in that kind
  * only. Returns { kind, id, item }, or null when nothing matches.
  */
-export function resolveContent(ref, lookup = getContent) {
+export function resolveContent(ref, lookup = findContent) {
   const slash = ref.indexOf('/');
   const kinds = slash < 0 ? CONTENT_KINDS : [ref.slice(0, slash)];
   const id = slash < 0 ? ref : ref.slice(slash + 1);
@@ -147,15 +160,42 @@ export function enemyPositions(count) {
   return positions;
 }
 
+/** Sets `target[key]`; returns the call that puts back what was there. */
+function override(target, key, value) {
+  const wasOwn = Object.hasOwn(target, key);
+  const original = target[key];
+  target[key] = value;
+  return () => {
+    if (wasOwn) target[key] = original;
+    else delete target[key];
+  };
+}
+
+/**
+ * Runs `undo` once, the first time the run ends. The listener stays on the
+ * bus: EventBus.emit skips the next listener when one is removed mid-emit.
+ */
+export function undoWhenRunEnds(eventBus, undo) {
+  let pending = true;
+  eventBus.on('session-state-changed', ({ state }) => {
+    if (!pending || !RUN_END_STATES.includes(state)) return;
+    pending = false;
+    undo();
+  });
+}
+
 /**
  * Stops the layer from spawning on its own: rocks trickle in from
  * updateRockTrickle() and the layer clock (machines, surges, the Warden) runs
- * in update().
+ * in update(). Returns the call that lets it spawn again.
  */
 export function freezeSpawner(waveManager) {
-  waveManager.update = () => {};
-  waveManager.updateRockTrickle = () => {};
+  const restores = [
+    override(waveManager, 'update', () => {}),
+    override(waveManager, 'updateRockTrickle', () => {}),
+  ];
   waveManager.spawnQueue = [];
+  return () => restores.forEach((restore) => restore());
 }
 
 /** One enemy through the factory, registered the way the wave spawner does. */
@@ -173,12 +213,14 @@ export function jumpToLayer(enemies, layer) {
   enemies.waveManager.currentWave = layer - 1;
   enemies.waveManager.waveInProgress = false;
   enemies.startNextWave();
+  // The HUD reads the layer from rockLayer, which only update() moves: with
+  // the spawner frozen it would stay on layer 1.
+  enemies.waveManager.rockLayer = layer;
 }
 
 /** The card, after the cards it requires (rank 1 of each, recursively). */
 function applyCard(progression, cardId) {
-  // The catalog, not the cards folder: weapon cards live in their weapon file.
-  const card = UPGRADE_LIBRARY.find((candidate) => candidate.id === cardId);
+  const card = findCard(cardId);
   for (const { type, id, level = 1 } of card.prerequisites ?? []) {
     if (type !== 'upgrade') continue;
     let owned = progression.getUpgradeCount(id);
@@ -292,21 +334,25 @@ function placeShip(player) {
 }
 
 // The ship stays where it was put (a ram or a Warden's charge cannot push it
-// off the picture) until the pilot steers; then it is his.
+// off the picture) until the pilot steers; then it is his. Returns the call
+// that lets go.
 function holdShip(player) {
   let steered = false;
-  setInterval(() => {
+  const intervalId = setInterval(() => {
     const input = player.cachedMovementInput;
     if (input?.up || input?.down || input?.left || input?.right) {
       steered = true;
     }
     if (!steered) placeShip(player);
   }, HOLD_TICK_MS);
+  return () => clearInterval(intervalId);
 }
 
 /**
  * Composes the scene on a run that has just started: `scene` is what
- * readContentScene returned, `services` the game's service map.
+ * readContentScene returned, `services` the game's service map. Everything
+ * the scene overrides is put back when the run ends or the pilot leaves to
+ * the menu, so the next run is a normal one.
  */
 export function composeContentScene({ scene, services }) {
   const { player, enemies, combat, progression } = services;
@@ -315,11 +361,15 @@ export function composeContentScene({ scene, services }) {
 
   COMPOSERS[scene.kind](scene, services);
 
-  if (scene.kind !== 'stages') freezeSpawner(enemies.waveManager);
+  const undo = [];
+  if (scene.kind !== 'stages') undo.push(freezeSpawner(enemies.waveManager));
   if (!scene.fire && ['enemies', 'bosses'].includes(scene.kind)) {
-    combat.weapons.handleShooting = () => {};
+    undo.push(override(combat.weapons, 'handleShooting', () => {}));
   }
   player.setInvulnerableTimer(INVULNERABLE_SECONDS);
   placeShip(player);
-  holdShip(player);
+  undo.push(holdShip(player));
+  undoWhenRunEnds(services['event-bus'], () =>
+    undo.forEach((restore) => restore())
+  );
 }

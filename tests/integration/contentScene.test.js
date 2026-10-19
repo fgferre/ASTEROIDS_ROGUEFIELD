@@ -5,12 +5,17 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { composeContentScene } from '../../src/bootstrap/contentScene.js';
+import {
+  composeContentScene,
+  spawnViaFactory,
+} from '../../src/bootstrap/contentScene.js';
 import { listContent } from '../../src/content/registry.js';
 import { GamePools } from '../../src/core/GamePools.js';
+import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import {
   createHeadlessGame,
   installDomStubs,
+  keyEvent,
 } from '../__helpers__/headlessGame.js';
 
 const STEPS = 60;
@@ -22,6 +27,8 @@ function activeEnemies(enemies) {
 }
 
 const idsOf = (kind) => listContent(kind).map((item) => [item.id, item]);
+// The cards a run can offer: the cards folder and the weapon cards.
+const catalogCards = UPGRADE_LIBRARY.map((card) => [card.id, card]);
 const getItem = (kind, id) => listContent(kind).find((item) => item.id === id);
 const typesOf = (enemies) => enemies.map((enemy) => enemy.type);
 const countType = (enemies, type) =>
@@ -34,6 +41,9 @@ describe('content scene on a live run', () => {
   // A fresh game on a started run. Booting it warns; the scenes must not.
   function startRun() {
     game = createHeadlessGame();
+    // The app's service map has the bus; the headless one lists only the
+    // simulation services.
+    game.services['event-bus'] = game.eventBus;
     game.session.startNewRun({ source: 'test' });
     console.warn.mockClear();
   }
@@ -123,6 +133,14 @@ describe('content scene on a live run', () => {
       expect(countType(first.enemies, 'asteroid')).toBe(0);
       expect(services.combat.bullets).toHaveLength(0);
     });
+
+    it("shows the boss's layer in the HUD, not layer 1", () => {
+      const { services } = play('bosses', item);
+      const { enemies } = services;
+
+      expect(enemies.waveState.current).toBe(enemies.waveManager.currentWave);
+      expect(enemies.waveState.current).toBeGreaterThan(1);
+    });
   });
 
   describe.each(idsOf('weapons'))('weapon %s', (id, item) => {
@@ -144,7 +162,7 @@ describe('content scene on a live run', () => {
     });
   });
 
-  describe.each(idsOf('cards'))('card %s', (id, item) => {
+  describe.each(catalogCards)('card %s', (id, item) => {
     it('is applied, with rocks and Motes ahead', () => {
       const { first } = play('cards', item);
 
@@ -162,6 +180,73 @@ describe('content scene on a live run', () => {
       expect(waveManager.currentWave).toBe(item.order);
       expect(waveManager.waveInProgress).toBe(true);
       expect(Object.hasOwn(waveManager, 'update')).toBe(false);
+    });
+  });
+
+  describe('leaving to the menu', () => {
+    const drone = () => getItem('enemies', 'drone');
+
+    // Esc > Quit to menu > Start, in the same tab.
+    function leaveAndStartAgain() {
+      game.session.exitToMenu({ source: 'test' });
+      game.session.startNewRun({ source: 'test' });
+    }
+
+    it('gives the next run its spawner back', () => {
+      play('enemies', drone());
+      leaveAndStartAgain();
+      const { enemies } = game.services;
+      for (let step = 0; step < 600; step += 1) game.step();
+
+      expect(Object.hasOwn(enemies.waveManager, 'update')).toBe(false);
+      expect(Object.hasOwn(enemies.waveManager, 'updateRockTrickle')).toBe(
+        false
+      );
+      expect(countType(activeEnemies(enemies), 'asteroid')).toBeGreaterThan(0);
+    });
+
+    it('gives the next run its shooting back', () => {
+      play('enemies', drone());
+      leaveAndStartAgain();
+      const { enemies, combat, player } = game.services;
+      spawnViaFactory(enemies, 'drone', {
+        x: player.position.x + 250,
+        y: player.position.y,
+      });
+      for (let step = 0; step < STEPS; step += 1) game.step();
+
+      expect(combat.bullets.length).toBeGreaterThan(0);
+    });
+
+    it('leaves the ship of the next run free to move', () => {
+      play('enemies', drone());
+      leaveAndStartAgain();
+      const { input, player } = game.services;
+      const frame = () => {
+        game.step();
+        vi.advanceTimersByTime(16);
+      };
+
+      // Not put back at the scene's spot (x = 120) while the pilot holds still.
+      player.position.x = 600;
+      for (let step = 0; step < 10; step += 1) frame();
+      expect(player.position.x).toBeGreaterThan(550);
+
+      const before = player.position.x;
+      input.onKeyDown(keyEvent('KeyD'));
+      for (let step = 0; step < 30; step += 1) frame();
+      input.onKeyUp(keyEvent('KeyD'));
+      expect(player.position.x).toBeGreaterThan(before + 20);
+    });
+
+    it('is back to normal after a Warden scene too', () => {
+      play('bosses', getItem('bosses', 'dust'));
+      leaveAndStartAgain();
+      const { enemies, combat } = game.services;
+
+      expect(Object.hasOwn(enemies.waveManager, 'update')).toBe(false);
+      expect(Object.hasOwn(combat.weapons, 'handleShooting')).toBe(false);
+      expect(enemies.waveState.current).toBe(1);
     });
   });
 });

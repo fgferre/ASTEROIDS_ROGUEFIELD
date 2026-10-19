@@ -65,6 +65,7 @@ import {
   NO_LEVEL_UP_XP,
   readContentScene,
   spawnViaFactory,
+  undoWhenRunEnds,
 } from './contentScene.js';
 
 // CONTEXT D-09: deterministic seed forced across all scenarios.
@@ -240,10 +241,11 @@ const HERO_PLAYER = Object.freeze({ x: 300, y: 300, driftSpeed: 14 });
 /**
  * Composes the hero scene through the public spawn paths: factory-backed
  * enemies, createXPOrb, a frozen wave manager and an unreachable level-up.
+ * Returns the call that unfreezes the wave manager.
  */
 export function composeHeroScene({ player, enemies, progression, xpOrbs }) {
   enemies.releaseAllAsteroidsToPool();
-  freezeSpawner(enemies.waveManager);
+  const unfreezeSpawner = freezeSpawner(enemies.waveManager);
   progression.experienceToNext = NO_LEVEL_UP_XP;
 
   const spawn = (type, config) => spawnViaFactory(enemies, type, config);
@@ -256,6 +258,7 @@ export function composeHeroScene({ player, enemies, progression, xpOrbs }) {
   player.position.y = HERO_PLAYER.y;
   player.angle = 0;
   player.setInvulnerableTimer(60);
+  return unfreezeSpawner;
 }
 
 /**
@@ -474,12 +477,13 @@ async function runDeferredScenario({
 
         await startRun(enemies);
         if (config.hero) {
-          composeHeroScene({
+          const unfreezeSpawner = composeHeroScene({
             player,
             enemies,
             progression,
             xpOrbs: services['xp-orbs'],
           });
+          undoWhenRunEnds(services['event-bus'], unfreezeSpawner);
         } else {
           forceProgressionUpgrades(progression, config.upgrades);
           forceWaveNumber(enemies, config.wave);

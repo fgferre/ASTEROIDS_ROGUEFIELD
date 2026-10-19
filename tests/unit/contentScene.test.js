@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { activateProfileHarness } from '../../src/bootstrap/profileHarness.js';
+import {
+  activateProfileHarness,
+  composeHeroScene,
+} from '../../src/bootstrap/profileHarness.js';
 import {
   composeContentScene,
   CONTENT_KINDS,
   enemyPositions,
+  freezeSpawner,
   parseContentParams,
   readContentScene,
   resolveContent,
 } from '../../src/bootstrap/contentScene.js';
+import { EventBus } from '../../src/core/EventBus.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../src/core/GameConstants.js';
 
 // `?content=<id>` (PLAN.md 0a.2): the URL parsing, the lookup order and the
@@ -95,6 +100,10 @@ describe('resolveContent', () => {
     expect(kindOf('harmonic')).toBe('weapons');
     expect(kindOf('bastion')).toBe('hulls');
     expect(kindOf('plasma')).toBe('cards');
+    // A weapon card lives in its weapon file, not in the cards folder.
+    expect(kindOf('harmonic_resonator')).toBe('cards');
+    expect(kindOf('cards/harmonic_resonator')).toBe('cards');
+    expect(kindOf('cards/plasma')).toBe('cards');
     expect(kindOf('layer-05')).toBe('stages');
     expect(kindOf('stages/layer-05')).toBe('stages');
     expect(kindOf('nothing-here')).toBeUndefined();
@@ -189,6 +198,7 @@ describe('enemyPositions', () => {
 });
 
 const makeServices = () => ({
+  'event-bus': new EventBus(),
   player: {
     position: { x: 500, y: 100 },
     velocity: { vx: 30, vy: -20 },
@@ -289,6 +299,96 @@ describe('composeContentScene', () => {
     player.cachedMovementInput.right = false;
     vi.advanceTimersByTime(50);
     expect(player.position.x).toBe(400);
+  });
+});
+
+describe('leaving the scene', () => {
+  const enemyScene = { kind: 'enemies', id: 'drone', item: {}, count: 1 };
+  const endRun = (services, state) =>
+    services['event-bus'].emit('session-state-changed', { state });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(['menu', 'player-died', 'victory'])(
+    'puts back the spawner, the shooting and the ship when the run goes to %s',
+    (state) => {
+      const services = makeServices();
+      const { waveManager } = services.enemies;
+      const { weapons } = services.combat;
+      const { player } = services;
+      const [update, updateRockTrickle, handleShooting] = [
+        waveManager.update,
+        waveManager.updateRockTrickle,
+        weapons.handleShooting,
+      ];
+
+      composeContentScene({ scene: enemyScene, services });
+      endRun(services, state);
+
+      expect(waveManager.update).toBe(update);
+      expect(waveManager.updateRockTrickle).toBe(updateRockTrickle);
+      expect(weapons.handleShooting).toBe(handleShooting);
+      player.position.x = 400;
+      vi.advanceTimersByTime(50);
+      expect(player.position.x).toBe(400);
+    }
+  );
+
+  it.each(['running', 'paused', 'retrying'])(
+    'stays composed while the run is %s',
+    (state) => {
+      const services = makeServices();
+      const { waveManager } = services.enemies;
+      const update = waveManager.update;
+
+      composeContentScene({ scene: enemyScene, services });
+      endRun(services, state);
+
+      expect(waveManager.update).not.toBe(update);
+      services.player.position.x = 400;
+      vi.advanceTimersByTime(50);
+      expect(services.player.position.x).toBeLessThan(GAME_WIDTH / 3);
+    }
+  );
+
+  it('deletes what it added, leaving the original on the prototype', () => {
+    class Waves {
+      update() {}
+      updateRockTrickle() {}
+    }
+    const waveManager = new Waves();
+
+    const unfreeze = freezeSpawner(waveManager);
+    expect(Object.hasOwn(waveManager, 'update')).toBe(true);
+    unfreeze();
+
+    expect(Object.hasOwn(waveManager, 'update')).toBe(false);
+    expect(Object.hasOwn(waveManager, 'updateRockTrickle')).toBe(false);
+  });
+
+  it('gives the hero scene the same way back', () => {
+    const update = vi.fn();
+    const waveManager = { update, updateRockTrickle: vi.fn(), spawnQueue: [] };
+
+    const unfreeze = composeHeroScene({
+      player: { position: {}, setInvulnerableTimer: vi.fn() },
+      enemies: {
+        releaseAllAsteroidsToPool: vi.fn(),
+        acquireEnemyViaFactory: vi.fn(() => ({})),
+        waveManager,
+      },
+      progression: {},
+      xpOrbs: { createXPOrb: vi.fn() },
+    });
+    expect(waveManager.update).not.toBe(update);
+    unfreeze();
+
+    expect(waveManager.update).toBe(update);
   });
 });
 
