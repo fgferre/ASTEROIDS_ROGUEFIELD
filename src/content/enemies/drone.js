@@ -112,4 +112,10 @@ export default {
   tags: ['enemy', 'hostile', 'ranged'],
   affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
   projectileColor: 'rgba(255, 96, 64, 0.92)',
+  // Its movement and weapon components fly and shoot it.
+  seeded: true,
+  behaviors: deepFreeze({
+    'fork-streams': {},
+    'spawn-on-field': { margin: 100, spread: 100 },
+  }),
 };

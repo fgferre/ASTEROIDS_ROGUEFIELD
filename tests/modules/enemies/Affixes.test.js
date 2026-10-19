@@ -17,15 +17,15 @@ import {
   RAM_CONFIG,
 } from '../../../src/content/enemies/ram.js';
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { AFFIX_GLYPH_NAMES } from '../../../src/modules/enemies/components/affixGlyphs.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
-import Mine from '../../../src/modules/enemies/types/Mine.js';
-import Ram from '../../../src/modules/enemies/types/Ram.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 
-const Husk = TYPE_CLASSES.husk;
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
+const Mine = recipeEnemyClass(getContent('enemies', 'mine'));
+const Ram = recipeEnemyClass(getContent('enemies', 'ram'));
 const { config: HUSK_CONFIG, components: HUSK_COMPONENTS } = getContent(
   'enemies',
   'husk'

@@ -14,15 +14,25 @@
 // - takeDamage(amount, source): the damage left for the hull, or null for none;
 // - dying(source, context) / died(source, context): before and after the
 //   base death (its event, Volatile, Splitter).
-// `getters` are read on the enemy by name (the views read them).
+// `getters` are read on the enemy by name (the views read them); `methods`
+// are called on it by name (the engine calls them), with (enemy, params,
+// ...args).
 // Its state lives on the enemy, under the names the views and tests read.
+import charge from './charge.js';
 import fanShot from './fanShot.js';
 import forage from './forage.js';
+import forkStreams from './forkStreams.js';
 import frontalShield from './frontalShield.js';
 import holdRange from './holdRange.js';
+import layMines from './layMines.js';
 import lobShell from './lobShell.js';
+import orbitSide from './orbitSide.js';
 import phase from './phase.js';
+import proximityFuse from './proximityFuse.js';
 import spawnOnDeath from './spawnOnDeath.js';
+import spawnOnField from './spawnOnField.js';
+import spin from './spin.js';
+import weaponTelegraph from './weaponTelegraph.js';
 
 export const BEHAVIORS = Object.freeze({
   'hold-range': holdRange,
@@ -32,4 +42,12 @@ export const BEHAVIORS = Object.freeze({
   forage,
   'spawn-on-death': spawnOnDeath,
   'frontal-shield': frontalShield,
+  'fork-streams': forkStreams,
+  'spawn-on-field': spawnOnField,
+  'orbit-side': orbitSide,
+  'weapon-telegraph': weaponTelegraph,
+  'proximity-fuse': proximityFuse,
+  charge,
+  spin,
+  'lay-mines': layMines,
 });

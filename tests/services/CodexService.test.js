@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
-import Mine from '../../src/modules/enemies/types/Mine.js';
+import { getContent } from '../../src/content/registry.js';
+import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
 import CodexService, {
   CODEX_STORAGE_KEY,
 } from '../../src/services/CodexService.js';
+
+const Mine = recipeEnemyClass(getContent('enemies', 'mine'));
 
 describe('CodexService', () => {
   let restoreDom;

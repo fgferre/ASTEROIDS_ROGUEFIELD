@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../src/core/GameConstants.js';
 import { getContent } from '../../../src/content/registry.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 
-const Shade = TYPE_CLASSES.shade;
+const Shade = recipeEnemyClass(getContent('enemies', 'shade'));
 const { phase, 'fan-shot': fan } = getContent('enemies', 'shade').behaviors;
 const {
   fade: SHADE_FADE_SECONDS,

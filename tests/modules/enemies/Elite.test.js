@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { getContent } from '../../../src/content/registry.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { ELITE_MODIFIERS } from '../../../src/data/enemies/elite.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 
-const Husk = TYPE_CLASSES.husk;
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
 const { config: HUSK_CONFIG, components: HUSK_COMPONENTS } = getContent(
   'enemies',
   'husk'

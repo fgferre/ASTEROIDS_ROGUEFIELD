@@ -49,6 +49,7 @@ export const ELITE_AFFIXES = deepFreeze({
     label: 'Splitter',
     glyph: 'fork',
     color: PALETTE.threat,
+    type: 'drone', // the enemy it releases on death (the Mote)
     count: 2, // proposta 18/10: Motes released on death
     speed: 120, // proposta 18/10: outward px/s of each Mote
     kinds: kindsFor('splitter'),

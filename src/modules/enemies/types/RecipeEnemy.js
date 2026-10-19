@@ -118,11 +118,20 @@ export class RecipeEnemy extends BaseEnemy {
   }
 }
 
+const CLASSES = new WeakMap();
+
 /**
- * The class for one recipe: its behaviors resolved by name, and their getters
- * (what the views read, e.g. `telegraphRatio`) on its prototype.
+ * The class for one recipe, built once (the pools, the factory and the
+ * snapshots share it): its behaviors resolved by name, and their getters
+ * (what the views read, e.g. `telegraphRatio`) and methods (what the engine
+ * calls, e.g. `triggerDetonation`) on its prototype.
  */
 export function recipeEnemyClass(recipe) {
+  if (!CLASSES.has(recipe)) CLASSES.set(recipe, buildClass(recipe));
+  return CLASSES.get(recipe);
+}
+
+function buildClass(recipe) {
   const steps = Object.entries(recipe.behaviors).map(([name, params]) => {
     const behavior = BEHAVIORS[name];
     if (!behavior) {
@@ -137,16 +146,26 @@ export function recipeEnemyClass(recipe) {
     recipe: { value: recipe },
     steps: { value: steps },
   });
+  const define = (name, descriptor) => {
+    if (Object.hasOwn(prototype, name)) {
+      throw new Error(
+        `[RecipeEnemy] ${recipe.id}: two behaviors define '${name}'`
+      );
+    }
+    Object.defineProperty(prototype, name, descriptor);
+  };
   for (const [behavior, params] of steps) {
     for (const [name, getter] of Object.entries(behavior.getters ?? {})) {
-      if (Object.hasOwn(prototype, name)) {
-        throw new Error(
-          `[RecipeEnemy] ${recipe.id}: two behaviors define '${name}'`
-        );
-      }
-      Object.defineProperty(prototype, name, {
+      define(name, {
         get() {
           return getter(this, params);
+        },
+      });
+    }
+    for (const [name, method] of Object.entries(behavior.methods ?? {})) {
+      define(name, {
+        value(...args) {
+          return method(this, params, ...args);
         },
       });
     }

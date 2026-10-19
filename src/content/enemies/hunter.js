@@ -117,4 +117,12 @@ export default {
   tags: ['enemy', 'hostile', 'ranged', 'elite'],
   affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
   projectileColor: 'rgba(80, 220, 255, 0.9)',
+  // Its movement and weapon components fly and shoot it.
+  seeded: true,
+  behaviors: deepFreeze({
+    'fork-streams': {},
+    'orbit-side': { stream: 'maneuverRandom' },
+    // The lens brightens over this window before a burst (docs/NORTE.md §3).
+    'weapon-telegraph': { telegraph: 0.4 },
+  }),
 };

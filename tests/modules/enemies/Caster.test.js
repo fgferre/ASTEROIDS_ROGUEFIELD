@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getContent } from '../../../src/content/registry.js';
 import { CASTER_SHELL_RADIUS } from '../../../src/content/enemies/caster.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
 
-const Caster = TYPE_CLASSES.caster;
+const Caster = recipeEnemyClass(getContent('enemies', 'caster'));
 const {
   interval: CASTER_FIRE_INTERVAL,
   lead: CASTER_LEAD_SECONDS,

@@ -99,4 +99,16 @@ export default {
   affixes: ['shielded', 'splitter', 'warded'],
   explodesOnDeath: true,
   projectileColor: 'rgba(255, 204, 102, 0.9)',
+  // Its proximity movement draws its drift; its weapon component and its
+  // fuse both set it off.
+  seeded: true,
+  behaviors: deepFreeze({
+    'proximity-fuse': {
+      armTime: MINE_CONFIG.armTime,
+      lifetime: 30, // seconds before it blows on its own
+      proximityRadius: MINE_CONFIG.proximityRadius,
+      explosionRadius: MINE_CONFIG.explosionRadius,
+      explosionDamage: MINE_CONFIG.explosionDamage,
+    },
+  }),
 };

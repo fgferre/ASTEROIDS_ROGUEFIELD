@@ -1,20 +1,19 @@
 // What every enemy item (src/content/enemies) owes the engine: the fields the
 // factory, its pool, the rewards, the Elite affixes, mine blasts and enemy
-// shots read, and a class to build it from — for a recipe, behaviors the
-// library has, with the params each reads. Every kind a layer asks for is one
-// of these items.
+// shots read, and a recipe to build it from: behaviors the library has, with
+// the params each reads. Every kind a layer asks for, and every enemy one
+// spawns, is one of these items.
 import { describe, expect, it } from 'vitest';
 import { getContent, listContent } from '../../src/content/registry.js';
-import { AFFIX_IDS } from '../../src/data/enemies/affixes.js';
+import { AFFIX_IDS, ELITE_AFFIXES } from '../../src/data/enemies/affixes.js';
 import { LAYERS, LAYER_MODIFIERS } from '../../src/data/layers.js';
-import { TYPE_CLASSES } from '../../src/modules/enemies/base/enemyTypeRegistry.js';
 import { BEHAVIORS } from '../../src/modules/enemies/behaviors/index.js';
+import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
 
 const enemies = listContent('enemies');
 const isStringList = (value) =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 const isCount = (value) => Number.isInteger(value) && value > 0;
-const recipes = enemies.filter((enemy) => enemy.behaviors);
 const isKind = {
   number: Number.isFinite,
   string: (v) => typeof v === 'string',
@@ -52,11 +51,11 @@ describe('enemy content', () => {
     for (const affix of affixes) expect(AFFIX_IDS).toContain(affix);
   });
 
-  it.each(enemies)('$id has a class to build it from', ({ id }) => {
-    expect(typeof TYPE_CLASSES[id]).toBe('function');
+  it.each(enemies)('$id has a class to build it from', (enemy) => {
+    expect(typeof recipeEnemyClass(enemy)).toBe('function');
   });
 
-  it.each(recipes)(
+  it.each(enemies)(
     '$id names behaviors the library has, with the params each reads',
     ({ behaviors, seeded }) => {
       expect(typeof seeded).toBe('boolean');
@@ -74,9 +73,16 @@ describe('enemy content', () => {
     }
   );
 
-  it('names a class only for an enemy item', () => {
-    for (const id of Object.keys(TYPE_CLASSES)) {
-      expect(getContent('enemies', id), id).toBeDefined();
+  it('every enemy a recipe or the Splitter releases is an enemy item', () => {
+    const kinds = [
+      ELITE_AFFIXES.splitter.type,
+      ...enemies.flatMap(({ behaviors }) =>
+        Object.values(behaviors).flatMap(({ type }) => type ?? [])
+      ),
+    ];
+    expect(kinds.length).toBeGreaterThan(1);
+    for (const kind of kinds) {
+      expect(getContent('enemies', kind), kind).toBeDefined();
     }
   });
 

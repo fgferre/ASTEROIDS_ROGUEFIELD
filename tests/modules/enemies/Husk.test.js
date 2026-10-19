@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { getContent } from '../../../src/content/registry.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 
-const Husk = TYPE_CLASSES.husk;
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
 const { count: HUSK_SPLIT_COUNT } = getContent('enemies', 'husk').behaviors[
   'spawn-on-death'
 ];

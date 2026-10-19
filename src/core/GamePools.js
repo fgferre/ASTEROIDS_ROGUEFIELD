@@ -17,7 +17,7 @@
 import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
 import { debugLog } from './debugLogging.js';
 import { listContent } from '../content/registry.js';
-import { TYPE_CLASSES } from '../modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../modules/enemies/types/RecipeEnemy.js';
 import { IS_DEV } from './env.js';
 
 /**
@@ -67,8 +67,11 @@ export class GamePools {
     this.initializeBulletPool(config.bullets);
     this.initializeParticlePool(config.particles);
     this.initializeAsteroidPool(config.asteroids);
-    for (const { id, pool } of listContent('enemies')) {
-      this.enemyPools.set(id, this.createEnemyPool(TYPE_CLASSES[id], pool));
+    for (const item of listContent('enemies')) {
+      this.enemyPools.set(
+        item.id,
+        this.createEnemyPool(recipeEnemyClass(item), item.pool)
+      );
     }
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);

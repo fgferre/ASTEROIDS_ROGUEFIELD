@@ -6,10 +6,11 @@ import {
   directorFor,
   modifierFor,
 } from '../../src/data/layers.js';
-import { TYPE_CLASSES } from '../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { getContent } from '../../src/content/registry.js';
+import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 
-const Husk = TYPE_CLASSES.husk;
+const Husk = recipeEnemyClass(getContent('enemies', 'husk'));
 
 // Field mock: every factory spawn lands in `active`, in spawn order.
 function createField({ player = { x: 400, y: 300 }, runSeed } = {}) {

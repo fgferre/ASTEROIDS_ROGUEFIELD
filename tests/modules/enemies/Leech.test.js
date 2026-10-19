@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import { getContent } from '../../../src/content/registry.js';
 import { ORB_VALUE } from '../../../src/data/enemies/asteroid-configs.js';
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { grow } from '../../../src/modules/enemies/behaviors/forage.js';
 import {
   createHeadlessGame,
@@ -12,7 +12,7 @@ import {
 
 const STEP = 1 / 60;
 
-const Leech = TYPE_CLASSES.leech;
+const Leech = recipeEnemyClass(getContent('enemies', 'leech'));
 const { config, behaviors } = getContent('enemies', 'leech');
 const { health: LEECH_HEALTH, radius: LEECH_RADIUS } = config;
 const {

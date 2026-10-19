@@ -375,15 +375,15 @@ export class BaseEnemy {
     // Override in subclasses for death effects
   }
 
-  /** Splitter: Motes fly out to both sides of the heading. */
+  /** Splitter: its `type` (Motes) fly out to both sides of the heading. */
   splitIntoMotes() {
-    const { count, speed } = ELITE_AFFIXES.splitter;
+    const { type, count, speed } = ELITE_AFFIXES.splitter;
     const heading = Math.atan2(this.vy, this.vx) || this.rotation || 0;
     for (let i = 0; i < count; i += 1) {
       const angle = heading + Math.PI / 2 + (i * Math.PI * 2) / count;
       const dx = Math.cos(angle);
       const dy = Math.sin(angle);
-      this.spawnChild('drone', {
+      this.spawnChild(type, {
         x: this.x + dx * this.radius * 0.6,
         y: this.y + dy * this.radius * 0.6,
         vx: dx * speed,

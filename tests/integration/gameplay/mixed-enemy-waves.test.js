@@ -3,9 +3,10 @@ import RandomService from '../../../src/core/RandomService.js';
 import { WaveManager } from '../../../src/modules/enemies/managers/WaveManager.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
-import { Drone } from '../../../src/modules/enemies/types/Drone.js';
-import { Mine } from '../../../src/modules/enemies/types/Mine.js';
-import { Hunter } from '../../../src/modules/enemies/types/Hunter.js';
+import { getContent } from '../../../src/content/registry.js';
+import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
+import { registerEnemyTypes } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
@@ -37,6 +38,18 @@ function createWaveManager(overrides = {}) {
 
   return new WaveManager({ enemySystem, random, eventBus: bus });
 }
+
+// Built the way the game builds them: through the factory, with the type's
+// components (they fly and shoot the Mote and the Seeker).
+function createViaFactory(system, type, config) {
+  const factory = new EnemyFactory(system);
+  registerEnemyTypes(factory, {
+    getAvailableBossMinionTypes: (types) => types,
+  });
+  return factory.create(type, config);
+}
+
+const Mine = recipeEnemyClass(getContent('enemies', 'mine'));
 
 let eventBus;
 const activeSystems = [];
@@ -115,17 +128,12 @@ describe('Support enemy behaviour', () => {
       getPlayerPositionSnapshot: () => ({ x: 120, y: 0 }),
     };
 
-    const drone = new Drone(system, {
-      fireRate: 0.2,
-      fireVariance: 0,
-      targetingRange: 500,
-    });
+    const drone = createViaFactory(system, 'drone', {});
     drone.x = 0;
     drone.y = 0;
-    drone.fireTimer = 0;
 
     eventBus.emit.mockClear();
-    drone.onUpdate(0.3);
+    drone.update(0.3);
 
     expect(drone.vx).not.toBe(0);
     const firedPayloads = getEventPayloads('enemy-fired');
@@ -166,25 +174,15 @@ describe('Support enemy behaviour', () => {
       getPlayerPositionSnapshot: () => ({ x: 150, y: 0 }),
     };
 
-    const hunter = new Hunter(system, {
-      preferredDistance: 150,
-      fireRange: 400,
-      burstCount: 1,
-      burstInterval: 0.1,
-      burstDelay: 0,
-    });
+    const hunter = createViaFactory(system, 'hunter', {});
     hunter.x = 0;
     hunter.y = 0;
-    hunter.burstCooldown = 0;
-    hunter.burstShotsRemaining = 1;
-    hunter.burstDelayTimer = 0;
 
     eventBus.emit.mockClear();
-    hunter.onUpdate(0.16);
+    hunter.update(0.16);
 
     const firedPayloads = getEventPayloads('enemy-fired');
     expect(firedPayloads.length).toBeGreaterThan(0);
-    expect(typeof hunter.turretAngle).toBe('number');
   });
 });
 

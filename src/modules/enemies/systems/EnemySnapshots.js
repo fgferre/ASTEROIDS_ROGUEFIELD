@@ -4,7 +4,8 @@
 import RandomService from '../../../core/RandomService.js';
 import { ASTEROID_SIZES } from '../../../core/GameConstants.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
-import { TYPE_CLASSES } from '../base/enemyTypeRegistry.js';
+import { getContent } from '../../../content/registry.js';
+import { recipeEnemyClass } from '../types/RecipeEnemy.js';
 import {
   safeNumber,
   deepClone,
@@ -514,11 +515,11 @@ export class EnemySnapshots {
       }
     }
 
-    // Off the factory path: a roster enemy is built from its class.
-    const EnemyClass = TYPE_CLASSES[snapshotType];
-    if (!enemy && EnemyClass) {
+    // Off the factory path: a roster enemy is built from its recipe.
+    const recipe = getContent('enemies', snapshotType);
+    if (!enemy && recipe) {
       try {
-        enemy = this.createEnemy(EnemyClass, config);
+        enemy = this.createEnemy(recipeEnemyClass(recipe), config);
       } catch (error) {
         console.error(
           '[EnemySystem] Failed to restore support enemy snapshot:',

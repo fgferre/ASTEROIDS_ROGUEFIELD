@@ -56,7 +56,6 @@ const BASE_CONFIG = {
   volleyVariance: 0.2,
   volleyProjectileSpeed: 320,
   volleySpread: 0.12,
-  minionTypes: ['drone', 'hunter'],
   spawnCooldown: 6.5,
   spawnVariance: 1.1,
   chargeCooldown: 6.2,
@@ -87,11 +86,8 @@ const BOSS_DEFAULTS = {
   phaseColors: Array.isArray(SOURCE_CONFIG?.phaseColors)
     ? [...SOURCE_CONFIG.phaseColors]
     : [...BASE_CONFIG.phaseColors],
-  minionTypes:
-    Array.isArray(SOURCE_CONFIG?.minionTypes) &&
-    SOURCE_CONFIG.minionTypes.length
-      ? [...SOURCE_CONFIG.minionTypes]
-      : [...BASE_CONFIG.minionTypes],
+  // Its content file (src/content/bosses/prime.js) names them.
+  minionTypes: [...(SOURCE_CONFIG.minionTypes ?? [])],
   phaseThresholds:
     Array.isArray(SOURCE_CONFIG?.phaseThresholds) &&
     SOURCE_CONFIG.phaseThresholds.length
@@ -132,7 +128,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.spawnCooldown = BOSS_DEFAULTS.spawnCooldown ?? 8;
     this.spawnVariance = BOSS_DEFAULTS.spawnVariance ?? 0;
-    this.minionTypes = [...(BOSS_DEFAULTS.minionTypes ?? ['drone'])];
+    this.minionTypes = [...BOSS_DEFAULTS.minionTypes];
 
     this.chargeCooldown = BOSS_DEFAULTS.chargeCooldown ?? 6;
     this.chargeDuration = BOSS_DEFAULTS.chargeDuration ?? 1;
@@ -294,7 +290,7 @@ export class BossEnemy extends BaseEnemy {
     this.minionTypes =
       Array.isArray(config.minionTypes) && config.minionTypes.length
         ? [...config.minionTypes]
-        : [...(defaults.minionTypes || ['drone'])];
+        : [...defaults.minionTypes];
     this.spawnCooldown = config.spawnCooldown ?? defaults.spawnCooldown ?? 6.5;
     this.spawnVariance = config.spawnVariance ?? defaults.spawnVariance ?? 0;
 

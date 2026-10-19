@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { getContent } from '../../../src/content/registry.js';
+import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 
-const Bulwark = TYPE_CLASSES.bulwark;
+const Bulwark = recipeEnemyClass(getContent('enemies', 'bulwark'));
 
 describe('Bulwark', () => {
   it('drains the shield from the front, takes hull damage from behind, and stays broken', () => {
