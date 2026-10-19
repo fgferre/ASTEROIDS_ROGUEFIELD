@@ -73,8 +73,12 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       investida, fase) e de mortes (dividir, filhotes, devolver orbes, explodir) sobre as estratégias de movimento que
       já existem; a receita declara stats, move, attack, onDeath, afixos, drops, cues, Códice e **papéis** para o
       diretor. Migrar os 11 inimigos um a um (Caster, Shade, Leech viram as primeiras receitas; suas classes somem).
-- [ ] **0a.4 Arma = padrão + projétil.** Padrões: projétil, leque, feixe a cada N, orbital, aura, cadeia; evoluções por
-      família declaradas na arma; o combate executa padrões e não conhece ids. Migrar lance, harmonic e scatter.
+- [x] **0a.4 Arma = padrão + projétil** (19/10): o arquivo da arma declara `fire` (padrões `stream`, `beam` a cada N,
+      `fan`), `projectile` (visual, velocidade, dano, alcance, estouro) e a própria carta (`card`, ids e ordem mantidos);
+      um despachante roda os padrões; cartas de arma e a exclusividade entre elas saem das armas; HUD e 3D leem a arma.
+      Nenhum id de arma no motor. Trace: estado igual; só o nome do evento da carta mudou (`upgrade-weapon`). Uma
+      quarta arma só em arquivo (fixture de teste) entra no catálogo e atira. Orbital, aura e cadeia ficam para quando
+      uma arma pedir.
 - [ ] **0a.5 Visual = receita.** Vocabulário curto (partes primitivas, papel de paleta, pontos emissivos, escala, o que
       anima) lido por um construtor só em `render3d`; inimigo novo não escreve render.
 - [ ] **0a.6 Diretor por papéis.** Roster e surtos das camadas sorteiam por papel e peso (`artillery`, `flanker`,
