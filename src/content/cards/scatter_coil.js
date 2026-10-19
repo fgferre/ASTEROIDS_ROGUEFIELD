@@ -1,4 +1,4 @@
-import { WEAPONS } from '../../data/weapons.js';
+import scatter from '../weapons/scatter.js';
 
 export default {
   id: 'scatter_coil',
@@ -7,7 +7,7 @@ export default {
   family: 'kinetic',
   rarity: 'epic',
   icon: '🎆',
-  themeColor: WEAPONS.scatter.colors.burst,
+  themeColor: scatter.colors.burst,
   unlockLevel: 3,
   tags: ['weapon', 'weaponry'],
   excludes: ['harmonic_resonator'],
@@ -19,9 +19,9 @@ export default {
     levels: [
       {
         title: 'Scatter Coil',
-        description: `Fires ${WEAPONS.scatter.flak.bolts} bolts in a ${WEAPONS.scatter.flak.fan}° fan; each bursts on its first hit or at ${WEAPONS.scatter.flak.range} px, hitting everything within ${WEAPONS.scatter.flak.burstRadius} px.`,
+        description: `Fires ${scatter.flak.bolts} bolts in a ${scatter.flak.fan}° fan; each bursts on its first hit or at ${scatter.flak.range} px, hitting everything within ${scatter.flak.burstRadius} px.`,
         highlights: [
-          `Multishot adds bolts to the fan, up to ${WEAPONS.scatter.flak.maxBolts}.`,
+          `Multishot adds bolts to the fan, up to ${scatter.flak.maxBolts}.`,
           'Slower volleys than the lance: get close.',
         ],
       },
@@ -34,7 +34,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-scatter',
-          payload: { weaponId: WEAPONS.scatter.id },
+          payload: { weaponId: scatter.id },
         },
       ],
     },

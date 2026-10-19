@@ -1,5 +1,5 @@
 import { PALETTE } from '../../data/constants/palette.js';
-import { WEAPONS } from '../../data/weapons.js';
+import harmonic from '../weapons/harmonic.js';
 
 export default {
   id: 'harmonic_resonator',
@@ -20,10 +20,10 @@ export default {
     levels: [
       {
         title: 'Harmonic Plasma Lance',
-        description: `Every ${WEAPONS.harmonic.beam.every}th shot is a ${WEAPONS.harmonic.beam.length} px beam dealing ${WEAPONS.harmonic.beam.damageMultiplier}x damage to everything it crosses.`,
+        description: `Every ${harmonic.beam.every}th shot is a ${harmonic.beam.length} px beam dealing ${harmonic.beam.damageMultiplier}x damage to everything it crosses.`,
         highlights: [
           'Large and medium rocks it kills split into one extra fragment.',
-          `The shot after a beam waits +${WEAPONS.harmonic.beam.cooldownPenalty}s.`,
+          `The shot after a beam waits +${harmonic.beam.cooldownPenalty}s.`,
         ],
       },
     ],
@@ -35,7 +35,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-harmonic',
-          payload: { weaponId: WEAPONS.harmonic.id },
+          payload: { weaponId: harmonic.id },
         },
       ],
     },
