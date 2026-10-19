@@ -148,7 +148,9 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
     - [x] 4 Museu (commits 469bcb5, 0124f96): `deploy.yml` faz checkout da tag `classic-2d` e a compila em `dist/classic/`;
           link "Play the original 2D game" nos créditos, acima da dobra (só resolve no site publicado). Tag e ramo
           `classic` criados localmente (bc1ad27 + prefixo `classic:` nos dados salvos, conferido no navegador).
-    - [ ] Fechamento: `npm run done`, sonda (menu, partida, arena de chefe; `?renderer=2d` ignorado), PR, OK do dono.
+    - [x] Fechamento (19/10): `npm run done` verde (1134 testes, build); sonda em Chromium headless (menu, partida, arena
+          de chefe, camada 10 com máquinas, créditos com o link, `?renderer=2d` abrindo em 3D), zero erros; tag `classic-2d`
+          publicada; PR #268 aberto sobre o #267. **Parado: mescla só com o OK do dono, depois das ondas.**
 
 ## Fora de escopo deste plano
 
