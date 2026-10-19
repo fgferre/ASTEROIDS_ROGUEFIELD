@@ -2,9 +2,10 @@
 // its content file names behaviors from here, in order, with their params.
 //
 // A behavior is a plain object. `params` names each param it reads and its
-// kind ('number' or 'string'; tests/content/enemies.test.js checks every
-// recipe against it); `usesRandom` marks one that draws from the enemy's own
-// stream, so its recipe must be `seeded`. Its hooks, all optional, receive
+// kind ('number', 'string', or 'count': a whole number of at least 1;
+// tests/content/enemies.test.js checks every recipe against it); `usesRandom`
+// marks one that draws from the enemy's own stream, so its recipe must be
+// `seeded`. Its hooks, all optional, receive
 // (enemy, params, ...):
 // - reset(): its state's starting values (construction and pool reset);
 // - init(config): at spawn, after the stats and the random stream;

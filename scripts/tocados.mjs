@@ -85,27 +85,45 @@ function globToRegExp(pattern) {
   return new RegExp(`^${source}$`);
 }
 
+// JSDoc blocks and line comments mention `import('x')` types, which are not
+// imports. Whole comment lines are dropped; a block-comment regex would eat
+// glob strings like './*/*.js'.
+const COMMENT_LINE_RE = /^[ \t]*(?:\*|\/\*|\/\/).*$/gm;
+
+// The repo-relative files that `file` imports: files matched by its
+// import.meta.glob patterns plus its resolved relative specifiers. `known` is
+// the Set of repo-relative paths that exist.
+export function importTargets(file, code, known) {
+  const source = code.replace(COMMENT_LINE_RE, '');
+  const targets = new Set();
+  for (const m of source.matchAll(GLOB_RE)) {
+    if (!m[1].startsWith('.')) continue;
+    const matches = globToRegExp(posix.join(posix.dirname(file), m[1]));
+    for (const candidate of known) {
+      if (candidate !== file && matches.test(candidate)) targets.add(candidate);
+    }
+  }
+  for (const re of SPECIFIER_RES) {
+    for (const m of source.matchAll(re)) {
+      if (!m[1].startsWith('.')) continue;
+      const base = posix.join(posix.dirname(file), m[1]);
+      const target = [base, `${base}.js`, `${base}/index.js`].find((c) =>
+        known.has(c)
+      );
+      if (target) targets.add(target);
+    }
+  }
+  return [...targets];
+}
+
 // sources: { [repo-relative path]: source text } -> reverse import graph:
 // Map(path -> Set of the files that import it), one entry per file given.
 export function buildGraph(sources) {
-  const importers = new Map(Object.keys(sources).map((p) => [p, new Set()]));
+  const known = new Set(Object.keys(sources));
+  const importers = new Map([...known].map((p) => [p, new Set()]));
   for (const [file, code] of Object.entries(sources)) {
-    for (const m of code.matchAll(GLOB_RE)) {
-      if (!m[1].startsWith('.')) continue;
-      const matches = globToRegExp(posix.join(posix.dirname(file), m[1]));
-      for (const [candidate, set] of importers) {
-        if (candidate !== file && matches.test(candidate)) set.add(file);
-      }
-    }
-    for (const re of SPECIFIER_RES) {
-      for (const m of code.matchAll(re)) {
-        if (!m[1].startsWith('.')) continue;
-        const base = posix.join(posix.dirname(file), m[1]);
-        const target = [base, `${base}.js`, `${base}/index.js`].find((c) =>
-          importers.has(c)
-        );
-        if (target) importers.get(target).add(file);
-      }
+    for (const target of importTargets(file, code, known)) {
+      importers.get(target).add(file);
     }
   }
   return importers;

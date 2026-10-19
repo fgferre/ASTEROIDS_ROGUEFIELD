@@ -19,6 +19,7 @@ import SFXBus from '../../src/modules/audio/SFXBus.js';
 import { DEATH_EFFECTS } from '../../src/modules/effects/EnemyEffects.js';
 import { FIRE_EFFECTS } from '../../src/modules/effects/EnemyFireEffects.js';
 import { BEHAVIORS } from '../../src/modules/enemies/behaviors/index.js';
+import { MovementComponent } from '../../src/modules/enemies/components/MovementComponent.js';
 import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
 
 const enemies = listContent('enemies');
@@ -28,6 +29,7 @@ const isCount = (value) => Number.isInteger(value) && value > 0;
 const isKind = {
   number: Number.isFinite,
   string: (v) => typeof v === 'string',
+  count: isCount,
 };
 // The cue kinds the event table reads from an enemy file (`cueOf` rows).
 const CUE_KINDS = AUDIO_EVENT_CUES.flatMap(({ cueOf }) => cueOf ?? []);
@@ -49,7 +51,9 @@ describe('enemy content', () => {
     expect(typeof config.displayName).toBe('string');
     expect(config.radius).toBeGreaterThan(0);
     expect(config.health).toBeGreaterThan(0);
-    expect(typeof components.movement.strategy).toBe('string');
+    expect(
+      new MovementComponent().strategies.has(components.movement.strategy)
+    ).toBe(true);
     expect(rewards.totalXP).toBeGreaterThan(0);
     if (rewards.baseOrbsMin === undefined) {
       expect(isCount(rewards.baseOrbs)).toBe(true);
