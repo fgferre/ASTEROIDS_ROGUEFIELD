@@ -37,6 +37,20 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # The original Canvas 2D game, kept as it was (tag classic-2d), served
+      # next to the current game under /classic/; the credits link to it.
+      - name: Checkout the original 2D game (tag classic-2d)
+        uses: actions/checkout@v4
+        with:
+          ref: classic-2d
+          path: classic-src
+
+      - name: Build the original 2D game into dist/classic
+        working-directory: classic-src
+        run: |
+          npm ci
+          npx vite build --base /ASTEROIDS_ROGUEFIELD/classic/ --outDir "$GITHUB_WORKSPACE/dist/classic" --emptyOutDir
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

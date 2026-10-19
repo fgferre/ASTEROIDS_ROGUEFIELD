@@ -47,7 +47,6 @@ export class Leech extends BaseEnemy {
     this.digestTimer = LEECH_DIGEST_INTERVAL;
     this.destroyed = false;
     this.movementStrategy = 'linear';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

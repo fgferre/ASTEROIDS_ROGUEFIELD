@@ -73,8 +73,8 @@ export function createTelegraphs(kit) {
     return geometry;
   }
 
-  // Charge lane / spread fan on the field plane, same timing as the 2D path
-  // (EffectsSystem.drawTelegraphs).
+  // Charge lane / spread fan on the field plane, timed by the boss's live
+  // `telegraph` state.
   function updateTelegraph(parts, boss, radius) {
     const t = boss.telegraph;
     parts.group.visible = Boolean(t);

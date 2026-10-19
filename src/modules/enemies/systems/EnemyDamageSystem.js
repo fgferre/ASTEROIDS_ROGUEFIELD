@@ -13,7 +13,7 @@
  * - Stateless sub-system that operates entirely on the EnemySystem facade state.
  * - Uses a context object to access shared services (spawn system, physics, player, etc.).
  * - Emits events via the facade to keep RewardManager integrations untouched.
- * - Mirrors the delegation strategy used by EnemySpawnSystem and EnemyRenderSystem.
+ * - Mirrors the delegation strategy used by EnemySpawnSystem.
  *
  * Usage:
  * ```js

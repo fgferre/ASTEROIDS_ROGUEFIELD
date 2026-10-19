@@ -7,11 +7,10 @@ import { PALETTE, withAlpha } from '../constants/palette.js';
  * Asteroid configurations use a variant-based system rather than the
  * component-based system used by other enemies (drone, hunter, mine, boss).
  *
- * However, field naming follows the same conventions defined in schema.js:
+ * However, field naming follows the same conventions as the enemy configs:
  * - Movement: Use `maxSpeed` (not `speed`)
  * - Weapon/Behavior: Use `cooldown` (not `interval` or `fireRate`)
  *
- * See schema.js for complete field definitions and naming conventions.
  */
 
 // === CRACK PROFILES ===

@@ -55,7 +55,6 @@ export default class GameSessionService {
 
     this.audioService = services?.audio || null;
     this.canvas = null;
-    this.ctx = null;
     this.seedInfo = {
       seed: null,
       source: 'unknown',
@@ -183,15 +182,14 @@ export default class GameSessionService {
   }
 
   /**
-   * Bootstraps session metadata including seed provenance and canvas context.
+   * Bootstraps session metadata including seed provenance and the canvas.
    * @param {Object} [options]
    * @param {*} [options.seed]
    * @param {string} [options.source]
    * @param {{ seed: *, source?: string }} [options.seedInfo]
    * @param {HTMLCanvasElement} [options.canvas]
-   * @param {CanvasRenderingContext2D} [options.ctx]
    */
-  initialize({ seed, source, seedInfo, canvas, ctx } = {}) {
+  initialize({ seed, source, seedInfo, canvas } = {}) {
     const normalizedSeedInfo =
       typeof seedInfo === 'object' && seedInfo !== null ? { ...seedInfo } : {};
 
@@ -226,10 +224,6 @@ export default class GameSessionService {
 
     if (canvas) {
       this.canvas = canvas;
-    }
-
-    if (ctx) {
-      this.ctx = ctx;
     }
 
     if (

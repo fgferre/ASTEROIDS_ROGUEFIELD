@@ -35,7 +35,6 @@ export const LEECH_CONFIG = deepFreeze({
 export const LEECH_COMPONENTS = deepFreeze({
   // The Leech steers itself (Leech.onUpdate); 'linear' only integrates vx/vy.
   movement: { strategy: 'linear', maxSpeed: LEECH_SPEED },
-  render: { strategy: 'procedural', shape: 'leech' },
   collision: {
     shape: 'circle',
     radius: LEECH_RADIUS,

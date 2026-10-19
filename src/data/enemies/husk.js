@@ -26,7 +26,6 @@ export const HUSK_COMPONENTS = deepFreeze({
     maxSpeed: HUSK_SPEED,
     targetingRange: 2000,
   },
-  render: { strategy: 'procedural', shape: 'husk' },
   collision: {
     shape: 'circle',
     radius: HUSK_RADIUS,

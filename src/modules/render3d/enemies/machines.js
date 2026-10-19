@@ -128,7 +128,7 @@ export function createMachineViews(kit) {
     ramOutline.map(([x, y]) => new THREE.Vector3(x * 1.08, 0.05, y * 1.08))
   );
 
-  // Weaver: one arm, trailing the spin (RenderComponent weaverArm).
+  // Weaver: one arm, trailing the spin.
   const armPoint = (angle, r) =>
     new THREE.Vector3(Math.cos(angle) * r, 0.06, Math.sin(angle) * r);
   const weaverArm = new THREE.TubeGeometry(
@@ -149,8 +149,7 @@ export function createMachineViews(kit) {
   casterBarrel.rotateZ(-Math.PI / 3);
   casterBarrel.translate(0.56, 0.34, 0);
 
-  // Shade: a swept blade (RenderComponent SHADE_OUTLINE), a ridge along
-  // the spine.
+  // Shade: a swept blade, a ridge along the spine.
   const shadeOutline = [
     [1.2, 0],
     [0.1, -0.5],
@@ -185,7 +184,7 @@ export function createMachineViews(kit) {
     shadeOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.05, y * 1.06))
   );
 
-  // Leech: the pod's outline (RenderComponent leechHull).
+  // Leech: the pod's outline.
   const pod = [];
   for (let i = 0; i < 40; i += 1) {
     const a = (i / 40) * TAU;

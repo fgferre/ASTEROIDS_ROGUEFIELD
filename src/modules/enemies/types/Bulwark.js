@@ -25,7 +25,6 @@ export class Bulwark extends BaseEnemy {
     this.shieldBroken = false;
     this.destroyed = false;
     this.movementStrategy = 'tracking';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

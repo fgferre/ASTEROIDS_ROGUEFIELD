@@ -29,7 +29,6 @@ export class Herald extends BaseEnemy {
     this.heraldKind = 'dust';
     this.destroyed = false;
     this.movementStrategy = 'linear';
-    this.renderStrategy = 'procedural';
     this.resetHeraldState();
 
     if (Object.keys(config).length > 0) {

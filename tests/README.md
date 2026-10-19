@@ -18,7 +18,7 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 - `tests/integration/`: several systems together: headless runs, replay, `determinism/`, `scenarios/`, boss curve, audio event coverage.
 - `tests/balance/`: reward mechanics and asteroid metrics over many waves (numbers, not feel: the owner's play is the judge).
 - `tests/visual/`: determinism of rendering, menu background, shake and audio, measured as numbers, never pixels.
-- `tests/process/`: rules about the repository itself: no dev globals reach production, the 2D renderer stays frozen, the test selector picks the right tests.
+- `tests/process/`: rules about the repository itself: no dev globals reach production, the test selector picks the right tests.
 - `tests/unit/`: small pure functions.
 
 ## Helpers and fixtures

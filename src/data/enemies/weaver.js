@@ -26,7 +26,6 @@ export const WEAVER_COMPONENTS = deepFreeze({
     maxSpeed: WEAVER_SPEED,
     preferredDistance: WEAVER_ORBIT_DISTANCE,
   },
-  render: { strategy: 'procedural', shape: 'weaver' },
   collision: { shape: 'circle', radius: WEAVER_RADIUS, response: 'damage' },
   health: { base: WEAVER_HEALTH, armor: 0, scaling: 1.0 },
 });

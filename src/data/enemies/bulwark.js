@@ -27,7 +27,6 @@ export const BULWARK_COMPONENTS = deepFreeze({
     maxSpeed: BULWARK_SPEED,
     targetingRange: 2000,
   },
-  render: { strategy: 'procedural', shape: 'bulwark' },
   collision: {
     shape: 'circle',
     radius: BULWARK_RADIUS,

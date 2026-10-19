@@ -1650,97 +1650,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
-  describe('render visual feedback gated by targetingUpgradeLevel + aimMode', () => {
-    // Helper: create a minimal canvas-2d-ish stub that records stroke/arc/fill
-    // calls so we can assert which visual elements were drawn.
-    function makeCtxStub() {
-      const calls = [];
-      const record =
-        (name) =>
-        (...args) =>
-          calls.push({ name, args });
-      return {
-        calls,
-        save: record('save'),
-        restore: record('restore'),
-        beginPath: record('beginPath'),
-        arc: record('arc'),
-        stroke: record('stroke'),
-        fill: record('fill'),
-        moveTo: record('moveTo'),
-        lineTo: record('lineTo'),
-        setLineDash: record('setLineDash'),
-        drawImage: record('drawImage'),
-        rotate: record('rotate'),
-        translate: record('translate'),
-        createRadialGradient: () => ({ addColorStop: () => {} }),
-        // Settable state — getters/setters as plain assignments.
-        set fillStyle(v) {
-          calls.push({ name: 'set:fillStyle', args: [v] });
-        },
-        set strokeStyle(v) {
-          calls.push({ name: 'set:strokeStyle', args: [v] });
-        },
-        set lineWidth(v) {
-          calls.push({ name: 'set:lineWidth', args: [v] });
-        },
-        set globalAlpha(v) {
-          calls.push({ name: 'set:globalAlpha', args: [v] });
-        },
-        set globalCompositeOperation(v) {
-          calls.push({ name: 'set:gco', args: [v] });
-        },
-        set font(v) {
-          calls.push({ name: 'set:font', args: [v] });
-        },
-        canvas: { width: 800, height: 600 },
-      };
-    }
-
-    function countArcCallsOnTarget(ctx, target) {
-      return ctx.calls.filter(
-        (c) =>
-          c.name === 'arc' &&
-          Math.abs(c.args[0] - target.x) < 1 &&
-          Math.abs(c.args[1] - target.y) < 1
-      ).length;
-    }
-
-    it('rank 0 (no targeting upgrade): no lock-ring arcs drawn on currentTarget', () => {
-      const { combat } = setupCombatHarness();
-      combat.targetUpdateTimer = 0;
-      combat.updateTargeting(0);
-      const target = combat.currentTarget;
-      expect(target).not.toBeNull();
-      // Rank 0 default.
-      expect(combat.targetingUpgradeLevel).toBe(0);
-
-      const ctx = makeCtxStub();
-      combat.render(ctx);
-
-      // No targeting-affordance arcs should be drawn on the target position.
-      // Bullets draw at their own positions, not the target's.
-      const arcs = countArcCallsOnTarget(ctx, target);
-      expect(arcs).toBe(0);
-    });
-
-    it('rank 1 + auto aim: lock-ring arc drawn on currentTarget', () => {
-      const { combat, eventBus } = setupCombatHarness();
-      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
-      combat.targetUpdateTimer = 0;
-      combat.updateTargeting(0);
-      const target = combat.currentTarget;
-      expect(target).not.toBeNull();
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(1);
-
-      const ctx = makeCtxStub();
-      combat.render(ctx);
-
-      const arcs = countArcCallsOnTarget(ctx, target);
-      expect(arcs).toBeGreaterThanOrEqual(1);
-    });
-
-    it('manual mode: no targeting render at any rank (no leak)', () => {
+  describe('lock feedback state by targetingUpgradeLevel + aimMode', () => {
+    it('manual mode at rank 3: no lock or predicted point left to draw (no leak)', () => {
       const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
@@ -1751,27 +1662,19 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
       combat.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      const targetSnapshot = { ...combat.currentTarget };
+      expect(combat.currentTarget).not.toBeNull();
 
       combat.setAimMode('manual');
-      // After manual toggle, currentTarget is null. Render uses the cached
-      // assignments, but the gate must skip them too. Verify by also placing
-      // a fake assignment back to test the explicit aimMode-gate path.
-      // Instead, simply assert render does NOT draw arcs at the previous
-      // target position when aimMode is 'manual'.
-      const ctx = makeCtxStub();
-      combat.render(ctx);
-      const arcs = countArcCallsOnTarget(ctx, targetSnapshot);
-      expect(arcs).toBe(0);
+      // The lock feedback reads these: manual mode must leave none behind.
+      expect(combat.currentTarget).toBeNull();
+      expect(combat.currentLockAssignments).toEqual([]);
+      expect(combat.predictedAimPoints).toEqual([]);
     });
 
-    // Fix-pass (F11): Codex review noted rank-2 predicted-marker render and
-    // rank-3 multi-lock indicator render had no test coverage. The render
-    // path gates these blocks at `targetingRank >= 2 && aimMode !== 'manual'`
-    // and `renderMultiLock === (rank >= 3)` respectively. These tests assert
-    // BOTH the gated content lands (when expected) AND it stays gated (when
-    // suppressed).
-    it('F11 (rank 2): predicted-impact marker drawn at the predicted-aim position', () => {
+    // Fix-pass (F11): Codex review noted rank-2 predicted-marker and rank-3
+    // multi-lock indicator had no test coverage. These tests assert the
+    // targeting state those markers are drawn from.
+    it('F11 (rank 2): predicted-impact point leads the moving target', () => {
       // Rank 2 requires the predicted point to be different from the target
       // position, so we use a MOVING target (the harness's Concern-4 setup).
       const { combat, eventBus } = setupCombatHarness({
@@ -1795,21 +1698,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const predicted = combat.predictedAimPoints[0].position;
       expect(predicted).toBeDefined();
 
-      const ctx = makeCtxStub();
-      combat.render(ctx);
-
-      // At least one arc call should land near the PREDICTED position
-      // (separate from the lock-ring arc which lands at target.x/y).
-      const predictedArcs = ctx.calls.filter(
-        (c) =>
-          c.name === 'arc' &&
-          Math.abs(c.args[0] - predicted.x) < 1 &&
-          Math.abs(c.args[1] - predicted.y) < 1
-      );
-      expect(predictedArcs.length).toBeGreaterThanOrEqual(1);
+      // The marker sits ahead of the target along its velocity, not on it.
+      const target = combat.currentTarget;
+      const lead =
+        (predicted.x - target.x) * target.vx +
+        (predicted.y - target.y) * target.vy;
+      expect(lead).toBeGreaterThan(0);
     });
 
-    it('F11 (rank 3): multi-lock indicator arcs drawn at ALL lock assignments (not just primary)', () => {
+    it('F11 (rank 3): multi-lock assignments cover more than the primary enemy', () => {
       const extraEnemies = [
         { id: 'enemy-2', x: 650, y: 320 },
         { id: 'enemy-3', x: 620, y: 280 },
@@ -1838,12 +1735,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const assignments = combat.currentLockAssignments;
       expect(assignments.length).toBeGreaterThanOrEqual(2);
 
-      const ctx = makeCtxStub();
-      combat.render(ctx);
-
-      // Lock-ring rendering: one arc + stroke pair per assignment. Verify at
-      // least 2 DISTINCT lock-ring arc positions land (proving rank-3
-      // multi-lock indicators draw all enemies, not just the primary).
+      // At least 2 DISTINCT locked enemies (the rank-3 indicators mark every
+      // assignment, not just the primary).
       const uniqueEnemyPositions = new Set();
       assignments.forEach((a) => {
         if (a && a.enemy) {
@@ -1853,26 +1746,6 @@ describe('FIX-05 centerline invariant + toggles', () => {
         }
       });
       expect(uniqueEnemyPositions.size).toBeGreaterThanOrEqual(2);
-
-      const arcHits = new Set();
-      ctx.calls
-        .filter((c) => c.name === 'arc')
-        .forEach((c) => {
-          const xKey = Math.round(c.args[0]);
-          const yKey = Math.round(c.args[1]);
-          // Match to any of the assignment positions (within ±50 px so the
-          // arc-radius offset doesn't disqualify the match).
-          for (const pos of uniqueEnemyPositions) {
-            const [px, py] = pos.split(',').map(Number);
-            if (Math.abs(px - xKey) < 2 && Math.abs(py - yKey) < 2) {
-              arcHits.add(pos);
-              break;
-            }
-          }
-        });
-      // Rank-3 contract: arcs land at AT LEAST 2 distinct lock positions
-      // (proving the multi-lock loop is rendering more than just index 0).
-      expect(arcHits.size).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -2527,152 +2400,6 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // The 4 enemies each absorb 1 bullet. Assignment count matches.
       expect(combat.currentLockAssignments.length).toBe(created.length);
       expect(created.length).toBe(4);
-    });
-  });
-
-  // Fix-pass-3 Finding 4: the lock-ring palette is currently wired to the
-  // assignment INDEX (`hue = 52 + index * 36` at CombatSystem.js:3400) so
-  // ring colors rotate around assignment order instead of communicating the
-  // threat level the planner promised: low-threat = #00F2FF (thruster cyan),
-  // high-threat = #FF3131 (alert red). The plan's must_haves list does NOT
-  // pin a specific medium-threat hex, so we chose #FFA800 (warning amber).
-  //
-  // Observable contract: when the player's currentTarget has a HIGH-threat
-  // cache entry, the stroke color used to draw its lock ring must equal the
-  // alert palette color (or contain the alert hex). When LOW-threat, it
-  // must match the cyan palette. Verified by mocking the canvas context and
-  // capturing strokeStyle assignments.
-  describe('Finding 4: lock-ring palette tied to threat tier (not assignment index)', () => {
-    // Helper: minimal canvas-2d stub that records strokeStyle assignments.
-    function makePaletteCtxStub() {
-      const calls = [];
-      const record =
-        (name) =>
-        (...args) =>
-          calls.push({ name, args });
-      return {
-        calls,
-        save: record('save'),
-        restore: record('restore'),
-        beginPath: record('beginPath'),
-        arc: record('arc'),
-        stroke: record('stroke'),
-        fill: record('fill'),
-        moveTo: record('moveTo'),
-        lineTo: record('lineTo'),
-        setLineDash: record('setLineDash'),
-        drawImage: record('drawImage'),
-        rotate: record('rotate'),
-        translate: record('translate'),
-        createRadialGradient: () => ({ addColorStop: () => {} }),
-        set fillStyle(v) {
-          calls.push({ name: 'set:fillStyle', args: [v] });
-        },
-        set strokeStyle(v) {
-          calls.push({ name: 'set:strokeStyle', args: [v] });
-        },
-        set lineWidth(v) {
-          calls.push({ name: 'set:lineWidth', args: [v] });
-        },
-        set globalAlpha(v) {
-          calls.push({ name: 'set:globalAlpha', args: [v] });
-        },
-        set globalCompositeOperation(v) {
-          calls.push({ name: 'set:gco', args: [v] });
-        },
-        set font(v) {
-          calls.push({ name: 'set:font', args: [v] });
-        },
-        canvas: { width: 800, height: 600 },
-      };
-    }
-
-    function strokeStylesFor(ctx) {
-      return ctx.calls
-        .filter((c) => c.name === 'set:strokeStyle')
-        .map((c) => c.args[0]);
-    }
-
-    it('Finding 4: HIGH-threat target renders lock ring in the alert (red) palette', () => {
-      const { combat, eventBus } = setupCombatHarness();
-      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
-      combat.targetUpdateTimer = 0;
-      combat.updateTargeting(0);
-      const target = combat.currentTarget;
-      expect(target).not.toBeNull();
-
-      // Force the cache to mark this target as HIGH threat by hand. The
-      // production code reads `targetThreatCache.get(enemy.id)` to derive
-      // the tier; we set urgency well above the high-threshold so the
-      // palette code path selects red.
-      combat.targetThreatCache.set(target.id, {
-        enemy: target,
-        distance: 200,
-        score: 5,
-        breakdown: { urgency: 20, impact: { urgency: 20 } },
-      });
-
-      const ctx = makePaletteCtxStub();
-      combat.render(ctx);
-
-      // Lock-ring strokes appear among all strokeStyle assignments. The
-      // first ring belongs to the primary (currentTarget). The expected
-      // hex is #FF3131 (the alert red from the plan visual direction).
-      const styles = strokeStylesFor(ctx).map(String);
-      const matchesRed = styles.some((s) => s.toLowerCase().includes('ff3131'));
-      expect(matchesRed).toBe(true);
-    });
-
-    it('Finding 4: LOW-threat target renders lock ring in the thruster (cyan) palette', () => {
-      const { combat, eventBus } = setupCombatHarness();
-      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
-      combat.targetUpdateTimer = 0;
-      combat.updateTargeting(0);
-      const target = combat.currentTarget;
-      expect(target).not.toBeNull();
-
-      // Force a LOW-threat cache entry (urgency near zero).
-      combat.targetThreatCache.set(target.id, {
-        enemy: target,
-        distance: 800,
-        score: 0,
-        breakdown: { urgency: 0, impact: { urgency: 0 } },
-      });
-
-      const ctx = makePaletteCtxStub();
-      combat.render(ctx);
-
-      const styles = strokeStylesFor(ctx).map(String);
-      const matchesCyan = styles.some((s) =>
-        s.toLowerCase().includes('00f2ff')
-      );
-      expect(matchesCyan).toBe(true);
-    });
-
-    it('Finding 4: MEDIUM-threat target renders lock ring in the warning (amber) palette', () => {
-      const { combat, eventBus } = setupCombatHarness();
-      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
-      combat.targetUpdateTimer = 0;
-      combat.updateTargeting(0);
-      const target = combat.currentTarget;
-      expect(target).not.toBeNull();
-
-      // Force a MEDIUM-threat cache entry — urgency in the middle band.
-      combat.targetThreatCache.set(target.id, {
-        enemy: target,
-        distance: 400,
-        score: 2,
-        breakdown: { urgency: 10, impact: { urgency: 10 } },
-      });
-
-      const ctx = makePaletteCtxStub();
-      combat.render(ctx);
-
-      const styles = strokeStylesFor(ctx).map(String);
-      const matchesAmber = styles.some((s) =>
-        s.toLowerCase().includes('ffa800')
-      );
-      expect(matchesAmber).toBe(true);
     });
   });
 

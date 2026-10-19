@@ -39,7 +39,6 @@ export const SHADE_COMPONENTS = deepFreeze({
     maxSpeed: SHADE_SPEED,
     phaseSpeed: SHADE_PHASE_SPEED,
   },
-  render: { strategy: 'procedural', shape: 'shade' },
   collision: {
     shape: 'circle',
     radius: SHADE_RADIUS,

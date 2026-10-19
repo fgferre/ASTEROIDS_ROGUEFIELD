@@ -4,9 +4,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 /**
  * Boss enemy configuration following canonical schema.
- * See schema.js for complete field definitions and naming conventions.
  *
- * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
  */
 
 // === BOSS CONFIGURATION ===
@@ -108,13 +106,12 @@ export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
 
 /**
  * Component configuration that assembles the boss enemy from modular behaviors.
- * Movement, rendering, collision and health management are delegated to
+ * Movement, collision and health management are delegated to
  * reusable components defined here; the boss class owns its attacks (fan,
  * volley, charge with telegraphs) and minion control per phase.
  *
  * @typedef {object} BossComponents
  * @property {object} movement - Seeking movement strategy configuration
- * @property {object} render - Procedural boss renderer tuning
  * @property {object} collision - Collision radius/response parameters
  * @property {object} health - Health/armor/phase configuration
  */
@@ -148,12 +145,6 @@ export const BOSS_COMPONENTS = deepFreeze({
       minDistance: 90,
     },
   ],
-  // Warden Prime (docs/NORTE.md §3): segmented ring around a violet core,
-  // drawn by RenderComponent's 'boss' look.
-  render: {
-    strategy: 'procedural-boss',
-    shape: 'boss',
-  },
   collision: {
     shape: 'circle',
     radius: 60,

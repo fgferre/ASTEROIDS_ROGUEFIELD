@@ -3,10 +3,7 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 /**
- * Mine enemy configuration following canonical schema.
- * See schema.js for complete field definitions and naming conventions.
- *
- * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
+ * Mine enemy configuration.
  */
 
 // === MINE CONFIGURATION ===
@@ -26,8 +23,6 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @property {number} proximityRadius
  * @property {number} explosionRadius
  * @property {number} explosionDamage
- * @property {number} pulseSpeed
- * @property {number} pulseAmount
  */
 export const MINE_CONFIG = deepFreeze({
   key: 'mine',
@@ -38,8 +33,6 @@ export const MINE_CONFIG = deepFreeze({
   proximityRadius: 80,
   explosionRadius: 120,
   explosionDamage: 40,
-  pulseSpeed: 2.6,
-  pulseAmount: 0.32,
 });
 
 /**
@@ -50,7 +43,6 @@ export const MINE_CONFIG = deepFreeze({
  * @typedef {object} MineComponents
  * @property {object} movement - Proximity / drift behavior
  * @property {object} weapon - Proximity-triggered explosion behavior
- * @property {object} render - Pulsing sphere renderer tuning
  * @property {object} collision - Collision radius and trigger response
  * @property {object} health - Base health/armor configuration
  */
@@ -67,12 +59,6 @@ export const MINE_COMPONENTS = deepFreeze({
     proximityRadius: 80,
     armTime: 0.5,
     triggerOnProximity: true,
-  },
-  render: {
-    strategy: 'procedural',
-    shape: 'sphere',
-    pulseSpeed: 2.6,
-    pulseAmount: 0.32,
   },
   collision: {
     shape: 'circle',

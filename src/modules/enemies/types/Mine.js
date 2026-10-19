@@ -1,5 +1,4 @@
 import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
-import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const MINE_DEFAULTS = MINE_CONFIG ?? {};
@@ -18,14 +17,10 @@ export class Mine extends BaseEnemy {
     this.proximityRadius = MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.explosionCause = null;
     this.destroyed = false;
     this.weaponState = {};
     this.movementStrategy = 'proximity';
-    this.renderStrategy = 'procedural-sphere';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -42,8 +37,6 @@ export class Mine extends BaseEnemy {
       this.weaponState = this.weaponState || {};
       this.movementStrategy =
         componentConfig?.movement?.strategy || 'proximity';
-      this.renderStrategy =
-        componentConfig?.render?.strategy || 'procedural-sphere';
       this.weaponPattern =
         componentConfig?.weapon?.pattern || this.weaponPattern;
     }
@@ -62,9 +55,6 @@ export class Mine extends BaseEnemy {
       config.explosionRadius ?? MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage =
       config.explosionDamage ?? MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulseSpeed = config.pulseSpeed ?? MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = config.pulseAmount ?? MINE_DEFAULTS.pulseAmount ?? 0.3;
-    this.pulsePhase = 0;
 
     this.random = this.resolveRandom({ ...config, id: this.id });
     this.armed = false;
@@ -121,8 +111,6 @@ export class Mine extends BaseEnemy {
     this.age += deltaTime;
     this.armTimer -= deltaTime;
     this.remainingLifetime -= deltaTime;
-    this.pulsePhase =
-      (this.pulsePhase + this.pulseSpeed * deltaTime) % (Math.PI * 2);
 
     if (!this.armed && this.armTimer <= 0) {
       this.armed = true;
@@ -204,30 +192,6 @@ export class Mine extends BaseEnemy {
     });
   }
 
-  onDraw() {
-    if (!this.useComponents || !this.components?.size) {
-      // Fallback: Generate payload without components (for testing)
-      const pulse = Math.sin(this.pulsePhase || 0);
-
-      return {
-        type: 'mine',
-        id: this.id,
-        x: this.x,
-        y: this.y,
-        radius: this.radius,
-        armed: this.armed,
-        pulse: pulse,
-        colors: {
-          body: ENEMY_EFFECT_COLORS.mine.body,
-          warning: ENEMY_EFFECT_COLORS.mine.warning,
-        },
-      };
-    }
-
-    // RenderComponent handles drawing via BaseEnemy.draw()
-    return;
-  }
-
   resetForPool() {
     super.resetForPool();
 
@@ -240,9 +204,6 @@ export class Mine extends BaseEnemy {
     this.proximityRadius = MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.explosionCause = null;
     this.destroyed = false;
   }

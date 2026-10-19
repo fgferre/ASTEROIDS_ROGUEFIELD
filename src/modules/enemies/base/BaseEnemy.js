@@ -7,7 +7,7 @@
  *
  * Design Patterns:
  * - Template Method: Defines lifecycle structure
- * - Composition: Components for rendering, movement, etc.
+ * - Composition: Components for movement, weapons, collision, health
  * - Object Pool: resetForPool() support
  *
  * @example
@@ -25,10 +25,6 @@
  * ```
  */
 
-import {
-  ENEMY_EFFECT_COLORS,
-  ENEMY_RENDER_PRESETS,
-} from '../../../data/constants/visual.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import RandomService from '../../../core/RandomService.js';
@@ -91,7 +87,6 @@ export class BaseEnemy {
     // Rendering
     this.rotation = 0;
     this.rotationSpeed = 0;
-    this.visible = true;
     this.lastHitTime = -Infinity; // performance.now() of the last damage taken
     this.hitFlashSeconds = HIT_FLASH_SECONDS;
 
@@ -256,48 +251,6 @@ export class BaseEnemy {
    * @param {number} deltaTime - Time elapsed
    */
   onUpdate() {
-    // Override in subclasses
-  }
-
-  /**
-   * Renders the enemy.
-   * Template method - subclasses should override.
-   *
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   */
-  draw(ctx) {
-    if (!this.alive || !this.visible) return;
-
-    // Delegate to render component if available
-    const renderComponent = this.components.get('render');
-    if (renderComponent && renderComponent.draw) {
-      const renderContext = {
-        enemy: this,
-        ctx,
-        colors: this.getColors(),
-        presets: this.getPresets(),
-        system: this.system,
-      };
-
-      if (renderComponent.draw.length <= 1) {
-        renderComponent.draw(renderContext);
-      } else {
-        renderComponent.draw(ctx, this, renderContext);
-      }
-      return;
-    }
-
-    // Subclass hook
-    this.onDraw(ctx);
-  }
-
-  /**
-   * Hook for subclass-specific rendering logic.
-   * Override this instead of draw() to preserve base behavior.
-   *
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   */
-  onDraw() {
     // Override in subclasses
   }
 
@@ -544,7 +497,6 @@ export class BaseEnemy {
     // Reset core state
     this.alive = false;
     this.initialized = false;
-    this.visible = true;
     this.lastHitTime = -Infinity;
     this.useComponents = false;
 
@@ -665,14 +617,6 @@ export class BaseEnemy {
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
     };
-  }
-
-  getColors() {
-    return ENEMY_EFFECT_COLORS?.[this.type] ?? {};
-  }
-
-  getPresets() {
-    return ENEMY_RENDER_PRESETS?.[this.type] ?? {};
   }
 
   runComponentUpdate(context) {

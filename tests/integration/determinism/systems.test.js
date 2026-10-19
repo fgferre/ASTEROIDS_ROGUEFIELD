@@ -1,28 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import RenderingSystem from '../../../src/modules/RenderingSystem.js';
 import { WaveManager } from '../../../src/modules/enemies/managers/WaveManager.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { createTestContainer } from '../../__helpers__/setup.js';
-
-function captureStarfieldSnapshot(seed) {
-  const container = createTestContainer(seed);
-  const random = container.resolve('random');
-  const rendering = new RenderingSystem({ random });
-
-  rendering.spaceSky.resize(800, 600);
-
-  return {
-    starCounts: rendering.spaceSky.layers.map((layer) => layer.stars.length),
-    sampleStars: rendering.spaceSky.layers.map((layer) =>
-      layer.stars.slice(0, 5).map((star) => ({
-        x: Number(star.x.toFixed(4)),
-        y: Number(star.y.toFixed(4)),
-        phase: Number(star.phase.toFixed(6)),
-        jitter: Number(star.jitter.toFixed(6)),
-      }))
-    ),
-  };
-}
 
 function createEnemySystemStub(random) {
   const created = [];
@@ -130,13 +109,6 @@ function captureOrbDropSnapshot(seed) {
 }
 
 describe('deterministic systems', () => {
-  it('produces identical starfield layouts for the same seed', () => {
-    const first = captureStarfieldSnapshot(1337);
-    const second = captureStarfieldSnapshot(1337);
-
-    expect(second).toEqual(first);
-  });
-
   it('spawns identical wave positions for the same seed', () => {
     const first = captureWaveSpawnSnapshot(2025);
     const second = captureWaveSpawnSnapshot(2025);

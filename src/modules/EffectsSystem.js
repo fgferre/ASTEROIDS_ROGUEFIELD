@@ -3,7 +3,6 @@ import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { requireService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { BossTransitions } from './effects/BossTransitions.js';
-import { Draw2D } from './effects/draw2d.js';
 import { EnemyEffects } from './effects/EnemyEffects.js';
 import { GameTime } from './effects/GameTime.js';
 import { Particles } from './effects/Particles.js';
@@ -52,7 +51,6 @@ export default class EffectsSystem extends BaseSystem {
     });
     this.randomHelpers = randomHelpers;
     Object.assign(this, randomHelpers);
-    this.draw2d = new Draw2D();
     this.particleEffects = new Particles({
       randomRange: randomHelpers.randomRange,
       randomCentered: randomHelpers.randomCentered,
@@ -282,10 +280,6 @@ export default class EffectsSystem extends BaseSystem {
       this.registerEventListener(`effects-${eventName}`, wrapped);
     };
 
-    registerBossEvent('boss-telegraph', (payload = {}) => {
-      this.draw2d.addTelegraph(payload.enemy || payload.boss || null);
-    });
-
     registerBossEvent('boss-spawned', (payload = {}) =>
       this.bossTransitions.onSpawned(payload)
     );
@@ -365,7 +359,7 @@ export default class EffectsSystem extends BaseSystem {
       if (data?.position) this.playerEffects.createOrbFusionEffect(data);
     });
 
-    this.registerEventListener('player-took-damage', (data) => {
+    this.registerEventListener('player-took-damage', () => {
       this.screenFeedback.addScreenShake(
         PLAYER_HIT_SHAKE.intensity,
         PLAYER_HIT_SHAKE.duration
@@ -380,14 +374,6 @@ export default class EffectsSystem extends BaseSystem {
 
       // Brief freeze frame for impact
       this.gameTime.addFreezeFrame(0.12, 0.15);
-
-      // Directional damage indicator
-      if (data?.damageSource && data?.playerPosition) {
-        this.draw2d.createDirectionalDamageIndicator(
-          data.damageSource,
-          data.playerPosition
-        );
-      }
     });
 
     this.registerEventListener('enemy-took-damage', (data) => {
@@ -438,10 +424,8 @@ export default class EffectsSystem extends BaseSystem {
 
     this.particleEffects.updateParticles(effectDelta);
     this.particleEffects.updateShockwaves(effectDelta);
-    this.draw2d.pruneTelegraphs();
     this.particleEffects.updateHitMarkers(effectDelta);
     this.particleEffects.updateDamageTexts(effectDelta);
-    this.draw2d.updateDamageIndicators(effectDelta);
     this.bossTransitions.updateBossTransitions(effectDelta);
     this.particleEffects.updateAmbient(effectDelta);
 
@@ -449,35 +433,14 @@ export default class EffectsSystem extends BaseSystem {
     return effectDelta;
   }
 
-  // === 2D DRAWING (effects/draw2d.js, frozen) ===
-  // RenderingSystem shakes the canvas and draws the effects through these.
-  applyScreenShake(ctx) {
-    this.draw2d.applyScreenShake(ctx, this.screenShake);
-  }
-
-  // Queued muzzle flashes become particles first; Renderer3D flushes the
-  // queue itself.
-  draw(ctx) {
-    this.particleEffects.flushMuzzleFlashQueue();
-    this.draw2d.draw(ctx, {
-      particles: this.particles,
-      shockwaves: this.shockwaves,
-      hitMarkers: this.hitMarkers,
-      damageTexts: this.damageTexts,
-      screenFlash: this.screenFlash,
-      bossTransitionEffects: this.bossTransitionEffects,
-    });
-  }
-
-  // Drawn under the entities; `view` is the camera's visible logical rect.
-  // Renderer3D passes no ctx: it only sets the view.
-  drawAmbient(ctx, view) {
+  // The ambient field spawns around `view`, the camera's visible logical
+  // rect; Renderer3D sets it every frame.
+  setAmbientView(view) {
     this.particleEffects.ambientView = view;
-    if (ctx) this.draw2d.drawAmbient(ctx, this.ambientChips, this.ambientMotes);
   }
 
   // Renderer3D and app.js read these lists on the effects object; the
-  // thruster suite swaps the particles, the 2D determinism suite the borders.
+  // thruster suite swaps the particles.
   get particles() {
     return this.particleEffects.particles;
   }
@@ -510,10 +473,6 @@ export default class EffectsSystem extends BaseSystem {
     return this.bossTransitions.bossTransitionEffects;
   }
 
-  set bossTransitionEffects(value) {
-    this.bossTransitions.bossTransitionEffects = value;
-  }
-
   // Called on the effects object: Renderer3D flushes the muzzle flashes,
   // PickupSystem rings a shockwave.
   flushMuzzleFlashQueue() {
@@ -525,18 +484,14 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   // === SCREEN FEEDBACK AND GAME TIME (effects/) ===
-  // Renderer3D reads the shake and the flash on the effects object; the 2D
-  // determinism suite sets the flash and the shake suite swaps the seed.
+  // Renderer3D reads the shake and the flash on the effects object; the
+  // shake suite swaps the seed.
   get screenShake() {
     return this.screenFeedback.screenShake;
   }
 
   get screenFlash() {
     return this.screenFeedback.screenFlash;
-  }
-
-  set screenFlash(value) {
-    this.screenFeedback.screenFlash = value;
   }
 
   get screenShakeSeedState() {
@@ -605,7 +560,6 @@ export default class EffectsSystem extends BaseSystem {
     super.reset(normalized);
     this.particleEffects.reset();
     this.bossTransitions.reset();
-    this.draw2d.reset();
     this.screenFeedback.reset();
     this.gameTime.reset();
   }

@@ -2,7 +2,6 @@ import {
   HUNTER_COMPONENTS,
   HUNTER_CONFIG,
 } from '../../../data/enemies/hunter.js';
-import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
@@ -40,7 +39,6 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = this.rotation;
     this.weaponState = {};
     this.movementStrategy = 'orbit';
-    this.renderStrategy = 'procedural-diamond';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -56,8 +54,6 @@ export class Hunter extends BaseEnemy {
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'orbit';
-      this.renderStrategy =
-        componentConfig?.render?.strategy || 'procedural-diamond';
       this.weaponPattern =
         componentConfig?.weapon?.pattern || this.weaponPattern;
       if (componentConfig?.movement?.orbitDirection) {
@@ -196,36 +192,6 @@ export class Hunter extends BaseEnemy {
     if (firing) return 1;
     const cooldown = state ? state.cooldown ?? 0 : this.burstCooldown ?? 0;
     return Math.max(0, Math.min(1, 1 - cooldown / SEEKER_TELEGRAPH_SECONDS));
-  }
-
-  /** Where the Seeker's lens points: at the player when known. */
-  get aimAngle() {
-    const player = this.system?.getCachedPlayer?.();
-    const target = player?.position;
-    if (!target) return this.rotation || 0;
-    return Math.atan2(target.y - this.y, target.x - this.x);
-  }
-
-  onDraw() {
-    if (!this.useComponents || !this.components?.size) {
-      // Fallback: Generate payload without components (for testing)
-      return {
-        type: 'hunter',
-        id: this.id,
-        x: this.x,
-        y: this.y,
-        radius: this.radius,
-        rotation: this.rotation || 0,
-        turretAngle: this.turretAngle || 0,
-        colors: {
-          body: ENEMY_EFFECT_COLORS.hunter.body,
-          turret: ENEMY_EFFECT_COLORS.hunter.turret,
-        },
-      };
-    }
-
-    // RenderComponent handles drawing via BaseEnemy.draw()
-    return;
   }
 
   onDestroyed(source, context = {}) {

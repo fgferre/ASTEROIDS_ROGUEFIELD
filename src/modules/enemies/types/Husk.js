@@ -16,7 +16,6 @@ export class Husk extends BaseEnemy {
     this.random = null;
     this.destroyed = false;
     this.movementStrategy = 'tracking';
-    this.renderStrategy = 'procedural';
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);

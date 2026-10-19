@@ -13,8 +13,8 @@ por imagem e jogando — nunca por teste.
 
 ## Decisões já tomadas (17/10)
 
-1. O jogo continua **Canvas 2D** com um passe de pós-processamento próprio; não se reescreve o gameplay em WebGL.
-   Reabrir só se o bloom em Canvas não segurar 60 fps na máquina do dono.
+1. ~~O jogo continua **Canvas 2D** com um passe de pós-processamento próprio; não se reescreve o gameplay em WebGL.~~
+   Superada: o salto para Three.js aconteceu em 17/10 (decisão 6) e o 2D sai do código em R14 (19/10).
 2. O menu em Three.js fica como está: é o alvo visual do jogo ("o jogo é continuação do menu", `docs/brand.md`).
 3. Direção: `docs/NORTE.md` vale (casco fosco, neon só na informação, fundo com volume). A escolha
    **vetor neon (Geometry Wars) × sprite ilustrado (Nova Drift)** é dele, por prancha comparativa (Etapa 3).
@@ -25,7 +25,8 @@ por imagem e jogando — nunca por teste.
    nova, paridade, captura nem leitura de rodada: máquina, arma ou efeito novo nasce só no 3D (`src/modules/render3d/`)
    e no 2D aparece como silhueta genérica ou não aparece. Só se mexe nele para não quebrar (ele precisa continuar
    abrindo). `tests/process/render2d-frozen.test.js` trava o tamanho dos quatro arquivos 2D; os docs não listam mais
-   pendências 2D. Matar o 2D de vez fica como opção dele para depois.
+   pendências 2D. Matar o 2D de vez fica como opção dele para depois. **Decidido em 19/10: o 2D sai do código (R14);
+   a versão 2D original vira peça de museu, gerada da tag `classic-2d` e aberta por um botão nos créditos.**
 
 ## Rodadas 1–11 — fechadas e mescladas na `main` (17–18/10; PRs #247–#260)
 
@@ -91,6 +92,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
+
   - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
@@ -126,6 +128,29 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
           17 min; revisão aqui.
     - [x] Fechamento (19/10): `npm run done` verde (173 arquivos, 1161 testes, build), sonda no navegador (partida, arena de
           chefe, easter egg 2D, zero erros), PR #267 aberto. **Parado: o dono joga antes de mesclar.**
+
+- [ ] **R14 Sem o 2D** (ramo `r14/sem-2d`, aberto 19/10 sobre `r13/ondas-uma-autoridade`; mescla depois das ondas e só com o
+      OK do dono). Decisão dele (19/10): o desenho Canvas 2D sai do código vivo; a versão 2D original vira peça de museu:
+      ramo `classic` e tag `classic-2d` = bc1ad27 (último commit 2D por padrão) + prefixo `classic:` nos dados salvos
+      (mesma origem no GitHub Pages), gerada pela publicação a partir da tag em `dist/classic/`, botão nos créditos.
+      Mapa (19/10): só cai no 2D sozinho se o Three.js não carregar, e aí o menu também não abre: nada real a perder.
+  - [x] 1 Desenho, troca de modo, serviços e testes só do 2D (commit 3e66b7d; portão verde, 1141 testes). Os testes de
+        mira conferem o estado da mira, não mais o desenho. Medição: 1 ajudante opus, 1 tentativa, 118k tokens, 9 min.
+  - [x] 2 Componente de desenho dos inimigos (commit c7d4c83; portão verde, 1137 testes): construído nos dois modos, nunca
+        desenhado no 3D; saiu com `renderStrategy`, os blocos `render` dos 12 dados (nenhum campo lido pelo 3D), o
+        desenho base dos inimigos e a esculpida do sprite da rocha. Medição: 1 ajudante opus, 1 tentativa, 131k tokens,
+        10 min.
+    - [x] 3 Restos (commit f142116; portão verde, 1134 testes): as listas de avisos e indicadores do arquivo de efeitos 2D só
+          alimentavam o próprio desenho (o 3D lê o estado do chefe e o HUD desenha os próprios chevrons), então o arquivo
+          saiu inteiro; `ctx` nulo, getters do combate, schema, presets, payload do chefe, pulso da mina e script de
+          benchmark órfão também. Medição: 1 ajudante opus, 1 tentativa, 190k tokens, 14 min. Restos da era 2D fora do
+          desenho ficaram em uma linha do BACKLOG.
+    - [x] 4 Museu (commits 469bcb5, 0124f96): `deploy.yml` faz checkout da tag `classic-2d` e a compila em `dist/classic/`;
+          link "Play the original 2D game" nos créditos, acima da dobra (só resolve no site publicado). Tag e ramo
+          `classic` criados localmente (bc1ad27 + prefixo `classic:` nos dados salvos, conferido no navegador).
+    - [x] Fechamento (19/10): `npm run done` verde (1134 testes, build); sonda em Chromium headless (menu, partida, arena
+          de chefe, camada 10 com máquinas, créditos com o link, `?renderer=2d` abrindo em 3D), zero erros; tag `classic-2d`
+          publicada; PR #268 aberto sobre o #267. **Parado: mescla só com o OK do dono, depois das ondas.**
 
 ## Fora de escopo deste plano
 

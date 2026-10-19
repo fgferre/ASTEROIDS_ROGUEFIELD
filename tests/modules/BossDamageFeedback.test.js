@@ -172,31 +172,6 @@ describe('boss damage feedback', () => {
     expect(boss.damageFlashStrength).toBe(0);
   });
 
-  it('buildRenderPayload reflects current feedback state', () => {
-    const { boss } = createBoss();
-
-    // Clean state
-    let payload = boss.buildRenderPayload();
-    expect(payload.damageFlash).toBe(0);
-    expect(payload.shieldImpact).toBe(0);
-    expect(payload.invulnerable).toBe(false);
-
-    // After damage
-    boss.onDamaged(100, 'laser');
-    payload = boss.buildRenderPayload();
-    expect(payload.damageFlash).toBeGreaterThan(0);
-    expect(payload.damageFlashStrength).toBeGreaterThan(0);
-
-    // After entering invulnerability with shield impact
-    boss.invulnerable = true;
-    boss.invulnerabilityTimer = 1;
-    boss.registerInvulnerabilityHit({ x: boss.x, y: boss.y - 30 });
-    payload = boss.buildRenderPayload();
-    expect(payload.invulnerable).toBe(true);
-    expect(payload.shieldImpact).toBeGreaterThan(0);
-    expect(payload.shieldImpactStrength).toBe(1);
-  });
-
   it('uses boss collision padding for bullet collision resolution', () => {
     const physics = new PhysicsSystem({ eventBus: createEventBus() });
     const boss = {

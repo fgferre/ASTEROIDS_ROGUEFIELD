@@ -4,9 +4,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 /**
  * Drone enemy configuration following canonical schema.
- * See schema.js for complete field definitions and naming conventions.
  *
- * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
  */
 
 // === DRONE CONFIGURATION ===
@@ -50,13 +48,12 @@ export const DRONE_CONFIG = deepFreeze({
 
 /**
  * Component configuration describing how the drone composes movement, weapon,
- * rendering, collision and health behaviors. This structure is consumed by the
+ * collision and health behaviors. This structure is consumed by the
  * EnemyFactory to instantiate reusable components instead of bespoke logic.
  *
  * @typedef {object} DroneComponents
  * @property {object} movement - Tracking movement tuning
  * @property {object} weapon - Predictive single-shot weapon configuration
- * @property {object} render - Procedural triangle renderer configuration
  * @property {object} collision - Collision radius/response tuning
  * @property {object} health - Base health and scaling configuration
  */
@@ -76,10 +73,6 @@ export const DRONE_COMPONENTS = deepFreeze({
     variance: 0.35,
     spread: 0.06,
     predictive: true,
-  },
-  render: {
-    strategy: 'procedural',
-    shape: 'triangle',
   },
   collision: {
     shape: 'circle',
