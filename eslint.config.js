@@ -34,7 +34,6 @@ export const OVER_THE_CAP = [
   'src/modules/MenuBackgroundSystem.js',
   'src/modules/PhysicsSystem.js',
   'src/modules/PlayerSystem.js',
-  'src/modules/UISystem.js',
   'src/modules/XPOrbSystem.js',
   'src/modules/combat/Targeting.js',
   'src/modules/effects/EnemyEffects.js',
