@@ -51,7 +51,7 @@ describe('Asteroid Metrics - Fragmentation', () => {
           }
 
           const { enemySystem } = harness;
-          enemySystem.waveState.current = 1;
+          enemySystem.waveManager.rockLayer = 1;
           enemySystem.reseedRandomScopes?.({ resetSequences: true });
 
           const key = `${size}${variant[0].toUpperCase()}${variant.slice(1)}`;

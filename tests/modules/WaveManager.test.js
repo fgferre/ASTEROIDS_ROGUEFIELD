@@ -59,7 +59,21 @@ function createField({ player = { x: 400, y: 300 }, runSeed } = {}) {
     enemy.destroyed = true;
     manager.onEnemyDestroyed({ enemy });
   };
-  return { manager, active, emits, enemySystem, kill, xpOrbs, effects };
+  // The layer's own rocks trickle in from EnemySystem's frame
+  // (updateRockTrickle); here they have all come and gone.
+  const clearRocks = () => {
+    manager.rocksSpawned = manager.rocksTotal;
+  };
+  return {
+    manager,
+    active,
+    emits,
+    enemySystem,
+    kill,
+    clearRocks,
+    xpOrbs,
+    effects,
+  };
 }
 
 function startLayer(field, layer) {
@@ -148,6 +162,7 @@ describe('WaveManager layer director', () => {
     expect(boss).toBeTruthy();
 
     manager.update(60);
+    field.clearRocks();
     const motes = ofType(active, 'drone');
     expect(motes).toHaveLength(4);
 
@@ -166,15 +181,15 @@ describe('WaveManager layer director', () => {
 });
 
 describe('WaveManager accounting', () => {
-  // EnemySystem's rock counters as EnemySpawnSystem leaves them mid-layer.
+  // The rock plan as the trickle leaves it mid-layer.
   const startWithRocks = (layer) => {
     const field = createField();
     startLayer(field, layer);
-    field.enemySystem.waveState = {
-      isActive: true,
-      totalAsteroids: 9,
-      asteroidsSpawned: 0,
-    };
+    Object.assign(field.manager, {
+      rocksActive: true,
+      rocksTotal: 9,
+      rocksSpawned: 0,
+    });
     return field;
   };
 
@@ -192,7 +207,7 @@ describe('WaveManager accounting', () => {
     field.kill(motes[0]);
 
     expect(motes).toHaveLength(3);
-    expect(field.enemySystem.waveState.asteroidsSpawned).toBe(0);
+    expect(field.manager.rocksSpawned).toBe(0);
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('Accounting discrepancy')
     );
@@ -221,18 +236,18 @@ describe('WaveManager accounting', () => {
 
     expect(manager.enemiesSpawnedThisWave).toBe(1);
     expect(manager.asteroidsSpawnedThisWave).toBe(1);
-    expect(field.enemySystem.waveState.asteroidsSpawned).toBe(1);
+    expect(manager.rocksSpawned).toBe(1);
   });
 
-  it("adds legacy surge rocks to EnemySystem's rock counts", () => {
+  it('adds surge rocks to the rock plan', () => {
     const field = startWithRocks(1);
     field.active.push({ type: 'asteroid', destroyed: false });
 
     field.manager.update(40); // the Rockfall surge: six rocks
 
-    expect(field.enemySystem.waveState).toMatchObject({
-      totalAsteroids: 15,
-      asteroidsSpawned: 6,
+    expect(field.manager).toMatchObject({
+      rocksTotal: 15,
+      rocksSpawned: 6,
     });
   });
 });
@@ -251,6 +266,7 @@ describe('WaveManager Heralds', () => {
     expect(herald).toMatchObject({ heraldKind: 'dust', elite: false });
 
     manager.update(60); // the Rockfall surge too
+    field.clearRocks();
     active.filter((e) => e !== herald && !e.destroyed).forEach(field.kill);
     expect(manager.waveInProgress).toBe(true);
 
@@ -347,6 +363,7 @@ describe('WaveManager field events', () => {
       'gravity-well',
     ]);
 
+    field.clearRocks();
     field.active.forEach((enemy) => field.kill(enemy));
     field.manager.update(0.1);
 
@@ -472,6 +489,7 @@ describe('WaveManager Boss Rush', () => {
     manager.bossRush = true;
     const clearLayer = () => {
       manager.update(60);
+      field.clearRocks();
       active.filter((e) => !e.destroyed).forEach(field.kill);
     };
 

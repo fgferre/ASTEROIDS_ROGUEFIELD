@@ -744,12 +744,6 @@ export default class GameSessionService {
       return false;
     }
 
-    const waveManagerActive = enemies.useManagers && enemies.waveManager;
-
-    if (!waveManagerActive) {
-      return false;
-    }
-
     if (reason === 'progression-reset') {
       const screen = this.getScreen();
       if (screen !== 'playing') {
@@ -776,20 +770,13 @@ export default class GameSessionService {
       return false;
     }
 
-    const waveState = enemies.waveState || null;
-
-    if (
-      typeof enemies.spawnInitialAsteroids === 'function' &&
-      !(waveState && waveState.initialSpawnDone)
-    ) {
-      try {
-        enemies.spawnInitialAsteroids(4);
-      } catch (error) {
-        console.error(
-          '[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:',
-          error
-        );
-      }
+    try {
+      enemies.waveManager.spawnLayerStartBurst(4);
+    } catch (error) {
+      console.error(
+        '[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:',
+        error
+      );
     }
 
     return true;

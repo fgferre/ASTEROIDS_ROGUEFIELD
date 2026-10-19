@@ -30,8 +30,6 @@ describe('Asteroid Metrics - Wave State Counters', () => {
   });
 
   test('wave lifecycle updates counters correctly', () => {
-    // EnemySystem drives the wave itself only when no WaveManager is attached.
-    harness.enemySystem.waveManager = null;
     prepareWave(harness.enemySystem, 1);
     const startState = { ...harness.enemySystem.waveState };
 
@@ -95,10 +93,6 @@ describe('Asteroid Metrics - Wave State Counters', () => {
     });
 
     harness.enemySystem.update(0);
-
-    if (harness.enemySystem.waveState?.isActive) {
-      harness.enemySystem.completeCurrentWave?.();
-    }
 
     const finalState = { ...harness.enemySystem.waveState };
 

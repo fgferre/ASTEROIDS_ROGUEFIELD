@@ -37,7 +37,7 @@ describe('Asteroid Metrics - Size Distribution', () => {
     { timeout: 15000 },
     () => {
       prepareWave(harness.enemySystem, 1);
-      harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
+      harness.enemySystem.waveManager.rocksTotal = SAMPLE_ASTEROID_COUNT;
       const spawnLog = [];
 
       try {

@@ -9,7 +9,6 @@ function spawnSystem(eventBus) {
     facade: {
       eventBus,
       asteroids: [],
-      useManagers: false,
       factory: {
         hasType: () => true,
         create: (type, config) => ({ type, ...config }),

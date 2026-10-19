@@ -30,6 +30,7 @@ import { clamp } from '../../../utils/mathHelpers.js';
 import {
   ASTEROID_EDGE_SPAWN_MARGIN,
   ASTEROID_SAFE_SPAWN_DISTANCE,
+  MAX_ASTEROIDS_ON_SCREEN,
   WAVE_BREAK_TIME,
   WAVE_SPAWN_DELAY,
 } from '../../../data/constants/gameplay.js';
@@ -69,6 +70,8 @@ const SURGE_INSET = 40;
 // Solar Flare screen flash (color alpha, seconds, intensity). Proposta 18/10.
 const GRAVITY_WELL_INSET = 40;
 const SOLAR_FLARE_FLASH = { alpha: 0.5, duration: 0.6, intensity: 0.45 };
+// The rock trickle: seconds between rocks, times a 0.5-1 draw.
+const ROCK_TRICKLE_DELAY = 1.0;
 
 // A pool hands the same object back as a new life (a new id) within a wave,
 // so a wave registration is remembered per life, not per object.
@@ -160,7 +163,20 @@ export class WaveManager {
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
 
-    // Timers
+    // The layer's rocks: EnemySystem builds each one, WaveManager trickles
+    // them in and keeps the counts EnemySystem.waveState reports. rockLayer
+    // is currentWave as of the last update (1 after a reset): rocks and
+    // fragments spawn with it. The plan (rocksTotal) is the layer's rocks
+    // plus those it did not plan (fragments, surge rocks, rock minions).
+    this.rockLayer = 1;
+    this.rocksActive = false;
+    this.rocksTotal = 0;
+    this.rocksSpawned = 0;
+    this.rockBurstDone = false;
+    this.layerRocks = 0;
+    this.completedWaves = 0;
+
+    // Timers (spawnTimer paces the rock trickle)
     this.spawnTimer = 0;
     this.spawnDelay = WAVE_SPAWN_DELAY || 1.0;
     this.spawnDelayMultiplier = 1;
@@ -605,12 +621,9 @@ export class WaveManager {
       };
     }
 
-    // EnemySystem's waveState counts rocks only (its kills sync from
-    // asteroidsKilledThisWave), so a drone or mine minion stays out of it.
-    if (isAsteroid && this.enemySystem?.waveState?.isActive) {
-      const state = this.enemySystem.waveState;
-      state.totalAsteroids = coerce(state.totalAsteroids) + 1;
-      state.asteroidsSpawned = coerce(state.asteroidsSpawned) + 1;
+    // The rock plan counts rocks only: a drone or mine minion stays out.
+    if (isAsteroid) {
+      this.addExtraRocks(1);
     }
 
     GameDebugLogger.log('STATE', 'Boss minion accounted for wave totals', {
@@ -741,14 +754,15 @@ export class WaveManager {
 
     this.layerSchedule = this.buildLayerSchedule(director);
     this.layerElapsed = 0;
+    this.layerRocks = director.rocks;
 
     const sharedSpawnDelayMultiplier =
       this.resolveWaveSpawnDelayMultiplier(config);
     config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
 
-    // The layer's own rocks are EnemySystem's (it trickles them in), so only
-    // the Warden and the scheduled machines count up front; surge rocks
-    // register themselves on spawn (registerActiveEnemy), like its own.
+    // The layer's own rocks trickle in (updateRockTrickle), so only the
+    // Warden and the scheduled machines count up front; rocks register
+    // themselves on spawn (registerActiveEnemy).
     let computedTotalEnemies = this.computeTotalEnemies(config);
     for (const { groups } of this.layerSchedule) {
       for (const { kind, count } of groups) {
@@ -1132,12 +1146,10 @@ export class WaveManager {
           this.enemiesSpawnedThisWave++;
         }
 
-        // The bridge counts a surge rock here; EnemySystem's waveState only
-        // planned the layer's own rocks, so it counts it too.
-        const rockState = this.enemySystem.waveState;
-        if (enemy && isAsteroid && rockState?.isActive) {
-          rockState.totalAsteroids += 1;
-          rockState.asteroidsSpawned += 1;
+        // The bridge counts a surge rock here; the rock plan only had the
+        // layer's own rocks, so it joins the plan too.
+        if (enemy && isAsteroid) {
+          this.addExtraRocks(1);
         }
       }
     }
@@ -1411,18 +1423,118 @@ export class WaveManager {
     }
   }
 
-  /** Asteroids the EnemySystem spawner still owes this layer. */
-  legacyRocksPending() {
-    const wave = this.enemySystem?.waveState;
-    return (
-      Boolean(wave?.isActive) && wave.asteroidsSpawned < wave.totalAsteroids
-    );
+  /** Rocks the trickle still owes this layer. */
+  rocksPending() {
+    return this.rocksActive && this.rocksSpawned < this.rocksTotal;
   }
 
   isFieldEmpty() {
-    return (
-      this.getRemainingActiveEnemyCount() === 0 && !this.legacyRocksPending()
+    return this.getRemainingActiveEnemyCount() === 0 && !this.rocksPending();
+  }
+
+  /**
+   * The rock trickle, run each frame right before update(): while the
+   * layer's rocks count, a rock spawns once the timer runs out if the plan
+   * has rocks left and the field holds fewer than MAX_ASTEROIDS_ON_SCREEN
+   * enemies; the next waits ROCK_TRICKLE_DELAY times a 0.5-1 draw.
+   */
+  updateRockTrickle(deltaTime) {
+    if (!this.rocksActive) {
+      return;
+    }
+
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    const enemySystem = this.enemySystem;
+    this.spawnTimer -= deltaTime;
+
+    if (
+      this.rocksSpawned < this.rocksTotal &&
+      enemySystem.getActiveEnemyCount() < MAX_ASTEROIDS_ON_SCREEN &&
+      this.spawnTimer <= 0
+    ) {
+      enemySystem.spawnAsteroid();
+      const spawnRandom =
+        enemySystem.getRandomScope('spawn') || enemySystem.getRandomService();
+      const delayMultiplier =
+        spawnRandom && typeof spawnRandom.range === 'function'
+          ? spawnRandom.range(0.5, 1)
+          : 0.5 + spawnRandom.float() * 0.5;
+      this.spawnTimer = ROCK_TRICKLE_DELAY * delayMultiplier;
+    }
+  }
+
+  /**
+   * The layer's first `count` rocks at once, out of its plan, once per plan
+   * (GameSessionService's run kickoff).
+   */
+  spawnLayerStartBurst(count = 4) {
+    if (this.rockBurstDone) {
+      return;
+    }
+
+    const spawnCount = Math.min(
+      count,
+      Math.max(0, this.rocksTotal - this.rocksSpawned)
     );
+    for (let i = 0; i < spawnCount; i++) {
+      this.enemySystem.spawnAsteroid();
+    }
+
+    this.rockBurstDone = true;
+    debugLog(`[WaveManager] Spawned ${spawnCount} initial asteroids`);
+  }
+
+  /** A rock of the plan spawned (EnemySystem.spawnAsteroid). */
+  countPlannedRock() {
+    if (this.rocksActive) {
+      this.rocksSpawned += 1;
+    }
+  }
+
+  /** Rocks the plan did not have (fragments, surge rocks, rock minions). */
+  addExtraRocks(count) {
+    if (this.rocksActive) {
+      this.rocksTotal += count;
+      this.rocksSpawned += count;
+    }
+  }
+
+  /**
+   * Starts the next layer from the session (run kickoff, a forced jump) and
+   * counts its rocks at once, on the plan the run already has.
+   */
+  startLayerFromSession() {
+    if (!this.waveInProgress) {
+      this.startNextWave();
+    }
+    this.rocksActive = true;
+  }
+
+  /**
+   * Ends every update: the rock state catches up with the layer clock. A
+   * layer that started since (not from the session) opens a fresh plan.
+   */
+  settleRocks() {
+    if (this.waveInProgress && !this.rocksActive) {
+      this.rocksTotal = this.layerRocks;
+      this.rocksSpawned = 0;
+      this.rockBurstDone = false;
+    }
+    this.rocksActive = this.waveInProgress;
+    this.rockLayer = this.currentWave;
+  }
+
+  /** Puts back the rock state a snapshot holds (EnemySystem.importState). */
+  restoreRocks({ layer, active, total, spawned, completedWaves, spawnTimer }) {
+    this.rockLayer = layer;
+    this.rocksActive = active;
+    this.rocksTotal = total;
+    this.rocksSpawned = spawned;
+    this.completedWaves = completedWaves;
+    this.spawnTimer = spawnTimer;
   }
 
   /**
@@ -1434,7 +1546,7 @@ export class WaveManager {
     if (
       !this.waveInProgress ||
       this.layerSchedule.some((entry) => !entry.event) ||
-      this.legacyRocksPending()
+      this.rocksPending()
     ) {
       return;
     }
@@ -1612,7 +1724,6 @@ export class WaveManager {
       spawnOffset: bossConfig.spawnOffset,
       randomScope: bossConfig.randomScope || 'boss-spawn',
       randomParentScope: bossConfig.randomParentScope || 'spawn',
-      skipWaveAccounting: true,
       metadata,
     };
 
@@ -2302,7 +2413,7 @@ export class WaveManager {
 
   /**
    * Development-only assertion to verify wave accounting consistency.
-   * Compares WaveManager counts against EnemySystem counts.
+   * Compares the bridge counts against the rock plan's.
    * Only runs in development mode to avoid performance impact.
    */
   assertAccountingConsistency() {
@@ -2310,7 +2421,7 @@ export class WaveManager {
       return;
     }
 
-    if (!this.waveInProgress || !this.enemySystem?.waveState) {
+    if (!this.waveInProgress) {
       return;
     }
 
@@ -2322,19 +2433,17 @@ export class WaveManager {
     const waveManagerSpawned = compatibilityMode
       ? this.asteroidsSpawnedThisWave
       : this.enemiesSpawnedThisWave;
-    const enemySystemTotal = this.enemySystem.waveState.totalAsteroids;
-    const enemySystemSpawned = this.enemySystem.waveState.asteroidsSpawned;
 
-    // Allow small discrepancies during spawn/death timing. EnemySystem plans
-    // the layer's rock total up front, while WaveManager counts rocks as they
+    // Allow small discrepancies during spawn/death timing. The rock plan has
+    // the layer's rock total up front, while the bridge counts rocks as they
     // register: only the spawned counts compare.
-    const spawnedDelta = Math.abs(waveManagerSpawned - enemySystemSpawned);
+    const spawnedDelta = Math.abs(waveManagerSpawned - this.rocksSpawned);
 
     if (spawnedDelta > 1) {
       console.warn(
         `[WaveManager] Accounting discrepancy detected!\n` +
           `  WaveManager: ${waveManagerSpawned}/${waveManagerTotal}\n` +
-          `  EnemySystem: ${enemySystemSpawned}/${enemySystemTotal}\n` +
+          `  Rock plan: ${this.rocksSpawned}/${this.rocksTotal}\n` +
           `  Wave: ${this.currentWave}`
       );
     }
@@ -2369,6 +2478,8 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakMap();
     this.endFieldEvents();
     this.endLayerModifier();
+    this.rocksActive = false;
+    this.completedWaves += 1;
 
     // Emit wave complete event
     this.eventBus.emit('wave-complete', {
@@ -2420,24 +2531,23 @@ export class WaveManager {
    * @param {number} deltaTime - Time elapsed
    */
   update(deltaTime) {
-    if (this.wavePaused) {
-      return;
+    if (!this.wavePaused) {
+      if (this.waveInProgress) {
+        this.updateLayerSchedule(deltaTime);
+      } else {
+        // Handle wave countdown
+        if (this.waveCountdown > 0) {
+          this.waveCountdown -= deltaTime;
+          this.waveCountdown = Math.max(0, this.waveCountdown);
+        }
+
+        if (this.waveCountdown <= 0) {
+          this.startNextWave();
+        }
+      }
     }
 
-    if (this.waveInProgress) {
-      this.updateLayerSchedule(deltaTime);
-      return;
-    }
-
-    // Handle wave countdown
-    if (!this.waveInProgress && this.waveCountdown > 0) {
-      this.waveCountdown -= deltaTime;
-      this.waveCountdown = Math.max(0, this.waveCountdown);
-    }
-
-    if (!this.waveInProgress && this.waveCountdown <= 0) {
-      this.startNextWave();
-    }
+    this.settleRocks();
   }
 
   /**
@@ -2469,6 +2579,15 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakMap();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
+    // The run's first layer starts from the session (startLayerFromSession)
+    // on this plan.
+    this.rockLayer = 1;
+    this.rocksActive = false;
+    this.rocksTotal = this.enemySystem.layerDirector(1).rocks;
+    this.rocksSpawned = 0;
+    this.rockBurstDone = false;
+    this.layerRocks = 0;
+    this.completedWaves = 0;
     if (this.randomSequences) {
       this.randomSequences.spawn = 0;
       this.randomSequences.variants = 0;

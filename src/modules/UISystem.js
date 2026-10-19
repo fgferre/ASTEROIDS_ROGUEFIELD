@@ -760,14 +760,9 @@ class UISystem extends BaseSystem {
       }
     });
 
-    const registerWaveCompletionListener = (eventName) => {
-      this.registerEventListener(eventName, (payload = {}) => {
-        this.tacticalHud.handleWaveCompletionEvent(payload, eventName);
-      });
-    };
-
-    registerWaveCompletionListener('wave-complete');
-    registerWaveCompletionListener('wave-completed');
+    this.registerEventListener('wave-complete', (payload = {}) => {
+      this.tacticalHud.handleWaveCompletionEvent(payload, 'wave-complete');
+    });
 
     this.registerEventListener('ui-show-screen', (payload = {}) => {
       if (payload?.screen) {

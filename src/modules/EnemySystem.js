@@ -47,8 +47,6 @@ import {
 import {
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
-  WAVE_BREAK_TIME,
-  WAVE_DURATION,
 } from '../data/constants/gameplay.js';
 import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
@@ -71,7 +69,6 @@ import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { bossRushDirectorFor, directorFor } from '../data/layers.js';
 import { scaleDirector } from '../data/difficulty.js';
-import { IS_DEV } from '../core/env.js';
 
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
@@ -96,12 +93,8 @@ class EnemySystem extends BaseSystem {
     this.asteroids = [];
     this.activeBosses = new Map();
     this.bossHudState = this.createInitialBossHudState();
-    this.spawnTimer = 0;
-    this.spawnDelay = 1.0;
     this.availableBossMinionTypes = [];
 
-    // Legacy wave state (for backward compatibility during migration)
-    this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
     this.lastWaveBroadcast = null;
@@ -117,8 +110,6 @@ class EnemySystem extends BaseSystem {
       warningFlag: '_snapshotFallbackWarningIssued',
       onFallback: this.reset.bind(this),
     });
-    this._waveManagerFallbackWarningIssued = false;
-    this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this._lastEnemyUpdateLog = 0;
     this._lastBossHudDamageUpdate = 0;
@@ -131,7 +122,6 @@ class EnemySystem extends BaseSystem {
     this.waveManager = null;
     this.rewardManager = null;
     this.heartDropsBlocked = false; // Blood Ledger
-    this.useManagers = true; // Feature flag to enable new manager system
 
     // Components (new architecture)
     this.movementComponent = null;
@@ -288,43 +278,29 @@ class EnemySystem extends BaseSystem {
     });
 
     // NEW: Integrate RewardManager with enemy destruction
-    if (this.useManagers) {
-      this.registerEventListener('enemy-destroyed', (data) => {
-        if (this.rewardManager && data.enemy) {
-          this.rewardManager.dropRewards(data.enemy);
-        }
-      });
-
-      if (this.waveManager) {
-        this.registerEventListener('wave-complete', (data = {}) => {
-          if (this.waveState) {
-            const waveNumber = Number.isFinite(Number(data.wave))
-              ? Number(data.wave)
-              : Number.isFinite(this.waveState.current)
-                ? this.waveState.current
-                : null;
-
-            if (
-              waveNumber !== null &&
-              this._lastWaveManagerCompletionHandled === waveNumber
-            ) {
-              return;
-            }
-
-            console.debug(
-              '[EnemySystem] Wave complete event received from WaveManager:',
-              data
-            );
-
-            if (waveNumber !== null) {
-              this._lastWaveManagerCompletionHandled = waveNumber;
-            }
-
-            this.handleWaveManagerWaveComplete(data);
-          }
-        });
+    this.registerEventListener('enemy-destroyed', (data) => {
+      if (this.rewardManager && data.enemy) {
+        this.rewardManager.dropRewards(data.enemy);
       }
-    }
+    });
+
+    this.registerEventListener('wave-complete', (data = {}) => {
+      const waveNumber = Number.isFinite(Number(data.wave))
+        ? Number(data.wave)
+        : this.waveState.current;
+
+      if (this._lastWaveManagerCompletionHandled === waveNumber) {
+        return;
+      }
+
+      console.debug(
+        '[EnemySystem] Wave complete event received from WaveManager:',
+        data
+      );
+
+      this._lastWaveManagerCompletionHandled = waveNumber;
+      this.handleWaveManagerWaveComplete(data);
+    });
 
     this.registerEventListener('boss-wave-started', (data) => {
       this.refreshServiceState({ force: true });
@@ -750,20 +726,28 @@ class EnemySystem extends BaseSystem {
   }
 
   setupManagers() {
-    try {
-      // Initialize WaveManager
-      const waveManagerRandom = this.getRandomScope('wave-manager', {
-        label: 'wave-manager',
-      });
-      const serviceResolver = this.dependencies?.serviceResolver;
+    // Initialize WaveManager: waves, their counts and the rock trickle are
+    // its, so the system cannot run without it.
+    const waveManagerRandom = this.getRandomScope('wave-manager', {
+      label: 'wave-manager',
+    });
+    const serviceResolver = this.dependencies?.serviceResolver;
 
+    try {
       this.waveManager = new WaveManager({
         enemySystem: this,
         eventBus: this.eventBus,
         random: waveManagerRandom,
         serviceResolver,
       });
+    } catch (error) {
+      throw new Error(
+        `[EnemySystem] WaveManager failed to initialize: ${error.message}`,
+        { cause: error }
+      );
+    }
 
+    try {
       // Initialize RewardManager
       const rewardRandom = this.getRandomScope('enemy-rewards', {
         parentScope: 'fragments',
@@ -778,10 +762,8 @@ class EnemySystem extends BaseSystem {
         serviceResolver,
       });
     } catch (error) {
-      console.warn('[EnemySystem] Failed to initialize managers', error);
-      this.waveManager = null;
+      console.warn('[EnemySystem] Failed to initialize RewardManager', error);
       this.rewardManager = null;
-      this.useManagers = false;
     }
   }
 
@@ -857,9 +839,6 @@ class EnemySystem extends BaseSystem {
         get sessionActive() {
           return facade.sessionActive;
         },
-        get spawnTimer() {
-          return facade.spawnTimer;
-        },
         createScopedRandom: (...args) => facade.createScopedRandom(...args),
         getRandomScope: (...args) => facade.getRandomScope(...args),
         getRandomService: (...args) => facade.getRandomService(...args),
@@ -913,7 +892,6 @@ class EnemySystem extends BaseSystem {
         invalidateActiveEnemyCache: (...args) =>
           facade.invalidateActiveEnemyCache?.(...args),
         emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
-        completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
         emitEvent: (...args) => facade.emitEvent?.(...args),
         getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
       };
@@ -939,14 +917,8 @@ class EnemySystem extends BaseSystem {
         get asteroids() {
           return facade.asteroids;
         },
-        get waveState() {
-          return facade.waveState;
-        },
         get sessionStats() {
           return facade.sessionStats;
-        },
-        get spawnTimer() {
-          return facade.spawnTimer;
         },
         get useComponents() {
           return facade.useComponents;
@@ -963,9 +935,6 @@ class EnemySystem extends BaseSystem {
         get waveManager() {
           return facade.waveManager;
         },
-        get useManagers() {
-          return facade.useManagers;
-        },
         refreshServiceState: (...args) => facade.refreshServiceState?.(...args),
         getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
         getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
@@ -977,10 +946,6 @@ class EnemySystem extends BaseSystem {
           facade.invalidateActiveEnemyCache?.(...args),
         releaseAsteroid: (...args) => facade.releaseAsteroid?.(...args),
         emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
-        completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
-        startNextWave: (...args) => facade.startNextWave?.(...args),
-        spawnInitialAsteroids: (...args) =>
-          facade.spawnInitialAsteroids?.(...args),
       };
 
       this.updateSystem = new EnemyUpdateSystem(context);
@@ -1687,25 +1652,20 @@ class EnemySystem extends BaseSystem {
     );
   }
 
-  createInitialWaveState() {
+  /**
+   * The wave as the HUD, snapshots and spawners read it: a read-only copy
+   * built from WaveManager, which owns every count (a new object each read).
+   */
+  get waveState() {
+    const waveManager = this.waveManager;
     return {
-      current: 1,
-      totalAsteroids: this.layerDirector(1).rocks,
-      asteroidsSpawned: 0,
-      asteroidsKilled: 0,
-      isActive: true,
-      breakTimer: 0,
-      completedWaves: 0,
-      timeRemaining: WAVE_DURATION,
-      spawnTimer: 0,
-      spawnDelay: 1.0,
-      initialSpawnDone: false,
-      managerTotals: { all: 0, asteroids: 0 },
-      managerCounts: {
-        spawned: { all: 0, asteroids: 0 },
-        killed: { all: 0, asteroids: 0 },
-      },
-      compatibilityMode: false,
+      current: waveManager.rockLayer,
+      totalAsteroids: waveManager.rocksTotal,
+      asteroidsSpawned: waveManager.rocksSpawned,
+      asteroidsKilled: waveManager.asteroidsKilledThisWave,
+      isActive: waveManager.rocksActive,
+      breakTimer: waveManager.rocksActive ? 0 : waveManager.waveCountdown,
+      completedWaves: waveManager.completedWaves,
     };
   }
 
@@ -1717,29 +1677,7 @@ class EnemySystem extends BaseSystem {
   }
 
   emitWaveStateUpdate(force = false) {
-    const managerTotals = this.waveState?.managerTotals || null;
-    const normalizedManagerTotals = managerTotals
-      ? {
-          all: Number.isFinite(managerTotals.all) ? managerTotals.all : 0,
-          asteroids: Number.isFinite(managerTotals.asteroids)
-            ? managerTotals.asteroids
-            : 0,
-        }
-      : null;
-
-    const wave = this.waveState
-      ? {
-          current: this.waveState.current,
-          totalAsteroids: this.waveState.totalAsteroids,
-          asteroidsKilled: this.waveState.asteroidsKilled,
-          isActive: Boolean(this.waveState.isActive),
-          breakTimer: Math.max(0, this.waveState.breakTimer),
-          completedWaves: this.waveState.completedWaves,
-          timeRemaining: Math.max(0, this.waveState.timeRemaining),
-          managerTotals: normalizedManagerTotals,
-          compatibilityMode: Boolean(this.waveState.compatibilityMode),
-        }
-      : null;
+    const wave = this.waveState;
 
     const session = this.sessionStats
       ? {
@@ -1749,23 +1687,16 @@ class EnemySystem extends BaseSystem {
       : null;
 
     const snapshot = {
-      current: wave?.current ?? 0,
-      totalAsteroids: wave?.totalAsteroids ?? 0,
-      asteroidsKilled: wave?.asteroidsKilled ?? 0,
-      isActive: wave?.isActive ?? false,
-      timeRemainingSeconds: wave?.isActive
-        ? Math.max(0, Math.ceil(wave?.timeRemaining ?? 0))
-        : 0,
-      breakTimerSeconds: !wave?.isActive
-        ? Math.max(0, Math.ceil(wave?.breakTimer ?? 0))
-        : 0,
-      completedWaves: wave?.completedWaves ?? 0,
+      current: wave.current,
+      totalAsteroids: wave.totalAsteroids,
+      asteroidsKilled: wave.asteroidsKilled,
+      isActive: wave.isActive,
+      breakTimerSeconds: !wave.isActive ? Math.ceil(wave.breakTimer) : 0,
+      completedWaves: wave.completedWaves,
       totalKills: session?.totalKills ?? 0,
       sessionTimeSeconds: session
         ? Math.max(0, Math.floor(session.timeElapsed ?? 0))
         : 0,
-      managerAllEnemiesTotal: normalizedManagerTotals?.all ?? 0,
-      compatibilityMode: Boolean(this.waveState?.compatibilityMode),
     };
 
     if (!force && this.lastWaveBroadcast) {
@@ -1775,13 +1706,10 @@ class EnemySystem extends BaseSystem {
         prev.totalAsteroids === snapshot.totalAsteroids &&
         prev.asteroidsKilled === snapshot.asteroidsKilled &&
         prev.isActive === snapshot.isActive &&
-        prev.timeRemainingSeconds === snapshot.timeRemainingSeconds &&
         prev.breakTimerSeconds === snapshot.breakTimerSeconds &&
         prev.completedWaves === snapshot.completedWaves &&
         prev.totalKills === snapshot.totalKills &&
-        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds &&
-        prev.managerAllEnemiesTotal === snapshot.managerAllEnemiesTotal &&
-        prev.compatibilityMode === snapshot.compatibilityMode;
+        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds;
 
       if (unchanged) {
         return;
@@ -1818,17 +1746,6 @@ class EnemySystem extends BaseSystem {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
     return this.updateSystem.updateSupportEnemies(deltaTime);
-  }
-
-  /**
-   * Updates wave progression through the update sub-system.
-   * Throws if the update sub-system is not initialized.
-   */
-  updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
-    if (!this.updateSystem) {
-      throw new Error('[EnemySystem] UpdateSystem not initialized');
-    }
-    return this.updateSystem.updateWaveLogic(deltaTime, { skipSpawning });
   }
 
   /**
@@ -1876,29 +1793,6 @@ class EnemySystem extends BaseSystem {
   }
 
   // === SISTEMA DE SPAWNING ===
-  // === SISTEMA DE SPAWNING ===
-  /**
-   * Handles spawning ticks via the spawn sub-system.
-   * Throws if the spawn sub-system is not initialized.
-   */
-  handleSpawning(deltaTime) {
-    if (!this.spawnSystem) {
-      throw new Error('[EnemySystem] SpawnSystem not initialized');
-    }
-    return this.spawnSystem.handleSpawning(deltaTime);
-  }
-
-  /**
-   * Indicates whether a spawn should occur using the spawn sub-system rules.
-   * Throws if the spawn sub-system is not initialized.
-   */
-  shouldSpawn() {
-    if (!this.spawnSystem) {
-      throw new Error('[EnemySystem] SpawnSystem not initialized');
-    }
-    return this.spawnSystem.shouldSpawn();
-  }
-
   /**
    * Spawns a boss enemy via the spawn sub-system.
    * Throws if the spawn sub-system is not initialized.
@@ -2087,63 +1981,6 @@ class EnemySystem extends BaseSystem {
       throw new Error('[EnemySystem] RenderSystem not initialized');
     }
     return this.renderSystem.render(ctx);
-  }
-
-  cloneWaveStateForSnapshot(wave = this.waveState) {
-    if (!wave) {
-      return null;
-    }
-
-    const base = this.createInitialWaveState();
-    return {
-      current: safeNumber(wave.current, base.current),
-      totalAsteroids: safeNumber(wave.totalAsteroids, base.totalAsteroids),
-      asteroidsSpawned: safeNumber(
-        wave.asteroidsSpawned,
-        base.asteroidsSpawned
-      ),
-      asteroidsKilled: safeNumber(wave.asteroidsKilled, base.asteroidsKilled),
-      isActive: Boolean(wave.isActive),
-      breakTimer: safeNumber(wave.breakTimer, base.breakTimer),
-      completedWaves: safeNumber(wave.completedWaves, base.completedWaves),
-      timeRemaining: safeNumber(wave.timeRemaining, base.timeRemaining),
-      spawnTimer: safeNumber(wave.spawnTimer, base.spawnTimer),
-      spawnDelay: safeNumber(wave.spawnDelay, base.spawnDelay),
-      initialSpawnDone: Boolean(wave.initialSpawnDone),
-      managerTotals: {
-        all: safeNumber(wave.managerTotals?.all, base.managerTotals.all),
-        asteroids: safeNumber(
-          wave.managerTotals?.asteroids,
-          base.managerTotals.asteroids
-        ),
-      },
-      managerCounts: {
-        spawned: {
-          all: safeNumber(
-            wave.managerCounts?.spawned?.all,
-            base.managerCounts.spawned.all
-          ),
-          asteroids: safeNumber(
-            wave.managerCounts?.spawned?.asteroids,
-            base.managerCounts.spawned.asteroids
-          ),
-        },
-        killed: {
-          all: safeNumber(
-            wave.managerCounts?.killed?.all,
-            base.managerCounts.killed.all
-          ),
-          asteroids: safeNumber(
-            wave.managerCounts?.killed?.asteroids,
-            base.managerCounts.killed.asteroids
-          ),
-        },
-      },
-      compatibilityMode:
-        typeof wave.compatibilityMode === 'boolean'
-          ? wave.compatibilityMode
-          : base.compatibilityMode,
-    };
   }
 
   cloneSessionStatsForSnapshot(stats = this.sessionStats) {
@@ -2585,7 +2422,7 @@ class EnemySystem extends BaseSystem {
   }
 
   exportState() {
-    const wave = this.cloneWaveStateForSnapshot();
+    const wave = this.waveState;
     const session = this.cloneSessionStatsForSnapshot();
     const asteroids = [];
     const bosses = [];
@@ -2620,7 +2457,7 @@ class EnemySystem extends BaseSystem {
     return {
       version: 1,
       sessionActive: Boolean(this.sessionActive),
-      spawnTimer: Number.isFinite(this.spawnTimer) ? this.spawnTimer : 0,
+      spawnTimer: this.waveManager.spawnTimer,
       waveState: wave,
       sessionStats: session,
       asteroids,
@@ -2657,11 +2494,14 @@ class EnemySystem extends BaseSystem {
       this.releaseAllAsteroidsToPool();
       this.asteroids = [];
 
-      const baseWave = this.createInitialWaveState();
-      this.waveState = {
-        ...baseWave,
-        ...this.cloneWaveStateForSnapshot(waveSnapshot),
-      };
+      this.waveManager.restoreRocks({
+        layer: safeNumber(waveSnapshot.current, 1),
+        active: Boolean(waveSnapshot.isActive),
+        total: safeNumber(waveSnapshot.totalAsteroids, 0),
+        spawned: safeNumber(waveSnapshot.asteroidsSpawned, 0),
+        completedWaves: safeNumber(waveSnapshot.completedWaves, 0),
+        spawnTimer: safeNumber(snapshot.spawnTimer, 0),
+      });
 
       const baseSession = this.createInitialSessionStats();
       this.sessionStats = {
@@ -2669,7 +2509,6 @@ class EnemySystem extends BaseSystem {
         ...this.cloneSessionStatsForSnapshot(sessionSnapshot),
       };
 
-      this.spawnTimer = safeNumber(snapshot.spawnTimer, 0);
       this.sessionActive = snapshot.sessionActive !== false;
       this._lastWaveManagerCompletionHandled = null;
 
@@ -2770,25 +2609,6 @@ class EnemySystem extends BaseSystem {
     return this.importState(snapshot);
   }
 
-  // === INTERFACE PARA OUTROS SISTEMAS ===
-  spawnInitialAsteroids(count = 4) {
-    if (!this.waveState) return;
-
-    const remaining = Math.max(
-      0,
-      this.waveState.totalAsteroids - this.waveState.asteroidsSpawned
-    );
-
-    const spawnCount = Math.min(count, remaining);
-
-    for (let i = 0; i < spawnCount; i++) {
-      this.spawnAsteroid();
-    }
-
-    this.waveState.initialSpawnDone = true;
-    console.log(`[EnemySystem] Spawned ${spawnCount} initial asteroids`);
-  }
-
   // === RESET E CLEANUP ===
   reset() {
     super.reset();
@@ -2796,9 +2616,7 @@ class EnemySystem extends BaseSystem {
     this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.invalidateActiveEnemyCache();
-    this.spawnTimer = 0;
     this._nextAsteroidPoolId = 1;
-    this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
@@ -2808,27 +2626,13 @@ class EnemySystem extends BaseSystem {
     this.refreshServiceState({ force: true });
     this.syncPhysicsIntegration(true);
 
-    const waveManagerActive = this.useManagers && this.waveManager;
-
-    if (waveManagerActive) {
-      try {
-        this.waveManager.reset();
-      } catch (error) {
-        console.error(
-          '[EnemySystem] Failed to reset WaveManager during system reset:',
-          error
-        );
-      }
-
-      if (this.waveState) {
-        this.waveState.isActive = false;
-        this.waveState.breakTimer = 0;
-        this.waveState.initialSpawnDone = false;
-        this.waveState.asteroidsSpawned = 0;
-        this.waveState.asteroidsKilled = 0;
-      }
-    } else {
-      this.spawnInitialAsteroids(4);
+    try {
+      this.waveManager.reset();
+    } catch (error) {
+      console.error(
+        '[EnemySystem] Failed to reset WaveManager during system reset:',
+        error
+      );
     }
 
     this.emitWaveStateUpdate(true);
@@ -2868,88 +2672,8 @@ class EnemySystem extends BaseSystem {
     this.sessionActive = false;
   }
 
-  completeCurrentWave() {
-    if (!this.waveState) return;
-
-    const wave = this.waveState;
-    if (!wave.isActive) return;
-
-    wave.isActive = false;
-    wave.breakTimer = WAVE_BREAK_TIME;
-    wave.completedWaves += 1;
-    wave.spawnTimer = 0;
-    wave.initialSpawnDone = false;
-
-    const waveManagerActive = this.useManagers && this.waveManager;
-
-    if (!waveManagerActive) {
-      this.grantWaveRewards();
-
-      this.eventBus.emit('wave-completed', {
-        wave: wave.current,
-        completedWaves: wave.completedWaves,
-        breakTimer: wave.breakTimer,
-      });
-    } else if (IS_DEV) {
-      console.debug(
-        '[EnemySystem] WaveManager active - skipping legacy wave-completed emit for Wave',
-        wave.current
-      );
-    }
-
-    this.emitWaveStateUpdate(true);
-  }
-
   startNextWave() {
-    if (!this.waveState) return;
-
-    const waveManagerActive = this.useManagers && this.waveManager;
-
-    let waveStarted = false;
-
-    if (waveManagerActive) {
-      if (!this.waveManager.waveInProgress) {
-        waveStarted = this.waveManager.startNextWave();
-
-        if (!waveStarted && IS_DEV) {
-          console.debug('[EnemySystem] WaveManager refused to start next wave');
-        }
-      } else {
-        waveStarted = true;
-      }
-
-      if (!waveStarted) {
-        this.emitWaveStateUpdate(true);
-        return;
-      }
-    }
-
-    const wave = this.waveState;
-
-    if (!waveManagerActive) {
-      wave.isActive = true;
-    } else if (waveStarted === true) {
-      wave.isActive = true;
-    }
-
-    if (!waveManagerActive) {
-      wave.current += 1;
-      wave.totalAsteroids = this.layerDirector(wave.current).rocks;
-      wave.asteroidsSpawned = 0;
-      wave.asteroidsKilled = 0;
-      wave.timeRemaining = WAVE_DURATION;
-      wave.spawnTimer = 1.0;
-      wave.spawnDelay = Math.max(0.8, 2.0 - wave.current * 0.1);
-      wave.initialSpawnDone = false;
-
-      this.spawnInitialAsteroids(4);
-
-      this.eventBus.emit('wave-started', {
-        wave: wave.current,
-        totalAsteroids: wave.totalAsteroids,
-      });
-    }
-
+    this.waveManager.startLayerFromSession();
     this.emitWaveStateUpdate(true);
   }
 
@@ -2963,8 +2687,9 @@ class EnemySystem extends BaseSystem {
   grantWaveRewards() {
     const xpOrbs = this.xpOrbs;
     const player = this.player;
+    const { current } = this.waveState;
 
-    const orbCount = 4 + Math.floor(this.waveState.current / 2);
+    const orbCount = 4 + Math.floor(current / 2);
 
     for (let i = 0; i < orbCount; i++) {
       const angle = (i / orbCount) * Math.PI * 2;
@@ -2972,15 +2697,13 @@ class EnemySystem extends BaseSystem {
       xpOrbs.createXPOrb(
         player.position.x + Math.cos(angle) * distance,
         player.position.y + Math.sin(angle) * distance,
-        20 + this.waveState.current * 5
+        20 + current * 5
       );
     }
   }
 
   getWaveState() {
-    if (!this.waveState) return null;
-
-    return { ...this.waveState };
+    return this.waveState;
   }
 
   getBossHudState() {
@@ -3276,9 +2999,6 @@ class EnemySystem extends BaseSystem {
     this.releaseAsteroid(boss);
 
     this.sessionStats.totalKills += 1;
-    if (this.waveState) {
-      this.waveState.asteroidsKilled += 1;
-    }
 
     this.emitWaveStateUpdate(true);
   }
