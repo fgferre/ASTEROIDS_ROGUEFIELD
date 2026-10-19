@@ -29,7 +29,6 @@ const STORED =
 // name whose file is back under the cap. Never add a name: split the file.
 export const MAX_LINES = 1200;
 export const OVER_THE_CAP = [
-  'src/modules/PlayerSystem.js',
 ];
 
 export default [

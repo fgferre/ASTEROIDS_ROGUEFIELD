@@ -146,8 +146,7 @@ export class PlayerEffects {
   // === The bursts ===
 
   // Dash kick (PLAN.md step 6, proposal 17/10): a short shake and a hard
-  // thruster burst out of the tail; the afterimages are the hull's own
-  // (PlayerSystem.renderDashGhosts).
+  // thruster burst out of the tail; the 3D ship mirror draws the afterimages.
   createDashBurst(position, direction) {
     this.addScreenShake(DASH_SHAKE.intensity, DASH_SHAKE.duration);
     const tailX = position.x - direction.x * 12;
