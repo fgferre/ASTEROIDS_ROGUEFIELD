@@ -76,7 +76,7 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       a vista é uma fatia da arena com a proporção da janela, **nunca além da borda do campo** (teste: em 21:9 a câmera
       presa ao campo não expõe o wrap); canvas 3D na densidade real com teto por preset (Retina do M1 a 60 fps); botão
       e tecla de tela cheia; áreas seguras; nenhum texto cortado em 1280×720. Captura em quatro proporções.
-      **Feito no ramo `r14/janela-inteira` (19/10); falta ele ver e jogar.** Canvas = janela, densidade = tela (teto 2,
+      **Feito e publicado (19/10); falta ele jogar e medir na tela dele.** Canvas = janela, densidade = tela (teto 2,
       presets como estavam). Câmera: altura vista = min(600/zoom, 800/proporção), presa para que o trapézio inclinado
       caiba no campo; o renderer diz à câmera lógica até onde o quadro alcança, então ela chega às quatro bordas (teste
       em `cameraRig.test.js`, proporções 1:1 a 32:9). Em zoom 1,3 a vista no alvo é 615×462 em 4:3 (igual a antes),
