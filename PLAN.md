@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 fechadas no ramo `r13/fechamento`, 19/10, à espera do dono)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 0 em curso no ramo `r0/fabrica`, 19/10)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --grep="R11"`, PRs #247–#260). Decisões de produto são do dono,
@@ -6,15 +6,10 @@ por imagem e jogando — nunca por teste.
 
 ## Passagem de bastão (19/10, noite)
 
-- **Ramo `r13/fechamento`** (não mesclado; um commit por item, `npm run done` verde em 19/10): R13.2, R13.4 (+ esquema de
-  controle no replay, replay sem Salvage nem vibração, dificuldade e dia do replay só valem para a run dele), R13.6,
-  R13.7, R12.5, faxina dos restos 2D, `dbToGain` único + lint do `IS_DEV` mais estrito, Tether que se explode não conta
-  abate (Códice, feed, Elite Hunter), cena `hero` sem download, teto de 5 ajudantes no CLAUDE.md (o app limita a 4).
-- **Cancelado pelo dono (19/10):** R13.3 (desempenho: "roda bem num Mac M1").
-- **Para o dono jogar antes de mesclar:** entrada do Warden (R12.5, números "proposta 19/10"; não capturada no navegador
-  embutido: a partida pausa sozinha com o painel escondido) e Hull Control/Camera Lead (R13.2).
-- **Próximo goal:** os oito pontos do goal de 18/10 fecharam; ele escolhe o próximo. Itens de gosto do BACKLOG foram
-  listados para ele com sugestão (19/10); nenhum foi feito.
+- **Goal do dono (19/10, `/goal`):** a Rodada 0 inteira, abaixo. Rodadas 12–13 e R14 já estão na `main` (PRs até #279).
+- **Ramo `r0/fabrica`** (integração, no checkout principal): um commit por fatia, trazido por cherry-pick do worktree do
+  ajudante. Junta na `main` só com o OK do dono. A sonda no navegador (menu, partida com abates) vem antes da junção;
+  o erro de console `game-session` → `renderer` ao carregar já existia na `main` (19/10) e não impede a partida.
 
 ## Rodada 0 (decidida 19/10, madrugada) — baratear o conteúdo antes de crescê-lo
 
@@ -32,6 +27,39 @@ linhas; uma arma, 8 arquivos com ids à mão; testes enumeram tipos à mão. As 
       arquivo voltou para baixo do teto). Medido em 19/10: **17 arquivos**, não 13. Além dos nove de 0b, a fábrica deve
       encolher EnemySystem (3.159), WaveManager (2.749), Targeting (1.619), EnemyEffects (1.512) e BossEnemy (1.372);
       SettingsPanel (1.328), UISystem (1.253) e o teste `aim-regression` (2.715) não têm etapa ainda.
+
+**Método (19/10).** Prova de comportamento igual: `tests/integration/golden-trace.test.js` joga partidas headless (cada
+camada, uma infinita, as duas armas extras) e guarda por segundo um hash do estado e outro dos eventos; uma fatia de
+refatoração não muda o fixture (renomear evento muda só o hash de eventos). No máximo 4 ajudantes ao mesmo tempo (limite
+do app), cada um num worktree, arquivos disjuntos. Ordem: trace → divisões 0b e de EnemySystem/WaveManager → 0a.1 →
+0a.3 ∥ 0a.4 → 0a.2, 0a.5, 0a.6 → 0a.7 → 0a.8 (medir antes de otimizar) → divisões restantes até a lista ter ≤ 3 nomes.
+
+**Desenho da fábrica (19/10, mapeado: o roster tem 10 máquinas — drone, hunter, mine, husk, ram, bulwark, weaver,
+caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
+
+- _Registro:_ `src/content/registry.js` lê `import.meta.glob('./*/*.js', { eager: true })`; cada arquivo faz
+  `export default { id, … }` com `id` = nome do arquivo; `order` onde a ordem decide sorteio (cartas, inimigos), para a
+  sequência não mudar; `listContent(kind)`, `getContent(kind, id)`. Tipos: enemies, bosses, weapons, cards, hulls,
+  stages, biomes.
+- _Inimigo:_ o arquivo junta o que hoje está espalhado (dados, componentes, recompensas, pool, tags, papéis, afixos,
+  cues, Códice, fala de avistamento, explosão, cor do projétil, visual). Uma classe só (`RecipeEnemy`) monta
+  comportamentos por nome de `src/modules/enemies/behaviors/`: movimento (estratégias do MovementComponent + manter
+  distância, investida, fase, forragear), ataque (padrões do WeaponComponent + granada com marcação, pôr mina), morte
+  (dividir, filhotes, devolver orbes, explodir), extra (escudo frontal). Nenhum arquivo do motor nomeia id de inimigo:
+  as listas à mão (EnemySystem, WaveManager, GamePools, RewardManager, `visual.js`, Códice, falas, afixos,
+  enemyMirror) leem o registro. Wardens e Heralds mantêm as classes; só os dados vão para `content/bosses`.
+- _Arma:_ `fire` lista padrões (projéteis, feixe a cada N, leque de flak), `projectile` declara tipo e propriedades
+  (velocidade, vida, estouro, perfuração), `card` declara a carta que a liga (ids `harmonic_resonator` e
+  `scatter_coil` ficam: replays gravam ids); a exclusividade entre cartas de arma é derivada; HUD, áudio e 3D leem a
+  arma; um evento só, `upgrade-weapon`, com o id.
+- _Visual:_ `view: '<nome>'` usa uma das vistas feitas à mão (as 10 de hoje ficam: redesenhá-las mudaria a imagem);
+  `visual: {…}` é montado pelo construtor de receitas em `render3d` (partes primitivas, papel de paleta, pontos
+  emissivos, escala, animação). Inimigo novo usa `visual`.
+- _Diretor:_ roster e surtos pedem `role`; cada inimigo declara `roles`, `weight`, `fromLayer`. Com um candidato só não
+  há sorteio (não consome random), então os papéis de hoje (um inimigo por papel) mantêm a sequência idêntica; inimigo
+  novo num papel passa a dividir as vagas.
+- _Prova final:_ ramo descartável com um inimigo e uma arma novos, um arquivo cada, `git diff --stat` só com os dois,
+  vistos na cena `?content=` e numa partida.
 
 ### 0a — a fábrica de conteúdo
 
@@ -64,8 +92,10 @@ linhas; uma arma, 8 arquivos com ids à mão; testes enumeram tipos à mão. As 
 - [ ] **0b.4 GameSessionService (2.394)** — fluxo da run, telas finais, recordes, modos, replay.
 - [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
 - [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
-- [ ] **0b.7 AAAHudLayout (1.892), Renderer3D (1.791), InputSystem (1.386)** — por painel; cena/espelhos/pós; teclado/
-      gamepad/comandos.
+- [ ] **0b.7 AAAHudLayout (1.892), Renderer3D (1.791)** — por painel; cena/espelhos/pós.
+- [x] **InputSystem** (1.386 → 1.184, 19/10): montagem dos comandos em `src/modules/input/commandPayloads.js`.
+- [x] **Teste `aim-regression`** (2.715, 19/10): quatro arquivos por assunto em `tests/integration/aim/`, os mesmos 80
+      testes.
 
 **Pronto quando:** um inimigo e uma arma novos entram com um arquivo cada e zero linhas no motor; os 11 inimigos e 3
 armas migrados com comportamento igual; nenhum arquivo acima do teto fora da lista de exceções, e a lista com no máximo
