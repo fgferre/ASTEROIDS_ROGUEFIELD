@@ -1,9 +1,10 @@
 // Machine views drawn by hand: the Wardens' machines — Mote (drone), Seeker
 // (hunter), Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and
-// Leech: their hulls, outlines and eyes, and what each lights or moves per
-// frame (the Ram's charge, the Caster's landing marks, the Shade's phasing,
-// the Leech's belly). An enemy's content file picks one by name (`view`); a
-// new enemy is built from its `visual` instead (recipes.js).
+// Leech: their views (shapes from lightMachines.js and heavyMachines.js),
+// outlines and eyes, and what each lights or moves per frame (the Ram's
+// charge, the Caster's landing marks, the Shade's phasing, the Leech's
+// belly). An enemy's content file picks one by name (`view`); a new enemy
+// is built from its `visual` instead (recipes.js).
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import {
