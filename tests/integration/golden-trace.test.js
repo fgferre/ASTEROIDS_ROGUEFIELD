@@ -210,6 +210,18 @@ function divergence(name, actual, expected) {
   return found.length ? `scenario ${name}: ${found.join('; ')}` : null;
 }
 
+// The second run starts from what the first did: empty saved data (the
+// first run's Hangar unlock and settings must not carry over) and empty pools.
+function traceAgain(scenario) {
+  GamePools.releaseAll();
+  const restoreDom = installDomStubs();
+  try {
+    return traceScenario(scenario);
+  } finally {
+    restoreDom();
+  }
+}
+
 const golden = JSON.parse(readFileSync(FIXTURE, 'utf8'));
 const SAME_ARCH = golden.arch === process.arch;
 const traced = {};
@@ -247,9 +259,7 @@ describe('golden trace', () => {
     const trace = traceScenario(scenario);
     traced[scenario.name] = trace;
     if (UPDATE) return;
-    const expected = SAME_ARCH
-      ? golden[scenario.name]
-      : traceScenario(scenario);
+    const expected = SAME_ARCH ? golden[scenario.name] : traceAgain(scenario);
     const message = divergence(scenario.name, trace, expected);
     if (message) throw new Error(message);
   });
