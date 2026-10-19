@@ -1,4 +1,4 @@
-// src/data/enemies/mine.js
+// src/content/enemies/mine.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -87,3 +87,11 @@ export const MINE_REWARDS = deepFreeze({
   totalXP: 25,
   healthHeartChance: 0.0,
 });
+
+export default {
+  id: 'mine',
+  order: 2,
+  config: MINE_CONFIG,
+  components: MINE_COMPONENTS,
+  rewards: MINE_REWARDS,
+};

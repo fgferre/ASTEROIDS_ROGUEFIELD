@@ -1,4 +1,4 @@
-// src/data/enemies/caster.js
+// src/content/enemies/caster.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -45,3 +45,11 @@ export const CASTER_REWARDS = deepFreeze({
   totalXP: 45, // proposta 18/10
   healthHeartChance: 0.02, // proposta 18/10
 });
+
+export default {
+  id: 'caster',
+  order: 8,
+  config: CASTER_CONFIG,
+  components: CASTER_COMPONENTS,
+  rewards: CASTER_REWARDS,
+};

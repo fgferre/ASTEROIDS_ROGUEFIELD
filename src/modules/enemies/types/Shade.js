@@ -17,7 +17,7 @@ import {
   SHADE_SPEED,
   SHADE_STILL_SPEED,
   SHADE_VISIBLE_SECONDS,
-} from '../../../data/enemies/shade.js';
+} from '../../../content/enemies/shade.js';
 import { resolvePlayerVelocity } from '../../../utils/combatHelpers.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 

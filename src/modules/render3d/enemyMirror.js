@@ -16,7 +16,7 @@
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../content/enemies/bulwark.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';

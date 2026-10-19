@@ -1,4 +1,4 @@
-// src/data/enemies/hunter.js
+// src/content/enemies/hunter.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -106,3 +106,11 @@ export const HUNTER_REWARDS = deepFreeze({
   totalXP: 50,
   healthHeartChance: 0.03,
 });
+
+export default {
+  id: 'hunter',
+  order: 3,
+  config: HUNTER_CONFIG,
+  components: HUNTER_COMPONENTS,
+  rewards: HUNTER_REWARDS,
+};

@@ -6,7 +6,7 @@ import Husk from '../../../src/modules/enemies/types/Husk.js';
 import {
   HUSK_COMPONENTS,
   HUSK_CONFIG,
-} from '../../../src/data/enemies/husk.js';
+} from '../../../src/content/enemies/husk.js';
 import { ELITE_MODIFIERS } from '../../../src/data/enemies/elite.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
 

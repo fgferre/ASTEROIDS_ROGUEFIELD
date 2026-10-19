@@ -2,7 +2,7 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 import { PALETTE } from '../constants/palette.js';
-import { BULWARK_SHIELD_HALF_ARC } from './bulwark.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../content/enemies/bulwark.js';
 
 // Elite affixes (PLAN.md R6.2): an Elite past layer 5 also rolls one or two of
 // these, shown as glyph badges over it and named in the kill feed

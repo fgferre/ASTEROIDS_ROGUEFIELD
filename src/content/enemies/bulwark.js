@@ -1,4 +1,4 @@
-// src/data/enemies/bulwark.js
+// src/content/enemies/bulwark.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -41,3 +41,11 @@ export const BULWARK_REWARDS = deepFreeze({
   totalXP: 60, // proposta 17/10
   healthHeartChance: 0.04, // proposta 17/10
 });
+
+export default {
+  id: 'bulwark',
+  order: 7,
+  config: BULWARK_CONFIG,
+  components: BULWARK_COMPONENTS,
+  rewards: BULWARK_REWARDS,
+};

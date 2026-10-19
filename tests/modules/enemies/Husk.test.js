@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import Husk from '../../../src/modules/enemies/types/Husk.js';
-import { HUSK_SPLIT_COUNT } from '../../../src/data/enemies/husk.js';
+import { HUSK_SPLIT_COUNT } from '../../../src/content/enemies/husk.js';
 
 describe('Husk', () => {
   it('splits into three Motes moving outward when it dies', () => {

@@ -14,7 +14,7 @@ import {
   LEECH_RADIUS,
   LEECH_SENSE_RADIUS,
   LEECH_SPEED,
-} from '../../../src/data/enemies/leech.js';
+} from '../../../src/content/enemies/leech.js';
 import { ORB_VALUE } from '../../../src/data/enemies/asteroid-configs.js';
 import Leech from '../../../src/modules/enemies/types/Leech.js';
 import {

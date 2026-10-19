@@ -8,7 +8,7 @@ import { PALETTE } from '../../../data/constants/palette.js';
 import {
   CASTER_SHELL_APEX,
   CASTER_SHELL_RADIUS,
-} from '../../../data/enemies/caster.js';
+} from '../../../content/enemies/caster.js';
 import { createSeededRandom } from '../asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';

@@ -12,7 +12,7 @@ import {
   CASTER_SHELL_RADIUS,
   CASTER_SPEED,
   CASTER_TELEGRAPH_SECONDS,
-} from '../../../data/enemies/caster.js';
+} from '../../../content/enemies/caster.js';
 import { resolvePlayerVelocity } from '../../../utils/combatHelpers.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 

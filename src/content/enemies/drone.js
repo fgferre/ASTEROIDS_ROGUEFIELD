@@ -1,4 +1,4 @@
-// src/data/enemies/drone.js
+// src/content/enemies/drone.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -101,3 +101,11 @@ export const DRONE_REWARDS = deepFreeze({
   totalXP: 30,
   healthHeartChance: 0.0,
 });
+
+export default {
+  id: 'drone',
+  order: 1,
+  config: DRONE_CONFIG,
+  components: DRONE_COMPONENTS,
+  rewards: DRONE_REWARDS,
+};

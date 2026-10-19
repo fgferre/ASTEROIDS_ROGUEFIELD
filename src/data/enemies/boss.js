@@ -1,6 +1,9 @@
 // src/data/enemies/boss.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
+import prime from '../../content/bosses/prime.js';
+import choir from '../../content/bosses/choir.js';
+import nullWarden from '../../content/bosses/null.js';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -57,52 +60,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @property {number} [volleyInterval] - @deprecated Use volleyCooldown instead
  * @property {number} [spawnInterval] - @deprecated Use spawnCooldown instead
  */
-const _bossConfigBase = {
-  key: 'boss',
-  displayName: 'Warden Prime',
-  radius: 60,
-  safeDistance: 240,
-  entryPadding: 24,
-  entryDriftSpeed: 85,
-  health: 1500,
-  healthScaling: 1.2,
-  acceleration: 120,
-  contactDamage: 45,
-  projectileDamage: 35,
-  spreadProjectileCount: 7,
-  spreadProjectileSpeed: 260,
-  spreadCooldown: 2.4,
-  spreadVariance: 0.45,
-  spreadArc: 0.85,
-  spreadAngleVariance: 0.12,
-  volleyBurstSize: 5,
-  volleyShotDelay: 0.16,
-  volleyCooldown: 1.35,
-  volleyVariance: 0.2,
-  volleyProjectileSpeed: 320,
-  volleySpread: 0.12,
-  minionTypes: ['drone', 'hunter'],
-  spawnCooldown: 6.5,
-  spawnVariance: 1.1,
-  chargeCooldown: 6.2,
-  chargeDuration: 1.1,
-  chargeRecovery: 1.4,
-  chargeSpeedMultiplier: 3.1,
-  chargeProjectileCount: 10,
-  chargeProjectileSpeed: 420,
-  chargeProjectileVariance: 0.08,
-  chargeAimVariance: 0.18,
-  phaseThresholds: [0.66, 0.33],
-  phaseCount: 3,
-  invulnerabilityDuration: 2.0,
-  rewards: Object.freeze({
-    xp: 500,
-    lootTable: Object.freeze(['core-upgrade', 'weapon-blueprint']),
-  }),
-  phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
-};
-
-export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
+export const BOSS_CONFIG = deepFreeze(prime.config);
 
 /**
  * Component configuration that assembles the boss enemy from modular behaviors.
@@ -115,50 +73,7 @@ export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
  * @property {object} collision - Collision radius/response parameters
  * @property {object} health - Health/armor/phase configuration
  */
-export const BOSS_COMPONENTS = deepFreeze({
-  movement: {
-    strategy: 'seeking',
-    acceleration: 120,
-    maxSpeed: 60,
-    safeDistance: 240,
-    damping: 0.95,
-  },
-  movementPhases: [
-    {
-      strategy: 'seeking',
-      acceleration: 80,
-      maxSpeed: 45,
-      safeDistance: 320,
-      damping: 0.96,
-      jitter: 0.05,
-    },
-    {
-      strategy: 'orbit',
-      acceleration: 240,
-      maxSpeed: 120,
-      preferredDistance: 180,
-    },
-    {
-      strategy: 'parasite',
-      acceleration: 280,
-      maxSpeed: 160,
-      minDistance: 90,
-    },
-  ],
-  collision: {
-    shape: 'circle',
-    radius: 60,
-    response: 'damage',
-    contactDamage: 45,
-  },
-  health: {
-    base: 1500,
-    armor: 0,
-    scaling: 1.2,
-    phaseThresholds: [0.66, 0.33],
-    invulnerabilityDuration: 2.0,
-  },
-});
+export const BOSS_COMPONENTS = deepFreeze(prime.components);
 
 // === WARDENS ===
 
@@ -181,110 +96,22 @@ export function bossKindForLayer(layer) {
   return WARDEN_CYCLE[slot % WARDEN_CYCLE.length];
 }
 
-export const WARDEN_KINDS = deepFreeze({
-  prime: {
-    displayName: 'Warden Prime',
-    subtitle: 'Guardian of the Ring',
-  },
-  // Three cores orbiting a shared centre; one sings (lit, vulnerable, fires)
-  // and the voice passes every `singDuration` s. Each phase breaks one core.
-  choir: {
-    displayName: 'Warden Choir',
-    subtitle: 'Three voices of the Ring',
-    radius: 118, // covers the cores: orbit + core radius
-    coreCount: 3,
-    coreOrbitRadius: 90,
-    coreRadius: 28,
-    orbitSpeed: 0.35, // rad/s
-    orbitSpeedPerLostCore: 0.35, // rad/s added per broken core
-    singDuration: 6,
-    dimDamageFactor: 0.25,
-    spreadProjectileCount: 5,
-    spreadArc: 0.6,
-    spreadCooldown: 2.2,
-    spreadVariance: 0.3,
-    spreadWindup: 0.45,
-    chorusInterval: 10,
-    chorusWindup: 1.1,
-    chorusShots: 3,
-    chorusSpread: 0.07,
-    chorusProjectileSpeed: 300,
-    movementPhases: [
-      {
-        strategy: 'seeking',
-        acceleration: 70,
-        maxSpeed: 40,
-        safeDistance: 300,
-        damping: 0.96,
-      },
-      {
-        strategy: 'seeking',
-        acceleration: 80,
-        maxSpeed: 50,
-        safeDistance: 280,
-        damping: 0.96,
-      },
-      {
-        strategy: 'seeking',
-        acceleration: 90,
-        maxSpeed: 60,
-        safeDistance: 260,
-        damping: 0.96,
-      },
-    ],
-  },
-  // A dark core inside 8 plates. Phase 2 opens the shell (plates orbit as
-  // hazards) and inverts the XP pull; phase 3 sheds the plates and charges.
-  null: {
-    displayName: 'Warden Null',
-    subtitle: 'The silence at the center',
-    radius: 70,
-    plateCount: 8,
-    plateRadius: 16,
-    shellSpin: 0.6, // rad/s, closed
-    openSpin: 1.1, // rad/s, open
-    openOrbitRadius: 150,
-    openDuration: 1.2, // s for the shell to spread
-    plateDamageFactor: 0.6, // of contactDamage
-    pullInterval: 12,
-    firstPullDelay: 2, // s after the shell opens
-    pullWindup: 1.0,
-    pullDuration: 3,
-    pullSpeed: 260,
-    pullAcceleration: 120,
-    chargeCooldown: 5.5,
-    chargeWindup: 0.8,
-    chargeProjectileCount: 8,
-    openChargeCooldown: 7,
-    // phase 3: windup + dash + recover + cooldown = finaleChargeCadence
-    finaleChargeCadence: 4,
-    finaleChargeWindup: 0.5,
-    finaleChargeDuration: 0.9,
-    finaleChargeRecovery: 0.6,
-    movementPhases: [
-      {
-        strategy: 'seeking',
-        acceleration: 80,
-        maxSpeed: 45,
-        safeDistance: 300,
-        damping: 0.96,
-      },
-      {
-        strategy: 'orbit',
-        acceleration: 200,
-        maxSpeed: 90,
-        preferredDistance: 240,
-      },
-      {
-        strategy: 'seeking',
-        acceleration: 140,
-        maxSpeed: 80,
-        safeDistance: 200,
-        damping: 0.95,
-      },
-    ],
-  },
-});
+// The three kinds, one file each in src/content/bosses/, in this order. Prime
+// also carries the shared `config` and `components` (BOSS_CONFIG and
+// BOSS_COMPONENTS above), which are not part of a kind's entry.
+export const WARDEN_KINDS = deepFreeze(
+  Object.fromEntries(
+    [prime, choir, nullWarden].map(
+      ({
+        id,
+        order: _order,
+        config: _config,
+        components: _components,
+        ...kind
+      }) => [id, kind]
+    )
+  )
+);
 
 /** Components for a Warden kind: the shared set with its own movement. */
 export function wardenComponents(kind) {

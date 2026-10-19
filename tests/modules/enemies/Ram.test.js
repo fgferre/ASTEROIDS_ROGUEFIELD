@@ -5,7 +5,7 @@ import {
   RAM_CHARGE_SECONDS,
   RAM_RECOVER_SECONDS,
   RAM_WINDUP_SECONDS,
-} from '../../../src/data/enemies/ram.js';
+} from '../../../src/content/enemies/ram.js';
 
 const speedOf = (enemy) => Math.hypot(enemy.vx, enemy.vy);
 

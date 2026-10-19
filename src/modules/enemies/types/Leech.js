@@ -17,7 +17,7 @@ import {
   LEECH_PICKUP_ORBS,
   LEECH_SENSE_RADIUS,
   LEECH_SPEED,
-} from '../../../data/enemies/leech.js';
+} from '../../../content/enemies/leech.js';
 import { PICKUP_TOKEN } from '../../../data/pickups.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 

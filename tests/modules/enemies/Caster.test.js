@@ -8,7 +8,7 @@ import {
   CASTER_SHELL_FLIGHT,
   CASTER_SHELL_RADIUS,
   CASTER_TELEGRAPH_SECONDS,
-} from '../../../src/data/enemies/caster.js';
+} from '../../../src/content/enemies/caster.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
 
 const setup = (playerAt) => {

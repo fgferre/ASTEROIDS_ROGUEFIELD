@@ -1,4 +1,7 @@
-import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
+import {
+  DRONE_COMPONENTS,
+  DRONE_CONFIG,
+} from '../../../content/enemies/drone.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';

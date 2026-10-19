@@ -1,4 +1,4 @@
-// src/data/enemies/leech.js
+// src/content/enemies/leech.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -49,3 +49,11 @@ export const LEECH_REWARDS = deepFreeze({
   totalXP: 45, // proposta 18/10: Weaver tier; the hoard comes on top
   healthHeartChance: 0.02, // proposta 18/10
 });
+
+export default {
+  id: 'leech',
+  order: 10,
+  config: LEECH_CONFIG,
+  components: LEECH_COMPONENTS,
+  rewards: LEECH_REWARDS,
+};

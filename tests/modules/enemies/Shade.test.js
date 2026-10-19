@@ -12,7 +12,7 @@ import {
   SHADE_PHASED_SECONDS,
   SHADE_SHOTS,
   SHADE_VISIBLE_SECONDS,
-} from '../../../src/data/enemies/shade.js';
+} from '../../../src/content/enemies/shade.js';
 
 const setup = (at) => {
   const player = {

@@ -1,4 +1,4 @@
-// src/data/enemies/shade.js
+// src/content/enemies/shade.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -53,3 +53,11 @@ export const SHADE_REWARDS = deepFreeze({
   totalXP: 45, // proposta 18/10
   healthHeartChance: 0.02, // proposta 18/10
 });
+
+export default {
+  id: 'shade',
+  order: 9,
+  config: SHADE_CONFIG,
+  components: SHADE_COMPONENTS,
+  rewards: SHADE_REWARDS,
+};

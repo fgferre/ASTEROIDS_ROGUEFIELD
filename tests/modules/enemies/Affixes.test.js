@@ -10,12 +10,15 @@ import {
 import {
   HUSK_COMPONENTS,
   HUSK_CONFIG,
-} from '../../../src/data/enemies/husk.js';
+} from '../../../src/content/enemies/husk.js';
 import {
   MINE_COMPONENTS,
   MINE_CONFIG,
-} from '../../../src/data/enemies/mine.js';
-import { RAM_COMPONENTS, RAM_CONFIG } from '../../../src/data/enemies/ram.js';
+} from '../../../src/content/enemies/mine.js';
+import {
+  RAM_COMPONENTS,
+  RAM_CONFIG,
+} from '../../../src/content/enemies/ram.js';
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
 import { AFFIX_GLYPH_NAMES } from '../../../src/modules/enemies/components/affixGlyphs.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';

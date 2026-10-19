@@ -1,4 +1,4 @@
-// src/data/enemies/weaver.js
+// src/content/enemies/weaver.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -35,3 +35,11 @@ export const WEAVER_REWARDS = deepFreeze({
   totalXP: 45, // proposta 17/10
   healthHeartChance: 0.02, // proposta 17/10
 });
+
+export default {
+  id: 'weaver',
+  order: 6,
+  config: WEAVER_CONFIG,
+  components: WEAVER_COMPONENTS,
+  rewards: WEAVER_REWARDS,
+};

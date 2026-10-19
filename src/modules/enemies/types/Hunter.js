@@ -1,7 +1,7 @@
 import {
   HUNTER_COMPONENTS,
   HUNTER_CONFIG,
-} from '../../../data/enemies/hunter.js';
+} from '../../../content/enemies/hunter.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};

@@ -1,4 +1,4 @@
-import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
+import { MINE_COMPONENTS, MINE_CONFIG } from '../../../content/enemies/mine.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const MINE_DEFAULTS = MINE_CONFIG ?? {};

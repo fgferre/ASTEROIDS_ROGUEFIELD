@@ -2,7 +2,7 @@ import {
   BULWARK_COMPONENTS,
   BULWARK_CONFIG,
   BULWARK_SHIELD_HALF_ARC,
-} from '../../../data/enemies/bulwark.js';
+} from '../../../content/enemies/bulwark.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import {
   absorbFrontalHit,

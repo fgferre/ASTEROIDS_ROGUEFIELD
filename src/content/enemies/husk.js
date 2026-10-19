@@ -1,4 +1,4 @@
-// src/data/enemies/husk.js
+// src/content/enemies/husk.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -40,3 +40,11 @@ export const HUSK_REWARDS = deepFreeze({
   totalXP: 45, // proposta 17/10
   healthHeartChance: 0.02, // proposta 17/10
 });
+
+export default {
+  id: 'husk',
+  order: 4,
+  config: HUSK_CONFIG,
+  components: HUSK_COMPONENTS,
+  rewards: HUSK_REWARDS,
+};

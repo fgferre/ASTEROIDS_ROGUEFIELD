@@ -4,7 +4,7 @@ import {
   WEAVER_LAY_INTERVAL,
   WEAVER_MAX_TETHERS,
   WEAVER_SPIN_SPEED,
-} from '../../../data/enemies/weaver.js';
+} from '../../../content/enemies/weaver.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 // How long the arms stay lit after laying a Tether.

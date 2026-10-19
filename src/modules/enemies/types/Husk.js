@@ -3,7 +3,7 @@ import {
   HUSK_CONFIG,
   HUSK_SPLIT_COUNT,
   HUSK_SPLIT_SPEED,
-} from '../../../data/enemies/husk.js';
+} from '../../../content/enemies/husk.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const TAU = Math.PI * 2;

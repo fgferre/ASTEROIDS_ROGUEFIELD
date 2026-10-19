@@ -7,7 +7,7 @@ import {
   RAM_ENGAGE_DISTANCE,
   RAM_RECOVER_SECONDS,
   RAM_WINDUP_SECONDS,
-} from '../../../data/enemies/ram.js';
+} from '../../../content/enemies/ram.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 // Speed lost per second while recovering (exponential drift-out).

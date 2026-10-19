@@ -1,4 +1,4 @@
-// src/data/enemies/ram.js
+// src/content/enemies/ram.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -43,3 +43,11 @@ export const RAM_REWARDS = deepFreeze({
   totalXP: 40, // proposta 17/10
   healthHeartChance: 0.02, // proposta 17/10
 });
+
+export default {
+  id: 'ram',
+  order: 5,
+  config: RAM_CONFIG,
+  components: RAM_COMPONENTS,
+  rewards: RAM_REWARDS,
+};

@@ -16,21 +16,21 @@ import { Shade } from '../types/Shade.js';
 import { Leech } from '../types/Leech.js';
 import { Herald } from '../types/Herald.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
-import { DRONE_COMPONENTS } from '../../../data/enemies/drone.js';
-import { HUNTER_COMPONENTS } from '../../../data/enemies/hunter.js';
-import { MINE_COMPONENTS } from '../../../data/enemies/mine.js';
+import { DRONE_COMPONENTS } from '../../../content/enemies/drone.js';
+import { HUNTER_COMPONENTS } from '../../../content/enemies/hunter.js';
+import { MINE_COMPONENTS } from '../../../content/enemies/mine.js';
 import {
   BOSS_COMPONENTS,
   WARDEN_KINDS,
   wardenComponents,
 } from '../../../data/enemies/boss.js';
-import { HUSK_COMPONENTS } from '../../../data/enemies/husk.js';
-import { RAM_COMPONENTS } from '../../../data/enemies/ram.js';
-import { WEAVER_COMPONENTS } from '../../../data/enemies/weaver.js';
-import { BULWARK_COMPONENTS } from '../../../data/enemies/bulwark.js';
-import { CASTER_COMPONENTS } from '../../../data/enemies/caster.js';
-import { SHADE_COMPONENTS } from '../../../data/enemies/shade.js';
-import { LEECH_COMPONENTS } from '../../../data/enemies/leech.js';
+import { HUSK_COMPONENTS } from '../../../content/enemies/husk.js';
+import { RAM_COMPONENTS } from '../../../content/enemies/ram.js';
+import { WEAVER_COMPONENTS } from '../../../content/enemies/weaver.js';
+import { BULWARK_COMPONENTS } from '../../../content/enemies/bulwark.js';
+import { CASTER_COMPONENTS } from '../../../content/enemies/caster.js';
+import { SHADE_COMPONENTS } from '../../../content/enemies/shade.js';
+import { LEECH_COMPONENTS } from '../../../content/enemies/leech.js';
 import { HERALD_COMPONENTS } from '../../../data/enemies/herald.js';
 
 /**

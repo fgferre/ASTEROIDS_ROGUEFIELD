@@ -37,9 +37,9 @@ import {
   ASTEROID_VARIANTS,
   ORB_VALUE,
 } from '../../../data/enemies/asteroid-configs.js';
-import { DRONE_REWARDS } from '../../../data/enemies/drone.js';
-import { HUNTER_REWARDS } from '../../../data/enemies/hunter.js';
-import { MINE_REWARDS } from '../../../data/enemies/mine.js';
+import { DRONE_REWARDS } from '../../../content/enemies/drone.js';
+import { HUNTER_REWARDS } from '../../../content/enemies/hunter.js';
+import { MINE_REWARDS } from '../../../content/enemies/mine.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ELITE_MODIFIERS } from '../../../data/enemies/elite.js';
 import { AFFIX_XP_BONUS } from '../../../data/enemies/affixes.js';
