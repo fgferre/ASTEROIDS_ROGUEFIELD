@@ -6,31 +6,10 @@
 // the merged bodies' two tones (hull, dark); +X is the nose, +Y up.
 
 import { rimLoop } from '../rimBatch.js';
+import { refine, sweep } from './shapes.js';
 
 const TAU = Math.PI * 2;
 const signedPow = (v, p) => Math.sign(v) * Math.abs(v) ** p;
-const catmull = (a, b, c, d, t) =>
-  0.5 *
-  (2 * b +
-    (c - a) * t +
-    (2 * a - 5 * b + 4 * c - d) * t * t +
-    (3 * b - a - 3 * c + d) * t * t * t);
-
-// Rows of numbers smoothed by a Catmull-Rom spline, `steps` rows per span.
-function refine(rows, steps) {
-  const out = [];
-  const last = rows.length - 1;
-  for (let i = 0; i < last; i += 1) {
-    const [a, b, c, d] = [i - 1, i, i + 1, i + 2].map(
-      (k) => rows[Math.max(0, Math.min(last, k))]
-    );
-    for (let s = 0; s < steps; s += 1) {
-      out.push(b.map((_, n) => catmull(a[n], b[n], c[n], d[n], s / steps)));
-    }
-  }
-  out.push(rows[last]);
-  return out;
-}
 
 /** The heavy machines' part lists and anchors, over the mirror's toolkit. */
 export function createHeavyParts(kit) {
@@ -41,14 +20,17 @@ export function createHeavyParts(kit) {
 
   // A solid of revolution about +Y from [radius, height] pairs traced
   // counter-clockwise (out along the bottom, up the side, in over the top);
-  // traced the other way it faces in (a bore, a throat).
+  // traced the other way it faces in (a bore, a throat). Not shapes.js's
+  // revolve: its vertices differ, and these parts were shaped on these.
   const lathe = (profile, segments) =>
     new THREE.LatheGeometry(
       profile.map(([r, y]) => new THREE.Vector2(r, y)),
       segments
     );
 
-  // `geometry`, built about +Y, turned so +Y runs along `direction` from `at`.
+  // `geometry`, built about +Y, turned so +Y runs along `direction` from `at`
+  // in one matrix (shapes.js's aim turns, then moves: the Caster's barrel
+  // would round differently).
   function aim(geometry, direction, at) {
     const turn = new THREE.Quaternion().setFromUnitVectors(
       UP,
@@ -59,70 +41,13 @@ export function createHeavyParts(kit) {
     );
   }
 
-  // A section swept along `path`: `section(i, angle)` is the [side, lift]
-  // offset of ring i's point at `angle` (side = across, lift = up).
-  function sweep(path, section, sides, { closed = false, capped = false }) {
-    const n = path.length;
-    const position = [];
-    const index = [];
-    const tangent = new THREE.Vector3();
-    const side = new THREE.Vector3();
-    const lift = new THREE.Vector3();
-    const point = new THREE.Vector3();
-    const at = (i) =>
-      path[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
-    for (let i = 0; i < n; i += 1) {
-      tangent.subVectors(at(i + 1), at(i - 1)).normalize();
-      side.crossVectors(tangent, UP).normalize();
-      lift.crossVectors(side, tangent);
-      for (let j = 0; j < sides; j += 1) {
-        const [s, l] = section(i, (j / sides) * TAU);
-        point.copy(path[i]).addScaledVector(side, s).addScaledVector(lift, l);
-        position.push(point.x, point.y, point.z);
-      }
-    }
-    for (let i = 0; i < (closed ? n : n - 1); i += 1) {
-      const a = i * sides;
-      const b = ((i + 1) % n) * sides;
-      for (let j = 0; j < sides; j += 1) {
-        const k = (j + 1) % sides;
-        index.push(a + j, b + j, a + k, a + k, b + j, b + k);
-      }
-    }
-    // caps: a fan over each end ring, on its own vertices (a crisp edge)
-    if (capped) {
-      [0, n - 1].forEach((ring, end) => {
-        const centre = position.length / 3;
-        const ringAt = ring * sides * 3;
-        const mid = new THREE.Vector3();
-        for (let j = 0; j < sides; j += 1) {
-          mid.add(point.fromArray(position, ringAt + j * 3));
-        }
-        mid.divideScalar(sides);
-        position.push(mid.x, mid.y, mid.z);
-        position.push(...position.slice(ringAt, ringAt + sides * 3));
-        for (let j = 0; j < sides; j += 1) {
-          const k = (j + 1) % sides;
-          if (end) index.push(centre, centre + 1 + k, centre + 1 + j);
-          else index.push(centre, centre + 1 + j, centre + 1 + k);
-        }
-      });
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(position, 3)
-    );
-    geometry.setIndex(index);
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-
   // A capped body along X (at `z`) from rows [x, half width, top, bottom],
-  // its sections superellipses (`exponent` 2 = oval, higher = boxier).
+  // its sections superellipses (`exponent` 2 = oval, higher = boxier); not
+  // shapes.js's loft (stations along a path, other caps).
   function loft(rows, sides, exponent, z = 0) {
     const p = 2 / exponent;
     return sweep(
+      THREE,
       rows.map(([x]) => v3(x, 0, z)),
       (i, a) => {
         const [, w, top, bottom] = rows[i];
@@ -335,6 +260,7 @@ export function createHeavyParts(kit) {
   const armParts = [
     {
       geometry: sweep(
+        THREE,
         armPath,
         (i, a) => [Math.cos(a) * armWidth(i), Math.sin(a) * armHeight(i)],
         8,
@@ -345,6 +271,7 @@ export function createHeavyParts(kit) {
     // a dark rib along the blade's back
     {
       geometry: sweep(
+        THREE,
         armPath.map((point, i) => point.clone().setY(point.y + armHeight(i))),
         (i, a) => [Math.cos(a) * 0.2 * armWidth(i), Math.sin(a) * 0.012],
         5,
@@ -515,6 +442,7 @@ export function createHeavyParts(kit) {
       })),
       ...sides.map((s) => ({
         geometry: sweep(
+          THREE,
           [
             v3(0.44, 0.15, s * 0.3),
             v3(0.64, 0.14, s * 0.36),
