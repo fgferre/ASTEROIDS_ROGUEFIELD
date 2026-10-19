@@ -56,9 +56,19 @@ solução para um browser?"_ (não é: herança do Canvas 800×600; nenhuma raz�
 movimento, instrumentos); o **o quê** fica travado por critérios verificáveis. Nada aqui muda balance: a arena segue
 800×600 lógicos com wrap; a câmera segue presa dentro do campo.
 
-- [ ] **14.1 Conferir antes de mexer (Explore, 10 min).** Como `viewport.js`/UISystem dimensionam o campo hoje; se o
-      renderer usa a densidade real de pixels (`setPixelRatio` e teto); como o HUD escala entre 1280×720 e 2560×1440;
-      se menu/Hangar/Códice estão na mesma caixa 4:3. Registrar os fatos no topo desta rodada.
+- [x] **14.1 Conferido (19/10, leitura do código; não medido em navegador).** O campo é uma caixa 4:3 escalada para
+      caber, centrada (`viewportScaling.js` ~109-146: escala = min(altura, largura) presa a [0,45; 1,9]; canvas =
+      800×600 × escala; mínimo 360×270, máximo 1520×1140); em 1920×1080 sobram ~288 px vazios de cada lado; as faixas
+      são o gradiente do `#game-ui`. A câmera 3D usa a proporção do canvas (4:3) e já tem `clampToField(distance,
+aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a câmera receber a proporção dela.
+      Densidade: `MAX_DEVICE_PIXEL_RATIO = 2` (`viewport.js`), composer por preset (ultra 2 / high 1,5 / medium 1,25 /
+      low 1); o menu usa DPR sem teto. HUD é DOM + CSS dentro do canvas (grade fixa 220px 1fr 220px, feed 200px); fonte
+      por `--hud-scale-effective` com três clamps que discordam (schema 0,8–1,3; painel 0,6–1,4; viewport 0,6–1,2) e
+      saturando em 1,2 a partir de ~807 px de altura; `--game-canvas-width/height`, `--hud-max-width`, `--hud-scale`
+      e `--hud-scale-auto` são escritos e nunca lidos; `@media ≤900px` do canvas nunca se aplica (inline vence);
+      `#minimap-canvas` é procurado e não existe. Tela cheia existe em `SettingsPanel.js` ~352-368 mas sem botão nem
+      chave no schema (inalcançável). Arena 800×600 com wrap só para nave e rochas (pickups prendem, projéteis somem).
+      Menu, Hangar, Códice e Settings já são tela cheia (`.screen` fixed inset 0) com painéis limitados por `min()`.
 - [ ] **14.2 A janela inteira.** O jogo ocupa toda a janela em qualquer proporção (16:9, 16:10, 21:9, 4:3) e densidade;
       a vista é uma fatia da arena com a proporção da janela, **nunca além da borda do campo** (teste: em 21:9 a câmera
       presa ao campo não expõe o wrap); canvas 3D na densidade real com teto por preset (Retina do M1 a 60 fps); botão
