@@ -18,7 +18,7 @@
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { BULWARK_SHIELD_HALF_ARC } from '../../content/enemies/bulwark.js';
+import { ELITE_AFFIXES } from '../../data/enemies/affixes.js';
 import { getContent, listContent } from '../../content/registry.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
@@ -129,8 +129,10 @@ export function markShadowCasters(root, minRadius = 0) {
  * - plateMaterial, darkMaterial, machineMaterial: the shared matte materials;
  *   tones: the hull/dark vertex tones of merged bodies; rimColors: threat,
  *   Elite and boss outlines; threatColor, bossColor: the accents;
- * - circleRim, sphere, smallSphere, warnRing, bulwarkPlate, bulwarkEdge,
- *   ghostDisc, fuseRing: the geometries two or more families draw;
+ * - circleRim, sphere, smallSphere, warnRing, ghostDisc, fuseRing: the
+ *   geometries two or more families draw; frontalPlate(halfArc): a frontal
+ *   plate's { plate, edge } geometries for that arc, bulwarkPlate and
+ *   bulwarkEdge those of the Shielded affix;
  * - view, emissive, setGain, tone, rim, glow, merged, body: the view helpers
  *   (a view record, accent tones, batched outline/glow anchors, one merged
  *   matte body per look); accentOf: a view's accent colour;
@@ -192,32 +194,35 @@ function createKit(THREE, scene, seeded, dissolve) {
   const threatColor = colorOf(THREE, PALETTE.threat);
   const bossColor = colorOf(THREE, PALETTE.boss);
 
-  // Bulwark: wide frontal plate (±BULWARK_SHIELD_HALF_ARC) and its rim
-  // (the Shielded affix wears them too).
-  const half = BULWARK_SHIELD_HALF_ARC;
-  const plate = new THREE.Shape();
-  plate.absarc(0, 0, 1.02, -half, half, false);
-  plate.absarc(0, 0, 0.8, half, -half, true);
-  const bulwarkPlate = new THREE.ExtrudeGeometry(plate, {
-    depth: 0.42,
-    bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.04,
-    bevelSegments: 1,
-    curveSegments: 16,
-  });
-  bulwarkPlate.rotateX(-Math.PI / 2);
-  bulwarkPlate.translate(0, -0.12, 0);
-  const bulwarkEdge = new THREE.RingGeometry(
-    0.99,
-    1.08,
-    16,
-    1,
-    -half,
-    half * 2
+  // A frontal plate (±halfArc) and its rim, one pair per arc: an enemy with a
+  // `frontal-shield` draws the arc its recipe sets, and the Shielded affix the
+  // one in ELITE_AFFIXES.
+  const plates = new Map();
+  function frontalPlate(half) {
+    if (!plates.has(half)) {
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, 1.02, -half, half, false);
+      shape.absarc(0, 0, 0.8, half, -half, true);
+      const plate = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.42,
+        bevelEnabled: true,
+        bevelThickness: 0.05,
+        bevelSize: 0.04,
+        bevelSegments: 1,
+        curveSegments: 16,
+      });
+      plate.rotateX(-Math.PI / 2);
+      plate.translate(0, -0.12, 0);
+      const edge = new THREE.RingGeometry(0.99, 1.08, 16, 1, -half, half * 2);
+      edge.rotateX(-Math.PI / 2);
+      edge.translate(0, 0.37, 0);
+      plates.set(half, { plate, edge });
+    }
+    return plates.get(half);
+  }
+  const { plate: bulwarkPlate, edge: bulwarkEdge } = frontalPlate(
+    ELITE_AFFIXES.shielded.halfArc
   );
-  bulwarkEdge.rotateX(-Math.PI / 2);
-  bulwarkEdge.translate(0, 0.37, 0);
 
   // Swift ghosts and the Caster's fill; Volatile fuse and Caster rings.
   const ghostDisc = new THREE.CircleGeometry(1, 24);
@@ -327,6 +332,7 @@ function createKit(THREE, scene, seeded, dissolve) {
     sphere,
     smallSphere,
     warnRing,
+    frontalPlate,
     bulwarkPlate,
     bulwarkEdge,
     ghostDisc,

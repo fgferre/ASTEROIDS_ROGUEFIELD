@@ -6,7 +6,7 @@ Content is data, behavior is a small library, `src/content/registry.js` links th
 
 - One file per item: `src/content/<kind>/<id>.js`, `export default { id, ... }`, `id` = file name. Kinds: `enemies`, `weapons`, `cards`, `hulls`, `stages`, `biomes`, `bosses`. A file in a subfolder is not an item (`hulls/lib/`).
 - `order`: a unique number per kind, where order decides a draw (cards, enemies). A new item takes the next free number. The lowest weapon `order` is the starting cannon.
-- Import only `src/data/constants/`, `src/utils/deepFreeze.js`, `src/data/layerParts.js` and other content files. Never `GameConstants` or a module that reads the registry (import cycle).
+- Import only `src/data/constants/` (except `visual.js`, which reads the registry: importing it closes an import cycle that crashes every test at load), `src/utils/deepFreeze.js`, `src/data/layerParts.js` and other content files. Never `GameConstants` or a module that reads the registry. `tests/content/registry.test.js` checks every content file's imports and names the file and the import that breaks this.
 - A new behavior, fire pattern or movement strategy is an engine change, not content.
 - Numbers are proposals: comment them `// proposta DD/MM`; the owner's play decides.
 
@@ -112,7 +112,7 @@ Data only. A tweak edits numbers in the existing file: Wardens `prime`, `choir`,
 
 A new enemy writes no render code. Give it one of:
 
-- `view: '<name>'`: one of the hand-made looks, `mote seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy).
+- `view: '<name>'`: one of the hand-made looks, `mote seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
 - `visual: { scale, parts, lights, animate }`, built by `src/modules/render3d/enemies/recipes.js`. Units are the enemy's radius, +x is the nose. `parts`: `{ shape: sphere|box|octahedron|icosahedron|cone|cylinder|torus, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, material: hull|trim|glow, color: <PALETTE key> }` — hull and trim are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`). `lights`: `{ at, size, color, pulse: <getter> }`. `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`). Unknown names throw. Copy `tests/__fixtures__/enemies/sentry.js`.
 - Neither: a default matte pod with one red eye.
 

@@ -36,27 +36,16 @@ import RandomService from '../../../core/RandomService.js';
  *   defaults: { size: 'medium' }
  * });
  *
- * // Register pooled enemy ships using GameConstants defaults
- * factory.registerType('drone', {
- *   class: Drone,
- *   pool: GamePools.drones,
- *   defaults: GameConstants.ENEMY_TYPES.drone,
- *   tags: ['enemy', 'hostile', 'ranged']
- * });
- *
- * factory.registerType('mine', {
- *   class: Mine,
- *   pool: GamePools.mines,
- *   defaults: GameConstants.ENEMY_TYPES.mine,
- *   tags: ['enemy', 'explosive']
- * });
- *
- * factory.registerType('hunter', {
- *   class: Hunter,
- *   pool: GamePools.hunters,
- *   defaults: GameConstants.ENEMY_TYPES.hunter,
- *   tags: ['enemy', 'elite']
- * });
+ * // Register the content roster, as enemyTypeRegistry.js does: one type per
+ * // src/content/enemies item, its class built from the recipe
+ * for (const item of listContent('enemies')) {
+ *   factory.registerType(item.id, {
+ *     class: recipeEnemyClass(item),
+ *     pool: GamePools.enemyPools.get(item.id) || null,
+ *     defaults: { ...item.config, components: item.components },
+ *     tags: item.tags
+ *   });
+ * }
  *
  * // Create an instance
  * const asteroid = factory.create('asteroid', {

@@ -10,6 +10,7 @@ import {
   CASTER_SHELL_APEX,
   CASTER_SHELL_RADIUS,
 } from '../../../content/enemies/caster.js';
+import { getContent } from '../../../content/registry.js';
 import { createSeededRandom } from '../asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';
@@ -396,9 +397,12 @@ export function createMachineViews(kit) {
       },
     ]);
     const plate = new THREE.Group();
-    const plateMesh = new THREE.Mesh(kit.bulwarkPlate, kit.plateMaterial);
+    // the arc its recipe's frontal shield hits within, so plate and hit area agree
+    const arc = getContent('enemies', kind).behaviors['frontal-shield'].halfArc;
+    const geometries = kit.frontalPlate(arc);
+    const plateMesh = new THREE.Mesh(geometries.plate, kit.plateMaterial);
     const edgeMaterial = kit.emissive(PALETTE.threat, 1.2);
-    const edge = new THREE.Mesh(kit.bulwarkEdge, edgeMaterial);
+    const edge = new THREE.Mesh(geometries.edge, edgeMaterial);
     plate.add(plateMesh, edge);
     group.add(hull, plate);
     kit.scene.add(group);

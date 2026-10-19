@@ -5,9 +5,6 @@ import * as PhysicsConstants from '../data/constants/physics.js';
 import * as GameplayConstants from '../data/constants/gameplay.js';
 import * as VisualConstants from '../data/constants/visual.js';
 import * as AsteroidConfigs from '../data/enemies/asteroid-configs.js';
-import * as DroneConfigs from '../content/enemies/drone.js';
-import * as HunterConfigs from '../content/enemies/hunter.js';
-import * as MineConfigs from '../content/enemies/mine.js';
 import * as BossConfigs from '../data/enemies/boss.js';
 
 // === DIMENSÕES DO JOGO ===
@@ -101,9 +98,6 @@ export * from '../data/constants/physics.js';
 export * from '../data/constants/gameplay.js';
 export * from '../data/constants/visual.js';
 export * from '../data/enemies/asteroid-configs.js';
-export * from '../content/enemies/drone.js';
-export * from '../content/enemies/hunter.js';
-export * from '../content/enemies/mine.js';
 
 // Namespace exports for optional direct module access
 export {
@@ -111,8 +105,5 @@ export {
   GameplayConstants,
   VisualConstants,
   AsteroidConfigs,
-  DroneConfigs,
-  HunterConfigs,
-  MineConfigs,
   BossConfigs,
 };
