@@ -731,7 +731,8 @@ export class PlayerMirror {
         : 0;
     const dashShield = invulnerable && this.dashGuard;
     this.rim.copy(dashShield ? this.dashRimRgb : this.rimRgb);
-    this.dashRing.visible = dashShield;
+    // the shield dome already reads as protection; the flat ring would sit inside it
+    this.dashRing.visible = dashShield && !player.isShieldActive;
 
     this.updateGhosts(player.dashGhosts);
 

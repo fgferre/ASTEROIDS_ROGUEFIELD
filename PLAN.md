@@ -113,8 +113,9 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 - [x] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
       3D; seed do director igual no EnemySystem e no WaveManager; avisos de "accounting discrepancy" explicados ou
       eliminados.
-- [ ] **R13.6 Oddity do 3D.** Anel chapado sob o domo do escudo (candidato: o anel do dash no espelho do jogador, que
-      só deveria aparecer nos i-frames — conferir na captura). Os itens 2D saíram: 2D congelado (decisão 6).
+- [x] **R13.6 Oddity do 3D** (19/10, ramo `r13/anel-sob-escudo`)**.** Era o anel do dash (i-frames), inclinado com o
+      casco, desenhado dentro do domo; agora some com o escudo erguido, como o comentário do domo já prometia.
+      Conferido no navegador com escudo + i-frames forçados (antes: anel; depois: só o domo).
 - [ ] **R13.7 Áudio morto.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
 - [x] **R13.8 Arquivos grandes** (fechado 19/10; PRs #263 a #267)**.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
