@@ -110,7 +110,13 @@ Data only. A tweak edits numbers in the existing file: Wardens `prime`, `choir`,
 
 ## Visual
 
-`view: '<name>'` picks one of the hand-made views; `visual: { ... }` is built from a recipe by the 3D builder: see `src/modules/render3d/enemies/` for the vocabulary. With neither, a default look.
+A new enemy writes no render code. Give it one of:
+
+- `view: '<name>'`: one of the hand-made looks, `mote seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy).
+- `visual: { scale, parts, lights, animate }`, built by `src/modules/render3d/enemies/recipes.js`. Units are the enemy's radius, +x is the nose. `parts`: `{ shape: sphere|box|octahedron|icosahedron|cone|cylinder|torus, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, material: hull|trim|glow, color: <PALETTE key> }` — hull and trim are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`). `lights`: `{ at, size, color, pulse: <getter> }`. `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`). Unknown names throw. Copy `tests/__fixtures__/enemies/sentry.js`.
+- Neither: a default matte pod with one red eye.
+
+`view` and `visual` together is an error (tests/content checks it).
 
 ## Checking
 
