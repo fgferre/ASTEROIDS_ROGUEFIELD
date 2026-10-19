@@ -3,7 +3,7 @@
 Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo veredito dele jogando (Mac M1, 60 fps):
 1, 3, 6, 7, 8, 9 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 17.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 18.**
 
 ## O BASTÃO — onde a sessão parou (18/10, noite) — RODADAS 12 E 13 (PARCIAL) MESCLADAS NA `main` (PR #261); SESSÃO NA NUVEM ENCERRADA, ELE SEGUE EM CONVERSA LOCAL
 
@@ -104,6 +104,13 @@ container pode reiniciar; apagar/arquivar refs remotas em massa é bloqueado na 
 - **(16)** _"O radar está muito básico… todos os instrumentos do painel não condizem com a realidade nova de um projeto
   AAA."_ / _"O app tem uma janela dinâmica… precisa se adaptar a isso também."_ → Rodada 14 no PLAN (janela inteira,
   `HUD.md`, instrumentos por maquete aprovada por ele). Fecha quando ele disser que o painel está à altura do jogo.
+- **(17)** _"Acho que a câmera dinâmica precisa ser revista depois dessas mudanças."_ / _"Tem que ser um algoritmo mais
+  inteligente que entenda como a movimentação de câmera deve se adequar ao viewport e ao contexto relevante… trocar de
+  posição, aumentar e diminuir o zoom de acordo com o que tem de importante na tela no momento, sejam spoils,
+  inimigos, high value targets, bosses, mini bosses… não acho que seja simplesmente uma correção… ela inclusive pode
+  brincar com ângulos diferentes. Enfim, dinâmica mesmo."_ / _"Tem que ter pesquisa de benchmarks hoje no mundo gamer e
+  talvez já existam algoritmos top-tier prontos."_ (19/10, depois da janela inteira) → 14.2b no PLAN. Fecha quando
+  ele jogar e disser que a câmera dirige a cena.
 
 ## Goal novo (palavras dele, 18/10, fim de tarde)
 

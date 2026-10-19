@@ -84,6 +84,15 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       Menu comprimido pela altura para caber em 1280×720 (casco em uma linha de três). Medido no painel do app, M1,
       horda de 200 em ultra com `renderScale=2`: ~61 fps na caixa antiga (2232×1674) e ~52 fps na janela 1440×900
       (2880×1800) — falta medir na tela dele; um teto de pixels por preset seria decisão dele.
+- [ ] **14.2b Câmera diretora** (pendência 17; antes do HUD, porque o radar acompanha o zoom). Com a janela inteira a
+      câmera em tela larga já vê o campo de lado a lado: não tem para onde se adiantar nem se afastar. Ele quer uma
+      câmera que dirige a cena: dá peso ao que importa no momento (chefe, mini-chefe, alvo valioso, ameaça rápida,
+      saque, inimigos), escolhe posição, zoom e ângulo, adapta-se à forma da janela, tem momentos (calmo, perigo, onda
+      limpa, entrada de chefe, morte, vitória). Regras fixas: nunca além da borda do campo; nunca esconde a ameaça que
+      vai acertar; ângulos ousados só em momentos especiais; reduzir movimento respeitado. Ordem: (1) pesquisa de
+      referências e algoritmos prontos (`docs/pesquisa-camera-2026-10-19.md`); (2) uma página de comportamento que ele
+      aprova; (3) implementar sobre o que já existe (avanço pela mira, afastar em perigo, enquadrar chefe), números num
+      lugar só, cena de teste por momento; (4) ele joga e ajusta — sensação, não fecha por teste.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.
