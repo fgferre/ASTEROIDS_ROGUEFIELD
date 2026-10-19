@@ -151,6 +151,7 @@ export function getHudCss() {
             .beam-pips.is-hidden { display: none; }
             .beam-pip { width: 5px; height: 5px; border: 1px solid var(--accent-line); border-radius: 1px; }
             .beam-pip.is-filled { background: var(--accent); box-shadow: var(--glow-accent); }
+            .beam-pip.is-hidden { display: none; }
             .evo-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 220px; }
             .evo-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 1px var(--space-1, 4px); color: var(--family-color); background: var(--surface); border: 1px solid color-mix(in srgb, var(--family-color) 55%, transparent); border-radius: var(--radius-sm); }
             .buff-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }

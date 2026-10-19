@@ -9,7 +9,6 @@ import { CardEffects } from './combat/CardEffects.js';
 import { COMBAT_AIMING_UPGRADE_CONFIG } from '../data/constants/gameplay.js';
 // The knockback suite imports it from here.
 export { knockbackSpeed } from './combat/HitResolution.js';
-import { WEAPONS } from '../data/weapons.js';
 
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -139,12 +138,10 @@ class CombatSystem extends BaseSystem {
       this.cards.applyWeaponTuning(data);
     });
 
-    // A weapon card names its weapon (data/weapons.js); an unknown id is ignored.
-    const takeWeapon = (data = {}) => {
-      if (WEAPONS[data.weaponId]) this.weapons.weaponId = data.weaponId;
-    };
-    this.registerEventListener('upgrade-weapon-harmonic', takeWeapon);
-    this.registerEventListener('upgrade-weapon-scatter', takeWeapon);
+    // A weapon card names its weapon (src/content/weapons/).
+    this.registerEventListener('upgrade-weapon', (data = {}) => {
+      this.weapons.takeWeapon(data.weaponId);
+    });
 
     // Cards that add a weapon behaviour keep the payload of their latest rank.
     this.registerEventListener('upgrade-thermal-lens', (data) => {

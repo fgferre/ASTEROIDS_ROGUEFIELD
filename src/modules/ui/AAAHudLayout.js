@@ -608,7 +608,7 @@ export class AAAHudLayout {
     this._systems.updateWeapon(this.els, state);
   }
 
-  /** The Harmonic beam fired: the weapon chip and its pips flash once. */
+  /** A beam fired: the weapon chip and its pips flash once. */
   flashBeam() {
     this._systems.flashBeam(this.els);
   }

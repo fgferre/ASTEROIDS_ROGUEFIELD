@@ -1,11 +1,13 @@
 // src/modules/ui/hud/systemsPanel.js
 
-import { WEAPONS } from '../../../data/weapons.js';
+import { WEAPONS, firePattern } from '../../../data/weapons.js';
 import { UPGRADE_FAMILIES } from '../../../data/upgrades/families.js';
 import { replay } from './hudCommon.js';
 
-// One pip per lance shot before the Harmonic beam (the beam is the last shot).
-export const BEAM_PIPS = WEAPONS.harmonic.beam.every - 1;
+// A weapon with an every-nth-shot beam shows one pip per shot before it (the
+// beam is the last shot). The markup holds the most any weapon needs.
+const beamPips = (weapon) => (firePattern(weapon, 'beam')?.every ?? 1) - 1;
+export const BEAM_PIPS = Math.max(0, ...Object.values(WEAPONS).map(beamPips));
 
 /**
  * The bottom-right panel: timed pickup chips, the WEAPON chip with its beam
@@ -84,8 +86,8 @@ export class SystemsPanel {
     if (!els?.weaponName || !state) {
       return;
     }
-    const harmonic = state.weaponId === 'harmonic';
-    const filled = harmonic ? BEAM_PIPS + 1 - state.shotsToBeam : 0;
+    const pips = beamPips(WEAPONS[state.weaponId]);
+    const filled = pips ? pips + 1 - state.shotsToBeam : 0;
     const key = `${state.weaponId}:${filled}:${state.evolutions.map((evolution) => evolution.id).join(',')}`;
     if (key === this._lastWeaponKey) {
       return;
@@ -93,10 +95,11 @@ export class SystemsPanel {
     this._lastWeaponKey = key;
     // The chip is a short label; the full name goes to the recap and pause.
     els.weaponName.textContent = state.chip || state.name.toUpperCase();
-    els.beamPips.classList.toggle('is-hidden', !harmonic);
-    els.beamPipEls.forEach((pip, index) =>
-      pip.classList.toggle('is-filled', index < filled)
-    );
+    els.beamPips.classList.toggle('is-hidden', !pips);
+    els.beamPipEls.forEach((pip, index) => {
+      pip.classList.toggle('is-filled', index < filled);
+      pip.classList.toggle('is-hidden', index >= pips);
+    });
 
     const ids = new Set(state.evolutions.map((evolution) => evolution.id));
     for (const [id, chip] of this._evolutionChips) {
@@ -119,7 +122,7 @@ export class SystemsPanel {
     }
   }
 
-  /** The Harmonic beam fired: the weapon chip and its pips flash once. */
+  /** A beam fired: the weapon chip and its pips flash once. */
   flashBeam(els) {
     if (els?.weaponChip) {
       replay(els.weaponChip, 'is-beam');

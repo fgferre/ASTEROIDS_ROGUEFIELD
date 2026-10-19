@@ -52,7 +52,7 @@ describe('Weapons', () => {
       {
         name: 'weapon-fired',
         payload: expect.objectContaining({
-          weaponType: 'basic',
+          pattern: 'stream',
           primaryTargetId: 'e1',
           centerlineTarget: { x: 600, y: 300 },
         }),

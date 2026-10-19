@@ -1,10 +1,11 @@
 // src/modules/combat/Weapons.js
 //
-// The ship's guns: the weapon it carries (lance, Harmonic beam, Scatter
-// flak), when it may fire, how a volley spreads over its lanes, and the
-// evolutions and Apexes that change the lance. CombatSystem owns it, ticks it
-// after targeting and before the shots fly; the card tuning lives in
-// CardEffects and the hit path in HitResolution.
+// The ship's guns: the weapon it carries (a content file in
+// src/content/weapons/), the fire patterns that weapon lists, when it may
+// fire, how a volley spreads over its lanes, and the evolutions and Apexes
+// that change the lance. CombatSystem owns it, ticks it after targeting and
+// before the shots fly; the card tuning lives in CardEffects and the hit path
+// in HitResolution.
 
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
@@ -18,10 +19,12 @@ import {
 } from '../../data/constants/gameplay.js';
 import { withAlpha } from '../../data/constants/palette.js';
 import {
+  DEFAULT_WEAPON_ID,
   LANCE_BASE_LOOK,
   WEAPONS,
   WEAPON_APEX,
   WEAPON_EVOLUTIONS,
+  firePattern,
 } from '../../data/weapons.js';
 
 // Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
@@ -30,18 +33,23 @@ const AIMING_CONFIG = COMBAT_AIMING_UPGRADE_CONFIG || {};
 // Trail alpha ramp, tail → head (precomputed: one string per step).
 const lanceTrailStyles = (color) =>
   Array.from({ length: 8 }, (_, i) => withAlpha(color, (0.65 * i) / 7));
-const HARMONIC_BEAM = WEAPONS.harmonic.beam;
-const FLAK = WEAPONS.scatter.flak;
+
+/** The fire patterns a weapon's `fire` list can name, and what runs each. */
+export const FIRE_PATTERNS = Object.freeze({
+  stream: 'fireStream',
+  beam: 'fireBeam',
+  fan: 'fireFan',
+});
 
 export class Weapons {
   /**
    * `player()`: the player service (position, muzzle point, turret angle).
    * `enemies()`: the enemy service (forEachActiveEnemy).
    * `targeting()`: the Targeting instance (locks, lead points, aim mode, right stick).
-   * `createBullet(fromPos, toPos, damage, volley)`: launches a shot (Projectiles).
+   * `createBullet(fromPos, toPos, damage, volley)`: launches the weapon's projectile (Projectiles).
    * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
-   * `cardEffects()`: the weapon cards in play (the beam reads the Thermal Lens).
+   * `cardEffects()`: the cards in play (the beam reads the Thermal Lens).
    * `tuning()`: the cards' fire-rate tuning, a fresh plain object: { aimCooldownMultiplier, cooldownTuning }.
    */
   constructor({
@@ -88,22 +96,22 @@ export class Weapons {
 
     if (!this.canShoot()) return;
 
-    const player = this.player();
-    const targeting = this.targeting();
-    const playerPos = player.getPosition();
+    const playerPos = this.player().getPosition();
     if (!playerPos) return;
 
-    if (this.weaponId === 'harmonic') {
-      this.harmonicShots += 1;
-      if (this.harmonicShots % HARMONIC_BEAM.every === 0) {
-        this.fireBeam(playerPos, playerStats);
-        return;
-      }
-    }
-    if (this.weaponId === 'scatter') {
-      this.fireFlak(playerPos, playerStats);
-      return;
-    }
+    // The first pattern due fires: one with `every: n` on every nth shot.
+    this.shots += 1;
+    const pattern = this.weapon.fire.find(
+      (entry) => !entry.every || this.shots % entry.every === 0
+    );
+    this[FIRE_PATTERNS[pattern.pattern]](pattern, playerPos, playerStats);
+  }
+
+  // `stream`: the weapon's projectile down the lock lanes, or straight ahead
+  // without a lock; Multishot adds lanes.
+  fireStream(pattern, playerPos, playerStats) {
+    const player = this.player();
+    const targeting = this.targeting();
 
     // Every shot leaves the turret's muzzle (R5.11). Without a lock the
     // turret has turned back onto the nose.
@@ -368,7 +376,7 @@ export class Weapons {
         position: playerPos,
         target: firstTarget,
         centerlineTarget,
-        weaponType: 'basic',
+        pattern: 'stream',
         primaryTargetId: targeting.currentTarget
           ? targeting.currentTarget.id
           : null,
@@ -464,7 +472,7 @@ export class Weapons {
         position: originPos,
         target: firedTargets[0].position,
         centerlineTarget,
-        weaponType: 'basic',
+        pattern: 'stream',
         primaryTargetId: null,
         targeting: {
           dynamicPrediction: false,
@@ -714,13 +722,25 @@ export class Weapons {
   // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===
   // The card effects reset in CardEffects; CombatSystem orders the two.
   resetWeaponState() {
-    this.weaponId = WEAPONS.lance.id;
-    this.harmonicShots = 0;
+    this.weaponId = DEFAULT_WEAPON_ID;
+    this.shots = 0; // since the weapon was taken: when `every` patterns fire
     this.evolutions = [];
     this.apexes = [];
     this.beams = [];
     this.flakBursts = [];
     this.refreshLanceLook();
+  }
+
+  /** The weapon the ship carries (its content file). */
+  get weapon() {
+    return WEAPONS[this.weaponId];
+  }
+
+  /** A weapon card swaps the cannon for its weapon; an unknown id is ignored. */
+  takeWeapon(weaponId) {
+    if (!WEAPONS[weaponId] || weaponId === this.weaponId) return;
+    this.weaponId = weaponId;
+    this.shots = 0;
   }
 
   /** A family's "3 of a kind" synergy evolves the lance for the rest of the run. */
@@ -787,15 +807,13 @@ export class Weapons {
 
   /** What the HUD shows: the weapon and its evolutions, in unlock order. */
   getWeaponState() {
-    const every = HARMONIC_BEAM.every;
+    const { name, chip } = this.weapon;
+    const beam = firePattern(this.weapon, 'beam');
     return {
       weaponId: this.weaponId,
-      name: WEAPONS[this.weaponId].name,
-      chip: WEAPONS[this.weaponId].chip,
-      shotsToBeam:
-        this.weaponId === 'harmonic'
-          ? every - (this.harmonicShots % every)
-          : null,
+      name,
+      chip,
+      shotsToBeam: beam?.every ? beam.every - (this.shots % beam.every) : null,
       evolutions: this.evolutions.map((family) => {
         const apex = this.apexes.includes(family) ? WEAPON_APEX[family] : null;
         const evolution = apex || WEAPON_EVOLUTIONS[family];
@@ -819,7 +837,7 @@ export class Weapons {
     });
   }
 
-  // Where a beam or a flak volley goes from `origin` (the muzzle): along the
+  // Where a beam or a fan goes from `origin` (the muzzle): along the
   // right stick, onto the primary lock's lead point in auto, along the turret
   // otherwise.
   getWeaponAngle(origin) {
@@ -833,22 +851,20 @@ export class Weapons {
       : this.player().getTurretAngle();
   }
 
-  // Harmonic beam: damage lands on everything in the segment on the firing
-  // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
-  // lances: from the muzzle onto the primary lock's lead point in auto, along
-  // the turret otherwise.
-  fireBeam(playerPos, playerStats) {
+  // `beam`: damage lands on everything in the segment on the firing frame;
+  // the beam stays on screen for `beam.duration`. Aimed like the lances: from
+  // the muzzle onto the primary lock's lead point in auto, along the turret
+  // otherwise.
+  fireBeam(beam, playerPos, playerStats) {
     const origin = this.player().getMuzzlePoint();
     const angle = this.getWeaponAngle(origin);
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
-    const { width, duration } = HARMONIC_BEAM;
+    const { width, duration, extraFragments } = beam;
     const length =
-      HARMONIC_BEAM.length *
-      (this.cardEffects().thermalLens?.beamLengthMultiplier ?? 1);
+      beam.length * (this.cardEffects().thermalLens?.beamLengthMultiplier ?? 1);
     const end = { x: origin.x + dirX * length, y: origin.y + dirY * length };
-    const damage =
-      (Number(playerStats?.damage) || 0) * HARMONIC_BEAM.damageMultiplier;
+    const damage = (Number(playerStats?.damage) || 0) * beam.damageMultiplier;
 
     const struck = [];
     this.forEachSolidEnemy((enemy) => {
@@ -879,7 +895,10 @@ export class Weapons {
     const vy = dirY * this.bulletSpeed;
     struck.forEach(({ enemy, x, y }) => {
       if (enemy.destroyed) return;
-      this.hitEnemy({ kind: 'beam', x, y, vx, vy, damage, hit: false }, enemy);
+      this.hitEnemy(
+        { kind: 'beam', x, y, vx, vy, damage, extraFragments, hit: false },
+        enemy
+      );
     });
 
     this.beams.push({
@@ -891,9 +910,10 @@ export class Weapons {
       width,
       life: duration,
       maxLife: duration,
-      maxRadius: HARMONIC_BEAM.flashRadius,
+      maxRadius: beam.flashRadius,
+      colors: this.weapon.colors,
     });
-    this.lastShotTime = -HARMONIC_BEAM.cooldownPenalty;
+    this.lastShotTime = -beam.cooldownPenalty;
     const targeting = this.targeting();
 
     this.emit('weapon-beam-fired', {
@@ -902,12 +922,13 @@ export class Weapons {
       angle,
       damage,
       hits: struck.length,
+      kick: beam.kick,
     });
     this.emit('weapon-fired', {
       position: playerPos,
       target: end,
       centerlineTarget: end,
-      weaponType: 'harmonic-beam',
+      pattern: beam.pattern,
       primaryTargetId: targeting.currentTarget
         ? targeting.currentTarget.id
         : null,
@@ -920,40 +941,43 @@ export class Weapons {
     });
   }
 
-  // Scatter Coil: a fan of flak bolts from the muzzle, aimed like the beam.
-  // Multishot adds bolts to the fan; the volley waits FLAK.cooldownMultiplier
-  // × the lance's cooldown.
-  fireFlak(playerPos, playerStats) {
+  // `fan`: a fan of the weapon's projectile from the muzzle, aimed like the
+  // beam. Multishot adds bolts to the fan; the volley waits
+  // `fan.cooldownMultiplier` × the lance's cooldown.
+  fireFan(fan, playerPos, playerStats) {
     const origin = this.player().getMuzzlePoint();
     const angle = this.getWeaponAngle(origin);
     const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
-    const bolts = Math.min(FLAK.maxBolts, FLAK.bolts + extra);
-    const fan = (FLAK.fan * Math.PI) / 180;
+    const bolts = Math.min(fan.maxBolts, fan.bolts + extra);
+    const spread = (fan.fan * Math.PI) / 180;
+    // Where the bolts are aimed: the end of their range, else of a lance's.
+    const reach =
+      this.weapon.projectile.range ?? this.bulletSpeed * this.bulletLifetime;
     // Shared by the volley's bolts: who its shrapnel already hit, and how
     // many bursts it has had (only the first lights the 3D scene).
     const volley = { struck: [], bursts: 0 };
     const predictedPoints = [];
     for (let i = 0; i < bolts; i += 1) {
-      const a = angle + fan * (i / (bolts - 1) - 0.5);
+      const a = angle + spread * (i / (bolts - 1) - 0.5);
       const end = {
-        x: origin.x + Math.cos(a) * FLAK.range,
-        y: origin.y + Math.sin(a) * FLAK.range,
+        x: origin.x + Math.cos(a) * reach,
+        y: origin.y + Math.sin(a) * reach,
       };
       this.createBullet(origin, end, playerStats.damage, volley);
       predictedPoints.push({ enemyId: null, position: end });
     }
-    this.lastShotTime = -this.shootCooldown * (FLAK.cooldownMultiplier - 1);
+    this.lastShotTime = -this.shootCooldown * (fan.cooldownMultiplier - 1);
     const targeting = this.targeting();
 
     const centre = {
-      x: origin.x + Math.cos(angle) * FLAK.range,
-      y: origin.y + Math.sin(angle) * FLAK.range,
+      x: origin.x + Math.cos(angle) * reach,
+      y: origin.y + Math.sin(angle) * reach,
     };
     this.emit('weapon-fired', {
       position: playerPos,
       target: centre,
       centerlineTarget: centre,
-      weaponType: 'scatter',
+      pattern: fan.pattern,
       primaryTargetId: targeting.currentTarget
         ? targeting.currentTarget.id
         : null,
@@ -966,15 +990,16 @@ export class Weapons {
     });
   }
 
-  // A flak burst: shrapnel hits every solid enemy whose rim is within
-  // FLAK.burstRadius, at most once per volley, through the same hit path as
-  // the bolts (so the evolutions apply).
+  // A projectile's `burst`: shrapnel hits every solid enemy whose rim is
+  // within `burst.radius`, at most once per volley, through the same hit path
+  // as the bolts (so the evolutions apply).
   burstFlak(bolt) {
     const { x, y, volley } = bolt;
+    const { radius, duration } = bolt.projectile.burst;
     const struck = [];
     this.forEachSolidEnemy((enemy) => {
       if (volley.struck.includes(enemy)) return;
-      const reach = FLAK.burstRadius + (enemy.radius || 0);
+      const reach = radius + (enemy.radius || 0);
       if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
         struck.push(enemy);
       }
@@ -1005,15 +1030,16 @@ export class Weapons {
       x,
       y,
       angle,
-      life: FLAK.burstDuration,
-      maxLife: FLAK.burstDuration,
-      maxRadius: FLAK.burstRadius,
+      life: duration,
+      maxLife: duration,
+      maxRadius: radius,
+      colors: bolt.colors,
       lit: volley.bursts === 0,
     });
     volley.bursts += 1;
     this.emit('flak-burst', {
       position: { x, y },
-      radius: FLAK.burstRadius,
+      radius,
       angle,
       hits: struck.length,
     });

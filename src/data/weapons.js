@@ -14,9 +14,9 @@ export const WEAPON_COLOR_INCENDIARY = '#ffc98a';
 export const WEAPON_COLOR_GRAVITIC = '#b38cff';
 
 /**
- * The three weapons, one file each in src/content/weapons/, listed by `order`
- * (the registry's bookkeeping, not part of a weapon's shape). `lance` is the
- * default; `harmonic` and `scatter` come from a card each.
+ * The weapons by id, one file each in src/content/weapons/ (lance.js says
+ * what a weapon declares); `order` is the registry's bookkeeping. A run starts
+ * with DEFAULT_WEAPON_ID, the lowest order; the others come from their card.
  */
 export const WEAPONS = deepFreeze(
   Object.fromEntries(
@@ -26,11 +26,12 @@ export const WEAPONS = deepFreeze(
     ])
   )
 );
+export const DEFAULT_WEAPON_ID = listContent('weapons')[0].id;
 
-// Colours of the Harmonic beam and the Scatter flak, kept in their weapon files.
-export const WEAPON_COLOR_BEAM_MID = WEAPONS.harmonic.colors.mid;
-export const WEAPON_COLOR_FLAK_CORE = WEAPONS.scatter.colors.core;
-export const WEAPON_COLOR_FLAK_BURST = WEAPONS.scatter.colors.burst;
+/** A weapon's first `fire` entry of this pattern ('beam', ...), or null. */
+export function firePattern(weapon, pattern) {
+  return weapon.fire.find((entry) => entry.pattern === pattern) ?? null;
+}
 
 // How a lance looks before any evolution. `trailLength`, `width` and
 // `headLength` are multipliers; an evolution overrides colours and

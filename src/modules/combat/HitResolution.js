@@ -15,10 +15,8 @@ import {
   KNOCKBACK_REFERENCE_DAMAGE,
 } from '../../data/constants/gameplay.js';
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
-import { WEAPONS, WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
+import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
-
-const HARMONIC_BEAM = WEAPONS.harmonic.beam;
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
 export function knockbackSpeed(damage) {
@@ -59,20 +57,21 @@ export class HitResolution {
     const cards = this.cards();
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
     let requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
-    // Chain Capacitor without the Chain Lance: some lances hit twice.
+    // Chain Capacitor without the Chain Lance: some projectiles hit twice.
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
-      (bullet.kind === 'lance' || bullet.kind === 'flak') &&
+      bullet.projectile &&
       !weapons.evolutions.includes('arc') &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
       requestedDamage *= 2;
     }
-    // Harmonic beam: a large/medium rock it kills splits once more, along
-    // the same seams (generateFragments is seeded by the rock's crackSeed).
+    // A beam's `extraFragments`: a large/medium rock it kills splits once
+    // more per fragment, along the same seams (generateFragments is seeded by
+    // the rock's crackSeed).
     const beamSplit =
-      bullet.kind === 'beam' &&
+      bullet.extraFragments > 0 &&
       enemy.type === 'asteroid' &&
       (enemy.size === 'large' || enemy.size === 'medium')
         ? {
@@ -157,7 +156,12 @@ export class HitResolution {
         this.applyKnockback(bullet, enemy, effectiveDamage);
       }
       if (beamSplit && damageResult.killed) {
-        this.spawnBeamFragment(enemiesSystem, enemy, beamSplit);
+        spawnBeamFragments(
+          enemiesSystem,
+          enemy,
+          beamSplit,
+          bullet.extraFragments
+        );
       }
       if (rewards && damageResult.killed) {
         this.dropProspectorOrbs(
@@ -170,9 +174,9 @@ export class HitResolution {
         this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
       }
     }
-    // A flak bolt bursts on its first hit, blocked or not; its shrapnel
-    // spares the enemy it struck.
-    if (bullet.kind === 'flak') {
+    // A projectile with a `burst` bursts on its first hit, blocked or not;
+    // its shrapnel spares the enemy it struck.
+    if (bullet.projectile?.burst) {
       bullet.volley.struck.push(enemy);
       weapons.burstFlak(bullet);
     }
@@ -214,11 +218,6 @@ export class HitResolution {
   // A new run: the Prospector carry starts empty.
   resetProspectorCarry() {
     this.prospectorCarry = 0;
-  }
-
-  // One more fragment from a beam kill (EnemyDamageSystem registers it).
-  spawnBeamFragment(enemies, parent, split) {
-    spawnBeamFragments(enemies, parent, split, HARMONIC_BEAM.extraFragments);
   }
 
   // Prospector: +25 % of the orbs a lance kill dropped (Motherlode: +100 %),

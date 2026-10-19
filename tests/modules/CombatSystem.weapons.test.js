@@ -11,13 +11,14 @@ import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
-import { WEAPONS, WEAPON_APEX } from '../../src/data/weapons.js';
+import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
 const DAMAGE = 10;
 const NOSE = 16;
+const BEAM = firePattern(WEAPONS.harmonic, 'beam');
 
 function makeEnemy(id, x, y, extra = {}) {
   return {
@@ -97,7 +98,7 @@ describe('Harmonic Plasma Lance', () => {
     const { combat, eventBus } = makeCombat([near, far, past, aside]);
     const beamFired = vi.fn();
     eventBus.on('weapon-beam-fired', beamFired);
-    eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'harmonic' });
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
 
     const stats = { multishot: 1, damage: DAMAGE };
     for (let shot = 0; shot < 3; shot += 1) combat.handleShooting(1, stats);
@@ -108,19 +109,19 @@ describe('Harmonic Plasma Lance', () => {
     expect(combat.bullets).toHaveLength(3);
     expect(combat.beams).toHaveLength(1);
     expect(beamFired).toHaveBeenCalledTimes(1);
-    const hit = 100 - DAMAGE * WEAPONS.harmonic.beam.damageMultiplier;
+    const hit = 100 - DAMAGE * BEAM.damageMultiplier;
     expect(near.health).toBeCloseTo(hit, 6);
     expect(far.health).toBeCloseTo(hit, 6);
     expect(past.health).toBe(100);
     expect(aside.health).toBe(100);
     // The next shot waits the cooldown plus the beam penalty.
-    expect(combat.lastShotTime).toBe(-WEAPONS.harmonic.beam.cooldownPenalty);
+    expect(combat.lastShotTime).toBe(-BEAM.cooldownPenalty);
     expect(combat.getWeaponState()).toMatchObject({
       weaponId: 'harmonic',
       shotsToBeam: 4,
     });
 
-    combat.updateWeaponEffects(WEAPONS.harmonic.beam.duration + 0.01);
+    combat.updateWeaponEffects(BEAM.duration + 0.01);
     expect(combat.beams).toHaveLength(0);
   });
 
@@ -144,7 +145,11 @@ describe('Harmonic Plasma Lance', () => {
     enemies.createScopedRandom = vi.fn(() => ({ random: null }));
     const { combat } = makeCombat([], { enemies });
 
-    combat.processBulletHit(lance({ kind: 'beam' }), rock, enemies);
+    combat.processBulletHit(
+      lance({ kind: 'beam', extraFragments: BEAM.extraFragments }),
+      rock,
+      enemies
+    );
 
     expect(enemies.acquireAsteroid).toHaveBeenCalledTimes(1);
     const fragment = enemies.acquireAsteroid.mock.calls[0][0];
@@ -172,7 +177,7 @@ describe('Harmonic Plasma Lance', () => {
     const { combat, eventBus } = makeCombat([phased, solid, aside]);
     const hits = vi.fn();
     eventBus.on('bullet-hit', hits);
-    eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'harmonic' });
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
     ['thermal', 'arc'].forEach((family) =>
       eventBus.emit('synergy-unlocked', { family })
     );
@@ -202,10 +207,11 @@ describe('Scatter Coil', () => {
     cleanupGlobalState();
   });
 
-  const FLAK = WEAPONS.scatter.flak;
+  const FAN = firePattern(WEAPONS.scatter, 'fan');
+  const BOLT = WEAPONS.scatter.projectile;
   const scatter = (enemyList) => {
     const made = makeCombat(enemyList);
-    made.eventBus.emit('upgrade-weapon-scatter', { weaponId: 'scatter' });
+    made.eventBus.emit('upgrade-weapon', { weaponId: 'scatter' });
     return made;
   };
 
@@ -233,7 +239,7 @@ describe('Scatter Coil', () => {
       name: 'Scatter Coil',
       shotsToBeam: null,
     });
-    eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'nope' });
+    eventBus.emit('upgrade-weapon', { weaponId: 'nope' });
     expect(combat.weaponId).toBe('scatter');
   });
 
@@ -243,40 +249,40 @@ describe('Scatter Coil', () => {
     eventBus.on('weapon-fired', fired);
 
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FLAK.bolts);
+    expect(combat.bullets).toHaveLength(FAN.bolts);
     const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
-    const half = (FLAK.fan * Math.PI) / 360;
+    const half = (FAN.fan * Math.PI) / 360;
     expect(angles[0]).toBeCloseTo(-half, 6);
-    expect(angles[FLAK.bolts - 1]).toBeCloseTo(half, 6);
+    expect(angles[FAN.bolts - 1]).toBeCloseTo(half, 6);
     combat.bullets.forEach((bolt) => {
       expect(bolt.kind).toBe('flak');
       expect(Math.hypot(bolt.vx, bolt.vy)).toBeCloseTo(
-        combat.bulletSpeed * FLAK.speedMultiplier,
+        combat.bulletSpeed * BOLT.speedMultiplier,
         6
       );
-      expect(bolt.damage).toBeCloseTo(DAMAGE * FLAK.damageMultiplier, 6);
+      expect(bolt.damage).toBeCloseTo(DAMAGE * BOLT.damageMultiplier, 6);
     });
     expect(combat.lastShotTime).toBeCloseTo(
-      -combat.shootCooldown * (FLAK.cooldownMultiplier - 1),
+      -combat.shootCooldown * (FAN.cooldownMultiplier - 1),
       6
     );
     expect(fired).toHaveBeenCalledWith(
-      expect.objectContaining({ weaponType: 'scatter' })
+      expect.objectContaining({ pattern: 'fan' })
     );
 
     combat.bullets = [];
     combat.handleShooting(1, { multishot: 3, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FLAK.bolts + 2);
+    expect(combat.bullets).toHaveLength(FAN.bolts + 2);
     combat.bullets = [];
     combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FLAK.maxBolts);
+    expect(combat.bullets).toHaveLength(FAN.maxBolts);
   });
 
   it('a bolt that hits nothing bursts at the end of its range; shrapnel hits each enemy in reach once per volley', () => {
     // Muzzle at (116, 300), aimed along +x: the centre bolt ends at x 296.
-    const end = 116 + FLAK.range;
+    const end = 116 + BOLT.range;
     const centre = makeEnemy('centre', end, 300); // in reach of all 5 bursts
-    const reach = FLAK.burstRadius + 10;
+    const reach = BOLT.burst.radius + 10;
     const outside = makeEnemy('outside', end + reach + 5, 300);
     const { combat, eventBus } = scatter([centre, outside]);
     const bursts = vi.fn();
@@ -286,25 +292,25 @@ describe('Scatter Coil', () => {
     for (let step = 0; step < 4; step += 1) combat.updateBullets(0.1);
 
     expect(combat.bullets).toHaveLength(0);
-    expect(bursts).toHaveBeenCalledTimes(FLAK.bolts);
-    expect(combat.flakBursts).toHaveLength(FLAK.bolts);
+    expect(bursts).toHaveBeenCalledTimes(FAN.bolts);
+    expect(combat.flakBursts).toHaveLength(FAN.bolts);
     expect(combat.flakBursts.filter((burst) => burst.lit)).toHaveLength(1);
     const burst = combat.flakBursts[2];
     expect(burst.x).toBeCloseTo(end, 3);
     expect(burst.y).toBeCloseTo(300, 3);
     expect(centre.health).toBeCloseTo(
-      100 - DAMAGE * FLAK.burstDamageMultiplier,
+      100 - DAMAGE * BOLT.burst.damageMultiplier,
       6
     );
     expect(outside.health).toBe(100);
 
-    combat.updateWeaponEffects(FLAK.burstDuration + 0.01);
+    combat.updateWeaponEffects(BOLT.burst.duration + 0.01);
     expect(combat.flakBursts).toHaveLength(0);
   });
 
   it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the evolution procs on both', () => {
     const target = makeEnemy('target', 200, 300);
-    const near = makeEnemy('near', 190, 300 + FLAK.burstRadius);
+    const near = makeEnemy('near', 190, 300 + BOLT.burst.radius);
     const phased = makeEnemy('phased', 190, 290, {
       type: 'shade',
       intangible: true,
@@ -320,9 +326,9 @@ describe('Scatter Coil', () => {
 
     expect(bolt.hit).toBe(true);
     expect(combat.flakBursts).toHaveLength(1);
-    expect(target.health).toBeCloseTo(100 - DAMAGE * FLAK.damageMultiplier, 6);
+    expect(target.health).toBeCloseTo(100 - DAMAGE * BOLT.damageMultiplier, 6);
     expect(near.health).toBeCloseTo(
-      100 - DAMAGE * FLAK.burstDamageMultiplier,
+      100 - DAMAGE * BOLT.burst.damageMultiplier,
       6
     );
     expect(phased.health).toBe(100);

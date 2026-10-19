@@ -1,12 +1,12 @@
-// Weapon looks in 3D (docs/NORTE.md §7 pillar 4): evolved lances, the
-// Harmonic beam, Scatter Coil bolts and bursts, chain arcs, the thruster
-// trails and the burn/slow marks, drawn into the shared
-// batches from CombatSystem's state. Colours come from data/weapons.js, the
-// same ones CombatSystem's 2D draw uses.
+// Weapon looks in 3D (docs/NORTE.md §7 pillar 4): evolved lances, beams,
+// flak bolts and bursts, chain arcs, the thruster trails and the burn/slow
+// marks, drawn into the shared batches from CombatSystem's state. Beams,
+// bolts and bursts carry the `colors` of the weapon that fired them; the
+// lance's come from data/weapons.js.
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
-import { WEAPONS, WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
+import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { rgbOf } from './batches.js';
 
 const LANCE_H = 3;
@@ -20,7 +20,7 @@ const ION_KINK = 14; // px, the most an ion segment bends off its line
 const AFTERBURN_BAND = 7;
 const AFTERBURN_CORE = 2;
 const AFTERBURN_GLOW = 14;
-// proposta 18/10: Scatter Coil looks. The bolt: tracer and core ribbon
+// proposta 18/10: the flak look. The bolt: tracer and core ribbon
 // widths, the head capsule's length/width, the head glow's size. The burst:
 // flash and core glow sizes, ring width at its start.
 const FLAK_H = 4;
@@ -112,9 +112,9 @@ export function pushLance(THREE, batches, look, evolved, bullet, pushTrail) {
   batches.glow.push(hx, LANCE_H + 1, hy, rgbOf(THREE, look.head), 9, 0.5, 1.4);
 }
 
-/** A Scatter Coil bolt: amber tracer, white-hot core and head. */
+/** A flak bolt: tracer, white-hot core and head, in its weapon's colours. */
 export function pushFlakBolt(THREE, batches, bullet, pushTrail) {
-  const { colors } = WEAPONS.scatter;
+  const { colors } = bullet;
   const tracer = rgbOf(THREE, colors.tracer);
   const core = rgbOf(THREE, colors.core);
   pushTrail(bullet, tracer, FLAK_TRACER_WIDTH, 1.5);
@@ -147,7 +147,6 @@ export function pushFlakBolt(THREE, batches, bullet, pushTrail) {
 export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const { ribbons, glow } = batches;
   const white = rgbOf(THREE, PALETTE.text);
-  const colors = WEAPONS.harmonic.colors;
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);
@@ -288,12 +287,11 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
 
   // Flak bursts: a hot flash and a ring opening to the burst radius; the
   // shrapnel sparks are Renderer3D's HitSparks, on 'flak-burst'.
-  const flak = WEAPONS.scatter;
-  const burstRgb = rgbOf(THREE, flak.colors.burst);
-  const flakCore = rgbOf(THREE, flak.colors.core);
   combat.flakBursts.forEach((burst) => {
+    const burstRgb = rgbOf(THREE, burst.colors.burst);
+    const flakCore = rgbOf(THREE, burst.colors.core);
     const k = burst.life / burst.maxLife;
-    const r = flak.flak.burstRadius * (0.35 + 0.65 * (1 - k));
+    const r = burst.maxRadius * (0.35 + 0.65 * (1 - k));
     ribbons.circle(
       burst.x,
       burst.y,
@@ -317,6 +315,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   });
 
   combat.beams.forEach((beam) => {
+    const { colors } = beam;
     const k = beam.life / beam.maxLife;
     BEAM_LAYERS.forEach(([key, width, gain, length]) => {
       ribbons.segment(

@@ -1,5 +1,6 @@
 // src/modules/ui/hud/hudMarkup.js
 
+import { DEFAULT_WEAPON_ID, WEAPONS } from '../../../data/weapons.js';
 import { BEAM_PIPS } from './systemsPanel.js';
 
 /** The HUD's markup: one block per panel, in on-screen order. */
@@ -132,7 +133,7 @@ export function getHudHtml() {
             <div class="systems-area hud-panel">
                 <div class="buff-row" id="ui-buffs"></div>
                 <div class="weapon-group">
-                    <div class="mode-chip weapon-chip" id="ui-weapon-chip">WEAPON <span class="data-val" id="ui-weapon-name">LANCE</span><span class="beam-pips is-hidden" id="ui-beam-pips">${'<span class="beam-pip"></span>'.repeat(BEAM_PIPS)}</span></div>
+                    <div class="mode-chip weapon-chip" id="ui-weapon-chip">WEAPON <span class="data-val" id="ui-weapon-name">${WEAPONS[DEFAULT_WEAPON_ID].chip}</span><span class="beam-pips is-hidden" id="ui-beam-pips">${'<span class="beam-pip"></span>'.repeat(BEAM_PIPS)}</span></div>
                     <div class="evo-row" id="ui-evolutions"></div>
                 </div>
                 <div class="systems-row">

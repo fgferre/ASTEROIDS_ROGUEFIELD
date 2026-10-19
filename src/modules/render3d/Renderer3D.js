@@ -47,7 +47,6 @@ import {
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
-import { WEAPONS } from '../../data/weapons.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -256,8 +255,8 @@ class Renderer3D extends BaseSystem {
         );
       }
     });
-    this.registerEventListener('weapon-beam-fired', () => {
-      this.impact.kick(WEAPONS.harmonic.beam.kick);
+    this.registerEventListener('weapon-beam-fired', (data) => {
+      this.impact.kick(data.kick);
     });
     // Flak shrapnel: a spark cone along the bolt's flight.
     this.registerEventListener('flak-burst', (data) => {
