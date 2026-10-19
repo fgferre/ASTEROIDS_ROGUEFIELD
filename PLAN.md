@@ -1,21 +1,23 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 0 fechada no ramo `r0/fabrica`, 19/10, à espera do dono)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodada 0 na `main` desde 19/10, PR #280)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
-sai daqui (a história fica no git: `git log --oneline main..r0/fabrica`, PRs até #279). Decisões de produto são do dono,
+sai daqui (a história fica no git: `git log --oneline --merges main`, PRs até #280). Decisões de produto são do dono,
 por imagem e jogando — nunca por teste.
 
 ## Passagem de bastão (19/10, noite)
 
-- **Ramo `r0/fabrica`**: a Rodada 0 inteira, um commit por fatia, `npm run done` verde (182 arquivos de teste), sonda
-  no navegador (menu, configurações, partida, morte → Game Over → Retry, cena hero, `?content=`). Junta na `main` só
-  com o OK do dono (publica o site).
+- **Rodada 0 na `main`** (PR #280, 19/10, com o OK dele): `npm run done` e a checagem do GitHub verdes; sonda no
+  navegador (menu, configurações, partida, morte → Game Over → Retry, cena hero, `?content=`).
 - **Ramo `r0/prova`** (não é para a `main`): um inimigo (Lancet) e uma arma (Needle Array) novos, escritos por um
   ajudante só a partir do `CONTENT.md`; o diff é os dois arquivos de conteúdo mais o fixture do trace (a carta nova vira
   oferta de nível). Conteúdo novo é a próxima meta.
-- **Para o dono conferir:** jogar uma partida (nada deve ter mudado); medir a horda na tela dele — abrir
+- **Para o dono conferir:** jogar uma partida no site (nada deve ter mudado); medir a horda na tela dele — abrir
   `?content=drone&count=200&quality=ultra&fire=1&desktop=force` e ler o fps no painel F8 (aqui, com a GPU do M1 em
   Chromium headless, deu 60,0).
 - O erro de console `game-session` → `renderer` ao carregar já existia na `main` (19/10) e não impede a partida.
+- **Se ele notar brilho mais fraco ou controle "clássico":** conferir primeiro o endereço e a qualidade. Em 19/10, no
+  endereço local, as configurações salvas estavam em clássico (sem inclinação lateral, de propósito) e a qualidade
+  automática caía de ultra para alto; na mesma qualidade, quatro conferências deram imagem e valores idênticos.
 
 ## Rodada 0 (19/10) — baratear o conteúdo antes de crescê-lo: feita
 
