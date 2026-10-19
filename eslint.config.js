@@ -42,7 +42,6 @@ export const OVER_THE_CAP = [
   'src/modules/enemies/types/BossEnemy.js',
   'src/modules/render3d/Renderer3D.js',
   'src/modules/ui/AAAHudLayout.js',
-  'src/modules/ui/SettingsPanel.js',
   'src/services/GameSessionService.js',
 ];
 
