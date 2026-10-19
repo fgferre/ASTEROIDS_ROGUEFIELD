@@ -541,7 +541,7 @@ class ProgressionSystem extends UpgradeSystem {
       : [];
     this.appliedUpgrades = new Map(entries);
     // Upgrade-driven numbers start clean: the caller re-applies every rank
-    // (GameSessionService.reapplyProgressionUpgrades), synergies included.
+    // (the session's deathSnapshot.reapplyProgressionUpgrades), synergies included.
     this.activeSynergies.clear();
     this.activeApexes.clear();
     this.xpGainMultiplier = 1;

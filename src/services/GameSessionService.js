@@ -1,14 +1,18 @@
-import {
-  DEFAULT_SAFE_SPAWN_DISTANCE,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  PLAYER_SAFE_SPAWN_DISTANCE,
-} from '../core/GameConstants.js';
-import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
-import { BOSS_RUSH_LAYERS, bossRushStage } from '../data/layers.js';
+import { bossRushStage } from '../data/layers.js';
 import { updateRecords } from './runRecords.js';
+import {
+  RandomScopes,
+  deriveInitialSeed,
+  logRandomSnapshot,
+  persistLastSeed,
+} from './session/randomScopes.js';
+import { DeathSnapshot } from './session/deathSnapshot.js';
+import { RunEnd } from './session/runEnd.js';
+import { RetryCountdown } from './session/retryCountdown.js';
+import { MenuButtons } from './session/menuButtons.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -17,18 +21,6 @@ import { updateRecords } from './runRecords.js';
  * deterministic RNG management, seed persistence and integration with
  * auxiliary systems (audio, UI, etc.).
  */
-const RANDOM_STORAGE_KEYS = {
-  override: 'roguefield.seedOverride',
-  last: 'roguefield.lastSeed',
-};
-
-// The end screens wait for the transmission on air (the last words) to end,
-// up to the cap.
-const GAME_OVER_SCREEN_DELAY_MS = 3000;
-const GAME_OVER_SCREEN_MAX_DELAY_MS = 6500; // proposta 18/10
-const VICTORY_SCREEN_DELAY_MS = 2500; // boss death effects play first
-const VICTORY_SCREEN_MAX_DELAY_MS = 7000; // proposta 18/10
-
 export default class GameSessionService {
   /**
    * @param {Object} options
@@ -55,14 +47,6 @@ export default class GameSessionService {
 
     this.audioService = services?.audio || null;
     this.canvas = null;
-    this.seedInfo = {
-      seed: null,
-      source: 'unknown',
-    };
-    this.currentRandomSnapshot = null;
-    this.currentRandomScope = 'uninitialized';
-    this.randomSnapshot = null;
-    this.deathSnapshot = null;
     // Recording of the current/last run (src/core/replay.js); set by the
     // replay controller, read by the F9 download.
     this.replayRecorder = null;
@@ -71,29 +55,10 @@ export default class GameSessionService {
     this.replayStart = null;
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
-    this.gameOverScreenTimeoutId = null;
-    // Set while the end screen waits for the transmission on air to end.
-    this.openRunEndScreen = null;
-    this.transmissionOnAir = false;
     this.quitExplosionPlayerRef = null;
-    this.isRetryCountdownActive = false;
 
-    this.retryCountdownElement = this.lookupDomElement('retry-countdown');
-    this.retryButtonElement = this.lookupDomElement('retry-game-btn');
-    this.retryCountElement = this.lookupDomElement('retry-count');
-    this.retryCountdownHideTimeout = null;
-    this.retryCountdownFollowupTimeout = null;
-
-    this.domClickHandler = (event) => this.handleDocumentClick(event);
-    this.domClickUnsubscribe = null;
     this.globalEventUnsubscribes = [];
     this._suppressWaveKickoff = false;
-    // True once the player continues past the final Warden (endless run).
-    this.endless = false;
-    // Boss Rush run: the three Wardens back to back (startNewRun); the
-    // Wardens killed so far.
-    this.bossRush = false;
-    this.bossRushWardens = 0;
     this.globalEventHandlers = {
       screenChanged: (data) => this.handleScreenChangedEvent(data),
       playerDied: (data) => this.handlePlayerDiedEvent(data),
@@ -119,11 +84,64 @@ export default class GameSessionService {
       },
       transmissionFinished: () => {
         this.transmissionOnAir = false;
-        this.openRunEndScreen?.();
+        this.runEnd.openRunEndScreen?.();
       },
     };
 
     this.initializeSessionState();
+
+    // The session's subjects (src/services/session/), each handed what it
+    // needs by name.
+    this.randomScopes = new RandomScopes({
+      random: this.random,
+      gameState: this.gameState,
+      audio: () => this.audioService,
+    });
+    this.snapshots = new DeathSnapshot({
+      random: this.random,
+      gameState: this.gameState,
+      seedInfo: this.randomScopes.seedInfo,
+      currentRandomSnapshot: () => this.randomScopes.currentRandomSnapshot,
+      prepareRandomForScope: (scope, options) =>
+        this.prepareRandomForScope(scope, options),
+      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      getConfiguredHullId: () => this.getConfiguredHullId(),
+      applyConfiguredPlayerHull: (options) =>
+        this.applyConfiguredPlayerHull(options),
+    });
+    this.runEnd = new RunEnd({
+      eventBus: this.eventBus,
+      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      getSessionState: () => this.getSessionState(),
+      setSessionState: (state, meta) => this.setSessionState(state, meta),
+      setScreen: (screen) => this.setScreen(screen),
+      emitScreenChanged: (screen, meta) => this.emitScreenChanged(screen, meta),
+      getConfiguredHullId: () => this.getConfiguredHullId(),
+      findSafeSpawnPoint: () => this.findSafeSpawnPoint(),
+    });
+    this.retry = new RetryCountdown({
+      eventBus: this.eventBus,
+      gameState: this.gameState,
+      canvas: () => this.canvas,
+      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      hasDeathSnapshot: () => this.hasDeathSnapshot(),
+      getDeathSnapshot: () => this.snapshots.getDeathSnapshot(),
+      restoreFromSnapshot: (options) => this.restoreFromSnapshot(options),
+      prepareRandomForScope: (scope, options) =>
+        this.prepareRandomForScope(scope, options),
+      clearPendingGameOverTransition: () =>
+        this.runEnd.clearPendingGameOverTransition(),
+      setScreen: (screen) => this.setScreen(screen),
+      emitScreenChanged: (screen, meta) => this.emitScreenChanged(screen, meta),
+      setSessionState: (state, meta) => this.setSessionState(state, meta),
+    });
+    this.menuButtons = new MenuButtons({
+      eventBus: this.eventBus,
+      startNewRun: (options) => this.startNewRun(options),
+      requestRetry: (options) => this.requestRetry(options),
+      exitToMenu: (payload) => this.exitToMenu(payload),
+      continueBeyondVictory: () => this.continueBeyondVictory(),
+    });
 
     if (
       this.gameStateFacade &&
@@ -173,23 +191,6 @@ export default class GameSessionService {
     this.sessionState = this.gameState.sessionState;
   }
 
-  lookupDomElement(id) {
-    if (typeof document === 'undefined' || !id) {
-      return null;
-    }
-
-    try {
-      const element = document.getElementById(id);
-      return element || null;
-    } catch (error) {
-      console.warn(
-        `[GameSessionService] Failed to lookup DOM element "${id}":`,
-        error
-      );
-      return null;
-    }
-  }
-
   /**
    * Bootstraps session metadata including seed provenance and the canvas.
    * @param {Object} [options]
@@ -216,39 +217,34 @@ export default class GameSessionService {
       normalizedSeedInfo.source = source;
     }
 
+    const bootSeed = this.randomScopes.seedInfo;
     if (Object.prototype.hasOwnProperty.call(normalizedSeedInfo, 'seed')) {
-      this.seedInfo.seed = normalizedSeedInfo.seed;
+      bootSeed.seed = normalizedSeedInfo.seed;
       if (this.gameState) {
         this.gameState.randomSeed = normalizedSeedInfo.seed;
       }
     }
 
     if (typeof normalizedSeedInfo.source === 'string') {
-      this.seedInfo.source = normalizedSeedInfo.source;
+      bootSeed.source = normalizedSeedInfo.source;
     }
 
     if (this.gameState) {
-      this.gameState.randomSeedSource = this.seedInfo.source;
+      this.gameState.randomSeedSource = bootSeed.source;
     }
 
     if (canvas) {
       this.canvas = canvas;
     }
 
-    if (
-      typeof this.seedInfo.seed !== 'undefined' &&
-      this.seedInfo.seed !== null
-    ) {
-      GameSessionService.persistLastSeed(
-        this.seedInfo.seed,
-        this.seedInfo.source
-      );
+    if (typeof bootSeed.seed !== 'undefined' && bootSeed.seed !== null) {
+      persistLastSeed(bootSeed.seed, bootSeed.source);
       debugLog(
-        `[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`
+        `[Random] Boot seed (${bootSeed.source}): ${String(bootSeed.seed)}`
       );
     }
 
-    this.setupDomEventListeners();
+    this.menuButtons.setupDomEventListeners();
     this.setupGlobalEventListeners();
   }
 
@@ -362,166 +358,6 @@ export default class GameSessionService {
     return this.sessionState;
   }
 
-  emitSessionRetryCountdown(payload = {}) {
-    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
-      return;
-    }
-
-    this.eventBus.emit('session-retry-countdown', { ...payload });
-  }
-
-  setupDomEventListeners() {
-    if (typeof document === 'undefined') {
-      return;
-    }
-
-    this.teardownDomEventListeners();
-
-    document.addEventListener('click', this.domClickHandler);
-    this.domClickUnsubscribe = () => {
-      document.removeEventListener('click', this.domClickHandler);
-      this.domClickUnsubscribe = null;
-    };
-  }
-
-  teardownDomEventListeners() {
-    if (typeof this.domClickUnsubscribe === 'function') {
-      try {
-        this.domClickUnsubscribe();
-      } catch (error) {
-        console.warn(
-          '[GameSessionService] Failed to remove DOM listener:',
-          error
-        );
-      }
-    }
-
-    this.domClickUnsubscribe = null;
-  }
-
-  handleDocumentClick(event) {
-    if (!event) {
-      return;
-    }
-
-    const { target } = event;
-    if (!target) {
-      return;
-    }
-
-    if (typeof Element !== 'undefined' && !(target instanceof Element)) {
-      return;
-    }
-
-    const elementTarget = /** @type {Element} */ (target);
-
-    const button =
-      typeof elementTarget.closest === 'function'
-        ? elementTarget.closest('button')
-        : null;
-    if (!button) {
-      return;
-    }
-
-    const { id } = button;
-    if (!id) {
-      return;
-    }
-
-    const preventDefault = () => {
-      try {
-        event.preventDefault();
-      } catch (error) {
-        console.warn(
-          '[GameSessionService] Failed to prevent default action:',
-          error
-        );
-      }
-    };
-
-    switch (id) {
-      case 'start-game-btn':
-      case 'daily-field-btn':
-      case 'boss-rush-btn':
-      case 'restart-game-btn':
-      case 'victory-restart-btn': {
-        preventDefault();
-        this.emitCreditsMenuRequest({ open: false, source: id });
-        // From the menu, Start flies a normal run, Daily Field today's field
-        // and Boss Rush the three Wardens; New Mission keeps the mode of the
-        // run that just ended.
-        const restart =
-          id === 'restart-game-btn' || id === 'victory-restart-btn';
-        this.startNewRun({
-          source: id,
-          daily: restart ? undefined : id === 'daily-field-btn',
-          bossRush: restart ? undefined : id === 'boss-rush-btn',
-        });
-        break;
-      }
-      case 'retry-game-btn': {
-        preventDefault();
-        if (!this.requestRetry({ source: id })) {
-          console.warn('[Retry] Request rejected - verify retry availability.');
-        }
-        break;
-      }
-      case 'quit-game-btn':
-      case 'victory-quit-btn': {
-        preventDefault();
-        this.exitToMenu({ source: 'gameover' });
-        break;
-      }
-      case 'victory-continue-btn': {
-        preventDefault();
-        this.continueBeyondVictory();
-        break;
-      }
-      case 'open-settings-btn': {
-        preventDefault();
-        this.emitSettingsMenuRequest({ source: 'menu' });
-        break;
-      }
-      case 'menu-credits-btn': {
-        preventDefault();
-        this.emitCreditsMenuRequest({
-          open: true,
-          source: 'menu',
-          triggerId: 'menu-credits-btn',
-        });
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  emitCreditsMenuRequest({
-    open,
-    source,
-    restoreFocus = false,
-    triggerId,
-  } = {}) {
-    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
-      return;
-    }
-
-    this.eventBus.emit('credits-menu-requested', {
-      open,
-      restoreFocus,
-      source,
-      triggerId,
-    });
-  }
-
-  emitSettingsMenuRequest(payload = {}) {
-    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
-      return;
-    }
-
-    this.eventBus.emit('settings-menu-requested', { ...payload });
-  }
-
   setupGlobalEventListeners() {
     if (!this.eventBus || typeof this.eventBus.on !== 'function') {
       return;
@@ -617,110 +453,6 @@ export default class GameSessionService {
     this.handlePlayerDeath(data);
   }
 
-  handleBossDefeatedEvent(payload = {}) {
-    if (this.bossRush && payload?.wave !== RUN_FINAL_LAYER) {
-      // Boss Rush: a card pick for each Warden before the last (not over
-      // the death screen).
-      this.bossRushWardens += 1;
-      if (this.getSessionState() === 'running') {
-        const progression = this.resolveServiceInstance('progression');
-        progression.emitLevelUp(progression.applyLevelUp());
-        progression.emitExperienceChanged();
-      }
-      return;
-    }
-    if (
-      payload?.wave !== RUN_FINAL_LAYER ||
-      this.endless ||
-      this.getSessionState() === 'victory'
-    ) {
-      return;
-    }
-
-    if (this.bossRush) {
-      this.bossRushWardens += 1;
-    }
-    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
-    this.setSessionState('victory', { reason: 'final-boss-defeated' });
-    this.eventBus.emit('run-won', {
-      wave: payload.wave,
-      hullId: this.getConfiguredHullId(),
-    });
-
-    this.scheduleRunEndScreen(
-      () => {
-        const summary =
-          this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
-        const data = { ...summary, ...this.recordRunReached(summary) };
-        this.setScreen('victory');
-        this.emitScreenChanged('victory', { source: 'run-won', data });
-      },
-      VICTORY_SCREEN_DELAY_MS,
-      VICTORY_SCREEN_MAX_DELAY_MS
-    );
-  }
-
-  /**
-   * Victory screen's "continue": the run goes endless. Layers resume from the
-   * one after the final Warden; later Wardens only drop their rewards. Not
-   * after a Boss Rush.
-   */
-  continueBeyondVictory() {
-    if (this.getSessionState() !== 'victory' || this.bossRush) {
-      return false;
-    }
-
-    this.clearPendingGameOverTransition();
-    this.endless = true;
-    // Lost between the final Warden's death and this screen: the run is won,
-    // so the ship comes back the way a Retry brings it (full hull, a safe
-    // spot, a moment of invulnerability).
-    const player = this.resolveServiceInstance('player');
-    if (player.isDead) {
-      player.health = player.maxHealth;
-      player.respawn(this.findSafeSpawnPoint(), 3);
-      this.resolveServiceInstance('world').reset();
-    }
-    this.resolveServiceInstance('enemies')?.waveManager?.resumeWaves();
-    this.setScreen('playing');
-    this.emitScreenChanged('playing', { source: 'run-continued' });
-    this.setSessionState('running', { reason: 'run-continued' });
-    this.eventBus.emit('run-continued', { fromLayer: RUN_FINAL_LAYER });
-    return true;
-  }
-
-  /**
-   * Records the layer and time in a run summary (and in today's Daily Field
-   * record on a Daily Field run); returns `{ bestLayer }` for the end screen.
-   * A Boss Rush records only its clear time (on a win) and returns
-   * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
-   * reached.
-   */
-  recordRunReached(summary = {}) {
-    if (this.bossRush) {
-      const records = updateRecords({
-        bossRushTime:
-          this.bossRushWardens === BOSS_RUSH_LAYERS.length
-            ? summary.stats?.timeElapsed
-            : 0,
-      });
-      return {
-        bossRush: {
-          stage: Math.min(this.bossRushWardens + 1, BOSS_RUSH_LAYERS.length),
-          bestStage: records.bossRushStage,
-          bestTime: records.bossRushTime,
-        },
-      };
-    }
-    const wave = summary.wave;
-    const reached = {
-      layer: typeof wave === 'number' ? wave : wave?.current,
-      time: summary.stats?.timeElapsed,
-    };
-    this.resolveServiceInstance('difficulty').recordRun(reached);
-    return { bestLayer: updateRecords(reached).bestLayer };
-  }
-
   handleTogglePauseEvent(payload = {}) {
     this.togglePause({ source: payload?.source || 'toggle-pause' });
   }
@@ -810,18 +542,18 @@ export default class GameSessionService {
       );
     }
 
-    this.clearRetryCountdownTimers();
-    this.clearPendingGameOverTransition();
+    this.retry.clearRetryCountdownTimers();
+    this.runEnd.clearPendingGameOverTransition();
     this.transmissionOnAir = false;
     this.isRetryCountdownActive = false;
-    this.clearDeathSnapshot();
-    this.hideRetryCountdown();
+    this.snapshots.clearDeathSnapshot();
+    this.retry.hideRetryCountdown();
     this.setRetryCount(1);
-    this.setRetryButtonEnabled(true);
+    this.retry.setRetryButtonEnabled(true);
 
     this._suppressWaveKickoff = false;
-    this.endless = false;
-    this.bossRushWardens = 0;
+    this.runEnd.endless = false;
+    this.runEnd.bossRushWardens = 0;
     updateRecords({ newRun: true });
     // Before the reset: the first layer's rock count already follows it.
     const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
@@ -906,12 +638,12 @@ export default class GameSessionService {
     }
 
     if (!this.hasDeathSnapshot()) {
-      this.createDeathSnapshot();
+      this.snapshots.createDeathSnapshot();
     }
 
-    this.scheduleGameOverScreenTransition({
+    this.runEnd.scheduleGameOverScreenTransition({
       ...data,
-      ...this.recordRunReached(data),
+      ...this.runEnd.recordRunReached(data),
     });
 
     const retriesRemaining = this.getRetryCount();
@@ -919,197 +651,15 @@ export default class GameSessionService {
       if (retriesRemaining < 0) {
         this.setRetryCount(0);
       }
-      this.setRetryButtonEnabled(false);
+      this.retry.setRetryButtonEnabled(false);
     } else {
-      this.setRetryButtonEnabled(true);
+      this.retry.setRetryButtonEnabled(true);
     }
 
     this.setSessionState('player-died', {
       reason: 'player-died',
       data,
     });
-  }
-
-  requestRetry({ source = 'unknown' } = {}) {
-    if (this.isRetryCountdownActive) {
-      console.warn(
-        '[Retry] Countdown already active - ignoring duplicate request.'
-      );
-      return false;
-    }
-
-    const started = this.beginRetryCountdown({ source });
-    if (!started) {
-      this.emitSessionRetryCountdown({
-        phase: 'aborted',
-        reason: 'validation-failed',
-        source,
-      });
-    }
-
-    return started;
-  }
-
-  beginRetryCountdown({ source = 'unknown' } = {}) {
-    if (this.isRetryCountdownActive) {
-      return false;
-    }
-
-    const retries = this.getRetryCount();
-    if (retries <= 0) {
-      console.warn('[Retry] No retries remaining.');
-      this.setRetryButtonEnabled(false);
-      return false;
-    }
-
-    if (!this.hasDeathSnapshot()) {
-      console.error('[Retry] Cannot begin countdown - missing snapshot');
-      this.setRetryButtonEnabled(true);
-      return false;
-    }
-
-    this.isRetryCountdownActive = true;
-
-    this.setRetryButtonEnabled(false);
-    this.setRetryCount(Math.max(0, retries - 1));
-
-    this.emitSessionRetryCountdown({
-      phase: 'start',
-      total: 3,
-      source,
-    });
-
-    const gameoverScreen = this.lookupDomElement('gameover-screen');
-    if (gameoverScreen) {
-      gameoverScreen.classList.add('hidden');
-    }
-
-    const gameUI = this.lookupDomElement('game-ui');
-    if (gameUI) {
-      gameUI.classList.remove('hidden');
-    }
-
-    const player = this.resolveServiceInstance('player');
-    if (player) {
-      player.isRetrying = true;
-    }
-
-    this.hideRetryCountdown();
-
-    const countdownValues = [3, 2, 1];
-
-    const advanceCountdown = (index = 0) => {
-      if (index >= countdownValues.length) {
-        this.emitSessionRetryCountdown({ phase: 'complete', source });
-        this.completeRetryRespawn();
-        return;
-      }
-
-      const value = countdownValues[index];
-      this.emitSessionRetryCountdown({
-        phase: 'tick',
-        value,
-        index,
-        remaining: countdownValues.length - index - 1,
-        total: countdownValues.length,
-        source,
-      });
-
-      this.showRetryCountdownNumber(value, () => advanceCountdown(index + 1));
-    };
-
-    advanceCountdown(0);
-
-    this.setSessionState('retrying', { reason: 'retry-countdown', source });
-
-    return true;
-  }
-
-  completeRetryRespawn() {
-    this.clearPendingGameOverTransition();
-    this.isRetryCountdownActive = false;
-
-    const player = this.resolveServiceInstance('player');
-    const world = this.resolveServiceInstance('world');
-    const snapshot = this.getDeathSnapshot();
-
-    if (!snapshot) {
-      console.error('[Retry] Cannot respawn - missing snapshot');
-      if (player) {
-        player.isRetrying = false;
-      }
-      this.setRetryButtonEnabled(true);
-      return false;
-    }
-
-    try {
-      if (snapshot.random) {
-        this.prepareRandomForScope('retry.respawn', {
-          mode: 'restore',
-          snapshot: snapshot.random,
-        });
-      } else {
-        this.prepareRandomForScope('retry.respawn', { mode: 'reset' });
-      }
-    } catch (error) {
-      console.warn('[Retry] Failed to configure RNG for retry:', error);
-    }
-
-    if (!player || !world) {
-      console.error('[Retry] Cannot respawn - missing services');
-      if (player) {
-        player.isRetrying = false;
-      }
-      this.setRetryButtonEnabled(true);
-      return false;
-    }
-
-    const restored = this.restoreFromSnapshot({ snapshot });
-    if (!restored) {
-      console.error('[Retry] Failed to restore snapshot');
-      player.isRetrying = false;
-      this.setRetryButtonEnabled(true);
-      return false;
-    }
-
-    const safeSpawn = this.findSafeSpawnPoint();
-
-    if (typeof player.respawn === 'function') {
-      try {
-        player.respawn(safeSpawn, 3);
-      } catch (error) {
-        console.error('[Retry] Failed to respawn player:', error);
-        player.isRetrying = false;
-        this.setRetryButtonEnabled(true);
-        return false;
-      }
-    }
-
-    if (typeof world.reset === 'function') {
-      try {
-        world.reset();
-      } catch (error) {
-        console.warn('[Retry] Failed to reset world during respawn:', error);
-      }
-    }
-
-    const gameoverScreen = this.lookupDomElement('gameover-screen');
-    if (gameoverScreen) {
-      gameoverScreen.classList.add('hidden');
-    }
-
-    this.hideRetryCountdown();
-
-    const gameUI = this.lookupDomElement('game-ui');
-    if (gameUI) {
-      gameUI.classList.remove('hidden');
-    }
-
-    this.setScreen('playing');
-    this.emitScreenChanged('playing', { source: 'retry-complete' });
-    this.setSessionState('running', { reason: 'retry-complete' });
-
-    return true;
   }
 
   togglePause({ source = 'toggle-pause' } = {}) {
@@ -1288,7 +838,7 @@ export default class GameSessionService {
       }
     }
 
-    this.clearPendingGameOverTransition();
+    this.runEnd.clearPendingGameOverTransition();
     this.setScreen('menu');
     this.emitScreenChanged('menu', { source: payload?.source || 'unknown' });
 
@@ -1308,112 +858,6 @@ export default class GameSessionService {
       reason: 'exit-to-menu',
       source: payload?.source,
     });
-  }
-
-  /**
-   * Retrieves the stored boot seed information.
-   * @returns {{ seed: *, source: string }}
-   */
-  getSeedInfo() {
-    return { ...this.seedInfo };
-  }
-
-  /**
-   * Returns the most recent RNG snapshot captured by the session.
-   * @returns {Object|null}
-   */
-  getRandomSnapshot() {
-    return this.currentRandomSnapshot;
-  }
-
-  /**
-   * Synchronizes RNG forks maintained by the audio subsystem.
-   * @param {Object} [options]
-   * @param {boolean} [options.refreshForks=false]
-   */
-  synchronizeAudioRandomScopes({ refreshForks = false } = {}) {
-    const audio = this.audioService;
-
-    if (!audio) {
-      return;
-    }
-
-    if (typeof audio.reseedRandomScopes === 'function') {
-      audio.reseedRandomScopes({ refreshForks });
-      return;
-    }
-
-    if (refreshForks && typeof audio.captureRandomScopes === 'function') {
-      audio.captureRandomScopes({ refreshForks: true });
-    } else if (typeof audio.captureRandomScopes === 'function') {
-      audio.captureRandomScopes();
-    }
-  }
-
-  /**
-   * Logs a formatted RNG snapshot message preserving legacy output.
-   * @param {string} scope
-   * @param {Object|null} snapshot
-   * @param {Object} [options]
-   * @param {string} [options.mode='reset']
-   */
-  logRandomSnapshot(scope, snapshot, { mode = 'reset' } = {}) {
-    GameSessionService.logRandomSnapshot(scope, snapshot, { mode });
-  }
-
-  /**
-   * Prepares the seeded RNG for a deterministic scope.
-   * @param {string} scope
-   * @param {Object} [options]
-   * @param {string} [options.mode='reset']
-   * @param {Object} [options.snapshot]
-   * @returns {Object|null}
-   */
-  prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
-    if (!this.random || typeof this.random.serialize !== 'function') {
-      console.warn(
-        `[Random] Cannot prepare RNG for scope "${scope}" - service unavailable.`
-      );
-      return null;
-    }
-
-    const seed = this.gameState?.randomSeed ?? this.seedInfo.seed;
-    let effectiveMode = mode;
-
-    if (effectiveMode === 'restore' && snapshot) {
-      try {
-        this.random.restore(snapshot);
-      } catch (error) {
-        console.warn(
-          `[Random] Failed to restore RNG snapshot for scope "${scope}":`,
-          error
-        );
-        if (typeof this.random.reset === 'function') {
-          this.random.reset(seed);
-        }
-        effectiveMode = 'reset';
-      }
-    } else if (typeof this.random.reset === 'function') {
-      this.random.reset(seed);
-    }
-
-    this.synchronizeAudioRandomScopes({ refreshForks: true });
-
-    if (typeof this.random.serialize !== 'function') {
-      return this.random;
-    }
-
-    const currentSnapshot = this.random.serialize();
-    this.currentRandomSnapshot = currentSnapshot;
-    this.currentRandomScope = scope;
-
-    if (this.gameState) {
-      this.gameState.randomSnapshot = currentSnapshot;
-      this.gameState.randomScope = scope;
-    }
-
-    this.logRandomSnapshot(scope, currentSnapshot, { mode: effectiveMode });
-    return this.random;
   }
 
   resolveServiceInstance(name) {
@@ -1499,206 +943,18 @@ export default class GameSessionService {
     }
   }
 
-  clearDeathSnapshot() {
-    this.deathSnapshot = null;
-    this.randomSnapshot = null;
-
-    if (this.gameState) {
-      this.gameState.deathSnapshot = null;
-      this.gameState.randomSnapshot = null;
-    }
-  }
-
-  clearPendingGameOverTransition() {
-    if (this.gameOverScreenTimeoutId) {
-      clearTimeout(this.gameOverScreenTimeoutId);
-      this.gameOverScreenTimeoutId = null;
-    }
-    this.openRunEndScreen = null;
-  }
-
-  /**
-   * `open()` runs after `delayMs`; if a transmission is on air then, it runs
-   * when the line ends, and by `maxDelayMs` at the latest.
-   */
-  scheduleRunEndScreen(open, delayMs, maxDelayMs) {
-    this.clearPendingGameOverTransition();
-    const fire = () => {
-      this.clearPendingGameOverTransition();
-      open();
-    };
-    this.gameOverScreenTimeoutId = setTimeout(() => {
-      if (!this.transmissionOnAir) {
-        fire();
-        return;
-      }
-      this.openRunEndScreen = fire;
-      this.gameOverScreenTimeoutId = setTimeout(fire, maxDelayMs - delayMs);
-    }, delayMs);
-  }
-
-  scheduleGameOverScreenTransition(data = {}) {
-    if (typeof setTimeout !== 'function') {
-      this.setScreen('gameover');
-      this.emitScreenChanged('gameover', {
-        source: 'player-died',
-        data,
-        immediate: true,
-      });
-      return;
-    }
-
-    this.scheduleRunEndScreen(
-      () => {
-        this.setScreen('gameover');
-        this.emitScreenChanged('gameover', { source: 'player-died', data });
-      },
-      GAME_OVER_SCREEN_DELAY_MS,
-      GAME_OVER_SCREEN_MAX_DELAY_MS
-    );
-  }
-
-  hasDeathSnapshot() {
-    return Boolean(this.deathSnapshot || this.gameState?.deathSnapshot);
-  }
-
-  getDeathSnapshot() {
-    return this.deathSnapshot || this.gameState?.deathSnapshot || null;
-  }
-
-  getRetryCount() {
-    let element = this.retryCountElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-count');
-      this.retryCountElement = element;
-    }
-
-    if (!element) {
-      return 0;
-    }
-
-    const parsed = parseInt(element.textContent || '0', 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  setRetryCount(value) {
-    let element = this.retryCountElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-count');
-      this.retryCountElement = element;
-    }
-
-    if (!element) {
-      return;
-    }
-
-    const numeric = Number.isFinite(value)
-      ? value
-      : parseInt(String(value || '0'), 10);
-    const safeValue = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
-    element.textContent = String(safeValue);
-  }
-
-  setRetryButtonEnabled(enabled = true) {
-    let element = this.retryButtonElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-game-btn');
-      this.retryButtonElement = element;
-    }
-
-    if (!element) {
-      return;
-    }
-
-    const allow = Boolean(enabled);
-    element.disabled = !allow;
-    if (element.style) {
-      element.style.opacity = allow ? '1' : '0.5';
-    }
-  }
-
-  ensureRetryCountdownElement() {
-    let element = this.retryCountdownElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-countdown');
-      if (!element && typeof document !== 'undefined') {
-        element = document.createElement('div');
-        element.id = 'retry-countdown';
-        element.className = 'wave-countdown';
-        document.body.appendChild(element);
-      }
-      this.retryCountdownElement = element || null;
-    }
-
-    return element || null;
-  }
-
-  clearRetryCountdownTimers() {
-    if (this.retryCountdownHideTimeout) {
-      clearTimeout(this.retryCountdownHideTimeout);
-      this.retryCountdownHideTimeout = null;
-    }
-
-    if (this.retryCountdownFollowupTimeout) {
-      clearTimeout(this.retryCountdownFollowupTimeout);
-      this.retryCountdownFollowupTimeout = null;
-    }
-  }
-
-  hideRetryCountdown() {
-    this.clearRetryCountdownTimers();
-
-    let element = this.retryCountdownElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-countdown');
-      this.retryCountdownElement = element;
-    }
-
-    if (element) {
-      element.classList.add('hidden');
-    }
-
-    this.emitSessionRetryCountdown({ phase: 'hidden' });
-  }
-
-  showRetryCountdownNumber(number, onComplete) {
-    const countdown = this.ensureRetryCountdownElement();
-    if (!countdown) {
-      if (typeof onComplete === 'function') {
-        setTimeout(onComplete, 0);
-      }
-      return;
-    }
-
-    countdown.textContent = String(number);
-    countdown.classList.remove('hidden');
-
-    this.clearRetryCountdownTimers();
-
-    this.retryCountdownHideTimeout = setTimeout(() => {
-      countdown.classList.add('hidden');
-      this.retryCountdownHideTimeout = null;
-      this.retryCountdownFollowupTimeout = setTimeout(() => {
-        this.retryCountdownFollowupTimeout = null;
-        if (typeof onComplete === 'function') {
-          onComplete();
-        }
-      }, 100);
-    }, 900);
-  }
-
   resetSystems({ manageRandom = true } = {}) {
     if (manageRandom) {
       this.prepareRandomForScope('systems.reset', { mode: 'reset' });
     } else {
       const snapshot =
-        this.currentRandomSnapshot ||
-        this.randomSnapshot ||
+        this.randomScopes.currentRandomSnapshot ||
+        this.snapshots.randomSnapshot ||
         this.gameState?.randomSnapshot ||
         null;
 
       if (snapshot) {
-        this.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
+        logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
           mode: 'snapshot',
         });
       }
@@ -1735,660 +991,141 @@ export default class GameSessionService {
     });
   }
 
-  createDeathSnapshot() {
-    const player = this.resolveServiceInstance('player');
-    const enemies = this.resolveServiceInstance('enemies');
-    const physics = this.resolveServiceInstance('physics');
-    const progression = this.resolveServiceInstance('progression');
-
-    if (!player || !enemies || !physics || !progression) {
-      console.warn(
-        '[Retry] Unable to capture snapshot - required services unavailable.'
-      );
-      return null;
-    }
-
-    let randomSnapshot = null;
-    if (this.random && typeof this.random.serialize === 'function') {
-      try {
-        randomSnapshot = this.random.serialize();
-      } catch (error) {
-        console.warn(
-          '[Random] Failed to serialize RNG during death snapshot:',
-          error
-        );
-      }
-    }
-
-    if (!randomSnapshot) {
-      randomSnapshot =
-        this.currentRandomSnapshot || this.gameState?.randomSnapshot || null;
-    }
-
-    if (randomSnapshot) {
-      this.logRandomSnapshot('death.snapshot', randomSnapshot, {
-        mode: 'snapshot',
-      });
-    }
-
-    const playerSnapshot = {
-      maxHealth: Number.isFinite(player.maxHealth) ? player.maxHealth : null,
-      health: Number.isFinite(player.health) ? player.health : null,
-      position: player.position ? { ...player.position } : null,
-      hullId:
-        typeof player.currentHull?.id === 'string'
-          ? player.currentHull.id
-          : this.getConfiguredHullId(),
-    };
-
-    if (Array.isArray(player.upgrades)) {
-      playerSnapshot.upgrades = [...player.upgrades];
-    }
-
-    const progressionSnapshot =
-      typeof progression.serialize === 'function'
-        ? progression.serialize()
-        : null;
-
-    const enemySnapshot =
-      typeof enemies.getSnapshotState === 'function'
-        ? enemies.getSnapshotState()
-        : typeof enemies.exportState === 'function'
-          ? enemies.exportState()
-          : null;
-
-    const physicsSnapshot =
-      typeof physics.getSnapshotState === 'function'
-        ? physics.getSnapshotState()
-        : typeof physics.exportState === 'function'
-          ? physics.exportState()
-          : null;
-
-    const snapshot = {
-      player: playerSnapshot,
-      progression: progressionSnapshot,
-      enemies: enemySnapshot,
-      physics: physicsSnapshot,
-      timestamp: Date.now(),
-      randomSeed: this.gameState?.randomSeed ?? this.seedInfo.seed,
-      random: randomSnapshot,
-    };
-
-    this.deathSnapshot = snapshot;
-    this.randomSnapshot = randomSnapshot;
-
-    if (this.gameState) {
-      this.gameState.deathSnapshot = snapshot;
-      if (randomSnapshot) {
-        this.gameState.randomSnapshot = randomSnapshot;
-      }
-    }
-
-    debugLog('[Retry] Death snapshot created', snapshot);
-    return snapshot;
-  }
-
-  restoreFromSnapshot({ snapshot } = {}) {
-    const payload =
-      snapshot || this.deathSnapshot || this.gameState?.deathSnapshot;
-
-    if (!payload) {
-      console.warn('[Retry] No snapshot available');
-      return false;
-    }
-
-    const player = this.resolveServiceInstance('player');
-    const enemies = this.resolveServiceInstance('enemies');
-    const physics = this.resolveServiceInstance('physics');
-    const progression = this.resolveServiceInstance('progression');
-
-    if (!player || !enemies || !physics || !progression) {
-      console.warn('[Retry] Cannot restore snapshot - missing services');
-      return false;
-    }
-
-    const rngSnapshot =
-      payload.random ||
-      this.randomSnapshot ||
-      this.currentRandomSnapshot ||
-      null;
-
-    if (rngSnapshot) {
-      this.prepareRandomForScope('snapshot.restore', {
-        mode: 'restore',
-        snapshot: rngSnapshot,
-      });
-    } else {
-      this.prepareRandomForScope('snapshot.restore', { mode: 'reset' });
-    }
-
-    let hadFallback = false;
-
-    if (typeof player.reset === 'function') {
-      try {
-        player.reset();
-      } catch (error) {
-        console.warn(
-          '[Retry] Failed to reset player before restoration:',
-          error
-        );
-      }
-    }
-
-    this.applyConfiguredPlayerHull({ hullId: payload.player?.hullId });
-    // The orbs' pull starts from base too: the upgrades are re-applied below.
-    this.resolveServiceInstance('xpOrbs').resetMagnetism();
-
-    let progressionRestored = false;
-    if (payload.progression && typeof progression.restoreState === 'function') {
-      try {
-        progressionRestored =
-          progression.restoreState(payload.progression) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to restore progression snapshot:', error);
-      }
-    } else if (
-      payload.progression &&
-      typeof progression.deserialize === 'function'
-    ) {
-      try {
-        progression.deserialize(payload.progression, { suppressEvents: false });
-        progressionRestored = true;
-      } catch (error) {
-        console.warn(
-          '[Retry] Failed to deserialize progression snapshot:',
-          error
-        );
-      }
-    }
-
-    if (!progressionRestored) {
-      hadFallback = true;
-      console.warn(
-        '[Retry] Progression snapshot unavailable - performing reset.'
-      );
-      if (typeof progression.reset === 'function') {
-        progression.reset();
-      }
-    }
-
-    if (progressionRestored) {
-      const {
-        reapplied: reappliedUpgrades,
-        total: totalUpgradeLevels,
-        errors: upgradeReapplyErrors,
-      } = this.reapplyProgressionUpgrades({
-        progression,
-        snapshot: payload.progression,
-      });
-
-      if (totalUpgradeLevels > 0) {
-        if (upgradeReapplyErrors > 0) {
-          hadFallback = true;
-          console.warn(
-            '[Retry] Failed to fully reapply upgrade effects after restoration.',
-            {
-              reapplied: reappliedUpgrades,
-              total: totalUpgradeLevels,
-              errors: upgradeReapplyErrors,
-            }
-          );
-        } else {
-          debugLog(
-            '[Retry] Reapplied upgrade effects after snapshot restore:',
-            reappliedUpgrades
-          );
-        }
-      }
-    }
-
-    // After the upgrades, which rebuilt every stat from the reset ones: the
-    // hull at death (its max included) comes back as it was, at full health.
-    if (payload.player) {
-      const { maxHealth, health, position, upgrades } = payload.player;
-
-      const hasValidMaxHealth = Number.isFinite(maxHealth) && maxHealth > 0;
-      if (hasValidMaxHealth) {
-        player.maxHealth = maxHealth;
-      }
-
-      if (Array.isArray(upgrades)) {
-        player.upgrades = [...upgrades];
-      }
-
-      let nextHealth = null;
-      if (hasValidMaxHealth) {
-        nextHealth = maxHealth;
-      } else if (Number.isFinite(health) && health > 0) {
-        nextHealth = health;
-      }
-
-      if (Number.isFinite(nextHealth)) {
-        player.health = nextHealth;
-      } else if (Number.isFinite(player.maxHealth) && player.maxHealth > 0) {
-        player.health = player.maxHealth;
-      }
-
-      if (position && typeof position === 'object') {
-        if (!player.position) {
-          player.position = { x: 0, y: 0 };
-        }
-
-        if (Number.isFinite(position.x)) {
-          player.position.x = position.x;
-        }
-
-        if (Number.isFinite(position.y)) {
-          player.position.y = position.y;
-        }
-      }
-    } else {
-      hadFallback = true;
-      console.warn(
-        '[Retry] Player snapshot missing - player reset to defaults.'
-      );
-    }
-
-    let enemiesRestored = false;
-    if (payload.enemies && typeof enemies.restoreSnapshotState === 'function') {
-      try {
-        enemiesRestored =
-          enemies.restoreSnapshotState(payload.enemies) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to restore enemy snapshot:', error);
-      }
-    } else if (payload.enemies && typeof enemies.importState === 'function') {
-      try {
-        enemiesRestored = enemies.importState(payload.enemies) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import enemy snapshot:', error);
-      }
-    }
-
-    if (!enemiesRestored) {
-      hadFallback = true;
-      console.warn('[Retry] Enemy snapshot unavailable - performing reset.');
-      if (typeof enemies.reset === 'function') {
-        enemies.reset();
-      }
-    }
-
-    let physicsRestored = false;
-    if (payload.physics && typeof physics.restoreSnapshotState === 'function') {
-      try {
-        physicsRestored =
-          physics.restoreSnapshotState(payload.physics) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to restore physics snapshot:', error);
-      }
-    } else if (payload.physics && typeof physics.importState === 'function') {
-      try {
-        physicsRestored = physics.importState(payload.physics) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import physics snapshot:', error);
-      }
-    }
-
-    if (!physicsRestored) {
-      hadFallback = true;
-      console.warn('[Retry] Physics snapshot unavailable - performing reset.');
-      if (typeof physics.reset === 'function') {
-        physics.reset();
-      }
-    }
-
-    this.deathSnapshot = payload;
-    if (payload.random) {
-      this.randomSnapshot = payload.random;
-      if (this.gameState) {
-        this.gameState.randomSnapshot = payload.random;
-      }
-    }
-
-    if (!hadFallback) {
-      debugLog('[Retry] Game state restored from snapshot');
-    } else {
-      console.warn('[Retry] Snapshot restore completed with fallbacks.');
-    }
-
-    return true;
-  }
-
-  reapplyProgressionUpgrades({ progression, snapshot } = {}) {
-    if (!progression || typeof progression.applyUpgradeEffects !== 'function') {
-      return { reapplied: 0, total: 0, errors: 0 };
-    }
-
-    let entries = [];
-
-    if (Array.isArray(snapshot?.appliedUpgrades)) {
-      entries = snapshot.appliedUpgrades
-        .map((entry) => {
-          if (Array.isArray(entry) && entry.length >= 2) {
-            return [entry[0], entry[1]];
-          }
-
-          if (entry && typeof entry === 'object') {
-            return [entry.id, entry.level];
-          }
-
-          return null;
-        })
-        .filter((entry) => entry && typeof entry[0] === 'string');
-    }
-
-    if (
-      entries.length === 0 &&
-      typeof progression.getAllUpgrades === 'function'
-    ) {
-      entries = Array.from(progression.getAllUpgrades().entries());
-    }
-
-    if (!entries.length) {
-      return { reapplied: 0, total: 0, errors: 0 };
-    }
-
-    if (typeof progression.refreshInjectedServices === 'function') {
-      try {
-        progression.refreshInjectedServices(true);
-      } catch (error) {
-        console.warn(
-          '[Retry] Failed to refresh progression services before reapply:',
-          error
-        );
-      }
-    }
-
-    let reapplied = 0;
-    let total = 0;
-    let errors = 0;
-
-    const upgradeLookup = progression && progression.upgradeLookup;
-
-    entries.forEach(([upgradeId, level]) => {
-      if (!upgradeId || !Number.isFinite(level)) {
-        return;
-      }
-
-      const normalizedLevel = Math.max(0, Math.floor(level));
-      if (normalizedLevel <= 0) {
-        return;
-      }
-
-      const definition =
-        upgradeLookup && typeof upgradeLookup.get === 'function'
-          ? upgradeLookup.get(upgradeId)
-          : null;
-      if (!definition) {
-        total += normalizedLevel;
-        errors += normalizedLevel;
-        console.warn(
-          '[Retry] Missing upgrade definition during reapply:',
-          upgradeId
-        );
-        return;
-      }
-
-      const levels = Array.isArray(definition.levels) ? definition.levels : [];
-
-      for (let index = 0; index < normalizedLevel; index += 1) {
-        total += 1;
-        const levelDefinition = levels[index];
-
-        if (!levelDefinition) {
-          errors += 1;
-          console.warn(
-            '[Retry] Missing level definition during upgrade reapply:',
-            upgradeId,
-            'level',
-            index + 1
-          );
-          continue;
-        }
-
-        try {
-          progression.applyUpgradeEffects(
-            definition,
-            levelDefinition,
-            index + 1
-          );
-          reapplied += 1;
-        } catch (error) {
-          errors += 1;
-          console.warn(
-            '[Retry] Failed to apply upgrade effect during reapply:',
-            upgradeId,
-            'level',
-            index + 1,
-            error
-          );
-        }
-      }
-    });
-
-    return { reapplied, total, errors };
-  }
-
-  findSafeSpawnPoint() {
-    const fallback = {
-      x: GAME_WIDTH / 2,
-      y: GAME_HEIGHT / 2,
-    };
-
-    const enemies = this.resolveServiceInstance('enemies');
-    const canvas = this.canvas || this.gameState?.canvas || null;
-
-    if (!enemies || !canvas) {
-      return fallback;
-    }
-
-    const asteroids =
-      typeof enemies.getActiveEnemies === 'function'
-        ? enemies.getActiveEnemies()
-        : typeof enemies.getAsteroids === 'function'
-          ? enemies.getAsteroids()
-          : [];
-
-    const width = GAME_WIDTH;
-    const height = GAME_HEIGHT;
-
-    const safeDistance =
-      PLAYER_SAFE_SPAWN_DISTANCE ?? DEFAULT_SAFE_SPAWN_DISTANCE ?? 300;
-
-    const center = { x: width / 2, y: height / 2 };
-    const quadrants = [
-      { x: width * 0.25, y: height * 0.25 },
-      { x: width * 0.75, y: height * 0.25 },
-      { x: width * 0.25, y: height * 0.75 },
-      { x: width * 0.75, y: height * 0.75 },
-    ];
-    const candidates = [center, ...quadrants];
-
-    const scoreCandidate = (point) => {
-      let minDistance = Number.POSITIVE_INFINITY;
-      let safe = true;
-
-      for (let index = 0; index < asteroids.length; index += 1) {
-        const ast = asteroids[index];
-        if (!ast) {
-          continue;
-        }
-
-        const ax = Number.isFinite(ast.x) ? ast.x : Number(ast.position?.x);
-        const ay = Number.isFinite(ast.y) ? ast.y : Number(ast.position?.y);
-
-        if (!Number.isFinite(ax) || !Number.isFinite(ay)) {
-          continue;
-        }
-
-        const dx = ax - point.x;
-        const dy = ay - point.y;
-        const distance = Math.hypot(dx, dy);
-        minDistance = Math.min(minDistance, distance);
-        if (distance <= safeDistance) {
-          safe = false;
-        }
-      }
-
-      return {
-        point,
-        safe,
-        minDistance,
-      };
-    };
-
-    let bestCandidate = null;
-
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = scoreCandidate(candidates[index]);
-      if (candidate.safe) {
-        return candidate.point;
-      }
-
-      if (!bestCandidate || candidate.minDistance > bestCandidate.minDistance) {
-        bestCandidate = candidate;
-      }
-    }
-
-    return bestCandidate?.point || fallback;
-  }
-
   resetForMenu() {
-    this.clearRetryCountdownTimers();
-    this.clearPendingGameOverTransition();
+    this.retry.clearRetryCountdownTimers();
+    this.runEnd.clearPendingGameOverTransition();
     this.transmissionOnAir = false;
     this.isRetryCountdownActive = false;
-    this.hideRetryCountdown();
+    this.retry.hideRetryCountdown();
     this.setRetryCount(0);
-    this.setRetryButtonEnabled(false);
-    this.clearDeathSnapshot();
+    this.retry.setRetryButtonEnabled(false);
+    this.snapshots.clearDeathSnapshot();
 
     if (this.gameState) {
       this.gameState.randomScope = 'menu';
     }
   }
 
-  /**
-   * Normalizes arbitrary seed inputs into deterministic values.
-   * @param {*} value
-   * @returns {*|null}
-   */
-  static parseSeedCandidate(value) {
-    if (value === null || value === undefined) {
-      return null;
-    }
+  // What moved to src/services/session/ keeps its name here for the callers
+  // outside the session (app, replay glue, game-state stub, tests).
 
-    const trimmed = String(value).trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    const numeric = Number(trimmed);
-    if (Number.isFinite(numeric)) {
-      return numeric;
-    }
-
-    return trimmed;
+  getSeedInfo() {
+    return this.randomScopes.getSeedInfo();
   }
 
-  /**
-   * Derives the initial seed and its provenance.
-   * @returns {{ seed: *, source: string }}
-   */
+  getRandomSnapshot() {
+    return this.randomScopes.getRandomSnapshot();
+  }
+
+  prepareRandomForScope(scope, options) {
+    return this.randomScopes.prepareRandomForScope(scope, options);
+  }
+
+  get deathSnapshot() {
+    return this.snapshots.deathSnapshot;
+  }
+
+  set deathSnapshot(value) {
+    this.snapshots.deathSnapshot = value;
+  }
+
+  hasDeathSnapshot() {
+    return this.snapshots.hasDeathSnapshot();
+  }
+
+  restoreFromSnapshot(options) {
+    return this.snapshots.restoreFromSnapshot(options);
+  }
+
+  get bossRush() {
+    return this.runEnd.bossRush;
+  }
+
+  set bossRush(value) {
+    this.runEnd.bossRush = value;
+  }
+
+  get transmissionOnAir() {
+    return this.runEnd.transmissionOnAir;
+  }
+
+  set transmissionOnAir(value) {
+    this.runEnd.transmissionOnAir = value;
+  }
+
+  handleBossDefeatedEvent(payload) {
+    return this.runEnd.handleBossDefeatedEvent(payload);
+  }
+
+  continueBeyondVictory() {
+    return this.runEnd.continueBeyondVictory();
+  }
+
+  get isRetryCountdownActive() {
+    return this.retry.isRetryCountdownActive;
+  }
+
+  set isRetryCountdownActive(value) {
+    this.retry.isRetryCountdownActive = value;
+  }
+
+  get retryCountdownElement() {
+    return this.retry.retryCountdownElement;
+  }
+
+  set retryCountdownElement(element) {
+    this.retry.retryCountdownElement = element;
+  }
+
+  get retryButtonElement() {
+    return this.retry.retryButtonElement;
+  }
+
+  set retryButtonElement(element) {
+    this.retry.retryButtonElement = element;
+  }
+
+  get retryCountElement() {
+    return this.retry.retryCountElement;
+  }
+
+  set retryCountElement(element) {
+    this.retry.retryCountElement = element;
+  }
+
+  requestRetry(options) {
+    return this.retry.requestRetry(options);
+  }
+
+  beginRetryCountdown(options) {
+    return this.retry.beginRetryCountdown(options);
+  }
+
+  completeRetryRespawn() {
+    return this.retry.completeRetryRespawn();
+  }
+
+  getRetryCount() {
+    return this.retry.getRetryCount();
+  }
+
+  setRetryCount(value) {
+    return this.retry.setRetryCount(value);
+  }
+
+  findSafeSpawnPoint() {
+    return this.retry.findSafeSpawnPoint();
+  }
+
+  handleDocumentClick(event) {
+    return this.menuButtons.handleDocumentClick(event);
+  }
+
   static deriveInitialSeed() {
-    let source = 'crypto';
-    let seed = null;
-
-    if (typeof window !== 'undefined') {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const fromUrl = params.get('seed');
-        const parsedUrlSeed = GameSessionService.parseSeedCandidate(fromUrl);
-        if (parsedUrlSeed !== null) {
-          source = 'url';
-          seed = parsedUrlSeed;
-          return { seed, source };
-        }
-      } catch (error) {
-        console.warn('[Random] Failed to parse seed from URL:', error);
-      }
-
-      try {
-        const storage = window.localStorage;
-        if (storage) {
-          const override = storage.getItem(RANDOM_STORAGE_KEYS.override);
-          const parsedOverride =
-            GameSessionService.parseSeedCandidate(override);
-          if (parsedOverride !== null) {
-            source = 'localStorage';
-            seed = parsedOverride;
-            return { seed, source };
-          }
-        }
-      } catch (error) {
-        console.warn(
-          '[Random] Failed to read seed override from localStorage:',
-          error
-        );
-      }
-
-      if (
-        window.crypto &&
-        typeof window.crypto.getRandomValues === 'function'
-      ) {
-        const buffer = new Uint32Array(1);
-        window.crypto.getRandomValues(buffer);
-        seed = buffer[0];
-        return { seed, source };
-      }
-    }
-
-    source = 'clock';
-    seed = Date.now() >>> 0;
-    return { seed, source };
+    return deriveInitialSeed();
   }
 
-  /**
-   * Persists the latest seed snapshot to localStorage for diagnostics.
-   * @param {*} seed
-   * @param {string} source
-   */
   static persistLastSeed(seed, source) {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        RANDOM_STORAGE_KEYS.last,
-        JSON.stringify({
-          seed: typeof seed === 'number' ? seed : String(seed),
-          source: source || 'unknown',
-          timestamp: Date.now(),
-        })
-      );
-    } catch (error) {
-      console.warn('[Random] Failed to persist last seed snapshot:', error);
-    }
-  }
-
-  /**
-   * Outputs a formatted snapshot log message.
-   * @param {string} scope
-   * @param {Object|null} snapshot
-   * @param {Object} [options]
-   * @param {string} [options.mode='reset']
-   */
-  static logRandomSnapshot(scope, snapshot, { mode = 'reset' } = {}) {
-    if (!snapshot) {
-      return;
-    }
-
-    const { seed, state } = snapshot;
-    const stateHex =
-      typeof state === 'number'
-        ? `0x${state.toString(16).padStart(8, '0')}`
-        : state;
-    debugLog(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
+    return persistLastSeed(seed, source);
   }
 }
