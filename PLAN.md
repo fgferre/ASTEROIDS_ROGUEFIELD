@@ -63,7 +63,10 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 
 ### 0a — a fábrica de conteúdo
 
-- [ ] **0a.1 Registro.** `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
+- [ ] **0a.1 Registro** (em curso 19/10: `src/content/registry.js` + `tests/content/registry.test.js`; feitos biomas,
+      41 cartas, 3 cascos, 3 armas — cada módulo antigo mantém os exports, agora lidos do registro; regra: arquivo de
+      conteúdo só importa constantes e outros arquivos de conteúdo, nunca um módulo que lê o registro — ciclo de import).
+      Pedido original: `src/content/{enemies,weapons,hulls,cards,stages,bosses}/<id>.js` carregados por
       `import.meta.glob`; criar o arquivo é registrar. `tests/content.test.js` valida todo item (campos, referências a
       comportamentos/cues/paleta, papéis resolvíveis) e substitui os testes que enumeram tipos à mão. Mover os dados
       atuais (`src/data/enemies`, `upgrades`, `weapons.js`, `shipModels.js`, `layers.js`, `biomes.js`) para lá.
@@ -93,6 +96,8 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
       do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
 - [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
+- [x] **WaveManager** (2.749 → 1.081, 19/10): agenda da camada, spawner, onda de chefe, eventos e random em
+      `src/modules/enemies/waves/`; a agenda (tipos de apoio, grupos por tipo) num módulo só, para o diretor por papéis.
 - [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
 - [x] **AAAHudLayout** (1.892 → 889, 19/10): um módulo por painel em `src/modules/ui/hud/` (mesmas 976 operações de DOM
       num DOM falso, antes e depois); HUD visto numa partida.
