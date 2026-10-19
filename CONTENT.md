@@ -15,7 +15,7 @@ Content is data, behavior is a small library, `src/content/registry.js` links th
 - Required: `roles` (jobs it fills, below); `config` `{ key, displayName, radius, health, contactDamage }`; `components` `{ movement: { strategy, ... }, collision, health }`, plus `weapon: { pattern, ... }` if it shoots; `rewards` `{ baseOrbs, totalXP, healthHeartChance }` (or `baseOrbsMin`/`baseOrbsMax`); `pool` `{ initial, max }`; `tags` (with `'enemy'`); `affixes` (Elite rolls it may get: `shielded swift volatile splitter warded`); `seeded` (true = own random stream; a behavior marked `*` needs it); `behaviors` `{ name: params }`.
 - Optional: `weight` (default 1), `fromLayer` (default 1), `projectileColor`, `explodesOnDeath`; `effects` `{ fire, death }` (`fire`: `muzzle-flash` default, `burst-flash`, `null` for none; `death`: `spark-burst shock-burst blast debris`); `explosion` (`small medium large`, default `medium`, `null` none); `cues` `{ fired, telegraph, destroyed }` (an `SFXBus` method name each); `codex` `{ lore, hint, glyph }`; `sighting` (line at first sight, 90 characters at most).
 - Movement `strategy`: `linear tracking orbit proximity seeking parasite volatile`. Weapon `pattern`: `single burst spread volley proximity`. Copy the numbers of an enemy that uses the same.
-- Copy: `src/content/enemies/drone.js` (movement and weapon), `caster.js` (several behaviors). Smallest that passes the tests, `tests/__fixtures__/enemies/gnat.js`:
+- Copy: `src/content/enemies/drone.js` (movement and weapon), `caster.js` (several behaviors). Smallest that passes the tests, `tests/__fixtures__/enemies/gnat.js` (test fixtures use `order` 900+ so they never collide; a real file takes the next free number):
 
 ```js
 export default {
@@ -117,6 +117,16 @@ A new enemy writes no render code. Give it one of:
 - Neither: a default matte pod with one red eye.
 
 `view` and `visual` together is an error (tests/content checks it).
+
+## Gotchas (found by the first worker who followed this page)
+
+- Next free `order`: the highest in the kind plus one — `grep -h "^  order:" src/content/<kind>/*.js | sort -n | tail -1`; card orders also live in each weapon's `card`.
+- Ids: enemies, weapons, hulls, stages, biomes in kebab-case (`needle-array`); card ids in snake_case (`needle_array`). The id is the file name.
+- Layers past 15 copy layer 14's roster and surges (`beyond()` in `src/data/layers.js`): an enemy with `fromLayer` ≥ 16 spawns only if its role is one layer 14 asks for.
+- Movement params are read by each strategy in `src/modules/enemies/components/MovementComponent.js` (orbit: `acceleration`, `maxSpeed`, `preferredDistance`, `orbitDirection`). Behaviors that set velocity themselves (`hold-range`, `charge`) need `strategy: 'linear'`.
+- `cone` and `cylinder` stand along y: `rotate: [0, 0, -Math.PI / 2]` points them at the nose (+x).
+- A fan's `cooldownMultiplier` below 1 fires faster than the lance.
+- New content changes play, so it can change the golden trace (a new card is a new level-up offer; an enemy in a role at layers 1–17 changes spawns): regenerate the fixture in the same commit, as the test's header says.
 
 ## Checking
 

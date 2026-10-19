@@ -77,11 +77,16 @@ describe('a weapon defined only as a content file', () => {
 
   it('brings its card to the catalog, ruling out the other weapon cards', () => {
     const card = UPGRADE_LIBRARY.at(-1);
-    expect(card).toMatchObject({ id: 'needle_coil', order: 42 });
-    expect([...card.excludes].sort()).toEqual([
-      'harmonic_resonator',
-      'scatter_coil',
-    ]);
+    expect(card).toMatchObject({ id: 'needle_coil', order: 900 });
+    const otherWeaponCards = UPGRADE_LIBRARY.filter(
+      (upgrade) =>
+        upgrade.id !== card.id &&
+        upgrade.levels.some((level) =>
+          level.effects.some((effect) => effect.event === 'upgrade-weapon')
+        )
+    ).map((upgrade) => upgrade.id);
+    expect(otherWeaponCards).toContain('harmonic_resonator');
+    expect([...card.excludes].sort()).toEqual(otherWeaponCards.sort());
     const harmonic = UPGRADE_LIBRARY.find(
       (upgrade) => upgrade.id === 'harmonic_resonator'
     );

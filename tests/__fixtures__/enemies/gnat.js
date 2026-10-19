@@ -7,7 +7,7 @@ const CONTACT_DAMAGE = 8;
 
 export default {
   id: 'gnat',
-  order: 11,
+  order: 900, // fixtures sit far past real content, so new items never collide
   roles: ['skirmisher'],
   weight: 1,
   fromLayer: 9,

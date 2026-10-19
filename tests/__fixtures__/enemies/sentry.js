@@ -9,7 +9,7 @@ const around = (i, r, y) => [Math.cos(i * TURN) * r, y, Math.sin(i * TURN) * r];
 
 export default {
   id: 'sentry',
-  order: 12,
+  order: 901, // fixtures sit far past real content, so new items never collide
   roles: ['skirmisher'],
   fromLayer: 9,
   config: {

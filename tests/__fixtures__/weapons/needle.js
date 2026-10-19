@@ -2,7 +2,7 @@
 // that reuses the shipped patterns with its own numbers, as a new weapon would.
 export default {
   id: 'needle',
-  order: 4,
+  order: 900, // fixtures sit far past real content, so new items never collide
   name: 'Needle Fan',
   chip: 'NEEDLE',
   description: 'A tight fan of fast needles; every 3rd shot is a long beam.',
@@ -33,7 +33,7 @@ export default {
   colors: { glow: '#88ccff', mid: '#cceeff', core: '#ffffff' },
   card: {
     id: 'needle_coil',
-    order: 42,
+    order: 900,
     category: 'offense',
     family: 'kinetic',
     rarity: 'epic',
