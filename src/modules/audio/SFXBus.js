@@ -3,6 +3,7 @@ import AudioCache from '../AudioCache.js';
 import AudioBatcher from '../AudioBatcher.js';
 import ThrusterLoopManager from '../ThrusterLoopManager.js';
 import { createSfxSynthPort } from './SfxSynthPort.js';
+import { dbToGain } from './MusicThemes.js';
 import RandomService from '../../core/RandomService.js';
 import {
   AUDIO_DISTANCE_MIX,
@@ -97,8 +98,6 @@ export function resolveDistanceMix(dx, dy) {
     cutoff: nearCutoffHz * (farCutoffHz / nearCutoffHz) ** t,
   };
 }
-
-const dbToGain = (db) => Math.pow(10, db / 20);
 
 // A struck partial reaches its peak this fast (s); a click is cut after this
 // many of its decay times (e^-5 < 1%).
