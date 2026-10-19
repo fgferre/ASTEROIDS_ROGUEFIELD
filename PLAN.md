@@ -88,7 +88,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 - [ ] **R13.6 Oddity do 3D.** Anel chapado sob o domo do escudo (candidato: o anel do dash no espelho do jogador, que
       só deveria aparecer nos i-frames — conferir na captura). Os itens 2D saíram: 2D congelado (decisão 6).
 - [ ] **R13.7 Áudio morto.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
-- [ ] **R13.8 Arquivos grandes.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
+- [x] **R13.8 Arquivos grandes** (fechado 19/10; PRs #263 a #267)**.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
@@ -111,7 +111,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         A fragmentação do feixe voltou ao domínio de inimigos (`spawnBeamFragments`, mesma contagem). Medição: dez
         ajudantes (nove opus, um sonnet; 60 a 290 mil tokens cada), três comparações roteirizadas byte a byte (visual,
         efeitos ×2), portão de primeira em todos os recortes; sessão principal em 59% da janela (590 mil tokens) ao fim.
-  - [ ] **R13.8.5 Autoridade das ondas** (ramo `r13/ondas-uma-autoridade`, aberto 18/10). Decisão: NÃO virar a chave
+  - [x] **R13.8.5 Autoridade das ondas** (mesclado 19/10, PR #267) (ramo `r13/ondas-uma-autoridade`, aberto 18/10). Decisão: NÃO virar a chave
         `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (o caminho "true" soltava todas as rochas de uma vez, sem cadência nem limite);
         o WaveManager vira dono único herdando a cadência atual. Prova em cada recorte: sonda headless (3 sementes ×
         1500/7200/3000 quadros) comparando spawns, eventos e contadores entre a main e o ramo, byte a byte.
@@ -127,9 +127,9 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
           escopos pai e fork legado ficam (fazem parte dos replays). Medição: 1 ajudante opus, 1 tentativa, 181k tokens,
           17 min; revisão aqui.
     - [x] Fechamento (19/10): `npm run done` verde (173 arquivos, 1161 testes, build), sonda no navegador (partida, arena de
-          chefe, easter egg 2D, zero erros), PR #267 aberto. **Parado: o dono joga antes de mesclar.**
+          chefe, easter egg 2D, zero erros), PR #267 mesclado em 19/10 com o OK do dono.
 
-- [ ] **R14 Sem o 2D** (ramo `r14/sem-2d`, aberto 19/10 sobre `r13/ondas-uma-autoridade`; mescla depois das ondas e só com o
+- [x] **R14 Sem o 2D** (mesclado 19/10, PR #269) (ramo `r14/sem-2d`, aberto 19/10 sobre `r13/ondas-uma-autoridade`; mescla depois das ondas e só com o
       OK do dono). Decisão dele (19/10): o desenho Canvas 2D sai do código vivo; a versão 2D original vira peça de museu:
       ramo `classic` e tag `classic-2d` = bc1ad27 (último commit 2D por padrão) + prefixo `classic:` nos dados salvos
       (mesma origem no GitHub Pages), gerada pela publicação a partir da tag em `dist/classic/`, botão nos créditos.
@@ -150,7 +150,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
           `classic` criados localmente (bc1ad27 + prefixo `classic:` nos dados salvos, conferido no navegador).
     - [x] Fechamento (19/10): `npm run done` verde (1134 testes, build); sonda em Chromium headless (menu, partida, arena
           de chefe, camada 10 com máquinas, créditos com o link, `?renderer=2d` abrindo em 3D), zero erros; tag `classic-2d`
-          publicada; PR #268 aberto sobre o #267. **Parado: mescla só com o OK do dono, depois das ondas.**
+          publicada; mesclado em 19/10 como PR #269 com o OK do dono (o #268 fechou sozinho quando o ramo das ondas foi apagado).
 
 ## Fora de escopo deste plano
 
