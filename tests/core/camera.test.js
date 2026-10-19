@@ -3,11 +3,8 @@ import {
   LOOK_AHEAD_MAX,
   createCamera,
   createCameraScene,
-  frameFor,
   lookAheadFor,
-  threatZoomFor,
 } from '../../src/core/camera.js';
-import { WARDEN_ARRIVAL } from '../../src/core/cinematics.js';
 
 const W = 800;
 const H = 600;
@@ -146,56 +143,11 @@ describe('createCamera', () => {
     expect(Math.abs(camera.zoom - before)).toBeLessThan(0.02);
   });
 
-  it('travels to the target, holds on it zoomed in, and comes back to the ship', () => {
-    const camera = createCamera({ fieldWidth: W, fieldHeight: H });
-    const { travelIn, hold, travelBack, zoom } = WARDEN_ARRIVAL;
-    settle(camera, 300, 380);
-    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
-    settle(camera, 300, 380, travelIn + hold / 2);
-    expect(camera.x).toBeCloseTo(500, 6);
-    expect(camera.y).toBeCloseTo(250, 6);
-    expect(camera.zoom).toBeCloseTo(zoom, 6);
-    settle(camera, 300, 380, hold / 2 + travelBack + 2);
-    expect(camera.zoom).toBeCloseTo(1.3, 6);
-    // Back in the dead zone around the ship, like a plain follow.
-    expect(Math.abs(camera.x - 300)).toBeLessThan(30.1);
-    expect(Math.abs(camera.y - 380)).toBeLessThan(22.6);
-  });
-
-  it('only retargets a travel already under way, and a reset drops it', () => {
-    const camera = createCamera({ fieldWidth: W, fieldHeight: H });
-    const { travelIn, hold, travelBack, zoom } = WARDEN_ARRIVAL;
-    settle(camera, 400, 380);
-    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
-    settle(camera, 400, 380, travelIn / 2);
-    camera.travelTo({ x: 300, y: 250 }, WARDEN_ARRIVAL);
-    settle(camera, 400, 380, travelIn / 2 + hold / 2);
-    expect(camera.x).toBeCloseTo(300, 6);
-    // Over on the first trip's clock: the second added no time.
-    settle(camera, 400, 380, hold / 2 + travelBack + 0.05);
-    expect(camera.zoom).toBeCloseTo(1.3, 6);
-
-    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
-    settle(camera, 400, 380, travelIn);
-    expect(camera.zoom).toBeCloseTo(zoom, 6);
-    camera.reset();
-    camera.update(400, 380, 1 / 60);
-    expect(camera.zoom).toBe(1.3);
-  });
-
   it('saturates the look-ahead at 90 px toward the aim', () => {
     const scene = { ...createCameraScene(), hasAim: true, aimX: 500, aimY: 0 };
     const near = lookAheadFor({ ...scene, aimX: 100 }, 0, 0, {});
     expect(near.x).toBeCloseTo(50, 6);
     expect(lookAheadFor(scene, 0, 0, {})).toEqual({ x: LOOK_AHEAD_MAX, y: 0 });
-    const camera = createCamera({ fieldWidth: 4000, fieldHeight: 3000 });
-    camera.snapTo(2000, 1500);
-    settle(camera, 2000, 1500, 5);
-    for (let t = 0; t < 5; t += 1 / 60) {
-      camera.update(2000, 1500, 1 / 60, { ...scene, aimX: 3000, aimY: 1500 });
-    }
-    // The dead zone (30 px) eats the first part of the 90 px lead.
-    expect(camera.x).toBeCloseTo(2000 + LOOK_AHEAD_MAX - 30, 1);
   });
 
   it('leads along the hull heading, not the aim, on Camera Lead: Hull', () => {
@@ -210,89 +162,31 @@ describe('createCamera', () => {
     const lead = lookAheadFor(scene, 2000, 1500, {}, 'hull');
     expect(lead.x).toBeCloseTo(0, 6);
     expect(lead.y).toBeCloseTo(LOOK_AHEAD_MAX, 6);
-    const camera = createCamera({ fieldWidth: 4000, fieldHeight: 3000 });
-    camera.setLead('hull');
-    camera.snapTo(2000, 1500);
-    for (let t = 0; t < 5; t += 1 / 60) {
-      camera.update(2000, 1500, 1 / 60, scene);
-    }
-    // The dead zone (22.5 px tall) eats the first part of the 90 px lead.
-    expect(camera.x).toBeCloseTo(2000, 1);
-    expect(camera.y).toBeCloseTo(1500 + LOOK_AHEAD_MAX - 22.5, 1);
   });
 
-  it('zooms out monotonically with the threat count', () => {
-    const zooms = [0, 1, 2, 4, 6, 8, 10, 14].map((n) => threatZoomFor(n));
-    expect(zooms[0]).toBeCloseTo(1.3, 6);
-    expect(zooms[2]).toBeCloseTo(1.3, 6);
-    expect(zooms[6]).toBeCloseTo(1.05, 6);
-    expect(zooms[7]).toBeCloseTo(1.05, 6);
-    for (let i = 1; i < zooms.length; i += 1) {
-      expect(zooms[i]).toBeLessThanOrEqual(zooms[i - 1]);
-    }
+  it('hands the dynamic shot to the director when the scene has a ship', () => {
     const camera = createCamera({ fieldWidth: W, fieldHeight: H });
-    settle(camera, W / 2, H / 2, 8, 1 / 60);
-    for (let t = 0; t < 8; t += 1 / 60) {
-      camera.update(W / 2, H / 2, 1 / 60, {
-        ...createCameraScene(),
-        threats: 12,
-      });
-    }
-    expect(camera.zoom).toBeCloseTo(1.05, 3);
-  });
-
-  it('frames ship and boss at the 60/40 midpoint with the margin', () => {
-    const near = frameFor(300, 300, 400, 300, {});
-    expect(near.x).toBeCloseTo(340, 6);
-    expect(near.y).toBeCloseTo(300, 6);
-    expect(near.zoom).toBe(1.3);
-    const far = frameFor(200, 300, 600, 300, {});
-    expect(far.x).toBeCloseTo(360, 6);
-    // Widest half-extent 240 + 120 margin must fit in 800 / (2 zoom).
-    expect(far.zoom).toBeCloseTo(W / (2 * 360), 6);
-    expect(frameFor(0, 0, 900, 0, {}).zoom).toBe(0.85);
-  });
-
-  it('keeps a wide boss inside the margin by its rim, not its centre', () => {
-    const centre = frameFor(200, 300, 600, 300, {}, W, H, 0);
-    const wide = frameFor(200, 300, 600, 300, {}, W, H, 100);
-    // Boss half-extent 240 + radius 100 + 120 margin = 460.
-    expect(wide.zoom).toBeCloseTo(W / (2 * 460), 6);
-    expect(wide.zoom).toBeLessThan(centre.zoom);
-  });
-
-  it('blends into boss framing and reaches its target', () => {
-    const camera = createCamera({ fieldWidth: W, fieldHeight: H });
-    camera.snapTo(200, 300);
-    const scene = {
-      ...createCameraScene(),
-      hasBoss: true,
-      bossX: 700,
-      bossY: 300,
-    };
-    camera.update(200, 300, 0.3, scene);
-    expect(camera.frameWeight).toBeGreaterThan(0);
-    expect(camera.frameWeight).toBeLessThan(1);
-    for (let t = 0; t < 4; t += 1 / 60) camera.update(200, 300, 1 / 60, scene);
-    expect(camera.frameWeight).toBe(1);
-    const goal = frameFor(200, 300, 700, 300, {});
-    expect(camera.zoom).toBeCloseTo(goal.zoom, 3);
-    expect(camera.x).toBeCloseTo(W / 2, 6); // zoom < 1: the whole field
-    for (let t = 0; t < 4; t += 1 / 60) camera.update(200, 300, 1 / 60);
-    expect(camera.frameWeight).toBe(0);
-    expect(camera.zoom).toBeCloseTo(1.3, 3);
+    camera.setAspect(16 / 9);
+    const scene = { ...createCameraScene(), hasShip: true, x: 400, y: 300 };
+    camera.update(400, 300, 1 / 60, scene);
+    expect(camera.directed).not.toBeNull();
+    expect(camera.moment).toBe('calm');
+    expect(camera.x).toBe(camera.directed.x);
+    camera.setMode('classic');
+    camera.update(400, 300, 1 / 60, scene);
+    expect(camera.directed).toBeNull();
   });
 
   it('classic mode ignores the scene and keeps the old numbers', () => {
     const busy = {
       ...createCameraScene(),
+      hasShip: true,
+      x: W / 2 + 80,
+      y: H / 2 + 40,
       hasAim: true,
       aimX: 790,
       aimY: 300,
-      threats: 20,
-      hasBoss: true,
-      bossX: 600,
-      bossY: 200,
+      enemies: [{ type: 'boss', x: 600, y: 200, radius: 80 }],
     };
     const classic = createCamera({ fieldWidth: W, fieldHeight: H });
     const plain = createCamera({ fieldWidth: W, fieldHeight: H });
@@ -307,6 +201,5 @@ describe('createCamera', () => {
       expect(classic.zoom).toBe(plain.zoom);
     }
     expect(classic.zoom).toBe(1.3);
-    expect(classic.frameWeight).toBe(0);
   });
 });

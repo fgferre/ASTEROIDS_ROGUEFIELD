@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_ZOOM } from '../../../src/core/camera.js';
-import { WARDEN_ARRIVAL } from '../../../src/core/cinematics.js';
+import { createCameraScene } from '../../../src/core/camera.js';
 import { EventBus } from '../../../src/core/EventBus.js';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import RandomService from '../../../src/core/RandomService.js';
@@ -42,23 +41,40 @@ describe('Renderer3D dash and brake camera', () => {
   });
 });
 
-describe('Renderer3D Warden arrival', () => {
-  it('sends the camera to the Warden, never with reduced motion or ?camera=0, and a reset brings it home', () => {
-    const warden = { x: 500, y: 250 };
+describe('Renderer3D camera director moments', () => {
+  const ship = { ...createCameraScene(), hasShip: true, x: 300, y: 300 };
+  const momentAfter = (renderer) => {
+    renderer.camera.update(300, 300, 1 / 60, ship);
+    return renderer.camera.moment;
+  };
+
+  it('opens the boss entrance on the Warden, with bars only without reduced motion, never on the classic or static camera', () => {
+    const warden = { x: 500, y: 250, radius: 60 };
     const renderer = new Renderer3D();
-    renderer.applyAccessibilityPreferences({ reducedMotion: true });
-    expect(renderer.playArrival(warden)).toBe(false);
-    renderer.applyAccessibilityPreferences({ reducedMotion: false });
     renderer.camera.setMode('static');
     expect(renderer.playArrival(warden)).toBe(false);
+    renderer.camera.setMode('classic');
+    expect(renderer.playArrival(warden)).toBe(false);
     renderer.camera.setMode('dynamic');
-
+    renderer.applyAccessibilityPreferences({ reducedMotion: true });
+    // No bars, but the moment still cuts in.
+    expect(renderer.playArrival(warden)).toBe(false);
+    expect(momentAfter(renderer)).toBe('bossEntrance');
+    renderer.applyAccessibilityPreferences({ reducedMotion: false });
     expect(renderer.playArrival(warden)).toBe(true);
-    renderer.camera.update(400, 300, WARDEN_ARRIVAL.travelIn);
-    expect(renderer.camera.zoom).toBeCloseTo(WARDEN_ARRIVAL.zoom, 6);
     renderer.onReset(); // a new run, the menu
-    renderer.camera.update(400, 300, 1 / 60);
-    expect(renderer.camera.zoom).toBeCloseTo(CAMERA_ZOOM, 6);
+    expect(momentAfter(renderer)).toBe('calm');
+  });
+
+  it('turns the boss falling, the ship dying and a cleared wave into moments', () => {
+    const eventBus = new EventBus();
+    const renderer = new Renderer3D({ eventBus });
+    eventBus.emit('wave-complete', { wave: 1 });
+    expect(momentAfter(renderer)).toBe('cleared');
+    eventBus.emit('boss-defeated', {});
+    expect(momentAfter(renderer)).toBe('victory');
+    eventBus.emit('player-died', {});
+    expect(momentAfter(renderer)).toBe('death');
   });
 });
 

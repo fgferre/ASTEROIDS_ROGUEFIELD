@@ -93,6 +93,24 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       referências e algoritmos prontos (`docs/pesquisa-camera-2026-10-19.md`); (2) uma página de comportamento que ele
       aprova; (3) implementar sobre o que já existe (avanço pela mira, afastar em perigo, enquadrar chefe), números num
       lugar só, cena de teste por momento; (4) ele joga e ajusta — sensação, não fecha por teste.
+      **(2) Página publicada 19/10** (privada, dele): https://claude.ai/artifact/2SQknYsbX8AxEQpPR5JDpi — oito momentos
+      sobre capturas reais em janela 16:9 (quadro escolhido no campo + o que aparece na tela, com o movimento ao tocar),
+      pesos, forma da janela (16:9, 21:9, em pé), cinco regras fixas, números de partida da pesquisa e uma escolha dele:
+      travessia da borda por corte rápido (proposta) ou deslizar. **Aprovada por ele em 19/10:** _"1) ok 2) deslizar a
+      camera rapidamente"_ — os oito momentos, pesos, regras e números de partida ficam como na página; na travessia
+      da borda a câmera desliza rápido até o outro lado (não corta; a rapidez é número de ajuste).
+      **(3) Feito 19/10 no ramo `r14/diretor`** (ele disse _"vamos seguir em frente"_). O modo dinâmico entrega o quadro
+      ao diretor (`src/core/cameraDirector.js`): momentos com prioridade e tempo mínimo, pesos, caixa, zoom por bisseção,
+      molas, deslize na borda; as regras valem depois das molas (nunca além da borda, nem com giro, inclinação, rolagem
+      ou tremida; o que bate em menos de 1,5 s na tela; a nave inteira na tela; nessa ordem). Geometria do quadro
+      inclinado em `src/core/cameraShot.js`; todos os números em `src/data/constants/camera.js`. Cena de teste por
+      momento: `?moment=calm|pressure|danger|cleared|bossEntrance|boss|death|victory` (só em dev), com `?content=` ou
+      `?scene=hero`. Eventos: `boss-spawned` (via `playArrival`), `boss-defeated`, `player-died`, `wave-complete`. A
+      visita ao Warden com zoom 1,7 saiu (a entrada aprovada abre e inclina); as faixas pretas e a câmera lenta ficam. O
+      modo clássico segue igual (sem visita ao Warden). Mini-chefe = Herald, alvo valioso = inimigo elite (o jogo não
+      tem outro marcador). Medido: 0,08 ms por quadro com 190 inimigos e 12 tiros. Limite visto: com o quadro
+      inclinado, a parte de baixo da tela é mais estreita, então uma faixa junto às bordas laterais nunca aparece ali
+      (já era assim); a nave nessa faixa deixa de ser exigida em vez de abrir o zoom. Falta: (4) ele joga e ajusta.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.
