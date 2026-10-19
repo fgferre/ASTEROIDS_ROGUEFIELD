@@ -108,6 +108,7 @@ export default class DifficultyService {
     this.urlDifficulty = difficultyId(urlParam('difficulty'));
     this.replayDifficulty = null;
     this.replayDateKey = null;
+    this.replayRun = false;
     this.daily = false;
     this.dateKey = null;
     this.runDifficulty = null;
@@ -135,7 +136,7 @@ export default class DifficultyService {
 
   /**
    * A replay plays at the difficulty it was recorded at, and a Daily Field
-   * replay on the day it was recorded.
+   * replay on the day it was recorded; both hold for the next run only.
    */
   useReplay(recording) {
     this.replayDifficulty =
@@ -152,6 +153,9 @@ export default class DifficultyService {
     if (daily !== undefined) this.daily = daily;
     this.dateKey = this.daily ? this.replayDateKey ?? this.todayKey() : null;
     this.runDifficulty = this.getSelectedDifficulty();
+    this.replayRun = this.replayDifficulty !== null;
+    this.replayDifficulty = null;
+    this.replayDateKey = null;
     if (!this.daily) {
       if (this.bootSeedSpent && !this.pinnedSeed) {
         this.runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
@@ -191,7 +195,7 @@ export default class DifficultyService {
    * Field may be another day's: it leaves the record alone.
    */
   recordRun({ layer, time }) {
-    if (!this.daily || this.replayDateKey) return null;
+    if (!this.daily || this.replayRun) return null;
     return updateDailyRecord({ dateKey: this.dateKey, layer, time });
   }
 

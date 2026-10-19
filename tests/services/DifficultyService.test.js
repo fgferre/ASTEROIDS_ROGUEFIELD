@@ -161,4 +161,18 @@ describe('DifficultyService', () => {
     expect(service.recordRun({ layer: 4, time: 120 })).toBeNull();
     expect(service.getDailyRecord().bestLayer).toBe(0);
   });
+
+  it("gives the viewer's own next run their difficulty and today's field back", () => {
+    const service = new DifficultyService({
+      settings: settingsWith('pilot'),
+      now: at('2026-10-18T12:00:00.000Z'),
+    });
+    service.useReplay({ difficulty: 'warden', date: '2026-10-17' });
+    service.beginRun({ daily: true });
+
+    expect(service.beginRun({ daily: true })).toBe(dailySeed('2026-10-18'));
+    expect(service.recordRun({ layer: 4, time: 120 })).not.toBeNull();
+    service.beginRun({ daily: false });
+    expect(service.getDifficulty()).toBe('pilot');
+  });
 });
