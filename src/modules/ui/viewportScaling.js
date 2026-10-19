@@ -1,7 +1,8 @@
 // src/modules/ui/viewportScaling.js
 //
-// Fits the 800x600 canvas and the HUD to the window: the canvas gets its CSS
-// size and a backing store at the device pixel ratio; the HUD scale follows.
+// Fits the game canvas to the whole window, at any aspect: its CSS size is
+// the window's, its backing store that × the device pixel ratio (capped);
+// the HUD's text scale follows the window.
 
 import {
   applyCanvasResolution,
@@ -11,7 +12,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 
 export class ViewportScaling {
   /**
-   * `refs`: the nodes { canvas, gameUi, gameField }.
+   * `refs.canvas`: the game canvas.
    * `hud()`: the AAA HUD layout (its panel corners are measured again).
    */
   constructor({ refs, hud }) {
@@ -20,9 +21,9 @@ export class ViewportScaling {
     this.resizeRaf = null;
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
-    this.currentCanvasScale = 1;
+    this.currentCanvasWidth = 0;
+    this.currentCanvasHeight = 0;
     this.currentCanvasDpr = 0;
-    this.canvasBaseSize = { width: GAME_WIDTH, height: GAME_HEIGHT };
     this.handleResize = this.handleResize.bind(this);
   }
 
@@ -76,89 +77,38 @@ export class ViewportScaling {
       return;
     }
 
-    const { canvas, gameUi, gameField } = this.refs;
-    if (!canvas || !gameUi) {
+    const { canvas } = this.refs;
+    if (!canvas) {
       return;
     }
 
-    const baseWidth = this.canvasBaseSize.width;
-    const baseHeight = this.canvasBaseSize.height;
-
-    const viewportHeight =
+    const width =
+      window.innerWidth || document.documentElement?.clientWidth || GAME_WIDTH;
+    const height =
       window.innerHeight ||
       document.documentElement?.clientHeight ||
-      baseHeight;
-    const viewportWidth =
-      window.innerWidth || document.documentElement?.clientWidth || baseWidth;
-
-    const computedStyles = window.getComputedStyle(gameUi);
-    const paddingTop = parseFloat(computedStyles.paddingTop || '0') || 0;
-    const paddingBottom = parseFloat(computedStyles.paddingBottom || '0') || 0;
-    const paddingLeft =
-      parseFloat(
-        computedStyles.paddingLeft || computedStyles.paddingInlineStart || '0'
-      ) || 0;
-    const paddingRight =
-      parseFloat(
-        computedStyles.paddingRight || computedStyles.paddingInlineEnd || '0'
-      ) || 0;
-    // Overlay now lives above the canvas. Do not reserve extra
-    // vertical space for HUD; only account for container paddings.
-    const reservedVertical = paddingTop + paddingBottom;
-    const availableHeight = viewportHeight - reservedVertical;
-    const MIN_SCALE = 0.45;
-    const MAX_SCALE = 1.9;
-    const heightScale = Math.max(
-      MIN_SCALE,
-      Math.min(MAX_SCALE, availableHeight / baseHeight)
-    );
-
-    const horizontalReserve = paddingLeft + paddingRight + 48;
-    const availableWidth = viewportWidth - horizontalReserve;
-    const widthScale = Math.max(
-      MIN_SCALE,
-      Math.min(MAX_SCALE, availableWidth / baseWidth)
-    );
-
-    const scale = Math.min(heightScale, widthScale);
-
+      GAME_HEIGHT;
     const dpr = resolveDevicePixelRatio();
     if (
       !options.force &&
-      dpr === this.currentCanvasDpr &&
-      Math.abs(scale - this.currentCanvasScale) < 0.005
+      width === this.currentCanvasWidth &&
+      height === this.currentCanvasHeight &&
+      dpr === this.currentCanvasDpr
     ) {
       return;
     }
 
-    this.currentCanvasScale = scale;
+    this.currentCanvasWidth = width;
+    this.currentCanvasHeight = height;
     this.currentCanvasDpr = dpr;
 
-    const scaledWidth = Math.round(baseWidth * scale);
-    const scaledHeight = Math.round(baseHeight * scale);
+    applyCanvasResolution(canvas, width, height, dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
 
-    // Backing store at native resolution; drawing stays in 800×600 logical
-    // units through the base transform the renderer applies each frame.
-    applyCanvasResolution(canvas, scaledWidth, scaledHeight, dpr);
-    canvas.style.width = `${scaledWidth}px`;
-    canvas.style.height = `${scaledHeight}px`;
-    canvas.style.maxWidth = '100%';
-    canvas.style.maxHeight = '100%';
-
-    if (gameUi && gameUi instanceof HTMLElement) {
-      gameUi.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
-      gameUi.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
-      const hudMaxWidth = Math.max(Math.min(scaledWidth + 320, 1600), 560);
-      gameUi.style.setProperty('--hud-max-width', `${hudMaxWidth}px`);
-    }
-
-    if (gameField && gameField instanceof HTMLElement) {
-      gameField.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
-      gameField.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
-    }
-
-    const hudAutoScale = Math.min(1.25, Math.max(0.82, scale));
-    this.updateHudScale(hudAutoScale);
+    // The HUD text scales as it did with the 800×600 box fitted to the window.
+    const fit = Math.min(width / GAME_WIDTH, height / GAME_HEIGHT);
+    this.updateHudScale(Math.min(1.25, Math.max(0.82, fit)));
   }
 
   updateHudScale(autoScale = null) {
@@ -176,7 +126,6 @@ export class ViewportScaling {
     const root = document.documentElement;
 
     if (root) {
-      root.style.setProperty('--hud-scale-auto', auto.toFixed(3));
       root.style.setProperty('--hud-scale-effective', effective.toFixed(3));
     }
     this.hud()?.invalidatePanelCorners();

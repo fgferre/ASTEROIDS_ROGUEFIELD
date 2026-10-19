@@ -3,13 +3,20 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { replay } from './hudCommon.js';
 
+// Screen points arrive as worldToScreen gives them: 800 × 600 whatever the
+// screen's aspect. Placement works in HUD units instead, square ones: the
+// screen is GAME_HEIGHT tall and GAME_HEIGHT × its aspect wide (800 at 4:3),
+// so angles and margins keep real proportions. `stretch` is HUD units per
+// screen-point unit across.
+
 // proposta 18/10 (PLAN R6.5): damage arcs on an ellipse just inside the
 // screen edge, one per direction (hits within ~17° refresh the same arc).
 export const DAMAGE_ARC_MS = 600;
 const DAMAGE_ARC_MAX = 4;
 const DAMAGE_ARC_MERGE = 0.3;
-const DAMAGE_ARC_RX = GAME_WIDTH * 0.46;
-const DAMAGE_ARC_RY = GAME_HEIGHT * 0.44;
+// The ellipse's radii, as shares of the screen's width and height.
+const DAMAGE_ARC_RX = 0.46;
+const DAMAGE_ARC_RY = 0.44;
 // Off-screen arrows: pooled, inset from the edge, distance rounded to 10.
 const EDGE_ARROW_MAX = 8;
 const EDGE_ARROW_MARGIN = 28;
@@ -17,9 +24,9 @@ const EDGE_ARROW_GAP = 28;
 const EDGE_ARROW_STEP = 30;
 
 /** Screen angle (rad) from the ship to the damage source; null when unknown. */
-export function damageArcAngle(ship, source) {
+export function damageArcAngle(ship, source, stretch = 1) {
   if (!ship || !source) return null;
-  const dx = source.x - ship.x;
+  const dx = (source.x - ship.x) * stretch;
   const dy = source.y - ship.y;
   if (!(Math.hypot(dx, dy) > 1)) return null;
   return Math.atan2(dy, dx);
@@ -132,10 +139,17 @@ export function createDirectionPools(layer) {
 /**
  * Red arc on the screen edge toward a hit's source (screen points of the
  * ship and the source), DAMAGE_ARC_MS long; up to DAMAGE_ARC_MAX at once.
- * Reduced motion: shown without the fade (CSS). `timers` is { later, cancel }.
+ * Reduced motion: shown without the fade (CSS). `timers` is { later, cancel };
+ * `width` the screen's in HUD units (measurePanelCorners).
  */
-export function showDamageArc(arcPool, ship, source, { later, cancel }) {
-  const angle = damageArcAngle(ship, source);
+export function showDamageArc(
+  arcPool,
+  ship,
+  source,
+  { later, cancel },
+  width = GAME_WIDTH
+) {
+  const angle = damageArcAngle(ship, source, width / GAME_WIDTH);
   if (angle === null || !arcPool.length) {
     return;
   }
@@ -156,8 +170,13 @@ export function showDamageArc(arcPool, ship, source, { later, cancel }) {
   arc.until = now + DAMAGE_ARC_MS;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const r = 1 / Math.hypot(cos / DAMAGE_ARC_RX, sin / DAMAGE_ARC_RY);
-  arc.el.style.left = `${(50 + ((cos * r) / GAME_WIDTH) * 100).toFixed(2)}%`;
+  const r =
+    1 /
+    Math.hypot(
+      cos / (width * DAMAGE_ARC_RX),
+      sin / (GAME_HEIGHT * DAMAGE_ARC_RY)
+    );
+  arc.el.style.left = `${(50 + ((cos * r) / width) * 100).toFixed(2)}%`;
   arc.el.style.top = `${(50 + ((sin * r) / GAME_HEIGHT) * 100).toFixed(2)}%`;
   arc.el.style.transform = `translate(-50%, -50%) rotate(${(angle + Math.PI / 2).toFixed(3)}rad)`;
   replay(arc.el, 'is-on');
@@ -174,18 +193,23 @@ export function showDamageArc(arcPool, ship, source, { later, cancel }) {
  * Edge arrows for targets off the screen: [{ kind: 'warden' | 'herald' |
  * 'pickup', x, y (800×600 screen point), color?, distance? }], in priority
  * order; the first EDGE_ARROW_MAX off-screen ones get an arrow. `corners`
- * is measurePanelCorners() (null while the HUD has no layout).
+ * is measurePanelCorners() (null while the HUD has no layout: 4:3 then).
  */
 export function placeEdgeArrows(arrowPool, targets, corners) {
+  const width = corners?.width ?? GAME_WIDTH;
+  const stretch = width / GAME_WIDTH;
+  const point = { x: 0, y: 0 };
   const shown = [];
   for (
     let i = 0;
     i < targets.length && shown.length < arrowPool.length;
     i += 1
   ) {
+    point.x = targets[i].x * stretch;
+    point.y = targets[i].y;
     const arrow = edgeArrow(
-      targets[i],
-      GAME_WIDTH,
+      point,
+      width,
       GAME_HEIGHT,
       EDGE_ARROW_MARGIN,
       corners
@@ -196,7 +220,7 @@ export function placeEdgeArrows(arrowPool, targets, corners) {
       shown.push(arrow);
     }
   }
-  spreadEdgeArrows(shown);
+  spreadEdgeArrows(shown, width, GAME_HEIGHT);
   const used = shown.length;
   for (let i = 0; i < used; i += 1) {
     const arrow = shown[i];
@@ -210,7 +234,7 @@ export function placeEdgeArrows(arrowPool, targets, corners) {
       el.style.setProperty('--arrow-color', target.color || '');
     }
     el.dataset.edge = arrow.edge;
-    el.style.left = `${((arrow.x / GAME_WIDTH) * 100).toFixed(2)}%`;
+    el.style.left = `${((arrow.x / width) * 100).toFixed(2)}%`;
     el.style.top = `${((arrow.y / GAME_HEIGHT) * 100).toFixed(2)}%`;
     slot.glyph.style.transform = `rotate(${arrow.angle.toFixed(3)}rad)`;
     const text = Number.isFinite(target.distance)
@@ -229,17 +253,17 @@ export function placeEdgeArrows(arrowPool, targets, corners) {
 }
 
 /**
- * The four corner panels as { w, h } boxes from their screen corner, in
- * 800×600 units; null while the HUD has no layout (hidden). `root` holds the
- * panels, `layer` is the full-screen direction layer they are measured in.
+ * The screen's `width` and the four corner panels as { w, h } boxes from
+ * their screen corner, in HUD units (above); null while the HUD has no
+ * layout (hidden). `root` holds the panels, `layer` is the full-screen
+ * direction layer they are measured in.
  */
 export function measurePanelCorners(root, layer) {
   const view = layer?.getBoundingClientRect?.();
   if (!view || !(view.width > 0) || !(view.height > 0)) {
     return null;
   }
-  const sx = GAME_WIDTH / view.width;
-  const sy = GAME_HEIGHT / view.height;
+  const scale = GAME_HEIGHT / view.height;
   // Every element the selector matches, joined into one box.
   const box = (selector, fromRight, fromBottom) => {
     const out = { w: 0, h: 0 };
@@ -248,12 +272,13 @@ export function measurePanelCorners(root, layer) {
       if (!(rect.width > 0)) return;
       const w = fromRight ? view.right - rect.left : rect.right - view.left;
       const h = fromBottom ? view.bottom - rect.top : rect.bottom - view.top;
-      out.w = Math.max(out.w, w * sx);
-      out.h = Math.max(out.h, h * sy);
+      out.w = Math.max(out.w, w * scale);
+      out.h = Math.max(out.h, h * scale);
     });
     return out;
   };
   return {
+    width: view.width * scale,
     topLeft: box('.stats-area', false, false),
     // The kill feed hangs under the radar (its min-height holds the rows).
     topRight: box('.radar-area, .hud-feed', true, false),

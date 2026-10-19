@@ -19,6 +19,9 @@ import { HALF_H, HALF_W } from './batches.js';
 import { FOV, KEY_SHADOW } from './sceneSetup.js';
 
 const TILT = (18 * Math.PI) / 180;
+const TAN_V = Math.tan((FOV * Math.PI) / 360);
+const COS = Math.cos(TILT);
+const SIN = Math.sin(TILT);
 const DOLLY_TIME_CONSTANT = 0.4;
 const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
@@ -35,6 +38,32 @@ export function smoothstep(a, b, x) {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * The frustum's footprint on the field plane, `distance` from the target on
+ * an `aspect` screen: a trapezoid, widest at its far (upper) edge. `halfWidth`
+ * is that edge's half; `up` and `down` reach from the target to the far and
+ * near edges. Every part grows with the distance, in proportion.
+ */
+export function footprint(distance, aspect, out = {}) {
+  const height = distance * COS;
+  const far = COS - TAN_V * SIN;
+  const near = COS + TAN_V * SIN;
+  out.halfWidth = (height * TAN_V * aspect) / far;
+  out.up = (height * (SIN + TAN_V * COS)) / far - distance * SIN;
+  out.down = distance * SIN + (height * (TAN_V * COS - SIN)) / near;
+  return out;
+}
+
+const UNIT = footprint(1, 1);
+
+/** The farthest the shot can sit with its footprint inside the field. */
+export function fieldFitDistance(aspect) {
+  return Math.min(
+    GAME_WIDTH / (2 * UNIT.halfWidth * aspect),
+    GAME_HEIGHT / (UNIT.up + UNIT.down)
+  );
+}
+
 export class CameraRig {
   // `camera`: the logical follow camera (createCamera).
   constructor(camera) {
@@ -48,6 +77,8 @@ export class CameraRig {
     this.cinematicFreeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     // The camera target (world x, z), written by updateCamera.
     this.focus = { x: 0, z: 0 };
+    // The shot's footprint this frame, as the logical camera's reach.
+    this.reach = {};
   }
 
   reset() {
@@ -133,13 +164,8 @@ export class CameraRig {
     this.dolly +=
       (goal - this.dolly) * (1 - Math.exp(-dt / DOLLY_TIME_CONSTANT));
 
-    // Height so the plane shows GAME_WIDTH / zoom units across (zoom 1.3 →
-    // ~615), times the dolly.
     const zoom = this.camera.effectiveZoom;
-    const visibleWidth = GAME_WIDTH / zoom;
-    const distance =
-      (visibleWidth / (2 * Math.tan((FOV * Math.PI) / 360) * t.camera.aspect)) *
-      this.dolly;
+    const distance = this.frameShot(t.camera.aspect);
 
     // Shake: the same offset/rotation ScreenShake.apply() gives the 2D ctx,
     // in screen units → world units at this zoom.
@@ -168,6 +194,20 @@ export class CameraRig {
     const roll = this.updateRoll(player, dt, reducedMotion);
     const angle = roll + (shaking ? shake.angle : 0);
     if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
+  }
+
+  // The shot's distance this frame: far enough that the plane shows the flat
+  // view's height (core/camera.js: 462 at zoom 1.3, 615 across at 4:3),
+  // times the dolly, never so far that the tilted footprint spills past the
+  // field. The logical camera then follows up to every edge of that shot.
+  frameShot(aspect) {
+    const { height } = this.camera.flatView();
+    const distance = Math.min(
+      (height / (2 * TAN_V)) * this.dolly,
+      fieldFitDistance(aspect)
+    );
+    this.camera.setReach(footprint(distance, aspect, this.reach));
+    return distance;
   }
 
   // The key light's shadow box over the shot: centred on the camera target
@@ -220,31 +260,25 @@ export class CameraRig {
     return dampTo(this.roll, goal, ROLL_SMOOTH, dt);
   }
 
-  // The follow point, kept so the frustum's footprint on the field plane (a
-  // trapezoid: wider at the far, upper edge) stays inside the 800×600 field.
-  // createCamera clamps for the flat 2D view; tilt and dolly widen this one.
+  // The follow point, kept so the frustum's footprint (footprint above)
+  // stays inside the 800×600 field: a safety net, as frameShot already has
+  // the logical camera clamp to the same reach. A footprint bigger than the
+  // field (only past fieldFitDistance) is centred.
   clampToField(distance, aspect) {
     const out = this.clampedFollow || (this.clampedFollow = { x: 0, y: 0 });
-    out.x = this.camera.x;
-    out.y = this.camera.y;
-    if (!this.camera.isEnabled()) return out;
-    const tanV = Math.tan((FOV * Math.PI) / 360);
-    const cos = Math.cos(TILT);
-    const sin = Math.sin(TILT);
-    const height = distance * cos;
-    const far = cos - tanV * sin;
-    const near = cos + tanV * sin;
-    const halfW = (height * tanV * aspect) / far;
-    const up = (height * (sin + tanV * cos)) / far - distance * sin;
-    const down = distance * sin + (height * (tanV * cos - sin)) / near;
+    const { halfWidth, up, down } = footprint(
+      distance,
+      aspect,
+      this.clampedFootprint || (this.clampedFootprint = {})
+    );
     out.x =
-      halfW * 2 >= GAME_WIDTH
+      halfWidth * 2 >= GAME_WIDTH
         ? GAME_WIDTH / 2
-        : Math.max(halfW, Math.min(GAME_WIDTH - halfW, out.x));
+        : Math.max(halfWidth, Math.min(GAME_WIDTH - halfWidth, this.camera.x));
     out.y =
       up + down >= GAME_HEIGHT
         ? (up + GAME_HEIGHT - down) / 2
-        : Math.max(up, Math.min(GAME_HEIGHT - down, out.y));
+        : Math.max(up, Math.min(GAME_HEIGHT - down, this.camera.y));
     return out;
   }
 }

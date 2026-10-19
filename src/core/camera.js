@@ -1,7 +1,9 @@
 // Game camera (docs/NORTE.md §2 "Câmera"): frames the 800×600 logical field
-// at a zoom, following the player with a dead zone and a smoothed lag. The
-// view is clamped to the field, so nothing past the edges (and no wrap seam)
-// is ever visible (boss framing may pull out past it, down to 0.85×).
+// at a zoom on a screen of any aspect, following the player with a dead zone
+// and a smoothed lag. The view never outgrows the field and is clamped to it,
+// so nothing past the edges (and no wrap seam) is ever visible. The renderer
+// tells it how far its tilted shot really reaches (setReach); headless, the
+// flat view is the shot.
 //
 // Modes (PLAN R5.7, proposta 18/10): 'dynamic' (default) leads toward the
 // aim (or along the hull with Settings → Controls → Camera Lead), breathes
@@ -120,9 +122,10 @@ export function threatZoomFor(count, base = CAMERA_ZOOM) {
 }
 
 /**
- * Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin. The
- * boss counts with its radius, so a wide Warden's rim stays inside the
- * margin instead of its centre only.
+ * Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin in a
+ * view of viewWidth × viewHeight at zoom 1 (the field's, at 4:3). The boss
+ * counts with its radius, so a wide Warden's rim stays inside the margin
+ * instead of its centre only.
  */
 export function frameFor(
   ax,
@@ -130,8 +133,8 @@ export function frameFor(
   bx,
   by,
   out,
-  fieldWidth = GAME_WIDTH,
-  fieldHeight = GAME_HEIGHT,
+  viewWidth = GAME_WIDTH,
+  viewHeight = GAME_HEIGHT,
   bossRadius = 0
 ) {
   const mx = ax * FRAME_SHIP_WEIGHT + bx * (1 - FRAME_SHIP_WEIGHT);
@@ -143,7 +146,7 @@ export function frameFor(
   out.x = mx;
   out.y = my;
   out.zoom = clamp(
-    Math.min(fieldWidth / (2 * hx), fieldHeight / (2 * hy)),
+    Math.min(viewWidth / (2 * hx), viewHeight / (2 * hy)),
     FRAME_ZOOM_MIN,
     FRAME_ZOOM_MAX
   );
@@ -222,6 +225,11 @@ export function createCamera({
   let mode = 'dynamic';
   let lead = 'aim';
   let reducedMotion = false;
+  // How much wider than the field the screen is (aspect ÷ field aspect).
+  let stretch = 1;
+  // How far the rendered shot reaches from the follow point (setReach);
+  // null until a renderer sets it, and the flat view stands in.
+  let shot = null;
   let lastTarget = null;
   let baseZoom = zoom;
   let pulse = null;
@@ -239,6 +247,8 @@ export function createCamera({
   let frameBlend = 0;
   const boss = { x: 0, y: 0, radius: 0 };
   const goal = { x: 0, y: 0, zoom };
+  const size = { width: fieldWidth, height: fieldHeight };
+  const flat = { halfWidth: 0, up: 0, down: 0 };
 
   const camera = {
     x: fieldWidth / 2,
@@ -317,16 +327,40 @@ export function createCamera({
       ctx.translate(-camera.x, -camera.y);
     },
 
+    /** What is on screen: the bounding box of the shot's reach. */
     getView() {
-      const z = camera.effectiveZoom;
-      const width = fieldWidth / z;
-      const height = fieldHeight / z;
+      const { halfWidth, up, down } = reach();
       return {
-        x: camera.x - width / 2,
-        y: camera.y - height / 2,
-        width,
-        height,
+        x: camera.x - halfWidth,
+        y: camera.y - up,
+        width: 2 * halfWidth,
+        height: up + down,
       };
+    },
+
+    /** The flat view's size at this zoom and aspect (viewSize below). */
+    flatView() {
+      const { width, height } = viewSize(camera.effectiveZoom);
+      return { width, height };
+    },
+
+    /** The screen's width ÷ height (the renderer's canvas). */
+    setAspect(aspect) {
+      stretch = aspect / (fieldWidth / fieldHeight);
+      clampToField();
+    },
+
+    /**
+     * How far the rendered shot reaches from the follow point, in field
+     * units: `halfWidth` to each side, `up` and `down`. The clamp and
+     * getView use it from now on.
+     */
+    setReach({ halfWidth, up, down }) {
+      shot = shot || { halfWidth: 0, up: 0, down: 0 };
+      shot.halfWidth = halfWidth;
+      shot.up = up;
+      shot.down = down;
+      clampToField();
     },
 
     setZoom(z) {
@@ -501,7 +535,7 @@ export function createCamera({
         boss.x,
         boss.y,
         goal,
-        fieldWidth,
+        fieldWidth * stretch,
         fieldHeight,
         boss.radius
       );
@@ -524,17 +558,31 @@ export function createCamera({
     frameBlend = 0;
   }
 
+  // The field units the view spans: the field's height over the zoom, as
+  // wide as the screen's aspect, shrunk until it fits the field (at 4:3,
+  // fieldWidth/zoom × fieldHeight/zoom, the whole field from zoom 1 down).
+  function viewSize(z) {
+    const fit = Math.max(z, stretch, 1);
+    size.width = (fieldWidth * stretch) / fit;
+    size.height = fieldHeight / fit;
+    return size;
+  }
+
+  // How far the view reaches from the follow point: the shot's, once set,
+  // else half the flat view each way.
+  function reach() {
+    if (shot) return shot;
+    const { width, height } = viewSize(camera.effectiveZoom);
+    flat.halfWidth = width / 2;
+    flat.up = height / 2;
+    flat.down = height / 2;
+    return flat;
+  }
+
   function clampToField() {
-    const z = camera.effectiveZoom;
-    if (z <= 1) {
-      camera.x = fieldWidth / 2;
-      camera.y = fieldHeight / 2;
-      return;
-    }
-    const halfW = fieldWidth / (2 * z);
-    const halfH = fieldHeight / (2 * z);
-    camera.x = clamp(camera.x, halfW, fieldWidth - halfW);
-    camera.y = clamp(camera.y, halfH, fieldHeight - halfH);
+    const { halfWidth, up, down } = reach();
+    camera.x = clamp(camera.x, halfWidth, fieldWidth - halfWidth);
+    camera.y = clamp(camera.y, up, fieldHeight - down);
   }
 
   return camera;

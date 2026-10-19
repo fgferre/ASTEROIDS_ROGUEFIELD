@@ -306,8 +306,10 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * Logical field (x, y) → 800×600 screen point through the perspective
-   * camera (last rendered pose), for the HUD. Null before the first frame.
+   * Logical field (x, y) → screen point through the perspective camera (last
+   * rendered pose), for the HUD: the screen spans 800 × 600 whatever its
+   * aspect (hud/direction.js restores real proportions). Null before the
+   * first frame.
    */
   worldToScreen(x, y, out = { x: 0, y: 0 }) {
     const t = this.three;
@@ -761,6 +763,8 @@ class Renderer3D extends BaseSystem {
     t.composer.setSize(t.width, t.height);
     t.camera.aspect = width / height;
     t.camera.updateProjectionMatrix();
+    // The logical camera frames the field for this screen (getView, clamp).
+    this.camera.setAspect(t.camera.aspect);
   }
 
   // The follow point kept inside the field (cameraRig.js).

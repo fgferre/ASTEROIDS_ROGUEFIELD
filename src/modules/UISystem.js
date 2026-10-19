@@ -550,6 +550,10 @@ class UISystem extends BaseSystem {
       this.settingsPanel.handleSettingsMenuRequest(payload);
     });
 
+    this.registerEventListener('toggle-fullscreen', () => {
+      this.settingsPanel.toggleFullscreen();
+    });
+
     this.registerEventListener('settings-changed', (change) => {
       this.settingsPanel.handleSettingsChange(change);
       this.followSettingsChange(change);

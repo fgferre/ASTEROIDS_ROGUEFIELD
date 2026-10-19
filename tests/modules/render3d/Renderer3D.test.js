@@ -263,7 +263,7 @@ describe('Renderer3D boss flash', () => {
     renderer.three = {
       bossFlash: { style: {} },
       bossFlashKey: '',
-      canvas: { clientWidth: 800 },
+      canvas: { clientWidth: 800, clientHeight: 600 },
     };
     renderer.mirrorBossTransitions(effects);
     return Number(

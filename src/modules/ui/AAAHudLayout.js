@@ -860,10 +860,16 @@ export class AAAHudLayout {
    * Reduced motion: shown without the fade (CSS).
    */
   showDamageFrom(ship, source) {
-    showDamageArc(this._arcPool, ship, source, {
-      later: (fn, ms) => this._later(fn, ms),
-      cancel: (id) => this._cancel(id),
-    });
+    showDamageArc(
+      this._arcPool,
+      ship,
+      source,
+      {
+        later: (fn, ms) => this._later(fn, ms),
+        cancel: (id) => this._cancel(id),
+      },
+      this._measuredCorners()?.width
+    );
   }
 
   /**
@@ -872,10 +878,16 @@ export class AAAHudLayout {
    * order; the first EDGE_ARROW_MAX off-screen ones get an arrow.
    */
   updateEdgeArrows(targets) {
+    placeEdgeArrows(this._arrowPool, targets, this._measuredCorners());
+  }
+
+  // The screen and its corner panels (measurePanelCorners), kept until the
+  // layout changes.
+  _measuredCorners() {
     if (!this._panelCorners) {
       this._panelCorners = measurePanelCorners(this._root, this.els?.direction);
     }
-    placeEdgeArrows(this._arrowPool, targets, this._panelCorners);
+    return this._panelCorners;
   }
 
   /** The panel layout changed (resize, HUD scale): measure it again. */

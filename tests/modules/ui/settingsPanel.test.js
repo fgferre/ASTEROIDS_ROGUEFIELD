@@ -3,6 +3,8 @@ import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import { SettingsPanel } from '../../../src/modules/ui/SettingsPanel.js';
 import SETTINGS_SCHEMA from '../../../src/data/settingsSchema.js';
 import { settingPreview } from '../../../src/modules/ui/settingsPreview.js';
+import SettingsSystem from '../../../src/modules/SettingsSystem.js';
+import { EventBus } from '../../../src/core/EventBus.js';
 
 // Just enough DOM for the settings renderer: elements with children,
 // dataset, attributes and a class-name querySelector.
@@ -178,5 +180,122 @@ describe('Accessibility settings on the page', () => {
       '115%',
       '130%',
     ]);
+  });
+});
+
+describe('Fullscreen setting', () => {
+  let restoreDom;
+  let settings;
+  let panel;
+  let page;
+  let leaveFullscreen;
+
+  // The page as the browser has it: a request (or exit) resolves and fires
+  // fullscreenchange; `refuse` makes the request fail like a blocked one.
+  const boot = (stored, { refuse = false } = {}) => {
+    if (stored !== undefined) {
+      localStorage.setItem(
+        'astro:settings:v1',
+        JSON.stringify({ video: { fullscreen: stored } })
+      );
+    }
+    const listeners = {};
+    const documentElement = {
+      dataset: {},
+      style: { setProperty() {} },
+      requestFullscreen: vi.fn(async () => {
+        if (refuse) throw new Error('blocked');
+        document.fullscreenElement = documentElement;
+        listeners.fullscreenchange();
+      }),
+    };
+    page = documentElement;
+    Object.assign(document, {
+      documentElement,
+      body: { classList: { toggle() {} } },
+      fullscreenElement: null,
+      addEventListener: (type, handler) => {
+        listeners[type] = handler;
+      },
+      exitFullscreen: vi.fn(async () => {
+        document.fullscreenElement = null;
+        listeners.fullscreenchange();
+      }),
+    });
+    leaveFullscreen = () => document.exitFullscreen();
+
+    const eventBus = new EventBus();
+    settings = new SettingsSystem({ eventBus });
+    panel = new SettingsPanel({
+      refs: {},
+      settings,
+      schema: SETTINGS_SCHEMA,
+      setHudBaseScale() {},
+    });
+    eventBus.on('settings-changed', (change) =>
+      panel.handleSettingsChange(change)
+    );
+    panel.bindSettingsControls();
+    panel.bootstrapSettingsState();
+  };
+  const shown = () => settings.getSetting('video', 'fullscreen');
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+  });
+  afterEach(() => restoreDom());
+
+  it('asks the browser once when the toggle goes on, and stays on', async () => {
+    boot();
+    settings.setSetting('video', 'fullscreen', true, { source: 'ui' });
+    await settle();
+
+    expect(page.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(shown()).toBe(true);
+  });
+
+  it('shows off when the player leaves with Esc, without a new request', async () => {
+    boot();
+    settings.setSetting('video', 'fullscreen', true, { source: 'ui' });
+    await settle();
+
+    await leaveFullscreen();
+
+    expect(shown()).toBe(false);
+    expect(page.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(document.exitFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('never asks at boot, and a saved "on" starts as off', async () => {
+    boot(true);
+    await settle();
+
+    expect(page.requestFullscreen).not.toHaveBeenCalled();
+    expect(shown()).toBe(false);
+  });
+
+  it('leaves the toggle off when the browser refuses', async () => {
+    boot(undefined, { refuse: true });
+    settings.setSetting('video', 'fullscreen', true, { source: 'ui' });
+    await settle();
+
+    expect(page.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(shown()).toBe(false);
+  });
+
+  it('exits when the toggle goes off, and the key flips it both ways', async () => {
+    boot();
+    panel.toggleFullscreen();
+    await settle();
+    expect(document.fullscreenElement).toBe(page);
+    expect(shown()).toBe(true);
+
+    panel.toggleFullscreen();
+    await settle();
+    expect(document.fullscreenElement).toBeNull();
+    expect(shown()).toBe(false);
+    expect(page.requestFullscreen).toHaveBeenCalledTimes(1);
+    expect(document.exitFullscreen).toHaveBeenCalledTimes(1);
   });
 });
