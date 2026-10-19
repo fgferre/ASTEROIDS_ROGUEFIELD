@@ -3,16 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import { BIOMES, BiomeTransition } from '../../../src/data/biomes.js';
 import { BiomeController } from '../../../src/modules/render3d/biomes3d.js';
+import { FOV } from '../../../src/modules/render3d/sceneSetup.js';
 import {
   BRIGHT_STARS,
+  CAMERA_FAR,
+  DEPTH_FADE,
   DUST_CLOUDS,
   NEBULA_FAR,
   NEBULA_GAIN,
   NEBULA_MID,
   NEBULA_NEAR,
+  SKY,
   STAR_LAYERS,
   SpaceField,
   TWINKLE,
+  layerSpan,
 } from '../../../src/modules/render3d/spaceField.js';
 
 const THREE = {};
@@ -27,6 +32,17 @@ new Function(
 
 const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
 const frame = { ship: null, shipLight: 0, pointScale: 1000, pixel: 1 };
+
+// A 16:9 camera `tilt` degrees from straight down, `range` from the field's
+// centre, looking up the field (the follow shot is 18° at ~580).
+function posed(tilt, range) {
+  const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 10, CAMERA_FAR);
+  const r = (tilt * Math.PI) / 180;
+  camera.position.set(0, range * Math.cos(r), range * Math.sin(r));
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  return camera;
+}
 
 function heights(points) {
   const { array } = points.geometry.attributes.position;
@@ -89,8 +105,8 @@ describe('SpaceField', () => {
       setRenderTarget: vi.fn(),
       render: vi.fn(),
     };
-    scene.onBeforeRender(renderer);
-    scene.onBeforeRender(renderer);
+    scene.onBeforeRender(renderer, scene, posed(18, 580));
+    scene.onBeforeRender(renderer, scene, posed(18, 580));
     expect(renderer.render).toHaveBeenCalledTimes(1);
     expect(renderer.render.mock.calls[0][0]).toBe(space.bakeScene);
     expect(renderer.setRenderTarget.mock.calls).toEqual([
@@ -114,6 +130,76 @@ describe('SpaceField', () => {
     expect(shown('medium')).toEqual([true, true, false, false]);
     expect(shown('high')).toEqual([true, true, true, true]);
     expect(shown('ultra')).toEqual([true, true, true, true]);
+  });
+
+  it('fills a low shot to the horizon and keeps the top-down shots as they were', () => {
+    const scene = new THREE.Scene();
+    const space = new SpaceField(THREE, scene);
+    const renderer = {
+      getRenderTarget: () => null,
+      setRenderTarget: () => {},
+      render: () => {},
+    };
+    const fadingPlanes = () => space.planes.map(({ fading }) => fading);
+    const drawn = (camera) => {
+      scene.onBeforeRender(renderer, scene, camera);
+      return {
+        still: [space.far, space.mid, space.near].map((p) => p.visible),
+        fading: fadingPlanes().map((p) => p.visible),
+        sky: [space.sky.visible, space.skyStars.visible],
+      };
+    };
+    // the follow shot, the wide view and the intro's high shot
+    [posed(18, 580), posed(5, 950), posed(32, 2360)].forEach((camera) => {
+      expect(drawn(camera)).toEqual({
+        still: [true, true, true],
+        fading: [false, false, false],
+        sky: [false, false],
+      });
+    });
+    // a live scene's low shot: each plane fades, the sky ends every ray
+    expect(drawn(posed(63, 430))).toEqual({
+      still: [false, false, false],
+      fading: [true, true, true],
+      sky: [true, true],
+    });
+    // the fading planes reach past where they fade out, which is short of
+    // the far clip; both versions share the biome's look
+    expect(DEPTH_FADE.end).toBeLessThan(CAMERA_FAR);
+    fadingPlanes().forEach((plane, i) => {
+      const still = [space.far, space.mid, space.near][i];
+      expect(plane.geometry.parameters.width / 2).toBeGreaterThan(
+        DEPTH_FADE.end
+      );
+      expect(plane.material.uniforms).toBe(still.material.uniforms);
+      expect(plane.material.defines.FADING).toBe('');
+      expect(still.material.defines.FADING).toBeUndefined();
+    });
+    // the stars at infinity sit inside it too
+    expect(SKY.radius).toBeLessThan(CAMERA_FAR);
+  });
+
+  it('dims each star layer toward the rim of its span, never inside it', () => {
+    const space = new SpaceField(THREE, new THREE.Scene());
+    STAR_LAYERS.forEach((layer, i) => {
+      const { half, cx, cz } = layerSpan(layer.depth);
+      const { position, aColor } = space.layers[i].geometry.attributes;
+      const inner = [];
+      const rim = [];
+      for (let k = 0; k < position.count; k += 1) {
+        const out =
+          Math.max(
+            Math.abs(position.getX(k) - cx),
+            Math.abs(position.getZ(k) - cz)
+          ) / half;
+        const light = aColor.getX(k) + aColor.getY(k) + aColor.getZ(k);
+        if (out < 0.75) inner.push(light);
+        if (out > 0.97) rim.push(light);
+      }
+      const mean = (a) => a.reduce((sum, v) => sum + v, 0) / a.length;
+      expect(Math.min(...inner)).toBeGreaterThan(0);
+      expect(mean(rim)).toBeLessThan(mean(inner) * 0.1);
+    });
   });
 
   it('keeps all of space unlit and out of the shadow map', () => {
