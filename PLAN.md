@@ -63,19 +63,20 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [x] **0a.1 Registro** (19/10): `src/content/registry.js`; biomas, 41 cartas, 3 cascos, 3 armas, 15 camadas, 10
       inimigos e 6 chefes, um arquivo cada; os módulos antigos mantêm os exports, lidos do registro. O motor lê os
       inimigos do registro (registro de tipos, agenda da camada, pools, recompensas, afixos, minas, cores de tiro,
-      nomes); sobra só o mapa `TYPE_CLASSES` até 0a.3. `tests/content/{registry,enemies}.test.js` validam cada item.
+      nomes); o mapa de classes sumiu em 0a.3. `tests/content/{registry,enemies}.test.js` validam cada item.
       Regra: arquivo de conteúdo importa só constantes (`src/data/constants/`) e outros arquivos de conteúdo — nunca
       `GameConstants` nem um módulo que lê o registro (ciclo de import que derruba tudo ao carregar).
 - [x] **0a.2 Cena de conteúdo** (19/10): `?content=<id>` (ou `<tipo>/<id>`) põe inimigo (`&count=` até 300), chefe,
       arma, casco, carta ou camada diante da nave numa partida real, spawner parado, nave invulnerável; inimigo e chefe
       sem a nave atirar, a não ser com `&fire=1`. `src/bootstrap/contentScene.js`; visto no navegador (Caster).
-- [ ] **0a.3 Inimigo = receita** (em curso 19/10): `RecipeEnemy` roda os comportamentos que o arquivo nomeia, de
+- [x] **0a.3 Inimigo = receita** (19/10): `RecipeEnemy` roda os comportamentos que o arquivo nomeia, de
       `src/modules/enemies/behaviors/` (passes tick → steer → act por quadro; cada receita ganha uma subclasse com os
-      getters que as vistas leem). Feitos Caster, Shade, Leech, Husk, Bulwark (trace igual + trace rígido de 45 campos);
-      falta Drone, Hunter, Mine, Ram, Weaver. Pedido original: Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
-      investida, fase) e de mortes (dividir, filhotes, devolver orbes, explodir) sobre as estratégias de movimento que
-      já existem; a receita declara stats, move, attack, onDeath, afixos, drops, cues, Códice e **papéis** para o
-      diretor. Migrar os 11 inimigos um a um (Caster, Shade, Leech viram as primeiras receitas; suas classes somem).
+      getters que as vistas leem; comportamento pode declarar `methods`). As 10 máquinas são receitas, as classes e o mapa
+      de classes sumiram; pools, fotos e registro montam a classe pela receita. Prova: trace igual a cada migração e um
+      trace rígido (~70 campos por inimigo, payload de eventos, 623 mil quadros-inimigo) idêntico às classes antigas.
+      Wardens e Heralds continuam classes (fora do pedido). Biblioteca: hold-range, lob-shell, phase, fan-shot, forage,
+      spawn-on-death, frontal-shield, fork-streams, spawn-on-field, orbit-side, weapon-telegraph, proximity-fuse,
+      charge, spin, lay-mines.
 - [x] **0a.4 Arma = padrão + projétil** (19/10): o arquivo da arma declara `fire` (padrões `stream`, `beam` a cada N,
       `fan`), `projectile` (visual, velocidade, dano, alcance, estouro) e a própria carta (`card`, ids e ordem mantidos);
       um despachante roda os padrões; cartas de arma e a exclusividade entre elas saem das armas; HUD e 3D leem a arma.
