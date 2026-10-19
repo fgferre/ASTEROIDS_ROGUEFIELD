@@ -89,10 +89,17 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [ ] **0b.1 AudioSystem (2.370)** — a tabela evento→cue vira dado (uma tabela de ~200 linhas); fachadas somem.
 - [ ] **0b.2 MenuBackgroundSystem (3.864)** — dividir por partes da cena do menu.
 - [ ] **0b.3 PlayerSystem (2.444)** — movimento, dash/freio, torreta, escudo, cascos.
-- [ ] **0b.4 GameSessionService (2.394)** — fluxo da run, telas finais, recordes, modos, replay.
+- [x] **0b.4 GameSessionService** (2.394 → 1.131, 19/10): sementes, foto da morte, contagem do retry, fim de run e botões
+      do menu em `src/services/session/`; trace igual; morte → Game Over → Retry visto no navegador.
 - [ ] **0b.5 PhysicsSystem (2.223)** — por par de colisão.
 - [ ] **0b.6 XPOrbSystem (2.077)** — orbes, fusão, ímã.
-- [ ] **0b.7 AAAHudLayout (1.892), Renderer3D (1.791)** — por painel; cena/espelhos/pós.
+- [x] **AAAHudLayout** (1.892 → 889, 19/10): um módulo por painel em `src/modules/ui/hud/` (mesmas 976 operações de DOM
+      num DOM falso, antes e depois); HUD visto numa partida.
+- [ ] **0b.7 Renderer3D (1.791)** — cena/espelhos/pós.
+- [x] **SettingsPanel** (1.328 → 868) e **UISystem** (1.253 → 964), 19/10: construtores de campo e textos de tecla em
+      `src/modules/ui/settings/`; busca no DOM e escala da tela em `src/modules/ui/`; painel e teclas vistos no navegador.
+- [x] **Trace de comparação** (19/10): 19 partidas de 60 s (camadas 1–15, 17, Boss Rush, harmonic e scatter na 9); pega
+      a velocidade de um inimigo de 180 para 181 em 14 das 19. O piloto não se move (movimento quase sem cobertura).
 - [x] **InputSystem** (1.386 → 1.184, 19/10): montagem dos comandos em `src/modules/input/commandPayloads.js`.
 - [x] **Teste `aim-regression`** (2.715, 19/10): quatro arquivos por assunto em `tests/integration/aim/`, os mesmos 80
       testes.
