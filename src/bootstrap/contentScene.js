@@ -14,6 +14,7 @@ import { getContent, listContent } from '../content/registry.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { bossKindForLayer } from '../data/enemies/boss.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
+import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 
 // Registry kinds a bare `?content=<id>` is looked up in, in this order.
 export const CONTENT_KINDS = Object.freeze([
@@ -176,7 +177,8 @@ export function jumpToLayer(enemies, layer) {
 
 /** The card, after the cards it requires (rank 1 of each, recursively). */
 function applyCard(progression, cardId) {
-  const card = getContent('cards', cardId);
+  // The catalog, not the cards folder: weapon cards live in their weapon file.
+  const card = UPGRADE_LIBRARY.find((candidate) => candidate.id === cardId);
   for (const { type, id, level = 1 } of card.prerequisites ?? []) {
     if (type !== 'upgrade') continue;
     let owned = progression.getUpgradeCount(id);
@@ -244,14 +246,9 @@ function composeBoss({ id }, { enemies }) {
   if (!boss) console.warn(`[contentScene] Warden "${id}" did not spawn.`);
 }
 
-// The card whose effect switches to the weapon; the ship's own weapon has none.
-function composeWeapon({ id }, { enemies, progression, combat }) {
-  const card = listContent('cards').find((candidate) =>
-    candidate.levels.some((level) =>
-      level.effects.some((effect) => effect.payload?.weaponId === id)
-    )
-  );
-  if (card) applyCard(progression, card.id);
+// The weapon's own card switches to it; the ship's default weapon has none.
+function composeWeapon({ id, item }, { enemies, progression, combat }) {
+  if (item.card) applyCard(progression, item.card.id);
   if (combat.weaponId !== id) {
     console.warn(`[contentScene] No card switches the ship to "${id}".`);
   }
