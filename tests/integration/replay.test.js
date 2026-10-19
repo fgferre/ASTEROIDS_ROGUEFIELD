@@ -15,9 +15,16 @@ import {
   createHeadlessGame,
   installDomStubs,
   keyEvent,
+  SEED,
 } from '../__helpers__/headlessGame.js';
-import { deserialize, serialize } from '../../src/core/replay.js';
+import {
+  createInputFrame,
+  createRecorder,
+  deserialize,
+  serialize,
+} from '../../src/core/replay.js';
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
+import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 
 const STEPS = 600; // 10 s at 60 Hz
@@ -76,10 +83,22 @@ describe('run replay', () => {
 
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
-  function recordRun(beforePick = () => {}, difficulty = 'veteran') {
+  // `hull` is flown unlocked; `bossRush` starts a Boss Rush; `controls` sets
+  // the player's control scheme.
+  function recordRun(
+    beforePick = () => {},
+    difficulty = 'veteran',
+    { hull, bossRush, controls } = {}
+  ) {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
-    live.session.startNewRun({ source: 'test' });
+    if (hull) {
+      live.session.resolveServiceInstance('hangar').owned[`${hull}-hull`] =
+        true;
+      live.services.settings.setSetting('gameplay', 'selectedHull', hull);
+    }
+    if (controls) live.services.player.controlScheme = controls;
+    live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
     progression.experienceToNext = TEST_XP_TO_LEVEL;
     const input = live.services.input;
@@ -115,10 +134,17 @@ describe('run replay', () => {
   }
 
   // Replays `recording` in a fresh instance: no key events, only the recording.
-  function replayRun(recording) {
+  // `start` is what starts the run (the browser clicks Start).
+  function replayRun(recording, start = { source: 'test' }) {
     const replay = createHeadlessGame();
+    // The hull setting is shared storage: the replay must ignore it.
+    replay.services.settings.setSetting(
+      'gameplay',
+      'selectedHull',
+      DEFAULT_HULL_ID
+    );
     replay.controller.arm(recording);
-    replay.session.startNewRun({ source: 'test' });
+    replay.session.startNewRun(start);
     replay.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
     for (let step = 0; step < STEPS; step += 1) {
       replay.controller.tick();
@@ -220,5 +246,113 @@ describe('run replay', () => {
     }
     expect(replay.services.difficulty.getDifficulty()).toBe('warden');
     expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it('replays a Boss Rush as a Boss Rush in its hull, whatever started it', () => {
+    const { live, recording } = recordRun(() => {}, 'veteran', {
+      hull: BASTION_HULL_ID,
+      bossRush: true,
+    });
+    const recorded = live.snapshot();
+    expect(recording).toMatchObject({
+      mode: 'bossRush',
+      date: null,
+      hull: BASTION_HULL_ID,
+    });
+
+    // Bastion is locked in this instance's Hangar; the browser clicks Start.
+    const replay = replayRun(recording, {
+      source: 'start-game-btn',
+      daily: false,
+      bossRush: false,
+    });
+    expect(replay.session.bossRush).toBe(true);
+    expect(replay.services.enemies.waveManager.bossRush).toBe(true);
+    expect(replay.services.player.currentHull.id).toBe(BASTION_HULL_ID);
+    expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it('replays a Daily Field on the day it was recorded', () => {
+    const live = createHeadlessGame();
+    live.services.difficulty.now = () => new Date('2026-10-17T12:00:00Z');
+    live.session.startNewRun({ source: 'daily-field-btn', daily: true });
+    const recording = deserialize(
+      serialize(live.session.replayRecorder.toJSON())
+    );
+    expect(recording).toMatchObject({ mode: 'daily', date: '2026-10-17' });
+
+    const replay = createHeadlessGame();
+    replay.services.difficulty.now = () => new Date('2026-10-18T12:00:00Z');
+    replay.controller.arm(recording);
+    replay.session.startNewRun({
+      source: 'start-game-btn',
+      daily: false,
+      bossRush: false,
+    });
+    expect(replay.services.difficulty.isDaily()).toBe(true);
+    expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
+  });
+
+  it('replays a Classic-controls run with Classic controls, whatever the replaying scheme', () => {
+    const { live, recording } = recordRun(() => {}, 'veteran', {
+      controls: 'classic',
+    });
+    const recorded = live.snapshot();
+    expect(recording.controls).toBe('classic');
+
+    // The replaying game flies Modern, as a viewer's default Settings would.
+    const replay = replayRun(recording);
+    expect(replay.services.player.controlScheme).toBe('classic');
+    expect(replay.snapshot()).toEqual(recorded);
+
+    // The viewer's next own run flies their scheme again.
+    replay.session.startNewRun({ source: 'test' });
+    expect(replay.services.player.controlScheme).toBe('modern');
+  });
+
+  it('plays a recording without a mode (version 5) as a normal run', () => {
+    const { live, recording } = recordRun();
+    const recorded = live.snapshot();
+    const { mode, date, ...v5 } = recording;
+    expect([mode, date]).toEqual(['normal', null]);
+
+    const replay = replayRun(deserialize({ ...v5, version: 5 }));
+    expect(replay.session.bossRush).toBe(false);
+    expect(replay.services.difficulty.isDaily()).toBe(false);
+    expect(replay.snapshot()).toEqual(recorded);
+  });
+
+  it("leaves the viewer's Salvage and pad alone, then pays and rumbles for their own run", () => {
+    const fake = installFakeGamepad();
+    try {
+      const recorder = createRecorder({
+        seed: SEED,
+        hull: DEFAULT_HULL_ID,
+        difficulty: 'veteran',
+        mode: 'normal',
+        controls: 'modern',
+      });
+      recorder.record(0, createInputFrame());
+      const replay = createHeadlessGame();
+      const hangar = replay.session.resolveServiceInstance('hangar');
+      const salvage = hangar.salvage;
+
+      replay.controller.arm(deserialize(serialize(recorder.toJSON())));
+      replay.session.startNewRun({ source: 'test' });
+      replay.step(); // the pad is polled
+      const death = { wave: { current: 9 }, stats: { totalKills: 47 } };
+      replay.eventBus.emit('player-took-damage', { damage: 10 });
+      replay.eventBus.emit('player-died', death);
+      expect(hangar.salvage).toBe(salvage);
+      expect(fake.effects).toEqual([]);
+
+      replay.session.startNewRun({ source: 'test' });
+      replay.eventBus.emit('player-took-damage', { damage: 10 });
+      replay.eventBus.emit('player-died', death);
+      expect(hangar.salvage).toBeGreaterThan(salvage);
+      expect(fake.effects).toHaveLength(1);
+    } finally {
+      fake.restore();
+    }
   });
 });

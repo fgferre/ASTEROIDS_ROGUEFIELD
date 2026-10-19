@@ -84,6 +84,8 @@ export default class AchievementService {
     eventBus.on('apex-unlocked', () => this.unlock('apex-predator'));
     eventBus.on('weapon-beam-fired', () => this.count('harmonic'));
     eventBus.on('enemy-destroyed', (payload = {}) => {
+      // A Tether that blows itself up was not destroyed by the pilot.
+      if (payload.source?.cause === 'mine-detonation') return;
       if (payload.enemy?.elite) this.count('elite-hunter');
       const killAchievement = KILL_ACHIEVEMENTS[payload.enemy?.type];
       if (killAchievement) this.count(killAchievement);

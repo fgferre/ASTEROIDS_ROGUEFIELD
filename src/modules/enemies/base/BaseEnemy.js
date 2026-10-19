@@ -506,7 +506,7 @@ export class BaseEnemy {
     this.vx = 0;
     this.vy = 0;
     // Steering strategies read `velocity` before vx/vy and the proximity one
-    // keeps its clock in `movementState`: a reused enemy starts from neither.
+    // keeps its drift in `movementState`: a reused enemy starts from neither.
     this.velocity = null;
     this.movementState = null;
 

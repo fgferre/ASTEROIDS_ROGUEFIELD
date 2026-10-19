@@ -16,4 +16,13 @@ describe('GameTime', () => {
     for (let i = 0; i < 5; i += 1) time.update(step);
     expect(time.update(step)).toBe(step);
   });
+
+  it('drops a running slow motion on reset (a new run or the menu)', () => {
+    const time = new GameTime({ emit: () => {}, motionReduced: () => false });
+    const step = 1 / 120;
+    time.applyTimeDilation(0.4, { holdDuration: 1, duration: 0.5 });
+    expect(time.update(step)).toBeCloseTo(step * 0.4, 10);
+    time.reset();
+    expect(time.update(step)).toBe(step);
+  });
 });

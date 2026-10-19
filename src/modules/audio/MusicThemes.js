@@ -7,6 +7,11 @@ export function midiToHz(midi) {
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
+/** Linear gain of a level in decibels (0 dB = 1, -6 dB = ~0.5). */
+export function dbToGain(db) {
+  return Math.pow(10, db / 20);
+}
+
 /** Semitones above the root for a scale degree (degree 7 = one octave up). */
 export function scaleDegreeSemitones(scale, degree) {
   const size = scale.length;

@@ -34,14 +34,14 @@ export function onboardingPrompts(
     keys: ['L-Stick'],
     text:
       scheme === 'classic'
-        ? 'Turn and thrust with the left stick. Your guns fire on their own.'
+        ? 'Turn and thrust with the left stick. The turret aims on its own; the right stick aims it by hand.'
         : 'Move with the left stick. The turret aims on its own; the right stick aims it by hand.',
   };
   const keyboardMove =
     scheme === 'classic'
       ? {
           keys: [keys.moveLeft, keys.moveUp, keys.moveRight],
-          text: 'Turn and thrust. Your guns fire on their own.',
+          text: 'Turn and thrust. The turret aims and fires on its own.',
         }
       : {
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],

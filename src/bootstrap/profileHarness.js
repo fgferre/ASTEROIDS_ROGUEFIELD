@@ -507,6 +507,9 @@ async function runDeferredScenario({
       );
     }
 
+    // The hero scene is an art-review picture: nothing to save to disk.
+    if (config.hero) return;
+
     const filename = `profile-${scenario}-${isoDate()}.json`;
     try {
       performanceMonitor.downloadLogs(filename);

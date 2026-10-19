@@ -99,6 +99,35 @@ describe('HangarService', () => {
     expect(hangar.salvage).toBe(15 + 99);
   });
 
+  it("pays a replayed run nothing, then the viewer's own run in full", () => {
+    stock(40);
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const awarded = [];
+    eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
+
+    eventBus.emit('game-started', { replay: true });
+    eventBus.emit('player-died', summary(9, 47));
+    expect(hangar.salvage).toBe(40);
+    expect(hangar.lastAward).toEqual({ amount: 0, total: 40, multiplier: 1 });
+    expect(JSON.parse(localStorage.getItem(HANGAR_STORAGE_KEY)).salvage).toBe(
+      40
+    );
+
+    eventBus.emit('game-started', { replay: true });
+    eventBus.emit('run-won', { wave: 15 });
+    eventBus.emit('screen-changed', {
+      screen: 'victory',
+      data: summary(15, 0),
+    });
+    expect(hangar.salvage).toBe(40);
+
+    eventBus.emit('game-started', {});
+    eventBus.emit('player-died', summary(9, 47));
+    expect(hangar.salvage).toBe(40 + 99);
+    expect(awarded).toEqual([99]);
+  });
+
   it('scales the payout by the difficulty salvage multiplier', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ eventBus, difficulty: atRate(1.3) });

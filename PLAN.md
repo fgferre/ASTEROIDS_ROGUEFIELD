@@ -1,36 +1,20 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 em curso — passagem de bastão abaixo, 19/10)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 12 e 13 fechadas no ramo `r13/fechamento`, 19/10, à espera do dono)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --grep="R11"`, PRs #247–#260). Decisões de produto são do dono,
 por imagem e jogando — nunca por teste.
 
-## Passagem de bastão (19/10, manhã; conversa local encerrada por tamanho)
+## Passagem de bastão (19/10, noite)
 
-- **Na `main` (9f5d768):** R13.8 inteiro (PRs #263 a #267: tooling, SFXBus, UI por tela, combate e efeitos por assunto,
-  WaveManager dono único das ondas) e R14 (PR #269: o desenho Canvas 2D saiu; a versão 2D original é build estático em
-  `/classic/`, gerado na publicação a partir da tag `classic-2d`, com link nos créditos). Também #270 (plano), #271
-  (`node_modules` nunca versionado), #272 (AGENTS.md). Nenhum ramo ou pasta de trabalho desta conversa sobrou.
-- **Em andamento em OUTRA conversa** ("Bugs verificados na main", worktree `../ASTEROIDS_ROGUEFIELD-bugs`, ramo
-  `fix/bugs-retry-e-sessao`): os 8 bugs do relatório, entre eles o retry que deixa a camada aberta com o campo vazio (as
-  rochas restauradas são contadas de novo e os contadores da camada não voltam). Arquivos dela: GameSessionService,
-  DifficultyService, InputSystem, ProgressionSystem, UpgradeSystem, XPOrbSystem, PlayerSystem, UISystem, LevelUpScreen,
-  EnemySystem, WaveManager, serviceManifest, profileHarness e testes. **Não tocar neles até ela mesclar.**
-- **Livres agora:** R13.6 (anel chapado no 3D; visual, captura e o dono julga), R13.7 (áudio morto; mecânico), R12.5
-  (entrada do Warden; sensação). R13.2, R13.3 e R13.4 esperam a mesclagem acima.
-- **Para o dono decidir** (a outra conversa cita no relatório dela): mina Warded que nunca explode (`Mine.js` marca
-  `detonated` antes do `takeDamage`, que devolve 0 na janela Warded) e filhos nascidos no abate que fecha a camada passam
-  sem contar (WaveManager recusa fora de camada). Restos da era 2D fora do desenho: uma linha no BACKLOG.
-- **Método que funcionou** (seção 5 de `docs/analise-estrutura-ia-2026-10-18.md`): um ajudante por recorte, brief
-  fechado, revisão das costuras na sessão principal, prova byte a byte com a sonda headless
-  (`tests/__helpers__/headlessGame.js`, 3 sementes) para o que muda ondas ou efeitos, `npm run done` e sonda no
-  navegador antes de mesclar (menu, partida, `?profile=boss-arena`, `?profile=late-stress`, créditos). Quando a janela do
-  app está escondida o jogo congela sem quadros: o Chromium headless do Playwright global (`/opt/homebrew`) serve para a
-  sonda, sem adicionar dependência. O easter egg 2D não existe mais: nada de `?renderer=2d`.
-- **Armadilhas novas:** em worktree com `node_modules` symlink, nunca `git add -A` (o .gitignore agora cobre o symlink);
-  PR empilhado sobre ramo que será apagado fecha sozinho no GitHub e não reabre (aconteceu com o #268): apontar para a
-  `main` antes de apagar a base.
-- A seção O BASTÃO de `docs/PENDENCIAS.md` é de 18/10 à noite (PR #261) e é do dono, nas palavras dele; este bloco é a
-  passagem atual.
+- **Ramo `r13/fechamento`** (não mesclado; um commit por item, `npm run done` verde em 19/10): R13.2, R13.4 (+ esquema de
+  controle no replay, replay sem Salvage nem vibração, dificuldade e dia do replay só valem para a run dele), R13.6,
+  R13.7, R12.5, faxina dos restos 2D, `dbToGain` único + lint do `IS_DEV` mais estrito, Tether que se explode não conta
+  abate (Códice, feed, Elite Hunter), cena `hero` sem download, teto de 5 ajudantes no CLAUDE.md (o app limita a 4).
+- **Cancelado pelo dono (19/10):** R13.3 (desempenho: "roda bem num Mac M1").
+- **Para o dono jogar antes de mesclar:** entrada do Warden (R12.5, números "proposta 19/10"; não capturada no navegador
+  embutido: a partida pausa sozinha com o painel escondido) e Hull Control/Camera Lead (R13.2).
+- **Próximo goal:** os oito pontos do goal de 18/10 fecharam; ele escolhe o próximo. Itens de gosto do BACKLOG foram
+  listados para ele com sugestão (19/10); nenhum foi feito.
 
 ## O pedido do dono (palavras dele, 17/10)
 
@@ -84,8 +68,9 @@ Conteúdo:
 
 Qualidade:
 
-- [ ] **R12.5 Entrada do Warden** (não iniciado em 18/10: o worker caiu sem escrever; fica para a próxima sessão)**.** No aviso de chefe: 1 s de câmera indo ao Warden, barras de letterbox, dilatação de
-      tempo curta; sem nada disso com movimento reduzido. Constantes "proposta 18/10".
+- [x] **R12.5 Entrada do Warden** (19/10, ramo `r13/fechamento`; o dono joga antes de mesclar)**.** No nascimento do
+      Warden (o aviso vem uma camada antes, sem Warden para visitar): câmera vai e volta em 1,5 s, letterbox, mundo a 40 %
+      por 1 s; nada disso com movimento reduzido. Constantes "proposta 19/10" em `src/core/cinematics.js`.
 - [x] **R12.6 Áudio limpo.** Aviso `ThrusterLoopManager` centenas de vezes (timer de partida sem marcar ativo);
       crossfade de tema (dois conjuntos de osciladores, percussão velha no beat novo); cues do Heat/Dust Herald;
       ouvinte `shield-shockwave` sem emissor; `musicController.initialized` morto; cue da Scatter Coil e da Leech.
@@ -103,19 +88,20 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       (a distante assada uma vez por bioma em alvo de baixa resolução, a média viva e barata, filamentos próximos
       aditivos e fracos); nuvens de poeira a meia profundidade com paralaxe real; nada recebe luz ou sombra; presets
       cortam camadas no low/medium. Captura antes/depois por bioma.
-- [ ] **R13.2 Casco e torreta como ele quer, em Settings.** Hoje nada no código liga casco à mira; o clássico (A/D
+- [x] **R13.2 Casco e torreta como ele quer, em Settings** (19/10; o dono joga)**.** Hoje nada no código liga casco à mira; o clássico (A/D
       gira, W empurra) só existe por `?controls=classic` e trava a torreta no nariz. Opção "Hull control: Modern /
       Classic" persistida em Settings, torreta automática nos dois, dica de onboarding; câmera "look-ahead" passa a
       poder seguir o casco em vez da mira (opção) — é a única coisa que pode parecer acoplamento.
-- [ ] **R13.3 Medição na máquina dele, sem fricção.** Botão "Copy performance report" no painel `?stats=1`/F8 e em
+- [ ] ~~**R13.3 Medição na máquina dele, sem fricção.**~~ Cancelado pelo dono (19/10). Botão "Copy performance report" no painel `?stats=1`/F8 e em
       Settings; benchmark de 20 s que recomenda um preset; relatório em texto para colar na conversa.
-- [ ] **R13.4 Replay grava o modo e o casco.** Boss Rush/Daily/infinito e casco no cabeçalho; playback restaura.
+- [x] **R13.4 Replay grava o modo e o casco** (19/10; casco já gravava; modo, dia do Daily e esquema de controle agora também)**.** Boss Rush/Daily/infinito e casco no cabeçalho; playback restaura.
 - [x] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
       3D; seed do director igual no EnemySystem e no WaveManager; avisos de "accounting discrepancy" explicados ou
       eliminados.
-- [ ] **R13.6 Oddity do 3D.** Anel chapado sob o domo do escudo (candidato: o anel do dash no espelho do jogador, que
-      só deveria aparecer nos i-frames — conferir na captura). Os itens 2D saíram: 2D congelado (decisão 6).
-- [ ] **R13.7 Áudio morto.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
+- [x] **R13.6 Oddity do 3D** (19/10, ramo `r13/anel-sob-escudo`)**.** Era o anel do dash (i-frames), inclinado com o
+      casco, desenhado dentro do domo; agora some com o escudo erguido, como o comentário do domo já prometia.
+      Conferido no navegador com escudo + i-frames forçados (antes: anel; depois: só o domo).
+- [x] **R13.7 Áudio morto** (19/10; 261 linhas, nada audível muda)**.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
 - [x] **R13.8 Arquivos grandes** (fechado 19/10; PRs #263 a #267)**.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).

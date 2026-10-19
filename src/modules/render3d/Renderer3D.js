@@ -28,6 +28,7 @@ import {
   epiloguePath,
   followPose,
   introPath,
+  WARDEN_ARRIVAL,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import {
@@ -320,9 +321,14 @@ class Renderer3D extends BaseSystem {
       this.applyAccessibilityPreferences(
         settings.getCategoryValues('accessibility')
       );
+      this.camera.setLead(settings.getCategoryValues('controls')?.cameraLead);
     }
     this.registerEventListener('settings-graphics-changed', (payload = {}) => {
       if (payload?.values) this.applyGraphicsPreferences(payload.values);
+    });
+    // Controls → Camera Lead; this event covers live edits and resets too.
+    this.registerEventListener('settings-controls-changed', (payload = {}) => {
+      if (payload?.values) this.camera.setLead(payload.values.cameraLead);
     });
     this.registerEventListener('settings-changed', (change = {}) => {
       if (
@@ -477,6 +483,24 @@ class Renderer3D extends BaseSystem {
       hold,
       frozenAt: freeze?.kind === kind ? freeze.t : null,
     };
+    return true;
+  }
+
+  /**
+   * The Warden's arrival: the follow camera travels to `warden` and back
+   * (WARDEN_ARRIVAL). False when nothing would move (no Warden, WebGL
+   * failed, `?camera=0`, reduced motion): the caller skips the letterbox.
+   */
+  playArrival(warden) {
+    if (
+      !warden ||
+      this.failed ||
+      !this.camera.isEnabled() ||
+      this.reducedMotion
+    ) {
+      return false;
+    }
+    this.camera.travelTo(warden, WARDEN_ARRIVAL);
     return true;
   }
 

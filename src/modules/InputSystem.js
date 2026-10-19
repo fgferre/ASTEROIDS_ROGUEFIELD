@@ -108,6 +108,8 @@ class InputSystem {
     this.isCapturingBinding = false;
     this.pendingStepPresses = new Set();
     this.inputSource = null;
+    // The run is a replay ('game-started' says so): the pad stays quiet.
+    this.replaying = false;
     // Pad sticks after the deadzone, read at each poll (see sampleInputFrame).
     this.padSticks = CENTRED_STICKS;
     this.padNavDirection = null;
@@ -291,6 +293,10 @@ class InputSystem {
         }
       });
 
+      eventBus.on('game-started', (payload = {}) => {
+        this.replaying = Boolean(payload.replay);
+      });
+
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
           this.rumble(GAMEPAD_RUMBLE.hullHit);
@@ -337,10 +343,13 @@ class InputSystem {
     return this.activeDevice;
   }
 
-  /** One dual-rumble effect on the active pad, unless the player turned it off. */
+  /**
+   * One dual-rumble effect on the active pad, unless the player turned it off
+   * or a replay is playing.
+   */
   rumble(effect) {
     const actuator = this.gamepad?.vibrationActuator;
-    if (!actuator || !this.isVibrationEnabled()) {
+    if (this.replaying || !actuator || !this.isVibrationEnabled()) {
       return;
     }
     actuator

@@ -31,8 +31,11 @@ export default class CodexService {
     eventBus.on('herald-spawned', (payload = {}) =>
       this.record({ type: 'herald', heraldKind: payload.kind })
     );
+    // A Tether that blows itself (timeout, proximity) is no kill of the pilot's.
     eventBus.on('enemy-destroyed', (payload = {}) =>
-      this.record(payload.enemy, { kill: true })
+      this.record(payload.enemy, {
+        kill: payload.source?.cause !== 'mine-detonation',
+      })
     );
     eventBus.on('player-died', (payload = {}) => {
       this.record(payload.killedBy);

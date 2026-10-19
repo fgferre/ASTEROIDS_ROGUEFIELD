@@ -5,6 +5,7 @@ import { WEAPONS } from '../../data/weapons.js';
 import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
 import RandomService from '../../core/RandomService.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
+import { WARDEN_ARRIVAL } from '../../core/cinematics.js';
 
 const COMBO_VISIBLE_MIN = 2;
 const RADAR_SIZE = 220;
@@ -21,6 +22,9 @@ const CHAPTER_BANNER_MS = 3000;
 const BOSS_INTRO_MS = 1500;
 const BOSS_BAR_HOLD_MS = 1000;
 const FADE_OUT_MS = 300;
+// The Warden arrival's letterbox slides with the camera's trip.
+const LETTERBOX_IN_MS = WARDEN_ARRIVAL.travelIn * 1000;
+const LETTERBOX_OUT_MS = WARDEN_ARRIVAL.travelBack * 1000;
 const FEED_LIFE_MS = 1600;
 const FEED_MAX_ROWS = 4;
 const COMBO_POP_MS = 120;
@@ -442,6 +446,11 @@ export class AAAHudLayout {
     this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
   }
 
+  /** The letterbox bars of the Warden's arrival, sliding in or out. */
+  showLetterbox(show) {
+    this.els?.letterbox?.classList.toggle('is-showing', Boolean(show));
+  }
+
   /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */
   holdBossBar(ms = BOSS_BAR_HOLD_MS) {
     this._bossBarHeldUntil = Math.max(
@@ -709,6 +718,7 @@ export class AAAHudLayout {
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
       cinematicHint: query('#ui-cinematic-hint'),
+      letterbox: query('#ui-letterbox'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
       bossIntroSub: query('#ui-boss-intro-sub'),
@@ -1508,6 +1518,7 @@ export class AAAHudLayout {
                 <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
             </div>
             <div class="cinematic-hint" id="ui-cinematic-hint">PRESS ANY KEY TO SKIP</div>
+            <div class="letterbox" id="ui-letterbox" aria-hidden="true"></div>
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
@@ -1782,6 +1793,12 @@ export class AAAHudLayout {
 
             .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
             .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
+            /* Under the panels (z-index -1 in the HUD layer), over the field. */
+            .letterbox { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+            .letterbox::before, .letterbox::after { content: ''; position: absolute; left: 0; width: 100%; height: ${WARDEN_ARRIVAL.barHeight}%; background: #000; }
+            .letterbox::before { top: 0; transform: translateY(-100%); }
+            .letterbox::after { bottom: 0; transform: translateY(100%); }
+            .letterbox.is-showing::before, .letterbox.is-showing::after { transform: translateY(0); }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
@@ -1842,6 +1859,8 @@ export class AAAHudLayout {
                 .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
                 .layer-banner.is-showing .layer-banner__line { animation: banner-line-draw 600ms var(--ease-out) 120ms both; }
                 .layer-banner.is-leaving, .boss-intro.is-leaving { transition: opacity ${FADE_OUT_MS}ms ease-in; }
+                .letterbox::before, .letterbox::after { transition: transform ${LETTERBOX_OUT_MS}ms ease-in-out; }
+                .letterbox.is-showing::before, .letterbox.is-showing::after { transition-duration: ${LETTERBOX_IN_MS}ms; }
                 .boss-intro.is-showing { animation: boss-intro-in 360ms var(--ease-out); }
                 .boss-intro.is-showing .boss-intro__line { animation: banner-line-draw 600ms var(--ease-out) 150ms both; }
                 .transmission.is-showing { animation: transmission-flicker 2.4s steps(1, end) infinite; }

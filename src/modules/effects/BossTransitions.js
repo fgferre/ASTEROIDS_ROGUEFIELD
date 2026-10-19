@@ -9,6 +9,7 @@
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { ShakePresets } from '../../utils/ScreenShake.js';
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
+import { WARDEN_ARRIVAL } from '../../core/cinematics.js';
 import {
   BOSS_EFFECTS_PRESETS,
   BOSS_SCREEN_SHAKES,
@@ -34,6 +35,7 @@ export class BossTransitions {
    * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling of a burst's count.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addFreezeFrame(duration, fade)`, `applyTimeDilation(scale, options)`: the effects' game time.
+   * `motionReduced()`: Settings → Accessibility → Reduced Motion; without it the arrival cinematic's slow motion replaces the entrance's own.
    */
   constructor({
     particleEffects,
@@ -45,6 +47,7 @@ export class BossTransitions {
     addScreenFlash,
     addFreezeFrame,
     applyTimeDilation,
+    motionReduced,
   }) {
     this.particleEffects = particleEffects;
     this.randomFloat = randomFloat;
@@ -55,6 +58,7 @@ export class BossTransitions {
     this.addScreenFlash = addScreenFlash;
     this.addFreezeFrame = addFreezeFrame;
     this.applyTimeDilation = applyTimeDilation;
+    this.motionReduced = motionReduced;
 
     this.bossTransitionEffects = [];
     this.activeBoss = { id: null, lastPhase: 0 };
@@ -474,7 +478,12 @@ export class BossTransitions {
     }
 
     this.applyBossScreenShake('spawn');
-    this.applyBossEffectTimings(config, palette, 'boss-spawned');
+    // The arrival cinematic's longer slow motion, while the camera visits
+    // the Warden; under Reduced Motion (no cinematic) the entrance's own.
+    const timings = this.motionReduced()
+      ? config
+      : { ...config, slowMotion: WARDEN_ARRIVAL.slowMotion };
+    this.applyBossEffectTimings(timings, palette, 'boss-spawned');
   }
 
   createBossPhaseTransition(payload = {}) {

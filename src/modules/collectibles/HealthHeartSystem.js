@@ -102,10 +102,6 @@ export class HealthHeartSystem {
     return heart;
   }
 
-  render(ctx) {
-    this.hearts.forEach((heart) => heart.render(ctx));
-  }
-
   getPlayerPosition() {
     if (!this.cachedPlayer) return null;
 

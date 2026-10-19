@@ -8,9 +8,7 @@ import {
   TRANSMISSION_VOICE,
 } from '../../../data/audio/stingers.js';
 import { MUSIC_THEMES } from '../../../data/audio/music.js';
-import { midiToHz, themeDegreeHz } from '../MusicThemes.js';
-
-const dbToGain = (db) => Math.pow(10, db / 20);
+import { dbToGain, midiToHz, themeDegreeHz } from '../MusicThemes.js';
 
 // Peak of the transmission squelch; the voice sits TRANSMISSION_VOICE.levelDb
 // under it.

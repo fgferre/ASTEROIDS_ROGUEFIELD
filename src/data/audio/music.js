@@ -21,14 +21,6 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     Object.freeze({ base: 0.22, tension: 0.16, danger: 0.12, climax: 0.08 }),
   ]),
   initialIntensity: 0,
-  relaxedIntensity: 0,
-  bossIntensity: 3,
-  rampDurations: Object.freeze({
-    rise: 1.2,
-    fall: 2.0,
-    bossRise: 0.6,
-    bossFall: 2.8,
-  }),
 });
 
 // Musical scales as semitones above the root (one octave).

@@ -685,7 +685,6 @@ export class PlayerMirror {
     const v = player.velocity || { vx: 0, vy: 0 };
     this.group.rotation.x = this.updateBank(player, time);
     this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
-    this.turret.visible = player.controlScheme === 'modern';
     this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
     this.turret.rotation.y = -(player.turretAngle - angle);
     this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
@@ -731,7 +730,8 @@ export class PlayerMirror {
         : 0;
     const dashShield = invulnerable && this.dashGuard;
     this.rim.copy(dashShield ? this.dashRimRgb : this.rimRgb);
-    this.dashRing.visible = dashShield;
+    // the shield dome already reads as protection; the flat ring would sit inside it
+    this.dashRing.visible = dashShield && !player.isShieldActive;
 
     this.updateGhosts(player.dashGhosts);
 

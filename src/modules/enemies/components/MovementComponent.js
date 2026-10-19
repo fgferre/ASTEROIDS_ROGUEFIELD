@@ -180,10 +180,7 @@ const createDefaultStrategies = () => ({
     const options = {
       driftSpeed: config.driftSpeed ?? 0,
       driftVariance: config.driftVariance ?? 12,
-      lifetime: config.lifetime ?? Infinity,
     };
-
-    state.elapsed = (state.elapsed || 0) + deltaTime;
 
     if (!state.velocity) {
       const angle =
@@ -193,10 +190,6 @@ const createDefaultStrategies = () => ({
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed,
       };
-    }
-
-    if (state.elapsed >= options.lifetime) {
-      enemy.markForRemoval?.('lifetime-expired');
     }
 
     if (options.driftSpeed > 0) {

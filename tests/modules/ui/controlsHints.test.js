@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 // The menu and pause keyboard hints in index.html; style.css shows the
-// data-scheme='classic' items only with ?controls=classic.
+// data-scheme='classic' items only on Classic hull control.
 const html = readFileSync(
   new URL('../../../src/index.html', import.meta.url),
   'utf8'

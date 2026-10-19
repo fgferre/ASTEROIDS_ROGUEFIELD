@@ -1,10 +1,13 @@
 // Records every run and plays back `?replay=<url>` recordings.
 //
 // Recording starts when a run starts ('game-started') and stops at death; the
-// run's seed and difficulty come from the difficulty service, and an armed
-// recording sets that service's difficulty before its run begins. The
-// recorder lives on the session (`session.replayRecorder`). Input is captured
-// and substituted at InputSystem's per-step seam (`setInputSource`); level-up
+// run's seed, difficulty and Daily Field day come from the difficulty service,
+// its mode from the session and its control scheme from the player. An armed
+// recording sets that service's difficulty and day and the session's start mode
+// before its run begins, and its hull and control scheme once the run has
+// started. The recorder lives on the session
+// (`session.replayRecorder`). Input is captured and substituted at
+// InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
 // re-applied at the next frame boundary, which is when a player's click lands
 // too (the loop stops stepping on level-up).
@@ -44,7 +47,10 @@ export function createReplayController({
   let player = null;
   let armedRecording = null;
   let pickPending = false;
+  // The viewer's own control scheme while a replay flies the recorded one.
+  let viewerControls = null;
   const difficulty = session.resolveServiceInstance('difficulty');
+  const playerService = session.resolveServiceInstance('player');
 
   const runStep = () => getStep() - runStartStep;
 
@@ -70,6 +76,10 @@ export function createReplayController({
     if (armedRecording) {
       player = createPlayer(armedRecording);
       session.applyConfiguredPlayerHull({ hullId: armedRecording.hull });
+      if (['modern', 'classic'].includes(armedRecording.controls)) {
+        viewerControls ??= playerService.controlScheme;
+        playerService.controlScheme = armedRecording.controls;
+      }
       armedRecording = null;
       recorder = null;
       input.setInputSource(replaySource);
@@ -77,10 +87,21 @@ export function createReplayController({
     }
 
     player = null;
+    if (viewerControls) {
+      playerService.controlScheme = viewerControls;
+      viewerControls = null;
+    }
     recorder = createRecorder({
       seed: difficulty.getRunSeed(),
       hull: session.getConfiguredHullId(),
       difficulty: difficulty.getDifficulty(),
+      mode: session.bossRush
+        ? 'bossRush'
+        : difficulty.isDaily()
+          ? 'daily'
+          : 'normal',
+      date: difficulty.dateKey,
+      controls: playerService.controlScheme,
     });
     session.replayRecorder = recorder;
     input.setInputSource(recordSource);
@@ -117,10 +138,14 @@ export function createReplayController({
   });
 
   return {
-    /** Plays `recording` on the next run start. */
+    /** Plays `recording` on the next run start, in its recorded mode. */
     arm(recording) {
       armedRecording = recording;
       difficulty.useReplay(recording);
+      session.replayStart = {
+        daily: recording.mode === 'daily',
+        bossRush: recording.mode === 'bossRush',
+      };
     },
     /**
      * Once per frame, before the fixed steps: applies a pending replay pick,

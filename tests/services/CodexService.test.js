@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
+import Mine from '../../src/modules/enemies/types/Mine.js';
 import CodexService, {
   CODEX_STORAGE_KEY,
 } from '../../src/services/CodexService.js';
@@ -29,6 +30,28 @@ describe('CodexService', () => {
     expect(seenOf(codex, 'ram')).toEqual({ firstLayer: 8, kills: 2 });
     expect(seenOf(codex, 'weaver')).toBeNull();
     expect(discovered).toEqual(['ram']);
+  });
+
+  it('does not count a Tether that detonates itself as destroyed', () => {
+    const eventBus = new EventBus();
+    const codex = new CodexService({ eventBus });
+    const spawnMine = () =>
+      new Mine({ eventBus }, { id: 'mine-1', x: 0, y: 0 });
+
+    const timedOut = spawnMine();
+    timedOut.onUpdate(timedOut.lifetime + 1);
+    expect(timedOut.alive).toBe(false);
+
+    const sprung = spawnMine();
+    sprung.armed = true;
+    sprung.system.getCachedPlayer = () => ({ position: { x: 10, y: 0 } });
+    sprung.onUpdate(0.016);
+    expect(sprung.alive).toBe(false);
+
+    expect(seenOf(codex, 'mine')).toEqual({ firstLayer: 1, kills: 0 });
+
+    spawnMine().takeDamage(1000, { type: 'player', cause: 'damage' });
+    expect(seenOf(codex, 'mine')).toEqual({ firstLayer: 1, kills: 1 });
   });
 
   it('meets a support machine when it arrives, before any kill', () => {

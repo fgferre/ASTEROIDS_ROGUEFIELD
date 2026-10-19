@@ -216,4 +216,13 @@ describe('PlayerMirror', () => {
     expect(mirror.dashRing.visible).toBe(false);
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
   });
+
+  it('hides the dash ring under a raised shield dome', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.isShieldActive = true;
+    player.dashTimer = 0.1;
+    player.invulnerableTimer = 0.2;
+    mirror.update(player, ribbons, 0.1);
+    expect(mirror.dashRing.visible).toBe(false);
+  });
 });

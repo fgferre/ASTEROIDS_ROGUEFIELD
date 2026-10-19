@@ -152,10 +152,32 @@ describe('replay recording', () => {
 
   it('records the difficulty (version 5); older recordings load as Veteran', () => {
     const json = createRecorder({ seed: 9, difficulty: 'warden' }).toJSON();
-    expect(json.version).toBe(5);
+    expect(json.version).toBeGreaterThanOrEqual(5);
     expect(deserialize(serialize(json)).difficulty).toBe('warden');
     const v4 = { version: 4, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
     expect(deserialize(v4).difficulty).toBe('veteran');
+  });
+
+  it('records the mode and Daily Field day (version 6); older recordings load as a normal run', () => {
+    const json = createRecorder({
+      seed: 9,
+      mode: 'daily',
+      date: '2026-10-18',
+    }).toJSON();
+    expect(json.version).toBe(6);
+    expect(deserialize(serialize(json))).toMatchObject({
+      mode: 'daily',
+      date: '2026-10-18',
+    });
+    const v5 = { version: 5, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+    expect(deserialize(v5)).toMatchObject({ mode: 'normal', date: null });
+  });
+
+  it('records the control scheme; recordings without one load as null', () => {
+    const json = createRecorder({ seed: 9, controls: 'classic' }).toJSON();
+    expect(deserialize(serialize(json)).controls).toBe('classic');
+    const v6 = { version: 6, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+    expect(deserialize(v6).controls).toBeNull();
   });
 
   it('still reads version 1 recordings, with dash off', () => {

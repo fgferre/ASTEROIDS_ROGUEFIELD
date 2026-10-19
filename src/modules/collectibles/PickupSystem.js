@@ -9,7 +9,6 @@
 
 import { BaseSystem } from '../../core/BaseSystem.js';
 import { requireService } from '../../core/serviceUtils.js';
-import { getEmissive } from '../../core/bloomLayer.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../core/GameConstants.js';
 import { PALETTE, LINE, withAlpha } from '../../data/constants/palette.js';
 import {
@@ -247,10 +246,9 @@ export class PickupSystem extends BaseSystem {
     }));
   }
 
-  // Matte token, colored rim, emissive glyph; blinks in its last seconds.
+  // Matte token, colored rim and glyph; blinks in its last seconds.
   render(ctx) {
     if (!this.pickups.length) return;
-    const emissive = getEmissive();
     for (const pickup of this.pickups) {
       const remaining = pickup.lifetime - pickup.age;
       if (
@@ -286,14 +284,6 @@ export class PickupSystem extends BaseSystem {
 
       drawGlyph(ctx, pickup.kind, r * 0.55, pickup.color);
       ctx.restore();
-
-      if (emissive) {
-        emissive.save();
-        emissive.setTransform(ctx.getTransform());
-        emissive.translate(pickup.x, pickup.y);
-        drawGlyph(emissive, pickup.kind, r * 0.55, pickup.color);
-        emissive.restore();
-      }
     }
   }
 

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EPILOGUE_MS, INTRO_MS } from '../../../src/core/cinematics.js';
+import {
+  EPILOGUE_MS,
+  INTRO_MS,
+  WARDEN_ARRIVAL,
+} from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import { RunCinematics } from '../../../src/modules/ui/runCinematics.js';
@@ -34,10 +38,12 @@ function setup({ plays = true } = {}) {
     layerBannerTitle: fakeElement(),
     layerBannerSub: fakeElement(),
     cinematicHint: fakeElement(),
+    letterbox: fakeElement(),
   };
   const renderer = {
     playIntro: vi.fn(() => plays),
     playEpilogue: vi.fn(() => plays),
+    playArrival: vi.fn(() => plays),
     endCinematic: vi.fn(),
   };
   const events = [];
@@ -149,5 +155,52 @@ describe('RunCinematics', () => {
     vi.advanceTimersByTime(1);
     expect(show).toHaveBeenCalledTimes(1);
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
+  });
+
+  it('letterboxes a Warden arrival without holding the run, lifting it as the camera turns back', () => {
+    const { ui, hud, renderer, events, held } = setup();
+    const warden = { x: 400, y: 84 };
+    expect(ui.cinematics.startArrival(warden)).toBe(true);
+    expect(renderer.playArrival).toHaveBeenCalledWith(warden);
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(true);
+
+    vi.advanceTimersByTime(
+      (WARDEN_ARRIVAL.travelIn + WARDEN_ARRIVAL.hold) * 1000
+    );
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
+    expect(held).toEqual([]);
+    expect(events).toEqual([
+      ['cinematic-started', 'arrival'],
+      ['cinematic-ended', 'arrival'],
+    ]);
+  });
+
+  it('only retargets the camera for a second Warden, and a new run lifts the letterbox at once', () => {
+    const { ui, hud, renderer, events } = setup();
+    ui.cinematics.startArrival({ x: 400, y: 84 });
+    vi.advanceTimersByTime(200);
+    const second = { x: 200, y: 84 };
+    ui.cinematics.startArrival(second);
+    expect(renderer.playArrival).toHaveBeenLastCalledWith(second);
+    expect(events).toEqual([['cinematic-started', 'arrival']]);
+
+    ui.cinematics.stop();
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
+    expect(events.at(-1)).toEqual(['cinematic-ended', 'arrival']);
+  });
+
+  it('shows no letterbox when the camera cannot move (reduced motion), nor over the intro', () => {
+    const refused = setup({ plays: false });
+    expect(refused.ui.cinematics.startArrival({ x: 400, y: 84 })).toBe(false);
+    expect(refused.hud.els.letterbox.classList.contains('is-showing')).toBe(
+      false
+    );
+    expect(refused.events).toEqual([]);
+
+    const { ui, renderer, startRun } = setup();
+    startRun();
+    expect(ui.cinematics.startArrival({ x: 400, y: 84 })).toBe(false);
+    expect(renderer.playArrival).not.toHaveBeenCalled();
+    expect(ui.cinematics.introActive).toBe(true);
   });
 });

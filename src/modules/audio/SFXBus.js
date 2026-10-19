@@ -3,6 +3,7 @@ import AudioCache from '../AudioCache.js';
 import AudioBatcher from '../AudioBatcher.js';
 import ThrusterLoopManager from '../ThrusterLoopManager.js';
 import { createSfxSynthPort } from './SfxSynthPort.js';
+import { dbToGain } from './MusicThemes.js';
 import RandomService from '../../core/RandomService.js';
 import {
   AUDIO_DISTANCE_MIX,
@@ -97,8 +98,6 @@ export function resolveDistanceMix(dx, dy) {
     cutoff: nearCutoffHz * (farCutoffHz / nearCutoffHz) ** t,
   };
 }
-
-const dbToGain = (db) => Math.pow(10, db / 20);
 
 // A struck partial reaches its peak this fast (s); a click is cut after this
 // many of its decay times (e^-5 < 1%).
@@ -667,13 +666,11 @@ class SFXBus {
       trackPerformance: (name) => bus._trackPerformance(name),
       resolveRandom: (...candidates) => bus._resolveRandom(...candidates),
       ambientDestination: () => bus.getAmbientDestination(),
-      protectedDestination: () => bus.getProtectedDestination(),
       connectAmbient: (node) => bus._connectAmbient(node),
       connectProtected: (node) => bus._connectProtected(node),
       ambientInput: (pan, distance) => bus._ambientInput(pan, distance),
       protectedPanner: (pan) => bus._protectedPanner(pan),
       sendToReverb: (node, sendDb) => bus._sendToReverb(node, sendDb),
-      noiseBuffer: (seconds) => bus._noiseBuffer(seconds),
       maneuverNoise: (...args) => bus._maneuverNoise(...args),
       maneuverTone: (...args) => bus._maneuverTone(...args),
       strike: (...args) => bus._strike(...args),
@@ -689,10 +686,6 @@ class SFXBus {
   // ===========================================================================
 
   // --- Batched shots and impacts (sfx/batched.js) ---
-
-  normalizeLaserShotOptions(options) {
-    return this._batched.normalizeLaserShotOptions(options);
-  }
 
   playLaserShot(options) {
     return this._batched.playLaserShot(options);
@@ -1014,21 +1007,6 @@ class SFXBus {
   // Lifecycle helpers consumed by the facade reset/destroy.
   // ===========================================================================
 
-  /** Flush + reset the batcher (facade reset). */
-  resetBatcher() {
-    if (this.batcher) {
-      this.batcher.flushPendingBatches();
-      this.batcher.resetStats();
-    }
-  }
-
-  /** Force-flush pending batches (facade flushAudioBatches). */
-  flushBatches() {
-    if (this.batcher) {
-      this.batcher.flushPendingBatches();
-    }
-  }
-
   /** Cleanup pool/cache/batcher/thruster state for a fresh run (facade reset). */
   reset() {
     if (this.pool) {
@@ -1045,15 +1023,6 @@ class SFXBus {
     if (this.thrusterLoops) {
       this.thrusterLoops.cleanup(this.pool);
     }
-  }
-
-  /** Aggregate stats for the facade performance logger. */
-  getStats() {
-    return {
-      pool: this.pool ? this.pool.getStats() : null,
-      cache: this.cache ? this.cache.getStats() : null,
-      batcher: this.batcher ? this.batcher.getStats() : null,
-    };
   }
 
   /**

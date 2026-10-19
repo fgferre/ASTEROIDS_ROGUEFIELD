@@ -4,9 +4,11 @@
 // is ever visible (boss framing may pull out past it, down to 0.85×).
 //
 // Modes (PLAN R5.7, proposta 18/10): 'dynamic' (default) leads toward the
-// aim, breathes the zoom with the threat count and frames ship + boss;
+// aim (or along the hull with Settings → Controls → Camera Lead), breathes
+// the zoom with the threat count and frames ship + boss;
 // 'classic' is the plain follow (`?camera=1`, or Settings → Graphics);
-// 'static' is the fixed full-field view (`?camera=0`).
+// 'static' is the fixed full-field view (`?camera=0`). In either moving mode a
+// travel (travelTo: the Warden's arrival) takes the shot to a target and back.
 //
 // Apply order per frame: base transform → screen shake → applyTransform(ctx).
 
@@ -19,7 +21,8 @@ const FOLLOW_TIME_CONSTANT = 0.25;
 // Share of a zoom pulse spent pushing in; the rest eases back out.
 const PULSE_ATTACK = 0.3;
 
-// Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX.
+// Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX;
+// a full LOOK_AHEAD_MAX along the nose when it leads on the hull.
 export const LOOK_AHEAD_MAX = 90;
 const LOOK_AHEAD_GAIN = 0.5;
 const LOOK_AHEAD_SMOOTH = 0.35;
@@ -83,12 +86,19 @@ export function dampTo(d, target, smoothTime, dt) {
   return d.value;
 }
 
-/** The look-ahead offset (out.x/y) the scene asks for at ship (x, y). */
-export function lookAheadFor(scene, x, y, out) {
+/**
+ * The look-ahead offset (out.x/y) the scene asks for at ship (x, y). `lead`
+ * 'hull' looks along the hull heading, 'aim' toward the aim point.
+ */
+export function lookAheadFor(scene, x, y, out, lead = 'aim') {
   let dx = 0;
   let dy = 0;
   let length = 0;
-  if (scene.hasAim) {
+  if (lead === 'hull') {
+    dx = Math.cos(scene.heading);
+    dy = Math.sin(scene.heading);
+    length = LOOK_AHEAD_MAX;
+  } else if (scene.hasAim) {
     dx = scene.aimX - x;
     dy = scene.aimY - y;
     length = Math.min(LOOK_AHEAD_MAX, Math.hypot(dx, dy) * LOOK_AHEAD_GAIN);
@@ -148,6 +158,7 @@ export function createCameraScene() {
     aimY: 0,
     vx: 0,
     vy: 0,
+    heading: 0,
     threats: 0,
     hasBoss: false,
     bossX: 0,
@@ -164,6 +175,7 @@ export function readCameraScene(scene, player, combat, enemies) {
   scene.aimY = aim ? aim.y : 0;
   scene.vx = player?.velocity?.vx || 0;
   scene.vy = player?.velocity?.vy || 0;
+  scene.heading = player?.angle || 0;
   scene.threats = 0;
   scene.hasBoss = false;
   if (!position) return scene;
@@ -194,6 +206,13 @@ function outsideDeadZone(delta, half) {
   return delta - clamp(delta, -half, half);
 }
 
+// What the follow closes of `delta`: what lies past the dead zone, and the
+// rest too as a travel's weight `w` nears 1 (the shot lands on its target).
+function followDelta(delta, half, w) {
+  const outside = outsideDeadZone(delta, half);
+  return outside + (delta - outside) * w;
+}
+
 export function createCamera({
   zoom = CAMERA_ZOOM,
   fieldWidth = GAME_WIDTH,
@@ -201,11 +220,16 @@ export function createCamera({
 } = {}) {
   let enabled = true;
   let mode = 'dynamic';
+  let lead = 'aim';
   let reducedMotion = false;
   let lastTarget = null;
   let baseZoom = zoom;
   let pulse = null;
   let pulseFactor = 1;
+  // A timed trip of the shot to a target and back (travelTo) and its eased
+  // 0..1 weight this frame.
+  let travel = null;
+  let travelWeight = 0;
   // Dynamic state: smoothed look-ahead, threat zoom, framing zoom and the
   // 0..1 blend toward boss framing.
   const lookX = { value: 0, velocity: 0 };
@@ -245,6 +269,7 @@ export function createCamera({
       }
       if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
       advancePulse(dt);
+      advanceTravel(dt);
       let followX = targetX;
       let followY = targetY;
       if (mode === 'dynamic') {
@@ -254,6 +279,13 @@ export function createCamera({
         camera.zoom = goal.zoom * pulseFactor;
       } else {
         camera.zoom = baseZoom * pulseFactor;
+      }
+      // A travel pulls the followed point and the zoom toward its target,
+      // and the follow below tightens to a direct one with its weight.
+      if (travelWeight > 0) {
+        followX += (travel.x - followX) * travelWeight;
+        followY += (travel.y - followY) * travelWeight;
+        camera.zoom += (travel.zoom - camera.zoom) * travelWeight;
       }
 
       // The field wraps: a jump of more than half of it is a wrap, not motion.
@@ -268,11 +300,13 @@ export function createCamera({
         return;
       }
 
-      const step = 1 - Math.exp(-Math.max(0, dt) / FOLLOW_TIME_CONSTANT);
+      const w = travelWeight;
+      const lag = 1 - Math.exp(-Math.max(0, dt) / FOLLOW_TIME_CONSTANT);
+      const step = lag + (1 - lag) * w;
       camera.x +=
-        outsideDeadZone(followX - camera.x, DEAD_ZONE_HALF_WIDTH) * step;
+        followDelta(followX - camera.x, DEAD_ZONE_HALF_WIDTH, w) * step;
       camera.y +=
-        outsideDeadZone(followY - camera.y, DEAD_ZONE_HALF_HEIGHT) * step;
+        followDelta(followY - camera.y, DEAD_ZONE_HALF_HEIGHT, w) * step;
       clampToField();
     },
 
@@ -315,6 +349,28 @@ export function createCamera({
       pulse = { peak, duration, elapsed: 0, from: pulseFactor };
     },
 
+    // Takes the shot to `target` (anything with x/y, read live: the Warden)
+    // and back: eases there over `travelIn` s, holds `hold` s at `zoom`,
+    // eases back over `travelBack` s, the follow carrying on underneath. A
+    // call while one runs only retargets it: trips never stack.
+    travelTo(target, { travelIn, hold, travelBack, zoom: travelZoom }) {
+      if (!enabled) return;
+      if (travel) {
+        travel.target = target;
+        return;
+      }
+      travel = {
+        target,
+        x: target.x,
+        y: target.y,
+        zoom: travelZoom,
+        travelIn,
+        hold,
+        travelBack,
+        elapsed: 0,
+      };
+    },
+
     snapTo(x, y) {
       if (!enabled) return;
       camera.x = x;
@@ -330,6 +386,8 @@ export function createCamera({
       lastTarget = null;
       pulse = null;
       pulseFactor = 1;
+      travel = null;
+      travelWeight = 0;
       resetDynamic();
     },
 
@@ -344,6 +402,11 @@ export function createCamera({
       camera.setEnabled(next !== 'static');
       mode = next === 'classic' ? 'classic' : 'dynamic';
       resetDynamic();
+    },
+
+    /** 'aim' | 'hull': what the dynamic look-ahead follows. */
+    setLead(next) {
+      lead = next === 'hull' ? 'hull' : 'aim';
     },
 
     setReducedMotion(flag) {
@@ -376,11 +439,32 @@ export function createCamera({
     pulseFactor = from + (pulse.peak / baseZoom - from) * envelope;
   }
 
+  // travelWeight: eased in over travelIn, 1 through the hold, eased out over
+  // travelBack. A target destroyed mid-trip keeps its last position.
+  function advanceTravel(dt) {
+    travelWeight = 0;
+    if (!travel) return;
+    travel.elapsed += Math.max(0, dt);
+    const { elapsed, travelIn, hold, travelBack, target } = travel;
+    const back = elapsed - travelIn - hold;
+    if (back >= travelBack) {
+      travel = null;
+      return;
+    }
+    if (!target.destroyed) {
+      travel.x = target.x;
+      travel.y = target.y;
+    }
+    travelWeight = smoothstep01(
+      back > 0 ? 1 - back / travelBack : Math.min(1, elapsed / travelIn)
+    );
+  }
+
   // goal.x/y/zoom: ship + look-ahead at the threat zoom, blended over
   // MODE_BLEND_SECONDS toward the boss framing.
   function dynamicGoal(x, y, dt, scene) {
     const slow = reducedMotion ? REDUCED_MOTION_ZOOM_SLOWDOWN : 1;
-    lookAheadFor(scene, x, y, goal);
+    lookAheadFor(scene, x, y, goal, lead);
     dampTo(lookX, goal.x, LOOK_AHEAD_SMOOTH, dt);
     dampTo(lookY, goal.y, LOOK_AHEAD_SMOOTH, dt);
     dampTo(

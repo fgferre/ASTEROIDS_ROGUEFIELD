@@ -31,6 +31,7 @@
  * its duck hit the same instant). Determinism: every scheduled time derives from
  * context.currentTime ONLY — no wall-clock or PRNG source is referenced here.
  */
+import { dbToGain } from './MusicThemes.js';
 
 // Duck envelope defaults (calibration — the browser-check tunes the feel inside
 // the SC3 gate). attack + hold + release = 1.2s ≤ 1.5s budget.
@@ -161,7 +162,7 @@ class DuckingController {
     const safeDepthDb = Number.isFinite(depthDb) ? Math.max(0, depthDb) : 0;
     const factor = Math.min(
       NOMINAL_GAIN,
-      Math.max(MIN_RAMP_VALUE, Math.pow(10, -safeDepthDb / 20))
+      Math.max(MIN_RAMP_VALUE, dbToGain(-safeDepthDb))
     );
 
     const attackS = Math.max(0, attackMs / 1000);

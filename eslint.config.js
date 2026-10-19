@@ -16,6 +16,13 @@ const vitestGlobals = {
   afterAll: 'readonly',
 };
 
+const DEV_SWITCH_MESSAGE =
+  'Dev mode is one switch: import IS_DEV from src/core/env.js';
+// Parents that store or hand on a value: `const x = v`, `x = v`, `{ a } = v`,
+// `...v`, `return v`, `f(v)`, `() => v`.
+const STORED =
+  ":matches([parent.type='VariableDeclarator'], [parent.type='AssignmentExpression'], [parent.type='AssignmentPattern'], [parent.type='SpreadElement'], [parent.type='ReturnStatement'], [parent.type='CallExpression'], [parent.type='ArrowFunctionExpression'])";
+
 export default [
   {
     ignores: [
@@ -79,6 +86,8 @@ export default [
   },
   // Dev mode is one switch: only src/core/env.js may read the build flags.
   // import.meta.env.BASE_URL (asset paths) is not a dev switch and stays legal.
+  // Besides the direct reads, storing the env object (alias, destructuring,
+  // default value, argument) is flagged: it is how DEV slips past a read check.
   {
     files: ['src/**/*.{js,mjs}'],
     rules: {
@@ -86,13 +95,17 @@ export default [
         'error',
         {
           selector:
-            "MemberExpression[object.object.name='process'][object.property.name='env'][property.name='NODE_ENV']",
-          message: 'Dev mode is one switch: import IS_DEV from src/core/env.js',
+            "MemberExpression[object.object.name='process'][object.property.name='env']:matches([property.name='NODE_ENV'], [property.value='NODE_ENV'])",
+          message: DEV_SWITCH_MESSAGE,
         },
         {
           selector:
-            "MemberExpression[object.type='MemberExpression'][object.object.type='MetaProperty'][object.property.name='env'][property.name=/^(DEV|PROD|MODE)$/]",
-          message: 'Dev mode is one switch: import IS_DEV from src/core/env.js',
+            "MemberExpression[object.type='MemberExpression'][object.object.type='MetaProperty'][object.property.name='env']:matches([property.name=/^(DEV|PROD|MODE)$/], [property.value=/^(DEV|PROD|MODE)$/])",
+          message: DEV_SWITCH_MESSAGE,
+        },
+        {
+          selector: `MemberExpression[object.type='MetaProperty'][property.name='env']${STORED}, MemberExpression[object.name='process'][property.name='env']${STORED}, MetaProperty[property.name='meta']${STORED}`,
+          message: `${DEV_SWITCH_MESSAGE} (do not store or destructure import.meta / import.meta.env / process.env)`,
         },
       ],
     },

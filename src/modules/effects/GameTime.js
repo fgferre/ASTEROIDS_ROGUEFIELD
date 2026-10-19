@@ -31,6 +31,19 @@ export const LEVEL_UP_SLOW_MO = {
 };
 export const DEATH_SLOW_MO = { scale: 0.3, hold: 0.5, ease: 0.4, zoom: 1.5 };
 
+function idleTimeDilation() {
+  return {
+    timer: 0,
+    duration: 0,
+    startScale: 1,
+    endScale: 1,
+    holdScale: 1,
+    holdTimer: 0,
+    easing: 'outCubic',
+    active: false,
+  };
+}
+
 export class GameTime {
   /**
    * `emit(name, payload)`: sends camera-zoom-pulse on the first running step after a slow-motion beat.
@@ -44,16 +57,7 @@ export class GameTime {
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
     this.pendingZoomPulse = null;
-    this.timeDilation = {
-      timer: 0,
-      duration: 0,
-      startScale: 1,
-      endScale: 1,
-      holdScale: 1,
-      holdTimer: 0,
-      easing: 'outCubic',
-      active: false,
-    };
+    this.timeDilation = idleTimeDilation();
   }
 
   // The world's delta for this step: the real one scaled by the freeze
@@ -73,11 +77,13 @@ export class GameTime {
     return delta;
   }
 
+  // A new run or the menu: no freeze or slow motion carries over.
   reset() {
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
     this.pendingZoomPulse = null;
+    this.timeDilation = idleTimeDilation();
   }
 
   updateFreezeFrameState(baseDelta) {
@@ -213,16 +219,7 @@ export class GameTime {
 
   applyTimeDilation(targetScale, options = {}) {
     if (!this.timeDilation) {
-      this.timeDilation = {
-        timer: 0,
-        duration: 0,
-        startScale: 1,
-        endScale: 1,
-        holdScale: 1,
-        holdTimer: 0,
-        easing: 'outCubic',
-        active: false,
-      };
+      this.timeDilation = idleTimeDilation();
     }
 
     const rawScale = Number.isFinite(targetScale) ? targetScale : 1;

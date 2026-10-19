@@ -24,7 +24,6 @@ import {
   AUDIO_REVERB_SEND_DB,
 } from '../data/audio/mix.js';
 import { BOSS_AUDIO_FREQUENCY_PRESETS } from '../data/audio/bossCues.js';
-import { requireRandom } from '../utils/randomHelpers.js';
 
 const DEV_MODE = IS_DEV;
 
@@ -242,11 +241,6 @@ class AudioSystem extends BaseSystem {
   }
   set batcher(value) {
     if (this.sfxBus) this.sfxBus.batcher = value;
-  }
-
-  /** @deprecated Compatibility accessor — the instance lives on SFXBus. */
-  get thrusterLoopManager() {
-    return this.sfxBus?.thrusterLoops ?? null;
   }
 
   /**
@@ -841,22 +835,6 @@ class AudioSystem extends BaseSystem {
     this.duckingController?.duck({ bus: 'music', ...AUDIO_BIG_MOMENT_DUCK });
   }
 
-  _randomBetween(min, max) {
-    const candidates = [
-      this.randomScopes?.families?.music,
-      this.randomScopes?.base,
-      this.random,
-    ];
-
-    for (const rng of candidates) {
-      if (rng && typeof rng.range === 'function') {
-        return rng.range(min, max);
-      }
-    }
-
-    return requireRandom(null, 'audio.music').range(min, max);
-  }
-
   bootstrapSettings() {
     if (
       this.settings &&
@@ -934,19 +912,6 @@ class AudioSystem extends BaseSystem {
 
   connectGainNode(node) {
     const destination = this.getEffectsDestination();
-    if (destination && node && typeof node.connect === 'function') {
-      node.connect(destination);
-    }
-  }
-
-  connectMusicNode(node) {
-    // Music content (file tracks via the manager target; legacy menu path) joins
-    // at the music DUCK node so it ducks with the music; falls back to the slider
-    // stage before the duck node is spliced.
-    const destination =
-      this.duckingController?.musicDuckGain ||
-      this.musicGain ||
-      this.masterGain;
     if (destination && node && typeof node.connect === 'function') {
       node.connect(destination);
     }
@@ -1064,10 +1029,6 @@ class AudioSystem extends BaseSystem {
     this.fileTrackManager?.stopTrack(trackId, options);
   }
 
-  evictFileTrack(trackId) {
-    this.fileTrackManager?.evictTrack(trackId);
-  }
-
   _evictAllFileTracks({ resetCurrentScreen = false } = {}) {
     const manager = this.fileTrackManager;
     if (!manager) {
@@ -1078,20 +1039,6 @@ class AudioSystem extends BaseSystem {
     });
     manager.activeTrackId = null;
     if (resetCurrentScreen) {
-      manager.currentScreen = null;
-    }
-  }
-
-  _destroyMenuTrackResources() {
-    const manager = this.fileTrackManager;
-    if (!manager) {
-      return;
-    }
-    manager.evictTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
-    if (manager.activeTrackId === FILE_TRACK_MANAGER_IDS.MENU_OPENING) {
-      manager.activeTrackId = null;
-    }
-    if (manager.currentScreen === 'menu') {
       manager.currentScreen = null;
     }
   }
@@ -1110,10 +1057,6 @@ class AudioSystem extends BaseSystem {
       default:
         break;
     }
-  }
-
-  playBossEvent(eventName, payload = {}) {
-    this.handleBossEvent(eventName, payload);
   }
 
   /**
@@ -1212,10 +1155,6 @@ class AudioSystem extends BaseSystem {
   // exist only because the determinism + port regression suites call them
   // directly and the SfxSynthPort forwards through them.
   // ===========================================================================
-
-  normalizeLaserShotOptions(options = {}) {
-    return this.sfxBus.normalizeLaserShotOptions(options);
-  }
 
   playLaserShot(options = {}) {
     this.sfxBus.playLaserShot(options);
@@ -1381,10 +1320,6 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playXPCollect();
   }
 
-  _playLaserShotDirect(params = {}) {
-    this.sfxBus._playLaserShotDirect(params);
-  }
-
   _playDroneFireDirect(params = {}) {
     this.sfxBus._playDroneFireDirect(params);
   }
@@ -1395,22 +1330,6 @@ class AudioSystem extends BaseSystem {
 
   _playMineExplosionDirect(params = {}) {
     this.sfxBus._playMineExplosionDirect(params);
-  }
-
-  _playTargetLockDirect(params = {}) {
-    this.sfxBus._playTargetLockDirect(params);
-  }
-
-  _playAsteroidBreakDirect(size) {
-    this.sfxBus._playAsteroidBreakDirect(size);
-  }
-
-  _playXPCollectDirect() {
-    this.sfxBus._playXPCollectDirect();
-  }
-
-  _executeBatchedSound(soundType, params = []) {
-    this.sfxBus._executeBatchedSound(soundType, params);
   }
 
   playLevelUp() {
@@ -2124,14 +2043,6 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playUpgradeSelect(rarity);
   }
 
-  /**
-   * Play button click sound.
-   * @deprecated Use playUISelect() instead
-   */
-  playButtonClick() {
-    this.playUISelect(); // Redirect to the new high-quality handler
-  }
-
   playPauseOpen() {
     this.sfxBus.playPauseOpen();
   }
@@ -2453,44 +2364,6 @@ class AudioSystem extends BaseSystem {
     if (this.pool) this.pool.resetStats();
     if (this.cache) this.cache.resetStats();
     if (this.batcher) this.batcher.resetStats();
-  }
-
-  // === Public API for Performance ===
-
-  /**
-   * Obtém estatísticas completas do sistema de áudio
-   */
-  getPerformanceStats() {
-    return {
-      performance: { ...this.performanceMonitor },
-      pool: this.pool ? this.pool.getStats() : null,
-      cache: this.cache ? this.cache.getStats() : null,
-      batcher: this.batcher ? this.batcher.getStats() : null,
-      optimizationsEnabled: {
-        pooling: !!this.pool,
-        caching: !!this.cache,
-        batching: !!this.batcher,
-      },
-    };
-  }
-
-  /**
-   * Enable/disable performance monitoring
-   */
-  setPerformanceMonitoring(enabled) {
-    this.performanceMonitor.enabled = enabled;
-    if (!enabled) {
-      this._resetPerformanceMonitoring();
-    }
-  }
-
-  /**
-   * Força flush de todos os batches pendentes
-   */
-  flushAudioBatches() {
-    if (this.batcher) {
-      this.batcher.flushPendingBatches();
-    }
   }
 }
 

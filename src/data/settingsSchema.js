@@ -102,6 +102,28 @@ const SETTINGS_SCHEMA = [
       'Remap main actions for keyboard and gamepad. Changes are saved immediately.',
     fields: [
       {
+        key: 'hullControl',
+        type: 'select',
+        control: 'segmented',
+        label: 'Hull Control',
+        description:
+          'Modern: WASD moves on the screen and the hull faces the motion. Classic: A/D turn the hull and W thrusts, Asteroids-style. The turret aims on its own in both.',
+        options: ['modern', 'classic'],
+        optionLabels: { modern: 'Modern', classic: 'Classic' },
+        default: 'modern',
+      },
+      {
+        key: 'cameraLead',
+        type: 'select',
+        control: 'segmented',
+        label: 'Camera Lead',
+        description:
+          'Where the Dynamic camera looks ahead: toward your aim, or along the hull.',
+        options: ['aim', 'hull'],
+        optionLabels: { aim: 'Aim', hull: 'Hull' },
+        default: 'aim',
+      },
+      {
         key: 'moveUp',
         type: 'binding',
         label: 'Thrust Forward',
