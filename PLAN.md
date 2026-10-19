@@ -115,8 +115,9 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         1500/7200/3000 quadros) comparando spawns, eventos e contadores entre a main e o ramo, byte a byte.
     - [x] 5.1 Subtração: chave, override, caminho "tudo de uma vez", espelho e rajada do caminho morto removidos (commit
           798bed6; 35.100 quadros idênticos).
-    - [ ] 5.2 Dono único: cadência das rochas e rajada inicial no WaveManager; `waveState` vira snapshot derivado; espelho do
-          EnemyUpdateSystem e modo legado sem WaveManager removidos (ajudante em curso em 18/10, mesma prova).
+    - [x] 5.2 Dono único (commit fbf852c; 44.100 quadros idênticos, camadas 1 a 5 e Boss Rush): cadência das rochas e rajada inicial no WaveManager; `waveState` vira snapshot derivado; espelho do
+          EnemyUpdateSystem e modo legado sem WaveManager removidos. Achado: a rajada de 4 rochas no início nunca
+          disparava (antes nem depois); ligá-la seria mudança de sensação, decisão do dono.
     - [ ] 5.3 Escopos de random: consolidar só o que a prova mostrar equivalente (rótulos e ordem dos sorteios fazem parte
           dos replays).
     - [ ] Fechamento: `npm run done`, sonda no navegador (partida, arena de chefe, easter egg 2D), PR aberto e **parar: o dono
