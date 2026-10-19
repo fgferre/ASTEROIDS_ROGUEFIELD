@@ -118,8 +118,12 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
     - [x] 5.2 Dono único (commit fbf852c; 44.100 quadros idênticos, camadas 1 a 5 e Boss Rush): cadência das rochas e rajada inicial no WaveManager; `waveState` vira snapshot derivado; espelho do
           EnemyUpdateSystem e modo legado sem WaveManager removidos. Achado: a rajada de 4 rochas no início nunca
           disparava (antes nem depois); ligá-la seria mudança de sensação, decisão do dono.
-    - [ ] 5.3 Escopos de random: consolidar só o que a prova mostrar equivalente (rótulos e ordem dos sorteios fazem parte
-          dos replays).
+    - [x] 5.3 Faxina e escopos de random (commit fef84c9; 87.300 quadros × 2 modos idênticos ao ramo; contra a main só 67
+          linhas de payload de depuração com `metadata` em outro lugar, vindas do 5.1, sem leitor): rajada de 4 rochas,
+          `getState`/`managerTotalsForWave`/`compatibilityModeActive`, `wave-state-updated` e a cópia de `layerDirector`
+          apagados; `layerDirector` mora no WaveManager. De random só a captura repetida de sementes saiu; rótulos,
+          escopos pai e fork legado ficam (fazem parte dos replays). Medição: 1 ajudante opus, 1 tentativa, 181k tokens,
+          17 min; revisão aqui.
     - [ ] Fechamento: `npm run done`, sonda no navegador (partida, arena de chefe, easter egg 2D), PR aberto e **parar: o dono
           joga antes de mesclar**.
 
