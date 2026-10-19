@@ -45,7 +45,6 @@ export const OVER_THE_CAP = [
   'src/modules/ui/AAAHudLayout.js',
   'src/modules/ui/SettingsPanel.js',
   'src/services/GameSessionService.js',
-  'tests/integration/aim-regression.test.js',
 ];
 
 export default [

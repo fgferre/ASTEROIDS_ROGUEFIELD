@@ -699,7 +699,7 @@ export class Targeting {
     // burst as one big volley that all hits OR all misses together. That
     // UNDER-FIRED mid-HP targets (e.g., HP=500/dmg=100/multi=4 capped at 2
     // bullets, delivering 200 dmg < 500 HP — wasted half the burst the
-    // player paid multishot for). See aim-regression.test.js "C2:" tests.
+    // player paid multishot for). See the "C2:" tests in tests/integration/aim/.
     const volleyDamage = damage * hitRate;
     if (volleyDamage <= 0) {
       return shotCount;
