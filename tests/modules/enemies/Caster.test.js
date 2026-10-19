@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Caster from '../../../src/modules/enemies/types/Caster.js';
-import {
-  CASTER_FIRE_INTERVAL,
-  CASTER_LEAD_SECONDS,
-  CASTER_SHELL_DAMAGE,
-  CASTER_SHELL_FLIGHT,
-  CASTER_SHELL_RADIUS,
-  CASTER_TELEGRAPH_SECONDS,
-} from '../../../src/content/enemies/caster.js';
+import { getContent } from '../../../src/content/registry.js';
+import { CASTER_SHELL_RADIUS } from '../../../src/content/enemies/caster.js';
+import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
+
+const Caster = TYPE_CLASSES.caster;
+const {
+  interval: CASTER_FIRE_INTERVAL,
+  lead: CASTER_LEAD_SECONDS,
+  damage: CASTER_SHELL_DAMAGE,
+  flight: CASTER_SHELL_FLIGHT,
+  telegraph: CASTER_TELEGRAPH_SECONDS,
+} = getContent('enemies', 'caster').behaviors['lob-shell'];
 
 const setup = (playerAt) => {
   const player = {

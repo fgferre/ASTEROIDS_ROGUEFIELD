@@ -4,50 +4,49 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 // Husk: slow heavy drifter that splits into Motes on death.
 // Numbers: proposta 17/10 — the owner's play decides.
-export const HUSK_SPEED = 70; // proposta 17/10
-export const HUSK_HEALTH = 90; // proposta 17/10
-export const HUSK_RADIUS = 20; // proposta 17/10
-export const HUSK_CONTACT_DAMAGE = 15; // proposta 17/10
-export const HUSK_SPLIT_COUNT = 3; // proposta 17/10: Motes released on death
-export const HUSK_SPLIT_SPEED = 120; // proposta 17/10: outward px/s of each Mote
-
-export const HUSK_CONFIG = deepFreeze({
-  key: 'husk',
-  displayName: 'Husk',
-  radius: HUSK_RADIUS,
-  health: HUSK_HEALTH,
-  contactDamage: HUSK_CONTACT_DAMAGE,
-});
-
-export const HUSK_COMPONENTS = deepFreeze({
-  movement: {
-    strategy: 'tracking',
-    acceleration: 60,
-    maxSpeed: HUSK_SPEED,
-    targetingRange: 2000,
-  },
-  collision: {
-    shape: 'circle',
-    radius: HUSK_RADIUS,
-    response: 'damage',
-    contactDamage: HUSK_CONTACT_DAMAGE,
-  },
-  health: { base: HUSK_HEALTH, armor: 0, scaling: 1.0 },
-});
-
-export const HUSK_REWARDS = deepFreeze({
-  baseOrbs: 3, // proposta 17/10
-  totalXP: 45, // proposta 17/10
-  healthHeartChance: 0.02, // proposta 17/10
-});
+const HEALTH = 90; // proposta 17/10
+const RADIUS = 20; // proposta 17/10
+const CONTACT_DAMAGE = 15; // proposta 17/10
 
 export default {
   id: 'husk',
   order: 4,
-  config: HUSK_CONFIG,
-  components: HUSK_COMPONENTS,
-  rewards: HUSK_REWARDS,
+  config: deepFreeze({
+    key: 'husk',
+    displayName: 'Husk',
+    radius: RADIUS,
+    health: HEALTH,
+    contactDamage: CONTACT_DAMAGE,
+  }),
+  components: deepFreeze({
+    movement: {
+      strategy: 'tracking',
+      acceleration: 60,
+      maxSpeed: 70, // proposta 17/10
+      targetingRange: 2000,
+    },
+    collision: {
+      shape: 'circle',
+      radius: RADIUS,
+      response: 'damage',
+      contactDamage: CONTACT_DAMAGE,
+    },
+    health: { base: HEALTH, armor: 0, scaling: 1.0 },
+  }),
+  rewards: deepFreeze({
+    baseOrbs: 3, // proposta 17/10
+    totalXP: 45, // proposta 17/10
+    healthHeartChance: 0.02, // proposta 17/10
+  }),
   pool: { initial: 3, max: 12 },
   tags: ['enemy', 'hostile', 'splitter'],
   affixes: ['shielded', 'swift', 'volatile', 'warded'],
+  seeded: true,
+  behaviors: deepFreeze({
+    'spawn-on-death': {
+      type: 'drone',
+      count: 3, // proposta 17/10: Motes released on death
+      speed: 120, // proposta 17/10: outward px/s of each Mote
+    },
+  }),
 };

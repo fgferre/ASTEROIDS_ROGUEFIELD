@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import Shade from '../../../src/modules/enemies/types/Shade.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../src/core/GameConstants.js';
-import {
-  SHADE_FADE_SECONDS,
-  SHADE_FAN_ARC,
-  SHADE_FIRE_DELAY,
-  SHADE_FIELD_MARGIN,
-  SHADE_FLANK_DISTANCE,
-  SHADE_FLANK_MIN_DISTANCE,
-  SHADE_PHASED_SECONDS,
-  SHADE_SHOTS,
-  SHADE_VISIBLE_SECONDS,
-} from '../../../src/content/enemies/shade.js';
+import { getContent } from '../../../src/content/registry.js';
+import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
+
+const Shade = TYPE_CLASSES.shade;
+const { phase, 'fan-shot': fan } = getContent('enemies', 'shade').behaviors;
+const {
+  fade: SHADE_FADE_SECONDS,
+  margin: SHADE_FIELD_MARGIN,
+  flank: SHADE_FLANK_DISTANCE,
+  flankMin: SHADE_FLANK_MIN_DISTANCE,
+  phased: SHADE_PHASED_SECONDS,
+  visible: SHADE_VISIBLE_SECONDS,
+} = phase;
+const { arc: SHADE_FAN_ARC, delay: SHADE_FIRE_DELAY, shots: SHADE_SHOTS } = fan;
 
 const setup = (at) => {
   const player = {

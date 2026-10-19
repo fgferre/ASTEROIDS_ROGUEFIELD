@@ -1,17 +1,24 @@
 // What every enemy item (src/content/enemies) owes the engine: the fields the
 // factory, its pool, the rewards, the Elite affixes, mine blasts and enemy
-// shots read, and a class to build it from. Every kind a layer asks for is one
+// shots read, and a class to build it from — for a recipe, behaviors the
+// library has, with the params each reads. Every kind a layer asks for is one
 // of these items.
 import { describe, expect, it } from 'vitest';
 import { getContent, listContent } from '../../src/content/registry.js';
 import { AFFIX_IDS } from '../../src/data/enemies/affixes.js';
 import { LAYERS, LAYER_MODIFIERS } from '../../src/data/layers.js';
 import { TYPE_CLASSES } from '../../src/modules/enemies/base/enemyTypeRegistry.js';
+import { BEHAVIORS } from '../../src/modules/enemies/behaviors/index.js';
 
 const enemies = listContent('enemies');
 const isStringList = (value) =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 const isCount = (value) => Number.isInteger(value) && value > 0;
+const recipes = enemies.filter((enemy) => enemy.behaviors);
+const isKind = {
+  number: Number.isFinite,
+  string: (v) => typeof v === 'string',
+};
 
 describe('enemy content', () => {
   it.each(enemies)('$id has the stats, components and rewards', (enemy) => {
@@ -48,6 +55,24 @@ describe('enemy content', () => {
   it.each(enemies)('$id has a class to build it from', ({ id }) => {
     expect(typeof TYPE_CLASSES[id]).toBe('function');
   });
+
+  it.each(recipes)(
+    '$id names behaviors the library has, with the params each reads',
+    ({ behaviors, seeded }) => {
+      expect(typeof seeded).toBe('boolean');
+      for (const [name, params] of Object.entries(behaviors)) {
+        const behavior = BEHAVIORS[name];
+        expect(behavior, name).toBeDefined();
+        expect(Object.keys(params).sort(), name).toEqual(
+          Object.keys(behavior.params).sort()
+        );
+        for (const [key, kind] of Object.entries(behavior.params)) {
+          expect(isKind[kind](params[key]), `${name}.${key}`).toBe(true);
+        }
+        if (behavior.usesRandom) expect(seeded, name).toBe(true);
+      }
+    }
+  );
 
   it('names a class only for an enemy item', () => {
     for (const id of Object.keys(TYPE_CLASSES)) {

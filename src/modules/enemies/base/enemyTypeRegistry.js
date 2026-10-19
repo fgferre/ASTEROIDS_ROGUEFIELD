@@ -1,6 +1,7 @@
 // src/modules/enemies/base/enemyTypeRegistry.js
 // Every enemy type the factory can build: class, pool, defaults and tags. The
-// roster's data is its src/content/enemies file; only its class is named here.
+// roster's data is its src/content/enemies file; a recipe there (`behaviors`)
+// is built by RecipeEnemy, and only the rest have a class named here.
 import { GamePools } from '../../../core/GamePools.js';
 import { listContent } from '../../../content/registry.js';
 import { Asteroid } from '../types/Asteroid.js';
@@ -9,13 +10,9 @@ import { Mine } from '../types/Mine.js';
 import { Hunter } from '../types/Hunter.js';
 import { BossEnemy } from '../types/BossEnemy.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
-import { Husk } from '../types/Husk.js';
 import { Ram } from '../types/Ram.js';
 import { Weaver } from '../types/Weaver.js';
-import { Bulwark } from '../types/Bulwark.js';
-import { Caster } from '../types/Caster.js';
-import { Shade } from '../types/Shade.js';
-import { Leech } from '../types/Leech.js';
+import { recipeEnemyClass } from '../types/RecipeEnemy.js';
 import { Herald } from '../types/Herald.js';
 import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 import {
@@ -25,21 +22,25 @@ import {
 } from '../../../data/enemies/boss.js';
 import { HERALD_COMPONENTS } from '../../../data/enemies/herald.js';
 
-// The class behind each roster enemy, by content id (GamePools builds its
-// pools from it too). The next step of the content factory replaces these
-// classes with recipes.
-export const TYPE_CLASSES = Object.freeze({
+// The roster enemies not yet recipes (PLAN.md 0a.3), by content id.
+const HAND_CLASSES = {
   drone: Drone,
   mine: Mine,
   hunter: Hunter,
-  husk: Husk,
   ram: Ram,
   weaver: Weaver,
-  bulwark: Bulwark,
-  caster: Caster,
-  shade: Shade,
-  leech: Leech,
-});
+};
+
+// The class behind each roster enemy, by content id (GamePools builds its
+// pools from it too): its recipe's RecipeEnemy class, else its own class.
+export const TYPE_CLASSES = Object.freeze(
+  Object.fromEntries(
+    listContent('enemies').map((item) => [
+      item.id,
+      item.behaviors ? recipeEnemyClass(item) : HAND_CLASSES[item.id],
+    ])
+  )
+);
 
 /**
  * Registers every enemy type with the factory. The boss minion list is

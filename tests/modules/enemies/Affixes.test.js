@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { listContent } from '../../../src/content/registry.js';
+import { getContent, listContent } from '../../../src/content/registry.js';
 import RandomService from '../../../src/core/RandomService.js';
 import {
   AFFIX_IDS,
@@ -8,10 +8,6 @@ import {
   ELITE_AFFIXES,
   rollAffixes,
 } from '../../../src/data/enemies/affixes.js';
-import {
-  HUSK_COMPONENTS,
-  HUSK_CONFIG,
-} from '../../../src/content/enemies/husk.js';
 import {
   MINE_COMPONENTS,
   MINE_CONFIG,
@@ -21,13 +17,19 @@ import {
   RAM_CONFIG,
 } from '../../../src/content/enemies/ram.js';
 import { EnemyFactory } from '../../../src/modules/enemies/base/EnemyFactory.js';
+import { TYPE_CLASSES } from '../../../src/modules/enemies/base/enemyTypeRegistry.js';
 import { AFFIX_GLYPH_NAMES } from '../../../src/modules/enemies/components/affixGlyphs.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
 import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
-import Husk from '../../../src/modules/enemies/types/Husk.js';
 import Mine from '../../../src/modules/enemies/types/Mine.js';
 import Ram from '../../../src/modules/enemies/types/Ram.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
+
+const Husk = TYPE_CLASSES.husk;
+const { config: HUSK_CONFIG, components: HUSK_COMPONENTS } = getContent(
+  'enemies',
+  'husk'
+);
 
 const SUPPORT_KINDS = listContent('enemies').map(({ id }) => id);
 
