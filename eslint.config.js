@@ -36,7 +36,6 @@ export const OVER_THE_CAP = [
   'src/modules/XPOrbSystem.js',
   'src/modules/combat/Targeting.js',
   'src/modules/effects/EnemyEffects.js',
-  'src/modules/enemies/managers/WaveManager.js',
   'src/modules/enemies/types/BossEnemy.js',
 ];
 
