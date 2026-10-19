@@ -77,11 +77,12 @@ describe('run replay', () => {
 
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
-  // `hull` is flown unlocked; `bossRush` starts a Boss Rush.
+  // `hull` is flown unlocked; `bossRush` starts a Boss Rush; `controls` sets
+  // the player's control scheme.
   function recordRun(
     beforePick = () => {},
     difficulty = 'veteran',
-    { hull, bossRush } = {}
+    { hull, bossRush, controls } = {}
   ) {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
@@ -90,6 +91,7 @@ describe('run replay', () => {
         true;
       live.services.settings.setSetting('gameplay', 'selectedHull', hull);
     }
+    if (controls) live.services.player.controlScheme = controls;
     live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
     progression.experienceToNext = TEST_XP_TO_LEVEL;
@@ -283,6 +285,23 @@ describe('run replay', () => {
     });
     expect(replay.services.difficulty.isDaily()).toBe(true);
     expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
+  });
+
+  it('replays a Classic-controls run with Classic controls, whatever the replaying scheme', () => {
+    const { live, recording } = recordRun(() => {}, 'veteran', {
+      controls: 'classic',
+    });
+    const recorded = live.snapshot();
+    expect(recording.controls).toBe('classic');
+
+    // The replaying game flies Modern, as a viewer's default Settings would.
+    const replay = replayRun(recording);
+    expect(replay.services.player.controlScheme).toBe('classic');
+    expect(replay.snapshot()).toEqual(recorded);
+
+    // The viewer's next own run flies their scheme again.
+    replay.session.startNewRun({ source: 'test' });
+    expect(replay.services.player.controlScheme).toBe('modern');
   });
 
   it('plays a recording without a mode (version 5) as a normal run', () => {

@@ -1,7 +1,7 @@
 // Run recording and replay.
 //
-// A run is reproducible from its seed, hull, difficulty, mode and the input the
-// simulation consumed at each fixed step (see fixedStep.js). The recording stores that
+// A run is reproducible from its seed, hull, control scheme, difficulty, mode and
+// the input the simulation consumed at each fixed step (see fixedStep.js). The recording stores that
 // per-step input run-length encoded (only the steps where it changes) plus the
 // upgrade picked at each level-up, in pick order, with any reroll or banish
 // made on the level-up screen before the pick. Analog stick values (gamepad)
@@ -18,7 +18,8 @@ export const REPLAY_VERSION = 6;
 // Versions 1-4 had no difficulty (version 5); they load as Veteran, the only
 // difficulty there was.
 // Versions 1-5 had no mode (version 6); they load as a normal run, the way
-// they always played back.
+// they always played back. They had no control scheme either: they play with
+// the viewer's.
 const READABLE_VERSIONS = new Set([1, 2, 3, 4, 5, REPLAY_VERSION]);
 const LEGACY_DIFFICULTY = 'veteran';
 const LEGACY_MODE = 'normal';
@@ -100,7 +101,8 @@ export function decodeInputFrame(mask, analog = []) {
  * Records a run. `record(step, frame)` must be called with increasing steps,
  * starting at 0 for the first simulated step of the run. `mode` is 'normal',
  * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
- * which its seed is drawn from, and null on any other run.
+ * which its seed is drawn from, and null on any other run. `controls` is the
+ * hull control scheme flown, 'modern' or 'classic'.
  */
 export function createRecorder({
   seed,
@@ -108,6 +110,7 @@ export function createRecorder({
   difficulty = LEGACY_DIFFICULTY,
   mode = LEGACY_MODE,
   date = null,
+  controls = null,
   version = REPLAY_VERSION,
 }) {
   const inputs = [];
@@ -149,6 +152,7 @@ export function createRecorder({
         difficulty,
         mode,
         date,
+        controls,
         steps,
         inputs: inputs.map((entry) => [...entry]),
         upgrades: upgrades.map(([step, entry]) => [
@@ -225,6 +229,7 @@ export function deserialize(text) {
     difficulty: data.difficulty ?? LEGACY_DIFFICULTY,
     mode: data.mode ?? LEGACY_MODE,
     date: data.date ?? null,
+    controls: data.controls ?? null,
     steps: data.steps,
     inputs: data.inputs,
     upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],

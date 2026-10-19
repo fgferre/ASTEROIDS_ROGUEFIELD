@@ -173,6 +173,13 @@ describe('replay recording', () => {
     expect(deserialize(v5)).toMatchObject({ mode: 'normal', date: null });
   });
 
+  it('records the control scheme; recordings without one load as null', () => {
+    const json = createRecorder({ seed: 9, controls: 'classic' }).toJSON();
+    expect(deserialize(serialize(json)).controls).toBe('classic');
+    const v6 = { version: 6, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+    expect(deserialize(v6).controls).toBeNull();
+  });
+
   it('still reads version 1 recordings, with dash off', () => {
     const v1 = { version: 1, seed: 3, hull: null, steps: 2, inputs: [[0, 17]] };
     const player = createPlayer(deserialize(serialize(v1)));
