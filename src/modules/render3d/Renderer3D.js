@@ -1,8 +1,7 @@
 // Gameplay renderer in Three.js (docs/NORTE.md §4b): a top-down scene tilted
 // 18°, real key + fill lights, UnrealBloom on emissives only, SMAA. The
 // simulation stays 2D: every frame the mirrors copy entity state from the
-// systems into pooled meshes. Registered as 'renderer' instead of
-// RenderingSystem unless `?renderer=2d` (see rendererMode.js).
+// systems into pooled meshes. Registered as 'renderer'.
 //
 // World mapping: logical (x, y) on the 800×600 field → world (x − 400, 0,
 // y − 300) on the XZ plane, y up, 1 logical unit = 1 world unit.
@@ -512,8 +511,8 @@ class Renderer3D extends BaseSystem {
     this.impact.kick(strength);
   }
 
-  // The same flags RenderingSystem reads: postProcessing off skips the
-  // composer (no bloom, no SMAA); antialiasing 'None' drops the SMAA pass.
+  // The graphics settings: postProcessing off skips the composer (no bloom,
+  // no SMAA); antialiasing 'None' drops the SMAA pass.
   applyGraphicsPreferences(values = {}) {
     this.graphics.postProcessing = values.postProcessing !== false;
     this.graphics.bloom = values.bloom !== false;
@@ -1015,7 +1014,7 @@ class Renderer3D extends BaseSystem {
   // --- frame -----------------------------------------------------------------
 
   /** `alpha`: the fixed stepper's leftover fraction (1 = latest step). */
-  render(ctx, alpha = 1) {
+  render(alpha = 1) {
     if (!this.ready()) return;
     this.applyPoses(alpha);
     try {
@@ -1042,8 +1041,8 @@ class Renderer3D extends BaseSystem {
 
     const t = this.three;
     // The ambient field spawns around the view and muzzle flashes are queued
-    // until a draw: both are fed by the 2D draw calls, so call them here.
-    effects?.drawAmbient(null, this.camera.getView());
+    // until a draw: both are fed here, once per frame.
+    effects?.setAmbientView(this.camera.getView());
     effects?.flushMuzzleFlashQueue();
 
     t.ribbons.begin();
@@ -1541,9 +1540,9 @@ class Renderer3D extends BaseSystem {
     return out;
   }
 
-  // The 2D overlays (EffectsSystem.drawWorld/drawScreenSpace, the
-  // CombatSystem lock marks, RenderingSystem.drawMagnetismField) as flat
-  // ribbons on the field plane and camera-facing sprites.
+  // The overlays (hit markers, damage numbers, the boss-transition border,
+  // the lock marks, the magnetism field) as flat ribbons on the field plane
+  // and camera-facing sprites.
   mirrorOverlays(player, effects) {
     const t = this.three;
     const { ribbons } = t;
@@ -1621,8 +1620,8 @@ class Renderer3D extends BaseSystem {
     }
   }
 
-  // Same gating as CombatSystem.render: rank 1 ring + line, rank 2 the
-  // predicted-aim marker, rank 3 every lock; nothing in manual aim. The
+  // Gated by the aiming rank: rank 1 ring + line, rank 2 the predicted-aim
+  // marker, rank 3 every lock; nothing in manual aim. The
   // lock line leaves the turret's muzzle.
   mirrorLocks(player) {
     const combat = this.cachedCombat;

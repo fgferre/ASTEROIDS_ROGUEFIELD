@@ -5,7 +5,8 @@
 // over the frame. Blurring the small copies keeps the cost near three
 // full-canvas draws per frame regardless of radius.
 //
-// Usage per frame (RenderingSystem does this):
+// Usage per frame (nothing calls beginFrame since the 2D renderer left, so
+// getEmissive() returns null):
 //   beginFrame(ctx)   — after screen shake is applied, so the layer aligns
 //   ... systems call getEmissive() and draw into it (same logical coords)
 //   composite(ctx)    — adds the glow; identity transform inside

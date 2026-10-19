@@ -670,8 +670,6 @@ export class WaveManager {
           proximityRadius: mineDefaults.proximityRadius,
           explosionRadius: mineDefaults.explosionRadius,
           explosionDamage: mineDefaults.explosionDamage,
-          pulseSpeed: mineDefaults.pulseSpeed,
-          pulseAmount: mineDefaults.pulseAmount,
           lifetime: mineDefaults.lifetime,
         };
       }

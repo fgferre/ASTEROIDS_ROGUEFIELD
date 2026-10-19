@@ -75,7 +75,7 @@ camada 15 (modo infinito só se ele pedir).
   de ~18°, luz-chave direcional + preenchimento frio, asteroides como malhas 3D procedurais (o gerador do menu,
   extraído para `src/modules/render3d/asteroidMesh.js`), nave low-poly extrudada do contorno de colisão, lanças e
   fagulhas emissivas, UnrealBloom + SMAA. A **simulação continua 2D** no plano 800×600; o renderer espelha as
-  entidades em malhas. `?renderer=2d` mantém o Canvas 2D como easter egg congelado (decisão dele, 18/10): não recebe feature nem paridade, só não pode quebrar.
+  entidades em malhas. O jogo 2D original fica como peça de museu em `/classic/`.
 - **Câmera dinâmica:** follow com dead zone e antecipação, dolly que afasta na velocidade e aproxima no combate,
   shake por deslocamento da câmera. Mesma lógica de `src/core/camera.js`, agora dirigindo uma câmera perspectiva.
 - **Movimento lateral:** A/D passam a ser strafe (deslocamento lateral); W/S empuxo; a nave aponta para onde se
@@ -84,9 +84,8 @@ camada 15 (modo infinito só se ele pedir).
 
 ## 5. O que não fazemos
 
-Sem narrativa falada, sem personagens, sem textura fotográfica, sem reescrever o gameplay em WebGL (o menu em
-Three.js fica como alvo visual; o jogo chega lá com Canvas 2D + bloom). Sem contorno neon em massa. Sem azul e
-rosa saturados em pedra.
+Sem narrativa falada, sem personagens, sem textura fotográfica, sem reescrever a simulação em WebGL (§4b: só o
+desenho é Three.js). Sem contorno neon em massa. Sem azul e rosa saturados em pedra.
 
 ## 6. Ordem de execução (fatias, cada uma com captura)
 

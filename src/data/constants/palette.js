@@ -24,7 +24,7 @@ export const PALETTE = Object.freeze({
 });
 
 // Fixed key light for every baked surface (upper-left, 35°), in radians.
-export const KEY_LIGHT_ANGLE = (-145 * Math.PI) / 180;
+const KEY_LIGHT_ANGLE = (-145 * Math.PI) / 180;
 export const KEY_LIGHT_DIR = Object.freeze({
   x: Math.cos(KEY_LIGHT_ANGLE),
   y: Math.sin(KEY_LIGHT_ANGLE),

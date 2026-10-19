@@ -102,7 +102,6 @@ function createServiceHarness(options = {}) {
   const gameStateFacade = { __attachSessionService: vi.fn() };
   const gameState = {
     canvas: { width: 800, height: 600 },
-    ctx: null,
     screen: 'menu',
     isPaused: false,
     sessionState: 'menu',

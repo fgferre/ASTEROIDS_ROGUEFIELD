@@ -116,7 +116,7 @@ class CombatSystem extends BaseSystem {
       this.targeting.resetAimingBranchState();
       this.cards.resetWeaponTuning();
       this.resetWeaponState();
-      this.targetThreatCache.clear();
+      this.targeting.targetThreatCache.clear();
       this.projectiles.clearEnemyBullets();
     });
 
@@ -232,8 +232,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === TARGETING (combat/Targeting.js) ===
-  // Targeting owns this state. The 3D renderer, the 2D draw, the fire paths
-  // and the aim regression suite read it on the combat object; the setters
+  // Targeting owns this state. The 3D renderer, the fire paths and the aim
+  // regression suite read it on the combat object; the setters
   // exist because that suite writes these fields.
   get currentTarget() {
     return this.targeting.currentTarget;
@@ -265,10 +265,6 @@ class CombatSystem extends BaseSystem {
 
   get predictedAimPointsMap() {
     return this.targeting.predictedAimPointsMap;
-  }
-
-  get targetThreatCache() {
-    return this.targeting.targetThreatCache;
   }
 
   get targetIndicatorPulse() {
@@ -332,7 +328,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // Called on the combat object by the aim regression suite, the shooting
-  // paths and (usingDynamicPrediction) both renderers.
+  // paths and (usingDynamicPrediction) the 3D renderer.
   updateTargeting(deltaTime) {
     this.targeting.updateTargeting(deltaTime);
   }
@@ -350,9 +346,9 @@ class CombatSystem extends BaseSystem {
   }
 
   // === PROJECTILES (combat/Projectiles.js) ===
-  // Projectiles owns the shots in flight. Both renderers, the HUD metrics,
+  // Projectiles owns the shots in flight. The 3D renderer, the HUD metrics,
   // Herald and the test helpers read these arrays on the combat object; the
-  // weapons suite assigns `bullets`. The 2D draw times itself into the perf.
+  // weapons suite assigns `bullets`.
   get bullets() {
     return this.projectiles.bullets;
   }
@@ -363,10 +359,6 @@ class CombatSystem extends BaseSystem {
 
   get enemyBullets() {
     return this.projectiles.enemyBullets;
-  }
-
-  get projectilePerf() {
-    return this.projectiles.projectilePerf;
   }
 
   // Called on the combat object: EnemySystem forwards enemy shots, app.js
@@ -408,10 +400,10 @@ class CombatSystem extends BaseSystem {
     const projectileUpdateStart = performance.now();
     this.projectiles.updateBullets(deltaTime);
     this.projectiles.updateEnemyBullets(deltaTime, player);
-    this.projectilePerf.projectileUpdateMs =
-      performance.now() - projectileUpdateStart;
-    this.projectilePerf.projectilePlayerCount = this.bullets.length;
-    this.projectilePerf.projectileEnemyCount = this.enemyBullets.length;
+    const perf = this.projectiles.projectilePerf;
+    perf.projectileUpdateMs = performance.now() - projectileUpdateStart;
+    perf.projectilePlayerCount = this.bullets.length;
+    perf.projectileEnemyCount = this.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
     this.cachedPhysics.forEachBulletCollision(
@@ -427,8 +419,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === WEAPONS (combat/Weapons.js) ===
-  // Weapons owns the guns. Both renderers, the 2D draw and the weapons,
-  // upgrade and aim suites read these fields on the combat object; the aim
+  // Weapons owns the guns. The 3D renderer and the weapons, upgrade and aim
+  // suites read these fields on the combat object; the aim
   // suite writes lastShotTime.
   get weaponId() {
     return this.weapons.weaponId;
@@ -501,9 +493,9 @@ class CombatSystem extends BaseSystem {
   }
 
   // === HITS AND CARDS (combat/HitResolution.js, combat/CardEffects.js) ===
-  // CardEffects owns what the cards leave on the Field. The 3D weapon mirror,
-  // the 2D draw and the weapons, upgrade and afterburn suites read it on the
-  // combat object.
+  // CardEffects owns what the cards leave on the Field. The 3D weapon mirror
+  // and the weapons, upgrade and afterburn suites read it on the combat
+  // object.
   get arcs() {
     return this.cards.arcs;
   }

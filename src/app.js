@@ -39,7 +39,6 @@ const gameState = {
   screen: 'menu',
   isPaused: false,
   canvas: null,
-  ctx: null,
   gameUI: null,
   initialized: false,
   lastTime: 0,
@@ -306,7 +305,6 @@ function init(recording = null) {
     ) {
       gameSessionService.initialize({
         canvas: gameState.canvas,
-        ctx: gameState.ctx,
         seedInfo,
       });
     }
@@ -566,7 +564,7 @@ function updateGame(deltaTime) {
 
 function renderGame(alpha) {
   performanceMonitor.startMeasure('render');
-  gameSystemServices.renderer.render(gameState.ctx, alpha);
+  gameSystemServices.renderer.render(alpha);
   performanceMonitor.endMeasure('render');
 }
 

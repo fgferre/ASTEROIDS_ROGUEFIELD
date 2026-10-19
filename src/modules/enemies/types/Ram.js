@@ -112,7 +112,7 @@ export class Ram extends BaseEnemy {
     this.vy = 0;
     this.chargeAngle = this.rotation;
     this.setState('windup', RAM_WINDUP_SECONDS);
-    // Same lane telegraph as the Warden's charge (EffectsSystem.drawTelegraphs).
+    // Same lane telegraph as the Warden's charge (render3d/enemies/telegraph.js).
     this.telegraph = {
       type: 'charge',
       angle: this.chargeAngle,

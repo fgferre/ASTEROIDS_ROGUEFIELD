@@ -17,9 +17,6 @@ export class Mine extends BaseEnemy {
     this.proximityRadius = MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.explosionCause = null;
     this.destroyed = false;
     this.weaponState = {};
@@ -58,9 +55,6 @@ export class Mine extends BaseEnemy {
       config.explosionRadius ?? MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage =
       config.explosionDamage ?? MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulseSpeed = config.pulseSpeed ?? MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = config.pulseAmount ?? MINE_DEFAULTS.pulseAmount ?? 0.3;
-    this.pulsePhase = 0;
 
     this.random = this.resolveRandom({ ...config, id: this.id });
     this.armed = false;
@@ -117,8 +111,6 @@ export class Mine extends BaseEnemy {
     this.age += deltaTime;
     this.armTimer -= deltaTime;
     this.remainingLifetime -= deltaTime;
-    this.pulsePhase =
-      (this.pulsePhase + this.pulseSpeed * deltaTime) % (Math.PI * 2);
 
     if (!this.armed && this.armTimer <= 0) {
       this.armed = true;
@@ -212,9 +204,6 @@ export class Mine extends BaseEnemy {
     this.proximityRadius = MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
-    this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.explosionCause = null;
     this.destroyed = false;
   }

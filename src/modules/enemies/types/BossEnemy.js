@@ -156,7 +156,6 @@ export class BossEnemy extends BaseEnemy {
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
-    this.renderPayload = this.buildRenderPayload();
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;
@@ -360,8 +359,6 @@ export class BossEnemy extends BaseEnemy {
     this.resetFeedbackState();
     this.applyPhaseMovement(true);
 
-    this.renderPayload = this.buildRenderPayload();
-
     GameDebugLogger.log('SPAWN', 'BossEnemy initialized', {
       id: this.id,
       wave: this.wave,
@@ -562,8 +559,6 @@ export class BossEnemy extends BaseEnemy {
         this.handlePhaseFinale(deltaTime, target);
         break;
     }
-
-    this.renderPayload = this.buildRenderPayload();
   }
 
   handlePhaseIntro(deltaTime, target) {
@@ -1368,36 +1363,6 @@ export class BossEnemy extends BaseEnemy {
     }
   }
 
-  buildRenderPayload() {
-    const phase = Math.max(0, Math.min(this.currentPhase, this.phaseCount - 1));
-    const pulse = this.invulnerable
-      ? 1 + Math.sin(this.age * 9) * 0.12
-      : 1 + Math.sin(this.age * 4) * 0.08;
-
-    return {
-      type: this.type,
-      id: this.id,
-      phase,
-      invulnerable: this.invulnerable,
-      scale: pulse,
-      color: this.phaseColors[phase] || '#ffffff',
-      phaseColors: [...this.phaseColors],
-      position: { x: this.x, y: this.y },
-      radius: this.radius,
-      damageFlash:
-        this.damageFlashDuration > 0
-          ? this.damageFlashTimer / this.damageFlashDuration
-          : 0,
-      damageFlashStrength: this.damageFlashStrength || 0,
-      shieldImpact:
-        this.shieldImpactDuration > 0
-          ? this.shieldImpactTimer / this.shieldImpactDuration
-          : 0,
-      shieldImpactStrength: this.shieldImpactStrength || 0,
-      shieldImpactAngle: this.shieldImpactAngle || 0,
-    };
-  }
-
   resetFeedbackState() {
     this.damageFlashTimer = 0;
     this.damageFlashStrength = 0;
@@ -1441,7 +1406,6 @@ export class BossEnemy extends BaseEnemy {
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
-    this.renderPayload = this.buildRenderPayload();
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;

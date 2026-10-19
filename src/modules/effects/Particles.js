@@ -66,7 +66,8 @@ export class Particles {
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
     this.ambientMotes = [];
-    // The camera's visible logical rect, set every frame through drawAmbient.
+    // The camera's visible logical rect, set every frame through
+    // setAmbientView.
     this.ambientView = null;
   }
 
