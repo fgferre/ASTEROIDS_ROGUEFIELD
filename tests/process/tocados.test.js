@@ -1,5 +1,6 @@
 // Commit gate (scripts/tocados.mjs): selection follows imports transitively,
-// through test helpers and vi.mock, without touching git or the disk.
+// through test helpers, vi.mock and import.meta.glob, without touching git or
+// the disk.
 
 import { describe, it, expect } from 'vitest';
 import { buildGraph, selectTests } from '../../scripts/tocados.mjs';
@@ -30,6 +31,29 @@ describe('tocados test selection', () => {
       'tests/y.test.js',
     ]);
     expect(selectTests(buildGraph({ 'src/c.js': '' }), ['src/c.js'])).toEqual(
+      []
+    );
+  });
+
+  it('follows import.meta.glob, so a content file reaches the registry tests', () => {
+    const content = buildGraph({
+      'src/content/registry.js':
+        "const modules = import.meta.glob('./*/*.js', { eager: true });",
+      'src/content/enemies/caster.js': 'export default { id: "caster" };',
+      'src/content/hulls/lib/panels.js': 'export const panels = [];',
+      'src/data/biomes.js':
+        "import { listContent } from '../content/registry.js';",
+      'tests/content/registry.test.js':
+        "const files = import.meta.glob('../../src/content/*/*.js', { eager: true });",
+      'tests/data/biomes.test.js':
+        "import { x } from '../../src/data/biomes.js';",
+      'tests/other.test.js': '',
+    });
+    expect(selectTests(content, ['src/content/enemies/caster.js'])).toEqual([
+      'tests/content/registry.test.js',
+      'tests/data/biomes.test.js',
+    ]);
+    expect(selectTests(content, ['src/content/hulls/lib/panels.js'])).toEqual(
       []
     );
   });
