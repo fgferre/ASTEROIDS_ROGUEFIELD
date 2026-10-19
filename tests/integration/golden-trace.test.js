@@ -2,6 +2,9 @@
  * Golden trace: fixed headless runs, hashed second by second, must match the fixture byte for byte.
  * Regenerate: GOLDEN_UPDATE=1 npx vitest run tests/integration/golden-trace.test.js
  * The fixture changes only in a commit that means to change behavior; a refactor must leave it alone.
+ * It holds on the CPU architecture it was recorded on (`arch`, today the owner's arm64 Mac): Math.sin,
+ * cos, exp and friends may differ in the last bit on another architecture (CI runs on x64), and a
+ * minute of play amplifies that into a different run. There, each scenario must play the same twice.
  */
 
 import { createHash } from 'node:crypto';
@@ -208,6 +211,7 @@ function divergence(name, actual, expected) {
 }
 
 const golden = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+const SAME_ARCH = golden.arch === process.arch;
 const traced = {};
 
 describe('golden trace', () => {
@@ -228,19 +232,25 @@ describe('golden trace', () => {
 
   afterAll(() => {
     if (!UPDATE) return;
-    const fixture = {};
+    const fixture = { arch: process.arch };
     for (const { name } of SCENARIOS) {
-      const trace = traced[name] ?? golden[name];
+      const trace = traced[name] ?? (SAME_ARCH ? golden[name] : undefined);
       if (trace) fixture[name] = trace;
     }
     writeFileSync(FIXTURE, `${JSON.stringify(fixture, null, 2)}\n`);
   });
 
-  it.each(SCENARIOS)('$name plays as recorded', (scenario) => {
+  const title = SAME_ARCH
+    ? '$name plays as recorded'
+    : '$name plays the same twice';
+  it.each(SCENARIOS)(title, (scenario) => {
     const trace = traceScenario(scenario);
     traced[scenario.name] = trace;
     if (UPDATE) return;
-    const message = divergence(scenario.name, trace, golden[scenario.name]);
+    const expected = SAME_ARCH
+      ? golden[scenario.name]
+      : traceScenario(scenario);
+    const message = divergence(scenario.name, trace, expected);
     if (message) throw new Error(message);
   });
 });
