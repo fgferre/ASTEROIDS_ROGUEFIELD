@@ -481,7 +481,6 @@ function gameLoop(currentTime) {
           particles: effects?.particles?.length || 0,
           wave: enemies?.waveManager?.currentWave || 0,
           projectileUpdateMs: projectilePerf?.projectileUpdateMs || 0,
-          projectileRenderMs: projectilePerf?.projectileRenderMs || 0,
           projectilePlayerCount: projectilePerf?.projectilePlayerCount || 0,
           projectileEnemyCount: projectilePerf?.projectileEnemyCount || 0,
           projectilePlayerTrailPoints:
@@ -511,8 +510,6 @@ function gameLoop(currentTime) {
       const combat = gameSystemServices?.['combat'];
       const projectilePerf = combat.getProjectilePerfSnapshot();
       if (projectilePerf && metricsCache) {
-        metricsCache.projectileRenderMs =
-          projectilePerf.projectileRenderMs || 0;
         metricsCache.projectilePlayerTrailPoints =
           projectilePerf.projectilePlayerTrailPoints || 0;
         metricsCache.projectileEnemyTrailPoints =

@@ -236,25 +236,6 @@ export class ScreenShake {
   }
 
   /**
-   * Applies shake to canvas context.
-   *
-   * @param {CanvasRenderingContext2D} ctx - Canvas context
-   * @param {number} centerX - Center point X for rotation
-   * @param {number} centerY - Center point Y for rotation
-   */
-  apply(ctx, centerX = 0, centerY = 0) {
-    if (this.trauma > 0.001) {
-      ctx.translate(this.offsetX, this.offsetY);
-
-      if (Math.abs(this.angle) > 0.001) {
-        ctx.translate(centerX, centerY);
-        ctx.rotate(this.angle);
-        ctx.translate(-centerX, -centerY);
-      }
-    }
-  }
-
-  /**
    * Resets shake to zero.
    */
   reset() {

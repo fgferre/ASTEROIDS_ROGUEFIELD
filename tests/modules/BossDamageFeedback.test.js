@@ -33,28 +33,19 @@ const createBoss = (overrides = {}) => {
 };
 
 describe('boss damage feedback', () => {
-  it('tracks boss hit flash and invulnerability shield impact state', () => {
+  it('tracks the boss hit flash', () => {
     const { boss } = createBoss();
 
     boss.onDamaged(72, 'laser');
     expect(boss.damageFlashTimer).toBeGreaterThan(0);
     expect(boss.damageFlashStrength).toBeGreaterThan(0);
 
-    boss.invulnerable = true;
-    boss.invulnerabilityTimer = 1;
-    boss.registerInvulnerabilityHit({ x: boss.x + 30, y: boss.y });
-
-    expect(boss.shieldImpactTimer).toBeGreaterThan(0);
-    expect(boss.shieldImpactStrength).toBe(1);
-    expect(boss.shieldImpactAngle).toBeCloseTo(0, 4);
-
     boss.onUpdate(0.05);
 
     expect(boss.damageFlashTimer).toBeLessThan(boss.damageFlashDuration);
-    expect(boss.shieldImpactTimer).toBeLessThan(boss.shieldImpactDuration);
   });
 
-  it('marks invulnerable boss bullet hits as blocked and triggers shield feedback', () => {
+  it('marks invulnerable boss bullet hits as blocked', () => {
     const eventBus = createEventBus();
     const combat = new CombatSystem({
       eventBus,
@@ -68,7 +59,6 @@ describe('boss damage feedback', () => {
       health: 900,
       maxHealth: 1500,
       invulnerable: true,
-      registerInvulnerabilityHit: vi.fn(),
     };
     const bullet = {
       x: 320,
@@ -87,10 +77,6 @@ describe('boss damage feedback', () => {
 
     expect(result.blocked).toBe(true);
     expect(result.effectiveDamage).toBe(0);
-    expect(boss.registerInvulnerabilityHit).toHaveBeenCalledWith({
-      x: 320,
-      y: 180,
-    });
     expect(eventBus.emit).toHaveBeenCalledWith(
       'bullet-hit',
       expect.objectContaining({
@@ -137,19 +123,12 @@ describe('boss damage feedback', () => {
     expect(blockedResult).toBe(false);
     expect(boss.health).toBe(990); // unchanged
 
-    // Shield impact should work while invulnerable
-    boss.registerInvulnerabilityHit({ x: boss.x + 30, y: boss.y });
-    expect(boss.shieldImpactStrength).toBe(1);
-
     // Tick down invulnerability timer fully
     boss.onUpdate(0.5);
     expect(boss.invulnerable).toBe(true);
     boss.onUpdate(0.5);
     expect(boss.invulnerable).toBe(false);
     expect(boss.invulnerabilityTimer).toBe(0);
-
-    // Shield state should be cleared
-    expect(boss.shieldImpactStrength).toBe(0);
 
     // Damage should work again after invulnerability expires
     const resumedResult = boss.takeDamage(100);
@@ -356,7 +335,6 @@ describe('boss damage feedback', () => {
       currentPhase: 1,
       invulnerable: true,
       destroyed: false,
-      registerInvulnerabilityHit: vi.fn(),
     };
     const support = {
       id: 'drone-restore',
@@ -423,10 +401,6 @@ describe('boss damage feedback', () => {
 
     expect(result.blocked).toBe(true);
     expect(result.effectiveDamage).toBe(0);
-    expect(boss.registerInvulnerabilityHit).toHaveBeenCalledWith({
-      x: bullet.x,
-      y: bullet.y,
-    });
   });
 
   it('drops stale boss objects during restore and keeps only the restored roster', () => {

@@ -366,13 +366,6 @@ export class EnemyMirror {
       if (!this.views.has(key)) this.dead.delete(key);
     };
 
-    this.hullMaterial = addRimLight(
-      new THREE.MeshStandardMaterial({
-        color: colorOf(THREE, PALETTE.hullLit),
-        metalness: 0.2,
-        roughness: 0.85,
-      })
-    );
     this.kit = createKit(THREE, scene, seeded, this.dissolve);
     this.rockViews = createRockViews(this.kit);
     // Outlines and eyes/lenses/nodes draw batched (rimBatch.js,

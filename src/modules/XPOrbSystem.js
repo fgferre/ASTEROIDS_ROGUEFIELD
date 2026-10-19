@@ -34,7 +34,6 @@ import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { getRenderScale } from '../core/viewport.js';
-import { getEmissive } from '../core/bloomLayer.js';
 import { PALETTE, withAlpha } from '../data/constants/palette.js';
 
 const ORB_CLASS_ORDER = [
@@ -528,7 +527,7 @@ class XPOrbSystem extends BaseSystem {
   }
 
   // Gold spark (docs/NORTE.md §3): four rays (eight from tier 3) with a soft
-  // halo, plus a separate core for the emissive layer.
+  // halo.
   createOrbSprite(visual) {
     const diameter = Math.ceil(visual.haloRadius * 2 + 2);
     const scale = getRenderScale();
@@ -570,22 +569,11 @@ class XPOrbSystem extends BaseSystem {
       ctx.fillStyle = body;
       ctx.fill();
     });
-    const core = bake((ctx) => {
-      const radius = visual.rayLength * 0.55;
-      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-      glow.addColorStop(0, PALETTE.text);
-      glow.addColorStop(0.35, PALETTE.xp);
-      glow.addColorStop(1, withAlpha(PALETTE.xp, 0));
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    if (!canvas || !core) {
+    if (!canvas) {
       return null;
     }
 
-    return { canvas, core, size: diameter, half: diameter / 2, scale };
+    return { canvas, size: diameter, half: diameter / 2, scale };
   }
 
   ensureOrbSprite(visual) {
@@ -1917,7 +1905,6 @@ class XPOrbSystem extends BaseSystem {
       return;
     }
 
-    const emissive = getEmissive();
     activeOrbs.forEach((orb) => {
       const sprite = this.ensureOrbSprite(
         this.getOrbVisualConfig(orb.class, orb.tier)
@@ -1944,22 +1931,18 @@ class XPOrbSystem extends BaseSystem {
         scaleY = pulse / (1 + stretch * 0.5);
       }
 
-      const draw = (target, image) => {
-        target.save();
-        target.translate(orb.x, orb.y);
-        target.rotate(rotation);
-        target.scale(scaleX, scaleY);
-        target.drawImage(
-          image,
-          -sprite.half,
-          -sprite.half,
-          sprite.size,
-          sprite.size
-        );
-        target.restore();
-      };
-      draw(ctx, sprite.canvas);
-      if (emissive) draw(emissive, sprite.core);
+      ctx.save();
+      ctx.translate(orb.x, orb.y);
+      ctx.rotate(rotation);
+      ctx.scale(scaleX, scaleY);
+      ctx.drawImage(
+        sprite.canvas,
+        -sprite.half,
+        -sprite.half,
+        sprite.size,
+        sprite.size
+      );
+      ctx.restore();
     });
   }
 

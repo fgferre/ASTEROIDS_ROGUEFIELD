@@ -149,10 +149,6 @@ export class BossEnemy extends BaseEnemy {
     this.damageFlashDuration = 0.14;
     this.damageFlashTimer = 0;
     this.damageFlashStrength = 0;
-    this.shieldImpactDuration = 0.24;
-    this.shieldImpactTimer = 0;
-    this.shieldImpactStrength = 0;
-    this.shieldImpactAngle = 0;
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
@@ -653,8 +649,6 @@ export class BossEnemy extends BaseEnemy {
   updateInvulnerability(deltaTime) {
     if (!this.invulnerable) {
       this._invulnLog = 0;
-      this.shieldImpactTimer = 0;
-      this.shieldImpactStrength = 0;
       return;
     }
 
@@ -669,8 +663,6 @@ export class BossEnemy extends BaseEnemy {
       this.invulnerable = false;
       this.invulnerabilityTimer = 0;
       this._invulnLog = 0;
-      this.shieldImpactTimer = 0;
-      this.shieldImpactStrength = 0;
 
       this.emitInvulnerabilityState(false, {
         reason: 'timer-expired',
@@ -889,13 +881,6 @@ export class BossEnemy extends BaseEnemy {
       this.damageFlashTimer = Math.max(0, this.damageFlashTimer - deltaTime);
       if (this.damageFlashTimer === 0) {
         this.damageFlashStrength = 0;
-      }
-    }
-
-    if (this.shieldImpactTimer > 0) {
-      this.shieldImpactTimer = Math.max(0, this.shieldImpactTimer - deltaTime);
-      if (this.shieldImpactTimer === 0) {
-        this.shieldImpactStrength = 0;
       }
     }
   }
@@ -1216,33 +1201,6 @@ export class BossEnemy extends BaseEnemy {
     );
   }
 
-  registerInvulnerabilityHit(position = null) {
-    if (!this.invulnerable) {
-      return;
-    }
-
-    let impactAngle = Number.isFinite(this.shieldImpactAngle)
-      ? this.shieldImpactAngle
-      : this.rotation || 0;
-
-    if (
-      position &&
-      Number.isFinite(position.x) &&
-      Number.isFinite(position.y) &&
-      Number.isFinite(this.x) &&
-      Number.isFinite(this.y)
-    ) {
-      impactAngle = Math.atan2(position.y - this.y, position.x - this.x);
-    }
-
-    this.shieldImpactAngle = impactAngle;
-    this.shieldImpactStrength = 1;
-    this.shieldImpactTimer = Math.max(
-      this.shieldImpactTimer || 0,
-      this.shieldImpactDuration
-    );
-  }
-
   evaluatePhaseTransition() {
     this.syncPhaseThresholds();
     if (!this.phaseHealthThresholds.length) {
@@ -1270,8 +1228,6 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = true;
     this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
-    this.shieldImpactTimer = 0;
-    this.shieldImpactStrength = 0;
 
     this.emitInvulnerabilityState(true, {
       reason: 'phase-transition',
@@ -1366,9 +1322,6 @@ export class BossEnemy extends BaseEnemy {
   resetFeedbackState() {
     this.damageFlashTimer = 0;
     this.damageFlashStrength = 0;
-    this.shieldImpactTimer = 0;
-    this.shieldImpactStrength = 0;
-    this.shieldImpactAngle = 0;
   }
 
   resetForPool() {

@@ -40,7 +40,6 @@ export class Projectiles {
     this.bossProjectileTrailLength = 18;
     this.projectilePerf = {
       projectileUpdateMs: 0,
-      projectileRenderMs: 0,
       projectilePlayerCount: 0,
       projectileEnemyCount: 0,
       projectilePlayerTrailPoints: 0,
@@ -668,7 +667,6 @@ export class Projectiles {
   // Zeroes the counters and returns every shot in flight to the pool.
   reset() {
     this.projectilePerf.projectileUpdateMs = 0;
-    this.projectilePerf.projectileRenderMs = 0;
     this.projectilePerf.projectilePlayerCount = 0;
     this.projectilePerf.projectileEnemyCount = 0;
     this.projectilePerf.projectilePlayerTrailPoints = 0;

@@ -10,7 +10,6 @@ import {
   withAlpha,
 } from '../data/constants/palette.js';
 import { getRenderScale, resolveDevicePixelRatio } from '../core/viewport.js';
-import { getEmissive } from '../core/bloomLayer.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
@@ -145,15 +144,6 @@ export function resolveControlScheme(setting) {
 const coneLength = (thrust, thrusterLevel) =>
   (4 + 12 * thrust) * (1 + 0.1 * thrusterLevel);
 
-// The emissive layer shares the frame transform; sync it to the caller's
-// current transform (recoil, ship rotation) and hand it back saved.
-const beginEmissive = (emissive, ctx) => {
-  if (!emissive) return null;
-  emissive.save();
-  emissive.setTransform(ctx.getTransform());
-  return emissive;
-};
-
 const createSpriteCanvas = (width, height, scale) => {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -280,7 +270,7 @@ const buildHullGeometry = (visual, levels) => {
 };
 
 // Static hull art per (hull, levels, scale): matte base, seams + nozzles,
-// and the 1 px player rim (emissive layer only).
+// and the 1 px player rim (only the dash ghosts draw it).
 const bakeHullSprites = (geometry, scale) => {
   const half = Math.ceil(geometry.extent + 3);
   const size = half * 2;
@@ -1307,19 +1297,14 @@ class PlayerSystem extends BaseSystem {
     );
     if (!sprites) return;
     const { half } = sprites;
-    const emissive = beginEmissive(getEmissive(), ctx);
-    const layers = emissive ? [ctx, emissive] : [ctx];
-    layers.forEach((target) => {
-      this.dashGhosts.forEach((ghost) => {
-        target.save();
-        target.translate(ghost.x, ghost.y);
-        target.rotate(ghost.angle);
-        target.globalAlpha = 0.6 * (1 - ghost.age / DASH_GHOST_LIFE);
-        target.drawImage(sprites.rim, -half, -half, half * 2, half * 2);
-        target.restore();
-      });
+    this.dashGhosts.forEach((ghost) => {
+      ctx.save();
+      ctx.translate(ghost.x, ghost.y);
+      ctx.rotate(ghost.angle);
+      ctx.globalAlpha = 0.6 * (1 - ghost.age / DASH_GHOST_LIFE);
+      ctx.drawImage(sprites.rim, -half, -half, half * 2, half * 2);
+      ctx.restore();
     });
-    emissive?.restore();
   }
 
   // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
@@ -1832,24 +1817,20 @@ class PlayerSystem extends BaseSystem {
     const angle = Number.isFinite(options.angle) ? options.angle : this.angle;
     const thrust = options.thrust || IDLE_THRUST;
     const cone = getConeSprite(geometry.accent, pixelScale);
-    const emissive = beginEmissive(options.emissive, ctx);
-    const layers = emissive ? [ctx, emissive] : [ctx];
 
     // main thrust sits under the hull
     if (cone && thrust.main > 0.01) {
       const length = coneLength(thrust.main, levels.thruster);
       geometry.nozzles.forEach((nozzle) => {
-        layers.forEach((target) =>
-          drawCone(
-            target,
-            cone,
-            nozzle.exitX,
-            nozzle.y,
-            Math.PI,
-            length * (nozzle.r / geometry.nozzleRadius),
-            nozzle.r * 5,
-            thrust.main
-          )
+        drawCone(
+          ctx,
+          cone,
+          nozzle.exitX,
+          nozzle.y,
+          Math.PI,
+          length * (nozzle.r / geometry.nozzleRadius),
+          nozzle.r * 5,
+          thrust.main
         );
       });
     }
@@ -1861,17 +1842,15 @@ class PlayerSystem extends BaseSystem {
 
     if (cone && thrust.aux > 0.01) {
       geometry.retroPorts.forEach((port) => {
-        layers.forEach((target) =>
-          drawCone(
-            target,
-            cone,
-            port.x,
-            port.y,
-            0,
-            3 + 7 * thrust.aux,
-            3.5,
-            thrust.aux
-          )
+        drawCone(
+          ctx,
+          cone,
+          port.x,
+          port.y,
+          0,
+          3 + 7 * thrust.aux,
+          3.5,
+          thrust.aux
         );
       });
     }
@@ -1879,42 +1858,18 @@ class PlayerSystem extends BaseSystem {
       geometry.rcsPorts.forEach((port) => {
         const amount = port.y < 0 ? thrust.sideL : thrust.sideR;
         if (amount > 0.01) {
-          layers.forEach((target) =>
-            drawCone(
-              target,
-              cone,
-              port.x,
-              port.y,
-              port.y < 0 ? -Math.PI / 2 : Math.PI / 2,
-              2 + 5 * amount,
-              3,
-              amount
-            )
+          drawCone(
+            ctx,
+            cone,
+            port.x,
+            port.y,
+            port.y < 0 ? -Math.PI / 2 : Math.PI / 2,
+            2 + 5 * amount,
+            3,
+            amount
           );
         }
       });
-    }
-
-    if (emissive) {
-      emissive.drawImage(sprites.rim, -half, -half, half * 2, half * 2);
-      const { cockpit } = geometry;
-      emissive.lineCap = 'round';
-      emissive.lineWidth = cockpit.width;
-      emissive.strokeStyle = withAlpha(PALETTE.player, 0.7);
-      emissive.beginPath();
-      emissive.moveTo(cockpit.from.x, cockpit.from.y);
-      emissive.lineTo(cockpit.to.x, cockpit.to.y);
-      emissive.stroke();
-      emissive.fillStyle = withAlpha(
-        geometry.accent,
-        0.35 + thrust.main * 0.65
-      );
-      geometry.nozzles.forEach((nozzle) => {
-        emissive.beginPath();
-        emissive.arc(nozzle.exitX, nozzle.y, nozzle.r, 0, Math.PI * 2);
-        emissive.fill();
-      });
-      emissive.restore();
     }
 
     return true;
@@ -2085,7 +2040,7 @@ class PlayerSystem extends BaseSystem {
   }
 
   // Persistent light trail behind the main nozzles (world space).
-  renderThrusterTrail(ctx, emissive, geometry, intensity) {
+  renderThrusterTrail(ctx, geometry, intensity) {
     const trail = this.thrusterTrail;
     const exit = this.getLocalToWorld(geometry.minNozzleX, 0);
     const slot = trail.points[trail.head];
@@ -2096,13 +2051,10 @@ class PlayerSystem extends BaseSystem {
     trail.count = Math.min(THRUSTER_TRAIL_LENGTH, trail.count + 1);
     if (trail.count < 2) return;
 
-    const layers = emissive ? [ctx, emissive] : [ctx];
     const start = trail.head - trail.count + THRUSTER_TRAIL_LENGTH;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    layers.forEach((target) => {
-      target.lineCap = 'round';
-    });
+    ctx.lineCap = 'round';
     for (let k = 1; k < trail.count; k += 1) {
       const a = trail.points[(start + k - 1) % THRUSTER_TRAIL_LENGTH];
       const b = trail.points[(start + k) % THRUSTER_TRAIL_LENGTH];
@@ -2110,14 +2062,12 @@ class PlayerSystem extends BaseSystem {
       if (strength < 0.02) continue;
       if (Math.hypot(b.x - a.x, b.y - a.y) > TRAIL_BREAK_DISTANCE) continue;
       const age = k / (trail.count - 1);
-      layers.forEach((target) => {
-        target.strokeStyle = withAlpha(geometry.accent, 0.5 * age * strength);
-        target.lineWidth = (0.5 + 2.5 * age) * strength;
-        target.beginPath();
-        target.moveTo(a.x, a.y);
-        target.lineTo(b.x, b.y);
-        target.stroke();
-      });
+      ctx.strokeStyle = withAlpha(geometry.accent, 0.5 * age * strength);
+      ctx.lineWidth = (0.5 + 2.5 * age) * strength;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -2131,9 +2081,7 @@ class PlayerSystem extends BaseSystem {
     const thrust = this.updateThrusterVisual();
     const levels = this.getHullVisualLevels();
     const geometry = this.getHullGeometry(this.currentHull, levels);
-    const emissive = beginEmissive(getEmissive(), ctx);
-    this.renderThrusterTrail(ctx, emissive, geometry, thrust.main);
-    emissive?.restore();
+    this.renderThrusterTrail(ctx, geometry, thrust.main);
     this.renderDashGhosts(ctx, geometry, levels);
 
     ctx.save();
@@ -2148,7 +2096,6 @@ class PlayerSystem extends BaseSystem {
       levels,
       angle: this.angle,
       thrust,
-      emissive: getEmissive(),
     });
     this.renderTurret(ctx);
 
@@ -2171,15 +2118,10 @@ class PlayerSystem extends BaseSystem {
     ctx.lineWidth = LINE.hair;
     ctx.strokeStyle = withAlpha(PALETTE.player, 0.8);
     ctx.stroke();
-    const emissive = beginEmissive(getEmissive(), ctx);
-    [ctx, emissive].forEach((target) => {
-      if (!target) return;
-      target.fillStyle = PALETTE.shot;
-      target.beginPath();
-      target.arc(1.6, 0, 1, 0, Math.PI * 2);
-      target.fill();
-    });
-    emissive?.restore();
+    ctx.fillStyle = PALETTE.shot;
+    ctx.beginPath();
+    ctx.arc(1.6, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 

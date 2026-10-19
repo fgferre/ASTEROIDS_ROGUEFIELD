@@ -1,5 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-import RandomService from '../../../src/core/RandomService.js';
+import { describe, expect, it } from 'vitest';
 import { BaseEnemy } from '../../../src/modules/enemies/base/BaseEnemy.js';
 import { MovementComponent } from '../../../src/modules/enemies/components/MovementComponent.js';
 
@@ -28,23 +27,5 @@ describe('BaseEnemy pool reuse', () => {
 
     expect(enemy.vx).toBe(0);
     expect(enemy.vy).toBe(40);
-  });
-
-  it('starts a reused mine lifetime clock from zero', () => {
-    const enemy = new BaseEnemy({});
-    const proximity = new MovementComponent({
-      strategy: 'proximity',
-      lifetime: 30,
-    });
-    const random = new RandomService('pool-test');
-    enemy.markForRemoval = vi.fn();
-
-    enemy.initialize({ id: 'first-mine' });
-    proximity.update({ enemy, deltaTime: 29, random });
-    enemy.resetForPool();
-    enemy.initialize({ id: 'second-mine' });
-    proximity.update({ enemy, deltaTime: 2, random });
-
-    expect(enemy.markForRemoval).not.toHaveBeenCalled();
   });
 });

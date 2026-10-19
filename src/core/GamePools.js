@@ -19,7 +19,6 @@ import { debugLog } from './debugLogging.js';
 import { Drone } from '../modules/enemies/types/Drone.js';
 import { Mine } from '../modules/enemies/types/Mine.js';
 import { Hunter } from '../modules/enemies/types/Hunter.js';
-import { BossEnemy } from '../modules/enemies/types/BossEnemy.js';
 import { Husk } from '../modules/enemies/types/Husk.js';
 import { Ram } from '../modules/enemies/types/Ram.js';
 import { Weaver } from '../modules/enemies/types/Weaver.js';
@@ -45,7 +44,6 @@ export class GamePools {
   static drones = null;
   static mines = null;
   static hunters = null;
-  static bosses = null;
   static husks = null;
   static rams = null;
   static weavers = null;
@@ -77,7 +75,6 @@ export class GamePools {
       drones: { initial: 10, max: 30 },
       mines: { initial: 5, max: 15 },
       hunters: { initial: 5, max: 12 },
-      bosses: { initial: 1, max: 3 },
       husks: { initial: 3, max: 12 },
       rams: { initial: 3, max: 12 },
       weavers: { initial: 2, max: 8 },
@@ -99,7 +96,6 @@ export class GamePools {
     this.drones = this.createEnemyPool(Drone, config.drones);
     this.mines = this.createEnemyPool(Mine, config.mines);
     this.hunters = this.createEnemyPool(Hunter, config.hunters);
-    this.bosses = this.createEnemyPool(BossEnemy, config.bosses);
     this.husks = this.createEnemyPool(Husk, config.husks);
     this.rams = this.createEnemyPool(Ram, config.rams);
     this.weavers = this.createEnemyPool(Weaver, config.weavers);
@@ -576,7 +572,6 @@ export class GamePools {
       this.drones,
       this.mines,
       this.hunters,
-      this.bosses,
       this.husks,
       this.rams,
       this.weavers,
@@ -610,7 +605,6 @@ export class GamePools {
       this.drones,
       this.mines,
       this.hunters,
-      this.bosses,
       this.husks,
       this.rams,
       this.weavers,
@@ -650,7 +644,6 @@ export class GamePools {
       drones: this.drones?.getStats() || null,
       mines: this.mines?.getStats() || null,
       hunters: this.hunters?.getStats() || null,
-      bosses: this.bosses?.getStats() || null,
       husks: this.husks?.getStats() || null,
       rams: this.rams?.getStats() || null,
       weavers: this.weavers?.getStats() || null,
@@ -689,7 +682,6 @@ export class GamePools {
       drones: this.drones,
       mines: this.mines,
       hunters: this.hunters,
-      bosses: this.bosses,
       husks: this.husks,
       rams: this.rams,
       weavers: this.weavers,
@@ -734,7 +726,6 @@ export class GamePools {
     this.drones = null;
     this.mines = null;
     this.hunters = null;
-    this.bosses = null;
     this.husks = null;
     this.rams = null;
     this.weavers = null;
@@ -797,7 +788,6 @@ if (typeof window !== 'undefined' && IS_DEV) {
     debugLog: () => GamePools.debugLog(),
     releaseAll: () => GamePools.releaseAll(),
     autoManage: () => GamePools.autoManageAll(),
-    bosses: () => GamePools.bosses,
   };
 }
 
@@ -809,7 +799,6 @@ export const {
   drones: DronePool,
   mines: MinePool,
   hunters: HunterPool,
-  bosses: BossPool,
   xpOrbs: XPOrbPool,
   shockwaves: ShockwavePool,
   tempObjects: TempObjectPool,

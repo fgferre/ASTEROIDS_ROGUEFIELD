@@ -50,7 +50,6 @@ export const MINE_COMPONENTS = deepFreeze({
   movement: {
     strategy: 'proximity',
     driftSpeed: 0,
-    lifetime: 30,
   },
   weapon: {
     pattern: 'proximity',

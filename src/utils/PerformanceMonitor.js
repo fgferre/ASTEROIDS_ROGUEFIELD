@@ -74,7 +74,6 @@ export class PerformanceMonitor {
       wave: 0,
       score: 0,
       projectileUpdateMs: 0,
-      projectileRenderMs: 0,
       projectilePlayerCount: 0,
       projectileEnemyCount: 0,
       projectilePlayerTrailPoints: 0,
@@ -577,7 +576,6 @@ export class PerformanceMonitor {
       <div>Enemy: ${m.projectileEnemyCount || 0}</div>
       <div>Trails: ${m.projectilePlayerTrailPoints || 0}</div>
       <div>Update: ${(m.projectileUpdateMs || 0).toFixed(1)}ms</div>
-      <div>Render: ${(m.projectileRenderMs || 0).toFixed(1)}ms</div>
       <div style="margin-top:5px;color:#ff0;">─── ENTITIES ───</div>
       <div>Enemies: ${m.enemies || 0}</div>
       <div>Orbs: ${m.orbs || 0}</div>

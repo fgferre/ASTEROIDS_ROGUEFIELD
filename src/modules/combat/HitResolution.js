@@ -106,13 +106,6 @@ export class HitResolution {
       Boolean(enemy.invulnerable) &&
       effectiveDamage <= 0;
 
-    if (
-      blockedByInvulnerability &&
-      typeof enemy.registerInvulnerabilityHit === 'function'
-    ) {
-      enemy.registerInvulnerabilityHit({ x: bullet.x, y: bullet.y });
-    }
-
     damageResult.effectiveDamage = effectiveDamage;
     damageResult.blocked = blockedByInvulnerability;
 
