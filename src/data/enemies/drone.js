@@ -4,9 +4,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 /**
  * Drone enemy configuration following canonical schema.
- * See schema.js for complete field definitions and naming conventions.
  *
- * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
  */
 
 // === DRONE CONFIGURATION ===
