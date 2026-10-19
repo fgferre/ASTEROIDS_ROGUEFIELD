@@ -26,8 +26,12 @@ liga os dois; quem adiciona conteúdo não toca no motor.** Hoje um inimigo novo
 linhas; uma arma, 8 arquivos com ids à mão; testes enumeram tipos à mão. As duas metades abaixo correm em paralelo
 (arquivos disjuntos), um commit por fatia, comportamento igual antes e depois (mesmos testes verdes).
 
-**Regra que vira verificação (primeira fatia de todas):** teto de **1.200 linhas por arquivo** no ESLint (`max-lines`),
-com lista de exceções nomeadas que só pode diminuir — a lista é o placar da dívida. Hoje acima do teto: 13 arquivos.
+- [x] **Regra que vira verificação (primeira fatia de todas; feita 19/10, ramo `r0/teto-de-linhas`):** teto de **1.200
+      linhas por arquivo** no ESLint (`max-lines`), com lista de exceções nomeadas que só pode diminuir — a lista é o
+      placar da dívida (`OVER_THE_CAP` em `eslint.config.js`; `tests/process/max-lines.test.js` falha num nome cujo
+      arquivo voltou para baixo do teto). Medido em 19/10: **17 arquivos**, não 13. Além dos nove de 0b, a fábrica deve
+      encolher EnemySystem (3.159), WaveManager (2.749), Targeting (1.619), EnemyEffects (1.512) e BossEnemy (1.372);
+      SettingsPanel (1.328), UISystem (1.253) e o teste `aim-regression` (2.715) não têm etapa ainda.
 
 ### 0a — a fábrica de conteúdo
 

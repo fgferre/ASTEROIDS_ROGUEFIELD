@@ -23,6 +23,31 @@ const DEV_SWITCH_MESSAGE =
 const STORED =
   ":matches([parent.type='VariableDeclarator'], [parent.type='AssignmentExpression'], [parent.type='AssignmentPattern'], [parent.type='SpreadElement'], [parent.type='ReturnStatement'], [parent.type='CallExpression'], [parent.type='ArrowFunctionExpression'])";
 
+// Line cap (PLAN.md, Rodada 0). These files were over it when the cap arrived
+// (19/10/2026): the list is the debt scoreboard and only shrinks. A file
+// leaves it when it is split, and tests/process/max-lines.test.js fails on a
+// name whose file is back under the cap. Never add a name: split the file.
+export const MAX_LINES = 1200;
+export const OVER_THE_CAP = [
+  'src/modules/AudioSystem.js',
+  'src/modules/EnemySystem.js',
+  'src/modules/InputSystem.js',
+  'src/modules/MenuBackgroundSystem.js',
+  'src/modules/PhysicsSystem.js',
+  'src/modules/PlayerSystem.js',
+  'src/modules/UISystem.js',
+  'src/modules/XPOrbSystem.js',
+  'src/modules/combat/Targeting.js',
+  'src/modules/effects/EnemyEffects.js',
+  'src/modules/enemies/managers/WaveManager.js',
+  'src/modules/enemies/types/BossEnemy.js',
+  'src/modules/render3d/Renderer3D.js',
+  'src/modules/ui/AAAHudLayout.js',
+  'src/modules/ui/SettingsPanel.js',
+  'src/services/GameSessionService.js',
+  'tests/integration/aim-regression.test.js',
+];
+
 export default [
   {
     ignores: [
@@ -70,6 +95,7 @@ export default [
       ],
       'no-empty': ['error', { allowEmptyCatch: true }],
       'no-extra-boolean-cast': 'error',
+      'max-lines': ['error', { max: MAX_LINES }],
       // Determinism contract: all randomness goes through RandomService.
       // Allowed exceptions disable the rule inline with a reason:
       // MenuBackgroundSystem.withSeededMathRandom, the dev Math.random guard,
@@ -113,5 +139,9 @@ export default [
   {
     files: ['src/core/env.js'],
     rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    files: OVER_THE_CAP,
+    rules: { 'max-lines': 'off' },
   },
 ];
