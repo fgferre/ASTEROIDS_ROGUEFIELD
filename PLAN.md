@@ -69,7 +69,10 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
 - [x] **0a.2 Cena de conteúdo** (19/10): `?content=<id>` (ou `<tipo>/<id>`) põe inimigo (`&count=` até 300), chefe,
       arma, casco, carta ou camada diante da nave numa partida real, spawner parado, nave invulnerável; inimigo e chefe
       sem a nave atirar, a não ser com `&fire=1`. `src/bootstrap/contentScene.js`; visto no navegador (Caster).
-- [ ] **0a.3 Inimigo = receita.** Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
+- [ ] **0a.3 Inimigo = receita** (em curso 19/10): `RecipeEnemy` roda os comportamentos que o arquivo nomeia, de
+      `src/modules/enemies/behaviors/` (passes tick → steer → act por quadro; cada receita ganha uma subclasse com os
+      getters que as vistas leem). Feitos Caster, Shade, Leech, Husk, Bulwark (trace igual + trace rígido de 45 campos);
+      falta Drone, Hunter, Mine, Ram, Weaver. Pedido original: Biblioteca de ataques (tiro, rajada, arco com marcação, feixe, leque, pôr mina,
       investida, fase) e de mortes (dividir, filhotes, devolver orbes, explodir) sobre as estratégias de movimento que
       já existem; a receita declara stats, move, attack, onDeath, afixos, drops, cues, Códice e **papéis** para o
       diretor. Migrar os 11 inimigos um a um (Caster, Shade, Leech viram as primeiras receitas; suas classes somem).
