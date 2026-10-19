@@ -1,7 +1,7 @@
 // A hull: its collision outline, thruster ports, flight stats (multiplied in
 // PlayerSystem.resetStats before the Hangar's modifiers; proposta 18/10) and
 // procedural art (see ./lib/panels.js). Listed by src/data/shipModels.js.
-import { SHIP_SIZE } from '../../core/GameConstants.js';
+import { SHIP_SIZE } from '../../data/constants/physics.js';
 import { panelPair, pt } from './lib/panels.js';
 
 const S = SHIP_SIZE;

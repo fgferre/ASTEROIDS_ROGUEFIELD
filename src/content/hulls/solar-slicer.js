@@ -2,7 +2,7 @@
 // swept blades whose edges burn amber, twin amber thrusters set wide on the
 // blade roots and a low turret housing (playerMirror.js reads `blades` and
 // `turret`).
-import { SHIP_SIZE } from '../../core/GameConstants.js';
+import { SHIP_SIZE } from '../../data/constants/physics.js';
 import { panelPair, pt } from './lib/panels.js';
 
 const S = SHIP_SIZE;

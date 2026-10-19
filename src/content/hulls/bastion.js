@@ -2,7 +2,7 @@
 // heavy flat stern, layered armour plates on the shoulders edged in amber,
 // twin amber thrusters and darker steel plates (playerMirror.js reads `armor`
 // and `albedo`).
-import { SHIP_SIZE } from '../../core/GameConstants.js';
+import { SHIP_SIZE } from '../../data/constants/physics.js';
 import { panelPair, pt } from './lib/panels.js';
 
 const S = SHIP_SIZE;

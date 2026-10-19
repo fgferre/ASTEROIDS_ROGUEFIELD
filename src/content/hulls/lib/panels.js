@@ -9,7 +9,7 @@
 // `minLevel` hides a panel until that upgrade level. An `armor` panel rides
 // on the plates under it as two stacked plates trimmed in the accent; a
 // visual's `albedo` scales its hull tones.
-import { SHIP_SIZE } from '../../../core/GameConstants.js';
+import { SHIP_SIZE } from '../../../data/constants/physics.js';
 
 const S = SHIP_SIZE;
 export const pt = (x, y) => ({ x: x * S, y: y * S });
