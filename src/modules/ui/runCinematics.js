@@ -5,16 +5,25 @@
 // simulation is held (no step runs, so replays stay exact), a skip hint shows
 // and any key skips; the layer banner — the title card — shows once, when it
 // ends. Epilogue: the renderer pulls back as the Ring wakes, the victory line
-// plays over it, and the victory screen waits for it to end. A renderer that
-// can't move the camera (2D, reduced motion, `?camera=0`) refuses both, and
-// the run keeps the plain banner.
+// plays over it, and the victory screen waits for it to end. Warden arrival:
+// the camera visits the Warden under letterbox bars while the run plays on
+// (no hold, no skip). A renderer that can't move the camera (2D, reduced
+// motion, `?camera=0`) refuses all three, and the run keeps the plain banner.
 
-import { EPILOGUE_MS, INTRO_MS } from '../../core/cinematics.js';
+import {
+  EPILOGUE_MS,
+  INTRO_MS,
+  WARDEN_ARRIVAL,
+} from '../../core/cinematics.js';
+
+// The bars leave as the camera starts back; they are gone when it lands.
+const ARRIVAL_MS = (WARDEN_ARRIVAL.travelIn + WARDEN_ARRIVAL.hold) * 1000;
 
 export class RunCinematics {
   /**
    * `renderer()`/`hud()` resolve the current ones (playIntro, playEpilogue,
-   * endCinematic / cancelBanner, showCinematicHint). `holdSim(flag)` stops or
+   * playArrival, endCinematic / cancelBanner, showCinematicHint,
+   * showLetterbox). `holdSim(flag)` stops or
    * restarts the fixed step; `bindSkip(fn)` listens for the skip and returns
    * the unbind; `onIntroEnd()` shows the layer banner.
    */
@@ -73,6 +82,23 @@ export class RunCinematics {
     return true;
   }
 
+  /**
+   * The letterbox while the camera visits `warden`; false (nothing happens)
+   * when the renderer can't. Never over the intro or the epilogue; a second
+   * Warden during one only retargets the camera.
+   */
+  startArrival(warden) {
+    if (this.kind === 'arrival') {
+      return this.renderer()?.playArrival?.(warden) ?? false;
+    }
+    if (this.kind || !this.renderer()?.playArrival?.(warden)) {
+      return false;
+    }
+    this.hud()?.showLetterbox(true);
+    this.begin('arrival', ARRIVAL_MS, () => this.finish());
+    return true;
+  }
+
   /** Runs `show` when the epilogue ends; false (run it now) without one. */
   deferUntilEpilogueEnds(show) {
     if (this.kind !== 'epilogue') {
@@ -114,6 +140,9 @@ export class RunCinematics {
 
   finish() {
     const { kind } = this;
+    if (kind === 'arrival') {
+      this.hud()?.showLetterbox(false);
+    }
     clearTimeout(this.timer);
     this.unbindSkip?.();
     this.timer = null;

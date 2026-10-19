@@ -28,6 +28,7 @@ import {
   epiloguePath,
   followPose,
   introPath,
+  WARDEN_ARRIVAL,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import {
@@ -482,6 +483,24 @@ class Renderer3D extends BaseSystem {
       hold,
       frozenAt: freeze?.kind === kind ? freeze.t : null,
     };
+    return true;
+  }
+
+  /**
+   * The Warden's arrival: the follow camera travels to `warden` and back
+   * (WARDEN_ARRIVAL). False when nothing would move (no Warden, WebGL
+   * failed, `?camera=0`, reduced motion): the caller skips the letterbox.
+   */
+  playArrival(warden) {
+    if (
+      !warden ||
+      this.failed ||
+      !this.camera.isEnabled() ||
+      this.reducedMotion
+    ) {
+      return false;
+    }
+    this.camera.travelTo(warden, WARDEN_ARRIVAL);
     return true;
   }
 

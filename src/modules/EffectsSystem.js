@@ -89,6 +89,7 @@ export default class EffectsSystem extends BaseSystem {
         this.gameTime.addFreezeFrame(duration, fade),
       applyTimeDilation: (scale, options) =>
         this.gameTime.applyTimeDilation(scale, options),
+      motionReduced: () => this.motionReduced,
     });
     const burstDependencies = {
       particleEffects: this.particleEffects,

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { CAMERA_ZOOM } from '../../../src/core/camera.js';
+import { WARDEN_ARRIVAL } from '../../../src/core/cinematics.js';
 import { EventBus } from '../../../src/core/EventBus.js';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import RandomService from '../../../src/core/RandomService.js';
@@ -37,6 +39,26 @@ describe('Renderer3D dash and brake camera', () => {
     expect(zoomAfter('player-braked')).toBeGreaterThan(base);
     expect(zoomAfter('player-dashed', true)).toBe(base);
     expect(zoomAfter('player-braked', true)).toBe(base);
+  });
+});
+
+describe('Renderer3D Warden arrival', () => {
+  it('sends the camera to the Warden, never with reduced motion or ?camera=0, and a reset brings it home', () => {
+    const warden = { x: 500, y: 250 };
+    const renderer = new Renderer3D();
+    renderer.applyAccessibilityPreferences({ reducedMotion: true });
+    expect(renderer.playArrival(warden)).toBe(false);
+    renderer.applyAccessibilityPreferences({ reducedMotion: false });
+    renderer.camera.setMode('static');
+    expect(renderer.playArrival(warden)).toBe(false);
+    renderer.camera.setMode('dynamic');
+
+    expect(renderer.playArrival(warden)).toBe(true);
+    renderer.camera.update(400, 300, WARDEN_ARRIVAL.travelIn);
+    expect(renderer.camera.zoom).toBeCloseTo(WARDEN_ARRIVAL.zoom, 6);
+    renderer.onReset(); // a new run, the menu
+    renderer.camera.update(400, 300, 1 / 60);
+    expect(renderer.camera.zoom).toBeCloseTo(CAMERA_ZOOM, 6);
   });
 });
 

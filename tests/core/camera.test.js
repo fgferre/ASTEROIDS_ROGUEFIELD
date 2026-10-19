@@ -7,6 +7,7 @@ import {
   lookAheadFor,
   threatZoomFor,
 } from '../../src/core/camera.js';
+import { WARDEN_ARRIVAL } from '../../src/core/cinematics.js';
 
 const W = 800;
 const H = 600;
@@ -126,6 +127,43 @@ describe('createCamera', () => {
     camera.pulseZoom(1.5, 0.6);
     camera.update(W / 2, H / 2, 1 / 240);
     expect(Math.abs(camera.zoom - before)).toBeLessThan(0.02);
+  });
+
+  it('travels to the target, holds on it zoomed in, and comes back to the ship', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H });
+    const { travelIn, hold, travelBack, zoom } = WARDEN_ARRIVAL;
+    settle(camera, 300, 380);
+    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
+    settle(camera, 300, 380, travelIn + hold / 2);
+    expect(camera.x).toBeCloseTo(500, 6);
+    expect(camera.y).toBeCloseTo(250, 6);
+    expect(camera.zoom).toBeCloseTo(zoom, 6);
+    settle(camera, 300, 380, hold / 2 + travelBack + 2);
+    expect(camera.zoom).toBeCloseTo(1.3, 6);
+    // Back in the dead zone around the ship, like a plain follow.
+    expect(Math.abs(camera.x - 300)).toBeLessThan(30.1);
+    expect(Math.abs(camera.y - 380)).toBeLessThan(22.6);
+  });
+
+  it('only retargets a travel already under way, and a reset drops it', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H });
+    const { travelIn, hold, travelBack, zoom } = WARDEN_ARRIVAL;
+    settle(camera, 400, 380);
+    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
+    settle(camera, 400, 380, travelIn / 2);
+    camera.travelTo({ x: 300, y: 250 }, WARDEN_ARRIVAL);
+    settle(camera, 400, 380, travelIn / 2 + hold / 2);
+    expect(camera.x).toBeCloseTo(300, 6);
+    // Over on the first trip's clock: the second added no time.
+    settle(camera, 400, 380, hold / 2 + travelBack + 0.05);
+    expect(camera.zoom).toBeCloseTo(1.3, 6);
+
+    camera.travelTo({ x: 500, y: 250 }, WARDEN_ARRIVAL);
+    settle(camera, 400, 380, travelIn);
+    expect(camera.zoom).toBeCloseTo(zoom, 6);
+    camera.reset();
+    camera.update(400, 380, 1 / 60);
+    expect(camera.zoom).toBe(1.3);
   });
 
   it('saturates the look-ahead at 90 px toward the aim', () => {
