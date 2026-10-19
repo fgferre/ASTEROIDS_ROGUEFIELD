@@ -17,7 +17,7 @@ import { DeathBursts } from './dissolve.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
-import { createImpactPass } from './impactPass.js';
+import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { ScorchDecals } from './scorchDecals.js';
@@ -49,9 +49,14 @@ export const KEY_SHADOW = {
 };
 
 // Last linear → sRGB step of the composer (the passes work in linear; the
-// renderer's outputEncoding only applies when drawing to the screen).
+// renderer's outputEncoding only applies when drawing to the screen), on
+// frames the impact pass, which ends in the same step, does not run.
 const OUTPUT_SHADER = {
-  uniforms: { tDiffuse: { value: null } },
+  uniforms: {
+    tDiffuse: { value: null },
+    tBloom: { value: null },
+    uBloom: { value: 0 },
+  },
   vertexShader: `
 varying vec2 vUv;
 void main() {
@@ -59,10 +64,10 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`,
   fragmentShader: `
-uniform sampler2D tDiffuse;
+${SCENE_READ}
 varying vec2 vUv;
 void main() {
-  gl_FragColor = LinearTosRGB(texture2D(tDiffuse, vUv));
+  gl_FragColor = LinearTosRGB(vec4(sceneAt(vUv), 1.0));
 }`,
 };
 
@@ -107,10 +112,44 @@ function bloomFromUrl() {
   }
 }
 
+// A point light that adds nothing at a pixel (the idle flash pool and the
+// Warden light sit at 0; past its range it fades to 0) skips the lit
+// materials' BRDF there: the same sum for less work on every lit pixel, and
+// a horde of machines is a lot of lit pixels (PLAN.md 0a.8). Before any
+// program compiles.
+function skipDarkPointLights(THREE) {
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  const start = chunk.indexOf('NUM_POINT_LIGHTS > 0');
+  const end = chunk.indexOf('#pragma unroll_loop_end', start);
+  THREE.ShaderChunk.lights_fragment_begin =
+    chunk.slice(0, start) +
+    chunk
+      .slice(start, end)
+      .replace('RE_Direct(', 'if ( directLight.visible ) RE_Direct(') +
+    chunk.slice(end);
+}
+
+// The bloom's last step, its half-res result blended over the whole scene
+// target, moves into the read of the pass after it (impactPass.js
+// SCENE_READ): one full-screen read and write less per frame at native
+// resolution, where a horde of lit machines already fills the GPU (PLAN.md
+// 0a.8). The bloom's copy draw is hidden; `passes` add its result on frames
+// it ran.
+function foldBloom(bloomPass, passes) {
+  bloomPass.materialCopy.visible = false;
+  passes.forEach(({ uniforms }) => {
+    uniforms.tBloom.value = bloomPass.renderTargetsHorizontal[0].texture;
+    Object.defineProperty(uniforms.uBloom, 'value', {
+      get: () => (bloomPass.enabled ? 1 : 0),
+    });
+  });
+}
+
 // `seeded` runs object creation inside the menu's seeded Math.random swap
 // (Three.js draws UUIDs from it).
 export function setupThree(seeded) {
   const THREE = window.THREE;
+  skipDarkPointLights(THREE);
   const canvas = document.getElementById('game-canvas');
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -196,7 +235,13 @@ export function setupThree(seeded) {
   composer.addPass(bloomPass);
   const impactPass = createImpactPass(THREE);
   composer.addPass(impactPass);
-  composer.addPass(new THREE.ShaderPass(OUTPUT_SHADER));
+  // the impact pass ends in the sRGB step: one of the two runs, never both
+  const outputPass = new THREE.ShaderPass(OUTPUT_SHADER);
+  Object.defineProperty(outputPass, 'enabled', {
+    get: () => !impactPass.enabled,
+  });
+  composer.addPass(outputPass);
+  foldBloom(bloomPass, [impactPass, outputPass]);
   const smaaPass = new THREE.SMAAPass(width, height);
   composer.addPass(smaaPass);
 
