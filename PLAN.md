@@ -85,8 +85,12 @@ caster, shade, leech —, cada id copiado à mão em ~10 arquivos do motor):**
       uma arma pedir.
 - [ ] **0a.5 Visual = receita.** Vocabulário curto (partes primitivas, papel de paleta, pontos emissivos, escala, o que
       anima) lido por um construtor só em `render3d`; inimigo novo não escreve render.
-- [ ] **0a.6 Diretor por papéis.** Roster e surtos das camadas sorteiam por papel e peso (`artillery`, `flanker`,
-      `scavenger`, `fromLayer`), não por nome.
+- [x] **0a.6 Diretor por papéis** (19/10): camadas, surtos e a Lua dos Caçadores pedem papéis (skirmisher, hazard,
+      sniper, carrier, charger, minelayer, tank, artillery, flanker, scavenger); cada inimigo declara `roles`, `weight`,
+      `fromLayer`. Um candidato: sem sorteio; vários: sorteio por peso por unidade num fluxo de random próprio, criado só
+      então — trace igual. Um inimigo de teste com papel existente entra nas camadas a partir do seu `fromLayer`.
+      Também 19/10: efeitos de tiro e morte, sons, explosão, Códice e fala de avistamento leem o arquivo do inimigo, com
+      padrões para um inimigo novo (registros de efeitos e de sons idênticos para os dez).
 - [ ] **0a.7 `CONTENT.md`** de uma página: como adicionar inimigo, arma, carta, casco, fase. O brief de um worker vira
       "adicione X seguindo CONTENT.md" — 1–2 arquivos, cinco em paralelo sem conflito.
 - [ ] **0a.8 Motor de horda** — medição de partida (19/10, neste Mac M1, Chromium com a GPU real via ANGLE Metal,
