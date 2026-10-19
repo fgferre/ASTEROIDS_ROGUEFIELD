@@ -9,9 +9,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
+import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import {
   createHeadlessGame,
   installDomStubs,
+  keyEvent,
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
 
@@ -24,6 +26,20 @@ const SECONDS = 60;
 const HASH_CHARS = 12;
 const WEAPON_LAYER = 9; // seven enemy kinds on the field within 20 s
 
+// What the pilot-route scenarios install first: the hold-S emergency brake
+// (Braking System 3 needs RCS 2, which needs Propulsors) and the deflector
+// shield (needs Energy Shield).
+const PILOT_CARDS = [
+  'propulsors',
+  'rcs_system',
+  'rcs_system',
+  'braking_system',
+  'braking_system',
+  'braking_system',
+  'shield',
+  'deflector_shield',
+];
+
 const SCENARIOS = [
   ...Array.from({ length: 15 }, (_, i) => ({
     name: `layer-${i + 1}`,
@@ -31,9 +47,57 @@ const SCENARIOS = [
   })),
   { name: 'layer-17-endless', layer: 17 },
   { name: 'boss-rush', bossRush: true },
-  { name: 'harmonic', layer: WEAPON_LAYER, card: 'harmonic_resonator' },
-  { name: 'scatter', layer: WEAPON_LAYER, card: 'scatter_coil' },
+  { name: 'harmonic', layer: WEAPON_LAYER, cards: ['harmonic_resonator'] },
+  { name: 'scatter', layer: WEAPON_LAYER, cards: ['scatter_coil'] },
+  { name: 'pilot-route-layer-4', layer: 4, cards: PILOT_CARDS, route: true },
+  {
+    name: 'pilot-route-bastion',
+    layer: WEAPON_LAYER,
+    cards: PILOT_CARDS,
+    route: true,
+    hull: BASTION_HULL_ID,
+  },
 ];
+
+// The pilot's route, by frame number only, through the real key handlers.
+// Move keys loop up, right, down, left, one second each. A dash at 1.5 s and
+// every 3 s after. Every 5 s the pilot lets go of the loop and holds S alone
+// for 0.4 s: the emergency brake fires only when S pushes against the motion
+// (at 5 s, 25 s and 45 s, after an 'up' leg), so the others are failed tries.
+// The shield key at 8 s (raises it) and 35 s (already up).
+const ROUTE_KEYS = ['KeyW', 'KeyD', 'KeyS', 'KeyA'];
+const BRAKE_HOLD_FRAMES = 24;
+
+function routeKeys(frame) {
+  const second = Math.floor(frame / FRAMES_PER_SECOND);
+  const braking =
+    second > 0 &&
+    second % 5 === 0 &&
+    frame - second * FRAMES_PER_SECOND < BRAKE_HOLD_FRAMES;
+  const keys = [braking ? 'KeyS' : ROUTE_KEYS[second % ROUTE_KEYS.length]];
+  // Taps are held for one frame.
+  if (frame % (3 * FRAMES_PER_SECOND) === FRAMES_PER_SECOND * 1.5) {
+    keys.push('ShiftLeft');
+  }
+  if (frame === 8 * FRAMES_PER_SECOND || frame === 35 * FRAMES_PER_SECOND) {
+    keys.push('KeyE');
+  }
+  return keys;
+}
+
+function createPilot(input) {
+  let pressed = [];
+  return (frame) => {
+    const next = routeKeys(frame);
+    pressed
+      .filter((code) => !next.includes(code))
+      .forEach((code) => input.onKeyUp(keyEvent(code)));
+    next
+      .filter((code) => !pressed.includes(code))
+      .forEach((code) => input.onKeyDown(keyEvent(code)));
+    pressed = next;
+  };
+}
 
 function jumpToLayer(enemies, layer) {
   enemies.releaseAllAsteroidsToPool();
@@ -42,11 +106,13 @@ function jumpToLayer(enemies, layer) {
   enemies.startNextWave();
 }
 
-// Weapon cards unlock at pilot level 3: the level is lifted for the pick only.
-function applyCard(progression, card) {
+// Cards unlock at pilot level 3 and up: the level is lifted for the picks only.
+function applyCards(progression, cards) {
   const { level } = progression;
   progression.level = Math.max(level, 10);
-  expect(progression.applyUpgrade(card)).toBe(true);
+  for (const card of cards) {
+    expect(progression.applyUpgrade(card)).toBe(true);
+  }
   progression.level = level;
 }
 
@@ -78,7 +144,7 @@ function frameState({ player, enemies, combat, progression, 'xp-orbs': orbs }) {
 }
 
 /** Plays one scenario; returns one short state hash and one event hash per second. */
-function traceScenario({ layer, bossRush, card }) {
+function traceScenario({ layer, bossRush, cards = [], route, hull }) {
   const game = createHeadlessGame();
   const { services, eventBus } = game;
   const { player, enemies, progression } = services;
@@ -90,10 +156,15 @@ function traceScenario({ layer, bossRush, card }) {
     return emit(name, ...args);
   };
 
+  if (hull) {
+    game.session.resolveServiceInstance('hangar').owned[`${hull}-hull`] = true;
+    services.settings.setSetting('gameplay', 'selectedHull', hull);
+  }
   game.session.startNewRun({ source: 'test', bossRush });
   player.setInvulnerableTimer(1e9);
   if (layer) jumpToLayer(enemies, layer);
-  if (card) applyCard(progression, card);
+  applyCards(progression, cards);
+  const fly = route ? createPilot(services.input) : null;
 
   const trace = { state: [], events: [] };
   for (let second = 0; second < SECONDS; second += 1) {
@@ -103,6 +174,7 @@ function traceScenario({ layer, bossRush, card }) {
       if (game.takeOfferedUpgrade()) {
         progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
       }
+      fly?.(second * FRAMES_PER_SECOND + frame);
       game.step();
       state.update(`${frameState(services)}\n`);
       names.update(`${events.join(',')}\n`);
