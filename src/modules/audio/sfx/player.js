@@ -19,7 +19,7 @@ const DASH_SFX = Object.freeze({
 });
 // proposta 18/10: the emergency brake is a reverse-thruster burst (noise, its
 // band sweeping down) and a low thud once the ship is at rest, `thud.delay`
-// s in (the brake's stopTime, data/upgrades/mobility.js).
+// s in (the brake's stopTime, src/content/cards/braking_system.js).
 const BRAKE_SFX = Object.freeze({
   seconds: 0.3,
   attack: 0.015,

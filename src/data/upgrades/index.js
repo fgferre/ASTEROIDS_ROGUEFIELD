@@ -2,20 +2,15 @@
 
 // Aggregator for all upgrade definitions
 // Maintains backward compatibility with original upgrades.js structure
+//
+// One file per card in src/content/cards/, listed by `order` (the order of
+// the catalog, which decides what a level-up offers first).
 
+import { listContent } from '../../content/registry.js';
 import { deepFreeze } from '../../utils/deepFreeze.js';
 import { UPGRADE_CATEGORIES } from './categories.js';
-import { OFFENSE_UPGRADES } from './offense.js';
-import { DEFENSE_UPGRADES } from './defense.js';
-import { MOBILITY_UPGRADES } from './mobility.js';
-import { UTILITY_UPGRADES } from './utility.js';
 
-const UPGRADE_LIBRARY = deepFreeze([
-  ...OFFENSE_UPGRADES,
-  ...DEFENSE_UPGRADES,
-  ...MOBILITY_UPGRADES,
-  ...UTILITY_UPGRADES,
-]);
+const UPGRADE_LIBRARY = deepFreeze(listContent('cards'));
 
 export { UPGRADE_CATEGORIES };
 export default UPGRADE_LIBRARY;
