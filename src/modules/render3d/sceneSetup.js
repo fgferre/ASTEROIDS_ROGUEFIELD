@@ -23,7 +23,7 @@ import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
-import { SpaceField } from './spaceField.js';
+import { CAMERA_FAR, SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
 
 export const FOV = 38;
@@ -166,8 +166,8 @@ export function setupThree(seeded) {
   renderer.info.autoReset = false;
 
   const scene = new THREE.Scene();
-  // Far enough for the nebula from the cinematics' high shots.
-  const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 9000);
+  // Far enough for the nebula from the high and the low shots (spaceField).
+  const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, CAMERA_FAR);
 
   // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in direction;
   // on high/ultra it casts shadows between the 3D objects (applyShadows),
