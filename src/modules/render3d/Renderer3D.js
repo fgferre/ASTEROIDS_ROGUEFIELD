@@ -849,8 +849,8 @@ class Renderer3D extends BaseSystem {
   }
 
   // The lock marks (overlayMirror.js).
-  mirrorLocks(player) {
-    mirrorLocks(this.three, this.cachedCombat, player);
+  mirrorLocks() {
+    mirrorLocks(this.three, this.cachedCombat);
   }
 
   // The boss-transition border and wash (overlayMirror.js).

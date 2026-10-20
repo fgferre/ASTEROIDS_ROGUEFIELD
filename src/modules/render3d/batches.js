@@ -459,8 +459,11 @@ export class RibbonBatch {
     }
   }
 
-  /** A flat band on the field plane (floor marks: lock lines, markers). */
-  segment(ax, ay, bx, by, h, rgb, width, gain) {
+  /**
+   * A flat band on the field plane (floor marks: lock lines, markers), at
+   * height `h`, or rising to `ah` at its start (a lock line from the turret).
+   */
+  segment(ax, ay, bx, by, h, rgb, width, gain, ah = h) {
     if (this.verts + 4 > this.maxVerts) return;
     const dx = bx - ax;
     const dy = by - ay;
@@ -475,8 +478,8 @@ export class RibbonBatch {
     const r = rgb[0] * gain;
     const g = rgb[1] * gain;
     const b = rgb[2] * gain;
-    this.vertex(x0 + nx, h, z0 + ny, 0, 0, 0, r, g, b);
-    this.vertex(x0 - nx, h, z0 - ny, 0, 0, 0, r, g, b);
+    this.vertex(x0 + nx, ah, z0 + ny, 0, 0, 0, r, g, b);
+    this.vertex(x0 - nx, ah, z0 - ny, 0, 0, 0, r, g, b);
     this.vertex(x1 + nx, h, z1 + ny, 0, 0, 0, r, g, b);
     this.vertex(x1 - nx, h, z1 - ny, 0, 0, 0, r, g, b);
   }

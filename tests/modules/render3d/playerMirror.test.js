@@ -285,6 +285,16 @@ describe('PlayerMirror', () => {
         return `${Math.round(muzzle.x)},${Math.round(muzzle.y)}`;
       });
       expect(new Set(tips).size, hull.id).toBe(3);
+      // every lock line leaves the turret's axis, at its own barrel's height
+      const pivot = player.getTurretPivot();
+      const heights = [0, 1, 2, 3].map((i) => {
+        const from = mirror.lockLineOrigin(i);
+        expect(from.x + HALF_W, hull.id).toBeCloseTo(pivot.x, 2);
+        expect(from.z + HALF_H, hull.id).toBeCloseTo(pivot.y, 2);
+        return from.y;
+      });
+      expect(heights[1], hull.id).toBeGreaterThan(turretTop);
+      expect(heights[3], hull.id).toBeGreaterThan(heights[1]);
     });
     GamePools.releaseAll();
   });

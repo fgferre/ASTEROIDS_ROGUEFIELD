@@ -271,6 +271,7 @@ export class PlayerMirror {
     this.layerStack = new THREE.Group();
     this.group.add(this.layerStack);
     this.layers = [];
+    this.lineOrigin = new THREE.Vector3();
   }
 
   // Rebuilds the meshes when the hull or its visual-upgrade levels change.
@@ -527,6 +528,20 @@ export class PlayerMirror {
       }
     }
     if (this.layers[best]) this.layers[best].frames = LAYER_RECOIL_FRAMES;
+  }
+
+  /**
+   * Where lock `index`'s line leaves, in world units (a reused vector): the
+   * turret's axis at the height of the barrel aimed at that lock, its
+   * layer's past the primary; it tilts with the ship's bank.
+   */
+  lockLineOrigin(index) {
+    const layer = index > 0 ? this.layers[index - 1] : null;
+    const [part, height] = layer?.group.visible
+      ? [layer.group, layer.barrelY]
+      : [this.turret, this.turretParts.barrelY + this.barrels.position.y];
+    part.updateWorldMatrix(true, false);
+    return part.localToWorld(this.lineOrigin.set(0, height, 0));
   }
 
   /**

@@ -476,7 +476,8 @@ export function hullTones(THREE) {
  * hexagonal collar, and the barrels group (mantlet with shrouded barrels,
  * muzzle brakes, dark bores and the lens hood, plus the amber lens), one
  * merged mesh per moving part in `material` (vertex `tones`). Returns
- * { group, housing, housingLow, barrels }; seatTurret() fits it to a hull.
+ * { group, housing, housingLow, barrels, barrelY } (the barrels' axis
+ * height); seatTurret() fits it to a hull.
  */
 export function buildTurret(THREE, material, tones, lensMaterial) {
   const solid = (...surfaces) => {
@@ -516,14 +517,15 @@ export function buildTurret(THREE, material, tones, lensMaterial) {
   barrels.add(gun, lens);
   const group = new THREE.Group();
   group.add(housing, housingLow, barrels);
-  return { group, housing, housingLow, barrels };
+  return { group, housing, housingLow, barrels, barrelY: TURRET_BARREL_Y };
 }
 
 /**
  * Multi-lock turret layer `level` (1 the lowest), built up from the turret's
  * seat like buildTurret: a thin disc on the turret's axis and its barrel,
  * one merged mesh each in `material` (vertex `tones`); the barrel recoils.
- * Returns { group, barrel }; the group turns about y.
+ * Returns { group, barrel, barrelY }; the group turns about y, its barrel's
+ * axis at height barrelY.
  */
 export function buildTurretLayer(THREE, material, tones, level) {
   const solid = (surface) =>
@@ -545,7 +547,7 @@ export function buildTurretLayer(THREE, material, tones, level) {
   );
   const group = new THREE.Group();
   group.add(disc, barrel);
-  return { group, barrel };
+  return { group, barrel, barrelY: y + LAYER_MID_Y };
 }
 
 /**
