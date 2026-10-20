@@ -87,7 +87,7 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
 
 // Gated by the aiming rank: rank 1 ring + line, rank 2 the predicted-aim
 // marker, rank 3 every lock; nothing in manual aim. The
-// lock line leaves the turret's muzzle.
+// lock line leaves the turret's muzzle, or its layer's with several locks.
 export function mirrorLocks(t, combat, player) {
   if (!combat || combat.aimMode === 'manual') return;
   const rank = combat.targetingUpgradeLevel || 0;
@@ -128,9 +128,15 @@ export function mirrorLocks(t, combat, player) {
       dashes,
       0.6
     );
+    // Several locks: each line leaves the barrel of the turret layer aimed
+    // at its lock, where that lock's shots leave.
+    const from =
+      multi && locks.length > 1
+        ? player.getMuzzlePoint(lock.predictedAim || target)
+        : { x: mx, y: my };
     ribbons.segment(
-      mx,
-      my,
+      from.x,
+      from.y,
       target.x,
       target.y,
       OVERLAY_H,

@@ -327,6 +327,7 @@ class Renderer3D extends BaseSystem {
       const speed = Math.hypot(bullet.vx || 0, bullet.vy || 0);
       if (speed <= 0) return;
       this.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
+      this.three?.player.recoilToward(this.cachedPlayer, bullet.vx, bullet.vy);
     });
   }
 

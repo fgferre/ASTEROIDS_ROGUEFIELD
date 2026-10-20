@@ -13,12 +13,23 @@ import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
+import { TURRET_BARREL_LENGTH } from '../../src/data/constants/physics.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
 const DAMAGE = 10;
 const NOSE = 16;
 const BEAM = firePattern(WEAPONS.harmonic, 'beam');
+// The mock turret turns on PIVOT, at heading 0; with `toward` (multi-lock),
+// the barrel tip of the turret layer aimed there.
+const PIVOT = { x: 100 + NOSE - TURRET_BARREL_LENGTH, y: 300 };
+function muzzleToward(toward) {
+  const angle = toward ? Math.atan2(toward.y - PIVOT.y, toward.x - PIVOT.x) : 0;
+  return {
+    x: PIVOT.x + Math.cos(angle) * TURRET_BARREL_LENGTH,
+    y: PIVOT.y + Math.sin(angle) * TURRET_BARREL_LENGTH,
+  };
+}
 
 function makeEnemy(id, x, y, extra = {}) {
   return {
@@ -62,7 +73,7 @@ function makeCombat(enemyList = [], options = {}) {
     getVelocity: () => ({ x: 0, y: 0 }),
     getShieldRadius: () => 16,
     getTurretAngle: () => 0,
-    getMuzzlePoint: () => ({ x: 100 + NOSE, y: 300 }),
+    getMuzzlePoint: muzzleToward,
     getStats: () => ({ multishot: 1, damage: DAMAGE }),
   };
   const enemies = options.enemies || makeEnemies(enemyList);
@@ -346,7 +357,10 @@ describe('Scatter Coil', () => {
     const groups = [angles.slice(0, 3), angles.slice(3, 5), angles.slice(5)];
     groups.forEach((group, index) => {
       const { predictedAim } = combat.currentLockAssignments[index];
-      const toLock = Math.atan2(predictedAim.y - 300, predictedAim.x - 116);
+      const toLock = Math.atan2(
+        predictedAim.y - PIVOT.y,
+        predictedAim.x - PIVOT.x
+      );
       const centre = group.reduce((sum, a) => sum + a, 0) / group.length;
       expect(centre).toBeCloseTo(toLock, 6);
       group.slice(1).forEach((a, i) => {
@@ -375,7 +389,7 @@ describe('Scatter Coil', () => {
       const { predictedAim } = combat.currentLockAssignments[index];
       const bolt = combat.bullets[index];
       expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(
-        Math.atan2(predictedAim.y - 300, predictedAim.x - 116),
+        Math.atan2(predictedAim.y - PIVOT.y, predictedAim.x - PIVOT.x),
         6
       );
     });
@@ -453,6 +467,63 @@ describe('Scatter Coil', () => {
     expect(combat.burns.has(target)).toBe(true);
     expect(combat.burns.has(near)).toBe(true);
     expect(combat.burns.has(phased)).toBe(false);
+  });
+});
+
+describe('multi-lock turret layers', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => {
+    GamePools.releaseAll();
+    cleanupGlobalState();
+  });
+
+  const STATS = { multishot: 3, damage: DAMAGE };
+  // Three locks round the ship with `weaponId` (null: the lance); `tips`:
+  // the barrel tip of the turret layer aimed at each lock, in lock order.
+  const locked = (weaponId) => {
+    const made = makeCombat([
+      makeEnemy('up', 250, 180),
+      makeEnemy('level', 300, 300),
+      makeEnemy('down', 250, 420),
+    ]);
+    if (weaponId) made.eventBus.emit('upgrade-weapon', { weaponId });
+    lockOnMany(made.combat, made.eventBus, 3);
+    const tips = made.combat.currentLockAssignments.map(({ predictedAim }) =>
+      muzzleToward(predictedAim)
+    );
+    return { ...made, tips };
+  };
+  const expectFrom = (shots, tips) => {
+    expect(shots).toHaveLength(tips.length);
+    shots.forEach((shot, i) => {
+      expect(shot.x).toBeCloseTo(tips[i].x, 9);
+      expect(shot.y).toBeCloseTo(tips[i].y, 9);
+    });
+  };
+
+  it('every lance, fan bolt and beam at a lock leaves the barrel tip of the turret layer aimed at it', () => {
+    let { combat, tips } = locked(null);
+    expect(new Set(tips.map((tip) => `${tip.x},${tip.y}`)).size).toBe(3);
+    combat.handleShooting(1, STATS);
+    expectFrom(combat.bullets, tips);
+
+    // 7 bolts on 3 locks: 3, 2, 2.
+    ({ combat, tips } = locked('scatter'));
+    combat.handleShooting(1, STATS);
+    expectFrom(
+      combat.bullets,
+      [0, 0, 0, 1, 1, 2, 2].map((i) => tips[i])
+    );
+
+    // The beams stay on their layers' barrels while they show.
+    ({ combat, tips } = locked('harmonic'));
+    combat.weapons.fireBeam(BEAM, { x: 100, y: 300 }, STATS);
+    expectFrom(combat.beams, tips);
+    combat.updateWeaponEffects(1 / 60);
+    expectFrom(combat.beams, tips);
   });
 });
 

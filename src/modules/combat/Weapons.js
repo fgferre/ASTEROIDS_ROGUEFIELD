@@ -332,11 +332,15 @@ export class Weapons {
       }
 
       // Lanes are laid out around the hull centre; shift them to the muzzle.
+      // With multi-lock each shot leaves the barrel of the turret layer
+      // aimed at its lock.
       this.createBullet(
-        {
-          x: fireOrigin.x + muzzle.x - playerPos.x,
-          y: fireOrigin.y + muzzle.y - playerPos.y,
-        },
+        multiLockActive
+          ? player.getMuzzlePoint(aimPoint)
+          : {
+              x: fireOrigin.x + muzzle.x - playerPos.x,
+              y: fireOrigin.y + muzzle.y - playerPos.y,
+            },
         aimPoint,
         playerStats.damage
       );
@@ -852,9 +856,11 @@ export class Weapons {
   }
 
   // Multi-lock (Targeting Matrix rank 3, several locks, auto aim, as the
-  // stream reads it): one entry per lock in order, with its lead point and
-  // the angle to it from `origin`; null otherwise.
-  getLockAims(origin) {
+  // stream reads it): one entry per lock in order, with its lead point, the
+  // barrel tip of the turret layer aimed at it (PlayerSystem.getMuzzlePoint:
+  // every pattern's shots at that lock leave there) and the angle from that
+  // tip to the lead point; null otherwise.
+  getLockAims() {
     const targeting = this.targeting();
     if (
       targeting.stickAim ||
@@ -864,27 +870,32 @@ export class Weapons {
     ) {
       return null;
     }
-    return targeting.currentLockAssignments.map(({ enemy, predictedAim }) => ({
-      enemyId: enemy.id,
-      point: predictedAim,
-      angle: Math.atan2(predictedAim.y - origin.y, predictedAim.x - origin.x),
-    }));
+    const player = this.player();
+    return targeting.currentLockAssignments.map(({ enemy, predictedAim }) => {
+      const origin = player.getMuzzlePoint(predictedAim);
+      return {
+        enemyId: enemy.id,
+        point: predictedAim,
+        origin,
+        angle: Math.atan2(predictedAim.y - origin.y, predictedAim.x - origin.x),
+      };
+    });
   }
 
   // `beam`: damage lands on everything in the segment on the firing frame;
   // the beam stays on screen for `beam.duration`. Aimed like the lances: from
   // the muzzle onto the primary lock's lead point in auto, along the turret
-  // otherwise. With multi-lock, one beam per lock; the cooldown penalty
-  // comes once per volley.
+  // otherwise. With multi-lock, one beam per lock from its turret layer's
+  // barrel; the cooldown penalty comes once per volley.
   fireBeam(beam, playerPos, playerStats) {
-    const origin = this.player().getMuzzlePoint();
-    const lockAims = this.getLockAims(origin);
-    const angles = lockAims
-      ? lockAims.map((lock) => lock.angle)
-      : [this.getWeaponAngle(origin)];
+    const muzzle = this.player().getMuzzlePoint();
+    const lockAims = this.getLockAims();
+    const shots = lockAims || [
+      { origin: muzzle, angle: this.getWeaponAngle(muzzle) },
+    ];
     // The primary lock's beam stands for the volley in the event.
-    const [end] = angles.map((angle) =>
-      this.fireBeamAlong(beam, origin, angle, playerStats)
+    const [end] = shots.map(({ origin, angle }) =>
+      this.fireBeamAlong(beam, origin, angle, playerStats, Boolean(lockAims))
     );
     this.lastShotTime = -beam.cooldownPenalty;
     const targeting = this.targeting();
@@ -911,9 +922,10 @@ export class Weapons {
     });
   }
 
-  // One beam of the volley: the hit test, the beam on screen and its event.
-  // Returns where it ends.
-  fireBeamAlong(beam, origin, angle, playerStats) {
+  // One beam of the volley: the hit test, the beam on screen and its event;
+  // `layered`: a multi-lock beam, from its turret layer's barrel. Returns
+  // where it ends.
+  fireBeamAlong(beam, origin, angle, playerStats, layered) {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const { width, duration, extraFragments } = beam;
@@ -968,6 +980,7 @@ export class Weapons {
       maxLife: duration,
       maxRadius: beam.flashRadius,
       colors: this.weapon.colors,
+      layered,
     });
 
     this.emit('weapon-beam-fired', {
@@ -985,7 +998,8 @@ export class Weapons {
   // beam. Multishot adds bolts to the fan; the volley waits
   // `fan.cooldownMultiplier` × the lance's cooldown. With multi-lock the same
   // bolts are split over the locks, earlier locks first, each lock getting a
-  // small fan of its own (same bolt spacing) centred on its lead point.
+  // small fan of its own (same bolt spacing) centred on its lead point, from
+  // its turret layer's barrel.
   fireFan(fan, playerPos, playerStats) {
     const origin = this.player().getMuzzlePoint();
     const angle = this.getWeaponAngle(origin);
@@ -998,14 +1012,14 @@ export class Weapons {
     // Shared by the volley's bolts: who its shrapnel already hit, and how
     // many bursts it has had (only the first lights the 3D scene).
     const volley = { struck: [], bursts: 0 };
-    const lockAims = this.getLockAims(origin);
+    const lockAims = this.getLockAims();
     const predictedPoints = [];
-    const launch = (a) => {
+    const launch = (a, from = origin) => {
       const end = {
-        x: origin.x + Math.cos(a) * reach,
-        y: origin.y + Math.sin(a) * reach,
+        x: from.x + Math.cos(a) * reach,
+        y: from.y + Math.sin(a) * reach,
       };
-      this.createBullet(origin, end, playerStats.damage, volley);
+      this.createBullet(from, end, playerStats.damage, volley);
       return end;
     };
     if (lockAims) {
@@ -1015,7 +1029,7 @@ export class Weapons {
       lockAims.forEach((lock, index) => {
         const count = share + (index < longer ? 1 : 0);
         for (let i = 0; i < count; i += 1) {
-          launch(lock.angle + step * (i - (count - 1) / 2));
+          launch(lock.angle + step * (i - (count - 1) / 2), lock.origin);
         }
         predictedPoints.push({
           enemyId: lock.enemyId,

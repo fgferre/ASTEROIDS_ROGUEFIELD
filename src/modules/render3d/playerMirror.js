@@ -9,7 +9,9 @@
 // ribbon trail. Dash afterimages, the invulnerability blink and the shield
 // impact flash mirror the 2D PlayerSystem render. In the modern scheme the
 // dorsal turret turns on its own to the simulation's turret heading; its
-// barrel tips sit on the sim's muzzle point.
+// barrel tips sit on the sim's muzzle point. With multi-lock (Targeting
+// Matrix rank 3) thin layers stack on its axis, one per lock past the
+// primary, each turned to its own sim heading.
 
 import {
   DASH_GHOST_COUNT,
@@ -28,6 +30,7 @@ import {
   VISUAL_SCALE,
   buildHullModel,
   buildTurret,
+  buildTurretLayer,
   edgeLines,
   hullTones,
   seatTurret,
@@ -59,6 +62,9 @@ const MUZZLE_LIGHT = 1.6;
 // Recoil of the barrels along the turret axis per shot (field units).
 const TURRET_RECOIL = 1.2;
 const MUZZLE_LIGHT_FRAMES = 2;
+// A turret layer's recoil after its shot: as long as the turret's own (two
+// flash frames, then the light frames).
+const LAYER_RECOIL_FRAMES = MUZZLE_LIGHT_FRAMES + 1;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the hull's UVs are planar, in hull units). proposta 18/10: strengths.
 const HULL_TILE = 16;
@@ -260,6 +266,11 @@ export class PlayerMirror {
       barrels: this.barrels,
     } = this.turretParts);
     this.group.add(this.turret);
+    // Multi-lock layers, built on first need and kept; the stack sits on the
+    // turret's seat, lowered with its barrels on the low collar.
+    this.layerStack = new THREE.Group();
+    this.group.add(this.layerStack);
+    this.layers = [];
   }
 
   // Rebuilds the meshes when the hull or its visual-upgrade levels change.
@@ -396,6 +407,7 @@ export class PlayerMirror {
     this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
     this.turret.rotation.y = -(player.turretAngle - angle);
     this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
+    this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
     const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
@@ -469,6 +481,54 @@ export class PlayerMirror {
     }
   }
 
+  // One layer per sim heading (PlayerSystem turretLayers), turned like the
+  // turret; the rest hide.
+  updateLayers(headings, angle) {
+    while (this.layers.length < headings.length) {
+      const layer = buildTurretLayer(
+        this.THREE,
+        this.hullMaterial,
+        this.tones,
+        this.layers.length + 1
+      );
+      layer.frames = 0;
+      this.layerStack.add(layer.group);
+      this.layers.push(layer);
+    }
+    this.layerStack.position.set(
+      this.turret.position.x,
+      this.turret.position.y + this.barrels.position.y,
+      0
+    );
+    for (let i = 0; i < this.layers.length; i += 1) {
+      const layer = this.layers[i];
+      layer.group.visible = i < headings.length;
+      if (!layer.group.visible) continue;
+      layer.group.rotation.y = -(headings[i] - angle);
+      layer.barrel.position.x = layer.frames > 0 ? -TURRET_RECOIL : 0;
+      if (layer.frames > 0) layer.frames -= 1;
+    }
+  }
+
+  /**
+   * A shot flew off along (vx, vy): the turret layer turned closest to it
+   * recoils (the turret's own barrels recoil on every shot already).
+   */
+  recoilToward(player, vx, vy) {
+    const headings = player.turretLayers;
+    let best = -1;
+    let most =
+      vx * Math.cos(player.turretAngle) + vy * Math.sin(player.turretAngle);
+    for (let i = 0; i < headings.length; i += 1) {
+      const along = vx * Math.cos(headings[i]) + vy * Math.sin(headings[i]);
+      if (along > most) {
+        best = i;
+        most = along;
+      }
+    }
+    if (this.layers[best]) this.layers[best].frames = LAYER_RECOIL_FRAMES;
+  }
+
   /**
    * Roll target: strafe input (modern only; classic A/D is torque) plus the
    * yaw rate, eased toward with BANK_SMOOTH_S. Returns radians.
@@ -535,6 +595,9 @@ export class PlayerMirror {
   reset() {
     this.trailCount = 0;
     this.muzzleFrames = 0;
+    this.layers.forEach((layer) => {
+      layer.frames = 0;
+    });
     this.bank = 0;
     this.bankTime = null;
     this.dashGuard = false;

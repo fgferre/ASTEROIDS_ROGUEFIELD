@@ -542,8 +542,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // offsetIndex = -0.5 and +0.5 → magnitudes = ±parallelSpacing/2.
       // For 4 lanes (the stale buggy state), magnitudes would be
       // ±parallelSpacing*1.5 and ±parallelSpacing*0.5 — and clamped to
-      // the limit. The observable test: the SPREAD between the two `from`
-      // points (perpendicular distance) reflects the 2-lane geometry.
+      // the limit. The observable test: the SPREAD between the two `to`
+      // points (perpendicular distance) reflects the 2-lane geometry (each
+      // lane leaves the barrel of the turret layer aimed at it, so the lanes
+      // part at the aim points, not at the origins).
       expect(created.length).toBe(2);
       const aimDx = created[0].to.x - playerPos.x;
       const aimDy = created[0].to.y - playerPos.y;
@@ -551,13 +553,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // Perpendicular unit vector to (aimDx, aimDy)
       const perpX = -aimDy / aimDist;
       const perpY = aimDx / aimDist;
-      // Project each bullet origin's offset from playerPos onto perp.
+      // Project each bullet aim point's offset from playerPos onto perp.
       const perp0 =
-        (created[0].from.x - playerPos.x) * perpX +
-        (created[0].from.y - playerPos.y) * perpY;
+        (created[0].to.x - playerPos.x) * perpX +
+        (created[0].to.y - playerPos.y) * perpY;
       const perp1 =
-        (created[1].from.x - playerPos.x) * perpX +
-        (created[1].from.y - playerPos.y) * perpY;
+        (created[1].to.x - playerPos.x) * perpX +
+        (created[1].to.y - playerPos.y) * perpY;
       const spread = Math.abs(perp1 - perp0);
 
       // Read spacing from the same source production code uses, so this
