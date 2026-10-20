@@ -38,15 +38,28 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
   cartas refeitas; orbes com peso; baús com cerimônia e 3 pickups novos; HUD de instrumento (encaixes, presets,
   cápsula de escudo/casco, radar, editor; `HUD.md`); telas novas de level-up, baú e fim; 4 armas, 6 inimigos e 4
   formações; o Anel 3D de todos os lados (`?scene=ring` em dev); correções de duas revisões.
-- **Ele jogou (20/10: _"já joguei"_). Falta o veredito dele, frente por frente** (perguntar e anotar aqui nas
-  palavras dele): (1) ritmo de cartas e se a partida (~18 min) e a luta do chefe (~75 s) estão boas — item 2;
-  (2) os sons e o motor: quantas cartas de propulsão abrem cada camada, o dash mais alto que o antigo, o motor que se
-  acalma na velocidade máxima de propósito; (3) baús, pickups e orbes; (4) o painel (preset Instrumento, cápsula,
-  radar, editor) e as telas novas; (5) as 4 armas e os inimigos novos; (6) as cores do modo daltônico; (7) se o
-  acabamento de perto do Anel (textura, sombras, janelas acesas) vem agora ou com a fase da viagem.
-- **Próximo, nesta ordem:** segunda audição (sons das armas, pickups, baú e formações novos; a skill `/sfx-generator`
-  roda AudioLDM) e o mix com ele jogando; frente 5 do `PLAN.md` (armas 7 → 12+, inimigos 16 → 30+, mini-chefes,
-  biomas 3 → 6, cascos com habilidade ativa); depois 6, 7 e 8; o roteiro (item 19) numa conversa nova.
+- **Veredito dele, jogando (20/10):** _"por enquanto eu diria que a gente está numa fase beta. O jogo ainda não tem
+  conteúdo suficiente… algo que a gente tem aqui para poucos minutos de jogo… nada do trabalho que a gente fez é
+  perdido, mas eu acho que falta uma visão grande das fases, da história e do mapa"_.
+  - Balanceamento: _"vem mais para frente"_.
+  - Som (revisar _"mais para frente"_): o tiro _"está com um barulho constante, um pouco chato… tinha que ser um pouco
+    mais sutil"_; ao motor _"falta… umas camadas de som mais graves"_; ao começar a partida _"tem um barulhinho que
+    parece que foi herdado do modelo antigo… precisa refazer"_; a trilha _"vai fazendo umas frequências chatas… para
+    criar uma tensão… não funciona bem… repensar toda essa parte"_; _"a única coisa… funcionando bem é a música da
+    introdução"_ (feita por ele).
+  - Baú: _"a abertura do baú foi legal, me agradou"_.
+  - Painel e telas: _"me agradou essa versão nova"_; os indicadores na nave _"deixa a interface mais clean"_; _"alguns
+    elementos estão muito grandes… podem diminuir um pouco, ocupar um pedacinho menor do layout"_.
+  - Modo daltônico: _"nem testei, não é importante isso agora"_. Anel de perto: _"tem que refinar ainda"_.
+  - Estrutura: capítulos com fases, fases com ondas e um chefe no fim; _"o próximo capítulo da história… a gente talvez
+    mude totalmente o cenário"_; uma árvore de habilidades, equipamentos e melhorias liberada aos poucos com o dinheiro
+    ganho, como no Vampire Survivors, pensada junto com a evolução e o tempo para vencer cada desafio; ligar tudo num
+    roteiro que faça sentido (item 19).
+- **Próximo, nesta ordem (aprovado por ele em 20/10: _"a próxima conversa começa pela visão do jogo"_):** (1) a visão do jogo num documento que ele aprova
+  antes de mais conteúdo — capítulos → fases → ondas → chefe, o mapa, a história (item 19) e a árvore de desbloqueios
+  com moeda (frente 6), com o tempo de jogo de cada pedaço; (2) o conteúdo da frente 5 feito para essa estrutura; (3)
+  painel menor (escala dos encaixes no preset, por imagem); (4) a revisão do som e da trilha (tiro mais sutil, graves no
+  motor, o som do início, a trilha de tensão; a música da introdução fica); (5) balanceamento por último.
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
