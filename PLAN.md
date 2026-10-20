@@ -153,6 +153,19 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
 implementados a partir de maquetes que ele aprovou; menu/Hangar/Códice na mesma linguagem; as duas guardas no gate;
 golden trace verde. **Fora de escopo:** conteúdo novo (Rodada 15).
 
+## Goal para a próxima conversa (redigido 20/10; colar no `/goal` depois de ela ler o bastão e este plano)
+
+> Fechar a Rodada 14 do Asteroid Roguefield seguindo o PLAN.md e o bastão de docs/PENDENCIAS.md. Primeiro o que depende
+> do dono: ele mede a janela inteira na tela dele (fps da horda em Retina; um teto de pixels por preset é decisão dele)
+> e joga a câmera de dois estados e as chegadas dos Wardens; o que ele disser entra em PENDENCIAS nas palavras dele.
+> Depois a cena viva de morte e de vitória final (passo e da câmera), e o HUD de instrumento: HUD.md com tokens,
+> hierarquia, movimento e estados; cada instrumento refeito a partir de maquete que ele aprova, começando pelo radar
+> tático que acompanha o zoom da câmera nova; recargas ancoradas na nave, barras e chips com hierarquia e pulso, barra
+> de chefe, feed; menu, Hangar, Códice e Settings na mesma linguagem; legibilidade com 200 inimigos; orçamento de quadro
+> por cena e capturas de referência no gate. Liberdade no estilo e no movimento; os critérios de pronto do PLAN e o
+> golden trace verde não se negociam; "menos é mais" vale para o HUD como valeu para a câmera. Quando a 14 fechar, a
+> Rodada 15 (longevidade) começa com o texto que já está neste plano.
+
 ## Rodada 15 (próxima; texto do goal já redigido) — longevidade
 
 Longevidade estilo Vampire Survivors sobre a fábrica e sobre o HUD novo: 12+ armas com evolução e Apex próprios, 30+
