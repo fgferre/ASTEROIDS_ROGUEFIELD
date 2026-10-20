@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  EPILOGUE_MS,
-  INTRO_MS,
-  WARDEN_ARRIVAL,
-} from '../../../src/core/cinematics.js';
+import { EPILOGUE_MS, INTRO_MS } from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import { RunCinematics } from '../../../src/modules/ui/runCinematics.js';
@@ -157,16 +153,16 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
   });
 
-  it('letterboxes a Warden arrival without holding the run, lifting it as the camera turns back', () => {
+  it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {
     const { ui, hud, renderer, events, held } = setup();
     const warden = { x: 400, y: 84 };
     expect(ui.cinematics.startArrival(warden)).toBe(true);
     expect(renderer.playArrival).toHaveBeenCalledWith(warden);
     expect(hud.els.letterbox.classList.contains('is-showing')).toBe(true);
 
-    vi.advanceTimersByTime(
-      (WARDEN_ARRIVAL.travelIn + WARDEN_ARRIVAL.hold) * 1000
-    );
+    vi.advanceTimersByTime(2000);
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(true);
+    ui.cinematics.endArrival();
     expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
     expect(held).toEqual([]);
     expect(events).toEqual([

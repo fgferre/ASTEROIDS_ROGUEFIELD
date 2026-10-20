@@ -216,6 +216,14 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('elite-spawned', (payload) => {
       this.camera.trigger('elite', payload);
     });
+    // A Warden crossing the edge on its entrance lights the border there.
+    this.registerEventListener('boss-arrival-crossed', (payload) => {
+      this.three?.veil.flare(
+        payload.x - HALF_W,
+        payload.y - HALF_H,
+        payload.flare
+      );
+    });
     this.registerEventListener('boss-telegraph', () => {
       this.camera.trigger('telegraph');
     });
@@ -361,10 +369,11 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * The Warden's arrival: the camera director opens its wide view on the
-   * whole field (a cut under reduced motion). False when the letterbox
-   * should not play (no Warden, WebGL failed, not the dynamic camera,
-   * reduced motion): the caller keeps the plain banner.
+   * A Warden's entrance: the camera director plays its live shot while it
+   * flies in, then a short wide look (only the wide look, a cut, under
+   * reduced motion). False when the letterbox should not play (no Warden,
+   * WebGL failed, not the dynamic camera, reduced motion): the caller keeps
+   * the plain banner.
    */
   playArrival(warden) {
     if (!warden || this.failed || this.camera.mode !== 'dynamic') {
@@ -686,6 +695,7 @@ class Renderer3D extends BaseSystem {
     const { focus } = this.cameraRig;
     const fog = t.enemies.updateFog(dt, this.denseFog, focus.x, focus.z);
     t.decals.update(dt, t.enemies.views);
+    t.veil.update(dt);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);

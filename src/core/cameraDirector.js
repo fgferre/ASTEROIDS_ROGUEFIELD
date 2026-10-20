@@ -8,7 +8,11 @@
 // about to cross an edge, when a boss is off the near shot, and for short
 // looks (a wave starting, an elite out of sight, a boss's announced attack,
 // a boss arriving). Once open it stays open a while. The ship is always on
-// screen. Every number is in data/constants/camera.js. Pure: the renderer
+// screen, except in the live scene of a Warden's entrance: low and moving,
+// it follows the shot in the Warden's own recipe while the Warden flies in
+// (enemies/boss/arrival.js) and hands back to the play view the moment it
+// closes up. Every number is in data/constants/camera.js and the Wardens'
+// recipes (src/content/bosses/). Pure: the renderer
 // poses the perspective camera from `pose` with the same math (cameraShot.js,
 // render3d/cameraRig.js).
 
@@ -82,12 +86,15 @@ export function createDirector({
   let reducedMotion = false;
   let forced = null;
 
+  // 'near', 'wide' or 'arrival' (a Warden's entrance).
   let state = 'near';
   // Seconds the wide view stays open after its last reason.
   let wideFor = 0;
   // Seconds left: the cleared wave's orbs, and the short looks.
   let clearedFor = 0;
   let glanceFor = 0;
+  // Seconds the springs stay quick after an entrance hands back.
+  let handbackFor = 0;
   let clock = 0;
   let primed = false;
   let sliding = false;
@@ -102,7 +109,14 @@ export function createDirector({
   const py = { value: fieldHeight / 2, velocity: 0 };
   const dist = { value: 1, velocity: 0 };
   const tilt = { value: nearAngles.tilt, velocity: 0 };
-  const goal = { x: fieldWidth / 2, y: fieldHeight / 2, distance: 1, tilt: 0 };
+  const yaw = { value: 0, velocity: 0 };
+  const goal = {
+    x: fieldWidth / 2,
+    y: fieldHeight / 2,
+    distance: 1,
+    tilt: 0,
+    yaw: 0,
+  };
 
   const pose = {
     x: fieldWidth / 2,
@@ -277,6 +291,32 @@ export function createDirector({
     return false;
   }
 
+  // --- a Warden's entrance --------------------------------------------------
+
+  function arrivingWarden(scene) {
+    const enemies = scene.enemies;
+    for (let i = 0; i < enemies.length; i += 1) {
+      const e = enemies[i];
+      if (e && !e.destroyed && e.arrival) return e;
+    }
+    return null;
+  }
+
+  // Its recipe's shot, from inside the field toward the edge it comes
+  // through (mirrored for the left edge), each pair eased over the entrance.
+  function frameArrival(boss) {
+    const a = boss.arrival;
+    const { shot } = a.recipe;
+    const k = smoothstep(a.progress);
+    const along = ([from, to]) => from + (to - from) * k;
+    const side = a.edge === 'left' ? -1 : 1;
+    goal.x = a.to.x + (boss.x - a.to.x) * shot.look;
+    goal.y = a.to.y + (boss.y - a.to.y) * shot.look;
+    goal.distance = along(shot.distance);
+    goal.tilt = along(shot.tilt) * DEG;
+    goal.yaw = side * (90 + along(shot.turn)) * DEG;
+  }
+
   function wantsWide(scene) {
     if (clearedFor > 0 && orbsLeft(scene)) return true;
     if (glanceFor > 0) return true;
@@ -318,10 +358,12 @@ export function createDirector({
     py.value = goal.y;
     dist.value = goal.distance;
     tilt.value = goal.tilt;
+    yaw.value = goal.yaw;
     px.velocity = 0;
     py.velocity = 0;
     dist.velocity = 0;
     tilt.velocity = 0;
+    yaw.velocity = 0;
   }
 
   // The ship stays on screen: move the shot the least toward it.
@@ -395,6 +437,7 @@ export function createDirector({
       wideFor = 0;
       clearedFor = 0;
       glanceFor = 0;
+      handbackFor = 0;
       sliding = false;
       director.snap();
     },
@@ -408,23 +451,31 @@ export function createDirector({
       clock += step;
       clearedFor = Math.max(0, clearedFor - step);
       glanceFor = Math.max(0, glanceFor - step);
+      handbackFor = Math.max(0, handbackFor - step);
       updateWide();
       updateNear(scene);
 
       const before = state;
-      if (forced) {
+      const warden = reducedMotion ? null : arrivingWarden(scene);
+      if (warden) {
+        state = 'arrival';
+      } else if (forced) {
         state = forced;
       } else {
         if (wantsWide(scene)) wideFor = T.wideHold;
         else wideFor = Math.max(0, wideFor - step);
         state = wideFor > 0 ? 'wide' : 'near';
       }
+      if (before === 'arrival' && !warden) handbackFor = T.arrival.handbackFor;
 
       const isWide = state === 'wide';
+      const live = state === 'arrival';
       goal.x = isWide ? wide.x : near.x;
       goal.y = isWide ? wide.y : near.y;
       goal.distance = isWide ? wide.distance : near.distance / zoomPulse;
       goal.tilt = isWide ? wideAngles.tilt : nearAngles.tilt;
+      goal.yaw = 0;
+      if (live) frameArrival(warden);
 
       // The wrap: a jump of more than half the field slides across (a cut
       // under reduced motion).
@@ -449,7 +500,17 @@ export function createDirector({
       const S = T.springs;
       const opening = goal.distance > dist.value;
       const zoomSmooth = (opening ? S.open : S.close) * slow;
-      if (sliding) {
+      // The entrance and its hand-back move every part at one quick pace.
+      const quick = live
+        ? T.arrival.swoop
+        : handbackFor > 0
+          ? T.arrival.handback
+          : 0;
+      if (quick) {
+        dampPosition(step, quick, Infinity);
+        dampTo(dist, goal.distance, quick, step);
+        dampTo(tilt, goal.tilt, quick, step);
+      } else if (sliding) {
         dampPosition(step, T.springs.open, Infinity);
         if (Math.hypot(px.value - goal.x, py.value - goal.y) < 8) {
           sliding = false;
@@ -460,14 +521,17 @@ export function createDirector({
       } else {
         dampPosition(step, S.position * slow, topSpeed);
       }
-      dampTo(dist, goal.distance, zoomSmooth, step);
-      dampTo(tilt, goal.tilt, S.tilt * slow, step);
+      if (!quick) {
+        dampTo(dist, goal.distance, zoomSmooth, step);
+        dampTo(tilt, goal.tilt, S.tilt * slow, step);
+      }
+      dampTo(yaw, goal.yaw, quick || S.tilt, step);
 
       // The calm drift, near only: slow, continuous curves.
       let driftX = 0;
       let driftY = 0;
       let lean = 0;
-      if (!isWide && !reducedMotion) {
+      if (!isWide && !live && !reducedMotion) {
         const D = T.drift;
         const e = shotExtent(dist.value, nearAngles, lens, extent);
         const amount =
@@ -485,9 +549,15 @@ export function createDirector({
       pose.y = py.value + driftY;
       pose.distance = dist.value;
       pose.tilt = tilt.value;
-      pose.yaw = 0;
+      pose.yaw = yaw.value;
       pose.roll = lean;
-      pose.rollMax = isWide || reducedMotion ? 0 : T.roll * DEG;
+      pose.rollMax = isWide || live || reducedMotion ? 0 : T.roll * DEG;
+      // A low shot sees past the field's far side: it has no fit, and the
+      // ship may be off it.
+      if (live) {
+        pose.zoom = 1;
+        return pose;
+      }
       pose.zoom =
         fieldFitDistance(pose, lens, fieldWidth, fieldHeight) / pose.distance;
       keepShip(scene);

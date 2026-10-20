@@ -89,7 +89,6 @@ export default class EffectsSystem extends BaseSystem {
         this.gameTime.addFreezeFrame(duration, fade),
       applyTimeDilation: (scale, options) =>
         this.gameTime.applyTimeDilation(scale, options),
-      motionReduced: () => this.motionReduced,
     });
     const burstDependencies = {
       particleEffects: this.particleEffects,
@@ -283,6 +282,14 @@ export default class EffectsSystem extends BaseSystem {
 
     registerBossEvent('boss-spawned', (payload = {}) =>
       this.bossTransitions.onSpawned(payload)
+    );
+
+    registerBossEvent('boss-arrival-crossed', (payload = {}) =>
+      this.bossTransitions.onArrivalCrossed(payload)
+    );
+
+    registerBossEvent('boss-arrived', (payload = {}) =>
+      this.bossTransitions.onArrived(payload)
     );
 
     registerBossEvent('boss-phase-changed', (payload = {}) =>

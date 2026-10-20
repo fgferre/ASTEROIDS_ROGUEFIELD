@@ -35,6 +35,9 @@ const SHAKE = CAMERA_DIRECTOR.shake;
 const CINEMATIC_HANDBACK_MS = 500;
 const FOLLOW_POSE = followPose();
 const COMBAT_RANGE = 140;
+// A low shot (a Warden's entrance) reaches to the horizon; what is drawn
+// around the view (the space dust) stops this far from its target.
+const MAX_REACH = 1200;
 
 export function smoothstep(a, b, x) {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
@@ -246,9 +249,9 @@ export class CameraRig {
 
     // The logical camera's reach and position, for getView and the space.
     const e = shotExtent(shot.distance, shot, this.lens, this.extent);
-    this.reach.halfWidth = Math.max(e.left, e.right);
-    this.reach.up = e.up;
-    this.reach.down = e.down;
+    this.reach.halfWidth = Math.min(MAX_REACH, Math.max(e.left, e.right));
+    this.reach.up = Math.min(MAX_REACH, e.up);
+    this.reach.down = Math.min(MAX_REACH, e.down);
     this.camera.setReach(this.reach);
     this.camera.x = shot.x;
     this.camera.y = shot.y;

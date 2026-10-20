@@ -786,7 +786,12 @@ class PhysicsSystem extends BaseSystem {
     const detectionRadius = Math.max(0, radius);
 
     this.activeBosses.forEach((boss) => {
-      if (!boss || boss.destroyed || !this.activeEnemies.has(boss)) {
+      if (
+        !boss ||
+        boss.destroyed ||
+        !this.activeEnemies.has(boss) ||
+        (boss.intangible && !includeIntangible)
+      ) {
         return;
       }
 

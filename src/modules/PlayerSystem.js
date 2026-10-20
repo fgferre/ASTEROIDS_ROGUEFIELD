@@ -191,6 +191,8 @@ class PlayerSystem extends BaseSystem {
       'shieldMaxHP',
     ]);
     this.invulnerableTimer = 0;
+    // A Warden's entrance holds the ship (holdControls).
+    this.controlHoldTimer = 0;
 
     // === DEATH/RETRY STATE ===
     this.isDead = false;
@@ -424,16 +426,24 @@ class PlayerSystem extends BaseSystem {
       return;
     }
 
-    const movement = this.movementInput.readMovement(commandQueue, inputSystem);
+    let movement = this.movementInput.readMovement(commandQueue, inputSystem);
     this.aimStick = getAimStickDirection(movement);
 
     this.shield.updateCooldown(deltaTime);
 
-    const dashRequested = this.maneuvers.takeDashRequest(deltaTime);
+    let dashRequested = this.maneuvers.takeDashRequest(deltaTime);
 
     // === ONLY UPDATE WHEN ALIVE: ===
     if (this.isDead || this.isRetrying) {
       return; // Don't process input, movement, or effects when dead/retrying
+    }
+
+    // Held, the input is read (so nothing queues up) and dropped.
+    if (this.controlHoldTimer > 0) {
+      this.controlHoldTimer = Math.max(0, this.controlHoldTimer - deltaTime);
+      movement = this.movementInput.getDefaultMovementBinary();
+      this.aimStick = null;
+      dashRequested = false;
     }
 
     if (dashRequested && this.maneuvers.dashCooldownTimer <= 0) {
@@ -726,6 +736,19 @@ class PlayerSystem extends BaseSystem {
     this.invulnerableTimer = duration;
   }
 
+  /**
+   * A Warden's entrance (enemies/boss/arrival.js): for `seconds` of world
+   * time the ship takes no steering, dash or fire, and nothing hurts it.
+   */
+  holdControls(seconds) {
+    this.controlHoldTimer = Math.max(this.controlHoldTimer, seconds);
+    this.invulnerableTimer = Math.max(this.invulnerableTimer, seconds);
+  }
+
+  get controlsHeld() {
+    return this.controlHoldTimer > 0;
+  }
+
   getStats() {
     return {
       health: this.health,
@@ -805,6 +828,7 @@ class PlayerSystem extends BaseSystem {
     this.flight.brakingDamping = 0;
     this.flight.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
+    this.controlHoldTimer = 0;
     this.flight.driftFactor = 0;
 
     // Reset visual upgrade levels

@@ -9,7 +9,8 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { resolveEventBus, resolveService } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
-import { bossKindForLayer } from '../../../data/enemies/boss.js';
+import { bossKindForLayer, WARDEN_KINDS } from '../../../data/enemies/boss.js';
+import { beginArrival } from '../boss/arrival.js';
 import { IS_DEV } from '../../../core/env.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
@@ -187,12 +188,22 @@ export class EnemySpawnSystem {
 
     boss.destroyed = false;
 
+    // Its entrance (boss/arrival.js): from where its fight starts it moves
+    // past the edge it comes in through.
+    const edge = ['left', 'right'].includes(config.entrance)
+      ? config.entrance
+      : boss.x < (GAME_WIDTH || 800) / 2
+        ? 'left'
+        : 'right';
+    const arrival = beginArrival(boss, WARDEN_KINDS[bossKind].arrival, edge);
+
     const payload = {
       enemy: boss,
       wave: waveNumber,
       config: spawnConfig,
       rewards: facade.mergeBossRewards(boss, spawnConfig.rewards || {}),
       position: { x: boss.x ?? 0, y: boss.y ?? 0 },
+      arrival,
     };
 
     if (typeof facade.emitEvent === 'function') {

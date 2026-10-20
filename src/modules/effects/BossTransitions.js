@@ -1,15 +1,15 @@
 // src/modules/effects/BossTransitions.js
 //
-// The boss's arrival, phase change and defeat: the bursts of violet light and
-// hull debris, their shockwaves, the shakes, flashes, freezes and slow motion
-// that frame them, and the pulsing border drawn over the view. EffectsSystem
+// The boss's entrance, phase change and defeat: the bursts of violet light
+// and hull debris, their shockwaves, the shakes, flashes, freezes and slow
+// motion that frame them, the edge lighting up where a Warden crosses it, and
+// the pulsing border drawn over the view. EffectsSystem
 // owns it and its boss listeners land here; Renderer3D reads the borders
 // through `bossTransitionEffects` on the effects object.
 
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { ShakePresets } from '../../utils/ScreenShake.js';
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
-import { WARDEN_ARRIVAL } from '../../core/cinematics.js';
 import {
   BOSS_EFFECTS_PRESETS,
   BOSS_SCREEN_SHAKES,
@@ -35,7 +35,6 @@ export class BossTransitions {
    * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling of a burst's count.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addFreezeFrame(duration, fade)`, `applyTimeDilation(scale, options)`: the effects' game time.
-   * `motionReduced()`: Settings → Accessibility → Reduced Motion; without it the arrival cinematic's slow motion replaces the entrance's own.
    */
   constructor({
     particleEffects,
@@ -47,7 +46,6 @@ export class BossTransitions {
     addScreenFlash,
     addFreezeFrame,
     applyTimeDilation,
-    motionReduced,
   }) {
     this.particleEffects = particleEffects;
     this.randomFloat = randomFloat;
@@ -58,7 +56,6 @@ export class BossTransitions {
     this.addScreenFlash = addScreenFlash;
     this.addFreezeFrame = addFreezeFrame;
     this.applyTimeDilation = applyTimeDilation;
-    this.motionReduced = motionReduced;
 
     this.bossTransitionEffects = [];
     this.activeBoss = { id: null, lastPhase: 0 };
@@ -69,15 +66,59 @@ export class BossTransitions {
     this.bossTransitionEffects = [];
   }
 
-  // EffectsSystem's boss listeners land here.
+  // EffectsSystem's boss listeners land here. A Warden spawns past the edge
+  // (enemies/boss/arrival.js): the world slows while it flies in and closes
+  // up, then eases back to full speed.
   onSpawned(payload = {}) {
     this.clearBossEffectsState();
     this.activeBoss.id = this.resolveBossId(payload);
     if (Number.isFinite(payload?.phase)) {
       this.activeBoss.lastPhase = payload.phase;
     }
+    const { arrival } = payload;
+    if (arrival) {
+      this.applyTimeDilation(arrival.world, {
+        holdDuration: arrival.travel + arrival.close,
+        duration: arrival.recover,
+      });
+    }
+  }
+
+  // It closed up where its fight starts: the entrance burst lands there.
+  onArrived(payload = {}) {
     this.createBossEntranceEffect(payload);
-    this.triggerBossTransitionEffect('boss-spawned');
+    this.triggerBossTransitionEffect('boss-arrived');
+  }
+
+  onArrivalCrossed({ x, y, flare } = {}) {
+    const config = this.getBossEffectConfig('arrivalFlare');
+    const count = this.getScaledParticleCount(config.sparks, {
+      allowZero: true,
+    });
+    for (let i = 0; i < count; i += 1) {
+      const along =
+        (i % 2 === 0 ? 1 : -1) *
+        this.randomRange(config.speed.min, config.speed.max, 'boss');
+      const particle = this.particleEffects.createParticle(
+        x,
+        y,
+        this.randomCentered(config.spread, 'boss'),
+        along,
+        flare,
+        this.randomRange(config.size.min, config.size.max, 'boss'),
+        this.randomRange(config.life.min, config.life.max, 'boss'),
+        'spark'
+      );
+      this.tagBossParticle(particle, 'boss-arrival');
+      this.particleEffects.particles.push(particle);
+    }
+    this.particleEffects.createShockwaveEffect({
+      position: { x, y },
+      radius: config.ring.radius,
+      duration: config.ring.duration,
+      baseWidth: config.ring.baseWidth,
+      color: flare,
+    });
   }
 
   onPhaseChanged(payload = {}) {
@@ -111,7 +152,7 @@ export class BossTransitions {
 
     const color = PALETTE.boss;
     const presets = {
-      'boss-spawned': {
+      'boss-arrived': {
         duration: 1.65,
         maxAlpha: 0.65,
         borderWidth: 30,
@@ -478,12 +519,7 @@ export class BossTransitions {
     }
 
     this.applyBossScreenShake('spawn');
-    // The arrival cinematic's longer slow motion, while the camera visits
-    // the Warden; under Reduced Motion (no cinematic) the entrance's own.
-    const timings = this.motionReduced()
-      ? config
-      : { ...config, slowMotion: WARDEN_ARRIVAL.slowMotion };
-    this.applyBossEffectTimings(timings, palette, 'boss-spawned');
+    this.applyBossEffectTimings(config, palette);
   }
 
   createBossPhaseTransition(payload = {}) {
