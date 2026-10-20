@@ -393,6 +393,10 @@ class CombatSystem extends BaseSystem {
       this.targeting.updateStickAim(player.getAimStick());
       this.targeting.updateTargeting(deltaTime);
       player.setAimPoint(this.targeting.getPrimaryAimPoint());
+      player.setTurretLayers(
+        this.targeting.computeLockCount(playerStats),
+        this.weapons.getLockAims()
+      );
 
       if (playerStats) {
         this.weapons.handleShooting(deltaTime, playerStats);

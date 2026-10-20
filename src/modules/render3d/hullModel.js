@@ -11,7 +11,8 @@
 // crease angle: curves read smooth, designed edges stay crisp. The static
 // parts merge into one vertex-coloured geometry (mergeStatic.js). Plus the
 // dorsal turret (domed housing or the low hexagonal collar, mantlet, twin
-// barrels, amber lens in a hood) and the nozzles' glowing throats. One way
+// barrels, amber lens in a hood), its multi-lock layers (thin discs stacked
+// on its axis, one thin barrel each) and the nozzles' glowing throats. One way
 // to build the ship: the game's render3d/playerMirror.js and the menu's
 // MenuHullPreview.js both call it, with their own materials. Ship-local
 // points are [x, height, y] in hull units (ship y → world z); the ship draws
@@ -100,6 +101,24 @@ const BARREL = [
 const LENS_HOOD = [
   -0.6, 0, 1, -0.3, 0.7, 1, 1.6, 0.85, 1, 2.5, 0.85, 1, 2.5, 0.62, 0, 1.9, 0.62,
   0, 1.9, 0, 0,
+];
+// Multi-lock layers (Targeting Matrix rank 3): thin discs stacked on the
+// turret's axis above the lens hood, each a little narrower than the one
+// under it, on a hub that reaches down to it; heights from the disc's
+// underside, radii in units of its radius. Each has one thin barrel
+// (measured back from its muzzle, on the sim muzzle point) at mid-disc.
+const LAYER_BASE_Y = 5;
+const LAYER_STEP = 0.75;
+const LAYER_R = 2.1;
+const LAYER_TAPER = 0.3;
+const LAYER_DISC = [
+  -0.45, 0, 0, -0.45, 0.3, 0, 0, 0.3, 0, 0, 0.92, 1, 0.12, 1, 2, 0.36, 1, 3,
+  0.5, 0.92, 1, 0.5, 0, 1,
+];
+const LAYER_MID_Y = 0.25;
+const LAYER_BARREL = [
+  -7.6, 0, 1, -7.6, 0.45, 1, -6.3, 0.45, 2, -6.3, 0.3, 2, -0.6, 0.3, 3, -0.6,
+  0.42, 3, 0, 0.42, 0, 0, 0.18, 0, -0.4, 0.18, 0, -0.4, 0, 0,
 ];
 
 // `points` shrunk toward their centroid by `k`.
@@ -457,7 +476,8 @@ export function hullTones(THREE) {
  * hexagonal collar, and the barrels group (mantlet with shrouded barrels,
  * muzzle brakes, dark bores and the lens hood, plus the amber lens), one
  * merged mesh per moving part in `material` (vertex `tones`). Returns
- * { group, housing, housingLow, barrels }; seatTurret() fits it to a hull.
+ * { group, housing, housingLow, barrels, barrelY } (the barrels' axis
+ * height); seatTurret() fits it to a hull.
  */
 export function buildTurret(THREE, material, tones, lensMaterial) {
   const solid = (...surfaces) => {
@@ -497,7 +517,37 @@ export function buildTurret(THREE, material, tones, lensMaterial) {
   barrels.add(gun, lens);
   const group = new THREE.Group();
   group.add(housing, housingLow, barrels);
-  return { group, housing, housingLow, barrels };
+  return { group, housing, housingLow, barrels, barrelY: TURRET_BARREL_Y };
+}
+
+/**
+ * Multi-lock turret layer `level` (1 the lowest), built up from the turret's
+ * seat like buildTurret: a thin disc on the turret's axis and its barrel,
+ * one merged mesh each in `material` (vertex `tones`); the barrel recoils.
+ * Returns { group, barrel, barrelY }; the group turns about y, its barrel's
+ * axis at height barrelY.
+ */
+export function buildTurretLayer(THREE, material, tones, level) {
+  const solid = (surface) =>
+    new THREE.Mesh(
+      mergeStatic(THREE, new ToneParts().add(surface).parts(THREE, tones)),
+      material
+    );
+  const y = LAYER_BASE_Y + LAYER_STEP * (level - 1);
+  const r = LAYER_R - LAYER_TAPER * (level - 1);
+  const disc = solid(
+    revolve(LAYER_DISC, 16, (along, radius, a) => [
+      radius * r * Math.cos(a),
+      y + along,
+      radius * r * Math.sin(a),
+    ])
+  );
+  const barrel = solid(
+    revolve(LAYER_BARREL, 8, aroundX(TURRET_BARREL_LENGTH, y + LAYER_MID_Y, 0))
+  );
+  const group = new THREE.Group();
+  group.add(disc, barrel);
+  return { group, barrel, barrelY: y + LAYER_MID_Y };
 }
 
 /**

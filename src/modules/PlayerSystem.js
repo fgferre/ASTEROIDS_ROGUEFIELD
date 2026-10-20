@@ -114,6 +114,11 @@ class PlayerSystem extends BaseSystem {
     this.angle = 0;
     // Weapon heading: the turret's, on the aim point in both schemes.
     this.turretAngle = 0;
+    // Multi-lock (Targeting Matrix rank 3): the headings of the turret's
+    // layers past the first, one per potential lock past the primary, and
+    // the locks they turn onto (Weapons.getLockAims, or null).
+    this.turretLayers = [];
+    this.lockAims = null;
     this.targetAngle = 0; // Para rotação suave (futuro)
     this.angularVelocity = 0;
 
@@ -526,19 +531,52 @@ class PlayerSystem extends BaseSystem {
       : this.aimPoint
         ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
         : this.angle;
+    this.turretAngle = this.turnTurret(this.turretAngle, goal, deltaTime);
+    // Each extra layer turns onto its own lock the same way; without one it
+    // follows the turret.
+    for (let i = 0; i < this.turretLayers.length; i += 1) {
+      const aim = this.lockAims?.[i + 1]?.point;
+      const layerGoal = aim
+        ? Math.atan2(aim.y - pivot.y, aim.x - pivot.x)
+        : this.turretAngle;
+      this.turretLayers[i] = this.turnTurret(
+        this.turretLayers[i],
+        layerGoal,
+        deltaTime
+      );
+    }
+  }
+
+  // One step of a turret heading onto `goal`: an exponential approach,
+  // capped at the turn rate.
+  turnTurret(angle, goal, deltaTime) {
     const maxStep =
       TURRET_TURN_RATE * this.maneuvers.turretTurnMultiplier * deltaTime;
-    const error = wrapAngle(goal - this.turretAngle);
+    const error = wrapAngle(goal - angle);
     const step = Math.max(
       -maxStep,
       Math.min(maxStep, error * (1 - Math.exp(-TURRET_RESPONSE * deltaTime)))
     );
-    this.turretAngle = wrapAngle(this.turretAngle + step);
+    return wrapAngle(angle + step);
   }
 
   /** CombatSystem's aim point for this step, or null without a lock. */
   setAimPoint(point) {
     this.aimPoint = point;
+  }
+
+  /**
+   * Multi-lock: the turret has `count` layers (Targeting's potential lock
+   * count; 1 is the turret alone) and layer i turns onto `lockAims[i]`
+   * (Weapons.getLockAims, or null). A new layer starts on the turret.
+   */
+  setTurretLayers(count, lockAims) {
+    this.lockAims = lockAims;
+    const extra = Math.max(0, count - 1);
+    while (this.turretLayers.length < extra) {
+      this.turretLayers.push(this.turretAngle);
+    }
+    this.turretLayers.length = extra;
   }
 
   updatePosition(deltaTime) {
@@ -670,12 +708,19 @@ class PlayerSystem extends BaseSystem {
     return this.getLocalToWorld(TURRET_PIVOT_X, 0);
   }
 
-  /** World point lances and the beam leave from: the turret's barrel tip. */
-  getMuzzlePoint() {
+  /**
+   * World point lances and the beam leave from: the turret's barrel tip.
+   * With `toward` (multi-lock), the tip of the turret layer aimed at that
+   * point, wherever the layer has turned so far.
+   */
+  getMuzzlePoint(toward = null) {
     const pivot = this.getTurretPivot();
+    const angle = toward
+      ? Math.atan2(toward.y - pivot.y, toward.x - pivot.x)
+      : this.turretAngle;
     return {
-      x: pivot.x + Math.cos(this.turretAngle) * TURRET_BARREL_LENGTH,
-      y: pivot.y + Math.sin(this.turretAngle) * TURRET_BARREL_LENGTH,
+      x: pivot.x + Math.cos(angle) * TURRET_BARREL_LENGTH,
+      y: pivot.y + Math.sin(angle) * TURRET_BARREL_LENGTH,
     };
   }
 
@@ -853,6 +898,8 @@ class PlayerSystem extends BaseSystem {
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
     this.turretAngle = 0;
+    this.turretLayers.length = 0;
+    this.lockAims = null;
     this.angularVelocity = 0;
     this.aimPoint = null;
     this.aimStick = null;
@@ -888,6 +935,8 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vy = 0;
     this.angularVelocity = 0;
     this.turretAngle = this.angle;
+    this.turretLayers.fill(this.angle);
+    this.lockAims = null;
     this.aimPoint = null;
     this.aimStick = null;
     this.flight.driftFactor = 0;

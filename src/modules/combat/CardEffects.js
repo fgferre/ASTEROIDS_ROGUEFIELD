@@ -457,11 +457,16 @@ export class CardEffects {
       this.staticShellPending = false;
       this.dischargeStaticShell(staticShell);
     }
-    // The beam stays on the muzzle while it shows (its damage already landed).
+    // The beam stays on the muzzle while it shows (its damage already
+    // landed); a multi-lock beam on the barrel of its turret layer, the one
+    // aimed along it.
     const player = this.player();
     if (weapons.beams.length && !player.isDead) {
-      const muzzle = player.getMuzzlePoint();
+      const turret = player.getMuzzlePoint();
       weapons.beams.forEach((beam) => {
+        const muzzle = beam.layered
+          ? player.getMuzzlePoint({ x: beam.ex, y: beam.ey })
+          : turret;
         beam.ex += muzzle.x - beam.x;
         beam.ey += muzzle.y - beam.y;
         beam.x = muzzle.x;

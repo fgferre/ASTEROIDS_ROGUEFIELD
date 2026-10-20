@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GamePools } from '../../../src/core/GamePools.js';
+import { TURRET_BARREL_LENGTH } from '../../../src/data/constants/physics.js';
 import {
+  ALL_HULLS,
   bastion,
   defaultHull,
   solarSlicer,
 } from '../../../src/data/shipModels.js';
+import CombatSystem from '../../../src/modules/CombatSystem.js';
 import PlayerSystem from '../../../src/modules/PlayerSystem.js';
+import { HALF_H, HALF_W } from '../../../src/modules/render3d/batches.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
@@ -215,6 +220,83 @@ describe('PlayerMirror', () => {
     mirror.update(player, ribbons, 0.2);
     expect(mirror.dashRing.visible).toBe(false);
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
+  });
+
+  it('stacks a thin turret layer per lock past the primary at Targeting Matrix rank 3, each turned onto its lock', () => {
+    if (!GamePools.initialized) GamePools.initialize();
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.multishot = 4;
+    // four drones round the ship (400, 300), 150 px out
+    const foes = [
+      [550, 300],
+      [400, 150],
+      [250, 300],
+      [400, 450],
+    ].map(([x, y], i) => ({
+      id: `drone-${i}`,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      health: 100,
+      type: 'drone',
+    }));
+    const eventBus = createEventBusMock();
+    const combat = new CombatSystem({
+      eventBus,
+      player,
+      enemies: { forEachActiveEnemy: (callback) => foes.forEach(callback) },
+      physics: { forEachBulletCollision: () => {} },
+    });
+    const play = () => {
+      for (let frame = 0; frame < 60; frame += 1) {
+        combat.update(1 / 60);
+        player.updateTurret(1 / 60);
+      }
+      mirror.update(player, ribbons, 0);
+      return mirror.layers.filter((layer) => layer.group.visible);
+    };
+
+    eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+    eventBus.emit('upgrade-aiming-suite', { level: 2 });
+    expect(play()).toHaveLength(0);
+
+    eventBus.emit('upgrade-aiming-suite', { level: 3, multiLockTargets: 4 });
+    ALL_HULLS.forEach((hull) => {
+      player.setHull(hull);
+      player.multishot = 4; // a new hull resets the stats
+      const shown = play();
+      expect(shown, hull.id).toHaveLength(3);
+      mirror.group.updateMatrixWorld(true);
+      const turretTop = new THREE.Box3().setFromObject(mirror.turret).max.y;
+      const tips = shown.map((layer, i) => {
+        // the barrel tip sits on the sim's muzzle point toward its own lock
+        const tip = layer.group.localToWorld(
+          new THREE.Vector3(TURRET_BARREL_LENGTH, 0, 0)
+        );
+        const muzzle = player.getMuzzlePoint(player.lockAims[i + 1].point);
+        expect(tip.x + HALF_W, hull.id).toBeCloseTo(muzzle.x, 2);
+        expect(tip.z + HALF_H, hull.id).toBeCloseTo(muzzle.y, 2);
+        expect(
+          new THREE.Box3().setFromObject(layer.barrel).min.y,
+          hull.id
+        ).toBeGreaterThan(turretTop);
+        return `${Math.round(muzzle.x)},${Math.round(muzzle.y)}`;
+      });
+      expect(new Set(tips).size, hull.id).toBe(3);
+      // every lock line leaves the turret's axis, at its own barrel's height
+      const pivot = player.getTurretPivot();
+      const heights = [0, 1, 2, 3].map((i) => {
+        const from = mirror.lockLineOrigin(i);
+        expect(from.x + HALF_W, hull.id).toBeCloseTo(pivot.x, 2);
+        expect(from.z + HALF_H, hull.id).toBeCloseTo(pivot.y, 2);
+        return from.y;
+      });
+      expect(heights[1], hull.id).toBeGreaterThan(turretTop);
+      expect(heights[3], hull.id).toBeGreaterThan(heights[1]);
+    });
+    GamePools.releaseAll();
   });
 
   it('hides the dash ring under a raised shield dome', () => {

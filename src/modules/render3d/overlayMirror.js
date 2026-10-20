@@ -4,6 +4,7 @@
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
+import { HALF_H, HALF_W } from './batches.js';
 
 const OVERLAY_H = 9;
 
@@ -71,7 +72,7 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
 
   if (!alive) return;
   const { x: px, y: py } = player.position;
-  mirrorLocks(t, combat, player);
+  mirrorLocks(t, combat);
 
   const orbs = xpOrbs?.xpOrbs || [];
   let orbActive = false;
@@ -86,13 +87,13 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
 }
 
 // Gated by the aiming rank: rank 1 ring + line, rank 2 the predicted-aim
-// marker, rank 3 every lock; nothing in manual aim. The
-// lock line leaves the turret's muzzle.
-export function mirrorLocks(t, combat, player) {
+// marker, rank 3 every lock; nothing in manual aim. The lock line leaves the
+// turret's axis at the height of the barrel aimed at that lock, so it reads
+// as coming out of the turret from any camera angle.
+export function mirrorLocks(t, combat) {
   if (!combat || combat.aimMode === 'manual') return;
   const rank = combat.targetingUpgradeLevel || 0;
   if (rank < 1) return;
-  const { x: mx, y: my } = player.getMuzzlePoint();
   const { ribbons, accentRgb } = t;
   const multi = rank >= 3;
   const locks = combat.currentLockAssignments || [];
@@ -128,15 +129,17 @@ export function mirrorLocks(t, combat, player) {
       dashes,
       0.6
     );
+    const from = t.player.lockLineOrigin(i);
     ribbons.segment(
-      mx,
-      my,
+      from.x + HALF_W,
+      from.z + HALF_H,
       target.x,
       target.y,
       OVERLAY_H,
       accentRgb,
       1,
-      alpha * 0.3
+      alpha * 0.3,
+      from.y
     );
   }
 
