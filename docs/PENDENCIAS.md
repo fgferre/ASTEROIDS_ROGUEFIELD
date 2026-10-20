@@ -6,7 +6,7 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 20.**
 
-## O BASTÃO — onde as sessões pararam (20/10, noite) — RODADA 15 EM ANDAMENTO NO RAMO `r15/jogar` (NÃO ESTÁ NA `main`)
+## O BASTÃO — onde as sessões pararam (20/10, noite) — FRENTES 1–4 DA RODADA 15 NA `main`, ESPERANDO O VEREDITO DELE
 
 **Como retomar (conversa local, qualquer máquina):**
 
@@ -32,25 +32,21 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
   linhas por arquivo); a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir nada"_); a câmera
   de dois estados (_"está boa, pode fechar"_) e as chegadas dos Wardens (_"aprovado"_); a arena com volume de qualquer
   ângulo.
-- **Rodada 15, feita no ramo `r15/jogar` (backup no GitHub; nada na `main` ainda — ele joga e aprova antes do PR):**
-  sons novos escolhidos por ele na audição (19 amostras, `SOUND.md`, camada de amostras); economia (curva de nível
-  120 + 40·(n−2)^1.7, ~45 cartas por partida, Warden com vida fixa ~75 s de luta, arma garantida no nível 3 e 7,
-  ofertas puxam a família, raridade por carta); 15 cartas fracas refeitas; orbes com peso e burst; baús com cerimônia
-  pausada e 3 pickups novos; HUD em encaixes com modelos (Instrumento novo e Clássico de hoje) e presets, escudo/casco
-  na cápsula que ele escolheu, radar tático, editor de layout estilo WoW; telas novas de level-up, baú e fim de
-  partida; 4 armas novas com evolução e Apex próprios (Arc Caster, Shard Halo, Furnace Corona, Seeker Swarm); 6
-  inimigos e 4 formações de onda; o Anel como estrutura iluminada e agora 3D de todos os lados (peças com nível de
-  detalhe; cena `?scene=ring` em dev para orbitar); o motor da nave com as camadas que ele escolheu na bancada
-  (turbine D, roar D, sub A, harmonic B, crackle C, puff D, ignition A, cutoff B, dash C, brake C), revisado pelo
-  ChatGPT (gpt-6.1-sol) e com os 4 defeitos achados corrigidos; as correções das duas revisões (jogo e telas). Tudo
-  proposta: falta ele jogar.
-- **Esperando ele:** jogar `r15/jogar` (http://localhost:5500/ASTEROIDS_ROGUEFIELD/) e julgar: o motor (quantas
-  cartas de propulsão abrem cada camada; o dash ficou mais alto que o antigo; o motor se acalma na velocidade máxima, de
-  propósito); as cores do modo daltônico; e decidir se o acabamento de perto do Anel (textura, sombras, janelas acesas)
-  vem agora ou com a fase da viagem até ele (de perto ainda parece caixa cinza lisa).
-- **Próximo, nesta ordem:** juntar o que ele aprovar na `main` por PR; sons das armas, pickups e baú novos (audição); mais armas (7 → 12+) e inimigos (16 → 30+), mini-chefes,
-  biomas (3 → 6), cascos com habilidade ativa; meta (desbloqueios, desafios); ritmo; cerimônias de evolução, cenas de
-  morte/vitória, três finais; o roteiro (item 19) numa conversa nova.
+- **Rodada 15, frentes 1–4, na `main` (PR #299, 20/10; não há mais ramos nem cópias de ajudantes):** sons
+  escolhidos por ele (19 amostras, `SOUND.md`) e o motor da nave com as camadas que ele escolheu; economia (curva
+  120 + 40·(n−2)^1.7, ~45 cartas, arma garantida nos níveis 3 e 7, raridade por carta, Warden com vida fixa); 15
+  cartas refeitas; orbes com peso; baús com cerimônia e 3 pickups novos; HUD de instrumento (encaixes, presets,
+  cápsula de escudo/casco, radar, editor; `HUD.md`); telas novas de level-up, baú e fim; 4 armas, 6 inimigos e 4
+  formações; o Anel 3D de todos os lados (`?scene=ring` em dev); correções de duas revisões.
+- **Ele jogou (20/10: _"já joguei"_). Falta o veredito dele, frente por frente** (perguntar e anotar aqui nas
+  palavras dele): (1) ritmo de cartas e se a partida (~18 min) e a luta do chefe (~75 s) estão boas — item 2;
+  (2) os sons e o motor: quantas cartas de propulsão abrem cada camada, o dash mais alto que o antigo, o motor que se
+  acalma na velocidade máxima de propósito; (3) baús, pickups e orbes; (4) o painel (preset Instrumento, cápsula,
+  radar, editor) e as telas novas; (5) as 4 armas e os inimigos novos; (6) as cores do modo daltônico; (7) se o
+  acabamento de perto do Anel (textura, sombras, janelas acesas) vem agora ou com a fase da viagem.
+- **Próximo, nesta ordem:** segunda audição (sons das armas, pickups, baú e formações novos; a skill `/sfx-generator`
+  roda AudioLDM) e o mix com ele jogando; frente 5 do `PLAN.md` (armas 7 → 12+, inimigos 16 → 30+, mini-chefes,
+  biomas 3 → 6, cascos com habilidade ativa); depois 6, 7 e 8; o roteiro (item 19) numa conversa nova.
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
@@ -60,7 +56,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
 jogando (20/10); "não tem problema mostrar a borda"; "a gente quer ver o inimigo chegando" (sem pausar a cena).
 
-**Avisos de processo:** até cinco ajudantes em paralelo, cada um com os arquivos dos outros nomeados; `pgrep -f`/
+**Avisos de processo:** até quatro ajudantes ao mesmo tempo (limite do app), cada um com os arquivos dos outros nomeados; `pgrep -f`/
 `pkill -f` matam o shell do ajudante; `set -o pipefail` em cadeias com testes; um ajudante pode "cair" sem escrever —
 conferir o diff; apagar refs remotas em massa é bloqueado na nuvem (a limpeza foi feita localmente: de 224 ramos
 antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar é antigo e não impede a partida.
