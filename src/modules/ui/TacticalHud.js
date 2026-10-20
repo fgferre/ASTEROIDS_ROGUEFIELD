@@ -578,15 +578,6 @@ export class TacticalHud {
 
   // A chest's cards (collectibles/chests.js): the CHEST banner with the
   // first, then a feed line each.
-  onChestCard({ index, total, name, detail, color } = {}) {
-    if (index === 0) {
-      this.layout?.showChestBanner(
-        `${total} ${total === 1 ? 'CARD' : 'CARDS'}`
-      );
-    }
-    this.layout?.addPickupFeed(name, detail, color);
-  }
-
   onAchievementUnlocked({ title } = {}) {
     this.layout?.addAchievementFeed(title);
   }

@@ -8,15 +8,17 @@
 // keeps the ship safe; the lid opens over the hold and bursts in amber at
 // its end. Then one card every `cardInterval` s (chestRewards.js), through
 // the applyUpgrade a level-up pick uses, each waiting again while a card
-// choice is up. Spent, it stays open a moment and is gone. Part of the
-// simulation: its draws come from the pickups' own chest stream.
+// choice is up ('chest-card'); 'chest-spent' once it has no more, and the UI
+// shows them (ui/ChestCeremony.js). Spent, it stays open a moment and is
+// gone. Part of the simulation: its draws come from the pickups' own chest
+// stream.
 //
 // States: closed → claimed → opening → granting → spent.
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { withAlpha } from '../../data/constants/palette.js';
 import { CHEST } from '../../data/pickups.js';
-import { describeChestCard, pickChestCard } from './chestRewards.js';
+import { pickChestCard } from './chestRewards.js';
 
 const TAU = Math.PI * 2;
 // World seconds of the lid opening (the hold, slowed), and of the ship kept
@@ -155,7 +157,7 @@ export class Chests {
     if (card && this.progression.applyUpgrade(card.id)) {
       chest.granted += 1;
       this.emit('chest-card', {
-        ...describeChestCard(this.progression, card),
+        id: card.id,
         index: chest.granted - 1,
         total: chest.cards,
         tier: chest.tier,
@@ -163,6 +165,7 @@ export class Chests {
       if (chest.granted < chest.cards) return;
     }
     chest.state = 'spent';
+    this.emit('chest-spent', { tier: chest.tier, granted: chest.granted });
     if (this.opening === chest) this.opening = null;
   }
 

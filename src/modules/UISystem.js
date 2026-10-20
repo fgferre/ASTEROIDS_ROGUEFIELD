@@ -16,6 +16,7 @@ import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { LevelUpScreen } from './ui/LevelUpScreen.js';
+import { ChestCeremony } from './ui/ChestCeremony.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
@@ -145,12 +146,22 @@ class UISystem extends BaseSystem {
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
       progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
       showCardsTip: () => this.showOnboardingCardsTip(),
       prefersReducedMotion: () => this.prefersReducedMotion(),
-      colorVision: () => this.settingsPanel.colorVision,
+      previewBuild: (card) => this.tacticalHud.layout?.previewBuildCard(card),
+    });
+    this.chestCeremony = new ChestCeremony({
+      refs: this.domRefs.chest,
+      progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
+      showScreen: (name, options) => this.showScreen(name, options),
+      showGameUI: () => this.showGameUI(),
+      cardChoiceOpen: () => this.levelUpScreen.levelUpState.isVisible,
+      prefersReducedMotion: () => this.prefersReducedMotion(),
     });
     this.pauseScreen = new PauseScreen({
       refs: this.domRefs.pause,
@@ -238,6 +249,7 @@ class UISystem extends BaseSystem {
     this.pauseScreen.bindPauseControls();
     this.runEndScreens.bindCopySeedLink();
     this.levelUpScreen.bindLevelUpControls();
+    this.chestCeremony.bindControls();
     this.settingsPanel.bindSettingsControls();
     this.creditsOverlay.bindCreditsControls();
     this.codexScreen.bindCodexControls();
@@ -383,6 +395,7 @@ class UISystem extends BaseSystem {
       }
       this.pilotDown = true;
       // Cards dealt on the step the ship died close: the death plays out.
+      this.chestCeremony.clear();
       if (this.levelUpScreen.levelUpState.isVisible) {
         this.showGameUI();
       }
@@ -461,8 +474,13 @@ class UISystem extends BaseSystem {
       this.tacticalHud.onPickupCollected(payload);
     });
 
+    // A chest's cards, shown once it has given them all (ui/ChestCeremony.js).
     this.registerEventListener('chest-card', (payload) => {
-      this.tacticalHud.onChestCard(payload);
+      this.chestCeremony.addCard(payload);
+    });
+    this.registerEventListener('chest-spent', () => {
+      if (this.runWon || this.pilotDown) return;
+      this.chestCeremony.chestSpent();
     });
 
     this.registerEventListener('achievement-unlocked', (payload) => {
@@ -513,6 +531,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
@@ -524,6 +543,8 @@ class UISystem extends BaseSystem {
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.pilotDown = false;
+      this.chestCeremony.clear();
+      this.runEndScreens.noteRunStart();
       this.transmissions?.clear();
       this.cinematics.stop();
       // After startNewRun has unpaused: the intro holds the first step.
@@ -610,6 +631,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('input-confirmed', () => {
       this.levelUpScreen.handleLevelUpConfirm();
+      this.chestCeremony.continue();
     });
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
@@ -798,8 +820,8 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (screenName === 'levelup') {
-      this.showScreen('levelup', {
+    if (screenName === 'levelup' || screenName === 'chest') {
+      this.showScreen(screenName, {
         overlay: true,
         show: true,
         emitEvent: false,
@@ -834,10 +856,11 @@ class UISystem extends BaseSystem {
           target.classList.toggle('hidden', !show);
         }
 
-        // Keep game-ui visible for pause, level-up and gameover overlays
+        // Keep game-ui visible for pause, card and run end overlays
         if (
           (screenName === 'pause' ||
             screenName === 'levelup' ||
+            screenName === 'chest' ||
             screenName === 'gameover' ||
             screenName === 'victory') &&
           show
@@ -847,7 +870,11 @@ class UISystem extends BaseSystem {
         }
 
         // The session service pauses the game on any non-'playing' screen.
-        if (screenName === 'levelup' && show && emitEvent) {
+        if (
+          (screenName === 'levelup' || screenName === 'chest') &&
+          show &&
+          emitEvent
+        ) {
           this.eventBus?.emit?.('screen-changed', { screen: screenName });
         }
         return;
@@ -901,13 +928,17 @@ class UISystem extends BaseSystem {
     }
   }
 
-  /** Back to play; several level-ups at once deal their card choices first. */
+  /**
+   * Back to play; several level-ups at once deal their card choices first,
+   * then a chest waiting shows its cards.
+   */
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
     if (
       !this.runWon &&
       !this.pilotDown &&
-      this.getService('progression').openNextLevelUpOffer()
+      (this.getService('progression').openNextLevelUpOffer() ||
+        this.chestCeremony.openNext())
     ) {
       return;
     }

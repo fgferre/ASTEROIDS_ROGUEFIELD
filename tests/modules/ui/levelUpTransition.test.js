@@ -142,14 +142,29 @@ describe('Level-up card transition', () => {
       const container = parent();
       const showScreen = vi.fn();
       const handlers = new Map();
+      const card = (id) => ({
+        id,
+        family: 'thermal',
+        rarity: 'common',
+        levels: [{}],
+        text: { name: id, levels: [{ description: 'Fire rate +11%.' }] },
+      });
+      const progression = {
+        upgradeLookup: new Map(['a', 'b', 'c'].map((id) => [id, card(id)])),
+        getUpgradeCount: () => 0,
+        getFamilyCounts: () => ({ thermal: 0 }),
+      };
       UISystem.prototype.setupEventListeners.call({
         levelUpScreen: new LevelUpScreen({
           refs: { container },
-          progression: () => null,
+          progression: () => progression,
+          combat: () => ({
+            getWeaponState: () => ({ weaponId: 'lance', chip: 'LANCE' }),
+          }),
           showScreen,
           showCardsTip: () => {},
           prefersReducedMotion: () => true,
-          colorVision: () => 'standard',
+          previewBuild: () => {},
         }),
         registerEventListener: (name, fn) => handlers.set(name, fn),
       });
@@ -207,6 +222,7 @@ describe('Level-up card choices', () => {
     const ui = Object.setPrototypeOf(
       {
         levelUpScreen,
+        chestCeremony: { openNext: () => false, clear: () => {} },
         onboarding: { cardPicked: () => {} },
         tacticalHud: { refreshHudFromServices: () => {} },
         queueTransmission: () => {},

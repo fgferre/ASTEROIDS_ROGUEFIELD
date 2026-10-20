@@ -51,12 +51,14 @@ describe('Hangar screen', () => {
     expect(hullLockText('bastion')).toBe('🔒 LOCKED · 520 SALVAGE');
   });
 
-  it('writes the recap line', () => {
-    expect(salvageLine({ amount: 99, total: 340 })).toBe(
-      'SALVAGE +99 (total 340)'
-    );
-    expect(salvageLine({ amount: 129, total: 340, multiplier: 1.3 })).toBe(
-      'SALVAGE +129 (×1.3 difficulty, total 340)'
-    );
+  it('writes the run end salvage line', () => {
+    expect(salvageLine({ amount: 99, total: 340 })).toEqual({
+      amount: '+99',
+      text: 'salvage · 340 to spend in the Hangar',
+    });
+    expect(salvageLine({ amount: 129, total: 340, multiplier: 1.3 })).toEqual({
+      amount: '+129',
+      text: 'salvage (×1.3 difficulty) · 340 to spend in the Hangar',
+    });
   });
 });

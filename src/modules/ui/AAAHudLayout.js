@@ -230,11 +230,6 @@ export class AAAHudLayout {
     }, delayMs);
   }
 
-  /** Amber "CHEST" banner with what it grants underneath. */
-  showChestBanner(subtitle) {
-    this._showBanner('CHEST', { tone: 'event', subtitle });
-  }
-
   /** Violet "HERALD OF …" banner with the Herald's line underneath. */
   showHeraldBanner(name, subtitle) {
     this._showBanner(String(name).toUpperCase(), {
@@ -595,6 +590,14 @@ export class AAAHudLayout {
       buffs: this._buffs,
       beams: this._beams,
     });
+  }
+
+  /**
+   * The level-up's highlighted card on the build instrument: `{ family }`
+   * gaining a card, or null. Models without a preview ignore it.
+   */
+  previewBuildCard(card) {
+    this._instruments.get('build')?.preview?.(card);
   }
 
   /** The right stick aims by hand while held: the aim reads MANUAL. */

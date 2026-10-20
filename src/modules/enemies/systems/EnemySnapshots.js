@@ -140,6 +140,9 @@ export class EnemySnapshots {
     return {
       totalKills: safeNumber(stats.totalKills, base.totalKills),
       timeElapsed: safeNumber(stats.timeElapsed, base.timeElapsed),
+      timeline: (stats.timeline ?? base.timeline).map((event) => ({
+        ...event,
+      })),
     };
   }
 

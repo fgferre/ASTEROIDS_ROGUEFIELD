@@ -10,13 +10,17 @@ export function salvageBalanceText(salvage) {
 }
 
 /**
- * "SALVAGE +120 (total 340)" under the game over / victory recap; off the
- * Veteran rate it names the difficulty multiplier: "(×1.3 difficulty, …)".
+ * The run end's salvage: `amount` ("+120") and the line after it, "salvage ·
+ * 340 to spend in the Hangar"; off the Veteran rate it names the difficulty
+ * multiplier: "salvage (×1.3 difficulty) · …".
  */
 export function salvageLine(award) {
   const multiplier = award?.multiplier ?? 1;
-  const rate = multiplier === 1 ? '' : `×${multiplier} difficulty, `;
-  return `SALVAGE +${award?.amount ?? 0} (${rate}total ${award?.total ?? 0})`;
+  const rate = multiplier === 1 ? '' : ` (×${multiplier} difficulty)`;
+  return {
+    amount: `+${award?.amount ?? 0}`,
+    text: `salvage${rate} · ${award?.total ?? 0} to spend in the Hangar`,
+  };
 }
 
 /** Over a hovered locked hull's silhouette: "🔒 LOCKED · 400 SALVAGE". */
