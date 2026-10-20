@@ -1,6 +1,6 @@
 # SOUND.md
 
-Every sound effect is a real sample the owner chose by ear; code only plays, varies and mixes them. Music and continuous sounds (thruster loop, hums) stay procedural. Read this before adding or changing a sound.
+Every sound effect is a real sample the owner chose by ear; code only plays, varies and mixes them. The ship engine is sample layers too (`src/public/audio/engine/`, driven by `src/modules/audio/shipEngine.js`), with the old synthesized loop kept only as the fallback when its files fail to load. Music and the other continuous hums stay procedural. Read this before adding or changing a sound.
 
 ## Palette (from `docs/NORTE.md`: dark stone, light inside)
 
