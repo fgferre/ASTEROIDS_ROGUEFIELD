@@ -51,6 +51,7 @@ export function createSamplePlayer(sfx) {
   let voices = []; // live voices, oldest first
   const lastStart = new Map(); // sampleId → context time of its last start
   const lastPick = new Map(); // sampleId → index of its last variation
+  const climbs = new Map(); // sampleId → { at, steps } of its climbing run
 
   async function fetchSample(fetchFile, id, entry) {
     try {
@@ -108,6 +109,15 @@ export function createSamplePlayer(sfx) {
       return;
     }
     await decode();
+  }
+
+  /** A climbing cue's playback rate: a semitone up per play in the run. */
+  function climbRate(id, { window, max }, now) {
+    const run = climbs.get(id);
+    const steps =
+      run && now - run.at <= window ? Math.min(run.steps + 1, max) : 0;
+    climbs.set(id, { at: now, steps });
+    return 2 ** (steps / 12);
   }
 
   /** A variation index, never the one this sample played last. */
@@ -181,7 +191,9 @@ export function createSamplePlayer(sfx) {
     const rng = sfx.resolveRandom(sfx.randomScopes?.families?.impact);
     const buffer = buffers[pickVariation(id, buffers.length, rng)];
     const { pitchSpread, gainSpreadDb } = SAMPLE_PLAYBACK;
-    const rate = 1 + rng.range(-pitchSpread, pitchSpread);
+    const spread = 1 + rng.range(-pitchSpread, pitchSpread);
+    const { climb } = SAMPLE_CUES[cue];
+    const rate = climb ? climbRate(id, climb, now) : spread;
     const gain = context.createGain();
     gain.gain.value = dbToGain(
       (entry.gain ?? 0) + rng.range(-gainSpreadDb, gainSpreadDb)

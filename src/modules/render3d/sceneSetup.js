@@ -383,7 +383,6 @@ export function setupThree(seeded) {
     scale: 1,
     shotRgb: rgbOf(THREE, PALETTE.shot),
     threatRgb: rgbOf(THREE, PALETTE.threat),
-    xpRgb: rgbOf(THREE, PALETTE.xp),
     statusRgb: rgbOf(THREE, PALETTE.status),
     accentRgb: rgbOf(THREE, PALETTE.player),
     textRgb: rgbOf(THREE, PALETTE.text),

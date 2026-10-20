@@ -31,7 +31,8 @@ const STEPS = 600; // 10 s at 60 Hz
 
 // Keys held during each half-second of the run (WASD moves on the screen
 // axes); lowercase letters are taps (e shield, g spread toggle, t aim toggle,
-// h dash). The route is picked so the run levels up twice.
+// h dash). The route is picked so the run levels up at least twice (four
+// times since the orbs burst out of kills, 20/10).
 const SEGMENT_STEPS = 30;
 const SCRIPT = [
   '',
@@ -40,8 +41,8 @@ const SCRIPT = [
   'WAe',
   'WA',
   'Wh',
+  'S',
   'A',
-  '',
   'A',
   'W',
   'g',

@@ -1,13 +1,17 @@
 import { SHIP_SIZE, XP_ORB_SIZE } from '../../core/GameConstants.js';
+import { XP_ORB_MAGNET_RAMP_SECONDS } from '../../data/constants/gameplay.js';
+import { getOrbConfig } from './orbClasses.js';
 
 /**
- * The ship's magnet: orbs inside its radius are drawn in, faster the closer
- * they get, and collected on arrival.
+ * The ship's magnet: an orb inside its radius accelerates toward the ship, a
+ * heavier class slower (its weight), up to a speed that grows as it nears,
+ * and is collected on arrival. An orb it moves is `steered` for this update,
+ * so the orb's own coasting (XPOrbSystem.updateFlight) leaves it be.
  */
 export class OrbMagnet {
   /**
    * @param {Object} kit
-   * @param {Object} kit.field - The OrbField (the grid of loose orbs)
+   * @param {Object} kit.field - The OrbField (the loose orbs)
    * @param {Object} kit.tuning - The shared OrbTuning (radius, force, boost)
    * @param {Function} kit.getPlayer - () => the ship, looked up again if lost
    * @param {Function} kit.getPullScale - () => 1, less in a Magnetic Storm
@@ -61,11 +65,6 @@ export class OrbMagnet {
       this.tuning.minOrbDistance * this.tuning.collectionRadiusPadding;
     const collectionRadiusSq = collectionRadius * collectionRadius;
 
-    const spatialIndex = this.field.ensureSpatialIndex();
-    if (!spatialIndex || spatialIndex.size === 0) {
-      return;
-    }
-
     const playerX = playerPos.x;
     const playerY = playerPos.y;
     const magnetismForce =
@@ -77,86 +76,57 @@ export class OrbMagnet {
         : 2.2;
 
     let moved = false;
-
-    spatialIndex.forEach((classData) => {
-      if (!classData || !classData.cells || classData.cells.size === 0) {
-        return;
+    const orbs = this.field.xpOrbs;
+    for (let i = 0; i < orbs.length; i += 1) {
+      const orb = orbs[i];
+      if (!this.field.isOrbActive(orb) || orb.isFusing) {
+        continue;
       }
 
-      const cellSize =
-        Number.isFinite(classData.cellSize) && classData.cellSize > 0
-          ? classData.cellSize
-          : magnetismRadius;
-      if (!Number.isFinite(cellSize) || cellSize <= 0) {
-        return;
+      const dx = playerX - orb.x;
+      const dy = playerY - orb.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq <= collectionRadiusSq) {
+        this.collectOrb(orb);
+        continue;
+      }
+      if (distanceSq > magnetismRadiusSq) {
+        continue;
       }
 
-      const searchRange = Math.max(
-        1,
-        Math.ceil((magnetismRadius + this.tuning.minOrbDistance) / cellSize)
-      );
-      const centerCellX = Math.floor(playerX / cellSize);
-      const centerCellY = Math.floor(playerY / cellSize);
-
-      for (let offsetX = -searchRange; offsetX <= searchRange; offsetX += 1) {
-        for (let offsetY = -searchRange; offsetY <= searchRange; offsetY += 1) {
-          const key = `${centerCellX + offsetX}:${centerCellY + offsetY}`;
-          const bucket = classData.cells.get(key);
-          if (!bucket || bucket.length === 0) {
-            continue;
-          }
-
-          for (let idx = 0; idx < bucket.length; idx += 1) {
-            const orb = bucket[idx];
-            if (!this.field.isOrbActive(orb) || orb.isFusing) {
-              continue;
-            }
-
-            const dx = playerX - orb.x;
-            const dy = playerY - orb.y;
-            const distanceSq = dx * dx + dy * dy;
-
-            if (distanceSq <= collectionRadiusSq) {
-              this.collectOrb(orb);
-              moved = true;
-              continue;
-            }
-
-            if (distanceSq <= 0 || distanceSq > magnetismRadiusSq) {
-              continue;
-            }
-
-            const distance = Math.sqrt(distanceSq);
-            if (!Number.isFinite(distance) || distance === 0) {
-              this.collectOrb(orb);
-              moved = true;
-              continue;
-            }
-
-            const normalizedDx = dx / distance;
-            const normalizedDy = dy / distance;
-            const proximity = 1 - Math.min(distance / magnetismRadius, 1);
-            const magnetBoost = 1 + proximity * boostMultiplier;
-            const speed = magnetismForce * magnetBoost;
-            const step = speed * deltaTime;
-
-            if (!Number.isFinite(step) || step <= 0) {
-              continue;
-            }
-
-            orb.x += normalizedDx * step;
-            orb.y += normalizedDy * step;
-            moved = true;
-
-            const postDx = playerX - orb.x;
-            const postDy = playerY - orb.y;
-            if (postDx * postDx + postDy * postDy <= collectionRadiusSq) {
-              this.collectOrb(orb);
-            }
-          }
-        }
+      // Steer toward the ship at the speed for this distance, the change in
+      // velocity capped by the orb's acceleration (lower when heavier).
+      const distance = Math.sqrt(distanceSq);
+      const proximity = 1 - distance / magnetismRadius;
+      const speed = magnetismForce * (1 + proximity * boostMultiplier);
+      const ramp = XP_ORB_MAGNET_RAMP_SECONDS * getOrbConfig(orb.class).weight;
+      let changeX = (dx / distance) * speed - orb.vx;
+      let changeY = (dy / distance) * speed - orb.vy;
+      const change = Math.hypot(changeX, changeY);
+      const maxChange = (speed / ramp) * deltaTime;
+      if (change > maxChange) {
+        changeX *= maxChange / change;
+        changeY *= maxChange / change;
       }
-    });
+      orb.vx += changeX;
+      orb.vy += changeY;
+      orb.steered = true;
+      moved = true;
+
+      // Reaching the ship within this step: collected, not flown past.
+      if (Math.hypot(orb.vx, orb.vy) * deltaTime >= distance) {
+        this.collectOrb(orb);
+        continue;
+      }
+      orb.x += orb.vx * deltaTime;
+      orb.y += orb.vy * deltaTime;
+
+      const postDx = playerX - orb.x;
+      const postDy = playerY - orb.y;
+      if (postDx * postDx + postDy * postDy <= collectionRadiusSq) {
+        this.collectOrb(orb);
+      }
+    }
 
     if (moved) {
       this.field.invalidateSpatialIndex();

@@ -505,16 +505,19 @@ export class PlayerEffects {
       this.particleEffects.particles.push(particle);
     }
 
-    const halo = this.createParticle(
+    // The flash where the new orb forms: short and white-hot at its core
+    // (proposta 20/10: 0.14 s, was a 0.4–0.8 s halo).
+    const flash = this.createParticle(
       x,
       y,
       0,
       0,
-      glowColor,
-      5 + tier * 1.8,
-      0.35 + tier * 0.07
+      particleColor,
+      6 + tier * 1.8,
+      0.14,
+      'flare'
     );
-    this.particleEffects.particles.push(halo);
+    this.particleEffects.particles.push(flash);
 
     const ringCount = this.getScaledParticleCount(4 + tier, { minimum: 2 });
     for (let i = 0; i < ringCount; i += 1) {

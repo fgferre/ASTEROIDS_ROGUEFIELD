@@ -1,14 +1,11 @@
-import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  XP_ORB_SIZE,
-} from '../../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { lerp } from '../../utils/mathHelpers.js';
 import { ORB_SPATIAL_NEIGHBOURS } from './OrbField.js';
+import { getOrbConfig } from './orbClasses.js';
 
 /**
  * How loose orbs sit: those past the field edge ease back in, and orbs of one
- * class draw together to a comfortable spacing without piling up.
+ * class at rest draw together to a comfortable spacing without piling up.
  */
 export class OrbSpacing {
   /**
@@ -52,9 +49,7 @@ export class OrbSpacing {
         continue;
       }
 
-      const tier = Number.isFinite(orb.tier) ? Math.max(1, orb.tier) : 1;
-      const radius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
-      const padding = Math.max(0, radius + margin);
+      const padding = Math.max(0, getOrbConfig(orb.class).radius + margin);
       const minX = padding;
       const maxX = Math.max(minX, width - padding);
       const minY = padding;
@@ -64,6 +59,9 @@ export class OrbSpacing {
       const targetY = Math.min(Math.max(orb.y, minY), maxY);
 
       if (targetX !== orb.x || targetY !== orb.y) {
+        // A burst stops at the edge: its outward motion goes.
+        if ((orb.x - targetX) * orb.vx > 0) orb.vx = 0;
+        if ((orb.y - targetY) * orb.vy > 0) orb.vy = 0;
         orb.x = lerp(orb.x, targetX, ease);
         orb.y = lerp(orb.y, targetY, ease);
         moved = true;
@@ -111,7 +109,7 @@ export class OrbSpacing {
 
       for (let i = 0; i < orbs.length; i += 1) {
         const orbA = orbs[i];
-        if (!this.field.isOrbEligibleForFusion(orbA)) {
+        if (!this.field.isOrbSettled(orbA)) {
           continue;
         }
 
@@ -130,7 +128,7 @@ export class OrbSpacing {
               const orbB = neighbors[n];
               if (
                 orbA === orbB ||
-                !this.field.isOrbEligibleForFusion(orbB) ||
+                !this.field.isOrbSettled(orbB) ||
                 orbB._gridIndex <= orbA._gridIndex
               ) {
                 continue;

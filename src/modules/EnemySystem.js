@@ -264,7 +264,10 @@ class EnemySystem extends BaseSystem {
     // NEW: Integrate RewardManager with enemy destruction
     this.registerEventListener('enemy-destroyed', (data) => {
       if (this.rewardManager && data.enemy) {
-        this.rewardManager.dropRewards(data.enemy);
+        this.rewardManager.dropRewards(
+          data.enemy,
+          data.source?.hitPosition ?? null
+        );
       }
     });
 
