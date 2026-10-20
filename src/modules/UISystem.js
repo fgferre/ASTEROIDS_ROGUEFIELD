@@ -118,8 +118,8 @@ class UISystem extends BaseSystem {
       enemies: () => this.getService('enemies'),
       progression: () => this.getService('progression'),
       combat: () => this.getService('combat'),
-      physics: () => this.getService('physics'),
       pickups: () => this.getService('pickups'),
+      xpOrbs: () => this.getService('xp-orbs'),
       renderer: () => this.getService('renderer'),
     });
     this.settingsPanel = new SettingsPanel({

@@ -9,9 +9,22 @@ const AAA_TACTICAL_LAYOUT = Object.freeze({
   description: 'AAA tactical HUD integrated via module.',
   plugin: {
     module: 'AAAHudLayout',
-    radarRange: 1500,
   },
-  items: [],
+  // The instruments on the screen: each item places a slot (anchor: the
+  // screen corner, x and y: px from it) and picks its model, a file under
+  // src/modules/ui/hud/instruments/<slot>/ (that folder's registry.js).
+  items: [
+    {
+      slot: 'radar',
+      model: 'tactical',
+      anchor: 'top-right',
+      x: 24,
+      y: 24,
+      scale: 1,
+      opacity: 1,
+      visible: true,
+    },
+  ],
   // Mode indicators (FIX-05) — read from CombatSystem.getSpreadMode() /
   // .getAimMode(); rendered by AAAHudLayout.updateModeIndicators.
   modeIndicators: {

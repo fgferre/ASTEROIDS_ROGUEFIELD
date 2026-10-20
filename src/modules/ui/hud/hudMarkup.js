@@ -37,30 +37,8 @@ export function getHudHtml() {
                 </div>
             </div>
 
-            <!-- RADAR (Top Right - Decagon + Analog Ring) -->
-            <div class="radar-area hud-panel">
-                <div class="radar-structure" id="ui-radar">
-                    <svg class="radar-svg-layer" viewBox="0 0 220 220">
-                        <circle class="radar-ring" cx="110" cy="110" r="108" />
-                        <circle class="radar-ring-dash" cx="110" cy="110" r="100" />
-                        <polygon class="radar-outline" points="110,15 166,33 200,81 200,139 166,187 110,205 54,187 20,139 20,81 54,33" />
-                        <line class="radar-axis" x1="110" y1="15" x2="110" y2="205" />
-                        <line class="radar-axis" x1="20" y1="139" x2="200" y2="81" />
-                        <line class="radar-axis" x1="20" y1="81" x2="200" y2="139" />
-                        <line class="radar-axis" x1="166" y1="33" x2="54" y2="187" />
-                        <line class="radar-axis" x1="54" y1="33" x2="166" y2="187" />
-                        <polygon class="radar-inner" points="110,53 144,64 164,93 164,127 144,156 110,167 76,156 56,127 56,93 76,64" />
-                    </svg>
-
-                    <div class="radar-mask">
-                        <div class="radar-sweep"></div>
-                        <div class="blip-container" id="ui-radar-blips">
-                            <div class="blip player"></div>
-                        </div>
-                    </div>
-                    <div class="radar-jam-label">NO SIGNAL</div>
-                </div>
-            </div>
+            <!-- RADAR (Top Right): the layout item's model mounts here -->
+            <div class="radar-area hud-panel" data-slot="radar"></div>
 
             <!-- NEXT WAVE (Center) -->
             <div class="next-wave-box" id="el-wave-alert">
