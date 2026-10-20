@@ -3,12 +3,22 @@
 import { biomeForLayer } from '../../data/biomes.js';
 import { CODEX_ENTRIES, codexIdOf } from '../../data/codex.js';
 import {
+  FAMILY_APEX_THRESHOLD,
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../data/upgrades/families.js';
+import { trackFamily } from './hud/instruments/build/instrument.js';
+import {
+  brief,
+  familyColor,
+  familyForm,
+  glyphMarkup,
+  shortName,
+  trackMarkup,
+} from './upgradeCard.js';
 
 // The run's framing (docs/NORTE.md §7 pillar 5): who killed the pilot, where,
-// and the build — one markup for the game over recap and the pause panel.
+// and the build — the pause panel's block, and the run end's (endBuildMarkup).
 
 /** "Elite Ram", "Warden Choir"; "the Field" when the last hit had no source. */
 export function killerName(source) {
@@ -140,12 +150,94 @@ export function buildBlockMarkup(build) {
     ${families}`;
 }
 
+// The main form of the build: an Apex first, else the evolution of the family
+// with the most cards; null before any.
+function mainForm(weapon, counts) {
+  const byCards = (a, b) => (counts[b.family] ?? 0) - (counts[a.family] ?? 0);
+  return (
+    [...weapon.evolutions].sort(
+      (a, b) => Number(b.apex) - Number(a.apex) || byCards(a, b)
+    )[0] ?? null
+  );
+}
+
+const CARDS_LEFT = ['', 'one card', 'two cards', 'three cards'];
+
+// "Apex 4/5 · one card from Solar Flare", or what the Apex does.
+function familyGoal(family, owned, weaponId) {
+  if (owned >= FAMILY_APEX_THRESHOLD) {
+    const apex = familyForm(family, weaponId, true);
+    return `<b>Apex</b> · ${brief(apex.description).toLowerCase()}`;
+  }
+  const apex = owned >= FAMILY_SYNERGY_THRESHOLD;
+  const target = apex ? FAMILY_APEX_THRESHOLD : FAMILY_SYNERGY_THRESHOLD;
+  const form = shortName(familyForm(family, weaponId, apex).name);
+  const reached = apex
+    ? `Apex ${owned}/${FAMILY_APEX_THRESHOLD}`
+    : `${owned}/${FAMILY_SYNERGY_THRESHOLD}`;
+  return `<b>${reached}</b> · ${CARDS_LEFT[target - owned]} from ${form}`;
+}
+
+function endFamilyMarkup(family) {
+  const known = family.id in UPGRADE_FAMILIES;
+  const glyphs = known
+    ? Array.from(
+        { length: FAMILY_APEX_THRESHOLD },
+        (_, i) =>
+          `${i === FAMILY_SYNERGY_THRESHOLD ? '<b class="end-fam__notch"></b>' : ''}${glyphMarkup(family.id, i < family.owned)}`
+      ).join('')
+    : '';
+  const count = known
+    ? `${Math.min(family.owned, FAMILY_APEX_THRESHOLD)}/${FAMILY_APEX_THRESHOLD}`
+    : '';
+  const tag =
+    family.active && family.bonusName
+      ? `<span class="end-fam__tag">${family.bonusName}</span>`
+      : '';
+  const cards = family.upgrades
+    .map(({ name, level }) => `<b>${name}</b><sup>${level}</sup>`)
+    .join(' · ');
+  const color = known ? familyColor(family.id) : 'var(--text-dim)';
+  return `<li class="end-fam" style="--fam: ${color}"><span class="end-fam__name">${family.name}</span><span class="end-fam__pips">${glyphs}</span><span class="end-fam__count">${count}</span><span class="end-fam__cards">${tag}${cards}</span></li>`;
+}
+
 /**
- * The death/victory screen's quote: the last transmission, labelled like its
- * HUD banner; empty when no line was shown.
+ * The run end's build: the weapon in its highest form with its other forms
+ * as chips, the main family's track toward the Apex, then every family with
+ * its cards and ranks.
  */
-export function transmissionQuoteMarkup(line) {
-  if (!line) return '';
-  return `<figcaption class="run-recap__quote-speaker">▌TRANSMISSION — ${line.speaker}</figcaption>
-    <blockquote class="run-recap__quote-line">${line.text}</blockquote>`;
+export function endBuildMarkup(build) {
+  const { weapon } = build;
+  const counts = Object.fromEntries(
+    build.families.map(({ id, owned }) => [id, owned])
+  );
+  const main = mainForm(weapon, counts);
+  const chips = [
+    main?.apex ? '<span class="end-chip is-apex">Apex</span>' : '',
+    ...weapon.evolutions
+      .filter((evolution) => evolution !== main)
+      .map(
+        (evolution) =>
+          `<span class="end-chip" style="--fam: ${familyColor(evolution.family)}">${shortName(evolution.name)}</span>`
+      ),
+  ].join('');
+  const trackId = main?.family ?? trackFamily(counts)?.family ?? null;
+  const owned = counts[trackId] ?? 0;
+  const cells = trackMarkup({
+    on: Math.min(owned, FAMILY_APEX_THRESHOLD),
+    fresh: 0,
+    total: FAMILY_APEX_THRESHOLD,
+    notch: FAMILY_SYNERGY_THRESHOLD,
+  });
+  const track = trackId
+    ? `<p class="end-wtrack" style="--fam: ${familyColor(trackId)}"><span class="end-wtrack__fam">${UPGRADE_FAMILIES[trackId].name}</span><span class="track">${cells}</span><span class="end-wtrack__goal">${familyGoal(trackId, owned, weapon.weaponId)}</span></p>`
+    : '';
+  const families = build.families.length
+    ? `<ul class="end-fams">${build.families.map(endFamilyMarkup).join('')}</ul>`
+    : '<p class="end-empty">No upgrades this run.</p>';
+  const tone = main ? `var(--${main.apex ? 'apex' : 'fam'})` : 'var(--text)';
+  const famColor = main ? familyColor(main.family) : 'var(--text)';
+  return `<p class="end-lbl">Build</p>
+    <p class="end-weapon${main?.apex ? ' is-apex' : ''}" style="--fam: ${famColor}; --tone: ${tone}"><span class="end-weapon__name">${main?.name ?? weapon.name}</span>${chips}</p>
+    ${track}${families}`;
 }

@@ -1,55 +1,92 @@
 // src/modules/ui/LevelUpScreen.js
 //
-// The level-up screen: one card per upgrade offered, keyboard, mouse and pad
-// focus over them, reroll and banish, and the pick that sends the run back
-// to play through the cards' exit animation.
+// The level-up screen (the owner's mock-ups of 20/10): "LEVEL n", one card
+// per upgrade offered (ui/upgradeCard.js), keyboard, mouse and pad focus over
+// them, reroll and banish, and the pick that sends the run back to play
+// through the cards' exit animation. The first three picks name themselves
+// and show where each family leads; the HUD's build instrument previews the
+// highlighted card's cell.
 
-import { pipsMarkup } from './runRecap.js';
+import { PROGRESSION_INITIAL_LEVEL } from '../../core/GameConstants.js';
 import { playLevelUpExit, staggerCardEntry } from './levelUpTransition.js';
+import {
+  cardClasses,
+  cardMarkup,
+  cardState,
+  paintCard,
+  weaponOfCard,
+} from './upgradeCard.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 // Level-up cards and the victory buttons ignore input this long after showing.
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
-const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
+// The picks that set the run's direction get their own strip.
+const FIRST_PICKS = ['First pick', 'Second pick', 'Third pick'];
 
-const COLOR_ASSIST_ACCENTS = {
-  offense: '#3366CC',
-  defense: '#2F855A',
-  mobility: '#E76F51',
-  utility: '#8E6CFF',
-  default: '#4C6EF5',
-};
+/**
+ * The HUD's build and XP instruments stay lit through a card screen's dim:
+ * their boxes, as holes in its backdrop (--hole-a-*, --hole-b-*).
+ */
+export function liftHudInstruments(screen) {
+  ['build', 'xp'].forEach((slot, i) => {
+    const rect = document
+      .querySelector(`#hud-layer [data-slot="${slot}"]`)
+      ?.getBoundingClientRect();
+    const hole = `--hole-${'ab'[i]}`;
+    const shown = rect && rect.width > 0;
+    screen.style.setProperty(
+      `${hole}-x`,
+      shown ? `${Math.round(rect.left + rect.width / 2)}px` : '-999px'
+    );
+    screen.style.setProperty(
+      `${hole}-y`,
+      shown ? `${Math.round(rect.top + rect.height / 2)}px` : '-999px'
+    );
+    screen.style.setProperty(
+      `${hole}-w`,
+      shown ? `${Math.round(rect.width / 2 + 90)}px` : '1px'
+    );
+    screen.style.setProperty(
+      `${hole}-h`,
+      shown ? `${Math.round(rect.height / 2 + 40)}px` : '1px'
+    );
+  });
+}
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, rerollBtn, banishBtn, banishHint }.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint }.
    * `progression()`: the progression service (offers, rerolls, banishes, picks), or none.
+   * `combat()`: the combat service (the held weapon a card names).
    * `emit(name, payload)`: sends ui-hover.
    * `showScreen(name, options)`: shows the level-up overlay.
    * `showGameUI()`: back to play, or to the next card choice waiting; it resets this screen too.
    * `showCardsTip()`: the first-run onboarding tip under the cards.
    * `prefersReducedMotion()`: the cards skip their entry and exit animation.
-   * `colorVision()`: 'assist' swaps the card accents for the color-blind palette.
+   * `previewBuild(card)`: the HUD build instrument shows `{ family }` as
+   *   gaining a card, or nothing (null).
    */
   constructor({
     refs,
     progression,
+    combat,
     emit,
     showScreen,
     showGameUI,
     showCardsTip,
     prefersReducedMotion,
-    colorVision,
+    previewBuild,
   }) {
     this.refs = refs;
     this.progression = progression;
+    this.combat = combat;
     this.emit = emit;
     this.showScreen = showScreen;
     this.showGameUI = showGameUI;
     this.showCardsTip = showCardsTip;
     this.prefersReducedMotion = prefersReducedMotion;
-    this.colorVision = colorVision;
+    this.previewBuild = previewBuild;
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -111,14 +148,34 @@ export class LevelUpScreen {
     this.levelUpState.isVisible = true;
     this.levelUpState.level = levelValue;
     this.showScreen('levelup', { overlay: true, show: true });
+    const screen = document.getElementById('levelup-screen');
+    if (screen) liftHudInstruments(screen);
     this.renderLevelUpOptions(options, data.poolSize);
     this.showCardsTip();
   }
 
-  // Cards, subtitle and reroll/banish buttons for the offered options; new
+  // "LEVEL n" over "Choose one", or the first picks' strip.
+  renderHeader() {
+    const { level: levelNode, text, picks } = this.refs;
+    const level = this.levelUpState.level;
+    if (levelNode) levelNode.textContent = Number.isFinite(level) ? level : '';
+    const pick = Number.isFinite(level) ? level - PROGRESSION_INITIAL_LEVEL : 0;
+    const strip = FIRST_PICKS[pick - 1];
+    text?.classList.toggle('hidden', Boolean(strip));
+    if (!picks) return;
+    picks.classList.toggle('hidden', !strip);
+    if (strip) {
+      const slots = FIRST_PICKS.map(
+        (_, i) =>
+          `<i class="lu-slot${i < pick - 1 ? ' is-done' : i === pick - 1 ? ' is-now' : ''}"></i>`
+      ).join('');
+      picks.innerHTML = `<span class="lu-picks__lbl">${strip}</span><span class="lu-picks__slots" aria-hidden="true">${slots}</span><span>Your first three picks set the run's direction.</span>`;
+    }
+  }
+
+  // Cards, header and reroll/banish buttons for the offered options; new
   // cards restart the input lockout so a held key can't pick one unseen.
   renderLevelUpOptions(options, offeredPoolSize) {
-    const levelValue = this.levelUpState.level;
     this.levelUpState.options = options;
     this.levelUpState.poolSize = Number.isFinite(Number(offeredPoolSize))
       ? Number(offeredPoolSize)
@@ -127,28 +184,24 @@ export class LevelUpScreen {
     this.levelUpState.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
     this.setBanishMode(false);
     this.updateLevelUpActionButtons();
-
-    if (this.refs.text) {
-      const optionCount = options.length;
-      const poolSize = this.levelUpState.poolSize;
-      const optionLabel = optionCount === 1 ? 'option' : 'options';
-      let suffix = ` (${optionCount} ${optionLabel})`;
-      if (poolSize > optionCount) {
-        suffix = ` (${optionCount} of ${poolSize} ${optionLabel})`;
-      }
-      const prefix = Number.isFinite(levelValue)
-        ? `Level ${levelValue} - Choose your technology`
-        : 'Choose your technology';
-      this.refs.text.textContent = `${prefix}${suffix}:`;
-    }
+    this.renderHeader();
 
     const container = this.refs.container;
     if (container) {
       container.innerHTML = '';
       const fragment = document.createDocumentFragment();
       const buttons = [];
+      // The weapon card stands apart, after the others.
+      const order = options
+        .map((option, index) => ({ option, index }))
+        .sort(
+          (a, b) =>
+            Number(Boolean(weaponOfCard(a.option.id))) -
+              Number(Boolean(weaponOfCard(b.option.id))) || a.index - b.index
+        );
+      this.levelUpState.options = order.map(({ option }) => option);
 
-      options.forEach((option, index) => {
+      order.forEach(({ option }, index) => {
         const button = this.createUpgradeOptionButton(option, index);
         fragment.appendChild(button);
         buttons.push(button);
@@ -192,7 +245,7 @@ export class LevelUpScreen {
       button.disabled = left <= 0;
       const count = button.querySelector('[data-count]');
       if (count) {
-        count.textContent = `${left} left`;
+        count.textContent = `${left}`;
       }
     });
   }
@@ -231,22 +284,18 @@ export class LevelUpScreen {
   }
 
   createUpgradeOptionButton(option, index) {
+    const progression = this.progression();
+    const state = cardState(progression, option.id);
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}${
-      option.cursed ? ' upgrade-option--cursed' : ''
-    }`;
+    button.className = cardClasses(state.definition);
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
-
-    const accentColors = this.resolveAccentColors(option);
-    button.style.setProperty('--upgrade-accent', accentColors.accent);
-    button.style.setProperty('--upgrade-accent-soft', accentColors.soft);
-    if (option.family) {
-      button.style.setProperty('--family-color', option.family.color);
-    }
-
-    button.innerHTML = this.buildUpgradeOptionMarkup(option);
+    paintCard(button, state.definition);
+    button.innerHTML = cardMarkup(state.definition, state, {
+      weapon: this.combat().getWeaponState(),
+      key: index + 1,
+    });
     button.addEventListener('click', () => this.selectUpgrade(option.id));
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
@@ -257,123 +306,6 @@ export class LevelUpScreen {
     );
 
     return button;
-  }
-
-  buildUpgradeOptionMarkup(option = {}) {
-    const category = option.category || {};
-    const currentLevel = Number.isFinite(Number(option.currentLevel))
-      ? Number(option.currentLevel)
-      : 0;
-    const maxLevel = Number.isFinite(Number(option.maxLevel))
-      ? Number(option.maxLevel)
-      : Math.max(currentLevel, 1);
-    const nextLevel = option.nextLevel || null;
-    const summary = option.summary ? option.summary : '';
-    const highlights = Array.isArray(nextLevel?.highlights)
-      ? nextLevel.highlights
-      : [];
-    const prerequisites = ensureArray(option.prerequisites);
-
-    const familySection = this.buildFamilyProgressMarkup(option.family);
-
-    const categoryIcon = category.icon
-      ? `<span class="upgrade-option__category-icon" aria-hidden="true">${category.icon}</span>`
-      : '';
-
-    const nextLevelSection = nextLevel
-      ? `<section class="upgrade-option__next">
-          <p class="upgrade-option__next-label">Next: ${
-            nextLevel.title || `Level ${currentLevel + 1}`
-          }</p>
-          <p class="upgrade-option__description">${
-            nextLevel.description || ''
-          }</p>
-          ${
-            highlights.length
-              ? `<ul class="upgrade-highlights">
-                  ${highlights.map((item) => `<li>${item}</li>`).join('')}
-                </ul>`
-              : ''
-          }
-        </section>`
-      : '<p class="upgrade-option__maxed">Technology maxed out.</p>';
-
-    const prerequisitesSection = prerequisites.length
-      ? `<footer class="upgrade-option__footer">
-          <ul class="upgrade-prerequisites">
-            ${prerequisites
-              .map((entry) => {
-                const label = entry?.label || entry?.description || '';
-                if (!label) {
-                  return '';
-                }
-                const stateClass = entry.met ? 'is-met' : 'is-locked';
-                const icon = entry.met ? '✔️' : '🔒';
-                return `<li class="${stateClass}">${icon} ${label}</li>`;
-              })
-              .join('')}
-          </ul>
-        </footer>`
-      : '';
-
-    const rarity = option.rarity || 'common';
-
-    return `
-      <p class="upgrade-option__rarity">${
-        option.cursed ? 'Cursed' : UPGRADE_RARITY_LABELS[rarity]
-      }</p>
-      <header class="upgrade-option__header">
-        <span class="upgrade-icon" aria-hidden="true">${
-          option.icon || '✨'
-        }</span>
-        <div class="upgrade-option__meta">
-          <div class="upgrade-option__chips">
-            <span class="upgrade-option__category">
-              ${categoryIcon}
-              ${category.label || 'Tecnologia'}
-            </span>
-            ${
-              option.family
-                ? `<span class="upgrade-option__family">${option.family.name}</span>`
-                : ''
-            }
-          </div>
-          <span class="upgrade-option__level">Lv. ${currentLevel}/${
-            maxLevel || Math.max(1, currentLevel)
-          }</span>
-        </div>
-      </header>
-      <div class="upgrade-option__body">
-        <h3 class="upgrade-option__title">${option.name || option.id}</h3>
-        ${summary ? `<p class="upgrade-option__summary">${summary}</p>` : ''}
-        ${familySection}
-        ${nextLevelSection}
-      </div>
-      ${prerequisitesSection}
-    `;
-  }
-
-  // Pips for distinct upgrades held in the family; names the bonus a pick unlocks.
-  buildFamilyProgressMarkup(family) {
-    if (!family) {
-      return '';
-    }
-    const pips = pipsMarkup(family.owned, family.required);
-    let state = '';
-    let label = `${family.name} ${Math.min(family.owned, family.required)}/${family.required} · ${family.bonusName}`;
-    if (family.active) {
-      state = ' is-active';
-      label = `${family.bonusName} online`;
-    } else if (family.completesSynergy) {
-      state = ' is-unlocking';
-      label = `Unlocks: ${family.bonusName} — ${family.bonusDescription}`;
-    } else if (family.owned > 0) {
-      state = ' is-building';
-    }
-    return `<p class="upgrade-option__family-progress${state}">
-        <span class="family-pips" aria-hidden="true">${pips}</span>
-        <span>${label}</span>
-      </p>`;
   }
 
   selectUpgrade(upgradeId) {
@@ -406,7 +338,8 @@ export class LevelUpScreen {
     }
   }
 
-  // Cards out (ui/levelUpTransition.js), input locked, then back to the run.
+  // Cards out (ui/levelUpTransition.js) toward the HUD's build instrument,
+  // input locked, then back to the run.
   leaveLevelUp(upgradeId) {
     const buttons = ensureArray(this.levelUpState.buttons);
     this.levelUpState.lockedUntil = Infinity;
@@ -414,7 +347,7 @@ export class LevelUpScreen {
       screen: document.getElementById('levelup-screen'),
       cards: buttons,
       picked: buttons.find((button) => button.dataset.upgradeId === upgradeId),
-      target: document.getElementById('ui-weapon-chip'),
+      target: document.querySelector('#hud-layer [data-slot="build"]'),
       reducedMotion: this.prefersReducedMotion(),
       done: () => this.showGameUI(),
     });
@@ -426,15 +359,6 @@ export class LevelUpScreen {
       ? Number(payload.poolSize)
       : options.length;
     this.levelUpState.options = options;
-
-    if (
-      Number.isFinite(Number(payload.level)) ||
-      Number.isFinite(Number(payload.newLevel))
-    ) {
-      this.updateLevelDisplay(payload.level ?? payload.newLevel, {
-        force: true,
-      });
-    }
 
     if (!options.length) {
       this.resetLevelUpState();
@@ -476,6 +400,16 @@ export class LevelUpScreen {
     });
 
     this.levelUpState.focusIndex = safeIndex;
+    this.previewFocusedCard();
+  }
+
+  // The highlighted card's cell on the HUD: a card new to its family adds one.
+  previewFocusedCard() {
+    const option = this.levelUpState.options[this.levelUpState.focusIndex];
+    const progression = this.progression();
+    if (!option || !progression) return;
+    const { definition, rank } = cardState(progression, option.id);
+    this.previewBuild(rank === 1 ? { family: definition.family } : null);
   }
 
   moveLevelUpFocus(direction) {
@@ -510,12 +444,6 @@ export class LevelUpScreen {
       default:
         break;
     }
-  }
-
-  updateLevelDisplay() {
-    // Standard HUD legacy method.
-    // AAA HUD updates via updateAAATacticalHudFromServices.
-    // Kept as stub for shared logic calls.
   }
 
   handleLevelUpConfirm() {
@@ -564,6 +492,7 @@ export class LevelUpScreen {
       }
     });
     this.setBanishMode(false);
+    if (this.levelUpState.isVisible) this.previewBuild(null);
 
     this.levelUpState = {
       isVisible: false,
@@ -576,87 +505,5 @@ export class LevelUpScreen {
       banishMode: false,
       exitTimer: null,
     };
-  }
-
-  resolveAccentColors(option) {
-    const fallback = '#3399ff';
-    let accent = fallback;
-    let categoryId = null;
-
-    if (option && typeof option === 'object') {
-      if (
-        typeof option.themeColor === 'string' &&
-        option.themeColor.trim().length
-      ) {
-        accent = option.themeColor.trim();
-      } else if (
-        typeof option.color === 'string' &&
-        option.color.trim().length
-      ) {
-        accent = option.color.trim();
-      }
-
-      categoryId =
-        option.category?.id ||
-        option.categoryId ||
-        (typeof option.id === 'string' ? option.id : null);
-    } else if (typeof option === 'string' && option.trim().length) {
-      accent = option.trim();
-    }
-
-    const colorVision = this.colorVision();
-
-    if (colorVision === 'assist') {
-      const assistAccent = this.resolveAssistAccent(categoryId);
-      if (assistAccent) {
-        accent = assistAccent;
-      }
-    }
-
-    const normalized =
-      typeof accent === 'string' ? accent.trim().toLowerCase() : '';
-    const softAlpha = colorVision === 'assist' ? 0.35 : 0.25;
-    let soft = 'rgba(51, 153, 255, 0.25)';
-
-    if (normalized.startsWith('#')) {
-      soft = this.hexToRgba(normalized, softAlpha);
-    } else if (normalized.startsWith('rgb')) {
-      soft = normalized.replace('rgb', 'rgba').replace(')', `, ${softAlpha})`);
-    } else if (normalized.startsWith('hsl')) {
-      soft = normalized.replace('hsl', 'hsla').replace(')', `, ${softAlpha})`);
-    } else if (colorVision === 'assist') {
-      soft = 'rgba(76, 110, 245, 0.32)';
-    }
-
-    return { accent, soft };
-  }
-
-  resolveAssistAccent(categoryId) {
-    if (!categoryId) {
-      return COLOR_ASSIST_ACCENTS.default;
-    }
-
-    return COLOR_ASSIST_ACCENTS[categoryId] || COLOR_ASSIST_ACCENTS.default;
-  }
-
-  hexToRgba(hex, alpha = 1) {
-    const sanitized = typeof hex === 'string' ? hex.replace('#', '') : '';
-    const clampedAlpha = Math.min(1, Math.max(0, alpha));
-
-    if (sanitized.length === 3) {
-      const r = parseInt(sanitized[0] + sanitized[0], 16);
-      const g = parseInt(sanitized[1] + sanitized[1], 16);
-      const b = parseInt(sanitized[2] + sanitized[2], 16);
-      return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`;
-    }
-
-    if (sanitized.length === 6) {
-      const r = parseInt(sanitized.slice(0, 2), 16);
-      const g = parseInt(sanitized.slice(2, 4), 16);
-      const b = parseInt(sanitized.slice(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`;
-    }
-
-    return `rgba(51, 153, 255, ${clampedAlpha})`;
   }
 }

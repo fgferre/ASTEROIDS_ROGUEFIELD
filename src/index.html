@@ -20,6 +20,8 @@
     />
     <script src="/libs/lucide.min.js"></script>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="cardScreens.css" />
+    <link rel="stylesheet" href="runEndScreens.css" />
   </head>
   <body>
     <div id="game-container">
@@ -186,37 +188,44 @@
         </div>
       </div>
 
-      <!-- Level Up Screen -->
-      <div id="levelup-screen" class="screen hidden">
+      <!-- Level Up Screen: the cards (ui/LevelUpScreen.js, ui/upgradeCard.js) -->
+      <div id="levelup-screen" class="screen cards-screen hidden">
         <div class="levelup-content">
-          <h2 class="levelup-title">TECH UPGRADE!</h2>
-          <p id="levelup-text" class="levelup-subtitle">
-            Level X - Choose your upgrade:
-          </p>
+          <header class="lu-head">
+            <h2 class="lu-title">
+              <span class="lu-rule" aria-hidden="true"></span>
+              <span class="lu-level"
+                ><small>Level</small><b id="levelup-level"></b
+              ></span>
+              <span class="lu-rule is-right" aria-hidden="true"></span>
+            </h2>
+            <p id="levelup-text" class="lu-sub">Choose one</p>
+            <p id="levelup-picks" class="lu-picks hidden"></p>
+          </header>
           <div id="upgrades-container" class="upgrades-grid">
             <!-- Upgrades will be inserted here dynamically -->
           </div>
           <div class="levelup-actions">
             <button
               id="levelup-reroll-btn"
-              class="btn btn--secondary levelup-action"
+              class="lu-ghost levelup-action"
               type="button"
             >
+              <kbd data-device="keyboard">R</kbd>
+              <kbd data-device="gamepad">X</kbd>
               Reroll
-              <span data-device="keyboard">(R)</span>
-              <span data-device="gamepad">(X)</span>
-              <span class="levelup-action__count" data-count>1 left</span>
+              <span class="lu-ghost__n" data-count>1</span>
             </button>
             <button
               id="levelup-banish-btn"
-              class="btn btn--danger levelup-action"
+              class="lu-ghost lu-ghost--danger levelup-action"
               type="button"
               aria-pressed="false"
             >
+              <kbd data-device="keyboard">B</kbd>
+              <kbd data-device="gamepad">Y</kbd>
               Banish
-              <span data-device="keyboard">(B)</span>
-              <span data-device="gamepad">(Y)</span>
-              <span class="levelup-action__count" data-count>1 left</span>
+              <span class="lu-ghost__n" data-count>1</span>
             </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
@@ -224,6 +233,35 @@
             <span data-device="keyboard">Esc</span>
             <span data-device="gamepad">B</span> cancels.
           </p>
+        </div>
+      </div>
+
+      <!-- Chest Screen: a chest's cards, one by one (ui/ChestCeremony.js) -->
+      <div
+        id="chest-screen"
+        class="screen cards-screen hidden"
+        tabindex="-1"
+        role="dialog"
+        aria-labelledby="chest-title"
+      >
+        <div class="levelup-content chest-content">
+          <h2 class="lu-title chest-title">
+            <span class="lu-rule" aria-hidden="true"></span>
+            <span id="chest-title" class="chest-title__name">Chest</span>
+            <span id="chest-count" class="chest-title__count"></span>
+            <span class="lu-rule is-right" aria-hidden="true"></span>
+          </h2>
+          <div id="chest-cards" class="upgrades-grid chest-cards"></div>
+          <button
+            id="chest-continue-btn"
+            class="end-btn end-btn--primary chest-continue"
+            type="button"
+            tabindex="-1"
+          >
+            <kbd data-device="keyboard">⏎</kbd>
+            <kbd data-device="gamepad">A</kbd>
+            Continue
+          </button>
         </div>
       </div>
 
@@ -556,112 +594,58 @@
         </div>
       </div>
 
-      <!-- Game Over Overlay -->
-      <div id="gameover-screen" class="screen screen--overlay hidden">
-        <div class="gameover-content">
-          <h1 class="gameover-title">GAME OVER</h1>
-          <section class="run-recap" aria-label="Death recap">
-            <p id="gameover-killer" class="run-recap__killer">—</p>
-            <p id="gameover-location" class="run-recap__location">—</p>
-            <p id="gameover-salvage" class="run-recap__salvage">—</p>
-            <p class="run-recap__seed">
-              <span id="gameover-seed" class="run-recap__location">—</span>
-              <button
-                id="gameover-copy-seed-btn"
-                class="btn btn--outline run-recap__copy"
-                type="button"
+      <!-- Game Over Overlay: the run end (ui/RunEndScreens.js) -->
+      <div
+        id="gameover-screen"
+        class="screen screen--overlay end-screen end-screen--death hidden"
+      >
+        <div class="end-content">
+          <div id="gameover-body" class="end-body"></div>
+          <p id="gameover-invite" class="end-invite"></p>
+          <div class="end-actions">
+            <button id="restart-game-btn" class="end-btn end-btn--primary">
+              <kbd data-device="keyboard">⏎</kbd>
+              <kbd data-device="gamepad">A</kbd>
+              New mission
+            </button>
+            <button id="retry-game-btn" class="end-btn">
+              Retry
+              <span class="end-btn__sub"
+                ><span id="retry-count">1</span> left</span
               >
-                Copy seed link
-              </button>
-            </p>
-            <figure id="gameover-quote" class="run-recap__quote"></figure>
-            <div id="gameover-build" class="run-build"></div>
-          </section>
-          <dl id="gameover-stats" class="gameover-stats">
-            <div class="gameover-stat">
-              <dt>Time</dt>
-              <dd id="gameover-time">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Layer</dt>
-              <dd id="gameover-wave">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Kills</dt>
-              <dd id="gameover-kills">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Max combo</dt>
-              <dd id="gameover-combo">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Level</dt>
-              <dd id="gameover-level">—</dd>
-            </div>
-          </dl>
-          <div class="gameover-actions">
-            <button id="restart-game-btn" class="btn btn--primary">
-              New Mission
             </button>
-            <button id="retry-game-btn" class="btn btn--secondary">
-              Retry (<span id="retry-count">1</span>/1)
-            </button>
-            <button id="quit-game-btn" class="btn btn--outline">
-              Quit to Menu
+            <button id="quit-game-btn" class="end-btn end-btn--quiet">
+              Quit to menu
             </button>
           </div>
+          <p class="end-seed">
+            <span id="gameover-seed" class="end-lbl">—</span>
+            <button id="gameover-copy-seed-btn" class="end-copy" type="button">
+              Copy seed link
+            </button>
+          </p>
         </div>
       </div>
 
-      <!-- Victory Overlay -->
-      <div id="victory-screen" class="screen screen--overlay victory hidden">
-        <div class="gameover-content">
-          <h1 id="victory-title" class="gameover-title">FIELD CLEARED</h1>
-          <p class="victory-subtitle">The Ring is quiet.</p>
-          <p id="victory-best" class="victory-subtitle">—</p>
-          <p id="victory-salvage" class="run-recap__salvage">—</p>
-          <dl id="victory-stats" class="gameover-stats">
-            <div class="gameover-stat">
-              <dt>Time</dt>
-              <dd id="victory-time">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Layer</dt>
-              <dd id="victory-wave">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Kills</dt>
-              <dd id="victory-kills">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Max combo</dt>
-              <dd id="victory-combo">—</dd>
-            </div>
-            <div class="gameover-stat">
-              <dt>Level</dt>
-              <dd id="victory-level">—</dd>
-            </div>
-          </dl>
-          <figure id="victory-quote" class="run-recap__quote"></figure>
-          <ul
-            id="victory-build"
-            class="gameover-build"
-            aria-label="Upgrades this run"
-          ></ul>
-          <ul
-            id="victory-synergies"
-            class="gameover-build"
-            aria-label="Unlocked synergies"
-          ></ul>
-          <div class="gameover-actions">
-            <button id="victory-continue-btn" class="btn btn--primary">
+      <!-- Victory Overlay: the run end (ui/RunEndScreens.js) -->
+      <div
+        id="victory-screen"
+        class="screen screen--overlay end-screen end-screen--win hidden"
+      >
+        <div class="end-content">
+          <div id="victory-body" class="end-body"></div>
+          <p id="victory-invite" class="end-invite"></p>
+          <div class="end-actions">
+            <button id="victory-continue-btn" class="end-btn end-btn--primary">
+              <kbd data-device="keyboard">⏎</kbd>
+              <kbd data-device="gamepad">A</kbd>
               Continue into the Deep Field
             </button>
-            <button id="victory-restart-btn" class="btn btn--secondary">
-              New Mission
+            <button id="victory-restart-btn" class="end-btn">
+              New mission
             </button>
-            <button id="victory-quit-btn" class="btn btn--outline">
-              Quit to Menu
+            <button id="victory-quit-btn" class="end-btn end-btn--quiet">
+              Quit to menu
             </button>
           </div>
         </div>
