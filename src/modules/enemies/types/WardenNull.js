@@ -16,6 +16,7 @@ export class WardenNull extends BossEnemy {
     super.initialize({
       ...config,
       displayName: NULL.displayName,
+      healthFactor: NULL.healthFactor,
       radius: NULL.radius,
       chargeCooldown: NULL.chargeCooldown,
       chargeWindup: NULL.chargeWindup,

@@ -1,4 +1,3 @@
-// Maneuver cards (R12; numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
@@ -10,22 +9,22 @@ export default {
   icon: '🧭',
   themeColor: PALETTE.boss,
   unlockLevel: 2,
-  tags: ['braking', 'dash', 'control'],
+  tags: ['dash', 'distance'],
   text: {
     name: 'Inertial Dampers',
-    summary: 'Bleeds off drift when you let go, and stretches the dash.',
+    summary:
+      'Dampers soak the kick of the dash drive, so it can push the ship much further.',
     lore: 'Field-grade dampers from a survey skiff. Built to hold still over a crack in a rock.',
     levels: [
       {
-        title: 'Drift Bleed',
-        description: 'Braking damping +25%: faster stops when you let go.',
-        highlights: ['Less drift between moves.'],
+        title: 'Soft Kick',
+        description: 'The dash goes 25% further.',
+        highlights: ['Clear a rock you would have clipped.'],
       },
       {
         title: 'Long Stride',
-        description:
-          'Braking damping +50% (cumulative) and the dash goes 15% further.',
-        highlights: ['Cross the gap, then stop on the spot.'],
+        description: 'The dash goes 50% further (cumulative).',
+        highlights: ['Cross half the gap in one burst.'],
       },
     ],
   },
@@ -35,8 +34,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-linear-damping',
-          payload: { multiplier: 1.25 },
+          event: 'upgrade-dash-distance',
+          payload: { multiplier: 1.25 }, // proposta 20/10
         },
       ],
     },
@@ -45,13 +44,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-linear-damping',
-          payload: { multiplier: 1.2 }, // Total: 1.50
-        },
-        {
-          type: 'event',
           event: 'upgrade-dash-distance',
-          payload: { multiplier: 1.15 },
+          payload: { multiplier: 1.2 }, // proposta 20/10; total 1.50
         },
       ],
     },

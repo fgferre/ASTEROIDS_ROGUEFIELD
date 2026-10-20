@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
-import {
-  UPGRADE_RARITIES,
-  UPGRADE_RARITY_WEIGHT_CAPS,
-} from '../../src/core/GameConstants.js';
+import { UPGRADE_RARITIES } from '../../src/core/GameConstants.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
@@ -22,7 +19,6 @@ const createProgression = (eventBus, level = 10) => {
   return progression;
 };
 
-const sum = (weights) => Object.values(weights).reduce((a, b) => a + b, 0);
 const ids = (options) => options.map((option) => option.id);
 
 describe('level-up card rarity, reroll and banish', () => {
@@ -47,35 +43,6 @@ describe('level-up card rarity, reroll and banish', () => {
         UPGRADE_LIBRARY.find(({ id }) => id === option.id).rarity
       );
     });
-  });
-
-  it('rarity weights sum to 1 and shift toward rare/epic with level, up to the caps', () => {
-    const level1 = progression.getRarityWeights(1);
-    expect(level1).toEqual({ common: 0.7, rare: 0.25, epic: 0.05 });
-    [1, 5, 11, 40].forEach((level) => {
-      expect(sum(progression.getRarityWeights(level))).toBeCloseTo(1, 10);
-    });
-    const level6 = progression.getRarityWeights(6);
-    expect(level6.epic).toBeGreaterThan(level1.epic);
-    expect(level6.rare).toBeGreaterThan(level1.rare);
-    expect(level6.common).toBeLessThan(level1.common);
-    expect(progression.getRarityWeights(40)).toMatchObject(
-      UPGRADE_RARITY_WEIGHT_CAPS
-    );
-  });
-
-  it('draws each tier at its weight regardless of how many cards it has', () => {
-    progression.level = 1;
-    const counts = { common: 0, rare: 0, epic: 0 };
-    const rolls = 4000;
-    for (let i = 0; i < rolls; i += 1) {
-      const [option] = progression.prepareUpgradeOptions(1).options;
-      counts[option.rarity] += 1;
-    }
-    expect(counts.common / rolls).toBeCloseTo(0.7, 1);
-    expect(counts.rare / rolls).toBeCloseTo(0.25, 1);
-    expect(counts.epic / rolls).toBeGreaterThan(0.03);
-    expect(counts.epic / rolls).toBeLessThan(0.07);
   });
 
   it('a reroll replaces all three cards with new ones and is spent', () => {

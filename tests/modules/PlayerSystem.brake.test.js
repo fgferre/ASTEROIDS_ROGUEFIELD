@@ -192,7 +192,7 @@ describe('Braking System 3: emergency brake', () => {
   };
   const holdSteps = Math.round(brake.hold / DELTA_TIME);
 
-  it('fires once S has been held 0.25 s against the motion, and stops the ship', () => {
+  it('fires once a direction has been held 0.25 s against the motion, and stops the ship', () => {
     const { player, movement, brakes } = makePlayer(-150);
     movement.down = true;
     steps(player, holdSteps - 1);
@@ -233,7 +233,7 @@ describe('Braking System 3: emergency brake', () => {
     expect(brakes()).toBe(2);
   });
 
-  it('Reactive Brake: the shockwave shoves 80% harder and deals up to 24 damage', () => {
+  it('Reactive Brake 2: the shockwave shoves twice as hard, deals up to 60 damage, and recharges in 0.72 s', () => {
     const { player, movement } = makePlayer(-150);
     UPGRADE_LIBRARY.find((u) => u.id === 'reactive_brake').levels.forEach(
       (level) =>
@@ -246,13 +246,42 @@ describe('Braking System 3: emergency brake', () => {
     const [[, braked]] = emitted('player-braked');
     expect(braked).toMatchObject({
       radius: brake.radius,
-      knockback: brake.knockback * 1.8,
+      knockback: brake.knockback * 2,
     });
     expect(emitted('shield-explosion-damage')).toEqual([
       [
         'shield-explosion-damage',
-        { position: braked.position, radius: brake.radius, damage: 24 },
+        { position: braked.position, radius: brake.radius, damage: 60 },
       ],
     ]);
+    expect(player.maneuvers.brakeCooldownTimer).toBeCloseTo(
+      brake.cooldown * 0.6,
+      9
+    );
+  });
+
+  it('fires against the motion in any direction, not across it', () => {
+    // Flying right: A (left) brakes, S (down) is a turn.
+    const { player, movement, brakes } = makePlayer(0);
+    player.velocity = { vx: 150, vy: 0 };
+    movement.down = true;
+    steps(player, holdSteps * 2);
+    expect(brakes()).toBe(0);
+
+    movement.down = false;
+    player.update(DELTA_TIME);
+    player.velocity = { vx: 150, vy: 0 };
+    movement.left = true;
+    steps(player, holdSteps);
+    expect(brakes()).toBe(1);
+
+    // Diagonal: flying down-right, W + A brakes.
+    movement.left = false;
+    steps(player, Math.round(brake.cooldown / DELTA_TIME));
+    player.velocity = { vx: 120, vy: 120 };
+    movement.up = true;
+    movement.left = true;
+    steps(player, holdSteps);
+    expect(brakes()).toBe(2);
   });
 });

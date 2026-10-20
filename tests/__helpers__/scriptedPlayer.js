@@ -11,9 +11,8 @@
  *   - Track elapsed time, boss kill time, and the set of boss phase transitions
  *     observed across the run.
  *
- * Intended for tests/integration/boss-curve.test.js (Phase 0 FIX-04) and
- * Phase 1 profiling-baseline reruns. Lives in tests/__helpers__/ alongside
- * setup.js, mocks.js, etc., per established project convention.
+ * Intended for Phase 1 profiling-baseline reruns. Lives in tests/__helpers__/
+ * alongside setup.js, mocks.js, etc., per established project convention.
  * NOT intended for production simulation.
  *
  * Usage:

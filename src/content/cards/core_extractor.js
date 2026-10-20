@@ -17,18 +17,18 @@ export default {
     levels: [
       {
         title: 'Field Kit',
-        description: 'XP from orbs +8%.',
-        highlights: ['Applies before the combo multiplier.'],
+        description: 'XP from orbs +15%.',
+        highlights: ['More level-ups, so more cards every run.'],
       },
       {
         title: 'Refinery',
-        description: 'XP from orbs +17% (cumulative).',
-        highlights: ['Another +8%.'],
+        description: 'XP from orbs +30% (cumulative).',
+        highlights: ['Builds come together layers sooner.'],
       },
       {
         title: 'Core Press',
-        description: 'XP from orbs +26% (cumulative).',
-        highlights: ['Another +8%.'],
+        description: 'XP from orbs +50% (cumulative).',
+        highlights: ['Every orb is worth half again as much.'],
       },
     ],
   },
@@ -40,7 +40,7 @@ export default {
           type: 'progression',
           property: 'xpGainMultiplier',
           operation: 'multiply',
-          value: 1.08,
+          value: 1.15, // proposta 20/10
         },
       ],
     },
@@ -51,7 +51,7 @@ export default {
           type: 'progression',
           property: 'xpGainMultiplier',
           operation: 'multiply',
-          value: 1.08,
+          value: 1.13, // proposta 20/10; total 1.30
         },
       ],
     },
@@ -62,7 +62,7 @@ export default {
           type: 'progression',
           property: 'xpGainMultiplier',
           operation: 'multiply',
-          value: 1.08,
+          value: 1.154, // proposta 20/10; total 1.50
         },
       ],
     },

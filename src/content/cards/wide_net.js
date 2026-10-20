@@ -1,5 +1,7 @@
 import { PALETTE } from '../../data/constants/palette.js';
 
+// Tow pulse (numbers: proposta 20/10): every `interval` s every orb on the
+// Field flies to the ship, the same pull as a Magnet pickup.
 export default {
   id: 'wide_net',
   order: 36,
@@ -12,23 +14,24 @@ export default {
   tags: ['collection', 'magnetism'],
   text: {
     name: 'Wide Net',
-    summary: 'Throws a wider, stronger tow field so orbs come to you faster.',
+    summary:
+      'A salvage-barge tow field that, every few seconds, hauls in every orb on the Field.',
     lore: 'Tow emitters from a salvage barge. They were built for whole hulls.',
     levels: [
       {
         title: 'Tow Field',
-        description: 'Orb pull +30% and collection range +10%.',
-        highlights: ['Orbs reach you faster.'],
+        description: 'Every 20 s, every orb on the Field flies to you.',
+        highlights: ['The same haul as a Magnet pickup.'],
       },
       {
         title: 'Barge Field',
-        description: 'Orb pull +69% and range +21% (cumulative).',
-        highlights: ['Less flying back for stragglers.'],
+        description: 'A haul every 15 s.',
+        highlights: ['No more flying back for stragglers.'],
       },
       {
         title: 'Hull Tow',
-        description: 'Orb pull +120% and range +33% (cumulative).',
-        highlights: ['Orbs snap to you.'],
+        description: 'A haul every 10 s.',
+        highlights: ['Fight anywhere: the XP comes to you.'],
       },
     ],
   },
@@ -37,21 +40,9 @@ export default {
       rank: 1,
       effects: [
         {
-          type: 'progression',
-          property: 'magnetismForce',
-          operation: 'multiply',
-          value: 1.3,
-        },
-        {
-          type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.1,
-        },
-        {
           type: 'event',
-          event: 'upgrade-magnetism',
-          payload: { multiplier: 1.1 },
+          event: 'upgrade-tow-pulse',
+          payload: { interval: 20 }, // proposta 20/10
         },
       ],
     },
@@ -59,21 +50,9 @@ export default {
       rank: 2,
       effects: [
         {
-          type: 'progression',
-          property: 'magnetismForce',
-          operation: 'multiply',
-          value: 1.3,
-        },
-        {
-          type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.1,
-        },
-        {
           type: 'event',
-          event: 'upgrade-magnetism',
-          payload: { multiplier: 1.1 },
+          event: 'upgrade-tow-pulse',
+          payload: { interval: 15 }, // proposta 20/10
         },
       ],
     },
@@ -81,21 +60,9 @@ export default {
       rank: 3,
       effects: [
         {
-          type: 'progression',
-          property: 'magnetismForce',
-          operation: 'multiply',
-          value: 1.3,
-        },
-        {
-          type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.1,
-        },
-        {
           type: 'event',
-          event: 'upgrade-magnetism',
-          payload: { multiplier: 1.1 },
+          event: 'upgrade-tow-pulse',
+          payload: { interval: 10 }, // proposta 20/10
         },
       ],
     },

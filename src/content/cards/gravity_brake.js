@@ -1,4 +1,3 @@
-// Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
@@ -14,23 +13,24 @@ export default {
   text: {
     name: 'Gravity Brake',
     summary:
-      'A short-range field that drags at anything flying close to the ship.',
+      'A field around the ship drags at anything flying close: enemies and their shots alike.',
     lore: 'The Ring held its rocks in place with fields like this. A small one still works.',
     levels: [
       {
         title: 'Drag Field',
-        description: 'Enemies within 120 px move 8% slower.',
-        highlights: ['Bosses are not slowed.'],
+        description:
+          'Enemies and enemy shots within 140 px of the ship move 20% slower.',
+        highlights: ['Warden shots slow too; Wardens themselves do not.'],
       },
       {
         title: 'Deep Drag',
-        description: 'Enemies within 120 px move 16% slower.',
-        highlights: ['Another -8% speed in the field.'],
+        description: 'Within 160 px, 35% slower.',
+        highlights: ['Time to slip between incoming shots.'],
       },
       {
         title: 'Still Point',
-        description: 'Enemies within 120 px move 24% slower.',
-        highlights: ['Close rocks crawl.'],
+        description: 'Within 180 px, 50% slower.',
+        highlights: ['Close rocks crawl and bullets hang in the air.'],
       },
     ],
   },
@@ -41,7 +41,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
-          payload: { radius: 120, slowFraction: 0.08 },
+          payload: { radius: 140, slowFraction: 0.2 }, // proposta 20/10
         },
       ],
     },
@@ -51,7 +51,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
-          payload: { radius: 120, slowFraction: 0.16 },
+          payload: { radius: 160, slowFraction: 0.35 }, // proposta 20/10
         },
       ],
     },
@@ -61,7 +61,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
-          payload: { radius: 120, slowFraction: 0.24 },
+          payload: { radius: 180, slowFraction: 0.5 }, // proposta 20/10
         },
       ],
     },

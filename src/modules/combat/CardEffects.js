@@ -2,11 +2,12 @@
 //
 // The weapon cards in play and what they leave on the Field: Chain Lance
 // arcs, Thermal burns and the Solar Flare's spread, Field slows and
-// Singularity pulls, the Cinder, Ion and Afterburn trails, Static Shell,
-// Gravity Brake and the emergency brake's shove, plus the fire-rate, shot and
-// lock-range tuning and the Targeting Suite. CombatSystem owns it, writes the
-// cards' payloads into `cardEffects` from the upgrade events and ticks it
-// after the hits land.
+// Singularity pulls, the Cinder, Ion and Afterburn trails, Static Shell, Arc
+// Lattice, Capacitor Bank sparks, Gravity Brake and the emergency brake's
+// shove, plus the fire-rate, shot and lock-range tuning (Gyro Servos' burst
+// included) and the Targeting Suite. CombatSystem owns it, writes the cards'
+// payloads into `cardEffects` from the upgrade events and ticks it after the
+// hits land.
 
 import { SHIP_SIZE } from '../../core/GameConstants.js';
 import {
@@ -18,6 +19,8 @@ import {
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 
 const AIMING_CONFIG = COMBAT_AIMING_UPGRADE_CONFIG || {};
+// Gyro Servos' burst rides the fire-rate tuning under this key.
+const DASH_FIRE_TUNING = { upgradeId: 'dash-fire', level: 1 };
 // Afterburn (Maneuver synergy) — proposta 18/10: a point every this many px
 // of dash travel, at most this many alive; a jump wider than the gap (the
 // screen wrap) starts a new, unjoined line.
@@ -38,13 +41,15 @@ export class CardEffects {
   /**
    * `player()`: the player service (position, muzzle point, dash timer).
    * `enemies()`: the enemy service the chain, burn and trail hits land on.
+   * `enemyBullets()`: the enemy shots in flight (Gravity Brake slows them).
    * `targeting()`: the Targeting instance (the Targeting Suite's settings, the lock range).
    * `weapons()`: the Weapons instance (shot speed, lifetime and cooldown, Apexes, the beams and flak bursts to age, forEachSolidEnemy).
    * `hits()`: the HitResolution instance (processBulletHit, applyDamageToEnemy, pushEnemy).
    */
-  constructor({ player, enemies, targeting, weapons, hits }) {
+  constructor({ player, enemies, enemyBullets, targeting, weapons, hits }) {
     this.player = player;
     this.enemies = enemies;
+    this.enemyBullets = enemyBullets;
     this.targeting = targeting;
     this.weapons = weapons;
     this.hits = hits;
@@ -53,7 +58,7 @@ export class CardEffects {
     this.resetCardState();
   }
 
-  // Fire rate, projectile speed/lifetime and lock range from upgrades. Keyed
+  // Fire rate, projectile speed and lock range from upgrades. Keyed
   // by upgrade rank so re-applying a rank (Retry) does not compound it.
   applyWeaponTuning(data = {}) {
     this.weaponTuningSources.set(`${data.upgradeId}:${data.level}`, data);
@@ -68,15 +73,12 @@ export class CardEffects {
       return value;
     };
     this.cooldownTuning = product('cooldownMultiplier');
-    this.lanceDamageTuning = product('lanceDamageMultiplier');
     this.pierceBonus = 0;
     this.weaponTuningSources.forEach((entry) => {
       this.pierceBonus += Number(entry.pierceBonus) || 0;
     });
     const weapons = this.weapons();
     weapons.bulletSpeed = BULLET_SPEED * product('bulletSpeedMultiplier');
-    weapons.bulletLifetime =
-      COMBAT_BULLET_LIFETIME * product('bulletLifetimeMultiplier');
     this.targeting().setTargetingRange(
       COMBAT_TARGETING_RANGE * product('targetingRangeMultiplier')
     );
@@ -89,7 +91,6 @@ export class CardEffects {
     weapons.shootCooldown = weapons.baseShootCooldown;
     this.aimCooldownMultiplier = 1;
     this.cooldownTuning = 1;
-    this.lanceDamageTuning = 1;
     this.pierceBonus = 0;
     this.weaponTuningSources = new Map();
     weapons.bulletSpeed = BULLET_SPEED;
@@ -188,6 +189,8 @@ export class CardEffects {
     this.afterburnTimer = 0;
     this.afterburnDashing = false;
     this.staticShellPending = false;
+    this.latticeTimer = 0;
+    this.dashFireTimer = 0;
   }
 
   // Singularity: the target (if alive) and every non-boss whose rim is
@@ -374,46 +377,105 @@ export class CardEffects {
     });
   }
 
-  // Static Shell: an arc to every enemy within reach of the ship.
-  dischargeStaticShell({ radius, damage }) {
+  // Every enemy whose rim is within `radius` of the ship, nearest first.
+  enemiesNearShip(radius) {
     const { x, y } = this.player().getPosition();
-    const origin = { x, y, radius: SHIP_SIZE };
-    const struck = [];
+    const near = [];
     this.weapons().forEachSolidEnemy((enemy) => {
       const reach = radius + (enemy.radius || 0);
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
-        struck.push(enemy);
-      }
+      const sq = (enemy.x - x) ** 2 + (enemy.y - y) ** 2;
+      if (sq <= reach * reach) near.push({ enemy, sq });
     });
-    struck.forEach((enemy) => {
-      if (enemy.destroyed) return;
-      this.addArc(origin, enemy);
-      // A chain-kind hit: no burn, slow or chain procs off the discharge.
-      this.hits().processBulletHit(
-        {
-          kind: 'chain',
-          x: enemy.x,
-          y: enemy.y,
-          vx: 0,
-          vy: 0,
-          damage,
-          hit: false,
-        },
-        enemy,
-        this.enemies()
-      );
+    return near.sort((a, b) => a.sq - b.sq).map(({ enemy }) => enemy);
+  }
+
+  // An arc from `source` into `target` for `damage`: a chain-kind hit, so no
+  // burn, slow or chain procs off it. `link`: the Capacitor Bank spark count.
+  strikeArc(source, target, damage, link = 0) {
+    this.addArc(source, target);
+    this.hits().processBulletHit(
+      {
+        kind: 'chain',
+        x: target.x,
+        y: target.y,
+        vx: 0,
+        vy: 0,
+        damage,
+        hit: false,
+        sparkLink: link,
+      },
+      target,
+      this.enemies()
+    );
+  }
+
+  // Arcs from the ship into each of `targets` (Static Shell, Arc Lattice).
+  strikeFromShip(targets, damage) {
+    const { x, y } = this.player().getPosition();
+    const origin = { x, y, radius: SHIP_SIZE };
+    targets.forEach((enemy) => {
+      if (!enemy.destroyed) this.strikeArc(origin, enemy, damage);
     });
   }
 
-  // Gravity Brake: undo part of this frame's travel near the ship.
+  // Static Shell: an arc to every enemy within reach of the ship.
+  dischargeStaticShell({ radius, damage }) {
+    this.strikeFromShip(this.enemiesNearShip(radius), damage);
+  }
+
+  // Arc Lattice: once charged, an arc into each of the `targets` nearest
+  // enemies within `radius`, for `damageMultiplier` shots of damage; with no
+  // one in reach the charge waits.
+  updateArcLattice({ interval, targets, radius, damageMultiplier }, deltaTime) {
+    this.latticeTimer = Math.min(interval, this.latticeTimer + deltaTime);
+    if (this.latticeTimer < interval - 1e-9) return;
+    const near = this.enemiesNearShip(radius);
+    if (!near.length) return;
+    this.latticeTimer = 0;
+    const damage = this.player().getStats().damage * damageMultiplier;
+    this.strikeFromShip(near.slice(0, targets), damage);
+  }
+
+  // Capacitor Bank: a kill (HitResolution) arcs from the dead enemy into the
+  // nearest one within `range`; this is spark number `link` in a row.
+  sparkFrom(source, damage, link) {
+    const { range } = this.cardEffects.killSpark;
+    let nearest = null;
+    let nearestSq = range * range;
+    this.weapons().forEachSolidEnemy((enemy) => {
+      if (enemy === source) return;
+      const sq = (enemy.x - source.x) ** 2 + (enemy.y - source.y) ** 2;
+      if (sq <= nearestSq) {
+        nearest = enemy;
+        nearestSq = sq;
+      }
+    });
+    if (nearest) this.strikeArc(source, nearest, damage, link);
+  }
+
+  // Gyro Servos: the dash fire burst, on the fire-rate tuning until it ends.
+  startDashFire() {
+    const { cooldownMultiplier, duration } = this.cardEffects.dashFire;
+    this.dashFireTimer = duration;
+    this.applyWeaponTuning({ ...DASH_FIRE_TUNING, cooldownMultiplier });
+  }
+
+  // Gravity Brake: undo part of this frame's travel near the ship, for
+  // enemies (not Wardens: they move on scripts) and every enemy shot.
   applyGravityBrake({ radius, slowFraction }, deltaTime) {
     const { x, y } = this.player().getPosition();
     const drag = slowFraction * deltaTime;
+    const inField = (item) =>
+      (item.x - x) ** 2 + (item.y - y) ** 2 <= radius * radius;
     this.weapons().forEachSolidEnemy((enemy) => {
-      if (enemy.type === 'boss') return;
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 > radius * radius) return;
+      if (enemy.type === 'boss' || !inField(enemy)) return;
       enemy.x -= (enemy.vx || 0) * drag;
       enemy.y -= (enemy.vy || 0) * drag;
+    });
+    this.enemyBullets().forEach((shot) => {
+      if (!inField(shot)) return;
+      shot.x -= (shot.vx || 0) * drag;
+      shot.y -= (shot.vy || 0) * drag;
     });
   }
 
@@ -435,8 +497,14 @@ export class CardEffects {
     fade(this.afterburnTrail);
     fade(this.wells);
 
-    const { cinderTrail, ionTrail, afterburn, staticShell, gravityBrake } =
-      this.cardEffects;
+    const {
+      cinderTrail,
+      ionTrail,
+      afterburn,
+      staticShell,
+      gravityBrake,
+      arcLattice,
+    } = this.cardEffects;
     if (afterburn) this.dropAfterburnPoints(afterburn);
     // Each trail ticks on its own timer while it has points.
     const tick = (list, trail, timerKey) => {
@@ -476,6 +544,16 @@ export class CardEffects {
 
     if (gravityBrake && !player.isDead) {
       this.applyGravityBrake(gravityBrake, deltaTime);
+    }
+    if (arcLattice && !player.isDead && !player.isRetrying) {
+      this.updateArcLattice(arcLattice, deltaTime);
+    }
+    if (this.dashFireTimer > 0) {
+      this.dashFireTimer -= deltaTime;
+      if (this.dashFireTimer <= 1e-9) {
+        this.dashFireTimer = 0;
+        this.applyWeaponTuning({ ...DASH_FIRE_TUNING, cooldownMultiplier: 1 });
+      }
     }
 
     if (this.burns.size) {

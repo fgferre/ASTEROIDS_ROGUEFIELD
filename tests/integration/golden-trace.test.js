@@ -29,9 +29,9 @@ const SECONDS = 60;
 const HASH_CHARS = 12;
 const WEAPON_LAYER = 9; // seven enemy kinds on the field within 20 s
 
-// What the pilot-route scenarios install first: the hold-S emergency brake
-// (Braking System 3 needs RCS 2, which needs Propulsors) and the deflector
-// shield (needs Energy Shield).
+// What the pilot-route scenarios install first: RCS 2, the emergency brake
+// (Braking System 3; both need Propulsors) and the deflector shield (needs
+// Energy Shield).
 const PILOT_CARDS = [
   'propulsors',
   'rcs_system',
