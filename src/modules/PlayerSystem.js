@@ -500,6 +500,8 @@ class PlayerSystem extends BaseSystem {
       position: { ...this.position },
       velocity: { ...this.velocity },
       angle: this.angle,
+      // The propulsion cards' levels every step, firing or not (the engine's tier).
+      visualLevels: this.thrusters.getHullVisualLevels(),
     });
   }
 

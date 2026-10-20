@@ -54,6 +54,7 @@ const FATIGUE_FULL = 7;
 const PITCH_JITTER = 0.05; // one-shots, +-5 %
 const PUFF_PAN = 0.55;
 const STOP_FADE = 0.03; // s, time constant of the bed's fade on stop()
+const ONESHOT_STOP = 0.03; // s, a sounding one-shot's fade on stop(), as the loops' crossfade
 
 const clamp = (v, lo = 0, hi = 1) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a, b, v) => {
@@ -150,6 +151,7 @@ export function createEngineModel({
 
   const oneshots = {};
   const lastPick = {};
+  const sounding = new Set(); // { src, g } of the one-shots started or scheduled, until they end
   function setSound(layer, sound) {
     if (layer in ONESHOT) {
       oneshots[layer] = Array.isArray(sound)
@@ -181,12 +183,25 @@ export function createEngineModel({
     const p = ctx.createStereoPanner();
     p.pan.value = clamp(pan, -1, 1);
     src.connect(g).connect(p).connect(fx);
+    const oneshot = { src, g };
+    sounding.add(oneshot);
     src.onended = () => {
+      sounding.delete(oneshot);
       src.disconnect();
       g.disconnect();
       p.disconnect();
     };
     src.start(Math.max(when, ctx.currentTime));
+  }
+
+  /** Fade out and stop every one-shot still sounding; one scheduled past the fade never plays. */
+  function silenceOneshots() {
+    const now = ctx.currentTime;
+    for (const { src, g } of sounding) {
+      g.gain.setTargetAtTime(0, now, ONESHOT_STOP / 3);
+      src.stop(now + ONESHOT_STOP * 2);
+    }
+    sounding.clear();
   }
 
   const input = { thrust: 0, lateral: 0, speed: 0, tier: 0 };
@@ -330,7 +345,10 @@ export function createEngineModel({
     }
   }
 
-  /** At rest at once (pause, death, menu): the bed fades out, no cut-off plays; the tier stays. */
+  /**
+   * At rest at once (pause, death, menu): the bed and the one-shots still
+   * sounding or scheduled fade out, no cut-off plays; the tier stays.
+   */
   function stop() {
     input.thrust = 0;
     input.lateral = 0;
@@ -345,6 +363,7 @@ export function createEngineModel({
       puffT: 0,
     });
     for (const v of Object.values(voices)) setParam(v.gain.gain, 0, STOP_FADE);
+    silenceOneshots();
   }
 
   return {
@@ -386,6 +405,7 @@ export function createEngineModel({
     dispose() {
       out.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
       for (const v of Object.values(voices)) startSource(v, null, 0.05);
+      silenceOneshots();
     },
   };
 }
