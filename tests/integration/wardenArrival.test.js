@@ -77,6 +77,9 @@ describe('Warden entrance', () => {
     const { game, boss, player, combat, hold } = prime();
     const health = boss.health;
     const shipHealth = player.health;
+    // Its first attack waits for the landing.
+    const spreadTimer = boss.spreadTimer;
+    const { to } = boss.arrival;
 
     game.step();
     expect(player.controlsHeld).toBe(true);
@@ -93,7 +96,12 @@ describe('Warden entrance', () => {
         shot = true;
       }
       expect(player.controlsHeld).toBe(true);
+      expect(player.invulnerableTimer).toBeGreaterThan(0);
       expect(player.position).toEqual({ x, y });
+      // Along its path only: in from the right edge, level with its spot.
+      expect(boss.x).toBeGreaterThanOrEqual(to.x);
+      expect(boss.y).toBeCloseTo(to.y, 6);
+      expect(boss.spreadTimer).toBe(spreadTimer);
       expect(combat.enemyBullets).toHaveLength(0);
       expect(boss.health).toBe(health);
       expect(player.health).toBe(shipHealth);
