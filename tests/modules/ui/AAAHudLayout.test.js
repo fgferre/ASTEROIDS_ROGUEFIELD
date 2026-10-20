@@ -10,6 +10,11 @@ import {
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 import { bossRushStageTitle } from '../../../src/data/layers.js';
 import { WEAPONS } from '../../../src/data/weapons.js';
+import { getInstrument } from '../../../src/modules/ui/hud/instruments/registry.js';
+import {
+  fakeDocument,
+  fakeElement as fakeHudElement,
+} from '../../__helpers__/fakeHudDom.js';
 
 describe('AAAHudLayout combo tier', () => {
   it('steps the combo color with the multiplier the progression system produces', () => {
@@ -65,25 +70,24 @@ function fakeElement() {
   return el;
 }
 
-describe('AAAHudLayout weapon and buff chips', () => {
+describe('AAAHudLayout classic build panel', () => {
   let hud;
+  let part;
   beforeEach(() => {
-    vi.stubGlobal('document', { createElement: fakeElement });
+    vi.stubGlobal('document', fakeDocument());
+    const container = fakeHudElement();
+    const build = Object.create(getInstrument('build', 'classic'));
+    build.mount(container);
     hud = new AAAHudLayout();
-    hud.els = {
-      weaponChip: fakeElement(),
-      weaponName: fakeElement(),
-      beamPips: fakeElement(),
-      beamPipEls: [fakeElement(), fakeElement(), fakeElement()],
-      evolutions: fakeElement(),
-      buffs: fakeElement(),
-    };
+    hud._instruments = new Map([['build', build]]);
+    part = (selector) => container.querySelector(selector);
+    pips = container.querySelectorAll('.beam-pip');
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  let pips;
   const filledPips = () =>
-    hud.els.beamPipEls.filter((pip) => pip.classList.contains('is-filled'))
-      .length;
+    pips.filter((pip) => pip.classList.contains('is-filled')).length;
 
   const weaponState = (weaponId, shotsToBeam = null) => ({
     weaponId,
@@ -93,58 +97,69 @@ describe('AAAHudLayout weapon and buff chips', () => {
     evolutions: [],
   });
 
+  const update = (weapon, more = {}) =>
+    hud.updateBuild({
+      weapon,
+      families: {},
+      spreadMode: 'concentrated',
+      aimMode: 'auto',
+      dash: 0,
+      ...more,
+    });
+
   it('names the weapon and fills a pip per shot toward the Harmonic beam', () => {
-    hud.updateWeapon(weaponState('lance'));
-    expect(hud.els.weaponName.textContent).toBe('LANCE');
-    expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
+    update(weaponState('lance'));
+    expect(part('#ui-weapon-name').textContent).toBe('LANCE');
+    expect(part('#ui-beam-pips').classList.contains('is-hidden')).toBe(true);
 
     // Beam every 4th shot: shotsToBeam 4 → 1 fills 0 → 3 pips.
     const pipsAt = (shotsToBeam) => {
-      hud.updateWeapon(weaponState('harmonic', shotsToBeam));
+      update(weaponState('harmonic', shotsToBeam));
       return filledPips();
     };
     expect([4, 3, 2, 1].map(pipsAt)).toEqual([0, 1, 2, 3]);
-    expect(hud.els.weaponName.textContent).toBe('HARMONIC');
-    expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(false);
+    expect(part('#ui-weapon-name').textContent).toBe('HARMONIC');
+    expect(part('#ui-beam-pips').classList.contains('is-hidden')).toBe(false);
   });
 
   it('reads the weapon name from the weapon state: the Scatter Coil has no pips', () => {
-    hud.updateWeapon(weaponState('scatter'));
-    expect(hud.els.weaponName.textContent).toBe('SCATTER');
-    expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
+    update(weaponState('scatter'));
+    expect(part('#ui-weapon-name').textContent).toBe('SCATTER');
+    expect(part('#ui-beam-pips').classList.contains('is-hidden')).toBe(true);
   });
 
   it('adds a family-coloured chip when the weapon evolves', () => {
     const state = weaponState('lance');
-    hud.updateWeapon(state);
-    expect(hud.els.evolutions.children).toHaveLength(0);
+    const evolutions = part('#ui-evolutions');
+    update(state);
+    expect(evolutions.children).toHaveLength(0);
 
-    hud.updateWeapon({
+    update({
       ...state,
       evolutions: [{ family: 'thermal', id: 'incendiary', name: 'x' }],
     });
-    const [chip] = hud.els.evolutions.children;
+    const [chip] = evolutions.children;
     expect(chip.textContent).toBe('INCENDIARY');
     expect(chip.style['--family-color']).toBeTruthy();
 
     // A new run clears the evolutions and their chips.
-    hud.updateWeapon(state);
-    expect(hud.els.evolutions.children).toHaveLength(0);
+    update(state);
+    expect(evolutions.children).toHaveLength(0);
   });
 
   it('swaps the chip for a brighter APEX chip when the family reaches its Apex', () => {
     const state = weaponState('lance');
-    hud.updateWeapon({
+    update({
       ...state,
       evolutions: [{ family: 'thermal', id: 'incendiary', name: 'x' }],
     });
-    hud.updateWeapon({
+    update({
       ...state,
       evolutions: [
         { family: 'thermal', id: 'solar-flare', apex: true, short: 'FLARE' },
       ],
     });
-    const chips = hud.els.evolutions.children;
+    const chips = part('#ui-evolutions').children;
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toBe('APEX FLARE');
     expect(chips[0].classList.contains('is-apex')).toBe(true);
@@ -152,17 +167,38 @@ describe('AAAHudLayout weapon and buff chips', () => {
 
   it('counts the Overcharge chip down and removes it at zero', () => {
     const { label, duration, color } = PICKUP_KINDS.overcharge;
+    const buffs = part('#ui-buffs');
     hud.startBuff('overcharge', label, duration, color);
-    const [chip] = hud.els.buffs.children;
+    update(weaponState('lance'));
+    const [chip] = buffs.children;
     const [text, meter] = chip.children;
     expect(text.textContent).toBe('OVERCHARGE 8.0s');
 
     hud.tickBuffs(0.1);
+    update(weaponState('lance'));
     expect(text.textContent).toBe('OVERCHARGE 7.9s');
     expect(meter.children[0].style.transform).toBe(`scaleX(${7.9 / duration})`);
 
     hud.tickBuffs(duration);
-    expect(hud.els.buffs.children).toHaveLength(0);
+    update(weaponState('lance'));
+    expect(buffs.children).toHaveLength(0);
+  });
+
+  it('reads MANUAL while the right stick aims, AUTO after', () => {
+    hud.setAimStick(true);
+    update(weaponState('lance'));
+    expect(part('#ui-aim-mode').textContent).toBe('MANUAL');
+    hud.setAimStick(false);
+    update(weaponState('lance'));
+    expect(part('#ui-aim-mode').textContent).toBe('AUTO');
+  });
+
+  it('flashes the weapon chip once per beam fired', () => {
+    update(weaponState('harmonic', 4));
+    expect(part('#ui-weapon-chip').classList.contains('is-beam')).toBe(false);
+    hud.flashBeam();
+    update(weaponState('harmonic', 4));
+    expect(part('#ui-weapon-chip').classList.contains('is-beam')).toBe(true);
   });
 });
 
@@ -344,19 +380,6 @@ describe('AAAHudLayout off-screen arrows around the panels', () => {
     expect(far).toMatchObject({ edge: 'top', x: 278, y: 28 });
     // Alone on its edge, it stays put.
     expect(other).toMatchObject({ edge: 'right', x: 772, y: 268 });
-  });
-});
-
-describe('AAAHudLayout AIM chip', () => {
-  it('reads MANUAL while the right stick aims, AUTO after', () => {
-    const hud = new AAAHudLayout();
-    hud.els = { aimModeIndicator: fakeElement() };
-    hud.setAimStick(true);
-    hud.updateModeIndicators('concentrated', 'auto');
-    expect(hud.els.aimModeIndicator.innerText).toBe('MANUAL');
-    hud.setAimStick(false);
-    hud.updateModeIndicators('concentrated', 'auto');
-    expect(hud.els.aimModeIndicator.innerText).toBe('AUTO');
   });
 });
 

@@ -1,19 +1,18 @@
 // src/modules/ui/AAAHudLayout.js
 
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
-import { getHudLayoutDefinition } from '../../data/ui/hudLayout.js';
-import { BossBar } from './hud/bossBar.js';
+import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
 import {
   createDirectionPools,
+  edgeMarker,
   measurePanelCorners,
   placeEdgeArrows,
   showDamageArc,
 } from './hud/direction.js';
-import { FADE_OUT_MS, FEED_MAX_ROWS, replay } from './hud/hudCommon.js';
+import { FADE_OUT_MS, comboTier, replay } from './hud/hudCommon.js';
 import { getHudHtml } from './hud/hudMarkup.js';
 import { getHudCss } from './hud/hudStyles.js';
 import { mountInstruments } from './hud/instruments/registry.js';
-import { SystemsPanel } from './hud/systemsPanel.js';
 
 // The pure helpers live with their panels; tests and TacticalHud read them here.
 export {
@@ -21,42 +20,36 @@ export {
   edgeArrow,
   spreadEdgeArrows,
 } from './hud/direction.js';
-export { bossSegments } from './hud/bossBar.js';
+export { bossSegments, comboTier } from './hud/hudCommon.js';
 
-const COMBO_VISIBLE_MIN = 2;
 const LAYER_BANNER_MS = 1200;
 const CHAPTER_BANNER_MS = 3000;
 const BOSS_INTRO_MS = 1500;
 const BOSS_BAR_HOLD_MS = 1000;
-const FEED_LIFE_MS = 1600;
-const LOW_HULL_PERCENT = 30;
-const CRITICAL_HULL_PERCENT = 15;
 // Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
 const ASTEROID_FEED_NAME = 'Fragment';
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
 
-/** Combo color tier: text < 1.3×, status 1.3–1.6×, xp 1.7–1.9×, boss at 2.0×. */
-export function comboTier(multiplier) {
-  const m = Number(multiplier) || 1;
-  if (m >= 1.999) return 'boss';
-  if (m > 1.601) return 'xp';
-  if (m >= 1.299) return 'status';
-  return 'text';
-}
+// A max of 0 (no shield yet) reads as an empty bar, not a division by zero.
+const safeMax = (max) => (Number.isFinite(max) && max > 0 ? max : 1);
+const safeValue = (value) => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
 export class AAAHudLayout {
-  // `items`: the layout's instruments (data/ui/hudLayout.js), mounted with it.
-  constructor({ items = getHudLayoutDefinition().items } = {}) {
+  // `items`: the preset's instruments (data/ui/hudPresets.js), mounted with it.
+  constructor({ items = getHudPreset(DEFAULT_HUD_PRESET).items } = {}) {
     this._items = items;
     this._instruments = new Map();
     this._mounted = false;
     this._styleElement = null;
     this._root = null;
+    this._layer = null;
     this.els = null;
-    this._bossBar = new BossBar();
-    this._systems = new SystemsPanel();
     this._lastCombo = null;
     this._lastComboTier = 'text';
+    this._aimStick = false;
+    this._buffs = [];
+    this._beams = 0;
+    this._wardenMarker = null;
     this._arcPool = [];
     this._arrowPool = [];
     this._panelCorners = null;
@@ -70,7 +63,6 @@ export class AAAHudLayout {
     this._transmissionHideTimer = null;
     this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
-    this._feedRows = [];
   }
 
   mount(container) {
@@ -105,12 +97,31 @@ export class AAAHudLayout {
     if (cockpitFrame) {
       this._root.appendChild(cockpitFrame);
     }
+    this._layer = hudLayer;
 
     this._cacheElements();
-    this._initializeBars();
-    this._instruments = mountInstruments(hudLayer, this._items);
     this._createDirectionPools();
+    this._mountInstruments();
+    this._mounted = true;
+  }
 
+  /** Swaps the instruments for another preset's items (the HUD stays up). */
+  setItems(items) {
+    this._items = items;
+    if (!this._mounted) {
+      return;
+    }
+    this._destroyInstruments();
+    this._mountInstruments();
+    this.invalidatePanelCorners();
+  }
+
+  _mountInstruments() {
+    this._instruments = mountInstruments(
+      this._layer,
+      this._items,
+      this.els.direction
+    );
     if (
       typeof globalThis !== 'undefined' &&
       globalThis.lucide &&
@@ -118,13 +129,15 @@ export class AAAHudLayout {
     ) {
       globalThis.lucide.createIcons();
     }
+  }
 
-    this._mounted = true;
+  _destroyInstruments() {
+    this._instruments.forEach((instrument) => instrument.destroy());
+    this._instruments = new Map();
   }
 
   unmount() {
-    this._instruments.forEach((instrument) => instrument.destroy());
-    this._instruments = new Map();
+    this._destroyInstruments();
     if (this._root && this._root.parentNode) {
       this._root.parentNode.removeChild(this._root);
     }
@@ -136,11 +149,14 @@ export class AAAHudLayout {
     this._mounted = false;
     this._styleElement = null;
     this._root = null;
+    this._layer = null;
     this.els = null;
-    this._bossBar.reset();
-    this._systems.reset();
     this._lastCombo = null;
     this._lastComboTier = 'text';
+    this._aimStick = false;
+    this._buffs = [];
+    this._beams = 0;
+    this._wardenMarker = null;
     this._arcPool = [];
     this._arrowPool = [];
     this._panelCorners = null;
@@ -155,7 +171,6 @@ export class AAAHudLayout {
     this._transmissionHideTimer = null;
     this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
-    this._feedRows = [];
   }
 
   _later(fn, ms) {
@@ -458,62 +473,9 @@ export class AAAHudLayout {
     });
   }
 
+  // The feed slot's model keeps the rows (instruments/registry.js, feed).
   _pushFeed(key, tone, render) {
-    const container = this.els?.feed;
-    if (!container) {
-      return;
-    }
-    // A row still on screen keeps counting and moves back to the top.
-    let row = this._feedRows.find((entry) => entry.key === key);
-    if (row) {
-      container.prepend(row.el);
-      this._feedRows = [
-        row,
-        ...this._feedRows.filter((entry) => entry !== row),
-      ];
-    } else {
-      const el = document.createElement('div');
-      el.className = `feed-row feed-row--${tone}`;
-      el.innerHTML =
-        '<span class="feed-label"></span><span class="feed-value"></span>';
-      row = {
-        key,
-        el,
-        count: 0,
-        label: el.firstChild,
-        value: el.lastChild,
-        timer: null,
-      };
-      container.prepend(el);
-      this._feedRows.unshift(row);
-      while (this._feedRows.length > FEED_MAX_ROWS) {
-        this._removeFeedRow(this._feedRows[this._feedRows.length - 1]);
-      }
-    }
-    render(row);
-    row.el.classList.remove('is-leaving');
-    if (row.timer) {
-      this._cancel(row.timer);
-    }
-    row.timer = this._later(
-      () => {
-        row.el.classList.add('is-leaving');
-        row.timer = this._later(
-          () => this._removeFeedRow(row),
-          FADE_OUT_MS + 100
-        );
-      },
-      FEED_LIFE_MS - FADE_OUT_MS - 100
-    );
-    return row;
-  }
-
-  _removeFeedRow(row) {
-    if (row.timer) {
-      this._cancel(row.timer);
-    }
-    row.el.remove();
-    this._feedRows = this._feedRows.filter((entry) => entry !== row);
+    this._instruments.get('feed')?.push(key, tone, render);
   }
 
   _cacheElements() {
@@ -526,35 +488,8 @@ export class AAAHudLayout {
     const query = (selector) => root.querySelector(selector);
 
     this.els = {
-      timer: query('#ui-timer'),
-      kills: query('#ui-kills'),
-      combo: query('#ui-combo'),
-      comboBox: query('#ui-combo-box'),
-      bossPanel: query('#ui-boss-panel'),
-      bossName: query('#ui-boss-name'),
-      bossFill: query('#ui-boss-fill'),
-      bossSegments: query('#ui-boss-segments'),
-      shieldRow: query('#ui-shield-row'),
-      shieldText: query('#ui-shield-text'),
-      hullRow: query('#ui-hull-row'),
-      hullText: query('#ui-hull-text'),
-      wave: query('#ui-wave-num'),
-      xpFill: query('#ui-xp-fill'),
-      xpText: query('#ui-xp-text'),
-      lvlText: query('#ui-lvl-text'),
       nextWaveBox: query('#el-wave-alert'),
       nextWaveTimer: query('#ui-next-wave-timer'),
-      // Plan 01.07 Task 5/6 — combat mode indicators.
-      spreadModeIndicator: query('#ui-spread-mode'),
-      aimModeIndicator: query('#ui-aim-mode'),
-      dashChip: query('#ui-dash-chip'),
-      dashFill: query('#ui-dash-fill'),
-      weaponChip: query('#ui-weapon-chip'),
-      weaponName: query('#ui-weapon-name'),
-      beamPips: query('#ui-beam-pips'),
-      beamPipEls: [...root.querySelectorAll('.beam-pip')],
-      evolutions: query('#ui-evolutions'),
-      buffs: query('#ui-buffs'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
@@ -566,221 +501,168 @@ export class AAAHudLayout {
       transmission: query('#ui-transmission'),
       transmissionSpeaker: query('#ui-transmission-speaker'),
       transmissionLine: query('#ui-transmission-line'),
-      feed: query('#ui-feed'),
       onboardingTip: query('#ui-onboarding-tip'),
       onboardingKeys: query('#ui-onboarding-keys'),
       onboardingText: query('#ui-onboarding-text'),
-      lowHpVignette: query('#ui-lowhp-vignette'),
       direction: query('#ui-direction'),
     };
   }
 
   /**
-   * Plan 01.07 Task 5/6 — update spread + aim mode indicators.
-   * @param {string} spreadMode - 'concentrated' or 'fan'.
-   * @param {string} aimMode - 'auto' or 'manual'.
+   * The ship's state this frame, for the vitals, the hull ring and the
+   * recharges: shield and hull with their maxima, `ship` its screen point
+   * (or null), `dash` the dash cooldown left (1 right after a dash, 0
+   * ready); the shield's `shieldMode` ('locked' | 'ready' | 'active' |
+   * 'cooldown'), `shieldSeconds` and `shieldCooldown` (fraction) of its
+   * cooldown left, `shieldKey` the bound key while it is ready.
    */
-  updateModeIndicators(spreadMode, aimMode) {
-    this._systems.updateModeIndicators(this.els, spreadMode, aimMode);
+  updateShip({
+    shield,
+    maxShield,
+    hull,
+    maxHull,
+    ship,
+    dash,
+    shieldMode,
+    shieldSeconds,
+    shieldCooldown,
+    shieldKey,
+  }) {
+    const now = performance.now();
+    const vitals = {
+      shield: safeValue(shield),
+      maxShield: safeMax(maxShield),
+      hull: safeValue(hull),
+      maxHull: safeMax(maxHull),
+    };
+    this._instruments.get('vitals')?.update({
+      ...vitals,
+      now,
+      shieldMode,
+      shieldSeconds,
+      shieldCooldown,
+      shieldKey,
+    });
+    this._instruments.get('hull-ring')?.update({ ...vitals, now, ship });
+    this._instruments
+      .get('recharges')
+      ?.update({ now, ship, dash, shield: shieldCooldown });
   }
 
-  /** The right stick aims by hand while held: the AIM chip reads MANUAL. */
+  /**
+   * The run's numbers: `clock` 'HH:MM:SS' and `seconds` elapsed, the layer,
+   * kills, the combo and its multiplier. A combo reaching a hotter tier gets
+   * a feed row.
+   */
+  updateStats({ clock, seconds, layer, kills, combo, multiplier }) {
+    this._instruments.get('run-info')?.update({
+      now: performance.now(),
+      clock,
+      seconds,
+      layer,
+      kills,
+      combo,
+      multiplier,
+    });
+    if (combo === this._lastCombo) {
+      return;
+    }
+    this._lastCombo = combo;
+    const tier = comboTier(multiplier);
+    if (COMBO_TIER_RANK[tier] > COMBO_TIER_RANK[this._lastComboTier]) {
+      this._pushFeed('combo', 'combo', (row) => {
+        row.el.dataset.tier = tier;
+        row.label.textContent = `Combo x${combo}`;
+        row.value.textContent = `${Number(multiplier).toFixed(1)}×`;
+      });
+    }
+    this._lastComboTier = tier;
+  }
+
+  /**
+   * The weapon and the build: CombatSystem.getWeaponState(), the family
+   * card counts, the fire modes and the dash cooldown; the timed pickups
+   * and the beam count ride along.
+   */
+  updateBuild({ weapon, families, spreadMode, aimMode, dash }) {
+    this._instruments.get('build')?.update({
+      now: performance.now(),
+      weapon,
+      families,
+      spreadMode,
+      aimMode: this._aimStick ? 'manual' : aimMode,
+      dash,
+      buffs: this._buffs,
+      beams: this._beams,
+    });
+  }
+
+  /** The right stick aims by hand while held: the aim reads MANUAL. */
   setAimStick(active) {
-    this._systems.setAimStick(active);
+    this._aimStick = Boolean(active);
   }
 
-  /**
-   * DASH chip: the bar empties as the dash recharges and the chip flashes
-   * once when it is ready again.
-   * @param {number} cooldownFraction - 1 right after a dash, 0 when ready.
-   */
-  updateDashCooldown(cooldownFraction) {
-    this._systems.updateDashCooldown(this.els, cooldownFraction);
-  }
-
-  /**
-   * WEAPON chip, beam pips and evolution chips from
-   * CombatSystem.getWeaponState(); writes the DOM only when something changed.
-   */
-  updateWeapon(state) {
-    this._systems.updateWeapon(this.els, state);
-  }
-
-  /** A beam fired: the weapon chip and its pips flash once. */
+  /** A beam fired: the weapon flashes once. */
   flashBeam() {
-    this._systems.flashBeam(this.els);
+    this._beams += 1;
   }
 
-  /** Timed pickup chip ("OVERCHARGE 7.9s"); collecting it again restarts it. */
+  /** Timed pickup ("OVERCHARGE 7.9s"); collecting it again restarts it. */
   startBuff(kind, label, duration, color) {
-    this._systems.startBuff(this.els, kind, label, duration, color);
+    const buff = this._buffs.find((entry) => entry.kind === kind);
+    if (buff) {
+      buff.duration = duration;
+      buff.remaining = duration;
+      return;
+    }
+    this._buffs.push({ kind, label, color, duration, remaining: duration });
   }
 
-  /** Counts the buff chips down on the game's clock; a chip at 0 goes away. */
+  /** Counts the timed pickups down on the game's clock; at 0 one goes. */
   tickBuffs(deltaTime) {
-    this._systems.tickBuffs(deltaTime);
+    this._buffs.forEach((buff) => {
+      buff.remaining -= deltaTime;
+    });
+    this._buffs = this._buffs.filter((buff) => buff.remaining > 0);
   }
 
   clearBuffs() {
-    this._systems.clearBuffs();
+    this._buffs = [];
   }
 
-  _initializeBars() {
-    if (!this.els) {
-      return;
+  /**
+   * The boss bar: a Warden's (or a Herald's) name, health in % and phase
+   * info ({ phase, phaseCount, phaseColors, invulnerable, herald }); hidden
+   * while the boss intro holds it. A living Warden dims the corners.
+   */
+  updateBoss(active, name, healthPercent, phaseInfo = {}) {
+    const herald = Boolean(phaseInfo.herald);
+    const warden = Boolean(active) && !herald;
+    if (
+      this._layer &&
+      this._layer.dataset.hudMode !== (warden ? 'warden' : 'calm')
+    ) {
+      this._layer.dataset.hudMode = warden ? 'warden' : 'calm';
     }
-
-    this.createSegments(this.els.shieldRow, 20);
-    this.createSegments(this.els.hullRow, 20);
-    this.updateVitals(100, 100, 100, 100);
-  }
-
-  /** Cria as divs de segmentos para as barras de vida/escudo */
-  createSegments(container, count) {
-    if (!container) {
-      return;
-    }
-
-    container.innerHTML = '';
-    for (let index = 0; index < count; index += 1) {
-      const div = document.createElement('div');
-      div.className = 'bar-segment filled';
-      container.appendChild(div);
-    }
-  }
-
-  /** Atualiza tempo, abates e combo */
-  updateStats(timeStr, kills, combo, multiplier) {
-    if (!this.els) {
-      return;
-    }
-
-    if (timeStr) this.els.timer.innerText = timeStr;
-    if (kills !== undefined) this.els.kills.innerText = kills;
-    if (combo !== undefined && combo !== this._lastCombo) {
-      const increased = combo > (this._lastCombo ?? 0);
-      this._lastCombo = combo;
-      const visible = combo >= COMBO_VISIBLE_MIN;
-      this.els.comboBox.classList.toggle('is-hidden', !visible);
-      const tier = comboTier(multiplier);
-      this.els.comboBox.dataset.tier = tier;
-      if (visible) {
-        this.els.combo.innerText = 'x' + combo;
-        if (increased) {
-          replay(this.els.comboBox, 'pulse');
-        }
-      }
-      if (COMBO_TIER_RANK[tier] > COMBO_TIER_RANK[this._lastComboTier]) {
-        this._pushFeed('combo', 'combo', (row) => {
-          row.el.dataset.tier = tier;
-          row.label.textContent = `Combo x${combo}`;
-          row.value.textContent = `${Number(multiplier).toFixed(1)}×`;
-        });
-      }
-      this._lastComboTier = tier;
-    }
-  }
-
-  /** Atualiza barras de vida e escudo */
-  updateVitals(shield, maxShield, hull, maxHull) {
-    if (!this.els) {
-      return;
-    }
-
-    const safeMaxShield =
-      Number.isFinite(maxShield) && maxShield > 0 ? maxShield : 1;
-    const safeMaxHull = Number.isFinite(maxHull) && maxHull > 0 ? maxHull : 1;
-    const safeShield = Number.isFinite(shield) ? Math.max(0, shield) : 0;
-    const safeHull = Number.isFinite(hull) ? Math.max(0, hull) : 0;
-
-    this._updateBar(this.els.shieldRow, safeShield, safeMaxShield);
-    this._updateBar(this.els.hullRow, safeHull, safeMaxHull);
-
-    const shieldPercent = Math.floor((safeShield / safeMaxShield) * 100);
-    this.els.shieldText.innerText = shieldPercent + '%';
-
-    const hpPercent = Math.floor((safeHull / safeMaxHull) * 100);
-    this.els.hullText.innerText = hpPercent + '%';
-
-    // Feedback visual de dano cr¡tico
-    if (hpPercent < LOW_HULL_PERCENT) {
-      this.els.hullText.classList.add('is-critical', 'glitch-text');
-    } else {
-      this.els.hullText.classList.remove('is-critical', 'glitch-text');
-    }
-
-    const vignette = this.els.lowHpVignette;
-    const hullPercent = (safeHull / safeMaxHull) * 100;
-    const alive = safeHull > 0;
-    vignette.classList.toggle(
-      'is-low',
-      alive && hullPercent < LOW_HULL_PERCENT
-    );
-    vignette.classList.toggle(
-      'is-critical',
-      alive && hullPercent < CRITICAL_HULL_PERCENT
-    );
-  }
-
-  /** Helper interno para preencher segmentos */
-  _updateBar(container, value, max) {
-    if (!container) {
-      return;
-    }
-
-    const segments = container.children;
-    const total = segments.length;
-    if (!total) {
-      return;
-    }
-
-    const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
-    const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
-
-    const filledCount = Math.ceil((safeValue / safeMax) * total);
-    for (let index = 0; index < total; index += 1) {
-      if (index < filledCount) segments[index].classList.add('filled');
-      else segments[index].classList.remove('filled');
-    }
-  }
-
-  /** Mostra/Esconde e atualiza Boss Bar */
-  updateBoss(active, name, healthPercent, phaseInfo) {
-    if (!this.els) {
-      return;
-    }
-    this._bossBar.update(
-      this.els,
-      this._bossBarHeldUntil,
-      active,
+    const now = performance.now();
+    this._instruments.get('warden')?.update({
+      now,
+      active: Boolean(active),
+      shown: now >= this._bossBarHeldUntil,
       name,
-      healthPercent,
-      phaseInfo
-    );
+      percent: Number.isFinite(healthPercent) ? healthPercent : 100,
+      phase: Math.max(0, Math.floor(phaseInfo.phase ?? 0)),
+      phaseCount: Math.max(1, Math.floor(phaseInfo.phaseCount ?? 1)),
+      phaseColors: phaseInfo.phaseColors || [],
+      invulnerable: Boolean(phaseInfo.invulnerable),
+      herald,
+      marker: this._wardenMarker,
+    });
   }
 
-  /** Atualiza XP, N¡vel e Onda */
-  updateExperience(level, currentXP, requiredXP, waveNum) {
-    if (!this.els) {
-      return;
-    }
-
-    if (waveNum !== undefined) this.els.wave.innerText = waveNum;
-
-    const safeRequired =
-      Number.isFinite(requiredXP) && requiredXP > 0 ? requiredXP : 1;
-    const safeCurrent = Number.isFinite(currentXP) ? Math.max(0, currentXP) : 0;
-
-    const xpPercent = Math.min(
-      100,
-      Math.floor((safeCurrent / safeRequired) * 100)
-    );
-    this.els.xpFill.style.width = xpPercent + '%';
-
-    this.els.xpText.innerText = `${Math.floor(safeCurrent)} / ${Math.floor(
-      safeRequired
-    )}`;
-    this.els.lvlText.innerText = `Lvl ${level}`;
+  /** XP toward the next level, the level and the layer. */
+  updateExperience({ level, current, required, layer }) {
+    this._instruments.get('xp')?.update({ level, current, required, layer });
   }
 
   updateNextWaveTimer(seconds) {
@@ -854,10 +736,19 @@ export class AAAHudLayout {
   /**
    * Edge arrows for targets off the screen: [{ kind: 'warden' | 'herald' |
    * 'pickup', x, y (800×600 screen point), color?, distance? }], in priority
-   * order; the first EDGE_ARROW_MAX off-screen ones get an arrow.
+   * order; the first EDGE_ARROW_MAX off-screen ones get an arrow. A Warden
+   * model with its own edge marker gets the first Warden instead.
    */
   updateEdgeArrows(targets) {
-    placeEdgeArrows(this._arrowPool, targets, this._measuredCorners());
+    const corners = this._measuredCorners();
+    this._wardenMarker = null;
+    let arrows = targets;
+    if (this._instruments.get('warden')?.edgeMarker) {
+      const warden = targets.find((target) => target.kind === 'warden');
+      if (warden) this._wardenMarker = edgeMarker(warden, corners);
+      arrows = targets.filter((target) => target.kind !== 'warden');
+    }
+    placeEdgeArrows(this._arrowPool, arrows, corners);
   }
 
   // The screen and its corner panels (measurePanelCorners), kept until the

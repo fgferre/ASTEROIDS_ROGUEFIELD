@@ -4,14 +4,27 @@
 // it from the services every frame (vitals, stats, radar, edge arrows, boss
 // bar) and pushes the run's events into it (banners, feeds, buffs, radar).
 
-import {
-  DEFAULT_HUD_LAYOUT_ID,
-  getHudLayoutDefinition,
-} from '../../data/ui/hudLayout.js';
+import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
 import { buildRadarState, createRadarMemory } from './hud/radar.js';
+
+/**
+ * The deflector's state for the vitals (player/shield.js, read as it runs):
+ * 'locked' (no shield card this run), 'ready', 'active' or 'cooldown' with
+ * the seconds left.
+ */
+export function shieldStatus(deflector) {
+  if (!deflector || !(deflector.shieldUpgradeLevel > 0)) {
+    return { mode: 'locked', seconds: 0 };
+  }
+  if (deflector.isShieldActive) return { mode: 'active', seconds: 0 };
+  if (deflector.shieldCooldownTimer > 0) {
+    return { mode: 'cooldown', seconds: deflector.shieldCooldownTimer };
+  }
+  return { mode: 'ready', seconds: 0 };
+}
 
 export class TacticalHud {
   /**
@@ -24,6 +37,8 @@ export class TacticalHud {
    * `xpOrbs()`: the XP orb service (the radar's haze).
    * `renderer()`: the renderer (edge arrows, the damage arc, the camera's
    *   view on the radar).
+   * `shieldKey()`: the Activate Shield key or button the player bound, as
+   *   a label ("E").
    */
   constructor({
     refs,
@@ -34,8 +49,10 @@ export class TacticalHud {
     pickups,
     xpOrbs,
     renderer,
+    shieldKey,
   }) {
     this.refs = refs;
+    this.shieldKey = shieldKey;
     this.player = player;
     this.enemies = enemies;
     this.progression = progression;
@@ -48,7 +65,8 @@ export class TacticalHud {
     // The mounted AAAHudLayout; transmissions, cinematics and onboarding
     // draw on it too.
     this.layout = null;
-    this.definition = getHudLayoutDefinition(DEFAULT_HUD_LAYOUT_ID);
+    // Settings → Interface → HUD Layout (data/ui/hudPresets.js).
+    this.presetId = DEFAULT_HUD_PRESET;
     this.cachedValues = { boss: { visible: false } };
     this.bossHudState = this.createInitialBossHudState();
   }
@@ -66,8 +84,20 @@ export class TacticalHud {
 
     mountTarget.style.padding = '0px';
 
-    this.layout = new AAAHudLayout({ items: this.definition.items });
+    this.layout = new AAAHudLayout({
+      items: getHudPreset(this.presetId).items,
+    });
     this.layout.mount(mountTarget);
+  }
+
+  /** The HUD Layout setting: the preset's instruments replace the current ones. */
+  setPreset(id) {
+    if (!id || id === this.presetId) {
+      return;
+    }
+    this.presetId = id;
+    this.layout?.setItems(getHudPreset(id).items);
+    this.updateAAATacticalHudFromServices({ force: true });
   }
 
   resolveAAATacticalMountTarget() {
@@ -127,6 +157,14 @@ export class TacticalHud {
           ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
           : { x: 0, y: 0 };
 
+    const renderer = this.renderer();
+    const waveState =
+      enemies && typeof enemies.getWaveState === 'function'
+        ? enemies.getWaveState() || null
+        : null;
+    const layer = waveState?.current ?? 1;
+    const dash = player ? player.getDashCooldownFraction() : 0;
+
     if (player || force) {
       const hull = Number(player?.health ?? 0) || 0;
       const maxHull = Number(player?.maxHealth ?? 0) || 0;
@@ -144,49 +182,59 @@ export class TacticalHud {
         maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
       }
 
-      hud.updateVitals(shield, maxShield, hull, maxHull);
-      if (player) {
-        hud.updateDashCooldown(player.getDashCooldownFraction());
-      }
+      // The broken shield's cooldown (player/shield.js), read as it runs.
+      const { mode: shieldMode, seconds: shieldSeconds } = shieldStatus(
+        player?.shield
+      );
+
+      hud.updateShip({
+        shield,
+        maxShield,
+        hull,
+        maxHull,
+        ship:
+          player && renderer
+            ? renderer.worldToScreen(playerPosition.x, playerPosition.y)
+            : null,
+        dash,
+        shieldMode,
+        shieldSeconds,
+        shieldCooldown:
+          shieldMode === 'cooldown'
+            ? shieldSeconds / player.shield.shieldMaxCooldown
+            : 0,
+        shieldKey: shieldMode === 'ready' ? this.shieldKey() : '',
+      });
     }
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
       const session = enemies.getSessionStats() || {};
       const timeElapsed =
         session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
-      const totalKills = session.totalKills ?? session.kills ?? 0;
+      const comboState = progression?.getComboState() || {};
 
-      hud.updateStats(
-        this.formatAAATacticalClock(timeElapsed),
-        totalKills,
-        undefined
-      );
+      hud.updateStats({
+        clock: this.formatAAATacticalClock(timeElapsed),
+        seconds: timeElapsed,
+        layer,
+        kills: session.totalKills ?? session.kills ?? 0,
+        combo: Number(comboState.comboCount ?? 0) || 0,
+        multiplier: comboState.multiplier,
+      });
     }
 
-    if (progression && typeof progression.getComboState === 'function') {
-      const comboState = progression.getComboState() || {};
-      const comboCount = Number(comboState.comboCount ?? 0) || 0;
-      hud.updateStats(null, undefined, comboCount, comboState.multiplier);
-    }
-
-    // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
-    // state. Single source of truth: CombatSystem.getSpreadMode() / .getAimMode().
+    // The weapon, the family track and the fire modes (FIX-05): single
+    // source of truth CombatSystem.getSpreadMode() / .getAimMode().
     const combat = this.combat();
-    if (combat && typeof hud.updateModeIndicators === 'function') {
-      const spreadMode =
-        typeof combat.getSpreadMode === 'function'
-          ? combat.getSpreadMode()
-          : 'concentrated';
-      const aimMode =
-        typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
-      hud.updateModeIndicators(spreadMode, aimMode);
-      hud.updateWeapon(combat.getWeaponState());
+    if (combat) {
+      hud.updateBuild({
+        weapon: combat.getWeaponState(),
+        families: progression?.getFamilyCounts() ?? {},
+        spreadMode: combat.getSpreadMode(),
+        aimMode: combat.getAimMode(),
+        dash,
+      });
     }
-
-    const waveState =
-      enemies && typeof enemies.getWaveState === 'function'
-        ? enemies.getWaveState() || null
-        : null;
 
     if (progression) {
       const level =
@@ -198,12 +246,12 @@ export class TacticalHud {
           ? progression.getExperience()
           : null;
 
-      hud.updateExperience(
+      hud.updateExperience({
         level,
-        xp?.current ?? 0,
-        xp?.needed ?? 1,
-        waveState?.current ?? 1
-      );
+        current: xp?.current ?? 0,
+        required: xp?.needed ?? 1,
+        layer,
+      });
     }
 
     if (typeof hud.updateNextWaveTimer === 'function') {
@@ -217,7 +265,6 @@ export class TacticalHud {
     }
 
     // The radar: every contact, the camera's view, the threat mode.
-    const renderer = this.renderer();
     if (player && enemies && hud.radarRange > 0) {
       hud.updateRadar(
         buildRadarState(

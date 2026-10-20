@@ -1,73 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getHudLayoutDefinition } from '../../../src/data/ui/hudLayout.js';
+import { HUD_PRESETS, getHudPreset } from '../../../src/data/ui/hudPresets.js';
+import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
+import { TacticalHud } from '../../../src/modules/ui/TacticalHud.js';
 import {
   getInstrument,
   mountInstruments,
 } from '../../../src/modules/ui/hud/instruments/registry.js';
+import {
+  fakeDocument,
+  fakeElement,
+  fakeHudRoot,
+} from '../../__helpers__/fakeHudDom.js';
 
 const files = import.meta.glob(
   '../../../src/modules/ui/hud/instruments/*/*.js',
   { eager: true }
 );
 
-// The node test environment has no DOM: just enough element for the models.
-function fakeElement() {
-  const classes = new Set();
-  const el = {
-    style: {},
-    dataset: {},
-    attributes: {},
-    children: [],
-    textContent: '',
-    innerHTML: '',
-    classList: {
-      contains: (name) => classes.has(name),
-      toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
-    },
-    set className(value) {
-      classes.clear();
-      value.split(' ').forEach((name) => classes.add(name));
-    },
-    setAttribute(name, value) {
-      el.attributes[name] = String(value);
-    },
-    appendChild(child) {
-      el.children.push(child);
-      return child;
-    },
-  };
-  return el;
-}
-
-// A slot container: one fake element per selector, two per selector list.
-function fakeSlot() {
-  const parts = new Map();
-  const part = (selector) => {
-    if (!parts.has(selector)) parts.set(selector, fakeElement());
-    return parts.get(selector);
-  };
-  return Object.assign(fakeElement(), {
-    querySelector: part,
-    querySelectorAll: (selector) => [
-      part(`${selector} 0`),
-      part(`${selector} 1`),
-    ],
-  });
-}
-
-const radarItem = getHudLayoutDefinition().items.find(
+const radarItem = getHudPreset('instrument').items.find(
   (item) => item.slot === 'radar'
 );
 
 function mountRadar(model) {
-  const slot = fakeSlot();
-  const root = {
-    querySelector: (selector) =>
-      selector === '[data-slot="radar"]' ? slot : null,
-  };
-  const radar = mountInstruments(root, [{ ...radarItem, model }]).get('radar');
-  return { slot, radar };
+  const root = fakeHudRoot();
+  const radar = mountInstruments(
+    root,
+    [{ ...radarItem, model }],
+    fakeElement()
+  ).get('radar');
+  return { slot: root.slots.get('radar'), radar };
 }
+
+// The ids of the models mounted per slot.
+const mountedModels = (mounted) =>
+  Object.fromEntries([...mounted].map(([slot, model]) => [slot, model.id]));
 
 const state = (blips) => ({
   range: 900,
@@ -82,10 +48,7 @@ const state = (blips) => ({
 
 describe('HUD instruments', () => {
   beforeEach(() => {
-    vi.stubGlobal('document', {
-      createElement: fakeElement,
-      createElementNS: fakeElement,
-    });
+    vi.stubGlobal('document', fakeDocument());
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -104,14 +67,117 @@ describe('HUD instruments', () => {
     }
   });
 
+  it('every preset places every slot once, each with a model that exists', () => {
+    const slots = new Set(
+      Object.keys(files).map((path) => path.split('/').slice(-2)[0])
+    );
+    for (const preset of Object.values(HUD_PRESETS)) {
+      expect(preset.items.map((item) => item.slot).sort()).toEqual(
+        [...slots].sort()
+      );
+      for (const { slot, model } of preset.items) {
+        expect(getInstrument(slot, model), `${preset.id} ${slot}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('the Instrument preset mounts the new models, the Classic one the old ones', () => {
+    const instrument = mountInstruments(
+      fakeHudRoot(),
+      getHudPreset('instrument').items,
+      fakeElement()
+    );
+    expect(mountedModels(instrument)).toEqual({
+      'hull-ring': 'instrument',
+      recharges: 'instrument',
+      'run-info': 'instrument',
+      warden: 'instrument',
+      radar: 'tactical',
+      feed: 'instrument',
+      vitals: 'instrument',
+      xp: 'instrument',
+      build: 'instrument',
+    });
+
+    const root = fakeHudRoot();
+    const classic = mountInstruments(
+      root,
+      getHudPreset('classic').items,
+      fakeElement()
+    );
+    // No recharges on the ship: the dash meter is the build's DASH chip.
+    expect(mountedModels(classic)).toEqual({
+      'hull-ring': 'classic',
+      'run-info': 'classic',
+      warden: 'classic',
+      radar: 'classic',
+      feed: 'classic',
+      vitals: 'classic',
+      xp: 'classic',
+      build: 'classic',
+    });
+    expect(root.slots.get('recharges').style.display).toBe('none');
+    // The old grid's places: 16 px margins, the boss bar between 220 px columns.
+    expect(root.slots.get('warden').style.left).toBe(
+      'calc(236px * var(--hud-u, 1))'
+    );
+    expect(root.slots.get('warden').style.right).toBe(
+      'calc(236px * var(--hud-u, 1))'
+    );
+  });
+
+  it('the HUD Layout setting swaps the mounted instruments for the other preset', () => {
+    const hud = new TacticalHud({
+      refs: {},
+      player: () => null,
+      enemies: () => null,
+      progression: () => null,
+      combat: () => null,
+      pickups: () => null,
+      xpOrbs: () => null,
+      renderer: () => null,
+      shieldKey: () => 'E',
+    });
+    const layout = new AAAHudLayout({
+      items: getHudPreset('instrument').items,
+    });
+    layout._mounted = true;
+    layout._layer = fakeHudRoot();
+    layout.els = { direction: fakeElement() };
+    layout._mountInstruments();
+    hud.layout = layout;
+    const destroyed = vi.spyOn(layout._instruments.get('xp'), 'destroy');
+
+    hud.setPreset('classic');
+
+    expect(destroyed).toHaveBeenCalled();
+    expect(hud.presetId).toBe('classic');
+    expect(layout._instruments.get('xp').id).toBe('classic');
+    expect(layout._instruments.get('radar').id).toBe('classic');
+    expect(layout._instruments.has('recharges')).toBe(false);
+    expect(
+      layout._layer.slots.get('build').classList.contains('hud-plate')
+    ).toBe(false);
+
+    hud.setPreset('instrument');
+    expect(layout._instruments.get('vitals').id).toBe('instrument');
+    expect(
+      layout._layer.slots.get('build').classList.contains('hud-plate')
+    ).toBe(true);
+  });
+
   it('mounts the tactical radar by default and the classic one when the item picks it', () => {
     expect(radarItem.model).toBe('tactical');
 
     const tactical = mountRadar('tactical');
     expect(tactical.radar.id).toBe('tactical');
     expect(tactical.slot.innerHTML).toContain('class="rt"');
-    expect(tactical.slot.style.top).toBe(`${radarItem.y}px`);
-    expect(tactical.slot.style.right).toBe(`${radarItem.x}px`);
+    expect(tactical.slot.style.top).toBe(
+      `calc(${radarItem.y}px * var(--hud-u, 1))`
+    );
+    expect(tactical.slot.style.right).toBe(
+      `calc(${radarItem.x}px * var(--hud-u, 1))`
+    );
     expect(tactical.radar.range).toBe(getInstrument('radar', 'tactical').range);
 
     const classic = mountRadar('classic');

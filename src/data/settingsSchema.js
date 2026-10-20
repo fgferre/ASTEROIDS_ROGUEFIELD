@@ -326,6 +326,17 @@ const SETTINGS_SCHEMA = [
         step: 0.05,
       },
       {
+        key: 'hudLayout',
+        type: 'select',
+        control: 'segmented',
+        label: 'HUD Layout',
+        description:
+          'Instrument: fine instruments that fade until needed, hull and dash on the ship. Classic: the panels from before.',
+        options: ['instrument', 'classic'],
+        optionLabels: { instrument: 'Instrument', classic: 'Classic' },
+        default: 'instrument',
+      },
+      {
         key: 'damageFlash',
         type: 'toggle',
         label: 'Damage Flash',

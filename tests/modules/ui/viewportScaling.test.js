@@ -44,4 +44,31 @@ describe('ViewportScaling', () => {
     expect([dense.width, dense.height]).toEqual([2560, 1440]);
     expect(dense.style.width).toBe('1280px');
   });
+
+  it('HUD Scale really scales the HUD at a 1080p window, 130 % included', () => {
+    const scaleAt = (hudScale) => {
+      const set = {};
+      vi.stubGlobal('window', {
+        innerWidth: 1920,
+        innerHeight: 1080,
+        devicePixelRatio: 1,
+        location: { search: '' },
+        requestAnimationFrame: () => 1,
+      });
+      vi.stubGlobal('document', {
+        documentElement: {
+          style: { setProperty: (name, value) => (set[name] = value) },
+        },
+      });
+      const viewport = new ViewportScaling({
+        refs: { canvas: { width: 800, height: 600, style: {} } },
+        hud: () => null,
+      });
+      viewport.updateViewportScaling({ force: true });
+      viewport.setHudBaseScale(hudScale);
+      return set['--hud-scale-effective'];
+    };
+    // 1.2 is the size the instruments are drawn at (--hud-u = 1).
+    expect([0.8, 1, 1.3].map(scaleAt)).toEqual(['0.960', '1.200', '1.560']);
+  });
 });

@@ -1,15 +1,20 @@
 // src/modules/ui/hud/instruments/registry.js
 //
-// HUD instruments. The HUD is slots (the radar, ...) and each slot shows one
-// of its models: every file under instruments/<slot>/<model>.js is one model,
-// `export default { slot, id, name, mount(container), update(state),
-// destroy() }`, with the slot and id equal to its folder and file name;
-// creating the file registers it. A layout item (data/ui/hudLayout.js)
+// HUD instruments. The HUD is slots (the radar, the XP line, ...) and each
+// slot shows one of its models: every file under instruments/<slot>/<model>.js
+// is one model, `export default { slot, id, name, mount(container, screen),
+// update(state), destroy() }`, with the slot and id equal to its folder and
+// file name; creating the file registers it. `screen` is the full-window
+// layer over the field (edge markers). A layout item (data/ui/hudPresets.js)
 // places a slot on the screen and picks its model; mountInstruments mounts a
-// fresh instance of it in the slot's container.
+// fresh instance of it in the slot's container. AAAHudLayout builds each
+// slot's state and calls update; every model of a slot reads the same state.
+// `now` is performance.now() in ms; a `ship` is the ship's screen point
+// (800 × 600 whatever the window, as renderer.worldToScreen gives it) or
+// null; fractions are 0..1.
 //
-// The radar slot's state, built each frame by TacticalHud through
-// buildRadarState (hud/radar.js) and read by every radar model:
+// radar      built each frame by TacticalHud through buildRadarState
+//            (hud/radar.js); the model's `range` is how far it reaches:
 // {
 //   range   field units from the ship to the rim (the model's `range`, which
 //           Dense Fog shortens)
@@ -35,6 +40,28 @@
 //                     kind in one direction); `distance` labels Heralds
 //   haze    [{ x, y, weight, inView }]: where XP orbs gather (weight: orbs)
 // }
+// run-info   { now, clock ('HH:MM:SS'), seconds, layer, kills, combo,
+//            multiplier }
+// xp         { level, current, required, layer }
+// vitals     { now, shield, maxShield, hull, maxHull, shieldMode ('locked':
+//            no shield card yet | 'ready' | 'active' | 'cooldown'),
+//            shieldSeconds and shieldCooldown (fraction) of the cooldown
+//            left, shieldKey (the bound key's label while ready) }
+// hull-ring  { now, ship, shield, maxShield, hull, maxHull }
+// recharges  { now, ship, dash (1 right after a dash, 0 ready), shield (the
+//            broken shield's cooldown left, 0 when up or none) }
+// build      { now, weapon (CombatSystem.getWeaponState()), families
+//            ({ family: distinct cards }), spreadMode, aimMode, dash, buffs
+//            ([{ kind, label, color, remaining, duration }]), beams (counts
+//            up once per beam fired) }
+// warden     { now, active, shown (false while the intro holds it), name,
+//            percent, phase, phaseCount, phaseColors, invulnerable, herald,
+//            marker ({ left, top (% of the screen), angle, edge, distance }:
+//            the Warden off screen, or null) }; a model with `edgeMarker`
+//            draws the marker itself, so the HUD's edge arrows skip Wardens
+// feed       no per-frame state: `push(key, tone, render)` adds a row (or
+//            refreshes the row with that key) and calls render(row) with
+//            { el, label, value, count } to fill it
 
 const modules = import.meta.glob('./*/*.js', { eager: true });
 
@@ -56,30 +83,54 @@ export function getInstrument(slot, id) {
 
 /**
  * Places each layout item's slot (`[data-slot="<slot>"]` under `root`) and
- * mounts its model there when visible; returns slot → mounted instance.
+ * mounts its model there when visible; `screen` is handed to every model.
+ * Returns slot → mounted instance.
  */
-export function mountInstruments(root, items) {
+export function mountInstruments(root, items, screen) {
   const mounted = new Map();
   for (const item of items) {
     const container = root.querySelector(`[data-slot="${item.slot}"]`);
     placeSlot(container, item);
     if (!item.visible) continue;
     const instance = Object.create(getInstrument(item.slot, item.model));
-    instance.mount(container);
+    instance.mount(container, screen);
     mounted.set(item.slot, instance);
   }
   return mounted;
 }
 
-// `anchor` is the screen corner ('top-right', ...); x and y are px from it.
-function placeSlot(container, { anchor, x, y, scale, opacity, visible }) {
-  const [vertical, horizontal] = anchor.split('-');
+// Offsets scale with the HUD (--hud-u, hudStyles.js).
+const px = (n) => `calc(${n}px * var(--hud-u, 1))`;
+
+// `anchor` is '<top|bottom>-<left|right|center|stretch>' inside the HUD's
+// frame or 'screen' (the whole layer); x and y are px from that corner or
+// edge. Every call writes every placement property: a preset switch reuses
+// the container.
+function placeSlot(
+  container,
+  { anchor, x, y, scale, opacity, visible, plate }
+) {
   const { style } = container;
+  const zoom = scale === 1 ? '' : `scale(${scale})`;
   style.position = 'absolute';
-  style[vertical] = `${y}px`;
-  style[horizontal] = `${x}px`;
-  style.transformOrigin = `${vertical} ${horizontal}`;
-  style.transform = scale === 1 ? '' : `scale(${scale})`;
+  style.top = style.bottom = style.left = style.right = '';
+  style.transform = zoom;
+  container.classList.toggle('hud-plate', Boolean(plate));
   style.opacity = String(opacity);
   style.display = visible ? '' : 'none';
+  if (anchor === 'screen') {
+    style.top = style.bottom = style.left = style.right = '0';
+    return;
+  }
+  const [vertical, horizontal] = anchor.split('-');
+  style[vertical] = px(y);
+  if (horizontal === 'stretch') {
+    style.left = style.right = px(x);
+  } else if (horizontal === 'center') {
+    style.left = `calc(50% + ${px(x)})`;
+    style.transform = `translateX(-50%) ${zoom}`.trim();
+  } else {
+    style[horizontal] = px(x);
+  }
+  style.transformOrigin = `${vertical} ${horizontal === 'stretch' ? 'center' : horizontal}`;
 }

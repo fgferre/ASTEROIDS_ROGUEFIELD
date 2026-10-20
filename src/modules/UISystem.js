@@ -121,6 +121,15 @@ class UISystem extends BaseSystem {
       pickups: () => this.getService('pickups'),
       xpOrbs: () => this.getService('xp-orbs'),
       renderer: () => this.getService('renderer'),
+      shieldKey: () => {
+        const device = this.getService('input').getActiveDevice();
+        return this.settingsPanel.formatBindingLabel(
+          this.settings?.getSetting('controls', 'activateShield')?.[
+            device
+          ]?.[0],
+          device
+        );
+      },
     });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
@@ -207,7 +216,10 @@ class UISystem extends BaseSystem {
       this.resolveSettingsService()?.getCategoryValues('controls')?.hullControl
     );
 
-    // Direct AAA HUD Activation
+    // Direct AAA HUD Activation, in the HUD Layout setting's preset
+    this.tacticalHud.setPreset(
+      this.resolveSettingsService()?.getCategoryValues('video')?.hudLayout
+    );
     this.tacticalHud.activateAAATacticalHud();
     if (this.tacticalHud.layout) {
       this.transmissions = new TransmissionQueue(
@@ -581,6 +593,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('settings-visual-changed', (payload = {}) => {
       this.settingsPanel.handleVisualPreferencesChange(payload);
+      this.tacticalHud.setPreset(payload.values?.video?.hudLayout);
     });
 
     this.registerEventListener('key-pressed', (payload) => {
