@@ -587,6 +587,20 @@ export class AAAHudLayout {
   }
 
   /**
+   * The ship's screen point as just drawn (or null), after every drawn
+   * frame, paused too: the hull ring and the recharges get their last state
+   * again at that point, so they sit on the ship whatever the camera does.
+   */
+  placeOnShip(ship) {
+    for (const slot of ['hull-ring', 'recharges']) {
+      const state = this._slotStates.get(slot);
+      if (!state) continue;
+      state.ship = ship;
+      this._instruments.get(slot)?.update(state);
+    }
+  }
+
+  /**
    * The run's numbers: `clock` 'HH:MM:SS' and `seconds` elapsed, the layer,
    * kills, the combo and its multiplier. A combo reaching a hotter tier gets
    * a feed row.

@@ -563,6 +563,8 @@ function renderGame(alpha) {
   performanceMonitor.startMeasure('render');
   gameSystemServices.renderer.render(alpha);
   performanceMonitor.endMeasure('render');
+  // The HUD drawn on the ship goes where this frame drew it, paused too.
+  gameSystemServices.ui.placeOnShip();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

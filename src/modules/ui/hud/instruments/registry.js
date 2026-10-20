@@ -9,9 +9,10 @@
 // places a slot on the screen and picks its model; mountInstruments mounts a
 // fresh instance of it in the slot's container. AAAHudLayout builds each
 // slot's state and calls update; every model of a slot reads the same state.
-// `now` is performance.now() in ms; a `ship` is the ship's screen point
-// (800 × 600 whatever the window, as renderer.worldToScreen gives it) or
-// null; fractions are 0..1.
+// `now` is performance.now() in ms; a `ship` is the ship's screen point as
+// last drawn (800 × 600 whatever the window: Renderer3D.shipOnScreen) or
+// null, fed again after every drawn frame (AAAHudLayout.placeOnShip);
+// fractions are 0..1.
 //
 // radar      built each frame by TacticalHud through buildRadarState
 //            (hud/radar.js); the model's `range` is how far it reaches:
@@ -136,6 +137,8 @@ function placeSlot(
   style.opacity = String(opacity);
   style.display = visible ? '' : 'none';
   if (anchor === 'screen') {
+    // Drawn at the ship in screen pixels: a scale would pull it off the ship.
+    style.transform = '';
     style.top = style.bottom = style.left = style.right = '0';
     return;
   }

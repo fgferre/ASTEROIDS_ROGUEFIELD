@@ -867,6 +867,15 @@ class UISystem extends BaseSystem {
     });
   }
 
+  /**
+   * After each drawn frame (app.js), paused too: the hull ring, the
+   * recharges and the editor's frames for them onto the ship as drawn.
+   */
+  placeOnShip() {
+    this.tacticalHud.placeOnShip();
+    this.hudEditor.followShip();
+  }
+
   update(deltaTime) {
     this.tacticalHud.update(deltaTime);
     if (this.onboarding.current) {

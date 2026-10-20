@@ -109,8 +109,8 @@ export default {
     this.toggle('is-ring', showRing);
     this.toggle('is-glitching', now < this.glitchUntil);
     if (ship) {
-      const left = `${f((ship.x / 800) * 100)}%`;
-      const top = `${f((ship.y / 600) * 100)}%`;
+      const left = `${((ship.x / 800) * 100).toFixed(2)}%`;
+      const top = `${((ship.y / 600) * 100).toFixed(2)}%`;
       if (left !== this.shown.left)
         this.ring.style.left = this.shown.left = left;
       if (top !== this.shown.top) this.ring.style.top = this.shown.top = top;
