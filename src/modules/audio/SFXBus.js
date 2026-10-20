@@ -26,6 +26,7 @@ import { createShieldCues } from './sfx/shields.js';
 import { createInterfaceCues } from './sfx/interface.js';
 import { createThrusterCues } from './sfx/thrusters.js';
 import { createSamplePlayer, interceptSampleCues } from './samplePlayer.js';
+import { createShipEngine } from './shipEngine.js';
 
 const EXPLOSION_SIZE_ORDER = Object.freeze(['small', 'medium', 'large']);
 const ASTEROID_SIZES = new Set(EXPLOSION_SIZE_ORDER);
@@ -197,6 +198,10 @@ class SFXBus {
     // it instead of its synthesis (the facade's boss roar is intercepted there) ---
     this.samples = createSamplePlayer(this._kit);
     interceptSampleCues(this, this.samples);
+
+    // --- the ship's engine (./shipEngine.js): the bench picks, played from
+    // the flight; until its files are in, the thruster loop above plays ---
+    this.engine = createShipEngine(this._kit);
   }
 
   /**
@@ -280,8 +285,10 @@ class SFXBus {
       random: scopes?.batcher,
     });
 
-    // The samples fetched at boot decode now that the context exists.
+    // The samples and the engine fetched at boot decode now that the context
+    // and the buses exist.
     this.samples.decode();
+    this.engine.decode();
 
     this.initialized = true;
   }
@@ -681,6 +688,7 @@ class SFXBus {
       trackPerformance: (name) => bus._trackPerformance(name),
       resolveRandom: (...candidates) => bus._resolveRandom(...candidates),
       ambientDestination: () => bus.getAmbientDestination(),
+      protectedDestination: () => bus.getProtectedDestination(),
       connectAmbient: (node) => bus._connectAmbient(node),
       connectProtected: (node) => bus._connectProtected(node),
       ambientInput: (pan, distance) => bus._ambientInput(pan, distance),
@@ -928,12 +936,13 @@ class SFXBus {
     return this._player.playShipHit();
   }
 
+  // The dash and the brake play the engine's one-shot once its files are in.
   playDash(options) {
-    return this._player.playDash(options);
+    if (!this.engine.dash()) this._player.playDash(options);
   }
 
   playBrake(options) {
-    return this._player.playBrake(options);
+    if (!this.engine.brake()) this._player.playBrake(options);
   }
 
   playLowHealthWarning() {
@@ -1000,7 +1009,7 @@ class SFXBus {
     return this._interface.playUIStartGame();
   }
 
-  // --- Thruster loops (sfx/thrusters.js) ---
+  // --- Thruster loops (sfx/thrusters.js): the engine's fallback ---
 
   startThrusterLoop(type, intensity, isAutomatic) {
     return this._thrusters.startThrusterLoop(type, intensity, isAutomatic);
@@ -1010,8 +1019,8 @@ class SFXBus {
     return this._thrusters.updateThrusterLoop(type, intensity);
   }
 
-  stopThrusterLoop(type, skipRelease) {
-    return this._thrusters.stopThrusterLoop(type, skipRelease);
+  stopThrusterLoop(type) {
+    return this._thrusters.stopThrusterLoop(type);
   }
 
   isThrusterActive(type) {
@@ -1022,7 +1031,7 @@ class SFXBus {
   // Lifecycle helpers consumed by the facade reset/destroy.
   // ===========================================================================
 
-  /** Cleanup pool/cache/batcher/thruster state for a fresh run (facade reset). */
+  /** Cleanup pool/cache/batcher/thruster/engine state for a fresh run (facade reset). */
   reset() {
     if (this.pool) {
       this.pool.cleanup();
@@ -1034,21 +1043,21 @@ class SFXBus {
       this.batcher.flushPendingBatches();
       this.batcher.resetStats();
     }
-    this._thrusters.cancelPendingThrusterStarts();
     if (this.thrusterLoops) {
       this.thrusterLoops.cleanup(this.pool);
     }
+    this.engine.reset();
   }
 
   /**
-   * Tear down: stop thruster loops, clean batcher/pool/cache, disconnect the
-   * buses. Idempotent (safe to call repeatedly).
+   * Tear down: stop thruster loops and the engine, clean batcher/pool/cache,
+   * disconnect the buses. Idempotent (safe to call repeatedly).
    */
   dispose() {
-    this._thrusters.cancelPendingThrusterStarts();
     if (this.thrusterLoops) {
       this.thrusterLoops.cleanup(this.pool);
     }
+    this.engine.dispose();
     if (this.batcher) {
       this.batcher.flushPendingBatches();
       this.batcher.resetStats();

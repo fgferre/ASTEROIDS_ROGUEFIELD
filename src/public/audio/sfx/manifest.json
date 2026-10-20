@@ -125,20 +125,6 @@
       }
     ]
   },
-  "dash": {
-    "files": ["dash/1.mp3"],
-    "gain": -17,
-    "priority": 4,
-    "cap": 2,
-    "gap": 100,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "dash/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A fast spaceship dash, short powerful whoosh of thrust with a sharp air burst, high quality game sound effect, dry, no music"
-      }
-    ]
-  },
   "xp-collect": {
     "files": ["xp-collect/1.mp3"],
     "gain": -12,

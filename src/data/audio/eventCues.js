@@ -37,6 +37,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'settings-audio-changed', run: 'volume' },
   { on: 'weapon-fired', run: 'listener' },
   { on: 'weapon-fired', cue: 'playLaserShot', payload: true },
+  { on: 'weapon-fired', run: 'engineShot' },
   {
     on: 'combat-target-lock',
     cue: 'playTargetLock',
@@ -186,7 +187,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'bullet-hit', run: 'bulletHit' },
   { on: 'player-took-damage', cue: 'playShipHit' },
   // The ship's own moves: centred on it; the dash whoosh sweeps toward where
-  // it goes.
+  // it goes (the engine's own dash and brake, once its files are in).
   {
     on: 'player-dashed',
     cue: 'playDash',
@@ -202,6 +203,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'player-health-changed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },
   { on: 'thruster-effect', run: 'thruster' },
+  // The engine follows each step's flight (after its thruster-effect events).
+  { on: 'player-moved', run: 'engineStep' },
 
   // Interface.
   {
@@ -210,6 +213,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     arg: ['rarity', 'common'],
   },
   { on: 'pause-state-changed', run: 'pauseMusic' },
+  { on: 'pause-state-changed', run: 'engineStop', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseOpen', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseClose', unless: 'isPaused' },
   { on: 'screen-changed', run: 'screen' },

@@ -54,6 +54,7 @@ export class PlayerThrusters {
     thrSideR,
     isMainManual,
     isAuxManual,
+    isSideManual,
   }) {
     // Main thruster (forward)
     if (thrMain > 0 || this.lastThrusterState.main > 0) {
@@ -104,7 +105,9 @@ export class PlayerThrusters {
         direction: dir,
         intensity: thrSideL,
         type: 'side',
+        side: 'left', // the engine sound pans its puffs by it
         visualLevel: this.rcsVisualLevel,
+        isAutomatic: !isSideManual,
       });
       this.lastThrusterState.sideL = thrSideL;
     }
@@ -121,7 +124,9 @@ export class PlayerThrusters {
         direction: dir,
         intensity: thrSideR,
         type: 'side',
+        side: 'right',
         visualLevel: this.rcsVisualLevel,
+        isAutomatic: !isSideManual,
       });
       this.lastThrusterState.sideR = thrSideR;
     }

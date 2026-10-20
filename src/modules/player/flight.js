@@ -101,6 +101,8 @@ export class PlayerFlight {
     // Track if thrusters are manually controlled (for audio distinction)
     const isMainManual = modern ? Boolean(move) : input.up;
     const isAuxManual = !modern && input.down;
+    // Classic sides only turn on A/D; modern ones damp the drift without a move.
+    const isSideManual = !modern || Boolean(move);
     const noManualThrust = !isMainManual && !isAuxManual;
     const dashing = this.maneuvers.dashTimer > 0;
     // RCS System: under thrust, push and drag both scale, so the same top
@@ -251,6 +253,7 @@ export class PlayerFlight {
       thrSideR,
       isMainManual,
       isAuxManual,
+      isSideManual,
     };
   }
 

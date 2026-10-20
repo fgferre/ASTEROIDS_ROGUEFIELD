@@ -11,11 +11,12 @@ import {
 } from '../../data/audio/samples.js';
 import { dbToGain } from './MusicThemes.js';
 
-/** A public file under audio/sfx/, through the Vite base; throws when not OK. */
-async function fetchSampleFile(path) {
-  const response = await fetch(`${import.meta.env.BASE_URL}audio/sfx/${path}`);
+/** A public file under audio/<folder>/, through the Vite base; throws when not OK. */
+export async function fetchAudioFile(folder, path) {
+  const url = `audio/${folder}/${path}`;
+  const response = await fetch(`${import.meta.env.BASE_URL}${url}`);
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} for audio/sfx/${path}`);
+    throw new Error(`HTTP ${response.status} for ${url}`);
   }
   return response;
 }
@@ -94,7 +95,7 @@ export function createSamplePlayer(sfx) {
   }
 
   /** Fetch the manifest and every file (the boot warm-up); never throws. */
-  async function load(fetchFile = fetchSampleFile) {
+  async function load(fetchFile = (path) => fetchAudioFile('sfx', path)) {
     try {
       const manifest = await (await fetchFile('manifest.json')).json();
       const loaded = await Promise.all(
@@ -167,6 +168,15 @@ export function createSamplePlayer(sfx) {
     return true;
   }
 
+  /** The cue's bus is there to play into (it is not before the buses exist). */
+  function busReady({ bus }) {
+    return Boolean(
+      bus === 'protected'
+        ? sfx.protectedDestination()
+        : sfx.ambientDestination()
+    );
+  }
+
   /** Route `node` like the cue's synthesis: its bus, pan and distance mix. */
   function connectVoice(node, { bus, spatialArg }, args) {
     const spatial = (spatialArg === undefined ? null : args[spatialArg]) || {};
@@ -174,18 +184,17 @@ export function createSamplePlayer(sfx) {
     if (bus === 'protected') {
       if (pan) node.connect(sfx.protectedPanner(pan));
       else sfx.connectProtected(node);
-      return true;
+      return;
     }
-    const destination = sfx.ambientInput(pan, spatial.distance || null);
-    if (!destination) return false;
-    node.connect(destination);
-    return true;
+    node.connect(sfx.ambientInput(pan, spatial.distance || null));
   }
 
   function startVoice(cue, id, { entry, buffers }, args) {
     const context = sfx.context;
     const now = context.currentTime;
     const priority = entry.priority ?? SAMPLE_PRIORITY.interface;
+    // A voice that could not connect never stops another to make room.
+    if (!busReady(SAMPLE_CUES[cue])) return;
     if (!makeRoom(id, entry, priority, now)) return;
 
     // Variation from the audio's seeded scopes (reseeded per run): the
@@ -200,7 +209,7 @@ export function createSamplePlayer(sfx) {
     gain.gain.value = dbToGain(
       (entry.gain ?? 0) + rng.range(-gainSpreadDb, gainSpreadDb)
     );
-    if (!connectVoice(gain, SAMPLE_CUES[cue], args)) return;
+    connectVoice(gain, SAMPLE_CUES[cue], args);
     if (entry.reverb !== null && entry.reverb !== undefined) {
       sfx.sendToReverb(gain, entry.reverb);
     }
