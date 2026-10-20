@@ -17,7 +17,11 @@ const WARDEN_SEGMENTS = 6;
 // Choir and Null views are drawn in field pixels (their bodies come from the
 // boss: `cores`, `plates`); Prime is a unit model scaled by the radius.
 const CHOIR_CORE_PX = 28;
+const CHOIR_ORBIT_PX = 90;
 const CHOIR_SHARDS = 5;
+// Prime's ring on its entrance (arrival.open 1): this much wider, tipped up
+// this far (radians), before it slams shut.
+const PRIME_OPEN = Object.freeze({ spread: 0.7, tip: 0.55 });
 const NULL_CLOSED_PX = 70;
 const BREAK_SECONDS = 1.6;
 const TAU = Math.PI * 2;
@@ -753,12 +757,12 @@ export function createWardenViews(kit) {
       const arm = new THREE.Mesh(choirArm, wardenPlateMaterial);
       const coreMaterial = wardenCoreMaterial(0.2);
       const core = new THREE.Mesh(orb, coreMaterial);
-      core.position.x = 90;
+      core.position.x = CHOIR_ORBIT_PX;
       core.scale.setScalar(CHOIR_CORE_PX);
       // the singing halo: a rim whose gain beats (it was its opacity)
       const haloTone = kit.tone(PALETTE.boss, 1.3);
       const halo = kit.rim(pivot, kit.circleRim, 1, haloTone.color);
-      halo.anchor.position.x = 90;
+      halo.anchor.position.x = CHOIR_ORBIT_PX;
       halos.push(halo);
       const shards = [];
       for (let k = 0; k < CHOIR_SHARDS; k += 1) {
@@ -875,6 +879,9 @@ export function createWardenViews(kit) {
     view.object.scale.setScalar(radius);
     view.object.rotation.y = -(boss.rotation || 0);
     view.ring.rotation.y = time * 0.35;
+    const open = boss.arrival?.open ?? 0;
+    view.ring.scale.setScalar(1 + PRIME_OPEN.spread * open);
+    view.ring.rotation.x = PRIME_OPEN.tip * open;
     const phase = Math.max(0, boss.currentPhase || 0);
     const intact = Math.max(1, WARDEN_SEGMENTS - phase * 2);
     const { geometry } = view.ring;
@@ -904,6 +911,10 @@ export function createWardenViews(kit) {
       if (state.alive) {
         const angle = Math.atan2(state.y - boss.y, state.x - boss.x);
         c.pivot.rotation.y = -angle;
+        // flung out past their arms on the entrance (coreSpread)
+        const reach = CHOIR_ORBIT_PX * (boss.coreSpread ?? 1);
+        c.core.position.x = reach;
+        c.halo.position.x = reach;
         const singing = boss.singingIndex === i;
         const beat = Math.sin(time * 5 + i);
         c.coreMaterial.emissiveIntensity = singing
@@ -930,7 +941,7 @@ export function createWardenViews(kit) {
       // out along the arm, sinking and tipping as it goes
       c.pivot.position.set(0, -40 * u * u, 0);
       c.arm.position.x = 70 * u;
-      c.core.position.x = 90 + 120 * u;
+      c.core.position.x = CHOIR_ORBIT_PX + 120 * u;
       c.arm.rotation.z = -1.2 * u;
       c.arm.rotation.x = 2.5 * u;
       c.core.rotation.y = 6 * u;

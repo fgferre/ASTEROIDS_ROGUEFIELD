@@ -7,6 +7,22 @@ export default {
   order: 2,
   displayName: 'Warden Choir',
   subtitle: 'Three voices of the Ring',
+  // Its entrance, the choir gathers: a curve in, spinning, the three cores
+  // far apart (each lights the edge as it crosses), then they draw in. The
+  // fields are explained in prime.js. Numbers: proposta 19/10.
+  arrival: {
+    start: 200,
+    motion: 'glide',
+    curve: 150,
+    travel: 1.3,
+    close: 0.35,
+    open: 1,
+    spin: 4,
+    world: 0.25,
+    recover: 0.5,
+    flare: '#f9c74f',
+    shot: { tilt: [60, 64], turn: [-45, 5], distance: [920, 780], look: 0.5 },
+  },
   radius: 118, // covers the cores: orbit + core radius
   coreCount: 3,
   coreOrbitRadius: 90,

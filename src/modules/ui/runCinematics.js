@@ -5,19 +5,17 @@
 // simulation is held (no step runs, so replays stay exact), a skip hint shows
 // and any key skips; the layer banner — the title card — shows once, when it
 // ends. Epilogue: the renderer pulls back as the Ring wakes, the victory line
-// plays over it, and the victory screen waits for it to end. Warden arrival:
-// the camera visits the Warden under letterbox bars while the run plays on
-// (no hold, no skip). A renderer that can't move the camera (2D, reduced
-// motion, `?camera=0`) refuses all three, and the run keeps the plain banner.
+// plays over it, and the victory screen waits for it to end. Warden
+// entrance: letterbox bars over the live shot until the Warden closes up
+// ('boss-arrived'); the run plays on, slowed (no hold, no skip). A renderer
+// that can't move the camera (2D, reduced motion, `?camera=0`) refuses all
+// three, and the run keeps the plain banner.
 
-import {
-  EPILOGUE_MS,
-  INTRO_MS,
-  WARDEN_ARRIVAL,
-} from '../../core/cinematics.js';
+import { EPILOGUE_MS, INTRO_MS } from '../../core/cinematics.js';
 
-// The bars leave as the camera starts back; they are gone when it lands.
-const ARRIVAL_MS = (WARDEN_ARRIVAL.travelIn + WARDEN_ARRIVAL.hold) * 1000;
+// The bars leave when the Warden closes up; this only covers one that never
+// does (released mid-entrance).
+const ARRIVAL_LIMIT_MS = 6000;
 
 export class RunCinematics {
   /**
@@ -83,9 +81,9 @@ export class RunCinematics {
   }
 
   /**
-   * The letterbox while the camera visits `warden`; false (nothing happens)
-   * when the renderer can't. Never over the intro or the epilogue; a second
-   * Warden during one only retargets the camera.
+   * The letterbox over `warden`'s entrance; false (nothing happens) when the
+   * renderer can't. Never over the intro or the epilogue; a second Warden
+   * during one keeps the bars up.
    */
   startArrival(warden) {
     if (this.kind === 'arrival') {
@@ -95,8 +93,13 @@ export class RunCinematics {
       return false;
     }
     this.hud()?.showLetterbox(true);
-    this.begin('arrival', ARRIVAL_MS, () => this.finish());
+    this.begin('arrival', ARRIVAL_LIMIT_MS, () => this.finish());
     return true;
+  }
+
+  /** The Warden closed up: the bars slide out. */
+  endArrival() {
+    if (this.kind === 'arrival') this.finish();
   }
 
   /** Runs `show` when the epilogue ends; false (run it now) without one. */

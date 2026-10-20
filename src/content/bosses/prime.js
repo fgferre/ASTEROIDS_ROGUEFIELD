@@ -8,13 +8,34 @@ export default {
   order: 1,
   displayName: 'Warden Prime',
   subtitle: 'Guardian of the Ring',
+  // Its entrance, the charge: straight in and fast with its ring flung open,
+  // a hard stop inside the field, the ring slams shut. Every Warden has one
+  // (CONTENT.md "Boss"; modules/enemies/boss/arrival.js). Seconds are on
+  // screen. Numbers: proposta 19/10 — the owner's play decides.
+  arrival: {
+    start: 200, // born this far past the edge, beyond its radius
+    motion: 'brake', // 'brake' fast then a hard stop, 'glide', 'heavy'
+    curve: 0, // the path's sideways bow (0: a straight line)
+    travel: 0.9, // from past the edge to where its fight starts
+    close: 0.25, // closing up; the fight starts after it
+    open: 1, // how open its pieces fly (0 shut .. 1 as open as it opens)
+    spin: 0, // extra spin of its pieces while open, rad/s
+    world: 0.25, // the world's speed meanwhile
+    recover: 0.5, // back to full speed after it closes
+    flare: '#ff6b6b', // the edge lights up in this colour where it crosses
+    // The live camera, low and moving, from inside the field toward the edge
+    // it comes through; each pair goes from the first value to the second
+    // over the entrance: tilt from straight down and turn about the edge's
+    // facing (degrees), distance (field units) from the point it looks at,
+    // which is `look` of the way from its spot to the Warden.
+    shot: { tilt: [62, 66], turn: [-28, -8], distance: [760, 620], look: 0.4 },
+  },
   config: {
     key: 'boss',
     displayName: 'Warden Prime',
     radius: 60,
     safeDistance: 240,
     entryPadding: 24,
-    entryDriftSpeed: 85,
     health: 1500,
     healthScaling: 1.2,
     acceleration: 120,

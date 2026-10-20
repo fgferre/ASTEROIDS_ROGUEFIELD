@@ -125,6 +125,14 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       `boss-telegraph`, `boss-spawned` (via `playArrival`, abre a vista aberta até existir a cena viva), `boss-defeated`
       (empurrão curto de cima). A cena viva, a morte e a vitória final ainda não têm câmera própria. (c) e (d) estão
       propostos como sessões à parte.
+      **(d) e a cena viva da chegada feitos 19/10 (ramo `claude/dazzling-agnesi-e1b925`), falta ele jogar.** Maquete
+      https://claude.ai/artifact/2AGKP3kzM1YeV2nFdK19GL; depois dele: _"cada chefe tem que ter sua própria animação
+      de entrada… uma receita já pronta… uma câmera 3D que movimente e que mostre por outro ângulo uma entrada
+      dramática"_, e rápida. Receita `arrival` em cada Warden (`src/content/bosses/`, CONTENT.md): nasce além da borda
+      lateral mais longe da nave, entra aberto (Prime anel, Coro núcleos, Null placas) com o mundo a 1/4 e a nave
+      presa e protegida, a borda acende onde ele cruza, fecha e só então luta (~1,2–1,7 s); câmera baixa do roteiro
+      dele e volta à vista de jogo ao fechar. Na simulação (`enemies/boss/arrival.js`), então repetições exatas; golden
+      trace muda só nos cenários com Warden. Morte e vitória final seguem sem cena viva.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.

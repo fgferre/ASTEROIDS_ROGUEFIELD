@@ -10,19 +10,13 @@
 export const INTRO_MS = 3000;
 export const EPILOGUE_MS = 4000;
 
-// The Warden's arrival, on its spawn: the camera director's boss entrance
-// opens on the ship and the Warden and tilts (data/constants/camera.js),
-// letterbox bars slide in and out, and the world slows meanwhile. Seconds.
-// No bars under Reduced Motion; the run is never held, input stays live.
+// The Warden's entrance (enemies/boss/arrival.js; its timing and live shot
+// are in each Warden's recipe): letterbox bars slide in when it spawns and
+// out when it closes up. Seconds. No bars under Reduced Motion.
 export const WARDEN_ARRIVAL = Object.freeze({
   travelIn: 0.4, // proposta 19/10: the bars slide in
-  hold: 0.6, // proposta 19/10: they stay
   travelBack: 0.5, // proposta 19/10: they slide out
   barHeight: 10, // proposta 19/10: each letterbox bar, % of the view
-  // proposta 19/10: the world at 40 % while the camera is away (travelIn +
-  // hold), back to full speed over the trip back. Replaces the entrance's
-  // own slow motion (BossTransitions).
-  slowMotion: Object.freeze({ scale: 0.4, hold: 1, duration: 0.5 }),
 });
 
 export const FOLLOW_TILT = 18;

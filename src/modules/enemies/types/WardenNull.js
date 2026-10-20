@@ -93,6 +93,14 @@ export class WardenNull extends BossEnemy {
     this.updateChargeState(deltaTime, target);
   }
 
+  // On the entrance the plates come spread wide, spinning, and shut at once
+  // when it stops.
+  poseArrival(open, spin, deltaTime) {
+    this.shellOpen = open;
+    this.shellAngle = (this.shellAngle + spin * deltaTime) % TAU;
+    this.updatePlates(deltaTime);
+  }
+
   updatePlates(deltaTime) {
     const spin =
       NULL.shellSpin + (NULL.openSpin - NULL.shellSpin) * this.shellOpen;

@@ -28,6 +28,7 @@ import * as Charge from '../boss/charge.js';
 import * as Minions from '../boss/minions.js';
 import * as PlayerTarget from '../boss/playerTarget.js';
 import * as DamageFlash from '../boss/damageFlash.js';
+import { advanceArrival, arrivalRemaining } from '../boss/arrival.js';
 
 const SOURCE_CONFIG = BOSS_CONFIG || {};
 
@@ -37,7 +38,6 @@ const BASE_CONFIG = {
   radius: 60,
   safeDistance: 220,
   entryPadding: 24,
-  entryDriftSpeed: 80,
   health: 1500,
   healthScaling: 1.2,
   speed: 60,
@@ -252,16 +252,6 @@ export class BossEnemy extends BaseEnemy {
       : Number.isFinite(defaults.safeDistance)
         ? defaults.safeDistance
         : this.radius * 2.5;
-    this.entryPadding = Number.isFinite(config.entryPadding)
-      ? Math.max(0, config.entryPadding)
-      : Number.isFinite(defaults.entryPadding)
-        ? Math.max(0, defaults.entryPadding)
-        : Math.max(16, this.radius * 0.35);
-    this.entryDriftSpeed = Number.isFinite(config.entryDriftSpeed)
-      ? config.entryDriftSpeed
-      : Number.isFinite(defaults.entryDriftSpeed)
-        ? defaults.entryDriftSpeed
-        : Math.max(45, (this.speed || 0) * 0.8);
 
     this.spreadProjectileCount =
       config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
@@ -378,32 +368,7 @@ export class BossEnemy extends BaseEnemy {
       phaseCount: this.phaseCount,
       phaseThresholds: [...this.phaseHealthThresholds],
       safeDistance: this.safeDistance,
-      entryPadding: this.entryPadding,
-      entryDriftSpeed: this.entryDriftSpeed,
     });
-
-    if (Number.isFinite(this.entryDriftSpeed) && this.entryDriftSpeed > 0) {
-      if (!Number.isFinite(this.vx)) {
-        this.vx = 0;
-      }
-      if (!Number.isFinite(this.vy)) {
-        this.vy = 0;
-      }
-
-      const entryBand = (this.entryPadding || 0) + (this.radius || 0);
-      if (this.y <= entryBand) {
-        const previousVy = this.vy;
-        this.vy = Math.max(this.vy, this.entryDriftSpeed);
-        if (this.vy !== previousVy) {
-          GameDebugLogger.log('STATE', 'Boss entry drift primed', {
-            id: this.id,
-            entryBand,
-            previousVy,
-            newVy: this.vy,
-          });
-        }
-      }
-    }
 
     return this;
   }
@@ -471,8 +436,22 @@ export class BossEnemy extends BaseEnemy {
     Phases.applyPhaseMovement(this, force);
   }
 
+  // Arriving (boss/arrival.js) it only flies in: no movement strategy (it
+  // would wrap it back across the field), no AI, no timers.
+  update(deltaTime) {
+    if (this.arrival) this.onUpdate(deltaTime);
+    else super.update(deltaTime);
+  }
+
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+    if (this.arrival) {
+      this.system?.getCachedPlayer()?.holdControls(arrivalRemaining(this));
+      advanceArrival(this, deltaTime, (name, payload) =>
+        this.getEventBus()?.emit(name, payload)
+      );
       return;
     }
 
@@ -533,6 +512,16 @@ export class BossEnemy extends BaseEnemy {
   attackOrigin() {
     return this;
   }
+
+  // What lights the edge as it crosses on its entrance: the hull here; the
+  // Choir's are its three cores.
+  arrivalBodies() {
+    return [this];
+  }
+
+  // Its pieces `open` (0 shut .. 1) and spinning `spin` rad/s more on its
+  // entrance. Prime's ring is the renderer's (it reads arrival.open).
+  poseArrival() {}
 
   angleTo(position) {
     const origin = this.attackOrigin();
@@ -807,6 +796,8 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
     DamageFlash.resetFeedbackState(this);
+    this.arrival = null;
+    this.intangible = false;
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
