@@ -4,9 +4,9 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 19.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 20.**
 
-## O BASTÃO — onde as sessões pararam (20/10) — RODADAS 0 E 14 (JANELA E CÂMERA) NA `main`; PRÓXIMA CONVERSA: RODADA 15
+## O BASTÃO — onde as sessões pararam (20/10, noite) — RODADA 15 EM ANDAMENTO NO RAMO `r15/jogar` (NÃO ESTÁ NA `main`)
 
 **Como retomar (conversa local, qualquer máquina):**
 
@@ -32,10 +32,25 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
   linhas por arquivo); a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir nada"_); a câmera
   de dois estados (_"está boa, pode fechar"_) e as chegadas dos Wardens (_"aprovado"_); a arena com volume de qualquer
   ângulo.
-- **Rodada 15 (decidida 20/10), nada começado:** melhorar de todas as formas que o jogador sente, na ordem do PLAN —
-  economia/upgrades e SFX renascido (item 18) em paralelo → loot/orbes → HUD/UX (item 16) → conteúdo → meta → ritmo
-  (item 2) → cerimônias e cenas (cena viva de morte e de vitória final; Anel modelado, item 15).
-- **Abertos dele:** itens 2, 15, 16 e 18 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Rodada 15, feita no ramo `r15/jogar` (backup no GitHub; nada na `main` ainda — ele joga e aprova antes do PR):**
+  sons novos escolhidos por ele na audição (19 amostras, `SOUND.md`, camada de amostras); economia (curva de nível
+  120 + 40·(n−2)^1.7, ~45 cartas por partida, Warden com vida fixa ~75 s de luta, arma garantida no nível 3 e 7,
+  ofertas puxam a família, raridade por carta); 15 cartas fracas refeitas; orbes com peso e burst; baús com cerimônia
+  pausada e 3 pickups novos; HUD em encaixes com modelos (Instrumento novo e Clássico de hoje) e presets, escudo/casco
+  na cápsula que ele escolheu, radar tático, editor de layout estilo WoW; telas novas de level-up, baú e fim de
+  partida; 4 armas novas com evolução e Apex próprios (Arc Caster, Shard Halo, Furnace Corona, Seeker Swarm); 6
+  inimigos e 4 formações de onda; o Anel como estrutura iluminada. Tudo proposta: falta ele jogar.
+- **Esperando ele:** jogar `r15/jogar` (http://localhost:5500/ASTEROIDS_ROGUEFIELD/); escolher os sons do motor na
+  bancada (`src/exported-assets/engine-bench/`, git-ignored; o modelo do motor está em `engine-model.js` lá);
+  aprovar o Anel em 3D completo (em andamento, ramo `r15/anel3d`).
+- **Próximo, nesta ordem:** juntar o que ele aprovar na `main` por PR; motor da nave no jogo a partir das escolhas
+  dele; sons das armas, pickups e baú novos (audição); mais armas (7 → 12+) e inimigos (16 → 30+), mini-chefes,
+  biomas (3 → 6), cascos com habilidade ativa; meta (desbloqueios, desafios); ritmo; cerimônias de evolução, cenas de
+  morte/vitória, três finais; o roteiro (item 19) numa conversa nova.
+- **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
+  Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
+  (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
+- **Abertos dele:** itens 2, 15, 16, 18 e 19 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
@@ -75,3 +90,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   chapada, sem luz, sem espessura. Nada foi mudado em 18/10 (ele não aprovou o paliativo de opacidade). Em 20/10 ele
   escolheu _"virar estrutura de verdade"_: modelar o Anel como estrutura iluminada (espessura, segmentos, borda pela
   luz-chave, névoa de distância), mantendo o acender do epílogo → Rodada 15, frente 8.
+
+## História (palavras dele, 20/10)
+
+- **(19)** Sobre o Anel remodelado: _"mesma estrutura, mas ela tem que ser 3d de verdade por todos os lados pois acho
+  que no futuro numa fase nova, podemos viajar para região desse ring, mostrar a viagem acontecer e mais etapas da
+  história acontecerem lá. essa viagem poderia ser até mesmo mostrando a nave por trás em 3a pessoa sabe? como num
+  cutscene e ter diálogos acontecendo, etc temos que refinar melhor esse roteiro o drama nele, a surpresa, a
+  reviravolta, até o endgame."_ → narrativa sai do "fora de escopo"; primeiro um roteiro em texto que ele aprova, o
+  Anel como asset 3D completo, depois a fase da viagem. Fecha quando ele aprovar o roteiro e jogar a viagem.

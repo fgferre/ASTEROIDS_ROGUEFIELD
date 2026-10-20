@@ -54,7 +54,7 @@ paralelo, em arquivos disjuntos.
 8. **Cerimônias e cenas.** Evolução e Apex com cerimônia (hoje um toast); cena viva de morte e vitória final
    (`run-won`; aprovada por ele em 19/10: câmera lenta forte, nave protegida e sem controle 2–3 s, câmera baixa que pode
    girar e sobe antes de devolver o controle — a mesma maquinaria das chegadas dos Wardens); três finais (Prime, Choir,
-   Null) com fala e imagem próprias; Anel partido modelado (item 15).
+   Null) com fala e imagem próprias; Anel partido modelado (item 15). Roteiro com drama, surpresa, virada e endgame, e uma fase de viagem até o Anel com cena em terceira pessoa e diálogos (item 19), a partir de um texto que ele aprova.
 
 **Pronto quando ele disser** que uma run inteira (20–30 min) prende do início ao fim, que o som e o painel estão à
 altura do jogo, e que volta no dia seguinte para desbloquear mais. **Guardas:** golden trace verde; teto de 1.200
@@ -113,5 +113,5 @@ mesma linguagem; as duas guardas no gate; golden trace verde.
 
 ## Fora de escopo deste plano
 
-Steam, mobile/touch, multiplayer, narrativa, troca do framework de testes, monetização. Arquivos antigos de processo
+Steam, mobile/touch, multiplayer, troca do framework de testes, monetização. (Narrativa entrou em 20/10, item 19: roteiro aprovado por ele antes de código.) Arquivos antigos de processo
 (GSD, `.planning/`) ficam fora do repo; o histórico está no git.
