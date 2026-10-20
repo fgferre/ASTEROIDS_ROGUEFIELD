@@ -5,7 +5,7 @@
 
 import { XP_ORB_SIZE } from '../../core/GameConstants.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { HALF_H, HALF_W, rgbOf } from './batches.js';
+import { HALF_H, HALF_W, SHOT_SHAPES, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
 import { HEART_HEIGHT, orbHeight } from './fieldTokens.js';
 import {
@@ -39,6 +39,7 @@ export function mirrorProjectiles(t, combat) {
   }
   mirrorWeaponEffects(t.THREE, combat, t, t.flashes);
 
+  // Enemy shots: a barbed dart in the shot's own colour, as its trail.
   const enemyBullets = combat.enemyBullets || [];
   for (let i = 0; i < enemyBullets.length; i += 1) {
     const b = enemyBullets[i];
@@ -54,7 +55,8 @@ export function mirrorProjectiles(t, combat) {
       r * 1.6,
       r * 0.75,
       rgb,
-      1.8
+      1.8,
+      SHOT_SHAPES.dart
     );
   }
 }
