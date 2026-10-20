@@ -178,7 +178,7 @@ describe('EnemyMirror', () => {
       caster: 1,
       shade: 1,
       leech: 2,
-      boss: 2,
+      boss: 3,
       'herald-dust': 3,
       'herald-heat': 2,
       'herald-silence': 1,
@@ -221,8 +221,8 @@ describe('EnemyMirror', () => {
       0
     );
     const batch = mirror.rimBatch;
-    // two 48-point circles and the Seeker's 6-point outline
-    expect(batch.count).toBe(48 * 2 + 6);
+    // two 48-point circles and the Seeker's 20-point outline
+    expect(batch.count).toBe(48 * 2 + 20);
     expect(batch.object.visible).toBe(true);
     expect(batch.object.geometry.drawRange.count).toBe(batch.count * 2);
     const colorAt = (segment) =>

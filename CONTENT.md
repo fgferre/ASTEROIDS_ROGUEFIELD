@@ -96,7 +96,7 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 
 ## Hull: `src/content/hulls/<id>.js` (+ one entry in `src/data/hangar.js`)
 
-- Fields: `name`, `outline` (collision points), `shieldPadding`, `thrusterPorts` `{ main aux left right }`, `stats` (multipliers: `acceleration maxSpeed maxHealth dashCooldown`), `visual` (panels from `./lib/panels.js`: `pt`, `panelPair`). Copy `default-hull.js`.
+- Fields: `name`, `outline` (collision points), `shieldPadding`, `thrusterPorts` `{ main aux left right }`, `stats` (multipliers: `acceleration maxSpeed maxHealth dashCooldown`), `visual` (panels from `./lib/panels.js`: `pt`, `panelPair`; its `form` shapes the 3D body, documented there). Copy `default-hull.js`.
 - To be flyable it needs a Hangar item with `unlocksHull: '<id>'` in `src/data/hangar.js` (`id name effect cost`).
 
 ## Stage and biome
@@ -113,8 +113,18 @@ Data only. A tweak edits numbers in the existing file: Wardens `prime`, `choir`,
 A new enemy writes no render code. Give it one of:
 
 - `view: '<name>'`: one of the hand-made looks, `mote seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
-- `visual: { scale, parts, lights, animate }`, built by `src/modules/render3d/enemies/recipes.js`. Units are the enemy's radius, +x is the nose. `parts`: `{ shape: sphere|box|octahedron|icosahedron|cone|cylinder|torus, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, material: hull|trim|glow, color: <PALETTE key> }` — hull and trim are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`). `lights`: `{ at, size, color, pulse: <getter> }`. `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`). Unknown names throw. Copy `tests/__fixtures__/enemies/sentry.js`.
-- Neither: a default matte pod with one red eye.
+- `visual: { scale, parts, lights, animate }`, built by `src/modules/render3d/enemies/recipes.js` from the shape helpers the hand-made machines use (`shapes.js`). Units are the enemy's radius, +x is the nose, +y up. `parts`: `{ shape, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, mirror, material: hull|trim|glow, color: <PALETTE key> }` — hull and trim are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`); `mirror: true` adds the twin across z. Shapes, designed on every side:
+
+  - `body`: `stations: [[x, half width, top, bottom, round?], …]`, `round` (2 oval, higher boxier), `ridge` — a smooth loft along x (fuselage, pod, carapace; `bottom` shapes the belly).
+  - `turned`: `profile: [[radius, height], …]`, `axis: 'y'|'x'`, `smooth` — turned round y (dome, disc, turret) or x (pod, barrel; the top is the nose); ends off the axis are capped, a profile that ends where it starts is a ring.
+  - `wing`: `root, tip, span, sweep, thick, dihedral, under` — a thick tapered blade out along +z from its root chord at `at`; `dihedral: Math.PI / 2, under: 1` is a fin.
+  - `tube`: `points: [[x, y, z], …], radius: r or [from, to]` — smooth through its points (arm, strut, pipe; not straight up).
+  - `nozzle`, `socket`: `dir` — a dark exhaust bell (mouth toward `dir`, default −x) and a dark eye housing (default +x); `size` is the radius.
+  - `sphere|box|octahedron|icosahedron|cone|cylinder|torus`: plain primitives, for small details only.
+
+  `lights`: `{ at, size, color, pulse: <getter>, dir, housing }`; each sits in a dark socket open away from the centre (or toward `dir`; `housing: false` for none). `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`). The outline follows the parts' top view (a circle if it tumbles). Unknown names throw. `sides` (and `rings` on `body` and `tube`) sets how finely a shape is cut: keep a view under ~2500 triangles. Copy `tests/__fixtures__/enemies/sentry.js`.
+
+- Neither: a default small matte machine with one red eye.
 
 `view` and `visual` together is an error (tests/content checks it).
 

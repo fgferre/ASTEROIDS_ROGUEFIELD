@@ -32,28 +32,27 @@ describe('MenuHullPreview', () => {
     expect([...materialsOf()]).toEqual([preview.materials.silhouette]);
   });
 
-  it('stacks the Bastion shoulder armour in two plates on darker steel', () => {
+  it("draws the game hull: amber-trimmed armour on the Bastion's darker steel", () => {
     const preview = new MenuHullPreview(THREE, new THREE.Group());
-    preview.setHull('default-hull');
-    const plates = preview.hull.children.length;
-    const steel = preview.materials.body.color.r;
+    const look = (hullId) => {
+      preview.setHull(hullId);
+      const color = preview.hull
+        .getObjectByName('hull')
+        .geometry.getAttribute('color');
+      let brightest = 0;
+      for (let i = 0; i < color.count; i += 1) {
+        brightest = Math.max(brightest, color.getX(i));
+      }
+      return { brightest, trim: preview.hull.getObjectByName('bladeEdge') };
+    };
 
-    preview.setHull('bastion');
-    const top = (material) =>
-      Math.max(
-        ...preview.hull.children
-          .filter((mesh) => mesh.material === material)
-          .map((mesh) => {
-            mesh.geometry.computeBoundingBox();
-            return mesh.position.z + mesh.geometry.boundingBox.max.z;
-          })
-      );
-    // the upper armour plate is the highest body-toned plate
-    expect(top(preview.materials.body)).toBeGreaterThan(
-      top(preview.materials.fin)
+    const interceptor = look('default-hull');
+    expect(interceptor.trim).toBeUndefined();
+    const bastion = look('bastion');
+    expect(bastion.trim.material.color.r).toBeGreaterThan(
+      bastion.trim.material.color.b
     );
-    expect(preview.hull.children.length).toBeGreaterThan(plates);
-    expect(preview.materials.body.color.r).toBeLessThan(steel);
+    expect(bastion.brightest).toBeLessThan(interceptor.brightest);
   });
 
   // A wide, short box off to the side, like the Hangar's: every vertex of

@@ -65,6 +65,34 @@ const visual = {
   nozzleLengthPerLevel: 0.025 * S,
   retroPorts: [pt(0.55, -0.12), pt(0.55, 0.12)],
   cockpit: { from: pt(0.72, 0), to: pt(1.02, 0), width: 0.06 * S },
+  // a long ridged needle, thin lens-section blades, engine pods riding the
+  // blade roots, tail fins with the braking upgrade
+  form: {
+    body: [
+      [1.35, 0, 0.15, 0, 0],
+      [1.27, 0.02, 0.151, 0.018, 0.012],
+      [1.1, 0.05, 0.154, 0.042, 0.026],
+      [0.85, 0.085, 0.158, 0.07, 0.04],
+      [0.55, 0.12, 0.162, 0.1, 0.052],
+      [0.2, 0.135, 0.165, 0.13, 0.058],
+      [-0.3, 0.135, 0.166, 0.14, 0.062],
+      [-0.7, 0.118, 0.166, 0.125, 0.058],
+      [-1.0, 0.095, 0.166, 0.1, 0.052],
+      [-1.1, 0.065, 0.166, 0.08, 0.046],
+    ],
+    deck: [1, 1],
+    belly: [2, 1.3],
+    spine: 0.3,
+    keel: 0.25,
+    seams: [0.55, -0.6],
+    prow: 0.55,
+    wing: { lift: 0.16, cant: -4, tc: [0.07, 0.05], belly: 0.8 },
+    flap: { lift: 0.18, cant: 32, tc: [0.1, 0.08], belly: 1 },
+    intake: 0.42,
+    nacelle: 0.3,
+    pods: false,
+    canopy: 0.085,
+  },
 };
 
 export default {
