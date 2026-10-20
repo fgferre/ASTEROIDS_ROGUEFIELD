@@ -7,6 +7,22 @@ export default {
   order: 3,
   displayName: 'Warden Null',
   subtitle: 'The silence at the center',
+  // Its entrance, the weight: slow and heavy with its plates spread wide,
+  // and they shut at once when it stops. The camera hugs the field. The
+  // fields are explained in prime.js. Numbers: proposta 19/10.
+  arrival: {
+    start: 160,
+    motion: 'heavy',
+    curve: 0,
+    travel: 1.3,
+    close: 0.2,
+    open: 1,
+    spin: 1.5,
+    world: 0.25,
+    recover: 0.5,
+    flare: '#b48cff',
+    shot: { tilt: [76, 70], turn: [12, 0], distance: [560, 440], look: 0.6 },
+  },
   radius: 70,
   plateCount: 8,
   plateRadius: 16,

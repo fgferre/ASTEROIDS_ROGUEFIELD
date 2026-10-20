@@ -108,6 +108,8 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 
 Data only. A tweak edits numbers in the existing file: Wardens `prime`, `choir`, `null` (`config` and `components` live in `prime.js`), Heralds `dust`, `heat`, `silence` (flat fields). Their behavior is in classes (`src/modules/enemies/types/`) and the lists are imports in `src/data/enemies/boss.js` and `herald.js`: a new boss is not content-only.
 
+Every Warden has its own entrance, the `arrival` recipe in its file (fields explained in `prime.js`): it is born past the left or right edge farther from the ship, flies in with its pieces open while the world slows and the ship is held, lights the edge where it crosses, closes up and only then fights; a low live camera follows the recipe's `shot`. A new Warden writes a recipe and, in its class, `poseArrival(open, spin, dt)` (how its pieces open) and `arrivalBodies()` if more than its hull lights the edge (`src/modules/enemies/boss/arrival.js`). See it with `?content=<id>`.
+
 ## Visual
 
 A new enemy writes no render code. Give it one of:

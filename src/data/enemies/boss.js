@@ -215,7 +215,17 @@ export const BOSS_EFFECTS_PRESETS = deepFreeze({
       intensity: 0.32,
     }),
     freezeFrame: Object.freeze({ duration: 0.18, fade: 0.2 }),
-    slowMotion: Object.freeze({ scale: 0.55, hold: 0.18, duration: 0.65 }),
+  }),
+  // Where a Warden crosses the edge on its entrance, in its recipe's colour:
+  // sparks run along the edge both ways and a small ring. World units and
+  // seconds: the world is slowed then (its recipe's `world`). Proposta 19/10.
+  arrivalFlare: Object.freeze({
+    sparks: 28,
+    speed: Object.freeze({ min: 420, max: 900 }),
+    spread: 60,
+    size: Object.freeze({ min: 2.4, max: 4 }),
+    life: Object.freeze({ min: 0.25, max: 0.45 }),
+    ring: Object.freeze({ radius: 160, duration: 0.4, baseWidth: 16 }),
   }),
   phaseTransition: Object.freeze({
     burst: Object.freeze({

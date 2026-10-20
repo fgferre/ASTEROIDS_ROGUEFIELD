@@ -3,6 +3,8 @@ import { BossEnemy } from './BossEnemy.js';
 
 const CHOIR = WARDEN_KINDS.choir;
 const TAU = Math.PI * 2;
+// How much farther out the cores fly, fully open on the entrance.
+const ARRIVAL_SPREAD = 1.2;
 
 // Warden Choir (layer 10): three cores orbit a shared centre. One sings —
 // lit, takes full damage, fires the fan — and the voice passes every
@@ -46,6 +48,7 @@ export class WardenChoir extends BossEnemy {
     this.singTimer = CHOIR.singDuration;
     this.chorusTimer = CHOIR.chorusInterval;
     this.chorusWindupTimer = 0;
+    this.coreSpread = 1;
   }
 
   singingCore() {
@@ -61,11 +64,25 @@ export class WardenChoir extends BossEnemy {
   }
 
   updateCorePositions() {
+    const orbit = CHOIR.coreOrbitRadius * this.coreSpread;
     for (const core of this.cores) {
       const angle = this.orbitAngle + core.offset;
-      core.x = this.x + Math.cos(angle) * CHOIR.coreOrbitRadius;
-      core.y = this.y + Math.sin(angle) * CHOIR.coreOrbitRadius;
+      core.x = this.x + Math.cos(angle) * orbit;
+      core.y = this.y + Math.sin(angle) * orbit;
     }
+  }
+
+  // Each core lights the edge as it crosses on the entrance.
+  arrivalBodies() {
+    return this.cores;
+  }
+
+  // On the entrance the cores fly wide and spin fast, then draw in.
+  poseArrival(open, spin, deltaTime) {
+    this.coreSpread = 1 + ARRIVAL_SPREAD * open;
+    this.orbitAngle =
+      (this.orbitAngle + (CHOIR.orbitSpeed + spin) * deltaTime) % TAU;
+    this.updateCorePositions();
   }
 
   // The voice moves to the next living core; a fan being announced by the

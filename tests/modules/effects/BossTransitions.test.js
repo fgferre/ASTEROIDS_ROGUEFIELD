@@ -1,9 +1,15 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { WARDEN_ARRIVAL } from '../../../src/core/cinematics.js';
 import { EventBus } from '../../../src/core/EventBus.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import RandomService from '../../../src/core/RandomService.js';
 import EffectsSystem from '../../../src/modules/EffectsSystem.js';
+
+const ARRIVAL = {
+  travel: 1.1,
+  close: 0.25,
+  world: 0.25,
+  recover: 0.5,
+};
 
 // World speed (simulated / real time) `seconds` after a Warden spawns.
 function speedAfterSpawn(seconds, reducedMotion) {
@@ -16,7 +22,11 @@ function speedAfterSpawn(seconds, reducedMotion) {
   });
   effects.applyAccessibilityPreferences({ reducedMotion });
   const warden = { id: 'warden', x: 400, y: 84 };
-  eventBus.emit('boss-spawned', { enemy: warden, position: { ...warden } });
+  eventBus.emit('boss-spawned', {
+    enemy: warden,
+    position: { ...warden },
+    arrival: ARRIVAL,
+  });
   const step = 1 / 120;
   for (let t = 0; t < seconds; t += step) effects.update(step);
   return effects.update(step) / step;
@@ -28,10 +38,10 @@ describe('BossTransitions Warden arrival', () => {
     if (!GamePools.initialized) GamePools.initialize();
   });
 
-  it('slows the world while the camera is away; under Reduced Motion only the short entrance slow-down', () => {
-    const { scale, hold, duration } = WARDEN_ARRIVAL.slowMotion;
-    expect(speedAfterSpawn(hold - 0.1, false)).toBeCloseTo(scale, 6);
-    expect(speedAfterSpawn(hold - 0.1, true)).toBe(1);
-    expect(speedAfterSpawn(hold + duration + 0.05, false)).toBe(1);
+  it('slows the world to its recipe speed until it closes up, then recovers; Reduced Motion softens it', () => {
+    const { travel, close, world, recover } = ARRIVAL;
+    expect(speedAfterSpawn(travel + close - 0.1, false)).toBeCloseTo(world, 6);
+    expect(speedAfterSpawn(0.05, true)).toBeGreaterThanOrEqual(0.7);
+    expect(speedAfterSpawn(travel + close + recover + 0.05, false)).toBe(1);
   });
 });

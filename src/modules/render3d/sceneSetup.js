@@ -253,7 +253,7 @@ export function setupThree(seeded) {
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
   // The arena's border, shown when the camera looks past it (fieldVeil.js).
-  createFieldVeil(THREE, scene);
+  const veil = createFieldVeil(THREE, scene);
   const biomes = new BiomeController(THREE, {
     key,
     fill,
@@ -347,6 +347,7 @@ export function setupThree(seeded) {
     wardenLight,
     backdrop,
     space,
+    veil,
     biomes,
     flashes,
     enemies,

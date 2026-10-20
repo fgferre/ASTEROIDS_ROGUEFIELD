@@ -2,13 +2,17 @@
  * Boss wave
  *
  * The Warden's layer: its wave config from BOSS_CONFIG (with the minion types
- * the field has), its entrance point clear of the ship, and its spawn.
+ * the field has), where its fight starts (inside the left or right edge, the
+ * one farther from the ship, clear of it) and its spawn, which starts its
+ * entrance from past that edge (boss/arrival.js).
  */
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { clamp } from '../../../utils/mathHelpers.js';
 import { BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { bossKindForLayer, WARDEN_KINDS } from '../../../data/enemies/boss.js';
+import { arrivalEdge } from '../boss/arrival.js';
 
 export class BossWave {
   /**
@@ -105,9 +109,6 @@ export class BossWave {
     const entryPadding = Number.isFinite(bossDefaults.entryPadding)
       ? Math.max(0, bossDefaults.entryPadding)
       : Math.max(20, bossRadius * 0.35);
-    const entryDriftSpeed = Number.isFinite(bossDefaults.entryDriftSpeed)
-      ? bossDefaults.entryDriftSpeed
-      : Math.max(45, (bossDefaults.speed || 60) * 0.85);
 
     const bossEntry = {
       type: this.bossEnemyKey || bossDefaults.key || 'boss',
@@ -118,10 +119,8 @@ export class BossWave {
       health: bossDefaults.health,
       healthScaling: bossDefaults.healthScaling,
       spawnStrategy: 'scripted-entrance',
-      entrance: 'top-center',
       safeDistance,
       entryPadding,
-      entryDriftSpeed,
       rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
       randomScope: 'boss-spawn',
       randomParentScope: 'spawn',
@@ -174,11 +173,15 @@ export class BossWave {
       : Number.isFinite(BOSS_CONFIG?.entryPadding)
         ? Math.max(0, BOSS_CONFIG.entryPadding)
         : Math.max(20, baseRadius * 0.35);
-    const entryDriftSpeed = Number.isFinite(bossConfig.entryDriftSpeed)
-      ? bossConfig.entryDriftSpeed
-      : Number.isFinite(BOSS_CONFIG?.entryDriftSpeed)
-        ? BOSS_CONFIG.entryDriftSpeed
-        : Math.max(45, (bossConfig.speed || BOSS_CONFIG?.speed || 60) * 0.85);
+    // Its own size keeps the spot inside the field (the Choir is the widest).
+    const kind = bossConfig.bossKind ?? bossKindForLayer(this.getLayer());
+    const radius = WARDEN_KINDS[kind]?.radius ?? baseRadius;
+    const entrance =
+      bossConfig.entrance ||
+      arrivalEdge(
+        playerSnapshot?.x ?? worldBounds.width / 2,
+        worldBounds.width
+      );
 
     let spawnPosition;
     if (
@@ -190,8 +193,8 @@ export class BossWave {
     } else {
       spawnPosition = this.calculateBossSpawnPosition(
         worldBounds,
-        bossConfig.entrance || 'top-center',
-        { safeDistance, entryPadding },
+        entrance,
+        { safeDistance, entryPadding, radius },
         playerSnapshot,
         spawnRandom
       );
@@ -200,11 +203,10 @@ export class BossWave {
     GameDebugLogger.log('SPAWN', 'Boss position calculated', {
       x: spawnPosition.x,
       y: spawnPosition.y,
-      entrance: bossConfig.entrance || 'top-center',
+      entrance,
       worldBounds,
       safeDistance,
       entryPadding,
-      entryDriftSpeed,
     });
 
     const metadata = {
@@ -212,7 +214,7 @@ export class BossWave {
       wave: this.getLayer(),
       isBossWave: true,
       spawnSource: 'wave-manager',
-      entrance: bossConfig.entrance || 'top-center',
+      entrance,
       supportPlan: Array.isArray(waveConfig.enemies)
         ? waveConfig.enemies.map((group) => ({
             type: group.type,
@@ -228,9 +230,8 @@ export class BossWave {
       wave: this.getLayer(),
       safeDistance,
       entryPadding,
-      entryDriftSpeed,
       spawnStrategy: bossConfig.spawnStrategy || 'scripted-entrance',
-      entrance: bossConfig.entrance || 'top-center',
+      entrance,
       spawnOffset: bossConfig.spawnOffset,
       randomScope: bossConfig.randomScope || 'boss-spawn',
       randomParentScope: bossConfig.randomParentScope || 'spawn',
@@ -277,7 +278,7 @@ export class BossWave {
       'spawn',
       'boss-position'
     );
-    const bossRadius = BOSS_CONFIG?.radius || 60;
+    const bossRadius = constraints?.radius || BOSS_CONFIG?.radius || 60;
     const safeDistance = Math.max(
       Number(constraints?.safeDistance) || 0,
       bossRadius * 2

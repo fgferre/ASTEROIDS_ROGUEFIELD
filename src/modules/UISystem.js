@@ -353,9 +353,12 @@ class UISystem extends BaseSystem {
       );
     });
 
-    // The Warden's arrival: the camera visits it under the letterbox.
+    // A Warden's entrance: the letterbox until it closes up.
     this.registerEventListener('boss-spawned', (payload = {}) => {
       this.cinematics.startArrival(payload.enemy);
+    });
+    this.registerEventListener('boss-arrived', () => {
+      this.cinematics.endArrival();
     });
 
     this.registerEventListener('boss-defeated', (payload = {}) => {

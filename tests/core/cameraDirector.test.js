@@ -6,6 +6,8 @@ import {
 } from '../../src/core/cameraDirector.js';
 import { projectToScreen } from '../../src/core/cameraShot.js';
 import { CAMERA_DIRECTOR } from '../../src/data/constants/camera.js';
+import { WARDEN_KINDS } from '../../src/data/enemies/boss.js';
+import { beginArrival } from '../../src/modules/enemies/boss/arrival.js';
 import { FOV } from '../../src/modules/render3d/sceneSetup.js';
 
 const W = 800;
@@ -256,5 +258,70 @@ describe('camera director', () => {
     run(r, scene(790, 300), 3);
     const cut = r.update(scene(10, 300), DT).x;
     expect(cut).toBeCloseTo(run(r, scene(10, 300), 3).x, 0);
+  });
+});
+
+describe('camera director, a Warden’s entrance', () => {
+  const RECIPE = WARDEN_KINDS.prime.arrival;
+
+  // A Warden that has just begun its entrance through `edge`.
+  function arriving(edge) {
+    const boss = {
+      type: 'boss',
+      x: 640,
+      y: 200,
+      radius: 60,
+      destroyed: false,
+      poseArrival() {},
+    };
+    beginArrival(boss, RECIPE, edge);
+    return boss;
+  }
+
+  it('goes low and turns to the edge it comes through, mirrored per edge', () => {
+    for (const [edge, side] of [
+      ['right', 1],
+      ['left', -1],
+    ]) {
+      const d = director();
+      run(d, scene(400, 300), 1);
+      const boss = arriving(edge);
+      const pose = run(d, scene(400, 300, { enemies: [boss] }), 1.5);
+      expect(d.moment, edge).toBe('arrival');
+      expect(pose.tilt, edge).toBeGreaterThan(45 * DEG);
+      expect(pose.tilt, edge).toBeCloseTo(RECIPE.shot.tilt[0] * DEG, 1);
+      expect(pose.yaw, edge).toBeCloseTo(
+        side * (90 + RECIPE.shot.turn[0]) * DEG,
+        1
+      );
+    }
+  });
+
+  it('hands back to the play view once the entrance ends, the yaw back to 0', () => {
+    const d = director();
+    run(d, scene(400, 300), 1);
+    const boss = arriving('right');
+    run(d, scene(400, 300, { enemies: [boss] }), 1.5);
+    expect(
+      Math.abs(d.update(scene(400, 300, { enemies: [boss] }), DT).yaw)
+    ).toBeGreaterThan(45 * DEG);
+
+    boss.arrival = null;
+    d.update(scene(400, 300, { enemies: [boss] }), DT);
+    expect(d.moment).not.toBe('arrival');
+    const pose = run(d, scene(400, 300, { enemies: [boss] }), 4);
+    expect(Math.abs(pose.yaw)).toBeLessThan(0.05);
+    expect(pose.tilt).toBeLessThan(45 * DEG);
+  });
+
+  it('never enters the entrance shot under reduced motion', () => {
+    const d = director();
+    d.setReducedMotion(true);
+    const boss = arriving('left');
+    for (let t = 0; t < 2; t += DT) {
+      const pose = d.update(scene(400, 300, { enemies: [boss] }), DT);
+      expect(d.moment).not.toBe('arrival');
+      expect(pose.yaw).toBe(0);
+    }
   });
 });

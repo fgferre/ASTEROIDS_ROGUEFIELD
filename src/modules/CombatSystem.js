@@ -382,8 +382,14 @@ class CombatSystem extends BaseSystem {
     const playerStats = player.getStats();
     this.lastKnownPlayerStats = playerStats || null;
 
-    // Only target and shoot when ship hull exists (visible and alive)
-    if (!player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
+    // Only target and shoot when ship hull exists (visible and alive) and
+    // the pilot has it (a Warden's entrance holds it).
+    if (
+      !player.isDead &&
+      !player.isRetrying &&
+      !player._quitExplosionHidden &&
+      !player.controlsHeld
+    ) {
       this.targeting.updateStickAim(player.getAimStick());
       this.targeting.updateTargeting(deltaTime);
       player.setAimPoint(this.targeting.getPrimaryAimPoint());

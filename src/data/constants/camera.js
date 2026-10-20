@@ -59,6 +59,13 @@ export const CAMERA_DIRECTOR = deepFreeze({
   // A boss falling mid-run: a short push from above, skipped in danger.
   bossDown: { zoom: 1.06, duration: 0.6 },
 
+  // A Warden's entrance: the live camera, low and moving, follows the shot in
+  // its own recipe (src/content/bosses/, `arrival.shot`). `swoop` is how fast
+  // it gets there and keeps up, `handback` how fast it returns to the play
+  // view the moment the Warden closes up, for `handbackFor` s. None of it
+  // under reduced motion: the wide view opens instead.
+  arrival: { swoop: 0.3, handback: 0.3, handbackFor: 1 },
+
   // Reduced motion (the system's setting or the game's): no drift, lead,
   // bank or shake; the wide view cuts in and out instead of moving; the
   // rest eases this many times slower.

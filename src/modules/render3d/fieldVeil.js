@@ -21,6 +21,11 @@ const CURTAIN_HEIGHT = 46;
 const CURTAIN_GLOW = 0.12;
 // How far past the field the darkening reaches (units).
 const REACH = 6000;
+// Where a Warden crosses the edge on its entrance (enemies/boss/arrival.js)
+// the line and its curtain light up in its colour and fade: how far along
+// the edge and across it (units), how bright, over how many seconds. At most
+// `count` at once. Proposta 19/10.
+const FLARE = { count: 4, along: 120, across: 9, glow: 1.1, fade: 1.1 };
 
 const HALF_W = GAME_WIDTH / 2;
 const HALF_H = GAME_HEIGHT / 2;
@@ -41,9 +46,38 @@ const PLANE_VERTEX = `
   }
 `;
 
+// The flares in a shader: each one's light at field point `p` (world xz).
+const FLARE_LIGHT = `
+  uniform vec4 uFlares[${FLARE.count}];
+  uniform vec3 uFlareColors[${FLARE.count}];
+  vec3 flareLight(vec2 p, float across) {
+    vec3 light = vec3(0.0);
+    for (int i = 0; i < ${FLARE.count}; i++) {
+      vec4 f = uFlares[i];
+      if (f.z > 0.0) {
+        vec2 d = (p - f.xy) / ${FLARE.along.toFixed(1)};
+        light += uFlareColors[i] * f.z * across * exp(-dot(d, d));
+      }
+    }
+    return light * ${FLARE.glow.toFixed(2)};
+  }
+`;
+
+/**
+ * The veil in `scene`. Returns `flare(x, z, color)` (world x/z of a point
+ * on the edge) and `update(dt)`, which fades the flares.
+ */
 export function createFieldVeil(THREE, scene) {
   const color = colorOf(THREE, VEIL_COLOR);
   const group = new THREE.Group();
+  const flares = Array.from({ length: FLARE.count }, () => ({
+    at: new THREE.Vector4(0, 0, 0, 0),
+    color: new THREE.Color(),
+  }));
+  const flareUniforms = {
+    uFlares: { value: flares.map((f) => f.at) },
+    uFlareColors: { value: flares.map((f) => f.color) },
+  };
 
   const plane = (material, height, renderOrder) => {
     const mesh = new THREE.Mesh(
@@ -78,15 +112,18 @@ export function createFieldVeil(THREE, scene) {
   // The glow along the edge, on both sides of it.
   plane(
     new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: color } },
+      uniforms: { uColor: { value: color }, ...flareUniforms },
       vertexShader: PLANE_VERTEX,
       fragmentShader: `
         uniform vec3 uColor;
         varying vec2 vPos;
         ${RECT_DISTANCE}
+        ${FLARE_LIGHT}
         void main() {
-          float g = exp(-abs(outside(vPos)) / ${EDGE_WIDTH.toFixed(1)});
-          gl_FragColor = vec4(uColor * g * ${EDGE_GLOW.toFixed(2)}, 1.0);
+          float d = abs(outside(vPos));
+          float g = exp(-d / ${EDGE_WIDTH.toFixed(1)});
+          vec3 flare = flareLight(vPos, exp(-d / ${FLARE.across.toFixed(1)}));
+          gl_FragColor = vec4(uColor * g * ${EDGE_GLOW.toFixed(2)} + flare, 1.0);
         }
       `,
       transparent: true,
@@ -99,20 +136,25 @@ export function createFieldVeil(THREE, scene) {
 
   // The curtain: four walls of light on the edges, brightest at the base.
   const curtain = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: color } },
+    uniforms: { uColor: { value: color }, ...flareUniforms },
     vertexShader: `
       varying float vUp;
+      varying vec2 vPos;
       void main() {
         vUp = uv.y;
+        vPos = (modelMatrix * vec4(position, 1.0)).xz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
       uniform vec3 uColor;
       varying float vUp;
+      varying vec2 vPos;
+      ${FLARE_LIGHT}
       void main() {
-        float g = pow(1.0 - vUp, 2.0) * ${CURTAIN_GLOW.toFixed(2)};
-        gl_FragColor = vec4(uColor * g, 1.0);
+        float base = pow(1.0 - vUp, 2.0);
+        vec3 flare = flareLight(vPos, 1.0 - vUp) * 0.5;
+        gl_FragColor = vec4(uColor * base * ${CURTAIN_GLOW.toFixed(2)} + flare, 1.0);
       }
     `,
     transparent: true,
@@ -136,5 +178,17 @@ export function createFieldVeil(THREE, scene) {
   wall(GAME_HEIGHT, HALF_W, 0, Math.PI / 2);
 
   scene.add(group);
-  return group;
+  return {
+    group,
+    flare(x, z, flareColor) {
+      const slot = flares.reduce((a, b) => (b.at.z < a.at.z ? b : a));
+      slot.at.set(x, z, 1, 0);
+      slot.color.set(flareColor);
+    },
+    update(dt) {
+      flares.forEach(({ at }) => {
+        at.z = Math.max(0, at.z - dt / FLARE.fade);
+      });
+    },
+  };
 }
