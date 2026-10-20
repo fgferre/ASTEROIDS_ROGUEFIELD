@@ -47,9 +47,11 @@ const BANK_YAW = (8 * Math.PI) / 180;
 const BANK_SMOOTH_S = 0.18;
 // Each shot pushes the hull back along the nose for the muzzle frames.
 const RECOIL_DIP = 2;
-// Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10).
+// Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10), its
+// band from DASH_RING_INNER to 1 of its radius.
 const DASH_RIM_BOOST = 3;
 const DASH_RING_OPACITY = 0.55;
+const DASH_RING_INNER = 0.94;
 const BLINK_HZ = 8;
 const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
@@ -84,6 +86,29 @@ function patchHull(shader) {
       totalEmissiveRadiance += uRim * pow(rim, 5.0) + vec3(uBlink * (0.25 + rim));`
     );
 }
+
+// The dash ring turns to face the camera about the ship: a ring of light
+// around it from any angle, never an edge (its radius is the mesh's scale).
+const DASH_RING_VERTEX = `
+varying vec2 vPos;
+void main() {
+  vPos = position.xy;
+  vec4 centre = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  vec2 corner = position.xy * length(modelMatrix[0].xyz);
+  gl_Position = projectionMatrix * (centre + vec4(corner, 0.0, 0.0));
+}`;
+
+const DASH_RING_FRAGMENT = `
+uniform vec3 uColor;
+varying vec2 vPos;
+void main() {
+  float r = length(vPos);
+  float aa = fwidth(r);
+  float inner = ${DASH_RING_INNER.toFixed(2)};
+  float band = smoothstep(inner - aa, inner + aa, r)
+    * (1.0 - smoothstep(1.0 - aa, 1.0, r));
+  gl_FragColor = vec4(uColor * band, 1.0);
+}`;
 
 // Hull and visual-upgrade levels: what the built geometry depends on.
 function hullKeyOf(hull, levels) {
@@ -177,14 +202,21 @@ export class PlayerMirror {
     this.rimRgb = rim.value.clone();
     this.dashRimRgb = rim.value.clone().multiplyScalar(DASH_RIM_BOOST);
     this.dashRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.94, 1, 64).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.6),
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: {
+            value: colorOf(THREE, PALETTE.player).multiplyScalar(
+              1.6 * DASH_RING_OPACITY
+            ),
+          },
+        },
+        vertexShader: DASH_RING_VERTEX,
+        fragmentShader: DASH_RING_FRAGMENT,
+        extensions: { derivatives: true },
         transparent: true,
-        opacity: DASH_RING_OPACITY,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
-        toneMapped: false,
       })
     );
     this.dashRing.visible = false;
@@ -406,7 +438,7 @@ export class PlayerMirror {
         : 0;
     const dashShield = invulnerable && this.dashGuard;
     this.rim.copy(dashShield ? this.dashRimRgb : this.rimRgb);
-    // the shield dome already reads as protection; the flat ring would sit inside it
+    // the shield shell already reads as protection; the ring would sit inside it
     this.dashRing.visible = dashShield && !player.isShieldActive;
 
     this.updateGhosts(player.dashGhosts);

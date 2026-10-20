@@ -2,8 +2,10 @@
 // generator at the lowest detail), one InstancedMesh per variant, lit by the
 // scene lights like the asteroids (docs/NORTE.md §2: matte mass). Each
 // EffectsSystem 'debris' particle becomes one instance that tumbles on its
-// own axis and shrinks away at the end of its life. Nothing is allocated
-// per frame.
+// own axis and shrinks away at the end of its life. The simulation throws
+// them flat across the field; each also climbs or sinks at its own slope as
+// it flies, so a burst opens into a ball of chunks seen from the side or
+// from below. Nothing is allocated per frame.
 
 import { createAsteroidGeometry } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
@@ -17,6 +19,9 @@ const CHUNK_HEIGHT = 2;
 const SHRINK_FROM = 0.3; // last 30 % of life
 const SPIN_RATE = 3.5; // × the particle's rotationSpeed (rad/s)
 const MIN_SPIN = 4; // rad/s, so slow particles still tumble
+// Steepest climb: the sine of the largest angle off the plane (~49°); slopes
+// spread evenly in sine, so a burst fills a ball rather than a cone.
+const LIFT_SINE = 0.75;
 
 // Deterministic [0, 1) from a float (no Math.random in the render loop).
 function hash01(v) {
@@ -64,6 +69,33 @@ export class DebrisChunks {
     this.scale = new THREE.Vector3();
     this.axis = new THREE.Vector3();
     this.color = new THREE.Color();
+    // particle (pooled, so reused across lives) → { life, age, height }
+    this.lifts = new WeakMap();
+  }
+
+  /**
+   * How far particle `p` has climbed (+) or sunk (−) off the plane: its
+   * planar speed × its slope, summed over its own clock (its age), so it
+   * holds still while the simulation is paused or slowed.
+   */
+  lift(p, seed, age) {
+    let state = this.lifts.get(p);
+    if (!state) {
+      state = { life: 0, age: 0, height: 0 };
+      this.lifts.set(p, state);
+    }
+    if (p.maxLife !== state.life || age < state.age) {
+      // a new life
+      state.life = p.maxLife;
+      state.age = 0;
+      state.height = 0;
+    }
+    const sine = (hash01(seed + 5) * 2 - 1) * LIFT_SINE;
+    const slope = sine / Math.sqrt(1 - sine * sine);
+    state.height +=
+      Math.hypot(p.vx || 0, p.vy || 0) * slope * (age - state.age);
+    state.age = age;
+    return state.height;
   }
 
   begin() {
@@ -100,7 +132,8 @@ export class DebrisChunks {
       .normalize();
     if (!(this.axis.lengthSq() > 0)) this.axis.set(0, 1, 0);
     this.quaternion.setFromAxisAngle(this.axis, spin);
-    this.position.set(p.x - HALF_W, CHUNK_HEIGHT + r, p.y - HALF_H);
+    const height = this.lift(p, seed, age);
+    this.position.set(p.x - HALF_W, CHUNK_HEIGHT + r + height, p.y - HALF_H);
     // flattened a little, like chips off a surface
     this.scale.set(r, r * (0.6 + 0.3 * hash01(seed + 4)), r);
     this.matrix.compose(this.position, this.quaternion, this.scale);

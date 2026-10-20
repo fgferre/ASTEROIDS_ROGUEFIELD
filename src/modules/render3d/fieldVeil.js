@@ -3,7 +3,8 @@
 // the ship goes out one side and comes back on the other. Three pieces on
 // the field's rectangle: the space beyond it a little darker, a glow along
 // its edge, and a low curtain of light rising from that edge, which reads
-// best when the camera looks across it.
+// best when the camera looks across it; a short skirt below the plane keeps
+// its foot soft from the side and from below.
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { colorOf } from './batches.js';
@@ -16,8 +17,10 @@ const BEYOND_FADE = 60;
 // The glow along the edge: its strength and how fast it falls off (units).
 const EDGE_GLOW = 0.22;
 const EDGE_WIDTH = 3;
-// The curtain: its height (units) and strength at the base.
+// The curtain: its height and skirt below the plane (units) and strength at
+// the base.
 const CURTAIN_HEIGHT = 46;
+const CURTAIN_SKIRT = 26;
 const CURTAIN_GLOW = 0.12;
 // How far past the field the darkening reaches (units).
 const REACH = 6000;
@@ -97,21 +100,23 @@ export function createFieldVeil(THREE, scene) {
     -5
   );
 
-  // The curtain: four walls of light on the edges, brightest at the base.
+  // The curtain: four walls of light on the edges, brightest at the base,
+  // fading up to its top and down to the skirt's foot.
   const curtain = new THREE.ShaderMaterial({
     uniforms: { uColor: { value: color } },
     vertexShader: `
-      varying float vUp;
+      varying float vY;
       void main() {
-        vUp = uv.y;
+        vY = (modelMatrix * vec4(position, 1.0)).y;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
       uniform vec3 uColor;
-      varying float vUp;
+      varying float vY;
       void main() {
-        float g = pow(1.0 - vUp, 2.0) * ${CURTAIN_GLOW.toFixed(2)};
+        float k = vY > 0.0 ? vY / ${CURTAIN_HEIGHT.toFixed(1)} : -vY / ${CURTAIN_SKIRT.toFixed(1)};
+        float g = pow(max(0.0, 1.0 - k), 2.0) * ${CURTAIN_GLOW.toFixed(2)};
         gl_FragColor = vec4(uColor * g, 1.0);
       }
     `,
@@ -122,10 +127,10 @@ export function createFieldVeil(THREE, scene) {
   });
   const wall = (length, x, z, turn) => {
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(length, CURTAIN_HEIGHT),
+      new THREE.PlaneGeometry(length, CURTAIN_HEIGHT + CURTAIN_SKIRT),
       curtain
     );
-    mesh.position.set(x, CURTAIN_HEIGHT / 2, z);
+    mesh.position.set(x, (CURTAIN_HEIGHT - CURTAIN_SKIRT) / 2, z);
     mesh.rotation.y = turn;
     mesh.renderOrder = -4;
     group.add(mesh);
