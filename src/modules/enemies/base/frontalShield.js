@@ -3,7 +3,8 @@
 // `maxShieldHealth` and `shieldBroken`. Hits within ±halfArc of the facing
 // drain the plate first; a broken plate stays broken.
 
-const angleBetween = (a, b) => {
+/** The angle between two directions, 0..π. */
+export const angleBetween = (a, b) => {
   const d = Math.abs(a - b) % (Math.PI * 2);
   return d > Math.PI ? Math.PI * 2 - d : d;
 };

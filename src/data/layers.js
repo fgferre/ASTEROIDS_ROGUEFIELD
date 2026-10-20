@@ -20,6 +20,9 @@ export { FIELD_EVENTS };
 // surges: a burst of `count` enemies (roles taken in turn; 'asteroid' is
 //   small rocks) at `at` seconds, from the field edge away from the player,
 //   announced by a "SURGE" banner with `label`.
+// formations: groups of one role that come in together in a shape (ring,
+//   sweep, swarm, wall), after their marks light at `at` seconds; what each
+//   shape does is in FORMATIONS (src/data/layerParts.js).
 // events: field events at `at` seconds into the layer (never on a Warden
 //   layer), announced by an amber "EVENT" banner with the event's label; what
 //   each does and for how long is in FIELD_EVENTS.
@@ -165,12 +168,16 @@ export function nextBossRushLayer(layer) {
   return BOSS_RUSH_LAYERS.find((n) => n > layer);
 }
 
-/** A layer's entry on Boss Rush: no surges or events, BOSS_RUSH_ROCKS rocks. */
+/**
+ * A layer's entry on Boss Rush: no surges, formations or events,
+ * BOSS_RUSH_ROCKS rocks.
+ */
 export function bossRushDirectorFor(layer) {
   return deepFreeze({
     ...directorFor(layer),
     rocks: BOSS_RUSH_ROCKS,
     surges: [],
+    formations: [],
     events: [],
   });
 }

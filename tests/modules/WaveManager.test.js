@@ -279,6 +279,7 @@ describe('WaveManager Heralds', () => {
     expect(herald).toMatchObject({ heraldKind: 'dust', elite: false });
 
     manager.update(60); // the Rockfall surge too
+    manager.update(2); // the Mite ring, warned of at 60 s
     field.clearRocks();
     active.filter((e) => e !== herald && !e.destroyed).forEach(field.kill);
     expect(manager.waveInProgress).toBe(true);
@@ -371,7 +372,9 @@ describe('WaveManager field events', () => {
     field.active.push({ type: 'asteroid', destroyed: false });
     field.manager.update(20);
     field.manager.update(20);
-    // Everything spawned by 40 s; the Gravity Well (45 s) is still pending.
+    field.manager.update(2);
+    // Everything spawned by 42 s (the Tether wall, warned of at 40 s); the
+    // Gravity Well (45 s) is still pending.
     expect(field.manager.layerSchedule.map((e) => e.event?.kind)).toEqual([
       'gravity-well',
     ]);

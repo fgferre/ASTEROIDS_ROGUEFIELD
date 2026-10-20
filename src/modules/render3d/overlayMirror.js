@@ -86,6 +86,32 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
   }
 }
 
+// An Aegis's ward (behaviors/ward.js): a faint lime link to each machine it
+// covers, as strong as its ward is whole. proposta 20/10.
+const WARD_LINK_WIDTH = 1;
+const WARD_LINK_GAIN = 0.3;
+
+export function mirrorWards(t, enemies) {
+  for (let i = 0; i < enemies.length; i += 1) {
+    const enemy = enemies[i];
+    const links = enemy?.wardLinks;
+    if (!links?.length || enemy.destroyed) continue;
+    const gain = WARD_LINK_GAIN * (enemy.wardRatio || 0);
+    for (let j = 0; j < links.length; j += 1) {
+      t.ribbons.segment(
+        enemy.x,
+        enemy.y,
+        links[j].x,
+        links[j].y,
+        OVERLAY_H,
+        t.statusRgb,
+        WARD_LINK_WIDTH,
+        gain
+      );
+    }
+  }
+}
+
 // Gated by the aiming rank: rank 1 ring + line, rank 2 the predicted-aim
 // marker, rank 3 every lock; nothing in manual aim. The lock line leaves the
 // turret's axis at the height of the barrel aimed at that lock, so it reads

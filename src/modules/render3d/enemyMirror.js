@@ -139,7 +139,8 @@ export function markShadowCasters(root, minRadius = 0) {
  *   (a view record, accent tones, batched outline/glow anchors, one merged
  *   matte body per look); accentOf: a view's accent colour;
  * - createTelegraph, updateTelegraph: field-plane telegraphs
- *   (enemies/telegraph.js), for the Ram and the Wardens.
+ *   (enemies/telegraph.js), for the Ram, the Wardens and recipe enemies
+ *   that aim.
  */
 function createKit(THREE, scene, seeded, dissolve) {
   // Matte mass (docs/NORTE.md §2): the eye/core is the only light; a

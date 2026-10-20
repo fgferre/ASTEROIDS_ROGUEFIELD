@@ -28,12 +28,13 @@ const isStringList = (value) =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 // The cue kinds the event table reads from an enemy file (`cueOf` rows).
 const CUE_KINDS = AUDIO_EVENT_CUES.flatMap(({ cueOf }) => cueOf ?? []);
-// The roles layer n asks for, roster and surges.
+// The roles layer n asks for: roster, surges and formations.
 const rolesOn = (n) => {
-  const { roster, surges } = directorFor(n);
+  const { roster, surges, formations } = directorFor(n);
   return [
     ...roster.map(({ role }) => role),
     ...surges.flatMap(({ roles }) => roles),
+    ...formations.map(({ role }) => role),
   ];
 };
 // From an enemy's first layer: the rest of the table and the endless layers

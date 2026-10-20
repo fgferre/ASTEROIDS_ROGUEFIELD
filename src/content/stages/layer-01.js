@@ -1,4 +1,4 @@
-// Layers 1–3: rock only.
+// Layers 1–3: rock; from 2, packs of Mites in formation.
 import { ROCKFALL, rockCurve } from '../../data/layerParts.js';
 
 export default {
@@ -7,6 +7,7 @@ export default {
   rocks: rockCurve(1),
   roster: [],
   surges: [ROCKFALL],
+  formations: [],
   events: [],
   warden: false,
 };
