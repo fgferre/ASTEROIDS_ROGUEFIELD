@@ -1,7 +1,7 @@
 // src/modules/ui/AAAHudLayout.js
 
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
-import RandomService from '../../core/RandomService.js';
+import { getHudLayoutDefinition } from '../../data/ui/hudLayout.js';
 import { BossBar } from './hud/bossBar.js';
 import {
   createDirectionPools,
@@ -12,12 +12,7 @@ import {
 import { FADE_OUT_MS, FEED_MAX_ROWS, replay } from './hud/hudCommon.js';
 import { getHudHtml } from './hud/hudMarkup.js';
 import { getHudCss } from './hud/hudStyles.js';
-import {
-  RADAR_NOISE_DOTS,
-  RADAR_NOISE_MS,
-  createBlipPool,
-  drawBlips,
-} from './hud/radar.js';
+import { mountInstruments } from './hud/instruments/registry.js';
 import { SystemsPanel } from './hud/systemsPanel.js';
 
 // The pure helpers live with their panels; tests and TacticalHud read them here.
@@ -26,7 +21,6 @@ export {
   edgeArrow,
   spreadEdgeArrows,
 } from './hud/direction.js';
-export { radarGlyph } from './hud/radar.js';
 export { bossSegments } from './hud/bossBar.js';
 
 const COMBO_VISIBLE_MIN = 2;
@@ -51,7 +45,10 @@ export function comboTier(multiplier) {
 }
 
 export class AAAHudLayout {
-  constructor() {
+  // `items`: the layout's instruments (data/ui/hudLayout.js), mounted with it.
+  constructor({ items = getHudLayoutDefinition().items } = {}) {
+    this._items = items;
+    this._instruments = new Map();
     this._mounted = false;
     this._styleElement = null;
     this._root = null;
@@ -60,13 +57,10 @@ export class AAAHudLayout {
     this._systems = new SystemsPanel();
     this._lastCombo = null;
     this._lastComboTier = 'text';
-    this._blipPool = [];
     this._arcPool = [];
     this._arrowPool = [];
     this._panelCorners = null;
-    this._radarJammed = false;
-    this._radarNoise = new RandomService('radar-jam');
-    this._radarNoiseAt = -Infinity;
+    this.radarJammed = false;
     this.radarRangeFactor = 1;
     this._timers = new Set();
     this._bannerTimer = null;
@@ -114,7 +108,7 @@ export class AAAHudLayout {
 
     this._cacheElements();
     this._initializeBars();
-    this._createBlipPool();
+    this._instruments = mountInstruments(hudLayer, this._items);
     this._createDirectionPools();
 
     if (
@@ -129,6 +123,8 @@ export class AAAHudLayout {
   }
 
   unmount() {
+    this._instruments.forEach((instrument) => instrument.destroy());
+    this._instruments = new Map();
     if (this._root && this._root.parentNode) {
       this._root.parentNode.removeChild(this._root);
     }
@@ -145,11 +141,10 @@ export class AAAHudLayout {
     this._systems.reset();
     this._lastCombo = null;
     this._lastComboTier = 'text';
-    this._blipPool = [];
     this._arcPool = [];
     this._arrowPool = [];
     this._panelCorners = null;
-    this._radarJammed = false;
+    this.radarJammed = false;
     this.radarRangeFactor = 1;
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
@@ -534,8 +529,6 @@ export class AAAHudLayout {
       bossName: query('#ui-boss-name'),
       bossFill: query('#ui-boss-fill'),
       bossSegments: query('#ui-boss-segments'),
-      radar: query('#ui-radar'),
-      radarContainer: query('#ui-radar-blips'),
       shieldRow: query('#ui-shield-row'),
       shieldText: query('#ui-shield-text'),
       hullRow: query('#ui-hull-row'),
@@ -807,29 +800,16 @@ export class AAAHudLayout {
   }
 
   /**
-   * Atualiza Radar
-   * @param {Array} blips - [{x: -1..1, y: -1..1, type, phased}]: type is a
-   *   radarGlyph() name or 'pickup'; a phased blip is dimmed.
+   * The radar slot's model draws this frame's radar state (its shape is
+   * documented in hud/instruments/registry.js).
    */
-  updateRadar(blips) {
-    if (!this.els) {
-      return;
-    }
+  updateRadar(state) {
+    this._instruments.get('radar')?.update(state);
+  }
 
-    let list = Array.isArray(blips) ? blips : [];
-    if (this._radarJammed) {
-      const now = performance.now();
-      if (now - this._radarNoiseAt < RADAR_NOISE_MS) {
-        return;
-      }
-      this._radarNoiseAt = now;
-      list = Array.from({ length: RADAR_NOISE_DOTS }, () => ({
-        x: this._radarNoise.range(-0.85, 0.85),
-        y: this._radarNoise.range(-0.85, 0.85),
-        type: 'noise',
-      }));
-    }
-    drawBlips(this._blipPool, list);
+  /** Field units the radar reaches: its model's range, after Dense Fog. */
+  get radarRange() {
+    return (this._instruments.get('radar')?.range ?? 0) * this.radarRangeFactor;
   }
 
   /** Dense Fog: the radar reaches `factor` of its usual range (1 = normal). */
@@ -837,15 +817,9 @@ export class AAAHudLayout {
     this.radarRangeFactor = factor;
   }
 
-  /** Sensor Jam: noise instead of blips and a "NO SIGNAL" label while on. */
+  /** Sensor Jam: noise instead of contacts and a "NO SIGNAL" label while on. */
   setRadarJammed(jammed) {
-    this._radarJammed = Boolean(jammed);
-    this._radarNoiseAt = -Infinity;
-    this.els?.radar?.classList.toggle('is-jammed', this._radarJammed);
-  }
-
-  _createBlipPool() {
-    this._blipPool = createBlipPool(this.els.radarContainer);
+    this.radarJammed = Boolean(jammed);
   }
 
   _createDirectionPools() {

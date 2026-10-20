@@ -75,36 +75,6 @@ export function getHudCss() {
             .boss-area.is-invulnerable .boss-bar-container { border-color: var(--text-dim, rgba(255, 255, 255, 0.35)); }
             .boss-area.is-invulnerable .boss-skull { border-color: var(--text-dim, rgba(255, 255, 255, 0.7)); color: var(--text-dim, rgba(255, 255, 255, 0.9)); }
 
-            /* RADAR - Decagon + Analog Ring */
-            .radar-area { grid-column: 3; grid-row: 1; justify-self: end; align-self: start; }
-            .radar-structure { width: 220px; height: 220px; position: relative; }
-            .radar-svg-layer { position: absolute; inset: 0; z-index: 5; pointer-events: none; fill: none; }
-            .radar-ring { stroke: var(--neutral, #00aaff); stroke-width: 2; stroke-opacity: 0.6; }
-            .radar-ring-dash { stroke: var(--accent, #00f2ff); stroke-width: 1; stroke-dasharray: 4 6; opacity: 0.3; }
-            .radar-outline { stroke: var(--accent, #00f2ff); stroke-width: 1.5; opacity: 0.8; }
-            .radar-axis { stroke: var(--neutral, #00aaff); stroke-width: 1; opacity: 0.1; }
-            .radar-inner { stroke: var(--neutral, #00aaff); stroke-width: 1; opacity: 0.2; }
-            .radar-mask {
-                position: absolute; inset: 0; z-index: 2; background: var(--surface, rgba(0, 10, 20, 0.5));
-                clip-path: polygon(50% 7%, 75.5% 15%, 91% 37%, 91% 63%, 75.5% 85%, 50% 93%, 24.5% 85%, 9% 63%, 9% 37%, 24.5% 15%);
-            }
-            .radar-sweep { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 0%, transparent 60%, transparent 80%, var(--glow-accent, rgba(0, 242, 255, 0.35)) 100%); animation: radar-sweep-anim 4s linear infinite; border-radius: 50%; mix-blend-mode: screen; pointer-events: none; }
-            .blip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
-            .blip { position: absolute; top: 0; left: 0; border-radius: 50%; box-shadow: 0 0 6px 1px currentColor; will-change: transform; }
-            .blip.rock { width: 5px; height: 5px; background: var(--text-dim); color: var(--text-dim); box-shadow: none; }
-            .blip.machine { width: 8px; height: 7px; border-radius: 0; background: var(--danger); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-            .blip.elite { width: 9px; height: 9px; box-sizing: border-box; border: 2px solid var(--xp); color: var(--xp); }
-            .blip.herald { width: 11px; height: 11px; border-radius: 0; background: var(--boss); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-            .blip.warden { width: 13px; height: 12px; border-radius: 0; background: var(--danger); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
-            .blip.pickup { width: 7px; height: 7px; border-radius: 0; background: var(--status); clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
-            .blip.ally { width: 6px; height: 6px; background: var(--status, #00ff66); color: var(--status, #00ff66); }
-            .blip.noise { width: 3px; height: 3px; background: var(--text-dim); color: var(--text-dim); box-shadow: none; }
-            .radar-jam-label { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 20; display: none; text-align: center; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.3em; margin-right: -0.3em; color: var(--xp); text-shadow: 0 0 8px var(--xp), 0 1px 0 rgba(0, 0, 0, 0.8); pointer-events: none; }
-            .radar-structure.is-jammed .radar-jam-label { display: block; }
-            .radar-structure.is-jammed .radar-sweep { opacity: 0.2; }
-            .radar-structure.is-jammed .blip.player { display: none; }
-            .blip.player { top: 50%; left: 50%; width: 8px; height: 8px; background: var(--text, #fff); border: 1px solid var(--accent, #00f2ff); color: var(--text, #fff); z-index: 15; transform: translate(-50%, -50%); }
-
             /* NEXT WAVE */
             .next-wave-box { position: absolute; top: 50%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-50%); font-family: var(--font-display, 'Orbitron', sans-serif); opacity: 0; transition: opacity var(--motion-base, 0.3s); pointer-events: none; z-index: 100; }
             .next-wave-box.visible { opacity: 1; }
@@ -169,7 +139,6 @@ export function getHudCss() {
 
             /* ANIMATIONS */
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            @keyframes radar-sweep-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             @keyframes alert-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
             @keyframes boss-hit { 0% { filter: brightness(1.6); } 100% { filter: brightness(1); } }
             @keyframes boss-critical { 0% { filter: brightness(2); } 100% { filter: brightness(1); } }
@@ -313,6 +282,6 @@ export function getHudCss() {
             @keyframes onboarding-tip-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
             @keyframes feed-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
-            @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
+            @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
         `;
 }

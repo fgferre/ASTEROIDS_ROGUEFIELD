@@ -10,7 +10,8 @@ import {
 } from '../../data/ui/hudLayout.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
-import { AAAHudLayout, radarGlyph } from './AAAHudLayout.js';
+import { AAAHudLayout } from './AAAHudLayout.js';
+import { buildRadarState, createRadarMemory } from './hud/radar.js';
 
 export class TacticalHud {
   /**
@@ -18,10 +19,11 @@ export class TacticalHud {
    * `player()`: the player service (vitals, dash, position), or none.
    * `enemies()`: the enemy service (session stats, wave, active enemies).
    * `progression()`: the progression service (combo, level, XP).
-   * `combat()`: the combat service (fire modes, weapon).
-   * `physics()`: the physics service (enemies in radar range).
+   * `combat()`: the combat service (fire modes, weapon, enemy shots).
    * `pickups()`: the pickup service (radar blips, edge arrows).
-   * `renderer()`: the renderer (edge arrows, the damage arc).
+   * `xpOrbs()`: the XP orb service (the radar's haze).
+   * `renderer()`: the renderer (edge arrows, the damage arc, the camera's
+   *   view on the radar).
    */
   constructor({
     refs,
@@ -29,8 +31,8 @@ export class TacticalHud {
     enemies,
     progression,
     combat,
-    physics,
     pickups,
+    xpOrbs,
     renderer,
   }) {
     this.refs = refs;
@@ -38,9 +40,11 @@ export class TacticalHud {
     this.enemies = enemies;
     this.progression = progression;
     this.combat = combat;
-    this.physics = physics;
     this.pickups = pickups;
+    this.xpOrbs = xpOrbs;
     this.renderer = renderer;
+    // The radar's threat hold and Sensor Jam noise, across frames.
+    this.radarMemory = createRadarMemory();
     // The mounted AAAHudLayout; transmissions, cinematics and onboarding
     // draw on it too.
     this.layout = null;
@@ -62,7 +66,7 @@ export class TacticalHud {
 
     mountTarget.style.padding = '0px';
 
-    this.layout = new AAAHudLayout();
+    this.layout = new AAAHudLayout({ items: this.definition.items });
     this.layout.mount(mountTarget);
   }
 
@@ -212,88 +216,32 @@ export class TacticalHud {
       hud.updateNextWaveTimer(breakSeconds);
     }
 
-    const physics = this.physics();
-    if (
-      (physics && typeof physics.getNearbyEnemies === 'function' && player) ||
-      (enemies && typeof enemies.getActiveEnemies === 'function' && player)
-    ) {
-      const pluginConfig = this.definition?.plugin || {};
-      const radarRange = Math.max(
-        1,
-        (Number(pluginConfig.radarRange) || 1500) * hud.radarRangeFactor
+    // The radar: every contact, the camera's view, the threat mode.
+    const renderer = this.renderer();
+    if (player && enemies && hud.radarRange > 0) {
+      hud.updateRadar(
+        buildRadarState(
+          {
+            ship: {
+              x: Number(playerPosition.x) || 0,
+              y: Number(playerPosition.y) || 0,
+              angle: player.angle,
+            },
+            range: hud.radarRange,
+            jammed: hud.radarJammed,
+            view: renderer ? renderer.camera.getView() : null,
+            enemies: enemies.getActiveEnemies(),
+            pickups: this.pickups()?.getActivePickups() || [],
+            orbs: this.xpOrbs()?.xpOrbs || [],
+            shots: combat?.enemyBullets || [],
+            now: performance.now(),
+          },
+          this.radarMemory
+        )
       );
-
-      let radarEnemies = [];
-      if (physics && typeof physics.getNearbyEnemies === 'function') {
-        try {
-          // A phased Shade still shows on the radar, dimmed.
-          radarEnemies = physics.getNearbyEnemies(
-            Number(playerPosition.x) || 0,
-            Number(playerPosition.y) || 0,
-            radarRange,
-            { includeIntangible: true }
-          );
-        } catch (error) {
-          radarEnemies = [];
-        }
-      } else if (enemies && typeof enemies.getActiveEnemies === 'function') {
-        radarEnemies = enemies.getActiveEnemies() || [];
-      }
-
-      const blips = [];
-      const originX = Number(playerPosition.x) || 0;
-      const originY = Number(playerPosition.y) || 0;
-      const limit = 80;
-
-      for (let index = 0; index < radarEnemies.length; index += 1) {
-        if (blips.length >= limit) {
-          break;
-        }
-
-        const enemy = radarEnemies[index];
-        if (!enemy) {
-          continue;
-        }
-
-        const enemyX = Number(enemy?.position?.x ?? enemy?.x ?? 0);
-        const enemyY = Number(enemy?.position?.y ?? enemy?.y ?? 0);
-        if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
-          continue;
-        }
-
-        const dx = enemyX - originX;
-        const dy = enemyY - originY;
-        const distance = Math.hypot(dx, dy);
-        if (!Number.isFinite(distance) || distance > radarRange) {
-          continue;
-        }
-
-        blips.push({
-          x: dx / radarRange,
-          y: dy / radarRange,
-          type: radarGlyph(enemy),
-          phased: Boolean(enemy.intangible),
-        });
-      }
-
-      const pickups = this.pickups()?.getActivePickups() || [];
-      for (let i = 0; i < pickups.length && blips.length < limit; i += 1) {
-        const dx = pickups[i].x - originX;
-        const dy = pickups[i].y - originY;
-        if (Math.hypot(dx, dy) <= radarRange) {
-          blips.push({
-            x: dx / radarRange,
-            y: dy / radarRange,
-            type: 'pickup',
-          });
-        }
-      }
-
-      hud.updateRadar(blips);
     }
 
     // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
-    const renderer = this.renderer();
     const arrowTargets = [];
     let herald = null;
     if (renderer && player && enemies) {
