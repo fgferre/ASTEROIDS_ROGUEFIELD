@@ -55,5 +55,5 @@ Read this before touching code. Each row points a subject to the file to open fi
 
 ## History
 
-- `docs/plans/` holds historical plans. It is not an entry point and may contradict the code.
+- Old plans, audits and reports live only in git history (`git log --all -- docs/`); they may contradict the code.
 - The current plan is `PLAN.md` at the root; the owner's list is `docs/PENDENCIAS.md` (read its first section only).
