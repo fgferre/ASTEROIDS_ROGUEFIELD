@@ -25,6 +25,7 @@ import { createPlayerCues } from './sfx/player.js';
 import { createShieldCues } from './sfx/shields.js';
 import { createInterfaceCues } from './sfx/interface.js';
 import { createThrusterCues } from './sfx/thrusters.js';
+import { createSamplePlayer, interceptSampleCues } from './samplePlayer.js';
 
 const EXPLOSION_SIZE_ORDER = Object.freeze(['small', 'medium', 'large']);
 const ASTEROID_SIZES = new Set(EXPLOSION_SIZE_ORDER);
@@ -191,6 +192,11 @@ class SFXBus {
     this._shields = createShieldCues(this._kit);
     this._interface = createInterfaceCues(this._kit);
     this._thrusters = createThrusterCues(this._kit);
+
+    // --- sample layer (./samplePlayer.js): a cue whose sample is loaded plays
+    // it instead of its synthesis (the facade's boss roar is intercepted there) ---
+    this.samples = createSamplePlayer(this._kit);
+    interceptSampleCues(this, this.samples);
   }
 
   /**
@@ -273,6 +279,9 @@ class SFXBus {
     this.batcher = new AudioBatcher(this.createSfxSynthPort(), 0, {
       random: scopes?.batcher,
     });
+
+    // The samples fetched at boot decode now that the context exists.
+    this.samples.decode();
 
     this.initialized = true;
   }

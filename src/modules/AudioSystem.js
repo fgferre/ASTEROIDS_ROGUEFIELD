@@ -6,6 +6,7 @@ import FileTrackManager, {
 } from './audio/FileTrackManager.js';
 import DuckingController from './audio/DuckingController.js';
 import { registerAudioEventCues } from './audio/eventDispatch.js';
+import { interceptSampleCues } from './audio/samplePlayer.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -71,6 +72,8 @@ class AudioSystem extends BaseSystem {
     // route through the centralized ensureRunning gate (which early-returns when
     // the facade is not yet initialized) and always read the live context/scopes.
     this._wireSfxBusSeams();
+    // The boss roar, the facade's own cue, goes through the sample layer too.
+    interceptSampleCues(this, this.sfxBus.samples, { facade: true });
 
     // Performance tracking
     this.performanceMonitor = {
@@ -137,6 +140,8 @@ class AudioSystem extends BaseSystem {
     this._exposeRandomDebugControls();
     this._setupEarlyInit();
     this._warmupEagerFileTracks();
+    // The SFX samples load with the boot (a page only: node tests have none).
+    if (typeof document !== 'undefined') this.sfxBus.samples.load();
   }
 
   // ---------------------------------------------------------------------------

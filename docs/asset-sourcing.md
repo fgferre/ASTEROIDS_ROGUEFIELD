@@ -33,6 +33,9 @@ sources + an AI-draft policy where applicable.
 
 ### Music / SFX
 
+- **SFX (owner's decision, 20/10/2026):** real samples chosen by the owner by ear —
+  generated on his Mac by the local `/sfx-generator` skill (AudioLDM) or taken from
+  Kenney CC0 packs. `SOUND.md` is the rule; this section's older lines are for music.
 - **Primary:** developer-made / mixed (final shipped tracks + SFX).
 - **AI drafts (NOT shipped):** Suno for music drafts during composition iteration —
   drafts inform direction; final shipped tracks are human-authored / mixed.
@@ -56,12 +59,14 @@ correspond to the integrations already enumerated in
 Google Fonts Orbitron + Rajdhani, Lucide icons). Phase 2-6b plans append rows for
 any new sources.
 
-| Source                                             | License                                     | Attribution required                                                      | Attribution target        | Audit date |
-| -------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------- | ---------- |
-| NASA imagery (via `MenuBackgroundSystem.js` fetch) | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy)                   | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Orbitron                            | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Rajdhani                            | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
-| Lucide icons                                       | ISC                                         | No (ISC permits use without notice; credit recommended)                   | docs/credits.md (Phase 7) | 2026-05-13 |
+| Source                                              | License                                     | Attribution required                                                       | Attribution target        | Audit date |
+| --------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- | ------------------------- | ---------- |
+| NASA imagery (via `MenuBackgroundSystem.js` fetch)  | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy)                    | docs/credits.md (Phase 7) | 2026-05-13 |
+| Google Fonts — Orbitron                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | docs/credits.md (Phase 7) | 2026-05-13 |
+| Google Fonts — Rajdhani                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | docs/credits.md (Phase 7) | 2026-05-13 |
+| Lucide icons                                        | ISC                                         | No (ISC permits use without notice; credit recommended)                    | docs/credits.md (Phase 7) | 2026-05-13 |
+| AudioLDM `cvssp/audioldm-s-full-v2` (generated SFX) | CC BY-NC-SA 4.0 (model weights)             | Yes; the generated files are shared under the same licence, non-commercial | in-game credits           | 2026-10-20 |
+| Kenney Interface, Sci-Fi and Impact Sounds          | CC0 1.0                                     | No (credit recommended)                                                    | in-game credits           | 2026-10-20 |
 
 **Audit cadence:** Phase 2-6b plans re-audit any row older than 6 months from the
 plan's start date. Lucide / Orbitron / Rajdhani are all under permissive licenses
