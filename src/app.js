@@ -578,6 +578,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // ?scene=ring (dev): the broken Ring alone, orbited; no game runs.
+    if (
+      IS_DEV &&
+      new URLSearchParams(window.location.search).get('scene') === 'ring'
+    ) {
+      (await import('./bootstrap/ringScene.js')).startRingScene();
+      return;
+    }
+
     // INFRA-01: ?profile=<scenario> activates the in-browser performance harness.
     // No-op when the URL flag is absent. Mutates gameState.randomSeed when active.
     activateProfileHarness({
