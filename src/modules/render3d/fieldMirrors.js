@@ -91,7 +91,8 @@ function pushTrail(t, bullet, rgb, width, gain) {
   ribbons.polyline(n + 1, 2.5, rgb, width, gain);
 }
 
-// XP orbs and hearts: their bodies (fieldTokens.js) in the light of a glow.
+// XP orbs and hearts: their bodies (fieldTokens.js) in the light of a glow;
+// pickup tokens and chests (pickupMirror.js, chestMirror.js).
 export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
   const orbs = xpOrbs?.xpOrbs || [];
   t.orbCrystals.begin();
@@ -125,7 +126,9 @@ export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
   }
   t.heartTokens.end();
 
-  t.pickups.update(pickups?.getActivePickups() || []);
+  const field = pickups?.getActivePickups() || [];
+  t.pickups.update(field);
+  t.chests.update(field, t.glow);
 }
 
 function fusionPop(orb, age) {

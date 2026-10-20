@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { PICKUP_KINDS, PICKUP_TOKEN } from '../../../src/data/pickups.js';
+import {
+  PICKUP_KINDS,
+  PICKUP_TOKEN,
+  eliteDropChance,
+} from '../../../src/data/pickups.js';
 import {
   STEP_SECONDS,
   createHeadlessGame,
@@ -25,6 +29,10 @@ function dropOnPlayer(game, kind) {
   game.services.pickups.spawnPickup(kind, x, y);
   game.step();
 }
+
+// The tokens on the field, without the chests an Elite may also drop.
+const tokens = (pickups) =>
+  pickups.getActivePickups().filter(({ kind }) => kind !== 'chest');
 
 function killPayload(elite) {
   return {
@@ -69,10 +77,23 @@ describe('PickupSystem', () => {
     for (let i = 0; i < 10; i += 1) {
       game.eventBus.emit('enemy-destroyed', killPayload(true));
     }
-    expect(pickups.getActivePickups()).toHaveLength(10);
+    expect(tokens(pickups)).toHaveLength(10);
 
     game.eventBus.emit('progression-reset');
     expect(pickups.eliteAlwaysDrops).toBe(false);
+  });
+
+  it("an Elite's drop chance rises gently with the layer", () => {
+    const chances = [1, 2, 5, 10, 15, 20].map(eliteDropChance);
+    expect(chances[0]).toBeCloseTo(0.35);
+    for (let i = 1; i < chances.length; i += 1) {
+      expect(chances[i]).toBeGreaterThan(chances[i - 1]);
+      expect(chances[i]).toBeLessThan(0.6);
+    }
+    // a curve: each layer adds less than the one before
+    expect(chances[1] - chances[0]).toBeGreaterThan(
+      eliteDropChance(15) - eliteDropChance(14)
+    );
   });
 
   it('expires a pickup at its lifetime', () => {
@@ -147,5 +168,70 @@ describe('PickupSystem', () => {
     expect(combat.shootCooldown).toBeCloseTo(base / 2);
     stepFor(game, 1);
     expect(combat.shootCooldown).toBeCloseTo(base);
+  });
+
+  it('Repair restores 25 hull', () => {
+    const game = startGame();
+    const { player } = game.services;
+    player.health = player.maxHealth - 40;
+
+    dropOnPlayer(game, 'repair');
+    expect(player.health).toBe(
+      player.maxHealth - 40 + PICKUP_KINDS.repair.hull
+    );
+  });
+
+  it('Stasis freezes machines and their shots for 2.5 s, not a Warden or its shots', () => {
+    const game = startGame();
+    const { enemies, pickups, player, combat } = game.services;
+    const drone = enemies.acquireEnemyViaFactory('drone', {
+      x: 120,
+      y: 120,
+      wave: 1,
+    });
+    const warden = { type: 'boss', stunTimer: 0 };
+    const visit = enemies.forEachActiveEnemy.bind(enemies);
+    const sweep = vi
+      .spyOn(enemies, 'forEachActiveEnemy')
+      .mockImplementation((callback) => {
+        visit(callback);
+        callback(warden);
+      });
+    const shot = (type) =>
+      combat.projectiles.createEnemyBullet({
+        position: { x: 400, y: 100 },
+        velocity: { x: 0, y: 120 },
+        enemy: { type, x: 400, y: 100 },
+      });
+    const droneShot = shot('drone');
+    const wardenShot = shot('boss');
+
+    const { x, y } = player.getPosition();
+    pickups.collect({ kind: 'stasis', x, y });
+    sweep.mockRestore();
+
+    const { duration } = PICKUP_KINDS.stasis;
+    expect(drone.stunTimer).toBe(duration);
+    expect(warden.stunTimer).toBe(0);
+    combat.projectiles.updateEnemyBullets(0.5, null);
+    expect(droneShot.y).toBe(100);
+    expect(wardenShot.y).toBeCloseTo(160);
+    combat.projectiles.updateEnemyBullets(duration, null);
+    combat.projectiles.updateEnemyBullets(0.5, null);
+    expect(droneShot.y).toBeCloseTo(160);
+  });
+
+  it('Salvage Cache bursts into XP orbs round it', () => {
+    const game = startGame();
+    const xpOrbs = game.services['xp-orbs'];
+    const created = vi.spyOn(xpOrbs, 'createXPOrb');
+    const { x, y } = game.services.player.getPosition();
+
+    game.services.pickups.collect({ kind: 'salvage', x, y });
+    const { orbs, burstRadius } = PICKUP_KINDS.salvage;
+    expect(created).toHaveBeenCalledTimes(orbs);
+    for (const [orbX, orbY] of created.mock.calls) {
+      expect(Math.hypot(orbX - x, orbY - y)).toBeCloseTo(burstRadius);
+    }
   });
 });

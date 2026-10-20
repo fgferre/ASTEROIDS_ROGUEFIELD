@@ -21,6 +21,7 @@ import { createFieldVeil } from './fieldVeil.js';
 import { FlashLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
+import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
@@ -277,6 +278,7 @@ export function setupThree(seeded) {
   const enemies = new EnemyMirror(THREE, scene, seeded, bursts);
   const player = new PlayerMirror(THREE, scene, seeded);
   const pickups = new PickupMirror(THREE, scene);
+  const chests = new ChestMirror(THREE, scene);
   const decals = new ScorchDecals(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
@@ -362,6 +364,7 @@ export function setupThree(seeded) {
     enemies,
     player,
     pickups,
+    chests,
     decals,
     shield,
     ribbons,

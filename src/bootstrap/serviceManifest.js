@@ -571,6 +571,7 @@ export function createServiceManifest(context = {}) {
         'xp-orbs',
         'enemies',
         'effects',
+        'progression',
         'random',
       ],
       factory: ({ resolved }) =>
@@ -580,6 +581,7 @@ export function createServiceManifest(context = {}) {
           'xp-orbs': resolved['xp-orbs'],
           enemies: resolved['enemies'],
           effects: resolved['effects'],
+          progression: resolved['progression'],
           random: resolved['random'],
         }),
     },

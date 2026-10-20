@@ -136,6 +136,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'leech-ate', cue: 'playLeechAte', at: 'source' },
   { on: 'leech-burst', cue: 'playLeechBurst', at: 'source' },
   { on: 'pickup-collected', cue: 'playPickupCollected', arg: 'kind' },
+  { on: 'chest-opening', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'transmission-shown', cue: 'playTransmission' },
   { on: 'transmission-shown', cue: 'playTransmissionVoice', arg: 'speaker' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },

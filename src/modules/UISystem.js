@@ -449,6 +449,10 @@ class UISystem extends BaseSystem {
       this.tacticalHud.onPickupCollected(payload);
     });
 
+    this.registerEventListener('chest-card', (payload) => {
+      this.tacticalHud.onChestCard(payload);
+    });
+
     this.registerEventListener('achievement-unlocked', (payload) => {
       this.tacticalHud.onAchievementUnlocked(payload);
     });

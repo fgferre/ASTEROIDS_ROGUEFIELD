@@ -1,6 +1,7 @@
 // src/services/HangarService.js
 
 import { BASE_MODIFIERS, HANGAR_ITEMS, runSalvage } from '../data/hangar.js';
+import { PICKUP_KINDS } from '../data/pickups.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
 import { loadJSON, saveJSON } from '../core/storage.js';
 
@@ -14,7 +15,8 @@ const ITEMS_BY_ID = new Map(HANGAR_ITEMS.map((item) => [item.id, item]));
  * localStorage. A run pays out on each death and on victory; a retried run
  * only pays the difference, so it is never paid twice. A replayed run pays
  * nothing. A Boss Rush run pays
- * per Warden felled instead of per layer (`runSalvage`). Systems read
+ * per Warden felled instead of per layer (`runSalvage`); every Salvage Cache
+ * picked up adds its bonus on top. Systems read
  * `getModifiers()` at run start; the hull stays the `selectedHull` setting,
  * gated here by `hullFor()`.
  */
@@ -38,6 +40,9 @@ export default class HangarService {
     eventBus.on('run-won', () => {
       this.won = true;
     });
+    eventBus.on('pickup-collected', ({ kind } = {}) => {
+      if (kind === 'salvage') this.cacheSalvage += PICKUP_KINDS.salvage.salvage;
+    });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
     eventBus.on('screen-changed', (payload = {}) => {
       if (payload.screen === 'victory') this.award(payload.data);
@@ -49,6 +54,7 @@ export default class HangarService {
     this.replay = replay;
     this.bossRush = bossRush;
     this.bossRushWardens = 0;
+    this.cacheSalvage = 0;
     this.runAwarded = 0;
     this.lastAward = null;
   }
@@ -66,12 +72,14 @@ export default class HangarService {
     const wave = runSummary.wave;
     const multiplier = this.difficulty.getModifiers().salvage;
     const worth = Math.round(
-      runSalvage({
+      (runSalvage({
         layer: typeof wave === 'number' ? wave : wave?.current,
         kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
         won: this.won,
         bossRushWardens: this.bossRush ? this.bossRushWardens : null,
-      }) * multiplier
+      }) +
+        this.cacheSalvage) *
+        multiplier
     );
     const amount = Math.max(0, worth - this.runAwarded);
     this.runAwarded += amount;

@@ -262,8 +262,10 @@ export function createProgressionCues(sfx) {
   }
 
   /**
-   * Pickup collected: per-kind cue (magnet arpeggio, pulse thump, overcharge zap).
-   * @param {'magnet'|'pulse'|'overcharge'} kind
+   * Pickup collected: per-kind cue (magnet arpeggio, pulse thump, overcharge
+   * zap, repair rising chord, stasis glassy fall, salvage clinks, the chest's
+   * opening low swell and chime).
+   * @param {'magnet'|'pulse'|'overcharge'|'repair'|'stasis'|'salvage'|'chest'} kind
    */
   function playPickupCollected(kind) {
     sfx.trackPerformance('playPickupCollected');
@@ -302,6 +304,21 @@ export function createProgressionCues(sfx) {
       } else if (kind === 'overcharge') {
         tone('sawtooth', 400, 1800, 0, 0.22, 0.09);
         tone('square', 800, 2400, 0.04, 0.18, 0.05);
+      } else if (kind === 'repair') {
+        [392, 494, 587].forEach((frequency, index) => {
+          tone('sine', frequency, frequency * 1.5, index * 0.06, 0.3, 0.09);
+        });
+      } else if (kind === 'stasis') {
+        tone('triangle', 2200, 660, 0, 0.5, 0.08);
+        tone('sine', 1760, 1320, 0.03, 0.6, 0.06);
+      } else if (kind === 'salvage') {
+        [1200, 1500, 1350].forEach((frequency, index) => {
+          tone('square', frequency, frequency, index * 0.07, 0.06, 0.04);
+        });
+      } else if (kind === 'chest') {
+        const swell = tone('sine', 90, 180, 0, 0.6, 0.25);
+        tone('triangle', 660, 1320, 0.12, 0.5, 0.08);
+        sfx.sendToReverb(swell, AUDIO_REVERB_SEND_DB.explosionMedium);
       }
     });
   }

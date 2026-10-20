@@ -192,4 +192,21 @@ describe('Leech in the game', () => {
       expect.objectContaining({ orbs: 3, xp: 2 * ORB_VALUE + bonus }),
     ]);
   });
+
+  it('never eats a chest', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { enemies, pickups } = game.services;
+    const leech = enemies.acquireEnemyViaFactory('leech', {
+      x: 120,
+      y: 120,
+      wave: 7,
+    });
+    const chest = pickups.chests.spawn('elite', 110, 120);
+    for (let i = 0; i < 3; i += 1) leech.onUpdate(1 / 600);
+
+    expect(pickups.chests.list).toEqual([chest]);
+    expect(leech.storedPickups).toEqual([]);
+    expect(leech.eaten).toBe(0);
+  });
 });

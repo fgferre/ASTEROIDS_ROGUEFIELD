@@ -57,6 +57,21 @@ describe('HangarService', () => {
     expect(awarded).toEqual([99, 23]);
   });
 
+  it('adds each Salvage Cache picked up to the run', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(2) });
+    eventBus.emit('game-started', {});
+    eventBus.emit('pickup-collected', { kind: 'salvage' });
+    eventBus.emit('pickup-collected', { kind: 'magnet' });
+    eventBus.emit('pickup-collected', { kind: 'salvage' });
+    eventBus.emit('player-died', summary(3, 0));
+    expect(hangar.lastAward.amount).toBe((30 + 2 * 10) * 2);
+
+    eventBus.emit('game-started', {});
+    eventBus.emit('player-died', summary(3, 0));
+    expect(hangar.lastAward.amount).toBe(30 * 2);
+  });
+
   it('adds 150 for a victory and 25 per endless layer', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
