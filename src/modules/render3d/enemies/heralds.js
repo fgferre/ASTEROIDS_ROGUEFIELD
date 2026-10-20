@@ -1,6 +1,6 @@
 // Herald views, violet-rimmed officials of the Ring, shaped to be seen from
-// any angle: Dust (a slow monolith of three blocks in a haze of motes, its
-// slits lighting), Heat (a kiln crown whose seam glows, a warning ring around
+// any angle: Dust (a slow banded monolith of three armoured sections in a
+// haze of grit, its slits lighting), Heat (a kiln crown whose seam glows, a warning ring around
 // it) and Silence (a dark crystal blade with one hooded eye and the blink
 // rings).
 
@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // Heralds: dust motes around the Dust slab; the Silence blink ring starts
 // this many radii wide and closes to one.
-const DUST_MOTES = 10;
+const DUST_MOTES = 16;
 const BLINK_RING_START = 2.2;
 
 // A smooth curve through `keys` spread evenly over u = 0..1 (Catmull-Rom).
@@ -226,9 +226,11 @@ export function createHeraldViews(kit) {
   // wind-carved mass of a single wedge (a steep front face, a crest and a
   // terrace edge that catch the light, a rounded back) swelling into three
   // sections through shallow waists, the middle one raised like a keep, its
-  // ends rounded off. Each section's slit lies in a dark socket in a scoop
-  // of the front face, a vent on its back; a keel, two pods and five stones
-  // under its lip.
+  // ends rounded off. Layered: a dark armour cap over each section's crest,
+  // a dark band round each waist, ledges along its front edge and its back.
+  // Each section's slit lies in a dark socket framed by a raised lip in a
+  // scoop of the front face, a louvred vent on its terrace; a keel, two pods
+  // and the stones it raises underneath.
   const DUST_HALF = 1.02;
   const DUST_SECTIONS = [-0.64, 0, 0.64];
   const DUST_WAIST = 0.33;
@@ -253,12 +255,12 @@ export function createHeraldViews(kit) {
   const DUST_FACE_NORMAL = [0.75, 0.662];
   // stations: even along the middle, packed toward the rounded ends
   const dustTip = Array.from(
-    { length: 10 },
-    (_, i) => 0.8 + (DUST_HALF - 0.8) * (1 - (1 - (i + 1) / 10) ** 3)
+    { length: 8 },
+    (_, i) => 0.8 + (DUST_HALF - 0.8) * (1 - (1 - (i + 1) / 8) ** 3)
   );
   const DUST_ZS = [
     ...dustTip.map((z) => -z).reverse(),
-    ...Array.from({ length: 33 }, (_, i) => -0.8 + 0.05 * i),
+    ...Array.from({ length: 25 }, (_, i) => -0.8 + (1.6 / 24) * i),
     ...dustTip,
   ];
   const bump = (u) => Math.exp(-u * u);
@@ -294,10 +296,11 @@ export function createHeraldViews(kit) {
   const dustRing = (z) =>
     DUST_PROFILE.points.map((_, i) => v3(...dustPoint(z, i), z));
   // the point `i` at z and its face's normal angle (from the points either
-  // side), pushed out along it by `out`
+  // side, round the closed profile), pushed out along it by `out`
   const dustFace = (z, i, out = 0) => {
+    const n = DUST_PROFILE.points.length;
     const [[x0, y0], [x, y], [x1, y1]] = [i - 1, i, i + 1].map((j) =>
-      dustPoint(z, j)
+      dustPoint(z, (j + n) % n)
     );
     const normal = Math.atan2(-(x1 - x0), y1 - y0);
     return {
@@ -313,6 +316,84 @@ export function createHeraldViews(kit) {
     32
   );
 
+  // the raised lip framing the slit at z: a loop on the front face
+  function dustFrame(z) {
+    const path = Array.from({ length: 21 }, (_, k) => {
+      const t = (k / 20) * TAU;
+      const at = z + 0.13 * Math.cos(t);
+      const { normal, position } = dustFace(at, DUST_FACE[1], 0.008);
+      const across = 0.075 * Math.sin(t);
+      return v3(
+        position[0] - Math.sin(normal) * across,
+        position[1] + Math.cos(normal) * across,
+        at
+      );
+    });
+    const { normal } = dustFace(z, DUST_FACE[1]);
+    return sweep(
+      path,
+      v3(Math.cos(normal), Math.sin(normal), 0),
+      () => 0.012,
+      () => 0.011,
+      5
+    );
+  }
+
+  // the armour cap over the section at z: from the front shoulder (its last
+  // rounded points) over the crest to the terrace edge, sunk into the mass
+  // at its two ends
+  const [, DUST_CREST, DUST_TERRACE_EDGE] = DUST_PROFILE.creases;
+  const DUST_CAP = Array.from(
+    { length: DUST_TERRACE_EDGE - DUST_CREST + 4 },
+    (_, k) => DUST_CREST - 3 + k
+  );
+  function dustCap(z) {
+    const zs = spaced(z - 0.25, z + 0.25, 10);
+    const rings = zs.map((at) => {
+      const k = Math.min(1, (0.25 - Math.abs(at - z)) / 0.03);
+      const outer = DUST_CAP.map((i) =>
+        v3(...dustFace(at, i, 0.03 * k).position)
+      );
+      const inner = DUST_CAP.map((i) =>
+        v3(...dustFace(at, i, -0.006).position)
+      );
+      return [...outer, ...inner.reverse()];
+    });
+    return loft(rings);
+  }
+
+  // a ledge along the length at profile point `i` (strata in the stone),
+  // tapering into the mass at both ends
+  function dustLedge(i) {
+    const path = spaced(-0.9, 0.9, 28).map((z) =>
+      v3(...dustFace(z, i, 0.003).position)
+    );
+    const { normal } = dustFace(0, i);
+    const taper = (t) => Math.sin(Math.PI * t) ** 0.4;
+    return sweep(
+      path,
+      v3(Math.cos(normal), Math.sin(normal), 0),
+      (t) => 0.014 * taper(t),
+      (t) => 0.022 * taper(t),
+      4
+    );
+  }
+
+  // a band round the whole profile at z, a ridge in section
+  function dustBand(z) {
+    const n = DUST_PROFILE.points.length;
+    const path = Array.from({ length: n + 1 }, (_, k) =>
+      v3(...dustFace(z, k % n, 0.004).position)
+    );
+    return sweep(
+      path,
+      v3(0, 0, 1),
+      () => 0.026,
+      () => 0.016,
+      4
+    );
+  }
+
   function dustParts() {
     const parts = [];
     const add = (color) => (geometry) => parts.push({ geometry, color });
@@ -321,7 +402,10 @@ export function createHeraldViews(kit) {
     hull3(DUST_ZS, dustRing, 0, DUST_PROFILE.creases).forEach((geometry, i) =>
       add(i < 2 ? hull : dark)(geometry)
     );
-    // each slit's socket in its scoop, a vent on the terrace behind it
+    // each slit's socket in its scoop, framed by a raised lip; a dark vent
+    // recess on the terrace behind it, four louvres across it
+    const louvre = new THREE.BoxGeometry(0.075, 0.01, 0.014);
+    louvre.rotateZ(dustFace(0, DUST_TERRACE[0]).normal - Math.PI / 2);
     DUST_SECTIONS.forEach((z) => {
       const socket = dustFace(z, DUST_FACE[1], -0.004);
       parts.push({
@@ -329,13 +413,27 @@ export function createHeraldViews(kit) {
         color: dark,
         position: socket.position,
       });
-      const vent = dustFace(z, DUST_TERRACE[0]);
+      add(dark)(dustFrame(z));
+      const vent = dustFace(z, DUST_TERRACE[0], -0.004);
       parts.push({
         geometry: lens(0.06, 0.02, 0.17, vent.normal, 8),
-        color: hull,
+        color: dark,
         position: vent.position,
       });
+      [-0.054, -0.018, 0.018, 0.054].forEach((dz) =>
+        parts.push({
+          geometry: louvre,
+          color: hull,
+          flat: true,
+          position: dustFace(z + dz, DUST_TERRACE[0], 0.006).position,
+        })
+      );
+      add(dark)(dustCap(z));
     });
+    // a band round each waist, a ledge along the front edge and the back
+    [-DUST_WAIST, DUST_WAIST].forEach((z) => add(dark)(dustBand(z)));
+    add(hull)(dustLedge(DUST_PROFILE.creases[0]));
+    add(dark)(dustLedge(DUST_TERRACE[0] + 2)); // on the back's upper curve
     // the keel, two pods under the belly, five stones under the front lip:
     // the wall it raises
     hull3(
@@ -382,13 +480,25 @@ export function createHeraldViews(kit) {
         rotationY: i * 1.3,
       });
     });
+    // and a smaller row under the back foot, hung either side of the pods
+    [-0.75, -0.38, -0.12, 0.12, 0.38, 0.75].forEach((z, i) => {
+      const size = 0.045 + 0.01 * ((i * 5) % 3);
+      parts.push({
+        geometry: stone,
+        color: dark,
+        flat: true,
+        position: [-0.27 * dustWidth(z) + dustBow(z), -0.15 * dustHeight(z), z],
+        scale: [size * 1.1, size * 0.75, size],
+        rotationY: i * 2.1 + 0.4,
+      });
+    });
     return parts;
   }
 
   function dustSlitParts() {
     return DUST_SECTIONS.map((z) => {
       const { normal, position } = dustFace(z, DUST_FACE[1], 0.006);
-      return { geometry: lens(0.028, 0.02, 0.2, normal), position };
+      return { geometry: lens(0.028, 0.02, 0.2, normal, 8), position };
     });
   }
 
@@ -742,31 +852,40 @@ export function createHeraldViews(kit) {
       kit.merged('herald-dust-slits', dustSlitParts),
       slitMaterial
     );
-    // the haze: a slow ring of faint dust motes, never in the bloom
+    // the haze: a slow ring of dust grains, faceted and lit (they read as
+    // grit from any side), half see-through; charging warms them amber,
+    // never into the bloom
     const haze = new THREE.Group();
-    const hazeMaterial = new THREE.MeshBasicMaterial({
+    const hazeMaterial = new THREE.MeshStandardMaterial({
       color: colorOf(THREE, PALETTE.rockLit),
+      emissive: colorOf(THREE, PALETTE.shot),
+      emissiveIntensity: 0,
+      metalness: 0.1,
+      roughness: 0.9,
+      flatShading: true,
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.5,
       depthWrite: false,
     });
     haze.add(
       new THREE.Mesh(
         kit.merged('herald-dust-haze', () => {
           const random = createSeededRandom(31.7);
+          const grain = new THREE.IcosahedronGeometry(1, 0);
           return Array.from({ length: DUST_MOTES }, (_, i) => {
             const angle = (i / DUST_MOTES) * TAU + random() * 0.5;
             const reach = 1.0 + random() * 0.5;
             const position = [
               Math.cos(angle) * reach,
-              -0.1 + random() * 0.3,
+              -0.12 + random() * 0.36,
               Math.sin(angle) * reach,
             ];
-            const size = 0.08 + random() * 0.12;
+            const size = 0.03 + random() * 0.045;
             return {
-              geometry: kit.smallSphere,
+              geometry: grain,
               position,
-              scale: [size, size * 0.5, size],
+              scale: [size, size * (0.6 + random() * 0.3), size * 0.85],
+              rotationY: random() * TAU,
             };
           });
         }),
@@ -878,7 +997,8 @@ export function createHeraldViews(kit) {
       object.rotation.y = -(herald.rotation || 0);
       kit.setGain(view.slitMaterial, 0.2 + 1.4 * charge + flash * 0.6);
       view.haze.rotation.y = time * 0.15 + (herald.rotation || 0);
-      view.hazeMaterial.opacity = 0.08 + 0.1 * charge;
+      view.hazeMaterial.opacity = 0.5 + 0.35 * charge;
+      view.hazeMaterial.emissiveIntensity = 0.45 * charge;
     } else if (view.kind === 'herald-heat') {
       object.rotation.y = 0;
       const breathe = 0.5 + 0.5 * Math.sin(time * 2.2);

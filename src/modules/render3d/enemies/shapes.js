@@ -1,7 +1,8 @@
 // The shape helpers the hand-made enemy models are built from
-// (lightMachines.js, heavyMachines.js): flat profiles and splines, rings
-// skinned into smooth closed parts, turned, lofted and swept bodies, blades
-// and seams, the dark sockets and nozzles, part records in the kit's tones and
+// (lightMachines.js, heavyMachines.js, the frontal plate, the Elite blades):
+// flat profiles and splines, rings skinned into smooth closed parts, turned,
+// lofted and swept bodies, sections swept round an arc, blades and seams,
+// the dark sockets and nozzles, part records in the kit's tones and
 // outlines. Each takes the Three namespace where it builds geometry; +X is
 // the nose, +Y up.
 
@@ -171,6 +172,59 @@ export function revolve(THREE, profile, segments, options = {}) {
     start,
     end,
   });
+}
+
+/**
+ * A closed section (r, y flat, × `scale`; either winding, its faces end up
+ * outward) swept round Y from angle `from` (0 = +x, toward +z) for `span`
+ * in `steps`: each side of the section is its own strip, so its edges stay
+ * crisp while the arc runs smooth; both ends are capped flat (a fan from
+ * the section's centre).
+ */
+export function arcSweep(THREE, section, steps, options) {
+  const { from, span, scale = 1 } = options;
+  const points = pairs(section, scale);
+  const n = points.length;
+  const position = [];
+  const index = [];
+  const push = (r, y, a) => {
+    position.push(Math.cos(a) * r, y, Math.sin(a) * r);
+    return position.length / 3 - 1;
+  };
+  points.forEach(([r0, y0], k) => {
+    const [r1, y1] = points[(k + 1) % n];
+    const base = position.length / 3;
+    for (let i = 0; i <= steps; i += 1) {
+      const a = from + (span * i) / steps;
+      push(r0, y0, a);
+      push(r1, y1, a);
+    }
+    for (let i = 0; i < steps; i += 1) {
+      const p = base + i * 2;
+      index.push(p, p + 1, p + 2, p + 1, p + 3, p + 2);
+    }
+  });
+  const cr = points.reduce((sum, [r]) => sum + r, 0) / n;
+  const cy = points.reduce((sum, [, y]) => sum + y, 0) / n;
+  [from, from + span].forEach((a, end) => {
+    const c = push(cr, cy, a);
+    points.forEach(([r, y]) => push(r, y, a));
+    for (let k = 0; k < n; k += 1) {
+      const p = c + 1 + k;
+      const q = c + 1 + ((k + 1) % n);
+      if (end) index.push(c, p, q);
+      else index.push(c, q, p);
+    }
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(position, 3)
+  );
+  geometry.setIndex(index);
+  if (volume(THREE, geometry) < 0) reverse(geometry);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 // A part built about +Y turned to face `dir` and moved to `at`.
