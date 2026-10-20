@@ -129,9 +129,10 @@ class AudioSystem extends BaseSystem {
     // CROSSING into ≤25% HP, re-armed when HP recovers above the threshold.
     this.lowHealthDuckArmed = false;
 
-    // Thruster sound system — the ThrusterLoopManager instance lives inside
-    // SFXBus; the event-driven state machine is ./audio/thrusterEvents.js, its
-    // state and inactivity timer stay here.
+    // Thruster sound system — the ship engine (./audio/shipEngine.js) and its
+    // fallback loop (ThrusterLoopManager) live inside SFXBus; the fallback's
+    // event-driven state machine is ./audio/thrusterEvents.js, its state and
+    // the inactivity timer (both stop on silence) stay here.
     this.thrusterState = createThrusterState();
     this.thrusterInactivityCheckInterval = null;
 
@@ -140,8 +141,12 @@ class AudioSystem extends BaseSystem {
     this._exposeRandomDebugControls();
     this._setupEarlyInit();
     this._warmupEagerFileTracks();
-    // The SFX samples load with the boot (a page only: node tests have none).
-    if (typeof document !== 'undefined') this.sfxBus.samples.load();
+    // The SFX samples and the engine load with the boot (a page only: node
+    // tests have none).
+    if (typeof document !== 'undefined') {
+      this.sfxBus.samples.load();
+      this.sfxBus.engine.load();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -724,18 +729,22 @@ class AudioSystem extends BaseSystem {
     exposeRandomDebugControls(this);
   }
 
-  // === THRUSTER SOUNDS (state machine: ./audio/thrusterEvents.js) ===
+  // === THRUSTER SOUNDS (the engine, else ./audio/thrusterEvents.js) ===
 
   handleThrusterEffect(data) {
-    followThrusterEffect(this, data);
+    if (!this.sfxBus.engine.follow(data)) followThrusterEffect(this, data);
   }
 
-  /** Every 50 ms, stops the loops that stopped hearing thruster events. */
+  /**
+   * Every 50 ms, stops the engine and the loops that stopped hearing the ship
+   * (pause, death, menu).
+   */
   _startThrusterInactivityChecker() {
     if (this.thrusterInactivityCheckInterval) {
       clearInterval(this.thrusterInactivityCheckInterval);
     }
     this.thrusterInactivityCheckInterval = setInterval(() => {
+      this.sfxBus.engine.stopIfIdle();
       stopIdleThrusters(this);
     }, 50);
   }
@@ -744,15 +753,14 @@ class AudioSystem extends BaseSystem {
     clearRandomDebugControls();
     this._evictAllFileTracks({ resetCurrentScreen: true });
 
-    // Cleanup the SFX optimization instances + thruster loops (owned by SFXBus).
+    // Cleanup the SFX optimization instances, thruster loops and the engine
+    // (owned by SFXBus).
     if (this.sfxBus) {
       this.sfxBus.reset();
     }
 
-    if (this.thrusterInactivityCheckInterval) {
-      clearInterval(this.thrusterInactivityCheckInterval);
-      this.thrusterInactivityCheckInterval = null;
-    }
+    // The inactivity checker (started by init) keeps running across runs: it
+    // is what stops the engine on a death, a card screen or the menu.
     if (this.thrusterState) {
       this.thrusterState.lastEventTime = { main: 0, retro: 0, side: 0 };
     }

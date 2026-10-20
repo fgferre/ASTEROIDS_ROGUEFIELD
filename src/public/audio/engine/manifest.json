@@ -1,0 +1,104 @@
+{
+  "level": -8,
+  "loops": {
+    "turbine": {
+      "file": "turbine.mp3",
+      "loopStart": 0.1,
+      "loopEnd": 2.019569,
+      "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 22, 50 steps, prompt: Continuous smooth futuristic spaceship engine hum with a clean whine, electric turbine running steadily at constant power, high quality; cut to a seamless loop"
+    },
+    "roar": {
+      "file": "roar.mp3",
+      "loopStart": 0.1,
+      "loopEnd": 1.959002,
+      "origin": "Kenney Sci-Fi Sounds thrusterFire_001.ogg (CC0 1.0), cut to a seamless loop"
+    },
+    "sub": {
+      "file": "sub.mp3",
+      "loopStart": 0.1,
+      "loopEnd": 2.063787,
+      "origin": "Kenney Sci-Fi Sounds spaceEngineLow_004.ogg (CC0 1.0), cut to a seamless loop"
+    },
+    "harmonic": {
+      "file": "harmonic.mp3",
+      "loopStart": 0.1,
+      "loopEnd": 1.425011,
+      "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 21, 50 steps, prompt: Continuous high frequency servo motor whine, steady bright electric tone, high quality; an octave up, cut to a seamless loop"
+    },
+    "crackle": {
+      "file": "crackle.mp3",
+      "loopStart": 0.1,
+      "loopEnd": 2.29,
+      "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 22, 50 steps, prompt: Continuous crackling electric sparks, steady static discharge crackle, constant sizzling electricity, high quality; cut to a seamless loop"
+    }
+  },
+  "oneshots": {
+    "puff": {
+      "files": [
+        "puff-1.mp3",
+        "puff-2.mp3",
+        "puff-3.mp3",
+        "puff-4.mp3",
+        "puff-5.mp3"
+      ],
+      "origins": [
+        {
+          "file": "puff-1.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_000.ogg (CC0 1.0), cut to a 0.28 s puff, post-processed"
+        },
+        {
+          "file": "puff-2.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_001.ogg (CC0 1.0), cut to a 0.28 s puff, post-processed"
+        },
+        {
+          "file": "puff-3.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_002.ogg (CC0 1.0), cut to a 0.28 s puff, post-processed"
+        },
+        {
+          "file": "puff-4.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_003.ogg (CC0 1.0), cut to a 0.28 s puff, post-processed"
+        },
+        {
+          "file": "puff-5.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_004.ogg (CC0 1.0), cut to a 0.28 s puff, post-processed"
+        }
+      ]
+    },
+    "ignition": {
+      "files": ["ignition.mp3"],
+      "origins": [
+        {
+          "file": "ignition.mp3",
+          "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 31, 50 steps, prompt: A spaceship engine ignition, a click followed by a turbine spinning up with a whoosh, high quality game sound effect"
+        }
+      ]
+    },
+    "cutoff": {
+      "files": ["cutoff.mp3"],
+      "origins": [
+        {
+          "file": "cutoff.mp3",
+          "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 33, 50 steps, prompt: A jet turbine engine shutting down, the whine winding down and fading out, high quality game sound effect"
+        }
+      ]
+    },
+    "dash": {
+      "files": ["dash.mp3"],
+      "origins": [
+        {
+          "file": "dash.mp3",
+          "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 31, 50 steps, prompt: A very fast sharp whoosh tearing through the air, violent air rip swoosh, high quality game sound effect, dry"
+        }
+      ]
+    },
+    "brake": {
+      "files": ["brake.mp3"],
+      "origins": [
+        {
+          "file": "brake.mp3",
+          "origin": "Kenney Sci-Fi Sounds thrusterFire_002.ogg (CC0 1.0), cut to a 0.55 s burst, post-processed"
+        }
+      ]
+    }
+  }
+}

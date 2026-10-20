@@ -54,7 +54,6 @@ export const SAMPLE_CUES = deepFreeze({
   playShipHit: { sample: 'ship-hit', bus: 'protected' },
   playShieldImpact: { sample: 'shield-impact', bus: 'protected' },
   playShieldBreak: { sample: 'shield-break', bus: 'protected' },
-  playDash: { sample: 'dash', bus: 'protected', spatialArg: 0 },
   playXPCollect: {
     sample: 'xp-collect',
     bus: 'ambient',

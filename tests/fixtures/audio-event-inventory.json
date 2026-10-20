@@ -36,6 +36,7 @@
   "player-dashed",
   "player-health-changed",
   "player-leveled-up",
+  "player-moved",
   "player-took-damage",
   "ram-charged",
   "run-continued",

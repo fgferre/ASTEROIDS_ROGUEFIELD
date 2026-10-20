@@ -197,6 +197,20 @@ describe('sample layer', () => {
     expect(live(sources)).toHaveLength(SAMPLE_PLAYBACK.maxVoices);
   });
 
+  it('a voice that cannot connect is dropped before it stops another to make room', async () => {
+    const { bus, sources } = makeBus();
+    await bus.samples.load(
+      fetchFor({ 'xp-collect': sample(['xp-collect/1.mp3'], { cap: 1 }) })
+    );
+
+    bus.playXPCollect();
+    bus.ambientBus = null; // torn down: the next voice has nowhere to play
+    bus.playXPCollect();
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0].stop).not.toHaveBeenCalled();
+  });
+
   it('a cue whose sample is not loaded synthesizes, and a failed manifest logs once', async () => {
     const { bus, context, sources } = makeBus();
     let finishDecode;
