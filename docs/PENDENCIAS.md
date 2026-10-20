@@ -3,7 +3,7 @@
 Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo veredito dele jogando (Mac M1, 60 fps):
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 18.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 19.**
 
 ## O BASTÃO — onde as sessões pararam (20/10) — RODADA 0 E METADE DA 14 NA `main` (PRs até #292); PRÓXIMA CONVERSA: FECHAR A 14 (HUD) E DEPOIS A 15 (LONGEVIDADE)
 
@@ -48,8 +48,9 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 - **Abertos dele:** item 2 (tempo do chefe da camada 5), item 15 (o Anel partido lê como faixa; explicado, nada mudado;
   modelar como estrutura iluminada mantendo o acender do epílogo), itens 16 e 17 acima. `BACKLOG.md`: 29 linhas.
 - **Rodada 15 (decidida 20/10): melhorar de todas as formas que o jogador sente**, absorvendo o resto da 14 — ordem
-  no PLAN: economia/upgrades → loot/orbes → HUD/UX → conteúdo → meta → ritmo → cerimônias e cenas → áudio. Ele disse:
-  _"tudo está rodando liso, não precisa medir nada"_ — sem medições por iniciativa própria.
+  no PLAN: economia/upgrades e SFX renascido (em paralelo) → loot/orbes → HUD/UX → conteúdo → meta → ritmo →
+  cerimônias e cenas. Ele disse: _"tudo está rodando liso, não precisa medir nada"_ e _"o som do jogo (SFX) precisa
+  renascer do zero praticamente, tudo muito ruim também"_ (item 18).
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); câmera de dois estados aprovada por maquete; primeira câmera contínua rejeitada; "não tem problema
@@ -77,6 +78,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   brincar com ângulos diferentes. Enfim, dinâmica mesmo."_ / _"Tem que ter pesquisa de benchmarks hoje no mundo gamer e
   talvez já existam algoritmos top-tier prontos."_ (19/10, depois da janela inteira) → 14.2b no PLAN. Fecha quando
   ele jogar e disser que a câmera dirige a cena.
+
+## Som (palavras dele, 20/10)
+
+- **(18)** _"O som do jogo SFX precisa renascer do zero praticamente, tudo muito ruim também."_ → Rodada 15, frente 2:
+  amostras de verdade (CC0 curadas ou geradas por IA com a aprovação dele), página de audição `?sound=` onde ele
+  escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
+  disser que o som está à altura do jogo.
 
 ## Goal novo (palavras dele, 18/10, fim de tarde)
 
