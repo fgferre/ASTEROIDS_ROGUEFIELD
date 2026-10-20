@@ -1,11 +1,13 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
+import { familyForm } from './ui/upgradeCard.js';
 
 const WORLD_SERVICE_MAP = {
   player: 'player',
   enemies: 'enemies',
   physics: 'physics',
   progression: 'progression',
+  combat: 'combat',
 };
 
 class WorldSystem extends BaseSystem {
@@ -71,7 +73,8 @@ class WorldSystem extends BaseSystem {
    * One moment of the run for the end screens' timeline (ui/runTimeline.js),
    * stamped with the run time and the layer. Kept in the enemies' session
    * stats, which a retry's snapshot carries: weapon evolutions and Apexes
-   * (once per family, a retry re-sends them), Warden kills with their fight
+   * (once per family, a retry re-sends them; named by the weapon held then,
+   * which a later weapon card does not rename), Warden kills with their fight
    * time from the arrival, the best combo (one entry, at its latest peak)
    * and deaths, in the order they happened.
    */
@@ -87,7 +90,9 @@ class WorldSystem extends BaseSystem {
   recordFamilyForm(kind, family) {
     const timeline = this.enemies.sessionStats.timeline;
     if (timeline.some((e) => e.kind === kind && e.family === family)) return;
-    this.recordRunEvent({ kind, family });
+    const { weaponId } = this.combat;
+    const { name } = familyForm(family, weaponId, kind === 'apex');
+    this.recordRunEvent({ kind, family, weaponId, name });
   }
 
   getBounds() {

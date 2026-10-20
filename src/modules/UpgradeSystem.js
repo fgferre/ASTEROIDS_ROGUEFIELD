@@ -22,10 +22,7 @@ import {
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
-import {
-  MAGNETISM_FORCE,
-  MAGNETISM_RADIUS,
-} from '../data/constants/gameplay.js';
+import { MAGNETISM_FORCE } from '../data/constants/gameplay.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -1138,18 +1135,6 @@ class UpgradeSystem extends BaseSystem {
     const xpSystem = this.xpOrbsService;
 
     if (!xpSystem) {
-      return;
-    }
-
-    if (property === 'orbMagnetismRadius') {
-      const current =
-        typeof xpSystem.getMagnetismRadius === 'function'
-          ? xpSystem.getMagnetismRadius()
-          : xpSystem.orbMagnetismRadius || MAGNETISM_RADIUS;
-      const nextRadius = applyNumericOperation(current, value);
-      if (typeof xpSystem.setMagnetismRadius === 'function') {
-        xpSystem.setMagnetismRadius(nextRadius);
-      }
       return;
     }
 

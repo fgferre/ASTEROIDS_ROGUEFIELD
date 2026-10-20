@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import UPGRADE_LIBRARY from '../../../src/data/upgrades/index.js';
-import { buildLine, cardMarkup } from '../../../src/modules/ui/upgradeCard.js';
+import { UPGRADE_FAMILIES } from '../../../src/data/upgrades/families.js';
+import {
+  buildLine,
+  cardMarkup,
+  familyColor,
+} from '../../../src/modules/ui/upgradeCard.js';
 
 const card = (id) => UPGRADE_LIBRARY.find((entry) => entry.id === id);
 const lance = { weaponId: 'lance', chip: 'LANCE' };
@@ -94,5 +100,35 @@ describe('upgrade card build line', () => {
     expect(markup).toContain('card__pattern');
     expect(markup).toContain('Scatter Coil');
     expect(markup).toContain('<kbd class="card__key">3</kbd>');
+  });
+
+  it('family and rarity accents are style.css tokens Colorblind Mode swaps', () => {
+    const css = readFileSync(
+      new URL('../../../src/style.css', import.meta.url),
+      'utf8'
+    );
+    const tokens = (selector) =>
+      Object.fromEntries(
+        [
+          ...css
+            .slice(css.indexOf(`${selector} {`))
+            .split('}')[0]
+            .matchAll(/(--[\w-]+):\s*([^;]+);/g),
+        ].map(([, name, value]) => [name, value])
+      );
+    const base = tokens(':root');
+    const assist = tokens(":root[data-color-vision='assist']");
+    Object.keys(UPGRADE_FAMILIES).forEach((family) => {
+      expect(familyColor(family)).toMatch(/^var\(--family-/);
+      expect(base).toHaveProperty(`--family-${family}`);
+    });
+    // Field stays white; the five hues red-green blindness mixes up change,
+    // each to its own, and the rare and cursed edges move off them too.
+    const families = ['kinetic', 'thermal', 'arc', 'salvage', 'maneuver'];
+    const swapped = families.map((family) => assist[`--family-${family}`]);
+    expect(new Set(swapped).size).toBe(families.length);
+    expect(assist['--rarity-rare']).toBeTruthy();
+    expect(assist['--rarity-cursed']).toBeTruthy();
+    expect(assist['--rarity-rare']).not.toBe(assist['--rarity-cursed']);
   });
 });

@@ -83,7 +83,6 @@ export class RunEndScreens {
   bodyMarkup(outcome, data, numbers) {
     const { layer, time, timeline } = numbers;
     const wardens = timeline.filter(({ kind }) => kind === 'warden').length;
-    const weapon = this.combat().getWeaponState();
     const head = runHeadline({
       outcome,
       layer,
@@ -117,7 +116,6 @@ export class RunEndScreens {
       outcome,
       layer,
       bestAtStart: this.bestAtStart,
-      weaponId: weapon.weaponId,
     });
     const progression = this.progression();
     const build = progression
@@ -152,7 +150,7 @@ export class RunEndScreens {
       </header>
       <section class="end-run"><p class="end-lbl">The run</p>${timelineMarkup(model)}</section>
       <div class="end-cols">
-        <section class="end-build">${build}</section>
+        <section class="end-build"><p class="end-lbl">Build</p>${build}</section>
         <section class="end-moment">
           <p class="end-lbl">Best moment</p>${momentMarkup}
           <div class="end-stats">${stats}</div>

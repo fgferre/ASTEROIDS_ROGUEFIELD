@@ -61,8 +61,29 @@ describe('run timeline', () => {
       'death',
     ]);
     expect(timeline.map(({ time }) => time)).toEqual([40, 138, 150, 200, 260]);
-    expect(timeline[0]).toMatchObject({ family: 'thermal', layer: 1 });
+    expect(timeline[0]).toMatchObject({
+      family: 'thermal',
+      layer: 1,
+      weaponId: 'lance',
+      name: 'Incendiary Lance',
+    });
     expect(timeline[1]).toMatchObject({ name: 'Warden Prime', fight: 48 });
     expect(timeline[3].combo).toBe(5);
+  });
+
+  it('names an evolution by the weapon held when it happened', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { world } = game.services;
+
+    game.eventBus.emit('synergy-unlocked', { family: 'thermal' });
+    game.eventBus.emit('upgrade-weapon', { weaponId: 'furnace-corona' });
+    game.eventBus.emit('apex-unlocked', { family: 'thermal' });
+
+    const timeline = world.buildRunSummary().stats.timeline;
+    expect(timeline.map(({ name, weaponId }) => [name, weaponId])).toEqual([
+      ['Incendiary Lance', 'lance'],
+      ['Sunheart', 'furnace-corona'],
+    ]);
   });
 });

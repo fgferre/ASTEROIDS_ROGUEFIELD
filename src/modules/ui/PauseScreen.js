@@ -1,10 +1,10 @@
 // src/modules/ui/PauseScreen.js
 //
 // The pause overlay: resume, settings, the HUD editor and quit (quit asks
-// twice, here and on the death recap), and the build panel with the
-// level-up tools left, where the run is and its seed.
+// twice, here and on the death screen), the run's build as the run end
+// shows it with the rerolls and banishes left, where the run is and its seed.
 
-import { buildBlockMarkup, collectBuild, runLocationLine } from './runRecap.js';
+import { collectBuild, endBuildMarkup, runLocationLine } from './runRecap.js';
 
 export class PauseScreen {
   /**
@@ -180,13 +180,13 @@ export class PauseScreen {
     }
   }
 
-  // The pause panel: the same build block as the death recap, plus the
-  // level-up tools left and where the run is.
+  // The pause panel: the run end's build block (runRecap.endBuildMarkup),
+  // plus the rerolls and banishes left and where the run is.
   renderPauseBuild() {
     const refs = this.refs;
     const progression = this.progression();
     if (!refs.build || !progression) return;
-    refs.build.innerHTML = buildBlockMarkup(
+    refs.build.innerHTML = endBuildMarkup(
       collectBuild(progression, this.combat())
     );
     refs.location.textContent = runLocationLine(this.layer());

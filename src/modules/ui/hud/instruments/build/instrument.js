@@ -18,6 +18,7 @@ import {
   WEAPON_FORMS,
 } from '../../../../../data/weapons.js';
 import { onDemand, replay } from '../../hudCommon.js';
+import { familyAccent } from '../../../upgradeCard.js';
 
 const CELLS = Array.from({ length: FAMILY_APEX_THRESHOLD }, (_, i) =>
   i === FAMILY_SYNERGY_THRESHOLD
@@ -169,7 +170,7 @@ export default {
     const lit = Math.min(FAMILY_APEX_THRESHOLD, cards);
     // The previewed card fills the next cell; at 3 or 5 it evolves.
     const gained = previewing && lit < FAMILY_APEX_THRESHOLD ? 1 : 0;
-    this.track.style.setProperty('--fam', UPGRADE_FAMILIES[family].color);
+    this.track.style.setProperty('--fam', familyAccent(family));
     this.familyLabel.textContent = UPGRADE_FAMILIES[family].name.toUpperCase();
     this.cells.forEach((cell, i) => {
       cell.classList.toggle('is-on', i < lit);

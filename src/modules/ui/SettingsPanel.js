@@ -58,11 +58,6 @@ export class SettingsPanel {
       capture: null,
       previousFocus: null,
     };
-    this.currentVisualPreferences = {
-      accessibility: {},
-      video: {},
-      derived: {},
-    };
     this.initializeSettingsMetadata();
   }
 
@@ -74,11 +69,6 @@ export class SettingsPanel {
   /** A binding button is waiting for its key or pad input. */
   get capturing() {
     return Boolean(this.settingsState.capture);
-  }
-
-  /** 'assist' while the color-blind palette is on, else 'standard'. */
-  get colorVision() {
-    return this.currentVisualPreferences.derived.colorVision || 'standard';
   }
 
   /** Redraws `categoryId` when it is the one on screen. */
@@ -373,7 +363,6 @@ export class SettingsPanel {
     if (body) {
       body.classList.toggle('hud-high-contrast', highContrast);
       body.classList.toggle('motion-reduced', reducedMotion);
-      body.classList.toggle('color-assist-mode', colorVision === 'assist');
       body.classList.toggle('flashing-reduced', Boolean(values.reduceFlashing));
       body.classList.toggle('subtitles-large', Boolean(values.largeSubtitles));
     }
@@ -459,14 +448,6 @@ export class SettingsPanel {
     const derived =
       values.derived ||
       this.deriveVisualPreferences(accessibility, video, graphics, gameplay);
-
-    this.currentVisualPreferences = {
-      accessibility,
-      video,
-      graphics,
-      gameplay,
-      derived,
-    };
 
     this.applyAccessibilitySettings(accessibility, derived);
     this.applyVideoSettings(video, derived);

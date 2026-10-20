@@ -74,12 +74,21 @@ describe('run end headline', () => {
     expect(inviteLine({ outcome: 'death', layer: 9, bestAtStart: 4 })).toBe(
       'A new best: <b>Layer 9</b>. The Ring goes on to 15.'
     );
+    expect(inviteLine({ outcome: 'death', layer: 18, bestAtStart: 16 })).toBe(
+      'A new best: <b>Layer 18</b>. The Deep Field goes on.'
+    );
   });
 });
 
 describe('run timeline', () => {
   const timeline = [
-    { kind: 'evolution', family: 'thermal', time: 250, layer: 3 },
+    {
+      kind: 'evolution',
+      family: 'thermal',
+      name: 'Incendiary Lance',
+      time: 250,
+      layer: 3,
+    },
     { kind: 'warden', name: 'Warden Prime', fight: 48, time: 362, layer: 5 },
     { kind: 'combo', combo: 48, time: 662, layer: 7 },
     {
@@ -96,7 +105,6 @@ describe('run timeline', () => {
       outcome: 'death',
       layer: 9,
       bestAtStart: 12,
-      weaponId: 'lance',
     });
     expect(model.reached).toBe(9.5);
     expect(model.wardenLayers).toEqual([

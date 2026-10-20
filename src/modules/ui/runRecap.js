@@ -18,7 +18,8 @@ import {
 } from './upgradeCard.js';
 
 // The run's framing (docs/NORTE.md §7 pillar 5): who killed the pilot, where,
-// and the build — the pause panel's block, and the run end's (endBuildMarkup).
+// and the build, the same block on the run end and the pause panel
+// (endBuildMarkup).
 
 /** "Elite Ram", "Warden Choir"; "the Field" when the last hit had no source. */
 export function killerName(source) {
@@ -60,7 +61,6 @@ export function collectBuild(progression, combat) {
     groups.get(key).push({
       name: definition.text?.name || definition.name || id,
       level,
-      maxLevel: Math.max(level, definition.levels?.length ?? level),
     });
   });
 
@@ -69,7 +69,6 @@ export function collectBuild(progression, combat) {
     return {
       id,
       name: family?.name ?? 'Other',
-      color: family?.color ?? null,
       bonusName: family?.bonus.name ?? null,
       owned: counts[id] ?? upgrades.length,
       active: active.has(id),
@@ -78,76 +77,6 @@ export function collectBuild(progression, combat) {
   });
 
   return { weapon: combat.getWeaponState(), families };
-}
-
-/** Filled/empty dots in the family's colour (level-up cards and the build). */
-export function pipsMarkup(filled, total) {
-  return Array.from(
-    { length: total },
-    (_, index) =>
-      `<span class="family-pip${index < filled ? ' is-filled' : ''}"></span>`
-  ).join('');
-}
-
-const familyStyle = (color) =>
-  color ? ` style="--family-color: ${color}"` : '';
-
-function familyMarkup(family) {
-  const synergy = family.bonusName
-    ? `<p class="upgrade-option__family-progress${
-        family.active ? ' is-active' : family.owned > 0 ? ' is-building' : ''
-      }">
-        <span class="family-pips" aria-hidden="true">${pipsMarkup(
-          family.owned,
-          FAMILY_SYNERGY_THRESHOLD
-        )}</span>
-        <span>${
-          family.active
-            ? `${family.name} · ${family.bonusName} online`
-            : `${family.name} ${Math.min(family.owned, FAMILY_SYNERGY_THRESHOLD)}/${FAMILY_SYNERGY_THRESHOLD} · ${family.bonusName}`
-        }</span>
-      </p>`
-    : `<p class="upgrade-option__family-progress">${family.name}</p>`;
-  const upgrades = family.upgrades
-    .map(
-      (upgrade) =>
-        `<li class="gameover-build__item">${upgrade.name}
-          <span class="family-pips" aria-label="Rank ${upgrade.level} of ${
-            upgrade.maxLevel
-          }">${pipsMarkup(upgrade.level, upgrade.maxLevel)}</span></li>`
-    )
-    .join('');
-  return `<li class="run-build__family${
-    family.active ? ' is-active' : ''
-  }"${familyStyle(family.color)}>
-      ${synergy}
-      <ul class="run-build__upgrades">${upgrades}</ul>
-    </li>`;
-}
-
-/** The build block: weapon and evolution chips, then upgrades by family. */
-export function buildBlockMarkup(build) {
-  const evolutions = build.weapon.evolutions
-    .map(
-      (evolution) =>
-        `<span class="upgrade-option__family" title="${
-          evolution.description || ''
-        }"${familyStyle(UPGRADE_FAMILIES[evolution.family]?.color)}>${
-          evolution.name
-        }</span>`
-    )
-    .join('');
-  const families = build.families.length
-    ? `<ul class="run-build__families">${build.families
-        .map(familyMarkup)
-        .join('')}</ul>`
-    : '<p class="run-build__empty">No upgrades yet</p>';
-  return `<div class="run-build__weapon">
-      <span class="run-build__label">Weapon</span>
-      <span class="run-build__weapon-name">${build.weapon.name}</span>
-      ${evolutions}
-    </div>
-    ${families}`;
 }
 
 // The main form of the build: an Apex first, else the evolution of the family
@@ -202,9 +131,9 @@ function endFamilyMarkup(family) {
 }
 
 /**
- * The run end's build: the weapon in its highest form with its other forms
- * as chips, the main family's track toward the Apex, then every family with
- * its cards and ranks.
+ * The build, on the run end and the pause panel: the weapon in its highest
+ * form with its other forms as chips, the main family's track toward the
+ * Apex, then every family with its cards and ranks.
  */
 export function endBuildMarkup(build) {
   const { weapon } = build;
@@ -237,7 +166,6 @@ export function endBuildMarkup(build) {
     : '<p class="end-empty">No upgrades this run.</p>';
   const tone = main ? `var(--${main.apex ? 'apex' : 'fam'})` : 'var(--text)';
   const famColor = main ? familyColor(main.family) : 'var(--text)';
-  return `<p class="end-lbl">Build</p>
-    <p class="end-weapon${main?.apex ? ' is-apex' : ''}" style="--fam: ${famColor}; --tone: ${tone}"><span class="end-weapon__name">${main?.name ?? weapon.name}</span>${chips}</p>
+  return `<p class="end-weapon${main?.apex ? ' is-apex' : ''}" style="--fam: ${famColor}; --tone: ${tone}"><span class="end-weapon__name">${main?.name ?? weapon.name}</span>${chips}</p>
     ${track}${families}`;
 }

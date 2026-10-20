@@ -48,13 +48,15 @@ const CURSED_ICON =
 
 const RARITY_MARKS = { common: 1, rare: 2, epic: 3 };
 
+/** A family's accent: its style.css token, which Colorblind Mode swaps. */
+export const familyAccent = (family) => `var(--family-${family})`;
+
 /** A family's colour on the screens (Maneuver's violet lightened to read). */
 export function familyColor(family) {
-  const color = UPGRADE_FAMILIES[family]?.color;
-  if (!color) return 'var(--text-dim)';
+  if (!UPGRADE_FAMILIES[family]) return 'var(--text-dim)';
   return family === 'maneuver'
-    ? `color-mix(in srgb, ${color} 55%, white)`
-    : color;
+    ? 'var(--family-maneuver-light)'
+    : familyAccent(family);
 }
 
 /** The family's shape, filled or as an outline. */
