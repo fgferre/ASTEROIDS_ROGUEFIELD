@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { getContent } from '../../../src/content/registry.js';
 import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import RandomService from '../../../src/core/RandomService.js';
+import { GamePools } from '../../../src/core/GamePools.js';
+import {
+  createHeadlessGame,
+  installDomStubs,
+} from '../../__helpers__/headlessGame.js';
 
 const recipe = getContent('enemies', 'twain');
 const Twain = recipeEnemyClass(recipe);
@@ -69,5 +74,33 @@ describe('Twain', () => {
     quarters[0].system = system;
     quarters[0].takeDamage(quarters[0].maxHealth);
     expect(system.spawned).toHaveLength(halves.length + quarters.length); // the last
+  });
+
+  it('a Retry keeps how many times a Twain has split: the last split does not split again', () => {
+    const restoreDom = installDomStubs();
+    try {
+      const game = createHeadlessGame();
+      game.session.startNewRun({ source: 'test' });
+      const { enemies } = game.services;
+      const twains = () =>
+        enemies.asteroids.filter(
+          (enemy) => enemy.type === 'twain' && !enemy.destroyed
+        );
+      enemies.acquireEnemyViaFactory('twain', {
+        x: 300,
+        y: 200,
+        wave: 11,
+        generation: SPLIT.generations,
+      });
+
+      enemies.importState(enemies.exportState());
+      const [restored] = twains();
+      expect(restored.generation).toBe(SPLIT.generations);
+      restored.takeDamage(restored.maxHealth);
+      expect(twains()).toHaveLength(0);
+    } finally {
+      GamePools.releaseAll();
+      restoreDom();
+    }
   });
 });

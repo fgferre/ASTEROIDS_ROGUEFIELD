@@ -1,6 +1,7 @@
 // src/modules/combat/firePatterns.js
 //
-// The fire patterns past the lance's, the beam's and the fan's (Weapons.js):
+// The fire patterns past the lance's (Weapons.js), the beam's and the fan's
+// (beamAndFan.js):
 // `chain`, lightning that jumps between enemies; `orbit`, blades circling the
 // ship; `aura`, a ring of heat that pulses round the ship; `seeker`, slow
 // missiles that turn onto their targets. Each `fire*` runs on a shot like
@@ -88,7 +89,8 @@ function emitFired(w, pattern, position, target = null, lockCount = 0) {
  * auto aim the primary lock first); each then jumps `jumps` times to the
  * nearest enemy within `jumpRange` px not struck yet, `fork` branches a hop,
  * at most `targets` enemies a cast, each hop dealing `falloff` × the one
- * before. Multishot adds a jump each, up to `maxJumps`. Nothing in reach:
+ * before. Multishot adds a jump each, up to `maxJumps`; the Chain
+ * Capacitor's extra jumps come on top. Nothing in reach:
  * the bolt crackles out and fades. An Apex form draws the heavy bolt.
  */
 export function fireChain(w, chain, playerPos, playerStats) {
@@ -111,7 +113,9 @@ export function fireChain(w, chain, playerPos, playerStats) {
   let damage = damageOf(playerStats, chain);
   firsts.forEach((enemy) => link(start, enemy, damage));
   const visited = [...firsts];
-  const jumps = Math.min(chain.maxJumps, chain.jumps + extraShots(playerStats));
+  const jumps =
+    Math.min(chain.maxJumps, chain.jumps + extraShots(playerStats)) +
+    (w.cards().cardEffects.chainCapacitor?.extraJumps ?? 0);
   let front = firsts;
   for (let hop = 0; hop < jumps && front.length; hop += 1) {
     damage *= chain.falloff;

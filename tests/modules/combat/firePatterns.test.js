@@ -109,6 +109,22 @@ describe('fire patterns', () => {
     expect(line[cast.jumps + 1].health).toBeLessThan(100);
   });
 
+  it('chain: with the Chain Capacitor each cast jumps once more', () => {
+    const cast = firstOf('arc-caster');
+    const line = Array.from({ length: cast.jumps + 3 }, (_, i) =>
+      enemy(`e${i}`, 200 + i * 100, 300)
+    );
+    const { combat, eventBus } = armed('arc-caster', line);
+    eventBus.emit('upgrade-chain-capacitor', {
+      extraJumps: 1,
+      doubleHitChance: 0.1,
+    });
+
+    combat.handleShooting(1, STATS);
+    const struck = line.filter((target) => target.health < 100);
+    expect(struck).toEqual(line.slice(0, cast.jumps + 2));
+  });
+
   it('chain: a hop past `jumpRange` breaks the chain; nothing in range crackles out and hits nothing', () => {
     const cast = firstOf('arc-caster');
     const near = enemy('near', 200, 300);
@@ -153,6 +169,20 @@ describe('fire patterns', () => {
     expect(combat.blades).toHaveLength(halo.blades + 2);
   });
 
+  it('orbit: a blade cut brings no lance evolution: with the Chain Lance it does not arc', () => {
+    const halo = firstOf('shard-halo');
+    const target = enemy('target', SHIP.x + halo.radius, SHIP.y);
+    const next = enemy('next', SHIP.x + halo.radius + 60, SHIP.y);
+    const { combat } = armed('shard-halo', [target, next]);
+    combat.weapons.evolveWeapon('arc');
+    expect(combat.weapons.hasEvolution('arc')).toBe(true);
+
+    tickWeaponField(combat.weapons, 0.01, STATS);
+    expect(target.health).toBeLessThan(100);
+    expect(next.health).toBe(100);
+    expect(combat.arcs).toHaveLength(0);
+  });
+
   it('orbit: the evolved ring breathes out to its reach and back', () => {
     const tide = firstOf('shard-halo', 'evolution');
     const { period, reach } = tide.sweep;
@@ -179,6 +209,18 @@ describe('fire patterns', () => {
     expect(inside.health).toBeCloseTo(100 - pulse, 6);
     combat.handleShooting(wait * 0.1 + 1e-6, STATS);
     expect(inside.health).toBeCloseTo(100 - 2 * pulse, 6);
+  });
+
+  it('aura: a pulse brings no lance evolution: with the Singularity it opens no well', () => {
+    const inside = enemy('inside', SHIP.x + 40, SHIP.y);
+    const { combat } = armed('furnace-corona', [inside]);
+    combat.weapons.apexWeapon('field');
+    expect(combat.weapons.hasApex('field')).toBe(true);
+
+    combat.handleShooting(1, STATS);
+    expect(inside.health).toBeLessThan(100);
+    expect(combat.cards.wells).toHaveLength(0);
+    expect(combat.cards.pulls.size).toBe(0);
   });
 
   it('aura: the Apex pulse sets what survives burning', () => {

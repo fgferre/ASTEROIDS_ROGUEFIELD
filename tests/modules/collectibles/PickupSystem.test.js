@@ -80,7 +80,20 @@ describe('PickupSystem', () => {
     expect(tokens(pickups)).toHaveLength(10);
 
     game.eventBus.emit('progression-reset');
-    expect(pickups.eliteAlwaysDrops).toBe(false);
+    expect(pickups.elitesAlwaysDrop()).toBe(false);
+  });
+
+  it("the Seeker Swarm's own Apex is no Motherlode: Elites drop at their chance", () => {
+    const game = startGame();
+    const { pickups } = game.services;
+    game.eventBus.emit('upgrade-weapon', { weaponId: 'seeker-swarm' });
+    game.eventBus.emit('apex-unlocked', { family: 'salvage' });
+
+    expect(pickups.elitesAlwaysDrop()).toBe(false);
+    for (let i = 0; i < 10; i += 1) {
+      game.eventBus.emit('enemy-destroyed', killPayload(true));
+    }
+    expect(tokens(pickups).length).toBeLessThan(10);
   });
 
   it("an Elite's drop chance rises gently with the layer", () => {
@@ -190,12 +203,15 @@ describe('PickupSystem', () => {
       wave: 1,
     });
     const warden = { type: 'boss', stunTimer: 0 };
+    // EnemyUpdateSystem stuns machines only: a rock drifts on.
+    const rock = { type: 'asteroid', stunTimer: 0 };
     const visit = enemies.forEachActiveEnemy.bind(enemies);
     const sweep = vi
       .spyOn(enemies, 'forEachActiveEnemy')
       .mockImplementation((callback) => {
         visit(callback);
         callback(warden);
+        callback(rock);
       });
     const shot = (type) =>
       combat.projectiles.createEnemyBullet({
@@ -213,6 +229,7 @@ describe('PickupSystem', () => {
     const { duration } = PICKUP_KINDS.stasis;
     expect(drone.stunTimer).toBe(duration);
     expect(warden.stunTimer).toBe(0);
+    expect(rock.stunTimer).toBe(0);
     combat.projectiles.updateEnemyBullets(0.5, null);
     expect(droneShot.y).toBe(100);
     expect(wardenShot.y).toBeCloseTo(160);

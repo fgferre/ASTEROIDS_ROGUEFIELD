@@ -3,7 +3,8 @@
 // The field's chests (PickupSystem owns them; numbers: CHEST in
 // data/pickups.js). A chest waits where it dropped until the ship touches
 // it; touched, it is claimed and opens as soon as no card choice is queued
-// or on screen and no other chest is opening. The opening slows the world
+// or on screen, no other chest is opening and no slow motion runs (a
+// Warden's arrival keeps its own). The opening slows the world
 // the way a Warden's arrival does (EffectsSystem.applyTimeDilation) and
 // keeps the ship safe; the lid opens over the hold and bursts in amber at
 // its end. Then one card every `cardInterval` s (chestRewards.js), through
@@ -78,7 +79,14 @@ export class Chests {
         chest.state = 'claimed';
       }
       if (chest.state === 'claimed') {
-        if (ship && !this.opening && !this.cardChoiceUp()) this.open(chest);
+        if (
+          ship &&
+          !this.opening &&
+          !this.cardChoiceUp() &&
+          !this.effects.isTimeDilated()
+        ) {
+          this.open(chest);
+        }
       } else if (chest.state === 'opening' && chest.timer >= OPEN_TIME) {
         this.burst(chest);
         chest.state = 'granting';

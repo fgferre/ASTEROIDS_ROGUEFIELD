@@ -195,11 +195,13 @@ export class CardEffects {
 
   // Sets `enemy` burning: `ticks` ticks of `damageFraction` × `damage` over
   // `duration` s (Incendiary Lance, the aura); `spreadTo` (an array) lets
-  // the Solar Flare spread it.
+  // the Solar Flare spread it. A burn set again keeps the time toward its
+  // next tick, so hits faster than its ticks do not put it out.
   ignite(enemy, damage, { duration, ticks, damageFraction }, spreadTo = null) {
+    const burning = this.burns.get(enemy);
     this.burns.set(enemy, {
       id: enemy.id,
-      timer: 0,
+      timer: burning?.id === enemy.id ? burning.timer : 0,
       interval: duration / ticks,
       ticksLeft: ticks,
       damage: damage * damageFraction,
@@ -477,19 +479,22 @@ export class CardEffects {
   }
 
   // Gravity Brake: undo part of this frame's travel near the ship, for
-  // enemies (not Wardens: they move on scripts) and every enemy shot.
+  // enemies (not Wardens: they move on scripts) and every enemy shot; what a
+  // Stasis or the Solar Flare holds did not travel.
   applyGravityBrake({ radius, slowFraction }, deltaTime) {
     const { x, y } = this.player().getPosition();
     const drag = slowFraction * deltaTime;
     const inField = (item) =>
       (item.x - x) ** 2 + (item.y - y) ** 2 <= radius * radius;
     this.weapons().forEachSolidEnemy((enemy) => {
-      if (enemy.type === 'boss' || !inField(enemy)) return;
+      if (enemy.type === 'boss' || enemy.stunTimer > 0 || !inField(enemy)) {
+        return;
+      }
       enemy.x -= (enemy.vx || 0) * drag;
       enemy.y -= (enemy.vy || 0) * drag;
     });
     this.enemyBullets().forEach((shot) => {
-      if (!inField(shot)) return;
+      if (shot.stasisTimer > 0 || !inField(shot)) return;
       shot.x -= (shot.vx || 0) * drag;
       shot.y -= (shot.vy || 0) * drag;
     });

@@ -6,6 +6,11 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
+import { burstFlak } from './combat/beamAndFan.js';
+import {
+  applyConcentratedFire,
+  computeParallelOffset,
+} from './combat/volleyLanes.js';
 import {
   holsterWeaponField,
   steerSeeker,
@@ -55,8 +60,7 @@ class CombatSystem extends BaseSystem {
       playerStats: () => this.lastKnownPlayerStats,
       bulletSpeed: () => this.weapons.bulletSpeed,
       spreadMode: () => this.weapons.spreadMode,
-      computeParallelOffset: (...args) =>
-        this.weapons.computeParallelOffset(...args),
+      computeParallelOffset,
     });
     this.projectiles = new Projectiles({
       physics: () => this.cachedPhysics,
@@ -71,7 +75,7 @@ class CombatSystem extends BaseSystem {
         lancePierce: this.weapons.lancePierce,
         pierceBonus: this.cards.pierceBonus,
       }),
-      burstFlak: (bolt) => this.weapons.burstFlak(bolt),
+      burstFlak: (bolt) => burstFlak(this.weapons, bolt),
       steer: (missile, dt) => steerSeeker(this.weapons, missile, dt),
     });
     this.hits = new HitResolution({
@@ -475,10 +479,6 @@ class CombatSystem extends BaseSystem {
     return this.weapons.evolutions;
   }
 
-  get apexes() {
-    return this.weapons.apexes;
-  }
-
   get lanceLook() {
     return this.weapons.lanceLook;
   }
@@ -539,7 +539,7 @@ class CombatSystem extends BaseSystem {
   }
 
   applyConcentratedFire(input, shotCount) {
-    return this.weapons.applyConcentratedFire(input, shotCount);
+    return applyConcentratedFire(this.weapons, input, shotCount);
   }
 
   evolveWeapon(family) {

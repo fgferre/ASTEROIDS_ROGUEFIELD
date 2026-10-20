@@ -16,6 +16,7 @@ const enemy = (id, x) => ({
 
 function makeCards(list = []) {
   const hits = [];
+  const damage = [];
   const enemies = {};
   const weapons = {
     beams: [],
@@ -39,11 +40,11 @@ function makeCards(list = []) {
     hits: () => ({
       processBulletHit: (hit, target, service) =>
         hits.push({ hit, target, service }),
-      applyDamageToEnemy: () => {},
+      applyDamageToEnemy: (service, target, amount) => damage.push(amount),
       pushEnemy: () => {},
     }),
   });
-  return { cards, hits, enemies, weapons };
+  return { cards, hits, damage, enemies, weapons };
 }
 
 describe('CardEffects', () => {
@@ -67,6 +68,36 @@ describe('CardEffects', () => {
       color: null,
       heavy: false,
     });
+  });
+
+  it('Gravity Brake holds back what moves near the ship, not what a Stasis froze', () => {
+    const moving = { ...enemy('moving', 150), vx: 100 };
+    const frozen = { ...enemy('frozen', 160), vx: 100, stunTimer: 1 };
+    const shots = [
+      { x: 120, y: 300, vx: 0, vy: 100, stasisTimer: 0 },
+      { x: 130, y: 300, vx: 0, vy: 100, stasisTimer: 1 },
+    ];
+    const { cards } = makeCards([moving, frozen]);
+    cards.enemyBullets = () => shots;
+
+    cards.applyGravityBrake({ radius: 200, slowFraction: 0.5 }, 0.1);
+    expect(moving.x).toBeCloseTo(145, 9);
+    expect(shots[0].y).toBeCloseTo(295, 9);
+    expect(frozen.x).toBe(160);
+    expect(shots[1].y).toBe(300);
+  });
+
+  it('a burn set again faster than it ticks still ticks on its own interval', () => {
+    const target = enemy('burning', 200);
+    const { cards, damage } = makeCards([target]);
+    // Sunheart's burn (a tick every 0.5 s) under pulses every 0.4 s.
+    const burn = { duration: 1.5, ticks: 3, damageFraction: 0.3 };
+    for (let frame = 0; frame < 170; frame += 1) {
+      if (frame % 24 === 0) cards.ignite(target, 10, burn);
+      cards.updateWeaponEffects(1 / 60);
+    }
+    expect(damage).toHaveLength(5);
+    damage.forEach((amount) => expect(amount).toBeCloseTo(3, 9));
   });
 
   it('ages the effects every tick and drops the expired ones', () => {

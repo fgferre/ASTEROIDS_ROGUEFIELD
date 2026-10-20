@@ -94,6 +94,7 @@ export function createHeadlessGame() {
   };
   const eventBus = new EventBus();
   const ui = {
+    chestCeremony: { current: null },
     handleBossEvent() {},
     showGameUI() {},
     showScreen() {},
@@ -154,6 +155,7 @@ export function createHeadlessGame() {
     services,
     eventBus,
     session,
+    ui,
     controller,
     takeOfferedUpgrade() {
       const id = offeredUpgrade;

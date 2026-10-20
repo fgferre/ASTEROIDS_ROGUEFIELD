@@ -386,7 +386,8 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     );
   }
 
-  const flare = combat.apexes.includes('thermal');
+  // The Solar Flare's glow: not on the Furnace Corona's own Apex burns.
+  const flare = combat.weapons.hasApex('thermal');
   combat.burns.forEach((entry, enemy) => {
     const rgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);
     const r = enemy.radius || 12;
