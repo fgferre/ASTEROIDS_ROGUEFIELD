@@ -60,8 +60,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 ## Som (palavras dele, 20/10)
 
 - **(18)** _"O som do jogo SFX precisa renascer do zero praticamente, tudo muito ruim também."_ → Rodada 15, frente 2:
-  amostras de verdade (CC0 curadas ou geradas por IA com a aprovação dele), página de audição `?sound=` onde ele
-  escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
+  amostras geradas pela skill local dele `/sfx-generator` (TangoFlux) e CC0 onde o modelo falha, página de audição
+  `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
   disser que o som está à altura do jogo.
 
 ## Fundo (palavras dele, 18/10, noite)

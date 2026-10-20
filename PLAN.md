@@ -22,8 +22,13 @@ paralelo, em arquivos disjuntos.
    tela de level-up mostrando o que cada carta completa ("esta fecha Afterburn").
 2. **SFX renascido.** Hoje todo efeito é sintetizado em código; impacto, tiro, explosão e interface assim nunca chegam a
    som de jogo profissional. Híbrido: **amostras de verdade** para todo evento (tiros, impactos, explosões, escudo,
-   pickups, cartas, interface, vozes dos Wardens) — biblioteca CC0 curada e/ou sons gerados por IA que ele aprove, com
-   licença anotada em `docs/creditos-audio.md`; 3–5 variações por evento, sorteio sem repetição, variação leve de tom e
+   pickups, cartas, interface, vozes dos Wardens) — **gerados na máquina dele pela skill local `/sfx-generator`
+   (modelo TangoFlux, texto → áudio; só a conversa local consegue invocá-la)**, com CC0 curado para o que o modelo faz
+   mal (cliques de interface, por exemplo); licença e origem de cada arquivo em `docs/creditos-audio.md` (conferir a
+   licença dos pesos do TangoFlux — há restrição a uso não comercial a verificar; o jogo é gratuito). Fluxo: `SOUND.md`
+   define a paleta → 3–5 candidatos por evento com variações de prompt e semente, duração curta → pós-processo (cortar
+   silêncio, normalizar loudness para um alvo único, fade, codificar em formato que Safari e Chrome tocam — mp3 ou
+   m4a; ogg não toca no Safari) → página de audição → só o escolhido entra em `src/public/audio/sfx/`; 3–5 variações por evento, sorteio sem repetição, variação leve de tom e
    volume, prioridade e limite de vozes; a infraestrutura de mix existente (barramentos, limitador, reverb, ducking, pan
    e distância) fica. Procedural só no contínuo (propulsor, zumbidos) e na música (stems em arquivo se ele reclamar).
    `SOUND.md` de uma página (paleta por família, regras de mix, orçamento de vozes e de MB, carregados no warm-up).
