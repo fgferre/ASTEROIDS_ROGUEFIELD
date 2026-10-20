@@ -134,8 +134,17 @@ export function mirrorEffects(t, effects, impact) {
     const rgb = rgbOf(THREE, p.color);
     if (p.type === 'debris') {
       t.debris.push(p, rgb);
-    } else if (p.type === 'smoke') {
-      t.smoke.push(p.x, 3, p.y, rgb, p.size * 2.8, p.alpha * 0.5);
+      continue;
+    }
+    // climbing or sinking with the chunks (debrisChunks.js), so a burst opens
+    // into a ball seen from the side, not a sheet
+    const up = t.debris.lift(
+      p,
+      undefined,
+      Math.max(0, (p.maxLife || 0) - (p.life || 0))
+    );
+    if (p.type === 'smoke') {
+      t.smoke.push(p.x, 3 + up, p.y, rgb, p.size * 2.8, p.alpha * 0.5);
     } else if (p.type === 'spark') {
       // stretched along velocity, like the 2D strokeSpark
       const speed = Math.hypot(p.vx, p.vy);
@@ -146,7 +155,7 @@ export function mirrorEffects(t, effects, impact) {
         p.y - p.vy * k,
         p.x + p.vx * k * 0.3,
         p.y + p.vy * k * 0.3,
-        2,
+        2 + up,
         rgb,
         Math.max(0.6, Math.min(stretch * 0.35, p.size * p.alpha)),
         1.6 * p.alpha
@@ -160,7 +169,7 @@ export function mirrorEffects(t, effects, impact) {
         p.y - cy,
         p.x + cx,
         p.y + cy,
-        2,
+        2 + up,
         rgb,
         Math.max(0.6, p.size * 0.4),
         2 * p.alpha
@@ -168,7 +177,7 @@ export function mirrorEffects(t, effects, impact) {
     } else {
       glow.push(
         p.x,
-        2,
+        2 + up,
         p.y,
         rgb,
         Math.max(1, p.size * p.alpha * 2.4),
@@ -176,7 +185,7 @@ export function mirrorEffects(t, effects, impact) {
         2
       );
       if (p.type === 'flare')
-        glow.push(p.x, 2.5, p.y, WHITE, p.size * 0.6, p.alpha, 2.5);
+        glow.push(p.x, 2.5 + up, p.y, WHITE, p.size * 0.6, p.alpha, 2.5);
     }
   }
 

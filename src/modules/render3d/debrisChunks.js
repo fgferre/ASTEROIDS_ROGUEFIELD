@@ -69,14 +69,18 @@ export class DebrisChunks {
     this.scale = new THREE.Vector3();
     this.axis = new THREE.Vector3();
     this.color = new THREE.Color();
-    // particle (pooled, so reused across lives) → { life, age, height }
+    // particle (pooled, so reused across lives) → { life, age, height, seed }
     this.lifts = new WeakMap();
+    // counts lives, to seed a slope for particles that carry no seed of their
+    // own (never Math.random: the simulation may own its stream)
+    this.lives = 0;
   }
 
   /**
    * How far particle `p` has climbed (+) or sunk (−) off the plane: its
    * planar speed × its slope, summed over its own clock (its age), so it
-   * holds still while the simulation is paused or slowed.
+   * holds still while the simulation is paused or slowed. Without a `seed`
+   * each life gets its own.
    */
   lift(p, seed, age) {
     let state = this.lifts.get(p);
@@ -89,8 +93,10 @@ export class DebrisChunks {
       state.life = p.maxLife;
       state.age = 0;
       state.height = 0;
+      this.lives += 1;
+      state.seed = this.lives * 0.618034;
     }
-    const sine = (hash01(seed + 5) * 2 - 1) * LIFT_SINE;
+    const sine = (hash01((seed ?? state.seed) + 5) * 2 - 1) * LIFT_SINE;
     const slope = sine / Math.sqrt(1 - sine * sine);
     state.height +=
       Math.hypot(p.vx || 0, p.vy || 0) * slope * (age - state.age);
