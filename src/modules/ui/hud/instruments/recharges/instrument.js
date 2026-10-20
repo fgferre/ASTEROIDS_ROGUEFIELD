@@ -83,7 +83,7 @@ export default {
 
   update({ now, ship, dash, shield }) {
     const at = ship
-      ? `${f((ship.x / 800) * 100)}%|${f((ship.y / 600) * 100)}%`
+      ? `${((ship.x / 800) * 100).toFixed(2)}%|${((ship.y / 600) * 100).toFixed(2)}%`
       : null;
     if (at !== this.at) {
       this.at = at;

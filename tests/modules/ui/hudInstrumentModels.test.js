@@ -136,7 +136,7 @@ describe('HUD instrument models', () => {
     expect(has('.rc-dash', 'is-on')).toBe(false);
     expect(has('.rc-dash', 'is-ready')).toBe(false);
     // Sized in screen pixels at the ship's screen point; no ship, no arcs.
-    expect(part('.rc').style.left).toBe('50%');
+    expect(part('.rc').style.left).toBe('50.00%');
     at(700, 0, null);
     expect(has('.rc', 'is-hidden')).toBe(true);
   });
@@ -172,6 +172,32 @@ describe('HUD instrument models', () => {
     at(9700, 0);
     expect(has('.hr', 'is-ring')).toBe(false);
     expect(has('.hr', 'is-low')).toBe(false);
+  });
+
+  it('on the ship: each drawn frame moves the hull ring and the recharges onto the ship as drawn, their state kept', () => {
+    const hud = new AAAHudLayout();
+    const ring = mount('hull-ring', 'instrument');
+    const recharges = mount('recharges', 'instrument');
+    hud._instruments = new Map([
+      ['hull-ring', ring.model],
+      ['recharges', recharges.model],
+    ]);
+    const ship = (hull) =>
+      hud.updateShip({ hull, maxHull: 100, ship: SHIP, dash: 0.5 });
+
+    ship(100);
+    ship(70);
+    hud.placeOnShip({ x: 200, y: 450 });
+    expect(ring.part('.hr-ring').style.left).toBe('25.00%');
+    expect(ring.part('.hr-ring').style.top).toBe('75.00%');
+    expect(recharges.part('.rc').style.left).toBe('25.00%');
+    expect(recharges.part('.rc').style.top).toBe('75.00%');
+    expect(ring.has('.hr', 'is-ring')).toBe(true);
+    expect(recharges.has('.rc-dash', 'is-on')).toBe(true);
+    // no ship drawn: no ring, no arcs
+    hud.placeOnShip(null);
+    expect(ring.has('.hr', 'is-ring')).toBe(false);
+    expect(recharges.has('.rc', 'is-hidden')).toBe(true);
   });
 
   it('warden: one bar split at its phases, draining right to left, "PHASE n/m", hits flash', () => {

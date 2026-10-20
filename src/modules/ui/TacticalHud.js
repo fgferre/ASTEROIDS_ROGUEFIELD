@@ -131,6 +131,11 @@ export class TacticalHud {
     this.layout.tickBuffs(deltaTime);
   }
 
+  /** The on-ship instruments onto the ship as the renderer just drew it. */
+  placeOnShip() {
+    this.layout?.placeOnShip(this.renderer()?.shipOnScreen ?? null);
+  }
+
   formatAAATacticalClock(totalSeconds) {
     const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
     const hours = Math.floor(seconds / 3600);
@@ -194,10 +199,8 @@ export class TacticalHud {
         maxShield,
         hull,
         maxHull,
-        ship:
-          player && renderer
-            ? renderer.worldToScreen(playerPosition.x, playerPosition.y)
-            : null,
+        // As last drawn: placeOnShip moves it with every drawn frame.
+        ship: player && renderer ? renderer.shipOnScreen : null,
         dash,
         shieldMode,
         shieldSeconds,

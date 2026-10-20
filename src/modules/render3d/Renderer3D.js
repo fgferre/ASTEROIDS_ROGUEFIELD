@@ -99,6 +99,9 @@ class Renderer3D extends BaseSystem {
     // Dolly, roll, field clamp, key shadow and cinematics (cameraRig.js).
     this.cameraRig = new CameraRig(this.camera);
     this.lastRenderTime = null;
+    // The ship's screen point as last drawn (trackShip), or null.
+    this.shipOnScreen = null;
+    this.shipPoint = { x: 0, y: 0 };
     this.three = null;
     this.failed = false;
     this.graphics = {
@@ -348,6 +351,22 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
+   * The ship's screen point as this frame draws it (worldToScreen's units):
+   * its drawn pose through the camera as posed this frame, so the HUD drawn
+   * on the ship (UISystem.placeOnShip, after each drawn frame) sits on it
+   * whatever the camera does, paused too. Null when no ship is drawn.
+   */
+  trackShip(player) {
+    const t = this.three;
+    const at = t.player.group.visible && player?.position;
+    // The pose updateCamera set, before the draw would apply it.
+    t.camera.updateMatrixWorld();
+    this.shipOnScreen = at
+      ? this.worldToScreen(at.x, at.y, this.shipPoint)
+      : null;
+  }
+
+  /**
    * Runs the intro descent over `durationMs`, then hands back to the follow
    * camera. False when nothing would move (WebGL failed, `?camera=0`,
    * reduced motion): the caller skips the cinematic.
@@ -534,6 +553,7 @@ class Renderer3D extends BaseSystem {
     this.camera.reset();
     this.cameraRig.reset();
     this.lastRenderTime = null;
+    this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
     this.three?.enemies.clear();
     this.three?.bursts.clear();
@@ -702,6 +722,7 @@ class Renderer3D extends BaseSystem {
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
+    this.trackShip(player);
     this.mirrorShield(player, time);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);

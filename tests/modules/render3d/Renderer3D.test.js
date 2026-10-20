@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { createCameraScene } from '../../../src/core/camera.js';
+import { projectToScreen } from '../../../src/core/cameraShot.js';
 import { EventBus } from '../../../src/core/EventBus.js';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import RandomService from '../../../src/core/RandomService.js';
@@ -7,6 +9,20 @@ import EffectsSystem from '../../../src/modules/EffectsSystem.js';
 import Renderer3D, {
   setBloomMips,
 } from '../../../src/modules/render3d/Renderer3D.js';
+import { FOV } from '../../../src/modules/render3d/sceneSetup.js';
+import { CAMERA_FAR } from '../../../src/modules/render3d/spaceField.js';
+
+// The vendored r128 build is UMD: evaluated with an `exports` object it
+// fills that object instead of a global.
+const THREE = {};
+new Function(
+  'exports',
+  'module',
+  readFileSync(
+    new URL('../../../src/public/libs/three.min.js', import.meta.url),
+    'utf8'
+  )
+)(THREE, {});
 
 describe('Renderer3D camera clamp', () => {
   it('keeps the dollied-out follow point inside the field', () => {
@@ -305,5 +321,83 @@ describe('Renderer3D boss flash', () => {
     expect(washAlpha(1, [effect(0.5), effect(0.3)])).toBeGreaterThan(
       washAlpha(1, [effect(0.5)])
     );
+  });
+});
+
+describe('Renderer3D ship on screen', () => {
+  // `frames` frames of the director's shot posed on a real perspective
+  // camera, as drawFrame poses it, with the ship drawn at (x, y), banking
+  // (a strafe rolls the shot); then the ship's point for the HUD.
+  const drawn = (aspect, wide, x, y, frames = 40) => {
+    const renderer = new Renderer3D();
+    const camera = new THREE.PerspectiveCamera(FOV, aspect, 10, CAMERA_FAR);
+    const t = {
+      THREE,
+      camera,
+      backdrop: { setWake() {} },
+      key: { castShadow: false },
+      player: { group: { visible: true } },
+    };
+    renderer.three = t;
+    const player = {
+      position: { x, y },
+      velocity: { vx: 0, vy: -90 },
+      angle: 0,
+    };
+    if (wide) renderer.camera.trigger('waveStart');
+    for (let i = 0; i < frames; i += 1) {
+      renderer.cameraRig.updateCamera(
+        t,
+        player,
+        [],
+        null,
+        null,
+        null,
+        1 / 60,
+        i === 0,
+        false
+      );
+    }
+    renderer.trackShip(player);
+    return renderer;
+  };
+
+  it("puts the HUD's ship point where the posed camera draws the ship, near and wide, at any aspect", () => {
+    const points = [
+      [400, 300],
+      [140, 470],
+      [650, 380],
+    ];
+    for (const aspect of [4 / 3, 16 / 9, 21 / 9, 9 / 16]) {
+      // the screen in pixels, 1080 tall
+      const width = 1080 * aspect;
+      for (const wide of [false, true]) {
+        for (const [x, y] of points) {
+          const renderer = drawn(aspect, wide, x, y);
+          const shot = `aspect ${aspect.toFixed(2)} at ${x},${y}`;
+          expect(renderer.camera.moment, shot).toBe(wide ? 'wide' : 'near');
+          const { shot: pose, lens } = renderer.cameraRig;
+          expect(lens.aspect, shot).toBe(aspect);
+          // the rig's own projection (core/cameraShot.js) of the same pose
+          const own = projectToScreen(pose, lens, x, y);
+          const hud = renderer.shipOnScreen;
+          expect((hud.x / 800) * width, shot).toBeCloseTo(
+            ((own.x + 1) / 2) * width,
+            2
+          );
+          expect((hud.y / 600) * 1080, shot).toBeCloseTo(
+            ((1 - own.y) / 2) * 1080,
+            2
+          );
+        }
+      }
+    }
+  });
+
+  it('has no ship point while no ship is drawn', () => {
+    const renderer = drawn(16 / 9, false, 400, 300, 1);
+    renderer.three.player.group.visible = false;
+    renderer.trackShip({ position: { x: 400, y: 300 } });
+    expect(renderer.shipOnScreen).toBeNull();
   });
 });
