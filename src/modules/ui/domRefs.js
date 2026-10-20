@@ -62,6 +62,7 @@ export function cacheStaticNodes() {
       container: document.getElementById('pause-screen') || null,
       resumeBtn: document.getElementById('pause-resume-btn') || null,
       settingsBtn: document.getElementById('pause-settings-btn') || null,
+      editHudBtn: document.getElementById('pause-edit-hud-btn') || null,
       exitBtn: document.getElementById('pause-exit-btn') || null,
       location: document.getElementById('pause-build-location') || null,
       build: document.getElementById('pause-build-block') || null,

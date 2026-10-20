@@ -20,6 +20,11 @@ import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
 import { TacticalHud } from './ui/TacticalHud.js';
+import { HudEditor } from './ui/hud/editor/HudEditor.js';
+import {
+  activePreset,
+  instrumentCatalog,
+} from './ui/hud/editor/layoutStore.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { HangarScreen } from './ui/HangarScreen.js';
 import { CodexScreen } from './ui/CodexScreen.js';
@@ -41,6 +46,8 @@ import {
   GAMEPAD_NAV_SCREENS,
   pickFocusTarget,
 } from './ui/gamepadNav.js';
+
+const STEP_ACTIONS = new Set(['up', 'down', 'left', 'right']);
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -131,6 +138,15 @@ class UISystem extends BaseSystem {
         );
       },
     });
+    this.hudEditor = new HudEditor({
+      hud: () => this.tacticalHud.layout,
+      settings: this.settings,
+      setLayout: (items) => this.tacticalHud.setLayout(items),
+      refresh: () => this.tacticalHud.refreshHudFromServices(true),
+      wardenLive: () =>
+        Boolean(this.tacticalHud.layout?.slotState('warden')?.active),
+      device: () => this.getService('input').getActiveDevice(),
+    });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
       pauseSettingsBtn: this.domRefs.pause.settingsBtn,
@@ -141,6 +157,7 @@ class UISystem extends BaseSystem {
         this.emitOverlayVisibilityChanged('settings', isOpen, payload),
       setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
+      openHudEditor: () => this.openHudEditor(),
     });
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
@@ -163,6 +180,7 @@ class UISystem extends BaseSystem {
       layer: () => this.transmissionLayer,
       settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
       closeSettings: () => this.settingsPanel.closeSettingsPanel(),
+      openHudEditor: () => this.openHudEditor(),
     });
     this.runEndScreens = new RunEndScreens({
       refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
@@ -216,9 +234,9 @@ class UISystem extends BaseSystem {
       this.resolveSettingsService()?.getCategoryValues('controls')?.hullControl
     );
 
-    // Direct AAA HUD Activation, in the HUD Layout setting's preset
-    this.tacticalHud.setPreset(
-      this.resolveSettingsService()?.getCategoryValues('video')?.hudLayout
+    // Direct AAA HUD Activation, in the HUD Layout setting's layout
+    this.followHudLayout(
+      this.resolveSettingsService()?.getCategoryValues('video')
     );
     this.tacticalHud.activateAAATacticalHud();
     if (this.tacticalHud.layout) {
@@ -252,6 +270,50 @@ class UISystem extends BaseSystem {
 
   getService(name) {
     return resolveService(name, this.dependencies);
+  }
+
+  /** The HUD Layout setting's layout on the HUD; the editor owns it while open. */
+  followHudLayout(video) {
+    if (!this.hudEditor.isOpen) {
+      this.tacticalHud.setLayout(
+        activePreset(video, instrumentCatalog()).items
+      );
+    }
+  }
+
+  /**
+   * Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
+   * editor over a paused run's HUD, or over the idle field from the menu;
+   * the screens it covers come back when it closes.
+   */
+  openHudEditor() {
+    if (this.hudEditor.isOpen || !this.tacticalHud.layout) {
+      return;
+    }
+    const { settingsState } = this.settingsPanel;
+    const settingsFrom = settingsState.isOpen ? settingsState.source : null;
+    const inRun = this.getService('game-state').getScreen() === 'playing';
+    const pause = document.getElementById('pause-screen');
+    const menu = document.getElementById('menu-screen');
+    const gameUI = document.getElementById('game-ui');
+    this.settingsPanel.closeSettingsPanel();
+    pause.classList.add('hidden');
+    if (!inRun) {
+      menu.classList.add('hidden');
+      gameUI.classList.remove('hidden');
+    }
+    this.hudEditor.open({
+      onClose: () => {
+        if (inRun) {
+          pause.classList.toggle('hidden', !this.pauseScreen.currentPauseState);
+        } else {
+          gameUI.classList.add('hidden');
+          menu.classList.remove('hidden');
+        }
+        if (settingsFrom) this.settingsPanel.openSettingsPanel(settingsFrom);
+        else this.domRefs.pause.editHudBtn?.focus({ preventScroll: true });
+      },
+    });
   }
 
   resolveSettingsService() {
@@ -474,6 +536,15 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
+      // The pad's Start resumes from anywhere: the editor keeps the run
+      // paused and asks before it closes.
+      if (this.hudEditor.isOpen) {
+        if (!data?.isPaused) {
+          queueMicrotask(() => this.eventBus.emit('toggle-pause'));
+          this.hudEditor.requestClose();
+        }
+        return;
+      }
       this.pauseScreen.updatePauseScreen(Boolean(data?.isPaused));
     });
 
@@ -495,6 +566,10 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('toggle-pause', () => {
+      // The HUD editor holds the pause screen (pause-state-changed below).
+      if (this.hudEditor.isOpen) {
+        return;
+      }
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
         this.pauseScreen.updatePauseScreen(Boolean(appState.isPaused()));
@@ -593,7 +668,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('settings-visual-changed', (payload = {}) => {
       this.settingsPanel.handleVisualPreferencesChange(payload);
-      this.tacticalHud.setPreset(payload.values?.video?.hudLayout);
+      this.followHudLayout(payload.values?.video);
     });
 
     this.registerEventListener('key-pressed', (payload) => {
@@ -647,6 +722,17 @@ class UISystem extends BaseSystem {
    * confirm bindings).
    */
   handleGamepadNav(action) {
+    // The HUD editor drives its instruments; its dialogs and panels move
+    // the focus like any screen.
+    if (this.hudEditor.isOpen) {
+      const root = this.hudEditor.navRoot;
+      if (root && (STEP_ACTIONS.has(action) || action === 'confirm')) {
+        this.navigateFocus(root, action);
+      } else {
+        this.hudEditor.handlePadNav(action);
+      }
+      return;
+    }
     const screen = this.getGamepadNavScreen();
     if (!screen || this.settingsPanel.capturing) {
       return;
@@ -663,17 +749,9 @@ class UISystem extends BaseSystem {
       case 'down':
       case 'left':
       case 'right':
-        this.moveGamepadFocus(element, action);
+      case 'confirm':
+        this.navigateFocus(element, action);
         break;
-      case 'confirm': {
-        const active = document.activeElement;
-        if (active && element.contains(active) && active !== element) {
-          active.click();
-        } else {
-          this.moveGamepadFocus(element, null);
-        }
-        break;
-      }
       case 'back':
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
         else if (id === 'codex') this.codexScreen.closeCodex();
@@ -694,6 +772,20 @@ class UISystem extends BaseSystem {
       }
       default:
         break;
+    }
+  }
+
+  /** A d-pad move or A in `root`: the focus moves, or the focused control is pressed. */
+  navigateFocus(root, action) {
+    if (action !== 'confirm') {
+      this.moveGamepadFocus(root, action);
+      return;
+    }
+    const active = document.activeElement;
+    if (active && root.contains(active) && active !== root) {
+      active.click();
+    } else {
+      this.moveGamepadFocus(root, null);
     }
   }
 

@@ -325,16 +325,26 @@ const SETTINGS_SCHEMA = [
         max: 1.3,
         step: 0.05,
       },
+      // The active layout: a built-in preset's id (data/ui/hudPresets.js)
+      // or one of `hudPresets`' (modules/ui/hud/editor/layoutStore.js).
       {
         key: 'hudLayout',
-        type: 'select',
-        control: 'segmented',
+        type: 'hudLayout',
         label: 'HUD Layout',
         description:
-          'Instrument: fine instruments that fade until needed, hull and dash on the ship. Classic: the panels from before.',
-        options: ['instrument', 'classic'],
-        optionLabels: { instrument: 'Instrument', classic: 'Classic' },
+          'Instrument: fine instruments that fade until needed. Classic: the panels from before. Minimal: the least on screen. Then your own layouts.',
         default: 'instrument',
+      },
+      // The player's own layouts, saved from the HUD editor; a reset of
+      // the Interface tab keeps them.
+      {
+        key: 'hudPresets',
+        type: 'hudPresets',
+        label: 'HUD Edit Mode',
+        description:
+          'Move, resize and swap every instrument on the live HUD, then save it as your own layout or share it as a code.',
+        default: [],
+        keepOnReset: true,
       },
       {
         key: 'damageFlash',

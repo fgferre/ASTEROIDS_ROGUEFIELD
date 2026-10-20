@@ -1,6 +1,8 @@
 // src/data/ui/hudPresets.js
 //
-// The HUD's presets (Settings → Interface → HUD Layout). A preset is the
+// The HUD's built-in presets (Settings → Interface → HUD Layout; the
+// player's own, made in Edit HUD Layout, live in the settings: see
+// modules/ui/hud/editor/layoutStore.js). A preset is the
 // list of layout items: each places one slot and picks its model, a file
 // under src/modules/ui/hud/instruments/<slot>/ (see that folder's
 // registry.js for the slots, the anchors and what each model is fed).
@@ -9,7 +11,8 @@
 //            (from both side edges, x in) inside the HUD's 16:9 frame, or
 //            'screen': the whole window (instruments drawn on the ship)
 //   x, y     px from the anchor at a 1080p window, scaled with the HUD
-//   plate    a soft dark plate behind the slot: the field's glowing border
+//   scale    0.6..1.6, grown from the anchored edge; opacity 0.2..1
+//   plate   a soft dark plate behind the slot: the field's glowing border
 //            fades out under it (HUD.md, Layout)
 //   visible  false leaves the slot empty
 
@@ -63,6 +66,29 @@ export const HUD_PRESETS = deepFreeze({
       item('vitals', 'classic', 'bottom-left', 16, 16),
       item('xp', 'classic', 'bottom-stretch', 236, 16),
       item('build', 'classic', 'bottom-right', 16, 16),
+    ],
+  },
+  // Less on screen: the vitals small just above the XP line at the bottom
+  // centre, a smaller radar, no run info and no feed.
+  minimal: {
+    id: 'minimal',
+    label: 'Minimal',
+    items: [
+      item('hull-ring', 'instrument', 'screen'),
+      item('recharges', 'instrument', 'screen'),
+      item('run-info', 'instrument', 'top-left', 32, 24, { visible: false }),
+      item('warden', 'instrument', 'top-center', 0, 24, plated),
+      item('radar', 'tactical', 'top-right', 24, 24, {
+        ...plated,
+        scale: 0.75,
+      }),
+      item('feed', 'instrument', 'top-right', 24, 228, { visible: false }),
+      item('vitals', 'instrument', 'bottom-center', 0, 56, {
+        ...plated,
+        scale: 0.8,
+      }),
+      item('xp', 'instrument', 'bottom-center', 0, 24, plated),
+      item('build', 'instrument', 'bottom-right', 32, 24, plated),
     ],
   },
 });

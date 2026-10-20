@@ -407,6 +407,9 @@ class SettingsSystem {
     }
 
     Object.keys(this.defaults[categoryId]).forEach((key) => {
+      if (this.findField(categoryId, key)?.keepOnReset) {
+        return;
+      }
       this.setSetting(categoryId, key, this.defaults[categoryId][key], {
         ...options,
         skipPersist: true,
@@ -427,8 +430,18 @@ class SettingsSystem {
   }
 
   resetAll(options = {}) {
+    // Fields marked keepOnReset hold the player's own things (saved HUD
+    // layouts): a reset keeps them.
     Object.keys(this.defaults).forEach((categoryId) => {
-      this.values[categoryId] = deepClone(this.defaults[categoryId]);
+      const kept = Object.fromEntries(
+        Object.entries(this.values[categoryId]).filter(
+          ([key]) => this.findField(categoryId, key)?.keepOnReset
+        )
+      );
+      this.values[categoryId] = {
+        ...deepClone(this.defaults[categoryId]),
+        ...kept,
+      };
     });
 
     this.persist();

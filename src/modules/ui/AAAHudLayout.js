@@ -12,7 +12,11 @@ import {
 import { FADE_OUT_MS, comboTier, replay } from './hud/hudCommon.js';
 import { getHudHtml } from './hud/hudMarkup.js';
 import { getHudCss } from './hud/hudStyles.js';
-import { mountInstruments } from './hud/instruments/registry.js';
+import {
+  mountInstruments,
+  mountKey,
+  placeInstruments,
+} from './hud/instruments/registry.js';
 
 // The pure helpers live with their panels; tests and TacticalHud read them here.
 export {
@@ -39,6 +43,8 @@ export class AAAHudLayout {
   constructor({ items = getHudPreset(DEFAULT_HUD_PRESET).items } = {}) {
     this._items = items;
     this._instruments = new Map();
+    // The state each slot's model was last given (the HUD editor's thumbnails).
+    this._slotStates = new Map();
     this._mounted = false;
     this._styleElement = null;
     this._root = null;
@@ -105,15 +111,47 @@ export class AAAHudLayout {
     this._mounted = true;
   }
 
-  /** Swaps the instruments for another preset's items (the HUD stays up). */
-  setItems(items) {
+  /**
+   * Swaps the instruments for another layout's items (the HUD stays up).
+   * Items that only move instruments keep them mounted; `remount` mounts
+   * fresh ones anyway (the HUD editor's samples go). True when fresh ones
+   * were mounted: they wait for their state.
+   */
+  setItems(items, { remount = false } = {}) {
+    const moved = !remount && mountKey(items) === mountKey(this._items);
     this._items = items;
     if (!this._mounted) {
-      return;
+      return false;
     }
-    this._destroyInstruments();
-    this._mountInstruments();
+    if (moved) {
+      placeInstruments(this._layer, items);
+    } else {
+      this._destroyInstruments();
+      this._mountInstruments();
+    }
     this.invalidatePanelCorners();
+    return !moved;
+  }
+
+  /** The layer the slots sit in (#hud-layer), once mounted. */
+  get layer() {
+    return this._layer;
+  }
+
+  /** The model mounted in `slot`, or undefined (the HUD editor's samples). */
+  instrument(slot) {
+    return this._instruments.get(slot);
+  }
+
+  /** The state `slot`'s model was last given, or undefined. */
+  slotState(slot) {
+    return this._slotStates.get(slot);
+  }
+
+  // One slot's state this frame, to its model.
+  _feed(slot, state) {
+    this._slotStates.set(slot, state);
+    this._instruments.get(slot)?.update(state);
   }
 
   _mountInstruments() {
@@ -138,6 +176,7 @@ export class AAAHudLayout {
 
   unmount() {
     this._destroyInstruments();
+    this._slotStates.clear();
     if (this._root && this._root.parentNode) {
       this._root.parentNode.removeChild(this._root);
     }
@@ -535,7 +574,7 @@ export class AAAHudLayout {
       hull: safeValue(hull),
       maxHull: safeMax(maxHull),
     };
-    this._instruments.get('vitals')?.update({
+    this._feed('vitals', {
       ...vitals,
       now,
       shieldMode,
@@ -543,10 +582,8 @@ export class AAAHudLayout {
       shieldCooldown,
       shieldKey,
     });
-    this._instruments.get('hull-ring')?.update({ ...vitals, now, ship });
-    this._instruments
-      .get('recharges')
-      ?.update({ now, ship, dash, shield: shieldCooldown });
+    this._feed('hull-ring', { ...vitals, now, ship });
+    this._feed('recharges', { now, ship, dash, shield: shieldCooldown });
   }
 
   /**
@@ -555,7 +592,7 @@ export class AAAHudLayout {
    * a feed row.
    */
   updateStats({ clock, seconds, layer, kills, combo, multiplier }) {
-    this._instruments.get('run-info')?.update({
+    this._feed('run-info', {
       now: performance.now(),
       clock,
       seconds,
@@ -585,7 +622,7 @@ export class AAAHudLayout {
    * and the beam count ride along.
    */
   updateBuild({ weapon, families, spreadMode, aimMode, dash }) {
-    this._instruments.get('build')?.update({
+    this._feed('build', {
       now: performance.now(),
       weapon,
       families,
@@ -645,7 +682,7 @@ export class AAAHudLayout {
       this._layer.dataset.hudMode = warden ? 'warden' : 'calm';
     }
     const now = performance.now();
-    this._instruments.get('warden')?.update({
+    this._feed('warden', {
       now,
       active: Boolean(active),
       shown: now >= this._bossBarHeldUntil,
@@ -662,7 +699,7 @@ export class AAAHudLayout {
 
   /** XP toward the next level, the level and the layer. */
   updateExperience({ level, current, required, layer }) {
-    this._instruments.get('xp')?.update({ level, current, required, layer });
+    this._feed('xp', { level, current, required, layer });
   }
 
   updateNextWaveTimer(seconds) {
@@ -691,7 +728,7 @@ export class AAAHudLayout {
    * documented in hud/instruments/registry.js).
    */
   updateRadar(state) {
-    this._instruments.get('radar')?.update(state);
+    this._feed('radar', state);
   }
 
   /** Field units the radar reaches: its model's range, after Dense Fog. */

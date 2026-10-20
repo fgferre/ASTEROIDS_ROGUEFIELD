@@ -148,10 +148,10 @@ describe('HUD instruments', () => {
     hud.layout = layout;
     const destroyed = vi.spyOn(layout._instruments.get('xp'), 'destroy');
 
-    hud.setPreset('classic');
+    hud.setLayout(getHudPreset('classic').items);
 
     expect(destroyed).toHaveBeenCalled();
-    expect(hud.presetId).toBe('classic');
+    expect(hud.items).toBe(getHudPreset('classic').items);
     expect(layout._instruments.get('xp').id).toBe('classic');
     expect(layout._instruments.get('radar').id).toBe('classic');
     expect(layout._instruments.has('recharges')).toBe(false);
@@ -159,7 +159,7 @@ describe('HUD instruments', () => {
       layout._layer.slots.get('build').classList.contains('hud-plate')
     ).toBe(false);
 
-    hud.setPreset('instrument');
+    hud.setLayout(getHudPreset('instrument').items);
     expect(layout._instruments.get('vitals').id).toBe('instrument');
     expect(
       layout._layer.slots.get('build').classList.contains('hud-plate')

@@ -27,6 +27,7 @@ export class SettingsPanel {
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
    * `setHudBaseScale(scale)`: the HUD scale setting; HUD and viewport follow.
    * `livePreset()`: the preset Auto quality runs now (Graphics preview).
+   * `openHudEditor()`: Interface → Edit HUD Layout.
    */
   constructor({
     refs,
@@ -37,6 +38,7 @@ export class SettingsPanel {
     announceVisibility,
     setHudBaseScale,
     livePreset,
+    openHudEditor,
   }) {
     this.refs = refs;
     this.pauseSettingsBtn = pauseSettingsBtn;
@@ -46,6 +48,7 @@ export class SettingsPanel {
     this.announceVisibility = announceVisibility;
     this.setHudBaseScale = setHudBaseScale;
     this.livePreset = livePreset;
+    this.openHudEditor = openHudEditor;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
@@ -543,6 +546,10 @@ export class SettingsPanel {
       );
       return;
     }
+    if (event.target.closest('[data-action="edit-hud-layout"]')) {
+      this.openHudEditor();
+      return;
+    }
     const captureButton = event.target.closest(
       '[data-action="capture-binding"]'
     );
@@ -710,7 +717,12 @@ export class SettingsPanel {
     const values = this.settings?.getCategoryValues(categoryId) || {};
 
     ensureArray(category.fields).forEach((field) => {
-      const element = renderSettingField(categoryId, field, values[field.key]);
+      const element = renderSettingField(
+        categoryId,
+        field,
+        values[field.key],
+        values
+      );
       if (!element) {
         return;
       }

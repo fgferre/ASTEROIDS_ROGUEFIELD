@@ -99,6 +99,23 @@ export function mountInstruments(root, items, screen) {
   return mounted;
 }
 
+/** What a layout mounts: equal for two layouts that only move instruments. */
+export function mountKey(items) {
+  return items
+    .map(({ slot, model, visible }) => `${slot}/${model}/${visible}`)
+    .join();
+}
+
+/**
+ * Moves each item's slot to its place, keeping what is mounted (the HUD
+ * editor's drags): only for items with the mounted ones' mountKey.
+ */
+export function placeInstruments(root, items) {
+  for (const item of items) {
+    placeSlot(root.querySelector(`[data-slot="${item.slot}"]`), item);
+  }
+}
+
 // Offsets scale with the HUD (--hud-u, hudStyles.js).
 const px = (n) => `calc(${n}px * var(--hud-u, 1))`;
 

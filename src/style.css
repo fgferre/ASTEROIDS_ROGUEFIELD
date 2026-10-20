@@ -1321,6 +1321,11 @@ select {
   width: 100%;
 }
 
+/* Resume, then Settings and Edit HUD side by side, then Quit across */
+.pause-actions > :last-child {
+  grid-column: 1 / -1;
+}
+
 .gameover-actions .btn {
   width: 100%;
   padding: var(--space-4) var(--space-5);

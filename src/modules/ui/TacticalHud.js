@@ -5,6 +5,7 @@
 // bar) and pushes the run's events into it (banners, feeds, buffs, radar).
 
 import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
+import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
@@ -65,8 +66,9 @@ export class TacticalHud {
     // The mounted AAAHudLayout; transmissions, cinematics and onboarding
     // draw on it too.
     this.layout = null;
-    // Settings → Interface → HUD Layout (data/ui/hudPresets.js).
-    this.presetId = DEFAULT_HUD_PRESET;
+    // The layout on screen: Settings → Interface → HUD Layout's preset
+    // (hud/editor/layoutStore.js), or the HUD editor's draft.
+    this.items = getHudPreset(DEFAULT_HUD_PRESET).items;
     this.cachedValues = { boss: { visible: false } };
     this.bossHudState = this.createInitialBossHudState();
   }
@@ -84,20 +86,20 @@ export class TacticalHud {
 
     mountTarget.style.padding = '0px';
 
-    this.layout = new AAAHudLayout({
-      items: getHudPreset(this.presetId).items,
-    });
+    this.layout = new AAAHudLayout({ items: this.items });
     this.layout.mount(mountTarget);
   }
 
-  /** The HUD Layout setting: the preset's instruments replace the current ones. */
-  setPreset(id) {
-    if (!id || id === this.presetId) {
+  /** A layout's items replace the ones on screen (the same ones: no-op). */
+  setLayout(items) {
+    if (!items || sameLayout(items, this.items)) {
       return;
     }
-    this.presetId = id;
-    this.layout?.setItems(getHudPreset(id).items);
-    this.updateAAATacticalHudFromServices({ force: true });
+    this.items = items;
+    // Instruments that only moved keep their state; fresh ones need it.
+    if (this.layout?.setItems(items)) {
+      this.updateAAATacticalHudFromServices({ force: true });
+    }
   }
 
   resolveAAATacticalMountTarget() {
