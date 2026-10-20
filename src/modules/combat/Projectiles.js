@@ -24,7 +24,7 @@ export class Projectiles {
   /**
    * `physics()`: the physics service (buildPlayerCollisionContext, checkCircleCollision).
    * `emit(name, payload)`: sends bullet-created and player-hit-by-projectile.
-   * `weapon()`: the ship's shot right now, a fresh plain object: { weaponId, bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceDamageTuning, lanceApexDamage, lancePierce, pierceBonus }.
+   * `weapon()`: the ship's shot right now, a fresh plain object: { weaponId, bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceApexDamage, lancePierce, pierceBonus }.
    * `burstFlak(bolt)`: bursts a projectile with a `burst` at the end of its range (the weapon's hit path).
    */
   constructor({ physics, emit, weapon, burstFlak }) {
@@ -65,6 +65,9 @@ export class Projectiles {
     // Configure bullet properties
     bullet.x = fromPos.x;
     bullet.y = fromPos.y;
+    // Where it left the muzzle: Afterburn Lance counts the flight.
+    bullet.originX = fromPos.x;
+    bullet.originY = fromPos.y;
     const speed = weapon.bulletSpeed * projectile.speedMultiplier;
     bullet.vx = (dx / distance) * speed;
     bullet.vy = (dy / distance) * speed;
@@ -73,8 +76,7 @@ export class Projectiles {
       weapon.thermalLens && !firePattern(definition, 'beam')
         ? weapon.thermalLens.lanceDamageMultiplier
         : 1;
-    const shotDamage =
-      damage * weapon.lanceDamageTuning * lens * weapon.lanceApexDamage;
+    const shotDamage = damage * lens * weapon.lanceApexDamage;
     // A projectile with a range lives until the end of it.
     const life = projectile.range
       ? projectile.range / speed

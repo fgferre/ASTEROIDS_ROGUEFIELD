@@ -1,5 +1,7 @@
-// Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
+
+// Dense slugs that finish what is already cracked (numbers: proposta 20/10).
+const THRESHOLD = 0.5; // of the enemy's max health
 
 export default {
   id: 'ballast_rounds',
@@ -10,26 +12,27 @@ export default {
   icon: '🪨',
   themeColor: PALETTE.player,
   unlockLevel: 1,
-  tags: ['damage', 'trade-off'],
+  tags: ['damage', 'finisher'],
   text: {
     name: 'Ballast Rounds',
-    summary: 'Packs every lance with dense slag: harder hits, slower breech.',
+    summary:
+      'Packs every shot with dense slag: what is already cracked comes apart.',
     lore: 'Ring hull scrap pressed into slugs. Heavier than it looks.',
     levels: [
       {
         title: 'Lead Core',
-        description: 'Lance damage +8%, fire rate -4%.',
-        highlights: ['Harmonic beams keep their damage.'],
+        description: 'Hits on enemies below half health deal +30% damage.',
+        highlights: ['Every weapon, the Harmonic beam included.'],
       },
       {
         title: 'Slag Core',
-        description: 'Lance damage +17%, fire rate -8% (cumulative).',
-        highlights: ['Another +8% damage and -4% fire rate.'],
+        description: 'Hits on enemies below half health deal +60% damage.',
+        highlights: ['The second half of every fight goes faster.'],
       },
       {
         title: 'Dead Weight',
-        description: 'Lance damage +26%, fire rate -11% (cumulative).',
-        highlights: ['Fewer shots, each one counts.'],
+        description: 'Hits on enemies below half health deal +100% damage.',
+        highlights: ['Wardens too, once they are half down.'],
       },
     ],
   },
@@ -39,8 +42,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-weapon-tuning',
-          payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          event: 'upgrade-execute-damage',
+          payload: { threshold: THRESHOLD, damageMultiplier: 1.3 }, // proposta 20/10
         },
       ],
     },
@@ -49,8 +52,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-weapon-tuning',
-          payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          event: 'upgrade-execute-damage',
+          payload: { threshold: THRESHOLD, damageMultiplier: 1.6 }, // proposta 20/10
         },
       ],
     },
@@ -59,8 +62,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-weapon-tuning',
-          payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          event: 'upgrade-execute-damage',
+          payload: { threshold: THRESHOLD, damageMultiplier: 2 }, // proposta 20/10
         },
       ],
     },

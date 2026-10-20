@@ -1,36 +1,35 @@
-// Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'scrap_compactor',
   order: 39,
-  category: 'utility',
+  category: 'defense',
   family: 'salvage',
   rarity: 'common',
   icon: '🗜️',
   themeColor: PALETTE.xp,
   unlockLevel: 1,
-  tags: ['xp', 'collection'],
+  tags: ['repair', 'level-up'],
   text: {
     name: 'Scrap Compactor',
     summary:
-      'Crushes the slag out of every orb so only the Ring light is left.',
+      'Presses the slag out of every orb into hull patches: each level-up repairs the ship.',
     lore: 'Bolted to the hold by a salvager who hated wasted space.',
     levels: [
       {
         title: 'Hand Press',
-        description: 'XP from orbs +6%.',
-        highlights: ['Applies before the combo multiplier.'],
+        description: 'Every level-up repairs 8 hull.',
+        highlights: ['The more you level, the more you mend.'],
       },
       {
         title: 'Hydraulic Press',
-        description: 'XP from orbs +12% (cumulative).',
-        highlights: ['Another +6%.'],
+        description: 'Every level-up repairs 14 hull.',
+        highlights: ['Every XP bonus now heals too.'],
       },
       {
         title: 'Mass Press',
-        description: 'XP from orbs +19% (cumulative).',
-        highlights: ['Another +6%.'],
+        description: 'Every level-up repairs 20 hull.',
+        highlights: ["Close to a heart's worth on every level-up."],
       },
     ],
   },
@@ -39,10 +38,9 @@ export default {
       rank: 1,
       effects: [
         {
-          type: 'progression',
-          property: 'xpGainMultiplier',
-          operation: 'multiply',
-          value: 1.06,
+          type: 'event',
+          event: 'upgrade-level-up-repair',
+          payload: { repair: 8 }, // proposta 20/10
         },
       ],
     },
@@ -50,10 +48,9 @@ export default {
       rank: 2,
       effects: [
         {
-          type: 'progression',
-          property: 'xpGainMultiplier',
-          operation: 'multiply',
-          value: 1.06,
+          type: 'event',
+          event: 'upgrade-level-up-repair',
+          payload: { repair: 14 }, // proposta 20/10
         },
       ],
     },
@@ -61,10 +58,9 @@ export default {
       rank: 3,
       effects: [
         {
-          type: 'progression',
-          property: 'xpGainMultiplier',
-          operation: 'multiply',
-          value: 1.06,
+          type: 'event',
+          event: 'upgrade-level-up-repair',
+          payload: { repair: 20 }, // proposta 20/10
         },
       ],
     },

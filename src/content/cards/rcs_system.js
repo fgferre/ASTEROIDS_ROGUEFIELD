@@ -1,3 +1,7 @@
+// Snappier thrust (numbers: proposta 20/10): under thrust the push and the
+// drag both scale by `multiplier`, so the top speed stays and everything that
+// leads to it is that much quicker. Measured (modern, base hull): full speed
+// from a standstill in 0.53 s and a full reversal in 0.75 s without the card.
 export default {
   id: 'rcs_system',
   order: 22,
@@ -7,7 +11,7 @@ export default {
   icon: '🛰️',
   themeColor: '#5DADE2',
   unlockLevel: 2,
-  tags: ['rotation', 'agility', 'maneuvers'],
+  tags: ['agility', 'maneuvers'],
   prerequisites: [
     {
       type: 'upgrade',
@@ -19,33 +23,34 @@ export default {
   text: {
     name: 'RCS System',
     summary:
-      'Enables maneuvering thrusters for precise rotation and agility control.',
+      'Maneuvering thrusters bite harder: the ship gets to speed, turns and reverses sooner, at the same top speed.',
     lore: 'Reaction Control System salvaged from abandoned space stations. Allows maneuvers impossible for conventional ships.',
     levels: [
       {
         title: 'Basic RCS',
-        description: 'Enables auxiliary thrusters for +15% rotation.',
-        highlights: ['Noticeable response in tight turns.'],
+        description:
+          'Under thrust, changes of speed and direction are 30% quicker: a full reversal in 0.6 s instead of 0.75 s.',
+        highlights: ['Top speed is unchanged: that is Main Thrusters.'],
       },
       {
         title: 'Active RCS',
-        description: 'Rotation +32% and angular damping -12%.',
-        highlights: ['Noticeably faster, more precise turns.'],
+        description: '60% quicker: a full reversal in 0.5 s.',
+        highlights: ['Full speed from a standstill in a third of a second.'],
       },
       {
         title: 'Enhanced RCS',
-        description: 'Rotation +55% and angular damping -25%.',
-        highlights: ['Space fighter control. Instant turns.'],
+        description: '90% quicker: a full reversal in 0.4 s.',
+        highlights: ['Dodge back the way you came.'],
       },
       {
         title: 'Vector RCS',
-        description: 'Rotation +90% and angular damping -40%.',
-        highlights: ['Superhuman control. Instant reversals.'],
+        description: '2.2 times as quick: a full reversal in 0.35 s.',
+        highlights: ['The ship goes where the keys point.'],
       },
       {
         title: 'Omni-directional RCS',
-        description: 'Rotation +130% and strafe thrust +15%.',
-        highlights: ['Sharper sidesteps around incoming fire.'],
+        description: '2.6 times as quick: a full reversal in 0.3 s.',
+        highlights: ['Starts, stops and turns all but instant.'],
       },
     ],
   },
@@ -55,8 +60,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-rotation-boost',
-          payload: { multiplier: 1.15 },
+          event: 'upgrade-thrust-agility',
+          payload: { multiplier: 1.3 }, // proposta 20/10
         },
         {
           type: 'event',
@@ -70,13 +75,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-rotation-boost',
-          payload: { multiplier: 1.148 }, // Total: 1.32
-        },
-        {
-          type: 'event',
-          event: 'upgrade-angular-damping',
-          payload: { multiplier: 0.88 }, // -12%
+          event: 'upgrade-thrust-agility',
+          payload: { multiplier: 1.6 }, // proposta 20/10
         },
         {
           type: 'event',
@@ -90,13 +90,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-rotation-boost',
-          payload: { multiplier: 1.174 }, // Total: 1.55
-        },
-        {
-          type: 'event',
-          event: 'upgrade-angular-damping',
-          payload: { multiplier: 0.852 }, // Total: 0.75
+          event: 'upgrade-thrust-agility',
+          payload: { multiplier: 1.9 }, // proposta 20/10
         },
         {
           type: 'event',
@@ -110,13 +105,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-rotation-boost',
-          payload: { multiplier: 1.226 }, // Total: 1.90
-        },
-        {
-          type: 'event',
-          event: 'upgrade-angular-damping',
-          payload: { multiplier: 0.8 }, // Total: 0.60
+          event: 'upgrade-thrust-agility',
+          payload: { multiplier: 2.2 }, // proposta 20/10
         },
         {
           type: 'event',
@@ -130,23 +120,13 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-rotation-boost',
-          payload: { multiplier: 1.211 }, // Total: 2.30
-        },
-        {
-          type: 'event',
-          event: 'upgrade-angular-damping',
-          payload: { multiplier: 1.0 }, // Total: 0.60 (no change)
+          event: 'upgrade-thrust-agility',
+          payload: { multiplier: 2.6 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
           payload: { level: 5 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-strafe-movement',
-          payload: { multiplier: 1.15 },
         },
       ],
     },

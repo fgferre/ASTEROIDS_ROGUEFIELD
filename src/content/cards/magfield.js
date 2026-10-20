@@ -16,20 +16,18 @@ export default {
     levels: [
       {
         title: 'Flux Lenses',
-        description: 'Increases collection range by +40%.',
-        highlights: [
-          'Multiplies current radius and intensifies attraction force.',
-        ],
+        description: 'Collection range +40% and orb pull +35%.',
+        highlights: ['Orbs start flying to you from further away.'],
       },
       {
         title: 'Dual Catalyst',
-        description: 'Expands accumulated bonus to +75% range.',
-        highlights: ['Applies additional 25% increment over current radius.'],
+        description: 'Collection range +75% and orb pull +69% (cumulative).',
+        highlights: ['Another +25% range and +25% pull.'],
       },
       {
         title: 'Harmonic Weave',
-        description: 'Stabilizes field at +105% total range.',
-        highlights: ['Adds 15% extra radius and reinforces magnetic force.'],
+        description: 'Collection range +100% and orb pull +94% (cumulative).',
+        highlights: ['Twice the reach you started with.'],
       },
     ],
   },
@@ -37,12 +35,6 @@ export default {
     {
       rank: 1,
       effects: [
-        {
-          type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.4,
-        },
         {
           type: 'progression',
           property: 'magnetismForce',
@@ -61,12 +53,6 @@ export default {
       effects: [
         {
           type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.25,
-        },
-        {
-          type: 'progression',
           property: 'magnetismForce',
           operation: 'multiply',
           value: 1.25,
@@ -81,12 +67,6 @@ export default {
     {
       rank: 3,
       effects: [
-        {
-          type: 'progression',
-          property: 'orbMagnetismRadius',
-          operation: 'multiply',
-          value: 1.15,
-        },
         {
           type: 'progression',
           property: 'magnetismForce',

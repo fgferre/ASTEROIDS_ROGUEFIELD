@@ -1,10 +1,11 @@
 // src/modules/combat/HitResolution.js
 //
 // What a hit does: a lance, beam, flak bolt, shrapnel or chain hit lands its
-// damage through the enemy service, then the knockback, the beam's extra
-// split, the Prospector's orbs and the evolutions' burn, slow, pull and
-// chain. CombatSystem owns it and resolves the collisions through it after
-// the shots move; the weapons and the card effects land their hits here too.
+// damage (raised by Afterburn Lance and Ballast Rounds) through the enemy
+// service, then the knockback, the beam's extra split, the Prospector's orbs,
+// the evolutions' burn, slow, pull and chain, and a kill's Capacitor spark.
+// CombatSystem owns it and resolves the collisions through it after the
+// shots move; the weapons and the card effects land their hits here too.
 
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
@@ -66,6 +67,26 @@ export class HitResolution {
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
       requestedDamage *= 2;
+    }
+    // Afterburn Lance: a round hits harder the further it flew.
+    const longBurn = cards.cardEffects.longBurn;
+    if (longBurn && bullet.projectile && Number.isFinite(bullet.originX)) {
+      const flown = Math.hypot(
+        bullet.x - bullet.originX,
+        bullet.y - bullet.originY
+      );
+      requestedDamage *=
+        1 +
+        (longBurn.bonusPer100px * Math.min(flown, longBurn.maxDistance)) / 100;
+    }
+    // Ballast Rounds: more damage to an enemy already below the threshold.
+    const execute = cards.cardEffects.executeDamage;
+    if (
+      execute &&
+      enemy.maxHealth > 0 &&
+      enemy.health < enemy.maxHealth * execute.threshold
+    ) {
+      requestedDamage *= execute.damageMultiplier;
     }
     // A beam's `extraFragments`: a large/medium rock it kills splits once
     // more per fragment, along the same seams (generateFragments is seeded by
@@ -172,6 +193,12 @@ export class HitResolution {
       }
       if (bullet.kind !== 'chain') {
         this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
+      }
+      // Capacitor Bank: a kill sparks on, up to `links` sparks in a row.
+      const spark = cards.cardEffects.killSpark;
+      const link = (bullet.sparkLink ?? 0) + 1;
+      if (spark && damageResult.killed && link <= spark.links) {
+        cards.sparkFrom(enemy, requestedDamage * spark.damageFraction, link);
       }
     }
     // A projectile with a `burst` bursts on its first hit, blocked or not;

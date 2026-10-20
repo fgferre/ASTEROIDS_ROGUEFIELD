@@ -1,8 +1,8 @@
 // src/modules/player/maneuvers.js
 //
 // The ship's maneuvers: the dash (its burst, cooldown, afterimages and
-// invulnerability, and Blink, the Maneuver Apex), the hold-S emergency
-// brake, and what the Maneuver cards change about them. PlayerSystem owns
+// invulnerability, Ghost Drive's spare charge and Blink, the Maneuver Apex),
+// the emergency brake, and what the Maneuver cards change about them. PlayerSystem owns
 // one and calls it in its update order; PhysicsSystem, the HUD and the 3D
 // mirror read the dash's fields through the player.
 
@@ -16,6 +16,11 @@ import {
   DASH_INVULNERABILITY,
 } from '../../data/constants/gameplay.js';
 import { getModernMove } from './movementInput.js';
+
+// Emergency brake: how far off straight back a held direction may point and
+// still brake, and how far it may wander (cosine) and still be the same press.
+const BRAKE_AGAINST = Math.PI / 4; // proposta 20/10
+const BRAKE_SAME_PRESS = 0.95;
 
 export class PlayerManeuvers {
   /**
@@ -32,11 +37,18 @@ export class PlayerManeuvers {
     this.resetDashState();
   }
 
-  // Once per step, alive or not: the cooldown runs down and this step's dash
-  // press is taken (true if there was one).
+  // Once per step, alive or not: the cooldown runs down (then Ghost Drive's
+  // spare charge refills over one more) and this step's dash press is taken
+  // (true if there was one).
   takeDashRequest(deltaTime) {
     if (this.dashCooldownTimer > 0) {
       this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer - deltaTime);
+    } else if (this.dashSpare < this.dashSpareMax) {
+      this.dashSpareTimer += deltaTime;
+      if (this.dashSpareTimer >= this.dashCooldown - 1e-9) {
+        this.dashSpare += 1;
+        this.dashSpareTimer = 0;
+      }
     }
     const dashRequested = this.dashRequested;
     this.dashRequested = false;
@@ -48,21 +60,30 @@ export class PlayerManeuvers {
     this.dashTimer = 0;
     this.dashDecayTimer = 0;
     this.dashCooldownTimer = 0;
+    this.dashSpare = this.dashSpareMax;
+    this.dashSpareTimer = 0;
     this.dashGhosts = [];
     this.dashGhostsDropped = 0;
     this.dashRammed = new Set();
     if (this.blinkTimer > 0) this.ship._quitExplosionHidden = false;
     this.blinkTimer = 0;
     this.brakeHold = 0;
+    this.brakeDir = null;
     this.brakeArmed = false;
     this.brakeCooldownTimer = 0;
     this.brakeTimer = 0;
     this.brakeFrom = null;
   }
 
+  /** A charge is ready: the cooldown is over, or a spare is left. */
+  canDash() {
+    return this.dashCooldownTimer <= 0 || this.dashSpare > 0;
+  }
+
   /**
    * Classic: forward along the nose, or backward while only S/↓ is held.
-   * Modern: along the held WASD direction, else along the nose.
+   * Modern: along the held WASD direction, else along the nose. Takes the
+   * main charge if it is ready, else a spare.
    */
   startDash(movement) {
     const fwd = { x: Math.cos(this.ship.angle), y: Math.sin(this.ship.angle) };
@@ -77,10 +98,14 @@ export class PlayerManeuvers {
     this.ship.velocity.vx += direction.x * impulse;
     this.ship.velocity.vy += direction.y * impulse;
     this.dashTimer = DASH_DURATION;
-    this.dashCooldownTimer = this.dashCooldown;
+    if (this.dashCooldownTimer <= 0) {
+      this.dashCooldownTimer = this.dashCooldown;
+    } else {
+      this.dashSpare -= 1;
+    }
     this.ship.invulnerableTimer = Math.max(
       this.ship.invulnerableTimer,
-      DASH_INVULNERABILITY + this.dashInvulnerabilityBonus
+      DASH_INVULNERABILITY
     );
     this.dashRammed.clear();
     // Blink: the renderers' hide flag, so the ship is gone from both views.
@@ -151,10 +176,26 @@ export class PlayerManeuvers {
   }
 
   /**
-   * Braking System 3: S held alone for `hold` s stops the ship over
-   * `stopTime` s and sends a shove-only shockwave, once per press. Armed only
-   * if S pushed against the motion when pressed, so flying down-screen with S
-   * (modern) never brakes.
+   * The direction the held keys thrust along, or null. Modern: the WASD (or
+   * stick) direction. Classic: along the nose with W alone, against it with S
+   * alone, not while turning.
+   */
+  getThrustDirection(input) {
+    if (this.ship.controlScheme === 'modern') return getModernMove(input);
+    if (input.up === input.down || input.left || input.right) return null;
+    const sign = input.up ? 1 : -1;
+    return {
+      x: Math.cos(this.ship.angle) * sign,
+      y: Math.sin(this.ship.angle) * sign,
+    };
+  }
+
+  /**
+   * Braking System 3: a direction held against the motion for `hold` s stops
+   * the ship over `stopTime` s and sends a shove-only shockwave, once per
+   * press. Armed only if, when pressed, the direction pointed within
+   * BRAKE_AGAINST of straight back and the ship flew faster than `minSpeed`
+   * along it; turning onto a new direction is a new press.
    */
   updateEmergencyBrake(deltaTime, input) {
     const brake = this.emergencyBrake;
@@ -165,36 +206,30 @@ export class PlayerManeuvers {
         this.brakeCooldownTimer - deltaTime
       );
     }
+    const dir = this.getThrustDirection(input);
     const held =
-      input.down &&
-      !input.up &&
-      !input.left &&
-      !input.right &&
-      !input.moveX &&
-      !input.moveY;
+      dir &&
+      this.brakeDir &&
+      dir.x * this.brakeDir.x + dir.y * this.brakeDir.y >= BRAKE_SAME_PRESS;
     if (!held) {
       this.brakeHold = 0;
-      this.brakeArmed = false;
-    } else {
-      if (this.brakeHold === 0) {
-        // S pushes down the screen (modern) or against the nose (classic).
-        const push =
-          this.ship.controlScheme === 'modern'
-            ? this.ship.velocity.vy
-            : -(
-                this.ship.velocity.vx * Math.cos(this.ship.angle) +
-                this.ship.velocity.vy * Math.sin(this.ship.angle)
-              );
-        this.brakeArmed = push < -brake.minSpeed;
-      }
+      this.brakeDir = dir;
+      const { vx, vy } = this.ship.velocity;
+      const along = dir ? vx * dir.x + vy * dir.y : 0;
+      this.brakeArmed =
+        along < -brake.minSpeed &&
+        along <= -Math.hypot(vx, vy) * Math.cos(BRAKE_AGAINST);
+    }
+    if (dir) {
       this.brakeHold += deltaTime;
       const due = this.brakeArmed && this.brakeHold >= brake.hold - 1e-9;
       if (due) this.brakeArmed = false; // one try per press
       if (due && this.brakeCooldownTimer <= 0 && this.dashTimer <= 0) {
-        this.brakeCooldownTimer = brake.cooldown;
+        const reactive = this.reactiveBrake;
+        this.brakeCooldownTimer =
+          brake.cooldown * (reactive?.cooldownMultiplier ?? 1);
         this.brakeTimer = brake.stopTime;
         this.brakeFrom = { ...this.ship.velocity };
-        const reactive = this.reactiveBrake;
         this.getEventBus()?.emit?.('player-braked', {
           position: { ...this.ship.position },
           radius: brake.radius,
@@ -219,18 +254,19 @@ export class PlayerManeuvers {
     }
   }
 
-  /** 0 when the dash is ready, 1 right after dashing. */
+  /** 0 when a dash is ready, 1 right after the last one. */
   getDashCooldownFraction() {
-    return this.dashCooldownTimer / this.dashCooldown;
+    return this.dashSpare > 0 ? 0 : this.dashCooldownTimer / this.dashCooldown;
   }
 
   // What the Maneuver cards and their Apex change, back to none.
   resetManeuverStats() {
     this.dashContactDamage = 0;
     this.dashDistanceMultiplier = 1;
-    this.dashInvulnerabilityBonus = 0;
+    this.dashSpareMax = 0;
+    this.dashSpare = 0;
+    this.dashSpareTimer = 0;
     this.dashGhostLinger = 1;
-    this.turretTurnMultiplier = 1;
     this.reactiveBrake = null;
     this.blink = null;
   }

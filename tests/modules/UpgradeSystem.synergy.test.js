@@ -206,11 +206,11 @@ describe('3-of-a-kind synergy', () => {
     );
     // core_extractor rank 1 × Scavenger.
     expect(progression.xpGainMultiplier).toBeCloseTo(
-      1.08 * SYNERGY_SCAVENGER_XP_MULTIPLIER,
+      1.15 * SYNERGY_SCAVENGER_XP_MULTIPLIER,
       6
     );
     expect(progression.collectXP(10).gained).toBe(
-      Math.round(10 * 1.08 * SYNERGY_SCAVENGER_XP_MULTIPLIER)
+      Math.round(10 * 1.15 * SYNERGY_SCAVENGER_XP_MULTIPLIER)
     );
 
     progression.reset();

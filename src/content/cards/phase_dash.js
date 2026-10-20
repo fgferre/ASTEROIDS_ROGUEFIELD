@@ -1,4 +1,3 @@
-// Maneuver cards (R12; numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
@@ -10,17 +9,18 @@ export default {
   icon: '🌫️',
   themeColor: PALETTE.boss,
   unlockLevel: 3,
-  tags: ['dash', 'invulnerability'],
+  tags: ['dash', 'charges'],
   text: {
     name: 'Ghost Drive',
     summary:
-      'The dash drive runs a beat out of phase: longer untouchable, longer afterimages.',
+      'The dash drive keeps a ghost charge a beat out of phase: two dashes back to back.',
     lore: 'Pilots swear the afterimages keep flying a moment after they leave.',
     levels: [
       {
         title: 'Ghost Drive',
-        description: 'The dash stays invulnerable 0.15 s longer.',
-        highlights: ['Its afterimages linger twice as long.'],
+        description:
+          'Holds a second dash charge: dash twice in a row. The spare refills one cooldown after the first.',
+        highlights: ['Afterimages linger twice as long.'],
       },
     ],
   },
@@ -31,7 +31,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-phase-dash',
-          payload: { invulnerability: 0.15, ghostLinger: 2 },
+          payload: { extraCharges: 1, ghostLinger: 2 }, // proposta 20/10
         },
       ],
     },

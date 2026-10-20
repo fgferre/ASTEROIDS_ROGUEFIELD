@@ -14,10 +14,7 @@ import {
   DASH_IMPULSE,
   DASH_INVULNERABILITY,
 } from '../../src/data/constants/gameplay.js';
-import {
-  SHIP_MAX_SPEED,
-  TURRET_TURN_RATE,
-} from '../../src/data/constants/physics.js';
+import { SHIP_MAX_SPEED } from '../../src/data/constants/physics.js';
 
 const DELTA_TIME = 1 / 60;
 
@@ -172,7 +169,7 @@ describe('Maneuver cards on the dash', () => {
     expect(player.dashCooldown).toBeCloseTo(base * 0.7, 2);
   });
 
-  it('Inertial Dampers: the dash covers 15% more ground', () => {
+  it('Inertial Dampers: the dash covers 50% more ground', () => {
     const dashDistance = (card) => {
       const { player, eventBus } = makePlayer();
       if (card) takeCard(eventBus, card);
@@ -180,50 +177,54 @@ describe('Maneuver cards on the dash', () => {
       while (player.dashTimer > 0) player.update(DELTA_TIME);
       return player.position.x - 400;
     };
-    // A shade over 15%: the auto-brake takes the same off both.
+    // A shade over 50%: the auto-brake takes the same off both.
     const ratio = dashDistance('inertial_dampers') / dashDistance();
-    expect(ratio).toBeGreaterThan(1.14);
-    expect(ratio).toBeLessThan(1.17);
+    expect(ratio).toBeGreaterThan(1.49);
+    expect(ratio).toBeLessThan(1.55);
   });
 
-  it('Ghost Drive: 0.15 s more invulnerability and afterimages that last twice as long', () => {
+  it('Ghost Drive: two dashes back to back; the spare refills one cooldown after the first', () => {
+    const { player, eventBus } = makePlayer();
+    const press = () => {
+      const before = player.dashTimer;
+      eventBus.emit('dash-pressed');
+      player.update(DELTA_TIME);
+      return player.dashTimer > before;
+    };
+    takeCard(eventBus, 'phase_dash');
+    expect(press()).toBe(true);
+    expect(player.getDashCooldownFraction()).toBe(0);
+    steps(player, 20); // past the dash
+    expect(press()).toBe(true);
+    steps(player, 20);
+    expect(press()).toBe(false);
+
+    // The main charge is back after its cooldown, the spare one more later.
+    const cooldownSteps = Math.ceil(DASH_COOLDOWN / DELTA_TIME);
+    steps(player, cooldownSteps - 40);
+    expect(press()).toBe(true);
+    steps(player, 20);
+    expect(press()).toBe(false);
+    steps(player, 2 * cooldownSteps);
+    expect(press()).toBe(true);
+    steps(player, 20);
+    expect(press()).toBe(true);
+  });
+
+  it('Ghost Drive: afterimages last twice as long', () => {
     // Past the last afterimage's plain life, inside twice that.
     const ghostsLeft = (card) => {
       const { player, eventBus } = makePlayer();
       if (card) takeCard(eventBus, card);
       dash(player, eventBus);
-      const invulnerable = player.invulnerableTimer;
       steps(
         player,
         Math.round((DASH_DURATION + DASH_GHOST_LIFE * 1.2) / DELTA_TIME)
       );
-      return { invulnerable, ghosts: player.dashGhosts.length };
+      return player.dashGhosts.length;
     };
-    expect(ghostsLeft()).toEqual({
-      invulnerable: DASH_INVULNERABILITY - DELTA_TIME,
-      ghosts: 0,
-    });
-    const ghostDrive = ghostsLeft('phase_dash');
-    expect(ghostDrive.invulnerable).toBeCloseTo(
-      DASH_INVULNERABILITY + 0.15 - DELTA_TIME,
-      6
-    );
-    expect(ghostDrive.ghosts).toBeGreaterThan(0);
-  });
-
-  it('Gyro Servos: the turret swings 50% faster onto a target behind', () => {
-    const swing = (card) => {
-      const { player, eventBus } = makePlayer();
-      if (card) takeCard(eventBus, card);
-      player.setAimPoint({ x: 300, y: 300 });
-      player.updateTurret(DELTA_TIME);
-      return Math.abs(player.turretAngle);
-    };
-    expect(swing()).toBeCloseTo(TURRET_TURN_RATE * DELTA_TIME, 6);
-    expect(swing('gyro_servos')).toBeCloseTo(
-      TURRET_TURN_RATE * 1.5 * DELTA_TIME,
-      6
-    );
+    expect(ghostsLeft()).toBe(0);
+    expect(ghostsLeft('phase_dash')).toBeGreaterThan(0);
   });
 
   it('Ram Plating: a dash hits each enemy it touches once, and only with the card', () => {
