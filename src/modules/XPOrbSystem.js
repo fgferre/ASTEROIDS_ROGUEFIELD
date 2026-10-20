@@ -13,6 +13,7 @@ import { OrbField } from './xp/OrbField.js';
 import { OrbFusion } from './xp/OrbFusion.js';
 import { OrbSpacing } from './xp/OrbSpacing.js';
 import { OrbMagnet } from './xp/OrbMagnet.js';
+import { PICKUP_KINDS } from '../data/pickups.js';
 
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
@@ -42,6 +43,8 @@ class XPOrbSystem extends BaseSystem {
 
     this.globalPull = null;
     this.drift = null;
+    // Wide Net: { interval, timer }, or null without the card.
+    this.towPulse = null;
 
     this.tuning = new OrbTuning();
     this.field = new OrbField({ tuning: this.tuning });
@@ -272,6 +275,12 @@ class XPOrbSystem extends BaseSystem {
 
     this.registerEventListener('progression-reset', () => {
       super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+      this.towPulse = null;
+    });
+
+    // A new rank keeps the time already counted toward the next haul.
+    this.registerEventListener('upgrade-tow-pulse', ({ interval }) => {
+      this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
     });
 
     this.registerEventListener('player-reset', () => {
@@ -371,6 +380,9 @@ class XPOrbSystem extends BaseSystem {
   }
 
   update(deltaTime) {
+    if (this.towPulse) {
+      this.updateTowPulse(deltaTime);
+    }
     if (this.globalPull) {
       this.updateGlobalPull(deltaTime);
     }
@@ -429,6 +441,17 @@ class XPOrbSystem extends BaseSystem {
       direction,
       target,
     };
+  }
+
+  // Wide Net: every `interval` s a Magnet pickup's pull, once no other pull
+  // (a Magnet, Warden Null, a Gravity Well) is on.
+  updateTowPulse(deltaTime) {
+    const tow = this.towPulse;
+    tow.timer += deltaTime;
+    if (tow.timer < tow.interval - 1e-9 || this.globalPull) return;
+    tow.timer = 0;
+    const { duration, pullSpeed, pullAcceleration } = PICKUP_KINDS.magnet;
+    this.startGlobalPull(duration, pullSpeed, pullAcceleration);
   }
 
   updateGlobalPull(deltaTime) {
@@ -667,6 +690,7 @@ class XPOrbSystem extends BaseSystem {
     this.fusion.reset();
     this.globalPull = null;
     this.drift = null;
+    this.towPulse = null;
 
     this.tuning.reset();
     this.field.invalidateSpatialIndex();

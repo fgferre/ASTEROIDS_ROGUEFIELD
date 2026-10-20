@@ -53,7 +53,8 @@ export class PlayerFlight {
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
-    this.strafeMultiplier = 1;
+    // RCS System: under thrust, push and drag × this (1: off).
+    this.agility = 1;
     // FIX-02: split damping into base (always) + braking (no-thrust frames only).
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
@@ -72,7 +73,6 @@ export class PlayerFlight {
   updateMovement(deltaTime, input) {
     // COPIAR EXATAMENTE da função updatePlayerMovement() original
     const modern = this.ship.controlScheme === 'modern';
-    const accelStep = this.acceleration * deltaTime;
     const fwd = {
       x: Math.cos(this.ship.angle),
       y: Math.sin(this.ship.angle),
@@ -101,6 +101,20 @@ export class PlayerFlight {
     // Track if thrusters are manually controlled (for audio distinction)
     const isMainManual = modern ? Boolean(move) : input.up;
     const isAuxManual = !modern && input.down;
+    const noManualThrust = !isMainManual && !isAuxManual;
+    const dashing = this.maneuvers.dashTimer > 0;
+    // RCS System: under thrust, push and drag both scale, so the same top
+    // speed comes (and turns round) sooner; a dash and its ease-off keep
+    // their own.
+    const agility =
+      noManualThrust || dashing || this.maneuvers.dashDecayTimer > 0
+        ? 1
+        : this.agility;
+    // The push matches the stepped drag, so the top speed stays put.
+    const drag = this.baseLinearDamping * deltaTime;
+    const push =
+      agility === 1 ? 1 : Math.expm1(drag * agility) / Math.expm1(drag);
+    const accelStep = this.acceleration * push * deltaTime;
 
     // Auto-brake quando não há input linear
     const noLinearInput = modern ? !move : !input.up && !input.down;
@@ -148,14 +162,10 @@ export class PlayerFlight {
 
     // Aplicar forças dos thrusters
     if (move) {
-      // Along the WASD direction; the part off the nose (a sidestep) takes
-      // the RCS strafe upgrade.
+      // Along the WASD direction.
       const moveStep = accelStep * MODERN_MOVE_ACCEL;
-      const along = move.x * fwd.x + move.y * fwd.y;
-      const side =
-        (move.x * right.x + move.y * right.y) * this.strafeMultiplier;
-      this.ship.velocity.vx += (fwd.x * along + right.x * side) * moveStep;
-      this.ship.velocity.vy += (fwd.y * along + right.y * side) * moveStep;
+      this.ship.velocity.vx += move.x * moveStep;
+      this.ship.velocity.vy += move.y * moveStep;
     } else {
       if (thrMain > 0) {
         this.ship.velocity.vx += fwd.x * accelStep * thrMain;
@@ -166,8 +176,7 @@ export class PlayerFlight {
         this.ship.velocity.vy -= fwd.y * accelStep * thrAux;
       }
       if (modern) {
-        const strafeStep =
-          accelStep * MODERN_MOVE_ACCEL * this.strafeMultiplier;
+        const strafeStep = accelStep * MODERN_MOVE_ACCEL;
         this.ship.velocity.vx += right.x * strafeStep * (thrSideL - thrSideR);
         this.ship.velocity.vy += right.y * strafeStep * (thrSideL - thrSideR);
       }
@@ -179,11 +188,10 @@ export class PlayerFlight {
     // upgrade's "Paradas mais rápidas" intent without making active flight
     // sluggish. The auto-damping thrusters (above) still fire during coast;
     // brakingDamping is the additive component layered on top of base.
-    const noManualThrust = !isMainManual && !isAuxManual;
     const effectiveDamping =
-      this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0);
+      (this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0)) *
+      agility;
     // A dash carries its burst undamped, under a raised speed cap.
-    const dashing = this.maneuvers.dashTimer > 0;
     if (!dashing) {
       const linearDamp = Math.exp(-effectiveDamping * deltaTime);
       this.ship.velocity.vx *= linearDamp;
@@ -247,8 +255,7 @@ export class PlayerFlight {
   }
 
   // Modern scheme: nose onto the WASD direction, else onto the motion, else
-  // hold. Exponential approach under a rate cap, so it never overshoots. RCS
-  // rotation upgrades raise the cap.
+  // hold. Exponential approach under a rate cap, so it never overshoots.
   updateFacing(deltaTime, move) {
     let heading = null;
     let rate = 0;
@@ -266,8 +273,7 @@ export class PlayerFlight {
       this.ship.angularVelocity = 0;
       return;
     }
-    const maxStep =
-      rate * (this.rotationSpeed / SHIP_ROTATION_SPEED) * deltaTime;
+    const maxStep = rate * deltaTime;
     const error = wrapAngle(heading - this.ship.angle);
     const step = Math.max(
       -maxStep,

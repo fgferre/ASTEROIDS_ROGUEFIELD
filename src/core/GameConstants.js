@@ -51,8 +51,8 @@ export const PROGRESSION_INITIAL_LEVEL = 1;
 // The step to pilot level n costs INITIAL + STEP × (n − 2)^POWER XP: level 2
 // costs 120 and each later step a little more (ProgressionSystem.levelCost).
 export const PROGRESSION_INITIAL_XP_REQUIREMENT = 120; // proposta 20/10
-export const PROGRESSION_LEVEL_COST_STEP = 30; // proposta 20/10
-export const PROGRESSION_LEVEL_COST_POWER = 1.6; // proposta 20/10
+export const PROGRESSION_LEVEL_COST_STEP = 40; // proposta 20/10
+export const PROGRESSION_LEVEL_COST_POWER = 1.7; // proposta 20/10
 // Simulation seconds between the level-up event and the pick screen opening,
 // so the slow-mo + zoom pulse play first (proposta 17/10).
 export const LEVEL_UP_SCREEN_DELAY_SECONDS = 0.12; // proposta 17/10: tempo de simulação; durante o slow-mo de 0.35x vale ~0.34 s reais, a tela abre a um terço do pulso

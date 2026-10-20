@@ -9,27 +9,30 @@ export default {
   icon: '⚓',
   themeColor: PALETTE.text,
   unlockLevel: 2,
-  tags: ['control', 'hull'],
+  tags: ['damage reduction', 'trade-off'],
   text: {
     name: 'Grav Anchor',
     summary:
-      'A small field generator that pins the ship in place when you let go.',
+      'Let go of the controls and a field generator pins the ship: hits land softer while it holds.',
     lore: 'Warden docking clamps still answer to a Ring signal. You found the signal.',
     levels: [
       {
         title: 'Soft Clamp',
-        description: 'Stopping power +25% and max hull +15.',
-        highlights: ['The ship settles faster when you release thrust.'],
+        description:
+          'While no movement key is held, hits deal 20% less damage.',
+        highlights: ['Move or dash and the clamp lets go.'],
       },
       {
         title: 'Hard Clamp',
-        description: 'Stopping power +56% and max hull +30 (cumulative).',
+        description:
+          'While no movement key is held, hits deal 35% less damage.',
         highlights: ['Hold a spot while the Field moves around you.'],
       },
       {
         title: 'Dead Stop',
-        description: 'Stopping power +95% and max hull +45 (cumulative).',
-        highlights: ['Near-instant stops.'],
+        description:
+          'While no movement key is held, hits deal 50% less damage.',
+        highlights: ['Half of every hit, as long as you stay put.'],
       },
     ],
   },
@@ -39,13 +42,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-linear-damping',
-          payload: { multiplier: 1.25 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-health-boost',
-          payload: { bonus: 15 },
+          event: 'upgrade-idle-guard',
+          payload: { damageReduction: 0.2 }, // proposta 20/10
         },
       ],
     },
@@ -54,13 +52,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-linear-damping',
-          payload: { multiplier: 1.25 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-health-boost',
-          payload: { bonus: 15 },
+          event: 'upgrade-idle-guard',
+          payload: { damageReduction: 0.35 }, // proposta 20/10
         },
       ],
     },
@@ -69,13 +62,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-linear-damping',
-          payload: { multiplier: 1.25 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-health-boost',
-          payload: { bonus: 15 },
+          event: 'upgrade-idle-guard',
+          payload: { damageReduction: 0.5 }, // proposta 20/10
         },
       ],
     },

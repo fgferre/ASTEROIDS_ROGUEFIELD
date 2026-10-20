@@ -8,7 +8,6 @@ const weapon = {
   bulletLifetime: 1.5,
   trailLength: 2,
   thermalLens: undefined,
-  lanceDamageTuning: 1,
   lanceApexDamage: 1,
   lancePierce: 1,
   pierceBonus: 2,

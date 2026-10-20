@@ -12,23 +12,24 @@ export default {
   tags: ['damage', 'trade-off'],
   text: {
     name: 'Reactor Bleed',
-    summary: 'Diverts reactor output from the engines into the cannon.',
+    summary:
+      'While the engines are idle, the reactor bleeds their output into the cannon.',
     lore: 'Every salvager knows the trick and every salvager regrets it at least once.',
     levels: [
       {
         title: 'Open Valve',
-        description: 'Damage +15%, top speed -4%.',
-        highlights: ['A trade: harder hits, heavier ship.'],
+        description: 'While no movement key is held, damage +30%.',
+        highlights: ['Let go to hit harder; move and the bonus is gone.'],
       },
       {
         title: 'Bypass Line',
-        description: 'Damage +32%, top speed -8% (cumulative).',
-        highlights: ['Applies another +15% damage and -4% speed.'],
+        description: 'While no movement key is held, damage +60%.',
+        highlights: ['Drifting counts: the ship need not be still.'],
       },
       {
         title: 'Core Tap',
-        description: 'Damage +52%, top speed -12% (cumulative).',
-        highlights: ['The engines run on what the cannon leaves.'],
+        description: 'While no movement key is held, damage +100%.',
+        highlights: ['A dash cuts the bleed until it ends.'],
       },
     ],
   },
@@ -38,13 +39,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-damage-boost',
-          payload: { multiplier: 1.15 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-speed-boost',
-          payload: { multiplier: 0.96 },
+          event: 'upgrade-reactor-bleed',
+          payload: { idleDamageMultiplier: 1.3 }, // proposta 20/10
         },
       ],
     },
@@ -53,13 +49,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-damage-boost',
-          payload: { multiplier: 1.15 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-speed-boost',
-          payload: { multiplier: 0.96 },
+          event: 'upgrade-reactor-bleed',
+          payload: { idleDamageMultiplier: 1.6 }, // proposta 20/10
         },
       ],
     },
@@ -68,13 +59,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-damage-boost',
-          payload: { multiplier: 1.15 },
-        },
-        {
-          type: 'event',
-          event: 'upgrade-speed-boost',
-          payload: { multiplier: 0.96 },
+          event: 'upgrade-reactor-bleed',
+          payload: { idleDamageMultiplier: 2 }, // proposta 20/10
         },
       ],
     },

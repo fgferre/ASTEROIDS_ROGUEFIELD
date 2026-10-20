@@ -61,7 +61,6 @@ class CombatSystem extends BaseSystem {
         bulletLifetime: this.weapons.bulletLifetime,
         trailLength: this.weapons.trailLength,
         thermalLens: this.cards.cardEffects.thermalLens,
-        lanceDamageTuning: this.cards.lanceDamageTuning,
         lanceApexDamage: this.weapons.lanceApexDamage,
         lancePierce: this.weapons.lancePierce,
         pierceBonus: this.cards.pierceBonus,
@@ -77,6 +76,7 @@ class CombatSystem extends BaseSystem {
     this.cards = new CardEffects({
       player: () => this.cachedPlayer,
       enemies: () => this.cachedEnemies,
+      enemyBullets: () => this.projectiles.enemyBullets,
       targeting: () => this.targeting,
       weapons: () => this.weapons,
       hits: () => this.hits,
@@ -164,6 +164,26 @@ class CombatSystem extends BaseSystem {
     });
     this.registerEventListener('upgrade-afterburn', (data) => {
       this.cards.cardEffects.afterburn = data;
+    });
+    this.registerEventListener('upgrade-long-burn', (data) => {
+      this.cards.cardEffects.longBurn = data;
+    });
+    this.registerEventListener('upgrade-execute-damage', (data) => {
+      this.cards.cardEffects.executeDamage = data;
+    });
+    this.registerEventListener('upgrade-kill-spark', (data) => {
+      this.cards.cardEffects.killSpark = data;
+    });
+    this.registerEventListener('upgrade-arc-lattice', (data) => {
+      this.cards.cardEffects.arcLattice = data;
+    });
+    this.registerEventListener('upgrade-dash-fire', (data) => {
+      this.cards.cardEffects.dashFire = data;
+    });
+
+    // Gyro Servos: every dash runs the cannon hot for a moment.
+    this.registerEventListener('player-dashed', () => {
+      if (this.cards.cardEffects.dashFire) this.cards.startDashFire();
     });
 
     this.registerEventListener('thruster-effect', (data = {}) => {

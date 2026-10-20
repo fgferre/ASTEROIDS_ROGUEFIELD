@@ -7,7 +7,7 @@ export default {
   order: 3,
   displayName: 'Warden Null',
   subtitle: 'The silence at the center',
-  healthFactor: 1.7, // proposta 20/10: explained in prime.js
+  healthFactor: 1.35, // proposta 20/10: explained in prime.js
   // Its entrance, the weight: slow and heavy with its plates spread wide,
   // and they shut at once when it stops. The camera hugs the field. The
   // fields are explained in prime.js. Numbers: proposta 19/10.

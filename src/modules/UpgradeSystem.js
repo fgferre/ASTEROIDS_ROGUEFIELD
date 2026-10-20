@@ -170,8 +170,13 @@ class UpgradeSystem extends BaseSystem {
       };
     }
 
+    // A reroll avoids the current cards, but keeps the ones the run doesn't
+    // own in the draw when no other card is new.
+    const avoided = ({ id }) => exclude.includes(id);
+    const isNew = ({ id }) => this.getUpgradeCount(id) === 0;
+    const newElsewhere = eligible.some((d) => !avoided(d) && isNew(d));
     const preferred = eligible.filter(
-      (definition) => !exclude.includes(definition.id)
+      (d) => !avoided(d) || (!newElsewhere && isNew(d))
     );
     const weapons = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
       ? preferred.filter(({ id }) => WEAPON_CARD_IDS.includes(id))
@@ -185,8 +190,8 @@ class UpgradeSystem extends BaseSystem {
       )
     );
     if (selection.length < cappedCount) {
-      const repeats = eligible.filter((definition) =>
-        exclude.includes(definition.id)
+      const repeats = eligible.filter(
+        (definition) => avoided(definition) && !selection.includes(definition)
       );
       selection.push(
         ...this.rollUpgradeDefinitions(

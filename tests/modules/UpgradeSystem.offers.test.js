@@ -131,6 +131,13 @@ describe('level-up offers', () => {
     for (let i = 0; i < 100; i += 1) {
       expect(offerIds(progression)).toContain('magfield');
     }
+    // A reroll avoids the other current cards but keeps the only new one.
+    const before = offerIds(progression);
+    const rerolled = progression.rerollUpgradeOptions().map(({ id }) => id);
+    expect(rerolled).toContain('magfield');
+    rerolled
+      .filter((id) => id !== 'magfield')
+      .forEach((id) => expect(before).not.toContain(id));
 
     // None left to find: offers still fill with owned cards.
     progression.appliedUpgrades.set('magfield', 1);

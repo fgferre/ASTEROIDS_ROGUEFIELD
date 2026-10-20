@@ -164,6 +164,10 @@ class PlayerSystem extends BaseSystem {
     this.magnetismRadius = MAGNETISM_RADIUS;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
+    this.resetCardStats();
+    // No thrust key held and no dash this step (updateMovement): Reactor
+    // Bleed and Grav Anchor read it.
+    this.enginesIdle = true;
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -255,25 +259,9 @@ class PlayerSystem extends BaseSystem {
       );
     });
 
-    this.registerEventListener('upgrade-rotation-boost', (data) => {
-      this.flight.rotationSpeed = this.flight.rotationSpeed * data.multiplier;
-      console.log(
-        '[PlayerSystem] Rotation speed boosted to',
-        this.flight.rotationSpeed
-      );
-    });
-
-    // rcs_system rank 5: harder sidesteps (strafe is base movement now).
-    this.registerEventListener('upgrade-strafe-movement', (data) => {
-      this.flight.strafeMultiplier *= data.multiplier;
-    });
-
-    this.registerEventListener('upgrade-angular-damping', (data) => {
-      this.flight.angularDamping = this.flight.angularDamping * data.multiplier;
-      console.log(
-        '[PlayerSystem] Angular damping adjusted to',
-        this.flight.angularDamping
-      );
+    // RCS System: snappier thrust, same top speed (flight.js).
+    this.registerEventListener('upgrade-thrust-agility', (data) => {
+      this.flight.agility = data.multiplier;
     });
 
     this.registerEventListener('upgrade-linear-damping', (data) => {
@@ -328,6 +316,33 @@ class PlayerSystem extends BaseSystem {
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
     });
 
+    // Cards that change what a hit does to the hull or the shot's damage
+    // (takeDamage, getStats); each keeps its latest rank's number.
+    this.registerEventListener('upgrade-reactor-bleed', (data) => {
+      this.idleDamageMultiplier = data.idleDamageMultiplier;
+    });
+    this.registerEventListener('upgrade-idle-guard', (data) => {
+      this.idleDamageReduction = data.damageReduction;
+    });
+    this.registerEventListener('upgrade-hull-armor', (data) => {
+      this.hullArmor = data.armor;
+    });
+    // Scrap Compactor and Blood Ledger: repairs on a level-up, on a Warden.
+    this.registerEventListener('upgrade-level-up-repair', (data) => {
+      this.levelUpRepair = data.repair;
+    });
+    this.registerEventListener('upgrade-boss-repair', (data) => {
+      this.bossRepairFraction = data.fraction;
+    });
+    this.registerEventListener('player-leveled-up', () => {
+      if (this.levelUpRepair > 0) this.heal(this.levelUpRepair);
+    });
+    this.registerEventListener('boss-defeated', () => {
+      if (this.bossRepairFraction > 0) {
+        this.heal(this.maxHealth * this.bossRepairFraction);
+      }
+    });
+
     // Phase Skin: invulnerability for `duration` s after a dash ends.
     this.registerEventListener('upgrade-phase-skin', (data) => {
       this.maneuvers.dashAfterInvulnerability = data.duration;
@@ -346,18 +361,17 @@ class PlayerSystem extends BaseSystem {
     this.registerEventListener('upgrade-ram-plating', (data) => {
       this.maneuvers.dashContactDamage = data.damage;
     });
-    this.registerEventListener('upgrade-turret-turn', (data) => {
-      this.maneuvers.turretTurnMultiplier *= data.multiplier;
-    });
     this.registerEventListener('upgrade-reactive-brake', (data) => {
       this.maneuvers.reactiveBrake = data;
     });
-    // Inertial Dampers 2: a faster dash under a higher cap goes further.
+    // Inertial Dampers: a faster dash under a higher cap goes further.
     this.registerEventListener('upgrade-dash-distance', (data) => {
       this.maneuvers.dashDistanceMultiplier *= data.multiplier;
     });
+    // Ghost Drive: spare dash charges, ready at once.
     this.registerEventListener('upgrade-phase-dash', (data) => {
-      this.maneuvers.dashInvulnerabilityBonus = data.invulnerability;
+      this.maneuvers.dashSpareMax = data.extraCharges;
+      this.maneuvers.dashSpare = data.extraCharges;
       this.maneuvers.dashGhostLinger = data.ghostLinger;
     });
     // Maneuver's Apex has no weapon: the dash becomes Blink (startDash).
@@ -451,7 +465,7 @@ class PlayerSystem extends BaseSystem {
       dashRequested = false;
     }
 
-    if (dashRequested && this.maneuvers.dashCooldownTimer <= 0) {
+    if (dashRequested && this.maneuvers.canDash()) {
       this.maneuvers.startDash(movement);
     }
 
@@ -512,6 +526,10 @@ class PlayerSystem extends BaseSystem {
   // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
   updateMovement(deltaTime, input) {
     const thrust = this.flight.updateMovement(deltaTime, input);
+    this.enginesIdle =
+      !thrust.isMainManual &&
+      !thrust.isAuxManual &&
+      !(this.maneuvers.dashTimer > 0);
     this.updateTurret(deltaTime);
     this.thrusters.emitThrusterEffects(thrust);
   }
@@ -550,8 +568,7 @@ class PlayerSystem extends BaseSystem {
   // One step of a turret heading onto `goal`: an exponential approach,
   // capped at the turn rate.
   turnTurret(angle, goal, deltaTime) {
-    const maxStep =
-      TURRET_TURN_RATE * this.maneuvers.turretTurnMultiplier * deltaTime;
+    const maxStep = TURRET_TURN_RATE * deltaTime;
     const error = wrapAngle(goal - angle);
     const step = Math.max(
       -maxStep,
@@ -736,11 +753,14 @@ class PlayerSystem extends BaseSystem {
   // `source`: the enemy (or its snapshot) that dealt the hit; the last one to
   // reach the hull is kept by value (enemies are pooled) for the death recap.
   // Every hit is scaled by the difficulty preset's enemyDamage.
+  // Grav Anchor cuts the hit while the engines are idle; Ablative Plating
+  // takes a fixed bite off what reaches the hull.
   takeDamage(amount, source = null) {
     const damageAmount =
       Math.max(0, amount) *
       (resolveService('difficulty', this.dependencies)?.getModifiers()
-        .enemyDamage ?? 1);
+        .enemyDamage ?? 1) *
+      (this.enginesIdle ? 1 - this.idleDamageReduction : 1);
     if (damageAmount <= 0) {
       return this.health;
     }
@@ -754,6 +774,9 @@ class PlayerSystem extends BaseSystem {
       }
 
       remainingDamage = Math.max(0, overflow);
+    }
+    if (this.hullArmor > 0 && remainingDamage > 0) {
+      remainingDamage = Math.max(1, remainingDamage - this.hullArmor);
     }
 
     const previousHealth = this.health;
@@ -799,7 +822,10 @@ class PlayerSystem extends BaseSystem {
       health: this.health,
       maxHealth: this.maxHealth,
       maxHP: this.maxHealth, // Alias for consistency
-      damage: this.damage,
+      // Reactor Bleed: harder shots while the engines are idle.
+      damage: this.enginesIdle
+        ? this.damage * this.idleDamageMultiplier
+        : this.damage,
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
       shieldLevel: this.shield.shieldUpgradeLevel,
@@ -862,10 +888,11 @@ class PlayerSystem extends BaseSystem {
     this.maneuvers.emergencyBrake = null;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
+    this.resetCardStats();
     this.flight.maxSpeed = SHIP_MAX_SPEED * hull.maxSpeed;
     this.flight.acceleration = SHIP_ACCELERATION * hull.acceleration;
     this.flight.rotationSpeed = SHIP_ROTATION_SPEED;
-    this.flight.strafeMultiplier = 1;
+    this.flight.agility = 1;
     // FIX-02: split damping — reset both components. baseLinearDamping returns
     // to ship default; brakingDamping clears any accumulated braking_system
     // upgrade contribution.
@@ -882,6 +909,15 @@ class PlayerSystem extends BaseSystem {
     this.thrusters.brakingVisualLevel = 0;
 
     this.shield.resetShieldState();
+  }
+
+  // What the hull and shot cards above change, back to none.
+  resetCardStats() {
+    this.idleDamageMultiplier = 1;
+    this.idleDamageReduction = 0;
+    this.hullArmor = 0;
+    this.levelUpRepair = 0;
+    this.bossRepairFraction = 0;
   }
 
   reset() {
@@ -903,6 +939,7 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = 0;
     this.aimPoint = null;
     this.aimStick = null;
+    this.enginesIdle = true;
     this.flight.driftFactor = 0;
     this.maneuvers.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag

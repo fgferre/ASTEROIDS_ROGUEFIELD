@@ -133,7 +133,7 @@ describe('Progression rate harness', () => {
     }
   );
 
-  it('the step to pilot level n costs 120 + 30 × (n − 2)^1.6 XP', () => {
+  it('the step to pilot level n costs 120 + 40 × (n − 2)^1.7 XP', () => {
     const container = createTestContainer('progression-curve');
     const progression = new ProgressionSystem({
       random: container.resolve('random'),
@@ -152,9 +152,9 @@ describe('Progression rate harness', () => {
       );
       expect(progression.level).toBe(n);
     }
-    expect(costs.slice(0, 5)).toEqual([120, 150, 210, 293, 395]);
+    expect(costs.slice(0, 5)).toEqual([120, 160, 249, 378, 542]);
     costs.forEach((cost, i) => {
-      expect(cost).toBe(Math.floor(120 + 30 * i ** 1.6));
+      expect(cost).toBe(Math.floor(120 + 40 * i ** 1.7));
     });
     progression.reset();
     expect(progression.experienceToNext).toBe(120);
