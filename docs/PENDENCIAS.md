@@ -55,7 +55,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
     mude totalmente o cenário"_; uma árvore de habilidades, equipamentos e melhorias liberada aos poucos com o dinheiro
     ganho, como no Vampire Survivors, pensada junto com a evolução e o tempo para vencer cada desafio; ligar tudo num
     roteiro que faça sentido (item 19).
-- **Próximo, nesta ordem (proposta de 20/10, à espera do OK dele):** (1) a visão do jogo num documento que ele aprova
+- **Próximo, nesta ordem (aprovado por ele em 20/10: _"a próxima conversa começa pela visão do jogo"_):** (1) a visão do jogo num documento que ele aprova
   antes de mais conteúdo — capítulos → fases → ondas → chefe, o mapa, a história (item 19) e a árvore de desbloqueios
   com moeda (frente 6), com o tempo de jogo de cada pedaço; (2) o conteúdo da frente 5 feito para essa estrutura; (3)
   painel menor (escala dos encaixes no preset, por imagem); (4) a revisão do som e da trilha (tiro mais sutil, graves no
