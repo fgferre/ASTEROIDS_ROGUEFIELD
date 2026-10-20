@@ -14,7 +14,8 @@
 //   lateral  the manual side thrusters: the right one +, the left one -
 //   speed    how near the ship flies to the top speed its push holds, along
 //            the push, from two steps of velocity (speedShare)
-//   tier     the propulsion cards' ranks (the events' visualLevel) against TIER_RANKS
+//   tier     the propulsion cards' ranks (player-moved's visualLevels, every
+//            step, firing or not) against TIER_RANKS
 // and the player's own shot (weapon-fired) ducks it on the next step, with
 // the stabilizer's puffs as strong as its automatic correction of the recoil
 // in that step. No step for ENGINE_IDLE_MS (pause, death, menu, a card screen)
@@ -59,8 +60,7 @@ const idleStep = () => ({ main: 0, retro: 0, left: 0, right: 0, automatic: 0 });
 export function createShipEngine(sfx) {
   let fetched = null; // { manifest, files: [path, ArrayBuffer][] } waiting for a context
   let model = null;
-  // Card ranks by thruster type: Main Thrusters, Braking System, RCS System.
-  const ranks = { main: 0, aux: 0, side: 0 };
+  let disposed = false; // torn down: a fetch or decode still in flight builds nothing
   let step = idleStep(); // this step's thrusters, until player-moved
   let before = null; // last step's velocity
   let share = 0; // last speedShare
@@ -72,7 +72,7 @@ export function createShipEngine(sfx) {
   async function decode() {
     const context = sfx.context;
     const destination = sfx.protectedDestination();
-    if (!fetched || !context || !destination) return;
+    if (disposed || !fetched || !context || !destination) return;
     const { manifest, files } = fetched;
     fetched = null;
     try {
@@ -84,6 +84,7 @@ export function createShipEngine(sfx) {
           ])
         )
       );
+      if (disposed) return;
       const buffers = {};
       Object.entries(manifest.loops).forEach(([layer, loop]) => {
         buffers[layer] = { ...loop, buffer: decoded.get(loop.file) };
@@ -118,6 +119,7 @@ export function createShipEngine(sfx) {
           await (await fetchFile(path)).arrayBuffer(),
         ])
       );
+      if (disposed) return;
       fetched = { manifest, files };
     } catch (error) {
       console.warn(
@@ -133,11 +135,8 @@ export function createShipEngine(sfx) {
    * One thruster-effect event into this step; false when the engine is not
    * playing (the procedural loop follows the event instead).
    */
-  function follow({ type, intensity = 0, isAutomatic, side, visualLevel }) {
+  function follow({ type, intensity = 0, isAutomatic, side }) {
     if (!model) return false;
-    if (type in ranks && Number.isFinite(visualLevel)) {
-      ranks[type] = visualLevel;
-    }
     const key = isAutomatic
       ? 'automatic'
       : type === 'main'
@@ -150,7 +149,7 @@ export function createShipEngine(sfx) {
   }
 
   /** The step's flight (player-moved): the engine's inputs, then its update. */
-  function flightStep({ velocity, angle }) {
+  function flightStep({ velocity, angle, visualLevels: levels }) {
     if (!model) return;
     const retro = step.retro * RETRO_THRUST > step.main;
     const sign = retro ? -1 : 1;
@@ -164,7 +163,7 @@ export function createShipEngine(sfx) {
       thrust: Math.max(step.main, step.retro * RETRO_THRUST),
       lateral: step.right - step.left,
       speed: share,
-      tier: engineTier(ranks.main + ranks.aux + ranks.side),
+      tier: engineTier(levels.thruster + levels.rcs + levels.braking),
     });
     if (shotPending) {
       model.shot({ recoil: Math.min(1, step.automatic / STABILIZER_FLOOR) });
@@ -199,30 +198,29 @@ export function createShipEngine(sfx) {
     shot() {
       if (model) shotPending = true;
     },
-    /** The dash's one-shot; false when the engine is not playing. */
+    /** The dash's one-shot, through the resume gate; false when the engine is not playing. */
     dash() {
-      model?.dash();
-      return Boolean(model);
+      if (!model) return false;
+      sfx.safePlay(() => model?.dash());
+      return true;
     },
-    /** The emergency brake's one-shot; false when the engine is not playing. */
+    /** The emergency brake's one-shot, through the resume gate; false when the engine is not playing. */
     brake() {
-      model?.brake();
-      return Boolean(model);
+      if (!model) return false;
+      sfx.safePlay(() => model?.brake());
+      return true;
     },
     /** No flight step for ENGINE_IDLE_MS: stop. */
     stopIfIdle(now = performance.now()) {
       if (lastStepAt !== null && now - lastStepAt > ENGINE_IDLE_MS) stop();
     },
-    /** A new run: at rest, no cards. */
-    reset() {
-      stop();
-      Object.keys(ranks).forEach((type) => {
-        ranks[type] = 0;
-      });
-    },
+    /** A new run: at rest (the cards come with every step). */
+    reset: stop,
     /** The model's numbers (engineModel snapshot), null when not playing. */
     snapshot: () => model?.snapshot() ?? null,
     dispose() {
+      disposed = true;
+      fetched = null;
       model?.dispose();
       model = null;
     },

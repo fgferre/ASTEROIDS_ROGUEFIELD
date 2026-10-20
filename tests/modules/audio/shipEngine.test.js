@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import AudioSystem from '../../../src/modules/AudioSystem.js';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
+import PlayerSystem from '../../../src/modules/PlayerSystem.js';
 import {
   engineTier,
   speedShare,
@@ -91,10 +92,8 @@ function fetchFor(manifest) {
       : { arrayBuffer: async () => ({ path }) };
 }
 
-/** The game's audio on stub nodes, its event bus, and the engine loaded (or not). */
-async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
-  const { context, gains, sources } = makeContext();
-  const errors = vi.spyOn(console, 'error');
+/** The SFX bus on `context`, its resume gate playing at once. */
+function initBus(context) {
   const random = new RandomService('engine:test');
   const scopes = {
     base: random,
@@ -109,6 +108,17 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
     safePlay: (fn) => fn(),
     randomScopes: scopes,
   });
+  return { bus, random };
+}
+
+// The card each thruster's visual level comes from (PlayerThrusters).
+const LEVEL_OF = { main: 'thruster', aux: 'braking', side: 'rcs' };
+
+/** The game's audio on stub nodes, its event bus, and the engine loaded (or not). */
+async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
+  const { context, gains, sources } = makeContext();
+  const errors = vi.spyOn(console, 'error');
+  const { bus, random } = initBus(context);
   const eventBus = new EventBus();
   const audio = new AudioSystem({
     eventBus,
@@ -121,7 +131,11 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
   await bus.engine.load(fetchFile);
   const engine = bus.engine;
 
-  /** One simulation step: its thruster events, then player-moved. */
+  /**
+   * One simulation step as PlayerSystem sends it: the firing thrusters'
+   * events, each with its card's visual level, then player-moved with all
+   * three levels (`levels`: thruster, rcs, braking).
+   */
   function step({
     main = 0,
     retro = 0,
@@ -131,12 +145,13 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
     levels = {},
     velocity = { vx: 0, vy: 0 },
   } = {}) {
+    const visualLevels = { thruster: 0, rcs: 0, braking: 0, ...levels };
     const thruster = (type, intensity, extra) =>
       eventBus.emit('thruster-effect', {
         type,
         intensity,
         position: { x: 400, y: 300 },
-        visualLevel: levels[type] ?? 0,
+        visualLevel: visualLevels[LEVEL_OF[type]],
         ...extra,
       });
     if (main) thruster('main', main, { isAutomatic: false });
@@ -144,13 +159,12 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
     if (automatic) thruster('aux', automatic, { isAutomatic: true });
     if (left) thruster('side', left, { side: 'left', isAutomatic: false });
     if (right) thruster('side', right, { side: 'right', isAutomatic: false });
-    if (levels.side && !left && !right) thruster('side', 0, { side: 'left' });
-    if (levels.aux && !retro && !automatic) thruster('aux', 0, {});
     context.currentTime += STEP;
     eventBus.emit('player-moved', {
       position: { x: 400, y: 300 },
       velocity,
       angle: 0,
+      visualLevels,
     });
   }
   const fly = (steps, flight) => {
@@ -201,7 +215,7 @@ describe('ship engine', () => {
     expect(gains().turbine).toBeCloseTo(0, 3);
   });
 
-  it('the propulsion cards add tiers: sub, then harmonic, then crackle', async () => {
+  it('the propulsion cards add tiers: sub, then harmonic, then crackle, even with thrusters that never fire', async () => {
     expect([0, 1, 3, 4, 7, 8, 13].map(engineTier)).toEqual([
       0, 1, 1, 2, 2, 3, 3,
     ]);
@@ -214,14 +228,33 @@ describe('ship engine', () => {
     fly(90, { main: 1 });
     expect(engine.snapshot().input.tier).toBe(0);
     expect(layers()).toEqual([false, false, false]);
-    // Main Thrusters 2 + RCS System 2: four ranks.
-    fly(90, { main: 1, levels: { main: 2, side: 2 } });
+    // Flying straight with Main Thrusters 3 + RCS System 1: four ranks,
+    // though the side thrusters never fire.
+    fly(90, { main: 1, levels: { thruster: 3, rcs: 1 } });
     expect(engine.snapshot().input.tier).toBe(2);
     expect(layers()).toEqual([true, true, false]);
-    // + Braking System 3 + Main Thrusters 3: eight.
-    fly(90, { main: 1, levels: { main: 3, side: 2, aux: 3 } });
+    // + Braking System 4, the retro never firing either: eight.
+    fly(90, { main: 1, levels: { thruster: 3, rcs: 1, braking: 4 } });
     expect(engine.snapshot().input.tier).toBe(3);
     expect(layers()).toEqual([true, true, true]);
+  });
+
+  it("the player's every step carries the three cards' levels to the engine", async () => {
+    const { engine, eventBus } = await makeAudio();
+    const input = {
+      getMovementInput: () => ({
+        up: true,
+        down: false,
+        left: false,
+        right: false,
+      }),
+    };
+    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    eventBus.emit('upgrade-thruster-visual', { level: 3 });
+    eventBus.emit('upgrade-rcs-visual', { level: 1 });
+
+    for (let i = 0; i < 10; i += 1) player.update(STEP);
+    expect(engine.snapshot().input.tier).toBe(2);
   });
 
   it('a side thruster puffs on its own side; the speed share is how near the push holds its top speed', async () => {
@@ -334,6 +367,41 @@ describe('ship engine', () => {
     expect(errors).not.toHaveBeenCalled();
   });
 
+  it('a pause and a teardown stop its one-shots too, playing or scheduled, with a short fade', async () => {
+    const { context, engine, eventBus, sources, fly, step } = await makeAudio();
+    const oneshots = (from) =>
+      sources.slice(from).filter((s) => !s.loop && s.start.mock.calls.length);
+    const faded = (source) =>
+      source.connect.mock.calls[0][0].gain.setTargetAtTime.mock.calls.some(
+        ([value]) => value === 0
+      );
+
+    fly(4, { main: 1 }); // the ignition
+    eventBus.emit('weapon-fired', {});
+    step({ automatic: 0.35 }); // the stabilizer's puffs, scheduled ahead
+    const [ended, ...ringing] = oneshots(0);
+    expect(ringing.length).toBeGreaterThanOrEqual(2);
+    expect(
+      ringing.some((s) => s.start.mock.calls[0][0] > context.currentTime)
+    ).toBe(true);
+    ended.onended(); // it finished on its own: nothing left to stop
+
+    eventBus.emit('pause-state-changed', { isPaused: true });
+    ringing.forEach((s) => {
+      expect(faded(s)).toBe(true);
+      expect(s.stop).toHaveBeenCalledTimes(1);
+      expect(s.stop.mock.calls[0][0]).toBeGreaterThan(context.currentTime);
+    });
+    expect(ended.stop).not.toHaveBeenCalled();
+
+    const from = sources.length;
+    eventBus.emit('player-dashed', { position: { x: 400, y: 300 } });
+    const [dash] = oneshots(from);
+    engine.dispose();
+    expect(faded(dash)).toBe(true);
+    expect(dash.stop).toHaveBeenCalledTimes(1);
+  });
+
   it('a death in a later run still stops it: the inactivity checker outlives the reset', async () => {
     const { audio, engine, fly } = await makeAudio();
     vi.useFakeTimers({
@@ -371,6 +439,20 @@ describe('ship engine', () => {
     expect(errors).not.toHaveBeenCalled();
   });
 
+  it('with the context suspended, the dash and the brake ask for a resume and play once it runs', async () => {
+    const { audio, context, eventBus, played } = await makeAudio();
+    audio._wireSfxBusSeams(); // the game's resume gate, not the immediate one
+    context.state = 'suspended';
+
+    eventBus.emit('player-dashed', { position: { x: 400, y: 300 } });
+    eventBus.emit('player-braked', { position: { x: 400, y: 300 } });
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    expect(played()).toEqual([]);
+
+    await audio.resumePromise;
+    expect(played()).toEqual(['dash.mp3', 'brake.mp3']);
+  });
+
   it('when the files fail it stays procedural: the thruster loop, the synthesized dash', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { bus, engine, errors, context, eventBus, step, played } =
@@ -395,5 +477,52 @@ describe('ship engine', () => {
     expect(played()).toEqual([]);
     expect(errors).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('a teardown while its files fetch or decode never builds the engine', async () => {
+    const gate = () => {
+      let open;
+      const shut = new Promise((resolve) => {
+        open = resolve;
+      });
+      return { shut, open };
+    };
+    const started = (sources) =>
+      sources.filter((s) => s.start.mock.calls.length);
+
+    // Torn down while decoding.
+    const decoding = makeContext();
+    const decodeGate = gate();
+    const decode = decoding.context.decodeAudioData;
+    decoding.context.decodeAudioData = vi.fn(async (file) => {
+      await decodeGate.shut;
+      return decode(file);
+    });
+    const late = initBus(decoding.context).bus;
+    const loading = late.engine.load(fetchFor(MANIFEST));
+    await vi.waitFor(() =>
+      expect(decoding.context.decodeAudioData).toHaveBeenCalled()
+    );
+    late.engine.dispose();
+    decodeGate.open();
+    await loading;
+    expect(late.engine.snapshot()).toBeNull();
+    expect(started(decoding.sources)).toEqual([]);
+
+    // Torn down while fetching.
+    const fetching = makeContext();
+    const fetchGate = gate();
+    const fetchFile = fetchFor(MANIFEST);
+    const early = initBus(fetching.context).bus;
+    const fetchingLoad = early.engine.load(async (path) => {
+      await fetchGate.shut;
+      return fetchFile(path);
+    });
+    early.engine.dispose();
+    fetchGate.open();
+    await fetchingLoad;
+    expect(early.engine.snapshot()).toBeNull();
+    expect(fetching.context.decodeAudioData).not.toHaveBeenCalled();
+    expect(started(fetching.sources)).toEqual([]);
   });
 });
