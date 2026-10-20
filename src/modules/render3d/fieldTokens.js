@@ -6,84 +6,15 @@
 // whatever the count; an empty batch is hidden.
 
 import { PALETTE } from '../../data/constants/palette.js';
-import { HALF_H, HALF_W, colorOf } from './batches.js';
+import { colorOf } from './batches.js';
 import { revolve, skin, sweep } from './enemies/shapes.js';
+import { InstanceBatch } from './glowBatch.js';
 import { mergeStatic } from './mergeStatic.js';
 
 const TAU = Math.PI * 2;
 // XP_ORB_MAX_PER_CLASS × the six orb classes
 export const ORB_CAP = 600;
 export const HEART_CAP = 32;
-
-/**
- * An InstancedMesh refilled every frame: a pose and a colour per instance
- * (linear, may pass 1 to bloom). `order`: the pose's Euler order ('YXZ'
- * tips first, then turns about the field's up).
- */
-export class InstanceBatch {
-  constructor(THREE, geometry, material, capacity, order = 'ZXY') {
-    this.capacity = capacity;
-    this.count = 0;
-    this.mesh = new THREE.InstancedMesh(geometry, material, capacity);
-    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    // set before the first compile: the program is keyed on it
-    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(capacity * 3),
-      3
-    );
-    this.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-    this.mesh.frustumCulled = false;
-    this.mesh.count = 0;
-    this.mesh.visible = false;
-    this.matrix = new THREE.Matrix4();
-    this.quaternion = new THREE.Quaternion();
-    this.euler = new THREE.Euler(0, 0, 0, order);
-    this.position = new THREE.Vector3();
-    this.scale = new THREE.Vector3();
-  }
-
-  begin() {
-    this.count = 0;
-  }
-
-  /**
-   * Logical (x, y) at height `h`, turned `yaw` about its own up axis, then
-   * tipped by `pitch` (about x) and `roll` (about z); uniform `scale`;
-   * colour `rgb` × `gain`. Its index, or −1 when the batch is full.
-   */
-  push(x, y, h, yaw, pitch, roll, scale, rgb, gain) {
-    if (this.count >= this.capacity) return -1;
-    const i = this.count;
-    this.position.set(x - HALF_W, h, y - HALF_H);
-    this.quaternion.setFromEuler(this.euler.set(pitch, yaw, roll));
-    this.scale.setScalar(scale);
-    this.matrix.compose(this.position, this.quaternion, this.scale);
-    this.mesh.setMatrixAt(i, this.matrix);
-    const color = this.mesh.instanceColor.array;
-    color[i * 3] = rgb[0] * gain;
-    color[i * 3 + 1] = rgb[1] * gain;
-    color[i * 3 + 2] = rgb[2] * gain;
-    this.count += 1;
-    return i;
-  }
-
-  /** Uploads what was pushed (`extra`: more per-instance attributes). */
-  end(extra) {
-    const n = this.count;
-    this.mesh.count = n;
-    this.mesh.visible = n > 0;
-    if (!n) return;
-    upload(this.mesh.instanceMatrix, n);
-    upload(this.mesh.instanceColor, n);
-    if (extra) upload(extra, n);
-  }
-}
-
-function upload(attribute, n) {
-  attribute.updateRange.offset = 0;
-  attribute.updateRange.count = n * attribute.itemSize;
-  attribute.needsUpdate = true;
-}
 
 // Light from within: each face between a deep, saturated tone (turned from
 // the camera and the key light) and the full one (facing either), a bright
@@ -316,7 +247,7 @@ export class OrbCrystals extends InstanceBatch {
   pushOrb(orb, tier, size, age, rgb) {
     const seed = this.seedOf(orb);
     const t = Math.min(6, Math.max(1, tier));
-    const i = this.push(
+    const i = this.pushPose(
       orb.x,
       orb.y,
       orbHeight(size) + ORB_LOOK.bob * Math.sin(age * 2.1 + seed),
@@ -400,7 +331,7 @@ export class HeartTokens extends InstanceBatch {
   /** A heart of `radius` at its `phase` (the beat's clock), in `rgb`. */
   pushHeart(x, y, radius, phase, rgb) {
     const p = HEART_POSE;
-    this.push(
+    this.pushPose(
       x,
       y,
       HEART_HEIGHT + 0.8 * Math.sin(phase * 0.5),

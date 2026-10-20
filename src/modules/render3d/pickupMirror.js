@@ -5,7 +5,8 @@
 
 import { PICKUP_KINDS, PICKUP_TOKEN } from '../../data/pickups.js';
 import { rgbOf } from './batches.js';
-import { InstanceBatch, tokenParts } from './fieldTokens.js';
+import { tokenParts } from './fieldTokens.js';
+import { InstanceBatch } from './glowBatch.js';
 import { addRimLight } from './rimLight.js';
 
 const POOL = 8;
@@ -59,7 +60,7 @@ export class PickupMirror {
       const yaw = 0.3 * Math.sin(p.age * 0.9 + i);
       const pitch = 0.1 * Math.sin(p.age * 1.7 + i);
       const roll = 0.1 * Math.cos(p.age * 1.3 + i);
-      view.body.push(p.x, p.y, h, yaw, pitch, roll, radius, WHITE, 1);
+      view.body.pushPose(p.x, p.y, h, yaw, pitch, roll, radius, WHITE, 1);
       const blinking =
         p.lifetime - p.age < PICKUP_TOKEN.blinkTime &&
         Math.floor(p.age / BLINK_WINDOW) % 2 === 1;
@@ -68,7 +69,7 @@ export class PickupMirror {
       const gain = blinking
         ? BLINK_GAIN
         : (LIGHT_LUMA / luma) * (1 + 0.15 * Math.sin(p.age * 5 + i));
-      view.light.push(p.x, p.y, h, yaw, pitch, roll, radius, rgb, gain);
+      view.light.pushPose(p.x, p.y, h, yaw, pitch, roll, radius, rgb, gain);
     }
     views.forEach((view) => {
       view.body.end();
