@@ -82,7 +82,8 @@ export class LayerEvents {
 
   /**
    * Hunters' Moon: the roster keeps only its roles, each count scaled;
-   * surges keep their size, spawning only those roles.
+   * surges keep their size, spawning only those roles; only formations of
+   * those roles come.
    */
   applyHuntersMoon(director) {
     if (director.modifier !== 'hunters-moon') return director;
@@ -101,6 +102,9 @@ export class LayerEvents {
           roles: surge.roles.filter((role) => roles.includes(role)),
         }))
         .filter((surge) => surge.roles.length > 0),
+      formations: director.formations.filter(({ role }) =>
+        roles.includes(role)
+      ),
     };
   }
 

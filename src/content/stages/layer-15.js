@@ -7,6 +7,7 @@ export default {
   rocks: rockCurve(15),
   roster: [{ role: 'sniper', count: 2, from: 3, every: 2, elite: 0.3 }],
   surges: [],
+  formations: [],
   events: [],
   warden: true,
 };

@@ -13,7 +13,10 @@ import {
 
 const SPAWN_STEPS = 10 * 60;
 
-/** Layer 7 whose whole plan is one `kind` (its role): no rocks, surges or events. */
+/**
+ * Layer 7 whose whole plan is one `kind` (its role): no rocks, surges,
+ * formations or events.
+ */
 function layerOfOne(kind) {
   const [role] = getContent('enemies', kind).roles;
   const game = createHeadlessGame();
@@ -26,6 +29,7 @@ function layerOfOne(kind) {
     ...wm.layerDirector(7),
     roster: [{ role, count: 1, from: 0, every: 1, elite: 0 }],
     surges: [],
+    formations: [],
     events: [],
     herald: null,
     modifier: null,

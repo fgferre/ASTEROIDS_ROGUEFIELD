@@ -90,9 +90,17 @@ export class RecipeEnemy extends BaseEnemy {
     });
   }
 
-  // Each `takeDamage` behavior passes on what is left, or null for none.
+  // A neighbour's ward (`guardHit`, the `ward` behavior) takes its share
+  // first; then each `takeDamage` behavior passes on what is left, or null
+  // for none.
   takeDamage(amount, source = null) {
     let left = amount;
+    this.system?.forEachActiveEnemy?.((other) => {
+      if (left > 0 && other !== this && other.guardHit) {
+        left = other.guardHit(this, left, source);
+      }
+    });
+    if (left < amount && !(left > 0)) return false;
     for (const [behavior, params] of this.steps) {
       if (!behavior.takeDamage) continue;
       left = behavior.takeDamage(this, params, left, source);

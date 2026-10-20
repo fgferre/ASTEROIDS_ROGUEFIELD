@@ -21,6 +21,7 @@
 // are called on it by name (the engine calls them), with (enemy, params,
 // ...args).
 // Its state lives on the enemy, under the names the views and tests read.
+import aimLine from './aimLine.js';
 import charge from './charge.js';
 import fanShot from './fanShot.js';
 import forage from './forage.js';
@@ -32,9 +33,14 @@ import lobShell from './lobShell.js';
 import orbitSide from './orbitSide.js';
 import phase from './phase.js';
 import proximityFuse from './proximityFuse.js';
+import rearWeakPoint from './rearWeakPoint.js';
+import runLanes from './runLanes.js';
 import spawnOnDeath from './spawnOnDeath.js';
 import spawnOnField from './spawnOnField.js';
 import spin from './spin.js';
+import split from './split.js';
+import turnToward from './turnToward.js';
+import ward from './ward.js';
 import weaponTelegraph from './weaponTelegraph.js';
 
 export const BEHAVIORS = Object.freeze({
@@ -53,4 +59,10 @@ export const BEHAVIORS = Object.freeze({
   charge,
   spin,
   'lay-mines': layMines,
+  'aim-line': aimLine,
+  'run-lanes': runLanes,
+  split,
+  ward,
+  'turn-toward': turnToward,
+  'rear-weak-point': rearWeakPoint,
 });

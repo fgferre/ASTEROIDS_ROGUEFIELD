@@ -1,8 +1,8 @@
 // Telegraphs on the field plane: the charge lane (or the Null's dark lane
-// between violet edges), the spread fan, the warning ring and the Choir's
-// converging beams. The Ram and the Wardens draw them; built once into the
-// toolkit (enemyMirror.js createKit) as kit.createTelegraph and
-// kit.updateTelegraph.
+// between violet edges), a marksman's aim line, the spread fan, the warning
+// ring and the Choir's converging beams. The Ram, the Wardens and any recipe
+// enemy that aims draw them; built once into the toolkit (enemyMirror.js
+// createKit) as kit.createTelegraph and kit.updateTelegraph.
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
@@ -73,8 +73,9 @@ export function createTelegraphs(kit) {
     return geometry;
   }
 
-  // Charge lane / spread fan on the field plane, timed by the boss's live
-  // `telegraph` state.
+  // Charge lane / aim line / spread fan on the field plane, timed by the
+  // boss's live `telegraph` state; an aim line held still (`locked`) burns
+  // brighter and wider.
   function updateTelegraph(parts, boss, radius) {
     const t = boss.telegraph;
     parts.group.visible = Boolean(t);
@@ -89,11 +90,12 @@ export function createTelegraphs(kit) {
     const chorus = t.type === 'chorus';
     parts.group.rotation.y = chorus ? 0 : -(t.angle || 0);
     const charge = t.type === 'charge';
+    const aim = t.type === 'aim';
     const dark = charge && t.tone === 'dark';
     parts.lane.visible = charge && !dark;
     parts.dark.visible = dark;
     parts.edges.forEach((edge) => (edge.visible = dark));
-    parts.line.visible = charge;
+    parts.line.visible = charge || aim;
     parts.fan.visible = t.type === 'fan';
     parts.beams.forEach((beam, i) => {
       const line = chorus ? t.lines?.[i] : null;
@@ -121,6 +123,16 @@ export function createTelegraphs(kit) {
         parts.lane.scale.set(length, 1, r * 1.8);
         parts.lane.material.opacity = 0.08 + 0.18 * progress;
       }
+    } else if (aim) {
+      parts.line.material.color.copy(kit.threatColor);
+      parts.line.scale.set(
+        Math.max(r * 2, t.length || 900),
+        1,
+        t.locked ? 3 : 1.5
+      );
+      parts.line.material.opacity = t.locked
+        ? 0.55 + 0.25 * pulse
+        : 0.15 + 0.35 * progress;
     } else if (t.type === 'fan') {
       const arc = Math.max(0.1, t.arc || 0.8);
       const length = Math.max(r * 1.5, t.length || 180);
@@ -128,6 +140,8 @@ export function createTelegraphs(kit) {
       parts.fan.scale.set(length, 1, length);
       parts.fan.material.opacity = 0.07 + 0.2 * progress;
     }
+    // the aim line is warning enough: no ring round a marksman
+    parts.warn.visible = !aim;
     const ring = r * (1.15 + 0.1 * pulse);
     parts.warn.scale.set(ring, 1, ring);
     parts.warn.material.opacity = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);

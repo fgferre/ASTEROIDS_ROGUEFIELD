@@ -40,6 +40,8 @@ export default {
   id: 'weaver',
   order: 6,
   roles: ['minelayer'],
+  // Sowers lay mines from layer 4; Weavers join them from 13.
+  fromLayer: 13,
   config: WEAVER_CONFIG,
   components: WEAVER_COMPONENTS,
   rewards: WEAVER_REWARDS,

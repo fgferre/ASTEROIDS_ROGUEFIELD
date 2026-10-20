@@ -500,7 +500,14 @@ export function createRecipeViews(kit) {
     });
   }
 
+  // A behavior's field-plane telegraph (`enemy.telegraph`: the aim line) is
+  // built the first time the enemy shows one (seeded: Three names it with
+  // Math.random).
   function update(view, enemy, time) {
+    if (enemy.telegraph || view.telegraph) {
+      view.telegraph ??= kit.seeded(() => kit.createTelegraph());
+      kit.updateTelegraph(view.telegraph, enemy, enemy.radius || 14);
+    }
     const { recipe, body } = view;
     const t = time + (view.seed % 7);
     const { spin, bob, pulse } = recipe;

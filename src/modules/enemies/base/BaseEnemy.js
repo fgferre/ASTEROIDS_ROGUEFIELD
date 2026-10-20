@@ -78,6 +78,8 @@ export class BaseEnemy {
     this.armor = 0;
     // Seconds left frozen (Solar Flare): EnemyUpdateSystem skips the update.
     this.stunTimer = 0;
+    // A formation's course { vx, vy, left } (waves/formations.js), else null.
+    this.course = null;
 
     // Lifecycle
     this.age = 0; // Time since spawn
@@ -135,6 +137,7 @@ export class BaseEnemy {
     this.y = config.y || 0;
     this.vx = config.vx || 0;
     this.vy = config.vy || 0;
+    this.course = config.course ?? null;
 
     // State
     this.alive = true;
@@ -158,6 +161,7 @@ export class BaseEnemy {
     if (!this.alive || !this.initialized) return;
 
     this.age += deltaTime;
+    const { x, y } = this;
 
     const hasMovementComponent =
       this.useComponents && this.hasComponent('movement');
@@ -179,7 +183,25 @@ export class BaseEnemy {
     this.onUpdate(deltaTime);
     this._componentsInvoked = false;
 
+    if (this.course) this.holdCourse(x, y, deltaTime);
     if (this.affixes.length) this.updateAffixes(deltaTime);
+  }
+
+  /**
+   * In formation: from where the frame found it (x, y) it flies its course's
+   * velocity, whatever its own movement did, facing that way, for the
+   * course's `left` s; its behaviors and weapon still run.
+   */
+  holdCourse(x, y, deltaTime) {
+    const { course } = this;
+    this.vx = course.vx;
+    this.vy = course.vy;
+    this.velocity = { vx: course.vx, vy: course.vy };
+    this.x = x + course.vx * deltaTime;
+    this.y = y + course.vy * deltaTime;
+    this.rotation = Math.atan2(course.vy, course.vx);
+    course.left -= deltaTime;
+    if (course.left <= 0) this.course = null;
   }
 
   /** Shielded turns its plate to the player; a lit Volatile fuse burns down. */
@@ -515,6 +537,7 @@ export class BaseEnemy {
     this.maxHealth = 100;
     this.armor = 0;
     this.stunTimer = 0;
+    this.course = null;
 
     // Reset lifecycle
     this.age = 0;

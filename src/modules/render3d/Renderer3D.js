@@ -35,12 +35,14 @@ import {
   mirrorPickups,
   mirrorProjectiles,
 } from './fieldMirrors.js';
+import { FormationMarks } from './formationMarks.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
 import { ImpactKick } from './impactPass.js';
 import {
   mirrorBossTransitions,
   mirrorLocks,
   mirrorOverlays,
+  mirrorWards,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
@@ -148,6 +150,7 @@ class Renderer3D extends BaseSystem {
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
     this.muzzles = new MuzzleFlashes();
+    this.formationMarks = new FormationMarks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
     // with distance from the camera target (the rig's focus).
@@ -223,6 +226,12 @@ class Renderer3D extends BaseSystem {
         payload.y - HALF_H,
         payload.flare
       );
+    });
+    // A formation's marks, and the edge lit where it comes in.
+    this.registerEventListener('formation-warned', (payload) => {
+      for (const { x, y } of this.formationMarks.add(payload)) {
+        this.three?.veil.flare(x - HALF_W, y - HALF_H, PALETTE.threat);
+      }
     });
     this.registerEventListener('boss-telegraph', () => {
       this.camera.trigger('telegraph');
@@ -714,6 +723,8 @@ class Renderer3D extends BaseSystem {
     );
     mirrorEffects(t, effects, this.impact);
     this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb);
+    this.formationMarks.update(dt, t.ribbons, t.threatRgb);
+    mirrorWards(t, enemyList);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();
     }

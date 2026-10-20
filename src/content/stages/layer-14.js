@@ -1,5 +1,5 @@
-// Layers 13–14: everything, Weavers included.
-import { fieldEvent, rockCurve } from '../../data/layerParts.js';
+// Layers 13–14: everything, Weavers included; every formation by 14.
+import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
 
 export default {
   id: 'layer-14',
@@ -16,6 +16,8 @@ export default {
     { role: 'artillery', count: 3, from: 15, every: 10, elite: 0.3 },
     { role: 'flanker', count: 3, from: 15, every: 10, elite: 0.3 },
     { role: 'scavenger', count: 2, from: 15, every: 15, elite: 0.3 },
+    { role: 'marksman', count: 3, from: 8, every: 10, elite: 0.3 },
+    { role: 'support', count: 2, from: 16, every: 14, elite: 0.3 },
   ],
   surges: [
     {
@@ -31,6 +33,12 @@ export default {
       count: 10,
       label: 'Full field',
     },
+  ],
+  formations: [
+    formation('ring', { role: 'swarmer', count: 12, at: 12, elite: 0.3 }),
+    formation('sweep', { role: 'skirmisher', count: 8, at: 26, elite: 0.3 }),
+    formation('wall', { role: 'hazard', count: 11, at: 38, elite: 0.3 }),
+    formation('swarm', { role: 'swarmer', count: 10, at: 50, elite: 0.3 }),
   ],
   events: [fieldEvent('solar-flare', 20), fieldEvent('sensor-jam', 40)],
   warden: false,

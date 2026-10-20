@@ -1,5 +1,6 @@
-// Layers 11–12: Seekers and Bulwarks.
-import { fieldEvent, rockCurve } from '../../data/layerParts.js';
+// Layers 11–12: Seekers and Bulwarks, Twains from 11, Anvils from 12 (a
+// wall of tanks).
+import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
 
 export default {
   id: 'layer-12',
@@ -15,10 +16,24 @@ export default {
     { role: 'artillery', count: 2, from: 15, every: 12, elite: 0.15 },
     { role: 'flanker', count: 2, from: 15, every: 12, elite: 0.15 },
     { role: 'scavenger', count: 1, from: 20, every: 1, elite: 0.15 },
+    { role: 'marksman', count: 2, from: 12, every: 14, elite: 0.15 },
+    { role: 'support', count: 1, from: 22, every: 1, elite: 0.15 },
+    { role: 'minelayer', count: 1, from: 30, every: 1, elite: 0.15 },
   ],
   surges: [
     { at: 30, roles: ['charger'], count: 5, label: 'Ram pack' },
     { at: 50, roles: ['artillery', 'flanker'], count: 4, label: 'Crossfire' },
+  ],
+  formations: [
+    formation('wall', {
+      role: 'tank',
+      count: 4,
+      at: 24,
+      gap: 220,
+      speed: 40,
+      elite: 0.15,
+    }),
+    formation('ring', { role: 'swarmer', count: 10, at: 44, elite: 0.15 }),
   ],
   events: [fieldEvent('solar-flare', 30)],
   warden: false,

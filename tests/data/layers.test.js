@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
+import { FORMATIONS } from '../../src/data/layerParts.js';
 import {
   BOSS_RUSH_LAYERS,
   FIELD_EVENTS,
@@ -20,6 +21,7 @@ import {
 const rolesOf = (layer) => [
   ...layer.roster.map(({ role }) => role),
   ...layer.surges.flatMap(({ roles }) => roles),
+  ...layer.formations.map(({ role }) => role),
 ];
 
 // The enemies layer n's roster can bring (each roster role's enemies).
@@ -98,6 +100,44 @@ describe('layer table', () => {
         expect(entry.elite).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('formations', () => {
+  const unitsOn = (layer) =>
+    layer.formations.reduce((sum, { count }) => sum + count, 0);
+
+  it('come in known shapes, with a role, units and a time, never on a Warden layer', () => {
+    for (const layer of LAYERS) {
+      if (layer.warden) expect(layer.formations).toEqual([]);
+      for (const entry of layer.formations) {
+        expect(FORMATIONS[entry.kind], entry.kind).toBeDefined();
+        expect(entry.role).toMatch(/\S/);
+        expect(entry.count).toBeGreaterThanOrEqual(
+          entry.kind === 'wall' ? 2 : 1
+        );
+        expect(entry.at).toBeGreaterThan(0);
+        expect(entry.elite).toBeGreaterThanOrEqual(0);
+        expect(entry.elite).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('use every shape on two layers or more, all four only on the deepest, more units deeper', () => {
+    for (const kind of Object.keys(FORMATIONS)) {
+      const layers = LAYERS.filter((layer) =>
+        layer.formations.some((entry) => entry.kind === kind)
+      );
+      expect(layers.length, kind).toBeGreaterThanOrEqual(2);
+    }
+    const shapesOn = (layer) =>
+      new Set(layer.formations.map(({ kind }) => kind)).size;
+    expect(shapesOn(LAYERS[13])).toBe(Object.keys(FORMATIONS).length);
+    const deepest = unitsOn(LAYERS[13]);
+    LAYERS.slice(0, 13).forEach((layer) => {
+      expect(shapesOn(layer)).toBeLessThan(Object.keys(FORMATIONS).length);
+      expect(unitsOn(layer)).toBeLessThan(deepest);
+    });
   });
 });
 
@@ -196,13 +236,14 @@ describe('Boss Rush', () => {
     ]);
   });
 
-  it("keeps each Warden layer's Warden and escort, with few rocks and no surges or events", () => {
+  it("keeps each Warden layer's Warden and escort, with few rocks and no surges, formations or events", () => {
     for (const layer of BOSS_RUSH_LAYERS) {
       const rush = bossRushDirectorFor(layer);
       expect(rush.warden).toBe(true);
       expect(rush.roster).toEqual(directorFor(layer).roster);
       expect(rush.rocks).toBeLessThan(directorFor(layer).rocks);
       expect(rush.surges).toEqual([]);
+      expect(rush.formations).toEqual([]);
       expect(rush.events).toEqual([]);
     }
   });
