@@ -1,99 +1,64 @@
 # Pendências — o que está quebrado e o que falta
 
 Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo veredito dele jogando (Mac M1, 60 fps):
-1, 3, 6, 7, 8, 9 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
+1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10 — história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 18.**
 
-## O BASTÃO — onde a sessão parou (18/10, noite) — RODADAS 12 E 13 (PARCIAL) MESCLADAS NA `main` (PR #261); SESSÃO NA NUVEM ENCERRADA, ELE SEGUE EM CONVERSA LOCAL
+## O BASTÃO — onde as sessões pararam (20/10) — RODADA 0 E METADE DA 14 NA `main` (PRs até #292); PRÓXIMA CONVERSA: FECHAR A 14 (HUD) E DEPOIS A 15 (LONGEVIDADE)
 
 **Como retomar (conversa local, qualquer máquina):**
 
-1. `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git && cd ASTEROIDS_ROGUEFIELD && git checkout main` — a
-   `main` contém tudo (PRs #247–#261). O ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg` não tem nada fora da `main`.
-2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (só a Rodada 12 — R12.5 não iniciado — e a Rodada 13 com o goal novo dele);
-   `docs/NORTE.md` (§1 ficção, §2–3 arte, §7 Norte 2); `BACKLOG.md` (27 linhas).
-3. `npm ci && npm run done` (160 arquivos / 1136 testes, build). Para ver o jogo: `npm run dev` →
-   `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`.
-4. **Antes de qualquer junção na `main`:** rodar a sonda headless de erros de runtime (o gate não pega erro de render).
-   Script (Playwright/Chromium; ajustar `executablePath` à máquina):
-
-   ```js
-   import { chromium } from 'playwright-core';
-   const port = process.env.PORT || 5550;
-   const b = await chromium.launch({
-     args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
-   });
-   const p = await b.newPage({ viewport: { width: 1600, height: 900 } });
-   const errs = [];
-   p.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 200)));
-   p.on('console', (m) => {
-     if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 240));
-   });
-   await p.goto(
-     `http://127.0.0.1:${port}/ASTEROIDS_ROGUEFIELD/?scene=hero&desktop=force&debugLogging=0`
-   );
-   await p.waitForSelector('#game-canvas', {
-     state: 'visible',
-     timeout: 180000,
-   });
-   await p.waitForTimeout(20000);
-   console.log(
-     'errors:',
-     new Set(errs).size,
-     [...new Set(errs)].slice(0, 8).join('\n')
-   );
-   await b.close();
-   ```
-
-5. Juntar na `main` sempre via pull request mesclado pela API (`gh api .../pulls` + `PUT .../merge`): o hook bloqueia
-   publicar a `main` diretamente, de propósito. Ele aprovou ("eu aprovo daqui… preciso que tudo seja mergeado na main").
-6. **Limpeza que ele pediu e a nuvem não pôde fazer (bloqueio de segurança):** 224 ramos remotos antigos (`codex/*`,
-   `feature/*`, `stash-recuperado-*`, `backup-main-quebrado`, …), nenhum ancestral da `main`. Localmente, com ele
-   confirmando a lista (`git fetch --prune && git branch -r`), apagar cada um no remoto com o push de exclusão do git
-   (`--delete`), em lotes de 20. Worktrees temporários da nuvem já foram removidos.
+1. `git checkout main && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; 190 arquivos de
+   teste; o golden trace de 21 partidas prova comportamento igual). Jogo: `npm run dev` →
+   `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Sonda e captura headless já estão no repo: `scripts/probe.mjs` e
+   `scripts/capture.mjs` (para nuvem ou automação; a conversa local tem navegador embutido).
+2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Passagem de bastão 19/10, Rodada 0 feita, **Rodada 14 com 14.1, 14.2 e
+   quase toda a 14.2b feitas**, Rodada 15 redigida); `CONTENT.md` (como adicionar inimigo, arma, carta, casco, fase,
+   bioma, chefe — um arquivo cada, zero linhas no motor); `docs/NORTE.md` (§1 ficção, §2–3 arte); `BACKLOG.md`.
+3. Juntar na `main` sempre por pull request (a conversa local tem feito isso; o hook bloqueia publicar a `main` direto).
 
 **Regras dele que valem para sempre:** (a) agir independentemente e crescer o jogo a cada rodada; (b) toda rodada
-melhora também gráficos, efeitos, câmera, jogabilidade e UX, não só conteúdo; (c) tudo em inglês no jogo; (d) números
-são "proposta" nomeada no código — ele julga jogando; (e) um commit por fatia, com captura; (f) nunca `git add -f`;
-(g) docs só com o que está aberto (PLAN perde rodadas fechadas; BACKLOG perde linhas feitas; PENDENCIAS é dele).
+melhora também gráficos, efeitos, câmera, jogabilidade e UX; (c) tudo em inglês no jogo; (d) números são "proposta"
+nomeada no conteúdo — ele julga jogando; (e) um commit por fatia, com captura; (f) nunca `git add -f`; (g) docs só com
+o que está aberto; (h) **maquete antes de código** para interface e câmera (ele aprova a imagem, depois se implementa);
+(i) **"às vezes menos é mais"** — a primeira câmera diretora foi rejeitada por overengineering; a de dois estados
+(perto/aberta) foi aprovada.
 
-**O goal dele (18/10, noite), nas palavras dele, está na seção "Goal novo" abaixo (itens 9–14), com os itens 7, 8 e 15.**
-Estado por ponto: fundo com volume → R13.1 feita (ele ainda não viu); faixa escura do Anel → item 15, nada mudado,
-explicado; casco/mira → nada no código acopla (lido 18/10), R13.2 proposta em Settings; medição na máquina dele →
-R13.3 proposta; áudio morto → R12.6 feita, sobras em R13.7; paridade 2D/3D → o 2D virou easter egg congelado por decisão dele (18/10, conversa local; PLAN decisão 6), sobra só o anel 3D em R13.6; replay sem modo → R13.4
-proposta; pooling/director → R13.5 feita (avisos 30–100/camada → 0); arquivos grandes → R13.8 proposta (pontos de
-corte mapeados no histórico desta sessão, não no repo: CombatSystem 4867, SFXBus 4595, UISystem 4516, EffectsSystem
-4462 linhas). **Ele pediu para avisar quando os oito estiverem fechados para trocar o goal; sugestão de goal seguinte
-já dada a ele (polimento de lançamento: primeiros 5 minutos a 60 fps, arte de próxima geração no herói e Wardens, mix
-ouvido, três finais, árvore do Hangar, zero avisos, regressão visual por capturas).**
+**Estado por frente (20/10):**
 
-**Rodada 12 (18/10, fim de tarde) — o que entrou:** terceira arma _Scatter Coil_ (carta épica; leque de 5 flaks que
-estouram em estilhaços; chip do HUD lê a arma); família _Maneuver_ (6 cartas, 41 no total; sinergia Afterburn =
-rastro ardente no dash; Apex Blink = dash vira salto; cartas de arma se excluem); _Leech_ (11ª máquina, come orbes e
-devolve com juros); falas de primeiro avistamento por máquina, abertura do Boss Rush e compra do Bastion (Códice
-descobre ao ver); áudio limpo (aviso do propulsor 40 → 0, crossfade sem bateria velha, Heralds com voz, controlador de
-intensidade morto removido, cues da flak e da Leech); bloom em Settings **e a correção de que nenhuma opção gráfica
-gravada chegava ao renderer 3D** (manifesto não injetava `settings`). R12.5 (entrada cinematográfica do Warden) não
-iniciou.
+- **Fábrica de conteúdo (Rodada 0): feita.** `src/content` com registro automático (10 inimigos, 6 chefes, 3 armas, 39
+  cartas, 4 cascos, 15 camadas, 3 biomas); inimigos e armas como receitas; visual por receita; diretor por papéis; cena
+  `?content=<id>&count=&fire=1`; teto de 1.200 linhas por arquivo sem exceções; horda de 200 Motes a 60 fps no M1.
+- **Janela inteira (14.2): feita e publicada.** Canvas = janela, densidade = tela (teto 2); a câmera vê uma fatia com a
+  proporção da janela e chega às quatro bordas; tela cheia (Settings → Interface, tecla F). **Falta ele medir na tela
+  dele:** no M1 em 1440×900 Retina, ultra com `renderScale=2`, deu ~52 fps na horda (era ~61 na caixa 4:3) — um teto de
+  pixels por preset é decisão dele.
+- **Câmera diretora (14.2b, item 17): quase feita.** Dois estados de cima (perto com inclinação leve; aberta quase de
+  cima com o campo inteiro em perigo, fim de fase, ameaça fora da vista), nave sempre na tela, pode passar da borda
+  deslizando rápido, véu de luz na borda e espaço mais escuro além dela, fundo sem emendas visto de baixo, chegada
+  animada própria de cada Warden com cena viva curta (mundo a 1/4, nave protegida). **Falta:** cena viva de morte e de
+  vitória final (passo e), e ele jogar e dizer que a câmera dirige a cena.
+- **Arena com volume (PRs #289–#292):** toda nave e inimigo com forma desenhada para qualquer ângulo; tiros, rastros,
+  feixes, fagulhas, orbes, corações, pickups, explosões, escudo e fundo lendo como volumes de qualquer ângulo.
+- **HUD e instrumentos (14.3–14.7, item 16): não começados.** `HUD.md` (tokens, hierarquia, movimento, estados) →
+  radar tático por maquete aprovada → recargas ancoradas na nave, barras, chips como ícones, barra de chefe, feed →
+  menu/Hangar/Códice/Settings na mesma linguagem → legibilidade com 200 inimigos → guardas no gate (orçamento de quadro
+  por cena; capturas de referência que pedem aprovação dele). O radar acompanha o zoom da câmera nova.
+- **Abertos dele:** item 2 (tempo do chefe da camada 5), item 15 (o Anel partido lê como faixa; explicado, nada mudado;
+  modelar como estrutura iluminada mantendo o acender do epílogo), itens 16 e 17 acima. `BACKLOG.md`: 29 linhas.
+- **Depois da 14: Rodada 15 (longevidade)**, texto já no PLAN — 12+ armas, 30+ inimigos, 6 biomas, roster de cascos,
+  árvore de desbloqueios, runs de 20–30 min com centenas de inimigos, qualidade por padrão mais alta.
 
-**Rodada 13 (parcial):** R13.1 espaço com volume (estrelas por profundidade, nebulosa em 3 planos com o distante assado
-uma vez, nuvens com paralaxe; −7 % ultra / −50 % low no quadro headless); R13.5 pooling/director. Restam R13.2–R13.4,
-R13.6–R13.8 no PLAN.
+**Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
+dias de desafio"); câmera de dois estados aprovada por maquete; primeira câmera contínua rejeitada; "não tem problema
+mostrar a borda"; "a gente quer ver o inimigo chegando" (sem pausar a cena). **Sem veredito ainda:** janela inteira na
+tela dele, câmera diretora jogando, chegadas dos Wardens.
 
-**Vereditos dele (19/10, madrugada, jogando num Mac M1):** _"vi e aprovei, mas é pouco conteúdo… Vampire Survivors são
-dias de desafio"_ (Rodadas 5–13 aprovadas; itens 1, 3, 7, 8 fechados); _"tudo roda bem a 60 fps num Mac M1, podemos
-até aumentar qualidade, detalhe e elementos 3D"_ (itens 6 e 9 fechados); a faixa escura (item 15) segue aberta; sobre
-as dívidas (arquivos grandes etc.): _"analise se ainda está assim mesmo, mas temos que melhorar isso"_. Goal
-seguinte **decidido** (19/10, ele: "você sabe o que é melhor fazer"): **Rodada 0** (feita na conversa local, PR #280); em seguida, decidido com ele em 19/10 de manhã,
-**Rodada 14 — janela inteira, HUD de instrumento, guardas no gate** (PLAN.md), e só depois a **Rodada 15 — longevidade**.
-
-**Tudo visto só em headless sem GPU (1–4 fps); nada ouvido em browser.** `?stats=1`/F8 mostra fps/ms reais.
-
-**Avisos de processo:** workers em paralelo só em arquivos disjuntos; `pgrep -f`/`pkill -f` matam o shell do worker;
-nunca `| tail`/`| grep` antes de `&&` em comandos de teste (usar `set -o pipefail`); um worker pode "cair" sem
-escrever nada (R12.5) — conferir o diff antes de dar por feito; um worker apagou `scratchpad/*.js` de outros; o
-container pode reiniciar; apagar/arquivar refs remotas em massa é bloqueado na nuvem.
+**Avisos de processo:** até cinco ajudantes em paralelo, cada um com os arquivos dos outros nomeados; `pgrep -f`/
+`pkill -f` matam o shell do ajudante; `set -o pipefail` em cadeias com testes; um ajudante pode "cair" sem escrever —
+conferir o diff; apagar refs remotas em massa é bloqueado na nuvem (a limpeza foi feita localmente: de 224 ramos
+antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar é antigo e não impede a partida.
 
 ## Jogabilidade e sensação
 
@@ -121,14 +86,6 @@ medição real de desempenho na máquina do dono, caminhos de áudio mortos, odd
 que não grava o modo, edge cases de pooling/director e arquivos ainda muito grandes. A cada rodada, melhorar também
 qualidade gráfica, efeitos, câmera, jogabilidade e UX, buscando o polimento de um título AAA de próxima geração no
 browser, sem se limitar às referências."_
-
-- **(10)** caminhos de áudio mortos.
-- **(11)** oddities visuais e de paridade 2D/3D (anel chapado sob o domo do escudo, nave 2D borrada, zoom do dash só no
-  3D, Wardens 2D com o visual do Prime…).
-- **(12)** replay que não grava o modo (Boss Rush/Daily tocam como run normal).
-- **(13)** edge cases de pooling/director (velocidade velha em inimigos reaproveitados, Heralds/Wardens sem pool, seed
-  do director inconsistente, avisos de "accounting discrepancy").
-- **(14)** arquivos ainda muito grandes (UISystem, CombatSystem, PlayerSystem, Renderer3D, SFXBus).
 
 - **(15)** _"Eu olhando bem no fundo aqui, eu percebo uma faixa mais escura no fundo, como se fosse um ribbon, um
   stripe, que eu não entendo do que se trata. Parece um defeito."_ / _"Ao invés de só tirar, me explica qual era a
