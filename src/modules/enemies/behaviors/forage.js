@@ -119,7 +119,7 @@ function burst(enemy, params) {
  */
 export default {
   params: {
-    sense: 'number',
+    sense: 'positive',
     bite: 'number',
     hunt: 'number',
     drift: 'number',
@@ -128,9 +128,9 @@ export default {
     maxGrowth: 'number',
     healthPerOrb: 'number',
     maxHealthGain: 'number',
-    pickupOrbs: 'number',
-    fullXP: 'number',
-    digest: 'number',
+    pickupOrbs: 'count',
+    fullXP: 'positive',
+    digest: 'positive',
     bonus: 'number',
     margin: 'number',
     ateEvent: 'string',

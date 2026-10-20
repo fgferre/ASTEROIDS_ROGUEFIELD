@@ -4,7 +4,7 @@
  * view).
  */
 export default {
-  params: { telegraph: 'number' },
+  params: { telegraph: 'positive' },
   getters: {
     telegraphRatio(enemy, { telegraph }) {
       const state = enemy.weaponState;

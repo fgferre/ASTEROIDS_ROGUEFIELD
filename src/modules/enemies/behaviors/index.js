@@ -2,11 +2,13 @@
 // its content file names behaviors from here, in order, with their params.
 //
 // A behavior is a plain object. `params` names each param it reads and its
-// kind ('number', 'string', or 'count': a whole number of at least 1;
-// tests/content/enemies.test.js checks every recipe against it); `usesRandom`
-// marks one that draws from the enemy's own stream, so its recipe must be
-// `seeded`. Its hooks, all optional, receive
-// (enemy, params, ...):
+// kind: 'string'; 'number' (finite, zero or more); 'positive' (finite, above
+// zero: a duration or a divisor); 'count' (a whole number of at least 1). An
+// optional `check(params)` returns a sentence when the numbers together make
+// no sense (a band whose min is past its max), else null.
+// tests/content/recipeProblems.js checks every recipe against both;
+// `usesRandom` marks one that draws from the enemy's own stream, so its recipe
+// must be `seeded`. Its hooks, all optional, receive (enemy, params, ...):
 // - reset(): its state's starting values (construction and pool reset);
 // - init(config): at spawn, after the stats and the random stream;
 // - tick / steer / act(deltaTime, frame): one frame, in that order across

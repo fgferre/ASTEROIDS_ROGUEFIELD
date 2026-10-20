@@ -9,9 +9,9 @@ export default {
     delay: 'number',
     shots: 'count',
     arc: 'number',
-    speed: 'number',
+    speed: 'positive',
     damage: 'number',
-    lifetime: 'number',
+    lifetime: 'positive',
     pattern: 'string',
   },
   act(enemy, params, deltaTime, { live, target }) {

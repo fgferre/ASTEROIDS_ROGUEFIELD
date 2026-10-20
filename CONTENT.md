@@ -14,7 +14,7 @@ Content is data, behavior is a small library, `src/content/registry.js` links th
 
 - Required: `roles` (jobs it fills, below); `config` `{ key, displayName, radius, health, contactDamage }`; `components` `{ movement: { strategy, ... }, collision, health }`, plus `weapon: { pattern, ... }` if it shoots; `rewards` `{ baseOrbs, totalXP, healthHeartChance }` (or `baseOrbsMin`/`baseOrbsMax`); `pool` `{ initial, max }`; `tags` (with `'enemy'`); `affixes` (Elite rolls it may get: `shielded swift volatile splitter warded`); `seeded` (true = own random stream; a behavior marked `*` needs it); `behaviors` `{ name: params }`.
 - Optional: `weight` (default 1), `fromLayer` (default 1), `projectileColor`, `explodesOnDeath`; `effects` `{ fire, death }` (`fire`: `muzzle-flash` default, `burst-flash`, `null` for none; `death`: `spark-burst shock-burst blast debris`); `explosion` (`small medium large`, default `medium`, `null` none); `cues` `{ fired, telegraph, destroyed }` (an `SFXBus` method name each); `codex` `{ lore, hint, glyph }`; `sighting` (line at first sight, 90 characters at most).
-- Movement `strategy`: `linear tracking orbit proximity seeking parasite volatile`. Weapon `pattern`: `single burst spread volley proximity`. Copy the numbers of an enemy that uses the same.
+- Movement `strategy`: `linear tracking orbit proximity seeking parasite volatile`. Weapon `pattern`: `single burst spread volley proximity`. Movement numbers are 0 or more; a misspelt `strategy` moves linearly and a misspelt weapon `pattern` never fires, so the tests refuse both; weapon `speed lifetime cooldown fireRange` must be above 0 and `burstCount` a whole number of at least 1. Copy the numbers of an enemy that uses the same.
 - Copy: `src/content/enemies/drone.js` (movement and weapon), `caster.js` (several behaviors). Smallest that passes the tests, `tests/__fixtures__/enemies/gnat.js` (test fixtures use `order` 900+ so they never collide; a real file takes the next free number):
 
 ```js
@@ -58,7 +58,7 @@ export default {
 
 ## Behaviors: `src/modules/enemies/behaviors/`
 
-A recipe passes exactly a behavior's params (the test compares the key sets). Params are numbers unless named as strings; `shots` and `count` are whole numbers of at least 1 (a fan of one shot flies straight at the ship); `*` = draws random. Event names: reuse the donor's (a new name plays no sound).
+A recipe passes exactly a behavior's params (the test compares the key sets). Params are numbers of 0 or more unless named as strings; one that is a duration, a range or a divisor (`fade windup flight interval glow fullXP`) must be above 0; `shots`, `count`, `max` and `pickupOrbs` are whole numbers of at least 1 (a fan of one shot flies straight at the ship); `*` = draws random. A band must not run backwards: `hold-range` `min` past `max`, `phase` `flankMin` past `flank` and `proximity-fuse` `armTime` past `lifetime` fail the tests. Event names: reuse the donor's (a new name plays no sound).
 
 | Behavior             | Does                                                                            | Params                                                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |

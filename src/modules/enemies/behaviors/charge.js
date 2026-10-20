@@ -70,9 +70,9 @@ function windup(enemy, params, target, deltaTime) {
  */
 export default {
   params: {
-    engage: 'number',
-    windup: 'number',
-    charge: 'number',
+    engage: 'positive',
+    windup: 'positive',
+    charge: 'positive',
     recover: 'number',
     drag: 'number',
     chargeEvent: 'string',

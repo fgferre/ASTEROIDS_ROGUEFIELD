@@ -83,16 +83,18 @@ function flankPoint(enemy, params, player, target) {
  */
 export default {
   params: {
-    fade: 'number',
-    visible: 'number',
-    phased: 'number',
-    flank: 'number',
+    fade: 'positive',
+    visible: 'positive',
+    phased: 'positive',
+    flank: 'positive',
     flankMin: 'number',
     still: 'number',
     margin: 'number',
     outEvent: 'string',
     inEvent: 'string',
   },
+  check: ({ flank, flankMin }) =>
+    flankMin > flank ? 'flankMin is past flank' : null,
   usesRandom: true,
   getters: {
     speed: (enemy) => enemy.movementValue('maxSpeed'),
