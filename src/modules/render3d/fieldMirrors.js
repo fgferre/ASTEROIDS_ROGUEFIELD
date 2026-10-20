@@ -3,8 +3,8 @@
 // XP orbs and hearts, ambient chips, particles, shockwaves and the screen
 // flash.
 
-import { XP_ORB_SIZE } from '../../core/GameConstants.js';
 import { PALETTE } from '../../data/constants/palette.js';
+import { getOrbConfig } from '../xp/orbClasses.js';
 import { HALF_H, HALF_W, SHOT_SHAPES, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
 import { HEART_HEIGHT, orbHeight } from './fieldTokens.js';
@@ -22,6 +22,20 @@ const KICK_WAVE_RADIUS = 90;
 const KICK_WAVE_FULL = 200;
 const KICK_WAVE_MIN = 0.25;
 const KICK_WAVE_MAX = 0.8;
+// proposta 20/10: an orb faster than minSpeed px/s (pulled, or bursting out
+// of a kill) trails a streak of its last `seconds` of travel, at most
+// maxLength px, `width` × its size across; it fades in over the next
+// minSpeed px/s.
+const ORB_STREAK = {
+  minSpeed: 90,
+  seconds: 0.05,
+  maxLength: 36,
+  width: 0.45,
+  gain: 1.3,
+};
+// proposta 20/10: a fused orb is born `scale` bigger and eases back to its
+// size over `seconds`.
+const FUSION_POP = { scale: 0.35, seconds: 0.3 };
 
 export function mirrorProjectiles(t, combat) {
   if (!combat) return;
@@ -85,12 +99,15 @@ export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
     const orb = orbs[i];
     if (!orb || orb.collected) continue;
     const tier = orb.tier || 1;
-    const base = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
+    const look = getOrbConfig(orb.class);
+    const rgb = rgbOf(t.THREE, look.baseColor);
     const age = Number.isFinite(orb.age) ? orb.age : time;
+    const base = look.radius * fusionPop(orb, age);
     const pulse = 1 + 0.18 * Math.sin(age * 4 + i * 0.7);
     const h = orbHeight(base);
-    t.glow.push(orb.x, h, orb.y, t.xpRgb, base * 1.6 * pulse, 0.45, 1);
-    t.orbCrystals.pushOrb(orb, tier, base, age, t.xpRgb);
+    t.glow.push(orb.x, h, orb.y, rgb, base * 1.6 * pulse, 0.45, 1);
+    t.orbCrystals.pushOrb(orb, tier, base, age, rgb);
+    pushOrbStreak(t, orb, h, base, rgb);
   }
   t.orbCrystals.end();
 
@@ -109,6 +126,28 @@ export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
   t.heartTokens.end();
 
   t.pickups.update(pickups?.getActivePickups() || []);
+}
+
+function fusionPop(orb, age) {
+  if (orb.source !== 'fusion' || !(age < FUSION_POP.seconds)) return 1;
+  return 1 + FUSION_POP.scale * (1 - age / FUSION_POP.seconds) ** 2;
+}
+
+function pushOrbStreak(t, orb, h, size, rgb) {
+  const speed = Math.hypot(orb.vx || 0, orb.vy || 0);
+  if (!(speed > ORB_STREAK.minSpeed)) return;
+  const k = Math.min(ORB_STREAK.seconds, ORB_STREAK.maxLength / speed);
+  const fade = Math.min(1, (speed - ORB_STREAK.minSpeed) / ORB_STREAK.minSpeed);
+  t.ribbons.streak(
+    orb.x - orb.vx * k,
+    orb.y - orb.vy * k,
+    orb.x,
+    orb.y,
+    h,
+    rgb,
+    size * ORB_STREAK.width,
+    ORB_STREAK.gain * fade
+  );
 }
 
 // `impact`: the lens kick (ImpactKick) big shockwaves drive.

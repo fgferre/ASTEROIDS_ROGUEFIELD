@@ -43,7 +43,23 @@ export const XP_ORB_MAX_PER_CLASS = 100;
 
 export const XP_ORB_FUSION_CHECK_INTERVAL = 0.3;
 
-export const XP_ORB_FUSION_ANIMATION_DURATION = 0.82;
+export const XP_ORB_FUSION_ANIMATION_DURATION = 0.2; // proposta 20/10: the fusing orbs are drawn together this fast (was 0.82)
+
+// A kill's orbs burst out of it (RewardManager.createXPOrbs) and coast to a
+// stop; a heavier class (its `weight`, orbClasses.js) drags harder, so it
+// flies less far and settles sooner. proposta 20/10
+export const XP_ORB_BURST = deepFreeze({
+  minSpeed: 120, // px/s at launch
+  maxSpeed: 260,
+  drag: 6, // 1/s × the class weight: weight 1 stops in 0.4–0.55 s, 18–42 px out
+  settleSpeed: 10, // px/s: slower than this the orb stops
+  awaySpread: 0.55, // the killing shot known: the ring narrows to this share of a turn, round "away" (±100°)
+  startOffset: 0.4, // × the enemy's radius, along the launch direction
+});
+
+// Inside the ship's magnet an orb reaches the magnet's speed in this many
+// seconds × its class weight: a heavier one arrives a little later.
+export const XP_ORB_MAGNET_RAMP_SECONDS = 0.12; // proposta 20/10
 
 export const XP_ORB_OFFSCREEN_MARGIN = 16; // Extra padding before soft-clamping into view
 export const XP_ORB_OFFSCREEN_RETURN_DURATION = 0.55; // Seconds to ease back inside bounds

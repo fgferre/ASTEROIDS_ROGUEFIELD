@@ -69,6 +69,9 @@ export class OrbField {
       id: 0,
       x: 0,
       y: 0,
+      vx: 0,
+      vy: 0,
+      steered: false,
       value: 0,
       class: 'blue',
       tier: 1,
@@ -92,6 +95,9 @@ export class OrbField {
     orb.id = 0;
     orb.x = 0;
     orb.y = 0;
+    orb.vx = 0;
+    orb.vy = 0;
+    orb.steered = false;
     orb.value = 0;
     orb.class = 'blue';
     orb.tier = 1;
@@ -154,6 +160,11 @@ export class OrbField {
 
   isOrbEligibleForFusion(orb) {
     return this.isOrbActive(orb) && !orb.isFusing;
+  }
+
+  /** Loose and at rest: a bursting or pulled orb neither clusters nor fuses. */
+  isOrbSettled(orb) {
+    return this.isOrbEligibleForFusion(orb) && !orb.vx && !orb.vy;
   }
 
   addOrbToPools(orb) {

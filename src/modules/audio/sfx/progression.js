@@ -363,11 +363,11 @@ export function createProgressionCues(sfx) {
     sfx.safePlay(() => {
       // Map tier classes to base frequencies
       const tierFrequencies = {
-        'xp-green': 523, // C5 (tier 2)
-        'xp-yellow': 659, // E5 (tier 3)
-        'xp-purple': 784, // G5 (tier 4)
-        'xp-red': 988, // B5 (tier 5)
-        'xp-crystal': 1175, // D6 (tier 6)
+        green: 523, // C5 (tier 2)
+        yellow: 659, // E5 (tier 3)
+        purple: 784, // G5 (tier 4)
+        red: 988, // B5 (tier 5)
+        crystal: 1175, // D6 (tier 6)
       };
 
       const baseFreq = tierFrequencies[toClass] || 440;

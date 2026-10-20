@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
 import { sampleIdFor } from '../../../src/modules/audio/samplePlayer.js';
 import {
+  SAMPLE_CUES,
   SAMPLE_PLAYBACK,
   SAMPLE_PRIORITY,
 } from '../../../src/data/audio/samples.js';
@@ -124,6 +125,31 @@ describe('sample layer', () => {
     expect(sources).toHaveLength(3);
     expect(sources[0].stop).toHaveBeenCalled();
     expect(live(sources)).toEqual([sources[1], sources[2]]);
+  });
+
+  it('a run of XP pickups climbs a semitone each, up to +7, and starts over after a pause', async () => {
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(
+      fetchFor({ 'xp-collect': sample(['xp-collect/1.mp3'], { gap: 25 }) })
+    );
+    const { window, max } = SAMPLE_CUES.playXPCollect.climb;
+
+    // Pickups 0.1 s apart (one inside the gap, dropped), then a pause.
+    const times = [0, 0.1, 0.11, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    times.forEach((time) => {
+      context.currentTime = time;
+      bus.playXPCollect();
+    });
+    context.currentTime = 0.9 + window + 0.01;
+    bus.playXPCollect();
+
+    const semitones = sources.map((s) =>
+      Math.round(12 * Math.log2(s.playbackRate.value))
+    );
+    expect(semitones).toEqual([0, 1, 2, 3, 4, 5, 6, 7, max, max, 0]);
+    sources.forEach((s, i) =>
+      expect(s.playbackRate.value).toBeCloseTo(2 ** (semitones[i] / 12), 9)
+    );
   });
 
   it('with every voice busy, stops the oldest of the lowest priority below the new one, else drops it', async () => {

@@ -103,6 +103,7 @@ class EnemyDamageSystem {
         cause: options.cause || 'damage',
         createFragments: options.createFragments !== false,
         triggerExplosion: options.triggerExplosion,
+        source: options.source,
       });
       return { killed: true, remainingHealth: 0, fragments };
     }
@@ -242,6 +243,8 @@ class EnemyDamageSystem {
       variant: asteroid.variant,
       maxHealth: asteroid.maxHealth,
       cause: options.cause || 'destroyed',
+      // The killing hit, when known: its orbs burst away from it.
+      source: options.source ?? null,
       wave: waveNumber,
       spawnedBy: asteroid.spawnedBy,
     };

@@ -14,6 +14,10 @@
 //               lowpass), read the way the synthesis reads it; none → centred.
 //   facade      true → the facade's own boss voice (AudioSystem), not an
 //               SFXBus cue.
+//   climb       { window, max }: a run climbs in pitch (SOUND.md). A play
+//               within `window` s of the last one sounds a semitone above it,
+//               up to `max` semitones; a longer pause starts over. Its pitch
+//               is the climb's, without the per-play spread.
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
@@ -34,7 +38,11 @@ export const SAMPLE_CUES = deepFreeze({
   playShieldImpact: { sample: 'shield-impact', bus: 'protected' },
   playShieldBreak: { sample: 'shield-break', bus: 'protected' },
   playDash: { sample: 'dash', bus: 'protected', spatialArg: 0 },
-  playXPCollect: { sample: 'xp-collect', bus: 'ambient' },
+  playXPCollect: {
+    sample: 'xp-collect',
+    bus: 'ambient',
+    climb: { window: 0.4, max: 7 }, // proposta 20/10
+  },
   playLevelUp: { sample: 'level-up', bus: 'ambient' },
   playUpgradeSelect: { sample: 'card-pick', bus: 'ambient' },
   playDroneFire: { sample: 'enemy-shot', bus: 'ambient', spatialArg: 0 },
