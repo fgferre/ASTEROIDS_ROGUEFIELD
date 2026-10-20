@@ -66,11 +66,11 @@ describe('HUD instrument models', () => {
   it('build: the family track fills from the run, notches the evolution at 3 and ends at the Apex', () => {
     const { model, part, container } = mount('build', 'instrument');
     const cells = container.querySelectorAll('.bd-cell');
-    const at = (families, evolutions = []) =>
+    const at = (families, evolutions = [], weaponId = 'lance') =>
       model.update({
         now: 0,
         weapon: {
-          weaponId: 'lance',
+          weaponId,
           name: 'Lance',
           chip: 'LANCE',
           evolutions,
@@ -105,6 +105,16 @@ describe('HUD instrument models', () => {
     expect(part('.bd-apex').textContent).toBe('Apex 5/5');
     expect(part('.bd-track').classList.contains('is-apex')).toBe(true);
     expect(part('.bd-modes').textContent).toBe('AIM AUTO · SPREAD CONC');
+
+    // A weapon with its own forms names them on its card's family.
+    at({ arc: 2 }, [], 'arc-caster');
+    expect(part('.bd-evo').textContent).toBe('Forked Arc at 3');
+    at(
+      { arc: 5 },
+      [{ family: 'arc', id: 'storm-crown', apex: true }],
+      'arc-caster'
+    );
+    expect(part('.bd-evo').textContent).toBe('Storm Crown');
   });
 
   it('recharges: the dash arc shows while it recharges and pulses 0.5 s once ready', () => {

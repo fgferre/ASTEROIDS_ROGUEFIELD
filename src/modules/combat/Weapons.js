@@ -1,11 +1,12 @@
 // src/modules/combat/Weapons.js
 //
 // The ship's guns: the weapon it carries (a content file in
-// src/content/weapons/), the fire patterns that weapon lists, when it may
-// fire, how a volley spreads over its lanes, and the evolutions and Apexes
-// that change the lance. CombatSystem owns it, ticks it after targeting and
-// before the shots fly; the card tuning lives in CardEffects and the hit path
-// in HitResolution.
+// src/content/weapons/), the fire patterns that weapon lists (chain, orbit,
+// aura and seeker in firePatterns.js), when it may fire, how a volley
+// spreads over its lanes, and the evolutions and Apexes that change the lance
+// or switch a weapon to its own form. CombatSystem owns it, ticks it after
+// targeting and before the shots fly; the card tuning lives in CardEffects
+// and the hit path in HitResolution.
 
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
@@ -21,11 +22,12 @@ import { withAlpha } from '../../data/constants/palette.js';
 import {
   DEFAULT_WEAPON_ID,
   LANCE_BASE_LOOK,
-  WEAPONS,
   WEAPON_APEX,
   WEAPON_EVOLUTIONS,
+  WEAPON_FORMS,
   firePattern,
 } from '../../data/weapons.js';
+import { fireAura, fireChain, fireOrbit, fireSeeker } from './firePatterns.js';
 
 // Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
@@ -36,9 +38,13 @@ const lanceTrailStyles = (color) =>
 
 /** The fire patterns a weapon's `fire` list can name, and what runs each. */
 export const FIRE_PATTERNS = Object.freeze({
-  stream: 'fireStream',
-  beam: 'fireBeam',
-  fan: 'fireFan',
+  stream: (weapons, ...shot) => weapons.fireStream(...shot),
+  beam: (weapons, ...shot) => weapons.fireBeam(...shot),
+  fan: (weapons, ...shot) => weapons.fireFan(...shot),
+  chain: fireChain,
+  orbit: fireOrbit,
+  aura: fireAura,
+  seeker: fireSeeker,
 });
 
 export class Weapons {
@@ -50,6 +56,7 @@ export class Weapons {
    * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
    * `cardEffects()`: the cards in play (the beam reads the Thermal Lens).
+   * `cards()`: the CardEffects instance (the chain's arcs, the aura's burns).
    * `tuning()`: the cards' fire-rate tuning, a fresh plain object: { aimCooldownMultiplier, cooldownTuning }.
    */
   constructor({
@@ -60,6 +67,7 @@ export class Weapons {
     hitEnemy,
     emit,
     cardEffects,
+    cards,
     tuning,
   }) {
     this.player = player;
@@ -69,6 +77,7 @@ export class Weapons {
     this.hitEnemy = hitEnemy;
     this.emit = emit;
     this.cardEffects = cardEffects;
+    this.cards = cards;
     this.tuning = tuning;
 
     this.lastShotTime = 0;
@@ -104,7 +113,7 @@ export class Weapons {
     const pattern = this.weapon.fire.find(
       (entry) => !entry.every || this.shots % entry.every === 0
     );
-    this[FIRE_PATTERNS[pattern.pattern]](pattern, playerPos, playerStats);
+    FIRE_PATTERNS[pattern.pattern](this, pattern, playerPos, playerStats);
   }
 
   // `stream`: the weapon's projectile down the lock lanes, or straight ahead
@@ -732,36 +741,82 @@ export class Weapons {
     this.apexes = [];
     this.beams = [];
     this.flakBursts = [];
+    // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
+    this.blades = [];
+    this.bladeCuts = new Map();
+    this.orbitClock = 0;
+    this.orbitSounded = false;
+    this.aura = null;
+    this.pulses = [];
+    this.broods = [];
     this.refreshLanceLook();
   }
 
-  /** The weapon the ship carries (its content file). */
+  /** The weapon the ship carries, in its own form once its family evolved. */
   get weapon() {
-    return WEAPONS[this.weaponId];
+    const forms = WEAPON_FORMS[this.weaponId];
+    const family = forms.base.card?.family;
+    if (forms.apex && this.apexes.includes(family)) return forms.apex;
+    if (forms.evolution && this.evolutions.includes(family)) {
+      return forms.evolution;
+    }
+    return forms.base;
+  }
+
+  /** The family the held weapon evolves on itself (its `evolution`), or null. */
+  get ownFamily() {
+    const forms = WEAPON_FORMS[this.weaponId];
+    return forms.evolution ? forms.base.card.family : null;
+  }
+
+  /** The family's lance evolution is on (not the held weapon's own family). */
+  hasEvolution(family) {
+    return family !== this.ownFamily && this.evolutions.includes(family);
+  }
+
+  hasApex(family) {
+    return family !== this.ownFamily && this.apexes.includes(family);
   }
 
   /** A weapon card swaps the cannon for its weapon; an unknown id is ignored. */
   takeWeapon(weaponId) {
-    if (!WEAPONS[weaponId] || weaponId === this.weaponId) return;
+    if (!WEAPON_FORMS[weaponId] || weaponId === this.weaponId) return;
     this.weaponId = weaponId;
     this.shots = 0;
   }
 
-  /** A family's "3 of a kind" synergy evolves the lance for the rest of the run. */
+  /**
+   * A family's "3 of a kind" synergy evolves the lance for the rest of the
+   * run, or the held weapon into its own form when it is the weapon's family.
+   */
   evolveWeapon(family) {
-    const evolution = WEAPON_EVOLUTIONS[family];
-    if (!evolution || this.evolutions.includes(family)) {
+    if (!WEAPON_EVOLUTIONS[family] || this.evolutions.includes(family)) {
       return;
     }
     this.evolutions.push(family);
     this.refreshLanceLook();
+    const { id, name, description } = this.evolutionOf(family);
     this.emit('weapon-evolved', {
       family,
-      id: evolution.id,
-      name: evolution.name,
-      description: evolution.description,
+      id,
+      name,
+      description,
       weaponId: this.weaponId,
     });
+  }
+
+  // What the family's evolution is now: the held weapon's own form on its
+  // family, else the lance's evolution or Apex. `short` is the HUD chip.
+  evolutionOf(family) {
+    const apex = this.apexes.includes(family);
+    if (family === this.ownFamily) {
+      const { form, name, chip, description } = this.weapon;
+      return { id: form.id, name, description, apex, short: chip };
+    }
+    const { id, name, description, short } = apex
+      ? WEAPON_APEX[family]
+      : WEAPON_EVOLUTIONS[family];
+    return { id, name, description, apex, short: short ?? id.toUpperCase() };
   }
 
   /** Five cards of a family raise its evolution to the Apex for the run. */
@@ -818,18 +873,10 @@ export class Weapons {
       name,
       chip,
       shotsToBeam: beam?.every ? beam.every - (this.shots % beam.every) : null,
-      evolutions: this.evolutions.map((family) => {
-        const apex = this.apexes.includes(family) ? WEAPON_APEX[family] : null;
-        const evolution = apex || WEAPON_EVOLUTIONS[family];
-        return {
-          family,
-          id: evolution.id,
-          name: evolution.name,
-          description: evolution.description,
-          apex: Boolean(apex),
-          short: apex ? apex.short : evolution.id.toUpperCase(),
-        };
-      }),
+      evolutions: this.evolutions.map((family) => ({
+        family,
+        ...this.evolutionOf(family),
+      })),
     };
   }
 

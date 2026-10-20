@@ -237,6 +237,13 @@ describe('sample layer', () => {
     expect(sampleIdFor('playExplosion', ['large'])).toBe('explosion-large');
     expect(sampleIdFor('playExplosion', ['huge'])).toBeNull();
     expect(sampleIdFor('playLaserShot', [{}])).toBe('lance-shot');
+    // A weapon's own shot, else the lance's.
+    expect(sampleIdFor('playLaserShot', [{ weaponId: 'arc-caster' }])).toBe(
+      'arc-caster-shot'
+    );
+    expect(sampleIdFor('playLaserShot', [{ weaponId: 'scatter' }])).toBe(
+      'lance-shot'
+    );
 
     const { bus, context, sources } = makeBus();
     await bus.samples.load(

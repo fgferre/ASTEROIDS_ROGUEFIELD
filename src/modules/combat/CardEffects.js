@@ -193,6 +193,20 @@ export class CardEffects {
     this.dashFireTimer = 0;
   }
 
+  // Sets `enemy` burning: `ticks` ticks of `damageFraction` × `damage` over
+  // `duration` s (Incendiary Lance, the aura); `spreadTo` (an array) lets
+  // the Solar Flare spread it.
+  ignite(enemy, damage, { duration, ticks, damageFraction }, spreadTo = null) {
+    this.burns.set(enemy, {
+      id: enemy.id,
+      timer: 0,
+      interval: duration / ticks,
+      ticksLeft: ticks,
+      damage: damage * damageFraction,
+      spreadTo,
+    });
+  }
+
   // Singularity: the target (if alive) and every non-boss whose rim is
   // within reach of the hit point are pulled toward it; the collapsing ring
   // is a `well`.
@@ -257,10 +271,11 @@ export class CardEffects {
   }
 
   // A jagged arc between two circles (Chain Lance, Static Shell, Solar Flare
-  // spread). `style`: { color } overrides the lance's arc colour, { heavy }
-  // draws the Storm Lance's thicker bolt.
+  // spread, the chain pattern). `style`: { color } overrides the lance's arc
+  // colour, { heavy } draws the Storm Lance's thicker bolt, { bolt, life }
+  // a weapon's thin bolt shown `life` s.
   addArc(source, target, style = null) {
-    const { duration } = WEAPON_EVOLUTIONS.arc.chain;
+    const duration = style?.life ?? WEAPON_EVOLUTIONS.arc.chain.duration;
     const dx = target.x - source.x;
     const dy = target.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -289,6 +304,7 @@ export class CardEffects {
       maxLife: duration,
       color: style?.color ?? null,
       heavy: Boolean(style?.heavy),
+      bolt: Boolean(style?.bolt),
     });
   }
 
@@ -491,6 +507,7 @@ export class CardEffects {
     const weapons = this.weapons();
     fade(weapons.beams);
     fade(weapons.flakBursts);
+    fade(weapons.pulses);
     fade(this.arcs);
     fade(this.cinders);
     fade(this.ions);

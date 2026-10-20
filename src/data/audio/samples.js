@@ -8,6 +8,9 @@
 // Cue fields:
 //   sample      the manifest's sampleId; an object picks it by the cue's first
 //               argument (the explosion's size).
+//   pick        { path, samples }: the sampleId by the value at `path` in the
+//               cue's first argument (the shot's weaponId); a value not
+//               listed plays `sample`.
 //   bus         the bus the cue's synthesis uses: 'protected' (player
 //               feedback, never ducks) or 'ambient' (the world, ducks).
 //   spatialArg  the argument carrying { pan, distance } (pan by x, distance
@@ -22,7 +25,21 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const SAMPLE_CUES = deepFreeze({
-  playLaserShot: { sample: 'lance-shot', bus: 'protected' },
+  // A weapon listed here has a shot of its own; until the manifest has its
+  // files it plays the lance's synthesis (the others play the lance's).
+  playLaserShot: {
+    sample: 'lance-shot',
+    pick: {
+      path: 'weaponId',
+      samples: {
+        'arc-caster': 'arc-caster-shot',
+        'shard-halo': 'shard-halo-cut',
+        'furnace-corona': 'furnace-corona-pulse',
+        'seeker-swarm': 'seeker-swarm-launch',
+      },
+    },
+    bus: 'protected',
+  },
   playBulletHit: { sample: 'bullet-hit', bus: 'protected' },
   playAsteroidBreak: { sample: 'rock-break', bus: 'ambient' },
   playExplosion: {
