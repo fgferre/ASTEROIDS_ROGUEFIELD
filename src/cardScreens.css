@@ -3,17 +3,27 @@
    ui/ChestCeremony.js, ui/upgradeCard.js), and what they share with the run
    end screens (runEndScreens.css): as the owner's mock-ups of 20/10 draw
    them, laid out at 1920 × 1080 and scaled with the window (--u is 1px
-   there). Only the style.css tokens, PALETTE colours and their mixes.
+   there). Only the style.css tokens, PALETTE colours and their mixes. The
+   pause panel's build is the run end's (runRecap.endBuildMarkup), at its
+   1920 × 1080 size inside the pause panel's fixed width.
    ============================================ */
 .cards-screen,
-.end-screen {
+.end-screen,
+.pause-build {
   --u: min(calc(100vw / 1920), calc(100vh / 1080));
   --fs: calc(var(--u) * var(--text-scale));
   --amber: #ffb347; /* PALETTE.shot */
   --apex: color-mix(in srgb, var(--amber) 35%, white);
   --boss-light: color-mix(in srgb, var(--boss) 55%, white);
   --text-faint: rgba(230, 238, 248, 0.38);
-  --r-common: color-mix(in srgb, var(--neutral) 70%, var(--text));
+}
+
+.pause-build {
+  --u: 1px;
+}
+
+.cards-screen,
+.end-screen {
   padding: 0;
   font-family: var(--font-ui);
   font-weight: 500;
@@ -202,7 +212,7 @@
 
 /* A card: the rarity on its top edge, in its marks and in its frame. */
 .card {
-  --rar: var(--r-common);
+  --rar: var(--rarity-common);
   --fam: var(--text-dim);
   position: relative;
   display: flex;
@@ -251,18 +261,18 @@ article.card {
 }
 
 .card--rare {
-  --rar: var(--accent);
+  --rar: var(--rarity-rare);
 }
 
 .card--cursed {
-  --rar: var(--boss-light);
+  --rar: var(--rarity-cursed);
 }
 
 .card--epic {
-  --rar: var(--xp);
+  --rar: var(--rarity-epic);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--xp) 9%, rgba(12, 17, 28, 0.92)),
+    color-mix(in srgb, var(--rar) 9%, rgba(12, 17, 28, 0.92)),
     rgba(6, 9, 16, 0.94) 38%
   );
 }
@@ -270,8 +280,8 @@ article.card {
 .card--epic::before {
   opacity: 1;
   box-shadow:
-    0 0 14px var(--xp),
-    0 0 2px var(--xp);
+    0 0 14px var(--rar),
+    0 0 2px var(--rar);
 }
 
 .card.is-focused {
@@ -821,7 +831,8 @@ article.card {
   }
 }
 
-/* A chest's card rises in with a flash of light (ChestCeremony.js). */
+/* A chest's card rises in with a flash of light (ChestCeremony.js); with
+   Reduce Flashing it only fades in. */
 @keyframes chest-card-reveal {
   0% {
     opacity: 0;
@@ -837,6 +848,19 @@ article.card {
     opacity: 1;
     transform: none;
     filter: none;
+  }
+}
+
+body.flashing-reduced .card.is-revealing {
+  animation-name: chest-card-fade;
+}
+
+@keyframes chest-card-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

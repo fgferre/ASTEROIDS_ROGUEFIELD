@@ -263,8 +263,8 @@ describe('HUD instrument models', () => {
     expect(marker.dataset.edge).toBe('right');
     expect(marker.querySelector('.wd-dist').textContent).toBe('780 m');
 
+    // A drawn frame moves it at once (TacticalHud.placeOnField), paused too.
     hud.updateEdgeArrows([{ kind: 'warden', x: 400, y: 300, distance: 200 }]);
-    hud.updateBoss(true, 'Warden Prime', 60, { phase: 0, phaseCount: 3 });
     expect(marker.classList.contains('is-on')).toBe(false);
   });
 

@@ -999,7 +999,7 @@ export class HudEditor {
     this.renderInspector();
   }
 
-  // After each drawn frame (UISystem.placeOnShip): the on-ship frames follow
+  // After each drawn frame (UISystem.placeOnField): the on-ship frames follow
   // the ship, as the camera keeps moving behind the paused run.
   followShip() {
     const s = this.state;

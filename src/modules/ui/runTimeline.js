@@ -9,12 +9,7 @@ import { BIOMES, biomeForLayer } from '../../data/biomes.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { BOSS_RUSH_LAYERS, directorFor } from '../../data/layers.js';
 import { formatRunTime, killerName } from './runRecap.js';
-import {
-  FAMILY_GLYPHS,
-  familyColor,
-  familyForm,
-  shortName,
-} from './upgradeCard.js';
+import { FAMILY_GLYPHS, familyColor, shortName } from './upgradeCard.js';
 
 const NUMBER_WORDS = [
   'Zero',
@@ -99,8 +94,11 @@ export function inviteLine({ outcome, layer, bestAtStart, bossRush }) {
     const words = NUMBER_WORDS[gap] ?? `${gap}`;
     return `Your best is <b>Layer ${bestAtStart}</b>. ${words} ${gap === 1 ? 'layer' : 'layers'} to go.`;
   }
-  return bestAtStart > 0 && bestAtStart === layer
-    ? `You matched your best: <b>Layer ${layer}</b>.`
+  if (bestAtStart > 0 && bestAtStart === layer) {
+    return `You matched your best: <b>Layer ${layer}</b>.`;
+  }
+  return layer > RUN_FINAL_LAYER
+    ? `A new best: <b>Layer ${layer}</b>. The Deep Field goes on.`
     : `A new best: <b>Layer ${layer}</b>. The Ring goes on to ${RUN_FINAL_LAYER}.`;
 }
 
@@ -153,16 +151,10 @@ const Y = 70;
  * The line's model: `span` layers across, the layer `reached` (a fraction
  * into it on a death), the Warden layers, the chapters, and each event with
  * where it sits (`at`), its side, its row and its labels (the best layer
- * before the run is one, ahead of a death). `weaponId`: the
- * weapon held at the end, which names the evolutions.
+ * before the run is one, ahead of a death). An evolution or Apex keeps the
+ * name it had when it happened (WorldSystem.recordFamilyForm).
  */
-export function timelineModel({
-  timeline,
-  outcome,
-  layer,
-  bestAtStart = 0,
-  weaponId,
-}) {
+export function timelineModel({ timeline, outcome, layer, bestAtStart = 0 }) {
   const cleared = outcome === 'victory';
   const span = Math.max(RUN_FINAL_LAYER, layer);
   const reached = cleared ? span : Math.min(span, layer + 0.5);
@@ -189,14 +181,13 @@ export function timelineModel({
       case 'evolution':
       case 'apex': {
         const apex = event.kind === 'apex';
-        const name = familyForm(event.family, weaponId, apex).name;
         return [
           {
             kind: event.kind,
             family: event.family,
             at: mid,
             up: true,
-            title: apex ? `Apex · ${shortName(name)}` : name,
+            title: apex ? `Apex · ${shortName(event.name)}` : event.name,
             sub: time,
             color: apex ? 'var(--apex)' : familyColor(event.family),
           },

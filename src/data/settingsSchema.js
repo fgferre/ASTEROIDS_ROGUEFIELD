@@ -534,7 +534,7 @@ const SETTINGS_SCHEMA = [
         type: 'toggle',
         label: 'Colorblind Mode',
         description:
-          'Activates alternative palette with better distinction between categories.',
+          'Card rarities, upgrade families and threats in colors that stay apart with color blindness.',
         default: false,
       },
     ],

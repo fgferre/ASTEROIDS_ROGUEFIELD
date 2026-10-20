@@ -638,6 +638,7 @@ export function createServiceManifest(context = {}) {
         'enemies',
         'physics',
         'progression',
+        'combat',
       ],
       factory: ({ resolved }) => {
         const world = new WorldSystem({
@@ -646,6 +647,7 @@ export function createServiceManifest(context = {}) {
           enemies: resolved['enemies'],
           physics: resolved['physics'],
           progression: resolved['progression'],
+          combat: resolved['combat'],
         });
 
         if (

@@ -103,7 +103,7 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 ## Card: `src/content/cards/<id>.js`
 
 - Fields: `category` (`offense defense mobility utility`), `family` (`kinetic thermal arc field salvage maneuver` or `null`; three of a family switch its bonus on), `rarity` (`common rare epic`), `icon`, `themeColor`, `unlockLevel` (pilot level), `tags`, `text` `{ name, summary, lore, levels: [{ title, description, highlights }] }`, `levels` `[{ rank, effects }]`; optional `cursed: true`, `prerequisites` `[{ type: 'upgrade', id, level, text }]`.
-- An effect is `{ type: 'event', event: 'upgrade-...', payload }` (an event the engine already handles: copy a card that does the same) or `{ type: 'progression', property, operation, value }` (`operation`: `add multiply set`; `property`: `xpGainMultiplier comboTimeout comboMultiplierStep comboMultiplierCap orbMagnetismRadius magnetismForce`).
+- An effect is `{ type: 'event', event: 'upgrade-...', payload }` (an event the engine already handles: copy a card that does the same) or `{ type: 'progression', property, operation, value }` (`operation`: `add multiply set`; `property`: `xpGainMultiplier comboTimeout comboMultiplierStep comboMultiplierCap magnetismForce`).
 - `order` is unique across cards and weapon cards together; it sets the catalog order, so what a level-up offers first.
 - Copy: `glass_cannon.js` (one rank), `shield.js` (three ranks), `rcs_system.js` (prerequisite).
 

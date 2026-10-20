@@ -10,8 +10,8 @@ import {
   WEAPONS,
   firePattern,
 } from '../../../../../data/weapons.js';
-import { UPGRADE_FAMILIES } from '../../../../../data/upgrades/families.js';
 import { replay } from '../../hudCommon.js';
+import { familyAccent } from '../../../upgradeCard.js';
 
 // A weapon with an every-nth-shot beam shows one pip per shot before it (the
 // beam is the last shot). The markup holds the most any weapon needs.
@@ -160,7 +160,7 @@ export default {
       chip.className = 'evo-chip';
       chip.classList.toggle('is-apex', Boolean(apex));
       chip.textContent = apex ? `APEX ${short}` : id.toUpperCase();
-      chip.style.setProperty('--family-color', UPGRADE_FAMILIES[family].color);
+      chip.style.setProperty('--family-color', familyAccent(family));
       els.evolutions.appendChild(chip);
       this.evolutionChips.set(id, chip);
     }

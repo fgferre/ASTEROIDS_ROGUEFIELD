@@ -890,11 +890,12 @@ class UISystem extends BaseSystem {
   }
 
   /**
-   * After each drawn frame (app.js), paused too: the hull ring, the
-   * recharges and the editor's frames for them onto the ship as drawn.
+   * After each drawn frame (app.js), paused too: the HUD on field points
+   * (the hull ring, the recharges, edge arrows, damage arcs) and the
+   * editor's frames for the on-ship ones, where this frame drew them.
    */
-  placeOnShip() {
-    this.tacticalHud.placeOnShip();
+  placeOnField() {
+    this.tacticalHud.placeOnField();
     this.hudEditor.followShip();
   }
 

@@ -346,7 +346,8 @@ class Renderer3D extends BaseSystem {
   /**
    * Logical field (x, y) → screen point through the perspective camera (last
    * rendered pose), for the HUD: the screen spans 800 × 600 whatever its
-   * aspect (hud/direction.js restores real proportions). Null before the
+   * aspect (hud/direction.js restores real proportions). Right after a draw
+   * (UISystem.placeOnField) it is that frame's projection. Null before the
    * first frame.
    */
   worldToScreen(x, y, out = { x: 0, y: 0 }) {
@@ -362,7 +363,7 @@ class Renderer3D extends BaseSystem {
   /**
    * The ship's screen point as this frame draws it (worldToScreen's units):
    * its drawn pose through the camera as posed this frame, so the HUD drawn
-   * on the ship (UISystem.placeOnShip, after each drawn frame) sits on it
+   * on the ship (UISystem.placeOnField, after each drawn frame) sits on it
    * whatever the camera does, paused too. Null when no ship is drawn.
    */
   trackShip(player) {

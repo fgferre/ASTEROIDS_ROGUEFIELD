@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import UPGRADE_LIBRARY from '../../../src/data/upgrades/index.js';
@@ -161,5 +162,19 @@ describe('chest ceremony', () => {
     state.levelUpOpen = false;
     expect(chest.openNext()).toBe(false);
     expect(screens).toEqual([]);
+  });
+
+  it('with Reduce Flashing a card fades in, without the flash', () => {
+    const css = readFileSync(
+      new URL('../../../src/cardScreens.css', import.meta.url),
+      'utf8'
+    );
+    const name = css.match(
+      /body\.flashing-reduced \.card\.is-revealing \{\s*animation-name: ([\w-]+);/
+    )?.[1];
+    expect(name).toBeTruthy();
+    const frames = css.slice(css.indexOf(`@keyframes ${name} {`));
+    expect(frames.slice(0, frames.indexOf('\n}'))).not.toMatch(/filter/);
+    expect(css).toMatch(/@keyframes chest-card-reveal[^@]*brightness/);
   });
 });

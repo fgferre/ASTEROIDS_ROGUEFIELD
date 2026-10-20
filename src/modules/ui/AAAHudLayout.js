@@ -791,16 +791,23 @@ export class AAAHudLayout {
    * Edge arrows for targets off the screen: [{ kind: 'warden' | 'herald' |
    * 'pickup', x, y (800×600 screen point), color?, distance? }], in priority
    * order; the first EDGE_ARROW_MAX off-screen ones get an arrow. A Warden
-   * model with its own edge marker gets the first Warden instead.
+   * model with its own edge marker gets the first Warden instead, moved at
+   * once with its last state (after every drawn frame, paused too).
    */
   updateEdgeArrows(targets) {
     const corners = this._measuredCorners();
     this._wardenMarker = null;
     let arrows = targets;
-    if (this._instruments.get('warden')?.edgeMarker) {
-      const warden = targets.find((target) => target.kind === 'warden');
-      if (warden) this._wardenMarker = edgeMarker(warden, corners);
-      arrows = targets.filter((target) => target.kind !== 'warden');
+    const warden = this._instruments.get('warden');
+    if (warden?.edgeMarker) {
+      const target = targets.find(({ kind }) => kind === 'warden');
+      if (target) this._wardenMarker = edgeMarker(target, corners);
+      arrows = targets.filter(({ kind }) => kind !== 'warden');
+      const state = this._slotStates.get('warden');
+      if (state) {
+        state.marker = this._wardenMarker;
+        warden.update(state);
+      }
     }
     placeEdgeArrows(this._arrowPool, arrows, corners);
   }

@@ -582,14 +582,6 @@ class XPOrbSystem extends BaseSystem {
     return this.tuning.orbMagnetismRadius;
   }
 
-  setMagnetismRadius(radius) {
-    const next = Number(radius);
-    if (!Number.isFinite(next)) {
-      return;
-    }
-    this.tuning.orbMagnetismRadius = Math.max(10, next);
-  }
-
   getMagnetismForce() {
     return this.tuning.magnetismForce;
   }

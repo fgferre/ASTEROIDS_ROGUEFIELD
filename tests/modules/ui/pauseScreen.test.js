@@ -31,7 +31,9 @@ describe('Pause screen', () => {
 
     pause.updatePauseScreen(true);
 
-    expect(refs.build.innerHTML).toContain('Amber Lance');
+    expect(refs.build.innerHTML).toContain(
+      '<span class="end-weapon__name">Amber Lance</span>'
+    );
     expect(refs.location.textContent).toMatch(/^Layer 3 · /);
     expect(refs.tools.textContent).toBe('Rerolls 2 · Banishes 1');
     expect(refs.seed.textContent).toBe('Seed 42 · Veteran');

@@ -36,8 +36,8 @@ export class TacticalHud {
    * `combat()`: the combat service (fire modes, weapon, enemy shots).
    * `pickups()`: the pickup service (radar blips, edge arrows).
    * `xpOrbs()`: the XP orb service (the radar's haze).
-   * `renderer()`: the renderer (edge arrows, the damage arc, the camera's
-   *   view on the radar).
+   * `renderer()`: the renderer (the drawn frame's projection for the ship,
+   *   edge arrows and damage arcs; the camera's view on the radar).
    * `shieldKey()`: the Activate Shield key or button the player bound, as
    *   a label ("E").
    */
@@ -69,6 +69,10 @@ export class TacticalHud {
     // The layout on screen: Settings → Interface → HUD Layout's preset
     // (hud/editor/layoutStore.js), or the HUD editor's draft.
     this.items = getHudPreset(DEFAULT_HUD_PRESET).items;
+    // Field points the drawn frame projects (placeOnField): the off-screen
+    // arrows' targets, and hits not yet shown as damage arcs.
+    this.edgeTargets = [];
+    this.pendingHits = [];
     this.cachedValues = { boss: { visible: false } };
     this.bossHudState = this.createInitialBossHudState();
   }
@@ -131,9 +135,29 @@ export class TacticalHud {
     this.layout.tickBuffs(deltaTime);
   }
 
-  /** The on-ship instruments onto the ship as the renderer just drew it. */
-  placeOnShip() {
-    this.layout?.placeOnShip(this.renderer()?.shipOnScreen ?? null);
+  /**
+   * After each drawn frame, paused too: the on-ship instruments onto the
+   * ship, the edge arrows (and the Warden's marker) and new damage arcs
+   * onto their field points, through the camera as the renderer just drew.
+   */
+  placeOnField() {
+    const layout = this.layout;
+    if (!layout) return;
+    const renderer = this.renderer();
+    const arrows = [];
+    for (const target of this.edgeTargets) {
+      const point = renderer.worldToScreen(target.x, target.y);
+      if (point) arrows.push({ ...target, x: point.x, y: point.y });
+    }
+    layout.updateEdgeArrows(arrows);
+    for (const { ship, source } of this.pendingHits) {
+      layout.showDamageFrom(
+        renderer.worldToScreen(ship.x, ship.y),
+        renderer.worldToScreen(source.x, source.y)
+      );
+    }
+    this.pendingHits.length = 0;
+    layout.placeOnShip(renderer.shipOnScreen);
   }
 
   formatAAATacticalClock(totalSeconds) {
@@ -199,7 +223,7 @@ export class TacticalHud {
         maxShield,
         hull,
         maxHull,
-        // As last drawn: placeOnShip moves it with every drawn frame.
+        // As last drawn: placeOnField moves it with every drawn frame.
         ship: player && renderer ? renderer.shipOnScreen : null,
         dash,
         shieldMode,
@@ -293,17 +317,16 @@ export class TacticalHud {
       );
     }
 
-    // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
+    // Off-screen arrows (Wardens, Heralds, then pickups) as field points,
+    // which placeOnField projects; and the Herald's bar.
     const arrowTargets = [];
     let herald = null;
-    if (renderer && player && enemies) {
+    if (player && enemies) {
       const toTarget = (kind, entity, color, labelled) => {
-        const point = renderer.worldToScreen(entity.x, entity.y);
-        if (!point) return;
         arrowTargets.push({
           kind,
-          x: point.x,
-          y: point.y,
+          x: entity.x,
+          y: entity.y,
           color,
           distance: labelled
             ? Math.hypot(
@@ -327,7 +350,7 @@ export class TacticalHud {
         toTarget('pickup', pickups[i], pickups[i].color, false);
       }
     }
-    hud.updateEdgeArrows(arrowTargets);
+    this.edgeTargets = arrowTargets;
 
     const bossState = this.getBossHudState();
     const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
@@ -551,13 +574,13 @@ export class TacticalHud {
     this.layout?.setAimStick(active);
   }
 
+  // Shown by the next drawn frame (placeOnField), through its camera.
   onPlayerTookDamage({ playerPosition, damageSource } = {}) {
-    const renderer = this.renderer();
-    if (!playerPosition || !damageSource || !renderer) return;
-    this.layout?.showDamageFrom(
-      renderer.worldToScreen(playerPosition.x, playerPosition.y),
-      renderer.worldToScreen(damageSource.x, damageSource.y)
-    );
+    if (!playerPosition || !damageSource || !this.layout) return;
+    this.pendingHits.push({
+      ship: { x: playerPosition.x, y: playerPosition.y },
+      source: { x: damageSource.x, y: damageSource.y },
+    });
   }
 
   onEnemyDestroyed(payload = {}) {

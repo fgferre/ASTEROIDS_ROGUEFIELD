@@ -82,6 +82,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'upgrade-banished', cue: 'playCardBanish' },
   { on: 'codex-discovered', cue: 'playCodexDiscovered' },
   { on: 'surge-started', cue: 'playSurgeSting' },
+  // A formation's marks light up on an edge: the surge's warning sting.
+  { on: 'formation-warned', cue: 'playSurgeSting' },
   { on: 'run-continued', cue: 'playDeepFieldEntry' },
   { on: 'salvage-awarded', cue: 'playSalvageAwarded', arg: 'amount' },
   { on: 'hangar-purchased', cue: 'playHangarPurchase' },

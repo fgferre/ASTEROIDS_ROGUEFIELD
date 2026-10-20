@@ -20,6 +20,7 @@ describe('Tactical HUD', () => {
       }),
       enemies: () => ({
         getSessionStats: () => ({ timeElapsed: 75, totalKills: 12 }),
+        getActiveEnemies: () => [],
       }),
       progression: () => null,
       combat: () => null,
@@ -61,5 +62,62 @@ describe('Tactical HUD', () => {
       multiplier: undefined,
     });
     expect(layout.tickBuffs).toHaveBeenCalledWith(0.016);
+  });
+
+  it('projects edge arrows and a hit through each drawn frame, paused too', () => {
+    // The camera pans 1:1 along x; worldToScreen sees it as last drawn.
+    let cameraX = 0;
+    const renderer = {
+      shipOnScreen: { x: 400, y: 300 },
+      worldToScreen: (x, y) => ({ x: x - cameraX, y }),
+    };
+    const tacticalHud = new TacticalHud({
+      refs: {},
+      player: () => ({
+        getDashCooldownFraction: () => 0,
+        getPosition: () => ({ x: 500, y: 300 }),
+      }),
+      enemies: () => ({
+        getActiveEnemies: () => [{ type: 'boss', x: 2000, y: 300 }],
+      }),
+      progression: () => null,
+      combat: () => null,
+      pickups: () => null,
+      renderer: () => renderer,
+      shieldKey: () => 'E',
+    });
+    const layout = {
+      updateShip: vi.fn(),
+      updateNextWaveTimer: vi.fn(),
+      updateBoss: vi.fn(),
+      tickBuffs: vi.fn(),
+      updateEdgeArrows: vi.fn(),
+      showDamageFrom: vi.fn(),
+      placeOnShip: vi.fn(),
+    };
+    tacticalHud.layout = layout;
+    const arrowX = () => layout.updateEdgeArrows.mock.lastCall[0][0].x;
+
+    tacticalHud.update(0.016);
+    tacticalHud.onPlayerTookDamage({
+      playerPosition: { x: 500, y: 300 },
+      damageSource: { x: 700, y: 300 },
+    });
+    expect(layout.updateEdgeArrows).not.toHaveBeenCalled();
+    expect(layout.showDamageFrom).not.toHaveBeenCalled();
+
+    cameraX = 100; // the frame drawn after that step
+    tacticalHud.placeOnField();
+    expect(arrowX()).toBe(1900);
+    expect(layout.showDamageFrom).toHaveBeenCalledWith(
+      { x: 400, y: 300 },
+      { x: 600, y: 300 }
+    );
+    expect(layout.placeOnShip).toHaveBeenCalledWith({ x: 400, y: 300 });
+
+    cameraX = 300; // paused: no step, the camera still moves
+    tacticalHud.placeOnField();
+    expect(arrowX()).toBe(1700);
+    expect(layout.showDamageFrom).toHaveBeenCalledTimes(1);
   });
 });

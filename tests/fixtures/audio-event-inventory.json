@@ -20,6 +20,7 @@
   "enemy-spawned",
   "enemy-telegraph",
   "flak-burst",
+  "formation-warned",
   "game-started",
   "hangar-purchased",
   "herald-spawned",
