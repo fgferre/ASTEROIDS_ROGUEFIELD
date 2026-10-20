@@ -16,6 +16,7 @@ export class WardenChoir extends BossEnemy {
     super.initialize({
       ...config,
       displayName: CHOIR.displayName,
+      healthFactor: CHOIR.healthFactor,
       radius: CHOIR.radius,
       spreadProjectileCount: CHOIR.spreadProjectileCount,
       spreadArc: CHOIR.spreadArc,

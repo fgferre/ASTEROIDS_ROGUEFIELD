@@ -48,30 +48,39 @@ export const PHYSICS_CELL_SIZE = 96;
 
 // === PROGRESSÃO ===
 export const PROGRESSION_INITIAL_LEVEL = 1;
-export const PROGRESSION_INITIAL_XP_REQUIREMENT = 150;
-export const PROGRESSION_LEVEL_SCALING = 1.4;
+// The step to pilot level n costs INITIAL + STEP × (n − 2)^POWER XP: level 2
+// costs 120 and each later step a little more (ProgressionSystem.levelCost).
+export const PROGRESSION_INITIAL_XP_REQUIREMENT = 120; // proposta 20/10
+export const PROGRESSION_LEVEL_COST_STEP = 30; // proposta 20/10
+export const PROGRESSION_LEVEL_COST_POWER = 1.6; // proposta 20/10
 // Simulation seconds between the level-up event and the pick screen opening,
 // so the slow-mo + zoom pulse play first (proposta 17/10).
 export const LEVEL_UP_SCREEN_DELAY_SECONDS = 0.12; // proposta 17/10: tempo de simulação; durante o slow-mo de 0.35x vale ~0.34 s reais, a tela abre a um terço do pulso
 export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
 export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
-// Level-up card rarity (proposta 18/10): chance of each tier at pilot level 1,
-// what each level above 1 adds to rare/epic, and their caps; common takes the
-// rest. Within a tier every eligible card is equally likely.
+// Level-up card rarity: each eligible card's draw weight is its rarity's
+// weight at pilot level 1, plus what each level above 1 adds to rare/epic, up
+// to their caps (a tier with more cards comes up more often).
 export const UPGRADE_RARITIES = Object.freeze(['common', 'rare', 'epic']);
 export const UPGRADE_RARITY_BASE_WEIGHTS = Object.freeze({
-  common: 0.7,
-  rare: 0.25,
-  epic: 0.05,
+  common: 1.0, // proposta 20/10
+  rare: 0.55, // proposta 20/10
+  epic: 0.25, // proposta 20/10
 });
 export const UPGRADE_RARITY_WEIGHT_PER_LEVEL = Object.freeze({
-  rare: 0.01,
-  epic: 0.01,
+  rare: 0.01, // proposta 20/10
+  epic: 0.02, // proposta 20/10
 });
 export const UPGRADE_RARITY_WEIGHT_CAPS = Object.freeze({
-  rare: 0.35,
-  epic: 0.2,
+  rare: 0.75, // proposta 20/10
+  epic: 0.6, // proposta 20/10
 });
+// A card of a family the run holds k distinct cards of, from one up to one
+// short of its Apex, weighs × (1 + this × k): offers lean toward the build.
+export const UPGRADE_FAMILY_STEER_PER_CARD = 0.5; // proposta 20/10
+// Pilot levels whose offer holds a weapon card while the run has none: the
+// second is the second chance if the first was turned down.
+export const UPGRADE_WEAPON_OFFER_LEVELS = Object.freeze([3, 7]); // proposta 20/10
 // Per-run level-up rerolls and banishes (proposta 18/10).
 export const PROGRESSION_UPGRADE_REROLLS_PER_RUN = 1;
 export const PROGRESSION_UPGRADE_BANISHES_PER_RUN = 1;
@@ -80,11 +89,9 @@ export const PROGRESSION_COMBO_MULTIPLIER_STEP = 0.1;
 export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;
 
 // === BOSS DIFFICULTY SCALING (Phase 0 — FIX-04) ===
-// Multiplicative scalar applied to boss base stats per cumulative upgrade-level
-// sum (sum of progressionService.appliedUpgrades values). Orthogonal to the
-// per-wave healthScaling. Starting values per CONTEXT D-17 — calibrated via
-// tests/integration/boss-curve.test.js and may be re-tuned in Task 3.
-export const UPGRADE_BOSS_HEALTH_SCALAR = 0.18;
+// Boss damage scalar per cumulative upgrade-level sum (sum of
+// progressionService.appliedUpgrades values). Warden health no longer scales
+// with cards: each Warden has its own `healthFactor` (src/content/bosses/).
 // FIX-04 Task 4 follow-up (2026-05-13): dropped from 0.05 -> 0.00 after live
 // playtest at 0.18 / 0.05 killed the 6-upgrade player. The harness stub didn't
 // model player vulnerability, so the damage bump (1.30x at sum=6) wasn't

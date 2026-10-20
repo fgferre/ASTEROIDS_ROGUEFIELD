@@ -8,6 +8,10 @@ export default {
   order: 1,
   displayName: 'Warden Prime',
   subtitle: 'Guardian of the Ring',
+  // Its health is config.health × healthScaling per layer past the first ×
+  // this, the same whatever cards the run owns: aimed at a 60-90 s fight on
+  // its layer. Numbers: proposta 20/10 — the owner's play decides.
+  healthFactor: 1.15, // proposta 20/10
   // Its entrance, the charge: straight in and fast with its ring flung open,
   // a hard stop inside the field, the ring slams shut. Every Warden has one
   // (CONTENT.md "Boss"; modules/enemies/boss/arrival.js). Seconds are on

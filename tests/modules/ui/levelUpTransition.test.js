@@ -221,11 +221,9 @@ describe('Level-up card choices', () => {
 
     // Exactly `count` levels from one pickup, then the pick-screen delay.
     const levelUp = (count) => {
-      let need = progression.experienceToNext;
-      let xp = need - progression.experience;
+      let xp = progression.experienceToNext - progression.experience;
       for (let i = 1; i < count; i += 1) {
-        need = Math.floor(need * progression.levelScaling);
-        xp += need;
+        xp += progression.levelCost(progression.level + i);
       }
       progression.collectXP(xp);
       progression.update(LEVEL_UP_SCREEN_DELAY_SECONDS);

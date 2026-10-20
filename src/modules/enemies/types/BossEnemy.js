@@ -1,21 +1,18 @@
 // src/modules/enemies/types/BossEnemy.js
 //
 // Warden Prime, and the base WardenChoir and WardenNull build on: stats from
-// the wave and the upgrades, the three-phase update, the telegraph, the boss
-// projectiles, the pattern draws, damage and defeat. The phases, the attacks
-// (fan, volley, charge, minions), the invulnerability, the damage flash and
-// the player lookup live in ../boss/; the methods the Wardens, EnemySnapshots
-// and the tests call stay here and hand the boss to them.
+// the wave and its health factor, the three-phase update, the telegraph, the
+// boss projectiles, the pattern draws, damage and defeat. The phases, the
+// attacks (fan, volley, charge, minions), the invulnerability, the damage
+// flash and the player lookup live in ../boss/; the methods the Wardens,
+// EnemySnapshots and the tests call stay here and hand the boss to them.
 
 import {
   BOSS_COMPONENTS,
   BOSS_CONFIG,
   WARDEN_KINDS,
 } from '../../../data/enemies/boss.js';
-import {
-  UPGRADE_BOSS_HEALTH_SCALAR,
-  UPGRADE_BOSS_DAMAGE_SCALAR,
-} from '../../../core/GameConstants.js';
+import { UPGRADE_BOSS_DAMAGE_SCALAR } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -226,11 +223,11 @@ export class BossEnemy extends BaseEnemy {
     const scaling = config.healthScaling ?? defaults.healthScaling ?? 1;
     const waveScaled =
       baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
+    // Each Warden's own factor (its content file), whatever cards are owned.
+    const healthFactor = config.healthFactor ?? WARDEN_KINDS.prime.healthFactor;
+    this.maxHealth = Math.ceil(waveScaled * healthFactor);
     const upgradeLevelSum = this._resolveUpgradeLevelSum(config);
-    const upgradeHealthFactor =
-      1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
     this.upgradeLevelSum = upgradeLevelSum;
-    this.maxHealth = Math.ceil(waveScaled * upgradeHealthFactor);
     this.health = config.currentHealth ?? this.maxHealth;
     this.healthInitialized = true;
 

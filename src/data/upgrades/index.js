@@ -32,6 +32,7 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
 const UPGRADE_LIBRARY = deepFreeze(
   [...listContent('cards'), ...WEAPON_CARDS].sort((a, b) => a.order - b.order)
 );
+export const WEAPON_CARD_IDS = Object.freeze(WEAPON_CARDS.map(({ id }) => id));
 
 export { UPGRADE_CATEGORIES };
 export default UPGRADE_LIBRARY;

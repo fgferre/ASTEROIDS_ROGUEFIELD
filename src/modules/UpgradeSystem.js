@@ -7,8 +7,13 @@ import {
   UPGRADE_RARITY_BASE_WEIGHTS,
   UPGRADE_RARITY_WEIGHT_PER_LEVEL,
   UPGRADE_RARITY_WEIGHT_CAPS,
+  UPGRADE_FAMILY_STEER_PER_CARD,
+  UPGRADE_WEAPON_OFFER_LEVELS,
 } from '../core/GameConstants.js';
-import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
+import UPGRADE_LIBRARY, {
+  UPGRADE_CATEGORIES,
+  WEAPON_CARD_IDS,
+} from '../data/upgrades/index.js';
 import {
   UPGRADE_FAMILIES,
   FAMILY_SYNERGY_THRESHOLD,
@@ -137,10 +142,13 @@ class UpgradeSystem extends BaseSystem {
 
   // === SISTEMA DE UPGRADES ===
   // `exclude`: ids drawn only if the rest of the pool runs out (reroll).
+  // `level`: the pilot level the offer is for; at UPGRADE_WEAPON_OFFER_LEVELS
+  // one slot, at random, holds a weapon card while the run has none.
   prepareUpgradeOptions(
     count = PROGRESSION_UPGRADE_ROLL_COUNT,
-    { exclude = [] } = {}
+    { exclude = [], level = this.level } = {}
   ) {
+    this.offerLevel = level;
     const eligible = this.getEligibleUpgradeDefinitions();
 
     const fallbackCount = Number.isFinite(PROGRESSION_UPGRADE_FALLBACK_COUNT)
@@ -165,14 +173,33 @@ class UpgradeSystem extends BaseSystem {
     const preferred = eligible.filter(
       (definition) => !exclude.includes(definition.id)
     );
-    const selection = this.rollUpgradeDefinitions(preferred, cappedCount);
+    const weapons = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
+      ? preferred.filter(({ id }) => WEAPON_CARD_IDS.includes(id))
+      : [];
+    const selection = this.rollUpgradeDefinitions(weapons, 1);
+    selection.push(
+      ...this.rollUpgradeDefinitions(
+        preferred.filter((definition) => !selection.includes(definition)),
+        cappedCount - selection.length,
+        selection
+      )
+    );
     if (selection.length < cappedCount) {
       const repeats = eligible.filter((definition) =>
         exclude.includes(definition.id)
       );
       selection.push(
-        ...this.rollUpgradeDefinitions(repeats, cappedCount - selection.length)
+        ...this.rollUpgradeDefinitions(
+          repeats,
+          cappedCount - selection.length,
+          selection
+        )
       );
+    }
+    if (weapons.length > 0) {
+      const [weapon] = selection.splice(0, 1);
+      const slot = this.selectionRandom().int(0, selection.length);
+      selection.splice(slot, 0, weapon);
     }
     const options = selection
       .map((definition) => this.buildUpgradeOption(definition))
@@ -193,43 +220,44 @@ class UpgradeSystem extends BaseSystem {
     );
   }
 
-  // Chance of each rarity tier at a pilot level; sums to 1.
-  getRarityWeights(level = this.level) {
-    const levelsGained = Math.max(0, Math.floor(Number(level) || 1) - 1);
-    const shifted = (tier) =>
-      Math.min(
-        UPGRADE_RARITY_WEIGHT_CAPS[tier],
-        UPGRADE_RARITY_BASE_WEIGHTS[tier] +
-          UPGRADE_RARITY_WEIGHT_PER_LEVEL[tier] * levelsGained
-      );
-    const rare = shifted('rare');
-    const epic = shifted('epic');
-    return { common: 1 - rare - epic, rare, epic };
+  // A card's draw weight: its rarity's at the pilot level (GameConstants),
+  // × (1 + UPGRADE_FAMILY_STEER_PER_CARD × k) when the run holds k distinct
+  // cards of its family, short of an Apex.
+  getDrawWeight({ rarity, family }) {
+    const rarityWeight = Math.min(
+      UPGRADE_RARITY_WEIGHT_CAPS[rarity] ?? Infinity,
+      UPGRADE_RARITY_BASE_WEIGHTS[rarity] +
+        (UPGRADE_RARITY_WEIGHT_PER_LEVEL[rarity] ?? 0) * (this.level - 1)
+    );
+    const owned = this.getFamilyCounts()[family] ?? 0;
+    const steer = owned < FAMILY_APEX_THRESHOLD ? owned : 0;
+    return rarityWeight * (1 + UPGRADE_FAMILY_STEER_PER_CARD * steer);
   }
 
-  // Draws up to `count` distinct definitions: a tier by its rarity weight,
-  // then a card within it, so a tier's chance doesn't depend on its size.
-  rollUpgradeDefinitions(pool, count) {
-    let rng = this.randomForks?.selection || this.random;
-    if (!rng || typeof rng.weightedPick !== 'function') {
-      rng = this.random;
-    }
+  selectionRandom() {
+    return this.randomForks?.selection ?? this.random;
+  }
 
-    const weights = this.getRarityWeights();
+  // Draws up to `count` distinct definitions, each by its draw weight. The
+  // last draw is a card the run doesn't own yet when neither `kept` (cards
+  // already in the offer) nor the draws before it hold one and the pool does.
+  rollUpgradeDefinitions(pool, count, kept = []) {
+    const isNew = ({ id }) => this.getUpgradeCount(id) === 0;
     const remaining = [...pool];
     const picks = [];
     while (picks.length < count && remaining.length > 0) {
-      const tierSizes = {};
-      remaining.forEach(({ rarity }) => {
-        tierSizes[rarity] = (tierSizes[rarity] || 0) + 1;
-      });
-      const index = rng.weightedPick(
-        remaining.map(({ rarity }, value) => ({
+      const fresh = remaining.filter(isNew);
+      const lastNeedsNew =
+        picks.length === count - 1 && ![...kept, ...picks].some(isNew);
+      const candidates = lastNeedsNew && fresh.length ? fresh : remaining;
+      const pick = this.selectionRandom().weightedPick(
+        candidates.map((value) => ({
           value,
-          weight: weights[rarity] / tierSizes[rarity],
+          weight: this.getDrawWeight(value),
         }))
       );
-      picks.push(remaining.splice(index, 1)[0]);
+      remaining.splice(remaining.indexOf(pick), 1);
+      picks.push(pick);
     }
     return picks;
   }
@@ -244,6 +272,7 @@ class UpgradeSystem extends BaseSystem {
 
     const { options, poolSize } = this.prepareUpgradeOptions(current.length, {
       exclude: current.map((option) => option.id),
+      level: this.offerLevel,
     });
     this.rerollsLeft -= 1;
     this.eventBus?.emit?.('upgrade-rerolled', {
@@ -271,7 +300,8 @@ class UpgradeSystem extends BaseSystem {
     const offeredIds = current.map((option) => option.id);
     const [replacement] = this.rollUpgradeDefinitions(
       eligible.filter((definition) => !offeredIds.includes(definition.id)),
-      1
+      1,
+      current.filter((option) => option.id !== upgradeId)
     );
     const options = [...current];
     if (replacement) {

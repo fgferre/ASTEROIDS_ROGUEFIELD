@@ -57,6 +57,11 @@ const SCRIPT = [
 ];
 // Low enough that the scripted run levels up, so level-up picks are replayed.
 const TEST_XP_TO_LEVEL = 10;
+// Every level costs TEST_XP_TO_LEVEL, so the short run levels up several times.
+const cheapLevels = (progression) => {
+  progression.levelCost = () => TEST_XP_TO_LEVEL;
+  progression.experienceToNext = TEST_XP_TO_LEVEL;
+};
 
 const KEY_CODES = {
   W: 'KeyW',
@@ -100,7 +105,7 @@ describe('run replay', () => {
     if (controls) live.services.player.controlScheme = controls;
     live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
-    progression.experienceToNext = TEST_XP_TO_LEVEL;
+    cheapLevels(progression);
     const input = live.services.input;
     const press = (letter) => input.onKeyDown(keyEvent(KEY_CODES[letter]));
     const release = (letter) => input.onKeyUp(keyEvent(KEY_CODES[letter]));
@@ -145,7 +150,7 @@ describe('run replay', () => {
     );
     replay.controller.arm(recording);
     replay.session.startNewRun(start);
-    replay.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+    cheapLevels(replay.services.progression);
     for (let step = 0; step < STEPS; step += 1) {
       replay.controller.tick();
       replay.step();
@@ -171,7 +176,7 @@ describe('run replay', () => {
     try {
       const live = createHeadlessGame();
       live.session.startNewRun({ source: 'test' });
-      live.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+      cheapLevels(live.services.progression);
       for (let step = 0; step < STEPS; step += 1) {
         if (live.takeOfferedUpgrade()) {
           const { progression } = live.services;
@@ -239,7 +244,7 @@ describe('run replay', () => {
     replay.services.settings.setSetting('gameplay', 'difficulty', 'pilot');
     replay.controller.arm(recording);
     replay.session.startNewRun({ source: 'test' });
-    replay.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+    cheapLevels(replay.services.progression);
     for (let step = 0; step < STEPS; step += 1) {
       replay.controller.tick();
       replay.step();

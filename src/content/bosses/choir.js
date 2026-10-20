@@ -7,6 +7,7 @@ export default {
   order: 2,
   displayName: 'Warden Choir',
   subtitle: 'Three voices of the Ring',
+  healthFactor: 1.7, // proposta 20/10: explained in prime.js
   // Its entrance, the choir gathers: a curve in, spinning, the three cores
   // far apart (each lights the edge as it crosses), then they draw in. The
   // fields are explained in prime.js. Numbers: proposta 19/10.
