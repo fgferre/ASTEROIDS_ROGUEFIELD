@@ -27,6 +27,7 @@ import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
+import { WeaponBodies } from './weaponBodies.js';
 
 export const FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
@@ -274,6 +275,7 @@ export function setupThree(seeded) {
   });
   const flashes = new FlashLights(THREE, scene);
   const debris = new DebrisChunks(THREE, scene);
+  const bodies = new WeaponBodies(THREE, scene);
   const bursts = new DeathBursts(debris, flashes);
   const enemies = new EnemyMirror(THREE, scene, seeded, bursts);
   const player = new PlayerMirror(THREE, scene, seeded);
@@ -375,6 +377,7 @@ export function setupThree(seeded) {
     orbCrystals,
     heartTokens,
     debris,
+    bodies,
     bursts,
     shockwaves,
     flash,

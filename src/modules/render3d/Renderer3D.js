@@ -688,6 +688,7 @@ class Renderer3D extends BaseSystem {
     t.smoke.begin();
     t.texts.begin();
     t.debris.begin();
+    t.bodies.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
     if (t.key.castShadow) {
@@ -743,6 +744,7 @@ class Renderer3D extends BaseSystem {
     t.smoke.end(pointScale);
     t.texts.end();
     t.debris.end();
+    t.bodies.end();
     this.impact.apply(
       t.impactPass,
       t.width,

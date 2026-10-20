@@ -12,6 +12,7 @@ import {
   mirrorWeaponEffects,
   pushFlakBolt,
   pushLance,
+  pushSeeker,
 } from './weaponMirror.js';
 
 const MAX_TRAIL_POINTS = 64;
@@ -49,6 +50,7 @@ export function mirrorProjectiles(t, combat) {
     const b = bullets[i];
     if (!b || b.hit) continue;
     if (b.kind === 'flak') pushFlakBolt(t.THREE, t, b, trail);
+    else if (b.kind === 'seeker') pushSeeker(t.THREE, t, b, trail);
     else pushLance(t.THREE, t, look, evolved, b, trail);
   }
   mirrorWeaponEffects(t.THREE, combat, t, t.flashes);

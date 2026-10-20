@@ -18,20 +18,22 @@ import {
 } from '../../data/constants/gameplay.js';
 import { BOSS_CONFIG } from '../../data/constants/visual.js';
 import { getContent } from '../../content/registry.js';
-import { WEAPONS, firePattern } from '../../data/weapons.js';
+import { firePattern } from '../../data/weapons.js';
 
 export class Projectiles {
   /**
    * `physics()`: the physics service (buildPlayerCollisionContext, checkCircleCollision).
    * `emit(name, payload)`: sends bullet-created and player-hit-by-projectile.
-   * `weapon()`: the ship's shot right now, a fresh plain object: { weaponId, bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceApexDamage, lancePierce, pierceBonus }.
+   * `weapon()`: the ship's shot right now, a fresh plain object: { form (the weapon in its current form), bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceApexDamage, lancePierce, pierceBonus }.
    * `burstFlak(bolt)`: bursts a projectile with a `burst` at the end of its range (the weapon's hit path).
+   * `steer(missile, dt)`: turns a `seeker` missile onto its target (firePatterns.js).
    */
-  constructor({ physics, emit, weapon, burstFlak }) {
+  constructor({ physics, emit, weapon, burstFlak, steer }) {
     this.physics = physics;
     this.emit = emit;
     this.weapon = weapon;
     this.burstFlak = burstFlak;
+    this.steer = steer;
 
     this.bullets = [];
     this.enemyBullets = [];
@@ -46,8 +48,9 @@ export class Projectiles {
     };
   }
 
-  // The weapon's projectile (its content file). `volley`: the fan's volley it
-  // belongs to; a projectile with a `burst` fired alone is a volley of one.
+  // The weapon's projectile (its content file, in the weapon's current form).
+  // `volley`: the fan's volley it belongs to; a projectile with a `burst`
+  // fired alone is a volley of one. Returns the shot (a seeker steers it).
   createBullet(fromPos, toPos, damage, volley = null) {
     const dx = toPos.x - fromPos.x;
     const dy = toPos.y - fromPos.y;
@@ -56,7 +59,7 @@ export class Projectiles {
     if (distance === 0) return;
 
     const weapon = this.weapon();
-    const definition = WEAPONS[weapon.weaponId];
+    const definition = weapon.form;
     const { projectile } = definition;
 
     // Use object pool instead of creating new object
@@ -94,6 +97,7 @@ export class Projectiles {
     bullet.type = 'player';
     bullet.kind = projectile.look;
     bullet.offscreenTimer = 0;
+    bullet.seeker = null;
     bullet.pierceLeft = projectile.pierce
       ? weapon.lancePierce + weapon.pierceBonus
       : 0;
@@ -118,6 +122,7 @@ export class Projectiles {
       from: fromPos,
       to: toPos,
     });
+    return bullet;
   }
 
   createEnemyBullet(data = {}) {
@@ -614,6 +619,7 @@ export class Projectiles {
       }
       trailPoints += bullet.trail.length;
 
+      if (bullet.seeker) this.steer(bullet, deltaTime);
       // Atualizar posição
       bullet.x += bullet.vx * deltaTime;
       bullet.y += bullet.vy * deltaTime;

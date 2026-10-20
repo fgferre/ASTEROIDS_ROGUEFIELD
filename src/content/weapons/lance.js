@@ -6,7 +6,8 @@
 //   on every nth shot, one without on any shot. Patterns (FIRE_PATTERNS in
 //   src/modules/combat/Weapons.js): `stream`, projectiles on the lock lanes
 //   (Multishot adds lanes); `beam`, a segment that hits everything it crosses;
-//   `fan`, a fan of projectiles (Multishot adds bolts).
+//   `fan`, a fan of projectiles (Multishot adds bolts); `chain`, `orbit`,
+//   `aura`, `seeker` (firePatterns.js, CONTENT.md).
 // `projectile`: what `stream` and `fan` launch. `look` is its 3D bolt: 'lance'
 //   (the family evolutions restyle it) or 'flak'. Speed and damage multiply
 //   the lance's; `range` (px) ends its flight, else the lance's lifetime does;
@@ -17,6 +18,9 @@
 //   burst) draw with.
 // `card`: the card that swaps the cannon for this weapon; src/data/upgrades/
 //   index.js gives it its one rank and rules out every other weapon card.
+// `evolution`, `apex` (optional, both or neither): the weapon's own forms at
+//   three and five cards of its card's family, in place of the family's lance
+//   evolution (arc-caster.js; CONTENT.md).
 // The Thermal Lens lengthens the beam of a weapon that has one, else it boosts
 // the projectile; the Chain Capacitor doubles some projectile hits.
 export default {

@@ -22,7 +22,9 @@ async function fetchSampleFile(path) {
 
 /** The sampleId a cue call plays (SAMPLE_CUES); null when it plays none. */
 export function sampleIdFor(cue, args = []) {
-  const sample = SAMPLE_CUES[cue]?.sample;
+  const { sample, pick } = SAMPLE_CUES[cue] ?? {};
+  const picked = pick?.samples[args[0]?.[pick.path]];
+  if (picked) return picked;
   if (typeof sample === 'string') return sample;
   return sample?.[args[0]] ?? null;
 }

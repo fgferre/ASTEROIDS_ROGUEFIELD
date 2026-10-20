@@ -6,6 +6,11 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
+import {
+  holsterWeaponField,
+  steerSeeker,
+  tickWeaponField,
+} from './combat/firePatterns.js';
 import { COMBAT_AIMING_UPGRADE_CONFIG } from '../data/constants/gameplay.js';
 // The knockback suite imports it from here.
 export { knockbackSpeed } from './combat/HitResolution.js';
@@ -37,6 +42,7 @@ class CombatSystem extends BaseSystem {
         this.hits.processBulletHit(hit, enemy, this.cachedEnemies),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       cardEffects: () => this.cards.cardEffects,
+      cards: () => this.cards,
       tuning: () => ({
         aimCooldownMultiplier: this.cards.aimCooldownMultiplier,
         cooldownTuning: this.cards.cooldownTuning,
@@ -56,7 +62,7 @@ class CombatSystem extends BaseSystem {
       physics: () => this.cachedPhysics,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       weapon: () => ({
-        weaponId: this.weapons.weaponId,
+        form: this.weapons.weapon,
         bulletSpeed: this.weapons.bulletSpeed,
         bulletLifetime: this.weapons.bulletLifetime,
         trailLength: this.weapons.trailLength,
@@ -66,6 +72,7 @@ class CombatSystem extends BaseSystem {
         pierceBonus: this.cards.pierceBonus,
       }),
       burstFlak: (bolt) => this.weapons.burstFlak(bolt),
+      steer: (missile, dt) => steerSeeker(this.weapons, missile, dt),
     });
     this.hits = new HitResolution({
       weapons: () => this.weapons,
@@ -424,7 +431,10 @@ class CombatSystem extends BaseSystem {
 
       if (playerStats) {
         this.weapons.handleShooting(deltaTime, playerStats);
+        tickWeaponField(this.weapons, deltaTime, playerStats);
       }
+    } else {
+      holsterWeaponField(this.weapons);
     }
 
     // Always update bullets - they keep flying even without ship hull
@@ -483,6 +493,23 @@ class CombatSystem extends BaseSystem {
 
   get flakBursts() {
     return this.weapons.flakBursts;
+  }
+
+  // firePatterns.js: the 3D weapon mirror draws them.
+  get blades() {
+    return this.weapons.blades;
+  }
+
+  get aura() {
+    return this.weapons.aura;
+  }
+
+  get pulses() {
+    return this.weapons.pulses;
+  }
+
+  get weaponForm() {
+    return this.weapons.weapon;
   }
 
   get bulletSpeed() {

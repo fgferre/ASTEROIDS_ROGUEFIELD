@@ -12,7 +12,11 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../../../../data/upgrades/families.js';
-import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../../../../data/weapons.js';
+import {
+  WEAPON_APEX,
+  WEAPON_EVOLUTIONS,
+  WEAPON_FORMS,
+} from '../../../../../data/weapons.js';
 import { onDemand, replay } from '../../hudCommon.js';
 
 const CELLS = Array.from({ length: FAMILY_APEX_THRESHOLD }, (_, i) =>
@@ -64,6 +68,16 @@ const CSS = `
 
 const shortName = (name) => name.replace(/ Lance$/, '');
 
+// The family's evolution (or Apex) as the held weapon has it: its own form
+// on its card's family, else the lance's.
+function evolutionName(weaponId, family, apex) {
+  const forms = WEAPON_FORMS[weaponId];
+  if (forms?.evolution && forms.base.card.family === family) {
+    return (apex ? forms.apex : forms.evolution).name;
+  }
+  return (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family].name;
+}
+
 /**
  * The family the track follows: the most cards among the families with a
  * weapon evolution (the first in data order on a tie); null before any.
@@ -109,7 +123,7 @@ export default {
         shown.name = name;
         this.name.textContent = name;
       }
-      this.updateTrack(trackFamily(state.families), weapon.evolutions);
+      this.updateTrack(trackFamily(state.families), weapon);
     }
     if (state.beams !== this.beams) {
       if (this.beams !== null) replay(this.name, 'ins-pulse');
@@ -125,11 +139,11 @@ export default {
     this.demand.update(now);
   },
 
-  updateTrack(track, evolutions) {
+  updateTrack(track, { weaponId, evolutions }) {
     const evolution =
       track && evolutions.find((e) => e.family === track.family);
     const key = track
-      ? `${track.family}:${track.cards}:${evolution?.id ?? ''}`
+      ? `${weaponId}:${track.family}:${track.cards}:${evolution?.id ?? ''}`
       : '';
     if (key === this.shown.track) return;
     this.shown.track = key;
@@ -147,8 +161,8 @@ export default {
     this.track.classList.toggle('is-apex', apex);
     this.evo.classList.toggle('is-on', Boolean(evolution));
     this.evo.textContent = evolution
-      ? shortName((apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family].name)
-      : `${shortName(WEAPON_EVOLUTIONS[family].name)} at ${FAMILY_SYNERGY_THRESHOLD}`;
+      ? shortName(evolutionName(weaponId, family, apex))
+      : `${shortName(evolutionName(weaponId, family, false))} at ${FAMILY_SYNERGY_THRESHOLD}`;
     this.apex.textContent = `Apex ${lit}/${FAMILY_APEX_THRESHOLD}`;
     // The weapon evolved (or reached its Apex) since the last frame.
     if (evolution && this.shown.evolution !== evolution.id) {

@@ -80,12 +80,19 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 
 ## Weapon: `src/content/weapons/<id>.js`
 
-- Fields: `name`, `chip` (HUD label), `description`, `fire`, `projectile`, `colors`, `card`. The header of `lance.js` explains each.
-- `fire`: patterns in order; the first due fires, one with `every: n` on every nth shot, the last has no `every`. Patterns: `stream` (no params); `beam`: `every length width duration damageMultiplier extraFragments cooldownPenalty kick flashRadius`; `fan`: `bolts maxBolts fan` (degrees) `cooldownMultiplier`.
-- `projectile` (exactly these): `look` (`lance` or `flak`), `speedMultiplier`, `damageMultiplier`, `range` (px, or `null`), `pierce`, `trailPoints` (or `null`), `burst` (`{ radius, damageMultiplier, duration }` or `null`).
-- `colors`: `glow mid core` for a `beam`; `tracer core` for `flak`; `burst core` for a `burst`.
+- Fields: `name`, `chip` (HUD label), `description`, `fire`, `projectile`, `colors`, `card`; optional `evolution` and `apex`. The header of `lance.js` explains each.
+- `fire`: patterns in order; the first due fires, one with `every: n` on every nth shot, the last has no `every`. Patterns (`cooldownMultiplier`: × the lance's cooldown before the next shot; Multishot adds what the pattern counts, up to its `max…`; the comment above each in `src/modules/combat/firePatterns.js` says what each param does):
+  - `stream` (no params); `beam`: `every length width duration damageMultiplier extraFragments cooldownPenalty kick flashRadius`; `fan`: `bolts maxBolts fan` (degrees) `cooldownMultiplier`.
+  - `chain` (lightning, hops to the next enemy): `range cone` (degrees, 360 all round) `bolts jumps maxJumps jumpRange falloff fork targets damageMultiplier cooldownMultiplier`.
+  - `orbit` (blades round the ship, each cutting an enemy once a cycle; every `orbit` entry is a ring, all turning at once): `blades maxBlades radius spin` (rad/s, below 0 the other way) `sweep` (`{ reach, period }` or `null`) `bladeRadius damageMultiplier cooldownMultiplier`.
+  - `aura` (a heat pulse on everything round the ship): `radius growth maxRadius damageMultiplier burn` (`{ duration, ticks, damageFraction }` or `null`) `duration cooldownMultiplier`.
+  - `seeker` (missiles of the weapon's `projectile` that turn onto their targets): `missiles maxMissiles spread` (degrees, 360 a ring) `turn` (rad/s) `acquire breed damageMultiplier cooldownMultiplier`.
+- `projectile` (exactly these, also on a weapon that launches none): `look` (`lance`, `flak` or `seeker`), `speedMultiplier`, `damageMultiplier`, `range` (px, or `null`), `pierce`, `trailPoints` (or `null`), `burst` (`{ radius, damageMultiplier, duration }` or `null`).
+- `colors`: `glow mid core` for a `beam`; `arc` for a `chain`; `edge core` for an `orbit`; `heat core` for an `aura`; `tracer core` for `flak` and `seeker`; `burst core` for a `burst`.
+- `evolution`, `apex` (both or neither, on a weapon with a `card`): `{ id, name, chip, description, fire }`, optional `projectile` and `colors`. At three cards of the card's family the weapon fires its `evolution`, at five its `apex`, whatever the order the cards came in; that family's lance evolution and Apex (`src/data/weapons.js`) stay off while it is held. Without them the family's lance evolution applies, as for the Lance, Harmonic and Scatter.
 - `card` (the card fields below, but no top-level `levels`): enters the level-up catalog with one rank and excludes every other weapon card. Without a `card` a weapon can only be the starting cannon.
-- Copy: `lance.js` (stream), `harmonic.js` (beam), `scatter.js` (fan and flak), `tests/__fixtures__/weapons/needle.js` (smallest card).
+- Its shot sound: a `playLaserShot` `pick` row in `src/data/audio/samples.js` names its own sample id; until the manifest has that sample it plays the lance's synthesis.
+- Copy: `lance.js` (stream), `harmonic.js` (beam), `scatter.js` (fan and flak), `arc-caster.js` (chain), `shard-halo.js` (orbit), `furnace-corona.js` (aura), `seeker-swarm.js` (seeker), each of the last four with its own evolution and Apex; `tests/__fixtures__/weapons/needle.js` (smallest card).
 
 ## Card: `src/content/cards/<id>.js`
 

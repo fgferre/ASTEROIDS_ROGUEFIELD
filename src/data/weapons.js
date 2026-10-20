@@ -28,6 +28,41 @@ export const WEAPONS = deepFreeze(
 );
 export const DEFAULT_WEAPON_ID = listContent('weapons')[0].id;
 
+// A weapon's own form (its `evolution` or `apex`): the weapon with the form's
+// name, chip, description and fire list, and its projectile and colours when
+// the form names them. `form` says which one it is.
+function ownForm(weapon, stage) {
+  const { id, name, chip, description, fire, projectile, colors } =
+    weapon[stage];
+  return {
+    ...weapon,
+    name,
+    chip,
+    description,
+    fire,
+    projectile: projectile ?? weapon.projectile,
+    colors: colors ?? weapon.colors,
+    form: { id, stage },
+  };
+}
+
+/**
+ * Each weapon in its three forms: `base`, and its own `evolution` and `apex`
+ * (null when the weapon has none: the family's lance evolution applies).
+ */
+export const WEAPON_FORMS = deepFreeze(
+  Object.fromEntries(
+    Object.values(WEAPONS).map((weapon) => [
+      weapon.id,
+      {
+        base: weapon,
+        evolution: weapon.evolution ? ownForm(weapon, 'evolution') : null,
+        apex: weapon.apex ? ownForm(weapon, 'apex') : null,
+      },
+    ])
+  )
+);
+
 /** A weapon's first `fire` entry of this pattern ('beam', ...), or null. */
 export function firePattern(weapon, pattern) {
   return weapon.fire.find((entry) => entry.pattern === pattern) ?? null;
@@ -47,7 +82,8 @@ export const LANCE_BASE_LOOK = deepFreeze({
 
 /**
  * Family → weapon evolution, switched on by the family's "3 of a kind"
- * synergy and kept for the run. `look` changes the lance in 2D and 3D.
+ * synergy and kept for the run. `look` changes the lance in 2D and 3D. A
+ * weapon with its own `evolution` takes that instead on its card's family.
  */
 export const WEAPON_EVOLUTIONS = deepFreeze({
   thermal: {
