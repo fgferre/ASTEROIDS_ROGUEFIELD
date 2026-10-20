@@ -16,6 +16,7 @@ import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
+import { HeartTokens, OrbCrystals } from './fieldTokens.js';
 import { createFieldVeil } from './fieldVeil.js';
 import { FlashLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
@@ -288,6 +289,8 @@ export function setupThree(seeded) {
   const glow = new PointBatch(THREE, 900);
   const matte = new PointBatch(THREE, 500, { shape: 'disc' });
   const smoke = new PointBatch(THREE, 300, { shape: 'puff' });
+  const orbCrystals = new OrbCrystals(THREE, scene, keyDir);
+  const heartTokens = new HeartTokens(THREE, scene, keyDir);
   scene.add(
     ribbons.object,
     lances.mesh,
@@ -365,6 +368,8 @@ export function setupThree(seeded) {
     glow,
     matte,
     smoke,
+    orbCrystals,
+    heartTokens,
     debris,
     bursts,
     shockwaves,

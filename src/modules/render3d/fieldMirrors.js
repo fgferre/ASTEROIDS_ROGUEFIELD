@@ -7,6 +7,7 @@ import { XP_ORB_SIZE } from '../../core/GameConstants.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
+import { HEART_HEIGHT, orbHeight } from './fieldTokens.js';
 import {
   mirrorWeaponEffects,
   pushFlakBolt,
@@ -74,8 +75,10 @@ function pushTrail(t, bullet, rgb, width, gain) {
   ribbons.polyline(n + 1, 2.5, rgb, width, gain);
 }
 
+// XP orbs and hearts: their bodies (fieldTokens.js) in the light of a glow.
 export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
   const orbs = xpOrbs?.xpOrbs || [];
+  t.orbCrystals.begin();
   for (let i = 0; i < orbs.length; i += 1) {
     const orb = orbs[i];
     if (!orb || orb.collected) continue;
@@ -83,19 +86,25 @@ export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
     const base = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
     const age = Number.isFinite(orb.age) ? orb.age : time;
     const pulse = 1 + 0.18 * Math.sin(age * 4 + i * 0.7);
-    t.glow.push(orb.x, 4, orb.y, t.xpRgb, base * 1.5 * pulse, 0.7, 1);
-    t.glow.push(orb.x, 4.5, orb.y, WHITE, base * 0.35, 0.9, 1.2);
+    const h = orbHeight(base);
+    t.glow.push(orb.x, h, orb.y, t.xpRgb, base * 1.6 * pulse, 0.45, 1);
+    t.orbCrystals.pushOrb(orb, tier, base, age, t.xpRgb);
   }
+  t.orbCrystals.end();
 
   const hearts = healthHearts?.hearts || [];
+  t.heartTokens.begin();
   for (let i = 0; i < hearts.length; i += 1) {
     const heart = hearts[i];
     if (!heart || heart.isCollected()) continue;
-    const pulse = 1 + Math.sin(heart.pulsePhase || 0) * 0.12;
+    const phase = heart.pulsePhase || 0;
+    const pulse = 1 + Math.sin(phase) * 0.12;
     const r = heart.radius || 14;
-    t.glow.push(heart.x, 4, heart.y, t.statusRgb, r * 1.6 * pulse, 0.7, 1);
-    t.glow.push(heart.x, 4.5, heart.y, WHITE, r * 0.4, 0.9, 1.2);
+    const h = HEART_HEIGHT;
+    t.glow.push(heart.x, h, heart.y, t.statusRgb, r * 1.9 * pulse, 0.5, 1);
+    t.heartTokens.pushHeart(heart.x, heart.y, r, phase, t.statusRgb);
   }
+  t.heartTokens.end();
 
   t.pickups.update(pickups?.getActivePickups() || []);
 }
