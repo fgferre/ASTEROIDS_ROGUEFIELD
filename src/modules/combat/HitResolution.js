@@ -6,8 +6,9 @@
 // split, the Prospector's orbs, the evolutions' burn, slow, pull and chain, a
 // kill's Capacitor spark and a breeding missile's brood. CombatSystem owns it
 // and resolves the collisions through it after the shots move; the weapons
-// and the card effects land their hits here too. A family the held weapon
-// evolves on itself brings none of its lance evolution here.
+// and the card effects land their hits here too. The lance evolutions come
+// on a lance, beam or flak hit only (see `lanceHit`), and a family the held
+// weapon evolves on itself brings none of its lance evolution here.
 
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
@@ -20,6 +21,7 @@ import {
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
+import { burstFlak } from './beamAndFan.js';
 import { breedSeekers } from './firePatterns.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
@@ -105,8 +107,15 @@ export class HitResolution {
             descriptors: enemy.generateFragments(),
           }
         : null;
+    // A projectile, or what a beam or a flak burst lands: the chain, blade
+    // and heat hits of the other weapons, which evolve on their own, and the
+    // cards' arcs bring no lance evolution.
+    const lanceHit =
+      Boolean(bullet.projectile) ||
+      bullet.kind === 'beam' ||
+      bullet.kind === 'shrapnel';
     const rewards =
-      bullet.kind !== 'chain' && weapons.hasEvolution('salvage')
+      lanceHit && weapons.hasEvolution('salvage')
         ? enemiesSystem.rewardManager
         : null;
     const orbsBefore = rewards ? rewards.stats.totalOrbsDropped : 0;
@@ -194,7 +203,7 @@ export class HitResolution {
           rewards.stats.totalOrbsDropped - orbsBefore
         );
       }
-      if (bullet.kind !== 'chain') {
+      if (lanceHit) {
         this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
       }
       if (bullet.seeker?.breed > 0 && damageResult.killed) {
@@ -211,7 +220,7 @@ export class HitResolution {
     // its shrapnel spares the enemy it struck.
     if (bullet.projectile?.burst) {
       bullet.volley.struck.push(enemy);
-      weapons.burstFlak(bullet);
+      burstFlak(weapons, bullet);
     }
 
     return damageResult;
@@ -266,8 +275,8 @@ export class HitResolution {
     rewards.createXPOrbs(enemy, extra, ORB_VALUE);
   }
 
-  // Burn, slow and chain on a weapon's hit (chain hits do not chain); an
-  // Apex replaces its family's first stage.
+  // Burn, slow and chain on a lance, beam or flak hit; an Apex replaces its
+  // family's first stage.
   applyEvolutionHit(enemy, damage, result, hit) {
     const weapons = this.weapons();
     const cards = this.cards();

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
 import {
   UPGRADE_FAMILIES,
@@ -189,7 +190,7 @@ describe('3-of-a-kind synergy', () => {
     expect(progression.applyUpgrade('scatter_coil')).toBe(false);
 
     // Owned `loner` lists plasma; plasma does not list it back.
-    const loner = progression.normalizeUpgradeDefinition({
+    const loner = normalizeUpgradeDefinition({
       id: 'loner',
       levels: [{ effects: [] }],
       excludes: ['plasma'],

@@ -574,7 +574,8 @@ export function createServiceManifest(context = {}) {
         'progression',
         'random',
       ],
-      factory: ({ resolved }) =>
+      // `combat` once it is built (Motherlode follows the held weapon).
+      factory: ({ resolved, container }) =>
         new PickupSystem({
           eventBus: resolved['event-bus'],
           player: resolved['player'],
@@ -583,6 +584,7 @@ export function createServiceManifest(context = {}) {
           effects: resolved['effects'],
           progression: resolved['progression'],
           random: resolved['random'],
+          serviceResolver: createServiceResolver(container),
         }),
     },
     {

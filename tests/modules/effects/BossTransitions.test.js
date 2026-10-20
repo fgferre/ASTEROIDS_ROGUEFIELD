@@ -38,10 +38,10 @@ describe('BossTransitions Warden arrival', () => {
     if (!GamePools.initialized) GamePools.initialize();
   });
 
-  it('slows the world to its recipe speed until it closes up, then recovers; Reduced Motion softens it', () => {
+  it('slows the world to its recipe speed until it closes up, then recovers, with Reduced Motion too', () => {
     const { travel, close, world, recover } = ARRIVAL;
     expect(speedAfterSpawn(travel + close - 0.1, false)).toBeCloseTo(world, 6);
-    expect(speedAfterSpawn(0.05, true)).toBeGreaterThanOrEqual(0.7);
+    expect(speedAfterSpawn(travel + close - 0.1, true)).toBeCloseTo(world, 6);
     expect(speedAfterSpawn(travel + close + recover + 0.05, false)).toBe(1);
   });
 });

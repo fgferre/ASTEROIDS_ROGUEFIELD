@@ -9,7 +9,7 @@
  * the same per-step seam (`setInputSource`) the browser uses.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import {
   createHeadlessGame,
@@ -26,6 +26,10 @@ import {
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
 import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
+import {
+  CHEST_REVEAL_MS,
+  ChestCeremony,
+} from '../../src/modules/ui/ChestCeremony.js';
 
 const STEPS = 600; // 10 s at 60 Hz
 
@@ -63,6 +67,14 @@ const cheapLevels = (progression) => {
   progression.levelCost = () => TEST_XP_TO_LEVEL;
   progression.experienceToNext = TEST_XP_TO_LEVEL;
 };
+
+// Enough of a DOM node for the chest's cards to show.
+const stubNode = () => ({
+  classList: { add() {}, remove() {}, replace() {}, toggle() {} },
+  style: { setProperty() {} },
+  appendChild() {},
+  focus() {},
+});
 
 const KEY_CODES = {
   W: 'KeyW',
@@ -170,6 +182,59 @@ describe('run replay', () => {
     expect(recorded.kills).toBeGreaterThan(0);
 
     expect(replayRun(recording).snapshot()).toEqual(recorded);
+  });
+
+  it("passes a chest's cards on its own after their reveal, and plays on to the same end", () => {
+    const { live, recording } = recordRun();
+    const recorded = live.snapshot();
+    vi.useFakeTimers();
+    try {
+      document.createElement = stubNode;
+      const replay = createHeadlessGame();
+      let backToPlay = 0;
+      const chest = new ChestCeremony({
+        refs: {
+          screen: stubNode(),
+          title: stubNode(),
+          count: stubNode(),
+          cards: stubNode(),
+          continueBtn: stubNode(),
+        },
+        showScreen() {},
+        showGameUI: () => {
+          backToPlay += 1;
+        },
+        cardChoiceOpen: () => false,
+        prefersReducedMotion: () => false,
+      });
+      replay.ui.chestCeremony = chest;
+      replay.controller.arm(recording);
+      replay.session.startNewRun({ source: 'test' });
+      cheapLevels(replay.services.progression);
+      // Frames of the paused loop: the controller ticks, no step runs.
+      const frames = (ms) => {
+        for (let t = 0; t < ms; t += 16) {
+          vi.advanceTimersByTime(16);
+          replay.controller.tick();
+        }
+      };
+      for (let step = 0; step < STEPS; step += 1) {
+        if (step === STEPS / 2) {
+          const card = { className: 'card', color: '#fff', html: '' };
+          chest.show([card, card, card]);
+          frames(2.5 * CHEST_REVEAL_MS); // the last card is still landing
+          expect(chest.isVisible).toBe(true);
+          frames(CHEST_REVEAL_MS);
+          expect(chest.isVisible).toBe(false);
+          expect(backToPlay).toBe(1);
+        }
+        replay.controller.tick();
+        replay.step();
+      }
+      expect(replay.snapshot()).toEqual(recorded);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('replays a gamepad-driven run (analog sticks, triggers) to the same end state', () => {

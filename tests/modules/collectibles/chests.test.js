@@ -25,10 +25,12 @@ function startGame() {
   return game;
 }
 
-// Only the pickups and the clock run: no XP, no level-up of its own.
+// Only the pickups and the clock (with its slow motion) run: no XP, no
+// level-up of its own.
 function tick(game, seconds) {
   const steps = Math.ceil(seconds / STEP_SECONDS);
   for (let i = 0; i < steps; i += 1) {
+    game.services.effects.update(STEP_SECONDS);
     game.services.pickups.update(STEP_SECONDS);
   }
 }
@@ -140,6 +142,27 @@ describe('chests', () => {
     ]);
     tick(game, CHEST.spentTime);
     expect(pickups.chests.list).toHaveLength(0);
+  });
+
+  it("waits out a Warden's arrival slow motion, then opens in its own", () => {
+    const game = startGame();
+    const { effects } = game.services;
+    const arrival = { travel: 1.1, close: 0.25, world: 0.25, recover: 0.5 };
+    const warden = { id: 'warden', x: 400, y: 84 };
+    game.eventBus.emit('boss-spawned', {
+      enemy: warden,
+      position: { ...warden },
+      arrival,
+    });
+    const chest = chestAtShip(game, 'elite');
+
+    tick(game, arrival.travel);
+    expect(chest.state).toBe('claimed');
+    expect(effects.gameTime.timeDilation.holdScale).toBe(arrival.world);
+
+    tick(game, arrival.close + arrival.recover + 0.05);
+    expect(chest.state).toBe('opening');
+    expect(effects.gameTime.timeDilation.holdScale).toBe(CHEST.slowScale);
   });
 
   it('a rank-up of an owned card first, then a new card of an owned family, else any card a level-up could offer', () => {

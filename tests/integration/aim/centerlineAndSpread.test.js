@@ -401,13 +401,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // F10-exported alias (no longer dead). Numeric value identical — pinned
     // to BULLET_SIZE in the F10 test. The clamp math now lives in
     // combat/Weapons.js (R13.8.4), so that is the file read here.
-    it('C7b: Weapons source imports COMBAT_BULLET_RADIUS from gameplay.js (preferred per plan artifact)', async () => {
+    it('C7b: the volley lanes source imports COMBAT_BULLET_RADIUS from gameplay.js (preferred per plan artifact)', async () => {
       // Read source as text to assert the import statement. Whitespace-tolerant.
       const fs = await import('fs/promises');
       const path = await import('path');
       const filePath = path.resolve(
         process.cwd(),
-        'src/modules/combat/Weapons.js'
+        'src/modules/combat/volleyLanes.js'
       );
       const src = await fs.readFile(filePath, 'utf8');
       // Import should mention COMBAT_BULLET_RADIUS from gameplay.js. Single

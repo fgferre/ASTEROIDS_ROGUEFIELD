@@ -9,7 +9,7 @@
  */
 
 import { BaseSystem } from '../../core/BaseSystem.js';
-import { requireService } from '../../core/serviceUtils.js';
+import { requireService, resolveService } from '../../core/serviceUtils.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../core/GameConstants.js';
 import { PALETTE, LINE, withAlpha } from '../../data/constants/palette.js';
 import {
@@ -55,7 +55,6 @@ export class PickupSystem extends BaseSystem {
     this.pickups = [];
     this.overchargeRemaining = 0;
     this.rockDropChance = 0;
-    this.eliteAlwaysDrops = false;
     this.layer = 1;
     this.chests = new Chests({
       player: this.player,
@@ -79,7 +78,7 @@ export class PickupSystem extends BaseSystem {
         this.chests.spawn('elite', x, y);
       }
       const chance = enemy.elite
-        ? this.eliteAlwaysDrops
+        ? this.elitesAlwaysDrop()
           ? 1
           : eliteDropChance(this.layer)
         : enemy.type === 'asteroid'
@@ -112,15 +111,21 @@ export class PickupSystem extends BaseSystem {
     this.registerEventListener('upgrade-lucky-fragment', (data) => {
       this.rockDropChance = data.chance;
     });
-    this.registerEventListener('apex-unlocked', ({ family } = {}) => {
-      if (WEAPON_APEX[family]?.eliteAlwaysDrops) this.eliteAlwaysDrops = true;
-    });
     this.registerEventListener('progression-reset', () => {
       this.rockDropChance = 0;
-      this.eliteAlwaysDrops = false;
     });
 
     this.registerEventListener('game-started', () => this.reset());
+  }
+
+  // Motherlode (an Apex whose `eliteAlwaysDrops` is set) while the lance
+  // carries it: not while the held weapon evolves on that family itself (the
+  // Seeker Swarm's own Apex), as for the orbs it adds (HitResolution).
+  elitesAlwaysDrop() {
+    const { weapons } = resolveService('combat', this.dependencies);
+    return Object.values(WEAPON_APEX).some(
+      (apex) => apex.eliteAlwaysDrops && weapons.hasApex(apex.family)
+    );
   }
 
   reseedRandom() {
@@ -241,11 +246,12 @@ export class PickupSystem extends BaseSystem {
   }
 
   // Every machine but a Warden (and a phased one, out of reach) stands still
-  // (the Solar Flare's stun); CombatSystem freezes the shots in flight.
+  // (the Solar Flare's stun; rocks drift on); CombatSystem freezes the shots
+  // in flight.
   fireStasis() {
     const { duration, shockwaveRadius, color } = PICKUP_KINDS.stasis;
     this.enemies.forEachActiveEnemy((enemy) => {
-      if (enemy.type === 'boss' || enemy.intangible) return;
+      if (['asteroid', 'boss'].includes(enemy.type) || enemy.intangible) return;
       enemy.stunTimer = Math.max(enemy.stunTimer || 0, duration);
     });
     this.eventBus.emit('stasis-started', { duration });

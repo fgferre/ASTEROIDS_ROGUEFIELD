@@ -340,10 +340,11 @@ describe('WaveManager field events', () => {
     );
   });
 
-  it('stuns every enemy and flashes the screen on a Solar Flare', () => {
+  it('stuns every machine and flashes the screen on a Solar Flare', () => {
     const field = createField();
     startLayer(field, 7);
-    field.active.push({ type: 'asteroid', destroyed: false });
+    const rock = { type: 'asteroid', destroyed: false };
+    field.active.push(rock);
 
     field.manager.update(35);
 
@@ -351,6 +352,8 @@ describe('WaveManager field events', () => {
     const drones = ofType(field.active, 'drone');
     expect(drones.length).toBeGreaterThan(0);
     for (const drone of drones) expect(drone.stunTimer).toBe(1);
+    // EnemyUpdateSystem stuns machines only: a rock drifts on.
+    expect(rock.stunTimer).toBeUndefined();
     expect(field.effects.addScreenFlash).toHaveBeenCalledTimes(1);
   });
 

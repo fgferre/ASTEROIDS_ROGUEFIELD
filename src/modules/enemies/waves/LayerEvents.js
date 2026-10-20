@@ -56,9 +56,12 @@ export class LayerEvents {
         .getCachedXPOrbs?.()
         ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
     } else if (kind === 'solar-flare') {
-      // A phased Shade (`intangible`) is out of reach of the flare.
+      // A phased Shade (`intangible`) is out of reach of the flare; rocks
+      // drift on (EnemyUpdateSystem stuns machines only).
       this.enemySystem.forEachActiveEnemy?.((enemy) => {
-        if (!enemy.intangible) enemy.stunTimer = duration;
+        if (!enemy.intangible && enemy.type !== 'asteroid') {
+          enemy.stunTimer = duration;
+        }
       });
       this.enemySystem
         .getCachedEffects?.()
