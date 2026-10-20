@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CAMERA_ZOOM,
-  createCamera,
-  frameFor,
-  threatZoomFor,
-} from '../../../src/core/camera.js';
+import { CAMERA_ZOOM, createCamera } from '../../../src/core/camera.js';
 import {
   CameraRig,
   footprint,
@@ -26,14 +21,9 @@ function rigAt(aspect, zoom, dolly = 1) {
 }
 
 describe('CameraRig field fit', () => {
-  // Boss framing's floor, the busy threat zoom, static, the base, a push-in.
-  const zooms = [
-    frameFor(0, 0, 900, 0, {}).zoom,
-    threatZoomFor(99),
-    1,
-    CAMERA_ZOOM,
-    1.5,
-  ];
+  // The classic shot: a pull-out under the field, the field, the base, a
+  // push-in.
+  const zooms = [0.85, 1.05, 1, CAMERA_ZOOM, 1.5];
   const aspects = [1, 4 / 3, 16 / 10, 16 / 9, 21 / 9, 32 / 9];
   const corners = [
     [5, 5],

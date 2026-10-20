@@ -16,6 +16,7 @@ import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
+import { createFieldVeil } from './fieldVeil.js';
 import { FlashLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
@@ -251,6 +252,8 @@ export function setupThree(seeded) {
 
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
+  // The arena's border, shown when the camera looks past it (fieldVeil.js).
+  createFieldVeil(THREE, scene);
   const biomes = new BiomeController(THREE, {
     key,
     fill,

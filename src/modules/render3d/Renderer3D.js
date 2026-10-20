@@ -15,11 +15,8 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import {
-  epiloguePath,
-  introPath,
-  WARDEN_ARRIVAL,
-} from '../../core/cinematics.js';
+import { epiloguePath, introPath } from '../../core/cinematics.js';
+import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
@@ -210,6 +207,26 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('wave-started', (payload = {}) => {
       this.biome.enterLayer(payload.wave);
+      this.camera.trigger('waveStart');
+    });
+    // What opens the camera director's wide view (core/cameraDirector.js).
+    this.registerEventListener('wave-complete', () => {
+      this.camera.trigger('cleared');
+    });
+    this.registerEventListener('elite-spawned', (payload) => {
+      this.camera.trigger('elite', payload);
+    });
+    this.registerEventListener('boss-telegraph', () => {
+      this.camera.trigger('telegraph');
+    });
+    // A boss falling mid-run: a short push from above.
+    this.registerEventListener('boss-defeated', () => {
+      if (!this.reducedMotion) {
+        this.camera.pulseZoom(
+          CAMERA_ZOOM * CAMERA_DIRECTOR.bossDown.zoom,
+          CAMERA_DIRECTOR.bossDown.duration
+        );
+      }
     });
     this.registerEventListener('layer-modifier-started', (payload = {}) => {
       if (payload.id === 'dense-fog') this.denseFog = true;
@@ -344,21 +361,17 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * The Warden's arrival: the follow camera travels to `warden` and back
-   * (WARDEN_ARRIVAL). False when nothing would move (no Warden, WebGL
-   * failed, `?camera=0`, reduced motion): the caller skips the letterbox.
+   * The Warden's arrival: the camera director opens its wide view on the
+   * whole field (a cut under reduced motion). False when the letterbox
+   * should not play (no Warden, WebGL failed, not the dynamic camera,
+   * reduced motion): the caller keeps the plain banner.
    */
   playArrival(warden) {
-    if (
-      !warden ||
-      this.failed ||
-      !this.camera.isEnabled() ||
-      this.reducedMotion
-    ) {
+    if (!warden || this.failed || this.camera.mode !== 'dynamic') {
       return false;
     }
-    this.camera.travelTo(warden, WARDEN_ARRIVAL);
-    return true;
+    this.camera.trigger('bossArrival', warden);
+    return !this.reducedMotion;
   }
 
   /** Eases from wherever the cinematic is back to the follow camera. */
@@ -487,8 +500,13 @@ class Renderer3D extends BaseSystem {
     p.length = 0;
   }
 
+  // The game's Reduce Motion, or the system's (the camera page's rule).
   applyAccessibilityPreferences(values = {}) {
-    this.reducedMotion = Boolean(values.reducedMotion);
+    this.reducedMotion =
+      Boolean(values.reducedMotion) ||
+      Boolean(
+        globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      );
     this.camera.setReducedMotion(this.reducedMotion);
     this.flashScale = values.reduceFlashing ? 0.3 : 1;
     this.impact.scale = this.flashScale;
@@ -640,6 +658,7 @@ class Renderer3D extends BaseSystem {
       enemyList,
       effects,
       this.cachedCombat,
+      this.cachedXPOrbs,
       dt,
       this.lastRenderTime === null,
       this.reducedMotion

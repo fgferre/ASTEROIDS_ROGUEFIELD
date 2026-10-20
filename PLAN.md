@@ -93,6 +93,38 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
       referências e algoritmos prontos (`docs/pesquisa-camera-2026-10-19.md`); (2) uma página de comportamento que ele
       aprova; (3) implementar sobre o que já existe (avanço pela mira, afastar em perigo, enquadrar chefe), números num
       lugar só, cena de teste por momento; (4) ele joga e ajusta — sensação, não fecha por teste.
+      **(2) Página publicada 19/10** (privada, dele): https://claude.ai/artifact/2SQknYsbX8AxEQpPR5JDpi — oito momentos
+      sobre capturas reais em janela 16:9 (quadro escolhido no campo + o que aparece na tela, com o movimento ao tocar),
+      pesos, forma da janela (16:9, 21:9, em pé), cinco regras fixas, números de partida da pesquisa e uma escolha dele:
+      travessia da borda por corte rápido (proposta) ou deslizar. **Aprovada por ele em 19/10:** _"1) ok 2) deslizar a
+      camera rapidamente"_ — os oito momentos, pesos, regras e números de partida ficam como na página; na travessia
+      da borda a câmera desliza rápido até o outro lado (não corta; a rapidez é número de ajuste).
+      **(3) Primeira versão (19/10, ramo `r14/diretor`, commit `a65b28f`, PR #288): rejeitada.** Diretor contínuo com
+      oito momentos, pesos e zoom por bisseção, preso dentro do campo. Dele, vendo as capturas: _"acho q ficou ruim, o
+      zoom out para dar amplitude do enquadramento nao está funcionando direito... em momento algum conseguimos ver todo
+      o battlefield na tela... as vezes menos é mais. talvez estejamos overengineering algo que é simples"_. Causa: a
+      regra antiga (nunca além da borda) com o campo 4:3 e a inclinação; em 16:9 a altura inteira nunca cabe. Ele pediu
+      uma análise ao ChatGPT (relatório fora do repo, 19/10): nave obrigatória acima da ameaça, perigo quase de cima,
+      sem girar enquanto se joga (os controles não giram com a câmera), borda atravessável e visível, preparar a
+      travessia, ler ataques anunciados, separar `boss-defeated` de `run-won`, flutuação sutil, conferir o quadro final.
+      **Segunda versão aprovada 19/10:** https://claude.ai/artifact/DXgVoUtHcjcEob5er2Q69e. Dele: _"Aprovo: de cima
+      enquanto jogo, cena viva só na chegada do chefe, vitória final e morte, véu de luz na borda, e perto com a
+      inclinação leve de hoje."_ Também dele: _"não acho q tem problema mostrar a borda"_; pausar a cena não (_"a gente
+      quer ver o inimigo chegando"_); jogo inteiro com câmera baixa fica como ideia futura. Passos da segunda versão:
+      (a) câmera de jogo em dois estados de cima: perto (a inclinação de hoje, segue a nave, pode passar da borda) e
+      aberta (quase de cima, campo inteiro e entorno; no fim da fase, ameaça fora da tela ou de vários lados, ataque
+      anunciado, travessia prevista, elite ou onda grande fora da vista; tempo mínimo); nave sempre na tela; flutuação
+      sutil na calma; reduzir movimento; (b) véu de luz nas bordas e espaço mais escuro além delas; (c) fundo de
+      estrelas sem emendas visto de baixo; (d) chegada animada de cada chefe atravessando a borda; (e) cena viva
+      (câmera lenta forte, jogador protegido e sem controle 2–3 s, câmera baixa que pode girar, sobe antes de devolver o
+      controle) só na chegada do chefe, `run-won` e morte; queda de chefe no meio = destaque curto de cima. Ordem: (a) e
+      (b) primeiro; (c) e (d) podem correr em paralelo; (e) depois deles. (4) ele joga e ajusta.
+      **(a) e (b) feitos 19/10 no mesmo ramo:** `src/core/cameraDirector.js` reescrito em dois estados (perto/aberta,
+      `?moment=near|wide` em dev), números em `src/data/constants/camera.js`; `src/modules/render3d/fieldVeil.js` (espaço
+      além da borda mais escuro, linha de luz, cortina baixa). Eventos: `wave-started`, `wave-complete`, `elite-spawned`,
+      `boss-telegraph`, `boss-spawned` (via `playArrival`, abre a vista aberta até existir a cena viva), `boss-defeated`
+      (empurrão curto de cima). A cena viva, a morte e a vitória final ainda não têm câmera própria. (c) e (d) estão
+      propostos como sessões à parte.
 - [ ] **14.3 `HUD.md`.** Tokens (cores do Anel, tipografia, escalas, espaçamentos), regras de hierarquia (o que importa
       agora é grande; o resto some até ser preciso), regras de movimento (toda mudança de valor pulsa curto; painéis
       entram e saem com easing), estados (calmo, ameaça, chefe, morte). Uma página. Todo instrumento obedece.

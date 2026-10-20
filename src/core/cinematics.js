@@ -5,20 +5,19 @@
 // distance, `tilt` is in degrees, `offsetX/offsetY` move the look-at point in
 // logical units, `wake` (0..1) lights the Ring. Both end where the follow
 // camera (or the held victory shot) takes over. The Warden's arrival is no
-// path: the follow camera itself travels (WARDEN_ARRIVAL below).
+// path: the camera director frames it (its boss entrance moment).
 
 export const INTRO_MS = 3000;
 export const EPILOGUE_MS = 4000;
 
-// The Warden's arrival, on its spawn: the follow camera travels to it
-// (camera.travelTo), holds there zoomed in and comes back, letterbox bars
-// slide in and out with it, and the world slows meanwhile. Seconds. None of
-// it under Reduced Motion; the run is never held, input stays live.
+// The Warden's arrival, on its spawn: the camera director's boss entrance
+// opens on the ship and the Warden and tilts (data/constants/camera.js),
+// letterbox bars slide in and out, and the world slows meanwhile. Seconds.
+// No bars under Reduced Motion; the run is never held, input stays live.
 export const WARDEN_ARRIVAL = Object.freeze({
-  travelIn: 0.4, // proposta 19/10: eases from the ship to the Warden
-  hold: 0.6, // proposta 19/10: stays on it
-  travelBack: 0.5, // proposta 19/10: eases back to the ship
-  zoom: 1.7, // proposta 19/10: on the Warden (the follow camera's is 1.3)
+  travelIn: 0.4, // proposta 19/10: the bars slide in
+  hold: 0.6, // proposta 19/10: they stay
+  travelBack: 0.5, // proposta 19/10: they slide out
   barHeight: 10, // proposta 19/10: each letterbox bar, % of the view
   // proposta 19/10: the world at 40 % while the camera is away (travelIn +
   // hold), back to full speed over the trip back. Replaces the entrance's

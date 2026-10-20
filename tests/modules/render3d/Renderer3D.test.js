@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_ZOOM } from '../../../src/core/camera.js';
-import { WARDEN_ARRIVAL } from '../../../src/core/cinematics.js';
+import { createCameraScene } from '../../../src/core/camera.js';
 import { EventBus } from '../../../src/core/EventBus.js';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import RandomService from '../../../src/core/RandomService.js';
@@ -42,23 +41,39 @@ describe('Renderer3D dash and brake camera', () => {
   });
 });
 
-describe('Renderer3D Warden arrival', () => {
-  it('sends the camera to the Warden, never with reduced motion or ?camera=0, and a reset brings it home', () => {
-    const warden = { x: 500, y: 250 };
+describe('Renderer3D camera director', () => {
+  const ship = { ...createCameraScene(), hasShip: true, x: 300, y: 300 };
+  const stateAfter = (renderer) => {
+    renderer.camera.update(300, 300, 1 / 60, ship);
+    return renderer.camera.moment;
+  };
+
+  it('opens wide on the Warden’s arrival, with bars only without reduced motion, never on the classic or static camera', () => {
+    const warden = { x: 500, y: 250, radius: 60 };
     const renderer = new Renderer3D();
-    renderer.applyAccessibilityPreferences({ reducedMotion: true });
-    expect(renderer.playArrival(warden)).toBe(false);
-    renderer.applyAccessibilityPreferences({ reducedMotion: false });
     renderer.camera.setMode('static');
     expect(renderer.playArrival(warden)).toBe(false);
+    renderer.camera.setMode('classic');
+    expect(renderer.playArrival(warden)).toBe(false);
     renderer.camera.setMode('dynamic');
-
+    renderer.applyAccessibilityPreferences({ reducedMotion: true });
+    // No bars, but the wide view still cuts in.
+    expect(renderer.playArrival(warden)).toBe(false);
+    expect(stateAfter(renderer)).toBe('wide');
+    renderer.applyAccessibilityPreferences({ reducedMotion: false });
     expect(renderer.playArrival(warden)).toBe(true);
-    renderer.camera.update(400, 300, WARDEN_ARRIVAL.travelIn);
-    expect(renderer.camera.zoom).toBeCloseTo(WARDEN_ARRIVAL.zoom, 6);
     renderer.onReset(); // a new run, the menu
-    renderer.camera.update(400, 300, 1 / 60);
-    expect(renderer.camera.zoom).toBeCloseTo(CAMERA_ZOOM, 6);
+    expect(stateAfter(renderer)).toBe('near');
+  });
+
+  it('opens wide when a wave starts and when a boss announces an attack', () => {
+    for (const event of ['wave-started', 'boss-telegraph']) {
+      const eventBus = new EventBus();
+      const renderer = new Renderer3D({ eventBus });
+      expect(stateAfter(renderer)).toBe('near');
+      eventBus.emit(event, { wave: 1 });
+      expect(stateAfter(renderer), event).toBe('wide');
+    }
   });
 });
 

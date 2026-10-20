@@ -1,33 +1,36 @@
-// The gameplay shot around the logical follow camera (core/camera.js): the
-// dolly, the strafe roll, the clamp to the field, the key light's shadow box
-// and the run's cinematics, posed on the perspective camera every frame.
+// The gameplay shot around the logical follow camera (core/camera.js), posed
+// on the perspective camera every frame: in the dynamic mode the camera
+// director's shot (core/cameraDirector.js, which may show past the field's
+// edge) with the strafe roll and a capped shake; in the classic mode the
+// dolly and the clamp to the field. Also the key light's shadow box and the
+// run's cinematics.
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
-import {
-  createCameraScene,
-  dampTo,
-  readCameraScene,
-} from '../../core/camera.js';
+import { createCameraScene, readCameraScene } from '../../core/camera.js';
+import { shotExtent } from '../../core/cameraShot.js';
 import {
   blendPose,
   cinematicFreezeFromUrl,
   followPose,
 } from '../../core/cinematics.js';
+import { dampTo } from '../../core/dampTo.js';
 import { IS_DEV } from '../../core/env.js';
+import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { FOV, KEY_SHADOW } from './sceneSetup.js';
 
-const TILT = (18 * Math.PI) / 180;
+const DEG = Math.PI / 180;
+const TILT = 18 * DEG;
 const TAN_V = Math.tan((FOV * Math.PI) / 360);
 const COS = Math.cos(TILT);
 const SIN = Math.sin(TILT);
 const DOLLY_TIME_CONSTANT = 0.4;
 const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
-// Camera roll on strafe (dynamic mode only, none in boss framing).
-const ROLL_MAX = (2.5 * Math.PI) / 180;
+// Camera roll on strafe, up to the director's rollMax for the moment.
 const ROLL_SMOOTH = 0.25;
+const SHAKE = CAMERA_DIRECTOR.shake;
 // A skipped or released cinematic eases back to the follow camera this long.
 const CINEMATIC_HANDBACK_MS = 500;
 const FOLLOW_POSE = followPose();
@@ -79,6 +82,10 @@ export class CameraRig {
     this.focus = { x: 0, z: 0 };
     // The shot's footprint this frame, as the logical camera's reach.
     this.reach = {};
+    // The lens the director frames with, and its shot as posed this frame.
+    this.lens = { tanV: TAN_V, aspect: 4 / 3 };
+    this.shot = { x: 0, y: 0, distance: 1, tilt: TILT, yaw: 0, roll: 0 };
+    this.extent = {};
   }
 
   reset() {
@@ -126,21 +133,40 @@ export class CameraRig {
   }
 
   // `t`: Renderer3D's WebGL kit; `snap`: the first frame (no last render).
-  updateCamera(t, player, enemies, effects, combat, dt, snap, reducedMotion) {
+  updateCamera(
+    t,
+    player,
+    enemies,
+    effects,
+    combat,
+    xpOrbs,
+    dt,
+    snap,
+    reducedMotion
+  ) {
     // Poses are interpolated by now (render → applyPoses), so is the scene.
     const position = player?.position;
+    this.lens.aspect = t.camera.aspect;
+    this.camera.setLens(this.lens);
     if (position) {
-      if (snap) {
-        this.camera.snapTo(position.x, position.y);
-      } else {
+      if (snap) this.camera.snapTo(position.x, position.y);
+      // The director lands on its first shot at once; the plain follow
+      // starts from the snap.
+      if (!snap || this.camera.mode === 'dynamic') {
         const scene = readCameraScene(
           this.cameraScene,
           player,
           combat,
-          enemies
+          enemies,
+          xpOrbs
         );
         this.camera.update(position.x, position.y, dt, scene);
       }
+    }
+    const directed = this.camera.directed;
+    if (directed) {
+      this.poseDirected(t, player, effects, directed, dt, reducedMotion);
+      return;
     }
 
     // Dolly: out at speed, in when something is close (smoothed).
@@ -191,9 +217,61 @@ export class CameraRig {
     this.focus.x = tx;
     this.focus.z = tz;
     this.aimKeyShadow(t, tx, tz, range);
-    const roll = this.updateRoll(player, dt, reducedMotion);
+    const roll = this.updateRoll(player, dt, reducedMotion, 0);
     const angle = roll + (shaking ? shake.angle : 0);
     if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
+  }
+
+  // The director's shot (which may show past the field's edge) with its calm
+  // lean, the strafe roll and the shake (capped, none under reduced motion);
+  // then a running cinematic poses relative to it, as in the classic shot.
+  poseDirected(t, player, effects, directed, dt, reducedMotion) {
+    const shot = this.shot;
+    const roll = this.updateRoll(player, dt, reducedMotion, directed.rollMax);
+    const shake = effects?.screenShake;
+    const shaking = !reducedMotion && shake && shake.trauma > 0.001;
+    const zoom = this.camera.effectiveZoom;
+    const cap = (v, max) => Math.max(-max, Math.min(max, v));
+    shot.x =
+      directed.x - (shaking ? cap(shake.offsetX / zoom, SHAKE.maxOffset) : 0);
+    shot.y =
+      directed.y - (shaking ? cap(shake.offsetY / zoom, SHAKE.maxOffset) : 0);
+    shot.distance = directed.distance;
+    shot.tilt = directed.tilt;
+    shot.yaw = directed.yaw;
+    shot.roll =
+      directed.roll +
+      roll +
+      (shaking ? cap(shake.angle, SHAKE.maxAngle * DEG) : 0);
+
+    // The logical camera's reach and position, for getView and the space.
+    const e = shotExtent(shot.distance, shot, this.lens, this.extent);
+    this.reach.halfWidth = Math.max(e.left, e.right);
+    this.reach.up = e.up;
+    this.reach.down = e.down;
+    this.camera.setReach(this.reach);
+    this.camera.x = shot.x;
+    this.camera.y = shot.y;
+
+    const cine = this.cinematicPose(performance.now());
+    const tilt = cine ? cine.tilt * DEG : shot.tilt;
+    const yaw = cine ? 0 : shot.yaw;
+    const range = shot.distance * (cine ? cine.distance : 1);
+    const tx = shot.x - HALF_W + (cine ? cine.offsetX : 0);
+    const tz = shot.y - HALF_H + (cine ? cine.offsetY : 0);
+    t.backdrop.setWake(cine ? cine.wake : 0);
+    const across = range * Math.sin(tilt);
+    t.camera.position.set(
+      tx - across * Math.sin(yaw),
+      range * Math.cos(tilt),
+      tz + across * Math.cos(yaw)
+    );
+    t.camera.up.set(Math.sin(yaw), 0, -Math.cos(yaw));
+    t.camera.lookAt(tx, 0, tz);
+    this.focus.x = tx;
+    this.focus.z = tz;
+    this.aimKeyShadow(t, tx, tz, range);
+    if (Math.abs(shot.roll) > 0.0001) t.camera.rotateZ(shot.roll);
   }
 
   // The shot's distance this frame: far enough that the plane shows the flat
@@ -236,18 +314,13 @@ export class CameraRig {
     }
   }
 
-  // Banks the view up to ROLL_MAX with the strafe: the screen-horizontal
-  // part of the ship's sideways velocity. Not in classic/static, boss
-  // framing, cinematics or reduced motion.
-  updateRoll(player, dt, reducedMotion) {
+  // Banks the view up to `rollMax` with the strafe: the screen-horizontal
+  // part of the ship's sideways velocity. Not in cinematics or reduced
+  // motion; the classic and static shots pass 0.
+  updateRoll(player, dt, reducedMotion, rollMax) {
     let goal = 0;
     const v = player?.velocity;
-    if (
-      v &&
-      this.camera.mode === 'dynamic' &&
-      !this.cinematic &&
-      !reducedMotion
-    ) {
+    if (v && rollMax > 0 && !this.cinematic && !reducedMotion) {
       const angle = player.angle || 0;
       const sin = Math.sin(angle);
       const lateral = -v.vx * sin + v.vy * Math.cos(angle);
@@ -255,7 +328,7 @@ export class CameraRig {
         -1,
         Math.min(1, (-sin * lateral) / SHIP_MAX_SPEED)
       );
-      goal = -ROLL_MAX * strafe * (1 - this.camera.frameWeight);
+      goal = -rollMax * strafe;
     }
     return dampTo(this.roll, goal, ROLL_SMOOTH, dt);
   }
