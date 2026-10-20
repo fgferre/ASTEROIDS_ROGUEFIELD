@@ -39,12 +39,16 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
   pausada e 3 pickups novos; HUD em encaixes com modelos (Instrumento novo e Clássico de hoje) e presets, escudo/casco
   na cápsula que ele escolheu, radar tático, editor de layout estilo WoW; telas novas de level-up, baú e fim de
   partida; 4 armas novas com evolução e Apex próprios (Arc Caster, Shard Halo, Furnace Corona, Seeker Swarm); 6
-  inimigos e 4 formações de onda; o Anel como estrutura iluminada. Tudo proposta: falta ele jogar.
-- **Esperando ele:** jogar `r15/jogar` (http://localhost:5500/ASTEROIDS_ROGUEFIELD/); escolher os sons do motor na
-  bancada (`src/exported-assets/engine-bench/`, git-ignored; o modelo do motor está em `engine-model.js` lá);
-  aprovar o Anel em 3D completo (em andamento, ramo `r15/anel3d`).
-- **Próximo, nesta ordem:** juntar o que ele aprovar na `main` por PR; motor da nave no jogo a partir das escolhas
-  dele; sons das armas, pickups e baú novos (audição); mais armas (7 → 12+) e inimigos (16 → 30+), mini-chefes,
+  inimigos e 4 formações de onda; o Anel como estrutura iluminada e agora 3D de todos os lados (peças com nível de
+  detalhe; cena `?scene=ring` em dev para orbitar); o motor da nave com as camadas que ele escolheu na bancada
+  (turbine D, roar D, sub A, harmonic B, crackle C, puff D, ignition A, cutoff B, dash C, brake C), revisado pelo
+  ChatGPT (gpt-6.1-sol) e com os 4 defeitos achados corrigidos; as correções das duas revisões (jogo e telas). Tudo
+  proposta: falta ele jogar.
+- **Esperando ele:** jogar `r15/jogar` (http://localhost:5500/ASTEROIDS_ROGUEFIELD/) e julgar: o motor (quantas
+  cartas de propulsão abrem cada camada; o dash ficou mais alto que o antigo; o motor se acalma na velocidade máxima, de
+  propósito); as cores do modo daltônico; e decidir se o acabamento de perto do Anel (textura, sombras, janelas acesas)
+  vem agora ou com a fase da viagem até ele (de perto ainda parece caixa cinza lisa).
+- **Próximo, nesta ordem:** juntar o que ele aprovar na `main` por PR; sons das armas, pickups e baú novos (audição); mais armas (7 → 12+) e inimigos (16 → 30+), mini-chefes,
   biomas (3 → 6), cascos com habilidade ativa; meta (desbloqueios, desafios); ritmo; cerimônias de evolução, cenas de
   morte/vitória, três finais; o roteiro (item 19) numa conversa nova.
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
