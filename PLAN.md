@@ -153,27 +153,68 @@ aspect)` (`cameraRig.js` ~136-150, 226-249): basta o canvas tomar a janela e a c
 implementados a partir de maquetes que ele aprovou; menu/Hangar/Códice na mesma linguagem; as duas guardas no gate;
 golden trace verde. **Fora de escopo:** conteúdo novo (Rodada 15).
 
+## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
+
+Dele (20/10): _"tudo está rodando liso, não precisa medir nada. Temos que agora focar em melhorar o projeto de todas as
+formas possíveis: falta conteúdo, problemas de HUD, layout, UX, lógica dos upgrades, oportunidades que melhorem a
+experiência, problemas de lógica nos upgrade paths, no sistema de orbes, loot, etc."_ / _"O som do jogo (SFX) precisa
+renascer do zero praticamente, tudo muito ruim também."_ Esta rodada absorve o resto da 14 (HUD 14.3–14.7 e a cena viva
+de morte/vitória). Frentes em ordem de impacto sentido; 1 e 2 correm em paralelo (arquivos disjuntos). Cada fatia = um
+commit, golden trace verde, captura (ou audição), e veredito curto dele quando for gosto. Até cinco ajudantes em
+paralelo, em arquivos disjuntos.
+
+1. **Economia da run e lógica dos upgrades.** Auditar a matemática: cartas por run (curva de XP × 15 camadas) contra
+   o que uma build precisa (sinergia em 3, Apex em 5 — hoje poucas runs chegam ao Apex); ofertas que constroem
+   identidade cedo (as três primeiras escolhas moldam a run); escolha de arma garantida (hoje a arma vem de carta
+   aleatória, e uma run pode nunca ver uma); evoluções ligadas à arma, não só à família; raridades reais (comum/
+   incomum/rara/épica) e pesos por camada; cartas que não entregam (conferir cada uma jogando a cena `?content=`);
+   tela de level-up mostrando o que cada carta completa ("esta fecha Afterburn").
+2. **SFX renascido.** Hoje todo efeito é sintetizado em código; impacto, tiro, explosão e interface assim nunca chegam a
+   som de jogo profissional. Híbrido: **amostras de verdade** para todo evento (tiros, impactos, explosões, escudo,
+   pickups, cartas, interface, vozes dos Wardens) — biblioteca CC0 curada e/ou sons gerados por IA que ele aprove, com
+   licença anotada em `docs/creditos-audio.md`; 3–5 variações por evento, sorteio sem repetição, variação leve de tom e
+   volume, prioridade e limite de vozes; a infraestrutura de mix existente (barramentos, limitador, reverb, ducking, pan
+   e distância) fica. Procedural só no contínuo (propulsor, zumbidos) e na música (stems em arquivo se ele reclamar).
+   `SOUND.md` de uma página (paleta por família, regras de mix, orçamento de vozes e de MB, carregados no warm-up).
+   **Página de audição `?sound=`** com candidatos A/B/C por evento: só entra o que ele escolher. Mix final com ele
+   jogando. Decisão dele (20/10): o jogo passa a carregar arquivos de áudio (a regra "sem assets externos" cai para o
+   som).
+3. **Loot e orbes como momentos.** Baús no campo (abrem com cerimônia; dão 1, 3 ou 5 cartas/evoluções como no Vampire
+   Survivors); pickups com variedade (hoje 3) e frequência com curva; orbes com velocidade e peso (hoje caem em anel),
+   ímã e fusão legíveis, valor por cor; moeda em jogo além do Salvage no fim; Leech e Caster já interagem com isso.
+4. **HUD, layout e UX** (= 14.3–14.7): `HUD.md`, radar tático por maquete aprovada, recargas na nave, barras e chips com
+   hierarquia e pulso, barra de chefe, feed; menu/Hangar/Códice/Settings na mesma linguagem; level-up e recap
+   reescritos; legibilidade com 200 inimigos; guardas no gate (orçamento de quadro, capturas de referência).
+5. **Conteúdo (a fábrica já paga por isso).** Armas primeiro (3 → 12+, cada uma com evolução e Apex próprios e som
+   próprio), depois inimigos (10 → 30+, com papéis e **formações de onda**: anel que fecha, linha que varre, enxame,
+   parede), mini-chefes entre Wardens, biomas (3 → 6) com segredos, eventos e chefe próprio; cascos com habilidade
+   ativa única (hoje só stats); runs de 20–30 min com centenas de inimigos; infinito que escala.
+6. **Meta que atravessa dias.** Árvore de desbloqueios (conquistas → armas, cascos, fases, modificadores), desafios
+   diários/semanais com modificadores, seleção de fase/bioma, perfil exportável (hoje só localStorage).
+7. **Ritmo e dificuldade.** Curva do chefe (item 2), surtos com Elite, objetivos de meio de run (sobreviver ao evento,
+   destruir estrutura, escoltar), curva de perigo visível, presets conferidos jogando.
+8. **Cerimônias e cenas.** Evolução e Apex com cerimônia (hoje um toast); cena viva de morte e vitória final; três
+   finais (Prime, Choir, Null) com fala e imagem próprias; Anel partido modelado (item 15).
+
+**Pronto quando ele disser** que uma run inteira (20–30 min) prende do início ao fim, que o som e o painel estão à
+altura do jogo, e que volta no dia seguinte para desbloquear mais. **Guardas:** golden trace verde; teto de 1.200
+linhas; conteúdo só pelo `CONTENT.md`; nada de medir desempenho por iniciativa própria (ele disse que roda liso);
+maquete antes de código em interface e câmera; audição antes de código no som.
+
 ## Goal para a próxima conversa (redigido 20/10; colar no `/goal` depois de ela ler o bastão e este plano)
 
-> Fechar a Rodada 14 do Asteroid Roguefield seguindo o PLAN.md e o bastão de docs/PENDENCIAS.md. Primeiro o que depende
-> do dono: ele mede a janela inteira na tela dele (fps da horda em Retina; um teto de pixels por preset é decisão dele)
-> e joga a câmera de dois estados e as chegadas dos Wardens; o que ele disser entra em PENDENCIAS nas palavras dele.
-> Depois a cena viva de morte e de vitória final (passo e da câmera), e o HUD de instrumento: HUD.md com tokens,
-> hierarquia, movimento e estados; cada instrumento refeito a partir de maquete que ele aprova, começando pelo radar
-> tático que acompanha o zoom da câmera nova; recargas ancoradas na nave, barras e chips com hierarquia e pulso, barra
-> de chefe, feed; menu, Hangar, Códice e Settings na mesma linguagem; legibilidade com 200 inimigos; orçamento de quadro
-> por cena e capturas de referência no gate. Liberdade no estilo e no movimento; os critérios de pronto do PLAN e o
-> golden trace verde não se negociam; "menos é mais" vale para o HUD como valeu para a câmera. Quando a 14 fechar, a
-> Rodada 15 (longevidade) começa com o texto que já está neste plano.
-
-## Rodada 15 (próxima; texto do goal já redigido) — longevidade
-
-Longevidade estilo Vampire Survivors sobre a fábrica e sobre o HUD novo: 12+ armas com evolução e Apex próprios, 30+
-inimigos com papéis distintos, 6 biomas com segredos, eventos e chefes próprios, roster de cascos com habilidade única,
-árvore de desbloqueios e desafios que atravessam dias, runs de 20–30 min com centenas de inimigos a 60 fps, infinito
-que escala; qualidade por padrão mais alta (volumetria, feixes na poeira, Anel partido modelado, herói e chefes com
-material de próxima geração). Cada item novo é um brief "adicione X seguindo CONTENT.md"; até cinco ajudantes em
-paralelo; números são proposta; ele joga.
+> Melhorar o Asteroid Roguefield de todas as formas que o jogador sente, seguindo a Rodada 15 do PLAN.md e o bastão de
+> docs/PENDENCIAS.md, nesta ordem (1 e 2 em paralelo): economia da run e lógica dos upgrades (cartas por run,
+> identidade cedo, arma garantida, evoluções por arma, raridades reais, cartas que não entregam); SFX renascido do zero
+> com amostras de verdade escolhidas pelo dono numa página de audição, SOUND.md e mix com ele jogando; loot e orbes
+> como momentos (baús com cerimônia, pickups variados, orbes com peso, moeda em jogo); HUD, layout e UX (HUD.md, radar
+> tático e instrumentos por maquete aprovada, menus na mesma linguagem, level-up e recap, legibilidade em horda,
+> guardas no gate); conteúdo pela fábrica (12+ armas com evolução e som próprios, 30+ inimigos com formações de onda,
+> mini-chefes, 6 biomas, cascos com habilidade ativa); meta que atravessa dias (árvore de desbloqueios, desafios,
+> seleção de fase, perfil exportável); ritmo e dificuldade; cerimônias de evolução, cenas de morte e vitória, três
+> finais, Anel modelado. Liberdade no como; guardas inegociáveis: golden trace verde, teto de linhas, conteúdo só pelo
+> CONTENT.md, maquete antes de código em interface e câmera, audição antes de código no som, números como proposta e
+> o dono julgando jogando; não medir desempenho por iniciativa própria.
 
 ## Decisões já tomadas
 
