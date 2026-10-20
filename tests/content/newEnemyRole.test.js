@@ -40,13 +40,20 @@ function spawnsOn(n, plan = n) {
   const spawnWave = vi.fn();
   const schedule = new LayerSchedule({
     eventBus: { emit: () => {} },
-    spawner: { waveRandom, spawnWave, spawnDelayMultiplier: 1 },
+    spawner: {
+      waveRandom,
+      spawnWave,
+      spawnDelayMultiplier: 1,
+      formationPoints: () => ({ edge: null, points: [] }),
+    },
     layerEvents: { updateFieldEvents: () => {}, startFieldEvent: () => {} },
     getLayer: () => n,
     isFieldEmpty: () => false,
     checkWaveCompletion: () => {},
   });
   schedule.layerSchedule = schedule.buildLayerSchedule(directorFor(plan));
+  // the second step brings the formations their first one warned of
+  schedule.updateLayerSchedule(1e6);
   schedule.updateLayerSchedule(1e6);
   const kinds = spawnWave.mock.calls.flatMap(([{ enemies }]) =>
     enemies.flatMap(({ type, count }) => Array(count).fill(type))

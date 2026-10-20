@@ -7,7 +7,6 @@ import {
 import {
   killerName,
   runLocationLine,
-  transmissionQuoteMarkup,
 } from '../../../src/modules/ui/runRecap.js';
 
 describe('death recap', () => {
@@ -82,15 +81,5 @@ describe('death recap', () => {
     expect(runLocationLine(9, 462, 17)).toBe(
       'Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE · BEST LAYER 17'
     );
-  });
-
-  it('quotes the last transmission under its banner label, or nothing', () => {
-    const quote = transmissionQuoteMarkup({
-      speaker: 'WARDEN PRIME',
-      text: 'Ember extinguished.',
-    });
-    expect(quote).toContain('▌TRANSMISSION — WARDEN PRIME');
-    expect(quote).toContain('Ember extinguished.');
-    expect(transmissionQuoteMarkup(null)).toBe('');
   });
 });

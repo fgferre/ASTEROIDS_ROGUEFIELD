@@ -4,7 +4,8 @@ import {
   PROGRESSION_COMBO_TIMEOUT,
   PROGRESSION_COMBO_MULTIPLIER_STEP,
   PROGRESSION_COMBO_MULTIPLIER_CAP,
-  PROGRESSION_LEVEL_SCALING,
+  PROGRESSION_LEVEL_COST_STEP,
+  PROGRESSION_LEVEL_COST_POWER,
   PROGRESSION_UPGRADE_ROLL_COUNT,
   LEVEL_UP_SCREEN_DELAY_SECONDS,
 } from '../core/GameConstants.js';
@@ -48,12 +49,7 @@ class ProgressionSystem extends UpgradeSystem {
       : 1;
     this.level = Math.max(1, initialLevel);
     this.experience = 0;
-    const initialRequirement = Number.isFinite(
-      PROGRESSION_INITIAL_XP_REQUIREMENT
-    )
-      ? PROGRESSION_INITIAL_XP_REQUIREMENT
-      : 100;
-    this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
+    this.experienceToNext = this.levelCost(this.level);
     this.totalExperience = 0;
     this.pendingLevelUpScreens = [];
     this.levelUpScreenTimer = 0;
@@ -84,11 +80,6 @@ class ProgressionSystem extends UpgradeSystem {
     this.playerService = null;
     this.uiService = null;
     this.effectsService = null;
-
-    const levelScaling = Number.isFinite(PROGRESSION_LEVEL_SCALING)
-      ? PROGRESSION_LEVEL_SCALING
-      : 1;
-    this.levelScaling = Math.max(1, levelScaling);
 
     this.refreshInjectedServices({ force: true });
   }
@@ -383,7 +374,8 @@ class ProgressionSystem extends UpgradeSystem {
 
     const level = this.pendingLevelUpScreens.shift();
     const { options, poolSize, totalDefinitions } = this.prepareUpgradeOptions(
-      PROGRESSION_UPGRADE_ROLL_COUNT
+      PROGRESSION_UPGRADE_ROLL_COUNT,
+      { level }
     );
     this.eventBus?.emit?.('upgrade-options-ready', {
       level,
@@ -397,12 +389,20 @@ class ProgressionSystem extends UpgradeSystem {
     return true;
   }
 
+  // XP from `level` to the next: the initial requirement, plus a step that
+  // grows gently with the level (GameConstants, proposta 20/10).
+  levelCost(level) {
+    return Math.floor(
+      PROGRESSION_INITIAL_XP_REQUIREMENT +
+        PROGRESSION_LEVEL_COST_STEP *
+          Math.max(0, level - 1) ** PROGRESSION_LEVEL_COST_POWER
+    );
+  }
+
   applyLevelUp() {
     this.level += 1;
     const previousRequirement = this.experienceToNext;
-    this.experienceToNext = Math.floor(
-      this.experienceToNext * this.levelScaling
-    );
+    this.experienceToNext = this.levelCost(this.level);
 
     return {
       level: this.level,
@@ -472,12 +472,7 @@ class ProgressionSystem extends UpgradeSystem {
       : 1;
     this.level = Math.max(1, initialLevel);
     this.experience = 0;
-    const initialRequirement = Number.isFinite(
-      PROGRESSION_INITIAL_XP_REQUIREMENT
-    )
-      ? PROGRESSION_INITIAL_XP_REQUIREMENT
-      : 100;
-    this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
+    this.experienceToNext = this.levelCost(this.level);
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.activeSynergies.clear();

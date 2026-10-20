@@ -12,6 +12,7 @@ import CombatSystem from '../../src/modules/CombatSystem.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
+import { fireBeam, fireFan } from '../../src/modules/combat/beamAndFan.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
 import { TURRET_BARREL_LENGTH } from '../../src/data/constants/physics.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
@@ -93,8 +94,10 @@ function lockOnMany(combat, eventBus, multishot) {
   expect(combat.currentTargetLocks).toHaveLength(multishot);
 }
 
+// A lance round, as Projectiles fires it.
 const lance = (overrides = {}) => ({
   kind: 'lance',
+  projectile: WEAPONS.lance.projectile,
   x: 0,
   y: 0,
   vx: 1,
@@ -379,7 +382,8 @@ describe('Scatter Coil', () => {
 
     // Fewer bolts than locks: one bolt each for the first locks.
     combat.bullets = [];
-    combat.weapons.fireFan(
+    fireFan(
+      combat.weapons,
       { ...FAN, bolts: 2, maxBolts: 2 },
       { x: 100, y: 300 },
       { multishot: 1, damage: DAMAGE }
@@ -398,7 +402,8 @@ describe('Scatter Coil', () => {
   it('a fan of one bolt flies along the aim', () => {
     const { combat } = scatter([]);
 
-    combat.weapons.fireFan(
+    fireFan(
+      combat.weapons,
       { ...FAN, bolts: 1 },
       { x: 100, y: 300 },
       { multishot: 1, damage: DAMAGE }
@@ -520,7 +525,7 @@ describe('multi-lock turret layers', () => {
 
     // The beams stay on their layers' barrels while they show.
     ({ combat, tips } = locked('harmonic'));
-    combat.weapons.fireBeam(BEAM, { x: 100, y: 300 }, STATS);
+    fireBeam(combat.weapons, BEAM, { x: 100, y: 300 }, STATS);
     expectFrom(combat.beams, tips);
     combat.updateWeaponEffects(1 / 60);
     expectFrom(combat.beams, tips);

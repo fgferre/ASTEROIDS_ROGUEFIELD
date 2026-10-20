@@ -1,30 +1,32 @@
-// Maneuver cards (R12; numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
+// Dash-fed turret (numbers: proposta 20/10): for `duration` s after each
+// dash the cannon's cooldown is × `cooldownMultiplier`.
 export default {
   id: 'gyro_servos',
   order: 28,
-  category: 'mobility',
+  category: 'offense',
   family: 'maneuver',
   rarity: 'common',
   icon: '🔄',
   themeColor: PALETTE.boss,
   unlockLevel: 1,
-  tags: ['turret', 'aim'],
+  tags: ['dash', 'fire-rate'],
   text: {
     name: 'Gyro Servos',
-    summary: 'Faster turret motors: the gun swings onto a new target sooner.',
+    summary:
+      'The dash spins up the turret gyros, and the gun runs hot while they wind down.',
     lore: 'Lifted from a Warden gun mount. It still twitches toward movement.',
     levels: [
       {
         title: 'Fast Servos',
-        description: 'Turret turn speed +25%.',
-        highlights: ['Quicker swings onto targets behind you.'],
+        description: 'After each dash, fire rate +40% for 1 s.',
+        highlights: ['Dash into the fight, not away from it.'],
       },
       {
         title: 'Gyro Lock',
-        description: 'Turret turn speed +50% (cumulative).',
-        highlights: ['The gun is where you look.'],
+        description: 'After each dash, fire rate +80% for 1.5 s.',
+        highlights: ['With a short dash cooldown the gun never cools.'],
       },
     ],
   },
@@ -34,8 +36,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-turret-turn',
-          payload: { multiplier: 1.25 },
+          event: 'upgrade-dash-fire',
+          payload: { cooldownMultiplier: 1 / 1.4, duration: 1 }, // proposta 20/10
         },
       ],
     },
@@ -44,8 +46,8 @@ export default {
       effects: [
         {
           type: 'event',
-          event: 'upgrade-turret-turn',
-          payload: { multiplier: 1.2 }, // Total: 1.50
+          event: 'upgrade-dash-fire',
+          payload: { cooldownMultiplier: 1 / 1.8, duration: 1.5 }, // proposta 20/10
         },
       ],
     },

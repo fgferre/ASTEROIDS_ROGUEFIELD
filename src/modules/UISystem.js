@@ -16,10 +16,16 @@ import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { LevelUpScreen } from './ui/LevelUpScreen.js';
+import { ChestCeremony } from './ui/ChestCeremony.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
 import { TacticalHud } from './ui/TacticalHud.js';
+import { HudEditor } from './ui/hud/editor/HudEditor.js';
+import {
+  activePreset,
+  instrumentCatalog,
+} from './ui/hud/editor/layoutStore.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { HangarScreen } from './ui/HangarScreen.js';
 import { CodexScreen } from './ui/CodexScreen.js';
@@ -41,6 +47,8 @@ import {
   GAMEPAD_NAV_SCREENS,
   pickFocusTarget,
 } from './ui/gamepadNav.js';
+
+const STEP_ACTIONS = new Set(['up', 'down', 'left', 'right']);
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -118,9 +126,27 @@ class UISystem extends BaseSystem {
       enemies: () => this.getService('enemies'),
       progression: () => this.getService('progression'),
       combat: () => this.getService('combat'),
-      physics: () => this.getService('physics'),
       pickups: () => this.getService('pickups'),
+      xpOrbs: () => this.getService('xp-orbs'),
       renderer: () => this.getService('renderer'),
+      shieldKey: () => {
+        const device = this.getService('input').getActiveDevice();
+        return this.settingsPanel.formatBindingLabel(
+          this.settings?.getSetting('controls', 'activateShield')?.[
+            device
+          ]?.[0],
+          device
+        );
+      },
+    });
+    this.hudEditor = new HudEditor({
+      hud: () => this.tacticalHud.layout,
+      settings: this.settings,
+      setLayout: (items) => this.tacticalHud.setLayout(items),
+      refresh: () => this.tacticalHud.refreshHudFromServices(true),
+      wardenLive: () =>
+        Boolean(this.tacticalHud.layout?.slotState('warden')?.active),
+      device: () => this.getService('input').getActiveDevice(),
     });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
@@ -132,16 +158,27 @@ class UISystem extends BaseSystem {
         this.emitOverlayVisibilityChanged('settings', isOpen, payload),
       setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
+      openHudEditor: () => this.openHudEditor(),
     });
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
       progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
       showCardsTip: () => this.showOnboardingCardsTip(),
       prefersReducedMotion: () => this.prefersReducedMotion(),
-      colorVision: () => this.settingsPanel.colorVision,
+      previewBuild: (card) => this.tacticalHud.layout?.previewBuildCard(card),
+    });
+    this.chestCeremony = new ChestCeremony({
+      refs: this.domRefs.chest,
+      progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
+      showScreen: (name, options) => this.showScreen(name, options),
+      showGameUI: () => this.showGameUI(),
+      cardChoiceOpen: () => this.levelUpScreen.levelUpState.isVisible,
+      prefersReducedMotion: () => this.prefersReducedMotion(),
     });
     this.pauseScreen = new PauseScreen({
       refs: this.domRefs.pause,
@@ -154,6 +191,7 @@ class UISystem extends BaseSystem {
       layer: () => this.transmissionLayer,
       settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
       closeSettings: () => this.settingsPanel.closeSettingsPanel(),
+      openHudEditor: () => this.openHudEditor(),
     });
     this.runEndScreens = new RunEndScreens({
       refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
@@ -207,7 +245,10 @@ class UISystem extends BaseSystem {
       this.resolveSettingsService()?.getCategoryValues('controls')?.hullControl
     );
 
-    // Direct AAA HUD Activation
+    // Direct AAA HUD Activation, in the HUD Layout setting's layout
+    this.followHudLayout(
+      this.resolveSettingsService()?.getCategoryValues('video')
+    );
     this.tacticalHud.activateAAATacticalHud();
     if (this.tacticalHud.layout) {
       this.transmissions = new TransmissionQueue(
@@ -226,6 +267,7 @@ class UISystem extends BaseSystem {
     this.pauseScreen.bindPauseControls();
     this.runEndScreens.bindCopySeedLink();
     this.levelUpScreen.bindLevelUpControls();
+    this.chestCeremony.bindControls();
     this.settingsPanel.bindSettingsControls();
     this.creditsOverlay.bindCreditsControls();
     this.codexScreen.bindCodexControls();
@@ -240,6 +282,50 @@ class UISystem extends BaseSystem {
 
   getService(name) {
     return resolveService(name, this.dependencies);
+  }
+
+  /** The HUD Layout setting's layout on the HUD; the editor owns it while open. */
+  followHudLayout(video) {
+    if (!this.hudEditor.isOpen) {
+      this.tacticalHud.setLayout(
+        activePreset(video, instrumentCatalog()).items
+      );
+    }
+  }
+
+  /**
+   * Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
+   * editor over a paused run's HUD, or over the idle field from the menu;
+   * the screens it covers come back when it closes.
+   */
+  openHudEditor() {
+    if (this.hudEditor.isOpen || !this.tacticalHud.layout) {
+      return;
+    }
+    const { settingsState } = this.settingsPanel;
+    const settingsFrom = settingsState.isOpen ? settingsState.source : null;
+    const inRun = this.getService('game-state').getScreen() === 'playing';
+    const pause = document.getElementById('pause-screen');
+    const menu = document.getElementById('menu-screen');
+    const gameUI = document.getElementById('game-ui');
+    this.settingsPanel.closeSettingsPanel();
+    pause.classList.add('hidden');
+    if (!inRun) {
+      menu.classList.add('hidden');
+      gameUI.classList.remove('hidden');
+    }
+    this.hudEditor.open({
+      onClose: () => {
+        if (inRun) {
+          pause.classList.toggle('hidden', !this.pauseScreen.currentPauseState);
+        } else {
+          gameUI.classList.add('hidden');
+          menu.classList.remove('hidden');
+        }
+        if (settingsFrom) this.settingsPanel.openSettingsPanel(settingsFrom);
+        else this.domRefs.pause.editHudBtn?.focus({ preventScroll: true });
+      },
+    });
   }
 
   resolveSettingsService() {
@@ -371,6 +457,7 @@ class UISystem extends BaseSystem {
       }
       this.pilotDown = true;
       // Cards dealt on the step the ship died close: the death plays out.
+      this.chestCeremony.clear();
       if (this.levelUpScreen.levelUpState.isVisible) {
         this.showGameUI();
       }
@@ -449,6 +536,15 @@ class UISystem extends BaseSystem {
       this.tacticalHud.onPickupCollected(payload);
     });
 
+    // A chest's cards, shown once it has given them all (ui/ChestCeremony.js).
+    this.registerEventListener('chest-card', (payload) => {
+      this.chestCeremony.addCard(payload);
+    });
+    this.registerEventListener('chest-spent', () => {
+      if (this.runWon || this.pilotDown) return;
+      this.chestCeremony.chestSpent();
+    });
+
     this.registerEventListener('achievement-unlocked', (payload) => {
       this.tacticalHud.onAchievementUnlocked(payload);
     });
@@ -458,6 +554,15 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
+      // The pad's Start resumes from anywhere: the editor keeps the run
+      // paused and asks before it closes.
+      if (this.hudEditor.isOpen) {
+        if (!data?.isPaused) {
+          queueMicrotask(() => this.eventBus.emit('toggle-pause'));
+          this.hudEditor.requestClose();
+        }
+        return;
+      }
       this.pauseScreen.updatePauseScreen(Boolean(data?.isPaused));
     });
 
@@ -479,6 +584,10 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('toggle-pause', () => {
+      // The HUD editor holds the pause screen (pause-state-changed below).
+      if (this.hudEditor.isOpen) {
+        return;
+      }
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
         this.pauseScreen.updatePauseScreen(Boolean(appState.isPaused()));
@@ -497,6 +606,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
@@ -508,6 +618,8 @@ class UISystem extends BaseSystem {
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.pilotDown = false;
+      this.chestCeremony.clear();
+      this.runEndScreens.noteRunStart();
       this.transmissions?.clear();
       this.cinematics.stop();
       // After startNewRun has unpaused: the intro holds the first step.
@@ -577,6 +689,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('settings-visual-changed', (payload = {}) => {
       this.settingsPanel.handleVisualPreferencesChange(payload);
+      this.followHudLayout(payload.values?.video);
     });
 
     this.registerEventListener('key-pressed', (payload) => {
@@ -593,6 +706,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('input-confirmed', () => {
       this.levelUpScreen.handleLevelUpConfirm();
+      this.chestCeremony.continue();
     });
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
@@ -630,6 +744,17 @@ class UISystem extends BaseSystem {
    * confirm bindings).
    */
   handleGamepadNav(action) {
+    // The HUD editor drives its instruments; its dialogs and panels move
+    // the focus like any screen.
+    if (this.hudEditor.isOpen) {
+      const root = this.hudEditor.navRoot;
+      if (root && (STEP_ACTIONS.has(action) || action === 'confirm')) {
+        this.navigateFocus(root, action);
+      } else {
+        this.hudEditor.handlePadNav(action);
+      }
+      return;
+    }
     const screen = this.getGamepadNavScreen();
     if (!screen || this.settingsPanel.capturing) {
       return;
@@ -646,17 +771,9 @@ class UISystem extends BaseSystem {
       case 'down':
       case 'left':
       case 'right':
-        this.moveGamepadFocus(element, action);
+      case 'confirm':
+        this.navigateFocus(element, action);
         break;
-      case 'confirm': {
-        const active = document.activeElement;
-        if (active && element.contains(active) && active !== element) {
-          active.click();
-        } else {
-          this.moveGamepadFocus(element, null);
-        }
-        break;
-      }
       case 'back':
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
         else if (id === 'codex') this.codexScreen.closeCodex();
@@ -677,6 +794,20 @@ class UISystem extends BaseSystem {
       }
       default:
         break;
+    }
+  }
+
+  /** A d-pad move or A in `root`: the focus moves, or the focused control is pressed. */
+  navigateFocus(root, action) {
+    if (action !== 'confirm') {
+      this.moveGamepadFocus(root, action);
+      return;
+    }
+    const active = document.activeElement;
+    if (active && root.contains(active) && active !== root) {
+      active.click();
+    } else {
+      this.moveGamepadFocus(root, null);
     }
   }
 
@@ -758,6 +889,16 @@ class UISystem extends BaseSystem {
     });
   }
 
+  /**
+   * After each drawn frame (app.js), paused too: the HUD on field points
+   * (the hull ring, the recharges, edge arrows, damage arcs) and the
+   * editor's frames for the on-ship ones, where this frame drew them.
+   */
+  placeOnField() {
+    this.tacticalHud.placeOnField();
+    this.hudEditor.followShip();
+  }
+
   update(deltaTime) {
     this.tacticalHud.update(deltaTime);
     if (this.onboarding.current) {
@@ -781,8 +922,8 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (screenName === 'levelup') {
-      this.showScreen('levelup', {
+    if (screenName === 'levelup' || screenName === 'chest') {
+      this.showScreen(screenName, {
         overlay: true,
         show: true,
         emitEvent: false,
@@ -817,10 +958,11 @@ class UISystem extends BaseSystem {
           target.classList.toggle('hidden', !show);
         }
 
-        // Keep game-ui visible for pause, level-up and gameover overlays
+        // Keep game-ui visible for pause, card and run end overlays
         if (
           (screenName === 'pause' ||
             screenName === 'levelup' ||
+            screenName === 'chest' ||
             screenName === 'gameover' ||
             screenName === 'victory') &&
           show
@@ -830,7 +972,11 @@ class UISystem extends BaseSystem {
         }
 
         // The session service pauses the game on any non-'playing' screen.
-        if (screenName === 'levelup' && show && emitEvent) {
+        if (
+          (screenName === 'levelup' || screenName === 'chest') &&
+          show &&
+          emitEvent
+        ) {
           this.eventBus?.emit?.('screen-changed', { screen: screenName });
         }
         return;
@@ -884,13 +1030,17 @@ class UISystem extends BaseSystem {
     }
   }
 
-  /** Back to play; several level-ups at once deal their card choices first. */
+  /**
+   * Back to play; several level-ups at once deal their card choices first,
+   * then a chest waiting shows its cards.
+   */
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
     if (
       !this.runWon &&
       !this.pilotDown &&
-      this.getService('progression').openNextLevelUpOffer()
+      (this.getService('progression').openNextLevelUpOffer() ||
+        this.chestCeremony.openNext())
     ) {
       return;
     }

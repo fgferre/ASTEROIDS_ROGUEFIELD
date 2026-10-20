@@ -42,6 +42,7 @@ import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ELITE_MODIFIERS } from '../../../data/enemies/elite.js';
 import { AFFIX_XP_BONUS } from '../../../data/enemies/affixes.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
+import { XP_ORB_BURST } from '../../../data/constants/gameplay.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import RandomService from '../../../core/RandomService.js';
 import {
@@ -232,8 +233,10 @@ export class RewardManager {
    * Drops rewards for a destroyed enemy.
    *
    * @param {BaseEnemy} enemy - The destroyed enemy
+   * @param {{x: number, y: number}|null} [hitPosition] - Where the killing
+   *   shot struck, when known: the orbs burst away from it
    */
-  dropRewards(enemy) {
+  dropRewards(enemy, hitPosition = null) {
     if (!enemy) return;
 
     const xpOrbSystem = this.getXPOrbSystem();
@@ -293,7 +296,13 @@ export class RewardManager {
     const dropRandomContext = this.createDropRandomContext(enemy);
 
     // Create XP orbs
-    this.createXPOrbs(enemy, orbCount, xpDistribution, dropRandomContext);
+    this.createXPOrbs(
+      enemy,
+      orbCount,
+      xpDistribution,
+      dropRandomContext,
+      hitPosition
+    );
 
     // Rare health heart drop from tough enemies
     this.tryDropHealthHeart(enemy, dropRandomContext);
@@ -303,13 +312,23 @@ export class RewardManager {
   }
 
   /**
-   * Creates XP orbs at the enemy's position.
+   * Bursts XP orbs out of the enemy (XP_ORB_BURST): spread evenly round it,
+   * or, with the killing shot's `hitPosition`, fanned away from that point;
+   * each flies out at its own speed and coasts to a stop (XPOrbSystem).
    *
    * @param {BaseEnemy} enemy - The enemy
    * @param {number} count - Number of orbs to create
-   * @param {number} xpPerOrb - XP value per orb
+   * @param {number|number[]} xpPerOrb - XP value per orb, or one per orb
+   * @param {Object} [randomContext] - The drop's seeded streams
+   * @param {{x: number, y: number}|null} [hitPosition] - Where the shot struck
    */
-  createXPOrbs(enemy, count, xpPerOrb, randomContext = null) {
+  createXPOrbs(
+    enemy,
+    count,
+    xpPerOrb,
+    randomContext = null,
+    hitPosition = null
+  ) {
     const xpOrbSystem = this.getXPOrbSystem();
     if (!xpOrbSystem || typeof xpOrbSystem.createXPOrb !== 'function') {
       console.warn('[RewardManager] XPOrbSystem not available or invalid');
@@ -321,6 +340,10 @@ export class RewardManager {
     const velocityRandom = context?.velocity || context?.base;
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 0;
     const total = Math.max(count, 1);
+    const awayX = hitPosition ? enemy.x - hitPosition.x : 0;
+    const awayY = hitPosition ? enemy.y - hitPosition.y : 0;
+    const away = awayX || awayY ? Math.atan2(awayY, awayX) : null;
+    const { minSpeed, maxSpeed, awaySpread, startOffset } = XP_ORB_BURST;
     const fallbackXP = Math.max(
       1,
       Array.isArray(xpPerOrb) ? xpPerOrb[0] ?? ORB_VALUE ?? 5 : xpPerOrb
@@ -332,15 +355,17 @@ export class RewardManager {
       const orbVelocityRandom =
         this.forkRandom(velocityRandom, `orb-${i}`) || velocityRandom;
 
-      const angleOffset = this.randomRange(orbPlacementRandom, 0, 0.3);
-      const angle = (TWO_PI * i) / total + angleOffset;
-      const distance =
-        radius * 0.5 + this.randomRange(orbPlacementRandom, 0, radius);
+      // A ring, each orb anywhere in its own share of it (so a lone orb can
+      // fly any way); away from a known hit the ring narrows to a fan.
+      const slot =
+        (TWO_PI * (i + this.randomRange(orbPlacementRandom, 0, 1))) / total;
+      const angle = away === null ? slot : away + (slot - Math.PI) * awaySpread;
+      const distance = radius * startOffset;
 
       const orbX = enemy.x + Math.cos(angle) * distance;
       const orbY = enemy.y + Math.sin(angle) * distance;
 
-      const speed = 20 + this.randomRange(orbVelocityRandom, 0, 30);
+      const speed = this.randomRange(orbVelocityRandom, minSpeed, maxSpeed);
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 

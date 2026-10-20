@@ -176,8 +176,9 @@ export class OrbFusion {
       return [];
     }
 
+    // Only orbs at rest: a burst lands before its orbs are drawn together.
     const candidates = classData.orbs.filter((orb) =>
-      this.field.isOrbEligibleForFusion(orb)
+      this.field.isOrbSettled(orb)
     );
     if (candidates.length < this.tuning.clusterFusionCount) {
       return [];
@@ -200,7 +201,7 @@ export class OrbFusion {
 
       while (stack.length > 0) {
         const current = stack.pop();
-        if (!this.field.isOrbEligibleForFusion(current)) {
+        if (!this.field.isOrbSettled(current)) {
           continue;
         }
 
@@ -219,10 +220,7 @@ export class OrbFusion {
 
             for (let n = 0; n < neighbors.length; n += 1) {
               const neighbor = neighbors[n];
-              if (
-                visited.has(neighbor) ||
-                !this.field.isOrbEligibleForFusion(neighbor)
-              ) {
+              if (visited.has(neighbor) || !this.field.isOrbSettled(neighbor)) {
                 continue;
               }
 
@@ -342,6 +340,8 @@ export class OrbFusion {
     selected.forEach((orb) => {
       orb.isFusing = true;
       orb.fusionId = animationId;
+      orb.vx = 0;
+      orb.vy = 0;
       animation.orbs.push({
         orb,
         startX: orb.x,

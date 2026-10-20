@@ -1,25 +1,24 @@
 // The Field's distant structures (docs/NORTE.md §2 "Fundo com volume"): the
-// broken Ring as a dark arc for scale, the intact Ring of Warden's Reach, and
-// dark fragments drifting below the field — 3D silhouettes at real depth in
-// front of the space behind them (spaceField.js). Each biome
+// broken Ring as a lit megastructure far below for scale, the intact Ring of
+// Warden's Reach, and dark fragments drifting below the field — 3D shapes at
+// real depth in front of the space behind them (spaceField.js). Each biome
 // (src/data/biomes.js) decides through setLook() how many far fragments
-// drift below and how much of the intact Ring shows.
+// drift below, how much of the intact Ring shows and the haze the broken
+// Ring sits in.
 
 import { createSeededRandom } from './asteroidMesh.js';
 import { colorOf } from './batches.js';
+import { BrokenRing } from './ring/brokenRing.js';
+import { RING_LOOK } from './ring/ringShape.js';
 
 const DEBRIS_COUNT = 48;
 const DEBRIS_COLOR = '#16130f';
 const STRUCTURE_COLOR = '#07050f';
 const STRUCTURE_EDGE = '#8070ff';
 const STRUCTURE_EDGE_ALPHA = 0.35;
-// The victory epilogue's "wake" (setWake): the Ring and the structures light
-// up from their dark silhouettes to these, bright enough to bloom.
-const RING_COLOR = '#030508';
-// The dark Ring lets a little of the nebula through, as if far away in haze.
-const RING_OPACITY = 0.7;
-const RING_WAKE_COLOR = '#9a8cff';
-const RING_WAKE_GAIN = 2.4;
+// The victory epilogue's "wake" (setWake): the broken Ring lights up along
+// its arc (ring/ringMaterial.js), the intact structures from their dark
+// silhouettes to this.
 const STRUCTURE_WAKE_COLOR = '#2c2470';
 
 // The intact Ring of Warden's Reach: two thick arcs and the beams between
@@ -86,30 +85,9 @@ export class FieldBackdrop {
     this.THREE = THREE;
     const random = createSeededRandom(4242.5);
 
-    // The broken Ring: a flattened dark band far below, a faint silhouette
-    // whose break sits inside the field's view.
-    const arc = Math.PI * 0.9;
-    const radius = 2200;
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(radius, 9, 8, 160, arc),
-      new THREE.MeshBasicMaterial({
-        color: colorOf(THREE, RING_COLOR),
-        transparent: true,
-        opacity: RING_OPACITY,
-        depthWrite: false,
-      })
-    );
-    ring.rotation.x = Math.PI / 2 - 0.12;
-    ring.rotation.z = (50 * Math.PI) / 180 - arc;
-    ring.scale.set(1, 1, 0.4);
-    ring.position.set(-1900, -900, -1700);
-    ring.renderOrder = -10;
-    scene.add(ring);
-    this.ring = ring;
-    this.ringColor = colorOf(THREE, RING_COLOR);
-    this.ringWakeColor = colorOf(THREE, RING_WAKE_COLOR).multiplyScalar(
-      RING_WAKE_GAIN
-    );
+    // The broken Ring far below, its break inside the field's view.
+    this.ring = new BrokenRing(THREE);
+    scene.add(this.ring.object);
 
     this.structures = ringStructures(THREE);
     scene.add(this.structures.group);
@@ -158,6 +136,11 @@ export class FieldBackdrop {
   setLook(look) {
     this.structureShare = look.structures;
     this.applyStructures();
+    // The haze the broken Ring sits in: the biome's sky and its clouds.
+    this.ring.uniforms.uHaze.value
+      .copy(look.hazeColor)
+      .multiplyScalar(look.hazeDensity * RING_LOOK.hazeGain)
+      .add(look.sky0);
 
     // Fragments past the share shrink away one by one.
     const shown = look.debris * DEBRIS_COUNT;
@@ -171,14 +154,11 @@ export class FieldBackdrop {
     this.debris.instanceMatrix.needsUpdate = true;
   }
 
-  /** The Ring's wake, 0 (dark silhouette) to 1 (lit), for the epilogue. */
+  /** The Ring's wake, 0 (dead) to 1 (lit along its arc), for the epilogue. */
   setWake(wake) {
     if (wake === this.wake) return;
     this.wake = wake;
-    this.ring.material.color
-      .copy(this.ringColor)
-      .lerp(this.ringWakeColor, wake);
-    this.ring.material.opacity = RING_OPACITY + (1 - RING_OPACITY) * wake;
+    this.ring.uniforms.uWake.value = wake;
     this.structures.dark.color
       .copy(this.structureColor)
       .lerp(this.structureWakeColor, wake);

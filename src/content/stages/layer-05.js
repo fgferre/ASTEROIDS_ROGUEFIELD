@@ -7,6 +7,7 @@ export default {
   rocks: rockCurve(5),
   roster: [],
   surges: [],
+  formations: [],
   events: [],
   warden: true,
 };

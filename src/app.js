@@ -563,6 +563,8 @@ function renderGame(alpha) {
   performanceMonitor.startMeasure('render');
   gameSystemServices.renderer.render(alpha);
   performanceMonitor.endMeasure('render');
+  // The HUD on field points goes where this frame drew them, paused too.
+  gameSystemServices.ui.placeOnField();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -573,6 +575,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Writes Canvas2D notice on the blocked path; no DI / no Three.js / no Web Audio.
     const guard = mobileGuard();
     if (guard.blocked) {
+      return;
+    }
+
+    // ?scene=ring (dev): the broken Ring alone, orbited; no game runs.
+    if (
+      IS_DEV &&
+      new URLSearchParams(window.location.search).get('scene') === 'ring'
+    ) {
+      (await import('./bootstrap/ringScene.js')).startRingScene();
       return;
     }
 

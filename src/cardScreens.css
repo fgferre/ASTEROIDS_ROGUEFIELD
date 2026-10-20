@@ -1,0 +1,904 @@
+/* ============================================
+   CARD SCREENS — the level-up and the chest's cards (ui/LevelUpScreen.js,
+   ui/ChestCeremony.js, ui/upgradeCard.js), and what they share with the run
+   end screens (runEndScreens.css): as the owner's mock-ups of 20/10 draw
+   them, laid out at 1920 × 1080 and scaled with the window (--u is 1px
+   there). Only the style.css tokens, PALETTE colours and their mixes. The
+   pause panel's build is the run end's (runRecap.endBuildMarkup), at its
+   1920 × 1080 size inside the pause panel's fixed width.
+   ============================================ */
+.cards-screen,
+.end-screen,
+.pause-build {
+  --u: min(calc(100vw / 1920), calc(100vh / 1080));
+  --fs: calc(var(--u) * var(--text-scale));
+  --amber: #ffb347; /* PALETTE.shot */
+  --apex: color-mix(in srgb, var(--amber) 35%, white);
+  --boss-light: color-mix(in srgb, var(--boss) 55%, white);
+  --text-faint: rgba(230, 238, 248, 0.38);
+}
+
+.pause-build {
+  --u: 1px;
+}
+
+.cards-screen,
+.end-screen {
+  padding: 0;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(2, 4, 8, 0.85);
+}
+
+.cards-screen kbd,
+.end-screen kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+  padding: 0 calc(5 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(10 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  border: 1px solid rgba(230, 238, 248, 0.28);
+  border-radius: 3px;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+/* The dim over the stopped field; the HUD's build and XP instruments stay
+   lit through it (holes at --hole-a-* and --hole-b-*, LevelUpScreen.js). */
+.cards-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --hole: transparent 72%, #000 100%;
+  background: radial-gradient(
+      ellipse 46% 44% at 50% 47%,
+      rgba(2, 4, 8, 0.55),
+      rgba(2, 4, 8, 0)
+    ),
+    rgba(2, 4, 8, 0.64);
+  -webkit-backdrop-filter: blur(calc(2 * var(--u))) saturate(0.8);
+  backdrop-filter: blur(calc(2 * var(--u))) saturate(0.8);
+  -webkit-mask-image: radial-gradient(
+      var(--hole-a-w, 1px) var(--hole-a-h, 1px) at var(--hole-a-x, -999px)
+        var(--hole-a-y, -999px),
+      var(--hole)
+    ),
+    radial-gradient(
+      var(--hole-b-w, 1px) var(--hole-b-h, 1px) at var(--hole-b-x, -999px)
+        var(--hole-b-y, -999px),
+      var(--hole)
+    );
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(
+      var(--hole-a-w, 1px) var(--hole-a-h, 1px) at var(--hole-a-x, -999px)
+        var(--hole-a-y, -999px),
+      var(--hole)
+    ),
+    radial-gradient(
+      var(--hole-b-w, 1px) var(--hole-b-h, 1px) at var(--hole-b-x, -999px)
+        var(--hole-b-y, -999px),
+      var(--hole)
+    );
+  mask-composite: intersect;
+}
+
+:root[data-contrast='high'] :is(.cards-screen, .end-screen)::before {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(2, 4, 8, 0.9);
+}
+
+/* ---------- LEVEL-UP AND CHEST ---------- */
+.cards-screen .levelup-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-bottom: calc(60 * var(--u));
+}
+
+.lu-head {
+  display: grid;
+  justify-items: center;
+  gap: calc(10 * var(--u));
+  margin-bottom: calc(30 * var(--u));
+}
+
+.lu-title {
+  display: flex;
+  align-items: center;
+  gap: calc(18 * var(--u));
+  margin: 0;
+  font: inherit;
+}
+
+.lu-rule {
+  width: calc(140 * var(--u));
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--xp) 70%, transparent)
+  );
+}
+
+.lu-rule.is-right {
+  transform: scaleX(-1);
+}
+
+.lu-level {
+  font-family: var(--font-display);
+  color: var(--xp);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lu-level small {
+  margin-right: calc(10 * var(--u));
+  font-size: calc(13 * var(--fs));
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.lu-level b {
+  font-size: calc(34 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.lu-sub,
+.lu-picks {
+  margin: 0;
+  font-size: calc(17 * var(--fs));
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.lu-picks {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  margin-top: calc(4 * var(--u));
+}
+
+.lu-picks__lbl {
+  font-family: var(--font-display);
+  font-size: calc(11 * var(--fs));
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lu-picks__slots {
+  display: flex;
+  gap: calc(8 * var(--u));
+}
+
+.lu-slot {
+  width: calc(13 * var(--u));
+  height: calc(13 * var(--u));
+  border: 1px solid rgba(230, 238, 248, 0.45);
+  transform: rotate(45deg);
+}
+
+.lu-slot.is-done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.lu-slot.is-now {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.cards-screen .upgrades-grid {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: calc(26 * var(--u));
+}
+
+/* A card: the rarity on its top edge, in its marks and in its frame. */
+.card {
+  --rar: var(--rarity-common);
+  --fam: var(--text-dim);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: calc(344 * var(--u));
+  min-height: calc(444 * var(--u));
+  margin: 0;
+  padding: calc(22 * var(--u)) calc(24 * var(--u)) 0;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  text-shadow: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 17, 28, 0.92),
+    rgba(6, 9, 16, 0.94)
+  );
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    outline-color var(--motion-fast) var(--ease-out);
+}
+
+article.card {
+  cursor: default;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: -1px;
+  height: 2px;
+  background: var(--rar);
+  border-radius: 4px 4px 0 0;
+  opacity: 0.8;
+}
+
+.card--common::before {
+  height: 1px;
+  opacity: 0.6;
+}
+
+.card--rare {
+  --rar: var(--rarity-rare);
+}
+
+.card--cursed {
+  --rar: var(--rarity-cursed);
+}
+
+.card--epic {
+  --rar: var(--rarity-epic);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rar) 9%, rgba(12, 17, 28, 0.92)),
+    rgba(6, 9, 16, 0.94) 38%
+  );
+}
+
+.card--epic::before {
+  opacity: 1;
+  box-shadow:
+    0 0 14px var(--rar),
+    0 0 2px var(--rar);
+}
+
+.card.is-focused {
+  transform: translateY(calc(-10 * var(--u)));
+  border-color: rgba(230, 238, 248, 0.5);
+  outline: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: calc(5 * var(--u));
+}
+
+.card:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: calc(5 * var(--u));
+}
+
+#levelup-screen.is-banishing .card.is-focused {
+  border-color: var(--danger-line);
+  outline-color: var(--danger);
+}
+
+.card__top {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  height: calc(14 * var(--u));
+}
+
+.card__rar {
+  display: flex;
+  gap: calc(3 * var(--u));
+  transform: skewX(-18deg);
+}
+
+.card__rar i {
+  width: calc(13 * var(--u));
+  height: calc(6 * var(--u));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar) 40%, transparent);
+}
+
+.card__rar i.is-on {
+  background: var(--rar);
+  box-shadow: none;
+}
+
+.card__rar-name {
+  font-family: var(--font-display);
+  font-size: calc(11 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--rar);
+}
+
+.card__key {
+  margin-left: auto;
+}
+
+.card__id {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  margin-top: calc(26 * var(--u));
+}
+
+.card__icon {
+  flex: none;
+  width: calc(46 * var(--u));
+  height: calc(46 * var(--u));
+  fill: none;
+  stroke: var(--fam);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--fam) 45%, transparent));
+}
+
+.card__names {
+  display: grid;
+}
+
+.card__name {
+  font-size: calc(27 * var(--fs));
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+}
+
+.card__tag {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+  margin-top: calc(6 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(10.5 * var(--fs));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fam);
+}
+
+.glyph {
+  flex: none;
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  fill: var(--fam);
+}
+
+.glyph.is-off {
+  fill: none;
+  stroke: var(--fam);
+  stroke-width: 1.2;
+  opacity: 0.55;
+}
+
+.card__sep {
+  color: var(--text-faint);
+}
+
+.card__state {
+  color: var(--text);
+}
+
+.card__fx {
+  display: block;
+  margin-top: calc(26 * var(--u));
+  font-size: calc(20 * var(--fs));
+  line-height: 1.32;
+}
+
+.card__fx b {
+  font-weight: 700;
+  color: #fff;
+}
+
+.card__fx2 {
+  display: block;
+  margin-top: calc(10 * var(--u));
+  font-size: calc(17 * var(--fs));
+  line-height: 1.3;
+  color: var(--text-dim);
+}
+
+/* The build line at the card's foot. */
+.card__build {
+  display: grid;
+  gap: calc(8 * var(--u));
+  margin: auto calc(-24 * var(--u)) 0;
+  padding: calc(16 * var(--u)) calc(24 * var(--u)) calc(20 * var(--u));
+  border-top: 1px solid var(--line);
+}
+
+/* The effect keeps clear of the build line when the card grows. */
+.card__fx:has(+ .card__build),
+.card__fx2 {
+  margin-bottom: calc(22 * var(--u));
+}
+
+.card__lbl {
+  font-family: var(--font-display);
+  font-size: calc(11 * var(--fs));
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.card__row {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+}
+
+.card__end {
+  margin-left: auto;
+  font-size: calc(15 * var(--fs));
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.card__what {
+  font-size: calc(22 * var(--fs));
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fam);
+}
+
+.card__why {
+  margin-top: calc(-2 * var(--u));
+  font-size: calc(16 * var(--fs));
+  line-height: 1.25;
+  color: var(--text-dim);
+}
+
+.card__build--completes {
+  border-top-color: color-mix(in srgb, var(--fam) 55%, transparent);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--fam) 16%, transparent),
+    color-mix(in srgb, var(--fam) 3%, transparent)
+  );
+}
+
+.card__build--completes .card__lbl {
+  color: var(--fam);
+}
+
+.card__step {
+  display: flex;
+  align-items: baseline;
+  gap: calc(8 * var(--u));
+  font-size: calc(16 * var(--fs));
+  line-height: 1.25;
+  color: var(--text-dim);
+}
+
+.card__step b {
+  font-size: calc(17 * var(--fs));
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--fam);
+}
+
+.card__at {
+  flex: none;
+  width: calc(38 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(10 * var(--fs));
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Tracks: the HUD build instrument's cells. */
+.track {
+  display: flex;
+  align-items: center;
+  gap: calc(4 * var(--u));
+}
+
+.track-cell {
+  width: calc(30 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(230, 238, 248, 0.32);
+}
+
+.track-cell.is-on {
+  background: var(--fam);
+  box-shadow: none;
+}
+
+.track-cell.is-new {
+  background: var(--fam);
+  box-shadow:
+    0 0 0 1px var(--fam),
+    0 0 10px var(--fam);
+}
+
+.track-notch {
+  width: 1px;
+  height: calc(14 * var(--u));
+  margin: 0 calc(4 * var(--u));
+  background: var(--fam);
+}
+
+/* The weapon card stands apart: gold, cut corners, its shot pattern. */
+.card--weapon {
+  --cut: calc(22 * var(--u));
+  margin-left: calc(30 * var(--u));
+  border: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--xp) 8%, rgba(12, 17, 28, 0.94)),
+    rgba(6, 9, 16, 0.95) 40%
+  );
+  clip-path: polygon(
+    var(--cut) 0,
+    100% 0,
+    100% calc(100% - var(--cut)),
+    calc(100% - var(--cut)) 100%,
+    0 100%,
+    0 var(--cut)
+  );
+}
+
+.card--weapon::before {
+  display: none;
+}
+
+.card:has(+ .card--weapon)::after {
+  content: '';
+  position: absolute;
+  right: calc(-42 * var(--u));
+  top: calc(40 * var(--u));
+  bottom: calc(40 * var(--u));
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--line) 20% 80%,
+    transparent
+  );
+}
+
+.card--weapon.is-focused,
+.card--weapon:focus-visible {
+  outline: none;
+}
+
+.card__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  pointer-events: none;
+}
+
+.card__frame path {
+  vector-effect: non-scaling-stroke;
+}
+
+.card__frame-outer {
+  stroke: var(--xp);
+  stroke-opacity: 0.85;
+}
+
+.card__frame-inner {
+  stroke: rgba(230, 238, 248, 0.16);
+}
+
+.card__frame-edge {
+  stroke: var(--xp);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px var(--xp));
+}
+
+.card--weapon.is-focused .card__frame-outer {
+  stroke-opacity: 1;
+  stroke-width: 2;
+}
+
+.card--weapon.is-focused .card__frame-inner {
+  stroke: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.card__wtag {
+  margin-left: calc(6 * var(--u));
+  padding: calc(3 * var(--u)) calc(7 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(10.5 * var(--fs));
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  border: 1px solid rgba(230, 238, 248, 0.4);
+  border-radius: 2px;
+}
+
+.card__wname {
+  display: block;
+  margin-top: calc(24 * var(--u));
+  font-size: calc(25 * var(--fs));
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.card__pattern {
+  display: block;
+  width: calc(200 * var(--u));
+  height: calc(120 * var(--u));
+  margin: calc(22 * var(--u)) auto 0;
+  overflow: visible;
+}
+
+.card__shots {
+  fill: none;
+  stroke: var(--shot);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--shot) 70%, transparent));
+}
+
+.card__shots circle {
+  fill: var(--shot);
+}
+
+.card__muzzle {
+  fill: var(--text);
+  opacity: 0.85;
+}
+
+.card--weapon .card__fx {
+  margin-top: calc(14 * var(--u));
+}
+
+.card--weapon .card__build {
+  border-top-color: color-mix(in srgb, var(--xp) 40%, transparent);
+}
+
+.card__swap {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+  font-size: calc(17 * var(--fs));
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.card__from {
+  color: var(--text-dim);
+  text-decoration: line-through;
+  text-decoration-color: rgba(230, 238, 248, 0.45);
+}
+
+.card__arrow {
+  font-family: var(--font-display);
+  font-size: calc(14 * var(--fs));
+  color: var(--xp);
+}
+
+/* Reroll and banish under the cards. */
+.cards-screen .levelup-actions {
+  display: flex;
+  justify-content: center;
+  gap: calc(34 * var(--u));
+  margin-top: calc(80 * var(--u));
+}
+
+.lu-ghost {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(6 * var(--u)) calc(8 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(12 * var(--fs));
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.lu-ghost:hover {
+  color: var(--text);
+}
+
+.lu-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lu-ghost__n {
+  font-family: var(--font-ui);
+  font-size: calc(16 * var(--fs));
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.lu-ghost--danger kbd {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+#levelup-banish-btn[aria-pressed='true'] {
+  color: var(--danger);
+}
+
+.cards-screen .levelup-hint {
+  margin: calc(12 * var(--u)) 0 0;
+  text-align: center;
+  font-size: calc(15 * var(--fs));
+  color: var(--danger);
+}
+
+.cards-screen .onboarding-cards-tip {
+  color: var(--text-dim);
+}
+
+/* Cards in and out (ui/levelUpTransition.js): rise in staggered by
+   --enter-delay; on a pick the chosen card shrinks toward the HUD's build
+   instrument (--fly-x/--fly-y), the rest fall away and the overlay clears. */
+@media (prefers-reduced-motion: no-preference) {
+  .card.is-entering {
+    animation: levelup-card-rise 260ms var(--ease-out) var(--enter-delay, 0ms)
+      backwards;
+  }
+
+  .card.is-picked {
+    animation: levelup-card-pick var(--motion-slow) var(--ease-out) forwards;
+  }
+
+  .card.is-dismissed {
+    animation: levelup-card-fall var(--motion-slow) ease-in forwards;
+  }
+
+  #levelup-screen.is-leaving {
+    opacity: 0;
+    transition: opacity var(--motion-slow) cubic-bezier(0.7, 0, 0.85, 0);
+  }
+
+  #levelup-screen.is-leaving :is(.lu-head, .levelup-actions) {
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-out);
+  }
+
+  .card.is-revealing {
+    animation: chest-card-reveal 420ms var(--ease-out) both;
+  }
+}
+
+@keyframes levelup-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes levelup-card-pick {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--fly-x), var(--fly-y)) scale(0.15);
+  }
+}
+
+@keyframes levelup-card-fall {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(48px) scale(0.96);
+  }
+}
+
+/* A chest's card rises in with a flash of light (ChestCeremony.js); with
+   Reduce Flashing it only fades in. */
+@keyframes chest-card-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+    filter: brightness(2.4);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: brightness(1.5);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+body.flashing-reduced .card.is-revealing {
+  animation-name: chest-card-fade;
+}
+
+@keyframes chest-card-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card.is-waiting {
+  opacity: 0;
+}
+
+.chest-title {
+  margin-bottom: calc(34 * var(--u));
+}
+
+.chest-title__name {
+  font-family: var(--font-display);
+  font-size: calc(26 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.chest-title__count {
+  font-family: var(--font-display);
+  font-size: calc(13 * var(--fs));
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.chest-cards.is-many .card {
+  width: calc(300 * var(--u));
+}
+
+.chest-continue {
+  margin-top: calc(64 * var(--u));
+  opacity: 0.35;
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+
+.chest-continue.is-ready {
+  opacity: 1;
+}

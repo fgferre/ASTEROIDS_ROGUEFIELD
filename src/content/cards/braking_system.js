@@ -11,9 +11,9 @@ export default {
   prerequisites: [
     {
       type: 'upgrade',
-      id: 'rcs_system',
-      level: 2,
-      text: 'Requires RCS System active (Lv. 2).',
+      id: 'propulsors',
+      level: 1,
+      text: 'Requires Main Thrusters installed (Lv. 1).',
     },
   ],
   text: {
@@ -37,7 +37,7 @@ export default {
         title: 'Emergency Brake',
         description: 'Linear damping +100%. Unlocks the emergency brake.',
         highlights: [
-          'Hold the reverse key (S) against your motion for 0.25 s: full stop and a shockwave that shoves enemies back.',
+          'Hold a direction against your motion for 0.25 s: full stop and a shockwave that shoves enemies back.',
         ],
       },
     ],
@@ -89,8 +89,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-emergency-brake',
-          // proposta 18/10: hold S against the motion `hold` s → stop over
-          // `stopTime` s with a shove-only shockwave of `radius` px.
+          // proposta 18/10: hold a direction against the motion `hold` s →
+          // stop over `stopTime` s with a shove-only shockwave of `radius` px.
           payload: {
             hold: 0.25,
             minSpeed: 40,

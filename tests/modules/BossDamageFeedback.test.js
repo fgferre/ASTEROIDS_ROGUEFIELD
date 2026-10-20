@@ -92,6 +92,7 @@ describe('boss damage feedback', () => {
   it('full phase transition cycle: damage -> phase change -> invulnerable -> blocked -> expires -> damage resumes', () => {
     const { boss, eventBus } = createBoss({
       health: 1500,
+      healthFactor: 1, // max health 1500 exactly, whatever the Warden's factor
       phaseThresholds: [0.66, 0.33],
       invulnerabilityDuration: 1.0,
     });

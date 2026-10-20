@@ -1,10 +1,14 @@
 // src/modules/combat/HitResolution.js
 //
-// What a hit does: a lance, beam, flak bolt, shrapnel or chain hit lands its
-// damage through the enemy service, then the knockback, the beam's extra
-// split, the Prospector's orbs and the evolutions' burn, slow, pull and
-// chain. CombatSystem owns it and resolves the collisions through it after
-// the shots move; the weapons and the card effects land their hits here too.
+// What a hit does: a lance, beam, flak bolt, shrapnel, chain, arc, blade,
+// heat or missile hit lands its damage (raised by Afterburn Lance and Ballast
+// Rounds) through the enemy service, then the knockback, the beam's extra
+// split, the Prospector's orbs, the evolutions' burn, slow, pull and chain, a
+// kill's Capacitor spark and a breeding missile's brood. CombatSystem owns it
+// and resolves the collisions through it after the shots move; the weapons
+// and the card effects land their hits here too. The lance evolutions come
+// on a lance, beam or flak hit only (see `lanceHit`), and a family the held
+// weapon evolves on itself brings none of its lance evolution here.
 
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
@@ -17,6 +21,8 @@ import {
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
+import { burstFlak } from './beamAndFan.js';
+import { breedSeekers } from './firePatterns.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
 export function knockbackSpeed(damage) {
@@ -62,10 +68,30 @@ export class HitResolution {
     if (
       capacitor &&
       bullet.projectile &&
-      !weapons.evolutions.includes('arc') &&
+      !weapons.hasEvolution('arc') &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
       requestedDamage *= 2;
+    }
+    // Afterburn Lance: a round hits harder the further it flew.
+    const longBurn = cards.cardEffects.longBurn;
+    if (longBurn && bullet.projectile && Number.isFinite(bullet.originX)) {
+      const flown = Math.hypot(
+        bullet.x - bullet.originX,
+        bullet.y - bullet.originY
+      );
+      requestedDamage *=
+        1 +
+        (longBurn.bonusPer100px * Math.min(flown, longBurn.maxDistance)) / 100;
+    }
+    // Ballast Rounds: more damage to an enemy already below the threshold.
+    const execute = cards.cardEffects.executeDamage;
+    if (
+      execute &&
+      enemy.maxHealth > 0 &&
+      enemy.health < enemy.maxHealth * execute.threshold
+    ) {
+      requestedDamage *= execute.damageMultiplier;
     }
     // A beam's `extraFragments`: a large/medium rock it kills splits once
     // more per fragment, along the same seams (generateFragments is seeded by
@@ -81,8 +107,15 @@ export class HitResolution {
             descriptors: enemy.generateFragments(),
           }
         : null;
+    // A projectile, or what a beam or a flak burst lands: the chain, blade
+    // and heat hits of the other weapons, which evolve on their own, and the
+    // cards' arcs bring no lance evolution.
+    const lanceHit =
+      Boolean(bullet.projectile) ||
+      bullet.kind === 'beam' ||
+      bullet.kind === 'shrapnel';
     const rewards =
-      bullet.kind !== 'chain' && weapons.evolutions.includes('salvage')
+      lanceHit && weapons.hasEvolution('salvage')
         ? enemiesSystem.rewardManager
         : null;
     const orbsBefore = rewards ? rewards.stats.totalOrbsDropped : 0;
@@ -170,15 +203,24 @@ export class HitResolution {
           rewards.stats.totalOrbsDropped - orbsBefore
         );
       }
-      if (bullet.kind !== 'chain') {
+      if (lanceHit) {
         this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
+      }
+      if (bullet.seeker?.breed > 0 && damageResult.killed) {
+        breedSeekers(weapons, bullet, enemy);
+      }
+      // Capacitor Bank: a kill sparks on, up to `links` sparks in a row.
+      const spark = cards.cardEffects.killSpark;
+      const link = (bullet.sparkLink ?? 0) + 1;
+      if (spark && damageResult.killed && link <= spark.links) {
+        cards.sparkFrom(enemy, requestedDamage * spark.damageFraction, link);
       }
     }
     // A projectile with a `burst` bursts on its first hit, blocked or not;
     // its shrapnel spares the enemy it struck.
     if (bullet.projectile?.burst) {
       bullet.volley.struck.push(enemy);
-      weapons.burstFlak(bullet);
+      burstFlak(weapons, bullet);
     }
 
     return damageResult;
@@ -223,7 +265,7 @@ export class HitResolution {
   // Prospector: +25 % of the orbs a lance kill dropped (Motherlode: +100 %),
   // carried across kills so small rocks (1 orb) still pay out on average.
   dropProspectorOrbs(rewards, enemy, dropped) {
-    const { orbBonus } = this.weapons().apexes.includes('salvage')
+    const { orbBonus } = this.weapons().hasApex('salvage')
       ? WEAPON_APEX.salvage
       : WEAPON_EVOLUTIONS.salvage;
     this.prospectorCarry += Math.max(0, dropped) * orbBonus;
@@ -233,42 +275,37 @@ export class HitResolution {
     rewards.createXPOrbs(enemy, extra, ORB_VALUE);
   }
 
-  // Burn, slow and chain on a lance or beam hit (chain hits do not chain);
-  // an Apex replaces its family's first stage.
+  // Burn, slow and chain on a lance, beam or flak hit; an Apex replaces its
+  // family's first stage.
   applyEvolutionHit(enemy, damage, result, hit) {
     const weapons = this.weapons();
     const cards = this.cards();
     if (!weapons.evolutions.length) return;
     const alive = !result.killed && !enemy.destroyed;
-    if (alive && weapons.evolutions.includes('thermal')) {
-      const { burn } = WEAPON_EVOLUTIONS.thermal;
-      cards.burns.set(enemy, {
-        id: enemy.id,
-        timer: 0,
-        interval: burn.duration / burn.ticks,
-        ticksLeft: burn.ticks,
-        damage: damage * burn.damageFraction,
-        spreadTo: weapons.apexes.includes('thermal') ? [] : null,
-      });
+    if (alive && weapons.hasEvolution('thermal')) {
+      cards.ignite(
+        enemy,
+        damage,
+        WEAPON_EVOLUTIONS.thermal.burn,
+        weapons.hasApex('thermal') ? [] : null
+      );
     }
     // Bosses move on scripts, not on velocity: no slow and no pull.
-    if (weapons.apexes.includes('field')) {
+    if (weapons.hasApex('field')) {
       cards.pullToward(enemy, alive, hit.x, hit.y);
     } else if (
       alive &&
       enemy.type !== 'boss' &&
-      weapons.evolutions.includes('field')
+      weapons.hasEvolution('field')
     ) {
       cards.slows.set(enemy, {
         id: enemy.id,
         timer: WEAPON_EVOLUTIONS.field.slow.duration,
       });
     }
-    if (weapons.evolutions.includes('arc')) {
+    if (weapons.hasEvolution('arc')) {
       const { chain } = WEAPON_EVOLUTIONS.arc;
-      const storm = weapons.apexes.includes('arc')
-        ? WEAPON_APEX.arc.chain
-        : null;
+      const storm = weapons.hasApex('arc') ? WEAPON_APEX.arc.chain : null;
       cards.chainFrom(
         enemy,
         damage * chain.damageFraction,

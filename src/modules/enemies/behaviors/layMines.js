@@ -7,9 +7,9 @@
 export default {
   params: {
     type: 'string',
-    interval: 'number',
-    max: 'number',
-    glow: 'number',
+    interval: 'positive',
+    max: 'count',
+    glow: 'positive',
     event: 'string',
   },
   usesRandom: true,

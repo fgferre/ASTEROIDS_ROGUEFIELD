@@ -3,7 +3,8 @@
 // Game time: the freeze frame and hit-stop of hits and kills, and the
 // slow-motion beats of level-up and death. Each step turns the real delta
 // into the world's delta. EffectsSystem owns it, ticks it first, and returns
-// that delta from its update.
+// that delta from its update. Part of the simulation: Reduced Motion, which
+// a replay does not record, only drops the camera's zoom pulse.
 
 // Hits feel like hits (PLAN.md step 5). PROPOSAL from 17/10, judged by playing.
 // Hit-stop on every kill: the world runs at `scale` speed, easing back to
@@ -48,7 +49,7 @@ function idleTimeDilation() {
 export class GameTime {
   /**
    * `emit(name, payload)`: sends camera-zoom-pulse on the first running step after a slow-motion beat.
-   * `motionReduced()`: Settings → Accessibility → Reduced Motion; shortens freezes and softens slow motion.
+   * `motionReduced()`: Settings → Accessibility → Reduced Motion; no zoom pulse on a slow-motion beat.
    */
   constructor({ emit, motionReduced }) {
     this.emit = emit;
@@ -178,13 +179,8 @@ export class GameTime {
   }
 
   addFreezeFrame(duration, fade = 0) {
-    let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
-    let finalFade = Number.isFinite(fade) ? fade : 0;
-
-    if (this.motionReduced()) {
-      finalDuration = Math.min(finalDuration, 0.12);
-      finalFade = Math.min(finalFade, 0.2);
-    }
+    const finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+    const finalFade = Number.isFinite(fade) ? fade : 0;
 
     if (finalDuration <= 0) {
       return;
@@ -224,26 +220,18 @@ export class GameTime {
     }
 
     const rawScale = Number.isFinite(targetScale) ? targetScale : 1;
-    let scale = Math.max(0, Math.min(1, rawScale));
+    const scale = Math.max(0, Math.min(1, rawScale));
 
-    const optionDuration = Number.isFinite(options.duration)
+    const duration = Number.isFinite(options.duration)
       ? Math.max(0, options.duration)
       : Number.isFinite(options.transition)
         ? Math.max(0, options.transition)
         : 0.45;
-    const optionHold = Number.isFinite(options.holdDuration)
+    const holdDuration = Number.isFinite(options.holdDuration)
       ? Math.max(0, options.holdDuration)
       : Number.isFinite(options.hold)
         ? Math.max(0, options.hold)
         : 0;
-    let duration = optionDuration;
-    let holdDuration = optionHold;
-
-    if (this.motionReduced()) {
-      scale = Math.max(scale, 0.7);
-      duration = Math.min(duration, 0.35);
-      holdDuration = Math.min(holdDuration, 0.12);
-    }
 
     if (scale >= 0.999 && holdDuration <= 0 && duration <= 0) {
       return;

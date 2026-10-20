@@ -1,32 +1,57 @@
 // src/modules/ui/RunEndScreens.js
 //
-// The two screens that end a run: the death recap (stats, killer, where,
-// salvage, build, seed and its share link) and the victory screen (stats,
-// build, synergies, best, salvage), both quoting the last transmission.
+// The two screens that end a run (the owner's mock-ups of 20/10): the
+// headline by how far it got, the last transmission, the run as a timeline
+// across its layers (ui/runTimeline.js), the build, the best moment, four
+// numbers and the salvage, the line that invites the next run and its
+// buttons; the death screen ends with the seed and its share link.
 
-import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
+import { loadRecords } from '../../services/runRecords.js';
+import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { SCREEN_INPUT_LOCKOUT_MS } from './LevelUpScreen.js';
-import {
-  buildBlockMarkup,
-  collectBuild,
-  formatRunTime,
-  killerName,
-  runLocationLine,
-  transmissionQuoteMarkup,
-} from './runRecap.js';
+import { collectBuild, endBuildMarkup, formatRunTime } from './runRecap.js';
 import { salvageLine } from './hangar.js';
-import { bossRushBest } from './menuStatus.js';
+import { glyphMarkup } from './upgradeCard.js';
+import {
+  bestMoment,
+  inviteLine,
+  killedByLine,
+  runHeadline,
+  timelineMarkup,
+  timelineModel,
+} from './runTimeline.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
+/**
+ * The run end's numbers from the summary the session hands the screen; a won
+ * run's time is the last Warden's fall (the screen opens a while later).
+ */
+function runNumbers(data, outcome) {
+  const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
+  const timeline = ensureArray(data.stats?.timeline);
+  const last = timeline[timeline.length - 1];
+  const end =
+    outcome === 'victory' && last?.kind === 'warden'
+      ? last.time
+      : data.stats?.timeElapsed;
+  return {
+    layer: Math.max(1, Math.floor(Number(wave) || 1)),
+    time: Math.max(0, Math.floor(Number(end) || 0)),
+    kills: data.stats?.totalKills ?? data.stats?.kills ?? 0,
+    level: data.player?.level ?? data.level ?? '—',
+    timeline,
+  };
+}
+
 export class RunEndScreens {
   /**
-   * `refs`: the screens' nodes { gameOver: { time, …, copySeedBtn, retryBtn, restartBtn }, victory: { title, …, continueBtn, restartBtn, quitBtn } }.
+   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn }, victory: { body, invite, continueBtn, restartBtn, quitBtn } }.
    * `showScreen(name, options)`: shows the gameover or victory overlay.
-   * `progression()`: the progression service (the death recap's build), or none.
+   * `progression()`: the progression service (the build), or none.
    * `combat()`: the combat service (the build's weapon).
    * `difficulty()`: the difficulty service (seed label and share link).
-   * `hangar()`: the hangar service; its lastAward is the Salvage line.
+   * `hangar()`: the hangar service; its lastAward is the salvage line.
    * `lastTransmission()`: the line shown since the death or the win, or null.
    */
   constructor({
@@ -46,6 +71,92 @@ export class RunEndScreens {
     this.hangar = hangar;
     this.lastTransmission = lastTransmission;
     this.victoryLockoutTimer = null;
+    this.bestAtStart = 0;
+  }
+
+  /** A run starts: the best layer it plays against. */
+  noteRunStart() {
+    this.bestAtStart = loadRecords().bestLayer;
+  }
+
+  // Headline, quote, timeline, build, best moment, numbers and salvage.
+  bodyMarkup(outcome, data, numbers) {
+    const { layer, time, timeline } = numbers;
+    const wardens = timeline.filter(({ kind }) => kind === 'warden').length;
+    const head = runHeadline({
+      outcome,
+      layer,
+      bossRush: data.bossRush ?? null,
+      wardens,
+      time,
+      // A Boss Rush records the time the screen opened at (runEnd.js).
+      newBest:
+        outcome === 'victory' &&
+        (data.bossRush
+          ? data.bossRush.bestTime === Math.floor(data.stats?.timeElapsed ?? 0)
+          : this.bestAtStart < RUN_FINAL_LAYER),
+    });
+    const badge = head.badge
+      ? `<span class="end-badge">${head.badge}</span>`
+      : '';
+    const of = head.of ? `<small>${head.of}</small>` : '';
+    const killer =
+      outcome === 'death'
+        ? (() => {
+            const { lead, name } = killedByLine(data.killedBy);
+            return `<p class="end-killer">${lead} <span class="end-killer__who">${name}</span><span class="end-sep">·</span>${formatRunTime(time)}</p>`;
+          })()
+        : '';
+    const transmission = this.lastTransmission();
+    const quote = transmission
+      ? `<p class="end-quote"><span class="end-quote__who">${transmission.speaker}</span>${transmission.text}</p>`
+      : '';
+    const model = timelineModel({
+      timeline,
+      outcome,
+      layer,
+      bestAtStart: this.bestAtStart,
+    });
+    const progression = this.progression();
+    const build = progression
+      ? endBuildMarkup(collectBuild(progression, this.combat()))
+      : '';
+    const moment = bestMoment(timeline, outcome);
+    const momentMarkup = moment
+      ? `<p class="end-moment__big is-${moment.tone}">${moment.title}</p><p class="end-moment__where">${moment.where}</p>`
+      : `<p class="end-moment__big">Layer ${layer}</p><p class="end-moment__where">${formatRunTime(time)}</p>`;
+    const fourth =
+      outcome === 'victory'
+        ? ['Max combo', `×${data.maxCombo ?? 0}`]
+        : ['Wardens', `${wardens}/${model.wardenLayers.length}`];
+    const stats = [
+      ['Time', formatRunTime(time)],
+      ['Kills', Number(numbers.kills).toLocaleString('en-US')],
+      ['Level', numbers.level],
+      fourth,
+    ]
+      .map(
+        ([label, value]) =>
+          `<div class="end-stat"><span class="end-stat__v">${value}</span><span class="end-lbl">${label}</span></div>`
+      )
+      .join('');
+    const award = salvageLine(this.hangar().lastAward);
+    const salvage = `<p class="end-salvage">${glyphMarkup('salvage')}<span class="end-salvage__v">${award.amount}</span><span>${award.text}</span></p>`;
+    return `<header class="end-head">
+        <p class="end-kicker">${head.kicker}</p>
+        <h1 class="end-title">${head.title}${of}</h1>
+        <p class="end-chapter">${head.line}${badge}</p>
+        ${killer}${quote}
+      </header>
+      <section class="end-run"><p class="end-lbl">The run</p>${timelineMarkup(model)}</section>
+      <div class="end-cols">
+        <section class="end-build"><p class="end-lbl">Build</p>${build}</section>
+        <section class="end-moment">
+          <p class="end-lbl">Best moment</p>${momentMarkup}
+          <div class="end-stats">${stats}</div>
+          ${salvage}
+        </section>
+      </div>`;
   }
 
   showGameOverScreen(payload) {
@@ -54,55 +165,17 @@ export class RunEndScreens {
 
     const data = payload?.data || {};
     const refs = this.refs.gameOver;
-    const setText = (node, value) => {
-      if (node) node.textContent = value;
-    };
-
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(Number(data.stats?.timeElapsed) || 0)
-    );
-    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
-    const level = data.player?.level ?? data.level;
-
-    setText(refs.time, `${minutes}:${seconds}`);
-    setText(refs.wave, `${wave ?? '—'}`);
-    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
-    setText(refs.combo, `x${data.maxCombo ?? 0}`);
-    setText(refs.level, `${level ?? '—'}`);
-    setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
-    const rush = data.bossRush;
-    setText(
-      refs.location,
-      rush
-        ? [
-            'Boss Rush',
-            `Warden ${rush.stage} of ${BOSS_RUSH_LAYERS.length}`,
-            formatRunTime(totalSeconds),
-            `BEST ${bossRushBest(rush.bestStage, rush.bestTime).toUpperCase()}`,
-          ].join(' · ')
-        : runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
-    );
-    setText(refs.salvage, salvageLine(this.hangar().lastAward));
-    setText(refs.seed, this.difficulty().runLabel());
-    setText(refs.copySeedBtn, 'Copy seed link');
-    if (refs.quote) {
-      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission());
-    }
-
-    const progression = this.progression();
-    if (refs.build && progression) {
-      refs.build.innerHTML = buildBlockMarkup(
-        collectBuild(progression, this.combat())
-      );
-    }
-
-    const focusTarget = refs.retryBtn?.disabled
-      ? refs.restartBtn
-      : refs.retryBtn || refs.restartBtn;
-    focusTarget?.focus({ preventScroll: true });
+    const numbers = runNumbers(data, 'death');
+    refs.body.innerHTML = this.bodyMarkup('death', data, numbers);
+    refs.invite.innerHTML = inviteLine({
+      outcome: 'death',
+      layer: numbers.layer,
+      bestAtStart: this.bestAtStart,
+      bossRush: data.bossRush ?? null,
+    });
+    refs.seed.textContent = this.difficulty().runLabel();
+    refs.copySeedBtn.textContent = 'Copy seed link';
+    refs.restartBtn?.focus({ preventScroll: true });
   }
 
   showVictoryScreen(payload) {
@@ -110,69 +183,18 @@ export class RunEndScreens {
 
     const data = payload?.data || {};
     const refs = this.refs.victory;
-    const setText = (node, value) => {
-      if (node) node.textContent = value;
-    };
-
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(Number(data.stats?.timeElapsed) || 0)
-    );
-    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
-    const level = data.player?.level ?? data.level;
-
     const rush = data.bossRush;
-    setText(refs.title, rush ? 'BOSS RUSH CLEARED' : 'FIELD CLEARED');
-    setText(refs.time, `${minutes}:${seconds}`);
-    setText(refs.wave, `${wave ?? '—'}`);
-    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
-    setText(refs.combo, `x${data.maxCombo ?? 0}`);
-    setText(refs.level, `${level ?? '—'}`);
-    setText(
-      refs.best,
-      rush
-        ? `Cleared in ${formatRunTime(totalSeconds)} · Best ${bossRushBest(rush.bestStage, rush.bestTime)}`
-        : `Best layer: ${data.bestLayer ?? wave ?? '—'}`
+    refs.body.innerHTML = this.bodyMarkup(
+      'victory',
+      data,
+      runNumbers(data, 'victory')
     );
+    refs.invite.innerHTML = inviteLine({
+      outcome: 'victory',
+      bossRush: rush ?? null,
+    });
     // A Boss Rush ends here: no Deep Field after it.
     refs.continueBtn?.classList.toggle('hidden', Boolean(rush));
-    setText(refs.salvage, salvageLine(this.hangar().lastAward));
-    if (refs.quote) {
-      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission());
-    }
-
-    if (refs.build) {
-      refs.build.innerHTML = '';
-      const upgrades = ensureArray(data.upgrades);
-      if (!upgrades.length) {
-        const empty = document.createElement('li');
-        empty.className = 'gameover-build__empty';
-        empty.textContent = 'No upgrades';
-        refs.build.appendChild(empty);
-      }
-      upgrades.forEach(({ name, id, level: rank }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.append(`${name || id} `);
-        const rankNode = document.createElement('span');
-        rankNode.className = 'gameover-build__rank';
-        rankNode.textContent = `Lv.${rank}`;
-        item.appendChild(rankNode);
-        refs.build.appendChild(item);
-      });
-    }
-
-    if (refs.synergies) {
-      refs.synergies.innerHTML = '';
-      ensureArray(data.synergies).forEach(({ name, family }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.textContent = name || family;
-        refs.synergies.appendChild(item);
-      });
-    }
 
     const buttons = [refs.continueBtn, refs.restartBtn, refs.quitBtn];
     buttons.forEach((button) => {

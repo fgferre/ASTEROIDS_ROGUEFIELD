@@ -18,20 +18,22 @@ import {
 } from '../../data/constants/gameplay.js';
 import { BOSS_CONFIG } from '../../data/constants/visual.js';
 import { getContent } from '../../content/registry.js';
-import { WEAPONS, firePattern } from '../../data/weapons.js';
+import { firePattern } from '../../data/weapons.js';
 
 export class Projectiles {
   /**
    * `physics()`: the physics service (buildPlayerCollisionContext, checkCircleCollision).
    * `emit(name, payload)`: sends bullet-created and player-hit-by-projectile.
-   * `weapon()`: the ship's shot right now, a fresh plain object: { weaponId, bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceDamageTuning, lanceApexDamage, lancePierce, pierceBonus }.
+   * `weapon()`: the ship's shot right now, a fresh plain object: { form (the weapon in its current form), bulletSpeed, bulletLifetime, trailLength, thermalLens, lanceApexDamage, lancePierce, pierceBonus }.
    * `burstFlak(bolt)`: bursts a projectile with a `burst` at the end of its range (the weapon's hit path).
+   * `steer(missile, dt)`: turns a `seeker` missile onto its target (firePatterns.js).
    */
-  constructor({ physics, emit, weapon, burstFlak }) {
+  constructor({ physics, emit, weapon, burstFlak, steer }) {
     this.physics = physics;
     this.emit = emit;
     this.weapon = weapon;
     this.burstFlak = burstFlak;
+    this.steer = steer;
 
     this.bullets = [];
     this.enemyBullets = [];
@@ -46,8 +48,9 @@ export class Projectiles {
     };
   }
 
-  // The weapon's projectile (its content file). `volley`: the fan's volley it
-  // belongs to; a projectile with a `burst` fired alone is a volley of one.
+  // The weapon's projectile (its content file, in the weapon's current form).
+  // `volley`: the fan's volley it belongs to; a projectile with a `burst`
+  // fired alone is a volley of one. Returns the shot (a seeker steers it).
   createBullet(fromPos, toPos, damage, volley = null) {
     const dx = toPos.x - fromPos.x;
     const dy = toPos.y - fromPos.y;
@@ -56,7 +59,7 @@ export class Projectiles {
     if (distance === 0) return;
 
     const weapon = this.weapon();
-    const definition = WEAPONS[weapon.weaponId];
+    const definition = weapon.form;
     const { projectile } = definition;
 
     // Use object pool instead of creating new object
@@ -65,6 +68,9 @@ export class Projectiles {
     // Configure bullet properties
     bullet.x = fromPos.x;
     bullet.y = fromPos.y;
+    // Where it left the muzzle: Afterburn Lance counts the flight.
+    bullet.originX = fromPos.x;
+    bullet.originY = fromPos.y;
     const speed = weapon.bulletSpeed * projectile.speedMultiplier;
     bullet.vx = (dx / distance) * speed;
     bullet.vy = (dy / distance) * speed;
@@ -73,8 +79,7 @@ export class Projectiles {
       weapon.thermalLens && !firePattern(definition, 'beam')
         ? weapon.thermalLens.lanceDamageMultiplier
         : 1;
-    const shotDamage =
-      damage * weapon.lanceDamageTuning * lens * weapon.lanceApexDamage;
+    const shotDamage = damage * lens * weapon.lanceApexDamage;
     // A projectile with a range lives until the end of it.
     const life = projectile.range
       ? projectile.range / speed
@@ -92,6 +97,7 @@ export class Projectiles {
     bullet.type = 'player';
     bullet.kind = projectile.look;
     bullet.offscreenTimer = 0;
+    bullet.seeker = null;
     bullet.pierceLeft = projectile.pierce
       ? weapon.lancePierce + weapon.pierceBonus
       : 0;
@@ -116,6 +122,7 @@ export class Projectiles {
       from: fromPos,
       to: toPos,
     });
+    return bullet;
   }
 
   createEnemyBullet(data = {}) {
@@ -181,6 +188,7 @@ export class Projectiles {
     bullet.destroyReason = null;
     bullet.destroyLogEmitted = false;
     bullet.createdAt = Date.now();
+    bullet.stasisTimer = 0;
 
     if (Number.isFinite(projectile.radius)) {
       bullet.radius = Math.max(0, projectile.radius);
@@ -401,18 +409,25 @@ export class Projectiles {
         continue;
       }
 
-      if (Array.isArray(bullet.trail)) {
-        bullet.trail.push({ x: bullet.x, y: bullet.y });
-        const trailLimit = this.getEnemyBulletTrailLimit(bullet);
-        if (trailLimit > 0 && bullet.trail.length > trailLimit) {
-          bullet.trail.splice(0, bullet.trail.length - trailLimit);
+      // Held by a Stasis (freezeEnemyBullets): still where it stopped, its
+      // trail and its life too; it still hurts.
+      if (bullet.stasisTimer > 0) {
+        bullet.stasisTimer -= deltaTime;
+        trailPoints += bullet.trail?.length ?? 0;
+      } else {
+        if (Array.isArray(bullet.trail)) {
+          bullet.trail.push({ x: bullet.x, y: bullet.y });
+          const trailLimit = this.getEnemyBulletTrailLimit(bullet);
+          if (trailLimit > 0 && bullet.trail.length > trailLimit) {
+            bullet.trail.splice(0, bullet.trail.length - trailLimit);
+          }
+          trailPoints += bullet.trail.length;
         }
-        trailPoints += bullet.trail.length;
-      }
 
-      bullet.x += bullet.vx * deltaTime;
-      bullet.y += bullet.vy * deltaTime;
-      bullet.life -= deltaTime;
+        bullet.x += bullet.vx * deltaTime;
+        bullet.y += bullet.vy * deltaTime;
+        bullet.life -= deltaTime;
+      }
 
       const outOfBounds =
         bullet.x < 0 ||
@@ -558,6 +573,13 @@ export class Projectiles {
     }
   }
 
+  /** A Stasis: every shot in flight but a Warden's stands still for `duration` s. */
+  freezeEnemyBullets(duration) {
+    for (const bullet of this.enemyBullets) {
+      if (bullet && !bullet.isBossProjectile) bullet.stasisTimer = duration;
+    }
+  }
+
   clearEnemyBullets() {
     if (!Array.isArray(this.enemyBullets) || !this.enemyBullets.length) {
       this.enemyBullets = [];
@@ -597,6 +619,7 @@ export class Projectiles {
       }
       trailPoints += bullet.trail.length;
 
+      if (bullet.seeker) this.steer(bullet, deltaTime);
       // Atualizar posição
       bullet.x += bullet.vx * deltaTime;
       bullet.y += bullet.vy * deltaTime;

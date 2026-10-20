@@ -107,12 +107,36 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     cleanupGlobalState();
   });
 
-  it('Ballast Rounds: +8% lance damage and -4% fire rate per rank', () => {
-    const { combat, eventBus } = makeCombat();
-    const cooldown = combat.shootCooldown;
+  it('Ballast Rounds 3: double damage on an enemy below half health, beams included', () => {
+    const [fresh, cracked, beamed] = [100, 40, 40].map((health, i) =>
+      makeEnemy(`e${i}`, 200, 300, { health, maxHealth: 100 })
+    );
+    const { combat, eventBus, enemies } = makeCombat([fresh, cracked, beamed]);
     takeCard(eventBus, 'ballast_rounds');
-    expect(fireLance(combat).damage).toBeCloseTo(DAMAGE * 1.08 ** 3, 6);
-    expect(combat.shootCooldown).toBeCloseTo(cooldown * 1.04 ** 3, 6);
+    combat.processBulletHit(lanceHit(), fresh, enemies);
+    combat.processBulletHit(lanceHit(), cracked, enemies);
+    const beam = { ...lanceHit(), kind: 'beam', projectile: undefined };
+    combat.processBulletHit(beam, beamed, enemies);
+    expect(fresh.health).toBe(100 - DAMAGE);
+    expect(cracked.health).toBe(40 - 2 * DAMAGE);
+    expect(beamed.health).toBe(40 - 2 * DAMAGE);
+  });
+
+  it('Afterburn Lance 3: +20% damage per 100 px a round flew, up to +80%, and a 52% longer lock', () => {
+    const near = makeEnemy('near', 300, 300, { health: 1000 });
+    const far = makeEnemy('far', 750, 300, { health: 1000 });
+    const { combat, eventBus, enemies } = makeCombat([near, far]);
+    const range = combat.targeting.targetingRange;
+    takeCard(eventBus, 'afterburn_lance');
+    expect(combat.targeting.targetingRange).toBeCloseTo(range * 1.15 ** 3, 6);
+    // Fired from x = 100: 200 px to `near`, 650 px (counted as 400) to `far`.
+    [near, far].forEach((enemy) => {
+      const round = fireLance(combat);
+      round.x = enemy.x;
+      combat.processBulletHit(round, enemy, enemies);
+    });
+    expect(1000 - near.health).toBeCloseTo(DAMAGE * 1.4, 6);
+    expect(1000 - far.health).toBeCloseTo(DAMAGE * 1.8, 6);
   });
 
   it('Recoil Dampers: a lance goes through one more target', () => {
@@ -234,16 +258,86 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     expect(doubled / hits).toBeLessThan(0.13);
   });
 
-  it('Gravity Brake: enemies within 120 px move 8% slower per rank, bosses do not', () => {
-    const near = makeEnemy('near', 180, 300, { vx: 100 });
+  it('Gravity Brake 3: enemies and enemy shots within 180 px move 50% slower, Wardens do not', () => {
+    const near = makeEnemy('near', 250, 300, { vx: 100 });
     const far = makeEnemy('far', 400, 300, { vx: 100 });
     const boss = makeEnemy('boss', 150, 300, { vx: 100, type: 'boss' });
     const { combat, eventBus } = makeCombat([near, far, boss]);
+    const shotNear = { x: 260, y: 300, vx: -200, vy: 0 };
+    const shotFar = { x: 400, y: 300, vx: -200, vy: 0 };
+    combat.enemyBullets.push(shotNear, shotFar);
     takeCard(eventBus, 'gravity_brake', 3);
     combat.updateWeaponEffects(0.5);
-    expect(near.x).toBeCloseTo(180 - 100 * 0.24 * 0.5, 6);
+    expect(near.x).toBeCloseTo(250 - 100 * 0.5 * 0.5, 6);
+    expect(shotNear.x).toBeCloseTo(260 + 200 * 0.5 * 0.5, 6);
     expect(far.x).toBe(400);
+    expect(shotFar.x).toBe(400);
     expect(boss.x).toBe(150);
+  });
+
+  it('Capacitor Bank: a kill sparks into the nearest enemy, and a killing spark sparks again up to the rank', () => {
+    const line = () =>
+      [5, 5, 100].map((health, i) =>
+        makeEnemy(`e${i}`, 200 + i * 100, 300, { health })
+      );
+    const sparked = (ranks) => {
+      const list = line();
+      const { combat, eventBus, enemies } = makeCombat(list);
+      takeCard(eventBus, 'capacitor_bank', ranks);
+      combat.processBulletHit(lanceHit(), list[0], enemies);
+      return { healths: list.map((enemy) => enemy.health), combat };
+    };
+    // Rank 1: one spark (60%) kills e1; that kill does not spark on.
+    expect(sparked(1).healths).toEqual([0, 0, 100]);
+    // Rank 3: sparks at full damage chain until one fails to kill.
+    const full = sparked(3);
+    expect(full.healths).toEqual([0, 0, 100 - DAMAGE]);
+    expect(full.combat.arcs).toHaveLength(2);
+    // No kill, no spark.
+    const tough = makeEnemy('tough', 200, 300);
+    const other = makeEnemy('other', 250, 300);
+    const plain = makeCombat([tough, other]);
+    takeCard(plain.eventBus, 'capacitor_bank');
+    plain.combat.processBulletHit(lanceHit(), tough, plain.enemies);
+    expect(other.health).toBe(100);
+  });
+
+  it('Arc Lattice 2: every 1 s the 2 nearest enemies within 180 px take a shot each; a charge waits for one in reach', () => {
+    const [a, b, c] = [150, 200, 250].map((x, i) => makeEnemy(`e${i}`, x, 300));
+    const outside = makeEnemy('out', 400, 300);
+    const list = [outside, c, b, a];
+    const { combat, eventBus } = makeCombat(list);
+    takeCard(eventBus, 'arc_lattice', 2);
+    combat.updateWeaponEffects(0.9);
+    expect(a.health).toBe(100);
+    combat.updateWeaponEffects(0.1);
+    expect([a, b, c, outside].map((enemy) => enemy.health)).toEqual([
+      100 - DAMAGE,
+      100 - DAMAGE,
+      100,
+      100,
+    ]);
+
+    // Nobody in reach: the charge holds, and strikes the first who comes.
+    list.length = 0;
+    combat.updateWeaponEffects(3);
+    const late = makeEnemy('late', 150, 300);
+    list.push(late);
+    combat.updateWeaponEffects(1 / 60);
+    expect(late.health).toBe(100 - DAMAGE);
+  });
+
+  it('Gyro Servos 2: fire rate +80% for 1.5 s after a dash', () => {
+    const { combat, eventBus } = makeCombat();
+    const cooldown = combat.shootCooldown;
+    takeCard(eventBus, 'gyro_servos');
+    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
+    eventBus.emit('player-dashed', {});
+    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    combat.updateWeaponEffects(1.4);
+    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    combat.updateWeaponEffects(0.2);
+    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
   });
 });
 
@@ -290,12 +384,55 @@ describe('R5.4 cards in a running game', () => {
     expect(after).toBeGreaterThan(0.4 - 2 * STEP_SECONDS);
   });
 
-  it('Scrap Compactor: +6% XP from orbs per rank', () => {
-    const { progression } = startGame().services;
-    ['scrap_compactor', 'scrap_compactor', 'scrap_compactor'].forEach((id) =>
-      progression.applyUpgrade(id)
-    );
-    expect(progression.xpGainMultiplier).toBeCloseTo(1.06 ** 3, 6);
+  it('Scrap Compactor 3: every level-up repairs 20 hull', () => {
+    const game = startGame();
+    const { player, progression } = game.services;
+    const levelUp = () => {
+      player.health = player.maxHealth - 50;
+      progression.collectXP(progression.experienceToNext);
+      return player.health - (player.maxHealth - 50);
+    };
+    expect(levelUp()).toBe(0);
+    [1, 2, 3].forEach(() => progression.applyUpgrade('scrap_compactor'));
+    expect(levelUp()).toBe(20);
+  });
+
+  it('Wide Net 3: every 10 s every orb on the Field flies to the ship', () => {
+    const game = startGame();
+    const { player, progression, 'xp-orbs': xpOrbs } = game.services;
+    player.setInvulnerableTimer(1e9);
+    progression.applyUpgrade('wide_net');
+    progression.applyUpgrade('wide_net');
+    progression.applyUpgrade('wide_net');
+    // XP orbs tick on world time, which can lag the steps (slow-mo).
+    stepFor(game, 9.5);
+    expect(xpOrbs.globalPull).toBeNull();
+    stepFor(game, 1);
+    expect(xpOrbs.globalPull).not.toBeNull();
+  });
+
+  it('Magnetic Field: each rank widens the reach the ship actually collects from', () => {
+    const game = startGame();
+    const { player, progression, 'xp-orbs': xpOrbs } = game.services;
+    const base = player.getMagnetismRadius();
+    // Steps one frame with an orb at `distance` straight right of the ship;
+    // true if the magnet moved it.
+    const pulls = (distance) => {
+      const { x, y } = player.getPosition();
+      const orb = xpOrbs.createXPOrb(x + distance, y, 1);
+      const before = orb.x;
+      xpOrbs.update(STEP_SECONDS);
+      const moved = orb.x !== before;
+      xpOrbs.consumeOrb(orb);
+      return moved;
+    };
+    expect(pulls(base * 1.3)).toBe(false);
+    progression.applyUpgrade('magfield');
+    expect(player.getMagnetismRadius()).toBe(Math.floor(base * 1.4));
+    expect(pulls(base * 1.3)).toBe(true);
+    progression.applyUpgrade('magfield');
+    progression.applyUpgrade('magfield');
+    expect(pulls(base * 1.9)).toBe(true);
   });
 
   it('Lucky Fragment: rocks drop field pickups only with the card', () => {
@@ -344,7 +481,7 @@ describe('R5.4 cards in a running game', () => {
     expect(player.health).toBe(floor);
   });
 
-  it('Blood Ledger (cursed): +100% XP and no heart drops', () => {
+  it('Blood Ledger (cursed): +100% XP, no heart drops, a full repair per Warden', () => {
     const game = startGame();
     const { progression, enemies, healthHearts } = game.services;
     const spawnHeart = vi.spyOn(healthHearts, 'spawnHeart');
@@ -367,5 +504,10 @@ describe('R5.4 cards in a running game', () => {
     for (let i = 0; i < 300; i += 1)
       enemies.rewardManager.tryDropHealthHeart(rock(i));
     expect(spawnHeart).not.toHaveBeenCalled();
+
+    const { player } = game.services;
+    player.health = 10;
+    game.eventBus.emit('boss-defeated', { x: 200, y: 200 });
+    expect(player.health).toBe(player.maxHealth);
   });
 });

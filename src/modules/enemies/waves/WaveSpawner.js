@@ -2,8 +2,8 @@
  * Wave spawner
  *
  * Puts a wave's groups on the field (spawnWave): where each unit enters (a
- * safe distance from the ship, the edges, a surge's burst point), the size of
- * a rock, and the wave's spawn pacing.
+ * safe distance from the ship, the edges, a surge's burst point, a
+ * formation's points), the size of a rock, and the wave's spawn pacing.
  */
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
@@ -15,6 +15,7 @@ import {
   ASTEROID_SAFE_SPAWN_DISTANCE,
   WAVE_SPAWN_DELAY,
 } from '../../../data/constants/gameplay.js';
+import { formationPoints } from './formations.js';
 import { SUPPORT_KINDS } from './LayerSchedule.js';
 
 // Surge bursts: units spread this far (px) along the edge either side of the
@@ -160,8 +161,11 @@ export class WaveSpawner {
    * @param {Object} [options]
    * @param {boolean} [options.surge] - Burst: every unit (asteroids too)
    *   spawns around one point on the field edge farthest from the player.
+   * @param {Array} [options.points] - A formation's points (formationPoints),
+   *   one per unit in group order: each unit spawns on its point and flies
+   *   its course.
    */
-  spawnWave(waveConfig, { surge = false } = {}) {
+  spawnWave(waveConfig, { surge = false, points = null } = {}) {
     const enemyGroups = Array.isArray(waveConfig?.enemies)
       ? waveConfig.enemies
       : [];
@@ -202,6 +206,7 @@ export class WaveSpawner {
       this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
+    let unit = 0;
 
     for (const enemyGroup of enemyGroups) {
       if (!enemyGroup || typeof enemyGroup !== 'object') {
@@ -232,8 +237,11 @@ export class WaveSpawner {
           ? this.waveRandom.createLegacyAsteroidScopedRandom()
           : this.waveRandom.createScopedRandom('spawn', 'wave-spawn');
 
+        const point = points?.[unit++] ?? null;
         let position;
-        if (surgeEdge) {
+        if (point) {
+          position = { x: point.x, y: point.y };
+        } else if (surgeEdge) {
           position = this.calculateSurgePosition(
             worldBounds,
             surgeEdge,
@@ -367,6 +375,12 @@ export class WaveSpawner {
           spawnDelayMultiplier: this.spawnDelayMultiplier,
         };
 
+        if (point) {
+          enemyConfig.vx = point.vx;
+          enemyConfig.vy = point.vy;
+          enemyConfig.course = { vx: point.vx, vy: point.vy, left: point.hold };
+        }
+
         if (
           !isAsteroid &&
           (enemyConfig.size === null ||
@@ -426,6 +440,25 @@ export class WaveSpawner {
         }
       }
     }
+  }
+
+  /** A formation's points round the ship now (formations.js). */
+  formationPoints(formation, count) {
+    const world = this.enemySystem?.getCachedWorld?.();
+    const bounds = world?.getBounds?.() || {
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+    };
+    const ship = this.enemySystem.getPlayerPositionSnapshot(
+      this.enemySystem.getCachedPlayer()
+    );
+    const { random } = this.waveRandom.createScopedRandom('spawn', 'formation');
+    return formationPoints(formation, count, {
+      ship,
+      width: bounds.width,
+      height: bounds.height,
+      random,
+    });
   }
 
   /**

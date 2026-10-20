@@ -35,12 +35,14 @@ import {
   mirrorPickups,
   mirrorProjectiles,
 } from './fieldMirrors.js';
+import { FormationMarks } from './formationMarks.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
 import { ImpactKick } from './impactPass.js';
 import {
   mirrorBossTransitions,
   mirrorLocks,
   mirrorOverlays,
+  mirrorWards,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
@@ -99,6 +101,9 @@ class Renderer3D extends BaseSystem {
     // Dolly, roll, field clamp, key shadow and cinematics (cameraRig.js).
     this.cameraRig = new CameraRig(this.camera);
     this.lastRenderTime = null;
+    // The ship's screen point as last drawn (trackShip), or null.
+    this.shipOnScreen = null;
+    this.shipPoint = { x: 0, y: 0 };
     this.three = null;
     this.failed = false;
     this.graphics = {
@@ -148,6 +153,7 @@ class Renderer3D extends BaseSystem {
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
     this.muzzles = new MuzzleFlashes();
+    this.formationMarks = new FormationMarks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
     // with distance from the camera target (the rig's focus).
@@ -223,6 +229,12 @@ class Renderer3D extends BaseSystem {
         payload.y - HALF_H,
         payload.flare
       );
+    });
+    // A formation's marks, and the edge lit where it comes in.
+    this.registerEventListener('formation-warned', (payload) => {
+      for (const { x, y } of this.formationMarks.add(payload)) {
+        this.three?.veil.flare(x - HALF_W, y - HALF_H, PALETTE.threat);
+      }
     });
     this.registerEventListener('boss-telegraph', () => {
       this.camera.trigger('telegraph');
@@ -334,7 +346,8 @@ class Renderer3D extends BaseSystem {
   /**
    * Logical field (x, y) → screen point through the perspective camera (last
    * rendered pose), for the HUD: the screen spans 800 × 600 whatever its
-   * aspect (hud/direction.js restores real proportions). Null before the
+   * aspect (hud/direction.js restores real proportions). Right after a draw
+   * (UISystem.placeOnField) it is that frame's projection. Null before the
    * first frame.
    */
   worldToScreen(x, y, out = { x: 0, y: 0 }) {
@@ -345,6 +358,22 @@ class Renderer3D extends BaseSystem {
     out.x = ((v.x + 1) / 2) * GAME_WIDTH;
     out.y = ((1 - v.y) / 2) * GAME_HEIGHT;
     return out;
+  }
+
+  /**
+   * The ship's screen point as this frame draws it (worldToScreen's units):
+   * its drawn pose through the camera as posed this frame, so the HUD drawn
+   * on the ship (UISystem.placeOnField, after each drawn frame) sits on it
+   * whatever the camera does, paused too. Null when no ship is drawn.
+   */
+  trackShip(player) {
+    const t = this.three;
+    const at = t.player.group.visible && player?.position;
+    // The pose updateCamera set, before the draw would apply it.
+    t.camera.updateMatrixWorld();
+    this.shipOnScreen = at
+      ? this.worldToScreen(at.x, at.y, this.shipPoint)
+      : null;
   }
 
   /**
@@ -534,6 +563,7 @@ class Renderer3D extends BaseSystem {
     this.camera.reset();
     this.cameraRig.reset();
     this.lastRenderTime = null;
+    this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
     this.three?.enemies.clear();
     this.three?.bursts.clear();
@@ -688,6 +718,7 @@ class Renderer3D extends BaseSystem {
     t.smoke.begin();
     t.texts.begin();
     t.debris.begin();
+    t.bodies.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
     if (t.key.castShadow) {
@@ -701,6 +732,7 @@ class Renderer3D extends BaseSystem {
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
+    this.trackShip(player);
     this.mirrorShield(player, time);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
@@ -714,6 +746,8 @@ class Renderer3D extends BaseSystem {
     );
     mirrorEffects(t, effects, this.impact);
     this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb);
+    this.formationMarks.update(dt, t.ribbons, t.threatRgb);
+    mirrorWards(t, enemyList);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();
     }
@@ -743,6 +777,7 @@ class Renderer3D extends BaseSystem {
     t.smoke.end(pointScale);
     t.texts.end();
     t.debris.end();
+    t.bodies.end();
     this.impact.apply(
       t.impactPass,
       t.width,

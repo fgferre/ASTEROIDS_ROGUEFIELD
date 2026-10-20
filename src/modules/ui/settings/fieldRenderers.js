@@ -1,18 +1,28 @@
 // src/modules/ui/settings/fieldRenderers.js
 //
-// The DOM for one settings row (toggle, range, select, segmented, binding),
-// built from a schema field and its current value, and the text of a range
-// value. SettingsPanel owns the events and the redraw.
+// The DOM for one settings row (toggle, range, select, segmented, binding,
+// the HUD layout picker and the HUD editor's button), built from a schema
+// field, its current value and its category's values, and the text of a
+// range value. SettingsPanel owns the events and the redraw.
 
 import { formatBindingLabel } from './bindingKeys.js';
+import {
+  allPresets,
+  instrumentCatalog,
+  readUserPresets,
+} from '../hud/editor/layoutStore.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-export function renderSettingField(categoryId, field, value) {
+export function renderSettingField(categoryId, field, value, values = {}) {
   if (field.control === 'segmented') {
     return renderSegmentedField(categoryId, field, value);
   }
   switch (field.type) {
+    case 'hudLayout':
+      return renderHudLayoutField(categoryId, field, value, values);
+    case 'hudPresets':
+      return renderHudEditField(categoryId, field, value);
     case 'toggle':
       return renderToggleField(categoryId, field, value);
     case 'range':
@@ -174,6 +184,69 @@ function renderSelectField(categoryId, field, value) {
     wrapper.appendChild(description);
   }
 
+  return wrapper;
+}
+
+// The active HUD layout: the built-in presets, then the player's own.
+function renderHudLayoutField(categoryId, field, value, values) {
+  const options = allPresets(
+    readUserPresets(values.hudPresets, instrumentCatalog())
+  ).map(({ id, name, builtIn }) => ({ id, name, builtIn }));
+  const wrapper = renderSelectField(
+    categoryId,
+    { ...field, options: [] },
+    value
+  );
+  const select = wrapper.querySelector('.settings-select-input');
+  select.disabled = false;
+  [
+    ['Presets', options.filter((option) => option.builtIn)],
+    ['Your Layouts', options.filter((option) => !option.builtIn)],
+  ].forEach(([label, group]) => {
+    if (group.length === 0) return;
+    const optgroup = document.createElement('optgroup');
+    optgroup.setAttribute('label', label);
+    group.forEach(({ id, name }) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = name;
+      optgroup.appendChild(option);
+    });
+    select.appendChild(optgroup);
+  });
+  select.value = options.some((option) => option.id === value)
+    ? value
+    : field.default;
+  return wrapper;
+}
+
+// The way into the HUD editor (SettingsPanel opens it), with the count of
+// layouts saved.
+function renderHudEditField(categoryId, field, value) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'settings-field settings-field--wide';
+  wrapper.dataset.settingKey = field.key;
+  wrapper.dataset.settingCategory = categoryId;
+
+  const label = document.createElement('span');
+  label.className = 'settings-field__label';
+  label.textContent = field.label;
+  wrapper.appendChild(label);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn--secondary settings-hud-edit';
+  button.dataset.action = 'edit-hud-layout';
+  button.textContent = 'Edit HUD Layout';
+  wrapper.appendChild(button);
+
+  const saved = ensureArray(value).length;
+  const description = document.createElement('p');
+  description.className = 'settings-field__description';
+  description.textContent = `${field.description} ${
+    saved === 1 ? '1 layout saved.' : `${saved || 'No'} layouts saved.`
+  }`;
+  wrapper.appendChild(description);
   return wrapper;
 }
 

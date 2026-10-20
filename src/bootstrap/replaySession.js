@@ -10,9 +10,12 @@
 // InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
 // re-applied at the next frame boundary, which is when a player's click lands
-// too (the loop stops stepping on level-up).
+// too (the loop stops stepping on level-up). A chest's cards, which wait for
+// Continue, go on their own once the last has had its reveal; the run is
+// paused under them, so the moment they go does not change it.
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
+import { CHEST_REVEAL_MS } from '../modules/ui/ChestCeremony.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {
@@ -47,6 +50,8 @@ export function createReplayController({
   let player = null;
   let armedRecording = null;
   let pickPending = false;
+  // When a replay's chest cards, all revealed, go (Date.now ms), or null.
+  let chestDoneAt = null;
   // The viewer's own control scheme while a replay flies the recorded one.
   let viewerControls = null;
   const difficulty = session.resolveServiceInstance('difficulty');
@@ -113,8 +118,11 @@ export function createReplayController({
     input.setInputSource(null);
   });
 
+  // A pick answers an offer on screen; a chest's cards (collectibles/
+  // chests.js) land with none up, and the replayed run grants them itself.
   eventBus.on('upgrade-applied', (payload = {}) => {
-    if (recorder && payload.upgradeId) {
+    const picked = progression.pendingUpgradeOptions.length > 0;
+    if (recorder && payload.upgradeId && picked) {
       recorder.recordUpgrade(runStep(), payload.upgradeId);
     }
   });
@@ -137,6 +145,21 @@ export function createReplayController({
     }
   });
 
+  // The chest's cards on screen (ui/ChestCeremony.js) go a reveal's length
+  // after the last one starts its own, as if Continue were pressed.
+  const passChestCards = () => {
+    const chest = ui.chestCeremony;
+    const shown = chest.current;
+    if (!shown || shown.revealed < shown.elements.length) {
+      chestDoneAt = null;
+      return;
+    }
+    chestDoneAt ??= Date.now() + CHEST_REVEAL_MS;
+    if (Date.now() < chestDoneAt) return;
+    chestDoneAt = null;
+    chest.continue();
+  };
+
   return {
     /** Plays `recording` on the next run start, in its recorded mode. */
     arm(recording) {
@@ -148,11 +171,16 @@ export function createReplayController({
       };
     },
     /**
-     * Once per frame, before the fixed steps: applies a pending replay pick,
-     * after the rerolls/banishes recorded before it.
+     * Once per frame, before the fixed steps: passes a chest's cards, and
+     * applies a pending replay pick after the rerolls/banishes recorded
+     * before it.
      */
     tick() {
-      if (!pickPending || !player) {
+      if (!player) {
+        return;
+      }
+      passChestCards();
+      if (!pickPending) {
         return;
       }
       pickPending = false;

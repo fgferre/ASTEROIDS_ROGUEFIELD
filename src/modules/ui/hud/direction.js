@@ -253,10 +253,54 @@ export function placeEdgeArrows(arrowPool, targets, corners) {
 }
 
 /**
- * The screen's `width` and the four corner panels as { w, h } boxes from
- * their screen corner, in HUD units (above); null while the HUD has no
- * layout (hidden). `root` holds the panels, `layer` is the full-screen
- * direction layer they are measured in.
+ * Where a Warden model's own screen-edge marker sits for its target (as
+ * placeEdgeArrows reads targets): { left, top (% of the screen), angle,
+ * edge, distance }, or null while the target is on screen. On the top edge
+ * it drops below the Warden bar, on the bottom one it rises above the XP
+ * line, when it would sit on them.
+ */
+export function edgeMarker(target, corners) {
+  const width = corners?.width ?? GAME_WIDTH;
+  const point = { x: target.x * (width / GAME_WIDTH), y: target.y };
+  const arrow = edgeArrow(
+    point,
+    width,
+    GAME_HEIGHT,
+    EDGE_ARROW_MARGIN,
+    corners
+  );
+  if (!arrow) return null;
+  const over = (bar) =>
+    bar &&
+    arrow.x > bar.x0 - EDGE_ARROW_GAP &&
+    arrow.x < bar.x1 + EDGE_ARROW_GAP;
+  if (arrow.edge === 'top' && over(corners?.topCenter)) {
+    arrow.y = Math.max(arrow.y, corners.topCenter.h + EDGE_ARROW_MARGIN);
+  }
+  if (arrow.edge === 'bottom' && over(corners?.bottomCenter)) {
+    arrow.y = Math.min(
+      arrow.y,
+      GAME_HEIGHT - corners.bottomCenter.h - EDGE_ARROW_MARGIN
+    );
+  }
+  return {
+    left: (arrow.x / width) * 100,
+    top: (arrow.y / GAME_HEIGHT) * 100,
+    angle: arrow.angle,
+    edge: arrow.edge,
+    distance: target.distance,
+  };
+}
+
+// A slot's drawn element(s): its model's markup, not its <style>.
+const drawn = (slot) => `[data-slot="${slot}"] > :not(style)`;
+
+/**
+ * The screen's `width`, the four corner panels as { w, h } boxes from
+ * their screen corner and the centre ones (the Warden bar on top, the XP
+ * line below) with their { x0, x1 } span too, in HUD units (above); null while the HUD
+ * has no layout (hidden). `root` holds the slots, `layer` is the
+ * full-screen direction layer they are measured in.
  */
 export function measurePanelCorners(root, layer) {
   const view = layer?.getBoundingClientRect?.();
@@ -266,7 +310,7 @@ export function measurePanelCorners(root, layer) {
   const scale = GAME_HEIGHT / view.height;
   // Every element the selector matches, joined into one box.
   const box = (selector, fromRight, fromBottom) => {
-    const out = { w: 0, h: 0 };
+    const out = { w: 0, h: 0, x0: Infinity, x1: -Infinity };
     root.querySelectorAll(selector).forEach((el) => {
       const rect = el.getBoundingClientRect();
       if (!(rect.width > 0)) return;
@@ -274,15 +318,19 @@ export function measurePanelCorners(root, layer) {
       const h = fromBottom ? view.bottom - rect.top : rect.bottom - view.top;
       out.w = Math.max(out.w, w * scale);
       out.h = Math.max(out.h, h * scale);
+      out.x0 = Math.min(out.x0, (rect.left - view.left) * scale);
+      out.x1 = Math.max(out.x1, (rect.right - view.left) * scale);
     });
     return out;
   };
   return {
     width: view.width * scale,
-    topLeft: box('.stats-area', false, false),
+    topLeft: box(drawn('run-info'), false, false),
     // The kill feed hangs under the radar (its min-height holds the rows).
-    topRight: box('.radar-area, .hud-feed', true, false),
-    bottomLeft: box('.status-area', false, true),
-    bottomRight: box('.systems-area', true, true),
+    topRight: box(`${drawn('radar')}, ${drawn('feed')}`, true, false),
+    bottomLeft: box(drawn('vitals'), false, true),
+    bottomRight: box(drawn('build'), true, true),
+    topCenter: box(drawn('warden'), false, false),
+    bottomCenter: box(drawn('xp'), false, true),
   };
 }

@@ -350,24 +350,36 @@ export class HeartTokens extends InstanceBatch {
 // The puck every token is built on, radius 1 (× the token's radius): a
 // raised lip round a recessed top, a chamfer, a short wall and a smaller
 // flat base, round for the Magnet, octagonal for the Pulse, hexagonal for
-// the Overcharge, so a kind also reads by its outline from low and from the
-// side. PUCK runs from the recess up over the lip and down the outside.
+// the Overcharge, square for the Repair, twelve-sided for the Stasis,
+// pentagonal for the Salvage Cache, so a kind also reads by its outline
+// from low and from the side. PUCK runs from the recess up over the lip and
+// down the outside.
 const PUCK = [
   0.66, 0.12, 0.69, 0.17, 0.75, 0.17, 0.88, 0.11, 0.97, 0.03, 0.97, -0.05, 0.84,
   -0.15, 0.5, -0.2,
 ];
 const RECESS = [0.665, 0.12, 0.665, 0.1];
 const SOCKET = [0.36, -0.19, 0.3, -0.24, 0.2, -0.25];
-const PUCK_SIDES = { magnet: 20, pulse: 8, overcharge: 6 };
+// Each kind's sides, and the turn that sets a flat side, not a corner,
+// toward the camera.
+const PUCKS = {
+  magnet: { sides: 20, turn: 0 },
+  pulse: { sides: 8, turn: Math.PI / 8 },
+  overcharge: { sides: 6, turn: 0 },
+  repair: { sides: 4, turn: Math.PI / 4 },
+  stasis: { sides: 12, turn: Math.PI / 12 },
+  salvage: { sides: 5, turn: (3 * Math.PI) / 10 },
+};
 const TOP = 0.12;
 
 // Bright parts of the light geometry, × the pickup colour.
 const shade = (THREE, k) => new THREE.Color(k, k, k);
 
+// Its corners at `turn` + k·2π/sides, as revolve()'s (0 = +x, toward +z).
 function torus(THREE, radius, tube, sides, turn, y) {
   const geometry = new THREE.TorusGeometry(radius, tube, 4, sides);
   geometry.rotateX(-Math.PI / 2);
-  geometry.rotateY(turn);
+  geometry.rotateY(-turn);
   geometry.translate(0, y, 0);
   return geometry;
 }
@@ -451,6 +463,66 @@ const GLYPHS = {
     geometry.translate(0, TOP + depth + 0.03, 0);
     return [{ geometry, color: shade(THREE, 1.1) }];
   },
+  // a cross, its centre white-hot
+  repair(THREE) {
+    const bar = (x, z) => {
+      const geometry = new THREE.BoxGeometry(x, 0.14, z);
+      geometry.translate(0, TOP + 0.08, 0);
+      return { geometry, color: shade(THREE, 1) };
+    };
+    const core = new THREE.BoxGeometry(0.2, 0.16, 0.2);
+    core.translate(0, TOP + 0.09, 0);
+    return [
+      bar(0.66, 0.2),
+      bar(0.2, 0.66),
+      { geometry: core, color: shade(THREE, 1.6) },
+    ];
+  },
+  // a snowflake: three crossed bars, tipped, round a hexagonal core
+  stasis(THREE) {
+    const y = TOP + 0.07;
+    const parts = [];
+    for (let k = 0; k < 3; k += 1) {
+      const bar = new THREE.BoxGeometry(0.78, 0.1, 0.08);
+      bar.translate(0, y, 0);
+      parts.push({ geometry: bar, rotationY: (k * Math.PI) / 3 });
+      for (const end of [-1, 1]) {
+        const tip = new THREE.BoxGeometry(0.06, 0.1, 0.2);
+        tip.translate(end * 0.3, y, 0);
+        parts.push({ geometry: tip, rotationY: (k * Math.PI) / 3 });
+      }
+    }
+    parts.forEach((part) => {
+      part.color = shade(THREE, 0.95);
+    });
+    const core = new THREE.CylinderGeometry(0.13, 0.13, 0.14, 6);
+    core.translate(0, y + 0.01, 0);
+    parts.push({ geometry: core, color: shade(THREE, 1.5) });
+    return parts;
+  },
+  // a gear: a toothed ring round a bright hub
+  salvage(THREE) {
+    const y = TOP + 0.07;
+    const parts = [
+      {
+        geometry: torus(THREE, 0.3, 0.07, 18, 0, y),
+        color: shade(THREE, 0.9),
+      },
+    ];
+    for (let k = 0; k < 6; k += 1) {
+      const tooth = new THREE.BoxGeometry(0.13, 0.12, 0.12);
+      tooth.translate(0.4, y, 0);
+      parts.push({
+        geometry: tooth,
+        rotationY: (k * Math.PI) / 3,
+        color: shade(THREE, 0.9),
+      });
+    }
+    const hub = new THREE.CylinderGeometry(0.12, 0.12, 0.14, 12);
+    hub.translate(0, y + 0.01, 0);
+    parts.push({ geometry: hub, color: shade(THREE, 1.5) });
+    return parts;
+  },
 };
 
 /**
@@ -460,10 +532,8 @@ const GLYPHS = {
  * chamfer, the glyph and the hover lens underneath.
  */
 export function tokenParts(THREE, kind) {
-  const sides = PUCK_SIDES[kind];
-  const round = sides > 8;
-  // a flat side, not a corner, toward the camera
-  const turn = sides === 8 ? Math.PI / 8 : 0;
+  const { sides, turn } = PUCKS[kind];
+  const round = sides > 12;
   const hull = colorOf(THREE, PALETTE.hull);
   const lit = colorOf(THREE, PALETTE.hullLit);
   const turned = (profile, caps) =>

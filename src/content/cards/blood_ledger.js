@@ -1,4 +1,3 @@
-// Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
@@ -15,13 +14,16 @@ export default {
   text: {
     name: 'Blood Ledger',
     summary:
-      'Sign the ledger: the Field pays double, and stops patching you up.',
+      'Sign the ledger: the Field pays double and stops patching you up. The ledger settles only when a Warden falls.',
     lore: 'Nobody knows who keeps the book. Everybody knows it always balances.',
     levels: [
       {
         title: 'Signed in Red',
-        description: 'XP from orbs +100%. Hearts no longer drop.',
-        highlights: ['Cursed: only hearts already on the field can heal you.'],
+        description:
+          'XP from orbs +100%. Hearts no longer drop. Every Warden you defeat repairs the hull in full.',
+        highlights: [
+          'Cursed: between Wardens, the Field drops no hearts at all.',
+        ],
       },
     ],
   },
@@ -39,6 +41,11 @@ export default {
           type: 'event',
           event: 'upgrade-no-heart-drops',
           payload: {},
+        },
+        {
+          type: 'event',
+          event: 'upgrade-boss-repair',
+          payload: { fraction: 1 }, // proposta 20/10
         },
       ],
     },

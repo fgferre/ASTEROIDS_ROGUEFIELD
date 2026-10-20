@@ -18,6 +18,10 @@ export const PALETTE = Object.freeze({
   boss: '#8a2be2',
   xp: '#ffd700',
   status: '#bcff00',
+  // field pickups (src/data/pickups.js), proposta 20/10
+  repair: '#7dffb0', // green-white
+  stasis: '#7fb2ff', // cold blue
+  salvage: '#dce6f5', // scrap silver
   // text
   text: '#e6eef8',
   textDim: 'rgba(230, 238, 248, 0.62)',

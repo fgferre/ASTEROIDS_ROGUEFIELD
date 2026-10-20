@@ -38,11 +38,13 @@ function triggerDetonation(enemy, params, reasonOrPayload, context = {}) {
 export default {
   params: {
     armTime: 'number',
-    lifetime: 'number',
-    proximityRadius: 'number',
-    explosionRadius: 'number',
+    lifetime: 'positive',
+    proximityRadius: 'positive',
+    explosionRadius: 'positive',
     explosionDamage: 'number',
   },
+  check: ({ armTime, lifetime }) =>
+    armTime > lifetime ? 'armTime is past lifetime' : null,
   methods: { triggerDetonation },
   reset(enemy, params) {
     enemy.armed = false;

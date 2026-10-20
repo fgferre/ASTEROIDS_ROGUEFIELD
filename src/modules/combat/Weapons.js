@@ -1,44 +1,53 @@
 // src/modules/combat/Weapons.js
 //
 // The ship's guns: the weapon it carries (a content file in
-// src/content/weapons/), the fire patterns that weapon lists, when it may
-// fire, how a volley spreads over its lanes, and the evolutions and Apexes
-// that change the lance. CombatSystem owns it, ticks it after targeting and
-// before the shots fly; the card tuning lives in CardEffects and the hit path
-// in HitResolution.
+// src/content/weapons/), the fire patterns that weapon lists (the lance's
+// stream here; beam and fan in beamAndFan.js; chain, orbit, aura and seeker
+// in firePatterns.js), when it may fire, and the evolutions and Apexes that
+// change the lance or switch a weapon to its own form; how a volley spreads
+// over its lanes is volleyLanes.js. CombatSystem owns it, ticks it after
+// targeting and before the shots fly; the card tuning lives in CardEffects
+// and the hit path in HitResolution.
 
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
   COMBAT_SHOOT_COOLDOWN,
   BULLET_SPEED,
   COMBAT_BULLET_LIFETIME,
-  COMBAT_AIMING_UPGRADE_CONFIG,
-  COMBAT_MULTISHOT_SPREAD_STEP,
   COMBAT_SPREAD_MODE_DEFAULT,
-  COMBAT_BULLET_RADIUS,
 } from '../../data/constants/gameplay.js';
 import { withAlpha } from '../../data/constants/palette.js';
 import {
   DEFAULT_WEAPON_ID,
   LANCE_BASE_LOOK,
-  WEAPONS,
   WEAPON_APEX,
   WEAPON_EVOLUTIONS,
+  WEAPON_FORMS,
   firePattern,
 } from '../../data/weapons.js';
+import { fireBeam, fireFan } from './beamAndFan.js';
+import { fireAura, fireChain, fireOrbit, fireSeeker } from './firePatterns.js';
+import {
+  applyConcentratedFire,
+  applyMultishotSpread,
+  computeParallelOffset,
+} from './volleyLanes.js';
 
 // Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
-const AIMING_CONFIG = COMBAT_AIMING_UPGRADE_CONFIG || {};
 // Trail alpha ramp, tail → head (precomputed: one string per step).
 const lanceTrailStyles = (color) =>
   Array.from({ length: 8 }, (_, i) => withAlpha(color, (0.65 * i) / 7));
 
 /** The fire patterns a weapon's `fire` list can name, and what runs each. */
 export const FIRE_PATTERNS = Object.freeze({
-  stream: 'fireStream',
-  beam: 'fireBeam',
-  fan: 'fireFan',
+  stream: (weapons, ...shot) => weapons.fireStream(...shot),
+  beam: fireBeam,
+  fan: fireFan,
+  chain: fireChain,
+  orbit: fireOrbit,
+  aura: fireAura,
+  seeker: fireSeeker,
 });
 
 export class Weapons {
@@ -50,6 +59,7 @@ export class Weapons {
    * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
    * `cardEffects()`: the cards in play (the beam reads the Thermal Lens).
+   * `cards()`: the CardEffects instance (the chain's arcs, the aura's burns).
    * `tuning()`: the cards' fire-rate tuning, a fresh plain object: { aimCooldownMultiplier, cooldownTuning }.
    */
   constructor({
@@ -60,6 +70,7 @@ export class Weapons {
     hitEnemy,
     emit,
     cardEffects,
+    cards,
     tuning,
   }) {
     this.player = player;
@@ -69,6 +80,7 @@ export class Weapons {
     this.hitEnemy = hitEnemy;
     this.emit = emit;
     this.cardEffects = cardEffects;
+    this.cards = cards;
     this.tuning = tuning;
 
     this.lastShotTime = 0;
@@ -104,7 +116,7 @@ export class Weapons {
     const pattern = this.weapon.fire.find(
       (entry) => !entry.every || this.shots % entry.every === 0
     );
-    this[FIRE_PATTERNS[pattern.pattern]](pattern, playerPos, playerStats);
+    FIRE_PATTERNS[pattern.pattern](this, pattern, playerPos, playerStats);
   }
 
   // `stream`: the weapon's projectile down the lock lanes, or straight ahead
@@ -259,7 +271,7 @@ export class Weapons {
           playerPos
         ) || { x: assignment.enemy.x, y: assignment.enemy.y };
         if (usingAdvancedBattery) {
-          const offset = this.computeParallelOffset(
+          const offset = computeParallelOffset(
             playerPos,
             predicted,
             duplicateIndex,
@@ -304,7 +316,8 @@ export class Weapons {
             // the volley.
             if (shotIndex === 0) {
               const enemy = assignment.enemy;
-              this._concentratedLanes = this.applyConcentratedFire(
+              this._concentratedLanes = applyConcentratedFire(
+                this,
                 {
                   kind: 'target',
                   enemy,
@@ -321,7 +334,7 @@ export class Weapons {
               aimPoint = { ...lane.aimPoint };
             }
           } else {
-            aimPoint = this.applyMultishotSpread(
+            aimPoint = applyMultishotSpread(
               playerPos,
               aimPoint,
               shotIndex,
@@ -433,7 +446,8 @@ export class Weapons {
     const sharedOrigin = this.targeting().aimMode === 'manual';
     const concentratedLanes =
       totalShots > 1 && this.spreadMode === 'concentrated'
-        ? this.applyConcentratedFire(
+        ? applyConcentratedFire(
+            this,
             { kind: 'direction', angle, originPos, sharedOrigin },
             totalShots,
             playerStats
@@ -450,7 +464,7 @@ export class Weapons {
           shotOrigin = { ...lane.fireOrigin };
           aimPoint = { ...lane.aimPoint };
         } else {
-          aimPoint = this.applyMultishotSpread(
+          aimPoint = applyMultishotSpread(
             originPos,
             aimPoint,
             shotIndex,
@@ -491,235 +505,10 @@ export class Weapons {
     }
   }
 
-  applyMultishotSpread(playerPos, targetPos, shotIndex, totalShots) {
-    const spreadStep = Number.isFinite(COMBAT_MULTISHOT_SPREAD_STEP)
-      ? COMBAT_MULTISHOT_SPREAD_STEP
-      : 0.3;
-    const spreadAngle = (shotIndex - (totalShots - 1) / 2) * spreadStep;
-
-    const dx = targetPos.x - playerPos.x;
-    const dy = targetPos.y - playerPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance === 0) return targetPos;
-
-    const baseAngle = Math.atan2(dy, dx);
-    const finalAngle = baseAngle + spreadAngle;
-
-    return {
-      x: playerPos.x + Math.cos(finalAngle) * distance,
-      y: playerPos.y + Math.sin(finalAngle) * distance,
-    };
-  }
-
   refreshShootCooldown() {
     const { aimCooldownMultiplier, cooldownTuning } = this.tuning();
     this.setShootCooldown(
       this.baseShootCooldown * aimCooldownMultiplier * cooldownTuning
-    );
-  }
-
-  computeParallelOffset(
-    playerPos,
-    aimPoint,
-    duplicateIndex,
-    duplicateCount,
-    enemy
-  ) {
-    if (!Number.isFinite(duplicateCount) || duplicateCount <= 1) {
-      return { x: 0, y: 0 };
-    }
-
-    const dx = aimPoint.x - playerPos.x;
-    const dy = aimPoint.y - playerPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance === 0) {
-      return { x: 0, y: 0 };
-    }
-
-    const slotCenter = (duplicateCount - 1) / 2;
-    const offsetIndex = duplicateIndex - slotCenter;
-    if (Math.abs(offsetIndex) < 0.0001) {
-      return { x: 0, y: 0 };
-    }
-
-    const spacing = AIMING_CONFIG.multiLock?.parallelSpacing ?? 10;
-
-    let magnitude = offsetIndex * spacing;
-    const targetRadius = enemy?.radius || 16;
-    // Lane clamp per FIX-05 (plan 01.07 Task 3): keep lanes inside the target's
-    // effective hit radius (radius + bullet radius). Tighter than the legacy
-    // `Math.max(spacing, targetRadius * radiusMultiplier)`. Fix-pass-2 (C7b):
-    // use the gameplay-domain alias COMBAT_BULLET_RADIUS (mirrors BULLET_SIZE
-    // numerically; pinned by the F10 test). The artifact contract in
-    // 01.07-aim-centerline-toggles-PLAN.md promises this name as the source
-    // of truth for combat clamp math.
-    const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
-    magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
-
-    const perpX = (-dy / distance) * magnitude;
-    const perpY = (dx / distance) * magnitude;
-
-    return { x: perpX, y: perpY };
-  }
-
-  /**
-   * Concentrated-fire helper extracted from the rank-3 parallel offset code path.
-   *
-   * Two discriminator shapes:
-   *   - `{ kind: 'target', enemy, predictedAim?, fireOrigin? }` — concentrated fire on a specific enemy.
-   *   - `{ kind: 'direction', angle, originPos }` — concentrated fire in a direction from an origin.
-   *
-   * Returns: `Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>` of length `shotCount`.
-   * For shotCount=1, returns a single entry with zero perpendicular offset.
-   *
-   * For `kind:'target'`, both `fireOrigin` and `aimPoint` are shifted by the same
-   * perpendicular vector (parallel lanes). Lane magnitude is clamped to
-   * `Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS)` so outer lanes never
-   * exceed the target's effective hit radius.
-   *
-   * For `kind:'direction'`, the helper does NOT consult a target — perpendicular
-   * offsets use the fixed `spacing` only; aim points sit at +1000 along the angle
-   * from each fireOrigin (matching the fixed-range baseline used by `fireForward`).
-   *
-   * Caller spawns the bullets — this helper returns positions only.
-   *
-   * @param {{kind: 'target', enemy: object, predictedAim?: {x,y}, fireOrigin?: {x,y}} | {kind: 'direction', angle: number, originPos: {x,y}}} input
-   * @param {number} shotCount
-   * @param {object} [playerStats] — reserved for future damage-aware behavior; not consumed here.
-   * @returns {Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>}
-   */
-  applyConcentratedFire(input, shotCount) {
-    if (!input || typeof input !== 'object') {
-      throw new Error(
-        '[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind'
-      );
-    }
-
-    const count = Math.max(0, Math.floor(Number(shotCount) || 0));
-    if (count <= 0) {
-      return [];
-    }
-
-    const spacing = AIMING_CONFIG.multiLock?.parallelSpacing ?? 10;
-
-    if (input.kind === 'target') {
-      const enemy = input.enemy;
-      if (!enemy) {
-        return [];
-      }
-
-      const predicted = input.predictedAim || { x: enemy.x, y: enemy.y };
-      const playerPos = input.fireOrigin || this.player().getPosition();
-
-      const baseAimX = predicted.x;
-      const baseAimY = predicted.y;
-      const baseOriginX = playerPos.x;
-      const baseOriginY = playerPos.y;
-
-      const dx = baseAimX - baseOriginX;
-      const dy = baseAimY - baseOriginY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance === 0 || count === 1) {
-        const results = [];
-        for (let i = 0; i < count; i += 1) {
-          results.push({
-            fireOrigin: { x: baseOriginX, y: baseOriginY },
-            aimPoint: { x: baseAimX, y: baseAimY },
-          });
-        }
-        return results;
-      }
-
-      const perpX = -dy / distance;
-      const perpY = dx / distance;
-
-      const targetRadius = enemy.radius || 16;
-      // Fix-pass-2 (C7b): use the gameplay-domain alias COMBAT_BULLET_RADIUS
-      // here too (mirrors the computeParallelOffset clamp). Mirrors BULLET_SIZE
-      // numerically; pinned by the F10 test.
-      const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
-
-      const slotCenter = (count - 1) / 2;
-      const results = [];
-      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
-        const offsetIndex = shotIndex - slotCenter;
-        const rawMagnitude = offsetIndex * spacing;
-        const magnitude = Math.max(
-          -clampLimit,
-          Math.min(clampLimit, rawMagnitude)
-        );
-
-        const shotPerpX = perpX * magnitude;
-        const shotPerpY = perpY * magnitude;
-
-        results.push({
-          fireOrigin: {
-            x: baseOriginX + shotPerpX,
-            y: baseOriginY + shotPerpY,
-          },
-          aimPoint: { x: baseAimX + shotPerpX, y: baseAimY + shotPerpY },
-        });
-      }
-      return results;
-    }
-
-    if (input.kind === 'direction') {
-      const angle = Number.isFinite(input.angle) ? input.angle : 0;
-      const originPos = input.originPos || { x: 0, y: 0 };
-      const baseOriginX = originPos.x;
-      const baseOriginY = originPos.y;
-      // Fix-pass (F6): `sharedOrigin` mode keeps every shot's fireOrigin
-      // anchored at `originPos` and applies the perpendicular offset only to
-      // the aimPoint. Used by manual aim so all multishot lanes leave from
-      // the SHIP NOSE (plan must_have), fanning out to slightly offset aim
-      // points rather than sliding the spawn position laterally.
-      const sharedOrigin = input.sharedOrigin === true;
-
-      const dxUnit = Math.cos(angle);
-      const dyUnit = Math.sin(angle);
-
-      // Perpendicular unit vector (no targetRadius reference — clamp is not used).
-      const perpX = -dyUnit;
-      const perpY = dxUnit;
-
-      const range = 1000;
-      const slotCenter = (count - 1) / 2;
-      const results = [];
-
-      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
-        const offsetIndex = shotIndex - slotCenter;
-        const magnitude = offsetIndex * spacing;
-        const shotPerpX = perpX * magnitude;
-        const shotPerpY = perpY * magnitude;
-
-        const fireOrigin = sharedOrigin
-          ? { x: baseOriginX, y: baseOriginY }
-          : { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY };
-        const aimAnchorX = sharedOrigin ? baseOriginX : fireOrigin.x;
-        const aimAnchorY = sharedOrigin ? baseOriginY : fireOrigin.y;
-        const aimPoint = sharedOrigin
-          ? {
-              // Aim point fans perpendicular from the on-axis projection so
-              // bullets share the origin but fly toward different lateral
-              // targets. Keeping the same `range` projection as the legacy
-              // path preserves muzzle-velocity magnitude per shot.
-              x: aimAnchorX + dxUnit * range + shotPerpX,
-              y: aimAnchorY + dyUnit * range + shotPerpY,
-            }
-          : {
-              x: aimAnchorX + dxUnit * range,
-              y: aimAnchorY + dyUnit * range,
-            };
-        results.push({ fireOrigin, aimPoint });
-      }
-      return results;
-    }
-
-    throw new Error(
-      `[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`
     );
   }
 
@@ -732,36 +521,82 @@ export class Weapons {
     this.apexes = [];
     this.beams = [];
     this.flakBursts = [];
+    // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
+    this.blades = [];
+    this.bladeCuts = new Map();
+    this.orbitClock = 0;
+    this.orbitSounded = false;
+    this.aura = null;
+    this.pulses = [];
+    this.broods = [];
     this.refreshLanceLook();
   }
 
-  /** The weapon the ship carries (its content file). */
+  /** The weapon the ship carries, in its own form once its family evolved. */
   get weapon() {
-    return WEAPONS[this.weaponId];
+    const forms = WEAPON_FORMS[this.weaponId];
+    const family = forms.base.card?.family;
+    if (forms.apex && this.apexes.includes(family)) return forms.apex;
+    if (forms.evolution && this.evolutions.includes(family)) {
+      return forms.evolution;
+    }
+    return forms.base;
+  }
+
+  /** The family the held weapon evolves on itself (its `evolution`), or null. */
+  get ownFamily() {
+    const forms = WEAPON_FORMS[this.weaponId];
+    return forms.evolution ? forms.base.card.family : null;
+  }
+
+  /** The family's lance evolution is on (not the held weapon's own family). */
+  hasEvolution(family) {
+    return family !== this.ownFamily && this.evolutions.includes(family);
+  }
+
+  hasApex(family) {
+    return family !== this.ownFamily && this.apexes.includes(family);
   }
 
   /** A weapon card swaps the cannon for its weapon; an unknown id is ignored. */
   takeWeapon(weaponId) {
-    if (!WEAPONS[weaponId] || weaponId === this.weaponId) return;
+    if (!WEAPON_FORMS[weaponId] || weaponId === this.weaponId) return;
     this.weaponId = weaponId;
     this.shots = 0;
   }
 
-  /** A family's "3 of a kind" synergy evolves the lance for the rest of the run. */
+  /**
+   * A family's "3 of a kind" synergy evolves the lance for the rest of the
+   * run, or the held weapon into its own form when it is the weapon's family.
+   */
   evolveWeapon(family) {
-    const evolution = WEAPON_EVOLUTIONS[family];
-    if (!evolution || this.evolutions.includes(family)) {
+    if (!WEAPON_EVOLUTIONS[family] || this.evolutions.includes(family)) {
       return;
     }
     this.evolutions.push(family);
     this.refreshLanceLook();
+    const { id, name, description } = this.evolutionOf(family);
     this.emit('weapon-evolved', {
       family,
-      id: evolution.id,
-      name: evolution.name,
-      description: evolution.description,
+      id,
+      name,
+      description,
       weaponId: this.weaponId,
     });
+  }
+
+  // What the family's evolution is now: the held weapon's own form on its
+  // family, else the lance's evolution or Apex. `short` is the HUD chip.
+  evolutionOf(family) {
+    const apex = this.apexes.includes(family);
+    if (family === this.ownFamily) {
+      const { form, name, chip, description } = this.weapon;
+      return { id: form.id, name, description, apex, short: chip };
+    }
+    const { id, name, description, short } = apex
+      ? WEAPON_APEX[family]
+      : WEAPON_EVOLUTIONS[family];
+    return { id, name, description, apex, short: short ?? id.toUpperCase() };
   }
 
   /** Five cards of a family raise its evolution to the Apex for the run. */
@@ -818,18 +653,10 @@ export class Weapons {
       name,
       chip,
       shotsToBeam: beam?.every ? beam.every - (this.shots % beam.every) : null,
-      evolutions: this.evolutions.map((family) => {
-        const apex = this.apexes.includes(family) ? WEAPON_APEX[family] : null;
-        const evolution = apex || WEAPON_EVOLUTIONS[family];
-        return {
-          family,
-          id: evolution.id,
-          name: evolution.name,
-          description: evolution.description,
-          apex: Boolean(apex),
-          short: apex ? apex.short : evolution.id.toUpperCase(),
-        };
-      }),
+      evolutions: this.evolutions.map((family) => ({
+        family,
+        ...this.evolutionOf(family),
+      })),
     };
   }
 
@@ -879,246 +706,6 @@ export class Weapons {
         origin,
         angle: Math.atan2(predictedAim.y - origin.y, predictedAim.x - origin.x),
       };
-    });
-  }
-
-  // `beam`: damage lands on everything in the segment on the firing frame;
-  // the beam stays on screen for `beam.duration`. Aimed like the lances: from
-  // the muzzle onto the primary lock's lead point in auto, along the turret
-  // otherwise. With multi-lock, one beam per lock from its turret layer's
-  // barrel; the cooldown penalty comes once per volley.
-  fireBeam(beam, playerPos, playerStats) {
-    const muzzle = this.player().getMuzzlePoint();
-    const lockAims = this.getLockAims();
-    const shots = lockAims || [
-      { origin: muzzle, angle: this.getWeaponAngle(muzzle) },
-    ];
-    // The primary lock's beam stands for the volley in the event.
-    const [end] = shots.map(({ origin, angle }) =>
-      this.fireBeamAlong(beam, origin, angle, playerStats, Boolean(lockAims))
-    );
-    this.lastShotTime = -beam.cooldownPenalty;
-    const targeting = this.targeting();
-
-    this.emit('weapon-fired', {
-      position: playerPos,
-      target: end,
-      centerlineTarget: end,
-      pattern: beam.pattern,
-      primaryTargetId: targeting.currentTarget
-        ? targeting.currentTarget.id
-        : null,
-      targeting: {
-        dynamicPrediction: targeting.usingDynamicPrediction(),
-        lockCount: targeting.currentTargetLocks.length,
-        multiLockActive: Boolean(lockAims),
-        predictedPoints: lockAims
-          ? lockAims.map(({ enemyId, point }) => ({
-              enemyId,
-              position: { ...point },
-            }))
-          : [],
-      },
-    });
-  }
-
-  // One beam of the volley: the hit test, the beam on screen and its event;
-  // `layered`: a multi-lock beam, from its turret layer's barrel. Returns
-  // where it ends.
-  fireBeamAlong(beam, origin, angle, playerStats, layered) {
-    const dirX = Math.cos(angle);
-    const dirY = Math.sin(angle);
-    const { width, duration, extraFragments } = beam;
-    const length =
-      beam.length * (this.cardEffects().thermalLens?.beamLengthMultiplier ?? 1);
-    const end = { x: origin.x + dirX * length, y: origin.y + dirY * length };
-    const damage = (Number(playerStats?.damage) || 0) * beam.damageMultiplier;
-
-    const struck = [];
-    this.forEachSolidEnemy((enemy) => {
-      const along = Math.max(
-        0,
-        Math.min(
-          length,
-          (enemy.x - origin.x) * dirX + (enemy.y - origin.y) * dirY
-        )
-      );
-      const offX = origin.x + dirX * along - enemy.x;
-      const offY = origin.y + dirY * along - enemy.y;
-      const radius = enemy.radius || 0;
-      const reach = radius + width / 2;
-      if (offX * offX + offY * offY > reach * reach) return;
-      // Hit point on the rim facing the beam (sparks need a normal).
-      const off = Math.hypot(offX, offY);
-      struck.push({
-        enemy,
-        x:
-          off > 0.5 ? enemy.x + (offX / off) * radius : enemy.x - dirX * radius,
-        y:
-          off > 0.5 ? enemy.y + (offY / off) * radius : enemy.y - dirY * radius,
-      });
-    });
-
-    const vx = dirX * this.bulletSpeed;
-    const vy = dirY * this.bulletSpeed;
-    struck.forEach(({ enemy, x, y }) => {
-      if (enemy.destroyed) return;
-      this.hitEnemy(
-        { kind: 'beam', x, y, vx, vy, damage, extraFragments, hit: false },
-        enemy
-      );
-    });
-
-    this.beams.push({
-      x: origin.x,
-      y: origin.y,
-      ex: end.x,
-      ey: end.y,
-      angle,
-      width,
-      life: duration,
-      maxLife: duration,
-      maxRadius: beam.flashRadius,
-      colors: this.weapon.colors,
-      layered,
-    });
-
-    this.emit('weapon-beam-fired', {
-      position: origin,
-      end,
-      angle,
-      damage,
-      hits: struck.length,
-      kick: beam.kick,
-    });
-    return end;
-  }
-
-  // `fan`: a fan of the weapon's projectile from the muzzle, aimed like the
-  // beam. Multishot adds bolts to the fan; the volley waits
-  // `fan.cooldownMultiplier` × the lance's cooldown. With multi-lock the same
-  // bolts are split over the locks, earlier locks first, each lock getting a
-  // small fan of its own (same bolt spacing) centred on its lead point, from
-  // its turret layer's barrel.
-  fireFan(fan, playerPos, playerStats) {
-    const origin = this.player().getMuzzlePoint();
-    const angle = this.getWeaponAngle(origin);
-    const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
-    const bolts = Math.min(fan.maxBolts, fan.bolts + extra);
-    const spread = (fan.fan * Math.PI) / 180;
-    // Where the bolts are aimed: the end of their range, else of a lance's.
-    const reach =
-      this.weapon.projectile.range ?? this.bulletSpeed * this.bulletLifetime;
-    // Shared by the volley's bolts: who its shrapnel already hit, and how
-    // many bursts it has had (only the first lights the 3D scene).
-    const volley = { struck: [], bursts: 0 };
-    const lockAims = this.getLockAims();
-    const predictedPoints = [];
-    const launch = (a, from = origin) => {
-      const end = {
-        x: from.x + Math.cos(a) * reach,
-        y: from.y + Math.sin(a) * reach,
-      };
-      this.createBullet(from, end, playerStats.damage, volley);
-      return end;
-    };
-    if (lockAims) {
-      const step = spread / (fan.bolts - 1);
-      const share = Math.floor(bolts / lockAims.length);
-      const longer = bolts % lockAims.length;
-      lockAims.forEach((lock, index) => {
-        const count = share + (index < longer ? 1 : 0);
-        for (let i = 0; i < count; i += 1) {
-          launch(lock.angle + step * (i - (count - 1) / 2), lock.origin);
-        }
-        predictedPoints.push({
-          enemyId: lock.enemyId,
-          position: { ...lock.point },
-        });
-      });
-    } else {
-      for (let i = 0; i < bolts; i += 1) {
-        const a =
-          bolts === 1 ? angle : angle + spread * (i / (bolts - 1) - 0.5);
-        predictedPoints.push({ enemyId: null, position: launch(a) });
-      }
-    }
-    this.lastShotTime = -this.shootCooldown * (fan.cooldownMultiplier - 1);
-    const targeting = this.targeting();
-
-    const centre = {
-      x: origin.x + Math.cos(angle) * reach,
-      y: origin.y + Math.sin(angle) * reach,
-    };
-    this.emit('weapon-fired', {
-      position: playerPos,
-      target: centre,
-      centerlineTarget: centre,
-      pattern: fan.pattern,
-      primaryTargetId: targeting.currentTarget
-        ? targeting.currentTarget.id
-        : null,
-      targeting: {
-        dynamicPrediction: targeting.usingDynamicPrediction(),
-        lockCount: targeting.currentTargetLocks.length,
-        multiLockActive: Boolean(lockAims),
-        predictedPoints,
-      },
-    });
-  }
-
-  // A projectile's `burst`: shrapnel hits every solid enemy whose rim is
-  // within `burst.radius`, at most once per volley, through the same hit path
-  // as the bolts (so the evolutions apply).
-  burstFlak(bolt) {
-    const { x, y, volley } = bolt;
-    const { radius, duration } = bolt.projectile.burst;
-    const struck = [];
-    this.forEachSolidEnemy((enemy) => {
-      if (volley.struck.includes(enemy)) return;
-      const reach = radius + (enemy.radius || 0);
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
-        struck.push(enemy);
-      }
-    });
-    volley.struck.push(...struck);
-    struck.forEach((enemy) => {
-      if (enemy.destroyed) return;
-      const dx = enemy.x - x;
-      const dy = enemy.y - y;
-      const distance = Math.hypot(dx, dy) || 1;
-      const radius = Math.min(enemy.radius || 0, distance);
-      this.hitEnemy(
-        {
-          kind: 'shrapnel',
-          x: enemy.x - (dx / distance) * radius,
-          y: enemy.y - (dy / distance) * radius,
-          vx: (dx / distance) * this.bulletSpeed,
-          vy: (dy / distance) * this.bulletSpeed,
-          damage: bolt.shrapnel,
-          hit: false,
-        },
-        enemy
-      );
-    });
-
-    const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
-    this.flakBursts.push({
-      x,
-      y,
-      angle,
-      life: duration,
-      maxLife: duration,
-      maxRadius: radius,
-      colors: bolt.colors,
-      lit: volley.bursts === 0,
-    });
-    volley.bursts += 1;
-    this.emit('flak-burst', {
-      position: { x, y },
-      radius,
-      angle,
-      hits: struck.length,
     });
   }
 

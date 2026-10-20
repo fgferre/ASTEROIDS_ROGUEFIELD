@@ -21,11 +21,13 @@ import { createFieldVeil } from './fieldVeil.js';
 import { FlashLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
+import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
+import { WeaponBodies } from './weaponBodies.js';
 
 export const FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
@@ -273,10 +275,12 @@ export function setupThree(seeded) {
   });
   const flashes = new FlashLights(THREE, scene);
   const debris = new DebrisChunks(THREE, scene);
+  const bodies = new WeaponBodies(THREE, scene);
   const bursts = new DeathBursts(debris, flashes);
   const enemies = new EnemyMirror(THREE, scene, seeded, bursts);
   const player = new PlayerMirror(THREE, scene, seeded);
   const pickups = new PickupMirror(THREE, scene);
+  const chests = new ChestMirror(THREE, scene);
   const decals = new ScorchDecals(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
@@ -362,6 +366,7 @@ export function setupThree(seeded) {
     enemies,
     player,
     pickups,
+    chests,
     decals,
     shield,
     ribbons,
@@ -372,6 +377,7 @@ export function setupThree(seeded) {
     orbCrystals,
     heartTokens,
     debris,
+    bodies,
     bursts,
     shockwaves,
     flash,
@@ -383,7 +389,6 @@ export function setupThree(seeded) {
     scale: 1,
     shotRgb: rgbOf(THREE, PALETTE.shot),
     threatRgb: rgbOf(THREE, PALETTE.threat),
-    xpRgb: rgbOf(THREE, PALETTE.xp),
     statusRgb: rgbOf(THREE, PALETTE.status),
     accentRgb: rgbOf(THREE, PALETTE.player),
     textRgb: rgbOf(THREE, PALETTE.text),

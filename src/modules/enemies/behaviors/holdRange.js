@@ -6,7 +6,8 @@ import { holdOnField } from './field.js';
  * never backs off the field (`margin` px in).
  */
 export default {
-  params: { min: 'number', max: 'number', margin: 'number' },
+  params: { min: 'number', max: 'positive', margin: 'number' },
+  check: ({ min, max }) => (min > max ? 'min is past max' : null),
   getters: {
     speed: (enemy) => enemy.movementValue('maxSpeed'),
   },

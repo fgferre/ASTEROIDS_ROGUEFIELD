@@ -4,13 +4,28 @@
 // it from the services every frame (vitals, stats, radar, edge arrows, boss
 // bar) and pushes the run's events into it (banners, feeds, buffs, radar).
 
-import {
-  DEFAULT_HUD_LAYOUT_ID,
-  getHudLayoutDefinition,
-} from '../../data/ui/hudLayout.js';
+import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
+import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
-import { AAAHudLayout, radarGlyph } from './AAAHudLayout.js';
+import { AAAHudLayout } from './AAAHudLayout.js';
+import { buildRadarState, createRadarMemory } from './hud/radar.js';
+
+/**
+ * The deflector's state for the vitals (player/shield.js, read as it runs):
+ * 'locked' (no shield card this run), 'ready', 'active' or 'cooldown' with
+ * the seconds left.
+ */
+export function shieldStatus(deflector) {
+  if (!deflector || !(deflector.shieldUpgradeLevel > 0)) {
+    return { mode: 'locked', seconds: 0 };
+  }
+  if (deflector.isShieldActive) return { mode: 'active', seconds: 0 };
+  if (deflector.shieldCooldownTimer > 0) {
+    return { mode: 'cooldown', seconds: deflector.shieldCooldownTimer };
+  }
+  return { mode: 'ready', seconds: 0 };
+}
 
 export class TacticalHud {
   /**
@@ -18,10 +33,13 @@ export class TacticalHud {
    * `player()`: the player service (vitals, dash, position), or none.
    * `enemies()`: the enemy service (session stats, wave, active enemies).
    * `progression()`: the progression service (combo, level, XP).
-   * `combat()`: the combat service (fire modes, weapon).
-   * `physics()`: the physics service (enemies in radar range).
+   * `combat()`: the combat service (fire modes, weapon, enemy shots).
    * `pickups()`: the pickup service (radar blips, edge arrows).
-   * `renderer()`: the renderer (edge arrows, the damage arc).
+   * `xpOrbs()`: the XP orb service (the radar's haze).
+   * `renderer()`: the renderer (the drawn frame's projection for the ship,
+   *   edge arrows and damage arcs; the camera's view on the radar).
+   * `shieldKey()`: the Activate Shield key or button the player bound, as
+   *   a label ("E").
    */
   constructor({
     refs,
@@ -29,22 +47,32 @@ export class TacticalHud {
     enemies,
     progression,
     combat,
-    physics,
     pickups,
+    xpOrbs,
     renderer,
+    shieldKey,
   }) {
     this.refs = refs;
+    this.shieldKey = shieldKey;
     this.player = player;
     this.enemies = enemies;
     this.progression = progression;
     this.combat = combat;
-    this.physics = physics;
     this.pickups = pickups;
+    this.xpOrbs = xpOrbs;
     this.renderer = renderer;
+    // The radar's threat hold and Sensor Jam noise, across frames.
+    this.radarMemory = createRadarMemory();
     // The mounted AAAHudLayout; transmissions, cinematics and onboarding
     // draw on it too.
     this.layout = null;
-    this.definition = getHudLayoutDefinition(DEFAULT_HUD_LAYOUT_ID);
+    // The layout on screen: Settings → Interface → HUD Layout's preset
+    // (hud/editor/layoutStore.js), or the HUD editor's draft.
+    this.items = getHudPreset(DEFAULT_HUD_PRESET).items;
+    // Field points the drawn frame projects (placeOnField): the off-screen
+    // arrows' targets, and hits not yet shown as damage arcs.
+    this.edgeTargets = [];
+    this.pendingHits = [];
     this.cachedValues = { boss: { visible: false } };
     this.bossHudState = this.createInitialBossHudState();
   }
@@ -62,8 +90,20 @@ export class TacticalHud {
 
     mountTarget.style.padding = '0px';
 
-    this.layout = new AAAHudLayout();
+    this.layout = new AAAHudLayout({ items: this.items });
     this.layout.mount(mountTarget);
+  }
+
+  /** A layout's items replace the ones on screen (the same ones: no-op). */
+  setLayout(items) {
+    if (!items || sameLayout(items, this.items)) {
+      return;
+    }
+    this.items = items;
+    // Instruments that only moved keep their state; fresh ones need it.
+    if (this.layout?.setItems(items)) {
+      this.updateAAATacticalHudFromServices({ force: true });
+    }
   }
 
   resolveAAATacticalMountTarget() {
@@ -95,6 +135,31 @@ export class TacticalHud {
     this.layout.tickBuffs(deltaTime);
   }
 
+  /**
+   * After each drawn frame, paused too: the on-ship instruments onto the
+   * ship, the edge arrows (and the Warden's marker) and new damage arcs
+   * onto their field points, through the camera as the renderer just drew.
+   */
+  placeOnField() {
+    const layout = this.layout;
+    if (!layout) return;
+    const renderer = this.renderer();
+    const arrows = [];
+    for (const target of this.edgeTargets) {
+      const point = renderer.worldToScreen(target.x, target.y);
+      if (point) arrows.push({ ...target, x: point.x, y: point.y });
+    }
+    layout.updateEdgeArrows(arrows);
+    for (const { ship, source } of this.pendingHits) {
+      layout.showDamageFrom(
+        renderer.worldToScreen(ship.x, ship.y),
+        renderer.worldToScreen(source.x, source.y)
+      );
+    }
+    this.pendingHits.length = 0;
+    layout.placeOnShip(renderer.shipOnScreen);
+  }
+
   formatAAATacticalClock(totalSeconds) {
     const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
     const hours = Math.floor(seconds / 3600);
@@ -123,6 +188,14 @@ export class TacticalHud {
           ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
           : { x: 0, y: 0 };
 
+    const renderer = this.renderer();
+    const waveState =
+      enemies && typeof enemies.getWaveState === 'function'
+        ? enemies.getWaveState() || null
+        : null;
+    const layer = waveState?.current ?? 1;
+    const dash = player ? player.getDashCooldownFraction() : 0;
+
     if (player || force) {
       const hull = Number(player?.health ?? 0) || 0;
       const maxHull = Number(player?.maxHealth ?? 0) || 0;
@@ -140,49 +213,57 @@ export class TacticalHud {
         maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
       }
 
-      hud.updateVitals(shield, maxShield, hull, maxHull);
-      if (player) {
-        hud.updateDashCooldown(player.getDashCooldownFraction());
-      }
+      // The broken shield's cooldown (player/shield.js), read as it runs.
+      const { mode: shieldMode, seconds: shieldSeconds } = shieldStatus(
+        player?.shield
+      );
+
+      hud.updateShip({
+        shield,
+        maxShield,
+        hull,
+        maxHull,
+        // As last drawn: placeOnField moves it with every drawn frame.
+        ship: player && renderer ? renderer.shipOnScreen : null,
+        dash,
+        shieldMode,
+        shieldSeconds,
+        shieldCooldown:
+          shieldMode === 'cooldown'
+            ? shieldSeconds / player.shield.shieldMaxCooldown
+            : 0,
+        shieldKey: shieldMode === 'ready' ? this.shieldKey() : '',
+      });
     }
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
       const session = enemies.getSessionStats() || {};
       const timeElapsed =
         session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
-      const totalKills = session.totalKills ?? session.kills ?? 0;
+      const comboState = progression?.getComboState() || {};
 
-      hud.updateStats(
-        this.formatAAATacticalClock(timeElapsed),
-        totalKills,
-        undefined
-      );
+      hud.updateStats({
+        clock: this.formatAAATacticalClock(timeElapsed),
+        seconds: timeElapsed,
+        layer,
+        kills: session.totalKills ?? session.kills ?? 0,
+        combo: Number(comboState.comboCount ?? 0) || 0,
+        multiplier: comboState.multiplier,
+      });
     }
 
-    if (progression && typeof progression.getComboState === 'function') {
-      const comboState = progression.getComboState() || {};
-      const comboCount = Number(comboState.comboCount ?? 0) || 0;
-      hud.updateStats(null, undefined, comboCount, comboState.multiplier);
-    }
-
-    // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
-    // state. Single source of truth: CombatSystem.getSpreadMode() / .getAimMode().
+    // The weapon, the family track and the fire modes (FIX-05): single
+    // source of truth CombatSystem.getSpreadMode() / .getAimMode().
     const combat = this.combat();
-    if (combat && typeof hud.updateModeIndicators === 'function') {
-      const spreadMode =
-        typeof combat.getSpreadMode === 'function'
-          ? combat.getSpreadMode()
-          : 'concentrated';
-      const aimMode =
-        typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
-      hud.updateModeIndicators(spreadMode, aimMode);
-      hud.updateWeapon(combat.getWeaponState());
+    if (combat) {
+      hud.updateBuild({
+        weapon: combat.getWeaponState(),
+        families: progression?.getFamilyCounts() ?? {},
+        spreadMode: combat.getSpreadMode(),
+        aimMode: combat.getAimMode(),
+        dash,
+      });
     }
-
-    const waveState =
-      enemies && typeof enemies.getWaveState === 'function'
-        ? enemies.getWaveState() || null
-        : null;
 
     if (progression) {
       const level =
@@ -194,12 +275,12 @@ export class TacticalHud {
           ? progression.getExperience()
           : null;
 
-      hud.updateExperience(
+      hud.updateExperience({
         level,
-        xp?.current ?? 0,
-        xp?.needed ?? 1,
-        waveState?.current ?? 1
-      );
+        current: xp?.current ?? 0,
+        required: xp?.needed ?? 1,
+        layer,
+      });
     }
 
     if (typeof hud.updateNextWaveTimer === 'function') {
@@ -212,98 +293,40 @@ export class TacticalHud {
       hud.updateNextWaveTimer(breakSeconds);
     }
 
-    const physics = this.physics();
-    if (
-      (physics && typeof physics.getNearbyEnemies === 'function' && player) ||
-      (enemies && typeof enemies.getActiveEnemies === 'function' && player)
-    ) {
-      const pluginConfig = this.definition?.plugin || {};
-      const radarRange = Math.max(
-        1,
-        (Number(pluginConfig.radarRange) || 1500) * hud.radarRangeFactor
+    // The radar: every contact, the camera's view, the threat mode.
+    if (player && enemies && hud.radarRange > 0) {
+      hud.updateRadar(
+        buildRadarState(
+          {
+            ship: {
+              x: Number(playerPosition.x) || 0,
+              y: Number(playerPosition.y) || 0,
+              angle: player.angle,
+            },
+            range: hud.radarRange,
+            jammed: hud.radarJammed,
+            view: renderer ? renderer.camera.getView() : null,
+            enemies: enemies.getActiveEnemies(),
+            pickups: this.pickups()?.getActivePickups() || [],
+            orbs: this.xpOrbs()?.xpOrbs || [],
+            shots: combat?.enemyBullets || [],
+            now: performance.now(),
+          },
+          this.radarMemory
+        )
       );
-
-      let radarEnemies = [];
-      if (physics && typeof physics.getNearbyEnemies === 'function') {
-        try {
-          // A phased Shade still shows on the radar, dimmed.
-          radarEnemies = physics.getNearbyEnemies(
-            Number(playerPosition.x) || 0,
-            Number(playerPosition.y) || 0,
-            radarRange,
-            { includeIntangible: true }
-          );
-        } catch (error) {
-          radarEnemies = [];
-        }
-      } else if (enemies && typeof enemies.getActiveEnemies === 'function') {
-        radarEnemies = enemies.getActiveEnemies() || [];
-      }
-
-      const blips = [];
-      const originX = Number(playerPosition.x) || 0;
-      const originY = Number(playerPosition.y) || 0;
-      const limit = 80;
-
-      for (let index = 0; index < radarEnemies.length; index += 1) {
-        if (blips.length >= limit) {
-          break;
-        }
-
-        const enemy = radarEnemies[index];
-        if (!enemy) {
-          continue;
-        }
-
-        const enemyX = Number(enemy?.position?.x ?? enemy?.x ?? 0);
-        const enemyY = Number(enemy?.position?.y ?? enemy?.y ?? 0);
-        if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
-          continue;
-        }
-
-        const dx = enemyX - originX;
-        const dy = enemyY - originY;
-        const distance = Math.hypot(dx, dy);
-        if (!Number.isFinite(distance) || distance > radarRange) {
-          continue;
-        }
-
-        blips.push({
-          x: dx / radarRange,
-          y: dy / radarRange,
-          type: radarGlyph(enemy),
-          phased: Boolean(enemy.intangible),
-        });
-      }
-
-      const pickups = this.pickups()?.getActivePickups() || [];
-      for (let i = 0; i < pickups.length && blips.length < limit; i += 1) {
-        const dx = pickups[i].x - originX;
-        const dy = pickups[i].y - originY;
-        if (Math.hypot(dx, dy) <= radarRange) {
-          blips.push({
-            x: dx / radarRange,
-            y: dy / radarRange,
-            type: 'pickup',
-          });
-        }
-      }
-
-      hud.updateRadar(blips);
     }
 
-    // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
-    const renderer = this.renderer();
+    // Off-screen arrows (Wardens, Heralds, then pickups) as field points,
+    // which placeOnField projects; and the Herald's bar.
     const arrowTargets = [];
     let herald = null;
-    if (renderer && player && enemies) {
+    if (player && enemies) {
       const toTarget = (kind, entity, color, labelled) => {
-        const point = renderer.worldToScreen(entity.x, entity.y);
-        if (!point) return;
         arrowTargets.push({
           kind,
-          x: point.x,
-          y: point.y,
+          x: entity.x,
+          y: entity.y,
           color,
           distance: labelled
             ? Math.hypot(
@@ -327,7 +350,7 @@ export class TacticalHud {
         toTarget('pickup', pickups[i], pickups[i].color, false);
       }
     }
-    hud.updateEdgeArrows(arrowTargets);
+    this.edgeTargets = arrowTargets;
 
     const bossState = this.getBossHudState();
     const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
@@ -551,13 +574,13 @@ export class TacticalHud {
     this.layout?.setAimStick(active);
   }
 
+  // Shown by the next drawn frame (placeOnField), through its camera.
   onPlayerTookDamage({ playerPosition, damageSource } = {}) {
-    const renderer = this.renderer();
-    if (!playerPosition || !damageSource || !renderer) return;
-    this.layout?.showDamageFrom(
-      renderer.worldToScreen(playerPosition.x, playerPosition.y),
-      renderer.worldToScreen(damageSource.x, damageSource.y)
-    );
+    if (!playerPosition || !damageSource || !this.layout) return;
+    this.pendingHits.push({
+      ship: { x: playerPosition.x, y: playerPosition.y },
+      source: { x: damageSource.x, y: damageSource.y },
+    });
   }
 
   onEnemyDestroyed(payload = {}) {
@@ -581,6 +604,8 @@ export class TacticalHud {
     }
   }
 
+  // A chest's cards (collectibles/chests.js): the CHEST banner with the
+  // first, then a feed line each.
   onAchievementUnlocked({ title } = {}) {
     this.layout?.addAchievementFeed(title);
   }

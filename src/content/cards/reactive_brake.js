@@ -1,4 +1,3 @@
-// Maneuver cards (R12; numbers: proposta 18/10, for the owner to judge by playing).
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
@@ -21,20 +20,21 @@ export default {
   ],
   text: {
     name: 'Reactive Brake',
-    summary: 'The emergency brake dumps its charge into the shockwave.',
+    summary:
+      'The emergency brake dumps its charge into the shockwave: every reversal hurts.',
     lore: 'All that speed has to go somewhere. Now it goes into them.',
     levels: [
       {
         title: 'Charged Ring',
         description:
-          'The brake shockwave shoves 40% harder and deals up to 12 damage.',
+          'The brake shockwave shoves 50% harder and deals up to 30 damage.',
         highlights: ['Full damage next to the ship, fading toward the edge.'],
       },
       {
         title: 'Detonating Ring',
         description:
-          'The brake shockwave shoves 80% harder and deals up to 24 damage.',
-        highlights: ['Stop dead in a crowd.'],
+          'The shockwave shoves twice as hard, deals up to 60 damage, and the brake recharges in 0.7 s instead of 1.2 s.',
+        highlights: ['Turn back in a crowd, again and again.'],
       },
     ],
   },
@@ -45,7 +45,12 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactive-brake',
-          payload: { knockbackMultiplier: 1.4, damage: 12 },
+          // proposta 20/10
+          payload: {
+            knockbackMultiplier: 1.5,
+            damage: 30,
+            cooldownMultiplier: 1,
+          },
         },
       ],
     },
@@ -55,7 +60,12 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactive-brake',
-          payload: { knockbackMultiplier: 1.8, damage: 24 },
+          // proposta 20/10
+          payload: {
+            knockbackMultiplier: 2,
+            damage: 60,
+            cooldownMultiplier: 0.6,
+          },
         },
       ],
     },

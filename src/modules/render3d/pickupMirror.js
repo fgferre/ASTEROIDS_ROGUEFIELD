@@ -1,7 +1,8 @@
 // Mirrors PickupSystem tokens as machined pucks (fieldTokens.js), instanced
 // per kind: a matte body and its light (rim, glyph, hover lens) in the
 // pickup colour, which pulses and goes dark in the blink steps of the last
-// seconds. Each token hovers and rocks a little. At most POOL drawn.
+// seconds. Each token hovers and rocks a little. At most POOL drawn. Chests
+// come in the same list and are chestMirror.js's.
 
 import { PICKUP_KINDS, PICKUP_TOKEN } from '../../data/pickups.js';
 import { rgbOf } from './batches.js';
@@ -51,10 +52,12 @@ export class PickupMirror {
       view.body.begin();
       view.light.begin();
     });
-    const count = Math.min(pickups.length, POOL);
-    for (let i = 0; i < count; i += 1) {
+    let shown = 0;
+    for (let i = 0; i < pickups.length && shown < POOL; i += 1) {
       const p = pickups[i];
       const view = this.kinds[p.kind];
+      if (!view) continue;
+      shown += 1;
       const radius = p.radius || PICKUP_TOKEN.radius;
       const h = HOVER + 0.6 * Math.sin(p.age * 2.4 + i);
       const yaw = 0.3 * Math.sin(p.age * 0.9 + i);

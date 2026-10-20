@@ -1,26 +1,33 @@
 /**
  * Pickup System
  *
- * Field pickups (Magnet, Pulse, Overcharge) dropped by Elites, Heralds and
- * Wardens. They drift, blink before expiring and apply their effect on
- * contact.
+ * Field pickups (Magnet, Pulse, Overcharge, Repair, Stasis, Salvage Cache)
+ * dropped by Elites, Heralds and Wardens. They drift, blink before expiring
+ * and apply their effect on contact. It also keeps the field's chests
+ * (chests.js): every Warden drops one, an Elite sometimes.
  * Catalogue and drop rules: src/data/pickups.js.
  */
 
 import { BaseSystem } from '../../core/BaseSystem.js';
-import { requireService } from '../../core/serviceUtils.js';
+import { requireService, resolveService } from '../../core/serviceUtils.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../core/GameConstants.js';
 import { PALETTE, LINE, withAlpha } from '../../data/constants/palette.js';
 import {
+  CHEST,
   PICKUP_KINDS,
   PICKUP_TOKEN,
   PICKUP_DROPS,
+  eliteDropChance,
 } from '../../data/pickups.js';
 import { WEAPON_APEX } from '../../data/weapons.js';
+import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
+import { Chests } from './chests.js';
 
 const TWO_PI = Math.PI * 2;
-// Salt for the pickup stream: a numeric fork leaves the root sequence intact.
+// Salts for the pickup and chest streams: a numeric fork leaves the root
+// sequence intact.
 const RANDOM_SALT = 0x9e3779b9;
+const CHEST_SALT = 0x85ebca6b;
 const KIND_WEIGHTS = Object.values(PICKUP_KINDS).map((kind) => ({
   value: kind.id,
   weight: kind.weight,
@@ -35,6 +42,11 @@ export class PickupSystem extends BaseSystem {
     this.xpOrbs = requireService('xp-orbs', this.dependencies, 'PickupSystem');
     this.enemies = requireService('enemies', this.dependencies, 'PickupSystem');
     this.effects = requireService('effects', this.dependencies, 'PickupSystem');
+    this.progression = requireService(
+      'progression',
+      this.dependencies,
+      'PickupSystem'
+    );
     this.rootRandom = requireService(
       'random',
       this.dependencies,
@@ -43,34 +55,51 @@ export class PickupSystem extends BaseSystem {
     this.pickups = [];
     this.overchargeRemaining = 0;
     this.rockDropChance = 0;
-    this.eliteAlwaysDrops = false;
+    this.layer = 1;
+    this.chests = new Chests({
+      player: this.player,
+      progression: this.progression,
+      effects: this.effects,
+      emit: (name, payload) => this.eventBus.emit(name, payload),
+      random: () => this.chestRandom,
+    });
     this.reseedRandom();
   }
 
   setupEventListeners() {
-    // Elites drop at their chance (always with Motherlode); plain rocks only
-    // with Lucky Fragment.
+    // Elites drop at their chance, which rises with the layer (always with
+    // Motherlode), and sometimes a chest; plain rocks only with Lucky
+    // Fragment.
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       const enemy = payload.enemy;
       if (!enemy || enemy.type === 'boss') return;
+      const { x, y } = payload.position || enemy;
+      if (enemy.elite && this.chestRandom.chance(CHEST.eliteChance)) {
+        this.chests.spawn('elite', x, y);
+      }
       const chance = enemy.elite
-        ? this.eliteAlwaysDrops
+        ? this.elitesAlwaysDrop()
           ? 1
-          : PICKUP_DROPS.eliteChance
+          : eliteDropChance(this.layer)
         : enemy.type === 'asteroid'
           ? this.rockDropChance
           : 0;
       if (chance <= 0 || !this.random.chance(chance)) return;
-      const { x, y } = payload.position || enemy;
       this.spawnPickup(this.rollKind(), x, y);
     });
 
+    // A Warden drops its chest where it dies, a pickup on either side.
     this.registerEventListener('boss-defeated', (payload = {}) => {
       const { x, y } = payload.position || payload.enemy || {};
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      this.chests.spawn('warden', x, y);
       const half = PICKUP_TOKEN.wardenSpread / 2;
       this.spawnPickup(PICKUP_DROPS.wardenGuaranteed, x - half, y);
       this.spawnPickup(this.rollKind(), x + half, y);
+    });
+
+    this.registerEventListener('wave-started', ({ wave } = {}) => {
+      if (Number.isFinite(wave)) this.layer = wave;
     });
 
     // A Herald always drops one.
@@ -82,21 +111,27 @@ export class PickupSystem extends BaseSystem {
     this.registerEventListener('upgrade-lucky-fragment', (data) => {
       this.rockDropChance = data.chance;
     });
-    this.registerEventListener('apex-unlocked', ({ family } = {}) => {
-      if (WEAPON_APEX[family]?.eliteAlwaysDrops) this.eliteAlwaysDrops = true;
-    });
     this.registerEventListener('progression-reset', () => {
       this.rockDropChance = 0;
-      this.eliteAlwaysDrops = false;
     });
 
     this.registerEventListener('game-started', () => this.reset());
   }
 
-  reseedRandom() {
-    this.random = this.rootRandom.fork(
-      ((this.rootRandom.seed ?? 0) ^ RANDOM_SALT) >>> 0
+  // Motherlode (an Apex whose `eliteAlwaysDrops` is set) while the lance
+  // carries it: not while the held weapon evolves on that family itself (the
+  // Seeker Swarm's own Apex), as for the orbs it adds (HitResolution).
+  elitesAlwaysDrop() {
+    const { weapons } = resolveService('combat', this.dependencies);
+    return Object.values(WEAPON_APEX).some(
+      (apex) => apex.eliteAlwaysDrops && weapons.hasApex(apex.family)
     );
+  }
+
+  reseedRandom() {
+    const seed = this.rootRandom.seed ?? 0;
+    this.random = this.rootRandom.fork((seed ^ RANDOM_SALT) >>> 0);
+    this.chestRandom = this.rootRandom.fork((seed ^ CHEST_SALT) >>> 0);
   }
 
   rollKind() {
@@ -130,12 +165,14 @@ export class PickupSystem extends BaseSystem {
         this.setOvercharge(1);
       }
     }
-    if (!this.pickups.length) return;
 
     const player = this.player;
     const canCollect =
       !player.isDead && !player.isRetrying && !player._quitExplosionHidden;
     const position = player.getPosition();
+    this.chests.update(deltaTime, canCollect ? position : null);
+    if (!this.pickups.length) return;
+
     const reachSq = PICKUP_TOKEN.pickupRadius * PICKUP_TOKEN.pickupRadius;
     const damping = Math.max(0, 1 - PICKUP_TOKEN.driftDamping * deltaTime);
     const margin = PICKUP_TOKEN.fieldMargin;
@@ -177,7 +214,14 @@ export class PickupSystem extends BaseSystem {
     } else if (kind === 'overcharge') {
       this.overchargeRemaining = PICKUP_KINDS.overcharge.duration;
       this.setOvercharge(PICKUP_KINDS.overcharge.cooldownMultiplier);
+    } else if (kind === 'repair') {
+      this.player.heal(PICKUP_KINDS.repair.hull);
+    } else if (kind === 'stasis') {
+      this.fireStasis();
+    } else if (kind === 'salvage') {
+      this.burstSalvage(x, y);
     }
+    // The Salvage Cache's Salvage is paid at the run's end (HangarService).
     this.eventBus.emit('pickup-collected', { kind, x, y });
   }
 
@@ -199,6 +243,41 @@ export class PickupSystem extends BaseSystem {
       color: withAlpha(color, 0.7),
     });
     this.effects.addScreenFlash(withAlpha(color, 0.35), 0.25, 0.22);
+  }
+
+  // Every machine but a Warden (and a phased one, out of reach) stands still
+  // (the Solar Flare's stun; rocks drift on); CombatSystem freezes the shots
+  // in flight.
+  fireStasis() {
+    const { duration, shockwaveRadius, color } = PICKUP_KINDS.stasis;
+    this.enemies.forEachActiveEnemy((enemy) => {
+      if (['asteroid', 'boss'].includes(enemy.type) || enemy.intangible) return;
+      enemy.stunTimer = Math.max(enemy.stunTimer || 0, duration);
+    });
+    this.eventBus.emit('stasis-started', { duration });
+    const position = this.player.getPosition();
+    this.effects.createShockwaveEffect({
+      position: { x: position.x, y: position.y },
+      radius: shockwaveRadius,
+      duration: 0.7,
+      baseWidth: 18,
+      color: withAlpha(color, 0.6),
+    });
+    this.effects.addScreenFlash(withAlpha(color, 0.3), 0.3, 0.2);
+  }
+
+  // A ring of XP orbs round the cache, in reach of the ship that took it.
+  burstSalvage(x, y) {
+    const { orbs, burstRadius } = PICKUP_KINDS.salvage;
+    for (let i = 0; i < orbs; i += 1) {
+      const angle = (i / orbs) * TWO_PI;
+      this.xpOrbs.createXPOrb(
+        x + Math.cos(angle) * burstRadius,
+        y + Math.sin(angle) * burstRadius,
+        ORB_VALUE,
+        { source: 'salvage-cache' }
+      );
+    }
   }
 
   // Fire-rate multiplier through CombatSystem's weapon-tuning channel; the
@@ -233,17 +312,23 @@ export class PickupSystem extends BaseSystem {
     return pickup.kind;
   }
 
-  /** Plain snapshot for other renderers (3D mirror). */
+  /**
+   * Plain snapshot for other renderers (3D mirrors, radar, edge arrows): the
+   * tokens, then the chests (kind 'chest', chests.js), which no Leech eats.
+   */
   getActivePickups() {
-    return this.pickups.map(({ kind, x, y, radius, age, lifetime, color }) => ({
-      kind,
-      x,
-      y,
-      radius,
-      age,
-      lifetime,
-      color,
-    }));
+    const tokens = this.pickups.map(
+      ({ kind, x, y, radius, age, lifetime, color }) => ({
+        kind,
+        x,
+        y,
+        radius,
+        age,
+        lifetime,
+        color,
+      })
+    );
+    return tokens.concat(this.chests.snapshots());
   }
 
   // Matte token, colored rim and glyph; blinks in its last seconds.
@@ -289,7 +374,9 @@ export class PickupSystem extends BaseSystem {
 
   onReset() {
     this.pickups = [];
+    this.chests.reset();
     this.overchargeRemaining = 0;
+    this.layer = 1;
     this.reseedRandom();
   }
 }

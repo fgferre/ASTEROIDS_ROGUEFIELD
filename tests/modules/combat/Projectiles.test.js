@@ -1,14 +1,14 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
+import { WEAPONS } from '../../../src/data/weapons.js';
 import { Projectiles } from '../../../src/modules/combat/Projectiles.js';
 
 const weapon = {
-  weaponId: 'lance',
+  form: WEAPONS.lance,
   bulletSpeed: 500,
   bulletLifetime: 1.5,
   trailLength: 2,
   thermalLens: undefined,
-  lanceDamageTuning: 1,
   lanceApexDamage: 1,
   lancePierce: 1,
   pierceBonus: 2,

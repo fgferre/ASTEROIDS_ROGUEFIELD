@@ -1,0 +1,254 @@
+{
+  "rock-break": {
+    "files": ["rock-break/1.mp3"],
+    "gain": -9,
+    "priority": 2,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "rock-break/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A big rock shattering in space, deep crunch and rubble scatter, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "bullet-hit": {
+    "files": ["bullet-hit/1.mp3"],
+    "gain": -10,
+    "priority": 2,
+    "cap": 6,
+    "gap": 20,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "bullet-hit/1.mp3",
+        "origin": "Kenney Impact Sounds impactPlate_light_001.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "lance-shot": {
+    "files": ["lance-shot/1.mp3"],
+    "gain": -15,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "lance-shot/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A single short clean sci-fi energy cannon shot, tight bright plasma zap with a quick decay, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "explosion-small": {
+    "files": ["explosion-small/1.mp3"],
+    "gain": -6,
+    "priority": 3,
+    "cap": 4,
+    "gap": 40,
+    "reverb": -14,
+    "origins": [
+      {
+        "file": "explosion-small/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A quick small sci-fi explosion, tight pop with crackle, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "explosion-medium": {
+    "files": ["explosion-medium/1.mp3"],
+    "gain": -4,
+    "priority": 3,
+    "cap": 4,
+    "gap": 40,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "explosion-medium/1.mp3",
+        "origin": "Kenney Sci-Fi Sounds explosionCrunch_003.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "explosion-large": {
+    "files": ["explosion-large/1.mp3"],
+    "gain": -2,
+    "priority": 3,
+    "cap": 3,
+    "gap": 60,
+    "reverb": -10,
+    "origins": [
+      {
+        "file": "explosion-large/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A massive cinematic space explosion with powerful deep bass boom, shockwave and long debris rumble, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "ship-hit": {
+    "files": ["ship-hit/1.mp3"],
+    "gain": -14,
+    "priority": 5,
+    "cap": 2,
+    "gap": 60,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "ship-hit/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A hard punch impact on a metal cockpit, crunchy low thump, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "shield-impact": {
+    "files": ["shield-impact/1.mp3"],
+    "gain": -16,
+    "priority": 5,
+    "cap": 3,
+    "gap": 40,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "shield-impact/1.mp3",
+        "origin": "Kenney Sci-Fi Sounds forceField_000.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "shield-break": {
+    "files": ["shield-break/1.mp3"],
+    "gain": -14,
+    "priority": 5,
+    "cap": 1,
+    "gap": 200,
+    "reverb": -14,
+    "origins": [
+      {
+        "file": "shield-break/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: An energy shield shattering, electric glass-like burst breaking with a descending buzz, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "xp-collect": {
+    "files": ["xp-collect/1.mp3"],
+    "gain": -12,
+    "priority": 1,
+    "cap": 6,
+    "gap": 25,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "xp-collect/1.mp3",
+        "origin": "Kenney Interface Sounds glass_004.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "level-up": {
+    "files": ["level-up/1.mp3"],
+    "gain": -5,
+    "priority": 1,
+    "cap": 1,
+    "gap": 200,
+    "reverb": -16,
+    "origins": [
+      {
+        "file": "level-up/1.mp3",
+        "origin": "Kenney Interface Sounds confirmation_001.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "card-pick": {
+    "files": ["card-pick/1.mp3"],
+    "gain": -15,
+    "priority": 1,
+    "cap": 1,
+    "gap": 100,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "card-pick/1.mp3",
+        "origin": "Kenney Interface Sounds confirmation_004.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "enemy-shot": {
+    "files": ["enemy-shot/1.mp3"],
+    "gain": -12,
+    "priority": 2,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "enemy-shot/1.mp3",
+        "origin": "Kenney Sci-Fi Sounds laserRetro_001.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "warden-arrival": {
+    "files": ["warden-arrival/1.mp3"],
+    "gain": 0,
+    "priority": 6,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -6,
+    "origins": [
+      {
+        "file": "warden-arrival/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A colossal ancient machine awakening, deep metallic groan and resonant roar with huge reverb, high quality game sound effect, dry, no music"
+      }
+    ]
+  },
+  "ui-hover": {
+    "files": ["ui-hover/1.mp3"],
+    "gain": -8,
+    "priority": 0,
+    "cap": 2,
+    "gap": 40,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "ui-hover/1.mp3",
+        "origin": "Kenney Interface Sounds click_001.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "ui-select": {
+    "files": ["ui-select/1.mp3"],
+    "gain": -10,
+    "priority": 0,
+    "cap": 2,
+    "gap": 40,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "ui-select/1.mp3",
+        "origin": "Kenney Interface Sounds switch_002.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "pause-open": {
+    "files": ["pause-open/1.mp3"],
+    "gain": -10,
+    "priority": 0,
+    "cap": 1,
+    "gap": 100,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "pause-open/1.mp3",
+        "origin": "Kenney Interface Sounds maximize_003.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "pause-close": {
+    "files": ["pause-close/1.mp3"],
+    "gain": -14,
+    "priority": 0,
+    "cap": 1,
+    "gap": 100,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "pause-close/1.mp3",
+        "origin": "Kenney Interface Sounds minimize_003.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  }
+}

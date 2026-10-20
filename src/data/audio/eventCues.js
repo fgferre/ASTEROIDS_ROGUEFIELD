@@ -37,6 +37,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'settings-audio-changed', run: 'volume' },
   { on: 'weapon-fired', run: 'listener' },
   { on: 'weapon-fired', cue: 'playLaserShot', payload: true },
+  { on: 'weapon-fired', run: 'engineShot' },
   {
     on: 'combat-target-lock',
     cue: 'playTargetLock',
@@ -82,6 +83,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'upgrade-banished', cue: 'playCardBanish' },
   { on: 'codex-discovered', cue: 'playCodexDiscovered' },
   { on: 'surge-started', cue: 'playSurgeSting' },
+  // A formation's marks light up on an edge: the surge's warning sting.
+  { on: 'formation-warned', cue: 'playSurgeSting' },
   { on: 'run-continued', cue: 'playDeepFieldEntry' },
   { on: 'salvage-awarded', cue: 'playSalvageAwarded', arg: 'amount' },
   { on: 'hangar-purchased', cue: 'playHangarPurchase' },
@@ -136,6 +139,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'leech-ate', cue: 'playLeechAte', at: 'source' },
   { on: 'leech-burst', cue: 'playLeechBurst', at: 'source' },
   { on: 'pickup-collected', cue: 'playPickupCollected', arg: 'kind' },
+  { on: 'chest-opening', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'transmission-shown', cue: 'playTransmission' },
   { on: 'transmission-shown', cue: 'playTransmissionVoice', arg: 'speaker' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },
@@ -185,7 +189,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'bullet-hit', run: 'bulletHit' },
   { on: 'player-took-damage', cue: 'playShipHit' },
   // The ship's own moves: centred on it; the dash whoosh sweeps toward where
-  // it goes.
+  // it goes (the engine's own dash and brake, once its files are in).
   {
     on: 'player-dashed',
     cue: 'playDash',
@@ -201,6 +205,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'player-health-changed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },
   { on: 'thruster-effect', run: 'thruster' },
+  // The engine follows each step's flight (after its thruster-effect events).
+  { on: 'player-moved', run: 'engineStep' },
 
   // Interface.
   {
@@ -209,6 +215,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     arg: ['rarity', 'common'],
   },
   { on: 'pause-state-changed', run: 'pauseMusic' },
+  { on: 'pause-state-changed', run: 'engineStop', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseOpen', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseClose', unless: 'isPaused' },
   { on: 'screen-changed', run: 'screen' },

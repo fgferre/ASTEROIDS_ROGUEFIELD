@@ -27,6 +27,7 @@ export class SettingsPanel {
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
    * `setHudBaseScale(scale)`: the HUD scale setting; HUD and viewport follow.
    * `livePreset()`: the preset Auto quality runs now (Graphics preview).
+   * `openHudEditor()`: Interface → Edit HUD Layout.
    */
   constructor({
     refs,
@@ -37,6 +38,7 @@ export class SettingsPanel {
     announceVisibility,
     setHudBaseScale,
     livePreset,
+    openHudEditor,
   }) {
     this.refs = refs;
     this.pauseSettingsBtn = pauseSettingsBtn;
@@ -46,6 +48,7 @@ export class SettingsPanel {
     this.announceVisibility = announceVisibility;
     this.setHudBaseScale = setHudBaseScale;
     this.livePreset = livePreset;
+    this.openHudEditor = openHudEditor;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
@@ -54,11 +57,6 @@ export class SettingsPanel {
       activeCategory: 'graphics',
       capture: null,
       previousFocus: null,
-    };
-    this.currentVisualPreferences = {
-      accessibility: {},
-      video: {},
-      derived: {},
     };
     this.initializeSettingsMetadata();
   }
@@ -71,11 +69,6 @@ export class SettingsPanel {
   /** A binding button is waiting for its key or pad input. */
   get capturing() {
     return Boolean(this.settingsState.capture);
-  }
-
-  /** 'assist' while the color-blind palette is on, else 'standard'. */
-  get colorVision() {
-    return this.currentVisualPreferences.derived.colorVision || 'standard';
   }
 
   /** Redraws `categoryId` when it is the one on screen. */
@@ -370,7 +363,6 @@ export class SettingsPanel {
     if (body) {
       body.classList.toggle('hud-high-contrast', highContrast);
       body.classList.toggle('motion-reduced', reducedMotion);
-      body.classList.toggle('color-assist-mode', colorVision === 'assist');
       body.classList.toggle('flashing-reduced', Boolean(values.reduceFlashing));
       body.classList.toggle('subtitles-large', Boolean(values.largeSubtitles));
     }
@@ -457,14 +449,6 @@ export class SettingsPanel {
       values.derived ||
       this.deriveVisualPreferences(accessibility, video, graphics, gameplay);
 
-    this.currentVisualPreferences = {
-      accessibility,
-      video,
-      graphics,
-      gameplay,
-      derived,
-    };
-
     this.applyAccessibilitySettings(accessibility, derived);
     this.applyVideoSettings(video, derived);
   }
@@ -541,6 +525,10 @@ export class SettingsPanel {
         segment.dataset.segmentValue,
         { source: 'ui' }
       );
+      return;
+    }
+    if (event.target.closest('[data-action="edit-hud-layout"]')) {
+      this.openHudEditor();
       return;
     }
     const captureButton = event.target.closest(
@@ -710,7 +698,12 @@ export class SettingsPanel {
     const values = this.settings?.getCategoryValues(categoryId) || {};
 
     ensureArray(category.fields).forEach((field) => {
-      const element = renderSettingField(categoryId, field, values[field.key]);
+      const element = renderSettingField(
+        categoryId,
+        field,
+        values[field.key],
+        values
+      );
       if (!element) {
         return;
       }

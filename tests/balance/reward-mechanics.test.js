@@ -12,6 +12,7 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { RewardManager } from '../../src/modules/enemies/managers/RewardManager.js';
 import * as CONSTANTS from '../../src/core/GameConstants.js';
+import { XP_ORB_BURST } from '../../src/data/constants/gameplay.js';
 
 describe('Reward Mechanics - Orb Drops', () => {
   let rewardManager;
@@ -499,7 +500,7 @@ describe('Reward Mechanics - Orb Drops', () => {
       });
     });
 
-    test('Should add scatter velocity to orbs', () => {
+    test('Should burst orbs outward at the burst speeds', () => {
       const enemy = {
         type: 'asteroid',
         size: 'medium',
@@ -512,14 +513,39 @@ describe('Reward Mechanics - Orb Drops', () => {
 
       rewardManager.dropRewards(enemy);
 
-      // All orbs should have velocity
       droppedOrbs.forEach((orb) => {
-        expect(orb.options.vx).toBeDefined();
-        expect(orb.options.vy).toBeDefined();
-
         const speed = Math.hypot(orb.options.vx, orb.options.vy);
-        expect(speed).toBeGreaterThan(0);
-        expect(speed).toBeLessThan(60); // 20-50 range per code
+        expect(speed).toBeGreaterThanOrEqual(XP_ORB_BURST.minSpeed);
+        expect(speed).toBeLessThanOrEqual(XP_ORB_BURST.maxSpeed);
+        // Out of the kill point, flying away from it.
+        const outX = orb.x - 400;
+        const outY = orb.y - 300;
+        expect(outX * orb.options.vx + outY * orb.options.vy).toBeGreaterThan(
+          0
+        );
+      });
+    });
+
+    test('Should fan the burst away from where the killing shot struck', () => {
+      const enemy = {
+        type: 'asteroid',
+        size: 'large',
+        variant: 'common',
+        wave: 1,
+        x: 400,
+        y: 300,
+        radius: 35,
+      };
+
+      // Struck from its left: the orbs fan out round "right" (angle 0).
+      rewardManager.dropRewards(enemy, { x: 370, y: 300 });
+
+      expect(droppedOrbs.length).toBeGreaterThan(1);
+      droppedOrbs.forEach((orb) => {
+        const angle = Math.atan2(orb.options.vy, orb.options.vx);
+        expect(Math.abs(angle)).toBeLessThanOrEqual(
+          Math.PI * XP_ORB_BURST.awaySpread
+        );
       });
     });
   });

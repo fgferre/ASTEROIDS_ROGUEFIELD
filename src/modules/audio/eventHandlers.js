@@ -149,6 +149,20 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.handleThrusterEffect(payload || {});
   },
 
+  // The ship engine (./shipEngine.js): each step's flight, the player's own
+  // shot, and at rest on a pause.
+  engineStep(audio, payload) {
+    audio.sfxBus.engine.flightStep(payload);
+  },
+
+  engineShot(audio) {
+    audio.sfxBus.engine.shot();
+  },
+
+  engineStop(audio) {
+    audio.sfxBus.engine.stop();
+  },
+
   screen(audio, payload) {
     audio._handleScreenChanged(payload);
   },

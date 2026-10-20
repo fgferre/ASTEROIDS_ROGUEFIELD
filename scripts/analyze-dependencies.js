@@ -5,7 +5,11 @@ import { importTargets } from './tocados.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
+const options = parseArgs(process.argv);
+// `--root <dir>` analyzes another tree laid out like this one (the test's).
+const PROJECT_ROOT = options.root
+  ? path.resolve(options.root)
+  : path.resolve(__dirname, '..');
 const SRC_DIR = path.join(PROJECT_ROOT, 'src');
 const TESTS_DIR = path.join(PROJECT_ROOT, 'tests');
 const INDEX_HTML = path.join(SRC_DIR, 'index.html');
@@ -48,6 +52,7 @@ function parseArgs(argv) {
     validateOnly: false,
     includeTests: false,
     format: 'all',
+    root: null,
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -60,6 +65,9 @@ function parseArgs(argv) {
       args.format = arg.split('=')[1];
     } else if (arg === '--format') {
       args.format = argv[i + 1];
+      i += 1;
+    } else if (arg === '--root') {
+      args.root = argv[i + 1];
       i += 1;
     }
   }
@@ -408,9 +416,8 @@ async function writeOutputs({ result, issues }, { validateOnly, format }) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv);
-  const analysis = await analyze(args);
-  await writeOutputs(analysis, args);
+  const analysis = await analyze(options);
+  await writeOutputs(analysis, options);
 }
 
 main().catch((error) => {

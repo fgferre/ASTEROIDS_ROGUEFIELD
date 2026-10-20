@@ -7,12 +7,18 @@ import {
 import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { ORB_CLASSES, ORB_CLASS_CONFIG } from './xp/orbClasses.js';
+import { XP_ORB_BURST } from '../data/constants/gameplay.js';
+import {
+  ORB_CLASSES,
+  ORB_CLASS_CONFIG,
+  getOrbConfig,
+} from './xp/orbClasses.js';
 import { OrbTuning } from './xp/OrbTuning.js';
 import { OrbField } from './xp/OrbField.js';
 import { OrbFusion } from './xp/OrbFusion.js';
 import { OrbSpacing } from './xp/OrbSpacing.js';
 import { OrbMagnet } from './xp/OrbMagnet.js';
+import { PICKUP_KINDS } from '../data/pickups.js';
 
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
@@ -42,6 +48,8 @@ class XPOrbSystem extends BaseSystem {
 
     this.globalPull = null;
     this.drift = null;
+    // Wide Net: { interval, timer }, or null without the card.
+    this.towPulse = null;
 
     this.tuning = new OrbTuning();
     this.field = new OrbField({ tuning: this.tuning });
@@ -272,6 +280,12 @@ class XPOrbSystem extends BaseSystem {
 
     this.registerEventListener('progression-reset', () => {
       super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+      this.towPulse = null;
+    });
+
+    // A new rank keeps the time already counted toward the next haul.
+    this.registerEventListener('upgrade-tow-pulse', ({ interval }) => {
+      this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
     });
 
     this.registerEventListener('player-reset', () => {
@@ -354,6 +368,10 @@ class XPOrbSystem extends BaseSystem {
     orb.id = this.generateOrbId();
     orb.x = x;
     orb.y = y;
+    // A burst's launch (RewardManager.createXPOrbs); it coasts to a stop.
+    orb.vx = options.vx ?? 0;
+    orb.vy = options.vy ?? 0;
+    orb.steered = false;
     orb.value = Number.isFinite(value) ? value : this.tuning.baseOrbValue;
     orb.class = resolvedConfig.name;
     orb.tier = resolvedConfig.tier;
@@ -371,6 +389,9 @@ class XPOrbSystem extends BaseSystem {
   }
 
   update(deltaTime) {
+    if (this.towPulse) {
+      this.updateTowPulse(deltaTime);
+    }
     if (this.globalPull) {
       this.updateGlobalPull(deltaTime);
     }
@@ -388,6 +409,7 @@ class XPOrbSystem extends BaseSystem {
       this.advanceOrbAges(deltaTime);
       if (this.drift) this.updateDrift(deltaTime);
       this.magnet.updateShipMagnetism(deltaTime);
+      this.updateFlight(deltaTime);
       this.spacing.updateOrbSoftBounds(deltaTime);
       this.spacing.updateOrbClustering(deltaTime);
       this.fusion.checkOrbFusion(deltaTime);
@@ -416,6 +438,36 @@ class XPOrbSystem extends BaseSystem {
     }
   }
 
+  // An orb's own motion: a burst out of a kill (or what the magnet left it)
+  // coasts, slowed by drag × its class weight, and stops below the settle
+  // speed (XP_ORB_BURST). Orbs the magnet or a global pull moved this update
+  // are theirs; the mark clears for the next.
+  updateFlight(deltaTime) {
+    const { drag, settleSpeed } = XP_ORB_BURST;
+    let moved = false;
+    for (const orb of this.xpOrbs) {
+      if (orb.steered) {
+        orb.steered = false;
+        continue;
+      }
+      if ((!orb.vx && !orb.vy) || !this.isOrbActive(orb) || orb.isFusing) {
+        continue;
+      }
+      const slow = Math.exp(-drag * getOrbConfig(orb.class).weight * deltaTime);
+      orb.vx *= slow;
+      orb.vy *= slow;
+      if (Math.hypot(orb.vx, orb.vy) < settleSpeed) {
+        orb.vx = 0;
+        orb.vy = 0;
+        continue;
+      }
+      orb.x += orb.vx * deltaTime;
+      orb.y += orb.vy * deltaTime;
+      moved = true;
+    }
+    if (moved) this.invalidateSpatialIndex();
+  }
+
   // Magnet pickup: every orb flies to the ship, faster each second; the
   // ship magnetism below collects them on arrival. `direction` -1 inverts it
   // (Warden Null): every orb flies away from the ship. A `target` {x, y}
@@ -431,13 +483,30 @@ class XPOrbSystem extends BaseSystem {
     };
   }
 
+  // Wide Net: every `interval` s a Magnet pickup's pull, once no other pull
+  // (a Magnet, Warden Null, a Gravity Well) is on.
+  updateTowPulse(deltaTime) {
+    const tow = this.towPulse;
+    tow.timer += deltaTime;
+    if (tow.timer < tow.interval - 1e-9 || this.globalPull) return;
+    tow.timer = 0;
+    const { duration, pullSpeed, pullAcceleration } = PICKUP_KINDS.magnet;
+    this.startGlobalPull(duration, pullSpeed, pullAcceleration);
+  }
+
   updateGlobalPull(deltaTime) {
+    if (!(deltaTime > 0)) return;
     const pull = this.globalPull;
     pull.remaining -= deltaTime;
     pull.elapsed += deltaTime;
     const target = pull.target || this.cachedPlayer?.getPosition();
     if (pull.remaining <= 0 || !target) {
       this.globalPull = null;
+      // Towed orbs stop where the pull lets go, not flung on.
+      for (const orb of this.xpOrbs) {
+        orb.vx = 0;
+        orb.vy = 0;
+      }
       return;
     }
     const step = (pull.speed + pull.acceleration * pull.elapsed) * deltaTime;
@@ -446,13 +515,21 @@ class XPOrbSystem extends BaseSystem {
       const dx = target.x - orb.x;
       const dy = target.y - orb.y;
       const distance = Math.hypot(dx, dy);
-      if (distance === 0) continue;
+      orb.steered = true;
+      if (distance === 0) {
+        orb.vx = 0;
+        orb.vy = 0;
+        continue;
+      }
       const move =
         pull.direction < 0
           ? -step / distance
           : Math.min(step, distance) / distance;
       orb.x += dx * move;
       orb.y += dy * move;
+      // Its velocity, for the streak a pulled orb draws.
+      orb.vx = (dx * move) / deltaTime;
+      orb.vy = (dy * move) / deltaTime;
     }
     this.invalidateSpatialIndex();
   }
@@ -503,14 +580,6 @@ class XPOrbSystem extends BaseSystem {
 
   getMagnetismRadius() {
     return this.tuning.orbMagnetismRadius;
-  }
-
-  setMagnetismRadius(radius) {
-    const next = Number(radius);
-    if (!Number.isFinite(next)) {
-      return;
-    }
-    this.tuning.orbMagnetismRadius = Math.max(10, next);
   }
 
   getMagnetismForce() {
@@ -667,6 +736,7 @@ class XPOrbSystem extends BaseSystem {
     this.fusion.reset();
     this.globalPull = null;
     this.drift = null;
+    this.towPulse = null;
 
     this.tuning.reset();
     this.field.invalidateSpatialIndex();

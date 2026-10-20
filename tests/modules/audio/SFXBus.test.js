@@ -603,12 +603,13 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
   });
 });
 
-describe('SFXBus thruster loops (one start per press)', () => {
+describe('SFXBus thruster loops (the engine fallback)', () => {
   function thrusterRig() {
-    vi.useFakeTimers();
     const { bus, context } = makeInitializedBus();
-    // Real gains know their context (the loop reads it on update).
+    // Real nodes know their context (the loop reads it on update and stop).
     bus.pool.getGain = () => Object.assign(createGainStub(), { context });
+    bus.pool.getOscillator = () =>
+      Object.assign(createOscillatorStub(), { context });
     const audio = new AudioSystem({
       random: new RandomService('thruster-loops'),
       settings: createSettingsStub(),
@@ -620,41 +621,34 @@ describe('SFXBus thruster loops (one start per press)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const frame = (intensity = 1) => {
       // PlayerSystem emits the side thrusters twice a frame (left, right).
-      audio.handleThrusterEffect({ type: 'side', intensity });
-      audio.handleThrusterEffect({ type: 'side', intensity });
+      audio.handleThrusterEffect({ type: 'side', side: 'left', intensity });
+      audio.handleThrusterEffect({ type: 'side', side: 'right', intensity });
     };
-    const done = () => {
-      warn.mockRestore();
-      vi.useRealTimers();
-    };
-    return { audio, bus, warn, startLoop, frame, done };
+    return { bus, warn, startLoop, frame, done: () => warn.mockRestore() };
   }
 
-  it('frames held through the start burst start one loop and warn nothing', () => {
-    const { audio, bus, warn, startLoop, frame, done } = thrusterRig();
+  it('without the engine files, held frames start one loop that follows the intensity', () => {
+    const { bus, warn, startLoop, frame, done } = thrusterRig();
 
     frame();
-    vi.advanceTimersByTime(16);
     frame(0.8);
-    vi.advanceTimersByTime(200);
     frame(0.8);
 
     expect(startLoop).toHaveBeenCalledTimes(1);
-    expect(startLoop.mock.calls[0][2]).toBe(0.8); // the latest intensity
-    expect(bus.thrusterLoops.isActive('side')).toBe(true);
+    expect(bus.thrusterLoops.activeLoops.get('side').intensity).toBe(0.8);
     expect(warn).not.toHaveBeenCalled();
-    expect(audio.thrusterState).not.toHaveProperty('lastIntensity');
     done();
   });
 
-  it('a tap shorter than the start burst cancels the pending loop', () => {
+  it('a release below the stop threshold stops the loop, with no burst or release voice', () => {
     const { bus, startLoop, frame, done } = thrusterRig();
+    const oscillators = vi.spyOn(bus.pool, 'getOscillator');
 
     frame();
     frame(0);
-    vi.advanceTimersByTime(200);
 
-    expect(startLoop).not.toHaveBeenCalled();
+    expect(startLoop).toHaveBeenCalledTimes(1);
+    expect(oscillators).toHaveBeenCalledTimes(2); // the loop's saw and square
     expect(bus.isThrusterActive('side')).toBe(false);
     done();
   });

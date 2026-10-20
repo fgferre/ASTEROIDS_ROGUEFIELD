@@ -1,9 +1,11 @@
 // What every enemy item (src/content/enemies) owes the engine: the fields the
 // factory, its pool, the rewards, the Elite affixes, mine blasts and enemy
 // shots read, and a recipe to build it from: behaviors the library has, with
-// the params each reads. Its look and sound, when it names them, are effects,
-// cues and sizes the engine has. Its roles are ones the layers ask for, on a
-// layer it can come to; every enemy one spawns is one of these items.
+// the params each reads, inside their limits (recipeProblems.js; its negative
+// cases are recipeProblems.test.js). Its look and sound, when it names them,
+// are effects, cues and sizes the engine has. Its roles are ones the layers
+// ask for, on a layer it can come to; every enemy one spawns is one of these
+// items.
 import { describe, expect, it } from 'vitest';
 import { getContent, listContent } from '../../src/content/registry.js';
 import { AUDIO_EVENT_CUES } from '../../src/data/audio/eventCues.js';
@@ -18,27 +20,21 @@ import {
 import SFXBus from '../../src/modules/audio/SFXBus.js';
 import { DEATH_EFFECTS } from '../../src/modules/effects/EnemyEffects.js';
 import { FIRE_EFFECTS } from '../../src/modules/effects/EnemyFireEffects.js';
-import { BEHAVIORS } from '../../src/modules/enemies/behaviors/index.js';
-import { MovementComponent } from '../../src/modules/enemies/components/MovementComponent.js';
 import { recipeEnemyClass } from '../../src/modules/enemies/types/RecipeEnemy.js';
+import { isCount, recipeProblems } from './recipeProblems.js';
 
 const enemies = listContent('enemies');
 const isStringList = (value) =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
-const isCount = (value) => Number.isInteger(value) && value > 0;
-const isKind = {
-  number: Number.isFinite,
-  string: (v) => typeof v === 'string',
-  count: isCount,
-};
 // The cue kinds the event table reads from an enemy file (`cueOf` rows).
 const CUE_KINDS = AUDIO_EVENT_CUES.flatMap(({ cueOf }) => cueOf ?? []);
-// The roles layer n asks for, roster and surges.
+// The roles layer n asks for: roster, surges and formations.
 const rolesOn = (n) => {
-  const { roster, surges } = directorFor(n);
+  const { roster, surges, formations } = directorFor(n);
   return [
     ...roster.map(({ role }) => role),
     ...surges.flatMap(({ roles }) => roles),
+    ...formations.map(({ role }) => role),
   ];
 };
 // From an enemy's first layer: the rest of the table and the endless layers
@@ -46,14 +42,11 @@ const rolesOn = (n) => {
 const LAYERS_SCANNED = 20;
 
 describe('enemy content', () => {
-  it.each(enemies)('$id has the stats, components and rewards', (enemy) => {
-    const { config, components, rewards } = enemy;
+  it.each(enemies)('$id has the stats and rewards', (enemy) => {
+    const { config, rewards } = enemy;
     expect(typeof config.displayName).toBe('string');
     expect(config.radius).toBeGreaterThan(0);
     expect(config.health).toBeGreaterThan(0);
-    expect(
-      new MovementComponent().strategies.has(components.movement.strategy)
-    ).toBe(true);
     expect(rewards.totalXP).toBeGreaterThan(0);
     if (rewards.baseOrbsMin === undefined) {
       expect(isCount(rewards.baseOrbs)).toBe(true);
@@ -84,20 +77,10 @@ describe('enemy content', () => {
   });
 
   it.each(enemies)(
-    '$id names behaviors the library has, with the params each reads',
-    ({ behaviors, seeded }) => {
-      expect(typeof seeded).toBe('boolean');
-      for (const [name, params] of Object.entries(behaviors)) {
-        const behavior = BEHAVIORS[name];
-        expect(behavior, name).toBeDefined();
-        expect(Object.keys(params).sort(), name).toEqual(
-          Object.keys(behavior.params).sort()
-        );
-        for (const [key, kind] of Object.entries(behavior.params)) {
-          expect(isKind[kind](params[key]), `${name}.${key}`).toBe(true);
-        }
-        if (behavior.usesRandom) expect(seeded, name).toBe(true);
-      }
+    '$id names behaviors, a strategy and a weapon pattern the engine has, with every number inside its limits',
+    (enemy) => {
+      expect(typeof enemy.seeded).toBe('boolean');
+      expect(recipeProblems(enemy)).toEqual([]);
     }
   );
 

@@ -279,6 +279,7 @@ describe('WaveManager Heralds', () => {
     expect(herald).toMatchObject({ heraldKind: 'dust', elite: false });
 
     manager.update(60); // the Rockfall surge too
+    manager.update(2); // the Mite ring, warned of at 60 s
     field.clearRocks();
     active.filter((e) => e !== herald && !e.destroyed).forEach(field.kill);
     expect(manager.waveInProgress).toBe(true);
@@ -339,10 +340,11 @@ describe('WaveManager field events', () => {
     );
   });
 
-  it('stuns every enemy and flashes the screen on a Solar Flare', () => {
+  it('stuns every machine and flashes the screen on a Solar Flare', () => {
     const field = createField();
     startLayer(field, 7);
-    field.active.push({ type: 'asteroid', destroyed: false });
+    const rock = { type: 'asteroid', destroyed: false };
+    field.active.push(rock);
 
     field.manager.update(35);
 
@@ -350,6 +352,8 @@ describe('WaveManager field events', () => {
     const drones = ofType(field.active, 'drone');
     expect(drones.length).toBeGreaterThan(0);
     for (const drone of drones) expect(drone.stunTimer).toBe(1);
+    // EnemyUpdateSystem stuns machines only: a rock drifts on.
+    expect(rock.stunTimer).toBeUndefined();
     expect(field.effects.addScreenFlash).toHaveBeenCalledTimes(1);
   });
 
@@ -371,7 +375,9 @@ describe('WaveManager field events', () => {
     field.active.push({ type: 'asteroid', destroyed: false });
     field.manager.update(20);
     field.manager.update(20);
-    // Everything spawned by 40 s; the Gravity Well (45 s) is still pending.
+    field.manager.update(2);
+    // Everything spawned by 42 s (the Tether wall, warned of at 40 s); the
+    // Gravity Well (45 s) is still pending.
     expect(field.manager.layerSchedule.map((e) => e.event?.kind)).toEqual([
       'gravity-well',
     ]);

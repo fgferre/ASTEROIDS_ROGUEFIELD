@@ -571,16 +571,20 @@ export function createServiceManifest(context = {}) {
         'xp-orbs',
         'enemies',
         'effects',
+        'progression',
         'random',
       ],
-      factory: ({ resolved }) =>
+      // `combat` once it is built (Motherlode follows the held weapon).
+      factory: ({ resolved, container }) =>
         new PickupSystem({
           eventBus: resolved['event-bus'],
           player: resolved['player'],
           'xp-orbs': resolved['xp-orbs'],
           enemies: resolved['enemies'],
           effects: resolved['effects'],
+          progression: resolved['progression'],
           random: resolved['random'],
+          serviceResolver: createServiceResolver(container),
         }),
     },
     {
@@ -636,6 +640,7 @@ export function createServiceManifest(context = {}) {
         'enemies',
         'physics',
         'progression',
+        'combat',
       ],
       factory: ({ resolved }) => {
         const world = new WorldSystem({
@@ -644,6 +649,7 @@ export function createServiceManifest(context = {}) {
           enemies: resolved['enemies'],
           physics: resolved['physics'],
           progression: resolved['progression'],
+          combat: resolved['combat'],
         });
 
         if (

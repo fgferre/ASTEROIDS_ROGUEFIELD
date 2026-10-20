@@ -140,6 +140,9 @@ export class EnemySnapshots {
     return {
       totalKills: safeNumber(stats.totalKills, base.totalKills),
       timeElapsed: safeNumber(stats.timeElapsed, base.timeElapsed),
+      timeline: (stats.timeline ?? base.timeline).map((event) => ({
+        ...event,
+      })),
     };
   }
 
@@ -237,6 +240,8 @@ export class EnemySnapshots {
       id: enemy.id || null,
       type: enemy.type || null,
       wave: safeNumber(enemy.wave, this.waveState?.current || 1),
+      // A Twain's splits so far (behaviors/split.js).
+      generation: safeNumber(enemy.generation, 0),
       x: safeNumber(enemy.x),
       y: safeNumber(enemy.y),
       vx: safeNumber(enemy.vx),
@@ -490,6 +495,7 @@ export class EnemySnapshots {
     const config = {
       id: snapshot.id || undefined,
       wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
+      generation: safeNumber(snapshot.generation, 0),
       x: safeNumber(snapshot.x, 0),
       y: safeNumber(snapshot.y, 0),
       vx: safeNumber(snapshot.vx, 0),

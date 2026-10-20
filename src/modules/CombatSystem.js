@@ -6,6 +6,16 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
+import { burstFlak } from './combat/beamAndFan.js';
+import {
+  applyConcentratedFire,
+  computeParallelOffset,
+} from './combat/volleyLanes.js';
+import {
+  holsterWeaponField,
+  steerSeeker,
+  tickWeaponField,
+} from './combat/firePatterns.js';
 import { COMBAT_AIMING_UPGRADE_CONFIG } from '../data/constants/gameplay.js';
 // The knockback suite imports it from here.
 export { knockbackSpeed } from './combat/HitResolution.js';
@@ -37,6 +47,7 @@ class CombatSystem extends BaseSystem {
         this.hits.processBulletHit(hit, enemy, this.cachedEnemies),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       cardEffects: () => this.cards.cardEffects,
+      cards: () => this.cards,
       tuning: () => ({
         aimCooldownMultiplier: this.cards.aimCooldownMultiplier,
         cooldownTuning: this.cards.cooldownTuning,
@@ -49,24 +60,23 @@ class CombatSystem extends BaseSystem {
       playerStats: () => this.lastKnownPlayerStats,
       bulletSpeed: () => this.weapons.bulletSpeed,
       spreadMode: () => this.weapons.spreadMode,
-      computeParallelOffset: (...args) =>
-        this.weapons.computeParallelOffset(...args),
+      computeParallelOffset,
     });
     this.projectiles = new Projectiles({
       physics: () => this.cachedPhysics,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       weapon: () => ({
-        weaponId: this.weapons.weaponId,
+        form: this.weapons.weapon,
         bulletSpeed: this.weapons.bulletSpeed,
         bulletLifetime: this.weapons.bulletLifetime,
         trailLength: this.weapons.trailLength,
         thermalLens: this.cards.cardEffects.thermalLens,
-        lanceDamageTuning: this.cards.lanceDamageTuning,
         lanceApexDamage: this.weapons.lanceApexDamage,
         lancePierce: this.weapons.lancePierce,
         pierceBonus: this.cards.pierceBonus,
       }),
-      burstFlak: (bolt) => this.weapons.burstFlak(bolt),
+      burstFlak: (bolt) => burstFlak(this.weapons, bolt),
+      steer: (missile, dt) => steerSeeker(this.weapons, missile, dt),
     });
     this.hits = new HitResolution({
       weapons: () => this.weapons,
@@ -77,6 +87,7 @@ class CombatSystem extends BaseSystem {
     this.cards = new CardEffects({
       player: () => this.cachedPlayer,
       enemies: () => this.cachedEnemies,
+      enemyBullets: () => this.projectiles.enemyBullets,
       targeting: () => this.targeting,
       weapons: () => this.weapons,
       hits: () => this.hits,
@@ -138,6 +149,10 @@ class CombatSystem extends BaseSystem {
       this.cards.applyWeaponTuning(data);
     });
 
+    this.registerEventListener('stasis-started', ({ duration } = {}) => {
+      this.projectiles.freezeEnemyBullets(duration);
+    });
+
     // A weapon card names its weapon (src/content/weapons/).
     this.registerEventListener('upgrade-weapon', (data = {}) => {
       this.weapons.takeWeapon(data.weaponId);
@@ -164,6 +179,26 @@ class CombatSystem extends BaseSystem {
     });
     this.registerEventListener('upgrade-afterburn', (data) => {
       this.cards.cardEffects.afterburn = data;
+    });
+    this.registerEventListener('upgrade-long-burn', (data) => {
+      this.cards.cardEffects.longBurn = data;
+    });
+    this.registerEventListener('upgrade-execute-damage', (data) => {
+      this.cards.cardEffects.executeDamage = data;
+    });
+    this.registerEventListener('upgrade-kill-spark', (data) => {
+      this.cards.cardEffects.killSpark = data;
+    });
+    this.registerEventListener('upgrade-arc-lattice', (data) => {
+      this.cards.cardEffects.arcLattice = data;
+    });
+    this.registerEventListener('upgrade-dash-fire', (data) => {
+      this.cards.cardEffects.dashFire = data;
+    });
+
+    // Gyro Servos: every dash runs the cannon hot for a moment.
+    this.registerEventListener('player-dashed', () => {
+      if (this.cards.cardEffects.dashFire) this.cards.startDashFire();
     });
 
     this.registerEventListener('thruster-effect', (data = {}) => {
@@ -400,7 +435,10 @@ class CombatSystem extends BaseSystem {
 
       if (playerStats) {
         this.weapons.handleShooting(deltaTime, playerStats);
+        tickWeaponField(this.weapons, deltaTime, playerStats);
       }
+    } else {
+      holsterWeaponField(this.weapons);
     }
 
     // Always update bullets - they keep flying even without ship hull
@@ -441,10 +479,6 @@ class CombatSystem extends BaseSystem {
     return this.weapons.evolutions;
   }
 
-  get apexes() {
-    return this.weapons.apexes;
-  }
-
   get lanceLook() {
     return this.weapons.lanceLook;
   }
@@ -459,6 +493,23 @@ class CombatSystem extends BaseSystem {
 
   get flakBursts() {
     return this.weapons.flakBursts;
+  }
+
+  // firePatterns.js: the 3D weapon mirror draws them.
+  get blades() {
+    return this.weapons.blades;
+  }
+
+  get aura() {
+    return this.weapons.aura;
+  }
+
+  get pulses() {
+    return this.weapons.pulses;
+  }
+
+  get weaponForm() {
+    return this.weapons.weapon;
   }
 
   get bulletSpeed() {
@@ -488,7 +539,7 @@ class CombatSystem extends BaseSystem {
   }
 
   applyConcentratedFire(input, shotCount) {
-    return this.weapons.applyConcentratedFire(input, shotCount);
+    return applyConcentratedFire(this.weapons, input, shotCount);
   }
 
   evolveWeapon(family) {

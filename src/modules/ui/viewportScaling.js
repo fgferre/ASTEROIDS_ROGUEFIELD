@@ -10,6 +10,10 @@ import {
 } from '../../core/viewport.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 
+// The window's share of the HUD scale stops here: a 1080p window is 1.2, the
+// size the instruments are drawn at (--hud-u = 1 there, hudStyles.js).
+const HUD_FIT_MAX = 1.2;
+
 export class ViewportScaling {
   /**
    * `refs.canvas`: the game canvas.
@@ -108,7 +112,7 @@ export class ViewportScaling {
 
     // The HUD text scales as it did with the 800×600 box fitted to the window.
     const fit = Math.min(width / GAME_WIDTH, height / GAME_HEIGHT);
-    this.updateHudScale(Math.min(1.25, Math.max(0.82, fit)));
+    this.updateHudScale(Math.min(HUD_FIT_MAX, Math.max(0.82, fit)));
   }
 
   updateHudScale(autoScale = null) {
@@ -122,7 +126,9 @@ export class ViewportScaling {
     const auto = Number.isFinite(this.currentHudAutoScale)
       ? this.currentHudAutoScale
       : 1;
-    const effective = Math.max(0.6, Math.min(1.2, baseScale * auto));
+    // The window's fit is capped, not the product: HUD Scale 130 % really
+    // is 1.3× the HUD at any window size.
+    const effective = Math.max(0.6, baseScale * auto);
     const root = document.documentElement;
 
     if (root) {

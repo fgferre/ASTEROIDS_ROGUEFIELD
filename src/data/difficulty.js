@@ -71,5 +71,9 @@ export function scaleDirector(director, factor) {
       ...surge,
       count: scaleCount(surge.count, factor),
     })),
+    formations: director.formations.map((entry) => ({
+      ...entry,
+      count: scaleCount(entry.count, factor),
+    })),
   };
 }

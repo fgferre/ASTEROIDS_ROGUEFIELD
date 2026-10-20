@@ -1,14 +1,14 @@
 // src/modules/ui/PauseScreen.js
 //
-// The pause overlay: resume, settings and quit (quit asks twice, here and on
-// the death recap), and the build panel with the level-up tools left, where
-// the run is and its seed.
+// The pause overlay: resume, settings, the HUD editor and quit (quit asks
+// twice, here and on the death screen), the run's build as the run end
+// shows it with the rerolls and banishes left, where the run is and its seed.
 
-import { buildBlockMarkup, collectBuild, runLocationLine } from './runRecap.js';
+import { collectBuild, endBuildMarkup, runLocationLine } from './runRecap.js';
 
 export class PauseScreen {
   /**
-   * `refs`: the overlay's nodes { resumeBtn, settingsBtn, exitBtn, location, build, tools, seed }.
+   * `refs`: the overlay's nodes { resumeBtn, settingsBtn, editHudBtn, exitBtn, location, build, tools, seed }.
    * `gameOverQuitBtn`: the death recap's Quit, which asks twice too.
    * `emit(name, payload)`: sends ui-hover, toggle-pause, settings-menu-requested, exit-to-menu-requested.
    * `showScreen(name, options)`: shows or hides the pause overlay.
@@ -18,6 +18,7 @@ export class PauseScreen {
    * `layer()`: the layer the run is on.
    * `settingsOpenHere()`: the settings panel is open from this screen.
    * `closeSettings()`: closes the settings panel when the game resumes.
+   * `openHudEditor()`: Edit HUD, over the paused run.
    */
   constructor({
     refs,
@@ -30,6 +31,7 @@ export class PauseScreen {
     layer,
     settingsOpenHere,
     closeSettings,
+    openHudEditor,
   }) {
     this.refs = refs;
     this.gameOverQuitBtn = gameOverQuitBtn;
@@ -41,6 +43,7 @@ export class PauseScreen {
     this.layer = layer;
     this.settingsOpenHere = settingsOpenHere;
     this.closeSettings = closeSettings;
+    this.openHudEditor = openHudEditor;
     this.currentPauseState = false;
     this.quitConfirm = { button: null, label: '', timeoutId: null };
   }
@@ -79,6 +82,12 @@ export class PauseScreen {
         this.emit('settings-menu-requested', { source: 'pause' });
       });
     }
+
+    pauseRefs.editHudBtn?.addEventListener('click', () => {
+      if (this.currentPauseState) {
+        this.openHudEditor();
+      }
+    });
 
     if (pauseRefs.exitBtn) {
       pauseRefs.exitBtn.addEventListener('mouseenter', () => {
@@ -171,13 +180,13 @@ export class PauseScreen {
     }
   }
 
-  // The pause panel: the same build block as the death recap, plus the
-  // level-up tools left and where the run is.
+  // The pause panel: the run end's build block (runRecap.endBuildMarkup),
+  // plus the rerolls and banishes left and where the run is.
   renderPauseBuild() {
     const refs = this.refs;
     const progression = this.progression();
     if (!refs.build || !progression) return;
-    refs.build.innerHTML = buildBlockMarkup(
+    refs.build.innerHTML = endBuildMarkup(
       collectBuild(progression, this.combat())
     );
     refs.location.textContent = runLocationLine(this.layer());

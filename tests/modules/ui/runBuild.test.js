@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildBlockMarkup,
   collectBuild,
+  endBuildMarkup,
 } from '../../../src/modules/ui/runRecap.js';
 
 const progression = {
@@ -26,12 +26,15 @@ const combat = {
   }),
 };
 
-describe('pause build block', () => {
-  it('lists the weapon, its evolutions and the lit synergy', () => {
-    const markup = buildBlockMarkup(collectBuild(progression, combat));
-    expect(markup).toContain('Amber Lance');
-    expect(markup).toContain('Incendiary Lance');
-    expect(markup).toContain('Thermal · Overheat online');
-    expect(markup).toContain('Rank 2 of 3');
+// The run end and the pause panel draw the same block.
+describe('run build block', () => {
+  it('names the weapon by its form, its family track and each family with its cards', () => {
+    const markup = endBuildMarkup(collectBuild(progression, combat));
+    expect(markup).toContain(
+      '<span class="end-weapon__name">Incendiary Lance</span>'
+    );
+    expect(markup).toContain('<b>Apex 3/5</b> · two cards from Solar Flare');
+    expect(markup).toContain('<span class="end-fam__tag">Overheat</span>');
+    expect(markup).toContain('<b>Plasma Gun</b><sup>2</sup>');
   });
 });

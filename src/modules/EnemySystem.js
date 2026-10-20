@@ -264,7 +264,10 @@ class EnemySystem extends BaseSystem {
     // NEW: Integrate RewardManager with enemy destruction
     this.registerEventListener('enemy-destroyed', (data) => {
       if (this.rewardManager && data.enemy) {
-        this.rewardManager.dropRewards(data.enemy);
+        this.rewardManager.dropRewards(
+          data.enemy,
+          data.source?.hitPosition ?? null
+        );
       }
     });
 
@@ -750,11 +753,9 @@ class EnemySystem extends BaseSystem {
     };
   }
 
+  // `timeline`: the run's moments for its end screen (WorldSystem records them).
   createInitialSessionStats() {
-    return {
-      totalKills: 0,
-      timeElapsed: 0,
-    };
+    return { totalKills: 0, timeElapsed: 0, timeline: [] };
   }
 
   // === UPDATE PRINCIPAL ===

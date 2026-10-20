@@ -325,6 +325,27 @@ const SETTINGS_SCHEMA = [
         max: 1.3,
         step: 0.05,
       },
+      // The active layout: a built-in preset's id (data/ui/hudPresets.js)
+      // or one of `hudPresets`' (modules/ui/hud/editor/layoutStore.js).
+      {
+        key: 'hudLayout',
+        type: 'hudLayout',
+        label: 'HUD Layout',
+        description:
+          'Instrument: fine instruments that fade until needed. Classic: the panels from before. Minimal: the least on screen. Then your own layouts.',
+        default: 'instrument',
+      },
+      // The player's own layouts, saved from the HUD editor; a reset of
+      // the Interface tab keeps them.
+      {
+        key: 'hudPresets',
+        type: 'hudPresets',
+        label: 'HUD Edit Mode',
+        description:
+          'Move, resize and swap every instrument on the live HUD, then save it as your own layout or share it as a code.',
+        default: [],
+        keepOnReset: true,
+      },
       {
         key: 'damageFlash',
         type: 'toggle',
@@ -513,7 +534,7 @@ const SETTINGS_SCHEMA = [
         type: 'toggle',
         label: 'Colorblind Mode',
         description:
-          'Activates alternative palette with better distinction between categories.',
+          'Card rarities, upgrade families and threats in colors that stay apart with color blindness.',
         default: false,
       },
     ],

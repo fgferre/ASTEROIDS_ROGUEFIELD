@@ -35,11 +35,11 @@ function land(enemy, { radius, damage, cause, landEvent }, x, y) {
  */
 export default {
   params: {
-    interval: 'number',
-    telegraph: 'number',
+    interval: 'positive',
+    telegraph: 'positive',
     lead: 'number',
-    flight: 'number',
-    radius: 'number',
+    flight: 'positive',
+    radius: 'positive',
     damage: 'number',
     cause: 'string',
     telegraphEvent: 'string',

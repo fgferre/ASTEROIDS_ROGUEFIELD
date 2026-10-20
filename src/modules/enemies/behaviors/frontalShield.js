@@ -11,7 +11,7 @@ import {
  * straight to the hull. A broken plate stays broken.
  */
 export default {
-  params: { health: 'number', halfArc: 'number' },
+  params: { health: 'positive', halfArc: 'positive' },
   reset(enemy, { health }) {
     enemy.facing = 0;
     enemy.shieldHealth = health;
