@@ -113,8 +113,11 @@ export function createReplayController({
     input.setInputSource(null);
   });
 
+  // A pick answers an offer on screen; a chest's cards (collectibles/
+  // chests.js) land with none up, and the replayed run grants them itself.
   eventBus.on('upgrade-applied', (payload = {}) => {
-    if (recorder && payload.upgradeId) {
+    const picked = progression.pendingUpgradeOptions.length > 0;
+    if (recorder && payload.upgradeId && picked) {
       recorder.recordUpgrade(runStep(), payload.upgradeId);
     }
   });

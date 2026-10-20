@@ -183,6 +183,7 @@ export class Projectiles {
     bullet.destroyReason = null;
     bullet.destroyLogEmitted = false;
     bullet.createdAt = Date.now();
+    bullet.stasisTimer = 0;
 
     if (Number.isFinite(projectile.radius)) {
       bullet.radius = Math.max(0, projectile.radius);
@@ -403,18 +404,25 @@ export class Projectiles {
         continue;
       }
 
-      if (Array.isArray(bullet.trail)) {
-        bullet.trail.push({ x: bullet.x, y: bullet.y });
-        const trailLimit = this.getEnemyBulletTrailLimit(bullet);
-        if (trailLimit > 0 && bullet.trail.length > trailLimit) {
-          bullet.trail.splice(0, bullet.trail.length - trailLimit);
+      // Held by a Stasis (freezeEnemyBullets): still where it stopped, its
+      // trail and its life too; it still hurts.
+      if (bullet.stasisTimer > 0) {
+        bullet.stasisTimer -= deltaTime;
+        trailPoints += bullet.trail?.length ?? 0;
+      } else {
+        if (Array.isArray(bullet.trail)) {
+          bullet.trail.push({ x: bullet.x, y: bullet.y });
+          const trailLimit = this.getEnemyBulletTrailLimit(bullet);
+          if (trailLimit > 0 && bullet.trail.length > trailLimit) {
+            bullet.trail.splice(0, bullet.trail.length - trailLimit);
+          }
+          trailPoints += bullet.trail.length;
         }
-        trailPoints += bullet.trail.length;
-      }
 
-      bullet.x += bullet.vx * deltaTime;
-      bullet.y += bullet.vy * deltaTime;
-      bullet.life -= deltaTime;
+        bullet.x += bullet.vx * deltaTime;
+        bullet.y += bullet.vy * deltaTime;
+        bullet.life -= deltaTime;
+      }
 
       const outOfBounds =
         bullet.x < 0 ||
@@ -557,6 +565,13 @@ export class Projectiles {
 
     for (let i = 0; i < hitsToEmit.length; i += 1) {
       this.emit('player-hit-by-projectile', hitsToEmit[i]);
+    }
+  }
+
+  /** A Stasis: every shot in flight but a Warden's stands still for `duration` s. */
+  freezeEnemyBullets(duration) {
+    for (const bullet of this.enemyBullets) {
+      if (bullet && !bullet.isBossProjectile) bullet.stasisTimer = duration;
     }
   }
 

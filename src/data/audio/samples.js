@@ -37,6 +37,17 @@ export const SAMPLE_CUES = deepFreeze({
   playXPCollect: { sample: 'xp-collect', bus: 'ambient' },
   playLevelUp: { sample: 'level-up', bus: 'ambient' },
   playUpgradeSelect: { sample: 'card-pick', bus: 'ambient' },
+  // By the pickup's kind (and the chest's opening); Magnet, Pulse and
+  // Overcharge have no sample id yet.
+  playPickupCollected: {
+    sample: {
+      repair: 'pickup-repair',
+      stasis: 'pickup-stasis',
+      salvage: 'pickup-salvage',
+      chest: 'chest-open',
+    },
+    bus: 'ambient',
+  },
   playDroneFire: { sample: 'enemy-shot', bus: 'ambient', spatialArg: 0 },
   playBossRoar: { sample: 'warden-arrival', bus: 'ambient', facade: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },

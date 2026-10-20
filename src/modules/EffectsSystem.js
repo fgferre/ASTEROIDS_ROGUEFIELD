@@ -524,6 +524,12 @@ export default class EffectsSystem extends BaseSystem {
     this.gameTime.addHitStop(kind);
   }
 
+  // A chest's opening (collectibles/chests.js) slows the world the way a
+  // Warden's arrival does.
+  applyTimeDilation(scale, options) {
+    this.gameTime.applyTimeDilation(scale, options);
+  }
+
   // === PLAYER AND ENEMY BURSTS (effects/PlayerEffects.js, EnemyEffects.js) ===
   // Called on the effects object: the thruster determinism suite fires the
   // thrusters, GameSessionService blows up the ship.

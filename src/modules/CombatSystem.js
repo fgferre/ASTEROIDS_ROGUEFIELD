@@ -138,6 +138,10 @@ class CombatSystem extends BaseSystem {
       this.cards.applyWeaponTuning(data);
     });
 
+    this.registerEventListener('stasis-started', ({ duration } = {}) => {
+      this.projectiles.freezeEnemyBullets(duration);
+    });
+
     // A weapon card names its weapon (src/content/weapons/).
     this.registerEventListener('upgrade-weapon', (data = {}) => {
       this.weapons.takeWeapon(data.weaponId);
