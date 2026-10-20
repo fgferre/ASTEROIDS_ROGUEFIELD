@@ -47,8 +47,9 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
   por cena; capturas de referência que pedem aprovação dele). O radar acompanha o zoom da câmera nova.
 - **Abertos dele:** item 2 (tempo do chefe da camada 5), item 15 (o Anel partido lê como faixa; explicado, nada mudado;
   modelar como estrutura iluminada mantendo o acender do epílogo), itens 16 e 17 acima. `BACKLOG.md`: 29 linhas.
-- **Depois da 14: Rodada 15 (longevidade)**, texto já no PLAN — 12+ armas, 30+ inimigos, 6 biomas, roster de cascos,
-  árvore de desbloqueios, runs de 20–30 min com centenas de inimigos, qualidade por padrão mais alta.
+- **Rodada 15 (decidida 20/10): melhorar de todas as formas que o jogador sente**, absorvendo o resto da 14 — ordem
+  no PLAN: economia/upgrades → loot/orbes → HUD/UX → conteúdo → meta → ritmo → cerimônias e cenas → áudio. Ele disse:
+  _"tudo está rodando liso, não precisa medir nada"_ — sem medições por iniciativa própria.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); câmera de dois estados aprovada por maquete; primeira câmera contínua rejeitada; "não tem problema
