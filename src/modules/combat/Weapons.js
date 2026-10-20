@@ -851,13 +851,69 @@ export class Weapons {
       : this.player().getTurretAngle();
   }
 
+  // Multi-lock (Targeting Matrix rank 3, several locks, auto aim, as the
+  // stream reads it): one entry per lock in order, with its lead point and
+  // the angle to it from `origin`; null otherwise.
+  getLockAims(origin) {
+    const targeting = this.targeting();
+    if (
+      targeting.stickAim ||
+      targeting.aimMode === 'manual' ||
+      targeting.targetingUpgradeLevel < 3 ||
+      targeting.currentTargetLocks.length < 2
+    ) {
+      return null;
+    }
+    return targeting.currentLockAssignments.map(({ enemy, predictedAim }) => ({
+      enemyId: enemy.id,
+      point: predictedAim,
+      angle: Math.atan2(predictedAim.y - origin.y, predictedAim.x - origin.x),
+    }));
+  }
+
   // `beam`: damage lands on everything in the segment on the firing frame;
   // the beam stays on screen for `beam.duration`. Aimed like the lances: from
   // the muzzle onto the primary lock's lead point in auto, along the turret
-  // otherwise.
+  // otherwise. With multi-lock, one beam per lock; the cooldown penalty
+  // comes once per volley.
   fireBeam(beam, playerPos, playerStats) {
     const origin = this.player().getMuzzlePoint();
-    const angle = this.getWeaponAngle(origin);
+    const lockAims = this.getLockAims(origin);
+    const angles = lockAims
+      ? lockAims.map((lock) => lock.angle)
+      : [this.getWeaponAngle(origin)];
+    // The primary lock's beam stands for the volley in the event.
+    const [end] = angles.map((angle) =>
+      this.fireBeamAlong(beam, origin, angle, playerStats)
+    );
+    this.lastShotTime = -beam.cooldownPenalty;
+    const targeting = this.targeting();
+
+    this.emit('weapon-fired', {
+      position: playerPos,
+      target: end,
+      centerlineTarget: end,
+      pattern: beam.pattern,
+      primaryTargetId: targeting.currentTarget
+        ? targeting.currentTarget.id
+        : null,
+      targeting: {
+        dynamicPrediction: targeting.usingDynamicPrediction(),
+        lockCount: targeting.currentTargetLocks.length,
+        multiLockActive: Boolean(lockAims),
+        predictedPoints: lockAims
+          ? lockAims.map(({ enemyId, point }) => ({
+              enemyId,
+              position: { ...point },
+            }))
+          : [],
+      },
+    });
+  }
+
+  // One beam of the volley: the hit test, the beam on screen and its event.
+  // Returns where it ends.
+  fireBeamAlong(beam, origin, angle, playerStats) {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const { width, duration, extraFragments } = beam;
@@ -913,8 +969,6 @@ export class Weapons {
       maxRadius: beam.flashRadius,
       colors: this.weapon.colors,
     });
-    this.lastShotTime = -beam.cooldownPenalty;
-    const targeting = this.targeting();
 
     this.emit('weapon-beam-fired', {
       position: origin,
@@ -924,26 +978,14 @@ export class Weapons {
       hits: struck.length,
       kick: beam.kick,
     });
-    this.emit('weapon-fired', {
-      position: playerPos,
-      target: end,
-      centerlineTarget: end,
-      pattern: beam.pattern,
-      primaryTargetId: targeting.currentTarget
-        ? targeting.currentTarget.id
-        : null,
-      targeting: {
-        dynamicPrediction: targeting.usingDynamicPrediction(),
-        lockCount: targeting.currentTargetLocks.length,
-        multiLockActive: false,
-        predictedPoints: [],
-      },
-    });
+    return end;
   }
 
   // `fan`: a fan of the weapon's projectile from the muzzle, aimed like the
   // beam. Multishot adds bolts to the fan; the volley waits
-  // `fan.cooldownMultiplier` × the lance's cooldown.
+  // `fan.cooldownMultiplier` × the lance's cooldown. With multi-lock the same
+  // bolts are split over the locks, earlier locks first, each lock getting a
+  // small fan of its own (same bolt spacing) centred on its lead point.
   fireFan(fan, playerPos, playerStats) {
     const origin = this.player().getMuzzlePoint();
     const angle = this.getWeaponAngle(origin);
@@ -956,15 +998,36 @@ export class Weapons {
     // Shared by the volley's bolts: who its shrapnel already hit, and how
     // many bursts it has had (only the first lights the 3D scene).
     const volley = { struck: [], bursts: 0 };
+    const lockAims = this.getLockAims(origin);
     const predictedPoints = [];
-    for (let i = 0; i < bolts; i += 1) {
-      const a = bolts === 1 ? angle : angle + spread * (i / (bolts - 1) - 0.5);
+    const launch = (a) => {
       const end = {
         x: origin.x + Math.cos(a) * reach,
         y: origin.y + Math.sin(a) * reach,
       };
       this.createBullet(origin, end, playerStats.damage, volley);
-      predictedPoints.push({ enemyId: null, position: end });
+      return end;
+    };
+    if (lockAims) {
+      const step = spread / (fan.bolts - 1);
+      const share = Math.floor(bolts / lockAims.length);
+      const longer = bolts % lockAims.length;
+      lockAims.forEach((lock, index) => {
+        const count = share + (index < longer ? 1 : 0);
+        for (let i = 0; i < count; i += 1) {
+          launch(lock.angle + step * (i - (count - 1) / 2));
+        }
+        predictedPoints.push({
+          enemyId: lock.enemyId,
+          position: { ...lock.point },
+        });
+      });
+    } else {
+      for (let i = 0; i < bolts; i += 1) {
+        const a =
+          bolts === 1 ? angle : angle + spread * (i / (bolts - 1) - 0.5);
+        predictedPoints.push({ enemyId: null, position: launch(a) });
+      }
     }
     this.lastShotTime = -this.shootCooldown * (fan.cooldownMultiplier - 1);
     const targeting = this.targeting();
@@ -984,7 +1047,7 @@ export class Weapons {
       targeting: {
         dynamicPrediction: targeting.usingDynamicPrediction(),
         lockCount: targeting.currentTargetLocks.length,
-        multiLockActive: false,
+        multiLockActive: Boolean(lockAims),
         predictedPoints,
       },
     });

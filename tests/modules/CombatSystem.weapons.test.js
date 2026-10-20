@@ -59,6 +59,8 @@ function makeCombat(enemyList = [], options = {}) {
   const player = {
     isDead: false,
     getPosition: () => ({ x: 100, y: 300 }),
+    getVelocity: () => ({ x: 0, y: 0 }),
+    getShieldRadius: () => 16,
     getTurretAngle: () => 0,
     getMuzzlePoint: () => ({ x: 100 + NOSE, y: 300 }),
     getStats: () => ({ multishot: 1, damage: DAMAGE }),
@@ -67,6 +69,17 @@ function makeCombat(enemyList = [], options = {}) {
   const physics = { forEachBulletCollision: () => {} };
   const combat = new CombatSystem({ eventBus, player, enemies, physics });
   return { combat, eventBus, enemies };
+}
+
+// Targeting Matrix at rank 3 with `multishot` locks on the listed enemies.
+function lockOnMany(combat, eventBus, multishot) {
+  eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+  eventBus.emit('upgrade-aiming-suite', { level: 2 });
+  eventBus.emit('upgrade-aiming-suite', { level: 3, multiLockTargets: 4 });
+  combat.lastKnownPlayerStats = { multishot, damage: DAMAGE };
+  combat.targetUpdateTimer = 0;
+  combat.updateTargeting(0);
+  expect(combat.currentTargetLocks).toHaveLength(multishot);
 }
 
 const lance = (overrides = {}) => ({
@@ -123,6 +136,42 @@ describe('Harmonic Plasma Lance', () => {
 
     combat.updateWeaponEffects(BEAM.duration + 0.01);
     expect(combat.beams).toHaveLength(0);
+  });
+
+  it('with several locks fires one beam at each lock and hits every locked enemy; the penalty comes once', () => {
+    const up = makeEnemy('up', 250, 180);
+    const level = makeEnemy('level', 300, 300);
+    const down = makeEnemy('down', 250, 420);
+    const { combat, eventBus } = makeCombat([up, level, down]);
+    const beamFired = vi.fn();
+    const fired = vi.fn();
+    eventBus.on('weapon-beam-fired', beamFired);
+    eventBus.on('weapon-fired', fired);
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+    lockOnMany(combat, eventBus, 3);
+
+    const stats = { multishot: 3, damage: DAMAGE };
+    for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+
+    expect(combat.beams).toHaveLength(3);
+    expect(beamFired).toHaveBeenCalledTimes(3);
+    const hit = 100 - DAMAGE * BEAM.damageMultiplier;
+    [up, level, down].forEach((enemy) => {
+      expect(enemy.health).toBeCloseTo(hit, 6);
+    });
+    expect(combat.lastShotTime).toBe(-BEAM.cooldownPenalty);
+    expect(fired).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pattern: 'beam',
+        targeting: expect.objectContaining({
+          multiLockActive: true,
+          predictedPoints: combat.currentLockAssignments.map((lock) => ({
+            enemyId: lock.enemy.id,
+            position: lock.predictedAim,
+          })),
+        }),
+      })
+    );
   });
 
   it('splits a large rock it kills into one extra fragment', () => {
@@ -276,6 +325,60 @@ describe('Scatter Coil', () => {
     combat.bullets = [];
     combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
     expect(combat.bullets).toHaveLength(FAN.maxBolts);
+  });
+
+  it('with several locks splits its bolts over the locks, earlier locks first, each a small fan on its lock', () => {
+    const enemies = [
+      makeEnemy('up', 250, 180),
+      makeEnemy('level', 300, 300),
+      makeEnemy('down', 250, 420),
+    ];
+    const { combat, eventBus } = scatter(enemies);
+    const fired = vi.fn();
+    eventBus.on('weapon-fired', fired);
+    lockOnMany(combat, eventBus, 3);
+
+    // 7 bolts on 3 locks: 3, 2, 2.
+    combat.handleShooting(1, { multishot: 3, damage: DAMAGE });
+    expect(combat.bullets).toHaveLength(FAN.bolts + 2);
+    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    const step = (FAN.fan * Math.PI) / 180 / (FAN.bolts - 1);
+    const groups = [angles.slice(0, 3), angles.slice(3, 5), angles.slice(5)];
+    groups.forEach((group, index) => {
+      const { predictedAim } = combat.currentLockAssignments[index];
+      const toLock = Math.atan2(predictedAim.y - 300, predictedAim.x - 116);
+      const centre = group.reduce((sum, a) => sum + a, 0) / group.length;
+      expect(centre).toBeCloseTo(toLock, 6);
+      group.slice(1).forEach((a, i) => {
+        expect(a - group[i]).toBeCloseTo(step, 6);
+      });
+    });
+    expect(fired).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pattern: 'fan',
+        targeting: expect.objectContaining({ multiLockActive: true }),
+      })
+    );
+    expect(
+      fired.mock.lastCall[0].targeting.predictedPoints.map((p) => p.enemyId)
+    ).toEqual(combat.currentTargetLocks.map((enemy) => enemy.id));
+
+    // Fewer bolts than locks: one bolt each for the first locks.
+    combat.bullets = [];
+    combat.weapons.fireFan(
+      { ...FAN, bolts: 2, maxBolts: 2 },
+      { x: 100, y: 300 },
+      { multishot: 1, damage: DAMAGE }
+    );
+    expect(combat.bullets).toHaveLength(2);
+    [0, 1].forEach((index) => {
+      const { predictedAim } = combat.currentLockAssignments[index];
+      const bolt = combat.bullets[index];
+      expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(
+        Math.atan2(predictedAim.y - 300, predictedAim.x - 116),
+        6
+      );
+    });
   });
 
   it('a fan of one bolt flies along the aim', () => {
