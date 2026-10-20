@@ -228,7 +228,7 @@ export function createMachineViews(kit) {
     // the arc its recipe's frontal shield hits within, so plate and hit area agree
     const arc = getContent('enemies', kind).behaviors['frontal-shield'].halfArc;
     const geometries = kit.frontalPlate(arc);
-    const plateMesh = new THREE.Mesh(geometries.plate, kit.plateMaterial);
+    const plateMesh = new THREE.Mesh(geometries.plate, kit.machineMaterial);
     const edgeMaterial = kit.emissive(PALETTE.threat, 1.2);
     const edge = new THREE.Mesh(geometries.edge, edgeMaterial);
     plate.add(hull, plateMesh, edge);
@@ -473,7 +473,7 @@ export function createMachineViews(kit) {
     view.object.rotation.y = 0;
     view.plate.rotation.y = -(enemy.facing || 0);
     const broken = Boolean(enemy.shieldBroken);
-    view.plateMesh.material = broken ? kit.darkMaterial : kit.plateMaterial;
+    view.plateMesh.material = broken ? kit.darkMaterial : kit.machineMaterial;
     view.edge.visible = !broken;
     const shield =
       enemy.maxShieldHealth > 0

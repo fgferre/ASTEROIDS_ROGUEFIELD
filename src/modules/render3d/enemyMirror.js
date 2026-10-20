@@ -29,6 +29,7 @@ import { createMachineViews } from './enemies/machines.js';
 import { createRecipeViews } from './enemies/recipes.js';
 import { VARIANT_LOOKS, createRockViews } from './enemies/rocks.js';
 import { createTelegraphs } from './enemies/telegraph.js';
+import { aim, arcSweep, revolve, sweep } from './enemies/shapes.js';
 import { createWardenViews } from './enemies/wardens.js';
 import { GlowBatch } from './glowBatch.js';
 import { mergeStatic } from './mergeStatic.js';
@@ -131,8 +132,9 @@ export function markShadowCasters(root, minRadius = 0) {
  *   Elite and boss outlines; threatColor, bossColor: the accents;
  * - circleRim, sphere, smallSphere, warnRing, ghostDisc, fuseRing: the
  *   geometries two or more families draw; frontalPlate(halfArc): a frontal
- *   plate's { plate, edge } geometries for that arc, bulwarkPlate and
- *   bulwarkEdge those of the Shielded affix;
+ *   plate's { plate, edge } geometries for that arc (the plate drawn in
+ *   machineMaterial), bulwarkPlate and bulwarkEdge those of the Shielded
+ *   affix;
  * - view, emissive, setGain, tone, rim, glow, merged, body: the view helpers
  *   (a view record, accent tones, batched outline/glow anchors, one merged
  *   matte body per look); accentOf: a view's accent colour;
@@ -194,37 +196,164 @@ function createKit(THREE, scene, seeded, dissolve) {
   const threatColor = colorOf(THREE, PALETTE.threat);
   const bossColor = colorOf(THREE, PALETTE.boss);
 
-  // A frontal plate (±halfArc) and its rim, one pair per arc: an enemy with a
-  // `frontal-shield` draws the arc its recipe sets, and the Shielded affix the
-  // one in ELITE_AFFIXES.
+  // A frontal plate (±halfArc) and its energy edge, one pair per arc: an
+  // enemy with a `frontal-shield` draws the arc its recipe sets, and the
+  // Shielded affix the one in ELITE_AFFIXES. Armour on every side, within r
+  // 0.8–1.02: a dark core slab faced with lit panels (each with a raised
+  // second layer, riveted) over a ledge, a lit crest cap, round bolsters at
+  // its ends, ribs and a mounting rail on its back (the Bulwark's braces
+  // land on it), a skid under it; its tones ride in vertex colours
+  // (machineMaterial). The edge is the light: a tube along the crest's front
+  // edge and a seam in each gap between the panels.
   const plates = new Map();
   function frontalPlate(half) {
     if (!plates.has(half)) {
-      const shape = new THREE.Shape();
-      shape.absarc(0, 0, 1.02, -half, half, false);
-      shape.absarc(0, 0, 0.8, half, -half, true);
-      const plate = new THREE.ExtrudeGeometry(shape, {
-        depth: 0.42,
-        bevelEnabled: true,
-        bevelThickness: 0.05,
-        bevelSize: 0.04,
-        bevelSegments: 1,
-        curveSegments: 16,
+      plates.set(half, {
+        plate: mergeStatic(THREE, plateParts(half)),
+        edge: mergeStatic(THREE, plateEdgeParts(half)),
       });
-      plate.rotateX(-Math.PI / 2);
-      plate.translate(0, -0.12, 0);
-      const edge = new THREE.RingGeometry(0.99, 1.08, 16, 1, -half, half * 2);
-      edge.rotateX(-Math.PI / 2);
-      edge.translate(0, 0.37, 0);
-      plates.set(half, { plate, edge });
     }
     return plates.get(half);
+  }
+  // sections (r, y): the core's front face runs (0.975, -0.12)–(0.955,
+  // 0.25), a panel's outer face (1.01, -0.095)–(0.99, 0.2)
+  const PLATE_CORE = [
+    0.975, -0.12, 0.955, 0.25, 0.925, 0.29, 0.84, 0.29, 0.81, 0.255, 0.8, -0.08,
+    0.83, -0.145, 0.95, -0.155,
+  ];
+  const PLATE_PANEL = [
+    0.97, -0.11, 1.0, -0.105, 1.01, -0.08, 0.99, 0.2, 0.975, 0.222, 0.945,
+    0.222,
+  ];
+  // the second layer on each panel, and the ledge under the panels
+  const PLATE_BOSS = [0.998, -0.048, 1.016, -0.036, 1.005, 0.14, 0.99, 0.158];
+  const PLATE_LEDGE = [
+    0.972, -0.13, 1.006, -0.124, 1.014, -0.14, 1.0, -0.165, 0.962, -0.165,
+  ];
+  const PLATE_CAP = [0.918, 0.28, 0.912, 0.31, 0.856, 0.31, 0.84, 0.28];
+  const PLATE_RIB = [
+    0.805, -0.1, 0.805, 0.24, 0.786, 0.22, 0.772, 0.15, 0.772, -0.05, 0.786,
+    -0.09,
+  ];
+  const PLATE_SKID = [0.935, -0.15, 0.92, -0.18, 0.86, -0.18, 0.845, -0.14];
+  const PLATE_GAP = 0.05; // radians between two panels
+  const plateSteps = (span) => Math.max(1, Math.round(span * 16));
+  // a round tube of `radius` along the arc at (r, y), its ends capped
+  function plateTube(r, y, radius, from, to) {
+    const steps = plateSteps(to - from);
+    const path = Array.from({ length: steps + 1 }, (_, i) => {
+      const a = from + ((to - from) * i) / steps;
+      return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
+    });
+    const section = (i, a) => [Math.cos(a) * radius, Math.sin(a) * radius];
+    return sweep(THREE, path, section, 6, { capped: true });
+  }
+  // the panels' [from, to] angles over ±half
+  function platePanels(half) {
+    const end = half - 0.07;
+    const count = Math.max(1, Math.round((2 * end) / 0.65));
+    const width = (2 * end - (count - 1) * PLATE_GAP) / count;
+    return Array.from({ length: count }, (_, i) => {
+      const from = -end + i * (width + PLATE_GAP);
+      return [from, from + width];
+    });
+  }
+
+  function plateParts(half) {
+    const { hull, dark } = tones;
+    const along = (section, from, to, color) => ({
+      geometry: arcSweep(THREE, section, plateSteps(to - from), {
+        from,
+        span: to - from,
+      }),
+      color,
+    });
+    const out = (a) => new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    const rivet = new THREE.CylinderGeometry(0.011, 0.014, 0.02, 6);
+    const rivetAt = (a, r, y, lean) =>
+      aim(
+        THREE,
+        rivet.clone(),
+        out(a).multiplyScalar(Math.cos(lean)).setY(Math.sin(lean)),
+        out(a).multiplyScalar(r).setY(y)
+      );
+    const panels = platePanels(half);
+    const parts = [
+      along(PLATE_CORE, -half, half, dark),
+      along(PLATE_CAP, -half + 0.05, half - 0.05, hull),
+      along(PLATE_SKID, -half + 0.08, half - 0.08, dark),
+      // the mounting rail across the back, at the braces' height
+      {
+        geometry: plateTube(0.792, 0.13, 0.02, -half + 0.08, half - 0.08),
+        color: dark,
+      },
+      along(PLATE_LEDGE, -half + 0.05, half - 0.05, hull),
+      ...panels.flatMap(([from, to]) => [
+        along(PLATE_PANEL, from, to, hull),
+        along(PLATE_BOSS, from + 0.1, to - 0.1, hull),
+      ]),
+    ];
+    // the bolsters capping each end
+    const bolster = revolve(
+      THREE,
+      [0, 0.33, 0.045, 0.326, 0.066, 0.3, 0.066, -0.13, 0.05, -0.165, 0, -0.17],
+      10,
+      { start: 'flat', end: 'flat' }
+    );
+    [-1, 1].forEach((side) => {
+      const a = side * (half - 0.035);
+      parts.push({
+        geometry: bolster,
+        color: hull,
+        position: [Math.cos(a) * 0.89, 0, Math.sin(a) * 0.89],
+      });
+    });
+    // ribs on the back between the bolsters, a rivet on the cap over each
+    const ribs = Math.max(2, Math.round(half * 4));
+    for (let i = 0; i <= ribs; i += 1) {
+      const a = -half + 0.16 + ((2 * half - 0.32) * i) / ribs;
+      parts.push(along(PLATE_RIB, a - 0.018, a + 0.018, dark), {
+        geometry: rivetAt(a, 0.884, 0.31, Math.PI / 2),
+        color: dark,
+      });
+    }
+    // a rivet at each panel's corners, on its outer face (it leans back
+    // 0.068 rad)
+    panels.forEach(([from, to]) =>
+      [from + 0.07, to - 0.07].forEach((a) =>
+        parts.push(
+          { geometry: rivetAt(a, 1.006, -0.05, 0.068), color: dark },
+          { geometry: rivetAt(a, 0.993, 0.16, 0.068), color: dark }
+        )
+      )
+    );
+    return parts;
+  }
+
+  // the light: a tube on the crest's front edge, a seam in each panel gap
+  function plateEdgeParts(half) {
+    const parts = [
+      { geometry: plateTube(0.944, 0.272, 0.028, -half + 0.04, half - 0.04) },
+    ];
+    const seam = new THREE.BoxGeometry(0.02, 0.29, 0.016);
+    seam.rotateZ(0.054); // up the core's leaning face
+    platePanels(half)
+      .slice(1)
+      .forEach(([from]) => {
+        const a = from - PLATE_GAP / 2;
+        parts.push({
+          geometry: seam,
+          position: [Math.cos(a) * 0.968, 0.06, Math.sin(a) * 0.968],
+          rotationY: -a,
+        });
+      });
+    return parts;
   }
   const { plate: bulwarkPlate, edge: bulwarkEdge } = frontalPlate(
     ELITE_AFFIXES.shielded.halfArc
   );
 
-  // Swift ghosts and the Caster's fill; Volatile fuse and Caster rings.
+  // The Caster's fill; Volatile fuse and Caster rings.
   const ghostDisc = new THREE.CircleGeometry(1, 24);
   ghostDisc.rotateX(-Math.PI / 2);
   const fuseRing = new THREE.RingGeometry(0.975, 1, 96);

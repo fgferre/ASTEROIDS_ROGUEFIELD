@@ -106,13 +106,13 @@ const FADE_FROM = Math.max(
   NEBULA_MID.graze[1],
   NEBULA_NEAR.graze[1]
 );
-// proposta 18/10: soft lumpy clouds lying flat between the field and the
-// stars, wrapped around the camera target (like the dust) so they parallax
-// for real. `size`: world units across (≈120–400 px at the follow shot);
-// opacity at most `alpha` (× base + perHaze × the biome's haze density,
-// capped at 1); colour the haze × `lift`; each `stretch`ed along its own
-// axis; drift (units/s) and spin (rad/s) at most; `texture` px per cell of
-// a 2×2 atlas of shapes.
+// proposta 18/10: soft lumpy clouds between the field and the stars, facing
+// the camera, wrapped around the camera target (like the dust) so they
+// parallax for real. `size`: world units across (≈120–400 px at the follow
+// shot); opacity at most `alpha` (× base + perHaze × the biome's haze
+// density, capped at 1); colour the haze × `lift`; each `stretch`ed along
+// its own axis; drift (units/s) and spin (rad/s) at most; `texture` px per
+// cell of a 2×2 atlas of shapes.
 export const DUST_CLOUDS = {
   count: 40,
   top: -300,
@@ -525,7 +525,8 @@ void main() {
 
 // Clouds: each quad's centre drifts and wraps into a box around the camera
 // target (shifted up the field by its depth, like the layers), fades at the
-// box edges and spins slowly in the plane. aShape: size, angle, spin, alpha;
+// box edges and spins slowly; the quad faces the camera, so a low shot sees
+// a lump, not a flat card edge-on. aShape: size, angle, spin, alpha;
 // aStretch: length over width.
 const CLOUD_VERTEX = `
 attribute vec2 aCorner;
@@ -549,7 +550,8 @@ void main() {
   vec2 corner = mat2(cos(a), sin(a), -sin(a), cos(a)) * aCorner * stretch * aShape.x * 0.5;
   vUv = aCell + (aCorner * 0.5 + 0.5) * 0.5;
   vAlpha = aShape.w * smoothstep(0.0, uEdge, min(edges.x, edges.y));
-  gl_Position = projectionMatrix * viewMatrix * vec4(p.x + corner.x, position.y, p.y + corner.y, 1.0);
+  vec4 centre = viewMatrix * vec4(p.x, position.y, p.y, 1.0);
+  gl_Position = projectionMatrix * (centre + vec4(corner, 0.0, 0.0));
 }`;
 
 const CLOUD_FRAGMENT = `
@@ -1032,7 +1034,8 @@ export class SpaceField {
     return points;
   }
 
-  // One mesh of `count` flat quads; each vertex carries its quad's centre.
+  // One mesh of `count` camera-facing quads; each vertex carries its quad's
+  // centre.
   buildClouds(THREE, random) {
     const { count, top, bottom, size, box, edge, drift, spin, stretch } =
       DUST_CLOUDS;
@@ -1099,7 +1102,6 @@ export class SpaceField {
         transparent: true,
         premultipliedAlpha: true,
         depthWrite: false,
-        side: THREE.DoubleSide,
       })
     );
     mesh.frustumCulled = false;

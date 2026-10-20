@@ -5,8 +5,9 @@
 
 import { XP_ORB_SIZE } from '../../core/GameConstants.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { HALF_H, HALF_W, rgbOf } from './batches.js';
+import { HALF_H, HALF_W, SHOT_SHAPES, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
+import { HEART_HEIGHT, orbHeight } from './fieldTokens.js';
 import {
   mirrorWeaponEffects,
   pushFlakBolt,
@@ -38,6 +39,7 @@ export function mirrorProjectiles(t, combat) {
   }
   mirrorWeaponEffects(t.THREE, combat, t, t.flashes);
 
+  // Enemy shots: a barbed dart in the shot's own colour, as its trail.
   const enemyBullets = combat.enemyBullets || [];
   for (let i = 0; i < enemyBullets.length; i += 1) {
     const b = enemyBullets[i];
@@ -53,7 +55,8 @@ export function mirrorProjectiles(t, combat) {
       r * 1.6,
       r * 0.75,
       rgb,
-      1.8
+      1.8,
+      SHOT_SHAPES.dart
     );
   }
 }
@@ -74,8 +77,10 @@ function pushTrail(t, bullet, rgb, width, gain) {
   ribbons.polyline(n + 1, 2.5, rgb, width, gain);
 }
 
+// XP orbs and hearts: their bodies (fieldTokens.js) in the light of a glow.
 export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
   const orbs = xpOrbs?.xpOrbs || [];
+  t.orbCrystals.begin();
   for (let i = 0; i < orbs.length; i += 1) {
     const orb = orbs[i];
     if (!orb || orb.collected) continue;
@@ -83,19 +88,25 @@ export function mirrorPickups(t, time, xpOrbs, healthHearts, pickups) {
     const base = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
     const age = Number.isFinite(orb.age) ? orb.age : time;
     const pulse = 1 + 0.18 * Math.sin(age * 4 + i * 0.7);
-    t.glow.push(orb.x, 4, orb.y, t.xpRgb, base * 1.5 * pulse, 0.7, 1);
-    t.glow.push(orb.x, 4.5, orb.y, WHITE, base * 0.35, 0.9, 1.2);
+    const h = orbHeight(base);
+    t.glow.push(orb.x, h, orb.y, t.xpRgb, base * 1.6 * pulse, 0.45, 1);
+    t.orbCrystals.pushOrb(orb, tier, base, age, t.xpRgb);
   }
+  t.orbCrystals.end();
 
   const hearts = healthHearts?.hearts || [];
+  t.heartTokens.begin();
   for (let i = 0; i < hearts.length; i += 1) {
     const heart = hearts[i];
     if (!heart || heart.isCollected()) continue;
-    const pulse = 1 + Math.sin(heart.pulsePhase || 0) * 0.12;
+    const phase = heart.pulsePhase || 0;
+    const pulse = 1 + Math.sin(phase) * 0.12;
     const r = heart.radius || 14;
-    t.glow.push(heart.x, 4, heart.y, t.statusRgb, r * 1.6 * pulse, 0.7, 1);
-    t.glow.push(heart.x, 4.5, heart.y, WHITE, r * 0.4, 0.9, 1.2);
+    const h = HEART_HEIGHT;
+    t.glow.push(heart.x, h, heart.y, t.statusRgb, r * 1.9 * pulse, 0.5, 1);
+    t.heartTokens.pushHeart(heart.x, heart.y, r, phase, t.statusRgb);
   }
+  t.heartTokens.end();
 
   t.pickups.update(pickups?.getActivePickups() || []);
 }
@@ -123,8 +134,17 @@ export function mirrorEffects(t, effects, impact) {
     const rgb = rgbOf(THREE, p.color);
     if (p.type === 'debris') {
       t.debris.push(p, rgb);
-    } else if (p.type === 'smoke') {
-      t.smoke.push(p.x, 3, p.y, rgb, p.size * 2.8, p.alpha * 0.5);
+      continue;
+    }
+    // climbing or sinking with the chunks (debrisChunks.js), so a burst opens
+    // into a ball seen from the side, not a sheet
+    const up = t.debris.lift(
+      p,
+      undefined,
+      Math.max(0, (p.maxLife || 0) - (p.life || 0))
+    );
+    if (p.type === 'smoke') {
+      t.smoke.push(p.x, 3 + up, p.y, rgb, p.size * 2.8, p.alpha * 0.5);
     } else if (p.type === 'spark') {
       // stretched along velocity, like the 2D strokeSpark
       const speed = Math.hypot(p.vx, p.vy);
@@ -135,7 +155,7 @@ export function mirrorEffects(t, effects, impact) {
         p.y - p.vy * k,
         p.x + p.vx * k * 0.3,
         p.y + p.vy * k * 0.3,
-        2,
+        2 + up,
         rgb,
         Math.max(0.6, Math.min(stretch * 0.35, p.size * p.alpha)),
         1.6 * p.alpha
@@ -149,7 +169,7 @@ export function mirrorEffects(t, effects, impact) {
         p.y - cy,
         p.x + cx,
         p.y + cy,
-        2,
+        2 + up,
         rgb,
         Math.max(0.6, p.size * 0.4),
         2 * p.alpha
@@ -157,7 +177,7 @@ export function mirrorEffects(t, effects, impact) {
     } else {
       glow.push(
         p.x,
-        2,
+        2 + up,
         p.y,
         rgb,
         Math.max(1, p.size * p.alpha * 2.4),
@@ -165,7 +185,7 @@ export function mirrorEffects(t, effects, impact) {
         2
       );
       if (p.type === 'flare')
-        glow.push(p.x, 2.5, p.y, WHITE, p.size * 0.6, p.alpha, 2.5);
+        glow.push(p.x, 2.5 + up, p.y, WHITE, p.size * 0.6, p.alpha, 2.5);
     }
   }
 

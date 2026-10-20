@@ -29,7 +29,8 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
       const a = r * k;
       const b = m.killed ? a : 0;
       const gain = 0.7 * alpha;
-      ribbons.segment(
+      // two bars of light that face the camera, never a flat cross
+      ribbons.tube(
         m.x - a,
         m.y - b,
         m.x + a,
@@ -39,7 +40,7 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
         1.2,
         gain
       );
-      ribbons.segment(
+      ribbons.tube(
         m.x + b,
         m.y - a,
         m.x - b,

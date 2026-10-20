@@ -2,12 +2,13 @@
 // flak bolts and bursts, chain arcs, the thruster trails and the burn/slow
 // marks, drawn into the shared batches from CombatSystem's state. Beams,
 // bolts and bursts carry the `colors` of the weapon that fired them; the
-// lance's come from data/weapons.js.
+// lance's come from data/weapons.js. Light keeps its body from any angle:
+// trails, bolts, arcs and beams are camera-facing tubes, rings are tori.
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
-import { rgbOf } from './batches.js';
+import { SHOT_SHAPES, rgbOf } from './batches.js';
 
 const LANCE_H = 3;
 const BEAM_H = 3.2;
@@ -32,6 +33,14 @@ const FLAK_HEAD_GLOW = 6;
 const FLAK_FLASH_SIZE = 30;
 const FLAK_CORE_SIZE = 12;
 const FLAK_RING_WIDTH = 2.6;
+// proposta 19/10: an evolved lance's arrowhead sits on the bolt's nose
+// (centre and half length × headLength, half width × the lance width); an
+// Apex's white needle runs through it and out the front.
+const HEAD_REACH = 7;
+const HEAD_LENGTH = 2.6;
+const HEAD_WIDTH = 1.5;
+const NEEDLE_LENGTH = 4.2;
+const NEEDLE_WIDTH = 0.4;
 // proposta 18/10: beam layers, outer glow → white core: [colour, width ×
 // beam width, gain]. Additive, so the core reads hottest where they overlap.
 // The fourth entry is the layer's length (× beam length): inner layers stop
@@ -50,8 +59,8 @@ const glint = (x, y) => {
 };
 
 /**
- * One evolved or base lance: body capsule, trail, and a head once evolved.
- * An Apex adds a wider `outer` ribbon, a white core ribbon and capsule, a
+ * One evolved or base lance: body bolt, trail, and an arrowhead once evolved.
+ * An Apex adds a wider `outer` ribbon, a white core ribbon and needle, a
  * thicker head, and Motherlode's gold glints along the trail.
  */
 export function pushLance(THREE, batches, look, evolved, bullet, pushTrail) {
@@ -81,38 +90,45 @@ export function pushLance(THREE, batches, look, evolved, bullet, pushTrail) {
     6.5 * look.headLength,
     1.5 * look.width,
     rgbOf(THREE, look.body),
-    1.9
+    1.9,
+    SHOT_SHAPES.bolt
   );
   if (!evolved) return;
-  const reach = 4.5 * look.headLength;
-  const headWidth = 1.2 * Math.max(0.8, look.width) * (look.apex ? 1.6 : 1);
+  const reach = HEAD_REACH * look.headLength;
+  const headWidth =
+    HEAD_WIDTH * Math.max(0.8, look.width) * (look.apex ? 1.4 : 1);
   const hx = bullet.x + Math.cos(angle) * reach;
   const hy = bullet.y + Math.sin(angle) * reach;
   batches.lances.push(
     hx,
     hy,
-    LANCE_H + 0.2,
+    LANCE_H,
     angle,
-    2.4 * look.headLength,
+    HEAD_LENGTH * look.headLength,
     headWidth,
     rgbOf(THREE, look.head),
-    2.8
+    2.8,
+    SHOT_SHAPES.head
   );
   if (!look.apex) return;
   batches.lances.push(
     hx,
     hy,
-    LANCE_H + 0.4,
+    LANCE_H,
     angle,
-    1.6 * look.headLength,
-    headWidth * 0.45,
+    NEEDLE_LENGTH * look.headLength,
+    headWidth * NEEDLE_WIDTH,
     rgbOf(THREE, PALETTE.text),
-    3.4
+    3.4,
+    SHOT_SHAPES.needle
   );
   batches.glow.push(hx, LANCE_H + 1, hy, rgbOf(THREE, look.head), 9, 0.5, 1.4);
 }
 
-/** A flak bolt: tracer, white-hot core and head, in its weapon's colours. */
+/**
+ * A flak bolt: tracer and white-hot core trails, and a slug in the tracer's
+ * colour that runs white-hot at its heart, in its weapon's colours.
+ */
 export function pushFlakBolt(THREE, batches, bullet, pushTrail) {
   const { colors } = bullet;
   const tracer = rgbOf(THREE, colors.tracer);
@@ -126,8 +142,9 @@ export function pushFlakBolt(THREE, batches, bullet, pushTrail) {
     Math.atan2(bullet.vy || 0, bullet.vx || 1),
     FLAK_HEAD_LENGTH,
     FLAK_HEAD_WIDTH,
-    core,
-    2
+    tracer,
+    2,
+    SHOT_SHAPES.flak
   );
   batches.glow.push(
     bullet.x,
@@ -168,13 +185,15 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const mx = (a.x + b.x) / 2 - ((b.y - a.y) / len) * kink;
     const my = (a.y + b.y) / 2 + ((b.x - a.x) / len) * kink;
-    [
-      [a, { x: mx, y: my }],
-      [{ x: mx, y: my }, b],
-    ].forEach(([p, q]) => {
-      ribbons.segment(p.x, p.y, q.x, q.y, ARC_H, ionRgb, 4, 0.7 * k);
-      ribbons.segment(p.x, p.y, q.x, q.y, ARC_H, white, 1, 1.6 * k);
-    });
+    const { px, py } = ribbons;
+    px[0] = a.x;
+    py[0] = a.y;
+    px[1] = mx;
+    py[1] = my;
+    px[2] = b.x;
+    py[2] = b.y;
+    ribbons.path(3, ARC_H, ionRgb, 4, 0.7 * k);
+    ribbons.path(3, ARC_H, white, 1, 1.6 * k);
     glow.push(b.x, ARC_H, b.y, ionRgb, 8 * k + 2, 0.5 * k, 1.4);
   }
   // Afterburn: the dash's line, an amber band under a hot core that cools
@@ -188,7 +207,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     glow.push(b.x, TRAIL_H, b.y, amberRgb, AFTERBURN_GLOW * fresh, 0.45 * k);
     if (i === 0 || !b.joined) continue;
     const a = burnLine[i - 1];
-    ribbons.segment(
+    ribbons.tube(
       a.x,
       a.y,
       b.x,
@@ -198,7 +217,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
       AFTERBURN_BAND * fresh,
       0.7 * k
     );
-    ribbons.segment(
+    ribbons.tube(
       a.x,
       a.y,
       b.x,
@@ -221,7 +240,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     }
   });
   combat.slows.forEach((entry, enemy) => {
-    ribbons.circle(
+    ribbons.ring(
       enemy.x,
       enemy.y,
       (enemy.radius || 12) + 4,
@@ -237,13 +256,13 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const singularityRgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);
   combat.pulls.forEach((entry, enemy) => {
     const r = (enemy.radius || 12) + 3;
-    ribbons.circle(enemy.x, enemy.y, r, ARC_H, singularityRgb, 1.6, 0.8);
+    ribbons.ring(enemy.x, enemy.y, r, ARC_H, singularityRgb, 1.6, 0.8);
   });
   const pull = WEAPON_APEX.field.pull;
   combat.wells.forEach((well) => {
     const k = well.life / well.maxLife;
     const r = 6 + (pull.radius - 6) * k;
-    ribbons.circle(
+    ribbons.ring(
       well.x,
       well.y,
       r,
@@ -252,7 +271,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
       3.2,
       0.9 * (1.2 - k)
     );
-    ribbons.circle(well.x, well.y, r * 0.55, ARC_H, white, 1.2, 0.7 * k);
+    ribbons.ring(well.x, well.y, r * 0.55, ARC_H, white, 1.2, 0.7 * k);
     glow.push(well.x, ARC_H, well.y, singularityRgb, 14, 1 - k * 0.5, 1.6);
   });
 
@@ -263,24 +282,16 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     const arcRgb = rgbOf(THREE, arc.color || lanceArc);
     // Storm Lance bolts are thicker, with a wider halo.
     const scale = arc.heavy ? 1.7 : 1;
-    for (let i = 1; i < points.length; i += 1) {
-      const a = points[i - 1];
-      const b = points[i];
-      const seg = (rgb, width, gain) =>
-        ribbons.segment(
-          a.x,
-          a.y,
-          b.x,
-          b.y,
-          ARC_H,
-          rgb,
-          width * scale,
-          gain * k
-        );
-      seg(arcRgb, 5, 0.5);
-      seg(arcRgb, 2.2, 1.1);
-      seg(white, 0.9, 1.8);
+    const n = Math.min(points.length, ribbons.px.length);
+    for (let i = 0; i < n; i += 1) {
+      ribbons.px[i] = points[i].x;
+      ribbons.py[i] = points[i].y;
     }
+    const layer = (rgb, width, gain) =>
+      ribbons.path(n, ARC_H, rgb, width * scale, gain * k, Infinity);
+    layer(arcRgb, 5, 0.5);
+    layer(arcRgb, 2.2, 1.1);
+    layer(white, 0.9, 1.8);
     const tip = points[points.length - 1];
     glow.push(tip.x, ARC_H, tip.y, arcRgb, 16 * scale, 0.8 * k, 1.4);
   });
@@ -292,7 +303,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     const flakCore = rgbOf(THREE, burst.colors.core);
     const k = burst.life / burst.maxLife;
     const r = burst.maxRadius * (0.35 + 0.65 * (1 - k));
-    ribbons.circle(
+    ribbons.ring(
       burst.x,
       burst.y,
       r,
@@ -318,7 +329,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     const { colors } = beam;
     const k = beam.life / beam.maxLife;
     BEAM_LAYERS.forEach(([key, width, gain, length]) => {
-      ribbons.segment(
+      ribbons.tube(
         beam.x,
         beam.y,
         beam.x + (beam.ex - beam.x) * length,

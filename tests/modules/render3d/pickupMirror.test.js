@@ -12,8 +12,8 @@ new Function(
   )
 )(THREE, {});
 
-const token = (age, lifetime = 18) => ({
-  kind: 'pulse',
+const token = (age, lifetime = 18, kind = 'pulse') => ({
+  kind,
   x: 10,
   y: 20,
   radius: 12,
@@ -22,22 +22,28 @@ const token = (age, lifetime = 18) => ({
   color: '#44ccff',
 });
 
+const shown = (mirror) =>
+  Object.values(mirror.kinds).reduce((n, view) => n + view.body.mesh.count, 0);
+
 describe('PickupMirror', () => {
-  it('shows one group per pickup and hides the rest', () => {
+  it('shows one token per pickup, instanced per kind, and hides the rest', () => {
     const mirror = new PickupMirror(THREE, new THREE.Scene());
-    mirror.update([token(1), token(2)]);
-    expect(mirror.views.filter((v) => v.group.visible)).toHaveLength(2);
+    mirror.update([token(1), token(2, 18, 'magnet')]);
+    expect(shown(mirror)).toBe(2);
+    expect(mirror.kinds.magnet.body.mesh.visible).toBe(true);
     mirror.update([token(1)]);
-    expect(mirror.views.filter((v) => v.group.visible)).toHaveLength(1);
+    expect(shown(mirror)).toBe(1);
+    expect(mirror.kinds.magnet.body.mesh.visible).toBe(false);
   });
 
-  it('blinks the ring only in the last seconds', () => {
+  it('blinks the light only in the last seconds', () => {
     const mirror = new PickupMirror(THREE, new THREE.Scene());
+    const light = () => mirror.kinds.pulse.light.mesh.instanceColor.array[2];
     mirror.update([token(5.12)]);
-    expect(mirror.views[0].ring.visible).toBe(true);
+    const lit = light();
     mirror.update([token(15.25)]);
-    expect(mirror.views[0].ring.visible).toBe(false);
+    expect(light()).toBeLessThan(lit * 0.2);
     mirror.update([token(15.13)]);
-    expect(mirror.views[0].ring.visible).toBe(true);
+    expect(light()).toBeGreaterThan(lit * 0.5);
   });
 });

@@ -1,91 +1,79 @@
-// Mirrors PickupSystem tokens into Three objects: a dark matte disc, an
-// emissive ring that pulses (and blinks in the last seconds) and a small
-// additive core, all in the pickup colour. Pooled; hidden when unused.
+// Mirrors PickupSystem tokens as machined pucks (fieldTokens.js), instanced
+// per kind: a matte body and its light (rim, glyph, hover lens) in the
+// pickup colour, which pulses and goes dark in the blink steps of the last
+// seconds. Each token hovers and rocks a little. At most POOL drawn.
 
-import { PICKUP_TOKEN } from '../../data/pickups.js';
-import { HALF_H, HALF_W, colorOf } from './batches.js';
+import { PICKUP_KINDS, PICKUP_TOKEN } from '../../data/pickups.js';
+import { rgbOf } from './batches.js';
+import { tokenParts } from './fieldTokens.js';
+import { InstanceBatch } from './glowBatch.js';
+import { addRimLight } from './rimLight.js';
 
 const POOL = 8;
 const BLINK_WINDOW = 0.12; // s per on/off step
-const RING_GAIN = 1.0;
+// The light's luminance whatever the pickup colour (amber is dimmer than
+// gold or cyan at the same value), just past the bloom threshold.
+const LIGHT_LUMA = 0.72;
+// the light in a blink's off step: dark glass, the glyph still reads
+const BLINK_GAIN = 0.06;
+const HOVER = 5;
+const WHITE = [1, 1, 1];
 
 export class PickupMirror {
   constructor(THREE, scene) {
     this.THREE = THREE;
-    this.views = [];
-    const discGeo = new THREE.CircleGeometry(1, 24);
-    const ringGeo = new THREE.RingGeometry(0.78, 1, 32);
-    const coreGeo = new THREE.CircleGeometry(0.34, 16);
-    for (let i = 0; i < POOL; i += 1) {
-      const group = new THREE.Group();
-      group.visible = false;
-      const disc = new THREE.Mesh(
-        discGeo,
-        new THREE.MeshStandardMaterial({
-          color: colorOf(THREE, '#0b0e14'),
-          roughness: 0.85,
-          metalness: 0.1,
-        })
-      );
-      const ring = new THREE.Mesh(
-        ringGeo,
-        new THREE.MeshBasicMaterial({
-          color: new THREE.Color(),
-          toneMapped: false,
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      const core = new THREE.Mesh(
-        coreGeo,
-        new THREE.MeshBasicMaterial({
-          color: new THREE.Color(),
-          toneMapped: false,
-          transparent: true,
-          opacity: 0.8,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      ring.position.y = 0.2;
-      core.position.y = 0.3;
-      for (const m of [disc, ring, core]) {
-        m.rotation.x = -Math.PI / 2;
-        group.add(m);
-      }
-      scene.add(group);
-      this.views.push({ group, disc, ring, core, kind: null });
+    const bodyMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        metalness: 0.2,
+        roughness: 0.75,
+      })
+    );
+    const lightMaterial = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      toneMapped: false,
+    });
+    this.kinds = {};
+    for (const kind of Object.keys(PICKUP_KINDS)) {
+      const { body, light } = tokenParts(THREE, kind);
+      const view = {
+        body: new InstanceBatch(THREE, body, bodyMaterial, POOL),
+        light: new InstanceBatch(THREE, light, lightMaterial, POOL),
+      };
+      scene.add(view.body.mesh, view.light.mesh);
+      this.kinds[kind] = view;
     }
   }
 
   update(pickups) {
+    const views = Object.values(this.kinds);
+    views.forEach((view) => {
+      view.body.begin();
+      view.light.begin();
+    });
     const count = Math.min(pickups.length, POOL);
-    for (let i = 0; i < POOL; i += 1) {
-      const view = this.views[i];
-      if (i >= count) {
-        view.group.visible = false;
-        continue;
-      }
+    for (let i = 0; i < count; i += 1) {
       const p = pickups[i];
+      const view = this.kinds[p.kind];
       const radius = p.radius || PICKUP_TOKEN.radius;
-      view.group.visible = true;
-      view.group.position.set(p.x - HALF_W, 3, p.y - HALF_H);
-      view.group.scale.setScalar(radius);
-      if (view.kind !== p.color) {
-        view.kind = p.color;
-        view.ring.material.color
-          .copy(colorOf(this.THREE, p.color))
-          .multiplyScalar(RING_GAIN);
-        view.core.material.color.copy(colorOf(this.THREE, p.color));
-      }
-      const pulse = 1 + 0.12 * Math.sin(p.age * 5 + i);
-      view.ring.scale.setScalar(pulse);
-      view.core.scale.setScalar(pulse);
+      const h = HOVER + 0.6 * Math.sin(p.age * 2.4 + i);
+      const yaw = 0.3 * Math.sin(p.age * 0.9 + i);
+      const pitch = 0.1 * Math.sin(p.age * 1.7 + i);
+      const roll = 0.1 * Math.cos(p.age * 1.3 + i);
+      view.body.pushPose(p.x, p.y, h, yaw, pitch, roll, radius, WHITE, 1);
       const blinking =
         p.lifetime - p.age < PICKUP_TOKEN.blinkTime &&
         Math.floor(p.age / BLINK_WINDOW) % 2 === 1;
-      view.ring.visible = !blinking;
+      const rgb = rgbOf(this.THREE, p.color);
+      const luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+      const gain = blinking
+        ? BLINK_GAIN
+        : (LIGHT_LUMA / luma) * (1 + 0.15 * Math.sin(p.age * 5 + i));
+      view.light.pushPose(p.x, p.y, h, yaw, pitch, roll, radius, rgb, gain);
     }
+    views.forEach((view) => {
+      view.body.end();
+      view.light.end();
+    });
   }
 }

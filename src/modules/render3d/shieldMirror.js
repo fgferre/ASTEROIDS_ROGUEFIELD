@@ -1,24 +1,38 @@
-// The ship's shield in 3D: a low dome of hexagonal tiles over the hull,
-// additive cyan, brightest at the silhouette. It grows in when raised, a hit
-// lights the tiles facing the impact and sends a ripple across the shell, and
-// a break cracks it: every tile flares and drops out on its own beat. One
-// mesh, one draw call; driven by Renderer3D from the PlayerSystem events
-// (the hull mirror's flat ring stays hidden while this one draws).
+// The ship's shield in 3D: a flattened shell of hexagonal tiles closed
+// around the hull (whole from every side, above and below), additive cyan,
+// brightest at the silhouette. It grows in when raised, a hit lights the
+// tiles facing the impact and sends a ripple across the shell, and a break
+// cracks it: every tile flares and drops out on its own beat. One mesh, one
+// draw call; driven by Renderer3D from the PlayerSystem events (the hull
+// mirror's dash ring stays hidden while this one draws).
 
 // proposta 18/10: look and timing.
-const DOME_HEIGHT = 0.55; // dome height / radius
+const SHELL_HEIGHT = 0.55; // shell half-height / radius
 const HEX_CELLS = 5.5; // tiles across the radius
 const BASE_GAIN = 0.55;
 const APPEAR_TIME = 0.25; // s
 const HIT_TIME = 0.6; // s, ripple and tile flash
 const BREAK_TIME = 0.55; // s, until the last tile is gone
 
+// The tiles' plane: the shell unrolled from its nearer pole (direction
+// around the axis × distance along the surface, Simpson's rule over the
+// squashed meridian), so they keep their size down the steep sides; the top
+// shot sees the old top-down grid but for the rim. The lower half mirrors
+// the upper one across the equator.
 const SHIELD_VERTEX = `
-varying vec3 vLocal;
+varying vec2 vTile;
 varying vec3 vNormalView;
 varying vec3 vViewDir;
+float meridian(float u) {
+  float c = cos(u);
+  float s = sin(u) * ${SHELL_HEIGHT.toFixed(2)};
+  return sqrt(c * c + s * s);
+}
 void main() {
-  vLocal = position;
+  float t = acos(clamp(abs(position.y), 0.0, 1.0));
+  float along = t / 6.0 * (1.0 + 4.0 * meridian(t * 0.5) + meridian(t));
+  float around = length(position.xz);
+  vTile = around > 1e-5 ? position.xz / around * along : vec2(0.0);
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vNormalView = normalize(normalMatrix * normal);
   vViewDir = normalize(-mv.xyz);
@@ -34,15 +48,14 @@ uniform vec2 uHitDir;
 uniform float uHitAge;
 uniform float uBreakAge;
 uniform float uBreakFlare;
-varying vec3 vLocal;
+varying vec2 vTile;
 varying vec3 vNormalView;
 varying vec3 vViewDir;
 float shieldHash(vec2 p) {
   return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
 }
 void main() {
-  // hex grid on the dome's top-down projection (the camera looks down)
-  vec2 uv = vLocal.xz * uCells;
+  vec2 uv = vTile * uCells;
   vec2 r = vec2(1.0, 1.7320508);
   vec2 a = mod(uv, r) - r * 0.5;
   vec2 b = mod(uv - r * 0.5, r) - r * 0.5;
@@ -55,8 +68,8 @@ void main() {
 
   float facing = abs(dot(normalize(vNormalView), normalize(vViewDir)));
   float fresnel = pow(1.0 - facing, 2.0);
-  // grows out from the centre while raised
-  float reach = uAppear * 1.2;
+  // grows out from the poles while raised (the equator is ~1.24 out)
+  float reach = uAppear * 1.45;
   float shown = 1.0 - smoothstep(reach - 0.15, reach, length(cell));
   float light = (0.05 + 0.5 * edge) * (0.35 + 0.65 * fresnel) * (0.45 + 0.55 * uLevel);
 
@@ -93,16 +106,8 @@ export class ShieldMirror {
       uBreakFlare: { value: 1 },
     };
     this.uniforms.uColor.value.multiplyScalar(BASE_GAIN);
-    // the upper hemisphere, squashed into a low dome
-    const geometry = new THREE.SphereGeometry(
-      1,
-      40,
-      12,
-      0,
-      Math.PI * 2,
-      0,
-      Math.PI / 2
-    );
+    // a whole sphere, squashed into a flat shell
+    const geometry = new THREE.SphereGeometry(1, 40, 24);
     this.mesh = new THREE.Mesh(
       geometry,
       new THREE.ShaderMaterial({
@@ -157,7 +162,7 @@ export class ShieldMirror {
     u.uHitAge.value = hitAge < HIT_TIME ? hitAge : -1;
     u.uBreakAge.value = breaking ? time - this.brokenAt : -1;
     this.mesh.position.set(x, 0, z);
-    this.mesh.scale.set(radius, radius * DOME_HEIGHT, radius);
+    this.mesh.scale.set(radius, radius * SHELL_HEIGHT, radius);
     return true;
   }
 

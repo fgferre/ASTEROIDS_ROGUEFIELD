@@ -191,7 +191,8 @@ describe('EnemyMirror', () => {
         if (o.material === mirror.machineMaterial) merged.push(o);
       });
       const own = ['husk', 'boss', 'herald-silence'].includes(kind);
-      expect(merged.length, kind).toBe(own ? 0 : 1);
+      // the Bulwark's plate carries its tones too, apart (it goes dark broken)
+      expect(merged.length, kind).toBe(own ? 0 : kind === 'bulwark' ? 2 : 1);
       if (!own) expect(merged[0].geometry.getAttribute('color')).toBeTruthy();
     }
     expect(mirror.machineMaterial.vertexColors).toBe(true);

@@ -16,6 +16,7 @@ import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
+import { HeartTokens, OrbCrystals } from './fieldTokens.js';
 import { createFieldVeil } from './fieldVeil.js';
 import { FlashLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
@@ -72,11 +73,17 @@ void main() {
 }`,
 };
 
+// The quad turns to face the camera about the wave's centre, so from any
+// angle the ring reads as the rim of an expanding bubble, never a line; the
+// top shot sees the ring the flat quad drew.
 const SHOCKWAVE_VERTEX = `
+uniform float uExtent;
 varying vec2 vPos;
 void main() {
   vPos = position.xz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vec4 centre = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  vec2 corner = vec2(position.x, -position.z) * uExtent;
+  gl_Position = projectionMatrix * (centre + vec4(corner, 0.0, 0.0));
 }`;
 
 // A sharp ring of uWidth world units plus a soft halo, premultiplied color.
@@ -282,6 +289,8 @@ export function setupThree(seeded) {
   const glow = new PointBatch(THREE, 900);
   const matte = new PointBatch(THREE, 500, { shape: 'disc' });
   const smoke = new PointBatch(THREE, 300, { shape: 'puff' });
+  const orbCrystals = new OrbCrystals(THREE, scene, keyDir);
+  const heartTokens = new HeartTokens(THREE, scene, keyDir);
   scene.add(
     ribbons.object,
     lances.mesh,
@@ -290,8 +299,8 @@ export function setupThree(seeded) {
     smoke.object
   );
 
-  // Shockwaves: a flat quad whose shader draws a ring of constant width
-  // in world units at any radius (a scaled RingGeometry would thicken).
+  // Shockwaves: a camera-facing quad whose shader draws a ring of constant
+  // width in world units at any radius (a scaled RingGeometry would thicken).
   const quad = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
   const shockwaves = [];
   for (let i = 0; i < MAX_SHOCKWAVES; i += 1) {
@@ -360,6 +369,8 @@ export function setupThree(seeded) {
     glow,
     matte,
     smoke,
+    orbCrystals,
+    heartTokens,
     debris,
     bursts,
     shockwaves,
