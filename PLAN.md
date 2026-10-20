@@ -90,7 +90,8 @@ mesma linguagem; as duas guardas no gate; golden trace verde.
 > Melhorar o Asteroid Roguefield de todas as formas que o jogador sente, seguindo a Rodada 15 do PLAN.md e o bastão de
 > docs/PENDENCIAS.md, nesta ordem (1 e 2 em paralelo): economia da run e lógica dos upgrades (cartas por run,
 > identidade cedo, arma garantida, evoluções por arma, raridades reais, cartas que não entregam); SFX renascido do zero
-> com amostras de verdade escolhidas pelo dono numa página de audição, SOUND.md e mix com ele jogando; loot e orbes
+> com amostras geradas pela skill local /sfx-generator (TangoFlux) e CC0 onde o modelo falha, escolhidas pelo dono numa
+> página de audição, SOUND.md e mix com ele jogando; loot e orbes
 > como momentos (baús com cerimônia, pickups variados, orbes com peso, moeda em jogo); HUD, layout e UX (HUD.md, radar
 > tático e instrumentos por maquete aprovada, menus na mesma linguagem, level-up e recap, legibilidade em horda,
 > guardas no gate); conteúdo pela fábrica (12+ armas com evolução e som próprios, 30+ inimigos com formações de onda,
