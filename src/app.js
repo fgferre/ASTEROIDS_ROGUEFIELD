@@ -462,7 +462,12 @@ function gameLoop(currentTime) {
       }
     } else {
       fixedStepper.reset();
-      effects.update(0);
+      // A quit explosion keeps animating after gameplay has stopped.
+      effects.update(
+        gameSessionService.getSessionState() === 'quitting'
+          ? Math.min(frameSeconds, 0.1)
+          : 0
+      );
     }
 
     // OPTIMIZATION #1: PerformanceMonitor Cache - recalculate only every 5 frames

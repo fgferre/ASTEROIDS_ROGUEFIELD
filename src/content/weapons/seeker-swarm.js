@@ -65,7 +65,7 @@ export default {
     description:
       'Salvos of 3; a missile that kills releases 2 more from the wreck.',
     fire: [
-      rack,
+      { ...rack, breed: 2 },
       { ...salvo, missiles: 3, maxMissiles: 6, turn: 3.6, breed: 2 },
     ],
   },

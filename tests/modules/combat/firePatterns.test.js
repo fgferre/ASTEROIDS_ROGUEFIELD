@@ -278,6 +278,31 @@ describe('fire patterns', () => {
     expect(brood).toHaveLength(2);
     brood.forEach((m) => expect(m.seeker.breed).toBe(0));
   });
+
+  it("seeker: the Apex's every-third rack missile also breeds", () => {
+    const { combat } = armed('seeker-swarm', [enemy('target', 300, 300)]);
+    combat.weapons.apexWeapon('salvage');
+
+    combat.handleShooting(1, STATS);
+    combat.handleShooting(1, STATS);
+    combat.handleShooting(1, STATS);
+
+    expect(combat.bullets.slice(-6)).toHaveLength(6);
+    combat.bullets.slice(-6).forEach((missile) => {
+      expect(missile.seeker.breed).toBe(2);
+    });
+  });
+
+  it('thermal family cards can evolve Furnace Corona even when their lance effects do not apply', () => {
+    const { combat, progression } = makeRun();
+
+    progression.applyUpgrade('furnace_corona');
+    progression.applyUpgrade('thermal_lens');
+    progression.applyUpgrade('afterburn_lance');
+
+    expect(combat.weaponId).toBe('furnace-corona');
+    expect(combat.weaponForm.form.id).toBe('nova-corona');
+  });
 });
 
 describe("a weapon's own evolution and Apex", () => {

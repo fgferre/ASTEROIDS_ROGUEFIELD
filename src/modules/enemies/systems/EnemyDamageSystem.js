@@ -537,7 +537,8 @@ class EnemyDamageSystem {
   }
 
   /**
-   * Delegates mine explosion handling to physics or falls back to shield logic.
+   * Delegates mine explosions to physics or applies their blast to the player
+   * and nearby enemies when no physics handler is available.
    *
    * @param {Object|null} data
    */
@@ -564,11 +565,17 @@ class EnemyDamageSystem {
       }
     }
 
-    this.handleShieldExplosionDamage({
+    const blast = {
       position: data.position,
       radius: data.radius,
       damage: data.damage,
+    };
+    this.applyDirectDamageToPlayer(data.damage, {
+      ...blast,
+      cause: 'mine-explosion',
+      source: data.enemy ?? data.source ?? null,
     });
+    this.handleShieldExplosionDamage(blast);
   }
 
   /**

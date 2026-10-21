@@ -300,3 +300,150 @@ describe('Level-up card choices', () => {
     expect(dealt).toEqual([start + 1, start + 4]);
   });
 });
+
+describe('UISystem overlay handoffs', () => {
+  let restoreDom;
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+  });
+  afterEach(() => restoreDom());
+
+  it('hides the finished level-up before opening a queued chest', () => {
+    const calls = [];
+    const ui = Object.setPrototypeOf(
+      {
+        levelUpScreen: { resetLevelUpState: () => {} },
+        chestCeremony: {
+          queue: [{}],
+          openNext: () => (calls.push('chest'), true),
+        },
+        getService: () => ({ openNextLevelUpOffer: () => false }),
+        showScreen: (...args) => calls.push(args),
+        tacticalHud: { refreshHudFromServices: vi.fn() },
+        runWon: false,
+        pilotDown: false,
+      },
+      UISystem.prototype
+    );
+
+    ui.showGameUI();
+
+    expect(calls).toEqual([
+      ['levelup', { overlay: true, show: false, emitEvent: false }],
+      'chest',
+    ]);
+  });
+
+  it('ignores pause and Settings input during the quit transition', () => {
+    const handlers = new Map();
+    const updatePauseScreen = vi.fn();
+    const handleSettingsMenuRequest = vi.fn();
+    const ui = Object.setPrototypeOf(
+      {
+        registerEventListener: (name, handler) => handlers.set(name, handler),
+      },
+      UISystem.prototype
+    );
+    ui.getService = () => ({
+      getRawState: () => ({ sessionState: 'quitting' }),
+    });
+    ui.hudEditor = { isOpen: false };
+    ui.pauseScreen = { updatePauseScreen };
+    ui.settingsPanel = { handleSettingsMenuRequest };
+    ui.setupEventListeners();
+
+    handlers.get('toggle-pause')();
+    handlers.get('settings-menu-requested')({ source: 'gamepad' });
+
+    expect(updatePauseScreen).not.toHaveBeenCalled();
+    expect(handleSettingsMenuRequest).not.toHaveBeenCalled();
+  });
+
+  it('pauses a live run before opening Settings and tags its return state', () => {
+    const handlers = new Map();
+    const eventBus = { emit: vi.fn() };
+    const session = {
+      getScreen: () => 'playing',
+      isPaused: () => false,
+      getSessionState: () => 'running',
+    };
+    const handleSettingsMenuRequest = vi.fn();
+    const ui = Object.setPrototypeOf(
+      {
+        eventBus,
+        registerEventListener: (name, handler) => handlers.set(name, handler),
+      },
+      UISystem.prototype
+    );
+    ui.getService = () => session;
+    ui.settingsPanel = { handleSettingsMenuRequest };
+    ui.setupEventListeners();
+
+    handlers.get('settings-menu-requested')({ source: 'gamepad' });
+
+    expect(eventBus.emit).toHaveBeenCalledWith('toggle-pause');
+    expect(handleSettingsMenuRequest).toHaveBeenCalledWith({
+      source: 'playing',
+    });
+  });
+
+  it.each(['levelup', 'chest'])(
+    'keeps the active %s screen when closing the HUD editor',
+    (screen) => {
+      const classes = {
+        pause: new Set(),
+        menu: new Set(['hidden']),
+        gameUI: new Set(),
+        levelup: new Set(),
+        chest: new Set(),
+      };
+      const classList = (name) => ({
+        add: (value) => classes[name].add(value),
+        remove: (value) => classes[name].delete(value),
+        contains: (value) => classes[name].has(value),
+        toggle: (value, force) =>
+          force ? classes[name].add(value) : classes[name].delete(value),
+      });
+      const ui = Object.setPrototypeOf(
+        {
+          hudEditor: {
+            isOpen: false,
+            open({ onClose }) {
+              this.isOpen = true;
+              this.onClose = onClose;
+            },
+          },
+          tacticalHud: { layout: {} },
+          settingsPanel: {
+            settingsState: { isOpen: true, source: 'gamepad' },
+            closeSettingsPanel: vi.fn(),
+            openSettingsPanel: vi.fn(),
+          },
+          getService: () => ({ getScreen: () => screen }),
+          pauseScreen: { currentPauseState: false },
+          domRefs: { pause: {} },
+        },
+        UISystem.prototype
+      );
+      document.getElementById = (id) =>
+        ({
+          'pause-screen': { classList: classList('pause') },
+          'menu-screen': { classList: classList('menu') },
+          'game-ui': { classList: classList('gameUI') },
+          'levelup-screen': { classList: classList('levelup') },
+          'chest-screen': { classList: classList('chest') },
+        })[id];
+
+      ui.openHudEditor();
+      expect(classes[screen].has('hidden')).toBe(true);
+      ui.hudEditor.onClose();
+
+      expect(classes.menu.has('hidden')).toBe(true);
+      expect(classes.gameUI.has('hidden')).toBe(false);
+      expect(classes[screen].has('hidden')).toBe(false);
+      expect(ui.settingsPanel.openSettingsPanel).toHaveBeenCalledWith(
+        'gamepad'
+      );
+    }
+  );
+});

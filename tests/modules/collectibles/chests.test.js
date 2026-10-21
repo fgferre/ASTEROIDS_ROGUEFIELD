@@ -165,6 +165,33 @@ describe('chests', () => {
     expect(effects.gameTime.timeDilation.holdScale).toBe(CHEST.slowScale);
   });
 
+  it.each([1, 3, 5])(
+    'keeps the ship safe through all %i card grants',
+    (count) => {
+      const game = startGame();
+      const { player, pickups, effects, progression } = game.services;
+      progression.level = 10;
+      player.setInvulnerableTimer(0);
+      vi.spyOn(pickups.chestRandom, 'chance').mockReturnValue(count === 5);
+      const chest = chestAtShip(game, count === 1 ? 'elite' : 'warden');
+      pickups.update(STEP_SECONDS);
+
+      let steps = 0;
+      while (chest.state !== 'spent' && steps < 600) {
+        const delta = effects.update(STEP_SECONDS);
+        player.update(delta);
+        expect(player.invulnerableTimer).toBeGreaterThan(0);
+        pickups.update(delta);
+        steps += 1;
+      }
+
+      expect(chest.state).toBe('spent');
+      expect(chest.granted).toBe(count);
+      player.update(player.invulnerableTimer + STEP_SECONDS);
+      expect(player.invulnerableTimer).toBe(0);
+    }
+  );
+
   it('a rank-up of an owned card first, then a new card of an owned family, else any card a level-up could offer', () => {
     const random = new RandomService(3);
     const progression = progressionAt(10);

@@ -304,12 +304,19 @@ class UISystem extends BaseSystem {
     }
     const { settingsState } = this.settingsPanel;
     const settingsFrom = settingsState.isOpen ? settingsState.source : null;
-    const inRun = this.getService('game-state').getScreen() === 'playing';
+    const screen = this.getService('game-state').getScreen();
+    const inRun = ['playing', 'levelup', 'chest'].includes(screen);
+    const coveredScreen = ['levelup', 'chest'].includes(screen)
+      ? document.getElementById(`${screen}-screen`)
+      : null;
+    const coveredScreenWasHidden =
+      coveredScreen?.classList.contains('hidden') ?? true;
     const pause = document.getElementById('pause-screen');
     const menu = document.getElementById('menu-screen');
     const gameUI = document.getElementById('game-ui');
-    this.settingsPanel.closeSettingsPanel();
+    this.settingsPanel.closeSettingsPanel({ resumeRun: false });
     pause.classList.add('hidden');
+    coveredScreen?.classList.add('hidden');
     if (!inRun) {
       menu.classList.add('hidden');
       gameUI.classList.remove('hidden');
@@ -322,6 +329,7 @@ class UISystem extends BaseSystem {
           gameUI.classList.add('hidden');
           menu.classList.remove('hidden');
         }
+        coveredScreen?.classList.toggle('hidden', coveredScreenWasHidden);
         if (settingsFrom) this.settingsPanel.openSettingsPanel(settingsFrom);
         else this.domRefs.pause.editHudBtn?.focus({ preventScroll: true });
       },
@@ -563,6 +571,9 @@ class UISystem extends BaseSystem {
         }
         return;
       }
+      if (!data?.isPaused && this.settingsPanel.isOpenFrom('playing')) {
+        this.settingsPanel.closeSettingsPanel({ resumeRun: false });
+      }
       this.pauseScreen.updatePauseScreen(Boolean(data?.isPaused));
     });
 
@@ -584,6 +595,12 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('toggle-pause', () => {
+      if (
+        this.getService('game-state')?.getRawState?.()?.sessionState ===
+        'quitting'
+      ) {
+        return;
+      }
       // The HUD editor holds the pause screen (pause-state-changed below).
       if (this.hudEditor.isOpen) {
         return;
@@ -662,7 +679,20 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('settings-menu-requested', (payload = {}) => {
-      this.settingsPanel.handleSettingsMenuRequest(payload);
+      const appState = this.getService('game-state');
+      if (appState?.getRawState?.()?.sessionState === 'quitting') {
+        return;
+      }
+      let source = payload.source || 'menu';
+      if (appState?.getScreen?.() === 'playing') {
+        if (appState.isPaused?.()) {
+          source = 'pause';
+        } else {
+          this.eventBus?.emit?.('toggle-pause');
+          source = 'playing';
+        }
+      }
+      this.settingsPanel.handleSettingsMenuRequest({ ...payload, source });
     });
 
     this.registerEventListener('toggle-fullscreen', () => {
@@ -1036,13 +1066,18 @@ class UISystem extends BaseSystem {
    */
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
-    if (
-      !this.runWon &&
-      !this.pilotDown &&
-      (this.getService('progression').openNextLevelUpOffer() ||
-        this.chestCeremony.openNext())
-    ) {
-      return;
+    if (!this.runWon && !this.pilotDown) {
+      if (this.getService('progression').openNextLevelUpOffer()) return;
+
+      // A level-up overlay stays visible while another overlay is opened.
+      if (this.chestCeremony.queue?.length) {
+        this.showScreen('levelup', {
+          overlay: true,
+          show: false,
+          emitEvent: false,
+        });
+      }
+      if (this.chestCeremony.openNext()) return;
     }
     this.showScreen('playing', options);
     this.tacticalHud.refreshHudFromServices(true);

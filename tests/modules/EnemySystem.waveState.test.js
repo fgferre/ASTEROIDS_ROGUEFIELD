@@ -3,7 +3,7 @@
  * read-only copy of them and EnemySpawnSystem keeps none of its own.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import {
   createEnemySystemHarness,
@@ -36,5 +36,37 @@ describe('EnemySystem.waveState', () => {
     );
     expect(Object.keys(enemySystem.spawnSystem)).toEqual(['facade']);
     expect(Object.hasOwn(enemySystem, 'waveState')).toBe(false);
+  });
+
+  it('does not reward a mine that detonates itself, but rewards one destroyed by the player', () => {
+    harness = createEnemySystemHarness();
+    const { enemySystem } = harness;
+    const dropRewards = vi.spyOn(enemySystem.rewardManager, 'dropRewards');
+    const mine = { type: 'mine' };
+
+    enemySystem.eventBus.emit('enemy-destroyed', {
+      enemy: mine,
+      source: { cause: 'mine-detonation' },
+    });
+    expect(dropRewards).not.toHaveBeenCalled();
+
+    enemySystem.eventBus.emit('enemy-destroyed', {
+      enemy: mine,
+      source: { cause: 'damage' },
+    });
+    expect(dropRewards).toHaveBeenCalledOnce();
+  });
+
+  it('clears Warden HUD state when the field resets during a boss fight', () => {
+    harness = createEnemySystemHarness();
+    const { enemySystem } = harness;
+    enemySystem.bosses.handleBossWaveStarted({ wave: 5 });
+    expect(enemySystem.getBossHudState().upcoming).toBe(true);
+
+    enemySystem.reset();
+
+    expect(enemySystem.getBossHudState()).toEqual(
+      enemySystem.bosses.createInitialBossHudState()
+    );
   });
 });

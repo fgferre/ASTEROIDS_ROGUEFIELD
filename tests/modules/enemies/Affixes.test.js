@@ -260,3 +260,49 @@ describe('Elite affixes', () => {
     );
   });
 });
+
+describe('mine blasts', () => {
+  it('damages the player and nearby enemies when physics has no mine handler', () => {
+    const player = {
+      position: { x: 100, y: 100 },
+      health: 100,
+      takeDamage(amount) {
+        this.health -= amount;
+        return this.health;
+      },
+    };
+    const nearbyEnemy = {
+      type: 'drone',
+      x: 100,
+      y: 100,
+      health: 50,
+      destroyed: false,
+      mass: 1,
+      vx: 0,
+      vy: 0,
+      rotationSpeed: 0,
+      takeDamage(amount) {
+        this.health -= amount;
+        return false;
+      },
+    };
+    const facade = createSystem({
+      asteroids: [nearbyEnemy],
+      getCachedPhysics: () => ({}),
+      getCachedPlayer: () => player,
+      getPlayerPositionSnapshot: () => player.position,
+      getPlayerHullRadius: () => 0,
+    });
+    const damage = new EnemyDamageSystem({ facade });
+
+    damage.handleMineExplosion({
+      enemy: { type: 'mine' },
+      position: { x: 100, y: 100 },
+      radius: 120,
+      damage: 40,
+    });
+
+    expect(player.health).toBe(60);
+    expect(nearbyEnemy.health).toBe(10);
+  });
+});

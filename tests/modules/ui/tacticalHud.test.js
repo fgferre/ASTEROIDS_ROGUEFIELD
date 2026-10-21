@@ -120,4 +120,40 @@ describe('Tactical HUD', () => {
     expect(arrowX()).toBe(1700);
     expect(layout.showDamageFrom).toHaveBeenCalledTimes(1);
   });
+
+  it('clears the previous Warden bar when a new run starts', () => {
+    const tacticalHud = new TacticalHud({
+      refs: {},
+      player: () => null,
+      enemies: () => null,
+      progression: () => null,
+      combat: () => null,
+      pickups: () => null,
+      renderer: () => null,
+      shieldKey: () => 'E',
+    });
+    const layout = {
+      setRadarJammed: vi.fn(),
+      setRadarRange: vi.fn(),
+      setAimStick: vi.fn(),
+      clearBuffs: vi.fn(),
+      updateBoss: vi.fn(),
+    };
+    tacticalHud.layout = layout;
+    tacticalHud.bossHudState = {
+      ...tacticalHud.createInitialBossHudState(),
+      active: true,
+      bossId: 'warden',
+      name: 'Warden',
+      health: 40,
+      maxHealth: 100,
+    };
+    tacticalHud.cachedValues.boss = { visible: true };
+
+    tacticalHud.onGameStarted();
+
+    expect(tacticalHud.getBossHudState().active).toBe(false);
+    expect(tacticalHud.cachedValues.boss.visible).toBe(false);
+    expect(layout.updateBoss).toHaveBeenCalledWith(false);
+  });
 });

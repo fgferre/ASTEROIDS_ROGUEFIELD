@@ -344,6 +344,12 @@ describe('GameSessionService lifecycle flows', () => {
     });
     expect(player._quitExplosionHidden).toBe(true);
     expect(exitSpy).not.toHaveBeenCalled();
+    expect(service.getSessionState()).toBe('quitting');
+    expect(service.isRunning()).toBe(false);
+    expect(service.togglePause()).toBe(false);
+    expect(service.getSessionState()).toBe('quitting');
+    service.handlePlayerDeath({ reason: 'collision-during-exit' });
+    expect(service.hasDeathSnapshot()).toBe(false);
 
     vi.advanceTimersByTime(3500);
     vi.runAllTimers();
@@ -612,5 +618,18 @@ describe('GameSessionService.resetSystems with the real service manifest', () =>
     game.session.startNewRun({ source: 'test' });
 
     expect(combat.bullets).toHaveLength(0);
+  });
+
+  it('clears field pickups and chests when a new run starts', () => {
+    const game = createHeadlessGame();
+    const { pickups } = game.services;
+    game.session.startNewRun({ source: 'test' });
+    pickups.spawnPickup('salvage', 100, 100);
+    pickups.chests.spawn('warden', 200, 200);
+    expect(pickups.getActivePickups()).toHaveLength(2);
+
+    game.session.startNewRun({ source: 'test' });
+
+    expect(pickups.getActivePickups()).toHaveLength(0);
   });
 });
