@@ -1,6 +1,6 @@
 // src/modules/ui/SettingsPanel.js
 //
-// The Settings overlay, opened from the menu or over the pause screen:
+// The Settings overlay, opened from the menu or over a stopped run:
 // category tabs, one control per schema field with its live preview, key
 // and pad binding capture, and the accessibility and video preferences
 // applied to the page as they change.
@@ -61,7 +61,7 @@ export class SettingsPanel {
     this.initializeSettingsMetadata();
   }
 
-  /** Open, and opened from `source` ('menu' or 'pause'). */
+  /** Open, and opened from the screen/state the panel covers. */
   isOpenFrom(source) {
     return this.settingsState.isOpen && this.settingsState.source === source;
   }
@@ -259,7 +259,6 @@ export class SettingsPanel {
     const source = payload?.source || 'menu';
 
     if (this.settingsState.isOpen) {
-      this.settingsState.source = source;
       return;
     }
 
@@ -596,23 +595,18 @@ export class SettingsPanel {
     }
   }
 
-  // Esc closes Settings opened outside the pause screen (there Esc resumes,
-  // and resuming closes it); never while a key binding is being captured.
+  // Escape closes Settings without also reaching the game's pause binding.
   handleSettingsKeyDown(event) {
     const state = this.settingsState;
-    if (
-      event.key !== 'Escape' ||
-      !state.isOpen ||
-      state.capture ||
-      state.source === 'pause'
-    ) {
+    if (event.key !== 'Escape' || !state.isOpen || state.capture) {
       return;
     }
     event.preventDefault();
+    event.stopPropagation();
     this.closeSettingsPanel();
   }
 
-  closeSettingsPanel() {
+  closeSettingsPanel({ resumeRun = true } = {}) {
     if (!this.settingsState.isOpen) {
       return;
     }
@@ -647,6 +641,7 @@ export class SettingsPanel {
     this.cancelBindingCapture();
     this.settingsState.isOpen = false;
     this.announceVisibility(false, { source });
+    if (resumeRun && source === 'playing') this.emit('toggle-pause');
   }
 
   renderSettingsCategories() {

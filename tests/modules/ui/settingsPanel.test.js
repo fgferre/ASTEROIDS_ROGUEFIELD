@@ -63,7 +63,10 @@ describe('Settings panel', () => {
     document.createElement = fakeElement;
     document.createTextNode = (text) => ({ textContent: text });
   });
-  afterEach(() => restoreDom());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    restoreDom();
+  });
 
   it('renders every schema key in its section, none lost', () => {
     SETTINGS_SCHEMA.forEach((category) => {
@@ -108,17 +111,87 @@ describe('Settings panel', () => {
     expect(settingPreview('masterVolume', 1)).toBeNull();
   });
 
-  it('closes on Esc when opened from the menu, not over pause or mid-binding', () => {
+  it('closes on Esc from every screen, but not during binding capture', () => {
     const escFor = (state) => {
       const panel = new SettingsPanel({ schema: SETTINGS_SCHEMA });
       Object.assign(panel.settingsState, { isOpen: true, ...state });
       panel.closeSettingsPanel = vi.fn();
-      panel.handleSettingsKeyDown({ key: 'Escape', preventDefault() {} });
+      const event = {
+        key: 'Escape',
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      };
+      panel.handleSettingsKeyDown(event);
       return panel.closeSettingsPanel.mock.calls.length;
     };
     expect(escFor({ source: 'menu' })).toBe(1);
-    expect(escFor({ source: 'pause' })).toBe(0);
+    expect(escFor({ source: 'pause' })).toBe(1);
+    expect(escFor({ source: 'playing' })).toBe(1);
     expect(escFor({ source: 'menu', capture: { device: 'keyboard' } })).toBe(0);
+  });
+
+  it('resumes only a run that Settings paused itself when closing', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const panel = Object.create(SettingsPanel.prototype);
+    const emit = vi.fn();
+    Object.assign(panel, {
+      settingsState: { isOpen: true, source: 'playing', previousFocus: null },
+      refs: {
+        overlay: {
+          classList: { add: vi.fn() },
+          setAttribute: vi.fn(),
+        },
+      },
+      emit,
+      announceVisibility: vi.fn(),
+      cancelBindingCapture: vi.fn(),
+    });
+
+    panel.closeSettingsPanel();
+    expect(emit).toHaveBeenCalledWith('toggle-pause');
+
+    emit.mockClear();
+    panel.settingsState = {
+      isOpen: true,
+      source: 'pause',
+      previousFocus: null,
+    };
+    panel.closeSettingsPanel();
+    expect(emit).not.toHaveBeenCalled();
+
+    panel.settingsState = {
+      isOpen: true,
+      source: 'playing',
+      previousFocus: null,
+    };
+    panel.closeSettingsPanel({ resumeRun: false });
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('closes from the mouse button through the same state-aware path', () => {
+    let click;
+    const closeButton = {
+      addEventListener(type, handler) {
+        if (type === 'click') click = handler;
+      },
+    };
+    const panel = new SettingsPanel({
+      refs: {
+        overlay: {
+          addEventListener: vi.fn(),
+          classList: { contains: () => false },
+        },
+        closeButtons: [closeButton],
+      },
+    });
+    panel.settingsState.isOpen = true;
+    panel.settingsState.source = 'playing';
+    panel.closeSettingsPanel = vi.fn();
+    panel.bindSettingsControls();
+
+    click({ preventDefault: vi.fn() });
+
+    expect(panel.closeSettingsPanel).toHaveBeenCalledOnce();
   });
 });
 

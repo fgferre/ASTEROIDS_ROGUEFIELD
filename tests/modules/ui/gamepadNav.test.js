@@ -87,4 +87,22 @@ describe('UISystem gamepad navigation', () => {
     const ui = Object.setPrototypeOf({}, UISystem.prototype);
     expect(ui.getGamepadNavScreen().id).toBe('gameover');
   });
+
+  it('closes Settings with pad back instead of operating a covered screen', () => {
+    const closeSettingsPanel = vi.fn();
+    const settings = { classList: { contains: () => false } };
+    document.getElementById = (id) =>
+      id === 'settings-screen' || id === 'levelup-screen' ? settings : null;
+    const ui = Object.setPrototypeOf(
+      {
+        settingsPanel: { capturing: false, closeSettingsPanel },
+        hudEditor: { isOpen: false },
+      },
+      UISystem.prototype
+    );
+
+    ui.handleGamepadNav('back');
+
+    expect(closeSettingsPanel).toHaveBeenCalledOnce();
+  });
 });

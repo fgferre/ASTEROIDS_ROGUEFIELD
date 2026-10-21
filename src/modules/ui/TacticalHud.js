@@ -564,10 +564,13 @@ export class TacticalHud {
 
   /** A new run: radar and aim stick back to normal, no buffs left. */
   onGameStarted() {
+    this.bossHudState = this.createInitialBossHudState();
+    this.cachedValues.boss = { visible: false };
     this.layout?.setRadarJammed(false);
     this.layout?.setRadarRange(1);
     this.layout?.setAimStick(false);
     this.layout?.clearBuffs();
+    this.layout?.updateBoss(false);
   }
 
   onAimStickChanged({ active } = {}) {

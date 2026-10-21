@@ -263,7 +263,9 @@ class EnemySystem extends BaseSystem {
 
     // NEW: Integrate RewardManager with enemy destruction
     this.registerEventListener('enemy-destroyed', (data) => {
-      if (this.rewardManager && data.enemy) {
+      const selfDetonatedMine =
+        data.enemy?.type === 'mine' && data.source?.cause === 'mine-detonation';
+      if (this.rewardManager && data.enemy && !selfDetonatedMine) {
         this.rewardManager.dropRewards(
           data.enemy,
           data.source?.hitPosition ?? null
@@ -1024,6 +1026,7 @@ class EnemySystem extends BaseSystem {
     this._snapshotFallbackWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this.bosses._lastBossHudDamageUpdate = 0;
+    this.bosses.bossHudState = this.bosses.createInitialBossHudState();
     this.refreshServiceState({ force: true });
     this.syncPhysicsIntegration(true);
 

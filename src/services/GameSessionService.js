@@ -261,7 +261,11 @@ export default class GameSessionService {
    * @returns {boolean}
    */
   isRunning() {
-    return this.getScreen() === 'playing' && !this.isPaused();
+    return (
+      this.getScreen() === 'playing' &&
+      !this.isPaused() &&
+      this.getSessionState() !== 'quitting'
+    );
   }
 
   /**
@@ -628,7 +632,7 @@ export default class GameSessionService {
   }
 
   handlePlayerDeath(data = {}) {
-    if (this.getSessionState() === 'victory') {
+    if (['victory', 'quitting'].includes(this.getSessionState())) {
       return;
     }
 
@@ -665,7 +669,7 @@ export default class GameSessionService {
   togglePause({ source = 'toggle-pause' } = {}) {
     const currentScreen = this.getScreen();
 
-    if (this.getSessionState() === 'victory') {
+    if (['victory', 'quitting'].includes(this.getSessionState())) {
       return false;
     }
 
@@ -724,6 +728,8 @@ export default class GameSessionService {
         const effects = this.resolveServiceInstance('effects');
         const ui = this.resolveServiceInstance('ui');
 
+        this.setSessionState('quitting', { reason: 'exit-to-menu' });
+        this.runEnd.clearPendingGameOverTransition();
         const wasPaused = this.isPaused();
         this.setPaused(false);
         if (wasPaused) {

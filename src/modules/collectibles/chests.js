@@ -72,6 +72,9 @@ export class Chests {
   /** `ship`: its position while it can collect, else null. */
   update(deltaTime, ship) {
     if (!this.list.length) return;
+    // Card grants may wait behind a level-up and outlast the lid's slow
+    // motion. Keep the ship safe until the last card opens the ceremony.
+    if (this.opening && ship) this.protectPlayer();
     for (const chest of this.list) {
       chest.age += deltaTime;
       chest.timer += deltaTime;
@@ -121,15 +124,19 @@ export class Chests {
       holdDuration: CHEST.slowHold,
       duration: CHEST.slowEase,
     });
-    this.player.setInvulnerableTimer(
-      Math.max(this.player.invulnerableTimer || 0, SAFE_TIME)
-    );
+    this.protectPlayer();
     this.emit('chest-opening', {
       kind: 'chest',
       tier: chest.tier,
       x: chest.x,
       y: chest.y,
     });
+  }
+
+  protectPlayer() {
+    this.player.setInvulnerableTimer(
+      Math.max(this.player.invulnerableTimer || 0, SAFE_TIME)
+    );
   }
 
   // The lid's burst of amber light: a ring, a flash and a crown of sparks.
