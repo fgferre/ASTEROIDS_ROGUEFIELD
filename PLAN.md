@@ -4,6 +4,11 @@ Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; 
 sai daqui (a história fica no git: `git log --oneline --merges main`). Decisões de produto são do dono, por imagem e
 jogando — nunca por teste.
 
+**Visão proposta em 22/10:** [plano mestre de design](docs/GAME_DESIGN_MASTER_PLAN.md), solicitado pelo dono:
+diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, desbloqueios e etapas de produção.
+Próximo passo pendente: revisar essa direção com ele antes da implementação da frente 5. O documento distingue
+estado atual, propostas e horizonte; não aprova números nem substitui automaticamente as decisões abaixo.
+
 ## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
 
 Dele (20/10): _"tudo está rodando liso, não precisa medir nada. Temos que agora focar em melhorar o projeto de todas as
