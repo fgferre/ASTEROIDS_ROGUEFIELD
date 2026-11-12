@@ -1,9 +1,8 @@
-// The player hull in the slab style (`form.style: 'slab'`): the same hull
-// data hullModel.js lofts (form stations, wing and flap panels with their
-// upgrades applied, nozzles, cockpit), built instead as layered, chamfered
-// plates: a dark keel, the fuselage, lighter shoulder armour and a spine with
-// vents; wings cut from the fin panels with an armour plate on top, a fence
-// and a weapon rail at the tip; canards and canted tail fins; a banded
+// The player hull's 3D shape: the hull data (form stations, wing and flap
+// panels with their upgrades applied, nozzles, cockpit) built as layered,
+// chamfered plates: a dark keel, the fuselage, lighter shoulder armour and a
+// spine with vents; wings cut from the fin panels with an armour plate on top,
+// a fence and a weapon rail at the tip; canards and canted tail fins; a banded
 // nacelle with an intake and a bell round every nozzle; a faceted canopy in
 // a dark socket. hullModel.js calls it and merges what it returns, so the
 // game and the menu draw it like any other hull. Points are [x, height, y]
@@ -21,6 +20,7 @@ const SHOULDER = [3.7, 4.5];
 const SPINE_TOP = 5.1;
 const WING = [2.15, 3.0];
 const WING_PLATE_TOP = 3.3;
+// Mirrors NOZZLE_HEIGHT in hullModel.js (which imports this file).
 const NOZZLE_HEIGHT = 2.6;
 
 /**
@@ -146,12 +146,13 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
   ];
   const edges = { edge: [], bladeEdge: [] };
   const tips = [];
-  const segment = (a, b) =>
-    edges.edge.push(new THREE.Vector3(...a), new THREE.Vector3(...b));
+  const line = (name, a, b) =>
+    edges[name].push(new THREE.Vector3(...a), new THREE.Vector3(...b));
 
   geometry.panels.forEach((panel) => {
     const points = panel.points.map((p) => [p.x, p.y]);
-    const sign = Math.sign(centroid(panel.points)[1]) || 1;
+    const [cx, cy] = centroid(panel.points);
+    const sign = Math.sign(cy) || 1;
     if (panel.rcsPort) {
       // the blade, thinner toward the tip, and the armour plate on it
       const thin = (v) => {
@@ -165,46 +166,55 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
           SPINE
         )
       );
-      // the lit leading edge (the panel's first side)
-      segment(
-        [points[0][0] + 0.1, WING[1], points[0][1]],
-        [points[1][0] + 0.1, WING[1] - 0.25, points[1][1]]
-      );
+      // the lit leading edge (the panel's first side); a blade's burns in
+      // the accent, along its trailing edge too
+      const corner = (i, dx, h) => [points[i][0] + dx, h, points[i][1]];
+      const lit = geometry.blades ? 'bladeEdge' : 'edge';
+      line(lit, corner(0, 0.1, WING[1]), corner(1, 0.1, WING[1] - 0.25));
+      if (geometry.blades) {
+        for (let i = 1; i < points.length - 1; i += 1) {
+          line(
+            lit,
+            corner(i, -0.1, WING[1] - 0.25),
+            corner(i + 1, -0.1, WING[1] - 0.1)
+          );
+        }
+      }
       const { x, y } = panel.rcsPort;
       tips.push([x, NOZZLE_HEIGHT, y]);
-      // a fence on the blade and the weapon rail along its tip
-      const [cx, cy] = centroid(panel.points);
       raised.push(
-        part(box(3.6, 0.7, 0.2, [cx - 0.4, WING_PLATE_TOP, cy]), DEEP),
-        part(box(8.5, 0.75, 0.8, [x + 3.2, WING[0] + 0.2, y]), DEEP),
-        part(drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6), BASE)
+        part(box(3.6, 0.7, 0.2, [cx - 0.4, WING_PLATE_TOP, cy]), DEEP)
       );
-    } else if (panel.flap) {
-      raised.push(part(slab(points, WING[1], WING[1] + 0.55, 0.12), FIN));
-    } else if (panel.armor) {
-      raised.push(part(slab(points, SHOULDER[0], SHOULDER[1], 0.2), SPINE));
-    }
-    // canards off the prow and canted tail fins, one each side of the body
-    if (panel.rcsPort) {
-      const at = (fx) => [fx * nose, rowAt(fx * nose)[1]];
-      const [ax, aw] = at(0.74);
-      const [bx, bw] = at(0.52);
-      raised.push(
-        part(
-          slab(
-            [
-              [ax, sign * aw * 0.8],
-              [bx + 1.2, sign * (bw + 2.6)],
-              [bx - 0.4, sign * (bw + 2.6)],
-              [bx, sign * bw * 0.8],
-            ],
-            FUSELAGE[0] + 0.2,
-            FUSELAGE[0] + 0.65,
-            0.1
-          ),
-          BASE
-        )
-      );
+      // the weapon rail along the tip
+      if (form.pods) {
+        raised.push(
+          part(box(8.5, 0.75, 0.8, [x + 3.2, WING[0] + 0.2, y]), DEEP),
+          part(drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6), BASE)
+        );
+      }
+      // canards off the prow
+      if (form.canards) {
+        const at = (fx) => [fx * nose, rowAt(fx * nose)[1]];
+        const [ax, aw] = at(0.74);
+        const [bx, bw] = at(0.52);
+        raised.push(
+          part(
+            slab(
+              [
+                [ax, sign * aw * 0.8],
+                [bx + 1.2, sign * (bw + 2.6)],
+                [bx - 0.4, sign * (bw + 2.6)],
+                [bx, sign * bw * 0.8],
+              ],
+              FUSELAGE[0] + 0.2,
+              FUSELAGE[0] + 0.65,
+              0.1
+            ),
+            BASE
+          )
+        );
+      }
+      // a canted tail fin each side of the spine
       const finAt = tail * 0.72;
       const fin = slab(
         [
@@ -219,8 +229,30 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       )
         .rotateX(-Math.PI / 2)
         .rotateX(sign * 0.5)
-        .translate(finAt, SHOULDER[1] * tall(finAt) - 0.3, sign * 2.4);
+        .translate(
+          finAt,
+          SHOULDER[1] * tall(finAt) - 0.3,
+          sign * rowAt(finAt)[1] * 0.75
+        );
       raised.push(part(fin, SPINE));
+    } else if (panel.flap) {
+      raised.push(part(slab(points, WING[1], WING[1] + 0.55, 0.12), FIN));
+    } else if (panel.armor) {
+      // shoulder armour: a slab over the wing root and a smaller one on
+      // it, the accent trim along the lower slab's outboard edges
+      const lower = inset(panel.points, 0.8);
+      const top = WING_PLATE_TOP + 1.5;
+      raised.push(
+        part(slab(lower, WING[1] - 0.2, top, 0.3), FIN),
+        part(slab(inset(panel.points, 0.5), top - 0.2, top + 0.8, 0.25), SPINE)
+      );
+      lower.forEach((a, i) => {
+        const b = lower[(i + 1) % lower.length];
+        const outboard = sign * ((a[1] + b[1]) / 2 - cy);
+        if (outboard > 0.5) {
+          line('bladeEdge', [a[0], top + 0.05, a[1]], [b[0], top + 0.05, b[1]]);
+        }
+      });
     }
   });
 

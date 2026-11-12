@@ -116,7 +116,6 @@ describe('PlayerMirror', () => {
 
   it('builds the Interceptor in plates, its wingtips following the RCS upgrade', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    expect(defaultHull.visual.form.style).toBe('slab');
     const stock = mirror.puffs.map(({ puff }) => Math.abs(puff.position.z));
     expect(stock).toHaveLength(2);
     // lit leading edges, one per wing
