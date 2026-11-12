@@ -128,6 +128,28 @@ describe('activateProfileHarness (INFRA-01)', () => {
     });
   });
 
+  describe('outside dev (published build)', () => {
+    it.each(['?profile=cold-open', '?scene=hero'])(
+      'ignores %s',
+      async (search) => {
+        vi.resetModules();
+        vi.stubEnv('DEV', false);
+        const harness = await import('../../src/bootstrap/profileHarness.js');
+        stubBrowserGlobals({ searchString: search });
+        const gameState = makeGameState();
+
+        const result = harness.activateProfileHarness({
+          gameState,
+          performanceMonitor: makePerfMonitor(),
+        });
+
+        vi.unstubAllEnvs();
+        expect(result).toEqual({ active: false });
+        expect(gameState.randomSeed).toBeNull();
+      }
+    );
+  });
+
   describe('active paths (all four whitelisted scenarios)', () => {
     const scenarios = ['cold-open', 'mid-game', 'boss-arena', 'late-stress'];
 
