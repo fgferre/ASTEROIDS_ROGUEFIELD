@@ -73,7 +73,6 @@ const band = (t0, t1, d0, d1, steps = 1) => {
 };
 
 export function createSovereign(sk) {
-  const BOSS_LIGHT = new THREE.Color('#ffe2b0');
   const {
     THREE,
     kit,
@@ -87,6 +86,7 @@ export function createSovereign(sk) {
     drum,
     merge,
   } = sk;
+  const BOSS_LIGHT = new THREE.Color('#ffe2b0');
   // Sovereign, Continuance's seat: a pale lacquered egg standing in a gold
   // collar, ringed by two polished halos that float round it. The egg's upper
   // face is eight shells (an inlaid rib down each, two bands across, a band
