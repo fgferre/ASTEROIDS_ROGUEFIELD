@@ -5,15 +5,15 @@ export default {
   title: 'CHAPTER II — THE DENSE CORE',
   layers: [6, 10],
   sky: ['#0b0a09', '#030303'],
-  hazeColor: '#5a4a5e',
-  hazeDensity: 0.45,
+  hazeColor: '#8a4e30', // proposta 12/11: rust, lit by the veins
+  hazeDensity: 0.9, // proposta 12/11
   veinColor: '#d9701c',
-  veinDensity: 0.38,
+  veinDensity: 0.55, // proposta 12/11
   dustColor: '#ffb35c',
   keyColor: '#ffe2bc',
   keyIntensity: 1.45,
-  fillColor: '#8a5a3a',
-  fillIntensity: 0.18,
+  fillColor: '#a8643c', // proposta 12/11
+  fillIntensity: 0.3, // proposta 12/11: machines read against the dark
   bloomScale: 1.2,
   debris: 1,
   structures: 0,
