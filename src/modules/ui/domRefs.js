@@ -85,10 +85,9 @@ export function cacheStaticNodes() {
       overlay: document.getElementById('campaign-screen') || null,
       nodes: document.getElementById('campaign-nodes') || null,
       detailTitle: document.getElementById('campaign-detail-title') || null,
-      detailFacts: document.getElementById('campaign-detail-facts') || null,
+      sectors: document.getElementById('campaign-sectors') || null,
       detailHeadStart:
         document.getElementById('campaign-detail-head-start') || null,
-      detailStatus: document.getElementById('campaign-detail-status') || null,
       launchBtn: document.getElementById('campaign-launch-btn') || null,
       openBtn: document.getElementById('menu-campaign-btn') || null,
       backBtn: document.getElementById('campaign-back-btn') || null,

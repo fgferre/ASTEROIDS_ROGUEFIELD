@@ -7,6 +7,7 @@
 import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
 import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
+import { bossTier } from '../../data/enemies/boss.js';
 import { localLayer } from '../../data/sectors.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
@@ -26,6 +27,12 @@ export function shieldStatus(deflector) {
     return { mode: 'cooldown', seconds: deflector.shieldCooldownTimer };
   }
   return { mode: 'ready', seconds: 0 };
+}
+
+// "Warden Prime" carries its tier in its name; a Sentinel's name does not,
+// so the boss bar and the intro card put the word before it.
+function tieredName(name, tier) {
+  return tier === 'sentinel' ? `Sentinel ${name}` : name;
 }
 
 export class TacticalHud {
@@ -383,7 +390,7 @@ export class TacticalHud {
     } else if (!bossActive) {
       hud.updateBoss(false);
     } else {
-      const bossName = bossState.name || 'BOSS';
+      const bossName = tieredName(bossState.name || 'BOSS', bossState.tier);
       const maxHealth = Number(bossState.maxHealth ?? 0) || 0;
       const currentHealth = Number(bossState.health ?? 0) || 0;
       const percent =
@@ -411,6 +418,7 @@ export class TacticalHud {
       defeated: false,
       bossId: null,
       name: null,
+      tier: null,
       health: 0,
       maxHealth: 0,
       phase: 0,
@@ -459,9 +467,11 @@ export class TacticalHud {
         next.maxHealth = Number(data?.maxHealth ?? next.maxHealth ?? 0) || 0;
         break;
       case 'boss-spawned':
+        next.tier = bossTier(data?.enemy?.bossKind);
         if (!current.active) {
           this.layout?.showBossIntro(
-            data?.enemy?.displayName,
+            data?.enemy?.displayName &&
+              tieredName(data.enemy.displayName, next.tier),
             data?.enemy?.subtitle
           );
         }

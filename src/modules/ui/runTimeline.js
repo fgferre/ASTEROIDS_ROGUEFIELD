@@ -8,7 +8,12 @@
 import { BIOMES, biomeForLayer } from '../../data/biomes.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { BOSS_RUSH_LAYERS, directorFor } from '../../data/layers.js';
-import { localLayer, nextSector } from '../../data/sectors.js';
+import {
+  localLayer,
+  nextInChapter,
+  nextSector,
+  sectorBossTier,
+} from '../../data/sectors.js';
 import { formatRunTime, killerName } from './runRecap.js';
 import { FAMILY_GLYPHS, familyColor, shortName } from './upgradeCard.js';
 
@@ -54,10 +59,12 @@ export function runHeadline({
     const chapter = biomeForLayer(sector.layers[0]).title;
     return outcome === 'victory'
       ? {
-          kicker: nextSector(sector) ? 'Warden down' : 'The Ring is quiet',
-          title: 'Chapter cleared',
+          kicker: nextSector(sector)
+            ? `${sectorBossTier(sector)} down`
+            : 'The Ring is quiet',
+          title: nextInChapter(sector) ? 'Sector cleared' : 'Chapter cleared',
           of: '',
-          line: `${chapter} · ${formatRunTime(time)}`,
+          line: `${sector.name} · ${formatRunTime(time)}`,
           badge: firstClear ? 'First clear' : newBest ? 'New best' : null,
         }
       : {
@@ -109,7 +116,7 @@ export function killedByLine(source) {
 
 /**
  * The invitation under the run: how far the best is, or the Deep Field; on a
- * sector run, the chapter `next` opened by the win, or how far its Warden is.
+ * sector run, the sector `next` opened by the win, or how far its boss is.
  */
 export function inviteLine({
   outcome,
@@ -122,14 +129,15 @@ export function inviteLine({
   if (sector) {
     if (outcome === 'victory') {
       return next
-        ? `${next.name} is open. <b>Next chapter.</b>`
+        ? `${next.name} is open. <b>Next ${nextInChapter(sector) ? 'sector' : 'chapter'}.</b>`
         : 'Every chapter of the Ring is clear. <b>Beat your time.</b>';
     }
     const total = sectorLayers(sector);
     const gap = total - localLayer(sector, layer);
-    if (gap <= 0) return 'The Warden held the line. <b>Again.</b>';
+    const boss = sectorBossTier(sector);
+    if (gap <= 0) return `The ${boss} held the line. <b>Again.</b>`;
     const words = NUMBER_WORDS[gap] ?? `${gap}`;
-    return `The Warden waits at <b>Layer ${total}</b>. ${words} ${gap === 1 ? 'layer' : 'layers'} to go.`;
+    return `The ${boss} waits at <b>Layer ${total}</b>. ${words} ${gap === 1 ? 'layer' : 'layers'} to go.`;
   }
   if (outcome === 'victory') {
     return bossRush

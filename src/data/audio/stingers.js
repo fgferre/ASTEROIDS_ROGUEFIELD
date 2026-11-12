@@ -100,6 +100,15 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantHz: 1500,
       formantQ: 7,
     }),
+    // proposta 12/11: a grinding square, low, gritty (the Sentinel)
+    'QUARRY MAW': Object.freeze({
+      grains: 9,
+      type: 'square',
+      notes: Object.freeze([26, 26, 29]), // D1 D1 F1
+      formantHz: 420,
+      formantQ: 3,
+      grit: true,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

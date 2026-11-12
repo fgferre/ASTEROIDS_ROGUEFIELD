@@ -578,7 +578,7 @@ export default class GameSessionService {
     const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
     if (waveManager) {
       waveManager.bossRush = this.bossRush;
-      waveManager.firstLayer = this.sector?.layers[0] ?? 1;
+      waveManager.sector = this.sector;
     }
 
     try {

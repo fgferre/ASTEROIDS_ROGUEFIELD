@@ -91,6 +91,35 @@ describe('EnemyMirror', () => {
     expect(view.cores[1].pivot.visible).toBe(true);
   });
 
+  it('draws the Quarry Maw with jaws that open and a core that heats', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const maw = {
+      id: 'maw',
+      type: 'boss',
+      bossKind: 'quarry-maw',
+      x: 400,
+      y: 300,
+      radius: 66,
+      facing: 0,
+      jawOpen: 0,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-quarry-maw');
+    expect(mirror.update([maw], 0)).toBeTruthy();
+    const view = mirror.views.get('maw');
+    expect(view.kind).toBe('boss-quarry-maw');
+    const [left, right] = view.jaws;
+    const shutHeat = view.coreMaterial.emissiveIntensity;
+    expect(left.pivot.rotation.y).toBeCloseTo(0);
+
+    maw.jawOpen = 1;
+    mirror.update([maw], 0);
+    expect(left.pivot.rotation.y).toBeLessThan(0);
+    expect(right.pivot.rotation.y).toBeCloseTo(-left.pivot.rotation.y);
+    expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(shutHeat * 5);
+  });
+
   it('gives every asteroid variant its own instanced look, rebound on reuse', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = (id, variant) => ({

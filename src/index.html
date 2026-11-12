@@ -632,14 +632,14 @@
               <h3 id="campaign-detail-title" class="campaign-detail__title">
                 —
               </h3>
-              <p id="campaign-detail-facts" class="campaign-detail__facts"></p>
+              <div
+                id="campaign-sectors"
+                class="campaign-sectors"
+                role="group"
+                aria-label="Sectors"
+              ></div>
               <p
                 id="campaign-detail-head-start"
-                class="campaign-detail__line"
-                hidden
-              ></p>
-              <p
-                id="campaign-detail-status"
                 class="campaign-detail__line"
                 hidden
               ></p>
@@ -717,7 +717,7 @@
             >
               <kbd data-device="keyboard">⏎</kbd>
               <kbd data-device="gamepad">A</kbd>
-              Next Chapter
+              <span class="end-btn__label">Next Chapter</span>
             </button>
             <button id="victory-restart-btn" class="end-btn">
               New mission

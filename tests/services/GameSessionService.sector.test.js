@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
+import { directorFor } from '../../src/data/layers.js';
 import { loadRecords } from '../../src/services/runRecords.js';
 import {
   createHeadlessGame,
@@ -73,8 +74,8 @@ describe('sector runs', () => {
 
   it('opens on the first sector at layer 1 with no head start', () => {
     const game = createHeadlessGame();
-    game.session.startNewRun({ source: 'test', sector: 'outer-ring' });
-    expect(game.session.sector.id).toBe('outer-ring');
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    expect(game.session.sector.id).toBe('debris-wake');
     expect(game.services.enemies.waveManager.currentWave).toBe(1);
     expect(game.services.progression.getLevel()).toBe(1);
   });
@@ -94,7 +95,7 @@ describe('sector runs', () => {
 
   it('is won at its Warden, with its own records and no endless continue', () => {
     const game = createHeadlessGame();
-    game.session.startNewRun({ source: 'test', sector: 'outer-ring' });
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
     game.services.player.setInvulnerableTimer(1e9);
     const won = [];
     const victories = [];
@@ -107,11 +108,11 @@ describe('sector runs', () => {
     killBoss(game);
 
     expect(game.session.getSessionState()).toBe('victory');
-    expect(won).toEqual([expect.objectContaining({ sector: 'outer-ring' })]);
+    expect(won).toEqual([expect.objectContaining({ sector: 'prime-gate' })]);
     expect(victories).toHaveLength(1);
     const { sector } = victories[0].data;
     expect(sector).toMatchObject({
-      id: 'outer-ring',
+      id: 'prime-gate',
       firstClear: true,
       next: 'dense-core',
     });
@@ -120,15 +121,47 @@ describe('sector runs', () => {
     expect(loadRecords()).toMatchObject({
       bestLayer: 0,
       bestTime: 0,
-      sectorsWon: ['outer-ring'],
+      sectorsWon: ['prime-gate'],
     });
+  });
+
+  it('plays its own stages, cast from its last layer, and only in its run', () => {
+    const game = createHeadlessGame();
+    const { waveManager } = game.services.enemies;
+    game.session.startNewRun({ source: 'test', sector: 'salvage-lanes' });
+    startOnLayer(game, 2);
+    const kinds = waveManager.layerSchedule.flatMap(({ groups }) =>
+      groups.map(({ kind }) => kind)
+    );
+    // Sowers come from layer 4 on the global table; the sector casts from 5.
+    expect(kinds).toContain('sower');
+    expect(kinds).toContain('ram');
+    expect(waveManager.layerDirector(2).formations[0].role).toBe('minelayer');
+
+    game.session.startNewRun({ source: 'test', daily: false, bossRush: false });
+    expect(waveManager.layerDirector(2)).toEqual(directorFor(2));
+  });
+
+  it('sends its own boss kind to the spawn on its last layer, the Warden otherwise', () => {
+    const game = createHeadlessGame();
+    const { waveManager } = game.services.enemies;
+    const generate = vi.spyOn(waveManager.bossWave, 'generateBossWave');
+    // Only the request is checked: the boss is not spawned here.
+    generate.mockReturnValue({ isBossWave: false, enemies: [] });
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    startOnLayer(game, 5);
+    expect(generate).toHaveBeenLastCalledWith('quarry-maw');
+
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    startOnLayer(game, 5);
+    expect(generate).toHaveBeenLastCalledWith(undefined);
   });
 
   it('keeps the sector on New Mission and a replay; a mode picked without one clears it', () => {
     const game = createHeadlessGame();
-    game.session.startNewRun({ source: 'test', sector: 'outer-ring' });
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
     game.session.startNewRun({ source: 'test' });
-    expect(game.session.sector.id).toBe('outer-ring');
+    expect(game.session.sector.id).toBe('debris-wake');
 
     game.session.startNewRun({ source: 'test', daily: false, bossRush: false });
     expect(game.session.sector).toBeNull();
@@ -137,10 +170,10 @@ describe('sector runs', () => {
     game.session.replayStart = {
       daily: false,
       bossRush: false,
-      sector: 'outer-ring',
+      sector: 'debris-wake',
     };
     game.session.startNewRun({ source: 'test', bossRush: true });
-    expect(game.session.sector.id).toBe('outer-ring');
+    expect(game.session.sector.id).toBe('debris-wake');
     expect(game.session.bossRush).toBe(false);
   });
 });

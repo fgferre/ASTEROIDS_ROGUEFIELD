@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CampaignMap,
-  campaignNodes,
-  defaultSectorId,
-  sectorDetail,
+  campaignChapters,
+  defaultSectorRow,
+  sectorRowsMarkup,
 } from '../../../src/modules/ui/CampaignMap.js';
 
 const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
@@ -12,68 +12,121 @@ const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
   bestLayer,
 });
 
+const CHAPTER_ONE = ['debris-wake', 'salvage-lanes', 'prime-gate'];
+
 describe('campaign map', () => {
-  it('reads each sector cleared, open or locked from the records, then three chapters with no signal', () => {
-    const nodes = campaignNodes(records(['outer-ring'], { 'outer-ring': 252 }));
-    expect(nodes.map(({ id, state }) => [id, state])).toEqual([
-      ['outer-ring', 'cleared'],
-      ['dense-core', 'open'],
-      ['wardens-reach', 'locked'],
-      [null, 'nosignal'],
-      [null, 'nosignal'],
-      [null, 'nosignal'],
+  it('reads each chapter cleared, open or locked from its sectors, then three chapters with no signal', () => {
+    const states = (won) =>
+      campaignChapters(records(won)).map(({ numeral, state }) => [
+        numeral,
+        state,
+      ]);
+    expect(states(['debris-wake'])).toEqual([
+      ['I', 'open'],
+      ['II', 'locked'],
+      ['III', 'locked'],
+      ['IV', 'nosignal'],
+      ['V', 'nosignal'],
+      ['VI', 'nosignal'],
     ]);
-    expect(nodes[0].bestTime).toBe(252);
-    expect(nodes[2].lock).toBe('Defeat Warden Choir to unlock');
+    expect(states(CHAPTER_ONE).slice(0, 3)).toEqual([
+      ['I', 'cleared'],
+      ['II', 'open'],
+      ['III', 'locked'],
+    ]);
+  });
+
+  it("lists a chapter's sectors with code, name, end boss, layers and state", () => {
+    const [one, two] = campaignChapters(
+      records(['debris-wake'], { 'debris-wake': 252 })
+    );
+    expect(one.title).toBe('CHAPTER I — THE OUTER RING');
+    expect(one.name).toBe('THE OUTER RING');
+    expect(
+      one.sectors.map(({ code, name, boss, layers, state, lock }) => ({
+        code,
+        name,
+        boss,
+        layers,
+        state,
+        lock,
+      }))
+    ).toEqual([
+      {
+        code: 'A',
+        name: 'DEBRIS WAKE',
+        boss: 'Sentinel: Quarry Maw',
+        layers: 5,
+        state: 'cleared',
+        lock: '',
+      },
+      {
+        code: 'B',
+        name: 'SALVAGE LANES',
+        boss: 'Sentinel: Gatekeeper',
+        layers: 5,
+        state: 'open',
+        lock: '',
+      },
+      {
+        code: 'C',
+        name: 'PRIME GATE',
+        boss: 'Warden: Prime',
+        layers: 5,
+        state: 'locked',
+        lock: 'Defeat Sentinel Gatekeeper to unlock',
+      },
+    ]);
+    expect(two.sectors).toHaveLength(1);
+    expect(two.sectors[0]).toMatchObject({
+      boss: 'Warden: Choir',
+      lock: 'Defeat Warden Prime to unlock',
+    });
+
+    const rows = sectorRowsMarkup(one.sectors);
+    expect(rows).toContain('id="campaign-sector-debris-wake"');
+    expect(rows).toContain('Cleared 4:12');
+    expect(rows).toContain(
+      'Locked<span class="campaign-sector__why">Defeat Sentinel Gatekeeper to unlock</span>'
+    );
   });
 
   it('opens on the first open sector, else the last cleared', () => {
-    expect(defaultSectorId(campaignNodes(records(['outer-ring'])))).toBe(
-      'dense-core'
-    );
-    const all = ['outer-ring', 'dense-core', 'wardens-reach'];
-    expect(defaultSectorId(campaignNodes(records(all)))).toBe('wardens-reach');
+    const rowsOf = (won) =>
+      campaignChapters(records(won)).flatMap((node) => node.sectors);
+    expect(defaultSectorRow(rowsOf(['debris-wake'])).id).toBe('salvage-lanes');
+    const all = [...CHAPTER_ONE, 'dense-core', 'wardens-reach'];
+    expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');
   });
 
-  it('details a sector from its data: chapter, layers, Warden, head start, best clear', () => {
-    const nodes = campaignNodes(records(['outer-ring'], { 'outer-ring': 252 }));
-    expect(sectorDetail(nodes[1])).toEqual({
-      title: 'CHAPTER II — THE DENSE CORE',
-      facts: '5 layers · Warden: Choir',
-      headStart: 'Starts with 4 card picks',
-      status: '',
-      launchable: true,
-    });
-    expect(sectorDetail(nodes[0])).toMatchObject({
-      headStart: '',
-      status: 'Best clear 4:12',
-    });
-  });
-
-  it('Launch carries the selected sector, and a locked one cannot launch', () => {
-    const text = () => ({
-      textContent: '',
-      hidden: false,
-      classList: { toggle() {} },
-    });
+  it('a chapter shows its rows; Launch carries the selected row, and a locked one cannot launch', () => {
+    const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
+    const text = () => ({ textContent: '', hidden: false });
     const refs = {
-      nodes: { querySelectorAll: () => [] },
+      nodes: list(),
+      sectors: list(),
       detailTitle: text(),
-      detailFacts: text(),
       detailHeadStart: text(),
-      detailStatus: text(),
       launchBtn: { dataset: {}, disabled: false },
     };
     const map = new CampaignMap({ refs });
-    map.nodes = campaignNodes(records(['outer-ring']));
+    map.chapters = campaignChapters(records(['debris-wake']));
 
-    map.select('dense-core');
+    map.selectSector('salvage-lanes');
+    expect(refs.detailTitle.textContent).toBe('CHAPTER I — THE OUTER RING');
+    expect(refs.sectors.innerHTML.match(/data-campaign-row=/g)).toHaveLength(3);
     expect(refs.launchBtn).toEqual({
-      dataset: { sector: 'dense-core' },
+      dataset: { sector: 'salvage-lanes' },
       disabled: false,
     });
 
-    map.select('wardens-reach');
+    map.selectSector('prime-gate');
     expect(refs.launchBtn.disabled).toBe(true);
+
+    map.selectChapter(2);
+    expect(refs.detailTitle.textContent).toBe('CHAPTER II — THE DENSE CORE');
+    expect(refs.launchBtn.dataset.sector).toBe('dense-core');
+    expect(refs.launchBtn.disabled).toBe(true);
+    expect(refs.detailHeadStart.textContent).toBe('Starts with 4 card picks');
   });
 });

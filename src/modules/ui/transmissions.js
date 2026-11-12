@@ -15,8 +15,20 @@ export function chapterTransmission(biomeId) {
   };
 }
 
-/** `moment` is 'warning' or 'defeated'; null when the layer has no line. */
-export function wardenTransmission(layer, moment) {
+/**
+ * `moment` is 'warning' or 'defeated'. A boss kind with its own lines (a
+ * Sentinel, STORY.sentinel) speaks them; else the layer's Warden lines. Null
+ * when neither has one.
+ */
+export function wardenTransmission(layer, moment, bossKind = null) {
+  const own = STORY.sentinel[bossKind]?.[moment];
+  if (own) {
+    return {
+      key: `sentinel:${bossKind}:${moment}`,
+      speaker: STORY.speaker[bossKind],
+      text: own,
+    };
+  }
   const text = STORY.warden[layer]?.[moment];
   if (!text) {
     return null;

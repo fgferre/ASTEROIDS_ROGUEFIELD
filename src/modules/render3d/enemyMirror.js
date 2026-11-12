@@ -3,11 +3,12 @@
 // damage (drawn instanced, rockInstances.js), the Wardens' machines (every
 // enemy of the content registry, in the look its file picks: a hand-made
 // `view`, else one built from its `visual`), the three Wardens (Prime, Choir,
-// Null; one view kind each, picked by `bossKind`) and the three Heralds (Dust,
-// Heat, Silence, picked by `heraldKind`). Views are pooled per kind and keyed
-// by entity id; a view not seen in a frame is hidden and returned to its
-// pool, unless its enemy was killed (`markDead`): then it burns away first
-// (dissolve.js).
+// Null; one view kind each, picked by `bossKind`), the Sentinels (one view
+// kind each, `boss-<bossKind>`: enemies/sentinels.js) and the three Heralds
+// (Dust, Heat, Silence, picked by `heraldKind`). Views are pooled per kind
+// and keyed by entity id; a view not seen in a frame is hidden and returned
+// to its pool, unless its enemy was killed (`markDead`): then it burns away
+// first (dissolve.js).
 //
 // The looks live in visual families under ./enemies/ (rocks, machines,
 // recipes, heralds, wardens, affixes; the telegraph and the rock shader are
@@ -30,6 +31,10 @@ import { createRecipeViews } from './enemies/recipes.js';
 import { VARIANT_LOOKS, createRockViews } from './enemies/rocks.js';
 import { createTelegraphs } from './enemies/telegraph.js';
 import { aim, arcSweep, revolve, sweep } from './enemies/shapes.js';
+import {
+  SENTINEL_VIEW_KINDS,
+  createSentinelViews,
+} from './enemies/sentinels.js';
 import { createWardenViews } from './enemies/wardens.js';
 import { GlowBatch } from './glowBatch.js';
 import { mergeStatic } from './mergeStatic.js';
@@ -50,15 +55,19 @@ export const KNOWN_KINDS = new Set([
   ...listContent('enemies').map(({ id }) => id),
   'boss',
 ]);
-// Every view kind create() builds: a Warden's `bossKind` splits 'boss' in
-// three; a Herald's `heraldKind` names its view.
+// Every view kind create() builds: a boss's `bossKind` splits 'boss' (the
+// three Wardens, the Sentinels); a Herald's `heraldKind` names its view.
 export const HERALD_VIEW_KINDS = Object.keys(HERALD_KINDS).map(
   (kind) => `herald-${kind}`
 );
-export const VIEW_KINDS = [
-  ...KNOWN_KINDS,
+const BOSS_VIEW_KINDS = new Set([
   'boss-choir',
   'boss-null',
+  ...SENTINEL_VIEW_KINDS,
+]);
+export const VIEW_KINDS = [
+  ...KNOWN_KINDS,
+  ...BOSS_VIEW_KINDS,
   ...HERALD_VIEW_KINDS,
 ];
 // The rock variants' looks (enemies/rocks.js).
@@ -510,6 +519,7 @@ export class EnemyMirror {
     this.recipeViews = createRecipeViews(this.kit);
     this.heraldViews = createHeraldViews(this.kit);
     this.wardenViews = createWardenViews(this.kit);
+    this.sentinelViews = createSentinelViews(this.kit, this.recipeViews);
     this.affixViews = createAffixViews(this.kit);
 
     // A kind with no look yet: visible, obviously unfinished.
@@ -543,6 +553,7 @@ export class EnemyMirror {
   }
 
   create(kind) {
+    if (this.sentinelViews.has(kind)) return this.sentinelViews.create(kind);
     switch (kind) {
       case 'asteroid':
         return this.rockViews.createRock();
@@ -622,7 +633,7 @@ export class EnemyMirror {
   }
 
   kindOf(type, bossKind, heraldKind) {
-    if (type === 'boss' && (bossKind === 'choir' || bossKind === 'null')) {
+    if (type === 'boss' && BOSS_VIEW_KINDS.has(`boss-${bossKind}`)) {
       return `boss-${bossKind}`;
     }
     if (type === 'herald') {
@@ -731,7 +742,9 @@ export class EnemyMirror {
       if (kind === 'asteroid') {
         this.rockViews.updateRock(view, enemy, time, flash);
       } else if (kind.startsWith('boss')) {
-        this.wardenViews.updateWarden(view, enemy, time);
+        if (this.sentinelViews.has(kind)) {
+          this.sentinelViews.update(view, enemy, time);
+        } else this.wardenViews.updateWarden(view, enemy, time);
         warden = view;
       } else if (kind.startsWith('herald')) {
         this.heraldViews.updateHerald(view, enemy, time, flash);
@@ -852,6 +865,7 @@ export class EnemyMirror {
   // look takes from it (the Husk's seams).
   bind(view, enemy) {
     if (view.kind === 'asteroid') this.rockViews.bindRock(view, enemy);
+    else if (this.sentinelViews.has(view.kind)) return;
     else if (view.kind.startsWith('boss')) this.wardenViews.bindWarden(view);
     else view.look?.bind?.(view);
   }

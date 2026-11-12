@@ -8,7 +8,7 @@
 
 import { loadRecords } from '../../services/runRecords.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
-import { localLayer, sectorById } from '../../data/sectors.js';
+import { localLayer, nextInChapter, sectorById } from '../../data/sectors.js';
 import { SCREEN_INPUT_LOCKOUT_MS } from './LevelUpScreen.js';
 import { collectBuild, endBuildMarkup, formatRunTime } from './runRecap.js';
 import { salvageLine } from './hangar.js';
@@ -215,6 +215,12 @@ export class RunEndScreens {
     if (refs.nextBtn) {
       refs.nextBtn.classList.toggle('hidden', !next);
       refs.nextBtn.dataset.sector = next?.id ?? '';
+      const label = refs.nextBtn.querySelector?.('.end-btn__label');
+      if (label) {
+        label.textContent = nextInChapter(sector)
+          ? 'Next Sector'
+          : 'Next Chapter';
+      }
     }
     if (refs.quitBtn) {
       refs.quitBtn.textContent = sector ? 'Campaign map' : 'Quit to menu';

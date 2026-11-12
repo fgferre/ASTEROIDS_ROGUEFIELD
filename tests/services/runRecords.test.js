@@ -54,20 +54,23 @@ describe('run records', () => {
     });
   });
 
-  it('opens a sector once the one before is won or a full run went past its Warden', () => {
-    const [outer, dense, reach] = [
-      'outer-ring',
+  it('opens a sector once the one before is won or a full run went past its boss', () => {
+    const [wake, lanes, gate, dense] = [
+      'debris-wake',
+      'salvage-lanes',
+      'prime-gate',
       'dense-core',
-      'wardens-reach',
     ].map(sectorById);
-    expect(isSectorUnlocked(outer)).toBe(true);
+    expect(isSectorUnlocked(wake)).toBe(true);
+    expect(isSectorUnlocked(lanes)).toBe(false);
+    updateRecords({ sectorWon: 'debris-wake', sectorTime: 200 });
+    expect(isSectorUnlocked(lanes)).toBe(true);
+    expect(isSectorUnlocked(gate)).toBe(false);
     expect(isSectorUnlocked(dense)).toBe(false);
-    updateRecords({ sectorWon: 'outer-ring', sectorTime: 200 });
+    updateRecords({ layer: 5 });
+    expect(isSectorUnlocked(dense)).toBe(false);
+    updateRecords({ layer: 6 });
+    expect(isSectorUnlocked(gate)).toBe(true);
     expect(isSectorUnlocked(dense)).toBe(true);
-    expect(isSectorUnlocked(reach)).toBe(false);
-    updateRecords({ layer: 10 });
-    expect(isSectorUnlocked(reach)).toBe(false);
-    updateRecords({ layer: 11 });
-    expect(isSectorUnlocked(reach)).toBe(true);
   });
 });

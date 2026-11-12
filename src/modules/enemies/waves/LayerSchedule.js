@@ -80,7 +80,8 @@ export class LayerSchedule {
    * Flattens a layer's roster, surges, formations and field events into
    * timed entries sorted by `at` (seconds into the layer). Surge roles are
    * taken in turn.
-   * Each enemy spawn gets an enemy for its role on this layer (enemiesFor):
+   * Each enemy spawn gets an enemy for its role on this layer (enemiesFor;
+   * a sector's own stage casts from its `castLayer`, src/data/sectors.js):
    * the only one, with no draw, or one drawn by `weight` for that spawn from
    * the layer's role stream, made at the first such draw. A role no enemy
    * fills yet spawns nothing.
@@ -90,7 +91,7 @@ export class LayerSchedule {
     let random = null;
     const enemyFor = (role) => {
       if (this.isAsteroidType(role)) return role;
-      const enemies = enemiesFor(role, layer);
+      const enemies = enemiesFor(role, director.castLayer ?? layer);
       if (enemies.length <= 1) return enemies[0]?.id;
       random ??= this.spawner.waveRandom.createRoleRandom(layer);
       return random.weightedPick(

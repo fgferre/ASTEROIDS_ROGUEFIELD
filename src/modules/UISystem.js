@@ -9,7 +9,12 @@ import {
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
-import { localLayer, nextSector, sectorById } from '../data/sectors.js';
+import {
+  localLayer,
+  nextSector,
+  sectorById,
+  sectorTitle,
+} from '../data/sectors.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -377,11 +382,12 @@ class UISystem extends BaseSystem {
     // A sector run counts its layers from its own first one.
     hud.showLayerBanner(sector ? localLayer(sector, layer) : layer, {
       boss,
+      sentinel: Boolean(sector?.boss),
       bossRush: this.bossRush,
       chapter: stage
         ? bossRushStageTitle(stage)
         : firstOfBiome
-          ? biome.title
+          ? sectorTitle(sector, biome.title)
           : layer > RUN_FINAL_LAYER
             ? 'DEEP FIELD'
             : '',
@@ -458,7 +464,7 @@ class UISystem extends BaseSystem {
         });
       }
       this.queueTransmission(
-        wardenTransmission(payload.nextBossWave, 'warning')
+        wardenTransmission(payload.nextBossWave, 'warning', this.sector?.boss)
       );
     });
 
@@ -473,7 +479,9 @@ class UISystem extends BaseSystem {
     this.registerEventListener('boss-defeated', (payload = {}) => {
       // A Warden whose death won the run: 'run-won' speaks for it.
       if (this.runWon) return;
-      this.queueTransmission(wardenTransmission(payload.wave, 'defeated'));
+      this.queueTransmission(
+        wardenTransmission(payload.wave, 'defeated', payload.enemy?.bossKind)
+      );
     });
 
     this.registerEventListener('player-died', () => {
@@ -649,7 +657,7 @@ class UISystem extends BaseSystem {
       this.cinematics.startEpilogue();
       // A chapter before the last ends on its Warden's own last words.
       const line = nextSector(sectorById(sector))
-        ? wardenTransmission(wave, 'defeated')
+        ? wardenTransmission(wave, 'defeated', sectorById(sector).boss)
         : victoryTransmission();
       this.queueTransmission(line, { interrupt: true });
     });

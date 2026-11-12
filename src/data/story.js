@@ -4,7 +4,8 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
 
 // What the Wardens say to the pilot (docs/NORTE.md §1, §7 pillar 1). Warden
-// lines are keyed by layer, not by boss class. Each line stays under 90
+// lines are keyed by layer, not by boss class; Sentinel lines by boss kind
+// (they end a sector, whatever its layer). Each line stays under 90
 // characters so it fits the transmission banner on one or two rows.
 export const STORY = deepFreeze({
   speaker: {
@@ -12,6 +13,7 @@ export const STORY = deepFreeze({
     5: 'WARDEN PRIME',
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
+    'quarry-maw': 'QUARRY MAW',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -59,6 +61,15 @@ export const STORY = deepFreeze({
     15: {
       warning:
         'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
+    },
+  },
+  // Sentinel lines, keyed by boss kind: warning and defeated as a Warden's.
+  sentinel: {
+    'quarry-maw': {
+      warning:
+        'Quarry unit active. Stone is counted before it is eaten. So are hulls.',
+      defeated:
+        'Quarry Maw offline. The stone goes uncounted. Prime will ask why.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

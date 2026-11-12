@@ -156,4 +156,52 @@ describe('Tactical HUD', () => {
     expect(tacticalHud.cachedValues.boss.visible).toBe(false);
     expect(layout.updateBoss).toHaveBeenCalledWith(false);
   });
+
+  it('names a Sentinel with its tier word, on the intro card and the bar', () => {
+    const tacticalHud = new TacticalHud({
+      refs: {},
+      player: () => null,
+      enemies: () => null,
+      progression: () => null,
+      combat: () => null,
+      pickups: () => null,
+      renderer: () => null,
+      shieldKey: () => 'E',
+    });
+    const layout = {
+      showBossIntro: vi.fn(),
+      updateShip: vi.fn(),
+      updateStats: vi.fn(),
+      updateNextWaveTimer: vi.fn(),
+      updateEdgeArrows: vi.fn(),
+      updateBoss: vi.fn(),
+      setRadarJammed: vi.fn(),
+      setRadarRange: vi.fn(),
+      setAimStick: vi.fn(),
+    };
+    tacticalHud.layout = layout;
+    const enemy = {
+      displayName: 'Quarry Maw',
+      subtitle: 'It still eats stone',
+      bossKind: 'quarry-maw',
+    };
+
+    tacticalHud.handleBossEvent('boss-spawned', {
+      enemy,
+      name: 'Quarry Maw',
+      health: 80,
+      maxHealth: 100,
+    });
+
+    expect(layout.showBossIntro).toHaveBeenCalledWith(
+      'Sentinel Quarry Maw',
+      'It still eats stone'
+    );
+    expect(layout.updateBoss).toHaveBeenLastCalledWith(
+      true,
+      'Sentinel Quarry Maw',
+      80,
+      expect.any(Object)
+    );
+  });
 });

@@ -11,7 +11,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { clamp } from '../../../utils/mathHelpers.js';
 import { BOSS_CONFIG } from '../../../data/constants/visual.js';
-import { bossKindForLayer, WARDEN_KINDS } from '../../../data/enemies/boss.js';
+import { bossKindForLayer, BOSS_KINDS } from '../../../data/enemies/boss.js';
 import { arrivalEdge } from '../boss/arrival.js';
 
 export class BossWave {
@@ -96,7 +96,8 @@ export class BossWave {
     return { ...base, minionTypes };
   }
 
-  generateBossWave() {
+  // `bossKind` (a sector's own boss) overrides the layer's Warden.
+  generateBossWave(bossKind) {
     const bossDefaults = this.resolveBossDefaults();
 
     const bossRadius = bossDefaults.radius || 60;
@@ -124,6 +125,7 @@ export class BossWave {
       rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
       randomScope: 'boss-spawn',
       randomParentScope: 'spawn',
+      ...(bossKind && { bossKind }),
       metadata: {
         minionTypes: Array.isArray(bossDefaults.minionTypes)
           ? [...bossDefaults.minionTypes]
@@ -175,7 +177,7 @@ export class BossWave {
         : Math.max(20, baseRadius * 0.35);
     // Its own size keeps the spot inside the field (the Choir is the widest).
     const kind = bossConfig.bossKind ?? bossKindForLayer(this.getLayer());
-    const radius = WARDEN_KINDS[kind]?.radius ?? baseRadius;
+    const radius = BOSS_KINDS[kind]?.radius ?? baseRadius;
     const entrance =
       bossConfig.entrance ||
       arrivalEdge(

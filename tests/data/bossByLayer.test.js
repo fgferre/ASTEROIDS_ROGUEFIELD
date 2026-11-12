@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOSS_BY_LAYER,
+  BOSS_KINDS,
+  SENTINEL_KINDS,
+  WARDEN_KINDS,
   bossKindForLayer,
+  bossTier,
 } from '../../src/data/enemies/boss.js';
-import { wardenFactoryKey } from '../../src/modules/enemies/types/wardens.js';
+import { BOSS_RUSH_LAYERS } from '../../src/data/layers.js';
+import {
+  WARDEN_CLASSES,
+  wardenFactoryKey,
+} from '../../src/modules/enemies/types/wardens.js';
 
 describe('BOSS_BY_LAYER', () => {
   it('puts Prime at 5, Choir at 10 and Null at 15', () => {
@@ -27,5 +35,21 @@ describe('BOSS_BY_LAYER', () => {
       'boss-choir',
       'boss-null',
     ]);
+  });
+
+  it('registers the Sentinels by kind, outside the Warden table and cycle', () => {
+    expect(Object.keys(SENTINEL_KINDS)).toEqual(['quarry-maw']);
+    expect(BOSS_KINDS['quarry-maw']).toBe(SENTINEL_KINDS['quarry-maw']);
+    expect(WARDEN_KINDS['quarry-maw']).toBeUndefined();
+    expect(bossTier('quarry-maw')).toBe('sentinel');
+    expect(bossTier('prime')).toBe('warden');
+    expect(wardenFactoryKey('quarry-maw')).toBe('boss-quarry-maw');
+    expect(WARDEN_CLASSES['quarry-maw'].name).toBe('SentinelQuarryMaw');
+
+    const layers = Array.from({ length: 60 }, (_, i) => i + 1);
+    const kinds = new Set(
+      [...layers, ...BOSS_RUSH_LAYERS].map(bossKindForLayer)
+    );
+    expect([...kinds].sort()).toEqual(['choir', 'null', 'prime']);
   });
 });

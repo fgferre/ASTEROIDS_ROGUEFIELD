@@ -12,7 +12,7 @@
 
 import { getContent, listContent } from '../content/registry.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
-import { bossKindForLayer } from '../data/enemies/boss.js';
+import { SENTINEL_KINDS, bossKindForLayer } from '../data/enemies/boss.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 
@@ -254,8 +254,10 @@ function composeEnemy({ id, count }, { enemies }) {
   }
 }
 
-// The layer a boss belongs to: its Herald's layer, or the Warden's.
+// The layer a boss belongs to: its Herald's layer, the Warden's, or the one
+// a Sentinel's file names.
 function layerOfBoss(id) {
+  if (SENTINEL_KINDS[id]) return SENTINEL_KINDS[id].layer;
   const stage = listContent('stages').find(
     (candidate) =>
       candidate.herald === id ||
@@ -265,7 +267,7 @@ function layerOfBoss(id) {
 }
 
 // A Herald comes through the factory like the layer's spawner sends it; a
-// Warden through BossWave, like the layer's boss spawn.
+// Warden or a Sentinel through BossWave, like the layer's boss spawn.
 function composeBoss({ id }, { enemies }) {
   const layer = layerOfBoss(id);
   jumpToLayer(enemies, layer);

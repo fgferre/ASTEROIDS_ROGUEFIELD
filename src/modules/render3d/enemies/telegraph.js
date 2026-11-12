@@ -1,6 +1,7 @@
 // Telegraphs on the field plane: the charge lane (or the Null's dark lane
-// between violet edges), a marksman's aim line, the spread fan, the warning
-// ring and the Choir's converging beams. The Ram, the Wardens and any recipe
+// between violet edges), a marksman's aim line, the spread fan (and the Quarry
+// Maw's intake cone, the same wedge), the warning ring and the beams (the
+// Choir's converging lines, the Maw's eject fan). The Ram, the Wardens and any recipe
 // enemy that aims draw them; built once into the toolkit (enemyMirror.js
 // createKit) as kit.createTelegraph and kit.updateTelegraph.
 
@@ -21,7 +22,7 @@ export function createTelegraphs(kit) {
   const fanGeometries = new Map();
 
   // Charge lane / fan / warning ring on the field plane (Wardens and Ram);
-  // `beams` lines for the Choir's converging volley.
+  // `beams` lines for the Choir's converging volley and the Maw's eject.
   function createTelegraph(beams = 0) {
     const additive = (hex) =>
       new THREE.MeshBasicMaterial({
@@ -87,7 +88,8 @@ export function createTelegraphs(kit) {
     const ox = Number.isFinite(t.x) ? t.x : boss.x;
     const oy = Number.isFinite(t.y) ? t.y : boss.y;
     parts.group.position.set(ox - HALF_W, 1, oy - HALF_H);
-    const chorus = t.type === 'chorus';
+    // beams are placed on the field, not turned with the telegraph
+    const chorus = t.type === 'chorus' || t.type === 'eject';
     parts.group.rotation.y = chorus ? 0 : -(t.angle || 0);
     const charge = t.type === 'charge';
     const aim = t.type === 'aim';
@@ -96,7 +98,8 @@ export function createTelegraphs(kit) {
     parts.dark.visible = dark;
     parts.edges.forEach((edge) => (edge.visible = dark));
     parts.line.visible = charge || aim;
-    parts.fan.visible = t.type === 'fan';
+    const intake = t.type === 'intake';
+    parts.fan.visible = t.type === 'fan' || intake;
     parts.beams.forEach((beam, i) => {
       const line = chorus ? t.lines?.[i] : null;
       beam.visible = Boolean(line);
@@ -133,12 +136,15 @@ export function createTelegraphs(kit) {
       parts.line.material.opacity = t.locked
         ? 0.55 + 0.25 * pulse
         : 0.15 + 0.35 * progress;
-    } else if (t.type === 'fan') {
+    } else if (t.type === 'fan' || intake) {
       const arc = Math.max(0.1, t.arc || 0.8);
       const length = Math.max(r * 1.5, t.length || 180);
       parts.fan.geometry = fanGeometry(arc);
       parts.fan.scale.set(length, 1, length);
-      parts.fan.material.opacity = 0.07 + 0.2 * progress;
+      // the intake's cone holds, beating, while it pulls
+      parts.fan.material.opacity = t.pulling
+        ? 0.05 + 0.05 * pulse
+        : 0.07 + 0.2 * progress;
     }
     // the aim line is warning enough: no ring round a marksman
     parts.warn.visible = !aim;

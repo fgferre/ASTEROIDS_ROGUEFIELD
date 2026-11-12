@@ -59,14 +59,17 @@ describe('Run end screens', () => {
     expect(gameOver.seed.textContent).toBe('Seed 42 · Veteran');
   });
 
-  it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
+  function victoryScreen() {
     const button = () => {
       const classes = new Set(['hidden']);
+      const label = { textContent: '' };
       return {
         dataset: {},
         textContent: '',
         disabled: false,
+        label,
         focus() {},
+        querySelector: () => label,
         classList: {
           toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
           contains: (name) => classes.has(name),
@@ -90,19 +93,25 @@ describe('Run end screens', () => {
       hangar: () => ({ lastAward: { amount: 80, total: 80 } }),
       lastTransmission: () => null,
     });
-
-    screens.showVictoryScreen({
-      data: {
-        wave: { current: 10 },
-        stats: { timeElapsed: 512, timeline: [] },
-        sector: {
-          id: 'dense-core',
-          time: 512,
-          bestTime: 512,
-          firstClear: true,
-          next: 'wardens-reach',
+    const win = (sector) =>
+      screens.showVictoryScreen({
+        data: {
+          wave: { current: 10 },
+          stats: { timeElapsed: 512, timeline: [] },
+          sector,
         },
-      },
+      });
+    return { victory, win };
+  }
+
+  it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
+    const { victory, win } = victoryScreen();
+    win({
+      id: 'dense-core',
+      time: 512,
+      bestTime: 512,
+      firstClear: true,
+      next: 'wardens-reach',
     });
 
     expect(victory.body.innerHTML).toContain('Chapter cleared');
@@ -110,6 +119,23 @@ describe('Run end screens', () => {
     expect(victory.continueBtn.classList.contains('hidden')).toBe(true);
     expect(victory.nextBtn.classList.contains('hidden')).toBe(false);
     expect(victory.nextBtn.dataset.sector).toBe('wardens-reach');
+    expect(victory.nextBtn.label.textContent).toBe('Next Chapter');
     expect(victory.quitBtn.textContent).toBe('Campaign map');
+  });
+
+  it('a sector won before its chapter ends: Sector cleared, by its name, and Next Sector', () => {
+    const { victory, win } = victoryScreen();
+    win({
+      id: 'debris-wake',
+      time: 512,
+      bestTime: 512,
+      firstClear: false,
+      next: 'salvage-lanes',
+    });
+
+    expect(victory.body.innerHTML).toContain('Sector cleared');
+    expect(victory.body.innerHTML).toContain('DEBRIS WAKE · 8:32');
+    expect(victory.nextBtn.dataset.sector).toBe('salvage-lanes');
+    expect(victory.nextBtn.label.textContent).toBe('Next Sector');
   });
 });

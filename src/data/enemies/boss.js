@@ -4,6 +4,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 import prime from '../../content/bosses/prime.js';
 import choir from '../../content/bosses/choir.js';
 import nullWarden from '../../content/bosses/null.js';
+import quarryMaw from '../../content/bosses/quarry-maw.js';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -96,12 +97,11 @@ export function bossKindForLayer(layer) {
   return WARDEN_CYCLE[slot % WARDEN_CYCLE.length];
 }
 
-// The three kinds, one file each in src/content/bosses/, in this order. Prime
-// also carries the shared `config` and `components` (BOSS_CONFIG and
-// BOSS_COMPONENTS above), which are not part of a kind's entry.
-export const WARDEN_KINDS = deepFreeze(
+// A boss kind's entry: its content file without the registry's `order` and
+// Prime's shared `config` and `components`.
+const kindsOf = (files) =>
   Object.fromEntries(
-    [prime, choir, nullWarden].map(
+    files.map(
       ({
         id,
         order: _order,
@@ -110,12 +110,30 @@ export const WARDEN_KINDS = deepFreeze(
         ...kind
       }) => [id, kind]
     )
-  )
-);
+  );
 
-/** Components for a Warden kind: the shared set with its own movement. */
+// The three kinds, one file each in src/content/bosses/, in this order. Prime
+// also carries the shared `config` and `components` (BOSS_CONFIG and
+// BOSS_COMPONENTS above), which are not part of a kind's entry.
+export const WARDEN_KINDS = deepFreeze(kindsOf([prime, choir, nullWarden]));
+
+// Sentinels: the boss that ends a sector (CONTENT.md "Boss"). Same `type:
+// 'boss'` as a Warden, `tier: 'sentinel'` in its file; never in BOSS_BY_LAYER,
+// the cycle, Boss Rush or the Warden achievements: a sector asks for one by
+// kind (`bossKind`).
+export const SENTINEL_KINDS = deepFreeze(kindsOf([quarryMaw]));
+
+/** Every boss kind, Wardens and Sentinels: what a `bossKind` can name. */
+export const BOSS_KINDS = deepFreeze({ ...WARDEN_KINDS, ...SENTINEL_KINDS });
+
+/** 'warden' or 'sentinel': the word the HUD and the lines use for it. */
+export function bossTier(kind) {
+  return BOSS_KINDS[kind]?.tier ?? 'warden';
+}
+
+/** Components for a boss kind: the shared set with its own movement. */
 export function wardenComponents(kind) {
-  const warden = WARDEN_KINDS[kind];
+  const warden = BOSS_KINDS[kind];
   if (!warden?.movementPhases) return BOSS_COMPONENTS;
   return {
     ...BOSS_COMPONENTS,
