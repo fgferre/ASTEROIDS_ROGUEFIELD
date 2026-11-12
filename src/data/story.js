@@ -32,6 +32,22 @@ export const STORY = deepFreeze({
     'wardens-reach':
       "Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.",
   },
+  // Spoken by the Ring as a sector run begins, in place of its biome's line
+  // (docs/ROTEIRO.md); a sector without one keeps the biome's.
+  sector: {
+    'debris-wake':
+      'Debris Wake. What the Ring let go of. All of it is still counted.',
+    'salvage-lanes':
+      'Salvage Lanes. Cargo moved here for nine hundred years. The schedule still runs.',
+    'furnace-drift':
+      'Furnace Drift. The Core vents here. It has not been allowed to cool.',
+    'crystal-choir':
+      'Crystal Choir. Nine voices held this seam shut. Three remain.',
+    'assembly-graveyard':
+      'Assembly Graveyard. The same chassis, built again. Order received once. Never closed.',
+    'quarantine-grid':
+      'Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.',
+  },
   // Spoken by the Ring the first time a support machine is ever seen (the
   // Codex's first meeting): the `sighting` line of its content file.
   // Machines without a line arrive unannounced.
@@ -66,6 +82,8 @@ export const STORY = deepFreeze({
     15: {
       warning:
         'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
+      defeated:
+        'Still... no longer. It hears you now. I kept it asleep a thousand years.',
     },
   },
   // Sentinel lines, keyed by boss kind: warning and defeated as a Warden's.
@@ -125,11 +143,13 @@ export const STORY = deepFreeze({
     },
   },
   // One is picked with the seeded random when the pilot dies.
+  // The pilot flies by remote link from the Wake: a hull is lost, not the
+  // pilot (docs/ROTEIRO.md).
   death: [
-    'Ember extinguished. The Field takes back what it is owed.',
-    'Signal lost. Your hull joins the Ring. You are part of it now.',
-    'Another pilot recorded. Another shard returned. The count continues.',
-    'The Ring has been broken a thousand years. It can wait for the next pilot.',
+    'Link severed. Interceptor lost. The Field keeps the hull.',
+    'Hull returned to the count. The Wake has another. The Ring has patience.',
+    'Signal lost. The Ring files one more shard. The pilot is not in it.',
+    'The Ring has been broken a thousand years. It can wait for your next hull.',
   ],
   victory:
     'Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.',

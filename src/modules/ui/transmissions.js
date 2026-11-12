@@ -7,11 +7,13 @@ import { biomeForLayer } from '../../data/biomes.js';
 export const TRANSMISSION_HOLD_MS = 3500;
 export const TRANSMISSION_CHARS_PER_SECOND = 40;
 
-export function chapterTransmission(biomeId) {
+/** The Ring names the place: the sector's own line, else its biome's. */
+export function chapterTransmission(biomeId, sectorId = null) {
+  const own = STORY.sector[sectorId];
   return {
-    key: `chapter:${biomeId}`,
+    key: `chapter:${own ? sectorId : biomeId}`,
     speaker: STORY.speaker.ring,
-    text: STORY.chapter[biomeId],
+    text: own ?? STORY.chapter[biomeId],
   };
 }
 

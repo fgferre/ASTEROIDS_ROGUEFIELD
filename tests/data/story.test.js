@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { STORY } from '../../src/data/story.js';
 import { BIOMES } from '../../src/data/biomes.js';
+import { chapterTransmission } from '../../src/modules/ui/transmissions.js';
 import { HERALD_KINDS } from '../../src/data/enemies/herald.js';
 
 const allLines = () => [
   ...Object.values(STORY.chapter),
+  ...Object.values(STORY.sector),
   ...Object.values(STORY.warden).flatMap((moments) => Object.values(moments)),
   ...Object.values(STORY.herald).flatMap((moments) => Object.values(moments)),
   ...STORY.death,
@@ -38,6 +40,20 @@ describe('story', () => {
       expect(STORY.herald[kind].spawned).toBeTruthy();
       expect(STORY.herald[kind].defeated).toBeTruthy();
     });
+  });
+
+  it("names a sector by its own line, and by its biome's when it has none", () => {
+    expect(chapterTransmission('outer-ring', 'debris-wake')).toMatchObject({
+      key: 'chapter:debris-wake',
+      text: STORY.sector['debris-wake'],
+    });
+    expect(chapterTransmission('outer-ring', 'prime-gate')).toMatchObject({
+      key: 'chapter:outer-ring',
+      text: STORY.chapter['outer-ring'],
+    });
+    expect(chapterTransmission('outer-ring').text).toBe(
+      STORY.chapter['outer-ring']
+    );
   });
 
   it('keeps every line within 90 characters and never repeats one', () => {

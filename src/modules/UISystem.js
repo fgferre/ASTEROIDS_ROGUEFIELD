@@ -393,7 +393,7 @@ class UISystem extends BaseSystem {
             : '',
     });
     if (firstOfBiome) {
-      this.queueTransmission(chapterTransmission(biome.id));
+      this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
     }
     if (stage === 1) {
       this.queueTransmission(bossRushTransmission());
@@ -655,11 +655,15 @@ class UISystem extends BaseSystem {
       this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
-      // A chapter before the last ends on its Warden's own last words.
-      const line = nextSector(sectorById(sector))
-        ? wardenTransmission(wave, 'defeated', sectorById(sector).boss)
-        : victoryTransmission();
-      this.queueTransmission(line, { interrupt: true });
+      // The boss's own last words; after the last one, the Ring's.
+      const last = wardenTransmission(
+        wave,
+        'defeated',
+        sectorById(sector)?.boss
+      );
+      this.queueTransmission(last, { interrupt: true });
+      if (!nextSector(sectorById(sector)))
+        this.queueTransmission(victoryTransmission());
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;
