@@ -33,9 +33,9 @@ tem as três fases. Capítulo 3: Assembly Graveyard (Sentinel Foundry Mother: mo
 interrompe; varre com dois braços; exposto com as baias abertas ou os braços pendentes) e Null Boundary (Warden Null);
 a fase do meio é Quarantine Grid (Sentinel Interdictor: gaiola de cercas com um lado aberto em volta da nave, feixe
 que mira, trava e queima; exposto quando a gaiola cai). Os três capítulos têm três fases cada (nove partidas, seis
-Sentinels novos); ele não jogou nenhuma. As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): fracos e a
-refazer em placas — drone, caster, anvil, bulwark, husk, leech, twain, mine, sower, weaver e o Herald Dust (proposto
-como conversa paralela, esperando ele iniciar).
+Sentinels novos); ele não jogou nenhuma. As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): os onze fracos
+foram refeitos em placas — drone, caster, mine, leech, anvil, bulwark, husk, twain, sower, weaver e o Herald Dust (receitas
+com `slab`, `drum` e `finish: 'panel'`). Ainda discretos no tamanho do jogo: leech, twain, weaver; ele julga jogando.
 Naves (item 20, 12/11): os três cascos são construídos em placas por `render3d/hullSlabModel.js`, lendo os mesmos
 dados de casco (painéis de asa e flap, bocais, cabine, `form.body`); o caminho antigo, arredondado, saiu de
 `hullModel.js`. Falta ele julgar as três jogando; se rejeitar, a volta é reverter os dois commits das naves.
