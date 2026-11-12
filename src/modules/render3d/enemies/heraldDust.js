@@ -1,179 +1,212 @@
-// The Herald of Dust's view (heralds.js draws Heat and Silence): a
-// hauler-surveyor side-on to the ship (local +x), long along z — three
-// armoured cars on dark couplings along a front rail, the middle one raised
-// under a survey house and dish, the end ones each swinging a grapple boom
-// forward; one counting light on the rail per rock of the wall it raises,
-// lit one by one as it winds up; a slow haze of grit round it. A recipe look
-// (recipes.js) as data.
+// The Herald of Dust's view (heralds.js draws Heat and Silence): a wall-laying
+// rig side-on to the ship (local +x), long along z — a heavy spine beam with
+// a raised survey house and dish amidships and a rock hopper each side of it,
+// engines behind; out in front on four struts, open space between them, a
+// wide spreader bar carrying one big counting light per rock of the wall it
+// raises, lit one by one as it winds up; an outrigger off each end of the
+// spine swinging a jointed grapple arm forward past the bar, a two-pronged
+// claw at its tip; a slow haze of grit round it. A recipe look (recipes.js) as data.
 
 import dust from '../../../content/bosses/dust.js';
 import { PALETTE } from '../../../data/constants/palette.js';
 import { createSeededRandom } from '../asteroidMesh.js';
 import { colorOf } from '../batches.js';
-import { turned } from './shapes.js';
 
 const TAU = Math.PI * 2;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // the grains of the haze
 const DUST_MOTES = 16;
-// the cars: centre [x, z] and turn about y, the end ones swung forward so
-// the train bows toward the ship; a point [x, z] in a car's own frame
-const CARS = [
-  [0.1, -0.68, -0.32],
-  [0, 0, 0],
-  [0.1, 0.68, 0.32],
+// a top-view rectangle [x0..x1] × [z0..z1], its corners cut by `chamfer`
+const deck = (x0, x1, z0, z1, chamfer = 0.04) => [
+  [x1, z1 - chamfer],
+  [x1 - chamfer, z1],
+  [x0 + chamfer, z1],
+  [x0, z1 - chamfer],
+  [x0, z0 + chamfer],
+  [x0 + chamfer, z0],
+  [x1 - chamfer, z0],
+  [x1, z0 + chamfer],
 ];
-const inCar = ([cx, cz, a], [x, z]) => {
-  const [[u, v]] = turned([[x, z]], a);
-  return [cx + u, cz + v];
-};
-const carAt = (frame, [x, y, z]) => {
-  const [u, v] = inCar(frame, [x, z]);
-  return [u, y, v];
-};
-// a car's own top-view outline, its front chamfered
-const car = (front, back, half, chamfer = 0.08) => [
-  [front, half - chamfer],
-  [front - chamfer, half],
-  [back + 0.05, half],
-  [back, half - 0.05],
-  [back, -half + 0.05],
-  [back + 0.05, -half],
-  [front - chamfer, -half],
-  [front, -half + chamfer],
+// the spreader bar's centre line and half length, and the counting lights
+// along it, one per wall rock
+const BAR_X = 0.46;
+const BAR_HALF = 0.8;
+const COUNT = Array.from({ length: dust.wallRocks }, (_, i) => [
+  BAR_X,
+  0.1,
+  -0.62 + (1.24 * i) / Math.max(1, dust.wallRocks - 1),
+]);
+// a grapple arm off the spine's end (side +1): out, then forward past the bar
+const ARM = [
+  [-0.3, 0.86],
+  [-0.22, 1.1],
+  [0.24, 1.14],
+  [0.3, 1.08],
+  [0.7, 1.08],
+  [0.8, 1.02],
+  [0.7, 0.96],
+  [0.3, 0.96],
+  [0.22, 0.9],
+  [-0.02, 0.9],
+  [-0.06, 0.86],
 ];
-// the counting lights along the front, one per wall rock, in the car each
-// falls on
-const COUNT = Array.from({ length: dust.wallRocks }, (_, i) => {
-  const z = -0.78 + (1.56 * i) / Math.max(1, dust.wallRocks - 1);
-  const frame = CARS[Math.abs(z) < 0.34 ? 1 : z < 0 ? 0 : 2];
-  return carAt(frame, [0.4, 0.07, z - frame[1]]);
-});
-// a grapple boom off an end car's outer side (its frame, side ±1): out,
-// then forward, ending in a claw
-const BOOM = [
-  [-0.12, 0.24],
-  [-0.04, 0.46],
-  [0.52, 0.5],
-  [0.6, 0.42],
-  [0.5, 0.36],
-  [0.06, 0.34],
-  [0.02, 0.24],
+// the rocks riding in a hopper: [x, y, z offsets, size, turn]
+const LOAD = [
+  [-0.07, 0.2, -0.08, 0.1, 0.4],
+  [0.04, 0.22, 0.07, 0.11, 1.9],
+  [-0.1, 0.19, 0.1, 0.08, 2.7],
+  [0.06, 0.19, -0.1, 0.08, 1.1],
 ];
-const flip = (side) => (points) => points.map(([x, z]) => [x, side * z]);
 
 const DUST_LOOK = Object.freeze({
   finish: 'panel',
   parts: [
-    ...CARS.flatMap((frame, i) => {
-      const slab = (outline, part) => ({
-        shape: 'slab',
-        outline: outline.map((p) => inCar(frame, p)),
-        ...part,
-      });
-      const tall = i === 1;
-      return [
-        slab(car(0.4, -0.4, 0.3, 0.12), {
-          bottom: -0.24,
-          top: -0.04,
-          material: 'trim',
-        }),
-        slab(car(0.34, -0.34, 0.27, 0.14), {
-          bottom: -0.06,
-          top: tall ? 0.22 : 0.16,
-          bevel: 0.05,
-        }),
-        slab(car(0.16, -0.28, 0.2, 0.08), {
-          bottom: tall ? 0.2 : 0.14,
-          top: tall ? 0.3 : 0.24,
-          bevel: 0.03,
-          material: tall ? 'trim' : 'steel',
-        }),
-        slab(car(0.48, 0.3, 0.26, 0.06), {
-          bottom: -0.16,
-          top: 0.06,
-          bevel: 0.025,
-          material: 'trim',
-        }),
-        {
-          shape: 'drum',
-          axis: 'x',
-          sides: 8,
-          size: [0.05, 0.08, 0.08],
-          at: carAt(frame, [-0.42, -0.02, 0]),
-          rotate: [0, frame[2], 0],
-          material: 'soot',
-        },
-      ];
-    }),
     {
       shape: 'slab',
-      outline: car(0.1, -0.22, 0.13),
+      outline: deck(-0.4, 0.02, -0.92, 0.92, 0.08),
+      bottom: -0.26,
+      top: -0.04,
+      material: 'trim',
+    },
+    {
+      shape: 'slab',
+      outline: deck(-0.34, -0.04, -0.88, 0.88, 0.06),
+      bottom: -0.06,
+      top: 0.12,
+      bevel: 0.04,
+    },
+    {
+      shape: 'slab',
+      outline: deck(-0.46, 0.12, -0.24, 0.24, 0.1),
+      bottom: -0.2,
+      top: 0.3,
+      bevel: 0.05,
+    },
+    {
+      shape: 'slab',
+      outline: deck(-0.36, 0.04, -0.17, 0.17, 0.06),
       bottom: 0.28,
       top: 0.42,
       bevel: 0.03,
       material: 'steel',
     },
     {
+      shape: 'box',
+      size: [0.012, 0.03, 0.14],
+      at: [0.125, 0.2, 0],
+      material: 'soot',
+    },
+    {
       shape: 'drum',
       sides: 8,
       taper: 2.2,
-      size: [0.08, 0.025, 0.08],
-      at: [-0.1, 0.46, 0],
+      size: [0.09, 0.025, 0.09],
+      at: [-0.2, 0.47, 0],
       material: 'trim',
     },
     {
       shape: 'drum',
       sides: 6,
       size: [0.025, 0.04, 0.025],
-      at: [-0.1, 0.43, 0],
+      at: [-0.2, 0.44, 0],
       material: 'soot',
     },
-    ...[-0.34, 0.34].map((z) => ({
+    ...[-0.56, 0.56].flatMap((z) => [
+      {
+        shape: 'slab',
+        outline: deck(-0.4, 0.02, z - 0.2, z + 0.2, 0.05),
+        bottom: 0.1,
+        top: 0.22,
+        bevel: 0.03,
+        material: 'trim',
+      },
+      {
+        shape: 'slab',
+        outline: deck(-0.34, -0.04, z - 0.15, z + 0.15, 0.03),
+        bottom: 0.1,
+        top: 0.18,
+        bevel: 0.01,
+        material: 'soot',
+      },
+      ...LOAD.map(([x, y, dz, size, turn]) => ({
+        shape: 'icosahedron',
+        size: [size * 1.2, size * 0.8, size],
+        at: [-0.19 + x, y, z + dz],
+        rotate: [turn, turn * 1.7, 0.3],
+        color: 'rockLit',
+      })),
+    ]),
+    ...[-0.6, 0, 0.6].map((z) => ({
       shape: 'drum',
-      axis: 'z',
+      axis: 'x',
       sides: 8,
-      size: [0.13, 0.13, 0.12],
-      at: [0.02, -0.04, z],
-      rotate: [0, z * 0.45, 0],
+      size: [0.07, 0.11, 0.11],
+      at: [-0.45, -0.08, z],
       material: 'soot',
     })),
-    ...[-1, 1].flatMap((side) => {
-      const frame = CARS[side < 0 ? 0 : 2];
-      const at = (x, y, z) => carAt(frame, [x, y, side * z]);
-      return [
-        {
-          shape: 'slab',
-          outline: flip(side)(BOOM).map((p) => inCar(frame, p)),
-          bottom: -0.08,
-          top: 0.06,
-          bevel: 0.02,
-          material: 'steel',
-        },
-        {
-          shape: 'drum',
-          sides: 8,
-          size: [0.09, 0.08, 0.09],
-          at: at(-0.04, 0, 0.3),
-          material: 'trim',
-        },
-        ...[0.47, 0.37].map((z) => ({
-          shape: 'drum',
-          axis: 'x',
-          sides: 4,
-          taper: 0,
-          size: [0.16, 0.065, 0.065],
-          at: at(0.7, -0.01, z),
-          rotate: [0, frame[2], 0],
-          material: 'trim',
-        })),
-      ];
-    }),
+    {
+      shape: 'slab',
+      outline: deck(BAR_X - 0.11, BAR_X + 0.11, -BAR_HALF, BAR_HALF, 0.07),
+      bottom: -0.12,
+      top: 0.1,
+      bevel: 0.04,
+      material: 'trim',
+    },
+    ...[-0.66, -0.3, 0.3, 0.66].map((z) => ({
+      shape: 'slab',
+      outline: deck(0.0, BAR_X - 0.09, z - 0.05, z + 0.05, 0.01),
+      bottom: -0.1,
+      top: 0.04,
+      bevel: 0.02,
+      material: 'steel',
+    })),
+    ...[-1, 1].flatMap((side) => [
+      {
+        shape: 'slab',
+        outline: ARM.map(([x, z]) => [x, side * z]),
+        bottom: -0.14,
+        top: 0.1,
+        bevel: 0.04,
+        material: 'steel',
+      },
+      {
+        shape: 'drum',
+        sides: 8,
+        size: [0.13, 0.1, 0.13],
+        at: [-0.2, 0.06, side * 0.94],
+        material: 'trim',
+      },
+      {
+        shape: 'drum',
+        sides: 6,
+        size: [0.1, 0.09, 0.1],
+        at: [0.27, 0.06, side * 1.02],
+        material: 'trim',
+      },
+      {
+        shape: 'slab',
+        outline: deck(0.7, 0.84, side * 1.02 - 0.15, side * 1.02 + 0.15),
+        bottom: -0.12,
+        top: 0.08,
+        bevel: 0.03,
+        material: 'trim',
+      },
+      ...[-1, 1].map((jaw) => ({
+        shape: 'drum',
+        axis: 'x',
+        sides: 4,
+        taper: 0,
+        size: [0.2, 0.09, 0.09],
+        at: [1.0, -0.02, side * 1.02 + jaw * 0.13],
+        rotate: [0, jaw * 0.3, 0],
+        material: 'steel',
+      })),
+    ]),
   ],
   lights: COUNT.map((at) => ({
     at,
-    dir: [0.5, 1, 0],
-    size: 0.065,
+    dir: [0, 1, 0],
+    size: 0.115,
     color: 'shot',
   })),
 });
@@ -238,7 +271,7 @@ export function createDustView(kit, recipeViews) {
     });
   }
 
-  // `telegraphRatio` counts the wall in: the rail's lights come on one by
+  // `telegraphRatio` counts the wall in: the bar's lights come on one by
   // one as it winds up, and the haze warms.
   function updateDust(view, herald, time, flash) {
     const charge = clamp01(herald.telegraphRatio || 0);
