@@ -114,6 +114,20 @@ describe('PlayerMirror', () => {
     );
   });
 
+  it('builds the Interceptor in plates, its wingtips following the RCS upgrade', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    expect(defaultHull.visual.form.style).toBe('slab');
+    const stock = mirror.puffs.map(({ puff }) => Math.abs(puff.position.z));
+    expect(stock).toHaveLength(2);
+    // lit leading edges, one per wing
+    const edge = mirror.ship.children.find((child) => child.name === 'edge');
+    expect(edge.geometry.getAttribute('position').count).toBe(4);
+
+    const grown = player.getHullGeometry(defaultHull, { rcs: 3 });
+    const span = Math.max(...grown.rcsPorts.map((port) => Math.abs(port.y)));
+    expect(span).toBeGreaterThan(stock[0]);
+  });
+
   it("draws each hull's static plates as one vertex-coloured mesh", () => {
     [defaultHull, solarSlicer, bastion].forEach((hull) => {
       const { mirror } = mirrorFor(hull);

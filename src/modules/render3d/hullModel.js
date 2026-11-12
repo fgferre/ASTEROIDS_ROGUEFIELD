@@ -24,6 +24,7 @@ import {
   TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
 } from '../../data/constants/physics.js';
+import { buildSlabHull } from './hullSlabModel.js';
 import { mergeStatic } from './mergeStatic.js';
 import { colorOf } from './batches.js';
 
@@ -597,6 +598,15 @@ export function edgeLines(THREE, model, materials) {
 export function buildHullModel(THREE, geometry, tones) {
   const { form, cockpit } = geometry;
   const colors = tones.map((c) => c.clone().multiplyScalar(geometry.albedo));
+  if (form.style === 'slab') {
+    const { plates, raised, ...rest } = buildSlabHull(
+      THREE,
+      geometry,
+      colors,
+      TURRET_PIVOT_X / VISUAL_SCALE
+    );
+    return { ...mergeHull(THREE, plates, raised), ...rest };
+  }
   const [body, detail] = [new ToneParts(), new ToneParts()];
   const edges = { edge: [], bladeEdge: [] };
   const tips = [];

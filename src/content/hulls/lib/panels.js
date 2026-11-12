@@ -11,7 +11,9 @@
 // visual's `albedo` scales its hull tones.
 //
 // A visual's `form` shapes the 3D hull (render3d/hullModel.js), in
-// SHIP_SIZE units: `body` stations [x, half-width, chine height, deck rise,
+// SHIP_SIZE units: `style: 'slab'` builds it as layered plates
+// (render3d/hullSlabModel.js: it reads `body`, `nacelle` and `canopy`),
+// otherwise lofted from: `body` stations [x, half-width, chine height, deck rise,
 // keel drop] from nose to stern, lofted; `deck` and `belly` exponents [m, n]
 // of the cross-section, height share (1 − |t|^m)^(1/n) at lateral fraction
 // t; `spine` and `keel` the shares of the deck and belly in the light and

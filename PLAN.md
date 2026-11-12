@@ -23,6 +23,10 @@ Medido sem tela (12/11, piloto do golden trace, nave que não morre, primeira ca
 dura 5,5–6 min (camadas de 45–80 s; chefes: Quarry Maw 90 s, Gatekeeper 80 s, Prime 89 s) e a vitória dispara nas
 três; golpes concentrados na camada 4 e no chefe (28, 42 e 45 no total); sem a trapaça o piloto morre 9–15 s depois
 de o chefe chegar. O plano mestre pede 14–18 min por fase: alongar é decisão dele, jogando.
+Naves (item 20, 12/11): o Interceptor passou para o estilo de placas (`form.style: 'slab'`,
+`render3d/hullSlabModel.js`, lendo os mesmos dados do casco); Solar Slicer e Bastion continuam no estilo antigo de
+`hullModel.js` até ele julgar o Interceptor — aprovado, os dois migram e o caminho antigo sai; rejeitado, tira-se
+`style` do casco e o arquivo novo.
 
 ## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
 

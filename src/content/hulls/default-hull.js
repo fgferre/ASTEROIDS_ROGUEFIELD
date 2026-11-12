@@ -61,9 +61,11 @@ const visual = {
   nozzleLengthPerLevel: 0.025 * S,
   retroPorts: [pt(0.3, -0.21), pt(0.3, 0.21)],
   cockpit: { from: pt(0.4, 0), to: pt(0.66, 0), width: 0.07 * S },
-  // a needle prow swelling into a rounded deck, swept fins with a slight
-  // droop, canted tail fins with the braking upgrade, wingtip pods
+  // layered plates (the slab style): a needle prow, armoured shoulders and a
+  // vented spine, swept blades with a weapon rail at each tip, canards,
+  // canted tail fins, twin nacelles
   form: {
+    style: 'slab',
     body: [
       [1.0, 0, 0.15, 0, 0],
       [0.94, 0.028, 0.152, 0.022, 0.016],
