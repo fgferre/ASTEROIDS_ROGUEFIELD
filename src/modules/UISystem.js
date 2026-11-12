@@ -92,19 +92,10 @@ class UISystem extends BaseSystem {
       hud: () => this.tacticalHud.layout,
       // The session's pause flag alone: no pause screen, no fixed steps.
       holdSim: (held) => this.getService('game-state')?.setPaused(held),
-      bindSkip: (skip) => {
-        // Capture on window runs before every other key handler: the key
-        // only skips (a held key's repeats are swallowed too).
-        const onKey = (event) => {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (!event.repeat) skip();
-        };
-        window.addEventListener('keydown', onKey, true);
-        return () => window.removeEventListener('keydown', onKey, true);
-      },
       onIntroEnd: () =>
         this.handleLayerStarted({ wave: this.transmissionLayer }),
+      speak: (entry) => this.queueTransmission(entry),
+      hush: () => this.transmissions?.clear(),
     });
     this.onboarding = new Onboarding(
       {
@@ -669,13 +660,14 @@ class UISystem extends BaseSystem {
       this.runWon = false;
       this.cinematics.release();
     });
-    this.registerEventListener('game-started', () => {
+    this.registerEventListener('game-started', (payload = {}) => {
       this.runWon = false;
       this.pilotDown = false;
       this.chestCeremony.clear();
       this.runEndScreens.noteRunStart();
       this.transmissions?.clear();
       this.cinematics.stop();
+      this.cinematics.armTravel(payload);
       // After startNewRun has unpaused: the intro holds the first step.
       queueMicrotask(() => this.cinematics.startIntro());
       this.removeOnboardingCardsTip();
@@ -701,12 +693,13 @@ class UISystem extends BaseSystem {
       this.onboarding.cardPicked();
       this.removeOnboardingCardsTip();
     });
-    // No cards once the run has ended: over the victory or under the game over.
+    // No cards once the run has ended: over the victory or under the game
+    // over; a run's first cards wait for its journey and intro.
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
-      if (this.runWon || this.pilotDown) {
-        return;
-      }
-      this.levelUpScreen.handleUpgradeOptions(payload);
+      if (this.runWon || this.pilotDown) return;
+      this.cinematics.afterTravel(() =>
+        this.levelUpScreen.handleUpgradeOptions(payload)
+      );
     });
     this.registerEventListener('upgrade-rerolled', (payload = {}) => {
       this.levelUpScreen.refreshLevelUpOptions(payload);

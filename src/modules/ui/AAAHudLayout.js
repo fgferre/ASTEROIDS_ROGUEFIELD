@@ -346,9 +346,14 @@ export class AAAHudLayout {
     this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
   }
 
-  /** The letterbox bars of the Warden's arrival, sliding in or out. */
-  showLetterbox(show) {
-    this.els?.letterbox?.classList.toggle('is-showing', Boolean(show));
+  /**
+   * The letterbox bars of a Warden's arrival or a journey, sliding in or
+   * out; a `journey` also clears the instruments off the screen.
+   */
+  showLetterbox(show, journey = false) {
+    const bars = this.els?.letterbox;
+    bars?.classList.toggle('is-showing', Boolean(show));
+    bars?.parentElement?.classList.toggle('is-journey', show && journey);
   }
 
   /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */

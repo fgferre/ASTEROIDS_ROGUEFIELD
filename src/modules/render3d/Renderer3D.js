@@ -46,6 +46,7 @@ import {
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { TravelScene } from './travelScene.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -67,6 +68,9 @@ const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
 const SHIP_MIN_CASTER = 5;
 // Point sizes of the star layers are authored for a frame this tall.
 const STAR_FRAME_HEIGHT = 900;
+// The journey's rig holds the intro's first pose under its own camera.
+const INTRO_START = introPath(0);
+const holdIntroStart = () => INTRO_START;
 
 // The pose of an entity's angle field, 0 when it has none.
 function angleOf(holder, key) {
@@ -105,6 +109,8 @@ class Renderer3D extends BaseSystem {
     this.shipOnScreen = null;
     this.shipPoint = { x: 0, y: 0 };
     this.three = null;
+    // The journey between sectors (travelScene.js), built with the scene.
+    this.travel = null;
     this.failed = false;
     this.graphics = {
       bloom: true,
@@ -389,6 +395,35 @@ class Renderer3D extends BaseSystem {
     return this.startCinematic(introPath, durationMs, false, 'intro');
   }
 
+  /**
+   * The journey to sector `to` over `durationMs` (ui/runCinematics.js): the
+   * ship flown along the Ring by its own camera, ending on the intro's first
+   * pose (playIntro next). False when nothing would move, as playIntro.
+   */
+  playTravel({ to, durationMs }) {
+    if (!this.ready()) return false;
+    if (!this.startCinematic(holdIntroStart, 1, true, 'travel')) return false;
+    const freeze = this.cameraRig.cinematicFreeze;
+    this.travel.start(
+      to,
+      durationMs,
+      this.cachedPlayer,
+      freeze?.kind === 'travel' ? freeze.t : null
+    );
+    return true;
+  }
+
+  /**
+   * The journey is over: the Ring and the field are back, and the run's
+   * sector shows its own place already (its first layer may wait for cards).
+   */
+  endTravel() {
+    if (!this.travel?.active) return;
+    this.travel.stop();
+    const sector = this.cachedEnemies?.waveManager?.sector;
+    if (sector) this.biome.enterLayer(sector.layers[0], sector);
+  }
+
   /** The victory pull-back; it holds its last shot until endCinematic(). */
   playEpilogue(durationMs) {
     return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
@@ -569,6 +604,7 @@ class Renderer3D extends BaseSystem {
     this.lastRenderTime = null;
     this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
+    this.travel?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -585,6 +621,7 @@ class Renderer3D extends BaseSystem {
 
   setup() {
     this.three = setupThree(this.seeded);
+    this.travel = new TravelScene(this.three);
     this.applyQuality();
   }
 
@@ -696,6 +733,7 @@ class Renderer3D extends BaseSystem {
     const player = this.cachedPlayer;
     const effects = this.cachedEffects;
     const enemyList = this.cachedEnemies?.getActiveEnemies() || [];
+    const travel = this.travel?.active ? this.travel : null;
     this.cameraRig.updateCamera(
       this.three,
       player,
@@ -710,6 +748,7 @@ class Renderer3D extends BaseSystem {
     this.lastRenderTime = now;
 
     const t = this.three;
+    travel?.frame(t.camera, t.height);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -736,7 +775,12 @@ class Renderer3D extends BaseSystem {
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
-    this.trackShip(player);
+    if (travel) {
+      travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
+      this.shipOnScreen = null;
+    } else {
+      this.trackShip(player);
+    }
     this.mirrorShield(player, time);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
@@ -766,9 +810,10 @@ class Renderer3D extends BaseSystem {
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(this.biome, fog);
-    const ship = t.player.group.visible && player?.position;
-    t.space.update(this.camera.x, this.camera.y, dt, {
+    t.biomes.update(travel ? travel.look : this.biome, fog);
+    const ship = t.player.group.visible && (travel?.focus || player?.position);
+    const view = travel?.focus || this.camera;
+    t.space.update(view.x, view.y, dt, {
       ship: ship || null,
       shipLight: t.player.light.intensity,
       pointScale,

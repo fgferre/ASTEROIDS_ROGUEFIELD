@@ -8,7 +8,8 @@
 //
 // `follow` of the way it moves with the point the camera aims at on the
 // field, so from the gameplay camera it parallaxes like something much
-// deeper than it sits; a scene that flies to it sets follow to 0.
+// deeper than it sits; a scene that flies to it sets follow to 0. `offset`
+// moves it off its place (the journey lays it along the ship's flight).
 
 import { mergeStatic } from '../mergeStatic.js';
 import { ringMaterial } from './ringMaterial.js';
@@ -66,6 +67,7 @@ export class BrokenRing {
     this.material = material;
     this.uniforms = uniforms;
     this.follow = RING.follow;
+    this.offset = new THREE.Vector3();
     // Null: each chunk by its distance; 0..2 forces that level everywhere.
     this.forcedLevel = null;
     // An LOD's update(camera) is the renderer's hook, every frame, before it
@@ -128,6 +130,7 @@ export class BrokenRing {
       RING.centre[1],
       RING.centre[2] + (camera.position.z + aim.z * reach) * this.follow
     );
+    object.position.add(this.offset);
     object.updateMatrixWorld(true);
     object.worldToLocal(local.setFromMatrixPosition(camera.matrixWorld));
     this.chunks.forEach((chunk) => {

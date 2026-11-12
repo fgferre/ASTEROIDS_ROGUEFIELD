@@ -88,6 +88,19 @@ export function deathTransmission(random, layer) {
   };
 }
 
+/**
+ * The journey's lines to sector `to`, in order (none for a sector without
+ * one). `holdMs`, when given, replaces each line's hold once typed.
+ */
+export function travelTransmissions(to, holdMs) {
+  return (STORY.travel[to] ?? []).map(({ speaker, text }, i) => ({
+    key: `travel:${to}:${i}`,
+    speaker: STORY.speaker[speaker],
+    text,
+    ...(holdMs && { holdMs }),
+  }));
+}
+
 export function victoryTransmission() {
   return { key: 'victory', speaker: STORY.speaker.ring, text: STORY.victory };
 }
@@ -166,7 +179,7 @@ export class TransmissionQueue {
       this.current.typed = typed;
       this.view.typeTransmission(entry.text.slice(0, typed), typed >= length);
     }
-    if (elapsed >= typingMs + TRANSMISSION_HOLD_MS) {
+    if (elapsed >= typingMs + (entry.holdMs ?? TRANSMISSION_HOLD_MS)) {
       this.view.hideTransmission();
       this.current = null;
       this.onFinished(entry);

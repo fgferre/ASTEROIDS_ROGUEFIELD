@@ -5,7 +5,9 @@
 // distance, `tilt` is in degrees, `offsetX/offsetY` move the look-at point in
 // logical units, `wake` (0..1) lights the Ring. Both end where the follow
 // camera (or the held victory shot) takes over. The Warden's arrival is no
-// path: the camera director frames it (its boss entrance moment).
+// path: the camera director frames it (its boss entrance moment). The
+// journey between sectors flies its own camera (render3d/travelScene.js)
+// and ends on the intro's first pose.
 
 export const INTRO_MS = 3000;
 export const EPILOGUE_MS = 4000;
@@ -17,6 +19,16 @@ export const WARDEN_ARRIVAL = Object.freeze({
   travelIn: 0.4, // proposta 19/10: the bars slide in
   travelBack: 0.5, // proposta 19/10: they slide out
   barHeight: 10, // proposta 19/10: each letterbox bar, % of the view
+});
+
+// The journey to a sector (ui/runCinematics.js): it lasts as long as its
+// lines take to type plus `lineHoldMs` each, after `leadMs` of flight, within
+// [minMs, maxMs]. Milliseconds.
+export const TRAVEL = Object.freeze({
+  lineHoldMs: 2000, // proposta 12/11
+  leadMs: 800, // proposta 12/11
+  minMs: 7000, // proposta 12/11
+  maxMs: 16000, // proposta 12/11
 });
 
 export const FOLLOW_TILT = 18;
@@ -32,15 +44,21 @@ const WAKE_START = 0.2;
 
 /**
  * Dev captures: `?cinematic=intro&t=0.4` (or `epilogue`) freezes that
- * cinematic's camera at t while it plays. Null without the flag.
+ * cinematic's camera at t while it plays. `?cinematic=travel&t=0.4` makes
+ * any run start fly the journey, frozen at t, to `&sector=<id>` (the opening
+ * to the first sector without it). Null without the flag.
  */
 export function cinematicFreezeFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
     const kind = params.get('cinematic');
     const t = Number(params.get('t'));
-    if (kind !== 'intro' && kind !== 'epilogue') return null;
-    return { kind, t: Number.isFinite(t) ? t : 0.5 };
+    if (!['intro', 'epilogue', 'travel'].includes(kind)) return null;
+    return {
+      kind,
+      t: Number.isFinite(t) ? t : 0.5,
+      sector: params.get('sector'),
+    };
   } catch {
     return null;
   }

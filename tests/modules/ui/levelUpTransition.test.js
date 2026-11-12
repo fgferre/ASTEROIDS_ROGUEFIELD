@@ -166,6 +166,7 @@ describe('Level-up card transition', () => {
           prefersReducedMotion: () => true,
           previewBuild: () => {},
         }),
+        cinematics: { afterTravel: (show) => show() },
         registerEventListener: (name, fn) => handlers.set(name, fn),
       });
 
@@ -229,6 +230,7 @@ describe('Level-up card choices', () => {
         getRandomFork: () => new RandomService(1),
         getService: () => progression,
         showScreen: (name) => screens.push(name),
+        cinematics: { afterTravel: (show) => show() },
         registerEventListener: (name, fn) => eventBus.on(name, fn),
       },
       UISystem.prototype
@@ -340,6 +342,7 @@ describe('UISystem overlay handoffs', () => {
     const handleSettingsMenuRequest = vi.fn();
     const ui = Object.setPrototypeOf(
       {
+        cinematics: { afterTravel: (show) => show() },
         registerEventListener: (name, handler) => handlers.set(name, handler),
       },
       UISystem.prototype
@@ -371,6 +374,7 @@ describe('UISystem overlay handoffs', () => {
     const ui = Object.setPrototypeOf(
       {
         eventBus,
+        cinematics: { afterTravel: (show) => show() },
         registerEventListener: (name, handler) => handlers.set(name, handler),
       },
       UISystem.prototype

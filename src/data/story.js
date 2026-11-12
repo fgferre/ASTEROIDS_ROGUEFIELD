@@ -10,6 +10,7 @@ import { listContent } from '../content/registry.js';
 export const STORY = deepFreeze({
   speaker: {
     ring: 'THE RING',
+    wake: 'WAKE',
     5: 'WARDEN PRIME',
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
@@ -47,6 +48,103 @@ export const STORY = deepFreeze({
       'Assembly Graveyard. The same chassis, built again. Order received once. Never closed.',
     'quarantine-grid':
       'Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.',
+  },
+  // The journey to each sector (docs/ROTEIRO.md), keyed by the sector it
+  // flies to: the opening to the first, then one between each pair. Spoken
+  // in order over the travel scene (src/modules/ui/runCinematics.js) by the
+  // Wake or the Ring (a `speaker` key above).
+  travel: {
+    'debris-wake': [
+      {
+        speaker: 'wake',
+        text: 'That signal could keep our lights on. Bring back what you can.',
+      },
+      {
+        speaker: 'wake',
+        text: 'Link is clean. The interceptor is yours. We lose a hull, not you.',
+      },
+      {
+        speaker: 'ring',
+        text: 'Visitors: one. Returning citizens: unresolved.',
+      },
+    ],
+    'salvage-lanes': [
+      {
+        speaker: 'wake',
+        text: "Something out there is still sorting the wreckage. Abandoned places don't do that.",
+      },
+      {
+        speaker: 'ring',
+        text: 'Lane assignment: none. Proceed uncounted. Briefly.',
+      },
+    ],
+    'prime-gate': [
+      {
+        speaker: 'wake',
+        text: 'The gate ahead has power. A thousand years, and it has power.',
+      },
+      { speaker: 'ring', text: 'Prime has been told. Prime is counting.' },
+    ],
+    'furnace-drift': [
+      {
+        speaker: 'wake',
+        text: "We're through. The heat is deeper in. That's what we came for.",
+      },
+      {
+        speaker: 'ring',
+        text: 'One hull past the gate. The record does not have a word for you.',
+      },
+    ],
+    'crystal-choir': [
+      {
+        speaker: 'wake',
+        text: 'Reactor crew is cheering. Every furnace you put out, our lights get steadier.',
+      },
+      {
+        speaker: 'wake',
+        text: 'Odd thing. The cracks out there got wider when it went cold.',
+      },
+    ],
+    'dense-core': [
+      {
+        speaker: 'wake',
+        text: "That wasn't a weapon back there. It was holding something closed. Go carefully.",
+      },
+      {
+        speaker: 'ring',
+        text: 'Resonance failing. Seam width: increasing. Cause: one hull.',
+      },
+    ],
+    'assembly-graveyard': [
+      {
+        speaker: 'wake',
+        text: 'We have the power we came for. We could turn back now.',
+      },
+      {
+        speaker: 'wake',
+        text: "...the signal moved. It's calling from further in. It's calling us by name.",
+      },
+    ],
+    'quarantine-grid': [
+      {
+        speaker: 'wake',
+        text: 'It builds the same machine forever. Nobody told it to stop. Nobody was left to.',
+      },
+      {
+        speaker: 'ring',
+        text: 'Quarantine ahead. Drawn by the operators. Not drawn against you. Against us.',
+      },
+    ],
+    'wardens-reach': [
+      {
+        speaker: 'wake',
+        text: 'They broke their own Ring. On purpose. And put a guard on the pieces.',
+      },
+      {
+        speaker: 'wake',
+        text: "Pilot... I think we're the thing the guard was for.",
+      },
+    ],
   },
   // Spoken by the Ring the first time a support machine is ever seen (the
   // Codex's first meeting): the `sighting` line of its content file.

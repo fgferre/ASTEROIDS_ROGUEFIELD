@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EPILOGUE_MS, INTRO_MS } from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
-import { RunCinematics } from '../../../src/modules/ui/runCinematics.js';
+import {
+  RunCinematics,
+  travelDestination,
+} from '../../../src/modules/ui/runCinematics.js';
 
 // The node test environment has no DOM: just enough element for the banner.
 function fakeElement(onAdd = () => {}) {
@@ -40,6 +43,8 @@ function setup({ plays = true } = {}) {
     playIntro: vi.fn(() => plays),
     playEpilogue: vi.fn(() => plays),
     playArrival: vi.fn(() => plays),
+    playTravel: vi.fn(() => plays),
+    endTravel: vi.fn(),
     endCinematic: vi.fn(),
   };
   const events = [];
@@ -51,6 +56,8 @@ function setup({ plays = true } = {}) {
     queueTransmission: vi.fn(),
     getService: () => null,
   };
+  const spoken = [];
+  const hush = vi.fn();
   ui.cinematics = new RunCinematics({
     eventBus: { emit: (name, payload) => events.push([name, payload.kind]) },
     renderer: () => renderer,
@@ -66,6 +73,9 @@ function setup({ plays = true } = {}) {
       UISystem.prototype.handleLayerStarted.call(ui, {
         wave: ui.transmissionLayer,
       }),
+    speak: (entry) => spoken.push(entry),
+    hush,
+    records: () => ({ sectorsWon: [] }),
   });
   // A run start: wave 1 starts (its banner queued), then the intro.
   const startRun = () => {
@@ -80,6 +90,8 @@ function setup({ plays = true } = {}) {
     events,
     held,
     startRun,
+    spoken,
+    hush,
     skip: () => skipKey?.(),
   };
 }
@@ -199,5 +211,75 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.startArrival({ x: 400, y: 84 })).toBe(false);
     expect(renderer.playArrival).not.toHaveBeenCalled();
     expect(ui.cinematics.introActive).toBe(true);
+  });
+
+  it('flies a journey for a carried start and the first-ever first-sector launch, not otherwise', () => {
+    const none = { sectorsWon: [] };
+    const won = { sectorsWon: ['debris-wake'] };
+    const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
+    expect(
+      travelDestination({ sector: 'salvage-lanes', carried: true }, won)
+    ).toBe('salvage-lanes');
+    expect(travelDestination(launch, none)).toBe('debris-wake');
+    expect(travelDestination(launch, won)).toBe(null);
+    expect(
+      travelDestination({ ...launch, sector: 'salvage-lanes' }, none)
+    ).toBe(null);
+    expect(
+      travelDestination({ ...launch, source: 'retry-game-btn' }, none)
+    ).toBe(null);
+    expect(travelDestination({ sector: null, source: 'start-game-btn' })).toBe(
+      null
+    );
+    expect(
+      travelDestination(
+        { sector: 'salvage-lanes', carried: true, replay: true },
+        won
+      )
+    ).toBe(null);
+    expect(
+      travelDestination({}, none, { kind: 'travel', sector: 'furnace-drift' })
+    ).toBe('furnace-drift');
+  });
+
+  it('holds the run through a journey, cards wait for the intro, and a skip drops the lines', () => {
+    const { ui, renderer, held, spoken, hush, banners, skip } = setup();
+    ui.cinematics.armTravel({ sector: 'salvage-lanes', carried: true });
+    const card = vi.fn();
+    ui.cinematics.afterTravel(card);
+    ui.cinematics.startIntro();
+    expect(ui.cinematics.kind).toBe('travel');
+    expect(renderer.playTravel).toHaveBeenCalledTimes(1);
+    expect(spoken.map((entry) => entry.key)).toEqual([
+      'travel:salvage-lanes:0',
+      'travel:salvage-lanes:1',
+    ]);
+    expect(held).toEqual([true]);
+    expect(card).not.toHaveBeenCalled();
+
+    skip();
+    expect(hush).toHaveBeenCalledTimes(1);
+    expect(renderer.endTravel).toHaveBeenCalledTimes(1);
+    expect(renderer.playIntro).toHaveBeenCalledTimes(1);
+    expect(ui.cinematics.kind).toBe(null);
+    expect(held.at(-1)).toBe(false);
+    vi.advanceTimersByTime(500);
+    expect(banners).toHaveLength(1);
+    expect(card).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays a journey as plain lines when the camera cannot move', () => {
+    const { ui, held, spoken } = setup({ plays: false });
+    ui.cinematics.armTravel({
+      sector: 'debris-wake',
+      source: 'campaign-launch-btn',
+    });
+    const card = vi.fn();
+    ui.cinematics.afterTravel(card);
+    ui.cinematics.startIntro();
+    expect(spoken).toHaveLength(3);
+    expect(spoken[0].holdMs).toBeUndefined();
+    expect(held).toEqual([]);
+    expect(card).toHaveBeenCalledTimes(1);
   });
 });

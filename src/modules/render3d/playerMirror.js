@@ -411,20 +411,7 @@ export class PlayerMirror {
     this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
-    const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
-    for (let i = 0; i < this.flames.length; i += 1) {
-      const { flame, core, r } = this.flames[i];
-      const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
-      flame.visible = main > 0.02;
-      core.visible = flame.visible;
-      flame.scale.set(length * flicker, r * 0.95, r * 0.95);
-      core.scale.set(length * 0.5 * flicker, r * 0.45, r * 0.45);
-    }
-    this.flameMaterial.opacity = Math.min(1, main * 1.2);
-    this.coreMaterial.opacity = Math.min(1, main * 1.1);
-    this.nozzleMaterial.color
-      .copy(this.accent)
-      .multiplyScalar(0.5 + 1.3 * main);
+    this.lightEngines(main, levels.thruster, time);
     for (let i = 0; i < this.puffs.length; i += 1) {
       const { puff, left } = this.puffs[i];
       const amount = (left ? thrust.sideL : thrust.sideR) || 0;
@@ -435,10 +422,6 @@ export class PlayerMirror {
       1,
       Math.max(thrust.sideL || 0, thrust.sideR || 0)
     );
-    // Warmer and brighter under thrust; each shot bumps it briefly.
-    this.light.color.copy(this.accent).lerp(this.warmLight, 0.35 * main);
-    this.light.intensity =
-      2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     // Blink while invulnerable after a hit; the dash's own i-frames do not.
@@ -480,6 +463,32 @@ export class PlayerMirror {
         1.6 * main
       );
     }
+  }
+
+  /**
+   * The main engines at `main` thrust (0..1), flames longer with the
+   * thruster upgrade `level`; the ship light warmer and brighter under
+   * thrust, bumped briefly by each shot. The journey (travelScene.js) lights
+   * them on a ship the simulation holds still.
+   */
+  lightEngines(main, level = 0, time = 0) {
+    const length = (5 + 18 * main) * (1 + 0.1 * (level || 0));
+    for (let i = 0; i < this.flames.length; i += 1) {
+      const { flame, core, r } = this.flames[i];
+      const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
+      flame.visible = main > 0.02;
+      core.visible = flame.visible;
+      flame.scale.set(length * flicker, r * 0.95, r * 0.95);
+      core.scale.set(length * 0.5 * flicker, r * 0.45, r * 0.45);
+    }
+    this.flameMaterial.opacity = Math.min(1, main * 1.2);
+    this.coreMaterial.opacity = Math.min(1, main * 1.1);
+    this.nozzleMaterial.color
+      .copy(this.accent)
+      .multiplyScalar(0.5 + 1.3 * main);
+    this.light.color.copy(this.accent).lerp(this.warmLight, 0.35 * main);
+    this.light.intensity =
+      2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
   }
 
   // One layer per sim heading (PlayerSystem turretLayers), turned like the

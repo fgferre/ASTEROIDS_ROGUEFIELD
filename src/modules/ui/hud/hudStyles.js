@@ -130,6 +130,8 @@ export function getHudCss() {
             .letterbox::before { top: 0; transform: translateY(-100%); }
             .letterbox::after { bottom: 0; transform: translateY(100%); }
             .letterbox.is-showing::before, .letterbox.is-showing::after { transform: translateY(0); }
+            .hud-frame, [data-slot='hull-ring'], [data-slot='recharges'], .hud-direction { transition: opacity 0.6s; }
+            #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction { opacity: 0; }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
