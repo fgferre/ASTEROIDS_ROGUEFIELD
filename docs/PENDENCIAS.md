@@ -6,21 +6,20 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 24.**
 
-## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NO RAMO `campanha/setores`, ESPERANDO ELE JOGAR
+## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NA `main`; O TRABALHO ATUAL, NO RAMO `campanha/ajustes`
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi
 feito… quer dizer que isso é definitivo e que está bom o suficiente… você mesmo deve perceber e avaliar"_ — e autorizou
-conversas paralelas. A `main` está parada em 21/10 (PR #302: correções de combate e de telas feitas por outro agente).
-Todo o trabalho de 12/11 está só no ramo `campanha/setores` (retomar por ele, não pela `main`): mapa de campanha,
-fases com camadas e chefe próprios, três Sentinels, os três cascos em placas; o detalhe está no `PLAN.md`. A visão do
+conversas paralelas. A campanha de nove fases (seis Sentinels, três Wardens) entrou na `main` pela PR #303 (12/11) e está publicada. O
+trabalho atual está no ramo `campanha/ajustes` (PR #305 aberta; não incorporar até ele dizer); o detalhe está no `PLAN.md`. A visão do
 jogo é `docs/GAME_DESIGN_MASTER_PLAN.md` (22/10). Conteúdo hoje: 16 inimigos, 7 armas, 39 cartas, 3 cascos, 15 camadas
 na descida, 3 biomas, 3 Wardens, 3 Heralds, Sentinels por fase; o golden trace tem 26 cenários. Dois pedidos dele
 estão em conversas paralelas: audição de som e painel menor em imagens. Ele ainda não jogou nada de 12/11.
 
 **Como retomar (conversa local, qualquer máquina):**
 
-1. `git checkout campanha/setores && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
+1. `git checkout campanha/ajustes && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
    26 cenários prova comportamento igual). Jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Captura: o
    navegador embutido da conversa local (não há scripts de sonda ou captura no repo).
 2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodada 15, oito frentes em ordem); `CONTENT.md` (como adicionar inimigo,
@@ -35,19 +34,9 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 (i) **"às vezes menos é mais"** — a primeira câmera diretora foi rejeitada por overengineering; a de dois estados
 (perto/aberta) foi aprovada.
 
-**Estado (20/10):**
-
-- **Feito e aprovado por ele:** a fábrica de conteúdo (Rodada 0: `src/content` com registro automático — 10 inimigos,
-  6 chefes, 3 armas, 39 cartas, 4 cascos, 15 camadas, 3 biomas; cena `?content=<id>&count=&fire=1`; teto de 1.200
-  linhas por arquivo); a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir nada"_); a câmera
-  de dois estados (_"está boa, pode fechar"_) e as chegadas dos Wardens (_"aprovado"_); a arena com volume de qualquer
-  ângulo.
-- **Rodada 15, frentes 1–4, na `main` (PR #299, 20/10; não há mais ramos nem cópias de ajudantes):** sons
-  escolhidos por ele (19 amostras, `SOUND.md`) e o motor da nave com as camadas que ele escolheu; economia (curva
-  120 + 40·(n−2)^1.7, ~45 cartas, arma garantida nos níveis 3 e 7, raridade por carta, Warden com vida fixa); 15
-  cartas refeitas; orbes com peso; baús com cerimônia e 3 pickups novos; HUD de instrumento (encaixes, presets,
-  cápsula de escudo/casco, radar, editor; `HUD.md`); telas novas de level-up, baú e fim; 4 armas, 6 inimigos e 4
-  formações; o Anel 3D de todos os lados (`?scene=ring` em dev); correções de duas revisões.
+- **Aprovado por ele (até 20/10):** a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir
+  nada"_); a câmera de dois estados (_"está boa, pode fechar"_); as chegadas dos Wardens (_"aprovado"_); a arena com
+  volume de qualquer ângulo; os sons que escolheu (`SOUND.md`).
 - **Veredito dele, jogando (20/10):** _"por enquanto eu diria que a gente está numa fase beta. O jogo ainda não tem
   conteúdo suficiente… algo que a gente tem aqui para poucos minutos de jogo… nada do trabalho que a gente fez é
   perdido, mas eu acho que falta uma visão grande das fases, da história e do mapa"_.
@@ -65,11 +54,6 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
     mude totalmente o cenário"_; uma árvore de habilidades, equipamentos e melhorias liberada aos poucos com o dinheiro
     ganho, como no Vampire Survivors, pensada junto com a evolução e o tempo para vencer cada desafio; ligar tudo num
     roteiro que faça sentido (item 19).
-- **Próximo, nesta ordem (aprovado por ele em 20/10: _"a próxima conversa começa pela visão do jogo"_):** (1) a visão do jogo num documento que ele aprova
-  antes de mais conteúdo — capítulos → fases → ondas → chefe, o mapa, a história (item 19) e a árvore de desbloqueios
-  com moeda (frente 6), com o tempo de jogo de cada pedaço; (2) o conteúdo da frente 5 feito para essa estrutura; (3)
-  painel menor (escala dos encaixes no preset, por imagem); (4) a revisão do som e da trilha (tiro mais sutil, graves no
-  motor, o som do início, a trilha de tensão; a música da introdução fica); (5) balanceamento por último.
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
@@ -98,7 +82,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 ## Som (palavras dele, 20/10)
 
 - **(18)** _"O som do jogo SFX precisa renascer do zero praticamente, tudo muito ruim também."_ → Rodada 15, frente 2:
-  amostras geradas pela skill local dele `/sfx-generator` (TangoFlux) e CC0 onde o modelo falha, página de audição
+  amostras geradas pela skill local dele `/sfx-generator` (AudioLDM) e CC0 onde o modelo falha, página de audição
   `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
   disser que o som está à altura do jogo.
 

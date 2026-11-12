@@ -6,7 +6,7 @@ This doc is the **internal** positioning anchor used to keep design + feature de
 
 ## Elevator pitch (≤60 words)
 
-Asteroid Roguefield is a top-down asteroid-arena roguelite where every run combines upgrades from five tag families — fire, cryo, chain, tech, kinetic — into a build that triggers synergies the moment three upgrades share a tag. Boss difficulty scales with your build. Runs last 8-12 minutes. You die, you pick differently, you roll again.
+Asteroid Roguefield is a top-down asteroid-arena roguelite where every run combines upgrades from six tag families — Kinetic, Thermal, Arc, Field, Salvage, Maneuver — into a build that triggers synergies the moment three upgrades share a tag. Run length is judged by play. You die, you pick differently, you roll again.
 
 (58 words. Cites the "just one more run" loop without using brand-marketing language.)
 
@@ -14,20 +14,20 @@ Asteroid Roguefield is a top-down asteroid-arena roguelite where every run combi
 
 Three closest-feel competitors. The visual references the developer named (Chorus, House of the Dying Sun, Everspace, Nova Drift, lone.AI, Metori) live in `docs/NORTE.md` as visual mood anchors — the three below are the **mechanic / audience** competitors.
 
-1. **Vampire Survivors** — _Audience overlap:_ players who love watching a build escalate, dying in chaos, and immediately starting over with a tweaked combination. They tolerate sparse narrative if the loop feels addictive. _Distinct angle:_ Asteroid Roguefield has explicit player control (aim, dodge, manage shield) instead of VS's auto-attack; the 5-tag synergy taxonomy gives more directed build-crafting than VS's mostly-passive evolution path; runs are shorter (8-12 min vs 20-30 min) so the "one more" cadence hits faster.
+1. **Vampire Survivors** — _Audience overlap:_ players who love watching a build escalate, dying in chaos, and immediately starting over with a tweaked combination. They tolerate sparse narrative if the loop feels addictive. _Distinct angle:_ Asteroid Roguefield has explicit player control (aim, dodge, manage shield) instead of VS's auto-attack; the 6-tag synergy taxonomy gives more directed build-crafting than VS's mostly-passive evolution path; run length is judged by play, aiming at a fast "one more" cadence.
 
-2. **Hades** — _Audience overlap:_ players who expect a roguelite to have polish, weighty hitstop, satisfying impact feedback, and a clear meta-progression curve. They reward craft. _Distinct angle:_ Asteroid Roguefield trades Hades's narrative density and isometric-action genre for a top-down asteroid-arena shooter; meta-power is capped at ≤15% of run ceiling (per PROJECT.md decision) so unlocks stay flavor over necessity; no voice acting, no story-mode pretension — content scope is VS+, not Hades-AAA.
+2. **Hades** — _Audience overlap:_ players who expect a roguelite to have polish, weighty hitstop, satisfying impact feedback, and a clear meta-progression curve. They reward craft. _Distinct angle:_ Asteroid Roguefield trades Hades's narrative density and isometric-action genre for a top-down asteroid-arena shooter; meta-power is capped at ≤15% of run ceiling (per PROJECT.md decision) so unlocks stay flavor over necessity; the story is told by short transmissions (`docs/ROTEIRO.md`), no voice acting — content scope is VS+, not Hades-AAA.
 
 3. **Nova Drift** — _Audience overlap:_ this is the closest genre-mate. Players who already love Asteroids-style arena combat with deep build evolution. _Distinct angle:_ Nova Drift's modifiers are mostly self-contained per-build; Asteroid Roguefield's 5-tag synergy taxonomy is explicit and combinatorial — 3-of-a-tag triggers a named bonus, so the player can SEE the build forming. The status × status interaction matrix (16 cells, all explicit per GAME-07) adds layer Nova Drift doesn't pursue.
 
 > **Status (2026-10-17):** the five-tag synergy taxonomy and the 16-cell status matrix described below are a
 > design promise, not shipped code — no tag family, synergy rule or status interaction exists in `src/` today.
 > The art and fiction direction now lives in `docs/NORTE.md`; the synergy rule, dash and run end are the owner's
-> pending decisions in `PLAN.md` step 6. This document is kept as the positioning target, not as a description.
+> decisions. This document is kept as the positioning target, not as a description.
 
 ## Distinctive promise (1-2 sentences)
 
-Asteroid Roguefield is the only roguelite where the asteroid-belt classic meets a fully-mapped synergy taxonomy — five tag families plus a 16-cell status × status interaction matrix authored before any feature ships, so every build choice composes deterministically into the next. The result: the "just one more run" loop, built on a foundation the player can actually reason about.
+Asteroid Roguefield is the only roguelite where the asteroid-belt classic meets a fully-mapped synergy taxonomy — six tag families plus a 16-cell status × status interaction matrix authored before any feature ships, so every build choice composes deterministically into the next. The result: the "just one more run" loop, built on a foundation the player can actually reason about.
 
 ## Audience profile
 
@@ -35,14 +35,14 @@ The target audience is the **modern indie roguelite enthusiast** who has 200+ ho
 
 ## Distribution surface
 
-> Surface recorded here per CONTEXT D-24 (revised 2026-05-13), NOT in `.planning/PROJECT.md` (URLs aren't permanent decisions).
+> Surface recorded here per CONTEXT D-24 (revised 2026-05-13), NOT in the project decisions (URLs aren't permanent decisions).
 
 **Active surface (dev + closed beta):**
 GitHub Pages — `https://fgferre.github.io/ASTEROIDS_ROGUEFIELD/`
 (existing deploy via `.github/workflows/deploy.yml`).
 
 **Closed-beta distribution:**
-Private link sharing of the same GitHub Pages URL with the PROC-16 trusted circle (named members captured in `docs/trusted-circle.md` at Phase 7). No separate distribution channel — the closed-beta surface IS the dev surface, gated by who-has-the-link.
+Private link sharing of the same GitHub Pages URL with a trusted circle. No separate distribution channel — the closed-beta surface IS the dev surface, gated by who-has-the-link.
 
 **Public launch surface:** **TBD at Phase 8.** Candidates under consideration:
 
@@ -56,4 +56,4 @@ PROC-02 (itch.io page draft) and PROC-06 (`build:itch` npm packaging script) are
 
 ---
 
-_Internal. Phase 7/8 distill into public copy. See PROC-18 in .planning/REQUIREMENTS.md._
+_Internal. Phase 7/8 distill into public copy._

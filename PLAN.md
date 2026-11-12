@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; Rodadas 0, 14 e as frentes 1–4 da 15 na `main`)
+# Modernização do Asteroid Roguefield — plano (12/11/2026)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
 sai daqui (a história fica no git: `git log --oneline --merges main`). Decisões de produto são do dono, por imagem e
@@ -10,7 +10,7 @@ Nada vai para a `main` até ele dizer. Ramo de trabalho: `campanha/ajustes` (PR 
 ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura no navegador e um commit por tarefa.
 
 1. **Roteiro** (`docs/ROTEIRO.md`): história inteira em texto — premissa, virada, uma fala por fase e por viagem, final.
-   Falantes THE RING e WAKE. Depois entra em `src/data/story.js`. [ ]
+   Falantes THE RING e WAKE. Feito: o roteiro existe e suas primeiras falas estão em `src/data/story.js`. [x]
 2. **Nove lugares**: hoje três biomas servem três fases cada; cada fase ganha o seu lugar (cor, névoa, veios, luz,
    detritos) por um `look` da fase sobre o bioma. Prancha das nove. [ ]
 3. **Viagem 3D entre fases**: ao vencer e seguir, a nave é vista por trás voando ao longo do Anel até o lugar seguinte,
@@ -23,87 +23,36 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
 Feito neste caminho: passagem de fase (espólio com contagem, nave segue com o build), segunda etapa do Quarry Maw,
 brilho das cores claras — itens 21–23 dele, conferidos no navegador.
 
-**Visão proposta em 22/10:** [plano mestre de design](docs/GAME_DESIGN_MASTER_PLAN.md), solicitado pelo dono:
-diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, desbloqueios e etapas de produção.
-Em 12/11 ele entregou o projeto ("é seu, decida") e essa direção virou a base do trabalho. O documento distingue
-estado atual, propostas e horizonte; os números continuam sendo propostas que ele julga jogando.
+## Estado (12/11)
 
-**Campanha, primeiro esqueleto (12/11, ramo `campanha/setores`, fora da `main`):** o dono disse "o projeto é seu, decida";
-a direção do plano mestre foi tomada como base. Feito: botão Campaign → mapa The Ring → cada capítulo (os três biomas
-atuais, 5 layers cada) é uma partida própria, vencida no seu Warden, que abre o próximo; capítulos 2 e 3 começam com
-4 e 8 escolhas de carta (`headStart`, proposta); layers numeradas dentro do capítulo; telas de vitória e derrota do
-capítulo; recordes `sectorsWon`/`sectorTimes`. A descida de 15 layers continua no botão Descent. Falta: ele jogar e
-julgar (mapa, head start, duração). Depois (12/11): o capítulo 1 virou três fases com camadas próprias — Debris Wake
-(Sentinel Quarry Maw), Salvage Lanes (Sentinel Gatekeeper), Prime Gate (Warden Prime); um setor pode ter `stages` e
-`boss`; Sentinel = chefe de fase (`tier: 'sentinel'`, lista de arquivos no CONTENT.md). Ele achou fraco o primeiro
-modelo feito por ajudante: modelos de chefe e de nave são feitos pela conversa principal (`sentinels.js`, placas com
-os painéis do casco). Falta: ele jogar as três fases; as fases A/B dos capítulos 2 e 3; as naves do jogador (item 20).
-Medido sem tela (12/11, piloto do golden trace que não mira nem desvia, nave que não morre, primeira carta sempre;
-uma amostra por fase): as nove fases chegam à vitória, sem erro. Duração: capítulo 1 4,5–5,5 min (chefes 66–109 s);
-capítulo 2 7,5–11,5 min (Kiln 196 s, Prism 222 s, Choir 102 s); capítulo 3 8,9–11,6 min (Foundry 174 s, Interdictor
-223 s, Null 125 s). Nível ao chegar no chefe: 9–10, 19–21 e 24–30. Golpes concentrados nas camadas do meio e no chefe.
-O Quarry Maw engoliu só 4 rochas em 12 sucções e o Foundry Mother nunca teve a montagem interrompida (o piloto não
-mira). O plano mestre pede 14–18 min por fase: alongar o capítulo 1 é decisão dele, jogando.
-Piloto que joga como pessoa (12/11, `npm run playtest [-- <fase>] [average|good]`, `src/bootstrap/botPilot.js`): lê só
-o que o jogador vê, nave mortal. Primeira rodada (semente 1): capítulo 1 jogável (mediano vence 2 de 3, bom vence 3);
-capítulos 2 e 3 matavam antes do chefe, porque o head start (4 e 8 cartas → níveis 5 e 9) ficava muito abaixo do nível
-da descida no mesmo ponto (~10 e ~20). Head start subiu para 9 e 16 (proposta): o piloto bom passou a vencer Assembly
-Graveyard e Quarantine Grid e a chegar ao Kiln. Ainda morrem cedo Resonance Chamber e Null Boundary (as fases antigas),
-as duas para granadas do Caster na segunda camada; Crystal Choir estoura 25 min (rochas lentas de matar). Uma semente
-oscila muito: rodar várias antes de mexer em número de inimigo.
-Cinco sementes do piloto (12/11, piloto bom; a semente só muda o piloto, não se sabe se muda o mundo): Resonance
-Chamber 5/5 mortes até 02:56, 4 na segunda camada (3 granada do Caster, 2 tiro de drone); Null Boundary 5/5 mortes até
-03:27, 4 na segunda camada (3 granada do Caster, 1 rocha, 1 Tether); Assembly Graveyard 4 vitórias (11–14 min) e 1
-estouro de 25 min. É sistemático nas duas fases antigas; falta o dono jogar antes de mexer em número.
-Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
-quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
-(código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e
-refletem nos espelhos, e fica exposto com os espelhos afastados). Os dois vistos lutando dentro das fases. O capítulo 2
-tem as três fases. Capítulo 3: Assembly Graveyard (Sentinel Foundry Mother: monta escolta limitada, que dano forte
-interrompe; varre com dois braços; exposto com as baias abertas ou os braços pendentes) e Null Boundary (Warden Null);
-a fase do meio é Quarantine Grid (Sentinel Interdictor: gaiola de cercas com um lado aberto em volta da nave, feixe
-que mira, trava e queima; exposto quando a gaiola cai). Os três capítulos têm três fases cada (nove partidas, seis
-Sentinels novos); ele não jogou nenhuma. As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): os onze fracos
-foram refeitos em placas — drone, caster, mine, leech, anvil, bulwark, husk, twain, sower, weaver e o Herald Dust (receitas
-com `slab`, `drum` e `finish: 'panel'`). Ainda discretos no tamanho do jogo: leech, twain, weaver; ele julga jogando.
-Naves (item 20, 12/11): os três cascos são construídos em placas por `render3d/hullSlabModel.js`, lendo os mesmos
-dados de casco (painéis de asa e flap, bocais, cabine, `form.body`); o caminho antigo, arredondado, saiu de
-`hullModel.js`. Falta ele julgar as três jogando; se rejeitar, a volta é reverter os dois commits das naves.
+A campanha de nove fases (três capítulos de três; seis Sentinels e três Wardens) entrou na `main` pela PR #303 (12/11)
+e está publicada. A história (`docs/ROTEIRO.md`): três capítulos e um final, o Crisol, com o chefe Sovereign e dois
+finais; falantes THE RING e WAKE; o piloto voa por ligação remota. O jogo tem 7 armas, 16 inimigos e 3 cascos. A
+Descent e o Boss Rush continuam existindo. As fases estão inline em `src/content/sectors`; uma fase pode ter
+`stages`, `boss` e `headStart`. Modelos de chefe e de nave foram feitos pela conversa principal; modelos 3D novos vão
+para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de horizonte: `docs/GAME_DESIGN_MASTER_PLAN.md`
+(22/10), que perde para o roteiro, este plano e o código quando divergem.
 
-## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
+## Medidas do piloto (12/11, `npm run playtest`; sem tela, nave mortal; propostas, o dono julga jogando)
 
-Dele (20/10): _"tudo está rodando liso, não precisa medir nada. Temos que agora focar em melhorar o projeto de todas as
-formas possíveis: falta conteúdo, problemas de HUD, layout, UX, lógica dos upgrades, oportunidades que melhorem a
-experiência, problemas de lógica nos upgrade paths, no sistema de orbes, loot, etc."_ / _"O som do jogo (SFX) precisa
-renascer do zero praticamente, tudo muito ruim também."_ Esta rodada absorve o resto da 14 (HUD 14.3–14.7 e a cena viva
-de morte/vitória). Frentes em ordem de impacto sentido; 1 e 2 correm em paralelo (arquivos disjuntos). Cada fatia = um
-commit, golden trace verde, captura (ou audição), e veredito curto dele quando for gosto. Até quatro ajudantes ao
-mesmo tempo (limite do app), em arquivos disjuntos.
+- Duração por capítulo (golden trace sem mira): capítulo 1 4,5–5,5 min (chefes 66–109 s); capítulo 2 7,5–11,5 min
+  (Kiln 196 s, Prism 222 s, Choir 102 s); capítulo 3 8,9–11,6 min (Foundry 174 s, Interdictor 223 s, Null 125 s).
+- Cinco sementes, piloto bom: Resonance Chamber 5/5 mortes até 02:56; Null Boundary 5/5 mortes até 03:27; Assembly
+  Graveyard 4 vitórias (11–14 min) e 1 estouro de 25 min. Mortes na segunda camada, sobretudo granada do Caster.
+- Achado: essas duas fases antigas jogam as camadas globais densas da Descent; as fases novas têm 2–4 máquinas por etapa.
+- A semente do mundo do playtest foi fixada. Rodar várias sementes antes de mexer em número de inimigo.
 
-**Frentes 1–4: feitas e na `main` (PR #299, 20/10).** Ele jogou (20/10); falta o veredito dele, frente por frente
-(lista no BASTÃO de `docs/PENDENCIAS.md`). Economia (curva 120 + 40·(n−2)^1.7, ~45 cartas, arma nos níveis 3 e 7,
-raridade por carta, Warden com vida fixa); SFX em amostras escolhidas por ele (`SOUND.md`; a skill `/sfx-generator`
-roda AudioLDM, não TangoFlux, e Kenney CC0 cobre o que ela faz mal) e o motor da nave em camadas; baús, pickups e
-orbes; HUD de instrumento com encaixes, presets e editor (`HUD.md`). Falta a segunda audição (sons das armas, pickups,
-baú e formações novos) e o mix com ele jogando.
+## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
-5. **Conteúdo (a fábrica já paga por isso).** Armas primeiro (hoje 7 → 12+, cada uma com evolução e Apex próprios e som
-   próprio), depois inimigos (hoje 16 → 30+, com papéis e **formações de onda**; as 4 primeiras já existem: anel que
-   fecha, linha que varre, enxame, parede), mini-chefes entre Wardens, biomas (3 → 6) com segredos, eventos e chefe próprio; cascos com habilidade
-   ativa única (hoje só stats); runs de 20–30 min com centenas de inimigos; infinito que escala.
-6. **Meta que atravessa dias.** Árvore de desbloqueios (conquistas → armas, cascos, fases, modificadores), desafios
-   diários/semanais com modificadores, seleção de fase/bioma, perfil exportável (hoje só localStorage).
-7. **Ritmo e dificuldade.** Curva do chefe (item 2), surtos com Elite, objetivos de meio de run (sobreviver ao evento,
-   destruir estrutura, escoltar), curva de perigo visível, presets conferidos jogando.
-8. **Cerimônias e cenas.** Evolução e Apex com cerimônia (hoje um toast); cena viva de morte e vitória final
-   (`run-won`; aprovada por ele em 19/10: câmera lenta forte, nave protegida e sem controle 2–3 s, câmera baixa que pode
-   girar e sobe antes de devolver o controle — a mesma maquinaria das chegadas dos Wardens); três finais (Prime, Choir,
-   Null) com fala e imagem próprias; Anel partido modelado (item 15). Roteiro com drama, surpresa, virada e endgame, e uma fase de viagem até o Anel com cena em terceira pessoa e diálogos (item 19), a partir de um texto que ele aprova.
+5. **Conteúdo.** Armas (hoje 7 → 12+, cada uma com evolução, Apex e som), inimigos (16 → 30+, com formações), mini-chefes,
+   biomas com segredos, cascos com habilidade ativa. Duração por fase: o dono julga jogando.
+6. **Meta que atravessa dias.** Árvore de desbloqueios, desafios diários/semanais, seleção de fase, perfil exportável.
+7. **Ritmo e dificuldade.** Curva do chefe, surtos com Elite, objetivos de meio de run, curva de perigo visível.
+8. **Cerimônias e cenas.** Evolução e Apex com cerimônia; cena viva de morte e vitória; final conforme
+   `docs/ROTEIRO.md`; Anel partido modelado (item 15).
 
-**Pronto quando ele disser** que uma run inteira (20–30 min) prende do início ao fim, que o som e o painel estão à
-altura do jogo, e que volta no dia seguinte para desbloquear mais. **Guardas:** golden trace verde; teto de 1.200
-linhas; conteúdo só pelo `CONTENT.md`; nada de medir desempenho por iniciativa própria (ele disse que roda liso);
-maquete antes de código em interface e câmera; audição antes de código no som.
+**Guardas:** golden trace verde; teto de 1.200 linhas; conteúdo só pelo `CONTENT.md`; nada de medir desempenho por
+iniciativa própria; maquete antes de código em interface e câmera; audição antes de código no som.
 
 ## Decisões já tomadas
 
