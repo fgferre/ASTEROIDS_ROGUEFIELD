@@ -42,8 +42,8 @@ const LEECH_PULSE_RATE = 6;
 const LEECH_PULSE_GAIN = 0.25;
 const LEECH_PULSE_SWELL = 0.08;
 // the Leech's belly window: its size (radii) empty, and where it sits
-const LEECH_BELLY = [0.36, 0.05, 0.16];
-const LEECH_BELLY_AT = [-0.35, 0.37, 0];
+const LEECH_BELLY = [0.31, 0.03, 0.31];
+const LEECH_BELLY_AT = [-0.38, 0.25, 0];
 
 // Caster: a squat mortar platform — a dark octagonal base on four braced
 // outriggers with foot pads, a steel deck, a hull turret block between the
@@ -224,90 +224,116 @@ const MINE_LOOK = Object.freeze({
   lights: [{ at: [0, 0.27, 0], dir: [0, 1, 0], size: 0.14 }],
 });
 
-// Leech: a parasite machine — a lamprey head, six jaw plates ringing a
-// sooty throat round the lit intake, a pincer clamp each side, on a steel
-// collar; behind it a ribbed tank, its belly window on top glowing with
-// what it has drained.
-const LEECH_JAWS = Array.from({ length: 6 }, (_, i) => ((i + 0.5) * TAU) / 6);
+// Leech: a tick of a machine — a fat octagonal tank, belted, a steel cap astern,
+// its whole back a sooty well where the belly window glows with what it has
+// drained; a thin neck, a head round the lit intake, and two big steel
+// dark-tipped pincers closing a ring in front of it.
+const LEECH_TANK_X = -0.38;
+const LEECH_PINCER_TIP = [
+  [1, 0.12],
+  [0.98, 0.3],
+  [0.84, 0.26],
+  [0.88, 0.14],
+];
 const LEECH_LOOK = Object.freeze({
   finish: 'panel',
   parts: [
     {
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      size: [0.42, 0.4, 0.4],
-      at: [-0.32, 0.02, 0],
+      shape: 'slab',
+      outline: gon(8, 0.58, Math.PI / 8),
+      bottom: -0.2,
+      top: 0.2,
+      bevel: 0.06,
+      at: [LEECH_TANK_X, 0, 0],
     },
-    ...[-0.62, -0.44, -0.26, -0.08].map((x) => ({
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      size: [0.035, 0.45, 0.45],
-      at: [x, 0.02, 0],
-      material: 'trim',
-    })),
     {
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      taper: 0.6,
-      size: [0.07, 0.4, 0.4],
-      at: [-0.81, 0.02, 0],
-      rotate: [0, Math.PI, 0],
+      shape: 'slab',
+      outline: gon(8, 0.62),
+      bottom: -0.07,
+      top: 0.07,
+      at: [LEECH_TANK_X, 0, 0],
       material: 'trim',
     },
     {
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      size: [0.07, 0.32, 0.32],
-      at: [0.17, 0.02, 0],
-      material: 'trim',
-    },
-    {
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      taper: 0.85,
-      size: [0.1, 0.42, 0.42],
-      at: [0.34, 0.02, 0],
-      material: 'steel',
-    },
-    {
-      shape: 'drum',
-      axis: 'x',
-      sides: 8,
-      size: [0.02, 0.3, 0.3],
-      at: [0.45, 0.02, 0],
+      shape: 'slab',
+      outline: gon(8, 0.45, Math.PI / 8),
+      bottom: 0.18,
+      top: 0.225,
+      at: [LEECH_TANK_X, 0, 0],
       material: 'soot',
     },
-    ...LEECH_JAWS.map((a) => ({
-      shape: 'drum',
-      axis: 'x',
-      sides: 4,
-      taper: 0.25,
-      size: [0.2, 0.06, 0.16],
-      at: [0.58, 0.02 + 0.33 * Math.cos(a), 0.33 * Math.sin(a)],
-      rotate: [a, 0, -0.35],
-    })),
     {
       shape: 'slab',
       outline: [
-        [0.98, 0.22],
-        [0.86, 0.46],
-        [0.4, 0.52],
-        [0.24, 0.44],
-        [0.7, 0.36],
-        [0.84, 0.22],
+        [-0.44, 0.2],
+        [-0.6, 0.12],
+        [-0.6, -0.12],
+        [-0.44, -0.2],
+      ],
+      bottom: -0.1,
+      top: 0.24,
+      at: [LEECH_TANK_X, 0, 0],
+      material: 'steel',
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [0.26, 0.15],
+        [0.06, 0.24],
+        [0.06, -0.24],
+        [0.26, -0.15],
       ],
       bottom: -0.12,
-      top: -0.02,
+      top: 0.12,
+      material: 'trim',
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [0.46, 0.1],
+        [0.4, 0.22],
+        [0.22, 0.22],
+        [0.16, 0.12],
+        [0.16, -0.12],
+        [0.22, -0.22],
+        [0.4, -0.22],
+        [0.46, -0.1],
+      ],
+      bottom: -0.14,
+      top: 0.2,
+      bevel: 0.04,
+    },
+    {
+      shape: 'slab',
+      outline: [
+        ...LEECH_PINCER_TIP.slice(0, 2),
+        [0.74, 0.5],
+        [0.42, 0.52],
+        [0.2, 0.38],
+        [0.2, 0.16],
+        [0.4, 0.16],
+        [0.4, 0.26],
+        [0.5, 0.34],
+        [0.68, 0.34],
+        ...LEECH_PINCER_TIP.slice(2),
+      ],
+      bottom: -0.12,
+      top: 0.12,
+      bevel: 0.03,
       mirror: true,
+      material: 'steel',
+    },
+    {
+      shape: 'slab',
+      outline: LEECH_PINCER_TIP,
+      bottom: -0.14,
+      top: 0.16,
+      mirror: true,
+      material: 'trim',
     },
   ],
   lights: [
-    { at: [0.5, 0.06, 0], dir: [1, 0.5, 0], size: 0.16, housing: false },
+    { at: [0.47, 0.08, 0], dir: [1, 0.5, 0], size: 0.16, housing: false },
   ],
 });
 
@@ -331,7 +357,7 @@ export function createMachineViews(kit, recipeViews) {
   const casterLook = recipeViews.lookOf(CASTER_LOOK);
   const mineLook = recipeViews.lookOf(MINE_LOOK);
   const leechLook = recipeViews.lookOf(LEECH_LOOK);
-  const bellyGeometry = drum(THREE, 1, 2, 8).rotateZ(-Math.PI / 2);
+  const bellyGeometry = drum(THREE, 1, 2, 8).rotateY(Math.PI / 8);
 
   function createSeeker(kind) {
     const group = new THREE.Group();
