@@ -21,6 +21,13 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 - `tests/process/`: rules about the repository itself: no dev globals reach production, the test selector picks the right tests.
 - `tests/unit/`: small pure functions.
 
+## Playtest bot
+
+- `npm run playtest` flies all nine sector runs headless with the bot pilot (`src/bootstrap/botPilot.js`, fed by `botPilotAdapter.js`), a mortal ship and one life each, and prints a report per sector and a summary table. About 3 minutes (a better bot lives longer, so it runs longer).
+- `npm run playtest -- good` picks the `good` bot (default `average`); `npm run playtest -- <sector-id> [average|good]` flies one sector.
+- It runs `tests/playtest/*.playtest.js` through `vitest.playtest.config.js` (`scripts/playtest.mjs` passes the choice in the environment), so `npm test` and the gate never run it.
+- The bot reads only what the screen shows (bodies, bullets, telegraphs and their timers, a boss's open plates); its skill is the named knobs in `PRESETS`. Its numbers are a probe, not a verdict: the owner's play judges difficulty.
+
 ## Helpers and fixtures
 
 - `tests/__helpers__/headlessGame.js` boots the real service manifest and steps frames without a browser; `scriptedPlayer.js` drives the inputs. Most integration and scenario tests go through them.
