@@ -1,4 +1,5 @@
 import { BossEnemy } from './BossEnemy.js';
+import { SentinelGatekeeper } from './SentinelGatekeeper.js';
 import { SentinelQuarryMaw } from './SentinelQuarryMaw.js';
 import { WardenChoir } from './WardenChoir.js';
 import { WardenNull } from './WardenNull.js';
@@ -11,6 +12,7 @@ export const WARDEN_CLASSES = Object.freeze({
   choir: WardenChoir,
   null: WardenNull,
   'quarry-maw': SentinelQuarryMaw,
+  gatekeeper: SentinelGatekeeper,
 });
 
 export function wardenFactoryKey(kind) {

@@ -109,6 +109,15 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantQ: 3,
       grit: true,
     }),
+    // proposta 12/11: a flat, steady sawtooth, nasal, a fifth above Prime's
+    // (the Sentinel)
+    GATEKEEPER: Object.freeze({
+      grains: 8,
+      type: 'sawtooth',
+      notes: Object.freeze([38, 38]), // D2 D2
+      formantHz: 760,
+      formantQ: 6,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

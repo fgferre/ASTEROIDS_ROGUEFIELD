@@ -8,6 +8,7 @@ import {
   bossKindForLayer,
   bossTier,
 } from '../../src/data/enemies/boss.js';
+import { ELITE_EXCLUDED_TYPES } from '../../src/data/enemies/elite.js';
 import { BOSS_RUSH_LAYERS } from '../../src/data/layers.js';
 import {
   WARDEN_CLASSES,
@@ -38,13 +39,20 @@ describe('BOSS_BY_LAYER', () => {
   });
 
   it('registers the Sentinels by kind, outside the Warden table and cycle', () => {
-    expect(Object.keys(SENTINEL_KINDS)).toEqual(['quarry-maw']);
+    expect(Object.keys(SENTINEL_KINDS)).toEqual(['quarry-maw', 'gatekeeper']);
     expect(BOSS_KINDS['quarry-maw']).toBe(SENTINEL_KINDS['quarry-maw']);
     expect(WARDEN_KINDS['quarry-maw']).toBeUndefined();
     expect(bossTier('quarry-maw')).toBe('sentinel');
     expect(bossTier('prime')).toBe('warden');
     expect(wardenFactoryKey('quarry-maw')).toBe('boss-quarry-maw');
     expect(WARDEN_CLASSES['quarry-maw'].name).toBe('SentinelQuarryMaw');
+    expect(WARDEN_KINDS.gatekeeper).toBeUndefined();
+    expect(bossTier('gatekeeper')).toBe('sentinel');
+    expect(wardenFactoryKey('gatekeeper')).toBe('boss-gatekeeper');
+    expect(WARDEN_CLASSES.gatekeeper.name).toBe('SentinelGatekeeper');
+    expect(ELITE_EXCLUDED_TYPES).toEqual(
+      expect.arrayContaining(['boss-quarry-maw', 'boss-gatekeeper'])
+    );
 
     const layers = Array.from({ length: 60 }, (_, i) => i + 1);
     const kinds = new Set(

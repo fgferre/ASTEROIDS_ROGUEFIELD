@@ -14,7 +14,11 @@ a direção do plano mestre foi tomada como base. Feito: botão Campaign → map
 atuais, 5 layers cada) é uma partida própria, vencida no seu Warden, que abre o próximo; capítulos 2 e 3 começam com
 4 e 8 escolhas de carta (`headStart`, proposta); layers numeradas dentro do capítulo; telas de vitória e derrota do
 capítulo; recordes `sectorsWon`/`sectorTimes`. A descida de 15 layers continua no botão Descent. Falta: ele jogar e
-julgar (mapa, head start, duração); depois, as fases A/B de cada capítulo como conteúdo novo (`src/content/sectors/`).
+julgar (mapa, head start, duração). Depois (12/11): o capítulo 1 virou três fases com camadas próprias — Debris Wake
+(Sentinel Quarry Maw), Salvage Lanes (Sentinel Gatekeeper), Prime Gate (Warden Prime); um setor pode ter `stages` e
+`boss`; Sentinel = chefe de fase (`tier: 'sentinel'`, lista de arquivos no CONTENT.md). Ele achou fraco o primeiro
+modelo feito por ajudante: modelos de chefe e de nave são feitos pela conversa principal (`sentinels.js`, placas com
+os painéis do casco). Falta: ele jogar as três fases; as fases A/B dos capítulos 2 e 3; as naves do jogador (item 20).
 
 ## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
 

@@ -120,6 +120,52 @@ describe('EnemyMirror', () => {
     expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(shutHeat * 5);
   });
 
+  it('draws the Gatekeeper with doors that swing open and its barrier', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const gate = {
+      id: 'gate',
+      type: 'boss',
+      bossKind: 'gatekeeper',
+      x: 400,
+      y: 300,
+      radius: 70,
+      facing: 0,
+      shieldUp: 1,
+      barrier: null,
+      telegraph: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-gatekeeper');
+    mirror.update([gate], 0);
+    const view = mirror.views.get('gate');
+    expect(view.kind).toBe('boss-gatekeeper');
+    expect(view.doors[0].pivot.rotation.y).toBeCloseTo(0);
+    expect(view.telegraph.barrier.group.visible).toBe(false);
+
+    gate.shieldUp = 0;
+    gate.barrier = {
+      type: 'barrier',
+      x: 400,
+      y: 300,
+      angle: Math.PI / 2,
+      gapAt: 190,
+      gapWidth: 140,
+      span: [-300, 300],
+      solid: 1,
+      phase: 'solid',
+      timer: 2,
+      duration: 4.5,
+    };
+    mirror.update([gate], 0);
+    expect(view.doors[0].pivot.rotation.y).toBeLessThan(-1);
+    expect(view.doors[1].pivot.rotation.y).toBeGreaterThan(1);
+    expect(view.telegraph.barrier.group.visible).toBe(true);
+    expect(view.telegraph.barrier.beams.every((beam) => beam.visible)).toBe(
+      true
+    );
+  });
+
   it('gives every asteroid variant its own instanced look, rebound on reuse', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = (id, variant) => ({

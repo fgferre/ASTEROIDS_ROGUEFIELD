@@ -79,6 +79,10 @@ describe('sector table', () => {
       bossKind: 'quarry-maw',
     });
     expect(sectorStage(wake, 6)).toBeNull();
+    expect(sectorStage(sectorById('salvage-lanes'), 5)).toMatchObject({
+      warden: true,
+      bossKind: 'gatekeeper',
+    });
     expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });

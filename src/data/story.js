@@ -14,6 +14,7 @@ export const STORY = deepFreeze({
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
     'quarry-maw': 'QUARRY MAW',
+    gatekeeper: 'GATEKEEPER',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -70,6 +71,10 @@ export const STORY = deepFreeze({
         'Quarry unit active. Stone is counted before it is eaten. So are hulls.',
       defeated:
         'Quarry Maw offline. The stone goes uncounted. Prime will ask why.',
+    },
+    gatekeeper: {
+      warning: 'Lane closed. Gate holds. You are not on the manifest.',
+      defeated: 'Gate open. One hull through. Prime has been told.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

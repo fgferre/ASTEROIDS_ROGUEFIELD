@@ -1,7 +1,8 @@
 // Telegraphs on the field plane: the charge lane (or the Null's dark lane
-// between violet edges), a marksman's aim line, the spread fan (and the Quarry
-// Maw's intake cone, the same wedge), the warning ring and the beams (the
-// Choir's converging lines, the Maw's eject fan). The Ram, the Wardens and any recipe
+// between violet edges, or the Gatekeeper's strip), a marksman's aim line,
+// the spread fan (and the Quarry Maw's intake cone, the same wedge), the
+// warning ring and the beams (the Choir's converging lines, the Maw's eject
+// fan, the Gatekeeper's barrier and its gap). The Ram, the Wardens and any recipe
 // enemy that aims draw them; built once into the toolkit (enemyMirror.js
 // createKit) as kit.createTelegraph and kit.updateTelegraph.
 
@@ -91,7 +92,8 @@ export function createTelegraphs(kit) {
     // beams are placed on the field, not turned with the telegraph
     const chorus = t.type === 'chorus' || t.type === 'eject';
     parts.group.rotation.y = chorus ? 0 : -(t.angle || 0);
-    const charge = t.type === 'charge';
+    // the Gatekeeper's strip is a charge lane of its own width
+    const charge = t.type === 'charge' || t.type === 'lane';
     const aim = t.type === 'aim';
     const dark = charge && t.tone === 'dark';
     parts.lane.visible = charge && !dark;
@@ -100,6 +102,10 @@ export function createTelegraphs(kit) {
     parts.line.visible = charge || aim;
     const intake = t.type === 'intake';
     parts.fan.visible = t.type === 'fan' || intake;
+    if (t.type === 'barrier') {
+      updateBarrier(parts, t, progress, pulse);
+      return;
+    }
     parts.beams.forEach((beam, i) => {
       const line = chorus ? t.lines?.[i] : null;
       beam.visible = Boolean(line);
@@ -123,7 +129,7 @@ export function createTelegraphs(kit) {
           edge.material.opacity = 0.3 + 0.6 * progress;
         });
       } else {
-        parts.lane.scale.set(length, 1, r * 1.8);
+        parts.lane.scale.set(length, 1, t.width || r * 1.8);
         parts.lane.material.opacity = 0.08 + 0.18 * progress;
       }
     } else if (aim) {
@@ -151,6 +157,34 @@ export function createTelegraphs(kit) {
     const ring = r * (1.15 + 0.1 * pulse);
     parts.warn.scale.set(ring, 1, ring);
     parts.warn.material.opacity = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
+  }
+
+  // The Gatekeeper's barrier (4 beams): a line across the field in two
+  // pieces round its gap, a bright post at each side of the gap; dim while it
+  // warns, solid and bright once it holds, fading out.
+  function updateBarrier(parts, t, progress, pulse) {
+    parts.warn.visible = false;
+    const [from, to] = t.span || [-1000, 1000];
+    const lo = t.gapAt - t.gapWidth / 2;
+    const hi = t.gapAt + t.gapWidth / 2;
+    const warning = t.phase === 'warn';
+    const glow = warning ? 0.12 + 0.3 * progress : 0.9 * t.solid;
+    const width = warning ? 2 + 2 * progress : 6 + 2 * pulse;
+    const pieces = [
+      [from, Math.max(0, lo - from), width, glow],
+      [hi, Math.max(0, to - hi), width, glow],
+      [lo - 2, 4, 40, Math.max(glow, warning ? 0.6 : 0)],
+      [hi - 2, 4, 40, Math.max(glow, warning ? 0.6 : 0)],
+    ];
+    parts.beams.forEach((beam, i) => {
+      const piece = pieces[i];
+      beam.visible = Boolean(piece);
+      if (!piece) return;
+      beam.position.set(piece[0], 0, 0);
+      beam.rotation.y = 0;
+      beam.scale.set(Math.max(0.01, piece[1]), 1, piece[2]);
+      beam.material.opacity = piece[3];
+    });
   }
 
   return { createTelegraph, updateTelegraph };

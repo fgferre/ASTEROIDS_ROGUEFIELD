@@ -152,6 +152,10 @@ describe('sector runs', () => {
     startOnLayer(game, 5);
     expect(generate).toHaveBeenLastCalledWith('quarry-maw');
 
+    game.session.startNewRun({ source: 'test', sector: 'salvage-lanes' });
+    startOnLayer(game, 5);
+    expect(generate).toHaveBeenLastCalledWith('gatekeeper');
+
     game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
     startOnLayer(game, 5);
     expect(generate).toHaveBeenLastCalledWith(undefined);
