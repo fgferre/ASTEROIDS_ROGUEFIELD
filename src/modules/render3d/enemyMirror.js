@@ -517,7 +517,7 @@ export class EnemyMirror {
     this.packView = (view) => this.packLive(view);
     this.recipeViews = createRecipeViews(this.kit);
     this.machineViews = createMachineViews(this.kit, this.recipeViews);
-    this.heraldViews = createHeraldViews(this.kit);
+    this.heraldViews = createHeraldViews(this.kit, this.recipeViews);
     this.wardenViews = createWardenViews(this.kit);
     this.sentinelViews = createSentinelViews(this.kit, this.recipeViews);
     this.affixViews = createAffixViews(this.kit);
@@ -862,7 +862,7 @@ export class EnemyMirror {
 
   // A fresh or pooled view takes its enemy's seed-driven looks: a rock's
   // shape, spin and variant, a Warden's parts made whole, what a machine's
-  // look takes from it (the Husk's seams).
+  // look takes from it (the Husk's turn).
   bind(view, enemy) {
     if (view.kind === 'asteroid') this.rockViews.bindRock(view, enemy);
     else if (this.sentinelViews.has(view.kind)) return;

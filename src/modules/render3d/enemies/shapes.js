@@ -394,6 +394,19 @@ export function drum(THREE, radius, length, sides, taper = 1) {
   return new THREE.CylinderGeometry(radius * taper, radius, length, sides);
 }
 
+// Top-view outlines ([x, z]) turned `a` about y, as a part's `rotate` turns.
+export const turned = (points, a) =>
+  points.map(([x, z]) => [
+    x * Math.cos(a) + z * Math.sin(a),
+    -x * Math.sin(a) + z * Math.cos(a),
+  ]);
+// A regular n-gon outline of `radius`, its first corner at angle `turn`.
+export const gon = (n, radius, turn = 0) =>
+  Array.from({ length: n }, (_, i) => {
+    const a = turn + (i * TAU) / n;
+    return [Math.cos(a) * radius, Math.sin(a) * radius];
+  });
+
 // The matte tones a part merges in (kit.tones), as part records.
 export function toned(tones) {
   return {

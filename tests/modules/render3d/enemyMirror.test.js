@@ -486,7 +486,7 @@ describe('EnemyMirror', () => {
       drone: 1,
       hunter: 1,
       mine: 1,
-      husk: 1,
+      husk: 2,
       ram: 1,
       weaver: 2,
       bulwark: 3,
@@ -494,13 +494,21 @@ describe('EnemyMirror', () => {
       shade: 1,
       leech: 2,
       boss: 3,
-      'herald-dust': 3,
+      'herald-dust': 2,
       'herald-heat': 2,
       'herald-silence': 1,
     };
     // the hard-surface looks merge on the panelled material instead
     const { panelMaterial } = mirror.recipeViews;
-    const panelled = ['drone', 'mine', 'caster', 'leech'];
+    const panelled = [
+      'drone',
+      'mine',
+      'weaver',
+      'bulwark',
+      'caster',
+      'leech',
+      'herald-dust',
+    ];
     for (const [kind, count] of Object.entries(expected)) {
       const view = mirror.acquire(kind);
       expect(draws(view.object), kind).toBe(count);
@@ -511,13 +519,16 @@ describe('EnemyMirror', () => {
       view.object.traverse((o) => {
         if (o.material === shared) merged.push(o);
       });
-      const own = ['husk', 'boss', 'herald-silence'].includes(kind);
-      // the Bulwark's plate carries its tones too, apart (it goes dark broken)
-      expect(merged.length, kind).toBe(own ? 0 : kind === 'bulwark' ? 2 : 1);
+      const own = ['boss', 'herald-silence'].includes(kind);
+      expect(merged.length, kind).toBe(own ? 0 : 1);
       if (!own) expect(merged[0].geometry.getAttribute('color')).toBeTruthy();
     }
     expect(panelMaterial.vertexColors).toBe(true);
     expect(mirror.machineMaterial.vertexColors).toBe(true);
+    // the Bulwark's plate carries its tones too, apart (it goes dark broken)
+    const { plateMesh } = mirror.acquire('bulwark');
+    expect(plateMesh.material).toBe(mirror.machineMaterial);
+    expect(plateMesh.geometry.getAttribute('color')).toBeTruthy();
     // the Elite ring is one mesh of dashes
     const ram = mirror.acquire('ram');
     mirror.applyElite(ram, true);

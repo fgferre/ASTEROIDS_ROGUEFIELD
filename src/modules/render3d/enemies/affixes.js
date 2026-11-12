@@ -132,8 +132,6 @@ export function createAffixViews(kit) {
       if (material.userData.gain !== undefined)
         kit.setGain(material, material.userData.gain);
     }
-    if (view.material)
-      view.material.userData.rockUniforms.uVein.value.copy(accent);
     view.rimColor = elite ? kit.rimColors.elite : kit.rimColors.threat;
     if (elite && !view.eliteRing) {
       view.eliteRing = kit.seeded(

@@ -1,10 +1,11 @@
 // Machine views drawn by hand: the Wardens' machines — Seeker (hunter),
 // Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and Leech: their
-// views (shapes from lightMachines.js and heavyMachines.js), outlines and
-// eyes, and what each lights or moves per frame (the Ram's charge, the
-// Caster's landing marks, the Shade's phasing, the Leech's belly). The
-// hard-surface ones (Caster, Tether, Leech) are recipe looks (recipes.js,
-// below as data) with their moving parts added here. An enemy's content
+// views (shapes from lightMachines.js), outlines and eyes, and what each
+// lights or moves per frame (the Ram's charge, the Caster's landing marks,
+// the Shade's phasing, the Leech's belly, the Weaver's rotor, the Bulwark's
+// plate). The hard-surface ones (Caster, Tether, Leech below; Husk, Weaver,
+// Bulwark in heavyMachines.js) are recipe looks (recipes.js) as data with
+// their moving parts added here. An enemy's content
 // file picks one by name (`view`); a new enemy is built from its `visual`
 // instead (recipes.js).
 
@@ -17,13 +18,10 @@ import { getContent } from '../../../content/registry.js';
 import { createSeededRandom } from '../asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';
-import { addRimLight } from '../rimLight.js';
-import { patchRockShader, rockUniforms } from './rockShader.js';
-import { createHeavyParts } from './heavyMachines.js';
+import { BULWARK_LOOK, HUSK_LOOK, WEAVER_LOOK } from './heavyMachines.js';
 import { ramModel, seekerModel, shadeModel } from './lightMachines.js';
-import { drum } from './shapes.js';
+import { drum, gon, turned } from './shapes.js';
 
-const WEAVER_ARMS = 3;
 const TAU = Math.PI * 2;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // proposta 18/10: the Caster's shell (px across, glow gain) and the Shade
@@ -46,18 +44,6 @@ const LEECH_PULSE_SWELL = 0.08;
 // the Leech's belly window: its size (radii) empty, and where it sits
 const LEECH_BELLY = [0.36, 0.05, 0.16];
 const LEECH_BELLY_AT = [-0.35, 0.37, 0];
-
-// Top-view outlines ([x, z]) turned `a` about y, as a part's `rotate` turns.
-const turned = (points, a) =>
-  points.map(([x, z]) => [
-    x * Math.cos(a) + z * Math.sin(a),
-    -x * Math.sin(a) + z * Math.cos(a),
-  ]);
-const gon = (n, radius, turn = 0) =>
-  Array.from({ length: n }, (_, i) => {
-    const a = turn + (i * TAU) / n;
-    return [Math.cos(a) * radius, Math.sin(a) * radius];
-  });
 
 // Caster: a squat mortar platform — a dark octagonal base on four braced
 // outriggers with foot pads, a steel deck, a hull turret block between the
@@ -335,16 +321,13 @@ export function createMachineViews(kit, recipeViews) {
   // The light machines' hulls, eyes and outlines (lightMachines.js).
   const seeker = seekerModel(kit);
 
-  // The heavy machines' parts: Husk, Weaver, Bulwark, Caster, Leech.
-  const heavy = createHeavyParts(kit);
-
   const ram = ramModel(kit);
-
-  // Weaver, Caster: rotor arms and mortar turret (heavyMachines.js).
-
   const shade = shadeModel(kit);
 
   // The hard-surface looks, and the Leech's belly window.
+  const huskLook = recipeViews.lookOf(HUSK_LOOK);
+  const weaverLook = recipeViews.lookOf(WEAVER_LOOK);
+  const bulwarkLook = recipeViews.lookOf(BULWARK_LOOK);
   const casterLook = recipeViews.lookOf(CASTER_LOOK);
   const mineLook = recipeViews.lookOf(MINE_LOOK);
   const leechLook = recipeViews.lookOf(LEECH_LOOK);
@@ -385,32 +368,9 @@ export function createMachineViews(kit, recipeViews) {
     return Object.assign(view, { triggerTone, arc, arcTone });
   }
 
+  // The wreck drifts at its seed's own turn, never toward its heading.
   function createHusk(kind) {
-    const group = new THREE.Group();
-    // the Ring rock's crack shader on the carapace: seams instead of veins;
-    // plates and belly keep their hull/dark tones in vertex colours
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.2,
-      roughness: 0.88,
-      flatShading: true,
-    });
-    material.userData.rockUniforms = rockUniforms(
-      THREE,
-      kit.threatColor.clone()
-    );
-    material.onBeforeCompile = patchRockShader;
-    addRimLight(material);
-    const geometry = kit.merged('husk-shell', heavy.huskShell);
-    const shell = new THREE.Mesh(geometry, material);
-    group.add(shell);
-    kit.scene.add(group);
-    return kit.view(kind, group, {
-      shell,
-      material,
-      // its outline at the plates' waist turns with the shell (bindHusk)
-      rims: [kit.rim(shell, heavy.outline(geometry, 0.04))],
-    });
+    return huskLook.create(kind);
   }
 
   function createRam(kind) {
@@ -434,76 +394,25 @@ export function createMachineViews(kit, recipeViews) {
     });
   }
 
+  // The rotor turns as one body; laying flushes the lay strips on its arms
+  // (its glowing parts) and lights the emitters at their tips (its lights).
   function createWeaver(kind) {
-    const group = new THREE.Group();
-    const hub = kit.body('weaver-hub', heavy.weaverHub);
-    // the matte rotor (hull/dark vertex tones) flushes with the accent while
-    // laying; the emissive color itself is the accent base the Elite swap
-    // rewrites
-    const armMaterial = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.3,
-      roughness: 0.7,
-      emissive: kit.threatColor.clone(),
-      emissiveIntensity: 0,
-    });
-    armMaterial.userData.base = armMaterial.emissive;
-    addRimLight(armMaterial);
-    const tipTone = kit.tone(PALETTE.threat, 0.5);
-    const spin = new THREE.Group();
-    const turns = Array.from(
-      { length: WEAVER_ARMS },
-      (_, i) => -(i * TAU) / WEAVER_ARMS
-    );
-    const arms = new THREE.Mesh(
-      kit.merged('weaver-arms', () => heavy.weaverArms(turns)),
-      armMaterial
-    );
-    const up = new THREE.Vector3(0, 1, 0);
-    const tips = turns.map((turn) =>
-      kit.glow(
-        spin,
-        tipTone,
-        1,
-        heavy.weaverTip.clone().applyAxisAngle(up, turn)
-      )
-    );
-    spin.add(arms);
-    group.add(hub, spin);
-    kit.scene.add(group);
-    return kit.view(kind, group, {
-      spin,
-      armMaterial,
-      tipTone,
-      tips: tips.map((tip) => tip.anchor),
-      accents: [armMaterial, tipTone],
-      rims: [kit.rim(group, kit.circleRim, 0.49)],
-      glows: tips,
-    });
+    return weaverLook.create(kind);
   }
 
+  // The hull and the plate braced to it turn together to the player; the
+  // plate is the shield (kit.frontalPlate, the arc its recipe's frontal
+  // shield hits within, so plate and hit area agree) and its lit edge.
   function createBulwark(kind) {
-    const group = new THREE.Group();
-    const hull = kit.body('bulwark-hull', heavy.bulwarkHull);
-    // the plate and the body braced behind it turn together to the player
-    const plate = new THREE.Group();
-    // the arc its recipe's frontal shield hits within, so plate and hit area agree
+    const view = bulwarkLook.create(kind);
     const arc = getContent('enemies', kind).behaviors['frontal-shield'].halfArc;
     const geometries = kit.frontalPlate(arc);
     const plateMesh = new THREE.Mesh(geometries.plate, kit.machineMaterial);
     const edgeMaterial = kit.emissive(PALETTE.threat, 1.2);
     const edge = new THREE.Mesh(geometries.edge, edgeMaterial);
-    plate.add(hull, plateMesh, edge);
-    group.add(plate);
-    kit.scene.add(group);
-    return kit.view(kind, group, {
-      plate,
-      plateMesh,
-      edge,
-      edgeMaterial,
-      accents: [edgeMaterial],
-      rims: [kit.rim(plate, heavy.outline(hull.geometry, 0.02))],
-    });
+    view.body.add(plateMesh, edge);
+    view.accents.push(edgeMaterial);
+    return Object.assign(view, { plateMesh, edge, edgeMaterial });
   }
 
   function createCaster(kind) {
@@ -647,15 +556,10 @@ export function createMachineViews(kit, recipeViews) {
     view.belly.scale.fromArray(LEECH_BELLY).multiplyScalar(swell);
   }
 
-  // The Husk's seams and turn come from its seed.
+  // The Husk's turn comes from its seed.
   function bindHusk(view) {
     const random = createSeededRandom((view.seed % 100000) + 1);
-    view.material.userData.rockUniforms.uSeed.value.set(
-      random() * 50,
-      random() * 50,
-      random() * 50
-    );
-    view.shell.rotation.y = random() * TAU;
+    view.body.rotation.y = random() * TAU;
   }
 
   // What each look lights or moves per frame, after the pose, the Elite look
@@ -674,15 +578,9 @@ export function createMachineViews(kit, recipeViews) {
     view.body.rotation.y = time * (armed ? 2.4 : 0.8);
   }
 
-  function updateHusk(view, enemy, time, flash) {
+  function updateHusk(view, enemy, time) {
     view.object.rotation.y = 0;
-    const heat = clamp01(enemy.damageRatio || 0);
-    const uniforms = view.material.userData.rockUniforms;
-    // reveal stays under 0.6: the fine crack layer is the Ring rock's look
-    uniforms.uGlow.value = 0.15 + 1.2 * heat;
-    uniforms.uReveal.value = 0.35 + 0.2 * heat;
-    uniforms.uWidth.value = 0.04 + 0.025 * heat;
-    uniforms.uFlash.value = flash * 0.45;
+    huskLook.update(view, enemy, time);
   }
 
   function updateRam(view, enemy) {
@@ -694,14 +592,13 @@ export function createMachineViews(kit, recipeViews) {
     kit.updateTelegraph(view.telegraph, enemy, enemy.radius || 14);
   }
 
-  function updateWeaver(view, enemy) {
+  function updateWeaver(view, enemy, time) {
+    weaverLook.update(view, enemy, time);
     view.object.rotation.y = 0;
-    view.spin.rotation.y = -(enemy.spin || 0);
+    view.body.rotation.y = -(enemy.spin || 0);
     const lay = clamp01(enemy.layGlow || 0);
-    view.armMaterial.emissiveIntensity = 2.2 * lay;
-    kit.setGain(view.tipTone, 0.5 + 1.6 * lay);
-    for (let i = 0; i < view.tips.length; i += 1) {
-      view.tips[i].scale.setScalar(0.09 + 0.07 * lay);
+    for (let i = 0; i < view.glowMaterials.length; i += 1) {
+      kit.setGain(view.glowMaterials[i], 0.3 + 2 * lay);
     }
   }
 
@@ -709,9 +606,9 @@ export function createMachineViews(kit, recipeViews) {
     phaseShade(view, 1 - clamp01(enemy.visibility ?? 1));
   }
 
-  function updateBulwark(view, enemy) {
-    view.object.rotation.y = 0;
-    view.plate.rotation.y = -(enemy.facing || 0);
+  function updateBulwark(view, enemy, time) {
+    bulwarkLook.update(view, enemy, time);
+    view.object.rotation.y = -(enemy.facing || 0);
     const broken = Boolean(enemy.shieldBroken);
     view.plateMesh.material = broken ? kit.darkMaterial : kit.machineMaterial;
     view.edge.visible = !broken;

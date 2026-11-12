@@ -1,20 +1,18 @@
 // Herald views, violet-rimmed officials of the Ring, shaped to be seen from
-// any angle: Dust (a slow banded monolith of three armoured sections in a
-// haze of grit, its slits lighting), Heat (a kiln crown whose seam glows, a warning ring around
-// it) and Silence (a dark crystal blade with one hooded eye and the blink
-// rings).
+// any angle: Dust (a hauler-surveyor of three armoured cars, heraldDust.js),
+// Heat (a kiln crown whose seam glows, a warning ring around it) and Silence
+// (a dark crystal blade with one hooded eye and the blink rings).
 
 import { PALETTE } from '../../../data/constants/palette.js';
-import { createSeededRandom } from '../asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';
 import { addRimLight } from '../rimLight.js';
+import { createDustView } from './heraldDust.js';
 
 const TAU = Math.PI * 2;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
-// Heralds: dust motes around the Dust slab; the Silence blink ring starts
-// this many radii wide and closes to one.
-const DUST_MOTES = 16;
+// Heralds: the Silence blink ring starts this many radii wide and closes
+// to one.
 const BLINK_RING_START = 2.2;
 
 // A smooth curve through `keys` spread evenly over u = 0..1 (Catmull-Rom).
@@ -66,8 +64,9 @@ function sectionPoint(s, a) {
  * @param {object} kit - the mirror's toolkit (enemyMirror.js createKit), never
  *   the mirror itself.
  */
-export function createHeraldViews(kit) {
+export function createHeraldViews(kit, recipeViews) {
   const { THREE } = kit;
+  const dustView = createDustView(kit, recipeViews);
   const { hull, dark } = kit.tones;
   const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -103,49 +102,6 @@ export function createHeraldViews(kit) {
       const [x, y] = sectionPoint(s, (j / n) * TAU);
       return v3(x, y, z);
     });
-
-  // A closed profile through corners [x, y, round, inner], counter-clockwise:
-  // round 0 keeps a corner sharp (a crease column), else it is rounded over
-  // that fraction of its two edges; the edge after it gets `inner` points
-  // (default 1), bowed out by up to `bow` × its length. Returns the points,
-  // the crease columns and each edge's columns.
-  function profile(corners, bow = 0, steps = 4) {
-    const points = [];
-    const creases = [];
-    const edges = [];
-    const m = corners.length;
-    const lerp = (a, b, t) => [
-      a[0] + (b[0] - a[0]) * t,
-      a[1] + (b[1] - a[1]) * t,
-    ];
-    corners.forEach((c, i) => {
-      const b = corners[(i + 1) % m];
-      if (c[2]) {
-        const p = lerp(c, corners[(i + m - 1) % m], c[2]);
-        const q = lerp(c, b, c[2]);
-        for (let s = 0; s <= steps; s += 1) {
-          const t = s / steps;
-          points.push(lerp(lerp(p, c, t), lerp(c, q, t), t));
-        }
-      } else {
-        creases.push(points.length);
-        points.push([c[0], c[1]]);
-      }
-      const from = points[points.length - 1];
-      const to = b[2] ? lerp(b, c, b[2]) : b;
-      const inner = c[3] ?? 1;
-      const edge = [];
-      for (let s = 1; s <= inner; s += 1) {
-        const t = s / (inner + 1);
-        const out = 4 * t * (1 - t) * bow;
-        const [x, y] = lerp(from, to, t);
-        edge.push(points.length);
-        points.push([x + (to[1] - from[1]) * out, y - (to[0] - from[0]) * out]);
-      }
-      edges.push(edge);
-    });
-    return { points, creases, edges };
-  }
 
   // A hull along +z: at each of `zs` a ring, given or `section(z)`'s,
   // skinned whole or in strips split at the `creases` columns (hard edges).
@@ -201,16 +157,6 @@ export function createHeraldViews(kit) {
       segments
     );
 
-  // A lens (flattened sphere) lying on a surface whose normal is at angle
-  // `normal` in the xy plane: `across` along the surface, `depth` along the
-  // normal, `length` along z.
-  function lens(across, depth, length, normal, segments = 12) {
-    const geometry = new THREE.SphereGeometry(1, segments, 8);
-    geometry.scale(across, depth, length);
-    geometry.rotateZ(normal - Math.PI / 2);
-    return geometry;
-  }
-
   // A closed outline in the field plane at height y, from -length to
   // +length along z: `front(z)` its reach toward +x, `back(z)` toward -x.
   function outline(length, front, back, y, steps = 24) {
@@ -219,287 +165,6 @@ export function createHeraldViews(kit) {
       ...zs.map((z) => v3(front(z), y, z)),
       ...zs.reverse().map((z) => v3(-back(z), y, z)),
     ]);
-  }
-
-  // --- Dust ------------------------------------------------------------------
-  // A slow monolith side-on to the ship (local +x), bowed toward it: one
-  // wind-carved mass of a single wedge (a steep front face, a crest and a
-  // terrace edge that catch the light, a rounded back) swelling into three
-  // sections through shallow waists, the middle one raised like a keep, its
-  // ends rounded off. Layered: a dark armour cap over each section's crest,
-  // a dark band round each waist, ledges along its front edge and its back.
-  // Each section's slit lies in a dark socket framed by a raised lip in a
-  // scoop of the front face, a louvred vent on its terrace; a keel, two pods
-  // and the stones it raises underneath.
-  const DUST_HALF = 1.02;
-  const DUST_SECTIONS = [-0.64, 0, 0.64];
-  const DUST_WAIST = 0.33;
-  const DUST_PROFILE = profile(
-    [
-      [0.34, -0.17, 0.35], // front lip
-      [0.5, -0.01, 0, 3], // front edge, then the front face
-      [0.2, 0.33, 0.3], // front shoulder
-      [-0.03, 0.42, 0], // crest
-      [-0.21, 0.36, 0], // terrace edge
-      [-0.25, 0.26, 0.35], // terrace foot, then the terrace
-      [-0.43, 0.05, 0.3], // back
-      [-0.33, -0.14, 0.35], // back foot
-      [0, -0.2, 0.4], // belly
-    ],
-    0.05,
-    3
-  );
-  const DUST_FACE = DUST_PROFILE.edges[1];
-  const DUST_TERRACE = DUST_PROFILE.edges[5];
-  // the front face's outward normal (front edge to shoulder)
-  const DUST_FACE_NORMAL = [0.75, 0.662];
-  // stations: even along the middle, packed toward the rounded ends
-  const dustTip = Array.from(
-    { length: 8 },
-    (_, i) => 0.8 + (DUST_HALF - 0.8) * (1 - (1 - (i + 1) / 8) ** 3)
-  );
-  const DUST_ZS = [
-    ...dustTip.map((z) => -z).reverse(),
-    ...Array.from({ length: 25 }, (_, i) => -0.8 + (1.6 / 24) * i),
-    ...dustTip,
-  ];
-  const bump = (u) => Math.exp(-u * u);
-  const dustWaist = (z) => bump((Math.abs(z) - DUST_WAIST) / 0.1);
-  const dustEnds = (z) => Math.max(0, 1 - Math.abs(z / DUST_HALF) ** 4) ** 0.25;
-  const dustWidth = (z) => dustEnds(z) * (1 - 0.05 * dustWaist(z));
-  const dustHeight = (z) => Math.sqrt(dustEnds(z)) * (1 - 0.15 * z * z);
-  // the upper half's rise: the keep in the middle, a dip at each waist
-  const dustLift = (z) =>
-    (0.9 + 0.28 * bump(z / 0.34)) * (1 - 0.08 * dustWaist(z));
-  const dustBow = (z) => -0.08 * z * z;
-  // how deep the front face is scooped at z (0..1), round each slit
-  const dustScoop = (z) =>
-    Math.max(
-      ...DUST_SECTIONS.map((s) => Math.max(0, 1 - ((z - s) / 0.24) ** 2) ** 2)
-    );
-  // the profile's point `i` at z
-  const dustPoint = (z, i) => {
-    const f = DUST_FACE.indexOf(i);
-    const dip =
-      f < 0
-        ? 0
-        : 0.035 *
-          dustScoop(z) *
-          Math.sin((Math.PI * (f + 1)) / (DUST_FACE.length + 1));
-    const x = DUST_PROFILE.points[i][0] - dip * DUST_FACE_NORMAL[0];
-    const y = DUST_PROFILE.points[i][1] - dip * DUST_FACE_NORMAL[1];
-    return [
-      dustBow(z) + x * dustWidth(z),
-      y * dustHeight(z) * (y > 0 ? dustLift(z) : 1),
-    ];
-  };
-  const dustRing = (z) =>
-    DUST_PROFILE.points.map((_, i) => v3(...dustPoint(z, i), z));
-  // the point `i` at z and its face's normal angle (from the points either
-  // side, round the closed profile), pushed out along it by `out`
-  const dustFace = (z, i, out = 0) => {
-    const n = DUST_PROFILE.points.length;
-    const [[x0, y0], [x, y], [x1, y1]] = [i - 1, i, i + 1].map((j) =>
-      dustPoint(z, (j + n) % n)
-    );
-    const normal = Math.atan2(-(x1 - x0), y1 - y0);
-    return {
-      normal,
-      position: [x + out * Math.cos(normal), y + out * Math.sin(normal), z],
-    };
-  };
-  const dustRim = outline(
-    DUST_HALF + 0.02,
-    (z) => 0.5 * dustWidth(z) + dustBow(z) + 0.035,
-    (z) => 0.43 * dustWidth(z) - dustBow(z) + 0.035,
-    0.0,
-    32
-  );
-
-  // the raised lip framing the slit at z: a loop on the front face
-  function dustFrame(z) {
-    const path = Array.from({ length: 21 }, (_, k) => {
-      const t = (k / 20) * TAU;
-      const at = z + 0.13 * Math.cos(t);
-      const { normal, position } = dustFace(at, DUST_FACE[1], 0.008);
-      const across = 0.075 * Math.sin(t);
-      return v3(
-        position[0] - Math.sin(normal) * across,
-        position[1] + Math.cos(normal) * across,
-        at
-      );
-    });
-    const { normal } = dustFace(z, DUST_FACE[1]);
-    return sweep(
-      path,
-      v3(Math.cos(normal), Math.sin(normal), 0),
-      () => 0.012,
-      () => 0.011,
-      5
-    );
-  }
-
-  // the armour cap over the section at z: from the front shoulder (its last
-  // rounded points) over the crest to the terrace edge, sunk into the mass
-  // at its two ends
-  const [, DUST_CREST, DUST_TERRACE_EDGE] = DUST_PROFILE.creases;
-  const DUST_CAP = Array.from(
-    { length: DUST_TERRACE_EDGE - DUST_CREST + 4 },
-    (_, k) => DUST_CREST - 3 + k
-  );
-  function dustCap(z) {
-    const zs = spaced(z - 0.25, z + 0.25, 10);
-    const rings = zs.map((at) => {
-      const k = Math.min(1, (0.25 - Math.abs(at - z)) / 0.03);
-      const outer = DUST_CAP.map((i) =>
-        v3(...dustFace(at, i, 0.03 * k).position)
-      );
-      const inner = DUST_CAP.map((i) =>
-        v3(...dustFace(at, i, -0.006).position)
-      );
-      return [...outer, ...inner.reverse()];
-    });
-    return loft(rings);
-  }
-
-  // a ledge along the length at profile point `i` (strata in the stone),
-  // tapering into the mass at both ends
-  function dustLedge(i) {
-    const path = spaced(-0.9, 0.9, 28).map((z) =>
-      v3(...dustFace(z, i, 0.003).position)
-    );
-    const { normal } = dustFace(0, i);
-    const taper = (t) => Math.sin(Math.PI * t) ** 0.4;
-    return sweep(
-      path,
-      v3(Math.cos(normal), Math.sin(normal), 0),
-      (t) => 0.014 * taper(t),
-      (t) => 0.022 * taper(t),
-      4
-    );
-  }
-
-  // a band round the whole profile at z, a ridge in section
-  function dustBand(z) {
-    const n = DUST_PROFILE.points.length;
-    const path = Array.from({ length: n + 1 }, (_, k) =>
-      v3(...dustFace(z, k % n, 0.004).position)
-    );
-    return sweep(
-      path,
-      v3(0, 0, 1),
-      () => 0.026,
-      () => 0.016,
-      4
-    );
-  }
-
-  function dustParts() {
-    const parts = [];
-    const add = (color) => (geometry) => parts.push({ geometry, color });
-    // the mass: the front face and crest lit, the terrace, back and belly
-    // dark
-    hull3(DUST_ZS, dustRing, 0, DUST_PROFILE.creases).forEach((geometry, i) =>
-      add(i < 2 ? hull : dark)(geometry)
-    );
-    // each slit's socket in its scoop, framed by a raised lip; a dark vent
-    // recess on the terrace behind it, four louvres across it
-    const louvre = new THREE.BoxGeometry(0.075, 0.01, 0.014);
-    louvre.rotateZ(dustFace(0, DUST_TERRACE[0]).normal - Math.PI / 2);
-    DUST_SECTIONS.forEach((z) => {
-      const socket = dustFace(z, DUST_FACE[1], -0.004);
-      parts.push({
-        geometry: lens(0.07, 0.022, 0.22, socket.normal, 10),
-        color: dark,
-        position: socket.position,
-      });
-      add(dark)(dustFrame(z));
-      const vent = dustFace(z, DUST_TERRACE[0], -0.004);
-      parts.push({
-        geometry: lens(0.06, 0.02, 0.17, vent.normal, 8),
-        color: dark,
-        position: vent.position,
-      });
-      [-0.054, -0.018, 0.018, 0.054].forEach((dz) =>
-        parts.push({
-          geometry: louvre,
-          color: hull,
-          flat: true,
-          position: dustFace(z + dz, DUST_TERRACE[0], 0.006).position,
-        })
-      );
-      add(dark)(dustCap(z));
-    });
-    // a band round each waist, a ledge along the front edge and the back
-    [-DUST_WAIST, DUST_WAIST].forEach((z) => add(dark)(dustBand(z)));
-    add(hull)(dustLedge(DUST_PROFILE.creases[0]));
-    add(dark)(dustLedge(DUST_TERRACE[0] + 2)); // on the back's upper curve
-    // the keel, two pods under the belly, five stones under the front lip:
-    // the wall it raises
-    hull3(
-      spaced(-0.82, 0.82, 16),
-      (z) => {
-        const k = Math.max(0, 1 - Math.abs(z / 0.82) ** 4) ** 0.25;
-        return {
-          x: 0.02 + dustBow(z),
-          y: -0.19 * dustHeight(z),
-          front: 0.08 * k,
-          top: 0.03,
-          bottom: 0.06 * k,
-          p: 2.4,
-        };
-      },
-      10
-    ).forEach(add(dark));
-    const pod = lathe(
-      [
-        [0.05, -0.04],
-        [0.05, -0.07],
-        [0.075, -0.075],
-        [0.1, -0.05],
-        [0.1, 0.02],
-      ],
-      16
-    );
-    [-0.55, 0.55].forEach((z) =>
-      parts.push({
-        geometry: pod,
-        color: hull,
-        position: [-0.14 + dustBow(z), -0.17 * dustHeight(z), z],
-      })
-    );
-    const stone = new THREE.IcosahedronGeometry(1, 0);
-    [-0.6, -0.3, 0, 0.3, 0.6].forEach((z, i) => {
-      const size = 0.07 + 0.012 * ((i * 7) % 3);
-      parts.push({
-        geometry: stone,
-        color: hull,
-        flat: true,
-        position: [0.33 * dustWidth(z) + dustBow(z), -0.16, z],
-        scale: [size, size * 0.8, size * 1.1],
-        rotationY: i * 1.3,
-      });
-    });
-    // and a smaller row under the back foot, hung either side of the pods
-    [-0.75, -0.38, -0.12, 0.12, 0.38, 0.75].forEach((z, i) => {
-      const size = 0.045 + 0.01 * ((i * 5) % 3);
-      parts.push({
-        geometry: stone,
-        color: dark,
-        flat: true,
-        position: [-0.27 * dustWidth(z) + dustBow(z), -0.15 * dustHeight(z), z],
-        scale: [size * 1.1, size * 0.75, size],
-        rotationY: i * 2.1 + 0.4,
-      });
-    });
-    return parts;
-  }
-
-  function dustSlitParts() {
-    return DUST_SECTIONS.map((z) => {
-      const { normal, position } = dustFace(z, DUST_FACE[1], 0.006);
-      return { geometry: lens(0.028, 0.02, 0.2, normal, 8), position };
-    });
   }
 
   // --- Heat ------------------------------------------------------------------
@@ -844,66 +509,6 @@ export function createHeraldViews(kit) {
     return parts;
   }
 
-  function createDust() {
-    const group = new THREE.Group();
-    const slab = kit.body('herald-dust', dustParts);
-    const slitMaterial = kit.emissive(PALETTE.shot, 0.3);
-    const slits = new THREE.Mesh(
-      kit.merged('herald-dust-slits', dustSlitParts),
-      slitMaterial
-    );
-    // the haze: a slow ring of dust grains, faceted and lit (they read as
-    // grit from any side), half see-through; charging warms them amber,
-    // never into the bloom
-    const haze = new THREE.Group();
-    const hazeMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.rockLit),
-      emissive: colorOf(THREE, PALETTE.shot),
-      emissiveIntensity: 0,
-      metalness: 0.1,
-      roughness: 0.9,
-      flatShading: true,
-      transparent: true,
-      opacity: 0.5,
-      depthWrite: false,
-    });
-    haze.add(
-      new THREE.Mesh(
-        kit.merged('herald-dust-haze', () => {
-          const random = createSeededRandom(31.7);
-          const grain = new THREE.IcosahedronGeometry(1, 0);
-          return Array.from({ length: DUST_MOTES }, (_, i) => {
-            const angle = (i / DUST_MOTES) * TAU + random() * 0.5;
-            const reach = 1.0 + random() * 0.5;
-            const position = [
-              Math.cos(angle) * reach,
-              -0.12 + random() * 0.36,
-              Math.sin(angle) * reach,
-            ];
-            const size = 0.03 + random() * 0.045;
-            return {
-              geometry: grain,
-              position,
-              scale: [size, size * (0.6 + random() * 0.3), size * 0.85],
-              rotationY: random() * TAU,
-            };
-          });
-        }),
-        hazeMaterial
-      )
-    );
-    group.add(slab, slits, haze);
-    kit.scene.add(group);
-    return kit.view('herald-dust', group, {
-      slitMaterial,
-      hazeMaterial,
-      haze,
-      accents: [slitMaterial],
-      rims: [kit.rim(group, dustRim)],
-      rimColor: kit.rimColors.boss,
-    });
-  }
-
   function createHeat() {
     const group = new THREE.Group();
     const shell = kit.body('herald-heat', heatParts);
@@ -994,11 +599,7 @@ export function createHeraldViews(kit) {
     const charge = clamp01(herald.telegraphRatio || 0);
     object.scale.setScalar(radius);
     if (view.kind === 'herald-dust') {
-      object.rotation.y = -(herald.rotation || 0);
-      kit.setGain(view.slitMaterial, 0.2 + 1.4 * charge + flash * 0.6);
-      view.haze.rotation.y = time * 0.15 + (herald.rotation || 0);
-      view.hazeMaterial.opacity = 0.5 + 0.35 * charge;
-      view.hazeMaterial.emissiveIntensity = 0.45 * charge;
+      dustView.updateDust(view, herald, time, flash);
     } else if (view.kind === 'herald-heat') {
       object.rotation.y = 0;
       const breathe = 0.5 + 0.5 * Math.sin(time * 2.2);
@@ -1034,5 +635,10 @@ export function createHeraldViews(kit) {
     }
   }
 
-  return { createDust, createHeat, createSilence, updateHerald };
+  return {
+    createDust: dustView.createDust,
+    createHeat,
+    createSilence,
+    updateHerald,
+  };
 }

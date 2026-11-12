@@ -1,495 +1,459 @@
-// The three heavy machines' parts (machines.js builds and moves the views),
-// designed on every side for a camera that tilts: the Husk's carapace of
-// Ring rock over a dark belly, the Weaver's hub and its rotor of swept arms,
-// the Bulwark's tracked body behind its plate. Solids of revolution and swept sections in
-// the merged bodies' two tones (hull, dark); +X is the nose, +Y up.
+// The heavy machines' looks as recipe data (recipes.js; machines.js builds
+// the views and moves their parts): the Husk's wreck, the Weaver's rotor and
+// the Bulwark's hull behind its plate. Units are the enemy's radius, +x the
+// nose, +y up.
 
-import { rimLoop } from '../rimBatch.js';
-import { refine, sweep } from './shapes.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../../content/enemies/bulwark.js';
+import { gon, turned } from './shapes.js';
 
 const TAU = Math.PI * 2;
-const signedPow = (v, p) => Math.sign(v) * Math.abs(v) ** p;
+// [x, z] at `r` along angle `a` (a part turned `a` about y puts its +x there)
+const polar = (r, a) => [Math.cos(a) * r, -Math.sin(a) * r];
+// a ring segment's outline from `a0` to `a1` between radii r0 and r1
+const band = (r0, r1, a0, a1, steps = 2) => {
+  const at = (k) => a0 + ((a1 - a0) * k) / steps;
+  const ks = Array.from({ length: steps + 1 }, (_, k) => k);
+  return [
+    ...ks.map((k) => polar(r1, at(k))),
+    ...ks.reverse().map((k) => polar(r0, at(k))),
+  ];
+};
 
-/** The heavy machines' part lists and anchors, over the mirror's toolkit. */
-export function createHeavyParts(kit) {
-  const { THREE } = kit;
-  const { hull, dark } = kit.tones;
-  const UP = new THREE.Vector3(0, 1, 0);
-  const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-
-  // A solid of revolution about +Y from [radius, height] pairs traced
-  // counter-clockwise (out along the bottom, up the side, in over the top);
-  // traced the other way it faces in (a bore, a throat). Not shapes.js's
-  // revolve: its vertices differ, and these parts were shaped on these.
-  const lathe = (profile, segments) =>
-    new THREE.LatheGeometry(
-      profile.map(([r, y]) => new THREE.Vector2(r, y)),
-      segments
-    );
-
-  // `geometry`, built about +Y, turned so +Y runs along `direction` from `at`
-  // in one matrix (shapes.js's aim turns, then moves: these parts would
-  // round differently).
-  function aim(geometry, direction, at) {
-    const turn = new THREE.Quaternion().setFromUnitVectors(
-      UP,
-      direction.clone().normalize()
-    );
-    return geometry.applyMatrix4(
-      new THREE.Matrix4().compose(at, turn, v3(1, 1, 1))
-    );
-  }
-
-  // A capped body along X (at `z`) from rows [x, half width, top, bottom],
-  // its sections superellipses (`exponent` 2 = oval, higher = boxier); not
-  // shapes.js's loft (stations along a path, other caps).
-  function loft(rows, sides, exponent, z = 0) {
-    const p = 2 / exponent;
-    return sweep(
-      THREE,
-      rows.map(([x]) => v3(x, 0, z)),
-      (i, a) => {
-        const [, w, top, bottom] = rows[i];
-        return [
-          w * signedPow(Math.cos(a), p),
-          (top + bottom) / 2 + ((top - bottom) / 2) * signedPow(Math.sin(a), p),
-        ];
-      },
-      sides,
-      { capped: true }
-    );
-  }
-
-  // A rock lump of the Ring: the unit icosphere dented by a function of
-  // position (the non-indexed polyhedron's duplicated vertices stay
-  // welded), its lower half squashed by `below`; a `crest` raises a ridge
-  // along its +X spine and slopes its -X end down (a carapace plate).
-  function rock(detail, phase, below = 1, crest = 0) {
-    const geometry = new THREE.IcosahedronGeometry(1, detail);
-    const p = geometry.getAttribute('position');
-    for (let i = 0; i < p.count; i += 1) {
-      const x = p.getX(i);
-      const y = p.getY(i);
-      const z = p.getZ(i);
-      const k =
-        0.94 +
-        0.06 *
-          Math.sin(x * 5.3 + z * 3.1 + phase) *
-          Math.cos(y * 4.7 + x * 2.3) +
-        0.025 * Math.sin(z * 9.1 + y * 6.7 + phase * 1.7);
-      const top =
-        (1 + crest * (1 - Math.min(1, Math.abs(z) * 1.3))) *
-        (1 - crest * Math.max(0, -x));
-      p.setXYZ(i, x * k, y * k * (y < 0 ? below : top), z * k);
-    }
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-
-  // The outline seen from above of a merged body, as a 48-point rim loop at
-  // height `y` (its widest waist), `pad` outside it; one per geometry.
-  const outlines = new WeakMap();
-  function outline(geometry, y, pad = 1.04) {
-    if (!outlines.has(geometry)) {
-      const bins = 48;
-      const reach = new Array(bins).fill(0);
-      const p = geometry.getAttribute('position');
-      for (let i = 0; i < p.count; i += 1) {
-        const x = p.getX(i);
-        const z = p.getZ(i);
-        const bin = Math.round((Math.atan2(z, x) / TAU) * bins + bins) % bins;
-        reach[bin] = Math.max(reach[bin], Math.hypot(x, z));
-      }
-      const around = (list, i) => list[(i + bins) % bins];
-      const filled = reach.map((r, i) =>
-        Math.max(r, (around(reach, i - 1) + around(reach, i + 1)) / 2)
-      );
-      const points = filled.map((r, i) => {
-        const smooth =
-          ((around(filled, i - 1) + 2 * r + around(filled, i + 1)) / 4) * pad;
-        const a = (i / bins) * TAU;
-        return v3(Math.cos(a) * smooth, y, Math.sin(a) * smooth);
-      });
-      outlines.set(geometry, rimLoop(points));
-    }
-    return outlines.get(geometry);
-  }
-
-  // --- Husk: three carapace plates of Ring rock (its three sleeping Motes)
-  // meeting under a crown knob, overhanging a dark belly with three release
-  // hatches and a keel boss underneath.
-  function huskShell() {
-    const lobes = [0, 1, 2].flatMap((k) => {
-      const angle = TAU / 6 + (k * TAU) / 3;
-      const at = (r, y) => [Math.cos(angle) * r, y, Math.sin(angle) * r];
-      return [
-        {
-          geometry: rock(3, k * 2.1, 0.35, 0.3),
-          color: hull,
-          scale: [0.66, 0.36, 0.5],
-          rotationY: -angle,
-          position: at(0.3, 0.04),
-        },
-        {
-          geometry: rock(1, 3 + k),
-          color: hull,
-          scale: [0.24, 0.07, 0.19],
-          rotationY: -angle,
-          position: at(0.4, -0.31),
-        },
-      ];
-    });
-    return [
-      ...lobes,
-      {
-        geometry: rock(3, 4.4),
-        color: dark,
-        scale: [0.74, 0.3, 0.74],
-        position: [0, -0.1, 0],
-      },
-      {
-        geometry: rock(1, 1.3),
-        color: dark,
-        scale: [0.2, 0.1, 0.2],
-        position: [0, 0.36, 0],
-      },
-      {
-        geometry: rock(1, 7),
-        color: hull,
-        scale: [0.17, 0.07, 0.17],
-        position: [0, -0.37, 0],
-      },
-    ];
-  }
-
-  // --- Weaver: a spinning-top hub (sensor dome on top, the Tether chute
-  // and three keel fins underneath) inside a rotor ring whose three blades
-  // sweep back to pods that hold the glowing tips.
-  const weaverFin = new THREE.ExtrudeGeometry(
-    new THREE.Shape(
-      [
-        [0.12, -0.08],
-        [0.31, -0.05],
-        [0.25, -0.13],
-        [0.12, -0.25],
-      ].map(([x, y]) => new THREE.Vector2(x, y))
-    ),
-    { depth: 0.035, bevelEnabled: false }
-  ).translate(0, 0, -0.0175);
-  const weaverHub = () => [
+// Husk: a dead keeper's wreck — three jagged slabs of Ring rock grown into
+// a C round an open bay, two salvaged hull plates still bolted on, bare ribs
+// across the bay's mouth; on the bay floor three Motes sleep, their eyes
+// waking as it is damaged, and the cracks in the rock glow and throb with
+// them.
+const HUSK_MOTES = [
+  [0.34, 0.12, 0.5],
+  [0.12, -0.16, -0.9],
+  [-0.06, 0.16, 2.2],
+];
+const HUSK_CRACKS = [
+  [-0.58, 0.2, 0.44, 0.9, 0.24],
+  [-0.34, 0.5, 0.44, -0.5, 0.2],
+  [-0.68, -0.32, 0.3, -1.2, 0.14],
+  [0.2, -0.64, 0.22, 0.25, 0.22],
+  [0.5, 0.58, 0.18, -1.0, 0.16],
+];
+const HUSK_ROCK = { bevel: 0.07, color: 'rock' };
+export const HUSK_LOOK = Object.freeze({
+  parts: [
     {
-      geometry: lathe(
-        [
-          [0, -0.24],
-          [0.08, -0.232],
-          [0.15, -0.195],
-          [0.23, -0.125],
-          [0.3, -0.045],
-          [0.325, 0],
-          [0.31, 0.055],
-          [0.26, 0.105],
-          [0.19, 0.14],
-          [0.12, 0.158],
-          [0, 0.162],
-        ],
-        24
-      ),
-      color: hull,
+      shape: 'slab',
+      outline: [
+        [0.62, 0.62],
+        [-0.3, 0.84],
+        [-0.84, 0.36],
+        [-0.82, -0.4],
+        [-0.2, -0.86],
+        [0.56, -0.66],
+      ],
+      bottom: -0.32,
+      top: -0.18,
+      material: 'trim',
     },
     {
-      geometry: lathe(
-        [
-          [0.31, -0.03],
-          [0.338, -0.018],
-          [0.344, 0],
-          [0.338, 0.018],
-          [0.31, 0.03],
-        ],
-        24
-      ),
-      color: dark,
+      shape: 'slab',
+      outline: [
+        [0.72, 0.3],
+        [0.3, 0.42],
+        [-0.26, 0.32],
+        [-0.34, -0.02],
+        [-0.2, -0.36],
+        [0.3, -0.4],
+        [0.7, -0.36],
+      ],
+      bottom: -0.22,
+      top: -0.08,
+      material: 'soot',
     },
     {
-      geometry: lathe(
-        [
-          [0.15, 0.148],
-          [0.156, 0.172],
-          [0.125, 0.203],
-          [0.075, 0.224],
-          [0, 0.231],
-        ],
-        20
-      ),
-      color: dark,
+      shape: 'slab',
+      outline: [
+        [-0.08, 0.88],
+        [-0.52, 0.78],
+        [-0.86, 0.42],
+        [-0.92, -0.04],
+        [-0.72, -0.38],
+        [-0.42, -0.3],
+        [-0.3, 0.02],
+        [-0.18, 0.34],
+        [0.04, 0.52],
+      ],
+      bottom: -0.26,
+      top: 0.3,
+      ...HUSK_ROCK,
     },
     {
-      geometry: lathe(
-        [
-          [0, -0.262],
-          [0.07, -0.258],
-          [0.105, -0.236],
-          [0.11, -0.205],
-        ],
-        16
-      ),
-      color: dark,
+      shape: 'slab',
+      outline: [
+        [-0.64, -0.44],
+        [-0.36, -0.84],
+        [0.1, -0.92],
+        [0.54, -0.72],
+        [0.68, -0.46],
+        [0.42, -0.4],
+        [0.12, -0.46],
+        [-0.22, -0.38],
+      ],
+      bottom: -0.24,
+      top: 0.22,
+      ...HUSK_ROCK,
     },
-    ...[0, 1, 2].map((k) => ({
-      geometry: weaverFin,
-      color: dark,
-      rotationY: TAU / 6 + (k * TAU) / 3,
+    {
+      shape: 'slab',
+      outline: [
+        [0.08, 0.58],
+        [0.36, 0.84],
+        [0.68, 0.64],
+        [0.76, 0.36],
+        [0.5, 0.34],
+        [0.26, 0.42],
+      ],
+      bottom: -0.22,
+      top: 0.18,
+      ...HUSK_ROCK,
+      color: 'rockLit',
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [-0.24, 0.72],
+        [-0.6, 0.6],
+        [-0.78, 0.22],
+        [-0.72, -0.2],
+        [-0.52, -0.22],
+        [-0.44, 0.2],
+        [-0.16, 0.46],
+      ],
+      bottom: 0.2,
+      top: 0.44,
+      ...HUSK_ROCK,
+      color: 'rockLit',
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [-0.2, -0.6],
+        [0.08, -0.8],
+        [0.4, -0.66],
+        [0.2, -0.52],
+      ],
+      bottom: 0.14,
+      top: 0.32,
+      ...HUSK_ROCK,
+    },
+    ...[
+      [-0.5, 0.48, 0.32, 0.12, 0.4],
+      [-0.66, 0.42, -0.06, 0.1, 1.3],
+      [0.44, 0.24, -0.6, 0.11, 2.1],
+      [-0.08, 0.28, 0.72, 0.09, 0.8],
+      [-0.84, 0.16, 0.24, 0.1, 2.6],
+      [0.62, 0.18, 0.5, 0.08, 1.9],
+      [-0.4, 0.2, -0.62, 0.1, 0.2],
+    ].map(([x, y, z, size, turn]) => ({
+      shape: 'icosahedron',
+      size: [size * 1.3, size * 0.8, size],
+      at: [x, y, z],
+      rotate: [turn, turn * 1.7, 0.3],
+      color: 'rock',
     })),
-  ];
-  // each blade dips past the rotor and lifts its pod (gull-winged)
-  const armAt = (angle, r, y) =>
-    v3(Math.cos(angle) * r, y, Math.sin(angle) * r);
-  const armCurve = new THREE.CubicBezierCurve3(
-    armAt(0.08, 0.4, 0.01),
-    armAt(-0.03, 0.66, -0.02),
-    armAt(-0.27, 0.88, 0.03),
-    armAt(-0.55, 0.96, 0.07)
-  );
-  const ARM_RINGS = 12;
-  const armPath = armCurve.getPoints(ARM_RINGS - 1);
-  const armEnd = armPath[ARM_RINGS - 1];
-  const armTangent = armCurve.getTangent(1);
-  // one blade (flat, tapering) and its tip pod: hull outside, dark cup
-  const armWidth = (i) => 0.115 - (0.065 * i) / (ARM_RINGS - 1);
-  const armHeight = (i) => 0.034 - (0.014 * i) / (ARM_RINGS - 1);
-  const armParts = [
     {
-      geometry: sweep(
-        THREE,
-        armPath,
-        (i, a) => [Math.cos(a) * armWidth(i), Math.sin(a) * armHeight(i)],
-        8,
-        {}
-      ),
-      color: hull,
-    },
-    // a dark rib along the blade's back
-    {
-      geometry: sweep(
-        THREE,
-        armPath.map((point, i) => point.clone().setY(point.y + armHeight(i))),
-        (i, a) => [Math.cos(a) * 0.2 * armWidth(i), Math.sin(a) * 0.012],
-        5,
-        {}
-      ),
-      color: dark,
+      shape: 'slab',
+      outline: [
+        [-0.52, -0.26],
+        [-0.86, -0.06],
+        [-0.92, -0.3],
+        [-0.66, -0.5],
+      ],
+      bottom: 0.14,
+      top: 0.24,
+      bevel: 0.02,
+      rotate: [0, 0, 0.2],
     },
     {
-      geometry: aim(
-        lathe(
-          [
-            [0, -0.13],
-            [0.05, -0.115],
-            [0.08, -0.06],
-            [0.095, 0],
-            [0.097, 0.045],
-            [0.088, 0.062],
-          ],
-          12
-        ),
-        armTangent,
-        armEnd
-      ),
-      color: hull,
+      shape: 'slab',
+      outline: [
+        [0.3, -0.42],
+        [0.62, -0.5],
+        [0.7, -0.36],
+        [0.4, -0.3],
+      ],
+      bottom: 0.1,
+      top: 0.18,
+      bevel: 0.015,
+      material: 'steel',
     },
-    {
-      geometry: aim(
-        lathe(
-          [
-            [0.088, 0.062],
-            [0.072, 0.052],
-            [0.04, 0.012],
-            [0, 0],
-          ],
-          12
-        ),
-        armTangent,
-        armEnd
-      ),
-      color: dark,
-    },
-  ];
-  const weaverRotor = lathe(
-    [
-      [0.37, -0.03],
-      [0.43, -0.045],
-      [0.475, -0.018],
-      [0.475, 0.018],
-      [0.43, 0.045],
-      [0.37, 0.03],
-      [0.37, -0.03],
-    ],
-    32
-  );
-  // the rotor and one blade per turn (radians about +Y)
-  const weaverArms = (turns) => [
-    { geometry: weaverRotor, color: dark },
-    ...turns.flatMap((rotationY) =>
-      armParts.map((part) => ({ ...part, rotationY }))
-    ),
-  ];
-  // where arm 0's tip glow sits, in its pod's cup
-  const weaverTip = armEnd.clone().addScaledVector(armTangent, 0.03);
+    ...[
+      [0.64, 0.06, 0.46, 0.12],
+      [0.48, 0.1, 0.3, -0.2],
+    ].map(([x, y, span, turn]) => ({
+      shape: 'box',
+      size: [0.025, 0.025, span],
+      at: [x, y, -0.02],
+      rotate: [0, turn, 0],
+      material: 'steel',
+    })),
+    ...HUSK_CRACKS.map(([x, z, y, turn, length]) => ({
+      shape: 'box',
+      size: [length / 2, 0.012, 0.014],
+      at: [x, y + 0.005, z],
+      rotate: [0, turn, 0],
+      material: 'glow',
+    })),
+    ...HUSK_MOTES.map(([x, z, a]) => ({
+      shape: 'slab',
+      outline: turned(
+        [
+          [0.14, 0],
+          [0.0, 0.07],
+          [-0.07, 0.1],
+          [-0.04, 0],
+          [-0.07, -0.1],
+          [0.0, -0.07],
+        ],
+        a
+      ).map(([u, v]) => [x + u, z + v]),
+      bottom: -0.1,
+      top: -0.03,
+      bevel: 0.012,
+      material: 'steel',
+    })),
+  ],
+  lights: HUSK_MOTES.map(([x, z, a]) => ({
+    at: [x + Math.cos(a) * 0.06, -0.03, z - Math.sin(a) * 0.06],
+    dir: [0, 1, 0],
+    size: 0.05,
+    pulse: 'damageRatio',
+  })),
+  animate: { pulse: 'damageRatio' },
+});
 
-  // --- Bulwark: an armoured shell over a dark tracked chassis, braced to
-  // the plate in front (kit.frontalPlate, r 0.8–1.02 within ±60°: nothing
-  // of the body reaches past r 0.76 there), a raised deck with a hatch and
-  // a sensor brow on top, twin nozzles at the back.
-  function bulwarkHull() {
-    const shell = refine(
-      [
-        [-0.84, 0.14, 0.12, 0],
-        [-0.79, 0.34, 0.21, -0.02],
-        [-0.66, 0.48, 0.27, -0.03],
-        [-0.46, 0.56, 0.31, -0.03],
-        [-0.15, 0.6, 0.33, -0.03],
-        [0.15, 0.6, 0.33, -0.03],
-        [0.37, 0.55, 0.31, -0.03],
-        [0.52, 0.47, 0.28, -0.03],
-        [0.62, 0.35, 0.24, -0.02],
-        [0.68, 0.16, 0.17, 0],
-      ],
-      2
-    );
-    // the raised deck on the shell: a second armour layer, boxier
-    const deck = refine(
-      [
-        [-0.62, 0.16, 0.3, 0.16],
-        [-0.56, 0.3, 0.38, 0.16],
-        [-0.4, 0.38, 0.43, 0.16],
-        [0.12, 0.4, 0.45, 0.16],
-        [0.36, 0.34, 0.42, 0.16],
-        [0.48, 0.2, 0.36, 0.16],
-      ],
-      2
-    );
-    const chassis = [
-      [-0.74, 0.2, 0.02, -0.12],
-      [-0.68, 0.4, 0.04, -0.19],
-      [-0.5, 0.48, 0.04, -0.21],
-      [0.3, 0.48, 0.04, -0.21],
-      [0.5, 0.42, 0.04, -0.19],
-      [0.6, 0.26, 0.02, -0.12],
-    ];
-    const track = [
-      [-0.76, 0.05, -0.04, -0.14],
-      [-0.71, 0.12, 0.03, -0.21],
-      [-0.6, 0.15, 0.05, -0.24],
-      [0.14, 0.15, 0.05, -0.24],
-      [0.26, 0.12, 0.03, -0.21],
-      [0.32, 0.05, -0.04, -0.14],
-    ];
-    // armour skirts over the tracks' upper half
-    const skirt = [
-      [-0.72, 0.025, 0.05, -0.03],
-      [-0.66, 0.035, 0.1, -0.1],
-      [0.2, 0.035, 0.1, -0.1],
-      [0.28, 0.025, 0.05, -0.03],
-    ];
-    const brow = [
-      [0.34, 0.22, 0.432, 0.34],
-      [0.44, 0.2, 0.402, 0.31],
-      [0.51, 0.12, 0.362, 0.3],
-    ];
-    const tread = new THREE.BoxGeometry(0.06, 0.2, 0.03);
-    const skid = new THREE.BoxGeometry(0.07, 0.03, 0.5);
-    const louvre = new THREE.BoxGeometry(0.03, 0.03, 0.2);
-    const nozzle = [
-      [0.06, -0.1],
-      [0.095, -0.02],
-      [0.105, 0.05],
-      [0.098, 0.075],
-    ];
-    const bore = [
-      [0.098, 0.075],
-      [0.08, 0.07],
-      [0.065, 0.02],
-      [0, 0.01],
-    ];
-    const back = v3(-1, 0, 0);
-    const sides = [1, -1];
-    return [
-      { geometry: loft(shell, 18, 2.8), color: hull },
-      { geometry: loft(deck, 16, 4), color: hull },
-      { geometry: loft(chassis, 12, 3), color: dark },
-      { geometry: loft(brow, 10, 3), color: dark },
-      ...sides.flatMap((s) => [
-        { geometry: loft(track, 16, 3, s * 0.55), color: dark },
-        { geometry: loft(skirt, 8, 4, s * 0.72), color: hull },
-      ]),
-      ...sides.flatMap((s) =>
-        [-0.55, -0.35, -0.15, 0.05].map((x) => ({
-          geometry: tread,
-          color: hull,
-          position: [x, -0.09, s * 0.7],
-        }))
-      ),
-      ...[-0.3, 0.15].map((x) => ({
-        geometry: skid,
-        color: hull,
-        position: [x, -0.215, 0],
-      })),
-      // engine louvres on the rear slope, behind the deck
-      ...[-0.67, -0.73].map((x, i) => ({
-        geometry: louvre,
-        color: dark,
-        position: [x, 0.27 - i * 0.04, 0],
-      })),
-      ...sides.map((s) => ({
-        geometry: sweep(
-          THREE,
-          [
-            v3(0.44, 0.15, s * 0.3),
-            v3(0.64, 0.14, s * 0.36),
-            v3(0.84, 0.13, s * 0.42),
-          ],
-          (i, a) => {
-            const r = [0.06, 0.05, 0.04][i];
-            return [Math.cos(a) * r, Math.sin(a) * r];
-          },
-          8,
-          { capped: true }
-        ),
-        color: hull,
-      })),
-      ...sides.flatMap((s) => [
-        {
-          geometry: aim(lathe(nozzle, 10), back, v3(-0.78, 0.11, s * 0.19)),
-          color: hull,
-        },
-        {
-          geometry: aim(lathe(bore, 10), back, v3(-0.78, 0.11, s * 0.19)),
-          color: dark,
-        },
-      ]),
+// Weaver: a rotor — a stacked octagonal hub, its chute underneath, and
+// three long thin arms bent back against the turn, each a dark beam under a
+// steel strip with the lay light down its spine and an emitter pod at its
+// tip that lights as a Tether is laid. The body turns as one.
+export const WEAVER_ARMS = [0, 1, 2].map((i) => (i * TAU) / 3);
+const WEAVER_ARM = [
+  [0.22, 0.13],
+  [0.6, 0.08],
+  [0.86, -0.01],
+  [0.86, -0.12],
+  [0.6, -0.07],
+  [0.22, -0.13],
+];
+const WEAVER_STRIP = [
+  [0.28, 0.06],
+  [0.6, 0.03],
+  [0.8, -0.03],
+  [0.8, -0.08],
+  [0.6, -0.04],
+  [0.28, -0.06],
+];
+export const WEAVER_TIP = [0.92, 0.08, -0.065];
+export const WEAVER_LOOK = Object.freeze({
+  finish: 'panel',
+  parts: [
+    {
+      shape: 'slab',
+      outline: gon(8, 0.38, Math.PI / 8),
+      bottom: -0.1,
+      top: 0.02,
+      material: 'trim',
+    },
+    {
+      shape: 'slab',
+      outline: gon(8, 0.31),
+      bottom: 0.0,
+      top: 0.11,
+      bevel: 0.03,
+      material: 'steel',
+    },
+    {
+      shape: 'slab',
+      outline: gon(6, 0.2, Math.PI / 6),
+      bottom: 0.09,
+      top: 0.19,
+      bevel: 0.025,
+    },
+    {
+      shape: 'drum',
+      sides: 6,
+      size: [0.09, 0.02, 0.09],
+      at: [0, 0.2, 0],
+      material: 'soot',
+    },
+    {
+      shape: 'drum',
+      sides: 8,
+      taper: 0.6,
+      size: [0.16, 0.06, 0.16],
+      at: [0, -0.16, 0],
+      rotate: [Math.PI, 0, 0],
+      material: 'trim',
+    },
+    ...WEAVER_ARMS.flatMap((a) => [
       {
-        geometry: lathe(
-          [
-            [0, -0.01],
-            [0.16, -0.01],
-            [0.175, 0.02],
-            [0.155, 0.04],
-            [0.11, 0.036],
-            [0, 0.04],
-          ],
-          14
-        ),
-        color: dark,
-        position: [-0.12, 0.435, 0],
+        shape: 'slab',
+        outline: turned(WEAVER_ARM, a),
+        bottom: -0.05,
+        top: 0.04,
+        bevel: 0.02,
+        material: 'trim',
       },
-    ];
-  }
+      {
+        shape: 'slab',
+        outline: turned(WEAVER_STRIP, a),
+        bottom: 0.03,
+        top: 0.07,
+        bevel: 0.01,
+        material: 'steel',
+      },
+      {
+        shape: 'box',
+        size: [0.18, 0.012, 0.014],
+        at: [Math.cos(a) * 0.5, 0.075, -Math.sin(a) * 0.5],
+        rotate: [0, a + 0.06, 0],
+        material: 'glow',
+      },
+      {
+        shape: 'drum',
+        sides: 6,
+        size: [0.13, 0.06, 0.13],
+        at: [
+          Math.cos(a) * WEAVER_TIP[0] + Math.sin(a) * WEAVER_TIP[2],
+          0,
+          -Math.sin(a) * WEAVER_TIP[0] + Math.cos(a) * WEAVER_TIP[2],
+        ],
+        material: 'steel',
+      },
+    ]),
+  ],
+  lights: WEAVER_ARMS.map((a) => ({
+    at: [
+      Math.cos(a) * WEAVER_TIP[0] + Math.sin(a) * WEAVER_TIP[2],
+      WEAVER_TIP[1],
+      -Math.sin(a) * WEAVER_TIP[0] + Math.cos(a) * WEAVER_TIP[2],
+    ],
+    dir: [0, 1, 0],
+    size: 0.07,
+    pulse: 'layGlow',
+  })),
+});
 
-  return {
-    outline,
-    huskShell,
-    weaverHub,
-    weaverArms,
-    weaverTip,
-    bulwarkHull,
-  };
-}
+// Bulwark: a compact tracked hull that narrows behind; its whole front a
+// broad mantlet — faceted armour blocks banked behind the shield plate
+// (kit.frontalPlate, r 0.8–1.02 within the shield's arc: nothing here
+// reaches past r 0.76 inside it), a cheek block past each end, a dark sill
+// under the plate; a stepped deck, a sensor house, twin nozzles behind.
+const BULWARK_ARC = BULWARK_SHIELD_HALF_ARC;
+const BULWARK_FACETS = 4;
+export const BULWARK_LOOK = Object.freeze({
+  finish: 'panel',
+  parts: [
+    {
+      shape: 'slab',
+      outline: [
+        [0.56, 0.4],
+        [0.36, 0.6],
+        [-0.46, 0.46],
+        [-0.76, 0.28],
+        [-0.82, 0.14],
+        [-0.82, -0.14],
+        [-0.76, -0.28],
+        [-0.46, -0.46],
+        [0.36, -0.6],
+        [0.56, -0.4],
+      ],
+      bottom: -0.22,
+      top: -0.02,
+      material: 'trim',
+    },
+    ...Array.from({ length: BULWARK_FACETS }, (_, i) => {
+      const step = (2 * BULWARK_ARC + 0.2) / BULWARK_FACETS;
+      const a0 = -BULWARK_ARC - 0.1 + i * step;
+      return {
+        shape: 'slab',
+        outline: band(0.5, 0.76, a0 + 0.03, a0 + step - 0.03, 1),
+        bottom: -0.12,
+        top: 0.22 - 0.04 * Math.abs(i - (BULWARK_FACETS - 1) / 2),
+        bevel: 0.04,
+        material: 'steel',
+      };
+    }),
+    {
+      shape: 'slab',
+      outline: band(0.44, 0.94, BULWARK_ARC + 0.08, BULWARK_ARC + 0.5, 2),
+      bottom: -0.2,
+      top: 0.2,
+      bevel: 0.05,
+      mirror: true,
+    },
+    {
+      shape: 'slab',
+      outline: band(0.78, 1.04, -BULWARK_ARC - 0.04, BULWARK_ARC + 0.04, 6),
+      bottom: -0.27,
+      top: -0.19,
+      bevel: 0.02,
+      material: 'soot',
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [0.4, 0.3],
+        [0.24, 0.42],
+        [-0.42, 0.34],
+        [-0.66, 0.2],
+        [-0.66, -0.2],
+        [-0.42, -0.34],
+        [0.24, -0.42],
+        [0.4, -0.3],
+      ],
+      bottom: -0.04,
+      top: 0.16,
+      bevel: 0.04,
+    },
+    {
+      shape: 'slab',
+      outline: [
+        [0.16, 0.16],
+        [0.06, 0.22],
+        [-0.34, 0.2],
+        [-0.42, 0.12],
+        [-0.42, -0.12],
+        [-0.34, -0.2],
+        [0.06, -0.22],
+        [0.16, -0.16],
+      ],
+      bottom: 0.14,
+      top: 0.28,
+      bevel: 0.03,
+      material: 'trim',
+    },
+    {
+      shape: 'box',
+      size: [0.012, 0.025, 0.13],
+      at: [0.165, 0.22, 0],
+      material: 'soot',
+    },
+    {
+      shape: 'drum',
+      axis: 'x',
+      sides: 8,
+      size: [0.08, 0.1, 0.1],
+      at: [-0.84, 0.02, 0.22],
+      mirror: true,
+      material: 'trim',
+    },
+    {
+      shape: 'drum',
+      axis: 'x',
+      sides: 8,
+      size: [0.012, 0.07, 0.07],
+      at: [-0.925, 0.02, 0.22],
+      mirror: true,
+      material: 'soot',
+    },
+  ],
+});
