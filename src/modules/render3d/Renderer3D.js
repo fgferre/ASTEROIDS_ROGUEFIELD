@@ -773,7 +773,11 @@ class Renderer3D extends BaseSystem {
     t.veil.update(dt);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
-    if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
+    if (warden) {
+      t.wardenLight.position.copy(warden.object.position).setY(40);
+      // A boss view may name its own light (Sovereign: pale gold).
+      t.wardenLight.color.copy(warden.light ?? t.wardenLightColor);
+    }
     t.player.update(player, t.ribbons, time);
     if (travel) {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);

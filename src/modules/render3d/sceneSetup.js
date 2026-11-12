@@ -358,6 +358,7 @@ export function setupThree(seeded) {
     key,
     keyDir,
     wardenLight,
+    wardenLightColor: wardenLight.color.clone(),
     backdrop,
     space,
     veil,

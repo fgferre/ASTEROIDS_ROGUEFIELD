@@ -47,11 +47,13 @@ export function createSentinelKit(kit, recipeViews) {
   const soot = dark.clone().multiplyScalar(0.55);
   const paint = colorOf(THREE, '#7a5a1c');
   // Sovereign's: a pale lacquered shell and its inlays, gold and bronze on
-  // polished metal.
-  const ivory = colorOf(THREE, '#e8e1d0');
+  // polished metal, a dark amber lacquer inside. Next to no blue in the
+  // warm ones, or the bosses' violet light turns them pink.
+  const ivory = colorOf(THREE, '#c4b9a3');
   const bone = colorOf(THREE, '#a89a80');
-  const gold = colorOf(THREE, '#d8b26a');
-  const bronze = colorOf(THREE, '#6e5532');
+  const gold = colorOf(THREE, '#d4a440');
+  const bronze = colorOf(THREE, '#6e4a1c');
+  const lacquer = colorOf(THREE, '#5e4e14');
   // The panelled hull: the plate material with baked maps of its own seed,
   // `tile` panels per unit of hull, tones in the vertex colours.
   function hullMaterial(seed, tile = PANEL_TILE) {
@@ -130,6 +132,7 @@ export function createSentinelKit(kit, recipeViews) {
     bone,
     gold,
     bronze,
+    lacquer,
     panelMaterial,
     hullMaterial,
     slab,

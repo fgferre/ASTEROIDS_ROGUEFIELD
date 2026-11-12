@@ -3,14 +3,7 @@ import { SENTINEL_KINDS } from '../../../../data/enemies/boss.js';
 import { colorOf } from '../../batches.js';
 import { addRimLight } from '../../rimLight.js';
 import { arcSweep, revolve } from '../shapes.js';
-import {
-  CORE_COLD,
-  CORE_HOT,
-  CORE_BEAT,
-  CORE_FLASH,
-  clamp01,
-  range,
-} from './kit.js';
+import { CORE_BEAT, CORE_FLASH, clamp01, range } from './kit.js';
 
 const TAU = Math.PI * 2;
 // Its own panel maps, finer than the other Sentinels' (panels per radius).
@@ -30,6 +23,17 @@ const EGG_H = 0.68;
 const EGG_POINT = 0.12;
 // How far up the egg (0..1) the shells reach: all but a pinhole at the tip.
 const SHELL_TOP = 0.998;
+// The core: a gem of eight facets parted round a burning heart (radii up
+// from its girdle), held by eight prongs.
+const GEM = [
+  0, 0.25, 0.08, 0.25, 0.15, 0.17, 0.19, 0.05, 0.19, -0.01, 0.14, -0.12, 0.05,
+  -0.21, 0, -0.23,
+];
+const GEM_Y = 0.25;
+const GEM_PART = 0.022; // how far each facet stands off the heart
+// proposta 12/11: the gem's own heat and the heart's, sealed and open.
+const GEM_HEAT = [0.04, 0.4];
+const HEART_GAIN = [0.1, 1.1];
 // The order lamps: jewels round the collar.
 const LAMP_R = 0.665;
 const LAMP_Y = 0.137;
@@ -38,11 +42,15 @@ const LAMP_COUNT = 40;
 const LAMP_GAIN = { protect: 0.6, rebuild: 1.0 };
 // proposta 12/11: the halos' lean when open (rad) and how fast they settle
 // into it (1/s).
-const HALO_TILT = [0.22, 0.16];
+const HALO_TILT = [0.3, 0.2];
+// The halos' gaps: four in each, lined up when sealed; open, the outer
+// halo's slip this far round (rad) and it turns against the inner.
+const HALO_GAP = 0.3;
+const HALO_SLIP = Math.PI / 4;
 const HALO_EASE = 3;
 // proposta 12/11: the shell's lacquer and the halos' polish.
-const SHELL_ROUGH = 0.45;
-const SHELL_ENV = 1.3;
+const SHELL_ROUGH = 0.76;
+const SHELL_ENV = 0.6;
 const METAL_ROUGH = 0.45;
 const METAL_ENV = 1.2;
 
@@ -65,6 +73,7 @@ const band = (t0, t1, d0, d1, steps = 1) => {
 };
 
 export function createSovereign(sk) {
+  const BOSS_LIGHT = new THREE.Color('#ffe2b0');
   const {
     THREE,
     kit,
@@ -73,7 +82,7 @@ export function createSovereign(sk) {
     bone,
     gold,
     bronze,
-    soot,
+    lacquer,
     box,
     drum,
     merge,
@@ -156,13 +165,13 @@ export function createSovereign(sk) {
     ...around(24, TAU / 48).map((a) =>
       at(box(0.04, 0.05, 0.035), bone, a, 0.66, 0.02)
     ),
-    { geometry: drum(0.56, 0.02, 24), color: soot, position: [0, 0.07, 0] },
+    { geometry: drum(0.56, 0.02, 24), color: lacquer, position: [0, 0.07, 0] },
   ]);
-  // The polished trim: a gold lip on the collar, the cradle's ring and six
-  // claws curling up round the core.
+  // The polished trim: the gold collar and its lip, the cradle's ring and
+  // eight prongs curling up to the gem's girdle.
   const claw = [
-    0.42, 0.07, 0.42, 0.2, 0.36, 0.31, 0.28, 0.38, 0.255, 0.36, 0.33, 0.29,
-    0.39, 0.19, 0.39, 0.07,
+    0.42, 0.07, 0.42, 0.18, 0.34, 0.26, 0.245, 0.31, 0.225, 0.29, 0.31, 0.24,
+    0.39, 0.17, 0.39, 0.07,
   ];
   const trim = merge([
     {
@@ -180,19 +189,20 @@ export function createSovereign(sk) {
       geometry: sweep([0.12, 0.07, 0.22, 0.07, 0.2, 0.12, 0.13, 0.12], 12),
       color: gold,
     },
-    ...around(6).map((a) => ({
-      geometry: sweep(claw, 1, a - 0.04, 0.08),
+    ...around(8).map((a) => ({
+      geometry: sweep(claw, 1, a - 0.035, 0.07),
       color: gold,
     })),
-    ...around(6, TAU / 12).map((a) =>
+    ...around(8, TAU / 16).map((a) =>
       at(box(0.1, 0.02, 0.02), bronze, a, 0.3, 0.08)
     ),
   ]);
 
   // One shell, centred on +x, about its foot (the hinge): the lacquered
-  // face, an inlaid rib down its middle, a band at its foot with three
-  // studs, and its lining in three dark ribbed strips.
-  const HALF = Math.PI / SHELLS - 0.018;
+  // face, an inlaid rib down its middle crossed by two bands, a medallion
+  // between them, a band at its foot with three studs, and its lining in
+  // three dark ribbed strips.
+  const HALF = Math.PI / SHELLS - 0.028;
   const shell = merge([
     {
       geometry: sweep(band(0, SHELL_TOP, -0.03, 0, 9), 3, -HALF, 2 * HALF),
@@ -200,13 +210,22 @@ export function createSovereign(sk) {
     },
     {
       geometry: sweep(band(0.08, 0.92, 0, 0.012, 7), 1, -0.025, 0.05),
-      color: bone,
+      color: bronze,
     },
     ...[
       [0.4, 0.43],
       [0.7, 0.72],
     ].map(([t0, t1]) => ({
       geometry: sweep(band(t0, t1, 0, 0.008), 3, -HALF + 0.01, 2 * HALF - 0.02),
+      color: bronze,
+    })),
+    // a medallion on the rib between the bands, a tile either side of it
+    {
+      geometry: sweep(band(0.52, 0.6, 0, 0.018, 2), 2, -0.07, 0.14),
+      color: gold,
+    },
+    ...[-1, 1].map((k) => ({
+      geometry: sweep(band(0.53, 0.59, 0, 0.01), 1, k * 0.2 - 0.04, 0.08),
       color: bone,
     })),
     {
@@ -224,58 +243,72 @@ export function createSovereign(sk) {
         k * ((2 * HALF) / 3) - HALF / 3 + 0.012,
         (2 * HALF) / 3 - 0.024
       ),
-      color: soot,
+      color: lacquer,
     })),
   ]);
   const [HINGE_R, HINGE_Y] = egg(0);
   shell.translate(-HINGE_R, -HINGE_Y, 0);
-  // The halos: a polished ring each, the inner with notches, the outer
-  // wider, an inlaid line round it, tabs on it and eight keys out from it.
+  // The halos: polished rings broken in four, the inner with notches, the
+  // outer wider, an inlaid line along it, tabs on it and a key either side
+  // of each gap.
+  const arcs = (gap) => around(4).map((a) => [a + gap / 2, Math.PI / 2 - gap]);
+  const inGap = (a, gap) => {
+    const off = ((a % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2);
+    return off < gap / 2 + 0.06 || off > Math.PI / 2 - gap / 2 - 0.06;
+  };
   const innerHalo = merge([
-    {
+    ...arcs(HALO_GAP).map(([from, span]) => ({
       geometry: sweep(
         [
           0.8, -0.09, 0.88, -0.09, 0.895, -0.065, 0.875, -0.04, 0.815, -0.04,
           0.795, -0.065,
         ],
-        64
-      ),
-      color: gold,
-    },
-    ...around(16).map((a) =>
-      at(box(0.05, 0.015, 0.018), bronze, a, 0.84, -0.035)
-    ),
-  ]);
-  const outerHalo = merge([
-    {
-      geometry: sweep(
-        [
-          1.0, -0.19, 1.1, -0.19, 1.115, -0.16, 1.1, -0.13, 1.0, -0.13, 0.985,
-          -0.16,
-        ],
-        72
-      ),
-      color: gold,
-    },
-    {
-      geometry: sweep(
-        [1.035, -0.13, 1.065, -0.13, 1.06, -0.118, 1.04, -0.118],
-        72
-      ),
-      color: bronze,
-    },
-    ...around(32, TAU / 64).map((a) =>
-      at(box(0.025, 0.012, 0.03), bronze, a, 1.012, -0.126)
-    ),
-    ...around(8).map((a) => ({
-      geometry: sweep(
-        [1.1, -0.185, 1.17, -0.175, 1.18, -0.16, 1.17, -0.145, 1.1, -0.135],
-        2,
-        a - 0.05,
-        0.1
+        16,
+        from,
+        span
       ),
       color: gold,
     })),
+    ...around(24)
+      .filter((a) => !inGap(a, HALO_GAP))
+      .map((a) => at(box(0.05, 0.015, 0.018), bronze, a, 0.84, -0.035)),
+  ]);
+  const outerHalo = merge([
+    ...arcs(HALO_GAP).flatMap(([from, span]) => [
+      {
+        geometry: sweep(
+          [
+            1.0, -0.19, 1.1, -0.19, 1.115, -0.16, 1.1, -0.13, 1.0, -0.13, 0.985,
+            -0.16,
+          ],
+          18,
+          from,
+          span
+        ),
+        color: gold,
+      },
+      {
+        geometry: sweep(
+          [1.035, -0.13, 1.065, -0.13, 1.06, -0.118, 1.04, -0.118],
+          18,
+          from + 0.04,
+          span - 0.08
+        ),
+        color: bronze,
+      },
+      ...[from, from + span - 0.1].map((a) => ({
+        geometry: sweep(
+          [1.1, -0.185, 1.17, -0.175, 1.18, -0.16, 1.17, -0.145, 1.1, -0.135],
+          2,
+          a,
+          0.1
+        ),
+        color: gold,
+      })),
+    ]),
+    ...around(40)
+      .filter((a) => !inGap(a, HALO_GAP))
+      .map((a) => at(box(0.025, 0.012, 0.03), bronze, a, 1.012, -0.126)),
   ]);
 
   // The jewels: one geometry, a colour per jewel written each frame.
@@ -286,8 +319,14 @@ export function createSovereign(sk) {
     )
   );
   const LAMP_VERTS = 36; // a box, non-indexed
-  const core = new THREE.IcosahedronGeometry(0.19, 1);
-  core.scale(1, 1.32, 1);
+  const gem = merge(
+    around(SHELLS).map((a) => ({
+      geometry: sweep(GEM, 1, a - Math.PI / SHELLS + 0.05, TAU / SHELLS - 0.1),
+      position: [Math.cos(a) * GEM_PART, GEM_Y, Math.sin(a) * GEM_PART],
+    }))
+  );
+  const heartGeometry = new THREE.IcosahedronGeometry(0.075, 0);
+  const heartColor = colorOf(THREE, '#ffe0a8');
   const protect = colorOf(THREE, PALETTE.status).multiplyScalar(
     LAMP_GAIN.protect
   );
@@ -311,16 +350,17 @@ export function createSovereign(sk) {
       new THREE.Mesh(trim, metalMaterial)
     );
     const coreMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, '#14100a'),
+      color: colorOf(THREE, '#a8681f'),
       emissive: colorOf(THREE, PALETTE.shot),
-      emissiveIntensity: CORE_COLD,
-      roughness: 0.3,
-      metalness: 0.2,
-      flatShading: true,
+      emissiveIntensity: GEM_HEAT[0],
+      roughness: 0.2,
+      metalness: 0.3,
+      envMapIntensity: 1.6,
     });
-    const heart = new THREE.Mesh(core, coreMaterial);
-    heart.position.set(0, 0.25, 0);
-    group.add(heart);
+    const heartMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
+    const heart = new THREE.Mesh(heartGeometry, heartMaterial);
+    heart.position.set(0, GEM_Y, 0);
+    group.add(new THREE.Mesh(gem, coreMaterial), heart);
     const lamps = new THREE.Mesh(
       lampGeometry.clone(),
       new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
@@ -353,6 +393,9 @@ export function createSovereign(sk) {
     return {
       kind,
       object: group,
+      // The scene's boss light in pale gold, not the Wardens' violet, which
+      // dyed the open shells' linings purple.
+      light: BOSS_LIGHT,
       heart,
       ring,
       plates,
@@ -361,6 +404,8 @@ export function createSovereign(sk) {
       axis: new THREE.Vector3(),
       last: null,
       coreMaterial,
+      heartMaterial,
+      bound: null,
       rims: [kit.rim(group, kit.circleRim, SOV_RIM)],
       rimColor: kit.rimColors.boss,
       glows: [],
@@ -389,7 +434,7 @@ export function createSovereign(sk) {
     const turn = boss.plateTurn ?? 0;
     const split = boss.splitAngle ?? 0;
     view.ring.rotation.y = -turn;
-    view.heart.rotation.y = time * 0.4;
+    view.heart.rotation.y = time * 0.7;
     const open = clamp01(boss.plateOpen ?? 0);
     const order = boss.order ?? 'protect';
     const both = order === 'both';
@@ -404,6 +449,12 @@ export function createSovereign(sk) {
     }
     // the halos: level when sealed; open, the inner tips toward the ship and
     // the outer away, or both up on the REBUILD half
+    // a pooled view taken by a new Sovereign starts its halos level
+    if (view.bound !== view.id) {
+      view.bound = view.id;
+      view.last = null;
+      for (const h of view.halos) h.x = h.z = 0;
+    }
     const dt =
       view.last === null ? 1 : Math.min(0.1, Math.max(0, time - view.last));
     view.last = time;
@@ -417,7 +468,7 @@ export function createSovereign(sk) {
         h,
         HALO_TILT[i] * open,
         toward + away,
-        i ? turn : -turn,
+        i ? -turn + open * (2 * turn + HALO_SLIP) : -turn,
         ease
       );
     });
@@ -440,10 +491,16 @@ export function createSovereign(sk) {
       }
     }
     colors.needsUpdate = true;
+    // the gem warms but keeps its facets; the heart in its seams burns
+    const beat = 1 + 0.15 * Math.sin(time * CORE_BEAT);
+    const flash = boss.getHitFlash() * CORE_FLASH * (0.2 + open);
     view.coreMaterial.emissiveIntensity =
-      CORE_COLD +
-      open * (CORE_HOT + 0.3 * Math.sin(time * CORE_BEAT)) +
-      boss.getHitFlash() * CORE_FLASH * (0.2 + open);
+      GEM_HEAT[0] + open * (GEM_HEAT[1] - GEM_HEAT[0]) * beat + 0.3 * flash;
+    view.heartMaterial.color
+      .copy(heartColor)
+      .multiplyScalar(
+        HEART_GAIN[0] + open * (HEART_GAIN[1] - HEART_GAIN[0]) * beat + flash
+      );
     const { wall, cone, lanes, split: line } = view.telegraph;
     kit.updateTelegraph(wall, { telegraph: boss.barrier }, radius);
     kit.updateTelegraph(cone, boss, radius);
