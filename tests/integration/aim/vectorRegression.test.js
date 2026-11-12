@@ -7,7 +7,7 @@
  *       rank 2 uses MOVING TARGET per REVIEWS Concern 4
  *   - describe('vector-neutral / plasma') → vector-EQUALS-baseline + damage-diff
  *
- * Per the Aim Audit 2026-05-12 (docs/aim-audit-2026-05-12.md), the production
+ * The production
  * `UpgradeSystem.applyUpgradeEffects` (UpgradeSystem.js:803-810) injects
  * `{ upgradeId, level: newLevel, category }` into every emitted upgrade event.
  * This test reproduces that injection by including `level` in the emitted

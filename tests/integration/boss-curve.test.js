@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-// ESM import shape verified in docs/esm-import-shapes-2026-05-12.md:
 // BossEnemy is a NAMED export (not default).
 import { BossEnemy } from '../../src/modules/enemies/types/BossEnemy.js';
 import WardenChoir from '../../src/modules/enemies/types/WardenChoir.js';

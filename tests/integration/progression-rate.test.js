@@ -7,7 +7,6 @@
  * How many cards a real run buys per layer is measured in full headless runs
  * (the XP a layer gives grows with the cards owned), not here.
  *
- * Per the Plan 01 ESM probe (docs/esm-import-shapes-2026-05-12.md),
  * ProgressionSystem uses `export default` — imported here as
  * `import ProgressionSystem from '...'`.
  */
