@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 24.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 25.**
 
 ## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NA `main`; O TRABALHO ATUAL, NO RAMO `campanha/ajustes`
 
@@ -57,7 +57,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
-- **Abertos dele:** itens 2, 15, 16, 18, 19, 20 e 21–23 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Abertos dele:** itens 2, 15, 16, 18, 19, 20 e 21–24 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
@@ -124,3 +124,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   asteroides que são muito fáceis de destruir. Deveria ter um desafio um pouco maior na segunda etapa dele."_
 - **(23)** _"todos os upgrades que eu peguei desapareceram de uma etapa para outra, assim que eu dei próximo setor…
   Mais grave ainda."_ Fecha quando ele seguir para o próximo setor com a nave como estava.
+- **(24)** Lugares e viagens (depois de ver a prancha das nove fases só com cores): _"tem que ter cenários diferentes,
+  mas percebe que já é uma arena 3D, o próprio anel por trás faz parte dessa ambientação. Então, talvez uma fase
+  poderia ser mais próxima do anel, até dentro do anel em algum momento, em volta do anel, num planeta de fundo, um
+  planeta próximo, perto de uma estrela, um campo de asteroides gigantes ao fundo… Um cemitério de naves enormes… um
+  disco protoplanetário… tem que pensar no roteiro que você escreveu… o roteiro é que pode prever isso. E entre uma
+  fase e outra, a nave pode se deslocar, entrar no hiperespaço… na hora do jogo, tudo bem ser isométrico… Mas na hora
+  que você vai de um lugar para o outro, os cutscenes e tal, são horas interessantes para a gente brincar com essas
+  possibilidades, já que a gente está se esmerando em fazer um mundo que é todo 3D."_ São ideias, não lista fechada.
+  Fecha quando ele vir as fases em lugares diferentes e as viagens.

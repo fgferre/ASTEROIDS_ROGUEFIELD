@@ -11,8 +11,9 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
 
 1. **Roteiro** (`docs/ROTEIRO.md`): história inteira em texto — premissa, virada, uma fala por fase e por viagem, final.
    Falantes THE RING e WAKE. Feito: o roteiro existe e suas primeiras falas estão em `src/data/story.js`. [x]
-2. **Nove lugares**: hoje três biomas servem três fases cada; cada fase ganha o seu lugar (cor, névoa, veios, luz,
-   detritos) por um `look` da fase sobre o bioma. Prancha das nove. [ ]
+2. **Lugares**: cor, névoa e luz por fase [x]. Falta o lugar de verdade (item 24 dele): cada fase num ponto do
+   mundo, com a peça de fundo da tabela "Os lugares" do `docs/ROTEIRO.md` (Anel longe/perto/por dentro, estrela,
+   planeta, cargueiros mortos, cristais, estaleiros, disco). Uma peça de fundo por fase, prancha das dez. [ ]
 3. **Viagem 3D entre fases**: ao vencer e seguir, a nave é vista por trás voando ao longo do Anel até o lugar seguinte,
    com a fala da viagem; pulável; a mesma cena abre a campanha. [ ]
 4. **Equilíbrio**: as duas fases antigas ganharam etapas próprias [x]; falta: capítulo 1 dura ~5 min; 16 escolhas de

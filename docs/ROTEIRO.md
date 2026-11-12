@@ -25,6 +25,27 @@ falhando, acha no Campo um sinal de energia. O jogador pilota, por ligação rem
    está **Sovereign**, que executa duas ordens que não cabem juntas: proteger e reconstruir. Vencê-lo dá ao piloto a
    escolha que os operadores não puderam fazer.
 
+## Os lugares (cada fase num ponto diferente deste mundo; o que se vê ao fundo da arena)
+
+O jogo é visto de cima; o lugar aparece no fundo 3D e nas viagens. A campanha é uma descida: de longe do Anel até o
+seu centro.
+
+| Fase                  | Onde fica                                   | O que se vê ao fundo                                                   |
+| --------------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| 1. Debris Wake        | Longe, fora do Anel, na cauda de destroços  | O Anel inteiro, pequeno e partido, ao longe; a estrela fria; destroços |
+| 2. Salvage Lanes      | A rota de carga, um cemitério de cargueiros | Cascos de naves enormes, mortos, em fila; o Anel maior                 |
+| 3. Prime Gate         | Colado na parede de fora do Anel            | A parede do Anel enchendo o fundo; o portão aceso                      |
+| 4. Furnace Drift      | Dentro do Anel, do lado da estrela          | A estrela enorme e próxima; respiros de calor; a face interna do Anel  |
+| 5. Crystal Choir      | Uma fenda na estrutura do Anel              | Formações gigantes de cristal; a fenda acesa por dentro                |
+| 6. Resonance Chamber  | Uma câmara imensa no interior do Anel       | Paredes e costelas da estrutura em volta; rachaduras brilhando         |
+| 7. Assembly Graveyard | Os estaleiros                               | Esqueletos de naves gigantes inacabadas presos em andaimes             |
+| 8. Quarantine Grid    | À sombra de um planeta escuro               | O planeta próximo, quase preto; a malha de balizas de quarentena       |
+| 9. Null Boundary      | A ruptura: as pontas quebradas do Anel      | As duas pontas do Anel e o vão; um disco de matéria moída girando      |
+| 10. The Crucible      | O centro: o coletor em volta da estrela     | A estrela muito perto; arcos do Anel sendo refeitos em volta dela      |
+
+As viagens ligam esses pontos: a nave vista por trás, o Anel crescendo, e um salto (hiperespaço) quando a distância
+é grande — entre capítulos e na abertura.
+
 ## Quem fala
 
 - **THE RING** — registro, inventário, temperatura. Nunca discursa. ✔
