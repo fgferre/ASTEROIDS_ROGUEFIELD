@@ -2,7 +2,12 @@
 
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
-import { BOSS_BY_LAYER, WARDEN_KINDS } from './enemies/boss.js';
+import {
+  BOSS_BY_LAYER,
+  SENTINEL_KINDS,
+  WARDEN_KINDS,
+  bossTier,
+} from './enemies/boss.js';
 import { HERALD_KINDS } from './enemies/herald.js';
 import { LAYERS, enemiesFor } from './layers.js';
 
@@ -25,6 +30,10 @@ const GLYPHS = {
     '<circle cy="-8" r="4.5"/><circle cx="7" cy="5" r="4.5"/><circle cx="-7" cy="5" r="4.5"/><circle class="eye" cy="-8" r="2"/>',
   'warden-null':
     '<circle r="13" fill="none" stroke-width="2"/><circle r="7"/><circle class="eye" r="3"/>',
+  'sentinel-quarry-maw':
+    '<path d="M-12,-9 L2,-11 L12,-3 L3,-3 L-3,-5 L-12,-5Z"/><path d="M-12,9 L2,11 L12,3 L3,3 L-3,5 L-12,5Z"/><circle class="eye" cx="3" r="2.5"/>',
+  'sentinel-gatekeeper':
+    '<rect x="5" y="-13" width="5" height="26"/><circle cx="-1" cy="-10" r="4"/><circle cx="-1" cy="10" r="4"/><rect x="-12" y="-6" width="11" height="12"/><rect class="eye" x="-11" y="-2" width="4" height="4"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -33,10 +42,13 @@ const GLYPHS = {
     '<polygon points="0,-15 5,-5 5,9 0,15 -5,9 -5,-5"/><circle class="eye" cy="-3" r="2"/>',
 };
 
-/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's or Herald's kind. */
+/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's, Sentinel's or Herald's kind. */
 export function codexIdOf(entity) {
   if (!entity?.type) return null;
-  if (entity.type === 'boss') return `warden-${entity.bossKind || 'prime'}`;
+  if (entity.type === 'boss') {
+    const kind = entity.bossKind || 'prime';
+    return `${bossTier(kind)}-${kind}`;
+  }
   if (entity.type === 'herald') return `herald-${entity.heraldKind || 'dust'}`;
   return entity.type;
 }
@@ -93,6 +105,18 @@ const warden = (kind, lore, hint) => ({
   herald: false,
 });
 
+// A Sentinel sits with the Wardens (`warden: true`), on the layer it ends.
+const sentinel = (kind, lore, hint) => ({
+  id: `sentinel-${kind}`,
+  name: SENTINEL_KINDS[kind].displayName,
+  lore,
+  hint,
+  glyph: GLYPHS[`sentinel-${kind}`],
+  fromLayer: SENTINEL_KINDS[kind].layer,
+  warden: true,
+  herald: false,
+});
+
 export const CODEX_ENTRIES = deepFreeze(
   [
     {
@@ -111,6 +135,16 @@ export const CODEX_ENTRIES = deepFreeze(
       'dust',
       'We sent the Dust ahead to speak for us. It speaks in walls. It counts every stone in the Outer Ring and lays them where a pilot must not pass; what it cannot count, it buries.',
       'Every few seconds it raises a wall of rock. The slits light first.'
+    ),
+    sentinel(
+      'quarry-maw',
+      'We built the Maw to feed the Ring its own stone. The Ring broke; the order to feed it did not. It still eats what drifts past and gives it back smaller, and counted.',
+      'Shut jaws shrug off shots. Fire into the open mouth, from its flank.'
+    ),
+    sentinel(
+      'gatekeeper',
+      'The lane to Prime was closed before the breaking and never reopened. The Gatekeeper holds it shut for a traffic that ended a thousand years ago. It has not been told.',
+      'Cross its barrier through the gap. Shoot its back while it recovers.'
     ),
     warden(
       'prime',
