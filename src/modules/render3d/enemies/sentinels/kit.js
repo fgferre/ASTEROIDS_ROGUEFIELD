@@ -46,16 +46,28 @@ export function createSentinelKit(kit, recipeViews) {
   const steel = hull.clone().multiplyScalar(1.7);
   const soot = dark.clone().multiplyScalar(0.55);
   const paint = colorOf(THREE, '#7a5a1c');
-  const maps = bakeHullMaps(THREE, kit.mapSeed + MAW_MAP_SEED);
-  Object.values(maps).forEach((map) => map.repeat.set(PANEL_TILE, PANEL_TILE));
-  // clone() drops the rim patch: add it again
-  const panelMaterial = addRimLight(kit.plateMaterial.clone());
-  Object.assign(panelMaterial, maps, {
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    aoMapIntensity: 0.8,
-    vertexColors: true,
-  });
-  panelMaterial.color.setRGB(1, 1, 1);
+  // Sovereign's: a pale lacquered shell and its inlays, gold and bronze on
+  // polished metal.
+  const ivory = colorOf(THREE, '#e8e1d0');
+  const bone = colorOf(THREE, '#a89a80');
+  const gold = colorOf(THREE, '#d8b26a');
+  const bronze = colorOf(THREE, '#6e5532');
+  // The panelled hull: the plate material with baked maps of its own seed,
+  // `tile` panels per unit of hull, tones in the vertex colours.
+  function hullMaterial(seed, tile = PANEL_TILE) {
+    const maps = bakeHullMaps(THREE, kit.mapSeed + seed);
+    Object.values(maps).forEach((map) => map.repeat.set(tile, tile));
+    // clone() drops the rim patch: add it again
+    const material = addRimLight(kit.plateMaterial.clone());
+    Object.assign(material, maps, {
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      aoMapIntensity: 0.8,
+      vertexColors: true,
+    });
+    material.color.setRGB(1, 1, 1);
+    return material;
+  }
+  const panelMaterial = hullMaterial(MAW_MAP_SEED);
 
   // A slab: `outline` ([x, z]) from y0 up to y1, its edges chamfered by
   // `bevel`.
@@ -114,7 +126,12 @@ export function createSentinelKit(kit, recipeViews) {
     steel,
     soot,
     paint,
+    ivory,
+    bone,
+    gold,
+    bronze,
     panelMaterial,
+    hullMaterial,
     slab,
     box,
     drum,
