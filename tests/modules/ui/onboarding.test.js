@@ -6,6 +6,7 @@ import UISystem from '../../../src/modules/UISystem.js';
 import {
   CARDS_TIP_TEXT,
   CARDS_TIP_TEXT_GAMEPAD,
+  DASH_TIP_SECONDS,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
   ONBOARDING_STORAGE_KEY,
@@ -94,6 +95,21 @@ describe('Onboarding', () => {
     run(onboarding, SHIELD_TIP_SECONDS + STEP, { shieldReady: true });
     expect(view.showing).toBeNull();
     expect(saved()).toContain('shield');
+  });
+
+  it('lets the dash tip leave on its own if the player never dashes', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    expect(view.showing).toBe('dash');
+    run(onboarding, DASH_TIP_SECONDS + STEP);
+    expect(view.showing).toBeNull();
+    expect(saved()).toContain('dash');
   });
 
   it('shows the cards tip on the first level-up and counts the pick', () => {

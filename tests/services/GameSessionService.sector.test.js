@@ -143,6 +143,36 @@ describe('sector runs', () => {
     expect(enemies.waveManager.currentWave).toBe(1);
   });
 
+  it('deals no cards during the win and carries every level gained then', () => {
+    const game = createHeadlessGame();
+    const { progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    game.services.player.setInvulnerableTimer(1e9);
+    let atWin = null;
+    const offers = [];
+    game.eventBus.on('run-won', () => {
+      atWin = progression.owedLevelUpOffers().length - progression.level;
+    });
+    game.eventBus.on('upgrade-options-ready', (payload) => {
+      if (atWin !== null) offers.push(payload);
+    });
+    startOnLayer(game, 5);
+    killBoss(game);
+    const gained = [progression.applyLevelUp(), progression.applyLevelUp()];
+    gained.forEach((level) => progression.emitLevelUp(level));
+    for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
+    expect(offers).toEqual([]);
+    const owed = atWin + progression.level;
+    expect(progression.owedLevelUpOffers()).toHaveLength(owed);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect(makePicks(game)).toBe(owed);
+  });
+
   it('is won at its Warden, with its own records and no endless continue', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'prime-gate' });

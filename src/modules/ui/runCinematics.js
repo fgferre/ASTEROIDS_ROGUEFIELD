@@ -79,13 +79,27 @@ export function travelDurationMs(lines) {
 /**
  * Skips on any key (a held key's repeats are swallowed too), click or newly
  * pressed pad button; returns the unbind. Capture on window runs before
- * every other handler: the input only skips.
+ * every other handler: the input only skips. A key still held after the
+ * unbind stays swallowed until it is released, so its repeats never reach
+ * the game as a fresh press (Escape would pause).
  */
 export function listenForSkip(skip) {
+  const keys = new Set();
+  let live = true;
   const onInput = (event) => {
+    if (!live && !(event.repeat && keys.has(event.code))) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (!event.repeat) skip();
+    if (event.type === 'keydown') keys.add(event.code);
+    if (live && !event.repeat) skip();
+  };
+  const detachKeys = () => {
+    window.removeEventListener('keydown', onInput, true);
+    window.removeEventListener('keyup', onKeyUp, true);
+  };
+  const onKeyUp = (event) => {
+    keys.delete(event.code);
+    if (!live && keys.size === 0) detachKeys();
   };
   // Pad buttons held when it starts (the press that started the run) wait
   // for their release.
@@ -109,10 +123,12 @@ export function listenForSkip(skip) {
     else frame = window.requestAnimationFrame(poll);
   };
   window.addEventListener('keydown', onInput, true);
+  window.addEventListener('keyup', onKeyUp, true);
   window.addEventListener('pointerdown', onInput, true);
   frame = window.requestAnimationFrame(poll);
   return () => {
-    window.removeEventListener('keydown', onInput, true);
+    live = false;
+    if (keys.size === 0) detachKeys();
     window.removeEventListener('pointerdown', onInput, true);
     window.cancelAnimationFrame(frame);
   };
@@ -187,7 +203,12 @@ export class RunCinematics {
     // No flight (reduced motion, no 3D): the lines play as they come.
     if (to) travelTransmissions(to).forEach((entry) => this.speak(entry));
     const playing = this.playIntro();
-    if (!playing) this.showCards();
+    // No intro: its end comes at once, so the layer's title card and line
+    // follow the journey's ('game-started' dropped the line queued before).
+    if (!playing) {
+      this.onIntroEnd();
+      this.showCards();
+    }
     return playing;
   }
 

@@ -13,6 +13,8 @@ export const ONBOARDING_GAP_SECONDS = 1.5;
 export const MOVE_HOLD_SECONDS = 0.6;
 /** The shield tip leaves on its own after this long on screen. */
 export const SHIELD_TIP_SECONDS = 6;
+/** The dash tip leaves on its own after this long on screen. */
+export const DASH_TIP_SECONDS = 10; // proposta 12/11
 export const CARDS_TIP_TEXT = 'Pick a card. R rerolls, B banishes.';
 export const CARDS_TIP_TEXT_GAMEPAD = 'Pick a card. X rerolls, Y banishes.';
 
@@ -147,7 +149,8 @@ export class Onboarding {
       return;
     }
     this.shownFor += dt;
-    if (id === 'shield' && this.shownFor >= SHIELD_TIP_SECONDS) {
+    const expiry = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS }[id];
+    if (this.shownFor >= expiry) {
       this.finish(id);
     }
   }

@@ -53,6 +53,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.pendingLevelUpScreens = [];
     this.levelUpScreenTimer = 0;
+    this.offersHeld = false;
 
     const comboTimeout = Number.isFinite(PROGRESSION_COMBO_TIMEOUT)
       ? Math.max(0, Number(PROGRESSION_COMBO_TIMEOUT))
@@ -122,6 +123,18 @@ class ProgressionSystem extends UpgradeSystem {
     this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'player-reset', silent: true, force: true });
+    });
+
+    // A won run deals no cards: the choices wait for the next sector (the
+    // carried build's `owed`) or for the endless run to go on.
+    this.registerEventListener('run-won', () => {
+      this.offersHeld = true;
+    });
+    this.registerEventListener('run-continued', () => {
+      this.offersHeld = false;
+    });
+    this.registerEventListener('game-started', () => {
+      this.offersHeld = false;
     });
 
     this.registerEventListener('player-died', () => {
@@ -352,7 +365,7 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   updatePendingLevelUpScreens(dt) {
-    if (this.pendingLevelUpScreens.length === 0) {
+    if (this.offersHeld || this.pendingLevelUpScreens.length === 0) {
       return;
     }
 

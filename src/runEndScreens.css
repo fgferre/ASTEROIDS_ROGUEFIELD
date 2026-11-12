@@ -19,6 +19,11 @@
   backdrop-filter: blur(calc(3 * var(--u))) saturate(0.75) brightness(0.7);
 }
 
+/* The play stops under an end screen, so its countdown is over. */
+body:has(.end-screen:not(.hidden)) .next-wave-box {
+  display: none;
+}
+
 .end-screen--death::before {
   box-shadow: inset 0 0 calc(220 * var(--u))
     color-mix(in srgb, var(--danger) 18%, transparent);

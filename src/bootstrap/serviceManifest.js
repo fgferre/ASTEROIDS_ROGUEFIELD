@@ -663,6 +663,57 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
+      name: 'menu-background',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'settings', 'random'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new MenuBackgroundSystem({
+          eventBus: resolved['event-bus'],
+          settings: resolved['settings'],
+          random: resolved['random'],
+          serviceResolver,
+        });
+      },
+    },
+    {
+      name: 'renderer',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'progression',
+        'xp-orbs',
+        'healthHearts',
+        'pickups',
+        'effects',
+        'combat',
+        'enemies',
+        'random',
+        'menu-background',
+        'settings',
+      ],
+      factory: ({ resolved }) => {
+        return new Renderer3D({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          progression: resolved['progression'],
+          'xp-orbs': resolved['xp-orbs'],
+          healthHearts: resolved['healthHearts'],
+          pickups: resolved['pickups'],
+          effects: resolved['effects'],
+          combat: resolved['combat'],
+          enemies: resolved['enemies'],
+          random: resolved['random'],
+          'menu-background': resolved['menu-background'],
+          settings: resolved['settings'],
+        });
+      },
+    },
+    // Last: an eager service can only resolve dependencies registered above it.
+    {
       name: 'game-session',
       singleton: true,
       lazy: false,
@@ -719,56 +770,6 @@ export function createServiceManifest(context = {}) {
         }
 
         return instance;
-      },
-    },
-    {
-      name: 'menu-background',
-      singleton: true,
-      lazy: false,
-      dependencies: ['event-bus', 'settings', 'random'],
-      factory: ({ resolved, container }) => {
-        const serviceResolver = createServiceResolver(container);
-        return new MenuBackgroundSystem({
-          eventBus: resolved['event-bus'],
-          settings: resolved['settings'],
-          random: resolved['random'],
-          serviceResolver,
-        });
-      },
-    },
-    {
-      name: 'renderer',
-      singleton: true,
-      lazy: false,
-      dependencies: [
-        'event-bus',
-        'player',
-        'progression',
-        'xp-orbs',
-        'healthHearts',
-        'pickups',
-        'effects',
-        'combat',
-        'enemies',
-        'random',
-        'menu-background',
-        'settings',
-      ],
-      factory: ({ resolved }) => {
-        return new Renderer3D({
-          eventBus: resolved['event-bus'],
-          player: resolved['player'],
-          progression: resolved['progression'],
-          'xp-orbs': resolved['xp-orbs'],
-          healthHearts: resolved['healthHearts'],
-          pickups: resolved['pickups'],
-          effects: resolved['effects'],
-          combat: resolved['combat'],
-          enemies: resolved['enemies'],
-          random: resolved['random'],
-          'menu-background': resolved['menu-background'],
-          settings: resolved['settings'],
-        });
       },
     },
   ];

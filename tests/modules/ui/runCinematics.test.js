@@ -9,6 +9,7 @@ import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import {
   RunCinematics,
+  listenForSkip,
   travelDestination,
 } from '../../../src/modules/ui/runCinematics.js';
 
@@ -309,5 +310,59 @@ describe('RunCinematics', () => {
     expect(spoken[0].holdMs).toBeUndefined();
     expect(held).toEqual([]);
     expect(card).toHaveBeenCalledTimes(1);
+  });
+
+  it("plays the layer's line after the journey's when the camera cannot move", () => {
+    const { ui, spoken, banners } = setup({ plays: false });
+    ui.queueTransmission = (entry) => spoken.push(entry);
+    // The layer starts before 'game-started', which drops its line.
+    UISystem.prototype.handleLayerStarted.call(ui, { wave: 1 });
+    spoken.length = 0;
+    ui.cinematics.armTravel({
+      sector: 'debris-wake',
+      source: 'campaign-launch-btn',
+    });
+    ui.cinematics.startIntro();
+    vi.advanceTimersByTime(500);
+    expect(spoken.map(({ key }) => key)).toEqual([
+      'travel:debris-wake:0',
+      'travel:debris-wake:1',
+      'travel:debris-wake:2',
+      expect.stringMatching(/^chapter:/),
+    ]);
+    expect(banners.length).toBeGreaterThan(0);
+  });
+
+  it("swallows a skip key's repeats after the skip until it is released", () => {
+    const listeners = new Map();
+    vi.stubGlobal('window', {
+      addEventListener: (type, fn) => listeners.set(type, fn),
+      removeEventListener: (type, fn) => {
+        if (listeners.get(type) === fn) listeners.delete(type);
+      },
+      requestAnimationFrame: () => 1,
+      cancelAnimationFrame: () => {},
+    });
+    const key = (type, repeat = false) => {
+      const event = {
+        type,
+        code: 'Escape',
+        repeat,
+        preventDefault: vi.fn(),
+        stopImmediatePropagation: vi.fn(),
+      };
+      listeners.get(type)?.(event);
+      return event.stopImmediatePropagation.mock.calls.length > 0;
+    };
+    let unbind = null;
+    const skip = vi.fn(() => unbind());
+    unbind = listenForSkip(skip);
+
+    expect(key('keydown')).toBe(true);
+    expect(skip).toHaveBeenCalledTimes(1);
+    expect(key('keydown', true)).toBe(true);
+    key('keyup');
+    expect(listeners.has('keydown')).toBe(false);
+    expect(skip).toHaveBeenCalledTimes(1);
   });
 });

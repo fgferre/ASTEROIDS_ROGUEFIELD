@@ -87,7 +87,9 @@ class UISystem extends BaseSystem {
       hud: () => this.tacticalHud.layout,
       // The session's pause flag alone: no pause screen, no fixed steps.
       holdSim: (held) => this.getService('game-state')?.setPaused(held),
+      // A head start holds the first layer: its title card waits for it.
       onIntroEnd: () =>
+        this.getService('enemies')?.waveManager.waveInProgress &&
         this.handleLayerStarted({ wave: this.transmissionLayer }),
       speak: (entry) => this.queueTransmission(entry),
       hush: () => this.transmissions?.clear(),
@@ -1020,12 +1022,10 @@ class UISystem extends BaseSystem {
 
         // Keep game-ui visible for pause, card and run end overlays
         if (
-          (screenName === 'pause' ||
-            screenName === 'levelup' ||
-            screenName === 'chest' ||
-            screenName === 'gameover' ||
-            screenName === 'victory') &&
-          show
+          show &&
+          ['pause', 'levelup', 'chest', 'gameover', 'victory'].includes(
+            screenName
+          )
         ) {
           const gameUI = document.getElementById('game-ui');
           if (gameUI) gameUI.classList.remove('hidden');

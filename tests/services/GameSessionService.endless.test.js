@@ -147,6 +147,33 @@ describe('endless run past the final Warden', () => {
     expect(game.session.getSessionState()).toBe('running');
   });
 
+  it('deals the card choices gained during the win once the run goes on', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player, progression } = game.services;
+    player.setInvulnerableTimer(1e9);
+    startOnLayer(game, 15);
+    killBoss(game);
+    const gained = [progression.applyLevelUp(), progression.applyLevelUp()];
+    gained.forEach((level) => progression.emitLevelUp(level));
+    const offered = [];
+    game.eventBus.on('upgrade-options-ready', ({ level }) =>
+      offered.push(level)
+    );
+    for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
+    expect(offered).toEqual([]);
+
+    game.session.continueBeyondVictory();
+    for (let step = 0; step < AFTER_STEPS; step += 1) {
+      game.step();
+      const id = game.takeOfferedUpgrade();
+      if (id) progression.applyUpgrade(id);
+    }
+    expect(offered).toEqual(
+      expect.arrayContaining(gained.map(({ level }) => level))
+    );
+  });
+
   it('keeps the best layer across runs and counts each run', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test' });
