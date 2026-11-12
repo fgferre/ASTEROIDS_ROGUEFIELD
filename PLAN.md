@@ -9,6 +9,13 @@ diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, de
 Próximo passo pendente: revisar essa direção com ele antes da implementação da frente 5. O documento distingue
 estado atual, propostas e horizonte; não aprova números nem substitui automaticamente as decisões abaixo.
 
+**Campanha, primeiro esqueleto (12/11, ramo `campanha/setores`, fora da `main`):** o dono disse "o projeto é seu, decida";
+a direção do plano mestre foi tomada como base. Feito: botão Campaign → mapa The Ring → cada capítulo (os três biomas
+atuais, 5 layers cada) é uma partida própria, vencida no seu Warden, que abre o próximo; capítulos 2 e 3 começam com
+4 e 8 escolhas de carta (`headStart`, proposta); layers numeradas dentro do capítulo; telas de vitória e derrota do
+capítulo; recordes `sectorsWon`/`sectorTimes`. A descida de 15 layers continua no botão Descent. Falta: ele jogar e
+julgar (mapa, head start, duração); depois, as fases A/B de cada capítulo como conteúdo novo (`src/content/sectors/`).
+
 ## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
 
 Dele (20/10): _"tudo está rodando liso, não precisa medir nada. Temos que agora focar em melhorar o projeto de todas as

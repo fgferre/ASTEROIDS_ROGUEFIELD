@@ -738,13 +738,9 @@ select {
   grid-column: 1 / -1;
 }
 
-/* Main menu: Start and Daily Field share the first row */
-.menu-screen__nav.menu-grid > :first-child {
-  grid-column: auto;
-}
-
-/* An odd last action spans the row */
-.menu-screen__nav.menu-grid > :last-child:nth-child(odd) {
+/* Main menu: Campaign spans the first row, Descent and Daily Field share the
+   second; an even last action is alone on its row and spans it */
+.menu-screen__nav.menu-grid > :last-child:nth-child(even) {
   grid-column: 1 / -1;
 }
 
@@ -1679,6 +1675,202 @@ kbd {
   color: var(--text-dim);
   border-style: dashed;
   cursor: not-allowed;
+}
+
+/* Campaign map (ui/CampaignMap.js): an arc of the Ring with its chapters,
+   the selected one's detail under it */
+.campaign-dialog {
+  width: min(960px, 94vw);
+  max-height: min(680px, 92vh);
+  gap: var(--space-4);
+}
+
+.campaign-map {
+  position: relative;
+  /* Never taller than a third of the window: the dialog fits 720 p */
+  width: min(100%, calc(32vh * 1000 / 260));
+  aspect-ratio: 1000 / 260;
+  margin: 0 auto var(--space-5);
+}
+
+.campaign-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.campaign-arc path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.campaign-arc__ring {
+  stroke: var(--neutral);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.campaign-arc__ring.is-dark {
+  stroke-dasharray: 3 6;
+  opacity: 0.35;
+}
+
+.campaign-arc__reach {
+  stroke: var(--accent-line);
+  stroke-width: 1.5;
+}
+
+.campaign-node {
+  position: absolute;
+  width: 8.5rem;
+  transform: translate(-50%, -7px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  text-align: center;
+  appearance: none;
+}
+
+button.campaign-node {
+  cursor: pointer;
+}
+
+.campaign-node__dot {
+  width: 14px;
+  height: 14px;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--neutral);
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.campaign-node__numeral {
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
+
+.campaign-node__name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.campaign-node__state {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.campaign-node.is-cleared .campaign-node__dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.campaign-node.is-open .campaign-node__dot {
+  border-color: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+.campaign-node.is-open .campaign-node__state {
+  color: var(--accent);
+}
+
+.campaign-node.is-locked,
+.campaign-node.is-nosignal {
+  color: var(--text-dim);
+}
+
+.campaign-node.is-nosignal {
+  opacity: 0.4;
+}
+
+.campaign-node.is-nosignal .campaign-node__dot {
+  border-style: dashed;
+}
+
+.campaign-node.is-selected .campaign-node__name {
+  color: var(--accent);
+}
+
+.campaign-node.is-selected .campaign-node__dot {
+  outline: 1px solid var(--accent-line);
+  outline-offset: 4px;
+}
+
+.campaign-node:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .campaign-node.is-open .campaign-node__dot {
+    animation: campaign-open-pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes campaign-open-pulse {
+    50% {
+      box-shadow: 0 0 2px rgba(0, 242, 255, 0.2);
+    }
+  }
+}
+
+.campaign-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+}
+
+.campaign-detail__text {
+  flex: 1;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.campaign-detail__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.campaign-detail__facts,
+.campaign-detail__line {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-dim);
+}
+
+.campaign-detail__facts {
+  color: var(--text);
+}
+
+.campaign-detail__line.is-locked {
+  font-style: italic;
+}
+
+.campaign-detail__launch {
+  flex: 0 0 auto;
+  min-width: 9rem;
 }
 
 /* ============================================

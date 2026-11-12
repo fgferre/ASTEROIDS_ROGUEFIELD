@@ -6,6 +6,7 @@ import {
   runHeadline,
   timelineModel,
 } from '../../../src/modules/ui/runTimeline.js';
+import { sectorById } from '../../../src/data/sectors.js';
 
 describe('run end headline', () => {
   it('a death names the layer reached, of 15, and its chapter', () => {
@@ -149,5 +150,61 @@ describe('run timeline', () => {
       title: 'Null down in 1:12',
       where: 'Layer 15 · the last Warden',
     });
+  });
+});
+
+describe('sector run end', () => {
+  const denseCore = sectorById('dense-core');
+
+  it('a win clears the chapter, with its time and its first-clear badge', () => {
+    expect(
+      runHeadline({
+        outcome: 'victory',
+        layer: 10,
+        sector: denseCore,
+        firstClear: true,
+        time: 512,
+      })
+    ).toEqual({
+      kicker: 'Warden down',
+      title: 'Chapter cleared',
+      of: '',
+      line: 'CHAPTER II — THE DENSE CORE · 8:32',
+      badge: 'First clear',
+    });
+    expect(
+      inviteLine({
+        outcome: 'victory',
+        sector: denseCore,
+        next: sectorById('wardens-reach'),
+      })
+    ).toBe("WARDEN'S REACH is open. <b>Next chapter.</b>");
+  });
+
+  it('a death counts the layer inside the chapter', () => {
+    expect(
+      runHeadline({ outcome: 'death', layer: 8, sector: denseCore })
+    ).toMatchObject({
+      title: 'Layer 3',
+      of: 'of 5',
+      line: 'CHAPTER II — THE DENSE CORE',
+    });
+    expect(inviteLine({ outcome: 'death', layer: 8, sector: denseCore })).toBe(
+      'The Warden waits at <b>Layer 5</b>. Two layers to go.'
+    );
+  });
+
+  it('the timeline spans only the chapter', () => {
+    const model = timelineModel({
+      timeline: [{ kind: 'death', killer: null, time: 300, layer: 8 }],
+      outcome: 'death',
+      layer: 8,
+      sector: denseCore,
+    });
+    expect([model.first, model.span]).toEqual([6, 10]);
+    expect(model.wardenLayers).toEqual([{ layer: 10, down: false }]);
+    expect(model.chapters.map(({ label }) => label)).toEqual([
+      'II · DENSE CORE',
+    ]);
   });
 });

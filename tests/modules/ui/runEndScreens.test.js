@@ -58,4 +58,58 @@ describe('Run end screens', () => {
     );
     expect(gameOver.seed.textContent).toBe('Seed 42 · Veteran');
   });
+
+  it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
+    const button = () => {
+      const classes = new Set(['hidden']);
+      return {
+        dataset: {},
+        textContent: '',
+        disabled: false,
+        focus() {},
+        classList: {
+          toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+          contains: (name) => classes.has(name),
+        },
+      };
+    };
+    const victory = {
+      body: {},
+      invite: {},
+      continueBtn: button(),
+      nextBtn: button(),
+      restartBtn: button(),
+      quitBtn: button(),
+    };
+    const screens = new RunEndScreens({
+      refs: { gameOver: {}, victory },
+      showScreen: vi.fn(),
+      progression: () => null,
+      combat: () => null,
+      difficulty: () => null,
+      hangar: () => ({ lastAward: { amount: 80, total: 80 } }),
+      lastTransmission: () => null,
+    });
+
+    screens.showVictoryScreen({
+      data: {
+        wave: { current: 10 },
+        stats: { timeElapsed: 512, timeline: [] },
+        sector: {
+          id: 'dense-core',
+          time: 512,
+          bestTime: 512,
+          firstClear: true,
+          next: 'wardens-reach',
+        },
+      },
+    });
+
+    expect(victory.body.innerHTML).toContain('Chapter cleared');
+    expect(victory.body.innerHTML).toContain('First clear');
+    expect(victory.continueBtn.classList.contains('hidden')).toBe(true);
+    expect(victory.nextBtn.classList.contains('hidden')).toBe(false);
+    expect(victory.nextBtn.dataset.sector).toBe('wardens-reach');
+    expect(victory.quitBtn.textContent).toBe('Campaign map');
+  });
 });

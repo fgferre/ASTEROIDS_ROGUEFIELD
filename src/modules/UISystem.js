@@ -9,6 +9,7 @@ import {
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
+import { localLayer, nextSector, sectorById } from '../data/sectors.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -28,6 +29,7 @@ import {
 } from './ui/hud/editor/layoutStore.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { HangarScreen } from './ui/HangarScreen.js';
+import { CampaignMap } from './ui/CampaignMap.js';
 import { CodexScreen } from './ui/CodexScreen.js';
 import { cacheStaticNodes } from './ui/domRefs.js';
 import { ViewportScaling } from './ui/viewportScaling.js';
@@ -76,6 +78,7 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
+    this.sector = null;
     // The line shown since the death or the win, quoted on the end screen.
     this.lastTransmission = null;
     this.cinematics = new RunCinematics({
@@ -129,6 +132,7 @@ class UISystem extends BaseSystem {
       pickups: () => this.getService('pickups'),
       xpOrbs: () => this.getService('xp-orbs'),
       renderer: () => this.getService('renderer'),
+      sector: () => this.sector,
       shieldKey: () => {
         const device = this.getService('input').getActiveDevice();
         return this.settingsPanel.formatBindingLabel(
@@ -189,6 +193,7 @@ class UISystem extends BaseSystem {
       combat: () => this.getService('combat'),
       difficulty: () => this.getService('difficulty'),
       layer: () => this.transmissionLayer,
+      sector: () => this.sector,
       settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
       closeSettings: () => this.settingsPanel.closeSettingsPanel(),
       openHudEditor: () => this.openHudEditor(),
@@ -232,6 +237,12 @@ class UISystem extends BaseSystem {
       hullName: (hull) => this.mainMenu.getHullDisplayName(hull),
       refreshShipSelector: () => this.mainMenu.requestMenuShipSelectorRefresh(),
     });
+    this.campaignMap = new CampaignMap({
+      refs: this.domRefs.campaign,
+      showScreen: (name, options) => this.showScreen(name, options),
+      announceVisibility: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('campaign', isOpen, payload),
+    });
     this.codexScreen = new CodexScreen({
       refs: this.domRefs.codex,
       showScreen: (name, options) => this.showScreen(name, options),
@@ -272,6 +283,7 @@ class UISystem extends BaseSystem {
     this.creditsOverlay.bindCreditsControls();
     this.codexScreen.bindCodexControls();
     this.hangarScreen.bindHangarControls();
+    this.campaignMap.bindCampaignControls();
     this.mainMenu.bindMainMenuControls();
     this.mainMenu.initializeMenuShipSelector();
     this.mainMenu.refreshMenuStatus();
@@ -352,6 +364,8 @@ class UISystem extends BaseSystem {
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     this.transmissionLayer = layer;
+    const sector = this.getService('game-session')?.sector ?? null;
+    this.sector = sector;
     // The intro's end shows this layer's title card.
     if (this.cinematics.introActive) {
       return;
@@ -360,7 +374,8 @@ class UISystem extends BaseSystem {
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
     const stage = this.bossRush ? bossRushStage(layer) : 0;
-    hud.showLayerBanner(layer, {
+    // A sector run counts its layers from its own first one.
+    hud.showLayerBanner(sector ? localLayer(sector, layer) : layer, {
       boss,
       bossRush: this.bossRush,
       chapter: stage
@@ -456,6 +471,8 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('boss-defeated', (payload = {}) => {
+      // A Warden whose death won the run: 'run-won' speaks for it.
+      if (this.runWon) return;
       this.queueTransmission(wardenTransmission(payload.wave, 'defeated'));
     });
 
@@ -521,8 +538,12 @@ class UISystem extends BaseSystem {
       }
       this.queueTransmission(sightingTransmission(type));
     });
-    this.registerEventListener('game-started', () => {
+    this.registerEventListener('game-started', (payload = {}) => {
+      // The sector run's sector (src/data/sectors.js), or null: the HUD and
+      // the pause panel count its layers from its own first one.
+      this.sector = sectorById(payload.sector);
       this.tacticalHud.onGameStarted();
+      this.campaignMap.noteRunStart(payload.sector);
     });
     this.registerEventListener('aim-stick-changed', (payload) => {
       this.tacticalHud.onAimStickChanged(payload);
@@ -621,12 +642,16 @@ class UISystem extends BaseSystem {
       }
     });
 
-    this.registerEventListener('run-won', () => {
+    this.registerEventListener('run-won', ({ wave, sector } = {}) => {
       this.runWon = true;
       this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
-      this.queueTransmission(victoryTransmission(), { interrupt: true });
+      // A chapter before the last ends on its Warden's own last words.
+      const line = nextSector(sectorById(sector))
+        ? wardenTransmission(wave, 'defeated')
+        : victoryTransmission();
+      this.queueTransmission(line, { interrupt: true });
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;
@@ -808,6 +833,7 @@ class UISystem extends BaseSystem {
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
         else if (id === 'codex') this.codexScreen.closeCodex();
         else if (id === 'hangar') this.hangarScreen.closeHangar();
+        else if (id === 'campaign') this.campaignMap.closeMap();
         else if (id === 'credits') {
           this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
         } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
@@ -1043,6 +1069,7 @@ class UISystem extends BaseSystem {
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
+      this.campaignMap.closeMap();
 
       document.body?.classList.remove('is-credits-open');
 
@@ -1050,6 +1077,7 @@ class UISystem extends BaseSystem {
         this.mainMenu.requestMenuShipSelectorRefresh();
         this.mainMenu.refreshMenuStatus();
         this.mainMenu.refreshBossRushLock();
+        this.campaignMap.menuShown();
       }
 
       if (emitEvent) {

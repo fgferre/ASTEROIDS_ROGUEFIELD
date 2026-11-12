@@ -47,6 +47,7 @@ export function cacheStaticNodes() {
       body: document.getElementById('victory-body') || null,
       invite: document.getElementById('victory-invite') || null,
       continueBtn: document.getElementById('victory-continue-btn') || null,
+      nextBtn: document.getElementById('victory-next-btn') || null,
       restartBtn: document.getElementById('victory-restart-btn') || null,
       quitBtn: document.getElementById('victory-quit-btn') || null,
     },
@@ -79,6 +80,19 @@ export function cacheStaticNodes() {
       openBtn: document.getElementById('menu-hangar-btn') || null,
       backBtn: document.getElementById('hangar-back-btn') || null,
       closeBtn: document.getElementById('hangar-close-btn') || null,
+    },
+    campaign: {
+      overlay: document.getElementById('campaign-screen') || null,
+      nodes: document.getElementById('campaign-nodes') || null,
+      detailTitle: document.getElementById('campaign-detail-title') || null,
+      detailFacts: document.getElementById('campaign-detail-facts') || null,
+      detailHeadStart:
+        document.getElementById('campaign-detail-head-start') || null,
+      detailStatus: document.getElementById('campaign-detail-status') || null,
+      launchBtn: document.getElementById('campaign-launch-btn') || null,
+      openBtn: document.getElementById('menu-campaign-btn') || null,
+      backBtn: document.getElementById('campaign-back-btn') || null,
+      closeBtn: document.getElementById('campaign-close-btn') || null,
     },
     settings: {
       overlay: document.getElementById('settings-screen') || null,

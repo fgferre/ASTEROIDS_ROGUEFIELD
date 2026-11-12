@@ -28,3 +28,4 @@
 - Arc family bonus (20/10): near-blank in play — the combo sits pinned at its cap, so a longer window and a bigger step add almost nothing.
 - Stasis (20/10): stops machines and their shots, not rocks — by design (its label says machines); the owner judges by playing.
 - File size (20/10): four JS files were near the 1,200-line cap; another worker is splitting them.
+- Campanha (12/11): um perfil que já passou de um Warden na descida vê vários capítulos OPEN pulsando no mapa; o head start espera a última carta — com o baralho esgotado a primeira layer ficaria presa (não acontece hoje); `npm run done` tropeça no `.agents/` não versionado de outra ferramenta (o CI não vê).

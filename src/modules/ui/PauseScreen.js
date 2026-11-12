@@ -16,6 +16,7 @@ export class PauseScreen {
    * `combat()`: the combat service (the build's weapon).
    * `difficulty()`: the difficulty service (the run's seed label).
    * `layer()`: the layer the run is on.
+   * `sector()`: the sector run's sector, or null.
    * `settingsOpenHere()`: the settings panel is open from this screen.
    * `closeSettings()`: closes the settings panel when the game resumes.
    * `openHudEditor()`: Edit HUD, over the paused run.
@@ -29,6 +30,7 @@ export class PauseScreen {
     combat,
     difficulty,
     layer,
+    sector = () => null,
     settingsOpenHere,
     closeSettings,
     openHudEditor,
@@ -41,6 +43,7 @@ export class PauseScreen {
     this.combat = combat;
     this.difficulty = difficulty;
     this.layer = layer;
+    this.sector = sector;
     this.settingsOpenHere = settingsOpenHere;
     this.closeSettings = closeSettings;
     this.openHudEditor = openHudEditor;
@@ -189,7 +192,12 @@ export class PauseScreen {
     refs.build.innerHTML = endBuildMarkup(
       collectBuild(progression, this.combat())
     );
-    refs.location.textContent = runLocationLine(this.layer());
+    refs.location.textContent = runLocationLine(
+      this.layer(),
+      null,
+      null,
+      this.sector()
+    );
     refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
     refs.seed.textContent = this.difficulty().runLabel();
   }

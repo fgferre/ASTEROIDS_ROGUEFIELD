@@ -8,6 +8,7 @@
 import { BIOMES, biomeForLayer } from '../../data/biomes.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { BOSS_RUSH_LAYERS, directorFor } from '../../data/layers.js';
+import { localLayer, nextSector } from '../../data/sectors.js';
 import { formatRunTime, killerName } from './runRecap.js';
 import { FAMILY_GLYPHS, familyColor, shortName } from './upgradeCard.js';
 
@@ -29,19 +30,44 @@ const NUMBER_WORDS = [
   'Fourteen',
 ];
 
+const sectorLayers = (sector) => sector.layers[1] - sector.layers[0] + 1;
+
 /**
  * The headline: `kicker` over `title` (with `of`), the `line` under it and a
- * `badge` ('New best') or null. `outcome` 'death' | 'victory'; `layer` the
- * layer reached; `bossRush` its { stage } on a Boss Rush; `wardens` killed.
+ * `badge` ('New best', 'First clear') or null. `outcome` 'death' | 'victory';
+ * `layer` the layer reached; `bossRush` its { stage } on a Boss Rush;
+ * `sector` the sector of a sector run (src/data/sectors.js), its layers
+ * counted from its first one, and `firstClear` its first win; `wardens`
+ * killed.
  */
 export function runHeadline({
   outcome,
   layer,
   bossRush,
+  sector = null,
+  firstClear = false,
   wardens,
   time,
   newBest,
 }) {
+  if (sector) {
+    const chapter = biomeForLayer(sector.layers[0]).title;
+    return outcome === 'victory'
+      ? {
+          kicker: nextSector(sector) ? 'Warden down' : 'The Ring is quiet',
+          title: 'Chapter cleared',
+          of: '',
+          line: `${chapter} · ${formatRunTime(time)}`,
+          badge: firstClear ? 'First clear' : newBest ? 'New best' : null,
+        }
+      : {
+          kicker: 'Signal lost',
+          title: `Layer ${localLayer(sector, layer)}`,
+          of: `of ${sectorLayers(sector)}`,
+          line: chapter,
+          badge: null,
+        };
+  }
   if (outcome === 'victory') {
     return {
       kicker: 'The Ring is quiet',
@@ -81,8 +107,30 @@ export function killedByLine(source) {
   return { lead: `Killed by ${/^[AEIOU]/.test(name) ? 'an' : 'a'}`, name };
 }
 
-/** The invitation under the run: how far the best is, or the Deep Field. */
-export function inviteLine({ outcome, layer, bestAtStart, bossRush }) {
+/**
+ * The invitation under the run: how far the best is, or the Deep Field; on a
+ * sector run, the chapter `next` opened by the win, or how far its Warden is.
+ */
+export function inviteLine({
+  outcome,
+  layer,
+  bestAtStart,
+  bossRush,
+  sector = null,
+  next = null,
+}) {
+  if (sector) {
+    if (outcome === 'victory') {
+      return next
+        ? `${next.name} is open. <b>Next chapter.</b>`
+        : 'Every chapter of the Ring is clear. <b>Beat your time.</b>';
+    }
+    const total = sectorLayers(sector);
+    const gap = total - localLayer(sector, layer);
+    if (gap <= 0) return 'The Warden held the line. <b>Again.</b>';
+    const words = NUMBER_WORDS[gap] ?? `${gap}`;
+    return `The Warden waits at <b>Layer ${total}</b>. ${words} ${gap === 1 ? 'layer' : 'layers'} to go.`;
+  }
   if (outcome === 'victory') {
     return bossRush
       ? 'The Wardens will be back. <b>Beat the clock.</b>'
@@ -107,19 +155,23 @@ const wardenName = (event, count) => {
   return count > 1 ? name.replace(/^Warden /, '') : name;
 };
 
-/** The best moment: the last Warden on a win, else the best combo, else a Warden or the latest form. */
-export function bestMoment(timeline, outcome) {
+/**
+ * The best moment: the last Warden on a win, else the best combo, else a
+ * Warden or the latest form; a sector run's layers count from its first one.
+ */
+export function bestMoment(timeline, outcome, sector = null) {
   const wardens = timeline.filter(({ kind }) => kind === 'warden');
   const last = wardens[wardens.length - 1];
+  const shown = (n) => (sector ? localLayer(sector, n) : n);
   const where = (event) =>
-    `Layer ${event.layer} · ${formatRunTime(event.time)}`;
+    `Layer ${shown(event.layer)} · ${formatRunTime(event.time)}`;
   if (outcome === 'victory' && last) {
     return {
       tone: 'warden',
       title: last.fight
         ? `${wardenName(last, 2)} down in ${formatRunTime(last.fight)}`
         : `${wardenName(last, 2)} down`,
-      where: `Layer ${last.layer} · the last Warden`,
+      where: `Layer ${shown(last.layer)} · the last Warden`,
     };
   }
   const combo = timeline.find(({ kind }) => kind === 'combo');
@@ -148,25 +200,36 @@ const W = 1040;
 const Y = 70;
 
 /**
- * The line's model: `span` layers across, the layer `reached` (a fraction
- * into it on a death), the Warden layers, the chapters, and each event with
- * where it sits (`at`), its side, its row and its labels (the best layer
- * before the run is one, ahead of a death). An evolution or Apex keeps the
- * name it had when it happened (WorldSystem.recordFamilyForm).
+ * The line's model: layers `first` to `span` across (a sector run: its own
+ * layers and chapter), the layer `reached` (a fraction into it on a death),
+ * the Warden layers, the chapters, and each event with where it sits (`at`),
+ * its side, its row and its labels (the best layer before the run is one,
+ * ahead of a death). An evolution or Apex keeps the name it had when it
+ * happened (WorldSystem.recordFamilyForm).
  */
-export function timelineModel({ timeline, outcome, layer, bestAtStart = 0 }) {
+export function timelineModel({
+  timeline,
+  outcome,
+  layer,
+  bestAtStart = 0,
+  sector = null,
+}) {
   const cleared = outcome === 'victory';
-  const span = Math.max(RUN_FINAL_LAYER, layer);
+  const first = sector ? sector.layers[0] : 1;
+  const span = sector ? sector.layers[1] : Math.max(RUN_FINAL_LAYER, layer);
   const reached = cleared ? span : Math.min(span, layer + 0.5);
   const wardenLayers = [];
-  for (let n = 1; n <= span; n += 1) {
+  for (let n = first; n <= span; n += 1) {
     if (directorFor(n).warden) wardenLayers.push(n);
   }
-  const chapters = BIOMES.map((biome, i) => ({
-    label: chapterLabel(biome.title),
-    from: biome.layers[0],
-    to: i === BIOMES.length - 1 ? RUN_FINAL_LAYER : biome.layers[1],
-  }));
+  const chapters = (sector ? [biomeForLayer(first)] : BIOMES).map(
+    (biome, i) => ({
+      label: chapterLabel(biome.title),
+      from: biome.layers[0],
+      to:
+        !sector && i === BIOMES.length - 1 ? RUN_FINAL_LAYER : biome.layers[1],
+    })
+  );
   if (span > RUN_FINAL_LAYER) {
     chapters.push({ label: 'DEEP FIELD', from: RUN_FINAL_LAYER + 1, to: span });
   }
@@ -246,8 +309,9 @@ export function timelineModel({ timeline, outcome, layer, bestAtStart = 0 }) {
       color: 'var(--xp)',
     });
   }
-  placeLabels(events, span);
+  placeLabels(events, span - first + 1);
   return {
+    first,
     span,
     reached,
     cleared,
@@ -271,7 +335,7 @@ function placeLabels(events, span) {
     });
 }
 
-const x = (model, at) => ((at - 1) / (model.span - 1)) * W;
+const x = (model, at) => ((at - model.first) / (model.span - model.first)) * W;
 
 function hexPoints(cx, cy, r) {
   return Array.from({ length: 6 }, (_, i) => {
@@ -315,7 +379,10 @@ function labelMarkup(event, cx) {
 /** The run line as SVG (CSS: .runline in runEndScreens.css). */
 export function timelineMarkup(model) {
   const end = x(model, model.reached);
-  const ticks = Array.from({ length: model.span }, (_, i) => i + 1)
+  const ticks = Array.from(
+    { length: model.span - model.first + 1 },
+    (_, i) => model.first + i
+  )
     .filter((n) => !model.wardenLayers.some(({ layer }) => layer === n))
     .map((n) => {
       const cx = x(model, n);
