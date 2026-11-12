@@ -1,5 +1,4 @@
-// Machine views drawn by hand: the Wardens' machines — Seeker (hunter),
-// Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and Leech: their
+// Machine views drawn by hand: the Wardens' machines — Tether (mine), Husk, Ram, Weaver, Bulwark, Caster, Shade and Leech: their
 // views (shapes from lightMachines.js), outlines and eyes, and what each
 // lights or moves per frame (the Ram's charge, the Caster's landing marks,
 // the Shade's phasing, the Leech's belly, the Weaver's rotor, the Bulwark's
@@ -19,7 +18,7 @@ import { createSeededRandom } from '../asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
 import { rimLoop } from '../rimBatch.js';
 import { BULWARK_LOOK, HUSK_LOOK, WEAVER_LOOK } from './heavyMachines.js';
-import { ramModel, seekerModel, shadeModel } from './lightMachines.js';
+import { ramModel, shadeModel } from './lightMachines.js';
 import { drum, gon, turned } from './shapes.js';
 
 const TAU = Math.PI * 2;
@@ -345,8 +344,6 @@ const LEECH_LOOK = Object.freeze({
 export function createMachineViews(kit, recipeViews) {
   const { THREE } = kit;
   // The light machines' hulls, eyes and outlines (lightMachines.js).
-  const seeker = seekerModel(kit);
-
   const ram = ramModel(kit);
   const shade = shadeModel(kit);
 
@@ -358,20 +355,6 @@ export function createMachineViews(kit, recipeViews) {
   const mineLook = recipeViews.lookOf(MINE_LOOK);
   const leechLook = recipeViews.lookOf(LEECH_LOOK);
   const bellyGeometry = drum(THREE, 1, 2, 8).rotateY(Math.PI / 8);
-
-  function createSeeker(kind) {
-    const group = new THREE.Group();
-    const body = kit.body('seeker-body', seeker.parts);
-    const lensTone = kit.tone(PALETTE.threat, 0.5);
-    group.add(body);
-    kit.scene.add(group);
-    return kit.view(kind, group, {
-      lensTone,
-      accents: [lensTone],
-      rims: [kit.rim(group, seeker.rim)],
-      glows: [kit.glow(group, lensTone, seeker.lensSize, seeker.lens)],
-    });
-  }
 
   function createTether(kind) {
     const view = mineLook.create(kind);
@@ -590,10 +573,6 @@ export function createMachineViews(kit, recipeViews) {
 
   // What each look lights or moves per frame, after the pose, the Elite look
   // and the affixes every machine shares (EnemyMirror.updateMachine).
-  function updateSeeker(view, enemy) {
-    kit.setGain(view.lensTone, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
-  }
-
   function updateTether(view, enemy, time) {
     mineLook.update(view, enemy, time);
     const armed = Boolean(enemy.armed);
@@ -650,7 +629,6 @@ export function createMachineViews(kit, recipeViews) {
     // `view`: `create(kind)` builds a view for that enemy kind, `update`
     // moves it per frame, `bind` gives it its seed's looks (EnemyMirror).
     views: {
-      seeker: { create: createSeeker, update: updateSeeker },
       tether: { create: createTether, update: updateTether },
       husk: { create: createHusk, update: updateHusk, bind: bindHusk },
       ram: { create: createRam, update: updateRam },

@@ -45,7 +45,6 @@ describe('EnemyMirror', () => {
     expect(
       Object.fromEntries(roster.map(({ id, view }) => [id, view]))
     ).toMatchObject({
-      hunter: 'seeker',
       mine: 'tether',
       husk: 'husk',
       ram: 'ram',
@@ -502,6 +501,7 @@ describe('EnemyMirror', () => {
     const { panelMaterial } = mirror.recipeViews;
     const panelled = [
       'drone',
+      'hunter',
       'mine',
       'weaver',
       'bulwark',
@@ -555,10 +555,11 @@ describe('EnemyMirror', () => {
       0
     );
     const batch = mirror.rimBatch;
-    // the drone's outline twice and the Seeker's 20-point outline
+    // the drone's outline twice and the hunter's own
     const outline = mirror.views.get('a').rims[0].points;
     const n = outline.length / 3;
-    expect(batch.count).toBe(n * 2 + 20);
+    const hunterN = mirror.views.get('c').rims[0].points.length / 3;
+    expect(batch.count).toBe(n * 2 + hunterN);
     expect(batch.object.visible).toBe(true);
     expect(batch.object.geometry.drawRange.count).toBe(batch.count * 2);
     const colorAt = (segment) =>

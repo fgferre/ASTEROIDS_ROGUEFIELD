@@ -130,7 +130,7 @@ A Sentinel ends a sector (a Warden ends a chapter): `type: 'boss'` like a Warden
 
 A new enemy writes no render code. Give it one of:
 
-- `view: '<name>'`: one of the hand-made looks, `seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
+- `view: '<name>'`: one of the hand-made looks, `tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
 - `visual: { scale, parts, lights, animate, finish }`, built by `src/modules/render3d/enemies/recipes.js` from the shape helpers the hand-made machines use (`shapes.js`). Units are the enemy's radius, +x is the nose, +y up. `parts`: `{ shape, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, mirror, material: hull|trim|steel|soot|glow, color: <PALETTE key> }` — hull, trim (dark), steel (worn, light) and soot (black) are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`); `mirror: true` adds the twin across z. Shapes, designed on every side:
 
   - `body`: `stations: [[x, half width, top, bottom, round?], …]`, `round` (2 oval, higher boxier), `ridge` — a smooth loft along x (fuselage, pod, carapace; `bottom` shapes the belly).
