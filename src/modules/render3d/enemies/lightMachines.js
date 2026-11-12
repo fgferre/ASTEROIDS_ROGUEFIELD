@@ -1,9 +1,9 @@
-// The five light machines' hulls (machines.js draws them): the Mote, Seeker,
-// Tether, Ram and Shade, shaped to be seen from any angle the camera takes —
+// Three light machines' hulls (machines.js draws them): the Seeker, Ram and
+// Shade, shaped to be seen from any angle the camera takes —
 // a top, sides, a back with dark nozzles and a designed underside — out of
 // smooth lofted and turned parts (shapes.js) in the hull/dark tones, merged
 // into each machine's one body (kit.body). Each model also says where its
-// eye, lens or nodes sit (in a dark socket) and where its outline runs (its
+// eye or lens sits (in a dark socket) and where its outline runs (its
 // waist).
 
 import {
@@ -14,84 +14,11 @@ import {
   nozzle,
   outline,
   pairs,
-  revolve,
   seam,
   socket,
   spline,
   toned,
 } from './shapes.js';
-
-const TAU = Math.PI * 2;
-
-/**
- * Mote: a small lens-shaped disc — six hull plates a side over a dark frame,
- * a raised dome in a dark collar, a dark waist band, a recessed boss under
- * it and two small nozzles behind — and one red eye in a socket at its
- * front edge.
- */
-export function moteModel(kit) {
-  const { THREE } = kit;
-  const eye = new THREE.Vector3(0.79, 0.145, 0);
-  const eyeSize = 0.2;
-  const look = new THREE.Vector3(1, 0.85, 0).normalize();
-  const parts = () => {
-    const { hull, dark } = toned(kit.tones);
-    const plates = (profile) =>
-      Array.from({ length: 6 }, (_, i) =>
-        hull(
-          revolve(THREE, profile, 3, {
-            from: (i * TAU) / 6 + 0.04,
-            span: TAU / 6 - 0.08,
-          })
-        )
-      );
-    const upper = [
-      0.44, 0.222, 0.64, 0.196, 0.82, 0.138, 0.94, 0.072, 0.985, 0.036,
-    ];
-    const lower = [0.985, -0.04, 0.92, -0.094, 0.76, -0.15, 0.52, -0.188];
-    const back = (side) =>
-      nozzle(
-        THREE,
-        new THREE.Vector3(-0.88, -0.01, 0.3 * side),
-        new THREE.Vector3(-1, -0.2, 0.25 * side),
-        0.075,
-        6
-      );
-    return [
-      ...plates(upper),
-      ...plates(lower),
-      dark(revolve(THREE, [0.42, 0.208, 0.75, 0.15, 0.99, 0.02], 12)),
-      dark(revolve(THREE, [0.99, -0.02, 0.75, -0.135, 0.5, -0.175], 12)),
-      dark(revolve(THREE, [0.985, 0.04, 1, 0, 0.985, -0.042], 24)),
-      dark(revolve(THREE, [0.52, -0.188, 0.47, -0.17, 0.3, -0.16], 16)),
-      hull(
-        revolve(
-          THREE,
-          [0.3, -0.16, 0.26, -0.195, 0.15, -0.228, 0.05, -0.24],
-          16,
-          {
-            end: 'smooth',
-          }
-        )
-      ),
-      hull(
-        revolve(
-          THREE,
-          [0.06, 0.4, 0.2, 0.385, 0.33, 0.33, 0.395, 0.262, 0.41, 0.2],
-          16,
-          {
-            start: 'smooth',
-          }
-        )
-      ),
-      dark(revolve(THREE, [0.395, 0.24, 0.43, 0.258, 0.47, 0.212], 16)),
-      dark(socket(THREE, eye, look, eyeSize, 10)),
-      dark(back(1)),
-      dark(back(-1)),
-    ];
-  };
-  return { parts, eye, eyeSize };
-}
 
 /**
  * Seeker: a slim chined fuselage with a dark spine line and belly pan, two
@@ -245,92 +172,6 @@ export function seekerModel(kit) {
     0.1
   );
   return { parts, lens, lensSize, rim };
-}
-
-/**
- * Tether: a dark turned core — domes with recessed ports, hull plates
- * between the struts, an armour belt — and three swept struts trailing its
- * spin, each ending in a dark collar clamped round a node.
- */
-export function tetherModel(kit) {
-  const { THREE } = kit;
-  const reach = 1.05;
-  const nodeSize = 0.15;
-  const angles = [0, 1, 2].map((i) => (i / 3) * TAU);
-  const tips = angles.map(
-    (angle) =>
-      new THREE.Vector3(Math.cos(angle) * reach, 0, -Math.sin(angle) * reach)
-  );
-  const parts = () => {
-    const { hull, dark } = toned(kit.tones);
-    // the lower half turns the upper's profiles upside down
-    const flipY = (flat) => {
-      const out = [];
-      for (let i = flat.length - 2; i >= 0; i -= 2) {
-        out.push(flat[i], -flat[i + 1]);
-      }
-      return out;
-    };
-    const dome = [
-      0.16, 0.318, 0.25, 0.302, 0.34, 0.25, 0.41, 0.16, 0.44, 0.085,
-    ];
-    const port = [0.1, 0.262, 0.135, 0.29, 0.16, 0.318];
-    const belt = [
-      0.44, 0.085, 0.47, 0.055, 0.475, 0, 0.47, -0.055, 0.44, -0.085,
-    ];
-    // plates between the struts (struts at revolve angles 0, ±120°)
-    const plate = [0.2, 0.33, 0.3, 0.3, 0.38, 0.235, 0.435, 0.14];
-    const plates = (profile) =>
-      [1, 3, 5].map((k) =>
-        hull(
-          revolve(THREE, profile, 4, {
-            from: (k * TAU) / 6 - 0.62,
-            span: 1.24,
-          })
-        )
-      );
-    // one strut along +x, trailing the spin (angle grows toward −z)
-    const strut = loft(
-      THREE,
-      10,
-      10,
-      (s) => {
-        const r = 0.36 + 0.54 * s;
-        const a = 0.32 * (1 - s) ** 1.5;
-        const k = (1 - s) ** 2;
-        return {
-          at: [Math.cos(a) * r, 0, -Math.sin(a) * r],
-          w: 0.058 + 0.08 * k,
-          top: 0.056 + 0.05 * k,
-          bottom: 0.05 + 0.045 * k,
-          e: 2.5,
-          ridge: 0.02,
-        };
-      },
-      { start: 'flat', end: 'flat' }
-    );
-    // a collar round the node's waist: from the side a dark band between
-    // two caps of light, from above a dark ring round the node
-    const collar = revolve(
-      THREE,
-      [0.15, 0.062, 0.19, 0.062, 0.208, 0, 0.19, -0.062, 0.15, -0.062],
-      14
-    );
-    collar.translate(reach, 0, 0);
-    return [
-      dark(revolve(THREE, port, 16, { start: 'smooth' })),
-      dark(revolve(THREE, dome, 24)),
-      hull(revolve(THREE, belt, 24)),
-      dark(revolve(THREE, flipY(dome), 24)),
-      dark(revolve(THREE, flipY(port), 16, { end: 'smooth' })),
-      hull(revolve(THREE, [0.14, 0.33, 0.17, 0.345, 0.2, 0.33, 0.2, 0.31], 16)),
-      ...plates(plate),
-      ...plates(flipY(plate)),
-      ...angles.map((angle) => hull(strut, angle)),
-      ...angles.map((angle) => dark(collar, angle)),
-    ];
-  };
-  return { parts, tips, nodeSize };
 }
 
 /**

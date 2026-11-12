@@ -23,6 +23,12 @@
 //         smooth through its points, tapering (arms, struts, pipes);
 //       nozzle, socket: { dir } — a dark exhaust bell (mouth toward dir,
 //         −x) and a dark eye housing (open toward dir, +x), radius 1;
+//       slab: { outline: [[x, z], …], bottom, top, bevel } — hard surface:
+//         a top-view outline extruded between two heights, edges chamfered
+//         (hulls, decks, plates, jaws);
+//       drum: { sides, taper, axis: y | x | z } — a faceted drum, radius 1
+//         and 2 long, its +axis end `taper` × the radius (pods, barrels,
+//         prongs: 0 is a point);
 //       sphere | box | octahedron | icosahedron | cone | cylinder | torus —
 //         each 1 radius out from its centre (cone and cylinder stand along
 //         y, the torus lies flat around y),
@@ -30,11 +36,14 @@
 //       in radii, +x the nose and +y up,
 //     mirror: also its twin across z (left/right), sides (and rings, for a
 //       body or tube): how finely a designed shape is cut,
-//     material: hull | trim | glow (hull; trim for nozzle and socket),
+//     material: hull | trim | steel | soot | glow (hull; trim for nozzle and
+//       socket): matte hull, dark trim, worn light steel, sooty black,
 //     color: a PALETTE key (hull: hullLit, trim: hull, glow: threat),
 //   }],
 //   lights: [{ at, size (0.18), color (threat), pulse: getter, dir, housing }],
 //   animate: { spin: [x, y, z] rad/s, bob: radii, pulse: getter },
+//   finish: matte | panel (matte) — panel: the hard-surface finish, the
+//     Sentinels' panelled hull maps on flat-shaded faces,
 // }
 // Lights are the eyes, lenses and nodes (one glow batch); a getter is an enemy
 // property read per frame as 0..1 (telegraphRatio, damageRatio, ...): a
@@ -45,16 +54,20 @@
 // body keeps a circle). Shapes from shapes.js, as the hand-made machines.
 
 import { PALETTE } from '../../../data/constants/palette.js';
+import { bakeHullMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
 import { mergeStatic } from '../mergeStatic.js';
 import { rimLoop } from '../rimBatch.js';
+import { addRimLight } from '../rimLight.js';
 import {
   blade,
+  drum,
   loft,
   mirrorZ,
   nozzle,
   refine,
   revolve,
+  slab,
   socket,
   spline,
   sweep,
@@ -76,6 +89,10 @@ const BOB_RATE = 2.4;
 const PULSE_RATE = 6;
 const PULSE_SWELL = 0.1;
 const PULSE_GAIN = 0.6;
+// The panel finish: panels per radius (the baked maps' tiling) and its maps'
+// own seed (a cached map's `repeat` is shared).
+const PANEL_TILE = 0.7;
+const PANEL_MAP_SEED = 0x7e11;
 
 // A plain machine in layered armour: a dark slab under a raised hull plate
 // with a dark spine, a hull belly and a dark keel under it, two swept wings,
@@ -186,9 +203,9 @@ const DEFAULT_VISUAL = Object.freeze({
   lights: [{ at: [0.8, 0.1, 0], dir: [1, 0.6, 0], size: 0.12 }],
 });
 
-// The matte materials' default tones (kit.tones); the shapes that are dark
-// unless they say otherwise.
-const MATTE = { hull: 'hull', trim: 'dark' };
+// The matte materials (their tones built in createRecipeViews); the shapes
+// that are dark unless they say otherwise.
+const MATTE = new Set(['hull', 'trim', 'steel', 'soot']);
 const DARK_SHAPES = new Set(['nozzle', 'socket']);
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -201,6 +218,24 @@ const level = (enemy, getter) => clamp01(Number(enemy[getter]) || 0);
  */
 export function createRecipeViews(kit) {
   const { THREE } = kit;
+  const { hull, dark } = kit.tones;
+  const tones = {
+    hull,
+    trim: dark,
+    steel: hull.clone().multiplyScalar(1.7),
+    soot: dark.clone().multiplyScalar(0.55),
+  };
+  // The panel finish, shared by every look that asks for it: the plate
+  // material carrying baked hull panels, its tones in vertex colours.
+  const panelMaterial = addRimLight(kit.plateMaterial.clone());
+  const maps = bakeHullMaps(THREE, kit.mapSeed + PANEL_MAP_SEED);
+  Object.values(maps).forEach((map) => map.repeat.set(PANEL_TILE, PANEL_TILE));
+  Object.assign(panelMaterial, maps, {
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    aoMapIntensity: 0.8,
+    vertexColors: true,
+  });
+  panelMaterial.color.setRGB(1, 1, 1);
   const torus = new THREE.TorusGeometry(1, 0.12, 8, 32);
   torus.rotateX(Math.PI / 2);
   const shapes = {
@@ -312,6 +347,21 @@ export function createRecipeViews(kit) {
         { capped: true }
       );
     },
+    slab({ outline, bottom = -0.1, top = 0.1, bevel = 0.03 }) {
+      if (!(outline?.length >= 3)) {
+        throw new Error('[recipes] a slab needs an outline of three points');
+      }
+      if (!(top > bottom))
+        throw new Error('[recipes] a slab needs top > bottom');
+      return slab(THREE, outline, bottom, top, bevel);
+    },
+    drum({ sides = 8, taper = 1, axis = 'y' }) {
+      const geometry = drum(THREE, 1, 2, sides, taper);
+      if (axis === 'x') geometry.rotateZ(-Math.PI / 2);
+      else if (axis === 'z') geometry.rotateX(Math.PI / 2);
+      else if (axis !== 'y') throw new Error(`[recipes] no axis '${axis}'`);
+      return geometry;
+    },
     nozzle: ({ dir = [-1, 0, 0], sides = 12 }) =>
       nozzle(THREE, origin, vector(dir), 1, sides),
     socket: ({ dir = [1, 0, 0], sides = 12 }) =>
@@ -411,7 +461,10 @@ export function createRecipeViews(kit) {
   // it), a merged geometry per glow colour, the outline, the lights and the
   // motion.
   function compile(visual) {
-    const { parts = [], lights = [], animate = {} } = visual;
+    const { parts = [], lights = [], animate = {}, finish = 'matte' } = visual;
+    if (finish !== 'matte' && finish !== 'panel') {
+      throw new Error(`[recipes] no finish '${finish}'`);
+    }
     const matte = [];
     const glows = new Map();
     parts.forEach((part) => {
@@ -422,10 +475,10 @@ export function createRecipeViews(kit) {
         const hex = paletteHex(part.color ?? 'threat');
         if (!glows.has(hex)) glows.set(hex, []);
         geometries.forEach((geometry) => glows.get(hex).push({ geometry }));
-      } else if (MATTE[material]) {
+      } else if (MATTE.has(material)) {
         const color = part.color
           ? colorOf(THREE, paletteHex(part.color))
-          : kit.tones[MATTE[material]];
+          : tones[material];
         geometries.forEach((geometry) => matte.push({ geometry, color }));
       } else {
         throw new Error(`[recipes] no material '${material}'`);
@@ -451,7 +504,8 @@ export function createRecipeViews(kit) {
     );
     return {
       scale: visual.scale ?? 1,
-      body: matte.length ? mergeStatic(THREE, matte) : null,
+      body: matte.length ? mergeBody(matte, finish) : null,
+      material: finish === 'panel' ? panelMaterial : kit.machineMaterial,
       glows: [...glows].map(([hex, list]) => ({
         hex,
         geometry: mergeStatic(THREE, list),
@@ -466,11 +520,33 @@ export function createRecipeViews(kit) {
     };
   }
 
+  // The matte parts as one geometry; the panel finish cuts them flat and
+  // gives the parts without UVs (turned and lofted ones) a top-view map.
+  function mergeBody(parts, finish) {
+    if (finish === 'matte') return mergeStatic(THREE, parts);
+    parts.forEach(({ geometry }) => {
+      if (geometry.getAttribute('uv')) return;
+      const p = geometry.getAttribute('position');
+      const uv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i += 1) {
+        uv[i * 2] = p.getX(i);
+        uv[i * 2 + 1] = p.getZ(i);
+      }
+      geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    });
+    const geometry = mergeStatic(
+      THREE,
+      parts.map((part) => ({ ...part, flat: true }))
+    );
+    geometry.setAttribute('uv2', geometry.getAttribute('uv'));
+    return geometry;
+  }
+
   function create(kind, recipe) {
     const group = new THREE.Group();
     const body = new THREE.Group();
     body.scale.setScalar(recipe.scale);
-    if (recipe.body) body.add(new THREE.Mesh(recipe.body, kit.machineMaterial));
+    if (recipe.body) body.add(new THREE.Mesh(recipe.body, recipe.material));
     const accents = [];
     const glowMaterials = recipe.glows.map(({ hex, geometry }) => {
       const material = kit.emissive(hex, GLOW_GAIN);
@@ -548,5 +624,5 @@ export function createRecipeViews(kit) {
     return look;
   }
 
-  return { lookOf };
+  return { lookOf, panelMaterial };
 }

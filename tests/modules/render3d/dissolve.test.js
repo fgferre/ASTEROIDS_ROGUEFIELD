@@ -50,7 +50,8 @@ describe('DissolvePool', () => {
     const enemy = mote('a');
     mirror.update([enemy], 0, 0);
     const view = mirror.views.get('a');
-    const body = view.body;
+    // the drone's look is a recipe: its hull is the body group's first mesh
+    const [body] = view.body.children;
     const hull = body.material;
 
     mirror.markDead(enemy);

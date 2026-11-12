@@ -130,17 +130,19 @@ A Sentinel ends a sector (a Warden ends a chapter): `type: 'boss'` like a Warden
 
 A new enemy writes no render code. Give it one of:
 
-- `view: '<name>'`: one of the hand-made looks, `mote seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
-- `visual: { scale, parts, lights, animate }`, built by `src/modules/render3d/enemies/recipes.js` from the shape helpers the hand-made machines use (`shapes.js`). Units are the enemy's radius, +x is the nose, +y up. `parts`: `{ shape, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, mirror, material: hull|trim|glow, color: <PALETTE key> }` — hull and trim are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`); `mirror: true` adds the twin across z. Shapes, designed on every side:
+- `view: '<name>'`: one of the hand-made looks, `seeker tether husk ram weaver bulwark caster shade leech` (shared with that enemy; `bulwark` draws its plate from a `frontal-shield` behavior, so it needs one).
+- `visual: { scale, parts, lights, animate, finish }`, built by `src/modules/render3d/enemies/recipes.js` from the shape helpers the hand-made machines use (`shapes.js`). Units are the enemy's radius, +x is the nose, +y up. `parts`: `{ shape, size: n or [x, y, z], at: [x, y, z], rotate: [x, y, z] radians, mirror, material: hull|trim|steel|soot|glow, color: <PALETTE key> }` — hull, trim (dark), steel (worn, light) and soot (black) are matte; only `glow` parts and `lights` shine (neon only on information, `docs/NORTE.md`); `mirror: true` adds the twin across z. Shapes, designed on every side:
 
   - `body`: `stations: [[x, half width, top, bottom, round?], …]`, `round` (2 oval, higher boxier), `ridge` — a smooth loft along x (fuselage, pod, carapace; `bottom` shapes the belly).
   - `turned`: `profile: [[radius, height], …]`, `axis: 'y'|'x'`, `smooth` — turned round y (dome, disc, turret) or x (pod, barrel; the top is the nose); ends off the axis are capped, a profile that ends where it starts is a ring.
   - `wing`: `root, tip, span, sweep, thick, dihedral, under` — a thick tapered blade out along +z from its root chord at `at`; `dihedral: Math.PI / 2, under: 1` is a fin.
   - `tube`: `points: [[x, y, z], …], radius: r or [from, to]` — smooth through its points (arm, strut, pipe; not straight up).
   - `nozzle`, `socket`: `dir` — a dark exhaust bell (mouth toward `dir`, default −x) and a dark eye housing (default +x); `size` is the radius.
+  - `slab`: `outline: [[x, z], …], bottom, top, bevel` — hard surface: a top-view outline extruded between two heights, edges chamfered (hull, deck, plate, jaw, clamp).
+  - `drum`: `sides, taper, axis: 'y'|'x'|'z'` — a faceted drum, radius 1 and 2 long; its + end is `taper` × the radius (pod, barrel, rib; 0 with 4 sides is a prong).
   - `sphere|box|octahedron|icosahedron|cone|cylinder|torus`: plain primitives, for small details only.
 
-  `lights`: `{ at, size, color, pulse: <getter>, dir, housing }`; each sits in a dark socket open away from the centre (or toward `dir`; `housing: false` for none). `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`, `wardRatio`, `layGlow`). A behavior's field-plane telegraph (the `aim-line` line) is drawn for it. The outline follows the parts' top view (a circle if it tumbles). Unknown names throw. `sides` (and `rings` on `body` and `tube`) sets how finely a shape is cut: keep a view under ~2500 triangles. Copy `tests/__fixtures__/enemies/sentry.js`.
+  `lights`: `{ at, size, color, pulse: <getter>, dir, housing }`; each sits in a dark socket open away from the centre (or toward `dir`; `housing: false` for none). `finish: 'panel'` (default `'matte'`) is the hard-surface finish of the Sentinels — flat faces under baked hull panels; build it from `slab` and `drum` in two or three tones (the Drone's file is the example). `animate`: `{ spin: [x, y, z] rad/s, bob, pulse: <getter> }`; a getter is one the enemy's behaviors provide (e.g. `telegraphRatio`, `wardRatio`, `layGlow`). A behavior's field-plane telegraph (the `aim-line` line) is drawn for it. The outline follows the parts' top view (a circle if it tumbles). Unknown names throw. `sides` (and `rings` on `body` and `tube`) sets how finely a shape is cut: keep a view under ~2500 triangles. Copy `tests/__fixtures__/enemies/sentry.js`.
 
 - Neither: a default small matte machine with one red eye.
 

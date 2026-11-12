@@ -41,11 +41,10 @@ describe('EnemyMirror', () => {
           : mirror.recipeViews.lookOf(visual)
       );
     }
-    // the ten machines keep the views drawn by hand for them
+    // the nine machines keep the views drawn by hand for them
     expect(
       Object.fromEntries(roster.map(({ id, view }) => [id, view]))
     ).toMatchObject({
-      drone: 'mote',
       hunter: 'seeker',
       mine: 'tether',
       husk: 'husk',
@@ -499,18 +498,25 @@ describe('EnemyMirror', () => {
       'herald-heat': 2,
       'herald-silence': 1,
     };
+    // the hard-surface looks merge on the panelled material instead
+    const { panelMaterial } = mirror.recipeViews;
+    const panelled = ['drone', 'mine', 'caster', 'leech'];
     for (const [kind, count] of Object.entries(expected)) {
       const view = mirror.acquire(kind);
       expect(draws(view.object), kind).toBe(count);
+      const shared = panelled.includes(kind)
+        ? panelMaterial
+        : mirror.machineMaterial;
       const merged = [];
       view.object.traverse((o) => {
-        if (o.material === mirror.machineMaterial) merged.push(o);
+        if (o.material === shared) merged.push(o);
       });
       const own = ['husk', 'boss', 'herald-silence'].includes(kind);
       // the Bulwark's plate carries its tones too, apart (it goes dark broken)
       expect(merged.length, kind).toBe(own ? 0 : kind === 'bulwark' ? 2 : 1);
       if (!own) expect(merged[0].geometry.getAttribute('color')).toBeTruthy();
     }
+    expect(panelMaterial.vertexColors).toBe(true);
     expect(mirror.machineMaterial.vertexColors).toBe(true);
     // the Elite ring is one mesh of dashes
     const ram = mirror.acquire('ram');
@@ -538,16 +544,20 @@ describe('EnemyMirror', () => {
       0
     );
     const batch = mirror.rimBatch;
-    // two 48-point circles and the Seeker's 20-point outline
-    expect(batch.count).toBe(48 * 2 + 20);
+    // the drone's outline twice and the Seeker's 20-point outline
+    const outline = mirror.views.get('a').rims[0].points;
+    const n = outline.length / 3;
+    expect(batch.count).toBe(n * 2 + 20);
     expect(batch.object.visible).toBe(true);
     expect(batch.object.geometry.drawRange.count).toBe(batch.count * 2);
     const colorAt = (segment) =>
       Array.from(batch.colors.array.slice(segment * 6, segment * 6 + 3));
     expectColor(colorAt(0), mirror.rimColors.threat);
-    expectColor(colorAt(48), mirror.rimColors.elite);
-    // world space: the first point of mote a's circle, radius 12 × 1.04
-    expect(batch.positions.getX(0)).toBeCloseTo(12 * 1.04);
+    expectColor(colorAt(n), mirror.rimColors.elite);
+    // world space: the first point of drone a's outline, × its radius and
+    // its look's scale
+    const scale = mirror.views.get('a').body.scale.x;
+    expect(batch.positions.getX(0)).toBeCloseTo(12 * scale * outline[0]);
 
     mirror.update([], 0);
     expect(batch.count).toBe(0);
@@ -574,26 +584,26 @@ describe('EnemyMirror', () => {
     const ram = { ...mine, id: 'r', type: 'ram', telegraphRatio: 0 };
     mirror.update([mine, ram], 0);
     const { mesh } = mirror.glows;
-    // three Tether nodes and the Ram's lens (its core shows only charging)
-    expect(mesh.count).toBe(4);
+    // the Mine's trigger and the Ram's lens (its core shows only charging)
+    expect(mesh.count).toBe(2);
     expect(mesh.visible).toBe(true);
     expectColor(
       Array.from(mesh.instanceColor.array.slice(0, 3)),
-      mirror.views.get('m').nodeTone.color
+      mirror.views.get('m').triggerTone.color
     );
     const size = (i) => {
       const matrix = new THREE.Matrix4();
       mesh.getMatrixAt(i, matrix);
       return new THREE.Vector3().setFromMatrixScale(matrix).x;
     };
-    const lens = size(3);
+    const lens = size(1);
     expect(lens).toBeCloseTo(14 * 0.12);
 
     mirror.markDead(ram);
     mirror.update([mine], 0, 0); // the burn starts
     mirror.update([mine], 0, DISSOLVE_SECONDS / 4);
-    expect(mesh.count).toBe(4);
-    expect(size(3)).toBeCloseTo(lens * 0.75);
+    expect(mesh.count).toBe(2);
+    expect(size(1)).toBeCloseTo(lens * 0.75);
 
     mirror.update([], 0, DISSOLVE_SECONDS);
     expect(mesh.count).toBe(0);

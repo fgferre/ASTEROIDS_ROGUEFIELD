@@ -2,7 +2,8 @@
 // (lightMachines.js, heavyMachines.js, the frontal plate, the Elite blades):
 // flat profiles and splines, rings skinned into smooth closed parts, turned,
 // lofted and swept bodies, sections swept round an arc, blades and seams,
-// the dark sockets and nozzles, part records in the kit's tones and
+// hard-surface slabs and faceted drums, the dark sockets and nozzles, part
+// records in the kit's tones and
 // outlines. Each takes the Three namespace where it builds geometry; +X is
 // the nose, +Y up.
 
@@ -359,6 +360,38 @@ export function nozzle(THREE, at, dir, r, segments = 12) {
     dir,
     at
   );
+}
+
+/**
+ * A hard-surface slab: the closed top-view `outline` ([[x, z], …]) from
+ * height `y0` up to `y1`, its edges cut by a one-step chamfer of `bevel`
+ * (crisp, not rounded). The plates, decks and jaws of armoured hulls.
+ */
+export function slab(THREE, outline, y0, y1, bevel = 0.025) {
+  const cut = Math.max(0, Math.min(bevel, (y1 - y0) / 2 - 1e-4));
+  const shape = new THREE.Shape(
+    outline.map(([x, z]) => new THREE.Vector2(x, z))
+  );
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: y1 - y0 - 2 * cut,
+    bevelEnabled: cut > 0,
+    bevelThickness: cut,
+    bevelSize: cut,
+    bevelOffset: -cut,
+    bevelSegments: 1,
+    curveSegments: 1,
+  });
+  geometry.rotateX(Math.PI / 2);
+  geometry.translate(0, y1 - cut, 0);
+  return geometry;
+}
+
+/**
+ * A faceted drum of `sides` round +Y, `radius` across and `length` tall,
+ * its top `taper` × the radius (0: a point; a few sides: a prong).
+ */
+export function drum(THREE, radius, length, sides, taper = 1) {
+  return new THREE.CylinderGeometry(radius * taper, radius, length, sides);
 }
 
 // The matte tones a part merges in (kit.tones), as part records.

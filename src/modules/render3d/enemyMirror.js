@@ -515,8 +515,8 @@ export class EnemyMirror {
     this.rimBatch = new RimBatch(THREE, scene);
     this.glows = new GlowBatch(THREE, scene);
     this.packView = (view) => this.packLive(view);
-    this.machineViews = createMachineViews(this.kit);
     this.recipeViews = createRecipeViews(this.kit);
+    this.machineViews = createMachineViews(this.kit, this.recipeViews);
     this.heraldViews = createHeraldViews(this.kit);
     this.wardenViews = createWardenViews(this.kit);
     this.sentinelViews = createSentinelViews(this.kit, this.recipeViews);
