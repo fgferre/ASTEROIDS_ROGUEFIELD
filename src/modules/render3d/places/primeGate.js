@@ -1,7 +1,8 @@
 // Prime Gate (docs/ROTEIRO.md "Os lugares" 3): right against the Ring's
 // outer wall. The wall fills the view below the field, plate after plate,
 // running lines along it, its rim edge across the top with space past it;
-// in it a gate, its frame lit, its shaft glowing faintly.
+// in it a gate with power after a thousand years: its frame lined with
+// light and lamps, guide lights leading to it, its shaft lit from inside.
 
 import { gradientDisc } from './kit.js';
 import { lightPoint, under } from './pieces.js';
@@ -15,17 +16,21 @@ export function buildPrimeGate(THREE, kit) {
   const { tone, random } = kit;
   const wall = kit.parts();
   const lit = kit.parts();
+  // proposta 12/11: plates a shade darker so rocks and the ship read.
   const plates = [
-    tone('#181b1f'),
-    tone('#1d2025'),
-    tone('#15171a'),
-    tone('#212429'),
+    tone('#121418'),
+    tone('#16191d'),
+    tone('#0f1114'),
+    tone('#1a1d21'),
   ];
-  const recess = tone('#0c0d0f');
-  const rib = tone('#24282e');
+  const recess = tone('#08090b');
+  const rib = tone('#1e2227');
   const line = tone('#7fe6ff', 0.16);
-  const gateLine = tone('#9fe8ff', 0.2);
-  const lamp = tone('#ffe2b0', 0.6);
+  // proposta 12/11: the gate's light — frame, lamps, shaft, guides.
+  const gateLine = tone('#a8f0ff', 0.5);
+  const lamp = tone('#eaf8ff', 1.2);
+  const shaft = tone('#5fd8f0', 0.5);
+  const guide = tone('#9fe8ff', 0.6);
 
   const [cw, cz] = WALL.cell;
   const nearGate = (x, z) =>
@@ -93,30 +98,70 @@ export function buildPrimeGate(THREE, kit) {
     );
     kit.box(wall, rib, at(1.38, 90), [len * r * 0.7, 36, r * 0.12], tangent);
     kit.box(wall, recess, at(1.03, -150), [len * r * 1.03, 300, 16], tangent);
-    kit.box(lit, gateLine, at(1.06, 82), [len * r * 1.04, 3, 4], tangent);
+    // The lit lip on top of the frame, and a fainter one round its rim.
+    kit.box(lit, gateLine, at(1.07, 102), [len * r * 1.07, 3, 6], tangent);
+    kit.box(
+      lit,
+      gateLine.clone().multiplyScalar(0.4),
+      at(1.44, 102),
+      [len * r * 1.44, 3, 5],
+      tangent
+    );
+    // Rings of light down the shaft, brighter the deeper: lit from inside.
+    [-50, -120, -190].forEach((y, d) =>
+      kit.box(
+        lit,
+        shaft.clone().multiplyScalar(0.35 + d * 0.3),
+        at(1.0, y),
+        [len * r, 4, 8],
+        tangent
+      )
+    );
     const corner = (i / sides) * Math.PI * 2;
     lightPoint(
       kit,
       lit,
       lamp,
-      [gx + Math.cos(corner) * r * 1.42, 96, gz + Math.sin(corner) * r * 1.42],
-      8
+      [gx + Math.cos(corner) * r * 1.42, 128, gz + Math.sin(corner) * r * 1.42],
+      12
     );
     if (i % 2 === 0) {
       kit.box(wall, rib, at(1.75, 30), [r * 0.62, 50, 60], [0, -a, 0]);
     }
   }
-  // The shaft's light, deep in the opening.
+  // The shaft's light, deep in the opening, and its spill on the wall.
   kit.put(
     lit,
-    gradientDisc(THREE, (k) => 0.25 + 0.75 * (1 - k) ** 2, {
-      rings: 6,
+    gradientDisc(THREE, (k) => 0.12 + 0.88 * (1 - k) ** 3, {
+      rings: 8,
       sides: 32,
     }),
-    tone('#4fc8e0', 0.16),
+    shaft,
     [gx, -260, gz],
     r
   );
+  kit.put(
+    lit,
+    gradientDisc(THREE, (k) => 0.12 * (1 - k) ** 2, {
+      rings: 8,
+      sides: 40,
+      hole: 0.55,
+    }),
+    shaft,
+    [gx, 120, gz],
+    r * 2.4
+  );
+  // Guide lights along the wall leading in to the gate, brightening.
+  for (let x = gx - r * 1.9, n = 0; n < 9; x -= 150, n += 1) {
+    [-1, 1].forEach((s) =>
+      kit.box(
+        lit,
+        guide.clone().multiplyScalar(1 - n * 0.09),
+        [x, 60, gz + s * r * 0.45],
+        [40, 3, 9]
+      )
+    );
+  }
 
   const object = new THREE.Group();
   object.add(kit.mesh(wall), kit.mesh(lit, 'glow'));

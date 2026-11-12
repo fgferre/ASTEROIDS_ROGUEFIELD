@@ -187,7 +187,14 @@ describe('sector table', () => {
       bossKind: 'sovereign',
     });
     expect(sectorStage(crucible, 15)).toBeNull();
-    expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
+    // The Warden's sector has its own stages and no `boss`: the Warden ends it.
+    const gate = sectorById('prime-gate');
+    expect(sectorStage(gate, 2).roster).toEqual([
+      expect.objectContaining({ role: 'sniper' }),
+    ]);
+    expect(sectorStage(gate, 5)).toMatchObject({ warden: true });
+    expect(sectorStage(gate, 5).bossKind).toBeUndefined();
+    expect(sectorStage({ ...gate, stages: undefined }, 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });
 
