@@ -46,6 +46,17 @@ describe('Codex entries', () => {
     });
   });
 
+  it('files the Interdictor with the Sentinels, on layer 15', () => {
+    const id = codexIdOf({ type: 'boss', bossKind: 'interdictor' });
+    expect(id).toBe('sentinel-interdictor');
+    expect(CODEX_ENTRIES.find((entry) => entry.id === id)).toMatchObject({
+      name: 'Interdictor',
+      warden: true,
+      fromLayer: 15,
+      hint: 'When its line stops following you, step off it. Leave the cage by the open side. Strike while it cools.',
+    });
+  });
+
   it('has a glyph, lore and hint for every boss', () => {
     const bosses = CODEX_ENTRIES.filter((entry) => entry.warden);
     expect(bosses.map((entry) => entry.id)).toContain('sentinel-gatekeeper');

@@ -9,6 +9,7 @@ import gatekeeper from '../../content/bosses/gatekeeper.js';
 import kilnEngine from '../../content/bosses/kiln-engine.js';
 import prismCrown from '../../content/bosses/prism-crown.js';
 import foundryMother from '../../content/bosses/foundry-mother.js';
+import interdictor from '../../content/bosses/interdictor.js';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -126,7 +127,14 @@ export const WARDEN_KINDS = deepFreeze(kindsOf([prime, choir, nullWarden]));
 // the cycle, Boss Rush or the Warden achievements: a sector asks for one by
 // kind (`bossKind`).
 export const SENTINEL_KINDS = deepFreeze(
-  kindsOf([quarryMaw, gatekeeper, kilnEngine, prismCrown, foundryMother])
+  kindsOf([
+    quarryMaw,
+    gatekeeper,
+    kilnEngine,
+    prismCrown,
+    foundryMother,
+    interdictor,
+  ])
 );
 
 /** Every boss kind, Wardens and Sentinels: what a `bossKind` can name. */

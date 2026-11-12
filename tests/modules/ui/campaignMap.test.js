@@ -96,7 +96,7 @@ describe('campaign map', () => {
       boss: 'Warden: Choir',
       lock: 'Defeat Sentinel Prism Crown to unlock',
     });
-    expect(three.sectors).toHaveLength(2);
+    expect(three.sectors).toHaveLength(3);
     expect(three.sectors[0]).toMatchObject({
       code: 'A',
       name: 'ASSEMBLY GRAVEYARD',
@@ -104,10 +104,16 @@ describe('campaign map', () => {
       lock: 'Defeat Warden Choir to unlock',
     });
     expect(three.sectors[1]).toMatchObject({
+      code: 'B',
+      name: 'QUARANTINE GRID',
+      boss: 'Sentinel: Interdictor',
+      lock: 'Defeat Sentinel Foundry Mother to unlock',
+    });
+    expect(three.sectors[2]).toMatchObject({
       code: 'C',
       name: 'NULL BOUNDARY',
       boss: 'Warden: Null',
-      lock: 'Defeat Sentinel Foundry Mother to unlock',
+      lock: 'Defeat Sentinel Interdictor to unlock',
     });
 
     const rows = sectorRowsMarkup(one.sectors);
@@ -128,6 +134,7 @@ describe('campaign map', () => {
       'crystal-choir',
       'dense-core',
       'assembly-graveyard',
+      'quarantine-grid',
       'wardens-reach',
     ];
     expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');

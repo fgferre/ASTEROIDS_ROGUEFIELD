@@ -10,6 +10,7 @@
 import { SENTINEL_KINDS } from '../../../data/enemies/boss.js';
 import { createFoundryMother } from './sentinels/foundryMother.js';
 import { createGatekeeper } from './sentinels/gatekeeper.js';
+import { createInterdictor } from './sentinels/interdictor.js';
 import { createKilnEngine } from './sentinels/kilnEngine.js';
 import { createSentinelKit } from './sentinels/kit.js';
 import { createPrismCrown } from './sentinels/prismCrown.js';
@@ -35,6 +36,7 @@ export function createSentinelViews(kit, recipeViews) {
       createKilnEngine,
       createPrismCrown,
       createFoundryMother,
+      createInterdictor,
     ].map((make) => {
       const view = make(sentinelKit);
       return [view.kind, view];

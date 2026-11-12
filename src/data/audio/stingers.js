@@ -147,6 +147,15 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantQ: 5,
       grit: true,
     }),
+    // proposta 12/11: a flat, clipped sawtooth pair a tritone apart, like an
+    // alarm that has repeated itself for centuries (the Sentinel)
+    'THE INTERDICTOR': Object.freeze({
+      grains: 9,
+      type: 'sawtooth',
+      notes: Object.freeze([45, 51]), // A2 Eb3
+      formantHz: 1400,
+      formantQ: 6,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

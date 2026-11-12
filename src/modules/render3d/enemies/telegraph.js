@@ -4,7 +4,8 @@
 // warning ring and the beams (the Choir's converging lines, the Maw's eject
 // fan, the Gatekeeper's barrier and its gap, the Prism Crown's reflected
 // beams), the Kiln Engine's hot wedges and slag pools (flat fans and
-// discs) and the Foundry Mother's arms (flat ring sectors). The Ram, the Wardens and any recipe enemy that aims draw them;
+// discs), the Foundry Mother's arms (flat ring sectors) and the
+// Interdictor's cage of fences and its locked beam. The Ram, the Wardens and any recipe enemy that aims draw them;
 // built once into the toolkit (enemyMirror.js createKit) as
 // kit.createTelegraph and kit.updateTelegraph.
 
@@ -144,6 +145,14 @@ export function createTelegraphs(kit) {
       updatePrism(parts, t, ox, oy, progress, pulse);
       return;
     }
+    if (t.type === 'grid') {
+      updateGrid(parts, t, ox, oy, progress, pulse);
+      return;
+    }
+    if (t.type === 'lock') {
+      updateLock(parts, t, progress, pulse);
+      return;
+    }
     if (t.type === 'sectors' || t.type === 'pools' || t.type === 'arms') {
       parts.warn.visible = false;
       parts.beams.forEach((beam) => (beam.visible = false));
@@ -254,6 +263,69 @@ export function createTelegraphs(kit) {
       );
       beam.material.opacity = glow;
     });
+  }
+
+  // A beam piece from (x1, y1) to (x2, y2), placed on the field round the
+  // group at (ox, oy).
+  function placeBeam(beam, s, ox, oy, width, glow) {
+    beam.visible = true;
+    beam.position.set(s.x1 - ox, 0, s.y1 - oy);
+    beam.rotation.y = -Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+    beam.scale.set(
+      Math.max(0.01, Math.hypot(s.x2 - s.x1, s.y2 - s.y1)),
+      1,
+      width
+    );
+    beam.material.opacity = glow;
+  }
+
+  // The Interdictor's cage (7 beams: its three fences, then a short bright
+  // post at each corner): thin and dim while it warns, solid and bright once
+  // it holds, fading out, like the Gatekeeper's barrier.
+  function updateGrid(parts, t, ox, oy, progress, pulse) {
+    parts.warn.visible = false;
+    parts.group.rotation.y = 0;
+    const warning = t.phase === 'warn';
+    const glow = warning ? 0.12 + 0.3 * progress : 0.9 * t.solid;
+    const width = warning ? 2 + 2 * progress : 6 + 2 * pulse;
+    const post = Math.max(glow, warning ? 0.6 : 0);
+    const fences = t.fences || [];
+    const posts = (t.posts || []).map((p) => ({
+      x1: p.x - 6,
+      y1: p.y,
+      x2: p.x + 6,
+      y2: p.y,
+    }));
+    parts.beams.forEach((beam, i) => {
+      beam.visible = false;
+      if (i < fences.length) placeBeam(beam, fences[i], ox, oy, width, glow);
+      else if (posts[i - fences.length]) {
+        placeBeam(beam, posts[i - fences.length], ox, oy, 12, post);
+      }
+    });
+  }
+
+  // The Interdictor's locked beam (1 beam), from its start to the field's
+  // edge: hair-thin while it aims, steady and brighter frozen, wide and
+  // bright as it burns.
+  function updateLock(parts, t, progress, pulse) {
+    parts.warn.visible = false;
+    parts.group.rotation.y = 0;
+    const [beam] = parts.beams;
+    if (!beam) return;
+    const look = {
+      aim: [1, 0.15 + 0.3 * progress],
+      freeze: [3, 0.75],
+      burn: [t.width * 0.6 + 2 * pulse, 0.6 + 0.3 * pulse],
+    }[t.phase] || [1, 0];
+    placeBeam(
+      beam,
+      { x1: t.x, y1: t.y, x2: t.x2, y2: t.y2 },
+      t.x,
+      t.y,
+      ...look
+    );
+    parts.beams.slice(1).forEach((other) => (other.visible = false));
   }
 
   // Dim while a hazard warns (brightening), bright and beating as it burns.

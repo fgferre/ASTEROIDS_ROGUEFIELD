@@ -1,6 +1,7 @@
 import { BossEnemy } from './BossEnemy.js';
 import { SentinelFoundryMother } from './SentinelFoundryMother.js';
 import { SentinelGatekeeper } from './SentinelGatekeeper.js';
+import { SentinelInterdictor } from './SentinelInterdictor.js';
 import { SentinelKilnEngine } from './SentinelKilnEngine.js';
 import { SentinelPrismCrown } from './SentinelPrismCrown.js';
 import { SentinelQuarryMaw } from './SentinelQuarryMaw.js';
@@ -19,6 +20,7 @@ export const WARDEN_CLASSES = Object.freeze({
   'kiln-engine': SentinelKilnEngine,
   'prism-crown': SentinelPrismCrown,
   'foundry-mother': SentinelFoundryMother,
+  interdictor: SentinelInterdictor,
 });
 
 export function wardenFactoryKey(kind) {

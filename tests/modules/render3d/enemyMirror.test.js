@@ -279,6 +279,77 @@ describe('EnemyMirror', () => {
     expect(arm.scale.x).toBeCloseTo(230);
   });
 
+  it('draws the Interdictor with its emitter on the boss’s aim, its cage and its lock', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const boss = {
+      id: 'interdictor',
+      type: 'boss',
+      bossKind: 'interdictor',
+      x: 400,
+      y: 300,
+      radius: 72,
+      ventOpen: 0,
+      mastRise: 1,
+      aimAngle: 0,
+      grid: null,
+      lock: null,
+      telegraph: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-interdictor');
+    mirror.update([boss], 0);
+    const view = mirror.views.get('interdictor');
+    expect(view.kind).toBe('boss-interdictor');
+    expect(view.telegraph.grid.group.visible).toBe(false);
+    expect(view.telegraph.lock.group.visible).toBe(false);
+    const cold = view.coreMaterial.emissiveIntensity;
+
+    boss.aimAngle = 1;
+    boss.grid = {
+      type: 'grid',
+      x: 300,
+      y: 300,
+      size: 360,
+      open: 1,
+      fences: [
+        { x1: 120, y1: 120, x2: 480, y2: 120 },
+        { x1: 480, y1: 480, x2: 120, y2: 480 },
+        { x1: 120, y1: 480, x2: 120, y2: 120 },
+      ],
+      posts: [
+        { x: 120, y: 120 },
+        { x: 480, y: 120 },
+        { x: 480, y: 480 },
+        { x: 120, y: 480 },
+      ],
+      solid: 1,
+      phase: 'solid',
+      timer: 3,
+      duration: 5.5,
+    };
+    boss.lock = {
+      type: 'lock',
+      x: 400,
+      y: 300,
+      angle: 0,
+      x2: 800,
+      y2: 300,
+      phase: 'burn',
+      timer: 0.3,
+      duration: 0.6,
+      width: 24,
+    };
+    mirror.update([boss], 0);
+    expect(view.emitter.rotation.y).toBeCloseTo(-1);
+    expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(cold);
+    expect(view.telegraph.grid.group.visible).toBe(true);
+    expect(view.telegraph.grid.beams.every((beam) => beam.visible)).toBe(true);
+    const [beam] = view.telegraph.lock.beams;
+    expect(beam.visible).toBe(true);
+    expect(beam.scale.x).toBeCloseTo(400);
+  });
+
   it('draws the Prism Crown with its mirrors where the boss puts them and its beams', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const crown = {

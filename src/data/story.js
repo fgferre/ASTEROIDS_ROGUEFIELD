@@ -18,6 +18,7 @@ export const STORY = deepFreeze({
     'kiln-engine': 'KILN ENGINE',
     'prism-crown': 'PRISM CROWN',
     'foundry-mother': 'FOUNDRY MOTHER',
+    interdictor: 'THE INTERDICTOR',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -95,6 +96,11 @@ export const STORY = deepFreeze({
         'Assembly line active. Chassis count: unfinished. Intruder count: one.',
       defeated:
         'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.',
+    },
+    interdictor: {
+      warning: 'Quarantine holds. Boundary drawn. You are inside it.',
+      defeated:
+        'Interdictor offline. The boundary is open. Null has been waiting for this.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

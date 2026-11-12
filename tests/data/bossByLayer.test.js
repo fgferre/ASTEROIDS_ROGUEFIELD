@@ -45,6 +45,7 @@ describe('BOSS_BY_LAYER', () => {
       'kiln-engine',
       'prism-crown',
       'foundry-mother',
+      'interdictor',
     ]);
     expect(BOSS_KINDS['quarry-maw']).toBe(SENTINEL_KINDS['quarry-maw']);
     expect(WARDEN_KINDS['quarry-maw']).toBeUndefined();
@@ -68,6 +69,10 @@ describe('BOSS_BY_LAYER', () => {
     expect(bossTier('foundry-mother')).toBe('sentinel');
     expect(wardenFactoryKey('foundry-mother')).toBe('boss-foundry-mother');
     expect(WARDEN_CLASSES['foundry-mother'].name).toBe('SentinelFoundryMother');
+    expect(WARDEN_KINDS.interdictor).toBeUndefined();
+    expect(bossTier('interdictor')).toBe('sentinel');
+    expect(wardenFactoryKey('interdictor')).toBe('boss-interdictor');
+    expect(WARDEN_CLASSES.interdictor.name).toBe('SentinelInterdictor');
     expect(ELITE_EXCLUDED_TYPES).toEqual(
       expect.arrayContaining([
         'boss-quarry-maw',
@@ -75,6 +80,7 @@ describe('BOSS_BY_LAYER', () => {
         'boss-kiln-engine',
         'boss-prism-crown',
         'boss-foundry-mother',
+        'boss-interdictor',
       ])
     );
 

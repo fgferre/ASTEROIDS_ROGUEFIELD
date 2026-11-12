@@ -29,7 +29,9 @@ quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); 
 refletem nos espelhos, e fica exposto com os espelhos afastados). Os dois vistos lutando dentro das fases. O capítulo 2
 tem as três fases. Capítulo 3: Assembly Graveyard (Sentinel Foundry Mother: monta escolta limitada, que dano forte
 interrompe; varre com dois braços; exposto com as baias abertas ou os braços pendentes) e Null Boundary (Warden Null);
-falta a fase B (Quarantine Grid, The Interdictor). As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): fracos e a
+a fase do meio é Quarantine Grid (Sentinel Interdictor: gaiola de cercas com um lado aberto em volta da nave, feixe
+que mira, trava e queima; exposto quando a gaiola cai). Os três capítulos têm três fases cada (nove partidas, seis
+Sentinels novos); ele não jogou nenhuma. As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): fracos e a
 refazer em placas — drone, caster, anvil, bulwark, husk, leech, twain, mine, sower, weaver e o Herald Dust (proposto
 como conversa paralela, esperando ele iniciar).
 Naves (item 20, 12/11): os três cascos são construídos em placas por `render3d/hullSlabModel.js`, lendo os mesmos
