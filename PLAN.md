@@ -19,10 +19,12 @@ julgar (mapa, head start, duração). Depois (12/11): o capítulo 1 virou três 
 `boss`; Sentinel = chefe de fase (`tier: 'sentinel'`, lista de arquivos no CONTENT.md). Ele achou fraco o primeiro
 modelo feito por ajudante: modelos de chefe e de nave são feitos pela conversa principal (`sentinels.js`, placas com
 os painéis do casco). Falta: ele jogar as três fases; as fases A/B dos capítulos 2 e 3; as naves do jogador (item 20).
-Medido sem tela (12/11, piloto do golden trace, nave que não morre, primeira carta sempre): cada fase do capítulo 1
-dura 5,5–6 min (camadas de 45–80 s; chefes: Quarry Maw 90 s, Gatekeeper 80 s, Prime 89 s) e a vitória dispara nas
-três; golpes concentrados na camada 4 e no chefe (28, 42 e 45 no total); sem a trapaça o piloto morre 9–15 s depois
-de o chefe chegar. O plano mestre pede 14–18 min por fase: alongar é decisão dele, jogando.
+Medido sem tela (12/11, piloto do golden trace que não mira nem desvia, nave que não morre, primeira carta sempre;
+uma amostra por fase): as nove fases chegam à vitória, sem erro. Duração: capítulo 1 4,5–5,5 min (chefes 66–109 s);
+capítulo 2 7,5–11,5 min (Kiln 196 s, Prism 222 s, Choir 102 s); capítulo 3 8,9–11,6 min (Foundry 174 s, Interdictor
+223 s, Null 125 s). Nível ao chegar no chefe: 9–10, 19–21 e 24–30. Golpes concentrados nas camadas do meio e no chefe.
+O Quarry Maw engoliu só 4 rochas em 12 sucções e o Foundry Mother nunca teve a montagem interrompida (o piloto não
+mira). O plano mestre pede 14–18 min por fase: alongar o capítulo 1 é decisão dele, jogando.
 Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
 quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
 (código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e
