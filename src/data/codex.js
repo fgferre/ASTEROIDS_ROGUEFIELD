@@ -36,6 +36,8 @@ const GLYPHS = {
     '<rect x="5" y="-13" width="5" height="26"/><circle cx="-1" cy="-10" r="4"/><circle cx="-1" cy="10" r="4"/><rect x="-12" y="-6" width="11" height="12"/><rect class="eye" x="-11" y="-2" width="4" height="4"/>',
   'sentinel-kiln-engine':
     '<polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(0)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(60)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(120)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(180)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(240)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(300)"/><circle class="eye" r="3.5"/>',
+  'sentinel-prism-crown':
+    '<path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(120)"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(240)"/><circle class="eye" r="3"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -152,6 +154,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'kiln-engine',
       'The Core was told to burn and nothing has told it to stop. The Kiln keeps the fire fed and the slag moving, for a foundry that has poured nothing in a thousand years.',
       'Stand in the cool wedges; they move. Fire while its fins are open.'
+    ),
+    sentinel(
+      'prism-crown',
+      'Nine sang the Ring closed; three were set in crystal to keep the note. The Crown still turns them toward anything that moves, and plays what is left of the hymn in light.',
+      'It shows its beams before it fires. Stand between them; strike while the mirrors are dark.'
     ),
     warden(
       'prime',

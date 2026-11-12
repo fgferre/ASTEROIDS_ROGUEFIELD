@@ -1,6 +1,7 @@
 import { BossEnemy } from './BossEnemy.js';
 import { SentinelGatekeeper } from './SentinelGatekeeper.js';
 import { SentinelKilnEngine } from './SentinelKilnEngine.js';
+import { SentinelPrismCrown } from './SentinelPrismCrown.js';
 import { SentinelQuarryMaw } from './SentinelQuarryMaw.js';
 import { WardenChoir } from './WardenChoir.js';
 import { WardenNull } from './WardenNull.js';
@@ -15,6 +16,7 @@ export const WARDEN_CLASSES = Object.freeze({
   'quarry-maw': SentinelQuarryMaw,
   gatekeeper: SentinelGatekeeper,
   'kiln-engine': SentinelKilnEngine,
+  'prism-crown': SentinelPrismCrown,
 });
 
 export function wardenFactoryKey(kind) {

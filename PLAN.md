@@ -25,8 +25,11 @@ três; golpes concentrados na camada 4 e no chefe (28, 42 e 45 no total); sem a 
 de o chefe chegar. O plano mestre pede 14–18 min por fase: alongar é decisão dele, jogando.
 Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
 quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
-(código C). Visto lutando dentro da fase (fatias, poças, aletas abertas). Falta a fase B (Crystal Choir, Sentinel
-Prism Crown).
+(código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e
+refletem nos espelhos, e fica exposto com os espelhos afastados). Os dois vistos lutando dentro das fases. O capítulo 2
+tem as três fases; faltam as fases A/B do capítulo 3. Reavaliação dos modelos antigos (12/11, pranchas): fracos e a
+refazer em placas — drone, caster, anvil, bulwark, husk, leech, twain, mine, sower, weaver e o Herald Dust (proposto
+como conversa paralela, esperando ele iniciar).
 Naves (item 20, 12/11): os três cascos são construídos em placas por `render3d/hullSlabModel.js`, lendo os mesmos
 dados de casco (painéis de asa e flap, bocais, cabine, `form.body`); o caminho antigo, arredondado, saiu de
 `hullModel.js`. Falta ele julgar as três jogando; se rejeitar, a volta é reverter os dois commits das naves.

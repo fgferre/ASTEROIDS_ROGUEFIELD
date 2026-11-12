@@ -24,6 +24,17 @@ describe('Codex entries', () => {
     });
   });
 
+  it('files the Prism Crown with the Sentinels, on layer 10', () => {
+    const id = codexIdOf({ type: 'boss', bossKind: 'prism-crown' });
+    expect(id).toBe('sentinel-prism-crown');
+    expect(CODEX_ENTRIES.find((entry) => entry.id === id)).toMatchObject({
+      name: 'Prism Crown',
+      warden: true,
+      fromLayer: 10,
+      hint: 'It shows its beams before it fires. Stand between them; strike while the mirrors are dark.',
+    });
+  });
+
   it('has a glyph, lore and hint for every boss', () => {
     const bosses = CODEX_ENTRIES.filter((entry) => entry.warden);
     expect(bosses.map((entry) => entry.id)).toContain('sentinel-gatekeeper');

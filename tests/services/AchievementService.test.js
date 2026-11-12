@@ -118,6 +118,7 @@ describe('AchievementService', () => {
     const { eventBus, unlocked } = setup();
     eventBus.emit('player-took-damage', { damage: 5 });
     eventBus.emit('boss-defeated', { bossKind: 'kiln-engine' });
+    eventBus.emit('boss-defeated', { bossKind: 'prism-crown' });
     expect(unlocked).toEqual([]);
   });
 

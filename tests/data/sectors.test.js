@@ -21,12 +21,13 @@ describe('sector table', () => {
       [1, 'B'],
       [1, 'C'],
       [2, 'A'],
+      [2, 'B'],
       [2, 'C'],
       [3, 'A'],
     ]);
-    // order 5 is kept for a later chapter-two sector
     expect(SECTORS.slice(3).map((s) => [s.id, s.order, s.name])).toEqual([
       ['furnace-drift', 4, 'FURNACE DRIFT'],
+      ['crystal-choir', 5, 'CRYSTAL CHOIR'],
       ['dense-core', 6, 'RESONANCE CHAMBER'],
       ['wardens-reach', 7, "WARDEN'S REACH"],
     ]);
@@ -102,6 +103,25 @@ describe('sector table', () => {
       bossKind: 'kiln-engine',
     });
     expect(sectorStage(furnace, 5)).toBeNull();
+    const crystal = sectorById('crystal-choir');
+    expect(sectorStage(crystal, 6)).toMatchObject({
+      roster: [expect.objectContaining({ role: 'sniper', count: 1 })],
+      castLayer: 10,
+    });
+    expect(sectorStage(crystal, 8).formations).toEqual([
+      expect.objectContaining({
+        kind: 'sweep',
+        role: 'minelayer',
+        spacing: 200,
+      }),
+    ]);
+    expect(sectorStage(crystal, 9).events).toEqual([
+      expect.objectContaining({ kind: 'gravity-well', at: 35 }),
+    ]);
+    expect(sectorStage(crystal, 10)).toMatchObject({
+      warden: true,
+      bossKind: 'prism-crown',
+    });
     expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });
@@ -112,7 +132,8 @@ describe('sector table', () => {
     expect(localLayer(dense, 10)).toBe(5);
     expect(nextSector(sectorById('debris-wake')).id).toBe('salvage-lanes');
     expect(nextSector(sectorById('prime-gate')).id).toBe('furnace-drift');
-    expect(nextSector(sectorById('furnace-drift')).id).toBe('dense-core');
+    expect(nextSector(sectorById('furnace-drift')).id).toBe('crystal-choir');
+    expect(nextSector(sectorById('crystal-choir')).id).toBe('dense-core');
     expect(nextSector(dense).id).toBe('wardens-reach');
     expect(nextSector(sectorById('wardens-reach'))).toBeNull();
     expect(sectorById('nowhere')).toBeNull();

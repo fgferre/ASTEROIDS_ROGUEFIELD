@@ -16,6 +16,7 @@ export const STORY = deepFreeze({
     'quarry-maw': 'QUARRY MAW',
     gatekeeper: 'GATEKEEPER',
     'kiln-engine': 'KILN ENGINE',
+    'prism-crown': 'PRISM CROWN',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -82,6 +83,11 @@ export const STORY = deepFreeze({
         'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
       defeated:
         'Kiln Engine cold. The Core will remember the temperature it lost.',
+    },
+    'prism-crown': {
+      warning:
+        'Three voices remain in the crystal. They have found a new listener.',
+      defeated: 'The Crown is dark. The Chamber heard it go quiet.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

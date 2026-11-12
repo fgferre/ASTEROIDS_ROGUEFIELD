@@ -2,10 +2,11 @@
 // between violet edges, or the Gatekeeper's strip), a marksman's aim line,
 // the spread fan (and the Quarry Maw's intake cone, the same wedge), the
 // warning ring and the beams (the Choir's converging lines, the Maw's eject
-// fan, the Gatekeeper's barrier and its gap), and the Kiln Engine's hot
-// wedges and slag pools (flat fans and discs). The Ram, the Wardens and any recipe
-// enemy that aims draw them; built once into the toolkit (enemyMirror.js
-// createKit) as kit.createTelegraph and kit.updateTelegraph.
+// fan, the Gatekeeper's barrier and its gap, the Prism Crown's reflected
+// beams), and the Kiln Engine's hot wedges and slag pools (flat fans and
+// discs). The Ram, the Wardens and any recipe enemy that aims draw them;
+// built once into the toolkit (enemyMirror.js createKit) as
+// kit.createTelegraph and kit.updateTelegraph.
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
@@ -123,6 +124,10 @@ export function createTelegraphs(kit) {
       updateBarrier(parts, t, progress, pulse);
       return;
     }
+    if (t.type === 'prism') {
+      updatePrism(parts, t, ox, oy, progress, pulse);
+      return;
+    }
     if (t.type === 'sectors' || t.type === 'pools') {
       parts.warn.visible = false;
       parts.beams.forEach((beam) => (beam.visible = false));
@@ -208,6 +213,29 @@ export function createTelegraphs(kit) {
       beam.rotation.y = 0;
       beam.scale.set(Math.max(0.01, piece[1]), 1, piece[2]);
       beam.material.opacity = piece[3];
+    });
+  }
+
+  // The Prism Crown's beams (two per mirror: core → mirror, mirror → edge):
+  // thin and dim while they warn, bright and a little wider as they burn.
+  function updatePrism(parts, t, ox, oy, progress, pulse) {
+    parts.warn.visible = false;
+    parts.group.rotation.y = 0;
+    const warning = t.phase === 'warn';
+    const width = warning ? 2 : t.width * 0.5 + 2 * pulse;
+    const glow = warning ? 0.12 + 0.3 * progress : 0.6 + 0.3 * pulse;
+    parts.beams.forEach((beam, i) => {
+      const s = t.segments?.[i];
+      beam.visible = Boolean(s);
+      if (!s) return;
+      beam.position.set(s.x1 - ox, 0, s.y1 - oy);
+      beam.rotation.y = -Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+      beam.scale.set(
+        Math.max(0.01, Math.hypot(s.x2 - s.x1, s.y2 - s.y1)),
+        1,
+        width
+      );
+      beam.material.opacity = glow;
     });
   }
 

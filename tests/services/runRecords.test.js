@@ -55,11 +55,12 @@ describe('run records', () => {
   });
 
   it('opens a sector once the one before is won or a full run went past its boss', () => {
-    const [wake, lanes, gate, furnace, dense] = [
+    const [wake, lanes, gate, furnace, crystal, dense] = [
       'debris-wake',
       'salvage-lanes',
       'prime-gate',
       'furnace-drift',
+      'crystal-choir',
       'dense-core',
     ].map(sectorById);
     expect(isSectorUnlocked(wake)).toBe(true);
@@ -73,7 +74,12 @@ describe('run records', () => {
     updateRecords({ layer: 6 });
     expect(isSectorUnlocked(gate)).toBe(true);
     expect(isSectorUnlocked(furnace)).toBe(true);
+    expect(isSectorUnlocked(crystal)).toBe(false);
+    updateRecords({ sectorWon: 'furnace-drift', sectorTime: 300 });
+    expect(isSectorUnlocked(crystal)).toBe(true);
     expect(isSectorUnlocked(dense)).toBe(false);
+    updateRecords({ sectorWon: 'crystal-choir', sectorTime: 300 });
+    expect(isSectorUnlocked(dense)).toBe(true);
     updateRecords({ layer: 11 });
     expect(isSectorUnlocked(dense)).toBe(true);
   });

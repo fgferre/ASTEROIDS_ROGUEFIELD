@@ -216,6 +216,63 @@ describe('EnemyMirror', () => {
     expect(spare.visible).toBe(false);
   });
 
+  it('draws the Prism Crown with its mirrors where the boss puts them and its beams', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const crown = {
+      id: 'crown',
+      type: 'boss',
+      bossKind: 'prism-crown',
+      x: 400,
+      y: 300,
+      radius: 70,
+      crownOpen: 0,
+      mirrors: [
+        { x: 512, y: 300, angle: 1, orbit: 0 },
+        { x: 344, y: 397, angle: 3, orbit: 2.09 },
+        { x: 344, y: 203, angle: 5, orbit: 4.19 },
+      ],
+      beams: null,
+      telegraph: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-prism-crown');
+    mirror.update([crown], 0);
+    const view = mirror.views.get('crown');
+    expect(view.kind).toBe('boss-prism-crown');
+    expect(view.mirrors).toHaveLength(4);
+    expect(view.mirrors[0].position.x).toBeCloseTo(112 / 70);
+    // its face bisects the core's beam (orbit 0) and its own (angle 1)
+    expect(view.mirrors[0].rotation.y).toBeCloseTo(-(Math.PI / 2 + 0.5));
+    expect(view.mirrors[3].visible).toBe(false);
+    expect(view.telegraph.beams.group.visible).toBe(false);
+    const cold = view.coreMaterial.emissiveIntensity;
+
+    crown.crownOpen = 1;
+    crown.beams = {
+      type: 'prism',
+      x: 400,
+      y: 300,
+      segments: [
+        { x1: 400, y1: 300, x2: 512, y2: 300 },
+        { x1: 512, y1: 300, x2: 800, y2: 500 },
+      ],
+      solid: 1,
+      phase: 'burn',
+      timer: 1,
+      duration: 2.2,
+      width: 20,
+    };
+    mirror.update([crown], 0);
+    expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(cold);
+    const [core, reflected, spare] = view.telegraph.beams.beams;
+    expect(view.telegraph.beams.group.visible).toBe(true);
+    expect(core.visible).toBe(true);
+    expect(core.scale.x).toBeCloseTo(112);
+    expect(reflected.position.x).toBeCloseTo(112);
+    expect(spare.visible).toBe(false);
+  });
+
   it('gives every asteroid variant its own instanced look, rebound on reuse', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = (id, variant) => ({

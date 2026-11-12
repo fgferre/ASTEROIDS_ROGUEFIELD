@@ -43,6 +43,7 @@ describe('BOSS_BY_LAYER', () => {
       'quarry-maw',
       'gatekeeper',
       'kiln-engine',
+      'prism-crown',
     ]);
     expect(BOSS_KINDS['quarry-maw']).toBe(SENTINEL_KINDS['quarry-maw']);
     expect(WARDEN_KINDS['quarry-maw']).toBeUndefined();
@@ -58,11 +59,16 @@ describe('BOSS_BY_LAYER', () => {
     expect(bossTier('kiln-engine')).toBe('sentinel');
     expect(wardenFactoryKey('kiln-engine')).toBe('boss-kiln-engine');
     expect(WARDEN_CLASSES['kiln-engine'].name).toBe('SentinelKilnEngine');
+    expect(WARDEN_KINDS['prism-crown']).toBeUndefined();
+    expect(bossTier('prism-crown')).toBe('sentinel');
+    expect(wardenFactoryKey('prism-crown')).toBe('boss-prism-crown');
+    expect(WARDEN_CLASSES['prism-crown'].name).toBe('SentinelPrismCrown');
     expect(ELITE_EXCLUDED_TYPES).toEqual(
       expect.arrayContaining([
         'boss-quarry-maw',
         'boss-gatekeeper',
         'boss-kiln-engine',
+        'boss-prism-crown',
       ])
     );
 

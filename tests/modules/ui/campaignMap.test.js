@@ -77,7 +77,7 @@ describe('campaign map', () => {
         lock: 'Defeat Sentinel Gatekeeper to unlock',
       },
     ]);
-    expect(two.sectors).toHaveLength(2);
+    expect(two.sectors).toHaveLength(3);
     expect(two.sectors[0]).toMatchObject({
       code: 'A',
       name: 'FURNACE DRIFT',
@@ -85,10 +85,16 @@ describe('campaign map', () => {
       lock: 'Defeat Warden Prime to unlock',
     });
     expect(two.sectors[1]).toMatchObject({
+      code: 'B',
+      name: 'CRYSTAL CHOIR',
+      boss: 'Sentinel: Prism Crown',
+      lock: 'Defeat Sentinel Kiln Engine to unlock',
+    });
+    expect(two.sectors[2]).toMatchObject({
       code: 'C',
       name: 'RESONANCE CHAMBER',
       boss: 'Warden: Choir',
-      lock: 'Defeat Sentinel Kiln Engine to unlock',
+      lock: 'Defeat Sentinel Prism Crown to unlock',
     });
 
     const rows = sectorRowsMarkup(one.sectors);
@@ -106,6 +112,7 @@ describe('campaign map', () => {
     const all = [
       ...CHAPTER_ONE,
       'furnace-drift',
+      'crystal-choir',
       'dense-core',
       'wardens-reach',
     ];

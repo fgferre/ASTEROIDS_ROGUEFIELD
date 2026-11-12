@@ -128,6 +128,15 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantQ: 3,
       grit: true,
     }),
+    // proposta 12/11: three clear triangle voices in a high open chord,
+    // glassy, what is left of the Choir's hymn (the Sentinel)
+    'PRISM CROWN': Object.freeze({
+      grains: 11,
+      type: 'triangle',
+      notes: Object.freeze([67, 72, 79]), // G4 C5 G5
+      formantHz: 2200,
+      formantQ: 8,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',
