@@ -389,6 +389,22 @@ class ProgressionSystem extends UpgradeSystem {
     return true;
   }
 
+  /**
+   * The levels whose card choice has not been made: the one on screen (its
+   * cards are dealt, none picked) and those waiting. `queueLevelUpOffers`
+   * puts them back in line (a build carried into the next sector).
+   */
+  owedLevelUpOffers() {
+    return [
+      ...(this.pendingUpgradeOptions.length > 0 ? [this.level] : []),
+      ...this.pendingLevelUpScreens,
+    ];
+  }
+
+  queueLevelUpOffers(levels) {
+    this.pendingLevelUpScreens.push(...levels);
+  }
+
   // XP from `level` to the next: the initial requirement, plus a step that
   // grows gently with the level (GameConstants, proposta 20/10).
   levelCost(level) {

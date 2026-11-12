@@ -746,9 +746,8 @@ class EnemySystem extends BaseSystem {
     const waveManager = this.waveManager;
     // A held countdown (a won sector's spoils time) shows as a break even
     // with rocks still on the field.
-    const active =
-      waveManager.rocksActive &&
-      !(waveManager.wavePaused && waveManager.waveCountdown > 0);
+    const spoils = waveManager.wavePaused && waveManager.waveCountdown > 0;
+    const active = waveManager.rocksActive && !spoils;
     return {
       current: waveManager.rockLayer,
       totalAsteroids: waveManager.rocksTotal,
@@ -756,6 +755,7 @@ class EnemySystem extends BaseSystem {
       asteroidsKilled: waveManager.asteroidsKilledThisWave,
       isActive: active,
       breakTimer: active ? 0 : waveManager.waveCountdown,
+      spoils,
       completedWaves: waveManager.completedWaves,
     };
   }

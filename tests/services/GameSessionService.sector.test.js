@@ -124,6 +124,25 @@ describe('sector runs', () => {
     expect(makePicks(game)).toBe(sectorById('dense-core').headStart - 3);
   });
 
+  it('carries the card choices a win left unmade and holds the first layer for them', () => {
+    const game = createHeadlessGame();
+    const { enemies, progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const gained = [progression.applyLevelUp(), progression.applyLevelUp()];
+    gained.forEach((level) => progression.emitLevelUp(level));
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect(enemies.waveManager.currentWave).toBe(0);
+    expect(makePicks(game)).toBe(2);
+    for (let step = 0; step < 5; step += 1) game.step();
+    expect(progression.getLevel()).toBe(3);
+    expect(enemies.waveManager.currentWave).toBe(1);
+  });
+
   it('is won at its Warden, with its own records and no endless continue', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'prime-gate' });

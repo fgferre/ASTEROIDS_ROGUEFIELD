@@ -306,7 +306,10 @@ export class TacticalHud {
       const breakSeconds = !isActive
         ? Math.max(0, Math.ceil(Number(breakTimerRaw) || 0))
         : 0;
-      hud.updateNextWaveTimer(breakSeconds);
+      hud.updateNextWaveTimer(
+        breakSeconds,
+        waveState?.spoils ? 'SECTOR CLEAR' : 'INCOMING LAYER'
+      );
     }
 
     // The radar: every contact, the camera's view, the threat mode.

@@ -570,7 +570,9 @@ export default class GameSessionService {
     this.setRetryCount(1);
     this.retry.setRetryButtonEnabled(true);
 
-    this._suppressWaveKickoff = false;
+    // The reset below must not start the first layer (a progression reset
+    // does, on the playing screen): this run starts it, or its head start.
+    this._suppressWaveKickoff = true;
     this.runEnd.endless = false;
     this.runEnd.bossRushWardens = 0;
     updateRecords({ newRun: true });
@@ -594,6 +596,7 @@ export default class GameSessionService {
 
     this.applyConfiguredPlayerHull();
     if (build) this.snapshots.restoreBuild(build);
+    this._suppressWaveKickoff = false;
 
     // A head start holds the first layer until its picks are made; a carried
     // build only takes the picks it is short of.
@@ -604,7 +607,8 @@ export default class GameSessionService {
       0,
       (this.sector?.headStart ?? 0) - levelsCarried
     );
-    if (!headStart) {
+    const owed = build?.owed ?? [];
+    if (!headStart && owed.length === 0) {
       this.ensureWaveKickoff({ reason: 'session-start' });
     }
 
@@ -656,7 +660,7 @@ export default class GameSessionService {
     }
 
     this.setSessionState('running', { reason: 'start-new-run' });
-    this.headStart.begin(headStart);
+    this.headStart.begin(headStart, owed);
 
     if (this.gameState) {
       this.gameState.lastTime =

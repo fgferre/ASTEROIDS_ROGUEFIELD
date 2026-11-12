@@ -531,6 +531,7 @@ export class AAAHudLayout {
 
     this.els = {
       nextWaveBox: query('#el-wave-alert'),
+      nextWaveLabel: query('#el-wave-alert .next-wave-label'),
       nextWaveTimer: query('#ui-next-wave-timer'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
@@ -727,7 +728,8 @@ export class AAAHudLayout {
     this._feed('xp', { level, current, required, layer });
   }
 
-  updateNextWaveTimer(seconds) {
+  // `label`: what the seconds count down to.
+  updateNextWaveTimer(seconds, label) {
     if (!this.els) {
       return;
     }
@@ -746,6 +748,7 @@ export class AAAHudLayout {
 
     nextWaveBox.classList.add('visible');
     nextWaveTimer.innerText = safeSeconds;
+    this.els.nextWaveLabel.textContent = label;
   }
 
   /**

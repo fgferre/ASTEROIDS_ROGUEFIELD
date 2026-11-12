@@ -64,8 +64,11 @@ export class DeathSnapshot {
    */
   captureBuild() {
     const player = this.resolveServiceInstance('player');
+    const progression = this.resolveServiceInstance('progression');
     return {
-      progression: this.resolveServiceInstance('progression').serialize(),
+      progression: progression.serialize(),
+      // Card choices the win left unmade (levels from the spoils).
+      owed: progression.owedLevelUpOffers(),
       maxHealth: player.maxHealth,
       upgrades: Array.isArray(player.upgrades) ? [...player.upgrades] : null,
     };

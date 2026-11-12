@@ -17,14 +17,17 @@ export class HeadStart {
   }
 
   /**
-   * Grants `picks` level-ups and holds the waves until they are all picked.
-   * Call once the run is running; 0 picks just clears an earlier head start.
+   * Grants `picks` level-ups and holds the waves until they are all picked,
+   * along with the `owed` choices of levels already gained (a carried build).
+   * Call once the run is running; nothing to pick just clears an earlier
+   * head start.
    */
-  begin(picks = 0) {
-    this.pending = picks > 0;
+  begin(picks = 0, owed = []) {
+    this.pending = picks > 0 || owed.length > 0;
     if (!this.pending) return;
     this.resolveServiceInstance('enemies').waveManager.holdWaves();
     const progression = this.resolveServiceInstance('progression');
+    progression.queueLevelUpOffers(owed);
     const levels = Array.from({ length: picks }, () =>
       progression.applyLevelUp()
     );
