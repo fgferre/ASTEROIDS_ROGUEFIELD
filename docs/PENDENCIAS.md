@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 20.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 21.**
 
 ## O BASTÃO — onde as sessões pararam (20/10, noite) — FRENTES 1–4 DA RODADA 15 NA `main`, ESPERANDO O VEREDITO DELE
 
@@ -112,3 +112,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   cutscene e ter diálogos acontecendo, etc temos que refinar melhor esse roteiro o drama nele, a surpresa, a
   reviravolta, até o endgame."_ → narrativa sai do "fora de escopo"; primeiro um roteiro em texto que ele aprova, o
   Anel como asset 3D completo, depois a fase da viagem. Fecha quando ele aprovar o roteiro e jogar a viagem.
+
+## Modelos 3D (palavras dele, 12/11)
+
+- **(20)** Sobre os modelos: _"a qualidade dos modelos 3D está bem fraca, próximo ao que a gente tinha antes"_ (o
+  primeiro Quarry Maw; refeito no mesmo dia pela conversa principal, em placas com painéis — falta ele ver). E sobre as
+  naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
+  Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
+  antes de código; fecha quando ele aprovar as naves novas.
