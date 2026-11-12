@@ -15,8 +15,8 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    detritos) por um `look` da fase sobre o bioma. Prancha das nove. [ ]
 3. **Viagem 3D entre fases**: ao vencer e seguir, a nave é vista por trás voando ao longo do Anel até o lugar seguinte,
    com a fala da viagem; pulável; a mesma cena abre a campanha. [ ]
-4. **Equilíbrio**: Resonance Chamber e Null Boundary matam o piloto em 2–3 min (5/5); capítulo 1 dura ~5 min; 16
-   escolhas de carta de uma vez. Medir com várias sementes, propor, medir de novo. [ ]
+4. **Equilíbrio**: as duas fases antigas ganharam etapas próprias [x]; falta: capítulo 1 dura ~5 min; 16 escolhas de
+   carta de uma vez; Furnace Drift e o Caster contra o piloto. [ ]
 5. **Final e capítulos seguintes**: o que o roteiro pedir além das nove fases (chefe final, cena final). [ ]
 6. **Acabamento**: BACKLOG de cima a baixo (bugs primeiro), sons dos chefes novos, textos, telas. [ ]
 
@@ -40,7 +40,10 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
 - Cinco sementes, piloto bom: Resonance Chamber 5/5 mortes até 02:56; Null Boundary 5/5 mortes até 03:27; Assembly
   Graveyard 4 vitórias (11–14 min) e 1 estouro de 25 min. Mortes na segunda camada, sobretudo granada do Caster.
 - Achado: essas duas fases antigas jogam as camadas globais densas da Descent; as fases novas têm 2–4 máquinas por etapa.
-- A semente do mundo do playtest foi fixada. Rodar várias sementes antes de mexer em número de inimigo.
+- Etapas próprias em Resonance Chamber e Null Boundary (12/11, proposta): perigos um por vez; piloto bom vence 3 de 5
+  sementes em cada (antes 0 de 5), o mediano chega à etapa 4–5. `npm run playtest -- <fase> <piloto> <semente>` agora
+  varia o mundo. Com o mundo variando: Crystal Choir 2/5, Furnace Drift 0/5, quase sempre granada do Caster — o piloto
+  desvia mal dela (uma só o matou em 42 s); antes de mexer no Caster, o dono joga. Cinco sementes ainda é ruído.
 
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 

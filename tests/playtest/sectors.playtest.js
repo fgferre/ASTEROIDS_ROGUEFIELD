@@ -2,7 +2,7 @@
  * Playtest: the bot (src/bootstrap/botPilot.js) flies sector runs headless
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
- * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good]`.
+ * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
  */
 
 import { afterAll, beforeEach, describe, it, vi } from 'vitest';
@@ -20,7 +20,8 @@ const FPS = Math.round(1 / STEP_SECONDS);
 const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
-const SEED = 1;
+// Seeds both the bot's miss rolls and the world (the run's seed).
+const SEED = Number(process.env.PLAYTEST_SEED || 1);
 // Kept before the fake timers: a long run hands the event loop a turn now
 // and then, or the worker cannot answer Vitest ("Timeout calling onTaskUpdate").
 const realTimeout = globalThis.setTimeout;
@@ -39,6 +40,8 @@ async function playSector(sector) {
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
+  // The run takes its world seed from the difficulty's first beginRun.
+  session.resolveServiceInstance('difficulty').runSeed = SEED;
   const driver = createBotDriver({
     services,
     eventBus,
