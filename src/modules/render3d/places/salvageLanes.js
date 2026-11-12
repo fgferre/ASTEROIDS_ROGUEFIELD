@@ -1,156 +1,178 @@
 // Salvage Lanes (docs/ROTEIRO.md "Os lugares" 2): the cargo route, a
-// graveyard of freighters. Three enormous dead hulks lie in file at three
-// depths, racks of containers along their spines, a few running lights
-// still dimly on; past them the Ring, larger than from the wake.
+// graveyard of freighters. Three enormous dead freighters lie in file at
+// three depths — each a clear hull from above: a long plated body, a pointed
+// bow, a bridge tower and an engine block at the stern — dark, a few running
+// lights still dimly on; past them the Ring, larger than from the wake.
 
+import { slab } from '../enemies/shapes.js';
 import { lightPoint, ringBand, under } from './pieces.js';
 
-// One dead freighter along x, `length` long and `beam` across: spine,
-// container racks (some gone), a stern block with its bridge tower and
-// engines, a blunt bow; `breakAt` (share of the length) snaps the spine
-// there, the bow half turned off its line.
-function hulk(kit, hull, lights, { length: L, beam: B, breakAt = null }) {
-  const { tone, random } = kit;
-  const tones = [
-    tone('#2a2622'),
-    tone('#22262a'),
-    tone('#3a2620'),
-    tone('#1c1e21'),
-    tone('#26303a'),
-    tone('#3a3424'),
-  ];
+// One dead freighter along x (bow at +x), `length` long and `beam` across.
+// `torn` (shares of the length) strips the plating off a stretch amidships,
+// its frames bare.
+function freighter(kit, hull, lights, { length: L, beam: B, torn = null }) {
+  const { THREE, tone, random } = kit;
+  const steel = [tone('#25282c'), tone('#222529'), tone('#282b2f')];
   const dark = tone('#17191c');
-  const dead = tone('#8fe0d0', 0.6);
-  const amber = tone('#ffb460', 1);
-  const parts = { hull, lights };
-  // The bow half's turn and drift when the spine is snapped.
-  const bend = (x) => (breakAt !== null && x > (breakAt - 0.5) * L ? 1 : 0);
-  const place = (x, y, z) => {
-    if (!bend(x)) return [x, y, z];
-    const pivot = (breakAt - 0.5) * L;
-    const a = 0.18;
-    const dx = x - pivot + B * 0.35;
-    return [
-      pivot + dx * Math.cos(a) - z * Math.sin(a),
-      y - dx * 0.06,
-      dx * Math.sin(a) + z * Math.cos(a) + B * 0.25,
-    ];
-  };
-  const turnOf = (x) => [0, bend(x) ? -0.18 : 0, bend(x) ? 0.06 : 0];
-  const box = (kind, color, x, y, z, size) =>
-    kit.box(parts[kind], color, place(x, y, z), size, turnOf(x));
-
-  // The spine, in two pieces where it snapped.
-  const step = L / 24;
-  for (let i = 0; i < 24; i += 1) {
-    const x = (i + 0.5) * step - L / 2;
-    if (breakAt !== null && Math.abs(x / L + 0.5 - breakAt) < 0.03) continue;
-    box('hull', dark, x, 0, 0, [step * 1.01, B * 0.2, B * 0.22]);
-    // Ribs under the spine, every other station.
-    if (i % 2 === 0)
-      box('hull', tones[3], x, -B * 0.12, 0, [B * 0.05, B * 0.14, B * 0.7]);
+  const deck = tone('#2c2f33');
+  const dead = tone('#8fe0d0', 0.55);
+  const amber = tone('#ffb460', 0.9);
+  const half = B / 2;
+  // The hull from above: a flat stern, straight sides, a long taper to a
+  // blunt point.
+  const plan = [
+    [-L / 2, -half],
+    [0.22 * L, -half],
+    [0.44 * L, -half * 0.45],
+    [L / 2, -half * 0.1],
+    [L / 2, half * 0.1],
+    [0.44 * L, half * 0.45],
+    [0.22 * L, half],
+    [-L / 2, half],
+  ];
+  const tornAt = (x) => torn && x / L + 0.5 > torn[0] && x / L + 0.5 < torn[1];
+  // The keel body, under everything.
+  kit.put(
+    hull,
+    slab(THREE, plan, -B * 0.42, -B * 0.06, B * 0.05),
+    dark,
+    [0, 0, 0]
+  );
+  // The deck plating in long plates, seams between; bare frames where torn.
+  const plates = 7;
+  for (let i = 0; i < plates; i += 1) {
+    const x0 = -L / 2 + (i / plates) * L * 0.94;
+    const x1 = -L / 2 + ((i + 1) / plates) * L * 0.94 - L * 0.008;
+    const mid = (x0 + x1) / 2;
+    const w =
+      mid > 0.22 * L
+        ? half * (1 - ((mid - 0.22 * L) / (0.28 * L)) * 0.7)
+        : half;
+    if (tornAt(mid)) {
+      for (let x = x0; x < x1; x += B * 0.18) {
+        kit.box(
+          hull,
+          steel[0],
+          [x, -B * 0.02, 0],
+          [B * 0.05, B * 0.06, w * 1.9]
+        );
+      }
+      kit.box(hull, dark, [mid, -B * 0.03, 0], [x1 - x0, B * 0.05, B * 0.1]);
+      continue;
+    }
+    kit.box(
+      hull,
+      steel[i % 3],
+      [mid, -B * 0.02, 0],
+      [x1 - x0, B * 0.08, w * 1.86]
+    );
   }
-  // Container racks both sides, stacked one to three high, some missing.
-  const c = B * 0.42;
-  for (let x = -0.36 * L; x < 0.3 * L; x += c) {
-    if (breakAt !== null && Math.abs(x / L + 0.5 - breakAt) < 0.05) continue;
-    [-1, 1].forEach((side) => {
-      if (random() < 0.16) return;
-      const high = 1 + Math.floor(random() * 3);
-      const color = tones[Math.floor(random() * tones.length)];
-      box('hull', color, x, -B * 0.06 + high * B * 0.07, side * B * 0.24, [
-        c * 0.9,
-        high * B * 0.14,
-        B * 0.42,
-      ]);
-    });
-  }
-  // The bow: a blunt wedge.
-  box('hull', tones[1], 0.4 * L, 0, 0, [B * 0.5, B * 0.34, B * 0.86]);
+  // A raised spine and two long covered cargo bays either side of it.
+  kit.box(hull, deck, [-0.02 * L, B * 0.05, 0], [L * 0.62, B * 0.07, B * 0.12]);
+  [-1, 1].forEach((side) => {
+    for (let x = -0.28 * L; x < 0.2 * L; x += 0.17 * L) {
+      if (tornAt(x + 0.08 * L)) continue;
+      kit.box(
+        hull,
+        steel[1],
+        [x + 0.08 * L, B * 0.06, side * half * 0.5],
+        [0.15 * L, B * 0.1, half * 0.62]
+      );
+    }
+  });
+  // The bridge: a stepped tower over the stern, a mast on top.
   kit.box(
     hull,
-    tones[1],
-    place(0.45 * L, 0, 0),
-    [B * 0.5, B * 0.3, B * 0.5],
-    [0, Math.PI / 4 + turnOf(0.45 * L)[1], turnOf(0.45 * L)[2]]
+    steel[2],
+    [-0.37 * L, B * 0.18, 0],
+    [0.09 * L, B * 0.36, B * 0.78]
   );
-  // The stern: block, bridge tower, mast and three engine drums.
-  box('hull', tones[0], -0.43 * L, B * 0.02, 0, [B * 0.8, B * 0.5, B * 1.0]);
-  box('hull', tones[3], -0.41 * L, B * 0.42, 0, [B * 0.36, B * 0.5, B * 0.7]);
-  box('hull', tones[1], -0.4 * L, B * 0.72, 0, [B * 0.22, B * 0.16, B * 0.9]);
-  box('hull', dark, -0.42 * L, B * 0.95, 0, [B * 0.04, B * 0.5, B * 0.04]);
-  [-0.28, 0, 0.28].forEach((z) =>
+  kit.box(hull, deck, [-0.38 * L, B * 0.42, 0], [0.06 * L, B * 0.16, B * 0.56]);
+  kit.box(hull, dark, [-0.385 * L, B * 0.62, 0], [B * 0.04, B * 0.3, B * 0.04]);
+  // The engine block past the stern, four nozzles out of it.
+  kit.box(
+    hull,
+    steel[0],
+    [-0.52 * L, -B * 0.1, 0],
+    [0.06 * L, B * 0.44, B * 0.94]
+  );
+  [-0.33, -0.11, 0.11, 0.33].forEach((z) =>
     kit.put(
       hull,
       kit.unit.drum(8),
       dark,
-      [-0.5 * L - B * 0.12, 0, z * B],
-      [B * 0.13, B * 0.36, B * 0.13],
+      [-0.56 * L, -B * 0.1, z * B],
+      [B * 0.1, 0.05 * L, B * 0.1],
       [0, 0, Math.PI / 2]
     )
   );
-  // Running lights: most dead, a few still dimly on; one at the bridge.
-  for (let x = -0.4 * L; x < 0.42 * L; x += L * 0.07) {
-    [-1, 1].forEach((side) => {
-      if (random() < 0.62) return;
-      lightPoint(
-        kit,
-        lights,
-        dead,
-        place(x, B * 0.12, side * B * 0.47),
-        B * 0.022
-      );
-    });
+  // Running lights: a handful still dimly on along the sides; the bridge's.
+  for (let x = -0.3 * L; x < 0.4 * L; x += L * 0.14) {
+    if (random() < 0.5) continue;
+    const side = random() < 0.5 ? -1 : 1;
+    lightPoint(kit, lights, dead, [x, B * 0.04, side * half * 0.98], B * 0.02);
   }
-  lightPoint(kit, lights, amber, place(-0.4 * L, B * 0.82, B * 0.44), B * 0.03);
+  lightPoint(kit, lights, amber, [-0.385 * L, B * 0.78, 0], B * 0.025);
+}
+
+// A freighter's parts and lights, placed in a layer.
+function placed(kit, hull, lights, at, turn, shape) {
+  const h = kit.parts();
+  const l = kit.parts();
+  freighter(kit, h, l, shape);
+  hull.push(...kit.moved(h, at, [0.06, turn, 0.04]));
+  lights.push(...kit.moved(l, at, [0.06, turn, 0.04]));
 }
 
 export function buildSalvageLanes(THREE, kit) {
   const { tone } = kit;
-  // Three hulks in file along the lane, each deeper and larger.
-  const hull = kit.parts();
-  const lights = kit.parts();
-  [
-    { at: [-420, 0, 260], turn: 0.42, length: 1350, beam: 170 },
-    {
-      at: [380, -850, -400],
-      turn: 0.36,
-      length: 2000,
-      beam: 250,
-      breakAt: 0.58,
-    },
-    { at: [-500, -2200, -1500], turn: 0.4, length: 2900, beam: 360 },
-  ].forEach(({ at, turn, ...shape }) => {
-    const h = kit.parts();
-    const l = kit.parts();
-    hulk(kit, h, l, shape);
-    hull.push(...kit.moved(h, at, [0.08, turn, 0.05]));
-    lights.push(...kit.moved(l, at, [0.08, turn, 0.05]));
-  });
-  const lane = new THREE.Group();
-  lane.add(kit.mesh(hull), kit.mesh(lights, 'glow'));
-  const layers = [{ object: lane, anchor: under(900), follow: 0.4 }];
-
-  // The Ring, nearer than from the wake: a broad arc past the hulks.
-  const band = kit.parts();
-  const bandLights = kit.parts();
-  ringBand(kit, band, bandLights, {
-    radius: 1700,
-    count: 140,
-    width: 120,
-    thick: 28,
-    gap: [2.0, 2.3],
-    tones: [tone('#2a3038'), tone('#323a44'), tone('#272c33')],
-    light: tone('#ffc27a', 1.2),
-    lightEvery: 13,
-  });
-  const ring = new THREE.Group();
-  ring.add(kit.mesh(band), kit.mesh(bandLights, 'glow'));
-  ring.rotation.set(0.9, 0.5, 0.15, 'YXZ');
-  layers.unshift({
-    object: ring,
-    anchor: under(2900, 1300, -300),
-    follow: 0.85,
-  });
-  return { layers };
+  const layer = (depth, follow, fill) => {
+    const hull = kit.parts();
+    const lights = kit.parts();
+    fill(hull, lights);
+    const object = new THREE.Group();
+    object.add(kit.mesh(hull), kit.mesh(lights, 'glow'));
+    return { object, anchor: under(depth), follow };
+  };
+  return {
+    layers: [
+      // The farthest freighter and, past it, the Ring: nearer than from
+      // the wake, a broad arc.
+      layer(3000, 0.75, (hull, lights) => {
+        placed(kit, hull, lights, [-700, 0, -500], 0.4, {
+          length: 2900,
+          beam: 380,
+        });
+        const band = kit.parts();
+        const bandLights = kit.parts();
+        ringBand(kit, band, bandLights, {
+          radius: 1700,
+          count: 140,
+          width: 120,
+          thick: 28,
+          gap: [2.0, 2.3],
+          tones: [tone('#2a3038'), tone('#323a44'), tone('#272c33')],
+          light: tone('#ffc27a', 1.2),
+          lightEvery: 13,
+        });
+        hull.push(...kit.moved(band, [1300, 100, 600], [0.9, 0.5, 0.15]));
+        lights.push(
+          ...kit.moved(bandLights, [1300, 100, 600], [0.9, 0.5, 0.15])
+        );
+      }),
+      layer(1800, 0.5, (hull, lights) =>
+        placed(kit, hull, lights, [450, 0, -150], 0.36, {
+          length: 2100,
+          beam: 280,
+          torn: [0.42, 0.6],
+        })
+      ),
+      layer(1000, 0.3, (hull, lights) =>
+        placed(kit, hull, lights, [-420, 0, 330], 0.44, {
+          length: 1400,
+          beam: 190,
+        })
+      ),
+    ],
+  };
 }

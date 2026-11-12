@@ -164,6 +164,7 @@ export class FieldBackdrop {
   setWake(wake) {
     if (wake === this.wake) return;
     this.wake = wake;
+    this.places.wake = wake;
     this.ring.uniforms.uWake.value = wake;
     this.structures.dark.color
       .copy(this.structureColor)
@@ -179,11 +180,14 @@ export class FieldBackdrop {
 
   // The biome's share of the intact Ring, raised to full while it wakes;
   // a place's set stands instead of it (and of the broken Ring, unless the
-  // set keeps it), except in the wake.
+  // set keeps it, which fades out as the set fades in), except in the wake.
   applyStructures() {
     const { group, dark, edge } = this.structures;
     const { hidesRing, hidesStructures } = this.places;
-    this.ring.object.visible = hidesRing * (1 - this.wake) < 0.5;
+    const ring = 1 - Math.min(1, hidesRing * (1 - this.wake));
+    this.ring.object.visible = ring > 0.001;
+    this.ring.material.opacity = ring;
+    this.ring.material.transparent = ring < 0.999;
     const share = Math.max(
       this.structureShare * (1 - hidesStructures),
       this.wake

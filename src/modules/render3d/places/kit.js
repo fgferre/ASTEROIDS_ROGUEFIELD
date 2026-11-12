@@ -5,7 +5,9 @@
 // that glows from inside: crystals, a dark planet) and `glow` (added light:
 // running lights, cracks, a star) — all sinking into the place's haze with
 // their depth under the field, as the broken Ring does (ring/ringMaterial.js),
-// so the far shapes sit low in contrast behind the play.
+// so the far shapes sit low in contrast behind the play. Seen through the
+// arena (the view ray crossing the 800×600 field) a set may sink further,
+// to `under` of its contrast, so it never competes with the play there.
 
 import { createSeededRandom } from '../asteroidMesh.js';
 import { colorOf } from '../batches.js';
@@ -15,24 +17,39 @@ import { mergeStatic } from '../mergeStatic.js';
 // its light where the haze is full.
 const MATTE = { roughness: 0.92, metalness: 0.08 };
 const GLOW_HAZE = 0.55;
+// The field's half extents in world units, and the soft edge (inside,
+// outside) over which the arena's dimming fades.
+const FIELD_HALF = [400, 300];
+const FIELD_EDGE = [40, 120];
 
 const VERTEX_HEAD = `
 uniform float uHazeDepth;
-varying float vPlaceHaze;`;
+uniform float uUnder;
+varying float vPlaceHaze;
+varying float vPlaceUnder;`;
 const VERTEX = `
 vec4 placeWorld = modelMatrix * vec4(transformed, 1.0);
 float placeReach = distance(placeWorld.xyz, cameraPosition);
 float placeBelow = clamp(-placeWorld.y / max(cameraPosition.y - placeWorld.y, 1.0),
   0.0, 1.0);
-vPlaceHaze = 1.0 - exp(-placeReach * placeBelow / uHazeDepth);`;
+vPlaceHaze = 1.0 - exp(-placeReach * placeBelow / uHazeDepth);
+vec2 placeOn = cameraPosition.xz + (placeWorld.xz - cameraPosition.xz)
+  * cameraPosition.y / max(cameraPosition.y - placeWorld.y, 1.0);
+vec2 placeIn = 1.0 - smoothstep(
+  vec2(${FIELD_HALF[0] - FIELD_EDGE[0]}.0, ${FIELD_HALF[1] - FIELD_EDGE[0]}.0),
+  vec2(${FIELD_HALF[0] + FIELD_EDGE[1]}.0, ${FIELD_HALF[1] + FIELD_EDGE[1]}.0),
+  abs(placeOn));
+vPlaceUnder = mix(1.0, uUnder, placeIn.x * placeIn.y);`;
 const FRAGMENT_HEAD = `
 uniform vec3 uHaze;
 uniform float uGlowHaze;
-varying float vPlaceHaze;`;
+varying float vPlaceHaze;
+varying float vPlaceUnder;`;
 const SURFACE = `
-gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, vPlaceHaze);`;
+gl_FragColor.rgb = mix(uHaze, mix(gl_FragColor.rgb, uHaze, vPlaceHaze),
+  vPlaceUnder);`;
 const LIGHT = `
-gl_FragColor.rgb *= 1.0 - uGlowHaze * vPlaceHaze;`;
+gl_FragColor.rgb *= (1.0 - uGlowHaze * vPlaceHaze) * vPlaceUnder;`;
 
 function hazed(material, uniforms, kind) {
   material.onBeforeCompile = (shader) => {
@@ -82,13 +99,19 @@ function makeMaterial(THREE, kind, uniforms) {
 /**
  * A set's kit: `haze` is the place's haze colour (shared with the broken
  * Ring, updated in place), `hazeDepth` the depth at which 63% of a surface
- * has sunk into it, `seed` its scatter.
+ * has sunk into it, `under` its contrast seen through the arena (1: as
+ * everywhere), `seed` its scatter.
  */
-export function createPlaceKit(THREE, haze, { hazeDepth = 1300, seed = 1 }) {
+export function createPlaceKit(
+  THREE,
+  haze,
+  { hazeDepth = 1300, under = 1, seed = 1 }
+) {
   const uniforms = {
     uHaze: { value: haze },
     uHazeDepth: { value: hazeDepth },
     uGlowHaze: { value: GLOW_HAZE },
+    uUnder: { value: under },
   };
   const materials = new Map();
   const matrix = new THREE.Matrix4();

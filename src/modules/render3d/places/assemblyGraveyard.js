@@ -16,9 +16,9 @@ function skeleton(
   { length: L, beam: B, frames = 18, plated = 0.3, gantries }
 ) {
   const { tone, random } = kit;
-  const steel = [tone('#3a3d39'), tone('#43463f'), tone('#333631')];
-  const plate = tone('#454842');
-  const dark = tone('#1d1f1d');
+  const steel = [tone('#5a5d54'), tone('#64675c'), tone('#50534b')];
+  const plate = tone('#44473f');
+  const dark = tone('#3a3c37');
   const work = tone('#ffb860', 1.5);
   const half = (s) =>
     (B / 2) * Math.min(1, 1.6 * Math.sin(Math.PI * (0.08 + 0.9 * s)) ** 0.7);
@@ -26,7 +26,8 @@ function skeleton(
     B * 0.55 * (0.55 + 0.45 * Math.sin(Math.PI * (0.05 + 0.9 * s)));
   const xOf = (s) => (s - 0.5) * L;
   // The keel, end to end.
-  kit.box(frame, dark, [0, -B * 0.55, 0], [L * 0.96, B * 0.07, B * 0.09]);
+  kit.box(frame, dark, [0, -B * 0.55, 0], [L * 0.96, B * 0.14, B * 0.17]);
+  kit.box(frame, steel[1], [0, -B * 0.47, 0], [L * 0.9, B * 0.04, B * 0.26]);
   const hoop = 9;
   for (let f = 0; f < frames; f += 1) {
     const s = (f + 0.5) / frames;
@@ -47,11 +48,14 @@ function skeleton(
         frame,
         steel[f % 3],
         [x, (y0 + y1) / 2, (z0 + z1) / 2],
-        [B * 0.035, B * 0.05, len * 1.04],
+        [B * 0.075, B * 0.09, len * 1.04],
         [tilt, 0, 0]
       );
-      // The bow plated on its near side.
-      if (s > 1 - plated && z0 < 0 && random() < 0.85) {
+      // The bow plated on its near side, and a run of plating along the
+      // bilge amidships, both sides.
+      const bow = s > 1 - plated && z0 < 0;
+      const bilge = s > 0.3 && s < 0.62 && k >= 2 && k <= 6;
+      if ((bow || bilge) && random() < 0.85) {
         kit.box(
           frame,
           plate,
@@ -60,7 +64,7 @@ function skeleton(
             (y0 + y1) / 2 - Math.sign(y0 + y1) * 4,
             (z0 + z1) / 2 - 6,
           ],
-          [(L / frames) * 0.96, B * 0.012, len],
+          [(L / frames) * 0.98, B * 0.025, len],
           [tilt, 0, 0]
         );
       }
@@ -85,7 +89,7 @@ function skeleton(
         frame,
         steel[1],
         [(xOf(sa) + xOf(sb)) / 2, (ya + yb) / 2, (za + zb) / 2],
-        [Math.hypot(dx, zb - za), B * 0.03, B * 0.03],
+        [Math.hypot(dx, zb - za), B * 0.055, B * 0.055],
         [0, Math.atan2(-(zb - za), dx), 0]
       );
     }
@@ -99,14 +103,28 @@ function skeleton(
         frame,
         steel[2],
         [x, -B * 0.15, side * reach],
-        [B * 0.07, B * 1.3, B * 0.07]
+        [B * 0.13, B * 1.3, B * 0.13]
       );
       kit.box(
         frame,
         steel[0],
         [x, -B * 0.15, side * reach],
-        [B * 0.22, B * 0.03, B * 0.03],
+        [B * 0.3, B * 0.05, B * 0.05],
         [0, 0, 0.9]
+      );
+      // Arms from the tower holding the hull at its deck edge.
+      const span = reach - half(s);
+      kit.box(
+        frame,
+        steel[1],
+        [x, 0, side * (reach - span / 2)],
+        [B * 0.07, B * 0.07, span]
+      );
+      kit.box(
+        frame,
+        steel[1],
+        [x, -B * 0.4, side * (reach - span * 0.6)],
+        [B * 0.06, B * 0.06, span * 1.2]
       );
       lightPoint(kit, lights, work, [x, B * 0.52, side * reach], B * 0.02);
     });
@@ -114,7 +132,7 @@ function skeleton(
       frame,
       steel[0],
       [x, B * 0.5, 0],
-      [B * 0.08, B * 0.06, reach * 2 + B * 0.1]
+      [B * 0.12, B * 0.1, reach * 2 + B * 0.1]
     );
     const boom = B * (0.9 + random() * 0.5);
     const side = g % 2 === 0 ? 1 : -1;
@@ -122,7 +140,7 @@ function skeleton(
       frame,
       steel[1],
       [x + boom * 0.3, B * 0.56, side * reach * 0.6],
-      [boom, B * 0.04, B * 0.04],
+      [boom, B * 0.07, B * 0.07],
       [0, side * 0.5, 0]
     );
   });
@@ -133,7 +151,7 @@ export function buildAssemblyGraveyard(THREE, kit) {
   const lights = kit.parts();
   [
     {
-      at: [-260, 0, 220],
+      at: [-260, 250, 220],
       turn: 0.38,
       length: 1500,
       beam: 340,

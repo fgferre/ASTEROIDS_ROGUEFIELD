@@ -6,7 +6,7 @@
 // broken Ring each layer of a set moves with the point the camera aims at,
 // its own `follow` of the way, so it parallaxes like something deeper than
 // it sits. A builder returns { layers: [{ object, anchor, follow }],
-// update?(seconds) }.
+// update?(seconds, wake) }.
 // A look with no backdrop (the Descent) shows none.
 
 import { createPlaceKit } from './kit.js';
@@ -23,6 +23,8 @@ export class PlaceSets {
     this.to = null;
     this.mix = 1;
     this.arrival = 1;
+    // The Ring's wake (FieldBackdrop.setWake), for sets whose lights follow it.
+    this.wake = 0;
     // Share of the view whose set hides the broken Ring / the intact arcs.
     this.hidesRing = 0;
     this.hidesStructures = 0;
@@ -67,8 +69,11 @@ export class PlaceSets {
       for (let m = 0; m < set.materials.length; m += 1) {
         const material = set.materials[m];
         material.opacity = share;
-        // A surface blends only while it fades; a glow always adds.
-        if (material.depthWrite) material.transparent = share < 0.999;
+        // A surface blends only while it fades (unless it always blends, to
+        // draw after the space behind it); a glow always adds.
+        if (material.depthWrite && !material.userData.blended) {
+          material.transparent = share < 0.999;
+        }
       }
       if (!PLACE_SETS[set.id].ring) this.hidesRing += share;
       this.hidesStructures += share;
@@ -76,8 +81,12 @@ export class PlaceSets {
   }
 
   build(id) {
-    const { build, hazeDepth, seed } = PLACE_SETS[id];
-    const kit = createPlaceKit(this.THREE, this.haze, { hazeDepth, seed });
+    const { build, hazeDepth, under, seed } = PLACE_SETS[id];
+    const kit = createPlaceKit(this.THREE, this.haze, {
+      hazeDepth,
+      under,
+      seed,
+    });
     const set = { id, ...build(this.THREE, kit) };
     set.materials = [...kit.materials.values()];
     set.object = new this.THREE.Group();
@@ -110,7 +119,7 @@ export class PlaceSets {
           anchor[2] + z * follow
         );
       }
-      set.update?.(time);
+      set.update?.(time, this.wake);
       set.object.updateMatrixWorld(true);
     }
   }
