@@ -16,7 +16,7 @@ const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
 const CHAPTER_ONE = ['debris-wake', 'salvage-lanes', 'prime-gate'];
 
 describe('campaign map', () => {
-  it('reads each chapter cleared, open or locked from its sectors, then three chapters with no signal', () => {
+  it('reads each chapter cleared, open or locked from its sectors, then two chapters with no signal', () => {
     const states = (won) =>
       campaignChapters(records(won)).map(({ numeral, state }) => [
         numeral,
@@ -26,7 +26,7 @@ describe('campaign map', () => {
       ['I', 'open'],
       ['II', 'locked'],
       ['III', 'locked'],
-      ['IV', 'nosignal'],
+      ['IV', 'locked'],
       ['V', 'nosignal'],
       ['VI', 'nosignal'],
     ]);
@@ -38,7 +38,7 @@ describe('campaign map', () => {
   });
 
   it("lists a chapter's sectors with code, name, end boss, layers and state", () => {
-    const [one, two, three] = campaignChapters(
+    const [one, two, three, four] = campaignChapters(
       records(['debris-wake'], { 'debris-wake': 252 })
     );
     expect(one.title).toBe('CHAPTER I — THE OUTER RING');
@@ -116,6 +116,18 @@ describe('campaign map', () => {
       boss: 'Warden: Null',
       lock: 'Defeat Sentinel Interdictor to unlock',
     });
+    expect(four.title).toBe('FINALE — THE CRUCIBLE');
+    expect(four.name).toBe('THE CRUCIBLE');
+    expect(four.sectors).toEqual([
+      expect.objectContaining({
+        code: 'A',
+        name: 'THE CRUCIBLE',
+        boss: 'SOVEREIGN',
+        layers: 5,
+        state: 'locked',
+        lock: 'Defeat Warden Null to unlock',
+      }),
+    ]);
 
     const rows = sectorRowsMarkup(one.sectors);
     expect(rows).toContain('id="campaign-sector-debris-wake"');
@@ -138,7 +150,10 @@ describe('campaign map', () => {
       'quarantine-grid',
       'wardens-reach',
     ];
-    expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');
+    expect(defaultSectorRow(rowsOf(all)).id).toBe('the-crucible');
+    expect(defaultSectorRow(rowsOf([...all, 'the-crucible'])).id).toBe(
+      'the-crucible'
+    );
   });
 
   it('a chapter shows its rows; Launch carries the selected row, and a locked one cannot launch', () => {

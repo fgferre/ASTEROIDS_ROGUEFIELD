@@ -5,12 +5,16 @@
 // fan, the Gatekeeper's barrier and its gap, the Prism Crown's reflected
 // beams), the Kiln Engine's hot wedges and slag pools (flat fans and
 // discs), the Foundry Mother's arms (flat ring sectors) and the
-// Interdictor's cage of fences and its locked beam. The Ram, the Wardens and any recipe enemy that aims draw them;
+// Interdictor's cage of fences and its locked beam, and Sovereign's split
+// line between its two halves. The Ram, the Wardens and any recipe enemy that aims draw them;
 // built once into the toolkit (enemyMirror.js createKit) as
 // kit.createTelegraph and kit.updateTelegraph.
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
+
+// How far Sovereign's split line and halves reach from its centre (field px).
+const SPLIT_REACH = 1100;
 
 /**
  * Telegraph parts and their per-frame update.
@@ -19,6 +23,11 @@ import { HALF_H, HALF_W, colorOf } from '../batches.js';
  */
 export function createTelegraphs(kit) {
   const { THREE } = kit;
+  // Sovereign's halves: REBUILD in the exposed colour, PROTECT in the
+  // shielded one; the line between them white-gold.
+  const rebuildColor = colorOf(THREE, PALETTE.shot);
+  const protectColor = colorOf(THREE, PALETTE.status);
+  const splitColor = colorOf(THREE, '#fff3d6');
   // telegraph pieces (flat on the field plane)
   const lanePlane = new THREE.PlaneGeometry(1, 1);
   lanePlane.rotateX(-Math.PI / 2);
@@ -151,6 +160,10 @@ export function createTelegraphs(kit) {
     }
     if (t.type === 'lock') {
       updateLock(parts, t, progress, pulse);
+      return;
+    }
+    if (t.type === 'split') {
+      updateSplit(parts, t, progress);
       return;
     }
     if (t.type === 'sectors' || t.type === 'pools' || t.type === 'arms') {
@@ -326,6 +339,42 @@ export function createTelegraphs(kit) {
       ...look
     );
     parts.beams.slice(1).forEach((other) => (other.visible = false));
+  }
+
+  // Sovereign's split (1 beam, 2 fans): a line across the field through it,
+  // the REBUILD half washed warm (the exposed colour) and the PROTECT half
+  // cool (the shielded one), faint enough to read the field through; thin
+  // and dim while it warns, bright once it turns.
+  function updateSplit(parts, t, progress) {
+    parts.warn.visible = false;
+    parts.group.rotation.y = 0;
+    const warning = t.phase === 'warn';
+    const [beam] = parts.beams;
+    if (beam) {
+      const ux = Math.cos(t.angle) * SPLIT_REACH;
+      const uy = Math.sin(t.angle) * SPLIT_REACH;
+      placeBeam(
+        beam,
+        { x1: t.x - ux, y1: t.y - uy, x2: t.x + ux, y2: t.y + uy },
+        t.x,
+        t.y,
+        warning ? 2 + 2 * progress : 5,
+        warning ? 0.15 + 0.35 * progress : 0.75
+      );
+      beam.material.color.copy(splitColor);
+    }
+    parts.beams.slice(1).forEach((other) => (other.visible = false));
+    const wash = warning ? 0.02 + 0.05 * progress : 0.07;
+    parts.fans.forEach((fan, i) => {
+      fan.visible = i < 2;
+      if (i >= 2) return;
+      fan.geometry = fanGeometry(Math.PI);
+      fan.position.set(0, 0, 0);
+      fan.rotation.y = -(t.angle + (i === 0 ? 1 : -1) * (Math.PI / 2));
+      fan.scale.set(SPLIT_REACH, 1, SPLIT_REACH);
+      fan.material.color.copy(i === 0 ? rebuildColor : protectColor);
+      fan.material.opacity = wash;
+    });
   }
 
   // Dim while a hazard warns (brightening), bright and beating as it burns.

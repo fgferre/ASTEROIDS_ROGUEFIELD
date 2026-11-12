@@ -10,6 +10,7 @@ import kilnEngine from '../../content/bosses/kiln-engine.js';
 import prismCrown from '../../content/bosses/prism-crown.js';
 import foundryMother from '../../content/bosses/foundry-mother.js';
 import interdictor from '../../content/bosses/interdictor.js';
+import sovereign from '../../content/bosses/sovereign.js';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -125,7 +126,8 @@ export const WARDEN_KINDS = deepFreeze(kindsOf([prime, choir, nullWarden]));
 // Sentinels: the boss that ends a sector (CONTENT.md "Boss"). Same `type:
 // 'boss'` as a Warden, `tier: 'sentinel'` in its file; never in BOSS_BY_LAYER,
 // the cycle, Boss Rush or the Warden achievements: a sector asks for one by
-// kind (`bossKind`).
+// kind (`bossKind`). Sovereign, the campaign's last boss, is asked for the
+// same way and ranks above the Wardens (`tier: 'sovereign'`).
 export const SENTINEL_KINDS = deepFreeze(
   kindsOf([
     quarryMaw,
@@ -134,13 +136,14 @@ export const SENTINEL_KINDS = deepFreeze(
     prismCrown,
     foundryMother,
     interdictor,
+    sovereign,
   ])
 );
 
 /** Every boss kind, Wardens and Sentinels: what a `bossKind` can name. */
 export const BOSS_KINDS = deepFreeze({ ...WARDEN_KINDS, ...SENTINEL_KINDS });
 
-/** 'warden' or 'sentinel': the word the HUD and the lines use for it. */
+/** 'warden', 'sentinel' or 'sovereign': the word the HUD and the lines use. */
 export function bossTier(kind) {
   return BOSS_KINDS[kind]?.tier ?? 'warden';
 }

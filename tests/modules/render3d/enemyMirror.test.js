@@ -348,6 +348,61 @@ describe('EnemyMirror', () => {
     expect(beam.scale.x).toBeCloseTo(400);
   });
 
+  it('draws Sovereign with its plates opening by order and half, and its split', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const boss = {
+      id: 'sovereign',
+      type: 'boss',
+      bossKind: 'sovereign',
+      x: 400,
+      y: 300,
+      radius: 84,
+      order: 'protect',
+      plateOpen: 0,
+      plateTurn: 0,
+      splitAngle: 0,
+      barrier: null,
+      telegraph: null,
+      beams: null,
+      split: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-sovereign');
+    mirror.update([boss], 0);
+    const view = mirror.views.get('sovereign');
+    expect(view.kind).toBe('boss-sovereign');
+    expect(view.plates.every((p) => p.hinge.position.x === 0)).toBe(true);
+    expect(view.telegraph.split.group.visible).toBe(false);
+
+    Object.assign(boss, { order: 'rebuild', plateOpen: 1 });
+    mirror.update([boss], 0);
+    expect(view.plates.every((p) => p.hinge.position.x > 0)).toBe(true);
+
+    // both orders: only the plates on the REBUILD half (+y) open
+    Object.assign(boss, {
+      order: 'both',
+      split: {
+        type: 'split',
+        x: 400,
+        y: 300,
+        angle: 0,
+        phase: 'turn',
+        timer: 1,
+        duration: 1,
+      },
+    });
+    mirror.update([boss], 0);
+    const [east, south, , north] = [0, 2, 4, 6].map((i) => view.plates[i]);
+    expect(south.hinge.position.x).toBeGreaterThan(0);
+    expect(north.hinge.position.x).toBe(0);
+    expect(east.hinge.position.x).toBeGreaterThan(0);
+    expect(view.telegraph.split.group.visible).toBe(true);
+    expect(view.telegraph.split.fans.slice(0, 2).every((f) => f.visible)).toBe(
+      true
+    );
+  });
+
   it('draws the Prism Crown with its mirrors where the boss puts them and its beams', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const crown = {

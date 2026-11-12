@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { listContent } from '../../src/content/registry.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import {
   BIOMES,
@@ -35,7 +36,7 @@ describe('biome table', () => {
   });
 
   it('writes every colour as a parseable hex or rgba string', () => {
-    BIOMES.forEach((biome) => {
+    listContent('biomes').forEach((biome) => {
       biome.sky.forEach((c) => expect(c).toMatch(HEX));
       COLOR_FIELDS.forEach((field) => expect(biome[field]).toMatch(HEX));
       const rgba = biome.tint.match(RGBA);
@@ -50,6 +51,17 @@ describe('biome table', () => {
       const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
       expect(r).toBeGreaterThanOrEqual(b);
       expect(r - b).toBeLessThanOrEqual(3);
+      expect(Math.max(r, g, b)).toBeLessThanOrEqual(0x0c);
+    });
+  });
+
+  it('keeps the Crucible, a sector-only place, under a near-black sky', () => {
+    const crucible = listContent('biomes').find((b) => b.id === 'crucible');
+    expect(crucible.sectorOnly).toBe(true);
+    expect(crucible.layers[0]).toBe(RUN_FINAL_LAYER + 1);
+    crucible.sky.forEach((c) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+      expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(4);
       expect(Math.max(r, g, b)).toBeLessThanOrEqual(0x0c);
     });
   });

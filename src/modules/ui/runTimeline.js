@@ -56,7 +56,7 @@ export function runHeadline({
   newBest,
 }) {
   if (sector) {
-    const chapter = biomeForLayer(sector.layers[0]).title;
+    const chapter = biomeForLayer(sector.layers[0], sector).title;
     return outcome === 'victory'
       ? {
           kicker: nextSector(sector)
@@ -202,7 +202,7 @@ export function bestMoment(timeline, outcome, sector = null) {
 
 // "CHAPTER II — THE DENSE CORE" → "II · DENSE CORE".
 const chapterLabel = (title) =>
-  title.replace(/^CHAPTER (\S+) — (THE )?/, '$1 · ');
+  title.replace(/^(?:CHAPTER )?(\S+) — (THE )?/, '$1 · ');
 
 const W = 1040;
 const Y = 70;
@@ -230,7 +230,7 @@ export function timelineModel({
   for (let n = first; n <= span; n += 1) {
     if (directorFor(n).warden) wardenLayers.push(n);
   }
-  const chapters = (sector ? [biomeForLayer(first)] : BIOMES).map(
+  const chapters = (sector ? [biomeForLayer(first, sector)] : BIOMES).map(
     (biome, i) => ({
       label: chapterLabel(biome.title),
       from: biome.layers[0],
@@ -238,7 +238,7 @@ export function timelineModel({
         !sector && i === BIOMES.length - 1 ? RUN_FINAL_LAYER : biome.layers[1],
     })
   );
-  if (span > RUN_FINAL_LAYER) {
+  if (!sector && span > RUN_FINAL_LAYER) {
     chapters.push({ label: 'DEEP FIELD', from: RUN_FINAL_LAYER + 1, to: span });
   }
 

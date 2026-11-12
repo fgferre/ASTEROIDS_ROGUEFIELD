@@ -8,7 +8,6 @@
 // data-sector). A sector run that ends back in the menu reopens the map.
 
 import { getContent } from '../../content/registry.js';
-import { BIOMES } from '../../data/biomes.js';
 import { bossKindForLayer } from '../../data/enemies/boss.js';
 import { SECTORS, sectorBossTier } from '../../data/sectors.js';
 import { isSectorUnlocked, loadRecords } from '../../services/runRecords.js';
@@ -50,19 +49,23 @@ export function sectorBossName(sector) {
 
 /**
  * Every sector as a row: `cleared` (with its best time), `open` or `locked`
- * (with what unlocks it), its code, name, end boss and layer count.
+ * (with what unlocks it), its code, name, end boss (its rank, unless the
+ * rank is its name) and layer count.
  */
 export function sectorRows(records) {
   return SECTORS.map((sector, index) => {
     const cleared = records.sectorsWon.includes(sector.id);
     const unlocked = isSectorUnlocked(sector, records);
     const previous = SECTORS[index - 1];
+    const tier = sectorBossTier(sector);
+    const boss = sectorBossName(sector);
     return {
       id: sector.id,
       chapter: sector.chapter,
       code: sector.code,
       name: sector.name,
-      boss: `${sectorBossTier(sector)}: ${sectorBossName(sector)}`,
+      boss:
+        tier.toUpperCase() === boss.toUpperCase() ? boss : `${tier}: ${boss}`,
       layers: sector.layers[1] - sector.layers[0] + 1,
       headStart: sector.headStart,
       state: cleared ? 'cleared' : unlocked ? 'open' : 'locked',
@@ -96,7 +99,7 @@ export function campaignChapters(records) {
       };
     }
     const { biome } = SECTORS.find((s) => s.id === sectors[0].id);
-    const title = BIOMES.find((b) => b.id === biome)?.title ?? '';
+    const title = getContent('biomes', biome)?.title ?? '';
     return {
       chapter,
       numeral,
