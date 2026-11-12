@@ -9,25 +9,33 @@ jogando — nunca por teste.
 Nada vai para a `main` até ele dizer. Ramo de trabalho: `campanha/ajustes` (PR #305 aberta, não incorporar). Ciclos, em
 ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura no navegador e um commit por tarefa.
 
-1. **Roteiro** (`docs/ROTEIRO.md`): história inteira em texto — premissa, virada, uma fala por fase e por viagem, final.
-   Falantes THE RING e WAKE. Feito: o roteiro existe e suas primeiras falas estão em `src/data/story.js`. [x]
-2. **Lugares**: cor, névoa e luz por fase [x]. Falta o lugar de verdade (item 24 dele): cada fase num ponto do
-   mundo, com a peça de fundo da tabela "Os lugares" do `docs/ROTEIRO.md` (Anel longe/perto/por dentro, estrela,
-   planeta, cargueiros mortos, cristais, estaleiros, disco). Uma peça de fundo por fase, prancha das dez. [ ]
-3. **Viagem 3D entre fases**: ao vencer e seguir, a nave é vista por trás voando ao longo do Anel até o lugar seguinte,
-   com a fala da viagem; pulável; a mesma cena abre a campanha. [ ]
-4. **Equilíbrio**: as duas fases antigas ganharam etapas próprias [x]; falta: capítulo 1 dura ~5 min; 16 escolhas de
-   carta de uma vez; Furnace Drift e o Caster contra o piloto. [ ]
-5. **Final e capítulos seguintes**: o que o roteiro pedir além das nove fases (chefe final, cena final). [ ]
-6. **Acabamento**: BACKLOG de cima a baixo (bugs primeiro), sons dos chefes novos, textos, telas. [ ]
+1. **Roteiro** (`docs/ROTEIRO.md`): história inteira, com os lugares; todas as falas estão em `src/data/story.js`
+   (chegadas, viagens, chefes, final). [x]
+2. **Lugares**: cor/névoa/luz por fase e um cenário 3D por fase atrás da arena (`render3d/places/`, dez cenários;
+   item 24 dele). [x] Ainda fracos, ele julga: planeta da Quarantine Grid, creme do Crisol.
+3. **Viagem 3D entre fases** (`render3d/travelScene.js`): nave por trás ao longo do Anel, falas do roteiro, salto
+   entre capítulos, pulável; abre a campanha. [x] Fraco: o Anel parece viaduto; clarão do salto tímido.
+4. **Equilíbrio**: etapas próprias nas duas fases antigas [x]; em andamento nas quatro sessões de refino. [ ]
+5. **Final**: décima fase The Crucible, chefe Sovereign (ordens PROTECT/REBUILD, modelo claro e polido — itens 25 e
+   26 dele), escolha Severance/Stewardship, dois desfechos, marca no mapa. [x] Sovereign fácil demais para o piloto.
+6. **Acabamento**: seis defeitos corrigidos (cartas perdidas na vitória, contagem sob as telas, Esc nas cenas, erro
+   ao carregar, dica do impulso, fala de chegada). Falta: BACKLOG restante, sons dos chefes novos, brilho/polido em
+   outros modelos (item 26). [ ]
+7. **Refino por parte do roteiro** (pedido dele, 12/11): quatro sessões em paralelo, cada uma num worktree e ramo
+   próprio (`refino-cap1`, `refino-cap2`, `refino-cap3`, `refino-final`), revisam e refinam a sua parte e deixam
+   `docs/propostas-<parte>.md`. A conversa principal confere cada ramo, junta em `campanha/ajustes`, roda
+   `npm run done` com a máquina vazia e apaga os arquivos de propostas depois de levar o que valer ao roteiro. [ ]
 
-Feito neste caminho: passagem de fase (espólio com contagem, nave segue com o build), segunda etapa do Quarry Maw,
-brilho das cores claras — itens 21–23 dele, conferidos no navegador.
+Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
+gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
+
+Feito neste caminho: passagem de fase (espólio com contagem, nave segue com o build e com as cartas devidas), segunda
+etapa do Quarry Maw, brilho das cores claras — itens 21–23 dele, conferidos no navegador.
 
 ## Estado (12/11)
 
 A campanha de nove fases (três capítulos de três; seis Sentinels e três Wardens) entrou na `main` pela PR #303 (12/11)
-e está publicada. A história (`docs/ROTEIRO.md`): três capítulos e um final, o Crisol, com o chefe Sovereign e dois
+e está publicada; a décima fase e tudo o mais de 12/11 à tarde estão só em `campanha/ajustes`. A história (`docs/ROTEIRO.md`): três capítulos e um final, o Crisol, com o chefe Sovereign e dois
 finais; falantes THE RING e WAKE; o piloto voa por ligação remota. O jogo tem 7 armas, 16 inimigos e 3 cascos. A
 Descent e o Boss Rush continuam existindo. As fases estão inline em `src/content/sectors`; uma fase pode ter
 `stages`, `boss` e `headStart`. Modelos de chefe e de nave foram feitos pela conversa principal; modelos 3D novos vão
