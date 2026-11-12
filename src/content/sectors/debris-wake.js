@@ -13,6 +13,7 @@ export default {
   headStart: 0, // proposta 12/11
   // proposta 12/11: cold, sparse, deep blue-black; where things were thrown away.
   look: {
+    backdrop: 'debris-wake',
     sky: ['#05080e', '#010203'],
     hazeColor: '#2a4478',
     hazeDensity: 0.55,

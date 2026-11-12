@@ -13,6 +13,7 @@ export default {
   headStart: 16, // proposta 12/11
   // proposta 12/11: grey-green industrial murk among dead hulls, dim.
   look: {
+    backdrop: 'assembly-graveyard',
     sky: ['#080a08', '#020302'],
     hazeColor: '#5e6e50',
     hazeDensity: 1.15,

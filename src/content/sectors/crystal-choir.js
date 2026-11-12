@@ -18,6 +18,7 @@ export default {
   headStart: 9, // proposta 12/11
   // proposta 12/11: pale cyan-white, bright crystal veins, clean cool air.
   look: {
+    backdrop: 'crystal-choir',
     sky: ['#070b0e', '#020304'],
     hazeColor: '#5cb4d0',
     hazeDensity: 0.7,

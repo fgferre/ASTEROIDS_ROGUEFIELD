@@ -11,6 +11,7 @@ export default {
   code: 'C',
   name: 'RESONANCE CHAMBER',
   biome: 'dense-core',
+  look: { backdrop: 'dense-core' },
   layers: [6, 10],
   headStart: 9, // proposta 12/11
   // proposta 12/11: every number below

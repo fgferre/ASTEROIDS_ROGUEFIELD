@@ -315,6 +315,7 @@ export class TravelScene {
     this.active = false;
     this.streaks.visible = false;
     this.t.veil.setLevel(1);
+    this.t.backdrop.setArrival(1);
     this.t.renderer.toneMappingExposure = 1;
     const ring = this.t.backdrop.ring;
     ring.offset.set(0, 0, 0);
@@ -431,8 +432,10 @@ export class TravelScene {
     camera.rotateZ(this.bank * CHASE.roll);
     camera.quaternion.slerp(this.introQuat, k ** 4);
 
-    // The field's border fades in as the camera reaches it.
+    // The field's border and the place's set fade in as the camera reaches
+    // the field.
     this.t.veil.setLevel(smooth(0.4, 1, k));
+    this.t.backdrop.setArrival(smooth(0.4, 1, k));
     this.look.mix = this.jumps
       ? Number(t >= JUMP.at)
       : smooth(LOOK_FADE[0], LOOK_FADE[1], t);

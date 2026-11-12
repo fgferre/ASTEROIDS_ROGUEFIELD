@@ -12,7 +12,8 @@ import { bossTier } from './enemies/boss.js';
 // those layers, and with `boss` that boss kind ends it instead of the Warden.
 // `look` (optional) names biome fields (sky, haze, veins, dust, lights, bloom,
 // debris, structures, tint) that replace its biome's on its layers, so each
-// sector is its own place; music stays the biome's.
+// sector is its own place; music stays the biome's. Its `backdrop` names the
+// place's 3D set behind the arena (src/modules/render3d/places/index.js).
 //
 // One file per sector in src/content/sectors/, listed by `order`.
 export const SECTORS = deepFreeze(listContent('sectors'));

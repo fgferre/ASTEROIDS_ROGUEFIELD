@@ -18,6 +18,7 @@ export default {
   headStart: 0, // proposta 12/11
   // proposta 12/11: a shipping lane picked clean, under teal work lights.
   look: {
+    backdrop: 'salvage-lanes',
     sky: ['#05100e', '#010504'],
     hazeColor: '#2f8a7e',
     hazeDensity: 1.15,

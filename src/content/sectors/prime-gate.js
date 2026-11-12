@@ -7,6 +7,7 @@ export default {
   code: 'C',
   name: 'PRIME GATE',
   biome: 'outer-ring',
+  look: { backdrop: 'prime-gate' },
   layers: [1, 5],
   headStart: 0, // proposta 12/11
 };

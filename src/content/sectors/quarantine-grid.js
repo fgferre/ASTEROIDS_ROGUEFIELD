@@ -13,6 +13,7 @@ export default {
   headStart: 16, // proposta 12/11
   // proposta 12/11: dark, thin haze, amber warning light, hard contrast.
   look: {
+    backdrop: 'quarantine-grid',
     sky: ['#050404', '#010101'],
     hazeColor: '#5a3410',
     hazeDensity: 0.4,

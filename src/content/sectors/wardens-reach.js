@@ -10,6 +10,7 @@ export default {
   code: 'C',
   name: 'NULL BOUNDARY',
   biome: 'wardens-reach',
+  look: { backdrop: 'wardens-reach' },
   layers: [11, 15],
   headStart: 16, // proposta 12/11
   // proposta 12/11: every number below

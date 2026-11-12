@@ -18,6 +18,7 @@ export default {
   headStart: 9, // proposta 12/11
   // proposta 12/11: hot orange haze, ember dust, a strong warm key.
   look: {
+    backdrop: 'furnace-drift',
     sky: ['#0c0705', '#030202'],
     hazeColor: '#d2621a',
     hazeDensity: 1.35,

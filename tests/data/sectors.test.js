@@ -218,7 +218,8 @@ describe('sector table', () => {
     );
     expect(place.place).toBe('debris-wake');
     expect(biomeForLayer(6, wake)).toBe(biomeForLayer(6));
-    expect(biomeForLayer(2, sectorById('prime-gate'))).toBe(ring);
+    const bare = { ...sectorById('prime-gate'), look: undefined };
+    expect(biomeForLayer(2, bare)).toBe(ring);
     expect(biomeForLayer(2)).toBe(ring);
   });
 
