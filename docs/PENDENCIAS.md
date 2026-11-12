@@ -6,12 +6,22 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 21.**
 
-## O BASTÃO — onde as sessões pararam (20/10, noite) — FRENTES 1–4 DA RODADA 15 NA `main`, ESPERANDO O VEREDITO DELE
+## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NO RAMO `campanha/setores`, ESPERANDO ELE JOGAR
+
+**Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
+_"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi
+feito… quer dizer que isso é definitivo e que está bom o suficiente… você mesmo deve perceber e avaliar"_ — e autorizou
+conversas paralelas. A `main` está parada em 21/10 (PR #302: correções de combate e de telas feitas por outro agente).
+Todo o trabalho de 12/11 está só no ramo `campanha/setores` (retomar por ele, não pela `main`): mapa de campanha,
+fases com camadas e chefe próprios, três Sentinels, os três cascos em placas; o detalhe está no `PLAN.md`. A visão do
+jogo é `docs/GAME_DESIGN_MASTER_PLAN.md` (22/10). Conteúdo hoje: 16 inimigos, 7 armas, 39 cartas, 3 cascos, 15 camadas
+na descida, 3 biomas, 3 Wardens, 3 Heralds, Sentinels por fase; o golden trace tem 26 cenários. Dois pedidos dele
+estão em conversas paralelas: audição de som e painel menor em imagens. Ele ainda não jogou nada de 12/11.
 
 **Como retomar (conversa local, qualquer máquina):**
 
-1. `git checkout main && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
-   21 partidas prova comportamento igual). Jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Captura: o
+1. `git checkout campanha/setores && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
+   26 cenários prova comportamento igual). Jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Captura: o
    navegador embutido da conversa local (não há scripts de sonda ou captura no repo).
 2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodada 15, oito frentes em ordem); `CONTENT.md` (como adicionar inimigo,
    arma, carta, casco, fase, bioma, chefe — um arquivo cada, zero linhas no motor); `docs/NORTE.md` (§1 ficção, §2–3
@@ -63,7 +73,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
-- **Abertos dele:** itens 2, 15, 16, 18 e 19 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Abertos dele:** itens 2, 15, 16, 18, 19 e 20 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas

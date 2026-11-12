@@ -6,8 +6,8 @@ jogando — nunca por teste.
 
 **Visão proposta em 22/10:** [plano mestre de design](docs/GAME_DESIGN_MASTER_PLAN.md), solicitado pelo dono:
 diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, desbloqueios e etapas de produção.
-Próximo passo pendente: revisar essa direção com ele antes da implementação da frente 5. O documento distingue
-estado atual, propostas e horizonte; não aprova números nem substitui automaticamente as decisões abaixo.
+Em 12/11 ele entregou o projeto ("é seu, decida") e essa direção virou a base do trabalho. O documento distingue
+estado atual, propostas e horizonte; os números continuam sendo propostas que ele julga jogando.
 
 **Campanha, primeiro esqueleto (12/11, ramo `campanha/setores`, fora da `main`):** o dono disse "o projeto é seu, decida";
 a direção do plano mestre foi tomada como base. Feito: botão Campaign → mapa The Ring → cada capítulo (os três biomas
