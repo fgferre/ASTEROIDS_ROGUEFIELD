@@ -85,7 +85,7 @@ describe('Sentinel Quarry Maw', () => {
 
     expect(boss.jawsOpen).toBe(true);
     expect(velocity.vx).toBeLessThan(0);
-    expect(velocity.vx).toBeGreaterThan(-MAW.shipPullAcceleration * 1.1);
+    expect(velocity.vx).toBeGreaterThan(-MAW.cycle[0].shipPull * 1.1);
   });
 
   it('takes a fraction of the damage shut and all of it open', () => {
@@ -112,7 +112,7 @@ describe('Sentinel Quarry Maw', () => {
       ).length;
     };
 
-    expect(spat(0)).toBe(MAW.eject.min);
+    expect(spat(0)).toBe(MAW.cycle[0].ejectMin);
     expect(spat(5)).toBe(5);
     expect(spat(20)).toBe(MAW.eject.max);
   });
@@ -131,5 +131,33 @@ describe('Sentinel Quarry Maw', () => {
     boss.invulnerable = false;
     boss.takeDamage(boss.maxHealth * 0.3);
     expect(boss.currentPhase).toBe(1);
+  });
+
+  it('spits twice in its second phase: more rocks, faster, a heavy one, the second fan through the gaps', () => {
+    const { boss, system } = createMaw();
+    const second = MAW.cycle[1];
+    boss.currentPhase = 1;
+    boss.beginEject(second);
+    system.acquireEnemyViaFactory.mockClear();
+    const rocks = () =>
+      system.acquireEnemyViaFactory.mock.calls
+        .filter(([type]) => type === 'asteroid')
+        .map(([, config]) => config);
+
+    for (let t = 0; t < second.ejectWindup + 0.05; t += 1 / 60) {
+      boss.updateMaw(1 / 60, null);
+    }
+    const first = rocks();
+    expect(first).toHaveLength(second.ejectMin);
+    expect(first.filter((rock) => rock.size === 'medium')).toHaveLength(1);
+    expect(Math.hypot(first[0].vx, first[0].vy)).toBeCloseTo(second.ejectSpeed);
+    expect(second.ejectSpeed).toBeGreaterThan(MAW.cycle[0].ejectSpeed);
+    expect(boss.mawState).toBe('eject-windup');
+
+    for (let t = 0; t < second.salvoGap + 0.05; t += 1 / 60) {
+      boss.updateMaw(1 / 60, null);
+    }
+    expect(rocks()).toHaveLength(second.ejectMin * 2 - 1);
+    expect(boss.mawState).toBe('drift');
   });
 });

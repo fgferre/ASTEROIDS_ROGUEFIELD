@@ -54,6 +54,7 @@ export class SentinelQuarryMaw extends BossEnemy {
     this.jawOpen = 0;
     this.facing = 0;
     this.swallowed = 0;
+    this.salvo = 0;
     this.swallowedTotal = 0;
   }
 
@@ -146,10 +147,18 @@ export class SentinelQuarryMaw extends BossEnemy {
         this.aimFan(cycle);
         if (this.mawTimer <= 0) {
           this.eject(cycle);
-          this.clearTelegraph();
-          this.mawState = 'drift';
-          this.mawTimer = cycle.drift;
-          this.applyPhaseMovement(true);
+          this.salvo += 1;
+          if (this.salvo < cycle.salvos) {
+            this.mawTimer = cycle.salvoGap;
+            this.telegraph.duration = cycle.salvoGap;
+            this.aimFan(cycle);
+          } else {
+            this.swallowed = 0;
+            this.clearTelegraph();
+            this.mawState = 'drift';
+            this.mawTimer = cycle.drift;
+            this.applyPhaseMovement(true);
+          }
         }
         break;
       default:
@@ -188,6 +197,7 @@ export class SentinelQuarryMaw extends BossEnemy {
     this.mawState = 'intake-windup';
     this.mawTimer = cycle.intakeWindup;
     this.swallowed = 0;
+    this.salvo = 0;
     this.setTelegraph({
       type: 'intake',
       x: this.x,
@@ -252,8 +262,9 @@ export class SentinelQuarryMaw extends BossEnemy {
     const d = Math.hypot(dx, dy) || 1;
     const velocity = target.player?.velocity;
     if (velocity && this.inCone(ship)) {
-      velocity.vx += (dx / d) * MAW.shipPullAcceleration * deltaTime;
-      velocity.vy += (dy / d) * MAW.shipPullAcceleration * deltaTime;
+      const { shipPull } = this.cycle();
+      velocity.vx += (dx / d) * shipPull * deltaTime;
+      velocity.vy += (dy / d) * shipPull * deltaTime;
     }
     if (d <= MAW.mouthReach + this.radius * 0.25) {
       this.system?.applyDirectDamageToPlayer?.(
@@ -281,14 +292,15 @@ export class SentinelQuarryMaw extends BossEnemy {
     this.swallowedTotal += 1;
   }
 
-  ejectCount() {
-    const { min, max } = MAW.eject;
-    return Math.max(min, Math.min(max, this.swallowed));
+  ejectCount(cycle) {
+    return Math.max(cycle.ejectMin, Math.min(MAW.eject.max, this.swallowed));
   }
 
+  // The fan of the salvo about to leave: a later salvo has one rock fewer
+  // and flies through the gaps of the one before.
   ejectAngles(cycle) {
-    const count = this.ejectCount();
-    const step = count > 1 ? cycle.fanArc / (count - 1) : 0;
+    const count = this.ejectCount(cycle) - (this.salvo % 2);
+    const step = cycle.fanArc / (this.ejectCount(cycle) - 1);
     const start = this.facing - (step * (count - 1)) / 2;
     return Array.from({ length: count }, (_, i) => start + step * i);
   }
@@ -296,6 +308,7 @@ export class SentinelQuarryMaw extends BossEnemy {
   beginEject(cycle) {
     this.mawState = 'eject-windup';
     this.mawTimer = cycle.ejectWindup;
+    this.salvo = 0;
     this.setTelegraph({
       type: 'eject',
       x: this.x,
@@ -326,18 +339,22 @@ export class SentinelQuarryMaw extends BossEnemy {
   // What it ate, spat back as ordinary field rocks (they pay when broken).
   eject(cycle) {
     const mouth = this.mouthPoint();
-    const { speed, size } = MAW.eject;
-    for (const angle of this.ejectAngles(cycle)) {
+    const { size, heavySize } = MAW.eject;
+    const speed = cycle.ejectSpeed;
+    const angles = this.ejectAngles(cycle);
+    // The heavy rocks sit at the fan's centre.
+    const firstHeavy = Math.floor((angles.length - cycle.heavy) / 2);
+    angles.forEach((angle, i) => {
+      const heavy = i >= firstHeavy && i < firstHeavy + cycle.heavy;
       this.spawnChild('asteroid', {
-        size,
+        size: heavy ? heavySize : size,
         variant: 'common',
         x: mouth.x,
         y: mouth.y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
       });
-    }
-    this.swallowed = 0;
+    });
   }
 }
 
