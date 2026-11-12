@@ -220,7 +220,9 @@ export function createTelegraphs(kit) {
   function updateSectors(parts, t, progress, pulse) {
     parts.group.rotation.y = 0;
     const width = (Math.PI * 2) / t.count;
-    const glow = hazardGlow(t.phase === 'warn', progress, pulse);
+    // proposta 12/11: the wedges cover half the field, so they glow fainter
+    // than a pool: rocks and orbs still read through them.
+    const glow = 0.45 * hazardGlow(t.phase === 'warn', progress, pulse);
     let next = 0;
     for (let i = 0; i < t.count; i += 1) {
       if ((i + t.offset) % 2 !== 0) continue;
