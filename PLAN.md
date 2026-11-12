@@ -4,6 +4,25 @@ Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; 
 sai daqui (a história fica no git: `git log --oneline --merges main`). Decisões de produto são do dono, por imagem e
 jogando — nunca por teste.
 
+## O caminho até pronto (12/11, ordem do dono: _"continuar a melhoria… até ele estar realmente pronto, balanceado, sem bugs, bem acabado, história completa, fases em diferentes localizações desse universo 3D, deslocamentos em 3D entre uma fase e outra… depois pensamos em publicar"_)
+
+Nada vai para a `main` até ele dizer. Ramo de trabalho: `campanha/ajustes` (PR #305 aberta, não incorporar). Ciclos, em
+ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura no navegador e um commit por tarefa.
+
+1. **Roteiro** (`docs/ROTEIRO.md`): história inteira em texto — premissa, virada, uma fala por fase e por viagem, final.
+   Falantes THE RING e WAKE. Depois entra em `src/data/story.js`. [ ]
+2. **Nove lugares**: hoje três biomas servem três fases cada; cada fase ganha o seu lugar (cor, névoa, veios, luz,
+   detritos) por um `look` da fase sobre o bioma. Prancha das nove. [ ]
+3. **Viagem 3D entre fases**: ao vencer e seguir, a nave é vista por trás voando ao longo do Anel até o lugar seguinte,
+   com a fala da viagem; pulável; a mesma cena abre a campanha. [ ]
+4. **Equilíbrio**: Resonance Chamber e Null Boundary matam o piloto em 2–3 min (5/5); capítulo 1 dura ~5 min; 16
+   escolhas de carta de uma vez. Medir com várias sementes, propor, medir de novo. [ ]
+5. **Final e capítulos seguintes**: o que o roteiro pedir além das nove fases (chefe final, cena final). [ ]
+6. **Acabamento**: BACKLOG de cima a baixo (bugs primeiro), sons dos chefes novos, textos, telas. [ ]
+
+Feito neste caminho: passagem de fase (espólio com contagem, nave segue com o build), segunda etapa do Quarry Maw,
+brilho das cores claras — itens 21–23 dele, conferidos no navegador.
+
 **Visão proposta em 22/10:** [plano mestre de design](docs/GAME_DESIGN_MASTER_PLAN.md), solicitado pelo dono:
 diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, desbloqueios e etapas de produção.
 Em 12/11 ele entregou o projeto ("é seu, decida") e essa direção virou a base do trabalho. O documento distingue

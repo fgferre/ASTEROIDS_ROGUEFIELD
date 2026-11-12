@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 21.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 24.**
 
 ## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NO RAMO `campanha/setores`, ESPERANDO ELE JOGAR
 
