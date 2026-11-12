@@ -43,13 +43,14 @@ export const PLACES = {
   'assembly-graveyard': [380, 160],
   'quarantine-grid': [520, 260],
   'wardens-reach': [200, 80],
+  'the-crucible': [60, 20],
 };
 // proposta 12/11: a journey into a new chapter (and the opening) jumps:
 // the streaks stretch into a tunnel from `from` to `at` while the frame
 // flashes (exposure × `flash` at its peak), and the ship drops out at its
 // destination, in its colours, the streaks settling by `settle`.
 export const JUMP = {
-  to: ['debris-wake', 'furnace-drift', 'assembly-graveyard'],
+  to: ['debris-wake', 'furnace-drift', 'assembly-graveyard', 'the-crucible'],
   from: 0.26,
   at: 0.4,
   settle: 0.5,
