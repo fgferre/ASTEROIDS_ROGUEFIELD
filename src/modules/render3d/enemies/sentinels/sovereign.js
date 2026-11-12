@@ -26,11 +26,11 @@ const SHELL_TOP = 0.998;
 // The core: a gem of eight facets parted round a burning heart (radii up
 // from its girdle), held by eight prongs.
 const GEM = [
-  0, 0.25, 0.08, 0.25, 0.15, 0.17, 0.19, 0.05, 0.19, -0.01, 0.14, -0.12, 0.05,
-  -0.21, 0, -0.23,
+  0, 0.27, 0.05, 0.27, 0.13, 0.2, 0.19, 0.07, 0.19, 0.01, 0.12, -0.12, 0.04,
+  -0.22, 0, -0.25,
 ];
 const GEM_Y = 0.25;
-const GEM_PART = 0.022; // how far each facet stands off the heart
+const GEM_PART = 0.016; // how far each facet stands off the heart
 // proposta 12/11: the gem's own heat and the heart's, sealed and open.
 const GEM_HEAT = [0.04, 0.4];
 const HEART_GAIN = [0.1, 1.1];
@@ -86,7 +86,9 @@ export function createSovereign(sk) {
     drum,
     merge,
   } = sk;
-  const BOSS_LIGHT = new THREE.Color('#ffe2b0');
+  // proposta 12/11: the boss light over it, pale gold and dim, so the
+  // lining stays dark against the shell
+  const BOSS_LIGHT = new THREE.Color('#ffe2b0').multiplyScalar(0.4);
   // Sovereign, Continuance's seat: a pale lacquered egg standing in a gold
   // collar, ringed by two polished halos that float round it. The egg's upper
   // face is eight shells (an inlaid rib down each, two bands across, a band
@@ -321,7 +323,7 @@ export function createSovereign(sk) {
   const LAMP_VERTS = 36; // a box, non-indexed
   const gem = merge(
     around(SHELLS).map((a) => ({
-      geometry: sweep(GEM, 1, a - Math.PI / SHELLS + 0.05, TAU / SHELLS - 0.1),
+      geometry: sweep(GEM, 2, a - Math.PI / SHELLS + 0.03, TAU / SHELLS - 0.06),
       position: [Math.cos(a) * GEM_PART, GEM_Y, Math.sin(a) * GEM_PART],
     }))
   );
