@@ -32,6 +32,10 @@ da descida no mesmo ponto (~10 e ~20). Head start subiu para 9 e 16 (proposta): 
 Graveyard e Quarantine Grid e a chegar ao Kiln. Ainda morrem cedo Resonance Chamber e Null Boundary (as fases antigas),
 as duas para granadas do Caster na segunda camada; Crystal Choir estoura 25 min (rochas lentas de matar). Uma semente
 oscila muito: rodar várias antes de mexer em número de inimigo.
+Cinco sementes do piloto (12/11, piloto bom; a semente só muda o piloto, não se sabe se muda o mundo): Resonance
+Chamber 5/5 mortes até 02:56, 4 na segunda camada (3 granada do Caster, 2 tiro de drone); Null Boundary 5/5 mortes até
+03:27, 4 na segunda camada (3 granada do Caster, 1 rocha, 1 Tether); Assembly Graveyard 4 vitórias (11–14 min) e 1
+estouro de 25 min. É sistemático nas duas fases antigas; falta o dono jogar antes de mexer em número.
 Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
 quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
 (código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e

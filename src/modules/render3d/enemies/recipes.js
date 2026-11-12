@@ -374,6 +374,20 @@ export function createRecipeViews(kit) {
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3();
 
+  // How much of its gain a colour keeps so it glows no brighter than the
+  // threat red: lime carries over twice red's luminance, and at one gain its
+  // bloom hid the machine under it (proposta 12/11: the luma
+  // ratio to the power 0.8 — the plain ratio killed lime's bloom, its root
+  // changed nothing).
+  const luma = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return (
+      (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) /
+      255
+    );
+  };
+  const even = (hex) => Math.min(1, (luma(PALETTE.threat) / luma(hex)) ** 0.8);
+
   function paletteHex(role) {
     const hex = PALETTE[role];
     if (typeof hex !== 'string' || !hex.startsWith('#')) {
@@ -549,15 +563,17 @@ export function createRecipeViews(kit) {
     if (recipe.body) body.add(new THREE.Mesh(recipe.body, recipe.material));
     const accents = [];
     const glowMaterials = recipe.glows.map(({ hex, geometry }) => {
-      const material = kit.emissive(hex, GLOW_GAIN);
+      const material = kit.emissive(hex, GLOW_GAIN * even(hex));
       if (hex === PALETTE.threat) accents.push(material);
       body.add(new THREE.Mesh(geometry, material));
       return material;
     });
+    const glowEven = recipe.glows.map(({ hex }) => even(hex));
     const lights = recipe.lights.map(({ at, size, hex, pulse }) => {
-      const tone = kit.tone(hex, pulse ? LIGHT_DIM : LIGHT_GAIN);
+      const keep = even(hex);
+      const tone = kit.tone(hex, (pulse ? LIGHT_DIM : LIGHT_GAIN) * keep);
       if (hex === PALETTE.threat) accents.push(tone);
-      return { ...kit.glow(body, tone, size, at), size, pulse };
+      return { ...kit.glow(body, tone, size, at), size, pulse, keep };
     });
     group.add(body);
     kit.scene.add(group);
@@ -565,6 +581,7 @@ export function createRecipeViews(kit) {
       recipe,
       body,
       glowMaterials,
+      glowEven,
       lights,
       accents,
       rims: [
@@ -596,7 +613,7 @@ export function createRecipeViews(kit) {
       for (let i = 0; i < view.glowMaterials.length; i += 1) {
         kit.setGain(
           view.glowMaterials[i],
-          GLOW_GAIN * (1 + PULSE_GAIN * throb)
+          GLOW_GAIN * view.glowEven[i] * (1 + PULSE_GAIN * throb)
         );
       }
     }
@@ -604,7 +621,10 @@ export function createRecipeViews(kit) {
       const light = view.lights[i];
       if (!light.pulse) continue;
       const lit = level(enemy, light.pulse);
-      kit.setGain(light.tone, LIGHT_DIM + (LIGHT_LIT - LIGHT_DIM) * lit);
+      kit.setGain(
+        light.tone,
+        (LIGHT_DIM + (LIGHT_LIT - LIGHT_DIM) * lit) * light.keep
+      );
       light.anchor.scale.setScalar(light.size * (1 + LIGHT_GROW * lit));
     }
   }
