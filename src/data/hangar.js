@@ -17,13 +17,15 @@ export const BOSS_RUSH_SALVAGE_PER_WARDEN = 15; // proposta 18/10
 /**
  * Salvage a run is worth: layers reached, kills, victory and endless depth.
  * A Boss Rush run (`bossRushWardens` given) is worth its Wardens killed and
- * the victory.
+ * the victory. A sector run (`firstLayer` its first layer) counts the layers
+ * it played, from `firstLayer`, and has no endless depth.
  */
 export function runSalvage({
   layer = 0,
   kills = 0,
   won = false,
   bossRushWardens = null,
+  firstLayer = 1,
 } = {}) {
   if (bossRushWardens !== null) {
     return (
@@ -32,15 +34,13 @@ export function runSalvage({
     );
   }
   const reached = Math.max(0, Math.floor(Number(layer) || 0));
+  const played = Math.max(0, reached - firstLayer + 1);
   const base =
-    reached * SALVAGE_PER_LAYER +
+    played * SALVAGE_PER_LAYER +
     Math.floor(Math.max(0, Number(kills) || 0) / SALVAGE_KILLS_PER_POINT);
   if (!won) return base;
-  return (
-    base +
-    SALVAGE_VICTORY_BONUS +
-    Math.max(0, reached - RUN_FINAL_LAYER) * SALVAGE_PER_ENDLESS_LAYER
-  );
+  const endless = firstLayer === 1 ? Math.max(0, reached - RUN_FINAL_LAYER) : 0;
+  return base + SALVAGE_VICTORY_BONUS + endless * SALVAGE_PER_ENDLESS_LAYER;
 }
 
 /** What a run starts with when nothing is owned. */

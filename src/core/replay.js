@@ -101,7 +101,9 @@ export function decodeInputFrame(mask, analog = []) {
  * Records a run. `record(step, frame)` must be called with increasing steps,
  * starting at 0 for the first simulated step of the run. `mode` is 'normal',
  * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
- * which its seed is drawn from, and null on any other run. `controls` is the
+ * which its seed is drawn from, and null on any other run. `sector` is a
+ * sector run's sector id (a 'normal' run), null on any other; recordings
+ * without it load as null. `controls` is the
  * hull control scheme flown, 'modern' or 'classic'.
  */
 export function createRecorder({
@@ -110,6 +112,7 @@ export function createRecorder({
   difficulty = LEGACY_DIFFICULTY,
   mode = LEGACY_MODE,
   date = null,
+  sector = null,
   controls = null,
   version = REPLAY_VERSION,
 }) {
@@ -152,6 +155,7 @@ export function createRecorder({
         difficulty,
         mode,
         date,
+        sector,
         controls,
         steps,
         inputs: inputs.map((entry) => [...entry]),
@@ -229,6 +233,7 @@ export function deserialize(text) {
     difficulty: data.difficulty ?? LEGACY_DIFFICULTY,
     mode: data.mode ?? LEGACY_MODE,
     date: data.date ?? null,
+    sector: data.sector ?? null,
     controls: data.controls ?? null,
     steps: data.steps,
     inputs: data.inputs,

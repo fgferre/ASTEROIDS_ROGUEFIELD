@@ -129,6 +129,8 @@ export class WaveManager {
     // Boss Rush run (set by GameSessionService before the run resets): only
     // the Warden layers, a breather between them.
     this.bossRush = false;
+    // Sector run (set the same way): the run opens on the sector's first layer.
+    this.firstLayer = 1;
     this.waveInProgress = false;
     this.wavePaused = false;
     this.waveStartTime = 0;
@@ -491,7 +493,7 @@ export class WaveManager {
 
     this.currentWave = this.bossRush
       ? nextBossRushLayer(this.currentWave)
-      : this.currentWave + 1;
+      : Math.max(this.currentWave + 1, this.firstLayer);
     this.waveInProgress = true;
     this.waveStartTime = this.getSimulationTimeMs();
     this.enemiesSpawnedThisWave = 0;

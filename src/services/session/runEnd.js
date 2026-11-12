@@ -1,13 +1,14 @@
 // src/services/session/runEnd.js
 //
 // How a run ends: the final Warden's death wins it (a Boss Rush after its
-// three Wardens), the victory screen's "continue" makes it endless, the layer
+// three Wardens, a sector run at its own Warden), the victory screen's "continue" makes it endless, the layer
 // and time reached go into the records, and the end screens open once the
 // last transmission ends.
 
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
-import { updateRecords } from '../runRecords.js';
+import { nextSector } from '../../data/sectors.js';
+import { loadRecords, updateRecords } from '../runRecords.js';
 
 // The end screens wait for the transmission on air (the last words) to end,
 // up to the cap.
@@ -53,6 +54,8 @@ export class RunEnd {
     // Wardens killed so far.
     this.bossRush = false;
     this.bossRushWardens = 0;
+    // Sector run (src/data/sectors.js): the sector played, or null.
+    this.sector = null;
   }
 
   handleBossDefeatedEvent(payload = {}) {
@@ -67,8 +70,9 @@ export class RunEnd {
       }
       return;
     }
+    const finalLayer = this.sector ? this.sector.layers[1] : RUN_FINAL_LAYER;
     if (
-      payload?.wave !== RUN_FINAL_LAYER ||
+      payload?.wave !== finalLayer ||
       this.endless ||
       this.getSessionState() === 'victory'
     ) {
@@ -83,13 +87,17 @@ export class RunEnd {
     this.eventBus.emit('run-won', {
       wave: payload.wave,
       hullId: this.getConfiguredHullId(),
+      ...(this.sector && { sector: this.sector.id }),
     });
 
     this.scheduleRunEndScreen(
       () => {
         const summary =
           this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
-        const data = { ...summary, ...this.recordRunReached(summary) };
+        const data = {
+          ...summary,
+          ...this.recordRunReached(summary, { won: true }),
+        };
         this.setScreen('victory');
         this.emitScreenChanged('victory', { source: 'run-won', data });
       },
@@ -101,10 +109,10 @@ export class RunEnd {
   /**
    * Victory screen's "continue": the run goes endless. Layers resume from the
    * one after the final Warden; later Wardens only drop their rewards. Not
-   * after a Boss Rush.
+   * after a Boss Rush or a sector run.
    */
   continueBeyondVictory() {
-    if (this.getSessionState() !== 'victory' || this.bossRush) {
+    if (this.getSessionState() !== 'victory' || this.bossRush || this.sector) {
       return false;
     }
 
@@ -132,9 +140,28 @@ export class RunEnd {
    * record on a Daily Field run); returns `{ bestLayer }` for the end screen.
    * A Boss Rush records only its clear time (on a win) and returns
    * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
-   * reached.
+   * reached. A sector run records only its clear (`won`) and returns
+   * `{ sector: { id, time, bestTime, firstClear, next } }`, `next` the next
+   * sector's id on a win, else null.
    */
-  recordRunReached(summary = {}) {
+  recordRunReached(summary = {}, { won = false } = {}) {
+    if (this.sector) {
+      const { id } = this.sector;
+      const time = Math.floor(summary.stats?.timeElapsed ?? 0);
+      const firstClear = won && !loadRecords().sectorsWon.includes(id);
+      const records = updateRecords(
+        won ? { sectorWon: id, sectorTime: time } : {}
+      );
+      return {
+        sector: {
+          id,
+          time,
+          bestTime: records.sectorTimes[id] ?? 0,
+          firstClear,
+          next: won ? nextSector(this.sector)?.id ?? null : null,
+        },
+      };
+    }
     if (this.bossRush) {
       const records = updateRecords({
         bossRushTime:

@@ -2,6 +2,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 import { bossRushStage } from '../data/layers.js';
+import { sectorById } from '../data/sectors.js';
 import { updateRecords } from './runRecords.js';
 import {
   RandomScopes,
@@ -11,6 +12,7 @@ import {
 } from './session/randomScopes.js';
 import { DeathSnapshot } from './session/deathSnapshot.js';
 import { RunEnd } from './session/runEnd.js';
+import { HeadStart } from './session/headStart.js';
 import { RetryCountdown } from './session/retryCountdown.js';
 import { MenuButtons } from './session/menuButtons.js';
 
@@ -50,7 +52,7 @@ export default class GameSessionService {
     // Recording of the current/last run (src/core/replay.js); set by the
     // replay controller, read by the F9 download.
     this.replayRecorder = null;
-    // `{ daily, bossRush }` of the replay armed for the next run; set by the
+    // `{ daily, bossRush, sector }` of the replay armed for the next run; set by the
     // replay controller, it wins over the mode the run is started with.
     this.replayStart = null;
     this.sessionState = 'menu';
@@ -73,7 +75,9 @@ export default class GameSessionService {
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
       bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
+      // A sector run is not a deep run: it raises no layer record.
       waveStarted: (payload) =>
+        this.sector ||
         updateRecords(
           this.bossRush
             ? { bossRushStage: bossRushStage(payload?.wave) }
@@ -118,6 +122,10 @@ export default class GameSessionService {
       emitScreenChanged: (screen, meta) => this.emitScreenChanged(screen, meta),
       getConfiguredHullId: () => this.getConfiguredHullId(),
       findSafeSpawnPoint: () => this.findSafeSpawnPoint(),
+    });
+    this.headStart = new HeadStart({
+      eventBus: this.eventBus,
+      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
     });
     this.retry = new RetryCountdown({
       eventBus: this.eventBus,
@@ -519,17 +527,24 @@ export default class GameSessionService {
 
   /**
    * `daily`: see DifficultyService.beginRun. `bossRush` true starts a Boss
-   * Rush, false any other run; undefined keeps the last mode. An armed replay
+   * Rush, false any other run; undefined keeps the last mode. `sector` (a
+   * sector id) starts a sector run, never daily nor Boss Rush; null any other
+   * run; undefined keeps the last one, unless `daily` or `bossRush` is given
+   * (a mode picked without a sector). An armed replay
    * (`replayStart`) starts in its recorded mode, whatever started the run, and
    * announces itself with `replay: true` on 'game-started': a replayed run has
    * no side effects on the viewer's save (Salvage) or pad (rumble).
    */
-  startNewRun({ source = 'unknown', daily, bossRush } = {}) {
+  startNewRun({ source = 'unknown', daily, bossRush, sector } = {}) {
     const replay = Boolean(this.replayStart);
     if (replay) {
-      ({ daily, bossRush } = this.replayStart);
+      ({ daily, bossRush, sector } = this.replayStart);
       this.replayStart = null;
     }
+    if (sector !== undefined || daily !== undefined || bossRush !== undefined) {
+      this.sector = sectorById(sector ?? null);
+    }
+    if (this.sector) [daily, bossRush] = [false, false];
     if (bossRush !== undefined) this.bossRush = bossRush;
     const difficulty = this.resolveServiceInstance('difficulty');
     const seed = difficulty.beginRun({ daily });
@@ -561,7 +576,10 @@ export default class GameSessionService {
     updateRecords({ newRun: true });
     // Before the reset: the first layer's rock count already follows it.
     const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
-    if (waveManager) waveManager.bossRush = this.bossRush;
+    if (waveManager) {
+      waveManager.bossRush = this.bossRush;
+      waveManager.firstLayer = this.sector?.layers[0] ?? 1;
+    }
 
     try {
       this.resetSystems({ manageRandom: false });
@@ -574,7 +592,10 @@ export default class GameSessionService {
 
     this.applyConfiguredPlayerHull();
 
-    this.ensureWaveKickoff({ reason: 'session-start' });
+    // A head start holds the first layer until its picks are made.
+    if (!this.sector?.headStart) {
+      this.ensureWaveKickoff({ reason: 'session-start' });
+    }
 
     const ui = this.resolveServiceInstance('ui');
     if (ui && typeof ui.showGameUI === 'function') {
@@ -609,6 +630,7 @@ export default class GameSessionService {
       source,
       timestamp: Date.now(),
       bossRush: this.bossRush,
+      sector: this.sector?.id ?? null,
       replay,
     });
     if (difficulty.isDaily()) {
@@ -622,6 +644,7 @@ export default class GameSessionService {
     }
 
     this.setSessionState('running', { reason: 'start-new-run' });
+    this.headStart.begin(this.sector?.headStart ?? 0);
 
     if (this.gameState) {
       this.gameState.lastTime =
@@ -1049,6 +1072,15 @@ export default class GameSessionService {
 
   set bossRush(value) {
     this.runEnd.bossRush = value;
+  }
+
+  /** The sector run's sector (src/data/sectors.js), or null. */
+  get sector() {
+    return this.runEnd.sector;
+  }
+
+  set sector(value) {
+    this.runEnd.sector = value;
   }
 
   get transmissionOnAir() {

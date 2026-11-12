@@ -4,7 +4,7 @@ Content is data, behavior is a small library, `src/content/registry.js` links th
 
 ## The rule
 
-- One file per item: `src/content/<kind>/<id>.js`, `export default { id, ... }`, `id` = file name. Kinds: `enemies`, `weapons`, `cards`, `hulls`, `stages`, `biomes`, `bosses`. A file in a subfolder is not an item (`hulls/lib/`).
+- One file per item: `src/content/<kind>/<id>.js`, `export default { id, ... }`, `id` = file name. Kinds: `enemies`, `weapons`, `cards`, `hulls`, `stages`, `biomes`, `sectors`, `bosses`. A file in a subfolder is not an item (`hulls/lib/`).
 - `order`: a unique number per kind, where order decides a draw (cards, enemies). A new item takes the next free number. The lowest weapon `order` is the starting cannon.
 - Import only `src/data/constants/` (except `visual.js`, which reads the registry: importing it closes an import cycle that crashes every test at load), `src/utils/deepFreeze.js`, `src/data/layerParts.js` and other content files. Never `GameConstants` or a module that reads the registry. `tests/content/registry.test.js` checks every content file's imports and names the file and the import that breaks this.
 - A new behavior, fire pattern or movement strategy is an engine change, not content.
@@ -116,6 +116,7 @@ A recipe passes exactly a behavior's params (the test compares the key sets). Pa
 
 - Stage `src/content/stages/layer-NN.js`: `order` = layer number; `rocks: rockCurve(n)`; `roster` `[{ role, count, from, every, elite }]` (`from` s into the layer, then every `every` s, `elite` chance); `surges` `[{ at, roles, count, label }]` (`ROCKFALL` in `layerParts.js`); `formations` `[formation('ring', { role, count, at })]` (`ring sweep swarm wall`; marks light at `at`, the units come `FORMATION_WARN` s later; each shape's own numbers, such as a ring's `radius` or a wall's `gap`, are in `FORMATIONS` in `layerParts.js` and can be set on the line); `events` `[fieldEvent('sensor-jam', at)]` (`gravity-well solar-flare sensor-jam`); `warden` (boolean); optional `herald` (`dust heat silence`). The run has `RUN_FINAL_LAYER` layers (`src/data/constants/gameplay.js`): today a stage is edited, not added. Copy `layer-08.js`.
 - Biome `src/content/biomes/<id>.js`: `title`, `layers: [first, last]`, sky, haze, vein, dust, light and `musicTheme` fields (`src/data/biomes.js` explains each). Ranges must tile layers 1 to `RUN_FINAL_LAYER`, and `tests/data/biomes.test.js` pins the three ids. Copy `dense-core.js`.
+- Sector `src/content/sectors/<id>.js`: one chapter played on its own (`src/data/sectors.js`), won at its last layer's Warden. `chapter`, `name`, `biome` (its biome id), `layers: [first, last]` inside that biome's range and ending on a `warden` layer, `headStart` (card picks before the first layer). `tests/data/sectors.test.js` checks the ranges. Copy `dense-core.js`.
 
 ## Boss: `src/content/bosses/<id>.js`
 

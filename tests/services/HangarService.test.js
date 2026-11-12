@@ -57,6 +57,19 @@ describe('HangarService', () => {
     expect(awarded).toEqual([99, 23]);
   });
 
+  it('pays a sector run the layers it played and its victory', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+
+    eventBus.emit('game-started', { sector: 'dense-core' });
+    eventBus.emit('run-won', { wave: 10, sector: 'dense-core' });
+    eventBus.emit('screen-changed', {
+      screen: 'victory',
+      data: summary(10, 50),
+    });
+    expect(hangar.lastAward.amount).toBe(5 * 10 + 10 + 150);
+  });
+
   it('adds each Salvage Cache picked up to the run', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ eventBus, difficulty: atRate(2) });
