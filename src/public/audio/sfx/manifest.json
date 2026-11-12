@@ -37,7 +37,7 @@
     "origins": [
       {
         "file": "lance-shot/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A single short clean sci-fi energy cannon shot, tight bright plasma zap with a quick decay, high quality game sound effect, dry, no music"
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single short mellow sci-fi laser shot, soft rounded pew in the mid frequencies, quick clean decay, high quality game sound effect, dry, no music; cut to 0.2 s (audition 12/11, pick C)"
       }
     ]
   },
@@ -248,6 +248,20 @@
       {
         "file": "pause-close/1.mp3",
         "origin": "Kenney Interface Sounds minimize_003.ogg (CC0 1.0), post-processed"
+      }
+    ]
+  },
+  "run-start": {
+    "files": ["run-start/1.mp3"],
+    "gain": -8,
+    "priority": 0,
+    "cap": 1,
+    "gap": 200,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "run-start/1.mp3",
+        "origin": "Kenney Sci-Fi Sounds forceField_003.ogg under Kenney Interface Sounds maximize_006.ogg (CC0 1.0), post-processed (audition 12/11, pick C)"
       }
     ]
   }

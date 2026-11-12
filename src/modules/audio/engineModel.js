@@ -16,7 +16,8 @@
  *   thrust  0..1   main engine
  *   lateral -1..1  side thruster: sign = the side that fires (left -, right +), size = how hard
  *   speed   0..1   speed / top speed; near top speed the engine stops "pushing" and loses treble
- *   tier    0..3   engine upgrades: each tier adds a layer (sub rumble, turbine harmonic, crackle)
+ *   tier    0..3   engine upgrades: tiers 2 and 3 add a layer (turbine harmonic, crackle); the sub
+ *                  rumble and the turbine an octave down play from the start (owner's pick, 12/11)
  *
  * buffers = {
  *   turbine, roar, sub, harmonic, crackle: { buffer, loopStart, loopEnd }   seamless loops
@@ -29,7 +30,7 @@ const MIX = {
   low: 0.75,
   turbine: 0.9,
   roar: 0.65,
-  sub: 0.75,
+  sub: 1, // proposta 12/11 (audition pick B), was 0.75 behind tier 1
   harmonic: 0.32,
   crackle: 0.3,
 };
@@ -40,8 +41,10 @@ const ONESHOT = {
   brake: 0.8,
   puff: 0.42,
 };
-const TIER_LAYER = { 1: 'sub', 2: 'harmonic', 3: 'crackle' };
+const LOW_FLOOR = 0.45; // proposta 12/11: the turbine an octave down stays under the full turbine
+const TIER_LAYER = { 2: 'harmonic', 3: 'crackle' };
 const BASE_POWER = MIX.turbine ** 2 + MIX.roar ** 2;
+const LOW_POWER = MIX.sub ** 2 + LOW_FLOOR ** 2; // the low layers, always on, share the bed's level
 
 const SPOOL_UP = 0.15; // s, turbine spin-up time constant (0 -> 90 % in ~0.35 s)
 const SPOOL_DOWN = 0.45; // s, wind-down after release (~1 s to silence)
@@ -291,10 +294,10 @@ export function createEngineModel({
     const crackleW = clamp((thrustS - 0.45) / 0.55) * (Math.PI / 2);
     const g = target.gains;
     const r = target.rates;
-    g.low = MIX.low * A * level * Math.cos(w);
+    g.low = A * level * (MIX.low * Math.cos(w) + LOW_FLOOR * Math.sin(w));
     g.turbine = MIX.turbine * A * level * Math.sin(w);
     g.roar = MIX.roar * A * Math.sin(roarW);
-    g.sub = MIX.sub * gates[1] * A * (0.5 + 0.5 * thrustS);
+    g.sub = MIX.sub * A * (0.5 + 0.5 * thrustS);
     g.harmonic = MIX.harmonic * gates[2] * A * spool ** 1.5;
     g.crackle = MIX.crackle * gates[3] * A * Math.sin(crackleW) * st.flutter;
     r.turbine = turbineRate;
@@ -306,9 +309,10 @@ export function createEngineModel({
 
     // upgrades add layers, not volume
     let added = 0;
-    for (let t = 1; t <= 3; t++) added += gates[t] * MIX[TIER_LAYER[t]] ** 2;
+    for (const [t, layer] of Object.entries(TIER_LAYER))
+      added += gates[t] * MIX[layer] ** 2;
     target.bed =
-      Math.sqrt(BASE_POWER / (BASE_POWER + added)) *
+      Math.sqrt(BASE_POWER / (BASE_POWER + LOW_POWER + added)) *
       (0.8 + 0.2 * push) *
       (1 - 0.12 * fatigue);
     target.cutoff = (2600 + 13400 * push ** 0.8) * (1 - 0.45 * fatigue);
