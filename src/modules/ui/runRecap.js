@@ -1,6 +1,7 @@
 // src/modules/ui/runRecap.js
 
 import { biomeForLayer } from '../../data/biomes.js';
+import { localLayer } from '../../data/sectors.js';
 import { CODEX_ENTRIES, codexIdOf } from '../../data/codex.js';
 import {
   FAMILY_APEX_THRESHOLD,
@@ -37,11 +38,17 @@ export function formatRunTime(totalSeconds) {
 
 /**
  * "Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE · BEST LAYER 12" (time and
- * best layer left out when null).
+ * best layer left out when null); a sector run's layer counts from the
+ * sector's first one.
  */
-export function runLocationLine(layer, totalSeconds = null, bestLayer = null) {
+export function runLocationLine(
+  layer,
+  totalSeconds = null,
+  bestLayer = null,
+  sector = null
+) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
-  const parts = [`Layer ${n}`];
+  const parts = [`Layer ${sector ? localLayer(sector, n) : n}`];
   if (totalSeconds !== null) parts.push(formatRunTime(totalSeconds));
   parts.push(biomeForLayer(n).title);
   if (bestLayer !== null) parts.push(`BEST LAYER ${bestLayer}`);

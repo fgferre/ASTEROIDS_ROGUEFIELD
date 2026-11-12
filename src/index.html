@@ -94,11 +94,19 @@
             </section>
             <nav class="menu-screen__nav menu-grid" aria-label="Main Menu">
               <button
-                id="start-game-btn"
+                id="menu-campaign-btn"
                 class="menu-screen__button menu-screen__button--primary"
                 type="button"
               >
-                Start
+                Campaign
+              </button>
+              <button
+                id="start-game-btn"
+                class="menu-screen__button"
+                type="button"
+                title="All three chapters in one run"
+              >
+                Descent
               </button>
               <button
                 id="daily-field-btn"
@@ -592,6 +600,70 @@
         </div>
       </div>
 
+      <!-- Campaign map: the Ring's chapters (ui/CampaignMap.js) -->
+      <div
+        id="campaign-screen"
+        class="screen screen--overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="campaign-title"
+        aria-hidden="true"
+      >
+        <div class="credits-dialog campaign-dialog">
+          <header class="credits-header">
+            <h2 id="campaign-title" class="credits-title">The Ring</h2>
+            <button
+              id="campaign-close-btn"
+              class="credits-close-btn"
+              type="button"
+              aria-label="Close campaign map"
+            >
+              ✕
+            </button>
+          </header>
+          <div
+            id="campaign-nodes"
+            class="campaign-map"
+            role="group"
+            aria-label="Chapters"
+          ></div>
+          <section class="campaign-detail" aria-live="polite">
+            <div class="campaign-detail__text">
+              <h3 id="campaign-detail-title" class="campaign-detail__title">
+                —
+              </h3>
+              <div
+                id="campaign-sectors"
+                class="campaign-sectors"
+                role="group"
+                aria-label="Sectors"
+              ></div>
+              <p
+                id="campaign-detail-head-start"
+                class="campaign-detail__line"
+                hidden
+              ></p>
+            </div>
+            <button
+              id="campaign-launch-btn"
+              class="btn btn--primary campaign-detail__launch"
+              type="button"
+            >
+              Launch
+            </button>
+          </section>
+          <footer class="credits-footer">
+            <button
+              id="campaign-back-btn"
+              class="btn btn--secondary"
+              type="button"
+            >
+              Back to Menu
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <!-- Game Over Overlay: the run end (ui/RunEndScreens.js) -->
       <div
         id="gameover-screen"
@@ -638,6 +710,14 @@
               <kbd data-device="keyboard">⏎</kbd>
               <kbd data-device="gamepad">A</kbd>
               Continue into the Deep Field
+            </button>
+            <button
+              id="victory-next-btn"
+              class="end-btn end-btn--primary hidden"
+            >
+              <kbd data-device="keyboard">⏎</kbd>
+              <kbd data-device="gamepad">A</kbd>
+              <span class="end-btn__label">Next Chapter</span>
             </button>
             <button id="victory-restart-btn" class="end-btn">
               New mission

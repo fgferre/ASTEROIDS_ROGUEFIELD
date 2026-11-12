@@ -76,6 +76,7 @@ export const SAMPLE_CUES = deepFreeze({
   playBossRoar: { sample: 'warden-arrival', bus: 'ambient', facade: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
+  playUIStartGame: { sample: 'run-start', bus: 'ambient' },
   playPauseOpen: { sample: 'pause-open', bus: 'ambient' },
   playPauseClose: { sample: 'pause-close', bus: 'ambient' },
 });

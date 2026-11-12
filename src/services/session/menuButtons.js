@@ -1,13 +1,14 @@
 // src/services/session/menuButtons.js
 //
 // The page's run buttons, heard with one document-level click listener: start
-// (normal, Daily Field, Boss Rush), New Mission, Retry, Quit, the victory
+// (Descent, Daily Field, Boss Rush), a sector (the campaign map's Launch, the
+// victory screen's Next Chapter), New Mission, Retry, Quit, the victory
 // screen's continue, and the menu's settings and credits.
 
 export class MenuButtons {
   /**
    * `eventBus`: emits 'credits-menu-requested' and 'settings-menu-requested'.
-   * `startNewRun({ source, daily, bossRush })`, `requestRetry({ source })`,
+   * `startNewRun({ source, daily, bossRush, sector })`, `requestRetry({ source })`,
    * `exitToMenu({ source })`, `continueBeyondVictory()`: the session's flows.
    */
   constructor({
@@ -113,6 +114,14 @@ export class MenuButtons {
           daily: restart ? undefined : id === 'daily-field-btn',
           bossRush: restart ? undefined : id === 'boss-rush-btn',
         });
+        break;
+      }
+      case 'campaign-launch-btn':
+      case 'victory-next-btn': {
+        preventDefault();
+        this.emitCreditsMenuRequest({ open: false, source: id });
+        // The button carries the sector it starts.
+        this.startNewRun({ source: id, sector: button.dataset.sector });
         break;
       }
       case 'retry-game-btn': {

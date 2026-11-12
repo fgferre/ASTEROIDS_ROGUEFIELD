@@ -17,6 +17,7 @@ Every sound effect is a real sample the owner chose by ear; code only plays, var
 
 - Generated on the owner's Mac by the local skill `/sfx-generator` (AudioLDM `cvssp/audioldm-s-full-v2`, weights CC BY-NC-SA 4.0: the game is free; every generated file is shared under the same licence, credited in the in-game credits). The model outputs 16 kHz mono; the pipeline below adds the missing air.
 - Kenney packs (Interface, Sci-Fi, Impact Sounds), CC0, for what the model does badly (clicks, crisp lasers).
+- Chosen by ear on 12/11 (audition page, kept out of git): the Lance shot is a generated short soft "pew" (AudioLDM seed 13, cut to 0.2 s, no exciter: he found the old one tiring when repeated); the run-start cue (`run-start`) is two Kenney sounds layered (Sci-Fi `forceField_003` under Interface `maximize_006`), replacing the synthesized one; the engine's low layer comes in from the start (`engineModel.js`).
 - Each file's origin (generator prompt and seed, or pack and file) is in `src/public/audio/sfx/manifest.json`; the sources are rows in `docs/asset-sourcing.md`.
 
 ## Pipeline (candidates never enter the repo)

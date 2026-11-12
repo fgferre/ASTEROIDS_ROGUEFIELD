@@ -9,8 +9,20 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 const HEALTH = 70; // proposta 20/10
 const RADIUS = 17; // proposta 20/10
 const CONTACT_DAMAGE = 12; // proposta 20/10
-const TURN = (Math.PI * 2) / 3;
-const around = (i, r, y) => [Math.cos(i * TURN) * r, y, Math.sin(i * TURN) * r];
+const STEP = Math.PI / 4;
+const EIGHT = [0, 1, 2, 3, 4, 5, 6, 7];
+const polar = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
+// A hoop plate seen from above: `half` radians either side of `a`, from
+// radius `inner` to `outer`.
+const arc = (a, half, inner, outer) =>
+  [
+    [outer, -half],
+    [outer, 0],
+    [outer, half],
+    [inner, half],
+    [inner, 0],
+    [inner, -half],
+  ].map(([r, da]) => [Math.cos(a + da) * r, Math.sin(a + da) * r]);
 
 export default {
   id: 'aegis',
@@ -56,93 +68,104 @@ export default {
       recharge: 5, // proposta 20/10: s until a broken ward is back
     },
   }),
-  // A squat lantern: a turned hull with a dark band, a mast with a thin lime
-  // halo, three vanes with a lime ward node each and one red eye. Its ward
-  // shows as the links to what it covers (render3d/overlayMirror.js).
+  // A ward wheel: an open eight-plate hoop round a hollow, a core hung in it
+  // on four spokes with the ward emitter on top, and four projector pylons
+  // standing out past the hoop, a lime node on each. It turns slowly; its
+  // lights are bright while the ward holds and go dim when it breaks. Its
+  // ward shows as the links to what it covers (render3d/overlayMirror.js).
   visual: {
-    scale: 1,
+    scale: 1.12,
+    finish: 'panel',
     parts: [
-      {
-        shape: 'turned',
-        profile: [
-          [0.12, 0.3],
-          [0.42, 0.27],
-          [0.66, 0.16],
-          [0.74, 0.04],
-          [0.7, -0.08],
-          [0.48, -0.18],
-          [0.12, -0.22],
-        ],
-        sides: 24,
-      },
-      {
-        shape: 'turned',
-        profile: [
-          [0.72, 0.07],
-          [0.79, 0.03],
-          [0.78, -0.05],
-          [0.7, -0.03],
-          [0.72, 0.07],
-        ],
-        sides: 24,
-        material: 'trim',
-      },
-      {
-        shape: 'turned',
-        profile: [
-          [0.16, 0.29],
-          [0.11, 0.44],
-          [0.07, 0.56],
-          [0.0, 0.58],
-        ],
-        sides: 12,
-        material: 'trim',
-      },
-      {
-        shape: 'torus',
-        size: [0.2, 0.16, 0.2],
-        at: [0, 0.6, 0],
-        material: 'glow',
-        color: 'status',
-      },
-      { shape: 'nozzle', at: [0, -0.22, 0], dir: [0, -1, 0], size: 0.16 },
-      ...[0, 1, 2].flatMap((i) => [
+      ...EIGHT.flatMap((k) => [
+        // the hoop: dark base plates, a raised armour plate on every other one
         {
-          shape: 'wing',
-          root: 0.34,
-          tip: 0.14,
-          span: 0.46,
-          sweep: 0.06,
-          thick: 0.08,
-          dihedral: 0.22,
-          sides: 8,
-          at: around(i + 0.5, 0.62, 0.04),
-          rotate: [0, Math.PI / 2 - (i + 0.5) * TURN, 0],
-        },
-        {
-          shape: 'turned',
-          profile: [
-            [0.02, 0.1],
-            [0.08, 0.07],
-            [0.1, -0.02],
-            [0.06, -0.08],
-          ],
-          sides: 10,
-          at: around(i + 0.5, 1.08, 0.14),
+          shape: 'slab',
+          outline: arc(k * STEP, 0.34, 0.54, 0.86),
+          bottom: -0.1,
+          top: 0.05,
+          bevel: 0.03,
           material: 'trim',
         },
+        k % 2
+          ? {
+              shape: 'slab',
+              outline: arc(k * STEP, 0.27, 0.6, 0.82),
+              bottom: 0.05,
+              top: 0.14,
+              bevel: 0.03,
+            }
+          : {
+              // a projector pylon, worn steel, out past the hoop
+              shape: 'slab',
+              outline: [
+                [0.6, 0.13],
+                [0.92, 0.13],
+                [1.1, 0.06],
+                [1.1, -0.06],
+                [0.92, -0.13],
+                [0.6, -0.13],
+              ],
+              bottom: -0.05,
+              top: 0.17,
+              bevel: 0.035,
+              rotate: [0, -k * STEP, 0],
+              material: 'steel',
+            },
       ]),
+      // the spokes, between the pylons
+      ...[1, 3, 5, 7].map((k) => ({
+        shape: 'box',
+        size: [0.16, 0.035, 0.035],
+        at: polar(k * STEP, 0.42, 0),
+        rotate: [0, -k * STEP, 0],
+        material: 'steel',
+      })),
+      // the core: a faceted drum, a stepped cap and a dark keel
+      {
+        shape: 'drum',
+        sides: 8,
+        size: [0.3, 0.1, 0.3],
+        rotate: [0, STEP / 2, 0],
+      },
+      {
+        shape: 'drum',
+        sides: 8,
+        taper: 0.78,
+        size: [0.25, 0.04, 0.25],
+        at: [0, 0.14, 0],
+        rotate: [0, STEP / 2, 0],
+        material: 'steel',
+      },
+      {
+        shape: 'drum',
+        sides: 8,
+        taper: 0.5,
+        size: [0.24, 0.07, 0.24],
+        at: [0, -0.17, 0],
+        rotate: [Math.PI, STEP / 2, 0],
+        material: 'trim',
+      },
     ],
     lights: [
-      ...[0, 1, 2].map((i) => ({
-        at: around(i + 0.5, 1.08, 0.22),
-        dir: around(i + 0.5, 0.6, 1),
-        size: 0.07,
+      // the ward emitter
+      {
+        at: [0, 0.2, 0],
+        dir: [0, 1, 0],
+        size: 0.09,
         color: 'status',
+        pulse: 'wardRatio',
+      },
+      // a ward node on each pylon
+      ...[0, 2, 4, 6].map((k) => ({
+        at: polar(k * STEP, 0.93, 0.19),
+        dir: polar(k * STEP, 0.5, 1),
+        size: 0.05,
+        color: 'status',
+        pulse: 'wardRatio',
       })),
-      { at: [0.68, 0.12, 0], dir: [1, 0.4, 0], size: 0.1 },
     ],
-    animate: { bob: 0.04 },
+    animate: { spin: [0, 0.35, 0] },
   },
   codex: {
     lore: 'The Ring set wardens over its work crews. This one still keeps its crew from harm — whatever crew it finds.',

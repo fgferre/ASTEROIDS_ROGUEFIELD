@@ -4,6 +4,49 @@ Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; 
 sai daqui (a história fica no git: `git log --oneline --merges main`). Decisões de produto são do dono, por imagem e
 jogando — nunca por teste.
 
+**Visão proposta em 22/10:** [plano mestre de design](docs/GAME_DESIGN_MASTER_PLAN.md), solicitado pelo dono:
+diagnóstico do conteúdo atual, campanha, roteiro, builds, inimigos, chefes, desbloqueios e etapas de produção.
+Em 12/11 ele entregou o projeto ("é seu, decida") e essa direção virou a base do trabalho. O documento distingue
+estado atual, propostas e horizonte; os números continuam sendo propostas que ele julga jogando.
+
+**Campanha, primeiro esqueleto (12/11, ramo `campanha/setores`, fora da `main`):** o dono disse "o projeto é seu, decida";
+a direção do plano mestre foi tomada como base. Feito: botão Campaign → mapa The Ring → cada capítulo (os três biomas
+atuais, 5 layers cada) é uma partida própria, vencida no seu Warden, que abre o próximo; capítulos 2 e 3 começam com
+4 e 8 escolhas de carta (`headStart`, proposta); layers numeradas dentro do capítulo; telas de vitória e derrota do
+capítulo; recordes `sectorsWon`/`sectorTimes`. A descida de 15 layers continua no botão Descent. Falta: ele jogar e
+julgar (mapa, head start, duração). Depois (12/11): o capítulo 1 virou três fases com camadas próprias — Debris Wake
+(Sentinel Quarry Maw), Salvage Lanes (Sentinel Gatekeeper), Prime Gate (Warden Prime); um setor pode ter `stages` e
+`boss`; Sentinel = chefe de fase (`tier: 'sentinel'`, lista de arquivos no CONTENT.md). Ele achou fraco o primeiro
+modelo feito por ajudante: modelos de chefe e de nave são feitos pela conversa principal (`sentinels.js`, placas com
+os painéis do casco). Falta: ele jogar as três fases; as fases A/B dos capítulos 2 e 3; as naves do jogador (item 20).
+Medido sem tela (12/11, piloto do golden trace que não mira nem desvia, nave que não morre, primeira carta sempre;
+uma amostra por fase): as nove fases chegam à vitória, sem erro. Duração: capítulo 1 4,5–5,5 min (chefes 66–109 s);
+capítulo 2 7,5–11,5 min (Kiln 196 s, Prism 222 s, Choir 102 s); capítulo 3 8,9–11,6 min (Foundry 174 s, Interdictor
+223 s, Null 125 s). Nível ao chegar no chefe: 9–10, 19–21 e 24–30. Golpes concentrados nas camadas do meio e no chefe.
+O Quarry Maw engoliu só 4 rochas em 12 sucções e o Foundry Mother nunca teve a montagem interrompida (o piloto não
+mira). O plano mestre pede 14–18 min por fase: alongar o capítulo 1 é decisão dele, jogando.
+Piloto que joga como pessoa (12/11, `npm run playtest [-- <fase>] [average|good]`, `src/bootstrap/botPilot.js`): lê só
+o que o jogador vê, nave mortal. Primeira rodada (semente 1): capítulo 1 jogável (mediano vence 2 de 3, bom vence 3);
+capítulos 2 e 3 matavam antes do chefe, porque o head start (4 e 8 cartas → níveis 5 e 9) ficava muito abaixo do nível
+da descida no mesmo ponto (~10 e ~20). Head start subiu para 9 e 16 (proposta): o piloto bom passou a vencer Assembly
+Graveyard e Quarantine Grid e a chegar ao Kiln. Ainda morrem cedo Resonance Chamber e Null Boundary (as fases antigas),
+as duas para granadas do Caster na segunda camada; Crystal Choir estoura 25 min (rochas lentas de matar). Uma semente
+oscila muito: rodar várias antes de mexer em número de inimigo.
+Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
+quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
+(código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e
+refletem nos espelhos, e fica exposto com os espelhos afastados). Os dois vistos lutando dentro das fases. O capítulo 2
+tem as três fases. Capítulo 3: Assembly Graveyard (Sentinel Foundry Mother: monta escolta limitada, que dano forte
+interrompe; varre com dois braços; exposto com as baias abertas ou os braços pendentes) e Null Boundary (Warden Null);
+a fase do meio é Quarantine Grid (Sentinel Interdictor: gaiola de cercas com um lado aberto em volta da nave, feixe
+que mira, trava e queima; exposto quando a gaiola cai). Os três capítulos têm três fases cada (nove partidas, seis
+Sentinels novos); ele não jogou nenhuma. As vistas dos Sentinels são um arquivo por chefe em `render3d/enemies/sentinels/`. Reavaliação dos modelos antigos (12/11, pranchas): os onze fracos
+foram refeitos em placas — drone, caster, mine, leech, anvil, bulwark, husk, twain, sower, weaver e o Herald Dust (receitas
+com `slab`, `drum` e `finish: 'panel'`). Ainda discretos no tamanho do jogo: leech, twain, weaver; ele julga jogando.
+Naves (item 20, 12/11): os três cascos são construídos em placas por `render3d/hullSlabModel.js`, lendo os mesmos
+dados de casco (painéis de asa e flap, bocais, cabine, `form.body`); o caminho antigo, arredondado, saiu de
+`hullModel.js`. Falta ele julgar as três jogando; se rejeitar, a volta é reverter os dois commits das naves.
+
 ## Rodada 15 (decidida 20/10 com ele) — melhorar o projeto de todas as formas, na ordem do que o jogador sente
 
 Dele (20/10): _"tudo está rodando liso, não precisa medir nada. Temos que agora focar em melhorar o projeto de todas as

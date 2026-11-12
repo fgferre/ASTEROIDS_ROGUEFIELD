@@ -110,6 +110,24 @@ describe('TransmissionQueue', () => {
   });
 });
 
+describe('wardenTransmission', () => {
+  it("speaks a Sentinel's own lines by kind, else the layer's Warden", () => {
+    const sentinel = wardenTransmission(5, 'warning', 'quarry-maw');
+    expect(sentinel).toEqual({
+      key: 'sentinel:quarry-maw:warning',
+      speaker: 'QUARRY MAW',
+      text: STORY.sentinel['quarry-maw'].warning,
+    });
+    expect(wardenTransmission(5, 'defeated', 'quarry-maw').text).toMatch(
+      /^Quarry Maw offline\./
+    );
+    expect(wardenTransmission(5, 'warning', 'prime')).toEqual(
+      wardenTransmission(5, 'warning')
+    );
+    expect(wardenTransmission(5, 'warning').speaker).toBe('WARDEN PRIME');
+  });
+});
+
 describe('heraldTransmission', () => {
   it("keys the line by kind and speaks with the Herald's own label", () => {
     expect(heraldTransmission('heat', 'defeated')).toEqual({

@@ -76,8 +76,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'enemy-spawned', run: 'enemySpawned' },
   { on: 'enemy-telegraph', cue: 'playEnemyTelegraph', at: 'source' },
   { on: 'elite-spawned', cue: 'playEliteSpawned' },
-  // Known bug, kept: the event sends `position`, the pan reads `x` (centred).
-  { on: 'weapon-beam-fired', cue: 'playHarmonicBeam', panX: 'x' },
+  { on: 'weapon-beam-fired', cue: 'playHarmonicBeam', panX: 'position.x' },
   { on: 'weapon-evolved', cue: 'playWeaponEvolved', duck: true },
   { on: 'upgrade-rerolled', cue: 'playCardReroll' },
   { on: 'upgrade-banished', cue: 'playCardBanish' },

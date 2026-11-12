@@ -9,7 +9,7 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { resolveEventBus, resolveService } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
-import { bossKindForLayer, WARDEN_KINDS } from '../../../data/enemies/boss.js';
+import { BOSS_KINDS, bossKindForLayer } from '../../../data/enemies/boss.js';
 import { beginArrival } from '../boss/arrival.js';
 import { IS_DEV } from '../../../core/env.js';
 
@@ -195,7 +195,7 @@ export class EnemySpawnSystem {
       : boss.x < (GAME_WIDTH || 800) / 2
         ? 'left'
         : 'right';
-    const arrival = beginArrival(boss, WARDEN_KINDS[bossKind].arrival, edge);
+    const arrival = beginArrival(boss, BOSS_KINDS[bossKind].arrival, edge);
 
     const payload = {
       enemy: boss,

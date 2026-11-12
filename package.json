@@ -26,6 +26,7 @@
     "test:balance": "vitest run tests/balance",
     "test:visual": "vitest run tests/visual",
     "test:physics": "vitest run tests/physics",
+    "playtest": "node scripts/playtest.mjs",
     "stress": "node scripts/run-stress-checks.mjs",
     "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
     "analyze:deps:watch": "nodemon --watch src --exec npm run analyze:deps",

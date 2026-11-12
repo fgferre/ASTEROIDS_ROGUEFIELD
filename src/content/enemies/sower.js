@@ -10,6 +10,11 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 const HEALTH = 50; // proposta 20/10
 const RADIUS = 15; // proposta 20/10
 const CONTACT_DAMAGE = 10; // proposta 20/10
+// One of the Tethers racked on its deck, seen from above: a small octagon.
+const TETHER_SEED = Array.from({ length: 8 }, (_, i) => {
+  const a = ((i + 0.5) * Math.PI) / 4;
+  return [Math.cos(a) * 0.15, Math.sin(a) * 0.15];
+});
 
 export default {
   id: 'sower',
@@ -56,76 +61,160 @@ export default {
       event: 'weaver-tether-laid',
     },
   }),
-  // A flat, boxy carrier: a drum hopper on its back holding three seeds, a
-  // dark pod on each flank with its nozzle, a chute behind that lights as a
-  // Tether drops, one eye.
+  // A flat barge: a dark hull under a deck, a bridge block forward with its
+  // eye; astern a rack of four Tethers ready to drop, the chute between them
+  // that lights as one falls, and across the stern the spreader boom whose
+  // tips light with it.
   visual: {
     scale: 1,
+    finish: 'panel',
     parts: [
       {
-        shape: 'body',
-        stations: [
-          [-0.72, 0.48, 0.14, 0.09],
-          [-0.2, 0.6, 0.17, 0.11],
-          [0.38, 0.5, 0.15, 0.09],
-          [0.86, 0.18, 0.09, 0.05],
+        shape: 'slab',
+        outline: [
+          [0.9, 0.22],
+          [0.64, 0.52],
+          [-0.62, 0.52],
+          [-0.74, 0.4],
+          [-0.74, -0.4],
+          [-0.62, -0.52],
+          [0.64, -0.52],
+          [0.9, -0.22],
         ],
-        round: 3.4,
-        ridge: 0.1,
-        sides: 16,
-        rings: 12,
-      },
-      {
-        shape: 'body',
-        stations: [
-          [-0.6, 0.08, 0.07, 0.06],
-          [-0.1, 0.13, 0.1, 0.08],
-          [0.35, 0.08, 0.07, 0.05],
-        ],
-        sides: 10,
-        rings: 8,
-        at: [0, -0.01, 0.6],
-        mirror: true,
+        bottom: -0.14,
+        top: 0,
         material: 'trim',
       },
       {
-        shape: 'turned',
-        profile: [
-          [0.0, 0.3],
-          [0.26, 0.3],
-          [0.33, 0.24],
-          [0.33, 0.14],
-          [0.28, 0.1],
+        shape: 'slab',
+        outline: [
+          [0.8, 0.2],
+          [0.58, 0.46],
+          [0.1, 0.46],
+          [0.1, -0.46],
+          [0.58, -0.46],
+          [0.8, -0.2],
         ],
-        sides: 20,
-        at: [-0.22, 0, 0],
+        bottom: -0.02,
+        top: 0.08,
+        bevel: 0.025,
+      },
+      {
+        shape: 'slab',
+        outline: [
+          [0.7, 0.1],
+          [0.6, 0.22],
+          [0.28, 0.22],
+          [0.22, 0.14],
+          [0.22, -0.14],
+          [0.28, -0.22],
+          [0.6, -0.22],
+          [0.7, -0.1],
+        ],
+        bottom: 0.06,
+        top: 0.19,
+        bevel: 0.03,
+        material: 'steel',
+      },
+      {
+        shape: 'slab',
+        outline: [
+          [0.06, 0.5],
+          [-0.68, 0.5],
+          [-0.68, 0.06],
+          [0.06, 0.06],
+        ],
+        bottom: -0.02,
+        top: 0.04,
+        bevel: 0.015,
+        mirror: true,
+        material: 'soot',
+      },
+      ...[-0.11, -0.47].flatMap((x) => [
+        {
+          shape: 'slab',
+          outline: TETHER_SEED.map(([u, v]) => [x + u, 0.28 + v]),
+          bottom: 0.02,
+          top: 0.12,
+          bevel: 0.02,
+          mirror: true,
+        },
+        {
+          shape: 'drum',
+          sides: 8,
+          size: [0.075, 0.03, 0.075],
+          at: [x, 0.14, 0.28],
+          mirror: true,
+          material: 'steel',
+        },
+        ...[0, 1, 2, 3].map((k) => ({
+          shape: 'drum',
+          axis: 'x',
+          sides: 4,
+          taper: 0.15,
+          size: [0.06, 0.04, 0.04],
+          at: [
+            x + Math.cos((k * Math.PI) / 2 + Math.PI / 4) * 0.2,
+            0.07,
+            0.28 + Math.sin((k * Math.PI) / 2 + Math.PI / 4) * 0.2,
+          ],
+          rotate: [0, -(k * Math.PI) / 2 - Math.PI / 4, 0],
+          mirror: true,
+          material: 'steel',
+        })),
+      ]),
+      {
+        shape: 'slab',
+        outline: [
+          [0.0, 0.06],
+          [-0.7, 0.08],
+          [-0.82, 0.05],
+          [-0.82, -0.05],
+          [-0.7, -0.08],
+          [0.0, -0.06],
+        ],
+        bottom: -0.04,
+        top: 0.1,
+        bevel: 0.02,
         material: 'trim',
       },
-      ...[0, 1, 2].map((i) => ({
-        shape: 'icosahedron',
-        size: 0.09,
-        at: [
-          -0.22 + Math.cos((i * Math.PI * 2) / 3) * 0.16,
-          0.36,
-          Math.sin((i * Math.PI * 2) / 3) * 0.16,
-        ],
-      })),
       {
-        shape: 'nozzle',
-        at: [-0.62, 0.02, 0.6],
-        size: 0.08,
-        sides: 10,
+        shape: 'drum',
+        axis: 'z',
+        sides: 6,
+        size: [0.06, 0.06, 0.8],
+        at: [-0.8, 0.06, 0],
+        material: 'steel',
+      },
+      {
+        shape: 'slab',
+        outline: [
+          [-0.72, 0.78],
+          [-0.72, 0.62],
+          [-0.88, 0.62],
+          [-0.88, 0.78],
+        ],
+        bottom: 0.0,
+        top: 0.1,
+        bevel: 0.02,
         mirror: true,
+        material: 'trim',
       },
     ],
     lights: [
       {
-        at: [-0.74, 0.07, 0],
-        dir: [-1, 0.3, 0],
+        at: [-0.84, 0.04, 0],
+        dir: [-1, 0.4, 0],
         size: 0.1,
         pulse: 'layGlow',
       },
-      { at: [0.8, 0.11, 0], dir: [1, 0.5, 0], size: 0.09 },
+      ...[0.82, -0.82].map((z) => ({
+        at: [-0.8, 0.1, z],
+        dir: [0, 1, 0],
+        size: 0.06,
+        pulse: 'layGlow',
+      })),
+      { at: [0.7, 0.14, 0], dir: [1, 0.6, 0], size: 0.08 },
     ],
   },
   codex: {

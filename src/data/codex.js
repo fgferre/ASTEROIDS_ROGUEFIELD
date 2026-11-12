@@ -2,7 +2,12 @@
 
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
-import { BOSS_BY_LAYER, WARDEN_KINDS } from './enemies/boss.js';
+import {
+  BOSS_BY_LAYER,
+  SENTINEL_KINDS,
+  WARDEN_KINDS,
+  bossTier,
+} from './enemies/boss.js';
 import { HERALD_KINDS } from './enemies/herald.js';
 import { LAYERS, enemiesFor } from './layers.js';
 
@@ -25,6 +30,18 @@ const GLYPHS = {
     '<circle cy="-8" r="4.5"/><circle cx="7" cy="5" r="4.5"/><circle cx="-7" cy="5" r="4.5"/><circle class="eye" cy="-8" r="2"/>',
   'warden-null':
     '<circle r="13" fill="none" stroke-width="2"/><circle r="7"/><circle class="eye" r="3"/>',
+  'sentinel-quarry-maw':
+    '<path d="M-12,-9 L2,-11 L12,-3 L3,-3 L-3,-5 L-12,-5Z"/><path d="M-12,9 L2,11 L12,3 L3,3 L-3,5 L-12,5Z"/><circle class="eye" cx="3" r="2.5"/>',
+  'sentinel-gatekeeper':
+    '<rect x="5" y="-13" width="5" height="26"/><circle cx="-1" cy="-10" r="4"/><circle cx="-1" cy="10" r="4"/><rect x="-12" y="-6" width="11" height="12"/><rect class="eye" x="-11" y="-2" width="4" height="4"/>',
+  'sentinel-kiln-engine':
+    '<polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(0)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(60)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(120)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(180)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(240)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(300)"/><circle class="eye" r="3.5"/>',
+  'sentinel-prism-crown':
+    '<path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(120)"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(240)"/><circle class="eye" r="3"/>',
+  'sentinel-foundry-mother':
+    '<rect x="-11" y="-5" width="22" height="10"/><rect x="-8" y="-10" width="5" height="5"/><rect x="3" y="-10" width="5" height="5"/><rect x="11" y="-1" width="5" height="2" transform="rotate(-35 11 0)"/><rect x="-16" y="-1" width="5" height="2" transform="rotate(-35 -11 0)"/><rect class="eye" x="-2" y="-2" width="4" height="4"/>',
+  'sentinel-interdictor':
+    '<rect x="-15" y="-15" width="2" height="30"/><rect x="-15" y="-15" width="30" height="2"/><rect x="13" y="-15" width="2" height="30"/><rect x="-7" y="-4" width="14" height="8"/><circle class="eye" r="2"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -33,10 +50,13 @@ const GLYPHS = {
     '<polygon points="0,-15 5,-5 5,9 0,15 -5,9 -5,-5"/><circle class="eye" cy="-3" r="2"/>',
 };
 
-/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's or Herald's kind. */
+/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's, Sentinel's or Herald's kind. */
 export function codexIdOf(entity) {
   if (!entity?.type) return null;
-  if (entity.type === 'boss') return `warden-${entity.bossKind || 'prime'}`;
+  if (entity.type === 'boss') {
+    const kind = entity.bossKind || 'prime';
+    return `${bossTier(kind)}-${kind}`;
+  }
   if (entity.type === 'herald') return `herald-${entity.heraldKind || 'dust'}`;
   return entity.type;
 }
@@ -93,6 +113,18 @@ const warden = (kind, lore, hint) => ({
   herald: false,
 });
 
+// A Sentinel sits with the Wardens (`warden: true`), on the layer it ends.
+const sentinel = (kind, lore, hint) => ({
+  id: `sentinel-${kind}`,
+  name: SENTINEL_KINDS[kind].displayName,
+  lore,
+  hint,
+  glyph: GLYPHS[`sentinel-${kind}`],
+  fromLayer: SENTINEL_KINDS[kind].layer,
+  warden: true,
+  herald: false,
+});
+
 export const CODEX_ENTRIES = deepFreeze(
   [
     {
@@ -111,6 +143,26 @@ export const CODEX_ENTRIES = deepFreeze(
       'dust',
       'We sent the Dust ahead to speak for us. It speaks in walls. It counts every stone in the Outer Ring and lays them where a pilot must not pass; what it cannot count, it buries.',
       'Every few seconds it raises a wall of rock. The slits light first.'
+    ),
+    sentinel(
+      'quarry-maw',
+      'We built the Maw to feed the Ring its own stone. The Ring broke; the order to feed it did not. It still eats what drifts past and gives it back smaller, and counted.',
+      'Shut jaws shrug off shots. Fire into the open mouth, from its flank.'
+    ),
+    sentinel(
+      'gatekeeper',
+      'The lane to Prime was closed before the breaking and never reopened. The Gatekeeper holds it shut for a traffic that ended a thousand years ago. It has not been told.',
+      'Cross its barrier through the gap. Shoot its back while it recovers.'
+    ),
+    sentinel(
+      'kiln-engine',
+      'The Core was told to burn and nothing has told it to stop. The Kiln keeps the fire fed and the slag moving, for a foundry that has poured nothing in a thousand years.',
+      'Stand in the cool wedges; they move. Fire while its fins are open.'
+    ),
+    sentinel(
+      'prism-crown',
+      'Nine sang the Ring closed; three were set in crystal to keep the note. The Crown still turns them toward anything that moves, and plays what is left of the hymn in light.',
+      'It shows its beams before it fires. Stand between them; strike while the mirrors are dark.'
     ),
     warden(
       'prime',
@@ -131,6 +183,16 @@ export const CODEX_ENTRIES = deepFreeze(
       'silence',
       'Past this point we do not answer. The Silence makes sure of it. It eats every signal in the Reach, yours first, and moves where nothing can hear it go.',
       'Blinds your radar while it lives. A ring marks where it blinks.'
+    ),
+    sentinel(
+      'foundry-mother',
+      "The Reach built the Ring's machines and was never told the Ring had ended. The Mother still lays down the same chassis, one after another, for a fleet no one will launch.",
+      'Hit it hard while it builds and the escort is scrapped. Strike again when its arms hang open.'
+    ),
+    sentinel(
+      'interdictor',
+      'The Reach was sealed on purpose. The Interdictor drew the lines and has enforced them since, against machines that wandered and now against a pilot who was never on any list.',
+      'When its line stops following you, step off it. Leave the cage by the open side. Strike while it cools.'
     ),
     warden(
       'null',

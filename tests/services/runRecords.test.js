@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { sectorById } from '../../src/data/sectors.js';
 import {
   isBossRushUnlocked,
+  isSectorUnlocked,
   loadRecords,
   updateRecords,
 } from '../../src/services/runRecords.js';
@@ -26,6 +28,8 @@ describe('run records', () => {
       runs: 0,
       bossRushStage: 3,
       bossRushTime: 420,
+      sectorsWon: [],
+      sectorTimes: {},
     });
   });
 
@@ -35,5 +39,59 @@ describe('run records', () => {
     expect(isBossRushUnlocked()).toBe(false);
     updateRecords({ layer: 6 });
     expect(isBossRushUnlocked()).toBe(true);
+  });
+
+  it('keeps each sector won and its fastest clear, without touching the layer records', () => {
+    updateRecords({ sectorWon: 'dense-core', sectorTime: 300 });
+    updateRecords({ sectorWon: 'dense-core', sectorTime: 360 });
+    updateRecords({ sectorWon: 'dense-core', sectorTime: 280 });
+
+    expect(loadRecords()).toMatchObject({
+      bestLayer: 0,
+      bestTime: 0,
+      sectorsWon: ['dense-core'],
+      sectorTimes: { 'dense-core': 280 },
+    });
+  });
+
+  it('opens a sector once the one before is won or a full run went past its boss', () => {
+    const [wake, lanes, gate, furnace, crystal, dense, graveyard, grid, reach] =
+      [
+        'debris-wake',
+        'salvage-lanes',
+        'prime-gate',
+        'furnace-drift',
+        'crystal-choir',
+        'dense-core',
+        'assembly-graveyard',
+        'quarantine-grid',
+        'wardens-reach',
+      ].map(sectorById);
+    expect(isSectorUnlocked(wake)).toBe(true);
+    expect(isSectorUnlocked(lanes)).toBe(false);
+    updateRecords({ sectorWon: 'debris-wake', sectorTime: 200 });
+    expect(isSectorUnlocked(lanes)).toBe(true);
+    expect(isSectorUnlocked(gate)).toBe(false);
+    expect(isSectorUnlocked(dense)).toBe(false);
+    updateRecords({ layer: 5 });
+    expect(isSectorUnlocked(furnace)).toBe(false);
+    updateRecords({ layer: 6 });
+    expect(isSectorUnlocked(gate)).toBe(true);
+    expect(isSectorUnlocked(furnace)).toBe(true);
+    expect(isSectorUnlocked(crystal)).toBe(false);
+    updateRecords({ sectorWon: 'furnace-drift', sectorTime: 300 });
+    expect(isSectorUnlocked(crystal)).toBe(true);
+    expect(isSectorUnlocked(dense)).toBe(false);
+    updateRecords({ sectorWon: 'crystal-choir', sectorTime: 300 });
+    expect(isSectorUnlocked(dense)).toBe(true);
+    updateRecords({ layer: 11 });
+    expect(isSectorUnlocked(dense)).toBe(true);
+    expect(isSectorUnlocked(graveyard)).toBe(true);
+    expect(isSectorUnlocked(grid)).toBe(false);
+    updateRecords({ sectorWon: 'assembly-graveyard', sectorTime: 400 });
+    expect(isSectorUnlocked(grid)).toBe(true);
+    expect(isSectorUnlocked(reach)).toBe(false);
+    updateRecords({ sectorWon: 'quarantine-grid', sectorTime: 400 });
+    expect(isSectorUnlocked(reach)).toBe(true);
   });
 });

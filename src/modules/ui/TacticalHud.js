@@ -7,6 +7,8 @@
 import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
 import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
+import { bossTier } from '../../data/enemies/boss.js';
+import { localLayer } from '../../data/sectors.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
 import { buildRadarState, createRadarMemory } from './hud/radar.js';
@@ -27,6 +29,12 @@ export function shieldStatus(deflector) {
   return { mode: 'ready', seconds: 0 };
 }
 
+// "Warden Prime" carries its tier in its name; a Sentinel's name does not,
+// so the boss bar and the intro card put the word before it.
+function tieredName(name, tier) {
+  return tier === 'sentinel' ? `Sentinel ${name}` : name;
+}
+
 export class TacticalHud {
   /**
    * `refs`: { gameField, gameUi }, where the layout's overlay is looked up.
@@ -40,6 +48,8 @@ export class TacticalHud {
    *   edge arrows and damage arcs; the camera's view on the radar).
    * `shieldKey()`: the Activate Shield key or button the player bound, as
    *   a label ("E").
+   * `sector()`: the sector run's sector, whose layers count from its first
+   *   one, or null.
    */
   constructor({
     refs,
@@ -51,9 +61,11 @@ export class TacticalHud {
     xpOrbs,
     renderer,
     shieldKey,
+    sector = () => null,
   }) {
     this.refs = refs;
     this.shieldKey = shieldKey;
+    this.sector = sector;
     this.player = player;
     this.enemies = enemies;
     this.progression = progression;
@@ -193,7 +205,11 @@ export class TacticalHud {
       enemies && typeof enemies.getWaveState === 'function'
         ? enemies.getWaveState() || null
         : null;
-    const layer = waveState?.current ?? 1;
+    const sector = this.sector();
+    // Before a head start's first layer the sector still reads layer 1.
+    const layer = sector
+      ? Math.max(1, localLayer(sector, waveState?.current ?? 0))
+      : waveState?.current ?? 1;
     const dash = player ? player.getDashCooldownFraction() : 0;
 
     if (player || force) {
@@ -374,7 +390,7 @@ export class TacticalHud {
     } else if (!bossActive) {
       hud.updateBoss(false);
     } else {
-      const bossName = bossState.name || 'BOSS';
+      const bossName = tieredName(bossState.name || 'BOSS', bossState.tier);
       const maxHealth = Number(bossState.maxHealth ?? 0) || 0;
       const currentHealth = Number(bossState.health ?? 0) || 0;
       const percent =
@@ -402,6 +418,7 @@ export class TacticalHud {
       defeated: false,
       bossId: null,
       name: null,
+      tier: null,
       health: 0,
       maxHealth: 0,
       phase: 0,
@@ -450,9 +467,11 @@ export class TacticalHud {
         next.maxHealth = Number(data?.maxHealth ?? next.maxHealth ?? 0) || 0;
         break;
       case 'boss-spawned':
+        next.tier = bossTier(data?.enemy?.bossKind);
         if (!current.active) {
           this.layout?.showBossIntro(
-            data?.enemy?.displayName,
+            data?.enemy?.displayName &&
+              tieredName(data.enemy.displayName, next.tier),
             data?.enemy?.subtitle
           );
         }

@@ -100,6 +100,62 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantHz: 1500,
       formantQ: 7,
     }),
+    // proposta 12/11: a grinding square, low, gritty (the Sentinel)
+    'QUARRY MAW': Object.freeze({
+      grains: 9,
+      type: 'square',
+      notes: Object.freeze([26, 26, 29]), // D1 D1 F1
+      formantHz: 420,
+      formantQ: 3,
+      grit: true,
+    }),
+    // proposta 12/11: a flat, steady sawtooth, nasal, a fifth above Prime's
+    // (the Sentinel)
+    GATEKEEPER: Object.freeze({
+      grains: 8,
+      type: 'sawtooth',
+      notes: Object.freeze([38, 38]), // D2 D2
+      formantHz: 760,
+      formantQ: 6,
+    }),
+    // proposta 12/11: a roaring sawtooth pair a tritone apart, low and
+    // gritty, like a flue drawing (the Sentinel)
+    'KILN ENGINE': Object.freeze({
+      grains: 10,
+      type: 'sawtooth',
+      notes: Object.freeze([33, 39]), // A1 Eb2
+      formantHz: 600,
+      formantQ: 3,
+      grit: true,
+    }),
+    // proposta 12/11: three clear triangle voices in a high open chord,
+    // glassy, what is left of the Choir's hymn (the Sentinel)
+    'PRISM CROWN': Object.freeze({
+      grains: 11,
+      type: 'triangle',
+      notes: Object.freeze([67, 72, 79]), // G4 C5 G5
+      formantHz: 2200,
+      formantQ: 8,
+    }),
+    // proposta 12/11: a low square pair a fifth apart, like a press cycling,
+    // dull and metallic (the Sentinel)
+    'FOUNDRY MOTHER': Object.freeze({
+      grains: 10,
+      type: 'square',
+      notes: Object.freeze([31, 38]), // G1 D2
+      formantHz: 900,
+      formantQ: 5,
+      grit: true,
+    }),
+    // proposta 12/11: a flat, clipped sawtooth pair a tritone apart, like an
+    // alarm that has repeated itself for centuries (the Sentinel)
+    'THE INTERDICTOR': Object.freeze({
+      grains: 9,
+      type: 'sawtooth',
+      notes: Object.freeze([45, 51]), // A2 Eb3
+      formantHz: 1400,
+      formantQ: 6,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

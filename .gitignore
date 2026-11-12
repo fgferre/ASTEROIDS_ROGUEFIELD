@@ -7,6 +7,9 @@ coverage/
 performance-log.json
 "Cópia (1)asteroid_stats_by_wave.csv"
 
+# Another local tool's folder (CodeAgentSwarm); it also tripped `npm run done`
+.agents/
+
 # Local AI tooling: shared config is versioned (.claude/settings.json, hooks, agents);
 # per-machine state stays local
 .claude/*

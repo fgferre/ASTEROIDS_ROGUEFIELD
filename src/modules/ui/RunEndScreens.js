@@ -8,6 +8,7 @@
 
 import { loadRecords } from '../../services/runRecords.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
+import { localLayer, nextInChapter, sectorById } from '../../data/sectors.js';
 import { SCREEN_INPUT_LOCKOUT_MS } from './LevelUpScreen.js';
 import { collectBuild, endBuildMarkup, formatRunTime } from './runRecap.js';
 import { salvageLine } from './hangar.js';
@@ -46,7 +47,8 @@ function runNumbers(data, outcome) {
 
 export class RunEndScreens {
   /**
-   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn }, victory: { body, invite, continueBtn, restartBtn, quitBtn } }.
+   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn } }.
+   * A sector run's screens (`data.sector`, runEnd.js) speak of its chapter.
    * `showScreen(name, options)`: shows the gameover or victory overlay.
    * `progression()`: the progression service (the build), or none.
    * `combat()`: the combat service (the build's weapon).
@@ -83,18 +85,24 @@ export class RunEndScreens {
   bodyMarkup(outcome, data, numbers) {
     const { layer, time, timeline } = numbers;
     const wardens = timeline.filter(({ kind }) => kind === 'warden').length;
+    const sector = sectorById(data.sector?.id);
     const head = runHeadline({
       outcome,
       layer,
       bossRush: data.bossRush ?? null,
+      sector,
+      firstClear: Boolean(data.sector?.firstClear),
       wardens,
       time,
-      // A Boss Rush records the time the screen opened at (runEnd.js).
+      // A Boss Rush and a sector run record the time the screen opened at
+      // (runEnd.js).
       newBest:
         outcome === 'victory' &&
         (data.bossRush
           ? data.bossRush.bestTime === Math.floor(data.stats?.timeElapsed ?? 0)
-          : this.bestAtStart < RUN_FINAL_LAYER),
+          : sector
+            ? data.sector.bestTime === data.sector.time
+            : this.bestAtStart < RUN_FINAL_LAYER),
     });
     const badge = head.badge
       ? `<span class="end-badge">${head.badge}</span>`
@@ -115,16 +123,18 @@ export class RunEndScreens {
       timeline,
       outcome,
       layer,
-      bestAtStart: this.bestAtStart,
+      // The best layer is a full run's record.
+      bestAtStart: sector ? 0 : this.bestAtStart,
+      sector,
     });
     const progression = this.progression();
     const build = progression
       ? endBuildMarkup(collectBuild(progression, this.combat()))
       : '';
-    const moment = bestMoment(timeline, outcome);
+    const moment = bestMoment(timeline, outcome, sector);
     const momentMarkup = moment
       ? `<p class="end-moment__big is-${moment.tone}">${moment.title}</p><p class="end-moment__where">${moment.where}</p>`
-      : `<p class="end-moment__big">Layer ${layer}</p><p class="end-moment__where">${formatRunTime(time)}</p>`;
+      : `<p class="end-moment__big">Layer ${sector ? localLayer(sector, layer) : layer}</p><p class="end-moment__where">${formatRunTime(time)}</p>`;
     const fourth =
       outcome === 'victory'
         ? ['Max combo', `×${data.maxCombo ?? 0}`]
@@ -172,6 +182,7 @@ export class RunEndScreens {
       layer: numbers.layer,
       bestAtStart: this.bestAtStart,
       bossRush: data.bossRush ?? null,
+      sector: sectorById(data.sector?.id),
     });
     refs.seed.textContent = this.difficulty().runLabel();
     refs.copySeedBtn.textContent = 'Copy seed link';
@@ -184,6 +195,8 @@ export class RunEndScreens {
     const data = payload?.data || {};
     const refs = this.refs.victory;
     const rush = data.bossRush;
+    const sector = sectorById(data.sector?.id);
+    const next = sectorById(data.sector?.next);
     refs.body.innerHTML = this.bodyMarkup(
       'victory',
       data,
@@ -192,11 +205,33 @@ export class RunEndScreens {
     refs.invite.innerHTML = inviteLine({
       outcome: 'victory',
       bossRush: rush ?? null,
+      sector,
+      next,
     });
-    // A Boss Rush ends here: no Deep Field after it.
-    refs.continueBtn?.classList.toggle('hidden', Boolean(rush));
+    // A Boss Rush or a sector run ends here: no Deep Field after it; a
+    // sector won opens the next one, and the map is where it goes back to
+    // (ui/CampaignMap.js).
+    refs.continueBtn?.classList.toggle('hidden', Boolean(rush || sector));
+    if (refs.nextBtn) {
+      refs.nextBtn.classList.toggle('hidden', !next);
+      refs.nextBtn.dataset.sector = next?.id ?? '';
+      const label = refs.nextBtn.querySelector?.('.end-btn__label');
+      if (label) {
+        label.textContent = nextInChapter(sector)
+          ? 'Next Sector'
+          : 'Next Chapter';
+      }
+    }
+    if (refs.quitBtn) {
+      refs.quitBtn.textContent = sector ? 'Campaign map' : 'Quit to menu';
+    }
 
-    const buttons = [refs.continueBtn, refs.restartBtn, refs.quitBtn];
+    const buttons = [
+      refs.continueBtn,
+      refs.nextBtn,
+      refs.restartBtn,
+      refs.quitBtn,
+    ];
     buttons.forEach((button) => {
       if (button) button.disabled = true;
     });
@@ -205,9 +240,12 @@ export class RunEndScreens {
       buttons.forEach((button) => {
         if (button) button.disabled = false;
       });
-      (rush ? refs.restartBtn : refs.continueBtn)?.focus({
-        preventScroll: true,
-      });
+      const primary = next
+        ? refs.nextBtn
+        : rush || sector
+          ? refs.restartBtn
+          : refs.continueBtn;
+      primary?.focus({ preventScroll: true });
     }, SCREEN_INPUT_LOCKOUT_MS);
   }
 

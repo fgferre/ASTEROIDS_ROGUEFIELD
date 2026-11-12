@@ -221,6 +221,106 @@ describe('an enemy’s 3D look from its content file alone', () => {
     }
   });
 
+  it('builds a hard-surface slab from its outline between two heights, chamfered', () => {
+    const { recipeViews } = mirrorOf();
+    const view = recipeViews
+      .lookOf({
+        parts: [
+          {
+            shape: 'slab',
+            outline: [
+              [0.8, 0],
+              [-0.4, 0.5],
+              [-0.4, -0.5],
+            ],
+            bottom: -0.1,
+            top: 0.2,
+            bevel: 0.04,
+          },
+        ],
+      })
+      .create('x');
+    const { geometry } = view.body.children[0];
+    geometry.computeBoundingBox();
+    const { min, max } = geometry.boundingBox;
+    expect(min.y).toBeCloseTo(-0.1, 5);
+    expect(max.y).toBeCloseTo(0.2, 5);
+    expect(max.x).toBeCloseTo(0.8, 5); // the chamfer cuts in, never out
+    expect(max.z).toBeCloseTo(0.5, 5);
+    // the top face is flat: its normals point straight up
+    const normal = geometry.attributes.normal;
+    const position = geometry.attributes.position;
+    let up = 0;
+    for (let i = 0; i < normal.count; i += 1) {
+      if (position.getY(i) > 0.2 - 1e-6 && normal.getY(i) > 0.999) up += 1;
+    }
+    expect(up).toBeGreaterThan(0);
+  });
+
+  it('builds a faceted drum along its axis, tapered toward its + end', () => {
+    const { recipeViews } = mirrorOf();
+    const box = (part) => {
+      const view = recipeViews.lookOf({ parts: [part] }).create('x');
+      const { geometry } = view.body.children[0];
+      geometry.computeBoundingBox();
+      return [geometry, geometry.boundingBox];
+    };
+    const [prong, along] = box({
+      shape: 'drum',
+      axis: 'x',
+      sides: 4,
+      taper: 0,
+      size: [0.3, 0.1, 0.1],
+    });
+    expect(along.min.x).toBeCloseTo(-0.3, 5);
+    expect(along.max.x).toBeCloseTo(0.3, 5);
+    // a point at +x: every vertex there sits on the axis
+    const position = prong.attributes.position;
+    for (let i = 0; i < position.count; i += 1) {
+      if (position.getX(i) > 0.3 - 1e-6) {
+        expect(Math.hypot(position.getY(i), position.getZ(i))).toBeLessThan(
+          1e-6
+        );
+      }
+    }
+    const [, upright] = box({ shape: 'drum', sides: 8 });
+    expect(upright.max.y).toBeCloseTo(1, 5);
+    const [, across] = box({ shape: 'drum', axis: 'z' });
+    expect(across.max.z).toBeCloseTo(1, 5);
+  });
+
+  it('gives a `panel` finish the shared panelled material, its maps on every part', () => {
+    const mirror = mirrorOf();
+    const { recipeViews } = mirror;
+    const view = recipeViews
+      .lookOf({
+        finish: 'panel',
+        parts: [
+          { shape: 'drum', sides: 6 },
+          {
+            shape: 'turned',
+            profile: [
+              [0.2, 0],
+              [0.1, 0.3],
+            ],
+          },
+        ],
+        lights: [{ at: [0.6, 0, 0] }],
+      })
+      .create('x');
+    const [body] = view.body.children;
+    expect(body.material).toBe(recipeViews.panelMaterial);
+    expect(body.material.normalMap).toBeTruthy();
+    expect(body.material.vertexColors).toBe(true);
+    // the turned part and the light's socket get a UV map too
+    const { uv, uv2, position } = body.geometry.attributes;
+    expect(uv.count).toBe(position.count);
+    expect(uv2).toBe(uv);
+    expect(() => recipeViews.lookOf({ finish: 'gloss' })).toThrow(
+      "no finish 'gloss'"
+    );
+  });
+
   it('builds a `mirror` part and its twin across z', () => {
     const { recipeViews } = mirrorOf();
     const count = (part) => {

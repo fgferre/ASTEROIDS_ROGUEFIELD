@@ -49,6 +49,7 @@ function setup({ plays = true } = {}) {
     tacticalHud: { layout: hud },
     transmissionLayer: 1,
     queueTransmission: vi.fn(),
+    getService: () => null,
   };
   ui.cinematics = new RunCinematics({
     eventBus: { emit: (name, payload) => events.push([name, payload.kind]) },

@@ -85,6 +85,20 @@ describe('AchievementService', () => {
     expect(unlocked).toContain('iron-escort');
   });
 
+  it('a sector win is not a descent won; Null still counts on its death', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('run-won', {
+      wave: 10,
+      hullId: BASTION_HULL_ID,
+      sector: 'dense-core',
+    });
+    expect(unlocked).toEqual([]);
+
+    eventBus.emit('boss-defeated', { bossKind: 'null' });
+    eventBus.emit('run-won', { wave: 15, sector: 'wardens-reach' });
+    expect(unlocked).toContain('null-and-void');
+  });
+
   it('full-garage needs both hull items owned in the Hangar', () => {
     const { eventBus, unlocked } = setup();
     eventBus.emit('hangar-purchased', {
@@ -98,6 +112,16 @@ describe('AchievementService', () => {
       owned: { 'solar-slicer-hull': true, 'bastion-hull': true },
     });
     expect(unlocked).toContain('full-garage');
+  });
+
+  it('a Sentinel down is no Warden achievement', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('player-took-damage', { damage: 5 });
+    eventBus.emit('boss-defeated', { bossKind: 'kiln-engine' });
+    eventBus.emit('boss-defeated', { bossKind: 'prism-crown' });
+    eventBus.emit('boss-defeated', { bossKind: 'foundry-mother' });
+    eventBus.emit('boss-defeated', { bossKind: 'interdictor' });
+    expect(unlocked).toEqual([]);
   });
 
   it('untouchable needs a Warden layer with no hull damage since it started', () => {

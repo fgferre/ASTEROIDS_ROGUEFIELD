@@ -37,6 +37,7 @@ import {
   nextBossRushLayer,
 } from '../../../data/layers.js';
 import { scaleDirector } from '../../../data/difficulty.js';
+import { sectorStage } from '../../../data/sectors.js';
 import { WaveRandom } from '../waves/WaveRandom.js';
 import { WaveSpawner } from '../waves/WaveSpawner.js';
 import { LayerEvents } from '../waves/LayerEvents.js';
@@ -129,6 +130,9 @@ export class WaveManager {
     // Boss Rush run (set by GameSessionService before the run resets): only
     // the Warden layers, a breather between them.
     this.bossRush = false;
+    // Sector run (set the same way, src/data/sectors.js): the run opens on
+    // the sector's first layer and plays the sector's own stages.
+    this.sector = null;
     this.waveInProgress = false;
     this.wavePaused = false;
     this.waveStartTime = 0;
@@ -278,7 +282,8 @@ export class WaveManager {
   }
 
   /**
-   * The layer's director (Boss Rush's on a Boss Rush run) with spawn counts
+   * The layer's director (Boss Rush's on a Boss Rush run, the sector's own
+   * stage on a sector run that has one) with spawn counts
    * scaled by the difficulty; past the table the endless modifiers roll from
    * the run seed, so each run gets its own.
    */
@@ -290,7 +295,8 @@ export class WaveManager {
     return scaleDirector(
       this.bossRush
         ? bossRushDirectorFor(layer)
-        : directorFor(layer, difficulty?.getRunSeed() ?? 0),
+        : sectorStage(this.sector, layer) ??
+            directorFor(layer, difficulty?.getRunSeed() ?? 0),
       difficulty?.getModifiers().spawnCount ?? 1
     );
   }
@@ -491,7 +497,7 @@ export class WaveManager {
 
     this.currentWave = this.bossRush
       ? nextBossRushLayer(this.currentWave)
-      : this.currentWave + 1;
+      : Math.max(this.currentWave + 1, this.sector?.layers[0] ?? 1);
     this.waveInProgress = true;
     this.waveStartTime = this.getSimulationTimeMs();
     this.enemiesSpawnedThisWave = 0;
@@ -511,7 +517,7 @@ export class WaveManager {
 
     if (director.warden) {
       GameDebugLogger.log('WAVE', 'Boss wave detected', { wave: waveNumber });
-      config = this.bossWave.generateBossWave();
+      config = this.bossWave.generateBossWave(director.bossKind);
     } else {
       config = { isBossWave: false, enemies: [] };
     }

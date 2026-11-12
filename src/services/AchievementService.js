@@ -77,7 +77,10 @@ export default class AchievementService {
       this.heraldsFelled.push(kind);
       this.count('herald-hunter');
     });
+    // Winning the descent: a sector run wins only its chapter (Null's own
+    // achievement still comes from its death, on 'boss-defeated').
     eventBus.on('run-won', (payload = {}) => {
+      if (payload.sector) return;
       this.unlock('null-and-void');
       if (this.cursedHeld) this.unlock('cursed-run');
       if (payload.hullId === BASTION_HULL_ID) this.unlock('iron-escort');

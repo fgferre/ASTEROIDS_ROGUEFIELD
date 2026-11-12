@@ -4,7 +4,8 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
 
 // What the Wardens say to the pilot (docs/NORTE.md §1, §7 pillar 1). Warden
-// lines are keyed by layer, not by boss class. Each line stays under 90
+// lines are keyed by layer, not by boss class; Sentinel lines by boss kind
+// (they end a sector, whatever its layer). Each line stays under 90
 // characters so it fits the transmission banner on one or two rows.
 export const STORY = deepFreeze({
   speaker: {
@@ -12,6 +13,12 @@ export const STORY = deepFreeze({
     5: 'WARDEN PRIME',
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
+    'quarry-maw': 'QUARRY MAW',
+    gatekeeper: 'GATEKEEPER',
+    'kiln-engine': 'KILN ENGINE',
+    'prism-crown': 'PRISM CROWN',
+    'foundry-mother': 'FOUNDRY MOTHER',
+    interdictor: 'THE INTERDICTOR',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -59,6 +66,41 @@ export const STORY = deepFreeze({
     15: {
       warning:
         'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
+    },
+  },
+  // Sentinel lines, keyed by boss kind: warning and defeated as a Warden's.
+  sentinel: {
+    'quarry-maw': {
+      warning:
+        'Quarry unit active. Stone is counted before it is eaten. So are hulls.',
+      defeated:
+        'Quarry Maw offline. The stone goes uncounted. Prime will ask why.',
+    },
+    gatekeeper: {
+      warning: 'Lane closed. Gate holds. You are not on the manifest.',
+      defeated: 'Gate open. One hull through. Prime has been told.',
+    },
+    'kiln-engine': {
+      warning:
+        'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
+      defeated:
+        'Kiln Engine cold. The Core will remember the temperature it lost.',
+    },
+    'prism-crown': {
+      warning:
+        'Three voices remain in the crystal. They have found a new listener.',
+      defeated: 'The Crown is dark. The Chamber heard it go quiet.',
+    },
+    'foundry-mother': {
+      warning:
+        'Assembly line active. Chassis count: unfinished. Intruder count: one.',
+      defeated:
+        'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.',
+    },
+    interdictor: {
+      warning: 'Quarantine holds. Boundary drawn. You are inside it.',
+      defeated:
+        'Interdictor offline. The boundary is open. Null has been waiting for this.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

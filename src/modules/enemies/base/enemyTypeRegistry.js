@@ -12,7 +12,7 @@ import { Herald } from '../types/Herald.js';
 import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 import {
   BOSS_COMPONENTS,
-  WARDEN_KINDS,
+  BOSS_KINDS,
   wardenComponents,
 } from '../../../data/enemies/boss.js';
 import { HERALD_COMPONENTS } from '../../../data/enemies/herald.js';
@@ -72,8 +72,8 @@ export function registerEnemyTypes(factory, { getAvailableBossMinionTypes }) {
       defaults: { ...bossDefaults, components: BOSS_COMPONENTS },
       tags: ['enemy', 'boss', 'elite'],
     });
-    // Choir and Null: their own classes.
-    for (const kind of Object.keys(WARDEN_KINDS)) {
+    // Choir, Null and the Sentinels: their own classes.
+    for (const kind of Object.keys(BOSS_KINDS)) {
       if (kind === 'prime') continue;
       factory.registerType(wardenFactoryKey(kind), {
         class: WARDEN_CLASSES[kind],

@@ -215,7 +215,7 @@ describe('ship engine', () => {
     expect(gains().turbine).toBeCloseTo(0, 3);
   });
 
-  it('the propulsion cards add tiers: sub, then harmonic, then crackle, even with thrusters that never fire', async () => {
+  it('the sub plays from the start; the propulsion cards add harmonic, then crackle, even with thrusters that never fire', async () => {
     expect([0, 1, 3, 4, 7, 8, 13].map(engineTier)).toEqual([
       0, 1, 1, 2, 2, 3, 3,
     ]);
@@ -227,7 +227,7 @@ describe('ship engine', () => {
 
     fly(90, { main: 1 });
     expect(engine.snapshot().input.tier).toBe(0);
-    expect(layers()).toEqual([false, false, false]);
+    expect(layers()).toEqual([true, false, false]);
     // Flying straight with Main Thrusters 3 + RCS System 1: four ranks,
     // though the side thrusters never fire.
     fly(90, { main: 1, levels: { thruster: 3, rcs: 1 } });

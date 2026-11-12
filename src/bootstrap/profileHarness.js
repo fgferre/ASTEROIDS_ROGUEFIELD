@@ -56,6 +56,7 @@
  */
 
 import { debugLog } from '../core/debugLogging.js';
+import { IS_DEV } from '../core/env.js';
 import { GAME_WIDTH } from '../core/GameConstants.js';
 import { applyBaseTransform } from '../core/viewport.js';
 import {
@@ -128,10 +129,10 @@ function getScenarioFromURL() {
     if (params.has('content')) {
       return 'content';
     }
-    if (params.get('scene') === 'hero') {
+    if (IS_DEV && params.get('scene') === 'hero') {
       return 'hero';
     }
-    if (!params.has('profile')) {
+    if (!IS_DEV || !params.has('profile')) {
       return null;
     }
 

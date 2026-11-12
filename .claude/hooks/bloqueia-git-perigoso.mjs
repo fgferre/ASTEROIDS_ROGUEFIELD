@@ -9,17 +9,23 @@
 //     (or `HEAD:<branch>`) for any branch that is not main.
 //   * force push, deleting a remote branch, `+refspec`, `--all/--tags/--mirror`
 //     and pushes whose destination cannot be judged (no refspec, bare HEAD).
+//     One deletion is let through (owner, 12/11/2026: keep the project clean):
+//     `git push <remote> --delete <branch>` of ONE branch, written out, that
+//     is not main or backup and whose commits are all in another branch of
+//     that remote (as last fetched), so nothing leaves the remote.
 //   * `git add -f/--force` — the only ignored paths here are ignored on purpose
 //     (.planning/, .claude/settings.local.json, logs).
 //
 // Input: JSON on stdin ({tool_name, tool_input:{command}}).
 // Output: exit 0 lets it through; exit 2 blocks and shows the reason (stderr).
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const ALLOWED =
   "Allowed without asking: 'git push origin main:backup' and 'git push [-u] origin <branch>' " +
-  "(or 'HEAD:<branch>') for any branch other than main. Pushing main publishes the site: ask the owner.";
+  "(or 'HEAD:<branch>') for any branch other than main, and 'git push origin --delete <branch>' for one branch " +
+  'already contained in another remote branch. Pushing main publishes the site: ask the owner.';
 const FORCE = new Set([
   '-f',
   '--force',
@@ -126,7 +132,42 @@ function destinationOf(refspec) {
   return refspec;
 }
 
-function judgePush(seg, args) {
+// True for `<remote> --delete <branch>` (any order of the flag) when the
+// branch is safe to drop: not main or backup, and contained in another
+// remote-tracking branch of the same remote.
+function deletesMergedBranch(args, cwd) {
+  const flags = args.filter((a) => a.startsWith('-'));
+  const targets = args.filter((a) => !a.startsWith('-'));
+  if (flags.length !== 1 || !['--delete', '-d'].includes(flags[0]))
+    return false;
+  if (targets.length !== 2 || !targets.every((t) => REF_NAME.test(t))) {
+    return false;
+  }
+  const [remote, branch] = targets;
+  if (['main', 'backup', 'HEAD'].includes(branch)) return false;
+  const ref = `refs/remotes/${remote}/${branch}`;
+  try {
+    const holders = execFileSync(
+      'git',
+      [
+        'for-each-ref',
+        '--contains',
+        ref,
+        '--format=%(refname)',
+        `refs/remotes/${remote}`,
+      ],
+      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+      .split('\n')
+      .filter((name) => name && name !== ref && !name.endsWith('/HEAD'));
+    return holders.length > 0;
+  } catch {
+    return false; // unknown branch or not a repository: not provably merged
+  }
+}
+
+function judgePush(seg, args, cwd) {
+  if (deletesMergedBranch(args, cwd)) return;
   if (args.some((a) => FORCE.has(a) || a.startsWith('--force-with-lease'))) {
     block(`force push or remote branch deletion -> '${seg}'`);
   }
@@ -189,7 +230,8 @@ function main() {
       if (sub >= toks.length) continue;
       if (toks[sub] !== 'push' && toks[sub] !== 'add') continue;
       const args = withoutRedirects(toks.slice(sub + 1));
-      if (toks[sub] === 'push') judgePush(seg, args);
+      if (toks[sub] === 'push')
+        judgePush(seg, args, data?.cwd || process.cwd());
       else judgeAdd(seg, args);
     } else if (
       EXECUTORS.has(toks[0].split('/').pop()) &&

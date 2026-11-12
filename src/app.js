@@ -480,9 +480,9 @@ function gameLoop(currentTime) {
         const projectilePerf = combat.getProjectilePerfSnapshot();
 
         metricsCache = {
-          enemies: enemies?.asteroids?.length || 0,
+          enemies: enemies?.getActiveEnemyCount() || 0,
           bullets: combat?.bullets?.length || 0,
-          orbs: xpOrbs?.orbs?.length || 0,
+          orbs: xpOrbs?.getActiveOrbs().length || 0,
           particles: effects?.particles?.length || 0,
           wave: enemies?.waveManager?.currentWave || 0,
           projectileUpdateMs: projectilePerf?.projectileUpdateMs || 0,

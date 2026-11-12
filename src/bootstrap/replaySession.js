@@ -106,6 +106,7 @@ export function createReplayController({
           ? 'daily'
           : 'normal',
       date: difficulty.dateKey,
+      sector: session.sector?.id ?? null,
       controls: playerService.controlScheme,
     });
     session.replayRecorder = recorder;
@@ -168,6 +169,7 @@ export function createReplayController({
       session.replayStart = {
         daily: recording.mode === 'daily',
         bossRush: recording.mode === 'bossRush',
+        sector: recording.sector ?? null,
       };
     },
     /**
