@@ -996,10 +996,12 @@ export class WaveManager {
 
   /**
    * Stops layer progression (until reset or resumeWaves): the run is over.
+   * `seconds` shows on the break timer and counts down, starting nothing (the
+   * time left to gather what a sector's Warden dropped).
    */
-  holdWaves() {
+  holdWaves(seconds = 0) {
     this.wavePaused = true;
-    this.waveCountdown = 0;
+    this.waveCountdown = seconds;
   }
 
   /**
@@ -1019,7 +1021,9 @@ export class WaveManager {
    * @param {number} deltaTime - Time elapsed
    */
   update(deltaTime) {
-    if (!this.wavePaused) {
+    if (this.wavePaused) {
+      this.waveCountdown = Math.max(0, this.waveCountdown - deltaTime);
+    } else {
       if (this.waveInProgress) {
         this.schedule.updateLayerSchedule(deltaTime);
       } else {

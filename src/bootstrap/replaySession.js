@@ -74,7 +74,7 @@ export function createReplayController({
     return frame;
   };
 
-  eventBus.on('game-started', () => {
+  eventBus.on('game-started', ({ carried = false } = {}) => {
     runStartStep = getStep();
     pickPending = false;
 
@@ -95,6 +95,14 @@ export function createReplayController({
     if (viewerControls) {
       playerService.controlScheme = viewerControls;
       viewerControls = null;
+    }
+    // A run that carries a build from the sector before cannot be played
+    // back from its seed alone: it is not recorded.
+    if (carried) {
+      recorder = null;
+      session.replayRecorder = null;
+      input.setInputSource(null);
+      return;
     }
     recorder = createRecorder({
       seed: difficulty.getRunSeed(),

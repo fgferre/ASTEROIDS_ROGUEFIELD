@@ -37,7 +37,7 @@ function killBoss(game) {
     game.step();
   }
   for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
-  vi.advanceTimersByTime(3000);
+  vi.advanceTimersByTime(6500);
   for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
   return boss;
 }

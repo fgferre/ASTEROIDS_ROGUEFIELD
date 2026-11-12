@@ -73,7 +73,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
-- **Abertos dele:** itens 2, 15, 16, 18, 19 e 20 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Abertos dele:** itens 2, 15, 16, 18, 19, 20 e 21–23 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
@@ -130,3 +130,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
   Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
   antes de código; fecha quando ele aprovar as naves novas.
+
+## Campanha (palavras dele, 12/11, jogando no site)
+
+- **(21)** Passagem de fase: _"quando você passa de fase, mata o boss… e escolhe seguir no jogo para a próxima etapa,
+  todas as coisas da tela somem, então não dá nem para pegar os spoils, os orbes que estão na tela, não aparece aquele
+  countdown como aparecia antes."_ Fecha quando ele passar de fase e conseguir recolher o que caiu.
+- **(22)** Primeiro boss: _"a segunda etapa dele, não inova, não fica mais difícil, nada muda. Ele continua jogando 3
+  asteroides que são muito fáceis de destruir. Deveria ter um desafio um pouco maior na segunda etapa dele."_
+- **(23)** _"todos os upgrades que eu peguei desapareceram de uma etapa para outra, assim que eu dei próximo setor…
+  Mais grave ainda."_ Fecha quando ele seguir para o próximo setor com a nave como estava.

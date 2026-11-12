@@ -94,6 +94,36 @@ describe('sector runs', () => {
     expect(enemies.waveManager.currentWave).toBe(6);
   });
 
+  it('carries the build into the next sector and takes only the head start it is short of', () => {
+    const game = createHeadlessGame();
+    const { enemies, progression, player } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const picks = Array.from({ length: 3 }, () => progression.applyLevelUp());
+    picks.forEach((level) => progression.emitLevelUp(level));
+    expect(makePicks(game)).toBe(3);
+    const cards = progression.serialize().appliedUpgrades;
+    const hull = player.maxHealth;
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    for (let step = 0; step < 5; step += 1) game.step();
+    expect(progression.getLevel()).toBe(4);
+    expect(progression.serialize().appliedUpgrades).toEqual(cards);
+    expect(player.maxHealth).toBe(hull);
+    expect(player.health).toBe(hull);
+    expect(enemies.waveManager.currentWave).toBe(1);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'dense-core',
+      carry: true,
+    });
+    expect(makePicks(game)).toBe(sectorById('dense-core').headStart - 3);
+  });
+
   it('is won at its Warden, with its own records and no endless continue', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
@@ -109,6 +139,11 @@ describe('sector runs', () => {
     killBoss(game);
 
     expect(game.session.getSessionState()).toBe('victory');
+    // The break timer counts the spoils time down; the orbs fly to the ship.
+    const { breakTimer, isActive } = game.services.enemies.waveState;
+    expect(isActive).toBe(false);
+    expect(breakTimer).toBeGreaterThan(0);
+    expect(breakTimer).toBeLessThan(6);
     expect(won).toEqual([expect.objectContaining({ sector: 'prime-gate' })]);
     expect(victories).toHaveLength(1);
     const { sector } = victories[0].data;

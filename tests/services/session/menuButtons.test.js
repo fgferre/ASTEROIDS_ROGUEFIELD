@@ -16,8 +16,8 @@ describe('menu buttons', () => {
     click(buttons, 'victory-next-btn', { sector: 'wardens-reach' });
 
     expect(startNewRun.mock.calls).toEqual([
-      [{ source: 'campaign-launch-btn', sector: 'dense-core' }],
-      [{ source: 'victory-next-btn', sector: 'wardens-reach' }],
+      [{ source: 'campaign-launch-btn', sector: 'dense-core', carry: false }],
+      [{ source: 'victory-next-btn', sector: 'wardens-reach', carry: true }],
     ]);
   });
 

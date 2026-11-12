@@ -94,7 +94,11 @@ function createServiceHarness(options = {}) {
     resetLevelUpState: vi.fn(),
   };
 
-  const xpOrbs = { reset: vi.fn(), resetMagnetism: vi.fn() };
+  const xpOrbs = {
+    reset: vi.fn(),
+    resetMagnetism: vi.fn(),
+    startGlobalPull: vi.fn(),
+  };
   const healthHearts = { reset: vi.fn() };
   const effects = {
     reset: vi.fn(),

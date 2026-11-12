@@ -121,7 +121,12 @@ export class MenuButtons {
         preventDefault();
         this.emitCreditsMenuRequest({ open: false, source: id });
         // The button carries the sector it starts.
-        this.startNewRun({ source: id, sector: button.dataset.sector });
+        // From the victory screen the ship goes on as it is.
+        this.startNewRun({
+          source: id,
+          sector: button.dataset.sector,
+          carry: id === 'victory-next-btn',
+        });
         break;
       }
       case 'retry-game-btn': {
