@@ -26,7 +26,7 @@ export default {
       },
       {
         title: 'Harmonic Matrix',
-        description: 'Stabilizes plasma for +70% total damage.',
+        description: 'Stabilizes plasma for +72.5% total damage.',
         highlights: ['Provides extra 15% multiplier on current value.'],
       },
     ],
