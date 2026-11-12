@@ -2,7 +2,8 @@
 // between violet edges, or the Gatekeeper's strip), a marksman's aim line,
 // the spread fan (and the Quarry Maw's intake cone, the same wedge), the
 // warning ring and the beams (the Choir's converging lines, the Maw's eject
-// fan, the Gatekeeper's barrier and its gap). The Ram, the Wardens and any recipe
+// fan, the Gatekeeper's barrier and its gap), and the Kiln Engine's hot
+// wedges and slag pools (flat fans and discs). The Ram, the Wardens and any recipe
 // enemy that aims draw them; built once into the toolkit (enemyMirror.js
 // createKit) as kit.createTelegraph and kit.updateTelegraph.
 
@@ -23,8 +24,9 @@ export function createTelegraphs(kit) {
   const fanGeometries = new Map();
 
   // Charge lane / fan / warning ring on the field plane (Wardens and Ram);
-  // `beams` lines for the Choir's converging volley and the Maw's eject.
-  function createTelegraph(beams = 0) {
+  // `beams` lines for the Choir's converging volley and the Maw's eject;
+  // `fans` flat wedges or discs for the Kiln Engine's sectors and pools.
+  function createTelegraph(beams = 0, fans = 0) {
     const additive = (hex) =>
       new THREE.MeshBasicMaterial({
         color: colorOf(THREE, hex),
@@ -56,10 +58,24 @@ export function createTelegraphs(kit) {
     for (let i = 0; i < beams; i += 1) {
       beamList.push(new THREE.Mesh(lanePlane, additive(PALETTE.threat)));
     }
-    group.add(lane, line, fan, warn, dark, ...edges, ...beamList);
+    const fanList = [];
+    for (let i = 0; i < fans; i += 1) {
+      fanList.push(new THREE.Mesh(lanePlane, additive(PALETTE.threat)));
+    }
+    group.add(lane, line, fan, warn, dark, ...edges, ...beamList, ...fanList);
     group.visible = false;
     kit.scene.add(group);
-    return { group, lane, line, fan, warn, dark, edges, beams: beamList };
+    return {
+      group,
+      lane,
+      line,
+      fan,
+      warn,
+      dark,
+      edges,
+      beams: beamList,
+      fans: fanList,
+    };
   }
 
   function fanGeometry(arc) {
@@ -102,8 +118,16 @@ export function createTelegraphs(kit) {
     parts.line.visible = charge || aim;
     const intake = t.type === 'intake';
     parts.fan.visible = t.type === 'fan' || intake;
+    parts.fans.forEach((fan) => (fan.visible = false));
     if (t.type === 'barrier') {
       updateBarrier(parts, t, progress, pulse);
+      return;
+    }
+    if (t.type === 'sectors' || t.type === 'pools') {
+      parts.warn.visible = false;
+      parts.beams.forEach((beam) => (beam.visible = false));
+      if (t.type === 'sectors') updateSectors(parts, t, progress, pulse);
+      else updatePools(parts, t, ox, oy);
       return;
     }
     parts.beams.forEach((beam, i) => {
@@ -184,6 +208,49 @@ export function createTelegraphs(kit) {
       beam.rotation.y = 0;
       beam.scale.set(Math.max(0.01, piece[1]), 1, piece[2]);
       beam.material.opacity = piece[3];
+    });
+  }
+
+  // Dim while a hazard warns (brightening), bright and beating as it burns.
+  const hazardGlow = (warning, progress, pulse) =>
+    warning ? 0.06 + 0.16 * progress : 0.3 + 0.08 * pulse;
+
+  // The Kiln Engine's hot wedges (one fan each, `count / 2` fans): every
+  // other wedge from its `angle`, as far as `length`.
+  function updateSectors(parts, t, progress, pulse) {
+    parts.group.rotation.y = 0;
+    const width = (Math.PI * 2) / t.count;
+    const glow = hazardGlow(t.phase === 'warn', progress, pulse);
+    let next = 0;
+    for (let i = 0; i < t.count; i += 1) {
+      if ((i + t.offset) % 2 !== 0) continue;
+      const fan = parts.fans[next];
+      next += 1;
+      if (!fan) break;
+      fan.visible = true;
+      fan.geometry = fanGeometry(width);
+      fan.position.set(0, 0, 0);
+      fan.rotation.y = -(t.angle + width * (i + 0.5));
+      fan.scale.set(t.length, 1, t.length);
+      fan.material.opacity = glow;
+    }
+  }
+
+  // The Kiln Engine's slag pools (one disc each), placed on the field.
+  function updatePools(parts, t, ox, oy) {
+    parts.group.rotation.y = 0;
+    parts.fans.forEach((fan, i) => {
+      const pool = t.pools?.[i];
+      fan.visible = Boolean(pool);
+      if (!pool) return;
+      const duration = pool.duration > 0 ? pool.duration : 1;
+      const progress = Math.min(1, Math.max(0, 1 - pool.timer / duration));
+      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
+      fan.geometry = fanGeometry(Math.PI * 2);
+      fan.position.set(pool.x - ox, 0, pool.y - oy);
+      fan.rotation.y = 0;
+      fan.scale.set(pool.radius, 1, pool.radius);
+      fan.material.opacity = hazardGlow(pool.phase === 'warn', progress, pulse);
     });
   }
 

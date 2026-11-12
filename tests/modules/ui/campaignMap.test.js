@@ -77,10 +77,18 @@ describe('campaign map', () => {
         lock: 'Defeat Sentinel Gatekeeper to unlock',
       },
     ]);
-    expect(two.sectors).toHaveLength(1);
+    expect(two.sectors).toHaveLength(2);
     expect(two.sectors[0]).toMatchObject({
-      boss: 'Warden: Choir',
+      code: 'A',
+      name: 'FURNACE DRIFT',
+      boss: 'Sentinel: Kiln Engine',
       lock: 'Defeat Warden Prime to unlock',
+    });
+    expect(two.sectors[1]).toMatchObject({
+      code: 'C',
+      name: 'RESONANCE CHAMBER',
+      boss: 'Warden: Choir',
+      lock: 'Defeat Sentinel Kiln Engine to unlock',
     });
 
     const rows = sectorRowsMarkup(one.sectors);
@@ -95,7 +103,12 @@ describe('campaign map', () => {
     const rowsOf = (won) =>
       campaignChapters(records(won)).flatMap((node) => node.sectors);
     expect(defaultSectorRow(rowsOf(['debris-wake'])).id).toBe('salvage-lanes');
-    const all = [...CHAPTER_ONE, 'dense-core', 'wardens-reach'];
+    const all = [
+      ...CHAPTER_ONE,
+      'furnace-drift',
+      'dense-core',
+      'wardens-reach',
+    ];
     expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');
   });
 
@@ -125,7 +138,7 @@ describe('campaign map', () => {
 
     map.selectChapter(2);
     expect(refs.detailTitle.textContent).toBe('CHAPTER II — THE DENSE CORE');
-    expect(refs.launchBtn.dataset.sector).toBe('dense-core');
+    expect(refs.launchBtn.dataset.sector).toBe('furnace-drift');
     expect(refs.launchBtn.disabled).toBe(true);
     expect(refs.detailHeadStart.textContent).toBe('Starts with 4 card picks');
   });

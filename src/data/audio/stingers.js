@@ -118,6 +118,16 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantHz: 760,
       formantQ: 6,
     }),
+    // proposta 12/11: a roaring sawtooth pair a tritone apart, low and
+    // gritty, like a flue drawing (the Sentinel)
+    'KILN ENGINE': Object.freeze({
+      grains: 10,
+      type: 'sawtooth',
+      notes: Object.freeze([33, 39]), // A1 Eb2
+      formantHz: 600,
+      formantQ: 3,
+      grit: true,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

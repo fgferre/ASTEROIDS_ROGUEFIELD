@@ -34,6 +34,8 @@ const GLYPHS = {
     '<path d="M-12,-9 L2,-11 L12,-3 L3,-3 L-3,-5 L-12,-5Z"/><path d="M-12,9 L2,11 L12,3 L3,3 L-3,5 L-12,5Z"/><circle class="eye" cx="3" r="2.5"/>',
   'sentinel-gatekeeper':
     '<rect x="5" y="-13" width="5" height="26"/><circle cx="-1" cy="-10" r="4"/><circle cx="-1" cy="10" r="4"/><rect x="-12" y="-6" width="11" height="12"/><rect class="eye" x="-11" y="-2" width="4" height="4"/>',
+  'sentinel-kiln-engine':
+    '<polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(0)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(60)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(120)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(180)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(240)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(300)"/><circle class="eye" r="3.5"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -145,6 +147,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'gatekeeper',
       'The lane to Prime was closed before the breaking and never reopened. The Gatekeeper holds it shut for a traffic that ended a thousand years ago. It has not been told.',
       'Cross its barrier through the gap. Shoot its back while it recovers.'
+    ),
+    sentinel(
+      'kiln-engine',
+      'The Core was told to burn and nothing has told it to stop. The Kiln keeps the fire fed and the slag moving, for a foundry that has poured nothing in a thousand years.',
+      'Stand in the cool wedges; they move. Fire while its fins are open.'
     ),
     warden(
       'prime',

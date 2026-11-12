@@ -114,7 +114,7 @@ describe('sector runs', () => {
     expect(sector).toMatchObject({
       id: 'prime-gate',
       firstClear: true,
-      next: 'dense-core',
+      next: 'furnace-drift',
     });
     expect(sector.bestTime).toBe(sector.time);
     expect(game.session.continueBeyondVictory()).toBe(false);

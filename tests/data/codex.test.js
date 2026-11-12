@@ -13,6 +13,17 @@ describe('Codex entries', () => {
     });
   });
 
+  it('files the Kiln Engine with the Sentinels, on layer 10', () => {
+    const id = codexIdOf({ type: 'boss', bossKind: 'kiln-engine' });
+    expect(id).toBe('sentinel-kiln-engine');
+    expect(CODEX_ENTRIES.find((entry) => entry.id === id)).toMatchObject({
+      name: 'Kiln Engine',
+      warden: true,
+      fromLayer: 10,
+      hint: 'Stand in the cool wedges; they move. Fire while its fins are open.',
+    });
+  });
+
   it('has a glyph, lore and hint for every boss', () => {
     const bosses = CODEX_ENTRIES.filter((entry) => entry.warden);
     expect(bosses.map((entry) => entry.id)).toContain('sentinel-gatekeeper');

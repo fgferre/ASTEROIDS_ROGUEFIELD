@@ -21,7 +21,14 @@ describe('sector table', () => {
       [1, 'B'],
       [1, 'C'],
       [2, 'A'],
+      [2, 'C'],
       [3, 'A'],
+    ]);
+    // order 5 is kept for a later chapter-two sector
+    expect(SECTORS.slice(3).map((s) => [s.id, s.order, s.name])).toEqual([
+      ['furnace-drift', 4, 'FURNACE DRIFT'],
+      ['dense-core', 6, 'RESONANCE CHAMBER'],
+      ['wardens-reach', 7, "WARDEN'S REACH"],
     ]);
     SECTORS.forEach((sector) => {
       const biome = BIOMES.find((b) => b.id === sector.biome);
@@ -83,6 +90,18 @@ describe('sector table', () => {
       warden: true,
       bossKind: 'gatekeeper',
     });
+    const furnace = sectorById('furnace-drift');
+    expect(sectorStage(furnace, 6)).toMatchObject({
+      roster: [expect.objectContaining({ role: 'skirmisher', count: 2 })],
+      castLayer: 10,
+    });
+    expect(sectorStage(furnace, 8).herald).toBe('heat');
+    expect(sectorStage(furnace, 9).bossKind).toBeUndefined();
+    expect(sectorStage(furnace, 10)).toMatchObject({
+      warden: true,
+      bossKind: 'kiln-engine',
+    });
+    expect(sectorStage(furnace, 5)).toBeNull();
     expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });
@@ -92,7 +111,8 @@ describe('sector table', () => {
     expect(localLayer(dense, 6)).toBe(1);
     expect(localLayer(dense, 10)).toBe(5);
     expect(nextSector(sectorById('debris-wake')).id).toBe('salvage-lanes');
-    expect(nextSector(sectorById('prime-gate')).id).toBe('dense-core');
+    expect(nextSector(sectorById('prime-gate')).id).toBe('furnace-drift');
+    expect(nextSector(sectorById('furnace-drift')).id).toBe('dense-core');
     expect(nextSector(dense).id).toBe('wardens-reach');
     expect(nextSector(sectorById('wardens-reach'))).toBeNull();
     expect(sectorById('nowhere')).toBeNull();

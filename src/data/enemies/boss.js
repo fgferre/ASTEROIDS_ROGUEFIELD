@@ -6,6 +6,7 @@ import choir from '../../content/bosses/choir.js';
 import nullWarden from '../../content/bosses/null.js';
 import quarryMaw from '../../content/bosses/quarry-maw.js';
 import gatekeeper from '../../content/bosses/gatekeeper.js';
+import kilnEngine from '../../content/bosses/kiln-engine.js';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -122,7 +123,9 @@ export const WARDEN_KINDS = deepFreeze(kindsOf([prime, choir, nullWarden]));
 // 'boss'` as a Warden, `tier: 'sentinel'` in its file; never in BOSS_BY_LAYER,
 // the cycle, Boss Rush or the Warden achievements: a sector asks for one by
 // kind (`bossKind`).
-export const SENTINEL_KINDS = deepFreeze(kindsOf([quarryMaw, gatekeeper]));
+export const SENTINEL_KINDS = deepFreeze(
+  kindsOf([quarryMaw, gatekeeper, kilnEngine])
+);
 
 /** Every boss kind, Wardens and Sentinels: what a `bossKind` can name. */
 export const BOSS_KINDS = deepFreeze({ ...WARDEN_KINDS, ...SENTINEL_KINDS });

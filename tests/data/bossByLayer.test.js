@@ -39,7 +39,11 @@ describe('BOSS_BY_LAYER', () => {
   });
 
   it('registers the Sentinels by kind, outside the Warden table and cycle', () => {
-    expect(Object.keys(SENTINEL_KINDS)).toEqual(['quarry-maw', 'gatekeeper']);
+    expect(Object.keys(SENTINEL_KINDS)).toEqual([
+      'quarry-maw',
+      'gatekeeper',
+      'kiln-engine',
+    ]);
     expect(BOSS_KINDS['quarry-maw']).toBe(SENTINEL_KINDS['quarry-maw']);
     expect(WARDEN_KINDS['quarry-maw']).toBeUndefined();
     expect(bossTier('quarry-maw')).toBe('sentinel');
@@ -50,8 +54,16 @@ describe('BOSS_BY_LAYER', () => {
     expect(bossTier('gatekeeper')).toBe('sentinel');
     expect(wardenFactoryKey('gatekeeper')).toBe('boss-gatekeeper');
     expect(WARDEN_CLASSES.gatekeeper.name).toBe('SentinelGatekeeper');
+    expect(WARDEN_KINDS['kiln-engine']).toBeUndefined();
+    expect(bossTier('kiln-engine')).toBe('sentinel');
+    expect(wardenFactoryKey('kiln-engine')).toBe('boss-kiln-engine');
+    expect(WARDEN_CLASSES['kiln-engine'].name).toBe('SentinelKilnEngine');
     expect(ELITE_EXCLUDED_TYPES).toEqual(
-      expect.arrayContaining(['boss-quarry-maw', 'boss-gatekeeper'])
+      expect.arrayContaining([
+        'boss-quarry-maw',
+        'boss-gatekeeper',
+        'boss-kiln-engine',
+      ])
     );
 
     const layers = Array.from({ length: 60 }, (_, i) => i + 1);

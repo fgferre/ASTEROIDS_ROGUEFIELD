@@ -2,10 +2,10 @@
 // (src/data/sectors.js).
 export default {
   id: 'dense-core',
-  order: 4,
+  order: 6,
   chapter: 2,
-  code: 'A',
-  name: 'THE DENSE CORE',
+  code: 'C',
+  name: 'RESONANCE CHAMBER',
   biome: 'dense-core',
   layers: [6, 10],
   headStart: 4, // proposta 12/11

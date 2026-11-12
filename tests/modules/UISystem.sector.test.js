@@ -19,7 +19,7 @@ describe('UISystem on a sector run', () => {
       boss: false,
       sentinel: false,
       bossRush: undefined,
-      chapter: 'CHAPTER II — THE DENSE CORE',
+      chapter: 'CHAPTER II — THE DENSE CORE · RESONANCE CHAMBER',
     });
     expect(ui.transmissionLayer).toBe(6);
   });

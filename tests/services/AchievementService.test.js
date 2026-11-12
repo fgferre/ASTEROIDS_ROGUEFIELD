@@ -114,6 +114,13 @@ describe('AchievementService', () => {
     expect(unlocked).toContain('full-garage');
   });
 
+  it('a Sentinel down is no Warden achievement', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('player-took-damage', { damage: 5 });
+    eventBus.emit('boss-defeated', { bossKind: 'kiln-engine' });
+    expect(unlocked).toEqual([]);
+  });
+
   it('untouchable needs a Warden layer with no hull damage since it started', () => {
     const { eventBus, unlocked } = setup();
     eventBus.emit('wave-started', { wave: 5 });

@@ -55,10 +55,11 @@ describe('run records', () => {
   });
 
   it('opens a sector once the one before is won or a full run went past its boss', () => {
-    const [wake, lanes, gate, dense] = [
+    const [wake, lanes, gate, furnace, dense] = [
       'debris-wake',
       'salvage-lanes',
       'prime-gate',
+      'furnace-drift',
       'dense-core',
     ].map(sectorById);
     expect(isSectorUnlocked(wake)).toBe(true);
@@ -68,9 +69,12 @@ describe('run records', () => {
     expect(isSectorUnlocked(gate)).toBe(false);
     expect(isSectorUnlocked(dense)).toBe(false);
     updateRecords({ layer: 5 });
-    expect(isSectorUnlocked(dense)).toBe(false);
+    expect(isSectorUnlocked(furnace)).toBe(false);
     updateRecords({ layer: 6 });
     expect(isSectorUnlocked(gate)).toBe(true);
+    expect(isSectorUnlocked(furnace)).toBe(true);
+    expect(isSectorUnlocked(dense)).toBe(false);
+    updateRecords({ layer: 11 });
     expect(isSectorUnlocked(dense)).toBe(true);
   });
 });

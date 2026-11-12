@@ -169,7 +169,7 @@ describe('sector run end', () => {
       kicker: 'Warden down',
       title: 'Chapter cleared',
       of: '',
-      line: 'THE DENSE CORE · 8:32',
+      line: 'RESONANCE CHAMBER · 8:32',
       badge: 'First clear',
     });
     expect(

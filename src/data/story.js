@@ -15,6 +15,7 @@ export const STORY = deepFreeze({
     15: 'WARDEN NULL',
     'quarry-maw': 'QUARRY MAW',
     gatekeeper: 'GATEKEEPER',
+    'kiln-engine': 'KILN ENGINE',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -75,6 +76,12 @@ export const STORY = deepFreeze({
     gatekeeper: {
       warning: 'Lane closed. Gate holds. You are not on the manifest.',
       defeated: 'Gate open. One hull through. Prime has been told.',
+    },
+    'kiln-engine': {
+      warning:
+        'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
+      defeated:
+        'Kiln Engine cold. The Core will remember the temperature it lost.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

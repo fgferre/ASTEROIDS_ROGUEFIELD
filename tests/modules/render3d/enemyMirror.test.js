@@ -166,6 +166,56 @@ describe('EnemyMirror', () => {
     );
   });
 
+  it('draws the Kiln Engine with fins that tilt open, its hot wedges and pools', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const kiln = {
+      id: 'kiln',
+      type: 'boss',
+      bossKind: 'kiln-engine',
+      x: 400,
+      y: 300,
+      radius: 72,
+      ventOpen: 0,
+      sectors: null,
+      pools: [],
+      telegraph: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-kiln-engine');
+    mirror.update([kiln], 0);
+    const view = mirror.views.get('kiln');
+    expect(view.kind).toBe('boss-kiln-engine');
+    expect(view.fins).toHaveLength(6);
+    expect(view.fins[0].rotation.z).toBeCloseTo(0);
+    expect(view.telegraph.sectors.group.visible).toBe(false);
+
+    kiln.ventOpen = 1;
+    kiln.sectors = {
+      type: 'sectors',
+      x: 400,
+      y: 300,
+      angle: 0,
+      count: 6,
+      offset: 0,
+      solid: 1,
+      phase: 'burn',
+      timer: 1,
+      duration: 2.5,
+      length: 500,
+    };
+    kiln.pools = [
+      { x: 500, y: 300, radius: 55, phase: 'burn', timer: 2, duration: 4 },
+    ];
+    mirror.update([kiln], 0);
+    expect(view.fins[0].rotation.z).toBeLessThan(-1);
+    expect(view.telegraph.sectors.fans.every((fan) => fan.visible)).toBe(true);
+    const [pool, spare] = view.telegraph.pools.fans;
+    expect(pool.visible).toBe(true);
+    expect(pool.position.x).toBeCloseTo(100);
+    expect(spare.visible).toBe(false);
+  });
+
   it('gives every asteroid variant its own instanced look, rebound on reuse', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = (id, variant) => ({

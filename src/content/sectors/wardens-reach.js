@@ -2,7 +2,7 @@
 // (src/data/sectors.js).
 export default {
   id: 'wardens-reach',
-  order: 5,
+  order: 7,
   chapter: 3,
   code: 'A',
   name: "WARDEN'S REACH",
