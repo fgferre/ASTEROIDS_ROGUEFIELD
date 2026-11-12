@@ -176,9 +176,9 @@ describe('sector run end', () => {
       inviteLine({
         outcome: 'victory',
         sector: denseCore,
-        next: sectorById('wardens-reach'),
+        next: sectorById('assembly-graveyard'),
       })
-    ).toBe("WARDEN'S REACH is open. <b>Next chapter.</b>");
+    ).toBe('ASSEMBLY GRAVEYARD is open. <b>Next chapter.</b>');
   });
 
   it('a death counts the layer inside the chapter', () => {

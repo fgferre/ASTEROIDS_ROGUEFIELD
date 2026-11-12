@@ -216,6 +216,69 @@ describe('EnemyMirror', () => {
     expect(spare.visible).toBe(false);
   });
 
+  it('draws the Foundry Mother with bay doors, arms on the boss’s swing and their zones', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const mother = {
+      id: 'mother',
+      type: 'boss',
+      bossKind: 'foundry-mother',
+      x: 400,
+      y: 300,
+      radius: 78,
+      ventOpen: 0,
+      bays: [
+        { open: 0, progress: 0 },
+        { open: 0, progress: 0 },
+      ],
+      arms: null,
+      armAngle: 0,
+      armReach: 0,
+      telegraph: null,
+      getHitFlash: () => 0,
+    };
+
+    expect(VIEW_KINDS).toContain('boss-foundry-mother');
+    mirror.update([mother], 0);
+    const view = mirror.views.get('mother');
+    expect(view.kind).toBe('boss-foundry-mother');
+    expect(view.doors).toHaveLength(2);
+    expect(view.doors[0].rotation.z).toBeCloseTo(0);
+    expect(view.units[0].visible).toBe(false);
+    expect(view.telegraph.arms.group.visible).toBe(false);
+    const cold = view.coreMaterial.emissiveIntensity;
+    const folded = view.arms[0].children[0].scale.x;
+
+    mother.bays[0] = { open: 1, progress: 0.5 };
+    mother.armAngle = 1;
+    mother.armReach = 1;
+    mother.arms = {
+      type: 'arms',
+      x: 400,
+      y: 300,
+      segments: [
+        { angle: 1, width: 1.2, inner: 78, outer: 230 },
+        { angle: 1 - Math.PI, width: 1.2, inner: 78, outer: 230 },
+      ],
+      solid: 1,
+      phase: 'sweep',
+      timer: 1,
+      duration: 1.6,
+    };
+    mirror.update([mother], 0);
+    expect(view.doors[0].rotation.z).toBeGreaterThan(1);
+    expect(view.doors[1].rotation.z).toBeCloseTo(0);
+    expect(view.units[0].visible).toBe(true);
+    expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(cold);
+    expect(view.arms[0].rotation.y).toBeCloseTo(-1);
+    expect(view.arms[1].rotation.y).toBeCloseTo(-1 - Math.PI);
+    expect(view.arms[0].children[0].scale.x).toBeGreaterThan(folded);
+    const [arm, other] = view.telegraph.arms.fans;
+    expect(view.telegraph.arms.group.visible).toBe(true);
+    expect(arm.visible && other.visible).toBe(true);
+    expect(arm.rotation.y).toBeCloseTo(-1);
+    expect(arm.scale.x).toBeCloseTo(230);
+  });
+
   it('draws the Prism Crown with its mirrors where the boss puts them and its beams', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const crown = {

@@ -119,6 +119,7 @@ describe('AchievementService', () => {
     eventBus.emit('player-took-damage', { damage: 5 });
     eventBus.emit('boss-defeated', { bossKind: 'kiln-engine' });
     eventBus.emit('boss-defeated', { bossKind: 'prism-crown' });
+    eventBus.emit('boss-defeated', { bossKind: 'foundry-mother' });
     expect(unlocked).toEqual([]);
   });
 

@@ -35,6 +35,17 @@ describe('Codex entries', () => {
     });
   });
 
+  it('files the Foundry Mother with the Sentinels, on layer 15', () => {
+    const id = codexIdOf({ type: 'boss', bossKind: 'foundry-mother' });
+    expect(id).toBe('sentinel-foundry-mother');
+    expect(CODEX_ENTRIES.find((entry) => entry.id === id)).toMatchObject({
+      name: 'Foundry Mother',
+      warden: true,
+      fromLayer: 15,
+      hint: 'Hit it hard while it builds and the escort is scrapped. Strike again when its arms hang open.',
+    });
+  });
+
   it('has a glyph, lore and hint for every boss', () => {
     const bosses = CODEX_ENTRIES.filter((entry) => entry.warden);
     expect(bosses.map((entry) => entry.id)).toContain('sentinel-gatekeeper');

@@ -37,7 +37,7 @@ describe('campaign map', () => {
   });
 
   it("lists a chapter's sectors with code, name, end boss, layers and state", () => {
-    const [one, two] = campaignChapters(
+    const [one, two, three] = campaignChapters(
       records(['debris-wake'], { 'debris-wake': 252 })
     );
     expect(one.title).toBe('CHAPTER I — THE OUTER RING');
@@ -96,6 +96,19 @@ describe('campaign map', () => {
       boss: 'Warden: Choir',
       lock: 'Defeat Sentinel Prism Crown to unlock',
     });
+    expect(three.sectors).toHaveLength(2);
+    expect(three.sectors[0]).toMatchObject({
+      code: 'A',
+      name: 'ASSEMBLY GRAVEYARD',
+      boss: 'Sentinel: Foundry Mother',
+      lock: 'Defeat Warden Choir to unlock',
+    });
+    expect(three.sectors[1]).toMatchObject({
+      code: 'C',
+      name: 'NULL BOUNDARY',
+      boss: 'Warden: Null',
+      lock: 'Defeat Sentinel Foundry Mother to unlock',
+    });
 
     const rows = sectorRowsMarkup(one.sectors);
     expect(rows).toContain('id="campaign-sector-debris-wake"');
@@ -114,6 +127,7 @@ describe('campaign map', () => {
       'furnace-drift',
       'crystal-choir',
       'dense-core',
+      'assembly-graveyard',
       'wardens-reach',
     ];
     expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');

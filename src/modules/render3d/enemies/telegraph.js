@@ -3,8 +3,8 @@
 // the spread fan (and the Quarry Maw's intake cone, the same wedge), the
 // warning ring and the beams (the Choir's converging lines, the Maw's eject
 // fan, the Gatekeeper's barrier and its gap, the Prism Crown's reflected
-// beams), and the Kiln Engine's hot wedges and slag pools (flat fans and
-// discs). The Ram, the Wardens and any recipe enemy that aims draw them;
+// beams), the Kiln Engine's hot wedges and slag pools (flat fans and
+// discs) and the Foundry Mother's arms (flat ring sectors). The Ram, the Wardens and any recipe enemy that aims draw them;
 // built once into the toolkit (enemyMirror.js createKit) as
 // kit.createTelegraph and kit.updateTelegraph.
 
@@ -23,6 +23,7 @@ export function createTelegraphs(kit) {
   lanePlane.rotateX(-Math.PI / 2);
   lanePlane.translate(0.5, 0, 0);
   const fanGeometries = new Map();
+  const ringGeometries = new Map();
 
   // Charge lane / fan / warning ring on the field plane (Wardens and Ram);
   // `beams` lines for the Choir's converging volley and the Maw's eject;
@@ -92,6 +93,21 @@ export function createTelegraphs(kit) {
     return geometry;
   }
 
+  // A ring sector `arc` wide from `inner` (a share of the outer radius, 1)
+  // out, centred on +x like a fan.
+  function ringGeometry(arc, inner) {
+    const key = `${Math.round(arc * 100)}:${Math.round(inner * 100)}`;
+    let geometry = ringGeometries.get(key);
+    if (!geometry) {
+      geometry = kit.seeded(
+        () => new THREE.RingGeometry(inner, 1, 32, 1, -arc / 2, arc)
+      );
+      geometry.rotateX(-Math.PI / 2);
+      ringGeometries.set(key, geometry);
+    }
+    return geometry;
+  }
+
   // Charge lane / aim line / spread fan on the field plane, timed by the
   // boss's live `telegraph` state; an aim line held still (`locked`) burns
   // brighter and wider.
@@ -128,10 +144,11 @@ export function createTelegraphs(kit) {
       updatePrism(parts, t, ox, oy, progress, pulse);
       return;
     }
-    if (t.type === 'sectors' || t.type === 'pools') {
+    if (t.type === 'sectors' || t.type === 'pools' || t.type === 'arms') {
       parts.warn.visible = false;
       parts.beams.forEach((beam) => (beam.visible = false));
       if (t.type === 'sectors') updateSectors(parts, t, progress, pulse);
+      else if (t.type === 'arms') updateArms(parts, t, progress, pulse);
       else updatePools(parts, t, ox, oy);
       return;
     }
@@ -264,6 +281,23 @@ export function createTelegraphs(kit) {
       fan.scale.set(t.length, 1, t.length);
       fan.material.opacity = glow;
     }
+  }
+
+  // The Foundry Mother's arms (one ring sector each), round the boss; as
+  // faint as the Kiln's wedges, for the same reason.
+  function updateArms(parts, t, progress, pulse) {
+    parts.group.rotation.y = 0;
+    const glow = 0.45 * hazardGlow(t.phase === 'warn', progress, pulse);
+    parts.fans.forEach((fan, i) => {
+      const s = t.segments?.[i];
+      fan.visible = Boolean(s);
+      if (!s) return;
+      fan.geometry = ringGeometry(s.width, s.inner / s.outer);
+      fan.position.set(0, 0, 0);
+      fan.rotation.y = -s.angle;
+      fan.scale.set(s.outer, 1, s.outer);
+      fan.material.opacity = glow;
+    });
   }
 
   // The Kiln Engine's slag pools (one disc each), placed on the field.

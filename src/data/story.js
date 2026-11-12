@@ -17,6 +17,7 @@ export const STORY = deepFreeze({
     gatekeeper: 'GATEKEEPER',
     'kiln-engine': 'KILN ENGINE',
     'prism-crown': 'PRISM CROWN',
+    'foundry-mother': 'FOUNDRY MOTHER',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -88,6 +89,12 @@ export const STORY = deepFreeze({
       warning:
         'Three voices remain in the crystal. They have found a new listener.',
       defeated: 'The Crown is dark. The Chamber heard it go quiet.',
+    },
+    'foundry-mother': {
+      warning:
+        'Assembly line active. Chassis count: unfinished. Intruder count: one.',
+      defeated:
+        'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

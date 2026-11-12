@@ -2,10 +2,10 @@
 // (src/data/sectors.js).
 export default {
   id: 'wardens-reach',
-  order: 7,
+  order: 9,
   chapter: 3,
-  code: 'A',
-  name: "WARDEN'S REACH",
+  code: 'C',
+  name: 'NULL BOUNDARY',
   biome: 'wardens-reach',
   layers: [11, 15],
   headStart: 8, // proposta 12/11

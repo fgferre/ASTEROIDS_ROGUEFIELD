@@ -23,5 +23,6 @@ export const ELITE_EXCLUDED_TYPES = deepFreeze([
   'boss-gatekeeper',
   'boss-kiln-engine',
   'boss-prism-crown',
+  'boss-foundry-mother',
   'herald',
 ]);

@@ -137,6 +137,16 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantHz: 2200,
       formantQ: 8,
     }),
+    // proposta 12/11: a low square pair a fifth apart, like a press cycling,
+    // dull and metallic (the Sentinel)
+    'FOUNDRY MOTHER': Object.freeze({
+      grains: 10,
+      type: 'square',
+      notes: Object.freeze([31, 38]), // G1 D2
+      formantHz: 900,
+      formantQ: 5,
+      grit: true,
+    }),
     'HERALD OF SILENCE': Object.freeze({
       grains: 8,
       type: 'sine',

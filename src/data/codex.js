@@ -38,6 +38,8 @@ const GLYPHS = {
     '<polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(0)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(60)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(120)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(180)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(240)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(300)"/><circle class="eye" r="3.5"/>',
   'sentinel-prism-crown':
     '<path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(120)"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(240)"/><circle class="eye" r="3"/>',
+  'sentinel-foundry-mother':
+    '<rect x="-11" y="-5" width="22" height="10"/><rect x="-8" y="-10" width="5" height="5"/><rect x="3" y="-10" width="5" height="5"/><rect x="11" y="-1" width="5" height="2" transform="rotate(-35 11 0)"/><rect x="-16" y="-1" width="5" height="2" transform="rotate(-35 -11 0)"/><rect class="eye" x="-2" y="-2" width="4" height="4"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -179,6 +181,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'silence',
       'Past this point we do not answer. The Silence makes sure of it. It eats every signal in the Reach, yours first, and moves where nothing can hear it go.',
       'Blinds your radar while it lives. A ring marks where it blinks.'
+    ),
+    sentinel(
+      'foundry-mother',
+      "The Reach built the Ring's machines and was never told the Ring had ended. The Mother still lays down the same chassis, one after another, for a fleet no one will launch.",
+      'Hit it hard while it builds and the escort is scrapped. Strike again when its arms hang open.'
     ),
     warden(
       'null',

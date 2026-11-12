@@ -24,12 +24,15 @@ describe('sector table', () => {
       [2, 'B'],
       [2, 'C'],
       [3, 'A'],
+      [3, 'C'],
     ]);
     expect(SECTORS.slice(3).map((s) => [s.id, s.order, s.name])).toEqual([
       ['furnace-drift', 4, 'FURNACE DRIFT'],
       ['crystal-choir', 5, 'CRYSTAL CHOIR'],
       ['dense-core', 6, 'RESONANCE CHAMBER'],
-      ['wardens-reach', 7, "WARDEN'S REACH"],
+      ['assembly-graveyard', 7, 'ASSEMBLY GRAVEYARD'],
+      // order 8 is kept for a later chapter-three sector
+      ['wardens-reach', 9, 'NULL BOUNDARY'],
     ]);
     SECTORS.forEach((sector) => {
       const biome = BIOMES.find((b) => b.id === sector.biome);
@@ -122,6 +125,28 @@ describe('sector table', () => {
       warden: true,
       bossKind: 'prism-crown',
     });
+    const graveyard = sectorById('assembly-graveyard');
+    expect(sectorStage(graveyard, 11)).toMatchObject({
+      roster: [
+        expect.objectContaining({ role: 'skirmisher', count: 2 }),
+        expect.objectContaining({ role: 'carrier', count: 1 }),
+      ],
+      castLayer: 15,
+    });
+    expect(sectorStage(graveyard, 12).formations).toEqual([
+      expect.objectContaining({ kind: 'swarm', role: 'swarmer', count: 8 }),
+    ]);
+    expect(sectorStage(graveyard, 13).events).toEqual([
+      expect.objectContaining({ kind: 'sensor-jam', at: 30 }),
+    ]);
+    expect(sectorStage(graveyard, 14).roster[0]).toMatchObject({
+      role: 'tank',
+      elite: 0.2,
+    });
+    expect(sectorStage(graveyard, 15)).toMatchObject({
+      warden: true,
+      bossKind: 'foundry-mother',
+    });
     expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });
@@ -134,7 +159,10 @@ describe('sector table', () => {
     expect(nextSector(sectorById('prime-gate')).id).toBe('furnace-drift');
     expect(nextSector(sectorById('furnace-drift')).id).toBe('crystal-choir');
     expect(nextSector(sectorById('crystal-choir')).id).toBe('dense-core');
-    expect(nextSector(dense).id).toBe('wardens-reach');
+    expect(nextSector(dense).id).toBe('assembly-graveyard');
+    expect(nextSector(sectorById('assembly-graveyard')).id).toBe(
+      'wardens-reach'
+    );
     expect(nextSector(sectorById('wardens-reach'))).toBeNull();
     expect(sectorById('nowhere')).toBeNull();
   });
