@@ -1942,6 +1942,48 @@ button.campaign-node {
   color: var(--accent);
 }
 
+/* The last sector's endings: a pip each, lit once reached */
+.campaign-sector__endings {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.campaign-sector__endings .campaign-sector__why {
+  display: inline;
+}
+
+.campaign-ending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  opacity: 0.55;
+}
+
+.campaign-ending__pip {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--neutral);
+  border-radius: 50%;
+}
+
+.campaign-ending.is-reached {
+  color: var(--xp);
+  opacity: 1;
+}
+
+.campaign-ending.is-reached .campaign-ending__pip {
+  border-color: var(--xp);
+  background: var(--xp);
+  box-shadow: 0 0 6px var(--xp);
+}
+
 .campaign-sector.is-locked {
   color: var(--text-dim);
 }

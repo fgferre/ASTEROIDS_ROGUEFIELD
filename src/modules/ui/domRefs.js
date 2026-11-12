@@ -50,6 +50,9 @@ export function cacheStaticNodes() {
       nextBtn: document.getElementById('victory-next-btn') || null,
       restartBtn: document.getElementById('victory-restart-btn') || null,
       quitBtn: document.getElementById('victory-quit-btn') || null,
+      menuBtn: document.getElementById('victory-menu-btn') || null,
+      choiceOptions: document.getElementById('ending-options') || null,
+      field: document.querySelector('#game-ui .game-field') || null,
     },
     pause: {
       container: document.getElementById('pause-screen') || null,
@@ -92,6 +95,8 @@ export function cacheStaticNodes() {
       openBtn: document.getElementById('menu-campaign-btn') || null,
       backBtn: document.getElementById('campaign-back-btn') || null,
       closeBtn: document.getElementById('campaign-close-btn') || null,
+      // The final card's Main menu: the menu it ends in keeps the map shut.
+      mainMenuBtn: document.getElementById('victory-menu-btn') || null,
     },
     settings: {
       overlay: document.getElementById('settings-screen') || null,

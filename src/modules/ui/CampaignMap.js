@@ -6,10 +6,13 @@
 // selected chapter's sectors as rows under it, and Launch for the selected
 // row (GameSessionService's MenuButtons starts the run from the button's
 // data-sector). A sector run that ends back in the menu reopens the map.
+// The campaign's last sector carries a pip per ending (data/story.js), lit
+// once the profile has reached it.
 
 import { getContent } from '../../content/registry.js';
 import { bossKindForLayer } from '../../data/enemies/boss.js';
 import { SECTORS, sectorBossTier } from '../../data/sectors.js';
+import { ENDING_SECTOR, STORY } from '../../data/story.js';
 import { isSectorUnlocked, loadRecords } from '../../services/runRecords.js';
 import { formatRunTime } from './runRecap.js';
 
@@ -50,7 +53,8 @@ export function sectorBossName(sector) {
 /**
  * Every sector as a row: `cleared` (with its best time), `open` or `locked`
  * (with what unlocks it), its code, name, end boss (its rank, unless the
- * rank is its name) and layer count.
+ * rank is its name) and layer count; the last sector also its `endings`
+ * ({ id, title, reached }), else none.
  */
 export function sectorRows(records) {
   return SECTORS.map((sector, index) => {
@@ -74,6 +78,14 @@ export function sectorRows(records) {
         unlocked || !previous
           ? ''
           : `Defeat ${sectorBossTier(previous)} ${sectorBossName(previous)} to unlock`,
+      endings:
+        sector.id === ENDING_SECTOR
+          ? Object.entries(STORY.ending).map(([id, { title }]) => ({
+              id,
+              title,
+              reached: records.endings.includes(id),
+            }))
+          : null,
     };
   });
 }
@@ -146,6 +158,18 @@ function rowState(row) {
   return `Locked${row.lock ? `<span class="campaign-sector__why">${row.lock}</span>` : ''}`;
 }
 
+// The endings under the last sector's row: a pip and a name each.
+function endingsMarkup(endings) {
+  if (!endings) return '';
+  const pips = endings
+    .map(
+      ({ id, title, reached }) =>
+        `<span class="campaign-ending${reached ? ' is-reached' : ''}" data-ending="${id}"><span class="campaign-ending__pip" aria-hidden="true"></span>${title}</span>`
+    )
+    .join('');
+  return `<span class="campaign-sector__endings"><span class="campaign-sector__why">Endings</span>${pips}</span>`;
+}
+
 /** A chapter's sectors as selectable rows (`data-campaign-row`). */
 export function sectorRowsMarkup(rows) {
   return rows
@@ -157,7 +181,7 @@ export function sectorRowsMarkup(rows) {
         <span class="campaign-sector__name">${row.name}</span>
         <span class="campaign-sector__boss">${row.boss}</span>
         <span class="campaign-sector__layers">${row.layers} layers</span>
-        <span class="campaign-sector__state">${rowState(row)}</span>
+        <span class="campaign-sector__state">${rowState(row)}</span>${endingsMarkup(row.endings)}
       </button>`
     )
     .join('');
@@ -228,6 +252,9 @@ export class CampaignMap {
     [refs.backBtn, refs.closeBtn].forEach((button) =>
       button?.addEventListener('click', () => this.closeMap())
     );
+    refs.mainMenuBtn?.addEventListener('click', () => {
+      this.returnToMap = false;
+    });
     refs.overlay.addEventListener('click', (event) => {
       if (event.target === refs.overlay) {
         this.closeMap();
@@ -383,7 +410,12 @@ export class CampaignMap {
   /** The main menu is shown: after a sector run, the map opens over it. */
   menuShown() {
     if (!this.returnToMap) return;
-    this.returnToMap = false;
-    this.openMap();
+    // Once the menu has settled: leaving a run shows it twice (the session,
+    // then its 'screen-changed'), and each showing closes the map.
+    queueMicrotask(() => {
+      if (!this.returnToMap) return;
+      this.returnToMap = false;
+      this.openMap();
+    });
   }
 }

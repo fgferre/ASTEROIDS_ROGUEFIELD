@@ -100,6 +100,23 @@ export function epiloguePath(t) {
   };
 }
 
+// The ending (ui/runCinematics.js playEnding): the epilogue's last shot
+// held while the Ring answers the choice, its wake going from 1 to this.
+const ENDING_WAKE = Object.freeze({
+  severance: 0, // the Ring's light goes out along its arc
+  stewardship: 1.25, // proposta 12/11: it stays lit, a little brighter
+});
+
+/** The ending's path: the held epilogue shot, the wake easing to its own. */
+export function endingPath(ending) {
+  const to = ENDING_WAKE[ending];
+  const endingPose = epiloguePath(1);
+  return (t) => {
+    endingPose.wake = lerp(1, to, easeInOut(t));
+    return endingPose;
+  };
+}
+
 /** The follow camera's own pose: what a cinematic hands back to. */
 export function followPose() {
   return { distance: 1, tilt: FOLLOW_TILT, offsetX: 0, offsetY: 0, wake: 0 };

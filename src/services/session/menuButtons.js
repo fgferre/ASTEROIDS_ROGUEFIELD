@@ -2,8 +2,9 @@
 //
 // The page's run buttons, heard with one document-level click listener: start
 // (Descent, Daily Field, Boss Rush), a sector (the campaign map's Launch, the
-// victory screen's Next Chapter), New Mission, Retry, Quit, the victory
-// screen's continue, and the menu's settings and credits.
+// victory screen's Next Chapter), New Mission, Retry, Quit (the final
+// card's Campaign and Main menu too), the victory screen's continue, and the
+// menu's settings and credits.
 
 export class MenuButtons {
   /**
@@ -137,7 +138,8 @@ export class MenuButtons {
         break;
       }
       case 'quit-game-btn':
-      case 'victory-quit-btn': {
+      case 'victory-quit-btn':
+      case 'victory-menu-btn': {
         preventDefault();
         this.exitToMenu({ source: 'gameover' });
         break;

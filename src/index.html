@@ -725,7 +725,25 @@
             <button id="victory-quit-btn" class="end-btn end-btn--quiet">
               Quit to menu
             </button>
+            <button id="victory-menu-btn" class="end-btn end-btn--quiet hidden">
+              Main menu
+            </button>
           </div>
+        </div>
+      </div>
+
+      <!-- The ending's choice, after the campaign's last win (ui/RunEndScreens.js) -->
+      <div
+        id="ending-screen"
+        class="screen screen--overlay end-screen end-screen--win end-screen--choice hidden"
+      >
+        <div class="end-content ending-content">
+          <header class="end-head">
+            <p class="end-kicker">Sovereign down</p>
+            <h1 class="end-title">Choose</h1>
+            <p class="ending-line">The orders are yours now.</p>
+          </header>
+          <div id="ending-options" class="ending-options"></div>
         </div>
       </div>
 
@@ -733,6 +751,7 @@
       <div id="game-ui" class="hidden">
         <div class="game-field">
           <canvas id="game-canvas" width="800" height="600"></canvas>
+          <div class="game-field__dim" aria-hidden="true"></div>
 
           <div class="game-field__overlay"></div>
         </div>

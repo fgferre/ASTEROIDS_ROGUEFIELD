@@ -5,6 +5,7 @@ import {
   isBossRushUnlocked,
   isSectorUnlocked,
   loadRecords,
+  RECORDS_STORAGE_KEY,
   updateRecords,
 } from '../../src/services/runRecords.js';
 
@@ -30,6 +31,19 @@ describe('run records', () => {
       bossRushTime: 420,
       sectorsWon: [],
       sectorTimes: {},
+      endings: [],
+    });
+  });
+
+  it('keeps each ending reached once, in the order found; an old save has none', () => {
+    localStorage.setItem(RECORDS_STORAGE_KEY, JSON.stringify({ runs: 3 }));
+    expect(loadRecords().endings).toEqual([]);
+    updateRecords({ ending: 'stewardship' });
+    updateRecords({ ending: 'stewardship' });
+    updateRecords({ ending: 'severance' });
+    expect(loadRecords()).toMatchObject({
+      runs: 3,
+      endings: ['stewardship', 'severance'],
     });
   });
 

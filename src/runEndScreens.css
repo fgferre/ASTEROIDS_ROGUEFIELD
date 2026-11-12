@@ -599,3 +599,132 @@
   border-bottom: 1px solid rgba(230, 238, 248, 0.3);
   cursor: pointer;
 }
+
+/* The final card's count of endings found (RunEndScreens.js). */
+.end-endings {
+  font-family: var(--font-display);
+  font-size: calc(13 * var(--fs));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* The ending's choice: the headline centred, two equal options side by
+   side (stacked on a narrow window). */
+.end-screen--choice {
+  align-items: center;
+}
+
+.ending-content {
+  width: calc(1100 * var(--u));
+  padding: calc(40 * var(--u)) 0;
+  text-align: center;
+}
+
+.ending-line {
+  margin: calc(18 * var(--u)) 0 0;
+  font-size: calc(22 * var(--fs));
+  color: var(--text-dim);
+}
+
+.ending-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(36 * var(--u));
+  margin-top: calc(64 * var(--u));
+}
+
+.ending-option {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: calc(18 * var(--u));
+  min-height: calc(250 * var(--u));
+  padding: calc(34 * var(--u)) calc(40 * var(--u));
+  font: inherit;
+  color: var(--text);
+  text-shadow: inherit;
+  background: rgba(8, 11, 19, 0.6);
+  border: 1px solid rgba(230, 238, 248, 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out);
+}
+
+.ending-option:hover,
+.ending-option:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, rgba(8, 11, 19, 0.6));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.ending-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ending-option__title {
+  font-family: var(--font-display);
+  font-size: calc(40 * var(--fs));
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ending-option:hover .ending-option__title,
+.ending-option:focus-visible .ending-option__title {
+  color: var(--accent);
+}
+
+.ending-option__text {
+  max-width: calc(400 * var(--u));
+  font-size: calc(20 * var(--fs));
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+@media (max-width: 1000px) {
+  .end-screen--choice {
+    --u: min(calc(100vw / 1100), calc(100vh / 1080));
+  }
+
+  .ending-options {
+    grid-template-columns: 1fr;
+    gap: calc(24 * var(--u));
+    margin-top: calc(44 * var(--u));
+  }
+
+  .ending-option {
+    min-height: calc(170 * var(--u));
+  }
+}
+
+/* The ending (RunEndScreens.chooseEnding): the HUD gives way to its
+   transmission, and Severance dims the field as the Ring goes out; a new
+   run lifts both. */
+.game-field.is-ending #hud-layer > :not(.transmission) {
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+
+.game-field__dim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 70% 70% at 50% 45%,
+    rgba(2, 4, 8, 0.3),
+    rgba(2, 4, 8, 0.75)
+  );
+}
+
+.game-field.is-severed .game-field__dim {
+  opacity: 1;
+  transition: opacity 6s ease-in-out;
+}

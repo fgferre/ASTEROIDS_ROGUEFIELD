@@ -7,10 +7,16 @@ import {
 } from '../../../src/modules/ui/CampaignMap.js';
 import { sectorById } from '../../../src/data/sectors.js';
 
-const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
+const records = (
+  sectorsWon = [],
+  sectorTimes = {},
+  bestLayer = 0,
+  endings = []
+) => ({
   sectorsWon,
   sectorTimes,
   bestLayer,
+  endings,
 });
 
 const CHAPTER_ONE = ['debris-wake', 'salvage-lanes', 'prime-gate'];
@@ -154,6 +160,35 @@ describe('campaign map', () => {
     expect(defaultSectorRow(rowsOf([...all, 'the-crucible'])).id).toBe(
       'the-crucible'
     );
+  });
+
+  it('marks the endings reached on the last sector, which stays open to play again like every sector', () => {
+    const all = [
+      ...CHAPTER_ONE,
+      'furnace-drift',
+      'crystal-choir',
+      'dense-core',
+      'assembly-graveyard',
+      'quarantine-grid',
+      'wardens-reach',
+      'the-crucible',
+    ];
+    const rows = campaignChapters(records(all, {}, 0, ['stewardship'])).flatMap(
+      (node) => node.sectors
+    );
+    expect(rows.filter((row) => row.endings).map((row) => row.id)).toEqual([
+      'the-crucible',
+    ]);
+    expect(rows.at(-1).endings).toEqual([
+      { id: 'severance', title: 'Severance', reached: false },
+      { id: 'stewardship', title: 'Stewardship', reached: true },
+    ]);
+    expect(rows.every((row) => row.state === 'cleared')).toBe(true);
+    const markup = sectorRowsMarkup(rows.slice(-1));
+    expect(markup).toContain(
+      'class="campaign-ending is-reached" data-ending="stewardship"'
+    );
+    expect(markup).toContain('class="campaign-ending" data-ending="severance"');
   });
 
   it('a chapter shows its rows; Launch carries the selected row, and a locked one cannot launch', () => {

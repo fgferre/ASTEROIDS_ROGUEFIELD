@@ -10,8 +10,9 @@ export const RECORDS_STORAGE_KEY = 'roguefield:records:v1';
  * Best layer reached, longest run (seconds) and runs started, across runs;
  * Boss Rush: the furthest Warden reached (1-3) and the fastest clear
  * (seconds, 0 before the first); sector runs: the ids won (`sectorsWon`) and
- * each one's fastest clear (`sectorTimes`, id → seconds). A sector run never
- * raises `bestLayer` or `bestTime`.
+ * each one's fastest clear (`sectorTimes`, id → seconds); the campaign's
+ * endings reached (`endings`, ids in the order found, data/story.js). A
+ * sector run never raises `bestLayer` or `bestTime`.
  */
 export function loadRecords() {
   const stored = loadJSON(RECORDS_STORAGE_KEY) ?? {};
@@ -23,12 +24,14 @@ export function loadRecords() {
     bossRushTime: Number(stored.bossRushTime) || 0,
     sectorsWon: Array.isArray(stored.sectorsWon) ? stored.sectorsWon : [],
     sectorTimes: stored.sectorTimes ?? {},
+    endings: Array.isArray(stored.endings) ? stored.endings : [],
   };
 }
 
 /**
  * Raises the records with what this run reached; returns the new records.
- * `sectorWon`: the id of a sector just won, in `sectorTime` seconds.
+ * `sectorWon`: the id of a sector just won, in `sectorTime` seconds;
+ * `ending`: the id of an ending just reached.
  */
 export function updateRecords({
   layer = 0,
@@ -38,6 +41,7 @@ export function updateRecords({
   bossRushTime = 0,
   sectorWon = null,
   sectorTime = 0,
+  ending = null,
 } = {}) {
   const records = loadRecords();
   const clear = Math.floor(Number(bossRushTime) || 0);
@@ -55,6 +59,10 @@ export function updateRecords({
         : records.bossRushTime,
     sectorsWon: records.sectorsWon,
     sectorTimes: records.sectorTimes,
+    endings:
+      ending && !records.endings.includes(ending)
+        ? [...records.endings, ending]
+        : records.endings,
   };
   if (sectorWon) {
     if (!next.sectorsWon.includes(sectorWon)) {

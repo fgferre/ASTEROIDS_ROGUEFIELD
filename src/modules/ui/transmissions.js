@@ -88,17 +88,26 @@ export function deathTransmission(random, layer) {
   };
 }
 
+// Lines spoken in order ({ speaker key, text }), keyed `${key}:${index}`.
+const spokenInOrder = (lines, key, holdMs) =>
+  lines.map(({ speaker, text }, i) => ({
+    key: `${key}:${i}`,
+    speaker: STORY.speaker[speaker],
+    text,
+    ...(holdMs && { holdMs }),
+  }));
+
 /**
  * The journey's lines to sector `to`, in order (none for a sector without
  * one). `holdMs`, when given, replaces each line's hold once typed.
  */
 export function travelTransmissions(to, holdMs) {
-  return (STORY.travel[to] ?? []).map(({ speaker, text }, i) => ({
-    key: `travel:${to}:${i}`,
-    speaker: STORY.speaker[speaker],
-    text,
-    ...(holdMs && { holdMs }),
-  }));
+  return spokenInOrder(STORY.travel[to] ?? [], `travel:${to}`, holdMs);
+}
+
+/** An ending's two lines (STORY.ending), in order; `holdMs` as above. */
+export function endingTransmissions(ending, holdMs) {
+  return spokenInOrder(STORY.ending[ending].lines, `ending:${ending}`, holdMs);
 }
 
 export function victoryTransmission() {

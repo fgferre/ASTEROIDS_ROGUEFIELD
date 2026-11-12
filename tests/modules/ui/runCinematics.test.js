@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EPILOGUE_MS, INTRO_MS } from '../../../src/core/cinematics.js';
+import {
+  EPILOGUE_MS,
+  INTRO_MS,
+  endingPath,
+  epiloguePath,
+} from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import {
@@ -164,6 +169,29 @@ describe('RunCinematics', () => {
     vi.advanceTimersByTime(1);
     expect(show).toHaveBeenCalledTimes(1);
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
+  });
+
+  it("plays an ending's two lines while the Ring's wake eases to its own, then the final card", () => {
+    const { ui, renderer, spoken } = setup();
+    renderer.startCinematic = vi.fn();
+    const onEnd = vi.fn();
+    ui.cinematics.playEnding('severance', onEnd);
+
+    expect(spoken.map(({ key, speaker }) => [key, speaker])).toEqual([
+      ['ending:severance:0', 'THE RING'],
+      ['ending:severance:1', 'WAKE'],
+    ]);
+    const [path, durationMs, hold] = renderer.startCinematic.mock.calls[0];
+    expect(hold).toBe(true);
+    expect(path(0).wake).toBe(1);
+    expect(path(1).wake).toBe(0);
+    expect(path(1).distance).toBe(epiloguePath(1).distance);
+    expect(endingPath('stewardship')(1).wake).toBeGreaterThan(1);
+
+    vi.advanceTimersByTime(durationMs - 1);
+    expect(onEnd).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {

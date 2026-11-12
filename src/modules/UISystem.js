@@ -197,6 +197,7 @@ class UISystem extends BaseSystem {
       difficulty: () => this.getService('difficulty'),
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
+      cinematics: this.cinematics,
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,
@@ -267,7 +268,7 @@ class UISystem extends BaseSystem {
     this.tacticalHud.updateAAATacticalHudFromServices({ force: true });
 
     this.pauseScreen.bindPauseControls();
-    this.runEndScreens.bindCopySeedLink();
+    this.runEndScreens.bindControls();
     this.levelUpScreen.bindLevelUpControls();
     this.chestCeremony.bindControls();
     this.settingsPanel.bindSettingsControls();
@@ -664,7 +665,7 @@ class UISystem extends BaseSystem {
       this.runWon = false;
       this.pilotDown = false;
       this.chestCeremony.clear();
-      this.runEndScreens.noteRunStart();
+      this.runEndScreens.noteRunStart(payload);
       this.transmissions?.clear();
       this.cinematics.stop();
       this.cinematics.armTravel(payload);
@@ -1007,8 +1008,6 @@ class UISystem extends BaseSystem {
 
     this.showScreen(screenName, { emitEvent: false });
   }
-
-  // Legacy Standard HUD update methods removed.
 
   showScreen(screenName, options = {}) {
     const { overlay = false, show = true, emitEvent = true } = options;

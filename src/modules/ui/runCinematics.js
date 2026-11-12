@@ -12,7 +12,9 @@
 // skips (the journey and the intro together); the layer banner — the title
 // card — shows once, when it ends. Epilogue: the renderer pulls back as the
 // Ring wakes, the victory line plays over it, and the victory screen waits
-// for it to end. Warden entrance: letterbox bars over the live shot until
+// for it to end. Ending (the campaign's last win, after the choice): the
+// epilogue's shot holds while the ending's lines play and the Ring answers
+// through its wake; then the final card. Warden entrance: letterbox bars over the live shot until
 // the Warden closes up ('boss-arrived'); the run plays on, slowed (no hold,
 // no skip). A renderer that can't move the camera (2D, reduced motion,
 // `?camera=0`) refuses them all, and the run keeps the plain banner; a
@@ -23,12 +25,14 @@ import {
   INTRO_MS,
   TRAVEL,
   cinematicFreezeFromUrl,
+  endingPath,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
 import { loadRecords } from '../../services/runRecords.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
+  endingTransmissions,
   travelTransmissions,
 } from './transmissions.js';
 
@@ -251,6 +255,28 @@ export class RunCinematics {
       show?.();
     });
     return true;
+  }
+
+  /**
+   * The ending picked (data/story.js STORY.ending): its lines play, timed
+   * as a journey's, while the held shot's wake eases to the ending's own
+   * (none without the 3D camera); `onEnd` runs once they are done.
+   */
+  playEnding(ending, onEnd) {
+    this.stop();
+    const lines = endingTransmissions(ending, TRAVEL.lineHoldMs);
+    const durationMs = travelDurationMs(lines);
+    this.renderer()?.startCinematic?.(
+      endingPath(ending),
+      durationMs,
+      true,
+      'ending'
+    );
+    lines.forEach((entry) => this.speak(entry));
+    this.begin('ending', durationMs, () => {
+      this.finish();
+      onEnd();
+    });
   }
 
   /**

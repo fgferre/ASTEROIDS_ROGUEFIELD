@@ -276,4 +276,37 @@ export const STORY = deepFreeze({
   ],
   victory:
     'Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.',
+  // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
+  // falls in ENDING_SECTOR the pilot picks one, by its `choice`; its
+  // `lines` play in order over the held epilogue shot.
+  ending: {
+    severance: {
+      title: 'Severance',
+      choice: 'Cut the core loose. The Field goes quiet. The archive sleeps.',
+      lines: [
+        {
+          speaker: 'ring',
+          text: 'Continuance: closed. Citizens: at rest. Thank you for counting us.',
+        },
+        { speaker: 'wake', text: 'Lights are steady. All of them. Come home.' },
+      ],
+    },
+    stewardship: {
+      title: 'Stewardship',
+      choice: 'Keep the Ring awake, under watch. Yours.',
+      lines: [
+        {
+          speaker: 'ring',
+          text: 'Continuance: supervised. Operator logged. Sectors relighting: nine. Then more.',
+        },
+        {
+          speaker: 'wake',
+          text: 'So we stay. Somebody has to keep count. Might as well be us.',
+        },
+      ],
+    },
+  },
 });
+
+/** The sector whose win opens the ending's choice. */
+export const ENDING_SECTOR = 'the-crucible';
