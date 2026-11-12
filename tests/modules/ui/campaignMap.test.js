@@ -5,6 +5,7 @@ import {
   defaultSectorRow,
   sectorRowsMarkup,
 } from '../../../src/modules/ui/CampaignMap.js';
+import { sectorById } from '../../../src/data/sectors.js';
 
 const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
   sectorsWon,
@@ -168,6 +169,8 @@ describe('campaign map', () => {
     expect(refs.detailTitle.textContent).toBe('CHAPTER II — THE DENSE CORE');
     expect(refs.launchBtn.dataset.sector).toBe('furnace-drift');
     expect(refs.launchBtn.disabled).toBe(true);
-    expect(refs.detailHeadStart.textContent).toBe('Starts with 4 card picks');
+    expect(refs.detailHeadStart.textContent).toBe(
+      `Starts with ${sectorById('furnace-drift').headStart} card picks`
+    );
   });
 });

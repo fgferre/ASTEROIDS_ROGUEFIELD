@@ -10,7 +10,7 @@ export default {
   name: 'ASSEMBLY GRAVEYARD',
   biome: 'wardens-reach',
   layers: [11, 15],
-  headStart: 8, // proposta 12/11
+  headStart: 16, // proposta 12/11
   boss: 'foundry-mother',
   // proposta 12/11: every number below
   stages: [

@@ -12,6 +12,7 @@ import {
   createHeadlessGame,
   installDomStubs,
 } from '../__helpers__/headlessGame.js';
+import { sectorById } from '../../src/data/sectors.js';
 
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;
@@ -87,9 +88,9 @@ describe('sector runs', () => {
     for (let step = 0; step < 5; step += 1) game.step();
     expect(enemies.waveManager.currentWave).toBe(0);
 
-    expect(makePicks(game)).toBe(4);
+    expect(makePicks(game)).toBe(sectorById('dense-core').headStart);
     for (let step = 0; step < 5; step += 1) game.step();
-    expect(progression.getLevel()).toBe(5);
+    expect(progression.getLevel()).toBe(sectorById('dense-core').headStart + 1);
     expect(enemies.waveManager.currentWave).toBe(6);
   });
 

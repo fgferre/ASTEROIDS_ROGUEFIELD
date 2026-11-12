@@ -15,7 +15,7 @@ export default {
   name: 'CRYSTAL CHOIR',
   biome: 'dense-core',
   layers: [6, 10],
-  headStart: 4, // proposta 12/11
+  headStart: 9, // proposta 12/11
   boss: 'prism-crown',
   // proposta 12/11: every number below
   stages: [

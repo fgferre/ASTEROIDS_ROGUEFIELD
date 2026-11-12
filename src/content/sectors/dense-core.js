@@ -8,5 +8,5 @@ export default {
   name: 'RESONANCE CHAMBER',
   biome: 'dense-core',
   layers: [6, 10],
-  headStart: 4, // proposta 12/11
+  headStart: 9, // proposta 12/11
 };

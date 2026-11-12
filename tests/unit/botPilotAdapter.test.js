@@ -9,6 +9,7 @@ import {
   createHeadlessGame,
   installDomStubs,
 } from '../__helpers__/headlessGame.js';
+import { sectorById } from '../../src/data/sectors.js';
 
 describe('bot driver', () => {
   let restoreDom;
@@ -29,11 +30,11 @@ describe('bot driver', () => {
     const { services, eventBus } = game;
     const driver = createBotDriver({ services, eventBus, preset: 'good' });
     game.session.startNewRun({ source: 'test', sector: 'dense-core' });
-    for (let frame = 0; frame < 6 * 60; frame += 1) {
+    for (let frame = 0; frame < 14 * 60; frame += 1) {
       driver.step();
       game.step();
     }
-    expect(driver.cards).toHaveLength(4);
+    expect(driver.cards).toHaveLength(sectorById('dense-core').headStart);
     expect(services.enemies.waveManager.currentWave).toBe(6);
     const { x, y } = services.player.position;
     expect(Math.hypot(x - 400, y - 300)).toBeGreaterThan(20);

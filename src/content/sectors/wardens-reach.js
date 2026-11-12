@@ -8,5 +8,5 @@ export default {
   name: 'NULL BOUNDARY',
   biome: 'wardens-reach',
   layers: [11, 15],
-  headStart: 8, // proposta 12/11
+  headStart: 16, // proposta 12/11
 };

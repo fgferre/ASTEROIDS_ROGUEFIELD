@@ -25,6 +25,13 @@ capítulo 2 7,5–11,5 min (Kiln 196 s, Prism 222 s, Choir 102 s); capítulo 3 8
 223 s, Null 125 s). Nível ao chegar no chefe: 9–10, 19–21 e 24–30. Golpes concentrados nas camadas do meio e no chefe.
 O Quarry Maw engoliu só 4 rochas em 12 sucções e o Foundry Mother nunca teve a montagem interrompida (o piloto não
 mira). O plano mestre pede 14–18 min por fase: alongar o capítulo 1 é decisão dele, jogando.
+Piloto que joga como pessoa (12/11, `npm run playtest [-- <fase>] [average|good]`, `src/bootstrap/botPilot.js`): lê só
+o que o jogador vê, nave mortal. Primeira rodada (semente 1): capítulo 1 jogável (mediano vence 2 de 3, bom vence 3);
+capítulos 2 e 3 matavam antes do chefe, porque o head start (4 e 8 cartas → níveis 5 e 9) ficava muito abaixo do nível
+da descida no mesmo ponto (~10 e ~20). Head start subiu para 9 e 16 (proposta): o piloto bom passou a vencer Assembly
+Graveyard e Quarantine Grid e a chegar ao Kiln. Ainda morrem cedo Resonance Chamber e Null Boundary (as fases antigas),
+as duas para granadas do Caster na segunda camada; Crystal Choir estoura 25 min (rochas lentas de matar). Uma semente
+oscila muito: rodar várias antes de mexer em número de inimigo.
 Capítulo 2 (12/11): primeira fase nova, Furnace Drift (camadas 6–10, Herald of Heat, Sentinel Kiln Engine: fatias
 quentes em rodízio, escória que vira poça, aletas abertas = janela de dano); a fase do Choir virou Resonance Chamber
 (código C); a fase do meio é Crystal Choir (Sentinel Prism Crown: mostra o caminho dos feixes, que saem do núcleo e
