@@ -8,7 +8,7 @@ The HUD is a set of slots (vitals, radar, run-info, xp, build, recharges, hull-r
 
 ## Tokens
 
-Reuse `src/style.css` `:root` only: `--accent` #00f2ff (player, systems), `--danger` #ff3131 (threat), `--boss` #8a2be2 (Wardens), `--xp` #ffd700 (XP, rewards), `--status` #bcff00 (active buffs), amber #ffb347 (player shots, Field crystal), `--text` / `--text-dim`, `--surface` / `--line`. Fonts: Orbitron for numbers and labels in caps, Rajdhani 500/700 for words. Type scale, spacing, radius and motion tokens as in `:root`. Every size is `calc(token × --hud-scale-effective)`, so the HUD Scale setting really scales the HUD. Sizes as in the owner's approved first mock-up (fine type, not heavy); the HUD Scale and Text Size settings enlarge it; a dark backing plate where the field is bright; never colour alone — every kind also has its own shape.
+Reuse `src/style.css` `:root` only: `--accent` #00f2ff (player, systems), `--danger` #ff3131 (threat), `--boss` #8a2be2 (Wardens), `--xp` #ffd700 (XP, rewards), `--status` #bcff00 (active buffs), amber #ffb347 (player shots, Field crystal), `--text` / `--text-dim`, `--surface` / `--line`. Fonts: Orbitron for numbers and labels in caps, Rajdhani 500/700 for words. Type scale, spacing, radius and motion tokens as in `:root`. Every size is `calc(token × --hud-scale-effective)`, so the HUD Scale setting really scales the HUD. Sizes as in the owner's approved first mock-up (fine type, not heavy), with the Instrument preset's slots drawn smaller (his pick of 12/11: vitals 72 %, radar and Warden bar 75 %, the rest 80–85 %); the HUD Scale and Text Size settings enlarge it; a dark backing plate where the field is bright; never colour alone — every kind also has its own shape.
 
 ## Layout
 
@@ -35,7 +35,7 @@ A value that changes pulses once (120 ms, scale 1.06 and brighter). Panels enter
 
 ## Tactical radar
 
-- A circle, 180 px at a 1080 p window (scaled like the rest), centred on the ship, north up (the controls never rotate).
+- A circle drawn 180 px at a 1080 p window, shown at 135 px in the Instrument preset (scaled like the rest), centred on the ship, north up (the controls never rotate).
 - What is inside the camera's view is dimmed on the radar (the player already sees it); what is outside is bright — that is the radar's job.
 - Real scale: range rings at 400 and 800 field units, labelled small; the field's border drawn as a line (the camera can cross it now); the camera's view drawn as a rectangle, so the radar follows the zoom of the near and wide camera states.
 - Blips by kind: rock = dim dot sized by the rock; machine = red triangle pointing where it flies; fast threat = triangle with a short speed tail; Elite = gold ring; Herald = violet diamond; Warden = large violet hexagon; pickup = green plus; XP = gold haze where orbs gather (not one dot each); Caster landing point = red ring that closes as the shell falls.
