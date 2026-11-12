@@ -11,6 +11,22 @@ export default {
   biome: 'wardens-reach',
   layers: [11, 15],
   headStart: 16, // proposta 12/11
+  // proposta 12/11: grey-green industrial murk among dead hulls, dim.
+  look: {
+    sky: ['#080a08', '#020302'],
+    hazeColor: '#5e6e50',
+    hazeDensity: 1.15,
+    veinColor: '#3e4a38',
+    veinDensity: 0.25,
+    dustColor: '#a8b098',
+    keyColor: '#d8dccb',
+    keyIntensity: 1.15,
+    fillColor: '#55604a',
+    fillIntensity: 0.35,
+    bloomScale: 1,
+    debris: 1,
+    tint: 'rgba(110, 130, 100, 0.06)',
+  },
   boss: 'foundry-mother',
   // proposta 12/11: every number below
   stages: [

@@ -30,19 +30,10 @@ export class BiomeController {
    */
   constructor(THREE, targets) {
     this.targets = { fillScale: 1, hemiScale: 1, ...targets };
-    // Linear colours per biome, parsed once.
-    this.colors = new Map(
-      BIOMES.map((biome) => [
-        biome.id,
-        {
-          sky0: colorOf(THREE, biome.sky[0]),
-          sky1: colorOf(THREE, biome.sky[1]),
-          ...Object.fromEntries(
-            COLORS.map((name) => [name, colorOf(THREE, biome[name])])
-          ),
-        },
-      ])
-    );
+    this.THREE = THREE;
+    // Linear colours per place (a biome, or a sector's look over one),
+    // parsed on first use.
+    this.colors = new Map();
     this.look = {
       from: BIOMES[0],
       to: BIOMES[0],
@@ -61,13 +52,13 @@ export class BiomeController {
    */
   update(transition, fog = 0) {
     const { from, to, mix } = transition;
-    const key = `${from.id}>${to.id}@${mix}~${fog}`;
+    const key = `${placeOf(from)}>${placeOf(to)}@${mix}~${fog}`;
     if (key === this.applied) return;
     this.applied = key;
 
     const look = this.look;
-    const a = this.colors.get(from.id);
-    const b = this.colors.get(to.id);
+    const a = this.colorsOf(from);
+    const b = this.colorsOf(to);
     look.from = from;
     look.to = to;
     look.mix = mix;
@@ -101,4 +92,23 @@ export class BiomeController {
     backdrop.setLook(look);
     space.setLook(look);
   }
+
+  colorsOf(biome) {
+    const place = placeOf(biome);
+    if (!this.colors.has(place)) {
+      const THREE = this.THREE;
+      this.colors.set(place, {
+        sky0: colorOf(THREE, biome.sky[0]),
+        sky1: colorOf(THREE, biome.sky[1]),
+        ...Object.fromEntries(
+          COLORS.map((name) => [name, colorOf(THREE, biome[name])])
+        ),
+      });
+    }
+    return this.colors.get(place);
+  }
+}
+
+function placeOf(biome) {
+  return biome.place ?? biome.id;
 }

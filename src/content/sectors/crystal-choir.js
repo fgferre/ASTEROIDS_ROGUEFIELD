@@ -16,6 +16,22 @@ export default {
   biome: 'dense-core',
   layers: [6, 10],
   headStart: 9, // proposta 12/11
+  // proposta 12/11: pale cyan-white, bright crystal veins, clean cool air.
+  look: {
+    sky: ['#070b0e', '#020304'],
+    hazeColor: '#5cb4d0',
+    hazeDensity: 0.7,
+    veinColor: '#d8faff',
+    veinDensity: 0.95,
+    dustColor: '#e4f8ff',
+    keyColor: '#eaf8ff',
+    keyIntensity: 1.55,
+    fillColor: '#5a8aa8',
+    fillIntensity: 0.35,
+    bloomScale: 1.1,
+    debris: 0.4,
+    tint: 'rgba(160, 230, 255, 0.05)',
+  },
   boss: 'prism-crown',
   // proposta 12/11: every number below
   stages: [

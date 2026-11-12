@@ -11,6 +11,18 @@ export default {
   biome: 'outer-ring',
   layers: [1, 5],
   headStart: 0, // proposta 12/11
+  // proposta 12/11: cold, sparse, deep blue-black; where things were thrown away.
+  look: {
+    sky: ['#05080e', '#010203'],
+    hazeColor: '#2a4478',
+    hazeDensity: 0.55,
+    veinDensity: 0.02,
+    dustColor: '#9aa6b8',
+    keyColor: '#dfe8ff',
+    keyIntensity: 1.5,
+    fillColor: '#3a4a66',
+    debris: 1,
+  },
   boss: 'quarry-maw',
   // proposta 12/11: every number below
   stages: [

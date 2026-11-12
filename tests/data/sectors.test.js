@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { listContent } from '../../src/content/registry.js';
-import { BIOMES } from '../../src/data/biomes.js';
+import { BIOMES, biomeForLayer } from '../../src/data/biomes.js';
 import { FIELD_EVENTS, FORMATIONS } from '../../src/data/layerParts.js';
 import { LAYERS } from '../../src/data/layers.js';
 import {
@@ -195,5 +195,18 @@ describe('sector table', () => {
     expect(nextSector(sectorById('quarantine-grid')).id).toBe('wardens-reach');
     expect(nextSector(sectorById('wardens-reach'))).toBeNull();
     expect(sectorById('nowhere')).toBeNull();
+  });
+
+  it("lays a sector's look over its biome on its own layers only", () => {
+    const wake = sectorById('debris-wake');
+    const ring = BIOMES.find((b) => b.id === 'outer-ring');
+    const place = biomeForLayer(2, wake);
+    Object.keys(ring).forEach((field) =>
+      expect(place[field]).toEqual(wake.look[field] ?? ring[field])
+    );
+    expect(place.place).toBe('debris-wake');
+    expect(biomeForLayer(6, wake)).toBe(biomeForLayer(6));
+    expect(biomeForLayer(2, sectorById('prime-gate'))).toBe(ring);
+    expect(biomeForLayer(2)).toBe(ring);
   });
 });

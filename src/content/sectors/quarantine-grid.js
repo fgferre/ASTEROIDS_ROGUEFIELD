@@ -11,6 +11,22 @@ export default {
   biome: 'wardens-reach',
   layers: [11, 15],
   headStart: 16, // proposta 12/11
+  // proposta 12/11: dark, thin haze, amber warning light, hard contrast.
+  look: {
+    sky: ['#050404', '#010101'],
+    hazeColor: '#5a3410',
+    hazeDensity: 0.4,
+    veinColor: '#ffb020',
+    veinDensity: 1,
+    dustColor: '#d8c8a8',
+    keyColor: '#ffd9a0',
+    keyIntensity: 1.7,
+    fillColor: '#3a2a24',
+    fillIntensity: 0.2,
+    debris: 0.3,
+    structures: 0.8,
+    tint: 'rgba(255, 150, 40, 0.06)',
+  },
   boss: 'interdictor',
   // proposta 12/11: every number below
   stages: [

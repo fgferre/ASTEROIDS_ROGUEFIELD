@@ -16,6 +16,20 @@ export default {
   biome: 'outer-ring',
   layers: [1, 5],
   headStart: 0, // proposta 12/11
+  // proposta 12/11: a shipping lane picked clean, under teal work lights.
+  look: {
+    sky: ['#05100e', '#010504'],
+    hazeColor: '#2f8a7e',
+    hazeDensity: 1.15,
+    veinColor: '#7ce0c0',
+    veinDensity: 0.12,
+    dustColor: '#bfe8dc',
+    keyColor: '#f0fff8',
+    fillColor: '#3f7a70',
+    debris: 0.5,
+    structures: 0.7,
+    tint: 'rgba(60, 170, 150, 0.06)',
+  },
   boss: 'gatekeeper',
   // proposta 12/11: every number below
   stages: [

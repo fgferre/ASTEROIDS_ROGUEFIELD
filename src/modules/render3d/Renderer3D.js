@@ -212,7 +212,11 @@ class Renderer3D extends BaseSystem {
       }
     });
     this.registerEventListener('wave-started', (payload = {}) => {
-      this.biome.enterLayer(payload.wave);
+      // A sector run shows its sector's look (WaveManager holds the sector).
+      this.biome.enterLayer(
+        payload.wave,
+        this.cachedEnemies?.waveManager?.sector
+      );
       this.camera.trigger('waveStart');
     });
     // What opens the camera director's wide view (core/cameraDirector.js).

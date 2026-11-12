@@ -9,6 +9,9 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // keeps the global layer numbers of its range (HP scaling, biome, music and
 // rewards follow them); with `stages` it plays its own definition of each of
 // those layers, and with `boss` that boss kind ends it instead of the Warden.
+// `look` (optional) names biome fields (sky, haze, veins, dust, lights, bloom,
+// debris, structures, tint) that replace its biome's on its layers, so each
+// sector is its own place; music stays the biome's.
 //
 // One file per sector in src/content/sectors/, listed by `order`.
 export const SECTORS = deepFreeze(listContent('sectors'));

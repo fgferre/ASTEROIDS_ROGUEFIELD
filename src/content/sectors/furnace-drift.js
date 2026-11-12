@@ -16,6 +16,20 @@ export default {
   biome: 'dense-core',
   layers: [6, 10],
   headStart: 9, // proposta 12/11
+  // proposta 12/11: hot orange haze, ember dust, a strong warm key.
+  look: {
+    sky: ['#0c0705', '#030202'],
+    hazeColor: '#d2621a',
+    hazeDensity: 1.35,
+    veinColor: '#ffa030',
+    veinDensity: 0.8,
+    dustColor: '#ffb050',
+    keyColor: '#ffb878',
+    keyIntensity: 1.7,
+    fillColor: '#8a401e',
+    debris: 0.4,
+    tint: 'rgba(255, 130, 40, 0.12)',
+  },
   boss: 'kiln-engine',
   // proposta 12/11: every number below
   stages: [

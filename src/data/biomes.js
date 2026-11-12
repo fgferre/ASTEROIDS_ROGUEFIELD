@@ -20,10 +20,33 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // One file per biome in src/content/biomes/, listed by `order`.
 export const BIOMES = deepFreeze(listContent('biomes'));
 
-/** The biome of a layer (1-based); layers past the table stay in the last. */
-export function biomeForLayer(layer) {
+// A sector's look over its biome, made once per sector.
+const LOOKS = new Map();
+
+/**
+ * The biome of a layer (1-based); layers past the table stay in the last.
+ * With a `sector` whose `look` (src/data/sectors.js) covers that layer, the
+ * biome with the look's fields over its own, and `place` the sector's id.
+ */
+export function biomeForLayer(layer, sector = null) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
-  return BIOMES.find((b) => n <= b.layers[1]) || BIOMES[BIOMES.length - 1];
+  const biome =
+    BIOMES.find((b) => n <= b.layers[1]) || BIOMES[BIOMES.length - 1];
+  if (
+    !sector?.look ||
+    sector.biome !== biome.id ||
+    n < sector.layers[0] ||
+    n > sector.layers[1]
+  ) {
+    return biome;
+  }
+  if (!LOOKS.has(sector.id)) {
+    LOOKS.set(
+      sector.id,
+      deepFreeze({ ...biome, ...sector.look, place: sector.id })
+    );
+  }
+  return LOOKS.get(sector.id);
 }
 
 /** Seconds a biome change takes to cross-fade. */
@@ -46,9 +69,9 @@ export class BiomeTransition {
     this.fresh = true;
   }
 
-  /** Call on every layer start. */
-  enterLayer(layer) {
-    const biome = biomeForLayer(layer);
+  /** Call on every layer start, with the run's sector (or null). */
+  enterLayer(layer, sector = null) {
+    const biome = biomeForLayer(layer, sector);
     if (this.fresh) {
       this.fresh = false;
       this.from = biome;
