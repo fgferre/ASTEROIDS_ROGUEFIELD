@@ -9,12 +9,7 @@ import {
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
-import {
-  localLayer,
-  nextSector,
-  sectorById,
-  sectorTitle,
-} from '../data/sectors.js';
+import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -367,7 +362,7 @@ class UISystem extends BaseSystem {
       return;
     }
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
-    const biome = biomeForLayer(layer);
+    const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;
     const stage = this.bossRush ? bossRushStage(layer) : 0;
     // A sector run counts its layers from its own first one.
@@ -467,6 +462,11 @@ class UISystem extends BaseSystem {
       this.cinematics.endArrival();
     });
 
+    // A boss with a line for its final phase speaks it as the phase begins.
+    this.registerEventListener('boss-phase-changed', ({ enemy, phase }) => {
+      if (phase !== enemy.phaseCount - 1) return;
+      this.queueTransmission(wardenTransmission(0, 'last', enemy.bossKind));
+    });
     this.registerEventListener('boss-defeated', (payload = {}) => {
       // A Warden whose death won the run: 'run-won' speaks for it.
       if (this.runWon) return;
@@ -646,14 +646,14 @@ class UISystem extends BaseSystem {
       this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
-      // The boss's own last words; after the last one, the Ring's.
+      // The boss's own last words; after Warden Null's, the Ring's.
       const last = wardenTransmission(
         wave,
         'defeated',
         sectorById(sector)?.boss
       );
       this.queueTransmission(last, { interrupt: true });
-      if (!nextSector(sectorById(sector)))
+      if (wave === RUN_FINAL_LAYER)
         this.queueTransmission(victoryTransmission());
     });
     this.registerEventListener('run-continued', () => {

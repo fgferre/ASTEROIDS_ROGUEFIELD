@@ -20,6 +20,7 @@ export const STORY = deepFreeze({
     'prism-crown': 'PRISM CROWN',
     'foundry-mother': 'FOUNDRY MOTHER',
     interdictor: 'THE INTERDICTOR',
+    sovereign: 'SOVEREIGN',
     dust: 'HERALD OF DUST',
     heat: 'HERALD OF HEAT',
     silence: 'HERALD OF SILENCE',
@@ -48,6 +49,8 @@ export const STORY = deepFreeze({
       'Assembly Graveyard. The same chassis, built again. Order received once. Never closed.',
     'quarantine-grid':
       'Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.',
+    'the-crucible':
+      'The Crucible. All orders arrive here. Two of them cannot both be obeyed.',
   },
   // The journey to each sector (docs/ROTEIRO.md), keyed by the sector it
   // flies to: the opening to the first, then one between each pair. Spoken
@@ -145,6 +148,20 @@ export const STORY = deepFreeze({
         text: "Pilot... I think we're the thing the guard was for.",
       },
     ],
+    'the-crucible': [
+      {
+        speaker: 'ring',
+        text: 'Continuance resumed. Restoring: nine hundred sectors, all citizens. Materials required.',
+      },
+      {
+        speaker: 'wake',
+        text: "It's pulling the Field back together. Pilot — it's pulling at us. At the Wake.",
+      },
+      {
+        speaker: 'wake',
+        text: "There's a center. Whatever gives the order is there. Go.",
+      },
+    ],
   },
   // Spoken by the Ring the first time a support machine is ever seen (the
   // Codex's first meeting): the `sighting` line of its content file.
@@ -217,6 +234,14 @@ export const STORY = deepFreeze({
       warning: 'Quarantine holds. Boundary drawn. You are inside it.',
       defeated:
         'Interdictor offline. The boundary is open. Null has been waiting for this.',
+    },
+    // `last`: as its final phase begins, the two orders at once.
+    sovereign: {
+      warning:
+        'Protect them. Rebuild them. I will do both. You are material for the second.',
+      last: 'Protect. Rebuild. Protect. The orders do not agree. I do not stop.',
+      defeated:
+        'Orders... unassigned. Operator present. Operator: you. Choose.',
     },
   },
   // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on

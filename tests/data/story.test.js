@@ -61,11 +61,8 @@ describe('story', () => {
   });
 
   it('flies to every sector with its journey, spoken by the Wake or the Ring', () => {
-    // The journey into the last chapter waits for its sector's cycle.
     expect(Object.keys(STORY.travel).sort()).toEqual(
-      SECTORS.filter((sector) => sector.chapter <= 3)
-        .map((sector) => sector.id)
-        .sort()
+      SECTORS.map((sector) => sector.id).sort()
     );
     Object.values(STORY.travel).forEach((lines) => {
       expect(lines.length).toBeGreaterThan(0);
