@@ -123,14 +123,14 @@ describe('Sentinel Foundry Mother', () => {
     expect(boss.escortsAlive()).toBe(cap);
   });
 
-  it('scraps the units and vents longer when hit for 5 % of its health while building', () => {
+  it('scraps the units and vents longer when hit for its scrap share of health while building', () => {
     const { boss, system } = createMother();
     const cycle = MOTHER.cycle[0];
     runUntil(boss, () => boss.foundryState === 'assemble');
     run(boss, MOTHER.bays.warn + 1);
-    boss.takeDamage(boss.maxHealth * 0.03);
+    boss.takeDamage(boss.maxHealth * (MOTHER.scrapShare - 0.02));
     expect(boss.foundryState).toBe('assemble');
-    boss.takeDamage(boss.maxHealth * 0.02);
+    boss.takeDamage(boss.maxHealth * 0.021);
     expect(boss.foundryState).toBe('stagger');
     expect(boss.bays.every((bay) => bay.progress === 0)).toBe(true);
 

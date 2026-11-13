@@ -1,7 +1,7 @@
 // A sector: a whole chapter played on its own, won at its Warden
 // (src/data/sectors.js), with its own stages: Shades, tanks and Seekers,
 // one danger added per stage.
-import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
+import { fieldEvent, formation } from '../../data/layerParts.js';
 
 export default {
   id: 'wardens-reach',
@@ -13,10 +13,11 @@ export default {
   look: { backdrop: 'wardens-reach' },
   layers: [11, 15],
   headStart: 16, // proposta 12/11
-  // proposta 12/11: every number below
+  // proposta 12/11: every number below. Few rocks (the layer curve gave 40
+  // a stage, and most of a stage was the mop-up).
   stages: [
     {
-      rocks: rockCurve(11),
+      rocks: 18,
       roster: [
         { role: 'sniper', count: 1, from: 10, every: 16, elite: 0 },
         { role: 'flanker', count: 1, from: 14, every: 20, elite: 0 },
@@ -27,7 +28,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(12),
+      rocks: 20,
       roster: [{ role: 'sniper', count: 1, from: 8, every: 16, elite: 0 }],
       surges: [],
       formations: [
@@ -37,7 +38,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(13),
+      rocks: 22,
       roster: [{ role: 'sniper', count: 1, from: 12, every: 18, elite: 0 }],
       surges: [],
       formations: [],
@@ -46,7 +47,7 @@ export default {
       herald: 'silence',
     },
     {
-      rocks: rockCurve(14),
+      rocks: 24,
       roster: [
         { role: 'sniper', count: 2, from: 8, every: 14, elite: 0.2 },
         { role: 'tank', count: 2, from: 12, every: 20, elite: 0.1 },
@@ -57,7 +58,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(15),
+      rocks: 10,
       roster: [],
       surges: [],
       formations: [],

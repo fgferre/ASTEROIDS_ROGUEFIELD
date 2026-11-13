@@ -138,6 +138,7 @@ describe('sector table', () => {
     });
     expect(sectorStage(graveyard, 12).formations).toEqual([
       expect.objectContaining({ kind: 'swarm', role: 'swarmer', count: 8 }),
+      expect.objectContaining({ kind: 'wall', role: 'skirmisher', count: 6 }),
     ]);
     expect(sectorStage(graveyard, 13).events).toEqual([
       expect.objectContaining({ kind: 'sensor-jam', at: 30 }),
@@ -152,7 +153,7 @@ describe('sector table', () => {
     });
     const grid = sectorById('quarantine-grid');
     expect(sectorStage(grid, 11).roster).toEqual([
-      expect.objectContaining({ role: 'marksman', count: 1 }),
+      expect.objectContaining({ role: 'marksman', count: 2 }),
       expect.objectContaining({ role: 'flanker', count: 1 }),
     ]);
     expect(sectorStage(grid, 12)).toMatchObject({
@@ -166,7 +167,12 @@ describe('sector table', () => {
       ],
       events: [expect.objectContaining({ kind: 'sensor-jam', at: 30 })],
     });
-    expect(sectorStage(grid, 13).herald).toBe('silence');
+    expect(sectorStage(grid, 13).herald).toBeUndefined();
+    expect(sectorStage(grid, 13)).toMatchObject({
+      formations: [
+        expect.objectContaining({ kind: 'ring', role: 'flanker', count: 4 }),
+      ],
+    });
     expect(sectorStage(grid, 14)).toMatchObject({
       formations: [
         expect.objectContaining({ kind: 'ring', role: 'swarmer', count: 10 }),

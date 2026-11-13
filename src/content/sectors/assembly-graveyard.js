@@ -1,6 +1,6 @@
 // A sector: a stretch of a chapter played on its own (src/data/sectors.js),
 // with its own stages and its own end boss.
-import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
+import { fieldEvent, formation } from '../../data/layerParts.js';
 
 export default {
   id: 'assembly-graveyard',
@@ -29,51 +29,61 @@ export default {
     tint: 'rgba(110, 130, 100, 0.06)',
   },
   boss: 'foundry-mother',
-  // proposta 12/11: every number below
+  // proposta 12/11: every number below. The yard is machines, not stone:
+  // few rocks (the layer curve gave 40 a stage, and most of a stage was the
+  // mop-up), and the line's one product, the Drone, comes in a batch every
+  // stage, two more each time; the Foundry Mother builds the same.
   stages: [
     {
-      rocks: rockCurve(11),
+      rocks: 18,
       roster: [
         { role: 'skirmisher', count: 2, from: 8, every: 10, elite: 0 },
         { role: 'carrier', count: 1, from: 10, every: 20, elite: 0 },
       ],
       surges: [],
-      formations: [],
+      formations: [
+        formation('sweep', { role: 'skirmisher', count: 4, at: 22 }),
+      ],
       events: [],
       warden: false,
     },
     {
-      rocks: rockCurve(12),
+      rocks: 20,
       roster: [{ role: 'tank', count: 1, from: 12, every: 25, elite: 0 }],
       surges: [],
-      formations: [formation('swarm', { role: 'swarmer', count: 8, at: 20 })],
+      formations: [
+        formation('swarm', { role: 'swarmer', count: 8, at: 20 }),
+        formation('wall', { role: 'skirmisher', count: 6, at: 34 }),
+      ],
       events: [],
       warden: false,
     },
     {
-      rocks: rockCurve(13),
+      rocks: 22,
       roster: [
         { role: 'minelayer', count: 2, from: 10, every: 16, elite: 0 },
         { role: 'support', count: 1, from: 15, every: 30, elite: 0 },
       ],
       surges: [],
-      formations: [],
+      formations: [formation('ring', { role: 'skirmisher', count: 8, at: 32 })],
       events: [fieldEvent('sensor-jam', 30)],
       warden: false,
     },
     {
-      rocks: rockCurve(14),
+      rocks: 24,
       roster: [
         { role: 'tank', count: 2, from: 10, every: 20, elite: 0.2 },
         { role: 'carrier', count: 1, from: 15, every: 20, elite: 0 },
       ],
       surges: [],
-      formations: [formation('wall', { role: 'skirmisher', count: 8, at: 25 })],
+      formations: [
+        formation('wall', { role: 'skirmisher', count: 10, at: 25 }),
+      ],
       events: [fieldEvent('gravity-well', 35)],
       warden: false,
     },
     {
-      rocks: rockCurve(15),
+      rocks: 10,
       roster: [],
       surges: [],
       formations: [],

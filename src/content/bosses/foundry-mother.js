@@ -51,7 +51,9 @@ export default {
     warn: 1.2, // proposta 12/11: s, the bays opening before they build
     closeSpeed: 4, // proposta 12/11: bay open (0..1) per s, shutting
   },
-  scrapShare: 0.05, // proposta 12/11: of max health, lost in one assembly
+  // proposta 12/11: of max health, lost in one assembly. At 0.05 a strong
+  // pilot scrapped eight assemblies in ten and the Mother never built.
+  scrapShare: 0.07,
   scrapVent: 1.5, // proposta 12/11: s added to the next vent
   stagger: 0.7, // proposta 12/11: s it reels after a scrap
   // Damage over time: one tick every `burnTick` s while the ship's centre is

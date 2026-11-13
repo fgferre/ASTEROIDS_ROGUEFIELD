@@ -14,6 +14,7 @@ export const STORY = deepFreeze({
     5: 'WARDEN PRIME',
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
+    null: 'WARDEN NULL',
     'quarry-maw': 'QUARRY MAW',
     gatekeeper: 'GATEKEEPER',
     'kiln-engine': 'KILN ENGINE',
@@ -227,13 +228,22 @@ export const STORY = deepFreeze({
     'foundry-mother': {
       warning:
         'Assembly line active. Chassis count: unfinished. Intruder count: one.',
+      // `last`: at half health, the order it cannot close.
+      last: 'Order open. Build the chassis. Build the chassis. No one closes the order.',
       defeated:
         'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.',
     },
     interdictor: {
       warning: 'Quarantine holds. Boundary drawn. You are inside it.',
+      // `last`: at half health, what the boundary is for.
+      last: 'The boundary was never for you. It keeps the Ring from hearing. You are loud.',
       defeated:
         'Interdictor offline. The boundary is open. Null has been waiting for this.',
+    },
+    // Warden Null's `last` (the final-phase hook is keyed by boss kind): its
+    // shell shed, it says why it wanted stillness.
+    null: {
+      last: 'Stop. Every shot is a voice. It is listening for one.',
     },
     // `last`: as its final phase begins, the two orders at once.
     sovereign: {
