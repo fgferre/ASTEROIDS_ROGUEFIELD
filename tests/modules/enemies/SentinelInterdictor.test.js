@@ -65,23 +65,102 @@ describe('Sentinel Interdictor', () => {
     expect(boss.maxHealth / warden).toBeCloseTo(0.6, 3);
   });
 
-  it('cages the ship with one open side, farthest from it first, then clockwise', () => {
+  it('cages the ship with a doorway in the side that faces it, the first one wider', () => {
     const { boss } = createInterdictor();
     runUntil(boss, () => boss.grid);
     const first = boss.grid;
-    expect(first).toMatchObject({ type: 'grid', size: 360, phase: 'warn' });
-    expect(first.fences).toHaveLength(3);
+    const { first: lesson } = INTERDICTOR.grid;
+    expect(first).toMatchObject({
+      type: 'grid',
+      size: INTERDICTOR.cycle[0].size,
+      phase: 'warn',
+      door: lesson.door,
+      closeTime: lesson.closeTime,
+    });
+    // three sides and the doorway's two stubs
+    expect(first.fences).toHaveLength(5);
     expect(first.posts).toHaveLength(4);
-    // the right side is the farthest from a boss at (400, 300)
-    expect(first.open).toBe(1);
-    const opens = [first.open];
-    for (let cycle = 0; cycle < 4; cycle += 1) {
-      runUntil(boss, () => boss.gridState === 'rest');
-      runUntil(boss, () => boss.gridState === 'grid');
-      expect(boss.grid.fences).toHaveLength(3);
-      opens.push(boss.grid.open);
-    }
-    expect(opens).toEqual([1, 2, 3, 0, 1]);
+    // the left side is the nearest to a boss at (400, 300)
+    expect(first.open).toBe(3);
+    const [a, b] = first.fences.slice(3);
+    const gap = Math.hypot(b.x1 - a.x2, b.y1 - a.y2);
+    expect(gap).toBeCloseTo(lesson.door);
+    runUntil(boss, () => boss.gridState === 'rest');
+    runUntil(boss, () => boss.gridState === 'grid');
+    expect(boss.grid.door).toBe(INTERDICTOR.cycle[0].door);
+    expect(boss.grid.closeTime).toBe(INTERDICTOR.cycle[0].closeTime);
+  });
+
+  it('draws the cage round where a moving ship is heading', () => {
+    const { boss } = createInterdictor();
+    const flying = target({ x: 100, y: 100 });
+    flying.player.velocity = { vx: 0, vy: 200 };
+    runUntil(boss, () => boss.grid, flying);
+    expect(boss.grid.y).toBeCloseTo(100 + 200 * INTERDICTOR.grid.lead);
+    // kept inside the field
+    expect(boss.grid.x).toBeCloseTo(boss.grid.size / 2);
+  });
+
+  it('slides the cage clear of its own body, so that it can close', () => {
+    const { boss } = createInterdictor();
+    const near = target({ x: 480, y: 310 });
+    runUntil(boss, () => boss.grid, near);
+    const { x, y, size, closes } = boss.grid;
+    expect(closes).toBe(true);
+    expect(
+      Math.max(Math.abs(boss.x - x), Math.abs(boss.y - y))
+    ).toBeGreaterThanOrEqual(size / 2 + boss.radius);
+    // the ship is still inside it
+    expect(Math.abs(near.position.x - x)).toBeLessThan(size / 2);
+    expect(Math.abs(near.position.y - y)).toBeLessThan(size / 2);
+  });
+
+  it('throws its four emitters out to the corners, then calls them home', () => {
+    const { boss } = createInterdictor();
+    expect(boss.emitters).toHaveLength(4);
+    const docked = boss.emitters.map((e) => ({ ...e }));
+    docked.forEach((e) => {
+      expect(e.docked).toBe(true);
+      expect(Math.hypot(e.x - boss.x, e.y - boss.y)).toBeCloseTo(
+        boss.radius * INTERDICTOR.grid.dock
+      );
+    });
+    runUntil(boss, () => boss.grid);
+    const grid = boss.grid;
+    run(boss, INTERDICTOR.grid.deploy / 2, target(grid));
+    expect(boss.emitters.every((e) => !e.docked && e.lift > 0.5)).toBe(true);
+    runUntil(boss, () => grid.phase === 'solid', target(grid));
+    boss.emitters.forEach((e, i) => {
+      expect(e.x).toBeCloseTo(grid.posts[i].x, 0);
+      expect(e.y).toBeCloseTo(grid.posts[i].y, 0);
+    });
+    runUntil(boss, () => !boss.grid, target(grid));
+    expect(boss.emitters.every((e) => !e.docked)).toBe(true);
+    run(boss, INTERDICTOR.grid.recall + 0.05, target(grid));
+    expect(boss.emitters.map((e) => e.docked)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('announces its attack once a cage, as it turns solid', () => {
+    const { boss, eventBus } = createInterdictor();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.grid);
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.grid.phase === 'solid', target(boss.grid));
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+    expect(attacks()[0][1].position).toEqual({ x: boss.x, y: boss.y });
+    runUntil(boss, () => boss.gridState === 'rest');
+    expect(attacks()).toHaveLength(1);
+    runUntil(boss, () => boss.grid?.phase === 'solid');
+    expect(attacks()).toHaveLength(2);
   });
 
   it('keeps the cage inside the field, even with the ship in a corner', () => {
@@ -95,56 +174,76 @@ describe('Sentinel Interdictor', () => {
     expect(y - size / 2).toBeGreaterThanOrEqual(0);
   });
 
-  it('hurts and pushes a ship on a fence only once solid, never across the open side', () => {
+  it('hurts a ship on a fence once and pushes it back, never across the doorway', () => {
     const { boss, system } = createInterdictor();
     runUntil(boss, () => boss.grid);
     const grid = boss.grid;
     const closed = (grid.open + 2) % 4;
     const fence = target(sideMiddle(grid, closed));
-    run(boss, INTERDICTOR.grid.warn - 0.1, fence);
+    run(boss, INTERDICTOR.grid.deploy, fence);
     expect(hits(system, 'boss-barrier')).toBe(0);
 
     runUntil(boss, () => grid.phase === 'solid', target(grid));
-    const open = target(sideMiddle(grid, grid.open));
-    boss.handlePhaseIntro(STEP, open);
+    const door = target(sideMiddle(grid, grid.open));
+    boss.handlePhaseIntro(STEP, door);
     expect(hits(system, 'boss-barrier')).toBe(0);
-    expect(open.player.velocity).toEqual({ vx: 0, vy: 0 });
+    expect(door.player.velocity).toEqual({ vx: 0, vy: 0 });
 
     // just inside the fence (the solid cage closes in a little each step)
     const edge = sideMiddle(grid, closed);
-    const pressed = target({
+    const inside = {
       x: edge.x + Math.sign(grid.x - edge.x) * 4,
       y: edge.y + Math.sign(grid.y - edge.y) * 4,
-    });
+    };
+    const pressed = target(inside);
     boss.handlePhaseIntro(STEP, pressed);
     expect(hits(system, 'boss-barrier')).toBe(1);
     // pushed back into the cage, away from that fence
-    const inward = {
-      x: grid.x - pressed.position.x,
-      y: grid.y - pressed.position.y,
-    };
+    const inward = { x: grid.x - inside.x, y: grid.y - inside.y };
     const v = pressed.player.velocity;
     expect(v.vx * inward.x + v.vy * inward.y).toBeGreaterThan(0);
+    // held on it, it does not hurt again within the grace
+    run(boss, INTERDICTOR.grid.grace - 0.1, target(inside));
+    expect(hits(system, 'boss-barrier')).toBe(1);
   });
 
-  it('closes the solid cage round its centre, the open side still open', () => {
+  it('spits a ship squeezed in a closing cage out of the doorway, not back and forth', () => {
+    const { boss, system } = createInterdictor(100, 100);
+    runUntil(boss, () => boss.grid);
+    const grid = boss.grid;
+    runUntil(boss, () => grid.phase === 'solid', target(grid));
+    // nearly closed: the ship touches two opposite fences at once
+    runUntil(boss, () => grid.size < 40, target(grid));
+    const caught = target({ x: grid.x + 3, y: grid.y + 2 });
+    boss.handlePhaseIntro(STEP, caught);
+    const door = sideMiddle(grid, grid.open);
+    const out = { x: door.x - grid.x, y: door.y - grid.y };
+    const v = caught.player.velocity;
+    const along = (v.vx * out.x + v.vy * out.y) / Math.hypot(out.x, out.y);
+    expect(along).toBeGreaterThanOrEqual(INTERDICTOR.grid.push * 0.99);
+    expect(hits(system, 'boss-barrier')).toBe(1);
+  });
+
+  it('closes the solid cage round its centre, the doorway still open', () => {
     const { boss } = createInterdictor(100, 100);
     runUntil(boss, () => boss.grid);
     const grid = boss.grid;
-    const { x, y, open } = grid;
+    const { x, y, open, full } = grid;
     runUntil(boss, () => grid.phase === 'solid', target(grid));
-    expect(grid.size).toBeCloseTo(360, 0);
+    expect(grid.size).toBeCloseTo(full, 0);
     runUntil(boss, () => grid.phase === 'fade', target(grid));
-    expect(grid.size).toBeCloseTo(360 * INTERDICTOR.grid.close, 0);
+    expect(grid.size).toBeCloseTo(full * INTERDICTOR.grid.close, 0);
     expect(grid).toMatchObject({ x, y, open });
+    // narrower than the doorway, the side has no stubs left
     expect(grid.fences).toHaveLength(3);
   });
 
-  it('does not close a cage drawn round its own body', () => {
-    const { boss } = createInterdictor();
-    const near = target({ x: 480, y: 330 });
+  it('does not close a cage it cannot slide clear of its own body', () => {
+    const { boss } = createInterdictor(200, 300);
+    const near = target({ x: 150, y: 300 });
     runUntil(boss, () => boss.grid, near);
     const grid = boss.grid;
+    expect(grid.closes).toBe(false);
     runUntil(boss, () => grid.phase === 'fade', near);
     expect(grid.size).toBe(grid.full);
   });
@@ -198,7 +297,7 @@ describe('Sentinel Interdictor', () => {
     expect(hits(system, 'boss-beam')).toBe(2);
   });
 
-  it('fires two locked beams per cage, three below half health with a smaller cage', () => {
+  it('fires one locked beam in its first cage, two after, three below half health in a smaller cage', () => {
     const count = (boss) => {
       let beams = 0;
       let had = false;
@@ -211,14 +310,16 @@ describe('Sentinel Interdictor', () => {
       return beams;
     };
     const { boss } = createInterdictor();
+    expect(count(boss)).toBe(1);
     expect(count(boss)).toBe(2);
 
     const late = createInterdictor().boss;
+    late.cages = 1;
     late.health = late.maxHealth * 0.45;
     late.evaluatePhaseTransition();
     expect(late.currentPhase).toBe(1);
     expect(late.cycle()).toMatchObject({
-      size: 320,
+      size: INTERDICTOR.cycle[0].size - 40,
       beams: 3,
       aim: 0.8,
       rest: 2.4,

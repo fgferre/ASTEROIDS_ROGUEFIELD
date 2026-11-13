@@ -11,12 +11,17 @@ import {
   range,
   mirrorZ,
   half,
+  lensGain,
+  progressOf,
 } from './kit.js';
 
 // Quarry Maw, in its radius (+X the mouth, +Y up). The jaws are drawn shut,
 // about their hinges, and swing out by JAW_SWING (radians) open.
 const HINGE = [0.1, 0.5];
 const JAW_SWING = 0.85;
+// proposta 13/11: the mouth's flash as a salvo leaves it (gain) and how fast
+// it fades (1/s).
+const SALVO_FLASH = [3, 9];
 
 // Top-view outlines ([x, z], counter-clockwise seen from above with +z down
 // the page), mirrored where they span the centre line.
@@ -102,6 +107,7 @@ export function createQuarryMaw(sk) {
     kit,
     recipeViews,
     panelMaterial,
+    lens,
     hull,
     dark,
     steel,
@@ -243,8 +249,15 @@ export function createQuarryMaw(sk) {
     const core = new THREE.Mesh(coreGeometry, coreMaterial);
     core.position.set(0.36, -0.06, 0);
     group.add(core);
+    // the mouth's light, just ahead of the jaws' tips: it gathers as the
+    // intake warns and burns while it pulls; it charges for each salvo and
+    // flashes as the rocks leave
+    const mouth = lens(group, [0.98, 0.06, 0], 0.075);
     kit.scene.add(group);
     return {
+      mouth,
+      salvo: 0,
+      flash: -Infinity,
       kind,
       object: group,
       jaws,
@@ -252,7 +265,7 @@ export function createQuarryMaw(sk) {
       coreMaterial,
       rims: [kit.rim(group, kit.circleRim, RIM)],
       rimColor: kit.rimColors.boss,
-      glows: lights.lights,
+      glows: [...lights.lights, mouth],
       telegraph: kit.createTelegraph(SENTINEL_KINDS['quarry-maw'].eject.max),
       id: null,
     };
@@ -287,6 +300,19 @@ export function createQuarryMaw(sk) {
       CORE_COLD +
       open * (CORE_HOT + 0.3 * Math.sin(time * CORE_BEAT)) +
       flash * CORE_FLASH * (0.2 + open);
+    const t = boss.telegraph;
+    if ((boss.salvo ?? 0) !== view.salvo) {
+      if ((boss.salvo ?? 0) > view.salvo) view.flash = time;
+      view.salvo = boss.salvo ?? 0;
+    }
+    const warning = t && !t.pulling && (t.type === 'intake' || t.timer > 0);
+    const mouth = t
+      ? lensGain(warning, progressOf(t), 1)
+      : lensGain(false, 0, 0);
+    kit.setGain(
+      view.mouth.tone,
+      mouth + SALVO_FLASH[0] * Math.exp(-SALVO_FLASH[1] * (time - view.flash))
+    );
     kit.updateTelegraph(view.telegraph, boss, radius);
   }
 

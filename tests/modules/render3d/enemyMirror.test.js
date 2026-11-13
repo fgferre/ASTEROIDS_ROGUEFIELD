@@ -14,6 +14,7 @@ import {
   VARIANT_LOOKS,
   VIEW_KINDS,
 } from '../../../src/modules/render3d/enemyMirror.js';
+import { LENS } from '../../../src/modules/render3d/enemies/sentinels/kit.js';
 
 // The vendored r128 build is UMD: evaluated with an `exports` object it
 // fills that object instead of a global.
@@ -145,6 +146,23 @@ describe('EnemyMirror', () => {
     expect(left.pivot.rotation.y).toBeLessThan(0);
     expect(right.pivot.rotation.y).toBeCloseTo(-left.pivot.rotation.y);
     expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(shutHeat * 5);
+
+    // the intake pulls: the mouth's light burns
+    expect(view.mouth.tone.userData.gain).toBeCloseTo(LENS.idle);
+    maw.telegraph = {
+      type: 'intake',
+      x: 400,
+      y: 300,
+      angle: 0,
+      arc: 1,
+      length: 260,
+      timer: 1,
+      duration: 2,
+      pulling: true,
+    };
+    mirror.update([maw], 0);
+    expect(view.mouth.tone.userData.gain).toBeGreaterThan(LENS.idle * 10);
+    expect(view.telegraph.fan.scale.x).toBeCloseTo(260);
   });
 
   it('draws the Gatekeeper with doors that swing open and its barrier', () => {
@@ -191,6 +209,9 @@ describe('EnemyMirror', () => {
     expect(view.telegraph.barrier.beams.every((beam) => beam.visible)).toBe(
       true
     );
+    // the wall is drawn as thick as it hurts, out of lit projectors
+    expect(view.telegraph.barrier.beams[0].scale.z).toBe(14);
+    expect(view.projectors[0].tone.userData.gain).toBeGreaterThan(LENS.idle);
   });
 
   it('draws the Kiln Engine with fins that tilt open, its hot wedges and pools', () => {
@@ -222,7 +243,8 @@ describe('EnemyMirror', () => {
       type: 'sectors',
       x: 400,
       y: 300,
-      angle: 0,
+      // wedge centres on the vents' bearings
+      angle: -Math.PI / 6,
       count: 6,
       offset: 0,
       solid: 1,
@@ -241,6 +263,19 @@ describe('EnemyMirror', () => {
     expect(pool.visible).toBe(true);
     expect(pool.position.x).toBeCloseTo(100);
     expect(spare.visible).toBe(false);
+    // the vents facing the hot wedges pour, the others stay dark
+    const gains = view.vents.map((vent) => vent.glow.tone.userData.gain);
+    expect(gains.filter((gain) => gain > LENS.idle)).toHaveLength(3);
+
+    // a slag shot in flight: a glow arcing from the boss to its mark
+    kiln.pools = [
+      { x: 600, y: 300, radius: 55, phase: 'warn', timer: 0.5, duration: 1 },
+    ];
+    mirror.update([kiln], 0);
+    const [shot] = view.telegraph.pools.sparks;
+    expect(shot.anchor.visible).toBe(true);
+    expect(shot.anchor.position.x).toBeCloseTo(100);
+    expect(shot.anchor.position.y).toBeGreaterThan(50);
   });
 
   it('draws the Foundry Mother with bay doors, arms on the boss’s swing and their zones', () => {
@@ -304,10 +339,19 @@ describe('EnemyMirror', () => {
     expect(arm.visible && other.visible).toBe(true);
     expect(arm.rotation.y).toBeCloseTo(-1);
     expect(arm.scale.x).toBeCloseTo(230);
+    // the claws burn as the arms swing, at the claws' ends
+    expect(view.claws[0].tone.userData.gain).toBeGreaterThan(LENS.idle);
+    expect(view.claws[0].anchor.position.x).toBeGreaterThan(1);
   });
 
-  it('draws the Interdictor with its emitter on the boss’s aim, its cage and its lock', () => {
+  it('draws the Interdictor with its fence emitters, the fences strung between them and its lock', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const corners = [
+      { x: 120, y: 120 },
+      { x: 480, y: 120 },
+      { x: 480, y: 480 },
+      { x: 120, y: 480 },
+    ];
     const boss = {
       id: 'interdictor',
       type: 'boss',
@@ -318,6 +362,7 @@ describe('EnemyMirror', () => {
       ventOpen: 0,
       mastRise: 1,
       aimAngle: 0,
+      emitters: corners.map(() => ({ x: 400, y: 300, lift: 0, docked: true })),
       grid: null,
       lock: null,
       telegraph: null,
@@ -328,32 +373,38 @@ describe('EnemyMirror', () => {
     mirror.update([boss], 0);
     const view = mirror.views.get('interdictor');
     expect(view.kind).toBe('boss-interdictor');
-    expect(view.telegraph.grid.group.visible).toBe(false);
-    expect(view.telegraph.lock.group.visible).toBe(false);
+    const { emitters, fences, beam } = view.telegraph;
+    // docked, the four emitters ride on its hull; nothing on the field
+    expect(emitters.count).toBe(4);
+    expect(fences.visible).toBe(false);
+    expect(beam.visible).toBe(false);
+    expect(view.charge.visible).toBe(false);
     const cold = view.coreMaterial.emissiveIntensity;
 
     boss.aimAngle = 1;
+    boss.emitters = corners.map((c) => ({ ...c, lift: 0, docked: false }));
     boss.grid = {
       type: 'grid',
       x: 300,
       y: 300,
       size: 360,
+      full: 360,
       open: 1,
+      door: 110,
       fences: [
         { x1: 120, y1: 120, x2: 480, y2: 120 },
         { x1: 480, y1: 480, x2: 120, y2: 480 },
         { x1: 120, y1: 480, x2: 120, y2: 120 },
+        { x1: 480, y1: 120, x2: 480, y2: 245 },
+        { x1: 480, y1: 355, x2: 480, y2: 480 },
       ],
-      posts: [
-        { x: 120, y: 120 },
-        { x: 480, y: 120 },
-        { x: 480, y: 480 },
-        { x: 120, y: 480 },
-      ],
+      posts: corners,
       solid: 1,
       phase: 'solid',
-      timer: 3,
-      duration: 5.5,
+      timer: 2,
+      duration: 3,
+      deploy: 0.8,
+      project: 0.35,
     };
     boss.lock = {
       type: 'lock',
@@ -370,11 +421,19 @@ describe('EnemyMirror', () => {
     mirror.update([boss], 0);
     expect(view.emitter.rotation.y).toBeCloseTo(-1);
     expect(view.coreMaterial.emissiveIntensity).toBeGreaterThan(cold);
-    expect(view.telegraph.grid.group.visible).toBe(true);
-    expect(view.telegraph.grid.beams.every((beam) => beam.visible)).toBe(true);
-    const [beam] = view.telegraph.lock.beams;
+    expect(view.telegraph.group.visible).toBe(true);
+    // an emitter stands on each corner
+    const at = new THREE.Matrix4();
+    emitters.getMatrixAt(2, at);
+    const where = new THREE.Vector3().setFromMatrixPosition(at);
+    expect(where.x).toBeCloseTo(480);
+    expect(where.z).toBeCloseTo(480);
+    // five fence pieces, the beam from the muzzle to the field's edge
+    expect(fences.visible).toBe(true);
+    expect(fences.geometry.drawRange.count).toBe(5 * 6);
     expect(beam.visible).toBe(true);
-    expect(beam.scale.x).toBeCloseTo(400);
+    expect(beam.geometry.attributes.aLen.getX(0)).toBeCloseTo(400 - 0.47 * 72);
+    expect(view.charge.visible).toBe(true);
   });
 
   it('draws Sovereign with its plates opening by order and half, and its split', () => {
@@ -430,6 +489,21 @@ describe('EnemyMirror', () => {
     expect(view.telegraph.split.fans.slice(0, 2).every((f) => f.visible)).toBe(
       true
     );
+
+    // a lane volley firing: a lit muzzle on the collar where each lane leaves
+    boss.beams = {
+      type: 'eject',
+      x: 400,
+      y: 300,
+      lines: [{ x: 400, y: 300, angle: Math.PI / 2, length: 520 }],
+      timer: 0,
+      duration: 0.9,
+    };
+    mirror.update([boss], 0);
+    const [muzzle, spare] = view.muzzles;
+    expect(muzzle.tone.userData.gain).toBeGreaterThan(LENS.idle);
+    expect(muzzle.anchor.position.z).toBeGreaterThan(0.5);
+    expect(spare.tone.userData.gain).toBeCloseTo(LENS.idle);
   });
 
   it('draws the Prism Crown with its mirrors where the boss puts them and its beams', () => {
@@ -485,6 +559,8 @@ describe('EnemyMirror', () => {
     expect(view.telegraph.beams.group.visible).toBe(true);
     expect(core.visible).toBe(true);
     expect(core.scale.x).toBeCloseTo(112);
+    // burning, as wide as it hurts
+    expect(core.scale.z).toBeCloseTo(20);
     expect(reflected.position.x).toBeCloseTo(112);
     expect(spare.visible).toBe(false);
   });

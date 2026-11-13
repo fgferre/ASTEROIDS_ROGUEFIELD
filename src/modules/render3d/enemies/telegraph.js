@@ -4,17 +4,42 @@
 // warning ring and the beams (the Choir's converging lines, the Maw's eject
 // fan, the Gatekeeper's barrier and its gap, the Prism Crown's reflected
 // beams), the Kiln Engine's hot wedges and slag pools (flat fans and
-// discs), the Foundry Mother's arms (flat ring sectors) and the
-// Interdictor's cage of fences and its locked beam, and Sovereign's split
-// line between its two halves. The Ram, the Wardens and any recipe enemy that aims draw them;
+// discs), the Foundry Mother's arms (flat ring sectors) and Sovereign's
+// split line between its two halves (the Interdictor draws its cage and
+// beam in its own view). The Ram, the Wardens and any recipe enemy that aims draw them;
 // built once into the toolkit (enemyMirror.js createKit) as
-// kit.createTelegraph and kit.updateTelegraph.
+// kit.createTelegraph and kit.updateTelegraph. The Sentinels' attacks wear
+// the shared danger language (telegraphLook.js: beams with a core and a
+// sheath, zones with burning edges) and light `sparks`, glows of their own
+// on the field (a view adds them to its glows): impacts, flares, slag in
+// flight.
 
 import { PALETTE } from '../../../data/constants/palette.js';
 import { HALF_H, HALF_W, colorOf } from '../batches.js';
+import { ZONE, createTelegraphLook } from './telegraphLook.js';
 
 // How far Sovereign's split line and halves reach from its centre (field px).
 const SPLIT_REACH = 1100;
+// proposta 13/11: a barrier flares this long (s) as it locks solid, a slag
+// pool as it lands; how high (px) a slag shot arcs.
+const LOCK_FLASH = 0.3;
+const SPLASH = 0.25;
+const SLAG_ARC = 90;
+// proposta 13/11: the hit width the barrier is drawn at when its view gives
+// none (px), and the width of an eject/lane line.
+const BARRIER_WIDTH = 10;
+const LINE_WIDTH = 10;
+const SPLIT_WIDTH = 6;
+// proposta 13/11: each look's strength [warning, live]. The wedges and the
+// arms cover a wide stretch of the field, so they stay faint enough to read
+// rocks and orbs through.
+const LANE_GAIN = [0.8, 1];
+const INTAKE_GAIN = [0.8, 0.7];
+const SECTOR_GAIN = [0.7, 0.5];
+const ARMS_GAIN = [0.5, 0.7];
+const POOL_GAIN = [1, 0.6];
+// The slag's glow: molten orange.
+const SLAG = '#ff9a3a';
 
 /**
  * Telegraph parts and their per-frame update.
@@ -28,6 +53,8 @@ export function createTelegraphs(kit) {
   const rebuildColor = colorOf(THREE, PALETTE.shot);
   const protectColor = colorOf(THREE, PALETTE.status);
   const splitColor = colorOf(THREE, '#fff3d6');
+  const slagColor = colorOf(THREE, SLAG);
+  const danger = createTelegraphLook(THREE, colorOf, kit.seeded);
   // telegraph pieces (flat on the field plane)
   const lanePlane = new THREE.PlaneGeometry(1, 1);
   lanePlane.rotateX(-Math.PI / 2);
@@ -37,8 +64,9 @@ export function createTelegraphs(kit) {
 
   // Charge lane / fan / warning ring on the field plane (Wardens and Ram);
   // `beams` lines for the Choir's converging volley and the Maw's eject;
-  // `fans` flat wedges or discs for the Kiln Engine's sectors and pools.
-  function createTelegraph(beams = 0, fans = 0) {
+  // `fans` flat wedges or discs for the Kiln Engine's sectors and pools;
+  // `sparks` glows on the field.
+  function createTelegraph(beams = 0, fans = 0, sparks = 0) {
     const additive = (hex) =>
       new THREE.MeshBasicMaterial({
         color: colorOf(THREE, hex),
@@ -77,6 +105,9 @@ export function createTelegraphs(kit) {
     group.add(lane, line, fan, warn, dark, ...edges, ...beamList, ...fanList);
     group.visible = false;
     kit.scene.add(group);
+    const sparkList = Array.from({ length: sparks }, () =>
+      kit.glow(group, kit.tone(PALETTE.threat, 0))
+    );
     return {
       group,
       lane,
@@ -87,7 +118,20 @@ export function createTelegraphs(kit) {
       edges,
       beams: beamList,
       fans: fanList,
+      sparks: sparkList,
     };
+  }
+
+  // Spark `i` of `parts` at (x, y) round the group, `h` px up, `size` px,
+  // `gain` × its colour (hex, default the threat red).
+  function spark(parts, i, x, y, h, size, gain, hex = null) {
+    const s = parts.sparks[i];
+    if (!s || gain <= 0.05) return;
+    s.anchor.visible = true;
+    s.anchor.position.set(x, h, y);
+    s.anchor.scale.setScalar(size);
+    if (hex) s.tone.userData.base.copy(hex);
+    kit.setGain(s.tone, gain);
   }
 
   function fanGeometry(arc) {
@@ -120,8 +164,18 @@ export function createTelegraphs(kit) {
 
   // Charge lane / aim line / spread fan on the field plane, timed by the
   // boss's live `telegraph` state; an aim line held still (`locked`) burns
-  // brighter and wider.
+  // brighter and wider. Its sparks are off unless a branch lights them.
   function updateTelegraph(parts, boss, radius) {
+    danger.tick(performance.now() / 1000);
+    // (a view's own telegraph parts, the Caster's, carry no sparks)
+    const sparks = parts.sparks ?? [];
+    for (const s of sparks) s.anchor.visible = false;
+    drawTelegraph(parts, boss, radius);
+    // the glow batch reads the sparks' poses after every view's update
+    if (sparks.length) parts.group.updateMatrixWorld(true);
+  }
+
+  function drawTelegraph(parts, boss, radius) {
     const t = boss.telegraph;
     parts.group.visible = Boolean(t);
     if (!t) return;
@@ -142,24 +196,17 @@ export function createTelegraphs(kit) {
     parts.lane.visible = charge && !dark;
     parts.dark.visible = dark;
     parts.edges.forEach((edge) => (edge.visible = dark));
-    parts.line.visible = charge || aim;
+    // the Gatekeeper's strip carries its own centre line
+    parts.line.visible = (charge && t.type !== 'lane') || aim;
     const intake = t.type === 'intake';
     parts.fan.visible = t.type === 'fan' || intake;
     parts.fans.forEach((fan) => (fan.visible = false));
     if (t.type === 'barrier') {
-      updateBarrier(parts, t, progress, pulse);
+      updateBarrier(parts, t, progress);
       return;
     }
     if (t.type === 'prism') {
-      updatePrism(parts, t, ox, oy, progress, pulse);
-      return;
-    }
-    if (t.type === 'grid') {
-      updateGrid(parts, t, ox, oy, progress, pulse);
-      return;
-    }
-    if (t.type === 'lock') {
-      updateLock(parts, t, progress, pulse);
+      updatePrism(parts, t, ox, oy, progress);
       return;
     }
     if (t.type === 'split') {
@@ -169,20 +216,22 @@ export function createTelegraphs(kit) {
     if (t.type === 'sectors' || t.type === 'pools' || t.type === 'arms') {
       parts.warn.visible = false;
       parts.beams.forEach((beam) => (beam.visible = false));
-      if (t.type === 'sectors') updateSectors(parts, t, progress, pulse);
-      else if (t.type === 'arms') updateArms(parts, t, progress, pulse);
+      if (t.type === 'sectors') updateSectors(parts, t, progress);
+      else if (t.type === 'arms') updateArms(parts, t, progress);
       else updatePools(parts, t, ox, oy);
       return;
     }
-    parts.beams.forEach((beam, i) => {
-      const line = chorus ? t.lines?.[i] : null;
-      beam.visible = Boolean(line);
-      if (!line) return;
-      beam.position.set(line.x - ox, 0, line.y - oy);
-      beam.rotation.y = -line.angle;
-      beam.scale.set(Math.max(1, line.length), 1, 2 + 4 * progress);
-      beam.material.opacity = (0.3 + 0.6 * progress) * (0.7 + 0.3 * pulse);
-    });
+    if (t.type === 'eject') updateEject(parts, t, ox, oy, progress);
+    else
+      parts.beams.forEach((beam, i) => {
+        const line = chorus ? t.lines?.[i] : null;
+        beam.visible = Boolean(line);
+        if (!line) return;
+        beam.position.set(line.x - ox, 0, line.y - oy);
+        beam.rotation.y = -line.angle;
+        beam.scale.set(Math.max(1, line.length), 1, 2 + 4 * progress);
+        beam.material.opacity = (0.3 + 0.6 * progress) * (0.7 + 0.3 * pulse);
+      });
     if (charge) {
       const length = Math.max(r * 2, t.length || 400);
       parts.line.material.color.copy(dark ? kit.bossColor : kit.threatColor);
@@ -196,6 +245,8 @@ export function createTelegraphs(kit) {
           edge.scale.set(length, 1, 3);
           edge.material.opacity = 0.3 + 0.6 * progress;
         });
+      } else if (t.type === 'lane') {
+        updateLane(parts, t, boss, length, progress);
       } else {
         parts.lane.scale.set(length, 1, t.width || r * 1.8);
         parts.lane.material.opacity = 0.08 + 0.18 * progress;
@@ -215,10 +266,23 @@ export function createTelegraphs(kit) {
       const length = Math.max(r * 1.5, t.length || 180);
       parts.fan.geometry = fanGeometry(arc);
       parts.fan.scale.set(length, 1, length);
+      if (intake) {
+        // the Maw's and Sovereign's: rings flowing in to the mouth
+        danger.zone(parts.fan, {
+          color: kit.threatColor,
+          warn: !t.pulling,
+          progress,
+          gain: t.pulling ? INTAKE_GAIN[1] : INTAKE_GAIN[0],
+          radius: length,
+          arc,
+          style: ZONE.PULL,
+        });
+      }
       // the intake's cone holds, beating, while it pulls
-      parts.fan.material.opacity = t.pulling
-        ? 0.05 + 0.05 * pulse
-        : 0.07 + 0.2 * progress;
+      else
+        parts.fan.material.opacity = t.pulling
+          ? 0.05 + 0.05 * pulse
+          : 0.07 + 0.2 * progress;
     }
     // the aim line is warning enough: no ring round a marksman
     parts.warn.visible = !aim;
@@ -227,118 +291,159 @@ export function createTelegraphs(kit) {
     parts.warn.material.opacity = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
   }
 
-  // The Gatekeeper's barrier (4 beams): a line across the field in two
-  // pieces round its gap, a bright post at each side of the gap; dim while it
-  // warns, solid and bright once it holds, fading out.
-  function updateBarrier(parts, t, progress, pulse) {
+  // The Gatekeeper's strip: a track as wide as it, arrows down it toward
+  // where it charges; while it winds up they light out from the boss, as it
+  // runs the stretch behind it dims.
+  function updateLane(parts, t, boss, length, progress) {
+    const ran =
+      (boss.x - t.x) * Math.cos(t.angle) + (boss.y - t.y) * Math.sin(t.angle);
+    danger.beam(parts.lane, {
+      x: 0,
+      y: 0,
+      angle: 0,
+      length,
+      width: t.width,
+      color: kit.threatColor,
+      warn: !t.charging,
+      progress,
+      gain: t.charging ? LANE_GAIN[1] : LANE_GAIN[0],
+      front: t.charging ? Math.max(0, ran) : progress * length,
+      core: 0.35,
+      chevron: 1,
+    });
+  }
+
+  // The Maw's eject fan and Sovereign's lanes: one line per shot from the
+  // mouth, a charge front running out while they warn; live (Sovereign's
+  // volley firing) bright, pulses running out.
+  function updateEject(parts, t, ox, oy, progress) {
+    const warning = t.timer > 0;
+    parts.beams.forEach((beam, i) => {
+      const line = t.lines?.[i];
+      beam.visible = Boolean(line);
+      if (!line) return;
+      danger.beam(beam, {
+        x: line.x - ox,
+        y: line.y - oy,
+        angle: line.angle,
+        length: line.length,
+        width: LINE_WIDTH,
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain: warning ? 0.7 + 0.5 * progress : 0.9,
+        front: warning ? progress * line.length * 1.2 : Infinity,
+      });
+    });
+  }
+
+  // A barrier (4 beams, 2 sparks): a wall across the field in two pieces
+  // round its gap, `parts.width` px thick (the hit's), and a post at each
+  // side of the gap. Warning, a guide runs out both ways from where the boss
+  // stood; solid, it locks with a flash at the posts and holds, energy
+  // running out along it; fading, it dims.
+  function updateBarrier(parts, t, progress) {
     parts.warn.visible = false;
     const [from, to] = t.span || [-1000, 1000];
     const lo = t.gapAt - t.gapWidth / 2;
     const hi = t.gapAt + t.gapWidth / 2;
     const warning = t.phase === 'warn';
-    const glow = warning ? 0.12 + 0.3 * progress : 0.9 * t.solid;
-    const width = warning ? 2 + 2 * progress : 6 + 2 * pulse;
-    const pieces = [
-      [from, Math.max(0, lo - from), width, glow],
-      [hi, Math.max(0, to - hi), width, glow],
-      [lo - 2, 4, 40, Math.max(glow, warning ? 0.6 : 0)],
-      [hi - 2, 4, 40, Math.max(glow, warning ? 0.6 : 0)],
+    const held = t.phase === 'solid' ? t.duration - t.timer : Infinity;
+    const lock = Math.max(0, 1 - held / LOCK_FLASH);
+    const solid = t.solid ?? 1;
+    const gain = warning ? 0.55 + 0.45 * progress : solid * (1 + 1.5 * lock);
+    const front = warning ? progress * 1.2 * Math.max(-from, to) : Infinity;
+    const walls = [
+      [from, lo - from],
+      [hi, to - hi],
     ];
-    parts.beams.forEach((beam, i) => {
-      const piece = pieces[i];
-      beam.visible = Boolean(piece);
-      if (!piece) return;
-      beam.position.set(piece[0], 0, 0);
-      beam.rotation.y = 0;
-      beam.scale.set(Math.max(0.01, piece[1]), 1, piece[2]);
-      beam.material.opacity = piece[3];
+    walls.forEach(([start, length], i) => {
+      const beam = parts.beams[i];
+      if (!beam) return;
+      beam.visible = length > 0;
+      if (length <= 0) return;
+      danger.beam(beam, {
+        x: start,
+        y: 0,
+        angle: 0,
+        length,
+        width: parts.width ?? BARRIER_WIDTH,
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain,
+        origin: -start,
+        front,
+      });
+    });
+    [lo, hi].forEach((at, i) => {
+      const post = parts.beams[i + 2];
+      if (!post) return;
+      post.visible = at > from && at < to;
+      if (!post.visible) return;
+      danger.beam(post, {
+        x: at - 2,
+        y: 0,
+        angle: 0,
+        length: 4,
+        width: 40,
+        color: kit.threatColor,
+        warn: false,
+        progress,
+        gain: warning ? 0.5 + 0.5 * progress : solid * (1 + 2.5 * lock),
+        core: 0,
+      });
+      spark(parts, i, at, 0, 4, 8, 3 * lock * solid, kit.threatColor);
     });
   }
 
-  // The Prism Crown's beams (two per mirror: core → mirror, mirror → edge):
-  // thin and dim while they warn, bright and a little wider as they burn.
-  function updatePrism(parts, t, ox, oy, progress, pulse) {
+  // The Prism Crown's beams (two per mirror: core → mirror, mirror → edge),
+  // as wide as they burn: while they warn a guide charges out from the gem
+  // to each mirror, then on to the edge; burning, full and bright, a flare
+  // on each mirror and sparks where each beam meets the edge (sparks: one
+  // per beam).
+  function updatePrism(parts, t, ox, oy, progress) {
     parts.warn.visible = false;
     parts.group.rotation.y = 0;
     const warning = t.phase === 'warn';
-    const width = warning ? 2 : t.width * 0.5 + 2 * pulse;
-    const glow = warning ? 0.12 + 0.3 * progress : 0.6 + 0.3 * pulse;
+    const flicker = 0.8 + 0.2 * Math.sin(performance.now() / 23);
     parts.beams.forEach((beam, i) => {
       const s = t.segments?.[i];
       beam.visible = Boolean(s);
       if (!s) return;
-      beam.position.set(s.x1 - ox, 0, s.y1 - oy);
-      beam.rotation.y = -Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
-      beam.scale.set(
-        Math.max(0.01, Math.hypot(s.x2 - s.x1, s.y2 - s.y1)),
-        1,
-        width
-      );
-      beam.material.opacity = glow;
-    });
-  }
-
-  // A beam piece from (x1, y1) to (x2, y2), placed on the field round the
-  // group at (ox, oy).
-  function placeBeam(beam, s, ox, oy, width, glow) {
-    beam.visible = true;
-    beam.position.set(s.x1 - ox, 0, s.y1 - oy);
-    beam.rotation.y = -Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
-    beam.scale.set(
-      Math.max(0.01, Math.hypot(s.x2 - s.x1, s.y2 - s.y1)),
-      1,
-      width
-    );
-    beam.material.opacity = glow;
-  }
-
-  // The Interdictor's cage (7 beams: its three fences, then a short bright
-  // post at each corner): thin and dim while it warns, solid and bright once
-  // it holds, fading out, like the Gatekeeper's barrier.
-  function updateGrid(parts, t, ox, oy, progress, pulse) {
-    parts.warn.visible = false;
-    parts.group.rotation.y = 0;
-    const warning = t.phase === 'warn';
-    const glow = warning ? 0.12 + 0.3 * progress : 0.9 * t.solid;
-    const width = warning ? 2 + 2 * progress : 6 + 2 * pulse;
-    const post = Math.max(glow, warning ? 0.6 : 0);
-    const fences = t.fences || [];
-    const posts = (t.posts || []).map((p) => ({
-      x1: p.x - 6,
-      y1: p.y,
-      x2: p.x + 6,
-      y2: p.y,
-    }));
-    parts.beams.forEach((beam, i) => {
-      beam.visible = false;
-      if (i < fences.length) placeBeam(beam, fences[i], ox, oy, width, glow);
-      else if (posts[i - fences.length]) {
-        placeBeam(beam, posts[i - fences.length], ox, oy, 12, post);
+      const length = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+      const leg = i % 2;
+      danger.beam(beam, {
+        x: s.x1 - ox,
+        y: s.y1 - oy,
+        angle: Math.atan2(s.y2 - s.y1, s.x2 - s.x1),
+        length,
+        width: t.width,
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain: warning ? 0.6 + 0.5 * progress : 1,
+        front: warning
+          ? Math.min(1, Math.max(0, 2 * progress - leg)) * length
+          : Infinity,
+        flare: leg,
+      });
+      // the mirror (end of a first leg) and the edge (end of a second)
+      const reached = warning ? 2 * progress - leg >= 1 : true;
+      const gain = warning ? 0.8 * progress : (leg ? 2.6 : 2) * flicker;
+      if (reached) {
+        spark(
+          parts,
+          i,
+          s.x2 - ox,
+          s.y2 - oy,
+          6,
+          leg ? 7 : 9,
+          gain,
+          kit.threatColor
+        );
       }
     });
-  }
-
-  // The Interdictor's locked beam (1 beam), from its start to the field's
-  // edge: hair-thin while it aims, steady and brighter frozen, wide and
-  // bright as it burns.
-  function updateLock(parts, t, progress, pulse) {
-    parts.warn.visible = false;
-    parts.group.rotation.y = 0;
-    const [beam] = parts.beams;
-    if (!beam) return;
-    const look = {
-      aim: [1, 0.15 + 0.3 * progress],
-      freeze: [3, 0.75],
-      burn: [t.width * 0.6 + 2 * pulse, 0.6 + 0.3 * pulse],
-    }[t.phase] || [1, 0];
-    placeBeam(
-      beam,
-      { x1: t.x, y1: t.y, x2: t.x2, y2: t.y2 },
-      t.x,
-      t.y,
-      ...look
-    );
-    parts.beams.slice(1).forEach((other) => (other.visible = false));
   }
 
   // Sovereign's split (1 beam, 2 fans): a line across the field through it,
@@ -351,17 +456,19 @@ export function createTelegraphs(kit) {
     const warning = t.phase === 'warn';
     const [beam] = parts.beams;
     if (beam) {
-      const ux = Math.cos(t.angle) * SPLIT_REACH;
-      const uy = Math.sin(t.angle) * SPLIT_REACH;
-      placeBeam(
-        beam,
-        { x1: t.x - ux, y1: t.y - uy, x2: t.x + ux, y2: t.y + uy },
-        t.x,
-        t.y,
-        warning ? 2 + 2 * progress : 5,
-        warning ? 0.15 + 0.35 * progress : 0.75
-      );
-      beam.material.color.copy(splitColor);
+      danger.beam(beam, {
+        x: -Math.cos(t.angle) * SPLIT_REACH,
+        y: -Math.sin(t.angle) * SPLIT_REACH,
+        angle: t.angle,
+        length: 2 * SPLIT_REACH,
+        width: SPLIT_WIDTH,
+        color: splitColor,
+        warn: warning,
+        progress,
+        gain: warning ? 0.45 + 0.35 * progress : 0.5,
+        origin: SPLIT_REACH,
+        front: warning ? progress * SPLIT_REACH : Infinity,
+      });
     }
     parts.beams.slice(1).forEach((other) => (other.visible = false));
     const wash = warning ? 0.02 + 0.05 * progress : 0.07;
@@ -372,23 +479,25 @@ export function createTelegraphs(kit) {
       fan.position.set(0, 0, 0);
       fan.rotation.y = -(t.angle + (i === 0 ? 1 : -1) * (Math.PI / 2));
       fan.scale.set(SPLIT_REACH, 1, SPLIT_REACH);
-      fan.material.color.copy(i === 0 ? rebuildColor : protectColor);
-      fan.material.opacity = wash;
+      danger.zone(fan, {
+        color: i === 0 ? rebuildColor : protectColor,
+        warn: warning,
+        progress,
+        gain: wash,
+        radius: SPLIT_REACH,
+        arc: Math.PI,
+        style: ZONE.WASH,
+      });
     });
   }
 
-  // Dim while a hazard warns (brightening), bright and beating as it burns.
-  const hazardGlow = (warning, progress, pulse) =>
-    warning ? 0.06 + 0.16 * progress : 0.3 + 0.08 * pulse;
-
   // The Kiln Engine's hot wedges (one fan each, `count / 2` fans): every
-  // other wedge from its `angle`, as far as `length`.
-  function updateSectors(parts, t, progress, pulse) {
+  // other wedge from its `angle`, as far as `length`: heat flowing out of
+  // the vents, its edges burning in while it warns.
+  function updateSectors(parts, t, progress) {
     parts.group.rotation.y = 0;
     const width = (Math.PI * 2) / t.count;
-    // proposta 12/11: the wedges cover half the field, so they glow fainter
-    // than a pool: rocks and orbs still read through them.
-    const glow = 0.45 * hazardGlow(t.phase === 'warn', progress, pulse);
+    const warning = t.phase === 'warn';
     let next = 0;
     for (let i = 0; i < t.count; i += 1) {
       if ((i + t.offset) % 2 !== 0) continue;
@@ -400,15 +509,27 @@ export function createTelegraphs(kit) {
       fan.position.set(0, 0, 0);
       fan.rotation.y = -(t.angle + width * (i + 0.5));
       fan.scale.set(t.length, 1, t.length);
-      fan.material.opacity = glow;
+      danger.zone(fan, {
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain: warning ? SECTOR_GAIN[0] : SECTOR_GAIN[1],
+        radius: t.length,
+        arc: width,
+        style: ZONE.HEAT,
+        hot: slagColor,
+        seed: i,
+      });
     }
   }
 
-  // The Foundry Mother's arms (one ring sector each), round the boss; as
-  // faint as the Kiln's wedges, for the same reason.
-  function updateArms(parts, t, progress, pulse) {
+  // The Foundry Mother's arms (one ring sector and one spark each), round
+  // the boss: the field its claws project, a lattice scanning out; as they
+  // swing, sparks fly at each claw.
+  function updateArms(parts, t, progress) {
     parts.group.rotation.y = 0;
-    const glow = 0.45 * hazardGlow(t.phase === 'warn', progress, pulse);
+    const warning = t.phase === 'warn';
+    const flicker = 0.7 + 0.3 * Math.sin(performance.now() / 17);
     parts.fans.forEach((fan, i) => {
       const s = t.segments?.[i];
       fan.visible = Boolean(s);
@@ -417,11 +538,28 @@ export function createTelegraphs(kit) {
       fan.position.set(0, 0, 0);
       fan.rotation.y = -s.angle;
       fan.scale.set(s.outer, 1, s.outer);
-      fan.material.opacity = glow;
+      danger.zone(fan, {
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain: warning ? ARMS_GAIN[0] : ARMS_GAIN[1],
+        radius: s.outer,
+        arc: s.width,
+        inner: s.inner / s.outer,
+        style: ZONE.FIELD,
+      });
+      if (!warning) {
+        const x = Math.cos(s.angle) * s.outer;
+        const y = Math.sin(s.angle) * s.outer;
+        spark(parts, i, x, y, 6, 6, 2.6 * flicker, kit.threatColor);
+      }
     });
   }
 
-  // The Kiln Engine's slag pools (one disc each), placed on the field.
+  // The Kiln Engine's slag pools (one disc each, a spark each), placed on
+  // the field: while the shot flies (a glowing blob arcing from the crown)
+  // its landing mark closes in; it lands with a splash and burns as molten
+  // crust, cooling as it ends.
   function updatePools(parts, t, ox, oy) {
     parts.group.rotation.y = 0;
     parts.fans.forEach((fan, i) => {
@@ -430,12 +568,41 @@ export function createTelegraphs(kit) {
       if (!pool) return;
       const duration = pool.duration > 0 ? pool.duration : 1;
       const progress = Math.min(1, Math.max(0, 1 - pool.timer / duration));
-      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
+      const warning = pool.phase === 'warn';
+      const x = pool.x - ox;
+      const y = pool.y - oy;
       fan.geometry = fanGeometry(Math.PI * 2);
-      fan.position.set(pool.x - ox, 0, pool.y - oy);
+      fan.position.set(x, 0, y);
       fan.rotation.y = 0;
       fan.scale.set(pool.radius, 1, pool.radius);
-      fan.material.opacity = hazardGlow(pool.phase === 'warn', progress, pulse);
+      danger.zone(fan, {
+        color: kit.threatColor,
+        warn: warning,
+        progress,
+        gain: warning ? POOL_GAIN[0] : POOL_GAIN[1],
+        radius: pool.radius,
+        style: ZONE.SLAG,
+        hot: slagColor,
+        seed: i * 7.3,
+      });
+      if (warning) {
+        const h = 6 + SLAG_ARC * Math.sin(Math.PI * progress);
+        spark(parts, i, x * progress, y * progress, h, 5, 3.2, slagColor);
+      } else {
+        const landed = (duration - pool.timer) / SPLASH;
+        if (landed < 1) {
+          spark(
+            parts,
+            i,
+            x,
+            y,
+            4,
+            pool.radius * 0.5 * (0.4 + landed),
+            2.5 * (1 - landed),
+            slagColor
+          );
+        }
+      }
     });
   }
 

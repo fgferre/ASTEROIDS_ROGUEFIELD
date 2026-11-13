@@ -10,7 +10,14 @@ import {
   clamp01,
   range,
   half,
+  lensGain,
+  progressOf,
 } from './kit.js';
+
+// proposta 13/11: how bright the welding light in a bay flickers while a
+// unit is built.
+const WELD = [1.5, 4];
+const WELD_LIGHT = '#ffe9c8';
 
 export function createFoundryMother(sk) {
   const {
@@ -18,6 +25,8 @@ export function createFoundryMother(sk) {
     kit,
     recipeViews,
     panelMaterial,
+    emitterMaterial,
+    lens,
     hull,
     dark,
     steel,
@@ -162,6 +171,12 @@ export function createFoundryMother(sk) {
     // a door on its hinge over each bay, the chassis being built under it
     const doors = [];
     const units = [];
+    // a welding light over each bay while it builds
+    const welds = MOTHER_BAYS.map((x) => {
+      const weld = lens(group, [x, 0.36, 0.05], 0.06);
+      weld.tone.userData.base.copy(colorOf(THREE, WELD_LIGHT));
+      return weld;
+    });
     for (const x of MOTHER_BAYS) {
       const hinge = new THREE.Group();
       hinge.position.set(x - 0.17, 0.27, 0);
@@ -172,16 +187,20 @@ export function createFoundryMother(sk) {
       doors.push(hinge);
       units.push(unit);
     }
+    // the arms are the weapon: polished steel, a lens in each claw that
+    // charges as the arms warn and burns as they swing
+    const claws = [];
     const arms = [0, 1].map(() => {
       const pivot = new THREE.Group();
-      const arm = new THREE.Mesh(motherArm, panelMaterial);
+      const arm = new THREE.Mesh(motherArm, emitterMaterial);
       arm.position.set(0.7, 0.1, 0);
       pivot.add(arm);
+      claws.push(lens(pivot, [1, 0.12, 0], 0.07));
       group.add(pivot);
       return pivot;
     });
     kit.scene.add(group);
-    const zones = kit.createTelegraph(0, 2);
+    const zones = kit.createTelegraph(0, 2, 2);
     return {
       kind,
       object: group,
@@ -191,7 +210,9 @@ export function createFoundryMother(sk) {
       coreMaterial,
       rims: [kit.rim(group, kit.circleRim, RIM)],
       rimColor: kit.rimColors.boss,
-      glows: lights.lights,
+      claws,
+      welds,
+      glows: [...lights.lights, ...claws, ...welds, ...zones.sparks],
       telegraph: { group: zones.group, arms: zones },
       id: null,
     };
@@ -210,13 +231,27 @@ export function createFoundryMother(sk) {
       const progress = clamp01(bay?.progress ?? 0);
       view.units[i].visible = progress > 0;
       view.units[i].scale.setScalar(Math.max(0.01, progress));
+      const weld = view.welds[i];
+      weld.anchor.visible = progress > 0 && progress < 1;
+      kit.setGain(
+        weld.tone,
+        WELD[0] +
+          (WELD[1] - WELD[0]) * (0.5 + 0.5 * Math.sin(time * 53 + i * 2))
+      );
     });
     const reach = clamp01(boss.armReach ?? 0);
     // the claw ends where the arms' segments end (boss.armOuter)
     const outer = (boss.armOuter ?? MOTHER.arms.outer) / radius;
+    const a = boss.arms;
+    const claw = a
+      ? lensGain(a.phase === 'warn', progressOf(a), 1)
+      : lensGain(false, 0, 0);
     view.arms.forEach((pivot, i) => {
       pivot.rotation.y = -((boss.armAngle ?? 0) + i * Math.PI);
-      pivot.children[0].scale.x = 0.3 + (outer - 1) * reach;
+      const length = 0.3 + (outer - 1) * reach;
+      pivot.children[0].scale.x = length;
+      view.claws[i].anchor.position.x = 0.7 + 0.95 * length;
+      kit.setGain(view.claws[i].tone, claw);
     });
     const heat = Math.max(clamp01(boss.ventOpen ?? 0), bayHeat);
     view.coreMaterial.emissiveIntensity =

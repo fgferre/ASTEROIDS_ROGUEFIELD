@@ -3,7 +3,14 @@ import { SENTINEL_KINDS } from '../../../../data/enemies/boss.js';
 import { colorOf } from '../../batches.js';
 import { addRimLight } from '../../rimLight.js';
 import { arcSweep, revolve } from '../shapes.js';
-import { CORE_BEAT, CORE_FLASH, clamp01, range } from './kit.js';
+import {
+  CORE_BEAT,
+  CORE_FLASH,
+  clamp01,
+  range,
+  lensGain,
+  progressOf,
+} from './kit.js';
 
 const TAU = Math.PI * 2;
 // Its own panel maps, finer than the other Sentinels' (panels per radius).
@@ -68,6 +75,10 @@ const SHELL_ROUGH = 0.76;
 const SHELL_ENV = 0.6;
 const METAL_ROUGH = 0.45;
 const METAL_ENV = 1.2;
+// The weapon lenses on the collar's rim (radii): the wall's two projectors
+// and a muzzle per lane, turned each frame to where their attack leaves.
+const MUZZLE_R = 0.76;
+const MUZZLE_Y = 0.1;
 
 // A point of the egg's outer face, `t` of the way from its waist to its tip,
 // pushed out by `d` (radii).
@@ -97,6 +108,7 @@ export function createSovereign(sk) {
     gold,
     bronze,
     lacquer,
+    lens,
     box,
     drum,
     merge,
@@ -492,7 +504,13 @@ export function createSovereign(sk) {
     group.add(ring);
     const halos = [halo(group, innerHalo), halo(group, outerHalo)];
     kit.scene.add(group);
-    const wall = kit.createTelegraph(4);
+    const wall = kit.createTelegraph(4, 0, 2);
+    wall.width = SOV.barrier.thickness;
+    // the wall's projectors and the lanes' muzzles, round the collar
+    const projectors = [0, 1].map(() => lens(group, [0, MUZZLE_Y, 0], 0.05));
+    const muzzles = Array.from({ length: SOV.lanes.count }, () =>
+      lens(group, [0, MUZZLE_Y, 0], 0.045)
+    );
     const cone = kit.createTelegraph(0);
     const lanes = kit.createTelegraph(SOV.lanes.count);
     const split = kit.createTelegraph(1, 2);
@@ -517,7 +535,9 @@ export function createSovereign(sk) {
       bound: null,
       rims: [kit.rim(group, kit.circleRim, SOV_RIM)],
       rimColor: kit.rimColors.boss,
-      glows: [],
+      projectors,
+      muzzles,
+      glows: [...projectors, ...muzzles, ...wall.sparks],
       telegraph: { group: telegraphs, wall, cone, lanes, split },
       id: null,
     };
@@ -534,6 +554,43 @@ export function createSovereign(sk) {
       h.tip.quaternion.setFromAxisAngle(view.axis, amount);
     } else h.tip.quaternion.set(0, 0, 0, 1);
     h.mesh.rotation.y = spin;
+  }
+
+  // A lens at field angle `angle` on the collar's rim, lit `gain`.
+  function placeLens(glow, angle, gain) {
+    glow.anchor.position.set(
+      Math.cos(angle) * MUZZLE_R,
+      MUZZLE_Y,
+      Math.sin(angle) * MUZZLE_R
+    );
+    kit.setGain(glow.tone, gain);
+  }
+
+  // The wall leaves the collar both ways along its line (the third phase's
+  // only one way): its projectors charge as it warns and burn while it
+  // holds. Each lane's muzzle charges with its warning and flickers as the
+  // volley fires.
+  function aimLenses(view, boss, time) {
+    const idle = lensGain(false, 0, 0);
+    const b = boss.barrier;
+    view.projectors.forEach((glow, i) => {
+      const used = b && (i === 0 || !b.ray);
+      placeLens(
+        glow,
+        (b?.angle ?? 0) + i * Math.PI,
+        used ? lensGain(b.phase === 'warn', progressOf(b), b.solid ?? 1) : idle
+      );
+    });
+    const v = boss.beams;
+    const fire = 0.75 + 0.25 * Math.sin(time * 45);
+    view.muzzles.forEach((glow, i) => {
+      const lane = v?.lines?.[i];
+      placeLens(
+        glow,
+        lane?.angle ?? 0,
+        lane ? lensGain(v.timer > 0, progressOf(v), fire) : idle
+      );
+    });
   }
 
   function update(view, boss, time) {
@@ -610,6 +667,7 @@ export function createSovereign(sk) {
       .multiplyScalar(
         HEART_GAIN[0] + open * (HEART_GAIN[1] - HEART_GAIN[0]) * beat + flash
       );
+    aimLenses(view, boss, time);
     const { wall, cone, lanes, split: line } = view.telegraph;
     kit.updateTelegraph(wall, { telegraph: boss.barrier }, radius);
     kit.updateTelegraph(cone, boss, radius);

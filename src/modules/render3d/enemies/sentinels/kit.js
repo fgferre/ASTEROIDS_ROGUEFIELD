@@ -2,8 +2,10 @@
 // maps (made once), the modelling helpers, the tones, and the core-heat
 // constants. A view file destructures what it needs from the kit.
 
+import { PALETTE } from '../../../../data/constants/palette.js';
 import { bakeHullMaps } from '../../bakedMaps.js';
 import { colorOf } from '../../batches.js';
+import { SPECULAR_CAP_GLSL } from '../../hullModel.js';
 import { mergeStatic } from '../../mergeStatic.js';
 import { addRimLight } from '../../rimLight.js';
 
@@ -14,10 +16,23 @@ export const CORE_COLD = 0.05;
 export const CORE_HOT = 1.5;
 export const CORE_BEAT = 9;
 export const CORE_FLASH = 0.9;
+// proposta 13/11: the weapon parts' polish (metal, how rough, reflections).
+const EMITTER_FINISH = { metalness: 0.85, roughness: 0.3, env: 1.2 };
 // Panels per unit of hull (the baked maps' tiling).
 const PANEL_TILE = 1.6;
 const MAW_MAP_SEED = 0x51a7;
 export const clamp01 = (x) => Math.max(0, Math.min(1, x));
+// proposta 13/11: an emitter's lens (× the threat red): dark glass at rest,
+// a light growing as its attack warns, burning while it is live.
+export const LENS = { idle: 0.12, warn: 2.2, live: 2.8 };
+/** How far a timed state ({ timer, duration }) has run, 0..1. */
+export const progressOf = (t) =>
+  clamp01(1 - t.timer / (t.duration > 0 ? t.duration : 1));
+/** A lens's gain: `warning` with `progress` 0..1, else `live` 0..1. */
+export const lensGain = (warning, progress, live) =>
+  warning
+    ? LENS.idle + (LENS.warn - LENS.idle) * progress * progress
+    : LENS.idle + (LENS.live - LENS.idle) * live;
 export const range = (from, to, n) =>
   Array.from({ length: n }, (_, i) => from + ((to - from) * i) / (n - 1));
 export const mirrorZ = (points) => points.map(([x, z]) => [x, -z]).reverse();
@@ -70,6 +85,32 @@ export function createSentinelKit(kit, recipeViews) {
     return material;
   }
   const panelMaterial = hullMaterial(MAW_MAP_SEED);
+  // The weapon parts (projectors, muzzles, vents' lips, lenses' housings):
+  // polished steel, its highlight capped like the ship's hull so it shines
+  // without blowing out. Tones in the vertex colours; one per view.
+  const emitterMaterial = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: EMITTER_FINISH.metalness,
+    roughness: EMITTER_FINISH.roughness,
+    envMapIntensity: EMITTER_FINISH.env,
+    flatShading: true,
+  });
+  emitterMaterial.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
+    );
+  };
+  addRimLight(emitterMaterial);
+  // A lens on `parent` at `at` ([x, y, z]), `size` across: a glow of the
+  // view (drawn by the glow batch, no draw of its own), set with lensGain.
+  const lens = (parent, at, size) =>
+    kit.glow(
+      parent,
+      kit.tone(PALETTE.threat, LENS.idle),
+      size,
+      new THREE.Vector3(...at)
+    );
 
   // A slab: `outline` ([x, z]) from y0 up to y1, its edges chamfered by
   // `bevel`.
@@ -135,6 +176,8 @@ export function createSentinelKit(kit, recipeViews) {
     lacquer,
     panelMaterial,
     hullMaterial,
+    emitterMaterial,
+    lens,
     slab,
     box,
     drum,
