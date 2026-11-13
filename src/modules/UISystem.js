@@ -385,9 +385,9 @@ class UISystem extends BaseSystem {
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
     }
-    this.queueTransmission(
-      stageTransmission(sector?.id, sector && localLayer(sector, layer))
-    );
+    const said =
+      sector && stageTransmission(sector.id, localLayer(sector, layer));
+    if (said) this.queueTransmission(said);
     if (stage === 1) {
       this.queueTransmission(bossRushTransmission());
     }
