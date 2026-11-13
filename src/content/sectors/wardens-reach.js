@@ -1,6 +1,6 @@
-// A sector: a whole chapter played on its own, won at its Warden
-// (src/data/sectors.js), with its own stages: Shades, tanks and Seekers,
-// one danger added per stage.
+// A sector: a stretch of a chapter played on its own (src/data/sectors.js),
+// won at its Warden (no `boss`: Warden Null ends it), with its own
+// stages: Shades, tanks and Seekers, one danger added per stage.
 import { fieldEvent, formation } from '../../data/layerParts.js';
 
 export default {
@@ -10,9 +10,9 @@ export default {
   code: 'C',
   name: 'NULL BOUNDARY',
   biome: 'wardens-reach',
-  look: { backdrop: 'wardens-reach' },
   layers: [11, 15],
   headStart: 16, // proposta 12/11
+  look: { backdrop: 'wardens-reach' },
   // proposta 12/11: every number below. Few rocks (the layer curve gave 40
   // a stage, and most of a stage was the mop-up).
   stages: [

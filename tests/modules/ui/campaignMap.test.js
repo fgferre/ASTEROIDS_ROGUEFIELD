@@ -128,7 +128,7 @@ describe('campaign map', () => {
       expect.objectContaining({
         code: 'A',
         name: 'THE CRUCIBLE',
-        boss: 'SOVEREIGN',
+        boss: 'Sovereign',
         layers: 5,
         state: 'locked',
         lock: 'Defeat Warden Null to unlock',

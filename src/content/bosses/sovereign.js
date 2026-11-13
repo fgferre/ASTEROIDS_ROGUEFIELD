@@ -21,8 +21,8 @@ export default {
   id: 'sovereign',
   order: 13,
   tier: 'sovereign',
-  displayName: 'SOVEREIGN',
-  subtitle: 'CONTINUANCE',
+  displayName: 'Sovereign',
+  subtitle: 'Continuance',
   layer: 20, // proposta 12/11: the layer it fights on (health scales by it)
   // × Prime's base on layer 20 (prime.js); shut half the time, it soaks far
   // more. Measured on the good bot over the whole sector, 12 seeds: at 0.48

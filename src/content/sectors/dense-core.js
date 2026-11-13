@@ -1,7 +1,8 @@
-// A sector: a whole chapter played on its own, won at its Warden
-// (src/data/sectors.js), with its own stages: Tethers, a stage of rocks
-// alone, then a Caster, one danger added per stage. Its Caster stage flies one
-// layer's rocks fewer and its Warden few rocks, so the machines are the threat.
+// A sector: a stretch of a chapter played on its own (src/data/sectors.js),
+// won at its Warden (no `boss`: Warden Choir ends it), with its own stages:
+// Tethers, a stage of rocks alone, then a Caster, one danger added per stage.
+// Its Caster stage flies one layer's rocks fewer and its Warden few rocks, so
+// the machines are the threat.
 import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
 
 export default {
@@ -11,9 +12,9 @@ export default {
   code: 'C',
   name: 'RESONANCE CHAMBER',
   biome: 'dense-core',
-  look: { backdrop: 'dense-core' },
   layers: [6, 10],
   headStart: 9, // proposta 12/11
+  look: { backdrop: 'dense-core' },
   // proposta 12/11: every number below
   stages: [
     {

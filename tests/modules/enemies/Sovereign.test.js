@@ -72,8 +72,8 @@ describe('Sovereign', () => {
     expect(boss.type).toBe('boss');
     expect(boss.bossKind).toBe('sovereign');
     expect(boss.tier).toBe('sovereign');
-    expect(boss.displayName).toBe('SOVEREIGN');
-    expect(boss.subtitle).toBe('CONTINUANCE');
+    expect(boss.displayName).toBe('Sovereign');
+    expect(boss.subtitle).toBe('Continuance');
     expect(boss.maxHealth).toBe(Math.ceil(base * SOV.healthFactor));
     expect(boss.phaseCount).toBe(3);
   });

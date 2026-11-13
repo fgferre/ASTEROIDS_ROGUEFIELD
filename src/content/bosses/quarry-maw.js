@@ -1,6 +1,6 @@
-// A Sentinel: the boss that ends a sector (a Warden ends a chapter). A mining
-// machine of the old Ring that still eats stone: a heavy hull, two jaw plates
-// round a furnace core. Its loop: INTAKE (a cone in front of the mouth, then
+// A Sentinel (CONTENT.md "Boss"): the boss that ends a sector (a Warden ends a
+// chapter). A mining machine of the old Ring that still eats stone: a heavy
+// hull, two jaw plates round a furnace core. Its loop: INTAKE (a cone in front of the mouth, then
 // the jaws open and pull: rocks in the cone are swallowed, the ship is drawn
 // gently in, the open core takes full damage), EJECT (the jaws shut, it turns
 // to the ship and spits what it ate as a fan of small rocks), a drift, again.

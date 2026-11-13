@@ -12,11 +12,11 @@ export default {
   code: 'A',
   name: 'THE CRUCIBLE',
   biome: 'crucible',
-  look: { backdrop: 'the-crucible' },
   layers: [16, 20],
   // proposta 12/11: the level the good bot reaches by the end of the Null
   // Boundary (26 at Warden Null, 27 after it).
   headStart: 26,
+  look: { backdrop: 'the-crucible' },
   boss: 'sovereign',
   // proposta 12/11: every number below
   stages: [
