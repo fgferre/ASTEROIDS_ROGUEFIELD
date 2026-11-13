@@ -48,8 +48,12 @@ const FLIGHT = {
 // the jump), `lift` radians over the chase camera's line of sight and
 // `ahead` units further off than the intro will see it at the start
 // (`opening`: the opening's start; `drop`: just out of a jump), closing in
-// to the intro's own distance by the rise.
+// to the intro's own distance by the rise. It is posed `hold` of the way
+// from the chase camera's view now (0: pinned to it, a sticker) to its view
+// at the rise, fixed in the world (1: wholly honest parallax, but the
+// flight's curve swings it out of frame early on).
 const DESTINATION = {
+  hold: 0.6,
   appear: [0, 0.12],
   lift: 0.24,
   ahead: 7000,
@@ -110,6 +114,12 @@ const STREAKS = {
   gain: 0.9,
   alpha: 0.45,
 };
+// proposta 12/11: the journey into `to` (docs/ROTEIRO.md: the awakened
+// Ring "pulling the Field back together") draws the dust toward the place
+// ahead: once its set shows, the streaks stream on ahead of the ship at
+// `speed` world units a second and gather toward its line of flight,
+// `gather` × closer by the far end of their box.
+const PULL = { to: 'the-crucible', speed: 1400, gather: 0.75 };
 // proposta 12/11: the place before the first sector: a nearly bare sky.
 const DEEP_SPACE = Object.freeze({
   ...BIOMES[0],
@@ -133,8 +143,16 @@ uniform vec4 uBox;
 uniform vec3 uShape;
 uniform vec2 uTube;
 uniform float uPixel;
+uniform float uPull;
 varying float vFade;
 varying float vSide;
+// A point along the box (0: its far end ahead), gathered toward the line
+// of flight the further ahead it is while the Field is pulled in.
+vec3 streakAt(float along, vec2 lateral, float span) {
+  float gather = 1.0 - uPull * (1.0 - clamp(along, 0.0, 1.0));
+  return uOrigin + uForward * (uBox.z - along * span)
+    + (uRight * lateral.x + uUp * lateral.y) * gather;
+}
 void main() {
   float span = uBox.z + uBox.w;
   float along = fract(aSeed.z + uTravel / span);
@@ -144,12 +162,12 @@ void main() {
   vec2 wall = lateral / max(length(lateral), 0.001)
     * uTube.y * (0.8 + 0.4 * fract(aSeed.x * 13.7));
   lateral = mix(lateral, wall, uTube.x);
-  vec3 head = uOrigin + uForward * (uBox.z - along * span)
-    + uRight * lateral.x + uUp * lateral.y;
   float len = uShape.x * (0.6 + 0.8 * fract(aSeed.x * 7.13 + aSeed.y * 3.7));
-  vec3 p = head - uForward * len * aCorner.x;
+  vec3 head = streakAt(along, lateral, span);
+  vec3 tail = streakAt(along + len / span, lateral, span);
+  vec3 p = mix(head, tail, aCorner.x);
   float dist = distance(cameraPosition, p);
-  vec3 side = normalize(cross(uForward, normalize(cameraPosition - p)));
+  vec3 side = normalize(cross(normalize(head - tail), normalize(cameraPosition - p)));
   float width = max(uShape.y, uPixel * dist);
   p += side * aCorner.y * width;
   vFade = (1.0 - aCorner.x)
@@ -251,6 +269,7 @@ export class TravelScene {
     this.active = false;
     this.places = travelPlaces(null);
     this.jumps = false;
+    this.pulls = false;
     this.opening = false;
     this.near = [FLIGHT.skim, FLIGHT.skim];
     this.look = { from: this.places.from, to: this.places.to, mix: 0 };
@@ -283,6 +302,9 @@ export class TravelScene {
     // The set ahead's pose: a view like the chase camera's, `ahead` further
     // on, standing in for the intro's first pose.
     this.eye = new THREE.Vector3();
+    this.behind = new THREE.Vector3();
+    this.chaseEye = new THREE.Vector3();
+    this.chaseQuat = new THREE.Quaternion();
     this.viewPos = new THREE.Vector3();
     this.viewQuat = new THREE.Quaternion();
     this.look4 = new THREE.Matrix4();
@@ -342,6 +364,7 @@ export class TravelScene {
       },
       uTube: { value: new THREE.Vector2(0, JUMP.tube) },
       uPixel: { value: 0 },
+      uPull: { value: 0 },
       uColor: { value: new THREE.Color() },
       uAlpha: { value: 0 },
     };
@@ -412,6 +435,7 @@ export class TravelScene {
     const before = SECTORS[SECTORS.indexOf(sector) - 1];
     this.opening = !before;
     this.jumps = this.opening || !nextInChapter(before);
+    this.pulls = sector.id === PULL.to;
     this.setId = this.places.to.backdrop ?? null;
     this.near[0] = FLIGHT.skim;
     this.near[1] = PLACE_SETS[this.setId]?.offRing ?? FLIGHT.skim;
@@ -655,9 +679,14 @@ export class TravelScene {
     u.uOrigin.value.copy(this.ship);
     u.uForward.value.copy(this.forward);
     u.uRight.value.copy(this.right);
+    // Pulled in, the dust outruns the ship toward the place ahead (its
+    // share steps in under a jump's white-out).
+    const pull = this.pulls ? this.destinationShare(t) : 0;
     u.uTravel.value =
       f * FLIGHT.arc * last * STREAKS.gain +
-      (this.jumps ? jumpDistance(t) * JUMP.speed * STREAKS.ahead * 4 : 0);
+      (this.jumps ? jumpDistance(t) * JUMP.speed * STREAKS.ahead * 4 : 0) -
+      (pull * PULL.speed * t * this.durationMs) / 1000;
+    u.uPull.value = pull * PULL.gather;
     u.uShape.value.x = STREAKS.length * (1 + (JUMP.stretch - 1) * stretch);
     u.uTube.value.x = tunnel;
     u.uPixel.value =
@@ -670,7 +699,8 @@ export class TravelScene {
   // The destination's set ahead: posed so a view like the chase camera's,
   // `ahead` further on, sees it as the intro's first pose will; that view
   // eases into the intro's own pose as the camera rises, where the set is
-  // back in its place. `this.offset` and `this.aim` hold the chase pose.
+  // back in its place. `this.offset` and `this.aim` hold the chase pose;
+  // the view moves with the world as much as DESTINATION.hold says.
   poseDestination(t, f, k, hand) {
     const places = this.t.backdrop.places;
     const share = this.destinationShare(t);
@@ -686,10 +716,32 @@ export class TravelScene {
       at.z + this.end.z
     );
     if (!group) return;
-    this.eye.copy(this.ship).add(this.offset);
+    // The chase view now, and at the rise, fixed in the world: posed
+    // DESTINATION.hold of the way to the latter, the ship closes in on the
+    // set and turns and sways under it, so it parallaxes.
+    const { eye, behind } = this;
+    this.chaseEye.copy(this.ship).add(this.offset);
     this.viewPos.copy(this.ship).add(this.aim);
+    this.look4.lookAt(this.chaseEye, this.viewPos, this.up);
+    this.chaseQuat.setFromRotationMatrix(this.look4);
+    const fr = flown(FLIGHT.rise);
+    this.flightPoint(fr, FLIGHT.rise, behind);
+    this.place(behind.x, behind.y, behind.z, eye);
+    this.flightPoint(fr - 0.002, FLIGHT.rise, behind);
+    this.place(behind.x, behind.y, behind.z, behind);
+    behind.subVectors(eye, behind).normalize();
+    this.viewPos.copy(behind).multiplyScalar(CHASE.ahead).add(eye);
+    this.viewPos.y += CHASE.lift;
+    const across = CHASE.right / Math.hypot(behind.x, behind.z);
+    eye.addScaledVector(behind, -CHASE.back);
+    eye.x -= behind.z * across;
+    eye.y += CHASE.up;
+    eye.z += behind.x * across;
     this.look4.lookAt(this.eye, this.viewPos, this.up);
-    this.viewQuat.setFromRotationMatrix(this.look4);
+    this.viewQuat
+      .setFromRotationMatrix(this.look4)
+      .slerp(this.chaseQuat, 1 - DESTINATION.hold);
+    eye.lerp(this.chaseEye, 1 - DESTINATION.hold);
     this.lifted.setFromAxisAngle(this.side, DESTINATION.lift);
     this.viewQuat.multiply(this.lifted);
     this.viewPos
