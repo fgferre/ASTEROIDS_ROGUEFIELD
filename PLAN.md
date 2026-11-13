@@ -107,11 +107,20 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   fase um pouco mais dura que a anterior" não se resolve com o piloto. O piloto mediano (seis sementes) vence 1–2 no
   capítulo II e 0 no Crisol. Mudado: Kiln (vida 65 → 55 % do Choir, queimadura 0,15 → 0,10), surto e anel da etapa 4 da
   Furnace, 28 pedras no Choir da Resonance Chamber, Sovereign (vida 0,48 → 0,55, etapas em 88 % e 62 %, barreira 0,3 → 0,6).
-- Medida de referência (13/11, jogo em e6ae532, piloto que pega o item da borda; piloto bom em doze sementes,
-  vitórias · mediano em seis; nenhum estouro de 25 min em 180 partidas): Debris Wake 10 · 6 | Salvage Lanes 12 · 3 |
-  Prime Gate 10 · 3 | Furnace Drift 5 · 1 | Crystal Choir 7 · 2 | Resonance Chamber 7 · 2 | Assembly Graveyard 9 · 3 |
-  Quarantine Grid 11 · 2 | Null Boundary 9 · 2 | The Crucible 2 · 0. Lutas vencidas: 44–157 s no capítulo I, 124–250 s
-  no II, 101–244 s no III (uma de 445 s na Quarantine Grid), 245–266 s no Sovereign.
+- **Medida de referência (13/11 de manhã, jogo em c567dad:** combo conta máquinas, abate do Volatile creditado, pedra
+  volta de 80 px, piloto que enxerga barreira girando e jaula fechando e não fica fora do alcance da arma; piloto bom
+  em 24 sementes · mediano em 12, vitórias; nenhum estouro de tempo): Debris Wake 20 · 9 | Salvage Lanes 23 · 11 |
+  Prime Gate 21 · 2 | Furnace Drift 20 · 3 | Crystal Choir 17 · 3 | Resonance Chamber 18 · 2 | Assembly Graveyard 21 · 5
+  | Quarantine Grid 24 · 9 | Null Boundary 18 · 4 | The Crucible 19 · 6. Lutas vencidas (piloto bom): 42–126 s nos
+  Sentinels do capítulo I, 46–608 s no Prime, 102–229 s no capítulo II, 90–165 s no III, 176–244 s no Sovereign.
+  Leitura: para o piloto bom a campanha ficou plana e fácil (71–100 %); para o mediano os muros são os três Wardens
+  (Prime 2 de 12, Choir 2, Null 4) e as etapas do capítulo II, não os Sentinels nem o Sovereign (6 de 12). As
+  medidas anteriores (abaixo) usavam um piloto cego para barreiras e um combo que só contava pedra: valem como
+  história, não como comparação. **Não calibrar antes das respostas dele** sobre cura e sobre o alvo da fase final
+  (`src/exported-assets/decisoes/`, página aberta para ele em 13/11).
+- Medida anterior (13/11 de madrugada, jogo em e6ae532, piloto antigo; bom em doze · mediano em seis): Debris Wake
+  10 · 6 | Salvage Lanes 12 · 3 | Prime Gate 10 · 3 | Furnace Drift 5 · 1 | Crystal Choir 7 · 2 | Resonance Chamber 7 · 2
+  | Assembly Graveyard 9 · 3 | Quarantine Grid 11 · 2 | Null Boundary 9 · 2 | The Crucible 2 · 0.
 - Lição de 13/11: doze sementes têm erro de ±2 vitórias, e cada mudança no piloto embaralha todas as partidas — o
   Crisol deu 6, 4, 7 e 2 em quatro medidas do mesmo jogo. Para decidir, somar medidas ou usar 24 sementes. Somando as
   quatro medidas de 12–13/11 (48 partidas por fase; a Assembly Graveyard só a última, depois de mexida): Debris Wake
