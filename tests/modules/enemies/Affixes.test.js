@@ -250,7 +250,8 @@ describe('Elite affixes', () => {
       ([name]) => name === 'enemy-destroyed'
     );
     expect(deaths).toHaveLength(1);
-    expect(deaths[0][1].source).toBe(source);
+    // The lighting hit's position, stamped with its cause (the combo reads it).
+    expect(deaths[0][1].source).toEqual({ ...source, cause: 'damage' });
   });
 
   it('Splitter: dies into two Motes flying apart', () => {
