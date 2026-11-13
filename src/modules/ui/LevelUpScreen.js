@@ -230,7 +230,7 @@ export class LevelUpScreen {
       if (!this.prefersReducedMotion()) {
         staggerCardEntry(buttons);
       }
-      this.focusLevelUpOption(0, { preventFocus: false });
+      this.focusLevelUpOption(0);
     } else {
       this.levelUpState.buttons = [];
     }
@@ -317,11 +317,10 @@ export class LevelUpScreen {
     button.addEventListener('click', () => this.selectUpgrade(option.id));
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
-      this.focusLevelUpOption(index, { preventFocus: true, fromPointer: true });
+      // Keyboard focus follows: Enter and the highlight name the same card.
+      this.focusLevelUpOption(index);
     });
-    button.addEventListener('focus', () =>
-      this.focusLevelUpOption(index, { preventFocus: false })
-    );
+    button.addEventListener('focus', () => this.focusLevelUpOption(index));
 
     return button;
   }
@@ -394,7 +393,7 @@ export class LevelUpScreen {
     });
   }
 
-  focusLevelUpOption(index, options = {}) {
+  focusLevelUpOption(index) {
     const buttons = ensureArray(this.levelUpState.buttons);
     if (!buttons.length) {
       this.levelUpState.focusIndex = -1;
@@ -409,7 +408,7 @@ export class LevelUpScreen {
       }
       if (idx === safeIndex) {
         button.classList.add('is-focused');
-        if (!options.preventFocus && document.activeElement !== button) {
+        if (document.activeElement !== button) {
           button.focus({ preventScroll: true });
         }
       } else {
@@ -464,7 +463,7 @@ export class LevelUpScreen {
 
     const currentIndex =
       this.levelUpState.focusIndex >= 0 ? this.levelUpState.focusIndex : 0;
-    this.focusLevelUpOption(currentIndex + direction, { preventFocus: false });
+    this.focusLevelUpOption(currentIndex + direction);
   }
 
   handleLevelUpInputAction(payload = {}) {
@@ -501,7 +500,7 @@ export class LevelUpScreen {
   applyFocusedUpgrade() {
     const index = this.levelUpState.focusIndex;
     if (index < 0) {
-      this.focusLevelUpOption(0, { preventFocus: false });
+      this.focusLevelUpOption(0);
     }
 
     const option = this.levelUpState.options?.[this.levelUpState.focusIndex];

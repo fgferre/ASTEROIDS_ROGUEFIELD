@@ -187,6 +187,50 @@ describe('Level-up card transition', () => {
       ]);
       expect(container.children[0].classes.has('is-focused')).toBe(true);
     });
+
+    it('moves keyboard focus to the card the pointer lights, so one card is armed', () => {
+      document.createElement = () => {
+        const listeners = {};
+        const node = {
+          ...fakeNode(),
+          addEventListener: (name, fn) => (listeners[name] = fn),
+          focus() {
+            document.activeElement = node;
+          },
+          listeners,
+        };
+        return node;
+      };
+      const definition = {
+        id: 'a',
+        family: 'thermal',
+        rarity: 'common',
+        levels: [{}],
+        text: { name: 'a', levels: [{ description: 'Fire rate +11%.' }] },
+      };
+      const levelUp = new LevelUpScreen({
+        progression: () => ({
+          upgradeLookup: new Map([['a', definition]]),
+          getUpgradeCount: () => 0,
+          getFamilyCounts: () => ({ thermal: 0 }),
+        }),
+        combat: () => ({ getWeaponState: () => ({}) }),
+        emit: () => {},
+        hud: () => null,
+      });
+      const options = [{ id: 'a' }, { id: 'a' }];
+      const cards = options.map((option, i) =>
+        levelUp.createUpgradeOptionButton(option, i)
+      );
+      Object.assign(levelUp.levelUpState, { options, buttons: cards });
+
+      levelUp.focusLevelUpOption(0);
+      cards[1].listeners.mouseenter();
+
+      expect(cards[1].classes.has('is-focused')).toBe(true);
+      expect(cards[0].classes.has('is-focused')).toBe(false);
+      expect(document.activeElement).toBe(cards[1]);
+    });
   });
 });
 
