@@ -73,13 +73,17 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
     (`render3d/travel/`: mundo fixo, rota, câmera em planos) e, na segunda rodada, com mais cortes e os lugares
     dentro dos planos (`travel/marks.js`); linguagem única de perigo dos chefes (`enemies/telegraphLook.js`: feixe
     com núcleo, zonas por tipo, lente que carrega na arma); Interdictor refeito (quatro emissores lançados, jaula
-    com porta voltada para o chefe, cerca que é parede). Em curso: sons da viagem (seis, escolhidos por ele) ligados
-    aos momentos do filme; vozes (Kokoro em `~/.voz-ai`; Ring = bf_emma, Wake = bm_george, Sovereign = am_onyx, todas
-    "tratadas") gravadas em `src/public/audio/voice/` e ainda não ligadas — falta tocar com a legenda, segurar a
-    legenda até a voz acabar, teto de tamanho próprio e audição dos outros falantes (Prime, Choir, Null, seis
-    Sentinels, três Heralds). Falta: trilha da viagem; brilho por material nas máquinas (item 26); área de coleta
-    25 → 40 muda o golden trace (pede o sim dele). **Não fazer agora** (item 27, palavras dele): equilíbrio por
-    loja no estilo Vampire Survivors — a calibragem geral da campanha espera essa direção.
+    com porta voltada para o chefe, cerca que é parede; portas 120/100 px: piloto bom 18 de 24, mediano 4 de 12); os
+    cinco pontos fracos dos ataques e os dois planos fracos da viagem retocados; sons da viagem (seis) ligados aos
+    momentos do filme (`travel/moments.js`, evento `travel-moment`); **todas as 110 falas têm voz** (Kokoro em
+    `~/.voz-ai`; receitas e textos em `src/public/audio/voice/manifest.json`; uma gravação só toca se o texto ainda
+    for igual ao da fala — fala editada volta a ser muda até regravar; legenda espera a voz; volume de voz nas
+    opções); trilha da viagem (tema B, `audio/journeyCue.js`, agendada pelo evento `travel-planned`); brilho por
+    material (tabela `SHINE` em `hullModel.js`; as naves dele ficaram como eram); área de coleta 25/28 → 40 (golden
+    trace regravado com o sim dele); Full Set fecha com uma arma da família. Tudo aprovado por ele por imagem e de
+    ouvido; **falta ele jogar** (decide jogando: aparelhos do Interdictor levarem tiro, cura, alarme de casco baixo,
+    publicar). **Não fazer agora** (item 27, palavras dele): equilíbrio por loja no estilo Vampire Survivors — a
+    calibragem geral da campanha espera essa direção.
     Páginas de decisão servidas em `localhost:5500/ASTEROIDS_ROGUEFIELD/exported-assets/<nome>/` (fora do git):
     `viagem`, `chefes-ataques`, `audicao-*`, `decisoes`.
 

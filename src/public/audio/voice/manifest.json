@@ -22,11 +22,7 @@
       "treatment": "prime"
     },
     "choir": {
-      "voice": [
-        "af_aoede",
-        "bf_isabella",
-        "bm_fable"
-      ],
+      "voice": ["af_aoede", "bf_isabella", "bm_fable"],
       "speed": 0.88,
       "treatment": "choir"
     },
