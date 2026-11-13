@@ -235,6 +235,20 @@ describe('PlayerMirror', () => {
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
   });
 
+  it('draws no afterimage dropped while Blink hides the ship', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const hidden = { x: 100, y: 300, angle: 0, age: 0 };
+    player.dashGhosts = [hidden];
+    player._quitExplosionHidden = true;
+    mirror.update(player, ribbons, 0.05);
+
+    player._quitExplosionHidden = false;
+    player.dashGhosts = [hidden, { x: 140, y: 300, angle: 0, age: 0 }];
+    mirror.update(player, ribbons, 0.15);
+    expect(mirror.ghosts[0].visible).toBe(false);
+    expect(mirror.ghosts[1].visible).toBe(true);
+  });
+
   it('stacks a thin turret layer per lock past the primary at Targeting Matrix rank 3, each turned onto its lock', () => {
     if (!GamePools.initialized) GamePools.initialize();
     const { player, mirror } = mirrorFor(defaultHull);

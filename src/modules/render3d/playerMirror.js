@@ -262,6 +262,9 @@ export class PlayerMirror {
       this.ghosts.push(ghost);
     }
     this.ghostRgb = colorOf(THREE, PALETTE.player);
+    // afterimages dropped while the ship was hidden (Blink): never drawn, so
+    // the hidden stretch of the dash leaves a gap
+    this.hiddenGhosts = new WeakSet();
     this.dashGuard = false;
 
     this.hullKey = null;
@@ -403,6 +406,7 @@ export class PlayerMirror {
     if (hidden) {
       this.light.intensity = 0;
       this.trailCount = 0;
+      player?.dashGhosts?.forEach((ghost) => this.hiddenGhosts.add(ghost));
       this.hideGhosts();
       return;
     }
@@ -597,7 +601,7 @@ export class PlayerMirror {
     for (let i = 0; i < this.ghosts.length; i += 1) {
       const mesh = this.ghosts[i];
       const ghost = ghosts[i];
-      if (!ghost) {
+      if (!ghost || this.hiddenGhosts.has(ghost)) {
         mesh.visible = false;
         continue;
       }
