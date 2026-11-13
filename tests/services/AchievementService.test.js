@@ -179,6 +179,35 @@ describe('AchievementService', () => {
     expect(unlocked).toContain('full-set');
   });
 
+  it('full-set asks for one weapon of a family that has two (thermal)', () => {
+    const { eventBus, unlocked } = setup();
+    const progression = new ProgressionSystem({
+      random: new RandomService(7),
+      eventBus,
+      player: {},
+      ui: {},
+      effects: {},
+      'xp-orbs': { attachProgression: () => {} },
+    });
+    progression.level = 10;
+    const thermal = UPGRADE_LIBRARY.filter(
+      ({ family }) => family === 'thermal'
+    );
+    const isWeapon = ({ excludes }) => (excludes ?? []).length > 0;
+    const weapons = thermal.filter(isWeapon);
+    expect(weapons.length).toBe(2);
+
+    thermal
+      .filter((card) => !isWeapon(card))
+      .forEach(({ id }) => {
+        expect(progression.applyUpgrade(id)).toBe(true);
+      });
+    expect(unlocked).not.toContain('full-set');
+
+    expect(progression.applyUpgrade(weapons[0].id)).toBe(true);
+    expect(unlocked).toContain('full-set');
+  });
+
   it('herald-hunter counts each Herald kind once, across sessions', () => {
     const { eventBus, service, unlocked } = setup();
     eventBus.emit('herald-defeated', { kind: 'dust' });
