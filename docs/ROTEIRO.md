@@ -64,6 +64,7 @@ As viagens ligam esses pontos: a nave vista por trás, o Anel crescendo, e um sa
 **1. Debris Wake** (chefe: Quarry Maw ✔)
 
 - Chegada — THE RING: `Debris Wake. What the Ring let go of. All of it is still counted.`
+- Quarry Maw, meia vida — QUARRY MAW: `Intake widened. Sorting continues. Nothing here is thrown away.`
 
 Viagem 1 → 2
 
@@ -73,6 +74,7 @@ Viagem 1 → 2
 **2. Salvage Lanes** (chefe: Gatekeeper ✔)
 
 - Chegada — THE RING: `Salvage Lanes. Cargo moved here for nine hundred years. The schedule still runs.`
+- Gatekeeper, meia vida — GATEKEEPER: `Schedule slipping. Second pass authorised. The lane stays closed.`
 
 Viagem 2 → 3
 
@@ -81,7 +83,8 @@ Viagem 2 → 3
 
 **3. Prime Gate** (chefe: Warden Prime ✔)
 
-- Chegada — THE RING: `Outer Ring. Sectors one through nine hundred. Atmosphere: none. Visitors: one.` ✔
+- Chegada — THE RING: `Prime Gate. Last opened: nine hundred years ago. Power: nominal. Keeper: on station.`
+- Prime, aviso — WARDEN PRIME: `Salvage pilot. You are counted. The Ring is broken. It is not abandoned.` ✔
 
 Viagem 3 → 4 (fim do capítulo)
 

@@ -41,6 +41,8 @@ export const STORY = deepFreeze({
       'Debris Wake. What the Ring let go of. All of it is still counted.',
     'salvage-lanes':
       'Salvage Lanes. Cargo moved here for nine hundred years. The schedule still runs.',
+    'prime-gate':
+      'Prime Gate. Last opened: nine hundred years ago. Power: nominal. Keeper: on station.',
     'furnace-drift':
       'Furnace Drift. The Core vents here. It has not been allowed to cool.',
     'crystal-choir':
@@ -206,11 +208,13 @@ export const STORY = deepFreeze({
     'quarry-maw': {
       warning:
         'Quarry unit active. Stone is counted before it is eaten. So are hulls.',
+      last: 'Intake widened. Sorting continues. Nothing here is thrown away.',
       defeated:
         'Quarry Maw offline. The stone goes uncounted. Prime will ask why.',
     },
     gatekeeper: {
       warning: 'Lane closed. Gate holds. You are not on the manifest.',
+      last: 'Schedule slipping. Second pass authorised. The lane stays closed.',
       defeated: 'Gate open. One hull through. Prime has been told.',
     },
     'kiln-engine': {
@@ -235,7 +239,7 @@ export const STORY = deepFreeze({
       defeated:
         'Interdictor offline. The boundary is open. Null has been waiting for this.',
     },
-    // `last`: as its final phase begins, the two orders at once.
+    // `last`: as its final phase begins (Sovereign: the two orders at once).
     sovereign: {
       warning:
         'Protect them. Rebuild them. I will do both. You are material for the second.',

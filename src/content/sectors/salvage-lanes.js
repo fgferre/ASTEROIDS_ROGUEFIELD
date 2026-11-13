@@ -38,7 +38,16 @@ export default {
       rocks: rockCurve(1),
       roster: [{ role: 'skirmisher', count: 1, from: 12, every: 14, elite: 0 }],
       surges: [ROCKFALL],
-      formations: [],
+      // The schedule still runs: a convoy of Drones crosses on its lane.
+      formations: [
+        formation('sweep', {
+          role: 'skirmisher',
+          count: 3,
+          at: 24,
+          spacing: 180,
+          speed: 120,
+        }),
+      ],
       events: [],
       warden: false,
     },
