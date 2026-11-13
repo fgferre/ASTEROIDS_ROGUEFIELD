@@ -164,13 +164,19 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   dúvidas se precisamos aumentar um pouco a área de atuação do collect da nave para pegar um pouco mais facilmente esses
   itens (não acho que eles devam ser magnéticos como são as orbes)."_ → coração agora sempre cai dentro da arena
   (13/11); conferir baús e outros itens; a área de coleta é dúvida dele: propor com número, ele decide.
+  **Decisão dele (13/11, página `decisoes-2`):** _"Sim: aumenta para a proposta e regrava a partida dos testes"_
+  (corações 25 → 40, itens 28 → 40).
 - **(29)** Sortear e banir ao passar de fase (13/11): _"Tudo segue junto: usos gastos continuam gastos."_ E a conquista
-  Full Set: _"Prefiro a meta difícil: família completa."_
+  Full Set: _"Prefiro a meta difícil: família completa."_ Na família de fogo, que tem duas cartas de arma (13/11):
+  _"A segunda arma não conta: fecha com todas as outras cartas da família."_
 - **(30)** Som ao pegar coração (13/11): _"Quero um som: prepare opções para eu ouvir."_
 - **(31)** Ataques dos chefes (13/11, sobre a jaula do Interdictor): _"mas como a nave lança essa grade? Isso não
   deveria ser um material de verdade? Tem que ter algo real e físico ou um dispositivo que gere esse campo, uma arma…
   acho particularmente que o efeito está muito sem graça e feio… aliás todas as miras e efeitos de dano e armas dos
   bosses estão muito sem graça, deveria tudo isso ser revisto e polido."_ Fecha quando ele aprovar por imagem e jogando.
+  **Veredito dele por imagem (13/11, página `chefes-ataques`):** os sete chefes _"Ficou bom"_ (Interdictor refeito
+  incluído); no geral _"A direção é essa"_. Atirar nos aparelhos da jaula: _"Decido depois de jogar a luta nova."_
+  Falta ele jogar.
 - **(32)** Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
   de fase, tipo os cutscenes, imaginei que a nave estaria realmente viajando no espaço 3D do universo que criamos, indo
   de uma localização para outra. E acho que a nave precisa respeitar essa movimentação dentro do cenário, usando seus
@@ -180,6 +186,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   **13/11, depois de ver os vídeos da viagem refeita** (as três: _"Está no caminho certo"_): _"Quero mais cara de
   filme: câmera mais ousada, mais cortes… está na direção certa, mas acho que o polimento pode ser levado mais para
   cara de filme e integrando melhor com as localizações 3D."_
+  **13/11, depois de ver os filmes com som e voz** (quatro viagens: _"Ficou bom"_; sons e vozes: _"Sons e vozes estão
+  bons"_): _"Agora sim: é essa a cara."_
 - **(33)** Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
   couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
   audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o

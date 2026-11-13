@@ -21,7 +21,7 @@ export class HealthHeartSystem {
     this.hearts = [];
     this.cachedPlayer = resolveService('player', this.dependencies);
     this.eventBus = resolveEventBus(this.dependencies);
-    this.collectionRadius = 25;
+    this.collectionRadius = 40; // px, proposta 13/11 (was 25): the owner found hearts hard to reach
 
     debugLog('[HealthHeartSystem] Initialized');
   }
