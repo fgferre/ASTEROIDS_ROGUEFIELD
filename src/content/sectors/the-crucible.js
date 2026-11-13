@@ -65,7 +65,6 @@ export default {
       ],
       events: [],
       warden: false,
-      herald: 'heat',
     },
     {
       rocks: rockCurve(19),

@@ -186,7 +186,7 @@ describe('sector table', () => {
     });
     const crucible = sectorById('the-crucible');
     expect(sectorStage(crucible, 16)).toMatchObject({ castLayer: 20 });
-    expect(sectorStage(crucible, 18).herald).toBe('heat');
+    expect(sectorStage(crucible, 18).herald).toBeUndefined();
     expect(sectorStage(crucible, 19).roster).toHaveLength(4);
     expect(sectorStage(crucible, 20)).toMatchObject({
       warden: true,

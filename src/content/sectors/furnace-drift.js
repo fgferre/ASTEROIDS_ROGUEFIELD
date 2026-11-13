@@ -70,10 +70,12 @@ export default {
         { role: 'artillery', count: 1, from: 10, every: 12, elite: 0 },
         { role: 'skirmisher', count: 2, from: 16, every: 14, elite: 0 },
       ],
+      // proposta 12/11: a Mote swarm of 3 and a ring of 6 (were 5 and 8):
+      // the chapter's first sector killed the good bot here 4 times in 12
       surges: [
-        { at: 40, roles: ['skirmisher'], count: 5, label: 'Mote swarm' },
+        { at: 40, roles: ['skirmisher'], count: 3, label: 'Mote swarm' },
       ],
-      formations: [formation('ring', { role: 'swarmer', count: 8, at: 25 })],
+      formations: [formation('ring', { role: 'swarmer', count: 6, at: 25 })],
       events: [fieldEvent('solar-flare', 35)],
       warden: false,
     },

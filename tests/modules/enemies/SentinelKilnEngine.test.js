@@ -45,7 +45,7 @@ const inWedge = (boss, i, distance = 150) => {
 };
 
 describe('Sentinel Kiln Engine', () => {
-  it('is a Sentinel boss with 65 % of Warden Choir’s health on layer 10', () => {
+  it('is a Sentinel boss with 55 % of Warden Choir’s health on layer 10', () => {
     const { boss } = createKiln();
     const base = 1500 * 1.2 ** (KILN.layer - 1);
     const choir = base * WARDEN_KINDS.choir.healthFactor;
@@ -56,7 +56,7 @@ describe('Sentinel Kiln Engine', () => {
     expect(boss.displayName).toBe('Kiln Engine');
     expect(KILN.layer).toBe(10);
     expect(boss.maxHealth).toBe(Math.ceil(base * KILN.healthFactor));
-    expect(boss.maxHealth / choir).toBeCloseTo(0.65, 3);
+    expect(boss.maxHealth / choir).toBeCloseTo(0.55, 3);
   });
 
   it('burns the ship only in a hot wedge, only while burning, a tick at a time', () => {

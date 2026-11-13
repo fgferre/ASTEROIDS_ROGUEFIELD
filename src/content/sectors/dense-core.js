@@ -1,7 +1,7 @@
 // A sector: a whole chapter played on its own, won at its Warden
-// (src/data/sectors.js), with its own stages: Tethers, the Herald of Heat,
-// then a Caster, one danger added per stage. Its Caster stage and its Warden
-// fly one layer's rocks fewer, so the machines are the threat.
+// (src/data/sectors.js), with its own stages: Tethers, a stage of rocks
+// alone, then a Caster, one danger added per stage. Its Caster stage flies one
+// layer's rocks fewer and its Warden few rocks, so the machines are the threat.
 import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
 
 export default {
@@ -43,7 +43,6 @@ export default {
       formations: [],
       events: [],
       warden: false,
-      herald: 'heat',
     },
     {
       rocks: rockCurve(8),
@@ -57,7 +56,9 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(9),
+      // proposta 12/11: 28 rocks (were the curve's 38): measured on the
+      // good bot, 12 seeds: 38 won 6, 20 and 28 won 8 (28: average 2 of 6)
+      rocks: 28,
       roster: [],
       surges: [],
       formations: [],

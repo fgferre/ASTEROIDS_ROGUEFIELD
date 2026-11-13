@@ -17,9 +17,10 @@ export default {
   displayName: 'Kiln Engine',
   subtitle: 'The fire was never told to stop',
   layer: 10, // proposta 12/11: the layer it fights on (health scales by it)
-  // 65 % of Warden Choir's health on the same layer: Choir is Prime's base ×
-  // its 1.1 (choir.js), so 0.65 × 1.1.
-  healthFactor: 0.715, // proposta 12/11
+  // 55 % of Warden Choir's health on the same layer: Choir is Prime's base ×
+  // its 1.1 (choir.js), so 0.55 × 1.1 (was 65 %: the first Sentinel of
+  // chapter II outlasted Warden Choir, its fight about 3 minutes long).
+  healthFactor: 0.605, // proposta 12/11
   radius: 72, // proposta 12/11
   // XP on top of the type-wide boss drop, like the other Sentinels: 100 + 500.
   rewards: { xp: 100 }, // proposta 12/11
@@ -48,7 +49,9 @@ export default {
   burnTick: 0.4, // proposta 12/11
   sectors: {
     count: 6, // wedges; every other one burns
-    damageFactor: 0.15, // proposta 12/11
+    // proposta 12/11: was 0.15; the wedges killed the good bot at the Kiln
+    // 5 times in 12 seeds, the chapter's first Sentinel
+    damageFactor: 0.1,
   },
   slag: {
     radius: 55, // proposta 12/11: px, the pool

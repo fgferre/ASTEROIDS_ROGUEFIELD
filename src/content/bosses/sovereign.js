@@ -24,17 +24,17 @@ export default {
   displayName: 'SOVEREIGN',
   subtitle: 'CONTINUANCE',
   layer: 20, // proposta 12/11: the layer it fights on (health scales by it)
-  // × Prime's base on layer 20 (prime.js): 23k, about Warden Null's on
-  // its own layer 15 (Null: 1.35 × the base there); shut half the time, it
-  // soaks far more. Measured on the bot, the boss fight alone: at 0.4 it
-  // never died; at 0.55 it lost 4 of 7; at 0.48 it won 4 of 4 in 183-213 s,
-  // the average one once with 6 hull left.
-  healthFactor: 0.48, // proposta 12/11
+  // × Prime's base on layer 20 (prime.js); shut half the time, it soaks far
+  // more. Measured on the good bot over the whole sector, 12 seeds: at 0.48
+  // its fight ran shorter than Warden Null's; at 0.55 it is the campaign's
+  // longest, about 3.5-4.5 minutes when won.
+  healthFactor: 0.55, // proposta 12/11
   radius: 84, // proposta 12/11
   // XP on top of the type-wide boss drop, like the Sentinels'.
   rewards: { xp: 300 }, // proposta 12/11
-  // proposta 12/11: the last phase is the longest stretch of its health
-  phaseThresholds: [0.7, 0.4],
+  // proposta 12/11: the last phase is the longest stretch of its health,
+  // and the longest in time (at 0.7, 0.4 its open half ended it fastest)
+  phaseThresholds: [0.88, 0.62],
   phaseCount: 3,
   invulnerabilityDuration: 1.5, // proposta 12/11: s, at each phase change
   // Its entrance: slow and heavy, every plate flung open, shut as it stops.
@@ -66,9 +66,9 @@ export default {
     gapRadius: 220, // proposta 12/11: px from its centre
     lead: 0.9, // proposta 12/11: rad
     thickness: 14, // proposta 12/11: px, like the Gatekeeper's
-    // proposta 12/11: softer than the Gatekeeper's (0.4, 260): a turning
-    // wall meets the ship more than once
-    damageFactor: 0.3, // of contactDamage
+    // proposta 12/11: was 0.3; the good bot won all 12 seeds with half its
+    // hull left (now 6 of 12, the campaign's hardest sector)
+    damageFactor: 0.6, // of contactDamage
     push: 200, // px/s away from the line (the ship thrusts 280)
     fade: 0.3, // proposta 12/11: s
   },
