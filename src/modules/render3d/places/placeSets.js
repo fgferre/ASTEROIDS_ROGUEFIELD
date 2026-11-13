@@ -2,7 +2,8 @@
 // (docs/ROTEIRO.md "Os lugares"): the backdrop set its look names
 // (`backdrop`, places/index.js), all built with the scene, each shown at the look's share of it (a biome cross-fade fades one set into the
 // next) and at the journey's `arrival` (travelScene.js: none while the ship
-// flies, all of it once the camera has risen onto the field). Like the
+// flies, all of it once the camera has risen onto the field; the place it
+// flies toward hangs ahead meanwhile, through setFlight). Like the
 // broken Ring each layer of a set moves with the point the camera aims at,
 // its own `follow` of the way, so it parallaxes like something deeper than
 // it sits. A builder returns { layers: [{ object, anchor, follow }],
@@ -29,6 +30,8 @@ export class PlaceSets {
     this.hidesRing = 0;
     this.hidesStructures = 0;
     this.aim = new THREE.Vector3();
+    // The set a journey flies toward (setFlight), shown on top of the look.
+    this.flight = { id: null, share: 0, x: 0, z: 0 };
     // An LOD's update(camera) runs every frame before its children draw.
     this.object = new THREE.LOD();
     this.object.update = (camera) => this.update(camera);
@@ -52,6 +55,28 @@ export class PlaceSets {
     this.apply();
   }
 
+  /**
+   * The journey's view of set `id` (travelScene.js): shown at `share` on
+   * top of the look's without hiding the Ring, its layers laid out for a
+   * camera aiming at field point (x, z); the journey poses its group, which
+   * this returns. Null ends it and puts the group back in place.
+   */
+  setFlight(id, share = 0, x = 0, z = 0) {
+    const { flight } = this;
+    if (flight.id !== id) {
+      const left = this.built.get(flight.id)?.object;
+      left?.position.set(0, 0, 0);
+      left?.quaternion.identity();
+      left?.scale.set(1, 1, 1);
+    }
+    flight.id = id;
+    flight.share = id ? share : 0;
+    flight.x = x;
+    flight.z = z;
+    this.apply();
+    return this.built.get(id)?.object ?? null;
+  }
+
   shareOf(id) {
     const from = this.from === id ? 1 - this.mix : 0;
     const to = this.to === id ? this.mix : 0;
@@ -64,7 +89,9 @@ export class PlaceSets {
     this.hidesStructures = 0;
     for (let i = 0; i < this.list.length; i += 1) {
       const set = this.list[i];
-      const share = this.shareOf(set.id);
+      const look = this.shareOf(set.id);
+      const flying = this.flight.id === set.id ? this.flight.share : 0;
+      const share = Math.max(look, flying);
       set.object.visible = share > 0.001;
       for (let m = 0; m < set.materials.length; m += 1) {
         const material = set.materials[m];
@@ -75,8 +102,8 @@ export class PlaceSets {
           material.transparent = share < 0.999;
         }
       }
-      if (!PLACE_SETS[set.id].ring) this.hidesRing += share;
-      this.hidesStructures += share;
+      if (!PLACE_SETS[set.id].ring) this.hidesRing += look;
+      this.hidesStructures += look;
     }
   }
 
@@ -105,12 +132,13 @@ export class PlaceSets {
     const { aim } = this;
     camera.getWorldDirection(aim);
     const reach = -camera.position.y / Math.min(aim.y, -0.1);
-    const x = camera.position.x + aim.x * reach;
-    const z = camera.position.z + aim.z * reach;
     const time = performance.now() / 1000;
     for (let i = 0; i < this.list.length; i += 1) {
       const set = this.list[i];
       if (!set.object.visible) continue;
+      const flying = this.flight.id === set.id;
+      const x = flying ? this.flight.x : camera.position.x + aim.x * reach;
+      const z = flying ? this.flight.z : camera.position.z + aim.z * reach;
       for (let j = 0; j < set.layers.length; j += 1) {
         const { holder, anchor, follow } = set.layers[j];
         holder.position.set(

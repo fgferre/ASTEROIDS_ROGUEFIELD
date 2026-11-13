@@ -165,6 +165,7 @@ export class RunCinematics {
     this.records = records;
     this.kind = null;
     this.timer = null;
+    this.handOff = null;
     this.unbindSkip = null;
     this.afterEpilogue = null;
     this.travelTo = null;
@@ -234,6 +235,11 @@ export class RunCinematics {
     this.hud()?.cancelBanner();
     this.hud()?.showCinematicHint(true);
     this.hud()?.showLetterbox(true, true);
+    // The instruments fade back in under the bars over the last second.
+    this.handOff = setTimeout(
+      () => this.hud()?.showLetterbox(true),
+      durationMs - TRAVEL.handOffMs
+    );
     this.holdSim(true);
     lines.forEach((entry) => this.speak(entry));
     this.unbindSkip = this.bindSkip(() => this.skip());
@@ -377,8 +383,10 @@ export class RunCinematics {
       this.hud()?.showLetterbox(false);
     }
     clearTimeout(this.timer);
+    clearTimeout(this.handOff);
     this.unbindSkip?.();
     this.timer = null;
+    this.handOff = null;
     this.unbindSkip = null;
     this.afterEpilogue = null;
     this.kind = null;

@@ -23,12 +23,14 @@ export const WARDEN_ARRIVAL = Object.freeze({
 
 // The journey to a sector (ui/runCinematics.js): it lasts as long as its
 // lines take to type plus `lineHoldMs` each, after `leadMs` of flight, within
-// [minMs, maxMs]. Milliseconds.
+// [minMs, maxMs]; over its last `handOffMs` the field and the instruments
+// fade in. Milliseconds.
 export const TRAVEL = Object.freeze({
   lineHoldMs: 2000, // proposta 12/11
   leadMs: 800, // proposta 12/11
   minMs: 7000, // proposta 12/11
   maxMs: 16000, // proposta 12/11
+  handOffMs: 1000, // proposta 12/11
 });
 
 export const FOLLOW_TILT = 18;
