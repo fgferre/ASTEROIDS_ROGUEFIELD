@@ -181,3 +181,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
   audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o
   projeto ainda não tem.
+  **Escolhas dele para os sons da viagem (13/11, audição em `src/exported-assets/audicao-viagem/`):**
+  _"queima=B carga-dobra=A passagem=C ignicao=B salto=A saida=C"_. Autorizou baixar um modelo de voz livre
+  (_"Sim, pode baixar"_) para a audição das vozes. Escolheu também o som do coração (_"coracao=A"_, já no jogo) e os
+  sete dos chefes (já no jogo).
