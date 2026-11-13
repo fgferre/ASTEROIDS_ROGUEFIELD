@@ -152,6 +152,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'transmission-shown', cue: 'playTransmission' },
   // A story line's recording, else the speaker's synthesized voice.
   { on: 'transmission-queued', run: 'voiceQueued' },
+  { on: 'voice-lines-coming', run: 'voiceComing' },
   { on: 'transmission-shown', run: 'voiceShown' },
   { on: 'transmission-cut', run: 'voiceStopped' },
   { on: 'transmission-finished', run: 'voiceStopped' },
@@ -216,6 +217,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'shield-recharged', cue: 'playShieldRecharged' },
   { on: 'shield-activation-failed', cue: 'playShieldFail' },
   { on: 'player-health-changed', run: 'playerHealth' },
+  { on: 'player-healed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },
   { on: 'thruster-effect', run: 'thruster' },
   // The engine follows each step's flight (after its thruster-effect events).

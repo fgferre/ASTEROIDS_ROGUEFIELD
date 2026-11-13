@@ -6,6 +6,7 @@ import eventInventory from '../fixtures/audio-event-inventory.json' with { type:
 import { STORY } from '../../src/data/story.js';
 import { loadVoiceManifest } from '../../src/modules/audio/voiceLines.js';
 import voiceManifest from '../../src/public/audio/voice/manifest.json' with { type: 'json' };
+import PlayerSystem from '../../src/modules/PlayerSystem.js';
 
 // ---------------------------------------------------------------------------
 // Source-derived audio event-coverage lock (plan 02.01 Task 3).
@@ -315,6 +316,19 @@ describe('player-health-changed → DuckingController EDGE delegation (plan 02.0
     spy.mockRestore();
     if (typeof audio.destroy === 'function') audio.destroy();
   });
+
+  it("a heal moves the music's health level back up, as a hurt moves it down", () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    eventBus.emit('player-health-changed', { current: 20, max: 100 });
+    expect(audio.musicMixer.runState.healthRatio).toBe(0.2);
+
+    const ship = { isDead: false, health: 20, maxHealth: 100, eventBus };
+    PlayerSystem.prototype.heal.call(ship, 70);
+    expect(audio.musicMixer.runState.healthRatio).toBe(0.9);
+    expect(audio.lowHealthDuckArmed).toBe(false);
+
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
 });
 
 describe('screen-changed → FileTrackManager delegation (plan 02.06)', () => {
@@ -581,6 +595,20 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
       text: STORY.victory,
     });
     expect(spy).not.toHaveBeenCalled();
+    audio.destroy();
+  });
+
+  it('voice-lines-coming → each coming line readied ahead of its showing', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const prepare = vi.fn();
+    audio.voiceLines = { prepare };
+    eventBus.emit('voice-lines-coming', {
+      entries: [{ key: 'travel:x:0' }, { key: 'chapter:x' }],
+    });
+    expect(prepare.mock.calls.map(([entry]) => entry.key)).toEqual([
+      'travel:x:0',
+      'chapter:x',
+    ]);
     audio.destroy();
   });
 

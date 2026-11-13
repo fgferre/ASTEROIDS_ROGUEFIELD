@@ -12,6 +12,7 @@ import {
   listenForSkip,
   travelDestination,
 } from '../../../src/modules/ui/runCinematics.js';
+import { travelTransmissions } from '../../../src/modules/ui/transmissions.js';
 
 // The node test environment has no DOM: just enough element for the banner.
 function fakeElement(onAdd = () => {}) {
@@ -269,6 +270,31 @@ describe('RunCinematics', () => {
     expect(
       travelDestination({}, none, { kind: 'travel', sector: 'furnace-drift' })
     ).toBe('furnace-drift');
+  });
+
+  it('readies the voices of the journey a start would fly and its chapter line, nothing otherwise', () => {
+    const emit = vi.fn();
+    const cinematics = new RunCinematics({
+      eventBus: { emit },
+      records: () => ({ sectorsWon: [] }),
+    });
+    cinematics.prepareTravel({
+      sector: 'debris-wake',
+      source: 'campaign-launch-btn',
+    });
+    expect(emit).toHaveBeenCalledTimes(1);
+    const [name, { entries }] = emit.mock.calls[0];
+    expect(name).toBe('voice-lines-coming');
+    expect(entries.map((entry) => entry.key)).toEqual([
+      ...travelTransmissions('debris-wake').map((entry) => entry.key),
+      'chapter:debris-wake',
+    ]);
+
+    cinematics.prepareTravel({
+      sector: 'debris-wake',
+      source: 'start-game-btn',
+    });
+    expect(emit).toHaveBeenCalledTimes(1);
   });
 
   it('holds the run through a journey, cards wait for the intro, and a skip drops the lines', () => {

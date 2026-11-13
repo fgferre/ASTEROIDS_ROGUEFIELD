@@ -278,6 +278,8 @@ export class RunEndScreens {
     if (refs.nextBtn) {
       refs.nextBtn.classList.toggle('hidden', !next);
       refs.nextBtn.dataset.sector = next?.id ?? '';
+      if (next)
+        this.cinematics.prepareTravel({ sector: next.id, carried: true });
       const label = refs.nextBtn.querySelector?.('.end-btn__label');
       if (label) {
         label.textContent = nextInChapter(sector)

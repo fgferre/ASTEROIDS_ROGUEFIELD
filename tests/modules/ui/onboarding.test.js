@@ -6,6 +6,8 @@ import UISystem from '../../../src/modules/UISystem.js';
 import {
   CARDS_TIP_TEXT,
   CARDS_TIP_TEXT_GAMEPAD,
+  CARDS_TIP_TEXT_HEAD_START,
+  CARDS_TIP_TEXT_HEAD_START_GAMEPAD,
   DASH_TIP_SECONDS,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
@@ -174,6 +176,19 @@ describe('Onboarding', () => {
     const onboarding = new Onboarding(fakeView());
     onboarding.start();
     expect(onboarding.cardsTip('gamepad')).toBe(CARDS_TIP_TEXT_GAMEPAD);
+  });
+
+  it('names the Equip for me key during a head start', () => {
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.cardsTip('keyboard', true)).toBe(
+      CARDS_TIP_TEXT_HEAD_START
+    );
+    expect(CARDS_TIP_TEXT_HEAD_START).toMatch(/\bQ equips/);
+    expect(onboarding.cardsTip('gamepad', true)).toBe(
+      CARDS_TIP_TEXT_HEAD_START_GAMEPAD
+    );
+    expect(CARDS_TIP_TEXT_HEAD_START_GAMEPAD).toMatch(/\bRB equips/);
   });
 
   it('is off when the Settings toggle is off', () => {

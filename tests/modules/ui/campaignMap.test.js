@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CampaignMap,
   campaignChapters,
@@ -210,10 +210,16 @@ describe('campaign map', () => {
       detailHeadStart: text(),
       launchBtn: { dataset: {}, disabled: false },
     };
-    const map = new CampaignMap({ refs });
+    const prepareTravel = vi.fn();
+    const map = new CampaignMap({ refs, prepareTravel });
     map.chapters = campaignChapters(records(['debris-wake']));
 
     map.selectSector('salvage-lanes');
+    // The journey this Launch would fly readies its voices now.
+    expect(prepareTravel).toHaveBeenCalledWith({
+      sector: 'salvage-lanes',
+      source: 'campaign-launch-btn',
+    });
     expect(refs.detailTitle.textContent).toBe('CHAPTER I — THE OUTER RING');
     expect(refs.sectors.innerHTML.match(/data-campaign-row=/g)).toHaveLength(3);
     expect(refs.launchBtn).toEqual({

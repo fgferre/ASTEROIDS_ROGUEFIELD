@@ -235,11 +235,13 @@ export class CampaignMap {
    * `refs`: the overlay's nodes { overlay, nodes, detailTitle, sectors, detailHeadStart, launchBtn, openBtn, backBtn, closeBtn }.
    * `showScreen(name, options)`: shows or hides the overlay.
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
+   * `prepareTravel(start)`: readies the journey a Launch would fly.
    */
-  constructor({ refs, showScreen, announceVisibility }) {
+  constructor({ refs, showScreen, announceVisibility, prepareTravel }) {
     this.refs = refs;
     this.showScreen = showScreen;
     this.announceVisibility = announceVisibility;
+    this.prepareTravel = prepareTravel;
     this.mapState = { isOpen: false, trigger: null };
     this.chapters = [];
     this.chapter = null;
@@ -379,6 +381,7 @@ export class CampaignMap {
     refs.detailHeadStart.hidden = !row.headStart;
     refs.launchBtn.dataset.sector = id;
     refs.launchBtn.disabled = row.state === 'locked';
+    this.prepareTravel({ sector: id, source: 'campaign-launch-btn' });
   }
 
   openMap() {

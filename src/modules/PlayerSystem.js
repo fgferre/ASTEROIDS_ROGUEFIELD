@@ -971,8 +971,8 @@ class PlayerSystem extends BaseSystem {
     if (actualHealing > 0) {
       this.eventBus?.emit?.('player-healed', {
         amount: actualHealing,
-        currentHealth: this.health,
-        maxHealth: this.maxHealth,
+        current: this.health,
+        max: this.maxHealth,
       });
     }
 

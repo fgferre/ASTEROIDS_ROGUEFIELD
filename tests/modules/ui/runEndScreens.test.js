@@ -95,7 +95,7 @@ describe('Run end screens', () => {
       },
     };
     const showScreen = vi.fn();
-    const cinematics = { playEnding: vi.fn() };
+    const cinematics = { playEnding: vi.fn(), prepareTravel: vi.fn() };
     const screens = new RunEndScreens({
       refs: { gameOver: {}, victory },
       showScreen,
@@ -183,7 +183,7 @@ describe('Run end screens', () => {
   });
 
   it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
-    const { victory, win } = victoryScreen();
+    const { victory, win, cinematics } = victoryScreen();
     win({
       id: 'dense-core',
       time: 512,
@@ -198,6 +198,11 @@ describe('Run end screens', () => {
     expect(victory.nextBtn.classList.contains('hidden')).toBe(false);
     expect(victory.nextBtn.dataset.sector).toBe('wardens-reach');
     expect(victory.nextBtn.label.textContent).toBe('Next Chapter');
+    // The journey Next Chapter flies readies its voices now.
+    expect(cinematics.prepareTravel).toHaveBeenCalledWith({
+      sector: 'wardens-reach',
+      carried: true,
+    });
     expect(victory.quitBtn.textContent).toBe('Campaign map');
   });
 

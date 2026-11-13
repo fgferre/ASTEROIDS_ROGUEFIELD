@@ -66,7 +66,7 @@ export class LevelUpScreen {
    * `emit(name, payload)`: sends ui-hover.
    * `showScreen(name, options)`: shows the level-up overlay.
    * `showGameUI()`: back to play, or to the next card choice waiting; it resets this screen too.
-   * `showCardsTip()`: the first-run onboarding tip under the cards.
+   * `showCardsTip(headStart)`: the first-run onboarding tip under the cards.
    * `prefersReducedMotion()`: the cards skip their entry and exit animation.
    * `hud()`: the HUD layout: its build instrument previews a card
    *   (previewBuildCard), its tip line names an automatic build.
@@ -162,7 +162,7 @@ export class LevelUpScreen {
     const screen = document.getElementById('levelup-screen');
     if (screen) liftHudInstruments(screen);
     this.renderLevelUpOptions(options, data.poolSize);
-    this.showCardsTip();
+    this.showCardsTip(Boolean(this.headStart().progress()));
   }
 
   // "LEVEL n" over "Choose one", or the first picks' strip; a head start's

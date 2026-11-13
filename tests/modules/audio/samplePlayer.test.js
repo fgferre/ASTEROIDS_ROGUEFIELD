@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { AUDIO_EVENT_CUES } from '../../../src/data/audio/eventCues.js';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
@@ -20,6 +21,15 @@ import {
 // synthesizes as before.
 
 const SFX = '../../../src/public/audio/sfx/';
+const SFX_BUDGET_BYTES = 3 * 1024 * 1024; // SOUND.md
+
+function folderBytes(dir) {
+  return readdirSync(dir).reduce((sum, name) => {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    return sum + (stat.isDirectory() ? folderBytes(path) : stat.size);
+  }, 0);
+}
 
 /** A bus on stub nodes whose buffer sources record what they play. */
 function makeBus() {
@@ -410,5 +420,11 @@ describe('sample layer', () => {
       )
     );
     expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('the sfx folder stays within its size budget', () => {
+    expect(
+      folderBytes(new URL(SFX, import.meta.url).pathname)
+    ).toBeLessThanOrEqual(SFX_BUDGET_BYTES);
   });
 });

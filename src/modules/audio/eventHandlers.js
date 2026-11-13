@@ -49,6 +49,10 @@ export const AUDIO_EVENT_HANDLERS = {
   voiceQueued(audio, payload) {
     if (payload) audio.voiceLines.prepare(payload);
   },
+  // Lines about to be queued (a journey offered) are readied ahead.
+  voiceComing(audio, payload) {
+    payload?.entries?.forEach((entry) => audio.voiceLines.prepare(entry));
+  },
   voiceShown(audio, payload) {
     if (!audio.voiceLines.play(payload ?? {})) {
       audio.sfxBus.playTransmissionVoice(payload?.speaker);
@@ -144,7 +148,7 @@ export const AUDIO_EVENT_HANDLERS = {
   // CROSSING into ≤25% HP only: repeated health events while already below
   // must not retrigger them; recovering (or dying) re-arms both edges.
   playerHealth(audio, payload) {
-    // The ship sends { current, max } (PlayerSystem).
+    // The ship sends { current, max } (PlayerSystem), on a hurt and a heal.
     const healthPercent = payload?.current / payload?.max;
     audio.musicMixer.setRunState({ healthRatio: healthPercent });
 

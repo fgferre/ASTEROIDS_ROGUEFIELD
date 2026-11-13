@@ -28,10 +28,12 @@ import {
   endingPath,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
+import { biomeForLayer } from '../../data/biomes.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
 import { loadRecords } from '../../services/runRecords.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
+  chapterTransmission,
   endingTransmissions,
   holdMsFor,
   travelTransmissions,
@@ -196,6 +198,24 @@ export class RunCinematics {
     const freeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.travelTo = travelDestination(start, this.records(), freeze);
     this.cards = this.travelTo ? [] : null;
+  }
+
+  /**
+   * A run `start` (as armTravel's) is offered (the victory screen's Next
+   * Sector, the campaign map's Launch): the voices of the journey it would
+   * fly and of its sector's chapter line load now (audio/voiceLines.js), so
+   * the first line speaks as it shows.
+   */
+  prepareTravel(start) {
+    const to = travelDestination(start, this.records());
+    if (!to) return;
+    const sector = sectorById(to);
+    const biome = biomeForLayer(sector.layers[0], sector);
+    const entries = travelTransmissions(to);
+    if (biome.layers[0] === sector.layers[0]) {
+      entries.push(chapterTransmission(biome.id, sector.id));
+    }
+    this.eventBus.emit('voice-lines-coming', { entries });
   }
 
   /** Runs `show` now, or after the intro while a journey is armed or plays. */

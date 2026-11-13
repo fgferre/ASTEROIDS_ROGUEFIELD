@@ -166,7 +166,7 @@ class UISystem extends BaseSystem {
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
-      showCardsTip: () => this.showOnboardingCardsTip(),
+      showCardsTip: (headStart) => this.showOnboardingCardsTip(headStart),
       prefersReducedMotion: () => this.prefersReducedMotion(),
       hud: () => this.tacticalHud.layout,
     });
@@ -238,6 +238,7 @@ class UISystem extends BaseSystem {
       showScreen: (name, options) => this.showScreen(name, options),
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('campaign', isOpen, payload),
+      prepareTravel: (start) => this.cinematics.prepareTravel(start),
     });
     this.codexScreen = new CodexScreen({
       refs: this.domRefs.codex,
@@ -1166,10 +1167,9 @@ class UISystem extends BaseSystem {
   }
 
   /** The cards tip in the level-up footer, on the first level-up only. */
-  showOnboardingCardsTip() {
-    const text = this.onboarding.cardsTip(
-      this.getService('input').getActiveDevice()
-    );
+  showOnboardingCardsTip(headStart) {
+    const device = this.getService('input').getActiveDevice();
+    const text = this.onboarding.cardsTip(device, headStart);
     const content = document.querySelector('#levelup-screen .levelup-content');
     if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
       return;
