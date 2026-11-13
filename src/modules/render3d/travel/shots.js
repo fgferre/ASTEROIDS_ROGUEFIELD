@@ -35,9 +35,10 @@ const INSERTS = new Set(['engines', 'gate', 'flyover']);
 //   the camera; aimed `mix` of the way from the structure to the ship.
 // `engines`: `back` behind the tail, `side` beside and `up` over it,
 //   looking at the point `aim` behind its middle; for `seconds`.
-// `chase` / `surge`: `back` behind, plus `pull` seconds of its speed, at
-//   most `most` more; heading `lag` seconds behind its own, rolled `roll` ×
-//   its bank.
+// `chase` / `surge` / `gate`: `back` behind, plus `pull` seconds of its
+//   speed, at most `most` more; heading `lag` seconds behind its own, rolled
+//   `roll` × its bank. The gate's rides close on its tail down through the
+//   hole, the lit frame sweeping past round it.
 // `flyover`: `down` under and `side` beside it, from `from` ahead of it to
 //   `to` (behind): it rushes at the camera and over it.
 // `track`: a long lens `side` beside it, away from the Ring's middle, and
@@ -47,11 +48,15 @@ const INSERTS = new Set(['engines', 'gate', 'flyover']);
 //   radians round it until the place's near structure (its shape, past
 //   `near`) stands beyond it; aimed `past` × `reach` past the ship toward
 //   that mark.
-// `gate`: `deep` under the hole it dives through, looking up.
 // `dropout`: from `from` ahead of it to `to` (behind), `side` beside and
 //   `up` over it: it comes out of the white at the camera and pulls away.
 // `reveal`: `back` behind the ship on the line from the place's signature
 //   shape through it, `under` × that under the line: the ship over the shape.
+//   A place seen past the deck's edge (its `view`, marks.js) is looked out
+//   to over the ship instead: `view.back` behind it on the level line from
+//   that point, `view.up` over it and `view.side` to its left, aimed `mix`
+//   of the angle from the ship to that point (the ship low to one side,
+//   clear of the banner).
 // `arrive`: `back` behind, `side` beside and `up` over it, aiming `ahead`
 //   past it and `down` under it (onto the place).
 const SHOT = {
@@ -80,9 +85,25 @@ const SHOT = {
   flyover: { from: 150, to: -90, down: 30, side: 22, fov: 46 },
   track: { side: 560, up: 60, drift: 120, fov: 17 },
   orbit: { reach: 110, up: 14, swing: 1.3, past: 0.12, near: 1800, fov: 40 },
-  gate: { deep: 260, fov: 34 },
+  gate: {
+    back: 55,
+    up: 12,
+    side: 10,
+    pull: 0.01,
+    most: 25,
+    lag: 0.15,
+    roll: 0.4,
+    fov: 44,
+  },
   dropout: { from: 150, to: -150, side: 44, up: 16, fov: 42 },
-  reveal: { back: 110, under: 0.16, side: 40, mix: 0.3, fov: 40 },
+  reveal: {
+    back: 110,
+    under: 0.16,
+    side: 40,
+    mix: 0.3,
+    fov: 40,
+    view: { back: 145, up: 230, side: 160, mix: 0.4, fov: 54 },
+  },
   arrive: { back: 120, side: 30, up: 55, ahead: 120, down: 55 },
 };
 const MAX = 10;
@@ -278,6 +299,9 @@ export class ShotPlan {
       const kind = this.kinds[i];
       const anchor = this.anchors[i];
       this.fovs[i] = SHOT[kind].fov ?? SHOT.fov;
+      if (kind === 'reveal' && this.marks.reach?.view) {
+        this.fovs[i] = SHOT.reveal.view.fov;
+      }
       if (kind === 'establish') {
         // The ship at rest over the place's near structure (or the dark
         // under it), seen from beyond it.
@@ -287,8 +311,6 @@ export class ShotPlan {
         else q.copy(p).addScaledVector(f, 600).addScaledVector(Y, -400);
         this.dirs[i].copy(q);
         this.over(p, q, f, e.back, e.under, e.side, anchor);
-      } else if (kind === 'gate') {
-        anchor.copy(motion.through).addScaledVector(Y, -SHOT.gate.deep);
       }
     }
   }
@@ -329,7 +351,7 @@ export class ShotPlan {
     let roll = 0;
     let lift = true;
     this.fov = this.fovs[i];
-    if (kind === 'chase' || kind === 'surge') {
+    if (kind === 'chase' || kind === 'surge' || kind === 'gate') {
       const s = SHOT[kind];
       const lagged = Math.max(from, t - s.lag / seconds);
       motion.at(lagged, p, f);
@@ -368,10 +390,30 @@ export class ShotPlan {
       // The ship over the place's signature shape, both ahead.
       const e = SHOT.reveal;
       const sign = this.marks.reach?.sign;
-      if (sign) this.over(ship, sign, fwd, e.back, e.under, e.side, eye);
-      else eye.copy(ship).addScaledVector(fwd, -e.back);
-      if (sign) target.copy(sign).lerp(ship, e.mix);
-      else target.copy(ship).addScaledVector(fwd, 300);
+      const view = this.marks.reach?.view;
+      if (view) {
+        // Over the ship's shoulder, out past the deck's edge.
+        const v = e.view;
+        f.subVectors(view, ship).setY(0).normalize();
+        side.set(-f.z, 0, f.x);
+        eye
+          .copy(ship)
+          .addScaledVector(f, -v.back)
+          .addScaledVector(Y, v.up)
+          .addScaledVector(side, -v.side);
+        p.subVectors(ship, eye).normalize();
+        target
+          .subVectors(view, eye)
+          .normalize()
+          .lerp(p, 1 - v.mix)
+          .add(eye);
+      } else if (sign) {
+        this.over(ship, sign, fwd, e.back, e.under, e.side, eye);
+        target.copy(sign).lerp(ship, e.mix);
+      } else {
+        eye.copy(ship).addScaledVector(fwd, -e.back);
+        target.copy(ship).addScaledVector(fwd, 300);
+      }
       lift = false;
     } else if (kind === 'arrive') {
       const a = SHOT.arrive;
@@ -416,10 +458,6 @@ export class ShotPlan {
       else p.copy(fwd);
       target.copy(ship).addScaledVector(p, e.reach * e.past);
       lift = false;
-    } else {
-      // gate: a fixed camera following the ship.
-      eye.copy(this.anchors[i]);
-      target.copy(ship);
     }
     if (lift) {
       // The ship above the middle of the frame, clear of the banner.

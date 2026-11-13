@@ -5,7 +5,9 @@
 // shipyard's slips); `sign`, the place's signature shape, which the
 // arrival reveals before the ship is in it (the far freighters, the star,
 // the planet, the rebuilt arcs); `through`, a hole the ship leaves by
-// (Prime's gate: "one hull through"). Each names a layer of the set and a
+// (Prime's gate: "one hull through"); `view`, where a place whose shape
+// sits under the Ring's deck shows past its edge, which the arrival looks
+// out to over the ship (the far crystals). Each names a layer of the set and a
 // point in its holder's frame: `share` of the layer's bounds, or `at` in its
 // own units. Found when a journey starts, in the scene, as its set stands
 // for the journey (placeSets.js setFlight).
@@ -34,6 +36,8 @@ export const MARKS = Object.freeze({
   'crystal-choir': {
     near: { layer: 0, share: [0.5, 0.85, 0.5] },
     sign: { layer: 0, share: [0.5, 0.6, 0.45] },
+    // 1300 down the seam inward of the deck (the set turns 0.32 about y).
+    view: { layer: 0, at: [-409, -100, -1234] },
   },
   'dense-core': {
     near: { layer: 0, share: [0.5, 0.95, 0.5] },

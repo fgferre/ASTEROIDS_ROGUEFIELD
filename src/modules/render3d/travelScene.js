@@ -318,6 +318,7 @@ export class TravelScene {
       reach: { near: new THREE.Vector3(), sign: new THREE.Vector3() },
     };
     this.gate = new THREE.Vector3();
+    this.view = new THREE.Vector3();
     this.lines = [];
     this.planned = false;
     this.rise = FLIGHT.rise;
@@ -488,6 +489,9 @@ export class TravelScene {
       if (!set || !spec) return null;
       markPoint(this.t.THREE, set, spec.near, x, z, pose, out.near);
       markPoint(this.t.THREE, set, spec.sign, x, z, pose, out.sign);
+      out.view = spec.view
+        ? markPoint(this.t.THREE, set, spec.view, x, z, pose, this.view)
+        : null;
       return out;
     };
     const leave = this.leg.from
