@@ -103,6 +103,22 @@ describe('TransmissionQueue', () => {
     expect(finished).toEqual(['boss:prime:warning', 'boss:prime:defeated']);
   });
 
+  it('reports a line cut by a banner finished when the queue is cleared', () => {
+    const hud = fakeHud();
+    const finished = [];
+    const queue = new TransmissionQueue(
+      hud,
+      () => {},
+      (entry) => finished.push(entry.key)
+    );
+    queue.push(wardenTransmission(15, 'defeated'));
+    queue.update(0);
+    hud.busy = true;
+    queue.update(500);
+    queue.clear();
+    expect(finished).toEqual(['boss:null:defeated']);
+  });
+
   it('shows the whole line at once with reduced motion', () => {
     const hud = fakeHud();
     const queue = new TransmissionQueue(hud, () => {});

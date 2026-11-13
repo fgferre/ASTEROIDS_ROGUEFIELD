@@ -153,6 +153,8 @@ export class TransmissionQueue {
     this.onFinished = onFinished;
     this.pending = [];
     this.current = null;
+    // A line a banner cut: still on air for whoever waits on it.
+    this.cut = null;
   }
 
   get active() {
@@ -173,11 +175,15 @@ export class TransmissionQueue {
 
   clear() {
     const { current } = this;
+    const onAir = current?.entry ?? this.cut;
     this.pending = [];
     this.current = null;
+    this.cut = null;
     if (current) {
       this.view.hideTransmission();
-      this.onFinished(current.entry);
+    }
+    if (onAir) {
+      this.onFinished(onAir);
     }
   }
 
@@ -185,6 +191,7 @@ export class TransmissionQueue {
     if (this.current && this.view.isBannerBusy()) {
       this.view.hideTransmission();
       this.pending.unshift(this.current.entry);
+      this.cut = this.current.entry;
       this.current = null;
     }
     if (!this.current) {
@@ -192,6 +199,7 @@ export class TransmissionQueue {
         return;
       }
       const entry = this.pending.shift();
+      this.cut = null;
       this.current = { entry, startedAt: nowMs, typed: -1 };
       this.view.showTransmission(entry.speaker);
       this.onShown(entry);
