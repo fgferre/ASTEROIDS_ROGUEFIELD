@@ -445,15 +445,8 @@ function pathDanger(world, path, knobs, safeUntil) {
 // What a path is pulled toward and kept off; loot only when it is `safe`.
 function intentScore(world, end, start, safe) {
   let score = 0;
-  // off the edges: across the wrap the turret loses its aim and new foes
-  // come in there
-  const edge = Math.min(
-    end.x,
-    world.width - end.x,
-    end.y,
-    world.height - end.y
-  );
-  score -= EDGE_WEIGHT * Math.max(0, 1 - edge / EDGE_GAP);
+  const edgeOf = (p) =>
+    Math.min(p.x, world.width - p.x, p.y, world.height - p.y);
   // loot: the nearest worth having, closer by the end of the path; straight
   // distances, as the edge term keeps it off the wrap (loot just across it
   // held the ship against the wall for minutes)
@@ -474,6 +467,12 @@ function intentScore(world, end, start, safe) {
     const gain = bestDistance - Math.hypot(best.x - end.x, best.y - end.y);
     score += (LOOT_WEIGHT * gain) / Math.max(40, world.ship.maxSpeed * 0.5);
   }
+  // off the edges: across the wrap the turret loses its aim and new foes
+  // come in there; loot it goes for lets it as close as the loot lies (a
+  // heart 25 px in held it just out of reach for twenty minutes)
+  const edgeGap =
+    best && safe ? Math.max(1, Math.min(EDGE_GAP, edgeOf(best))) : EDGE_GAP;
+  score -= EDGE_WEIGHT * Math.max(0, 1 - edgeOf(end) / edgeGap);
   // a moving ship is a harder target: keep some way on
   const terminal = world.ship.acceleration / Math.max(0.1, world.ship.damping);
   score += MOVE_WEIGHT * Math.min(1, Math.hypot(end.vx, end.vy) / terminal);

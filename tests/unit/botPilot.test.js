@@ -355,6 +355,14 @@ describe('decide', () => {
     const world = makeWorld({ loot: [{ x: 600, y: 300 }] });
     expect(decide(world, KNOBS).dir).toBe(3);
   });
+
+  it('goes for a heart lying close to the edge', () => {
+    const world = makeWorld({
+      loot: [{ x: 300, y: 575 }],
+      ship: { x: 300, y: 550 },
+    });
+    expect(DIRECTIONS[decide(world, KNOBS).dir]?.y).toBeGreaterThan(0.5);
+  });
 });
 
 describe('createBotPilot', () => {
