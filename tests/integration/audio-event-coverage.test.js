@@ -288,9 +288,9 @@ describe('player-health-changed → DuckingController EDGE delegation (plan 02.0
     const spy = vi.spyOn(audio.duckingController, 'duck');
 
     // Three events, all below 25% — only the FIRST (the crossing) ducks.
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 });
-    eventBus.emit('player-health-changed', { health: 15, maxHealth: 100 });
-    eventBus.emit('player-health-changed', { health: 10, maxHealth: 100 });
+    eventBus.emit('player-health-changed', { current: 20, max: 100 });
+    eventBus.emit('player-health-changed', { current: 15, max: 100 });
+    eventBus.emit('player-health-changed', { current: 10, max: 100 });
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toMatchObject({ bus: 'music' });
@@ -303,9 +303,9 @@ describe('player-health-changed → DuckingController EDGE delegation (plan 02.0
     const { audio, eventBus } = resolveRealAudioService();
     const spy = vi.spyOn(audio.duckingController, 'duck');
 
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 1
-    eventBus.emit('player-health-changed', { health: 50, maxHealth: 100 }); // recover (re-arm)
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 2
+    eventBus.emit('player-health-changed', { current: 20, max: 100 }); // duck 1
+    eventBus.emit('player-health-changed', { current: 50, max: 100 }); // recover (re-arm)
+    eventBus.emit('player-health-changed', { current: 20, max: 100 }); // duck 2
 
     expect(spy).toHaveBeenCalledTimes(2);
 

@@ -127,7 +127,8 @@ export const AUDIO_EVENT_HANDLERS = {
   // CROSSING into ≤25% HP only: repeated health events while already below
   // must not retrigger them; recovering (or dying) re-arms both edges.
   playerHealth(audio, payload) {
-    const healthPercent = payload?.health / payload?.maxHealth;
+    // The ship sends { current, max } (PlayerSystem).
+    const healthPercent = payload?.current / payload?.max;
     audio.musicMixer.setRunState({ healthRatio: healthPercent });
 
     if (healthPercent <= 0.25 && healthPercent > 0) {
