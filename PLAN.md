@@ -91,14 +91,19 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   fase um pouco mais dura que a anterior" não se resolve com o piloto. O piloto mediano (seis sementes) vence 1–2 no
   capítulo II e 0 no Crisol. Mudado: Kiln (vida 65 → 55 % do Choir, queimadura 0,15 → 0,10), surto e anel da etapa 4 da
   Furnace, 28 pedras no Choir da Resonance Chamber, Sovereign (vida 0,48 → 0,55, etapas em 88 % e 62 %, barreira 0,3 → 0,6).
-- Medida de referência (13/11, madrugada; jogo em 55a99a4, piloto que não espera mais por item inalcançável e
-  corações de vida sempre dentro da arena; piloto bom em doze sementes, vitórias · piloto mediano em seis): Debris Wake
-  11 · 5 | Salvage Lanes 10 · 3 | Prime Gate 8 · 3 | Furnace Drift 8 · 4 | Crystal Choir 9 · 1 | Resonance Chamber 6 · 0
-  | Assembly Graveyard 12 · 4 | Quarantine Grid 9 · 4 | Null Boundary 8 · 1 | The Crucible 7 · 1. Lutas de chefe vencidas:
-  51–157 s no capítulo I, 109–292 s no II, 104–314 s no III, 212–277 s no Sovereign. Dois estouros de 25 min ainda:
-  Crystal Choir semente 1 (camada 2, 1433 s) e Quarantine Grid semente 8 (chefe, 1052 s). As medidas anteriores a
-  esta usavam o piloto antigo e não se comparam semente a semente (qualquer mudança no piloto embaralha a partida).
-  Fora do alvo: Assembly Graveyard (12 de 12) é a fase mais fácil da campanha estando no capítulo III.
+- Medida de referência (13/11, jogo em e6ae532, piloto que pega o item da borda; piloto bom em doze sementes,
+  vitórias · mediano em seis; nenhum estouro de 25 min em 180 partidas): Debris Wake 10 · 6 | Salvage Lanes 12 · 3 |
+  Prime Gate 10 · 3 | Furnace Drift 5 · 1 | Crystal Choir 7 · 2 | Resonance Chamber 7 · 2 | Assembly Graveyard 9 · 3 |
+  Quarantine Grid 11 · 2 | Null Boundary 9 · 2 | The Crucible 2 · 0. Lutas vencidas: 44–157 s no capítulo I, 124–250 s
+  no II, 101–244 s no III (uma de 445 s na Quarantine Grid), 245–266 s no Sovereign.
+- Lição de 13/11: doze sementes têm erro de ±2 vitórias, e cada mudança no piloto embaralha todas as partidas — o
+  Crisol deu 6, 4, 7 e 2 em quatro medidas do mesmo jogo. Para decidir, somar medidas ou usar 24 sementes. Somando as
+  quatro medidas de 12–13/11 (48 partidas por fase; a Assembly Graveyard só a última, depois de mexida): Debris Wake
+  85 % · Salvage Lanes 87 % · Prime Gate 71 % | Furnace Drift 54 % · Crystal Choir 62 % · Resonance Chamber 54 % |
+  Assembly Graveyard 75 % · Quarantine Grid 81 % · Null Boundary 62 % | The Crucible 40 %. Fora do desenho: a
+  Quarantine Grid, mais fácil que todo o capítulo II. No Crisol quase toda morte é da barreira giratória do Sovereign
+  (220–355 de dano por luta), e o piloto não enxerga cerca em movimento: para ele a barreira pesa mais do que pesará
+  para quem joga olhando — ele julga jogando antes de mexer.
 
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
