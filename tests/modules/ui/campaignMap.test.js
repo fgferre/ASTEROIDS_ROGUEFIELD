@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CampaignMap,
   campaignChapters,
+  campaignMarkup,
   defaultSectorRow,
   sectorRowsMarkup,
 } from '../../../src/modules/ui/CampaignMap.js';
@@ -141,6 +142,14 @@ describe('campaign map', () => {
     expect(rows).toContain(
       'Locked<span class="campaign-sector__why">Defeat Sentinel Gatekeeper to unlock</span>'
     );
+  });
+
+  it('lets only the first open chapter call, however many are open', () => {
+    // A profile from before the campaign: past two Wardens in the Descent.
+    const markup = campaignMarkup(campaignChapters(records([], {}, 12)));
+    expect(markup.match(/is-open/g).length).toBeGreaterThan(1);
+    expect(markup.match(/is-next/g)).toHaveLength(1);
+    expect(markup).toMatch(/id="campaign-chapter-1" class="[^"]*is-next/);
   });
 
   it('opens on the first open sector, else the last cleared', () => {

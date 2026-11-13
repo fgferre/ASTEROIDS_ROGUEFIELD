@@ -195,8 +195,10 @@ function arcPath(from, to) {
 
 /**
  * The arc and its chapter nodes: real chapters are buttons
- * (`data-campaign-chapter`), the chapters to come are not selectable. CSS:
- * .campaign-* in style.css.
+ * (`data-campaign-chapter`), the chapters to come are not selectable. The
+ * first open chapter is the one that calls (`is-next`); a profile from
+ * before the campaign can have several open at once. CSS: .campaign-* in
+ * style.css.
  */
 export function campaignMarkup(chapters) {
   const lastReal = chapters.filter((node) => node.sectors.length).length - 1;
@@ -205,6 +207,7 @@ export function campaignMarkup(chapters) {
       node.sectors.length && node.state !== 'locked' ? i : last,
     0
   );
+  const next = chapters.findIndex((node) => node.state === 'open');
   const svg = `<svg class="campaign-arc" viewBox="0 0 1000 260" aria-hidden="true">
     <path class="campaign-arc__ring" d="${arcPath(-ARC.edge, nodeAngle(lastReal))}"/>
     <path class="campaign-arc__ring is-dark" d="${arcPath(nodeAngle(lastReal), ARC.edge)}"/>
@@ -221,7 +224,7 @@ export function campaignMarkup(chapters) {
       if (!node.sectors.length) {
         return `<div class="campaign-node is-nosignal" style="${style}">${inner}</div>`;
       }
-      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}" style="${style}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
+      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}${i === next ? ' is-next' : ''}" style="${style}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
     })
     .join('');
   return `${svg}${items}`;

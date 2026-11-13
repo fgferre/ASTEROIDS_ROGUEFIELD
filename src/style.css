@@ -1830,7 +1830,7 @@ button.campaign-node {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .campaign-node.is-open .campaign-node__dot {
+  .campaign-node.is-next .campaign-node__dot {
     animation: campaign-open-pulse 2.4s ease-in-out infinite;
   }
 
