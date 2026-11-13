@@ -89,6 +89,35 @@ describe('EnemyMirror', () => {
     expect(view.cores[1].pivot.visible).toBe(true);
   });
 
+  it('a pooled Choir view comes back with its arms in place', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const core = (alive, x) => ({ alive, x, y: 300 });
+    const choir = (id, cores) => ({
+      id,
+      type: 'boss',
+      bossKind: 'choir',
+      x: 400,
+      y: 300,
+      radius: 118,
+      singingIndex: 1,
+      cores,
+      getHitFlash: () => 0,
+    });
+    const first = choir('first', [core(false, 490), core(true, 310)]);
+    mirror.update([first], 0);
+    const view = mirror.views.get('first');
+    mirror.update([first], 1); // mid-break: the arm is out and tipped
+    expect(view.cores[0].arm.position.x).toBeGreaterThan(0);
+
+    mirror.update([], 1.1); // gone without a kill: straight to the pool
+    mirror.update([choir('second', [core(true, 490), core(true, 310)])], 2);
+    expect(mirror.views.get('second')).toBe(view);
+    const { arm, core: orb } = view.cores[0];
+    expect(arm.position.toArray()).toEqual([0, 0, 0]);
+    expect(arm.rotation.toArray().slice(0, 3)).toEqual([0, 0, 0]);
+    expect(orb.rotation.y).toBe(0);
+  });
+
   it('draws the Quarry Maw with jaws that open and a core that heats', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const maw = {

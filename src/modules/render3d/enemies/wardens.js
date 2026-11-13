@@ -853,6 +853,9 @@ export function createWardenViews(kit) {
         core.pivot.visible = true;
         core.pivot.position.set(0, 0, 0);
         core.pivot.rotation.set(0, 0, 0);
+        core.arm.position.set(0, 0, 0);
+        core.arm.rotation.set(0, 0, 0);
+        core.core.rotation.set(0, 0, 0);
         core.shards.forEach((shard) => (shard.visible = false));
       });
       return;
