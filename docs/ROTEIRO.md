@@ -131,6 +131,7 @@ Viagem 6 → 7 (fim do capítulo)
 **7. Assembly Graveyard** (chefe: Foundry Mother ✔)
 
 - Chegada — THE RING: `Assembly Graveyard. The same chassis, built again. Order received once. Never closed.`
+- Foundry Mother, meia vida — FOUNDRY MOTHER: `Order open. Build the chassis. Build the chassis. No one closes the order.`
 
 Viagem 7 → 8
 
@@ -140,6 +141,7 @@ Viagem 7 → 8
 **8. Quarantine Grid** (chefe: The Interdictor ✔)
 
 - Chegada — THE RING: `Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.`
+- Interdictor, meia vida — THE INTERDICTOR: `The boundary was never for you. It keeps the Ring from hearing. You are loud.`
 
 Viagem 8 → 9
 
@@ -149,6 +151,7 @@ Viagem 8 → 9
 **9. Null Boundary** (chefe: Warden Null ✔ aviso)
 
 - Chegada — THE RING: `Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.` ✔
+- Null, última fase — WARDEN NULL: `Stop. Every shot is a voice. It is listening for one.`
 - Null derrotado — WARDEN NULL: `Still... no longer. It hears you now. I kept it asleep a thousand years.`
 - Vitória do capítulo — THE RING: `Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.` ✔
 

@@ -74,8 +74,10 @@ export default {
   cycle: [
     // solid 3.6: the cage drops soon after its second beam (12/11: it stood
     // empty for two seconds)
-    { drift: 1.6, size: 360, solid: 3.6, beams: 2, aim: 1.0, rest: 2.5 },
-    { drift: 1.2, size: 320, solid: 5.5, beams: 3, aim: 0.8, rest: 2.0 },
+    // rest 3 and 2.4 (were 2.5 and 2): it was open a quarter of the time and
+    // the fight ran three minutes and more
+    { drift: 1.6, size: 360, solid: 3.6, beams: 2, aim: 1.0, rest: 3 },
+    { drift: 1.2, size: 320, solid: 5.5, beams: 3, aim: 0.8, rest: 2.4 },
   ], // proposta 12/11
   // It steers itself (the drift above); the phases only name the strategy.
   movementPhases: [{ strategy: 'linear' }, { strategy: 'linear' }],

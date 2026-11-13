@@ -1,7 +1,9 @@
 // Null Boundary (wardens-reach; docs/ROTEIRO.md "Os lugares" 9): the break
 // itself. The broken Ring's torn end stays where the field always shows it
 // (this set keeps it); across the gap its other end faces it, and between
-// them a disc of ground-up matter turns slowly in the Ring's plane.
+// them a disc of ground-up matter turns slowly in the Ring's plane. In the
+// victory's wake (FieldBackdrop.setWake) the far end lights as the Ring
+// does and the disc brightens and turns faster, pulled back toward it.
 
 import { mergeStatic } from '../mergeStatic.js';
 import { ringMaterial } from '../ring/ringMaterial.js';
@@ -11,9 +13,12 @@ import { gradientDisc } from './kit.js';
 
 // proposta 12/11: the gap between the two ends (Ring units of arc), the
 // modules of the far end shown, and the disc (radius, turn per second).
-const GAP = 520;
+const GAP = 240;
 const FAR_END_MODULES = 18;
-const DISC = { radius: 1000, spin: 0.02, rocks: 360 };
+const DISC = { radius: 750, spin: 0.02, rocks: 360 };
+// proposta 12/11: at full wake the disc turns `spin` times faster and its
+// dust glows `gain` times brighter, toward `color`.
+const DISC_WAKE = { spin: 6, gain: 2.2, color: '#d8d0ff' };
 
 // The far end: the torn end's first modules mirrored across the middle of
 // the gap (faces turned back the right way round).
@@ -107,7 +112,10 @@ export function buildWardensReach(THREE, kit) {
     DISC.radius * 1.1
   );
   const disc = new THREE.Group();
-  disc.add(kit.mesh(rubble), kit.mesh(dust, 'glow'));
+  disc.add(kit.mesh(rubble), kit.mesh(dust, 'glow', 'dust'));
+  const dustColor = kit.materials.get('dust').color;
+  const dustWake = tone(DISC_WAKE.color, DISC_WAKE.gain);
+  const white = new THREE.Color(1, 1, 1);
   disc.position.set(
     Math.cos(mirror) * RING.radius,
     -20,
@@ -118,10 +126,21 @@ export function buildWardensReach(THREE, kit) {
   const object = new THREE.Group();
   object.rotation.x = -RING.tilt;
   object.add(end, disc);
+  // The disc's turn, summed so a change of speed does not jump it.
+  let turned = 0;
+  let last = null;
   return {
     layers: [{ object, anchor: RING.centre, follow: RING.follow }],
-    update(time) {
-      disc.rotation.y = time * DISC.spin;
+    update(time, wake) {
+      turned =
+        last === null
+          ? time * DISC.spin
+          : turned +
+            (time - last) * DISC.spin * (1 + (DISC_WAKE.spin - 1) * wake);
+      last = time;
+      disc.rotation.y = turned;
+      uniforms.uWake.value = wake;
+      dustColor.copy(white).lerp(dustWake, wake);
     },
   };
 }

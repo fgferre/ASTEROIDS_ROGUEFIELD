@@ -194,7 +194,7 @@ describe('Sentinel Interdictor', () => {
       size: 320,
       beams: 3,
       aim: 0.8,
-      rest: 2,
+      rest: 2.4,
     });
     expect(count(late)).toBe(3);
   });

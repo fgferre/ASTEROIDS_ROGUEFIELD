@@ -58,10 +58,11 @@ export function buildQuarantineGrid(THREE, kit) {
     const along = n.dot(axis);
     const band = 0.5 + 0.5 * Math.sin(along * 21 + 0.8 * Math.sin(along * 6));
     const rim = (1 - Math.max(0, n.y)) ** 4;
+    // proposta 12/11: the night side as dark as the sky it hides.
     const k =
-      0.05 * (0.6 + 0.8 * band) +
-      0.09 * rim +
-      0.07 * lit ** 3 +
+      0.012 * (0.6 + 0.8 * band) +
+      0.025 * rim +
+      0.04 * lit ** 3 +
       0.45 * lit ** 6 * (1 - Math.abs(n.y)) ** 1.5;
     shade.set([k, k, k], i * 3);
   }
@@ -82,7 +83,7 @@ export function buildQuarantineGrid(THREE, kit) {
       (r, a) => {
         const edge = Math.exp(-(((r - 0.99) / 0.008) ** 2));
         const lit = Math.max(0, Math.cos(a - crest)) ** 3;
-        const haze = Math.exp(-(((r - 1.0) / 0.02) ** 2)) * 0.06;
+        const haze = Math.exp(-(((r - 1.0) / 0.02) ** 2)) * 0.02;
         return edge * lit ** 2 + haze;
       },
       { rings: 12, sides: 120, hole: 0.94 }
