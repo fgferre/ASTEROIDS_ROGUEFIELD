@@ -168,7 +168,7 @@ describe('Sentinel Kiln Engine', () => {
       text: 'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
     });
     expect(wardenTransmission(10, 'defeated', 'kiln-engine').text).toBe(
-      'Kiln Engine cold. The Core will remember the temperature it lost.'
+      'Kiln Engine cold. Heat released: all of it. Seams: one, opening.'
     );
   });
 });

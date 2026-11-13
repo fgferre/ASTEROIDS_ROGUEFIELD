@@ -70,6 +70,67 @@ export function ringBand(kit, parts, lights, options) {
   }
 }
 
+/**
+ * A crack of light lying in the x-z plane: a jagged chain of thin strips
+ * from x = -`length` / 2 to +`length` / 2 at `at`, each `width` across and
+ * up to `jag` off the line, thinning to its ends, with `branches` short
+ * ones leaving it. `parts` takes the crack as it rests, `gape` the same
+ * line `GAPE` times as wide: what shows once it has opened (seams()).
+ */
+const GAPE = 5; // proposta 12/11
+export function crack(kit, parts, gape, color, at, options) {
+  const { length, width, jag, steps = 10, branches = 2 } = options;
+  const { random } = kit;
+  const strip = (x0, z0, x1, z1, w) => {
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const middle = [at[0] + (x0 + x1) / 2, at[1], at[2] + (z0 + z1) / 2];
+    const turn = [0, -Math.atan2(dz, dx), 0];
+    const run = Math.hypot(dx, dz) * 1.04;
+    kit.box(parts, color, middle, [run, 1, w], turn);
+    kit.box(gape, color, middle, [run, 1, w * GAPE], turn);
+  };
+  let x = -length / 2;
+  let z = 0;
+  for (let i = 0; i < steps; i += 1) {
+    const nx = x + length / steps;
+    const nz = i === steps - 1 ? 0 : (random() - 0.5) * 2 * jag;
+    const k = Math.sin(((i + 0.5) / steps) * Math.PI);
+    strip(x, z, nx, nz, width * (0.35 + 0.65 * k));
+    if (i > 0 && i < steps - 1 && random() < branches / steps) {
+      const side = random() < 0.5 ? -1 : 1;
+      const reach = (length / steps) * (0.6 + random() * 0.6);
+      strip(x, z, x + reach * 0.6, z + side * reach, width * 0.4);
+    }
+    x = nx;
+    z = nz;
+  }
+}
+
+/**
+ * A place's cracks (crack()'s `parts` and `gape`) as lights of their own,
+ * `name`d: `rest` their brightness while the place holds, `open` once it
+ * has given way (the victory shot's wake, 0..1), when the wide line shows
+ * too. Returns { object, give(time, wake) }.
+ */
+export function seams(kit, parts, gape, name, { rest, open }) {
+  const object = new kit.THREE.Group();
+  object.add(
+    kit.mesh(parts, 'glow', name),
+    kit.mesh(gape, 'glow', `${name}-open`)
+  );
+  const line = kit.materials.get(name);
+  const wide = kit.materials.get(`${name}-open`);
+  return {
+    object,
+    give(time, wake) {
+      const breath = 0.88 + 0.12 * Math.sin(time * 0.9);
+      line.color.setScalar((rest + (open - rest) * wake) * breath);
+      wide.color.setScalar(open * 0.55 * wake);
+    },
+  };
+}
+
 /** A small glowing point (a running light, a beacon) of `size`. */
 export function lightPoint(kit, parts, color, at, size) {
   return kit.put(parts, kit.unit.octahedron, color, at, size);

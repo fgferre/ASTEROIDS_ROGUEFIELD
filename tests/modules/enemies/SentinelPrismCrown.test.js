@@ -199,10 +199,10 @@ describe('Sentinel Prism Crown', () => {
     expect(wardenTransmission(10, 'warning', 'prism-crown')).toEqual({
       key: 'sentinel:prism-crown:warning',
       speaker: 'PRISM CROWN',
-      text: 'Three voices remain in the crystal. They have found a new listener.',
+      text: 'Six voices sleep in the crystal. The Crown still carries their note.',
     });
     expect(wardenTransmission(10, 'defeated', 'prism-crown').text).toBe(
-      'The Crown is dark. The Chamber heard it go quiet.'
+      'The Crown is dark. The note has stopped. The seam has not.'
     );
   });
 });

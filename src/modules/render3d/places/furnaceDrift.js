@@ -1,13 +1,17 @@
 // Furnace Drift (docs/ROTEIRO.md "Os lugares" 4): inside the Ring, on the
 // star's side. The star huge and close, its disc partly out of frame in its
 // corona; the Ring's inner face a dark band across it, vents glowing along
-// it; nearer, heat vents rising out of the dark.
+// it; nearer, heat vents rising out of the dark. Hairline cracks of cold
+// light run along the face: they open when the Kiln goes cold (the
+// chapter's turn: the heat was holding them shut).
 
 import { gradientDisc } from './kit.js';
-import { under } from './pieces.js';
+import { crack, seams, under } from './pieces.js';
 
 // proposta 12/11: the star's disc as a share of its corona's radius.
 const DISC = 0.4;
+// The cold light in the chapter's cracks (the three places share it).
+export const SEAM_LIGHT = '#bfeeff';
 
 export function buildFurnaceDrift(THREE, kit) {
   const { tone, random } = kit;
@@ -24,7 +28,7 @@ export function buildFurnaceDrift(THREE, kit) {
           : 0.3 * Math.exp(-(r - DISC) * 6) + 0.05 * (1 - r),
       { rings: 30, sides: 72 }
     ),
-    tone('#ff9a50', 0.5),
+    tone('#ff9a50', 0.6),
     [0, 0, 0],
     4400
   );
@@ -56,6 +60,24 @@ export function buildFurnaceDrift(THREE, kit) {
     }
   }
   [-215, 215].forEach((z) => kit.box(band, rib, [0, 26, z], [8000, 60, 30]));
+  // proposta 12/11: the cracks along the face, between its rails.
+  const cracked = kit.parts();
+  const gaping = kit.parts();
+  const cold = tone(SEAM_LIGHT);
+  for (let i = 0; i < 9; i += 1) {
+    crack(
+      kit,
+      cracked,
+      gaping,
+      cold,
+      [-2800 + i * 700 + (random() - 0.5) * 300, 27, (random() - 0.5) * 240],
+      { length: 420 + random() * 380, width: 6, jag: 38 }
+    );
+  }
+  const cracks = seams(kit, cracked, gaping, 'furnace-seams', {
+    rest: 0.14,
+    open: 1.6,
+  });
 
   // Heat vents rising from below: dark stacks, their mouths a dull glow
   // behind a grille.
@@ -98,7 +120,7 @@ export function buildFurnaceDrift(THREE, kit) {
   });
 
   const face = new THREE.Group();
-  face.add(kit.mesh(band), kit.mesh(vents, 'glow'));
+  face.add(kit.mesh(band), kit.mesh(vents, 'glow'), cracks.object);
   face.rotation.set(0, -0.32, 0.04);
   const near = new THREE.Group();
   near.add(kit.mesh(stacks), kit.mesh(mouths, 'glow'));
@@ -112,5 +134,6 @@ export function buildFurnaceDrift(THREE, kit) {
       { object: face, anchor: under(2400, 0, -300), follow: 0.7 },
       { object: near, anchor: under(1100), follow: 0.35 },
     ],
+    update: cracks.give,
   };
 }

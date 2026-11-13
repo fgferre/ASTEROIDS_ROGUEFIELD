@@ -41,7 +41,7 @@ export default {
     flare: '#9fe8ff',
     shot: { tilt: [64, 64], turn: [-20, -6], distance: [640, 560], look: 0.45 },
   },
-  coreDamageFactor: 0.3, // proposta 12/11: not resting, 30 % gets through
+  coreDamageFactor: 0.4, // proposta 12/11: not resting, 40 % gets through
   crown: {
     orbit: 1.6, // × radius: the mirrors' distance from the core
     spread: 0.5, // × the orbit: how much farther out they sit at rest
@@ -68,8 +68,8 @@ export default {
   // fast the crown turns meanwhile (°/s, its direction alternates by
   // volley); the rest.
   cycle: [
-    { drift: 1.6, mirrors: 3, warn: 1.2, burn: 2.2, sweep: 18, rest: 3 },
-    { drift: 1.2, mirrors: 4, warn: 1.2, burn: 2.2, sweep: 26, rest: 2.4 },
+    { drift: 1.6, mirrors: 3, warn: 1.2, burn: 2.2, sweep: 18, rest: 3.4 },
+    { drift: 1.2, mirrors: 4, warn: 1.2, burn: 2.2, sweep: 26, rest: 2.8 },
   ], // proposta 12/11
   // It steers itself (the drift above); the phases only name the strategy.
   movementPhases: [{ strategy: 'linear' }, { strategy: 'linear' }],
