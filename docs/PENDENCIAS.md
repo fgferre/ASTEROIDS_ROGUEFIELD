@@ -176,7 +176,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   bosses estão muito sem graça, deveria tudo isso ser revisto e polido."_ Fecha quando ele aprovar por imagem e jogando.
   **Veredito dele por imagem (13/11, página `chefes-ataques`):** os sete chefes _"Ficou bom"_ (Interdictor refeito
   incluído); no geral _"A direção é essa"_. Atirar nos aparelhos da jaula: _"Decido depois de jogar a luta nova."_
-  Falta ele jogar.
+  Os cinco retoques seguintes (fim da jaula, anel de aviso, setas do Gatekeeper, sucção do Maw, feixe do Sovereign):
+  _"Ficou bom"_. Falta ele jogar.
 - **(32)** Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
   de fase, tipo os cutscenes, imaginei que a nave estaria realmente viajando no espaço 3D do universo que criamos, indo
   de uma localização para outra. E acho que a nave precisa respeitar essa movimentação dentro do cenário, usando seus
