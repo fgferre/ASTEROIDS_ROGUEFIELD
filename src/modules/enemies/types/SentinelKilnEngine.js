@@ -1,11 +1,11 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
+import { driftToCentre } from '../boss/drift.js';
+import { SHIP_REACH } from '../boss/playerTarget.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const KILN = BOSS_KINDS['kiln-engine'];
 const TAU = Math.PI * 2;
-// The ship's hull when the player does not say (px).
-const SHIP_REACH = 16;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -128,7 +128,7 @@ export class SentinelKilnEngine extends BossEnemy {
         }
         break;
       default:
-        this.driftToCentre(deltaTime);
+        driftToCentre(this, deltaTime, KILN.drift);
         if (this.kilnTimer <= 0 && position) this.beginSectors(cycle, position);
         break;
     }
@@ -143,25 +143,6 @@ export class SentinelKilnEngine extends BossEnemy {
     const keep = Math.max(0, 1 - 4 * deltaTime);
     this.vx *= keep;
     this.vy *= keep;
-  }
-
-  // Toward mid-field, slowing as it arrives.
-  driftToCentre(deltaTime) {
-    this.movementStrategy = 'linear';
-    const { acceleration, maxSpeed, arrive } = KILN.drift;
-    const dx = GAME_WIDTH / 2 - this.x;
-    const dy = GAME_HEIGHT / 2 - this.y;
-    const distance = Math.hypot(dx, dy);
-    const wanted = distance > 1 ? maxSpeed * Math.min(1, distance / arrive) : 0;
-    const wx = distance > 1 ? (dx / distance) * wanted : 0;
-    const wy = distance > 1 ? (dy / distance) * wanted : 0;
-    const step = acceleration * deltaTime;
-    const ex = wx - this.vx;
-    const ey = wy - this.vy;
-    const gap = Math.hypot(ex, ey);
-    const k = gap > step ? step / gap : 1;
-    this.vx += ex * k;
-    this.vy += ey * k;
   }
 
   moveFins(goal, deltaTime) {

@@ -1,5 +1,6 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
+import { pullRocks } from '../boss/rockPull.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const MAW = BOSS_KINDS['quarry-maw'];
@@ -233,27 +234,21 @@ export class SentinelQuarryMaw extends BossEnemy {
   // is drawn in gently; the open mouth hurts.
   pull(deltaTime, target) {
     const mouth = this.mouthPoint();
-    const rocks = [];
-    this.system?.forEachActiveEnemy?.((enemy) => {
-      if (enemy.type === 'asteroid' && !enemy.destroyed) rocks.push(enemy);
-    });
-    for (const rock of rocks) {
-      const dx = mouth.x - rock.x;
-      const dy = mouth.y - rock.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= MAW.swallowReach + (rock.radius || 0) * 0.5) {
-        this.swallow(rock);
-        continue;
+    pullRocks(
+      this,
+      mouth,
+      deltaTime,
+      {
+        reach: MAW.swallowReach,
+        acceleration: MAW.rockPullAcceleration,
+        maxSpeed: MAW.rockPullMaxSpeed,
+      },
+      (point, margin) => this.inCone(point, margin),
+      () => {
+        this.swallowed += 1;
+        this.swallowedTotal += 1;
       }
-      if (!this.inCone(rock, rock.radius || 0)) continue;
-      rock.vx += (dx / d) * MAW.rockPullAcceleration * deltaTime;
-      rock.vy += (dy / d) * MAW.rockPullAcceleration * deltaTime;
-      const speed = Math.hypot(rock.vx, rock.vy);
-      if (speed > MAW.rockPullMaxSpeed) {
-        rock.vx *= MAW.rockPullMaxSpeed / speed;
-        rock.vy *= MAW.rockPullMaxSpeed / speed;
-      }
-    }
+    );
 
     const ship = target?.position;
     if (!ship || !this.jawsOpen) return;
@@ -277,19 +272,6 @@ export class SentinelQuarryMaw extends BossEnemy {
         }
       );
     }
-  }
-
-  // Gone without 'enemy-destroyed': no orbs, no kill, no combo. The layer
-  // still counts it as gone, so it can close.
-  swallow(rock) {
-    rock.destroyed = true;
-    this.system?.invalidateActiveEnemyCache?.();
-    this.system?.waveManager?.onEnemyDestroyed?.({
-      enemy: rock,
-      swallowedBy: this.id,
-    });
-    this.swallowed += 1;
-    this.swallowedTotal += 1;
   }
 
   ejectCount(cycle) {

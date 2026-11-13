@@ -7,6 +7,9 @@
 
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
+// The ship's hull when the player does not say (px).
+export const SHIP_REACH = 16;
+
 export function resolvePlayerTarget(boss) {
   const player =
     boss.system && typeof boss.system.getCachedPlayer === 'function'

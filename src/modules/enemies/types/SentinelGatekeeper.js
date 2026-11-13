@@ -1,14 +1,7 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
 import { angleBetween } from '../base/frontalShield.js';
-import {
-  SHIP_REACH,
-  barrierHits,
-  barrierOffset,
-  fieldSpan,
-  pressBarrier,
-  tickBarrier,
-} from '../boss/barrier.js';
+import { fieldSpan, pressBarrier, tickBarrier } from '../boss/barrier.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const GATE = BOSS_KINDS.gatekeeper;
@@ -254,16 +247,6 @@ export class SentinelGatekeeper extends BossEnemy {
       return;
     }
     if (this.barrier.phase === 'solid') this.pressBarrier(target);
-  }
-
-  /** Where `point` is against the barrier: along the line and off it (px). */
-  barrierOffset(point) {
-    return barrierOffset(this.barrier, point);
-  }
-
-  /** True when the solid barrier touches `point` (a ship of `reach` px). */
-  barrierHits(point, reach = SHIP_REACH) {
-    return barrierHits(this.barrier, point, reach, GATE.barrier.thickness);
   }
 
   pressBarrier(target) {

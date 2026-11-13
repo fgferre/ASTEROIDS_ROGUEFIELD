@@ -10,9 +10,7 @@
 // ignore it.
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
-
-// The ship's hull when the player does not say (px).
-export const SHIP_REACH = 16;
+import { SHIP_REACH } from './playerTarget.js';
 
 /**
  * The stretch [from, to] of the line through (x, y) along (ux, uy) inside the

@@ -1,12 +1,12 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
+import { driftToCentre } from '../boss/drift.js';
+import { SHIP_REACH } from '../boss/playerTarget.js';
 import { BossEnemy } from './BossEnemy.js';
 import { distanceToSegment, segmentToEdge } from './SentinelPrismCrown.js';
 
 const INTERDICTOR = BOSS_KINDS.interdictor;
 const SIDES = 4;
-// The ship's hull when the player does not say (px).
-const SHIP_REACH = 16;
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
@@ -167,7 +167,7 @@ export class SentinelInterdictor extends BossEnemy {
         }
         break;
       default:
-        this.driftToCentre(deltaTime);
+        driftToCentre(this, deltaTime, INTERDICTOR.drift);
         if (this.gridTimer <= 0 && position) this.beginGrid(cycle, position);
         break;
     }
@@ -183,25 +183,6 @@ export class SentinelInterdictor extends BossEnemy {
     this.movementStrategy = 'linear';
     this.vx = 0;
     this.vy = 0;
-  }
-
-  // Toward mid-field, slowing as it arrives.
-  driftToCentre(deltaTime) {
-    this.movementStrategy = 'linear';
-    const { acceleration, maxSpeed, arrive } = INTERDICTOR.drift;
-    const dx = GAME_WIDTH / 2 - this.x;
-    const dy = GAME_HEIGHT / 2 - this.y;
-    const distance = Math.hypot(dx, dy);
-    const wanted = distance > 1 ? maxSpeed * Math.min(1, distance / arrive) : 0;
-    const wx = distance > 1 ? (dx / distance) * wanted : 0;
-    const wy = distance > 1 ? (dy / distance) * wanted : 0;
-    const accel = acceleration * deltaTime;
-    const ex = wx - this.vx;
-    const ey = wy - this.vy;
-    const gap = Math.hypot(ex, ey);
-    const k = gap > accel ? accel / gap : 1;
-    this.vx += ex * k;
-    this.vy += ey * k;
   }
 
   // GRID: the square round the ship, inside the field; the open side is the

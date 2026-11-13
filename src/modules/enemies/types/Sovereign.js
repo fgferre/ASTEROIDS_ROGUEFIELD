@@ -1,6 +1,8 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
 import { fieldSpan, pressBarrier, tickBarrier } from '../boss/barrier.js';
+import { driftToCentre } from '../boss/drift.js';
+import { pullRocks } from '../boss/rockPull.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const SOV = BOSS_KINDS.sovereign;
@@ -217,7 +219,7 @@ export class Sovereign extends BossEnemy {
     if (position) this.shipAt = { x: position.x, y: position.y };
     const cycle = this.cycle();
     this.sovTimer -= deltaTime;
-    this.driftToCentre(deltaTime);
+    driftToCentre(this, deltaTime, SOV.drift);
     switch (this.sovState) {
       case 'protect-windup':
         if (this.sovTimer <= 0) {
@@ -287,23 +289,6 @@ export class Sovereign extends BossEnemy {
 
   bearingTo(point) {
     return Math.atan2(point.y - this.y, point.x - this.x);
-  }
-
-  // Toward mid-field, slowing as it arrives.
-  driftToCentre(deltaTime) {
-    this.movementStrategy = 'linear';
-    const { acceleration, maxSpeed, arrive } = SOV.drift;
-    const dx = GAME_WIDTH / 2 - this.x;
-    const dy = GAME_HEIGHT / 2 - this.y;
-    const distance = Math.hypot(dx, dy);
-    const wanted = distance > 1 ? maxSpeed * Math.min(1, distance / arrive) : 0;
-    const ex = (distance > 1 ? (dx / distance) * wanted : 0) - this.vx;
-    const ey = (distance > 1 ? (dy / distance) * wanted : 0) - this.vy;
-    const gap = Math.hypot(ex, ey);
-    const k =
-      gap > acceleration * deltaTime ? (acceleration * deltaTime) / gap : 1;
-    this.vx += ex * k;
-    this.vy += ey * k;
   }
 
   // The plates follow the order; shut they turn fast, open slowly.
@@ -478,28 +463,14 @@ export class Sovereign extends BossEnemy {
   // in at `shipPull` px/s².
   pull(deltaTime, target, shipPull, inside) {
     const { rockAcceleration, rockMaxSpeed, absorbReach, rockWorth } = SOV.pull;
-    const rocks = [];
-    this.system?.forEachActiveEnemy?.((enemy) => {
-      if (enemy.type === 'asteroid' && !enemy.destroyed) rocks.push(enemy);
+    const rockPull = {
+      reach: this.radius + absorbReach,
+      acceleration: rockAcceleration,
+      maxSpeed: rockMaxSpeed,
+    };
+    pullRocks(this, this, deltaTime, rockPull, inside, () => {
+      this.build = Math.min(1, this.build + rockWorth);
     });
-    for (const rock of rocks) {
-      const dx = this.x - rock.x;
-      const dy = this.y - rock.y;
-      const d = Math.hypot(dx, dy) || 1;
-      if (d <= this.radius + absorbReach + (rock.radius || 0) * 0.5) {
-        this.absorb(rock);
-        this.build = Math.min(1, this.build + rockWorth);
-        continue;
-      }
-      if (!inside(rock, rock.radius || 0)) continue;
-      rock.vx += (dx / d) * rockAcceleration * deltaTime;
-      rock.vy += (dy / d) * rockAcceleration * deltaTime;
-      const speed = Math.hypot(rock.vx, rock.vy);
-      if (speed > rockMaxSpeed) {
-        rock.vx *= rockMaxSpeed / speed;
-        rock.vy *= rockMaxSpeed / speed;
-      }
-    }
     const ship = target?.position;
     const velocity = target?.player?.velocity;
     if (!ship || !velocity || !inside(ship, 0)) return;
@@ -508,17 +479,6 @@ export class Sovereign extends BossEnemy {
     const d = Math.hypot(dx, dy) || 1;
     velocity.vx += (dx / d) * shipPull * deltaTime;
     velocity.vy += (dy / d) * shipPull * deltaTime;
-  }
-
-  // Gone without 'enemy-destroyed', like the Quarry Maw's swallow: the
-  // layer still counts it as gone, so it can close.
-  absorb(rock) {
-    rock.destroyed = true;
-    this.system?.invalidateActiveEnemyCache?.();
-    this.system?.waveManager?.onEnemyDestroyed?.({
-      enemy: rock,
-      swallowedBy: this.id,
-    });
   }
 
   // The assembly: true once it is done, its escorts sent (two at most, as
