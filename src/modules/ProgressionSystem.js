@@ -547,6 +547,10 @@ class ProgressionSystem extends UpgradeSystem {
       experienceToNext: safeNumber(this.experienceToNext, 100),
       totalExperience: safeNumber(this.totalExperience, 0),
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
+      // The level-up screen's budget left, and the cards banished this run.
+      rerollsLeft: this.rerollsLeft,
+      banishesLeft: this.banishesLeft,
+      banishedUpgrades: Array.from(this.banishedUpgrades),
       comboState: {
         comboCount: safeNumber(this.currentCombo, 0),
         comboTimer: safeNumber(this.comboTimer, 0),
@@ -570,6 +574,15 @@ class ProgressionSystem extends UpgradeSystem {
       ? snapshot.appliedUpgrades
       : [];
     this.appliedUpgrades = new Map(entries);
+    if (Number.isFinite(snapshot.rerollsLeft)) {
+      this.rerollsLeft = snapshot.rerollsLeft;
+    }
+    if (Number.isFinite(snapshot.banishesLeft)) {
+      this.banishesLeft = snapshot.banishesLeft;
+    }
+    if (Array.isArray(snapshot.banishedUpgrades)) {
+      this.banishedUpgrades = new Set(snapshot.banishedUpgrades);
+    }
     // Upgrade-driven numbers start clean: the caller re-applies every rank
     // (the session's deathSnapshot.reapplyProgressionUpgrades), synergies included.
     this.activeSynergies.clear();

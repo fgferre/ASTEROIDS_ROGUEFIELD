@@ -185,6 +185,32 @@ describe('sector runs', () => {
     expect(makePicks(game)).toBe(sectorById('dense-core').headStart - 3);
   });
 
+  it('carries the rerolls, banishes and banished cards left into the next sector only', () => {
+    const game = createHeadlessGame();
+    const { progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const full = [progression.rerollsLeft, progression.banishesLeft];
+    progression.emitLevelUp(progression.applyLevelUp());
+    firstOffer(game);
+    progression.rerollUpgradeOptions();
+    const banished = progression.pendingUpgradeOptions[0].id;
+    progression.banishUpgrade(banished);
+    const left = [progression.rerollsLeft, progression.banishesLeft];
+    expect(left).toEqual([full[0] - 1, full[1] - 1]);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect([progression.rerollsLeft, progression.banishesLeft]).toEqual(left);
+    expect([...progression.banishedUpgrades]).toEqual([banished]);
+
+    game.session.startNewRun({ source: 'test', sector: 'salvage-lanes' });
+    expect([progression.rerollsLeft, progression.banishesLeft]).toEqual(full);
+    expect(progression.banishedUpgrades.size).toBe(0);
+  });
+
   it('carries the card choices a win left unmade and holds the first layer for them', () => {
     const game = createHeadlessGame();
     const { enemies, progression } = game.services;
