@@ -163,7 +163,7 @@ describe('Sentinel Kiln Engine', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(10, 'warning', 'kiln-engine')).toEqual({
-      key: 'sentinel:kiln-engine:warning',
+      key: 'boss:kiln-engine:warning',
       speaker: 'KILN ENGINE',
       text: 'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
     });

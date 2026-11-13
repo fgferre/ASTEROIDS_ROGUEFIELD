@@ -177,7 +177,7 @@ describe('Sentinel Gatekeeper', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(5, 'warning', 'gatekeeper')).toEqual({
-      key: 'sentinel:gatekeeper:warning',
+      key: 'boss:gatekeeper:warning',
       speaker: 'GATEKEEPER',
       text: 'Lane closed. Gate holds. You are not on the manifest.',
     });

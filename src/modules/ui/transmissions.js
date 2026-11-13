@@ -2,6 +2,7 @@
 
 import { STORY } from '../../data/story.js';
 import { biomeForLayer } from '../../data/biomes.js';
+import { bossKindForLayer } from '../../data/enemies/boss.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 
 /** How long a line stays on screen once it is fully typed. */
@@ -19,28 +20,17 @@ export function chapterTransmission(biomeId, sectorId = null) {
 }
 
 /**
- * `moment` is 'warning' or 'defeated'. A boss kind with its own lines (a
- * Sentinel, STORY.sentinel) speaks them; else the layer's Warden lines. Null
- * when neither has one.
+ * A boss's own line (STORY.boss) for `moment`: 'warning', 'last' or
+ * 'defeated'. The boss is `bossKind` (a sector's Sentinel, or the boss itself)
+ * or, without one, the layer's Warden. Null when it has no line.
  */
 export function wardenTransmission(layer, moment, bossKind = null) {
-  const own = STORY.sentinel[bossKind]?.[moment];
-  if (own) {
-    return {
-      key: `sentinel:${bossKind}:${moment}`,
-      speaker: STORY.speaker[bossKind],
-      text: own,
-    };
-  }
-  const text = STORY.warden[layer]?.[moment];
+  const kind = bossKind ?? bossKindForLayer(layer);
+  const text = STORY.boss[kind]?.[moment];
   if (!text) {
     return null;
   }
-  return {
-    key: `warden:${layer}:${moment}`,
-    speaker: STORY.speaker[layer],
-    text,
-  };
+  return { key: `boss:${kind}:${moment}`, speaker: STORY.speaker[kind], text };
 }
 
 /** `moment` is 'spawned' or 'defeated'; null for an unknown kind. */
@@ -67,7 +57,11 @@ export function sightingTransmission(type) {
 
 /** Warden Prime opens a Boss Rush. */
 export function bossRushTransmission() {
-  return { key: 'boss-rush', speaker: STORY.speaker[5], text: STORY.bossRush };
+  return {
+    key: 'boss-rush',
+    speaker: STORY.speaker.prime,
+    text: STORY.bossRush,
+  };
 }
 
 /** The Ring logs a Hangar purchase; null for an item without a line. */
@@ -79,12 +73,18 @@ export function hangarTransmission(itemId) {
   return { key: `hangar:${itemId}`, speaker: STORY.speaker.ring, text };
 }
 
-/** A death line picked with the seeded `random`, spoken by the biome's Warden. */
-export function deathTransmission(random, layer) {
+/**
+ * A death line picked with the seeded `random`, spoken by the biome's Warden;
+ * by the Ring in a `sector`'s own place past the Wardens (the Crucible).
+ */
+export function deathTransmission(random, layer, sector = null) {
   const index = random.int(0, STORY.death.length - 1);
+  const biome = biomeForLayer(layer, sector);
   return {
     key: `death:${index}`,
-    speaker: STORY.speaker[biomeForLayer(layer).layers[1]],
+    speaker: biome.sectorOnly
+      ? STORY.speaker.ring
+      : STORY.speaker[bossKindForLayer(biome.layers[1])],
     text: STORY.death[index],
   };
 }

@@ -197,7 +197,7 @@ describe('Sentinel Prism Crown', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(10, 'warning', 'prism-crown')).toEqual({
-      key: 'sentinel:prism-crown:warning',
+      key: 'boss:prism-crown:warning',
       speaker: 'PRISM CROWN',
       text: 'Six voices sleep in the crystal. The Crown still carries their note.',
     });

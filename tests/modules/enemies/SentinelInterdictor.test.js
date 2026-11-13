@@ -223,7 +223,7 @@ describe('Sentinel Interdictor', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(15, 'warning', 'interdictor')).toEqual({
-      key: 'sentinel:interdictor:warning',
+      key: 'boss:interdictor:warning',
       speaker: 'THE INTERDICTOR',
       text: 'Quarantine holds. Boundary drawn. You are inside it.',
     });

@@ -3,17 +3,15 @@
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { listContent } from '../content/registry.js';
 
-// What the Wardens say to the pilot (docs/NORTE.md §1, §7 pillar 1). Warden
-// lines are keyed by layer, not by boss class; Sentinel lines by boss kind
-// (they end a sector, whatever its layer). Each line stays under 90
-// characters so it fits the transmission banner on one or two rows.
+// What is said to the pilot (docs/NORTE.md §1, §7 pillar 1; the campaign's
+// script is docs/ROTEIRO.md). Each line stays under 90 characters so it fits
+// the transmission banner on one or two rows.
 export const STORY = deepFreeze({
   speaker: {
     ring: 'THE RING',
     wake: 'WAKE',
-    5: 'WARDEN PRIME',
-    10: 'THE CHOIR',
-    15: 'WARDEN NULL',
+    prime: 'WARDEN PRIME',
+    choir: 'THE CHOIR',
     null: 'WARDEN NULL',
     'quarry-maw': 'QUARRY MAW',
     gatekeeper: 'GATEKEEPER',
@@ -41,9 +39,9 @@ export const STORY = deepFreeze({
     'debris-wake':
       'Debris Wake. What the Ring let go of. All of it is still counted.',
     'salvage-lanes':
-      'Salvage Lanes. Cargo moved here for nine hundred years. The schedule still runs.',
+      'Salvage Lanes. Cargo has moved here for a thousand years. The schedule still runs.',
     'prime-gate':
-      'Prime Gate. Last opened: nine hundred years ago. Power: nominal. Keeper: on station.',
+      'Prime Gate. Last opened: a thousand years ago. Power: nominal. Keeper: on station.',
     'furnace-drift':
       'Furnace Drift. The Core vents here. It has not been allowed to cool.',
     'crystal-choir':
@@ -54,6 +52,8 @@ export const STORY = deepFreeze({
       'Assembly Graveyard. The same chassis, built again. Order received once. Never closed.',
     'quarantine-grid':
       'Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.',
+    'wardens-reach':
+      'Null Boundary. Cut made by the operators. Guard posted: one. Nothing logged past it.',
     'the-crucible':
       'The Crucible. All orders arrive here. Two of them cannot both be obeyed.',
   },
@@ -188,30 +188,11 @@ export const STORY = deepFreeze({
     'bastion-hull':
       'Escort hull logged: Bastion. Built to bring others home. Carrying one.',
   },
-  // warning: on 'boss-warning', the layer before the Warden. defeated: on its
-  // 'boss-defeated' (the last Warden's defeat is the victory line).
-  warden: {
-    5: {
-      warning:
-        'Salvage pilot. You are counted. The Ring is broken. It is not abandoned.',
-      defeated:
-        'Prime yields. The record is kept. Below, the Choir is already singing it.',
-    },
-    10: {
-      warning:
-        'We are three. We were nine. We sang the Ring closed. We will sing you still.',
-      defeated:
-        'The hymn breaks. We were not guarding it. We were holding it shut.',
-    },
-    15: {
-      warning:
-        'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
-      defeated:
-        'Still... no longer. It hears you now. I kept it asleep a thousand years.',
-    },
-  },
-  // Sentinel lines, keyed by boss kind: warning and defeated as a Warden's.
-  sentinel: {
+  // What each boss says, keyed by its kind (Wardens and Sentinels alike), in
+  // the campaign's order. warning: on 'boss-warning', the layer before it.
+  // last: as its final phase begins. defeated: on its 'boss-defeated' (after
+  // Warden Null's on the run's last layer comes `victory`).
+  boss: {
     'quarry-maw': {
       warning:
         'Quarry unit active. Stone is counted before it is eaten. So are hulls.',
@@ -224,38 +205,57 @@ export const STORY = deepFreeze({
       last: 'Schedule slipping. Second pass authorised. The lane stays closed.',
       defeated: 'Gate open. One hull through. Prime has been told.',
     },
+    prime: {
+      warning:
+        'Salvage pilot. You are counted. The Ring is broken. It is not abandoned.',
+      last: 'The count does not close with you in it. Prime will correct the count.',
+      defeated:
+        'Prime yields. The record is kept. Below, the Choir is already singing it.',
+    },
     'kiln-engine': {
       warning:
         'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
+      last: 'Vents sealed. Pressure: rising. The fire has one place left to go.',
       defeated:
         'Kiln Engine cold. Heat released: all of it. Seams: one, opening.',
     },
     'prism-crown': {
       warning:
         'Six voices sleep in the crystal. The Crown still carries their note.',
+      last: 'The note is cracking. Six sleepers stir. The Crown holds them a little longer.',
       defeated: 'The Crown is dark. The note has stopped. The seam has not.',
     },
+    choir: {
+      warning:
+        'We are three. We were nine. We sang the Ring closed. We will sing you still.',
+      last: 'The hymn thins. The seam hears the gap. Do not be the gap.',
+      defeated:
+        'The hymn breaks. We were not guarding it. We were holding it shut.',
+    },
+    // `last`: the order it cannot close.
     'foundry-mother': {
       warning:
         'Assembly line active. Chassis count: unfinished. Intruder count: one.',
-      // `last`: at half health, the order it cannot close.
       last: 'Order open. Build the chassis. Build the chassis. No one closes the order.',
       defeated:
         'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.',
     },
+    // `last`: what the boundary is for.
     interdictor: {
       warning: 'Quarantine holds. Boundary drawn. You are inside it.',
-      // `last`: at half health, what the boundary is for.
       last: 'The boundary was never for you. It keeps the Ring from hearing. You are loud.',
       defeated:
         'Interdictor offline. The boundary is open. Null has been waiting for this.',
     },
-    // Warden Null's `last` (the final-phase hook is keyed by boss kind): its
-    // shell shed, it says why it wanted stillness.
+    // `last`: its shell shed, it says why it wanted stillness.
     null: {
+      warning:
+        'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
       last: 'Stop. Every shot is a voice. It is listening for one.',
+      defeated:
+        'Still... no longer. It hears you now. I kept it asleep a thousand years.',
     },
-    // `last`: as its final phase begins (Sovereign: the two orders at once).
+    // `last`: the two orders at once.
     sovereign: {
       warning:
         'Protect them. Rebuild them. I will do both. You are material for the second.',
@@ -296,9 +296,9 @@ export const STORY = deepFreeze({
   ],
   victory:
     'Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.',
-  // Spoken by the Wake in the middle of a sector run, as its third stage
-  // begins: where each chapter's turn is said while it is happening
-  // (docs/ROTEIRO.md "Falas de meio de fase"). Keyed by sector, then stage.
+  // Spoken as a stage of a sector run begins (docs/ROTEIRO.md "Falas de meio
+  // de fase"), keyed by sector, then stage: the Wake at every third, where
+  // each chapter's turn is said while it is happening; the others as noted.
   stage: {
     'debris-wake': {
       3: {
@@ -320,7 +320,7 @@ export const STORY = deepFreeze({
     'prime-gate': {
       3: {
         speaker: 'wake',
-        text: 'A garrison. For a gate nobody has used in nine centuries. Who are they expecting?',
+        text: 'A garrison. For a gate nobody has used in a thousand years. Who are they expecting?',
       },
     },
     'furnace-drift': {

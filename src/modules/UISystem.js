@@ -493,7 +493,11 @@ class UISystem extends BaseSystem {
       }
       this.lastTransmission = null;
       this.queueTransmission(
-        deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
+        deathTransmission(
+          this.getRandomFork('base'),
+          this.transmissionLayer,
+          this.sector
+        ),
         { interrupt: true }
       );
     });

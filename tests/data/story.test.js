@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENDING_SECTOR, STORY } from '../../src/data/story.js';
 import { BIOMES } from '../../src/data/biomes.js';
+import { BOSS_KINDS } from '../../src/data/enemies/boss.js';
 import {
   chapterTransmission,
   stageTransmission,
@@ -11,7 +12,7 @@ import { SECTORS } from '../../src/data/sectors.js';
 const allLines = () => [
   ...Object.values(STORY.chapter),
   ...Object.values(STORY.sector),
-  ...Object.values(STORY.warden).flatMap((moments) => Object.values(moments)),
+  ...Object.values(STORY.boss).flatMap((moments) => Object.values(moments)),
   ...Object.values(STORY.herald).flatMap((moments) => Object.values(moments)),
   ...STORY.death,
   STORY.victory,
@@ -32,21 +33,20 @@ const allLines = () => [
 ];
 
 describe('story', () => {
-  it('has a chapter line per biome and the Warden lines per Warden layer', () => {
+  it('has a chapter line per biome and three lines per boss kind', () => {
     expect(Object.keys(STORY.chapter).sort()).toEqual(
       BIOMES.map((b) => b.id).sort()
     );
-    expect(Object.keys(STORY.warden)).toEqual(['5', '10', '15']);
-    [5, 10].forEach((layer) => {
-      expect(STORY.warden[layer].warning).toBeTruthy();
-      expect(STORY.warden[layer].defeated).toBeTruthy();
+    expect(Object.keys(STORY.boss).sort()).toEqual(
+      Object.keys(BOSS_KINDS).sort()
+    );
+    Object.entries(STORY.boss).forEach(([kind, lines]) => {
+      expect(Object.keys(lines)).toEqual(['warning', 'last', 'defeated']);
+      expect(STORY.speaker[kind]).toBeTruthy();
     });
-    expect(STORY.warden[15].warning).toBeTruthy();
     expect(STORY.death).toHaveLength(4);
     expect(STORY.victory).toBeTruthy();
-    ['ring', 5, 10, 15].forEach((who) =>
-      expect(STORY.speaker[who]).toBeTruthy()
-    );
+    expect(STORY.speaker.ring).toBeTruthy();
   });
 
   it('gives each Herald a speaker and a line as it appears and as it falls', () => {
@@ -98,7 +98,7 @@ describe('story', () => {
     expect(SECTORS.some((sector) => sector.id === ENDING_SECTOR)).toBe(true);
   });
 
-  it('has the Wake speak mid-run in every sector, and nowhere else', () => {
+  it('has a line at the third stage of every sector, and in no other place', () => {
     expect(Object.keys(STORY.stage).sort()).toEqual(
       SECTORS.map((sector) => sector.id).sort()
     );
@@ -118,7 +118,7 @@ describe('story', () => {
   });
 
   it('is frozen', () => {
-    expect(Object.isFrozen(STORY.warden[5])).toBe(true);
+    expect(Object.isFrozen(STORY.boss.prime)).toBe(true);
     expect(Object.isFrozen(STORY.death)).toBe(true);
   });
 });

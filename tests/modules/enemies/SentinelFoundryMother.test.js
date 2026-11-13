@@ -251,7 +251,7 @@ describe('Sentinel Foundry Mother', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(15, 'warning', 'foundry-mother')).toEqual({
-      key: 'sentinel:foundry-mother:warning',
+      key: 'boss:foundry-mother:warning',
       speaker: 'FOUNDRY MOTHER',
       text: 'Assembly line active. Chassis count: unfinished. Intruder count: one.',
     });

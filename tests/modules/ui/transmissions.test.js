@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import RandomService from '../../../src/core/RandomService.js';
 import { STORY } from '../../../src/data/story.js';
+import { sectorById } from '../../../src/data/sectors.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
   TRANSMISSION_HOLD_MS,
@@ -51,19 +52,19 @@ describe('TransmissionQueue', () => {
 
     hud.busy = false;
     queue.update(1000);
-    expect(hud.showing).toBe(STORY.speaker[5]);
-    expect(shown).toEqual(['warden:5:warning']);
+    expect(hud.showing).toBe(STORY.speaker.prime);
+    expect(shown).toEqual(['boss:prime:warning']);
     queue.update(1000 + 250);
     expect(hud.text).toBe(
-      STORY.warden[5].warning.slice(0, TRANSMISSION_CHARS_PER_SECOND / 4)
+      STORY.boss.prime.warning.slice(0, TRANSMISSION_CHARS_PER_SECOND / 4)
     );
 
     const typingMs =
-      (STORY.warden[5].warning.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+      (STORY.boss.prime.warning.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
     queue.update(1000 + typingMs + TRANSMISSION_HOLD_MS);
     expect(hud.showing).toBeNull();
     queue.update(1000 + typingMs + TRANSMISSION_HOLD_MS + 16);
-    expect(shown).toEqual(['warden:5:warning', 'warden:5:defeated']);
+    expect(shown).toEqual(['boss:prime:warning', 'boss:prime:defeated']);
   });
 
   it('cuts a line when a banner opens and replays it afterwards', () => {
@@ -77,8 +78,8 @@ describe('TransmissionQueue', () => {
     expect(hud.showing).toBeNull();
     hud.busy = false;
     queue.update(2000);
-    expect(hud.showing).toBe(STORY.speaker[10]);
-    expect(shown).toEqual(['warden:10:warning', 'warden:10:warning']);
+    expect(hud.showing).toBe(STORY.speaker.choir);
+    expect(shown).toEqual(['boss:choir:warning', 'boss:choir:warning']);
   });
 
   it('reports a line finished after its hold, or when it is dropped', () => {
@@ -94,12 +95,12 @@ describe('TransmissionQueue', () => {
     queue.update(TRANSMISSION_HOLD_MS - 1, true);
     expect(finished).toEqual([]);
     queue.update(TRANSMISSION_HOLD_MS, true);
-    expect(finished).toEqual(['warden:5:warning']);
+    expect(finished).toEqual(['boss:prime:warning']);
 
     queue.push(wardenTransmission(5, 'defeated'));
     queue.update(TRANSMISSION_HOLD_MS + 16, true);
     queue.interrupt(victoryTransmission());
-    expect(finished).toEqual(['warden:5:warning', 'warden:5:defeated']);
+    expect(finished).toEqual(['boss:prime:warning', 'boss:prime:defeated']);
   });
 
   it('shows the whole line at once with reduced motion', () => {
@@ -107,7 +108,7 @@ describe('TransmissionQueue', () => {
     const queue = new TransmissionQueue(hud, () => {});
     queue.push(wardenTransmission(15, 'warning'));
     queue.update(0, true);
-    expect(hud.text).toBe(STORY.warden[15].warning);
+    expect(hud.text).toBe(STORY.boss.null.warning);
   });
 });
 
@@ -115,9 +116,9 @@ describe('wardenTransmission', () => {
   it("speaks a Sentinel's own lines by kind, else the layer's Warden", () => {
     const sentinel = wardenTransmission(5, 'warning', 'quarry-maw');
     expect(sentinel).toEqual({
-      key: 'sentinel:quarry-maw:warning',
+      key: 'boss:quarry-maw:warning',
       speaker: 'QUARRY MAW',
-      text: STORY.sentinel['quarry-maw'].warning,
+      text: STORY.boss['quarry-maw'].warning,
     });
     expect(wardenTransmission(5, 'defeated', 'quarry-maw').text).toMatch(
       /^Quarry Maw offline\./
@@ -133,15 +134,15 @@ describe('winTransmissions', () => {
   it('wakes the Ring after Warden Null only, not after the Sentinels of its chapter', () => {
     const keys = (lines) => lines.map((line) => line?.key);
     expect(keys(winTransmissions(15))).toEqual([
-      'warden:15:defeated',
+      'boss:null:defeated',
       'victory',
     ]);
     expect(keys(winTransmissions(15, 'foundry-mother'))).toEqual([
-      'sentinel:foundry-mother:defeated',
+      'boss:foundry-mother:defeated',
     ]);
-    expect(keys(winTransmissions(5))).toEqual(['warden:5:defeated']);
+    expect(keys(winTransmissions(5))).toEqual(['boss:prime:defeated']);
     expect(keys(winTransmissions(20, 'sovereign'))).toEqual([
-      'sentinel:sovereign:defeated',
+      'boss:sovereign:defeated',
     ]);
   });
 });
@@ -198,7 +199,17 @@ describe('deathTransmission', () => {
     expect(pick(1234)).toEqual(pick(1234));
     pick(1234).forEach((text) => expect(STORY.death).toContain(text));
     expect(deathTransmission(new RandomService(1), 7).speaker).toBe(
-      STORY.speaker[10]
+      STORY.speaker.choir
+    );
+  });
+
+  it('is spoken by the Ring in the Crucible, past the last Warden', () => {
+    const crucible = sectorById('the-crucible');
+    expect(deathTransmission(new RandomService(1), 18, crucible).speaker).toBe(
+      STORY.speaker.ring
+    );
+    expect(deathTransmission(new RandomService(1), 18).speaker).toBe(
+      STORY.speaker.null
     );
   });
 });
