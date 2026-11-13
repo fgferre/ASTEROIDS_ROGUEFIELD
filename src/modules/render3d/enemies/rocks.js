@@ -7,6 +7,7 @@ import { PALETTE } from '../../../data/constants/palette.js';
 import { createAsteroidGeometry, createSeededRandom } from '../asteroidMesh.js';
 import { bakeRockMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
+import { SHINE } from '../hullModel.js';
 import { RockInstances } from '../rockInstances.js';
 import {
   FOG_DIM,
@@ -34,8 +35,10 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // `reveal`/`width` set how much of the crack network the veins light.
 // Crystal swaps to a glossy faceted material with a cold rim (`rim`);
 // `gain` multiplies `base` past white (a polished metal's reflectance).
+// Stone and crystal take their finish from hullModel.js SHINE; iron, the
+// dense core and gold are their own mixes of ore and stone.
 export const VARIANT_LOOKS = {
-  common: { base: '#ffffff', roughness: 0.94, metalness: 0.04 },
+  common: { base: '#ffffff', ...SHINE.rock },
   iron: { base: '#f4f7ff', roughness: 0.42, metalness: 0.3 },
   denseCore: { base: '#a4b6dc', roughness: 0.7, metalness: 0.12 },
   // proposta 13/11: polished gold between the veins — `gain` lifts the
@@ -52,8 +55,7 @@ export const VARIANT_LOOKS = {
   },
   volatile: {
     base: '#f0d2bc',
-    roughness: 0.94,
-    metalness: 0.04,
+    ...SHINE.rock,
     vein: PALETTE.shot,
     veinGlow: 1.3,
     floor: 0.35,
@@ -64,8 +66,7 @@ export const VARIANT_LOOKS = {
   },
   parasite: {
     base: '#dcbcc4',
-    roughness: 0.9,
-    metalness: 0.06,
+    ...SHINE.rock,
     vein: PALETTE.threat,
     veinGlow: 1.2,
     floor: 0.25,
@@ -76,8 +77,7 @@ export const VARIANT_LOOKS = {
   },
   crystal: {
     base: '#86b8e8',
-    roughness: 0.2,
-    metalness: 0.05,
+    ...SHINE.crystal,
     vein: '#bfe8ff',
     veinGlow: 0.45,
     reveal: 0.3,

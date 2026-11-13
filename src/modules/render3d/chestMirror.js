@@ -10,6 +10,7 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { CHEST } from '../../data/pickups.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
+import { SHINE } from './hullModel.js';
 import { mergeStatic } from './mergeStatic.js';
 import { addRimLight } from './rimLight.js';
 
@@ -146,8 +147,7 @@ export class ChestMirror {
     const bodyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
         vertexColors: true,
-        metalness: 0.25,
-        roughness: 0.72,
+        ...SHINE.paint,
       })
     );
     const body = bodyParts(THREE);

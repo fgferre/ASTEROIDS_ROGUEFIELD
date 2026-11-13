@@ -12,19 +12,17 @@
 
 import { createSeededRandom } from '../asteroidMesh.js';
 import { colorOf } from '../batches.js';
+import { SHINE } from '../hullModel.js';
 import { mergeStatic } from '../mergeStatic.js';
 
-// proposta 12/11: the matte surfaces' finish; a glow loses `glowHaze` of
-// its light where the haze is full.
-const MATTE = { roughness: 0.92, metalness: 0.08 };
-// proposta 13/11: a gem's polished facets — `glow` of its vertex colour lit
-// from inside, `body` of it taking the field's lights, its sheen capped at
-// `cap` (direct, reflected) as the ship's is (hullModel.js
+// The hard surfaces' finish is worn metal and stone (hullModel.js SHINE: a
+// set seen under the haze shows no finer shine); a glow loses `glowHaze`
+// of its light where the haze is full.
+// proposta 13/11: a gem's polished facets (SHINE.crystal) — `glow` of its
+// vertex colour lit from inside, `body` of it taking the field's lights, its
+// sheen capped at `cap` (direct, reflected) as the ship's is (hullModel.js
 // SPECULAR_CAP_GLSL), higher because the haze takes most of it.
 const GEM = {
-  roughness: 0.25,
-  metalness: 0.1,
-  envMapIntensity: 2,
   body: 0.3,
   glow: 0.7,
   cap: [0.7, 0.3],
@@ -97,20 +95,18 @@ function hazed(material, uniforms, kind) {
 function makeMaterial(THREE, kind, uniforms) {
   if (kind === 'matte') {
     return hazed(
-      new THREE.MeshStandardMaterial({ vertexColors: true, ...MATTE }),
+      new THREE.MeshStandardMaterial({ vertexColors: true, ...SHINE.worn }),
       uniforms,
       kind
     );
   }
   if (kind === 'gem') {
-    const { roughness, metalness, envMapIntensity, body } = GEM;
+    const { body } = GEM;
     return hazed(
       new THREE.MeshStandardMaterial({
         vertexColors: true,
         color: new THREE.Color(body, body, body),
-        roughness,
-        metalness,
-        envMapIntensity,
+        ...SHINE.crystal,
       }),
       uniforms,
       kind

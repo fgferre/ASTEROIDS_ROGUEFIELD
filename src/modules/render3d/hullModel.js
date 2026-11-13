@@ -83,15 +83,56 @@ const LAYER_BARREL = [
 const STEEL = 4;
 
 /**
- * MeshStandardMaterial settings per finish (FINISH order): satin paint,
- * glossier accent panels, polished steel; the paint and the accents carry
- * the baked panel maps (their roughness map is about 1, so `roughness` is
- * what the surface gets). proposta 12/11: values set by eye on captures.
+ * How each material the game builds with takes the light, one place for
+ * every model (MeshStandardMaterial settings): a little shine by what a
+ * thing is made of (the owner, 13/11: "aço inoxidável tem brilho, vidro tem
+ * brilho... metais geralmente têm brilho"), the mass still matte enough to
+ * read (docs/NORTE.md §2). proposta 13/11, set by eye on captures:
+ * - paint: painted plate, satin (hulls, enemy plates, pickups);
+ * - gloss: lacquered accent panels and shells;
+ * - steel: polished or bare metal (barrels, blades, rails, claws, rams);
+ * - glass: canopies and lens covers, a tight glint;
+ * - crystal: cut crystal facets, a sharp highlight;
+ * - worn: rust, soot, wrecks, broken plate, the Ring and the places' sets
+ *   (seen under their haze, no finer shine shows), dull;
+ * - rock: stone, dullest.
+ */
+export const SHINE = Object.freeze({
+  paint: Object.freeze({ metalness: 0.2, roughness: 0.64, envMapIntensity: 1 }),
+  gloss: Object.freeze({
+    metalness: 0.2,
+    roughness: 0.48,
+    envMapIntensity: 1.2,
+  }),
+  steel: Object.freeze({
+    metalness: 0.85,
+    roughness: 0.3,
+    envMapIntensity: 1.2,
+  }),
+  glass: Object.freeze({
+    metalness: 0.1,
+    roughness: 0.22,
+    envMapIntensity: 1.2,
+  }),
+  crystal: Object.freeze({
+    metalness: 0.1,
+    roughness: 0.25,
+    envMapIntensity: 2,
+  }),
+  worn: Object.freeze({ metalness: 0.15, roughness: 0.88, envMapIntensity: 1 }),
+  rock: Object.freeze({ metalness: 0.04, roughness: 0.94, envMapIntensity: 1 }),
+});
+
+/**
+ * The hull's materials per finish (FINISH order): satin paint, glossier
+ * accent panels, polished steel; the paint and the accents carry the baked
+ * panel maps (their roughness map is about 1, so `roughness` is what the
+ * surface gets).
  */
 export const HULL_FINISHES = Object.freeze([
-  { metalness: 0.2, roughness: 0.64, envMapIntensity: 1 },
-  { metalness: 0.2, roughness: 0.48, envMapIntensity: 1.2 },
-  { metalness: 1, roughness: 0.45, envMapIntensity: 2.5 },
+  SHINE.paint,
+  SHINE.gloss,
+  SHINE.steel,
 ]);
 
 /**
@@ -105,15 +146,51 @@ export const SPECULAR_CAP_GLSL = `
       reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.2));`;
 
 /**
+ * A MeshStandardMaterial's onBeforeCompile (set it before addRimLight, which
+ * chains after it): the specular cap, and a part's own SHINE class where
+ * its merged geometry carries one (mergeStatic `shine`: roughness and
+ * metalness per vertex, 0 for the material's own), so a body's steel parts
+ * gleam in the same draw as its painted plates. A geometry without the
+ * attribute reads WebGL's constant for it (0, or 1 where a ShaderMaterial
+ * left its default colour on that slot): both mean the material's own.
+ */
+export function patchShine(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace(
+      '#include <common>',
+      '#include <common>\nattribute vec2 shine;\nvarying vec2 vShine;'
+    )
+    .replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\nvShine = shine;'
+    );
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec2 vShine;')
+    .replace(
+      '#include <metalnessmap_fragment>',
+      `#include <metalnessmap_fragment>
+      if (vShine.x > 0.0 && vShine.x < 1.0) {
+        roughnessFactor *= vShine.x / roughness;
+        metalnessFactor = vShine.y;
+      }`
+    )
+    .replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
+    );
+}
+
+/** Gives `material` patchShine (again after a clone(), which drops it). */
+export function shiny(material) {
+  material.onBeforeCompile = patchShine;
+  return material;
+}
+
+/**
  * The canopy's dark glass: a tight highlight over a faint cyan glow.
  * proposta 12/11.
  */
-export const CANOPY_GLASS = Object.freeze({
-  metalness: 0.1,
-  roughness: 0.22,
-  envMapIntensity: 1.2,
-  glow: 0.14,
-});
+export const CANOPY_GLASS = Object.freeze({ ...SHINE.glass, glow: 0.14 });
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (u, v) => [
@@ -330,6 +407,12 @@ export function hullTones(THREE) {
     tone(PALETTE.neutral, PALETTE.salvage, 0.2),
   ];
 }
+
+/**
+ * Bare steel's tone, the hull's STEEL: a metal's colour is what it
+ * reflects, so a SHINE.steel part needs a light one to gleam.
+ */
+export const steelTone = (THREE) => hullTones(THREE)[STEEL];
 
 /**
  * The turret, built up from y = 0: the housing (a domed ring) and the low

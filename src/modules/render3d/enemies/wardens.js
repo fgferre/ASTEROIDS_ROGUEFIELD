@@ -10,6 +10,7 @@ import { PALETTE } from '../../../data/constants/palette.js';
 import { WARDEN_KINDS } from '../../../data/enemies/boss.js';
 import { bakePlateMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
+import { shiny } from '../hullModel.js';
 import { mergeStatic } from '../mergeStatic.js';
 import { addRimLight } from '../rimLight.js';
 
@@ -59,8 +60,9 @@ export function createWardenViews(kit) {
   // Every matte Warden part: the plate look plus grooved surface maps on
   // their UVs, smooth-shaded, its two tones (hull, dark) in vertex colours.
   const plateMaps = bakePlateMaps(THREE, kit.mapSeed);
-  // clone() drops the rim patch (and userData functions): add it again
-  const wardenPlateMaterial = addRimLight(kit.plateMaterial.clone());
+  // clone() drops the shine and rim patches (and userData functions): add
+  // them again
+  const wardenPlateMaterial = addRimLight(shiny(kit.plateMaterial.clone()));
   Object.assign(wardenPlateMaterial, plateMaps, {
     normalScale: new THREE.Vector2(PLATE_NORMAL_SCALE, PLATE_NORMAL_SCALE),
     aoMapIntensity: PLATE_AO,

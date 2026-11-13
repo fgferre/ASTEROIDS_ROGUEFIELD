@@ -37,7 +37,7 @@
 //     mirror: also its twin across z (left/right), sides (and rings, for a
 //       body or tube): how finely a designed shape is cut,
 //     material: hull | trim | steel | soot | glow (hull; trim for nozzle and
-//       socket): matte hull, dark trim, worn light steel, sooty black,
+//       socket): satin hull, dark trim, polished light steel, sooty black,
 //     color: a PALETTE key (hull: hullLit, trim: hull, glow: threat),
 //   }],
 //   lights: [{ at, size (0.18), color (threat), pulse: getter, dir, housing }],
@@ -56,6 +56,7 @@
 import { PALETTE } from '../../../data/constants/palette.js';
 import { bakeHullMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
+import { SHINE, shiny, steelTone } from '../hullModel.js';
 import { mergeStatic } from '../mergeStatic.js';
 import { rimLoop } from '../rimBatch.js';
 import { addRimLight } from '../rimLight.js';
@@ -203,9 +204,11 @@ const DEFAULT_VISUAL = Object.freeze({
   lights: [{ at: [0.8, 0.1, 0], dir: [1, 0.6, 0], size: 0.12 }],
 });
 
-// The matte materials (their tones built in createRecipeViews); the shapes
-// that are dark unless they say otherwise.
+// The lit materials (their tones built in createRecipeViews) and how each
+// takes the light (hullModel.js SHINE; hull and trim are the body's satin
+// paint); the shapes that are dark unless they say otherwise.
 const MATTE = new Set(['hull', 'trim', 'steel', 'soot']);
+const SHINE_OF = { steel: SHINE.steel, soot: SHINE.worn };
 const DARK_SHAPES = new Set(['nozzle', 'socket']);
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -222,12 +225,12 @@ export function createRecipeViews(kit) {
   const tones = {
     hull,
     trim: dark,
-    steel: hull.clone().multiplyScalar(1.7),
+    steel: steelTone(THREE),
     soot: dark.clone().multiplyScalar(0.55),
   };
   // The panel finish, shared by every look that asks for it: the plate
   // material carrying baked hull panels, its tones in vertex colours.
-  const panelMaterial = addRimLight(kit.plateMaterial.clone());
+  const panelMaterial = addRimLight(shiny(kit.plateMaterial.clone()));
   const maps = bakeHullMaps(THREE, kit.mapSeed + PANEL_MAP_SEED);
   Object.values(maps).forEach((map) => map.repeat.set(PANEL_TILE, PANEL_TILE));
   Object.assign(panelMaterial, maps, {
@@ -493,7 +496,10 @@ export function createRecipeViews(kit) {
         const color = part.color
           ? colorOf(THREE, paletteHex(part.color))
           : tones[material];
-        geometries.forEach((geometry) => matte.push({ geometry, color }));
+        const shine = SHINE_OF[material];
+        geometries.forEach((geometry) =>
+          matte.push({ geometry, color, shine })
+        );
       } else {
         throw new Error(`[recipes] no material '${material}'`);
       }

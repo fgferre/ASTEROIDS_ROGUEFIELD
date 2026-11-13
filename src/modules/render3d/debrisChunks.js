@@ -9,6 +9,7 @@
 
 import { createAsteroidGeometry } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
+import { SHINE } from './hullModel.js';
 
 // proposta 17/10: pool, shape and motion of the chunks.
 const VARIANTS = 4;
@@ -33,8 +34,7 @@ export class DebrisChunks {
   constructor(THREE, scene) {
     this.material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.92,
-      metalness: 0.05,
+      ...SHINE.rock,
       flatShading: true,
     });
     this.meshes = [];

@@ -3,10 +3,13 @@
 // into a vertex colour, so the parts of a machine that never move apart draw
 // as one mesh under one shared material. `flat` parts take face normals (the
 // look of a flatShading material). The result is non-indexed and keeps uv/uv2
-// only when every part has them (baked surface maps).
+// only when every part has them (baked surface maps). A part's `shine` (a
+// hullModel.js SHINE class) rides in a `shine` attribute (roughness,
+// metalness; 0 on the other parts: the material's own) that patchShine
+// reads, so steel and paint share one draw.
 
 /**
- * parts: [{ geometry, color?, flat?, position?: [x, y, z],
+ * parts: [{ geometry, color?, shine?, flat?, position?: [x, y, z],
  *           scale?: number | [x, y, z], rotationY? }]
  */
 export function mergeStatic(THREE, parts) {
@@ -23,6 +26,9 @@ export function mergeStatic(THREE, parts) {
   const position = new Float32Array(total * 3);
   const normal = new Float32Array(total * 3);
   const color = colored ? new Float32Array(total * 3) : null;
+  const shine = parts.some((part) => part.shine)
+    ? new Float32Array(total * 2)
+    : null;
   const uvs = uvNames.map(() => new Float32Array(total * 2));
 
   const matrix = new THREE.Matrix4();
@@ -57,6 +63,10 @@ export function mergeStatic(THREE, parts) {
         .normalize()
         .toArray(normal, o);
       if (color) tint.toArray(color, o);
+      if (shine && part.shine) {
+        shine[(offset + i) * 2] = part.shine.roughness;
+        shine[(offset + i) * 2 + 1] = part.shine.metalness;
+      }
     }
     if (part.flat) {
       for (let i = 0; i < pos.count; i += 3) {
@@ -82,6 +92,7 @@ export function mergeStatic(THREE, parts) {
   merged.setAttribute('position', new THREE.BufferAttribute(position, 3));
   merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
   if (color) merged.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  if (shine) merged.setAttribute('shine', new THREE.BufferAttribute(shine, 2));
   uvNames.forEach((name, n) =>
     merged.setAttribute(name, new THREE.BufferAttribute(uvs[n], 2))
   );

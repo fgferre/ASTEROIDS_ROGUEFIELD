@@ -5,7 +5,7 @@
 import { PALETTE } from '../../../../data/constants/palette.js';
 import { bakeHullMaps } from '../../bakedMaps.js';
 import { colorOf } from '../../batches.js';
-import { SPECULAR_CAP_GLSL } from '../../hullModel.js';
+import { SHINE, shiny } from '../../hullModel.js';
 import { mergeStatic } from '../../mergeStatic.js';
 import { addRimLight } from '../../rimLight.js';
 
@@ -16,8 +16,6 @@ export const CORE_COLD = 0.05;
 export const CORE_HOT = 1.5;
 export const CORE_BEAT = 9;
 export const CORE_FLASH = 0.9;
-// proposta 13/11: the weapon parts' polish (metal, how rough, reflections).
-const EMITTER_FINISH = { metalness: 0.85, roughness: 0.3, env: 1.2 };
 // Panels per unit of hull (the baked maps' tiling).
 const PANEL_TILE = 1.6;
 const MAW_MAP_SEED = 0x51a7;
@@ -56,8 +54,8 @@ export const hex = (radius, turn = 0) =>
 export function createSentinelKit(kit, recipeViews) {
   const { THREE } = kit;
   const { hull, dark } = kit.tones;
-  // Worn steel (teeth, rolls, rams), soot (inside the mouth) and old hazard
-  // paint: matte tones in the vertex colours, like hull and dark.
+  // Bare steel (teeth, rolls, rams), soot (inside the mouth) and old hazard
+  // paint: tones in the vertex colours, like hull and dark.
   const steel = hull.clone().multiplyScalar(1.7);
   const soot = dark.clone().multiplyScalar(0.55);
   const paint = colorOf(THREE, '#7a5a1c');
@@ -74,8 +72,8 @@ export function createSentinelKit(kit, recipeViews) {
   function hullMaterial(seed, tile = PANEL_TILE) {
     const maps = bakeHullMaps(THREE, kit.mapSeed + seed);
     Object.values(maps).forEach((map) => map.repeat.set(tile, tile));
-    // clone() drops the rim patch: add it again
-    const material = addRimLight(kit.plateMaterial.clone());
+    // clone() drops the shine and rim patches: add them again
+    const material = addRimLight(shiny(kit.plateMaterial.clone()));
     Object.assign(material, maps, {
       normalScale: new THREE.Vector2(0.8, 0.8),
       aoMapIntensity: 0.8,
@@ -88,19 +86,13 @@ export function createSentinelKit(kit, recipeViews) {
   // The weapon parts (projectors, muzzles, vents' lips, lenses' housings):
   // polished steel, its highlight capped like the ship's hull so it shines
   // without blowing out. Tones in the vertex colours; one per view.
-  const emitterMaterial = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    metalness: EMITTER_FINISH.metalness,
-    roughness: EMITTER_FINISH.roughness,
-    envMapIntensity: EMITTER_FINISH.env,
-    flatShading: true,
-  });
-  emitterMaterial.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <lights_fragment_end>',
-      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
-    );
-  };
+  const emitterMaterial = shiny(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      ...SHINE.steel,
+      flatShading: true,
+    })
+  );
   addRimLight(emitterMaterial);
   // A lens on `parent` at `at` ([x, y, z]), `size` across: a glow of the
   // view (drawn by the glow batch, no draw of its own), set with lensGain.
@@ -144,10 +136,20 @@ export function createSentinelKit(kit, recipeViews) {
     if (axis === 'z') geometry.rotateX(Math.PI / 2);
     return geometry;
   }
+  // The tones that name a metal of their own (hullModel.js SHINE): bare
+  // steel gleams, soot stays dull; the rest is the material's paint.
+  const shineOf = new Map([
+    [steel, SHINE.steel],
+    [soot, SHINE.worn],
+  ]);
   function merge(parts) {
     const geometry = mergeStatic(
       THREE,
-      parts.map((part) => ({ flat: true, ...part }))
+      parts.map((part) => ({
+        flat: true,
+        shine: shineOf.get(part.color),
+        ...part,
+      }))
     );
     geometry.setAttribute('uv2', geometry.getAttribute('uv'));
     return geometry;

@@ -37,6 +37,7 @@ import {
 } from './enemies/sentinels.js';
 import { createWardenViews } from './enemies/wardens.js';
 import { GlowBatch } from './glowBatch.js';
+import { SHINE, shiny } from './hullModel.js';
 import { mergeStatic } from './mergeStatic.js';
 import { RimBatch, rimLoop } from './rimBatch.js';
 import { addRimLight } from './rimLight.js';
@@ -154,30 +155,35 @@ export function markShadowCasters(root, minRadius = 0) {
 function createKit(THREE, scene, seeded, dissolve) {
   // Matte mass (docs/NORTE.md §2): the eye/core is the only light; a
   // faint key-coloured rim (rimLight.js) keeps machine silhouettes apart
-  // from the field. Rocks get none.
+  // from the field. Rocks get none. Plates are satin paint (hullModel.js
+  // SHINE), a broken one worn; a merged body's steel and soot parts take
+  // their own class (patchShine).
   const plateMaterial = addRimLight(
-    new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit),
-      metalness: 0.2,
-      roughness: 0.85,
-      flatShading: true,
-    })
+    shiny(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.hullLit),
+        ...SHINE.paint,
+        flatShading: true,
+      })
+    )
   );
   const darkMaterial = addRimLight(
-    new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hull),
-      metalness: 0.3,
-      roughness: 0.8,
-    })
+    shiny(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.hull),
+        ...SHINE.worn,
+      })
+    )
   );
-  // The static matte parts of a machine, merged per look (mergeStatic):
-  // their hull/dark/plate tones ride in vertex colours, one draw each.
+  // The static parts of a machine, merged per look (mergeStatic): their
+  // hull/dark/plate tones ride in vertex colours, one draw each.
   const machineMaterial = addRimLight(
-    new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.2,
-      roughness: 0.85,
-    })
+    shiny(
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        ...SHINE.paint,
+      })
+    )
   );
   const tones = {
     hull: colorOf(THREE, PALETTE.hullLit),
