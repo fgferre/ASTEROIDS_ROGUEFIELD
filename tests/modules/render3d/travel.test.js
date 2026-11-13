@@ -115,6 +115,7 @@ describe('the journey between sectors', () => {
   });
 
   it('holds every shot long enough to read at any length, cutting into pauses', () => {
+    const inserts = ['engines', 'gate', 'flyover'];
     [7000, 16000].forEach((durationMs) => {
       ['salvage-lanes', 'furnace-drift'].forEach((to) => {
         const { motion } = fly(to, durationMs);
@@ -122,8 +123,9 @@ describe('the journey between sectors', () => {
         shots.plan(motion, durationMs, []);
         const cuts = [0, ...shots.cuts, 1];
         for (let i = 1; i < cuts.length; i += 1) {
+          const min = inserts.includes(shots.kinds[i - 1]) ? 749 : 1099;
           expect((cuts[i] - cuts[i - 1]) * durationMs).toBeGreaterThanOrEqual(
-            1199
+            min
           );
         }
       });
@@ -131,5 +133,63 @@ describe('the journey between sectors', () => {
     const pauses = linePauses([{ text: 'x'.repeat(40) }], 10000);
     expect(pauses[0][0]).toBeCloseTo(0.1);
     expect(pauses[0][1]).toBeCloseTo(0.3);
+  });
+
+  it('cuts more often the longer the journey', () => {
+    const count = (to, durationMs) => {
+      const { motion } = fly(to, durationMs);
+      const shots = new ShotPlan(THREE);
+      shots.plan(
+        motion,
+        durationMs,
+        [],
+        {},
+        Math.max(0.72, 1 - 2600 / durationMs)
+      );
+      return shots.kinds.length;
+    };
+    expect(count('the-crucible', 16000)).toBeGreaterThanOrEqual(7);
+    expect(count('the-crucible', 16000)).toBeGreaterThan(
+      count('furnace-drift', 7000)
+    );
+    expect(count('salvage-lanes', 7000)).toBeGreaterThanOrEqual(4);
+  });
+
+  it('banks without snapping where a turn meets a straight', () => {
+    ['furnace-drift', 'the-crucible'].forEach((to) => {
+      const { motion } = fly(to, 9000);
+      let last = null;
+      for (let t = 0; t <= 1; t += 1 / 540) {
+        if (Math.abs(t - 0.36) < 0.01) {
+          last = null;
+          continue;
+        }
+        motion.sample(t);
+        if (last !== null)
+          expect(Math.abs(motion.bank - last)).toBeLessThan(0.06);
+        last = motion.bank;
+      }
+    });
+  });
+
+  it('leaves by a gate through the gate, nose along its way', () => {
+    const leg = travelLeg('furnace-drift');
+    const map = new WorldMap(THREE).set(frame(leg.to), new THREE.Vector3(), 0);
+    const start = new THREE.Vector3();
+    map.point(frame(leg.from).position, start);
+    const gate = start.clone().add(new THREE.Vector3(500, -1400, -300));
+    const motion = new ShipMotion(THREE);
+    motion.plan(map, frame(leg.from), frame(leg.to), 8000, 0.36, false, gate);
+    const p = new THREE.Vector3();
+    const f = new THREE.Vector3();
+    motion.at(motion.gateAt, p, f);
+    expect(p.distanceTo(gate)).toBeLessThan(1);
+    expect(f.y).toBeLessThan(-0.5);
+    const q = new THREE.Vector3();
+    for (let t = 0.02; t < 0.35; t += 0.01) {
+      motion.at(t, p, f);
+      motion.at(t + 0.001, q);
+      expect(q.sub(p).normalize().dot(f)).toBeGreaterThan(0.95);
+    }
   });
 });

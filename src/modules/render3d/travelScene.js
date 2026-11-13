@@ -27,13 +27,15 @@ import { createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { RING, RING_LOOK } from './ring/ringShape.js';
 import { ShipMotion } from './travel/motion.js';
+import { MARKS, markPoint } from './travel/marks.js';
 import { ShotPlan } from './travel/shots.js';
 import { PLACE_ANGLES, WORLD, WorldMap, placeFrame } from './travel/world.js';
 
-// proposta 12/11: from `rise` the camera climbs into the intro's pose. The
-// Ring's running lights glow `lights` × and its haze runs `haze` × deeper
-// while it flies.
-const FLIGHT = { rise: 0.72, lights: 4, haze: 3 };
+// proposta 12/11: from `rise` the camera climbs into the intro's pose (13/11:
+// over the last `riseSeconds` of a longer journey, so its shots get the
+// time). The Ring's running lights glow `lights` × and its haze runs `haze`
+// × deeper while it flies.
+const FLIGHT = { rise: 0.72, riseSeconds: 2.6, lights: 4, haze: 3 };
 // proposta 13/11: on a hop the place left fades out over `leave` and the
 // place ahead in over `reach` (t), the colours crossing over `look`; on a
 // jump all three swap under the white-out.
@@ -303,6 +305,18 @@ export class TravelScene {
     this.leftPos = new THREE.Vector3();
     this.leftQuat = new THREE.Quaternion();
     this.leftScale = new THREE.Vector3();
+    // The places' marks in the scene (travel/marks.js), found on the first
+    // frame, once the intro's aim lays the sets out.
+    this.marks = {
+      leave: { near: new THREE.Vector3(), sign: new THREE.Vector3() },
+      reach: { near: new THREE.Vector3(), sign: new THREE.Vector3() },
+    };
+    this.gate = new THREE.Vector3();
+    this.lines = [];
+    this.planned = false;
+    this.rise = FLIGHT.rise;
+    this.baseFov = null;
+    this.identity = new THREE.Matrix4();
     this.pose4 = new THREE.Matrix4();
     this.home4 = new THREE.Matrix4();
     this.yawQuat = new THREE.Quaternion();
@@ -433,16 +447,12 @@ export class TravelScene {
     placeFrame(this.leg.to, this.toFrame);
     placeFrame(this.leg.from, this.fromFrame);
     this.map.set(this.toFrame, this.end, this.turn);
-    this.motion.plan(
-      this.map,
-      this.fromFrame,
-      this.toFrame,
-      durationMs,
-      this.jumps ? JUMP.at : null,
-      this.opening
+    this.lines = travelTransmissions(to, TRAVEL.lineHoldMs);
+    this.rise = Math.max(
+      FLIGHT.rise,
+      1 - (FLIGHT.riseSeconds * 1000) / durationMs
     );
-    const lines = travelTransmissions(to, TRAVEL.lineHoldMs);
-    this.shots.plan(this.motion, durationMs, linePauses(lines, durationMs));
+    this.planned = false;
     // The place left's set: where it stands in the world, as the place
     // reached's stands on the spawn (its set's own pose).
     this.map.point(this.fromFrame.position, this.leftPos);
@@ -456,13 +466,65 @@ export class TravelScene {
     this.pose4
       .multiply(this.home4)
       .decompose(this.leftPos, this.leftQuat, this.leftScale);
+    this.baseFov = null;
     this.active = true;
     this.streaks.visible = true;
+  }
+
+  // The flight and its shots, once the intro's aim (`x`, `z`) lays the
+  // sets out where the camera will find their marks.
+  plan(x, z) {
+    const sets = this.t.backdrop.places.built;
+    const mark = (id, pose, out) => {
+      const set = sets.get(id);
+      const spec = MARKS[id];
+      if (!set || !spec) return null;
+      markPoint(this.t.THREE, set, spec.near, x, z, pose, out.near);
+      markPoint(this.t.THREE, set, spec.sign, x, z, pose, out.sign);
+      return out;
+    };
+    const leave = this.leg.from
+      ? mark(this.leg.from, this.pose4, this.marks.leave)
+      : null;
+    const reach = mark(this.leg.to, this.identity, this.marks.reach);
+    const through = this.jumps && MARKS[this.leg.from]?.through;
+    const gate = through
+      ? markPoint(
+          this.t.THREE,
+          sets.get(this.leg.from),
+          through,
+          x,
+          z,
+          this.pose4,
+          this.gate
+        )
+      : null;
+    this.motion.plan(
+      this.map,
+      this.fromFrame,
+      this.toFrame,
+      this.durationMs,
+      this.jumps ? JUMP.at : null,
+      this.opening,
+      gate
+    );
+    this.shots.plan(
+      this.motion,
+      this.durationMs,
+      linePauses(this.lines, this.durationMs),
+      { leave, reach },
+      this.rise
+    );
+    this.planned = true;
   }
 
   stop() {
     if (!this.active) return;
     this.active = false;
+    if (this.baseFov !== null) {
+      this.t.camera.fov = this.baseFov;
+      this.t.camera.updateProjectionMatrix();
+    }
     this.streaks.visible = false;
     this.veil.visible = false;
     this.t.veil.setLevel(1);
@@ -497,12 +559,10 @@ export class TravelScene {
    */
   frame(camera, pixelHeight) {
     const t = this.progress;
-    const k = easeInOut((t - FLIGHT.rise) / (1 - FLIGHT.rise));
+    const k = easeInOut((t - this.rise) / (1 - this.rise));
     this.k = k;
     const hand = smooth(1 - TRAVEL.handOffMs / this.durationMs, 1, t);
     const { motion, ship, forward } = this;
-    motion.sample(t);
-    this.right.set(-forward.z, 0, forward.x).normalize();
 
     // The Ring laid for the flight at its flight size, then back to its
     // place.
@@ -538,6 +598,11 @@ export class TravelScene {
       .add(this.introPos)
       .sub(this.end);
     this.introOffset.copy(this.introPos).sub(this.end);
+    if (!this.planned) {
+      this.plan(this.introAim.x + this.end.x, this.introAim.z + this.end.z);
+    }
+    motion.sample(t);
+    this.right.set(-forward.z, 0, forward.x).normalize();
     const roll = this.shots.pose(t, motion, this.eye, this.aim);
     this.offset.subVectors(this.eye, ship);
     this.aim.sub(ship);
@@ -558,6 +623,13 @@ export class TravelScene {
     camera.lookAt(this.aim);
     camera.rotateZ(roll * (1 - k));
     camera.quaternion.slerp(this.introQuat, k ** 4);
+    // The shot's lens, back to the intro's as it rises.
+    if (this.baseFov === null) this.baseFov = camera.fov;
+    const fov = this.shots.fov + (this.baseFov - this.shots.fov) * k;
+    if (fov !== camera.fov) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
 
     // The field's border and drifting fragments fade in over the last
     // second; the place's own set already stands ahead.

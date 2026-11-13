@@ -9,7 +9,7 @@
 // Arc-length samples per piece of a course.
 const SAMPLES = 48;
 // Waypoints a course can hold.
-const MAX_POINTS = 6;
+const MAX_POINTS = 8;
 
 function hermite(p0, m0, p1, m1, u, out) {
   const u2 = u * u;

@@ -34,7 +34,8 @@ export const HOP = {
 };
 // proposta 13/11: a jump. The ship turns off its place onto the line to
 // where it goes by `lineUp` (t), `turn` units on and `climb` up (clear of
-// the Ring's walls), surges `surge` units more, reaching `surgeSpeed` × its
+// the Ring's walls; 13/11: its turn swung `pull` wide, so it levels out of
+// the climb without a snap), surges `surge` units more, reaching `surgeSpeed` × its
 // mean speed at the leap (`at`, travelScene.js JUMP.at); it drops out `drop`
 // units short of its place, at `dropSpeed` × the mean speed it needs to
 // stop there by t = 1, along its arrival heading bent `bend` toward the line
@@ -42,8 +43,9 @@ export const HOP = {
 // ship waits in deep space nosed `deepTurn` radians off that line.
 export const WARP = {
   lineUp: 0.17,
-  turn: 450,
+  turn: 700,
   climb: 300,
+  pull: 1.2,
   surge: 2600,
   surgeSpeed: 2.8,
   drop: 4200,
@@ -51,9 +53,24 @@ export const WARP = {
   bend: 0.35,
   deepTurn: 1.1,
 };
+// proposta 13/11: a jump out by a hole (marks.js `through`: Prime's gate):
+// the dive pitched `pitch` (radians) down, entered `over` before the hole
+// and pulled out of `out` past it, levelling to `level` down; its turns
+// swing `pull` wide; it reaches the dive at `fall` × the mean speed of its
+// nose-over.
+export const GATE = {
+  pitch: 1.0,
+  over: 650,
+  out: 520,
+  level: 0.12,
+  pull: 0.45,
+  fall: 1.6,
+};
 // proposta 13/11: the bank: atan(sideways pull / `g`), at most `max`
-// radians (world units per second²).
-const BANK = { g: 1400, max: 1.0 };
+// radians (world units per second²), averaged over `blur` seconds either
+// side (weights 1-2-3-4-3-2-1) so it never snaps where a turn meets a
+// straight.
+const BANK = { g: 1400, max: 1.0, blur: 0.32 };
 // proposta 13/11: the engines: `cruise` at a steady speed, ± `gain` per unit
 // of acceleration (in cruise speeds per t), within `range`; a jump's surge
 // adds up to `surge`.
@@ -75,6 +92,11 @@ export class ShipMotion {
     this.d = [0, 1, 2, 3, 4, 5].map(() => new THREE.Vector3());
     // A hop's time on the Ring's deck [from, to] (t).
     this.skim = [0, 0];
+    // The laid Ring's centre in the scene; a jump out by a hole: the hole
+    // (a scene point) and the t it is passed.
+    this.centre = new THREE.Vector3();
+    this.through = null;
+    this.gateAt = 0;
     this.w = new THREE.Vector3();
     this.u = new THREE.Vector3();
     this.p = new THREE.Vector3();
@@ -105,9 +127,9 @@ export class ShipMotion {
   /**
    * Plans the flight from frame `from` to frame `to` (world.js placeFrame)
    * on `map`; `jumpAt`: the leap's t, null for a hop; `deep`: leaving deep
-   * space.
+   * space; `gate`: a jump's hole to leave by (scene point), or null.
    */
-  plan(map, from, to, durationMs, jumpAt, deep) {
+  plan(map, from, to, durationMs, jumpAt, deep, gate = null) {
     const { v, d } = this;
     this.durationMs = durationMs;
     map.point(from.position, v[0]);
@@ -116,7 +138,13 @@ export class ShipMotion {
     map.direction(to.heading, d[4]);
     this.jumpAt = jumpAt ?? 1;
     this.jumps = jumpAt !== null;
-    if (this.jumps) this.planJump(deep);
+    this.through = null;
+    this.lineUp = WARP.lineUp;
+    this.turnAt = HOP.turnAt;
+    this.landAt = HOP.landAt;
+    this.centre.set(0, 0, 0);
+    map.point(this.centre, this.centre);
+    if (this.jumps) this.planJump(deep, gate);
     else this.planHop(map, from, to);
   }
 
@@ -179,27 +207,33 @@ export class ShipMotion {
     this.skim[1] = t3;
   }
 
-  planJump(deep) {
+  planJump(deep, gate) {
     const { v, d, u, w } = this;
     const at = this.jumpAt;
     // The line to the place, and the ship turned onto it, risen clear.
     u.subVectors(v[4], v[0]).setY(0).normalize();
     if (deep) d[0].copy(u).applyAxisAngle(this.Y, WARP.deepTurn);
-    v[2].copy(v[4]);
-    this.turnOff(1, WARP.turn, WARP.climb);
-    u.copy(d[1]);
-    v[2].copy(v[1]).addScaledVector(u, WARP.surge);
-    d[2].copy(u);
-    this.before.set([v[0], v[1], v[2]], [d[0], d[1], d[2]], 0.5);
-    const turned = this.before.lengths[48];
-    const total = this.before.length;
-    const t1 = WARP.lineUp;
-    const mean = (total - turned) / (at - t1);
-    this.beforeTime.set(
-      restingKnots([0, t1], [0, turned], 0, (1.4 * turned) / t1).concat([
-        [at, total, WARP.surgeSpeed * mean],
-      ])
-    );
+    if (gate) {
+      this.planGate(gate, at);
+    } else {
+      v[2].copy(v[4]);
+      this.turnOff(1, WARP.turn, WARP.climb);
+      u.copy(d[1]);
+      v[2].copy(v[1]).addScaledVector(u, WARP.surge);
+      d[2].copy(u);
+      this.before.set([v[0], v[1], v[2]], [d[0], d[1], d[2]], WARP.pull);
+      const turned = this.before.lengths[48];
+      const total = this.before.length;
+      const t1 = WARP.lineUp;
+      const mean = (total - turned) / (at - t1);
+      this.beforeTime.set(
+        restingKnots([0, t1], [0, turned], 0, (1.4 * turned) / t1).concat([
+          [at, total, WARP.surgeSpeed * mean],
+        ])
+      );
+      this.surgeMean = mean;
+    }
+    const mean = this.surgeMean;
     // Out of the jump: short of the place, along its heading bent toward
     // the line jumped on; in on the place's line, braking.
     w.copy(u).setY(0).normalize().multiplyScalar(WARP.bend).add(d[4]);
@@ -220,6 +254,50 @@ export class ShipMotion {
     this.cruiseSpeed = mean;
   }
 
+  // A jump leaving by a hole in its place's set (marks.js `through`, at
+  // `gate`): the ship noses over into a dive `GATE.over` above it, falls
+  // through it along its dive, pulls out `GATE.out` past it onto the line
+  // to the place it goes to (u) and surges on along it to the leap.
+  planGate(gate, at) {
+    const { v, d, u, w, Y } = this;
+    const g = GATE;
+    // The dive: from the place toward the gate, pitched `pitch` down.
+    w.subVectors(gate, v[0]).setY(0).normalize();
+    w.multiplyScalar(Math.cos(g.pitch)).addScaledVector(Y, -Math.sin(g.pitch));
+    v[1].copy(gate).addScaledVector(w, -g.over);
+    d[1].copy(w);
+    v[2].copy(gate);
+    d[2].copy(w);
+    v[3].copy(gate).addScaledVector(w, g.out).addScaledVector(u, g.out);
+    d[3].copy(u).addScaledVector(Y, -g.level).normalize();
+    v[5].copy(v[3]).addScaledVector(u, WARP.surge);
+    d[5].copy(u);
+    const points = [v[0], v[1], v[2], v[3], v[5]];
+    this.before.set(points, [d[0], d[1], d[2], d[3], d[5]], g.pull);
+    const s = [0, 1, 2, 3, 4].map((i) => this.before.lengths[i * 48]);
+    const t1 = WARP.lineUp;
+    // The fall, the pull-out and the surge shared by length, the fall eased.
+    const span = s[4] - s[1];
+    const times = [0, t1];
+    for (let i = 2; i < 5; i += 1) {
+      times.push(t1 + ((at - t1) * (s[i] - s[1])) / span);
+    }
+    const mean = span / (at - t1);
+    this.beforeTime.set(
+      restingKnots(times, s, 0, WARP.surgeSpeed * mean).map((k, i) =>
+        i === 1 ? [k[0], k[1], (g.fall * s[1]) / t1] : k
+      )
+    );
+    this.surgeMean = mean;
+    this.through = gate;
+    this.gateAt = times[2];
+  }
+
+  /** The laid Ring's centre (scene) into `out`. */
+  ringCentre(out) {
+    return out.copy(this.centre);
+  }
+
   // Position and heading at t into `out` / `dir`; its speed (units per t).
   at(t, out, dir) {
     if (!this.leapt(t)) {
@@ -235,26 +313,43 @@ export class ShipMotion {
     return this.jumps && t >= this.jumpAt;
   }
 
-  /** This frame at t: position, forward, speed, bank, thrust. */
-  sample(t) {
+  // The bank at t from the turn rate a moment either side (same leg).
+  bankAt(t) {
     const e = 0.004;
-    const speed = this.at(t, this.position, this.forward);
-    // The turn rate from the heading a moment either side (same leg).
+    const speed = this.at(t, this.p, this.f0);
     const lo = this.leapt(t)
       ? Math.max(this.jumpAt, t - e)
       : Math.max(0, t - e);
     const hi = this.leapt(t) ? t + e : Math.min(this.jumpAt - 1e-4, t + e);
     this.at(lo, this.p, this.f0);
-    const fast = this.at(hi, this.p, this.f1);
+    this.at(hi, this.p, this.f1);
     const turn = this.f0.x * this.f1.z - this.f0.z * this.f1.x;
     const seconds = this.durationMs / 1000;
     const rate =
       Math.asin(Math.max(-1, Math.min(1, turn))) / ((hi - lo) * seconds);
     const pull = (rate * speed) / seconds;
-    this.bank = Math.max(
-      -BANK.max,
-      Math.min(BANK.max, Math.atan(pull / BANK.g))
-    );
+    return Math.max(-BANK.max, Math.min(BANK.max, Math.atan(pull / BANK.g)));
+  }
+
+  /** This frame at t: position, forward, speed, bank, thrust. */
+  sample(t) {
+    const e = 0.004;
+    const step = (BANK.blur * 1000) / 3 / this.durationMs;
+    let bank = 0;
+    for (let k = -3; k <= 3; k += 1) {
+      let at = Math.min(1, Math.max(0, t + k * step));
+      // Not across the leap: the ship is somewhere else on the far side.
+      if (this.jumps && t < this.jumpAt) at = Math.min(at, this.jumpAt - 1e-4);
+      if (this.leapt(t)) at = Math.max(at, this.jumpAt);
+      bank += (4 - Math.abs(k)) * this.bankAt(at);
+    }
+    this.bank = bank / 16;
+    const speed = this.at(t, this.position, this.forward);
+    const lo = this.leapt(t)
+      ? Math.max(this.jumpAt, t - e)
+      : Math.max(0, t - e);
+    const hi = this.leapt(t) ? t + e : Math.min(this.jumpAt - 1e-4, t + e);
+    const fast = this.at(hi, this.p, this.f1);
     this.speed = speed;
     const accel = (fast - this.at(lo, this.p, this.f0)) / (hi - lo);
     const r = accel / Math.max(1, this.cruiseSpeed);
