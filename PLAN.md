@@ -21,10 +21,15 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
 6. **Acabamento**: seis defeitos corrigidos (cartas perdidas na vitória, contagem sob as telas, Esc nas cenas, erro
    ao carregar, dica do impulso, fala de chegada). Falta: BACKLOG restante, sons dos chefes novos, brilho/polido em
    outros modelos (item 26). [ ]
-7. **Refino por parte do roteiro** (pedido dele, 12/11): quatro sessões em paralelo, cada uma num worktree e ramo
-   próprio (`refino-cap1`, `refino-cap2`, `refino-cap3`, `refino-final`), revisam e refinam a sua parte e deixam
-   `docs/propostas-<parte>.md`. A conversa principal confere cada ramo, junta em `campanha/ajustes`, roda
-   `npm run done` com a máquina vazia e apaga os arquivos de propostas depois de levar o que valer ao roteiro. [ ]
+7. **Refino por parte do roteiro** (pedido dele, 12/11): quatro sessões, uma por capítulo e uma para o final e o
+   arco; os quatro ramos estão juntos em `campanha/ajustes` e a bateria inteira passa. [x] Das propostas delas, feito:
+   granada do Caster justa, Wake fala no meio da fase e da sua gente, arquivo nomeado no Assembly Graveyard, "equipar
+   por mim", cartas de partida nas fases 2 e 3, fala repetida cortada, nome certo do chefe no cartão final, viagem
+   refeita (escala, destino à frente, salto). Em aberto, para depois de ele jogar: Prime com mais vida e pedras do
+   Quarry Maw menos punitivas (o primeiro chefe dura mais que o guardião do capítulo); dano de pedra nos capítulos II
+   e III; Herald of Heat duas vezes no capítulo II; rachaduras acesas nas viagens 4→5 e 5→6; destroços correndo para
+   o centro na viagem 9→10; Null mais dura que o chefe final; o piloto de teste que trava num canto.
+8. **Curva da campanha** (medida acima): o capítulo II é um degrau e Sovereign é fácil para onde está. [ ]
 
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.

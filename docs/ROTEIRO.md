@@ -79,7 +79,7 @@ Viagem 1 → 2
 Viagem 2 → 3
 
 - WAKE: `The gate ahead has power. A thousand years, and it has power.`
-- THE RING: `Prime has been told. Prime is counting.`
+- THE RING: `Gate log updated. Prime is counting.`
 
 **3. Prime Gate** (chefe: Warden Prime ✔)
 
@@ -205,6 +205,14 @@ Depois do final: as fases continuam jogáveis; a Descida e o Boss Rush são "reg
 - Quarantine Grid: `These fences point inward. They weren't keeping us out. They were keeping it in.`
 - Null Boundary: `Past this line our charts are blank. The signal isn't. It knows we're here.`
 - The Crucible: `It has our hull plans, pilot. It's building Wakes. Finish this before one launches.`
+
+Além dessas, uma vez por capítulo o Wake fala da sua gente, na quarta etapa (para que perder o Wake pese no final), e
+o Anel nomeia o arquivo dos cidadãos na segunda etapa do Assembly Graveyard, duas fases antes de ele importar:
+
+- Salvage Lanes: `Forty of us on this ship, pilot. All forty are watching your feed.`
+- Crystal Choir: `Reactor crew says thank you. Mara hasn't slept in a week. Tonight she might.`
+- Quarantine Grid: `The kids on deck three named your hull. I'm not telling you what.`
+- Assembly Graveyard — THE RING: `Citizens stored: eleven million. Citizens restored: none. Order still open.`
 
 ## Falas de derrota (revisão: a ligação é remota — perde-se a nave, não o piloto)
 

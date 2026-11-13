@@ -91,7 +91,7 @@ export const STORY = deepFreeze({
         speaker: 'wake',
         text: 'The gate ahead has power. A thousand years, and it has power.',
       },
-      { speaker: 'ring', text: 'Prime has been told. Prime is counting.' },
+      { speaker: 'ring', text: 'Gate log updated. Prime is counting.' },
     ],
     'furnace-drift': [
       {
@@ -311,6 +311,11 @@ export const STORY = deepFreeze({
         speaker: 'wake',
         text: 'Those convoys are on a timetable. Somebody is still dispatching them.',
       },
+      // The Wake's people, once a chapter: what a loss would cost.
+      4: {
+        speaker: 'wake',
+        text: 'Forty of us on this ship, pilot. All forty are watching your feed.',
+      },
     },
     'prime-gate': {
       3: {
@@ -329,6 +334,11 @@ export const STORY = deepFreeze({
         speaker: 'wake',
         text: "The seam is singing back. I don't like how much it sounds like an alarm.",
       },
+      // The Wake's people, once a chapter: what a loss would cost.
+      4: {
+        speaker: 'wake',
+        text: "Reactor crew says thank you. Mara hasn't slept in a week. Tonight she might.",
+      },
     },
     'dense-core': {
       3: {
@@ -336,7 +346,12 @@ export const STORY = deepFreeze({
         text: "The cracks answer when a machine dies. Pilot, I think we're the ones opening them.",
       },
     },
+    // The archive is named here, two sectors before it matters.
     'assembly-graveyard': {
+      2: {
+        speaker: 'ring',
+        text: 'Citizens stored: eleven million. Citizens restored: none. Order still open.',
+      },
       3: {
         speaker: 'wake',
         text: "Same hull, same serial, again and again. It isn't building a fleet. It's repeating.",
@@ -346,6 +361,11 @@ export const STORY = deepFreeze({
       3: {
         speaker: 'wake',
         text: "These fences point inward. They weren't keeping us out. They were keeping it in.",
+      },
+      // The Wake's people, once a chapter: what a loss would cost.
+      4: {
+        speaker: 'wake',
+        text: "The kids on deck three named your hull. I'm not telling you what.",
       },
     },
     'wardens-reach': {

@@ -163,6 +163,13 @@ const wardenName = (event, count) => {
   return count > 1 ? name.replace(/^Warden /, '') : name;
 };
 
+// What a won run's best moment calls the boss it ended on, by its rank.
+const LAST_STAND = {
+  Warden: 'the last Warden',
+  Sentinel: "the sector's Sentinel",
+  Sovereign: 'the centre of the Ring',
+};
+
 /**
  * The best moment: the last Warden on a win, else the best combo, else a
  * Warden or the latest form; a sector run's layers count from its first one.
@@ -179,7 +186,7 @@ export function bestMoment(timeline, outcome, sector = null) {
       title: last.fight
         ? `${wardenName(last, 2)} down in ${formatRunTime(last.fight)}`
         : `${wardenName(last, 2)} down`,
-      where: `Layer ${shown(last.layer)} · the last Warden`,
+      where: `Layer ${shown(last.layer)} · ${LAST_STAND[sector ? sectorBossTier(sector) : 'Warden']}`,
     };
   }
   const combo = timeline.find(({ kind }) => kind === 'combo');

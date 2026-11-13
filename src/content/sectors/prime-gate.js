@@ -13,7 +13,7 @@ export default {
   biome: 'outer-ring',
   look: { backdrop: 'prime-gate' },
   layers: [1, 5],
-  headStart: 0, // proposta 12/11
+  headStart: 5, // proposta 12/11: entered from the map, a ship that came through the two sectors before has about this
   // proposta 12/11: every number below
   stages: [
     // The picket: Drones in a rank, then on patrol (Prime's aimed shots).

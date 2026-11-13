@@ -15,7 +15,7 @@ export default {
   name: 'SALVAGE LANES',
   biome: 'outer-ring',
   layers: [1, 5],
-  headStart: 0, // proposta 12/11
+  headStart: 2, // proposta 12/11: entered from the map, a ship that came through the sector before has about this
   // proposta 12/11: a shipping lane picked clean, under teal work lights.
   look: {
     backdrop: 'salvage-lanes',
