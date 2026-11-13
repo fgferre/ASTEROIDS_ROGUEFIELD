@@ -378,17 +378,12 @@ export class SettingsPanel {
   }
 
   applyVideoSettings(values = {}, derived = null) {
-    const root = document.documentElement;
     const hudScale = Number.isFinite(Number(derived?.hudScale))
       ? Number(derived.hudScale)
       : Number.isFinite(Number(values.hudScale))
         ? Number(values.hudScale)
         : 1;
     const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
-
-    if (root) {
-      root.dataset.hudScale = String(baseScale);
-    }
 
     this.setHudBaseScale(baseScale);
 
