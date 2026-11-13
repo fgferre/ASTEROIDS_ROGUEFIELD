@@ -842,6 +842,9 @@ class SFXBus {
   // `options.kind`); nothing is synthesized while it is not loaded.
   playBossAttack() {}
 
+  // A health heart picked up: only its sample.
+  playHeartPickup() {}
+
   // --- Stingers and transmissions (sfx/stingers.js) ---
 
   playEliteSpawned() {

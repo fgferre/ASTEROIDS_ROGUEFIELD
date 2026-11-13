@@ -153,6 +153,20 @@
       }
     ]
   },
+  "heart-pickup": {
+    "files": ["heart-pickup/1.mp3"],
+    "gain": -5,
+    "priority": 1,
+    "cap": 1,
+    "gap": 150,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "heart-pickup/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A warm soft rising chime, gentle glassy bell with a smooth upward glide, calm and reassuring, clean and dry, high quality game sound effect, no music (audition 13/11, pick A)"
+      }
+    ]
+  },
   "card-pick": {
     "files": ["card-pick/1.mp3"],
     "gain": -15,

@@ -67,6 +67,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'player-leveled-up', cue: 'playLevelUp', duck: true },
   // All orbs play the same sound (all are tier 1 blue).
   { on: 'xp-collected', cue: 'playXPCollect' },
+  // A health heart picked up: its own sample, not positional.
+  { on: 'health-heart-collected', cue: 'playHeartPickup' },
   { on: 'xp-orb-fused', cue: 'playOrbFusion', arg: 'toClass' },
   {
     on: 'enemy-spawned',

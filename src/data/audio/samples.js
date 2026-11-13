@@ -60,6 +60,9 @@ export const SAMPLE_CUES = deepFreeze({
     climb: { window: 0.4, max: 7 }, // proposta 20/10
   },
   playLevelUp: { sample: 'level-up', bus: 'ambient' },
+  // A health heart picked up (eventCues `health-heart-collected`); gain, cap 1
+  // and gap in the manifest: proposta 13/11.
+  playHeartPickup: { sample: 'heart-pickup', bus: 'ambient' },
   playUpgradeSelect: { sample: 'card-pick', bus: 'ambient' },
   // By the pickup's kind (and the chest's opening); Magnet, Pulse and
   // Overcharge have no sample id yet.

@@ -24,6 +24,7 @@
   "formation-warned",
   "game-started",
   "hangar-purchased",
+  "health-heart-collected",
   "herald-spawned",
   "input-confirmed",
   "leech-ate",

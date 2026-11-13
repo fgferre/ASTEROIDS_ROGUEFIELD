@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
+import { AUDIO_EVENT_CUES } from '../../../src/data/audio/eventCues.js';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
 import { sampleIdFor } from '../../../src/modules/audio/samplePlayer.js';
 import {
@@ -319,6 +320,33 @@ describe('sample layer', () => {
     const { bus, context, sources } = makeBus();
     bus.playBossAttack({ kind: 'prime', pan: 0, distance: null });
     expect(sources).toHaveLength(0);
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('a health heart pickup plays its own file once, not again inside its gap', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const entry = manifest['heart-pickup'];
+    expect(entry.cap).toBe(1);
+    expect(
+      existsSync(new URL(`${SFX}${entry.files[0]}`, import.meta.url))
+    ).toBe(true);
+    expect(
+      AUDIO_EVENT_CUES.find((row) => row.on === 'health-heart-collected').cue
+    ).toBe('playHeartPickup');
+
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(fetchFor({ 'heart-pickup': entry }));
+    const play = (time) => {
+      context.currentTime = time;
+      bus.playHeartPickup();
+    };
+    play(0);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('heart-pickup/1.mp3');
+    play(entry.gap / 1000 - 0.01);
+    expect(sources).toHaveLength(1);
     expect(context.createOscillator).not.toHaveBeenCalled();
   });
 });

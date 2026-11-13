@@ -600,6 +600,10 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('xp-collected', {}, 'playXPCollect');
   });
 
+  it('health-heart-collected → playHeartPickup', () => {
+    expectDelegates('health-heart-collected', {}, 'playHeartPickup');
+  });
+
   it('xp-orb-fused → playOrbFusion', () => {
     expectDelegates(
       'xp-orb-fused',
