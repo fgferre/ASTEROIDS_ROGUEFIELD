@@ -188,7 +188,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   filme: câmera mais ousada, mais cortes… está na direção certa, mas acho que o polimento pode ser levado mais para
   cara de filme e integrando melhor com as localizações 3D."_
   **13/11, depois de ver os filmes com som e voz** (quatro viagens: _"Ficou bom"_; sons e vozes: _"Sons e vozes estão
-  bons"_): _"Agora sim: é essa a cara."_
+  bons"_): _"Agora sim: é essa a cara."_ Os dois planos refeitos depois (mergulho pelo portão, cristais aparecendo
+  antes): _"Ficou bom"_.
 - **(33)** Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
   couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
   audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o
