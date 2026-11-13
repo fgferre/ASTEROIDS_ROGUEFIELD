@@ -149,6 +149,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   todos podem ter um pouco de brilho de acordo com o material real… se for aço inoxidável tem brilho, se é vidro, tem
   brilho e daí por diante. Metais geralmente têm brilho, entendeu meu pedido? Talvez você já tenha feito isso, só estou
   explicando."_ → o brilho segue o material de verdade em tudo (máquinas, chefes, estruturas), não só onde é "joia".
+  **Veredito dele (13/11, página `src/exported-assets/materiais/`):** máquinas inimigas _"Ficou bom"_; suas naves
+  _"Preferia como era antes"_ (os canos voltaram ao acabamento de antes); guardiões e chefes _"Ficou bom"_; lugares e
+  combate _"Ficou bom"_; no geral _"É isso: brilho pelo material, sem exagero"_.
 - **(27)** Equilíbrio como no Vampire Survivors (13/11, ao não escolher alvo para a fase final): _"acho que temos que
   repensar o equilíbrio como é hoje em Vampire Survivors (nossa inspiração além do Asteroids). Hoje você só consegue
   avançar no Vampire Survivors depois que começa a comprar itens de power-ups na loja com a moeda do jogo. Já havia

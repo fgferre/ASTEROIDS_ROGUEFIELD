@@ -132,7 +132,9 @@ export const SHINE = Object.freeze({
 export const HULL_FINISHES = Object.freeze([
   SHINE.paint,
   SHINE.gloss,
-  SHINE.steel,
+  // The ship's own steel, not the table's: the owner saw its barrels in the
+  // shared steel (13/11) and preferred them as they were.
+  Object.freeze({ metalness: 1, roughness: 0.45, envMapIntensity: 2.5 }),
 ]);
 
 /**
