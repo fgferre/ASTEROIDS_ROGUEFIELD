@@ -162,11 +162,12 @@ export function getHudCss() {
             body.hud-high-contrast :is(.stat-block, .feed-row, .transmission) { background: var(--surface); outline: 2px solid var(--line); }
             body.hud-high-contrast :is(.mode-chip, .xp-bar-container, .bar-segment, .boss-bar-container, .onboarding-tip) { border-width: 2px; }
 
-            /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
-            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }
+            /* ONBOARDING TIP (first run, top centre under the boss bar slot); one line until it would
+               reach a top corner column (the Classic radar, 170 px + margins, the widest), then it wraps */
+            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; width: max-content; max-width: calc(min(100cqw, 100cqh * 16 / 9) - 404px * var(--hud-u)); box-sizing: border-box; opacity: 0; visibility: hidden; }
             .onboarding-tip.is-showing { opacity: 1; visibility: visible; }
             .onboarding-tip.is-leaving { opacity: 0; }
-            .onboarding-tip__keys { display: flex; gap: var(--space-1); }
+            .onboarding-tip__keys { display: flex; flex: none; gap: var(--space-1); }
             .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
             .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
 
