@@ -1,7 +1,10 @@
 // Debris Wake (docs/ROTEIRO.md "Os lugares" 1): far outside the Ring, in the
 // tail of its wreckage. The whole Ring small and broken in the distance, a
 // cold small star off in a corner, and what the Ring let go of — torn
-// panels, trusses, a module — drifting between them and the field.
+// panels, trusses, a module — drifting between them and the field. The
+// pieces carry the count's tags: small lights ticking through the wreck,
+// depth after depth, as the Quarry Maw tallies it; when the Maw goes
+// offline they go out, the nearest first (the stone goes uncounted).
 
 import { gradientDisc } from './kit.js';
 import { lightPoint, ringBand, under } from './pieces.js';
@@ -14,6 +17,14 @@ const WRECK = [
   { depth: 1500, follow: 0.32, count: 16, spread: [2800, 2000] },
   { depth: 2300, follow: 0.55, count: 20, spread: [3400, 2400] },
 ];
+// proposta 12/11: the tags — one every `every` pieces, `size` (+ `grow` per
+// depth); their tick (per second, a depth's `low` light flaring by `blip`
+// for `flare` of each tick, the depths a third of a tick apart); and the
+// wake at which each depth's tags give a last `flash` and fade out over
+// `fade` (`out` + `step` per depth).
+const TAGS = { every: 3, size: 9, grow: 4 };
+const TICK = { rate: 0.7, low: 0.6, blip: 0.9, flare: 0.25 };
+const DARK = { out: 0.1, step: 0.2, fade: 0.25, flash: 2.6 };
 
 // One wreck piece in its own frame, `size` across: a torn panel (plate, a
 // lighter rim along one edge, ribs under it), a truss (two rails, braces) or
@@ -147,20 +158,21 @@ export function buildDebrisWake(THREE, kit) {
       const turn = [random() * 6, random() * 6, random() * 6];
       const out = piece(kit, shades, kinds[(i + n) % kinds.length], size);
       wreck.push(...kit.moved(out, at, turn));
-      if (i % 4 === 1) {
+      if (i % TAGS.every === 1) {
         lightPoint(
           kit,
           glints,
-          dead[i % 8 === 1 ? 1 : 0],
+          dead[i % (TAGS.every * 3) === 1 ? 1 : 0],
           [at[0], at[1] + size * 0.1, at[2]],
-          4 + n * 2
+          TAGS.size + n * TAGS.grow
         );
       }
     }
     const object = new THREE.Group();
-    object.add(kit.mesh(wreck), kit.mesh(glints, 'glow'));
+    object.add(kit.mesh(wreck), kit.mesh(glints, 'glow', `tags-${n}`));
     return { object, anchor: under(depth), follow };
   });
+  const tags = WRECK.map((_, n) => kit.materials.get(`tags-${n}`));
 
   return {
     layers: [
@@ -172,5 +184,17 @@ export function buildDebrisWake(THREE, kit) {
       { object: ring, anchor: under(3400, 1250, -500), follow: 0.9 },
       ...layers,
     ],
+    update(time, wake) {
+      for (let n = 0; n < tags.length; n += 1) {
+        const phase = (time * TICK.rate + n / 3) % 1;
+        const blip = Math.max(0, 1 - phase / TICK.flare);
+        const out = (wake - DARK.out - n * DARK.step) / DARK.fade;
+        tags[n].color.setScalar(
+          out <= 0
+            ? TICK.low + TICK.blip * blip
+            : DARK.flash * Math.max(0, 1 - out) ** 2
+        );
+      }
+    },
   };
 }

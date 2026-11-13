@@ -3,6 +3,8 @@
 // running lines along it, its rim edge across the top with space past it;
 // in it a gate with power after a thousand years: its frame lined with
 // light and lamps, guide lights leading to it, its shaft lit from inside.
+// When Warden Prime yields the gate lets one hull through: its frame turns
+// like a lock coming undone and the shaft and the guides flare.
 
 import { gradientDisc } from './kit.js';
 import { lightPoint, under } from './pieces.js';
@@ -11,6 +13,10 @@ import { lightPoint, under } from './pieces.js';
 // (centre, aperture radius), in the wall's own units.
 const WALL = { cell: [210, 150], x: [-2400, 2400], z: [-470, 1500] };
 const GATE = { at: [520, 330], radius: 300 };
+// proposta 12/11: the open gate — the frame's turn (radians: half a side),
+// the shaft and guides `flare` times brighter, the turn done by `turned`
+// of the wake and the flare starting at `from`.
+const OPEN = { turn: Math.PI / 8, flare: 2.6, turned: 0.7, from: 0.25 };
 
 export function buildPrimeGate(THREE, kit) {
   const { tone, random } = kit;
@@ -77,6 +83,11 @@ export function buildPrimeGate(THREE, kit) {
 
   // The gate: an octagonal frame raised off the wall, clamps round it, the
   // shaft walls down into the dark, lamps at its corners and a lit edge.
+  // The frame and its lights turn as one (`frame`, `frameLit`); the shaft
+  // and the guides flare (`open`).
+  const frame = kit.parts();
+  const frameLit = kit.parts();
+  const open = kit.parts();
   const [gx, gz] = GATE.at;
   const r = GATE.radius;
   const sides = 8;
@@ -90,18 +101,18 @@ export function buildPrimeGate(THREE, kit) {
       gz + Math.sin(a) * r * k,
     ];
     kit.box(
-      wall,
+      frame,
       rib,
       at(1.24, 50),
       [len * r * 1.24 + 8, 100, r * 0.42],
       tangent
     );
-    kit.box(wall, rib, at(1.38, 90), [len * r * 0.7, 36, r * 0.12], tangent);
+    kit.box(frame, rib, at(1.38, 90), [len * r * 0.7, 36, r * 0.12], tangent);
     kit.box(wall, recess, at(1.03, -150), [len * r * 1.03, 300, 16], tangent);
     // The lit lip on top of the frame, and a fainter one round its rim.
-    kit.box(lit, gateLine, at(1.07, 102), [len * r * 1.07, 3, 6], tangent);
+    kit.box(frameLit, gateLine, at(1.07, 102), [len * r * 1.07, 3, 6], tangent);
     kit.box(
-      lit,
+      frameLit,
       gateLine.clone().multiplyScalar(0.4),
       at(1.44, 102),
       [len * r * 1.44, 3, 5],
@@ -110,7 +121,7 @@ export function buildPrimeGate(THREE, kit) {
     // Rings of light down the shaft, brighter the deeper: lit from inside.
     [-50, -120, -190].forEach((y, d) =>
       kit.box(
-        lit,
+        open,
         shaft.clone().multiplyScalar(0.35 + d * 0.3),
         at(1.0, y),
         [len * r, 4, 8],
@@ -120,18 +131,18 @@ export function buildPrimeGate(THREE, kit) {
     const corner = (i / sides) * Math.PI * 2;
     lightPoint(
       kit,
-      lit,
+      frameLit,
       lamp,
       [gx + Math.cos(corner) * r * 1.42, 128, gz + Math.sin(corner) * r * 1.42],
       12
     );
     if (i % 2 === 0) {
-      kit.box(wall, rib, at(1.75, 30), [r * 0.62, 50, 60], [0, -a, 0]);
+      kit.box(frame, rib, at(1.75, 30), [r * 0.62, 50, 60], [0, -a, 0]);
     }
   }
   // The shaft's light, deep in the opening, and its spill on the wall.
   kit.put(
-    lit,
+    open,
     gradientDisc(THREE, (k) => 0.12 + 0.88 * (1 - k) ** 3, {
       rings: 8,
       sides: 32,
@@ -141,7 +152,7 @@ export function buildPrimeGate(THREE, kit) {
     r
   );
   kit.put(
-    lit,
+    open,
     gradientDisc(THREE, (k) => 0.12 * (1 - k) ** 2, {
       rings: 8,
       sides: 40,
@@ -155,7 +166,7 @@ export function buildPrimeGate(THREE, kit) {
   for (let x = gx - r * 1.9, n = 0; n < 9; x -= 150, n += 1) {
     [-1, 1].forEach((s) =>
       kit.box(
-        lit,
+        open,
         guide.clone().multiplyScalar(1 - n * 0.09),
         [x, 60, gz + s * r * 0.45],
         [40, 3, 9]
@@ -163,8 +174,30 @@ export function buildPrimeGate(THREE, kit) {
     );
   }
 
+  // The frame turns about the gate's centre.
+  const lock = new THREE.Group();
+  lock.position.set(gx, 0, gz);
+  lock.add(
+    kit.mesh(kit.moved(frame, [-gx, 0, -gz])),
+    kit.mesh(kit.moved(frameLit, [-gx, 0, -gz]), 'glow')
+  );
   const object = new THREE.Group();
-  object.add(kit.mesh(wall), kit.mesh(lit, 'glow'));
+  object.add(
+    kit.mesh(wall),
+    kit.mesh(lit, 'glow'),
+    kit.mesh(open, 'glow', 'gate-open'),
+    lock
+  );
   object.rotation.set(0, 0.14, 0);
-  return { layers: [{ object, anchor: under(1400), follow: 0.4 }] };
+  const flare = kit.materials.get('gate-open');
+  return {
+    layers: [{ object, anchor: under(1400), follow: 0.4 }],
+    update(time, wake) {
+      const k = Math.min(1, wake);
+      const turn = Math.min(1, k / OPEN.turned);
+      lock.rotation.y = OPEN.turn * turn * turn * (3 - 2 * turn);
+      const up = Math.max(0, (k - OPEN.from) / (1 - OPEN.from));
+      flare.color.setScalar(1 + (OPEN.flare - 1) * up);
+    },
+  };
 }

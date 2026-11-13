@@ -4,7 +4,9 @@
 // cradle, each one step further on — a bare keel, then ribs, then stringers,
 // then plating — and past the most nearly finished one the line starts again
 // at a bare keel. The crane on each slip stands at its work front, the work
-// lights still on.
+// lights still on and the welding under it flickering. When the Foundry
+// Mother stops, the line is still: the welding dies and the work lights go
+// out down the yard.
 
 import { lightPoint, under } from './pieces.js';
 
@@ -27,10 +29,21 @@ const SLIPS = [
 // the bow, y up, z across to its right): side by side, each a step deeper.
 const STEP = [80, -230, 330];
 const MID = (SLIPS.length - 1) / 2;
+// proposta 12/11: the welding's flicker (two rates per second, its `low`
+// share), gone by `weldOut` of the wake; the work lights left at `dead`
+// once out, going out from `workFrom` to `workOut` of the wake.
+const STILL = {
+  rates: [17, 6.3],
+  low: 0.35,
+  weldOut: 0.3,
+  dead: 0.06,
+  workFrom: 0.15,
+  workOut: 0.75,
+};
 
 // One chassis on its slip, bow at +x, the deck edges at y = 0, built as far
 // as `progress` says, in its gantry cradle with the crane at the work front.
-function slip(kit, frame, lights, { ribs, stringers, plating }) {
+function slip(kit, frame, lights, welds, { ribs, stringers, plating }) {
   const { tone } = kit;
   const L = LENGTH;
   const B = BEAM;
@@ -162,7 +175,7 @@ function slip(kit, frame, lights, { ribs, stringers, plating }) {
   [-0.6, 0.15, 0.5].forEach((z, i) =>
     lightPoint(
       kit,
-      lights,
+      welds,
       weld,
       [at - bay * 0.4, -B * (0.15 + 0.12 * i), z * half(Math.min(front, 0.97))],
       4
@@ -174,13 +187,16 @@ export function buildAssemblyGraveyard(THREE, kit) {
   const { tone } = kit;
   const frame = kit.parts();
   const lights = kit.parts();
+  const welds = kit.parts();
   SLIPS.forEach((progress, i) => {
     const f = kit.parts();
     const l = kit.parts();
-    slip(kit, f, l, progress);
+    const w = kit.parts();
+    slip(kit, f, l, w, progress);
     const at = STEP.map((d) => d * (i - MID));
     frame.push(...kit.moved(f, at));
     lights.push(...kit.moved(l, at));
+    welds.push(...kit.moved(w, at));
   });
   // The line: one transfer rail under the sterns, slip to slip and on into
   // the haze past the last, a dim light at each slip.
@@ -206,10 +222,32 @@ export function buildAssemblyGraveyard(THREE, kit) {
       5
     );
   }
-  const yard = [frame, lights].map((parts) =>
+  const yard = [frame, lights, welds].map((parts) =>
     kit.moved(parts, [0, 0, 260], [0.05, Math.PI / 2 + 0.12, 0])
   );
   const object = new THREE.Group();
-  object.add(kit.mesh(yard[0]), kit.mesh(yard[1], 'glow'));
-  return { layers: [{ object, anchor: under(1500), follow: 0.45 }] };
+  object.add(
+    kit.mesh(yard[0]),
+    kit.mesh(yard[1], 'glow', 'yard-work'),
+    kit.mesh(yard[2], 'glow', 'yard-weld')
+  );
+  const work = kit.materials.get('yard-work');
+  const weld = kit.materials.get('yard-weld');
+  const [fast, slow] = STILL.rates;
+  return {
+    layers: [{ object, anchor: under(1500), follow: 0.45 }],
+    update(time, wake) {
+      const k = Math.min(1, wake);
+      const flicker =
+        STILL.low +
+        (1 - STILL.low) *
+          Math.abs(Math.sin(time * fast) * Math.sin(time * slow + 1.3));
+      weld.color.setScalar(flicker * Math.max(0, 1 - k / STILL.weldOut));
+      const out = Math.min(
+        1,
+        Math.max(0, (k - STILL.workFrom) / (STILL.workOut - STILL.workFrom))
+      );
+      work.color.setScalar(1 - (1 - STILL.dead) * out);
+    },
+  };
 }

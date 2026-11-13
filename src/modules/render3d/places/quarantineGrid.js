@@ -1,7 +1,9 @@
 // Quarantine Grid (docs/ROTEIRO.md "Os lugares" 8): in the shadow of a dark
 // planet. Its limb fills a corner of the view, near black, a thin crescent
 // lit along its far edge; across it, at two depths, the quarantine lattice,
-// its beacons pulsing amber at the nodes.
+// its beacons pulsing amber at the nodes. When the Interdictor goes offline
+// the boundary opens: the beacons go out and the lattices sag away into the
+// dark, the nearer first.
 
 import { gradientDisc } from './kit.js';
 import { lightPoint, under } from './pieces.js';
@@ -14,6 +16,11 @@ const LATTICES = [
   { depth: 1700, spacing: 520, lines: [9, 7], follow: 0.5 },
 ];
 const PULSE = { period: 2.6, low: 0.45 };
+// proposta 12/11: the open boundary — each lattice's beacons out and its
+// fall done over `span` of the wake (the beacons out in its first half),
+// the farther `step` later; it sinks
+// `sink` (a share of its depth) and tips `tip` radians as it goes.
+const FALL = { span: 0.55, step: 0.25, sink: 0.35, tip: 0.1 };
 
 function lattice(kit, beams, beacons, { spacing, lines: [nx, nz] }, level) {
   const { tone, random } = kit;
@@ -107,21 +114,34 @@ export function buildQuarantineGrid(THREE, kit) {
   const layers = [
     { object: world, anchor: under(PLANET.depth, -600, 450), follow: 0.94 },
   ];
-  LATTICES.forEach((spec, level) => {
+  const fences = LATTICES.map((spec, level) => {
     const beams = kit.parts();
     const beacons = kit.parts();
     lattice(kit, beams, beacons, spec, level);
     const object = new THREE.Group();
-    object.add(kit.mesh(beams), kit.mesh(beacons, 'glow', 'beacons'));
+    object.add(kit.mesh(beams), kit.mesh(beacons, 'glow', `beacons-${level}`));
     object.rotation.set(0, 0.2 + level * 0.12, 0);
     layers.push({ object, anchor: under(spec.depth), follow: spec.follow });
+    return {
+      object,
+      beacons: kit.materials.get(`beacons-${level}`),
+      sink: spec.depth * FALL.sink,
+    };
   });
-  const beacons = kit.materials.get('beacons');
   return {
     layers,
-    update(time) {
+    update(time, wake) {
       const wave = 0.5 + 0.5 * Math.sin((time * Math.PI * 2) / PULSE.period);
-      beacons.color.setScalar(PULSE.low + (1 - PULSE.low) * wave);
+      const pulse = PULSE.low + (1 - PULSE.low) * wave;
+      for (let level = 0; level < fences.length; level += 1) {
+        const { object, beacons, sink } = fences[level];
+        const t = (Math.min(1, wake) - level * FALL.step) / FALL.span;
+        const down = Math.min(1, Math.max(0, t));
+        const eased = down * down * (3 - 2 * down);
+        beacons.color.setScalar(pulse * Math.max(0, 1 - 2 * Math.max(0, t)));
+        object.position.y = -sink * eased;
+        object.rotation.z = FALL.tip * eased;
+      }
     },
   };
 }
