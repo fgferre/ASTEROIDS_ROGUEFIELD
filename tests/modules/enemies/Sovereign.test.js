@@ -78,6 +78,19 @@ describe('Sovereign', () => {
     expect(boss.phaseCount).toBe(3);
   });
 
+  it('announces its attack once each time its plates shut to PROTECT', () => {
+    const { boss, eventBus } = createSovereign();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.sovState === 'protect-windup');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+    expect(attacks()[0][1].position).toEqual({ x: boss.x, y: boss.y });
+  });
+
   it('alternates its orders: a wall that warns then turns, then an open core that pulls and builds escorts', () => {
     const { boss, system } = createSovereign();
     runUntil(boss, () => boss.sovState === 'protect-windup');

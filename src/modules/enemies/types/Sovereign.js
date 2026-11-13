@@ -333,6 +333,12 @@ export class Sovereign extends BossEnemy {
       duration: cycle.protectWindup,
     };
     this.placeLine(this.barrier);
+    // Its plates shut: its sound (eventCues `boss-attack-started`).
+    this.getEventBus()?.emit?.('boss-attack-started', {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
+    });
   }
 
   placeLine(b) {
