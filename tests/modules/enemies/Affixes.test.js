@@ -218,6 +218,41 @@ describe('Elite affixes', () => {
     expect(player.takeDamage).toHaveBeenCalled();
   });
 
+  it('Volatile: the hit that lights the fuse is the kill, and the death is credited to it', () => {
+    const eventBus = { emit: vi.fn() };
+    const facade = {
+      asteroids: [],
+      eventBus,
+      getCachedPlayer: () => null,
+      getPlayerPositionSnapshot: () => null,
+    };
+    const damage = new EnemyDamageSystem({ facade });
+    const husk = create(
+      'husk',
+      { elite: true, affixes: ['volatile'] },
+      createSystem({
+        eventBus,
+        applyDamage: (enemy, amount, options) =>
+          damage.applyDamage(enemy, amount, options),
+        triggerVolatileExplosion: () => {},
+      })
+    );
+    const source = { hitPosition: { x: 110, y: 100 } };
+
+    expect(damage.applyDamage(husk, husk.maxHealth * 2, { source })).toEqual(
+      expect.objectContaining({ killed: true })
+    );
+    expect(husk.alive).toBe(true); // the fuse still burns
+    expect(damage.applyDamage(husk, 50, { source }).killed).toBe(false);
+
+    husk.update(ELITE_AFFIXES.volatile.fuse + 0.01);
+    const deaths = eventBus.emit.mock.calls.filter(
+      ([name]) => name === 'enemy-destroyed'
+    );
+    expect(deaths).toHaveLength(1);
+    expect(deaths[0][1].source).toBe(source);
+  });
+
   it('Splitter: dies into two Motes flying apart', () => {
     const system = createSystem();
     const ram = create('ram', { elite: true, affixes: ['splitter'] }, system);
