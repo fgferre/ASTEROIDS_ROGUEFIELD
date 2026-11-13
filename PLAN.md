@@ -52,6 +52,16 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    lugar deixado nunca aparece na viagem. Deixado para ele julgar: "Interdictor"/"THE INTERDICTOR" e "Warden
    Choir"/"THE CHOIR" (já eram assim na `main`); a reação da Debris Wake é a mais discreta. A pedra do Sovereign virou lapidação brilhante (lia como lanterna de lado). Verificado e não era defeito: o jogo fica parado durante as falas do final (o que roda são os 6 s de espólio); a chegada do chefe não se pula (roda na simulação), Esc pausa.
 
+10. **Defeitos do BACKLOG** (13/11, releitura inteira): consertados — tela final que esperava por uma fala cortada,
+    banir acendendo duas cartas, vários capítulos piscando no mapa, piloto das cenas de teste que não parava, braços
+    do Choir reaproveitado, colisão que dependia do relógio (replay), pós-imagens do Blink, aviso de SURGE engolido
+    pelo de EVENT, dica encostando no radar a 130 %, ~600 linhas de código morto. Texto da conquista Full Set agora
+    diz três cartas (decisão minha; o gatilho não mudou). Não eram defeito: Warded, conquistas no Boss Rush (já
+    corrigido em outubro), anel do Silence, jogo rodando nas falas do final. [x] **Pedem o sim dele (mudam a partida
+    de referência, que teria de ser regravada):** o abate do inimigo Volatile não conta para os efeitos "ao matar"
+    (conserto escrito e testado, não aplicado); a pedra que dá a volta no campo reaparece colada na borda e toca na
+    hora a nave que estiver ali.
+
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
 
