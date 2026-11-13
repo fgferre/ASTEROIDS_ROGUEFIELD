@@ -150,7 +150,11 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'pickup-collected', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'chest-opening', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'transmission-shown', cue: 'playTransmission' },
-  { on: 'transmission-shown', cue: 'playTransmissionVoice', arg: 'speaker' },
+  // A story line's recording, else the speaker's synthesized voice.
+  { on: 'transmission-queued', run: 'voiceQueued' },
+  { on: 'transmission-shown', run: 'voiceShown' },
+  { on: 'transmission-cut', run: 'voiceStopped' },
+  { on: 'transmission-finished', run: 'voiceStopped' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },
 
   // Enemy shots, by the firing machine (the batcher reads the shot's fields):

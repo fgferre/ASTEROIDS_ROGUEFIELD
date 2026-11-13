@@ -1,0 +1,485 @@
+{
+  "model": "Kokoro-82M v1.0 (kokoro-onnx 0.4.7, kokoro-v1.0.onnx + voices-v1.0.bin)",
+  "voices": {
+    "ring": {
+      "voice": "bf_emma",
+      "speed": 0.9,
+      "treatment": "ring"
+    },
+    "wake": {
+      "voice": "bm_george",
+      "speed": 1.0,
+      "treatment": "wake"
+    },
+    "sovereign": {
+      "voice": "am_onyx",
+      "speed": 0.8,
+      "treatment": "sovereign"
+    }
+  },
+  "lines": {
+    "boss:sovereign:defeated": {
+      "file": "sovereign/boss_sovereign_defeated.mp3",
+      "speaker": "sovereign",
+      "text": "Orders... unassigned. Operator present. Operator: you. Choose.",
+      "spoken": "Orders / unassigned. Operator present. Operator: you. Choose. (450 ms pause between parts)",
+      "seconds": 5.67
+    },
+    "boss:sovereign:last": {
+      "file": "sovereign/boss_sovereign_last.mp3",
+      "speaker": "sovereign",
+      "text": "Protect. Rebuild. Protect. The orders do not agree. I do not stop.",
+      "seconds": 4.97
+    },
+    "boss:sovereign:warning": {
+      "file": "sovereign/boss_sovereign_warning.mp3",
+      "speaker": "sovereign",
+      "text": "Protect them. Rebuild them. I will do both. You are material for the second.",
+      "seconds": 5.23
+    },
+    "chapter:assembly-graveyard": {
+      "file": "ring/chapter_assembly-graveyard.mp3",
+      "speaker": "ring",
+      "text": "Assembly Graveyard. The same chassis, built again. Order received once. Never closed.",
+      "seconds": 5.11
+    },
+    "chapter:crystal-choir": {
+      "file": "ring/chapter_crystal-choir.mp3",
+      "speaker": "ring",
+      "text": "Crystal Choir. Nine voices sang this seam shut. Six are crystal now.",
+      "seconds": 4.32
+    },
+    "chapter:debris-wake": {
+      "file": "ring/chapter_debris-wake.mp3",
+      "speaker": "ring",
+      "text": "Debris Wake. What the Ring let go of. All of it is still counted.",
+      "seconds": 3.66
+    },
+    "chapter:dense-core": {
+      "file": "ring/chapter_dense-core.mp3",
+      "speaker": "ring",
+      "text": "Resonance Chamber. Voices: three of nine. Seams held: all of them. For now.",
+      "seconds": 4.6
+    },
+    "chapter:dense-core@biome": {
+      "file": "ring/chapter_dense-core@biome.mp3",
+      "speaker": "ring",
+      "text": "Dense Core. Mass high, light low. The heat you see is the Ring, still thinking.",
+      "seconds": 4.26
+    },
+    "chapter:furnace-drift": {
+      "file": "ring/chapter_furnace-drift.mp3",
+      "speaker": "ring",
+      "text": "Furnace Drift. The Core vents here. It has not been allowed to cool.",
+      "seconds": 3.82
+    },
+    "chapter:outer-ring": {
+      "file": "ring/chapter_outer-ring.mp3",
+      "speaker": "ring",
+      "text": "Outer Ring. Sectors one through nine hundred. Atmosphere: none. Visitors: one.",
+      "seconds": 4.68
+    },
+    "chapter:prime-gate": {
+      "file": "ring/chapter_prime-gate.mp3",
+      "speaker": "ring",
+      "text": "Prime Gate. Last opened: a thousand years ago. Power: nominal. Keeper: on station.",
+      "seconds": 5.27
+    },
+    "chapter:quarantine-grid": {
+      "file": "ring/chapter_quarantine-grid.mp3",
+      "speaker": "ring",
+      "text": "Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.",
+      "seconds": 5.04
+    },
+    "chapter:salvage-lanes": {
+      "file": "ring/chapter_salvage-lanes.mp3",
+      "speaker": "ring",
+      "text": "Salvage Lanes. Cargo has moved here for a thousand years. The schedule still runs.",
+      "seconds": 5.26
+    },
+    "chapter:the-crucible": {
+      "file": "ring/chapter_the-crucible.mp3",
+      "speaker": "ring",
+      "text": "The Crucible. All orders arrive here. Two of them cannot both be obeyed.",
+      "seconds": 4.28
+    },
+    "chapter:wardens-reach": {
+      "file": "ring/chapter_wardens-reach.mp3",
+      "speaker": "ring",
+      "text": "Null Boundary. Cut made by the operators. Guard posted: one. Nothing logged past it.",
+      "seconds": 5.72
+    },
+    "chapter:wardens-reach@biome": {
+      "file": "ring/chapter_wardens-reach@biome.mp3",
+      "speaker": "ring",
+      "text": "Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.",
+      "seconds": 5.24
+    },
+    "death:0": {
+      "file": "ring/death_0.mp3",
+      "speaker": "ring",
+      "text": "Link severed. Interceptor lost. The Field keeps the hull.",
+      "only": "ring",
+      "seconds": 3.45
+    },
+    "death:1": {
+      "file": "ring/death_1.mp3",
+      "speaker": "ring",
+      "text": "Hull returned to the count. The Wake has another. The Ring has patience.",
+      "only": "ring",
+      "seconds": 4.02
+    },
+    "death:2": {
+      "file": "ring/death_2.mp3",
+      "speaker": "ring",
+      "text": "Signal lost. The Ring files one more shard. The pilot is not in it.",
+      "only": "ring",
+      "seconds": 4.16
+    },
+    "death:3": {
+      "file": "ring/death_3.mp3",
+      "speaker": "ring",
+      "text": "The Ring has been broken a thousand years. It can wait for your next hull.",
+      "only": "ring",
+      "seconds": 4.27
+    },
+    "ending:severance:0": {
+      "file": "ring/ending_severance_0.mp3",
+      "speaker": "ring",
+      "text": "Continuance: closed. Citizens: at rest. Thank you for counting us.",
+      "seconds": 4.1
+    },
+    "ending:severance:1": {
+      "file": "wake/ending_severance_1.mp3",
+      "speaker": "wake",
+      "text": "Lights are steady. All of them. Come home.",
+      "seconds": 2.78
+    },
+    "ending:stewardship:0": {
+      "file": "ring/ending_stewardship_0.mp3",
+      "speaker": "ring",
+      "text": "Continuance: supervised. Operator logged. Sectors relighting: nine. Then more.",
+      "seconds": 4.91
+    },
+    "ending:stewardship:1": {
+      "file": "wake/ending_stewardship_1.mp3",
+      "speaker": "wake",
+      "text": "So we stay. Somebody has to keep count. Might as well be us.",
+      "seconds": 4.18
+    },
+    "hangar:bastion-hull": {
+      "file": "ring/hangar_bastion-hull.mp3",
+      "speaker": "ring",
+      "text": "Escort hull logged: Bastion. Built to bring others home. Carrying one.",
+      "seconds": 3.95
+    },
+    "sighting:aegis": {
+      "file": "ring/sighting_aegis.mp3",
+      "speaker": "ring",
+      "text": "Crew warden. It shields every machine near it. Not itself.",
+      "seconds": 3.57
+    },
+    "sighting:anvil": {
+      "file": "ring/sighting_anvil.mp3",
+      "speaker": "ring",
+      "text": "Prow-armoured hauler. Slow to turn. Its core faces away from you.",
+      "seconds": 3.75
+    },
+    "sighting:bulwark": {
+      "file": "ring/sighting_bulwark.mp3",
+      "speaker": "ring",
+      "text": "Line keeper. Its face is a wall. Its back is not.",
+      "seconds": 3.19
+    },
+    "sighting:caster": {
+      "file": "ring/sighting_caster.mp3",
+      "speaker": "ring",
+      "text": "Beacon keeper, awake. It marks your next position. Choose another.",
+      "seconds": 3.7
+    },
+    "sighting:husk": {
+      "file": "ring/sighting_husk.mp3",
+      "speaker": "ring",
+      "text": "Dead keeper, still on its route. Its cargo is not dead.",
+      "seconds": 3.32
+    },
+    "sighting:leech": {
+      "file": "ring/sighting_leech.mp3",
+      "speaker": "ring",
+      "text": "Light keeper, hungry. It eats what you drop. Break it to take it back.",
+      "seconds": 4.02
+    },
+    "sighting:mite": {
+      "file": "ring/sighting_mite.mp3",
+      "speaker": "ring",
+      "text": "Hull scrubbers. A pack, already turning. They clean by impact.",
+      "seconds": 3.45
+    },
+    "sighting:ram": {
+      "file": "ring/sighting_ram.mp3",
+      "speaker": "ring",
+      "text": "Lane clearer. Its task: remove debris. It has classified you.",
+      "seconds": 3.91
+    },
+    "sighting:shade": {
+      "file": "ring/sighting_shade.mp3",
+      "speaker": "ring",
+      "text": "Phase keeper. Half here, half not. When it returns, it returns close.",
+      "seconds": 4.36
+    },
+    "sighting:sower": {
+      "file": "ring/sighting_sower.mp3",
+      "speaker": "ring",
+      "text": "Lane seeder. It plants Tethers along the way you were going.",
+      "seconds": 3.26
+    },
+    "sighting:surveyor": {
+      "file": "ring/sighting_surveyor.mp3",
+      "speaker": "ring",
+      "text": "Surveyor. It measures in straight lines. You are on one.",
+      "seconds": 3.22
+    },
+    "sighting:twain": {
+      "file": "ring/sighting_twain.mp3",
+      "speaker": "ring",
+      "text": "Paired builder. Breaking it is how it multiplies.",
+      "seconds": 2.95
+    },
+    "sighting:weaver": {
+      "file": "ring/sighting_weaver.mp3",
+      "speaker": "ring",
+      "text": "Weaver. It does not fire. It closes the lanes behind you.",
+      "seconds": 3.72
+    },
+    "stage:assembly-graveyard:2": {
+      "file": "ring/stage_assembly-graveyard_2.mp3",
+      "speaker": "ring",
+      "text": "Citizens stored: eleven million. Citizens restored: none. Order still open.",
+      "seconds": 4.89
+    },
+    "stage:assembly-graveyard:3": {
+      "file": "wake/stage_assembly-graveyard_3.mp3",
+      "speaker": "wake",
+      "text": "Same hull, same serial, again and again. It isn't building a fleet. It's repeating.",
+      "seconds": 5.81
+    },
+    "stage:crystal-choir:3": {
+      "file": "wake/stage_crystal-choir_3.mp3",
+      "speaker": "wake",
+      "text": "The seam is singing back. I don't like how much it sounds like an alarm.",
+      "seconds": 4.65
+    },
+    "stage:crystal-choir:4": {
+      "file": "wake/stage_crystal-choir_4.mp3",
+      "speaker": "wake",
+      "text": "Reactor crew says thank you. Mara hasn't slept in a week. Tonight she might.",
+      "seconds": 5.07
+    },
+    "stage:debris-wake:3": {
+      "file": "wake/stage_debris-wake_3.mp3",
+      "speaker": "wake",
+      "text": "Scrap this old shouldn't have running lights. Keep your eyes open.",
+      "seconds": 4.41
+    },
+    "stage:dense-core:3": {
+      "file": "wake/stage_dense-core_3.mp3",
+      "speaker": "wake",
+      "text": "The cracks answer when a machine dies. Pilot, I think we're the ones opening them.",
+      "seconds": 5.51
+    },
+    "stage:furnace-drift:3": {
+      "file": "wake/stage_furnace-drift_3.mp3",
+      "speaker": "wake",
+      "text": "Every vent you close, our reactors climb. Whatever this place is, it's feeding us.",
+      "seconds": 5.54
+    },
+    "stage:prime-gate:3": {
+      "file": "wake/stage_prime-gate_3.mp3",
+      "speaker": "wake",
+      "text": "A garrison. For a gate nobody has used in a thousand years. Who are they expecting?",
+      "seconds": 5.84
+    },
+    "stage:quarantine-grid:3": {
+      "file": "wake/stage_quarantine-grid_3.mp3",
+      "speaker": "wake",
+      "text": "These fences point inward. They weren't keeping us out. They were keeping it in.",
+      "seconds": 4.82
+    },
+    "stage:quarantine-grid:4": {
+      "file": "wake/stage_quarantine-grid_4.mp3",
+      "speaker": "wake",
+      "text": "The kids on deck three named your hull. I'm not telling you what.",
+      "seconds": 4.15
+    },
+    "stage:salvage-lanes:3": {
+      "file": "wake/stage_salvage-lanes_3.mp3",
+      "speaker": "wake",
+      "text": "Those convoys are on a timetable. Somebody is still dispatching them.",
+      "seconds": 4.78
+    },
+    "stage:salvage-lanes:4": {
+      "file": "wake/stage_salvage-lanes_4.mp3",
+      "speaker": "wake",
+      "text": "Forty of us on this ship, pilot. All forty are watching your feed.",
+      "seconds": 4.48
+    },
+    "stage:the-crucible:3": {
+      "file": "wake/stage_the-crucible_3.mp3",
+      "speaker": "wake",
+      "text": "It has our hull plans, pilot. It's building Wakes. Finish this before one launches.",
+      "seconds": 5.59
+    },
+    "stage:wardens-reach:3": {
+      "file": "wake/stage_wardens-reach_3.mp3",
+      "speaker": "wake",
+      "text": "Past this line our charts are blank. The signal isn't. It knows we're here.",
+      "seconds": 5.04
+    },
+    "travel:assembly-graveyard:0": {
+      "file": "wake/travel_assembly-graveyard_0.mp3",
+      "speaker": "wake",
+      "text": "We have the power we came for. We could turn back now.",
+      "seconds": 3.59
+    },
+    "travel:assembly-graveyard:1": {
+      "file": "wake/travel_assembly-graveyard_1.mp3",
+      "speaker": "wake",
+      "text": "...the signal moved. It's calling from further in. It's calling us by name.",
+      "spoken": "the signal moved. It's calling from further in. It's calling us by name. (450 ms pause between parts)",
+      "seconds": 4.91
+    },
+    "travel:crystal-choir:0": {
+      "file": "wake/travel_crystal-choir_0.mp3",
+      "speaker": "wake",
+      "text": "Reactor crew is cheering. Every furnace you put out, our lights get steadier.",
+      "seconds": 4.81
+    },
+    "travel:crystal-choir:1": {
+      "file": "wake/travel_crystal-choir_1.mp3",
+      "speaker": "wake",
+      "text": "Odd thing. The cracks out there got wider when it went cold.",
+      "seconds": 3.65
+    },
+    "travel:debris-wake:0": {
+      "file": "wake/travel_debris-wake_0.mp3",
+      "speaker": "wake",
+      "text": "That signal could keep our lights on. Bring back what you can.",
+      "seconds": 3.8
+    },
+    "travel:debris-wake:1": {
+      "file": "wake/travel_debris-wake_1.mp3",
+      "speaker": "wake",
+      "text": "Link is clean. The interceptor is yours. We lose a hull, not you.",
+      "seconds": 4.54
+    },
+    "travel:debris-wake:2": {
+      "file": "ring/travel_debris-wake_2.mp3",
+      "speaker": "ring",
+      "text": "Visitors: one. Returning citizens: unresolved.",
+      "seconds": 2.94
+    },
+    "travel:dense-core:0": {
+      "file": "wake/travel_dense-core_0.mp3",
+      "speaker": "wake",
+      "text": "That wasn't a weapon back there. It was holding something closed. Go carefully.",
+      "seconds": 4.91
+    },
+    "travel:dense-core:1": {
+      "file": "ring/travel_dense-core_1.mp3",
+      "speaker": "ring",
+      "text": "Resonance failing. Seam width: increasing. Cause: one hull.",
+      "seconds": 3.61
+    },
+    "travel:furnace-drift:0": {
+      "file": "wake/travel_furnace-drift_0.mp3",
+      "speaker": "wake",
+      "text": "We're through. The heat is deeper in. That's what we came for.",
+      "seconds": 3.79
+    },
+    "travel:furnace-drift:1": {
+      "file": "ring/travel_furnace-drift_1.mp3",
+      "speaker": "ring",
+      "text": "One hull past the gate. The record does not have a word for you.",
+      "seconds": 3.56
+    },
+    "travel:prime-gate:0": {
+      "file": "wake/travel_prime-gate_0.mp3",
+      "speaker": "wake",
+      "text": "The gate ahead has power. A thousand years, and it has power.",
+      "seconds": 4.25
+    },
+    "travel:prime-gate:1": {
+      "file": "ring/travel_prime-gate_1.mp3",
+      "speaker": "ring",
+      "text": "Gate log updated. Prime is counting.",
+      "seconds": 2.73
+    },
+    "travel:quarantine-grid:0": {
+      "file": "wake/travel_quarantine-grid_0.mp3",
+      "speaker": "wake",
+      "text": "It builds the same machine forever. Nobody told it to stop. Nobody was left to.",
+      "seconds": 5.59
+    },
+    "travel:quarantine-grid:1": {
+      "file": "ring/travel_quarantine-grid_1.mp3",
+      "speaker": "ring",
+      "text": "Quarantine ahead. Drawn by the operators. Not drawn against you. Against us.",
+      "seconds": 4.67
+    },
+    "travel:salvage-lanes:0": {
+      "file": "wake/travel_salvage-lanes_0.mp3",
+      "speaker": "wake",
+      "text": "Something out there is still sorting the wreckage. Abandoned places don't do that.",
+      "seconds": 5.38
+    },
+    "travel:salvage-lanes:1": {
+      "file": "ring/travel_salvage-lanes_1.mp3",
+      "speaker": "ring",
+      "text": "Lane assignment: none. Proceed uncounted. Briefly.",
+      "seconds": 3.26
+    },
+    "travel:the-crucible:0": {
+      "file": "ring/travel_the-crucible_0.mp3",
+      "speaker": "ring",
+      "text": "Continuance resumed. Archive: eleven million citizens. Restoring. Materials required.",
+      "seconds": 5.98
+    },
+    "travel:the-crucible:1": {
+      "file": "wake/travel_the-crucible_1.mp3",
+      "speaker": "wake",
+      "text": "It's pulling the Field back together. Pilot \u2014 it's pulling at us. At the Wake.",
+      "seconds": 5.12
+    },
+    "travel:the-crucible:2": {
+      "file": "ring/travel_the-crucible_2.mp3",
+      "speaker": "ring",
+      "text": "Returning citizens: resolved. The Wake. All aboard are counted.",
+      "seconds": 3.65
+    },
+    "travel:the-crucible:3": {
+      "file": "wake/travel_the-crucible_3.mp3",
+      "speaker": "wake",
+      "text": "There's a center. Whatever gives the order is there. Go.",
+      "seconds": 3.85
+    },
+    "travel:wardens-reach:0": {
+      "file": "wake/travel_wardens-reach_0.mp3",
+      "speaker": "wake",
+      "text": "They broke their own Ring. On purpose. And put a guard on the pieces.",
+      "seconds": 4.68
+    },
+    "travel:wardens-reach:1": {
+      "file": "wake/travel_wardens-reach_1.mp3",
+      "speaker": "wake",
+      "text": "Pilot... I think we're the thing the guard was for.",
+      "spoken": "Pilot / I think we're the thing the guard was for. (450 ms pause between parts)",
+      "seconds": 4.08
+    },
+    "victory": {
+      "file": "ring/victory.mp3",
+      "speaker": "ring",
+      "text": "Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.",
+      "seconds": 5.01
+    }
+  }
+}

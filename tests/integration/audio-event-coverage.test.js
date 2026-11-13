@@ -3,6 +3,9 @@ import { createServiceManifest } from '../../src/bootstrap/serviceManifest.js';
 import { createAudioContextStub } from '../__helpers__/stubs.js';
 import { assertManagerWired } from '../__helpers__/audio-manifest-wiring.js';
 import eventInventory from '../fixtures/audio-event-inventory.json' with { type: 'json' };
+import { STORY } from '../../src/data/story.js';
+import { loadVoiceManifest } from '../../src/modules/audio/voiceLines.js';
+import voiceManifest from '../../src/public/audio/voice/manifest.json' with { type: 'json' };
 
 // ---------------------------------------------------------------------------
 // Source-derived audio event-coverage lock (plan 02.01 Task 3).
@@ -566,6 +569,19 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
       'playTransmissionVoice',
       ([speaker]) => expect(speaker).toBe('THE CHOIR')
     );
+  });
+
+  it('transmission-shown of a recorded line → its recording, no synthesized voice', async () => {
+    await loadVoiceManifest(async () => ({ json: async () => voiceManifest }));
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.sfxBus, 'playTransmissionVoice');
+    eventBus.emit('transmission-shown', {
+      speaker: 'THE RING',
+      key: 'victory',
+      text: STORY.victory,
+    });
+    expect(spy).not.toHaveBeenCalled();
+    audio.destroy();
   });
 
   it('enemy-telegraph far from the player → playEnemyTelegraph with a distance mix', () => {

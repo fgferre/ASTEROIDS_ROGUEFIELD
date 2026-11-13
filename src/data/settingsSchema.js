@@ -482,6 +482,16 @@ const SETTINGS_SCHEMA = [
         max: 1,
         step: 0.05,
       },
+      {
+        key: 'voiceVolume',
+        type: 'range',
+        label: 'Voice Volume',
+        description: 'The spoken transmissions. At zero the voices are off.',
+        default: 1,
+        min: 0,
+        max: 1,
+        step: 0.05,
+      },
     ],
   },
   {

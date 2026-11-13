@@ -7,6 +7,7 @@ import FileTrackManager, {
 import DuckingController from './audio/DuckingController.js';
 import { registerAudioEventCues } from './audio/eventDispatch.js';
 import { interceptSampleCues } from './audio/samplePlayer.js';
+import { createVoicePlayer, loadVoiceManifest } from './audio/voiceLines.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -26,7 +27,9 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import {
   AUDIO_BIG_MOMENT_DUCK,
   AUDIO_MASTER_LIMITER,
+  AUDIO_VOICE,
 } from '../data/audio/mix.js';
+import { dbToGain } from './audio/MusicThemes.js';
 
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -39,6 +42,7 @@ class AudioSystem extends BaseSystem {
     this.masterLimiter = null;
     this.musicGain = null;
     this.effectsGain = null;
+    this.voiceGain = null;
     this.initialized = false;
     this.sounds = new Map();
     this.settings = resolveService('settings', this.dependencies);
@@ -57,6 +61,7 @@ class AudioSystem extends BaseSystem {
       master: 0.25,
       music: 0.6,
       effects: 1,
+      voice: 1,
       muteAll: false,
     };
 
@@ -125,6 +130,27 @@ class AudioSystem extends BaseSystem {
     // AudioSystem.init() after the buses + MusicMixer exist.
     this.duckingController = new DuckingController();
 
+    // The recorded story lines (./audio/voiceLines.js), on their own bus
+    // (the Voices slider); the music ducks under them.
+    this.voiceLines = createVoicePlayer({
+      getContext: () => this.context,
+      getDestination: () => this.voiceGain,
+      duck: (seconds) =>
+        this.duckingController.duck({
+          bus: 'music',
+          ...AUDIO_VOICE.duck,
+          holdMs: seconds * 1000,
+        }),
+      unduck: () =>
+        this.duckingController.duck({
+          bus: 'music',
+          depthDb: 0,
+          attackMs: AUDIO_VOICE.recoverMs,
+          holdMs: 0,
+          releaseMs: 0,
+        }),
+    });
+
     // Low-HP duck edge-detection latch (review fix): the duck fires only on the
     // CROSSING into ≤25% HP, re-armed when HP recovers above the threshold.
     this.lowHealthDuckArmed = false;
@@ -141,11 +167,12 @@ class AudioSystem extends BaseSystem {
     this._exposeRandomDebugControls();
     this._setupEarlyInit();
     this._warmupEagerFileTracks();
-    // The SFX samples and the engine load with the boot (a page only: node
-    // tests have none).
+    // The SFX samples, the engine and the voices' manifest load with the
+    // boot (a page only: node tests have none).
     if (typeof document !== 'undefined') {
       this.sfxBus.samples.load();
       this.sfxBus.engine.load();
+      loadVoiceManifest();
     }
   }
 
@@ -293,9 +320,11 @@ class AudioSystem extends BaseSystem {
 
       this.musicGain = this.context.createGain();
       this.effectsGain = this.context.createGain();
+      this.voiceGain = this.context.createGain();
 
       this.musicGain.connect(this.masterLimiter);
       this.effectsGain.connect(this.masterLimiter);
+      this.voiceGain.connect(this.masterLimiter);
 
       this.applyVolumeToNodes();
       // AUDIO-01: the adaptive 4-layer music now lives in MusicMixer. It builds
@@ -420,6 +449,7 @@ class AudioSystem extends BaseSystem {
         values.effectsVolume,
         this.volumeState.effects
       ),
+      voice: this.sanitizeVolume(values.voiceVolume, this.volumeState.voice),
       muteAll: Boolean(values.muteAll ?? this.volumeState.muteAll),
     };
 
@@ -433,7 +463,7 @@ class AudioSystem extends BaseSystem {
 
     // Master scales the summed mix once, at masterGain (after the limiter); the
     // bus sliders carry only the per-bus mix.
-    const { master, music, effects, muteAll } = this.volumeState;
+    const { master, music, effects, voice, muteAll } = this.volumeState;
     const masterValue = muteAll ? 0 : master;
 
     this.masterGain.gain.value = masterValue;
@@ -444,6 +474,12 @@ class AudioSystem extends BaseSystem {
 
     if (this.effectsGain) {
       this.effectsGain.gain.value = muteAll ? 0 : effects;
+    }
+
+    if (this.voiceGain) {
+      this.voiceGain.gain.value = muteAll
+        ? 0
+        : voice * dbToGain(AUDIO_VOICE.gainDb);
     }
   }
 

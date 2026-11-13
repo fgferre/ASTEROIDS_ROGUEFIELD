@@ -70,12 +70,19 @@ describe('TransmissionQueue', () => {
   it('cuts a line when a banner opens and replays it afterwards', () => {
     const hud = fakeHud();
     const shown = [];
-    const queue = new TransmissionQueue(hud, (entry) => shown.push(entry.key));
+    const cut = [];
+    const queue = new TransmissionQueue(
+      hud,
+      (entry) => shown.push(entry.key),
+      () => {},
+      (entry) => cut.push(entry.key)
+    );
     queue.push(wardenTransmission(10, 'warning'));
     queue.update(0);
     hud.busy = true;
     queue.update(500);
     expect(hud.showing).toBeNull();
+    expect(cut).toEqual(['boss:choir:warning']);
     hud.busy = false;
     queue.update(2000);
     expect(hud.showing).toBe(STORY.speaker.choir);

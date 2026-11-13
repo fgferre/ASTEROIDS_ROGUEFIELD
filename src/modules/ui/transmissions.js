@@ -4,10 +4,24 @@ import { STORY } from '../../data/story.js';
 import { biomeForLayer } from '../../data/biomes.js';
 import { bossKindForLayer } from '../../data/enemies/boss.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
+import { voiceFor } from '../audio/voiceLines.js';
 
 /** How long a line stays on screen once it is fully typed. */
 export const TRANSMISSION_HOLD_MS = 3500;
 export const TRANSMISSION_CHARS_PER_SECOND = 40;
+// A recorded line stays up this long after its voice ends.
+export const VOICE_TAIL_MS = 400;
+
+/**
+ * How long `entry` holds once typed (in `typingMs`): its own hold, or, with
+ * a recording (audio/voiceLines.js), long enough to stay up through it.
+ */
+export function holdMsFor(entry, typingMs) {
+  const hold = entry.holdMs ?? TRANSMISSION_HOLD_MS;
+  const voice = voiceFor(entry);
+  if (!voice) return hold;
+  return Math.max(hold, voice.seconds * 1000 + VOICE_TAIL_MS - typingMs);
+}
 
 /** The Ring names the place: the sector's own line, else its biome's. */
 export function chapterTransmission(biomeId, sectorId = null) {
@@ -144,13 +158,15 @@ export function victoryTransmission() {
  * is up; a banner that opens mid-line cuts it, and it replays afterwards.
  * `view` is the HUD (isBannerBusy, showTransmission, typeTransmission,
  * hideTransmission); `onShown(entry)` fires each time a line starts,
- * `onFinished(entry)` once it is done for good: held to the end, or dropped.
+ * `onFinished(entry)` once it is done for good: held to the end, or dropped;
+ * `onCut(entry)` when a banner cuts it (it plays again afterwards).
  */
 export class TransmissionQueue {
-  constructor(view, onShown, onFinished = () => {}) {
+  constructor(view, onShown, onFinished = () => {}, onCut = () => {}) {
     this.view = view;
     this.onShown = onShown;
     this.onFinished = onFinished;
+    this.onCut = onCut;
     this.pending = [];
     this.current = null;
     // A line a banner cut: still on air for whoever waits on it.
@@ -193,6 +209,7 @@ export class TransmissionQueue {
       this.pending.unshift(this.current.entry);
       this.cut = this.current.entry;
       this.current = null;
+      this.onCut(this.cut);
     }
     if (!this.current) {
       if (!this.pending.length || this.view.isBannerBusy()) {
@@ -221,7 +238,7 @@ export class TransmissionQueue {
       this.current.typed = typed;
       this.view.typeTransmission(entry.text.slice(0, typed), typed >= length);
     }
-    if (elapsed >= typingMs + (entry.holdMs ?? TRANSMISSION_HOLD_MS)) {
+    if (elapsed >= typingMs + holdMsFor(entry, typingMs)) {
       this.view.hideTransmission();
       this.current = null;
       this.onFinished(entry);

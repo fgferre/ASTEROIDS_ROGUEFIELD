@@ -43,6 +43,23 @@ export const AUDIO_EVENT_HANDLERS = {
     }
   },
 
+  // A story line (audio/voiceLines.js): readied as it is queued, played as
+  // it shows (a line without a recording gets the synthesized voice), its
+  // voice stopped when a banner cuts it and released once it is done.
+  voiceQueued(audio, payload) {
+    if (payload) audio.voiceLines.prepare(payload);
+  },
+  voiceShown(audio, payload) {
+    if (!audio.voiceLines.play(payload ?? {})) {
+      audio.sfxBus.playTransmissionVoice(payload?.speaker);
+    }
+  },
+  voiceStopped(audio, payload, eventName) {
+    const key = payload?.key ?? null;
+    if (eventName === 'transmission-finished') audio.voiceLines.release(key);
+    else audio.voiceLines.stop(key);
+  },
+
   // The player's position: the pan and distance reference of every cue.
   listener(audio, payload) {
     const position = payload?.position;

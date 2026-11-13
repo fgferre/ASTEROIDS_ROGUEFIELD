@@ -262,11 +262,10 @@ class UISystem extends BaseSystem {
         this.tacticalHud.layout,
         ({ speaker, key, text }) => {
           this.lastTransmission = { speaker, text };
-          this.eventBus.emit('transmission-shown', { speaker, key });
+          this.eventBus.emit('transmission-shown', { speaker, key, text });
         },
-        ({ key }) => {
-          this.eventBus.emit('transmission-finished', { key });
-        }
+        ({ key }) => this.eventBus.emit('transmission-finished', { key }),
+        ({ key }) => this.eventBus.emit('transmission-cut', { key })
       );
     }
     this.tacticalHud.updateAAATacticalHudFromServices({ force: true });
@@ -403,6 +402,7 @@ class UISystem extends BaseSystem {
     } else {
       queue.push(entry);
     }
+    this.eventBus.emit('transmission-queued', entry);
     if (this.transmissionRaf) {
       return;
     }

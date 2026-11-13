@@ -21,6 +21,7 @@ import { SECTORS, nextInChapter, sectorById } from '../../data/sectors.js';
 import { TRAVEL, easeInOut } from '../../core/cinematics.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
+  holdMsFor,
   travelTransmissions,
 } from '../ui/transmissions.js';
 import { createSeededRandom } from './asteroidMesh.js';
@@ -180,16 +181,17 @@ function travelPlaces(to) {
 }
 
 /**
- * The spans of a journey's t between its `lines` (typed, then held: the
- * text stands still), over `durationMs`.
+ * The spans of a journey's t between its `lines` (typed, then held — a
+ * recorded line through its voice: the text stands still), over
+ * `durationMs`.
  */
 export function linePauses(lines, durationMs) {
   const pauses = [];
   let at = 0;
   lines.forEach((line) => {
-    const typed =
-      at + (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
-    at = typed + (line.holdMs ?? TRAVEL.lineHoldMs);
+    const typing = (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+    const typed = at + typing;
+    at = typed + holdMsFor({ holdMs: TRAVEL.lineHoldMs, ...line }, typing);
     pauses.push([typed / durationMs, at / durationMs]);
   });
   return pauses;

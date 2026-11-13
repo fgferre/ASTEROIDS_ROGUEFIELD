@@ -33,6 +33,7 @@ import { loadRecords } from '../../services/runRecords.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
   endingTransmissions,
+  holdMsFor,
   travelTransmissions,
 } from './transmissions.js';
 
@@ -64,16 +65,24 @@ export function travelDestination(
   return opening ? sector : null;
 }
 
-/** The journey's length for its `lines`: typed, held, within TRAVEL. */
+/**
+ * The journey's length for its `lines`: typed, held, within TRAVEL; longer
+ * when its recorded lines (audio/voiceLines.js) need it to be spoken out.
+ */
 export function travelDurationMs(lines) {
-  const spoken = lines.reduce(
-    (sum, line) =>
-      sum +
-      (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000 +
-      TRAVEL.lineHoldMs,
-    TRAVEL.leadMs
+  const sum = (hold) =>
+    lines.reduce((total, line) => {
+      const typing = (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+      return total + typing + hold(line, typing);
+    }, TRAVEL.leadMs);
+  const typed = sum(() => TRAVEL.lineHoldMs);
+  const spoken = sum((line, typing) =>
+    holdMsFor({ ...line, holdMs: TRAVEL.lineHoldMs }, typing)
   );
-  return Math.min(TRAVEL.maxMs, Math.max(TRAVEL.minMs, spoken));
+  return Math.max(
+    Math.min(TRAVEL.maxMs, Math.max(TRAVEL.minMs, typed)),
+    spoken
+  );
 }
 
 /**
