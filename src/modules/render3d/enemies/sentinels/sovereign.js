@@ -23,14 +23,29 @@ const EGG_H = 0.68;
 const EGG_POINT = 0.12;
 // How far up the egg (0..1) the shells reach: all but a pinhole at the tip.
 const SHELL_TOP = 0.998;
-// The core: a gem of eight facets parted round a burning heart (radii up
-// from its girdle), held by eight prongs.
-const GEM = [
-  0, 0.27, 0.05, 0.27, 0.13, 0.2, 0.19, 0.07, 0.19, 0.01, 0.12, -0.12, 0.04,
-  -0.22, 0, -0.25,
+// The core: a round brilliant cut in eights round a burning heart, held at
+// its girdle by eight prongs. proposta 12/11: its girdle's radius and height,
+// the table's radius and the window in it, the crown's and pavilion's heights, the girdle
+// band, and half the seam between crown and pavilion where the heart shows.
+const GEM_R = 0.21;
+const GEM_Y = 0.3;
+const GEM_TABLE = 0.115;
+const GEM_WINDOW = 0.055;
+const GEM_CROWN = 0.075;
+const GEM_DEPTH = 0.18;
+const GEM_BAND = 0.012;
+const GEM_SEAM = 0.008;
+// proposta 12/11: the facets' shades: table, stars, kites, upper girdle,
+// girdle band, pavilion mains, lower girdle.
+const GEM_SHADES = [
+  '#ffd27a',
+  '#f2a840',
+  '#8a4a14',
+  '#c87a28',
+  '#6e3c10',
+  '#5e300c',
+  '#c07428',
 ];
-const GEM_Y = 0.25;
-const GEM_PART = 0.016; // how far each facet stands off the heart
 // proposta 12/11: the gem's own heat and the heart's, sealed and open.
 const GEM_HEAT = [0.04, 0.4];
 const HEART_GAIN = [0.1, 1.1];
@@ -321,13 +336,104 @@ export function createSovereign(sk) {
     )
   );
   const LAMP_VERTS = 36; // a box, non-indexed
-  const gem = merge(
-    around(SHELLS).map((a) => ({
-      geometry: sweep(GEM, 2, a - Math.PI / SHELLS + 0.03, TAU / SHELLS - 0.06),
-      position: [Math.cos(a) * GEM_PART, GEM_Y, Math.sin(a) * GEM_PART],
-    }))
+  // The brilliant (about its girdle): an octagonal table with a window in
+  // it, eight star facets, eight kite bezels and sixteen upper-girdle facets
+  // on the crown, a thin girdle band, then the seam, and the pavilion's eight
+  // long mains and sixteen lower-girdle facets down to the culet. The kites'
+  // side points sit where each kite stays flat. Each kind of facet carries
+  // its own shade of amber, so the cut reads at play size as well as close.
+  function brilliant() {
+    const ring = (n, r, y, turn = 0) =>
+      around(n, turn).map((a) => [Math.cos(a) * r, y, Math.sin(a) * r]);
+    const lean = Math.cos(Math.PI / 8);
+    const base = GEM_SEAM + GEM_BAND;
+    const top = base + GEM_CROWN;
+    const culet = -GEM_SEAM - GEM_DEPTH;
+    // proposta 12/11: the stars reach halfway down the crown, the lower
+    // girdle facets two thirds of the way to the culet
+    const starR = (GEM_TABLE + 0.5 * (GEM_R - GEM_TABLE)) / lean;
+    const lowR = (0.35 * GEM_R) / lean;
+    const table = ring(8, GEM_TABLE, top);
+    const eye = ring(8, GEM_WINDOW, top);
+    const stars = ring(8, starR, (top + base) / 2, Math.PI / 8);
+    const band = ring(16, GEM_R, GEM_SEAM);
+    const girdle = ring(16, GEM_R, base);
+    const rim = ring(16, GEM_R, -GEM_SEAM);
+    const lows = ring(8, lowR, culet + 0.35 * GEM_DEPTH, Math.PI / 8);
+    const point = [0, culet, 0];
+    const facets = GEM_SHADES.map((hex) => ({ color: hex, faces: [] }));
+    const [flat, star, kite, upper, rimBand, main, lower] = facets;
+    for (let k = 0; k < 8; k += 1) {
+      const [j, k1, k0] = [2 * k, (k + 1) % 8, (k + 7) % 8];
+      const [g0, g1, g2] = [j, j + 1, (j + 2) % 16];
+      flat.faces.push(
+        [table[k], table[k1], eye[k1]],
+        [table[k], eye[k1], eye[k]]
+      );
+      star.faces.push([table[k], table[k1], stars[k]]);
+      kite.faces.push(
+        [table[k], stars[k0], girdle[g0]],
+        [table[k], girdle[g0], stars[k]]
+      );
+      upper.faces.push(
+        [stars[k], girdle[g0], girdle[g1]],
+        [stars[k], girdle[g1], girdle[g2]]
+      );
+      main.faces.push([point, lows[k0], rim[g0]], [point, rim[g0], lows[k]]);
+      lower.faces.push(
+        [lows[k], rim[g0], rim[g1]],
+        [lows[k], rim[g1], rim[g2]]
+      );
+    }
+    for (let j = 0; j < 16; j += 1) {
+      const j1 = (j + 1) % 16;
+      rimBand.faces.push(
+        [band[j], band[j1], girdle[j1]],
+        [band[j], girdle[j1], girdle[j]]
+      );
+    }
+    // each face wound to look out from the girdle's centre
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    return facets.map(({ color, faces }) => {
+      const position = faces.flatMap(([p, q, r]) => {
+        a.fromArray(p);
+        b.fromArray(q).sub(a);
+        c.fromArray(r).sub(a);
+        a.set(p[0] + q[0] + r[0], p[1] + q[1] + r[1], p[2] + q[2] + r[2]);
+        return b.cross(c).dot(a) < 0 ? [...p, ...r, ...q] : [...p, ...q, ...r];
+      });
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(position, 3)
+      );
+      geometry.computeVertexNormals();
+      return {
+        geometry: mapped(geometry),
+        color: colorOf(THREE, color),
+        position: [0, GEM_Y, 0],
+      };
+    });
+  }
+  const gem = merge(brilliant());
+  // The heart fills the gem just inside it: a hot plate under the window
+  // and a rim level with the seam.
+  const heartGeometry = revolve(
+    THREE,
+    [
+      0,
+      GEM_SEAM + GEM_BAND + GEM_CROWN - 0.012,
+      GEM_TABLE * 0.9,
+      GEM_SEAM + GEM_BAND + GEM_CROWN - 0.012,
+      GEM_R - 0.012,
+      0,
+      0,
+      -GEM_SEAM - GEM_DEPTH + 0.03,
+    ],
+    16
   );
-  const heartGeometry = new THREE.IcosahedronGeometry(0.075, 0);
   const heartColor = colorOf(THREE, '#ffe0a8');
   const protect = colorOf(THREE, PALETTE.status).multiplyScalar(
     LAMP_GAIN.protect
@@ -352,12 +458,13 @@ export function createSovereign(sk) {
       new THREE.Mesh(trim, metalMaterial)
     );
     const coreMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, '#a8681f'),
+      vertexColors: true,
       emissive: colorOf(THREE, PALETTE.shot),
       emissiveIntensity: GEM_HEAT[0],
-      roughness: 0.2,
-      metalness: 0.3,
-      envMapIntensity: 1.6,
+      // proposta 12/11: polished hard, so each facet catches its own light
+      roughness: 0.12,
+      metalness: 0.5,
+      envMapIntensity: 2,
     });
     const heartMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
     const heart = new THREE.Mesh(heartGeometry, heartMaterial);
