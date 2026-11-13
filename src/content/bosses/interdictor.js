@@ -49,7 +49,11 @@ export default {
     warn: 1.2, // proposta 12/11: s of thin lines before it is solid
     fade: 0.3, // proposta 12/11: s, it fades after its hold (harmless)
     thickness: 14, // proposta 12/11: px, a solid fence
-    damageFactor: 0.4, // proposta 12/11: of contactDamage, like the barrier
+    // proposta 13/11: of contactDamage, was 0.4 (like the barrier): the good
+    // pilot reached it at full hull every time and won 23/24; at 0.55 (and
+    // the beam at 0.45) 19/24. At 0.7 with a 36 px beam 21/24, and with a
+    // 0.3 s beam freeze 22/24: harder or more hits did not lower it further.
+    damageFactor: 0.55,
     push: 260, // proposta 12/11: px/s away from the fence (the ship thrusts 280)
     // proposta 12/11: of its side, where the solid cage has closed to by the
     // end of its hold (was 1, it never moved): standing still, the cage and
@@ -70,8 +74,8 @@ export default {
     gap: 0.5, // proposta 12/11: s between one beam's end and the next aim
     width: 24, // proposta 12/11: px
     // proposta 12/11: was 0.15; a beam that landed took 7, less than a
-    // drone's shot
-    damageFactor: 0.3,
+    // drone's shot; proposta 13/11: 0.3 → 0.45, with the fence above
+    damageFactor: 0.45,
   },
   burnTick: 0.4, // proposta 12/11
   ventSpeed: 3, // proposta 12/11: ventOpen (0..1) per s
