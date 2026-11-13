@@ -1,8 +1,9 @@
 // The player hull in 3D (docs/NORTE.md §3): the ship hullModel.js builds
 // from the hull's art data (lofted fuselage, airfoil wings that grow with
 // the RCS upgrade, tail fins, nacelles, intakes, pods, canopy, edge lines,
-// turret), under one matte vertex-coloured material with baked panel maps
-// and a cyan fresnel rim, cached per hull and upgrade levels. The only
+// turret), in three vertex-coloured finishes (satin paint and glossier
+// accent panels with baked panel maps, polished steel) under a cyan fresnel
+// rim, with a dark glass canopy, cached per hull and upgrade levels. The only
 // strong light is the thrusters (hull accent: cyan Interceptor, amber Solar
 // Slicer): glowing throats, cones with a white core that stretch with
 // thrust, side puffs on strafe at the wingtip ports, a point light and a
@@ -26,7 +27,10 @@ import {
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import {
+  CANOPY_GLASS,
+  HULL_FINISHES,
   NOZZLE_HEIGHT,
+  SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
   buildTurret,
@@ -71,11 +75,11 @@ const HULL_TILE = 16;
 const HULL_NORMAL_SCALE = 0.5;
 const HULL_AO = 0.8;
 const HULL_MAP_SEED = 3131.9;
-const HULL_ROUGHNESS = 0.8;
 
-// Cyan fresnel rim on the hull (a tight band on the silhouette against the
-// dark field) plus the white invulnerability pulse, both as emissive; the
-// pulse is weighted to the rim so the panels stay readable while it blinks.
+// The specular cap (hullModel.js), then the cyan fresnel rim on the hull (a
+// tight band on the silhouette against the dark field) plus the white
+// invulnerability pulse, both as emissive; the pulse is weighted to the rim
+// so the panels stay readable while it blinks.
 function patchHull(shader) {
   const { uRim, uBlink } = this.userData;
   shader.uniforms.uRim = uRim;
@@ -84,6 +88,10 @@ function patchHull(shader) {
     .replace(
       '#include <common>',
       '#include <common>\nuniform vec3 uRim;\nuniform float uBlink;'
+    )
+    .replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
     )
     .replace(
       '#include <emissivemap_fragment>',
@@ -131,27 +139,34 @@ export class PlayerMirror {
     this.group.add(this.ship);
     scene.add(this.group);
 
-    // One matte material for every hull part; the tones (dark interiors,
-    // belly, deck and wings, spine) ride in the vertex colours, so the key
-    // light models the curved surfaces without a sheen.
+    // One material per finish (HULL_FINISHES: satin paint, glossy accents,
+    // polished steel); the tones ride in the vertex colours, the paint and
+    // the accents carry the baked panel maps. All take the rim and blink.
     const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
     const blink = { value: 0 };
     const maps = bakeHullMaps(THREE, HULL_MAP_SEED);
     Object.values(maps).forEach((map) =>
       map.repeat.set(1 / HULL_TILE, 1 / HULL_TILE)
     );
-    const hullMaterial = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.2,
-      roughness: HULL_ROUGHNESS,
-      ...maps,
-      normalScale: new THREE.Vector2(HULL_NORMAL_SCALE, HULL_NORMAL_SCALE),
-      aoMapIntensity: HULL_AO,
+    this.hullMaterials = HULL_FINISHES.map((finish) => {
+      const material = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        ...finish,
+      });
+      material.userData.uRim = rim;
+      material.userData.uBlink = blink;
+      material.onBeforeCompile = patchHull;
+      return addRimLight(material);
     });
-    hullMaterial.userData.uRim = rim;
-    hullMaterial.userData.uBlink = blink;
-    hullMaterial.onBeforeCompile = patchHull;
-    this.hullMaterial = addRimLight(hullMaterial);
+    // the painted finishes: the ones with the panel maps
+    this.mappedMaterials = this.hullMaterials.slice(0, 2);
+    this.mappedMaterials.forEach((material) =>
+      Object.assign(material, maps, {
+        normalScale: new THREE.Vector2(HULL_NORMAL_SCALE, HULL_NORMAL_SCALE),
+        aoMapIntensity: HULL_AO,
+      })
+    );
+    this.hullMaterial = this.hullMaterials[0];
     this.tones = hullTones(THREE);
     // hull key → { hull, ghost, canopy, edges, tips, deckY }, kept for the
     // session
@@ -159,12 +174,12 @@ export class PlayerMirror {
     this.hullMaps = maps;
     this.surfaceMaps = true;
     this.blink = blink;
+    const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
     this.canopyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
         color: colorOf(THREE, PALETTE.rockShadow),
-        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.14),
-        metalness: 0.1,
-        roughness: 0.3,
+        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(canopyGlow),
+        ...glass,
       })
     );
     this.edgeMaterial = new THREE.LineBasicMaterial({
@@ -257,8 +272,8 @@ export class PlayerMirror {
     this.trailCount = 0;
     this.trailHead = 0;
     this.thrustRgb = rgbOf(THREE, PALETTE.player);
-    // The turret, in the hull material; rebuild() seats it on each hull.
-    this.turretParts = buildTurret(THREE, this.hullMaterial, this.tones);
+    // The turret, in the hull finishes; rebuild() seats it on each hull.
+    this.turretParts = buildTurret(THREE, this.hullMaterials, this.tones);
     ({
       group: this.turret,
       housing: this.turretHousing,
@@ -359,7 +374,7 @@ export class PlayerMirror {
       this.puffs.push({ puff, left: port.y < 0 });
     });
 
-    const hullMesh = new THREE.Mesh(built.hull, this.hullMaterial);
+    const hullMesh = new THREE.Mesh(built.hull, this.hullMaterials);
     hullMesh.name = 'hull';
     this.ship.add(hullMesh);
     this.ghosts.forEach((ghost) => {
@@ -497,7 +512,7 @@ export class PlayerMirror {
     while (this.layers.length < headings.length) {
       const layer = buildTurretLayer(
         this.THREE,
-        this.hullMaterial,
+        this.hullMaterials,
         this.tones,
         this.layers.length + 1
       );
@@ -609,11 +624,12 @@ export class PlayerMirror {
   setSurfaceMaps(enabled) {
     if (enabled === this.surfaceMaps) return;
     this.surfaceMaps = enabled;
-    const material = this.hullMaterial;
-    Object.keys(this.hullMaps).forEach((name) => {
-      material[name] = enabled ? this.hullMaps[name] : null;
+    this.mappedMaterials.forEach((material) => {
+      Object.keys(this.hullMaps).forEach((name) => {
+        material[name] = enabled ? this.hullMaps[name] : null;
+      });
+      material.needsUpdate = true;
     });
-    material.needsUpdate = true;
   }
 
   reset() {

@@ -130,8 +130,8 @@ describe('PlayerMirror', () => {
   it("draws each hull's static plates as one vertex-coloured mesh", () => {
     [defaultHull, solarSlicer, bastion].forEach((hull) => {
       const { mirror } = mirrorFor(hull);
-      const solids = mirror.ship.children.filter(
-        (child) => child.material === mirror.hullMaterial
+      const solids = mirror.ship.children.filter((child) =>
+        [child.material].flat().includes(mirror.hullMaterial)
       );
       expect(
         solids.map((mesh) => mesh.name),

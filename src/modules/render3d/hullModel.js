@@ -6,8 +6,11 @@
 // the nozzles' glowing throats and the dorsal turret (domed housing or the
 // low hexagonal collar, mantlet, twin barrels, amber lens in a hood) with its
 // multi-lock layers (thin discs stacked on its axis, one thin barrel each).
+// Each solid draws in three finishes (HULL_FINISHES: satin paint, glossier
+// accent panels, polished steel), one draw group each in finish order.
 // One way to build the ship: the game's render3d/playerMirror.js and the
-// menu's MenuHullPreview.js both call it, with their own materials.
+// menu's MenuHullPreview.js both call it, with their own materials made
+// from HULL_FINISHES.
 // Ship-local points are [x, height, y] in hull units (ship y → world z); the
 // ship draws at VISUAL_SCALE, the turret unscaled.
 
@@ -16,7 +19,7 @@ import {
   TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
 } from '../../data/constants/physics.js';
-import { buildSlabHull } from './hullSlabModel.js';
+import { FINISH, buildSlabHull } from './hullSlabModel.js';
 import { mergeStatic } from './mergeStatic.js';
 import { colorOf } from './batches.js';
 
@@ -75,6 +78,42 @@ const LAYER_BARREL = [
   -7.6, 0, 1, -7.6, 0.45, 1, -6.3, 0.45, 2, -6.3, 0.3, 2, -0.6, 0.3, 3, -0.6,
   0.42, 3, 0, 0.42, 0, 0, 0.18, 0, -0.4, 0.18, 0, -0.4, 0, 0,
 ];
+
+// The steel tone (hullTones).
+const STEEL = 4;
+
+/**
+ * MeshStandardMaterial settings per finish (FINISH order): satin paint,
+ * glossier accent panels, polished steel; the paint and the accents carry
+ * the baked panel maps (their roughness map is about 1, so `roughness` is
+ * what the surface gets). proposta 12/11: values set by eye on captures.
+ */
+export const HULL_FINISHES = Object.freeze([
+  { metalness: 0.2, roughness: 0.64, envMapIntensity: 1 },
+  { metalness: 0.2, roughness: 0.48, envMapIntensity: 1.2 },
+  { metalness: 1, roughness: 0.45, envMapIntensity: 2.5 },
+]);
+
+/**
+ * GLSL for after `#include <lights_fragment_end>`: caps the specular light
+ * (direct and reflected) so the glossy finishes keep a tight sheen without
+ * clipping to white and blooming on a face turned to the key light.
+ * proposta 12/11.
+ */
+export const SPECULAR_CAP_GLSL = `
+      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.3));
+      reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.2));`;
+
+/**
+ * The canopy's dark glass: a tight highlight over a faint cyan glow.
+ * proposta 12/11.
+ */
+export const CANOPY_GLASS = Object.freeze({
+  metalness: 0.1,
+  roughness: 0.22,
+  envMapIntensity: 1.2,
+  glow: 0.14,
+});
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (u, v) => [
@@ -172,8 +211,9 @@ function bake(surface) {
 // Baked surfaces bucketed by tone: one geometry per tone for mergeStatic,
 // with planar UVs (hull units, on the face's dominant axis) for the maps.
 class ToneParts {
-  constructor() {
+  constructor(finish = FINISH.paint) {
     this.buckets = new Map();
+    this.finish = finish;
   }
 
   add(surface) {
@@ -212,9 +252,29 @@ class ToneParts {
       geometry.setAttribute('normal', attribute(nor, 3));
       geometry.setAttribute('uv', attribute(uv, 2));
       geometry.setAttribute('uv2', attribute(uv, 2));
-      return { geometry, color: colors[tone] };
+      return { geometry, color: colors[tone], finish: this.finish };
     });
   }
+}
+
+// Merges `parts` in finish order (stable) and adds one draw group per run
+// of a finish, its material index the finish.
+function mergeFinishes(THREE, parts) {
+  const finishOf = (part) => part.finish ?? FINISH.paint;
+  const ordered = [...parts].sort((a, b) => finishOf(a) - finishOf(b));
+  const merged = mergeStatic(THREE, ordered);
+  let start = 0;
+  ordered.forEach((part, i) => {
+    const { index } = part.geometry;
+    const count = index
+      ? index.count
+      : part.geometry.getAttribute('position').count;
+    const last = merged.groups[merged.groups.length - 1];
+    if (i > 0 && last.materialIndex === finishOf(part)) last.count += count;
+    else merged.addGroup(start, count, finishOf(part));
+    start += count;
+  });
+  return merged;
 }
 
 // A body of revolution: `rows` [along, radius, tone, ...] from one end to
@@ -240,6 +300,11 @@ const aroundX =
     y + r * Math.sin(a) * squash,
     z + r * Math.cos(a),
   ];
+// A barrel in steel: every tone but the bore's (0) turns STEEL.
+function steel(surface) {
+  surface.tones = surface.tones.map((tone) => (tone ? STEEL : tone));
+  return surface;
+}
 const aroundY = (along, r, a) => [r * Math.cos(a), along, r * Math.sin(a)];
 const boxAlongX = (x, y, z, p, squash) => (along, r, a) => {
   const bend = (v) => Math.sign(v) * Math.abs(v) ** (2 / p);
@@ -250,7 +315,10 @@ const boxAlongX = (x, y, z, p, squash) => (along, r, a) => {
   ];
 };
 
-/** The hull tones by DEEP, BASE, FIN, SPINE (linear), before a hull's albedo. */
+/**
+ * The hull tones by DEEP, BASE, FIN, SPINE and STEEL (linear), before a
+ * hull's albedo.
+ */
 export function hullTones(THREE) {
   const tone = (from, to, t) =>
     colorOf(THREE, from).lerp(colorOf(THREE, to), t);
@@ -259,6 +327,7 @@ export function hullTones(THREE) {
     tone(PALETTE.hull, PALETTE.hullLit, 0.2),
     tone(PALETTE.hullLit, PALETTE.neutral, 0.15),
     tone(PALETTE.hullLit, PALETTE.neutral, 0.6),
+    tone(PALETTE.neutral, PALETTE.salvage, 0.2),
   ];
 }
 
@@ -266,32 +335,42 @@ export function hullTones(THREE) {
  * The turret, built up from y = 0: the housing (a domed ring) and the low
  * hexagonal collar, and the barrels group (mantlet with shrouded barrels,
  * muzzle brakes, dark bores and the lens hood, plus the amber lens), one
- * merged mesh per moving part in `material` (vertex `tones`). Returns
+ * merged mesh per moving part in `material` (vertex `tones`; an array of
+ * HULL_FINISHES materials: glossy housings, steel barrels). Returns
  * { group, housing, housingLow, barrels, barrelY } (the barrels' axis
  * height); seatTurret() fits it to a hull.
  */
 export function buildTurret(THREE, material, tones, lensMaterial) {
-  const solid = (...surfaces) => {
-    const parts = new ToneParts();
-    surfaces.forEach((surface) => parts.add(surface));
-    return new THREE.Mesh(
-      mergeStatic(THREE, parts.parts(THREE, tones)),
-      material
+  // [finish, surface] pairs → one mesh
+  const solid = (...pairs) => {
+    const parts = pairs.flatMap(([finish, surface]) =>
+      new ToneParts(finish).add(surface).parts(THREE, tones)
     );
+    return new THREE.Mesh(mergeFinishes(THREE, parts), material);
   };
-  const housing = solid(revolve(HOUSING, 16, aroundY));
+  const housing = solid([FINISH.gloss, revolve(HOUSING, 16, aroundY)]);
   housing.name = 'turretHousing';
-  const housingLow = solid(revolve(HOUSING_LOW, 6, aroundY));
+  const housingLow = solid([FINISH.gloss, revolve(HOUSING_LOW, 6, aroundY)]);
   housingLow.name = 'turretHousingLow';
   // Barrels and their mantlet recoil together along the turret's axis.
   const barrels = new THREE.Group();
-  const barrel = (z) =>
-    revolve(BARREL, 8, aroundX(TURRET_BARREL_LENGTH, TURRET_BARREL_Y, z));
+  const barrel = (z) => [
+    FINISH.metal,
+    steel(
+      revolve(BARREL, 8, aroundX(TURRET_BARREL_LENGTH, TURRET_BARREL_Y, z))
+    ),
+  ];
   const gun = solid(
-    revolve(MANTLET, 16, boxAlongX(0, TURRET_BARREL_Y, 0, 5, 0.5)),
+    [
+      FINISH.paint,
+      revolve(MANTLET, 16, boxAlongX(0, TURRET_BARREL_Y, 0, 5, 0.5)),
+    ],
     barrel(-TURRET_BARREL_Z),
     barrel(TURRET_BARREL_Z),
-    revolve(LENS_HOOD, 10, aroundX(0, TURRET_BARREL_Y + 1.1, 0, 0.8))
+    [
+      FINISH.paint,
+      revolve(LENS_HOOD, 10, aroundX(0, TURRET_BARREL_Y + 1.1, 0, 0.8)),
+    ]
   );
   const lens = new THREE.Mesh(
     new THREE.SphereGeometry(0.62, 8, 6).translate(
@@ -319,9 +398,12 @@ export function buildTurret(THREE, material, tones, lensMaterial) {
  * axis at height barrelY.
  */
 export function buildTurretLayer(THREE, material, tones, level) {
-  const solid = (surface) =>
+  const solid = (surface, finish) =>
     new THREE.Mesh(
-      mergeStatic(THREE, new ToneParts().add(surface).parts(THREE, tones)),
+      mergeFinishes(
+        THREE,
+        new ToneParts(finish).add(surface).parts(THREE, tones)
+      ),
       material
     );
   const y = LAYER_BASE_Y + LAYER_STEP * (level - 1);
@@ -331,10 +413,18 @@ export function buildTurretLayer(THREE, material, tones, level) {
       radius * r * Math.cos(a),
       y + along,
       radius * r * Math.sin(a),
-    ])
+    ]),
+    FINISH.gloss
   );
   const barrel = solid(
-    revolve(LAYER_BARREL, 8, aroundX(TURRET_BARREL_LENGTH, y + LAYER_MID_Y, 0))
+    steel(
+      revolve(
+        LAYER_BARREL,
+        8,
+        aroundX(TURRET_BARREL_LENGTH, y + LAYER_MID_Y, 0)
+      )
+    ),
+    FINISH.metal
   );
   const group = new THREE.Group();
   group.add(disc, barrel);
@@ -379,8 +469,9 @@ export function edgeLines(THREE, model, materials) {
  * applied, nozzles, cockpit, `form` in SHIP_SIZE units) and `tones`
  * (hullTones, scaled here by the hull's albedo), shaped by hullSlabModel.js.
  * Returns { hull, ghost, canopy, edges, tips, deckY }: the static parts as
- * one vertex-coloured geometry, fuselage and wings first, then the raised
- * parts; `ghost` draws only the first range of the same buffers (the dash
+ * one vertex-coloured geometry with a draw group per finish (HULL_FINISHES
+ * materials), fuselage and wings first, then the raised parts; `ghost`
+ * draws only the first range of the same buffers (the dash
  * afterimages); the canopy's glass; the edge segments by kind ({ edge,
  * bladeEdge }); the wingtip points (RCS ports) in the panels' order; the
  * deck height at the turret pivot.
@@ -397,10 +488,11 @@ export function buildHullModel(THREE, geometry, tones) {
 }
 
 // The hull's parts as one vertex-coloured geometry, fuselage and wings
-// first: the dash ghosts draw only that range of the same buffers.
+// first (all paint, so finish order keeps them first): the dash ghosts draw
+// only that range of the same buffers.
 function mergeHull(THREE, plates, raised) {
   const parts = [...plates, ...raised];
-  const hull = mergeStatic(THREE, parts);
+  const hull = mergeFinishes(THREE, parts);
   parts.forEach((part) => part.geometry.dispose());
   const ghost = new THREE.BufferGeometry();
   ghost.setAttribute('position', hull.getAttribute('position'));

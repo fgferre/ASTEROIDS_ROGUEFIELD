@@ -2,8 +2,9 @@
 
 // The chosen hull on the main menu and in the Hangar: the game's own 3D ship
 // (render3d/hullModel.js, laid out as render3d/playerMirror.js draws it, at
-// the hull's base upgrade levels) under menu materials: the matte
-// vertex-coloured hull and turret and the glass canopy, edge lines, glowing
+// the hull's base upgrade levels) under menu materials: the game's finishes
+// (satin paint, glossy accents, polished steel) on the vertex-coloured hull
+// and turret and the dark glass canopy, edge lines, glowing
 // throats and a thruster plume in the hull accent (cyan Interceptor, amber
 // Solar Slicer and Bastion). The menu's key light circles the hull as the
 // camera orbits, so a fixed screen-space studio light (hull and canopy
@@ -18,7 +19,10 @@ import { PALETTE } from '../data/constants/palette.js';
 import { HullArt } from './player/hullArt.js';
 import { colorOf } from './render3d/batches.js';
 import {
+  CANOPY_GLASS,
+  HULL_FINISHES,
   NOZZLE_HEIGHT,
+  SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
   buildTurret,
@@ -62,14 +66,21 @@ void main() {
 }`;
 
 function patchHull(shader) {
-  shader.fragmentShader = shader.fragmentShader.replace(
-    '#include <emissivemap_fragment>',
-    `#include <emissivemap_fragment>
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
+    )
+    .replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
       // Facing the viewer whatever the normal's sign.
       vec3 facing = faceforward(normal, -vViewPosition, normal);
       float studio = max(dot(facing, normalize(${STUDIO_GLSL})), 0.0);
-      totalEmissiveRadiance += diffuseColor.rgb * ${STUDIO_STRENGTH} * studio;`
-  );
+      // metal has little diffuse: it keeps its own reflections
+      totalEmissiveRadiance += diffuseColor.rgb * ${STUDIO_STRENGTH} * studio
+        * (1.0 - 0.6 * metalnessFactor);`
+    );
 }
 
 export class MenuHullPreview {
@@ -94,21 +105,20 @@ export class MenuHullPreview {
       material.onBeforeCompile = patchHull;
       return material;
     };
+    const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
     this.materials = {
-      hull: studio(
-        new THREE.MeshStandardMaterial({
-          vertexColors: true,
-          metalness: 0.2,
-          roughness: 0.8,
-        })
+      // one per finish, as in the game
+      hull: HULL_FINISHES.map((finish) =>
+        studio(
+          new THREE.MeshStandardMaterial({ vertexColors: true, ...finish })
+        )
       ),
       // Dark glass with a dim cyan glow, as in the game.
       canopy: studio(
         new THREE.MeshStandardMaterial({
           color: colorOf(THREE, PALETTE.rockShadow),
-          emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.14),
-          metalness: 0.1,
-          roughness: 0.3,
+          emissive: colorOf(THREE, PALETTE.player).multiplyScalar(canopyGlow),
+          ...glass,
         })
       ),
       edge: new THREE.LineBasicMaterial({
