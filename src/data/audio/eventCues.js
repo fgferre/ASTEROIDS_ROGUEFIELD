@@ -243,8 +243,12 @@ export const AUDIO_EVENT_CUES = Object.freeze([
 
   // The journey between sectors (render3d/travel/moments.js): each moment's
   // sample, the burn's loop on and off, and all of it fading when it ends.
+  // Its score (audio/journeyCue.js) is laid out from the plan as it starts
+  // and stops early on a skip; the sector's music hands over at the end.
+  { on: 'travel-planned', run: 'journeyPlanned' },
   { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
   { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },
   { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
   { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
+  { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
 ]);

@@ -138,6 +138,18 @@ export const AUDIO_EVENT_HANDLERS = {
     );
   },
 
+  // The journey's score (./journeyCue.js) plays alone, the layers held
+  // down; at its end (or a skip) the sector's music comes in.
+  journeyPlanned(audio, payload) {
+    if (audio.journeyCue.play(payload ?? {})) {
+      audio.musicMixer.holdForJourney(true);
+    }
+  },
+  journeyEnded(audio) {
+    audio.journeyCue.end();
+    audio.musicMixer.holdForJourney(false);
+  },
+
   // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
   // freeze, no drift).
   pauseMusic(audio, payload) {

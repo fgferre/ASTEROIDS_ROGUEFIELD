@@ -60,6 +60,7 @@
   "transmission-queued",
   "transmission-shown",
   "travel-moment",
+  "travel-planned",
   "ui-hover",
   "ui-overlay-visibility-changed",
   "upgrade-applied",

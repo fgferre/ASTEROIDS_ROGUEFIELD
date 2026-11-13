@@ -621,8 +621,8 @@ class Renderer3D extends BaseSystem {
 
   setup() {
     this.three = setupThree(this.seeded);
-    this.travel = new TravelScene(this.three, (id) =>
-      this.eventBus?.emit('travel-moment', { id })
+    this.travel = new TravelScene(this.three, (event, payload) =>
+      this.eventBus?.emit(event, payload)
     );
     this.applyQuality();
   }

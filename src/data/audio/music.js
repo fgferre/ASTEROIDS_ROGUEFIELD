@@ -343,6 +343,115 @@ export const MUSIC_THEME_CROSSFADE = Object.freeze({
   segments: 8,
 });
 
+// The journey's score (modules/audio/journeyCue.js), proposta 13/11: the
+// treatment the owner chose by ear ("B", a journey motif). Notes are scale
+// degrees of `theme` (root A2, A dorian; 7 = the root an octave up) or
+// semitones above its root (`notes` of a held chord); times in seconds;
+// gains as rendered on the audition. A soft pad, and the chapter motif
+// plucked through a delay echo: on the ignite, left hanging; a quiet echo on
+// a hop's first fly-by; on a jump a run that climbs and quickens from the
+// charge into the leap, a chord that swells into the drop-out and the motif
+// low after it; again on the brake; the top A and an open chord at the end,
+// where the sector's own layers come in (MusicMixer.holdForJourney).
+export const MUSIC_JOURNEY = Object.freeze({
+  theme: 'outer-ring',
+  // The audition sat the cue 6.2 dB under its render beside the voices at
+  // full; the music slider's default (0.6, −4.4 dB) makes up the rest.
+  levelDb: -1.7,
+  // Seeded oscillator detune, ± cents (the cue's own stream).
+  detuneCents: 7,
+  seed: 'audio:music:journey',
+  pad: Object.freeze({
+    type: 'sine',
+    notes: Object.freeze([0, 7]),
+    filter: Object.freeze({ type: 'lowpass', frequency: 380, Q: 0.8 }),
+    lfo: Object.freeze({ rate: 0.06, depth: 0.25 }),
+    gain: 0.12,
+    riseTau: 0.8, // from the journey's start
+    fallTau: 0.4, // from its end
+  }),
+  // A plucked note: a triangle plus a sine an octave up, a short rise, then
+  // an exponential fall of `decay` seconds (τ = decay / 4).
+  pluck: Object.freeze({
+    partials: Object.freeze([
+      Object.freeze({ type: 'triangle', ratio: 1, gain: 1 }),
+      Object.freeze({ type: 'sine', ratio: 2, gain: 0.35 }),
+    ]),
+    attack: 0.04,
+    fallFrom: 0.06,
+    decay: 1.4,
+    lastDecay: 2.4, // the motif's last note
+  }),
+  // The plucks' lowpass, then dry plus a feedback delay.
+  echo: Object.freeze({
+    lowpass: 1800,
+    delay: 0.375,
+    feedback: 0.35,
+    wet: 0.3,
+  }),
+  // The motif (the theme's own three degrees unless `notes`) at a moment.
+  motifs: Object.freeze({
+    ignite: Object.freeze({ octave: 1, gain: 0.22, step: 0.45 }),
+    flyby: Object.freeze({
+      octave: 2,
+      gain: 0.08,
+      step: 0.35,
+      notes: Object.freeze([4, 5]),
+    }),
+    dropout: Object.freeze({ after: 2.6, octave: 0, gain: 0.16, step: 0.6 }),
+    brake: Object.freeze({ octave: 1, gain: 0.2, step: 0.45 }),
+  }),
+  // A jump's charge: the run, an octave up every `octaveEvery` notes, each
+  // step `quicken` × the last (down to `minStep`), louder toward the leap.
+  climb: Object.freeze({
+    notes: Object.freeze([0, 4, 5, 7]),
+    octave: 1,
+    octaveEvery: 8,
+    step: 0.32,
+    quicken: 0.9,
+    minStep: 0.11,
+    gainFrom: 0.08,
+    gainTo: 0.2,
+    decay: 0.6,
+    stopsBefore: 0.05, // no note this close to the leap
+  }),
+  // The leap → drop-out: a held chord swelling from the leap to `peak` just
+  // after the drop-out, then fading.
+  bloom: Object.freeze({
+    type: 'triangle',
+    notes: Object.freeze([12, 19, 21, 24]),
+    filter: Object.freeze({ type: 'lowpass', frequency: 2200, Q: 0.8 }),
+    peak: 0.2,
+    peakAfter: 0.1,
+    fallAfter: 0.4,
+    fallTau: 1.6,
+  }),
+  // The end: the figure's top A, plucked, over an open chord.
+  resolve: Object.freeze({
+    degree: 7,
+    octave: 1,
+    gain: 0.24,
+    decay: 3,
+    type: 'sine',
+    notes: Object.freeze([0, 7, 12, 19, 33]),
+    filter: Object.freeze({ type: 'lowpass', frequency: 1600, Q: 0.8 }),
+    peak: 0.18,
+    riseFrom: -0.05,
+    peakAfter: 0.15,
+    fallAfter: 0.6,
+    fallTau: 1.2,
+  }),
+  // A journey cut short (a skip): `end` this much before its plan stops the
+  // score over `stopSeconds`.
+  early: 0.25,
+  stopSeconds: 0.15,
+  // The sector's layers: down over `holdSeconds` as the journey starts; at
+  // its end in at `arrivalLevel` over the theme crossfade, held there until
+  // the run's own level reaches it.
+  holdSeconds: 1.5,
+  arrivalLevel: 1,
+});
+
 // Run-following music intensity (0..1). Weighted sum of run progress (wave /
 // RUN_FINAL_LAYER), enemy density and a low-HP bump, smoothed with separate
 // attack/release time constants; each level fades in when the smoothed value

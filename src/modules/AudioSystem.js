@@ -8,6 +8,7 @@ import DuckingController from './audio/DuckingController.js';
 import { registerAudioEventCues } from './audio/eventDispatch.js';
 import { interceptSampleCues } from './audio/samplePlayer.js';
 import { createVoicePlayer, loadVoiceManifest } from './audio/voiceLines.js';
+import { createJourneyCue } from './audio/journeyCue.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -149,6 +150,14 @@ class AudioSystem extends BaseSystem {
           holdMs: 0,
           releaseMs: 0,
         }),
+    });
+
+    // The journey's score (./audio/journeyCue.js), on the music path at the
+    // duck stage, like the file tracks.
+    this.journeyCue = createJourneyCue({
+      getContext: () => this.context,
+      getDestination: () =>
+        this.duckingController.musicDuckGain || this.musicGain,
     });
 
     // Low-HP duck edge-detection latch (review fix): the duck fires only on the
@@ -813,6 +822,7 @@ class AudioSystem extends BaseSystem {
     if (this.musicMixer) {
       this.musicMixer.resetRun();
     }
+    this.journeyCue.stop();
     this.runEnemyCount = 0;
     this.listenerX = GAME_WIDTH / 2;
     this.listenerY = GAME_HEIGHT / 2;
@@ -836,6 +846,7 @@ class AudioSystem extends BaseSystem {
     if (this.sfxBus && typeof this.sfxBus.dispose === 'function') {
       this.sfxBus.dispose();
     }
+    this.journeyCue.stop();
     // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
     if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
       this.musicMixer.dispose();

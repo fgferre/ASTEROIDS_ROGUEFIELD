@@ -271,6 +271,26 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
     });
   });
 
+  it('travel-planned lays out the journey score and holds the layers; its end hands over', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    audio.journeyCue = { play: vi.fn(() => true), end: vi.fn(), stop: vi.fn() };
+    const hold = vi.spyOn(audio.musicMixer, 'holdForJourney');
+    const plan = { moments: [{ id: 'ignite', at: 1.4 }], duration: 10 };
+
+    eventBus.emit('travel-planned', plan);
+    expect(audio.journeyCue.play).toHaveBeenCalledWith(plan);
+    expect(hold).toHaveBeenLastCalledWith(true);
+
+    eventBus.emit('travel-moment', { id: 'brake' });
+    expect(audio.journeyCue.end).not.toHaveBeenCalled();
+    eventBus.emit('travel-moment', { id: 'end' });
+    expect(audio.journeyCue.end).toHaveBeenCalledTimes(1);
+    expect(hold).toHaveBeenLastCalledWith(false);
+
+    vi.restoreAllMocks();
+    audio.destroy();
+  });
+
   it('boss-warning plays the warden stinger exactly once', () => {
     withAudio(({ eventBus, warden }) => {
       eventBus.emit('boss-warning', { wave: 4, nextBossWave: 5 });

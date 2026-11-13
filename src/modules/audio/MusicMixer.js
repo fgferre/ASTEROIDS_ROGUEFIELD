@@ -1,6 +1,7 @@
 import { RUN_FINAL_LAYER } from '../../core/GameConstants.js';
 import {
   MUSIC_DEFAULT_THEME,
+  MUSIC_JOURNEY,
   MUSIC_LAYER_CONFIG,
   MUSIC_PERCUSSION,
   MUSIC_RUN_INTENSITY,
@@ -217,6 +218,10 @@ class MusicMixer {
     this.runIntensity = 0;
     this.bossLevel = null;
     this._smoothHandle = null;
+
+    // --- the journey between sectors (holdForJourney) ---
+    this._journeyHeld = false;
+    this._arrivalLevel = null;
 
     this.initialized = false;
   }
@@ -525,7 +530,36 @@ class MusicMixer {
     }
     this.bossLevel =
       eventName === 'boss-defeated' ? null : BOSS_ARC_INTENSITY[eventName];
-    this._applyIntensity(resolveMusicLevel(this.runIntensity, this.bossLevel));
+    this._applyIntensity(this._resolvedLevel());
+  }
+
+  /**
+   * The journey between sectors (journeyCue.js) plays its score alone: the
+   * layers go down over MUSIC_JOURNEY.holdSeconds while `held`; when it ends
+   * they come in at MUSIC_JOURNEY.arrivalLevel over the theme crossfade,
+   * held there until the run's own level reaches it. Ending without a hold
+   * does nothing.
+   *
+   * @param {boolean} held
+   */
+  holdForJourney(held) {
+    if (!held && !this._journeyHeld) return;
+    this._journeyHeld = !!held;
+    this._arrivalLevel = held ? null : MUSIC_JOURNEY.arrivalLevel;
+    this._applyIntensity(this._resolvedLevel(), {
+      rampSeconds: held
+        ? MUSIC_JOURNEY.holdSeconds
+        : MUSIC_THEME_CROSSFADE.seconds,
+    });
+  }
+
+  /** The run's level, the boss floor, the journey's hold and arrival. @private */
+  _resolvedLevel() {
+    if (this._journeyHeld) return 0;
+    const level = resolveMusicLevel(this.runIntensity, this.bossLevel);
+    return this._arrivalLevel === null
+      ? level
+      : Math.max(level, this._arrivalLevel);
   }
 
   /**
@@ -549,6 +583,8 @@ class MusicMixer {
     this.runState = { wave: 0, enemyCount: 0, healthRatio: 1 };
     this.runIntensity = 0;
     this.bossLevel = null;
+    this._journeyHeld = false;
+    this._arrivalLevel = null;
     this._applyIntensity(0, {
       rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,
     });
@@ -589,7 +625,13 @@ class MusicMixer {
       this.runIntensity = target;
       this._stopSmoothing();
     }
-    const level = resolveMusicLevel(this.runIntensity, this.bossLevel);
+    if (
+      this._arrivalLevel !== null &&
+      intensityToLevel(this.runIntensity) >= this._arrivalLevel
+    ) {
+      this._arrivalLevel = null;
+    }
+    const level = this._resolvedLevel();
     if (level !== this.targetLevel) {
       this._applyIntensity(level, {
         rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,

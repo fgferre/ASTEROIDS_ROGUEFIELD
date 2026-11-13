@@ -9,6 +9,7 @@ import { createServiceManifest } from '../../../src/bootstrap/serviceManifest.js
 import { createAudioContextStub } from '../../__helpers__/stubs.js';
 import { assertManagerWired } from '../../__helpers__/audio-manifest-wiring.js';
 import {
+  MUSIC_JOURNEY,
   MUSIC_LAYER_CONFIG,
   MUSIC_PERCUSSION,
   MUSIC_THEME_CROSSFADE,
@@ -611,6 +612,31 @@ describe('MusicMixer — run-following intensity (wave + density + HP + boss)', 
     // The boss arc overrides upwards, never downwards.
     expect(activeLayers({ wave: 1, enemyCount: 0 }, 3)).toEqual(LAYER_KEYS);
     expect(activeLayers({ wave: 15, enemyCount: 20 }, 1)).toEqual(LAYER_KEYS);
+  });
+
+  it('a journey holds the layers silent, then hands over to the sector at its end', () => {
+    vi.useFakeTimers();
+    const mixer = makeMixer();
+    mixer.init(createAudioContextStub(), makeSliderStageStub().node);
+    mixer.holdForJourney(false); // no journey held: nothing happens
+    expect(mixer.targetLevel).toBe(0);
+
+    mixer.holdForJourney(true);
+    mixer.setIntensityFromBossEvent('boss-warning');
+    expect(mixer.targetLevel).toBe(0);
+
+    mixer.setIntensityFromBossEvent('boss-defeated');
+    mixer.holdForJourney(false);
+    expect(mixer.targetLevel).toBe(MUSIC_JOURNEY.arrivalLevel);
+    // The run's own level, once it reaches the arrival's, takes over.
+    mixer.setRunState({ wave: 3, enemyCount: 6 });
+    vi.advanceTimersByTime(20000);
+    expect(mixer.targetLevel).toBe(1);
+    mixer.setRunState({ wave: 1, enemyCount: 0 });
+    vi.advanceTimersByTime(60000);
+    expect(mixer.targetLevel).toBe(0);
+    mixer.dispose();
+    vi.useRealTimers();
   });
 });
 

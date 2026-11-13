@@ -259,12 +259,16 @@ function prepareTravelRing(ring) {
 }
 
 export class TravelScene {
-  /** `emit(id)`: each of a played journey's sound moments (moments.js). */
+  /**
+   * `emit(event, payload)`: a played journey's planned sound moments
+   * ('travel-planned'), then each as it comes ('travel-moment', moments.js).
+   */
   constructor(t, emit = () => {}) {
     const { THREE } = t;
     this.t = t;
     this.active = false;
-    this.clock = new MomentClock(emit);
+    this.emit = emit;
+    this.clock = new MomentClock((id) => emit('travel-moment', { id }));
     this.moments = [];
     this.places = travelPlaces(null);
     this.leg = travelLeg(null);
@@ -533,8 +537,18 @@ export class TravelScene {
       this.rise,
       JUMP.white[2]
     );
-    // A frozen capture plays no sound.
-    if (this.frozenAt === null) this.clock.start(this.moments);
+    // A frozen capture plays no sound. The score (audio/journeyCue.js) is
+    // told the whole plan now, in seconds from now, so its swells arrive on
+    // their moments; `duration` runs to the journey's end.
+    if (this.frozenAt === null) {
+      this.clock.start(this.moments);
+      const t0 = this.progress;
+      const seconds = (t) => ((t - t0) * this.durationMs) / 1000;
+      this.emit('travel-planned', {
+        moments: this.moments.map(({ id, t }) => ({ id, at: seconds(t) })),
+        duration: seconds(1),
+      });
+    }
     this.planned = true;
   }
 
