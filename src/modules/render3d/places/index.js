@@ -3,7 +3,9 @@
 // set (placeSets.js), `hazeDepth` how deep its surfaces sink into the haze
 // (kit.js), `under` its contrast seen through the arena (kit.js, default
 // 1), `seed` its scatter; `ring: true` keeps the broken Ring in view
-// (a set stands instead of it and of the intact arcs otherwise).
+// (a set stands instead of it and of the intact arcs otherwise). `wakes:
+// true` where the Ring itself wakes at the win (Null's place, the Crucible);
+// elsewhere it sleeps through it and only the set answers.
 // `offRing` (proposta 12/11) is how far from the Ring the place is as the
 // journey to it ends (travelScene.js; docs/ROTEIRO.md "Os lugares"):
 // [side, height] in world units, inward of the laid Ring's centre line
@@ -78,6 +80,7 @@ export const PLACE_SETS = Object.freeze({
     seed: 19,
     offRing: [600, 240],
     ring: true,
+    wakes: true,
   },
   'the-crucible': {
     build: buildTheCrucible,
@@ -85,5 +88,6 @@ export const PLACE_SETS = Object.freeze({
     under: 0.55,
     seed: 20,
     offRing: [500, 160],
+    wakes: true,
   },
 });

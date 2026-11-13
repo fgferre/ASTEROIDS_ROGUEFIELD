@@ -62,6 +62,22 @@ describe('FieldBackdrop', () => {
     expect(backdrop.structures.group.visible).toBe(false);
   });
 
+  it('leaves the Ring asleep at a win in a place where it does not wake', () => {
+    const backdrop = new FieldBackdrop(THREE, new THREE.Scene());
+    backdrop.setLook(look({ to: { backdrop: 'salvage-lanes' } }));
+    backdrop.setArrival(1);
+    backdrop.setWake(1);
+    expect(backdrop.places.wake).toBe(1);
+    expect(backdrop.ring.uniforms.uWake.value).toBe(0);
+    expect(backdrop.ring.object.visible).toBe(false);
+    expect(backdrop.structures.group.visible).toBe(false);
+
+    backdrop.setLook(look({ to: { backdrop: 'wardens-reach' } }));
+    backdrop.setArrival(1);
+    expect(backdrop.ring.uniforms.uWake.value).toBe(1);
+    expect(backdrop.structures.group.visible).toBe(true);
+  });
+
   it("sits in the biome's haze and shows its share of fragments and the intact Ring", () => {
     const backdrop = new FieldBackdrop(THREE, new THREE.Scene());
     backdrop.setLook(look({ structures: 0.4, debris: 0.25 }));

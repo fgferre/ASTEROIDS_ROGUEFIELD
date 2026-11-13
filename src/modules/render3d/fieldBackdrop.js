@@ -160,15 +160,14 @@ export class FieldBackdrop {
     this.debris.instanceMatrix.needsUpdate = true;
   }
 
-  /** The Ring's wake, 0 (dead) to 1 (lit along its arc), for the epilogue. */
+  /**
+   * The epilogue's wake, 0 to 1: the place's set answers its boss's fall,
+   * and the Ring lights along its arc where it wakes (applyStructures).
+   */
   setWake(wake) {
     if (wake === this.wake) return;
     this.wake = wake;
     this.places.wake = wake;
-    this.ring.uniforms.uWake.value = wake;
-    this.structures.dark.color
-      .copy(this.structureColor)
-      .lerp(this.structureWakeColor, wake);
     this.applyStructures();
   }
 
@@ -181,20 +180,22 @@ export class FieldBackdrop {
   // The biome's share of the intact Ring, raised to full while it wakes;
   // a place's set stands instead of it (and of the broken Ring, unless the
   // set keeps it, which fades out as the set fades in), except in the wake.
+  // The Ring wakes only where the story has it wake: not in a place whose
+  // set sleeps through the win (places/index.js `wakes`).
   applyStructures() {
     const { group, dark, edge } = this.structures;
-    const { hidesRing, hidesStructures } = this.places;
-    const ring = 1 - Math.min(1, hidesRing * (1 - this.wake));
+    const { hidesRing, hidesStructures, sleeps } = this.places;
+    const wake = this.wake * (1 - Math.min(1, sleeps));
+    this.ring.uniforms.uWake.value = wake;
+    dark.color.copy(this.structureColor).lerp(this.structureWakeColor, wake);
+    const ring = 1 - Math.min(1, hidesRing * (1 - wake));
     this.ring.object.visible = ring > 0.001;
     this.ring.material.opacity = ring;
     this.ring.material.transparent = ring < 0.999;
-    const share = Math.max(
-      this.structureShare * (1 - hidesStructures),
-      this.wake
-    );
+    const share = Math.max(this.structureShare * (1 - hidesStructures), wake);
     group.visible = share > 0.001;
     dark.opacity = share;
     edge.opacity =
-      share * (STRUCTURE_EDGE_ALPHA + (1 - STRUCTURE_EDGE_ALPHA) * this.wake);
+      share * (STRUCTURE_EDGE_ALPHA + (1 - STRUCTURE_EDGE_ALPHA) * wake);
   }
 }

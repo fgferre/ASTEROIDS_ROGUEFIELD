@@ -29,6 +29,8 @@ export class PlaceSets {
     // Share of the view whose set hides the broken Ring / the intact arcs.
     this.hidesRing = 0;
     this.hidesStructures = 0;
+    // The share of a place where the Ring sleeps through a win (`wakes`).
+    this.sleeps = 0;
     this.aim = new THREE.Vector3();
     // The set a journey flies toward (setFlight), shown on top of the look.
     this.flight = { id: null, share: 0, x: 0, z: 0 };
@@ -87,6 +89,7 @@ export class PlaceSets {
   apply() {
     this.hidesRing = 0;
     this.hidesStructures = 0;
+    this.sleeps = 0;
     for (let i = 0; i < this.list.length; i += 1) {
       const set = this.list[i];
       const look = this.shareOf(set.id);
@@ -103,6 +106,7 @@ export class PlaceSets {
         }
       }
       if (!PLACE_SETS[set.id].ring) this.hidesRing += look;
+      if (!PLACE_SETS[set.id].wakes) this.sleeps += look;
       this.hidesStructures += look;
     }
   }
