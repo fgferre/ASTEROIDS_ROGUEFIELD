@@ -336,12 +336,23 @@ export async function startRun(enemiesService) {
 
 /**
  * Runs the scripted-player driver for `durationSec` simulated seconds, or
- * until `driver.bossKilled === true` for boss-arena. Uses setInterval at
- * 60Hz cadence. Resolves when the timer or kill condition trips.
+ * until `driver.bossKilled === true` for boss-arena, or until the run ends
+ * (menu, death, victory). Uses setInterval at 60Hz cadence.
  */
-function runScenarioDriver(driver, scenario, durationSec, player) {
+export function runScenarioDriver(
+  driver,
+  scenario,
+  durationSec,
+  player,
+  eventBus
+) {
   return new Promise((resolve) => {
     let simulatedSeconds = 0;
+    const stop = () => {
+      clearInterval(intervalId);
+      resolve();
+    };
+    undoWhenRunEnds(eventBus, stop);
     const intervalId = setInterval(() => {
       try {
         if (scenario === 'hero' && player?.velocity) {
@@ -367,8 +378,7 @@ function runScenarioDriver(driver, scenario, durationSec, player) {
       simulatedSeconds += DRIVER_TICK_DT;
       const bossExit = scenario === 'boss-arena' && driver.bossKilled;
       if (simulatedSeconds >= durationSec || bossExit) {
-        clearInterval(intervalId);
-        resolve();
+        stop();
       }
     }, Number(DRIVER_TICK_MS));
   });
@@ -518,7 +528,8 @@ async function runDeferredScenario({
         driver,
         scenario,
         config.durationSec,
-        services.player
+        services.player,
+        services['event-bus']
       );
     } else {
       // No driver: still hold for the scenario duration so the auto-log

@@ -3,7 +3,9 @@ import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import {
   activateProfileHarness,
   composeHeroScene,
+  runScenarioDriver,
 } from '../../src/bootstrap/profileHarness.js';
+import { EventBus } from '../../src/core/EventBus.js';
 
 // INFRA-01 (Phase 1, Plan 01.02) — URL-flag activation contract for the
 // in-browser performance harness.
@@ -195,5 +197,28 @@ describe('composeHeroScene', () => {
     expect(update).not.toHaveBeenCalled();
     expect(updateRockTrickle).not.toHaveBeenCalled();
     expect(enemies.waveManager.spawnQueue).toEqual([]);
+  });
+});
+
+describe('runScenarioDriver', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('stops steering the ship once the run leaves for the menu', async () => {
+    const eventBus = new EventBus();
+    const driver = { update: vi.fn() };
+    const player = { velocity: { vx: 0, vy: 0 }, angle: 0 };
+    const done = runScenarioDriver(driver, 'mid-game', 60, player, eventBus);
+
+    vi.advanceTimersByTime(1000);
+    eventBus.emit('session-state-changed', { state: 'menu' });
+    const steps = driver.update.mock.calls.length;
+    player.velocity.vx = 0;
+    vi.advanceTimersByTime(5000);
+
+    await done;
+    expect(steps).toBeGreaterThan(0);
+    expect(driver.update).toHaveBeenCalledTimes(steps);
+    expect(player.velocity.vx).toBe(0);
   });
 });
