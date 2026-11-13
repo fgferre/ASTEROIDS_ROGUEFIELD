@@ -202,3 +202,5 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   **Vozes escolhidas (13/11, audição em `src/exported-assets/audicao-vozes/`):** _"ring=bf_emma/tratada
   wake=bm_george/tratada sovereign=am_onyx/tratada"_. Faltam as vozes dos outros que falam (Wardens, Sentinels,
   Heralds): audição antes de entrar.
+  **Vozes dos outros doze (13/11, audição em `src/exported-assets/audicao-vozes-2/`):** _"prime=A choir=C null=A
+  quarry-maw=A gatekeeper=A kiln-engine=A prism-crown=A foundry-mother=A interdictor=A dust=A heat=A silence=A"_.
