@@ -61,7 +61,7 @@ describe('story', () => {
       key: 'chapter:debris-wake',
       text: STORY.sector['debris-wake'],
     });
-    expect(chapterTransmission('outer-ring', 'prime-gate')).toMatchObject({
+    expect(chapterTransmission('outer-ring', 'no-such-sector')).toMatchObject({
       key: 'chapter:outer-ring',
       text: STORY.chapter['outer-ring'],
     });
