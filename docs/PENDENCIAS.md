@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 33.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
 
 ## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NA `main`; O TRABALHO ATUAL, NO RAMO `campanha/ajustes`
 
@@ -174,3 +174,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   motores ou talvez, dependendo da distância, entrando em dobra, mas o movimento da nave tem que ser real, de virar de
   frente para onde ela está indo e ir. A câmera tem que ser interessante, como num filme de Star Wars que segue um
   X-wing. Precisa polir."_ Fecha quando ele vir a viagem nova.
+  **13/11, depois de ver os vídeos da viagem refeita** (as três: _"Está no caminho certo"_): _"Quero mais cara de
+  filme: câmera mais ousada, mais cortes… está na direção certa, mas acho que o polimento pode ser levado mais para
+  cara de filme e integrando melhor com as localizações 3D."_
+- **(33)** Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
+  couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
+  audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o
+  projeto ainda não tem.
