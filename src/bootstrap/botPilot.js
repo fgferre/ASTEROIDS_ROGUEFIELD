@@ -442,9 +442,6 @@ function pathDanger(world, path, knobs, safeUntil) {
   return { total, soon };
 }
 
-const wrapDistance = (world, ax, ay, bx, by) =>
-  Math.hypot(wrapDelta(bx - ax, world.width), wrapDelta(by - ay, world.height));
-
 // What a path is pulled toward and kept off; loot only when it is `safe`.
 function intentScore(world, end, start, safe) {
   let score = 0;
@@ -457,19 +454,24 @@ function intentScore(world, end, start, safe) {
     world.height - end.y
   );
   score -= EDGE_WEIGHT * Math.max(0, 1 - edge / EDGE_GAP);
-  // loot: the nearest worth having, closer by the end of the path
+  // loot: the nearest worth having, closer by the end of the path; straight
+  // distances, as the edge term keeps it off the wrap (loot just across it
+  // held the ship against the wall for minutes)
   let best = null;
   let bestDistance = LOOT_REACH;
   for (const item of world.loot) {
-    const d = wrapDistance(world, start.x, start.y, item.x, item.y);
+    // a heart dropped past the edge can never be picked up: not worth waiting for
+    const outside =
+      item.x < 0 || item.x > world.width || item.y < 0 || item.y > world.height;
+    if (outside) continue;
+    const d = Math.hypot(item.x - start.x, item.y - start.y);
     if (d < bestDistance) {
       best = item;
       bestDistance = d;
     }
   }
   if (best && safe) {
-    const gain =
-      bestDistance - wrapDistance(world, end.x, end.y, best.x, best.y);
+    const gain = bestDistance - Math.hypot(best.x - end.x, best.y - end.y);
     score += (LOOT_WEIGHT * gain) / Math.max(40, world.ship.maxSpeed * 0.5);
   }
   // a moving ship is a harder target: keep some way on
