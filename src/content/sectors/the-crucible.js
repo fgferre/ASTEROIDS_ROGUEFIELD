@@ -87,7 +87,11 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(20),
+      // proposta 13/11: 16 rocks (were the curve's 40, four times the
+      // Wardens' 10): fewer hearts in the fight. With Sovereign's wall turning
+      // faster and health 0.6, good bot 24 seeds: 19 → 11 won; average 12
+      // seeds: 6 → 3 (rocks and wall alone, health 0.55: 15 and 1)
+      rocks: 16,
       roster: [],
       surges: [],
       formations: [],

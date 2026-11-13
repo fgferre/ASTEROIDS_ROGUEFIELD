@@ -28,7 +28,10 @@ export default {
   // more. Measured on the good bot over the whole sector, 12 seeds: at 0.48
   // its fight ran shorter than Warden Null's; at 0.55 it is the campaign's
   // longest, about 3.5-4.5 minutes when won.
-  healthFactor: 0.55, // proposta 12/11
+  // proposta 13/11: was 0.55; with the faster wall and 16 rocks in its
+  // stage (the-crucible.js) won fights ran 167-220 s, short of the Wardens'
+  // margin; at 0.6, 185-238 s, good bot 11 of 24 (was 19), average 3 of 12
+  healthFactor: 0.6,
   radius: 84, // proposta 12/11
   // XP on top of the type-wide boss drop, like the Sentinels'.
   rewards: { xp: 300 }, // proposta 12/11
@@ -111,7 +114,7 @@ export default {
     {
       protectWindup: 1.2,
       protect: 4,
-      sweep: 0.2,
+      sweep: 0.26, // proposta 13/11: was 0.2 (the seeing bot dodged it)
       volleys: 1,
       rebuildWindup: 1.2,
       build: 6,
@@ -123,7 +126,7 @@ export default {
     {
       protectWindup: 1.0,
       protect: 4.5,
-      sweep: 0.26,
+      sweep: 0.34, // proposta 13/11: was 0.26 (measured: healthFactor)
       volleys: 3,
       rebuildWindup: 0.9,
       build: 5,
