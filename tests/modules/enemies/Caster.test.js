@@ -118,4 +118,22 @@ describe('Caster', () => {
       target: { x: 430, y: 300 },
     });
   });
+
+  it('fixes its aim as the ring appears: a ship that moves on is not followed', () => {
+    const { player, eventBus, caster } = setup({ x: 430, y: 300 });
+    caster.onUpdate(CASTER_FIRE_INTERVAL - CASTER_TELEGRAPH_SECONDS + 0.01);
+    player.position.x = 600;
+    player.position.y = 120;
+    caster.onUpdate(CASTER_TELEGRAPH_SECONDS);
+
+    const fired = eventBus.emit.mock.calls.find(
+      ([event]) => event === 'caster-shell-fired'
+    );
+    expect(fired[1].target).toEqual({ x: 430, y: 300 });
+    // The warning plus the flight outlast a plain flight out of the blast.
+    const SHIP_THRUST_SPEED = 90; // px/s measured by the test pilot
+    expect(
+      (CASTER_TELEGRAPH_SECONDS + CASTER_SHELL_FLIGHT) * SHIP_THRUST_SPEED
+    ).toBeGreaterThan(CASTER_SHELL_RADIUS);
+  });
 });

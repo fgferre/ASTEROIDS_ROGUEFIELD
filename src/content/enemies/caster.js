@@ -10,7 +10,10 @@ const HEALTH = 55; // proposta 18/10
 const RADIUS = 15; // proposta 18/10
 const CONTACT_DAMAGE = 12; // proposta 18/10
 // The 3D view draws the shell's blast ring and its arc from these.
-export const CASTER_SHELL_RADIUS = 110; // proposta 18/10: blast radius, px
+// proposta 12/11 (was 110): blast radius, px. With the aim now fixed as the
+// ring appears, the ship has telegraph + flight (1.6 s) to fly out of it; at
+// 110 and an aim that followed the ship, only a dash got out.
+export const CASTER_SHELL_RADIUS = 90;
 export const CASTER_SHELL_APEX = 90; // proposta 18/10: px of rise mid-flight
 
 export default {
