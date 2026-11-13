@@ -42,7 +42,7 @@ import {
   hangarTransmission,
   heraldTransmission,
   sightingTransmission,
-  victoryTransmission,
+  winTransmissions,
   wardenTransmission,
 } from './ui/transmissions.js';
 import {
@@ -653,15 +653,9 @@ class UISystem extends BaseSystem {
       this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
-      // The boss's own last words; after Warden Null's, the Ring's.
-      const last = wardenTransmission(
-        wave,
-        'defeated',
-        sectorById(sector)?.boss
-      );
+      const [last, ...after] = winTransmissions(wave, sectorById(sector)?.boss);
       this.queueTransmission(last, { interrupt: true });
-      if (wave === RUN_FINAL_LAYER)
-        this.queueTransmission(victoryTransmission());
+      after.forEach((line) => this.queueTransmission(line));
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;

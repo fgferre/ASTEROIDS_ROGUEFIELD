@@ -2,6 +2,7 @@
 
 import { STORY } from '../../data/story.js';
 import { biomeForLayer } from '../../data/biomes.js';
+import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 
 /** How long a line stays on screen once it is fully typed. */
 export const TRANSMISSION_HOLD_MS = 3500;
@@ -119,6 +120,19 @@ export function stageTransmission(sectorId, stage) {
     speaker: STORY.speaker[line.speaker],
     text: line.text,
   };
+}
+
+/**
+ * What is said as a run is won: the boss's own last words (null when it has
+ * none), then, after Warden Null's, the Ring's. `bossKind` is the sector's
+ * Sentinel, if it ends on one: the Sentinels of Null's chapter die on the
+ * same layer number and do not wake the Ring.
+ */
+export function winTransmissions(layer, bossKind = null) {
+  const last = wardenTransmission(layer, 'defeated', bossKind);
+  return layer === RUN_FINAL_LAYER && !bossKind
+    ? [last, victoryTransmission()]
+    : [last];
 }
 
 export function victoryTransmission() {

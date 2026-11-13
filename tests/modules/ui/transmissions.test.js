@@ -12,6 +12,7 @@ import {
   sightingTransmission,
   victoryTransmission,
   wardenTransmission,
+  winTransmissions,
 } from '../../../src/modules/ui/transmissions.js';
 
 function fakeHud() {
@@ -125,6 +126,23 @@ describe('wardenTransmission', () => {
       wardenTransmission(5, 'warning')
     );
     expect(wardenTransmission(5, 'warning').speaker).toBe('WARDEN PRIME');
+  });
+});
+
+describe('winTransmissions', () => {
+  it('wakes the Ring after Warden Null only, not after the Sentinels of its chapter', () => {
+    const keys = (lines) => lines.map((line) => line?.key);
+    expect(keys(winTransmissions(15))).toEqual([
+      'warden:15:defeated',
+      'victory',
+    ]);
+    expect(keys(winTransmissions(15, 'foundry-mother'))).toEqual([
+      'sentinel:foundry-mother:defeated',
+    ]);
+    expect(keys(winTransmissions(5))).toEqual(['warden:5:defeated']);
+    expect(keys(winTransmissions(20, 'sovereign'))).toEqual([
+      'sentinel:sovereign:defeated',
+    ]);
   });
 });
 
