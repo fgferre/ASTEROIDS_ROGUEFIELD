@@ -44,8 +44,13 @@ const wrapAngle = (angle) => {
 //                    ship, within `split.range`) and assembles as above; the
 //                    PROTECT half fires a lane volley every
 //                    `split.volleyEvery` s and carries a solid wall along its
-//                    middle. A scrap staggers it here too: the line and the
-//                    lanes stop.
+//                    middle. Each assembly done, and each one scrapped
+//                    (`split.scrapShare`), the orders change sides:
+//   split-flip     — `split.flipWindup` s: the line stops and warns, nothing
+//                    pulls, the wall warns along the middle of the half that
+//                    is REBUILD now; then `splitAngle` turns π at once (the
+//                    halves trade places), the wall is solid there and a lane
+//                    volley follows `split.flipVolley` s later.
 // Shut (PROTECT), every hit lands `protectDamageFactor`.
 // What the view (and the later model) reads:
 //   order      — 'protect' | 'rebuild' | 'both' (third phase);
@@ -61,7 +66,9 @@ const wrapAngle = (angle) => {
 //                Maw's);
 //   beams      — null or a lane volley ({ type: 'eject', lines, … });
 //   split      — null or { type: 'split', x, y, angle, phase 'warn'|'turn',
-//                timer, duration }.
+//                timer, duration } ('warn' again through a split-flip; the
+//                model may read `sovState === 'split-flip'` and `sovTimer`
+//                to move its shells ahead of the π turn).
 // For the bot (botPilotAdapter): ventOpen (exposed), shieldUp and facing
 // (third phase: the PROTECT half's direction).
 export class Sovereign extends BossEnemy {
@@ -158,7 +165,9 @@ export class Sovereign extends BossEnemy {
     const killed = super.takeDamage(amount, source);
     if (this.building && this.alive) {
       this.assemblyDamage += before - this.health;
-      if (this.assemblyDamage >= SOV.scrapShare * this.maxHealth) this.scrap();
+      const share =
+        this.order === 'both' ? SOV.split.scrapShare : SOV.scrapShare;
+      if (this.assemblyDamage >= share * this.maxHealth) this.scrap();
     }
     return killed;
   }
@@ -254,11 +263,10 @@ export class Sovereign extends BossEnemy {
         }
         break;
       case 'stagger':
-        if (this.sovTimer > 0) break;
-        if (this.order === 'both') this.sovState = 'split';
-        else this.beginProtect(cycle, position);
+        if (this.sovTimer <= 0) this.beginProtect(cycle, position);
         break;
       case 'split-windup':
+      case 'split-flip':
       case 'split':
         this.updateSplit(deltaTime, target);
         break;
@@ -526,13 +534,30 @@ export class Sovereign extends BossEnemy {
   }
 
   // Hit hard enough while assembling: the assembly is scrapped and it reels,
-  // open (on the last phase the line and the lanes stop).
+  // open; on the last phase the orders change sides instead.
   scrap() {
     this.build = 0;
     this.assemblyDamage = 0;
+    if (this.order === 'both') {
+      this.beginFlip();
+      return;
+    }
     this.sovState = 'stagger';
     this.sovTimer = SOV.stagger;
-    if (this.order !== 'both') this.clearTelegraph();
+    this.clearTelegraph();
+  }
+
+  // The last phase's orders change sides: the line stops and warns, the wall
+  // warns where it will stand, along the middle of today's REBUILD half.
+  beginFlip() {
+    const { flipWindup } = SOV.split;
+    this.sovState = 'split-flip';
+    this.sovTimer = flipWindup;
+    this.build = 0;
+    this.assemblyDamage = 0;
+    const warn = { phase: 'warn', timer: flipWindup, duration: flipWindup };
+    Object.assign(this.split, warn);
+    Object.assign(this.barrier, warn, { solid: 0 });
   }
 
   // The last phase: the REBUILD half toward the ship, the line warning.
@@ -575,14 +600,19 @@ export class Sovereign extends BossEnemy {
 
   // Both orders: the line turns, the REBUILD half pulls and assembles, the
   // PROTECT half fires its lanes; its wall runs along the PROTECT half's
-  // middle.
+  // middle. An assembly done (or scrapped) trades the halves (beginFlip).
   updateSplit(deltaTime, target) {
     const { spin, volleyEvery, shipPull, build, escortCap } = SOV.split;
     const s = this.split;
     const b = this.barrier;
-    if (this.sovState === 'split-windup') {
+    const flipping = this.sovState === 'split-flip';
+    if (this.sovState !== 'split') {
       s.timer = b.timer = Math.max(0, this.sovTimer);
       if (this.sovTimer <= 0) {
+        if (flipping) {
+          this.splitAngle = wrapAngle(this.splitAngle + Math.PI);
+          this.volleyTimer = SOV.split.flipVolley;
+        }
         this.sovState = 'split';
         Object.assign(s, { phase: 'turn', timer: 1, duration: 1 });
         Object.assign(b, { phase: 'solid', solid: 1, timer: 1, duration: 1 });
@@ -592,17 +622,19 @@ export class Sovereign extends BossEnemy {
       this.pull(deltaTime, target, shipPull, (point, margin) =>
         this.inRebuildHalf(point, margin)
       );
-      this.assemble(deltaTime, build, escortCap);
       this.volleyTimer -= deltaTime;
       if (this.volleyTimer <= 0) {
         this.volleyTimer = volleyEvery;
         this.beginLanes(this.protectLaneCentre());
       }
+      if (this.assemble(deltaTime, build, escortCap)) this.beginFlip();
     }
     s.x = this.x;
     s.y = this.y;
     s.angle = this.splitAngle;
-    b.angle = this.splitAngle - HALF_PI;
+    // through a flip the wall already warns where the turn will put it
+    const flipped = this.sovState === 'split-flip' ? -1 : 1;
+    b.angle = this.splitAngle - flipped * HALF_PI;
   }
 
   // The lanes' centre: at the ship when it stands in the PROTECT half, else

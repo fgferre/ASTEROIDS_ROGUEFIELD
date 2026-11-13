@@ -9,7 +9,7 @@ export default {
   layers: [16, 20],
   sky: ['#0a0906', '#020202'], // proposta 12/11: near-black, barely warm
   hazeColor: '#8c6a34', // proposta 12/11: warm gold haze
-  hazeDensity: 1.0, // proposta 12/11
+  hazeDensity: 0.6, // proposta 12/11: 1.0 turned the field mustard
   veinColor: '#ffd27a', // proposta 12/11: the core's light in the veins
   veinDensity: 1.1, // proposta 12/11: strong
   dustColor: '#f2e4c4',

@@ -156,21 +156,22 @@ describe('Sovereign', () => {
     expect(system.acquireEnemyViaFactory).not.toHaveBeenCalled();
   });
 
-  it('changes phase at two thirds and one third; the last gives both orders at once', () => {
+  it('changes phase at its two thresholds; the last gives both orders at once', () => {
     const { boss } = createSovereign();
     boss.plateOpen = 1;
     run(boss, STEP);
 
-    boss.takeDamage(boss.maxHealth * 0.3);
+    const [first, second] = SOV.phaseThresholds;
+    boss.takeDamage(boss.maxHealth * (1 - first - 0.02));
     expect(boss.currentPhase).toBe(0);
-    boss.takeDamage(boss.maxHealth * 0.05);
+    boss.takeDamage(boss.maxHealth * 0.03);
     expect(boss.currentPhase).toBe(1);
-    expect(boss.cycle().volleys).toBeGreaterThan(0);
+    expect(boss.cycle().volleys).toBeGreaterThan(SOV.cycle[0].volleys);
     expect(boss.cycle().shipPull).toBeGreaterThan(SOV.cycle[0].shipPull);
 
     boss.invulnerable = false;
     boss.plateOpen = 1;
-    boss.takeDamage(boss.maxHealth * 0.34);
+    boss.takeDamage(boss.maxHealth * (first - second));
     expect(boss.currentPhase).toBe(2);
     expect(boss.order).toBe('both');
     expect(boss.split).toMatchObject({ type: 'split', phase: 'warn' });
@@ -227,6 +228,34 @@ describe('Sovereign', () => {
     for (const line of boss.beams.lines) {
       expect(Math.sin(line.angle - boss.splitAngle)).toBeLessThan(0);
     }
+  });
+
+  it('in the last phase a scrapped or finished assembly trades the halves after a warning', () => {
+    const { boss, system } = splitBoss();
+    boss.invulnerable = false;
+    const below = { x: 400, y: 450 };
+    const hit = { hitPosition: { x: 400, y: 380 } };
+
+    boss.takeDamage(boss.maxHealth * SOV.split.scrapShare, hit);
+    expect(boss.sovState).toBe('split-flip');
+    expect(boss.split.phase).toBe('warn');
+    // the wall warns along the middle of the half that is still open
+    expect(boss.barrier.phase).toBe('warn');
+    run(boss, STEP, target(below));
+    expect(Math.sin(boss.barrier.angle)).toBeCloseTo(1);
+    expect(boss.shielded(hit.hitPosition)).toBe(false);
+
+    const held = boss.splitAngle;
+    run(boss, SOV.split.flipWindup, target(below));
+    expect(boss.sovState).toBe('split');
+    expect(Math.cos(boss.splitAngle - held)).toBeLessThan(-0.9);
+    expect(boss.barrier.phase).toBe('solid');
+    expect(boss.shielded(hit.hitPosition)).toBe(true);
+    expect(system.acquireEnemyViaFactory).not.toHaveBeenCalled();
+
+    // left alone, the assembly finishes: escorts, and the halves trade again
+    runUntil(boss, () => boss.sovState === 'split-flip', target(below));
+    expect(system.acquireEnemyViaFactory).toHaveBeenCalled();
   });
 
   it('hurts and pushes the ship on its solid wall, not in the gap', () => {

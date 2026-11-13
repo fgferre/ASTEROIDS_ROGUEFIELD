@@ -692,6 +692,37 @@ body:has(.end-screen:not(.hidden)) .next-wave-box {
   color: var(--text-dim);
 }
 
+/* What the ending settles: who, then what becomes of them. */
+.ending-stakes {
+  display: grid;
+  gap: calc(12 * var(--u));
+  width: 100%;
+  margin-top: calc(10 * var(--u));
+  padding-top: calc(22 * var(--u));
+  border-top: 1px solid rgba(230, 238, 248, 0.16);
+  text-align: left;
+}
+
+.ending-stake {
+  display: grid;
+  grid-template-columns: calc(160 * var(--u)) 1fr;
+  gap: calc(16 * var(--u));
+  align-items: baseline;
+}
+
+.ending-stake__who {
+  font-family: var(--font-display);
+  font-size: calc(13 * var(--fs));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ending-stake__what {
+  font-size: calc(18 * var(--fs));
+  line-height: 1.35;
+}
+
 @media (max-width: 1000px) {
   .end-screen--choice {
     --u: min(calc(100vw / 1100), calc(100vh / 1080));

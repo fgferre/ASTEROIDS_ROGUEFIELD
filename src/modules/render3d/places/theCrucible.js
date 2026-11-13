@@ -3,7 +3,11 @@
 // than from the Furnace; round it arcs of the Ring being rebuilt at several
 // depths — some stretches whole, some bare frames and gaps — turning
 // slowly about it. Their running lights follow the Ring's wake (lit while
-// it wakes, dim when it does not).
+// it wakes, dim when it does not), and the set answers the campaign's
+// ending (core/cinematics.js endingPath): past a full wake (Stewardship)
+// the bare stretches are plated over in light; a wake that falls back
+// from full (Severance) puts the lights out, stops the arcs and dims the
+// star, until the set has been out of view.
 
 import { gradientDisc } from './kit.js';
 import { lightPoint, under } from './pieces.js';
@@ -53,10 +57,17 @@ const ARCS = [
 ];
 const SPIN = [0.012, -0.008];
 const LIGHTS = { low: 0.4, high: 1.4 };
+// proposta 12/11: the wake past 1 that plates every bare stretch (the
+// Stewardship's own), the new plates' glow, the star's level once severed
+// and the seconds out of view after which a severed set is whole again.
+const PLATED_AT = 1.25;
+const PLATING = 0.9;
+const SEVERED_STAR = 0.45;
+const FORGET = 1;
 
 // One arc of modules round the star's axis: built decks with a keel, and
 // in its bare stretch only the frames and two rails, waiting for plates.
-function arc(kit, hull, lights, { radius, from, to, bare }) {
+function arc(kit, hull, lights, plating, { radius, from, to, bare }) {
   const { tone, random } = kit;
   const decks = [tone('#3a3630'), tone('#423d36'), tone('#35312c')];
   const frame = tone('#4a443b');
@@ -86,6 +97,8 @@ function arc(kit, hull, lights, { radius, from, to, bare }) {
           turn
         )
       );
+      // the deck this frame waits for, laid in light by the Stewardship
+      kit.box(plating, lamp, at(radius, 0), [along * 0.95, thick, width], turn);
       continue;
     }
     kit.box(
@@ -127,7 +140,9 @@ export function buildTheCrucible(THREE, kit) {
       (r) =>
         r < DISC
           ? 1 - 0.35 * (r / DISC) ** 3
-          : 0.38 * Math.exp(-(r - DISC) * 5) + 0.05 * (1 - r),
+          : // proposta 12/11: a tight corona (it was 0.38, 5 and a 0.05
+            // tail, which washed the whole arena cream under a gold boss)
+            0.3 * Math.exp(-(r - DISC) * 9) + 0.015 * (1 - r),
       { rings: 20, sides: 56 }
     ),
     tone('#ffdca0', 0.7),
@@ -136,32 +151,61 @@ export function buildTheCrucible(THREE, kit) {
   );
 
   const groups = [0, 1].map((g) => {
-    const hull = kit.parts();
-    const lights = kit.parts();
+    const lists = [kit.parts(), kit.parts(), kit.parts()];
     ARCS.filter((spec) => spec.group === g).forEach((spec) => {
-      const h = kit.parts();
-      const l = kit.parts();
-      arc(kit, h, l, spec);
-      hull.push(
-        ...kit.moved(h, [0, spec.height, 0], [spec.tilt, 0, spec.tilt * 0.6])
-      );
-      lights.push(
-        ...kit.moved(l, [0, spec.height, 0], [spec.tilt, 0, spec.tilt * 0.6])
+      const own = [kit.parts(), kit.parts(), kit.parts()];
+      arc(kit, ...own, spec);
+      own.forEach((parts, i) =>
+        lists[i].push(
+          ...kit.moved(
+            parts,
+            [0, spec.height, 0],
+            [spec.tilt, 0, spec.tilt * 0.6]
+          )
+        )
       );
     });
+    const [hull, lights, plating] = lists;
     const group = new THREE.Group();
-    group.add(kit.mesh(hull), kit.mesh(lights, 'glow', 'crucible-lights'));
+    group.add(
+      kit.mesh(hull),
+      kit.mesh(lights, 'glow', 'crucible-lights'),
+      kit.mesh(plating, 'glow', 'crucible-plating')
+    );
     return group;
   });
   const object = new THREE.Group();
-  object.add(kit.mesh(star, 'glow'), ...groups);
+  object.add(kit.mesh(star, 'glow', 'crucible-star'), ...groups);
   const lights = kit.materials.get('crucible-lights');
+  const plating = kit.materials.get('crucible-plating');
+  const starLight = kit.materials.get('crucible-star');
+  plating.color.setScalar(0);
+  // The ending's memory: the wake has been full, and how far it fell since.
+  let woke = false;
+  let severed = 0;
+  let last = 0;
+  const turned = [0, 0];
   return {
     layers: [{ object, anchor: under(3600, 250, 250), follow: 0.9 }],
     update(time, wake) {
-      groups[0].rotation.y = time * SPIN[0];
-      groups[1].rotation.y = time * SPIN[1];
-      lights.color.setScalar(LIGHTS.low + (LIGHTS.high - LIGHTS.low) * wake);
+      const dt = Math.max(0, time - last);
+      if (dt > FORGET) {
+        woke = false;
+        severed = 0;
+      }
+      last = time;
+      if (wake >= 1) woke = true;
+      if (woke) severed = Math.max(0, 1 - wake);
+      const run = Math.min(dt, 0.1) * (1 - severed);
+      groups.forEach((group, g) => {
+        turned[g] += SPIN[g] * run;
+        group.rotation.y = turned[g];
+      });
+      const lit = LIGHTS.low + (LIGHTS.high - LIGHTS.low) * wake;
+      lights.color.setScalar(lit * (1 - severed));
+      starLight.color.setScalar(1 - (1 - SEVERED_STAR) * severed);
+      const plated = Math.min(1, Math.max(0, (wake - 1) / (PLATED_AT - 1)));
+      plating.color.setScalar(PLATING * plated);
     },
   };
 }

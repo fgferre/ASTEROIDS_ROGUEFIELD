@@ -156,11 +156,15 @@ export const STORY = deepFreeze({
     'the-crucible': [
       {
         speaker: 'ring',
-        text: 'Continuance resumed. Restoring: nine hundred sectors, all citizens. Materials required.',
+        text: 'Continuance resumed. Archive: eleven million citizens. Restoring. Materials required.',
       },
       {
         speaker: 'wake',
         text: "It's pulling the Field back together. Pilot — it's pulling at us. At the Wake.",
+      },
+      {
+        speaker: 'ring',
+        text: 'Returning citizens: resolved. The Wake. All aboard are counted.',
       },
       {
         speaker: 'wake',
@@ -358,12 +362,21 @@ export const STORY = deepFreeze({
     },
   },
   // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
-  // falls in ENDING_SECTOR the pilot picks one, by its `choice`; its
-  // `lines` play in order over the held epilogue shot.
+  // falls in ENDING_SECTOR the pilot picks one, by its `choice` and its
+  // `stakes` (what becomes of the Ring, of the archive of its citizens and
+  // of the Wake); its `lines` play in order over the held epilogue shot and
+  // its `epitaph` stands under the final card's title.
   ending: {
     severance: {
       title: 'Severance',
       choice: 'Cut the core loose. The Field goes quiet. The archive sleeps.',
+      stakes: {
+        ring: 'Goes dark. Nothing is rebuilt again.',
+        archive: 'Every citizen it holds sleeps. None is restored.',
+        wake: 'Takes the power it came for and goes home.',
+      },
+      epitaph:
+        'The Ring is dark. Its citizens are at rest. The Wake went home.',
       lines: [
         {
           speaker: 'ring',
@@ -375,6 +388,12 @@ export const STORY = deepFreeze({
     stewardship: {
       title: 'Stewardship',
       choice: 'Keep the Ring awake, under watch. Yours.',
+      stakes: {
+        ring: 'Stays awake and rebuilds, on your orders.',
+        archive: 'Kept open. One day, perhaps, restored.',
+        wake: 'Stays to stand watch. Nobody goes home.',
+      },
+      epitaph: 'The Ring is awake, and watched. The Wake keeps the count.',
       lines: [
         {
           speaker: 'ring',

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
-import { RunEndScreens } from '../../../src/modules/ui/RunEndScreens.js';
+import {
+  RunEndScreens,
+  endingChoiceMarkup,
+} from '../../../src/modules/ui/RunEndScreens.js';
+import { STORY } from '../../../src/data/story.js';
 import { loadRecords } from '../../../src/services/runRecords.js';
 
 describe('Run end screens', () => {
@@ -146,6 +150,14 @@ describe('Run end screens', () => {
     expect(loadRecords().endings).toEqual([]);
   });
 
+  it('each option of the choice says what it means for the Ring, the archive and the Wake', () => {
+    const markup = endingChoiceMarkup();
+    Object.values(STORY.ending).forEach(({ title, stakes }) => {
+      expect(markup).toContain(title);
+      Object.values(stakes).forEach((text) => expect(markup).toContain(text));
+    });
+  });
+
   it('a pick records its ending once and plays it, then the final card counts the endings found', () => {
     const { victory, win, screens, showScreen, cinematics } = victoryScreen();
     win(CRUCIBLE);
@@ -162,6 +174,7 @@ describe('Run end screens', () => {
     cinematics.playEnding.mock.calls[0][1]();
     expect(victory.body.innerHTML).toContain('The end');
     expect(victory.body.innerHTML).toContain('Severance');
+    expect(victory.body.innerHTML).toContain(STORY.ending.severance.epitaph);
     expect(victory.invite.innerHTML).toContain('Endings found <b>1 / 2</b>');
     expect(victory.quitBtn.textContent).toBe('Campaign');
     expect(victory.menuBtn.classList.contains('hidden')).toBe(false);
