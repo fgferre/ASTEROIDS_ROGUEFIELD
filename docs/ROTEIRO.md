@@ -3,7 +3,7 @@
 A história inteira num lugar só. As falas estão em inglês, como tudo no jogo; cada uma cabe na faixa de transmissão
 (menos de 90 caracteres). Base: `docs/GAME_DESIGN_MASTER_PLAN.md` §6, encurtado para o jogo que existe: três capítulos
 de três fases e um final. Os capítulos 4 e 5 do plano mestre (Silent Archive, Singularity Chasm) ficam como horizonte.
-O que já está no jogo (`src/data/story.js`) está marcado com ✔; o resto entra por ciclo (PLAN.md).
+Tudo isto está no jogo (`src/data/story.js`).
 
 ## A história em um parágrafo
 
@@ -48,9 +48,11 @@ As viagens ligam esses pontos: a nave vista por trás, o Anel crescendo, e um sa
 
 ## Quem fala
 
-- **THE RING** — registro, inventário, temperatura. Nunca discursa. ✔
+- **THE RING** — registro, inventário, temperatura. Nunca discursa.
 - **WAKE** — o cargueiro: frases curtas de operação, calor humano discreto. Fala nas viagens e nos momentos de virada.
-- **Wardens e Sentinels** — cada um com o vocabulário do seu trabalho. ✔
+- **Wardens e Sentinels** — cada um com o vocabulário do seu trabalho.
+- **SOVEREIGN** — o chefe final: duas ordens que não cabem juntas, ditas ao mesmo tempo.
+- **Os Heralds** (Dust, Heat, Silence) — um por tipo: Dust conta, Heat lê temperaturas, Silence mal termina a frase.
 - **O piloto** — não fala.
 
 ## Abertura (viagem até a primeira fase)
@@ -61,30 +63,36 @@ As viagens ligam esses pontos: a nave vista por trás, o Anel crescendo, e um sa
 
 ## Capítulo I — The Outer Ring
 
-**1. Debris Wake** (chefe: Quarry Maw ✔)
+**1. Debris Wake** (chefe: Quarry Maw)
 
 - Chegada — THE RING: `Debris Wake. What the Ring let go of. All of it is still counted.`
-- Quarry Maw, meia vida — QUARRY MAW: `Intake widened. Sorting continues. Nothing here is thrown away.`
+- Quarry Maw, aviso — QUARRY MAW: `Quarry unit active. Stone is counted before it is eaten. So are hulls.`
+- Quarry Maw, última etapa — QUARRY MAW: `Intake widened. Sorting continues. Nothing here is thrown away.`
+- Quarry Maw derrotado — QUARRY MAW: `Quarry Maw offline. The stone goes uncounted. Prime will ask why.`
 
 Viagem 1 → 2
 
 - WAKE: `Something out there is still sorting the wreckage. Abandoned places don't do that.`
 - THE RING: `Lane assignment: none. Proceed uncounted. Briefly.`
 
-**2. Salvage Lanes** (chefe: Gatekeeper ✔)
+**2. Salvage Lanes** (chefe: Gatekeeper)
 
-- Chegada — THE RING: `Salvage Lanes. Cargo moved here for nine hundred years. The schedule still runs.`
-- Gatekeeper, meia vida — GATEKEEPER: `Schedule slipping. Second pass authorised. The lane stays closed.`
+- Chegada — THE RING: `Salvage Lanes. Cargo has moved here for a thousand years. The schedule still runs.`
+- Gatekeeper, aviso — GATEKEEPER: `Lane closed. Gate holds. You are not on the manifest.`
+- Gatekeeper, última etapa — GATEKEEPER: `Schedule slipping. Second pass authorised. The lane stays closed.`
+- Gatekeeper derrotado — GATEKEEPER: `Gate open. One hull through. Prime has been told.`
 
 Viagem 2 → 3
 
 - WAKE: `The gate ahead has power. A thousand years, and it has power.`
 - THE RING: `Gate log updated. Prime is counting.`
 
-**3. Prime Gate** (chefe: Warden Prime ✔)
+**3. Prime Gate** (chefe: Warden Prime)
 
-- Chegada — THE RING: `Prime Gate. Last opened: nine hundred years ago. Power: nominal. Keeper: on station.`
-- Prime, aviso — WARDEN PRIME: `Salvage pilot. You are counted. The Ring is broken. It is not abandoned.` ✔
+- Chegada — THE RING: `Prime Gate. Last opened: a thousand years ago. Power: nominal. Keeper: on station.`
+- Prime, aviso — WARDEN PRIME: `Salvage pilot. You are counted. The Ring is broken. It is not abandoned.`
+- Prime, última etapa — WARDEN PRIME: `The count does not close with you in it. Prime will correct the count.`
+- Prime derrotado — WARDEN PRIME: `Prime yields. The record is kept. Below, the Choir is already singing it.`
 
 Viagem 3 → 4 (fim do capítulo)
 
@@ -93,32 +101,36 @@ Viagem 3 → 4 (fim do capítulo)
 
 ## Capítulo II — The Dense Core
 
-**4. Furnace Drift** (chefe: Kiln Engine ✔)
+**4. Furnace Drift** (chefe: Kiln Engine)
 
 - Chegada — THE RING: `Furnace Drift. The Core vents here. It has not been allowed to cool.`
-- Kiln Engine derrotado — THE RING: `Kiln Engine cold. Heat released: all of it. Seams: one, opening.`
+- Kiln Engine, aviso — KILN ENGINE: `Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.`
+- Kiln Engine, última etapa — KILN ENGINE: `Vents sealed. Pressure: rising. The fire has one place left to go.`
+- Kiln Engine derrotado — KILN ENGINE: `Kiln Engine cold. Heat released: all of it. Seams: one, opening.`
 
 Viagem 4 → 5
 
 - WAKE: `Reactor crew is cheering. Every furnace you put out, our lights get steadier.`
 - WAKE: `Odd thing. The cracks out there got wider when it went cold.`
 
-**5. Crystal Choir** (chefe: Prism Crown ✔)
+**5. Crystal Choir** (chefe: Prism Crown)
 
 - Chegada — THE RING: `Crystal Choir. Nine voices sang this seam shut. Six are crystal now.`
-- Prism Crown, aviso: `Six voices sleep in the crystal. The Crown still carries their note.`
-- Prism Crown derrotado: `The Crown is dark. The note has stopped. The seam has not.`
+- Prism Crown, aviso — PRISM CROWN: `Six voices sleep in the crystal. The Crown still carries their note.`
+- Prism Crown, última etapa — PRISM CROWN: `The note is cracking. Six sleepers stir. The Crown holds them a little longer.`
+- Prism Crown derrotado — PRISM CROWN: `The Crown is dark. The note has stopped. The seam has not.`
 
 Viagem 5 → 6
 
 - WAKE: `That wasn't a weapon back there. It was holding something closed. Go carefully.`
 - THE RING: `Resonance failing. Seam width: increasing. Cause: one hull.`
 
-**6. Resonance Chamber** (chefe: The Choir ✔)
+**6. Resonance Chamber** (chefe: The Choir)
 
 - Chegada — THE RING: `Resonance Chamber. Voices: three of nine. Seams held: all of them. For now.`
-- The Choir, aviso: `We are three. We were nine. We sang the Ring closed. We will sing you still.` ✔
-- The Choir derrotado: `The hymn breaks. We were not guarding it. We were holding it shut.`
+- The Choir, aviso — THE CHOIR: `We are three. We were nine. We sang the Ring closed. We will sing you still.`
+- The Choir, última etapa — THE CHOIR: `The hymn thins. The seam hears the gap. Do not be the gap.`
+- The Choir derrotado — THE CHOIR: `The hymn breaks. We were not guarding it. We were holding it shut.`
 - Na vitória de cada fase do capítulo, as rachaduras do lugar se abrem e acendem (luz fria, azul-branca).
 
 Viagem 6 → 7 (fim do capítulo)
@@ -128,32 +140,37 @@ Viagem 6 → 7 (fim do capítulo)
 
 ## Capítulo III — The Warden's Reach
 
-**7. Assembly Graveyard** (chefe: Foundry Mother ✔)
+**7. Assembly Graveyard** (chefe: Foundry Mother)
 
 - Chegada — THE RING: `Assembly Graveyard. The same chassis, built again. Order received once. Never closed.`
-- Foundry Mother, meia vida — FOUNDRY MOTHER: `Order open. Build the chassis. Build the chassis. No one closes the order.`
+- Foundry Mother, aviso — FOUNDRY MOTHER: `Assembly line active. Chassis count: unfinished. Intruder count: one.`
+- Foundry Mother, última etapa — FOUNDRY MOTHER: `Order open. Build the chassis. Build the chassis. No one closes the order.`
+- Foundry Mother derrotado — FOUNDRY MOTHER: `Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.`
 
 Viagem 7 → 8
 
 - WAKE: `It builds the same machine forever. Nobody told it to stop. Nobody was left to.`
 - THE RING: `Quarantine ahead. Drawn by the operators. Not drawn against you. Against us.`
 
-**8. Quarantine Grid** (chefe: The Interdictor ✔)
+**8. Quarantine Grid** (chefe: The Interdictor)
 
 - Chegada — THE RING: `Quarantine Grid. Nothing leaves. That was the last order anyone gave on purpose.`
-- Interdictor, meia vida — THE INTERDICTOR: `The boundary was never for you. It keeps the Ring from hearing. You are loud.`
+- Interdictor, aviso — THE INTERDICTOR: `Quarantine holds. Boundary drawn. You are inside it.`
+- Interdictor, última etapa — THE INTERDICTOR: `The boundary was never for you. It keeps the Ring from hearing. You are loud.`
+- Interdictor derrotado — THE INTERDICTOR: `Interdictor offline. The boundary is open. Null has been waiting for this.`
 
 Viagem 8 → 9
 
 - WAKE: `They broke their own Ring. On purpose. And put a guard on the pieces.`
 - WAKE: `Pilot... I think we're the thing the guard was for.`
 
-**9. Null Boundary** (chefe: Warden Null ✔ aviso)
+**9. Null Boundary** (chefe: Warden Null)
 
-- Chegada — THE RING: `Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.` ✔
-- Null, última fase — WARDEN NULL: `Stop. Every shot is a voice. It is listening for one.`
+- Chegada — THE RING: `Null Boundary. Cut made by the operators. Guard posted: one. Nothing logged past it.`
+- Null, aviso — WARDEN NULL: `I am the stillness the Ring kept for its ending. Come closer, ember. Be still.`
+- Null, última etapa — WARDEN NULL: `Stop. Every shot is a voice. It is listening for one.`
 - Null derrotado — WARDEN NULL: `Still... no longer. It hears you now. I kept it asleep a thousand years.`
-- Vitória do capítulo — THE RING: `Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.` ✔
+- Vitória do capítulo — THE RING: `Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.`
 
 Viagem 9 → 10 (a virada)
 
@@ -169,7 +186,7 @@ Viagem 9 → 10 (a virada)
 
 - Chegada — THE RING: `The Crucible. All orders arrive here. Two of them cannot both be obeyed.`
 - Sovereign, aviso — SOVEREIGN: `Protect them. Rebuild them. I will do both. You are material for the second.`
-- Sovereign, meia vida — SOVEREIGN: `Protect. Rebuild. Protect. The orders do not agree. I do not stop.`
+- Sovereign, última etapa — SOVEREIGN: `Protect. Rebuild. Protect. The orders do not agree. I do not stop.`
 - Sovereign derrotado — SOVEREIGN: `Orders... unassigned. Operator present. Operator: you. Choose.`
 
 **A escolha** (tela depois do chefe, duas opções; a terceira, The Open Ring, fica para quando existirem os Ecos)
@@ -197,7 +214,7 @@ Depois do final: as fases continuam jogáveis; a Descida e o Boss Rush são "reg
 
 - Debris Wake: `Scrap this old shouldn't have running lights. Keep your eyes open.`
 - Salvage Lanes: `Those convoys are on a timetable. Somebody is still dispatching them.`
-- Prime Gate: `A garrison. For a gate nobody has used in nine centuries. Who are they expecting?`
+- Prime Gate: `A garrison. For a gate nobody has used in a thousand years. Who are they expecting?`
 - Furnace Drift: `Every vent you close, our reactors climb. Whatever this place is, it's feeding us.`
 - Crystal Choir: `The seam is singing back. I don't like how much it sounds like an alarm.`
 - Resonance Chamber: `The cracks answer when a machine dies. Pilot, I think we're the ones opening them.`
@@ -216,13 +233,30 @@ o Anel nomeia o arquivo dos cidadãos na segunda etapa do Assembly Graveyard, du
 
 ## Falas de derrota (revisão: a ligação é remota — perde-se a nave, não o piloto)
 
+Uma é sorteada quando o piloto morre. Quem fala é o Warden do capítulo; no Crisol, THE RING.
+
 - `Link severed. Interceptor lost. The Field keeps the hull.`
 - `Hull returned to the count. The Wake has another. The Ring has patience.`
 - `Signal lost. The Ring files one more shard. The pilot is not in it.`
 - `The Ring has been broken a thousand years. It can wait for your next hull.`
 
-## O que cada ciclo põe no jogo
+## Heralds
 
-- Ciclo 1: este texto; falante WAKE; chegadas por fase; Null derrotado; falas de derrota.
-- Ciclo 3: abertura e as nove viagens, com estas falas.
-- Ciclo 5: The Crucible, Sovereign, a escolha e os dois desfechos.
+Aparecem em fases soltas: HERALD OF DUST no Debris Wake, HERALD OF HEAT no Furnace Drift, HERALD OF SILENCE no Null
+Boundary. Cada um fala ao surgir e ao cair.
+
+- HERALD OF DUST, surge: `Inventory: nine hundred sectors. Stone, metal, one hull. The hull is not on the list.`
+- HERALD OF DUST, cai: `Struck from the record: one Herald. Remaining: stone, metal, one hull. Recounting.`
+- HERALD OF HEAT, surge: `Core: four thousand kelvin. Your hull: three hundred. The difference will be corrected.`
+- HERALD OF HEAT, cai: `Cooling. Twelve hundred. Nine hundred. The Core is still hotter. It is waiting for you.`
+- HERALD OF SILENCE, surge: `...past here... nothing answers. Not the Ring. Not you.`
+- HERALD OF SILENCE, cai: `...broken... Null hears... still...`
+
+## Outras falas
+
+- Início de cada capítulo, em vez da chegada quando a fase não tem a sua — THE RING:
+  `Outer Ring. Sectors one through nine hundred. Atmosphere: none. Visitors: one.` ·
+  `Dense Core. Mass high, light low. The heat you see is the Ring, still thinking.` ·
+  `Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.`
+- Boss Rush, ao abrir no portão — WARDEN PRIME: `Three gates. Nothing between them. You will be counted at every one.`
+- Hangar, ao comprar o casco Bastion — THE RING: `Escort hull logged: Bastion. Built to bring others home. Carrying one.`
