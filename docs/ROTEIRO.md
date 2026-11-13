@@ -145,8 +145,10 @@ Viagem 8 → 9
 
 Viagem 9 → 10 (a virada)
 
-- THE RING: `Continuance resumed. Restoring: nine hundred sectors, all citizens. Materials required.`
+- THE RING: `Continuance resumed. Archive: eleven million citizens. Restoring. Materials required.`
 - WAKE: `It's pulling the Field back together. Pilot — it's pulling at us. At the Wake.`
+- THE RING: `Returning citizens: resolved. The Wake. All aboard are counted.` (fecha o "unresolved" da abertura e o
+  "calling us by name" da viagem 6 → 7; a primeira fala planta o arquivo, que a escolha depois decide)
 - WAKE: `There's a center. Whatever gives the order is there. Go.`
 
 ## Final — The Crucible
@@ -160,12 +162,22 @@ Viagem 9 → 10 (a virada)
 
 **A escolha** (tela depois do chefe, duas opções; a terceira, The Open Ring, fica para quando existirem os Ecos)
 
+Cada opção diz, na própria tela, o que acontece com o Anel, com o arquivo e com o Wake; o cartão final leva um
+epitáfio. No fundo, o Crisol responde: em Severance as luzes apagam, os arcos param e a estrela esmaece; em
+Stewardship os trechos vazios dos arcos se fecham em luz.
+
 - **Severance** — `Cut the core loose. The Field goes quiet. The archive sleeps.`
+  - O Anel: `Goes dark. Nothing is rebuilt again.` · O arquivo: `Every citizen it holds sleeps. None is restored.` ·
+    O Wake: `Takes the power it came for and goes home.`
   - THE RING: `Continuance: closed. Citizens: at rest. Thank you for counting us.`
   - WAKE: `Lights are steady. All of them. Come home.`
+  - Epitáfio: `The Ring is dark. Its citizens are at rest. The Wake went home.`
 - **Stewardship** — `Keep the Ring awake, under watch. Yours.`
+  - O Anel: `Stays awake and rebuilds, on your orders.` · O arquivo: `Kept open. One day, perhaps, restored.` ·
+    O Wake: `Stays to stand watch. Nobody goes home.`
   - THE RING: `Continuance: supervised. Operator logged. Sectors relighting: nine. Then more.`
   - WAKE: `So we stay. Somebody has to keep count. Might as well be us.`
+  - Epitáfio: `The Ring is awake, and watched. The Wake keeps the count.`
 
 Depois do final: as fases continuam jogáveis; a Descida e o Boss Rush são "registros do arquivo".
 

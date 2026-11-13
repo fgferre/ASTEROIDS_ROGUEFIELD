@@ -11,7 +11,8 @@
 // reeling and open. Third phase, "the orders do not agree": both at once,
 // split by a turning line through it; hits from the REBUILD half land in
 // full, from the PROTECT half they are soaked, and the PROTECT half carries
-// a wall and the lanes. It ends the Crucible, the campaign's tenth sector,
+// a wall and the lanes; every assembly, done or scrapped, the two halves
+// trade places after a warning, so the open side has to be chased round it. It ends the Crucible, the campaign's tenth sector,
 // asked for by kind like a Sentinel but ranked above the Wardens (`tier`).
 // Behavior: src/modules/enemies/types/Sovereign.js; listed by
 // src/data/enemies/boss.js (SENTINEL_KINDS). Seconds, field px, radians.
@@ -23,14 +24,17 @@ export default {
   displayName: 'SOVEREIGN',
   subtitle: 'CONTINUANCE',
   layer: 20, // proposta 12/11: the layer it fights on (health scales by it)
-  // × Prime's base on layer 20 (prime.js): 19.2k, about 0.74 of Warden
-  // Null's on its own layer 15 (Null: 1.35 × the base there); shut half the
-  // time, it soaks far more (measured with the bot: a 150-260 s fight).
-  healthFactor: 0.4, // proposta 12/11
+  // × Prime's base on layer 20 (prime.js): 23k, about Warden Null's on
+  // its own layer 15 (Null: 1.35 × the base there); shut half the time, it
+  // soaks far more. Measured on the bot, the boss fight alone: at 0.4 it
+  // never died; at 0.55 it lost 4 of 7; at 0.48 it won 4 of 4 in 183-213 s,
+  // the average one once with 6 hull left.
+  healthFactor: 0.48, // proposta 12/11
   radius: 84, // proposta 12/11
   // XP on top of the type-wide boss drop, like the Sentinels'.
   rewards: { xp: 300 }, // proposta 12/11
-  phaseThresholds: [0.66, 0.33], // proposta 12/11
+  // proposta 12/11: the last phase is the longest stretch of its health
+  phaseThresholds: [0.7, 0.4],
   phaseCount: 3,
   invulnerabilityDuration: 1.5, // proposta 12/11: s, at each phase change
   // Its entrance: slow and heavy, every plate flung open, shut as it stops.
@@ -108,7 +112,7 @@ export default {
       protectWindup: 1.2,
       protect: 4,
       sweep: 0.2,
-      volleys: 0,
+      volleys: 1,
       rebuildWindup: 1.2,
       build: 6,
       arc: 1.2,
@@ -132,14 +136,20 @@ export default {
   // Third phase: the split line turns `spin` rad/s; the PROTECT half fires a
   // lane volley every `volleyEvery` s and carries a wall along its middle;
   // the REBUILD half pulls (`shipPull`, `range`) and assembles (`build` s).
+  // An assembly done, or scrapped by `scrapShare` of its max health lost in
+  // it, trades the halves: `flipWindup` s of warning, then a lane volley
+  // `flipVolley` s after the turn.
   split: {
     windup: 1.5,
-    spin: 0.38,
-    volleyEvery: 2.6,
+    spin: 0.44,
+    volleyEvery: 2.3,
     range: 420,
     shipPull: 160,
     build: 6,
     escortCap: 3,
+    scrapShare: 0.05,
+    flipWindup: 1.4,
+    flipVolley: 0.8,
   }, // proposta 12/11
   // It steers itself (the drift above); the phases only name the strategy.
   movementPhases: [

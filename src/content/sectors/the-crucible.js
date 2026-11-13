@@ -23,11 +23,15 @@ export default {
     {
       rocks: rockCurve(16),
       roster: [
-        { role: 'skirmisher', count: 3, from: 6, every: 9, elite: 0.1 },
-        { role: 'charger', count: 2, from: 14, every: 16, elite: 0 },
+        { role: 'skirmisher', count: 6, from: 6, every: 7, elite: 0.1 },
+        { role: 'charger', count: 4, from: 12, every: 10, elite: 0 },
       ],
       surges: [],
-      formations: [formation('swarm', { role: 'swarmer', count: 8, at: 20 })],
+      // two swarms: the good bot cleared the stage in 23 s with one
+      formations: [
+        formation('swarm', { role: 'swarmer', count: 8, at: 18 }),
+        formation('swarm', { role: 'swarmer', count: 10, at: 38 }),
+      ],
       events: [],
       warden: false,
     },

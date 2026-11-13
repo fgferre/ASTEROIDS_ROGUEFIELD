@@ -30,18 +30,31 @@ const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 const ENDINGS = Object.keys(STORY.ending);
 
-/** The choice's options, side by side: each ending's title and sentence. */
+// What each ending settles, in the order its option lists it.
+const STAKES = [
+  ['ring', 'The Ring'],
+  ['archive', 'The archive'],
+  ['wake', 'The Wake'],
+];
+
+/**
+ * The choice's options, side by side: each ending's title and sentence,
+ * then what it means for the Ring, the archive and the Wake.
+ */
 export function endingChoiceMarkup() {
-  return ENDINGS.map(
-    (
-      id,
-      i
-    ) => `<button type="button" id="ending-${id}-btn" class="ending-option" data-ending="${id}">
+  return ENDINGS.map((id, i) => {
+    const { title, choice, stakes } = STORY.ending[id];
+    const rows = STAKES.map(
+      ([key, label]) =>
+        `<span class="ending-stake"><span class="ending-stake__who">${label}</span><span class="ending-stake__what">${stakes[key]}</span></span>`
+    ).join('');
+    return `<button type="button" id="ending-${id}-btn" class="ending-option ending-option--${id}" data-ending="${id}">
         <kbd data-device="keyboard">${i + 1}</kbd>
-        <span class="ending-option__title">${STORY.ending[id].title}</span>
-        <span class="ending-option__text">${STORY.ending[id].choice}</span>
-      </button>`
-  ).join('');
+        <span class="ending-option__title">${title}</span>
+        <span class="ending-option__text">${choice}</span>
+        <span class="ending-stakes">${rows}</span>
+      </button>`;
+  }).join('');
 }
 
 /**
@@ -112,8 +125,9 @@ export class RunEndScreens {
   }
 
   // Headline, quote, timeline, build, best moment, numbers and salvage; a
-  // `finalTitle` makes the headline the campaign's final card.
-  bodyMarkup(outcome, data, numbers, finalTitle = null) {
+  // `final` ending (STORY.ending's) makes the headline the campaign's final
+  // card: its title, and its epitaph for the line under it.
+  bodyMarkup(outcome, data, numbers, final = null) {
     const { layer, time, timeline } = numbers;
     const wardens = timeline.filter(({ kind }) => kind === 'warden').length;
     const sector = sectorById(data.sector?.id);
@@ -135,9 +149,10 @@ export class RunEndScreens {
             ? data.sector.bestTime === data.sector.time
             : this.bestAtStart < RUN_FINAL_LAYER),
     });
-    if (finalTitle) {
+    if (final) {
       head.kicker = 'The end';
-      head.title = finalTitle;
+      head.title = final.title;
+      head.line = final.epitaph ?? head.line;
     }
     const badge = head.badge
       ? `<span class="end-badge">${head.badge}</span>`
@@ -246,7 +261,7 @@ export class RunEndScreens {
       'victory',
       data,
       runNumbers(data, 'victory'),
-      finale ? STORY.ending[ending]?.title ?? 'Sovereign down' : null
+      finale ? STORY.ending[ending] ?? { title: 'Sovereign down' } : null
     );
     refs.invite.innerHTML = finale
       ? `<span class="end-endings">Endings found <b>${loadRecords().endings.length} / ${ENDINGS.length}</b></span>`

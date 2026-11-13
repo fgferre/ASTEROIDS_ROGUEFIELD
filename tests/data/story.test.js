@@ -15,10 +15,14 @@ const allLines = () => [
   ...Object.values(STORY.travel).flatMap((lines) =>
     lines.map((line) => line.text)
   ),
-  ...Object.values(STORY.ending).flatMap(({ choice, lines }) => [
-    choice,
-    ...lines.map((line) => line.text),
-  ]),
+  ...Object.values(STORY.ending).flatMap(
+    ({ choice, stakes, epitaph, lines }) => [
+      choice,
+      epitaph,
+      ...Object.values(stakes),
+      ...lines.map((line) => line.text),
+    ]
+  ),
 ];
 
 describe('story', () => {
@@ -75,11 +79,14 @@ describe('story', () => {
     expect(STORY.speaker.wake).toBe('WAKE');
   });
 
-  it('ends on two endings, each a title, a choice and a line from the Ring then the Wake', () => {
+  it('ends on two endings, each a title, a choice, its stakes, an epitaph and a line from the Ring then the Wake', () => {
     expect(Object.keys(STORY.ending)).toEqual(['severance', 'stewardship']);
-    Object.values(STORY.ending).forEach(({ title, choice, lines }) => {
+    Object.values(STORY.ending).forEach((ending) => {
+      const { title, choice, stakes, epitaph, lines } = ending;
       expect(title).toBeTruthy();
       expect(choice).toBeTruthy();
+      expect(epitaph).toBeTruthy();
+      expect(Object.keys(stakes)).toEqual(['ring', 'archive', 'wake']);
       expect(lines.map((line) => line.speaker)).toEqual(['ring', 'wake']);
     });
     expect(SECTORS.some((sector) => sector.id === ENDING_SECTOR)).toBe(true);
