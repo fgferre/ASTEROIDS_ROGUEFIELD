@@ -4,6 +4,10 @@ import { SECTORS } from '../../../src/data/sectors.js';
 import { ShipMotion } from '../../../src/modules/render3d/travel/motion.js';
 import { ShotPlan } from '../../../src/modules/render3d/travel/shots.js';
 import {
+  MomentClock,
+  travelMoments,
+} from '../../../src/modules/render3d/travel/moments.js';
+import {
   WorldMap,
   placeFrame,
 } from '../../../src/modules/render3d/travel/world.js';
@@ -191,5 +195,62 @@ describe('the journey between sectors', () => {
       motion.at(t + 0.001, q);
       expect(q.sub(p).normalize().dot(f)).toBeGreaterThan(0.95);
     }
+  });
+
+  it('times its sounds off the film: in order, the warp only on a jump, the charge ending on the leap', () => {
+    [7000, 16000].forEach((durationMs) => {
+      ['salvage-lanes', 'furnace-drift'].forEach((to) => {
+        const { leg, motion } = fly(to, durationMs);
+        const shots = new ShotPlan(THREE);
+        shots.plan(motion, durationMs, []);
+        const moments = travelMoments(motion, shots, durationMs, 0.72, 0.375);
+        const ids = moments.map((m) => m.id);
+        const at = (id) => moments.find((m) => m.id === id).t;
+        moments.forEach((m, i) => {
+          expect(m.t).toBeGreaterThanOrEqual(i ? moments[i - 1].t : 0);
+          expect(m.t).toBeLessThanOrEqual(1);
+        });
+        expect(ids.at(-1)).toBe('brake');
+        expect(at('burn')).toBeGreaterThan(at('ignite'));
+        const passes = moments.filter((m) => m.id === 'flyby');
+        expect(passes.length).toBeLessThanOrEqual(2);
+        if (!leg.jumps) {
+          expect(passes.length).toBeGreaterThanOrEqual(1);
+          expect(ids).not.toContain('charge');
+          expect(ids).not.toContain('leap');
+          expect(ids).not.toContain('dropout');
+          return;
+        }
+        expect(at('leap')).toBe(motion.jumpAt);
+        expect((at('leap') - at('charge')) * durationMs).toBeCloseTo(2200);
+        expect(at('dropout')).toBeGreaterThan(at('leap'));
+        // the leap and the drop-out are not shared with a fly-by
+        passes.forEach((m) => {
+          const clear =
+            m.t < at('leap') - 1300 / durationMs ||
+            m.t > at('dropout') + 600 / durationMs;
+          expect(clear).toBe(true);
+        });
+      });
+    });
+  });
+
+  it('plays its moments once each as t passes them, none late, and ends once', () => {
+    const heard = [];
+    const clock = new MomentClock((id) => heard.push(id));
+    clock.tick(0.5, 10000); // not started: silent
+    clock.start([
+      { id: 'ignite', t: 0.1 },
+      { id: 'burn', t: 0.12 },
+      { id: 'flyby', t: 0.3 },
+      { id: 'brake', t: 0.72 },
+    ]);
+    clock.tick(0.11, 10000);
+    clock.tick(0.13, 10000);
+    clock.tick(0.13, 10000);
+    clock.tick(0.9, 10000); // a late frame: the fly-by is stale, the stop is not
+    clock.stop();
+    clock.stop();
+    expect(heard).toEqual(['ignite', 'burn', 'brake', 'end']);
   });
 });

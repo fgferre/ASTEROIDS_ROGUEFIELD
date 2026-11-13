@@ -234,4 +234,11 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
   { on: 'game-started', cue: 'playUIStartGame' },
+
+  // The journey between sectors (render3d/travel/moments.js): each moment's
+  // sample, the burn's loop on and off, and all of it fading when it ends.
+  { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
+  { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },
+  { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
+  { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
 ]);

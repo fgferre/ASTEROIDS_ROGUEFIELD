@@ -28,6 +28,7 @@ import { HALF_H, HALF_W } from './batches.js';
 import { RING, RING_LOOK } from './ring/ringShape.js';
 import { ShipMotion } from './travel/motion.js';
 import { MARKS, markPoint } from './travel/marks.js';
+import { MomentClock, travelMoments } from './travel/moments.js';
 import { ShotPlan } from './travel/shots.js';
 import { PLACE_ANGLES, WORLD, WorldMap, placeFrame } from './travel/world.js';
 
@@ -256,10 +257,13 @@ function prepareTravelRing(ring) {
 }
 
 export class TravelScene {
-  constructor(t) {
+  /** `emit(id)`: each of a played journey's sound moments (moments.js). */
+  constructor(t, emit = () => {}) {
     const { THREE } = t;
     this.t = t;
     this.active = false;
+    this.clock = new MomentClock(emit);
+    this.moments = [];
     this.places = travelPlaces(null);
     this.leg = travelLeg(null);
     this.jumps = false;
@@ -422,6 +426,7 @@ export class TravelScene {
    * `frozenAt` (dev) holds one t.
    */
   start(to, durationMs, player, frozenAt = null) {
+    this.clock.stop();
     this.places = travelPlaces(to);
     this.leg = travelLeg(to);
     this.opening = !this.leg.from;
@@ -515,10 +520,20 @@ export class TravelScene {
       { leave, reach },
       this.rise
     );
+    this.moments = travelMoments(
+      this.motion,
+      this.shots,
+      this.durationMs,
+      this.rise,
+      JUMP.white[2]
+    );
+    // A frozen capture plays no sound.
+    if (this.frozenAt === null) this.clock.start(this.moments);
     this.planned = true;
   }
 
   stop() {
+    this.clock.stop();
     if (!this.active) return;
     this.active = false;
     if (this.baseFov !== null) {
@@ -601,6 +616,7 @@ export class TravelScene {
     if (!this.planned) {
       this.plan(this.introAim.x + this.end.x, this.introAim.z + this.end.z);
     }
+    this.clock.tick(t, this.durationMs);
     motion.sample(t);
     this.right.set(-forward.z, 0, forward.x).normalize();
     const roll = this.shots.pose(t, motion, this.eye, this.aim);

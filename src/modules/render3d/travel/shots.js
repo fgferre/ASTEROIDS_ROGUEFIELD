@@ -243,6 +243,27 @@ export class ShotPlan {
     return best;
   }
 
+  /**
+   * The t the camera passes the ship in shot `i` (a fly-over or a drop-out
+   * at its nearest, the long lens running beside it at its middle), else
+   * null.
+   */
+  passAt(i) {
+    const kind = this.kinds[i];
+    let u = null;
+    if (kind === 'track') u = 0.5;
+    if (kind === 'flyover' || kind === 'dropout') {
+      // Where pose() eases the camera's offset along the ship through 0.
+      const e = SHOT[kind];
+      const k = e.from / (e.from - e.to);
+      u = 0.5 - Math.sin(Math.asin(1 - 2 * k) / 3);
+    }
+    if (u === null) return null;
+    const from = i ? this.cuts[i - 1] : 0;
+    const to = i < this.cuts.length ? this.cuts[i] : 1;
+    return from + (to - from) * u;
+  }
+
   shotAt(t) {
     let i = 0;
     while (i < this.cuts.length && t >= this.cuts[i]) i += 1;

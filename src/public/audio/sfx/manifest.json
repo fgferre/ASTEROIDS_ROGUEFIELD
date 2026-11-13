@@ -376,5 +376,91 @@
         "origin": "Kenney Sci-Fi Sounds forceField_003.ogg under Kenney Interface Sounds maximize_006.ogg (CC0 1.0), post-processed (audition 12/11, pick C)"
       }
     ]
+  },
+  "travel-ignite": {
+    "files": ["travel-ignite/1.mp3"],
+    "gain": -6,
+    "priority": 3,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "travel-ignite/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: A sci-fi thruster ignition, clean rising whoosh with a punchy low thump then a bright jet roar, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick B)"
+      }
+    ]
+  },
+  "travel-burn": {
+    "files": ["travel-burn/1.mp3"],
+    "gain": -10,
+    "priority": 3,
+    "cap": 1,
+    "gap": 0,
+    "reverb": null,
+    "loopStart": 0.1,
+    "loopEnd": 1.95,
+    "origins": [
+      {
+        "file": "travel-burn/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: Sustained rocket engine burn, continuous clean jet roar, steady and smooth, even volume, cinematic sci-fi game sound effect, clean and bright, no music, no voice; cut to a seamless loop (audition 13/11, pick B)"
+      }
+    ]
+  },
+  "travel-charge": {
+    "files": ["travel-charge/1.mp3"],
+    "gain": -6,
+    "priority": 3,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "travel-charge/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: Sci-fi warp drive charging, energy winding up with a rising tone that tightens before the leap, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick A)"
+      }
+    ]
+  },
+  "travel-leap": {
+    "files": ["travel-leap/1.mp3"],
+    "gain": -3,
+    "priority": 3,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "travel-leap/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A spaceship jumping into warp, huge clean snap boom opening into a rushing tunnel of air and energy, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick A)"
+      }
+    ]
+  },
+  "travel-dropout": {
+    "files": ["travel-dropout/1.mp3"],
+    "gain": -6,
+    "priority": 3,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "travel-dropout/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 3, 50 steps, prompt: A spaceship dropping out of warp, deep decelerating thump and a settling low engine hum, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick C)"
+      }
+    ]
+  },
+  "travel-flyby": {
+    "files": ["travel-flyby/1.mp3"],
+    "gain": -6,
+    "priority": 3,
+    "cap": 1,
+    "gap": 500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "travel-flyby/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 3, 50 steps, prompt: A spaceship flying past a fixed camera, fast doppler whoosh of an engine passing by, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick C)"
+      }
+    ]
   }
 }

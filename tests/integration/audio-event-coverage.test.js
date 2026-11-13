@@ -604,6 +604,18 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('health-heart-collected', {}, 'playHeartPickup');
   });
 
+  it('travel-moment → its sample, the burn loop on and off, all off at the end', () => {
+    expectDelegates(
+      'travel-moment',
+      { id: 'leap' },
+      'playTravelMoment',
+      (args) => expect(args[0]).toBe('leap')
+    );
+    expectDelegates('travel-moment', { id: 'burn' }, 'playTravelBurn');
+    expectDelegates('travel-moment', { id: 'brake' }, 'stopTravelBurn');
+    expectDelegates('travel-moment', { id: 'end' }, 'stopTravelSounds');
+  });
+
   it('xp-orb-fused → playOrbFusion', () => {
     expectDelegates(
       'xp-orb-fused',

@@ -349,4 +349,66 @@ describe('sample layer', () => {
     expect(sources).toHaveLength(1);
     expect(context.createOscillator).not.toHaveBeenCalled();
   });
+
+  it('the journey plays each moment by its id, loops the burn faded in, and fades it all out at the end', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const ids = [
+      SAMPLE_CUES.playTravelBurn.sample,
+      ...Object.values(SAMPLE_CUES.playTravelMoment.sample),
+    ];
+    expect(ids).toHaveLength(6);
+    const entries = Object.fromEntries(ids.map((id) => [id, manifest[id]]));
+    ids.forEach((id) =>
+      expect(
+        existsSync(new URL(`${SFX}${entries[id].files[0]}`, import.meta.url))
+      ).toBe(true)
+    );
+
+    const { bus, context, sources } = makeBus();
+    const gains = [];
+    context.createGain = vi.fn(() => {
+      const node = createGainStub();
+      gains.push(node);
+      return node;
+    });
+    await bus.samples.load(fetchFor(entries));
+    bus.playTravelMoment('ignite');
+    bus.playTravelMoment('burn'); // the loop's own cue starts it
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('travel-ignite/1.mp3');
+
+    bus.playTravelBurn();
+    const burn = sources[1];
+    const burnEntry = entries['travel-burn'];
+    expect(burn.loop).toBe(true);
+    expect(burn.loopStart).toBe(burnEntry.loopStart);
+    expect(burn.loopEnd).toBe(burnEntry.loopEnd);
+    const burnGain = gains.at(-1).gain;
+    expect(burnGain.setValueAtTime).toHaveBeenCalledWith(0, 0);
+    expect(burnGain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      expect.any(Number),
+      SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+
+    // Still looping long after its file's length; braking fades it out.
+    context.currentTime = 30;
+    bus.playTravelMoment('leap');
+    expect(burn.stop).not.toHaveBeenCalled();
+    bus.stopTravelBurn();
+    expect(burn.stop).toHaveBeenCalledWith(
+      30 + SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+
+    // The end (or a skip) fades whatever still plays.
+    bus.playTravelBurn();
+    bus.stopTravelSounds();
+    [2, 3].forEach((i) =>
+      expect(sources[i].stop).toHaveBeenCalledWith(
+        30 + SAMPLE_PLAYBACK.cutFadeSeconds
+      )
+    );
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
 });
