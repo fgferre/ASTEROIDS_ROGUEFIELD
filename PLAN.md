@@ -104,6 +104,13 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   Quarantine Grid, mais fácil que todo o capítulo II. No Crisol quase toda morte é da barreira giratória do Sovereign
   (220–355 de dano por luta), e o piloto não enxerga cerca em movimento: para ele a barreira pesa mais do que pesará
   para quem joga olhando — ele julga jogando antes de mexer.
+- Quarantine Grid em 24 sementes (13/11): 23 vitórias antes; com cerca 0,4 → 0,55 e feixe 0,3 → 0,45, 19 (guardado).
+  Bater mais forte ou mais vezes não baixou além disso (21 e 22 de 24). O piloto chega a todo chefe com o casco
+  cheio e se cura durante a luta: os corações de vida (pedra grande 5 %, média 2 %, cada um devolve 25 % do casco)
+  apagam o que as etapas tiram. É por isso que mexer em etapas quase não muda as fases — só mata dentro da etapa.
+  Pergunta de desenho para ele, jogando: a cura está generosa demais do capítulo II em diante? Não mexi (é global e
+  já está publicado). Resta no piloto: às vezes se esconde num canto fora do alcance da própria arma (uma luta de
+  962 s na Quarantine Grid, semente 5); um humano não faz isso.
 
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
