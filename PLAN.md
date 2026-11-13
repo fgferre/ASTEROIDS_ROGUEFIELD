@@ -131,6 +131,13 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   fase um pouco mais dura que a anterior" não se resolve com o piloto. O piloto mediano (seis sementes) vence 1–2 no
   capítulo II e 0 no Crisol. Mudado: Kiln (vida 65 → 55 % do Choir, queimadura 0,15 → 0,10), surto e anel da etapa 4 da
   Furnace, 28 pedras no Choir da Resonance Chamber, Sovereign (vida 0,48 → 0,55, etapas em 88 % e 62 %, barreira 0,3 → 0,6).
+- **Medida de 13/11 à tarde (jogo em 70708f7 com o Interdictor novo, coleta 40 px; piloto bom em 24 · mediano em
+  12, vitórias; nenhum estouro):** Debris Wake 21 · 10 | Salvage Lanes 21 · 10 | Prime Gate 19 · 1 | Furnace Drift
+  21 · 2 | Crystal Choir 16 · 5 | Resonance Chamber 14 · 3 | Assembly Graveyard 20 · 5 | Quarantine Grid 14 · 5 | Null
+  Boundary 17 · 1 | The Crucible 12 · 2. Leitura: para o piloto bom a curva tem desenho (cada capítulo aperta, o
+  final é o mais difícil, 50 %); a Quarantine Grid deixou de ser passeio (era 24). A coleta mais fácil não afrouxou
+  o jogo. Para o mediano os muros continuam os três Wardens (1, 3 e 1 de 12) e as etapas da Furnace Drift (8 das 10
+  mortes antes do chefe); não mexer até a direção da loja (item 27 dele).
 - **Medida de referência (13/11 de manhã, jogo em c567dad:** combo conta máquinas, abate do Volatile creditado, pedra
   volta de 80 px, piloto que enxerga barreira girando e jaula fechando e não fica fora do alcance da arma; piloto bom
   em 24 sementes · mediano em 12, vitórias; nenhum estouro de tempo): Debris Wake 20 · 9 | Salvage Lanes 23 · 11 |
