@@ -2,7 +2,9 @@
 // shape × material family (stone, crystal), refilled every frame with the
 // live rocks' poses and looks as per-instance attributes the rock shader
 // reads (enemyMirror.js). A mesh with no rock this frame is hidden, so it
-// costs no draw call, in the main pass or the shadow pass.
+// costs no draw call, in the main pass or the shadow pass. A full mesh
+// doubles its buffers in place (still one draw): a live rock is never left
+// undrawn, since an unseen rock still hits.
 
 export const ROCK_INSTANCE_CAP = 64;
 
@@ -20,6 +22,7 @@ export const ROCK_ATTRIBUTES = {
 export class RockInstances {
   /** `materials`: family → shared material; `geometries`: the rock shapes. */
   constructor(THREE, scene, geometries, materials) {
+    this.THREE = THREE;
     this.meshes = {};
     this.counts = {};
     Object.entries(materials).forEach(([family, material]) => {
@@ -31,14 +34,15 @@ export class RockInstances {
           geometry.setAttribute(name, attribute)
         );
         if (shape.index) geometry.setIndex(shape.index);
-        Object.entries(ROCK_ATTRIBUTES).forEach(([name, size]) => {
-          const attribute = new THREE.InstancedBufferAttribute(
-            new Float32Array(ROCK_INSTANCE_CAP * size),
-            size
-          );
-          attribute.setUsage(THREE.DynamicDrawUsage);
-          geometry.setAttribute(name, attribute);
-        });
+        Object.entries(ROCK_ATTRIBUTES).forEach(([name, size]) =>
+          geometry.setAttribute(
+            name,
+            this.instanceBuffer(
+              new Float32Array(ROCK_INSTANCE_CAP * size),
+              size
+            )
+          )
+        );
         const mesh = new THREE.InstancedMesh(
           geometry,
           material,
@@ -63,14 +67,14 @@ export class RockInstances {
 
   /**
    * One live rock this frame: `view.family`/`view.shape` pick the mesh,
-   * `view.object.matrixWorld` is its pose, `view.rock` its look. False when
-   * that mesh is full.
+   * `view.object.matrixWorld` is its pose, `view.rock` its look. A full
+   * mesh grows first.
    */
   push(view) {
     const counts = this.counts[view.family];
     const n = counts[view.shape];
-    if (n >= ROCK_INSTANCE_CAP) return false;
     const mesh = this.meshes[view.family][view.shape];
+    if (n >= mesh.instanceMatrix.count) this.grow(mesh);
     mesh.setMatrixAt(n, view.object.matrixWorld);
     const { attributes } = mesh.geometry;
     const { base, vein, seed, glow, surface } = view.rock;
@@ -80,7 +84,26 @@ export class RockInstances {
     attributes.aGlow.array.set(glow, n * 4);
     attributes.aSurface.array.set(surface, n * 2);
     counts[view.shape] = n + 1;
-    return true;
+  }
+
+  instanceBuffer(array, size) {
+    const attribute = new this.THREE.InstancedBufferAttribute(array, size);
+    attribute.setUsage(this.THREE.DynamicDrawUsage);
+    return attribute;
+  }
+
+  // Doubles a full mesh's instance buffers, keeping what this frame already
+  // packed; new buffer objects, so the renderer uploads them at their size.
+  grow(mesh) {
+    const bigger = (attribute) => {
+      const array = new Float32Array(attribute.array.length * 2);
+      array.set(attribute.array);
+      return this.instanceBuffer(array, attribute.itemSize);
+    };
+    mesh.instanceMatrix = bigger(mesh.instanceMatrix);
+    Object.keys(ROCK_ATTRIBUTES).forEach((name) =>
+      mesh.geometry.setAttribute(name, bigger(mesh.geometry.attributes[name]))
+    );
   }
 
   /** Uploads what was pushed; empty meshes are hidden. */

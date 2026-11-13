@@ -85,15 +85,27 @@ describe('RockInstances', () => {
     expect(mesh.visible).toBe(false);
   });
 
-  it('refuses rocks past the cap', () => {
-    const { rocks } = setup();
+  it('grows a full mesh so every live rock is drawn, in the same mesh', () => {
+    const { scene, rocks } = setup();
+    const mesh = rocks.meshes.crystal[0];
+    const total = ROCK_INSTANCE_CAP * 2 + 1;
     rocks.begin();
-    const view = rockView('crystal', 0, 0);
-    for (let i = 0; i < ROCK_INSTANCE_CAP; i += 1) {
-      expect(rocks.push(view)).toBe(true);
+    for (let i = 0; i < total; i += 1) {
+      rocks.push(rockView('crystal', 0, i));
     }
-    expect(rocks.push(view)).toBe(false);
     rocks.end();
-    expect(rocks.meshes.crystal[0].count).toBe(ROCK_INSTANCE_CAP);
+    expect(rocks.meshes.crystal[0]).toBe(mesh);
+    expect(scene.children).toHaveLength(4);
+    expect(mesh.count).toBe(total);
+    expect(mesh.instanceMatrix.count).toBeGreaterThanOrEqual(total);
+    const matrix = new THREE.Matrix4();
+    [0, ROCK_INSTANCE_CAP - 1, total - 1].forEach((i) => {
+      mesh.getMatrixAt(i, matrix);
+      expect(matrix.elements[12]).toBe(i);
+    });
+    const { aGlow, aSurface } = mesh.geometry.attributes;
+    expect(aGlow.count).toBe(mesh.instanceMatrix.count);
+    expect(aSurface.getX(0)).toBeCloseTo(0.9);
+    expect(aSurface.getX(total - 1)).toBeCloseTo(0.9);
   });
 });
