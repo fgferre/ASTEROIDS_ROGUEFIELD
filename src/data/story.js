@@ -276,9 +276,6 @@ export const STORY = deepFreeze({
   ],
   victory:
     'Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.',
-  // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
-  // falls in ENDING_SECTOR the pilot picks one, by its `choice`; its
-  // `lines` play in order over the held epilogue shot.
   // Spoken by the Wake in the middle of a sector run, as its third stage
   // begins: where each chapter's turn is said while it is happening
   // (docs/ROTEIRO.md "Falas de meio de fase"). Keyed by sector, then stage.
@@ -344,6 +341,9 @@ export const STORY = deepFreeze({
       },
     },
   },
+  // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
+  // falls in ENDING_SECTOR the pilot picks one, by its `choice`; its
+  // `lines` play in order over the held epilogue shot.
   ending: {
     severance: {
       title: 'Severance',
