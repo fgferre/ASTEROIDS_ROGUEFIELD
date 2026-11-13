@@ -50,7 +50,15 @@ export default {
     {
       rocks: 20,
       roster: [{ role: 'tank', count: 1, from: 12, every: 25, elite: 0 }],
-      surges: [],
+      // proposta 13/11: a Drone batch at 45 (was none): the good pilot
+      // crossed the four stages losing 0-35 hull most stages and won 12/12;
+      // chapter II's stages cost it 60-130. A Drone trickle here and in the
+      // next stage as well took the average pilot to 0/6. As it stands
+      // (with the Mother's arms at 0.6): good 9/12, average 3/6 (were 12/12
+      // and 4/6).
+      surges: [
+        { at: 45, roles: ['skirmisher'], count: 4, label: 'Drone batch' },
+      ],
       formations: [
         formation('swarm', { role: 'swarmer', count: 8, at: 20 }),
         formation('wall', { role: 'skirmisher', count: 6, at: 34 }),
@@ -64,7 +72,10 @@ export default {
         { role: 'minelayer', count: 2, from: 10, every: 16, elite: 0 },
         { role: 'support', count: 1, from: 15, every: 30, elite: 0 },
       ],
-      surges: [],
+      // proposta 13/11: a Drone batch at 40 (was none), as above.
+      surges: [
+        { at: 40, roles: ['skirmisher'], count: 6, label: 'Drone batch' },
+      ],
       formations: [formation('ring', { role: 'skirmisher', count: 8, at: 32 })],
       events: [fieldEvent('sensor-jam', 30)],
       warden: false,
@@ -74,8 +85,13 @@ export default {
       roster: [
         { role: 'tank', count: 2, from: 10, every: 20, elite: 0.2 },
         { role: 'carrier', count: 1, from: 15, every: 20, elite: 0 },
+        // proposta 13/11: a Drone trickle and a batch at 40 (were none), as
+        // above; 3 every 10 s and a batch of 8 took the average pilot to 0/6.
+        { role: 'skirmisher', count: 2, from: 8, every: 12, elite: 0.1 },
       ],
-      surges: [],
+      surges: [
+        { at: 40, roles: ['skirmisher'], count: 6, label: 'Drone batch' },
+      ],
       formations: [
         formation('wall', { role: 'skirmisher', count: 10, at: 25 }),
       ],

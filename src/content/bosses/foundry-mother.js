@@ -79,8 +79,11 @@ export default {
     warn: 0.7,
     reachSpeed: 3, // proposta 12/11: armReach (0..1) per s
     // proposta 12/11: was 0.15; a caught ship lost 7-21 a fight, nothing a
-    // health pickup did not undo before the next sweep.
-    damageFactor: 0.3,
+    // health pickup did not undo before the next sweep. proposta 13/11: was
+    // 0.3; with the sector's harder stages the good pilot still won 11/12
+    // at 0.45; at 0.6, 9/12 (all three lost at the Mother, fights 101-165
+    // s), the average pilot 3/6.
+    damageFactor: 0.6,
   },
   ventSpeed: 3, // proposta 12/11: ventOpen (0..1) per s
   drift: {
