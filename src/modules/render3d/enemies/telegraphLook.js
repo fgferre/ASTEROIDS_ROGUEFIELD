@@ -10,8 +10,11 @@
 // - A zone on a fan, disc or ring sector (polar, from its emitter): an edge
 //   that burns in while it warns and holds bright once it is live, and a
 //   body by style: HEAT (shimmering tongues and embers flowing out), SLAG
-//   (a landing mark, then molten crust), PULL (rings flowing in to the
-//   mouth), FIELD (a projected lattice) and WASH (a faint sheen).
+//   (a landing mark, then molten crust), PULL (rings, streaks and specks
+//   of debris drawn in to the mouth, faster as they near it), FIELD (a
+//   projected lattice), WASH (a faint sheen) and RING (the warning round a
+//   boss: a rim burning in both ways from where it strikes, a dial inside
+//   lighting as it passes; whole and hot once the attack is live).
 // The drawn size is the mesh's: the hit area is the truth, never wider.
 
 const TAU = Math.PI * 2;
@@ -22,6 +25,7 @@ export const ZONE = Object.freeze({
   PULL: 2,
   FIELD: 3,
   WASH: 4,
+  RING: 5,
 });
 
 // proposta 13/11: the hot white the cores burn at (× the zone's colour).
@@ -87,9 +91,13 @@ void main() {
   float lit = step(s, uFront);
   float head = exp(-pow((s - uFront) / 10.0, 2.0)) * step(uFront, 1e4)
     * mix(1.0, 0.35 * sheath, uChevron);
-  // arrows down a lane: chevrons pointing away from the origin
-  float chev = line(fract((s - abs(off) * 0.7) / 48.0 - t * 1.6 * uFlow) * 48.0 - 24.0, 7.0)
-    * uChevron * step(abs(off), halfW - 4.0);
+  // arrows down a lane, pointing away from the origin: the tip on the
+  // centre line runs ahead of the arms; each a sharp bright leading edge
+  // and a tail fading behind it, so the strip reads as motion one way
+  float period = clamp(0.6 * uWidth, 40.0, 90.0);
+  float c = fract((s + abs(off) * 0.75) / period - t * 1.4 * uFlow);
+  float chev = smoothstep(0.52, 0.94, c) * (1.0 - smoothstep(0.94, 0.985, c))
+    * uChevron * step(abs(off), halfW - 5.0);
   vec3 col;
   float alpha;
   if (uWarn > 0.5) {
@@ -98,8 +106,8 @@ void main() {
     float guide = 0.35 + 0.5 * lit;
     float fill = (0.05 + 0.15 * uProgress) * sheath * (1.0 - 0.6 * uChevron);
     alpha = core * guide * 0.9 + edge * dash * (0.3 + 0.5 * uProgress)
-      + fill * lit + head * (0.4 + 0.6 * uCore) + chev * lit * (0.15 + 0.35 * uProgress);
-    col = mix(uColor, uHot, 0.35 * core + 0.6 * head);
+      + fill * lit + head * (0.4 + 0.6 * uCore) + chev * lit * (0.2 + 0.45 * uProgress);
+    col = mix(uColor, uHot, 0.35 * core + 0.6 * head + 0.4 * chev * chev * chev);
   } else {
     // live: a hot core in its sheath, pulses running along it
     float pulse = pow(0.5 + 0.5 * sin((s / 46.0 - t * 5.0 * uFlow) * 6.2832), 6.0) * (1.0 - uChevron);
@@ -107,7 +115,7 @@ void main() {
     float flare = uFlare * exp(-pow((uLength - a) / 12.0, 2.0));
     float body = mix(0.55, 0.12, uChevron) * sheath + 0.3 * pulse * sheath;
     alpha = (body * grain + 1.2 * core + 0.9 * edge + flare * sheath + 0.8 * chev) * mix(1.0, 0.35, step(s, uFront) * uChevron);
-    col = mix(uColor, uHot, clamp(core * 0.9 + 0.3 * pulse * sheath + flare + 0.3 * chev, 0.0, 1.0));
+    col = mix(uColor, uHot, clamp(core * 0.9 + 0.3 * pulse * sheath + flare + 0.5 * chev * chev * chev, 0.0, 1.0));
   }
   gl_FragColor = vec4(col * alpha * uGain, 1.0);
 }`;
@@ -196,16 +204,38 @@ void main() {
       hot = (0.7 * crack + bubble) * cool;
     }
   } else if (uStyle < 2.5) {
-    // PULL: rings and streamlines flowing in to the mouth
-    float speed = warn > 0.5 ? 0.6 : 2.2;
-    float rings = pow(0.5 + 0.5 * sin((r / 34.0 + t * speed) * 6.2832), 8.0);
-    float streams = step(0.9, fract(theta * uRadius / 30.0 + 0.5)) * step(0.5, fract(r / 22.0 + t * speed * 1.5));
-    float lean = 1.0 - u;
+    // PULL: drawn in to the mouth, faster as it nears. tau runs 0 at the
+    // rim to 1 at the mouth, its pace rising five times on the way in, so
+    // what rides it bunches at the rim and streaks at the mouth.
+    float tau = (sqrt(0.1225 + 2.6 * (1.0 - u)) - 0.35) / 1.3;
+    float pace = 0.35 + 1.3 * tau;
+    float speed = warn > 0.5 ? 0.25 : 0.9;
+    // rings closing in: a sharp mouthward edge, a tail behind
+    float ring = fract(tau * 4.0 - t * speed);
+    float rings = smoothstep(0.5, 0.96, ring) * (1.0 - smoothstep(0.96, 1.0, ring));
+    // lanes of streaks and specks converging on the mouth
+    float lanes = max(3.0, floor(uArc * uRadius / 26.0));
+    float lane = (theta / max(uArc, 0.001) + 0.5) * lanes;
+    float li = floor(lane);
+    float lanePx = max(1.0, r * uArc / lanes);
+    float across = (fract(lane) - 0.5) * lanePx;
+    float lh = hash(vec2(li, uSeed + 3.1));
+    float dash = fract(tau * 3.0 + lh - t * speed * 1.3);
+    float streak = line(across, 1.0) * step(0.45, lh)
+      * smoothstep(0.55, 0.92, dash) * (1.0 - step(0.97, dash)) * (0.3 + tau);
+    // specks of debris riding the lanes, one cell in four lit
+    float cellT = tau * 7.0 + lh * 3.0 - t * speed * 1.1;
+    float sh = hash(vec2(li, floor(cellT)) + uSeed);
+    float alongPx = (fract(cellT) - 0.5) * uRadius * pace / 7.0;
+    float speck = step(0.72, sh) * exp(-(alongPx * alongPx / (2.0 + 6.0 * tau) + across * across) / 1.6);
+    float throat = exp(-u * 7.0);
     if (warn > 0.5) {
-      alpha = 0.03 + 0.06 * uProgress + 0.18 * rings * uProgress;
+      alpha = 0.03 + 0.05 * uProgress + (0.2 * rings + 0.12 * streak) * uProgress;
+      hot = 0.2 * rings * tau;
     } else {
-      alpha = 0.05 + (0.32 * rings + 0.2 * streams) * (0.4 + 0.6 * lean);
-      hot = 0.4 * rings * lean;
+      alpha = 0.04 + 0.34 * rings * (0.35 + 0.65 * tau) + 0.4 * streak
+        + 1.4 * speck + 0.3 * throat + 0.12 * glowIn;
+      hot = 0.35 * rings * tau + 0.9 * speck + 0.4 * throat;
     }
   } else if (uStyle < 3.5) {
     // FIELD: a lattice projected from the claw, scanning out
@@ -220,13 +250,43 @@ void main() {
       alpha = (0.13 + 0.45 * lattice) * shimmer + 0.5 * spine;
       hot = 0.6 * spine;
     }
-  } else {
+  } else if (uStyle < 4.5) {
     // WASH: faint, a slow sheen sweeping round
     float sheen = pow(0.5 + 0.5 * sin(theta * 3.0 - t * 1.2), 6.0);
     alpha = 0.5 + 0.5 * sheen;
+  } else {
+    // RING: the warning round a boss. The rim burns in both ways from
+    // where it strikes (its own +x) to behind it, a hot head where it
+    // burns, a dial of ticks inside lighting as it passes; live, the rim
+    // whole and hot and the ticks chasing round.
+    float sweep = abs(theta) / 3.14159;
+    float lit = warn > 0.5 ? step(sweep, uProgress) : 1.0;
+    float rimW = warn > 0.5 ? 1.5 : 2.5;
+    float rim = line(outer - rimW * 0.5, rimW);
+    float sheath = exp(-outer / (warn > 0.5 ? 3.0 : 5.0));
+    float band = (1.0 - uInner) * uRadius;
+    float ticks = floor(uRadius * 6.2832 / 16.0);
+    float tickPx = r * 6.2832 / ticks;
+    float spin = warn > 0.5 ? 0.0 : t * 0.6;
+    float tick = line((fract(theta / 6.2832 * ticks + spin) - 0.5) * tickPx, 2.0)
+      * step(3.5, outer) * step(outer, 0.65 * band);
+    float head = warn > 0.5
+      ? exp(-pow((sweep - uProgress) * 3.14159 * r / 7.0, 2.0)) * step(0.02, uProgress) * (1.0 - step(0.999, uProgress))
+      : 0.0;
+    if (warn > 0.5) {
+      alpha = rim * (0.1 + (0.75 + 0.35 * uProgress) * lit) + 0.3 * sheath * lit
+        + 0.5 * tick * lit + 1.6 * head * (rim + sheath);
+      hot = 0.2 * rim * lit + 0.9 * head;
+    } else {
+      float chase = 0.4 + 0.6 * step(0.5, fract(theta / 6.2832 * 6.0 - t * 0.9));
+      alpha = 1.1 * rim + 0.4 * sheath + 0.3 * tick * chase;
+      hot = 0.55 * rim;
+    }
   }
-  float edgeA = edge * burnt * (warn > 0.5 ? 0.55 + 0.45 * uProgress : 1.0);
-  alpha += edgeA * (uStyle > 3.5 ? 0.0 : 1.0);
+  // the wash and the ring carry no shared edge
+  float edgeA = edge * burnt * (warn > 0.5 ? 0.55 + 0.45 * uProgress : 1.0)
+    * step(uStyle, 3.5);
+  alpha += edgeA;
   hot = clamp(hot + edgeA * (warn > 0.5 ? 0.2 : 0.5), 0.0, 1.0);
   col = mix(uColor, uHot, hot);
   gl_FragColor = vec4(col * alpha * uGain, 1.0);

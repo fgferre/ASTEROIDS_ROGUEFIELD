@@ -21,6 +21,11 @@ const FENCE_HALF = 13;
 const CELL = 10;
 // The cage's pieces: three sides and the doorway's two stubs.
 const PIECES = 6;
+// proposta 13/11: a docked emitter's size (× EMITTER) and its lens's glow.
+const DOCKED = 0.7;
+const LENS_DOCKED = 0.25;
+// Flying home, the share of the flight after which its lens relights.
+const RESEAT = 0.8;
 // Where the mast's barrel ends, a share of its radius from its centre.
 const MUZZLE = 0.47;
 
@@ -49,8 +54,10 @@ void main() {
 // A fence: while it warns, a hair line grows from each emitter (uGrow, px
 // reached); solid, a lattice field between two bright rails round a hot
 // core, scan pulses running out from the emitters, bright at the emitters
-// and at the doorway's jambs; collapsing (uCollapse 0..1) it pulls back
-// into the emitters, flickering.
+// and at the doorway's jambs. Collapsing (uCollapse 0..1) it breaks down,
+// harmless: the rails go out, the lattice tears open cell by cell and
+// pulls back along the line into each emitter, a crackle of discharge
+// running down its spent core, its red cooling to ash.
 const FENCE_FRAGMENT = `
 uniform vec3 uColor;
 uniform float uTime;
@@ -65,22 +72,27 @@ varying vec2 vEnds;
 float line(float x, float w) {
   return 1.0 - smoothstep(0.0, w, abs(fract(x) - 0.5) * 2.0);
 }
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
 void main() {
   float a = abs(vAcross);
   float fromA = vEnds.x > 0.5 ? vAlong : 1e5;
   float fromB = vEnds.y > 0.5 ? vLen - vAlong : 1e5;
   float d = min(fromA, fromB);
   float jamb = min(vEnds.x > 0.5 ? 1e5 : vAlong, vEnds.y > 0.5 ? 1e5 : vLen - vAlong);
-  float reach = uGrow * (1.0 - uCollapse);
+  float k = uCollapse;
+  float reach = uGrow * (1.0 - k);
   if (d > reach) discard;
-  float front = exp(-(reach - d) / 6.0) * step(0.001, uCollapse + (1.0 - uSolid));
+  float front = exp(-(reach - d) / 6.0) * step(0.001, k + (1.0 - uSolid));
   float core = exp(-a * a * (uSolid < 0.5 ? 30.0 : 90.0));
   float glow;
+  vec3 hot = mix(uColor, vec3(1.0, 0.82, 0.78), clamp(core * 0.55 + front * 0.4, 0.0, 1.0));
   if (uSolid < 0.5) {
     // the projected line: a thread with dashes running out
     float dash = 0.6 + 0.4 * step(0.5, fract(d / 14.0 - uTime * 2.5));
     glow = core * (0.8 * dash + 1.4 * front);
-  } else {
+  } else if (k <= 0.0) {
     float v = vAcross * uHalf;
     float lattice = max(line((vAlong + v) / ${CELL.toFixed(1)}, 0.18),
       line((vAlong - v) / ${CELL.toFixed(1)}, 0.18));
@@ -89,13 +101,27 @@ void main() {
     float fill = 0.07 + 0.5 * lattice * (1.0 - a * 0.5);
     float ends = exp(-d / 8.0) * 1.0 + exp(-jamb / 5.0) * 1.4;
     glow = fill + 0.5 * rails + 0.8 * core + 0.25 * scan * (1.0 - a) + ends * (1.0 - a * 0.5);
-    glow += 1.5 * front;
-    float flicker = uCollapse > 0.0
-      ? 0.6 + 0.4 * step(0.35, fract(sin(floor(uTime * 40.0) + vAlong * 0.05) * 43758.5))
-      : 1.0;
-    glow *= flicker;
+  } else {
+    // breaking down: whole cells drop out, more as it goes
+    float v = vAcross * uHalf;
+    float cell = floor(vAlong / ${(CELL * 2).toFixed(1)});
+    float kept = step(k * 1.15, hash(vec2(cell, floor(vLen))));
+    float lattice = max(line((vAlong + v) / ${CELL.toFixed(1)}, 0.18),
+      line((vAlong - v) / ${CELL.toFixed(1)}, 0.18)) * kept;
+    float spent = 1.0 - k;
+    float rails = smoothstep(0.72, 0.9, a) * (1.0 - smoothstep(0.92, 1.0, a)) * spent * spent;
+    // the discharge: a jagged thread crackling along the core
+    float tick = floor(uTime * 30.0);
+    float jag = (hash(vec2(floor(vAlong / 7.0), tick)) - 0.5) * 0.9;
+    float arc = exp(-pow((vAcross - jag) * 7.0, 2.0)) * step(0.4, hash(vec2(floor(vAlong / 23.0), tick)));
+    float ends = exp(-d / 8.0) * spent;
+    float cool = sqrt(k);
+    glow = (0.04 + 0.35 * lattice) * spent * spent + 0.5 * rails + 0.4 * core * spent
+      + 0.7 * arc * spent + ends + 1.0 * front * spent;
+    // the red cooling fast to a dim ash violet, the crackle a pale violet
+    vec3 ash = vec3(0.3, 0.24, 0.42);
+    hot = mix(mix(uColor, ash, cool), vec3(0.85, 0.8, 1.0), clamp(arc * spent + front * 0.4, 0.0, 1.0));
   }
-  vec3 hot = mix(uColor, vec3(1.0, 0.82, 0.78), clamp(core * 0.55 + front * 0.4, 0.0, 1.0));
   gl_FragColor = vec4(hot * glow, 1.0);
 }
 `;
@@ -425,18 +451,39 @@ export function createInterdictor(sk) {
   const scale = new THREE.Vector3();
 
   // The four emitters: docked on its foot, thrown up and out to the cage's
-  // corners, home again; their lenses dim docked, hot when out.
+  // corners, home again; their lenses dim docked, hot when out. As the cage
+  // collapses they spit and flicker; flying home they cool, the lens
+  // dimming to its docked glow and the body easing to its docked size.
   function updateEmitters(view, boss, time) {
     const { emitters, lenses, lensMaterial } = view.telegraph;
     const list = boss.emitters || [];
     const radius = boss.radius || INTERDICTOR.radius;
     const g = boss.grid;
+    const recall = !g ? boss.recall : null;
+    const home = recall
+      ? clamp01(1 - recall.timer / (recall.duration || 1))
+      : 0;
     // a cage closed tight squeezes its emitters together: they draw in
-    const tight = g ? 0.45 + 0.55 * clamp01(g.size / (EMITTER * 4)) : 1;
+    // (flying home, from the size the cage had when it fell)
+    const cage = g
+      ? g.size
+      : recall
+        ? Math.hypot(
+            recall.from[1].x - recall.from[0].x,
+            recall.from[1].y - recall.from[0].y
+          )
+        : EMITTER * 4;
+    const tight = 0.45 + 0.55 * clamp01(cage / (EMITTER * 4));
+    const settle = home * home * (3 - 2 * home);
     list.forEach((e, i) => {
       const lift = clamp01(e.lift ?? 0);
       // docked it folds smaller into its dock
-      const size = EMITTER * ((e.docked ? 0.7 : tight) + 0.35 * lift);
+      const fold = e.docked
+        ? DOCKED
+        : recall
+          ? tight + (DOCKED - tight) * settle
+          : tight;
+      const size = EMITTER * (fold + 0.35 * lift);
       at.set(e.x, 0.16 * radius + 4 + lift * THROW_HEIGHT, e.y);
       spin.setFromAxisAngle(up, lift * Math.PI * 1.5 + Math.PI / 4);
       scale.setScalar(size);
@@ -449,9 +496,21 @@ export function createInterdictor(sk) {
     lenses.instanceMatrix.needsUpdate = true;
     const out = list.some((e) => !e.docked);
     const beat = 0.5 + 0.5 * Math.sin(time * 14);
-    let heat = out ? 1.2 + 0.6 * beat : 0.25;
+    let heat = out ? 1.2 + 0.6 * beat : LENS_DOCKED;
     if (g?.phase === 'solid') heat = 1.6 + 0.3 * beat;
-    if (g?.phase === 'fade') heat = 0.4 + 1.6 * clamp01(g.solid) * beat;
+    if (g?.phase === 'fade') {
+      const spit = Math.sin(time * 61) * Math.sin(time * 37) > 0.2 ? 1 : 0.45;
+      heat = (0.5 + 1.4 * clamp01(g.solid)) * spit;
+    }
+    // flying home the lens goes dark, then lights to its docked glow as
+    // it seats
+    if (recall) {
+      heat =
+        home < RESEAT
+          ? 0.5 - 0.44 * clamp01(home / 0.3)
+          : 0.06 +
+            (LENS_DOCKED - 0.06) * clamp01((home - RESEAT) / (1 - RESEAT));
+    }
     lensMaterial.color.copy(threat).multiplyScalar(heat);
   }
 

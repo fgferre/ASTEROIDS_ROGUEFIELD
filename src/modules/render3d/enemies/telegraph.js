@@ -38,8 +38,17 @@ const INTAKE_GAIN = [0.8, 0.7];
 const SECTOR_GAIN = [0.7, 0.5];
 const ARMS_GAIN = [0.5, 0.7];
 const POOL_GAIN = [1, 0.6];
+// The split line is near white: live it burns at the other beams' strength
+// (their red is far darker), not a glare across the screen's centre.
+const SPLIT_GAIN = [0.45, 0.2];
 // The slag's glow: molten orange.
 const SLAG = '#ff9a3a';
+// The Sentinels' attacks whose warning ring wears the shared language (the
+// Wardens', the Ram's and a recipe enemy's keep the flat circle); its band
+// (a share of its radius, from the rim in) and strength [warning, live].
+const SENTINEL_RING = new Set(['lane', 'intake', 'eject']);
+const RING_INNER = 0.8;
+const RING_GAIN = [0.75, 0.6];
 
 /**
  * Telegraph parts and their per-frame update.
@@ -286,9 +295,54 @@ export function createTelegraphs(kit) {
     }
     // the aim line is warning enough: no ring round a marksman
     parts.warn.visible = !aim;
+    if (SENTINEL_RING.has(t.type)) {
+      updateRing(parts, t, boss, r, progress);
+      return;
+    }
     const ring = r * (1.15 + 0.1 * pulse);
     parts.warn.scale.set(ring, 1, ring);
     parts.warn.material.opacity = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
+  }
+
+  // A Sentinel's warning ring, in the shared language: closing in a little
+  // as its rim burns in from the side it strikes, whole and hot while the
+  // attack is live. A charge's ring stays where it set off and fades as
+  // the boss leaves it.
+  function updateRing(parts, t, boss, r, progress) {
+    const live =
+      t.type === 'lane'
+        ? t.charging
+        : t.type === 'intake'
+          ? t.pulling
+          : t.timer <= 0;
+    let gain = live ? RING_GAIN[1] : RING_GAIN[0] * (0.6 + 0.4 * progress);
+    if (t.type === 'lane' && live) {
+      const ran =
+        (boss.x - t.x) * Math.cos(t.angle) + (boss.y - t.y) * Math.sin(t.angle);
+      gain *= Math.max(0, 1 - ran / (2 * r));
+    }
+    const radius = r * (live ? 1.18 : 1.3 - 0.12 * progress);
+    parts.warn.geometry = ringGeometry(Math.PI * 2, RING_INNER);
+    // the eject's group lies unturned: turn the ring to the volley's aim
+    let aim = 0;
+    if (t.type === 'eject' && t.lines?.length) {
+      const sum = t.lines.reduce(
+        (s, l) => [s[0] + Math.cos(l.angle), s[1] + Math.sin(l.angle)],
+        [0, 0]
+      );
+      aim = Math.atan2(sum[1], sum[0]);
+    }
+    parts.warn.rotation.y = -aim;
+    parts.warn.scale.set(radius, 1, radius);
+    danger.zone(parts.warn, {
+      color: kit.threatColor,
+      warn: !live,
+      progress,
+      gain,
+      radius,
+      inner: RING_INNER,
+      style: ZONE.RING,
+    });
   }
 
   // The Gatekeeper's strip: a track as wide as it, arrows down it toward
@@ -465,7 +519,7 @@ export function createTelegraphs(kit) {
         color: splitColor,
         warn: warning,
         progress,
-        gain: warning ? 0.45 + 0.35 * progress : 0.5,
+        gain: warning ? SPLIT_GAIN[0] + 0.35 * progress : SPLIT_GAIN[1],
         origin: SPLIT_REACH,
         front: warning ? progress * SPLIT_REACH : Infinity,
       });
