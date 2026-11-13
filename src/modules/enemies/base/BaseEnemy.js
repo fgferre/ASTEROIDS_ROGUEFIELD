@@ -111,6 +111,7 @@ export class BaseEnemy {
     this.affixes = affixes;
     this.wardedUntil = -Infinity; // age until which Warded takes no damage
     this.volatileFuse = null; // seconds left once Volatile's fuse is lit
+    this.fuseLitBy = null; // the lethal hit's { cause, source } (EnemyDamageSystem)
     this.volatileSpent = false;
     this.splitSpent = false;
     this.blastSpent = false;
@@ -210,12 +211,17 @@ export class BaseEnemy {
     if (this.volatileFuse === null) return;
     this.volatileFuse -= deltaTime;
     if (this.volatileFuse > 0) return;
-    // The kill takes the normal path; onDestroyed sets off the blast.
+    // The kill takes the normal path, credited to the hit that lit the fuse;
+    // onDestroyed sets off the blast.
     this.volatileFuse = null;
     this.volatileSpent = true;
     this.wardedUntil = -Infinity;
     const lethal = this.health + (this.armor || 0) + (this.shields || 0) + 1;
-    this.system.applyDamage(this, lethal, { cause: 'volatile-fuse' });
+    this.system.applyDamage(
+      this,
+      lethal,
+      this.fuseLitBy ?? { cause: 'volatile-fuse' }
+    );
   }
 
   /** Warded's window is open, or the Volatile fuse is burning. */

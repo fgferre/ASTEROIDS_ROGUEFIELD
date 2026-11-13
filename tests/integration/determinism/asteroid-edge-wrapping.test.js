@@ -7,7 +7,12 @@
 
 import { describe, expect, it } from 'vitest';
 import { wrapScreenEdges } from '../../../src/modules/enemies/components/MovementComponent.js';
-import { GAME_WIDTH, GAME_HEIGHT } from '../../../src/core/GameConstants.js';
+import {
+  ASTEROID_SIZES,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  SHIP_SIZE,
+} from '../../../src/core/GameConstants.js';
 
 describe('Asteroid edge wrapping', () => {
   it('should NOT wrap asteroids spawned at edge spawn positions (±80px)', () => {
@@ -132,5 +137,49 @@ describe('Asteroid edge wrapping', () => {
     // Started at 880, traveled 200 pixels left, should be at 680
     expect(asteroid.x).toBeGreaterThan(0);
     expect(asteroid.x).toBeLessThan(GAME_WIDTH);
+  });
+
+  it('a rock wrapping in never appears in contact with a ship at the edge', () => {
+    const bounds = { left: 0, top: 0, right: GAME_WIDTH, bottom: GAME_HEIGHT };
+    const shipReach = SHIP_SIZE + 25; // a large hull with its shield up
+    const cases = [
+      { from: { x: -101, y: 300 }, ship: { x: GAME_WIDTH, y: 300 } },
+      { from: { x: GAME_WIDTH + 101, y: 300 }, ship: { x: 0, y: 300 } },
+      { from: { x: 400, y: -101 }, ship: { x: 400, y: GAME_HEIGHT } },
+      { from: { x: 400, y: GAME_HEIGHT + 101 }, ship: { x: 400, y: 0 } },
+    ];
+    for (const radius of Object.values(ASTEROID_SIZES)) {
+      for (const { from, ship } of cases) {
+        const rock = { type: 'asteroid', radius, ...from };
+        wrapScreenEdges(rock, bounds);
+        const gap = Math.hypot(rock.x - ship.x, rock.y - ship.y);
+        expect(gap).toBeGreaterThan(radius + shipReach);
+      }
+    }
+  });
+
+  it('a rock wrapping in still comes back into the field', () => {
+    const bounds = { left: 0, top: 0, right: GAME_WIDTH, bottom: GAME_HEIGHT };
+    // The slowest rock, barely heading in: it must cross the margin and never
+    // be thrown back out by the wrap itself.
+    const rock = {
+      type: 'asteroid',
+      radius: ASTEROID_SIZES.large,
+      x: -101,
+      y: 300,
+      vx: -5,
+      vy: 0,
+    };
+    wrapScreenEdges(rock, bounds);
+    const dt = 1 / 60;
+    let steps = 0;
+    while (rock.x > GAME_WIDTH - rock.radius && steps < 60 * 60) {
+      const before = rock.x;
+      rock.x += rock.vx * dt;
+      wrapScreenEdges(rock, bounds);
+      expect(rock.x).toBeLessThan(before);
+      steps += 1;
+    }
+    expect(rock.x).toBeLessThanOrEqual(GAME_WIDTH - rock.radius);
   });
 });

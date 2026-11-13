@@ -10,6 +10,7 @@ import {
 } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { wrapScreenEdges } from '../components/MovementComponent.js';
 import FragmentationSystem from '../systems/FragmentationSystem.js';
 import CrackGenerationService from '../../../services/CrackGenerationService.js';
 import {
@@ -642,12 +643,7 @@ export class Asteroid extends BaseEnemy {
       this.y += this.vy * deltaTime;
       this.rotation += this.rotationSpeed * deltaTime;
 
-      // Screen wrapping
-      const margin = this.radius;
-      if (this.x < -margin) this.x = GAME_WIDTH + margin;
-      if (this.x > GAME_WIDTH + margin) this.x = -margin;
-      if (this.y < -margin) this.y = GAME_HEIGHT + margin;
-      if (this.y > GAME_HEIGHT + margin) this.y = -margin;
+      wrapScreenEdges(this);
     }
 
     // Timers (always update)
