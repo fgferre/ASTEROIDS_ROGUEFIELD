@@ -279,6 +279,71 @@ export const STORY = deepFreeze({
   // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
   // falls in ENDING_SECTOR the pilot picks one, by its `choice`; its
   // `lines` play in order over the held epilogue shot.
+  // Spoken by the Wake in the middle of a sector run, as its third stage
+  // begins: where each chapter's turn is said while it is happening
+  // (docs/ROTEIRO.md "Falas de meio de fase"). Keyed by sector, then stage.
+  stage: {
+    'debris-wake': {
+      3: {
+        speaker: 'wake',
+        text: "Scrap this old shouldn't have running lights. Keep your eyes open.",
+      },
+    },
+    'salvage-lanes': {
+      3: {
+        speaker: 'wake',
+        text: 'Those convoys are on a timetable. Somebody is still dispatching them.',
+      },
+    },
+    'prime-gate': {
+      3: {
+        speaker: 'wake',
+        text: 'A garrison. For a gate nobody has used in nine centuries. Who are they expecting?',
+      },
+    },
+    'furnace-drift': {
+      3: {
+        speaker: 'wake',
+        text: "Every vent you close, our reactors climb. Whatever this place is, it's feeding us.",
+      },
+    },
+    'crystal-choir': {
+      3: {
+        speaker: 'wake',
+        text: "The seam is singing back. I don't like how much it sounds like an alarm.",
+      },
+    },
+    'dense-core': {
+      3: {
+        speaker: 'wake',
+        text: "The cracks answer when a machine dies. Pilot, I think we're the ones opening them.",
+      },
+    },
+    'assembly-graveyard': {
+      3: {
+        speaker: 'wake',
+        text: "Same hull, same serial, again and again. It isn't building a fleet. It's repeating.",
+      },
+    },
+    'quarantine-grid': {
+      3: {
+        speaker: 'wake',
+        text: "These fences point inward. They weren't keeping us out. They were keeping it in.",
+      },
+    },
+    'wardens-reach': {
+      3: {
+        speaker: 'wake',
+        text: "Past this line our charts are blank. The signal isn't. It knows we're here.",
+      },
+    },
+    'the-crucible': {
+      3: {
+        speaker: 'wake',
+        text: "It has our hull plans, pilot. It's building Wakes. Finish this before one launches.",
+      },
+    },
+  },
   ending: {
     severance: {
       title: 'Severance',

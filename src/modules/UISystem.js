@@ -37,6 +37,7 @@ import {
   TransmissionQueue,
   bossRushTransmission,
   chapterTransmission,
+  stageTransmission,
   deathTransmission,
   hangarTransmission,
   heraldTransmission,
@@ -384,6 +385,9 @@ class UISystem extends BaseSystem {
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
     }
+    this.queueTransmission(
+      stageTransmission(sector?.id, sector && localLayer(sector, layer))
+    );
     if (stage === 1) {
       this.queueTransmission(bossRushTransmission());
     }

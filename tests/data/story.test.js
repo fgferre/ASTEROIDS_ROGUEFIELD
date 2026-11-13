@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ENDING_SECTOR, STORY } from '../../src/data/story.js';
 import { BIOMES } from '../../src/data/biomes.js';
-import { chapterTransmission } from '../../src/modules/ui/transmissions.js';
+import {
+  chapterTransmission,
+  stageTransmission,
+} from '../../src/modules/ui/transmissions.js';
 import { HERALD_KINDS } from '../../src/data/enemies/herald.js';
 import { SECTORS } from '../../src/data/sectors.js';
 
@@ -12,6 +15,9 @@ const allLines = () => [
   ...Object.values(STORY.herald).flatMap((moments) => Object.values(moments)),
   ...STORY.death,
   STORY.victory,
+  ...Object.values(STORY.stage).flatMap((stages) =>
+    Object.values(stages).map((line) => line.text)
+  ),
   ...Object.values(STORY.travel).flatMap((lines) =>
     lines.map((line) => line.text)
   ),
@@ -83,6 +89,19 @@ describe('story', () => {
       expect(lines.map((line) => line.speaker)).toEqual(['ring', 'wake']);
     });
     expect(SECTORS.some((sector) => sector.id === ENDING_SECTOR)).toBe(true);
+  });
+
+  it('has the Wake speak mid-run in every sector, and nowhere else', () => {
+    expect(Object.keys(STORY.stage).sort()).toEqual(
+      SECTORS.map((sector) => sector.id).sort()
+    );
+    expect(stageTransmission('debris-wake', 3)).toMatchObject({
+      key: 'stage:debris-wake:3',
+      speaker: 'WAKE',
+      text: STORY.stage['debris-wake'][3].text,
+    });
+    expect(stageTransmission('debris-wake', 2)).toBeNull();
+    expect(stageTransmission(undefined, null)).toBeNull();
   });
 
   it('keeps every line within 90 characters and never repeats one', () => {

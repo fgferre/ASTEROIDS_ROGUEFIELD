@@ -110,6 +110,17 @@ export function endingTransmissions(ending, holdMs) {
   return spokenInOrder(STORY.ending[ending].lines, `ending:${ending}`, holdMs);
 }
 
+/** The line a sector's `stage` (1-based) opens with, or null. */
+export function stageTransmission(sectorId, stage) {
+  const line = STORY.stage[sectorId]?.[stage];
+  if (!line) return null;
+  return {
+    key: `stage:${sectorId}:${stage}`,
+    speaker: STORY.speaker[line.speaker],
+    text: line.text,
+  };
+}
+
 export function victoryTransmission() {
   return { key: 'victory', speaker: STORY.speaker.ring, text: STORY.victory };
 }

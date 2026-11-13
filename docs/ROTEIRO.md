@@ -169,6 +169,19 @@ Viagem 9 → 10 (a virada)
 
 Depois do final: as fases continuam jogáveis; a Descida e o Boss Rush são "registros do arquivo".
 
+## Falas de meio de fase (o Wake, ao começar a terceira etapa: a virada dita enquanto acontece)
+
+- Debris Wake: `Scrap this old shouldn't have running lights. Keep your eyes open.`
+- Salvage Lanes: `Those convoys are on a timetable. Somebody is still dispatching them.`
+- Prime Gate: `A garrison. For a gate nobody has used in nine centuries. Who are they expecting?`
+- Furnace Drift: `Every vent you close, our reactors climb. Whatever this place is, it's feeding us.`
+- Crystal Choir: `The seam is singing back. I don't like how much it sounds like an alarm.`
+- Resonance Chamber: `The cracks answer when a machine dies. Pilot, I think we're the ones opening them.`
+- Assembly Graveyard: `Same hull, same serial, again and again. It isn't building a fleet. It's repeating.`
+- Quarantine Grid: `These fences point inward. They weren't keeping us out. They were keeping it in.`
+- Null Boundary: `Past this line our charts are blank. The signal isn't. It knows we're here.`
+- The Crucible: `It has our hull plans, pilot. It's building Wakes. Finish this before one launches.`
+
 ## Falas de derrota (revisão: a ligação é remota — perde-se a nave, não o piloto)
 
 - `Link severed. Interceptor lost. The Field keeps the hull.`
