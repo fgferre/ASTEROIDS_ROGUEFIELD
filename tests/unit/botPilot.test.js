@@ -351,6 +351,37 @@ describe('decide', () => {
     expect(decide(shielded, KNOBS).shield).toBe(true);
   });
 
+  it('steps out of a barrier that will be there', () => {
+    // A solid wall through (400, 300), turning down onto the ship 60 px
+    // below it: safe now, hit where the wall will be.
+    const wall = {
+      type: 'barrier',
+      x: 400,
+      y: 300,
+      angle: 0,
+      spin: 0.4,
+      gapAt: -300,
+      gapWidth: 100,
+      span: [-400, 400],
+      phase: 'solid',
+      timer: 3,
+    };
+    const world = makeWorld({ zones: [wall], ship: { x: 600, y: 360 } });
+    expect(hazardAt(world, 600, 360, 0)).toBe(0);
+    expect(hazardAt(world, 600, 360, 0.7)).toBeGreaterThanOrEqual(1);
+    const plan = decide(world, KNOBS);
+    expect(plan.dir).not.toBe(0);
+    expect(pathHazard(world, plan.dir)).toBeLessThan(pathHazard(world, 0));
+  });
+
+  it('closes on a target beyond its weapon’s reach', () => {
+    // 220 px off a boss's rim: a firing gap for a long gun, out of a 180 px
+    // scatter gun's reach.
+    const boss = { x: 200, y: 300, radius: 50, open: 0 };
+    const world = makeWorld({ boss, ship: { x: 470, reach: 180 } });
+    expect(DIRECTIONS[decide(world, KNOBS).dir]?.x).toBeLessThan(0);
+  });
+
   it('goes for an orb when nothing threatens', () => {
     const world = makeWorld({ loot: [{ x: 600, y: 300 }] });
     expect(decide(world, KNOBS).dir).toBe(3);

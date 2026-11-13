@@ -75,17 +75,31 @@ function artilleryZones(enemy) {
   return zones;
 }
 
-// A swinging arm's turn rate, as seen from one look to the next.
-function armSpin(arms, time, memory) {
-  const angle = arms.segments?.[0]?.angle;
-  const last = memory.get(arms);
-  memory.set(arms, { angle, time });
-  if (!last || !(time > last.time) || !Number.isFinite(angle)) return 0;
-  const turn = Math.atan2(
-    Math.sin(angle - last.angle),
-    Math.cos(angle - last.angle)
+// How fast a shape changes `value` (per s), as seen from one look to the
+// next: a swinging arm's or a turning wall's angle (`turn`), a cage's side.
+function seenRate(shape, value, time, memory, turn = false) {
+  const last = memory.get(shape);
+  memory.set(shape, { value, time });
+  if (!last || !(time > last.time) || !Number.isFinite(value)) return 0;
+  const change = value - last.value;
+  const step = turn ? Math.atan2(Math.sin(change), Math.cos(change)) : change;
+  return step / (time - last.time);
+}
+
+// The turret's reach with the weapon it carries (px): what its shots or
+// strikes get to, never past the turret's own targeting range.
+function weaponReach(combat) {
+  const form = combat.weaponForm;
+  const shot =
+    form?.projectile?.range ??
+    combat.bulletSpeed * (combat.weapons?.bulletLifetime || 0);
+  const reaches = (form?.fire || []).map(
+    (p) =>
+      p.range ?? p.length ?? p.acquire ?? p.sweep?.reach ?? p.radius ?? shot
   );
-  return turn / (time - last.time);
+  const reach = Math.max(0, ...reaches);
+  const targeting = combat.targeting?.targetingRange ?? Infinity;
+  return reach > 0 ? Math.min(reach, targeting) : targeting;
 }
 
 /**
@@ -113,6 +127,7 @@ export function readWorld(services, time, memory = new WeakMap()) {
       !shield.isShieldActive &&
       !(shield.shieldCooldownTimer > 0),
     invulnerable: player.invulnerableTimer || 0,
+    reach: weaponReach(combat),
     health: player.health,
     maxHealth: player.maxHealth,
   };
@@ -142,7 +157,14 @@ export function readWorld(services, time, memory = new WeakMap()) {
     for (const field of BOSS_ZONES) {
       if (!e[field]?.type) continue;
       const zone = zoneOf(e[field], e);
-      if (field === 'arms') zone.spin = armSpin(e.arms, time, memory);
+      const shape = e[field];
+      if (field === 'arms' || field === 'barrier') {
+        const angle =
+          field === 'arms' ? shape.segments?.[0]?.angle : shape.angle;
+        zone.spin = seenRate(shape, angle, time, memory, true);
+      }
+      if (field === 'grid')
+        zone.closing = seenRate(shape, shape.size, time, memory);
       zones.push(zone);
     }
     for (const pool of e.pools || []) {
