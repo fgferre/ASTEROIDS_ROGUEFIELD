@@ -58,9 +58,13 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
     pelo de EVENT, dica encostando no radar a 130 %, ~600 linhas de código morto. Texto da conquista Full Set agora
     diz três cartas (decisão minha; o gatilho não mudou). Não eram defeito: Warded, conquistas no Boss Rush (já
     corrigido em outubro), anel do Silence, jogo rodando nas falas do final. [x] **Pedem o sim dele (mudam a partida
-    de referência, que teria de ser regravada):** o abate do inimigo Volatile não conta para os efeitos "ao matar"
-    (conserto escrito e testado, não aplicado); a pedra que dá a volta no campo reaparece colada na borda e toca na
-    hora a nave que estiver ali.
+    de referência, que teria de ser regravada):** o abate do inimigo Volatile não conta para os efeitos "ao matar";
+    abates de máquinas não alimentam o combo (só pedra conta) — os dois consertos estão prontos no ramo
+    `pendente/consertos-que-mudam-a-referencia`; a pedra que dá a volta no campo reaparece colada na borda e toca na
+    hora a nave que estiver ali (sem conserto escrito). Segunda leva (13/11): pedra além da 64ª de um formato não era
+    desenhada (agora o lote cresce); alarme de casco baixo e abafamento da música nunca tocavam (o áudio lia nomes
+    de campo errados) — vão soar pela primeira vez, ele ouve e julga; Afterburn não deixa fogo onde o Blink esconde
+    a nave. Regra para ele definir: reroll/banish ao passar de fase. Cura é muda (som novo é escolha dele).
 
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
