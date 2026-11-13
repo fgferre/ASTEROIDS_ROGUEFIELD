@@ -19,15 +19,15 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
 5. **Final**: décima fase The Crucible, chefe Sovereign (ordens PROTECT/REBUILD, modelo claro e polido — itens 25 e
    26 dele), escolha Severance/Stewardship, dois desfechos, marca no mapa. [x] Sovereign fácil demais para o piloto.
 6. **Acabamento**: seis defeitos corrigidos (cartas perdidas na vitória, contagem sob as telas, Esc nas cenas, erro
-   ao carregar, dica do impulso, fala de chegada). Falta: BACKLOG restante, sons dos chefes novos, brilho/polido em
+   ao carregar, dica do impulso, fala de chegada). Falta: BACKLOG restante, sons dos chefes novos (audição pronta em `src/exported-assets/audicao-chefes/`, fora do git: três opções para o ataque de cada um dos sete; ele escolhe ouvindo, nada ligado ao jogo), brilho/polido em
    outros modelos (item 26). [ ]
 7. **Refino por parte do roteiro** (pedido dele, 12/11): quatro sessões, uma por capítulo e uma para o final e o
    arco; os quatro ramos estão juntos em `campanha/ajustes` e a bateria inteira passa. [x] Das propostas delas, feito:
    granada do Caster justa, Wake fala no meio da fase e da sua gente, arquivo nomeado no Assembly Graveyard, "equipar
    por mim", cartas de partida nas fases 2 e 3, fala repetida cortada, nome certo do chefe no cartão final, viagem
-   refeita (escala, destino à frente, salto). Em aberto, para depois de ele jogar: Prime com mais vida e pedras do
-   Quarry Maw menos punitivas (o primeiro chefe dura mais que o guardião do capítulo); dano de pedra nos capítulos II
-   e III; o piloto de teste que trava num canto.
+   refeita (escala, destino à frente, salto). Em aberto, para depois de ele jogar: dano de pedra nos
+   capítulos II e III. (A proposta "Prime com mais vida" caiu: em doze sementes a luta do Prime dura 68–333 s, mais
+   que a do Quarry Maw, 73–138 s, e a do Gatekeeper, 53–111 s; o capítulo I vence 10, 10 e 8.)
 8. **Curva da campanha** (medidas abaixo, doze sementes): o capítulo II deixou de ser degrau (Furnace Drift 1 → 7,
    Resonance Chamber 5 → 8) e o Crisol virou a fase mais dura (12 → 6), com a luta do Sovereign a mais longa (219–299
    s, acima da Null). [x] Assembly Graveyard e Quarantine Grid venciam 11 de 12 sem levar um golpe dos chefes: a
@@ -91,6 +91,14 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   fase um pouco mais dura que a anterior" não se resolve com o piloto. O piloto mediano (seis sementes) vence 1–2 no
   capítulo II e 0 no Crisol. Mudado: Kiln (vida 65 → 55 % do Choir, queimadura 0,15 → 0,10), surto e anel da etapa 4 da
   Furnace, 28 pedras no Choir da Resonance Chamber, Sovereign (vida 0,48 → 0,55, etapas em 88 % e 62 %, barreira 0,3 → 0,6).
+- Medida de referência (13/11, madrugada; jogo em 55a99a4, piloto que não espera mais por item inalcançável e
+  corações de vida sempre dentro da arena; piloto bom em doze sementes, vitórias · piloto mediano em seis): Debris Wake
+  11 · 5 | Salvage Lanes 10 · 3 | Prime Gate 8 · 3 | Furnace Drift 8 · 4 | Crystal Choir 9 · 1 | Resonance Chamber 6 · 0
+  | Assembly Graveyard 12 · 4 | Quarantine Grid 9 · 4 | Null Boundary 8 · 1 | The Crucible 7 · 1. Lutas de chefe vencidas:
+  51–157 s no capítulo I, 109–292 s no II, 104–314 s no III, 212–277 s no Sovereign. Dois estouros de 25 min ainda:
+  Crystal Choir semente 1 (camada 2, 1433 s) e Quarantine Grid semente 8 (chefe, 1052 s). As medidas anteriores a
+  esta usavam o piloto antigo e não se comparam semente a semente (qualquer mudança no piloto embaralha a partida).
+  Fora do alvo: Assembly Graveyard (12 de 12) é a fase mais fácil da campanha estando no capítulo III.
 
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
