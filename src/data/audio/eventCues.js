@@ -99,6 +99,14 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     cue: 'playEnemyTelegraph',
     at: 'source',
   },
+  // A Warden's signature attack (the Maw's intake, the Kiln's wedges
+  // igniting, ...): its kind's own sample, at the boss.
+  {
+    on: 'boss-attack-started',
+    cue: 'playBossAttack',
+    at: 'source',
+    fields: { kind: 'enemy.bossKind' },
+  },
   // Support machines' own cues, at the machine's position.
   { on: 'ram-charged', cue: 'playRamCharge', at: 'source' },
   { on: 'weaver-tether-laid', cue: 'playWeaverTether', at: 'source' },

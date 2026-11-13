@@ -258,6 +258,12 @@ export class SentinelPrismCrown extends BossEnemy {
       timer: cycle.burn,
       duration: cycle.burn,
     });
+    // The beams fire: their sound (eventCues `boss-attack-started`).
+    this.getEventBus()?.emit?.('boss-attack-started', {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
+    });
   }
 
   // Each mirror's two segments: core → mirror, mirror → the field's edge.

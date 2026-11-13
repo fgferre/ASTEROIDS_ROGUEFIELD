@@ -10,7 +10,7 @@
 //               argument (the explosion's size).
 //   pick        { path, samples }: the sampleId by the value at `path` in the
 //               cue's first argument (the shot's weaponId); a value not
-//               listed plays `sample`.
+//               listed plays `sample` (none: nothing).
 //   bus         the bus the cue's synthesis uses: 'protected' (player
 //               feedback, never ducks) or 'ambient' (the world, ducks).
 //   spatialArg  the argument carrying { pan, distance } (pan by x, distance
@@ -74,6 +74,24 @@ export const SAMPLE_CUES = deepFreeze({
   },
   playDroneFire: { sample: 'enemy-shot', bus: 'ambient', spatialArg: 0 },
   playBossRoar: { sample: 'warden-arrival', bus: 'ambient', facade: true },
+  // A Warden's signature attack, by its kind (eventCues `boss-attack-started`;
+  // audition 13/11). Gains, cap 1 and gaps in the manifest: proposta 13/11.
+  playBossAttack: {
+    pick: {
+      path: 'kind',
+      samples: {
+        'quarry-maw': 'quarry-maw-intake',
+        gatekeeper: 'gatekeeper-barrier',
+        'kiln-engine': 'kiln-engine-ignite',
+        'prism-crown': 'prism-crown-beam',
+        'foundry-mother': 'foundry-mother-sweep',
+        interdictor: 'interdictor-cage',
+        sovereign: 'sovereign-protect',
+      },
+    },
+    bus: 'ambient',
+    spatialArg: 0,
+  },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
   playUIStartGame: { sample: 'run-start', bus: 'ambient' },

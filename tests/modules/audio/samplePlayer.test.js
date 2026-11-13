@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
 import { sampleIdFor } from '../../../src/modules/audio/samplePlayer.js';
@@ -16,6 +17,8 @@ import {
 // The sample layer (SOUND.md): a cue whose sample is loaded plays it, varied
 // and within the voice rules, on the synthesis's bus; any other cue
 // synthesizes as before.
+
+const SFX = '../../../src/public/audio/sfx/';
 
 /** A bus on stub nodes whose buffer sources record what they play. */
 function makeBus() {
@@ -276,5 +279,46 @@ describe('sample layer', () => {
     bus.playExplosion('small', { pan: 0, distance: null });
     expect(context.createOscillator).toHaveBeenCalled();
     expect(sources.filter((s) => s.buffer?.path)).toHaveLength(1);
+  });
+
+  it('each Warden attack plays its own file once, not again inside its gap, at the boss', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const kinds = Object.entries(SAMPLE_CUES.playBossAttack.pick.samples);
+    expect(kinds).toHaveLength(7);
+
+    for (const [kind, id] of kinds) {
+      const entry = manifest[id];
+      expect(entry, id).toBeDefined();
+      entry.files.forEach((file) =>
+        expect(existsSync(new URL(`${SFX}${file}`, import.meta.url))).toBe(true)
+      );
+      expect(entry.cap).toBe(1);
+
+      const { bus, context, sources } = makeBus();
+      await bus.samples.load(fetchFor({ [id]: entry }));
+      const ambientInput = vi.spyOn(bus, '_ambientInput');
+      const play = (time) => {
+        context.currentTime = time;
+        bus.playBossAttack({ kind, pan: -0.3, distance: null });
+      };
+
+      play(0);
+      expect(sources).toHaveLength(1);
+      expect(sources[0].buffer.path).toBe(`${id}/1.mp3`);
+      expect(ambientInput).toHaveBeenCalledWith(-0.3, null);
+      play(entry.gap / 1000 - 0.01);
+      expect(sources).toHaveLength(1);
+      play(entry.gap / 1000 + 0.01);
+      expect(sources).toHaveLength(2);
+      expect(context.createOscillator).not.toHaveBeenCalled();
+    }
+
+    // A boss with no attack sound plays nothing at all.
+    const { bus, context, sources } = makeBus();
+    bus.playBossAttack({ kind: 'prime', pan: 0, distance: null });
+    expect(sources).toHaveLength(0);
+    expect(context.createOscillator).not.toHaveBeenCalled();
   });
 });

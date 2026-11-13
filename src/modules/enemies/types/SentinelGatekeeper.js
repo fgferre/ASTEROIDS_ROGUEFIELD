@@ -141,6 +141,13 @@ export class SentinelGatekeeper extends BossEnemy {
         this.holdStill(deltaTime);
         this.turnTo(position, GATE.turnRate, deltaTime);
         if (this.gateTimer <= 0) {
+          // The barrier turns solid this step (its clock ran with this
+          // windup's): its sound (eventCues `boss-attack-started`).
+          this.getEventBus()?.emit?.('boss-attack-started', {
+            enemy: this,
+            enemyId: this.id,
+            position: { x: this.x, y: this.y },
+          });
           this.chargesLeft = cycle.charges;
           this.beginLane(cycle, position);
         }

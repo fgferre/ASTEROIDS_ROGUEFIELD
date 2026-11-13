@@ -306,6 +306,12 @@ export class SentinelFoundryMother extends BossEnemy {
       if (this.foundryTimer > 0) return;
       Object.assign(a, { phase: 'sweep', solid: 1 });
       this.foundryTimer = a.duration = cycle.sweepTime;
+      // The arms swing: their sound (eventCues `boss-attack-started`).
+      this.getEventBus()?.emit?.('boss-attack-started', {
+        enemy: this,
+        enemyId: this.id,
+        position: { x: this.x, y: this.y },
+      });
     }
     const progress = clamp01(1 - this.foundryTimer / a.duration);
     this.armAngle = this.sweepFrom + this.sweepArc * progress;

@@ -132,6 +132,12 @@ export class SentinelQuarryMaw extends BossEnemy {
             this.telegraph.pulling = true;
             this.telegraph.duration = cycle.intake;
           }
+          // The intake begins: its sound (eventCues `boss-attack-started`).
+          this.getEventBus()?.emit?.('boss-attack-started', {
+            enemy: this,
+            enemyId: this.id,
+            position: { x: this.x, y: this.y },
+          });
         }
         break;
       case 'intake':

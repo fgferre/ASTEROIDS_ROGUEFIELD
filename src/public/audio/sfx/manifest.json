@@ -195,6 +195,104 @@
       }
     ]
   },
+  "quarry-maw-intake": {
+    "files": ["quarry-maw-intake/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "quarry-maw-intake/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A giant rock crusher gulping boulders, low roaring intake whoosh and crunching grinding stone, rough and heavy, high quality game sound effect, no music (audition 13/11, pick C)"
+      }
+    ]
+  },
+  "gatekeeper-barrier": {
+    "files": ["gatekeeper-barrier/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "gatekeeper-barrier/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A heavy electrified gate bar swinging round, low electric hum with a metal clank, buzzing sci-fi barrier, cinematic game sound effect, no music (audition 13/11, pick A)"
+      }
+    ]
+  },
+  "kiln-engine-ignite": {
+    "files": ["kiln-engine-ignite/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "kiln-engine-ignite/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A roaring burst of fire, gas igniting with a powerful whoosh, furnace flame with body, cinematic game sound effect, no music (audition 13/11, pick A)"
+      }
+    ]
+  },
+  "prism-crown-beam": {
+    "files": ["prism-crown-beam/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "prism-crown-beam/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A piercing buzzing laser beam passing through glass crystals, resonant shimmering glass ring, harsh and tense, high quality game sound effect, no music (audition 13/11, pick C)"
+      }
+    ]
+  },
+  "foundry-mother-sweep": {
+    "files": ["foundry-mother-sweep/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "foundry-mother-sweep/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A giant hydraulic robotic arm swinging with motor whine then a massive metal crash, heavy and gritty, high quality game sound effect, no music (audition 13/11, pick C)"
+      }
+    ]
+  },
+  "interdictor-cage": {
+    "files": ["interdictor-cage/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "interdictor-cage/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: An electric fence hum rising as a containment field tightens, then a sharp electric snap, sci-fi energy cage closing, cinematic game sound effect, no music (audition 13/11, pick A)"
+      }
+    ]
+  },
+  "sovereign-protect": {
+    "files": ["sovereign-protect/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "sovereign-protect/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: Enormous ceramic plates sliding closed, solemn heavy stone grinding with a low bell-like machine tone, ancient colossal mechanism, cinematic game sound effect, no music (audition 13/11, pick B)"
+      }
+    ]
+  },
   "ui-hover": {
     "files": ["ui-hover/1.mp3"],
     "gain": -8,

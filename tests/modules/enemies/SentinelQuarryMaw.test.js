@@ -160,4 +160,17 @@ describe('Sentinel Quarry Maw', () => {
     expect(rocks()).toHaveLength(second.ejectMin * 2 - 1);
     expect(boss.mawState).toBe('drift');
   });
+  it('announces its attack once, as the jaws open on the intake', () => {
+    const maw = createMaw();
+    const attacks = () =>
+      maw.eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(maw, 'intake-windup');
+    expect(attacks()).toHaveLength(0);
+    runUntil(maw, 'intake');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(maw.boss);
+    expect(attacks()[0][1].position).toEqual({ x: maw.boss.x, y: maw.boss.y });
+  });
 });

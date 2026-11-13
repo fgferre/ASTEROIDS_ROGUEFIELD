@@ -205,4 +205,17 @@ describe('Sentinel Prism Crown', () => {
       'The Crown is dark. The note has stopped. The seam has not.'
     );
   });
+  it('announces its attack once, as the beams fire', () => {
+    const { boss, eventBus } = createCrown();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.crownState === 'align');
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.crownState === 'fire');
+    expect(boss.beams.phase).toBe('burn');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+  });
 });

@@ -1,5 +1,6 @@
 [
   "asteroid-volatile-exploded",
+  "boss-attack-started",
   "boss-defeated",
   "boss-phase-changed",
   "boss-spawned",

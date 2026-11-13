@@ -277,4 +277,16 @@ describe('Sentinel Foundry Mother', () => {
       'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.'
     );
   });
+  it('announces its attack once, as the arms start to swing', () => {
+    const { boss, eventBus } = createMother();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.arms?.phase === 'warn');
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.arms?.phase === 'sweep');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+  });
 });

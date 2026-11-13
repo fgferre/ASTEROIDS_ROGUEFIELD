@@ -190,6 +190,12 @@ export class SentinelKilnEngine extends BossEnemy {
       s.phase = 'burn';
       s.solid = 1;
       s.timer = s.duration = cycle.sectorBurn;
+      // The hot wedges ignite: their sound (eventCues `boss-attack-started`).
+      this.getEventBus()?.emit?.('boss-attack-started', {
+        enemy: this,
+        enemyId: this.id,
+        position: { x: this.x, y: this.y },
+      });
     } else if (this.sectorSteps > 0) {
       this.sectorSteps -= 1;
       s.offset += 1;

@@ -453,6 +453,21 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     audio.destroy();
   });
 
+  it('boss-attack-started → playBossAttack with the boss’s kind, panned to it', () => {
+    expectDelegates(
+      'boss-attack-started',
+      {
+        enemy: { type: 'boss', bossKind: 'kiln-engine', x: 760, y: 300 },
+        position: { x: 760, y: 300 },
+      },
+      'playBossAttack',
+      ([options]) => {
+        expect(options.kind).toBe('kiln-engine');
+        expect(options.pan).toBeGreaterThan(0);
+      }
+    );
+  });
+
   it('ram-charged → playRamCharge', () => {
     expectDelegates(
       'ram-charged',

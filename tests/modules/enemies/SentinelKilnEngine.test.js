@@ -171,4 +171,20 @@ describe('Sentinel Kiln Engine', () => {
       'Kiln Engine cold. Heat released: all of it. Seams: one, opening.'
     );
   });
+  it('announces its attack each time the hot wedges ignite', () => {
+    const { boss, eventBus } = createKiln();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.sectors);
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.sectors?.phase === 'burn');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+    runUntil(boss, () => boss.sectors?.phase === 'warn');
+    expect(attacks()).toHaveLength(1);
+    runUntil(boss, () => boss.sectors?.phase === 'burn');
+    expect(attacks()).toHaveLength(2);
+  });
 });

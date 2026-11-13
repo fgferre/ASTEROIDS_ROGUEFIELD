@@ -838,6 +838,10 @@ class SFXBus {
     return this._machines.playLeechBurst(options);
   }
 
+  // A Warden's signature attack: only its sample (samples.js picks it by
+  // `options.kind`); nothing is synthesized while it is not loaded.
+  playBossAttack() {}
+
   // --- Stingers and transmissions (sfx/stingers.js) ---
 
   playEliteSpawned() {

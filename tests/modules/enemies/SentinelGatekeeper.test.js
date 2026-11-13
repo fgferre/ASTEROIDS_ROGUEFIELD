@@ -194,4 +194,17 @@ describe('Sentinel Gatekeeper', () => {
       'Gate open. One hull through. Prime has been told.'
     );
   });
+  it('announces its attack once, as the barrier turns solid', () => {
+    const { boss, eventBus } = createGate();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, 'barrier-windup');
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, 'lane-windup');
+    expect(boss.barrier.phase).toBe('solid');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+  });
 });
