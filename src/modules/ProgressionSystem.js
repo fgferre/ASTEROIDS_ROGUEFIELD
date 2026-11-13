@@ -381,25 +381,31 @@ class ProgressionSystem extends UpgradeSystem {
   // next before play resumes. The cards are rolled when shown, so they follow
   // the earlier picks. Returns false when none is waiting.
   openNextLevelUpOffer() {
-    if (this.pendingLevelUpScreens.length === 0) {
+    const offer = this.dealNextLevelUpOffer();
+    if (!offer) {
       return false;
     }
 
-    const level = this.pendingLevelUpScreens.shift();
-    const { options, poolSize, totalDefinitions } = this.prepareUpgradeOptions(
-      PROGRESSION_UPGRADE_ROLL_COUNT,
-      { level }
-    );
     this.eventBus?.emit?.('upgrade-options-ready', {
-      level,
-      options,
-      poolSize,
-      totalDefinitions,
+      ...offer,
       inventory: this.getUpgradeProgressSnapshot(),
       synergies: this.getSynergySnapshot(),
-      autoResolved: options.length === 0,
+      autoResolved: offer.options.length === 0,
     });
     return true;
+  }
+
+  // Deals the next waiting level's cards without showing them: { level,
+  // options, poolSize, totalDefinitions }, or null when none is waiting.
+  dealNextLevelUpOffer() {
+    if (this.pendingLevelUpScreens.length === 0) {
+      return null;
+    }
+    const level = this.pendingLevelUpScreens.shift();
+    return {
+      level,
+      ...this.prepareUpgradeOptions(PROGRESSION_UPGRADE_ROLL_COUNT, { level }),
+    };
   }
 
   /**

@@ -180,6 +180,21 @@
   color: var(--accent);
 }
 
+/* A head start's picks: "Head start 3 / 16" over the level. */
+.lu-headstart {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: calc(11 * var(--fs));
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lu-headstart b {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .lu-picks__slots {
   display: flex;
   gap: calc(8 * var(--u));
@@ -745,6 +760,17 @@ article.card {
 .lu-ghost--danger kbd {
   color: var(--danger);
   border-color: var(--danger-line);
+}
+
+/* Equip for me: the head start's picks left, made in one go. */
+.lu-ghost--auto {
+  padding-left: calc(34 * var(--u));
+  border-left: 1px solid rgba(230, 238, 248, 0.18);
+}
+
+.lu-ghost--auto kbd {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 #levelup-banish-btn[aria-pressed='true'] {

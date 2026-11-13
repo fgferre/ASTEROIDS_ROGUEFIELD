@@ -161,13 +161,14 @@ class UISystem extends BaseSystem {
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
       progression: () => this.getService('progression'),
+      headStart: () => this.getService('game-session').headStart,
       combat: () => this.getService('combat'),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
       showCardsTip: () => this.showOnboardingCardsTip(),
       prefersReducedMotion: () => this.prefersReducedMotion(),
-      previewBuild: (card) => this.tacticalHud.layout?.previewBuildCard(card),
+      hud: () => this.tacticalHud.layout,
     });
     this.chestCeremony = new ChestCeremony({
       refs: this.domRefs.chest,
@@ -362,9 +363,7 @@ class UISystem extends BaseSystem {
     const sector = this.getService('game-session')?.sector ?? null;
     this.sector = sector;
     // The intro's end shows this layer's title card.
-    if (this.cinematics.introActive) {
-      return;
-    }
+    if (this.cinematics.introActive) return;
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;

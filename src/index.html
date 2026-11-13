@@ -200,6 +200,7 @@
       <div id="levelup-screen" class="screen cards-screen hidden">
         <div class="levelup-content">
           <header class="lu-head">
+            <p id="levelup-headstart" class="lu-headstart hidden"></p>
             <h2 class="lu-title">
               <span class="lu-rule" aria-hidden="true"></span>
               <span class="lu-level"
@@ -234,6 +235,15 @@
               <kbd data-device="gamepad">Y</kbd>
               Banish
               <span class="lu-ghost__n" data-count>1</span>
+            </button>
+            <button
+              id="levelup-equip-btn"
+              class="lu-ghost lu-ghost--auto levelup-action hidden"
+              type="button"
+            >
+              <kbd data-device="keyboard">Q</kbd>
+              <kbd data-device="gamepad">RB</kbd>
+              Equip for me
             </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">

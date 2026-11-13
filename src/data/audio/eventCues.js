@@ -212,6 +212,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     on: 'upgrade-applied',
     cue: 'playUpgradeSelect',
     arg: ['rarity', 'common'],
+    // "Equip for me" makes a head start's picks at once: one sound.
+    throttleMs: 150,
   },
   { on: 'pause-state-changed', run: 'pauseMusic' },
   { on: 'pause-state-changed', run: 'engineStop', when: 'isPaused' },

@@ -5,7 +5,8 @@
 // them, reroll and banish, and the pick that sends the run back to play
 // through the cards' exit animation. The first three picks name themselves
 // and show where each family leads; the HUD's build instrument previews the
-// highlighted card's cell.
+// highlighted card's cell. During a sector's head start a counter shows the
+// pick, and "Equip for me" makes the picks left (session/headStart.js).
 
 import { PROGRESSION_INITIAL_LEVEL } from '../../core/GameConstants.js';
 import { playLevelUpExit, staggerCardEntry } from './levelUpTransition.js';
@@ -23,6 +24,8 @@ const ensureArray = (value) => (Array.isArray(value) ? value : []);
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
 // The picks that set the run's direction get their own strip.
 const FIRST_PICKS = ['First pick', 'Second pick', 'Third pick'];
+// How long the line naming an automatic build stays up.
+export const EQUIPPED_NOTICE_MS = 5000;
 
 /**
  * The HUD's build and XP instruments stay lit through a card screen's dim:
@@ -56,37 +59,41 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint }.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, headStart, equipBtn }.
    * `progression()`: the progression service (offers, rerolls, banishes, picks), or none.
+   * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
    * `emit(name, payload)`: sends ui-hover.
    * `showScreen(name, options)`: shows the level-up overlay.
    * `showGameUI()`: back to play, or to the next card choice waiting; it resets this screen too.
    * `showCardsTip()`: the first-run onboarding tip under the cards.
    * `prefersReducedMotion()`: the cards skip their entry and exit animation.
-   * `previewBuild(card)`: the HUD build instrument shows `{ family }` as
-   *   gaining a card, or nothing (null).
+   * `hud()`: the HUD layout: its build instrument previews a card
+   *   (previewBuildCard), its tip line names an automatic build.
    */
   constructor({
     refs,
     progression,
+    headStart,
     combat,
     emit,
     showScreen,
     showGameUI,
     showCardsTip,
     prefersReducedMotion,
-    previewBuild,
+    hud,
   }) {
     this.refs = refs;
     this.progression = progression;
+    this.headStart = headStart;
     this.combat = combat;
     this.emit = emit;
     this.showScreen = showScreen;
     this.showGameUI = showGameUI;
     this.showCardsTip = showCardsTip;
     this.prefersReducedMotion = prefersReducedMotion;
-    this.previewBuild = previewBuild;
+    this.hud = hud;
+    this.noticeTimer = null;
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -101,9 +108,10 @@ export class LevelUpScreen {
   }
 
   bindLevelUpControls() {
-    const { rerollBtn, banishBtn } = this.refs;
+    const { rerollBtn, banishBtn, equipBtn } = this.refs;
     rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
     banishBtn?.addEventListener('click', () => this.toggleBanishMode());
+    equipBtn?.addEventListener('click', () => this.equipForMe());
 
     document.addEventListener('keydown', (event) => {
       if (!this.levelUpState.isVisible || event.repeat) {
@@ -113,16 +121,19 @@ export class LevelUpScreen {
         this.rerollLevelUpOptions();
       } else if (event.code === 'KeyB') {
         this.toggleBanishMode();
+      } else if (event.code === 'KeyQ') {
+        this.equipForMe();
       } else if (event.key === 'Escape' && this.levelUpState.banishMode) {
         this.setBanishMode(false);
       }
     });
   }
 
-  /** A pad press here: reroll, banish, or back out of banish mode. */
+  /** A pad press here: reroll, banish, equip for me, or back out of banish mode. */
   handleGamepadNav(action) {
     if (action === 'reroll') this.rerollLevelUpOptions();
     else if (action === 'banish') this.toggleBanishMode();
+    else if (action === 'tabNext') this.equipForMe();
     else if (action === 'back' && this.levelUpState.banishMode) {
       this.setBanishMode(false);
     }
@@ -154,9 +165,16 @@ export class LevelUpScreen {
     this.showCardsTip();
   }
 
-  // "LEVEL n" over "Choose one", or the first picks' strip.
+  // "LEVEL n" over "Choose one", or the first picks' strip; a head start's
+  // counter over them and its "Equip for me" under the cards.
   renderHeader() {
-    const { level: levelNode, text, picks } = this.refs;
+    const { level: levelNode, text, picks, headStart, equipBtn } = this.refs;
+    const progress = this.headStart().progress();
+    headStart?.classList.toggle('hidden', !progress);
+    equipBtn?.classList.toggle('hidden', !progress);
+    if (headStart && progress) {
+      headStart.innerHTML = `Head start <b>${progress.pick}</b> / ${progress.total}`;
+    }
     const level = this.levelUpState.level;
     if (levelNode) levelNode.textContent = Number.isFinite(level) ? level : '';
     const pick = Number.isFinite(level) ? level - PROGRESSION_INITIAL_LEVEL : 0;
@@ -409,7 +427,33 @@ export class LevelUpScreen {
     const progression = this.progression();
     if (!option || !progression) return;
     const { definition, rank } = cardState(progression, option.id);
-    this.previewBuild(rank === 1 ? { family: definition.family } : null);
+    this.hud()?.previewBuildCard(
+      rank === 1 ? { family: definition.family } : null
+    );
+  }
+
+  // The head start's picks left, made at once (one pick sound: the cue's
+  // throttle); back to play, and the HUD's tip line names the build.
+  equipForMe() {
+    const progress = this.headStart().progress();
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked() || !progress) {
+      return;
+    }
+    this.disableLevelUpOptions();
+    const families = this.headStart().equipRest();
+    this.showGameUI();
+    const cards = progress.total - progress.pick + 1;
+    const build = families.map(({ name, cards: n }) => `${name} ${n}`);
+    const hud = this.hud();
+    hud?.showOnboardingTip(
+      [],
+      `Equipped ${cards} card${cards === 1 ? '' : 's'}: ${build.join(' · ')}`
+    );
+    clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(
+      () => hud?.hideOnboardingTip(),
+      EQUIPPED_NOTICE_MS
+    );
   }
 
   moveLevelUpFocus(direction) {
@@ -492,7 +536,7 @@ export class LevelUpScreen {
       }
     });
     this.setBanishMode(false);
-    if (this.levelUpState.isVisible) this.previewBuild(null);
+    if (this.levelUpState.isVisible) this.hud()?.previewBuildCard(null);
 
     this.levelUpState = {
       isVisible: false,
