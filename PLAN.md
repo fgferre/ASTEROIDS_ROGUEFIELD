@@ -27,21 +27,26 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    por mim", cartas de partida nas fases 2 e 3, fala repetida cortada, nome certo do chefe no cartão final, viagem
    refeita (escala, destino à frente, salto). Em aberto, para depois de ele jogar: Prime com mais vida e pedras do
    Quarry Maw menos punitivas (o primeiro chefe dura mais que o guardião do capítulo); dano de pedra nos capítulos II
-   e III; rachaduras acesas nas viagens 4→5 e 5→6; destroços correndo para o centro na viagem 9→10; o piloto de
-   teste que trava num canto.
+   e III; o piloto de teste que trava num canto.
 8. **Curva da campanha** (medidas abaixo, doze sementes): o capítulo II deixou de ser degrau (Furnace Drift 1 → 7,
    Resonance Chamber 5 → 8) e o Crisol virou a fase mais dura (12 → 6), com a luta do Sovereign a mais longa (219–299
-   s, acima da Null). [x] Em aberto: Assembly Graveyard e Quarantine Grid vencem 11 de 12 sem perder casco — mexer nas
-   etapas não muda nada, o casco volta cheio antes de cada Sentinel; pede comportamento do Sentinel ou menos cura, e
-   isso ele julga jogando.
+   s, acima da Null). [x] Assembly Graveyard e Quarantine Grid venciam 11 de 12 sem levar um golpe dos chefes: a
+   jaula do Interdictor agora fecha (e o feixe dói mais) e os braços da Foundry Mother alcançam a nave; o piloto perde
+   casco na maioria das lutas, mas ainda vence 10 e 11 de 12. Em aberto, ele julga jogando: a Mother precisa de um
+   ataque que siga a nave (derivar para ela, ou braços que se estendem — o segundo pede mudança no desenho); a jaula
+   fechando não foi vista na tela, só em teste e medição.
 9. **Unidade** (dúvida dele, 12/11: cada sessão pode ter feito do seu jeito): revisão do conjunto e correção. Feito: o
    Anel tem mil anos em toda fala; falas de chefe numa tabela só, por tipo (`STORY.boss`), com fala de última etapa
    para os dez; Null Boundary com chegada própria; no Crisol quem fala na morte é o Anel; Herald of Heat uma vez só;
    a viagem lê capítulo e distância de onde já estavam (`PLACE_SETS.offRing`); roteiro igual ao jogo; fichas de fase e
    de chefe na mesma forma; deriva e puxão de pedras dos chefes num lugar só (`enemies/boss/drift.js`, `rockPull.js`),
-   com dez voos gravados do piloto repetidos idênticos. [x] Deixado para ele julgar: só os
-   cenários do capítulo II, da Null e do Crisol reagem à vitória; "Interdictor"/"THE INTERDICTOR" e "Warden
-   Choir"/"THE CHOIR" (já eram assim na `main`).
+   com dez voos gravados do piloto repetidos idênticos. [x] Em seguida, das fotos: o cenário das dez
+   fases responde à queda do chefe (faltavam cinco); o Anel só acorda na vitória onde a história o acorda
+   (`PLACE_SETS.wakes`: Null Boundary e o Crisol; antes acendia em toda fase); na viagem final os destroços correm
+   para o Crisol; o destino da viagem segura seu lugar no mundo em vez de andar com a câmera; a moldura da tela some
+   sob as barras (o clarão do salto fica branco inteiro). Não feito: rachaduras acesas nas viagens 4→5 e 5→6 — o
+   lugar deixado nunca aparece na viagem. Deixado para ele julgar: "Interdictor"/"THE INTERDICTOR" e "Warden
+   Choir"/"THE CHOIR" (já eram assim na `main`); a reação da Debris Wake é a mais discreta.
 
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
