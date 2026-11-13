@@ -68,11 +68,14 @@ export function getHudCss() {
 
             .cockpit-frame {
                 position: absolute; width: 100%; height: 100%; z-index: 11; pointer-events: none;
+                transition: opacity var(--motion-base, 0.3s);
                 background: linear-gradient(135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(-135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(45deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(-45deg, rgba(5,5,5,0.5) 2%, transparent 10%);
             }
+            /* Under the letterbox the picture is the scene's alone (the jump's white-out). */
+            body:has(.letterbox.is-showing) .cockpit-frame { opacity: 0; }
 
 
             /* NEXT WAVE */
