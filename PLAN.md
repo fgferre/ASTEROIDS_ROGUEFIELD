@@ -32,9 +32,11 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    Resonance Chamber 5 → 8) e o Crisol virou a fase mais dura (12 → 6), com a luta do Sovereign a mais longa (219–299
    s, acima da Null). [x] Assembly Graveyard e Quarantine Grid venciam 11 de 12 sem levar um golpe dos chefes: a
    jaula do Interdictor agora fecha (e o feixe dói mais) e os braços da Foundry Mother alcançam a nave; o piloto perde
-   casco na maioria das lutas, mas ainda vence 10 e 11 de 12. Em aberto, ele julga jogando: a Mother precisa de um
-   ataque que siga a nave (derivar para ela, ou braços que se estendem — o segundo pede mudança no desenho); a jaula
-   fechando não foi vista na tela, só em teste e medição.
+   casco na maioria das lutas. A Mother ganhou braços que se esticam até um pouco além da nave quando o aviso começa
+   (ela continua parada, linha de montagem; decisão minha, ele pode trocar jogando): 10 de 12, com perda real de
+   casco; o alcance é sensível (curto 11, longo 6 com luta de vinte minutos). Interdictor 10 de 12; a jaula fechando
+   foi vista em captura. Em aberto, ele julga jogando: as duas ainda acima da meta de 8–9; na Mother só se desvia
+   para fora e há uma faixa segura bem longe.
 9. **Unidade** (dúvida dele, 12/11: cada sessão pode ter feito do seu jeito): revisão do conjunto e correção. Feito: o
    Anel tem mil anos em toda fala; falas de chefe numa tabela só, por tipo (`STORY.boss`), com fala de última etapa
    para os dez; Null Boundary com chegada própria; no Crisol quem fala na morte é o Anel; Herald of Heat uma vez só;
@@ -46,7 +48,7 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    para o Crisol; o destino da viagem segura seu lugar no mundo em vez de andar com a câmera; a moldura da tela some
    sob as barras (o clarão do salto fica branco inteiro). Não feito: rachaduras acesas nas viagens 4→5 e 5→6 — o
    lugar deixado nunca aparece na viagem. Deixado para ele julgar: "Interdictor"/"THE INTERDICTOR" e "Warden
-   Choir"/"THE CHOIR" (já eram assim na `main`); a reação da Debris Wake é a mais discreta.
+   Choir"/"THE CHOIR" (já eram assim na `main`); a reação da Debris Wake é a mais discreta. A pedra do Sovereign virou lapidação brilhante (lia como lanterna de lado). Verificado e não era defeito: o jogo fica parado durante as falas do final (o que roda são os 6 s de espólio); a chegada do chefe não se pula (roda na simulação), Esc pausa.
 
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
