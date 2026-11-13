@@ -238,6 +238,25 @@ describe('AAAHudLayout layer modifier', () => {
     expect(banner.style['--modifier-color']).toBe('#5eead4');
   });
 
+  it('shows an EVENT that falls with a SURGE after it, not over it', () => {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      layerBanner: fakeElement(),
+      layerBannerTitle: fakeElement(),
+      layerBannerSub: fakeElement(),
+    };
+    hud.showSurgeBanner('Rockfall');
+    hud.showFieldEventBanner('Solar Flare');
+    vi.advanceTimersByTime(0);
+    expect(hud.els.layerBannerTitle.textContent).toBe('SURGE');
+    expect(hud.els.layerBannerSub.textContent).toBe('Rockfall');
+
+    vi.advanceTimersByTime(1250);
+    expect(hud.els.layerBannerTitle.textContent).toBe('EVENT');
+    expect(hud.els.layerBannerSub.textContent).toBe('Solar Flare');
+    expect(hud.isBannerBusy()).toBe(true);
+  });
+
   it('titles a Boss Rush Warden banner BOSS RUSH over its stage', () => {
     const hud = new AAAHudLayout();
     hud.els = {
