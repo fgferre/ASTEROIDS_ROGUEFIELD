@@ -25,7 +25,9 @@ const wrapAngle = (angle) => {
 //   stagger  — `stagger` s, still and shut; its next vent is `scrapVent` s
 //              longer;
 //   sweep    — two opposite arms show their ring segments for `arms.warn` s,
-//              placed so the ship sits mid-swing, then swing `cycle.sweepArc`
+//              placed so the ship sits mid-swing and reaching `arms.lead` px
+//              past the ship's distance (within `arms.outer`..`maxReach`),
+//              then swing `cycle.sweepArc`
 //              degrees in `cycle.sweepTime` s (direction alternating each
 //              cycle); a tick every `burnTick` s while the ship's centre is in
 //              a swinging segment; rocks and enemies ignore them;
@@ -40,7 +42,9 @@ const wrapAngle = (angle) => {
 //              the segment), width, inner, outer }], solid 0..1, phase
 //              'warn'|'sweep', timer, duration };
 //   armAngle — radians, arm 0's direction (arm 1 is opposite);
-//   armReach — 0..1, the arms folded (0) or extended (1).
+//   armReach — 0..1, the arms folded (0) or extended (1);
+//   armOuter — px, the claw's distance at armReach 1: this swing's reach,
+//              the segments' `outer` (the same number draws and hits).
 export class SentinelFoundryMother extends BossEnemy {
   initialize(config = {}) {
     super.initialize({
@@ -80,6 +84,7 @@ export class SentinelFoundryMother extends BossEnemy {
     this.arms = null;
     this.armAngle = 0;
     this.armReach = 0;
+    this.armOuter = MOTHER.arms.outer;
     this.sweepFrom = 0;
     this.sweepArc = 0;
     this.sweeps = 0;
@@ -267,11 +272,15 @@ export class SentinelFoundryMother extends BossEnemy {
   // SWEEP: arm 0 starts half a swing behind the ship's bearing, so the ship
   // sits mid-swing; the direction alternates each cycle.
   beginSweep(cycle, position) {
-    const { warn } = MOTHER.arms;
+    const { warn, outer, lead, maxReach } = MOTHER.arms;
     const turn = this.sweeps % 2 === 0 ? 1 : -1;
     const bearing = position
       ? Math.atan2(position.y - this.y, position.x - this.x)
       : this.armAngle;
+    const distance = position
+      ? Math.hypot(position.x - this.x, position.y - this.y)
+      : 0;
+    this.armOuter = Math.min(maxReach, Math.max(outer, distance + lead));
     this.foundryState = 'sweep';
     this.foundryTimer = warn;
     this.sweepArc = turn * cycle.sweepArc * DEG;
@@ -310,7 +319,7 @@ export class SentinelFoundryMother extends BossEnemy {
 
   placeArms() {
     const a = this.arms;
-    const { inner, outer, width } = MOTHER.arms;
+    const { inner, width } = MOTHER.arms;
     a.x = this.x;
     a.y = this.y;
     a.timer = Math.max(0, this.foundryTimer);
@@ -318,7 +327,7 @@ export class SentinelFoundryMother extends BossEnemy {
       angle: wrapAngle(this.armAngle + i * Math.PI),
       width: width * DEG,
       inner,
-      outer,
+      outer: this.armOuter,
     }));
   }
 

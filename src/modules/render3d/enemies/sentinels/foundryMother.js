@@ -34,7 +34,8 @@ export function createFoundryMother(sk) {
   // soot-black well in a steel frame, a hatch on a hinge over each that
   // tilts open with boss.bays[i].open, a chassis growing hot inside with its
   // progress), a gantry between the bays carrying the hub the two arms turn
-  // on (boss.armAngle, reaching out with boss.armReach: a boom with a claw),
+  // on (boss.armAngle, reaching out with boss.armReach to boss.armOuter: a
+  // boom with a claw),
   // and a stack at every corner. Hot while it vents or builds. Its arms'
   // zones are one telegraph under one group.
   const MOTHER = SENTINEL_KINDS['foundry-mother'];
@@ -211,7 +212,8 @@ export function createFoundryMother(sk) {
       view.units[i].scale.setScalar(Math.max(0.01, progress));
     });
     const reach = clamp01(boss.armReach ?? 0);
-    const outer = MOTHER.arms.outer / radius;
+    // the claw ends where the arms' segments end (boss.armOuter)
+    const outer = (boss.armOuter ?? MOTHER.arms.outer) / radius;
     view.arms.forEach((pivot, i) => {
       pivot.rotation.y = -((boss.armAngle ?? 0) + i * Math.PI);
       pivot.children[0].scale.x = 0.3 + (outer - 1) * reach;
