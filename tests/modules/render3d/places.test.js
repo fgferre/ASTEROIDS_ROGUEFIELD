@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { biomeForLayer } from '../../../src/data/biomes.js';
 import { SECTORS, sectorById } from '../../../src/data/sectors.js';
 import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
-import {
-  PLACE_SETS,
-  placeSetOf,
-} from '../../../src/modules/render3d/places/index.js';
+import { PLACE_SETS } from '../../../src/modules/render3d/places/index.js';
 
 const THREE = {};
 new Function(
@@ -31,17 +28,12 @@ const lookAt = (place) => ({
 });
 
 describe('place backdrop sets', () => {
-  it("resolves a sector's backdrop on its layers, none for the Descent or a sector without one", () => {
-    const wake = sectorById('debris-wake');
-    const first = wake.layers[0];
-    expect(placeSetOf(biomeForLayer(first, wake))).toBe(
-      PLACE_SETS['debris-wake']
-    );
-    expect(placeSetOf(biomeForLayer(first))).toBeNull();
-    const bare = { ...wake, look: undefined };
-    expect(placeSetOf(biomeForLayer(first, bare))).toBeNull();
+  it("has a set for every sector's backdrop, each placed off the Ring for its journey", () => {
     SECTORS.filter((s) => s.look?.backdrop).forEach((s) =>
       expect(PLACE_SETS[s.look.backdrop]).toBeTruthy()
+    );
+    Object.values(PLACE_SETS).forEach((set) =>
+      expect(set.offRing).toHaveLength(2)
     );
   });
 

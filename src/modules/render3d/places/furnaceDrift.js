@@ -6,12 +6,7 @@
 // chapter's turn: the heat was holding them shut).
 
 import { gradientDisc } from './kit.js';
-import { crack, seams, under } from './pieces.js';
-
-// proposta 12/11: the star's disc as a share of its corona's radius.
-const DISC = 0.4;
-// The cold light in the chapter's cracks (the three places share it).
-export const SEAM_LIGHT = '#bfeeff';
+import { SEAM_LIGHT, crack, seams, starGlow, under } from './pieces.js';
 
 export function buildFurnaceDrift(THREE, kit) {
   const { tone, random } = kit;
@@ -20,14 +15,13 @@ export function buildFurnaceDrift(THREE, kit) {
   const star = kit.parts();
   kit.put(
     star,
-    gradientDisc(
-      THREE,
-      (r) =>
-        r < DISC
-          ? 1 - 0.45 * (r / DISC) ** 3
-          : 0.3 * Math.exp(-(r - DISC) * 6) + 0.05 * (1 - r),
-      { rings: 30, sides: 72 }
-    ),
+    starGlow(THREE, {
+      limb: 0.45,
+      falloff: 6,
+      tail: 0.05,
+      rings: 30,
+      sides: 72,
+    }),
     tone('#ff9a50', 0.6),
     [0, 0, 0],
     4400

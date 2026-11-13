@@ -9,14 +9,11 @@
 // from full (Severance) puts the lights out, stops the arcs and dims the
 // star, until the set has been out of view.
 
-import { gradientDisc } from './kit.js';
-import { lightPoint, under } from './pieces.js';
+import { lightPoint, starGlow, under } from './pieces.js';
 
-// proposta 12/11: the star's disc as a share of its corona's radius; the
-// arcs (radius, height over the star, tilt, the stretch built and the
+// proposta 12/11: the arcs (radius, height over the star, tilt, the stretch built and the
 // stretch still bare, radians) in two groups turning at `spin` rad/s; the
 // lights' level dead (`low`) and at full wake (`high`).
-const DISC = 0.4;
 const ARCS = [
   {
     group: 0,
@@ -135,16 +132,15 @@ export function buildTheCrucible(THREE, kit) {
   const star = kit.parts();
   kit.put(
     star,
-    gradientDisc(
-      THREE,
-      (r) =>
-        r < DISC
-          ? 1 - 0.35 * (r / DISC) ** 3
-          : // proposta 12/11: a tight corona (it was 0.38, 5 and a 0.05
-            // tail, which washed the whole arena cream under a gold boss)
-            0.3 * Math.exp(-(r - DISC) * 9) + 0.015 * (1 - r),
-      { rings: 20, sides: 56 }
-    ),
+    starGlow(THREE, {
+      limb: 0.35,
+      // proposta 12/11: a tight corona (it was 0.38, 5 and a 0.05 tail,
+      // which washed the whole arena cream under a gold boss)
+      falloff: 9,
+      tail: 0.015,
+      rings: 20,
+      sides: 56,
+    }),
     tone('#ffdca0', 0.7),
     [0, 0, 0],
     3800

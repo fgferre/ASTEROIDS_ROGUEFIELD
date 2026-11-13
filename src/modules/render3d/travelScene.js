@@ -18,20 +18,22 @@
 // frame.
 
 import { BIOMES, biomeForLayer } from '../../data/biomes.js';
-import { SECTORS, sectorById } from '../../data/sectors.js';
+import { SECTORS, nextInChapter, sectorById } from '../../data/sectors.js';
 import { TRAVEL, easeInOut } from '../../core/cinematics.js';
 import { createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
+import { PLACE_SETS } from './places/index.js';
 import { RING, RING_LOOK } from './ring/ringShape.js';
 
 // proposta 12/11: the flight. The ship flies `arc` radians of the Ring's
 // circle, laid at `scale` × its size, skimming its deck (`skim`: [side,
 // height], world units inward of its centre line and over its deck) and,
-// from `peel`, easing out to its destination's distance (PLACES); it
-// cruises, then from `brake` slows onto its spawn, its engines at `thrust`.
+// from `peel`, easing out to its destination's distance (its set's
+// `offRing`, places/index.js); it cruises, then from `brake` slows onto its
+// spawn, its engines at `thrust`.
 // From `rise` the camera climbs into the intro's pose. The Ring's running
 // lights glow `lights` × and its haze runs `haze` × deeper while it flies.
-export const FLIGHT = {
+const FLIGHT = {
   arc: (40 * Math.PI) / 180,
   scale: 5,
   skim: [-60, 44],
@@ -41,22 +43,6 @@ export const FLIGHT = {
   rise: 0.72,
   lights: 4,
   haze: 3,
-};
-// proposta 12/11: how far from the Ring each place is as its journey ends
-// (docs/ROTEIRO.md "Os lugares"): [side, height] in world units, inward of
-// the laid Ring's centre line (negative: outside its outer wall) and over
-// its deck.
-export const PLACES = {
-  'debris-wake': [6000, 2600],
-  'salvage-lanes': [2600, 1100],
-  'prime-gate': [-380, -10],
-  'furnace-drift': [1500, 500],
-  'crystal-choir': [300, 120],
-  'dense-core': [220, 90],
-  'assembly-graveyard': [1800, 700],
-  'quarantine-grid': [2600, 1200],
-  'wardens-reach': [600, 240],
-  'the-crucible': [500, 160],
 };
 // proposta 12/11: the place ahead. Its set shows from `appear` (a jump: at
 // the jump), `lift` radians over the chase camera's line of sight and
@@ -75,8 +61,7 @@ const DESTINATION = {
 // `stretch` ×, `speed` × faster at `at`; the frame whites out over
 // `white` ([up, peak, held, clear]); the ship drops out at its destination
 // and the streaks slow back to the cruise by `settle`.
-export const JUMP = {
-  to: ['debris-wake', 'furnace-drift', 'assembly-graveyard', 'the-crucible'],
+const JUMP = {
   from: 0.18,
   at: 0.36,
   settle: 0.54,
@@ -207,7 +192,7 @@ void main() {
 }`;
 
 /** The place a journey to `to` leaves: the sector before, else deep space. */
-export function travelPlaces(to) {
+function travelPlaces(to) {
   const sector = sectorById(to) ?? SECTORS[0];
   const index = SECTORS.indexOf(sector);
   const before = SECTORS[index - 1];
@@ -221,7 +206,7 @@ export function travelPlaces(to) {
  * Share of the flight's length flown by t: a cruise, then from
  * FLIGHT.brake a steady slowing to rest at 1 (speed continuous).
  */
-export function flown(t) {
+function flown(t) {
   const x = Math.min(1, Math.max(0, t));
   const b = FLIGHT.brake;
   const v = 2 / (1 + b);
@@ -234,7 +219,7 @@ export function flown(t) {
  * The jump's extra distance by t (in units of its top speed × t): its
  * speed climbs from JUMP.from to JUMP.at, then falls away by JUMP.settle.
  */
-export function jumpDistance(t) {
+function jumpDistance(t) {
   const { from, at, settle } = JUMP;
   if (t <= from) return 0;
   const up = at - from;
@@ -424,10 +409,12 @@ export class TravelScene {
   start(to, durationMs, player, frozenAt = null) {
     this.places = travelPlaces(to);
     const sector = sectorById(to) ?? SECTORS[0];
-    this.opening = SECTORS.indexOf(sector) === 0;
-    this.jumps = JUMP.to.includes(sector.id);
+    const before = SECTORS[SECTORS.indexOf(sector) - 1];
+    this.opening = !before;
+    this.jumps = this.opening || !nextInChapter(before);
+    this.setId = this.places.to.backdrop ?? null;
     this.near[0] = FLIGHT.skim;
-    this.near[1] = PLACES[sector.id] ?? FLIGHT.skim;
+    this.near[1] = PLACE_SETS[this.setId]?.offRing ?? FLIGHT.skim;
     // Over the last second the field's drifting fragments come in.
     this.bare = {
       ...this.places.to,
@@ -437,7 +424,6 @@ export class TravelScene {
     this.look.from = this.places.from;
     this.look.to = this.places.to;
     this.look.mix = 0;
-    this.setId = this.places.to.backdrop ?? null;
     this.startedAt = performance.now();
     this.durationMs = durationMs;
     this.frozenAt = frozenAt;

@@ -8,8 +8,7 @@
 // the hymn breaks.
 
 import { gradientDisc } from './kit.js';
-import { SEAM_LIGHT } from './furnaceDrift.js';
-import { crack, seams, under } from './pieces.js';
+import { SEAM_LIGHT, crack, seams, under } from './pieces.js';
 
 // proposta 12/11: the ribs' arc (centre height, radius, angles from wall
 // to wall through the bottom), their count, spacing and section; the wall

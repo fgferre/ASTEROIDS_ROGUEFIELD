@@ -5,8 +5,7 @@
 // floor and up onto the terraces; it gapes when the Prism Crown goes dark.
 
 import { gradientDisc } from './kit.js';
-import { SEAM_LIGHT } from './furnaceDrift.js';
-import { crack, crystal, seams, under } from './pieces.js';
+import { SEAM_LIGHT, crack, crystal, seams, under } from './pieces.js';
 
 // proposta 12/11: the seam's half-width at the top, each terrace's step
 // across and down, its floor's depth (local units).

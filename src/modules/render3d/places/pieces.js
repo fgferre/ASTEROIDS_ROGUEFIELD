@@ -1,5 +1,12 @@
 // Pieces more than one place's set is built from (places/kit.js parts).
 
+import { gradientDisc } from './kit.js';
+
+// The cold light in the second chapter's cracks (its three places share it).
+export const SEAM_LIGHT = '#bfeeff';
+// proposta 12/11: a star's disc as a share of its corona's radius.
+const STAR_DISC = 0.4;
+
 // The gameplay camera leans this much (cameraRig.js TILT): what sits
 // `depth` under the point it aims at shows at the middle of the screen
 // this much further up the field.
@@ -129,6 +136,21 @@ export function seams(kit, parts, gape, name, { rest, open }) {
       wide.color.setScalar(open * 0.55 * wake);
     },
   };
+}
+
+/**
+ * A star (gradientDisc): its disc darkened `limb` toward its edge, its
+ * corona falling off `falloff` fast over a faint `tail`.
+ */
+export function starGlow(THREE, { limb, falloff, tail, rings, sides }) {
+  return gradientDisc(
+    THREE,
+    (r) =>
+      r < STAR_DISC
+        ? 1 - limb * (r / STAR_DISC) ** 3
+        : 0.3 * Math.exp(-(r - STAR_DISC) * falloff) + tail * (1 - r),
+    { rings, sides }
+  );
 }
 
 /** A small glowing point (a running light, a beacon) of `size`. */
