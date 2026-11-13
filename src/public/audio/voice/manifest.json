@@ -15,9 +15,242 @@
       "voice": "am_onyx",
       "speed": 0.8,
       "treatment": "sovereign"
+    },
+    "prime": {
+      "voice": "bm_lewis",
+      "speed": 0.85,
+      "treatment": "prime"
+    },
+    "choir": {
+      "voice": [
+        "af_aoede",
+        "bf_isabella",
+        "bm_fable"
+      ],
+      "speed": 0.88,
+      "treatment": "choir"
+    },
+    "null": {
+      "voice": "af_river",
+      "speed": 0.75,
+      "treatment": "null"
+    },
+    "quarry-maw": {
+      "voice": "am_fenrir",
+      "speed": 0.9,
+      "treatment": "quarry-maw"
+    },
+    "gatekeeper": {
+      "voice": "bm_daniel",
+      "speed": 0.95,
+      "treatment": "gatekeeper"
+    },
+    "kiln-engine": {
+      "voice": "am_adam",
+      "speed": 0.9,
+      "treatment": "kiln-engine"
+    },
+    "prism-crown": {
+      "voice": "af_bella",
+      "speed": 0.9,
+      "treatment": "prism-crown"
+    },
+    "foundry-mother": {
+      "voice": "bf_alice",
+      "speed": 0.95,
+      "treatment": "foundry-mother"
+    },
+    "interdictor": {
+      "voice": "am_eric",
+      "speed": 0.9,
+      "treatment": "interdictor"
+    },
+    "dust": {
+      "voice": "bm_fable",
+      "speed": 1.05,
+      "treatment": "dust"
+    },
+    "heat": {
+      "voice": "am_liam",
+      "speed": 1.1,
+      "treatment": "heat"
+    },
+    "silence": {
+      "voice": "af_nicole",
+      "speed": 0.85,
+      "treatment": "silence"
     }
   },
   "lines": {
+    "boss-rush": {
+      "file": "prime/boss-rush.mp3",
+      "speaker": "prime",
+      "text": "Three gates. Nothing between them. You will be counted at every one.",
+      "seconds": 5.1
+    },
+    "boss:choir:defeated": {
+      "file": "choir/boss_choir_defeated.mp3",
+      "speaker": "choir",
+      "text": "The hymn breaks. We were not guarding it. We were holding it shut.",
+      "seconds": 3.86
+    },
+    "boss:choir:last": {
+      "file": "choir/boss_choir_last.mp3",
+      "speaker": "choir",
+      "text": "The hymn thins. The seam hears the gap. Do not be the gap.",
+      "seconds": 3.82
+    },
+    "boss:choir:warning": {
+      "file": "choir/boss_choir_warning.mp3",
+      "speaker": "choir",
+      "text": "We are three. We were nine. We sang the Ring closed. We will sing you still.",
+      "seconds": 4.74
+    },
+    "boss:foundry-mother:defeated": {
+      "file": "foundry-mother/boss_foundry-mother_defeated.mp3",
+      "speaker": "foundry-mother",
+      "text": "Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.",
+      "seconds": 4.52
+    },
+    "boss:foundry-mother:last": {
+      "file": "foundry-mother/boss_foundry-mother_last.mp3",
+      "speaker": "foundry-mother",
+      "text": "Order open. Build the chassis. Build the chassis. No one closes the order.",
+      "seconds": 4.38
+    },
+    "boss:foundry-mother:warning": {
+      "file": "foundry-mother/boss_foundry-mother_warning.mp3",
+      "speaker": "foundry-mother",
+      "text": "Assembly line active. Chassis count: unfinished. Intruder count: one.",
+      "seconds": 4.31
+    },
+    "boss:gatekeeper:defeated": {
+      "file": "gatekeeper/boss_gatekeeper_defeated.mp3",
+      "speaker": "gatekeeper",
+      "text": "Gate open. One hull through. Prime has been told.",
+      "seconds": 3.03
+    },
+    "boss:gatekeeper:last": {
+      "file": "gatekeeper/boss_gatekeeper_last.mp3",
+      "speaker": "gatekeeper",
+      "text": "Schedule slipping. Second pass authorised. The lane stays closed.",
+      "seconds": 3.8
+    },
+    "boss:gatekeeper:warning": {
+      "file": "gatekeeper/boss_gatekeeper_warning.mp3",
+      "speaker": "gatekeeper",
+      "text": "Lane closed. Gate holds. You are not on the manifest.",
+      "seconds": 3.18
+    },
+    "boss:interdictor:defeated": {
+      "file": "interdictor/boss_interdictor_defeated.mp3",
+      "speaker": "interdictor",
+      "text": "Interdictor offline. The boundary is open. Null has been waiting for this.",
+      "seconds": 4.03
+    },
+    "boss:interdictor:last": {
+      "file": "interdictor/boss_interdictor_last.mp3",
+      "speaker": "interdictor",
+      "text": "The boundary was never for you. It keeps the Ring from hearing. You are loud.",
+      "seconds": 3.59
+    },
+    "boss:interdictor:warning": {
+      "file": "interdictor/boss_interdictor_warning.mp3",
+      "speaker": "interdictor",
+      "text": "Quarantine holds. Boundary drawn. You are inside it.",
+      "seconds": 2.75
+    },
+    "boss:kiln-engine:defeated": {
+      "file": "kiln-engine/boss_kiln-engine_defeated.mp3",
+      "speaker": "kiln-engine",
+      "text": "Kiln Engine cold. Heat released: all of it. Seams: one, opening.",
+      "seconds": 4.0
+    },
+    "boss:kiln-engine:last": {
+      "file": "kiln-engine/boss_kiln-engine_last.mp3",
+      "speaker": "kiln-engine",
+      "text": "Vents sealed. Pressure: rising. The fire has one place left to go.",
+      "seconds": 4.3
+    },
+    "boss:kiln-engine:warning": {
+      "file": "kiln-engine/boss_kiln-engine_warning.mp3",
+      "speaker": "kiln-engine",
+      "text": "Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.",
+      "seconds": 4.74
+    },
+    "boss:null:defeated": {
+      "file": "null/boss_null_defeated.mp3",
+      "speaker": "null",
+      "text": "Still... no longer. It hears you now. I kept it asleep a thousand years.",
+      "spoken": "Still / no longer. It hears you now. I kept it asleep a thousand years. (450 ms pause between parts)",
+      "seconds": 7.2
+    },
+    "boss:null:last": {
+      "file": "null/boss_null_last.mp3",
+      "speaker": "null",
+      "text": "Stop. Every shot is a voice. It is listening for one.",
+      "seconds": 5.31
+    },
+    "boss:null:warning": {
+      "file": "null/boss_null_warning.mp3",
+      "speaker": "null",
+      "text": "I am the stillness the Ring kept for its ending. Come closer, ember. Be still.",
+      "seconds": 6.61
+    },
+    "boss:prime:defeated": {
+      "file": "prime/boss_prime_defeated.mp3",
+      "speaker": "prime",
+      "text": "Prime yields. The record is kept. Below, the Choir is already singing it.",
+      "seconds": 5.91
+    },
+    "boss:prime:last": {
+      "file": "prime/boss_prime_last.mp3",
+      "speaker": "prime",
+      "text": "The count does not close with you in it. Prime will correct the count.",
+      "seconds": 4.9
+    },
+    "boss:prime:warning": {
+      "file": "prime/boss_prime_warning.mp3",
+      "speaker": "prime",
+      "text": "Salvage pilot. You are counted. The Ring is broken. It is not abandoned.",
+      "seconds": 6.03
+    },
+    "boss:prism-crown:defeated": {
+      "file": "prism-crown/boss_prism-crown_defeated.mp3",
+      "speaker": "prism-crown",
+      "text": "The Crown is dark. The note has stopped. The seam has not.",
+      "seconds": 4.36
+    },
+    "boss:prism-crown:last": {
+      "file": "prism-crown/boss_prism-crown_last.mp3",
+      "speaker": "prism-crown",
+      "text": "The note is cracking. Six sleepers stir. The Crown holds them a little longer.",
+      "seconds": 5.41
+    },
+    "boss:prism-crown:warning": {
+      "file": "prism-crown/boss_prism-crown_warning.mp3",
+      "speaker": "prism-crown",
+      "text": "Six voices sleep in the crystal. The Crown still carries their note.",
+      "seconds": 5.01
+    },
+    "boss:quarry-maw:defeated": {
+      "file": "quarry-maw/boss_quarry-maw_defeated.mp3",
+      "speaker": "quarry-maw",
+      "text": "Quarry Maw offline. The stone goes uncounted. Prime will ask why.",
+      "seconds": 4.28
+    },
+    "boss:quarry-maw:last": {
+      "file": "quarry-maw/boss_quarry-maw_last.mp3",
+      "speaker": "quarry-maw",
+      "text": "Intake widened. Sorting continues. Nothing here is thrown away.",
+      "seconds": 3.99
+    },
+    "boss:quarry-maw:warning": {
+      "file": "quarry-maw/boss_quarry-maw_warning.mp3",
+      "speaker": "quarry-maw",
+      "text": "Quarry unit active. Stone is counted before it is eaten. So are hulls.",
+      "seconds": 4.5
+    },
     "boss:sovereign:defeated": {
       "file": "sovereign/boss_sovereign_defeated.mp3",
       "speaker": "sovereign",
@@ -172,6 +405,44 @@
       "speaker": "ring",
       "text": "Escort hull logged: Bastion. Built to bring others home. Carrying one.",
       "seconds": 3.95
+    },
+    "herald:dust:defeated": {
+      "file": "dust/herald_dust_defeated.mp3",
+      "speaker": "dust",
+      "text": "Struck from the record: one Herald. Remaining: stone, metal, one hull. Recounting.",
+      "seconds": 5.1
+    },
+    "herald:dust:spawned": {
+      "file": "dust/herald_dust_spawned.mp3",
+      "speaker": "dust",
+      "text": "Inventory: nine hundred sectors. Stone, metal, one hull. The hull is not on the list.",
+      "seconds": 5.3
+    },
+    "herald:heat:defeated": {
+      "file": "heat/herald_heat_defeated.mp3",
+      "speaker": "heat",
+      "text": "Cooling. Twelve hundred. Nine hundred. The Core is still hotter. It is waiting for you.",
+      "seconds": 3.87
+    },
+    "herald:heat:spawned": {
+      "file": "heat/herald_heat_spawned.mp3",
+      "speaker": "heat",
+      "text": "Core: four thousand kelvin. Your hull: three hundred. The difference will be corrected.",
+      "seconds": 4.0
+    },
+    "herald:silence:defeated": {
+      "file": "silence/herald_silence_defeated.mp3",
+      "speaker": "silence",
+      "text": "...broken... Null hears... still...",
+      "spoken": "broken / Null hears / still (450 ms pause between parts)",
+      "seconds": 4.29
+    },
+    "herald:silence:spawned": {
+      "file": "silence/herald_silence_spawned.mp3",
+      "speaker": "silence",
+      "text": "...past here... nothing answers. Not the Ring. Not you.",
+      "spoken": "past here / nothing answers. Not the Ring. Not you. (450 ms pause between parts)",
+      "seconds": 6.1
     },
     "sighting:aegis": {
       "file": "ring/sighting_aegis.mp3",

@@ -141,7 +141,11 @@ describe('a recorded line holds through its voice', () => {
   });
 
   it('a line without a recording keeps its hold', () => {
-    const plain = wardenTransmission(0, 'warning', 'prime');
+    // every speaker is recorded now: a line whose words were edited has none
+    const plain = {
+      ...wardenTransmission(0, 'warning', 'prime'),
+      text: 'An edited line.',
+    };
     expect(voiceFor(plain)).toBeNull();
     expect(holdMsFor(plain, 0)).toBe(TRANSMISSION_HOLD_MS);
     expect(holdMsFor({ ...plain, holdMs: 1234 }, 0)).toBe(1234);
@@ -246,7 +250,11 @@ describe('createVoicePlayer', () => {
 
   it('says nothing for a line without a recording', async () => {
     const { player, sources } = await readyPlayer();
-    expect(player.play(wardenTransmission(0, 'warning', 'prime'))).toBe(false);
+    const edited = {
+      ...wardenTransmission(0, 'warning', 'prime'),
+      text: 'An edited line.',
+    };
+    expect(player.play(edited)).toBe(false);
     expect(sources).toHaveLength(0);
   });
 });
