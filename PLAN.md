@@ -54,6 +54,14 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   varia o mundo. Com o mundo variando: Crystal Choir 2/5, Furnace Drift 0/5, quase sempre granada do Caster — o piloto
   desvia mal dela (uma só o matou em 42 s); antes de mexer no Caster, o dono joga. Cinco sementes ainda é ruído.
 
+- Campanha inteira com os quatro ramos de refino juntos (12/11 à noite, cópia de teste; piloto bom, sementes 1–3,
+  vitórias e tempo de uma vitória): Debris Wake 3/3 (6 min) · Salvage Lanes 2/3 (5) · Prime Gate 3/3 (6–8) · Furnace
+  Drift 1/3 (16) · Crystal Choir 2/3 (10–19) · Resonance Chamber 0/3 (morre no Choir) · Assembly Graveyard 3/3 (6–9) ·
+  Quarantine Grid 2/3 (9; um estouro de 25 min) · Null Boundary 2/3 (11–12) · The Crucible 3/3 (10–13, chefe 220–390 s).
+  O degrau é o capítulo II. Granada do Caster (mira fixa, raio 90): em 12 sementes, Furnace Drift 0 → 2 vitórias e
+  chega ao chefe 1 → 9 vezes; Resonance Chamber igual (4 de 12). Uma semente vira com qualquer mudança: três sementes
+  é pouco, doze é o mínimo para comparar.
+
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
 5. **Conteúdo.** Armas (hoje 7 → 12+, cada uma com evolução, Apex e som), inimigos (16 → 30+, com formações), mini-chefes,
