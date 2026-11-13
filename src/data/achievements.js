@@ -55,7 +55,7 @@ export const ACHIEVEMENTS = deepFreeze([
   {
     id: 'full-set',
     title: 'Full Set',
-    description: 'Complete an upgrade family and hear it resonate.',
+    description: 'Hold three cards of one upgrade family and hear it resonate.',
     glyph: '❖',
   },
   {
