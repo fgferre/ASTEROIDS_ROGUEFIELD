@@ -11,6 +11,8 @@ import {
   resolveService,
 } from '../../core/serviceUtils.js';
 import { debugLog } from '../../core/debugLogging.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
+import { clamp } from '../../utils/mathHelpers.js';
 import HealthHeart from './HealthHeart.js';
 
 export class HealthHeartSystem {
@@ -95,10 +97,17 @@ export class HealthHeartSystem {
     }
   }
 
+  // Kept on the field: an enemy shot down past the edge would leave its
+  // heart where the ship can never reach it.
   spawnHeart(x, y, options = {}) {
-    const heart = new HealthHeart(x, y, options);
+    const margin = this.collectionRadius;
+    const heart = new HealthHeart(
+      clamp(x, margin, GAME_WIDTH - margin),
+      clamp(y, margin, GAME_HEIGHT - margin),
+      options
+    );
     this.hearts.push(heart);
-    debugLog(`[HealthHeartSystem] Heart spawned at (${x}, ${y})`);
+    debugLog(`[HealthHeartSystem] Heart spawned at (${heart.x}, ${heart.y})`);
     return heart;
   }
 
