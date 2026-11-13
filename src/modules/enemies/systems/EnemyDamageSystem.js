@@ -95,8 +95,17 @@ class EnemyDamageSystem {
     }
 
     // options.source carries the hit position for direction-aware enemies (Bulwark).
+    const unlit = asteroid.volatileFuse === null;
     const killed = asteroid.takeDamage(damage, options.source);
     const remainingHealth = Math.max(0, asteroid.health);
+
+    // A lethal hit on a Volatile lights its fuse: that hit is the kill (its
+    // on-kill extras fire now); the death, when the fuse burns out, is
+    // credited to the same cause and source (BaseEnemy.updateAffixes).
+    if (unlit && asteroid.volatileFuse !== null) {
+      asteroid.fuseLitBy = { cause: options.cause, source: options.source };
+      return { killed: true, remainingHealth: 0, fragments: [] };
+    }
 
     if (killed) {
       const fragments = this.destroyAsteroid(asteroid, {
