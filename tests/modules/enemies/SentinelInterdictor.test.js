@@ -110,7 +110,12 @@ describe('Sentinel Interdictor', () => {
     expect(hits(system, 'boss-barrier')).toBe(0);
     expect(open.player.velocity).toEqual({ vx: 0, vy: 0 });
 
-    const pressed = target(sideMiddle(grid, closed));
+    // just inside the fence (the solid cage closes in a little each step)
+    const edge = sideMiddle(grid, closed);
+    const pressed = target({
+      x: edge.x + Math.sign(grid.x - edge.x) * 4,
+      y: edge.y + Math.sign(grid.y - edge.y) * 4,
+    });
     boss.handlePhaseIntro(STEP, pressed);
     expect(hits(system, 'boss-barrier')).toBe(1);
     // pushed back into the cage, away from that fence
@@ -120,6 +125,28 @@ describe('Sentinel Interdictor', () => {
     };
     const v = pressed.player.velocity;
     expect(v.vx * inward.x + v.vy * inward.y).toBeGreaterThan(0);
+  });
+
+  it('closes the solid cage round its centre, the open side still open', () => {
+    const { boss } = createInterdictor(100, 100);
+    runUntil(boss, () => boss.grid);
+    const grid = boss.grid;
+    const { x, y, open } = grid;
+    runUntil(boss, () => grid.phase === 'solid', target(grid));
+    expect(grid.size).toBeCloseTo(360, 0);
+    runUntil(boss, () => grid.phase === 'fade', target(grid));
+    expect(grid.size).toBeCloseTo(360 * INTERDICTOR.grid.close, 0);
+    expect(grid).toMatchObject({ x, y, open });
+    expect(grid.fences).toHaveLength(3);
+  });
+
+  it('does not close a cage drawn round its own body', () => {
+    const { boss } = createInterdictor();
+    const near = target({ x: 480, y: 330 });
+    runUntil(boss, () => boss.grid, near);
+    const grid = boss.grid;
+    runUntil(boss, () => grid.phase === 'fade', near);
+    expect(grid.size).toBe(grid.full);
   });
 
   it('tracks the ship while aiming, then freezes the line where it was', () => {

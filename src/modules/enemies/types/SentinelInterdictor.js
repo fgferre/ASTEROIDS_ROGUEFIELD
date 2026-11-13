@@ -34,7 +34,9 @@ export function cageSides(x, y, size) {
 //   grid  — it stops; a square cage of `cycle.size` px is drawn round the
 //           ship (kept inside the field), one side open: the side farthest
 //           from it the first time, then the next one clockwise each cycle.
-//           The cage warns `grid.warn` s, holds solid `cycle.solid` s, fades
+//           The cage warns `grid.warn` s, holds solid `cycle.solid` s (closing
+//           in round its centre to `grid.close` of its side over
+//           `grid.closeTime` s), fades
 //           `grid.fade` s; solid, a fence hurts and pushes the ship back
 //           (rocks, enemies and bullets ignore it). From the warning on it
 //           fires `cycle.beams` locked beams one after another, `lock.gap`
@@ -49,7 +51,8 @@ export function cageSides(x, y, size) {
 //   ventOpen — 0..1, the vents open (1) or shut (0);
 //   mastRise — 0..1, the emitter mast raised (1) or down (entrance);
 //   aimAngle — radians, where its emitter points;
-//   grid     — null or { type: 'grid', x, y (its centre), size, open (0..3,
+//   grid     — null or { type: 'grid', x, y (its centre), size (now), full
+//              (as drawn), open (0..3,
 //              the open side: 0 top, 1 right, 2 bottom, 3 left), fences:
 //              [{ x1, y1, x2, y2 }] (the three closed sides), posts: [{ x, y
 //              }] (the four corners), solid 0..1, phase 'warn'|'solid'|
@@ -214,6 +217,12 @@ export class SentinelInterdictor extends BossEnemy {
       x,
       y,
       size,
+      full: size,
+      // with its own body inside the cage, closing would press the ship
+      // onto it (12/11, a pilot died that way): that cage stands still
+      closes:
+        Math.max(Math.abs(this.x - x), Math.abs(this.y - y)) >=
+        size / 2 + this.radius,
       open: this.openSide,
       fences: sides.filter((_, i) => i !== this.openSide),
       posts: sides.map((s) => ({ x: s.x1, y: s.y1 })),
@@ -248,7 +257,26 @@ export class SentinelInterdictor extends BossEnemy {
         return;
       }
     }
-    if (g.phase === 'solid') this.pressFences(target);
+    if (g.phase === 'solid') {
+      if (g.closes) this.closeCage(g);
+      this.pressFences(target);
+    }
+  }
+
+  // Solid, the quarantine closes in round its centre, from `full` down to
+  // `grid.close` of it in `grid.closeTime` s, then holds; the open side
+  // stays open.
+  // A cage drawn round its own body does not close.
+  closeCage(g) {
+    const progress = clamp(
+      (g.duration - g.timer) / INTERDICTOR.grid.closeTime,
+      0,
+      1
+    );
+    g.size = g.full * (1 - (1 - INTERDICTOR.grid.close) * progress);
+    const sides = cageSides(g.x, g.y, g.size);
+    g.fences = sides.filter((_, i) => i !== g.open);
+    g.posts = sides.map((s) => ({ x: s.x1, y: s.y1 }));
   }
 
   /** The solid fences that touch `point` (a ship of `reach` px). */

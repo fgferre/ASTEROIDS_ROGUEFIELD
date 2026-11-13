@@ -189,8 +189,9 @@ describe('Sentinel Foundry Mother', () => {
     expect(boss.arms.phase).toBe('warn');
     expect(system.applyDirectDamageToPlayer).not.toHaveBeenCalled();
 
-    runUntil(boss, () => boss.arms.phase === 'sweep', onArm(boss, 300));
-    run(boss, 0.5, onArm(boss, 300));
+    const past = MOTHER.arms.outer + 30;
+    runUntil(boss, () => boss.arms.phase === 'sweep', onArm(boss, past));
+    run(boss, 0.5, onArm(boss, past));
     expect(system.applyDirectDamageToPlayer).not.toHaveBeenCalled();
 
     boss.handlePhaseIntro(STEP, onArm(boss));

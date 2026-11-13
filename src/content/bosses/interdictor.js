@@ -1,8 +1,9 @@
 // A Sentinel (CONTENT.md "Boss"): the machine that kept the Reach
 // quarantined. A low slab with an emitter mast. Its loop: GRID (it stops and
 // raises a square cage of energy fences round the ship, one side left open,
-// the open side turning clockwise each cycle; touching a solid fence hurts
-// and pushes the ship back like the Gatekeeper's barrier), LOCK (while the
+// the open side turning clockwise each cycle; solid, it closes in round its
+// centre, unless its own body is inside; touching a solid fence hurts and
+// pushes the ship back like the Gatekeeper's barrier), LOCK (while the
 // cage stands it fires locked beams from itself: a line tracks the ship,
 // freezes, then burns along the frozen line to the field's edge), REST (the
 // cage is down, it cools: full damage), a drift toward mid-field, again.
@@ -50,6 +51,15 @@ export default {
     thickness: 14, // proposta 12/11: px, a solid fence
     damageFactor: 0.4, // proposta 12/11: of contactDamage, like the barrier
     push: 260, // proposta 12/11: px/s away from the fence (the ship thrusts 280)
+    // proposta 12/11: of its side, where the solid cage has closed to by the
+    // end of its hold (was 1, it never moved): standing still, the cage and
+    // the beams never touched the ship in 11 fights; now it has to leave by
+    // the open side or be pressed.
+    close: 0.2,
+    // proposta 12/11: s it takes to close, then it holds closed. Over the
+    // whole hold the pilot stepped back from a slow fence (10/12 won); at 2 s
+    // it was caught inside four times in twelve, dead in the first cages.
+    closeTime: 3,
   },
   // A locked beam: aims (the cycle's `aim`), freezes, burns to the edge.
   // Damage over time: one tick every `burnTick` s while the ship's centre is
@@ -59,7 +69,9 @@ export default {
     burn: 0.6, // proposta 12/11: s
     gap: 0.5, // proposta 12/11: s between one beam's end and the next aim
     width: 24, // proposta 12/11: px
-    damageFactor: 0.15, // proposta 12/11
+    // proposta 12/11: was 0.15; a beam that landed took 7, less than a
+    // drone's shot
+    damageFactor: 0.3,
   },
   burnTick: 0.4, // proposta 12/11
   ventSpeed: 3, // proposta 12/11: ventOpen (0..1) per s

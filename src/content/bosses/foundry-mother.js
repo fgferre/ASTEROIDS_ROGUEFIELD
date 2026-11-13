@@ -61,11 +61,20 @@ export default {
   burnTick: 0.4, // proposta 12/11
   arms: {
     inner: 78, // proposta 12/11: px from its centre (its own radius)
-    outer: 230, // proposta 12/11: px
+    // proposta 12/11: px; was 230, short of where a pilot stands off a shut
+    // boss (~300 px from its centre): in 11 fights the arms never landed.
+    // At 320 the pilot parked at the field's edge, past the turret's good
+    // range, and two fights in nine ran 14 and 20 minutes.
+    outer: 300,
     width: 70, // proposta 12/11: degrees, each segment
-    warn: 1.0, // proposta 12/11: s shown before they swing
+    // proposta 12/11: s shown before they swing; was 1.0, and the arm's
+    // leading edge reaches a ship mid-swing a quarter second later: a pilot
+    // building-side always flew clear of it.
+    warn: 0.7,
     reachSpeed: 3, // proposta 12/11: armReach (0..1) per s
-    damageFactor: 0.15, // proposta 12/11
+    // proposta 12/11: was 0.15; a caught ship lost 7-21 a fight, nothing a
+    // health pickup did not undo before the next sweep.
+    damageFactor: 0.3,
   },
   ventSpeed: 3, // proposta 12/11: ventOpen (0..1) per s
   drift: {
