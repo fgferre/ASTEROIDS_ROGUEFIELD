@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 27.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 33.**
 
 ## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NA `main`; O TRABALHO ATUAL, NO RAMO `campanha/ajustes`
 
@@ -16,6 +16,9 @@ trabalho atual está no ramo `campanha/ajustes` (PR #305 aberta; não incorporar
 jogo é `docs/GAME_DESIGN_MASTER_PLAN.md` (22/10). Conteúdo hoje: 16 inimigos, 7 armas, 39 cartas, 3 cascos, 15 camadas
 na descida, 3 biomas, 3 Wardens, 3 Heralds, Sentinels por fase; o golden trace tem 26 cenários. Dois pedidos dele
 estão em conversas paralelas: audição de som e painel menor em imagens. Ele ainda não jogou nada de 12/11.
+**13/11:** ele respondeu à página de decisões (`src/exported-assets/decisoes/`, fora do git) e escolheu os sons dos
+sete chefes novos; as respostas viraram os itens 26 (complemento) e 27–32 abaixo. Ainda não publicar: _"quero jogar
+antes"_. Autorizou regravar o golden trace (feito) e arquivar as sessões e ramos de 12/11.
 
 **Como retomar (conversa local, qualquer máquina):**
 
@@ -142,3 +145,32 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   mais reflexivos e brilhosos também. Não sei se isso penaliza muito o jogo, mas por quê, né? Por que não?"_ → o fosco
   veio do `docs/NORTE.md` (luz só como informação); a cena já tem ambiente para reflexo, custo quase nulo. Primeiro no
   Sovereign, por imagem; depois onde fizer sentido (cristais, metais de nave, chefes).
+  **13/11, ao aprovar a pedra de ouro polida:** _"falei de brilho nos materiais, mas acho que nave, vidros, metais,
+  todos podem ter um pouco de brilho de acordo com o material real… se for aço inoxidável tem brilho, se é vidro, tem
+  brilho e daí por diante. Metais geralmente têm brilho, entendeu meu pedido? Talvez você já tenha feito isso, só estou
+  explicando."_ → o brilho segue o material de verdade em tudo (máquinas, chefes, estruturas), não só onde é "joia".
+- **(27)** Equilíbrio como no Vampire Survivors (13/11, ao não escolher alvo para a fase final): _"acho que temos que
+  repensar o equilíbrio como é hoje em Vampire Survivors (nossa inspiração além do Asteroids). Hoje você só consegue
+  avançar no Vampire Survivors depois que começa a comprar itens de power-ups na loja com a moeda do jogo. Já havia
+  pedido um estudo sobre isso, deve estar no repo. Precisamos lançar isso para ser investigado e implementado
+  corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
+  (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
+  lá, não calibrar a campanha para ser vencível sem loja.
+- **(28)** Itens fora da tela e área de coleta (13/11): _"os corações muitas vezes ficam para fora da tela e precisam
+  voltar para a arena assim como as orbes. Os demais itens também talvez estejam passando pela mesma coisa… tenho
+  dúvidas se precisamos aumentar um pouco a área de atuação do collect da nave para pegar um pouco mais facilmente esses
+  itens (não acho que eles devam ser magnéticos como são as orbes)."_ → coração agora sempre cai dentro da arena
+  (13/11); conferir baús e outros itens; a área de coleta é dúvida dele: propor com número, ele decide.
+- **(29)** Sortear e banir ao passar de fase (13/11): _"Tudo segue junto: usos gastos continuam gastos."_ E a conquista
+  Full Set: _"Prefiro a meta difícil: família completa."_
+- **(30)** Som ao pegar coração (13/11): _"Quero um som: prepare opções para eu ouvir."_
+- **(31)** Ataques dos chefes (13/11, sobre a jaula do Interdictor): _"mas como a nave lança essa grade? Isso não
+  deveria ser um material de verdade? Tem que ter algo real e físico ou um dispositivo que gere esse campo, uma arma…
+  acho particularmente que o efeito está muito sem graça e feio… aliás todas as miras e efeitos de dano e armas dos
+  bosses estão muito sem graça, deveria tudo isso ser revisto e polido."_ Fecha quando ele aprovar por imagem e jogando.
+- **(32)** Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
+  de fase, tipo os cutscenes, imaginei que a nave estaria realmente viajando no espaço 3D do universo que criamos, indo
+  de uma localização para outra. E acho que a nave precisa respeitar essa movimentação dentro do cenário, usando seus
+  motores ou talvez, dependendo da distância, entrando em dobra, mas o movimento da nave tem que ser real, de virar de
+  frente para onde ela está indo e ir. A câmera tem que ser interessante, como num filme de Star Wars que segue um
+  X-wing. Precisa polir."_ Fecha quando ele vir a viagem nova.
