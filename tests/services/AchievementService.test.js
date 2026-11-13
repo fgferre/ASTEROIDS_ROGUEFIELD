@@ -3,6 +3,8 @@ import { EventBus } from '../../src/core/EventBus.js';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
 import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
+import RandomService from '../../src/core/RandomService.js';
 import AchievementService, {
   ACHIEVEMENTS_STORAGE_KEY,
 } from '../../src/services/AchievementService.js';
@@ -31,7 +33,6 @@ describe('AchievementService', () => {
     ['choir-silenced', ['boss-defeated', { bossKind: 'choir' }]],
     ['null-and-void', ['run-won', { wave: 15 }]],
     ['deep-field', ['wave-started', { wave: 20 }]],
-    ['full-set', ['synergy-unlocked', { family: 'kinetic' }]],
     ['apex-predator', ['apex-unlocked', { family: 'arc' }]],
   ])('unlocks %s on its event', (id, [event, payload]) => {
     const { eventBus, unlocked } = setup();
@@ -151,6 +152,31 @@ describe('AchievementService', () => {
     eventBus.emit('upgrade-applied', { upgradeId: cursed.id });
     eventBus.emit('run-won', {});
     expect(unlocked).toContain('cursed-run');
+  });
+
+  it('full-set needs every card of one family held, not its three-card bonus', () => {
+    const { eventBus, unlocked } = setup();
+    const progression = new ProgressionSystem({
+      random: new RandomService(7),
+      eventBus,
+      player: {},
+      ui: {},
+      effects: {},
+      'xp-orbs': { attachProgression: () => {} },
+    });
+    progression.level = 10;
+    const arc = UPGRADE_LIBRARY.filter(({ family }) => family === 'arc');
+    expect(arc.length).toBeGreaterThan(3);
+    progression.applyUpgrade('multishot'); // the Targeting Suite needs it
+
+    arc.slice(0, -1).forEach(({ id }) => {
+      expect(progression.applyUpgrade(id)).toBe(true);
+    });
+    expect(progression.activeSynergies.has('arc')).toBe(true);
+    expect(unlocked).not.toContain('full-set');
+
+    expect(progression.applyUpgrade(arc.at(-1).id)).toBe(true);
+    expect(unlocked).toContain('full-set');
   });
 
   it('herald-hunter counts each Herald kind once, across sessions', () => {

@@ -593,6 +593,7 @@ class UpgradeSystem extends BaseSystem {
       summary,
       effects,
       prerequisites,
+      familyComplete: this.isFamilyComplete(definition.family),
     });
 
     console.log(
@@ -687,6 +688,14 @@ class UpgradeSystem extends BaseSystem {
         this.eventBus?.emit?.('apex-unlocked', { family: family.id });
       }
     });
+  }
+
+  // The build holds every card of the family (at any rank).
+  isFamilyComplete(familyId) {
+    if (!UPGRADE_FAMILIES[familyId]) return false;
+    return this.upgradeDefinitions
+      .filter((definition) => definition.family === familyId)
+      .every(({ id }) => this.getUpgradeCount(id) > 0);
   }
 
   describeFamilyProgress(definition) {
