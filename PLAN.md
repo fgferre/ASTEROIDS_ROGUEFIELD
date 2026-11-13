@@ -66,6 +66,26 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
     de campo errados) — vão soar pela primeira vez, ele ouve e julga; Afterburn não deixa fogo onde o Blink esconde
     a nave. Regra para ele definir: reroll/banish ao passar de fase. Cura é muda (som novo é escolha dele).
 
+11. **Respostas dele de 13/11** (dezesseis decisões numa página; palavras dele em `docs/PENDENCIAS.md` 26–33). Feito:
+    sons dos sete chefes novos e do coração de vida (escolhidos por ele de ouvido); reroll/banish e banidas seguem
+    para a fase seguinte; Full Set pede a família inteira (a térmica não fecha: duas cartas de arma — perguntar);
+    Sovereign de novo o mais difícil (piloto bom 11 de 24, mediano 3 de 12); viagem refeita como voo de verdade
+    (`render3d/travel/`: mundo fixo, rota, câmera em planos) e, na segunda rodada, com mais cortes e os lugares
+    dentro dos planos (`travel/marks.js`); linguagem única de perigo dos chefes (`enemies/telegraphLook.js`: feixe
+    com núcleo, zonas por tipo, lente que carrega na arma); Interdictor refeito (quatro emissores lançados, jaula
+    com porta voltada para o chefe, cerca que é parede). Em curso: sons da viagem (seis, escolhidos por ele) ligados
+    aos momentos do filme; vozes (Kokoro em `~/.voz-ai`; Ring = bf_emma, Wake = bm_george, Sovereign = am_onyx, todas
+    "tratadas") gravadas em `src/public/audio/voice/` e ainda não ligadas — falta tocar com a legenda, segurar a
+    legenda até a voz acabar, teto de tamanho próprio e audição dos outros falantes (Prime, Choir, Null, seis
+    Sentinels, três Heralds). Falta: trilha da viagem; brilho por material nas máquinas (item 26); área de coleta
+    25 → 40 muda o golden trace (pede o sim dele). **Não fazer agora** (item 27, palavras dele): equilíbrio por
+    loja no estilo Vampire Survivors — a calibragem geral da campanha espera essa direção.
+    Páginas de decisão servidas em `localhost:5500/ASTEROIDS_ROGUEFIELD/exported-assets/<nome>/` (fora do git):
+    `viagem`, `chefes-ataques`, `audicao-*`, `decisoes`.
+
+Lição de 13/11: nunca esperar com `pgrep -f "<comando>"` (o próprio vigia casa com o padrão; travou um ajudante 7 h)
+— a medição roda como um comando só, em segundo plano. O app aceita no máximo quatro ajudantes ao mesmo tempo.
+
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
 
