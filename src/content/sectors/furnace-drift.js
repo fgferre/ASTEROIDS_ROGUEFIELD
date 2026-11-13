@@ -51,8 +51,10 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(8),
-      roster: [{ role: 'skirmisher', count: 2, from: 8, every: 10, elite: 0 }],
+      // One layer's rocks fewer and a slower trickle of Drones: the Herald
+      // is the stage (measured 12/11: it ran four to five minutes).
+      rocks: rockCurve(7),
+      roster: [{ role: 'skirmisher', count: 2, from: 8, every: 16, elite: 0 }],
       surges: [],
       formations: [],
       events: [],
@@ -60,9 +62,13 @@ export default {
       herald: 'heat',
     },
     {
-      rocks: rockCurve(9),
+      rocks: rockCurve(8),
+      // One Caster at a time: its blast is wider than the ship can fly out
+      // of (measured 12/11: only a dash clears it), so two of them asked
+      // for a dash every 1.6 s, the dash's whole cooldown.
       roster: [
-        { role: 'artillery', count: 2, from: 10, every: 14, elite: 0.15 },
+        { role: 'artillery', count: 1, from: 10, every: 12, elite: 0 },
+        { role: 'skirmisher', count: 2, from: 16, every: 14, elite: 0 },
       ],
       surges: [
         { at: 40, roles: ['skirmisher'], count: 5, label: 'Mote swarm' },
@@ -72,7 +78,8 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(10),
+      // Two layers' rocks fewer: the fight is the Kiln's fire, not the field.
+      rocks: rockCurve(8),
       roster: [],
       surges: [],
       formations: [],

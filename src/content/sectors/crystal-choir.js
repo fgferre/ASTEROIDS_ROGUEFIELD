@@ -34,10 +34,12 @@ export default {
     tint: 'rgba(160, 230, 255, 0.05)',
   },
   boss: 'prism-crown',
-  // proposta 12/11: every number below
+  // proposta 12/11: every number below. Each stage flies one layer's rocks
+  // fewer (the Crown's stage two): the seam is about lines of fire, the
+  // Hunters' and Surveyors' first, then the Crown's beams.
   stages: [
     {
-      rocks: rockCurve(6),
+      rocks: rockCurve(5),
       roster: [{ role: 'sniper', count: 1, from: 12, every: 16, elite: 0 }],
       surges: [ROCKFALL],
       formations: [],
@@ -45,7 +47,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(7),
+      rocks: rockCurve(6),
       roster: [{ role: 'marksman', count: 1, from: 10, every: 18, elite: 0 }],
       surges: [],
       formations: [formation('wall', { role: 'skirmisher', count: 6, at: 20 })],
@@ -53,14 +55,14 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(8),
-      roster: [{ role: 'sniper', count: 2, from: 8, every: 14, elite: 0.1 }],
+      rocks: rockCurve(7),
+      roster: [{ role: 'sniper', count: 2, from: 8, every: 14, elite: 0 }],
       surges: [],
       formations: [
         formation('sweep', {
           role: 'minelayer',
-          count: 3,
-          at: 15,
+          count: 2,
+          at: 25,
           spacing: 200,
           speed: 110,
         }),
@@ -69,7 +71,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(9),
+      rocks: rockCurve(8),
       roster: [
         { role: 'marksman', count: 2, from: 10, every: 14, elite: 0.15 },
         { role: 'support', count: 1, from: 20, every: 30, elite: 0 },
@@ -80,7 +82,7 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(10),
+      rocks: rockCurve(8),
       roster: [],
       surges: [],
       formations: [],

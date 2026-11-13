@@ -93,6 +93,7 @@ Viagem 3 → 4 (fim do capítulo)
 **4. Furnace Drift** (chefe: Kiln Engine ✔)
 
 - Chegada — THE RING: `Furnace Drift. The Core vents here. It has not been allowed to cool.`
+- Kiln Engine derrotado — THE RING: `Kiln Engine cold. Heat released: all of it. Seams: one, opening.`
 
 Viagem 4 → 5
 
@@ -101,7 +102,9 @@ Viagem 4 → 5
 
 **5. Crystal Choir** (chefe: Prism Crown ✔)
 
-- Chegada — THE RING: `Crystal Choir. Nine voices held this seam shut. Three remain.`
+- Chegada — THE RING: `Crystal Choir. Nine voices sang this seam shut. Six are crystal now.`
+- Prism Crown, aviso: `Six voices sleep in the crystal. The Crown still carries their note.`
+- Prism Crown derrotado: `The Crown is dark. The note has stopped. The seam has not.`
 
 Viagem 5 → 6
 
@@ -110,7 +113,10 @@ Viagem 5 → 6
 
 **6. Resonance Chamber** (chefe: The Choir ✔)
 
-- Chegada — THE RING: `Dense Core. Mass high, light low. The heat you see is the Ring, still thinking.` ✔
+- Chegada — THE RING: `Resonance Chamber. Voices: three of nine. Seams held: all of them. For now.`
+- The Choir, aviso: `We are three. We were nine. We sang the Ring closed. We will sing you still.` ✔
+- The Choir derrotado: `The hymn breaks. We were not guarding it. We were holding it shut.`
+- Na vitória de cada fase do capítulo, as rachaduras do lugar se abrem e acendem (luz fria, azul-branca).
 
 Viagem 6 → 7 (fim do capítulo)
 

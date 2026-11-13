@@ -3,10 +3,13 @@
 // wall, one after another into the distance, deep dark between them; the
 // chamber's wall plates cling to the high sides and fall away into the dark
 // below; the amber comes from thin cracks along the ribs and from deep
-// under them, seen between.
+// under them, seen between. Deeper still, cold light shows through long
+// cracks in the chamber's floor: what the Choir sings shut. They gape when
+// the hymn breaks.
 
 import { gradientDisc } from './kit.js';
-import { under } from './pieces.js';
+import { SEAM_LIGHT } from './furnaceDrift.js';
+import { crack, seams, under } from './pieces.js';
 
 // proposta 12/11: the ribs' arc (centre height, radius, angles from wall
 // to wall through the bottom), their count, spacing and section; the wall
@@ -113,8 +116,31 @@ export function buildDenseCore(THREE, kit) {
     );
   }
 
+  // proposta 12/11: the cracks in the floor, running down the chamber
+  // under the ribs. Built along x, then turned along the chamber.
+  const cracked = kit.parts();
+  const gaping = kit.parts();
+  const cold = tone(SEAM_LIGHT);
+  [-520, 60, 610].forEach((x, i) =>
+    crack(kit, cracked, gaping, cold, [(i - 1) * 500, centre - R - 420, x], {
+      length: 2600 + random() * 900,
+      width: 15,
+      jag: 150,
+      steps: 20,
+      branches: 6,
+    })
+  );
+  const cracks = seams(kit, cracked, gaping, 'chamber-seams', {
+    rest: 0.2,
+    open: 0.95,
+  });
+  cracks.object.rotation.y = Math.PI / 2;
+
   const object = new THREE.Group();
-  object.add(kit.mesh(frame), kit.mesh(glow, 'glow'));
+  object.add(kit.mesh(frame), kit.mesh(glow, 'glow'), cracks.object);
   object.rotation.set(0, 0.22, 0);
-  return { layers: [{ object, anchor: under(380), follow: 0.3 }] };
+  return {
+    layers: [{ object, anchor: under(380), follow: 0.3 }],
+    update: cracks.give,
+  };
 }

@@ -44,7 +44,9 @@ export const STORY = deepFreeze({
     'furnace-drift':
       'Furnace Drift. The Core vents here. It has not been allowed to cool.',
     'crystal-choir':
-      'Crystal Choir. Nine voices held this seam shut. Three remain.',
+      'Crystal Choir. Nine voices sang this seam shut. Six are crystal now.',
+    'dense-core':
+      'Resonance Chamber. Voices: three of nine. Seams held: all of them. For now.',
     'assembly-graveyard':
       'Assembly Graveyard. The same chassis, built again. Order received once. Never closed.',
     'quarantine-grid':
@@ -192,7 +194,7 @@ export const STORY = deepFreeze({
       warning:
         'We are three. We were nine. We sang the Ring closed. We will sing you still.',
       defeated:
-        'The hymn breaks. No matter. At the center, nothing needs to be sung.',
+        'The hymn breaks. We were not guarding it. We were holding it shut.',
     },
     15: {
       warning:
@@ -217,12 +219,12 @@ export const STORY = deepFreeze({
       warning:
         'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
       defeated:
-        'Kiln Engine cold. The Core will remember the temperature it lost.',
+        'Kiln Engine cold. Heat released: all of it. Seams: one, opening.',
     },
     'prism-crown': {
       warning:
-        'Three voices remain in the crystal. They have found a new listener.',
-      defeated: 'The Crown is dark. The Chamber heard it go quiet.',
+        'Six voices sleep in the crystal. The Crown still carries their note.',
+      defeated: 'The Crown is dark. The note has stopped. The seam has not.',
     },
     'foundry-mother': {
       warning:

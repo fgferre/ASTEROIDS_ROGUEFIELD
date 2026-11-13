@@ -1,10 +1,12 @@
 // Crystal Choir (docs/ROTEIRO.md "Os lugares" 5): a seam in the Ring's
 // structure. Its two walls step down in terraces to a crack lit from
 // inside; giant crystals grow from the terraces and the floor toward the
-// light above, glowing from within.
+// light above, glowing from within. The crack itself runs jagged along the
+// floor and up onto the terraces; it gapes when the Prism Crown goes dark.
 
 import { gradientDisc } from './kit.js';
-import { crystal, under } from './pieces.js';
+import { SEAM_LIGHT } from './furnaceDrift.js';
+import { crack, crystal, seams, under } from './pieces.js';
 
 // proposta 12/11: the seam's half-width at the top, each terrace's step
 // across and down, its floor's depth (local units).
@@ -21,7 +23,7 @@ export function buildCrystalChoir(THREE, kit) {
     tone('#1b1f24'),
     tone('#2b3239'),
   ];
-  const crack = tone('#8fe4ff', 0.42);
+  const seamGlow = tone('#8fe4ff', 0.42);
   const ice = tone('#9fe6f6', 0.32);
 
   // The walls, terrace by terrace, broken into blocks along the seam.
@@ -61,7 +63,7 @@ export function buildCrystalChoir(THREE, kit) {
   kit.put(
     glow,
     gradientDisc(THREE, (r) => (1 - r) ** 1.6, { rings: 8, sides: 40 }),
-    crack,
+    seamGlow,
     [0, SEAM.floor + 2, 0],
     [240, 1, length * 0.55]
   );
@@ -107,12 +109,51 @@ export function buildCrystalChoir(THREE, kit) {
     );
   }
 
+  // proposta 12/11: the crack along the floor, and smaller ones that have
+  // climbed onto the terraces. Built along x, then turned along the seam.
+  const cracked = kit.parts();
+  const gaping = kit.parts();
+  const cold = tone(SEAM_LIGHT);
+  crack(kit, cracked, gaping, cold, [0, SEAM.floor + 6, 0], {
+    length: length * 0.8,
+    width: 13,
+    jag: 90,
+    steps: 26,
+    branches: 7,
+  });
+  for (let i = 0; i < 8; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const k = 1 + (i % 2);
+    const inner = SEAM.half + (SEAM.tiers - 1 - k) * SEAM.step;
+    crack(
+      kit,
+      cracked,
+      gaping,
+      cold,
+      [
+        (i / 7 - 0.5) * length * 0.75,
+        -k * SEAM.drop + 8,
+        side * (inner + 140 + random() * 160),
+      ],
+      { length: 380 + random() * 300, width: 6, jag: 46 }
+    );
+  }
+  const cracks = seams(kit, cracked, gaping, 'choir-seams', {
+    rest: 0.16,
+    open: 1.15,
+  });
+  cracks.object.rotation.y = Math.PI / 2;
+
   const object = new THREE.Group();
   object.add(
     kit.mesh(rock),
     kit.mesh(crystals, 'lamp'),
-    kit.mesh(glow, 'glow')
+    kit.mesh(glow, 'glow'),
+    cracks.object
   );
   object.rotation.set(0, 0.32, 0);
-  return { layers: [{ object, anchor: under(1000), follow: 0.4 }] };
+  return {
+    layers: [{ object, anchor: under(1000), follow: 0.4 }],
+    update: cracks.give,
+  };
 }
