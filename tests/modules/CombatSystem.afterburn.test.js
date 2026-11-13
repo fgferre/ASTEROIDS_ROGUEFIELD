@@ -91,6 +91,22 @@ describe('Afterburn (Maneuver synergy)', () => {
     expect(combat.afterburnTrail).toHaveLength(5);
   });
 
+  it('leaves no fire where a Blink hides the ship', () => {
+    const { combat, player } = makeCombat();
+    player.dashTimer = 0.1;
+    player._quitExplosionHidden = true;
+    combat.updateWeaponEffects(FRAME);
+    player.position.x = 132;
+    player._quitExplosionHidden = false;
+    combat.updateWeaponEffects(FRAME);
+    player.position.x = 140;
+    combat.updateWeaponEffects(FRAME);
+    expect(combat.afterburnTrail.map((p) => [p.x, p.joined])).toEqual([
+      [132, false],
+      [140, true],
+    ]);
+  });
+
   it('burns an enemy on the trail once per tick, never a phased Shade', () => {
     const drone = makeEnemy('drone', 116, 320);
     const shade = makeEnemy('shade', 124, 300, {
