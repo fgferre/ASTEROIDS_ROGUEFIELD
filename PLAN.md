@@ -14,7 +14,9 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
 2. **Lugares**: cor/névoa/luz por fase e um cenário 3D por fase atrás da arena (`render3d/places/`, dez cenários;
    item 24 dele). [x] Ainda fracos, ele julga: planeta da Quarantine Grid, creme do Crisol.
 3. **Viagem 3D entre fases** (`render3d/travelScene.js`): nave por trás ao longo do Anel, falas do roteiro, salto
-   entre capítulos, pulável; abre a campanha. [x] Fraco: o Anel parece viaduto; clarão do salto tímido.
+   entre capítulos, pulável; abre a campanha. [x] O Anel visto de perto ganhou cidade no convés (canais com luzes,
+   quadras, torres, muros com janelas; só nos níveis de perto, o jogo não muda). Fraco: tudo em caixas; custo da
+   viagem nunca medido em máquina fraca.
 4. **Equilíbrio**: etapas próprias nas duas fases antigas [x]; em andamento nas quatro sessões de refino. [ ]
 5. **Final**: décima fase The Crucible, chefe Sovereign (ordens PROTECT/REBUILD, modelo claro e polido — itens 25 e
    26 dele), escolha Severance/Stewardship, dois desfechos, marca no mapa. [x] Sovereign fácil demais para o piloto.
