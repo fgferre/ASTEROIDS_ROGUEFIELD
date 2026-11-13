@@ -1,8 +1,9 @@
 // The tools a place's backdrop set (places/index.js) is built with: parts
 // placed by any transform and merged into one static mesh per material, in
-// the three materials every set shares the look of — `matte` (lit by the
+// the four materials every set shares the look of — `matte` (lit by the
 // field's lights, the hard surfaces), `lamp` (unlit and opaque, a surface
-// that glows from inside: crystals, a dark planet) and `glow` (added light:
+// that glows from inside: a dark planet), `gem` (polished, lit from inside
+// and catching the field's lights: crystals) and `glow` (added light:
 // running lights, cracks, a star) — all sinking into the place's haze with
 // their depth under the field, as the broken Ring does (ring/ringMaterial.js),
 // so the far shapes sit low in contrast behind the play. Seen through the
@@ -16,6 +17,18 @@ import { mergeStatic } from '../mergeStatic.js';
 // proposta 12/11: the matte surfaces' finish; a glow loses `glowHaze` of
 // its light where the haze is full.
 const MATTE = { roughness: 0.92, metalness: 0.08 };
+// proposta 13/11: a gem's polished facets — `glow` of its vertex colour lit
+// from inside, `body` of it taking the field's lights, its sheen capped at
+// `cap` (direct, reflected) as the ship's is (hullModel.js
+// SPECULAR_CAP_GLSL), higher because the haze takes most of it.
+const GEM = {
+  roughness: 0.25,
+  metalness: 0.1,
+  envMapIntensity: 2,
+  body: 0.3,
+  glow: 0.7,
+  cap: [0.7, 0.3],
+};
 const GLOW_HAZE = 0.55;
 // The field's half extents in world units, and the soft edge (inside,
 // outside) over which the arena's dimming fades.
@@ -50,6 +63,11 @@ gl_FragColor.rgb = mix(uHaze, mix(gl_FragColor.rgb, uHaze, vPlaceHaze),
   vPlaceUnder);`;
 const LIGHT = `
 gl_FragColor.rgb *= (1.0 - uGlowHaze * vPlaceHaze) * vPlaceUnder;`;
+const GEM_GLOW = `
+totalEmissiveRadiance += vColor.rgb * ${GEM.glow.toFixed(2)};`;
+const GEM_CAP = `
+reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${GEM.cap[0].toFixed(2)}));
+reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(${GEM.cap[1].toFixed(2)}));`;
 
 function hazed(material, uniforms, kind) {
   material.onBeforeCompile = (shader) => {
@@ -59,6 +77,14 @@ function hazed(material, uniforms, kind) {
       .replace('#include <fog_vertex>', `#include <fog_vertex>${VERTEX}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>${FRAGMENT_HEAD}`)
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>${kind === 'gem' ? GEM_GLOW : ''}`
+      )
+      .replace(
+        '#include <lights_fragment_end>',
+        `#include <lights_fragment_end>${kind === 'gem' ? GEM_CAP : ''}`
+      )
       .replace(
         '#include <fog_fragment>',
         `#include <fog_fragment>${kind === 'glow' ? LIGHT : SURFACE}`
@@ -72,6 +98,20 @@ function makeMaterial(THREE, kind, uniforms) {
   if (kind === 'matte') {
     return hazed(
       new THREE.MeshStandardMaterial({ vertexColors: true, ...MATTE }),
+      uniforms,
+      kind
+    );
+  }
+  if (kind === 'gem') {
+    const { roughness, metalness, envMapIntensity, body } = GEM;
+    return hazed(
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        color: new THREE.Color(body, body, body),
+        roughness,
+        metalness,
+        envMapIntensity,
+      }),
       uniforms,
       kind
     );

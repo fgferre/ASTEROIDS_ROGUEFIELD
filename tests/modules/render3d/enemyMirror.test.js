@@ -495,6 +495,30 @@ describe('EnemyMirror', () => {
     expect(views.size).toBe(1); // one pooled view, rebound each time
   });
 
+  it('draws a gold rock as polished metal, its sheen capped', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    mirror.update(
+      [
+        {
+          id: 'g',
+          type: 'asteroid',
+          variant: 'gold',
+          x: 0,
+          y: 0,
+          radius: 30,
+          getHitFlash: () => 0,
+        },
+      ],
+      0
+    );
+    const view = mirror.views.get('g');
+    const mesh = mirror.rocks.meshes.stone[view.shape];
+    const { aBase, aSurface } = mesh.geometry.attributes;
+    expect(aBase.getX(0)).toBeGreaterThan(1);
+    expect(aSurface.getY(0)).toBeCloseTo(VARIANT_LOOKS.gold.metalness);
+    expect(mirror.rockFamilies.stone.defines.ROCK_SHEEN).toBe('');
+  });
+
   it('writes a rock’s crack glow and hit flash into its instance', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = {

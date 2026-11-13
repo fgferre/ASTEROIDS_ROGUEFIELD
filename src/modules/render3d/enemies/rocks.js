@@ -32,15 +32,19 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // `veinGlow` at `rate` Hz. A Volatile's veins race at `armedRate` once its
 // fuse arms; a Parasite's quicken toward `nearRate` as it closes on the player.
 // `reveal`/`width` set how much of the crack network the veins light.
-// Crystal swaps to a glossy faceted material with a cold rim (`rim`).
+// Crystal swaps to a glossy faceted material with a cold rim (`rim`);
+// `gain` multiplies `base` past white (a polished metal's reflectance).
 export const VARIANT_LOOKS = {
   common: { base: '#ffffff', roughness: 0.94, metalness: 0.04 },
   iron: { base: '#f4f7ff', roughness: 0.42, metalness: 0.3 },
   denseCore: { base: '#a4b6dc', roughness: 0.7, metalness: 0.12 },
+  // proposta 13/11: polished gold between the veins — `gain` lifts the
+  // dark rock albedo to a metal's reflectance, its sheen capped (ROCK_SHEEN).
   gold: {
-    base: '#ffe6b8',
-    roughness: 0.5,
-    metalness: 0.3,
+    base: '#ffae48',
+    gain: 9,
+    roughness: 0.38,
+    metalness: 0.85,
     vein: PALETTE.xp,
     veinGlow: 0.9,
     reveal: 1,
@@ -178,6 +182,7 @@ export function createRockViews(kit) {
       colorOf(THREE, PALETTE.shot)
     );
     stone.userData.rockMaps = stoneMaps;
+    stone.defines.ROCK_SHEEN = '';
     const crystal = crystalMaterial({
       ...stone.userData.rockUniforms,
       uRim: { value: VARIANT_LOOKS.crystal.rim },
@@ -220,6 +225,7 @@ export function createRockViews(kit) {
       colorOf(THREE, PALETTE.shot)
     );
     material.userData.rockMaps = stoneMaps;
+    material.defines.ROCK_SHEEN = '';
     material.onBeforeCompile = patchRockShader;
     trackRockMaterial(material);
     const mesh = new THREE.Mesh(rockGeometries[0], material);
@@ -347,7 +353,10 @@ export function createRockViews(kit) {
     view.family = look.crystal ? 'crystal' : 'stone';
     view.object.material = rockFamilies[view.family];
     const { rock } = view;
-    rock.base.set(look.base).convertSRGBToLinear();
+    rock.base
+      .set(look.base)
+      .convertSRGBToLinear()
+      .multiplyScalar(look.gain || 1);
     rock.vein.set(look.vein || PALETTE.shot).convertSRGBToLinear();
     rock.surface[0] = look.roughness;
     rock.surface[1] = look.metalness;

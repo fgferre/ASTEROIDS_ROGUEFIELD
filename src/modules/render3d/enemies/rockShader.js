@@ -4,6 +4,7 @@
 // Husk's hull plate wears it for its seams (machines.js).
 
 import { colorOf } from '../batches.js';
+import { SPECULAR_CAP_GLSL } from '../hullModel.js';
 
 // Dense Fog (endless layer modifier, PLAN.md R8.2): rocks lose up to
 // FOG_DIM of their light with distance from the camera target, all of it
@@ -165,6 +166,7 @@ export function patchRockShader(shader) {
       vRockFogXZ = (modelMatrix * rockFogPos).xz;
       #endif`
     );
+  // ROCK_SHEEN (the stone rocks): a polished variant's highlights capped.
   // Baked maps (rock geometry has no UVs): triplanar in object space, the
   // detail normal added to the shaded normal (flat crystal facets keep their
   // facets), roughness and AO multiplied into what the material sets.
@@ -230,6 +232,13 @@ export function patchRockShader(shader) {
       float rockOcclusion = mix(1.0, rockAo, uRockAoIntensity);
       reflectedLight.indirectDiffuse *= rockOcclusion;
       reflectedLight.directDiffuse *= mix(1.0, rockOcclusion, 0.5);
+      #endif`
+    )
+    .replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>
+      #ifdef ROCK_SHEEN
+      ${SPECULAR_CAP_GLSL}
       #endif`
     )
     .replace(

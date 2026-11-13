@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { biomeForLayer } from '../../../src/data/biomes.js';
 import { SECTORS, sectorById } from '../../../src/data/sectors.js';
 import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
+import { buildCrystalChoir } from '../../../src/modules/render3d/places/crystalChoir.js';
 import { PLACE_SETS } from '../../../src/modules/render3d/places/index.js';
+import { createPlaceKit } from '../../../src/modules/render3d/places/kit.js';
 
 const THREE = {};
 new Function(
@@ -56,5 +58,22 @@ describe('place backdrop sets', () => {
     built.forEach((set) => expect(set.object.visible).toBe(false));
     expect(backdrop.ring.object.visible).toBe(true);
     expect(backdrop.structures.group.visible).toBe(true);
+  });
+
+  it("draws the Crystal Choir's crystals polished, lit from inside, their sheen capped", () => {
+    const kit = createPlaceKit(THREE, new THREE.Color(), { under: 0.7 });
+    buildCrystalChoir(THREE, kit);
+    const gem = kit.materials.get('gem');
+    expect(gem.roughness).toBeLessThan(kit.materials.get('matte').roughness);
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.standard.vertexShader,
+      fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+    };
+    gem.onBeforeCompile(shader);
+    expect(shader.fragmentShader).toContain('totalEmissiveRadiance += vColor');
+    expect(shader.fragmentShader).toContain(
+      'min(reflectedLight.directSpecular'
+    );
   });
 });

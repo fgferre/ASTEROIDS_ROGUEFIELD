@@ -146,7 +146,7 @@ export function buildCrystalChoir(THREE, kit) {
   const object = new THREE.Group();
   object.add(
     kit.mesh(rock),
-    kit.mesh(crystals, 'lamp'),
+    kit.mesh(crystals, 'gem'),
     kit.mesh(glow, 'glow'),
     cracks.object
   );
