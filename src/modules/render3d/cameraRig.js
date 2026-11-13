@@ -196,8 +196,7 @@ export class CameraRig {
     const zoom = this.camera.effectiveZoom;
     const distance = this.frameShot(t.camera.aspect);
 
-    // Shake: the same offset/rotation ScreenShake.apply() gives the 2D ctx,
-    // in screen units → world units at this zoom.
+    // Shake: the effects' offset/rotation, in screen units → world units at this zoom.
     const shake = effects?.screenShake;
     const shaking = shake && shake.trauma > 0.001;
     const ox = shaking ? shake.offsetX / zoom : 0;

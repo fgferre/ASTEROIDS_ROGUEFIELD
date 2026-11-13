@@ -103,8 +103,7 @@ void main() {
 }`;
 
 // `?bloom=0` turns the pass off; `?bloom=<n>` (0..3) scales its strength and
-// replaces the Bloom Intensity setting (`set`) — the same flag the 2D
-// bloomLayer reads.
+// replaces the Bloom Intensity setting (`set`).
 function bloomFromUrl() {
   const unset = { enabled: true, scale: 1, set: false };
   try {

@@ -487,13 +487,6 @@ class PlayerSystem extends BaseSystem {
       this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
     }
 
-    if (this.shieldHitGraceTimer > 0) {
-      this.shieldHitGraceTimer = Math.max(
-        0,
-        this.shieldHitGraceTimer - deltaTime
-      );
-    }
-
     // Emitir evento para outros sistemas
     // Usamos o método 'emitSilently' para não poluir o console a cada frame.
     this.eventBus?.emitSilently?.('player-moved', {
@@ -631,23 +624,6 @@ class PlayerSystem extends BaseSystem {
     };
   }
 
-  getHullMetricsFor(hullDefinition = this.currentHull) {
-    if (!hullDefinition) {
-      return {
-        outline: [],
-        boundingRadius: SHIP_SIZE,
-        shieldPadding: 0,
-        outlinePath: null,
-      };
-    }
-
-    if (hullDefinition === this.currentHull && this._currentHullMetrics) {
-      return this._currentHullMetrics;
-    }
-
-    return computeHullMetrics(hullDefinition);
-  }
-
   getHullVisualLevels() {
     return this.thrusters.getHullVisualLevels();
   }
@@ -673,23 +649,8 @@ class PlayerSystem extends BaseSystem {
     return { ...this.velocity };
   }
 
-  getAngularVelocity() {
-    return this.angularVelocity;
-  }
-
   getMagnetismRadius() {
     return this.magnetismRadius;
-  }
-
-  getHullOutline() {
-    if (
-      !this._currentHullMetrics ||
-      !Array.isArray(this._currentHullMetrics.outline)
-    ) {
-      return [];
-    }
-
-    return this._currentHullMetrics.outline.map((vertex) => ({ ...vertex }));
   }
 
   getHullBoundingRadius() {
@@ -861,10 +822,6 @@ class PlayerSystem extends BaseSystem {
   setPosition(x, y) {
     this.position.x = x;
     this.position.y = y;
-  }
-
-  setAngle(angle) {
-    this.angle = wrapAngle(angle);
   }
 
   getShieldState() {

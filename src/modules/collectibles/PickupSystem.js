@@ -11,7 +11,7 @@
 import { BaseSystem } from '../../core/BaseSystem.js';
 import { requireService, resolveService } from '../../core/serviceUtils.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../core/GameConstants.js';
-import { PALETTE, LINE, withAlpha } from '../../data/constants/palette.js';
+import { withAlpha } from '../../data/constants/palette.js';
 import {
   CHEST,
   PICKUP_KINDS,
@@ -331,87 +331,12 @@ export class PickupSystem extends BaseSystem {
     return tokens.concat(this.chests.snapshots());
   }
 
-  // Matte token, colored rim and glyph; blinks in its last seconds.
-  render(ctx) {
-    if (!this.pickups.length) return;
-    for (const pickup of this.pickups) {
-      const remaining = pickup.lifetime - pickup.age;
-      if (
-        remaining < PICKUP_TOKEN.blinkTime &&
-        Math.floor(remaining * 8) % 2 === 0
-      ) {
-        continue;
-      }
-      const pulse = 1 + Math.sin(pickup.age * 4 + pickup.phase) * 0.08;
-      const r = pickup.radius * pulse;
-
-      ctx.save();
-      ctx.translate(pickup.x, pickup.y);
-
-      const halo = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 2);
-      halo.addColorStop(0, withAlpha(pickup.color, 0.25));
-      halo.addColorStop(1, withAlpha(pickup.color, 0));
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 2, 0, TWO_PI);
-      ctx.fill();
-
-      const body = ctx.createLinearGradient(-r, -r, r, r);
-      body.addColorStop(0, PALETTE.hullLit);
-      body.addColorStop(1, PALETTE.hull);
-      ctx.fillStyle = body;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, TWO_PI);
-      ctx.fill();
-      ctx.lineWidth = LINE.thin;
-      ctx.strokeStyle = pickup.color;
-      ctx.stroke();
-
-      drawGlyph(ctx, pickup.kind, r * 0.55, pickup.color);
-      ctx.restore();
-    }
-  }
-
   onReset() {
     this.pickups = [];
     this.chests.reset();
     this.overchargeRemaining = 0;
     this.layer = 1;
     this.reseedRandom();
-  }
-}
-
-function drawGlyph(ctx, kind, s, color) {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = LINE.base;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  if (kind === 'magnet') {
-    // horseshoe, open side up
-    ctx.moveTo(-s * 0.7, -s * 0.8);
-    ctx.lineTo(-s * 0.7, 0);
-    ctx.arc(0, 0, s * 0.7, Math.PI, 0, true);
-    ctx.lineTo(s * 0.7, -s * 0.8);
-    ctx.stroke();
-  } else if (kind === 'pulse') {
-    // core dot inside a ring
-    ctx.arc(0, 0, s * 0.85, 0, TWO_PI);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, s * 0.3, 0, TWO_PI);
-    ctx.fill();
-  } else {
-    // lightning bolt
-    ctx.moveTo(s * 0.25, -s);
-    ctx.lineTo(-s * 0.45, s * 0.1);
-    ctx.lineTo(s * 0.05, s * 0.1);
-    ctx.lineTo(-s * 0.25, s);
-    ctx.lineTo(s * 0.45, -s * 0.1);
-    ctx.lineTo(-s * 0.05, -s * 0.1);
-    ctx.closePath();
-    ctx.fill();
   }
 }
 

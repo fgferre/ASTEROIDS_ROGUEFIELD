@@ -421,16 +421,6 @@ export class ServiceRegistry {
 
     return container;
   }
-
-  /**
-   * Exports the dependency graph as a visualization.
-   *
-   * @param {DIContainer} container - The DI container
-   * @returns {string} DOT format graph
-   */
-  static exportDependencyGraph(container) {
-    return container.generateDependencyGraph();
-  }
 }
 
 // Export convenience function

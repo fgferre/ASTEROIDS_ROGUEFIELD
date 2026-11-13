@@ -28,12 +28,6 @@ export function createMenuAsteroidField(kit) {
     tmpCannonVec3 = new CANNON.Vec3();
   }
 
-  function ensurePoolSize(size) {
-    while (kit.asteroidPool.length < size) {
-      createPoolableAsteroid();
-    }
-  }
-
   function createPoolableAsteroid() {
     const { THREE, CANNON } = kit;
     const mesh = new THREE.Mesh();
@@ -554,7 +548,6 @@ export function createMenuAsteroidField(kit) {
 
   return {
     createTemporaries,
-    ensurePoolSize,
     createPoolableAsteroid,
     prepareInitialField,
     spawnBeltAsteroid,
