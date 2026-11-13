@@ -6,10 +6,11 @@
 // (a set stands instead of it and of the intact arcs otherwise). `wakes:
 // true` where the Ring itself wakes at the win (Null's place, the Crucible);
 // elsewhere it sleeps through it and only the set answers.
-// `offRing` (proposta 12/11) is how far from the Ring the place is as the
-// journey to it ends (travelScene.js; docs/ROTEIRO.md "Os lugares"):
-// [side, height] in world units, inward of the laid Ring's centre line
-// (negative: outside its outer wall) and over its deck.
+// `offRing` (proposta 12/11) is how far from the Ring the place stands in
+// the journeys' world (travel/world.js, which sets it along the Ring;
+// docs/ROTEIRO.md "Os lugares"): [side, height] in world units, inward of
+// the laid Ring's centre line (negative: outside its outer wall) and over
+// its deck.
 
 import { buildAssemblyGraveyard } from './assemblyGraveyard.js';
 import { buildCrystalChoir } from './crystalChoir.js';

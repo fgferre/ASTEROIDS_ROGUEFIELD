@@ -1,65 +1,43 @@
 // The journey between sectors (ui/runCinematics.js), drawn in the game's own
-// scene: the real ship, seen from behind, skims the broken Ring — laid along
-// its flight at `FLIGHT.scale` × its size (brokenRing.js `offset`), plating
-// and running lights streaming past under it, its far side arched across the
-// sky — through streaks of dust, flying toward the place it goes to: that
-// place's set (places/placeSets.js setFlight) hangs ahead, posed as the
-// intro's first shot will see it, and grows as the ship closes in, while the
-// colours cross-fade from the place just left (deep space before the first).
-// A journey into a new chapter jumps: a tunnel of stretched streaks, a
-// white-out, and the drop-out in front of the new place. The opening flies
-// in from deep space toward the whole Ring, small and far. The flight
-// decelerates onto the ship's spawn, heading where it will start; over its
-// last stretch the camera rises into the intro's first pose, the Ring and
-// the set settle back where the field sees them, and over the last second
-// the field (its border, the drifting fragments) fades in, so the intro goes
-// on without a cut. Everything is a function of t (0..1): `?cinematic=
-// travel&t=` freezes a frame (core/cinematics.js). Nothing is allocated per
-// frame.
+// scene: the real ship flies through the world of the places (travel/
+// world.js: the broken Ring laid at its flight size, every place fixed
+// along it) from the place it just won — its set in view, posed where that
+// place stands — to the place it goes to, whose set waits where the intro
+// will see it. The ship turns off its place, burns, skims the Ring and
+// brakes in on a hop inside a chapter; into a new chapter (and the opening,
+// from deep space) it lines up, surges and jumps — a tunnel of stretched
+// streaks, a white-out — and drops out short of the place (travel/
+// motion.js). The camera cuts between a few shots (travel/shots.js); the
+// last, over the ship's back, runs on into the rise to the intro's first
+// pose while the Ring and the sets settle back where the field sees them,
+// and over the last second the field (its border, the drifting fragments)
+// fades in, so the intro goes on without a cut. The colours cross-fade
+// from the place left (deep space before the first) to the place reached.
+// Everything is a function of t (0..1): `?cinematic=travel&t=` freezes a
+// frame (core/cinematics.js). Nothing is allocated per frame.
 
 import { BIOMES, biomeForLayer } from '../../data/biomes.js';
 import { SECTORS, nextInChapter, sectorById } from '../../data/sectors.js';
 import { TRAVEL, easeInOut } from '../../core/cinematics.js';
+import {
+  TRANSMISSION_CHARS_PER_SECOND,
+  travelTransmissions,
+} from '../ui/transmissions.js';
 import { createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
-import { PLACE_SETS } from './places/index.js';
 import { RING, RING_LOOK } from './ring/ringShape.js';
+import { ShipMotion } from './travel/motion.js';
+import { ShotPlan } from './travel/shots.js';
+import { PLACE_ANGLES, WORLD, WorldMap, placeFrame } from './travel/world.js';
 
-// proposta 12/11: the flight. The ship flies `arc` radians of the Ring's
-// circle, laid at `scale` × its size, skimming its deck (`skim`: [side,
-// height], world units inward of its centre line and over its deck) and,
-// from `peel`, easing out to its destination's distance (its set's
-// `offRing`, places/index.js); it cruises, then from `brake` slows onto its
-// spawn, its engines at `thrust`.
-// From `rise` the camera climbs into the intro's pose. The Ring's running
-// lights glow `lights` × and its haze runs `haze` × deeper while it flies.
-const FLIGHT = {
-  arc: (40 * Math.PI) / 180,
-  scale: 5,
-  skim: [-60, 44],
-  peel: [0.42, 0.72],
-  thrust: 0.5,
-  brake: 0.62,
-  rise: 0.72,
-  lights: 4,
-  haze: 3,
-};
-// proposta 12/11: the place ahead. Its set shows from `appear` (a jump: at
-// the jump), `lift` radians over the chase camera's line of sight and
-// `ahead` units further off than the intro will see it at the start
-// (`opening`: the opening's start; `drop`: just out of a jump), closing in
-// to the intro's own distance by the rise. It is posed `hold` of the way
-// from the chase camera's view now (0: pinned to it, a sticker) to its view
-// at the rise, fixed in the world (1: wholly honest parallax, but the
-// flight's curve swings it out of frame early on).
-const DESTINATION = {
-  hold: 0.6,
-  appear: [0, 0.12],
-  lift: 0.24,
-  ahead: 7000,
-  opening: 8000,
-  drop: 5000,
-};
+// proposta 12/11: from `rise` the camera climbs into the intro's pose. The
+// Ring's running lights glow `lights` × and its haze runs `haze` × deeper
+// while it flies.
+const FLIGHT = { rise: 0.72, lights: 4, haze: 3 };
+// proposta 13/11: on a hop the place left fades out over `leave` and the
+// place ahead in over `reach` (t), the colours crossing over `look`; on a
+// jump all three swap under the white-out.
+const PLACES = { leave: [0.26, 0.42], reach: [0.3, 0.46], look: [0.3, 0.5] };
 // proposta 12/11: a journey into a new chapter (and the opening) jumps:
 // from `from` the streaks pull into a tunnel of radius `tube` and stretch
 // `stretch` ×, `speed` × faster at `at`; the frame whites out over
@@ -75,28 +53,6 @@ const JUMP = {
   white: [0.3, 0.355, 0.375, 0.45],
   tint: '#a9dcff',
 };
-// proposta 12/11: the chase camera, in the ship's frame (world units):
-// `back` behind, `up` above, `right` to the side, aiming `ahead` past the
-// ship and `lift` over it; it rolls `roll` × the ship's bank.
-const CHASE = {
-  back: 105,
-  up: 24,
-  right: 10,
-  ahead: 420,
-  lift: -14,
-  roll: 0.5,
-};
-// proposta 12/11: the ship banks `base` into the Ring's curve and sways
-// ±`sway` `swayTurns` times over the flight (radians).
-const BANK = { base: 0.16, sway: 0.1, swayTurns: 1.5 };
-// proposta 12/11: the colours cross-fade between these points of t.
-const LOOK_FADE = [0.04, 0.3];
-// proposta 12/11: the Ring's far side, arched across the sky ahead: the
-// whole Ring again at `scale` × its size, its centre `at` [right, height,
-// ahead] of the ship in the flight's final heading turned `yaw` toward its
-// start (it keeps that offset: too far to parallax), its plane stood `lift`
-// radians up so its arc rises over the horizon.
-const SKY_ARC = { scale: 3.5, at: [0, -3500, -10000], yaw: -0.35, lift: 1.2 };
 // proposta 12/11: the dust streaks: `count` in a box `half` wide and high
 // round the flight line, from `ahead` in front to `behind` the ship, none
 // within `clear` of it; each `length` long (× 0.6..1.4) and `width` thick,
@@ -221,16 +177,34 @@ function travelPlaces(to) {
 }
 
 /**
- * Share of the flight's length flown by t: a cruise, then from
- * FLIGHT.brake a steady slowing to rest at 1 (speed continuous).
+ * The spans of a journey's t between its `lines` (typed, then held: the
+ * text stands still), over `durationMs`.
  */
-function flown(t) {
-  const x = Math.min(1, Math.max(0, t));
-  const b = FLIGHT.brake;
-  const v = 2 / (1 + b);
-  if (x <= b) return v * x;
-  const d = x - b;
-  return v * (b + d - (d * d) / (2 * (1 - b)));
+export function linePauses(lines, durationMs) {
+  const pauses = [];
+  let at = 0;
+  lines.forEach((line) => {
+    const typed =
+      at + (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+    at = typed + (line.holdMs ?? TRAVEL.lineHoldMs);
+    pauses.push([typed / durationMs, at / durationMs]);
+  });
+  return pauses;
+}
+
+/**
+ * The journey's shape to sector `to`: where it leaves from and goes to
+ * (world.js place ids, null for deep space) and whether it jumps (into a
+ * new chapter, and the opening).
+ */
+export function travelLeg(to) {
+  const sector = sectorById(to) ?? SECTORS[0];
+  const before = SECTORS[SECTORS.indexOf(sector) - 1];
+  return {
+    from: before?.look?.backdrop ?? null,
+    to: sector.look?.backdrop ?? null,
+    jumps: !before || !nextInChapter(before),
+  };
 }
 
 /**
@@ -251,12 +225,29 @@ function smooth(a, b, x) {
   return k * k * (3 - 2 * k);
 }
 
-// The chunks of the Ring the flight passes, built at their close levels
-// with the scene (the loading screen): no build mid-flight.
+// proposta 13/11: how far round each place (radians of the Ring) a
+// journey's camera comes close to it: a jump's drop-out and the arrival.
+const SKIRT = 0.4;
+
+// The chunks of the Ring a hop skims and those round the places, built at
+// their close levels with the scene (the loading screen): no build
+// mid-flight.
 function prepareTravelRing(ring) {
+  const spans = [];
+  SECTORS.forEach((sector, i) => {
+    const a = PLACE_ANGLES[sector.look?.backdrop];
+    if (a === undefined) return;
+    spans.push([a - SKIRT, a + SKIRT]);
+    const next = SECTORS[i + 1];
+    const b = PLACE_ANGLES[next?.look?.backdrop];
+    if (nextInChapter(sector) && b !== undefined) {
+      spans.push([Math.min(a, b), Math.max(a, b)]);
+    }
+  });
   ring.chunks.forEach((chunk) => {
-    if (chunk.phi + chunk.half < -0.1) return;
-    if (chunk.phi - chunk.half > FLIGHT.arc + 0.1) return;
+    const lo = chunk.phi - chunk.half;
+    const hi = chunk.phi + chunk.half;
+    if (!spans.some(([a, b]) => hi >= a && lo <= b)) return;
     ring.build(chunk, 1);
     ring.build(chunk, 2);
   });
@@ -268,13 +259,12 @@ export class TravelScene {
     this.t = t;
     this.active = false;
     this.places = travelPlaces(null);
+    this.leg = travelLeg(null);
     this.jumps = false;
     this.pulls = false;
     this.opening = false;
-    this.near = [FLIGHT.skim, FLIGHT.skim];
     this.look = { from: this.places.from, to: this.places.to, mix: 0 };
     this.bare = null;
-    this.setId = null;
     this.startedAt = 0;
     this.durationMs = 1;
     this.frozenAt = null;
@@ -282,14 +272,23 @@ export class TravelScene {
     this.end = new THREE.Vector3();
     this.turn = 0;
     this.k = 0;
-    this.ship = new THREE.Vector3();
-    this.forward = new THREE.Vector3();
+    this.map = new WorldMap(THREE);
+    this.motion = new ShipMotion(THREE);
+    this.shots = new ShotPlan(THREE);
+    this.fromFrame = {
+      position: new THREE.Vector3(),
+      heading: new THREE.Vector3(),
+      angle: 0,
+    };
+    this.toFrame = {
+      position: new THREE.Vector3(),
+      heading: new THREE.Vector3(),
+      angle: 0,
+    };
+    this.ship = this.motion.position;
+    this.forward = this.motion.forward;
     this.right = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
-    this.heading = 0;
-    this.pitch = 0;
-    this.bank = 0;
-    this.main = 1;
     this.focus = { x: HALF_W, y: HALF_H };
     this.introPos = new THREE.Vector3();
     this.introQuat = new THREE.Quaternion();
@@ -298,27 +297,20 @@ export class TravelScene {
     this.offset = new THREE.Vector3();
     this.introOffset = new THREE.Vector3();
     this.aim = new THREE.Vector3();
-    this.ringStart = new THREE.Vector3();
-    // The set ahead's pose: a view like the chase camera's, `ahead` further
-    // on, standing in for the intro's first pose.
     this.eye = new THREE.Vector3();
-    this.behind = new THREE.Vector3();
-    this.chaseEye = new THREE.Vector3();
-    this.chaseQuat = new THREE.Quaternion();
-    this.viewPos = new THREE.Vector3();
-    this.viewQuat = new THREE.Quaternion();
-    this.look4 = new THREE.Matrix4();
-    this.view4 = new THREE.Matrix4();
-    this.intro4 = new THREE.Matrix4();
+    this.ringAt = new THREE.Vector3();
+    // The place left's set, posed where that place stands (start()).
+    this.leftPos = new THREE.Vector3();
+    this.leftQuat = new THREE.Quaternion();
+    this.leftScale = new THREE.Vector3();
+    this.pose4 = new THREE.Matrix4();
+    this.home4 = new THREE.Matrix4();
+    this.yawQuat = new THREE.Quaternion();
     this.unit = new THREE.Vector3(1, 1, 1);
-    this.side = new THREE.Vector3(1, 0, 0);
-    this.lifted = new THREE.Quaternion();
     const ring = t.backdrop.ring;
     this.idle = ring.uniforms.uIdle.value.clone();
     this.streaks = this.buildStreaks(THREE);
     t.scene.add(this.streaks);
-    this.skyArc = this.buildSkyArc(THREE, ring);
-    t.scene.add(this.skyArc);
     this.veil = this.buildVeil(THREE);
     t.overlay.add(this.veil);
     prepareTravelRing(ring);
@@ -386,20 +378,6 @@ export class TravelScene {
     return mesh;
   }
 
-  // The Ring's far side for the sky: its chunks' far geometry again, in its
-  // material, posed by frame().
-  buildSkyArc(THREE, ring) {
-    const group = new THREE.Group();
-    ring.chunks.forEach((chunk) => {
-      const mesh = new THREE.Mesh(chunk.meshes[0].geometry, ring.material);
-      mesh.renderOrder = -10;
-      mesh.frustumCulled = false;
-      group.add(mesh);
-    });
-    group.visible = false;
-    return group;
-  }
-
   buildVeil(THREE) {
     this.veilUniforms = {
       uTint: { value: new THREE.Color(JUMP.tint) },
@@ -431,14 +409,10 @@ export class TravelScene {
    */
   start(to, durationMs, player, frozenAt = null) {
     this.places = travelPlaces(to);
-    const sector = sectorById(to) ?? SECTORS[0];
-    const before = SECTORS[SECTORS.indexOf(sector) - 1];
-    this.opening = !before;
-    this.jumps = this.opening || !nextInChapter(before);
-    this.pulls = sector.id === PULL.to;
-    this.setId = this.places.to.backdrop ?? null;
-    this.near[0] = FLIGHT.skim;
-    this.near[1] = PLACE_SETS[this.setId]?.offRing ?? FLIGHT.skim;
+    this.leg = travelLeg(to);
+    this.opening = !this.leg.from;
+    this.jumps = this.leg.jumps;
+    this.pulls = (sectorById(to) ?? SECTORS[0]).id === PULL.to;
     // Over the last second the field's drifting fragments come in.
     this.bare = {
       ...this.places.to,
@@ -453,9 +427,35 @@ export class TravelScene {
     this.frozenAt = frozenAt;
     const at = player?.position ?? { x: HALF_W, y: HALF_H };
     this.end.set(at.x - HALF_W, 0, at.y - HALF_H);
-    // The flight below heads up the field (−π/2) as it lands: turned to
-    // the spawn's heading.
+    // The world's heading down the arc lands up the field (−π/2), turned
+    // to the spawn's heading.
     this.turn = (player?.angle ?? -Math.PI / 2) + Math.PI / 2;
+    placeFrame(this.leg.to, this.toFrame);
+    placeFrame(this.leg.from, this.fromFrame);
+    this.map.set(this.toFrame, this.end, this.turn);
+    this.motion.plan(
+      this.map,
+      this.fromFrame,
+      this.toFrame,
+      durationMs,
+      this.jumps ? JUMP.at : null,
+      this.opening
+    );
+    const lines = travelTransmissions(to, TRAVEL.lineHoldMs);
+    this.shots.plan(this.motion, durationMs, linePauses(lines, durationMs));
+    // The place left's set: where it stands in the world, as the place
+    // reached's stands on the spawn (its set's own pose).
+    this.map.point(this.fromFrame.position, this.leftPos);
+    this.yawQuat.setFromAxisAngle(
+      this.up,
+      -(this.map.yaw + this.fromFrame.angle)
+    );
+    this.pose4.compose(this.leftPos, this.yawQuat, this.unit);
+    this.yawQuat.setFromAxisAngle(this.up, -this.turn);
+    this.home4.compose(this.end, this.yawQuat, this.unit).invert();
+    this.pose4
+      .multiply(this.home4)
+      .decompose(this.leftPos, this.leftQuat, this.leftScale);
     this.active = true;
     this.streaks.visible = true;
   }
@@ -464,10 +464,10 @@ export class TravelScene {
     if (!this.active) return;
     this.active = false;
     this.streaks.visible = false;
-    this.skyArc.visible = false;
     this.veil.visible = false;
     this.t.veil.setLevel(1);
     this.t.backdrop.places.setFlight(null);
+    this.t.backdrop.places.setFlight(null, 0, 0, 0, 1);
     this.t.backdrop.setArrival(1);
     const ring = this.t.backdrop.ring;
     ring.offset.set(0, 0, 0);
@@ -478,125 +478,57 @@ export class TravelScene {
     ring.uniforms.uHazeDepth.value = RING_LOOK.hazeDepth;
   }
 
-  // Share of the way from skimming the Ring to the destination's distance
-  // at t: a jump drops there at once, under its white-out.
-  closeness(t) {
-    if (this.jumps) return Number(t >= JUMP.at);
-    return smooth(FLIGHT.peel[0], FLIGHT.peel[1], t);
-  }
-
-  // The ship's place in the flight frame (the spawn at the origin, heading
-  // −z as it lands) after share `f` of the flight at t, into `out`.
-  flightPoint(f, t, out) {
-    const phi = FLIGHT.arc * (1 - f);
-    const close = this.closeness(t);
-    const [side0, height0] = this.near[0];
-    const [side1, height1] = this.near[1];
-    const side = side0 + (side1 - side0) * close;
-    const height = height0 + (height1 - height0) * close;
-    const radius = RING.radius * FLIGHT.scale - side;
-    const last = RING.radius * FLIGHT.scale - side1;
-    return out.set(
-      radius * Math.cos(phi) - last,
-      height - height1,
-      radius * Math.sin(phi)
-    );
-  }
-
   get progress() {
     if (this.frozenAt !== null) return Math.min(1, Math.max(0, this.frozenAt));
     return Math.min(1, (performance.now() - this.startedAt) / this.durationMs);
   }
 
-  // (x, z) turned by the spawn's heading, about the end point, into `out`.
-  place(x, y, z, out) {
-    const c = Math.cos(this.turn);
-    const s = Math.sin(this.turn);
-    return out.set(
-      this.end.x + x * c - z * s,
-      this.end.y + y,
-      this.end.z + x * s + z * c
-    );
-  }
-
-  // How much further off the place ahead is than the intro will see it.
-  destinationAhead(t, f) {
-    const toRise = Math.max(0, 1 - f / flown(FLIGHT.rise));
-    if (!this.jumps) return DESTINATION.ahead * toRise;
-    if (t < JUMP.at) return DESTINATION.opening;
-    // Out of the jump it rushes in, then closes slowly.
-    const x = Math.min(1, (t - JUMP.at) / (FLIGHT.rise - JUMP.at));
-    return DESTINATION.drop * (1 - x) ** 2 * (1 - 0.6 * x) * (toRise > 0);
-  }
-
-  destinationShare(t) {
-    if (this.opening) return 1;
-    if (this.jumps) return Number(t >= JUMP.at);
-    return smooth(DESTINATION.appear[0], DESTINATION.appear[1], t);
+  // Distance the ship has flown by t (both legs of a jump), world units.
+  travelled(t) {
+    const { motion } = this;
+    if (!motion.leapt(t)) return motion.beforeTime.distance(t);
+    return motion.before.length + motion.afterTime.distance(t);
   }
 
   /**
    * This frame of the flight, after the rig has posed `camera` on the
-   * intro's first pose: the ship's pose, the camera, the Ring, the place
-   * ahead, the look and the streaks. `pixelHeight`: the frame's height in
-   * pixels.
+   * intro's first pose: the ship's pose, the camera, the Ring, the places,
+   * the look and the streaks. `pixelHeight`: the frame's height in pixels.
    */
   frame(camera, pixelHeight) {
     const t = this.progress;
-    const f = flown(t);
     const k = easeInOut((t - FLIGHT.rise) / (1 - FLIGHT.rise));
     this.k = k;
     const hand = smooth(1 - TRAVEL.handOffMs / this.durationMs, 1, t);
-
-    // The ship closing in on the laid Ring, heading along its flight.
-    const { ship, forward, aim } = this;
-    this.flightPoint(f, t, aim);
-    this.place(aim.x, aim.y, aim.z, ship);
-    this.flightPoint(Math.max(0, f - 0.002), t, forward);
-    this.place(forward.x, forward.y, forward.z, forward);
-    if (f > 0.002) forward.subVectors(ship, forward).normalize();
-    else forward.set(0, 0, -1);
-    this.pitch = Math.asin(forward.y);
+    const { motion, ship, forward } = this;
+    motion.sample(t);
     this.right.set(-forward.z, 0, forward.x).normalize();
-    this.heading = Math.atan2(forward.z, forward.x);
-    const sway = Math.sin(t * Math.PI * 2 * BANK.swayTurns);
-    this.bank = (BANK.base + BANK.sway * sway) * (1 - k);
-    this.main = FLIGHT.thrust * (1 - k);
 
     // The Ring laid for the flight at its flight size, then back to its
-    // place; its far side arched over the sky while it flies.
+    // place.
     const ring = this.t.backdrop.ring;
-    const size = RING.radius * FLIGHT.scale;
-    const last = size - this.near[1][0];
-    this.place(-last, -this.near[1][1], 0, this.ringStart);
+    this.ringAt.set(0, 0, 0);
+    this.map.point(this.ringAt, this.ringAt);
     ring.offset
       .set(
-        this.ringStart.x - RING.centre[0],
-        this.ringStart.y - RING.centre[1],
-        this.ringStart.z - RING.centre[2]
+        this.ringAt.x - RING.centre[0],
+        this.ringAt.y - RING.centre[1],
+        this.ringAt.z - RING.centre[2]
       )
       .multiplyScalar(1 - k);
     ring.follow = RING.follow * k;
-    ring.object.rotation.set(-RING.tilt * k, -this.turn * (1 - k), 0);
-    ring.object.scale.setScalar(FLIGHT.scale + (1 - FLIGHT.scale) * k);
+    ring.object.rotation.set(-RING.tilt * k, -this.map.yaw * (1 - k), 0);
+    ring.object.scale.setScalar(WORLD.scale + (1 - WORLD.scale) * k);
     ring.uniforms.uIdle.value
       .copy(this.idle)
       .multiplyScalar(FLIGHT.lights + (1 - FLIGHT.lights) * k);
     ring.uniforms.uHazeDepth.value =
       RING_LOOK.hazeDepth * (FLIGHT.haze + (1 - FLIGHT.haze) * k);
-    const [sx, sy, sz] = SKY_ARC.at;
-    const c = Math.cos(SKY_ARC.yaw);
-    const s = Math.sin(SKY_ARC.yaw);
-    this.place(sx * c + sz * s, sy, sz * c - sx * s, this.skyArc.position)
-      .sub(this.end)
-      .add(this.ship);
-    this.skyArc.rotation.set(SKY_ARC.lift, SKY_ARC.yaw - this.turn, 0, 'YXZ');
-    this.skyArc.scale.setScalar(SKY_ARC.scale);
 
-    // The chase pose, then eased into the intro's, which the rig holds
-    // under it: both relative to the ship (it lands on the spawn the intro
-    // looks at), the distance growing geometrically so the ship stays in
-    // the shot while the camera climbs.
+    // The shot, then eased into the intro's pose, which the rig holds under
+    // it: both relative to the ship (it lands on the spawn the intro looks
+    // at), the distance growing geometrically so the ship stays in the
+    // shot while the camera climbs.
     this.introPos.copy(camera.position);
     this.introQuat.copy(camera.quaternion);
     this.introUp.set(0, 1, 0).applyQuaternion(this.introQuat);
@@ -606,35 +538,34 @@ export class TravelScene {
       .add(this.introPos)
       .sub(this.end);
     this.introOffset.copy(this.introPos).sub(this.end);
-    this.offset
-      .copy(this.forward)
-      .multiplyScalar(-CHASE.back)
-      .addScaledVector(this.right, CHASE.right);
-    this.offset.y += CHASE.up;
-    this.aim.copy(this.forward).multiplyScalar(CHASE.ahead);
-    this.aim.y += CHASE.lift;
-    this.poseDestination(t, f, k, hand);
-    const near = this.offset.length();
-    const far = this.introOffset.length();
-    this.offset
-      .divideScalar(near)
-      .lerp(this.introOffset.divideScalar(far), k)
-      .normalize()
-      .multiplyScalar(near * (far / near) ** k);
-    camera.position.copy(this.ship).add(this.offset);
-    this.aim.lerp(this.introAim, k).add(this.ship);
+    const roll = this.shots.pose(t, motion, this.eye, this.aim);
+    this.offset.subVectors(this.eye, ship);
+    this.aim.sub(ship);
+    this.posePlaces(t, hand);
+    if (k > 0) {
+      const near = this.offset.length();
+      const far = this.introOffset.length();
+      this.offset
+        .divideScalar(near)
+        .lerp(this.introOffset.divideScalar(far), k)
+        .normalize()
+        .multiplyScalar(near * (far / near) ** k);
+      this.aim.lerp(this.introAim, k);
+    }
+    camera.position.copy(ship).add(this.offset);
+    this.aim.add(ship);
     camera.up.set(0, 1, 0).lerp(this.introUp, k);
     camera.lookAt(this.aim);
-    camera.rotateZ(this.bank * CHASE.roll);
+    camera.rotateZ(roll * (1 - k));
     camera.quaternion.slerp(this.introQuat, k ** 4);
 
     // The field's border and drifting fragments fade in over the last
-    // second; the place's own set already flies ahead.
+    // second; the place's own set already stands ahead.
     this.t.veil.setLevel(hand);
     this.t.backdrop.setArrival(smooth(0.3, 1, k));
     this.look.mix = this.jumps
       ? Number(t >= JUMP.at)
-      : smooth(LOOK_FADE[0], LOOK_FADE[1], t);
+      : smooth(PLACES.look[0], PLACES.look[1], t);
     this.look.from = this.places.from;
     this.look.to = this.places.to;
     if (hand > 0) {
@@ -643,7 +574,7 @@ export class TravelScene {
     }
 
     // The jump: the streaks pull into a tunnel and stretch, the frame
-    // whites out, and the ship drops out in front of the new place.
+    // whites out, and the ship drops out short of the new place.
     const build = this.jumps ? smooth(JUMP.from, JUMP.at, t) : 0;
     const tunnel = t < JUMP.at ? build : 0;
     const stretch = this.jumps
@@ -660,30 +591,28 @@ export class TravelScene {
     this.veilUniforms.uAspect.value = camera.aspect;
     this.veil.visible = white > 0.001 || tunnel > 0.001;
 
-    // The Ring hides while the ship is out of it: before the opening's
-    // jump, and inside a jump's tunnel.
+    // The Ring hides while the ship is out of it: in deep space before the
+    // opening's jump, and inside a jump's tunnel.
     let inRing = 1;
-    if (this.opening) inRing = 0;
-    else if (this.jumps && t < JUMP.at) {
-      inRing = 1 - smooth(JUMP.from, JUMP.at - 0.04, t);
+    if (this.jumps && t < JUMP.at) {
+      inRing = this.opening ? 0 : 1 - smooth(JUMP.from, JUMP.at - 0.04, t);
     }
     const shown = ring.material.opacity * (inRing + (1 - inRing) * k);
     ring.material.opacity = shown;
     ring.material.transparent = shown < 0.999;
     ring.object.visible = shown > 0.001;
-    this.skyArc.visible = shown > 0.001 && k < 0.6;
-    this.focus.x = this.ship.x + HALF_W;
-    this.focus.y = this.ship.z + HALF_H;
+    this.focus.x = ship.x + HALF_W;
+    this.focus.y = ship.z + HALF_H;
 
     const u = this.uniforms;
-    u.uOrigin.value.copy(this.ship);
-    u.uForward.value.copy(this.forward);
+    u.uOrigin.value.copy(ship);
+    u.uForward.value.copy(forward);
     u.uRight.value.copy(this.right);
     // Pulled in, the dust outruns the ship toward the place ahead (its
     // share steps in under a jump's white-out).
-    const pull = this.pulls ? this.destinationShare(t) : 0;
+    const pull = this.pulls ? this.reachShare(t) : 0;
     u.uTravel.value =
-      f * FLIGHT.arc * last * STREAKS.gain +
+      this.travelled(t) * STREAKS.gain +
       (this.jumps ? jumpDistance(t) * JUMP.speed * STREAKS.ahead * 4 : 0) -
       (pull * PULL.speed * t * this.durationMs) / 1000;
     u.uPull.value = pull * PULL.gather;
@@ -696,72 +625,45 @@ export class TravelScene {
     u.uColor.value.copy(this.t.biomes.look.dustColor);
   }
 
-  // The destination's set ahead: posed so a view like the chase camera's,
-  // `ahead` further on, sees it as the intro's first pose will; that view
-  // eases into the intro's own pose as the camera rises, where the set is
-  // back in its place. `this.offset` and `this.aim` hold the chase pose;
-  // the view moves with the world as much as DESTINATION.hold says.
-  poseDestination(t, f, k, hand) {
+  // Share of the place reached's set shown at t.
+  reachShare(t) {
+    if (this.jumps) return Number(t >= JUMP.at);
+    return smooth(PLACES.reach[0], PLACES.reach[1], t);
+  }
+
+  // Share of the place left's set shown at t.
+  leaveShare(t) {
+    if (this.opening) return 0;
+    if (this.jumps) return Number(t < JUMP.at);
+    return 1 - smooth(PLACES.leave[0], PLACES.leave[1], t);
+  }
+
+  // The two places' sets, each standing where its place is in the world:
+  // the place reached's in its own pose (the ship lands on its spawn), the
+  // place left's where start() put it; both laid out for the intro's aim.
+  posePlaces(t, hand) {
     const places = this.t.backdrop.places;
-    const share = this.destinationShare(t);
-    if (!this.setId || share <= 0) {
-      places.setFlight(null);
-      return;
-    }
-    const at = this.introAim;
-    const group = places.setFlight(
-      this.setId,
-      Math.max(share, hand),
-      at.x + this.end.x,
-      at.z + this.end.z
+    const x = this.introAim.x + this.end.x;
+    const z = this.introAim.z + this.end.z;
+    const reach = Math.max(this.reachShare(t), hand);
+    places.setFlight(reach > 0 ? this.leg.to : null, reach, x, z);
+    const leave = this.leaveShare(t) * (1 - hand);
+    const left = places.setFlight(
+      leave > 0 ? this.leg.from : null,
+      leave,
+      x,
+      z,
+      1
     );
-    if (!group) return;
-    // The chase view now, and at the rise, fixed in the world: posed
-    // DESTINATION.hold of the way to the latter, the ship closes in on the
-    // set and turns and sways under it, so it parallaxes.
-    const { eye, behind } = this;
-    this.chaseEye.copy(this.ship).add(this.offset);
-    this.viewPos.copy(this.ship).add(this.aim);
-    this.look4.lookAt(this.chaseEye, this.viewPos, this.up);
-    this.chaseQuat.setFromRotationMatrix(this.look4);
-    const fr = flown(FLIGHT.rise);
-    this.flightPoint(fr, FLIGHT.rise, behind);
-    this.place(behind.x, behind.y, behind.z, eye);
-    this.flightPoint(fr - 0.002, FLIGHT.rise, behind);
-    this.place(behind.x, behind.y, behind.z, behind);
-    behind.subVectors(eye, behind).normalize();
-    this.viewPos.copy(behind).multiplyScalar(CHASE.ahead).add(eye);
-    this.viewPos.y += CHASE.lift;
-    const across = CHASE.right / Math.hypot(behind.x, behind.z);
-    eye.addScaledVector(behind, -CHASE.back);
-    eye.x -= behind.z * across;
-    eye.y += CHASE.up;
-    eye.z += behind.x * across;
-    this.look4.lookAt(this.eye, this.viewPos, this.up);
-    this.viewQuat
-      .setFromRotationMatrix(this.look4)
-      .slerp(this.chaseQuat, 1 - DESTINATION.hold);
-    eye.lerp(this.chaseEye, 1 - DESTINATION.hold);
-    this.lifted.setFromAxisAngle(this.side, DESTINATION.lift);
-    this.viewQuat.multiply(this.lifted);
-    this.viewPos
-      .set(0, 0, -1)
-      .applyQuaternion(this.viewQuat)
-      .multiplyScalar(this.destinationAhead(t, f))
-      .add(this.eye)
-      .lerp(this.introPos, k);
-    this.viewQuat.slerp(this.introQuat, k);
-    this.view4.compose(this.viewPos, this.viewQuat, this.unit);
-    this.intro4.compose(this.introPos, this.introQuat, this.unit).invert();
-    this.view4
-      .multiply(this.intro4)
-      .decompose(group.position, group.quaternion, group.scale);
+    if (!left) return;
+    left.position.copy(this.leftPos);
+    left.quaternion.copy(this.leftQuat);
   }
 
   /** The ship mirror on its flight pose, engines lit; after its update. */
   poseShip(mirror, level, time) {
     mirror.group.position.copy(this.ship);
-    mirror.group.rotation.set(this.bank, -this.heading, this.pitch);
-    mirror.lightEngines(this.main, level, time);
+    this.motion.pose(mirror.group.quaternion);
+    mirror.lightEngines(this.motion.thrust, level, time);
   }
 }

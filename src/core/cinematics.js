@@ -48,7 +48,8 @@ const WAKE_START = 0.2;
  * Dev captures: `?cinematic=intro&t=0.4` (or `epilogue`) freezes that
  * cinematic's camera at t while it plays. `?cinematic=travel&t=0.4` makes
  * any run start fly the journey, frozen at t, to `&sector=<id>` (the opening
- * to the first sector without it). Null without the flag.
+ * to the first sector without it); without `t` that journey plays on
+ * (to film it). Null without the flag.
  */
 export function cinematicFreezeFromUrl() {
   try {
@@ -56,9 +57,10 @@ export function cinematicFreezeFromUrl() {
     const kind = params.get('cinematic');
     const t = Number(params.get('t'));
     if (!['intro', 'epilogue', 'travel'].includes(kind)) return null;
+    const plays = kind === 'travel' && !params.has('t');
     return {
       kind,
-      t: Number.isFinite(t) ? t : 0.5,
+      t: plays ? null : Number.isFinite(t) ? t : 0.5,
       sector: params.get('sector'),
     };
   } catch {

@@ -32,8 +32,12 @@ export class PlaceSets {
     // The share of a place where the Ring sleeps through a win (`wakes`).
     this.sleeps = 0;
     this.aim = new THREE.Vector3();
-    // The set a journey flies toward (setFlight), shown on top of the look.
-    this.flight = { id: null, share: 0, x: 0, z: 0 };
+    // The sets a journey flies toward and away from (setFlight: slots 0
+    // and 1), shown on top of the look.
+    this.flights = [
+      { id: null, share: 0, x: 0, z: 0 },
+      { id: null, share: 0, x: 0, z: 0 },
+    ];
     // An LOD's update(camera) runs every frame before its children draw.
     this.object = new THREE.LOD();
     this.object.update = (camera) => this.update(camera);
@@ -58,13 +62,14 @@ export class PlaceSets {
   }
 
   /**
-   * The journey's view of set `id` (travelScene.js): shown at `share` on
-   * top of the look's without hiding the Ring, its layers laid out for a
-   * camera aiming at field point (x, z); the journey poses its group, which
-   * this returns. Null ends it and puts the group back in place.
+   * The journey's view of set `id` in `slot` (travelScene.js: 0 the place
+   * it flies toward, 1 the place it leaves): shown at `share` on top of the
+   * look's without hiding the Ring, its layers laid out for a camera aiming
+   * at field point (x, z); the journey poses its group, which this returns.
+   * Null ends it and puts the group back in place.
    */
-  setFlight(id, share = 0, x = 0, z = 0) {
-    const { flight } = this;
+  setFlight(id, share = 0, x = 0, z = 0, slot = 0) {
+    const flight = this.flights[slot];
     if (flight.id !== id) {
       const left = this.built.get(flight.id)?.object;
       left?.position.set(0, 0, 0);
@@ -77,6 +82,13 @@ export class PlaceSets {
     flight.z = z;
     this.apply();
     return this.built.get(id)?.object ?? null;
+  }
+
+  // The flight slot showing set `id`, or null.
+  flightOf(id) {
+    const [a, b] = this.flights;
+    if (a.id === id) return a;
+    return b.id === id ? b : null;
   }
 
   shareOf(id) {
@@ -93,7 +105,7 @@ export class PlaceSets {
     for (let i = 0; i < this.list.length; i += 1) {
       const set = this.list[i];
       const look = this.shareOf(set.id);
-      const flying = this.flight.id === set.id ? this.flight.share : 0;
+      const flying = this.flightOf(set.id)?.share ?? 0;
       const share = Math.max(look, flying);
       set.object.visible = share > 0.001;
       for (let m = 0; m < set.materials.length; m += 1) {
@@ -140,9 +152,9 @@ export class PlaceSets {
     for (let i = 0; i < this.list.length; i += 1) {
       const set = this.list[i];
       if (!set.object.visible) continue;
-      const flying = this.flight.id === set.id;
-      const x = flying ? this.flight.x : camera.position.x + aim.x * reach;
-      const z = flying ? this.flight.z : camera.position.z + aim.z * reach;
+      const flying = this.flightOf(set.id);
+      const x = flying ? flying.x : camera.position.x + aim.x * reach;
+      const z = flying ? flying.z : camera.position.z + aim.z * reach;
       for (let j = 0; j < set.layers.length; j += 1) {
         const { holder, anchor, follow } = set.layers[j];
         holder.position.set(
