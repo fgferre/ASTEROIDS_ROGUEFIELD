@@ -27,9 +27,21 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
    por mim", cartas de partida nas fases 2 e 3, fala repetida cortada, nome certo do chefe no cartão final, viagem
    refeita (escala, destino à frente, salto). Em aberto, para depois de ele jogar: Prime com mais vida e pedras do
    Quarry Maw menos punitivas (o primeiro chefe dura mais que o guardião do capítulo); dano de pedra nos capítulos II
-   e III; Herald of Heat duas vezes no capítulo II; rachaduras acesas nas viagens 4→5 e 5→6; destroços correndo para
-   o centro na viagem 9→10; Null mais dura que o chefe final; o piloto de teste que trava num canto.
-8. **Curva da campanha** (medida acima): o capítulo II é um degrau e Sovereign é fácil para onde está. [ ]
+   e III; rachaduras acesas nas viagens 4→5 e 5→6; destroços correndo para o centro na viagem 9→10; o piloto de
+   teste que trava num canto.
+8. **Curva da campanha** (medidas abaixo, doze sementes): o capítulo II deixou de ser degrau (Furnace Drift 1 → 7,
+   Resonance Chamber 5 → 8) e o Crisol virou a fase mais dura (12 → 6), com a luta do Sovereign a mais longa (219–299
+   s, acima da Null). [x] Em aberto: Assembly Graveyard e Quarantine Grid vencem 11 de 12 sem perder casco — mexer nas
+   etapas não muda nada, o casco volta cheio antes de cada Sentinel; pede comportamento do Sentinel ou menos cura, e
+   isso ele julga jogando.
+9. **Unidade** (dúvida dele, 12/11: cada sessão pode ter feito do seu jeito): revisão do conjunto e correção. Feito: o
+   Anel tem mil anos em toda fala; falas de chefe numa tabela só, por tipo (`STORY.boss`), com fala de última etapa
+   para os dez; Null Boundary com chegada própria; no Crisol quem fala na morte é o Anel; Herald of Heat uma vez só;
+   a viagem lê capítulo e distância de onde já estavam (`PLACE_SETS.offRing`); roteiro igual ao jogo; fichas de fase e
+   de chefe na mesma forma; deriva e puxão de pedras dos chefes num lugar só (`enemies/boss/drift.js`, `rockPull.js`),
+   com dez voos gravados do piloto repetidos idênticos. [x] Deixado para ele julgar: só os
+   cenários do capítulo II, da Null e do Crisol reagem à vitória; "Interdictor"/"THE INTERDICTOR" e "Warden
+   Choir"/"THE CHOIR" (já eram assim na `main`).
 
 Lição de 12/11: com quatro sessões e seus ajudantes a máquina passa de carga 100 e os testes estouram o tempo; não
 gravar nada sem teste verde — rodar só os testes do que tocou, com `--testTimeout` longo, e a bateria inteira depois.
@@ -66,6 +78,12 @@ para um `worker` em opus (CLAUDE.md). SFX: AudioLDM (`SOUND.md`). Visão de hori
   O degrau é o capítulo II. Granada do Caster (mira fixa, raio 90): em 12 sementes, Furnace Drift 0 → 2 vitórias e
   chega ao chefe 1 → 9 vezes; Resonance Chamber igual (4 de 12). Uma semente vira com qualquer mudança: três sementes
   é pouco, doze é o mínimo para comparar.
+- Curva (12/11 à noite, piloto bom, doze sementes, vitórias; estouro de 25 min não conta como morte): Debris Wake 10 ·
+  Salvage Lanes 10 · Prime Gate 8 · Furnace Drift 7 (era 1) · Crystal Choir 7 · Resonance Chamber 8 (era 5) · Assembly
+  Graveyard 11 · Quarantine Grid 11 · Null Boundary 6 · The Crucible 6 (era 12). Com doze sementes, ±1–2 é ruído: "cada
+  fase um pouco mais dura que a anterior" não se resolve com o piloto. O piloto mediano (seis sementes) vence 1–2 no
+  capítulo II e 0 no Crisol. Mudado: Kiln (vida 65 → 55 % do Choir, queimadura 0,15 → 0,10), surto e anel da etapa 4 da
+  Furnace, 28 pedras no Choir da Resonance Chamber, Sovereign (vida 0,48 → 0,55, etapas em 88 % e 62 %, barreira 0,3 → 0,6).
 
 ## Rodada 15 — frentes ainda abertas (as 1–4 estão na `main`; veredito dele em `docs/PENDENCIAS.md`)
 
