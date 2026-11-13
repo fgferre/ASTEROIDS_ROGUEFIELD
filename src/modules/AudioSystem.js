@@ -823,6 +823,7 @@ class AudioSystem extends BaseSystem {
       this.musicMixer.resetRun();
     }
     this.journeyCue.stop();
+    clearTimeout(this.chapterStingerTimer);
     this.runEnemyCount = 0;
     this.listenerX = GAME_WIDTH / 2;
     this.listenerY = GAME_HEIGHT / 2;

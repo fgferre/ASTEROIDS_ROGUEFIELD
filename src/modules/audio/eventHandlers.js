@@ -15,6 +15,9 @@ import {
  * Pan + distance mix of an enemy-side cue from its source position; no
  * distance mix when the position is unknown.
  */
+// How long the chapter stinger waits for a journey to claim its motif.
+const CHAPTER_STINGER_WAIT_MS = 400;
+
 export function sourceSpatial(audio, data) {
   const position = data?.position || data?.enemy || null;
   const known = Number.isFinite(position?.x) && Number.isFinite(position?.y);
@@ -122,7 +125,14 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.musicMixer.setTheme(musicThemeForLayer(wave));
     const chapterTheme = chapterThemeForLayer(wave);
     if (chapterTheme) {
-      audio.sfxBus.playChapterStinger(chapterTheme);
+      // A journey that opens the sector plays the chapter's motif itself and
+      // is planned a few frames after this (journeyPlanned): the stinger
+      // waits that long, so the motif is not heard twice.
+      clearTimeout(audio.chapterStingerTimer);
+      audio.chapterStingerTimer = setTimeout(
+        () => audio.sfxBus.playChapterStinger(chapterTheme),
+        CHAPTER_STINGER_WAIT_MS
+      );
     }
   },
 
@@ -142,6 +152,7 @@ export const AUDIO_EVENT_HANDLERS = {
   // down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
     if (audio.journeyCue.play(payload ?? {})) {
+      clearTimeout(audio.chapterStingerTimer);
       audio.musicMixer.holdForJourney(true);
     }
   },

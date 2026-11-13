@@ -250,14 +250,34 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
 
   it('wave-started on a biome’s first layer picks its theme and plays the chapter stinger', () => {
     withAudio(({ eventBus, setTheme, chapter }) => {
+      vi.useFakeTimers();
       eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
       expect(setTheme).toHaveBeenCalledWith('dense-core');
+      vi.advanceTimersByTime(500);
       expect(chapter).toHaveBeenCalledTimes(1);
       expect(chapter).toHaveBeenCalledWith('dense-core');
 
       eventBus.emit('wave-started', { wave: 7, totalEnemies: 10 });
+      vi.advanceTimersByTime(500);
       expect(chapter).toHaveBeenCalledTimes(1); // mid-biome: no stinger
+      vi.useRealTimers();
     });
+  });
+
+  it('a journey planned right after the sector starts keeps the chapter stinger silent: its score plays the motif', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    audio.journeyCue = { play: vi.fn(() => true), end: vi.fn(), stop: vi.fn() };
+    const chapter = vi.spyOn(audio.sfxBus, 'playChapterStinger');
+    vi.useFakeTimers();
+
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+    eventBus.emit('travel-planned', { moments: [], duration: 10 });
+    vi.advanceTimersByTime(500);
+    expect(chapter).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    audio.destroy();
   });
 
   it('a Warden layer takes the warden theme; boss-defeated hands back to the biome', () => {
