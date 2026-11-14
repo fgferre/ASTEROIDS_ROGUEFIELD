@@ -6,7 +6,7 @@ jogando — nunca por teste.
 
 ## O caminho até pronto (12/11, ordem do dono: _"continuar a melhoria… até ele estar realmente pronto, balanceado, sem bugs, bem acabado, história completa, fases em diferentes localizações desse universo 3D, deslocamentos em 3D entre uma fase e outra… depois pensamos em publicar"_)
 
-Nada vai para a `main` até ele dizer. Ramo de trabalho: `campanha/ajustes` (PR #305 aberta, não incorporar). Ciclos, em
+Em 13/11 à noite ele mandou publicar (_"Vamos comittar, mergear, limpar e publicar"_): a PR #305 entrou na `main`. Trabalho novo sai de um ramo novo; nada mais vai para a `main` sem ele dizer. Ciclos, em
 ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura no navegador e um commit por tarefa.
 
 1. **Roteiro** (`docs/ROTEIRO.md`): história inteira, com os lugares; todas as falas estão em `src/data/story.js`

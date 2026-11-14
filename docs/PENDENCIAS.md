@@ -6,23 +6,29 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
 
-## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NA `main`; O TRABALHO ATUAL, NO RAMO `campanha/ajustes`
+## O BASTÃO — onde as sessões pararam (13/11) — TUDO ESTÁ NA `main` E PUBLICADO
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi
 feito… quer dizer que isso é definitivo e que está bom o suficiente… você mesmo deve perceber e avaliar"_ — e autorizou
 conversas paralelas. A campanha de nove fases (seis Sentinels, três Wardens) entrou na `main` pela PR #303 (12/11) e está publicada. O
-trabalho atual está no ramo `campanha/ajustes` (PR #305 aberta; não incorporar até ele dizer); o detalhe está no `PLAN.md`. A visão do
+trabalho de 12–13/11 entrou pela PR #305 (13/11, por ordem dele); o detalhe está no `PLAN.md`. A visão do
 jogo é `docs/GAME_DESIGN_MASTER_PLAN.md` (22/10). Conteúdo hoje: 16 inimigos, 7 armas, 39 cartas, 3 cascos, 15 camadas
 na descida, 3 biomas, 3 Wardens, 3 Heralds, Sentinels por fase; o golden trace tem 26 cenários. Dois pedidos dele
 estão em conversas paralelas: audição de som e painel menor em imagens. Ele ainda não jogou nada de 12/11.
 **13/11:** ele respondeu à página de decisões (`src/exported-assets/decisoes/`, fora do git) e escolheu os sons dos
 sete chefes novos; as respostas viraram os itens 26 (complemento) e 27–32 abaixo. Ainda não publicar: _"quero jogar
 antes"_. Autorizou regravar o golden trace (feito) e arquivar as sessões e ramos de 12/11.
+**13/11 à noite:** depois de aprovar por imagem e de ouvido a viagem (filme, sons, trilha, vozes), os ataques dos
+chefes, o brilho e as vozes de todos os personagens, ele mandou: _"Vamos comittar, mergear, limpar e publicar"_ → a
+PR #305 entrou na `main` e o site tem a campanha de dez fases. **Ele ainda não jogou nada de 12–13/11**: decide
+jogando a luta do Interdictor (e se os aparelhos levam tiro), os volumes de voz/trilha, a cura, o alarme de casco
+baixo. Audição aberta, sem resposta: `src/exported-assets/audicao-armas-inimigos/` (dezesseis sons). Trabalho novo
+sai de um ramo novo a partir da `main`.
 
 **Como retomar (conversa local, qualquer máquina):**
 
-1. `git checkout campanha/ajustes && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
+1. `git checkout main && git pull && git checkout -b <ramo novo> && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
    26 cenários prova comportamento igual). Jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Captura: o
    navegador embutido da conversa local (não há scripts de sonda ou captura no repo).
 2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodada 15, oito frentes em ordem); `CONTENT.md` (como adicionar inimigo,
