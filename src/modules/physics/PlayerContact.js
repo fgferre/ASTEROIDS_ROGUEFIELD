@@ -22,12 +22,7 @@ export class PlayerContact {
    * `getNearbyEnemies(x, y, radius)`: the boss-aware spatial query.
    * `maxEnemyRadius()`: the widest enemy radius seen, which pads the query.
    */
-  constructor({
-    impacts,
-    emit,
-    getNearbyEnemies,
-    maxEnemyRadius,
-  }) {
+  constructor({ impacts, emit, getNearbyEnemies, maxEnemyRadius }) {
     this.impacts = impacts;
     this.emit = emit;
     this.getNearbyEnemies = getNearbyEnemies;
