@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import manifest from '../../../src/public/audio/voice/manifest.json' with { type: 'json' };
 import { STORY } from '../../../src/data/story.js';
 import { SECTORS } from '../../../src/data/sectors.js';
+import { BIOMES } from '../../../src/data/biomes.js';
 import { TRAVEL } from '../../../src/core/cinematics.js';
 import {
   createVoicePlayer,
@@ -42,6 +43,11 @@ function everyLine() {
   const lines = [];
   Object.keys(STORY.chapter).forEach((biome) =>
     lines.push(chapterTransmission(biome))
+  );
+  BIOMES.forEach(({ layers }) =>
+    STORY.death.forEach((_, i) =>
+      lines.push(deathTransmission({ int: () => i }, layers[0]))
+    )
   );
   SECTORS.forEach((sector) => {
     lines.push(chapterTransmission(sector.biome, sector.id));
@@ -95,6 +101,14 @@ const typingMs = (text) => (text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
 describe('recorded lines (src/public/audio/voice)', () => {
   it('every recording says a line the game can say under its key', () => {
     const lines = everyLine();
+    const deathSpeakers = ['ring', 'prime', 'choir', 'null'].map(
+      (key) => STORY.speaker[key]
+    );
+    deathSpeakers.forEach((speaker) =>
+      expect(
+        lines.some((l) => l.key.startsWith('death:') && l.speaker === speaker)
+      ).toBe(true)
+    );
     const stale = Object.entries(manifest.lines)
       .filter(([, recording]) => !lines.some((l) => voiceFor(l) === recording))
       .map(([id]) => id);
@@ -127,8 +141,26 @@ describe('voiceFor', () => {
     const text = STORY.death[0];
     expect(voiceFor({ key: 'death:0', speaker: ring, text })).toBeTruthy();
     expect(
-      voiceFor({ key: 'death:0', speaker: STORY.speaker.prime, text })
+      voiceFor({ key: 'death:0', speaker: STORY.speaker.wake, text })
     ).toBeNull();
+  });
+
+  it("gives a line said by several speakers each one's own recording", () => {
+    const text = STORY.death[0];
+    const said = (speaker) => voiceFor({ key: 'death:0', speaker, text });
+    expect(said(STORY.speaker.prime)).toBe(manifest.lines['death:0@prime']);
+    expect(said(ring)).toBe(manifest.lines['death:0']);
+    expect(said(STORY.speaker.sovereign)).toBeNull();
+  });
+
+  it("readies a run's death lines in its chapter's Warden's voice", () => {
+    BIOMES.forEach(({ layers }) => {
+      const deaths = runVoiceLines({}, layers[0]).filter(
+        (l) => l.key.startsWith('death:') && l.speaker !== ring
+      );
+      expect(deaths.length).toBeGreaterThan(0);
+      deaths.forEach((l) => expect(voiceFor(l)?.text).toBe(l.text));
+    });
   });
 });
 

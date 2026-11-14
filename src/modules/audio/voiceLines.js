@@ -2,8 +2,9 @@
 // mp3 per line). The manifest loads with the boot (a few KB; the lines play
 // text-only until it has); a line is voiced only when a recording says its
 // exact text (under its key, else `<key>@biome`, the biome's line kept apart
-// from a sector's own under the same key) and, with `only`, in that
-// speaker's mouth: a stale recording never plays over an edited line. One
+// from a sector's own under the same key, else `<key>@<speaker key>`, one
+// line said by several speakers) and, with `only`, in that speaker's mouth:
+// a stale recording never plays over an edited line. One
 // voice at a time: a line's recording loads ahead with its run's (`expect`)
 // or when it is queued, plays as it shows (one that arrives late still plays
 // if it ends before the line leaves, startsLate), and stops on a fade when
@@ -31,7 +32,10 @@ export async function loadVoiceManifest(
 
 // The manifest id of `entry`'s recording, or null.
 function recordingId({ key, text, speaker } = {}) {
-  for (const id of [key, `${key}@biome`]) {
+  const speakerKey = Object.keys(STORY.speaker).find(
+    (k) => STORY.speaker[k] === speaker
+  );
+  for (const id of [key, `${key}@biome`, `${key}@${speakerKey}`]) {
     const line = recordings[id];
     if (
       line &&

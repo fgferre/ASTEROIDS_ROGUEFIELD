@@ -372,6 +372,90 @@
       "only": "ring",
       "seconds": 4.27
     },
+    "death:0@choir": {
+      "file": "choir/death_0.mp3",
+      "speaker": "choir",
+      "text": "Link severed. Interceptor lost. The Field keeps the hull.",
+      "only": "choir",
+      "seconds": 3.91
+    },
+    "death:0@null": {
+      "file": "null/death_0.mp3",
+      "speaker": "null",
+      "text": "Link severed. Interceptor lost. The Field keeps the hull.",
+      "only": "null",
+      "seconds": 5.51
+    },
+    "death:0@prime": {
+      "file": "prime/death_0.mp3",
+      "speaker": "prime",
+      "text": "Link severed. Interceptor lost. The Field keeps the hull.",
+      "only": "prime",
+      "seconds": 4.69
+    },
+    "death:1@choir": {
+      "file": "choir/death_1.mp3",
+      "speaker": "choir",
+      "text": "Hull returned to the count. The Wake has another. The Ring has patience.",
+      "only": "choir",
+      "seconds": 4.36
+    },
+    "death:1@null": {
+      "file": "null/death_1.mp3",
+      "speaker": "null",
+      "text": "Hull returned to the count. The Wake has another. The Ring has patience.",
+      "only": "null",
+      "seconds": 6.07
+    },
+    "death:1@prime": {
+      "file": "prime/death_1.mp3",
+      "speaker": "prime",
+      "text": "Hull returned to the count. The Wake has another. The Ring has patience.",
+      "only": "prime",
+      "seconds": 5.48
+    },
+    "death:2@choir": {
+      "file": "choir/death_2.mp3",
+      "speaker": "choir",
+      "text": "Signal lost. The Ring files one more shard. The pilot is not in it.",
+      "only": "choir",
+      "seconds": 4.83
+    },
+    "death:2@null": {
+      "file": "null/death_2.mp3",
+      "speaker": "null",
+      "text": "Signal lost. The Ring files one more shard. The pilot is not in it.",
+      "only": "null",
+      "seconds": 6.11
+    },
+    "death:2@prime": {
+      "file": "prime/death_2.mp3",
+      "speaker": "prime",
+      "text": "Signal lost. The Ring files one more shard. The pilot is not in it.",
+      "only": "prime",
+      "seconds": 5.64
+    },
+    "death:3@choir": {
+      "file": "choir/death_3.mp3",
+      "speaker": "choir",
+      "text": "The Ring has been broken a thousand years. It can wait for your next hull.",
+      "only": "choir",
+      "seconds": 5.01
+    },
+    "death:3@null": {
+      "file": "null/death_3.mp3",
+      "speaker": "null",
+      "text": "The Ring has been broken a thousand years. It can wait for your next hull.",
+      "only": "null",
+      "seconds": 6.43
+    },
+    "death:3@prime": {
+      "file": "prime/death_3.mp3",
+      "speaker": "prime",
+      "text": "The Ring has been broken a thousand years. It can wait for your next hull.",
+      "only": "prime",
+      "seconds": 5.65
+    },
     "ending:severance:0": {
       "file": "ring/ending_severance_0.mp3",
       "speaker": "ring",
