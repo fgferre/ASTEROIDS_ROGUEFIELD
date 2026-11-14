@@ -10,6 +10,7 @@ import {
   deathTransmission,
   hangarTransmission,
   heraldTransmission,
+  runVoiceLines,
   sightingTransmission,
   victoryTransmission,
   wardenTransmission,
@@ -65,6 +66,23 @@ describe('TransmissionQueue', () => {
     expect(hud.showing).toBeNull();
     queue.update(1000 + typingMs + TRANSMISSION_HOLD_MS + 16);
     expect(shown).toEqual(['boss:prime:warning', 'boss:prime:defeated']);
+  });
+
+  it('tells how long a shown line stays up: typed and held', () => {
+    const shown = [];
+    const line = wardenTransmission(5, 'warning');
+    const typingMs = (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+    [false, true].forEach((reducedMotion) => {
+      const queue = new TransmissionQueue(fakeHud(), (_, onScreenMs) =>
+        shown.push(onScreenMs)
+      );
+      queue.push(line);
+      queue.update(0, reducedMotion);
+    });
+    expect(shown).toEqual([
+      typingMs + TRANSMISSION_HOLD_MS,
+      TRANSMISSION_HOLD_MS,
+    ]);
   });
 
   it('cuts a line when a banner opens and replays it afterwards', () => {
@@ -257,5 +275,79 @@ describe('deathTransmission', () => {
     expect(deathTransmission(new RandomService(1), 18).speaker).toBe(
       STORY.speaker.null
     );
+  });
+});
+
+describe('runVoiceLines', () => {
+  const keys = (start, layer) =>
+    runVoiceLines(start, layer).map((line) => line.key);
+  const deaths = STORY.death.map((_, i) => `death:${i}`);
+
+  it("a sector ending on a Sentinel: its stage lines, its Sentinel's, its machines' sightings, every death line", () => {
+    const said = keys({ sector: 'quarantine-grid' });
+    expect(said).toEqual(
+      expect.arrayContaining([
+        'chapter:quarantine-grid',
+        ...Object.keys(STORY.stage['quarantine-grid']).map(
+          (stage) => `stage:quarantine-grid:${stage}`
+        ),
+        'boss:interdictor:warning',
+        'boss:interdictor:last',
+        'boss:interdictor:defeated',
+        // marksman → Shade, minelayer → Sower, swarmer → Mite
+        'sighting:shade',
+        'sighting:sower',
+        'sighting:mite',
+        ...deaths,
+      ])
+    );
+    expect(said.some((key) => key.startsWith('boss:null'))).toBe(false);
+    expect(said).not.toContain('victory');
+    expect(new Set(said).size).toBe(said.length);
+  });
+
+  it("a sector ending on a Warden: the Warden's lines, its Herald's, and the victory on the run's last layer", () => {
+    const said = keys({ sector: 'wardens-reach' });
+    expect(said).toEqual(
+      expect.arrayContaining([
+        'boss:null:warning',
+        'boss:null:last',
+        'boss:null:defeated',
+        'herald:silence:spawned',
+        'herald:silence:defeated',
+        'victory',
+      ])
+    );
+  });
+
+  it('a Descent: the rest of the chapter and one layer on, from the layer it is at', () => {
+    const said = keys({ sector: null }, 4);
+    expect(said).toEqual(
+      expect.arrayContaining([
+        'boss:prime:warning',
+        'boss:prime:defeated',
+        // layer 6 opens the next chapter
+        'chapter:dense-core',
+        ...deaths,
+      ])
+    );
+    expect(said).not.toContain('chapter:outer-ring');
+    expect(said.some((key) => key.startsWith('boss:choir'))).toBe(false);
+    expect(keys({}, 1)).toContain('herald:dust:spawned');
+    expect(keys({}, 4)).not.toContain('herald:dust:spawned');
+  });
+
+  it("a Boss Rush: Prime's opening line and the three Wardens', ending on the victory", () => {
+    const said = keys({ bossRush: true });
+    expect(said).toEqual(
+      expect.arrayContaining([
+        'boss-rush',
+        ...['prime', 'choir', 'null'].flatMap((kind) =>
+          ['warning', 'last', 'defeated'].map((m) => `boss:${kind}:${m}`)
+        ),
+        'victory',
+      ])
+    );
+    expect(said.some((key) => key.startsWith('stage:'))).toBe(false);
   });
 });

@@ -4,13 +4,13 @@
 // exact text (under its key, else `<key>@biome`, the biome's line kept apart
 // from a sector's own under the same key) and, with `only`, in that
 // speaker's mouth: a stale recording never plays over an edited line. One
-// voice at a time: a line fetches and decodes when it is queued, plays as it
-// shows (a recording not ready within LATE_START_S of that stays silent),
-// and stops on a fade when cut, replaced or dropped.
+// voice at a time: a line's recording loads ahead with its run's (`expect`)
+// or when it is queued, plays as it shows (one that arrives late still plays
+// if it ends before the line leaves, startsLate), and stops on a fade when
+// cut, replaced or dropped.
 import { STORY } from '../../data/story.js';
 import { fetchAudioFile } from './samplePlayer.js';
 
-const LATE_START_S = 0.3;
 const FADE_S = 0.08;
 
 let recordings = {}; // manifest.lines once loaded
@@ -51,6 +51,15 @@ export function voiceFor(entry) {
 }
 
 /**
+ * A recording `seconds` long that arrives `lateS` after its line showed
+ * still plays when it ends before the line leaves (`onScreenMs` after it
+ * showed); else it stays silent rather than be cut.
+ */
+export function startsLate(lateS, seconds, onScreenMs = 0) {
+  return lateS + seconds <= onScreenMs / 1000;
+}
+
+/**
  * `getContext()`/`getDestination()` the live AudioContext and the voice
  * bus; `audible()` false while the voices are off (no duck then);
  * `duck(seconds)` lowers the music under a voice, `unduck()` lets it back up
@@ -71,7 +80,7 @@ export function createVoicePlayer({
   const queued = new Map(); // id → how many queued lines say it
   let coming = new Set(); // ids readied for lines about to be queued
   let playing = null; // { id, source, gain }
-  let waiting = null; // { id, until } a shown line whose file is not ready
+  let waiting = null; // { id } a shown line whose file is not ready
 
   // Fetch and decode recording `id`; a failed load is tried again next time.
   function load(id) {
@@ -99,19 +108,21 @@ export function createVoicePlayer({
     ready.delete(id);
   }
 
-  /** `entry` is queued: its recording loads and is kept until it is done. */
+  /**
+   * `entry` is queued: its recording loads and is kept until it is done (and
+   * while the coming set has it: a line said again, a death after a retry).
+   */
   function queue(entry) {
     const id = recordingId(entry);
     if (!id) return;
     queued.set(id, (queued.get(id) ?? 0) + 1);
-    coming.delete(id);
     load(id);
   }
 
   /**
-   * Lines about to be queued (a journey offered) load ahead; they replace
-   * the previous set, whose lines not queued since are let go (`[]` lets
-   * them all go).
+   * Lines about to be queued (a run offered or started: its journey and
+   * what its fight can say) load ahead and stay; they replace the previous
+   * set, whose lines not queued now are let go (`[]` lets them all go).
    */
   function expect(entries = []) {
     const before = coming;
@@ -138,9 +149,10 @@ export function createVoicePlayer({
   }
 
   /**
-   * `entry` shows: its recording plays (the one before stops). True when it
-   * has one (even if it ends up silent: not ready in time, or no longer
-   * queued, a line left over from a run that ended), else false.
+   * `entry` shows (for `entry.onScreenMs`): its recording plays (the one
+   * before stops). True when it has one (even if it ends up silent: too late
+   * to finish, or no longer queued, a line left over from a run that ended),
+   * else false.
    */
   function play(entry) {
     stop();
@@ -153,12 +165,16 @@ export function createVoicePlayer({
       start(id, ready.get(id));
       return true;
     }
-    const ask = { id, until: context.currentTime + LATE_START_S };
+    const ask = { id };
+    const shownAt = context.currentTime;
     waiting = ask;
     loads.get(id)?.then((buffer) => {
       if (waiting !== ask) return;
       waiting = null;
-      if (buffer && context.currentTime <= ask.until) start(id, buffer);
+      const late = context.currentTime - shownAt;
+      if (buffer && startsLate(late, buffer.duration, entry.onScreenMs)) {
+        start(id, buffer);
+      }
     });
     return true;
   }

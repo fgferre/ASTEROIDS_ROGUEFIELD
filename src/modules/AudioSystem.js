@@ -827,7 +827,6 @@ class AudioSystem extends BaseSystem {
     this.journeyCue.stop();
     clearTimeout(this.chapterStingerTimer);
     this.chapterStingerTimer = null;
-    this.journeyFlown = false;
     this.chapterClaimed = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();

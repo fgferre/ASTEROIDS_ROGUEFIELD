@@ -28,14 +28,14 @@ import {
   endingPath,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
-import { biomeForLayer } from '../../data/biomes.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
+import { STORY } from '../../data/story.js';
 import { loadRecords } from '../../services/runRecords.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
-  chapterTransmission,
   endingTransmissions,
   holdMsFor,
+  runVoiceLines,
   travelTransmissions,
 } from './transmissions.js';
 
@@ -198,23 +198,44 @@ export class RunCinematics {
     const freeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.travelTo = travelDestination(start, this.records(), freeze);
     this.cards = this.travelTo ? [] : null;
+    this.readyVoices(start, this.travelTo);
   }
 
   /**
    * A run `start` (as armTravel's) is offered (the victory screen's Next
-   * Sector, the campaign map's Launch): the voices of the journey it would
-   * fly and of its sector's chapter line load now (audio/voiceLines.js), so
-   * the first line speaks as it shows.
+   * Sector, the campaign map's Launch): its voices load now, as below.
    */
   prepareTravel(start) {
-    const to = travelDestination(start, this.records());
-    if (!to) return;
-    const sector = sectorById(to);
-    const biome = biomeForLayer(sector.layers[0], sector);
-    const entries = travelTransmissions(to);
-    if (biome.layers[0] === sector.layers[0]) {
-      entries.push(chapterTransmission(biome.id, sector.id));
-    }
+    this.readyVoices(start, travelDestination(start, this.records()));
+  }
+
+  /**
+   * The recordings (audio/voiceLines.js) of the journey to `to` (none: null)
+   * and of every line run `start` can say in its fight load now, in place of
+   * the ones loaded before, so each line speaks as it shows.
+   */
+  readyVoices(start, to) {
+    const entries = to ? travelTransmissions(to) : [];
+    entries.push(...runVoiceLines(start));
+    this.eventBus.emit('voice-lines-coming', { entries });
+  }
+
+  /**
+   * Layer `layer` of a run in `sector` (or null) starts: a Descent readies
+   * the voices of the stretch ahead (runVoiceLines), a sector run or a Boss
+   * Rush has all of its own since its start.
+   */
+  prepareLayer(layer, sector, bossRush) {
+    if (sector || bossRush) return;
+    const entries = runVoiceLines({}, layer);
+    this.eventBus.emit('voice-lines-coming', { entries });
+  }
+
+  /** The ending choice opens: the lines of every ending load now. */
+  prepareEnding() {
+    const entries = Object.keys(STORY.ending).flatMap((ending) =>
+      endingTransmissions(ending)
+    );
     this.eventBus.emit('voice-lines-coming', { entries });
   }
 

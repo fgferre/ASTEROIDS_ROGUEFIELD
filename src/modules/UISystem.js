@@ -261,9 +261,10 @@ class UISystem extends BaseSystem {
     if (this.tacticalHud.layout) {
       this.transmissions = new TransmissionQueue(
         this.tacticalHud.layout,
-        ({ speaker, key, text }) => {
+        ({ speaker, key, text }, onScreenMs) => {
           this.lastTransmission = { speaker, text };
-          this.eventBus.emit('transmission-shown', { speaker, key, text });
+          const shown = { speaker, key, text, onScreenMs };
+          this.eventBus.emit('transmission-shown', shown);
         },
         (entry) => this.eventBus.emit('transmission-finished', entry),
         (entry) => this.eventBus.emit('transmission-cut', entry),
@@ -363,6 +364,7 @@ class UISystem extends BaseSystem {
     this.transmissionLayer = layer;
     const sector = this.getService('game-session')?.sector ?? null;
     this.sector = sector;
+    this.cinematics.prepareLayer(layer, sector, this.bossRush);
     // The intro's end shows this layer's title card.
     if (this.cinematics.introActive) return;
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
@@ -482,9 +484,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('player-died', () => {
-      if (this.runWon) {
-        return;
-      }
+      if (this.runWon) return;
       this.pilotDown = true;
       // Cards dealt on the step the ship died close: the death plays out.
       this.chestCeremony.clear();

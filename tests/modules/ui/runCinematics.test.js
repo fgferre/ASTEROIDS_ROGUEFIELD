@@ -12,7 +12,11 @@ import {
   listenForSkip,
   travelDestination,
 } from '../../../src/modules/ui/runCinematics.js';
-import { travelTransmissions } from '../../../src/modules/ui/transmissions.js';
+import {
+  endingTransmissions,
+  runVoiceLines,
+  travelTransmissions,
+} from '../../../src/modules/ui/transmissions.js';
 
 // The node test environment has no DOM: just enough element for the banner.
 function fakeElement(onAdd = () => {}) {
@@ -66,7 +70,11 @@ function setup({ plays = true } = {}) {
   const spoken = [];
   const hush = vi.fn();
   ui.cinematics = new RunCinematics({
-    eventBus: { emit: (name, payload) => events.push([name, payload.kind]) },
+    // The cinematics' own events (each layer also readies its voices).
+    eventBus: {
+      emit: (name, payload) =>
+        name.startsWith('cinematic') && events.push([name, payload.kind]),
+    },
     renderer: () => renderer,
     hud: () => hud,
     holdSim: (flag) => held.push(flag),
@@ -272,29 +280,44 @@ describe('RunCinematics', () => {
     ).toBe('furnace-drift');
   });
 
-  it('readies the voices of the journey a start would fly and its chapter line, nothing otherwise', () => {
+  it("readies the voices of the journey a start would fly and of the run's fight, in place of the ones before", () => {
     const emit = vi.fn();
     const cinematics = new RunCinematics({
       eventBus: { emit },
       records: () => ({ sectorsWon: [] }),
     });
-    cinematics.prepareTravel({
-      sector: 'debris-wake',
-      source: 'campaign-launch-btn',
-    });
-    expect(emit).toHaveBeenCalledTimes(1);
-    const [name, { entries }] = emit.mock.calls[0];
-    expect(name).toBe('voice-lines-coming');
-    expect(entries.map((entry) => entry.key)).toEqual([
+    const keys = () => emit.mock.lastCall[1].entries.map((entry) => entry.key);
+    const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
+    cinematics.prepareTravel(launch);
+    expect(emit.mock.lastCall[0]).toBe('voice-lines-coming');
+    expect(keys()).toEqual([
       ...travelTransmissions('debris-wake').map((entry) => entry.key),
-      'chapter:debris-wake',
+      ...runVoiceLines(launch).map((entry) => entry.key),
     ]);
+    expect(keys()).toContain('chapter:debris-wake');
+    expect(keys()).toContain('boss:quarry-maw:warning');
 
-    cinematics.prepareTravel({
-      sector: 'debris-wake',
-      source: 'start-game-btn',
-    });
+    // The run starts without its journey (a sector already won): its
+    // fight's lines alone, from the start.
+    cinematics.armTravel({ sector: 'debris-wake', source: 'start-game-btn' });
+    expect(keys()).toEqual(
+      runVoiceLines({ sector: 'debris-wake' }).map((e) => e.key)
+    );
+
+    // A Descent readies the stretch ahead as each layer starts; a sector
+    // run or a Boss Rush keeps what its start readied.
+    emit.mockClear();
+    cinematics.prepareLayer(4, null, false);
+    expect(keys()).toEqual(runVoiceLines({}, 4).map((entry) => entry.key));
+    cinematics.prepareLayer(3, { id: 'debris-wake' }, false);
+    cinematics.prepareLayer(5, null, true);
     expect(emit).toHaveBeenCalledTimes(1);
+
+    cinematics.prepareEnding();
+    expect(keys()).toEqual([
+      ...endingTransmissions('severance').map((entry) => entry.key),
+      ...endingTransmissions('stewardship').map((entry) => entry.key),
+    ]);
   });
 
   it('holds the run through a journey, cards wait for the intro, and a skip drops the lines', () => {

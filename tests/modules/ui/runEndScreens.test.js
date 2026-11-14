@@ -95,7 +95,11 @@ describe('Run end screens', () => {
       },
     };
     const showScreen = vi.fn();
-    const cinematics = { playEnding: vi.fn(), prepareTravel: vi.fn() };
+    const cinematics = {
+      playEnding: vi.fn(),
+      prepareTravel: vi.fn(),
+      prepareEnding: vi.fn(),
+    };
     const screens = new RunEndScreens({
       refs: { gameOver: {}, victory },
       showScreen,
@@ -126,8 +130,9 @@ describe('Run end screens', () => {
   };
 
   it('the campaign won opens the choice, never on a replay nor any other sector', () => {
-    const { win, screens, showScreen } = victoryScreen();
+    const { win, screens, showScreen, cinematics } = victoryScreen();
     win({ ...CRUCIBLE, id: 'wardens-reach', next: 'the-crucible' });
+    expect(cinematics.prepareEnding).not.toHaveBeenCalled();
     expect(screens.choice).toBe(null);
     expect(showScreen).toHaveBeenLastCalledWith('victory', {
       overlay: true,
@@ -136,6 +141,8 @@ describe('Run end screens', () => {
 
     win(CRUCIBLE);
     expect(screens.choice).not.toBe(null);
+    // The endings' voices load while the choice is read.
+    expect(cinematics.prepareEnding).toHaveBeenCalledTimes(1);
     expect(showScreen).toHaveBeenLastCalledWith('ending', {
       overlay: true,
       show: true,

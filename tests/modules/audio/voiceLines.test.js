@@ -8,6 +8,7 @@ import { TRAVEL } from '../../../src/core/cinematics.js';
 import {
   createVoicePlayer,
   loadVoiceManifest,
+  startsLate,
   voiceFor,
 } from '../../../src/modules/audio/voiceLines.js';
 import { travelDurationMs } from '../../../src/modules/ui/runCinematics.js';
@@ -23,6 +24,7 @@ import {
   hangarTransmission,
   heraldTransmission,
   holdMsFor,
+  runVoiceLines,
   sightingTransmission,
   stageTransmission,
   travelTransmissions,
@@ -205,7 +207,11 @@ describe('createVoicePlayer', () => {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   // A player whose decoded buffers name the file they came from.
-  function makePlayer({ audible = () => true, fail = () => false } = {}) {
+  function makePlayer({
+    audible = () => true,
+    fail = () => false,
+    arrive = async () => {},
+  } = {}) {
     const context = createAudioContextStub();
     context.decodeAudioData = vi.fn(async (file) => ({ file, duration: 2 }));
     const sources = [];
@@ -225,11 +231,12 @@ describe('createVoicePlayer', () => {
       unduck,
       fetchFile: async (file) => {
         fetched.push(file);
+        await arrive(file);
         if (fail(file)) throw new Error('offline');
         return { arrayBuffer: async () => file };
       },
     });
-    return { player, sources, fetched, duck, unduck };
+    return { player, sources, fetched, duck, unduck, context };
   }
 
   async function readyPlayer(options) {
@@ -322,6 +329,79 @@ describe('createVoicePlayer', () => {
     player.release(journey[1]);
     player.queue(journey[1]);
     expect(fetches(journey[1])).toBe(2);
+  });
+
+  it("a run's lines load as it is offered, stay through its fight, and go when the next run's replace them or the menu lets them go", async () => {
+    const run = runVoiceLines({ sector: 'quarantine-grid' });
+    const next = runVoiceLines({ sector: 'wardens-reach' });
+    const { player, fetched } = makePlayer();
+    const files = (lines) => [
+      ...new Set(
+        lines
+          .map(voiceFor)
+          .filter(Boolean)
+          .map(({ file }) => file)
+      ),
+    ];
+    player.expect(run);
+    expect(fetched).toEqual(files(run));
+    // The same set again (the run starts after its offer): nothing reloads.
+    player.expect(run);
+    expect(fetched).toHaveLength(files(run).length);
+    // Its in-fight line is ready when the fight queues it.
+    const warning = wardenTransmission(15, 'warning', 'interdictor');
+    player.queue(warning);
+    expect(fetched).toHaveLength(files(run).length);
+    // Dropped (a banner's interrupt) and queued again: still loaded.
+    player.release(warning);
+    player.queue(warning);
+    expect(fetched).toHaveLength(files(run).length);
+    // The next run's set: only its new files load; the queued line stays.
+    fetched.length = 0;
+    player.expect(next);
+    const shared = files(run).filter((file) => files(next).includes(file));
+    expect(fetched).toEqual(
+      files(next).filter((file) => !shared.includes(file))
+    );
+    player.queue(warning);
+    expect(fetched).not.toContain(voiceFor(warning).file);
+    // Back on the menu: every file goes; asked again, it loads again.
+    player.release(warning);
+    player.release(warning);
+    player.expect([]);
+    fetched.length = 0;
+    player.queue(next[0]);
+    expect(fetched).toEqual([voiceFor(next[0]).file]);
+  });
+
+  it('a recording that arrives late plays only if it ends before its line leaves', () => {
+    expect(startsLate(0.3, 2, 3000)).toBe(true);
+    expect(startsLate(1, 2, 3000)).toBe(true);
+    expect(startsLate(1.01, 2, 3000)).toBe(false);
+    // A line whose time on screen is unknown never starts late.
+    expect(startsLate(0.01, 2)).toBe(false);
+  });
+
+  it('starts a late voice when it still fits, keeps it silent when it would be cut', async () => {
+    let deliver;
+    const { player, sources, context } = makePlayer({
+      arrive: () => new Promise((resolve) => (deliver = resolve)),
+    });
+    // decodeAudioData stub: every recording lasts 2 s.
+    const show = async (onScreenMs, lateS) => {
+      player.queue(line);
+      context.currentTime = 10;
+      player.play({ ...line, onScreenMs });
+      context.currentTime = 10 + lateS;
+      deliver();
+      await settle();
+      await settle();
+      player.release(line);
+    };
+    await show(3000, 0.9);
+    expect(sources).toHaveLength(1);
+    await show(3000, 1.2);
+    expect(sources).toHaveLength(1);
   });
 
   it('with the voices off a line ducks nothing (its source still plays)', async () => {

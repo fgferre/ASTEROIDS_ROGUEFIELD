@@ -331,6 +331,7 @@ export class RunEndScreens {
    */
   showEndingChoice(payload) {
     this.choice = payload;
+    this.cinematics.prepareEnding();
     const options = this.refs.victory.choiceOptions;
     options.innerHTML = endingChoiceMarkup();
     this.showScreen('ending', { overlay: true, show: true });

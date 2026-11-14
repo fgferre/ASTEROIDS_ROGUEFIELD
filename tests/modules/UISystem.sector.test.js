@@ -7,7 +7,7 @@ describe('UISystem on a sector run', () => {
     const showLayerBanner = vi.fn();
     const ui = {
       tacticalHud: { layout: { showLayerBanner } },
-      cinematics: { introActive: false },
+      cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
       getService: (name) =>
         name === 'game-session' ? { sector: sectorById('dense-core') } : null,
@@ -28,7 +28,7 @@ describe('UISystem on a sector run', () => {
     const showLayerBanner = vi.fn();
     const ui = {
       tacticalHud: { layout: { showLayerBanner } },
-      cinematics: { introActive: false },
+      cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
       getService: (name) =>
         name === 'game-session' ? { sector: sectorById('debris-wake') } : null,
@@ -47,7 +47,7 @@ describe('UISystem on a sector run', () => {
     const showLayerBanner = vi.fn();
     const ui = {
       tacticalHud: { layout: { showLayerBanner } },
-      cinematics: { introActive: false },
+      cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
       getService: (name) =>
         name === 'game-session' ? { sector: sectorById('the-crucible') } : null,

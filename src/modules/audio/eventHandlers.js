@@ -53,8 +53,8 @@ export const AUDIO_EVENT_HANDLERS = {
   voiceQueued(audio, payload) {
     if (payload) audio.voiceLines.queue(payload);
   },
-  // Lines about to be queued (a journey offered) are readied ahead, in place
-  // of the ones readied before.
+  // Lines about to be queued (a run offered or started: its journey and its
+  // fight's lines) are readied ahead, in place of the ones readied before.
   voiceComing(audio, payload) {
     audio.voiceLines.expect(payload?.entries);
   },
@@ -142,20 +142,15 @@ export const AUDIO_EVENT_HANDLERS = {
   },
 
   // The run start's opening (ui/runCinematics.js), sent as the run starts,
-  // not from a frame. A journey claims the chapter's motif (waveStarted). An
-  // intro with no journey before it: the lines readied for a journey this
-  // start does not fly are let go.
+  // not from a frame. A journey claims the chapter's motif (waveStarted).
   cinematicStarted(audio, payload) {
     if (payload?.kind === 'travel') {
-      audio.journeyFlown = true;
       if (audio.chapterStingerTimer) {
         clearTimeout(audio.chapterStingerTimer);
         audio.chapterStingerTimer = null;
       } else {
         audio.chapterClaimed = true;
       }
-    } else if (payload?.kind === 'intro' && !audio.journeyFlown) {
-      audio.voiceLines.expect([]);
     }
   },
 
