@@ -660,5 +660,26 @@ export function createTelegraphs(kit) {
     });
   }
 
-  return { createTelegraph, updateTelegraph };
+  /**
+   * Loading-screen warm-up (Renderer3D.warmUp): the danger looks are worn
+   * on a telegraph's first attack, so their programs would compile mid-fight;
+   * a spare beam and zone (a look stays on its mesh) are drawn by `compile`
+   * once, then leave the scene, their programs kept.
+   */
+  function warmLooks(compile) {
+    const [group, beam, zone] = kit.seeded(() => [
+      new THREE.Group(),
+      new THREE.Mesh(lanePlane),
+      new THREE.Mesh(fanGeometry(Math.PI * 2)),
+    ]);
+    group.add(beam, zone);
+    kit.scene.add(group);
+    const look = { color: kit.threatColor, warn: true, progress: 0, gain: 1 };
+    danger.beam(beam, { ...look, x: 0, y: 0, angle: 0, length: 1, width: 1 });
+    danger.zone(zone, { ...look, radius: 1, style: ZONE.FIELD });
+    compile();
+    kit.scene.remove(group);
+  }
+
+  return { createTelegraph, updateTelegraph, warmLooks };
 }

@@ -214,6 +214,12 @@ export class PlayerMirror {
       2
     );
     this.group.add(this.light);
+    // A dark stand-in, on only while the ship is hidden (a blink, a death):
+    // the lit programs are keyed on the count of lights shown, so without
+    // it hiding the ship recompiles every lit material mid-play.
+    this.standIn = new THREE.PointLight(0x000000, 0, 1, 2);
+    this.standIn.visible = false;
+    scene.add(this.standIn);
 
     this.muzzleFrames = 0;
     this.bank = 0;
@@ -403,6 +409,7 @@ export class PlayerMirror {
       player._quitExplosionHidden ||
       !player.currentHull?.visual;
     this.group.visible = !hidden;
+    this.standIn.visible = hidden;
     if (hidden) {
       this.light.intensity = 0;
       this.trailCount = 0;

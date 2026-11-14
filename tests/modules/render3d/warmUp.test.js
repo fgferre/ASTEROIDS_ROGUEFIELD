@@ -136,6 +136,16 @@ describe('Renderer3D.warmUp', () => {
     );
     expect(compiled.has(enemies.rimBatch.object.material)).toBe(true);
     expect(compiled.has(enemies.glows.mesh.material)).toBe(true);
+    // the bosses' danger looks, worn only on a first attack: a beam, a zone
+    const looks = [...compiled].filter((material) => material.uniforms?.uWarn);
+    expect(looks.some((material) => material.uniforms.uFront)).toBe(true);
+    expect(looks.some((material) => material.uniforms.uStyle)).toBe(true);
+    // the Bulwark's plate as broken, and burning broken
+    expect(compiled.has(enemies.kit.darkMaterial)).toBe(true);
+    const burntDark = [...enemies.pools.get('bulwark')].some((view) =>
+      view.dissolve?.twins.has(enemies.kit.darkMaterial)
+    );
+    expect(burntDark).toBe(true);
     let twins = 0;
     enemies.pools.forEach((pool) =>
       pool.forEach((view) => {

@@ -620,6 +620,9 @@ export class EnemyMirror {
       view.seed = i;
       this.bind(view, { variant: look });
       if (look === true) this.affixViews.showAll(view);
+      // the Bulwark's plate as broken: dark, a material only a fight shows
+      if (view.plateMesh && i > 0)
+        view.plateMesh.material = this.kit.darkMaterial;
       return view;
     });
     compile();

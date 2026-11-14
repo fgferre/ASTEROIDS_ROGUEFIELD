@@ -249,6 +249,22 @@ describe('PlayerMirror', () => {
     expect(mirror.ghosts[1].visible).toBe(true);
   });
 
+  it('keeps the count of lights shown while Blink hides the ship', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const shown = () => {
+      let count = 0;
+      mirror.group.parent.traverseVisible((object) => {
+        if (object.isPointLight) count += 1;
+      });
+      return count;
+    };
+    const before = shown();
+    player._quitExplosionHidden = true;
+    mirror.update(player, ribbons, 0.05);
+    expect(mirror.group.visible).toBe(false);
+    expect(shown()).toBe(before);
+  });
+
   it('stacks a thin turret layer per lock past the primary at Targeting Matrix rank 3, each turned onto its lock', () => {
     if (!GamePools.initialized) GamePools.initialize();
     const { player, mirror } = mirrorFor(defaultHull);

@@ -512,9 +512,11 @@ class Renderer3D extends BaseSystem {
   // changes the lit programs, so a preset change recompiles them once. A
   // new map is drawn once here, seeded: three names it with a Math.random
   // UUID. Through a whole render(): shadowMap.render alone reads the
-  // renderer's per-frame light state, which is null between frames.
+  // renderer's per-frame light state, which is null between frames. Into
+  // the target the frame draws to, or it compiles a screen-encoded program
+  // for every material, mid-play.
   applyShadows(size) {
-    const { renderer, key, scene, camera } = this.three;
+    const { renderer, key, scene, camera, composer } = this.three;
     const on = size > 0;
     renderer.shadowMap.enabled = on;
     key.castShadow = on;
@@ -522,7 +524,11 @@ class Renderer3D extends BaseSystem {
       key.shadow.mapSize.set(size, size);
       key.shadow.map?.dispose();
       key.shadow.map = null;
+      renderer.setRenderTarget(
+        this.graphics.postProcessing ? composer.readBuffer : null
+      );
       this.seeded(() => renderer.render(scene, camera));
+      renderer.setRenderTarget(null);
     }
   }
 
@@ -646,7 +652,7 @@ class Renderer3D extends BaseSystem {
   /**
    * Loading screen (app.js): builds the scene (maps baked) and compiles every
    * program a run can draw with — each enemy view kind in all its looks and
-   * burning, both hulls, then one frame of everything through the composer
+   * burning, both hulls, the bosses' danger looks, then one frame of everything through the composer
    * (post passes, texture and buffer uploads). One chunk per task, so the
    * bar repaints; `onProgress(done)` after each, 0..1.
    */
@@ -656,6 +662,7 @@ class Renderer3D extends BaseSystem {
       () => this.ready(),
       () => this.three.player.warm(this.cachedPlayer, compile),
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
+      () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
