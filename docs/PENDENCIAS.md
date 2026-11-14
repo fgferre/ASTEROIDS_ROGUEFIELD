@@ -23,8 +23,8 @@ antes"_. Autorizou regravar o golden trace (feito) e arquivar as sessões e ramo
 chefes, o brilho e as vozes de todos os personagens, ele mandou: _"Vamos comittar, mergear, limpar e publicar"_ → a
 PR #305 entrou na `main` e o site tem a campanha de dez fases. **Ele ainda não jogou nada de 12–13/11**: decide
 jogando a luta do Interdictor (e se os aparelhos levam tiro), os volumes de voz/trilha, a cura, o alarme de casco
-baixo. Audição aberta, sem resposta: `src/exported-assets/audicao-armas-inimigos/` (dezesseis sons). Trabalho novo
-sai de um ramo novo a partir da `main`.
+baixo. Trabalho novo sai de um ramo novo a partir da `main` (o primeiro: `som/armas-inimigos`, os dezesseis sons
+que ele escolheu em 13/11, item 18).
 
 **Como retomar (conversa local, qualquer máquina):**
 
@@ -94,6 +94,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   amostras geradas pela skill local dele `/sfx-generator` (AudioLDM) e CC0 onde o modelo falha, página de audição
   `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
   disser que o som está à altura do jogo.
+  **13/11 (audição `src/exported-assets/audicao-armas-inimigos/`, dezesseis sons que ainda eram síntese ou mudos):**
+  _"arc-caster=A shard-halo=A furnace-corona=A seeker-swarm=A harmonic-beam=A scatter-flak=A hunter-rajada=A
+  mira-trava=A caster-carga=A caster-disparo=A caster-impacto=A chefe-fase=B chefe-derrota=B prime-ataque=C
+  coro-ataque=B null-ataque=A"_.
 
 ## Fundo (palavras dele, 18/10, noite)
 
