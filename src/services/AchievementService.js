@@ -85,7 +85,6 @@ export default class AchievementService {
       if (this.cursedHeld) this.unlock('cursed-run');
       if (payload.hullId === BASTION_HULL_ID) this.unlock('iron-escort');
     });
-    eventBus.on('synergy-unlocked', () => this.unlock('full-set'));
     eventBus.on('apex-unlocked', () => this.unlock('apex-predator'));
     eventBus.on('weapon-beam-fired', () => this.count('harmonic'));
     eventBus.on('enemy-destroyed', (payload = {}) => {
@@ -103,6 +102,7 @@ export default class AchievementService {
     eventBus.on('pickup-collected', () => this.count('scrapper'));
     eventBus.on('upgrade-applied', (payload = {}) => {
       if (CURSED_UPGRADES.has(payload.upgradeId)) this.cursedHeld = true;
+      if (payload.familyComplete) this.unlock('full-set');
     });
   }
 

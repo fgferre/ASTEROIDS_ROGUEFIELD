@@ -17,9 +17,10 @@ export default {
   displayName: 'Kiln Engine',
   subtitle: 'The fire was never told to stop',
   layer: 10, // proposta 12/11: the layer it fights on (health scales by it)
-  // 65 % of Warden Choir's health on the same layer: Choir is Prime's base ×
-  // its 1.1 (choir.js), so 0.65 × 1.1.
-  healthFactor: 0.715, // proposta 12/11
+  // 55 % of Warden Choir's health on the same layer: Choir is Prime's base ×
+  // its 1.1 (choir.js), so 0.55 × 1.1 (was 65 %: the first Sentinel of
+  // chapter II outlasted Warden Choir, its fight about 3 minutes long).
+  healthFactor: 0.605, // proposta 12/11
   radius: 72, // proposta 12/11
   // XP on top of the type-wide boss drop, like the other Sentinels: 100 + 500.
   rewards: { xp: 100 }, // proposta 12/11
@@ -41,14 +42,16 @@ export default {
     flare: '#ff7b2e',
     shot: { tilt: [66, 64], turn: [-18, -4], distance: [640, 560], look: 0.45 },
   },
-  shellDamageFactor: 0.3, // proposta 12/11: shut, 30 % gets through
+  shellDamageFactor: 0.4, // proposta 12/11: shut, 40 % gets through
   finSpeed: 3, // proposta 12/11: fins open (0..1) per s
   // Damage over time: one tick every `burnTick` s while the ship's centre is
   // in a burning wedge or pool, `damageFactor` of contactDamage.
   burnTick: 0.4, // proposta 12/11
   sectors: {
     count: 6, // wedges; every other one burns
-    damageFactor: 0.15, // proposta 12/11
+    // proposta 12/11: was 0.15; the wedges killed the good bot at the Kiln
+    // 5 times in 12 seeds, the chapter's first Sentinel
+    damageFactor: 0.1,
   },
   slag: {
     radius: 55, // proposta 12/11: px, the pool
@@ -68,25 +71,25 @@ export default {
   cycle: [
     {
       drift: 1.8,
-      sectorWarn: 1.2,
-      sectorStepWarn: 0.8,
+      sectorWarn: 1.6,
+      sectorStepWarn: 1.1,
       sectorBurn: 2.5,
       sectorSteps: 1,
       slagShots: 4,
       slagFlight: 1.0,
       poolBurn: 4,
-      vent: 3,
+      vent: 3.6,
     },
     {
       drift: 1.4,
-      sectorWarn: 1.2,
-      sectorStepWarn: 0.8,
+      sectorWarn: 1.6,
+      sectorStepWarn: 1.1,
       sectorBurn: 2.5,
       sectorSteps: 2,
       slagShots: 5,
       slagFlight: 1.0,
       poolBurn: 4,
-      vent: 2.4,
+      vent: 3,
     },
   ], // proposta 12/11
   // It steers itself (the drift above); the phases only name the strategy.

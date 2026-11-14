@@ -29,14 +29,14 @@ export const RING = {
   follow: 0.5,
   chunk: 8,
 };
-// proposta 20/10: its look. Matte metal (`albedo`, `roughness`,
-// `metalness`) under the field's own lights, the lower faces down to `low`
-// of the light (self-shadow), the bevelled rim edges `edge` × brighter (they
-// catch the key light; close up a brighter edge reads as a neon line, so it
-// dims to `edgeClose` × as the camera comes from `edgeFade[1]` to
-// `edgeFade[0]` units). The haze (the biome's sky + haze × `hazeGain`)
-// grows with the length of the view ray under the field plane, the same
-// from any shot: 63% after `hazeDepth`. Running lights glow `idle` ×
+// proposta 20/10: its look. Worn metal (`albedo`, its finish hullModel.js
+// SHINE.worn: under the haze no finer shine shows) under the field's own
+// lights, the lower faces down to `low` of the light (self-shadow), the
+// bevelled rim edges `edge` × brighter (they catch the key light; close up a
+// brighter edge reads as a neon line, so it dims to `edgeClose` × as the
+// camera comes from `edgeFade[1]` to `edgeFade[0]` units). The haze (the
+// biome's sky + haze × `hazeGain`) grows with the length of the view ray
+// under the field plane, the same from any shot: 63% after `hazeDepth`. Running lights glow `idle` ×
 // `idleColor` before the wake (most are dead); in the wake the hull takes
 // `spill` of the violet. What hangs under the hull (the keel, its plating,
 // pods, masts) is `under` × lighter, so a light from below finds it as lit
@@ -44,8 +44,6 @@ export const RING = {
 // reach it).
 export const RING_LOOK = {
   albedo: '#272b32',
-  roughness: 0.9,
-  metalness: 0.1,
   low: 0.35,
   edge: 6.5,
   edgeClose: 1.8,

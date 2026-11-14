@@ -6,11 +6,13 @@
 // selected chapter's sectors as rows under it, and Launch for the selected
 // row (GameSessionService's MenuButtons starts the run from the button's
 // data-sector). A sector run that ends back in the menu reopens the map.
+// The campaign's last sector carries a pip per ending (data/story.js), lit
+// once the profile has reached it.
 
 import { getContent } from '../../content/registry.js';
-import { BIOMES } from '../../data/biomes.js';
 import { bossKindForLayer } from '../../data/enemies/boss.js';
 import { SECTORS, sectorBossTier } from '../../data/sectors.js';
+import { ENDING_SECTOR, STORY } from '../../data/story.js';
 import { isSectorUnlocked, loadRecords } from '../../services/runRecords.js';
 import { formatRunTime } from './runRecap.js';
 
@@ -50,19 +52,24 @@ export function sectorBossName(sector) {
 
 /**
  * Every sector as a row: `cleared` (with its best time), `open` or `locked`
- * (with what unlocks it), its code, name, end boss and layer count.
+ * (with what unlocks it), its code, name, end boss (its rank, unless the
+ * rank is its name) and layer count; the last sector also its `endings`
+ * ({ id, title, reached }), else none.
  */
 export function sectorRows(records) {
   return SECTORS.map((sector, index) => {
     const cleared = records.sectorsWon.includes(sector.id);
     const unlocked = isSectorUnlocked(sector, records);
     const previous = SECTORS[index - 1];
+    const tier = sectorBossTier(sector);
+    const boss = sectorBossName(sector);
     return {
       id: sector.id,
       chapter: sector.chapter,
       code: sector.code,
       name: sector.name,
-      boss: `${sectorBossTier(sector)}: ${sectorBossName(sector)}`,
+      boss:
+        tier.toUpperCase() === boss.toUpperCase() ? boss : `${tier}: ${boss}`,
       layers: sector.layers[1] - sector.layers[0] + 1,
       headStart: sector.headStart,
       state: cleared ? 'cleared' : unlocked ? 'open' : 'locked',
@@ -71,6 +78,14 @@ export function sectorRows(records) {
         unlocked || !previous
           ? ''
           : `Defeat ${sectorBossTier(previous)} ${sectorBossName(previous)} to unlock`,
+      endings:
+        sector.id === ENDING_SECTOR
+          ? Object.entries(STORY.ending).map(([id, { title }]) => ({
+              id,
+              title,
+              reached: records.endings.includes(id),
+            }))
+          : null,
     };
   });
 }
@@ -96,7 +111,7 @@ export function campaignChapters(records) {
       };
     }
     const { biome } = SECTORS.find((s) => s.id === sectors[0].id);
-    const title = BIOMES.find((b) => b.id === biome)?.title ?? '';
+    const title = getContent('biomes', biome)?.title ?? '';
     return {
       chapter,
       numeral,
@@ -143,6 +158,18 @@ function rowState(row) {
   return `Locked${row.lock ? `<span class="campaign-sector__why">${row.lock}</span>` : ''}`;
 }
 
+// The endings under the last sector's row: a pip and a name each.
+function endingsMarkup(endings) {
+  if (!endings) return '';
+  const pips = endings
+    .map(
+      ({ id, title, reached }) =>
+        `<span class="campaign-ending${reached ? ' is-reached' : ''}" data-ending="${id}"><span class="campaign-ending__pip" aria-hidden="true"></span>${title}</span>`
+    )
+    .join('');
+  return `<span class="campaign-sector__endings"><span class="campaign-sector__why">Endings</span>${pips}</span>`;
+}
+
 /** A chapter's sectors as selectable rows (`data-campaign-row`). */
 export function sectorRowsMarkup(rows) {
   return rows
@@ -154,7 +181,7 @@ export function sectorRowsMarkup(rows) {
         <span class="campaign-sector__name">${row.name}</span>
         <span class="campaign-sector__boss">${row.boss}</span>
         <span class="campaign-sector__layers">${row.layers} layers</span>
-        <span class="campaign-sector__state">${rowState(row)}</span>
+        <span class="campaign-sector__state">${rowState(row)}</span>${endingsMarkup(row.endings)}
       </button>`
     )
     .join('');
@@ -168,8 +195,10 @@ function arcPath(from, to) {
 
 /**
  * The arc and its chapter nodes: real chapters are buttons
- * (`data-campaign-chapter`), the chapters to come are not selectable. CSS:
- * .campaign-* in style.css.
+ * (`data-campaign-chapter`), the chapters to come are not selectable. The
+ * first open chapter is the one that calls (`is-next`); a profile from
+ * before the campaign can have several open at once. CSS: .campaign-* in
+ * style.css.
  */
 export function campaignMarkup(chapters) {
   const lastReal = chapters.filter((node) => node.sectors.length).length - 1;
@@ -178,6 +207,7 @@ export function campaignMarkup(chapters) {
       node.sectors.length && node.state !== 'locked' ? i : last,
     0
   );
+  const next = chapters.findIndex((node) => node.state === 'open');
   const svg = `<svg class="campaign-arc" viewBox="0 0 1000 260" aria-hidden="true">
     <path class="campaign-arc__ring" d="${arcPath(-ARC.edge, nodeAngle(lastReal))}"/>
     <path class="campaign-arc__ring is-dark" d="${arcPath(nodeAngle(lastReal), ARC.edge)}"/>
@@ -194,7 +224,7 @@ export function campaignMarkup(chapters) {
       if (!node.sectors.length) {
         return `<div class="campaign-node is-nosignal" style="${style}">${inner}</div>`;
       }
-      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}" style="${style}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
+      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}${i === next ? ' is-next' : ''}" style="${style}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
     })
     .join('');
   return `${svg}${items}`;
@@ -205,11 +235,13 @@ export class CampaignMap {
    * `refs`: the overlay's nodes { overlay, nodes, detailTitle, sectors, detailHeadStart, launchBtn, openBtn, backBtn, closeBtn }.
    * `showScreen(name, options)`: shows or hides the overlay.
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
+   * `prepareTravel(start)`: readies the journey a Launch would fly.
    */
-  constructor({ refs, showScreen, announceVisibility }) {
+  constructor({ refs, showScreen, announceVisibility, prepareTravel }) {
     this.refs = refs;
     this.showScreen = showScreen;
     this.announceVisibility = announceVisibility;
+    this.prepareTravel = prepareTravel;
     this.mapState = { isOpen: false, trigger: null };
     this.chapters = [];
     this.chapter = null;
@@ -225,6 +257,9 @@ export class CampaignMap {
     [refs.backBtn, refs.closeBtn].forEach((button) =>
       button?.addEventListener('click', () => this.closeMap())
     );
+    refs.mainMenuBtn?.addEventListener('click', () => {
+      this.returnToMap = false;
+    });
     refs.overlay.addEventListener('click', (event) => {
       if (event.target === refs.overlay) {
         this.closeMap();
@@ -346,6 +381,7 @@ export class CampaignMap {
     refs.detailHeadStart.hidden = !row.headStart;
     refs.launchBtn.dataset.sector = id;
     refs.launchBtn.disabled = row.state === 'locked';
+    this.prepareTravel({ sector: id, source: 'campaign-launch-btn' });
   }
 
   openMap() {
@@ -380,7 +416,12 @@ export class CampaignMap {
   /** The main menu is shown: after a sector run, the map opens over it. */
   menuShown() {
     if (!this.returnToMap) return;
-    this.returnToMap = false;
-    this.openMap();
+    // Once the menu has settled: leaving a run shows it twice (the session,
+    // then its 'screen-changed'), and each showing closes the map.
+    queueMicrotask(() => {
+      if (!this.returnToMap) return;
+      this.returnToMap = false;
+      this.openMap();
+    });
   }
 }

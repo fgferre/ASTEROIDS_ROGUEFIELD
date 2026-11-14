@@ -123,14 +123,14 @@ describe('Sentinel Foundry Mother', () => {
     expect(boss.escortsAlive()).toBe(cap);
   });
 
-  it('scraps the units and vents longer when hit for 5 % of its health while building', () => {
+  it('scraps the units and vents longer when hit for its scrap share of health while building', () => {
     const { boss, system } = createMother();
     const cycle = MOTHER.cycle[0];
     runUntil(boss, () => boss.foundryState === 'assemble');
     run(boss, MOTHER.bays.warn + 1);
-    boss.takeDamage(boss.maxHealth * 0.03);
+    boss.takeDamage(boss.maxHealth * (MOTHER.scrapShare - 0.02));
     expect(boss.foundryState).toBe('assemble');
-    boss.takeDamage(boss.maxHealth * 0.02);
+    boss.takeDamage(boss.maxHealth * 0.021);
     expect(boss.foundryState).toBe('stagger');
     expect(boss.bays.every((bay) => bay.progress === 0)).toBe(true);
 
@@ -174,6 +174,23 @@ describe('Sentinel Foundry Mother', () => {
     expect(hit()).toBeCloseTo(100 * MOTHER.shellDamageFactor);
   });
 
+  it('reaches past the ship’s distance at the warning, within its least and most reach', () => {
+    const { lead, outer, maxReach } = MOTHER.arms;
+    const reachFor = (distance) => {
+      const { boss } = createMother();
+      const aim = target({ x: 400 + distance, y: 300 });
+      runUntil(boss, () => boss.arms, aim);
+      const reach = boss.arms.segments[0].outer;
+      run(boss, MOTHER.arms.warn + 0.3, target({ x: 400, y: 300 + distance }));
+      expect(boss.arms.segments[1].outer).toBe(reach);
+      return reach;
+    };
+
+    expect(reachFor(100)).toBe(outer);
+    expect(reachFor(280)).toBeCloseTo(280 + lead, 0);
+    expect(reachFor(380)).toBe(maxReach);
+  });
+
   it('hurts a ship inside a swinging arm, not one outside or during the warning', () => {
     const { boss, system } = createMother();
     runUntil(boss, () => boss.arms);
@@ -181,7 +198,7 @@ describe('Sentinel Foundry Mother', () => {
     expect(boss.arms.segments).toHaveLength(2);
     expect(boss.arms.segments[0]).toMatchObject({
       inner: MOTHER.arms.inner,
-      outer: MOTHER.arms.outer,
+      outer: boss.armOuter,
     });
     for (let t = 0; t < MOTHER.arms.warn - 0.05; t += STEP) {
       boss.handlePhaseIntro(STEP, onArm(boss));
@@ -189,8 +206,9 @@ describe('Sentinel Foundry Mother', () => {
     expect(boss.arms.phase).toBe('warn');
     expect(system.applyDirectDamageToPlayer).not.toHaveBeenCalled();
 
-    runUntil(boss, () => boss.arms.phase === 'sweep', onArm(boss, 300));
-    run(boss, 0.5, onArm(boss, 300));
+    const past = boss.armOuter + 30;
+    runUntil(boss, () => boss.arms.phase === 'sweep', onArm(boss, past));
+    run(boss, 0.5, onArm(boss, past));
     expect(system.applyDirectDamageToPlayer).not.toHaveBeenCalled();
 
     boss.handlePhaseIntro(STEP, onArm(boss));
@@ -251,12 +269,24 @@ describe('Sentinel Foundry Mother', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(15, 'warning', 'foundry-mother')).toEqual({
-      key: 'sentinel:foundry-mother:warning',
+      key: 'boss:foundry-mother:warning',
       speaker: 'FOUNDRY MOTHER',
       text: 'Assembly line active. Chassis count: unfinished. Intruder count: one.',
     });
     expect(wardenTransmission(15, 'defeated', 'foundry-mother').text).toBe(
       'Foundry Mother stopped. The line is still. The count is wrong and will stay wrong.'
     );
+  });
+  it('announces its attack once, as the arms start to swing', () => {
+    const { boss, eventBus } = createMother();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.arms?.phase === 'warn');
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.arms?.phase === 'sweep');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
   });
 });

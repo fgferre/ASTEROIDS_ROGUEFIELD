@@ -326,10 +326,15 @@ export class CardEffects {
   }
 
   // Afterburn: while the ship dashes, a point every AFTERBURN_POINT_SPACING
-  // px of its travel; `joined` links a point to the one before it.
+  // px of its travel; `joined` links a point to the one before it. None
+  // while a Blink hides the ship: it jumps that stretch.
   dropAfterburnPoints({ life }) {
     const player = this.player();
-    if (player.isDead || !(player.dashTimer > 0)) {
+    if (
+      player.isDead ||
+      player._quitExplosionHidden ||
+      !(player.dashTimer > 0)
+    ) {
       this.afterburnDashing = false;
       return;
     }

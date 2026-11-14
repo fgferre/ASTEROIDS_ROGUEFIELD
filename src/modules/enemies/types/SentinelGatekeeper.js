@@ -1,37 +1,18 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
 import { angleBetween } from '../base/frontalShield.js';
+import { fieldSpan, pressBarrier, tickBarrier } from '../boss/barrier.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const GATE = BOSS_KINDS.gatekeeper;
 const TAU = Math.PI * 2;
 // A plate raised this far soaks the front arc.
 const RAISED_AT = 0.5;
-// The ship's hull when the player does not say (px).
-const SHIP_REACH = 16;
 
 const wrapAngle = (angle) => {
   const a = (((angle + Math.PI) % TAU) + TAU) % TAU;
   return a - Math.PI;
 };
-
-// The stretch [from, to] of the line through (x, y) along (ux, uy) inside
-// the field, as distances from (x, y).
-function fieldSpan(x, y, ux, uy) {
-  let from = -Infinity;
-  let to = Infinity;
-  for (const [p, u, size] of [
-    [x, ux, GAME_WIDTH],
-    [y, uy, GAME_HEIGHT],
-  ]) {
-    if (Math.abs(u) < 1e-6) continue;
-    const a = (0 - p) / u;
-    const b = (size - p) / u;
-    from = Math.max(from, Math.min(a, b));
-    to = Math.min(to, Math.max(a, b));
-  }
-  return from < to ? [from, to] : [-GAME_WIDTH, GAME_WIDTH];
-}
 
 // How far (x, y) can go along (ux, uy) and stay `margin` inside the field.
 function roomAhead(x, y, ux, uy, margin) {
@@ -160,6 +141,13 @@ export class SentinelGatekeeper extends BossEnemy {
         this.holdStill(deltaTime);
         this.turnTo(position, GATE.turnRate, deltaTime);
         if (this.gateTimer <= 0) {
+          // The barrier turns solid this step (its clock ran with this
+          // windup's): its sound (eventCues `boss-attack-started`).
+          this.getEventBus()?.emit?.('boss-attack-started', {
+            enemy: this,
+            enemyId: this.id,
+            position: { x: this.x, y: this.y },
+          });
           this.chargesLeft = cycle.charges;
           this.beginLane(cycle, position);
         }
@@ -256,78 +244,20 @@ export class SentinelGatekeeper extends BossEnemy {
     };
   }
 
-  // The barrier's own clock: warn → solid (hold) → fade → gone. Solid, it
-  // hurts and pushes the ship away outside the gap; rocks, enemies and
-  // bullets ignore it.
+  // The barrier's own clock (boss/barrier.js): warn → solid (hold) → fade →
+  // gone. Solid, it hurts and pushes the ship away outside the gap; rocks,
+  // enemies and bullets ignore it.
   updateBarrier(deltaTime, target) {
-    const b = this.barrier;
-    if (!b) return;
-    b.timer -= deltaTime;
-    if (b.phase === 'warn' && b.timer <= 0) {
-      b.phase = 'solid';
-      b.solid = 1;
-      b.timer = b.duration = b.hold;
-    } else if (b.phase === 'solid' && b.timer <= 0) {
-      b.phase = 'fade';
-      b.timer = b.duration = GATE.barrier.fade;
-    } else if (b.phase === 'fade') {
-      b.solid = Math.max(0, b.timer / b.duration);
-      if (b.timer <= 0) {
-        this.barrier = null;
-        return;
-      }
+    if (!this.barrier) return;
+    if (!tickBarrier(this.barrier, deltaTime, GATE.barrier.fade)) {
+      this.barrier = null;
+      return;
     }
-    if (b.phase === 'solid') this.pressBarrier(target);
-  }
-
-  /** Where `point` is against the barrier: along the line and off it (px). */
-  barrierOffset(point) {
-    const b = this.barrier;
-    const dx = point.x - b.x;
-    const dy = point.y - b.y;
-    const ux = Math.cos(b.angle);
-    const uy = Math.sin(b.angle);
-    return { along: dx * ux + dy * uy, off: -dx * uy + dy * ux };
-  }
-
-  /** True when the solid barrier touches `point` (a ship of `reach` px). */
-  barrierHits(point, reach = SHIP_REACH) {
-    const b = this.barrier;
-    if (b?.phase !== 'solid') return false;
-    const { along, off } = this.barrierOffset(point);
-    if (Math.abs(along - b.gapAt) <= b.gapWidth / 2) return false;
-    return Math.abs(off) <= GATE.barrier.thickness / 2 + reach;
+    if (this.barrier.phase === 'solid') this.pressBarrier(target);
   }
 
   pressBarrier(target) {
-    const ship = target?.position;
-    const reach = target?.player?.getHullBoundingRadius?.() ?? SHIP_REACH;
-    if (!ship || !this.barrierHits(ship, reach)) return;
-    const b = this.barrier;
-    const { along, off } = this.barrierOffset(ship);
-    // The normal, toward the side the ship is on (or comes from).
-    const nx = -Math.sin(b.angle);
-    const ny = Math.cos(b.angle);
-    const velocity = target.player?.velocity;
-    const moving = velocity ? velocity.vx * nx + velocity.vy * ny : 0;
-    const side = Math.sign(off) || -Math.sign(moving) || 1;
-    if (velocity) {
-      const away = moving * side;
-      const kick = Math.max(0, GATE.barrier.push - away) * side;
-      velocity.vx += nx * kick;
-      velocity.vy += ny * kick;
-    }
-    const ux = Math.cos(b.angle);
-    const uy = Math.sin(b.angle);
-    this.system?.applyDirectDamageToPlayer?.(
-      Math.round(this.contactDamage * GATE.barrier.damageFactor),
-      {
-        cause: 'boss-barrier',
-        position: { x: b.x + ux * along, y: b.y + uy * along },
-        radius: GATE.barrier.thickness / 2 + reach,
-        source: this,
-      }
-    );
+    pressBarrier(this, this.barrier, target, GATE.barrier);
   }
 
   // CHARGE THE LANE: a strip as wide as it, from where it stands toward the

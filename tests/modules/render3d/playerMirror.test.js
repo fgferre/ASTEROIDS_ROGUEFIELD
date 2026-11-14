@@ -130,8 +130,8 @@ describe('PlayerMirror', () => {
   it("draws each hull's static plates as one vertex-coloured mesh", () => {
     [defaultHull, solarSlicer, bastion].forEach((hull) => {
       const { mirror } = mirrorFor(hull);
-      const solids = mirror.ship.children.filter(
-        (child) => child.material === mirror.hullMaterial
+      const solids = mirror.ship.children.filter((child) =>
+        [child.material].flat().includes(mirror.hullMaterial)
       );
       expect(
         solids.map((mesh) => mesh.name),
@@ -233,6 +233,36 @@ describe('PlayerMirror', () => {
     mirror.update(player, ribbons, 0.2);
     expect(mirror.dashRing.visible).toBe(false);
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
+  });
+
+  it('draws no afterimage dropped while Blink hides the ship', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const hidden = { x: 100, y: 300, angle: 0, age: 0 };
+    player.dashGhosts = [hidden];
+    player._quitExplosionHidden = true;
+    mirror.update(player, ribbons, 0.05);
+
+    player._quitExplosionHidden = false;
+    player.dashGhosts = [hidden, { x: 140, y: 300, angle: 0, age: 0 }];
+    mirror.update(player, ribbons, 0.15);
+    expect(mirror.ghosts[0].visible).toBe(false);
+    expect(mirror.ghosts[1].visible).toBe(true);
+  });
+
+  it('keeps the count of lights shown while Blink hides the ship', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const shown = () => {
+      let count = 0;
+      mirror.group.parent.traverseVisible((object) => {
+        if (object.isPointLight) count += 1;
+      });
+      return count;
+    };
+    const before = shown();
+    player._quitExplosionHidden = true;
+    mirror.update(player, ribbons, 0.05);
+    expect(mirror.group.visible).toBe(false);
+    expect(shown()).toBe(before);
   });
 
   it('stacks a thin turret layer per lock past the primary at Targeting Matrix rank 3, each turned onto its lock', () => {

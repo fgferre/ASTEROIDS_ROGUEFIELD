@@ -224,9 +224,8 @@ export function createMenuStarfield(kit) {
         '/';
 
       const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const baseCandidates = Array.from(
-        new Set([normalizedBaseUrl, '/'].filter(Boolean))
-      );
+      // Second entry = one retry on the same base (a bare '/' 404s under the site base path).
+      const baseCandidates = [normalizedBaseUrl, normalizedBaseUrl];
 
       const nasaFiles = [
         'stars.0.bin',

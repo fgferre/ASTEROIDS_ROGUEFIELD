@@ -4,8 +4,9 @@
 // Drone through the Warden's minion path, never past `escortCap` of its own
 // alive; open, it takes full damage, and `scrapShare` of its health lost
 // during one assembly scraps the units in progress, staggers it and adds
-// `scrapVent` s to its next vent), SWEEP (two opposite arms reach out, each
-// a ring segment round the body, shown, then swung through `sweepArc` in
+// `scrapVent` s to its next vent), SWEEP (two opposite arms reach out to just
+// past the ship's distance, each a ring segment round the body, shown, then
+// swung through `sweepArc` in
 // `sweepTime`, the direction alternating each cycle; they hurt only the
 // ship), VENT (the arms hang, the shell is open: full damage), a drift toward
 // mid-field, again. Shut, its shell lets `shellDamageFactor` through. Below
@@ -51,7 +52,9 @@ export default {
     warn: 1.2, // proposta 12/11: s, the bays opening before they build
     closeSpeed: 4, // proposta 12/11: bay open (0..1) per s, shutting
   },
-  scrapShare: 0.05, // proposta 12/11: of max health, lost in one assembly
+  // proposta 12/11: of max health, lost in one assembly. At 0.05 a strong
+  // pilot scrapped eight assemblies in ten and the Mother never built.
+  scrapShare: 0.07,
   scrapVent: 1.5, // proposta 12/11: s added to the next vent
   stagger: 0.7, // proposta 12/11: s it reels after a scrap
   // Damage over time: one tick every `burnTick` s while the ship's centre is
@@ -59,11 +62,28 @@ export default {
   burnTick: 0.4, // proposta 12/11
   arms: {
     inner: 78, // proposta 12/11: px from its centre (its own radius)
-    outer: 230, // proposta 12/11: px
+    // proposta 12/11: px, the least reach; was 230, short of where a pilot
+    // stands off a shut boss (~300 px from its centre): in 11 fights the
+    // arms never landed. At 320 the pilot parked at the field's edge, past
+    // the turret's good range, and two fights in nine ran 14 and 20 minutes.
+    outer: 300,
+    // proposta 12/11: the arms reach `lead` px past the ship's distance when
+    // the warning starts, never under `outer` nor past `maxReach` (was a
+    // fixed 300: standing off answered it, 11/12 good wins).
+    lead: 80,
+    maxReach: 420,
     width: 70, // proposta 12/11: degrees, each segment
-    warn: 1.0, // proposta 12/11: s shown before they swing
+    // proposta 12/11: s shown before they swing; was 1.0, and the arm's
+    // leading edge reaches a ship mid-swing a quarter second later: a pilot
+    // building-side always flew clear of it.
+    warn: 0.7,
     reachSpeed: 3, // proposta 12/11: armReach (0..1) per s
-    damageFactor: 0.15, // proposta 12/11
+    // proposta 12/11: was 0.15; a caught ship lost 7-21 a fight, nothing a
+    // health pickup did not undo before the next sweep. proposta 13/11: was
+    // 0.3; with the sector's harder stages the good pilot still won 11/12
+    // at 0.45; at 0.6, 9/12 (all three lost at the Mother, fights 101-165
+    // s), the average pilot 3/6.
+    damageFactor: 0.6,
   },
   ventSpeed: 3, // proposta 12/11: ventOpen (0..1) per s
   drift: {

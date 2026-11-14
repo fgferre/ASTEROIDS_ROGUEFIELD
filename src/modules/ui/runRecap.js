@@ -50,7 +50,7 @@ export function runLocationLine(
   const n = Math.max(1, Math.floor(Number(layer) || 1));
   const parts = [`Layer ${sector ? localLayer(sector, n) : n}`];
   if (totalSeconds !== null) parts.push(formatRunTime(totalSeconds));
-  parts.push(biomeForLayer(n).title);
+  parts.push(biomeForLayer(n, sector).title);
   if (bestLayer !== null) parts.push(`BEST LAYER ${bestLayer}`);
   return parts.join(' · ');
 }

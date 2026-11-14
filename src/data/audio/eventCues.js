@@ -67,6 +67,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'player-leveled-up', cue: 'playLevelUp', duck: true },
   // All orbs play the same sound (all are tier 1 blue).
   { on: 'xp-collected', cue: 'playXPCollect' },
+  // A health heart picked up: its own sample, not positional.
+  { on: 'health-heart-collected', cue: 'playHeartPickup' },
   { on: 'xp-orb-fused', cue: 'playOrbFusion', arg: 'toClass' },
   {
     on: 'enemy-spawned',
@@ -98,6 +100,14 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     except: ['boss'],
     cue: 'playEnemyTelegraph',
     at: 'source',
+  },
+  // A Warden's signature attack (the Maw's intake, the Kiln's wedges
+  // igniting, ...): its kind's own sample, at the boss.
+  {
+    on: 'boss-attack-started',
+    cue: 'playBossAttack',
+    at: 'source',
+    fields: { kind: 'enemy.bossKind' },
   },
   // Support machines' own cues, at the machine's position.
   { on: 'ram-charged', cue: 'playRamCharge', at: 'source' },
@@ -140,7 +150,13 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'pickup-collected', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'chest-opening', cue: 'playPickupCollected', arg: 'kind' },
   { on: 'transmission-shown', cue: 'playTransmission' },
-  { on: 'transmission-shown', cue: 'playTransmissionVoice', arg: 'speaker' },
+  // A story line's recording, else the speaker's synthesized voice.
+  { on: 'transmission-queued', run: 'voiceQueued' },
+  { on: 'voice-lines-coming', run: 'voiceComing' },
+  { on: 'transmission-shown', run: 'voiceShown' },
+  { on: 'transmission-cut', run: 'voiceStopped' },
+  { on: 'transmission-finished', run: 'voiceStopped' },
+  { on: 'transmission-dropped', run: 'voiceStopped' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },
 
   // Enemy shots, by the firing machine (the batcher reads the shot's fields):
@@ -202,6 +218,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'shield-recharged', cue: 'playShieldRecharged' },
   { on: 'shield-activation-failed', cue: 'playShieldFail' },
   { on: 'player-health-changed', run: 'playerHealth' },
+  { on: 'player-healed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },
   { on: 'thruster-effect', run: 'thruster' },
   // The engine follows each step's flight (after its thruster-effect events).
@@ -212,6 +229,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     on: 'upgrade-applied',
     cue: 'playUpgradeSelect',
     arg: ['rarity', 'common'],
+    // "Equip for me" makes a head start's picks at once: one sound.
+    throttleMs: 150,
   },
   { on: 'pause-state-changed', run: 'pauseMusic' },
   { on: 'pause-state-changed', run: 'engineStop', when: 'isPaused' },
@@ -222,4 +241,16 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
   { on: 'game-started', cue: 'playUIStartGame' },
+
+  // The journey between sectors (render3d/travel/moments.js): each moment's
+  // sample, the burn's loop on and off, and all of it fading when it ends.
+  // Its score (audio/journeyCue.js) is laid out from the plan as it starts
+  // and stops early on a skip; the sector's music hands over at the end.
+  { on: 'cinematic-started', run: 'cinematicStarted' },
+  { on: 'travel-planned', run: 'journeyPlanned' },
+  { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
+  { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },
+  { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
+  { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
+  { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
 ]);

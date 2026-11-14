@@ -5,6 +5,7 @@ import {
   isBossRushUnlocked,
   isSectorUnlocked,
   loadRecords,
+  RECORDS_STORAGE_KEY,
   updateRecords,
 } from '../../src/services/runRecords.js';
 
@@ -30,6 +31,19 @@ describe('run records', () => {
       bossRushTime: 420,
       sectorsWon: [],
       sectorTimes: {},
+      endings: [],
+    });
+  });
+
+  it('keeps each ending reached once, in the order found; an old save has none', () => {
+    localStorage.setItem(RECORDS_STORAGE_KEY, JSON.stringify({ runs: 3 }));
+    expect(loadRecords().endings).toEqual([]);
+    updateRecords({ ending: 'stewardship' });
+    updateRecords({ ending: 'stewardship' });
+    updateRecords({ ending: 'severance' });
+    expect(loadRecords()).toMatchObject({
+      runs: 3,
+      endings: ['stewardship', 'severance'],
     });
   });
 
@@ -55,18 +69,29 @@ describe('run records', () => {
   });
 
   it('opens a sector once the one before is won or a full run went past its boss', () => {
-    const [wake, lanes, gate, furnace, crystal, dense, graveyard, grid, reach] =
-      [
-        'debris-wake',
-        'salvage-lanes',
-        'prime-gate',
-        'furnace-drift',
-        'crystal-choir',
-        'dense-core',
-        'assembly-graveyard',
-        'quarantine-grid',
-        'wardens-reach',
-      ].map(sectorById);
+    const [
+      wake,
+      lanes,
+      gate,
+      furnace,
+      crystal,
+      dense,
+      graveyard,
+      grid,
+      reach,
+      crucible,
+    ] = [
+      'debris-wake',
+      'salvage-lanes',
+      'prime-gate',
+      'furnace-drift',
+      'crystal-choir',
+      'dense-core',
+      'assembly-graveyard',
+      'quarantine-grid',
+      'wardens-reach',
+      'the-crucible',
+    ].map(sectorById);
     expect(isSectorUnlocked(wake)).toBe(true);
     expect(isSectorUnlocked(lanes)).toBe(false);
     updateRecords({ sectorWon: 'debris-wake', sectorTime: 200 });
@@ -93,5 +118,8 @@ describe('run records', () => {
     expect(isSectorUnlocked(reach)).toBe(false);
     updateRecords({ sectorWon: 'quarantine-grid', sectorTime: 400 });
     expect(isSectorUnlocked(reach)).toBe(true);
+    expect(isSectorUnlocked(crucible)).toBe(false);
+    updateRecords({ sectorWon: 'wardens-reach', sectorTime: 700 });
+    expect(isSectorUnlocked(crucible)).toBe(true);
   });
 });

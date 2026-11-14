@@ -33,6 +33,20 @@ export class TextSprites {
       scene.add(sprite);
       this.sprites.push(sprite);
     }
+    // numbers baked before the web font arrived stay in the fallback font:
+    // drop them once, so later numbers use the real one
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(() => this.clearCache());
+      document.fonts.addEventListener('loadingdone', () => this.clearCache());
+    }
+  }
+
+  clearCache() {
+    this.caches.forEach((map) => {
+      map.forEach((old) => old.texture.dispose());
+      map.clear();
+    });
+    this.cached = 0;
   }
 
   texture(value, color) {
@@ -43,13 +57,7 @@ export class TextSprites {
     }
     let entry = cache.get(value);
     if (entry) return entry;
-    if (this.cached >= MAX_CACHED) {
-      this.caches.forEach((map) => {
-        map.forEach((old) => old.texture.dispose());
-        map.clear();
-      });
-      this.cached = 0;
-    }
+    if (this.cached >= MAX_CACHED) this.clearCache();
     const text = String(value);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');

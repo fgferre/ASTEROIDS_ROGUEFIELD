@@ -58,6 +58,20 @@ function makePicks(game) {
   return picks;
 }
 
+// Steps until the head start's first cards are dealt; their ids.
+function firstOffer(game) {
+  for (let step = 0; step < PICK_STEPS; step += 1) {
+    game.step();
+    if (game.takeOfferedUpgrade()) break;
+  }
+  return game.services.progression.pendingUpgradeOptions.map(({ id }) => id);
+}
+
+const ranksHeld = (progression) =>
+  progression
+    .serialize()
+    .appliedUpgrades.reduce((sum, [, rank]) => sum + rank, 0);
+
 describe('sector runs', () => {
   let restoreDom;
   beforeEach(() => {
@@ -94,6 +108,158 @@ describe('sector runs', () => {
     expect(enemies.waveManager.currentWave).toBe(6);
   });
 
+  it('equips the head start picks left at once and opens the first layer', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test', sector: 'dense-core' });
+    const { enemies, progression } = game.services;
+    const { headStart } = game.session;
+    const total = sectorById('dense-core').headStart;
+    const offered = [];
+    game.eventBus.on('upgrade-options-ready', () => offered.push(1));
+
+    progression.applyUpgrade(firstOffer(game)[0]);
+    firstOffer(game);
+    expect(headStart.progress()).toEqual({ pick: 2, total });
+    offered.length = 0;
+
+    const families = headStart.equipRest();
+    expect(ranksHeld(progression)).toBe(total);
+    expect(offered).toEqual([]); // no card screen opened on the way
+    expect(headStart.progress()).toBeNull();
+    expect(families.reduce((sum, f) => sum + f.cards, 0)).toBeGreaterThan(0);
+    for (let step = 0; step < 5; step += 1) game.step();
+    expect(enemies.waveManager.currentWave).toBe(6);
+  });
+
+  it('equips the same build for the same seed', () => {
+    const build = () => {
+      const game = createHeadlessGame();
+      game.session.startNewRun({ source: 'test', sector: 'dense-core' });
+      firstOffer(game);
+      game.session.headStart.equipRest();
+      return game.services.progression.serialize().appliedUpgrades;
+    };
+    expect(build()).toEqual(build());
+  });
+
+  it('offers no equipping outside a head start', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const { progression } = game.services;
+    const { headStart } = game.session;
+    expect(headStart.progress()).toBeNull();
+    progression.emitLevelUp(progression.applyLevelUp());
+    firstOffer(game);
+    expect(headStart.progress()).toBeNull();
+    expect(headStart.equipRest()).toEqual([]);
+    expect(ranksHeld(progression)).toBe(0);
+  });
+
+  it('carries the build into the next sector and takes only the head start it is short of', () => {
+    const game = createHeadlessGame();
+    const { enemies, progression, player } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const picks = Array.from({ length: 3 }, () => progression.applyLevelUp());
+    picks.forEach((level) => progression.emitLevelUp(level));
+    expect(makePicks(game)).toBe(3);
+    const cards = progression.serialize().appliedUpgrades;
+    const hull = player.maxHealth;
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    for (let step = 0; step < 5; step += 1) game.step();
+    expect(progression.getLevel()).toBe(4);
+    expect(progression.serialize().appliedUpgrades).toEqual(cards);
+    expect(player.maxHealth).toBe(hull);
+    expect(player.health).toBe(hull);
+    expect(enemies.waveManager.currentWave).toBe(1);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'dense-core',
+      carry: true,
+    });
+    expect(makePicks(game)).toBe(sectorById('dense-core').headStart - 3);
+  });
+
+  it('carries the rerolls, banishes and banished cards left into the next sector only', () => {
+    const game = createHeadlessGame();
+    const { progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const full = [progression.rerollsLeft, progression.banishesLeft];
+    progression.emitLevelUp(progression.applyLevelUp());
+    firstOffer(game);
+    progression.rerollUpgradeOptions();
+    const banished = progression.pendingUpgradeOptions[0].id;
+    progression.banishUpgrade(banished);
+    const left = [progression.rerollsLeft, progression.banishesLeft];
+    expect(left).toEqual([full[0] - 1, full[1] - 1]);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect([progression.rerollsLeft, progression.banishesLeft]).toEqual(left);
+    expect([...progression.banishedUpgrades]).toEqual([banished]);
+
+    game.session.startNewRun({ source: 'test', sector: 'salvage-lanes' });
+    expect([progression.rerollsLeft, progression.banishesLeft]).toEqual(full);
+    expect(progression.banishedUpgrades.size).toBe(0);
+  });
+
+  it('carries the card choices a win left unmade and holds the first layer for them', () => {
+    const game = createHeadlessGame();
+    const { enemies, progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
+    const gained = [progression.applyLevelUp(), progression.applyLevelUp()];
+    gained.forEach((level) => progression.emitLevelUp(level));
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect(enemies.waveManager.currentWave).toBe(0);
+    expect(makePicks(game)).toBe(2);
+    for (let step = 0; step < 5; step += 1) game.step();
+    expect(progression.getLevel()).toBe(3);
+    expect(enemies.waveManager.currentWave).toBe(1);
+  });
+
+  it('deals no cards during the win and carries every level gained then', () => {
+    const game = createHeadlessGame();
+    const { progression } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    game.services.player.setInvulnerableTimer(1e9);
+    let atWin = null;
+    const offers = [];
+    game.eventBus.on('run-won', () => {
+      atWin = progression.owedLevelUpOffers().length - progression.level;
+    });
+    game.eventBus.on('upgrade-options-ready', (payload) => {
+      if (atWin !== null) offers.push(payload);
+    });
+    startOnLayer(game, 5);
+    killBoss(game);
+    const gained = [progression.applyLevelUp(), progression.applyLevelUp()];
+    gained.forEach((level) => progression.emitLevelUp(level));
+    for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
+    expect(offers).toEqual([]);
+    const owed = atWin + progression.level;
+    expect(progression.owedLevelUpOffers()).toHaveLength(owed);
+
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'salvage-lanes',
+      carry: true,
+    });
+    expect(makePicks(game)).toBe(owed);
+  });
+
   it('is won at its Warden, with its own records and no endless continue', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
@@ -109,6 +275,11 @@ describe('sector runs', () => {
     killBoss(game);
 
     expect(game.session.getSessionState()).toBe('victory');
+    // The break timer counts the spoils time down; the orbs fly to the ship.
+    const { breakTimer, isActive } = game.services.enemies.waveState;
+    expect(isActive).toBe(false);
+    expect(breakTimer).toBeGreaterThan(0);
+    expect(breakTimer).toBeLessThan(6);
     expect(won).toEqual([expect.objectContaining({ sector: 'prime-gate' })]);
     expect(victories).toHaveLength(1);
     const { sector } = victories[0].data;

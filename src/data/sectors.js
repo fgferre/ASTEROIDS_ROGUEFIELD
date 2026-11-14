@@ -2,6 +2,7 @@
 
 import { listContent } from '../content/registry.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
+import { bossTier } from './enemies/boss.js';
 
 // Sector runs: a stretch of a chapter's layers on its own, won when the boss
 // on the sector's last layer dies. `headStart` card picks come before the
@@ -9,6 +10,10 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // keeps the global layer numbers of its range (HP scaling, biome, music and
 // rewards follow them); with `stages` it plays its own definition of each of
 // those layers, and with `boss` that boss kind ends it instead of the Warden.
+// `look` (optional) names biome fields (sky, haze, veins, dust, lights, bloom,
+// debris, structures, tint) that replace its biome's on its layers, so each
+// sector is its own place; music stays the biome's. Its `backdrop` names the
+// place's 3D set behind the arena (src/modules/render3d/places/index.js).
 //
 // One file per sector in src/content/sectors/, listed by `order`.
 export const SECTORS = deepFreeze(listContent('sectors'));
@@ -35,9 +40,13 @@ export function localLayer(sector, layer) {
   return layer - sector.layers[0] + 1;
 }
 
-/** Its end boss's rank: 'Sentinel' for a sector's own `boss`, else 'Warden'. */
+/**
+ * Its end boss's rank: its own `boss`'s tier ('Sentinel', 'Sovereign'), else
+ * 'Warden'.
+ */
 export function sectorBossTier(sector) {
-  return sector.boss ? 'Sentinel' : 'Warden';
+  const tier = sector.boss ? bossTier(sector.boss) : 'warden';
+  return tier[0].toUpperCase() + tier.slice(1);
 }
 
 /** True when the next sector goes on in the same chapter. */

@@ -3,6 +3,10 @@ import { createServiceManifest } from '../../src/bootstrap/serviceManifest.js';
 import { createAudioContextStub } from '../__helpers__/stubs.js';
 import { assertManagerWired } from '../__helpers__/audio-manifest-wiring.js';
 import eventInventory from '../fixtures/audio-event-inventory.json' with { type: 'json' };
+import { STORY } from '../../src/data/story.js';
+import { loadVoiceManifest } from '../../src/modules/audio/voiceLines.js';
+import voiceManifest from '../../src/public/audio/voice/manifest.json' with { type: 'json' };
+import PlayerSystem from '../../src/modules/PlayerSystem.js';
 
 // ---------------------------------------------------------------------------
 // Source-derived audio event-coverage lock (plan 02.01 Task 3).
@@ -246,14 +250,52 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
 
   it('wave-started on a biome’s first layer picks its theme and plays the chapter stinger', () => {
     withAudio(({ eventBus, setTheme, chapter }) => {
+      vi.useFakeTimers();
       eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
       expect(setTheme).toHaveBeenCalledWith('dense-core');
+      vi.advanceTimersByTime(500);
       expect(chapter).toHaveBeenCalledTimes(1);
       expect(chapter).toHaveBeenCalledWith('dense-core');
 
       eventBus.emit('wave-started', { wave: 7, totalEnemies: 10 });
+      vi.advanceTimersByTime(500);
       expect(chapter).toHaveBeenCalledTimes(1); // mid-biome: no stinger
+      vi.useRealTimers();
     });
+  });
+
+  it('a journey flown as the sector starts keeps the chapter stinger silent, however late its first frame: its score plays the motif', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const chapter = vi.spyOn(audio.sfxBus, 'playChapterStinger');
+    vi.useFakeTimers();
+
+    // The journey starts as the run starts; travel-planned waits a frame.
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+    eventBus.emit('cinematic-started', { kind: 'travel' });
+    vi.advanceTimersByTime(2000);
+    expect(chapter).not.toHaveBeenCalled();
+
+    // A head start's first layer starts after the journey: no stinger
+    // either; the next chapter's has one.
+    audio.reset();
+    eventBus.emit('cinematic-started', { kind: 'travel' });
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+    vi.advanceTimersByTime(500);
+    expect(chapter).not.toHaveBeenCalled();
+    eventBus.emit('wave-started', { wave: 11, totalEnemies: 10 });
+    vi.advanceTimersByTime(500);
+    expect(chapter).toHaveBeenCalledTimes(1);
+
+    // A run start with no journey (its intro) keeps it.
+    audio.reset();
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+    eventBus.emit('cinematic-started', { kind: 'intro' });
+    vi.advanceTimersByTime(500);
+    expect(chapter).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    audio.destroy();
   });
 
   it('a Warden layer takes the warden theme; boss-defeated hands back to the biome', () => {
@@ -265,6 +307,26 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
       eventBus.emit('boss-defeated', {});
       expect(setTheme).toHaveBeenLastCalledWith('dense-core');
     });
+  });
+
+  it('travel-planned lays out the journey score and holds the layers; its end hands over', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    audio.journeyCue = { play: vi.fn(() => true), end: vi.fn(), stop: vi.fn() };
+    const hold = vi.spyOn(audio.musicMixer, 'holdForJourney');
+    const plan = { moments: [{ id: 'ignite', at: 1.4 }], duration: 10 };
+
+    eventBus.emit('travel-planned', plan);
+    expect(audio.journeyCue.play).toHaveBeenCalledWith(plan);
+    expect(hold).toHaveBeenLastCalledWith(true);
+
+    eventBus.emit('travel-moment', { id: 'brake' });
+    expect(audio.journeyCue.end).not.toHaveBeenCalled();
+    eventBus.emit('travel-moment', { id: 'end' });
+    expect(audio.journeyCue.end).toHaveBeenCalledTimes(1);
+    expect(hold).toHaveBeenLastCalledWith(false);
+
+    vi.restoreAllMocks();
+    audio.destroy();
   });
 
   it('boss-warning plays the warden stinger exactly once', () => {
@@ -288,9 +350,9 @@ describe('player-health-changed → DuckingController EDGE delegation (plan 02.0
     const spy = vi.spyOn(audio.duckingController, 'duck');
 
     // Three events, all below 25% — only the FIRST (the crossing) ducks.
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 });
-    eventBus.emit('player-health-changed', { health: 15, maxHealth: 100 });
-    eventBus.emit('player-health-changed', { health: 10, maxHealth: 100 });
+    eventBus.emit('player-health-changed', { current: 20, max: 100 });
+    eventBus.emit('player-health-changed', { current: 15, max: 100 });
+    eventBus.emit('player-health-changed', { current: 10, max: 100 });
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toMatchObject({ bus: 'music' });
@@ -303,13 +365,26 @@ describe('player-health-changed → DuckingController EDGE delegation (plan 02.0
     const { audio, eventBus } = resolveRealAudioService();
     const spy = vi.spyOn(audio.duckingController, 'duck');
 
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 1
-    eventBus.emit('player-health-changed', { health: 50, maxHealth: 100 }); // recover (re-arm)
-    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 2
+    eventBus.emit('player-health-changed', { current: 20, max: 100 }); // duck 1
+    eventBus.emit('player-health-changed', { current: 50, max: 100 }); // recover (re-arm)
+    eventBus.emit('player-health-changed', { current: 20, max: 100 }); // duck 2
 
     expect(spy).toHaveBeenCalledTimes(2);
 
     spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+
+  it("a heal moves the music's health level back up, as a hurt moves it down", () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    eventBus.emit('player-health-changed', { current: 20, max: 100 });
+    expect(audio.musicMixer.runState.healthRatio).toBe(0.2);
+
+    const ship = { isDead: false, health: 20, maxHealth: 100, eventBus };
+    PlayerSystem.prototype.heal.call(ship, 70);
+    expect(audio.musicMixer.runState.healthRatio).toBe(0.9);
+    expect(audio.lowHealthDuckArmed).toBe(false);
+
     if (typeof audio.destroy === 'function') audio.destroy();
   });
 });
@@ -453,6 +528,21 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     audio.destroy();
   });
 
+  it('boss-attack-started → playBossAttack with the boss’s kind, panned to it', () => {
+    expectDelegates(
+      'boss-attack-started',
+      {
+        enemy: { type: 'boss', bossKind: 'kiln-engine', x: 760, y: 300 },
+        position: { x: 760, y: 300 },
+      },
+      'playBossAttack',
+      ([options]) => {
+        expect(options.kind).toBe('kiln-engine');
+        expect(options.pan).toBeGreaterThan(0);
+      }
+    );
+  });
+
   it('ram-charged → playRamCharge', () => {
     expectDelegates(
       'ram-charged',
@@ -553,6 +643,72 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     );
   });
 
+  it('transmission-shown of a recorded line → its recording, no synthesized voice', async () => {
+    await loadVoiceManifest(async () => ({ json: async () => voiceManifest }));
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.sfxBus, 'playTransmissionVoice');
+    eventBus.emit('transmission-shown', {
+      speaker: 'THE RING',
+      key: 'victory',
+      text: STORY.victory,
+    });
+    expect(spy).not.toHaveBeenCalled();
+    audio.destroy();
+  });
+
+  it('a recorded line ducks the music on its own stage (not with the voices off) and leaving the run stops it', async () => {
+    await loadVoiceManifest(async () => ({ json: async () => voiceManifest }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      }))
+    );
+    const { audio, eventBus } = resolveRealAudioService();
+    audio.voiceGain = audio.context.createGain();
+    const sources = [];
+    audio.context.createBufferSource = vi.fn(() => {
+      const source = { connect() {}, start: vi.fn(), stop: vi.fn() };
+      sources.push(source);
+      return source;
+    });
+    const duck = vi.spyOn(audio.duckingController, 'duck');
+    const line = { speaker: 'THE RING', key: 'victory', text: STORY.victory };
+    const say = async () => {
+      eventBus.emit('transmission-queued', line);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      eventBus.emit('transmission-shown', line);
+    };
+
+    await say();
+    expect(sources).toHaveLength(1);
+    expect(duck).toHaveBeenCalledWith(
+      expect.objectContaining({ bus: 'voice' })
+    );
+    audio.reset();
+    expect(sources[0].stop).toHaveBeenCalled();
+
+    duck.mockClear();
+    audio.updateVolumeState({ voiceVolume: 0 });
+    await say();
+    expect(sources).toHaveLength(2);
+    expect(duck).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+    audio.destroy();
+  });
+
+  it('voice-lines-coming → the coming lines readied ahead of their showing', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const expectLines = vi.fn();
+    audio.voiceLines = { expect: expectLines, clear: vi.fn() };
+    const entries = [{ key: 'travel:x:0' }, { key: 'chapter:x' }];
+    eventBus.emit('voice-lines-coming', { entries });
+    expect(expectLines).toHaveBeenCalledWith(entries);
+    audio.destroy();
+  });
+
   it('enemy-telegraph far from the player → playEnemyTelegraph with a distance mix', () => {
     expectDelegates(
       'enemy-telegraph',
@@ -583,6 +739,22 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
 
   it('xp-collected → playXPCollect', () => {
     expectDelegates('xp-collected', {}, 'playXPCollect');
+  });
+
+  it('health-heart-collected → playHeartPickup', () => {
+    expectDelegates('health-heart-collected', {}, 'playHeartPickup');
+  });
+
+  it('travel-moment → its sample, the burn loop on and off, all off at the end', () => {
+    expectDelegates(
+      'travel-moment',
+      { id: 'leap' },
+      'playTravelMoment',
+      (args) => expect(args[0]).toBe('leap')
+    );
+    expectDelegates('travel-moment', { id: 'burn' }, 'playTravelBurn');
+    expectDelegates('travel-moment', { id: 'brake' }, 'stopTravelBurn');
+    expectDelegates('travel-moment', { id: 'end' }, 'stopTravelSounds');
   });
 
   it('xp-orb-fused → playOrbFusion', () => {

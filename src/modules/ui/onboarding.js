@@ -13,8 +13,15 @@ export const ONBOARDING_GAP_SECONDS = 1.5;
 export const MOVE_HOLD_SECONDS = 0.6;
 /** The shield tip leaves on its own after this long on screen. */
 export const SHIELD_TIP_SECONDS = 6;
+/** The dash tip leaves on its own after this long on screen. */
+export const DASH_TIP_SECONDS = 10; // proposta 12/11
 export const CARDS_TIP_TEXT = 'Pick a card. R rerolls, B banishes.';
 export const CARDS_TIP_TEXT_GAMEPAD = 'Pick a card. X rerolls, Y banishes.';
+/** The same tip during a head start, where "Equip for me" makes the rest. */
+export const CARDS_TIP_TEXT_HEAD_START =
+  'Pick a card. R rerolls, B banishes, Q equips the rest.';
+export const CARDS_TIP_TEXT_HEAD_START_GAMEPAD =
+  'Pick a card. X rerolls, Y banishes, RB equips the rest.';
 
 /** In-play tips in order; `cards` lives on the level-up screen instead. */
 const PLAY_STEPS = ['move', 'dash', 'shield'];
@@ -147,7 +154,8 @@ export class Onboarding {
       return;
     }
     this.shownFor += dt;
-    if (id === 'shield' && this.shownFor >= SHIELD_TIP_SECONDS) {
+    const expiry = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS }[id];
+    if (this.shownFor >= expiry) {
       this.finish(id);
     }
   }
@@ -165,13 +173,18 @@ export class Onboarding {
   }
 
   /** Footer text for the level-up screen, or null once learned. */
-  cardsTip(device = 'keyboard') {
+  cardsTip(device = 'keyboard', headStart = false) {
     if (!this.active || this.done.has('cards')) {
       return null;
     }
     if (!this.cardsShown) {
       this.cardsShown = true;
       this.onStep('cards');
+    }
+    if (headStart) {
+      return device === 'gamepad'
+        ? CARDS_TIP_TEXT_HEAD_START_GAMEPAD
+        : CARDS_TIP_TEXT_HEAD_START;
     }
     return device === 'gamepad' ? CARDS_TIP_TEXT_GAMEPAD : CARDS_TIP_TEXT;
   }

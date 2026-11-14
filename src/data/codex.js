@@ -42,6 +42,8 @@ const GLYPHS = {
     '<rect x="-11" y="-5" width="22" height="10"/><rect x="-8" y="-10" width="5" height="5"/><rect x="3" y="-10" width="5" height="5"/><rect x="11" y="-1" width="5" height="2" transform="rotate(-35 11 0)"/><rect x="-16" y="-1" width="5" height="2" transform="rotate(-35 -11 0)"/><rect class="eye" x="-2" y="-2" width="4" height="4"/>',
   'sentinel-interdictor':
     '<rect x="-15" y="-15" width="2" height="30"/><rect x="-15" y="-15" width="30" height="2"/><rect x="13" y="-15" width="2" height="30"/><rect x="-7" y="-4" width="14" height="8"/><circle class="eye" r="2"/>',
+  'sovereign-sovereign':
+    '<circle r="5"/><rect x="-3" y="-15" width="6" height="5"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(60)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(120)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(180)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(240)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(300)"/><circle class="eye" r="2.5"/>',
   'herald-dust':
     '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
   'herald-heat':
@@ -113,13 +115,14 @@ const warden = (kind, lore, hint) => ({
   herald: false,
 });
 
-// A Sentinel sits with the Wardens (`warden: true`), on the layer it ends.
+// A Sentinel (or Sovereign) sits with the Wardens (`warden: true`), on the
+// layer it ends.
 const sentinel = (kind, lore, hint) => ({
-  id: `sentinel-${kind}`,
+  id: `${bossTier(kind)}-${kind}`,
   name: SENTINEL_KINDS[kind].displayName,
   lore,
   hint,
-  glyph: GLYPHS[`sentinel-${kind}`],
+  glyph: GLYPHS[`${bossTier(kind)}-${kind}`],
   fromLayer: SENTINEL_KINDS[kind].layer,
   warden: true,
   herald: false,
@@ -198,6 +201,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'null',
       'The stillness the Ring kept for its ending. It opens the Ring itself. Everything that falls through the Field falls toward it, and for a thousand years nothing has arrived still burning.',
       'Pulls the sparks back. Its plates burn when the shell is open.'
+    ),
+    sentinel(
+      'sovereign',
+      'Continuance kept two orders at the centre of the Ring: protect them, rebuild them. When it could no longer do both, it did not choose. It still turns between them, and everything that reaches it is material.',
+      'Plates shut: it shrugs off shots, ride its wall through the gap. Plates open: hit hard and the rebuild breaks. At the end, stay on its open half.'
     ),
   ].sort((a, b) => a.fromLayer - b.fromLayer)
 );

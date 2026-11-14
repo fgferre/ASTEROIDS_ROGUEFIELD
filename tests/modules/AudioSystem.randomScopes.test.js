@@ -336,14 +336,15 @@ describe('AudioSystem random scope synchronization', () => {
     expect(audio.musicGain.gain.value).toBeCloseTo(0.3);
     expect(trackGain.gain.value).toBe(1);
     // Plan 02.06: file tracks join at the music DUCK node (rests 1.0) so they
-    // duck WITH the music; the duck node is itself wired into the musicGain
-    // slider stage. The track gain stays independent of the slider value.
+    // duck WITH the music; the duck node (then the voice's own duck stage)
+    // is wired into the musicGain slider stage. The track gain stays
+    // independent of the slider value.
     expect(trackGain.connect).toHaveBeenCalledWith(
       audio.duckingController.musicDuckGain
     );
-    expect(audio.duckingController.musicDuckGain.connect).toHaveBeenCalledWith(
-      audio.musicGain
-    );
+    const { musicDuckGain, musicVoiceDuckGain } = audio.duckingController;
+    expect(musicDuckGain.connect).toHaveBeenCalledWith(musicVoiceDuckGain);
+    expect(musicVoiceDuckGain.connect).toHaveBeenCalledWith(audio.musicGain);
 
     audio.updateVolumeState({
       masterVolume: 0.4,

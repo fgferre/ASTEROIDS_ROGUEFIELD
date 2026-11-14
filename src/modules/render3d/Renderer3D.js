@@ -46,6 +46,7 @@ import {
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { TravelScene } from './travelScene.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -67,6 +68,9 @@ const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
 const SHIP_MIN_CASTER = 5;
 // Point sizes of the star layers are authored for a frame this tall.
 const STAR_FRAME_HEIGHT = 900;
+// The journey's rig holds the intro's first pose under its own camera.
+const INTRO_START = introPath(0);
+const holdIntroStart = () => INTRO_START;
 
 // The pose of an entity's angle field, 0 when it has none.
 function angleOf(holder, key) {
@@ -105,6 +109,8 @@ class Renderer3D extends BaseSystem {
     this.shipOnScreen = null;
     this.shipPoint = { x: 0, y: 0 };
     this.three = null;
+    // The journey between sectors (travelScene.js), built with the scene.
+    this.travel = null;
     this.failed = false;
     this.graphics = {
       bloom: true,
@@ -212,7 +218,11 @@ class Renderer3D extends BaseSystem {
       }
     });
     this.registerEventListener('wave-started', (payload = {}) => {
-      this.biome.enterLayer(payload.wave);
+      // A sector run shows its sector's look (WaveManager holds the sector).
+      this.biome.enterLayer(
+        payload.wave,
+        this.cachedEnemies?.waveManager?.sector
+      );
       this.camera.trigger('waveStart');
     });
     // What opens the camera director's wide view (core/cameraDirector.js).
@@ -385,6 +395,35 @@ class Renderer3D extends BaseSystem {
     return this.startCinematic(introPath, durationMs, false, 'intro');
   }
 
+  /**
+   * The journey to sector `to` over `durationMs` (ui/runCinematics.js): the
+   * ship flown along the Ring by its own camera, ending on the intro's first
+   * pose (playIntro next). False when nothing would move, as playIntro.
+   */
+  playTravel({ to, durationMs }) {
+    if (!this.ready()) return false;
+    if (!this.startCinematic(holdIntroStart, 1, true, 'travel')) return false;
+    const freeze = this.cameraRig.cinematicFreeze;
+    this.travel.start(
+      to,
+      durationMs,
+      this.cachedPlayer,
+      freeze?.kind === 'travel' ? freeze.t : null
+    );
+    return true;
+  }
+
+  /**
+   * The journey is over: the Ring and the field are back, and the run's
+   * sector shows its own place already (its first layer may wait for cards).
+   */
+  endTravel() {
+    if (!this.travel?.active) return;
+    this.travel.stop();
+    const sector = this.cachedEnemies?.waveManager?.sector;
+    if (sector) this.biome.enterLayer(sector.layers[0], sector);
+  }
+
   /** The victory pull-back; it holds its last shot until endCinematic(). */
   playEpilogue(durationMs) {
     return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
@@ -473,9 +512,11 @@ class Renderer3D extends BaseSystem {
   // changes the lit programs, so a preset change recompiles them once. A
   // new map is drawn once here, seeded: three names it with a Math.random
   // UUID. Through a whole render(): shadowMap.render alone reads the
-  // renderer's per-frame light state, which is null between frames.
+  // renderer's per-frame light state, which is null between frames. Into
+  // the target the frame draws to, or it compiles a screen-encoded program
+  // for every material, mid-play.
   applyShadows(size) {
-    const { renderer, key, scene, camera } = this.three;
+    const { renderer, key, scene, camera, composer } = this.three;
     const on = size > 0;
     renderer.shadowMap.enabled = on;
     key.castShadow = on;
@@ -483,7 +524,11 @@ class Renderer3D extends BaseSystem {
       key.shadow.mapSize.set(size, size);
       key.shadow.map?.dispose();
       key.shadow.map = null;
+      renderer.setRenderTarget(
+        this.graphics.postProcessing ? composer.readBuffer : null
+      );
       this.seeded(() => renderer.render(scene, camera));
+      renderer.setRenderTarget(null);
     }
   }
 
@@ -565,6 +610,7 @@ class Renderer3D extends BaseSystem {
     this.lastRenderTime = null;
     this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
+    this.travel?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -581,6 +627,9 @@ class Renderer3D extends BaseSystem {
 
   setup() {
     this.three = setupThree(this.seeded);
+    this.travel = new TravelScene(this.three, (event, payload) =>
+      this.eventBus?.emit(event, payload)
+    );
     this.applyQuality();
   }
 
@@ -603,7 +652,7 @@ class Renderer3D extends BaseSystem {
   /**
    * Loading screen (app.js): builds the scene (maps baked) and compiles every
    * program a run can draw with — each enemy view kind in all its looks and
-   * burning, both hulls, then one frame of everything through the composer
+   * burning, both hulls, the bosses' danger looks, then one frame of everything through the composer
    * (post passes, texture and buffer uploads). One chunk per task, so the
    * bar repaints; `onProgress(done)` after each, 0..1.
    */
@@ -613,6 +662,7 @@ class Renderer3D extends BaseSystem {
       () => this.ready(),
       () => this.three.player.warm(this.cachedPlayer, compile),
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
+      () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
@@ -692,6 +742,7 @@ class Renderer3D extends BaseSystem {
     const player = this.cachedPlayer;
     const effects = this.cachedEffects;
     const enemyList = this.cachedEnemies?.getActiveEnemies() || [];
+    const travel = this.travel?.active ? this.travel : null;
     this.cameraRig.updateCamera(
       this.three,
       player,
@@ -706,6 +757,7 @@ class Renderer3D extends BaseSystem {
     this.lastRenderTime = now;
 
     const t = this.three;
+    travel?.frame(t.camera, t.height);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -730,9 +782,18 @@ class Renderer3D extends BaseSystem {
     t.veil.update(dt);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
-    if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
+    if (warden) {
+      t.wardenLight.position.copy(warden.object.position).setY(40);
+      // A boss view may name its own light (Sovereign: pale gold).
+      t.wardenLight.color.copy(warden.light ?? t.wardenLightColor);
+    }
     t.player.update(player, t.ribbons, time);
-    this.trackShip(player);
+    if (travel) {
+      travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
+      this.shipOnScreen = null;
+    } else {
+      this.trackShip(player);
+    }
     this.mirrorShield(player, time);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
@@ -762,9 +823,10 @@ class Renderer3D extends BaseSystem {
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(this.biome, fog);
-    const ship = t.player.group.visible && player?.position;
-    t.space.update(this.camera.x, this.camera.y, dt, {
+    t.biomes.update(travel ? travel.look : this.biome, fog);
+    const ship = t.player.group.visible && (travel?.focus || player?.position);
+    const view = travel?.focus || this.camera;
+    t.space.update(view.x, view.y, dt, {
       ship: ship || null,
       shipLight: t.player.light.intensity,
       pointScale,

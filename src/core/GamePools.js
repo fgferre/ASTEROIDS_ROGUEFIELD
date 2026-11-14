@@ -707,15 +707,6 @@ export class GamePools {
 // Development tools
 if (typeof window !== 'undefined' && IS_DEV) {
   window.GamePools = GamePools;
-
-  // Add global debug commands
-  window.__gamePoolsDebug = {
-    stats: () => GamePools.getPoolStats(),
-    validate: () => GamePools.validateAll(),
-    debugLog: () => GamePools.debugLog(),
-    releaseAll: () => GamePools.releaseAll(),
-    autoManage: () => GamePools.autoManageAll(),
-  };
 }
 
 // Export individual pools for convenience

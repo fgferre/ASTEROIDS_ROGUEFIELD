@@ -4,14 +4,21 @@
 // spine with vents; wings cut from the fin panels with an armour plate on top,
 // a fence and a weapon rail at the tip; canards and canted tail fins; a banded
 // nacelle with an intake and a bell round every nozzle; a faceted canopy in
-// a dark socket. hullModel.js calls it and merges what it returns, so the
-// game and the menu draw it like any other hull. Points are [x, height, y]
-// in hull units, as in hullModel.js.
+// a dark socket. Each part has a finish: satin paint, glossier accent
+// panels (shoulder and wing armour, tail fins, flaps) or polished steel
+// (nozzle bells and bands, intake rims, the weapon rail's barrel, trim
+// strips, the antenna and the chin sensor). hullModel.js calls it and merges
+// what it returns, so the game and the menu draw it like any other hull.
+// Points are [x, height, y] in hull units, as in hullModel.js.
 
 import { SHIP_SIZE } from '../../data/constants/physics.js';
 
 const S = SHIP_SIZE;
-const [DEEP, BASE, FIN, SPINE] = [0, 1, 2, 3];
+// Tones, as hullTones (STEEL: the polished metal's own).
+const [DEEP, BASE, FIN, SPINE, STEEL] = [0, 1, 2, 3, 4];
+/** The finishes: the material each part draws in (hullModel.js HULL_FINISHES). */
+export const FINISH = Object.freeze({ paint: 0, gloss: 1, metal: 2 });
+const { gloss: GLOSS, metal: METAL } = FINISH;
 // Heights (hull units) of the layers at the hull's tallest station; they
 // shrink toward the nose with the deck (form.body).
 const KEEL = [1.1, 2.3];
@@ -24,8 +31,8 @@ const WING_PLATE_TOP = 3.3;
 const NOZZLE_HEIGHT = 2.6;
 
 /**
- * `geometry`: the hull's geometry (hullArt.js). `colors`: the four hull
- * tones with the hull's albedo. Returns { plates, raised, canopy, edges,
+ * `geometry`: the hull's geometry (hullArt.js). `colors`: the hull tones
+ * (hullTones) with the hull's albedo. Returns { plates, raised, canopy, edges,
  * tips, deckY }: `plates` (fuselage and wings: what a dash ghost draws) and
  * `raised` (the rest) as mergeStatic parts, the canopy's glass, the edge
  * segments, the wingtip points in the panels' order and the deck height at
@@ -92,10 +99,11 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     solid.setAttribute('uv2', solid.getAttribute('uv'));
     return solid;
   }
-  const part = (solid, tone) => ({
+  const part = (solid, tone, finish = FINISH.paint) => ({
     geometry: solid,
     color: colors[tone],
     flat: true,
+    finish,
   });
   // The fuselage's outline, `k` times as wide, between x0 (fore) and x1.
   const outline = (k, x0 = rows[0][0], x1 = rows[rows.length - 1][0]) => {
@@ -124,7 +132,8 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
   const raised = [
     part(
       slab(outline(0.74, nose * 0.5, tail * 0.92), ...SHOULDER, 0.26, taper),
-      SPINE
+      SPINE,
+      GLOSS
     ),
     part(
       slab(
@@ -140,9 +149,13 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     ...[0.7, 0.5, 0.3].map((t) =>
       part(box(0.5, 0.16, 1.5, [tail * t, SPINE_TOP * tall(tail * t), 0]), DEEP)
     ),
-    part(box(0.12, 1.5, 0.12, [tail * 0.86, SPINE_TOP + 0.4, 0]), BASE),
+    part(box(0.12, 1.5, 0.12, [tail * 0.86, SPINE_TOP + 0.4, 0]), STEEL, METAL),
     // a chin sensor under the prow
-    part(drum(nose * 0.86, nose * 0.7, 0.3, 0.55, KEEL[0] + 0.5, 0, 8), DEEP),
+    part(
+      drum(nose * 0.86, nose * 0.7, 0.3, 0.55, KEEL[0] + 0.5, 0, 8),
+      STEEL,
+      METAL
+    ),
   ];
   const edges = { edge: [], bladeEdge: [] };
   const tips = [];
@@ -163,7 +176,8 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       raised.push(
         part(
           slab(inset(panel.points, 0.72), WING[1] - 0.2, WING_PLATE_TOP, 0.12),
-          SPINE
+          SPINE,
+          GLOSS
         )
       );
       // the lit leading edge (the panel's first side); a blade's burns in
@@ -183,13 +197,17 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       const { x, y } = panel.rcsPort;
       tips.push([x, NOZZLE_HEIGHT, y]);
       raised.push(
-        part(box(3.6, 0.7, 0.2, [cx - 0.4, WING_PLATE_TOP, cy]), DEEP)
+        part(box(3.6, 0.7, 0.2, [cx - 0.4, WING_PLATE_TOP, cy]), STEEL, METAL)
       );
       // the weapon rail along the tip
       if (form.pods) {
         raised.push(
           part(box(8.5, 0.75, 0.8, [x + 3.2, WING[0] + 0.2, y]), DEEP),
-          part(drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6), BASE)
+          part(
+            drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6),
+            STEEL,
+            METAL
+          )
         );
       }
       // canards off the prow
@@ -234,9 +252,11 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
           SHOULDER[1] * tall(finAt) - 0.3,
           sign * rowAt(finAt)[1] * 0.75
         );
-      raised.push(part(fin, SPINE));
+      raised.push(part(fin, SPINE, GLOSS));
     } else if (panel.flap) {
-      raised.push(part(slab(points, WING[1], WING[1] + 0.55, 0.12), FIN));
+      raised.push(
+        part(slab(points, WING[1], WING[1] + 0.55, 0.12), FIN, GLOSS)
+      );
     } else if (panel.armor) {
       // shoulder armour: a slab over the wing root and a smaller one on
       // it, the accent trim along the lower slab's outboard edges
@@ -244,7 +264,11 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       const top = WING_PLATE_TOP + 1.5;
       raised.push(
         part(slab(lower, WING[1] - 0.2, top, 0.3), FIN),
-        part(slab(inset(panel.points, 0.5), top - 0.2, top + 0.8, 0.25), SPINE)
+        part(
+          slab(inset(panel.points, 0.5), top - 0.2, top + 0.8, 0.25),
+          SPINE,
+          GLOSS
+        )
       );
       lower.forEach((a, i) => {
         const b = lower[(i + 1) % lower.length];
@@ -256,17 +280,25 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     }
   });
 
-  // Nacelles: an intake, a casing with two bands, the bell to the exit lip
-  // and a dark throat inside it.
+  // Nacelles: an intake rim, a casing with two steel bands, the steel bell
+  // to the exit lip and a dark throat inside it.
   geometry.nozzles.forEach(({ x, y, r, exitX }) => {
     const fore = x + (form.nacelle ?? 0.3) * S;
     const at = [NOZZLE_HEIGHT, y];
     raised.push(
       part(drum(fore, x, r * 1.25, r * 1.4, ...at), FIN),
-      part(drum(fore + 0.2, fore - 0.25, r * 0.95, r * 0.95, ...at), DEEP),
-      part(drum(fore - 0.9, fore - 1.6, r * 1.48, r * 1.48, ...at), DEEP),
-      part(drum(x + 0.9, x + 0.2, r * 1.5, r * 1.5, ...at), BASE),
-      part(drum(x, exitX, r * 1.5, r * 1.12, ...at), BASE),
+      part(
+        drum(fore + 0.2, fore - 0.25, r * 0.95, r * 0.95, ...at),
+        STEEL,
+        METAL
+      ),
+      part(
+        drum(fore - 0.9, fore - 1.6, r * 1.48, r * 1.48, ...at),
+        STEEL,
+        METAL
+      ),
+      part(drum(x + 0.9, x + 0.2, r * 1.5, r * 1.5, ...at), STEEL, METAL),
+      part(drum(x, exitX, r * 1.5, r * 1.12, ...at), STEEL, METAL),
       part(drum(exitX + 0.5, exitX - 0.1, r * 0.92, r * 0.86, ...at), DEEP)
     );
   });

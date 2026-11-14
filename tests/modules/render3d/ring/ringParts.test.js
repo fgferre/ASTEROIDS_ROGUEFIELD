@@ -142,6 +142,24 @@ describe('ringParts', () => {
     expect(mid.under).toBeGreaterThan(100);
   });
 
+  it('builds a city on the deck at the close levels, over level 0 plates', () => {
+    const { width: W, wall, rim: h } = RING;
+    // Vertices between the rim walls, over the deck.
+    const onDeck = (geometry) => {
+      const p = geometry.getAttribute('position');
+      let count = 0;
+      for (let i = 0; i < p.count; i += 1) {
+        const r = Math.hypot(p.getX(i), p.getZ(i)) - RING.radius;
+        if (Math.abs(r) < W / 2 - wall && p.getY(i) > 0.2) count += 1;
+        else if (Math.abs(r) < W / 2 && p.getY(i) > h + 1) count += 1;
+      }
+      return count;
+    };
+    expect(onDeck(build(1, [16, 24]))).toBeGreaterThan(
+      onDeck(build(0, [16, 24])) * 8
+    );
+  });
+
   it('is a dead structure until the wake at every level: few faint lights, the wake on its seams', () => {
     [0, 1, 2].forEach((lod) => {
       const colors = build(lod, [0, 24]).getAttribute('color');

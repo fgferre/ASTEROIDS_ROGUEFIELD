@@ -1,5 +1,6 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
+import { driftToCentre } from '../boss/drift.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const CROWN = BOSS_KINDS['prism-crown'];
@@ -171,7 +172,7 @@ export class SentinelPrismCrown extends BossEnemy {
         }
         break;
       default:
-        this.driftToCentre(deltaTime);
+        driftToCentre(this, deltaTime, CROWN.drift);
         if (this.crownTimer <= 0 && position) this.align(cycle, position);
         break;
     }
@@ -186,25 +187,6 @@ export class SentinelPrismCrown extends BossEnemy {
     this.movementStrategy = 'linear';
     this.vx = 0;
     this.vy = 0;
-  }
-
-  // Toward mid-field, slowing as it arrives.
-  driftToCentre(deltaTime) {
-    this.movementStrategy = 'linear';
-    const { acceleration, maxSpeed, arrive } = CROWN.drift;
-    const dx = GAME_WIDTH / 2 - this.x;
-    const dy = GAME_HEIGHT / 2 - this.y;
-    const distance = Math.hypot(dx, dy);
-    const wanted = distance > 1 ? maxSpeed * Math.min(1, distance / arrive) : 0;
-    const wx = distance > 1 ? (dx / distance) * wanted : 0;
-    const wy = distance > 1 ? (dy / distance) * wanted : 0;
-    const step = acceleration * deltaTime;
-    const ex = wx - this.vx;
-    const ey = wy - this.vy;
-    const gap = Math.hypot(ex, ey);
-    const k = gap > step ? step / gap : 1;
-    this.vx += ex * k;
-    this.vy += ey * k;
   }
 
   moveCrown(goal, deltaTime) {
@@ -275,6 +257,12 @@ export class SentinelPrismCrown extends BossEnemy {
       solid: 1,
       timer: cycle.burn,
       duration: cycle.burn,
+    });
+    // The beams fire: their sound (eventCues `boss-attack-started`).
+    this.getEventBus()?.emit?.('boss-attack-started', {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
     });
   }
 

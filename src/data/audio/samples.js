@@ -1,8 +1,9 @@
 // src/data/audio/samples.js
 // The sample layer (SOUND.md): which cue plays which sample, and the playback
 // rules. The files and each sample's mix (gain dB, priority, cap, gap ms,
-// reverb send dB) live in src/public/audio/sfx/manifest.json; a cue whose
-// sample has no loaded files there plays its synthesis, as before.
+// reverb send dB; a loop's loopStart and loopEnd, seconds) live in
+// src/public/audio/sfx/manifest.json; a cue whose sample has no loaded files
+// there plays its synthesis, as before.
 // src/modules/audio/samplePlayer.js reads both.
 //
 // Cue fields:
@@ -10,7 +11,7 @@
 //               argument (the explosion's size).
 //   pick        { path, samples }: the sampleId by the value at `path` in the
 //               cue's first argument (the shot's weaponId); a value not
-//               listed plays `sample`.
+//               listed plays `sample` (none: nothing).
 //   bus         the bus the cue's synthesis uses: 'protected' (player
 //               feedback, never ducks) or 'ambient' (the world, ducks).
 //   spatialArg  the argument carrying { pan, distance } (pan by x, distance
@@ -21,12 +22,15 @@
 //               within `window` s of the last one sounds a semitone above it,
 //               up to `max` semitones; a longer pause starts over. Its pitch
 //               is the climb's, without the per-play spread.
+//   loop        true → it plays on between its loopStart and loopEnd, faded
+//               in over SAMPLE_PLAYBACK.loopFadeSeconds, until stopped
+//               (samplePlayer.js stop).
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const SAMPLE_CUES = deepFreeze({
   // A weapon listed here has a shot of its own; until the manifest has its
-  // files it plays the lance's synthesis (the others play the lance's).
+  // files it plays the lance's sample, like the others.
   playLaserShot: {
     sample: 'lance-shot',
     pick: {
@@ -60,6 +64,9 @@ export const SAMPLE_CUES = deepFreeze({
     climb: { window: 0.4, max: 7 }, // proposta 20/10
   },
   playLevelUp: { sample: 'level-up', bus: 'ambient' },
+  // A health heart picked up (eventCues `health-heart-collected`); gain, cap 1
+  // and gap in the manifest: proposta 13/11.
+  playHeartPickup: { sample: 'heart-pickup', bus: 'ambient' },
   playUpgradeSelect: { sample: 'card-pick', bus: 'ambient' },
   // By the pickup's kind (and the chest's opening); Magnet, Pulse and
   // Overcharge have no sample id yet.
@@ -74,6 +81,38 @@ export const SAMPLE_CUES = deepFreeze({
   },
   playDroneFire: { sample: 'enemy-shot', bus: 'ambient', spatialArg: 0 },
   playBossRoar: { sample: 'warden-arrival', bus: 'ambient', facade: true },
+  // A Warden's signature attack, by its kind (eventCues `boss-attack-started`;
+  // audition 13/11). Gains, cap 1 and gaps in the manifest: proposta 13/11.
+  playBossAttack: {
+    pick: {
+      path: 'kind',
+      samples: {
+        'quarry-maw': 'quarry-maw-intake',
+        gatekeeper: 'gatekeeper-barrier',
+        'kiln-engine': 'kiln-engine-ignite',
+        'prism-crown': 'prism-crown-beam',
+        'foundry-mother': 'foundry-mother-sweep',
+        interdictor: 'interdictor-cage',
+        sovereign: 'sovereign-protect',
+      },
+    },
+    bus: 'ambient',
+    spatialArg: 0,
+  },
+  // The journey between sectors (eventCues `travel-moment`; audition 13/11),
+  // by its moment's id (render3d/travel/moments.js); the burn is a loop.
+  // Gains in the manifest: proposta 13/11.
+  playTravelMoment: {
+    sample: {
+      ignite: 'travel-ignite',
+      charge: 'travel-charge',
+      leap: 'travel-leap',
+      dropout: 'travel-dropout',
+      flyby: 'travel-flyby',
+    },
+    bus: 'ambient',
+  },
+  playTravelBurn: { sample: 'travel-burn', bus: 'ambient', loop: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
   playUIStartGame: { sample: 'run-start', bus: 'ambient' },
@@ -99,4 +138,6 @@ export const SAMPLE_PLAYBACK = deepFreeze({
   gainSpreadDb: 1.5, // ± dB per play, over the manifest gain
   maxVoices: 24, // sample voices at once, all samples together
   stealFadeSeconds: 0.01, // a stopped voice fades this fast (no click)
+  loopFadeSeconds: 0.25, // a loop fades in and out this long (proposta 13/11)
+  cutFadeSeconds: 0.15, // the journey's sounds fade out this fast when it ends
 });

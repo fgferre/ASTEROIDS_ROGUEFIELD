@@ -1,6 +1,6 @@
-// A Sentinel: the boss that ends a sector (a Warden ends a chapter). A mining
-// machine of the old Ring that still eats stone: a heavy hull, two jaw plates
-// round a furnace core. Its loop: INTAKE (a cone in front of the mouth, then
+// A Sentinel (CONTENT.md "Boss"): the boss that ends a sector (a Warden ends a
+// chapter). A mining machine of the old Ring that still eats stone: a heavy
+// hull, two jaw plates round a furnace core. Its loop: INTAKE (a cone in front of the mouth, then
 // the jaws open and pull: rocks in the cone are swallowed, the ship is drawn
 // gently in, the open core takes full damage), EJECT (the jaws shut, it turns
 // to the ship and spits what it ate as a fan of small rocks), a drift, again.
@@ -47,20 +47,43 @@ export default {
   rockPullAcceleration: 420, // proposta 12/11: px/s², rocks in the cone
   rockPullMaxSpeed: 240, // proposta 12/11
   swallowReach: 24, // proposta 12/11: px past the mouth a rock is eaten
-  shipPullAcceleration: 90, // proposta 12/11: px/s²; the ship thrusts 280
   mouthReach: 34, // proposta 12/11: px round the open mouth that hurt
   mouthDamageFactor: 0.6, // proposta 12/11: of contactDamage
-  eject: { min: 3, max: 8, speed: 170, size: 'small' }, // proposta 12/11
+  eject: { max: 8, size: 'small', heavySize: 'medium' }, // proposta 12/11
   // The cycle per phase: drift (recovery), the intake's warning and pull,
-  // the eject's warning; the fan's arc.
+  // the eject's warning; the fan's arc, its fewest rocks and their speed.
+  // `shipPull` (px/s²; the ship thrusts 280) draws the ship in. `salvos`
+  // fans leave one after another, `salvoGap` s apart, each aimed through the
+  // gaps of the one before; `heavy` rocks at a fan's centre are bigger ones
+  // that break into more. The second phase (owner, 12/11: "não inova, não
+  // fica mais difícil… 3 asteroides que são muito fáceis de destruir") spits
+  // twice, faster, with a heavy rock, and pulls harder.
   cycle: [
-    { drift: 2.4, intakeWindup: 1.2, intake: 3, ejectWindup: 0.9, fanArc: 0.8 },
+    {
+      drift: 2.4,
+      intakeWindup: 1.2,
+      intake: 3,
+      ejectWindup: 0.9,
+      fanArc: 0.8,
+      ejectMin: 3,
+      ejectSpeed: 170,
+      shipPull: 90,
+      salvos: 1,
+      salvoGap: 0,
+      heavy: 0,
+    },
     {
       drift: 1.4,
       intakeWindup: 1.0,
       intake: 2.6,
       ejectWindup: 0.7,
-      fanArc: 1.3,
+      fanArc: 1.5,
+      ejectMin: 5,
+      ejectSpeed: 230,
+      shipPull: 150,
+      salvos: 2,
+      salvoGap: 0.55,
+      heavy: 1,
     },
   ], // proposta 12/11
   movementPhases: [

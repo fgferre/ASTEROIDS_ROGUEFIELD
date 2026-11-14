@@ -28,6 +28,9 @@ export { bossSegments, comboTier } from './hud/hudCommon.js';
 
 const LAYER_BANNER_MS = 1200;
 const CHAPTER_BANNER_MS = 3000;
+// A SURGE or EVENT banner on screen is not replaced by the other: the two can
+// fall in the same second, and each is a warning.
+const WARNING_TONES = ['surge', 'event'];
 const BOSS_INTRO_MS = 1500;
 const BOSS_BAR_HOLD_MS = 1000;
 // Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
@@ -63,7 +66,8 @@ export class AAAHudLayout {
     this.radarRangeFactor = 1;
     this._timers = new Set();
     this._bannerTimer = null;
-    this._modifierBannerTimer = null;
+    this._queuedBanners = new Set();
+    this._bannerTone = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -204,7 +208,8 @@ export class AAAHudLayout {
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
     this._bannerTimer = null;
-    this._modifierBannerTimer = null;
+    this._queuedBanners.clear();
+    this._bannerTone = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -255,12 +260,36 @@ export class AAAHudLayout {
 
   /** "SURGE" banner with the burst's label underneath. */
   showSurgeBanner(label) {
-    this._showBanner('SURGE', { tone: 'surge', subtitle: label });
+    this._showWarning('SURGE', { tone: 'surge', subtitle: label });
   }
 
   /** Amber "EVENT" banner with the field event's label underneath. */
   showFieldEventBanner(label) {
-    this._showBanner('EVENT', { tone: 'event', subtitle: label });
+    this._showWarning('EVENT', { tone: 'event', subtitle: label });
+  }
+
+  /** A warning banner: it waits for a SURGE or EVENT one still on screen. */
+  _showWarning(title, options) {
+    const waitMs = WARNING_TONES.includes(this._bannerTone)
+      ? Math.max(0, this._bannerEndsAt - performance.now())
+      : 0;
+    if (waitMs === 0) {
+      this._showBanner(title, options);
+      return;
+    }
+    // hold the slot, so a third warning lines up behind this one
+    this._bannerTone = options.tone;
+    this._bannerEndsAt += LAYER_BANNER_MS;
+    this._queueBanner(() => this._showBanner(title, options), waitMs);
+  }
+
+  /** Runs `show` after `delayMs`, unless cancelBanner drops it first. */
+  _queueBanner(show, delayMs) {
+    const id = this._later(() => {
+      this._queuedBanners.delete(id);
+      show();
+    }, delayMs);
+    this._queuedBanners.add(id);
   }
 
   /**
@@ -270,8 +299,7 @@ export class AAAHudLayout {
    */
   showModifierBanner(label, color) {
     const delayMs = Math.max(0, this._bannerEndsAt - performance.now());
-    this._modifierBannerTimer = this._later(() => {
-      this._modifierBannerTimer = null;
+    this._queueBanner(() => {
       this.els?.layerBanner?.style.setProperty('--modifier-color', color);
       this._showBanner('MODIFIER', { tone: 'modifier', subtitle: label });
     }, delayMs);
@@ -306,6 +334,7 @@ export class AAAHudLayout {
     if (this._bannerTimer) {
       this._cancel(this._bannerTimer);
     }
+    this._bannerTone = tone;
     this._bannerEndsAt = performance.now() + delayMs + durationMs;
     this._bannerTimer = this._later(() => {
       this.els.layerBannerTitle.textContent = title;
@@ -333,10 +362,9 @@ export class AAAHudLayout {
       this._cancel(this._bannerTimer);
       this._bannerTimer = null;
     }
-    if (this._modifierBannerTimer) {
-      this._cancel(this._modifierBannerTimer);
-      this._modifierBannerTimer = null;
-    }
+    this._queuedBanners.forEach((id) => this._cancel(id));
+    this._queuedBanners.clear();
+    this._bannerTone = null;
     this._bannerEndsAt = 0;
     this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
   }
@@ -346,9 +374,14 @@ export class AAAHudLayout {
     this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
   }
 
-  /** The letterbox bars of the Warden's arrival, sliding in or out. */
-  showLetterbox(show) {
-    this.els?.letterbox?.classList.toggle('is-showing', Boolean(show));
+  /**
+   * The letterbox bars of a Warden's arrival or a journey, sliding in or
+   * out; a `journey` also clears the instruments off the screen.
+   */
+  showLetterbox(show, journey = false) {
+    const bars = this.els?.letterbox;
+    bars?.classList.toggle('is-showing', Boolean(show));
+    bars?.parentElement?.classList.toggle('is-journey', show && journey);
   }
 
   /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */
@@ -531,6 +564,7 @@ export class AAAHudLayout {
 
     this.els = {
       nextWaveBox: query('#el-wave-alert'),
+      nextWaveLabel: query('#el-wave-alert .next-wave-label'),
       nextWaveTimer: query('#ui-next-wave-timer'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
@@ -727,7 +761,8 @@ export class AAAHudLayout {
     this._feed('xp', { level, current, required, layer });
   }
 
-  updateNextWaveTimer(seconds) {
+  // `label`: what the seconds count down to.
+  updateNextWaveTimer(seconds, label) {
     if (!this.els) {
       return;
     }
@@ -746,6 +781,7 @@ export class AAAHudLayout {
 
     nextWaveBox.classList.add('visible');
     nextWaveTimer.innerText = safeSeconds;
+    this.els.nextWaveLabel.textContent = label;
   }
 
   /**

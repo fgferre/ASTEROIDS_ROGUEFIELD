@@ -53,4 +53,22 @@ describe('mergeStatic', () => {
     }
     expect(merged.getAttribute('color')).toBeUndefined();
   });
+
+  it('carries a part’s shine class per vertex, the others at the material’s own', () => {
+    const steel = { roughness: 0.3, metalness: 0.85 };
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const count = box.toNonIndexed().getAttribute('position').count;
+    const merged = mergeStatic(THREE, [
+      { geometry: box, shine: steel },
+      { geometry: box },
+    ]);
+    const shine = merged.getAttribute('shine');
+    expect(shine.count).toBe(count * 2);
+    expect(shine.getX(0)).toBeCloseTo(0.3);
+    expect(shine.getY(count - 1)).toBeCloseTo(0.85);
+    expect([shine.getX(count), shine.getY(count * 2 - 1)]).toEqual([0, 0]);
+    expect(
+      mergeStatic(THREE, [{ geometry: box }]).getAttribute('shine')
+    ).toBeUndefined();
+  });
 });

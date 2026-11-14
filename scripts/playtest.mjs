@@ -3,6 +3,7 @@
 //   npm run playtest                       all nine sectors, bot 'average'
 //   npm run playtest -- good               all nine, bot 'good'
 //   npm run playtest -- dense-core [good]  one sector
+//   npm run playtest -- dense-core good 3  one sector, world and bot seed 3
 //
 // Hands the choice to tests/playtest/sectors.playtest.js through the
 // environment and runs it under vitest.playtest.config.js.
@@ -15,7 +16,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PRESETS = ['average', 'good'];
 const args = process.argv.slice(2);
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
-const sector = args.find((arg) => !PRESETS.includes(arg)) || '';
+const [sector = '', seed = ''] = args.filter((arg) => !PRESETS.includes(arg));
 
 const result = spawnSync(
   process.execPath,
@@ -28,7 +29,12 @@ const result = spawnSync(
   {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, PLAYTEST_PRESET: preset, PLAYTEST_SECTOR: sector },
+    env: {
+      ...process.env,
+      PLAYTEST_PRESET: preset,
+      PLAYTEST_SECTOR: sector,
+      PLAYTEST_SEED: seed,
+    },
   }
 );
 process.exit(result.status ?? 1);

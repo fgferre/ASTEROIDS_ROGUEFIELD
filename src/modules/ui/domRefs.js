@@ -26,6 +26,8 @@ export function cacheStaticNodes() {
       rerollBtn: document.getElementById('levelup-reroll-btn') || null,
       banishBtn: document.getElementById('levelup-banish-btn') || null,
       banishHint: document.getElementById('levelup-banish-hint') || null,
+      headStart: document.getElementById('levelup-headstart') || null,
+      equipBtn: document.getElementById('levelup-equip-btn') || null,
     },
     chest: {
       screen: document.getElementById('chest-screen') || null,
@@ -50,6 +52,9 @@ export function cacheStaticNodes() {
       nextBtn: document.getElementById('victory-next-btn') || null,
       restartBtn: document.getElementById('victory-restart-btn') || null,
       quitBtn: document.getElementById('victory-quit-btn') || null,
+      menuBtn: document.getElementById('victory-menu-btn') || null,
+      choiceOptions: document.getElementById('ending-options') || null,
+      field: document.querySelector('#game-ui .game-field') || null,
     },
     pause: {
       container: document.getElementById('pause-screen') || null,
@@ -92,6 +97,8 @@ export function cacheStaticNodes() {
       openBtn: document.getElementById('menu-campaign-btn') || null,
       backBtn: document.getElementById('campaign-back-btn') || null,
       closeBtn: document.getElementById('campaign-close-btn') || null,
+      // The final card's Main menu: the menu it ends in keeps the map shut.
+      mainMenuBtn: document.getElementById('victory-menu-btn') || null,
     },
     settings: {
       overlay: document.getElementById('settings-screen') || null,

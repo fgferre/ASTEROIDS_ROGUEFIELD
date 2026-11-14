@@ -7,6 +7,7 @@
 
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
 import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
+import { PICKUP_KINDS } from '../../data/pickups.js';
 import { nextSector } from '../../data/sectors.js';
 import { loadRecords, updateRecords } from '../runRecords.js';
 
@@ -14,8 +15,11 @@ import { loadRecords, updateRecords } from '../runRecords.js';
 // up to the cap.
 const GAME_OVER_SCREEN_DELAY_MS = 3000;
 const GAME_OVER_SCREEN_MAX_DELAY_MS = 6500; // proposta 18/10
-const VICTORY_SCREEN_DELAY_MS = 2500; // boss death effects play first
-const VICTORY_SCREEN_MAX_DELAY_MS = 7000; // proposta 18/10
+// The win leaves time to gather the spoils: every orb flies to the ship (a
+// Magnet's pull) and the break timer counts the seconds down to the screen.
+const VICTORY_SPOILS_SECONDS = 6; // proposta 12/11 (2.5 s: the owner could not gather anything)
+const VICTORY_SCREEN_DELAY_MS = VICTORY_SPOILS_SECONDS * 1000;
+const VICTORY_SCREEN_MAX_DELAY_MS = 9000; // proposta 12/11
 
 export class RunEnd {
   /**
@@ -82,7 +86,15 @@ export class RunEnd {
     if (this.bossRush) {
       this.bossRushWardens += 1;
     }
-    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
+    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves(
+      VICTORY_SPOILS_SECONDS
+    );
+    const { pullSpeed, pullAcceleration } = PICKUP_KINDS.magnet;
+    this.resolveServiceInstance('xpOrbs')?.startGlobalPull(
+      VICTORY_SPOILS_SECONDS,
+      pullSpeed,
+      pullAcceleration
+    );
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
     this.eventBus.emit('run-won', {
       wave: payload.wave,

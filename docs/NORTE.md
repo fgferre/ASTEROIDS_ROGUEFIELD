@@ -13,7 +13,7 @@ Há mil anos uma megaestrutura orbital — o **Anel** — se partiu. O que sobro
 de pedra e metal que ainda guarda, por dentro, a luz da máquina que o Anel era. Você pilota um **interceptor de
 salvamento** enviado para dentro do Campo. Quanto mais fundo, mais o Campo acorda: os fragmentos revelam cristal
 quando rachados, os **Guardiões** (restos automáticos do Anel) voltam a patrulhar, e a cada cinco camadas um
-**Guardião-Maior** barra o caminho. Não há vilão falando. A história é contada pelo que você vê: a luz dentro das
+**Guardião-Maior** barra o caminho. (Correção de 20/10: a narrativa entrou no jogo; a história está em `docs/ROTEIRO.md`.) Não há vilão falando neste parágrafo original. A história é contada pelo que você vê: a luz dentro das
 pedras, as máquinas que acordam, a profundidade. _"Solidão na vastidão: o jogador é pequeno num campo que não o
 nota"_ — isso fica.
 
@@ -84,17 +84,8 @@ camada 15 (modo infinito só se ele pedir).
 
 ## 5. O que não fazemos
 
-Sem narrativa falada, sem personagens, sem textura fotográfica, sem reescrever a simulação em WebGL (§4b: só o
-desenho é Three.js). Sem contorno neon em massa. Sem azul e rosa saturados em pedra.
-
-## 6. Ordem de execução (fatias, cada uma com captura)
-
-1. Camada de bloom + paleta em código (`src/data/constants/palette.js`).
-2. Fundo: névoa, poeira, estrelas novas, silhueta do Anel.
-3. Fragmentos do Anel (asteroides) com rachaduras que acendem.
-4. Interceptor e Solar Slicer novos; tiros e orbes.
-5. Motes, Seekers, Tethers; Warden Prime segmentado.
-6. Câmera 1.3× com follow; zoom em level-up/morte.
+Sem textura fotográfica, sem reescrever a simulação em WebGL (§4b: só o
+desenho é Three.js). Sem contorno neon em massa. (Correção de 20/10: a narrativa entrou — ver `docs/ROTEIRO.md`; o que segue valendo é não haver texto longo nem vilão em cena.) Sem azul e rosa saturados em pedra.
 
 ## 7. Norte 2 — "grandioso" (18/10, madrugada; pedido dele: _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo a cada rodada"_)
 

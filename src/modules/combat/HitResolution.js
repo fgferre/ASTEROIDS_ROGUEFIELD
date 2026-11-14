@@ -21,6 +21,7 @@ import {
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
+import { isBossEnemy } from '../physics/bossTuning.js';
 import { burstFlak } from './beamAndFan.js';
 import { breedSeekers } from './firePatterns.js';
 
@@ -134,14 +135,12 @@ export class HitResolution {
         ? Math.max(0, healthBefore - remainingHealth)
         : 0;
     const blockedByInvulnerability =
-      enemy.type === 'boss' &&
-      Boolean(enemy.invulnerable) &&
-      effectiveDamage <= 0;
+      isBossEnemy(enemy) && Boolean(enemy.invulnerable) && effectiveDamage <= 0;
 
     damageResult.effectiveDamage = effectiveDamage;
     damageResult.blocked = blockedByInvulnerability;
 
-    if (enemy.type === 'boss') {
+    if (isBossEnemy(enemy)) {
       const maxHealth = Number.isFinite(enemy.maxHealth)
         ? enemy.maxHealth
         : null;
@@ -244,7 +243,7 @@ export class HitResolution {
     if (enemy.type === 'asteroid') return;
     const length = Math.hypot(dx, dy);
     if (length === 0) return;
-    const heavy = enemy.type === 'boss' || enemy.type === 'herald';
+    const heavy = isBossEnemy(enemy) || enemy.type === 'herald';
     const push = speed * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
     const ix = (dx / length) * push;
     const iy = (dy / length) * push;

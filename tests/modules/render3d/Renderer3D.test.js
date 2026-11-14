@@ -149,7 +149,7 @@ describe('Renderer3D brake ring', () => {
 });
 
 describe('Renderer3D shadows', () => {
-  it('builds a resized shadow map inside a seeded frame', () => {
+  it('builds a resized shadow map inside a seeded frame, into the frame target', () => {
     // three r128: shadowMap.render reads the per-frame light state, which
     // only exists while renderer.render() runs.
     let inFrame = false;
@@ -160,10 +160,15 @@ describe('Renderer3D shadows', () => {
         if (!inFrame) throw new TypeError("reading 'state' of null");
       }),
     };
+    const readBuffer = {};
+    let target = null;
     const fake = {
       shadowMap,
+      setRenderTarget: vi.fn((t) => (target = t)),
       render: vi.fn(() => {
         expect(seeded).toBe(true);
+        // the composer's target: a screen draw compiles every material again
+        expect(target).toBe(readBuffer);
         inFrame = true;
         shadowMap.render();
         inFrame = false;
@@ -178,12 +183,19 @@ describe('Renderer3D shadows', () => {
     };
     const mapSize = { x: 2048, set: vi.fn((x) => (mapSize.x = x)) };
     const key = { castShadow: false, shadow: { mapSize, map: null } };
-    renderer.three = { renderer: fake, key, scene: {}, camera: {} };
+    renderer.three = {
+      renderer: fake,
+      key,
+      scene: {},
+      camera: {},
+      composer: { readBuffer },
+    };
 
     expect(() => renderer.applyShadows(1024)).not.toThrow();
     expect(fake.render).toHaveBeenCalledTimes(1);
     expect(mapSize.x).toBe(1024);
     expect(key.castShadow).toBe(true);
+    expect(target).toBe(null);
   });
 });
 

@@ -15,7 +15,8 @@ export class HangarScreen {
   /**
    * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, balance, openBtn, backBtn, closeBtn }.
    * `settings`: the settings service; a hull button selects that hull.
-   * `emit(name, payload)`: sends hangar-hull-hovered.
+   * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
+   *   transmission events (its voice, audio/voiceLines.js).
    * `showScreen(name, options)`: shows or hides the overlay.
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
    * `hangar()`: the hangar service (Salvage, items, purchases, unlocked hulls).
@@ -44,18 +45,31 @@ export class HangarScreen {
     this.hullName = hullName;
     this.refreshShipSelector = refreshShipSelector;
     this.hangarState = { isOpen: false, trigger: null };
+    this.purchaseLine = null;
   }
 
   // The run's transmission banner is hidden in the menu: the Ring's line
   // for a purchase shows in the caption under the hull stage, scrolled into
-  // view.
+  // view, and speaks through the transmission events like a run's line.
   showPurchaseLine(line) {
     const caption = this.refs.hullLock;
     if (line && caption) {
+      this.endPurchaseLine();
       caption.textContent = `${line.speaker}: ${line.text}`;
       caption.hidden = false;
       caption.scrollIntoView({ block: 'nearest' });
+      this.purchaseLine = line;
+      this.emit('transmission-queued', line);
+      this.emit('transmission-shown', line);
     }
+  }
+
+  // Another caption or leaving the Hangar ends the purchase line: its voice
+  // stops and its recording is let go.
+  endPurchaseLine() {
+    if (!this.purchaseLine) return;
+    this.emit('transmission-finished', this.purchaseLine);
+    this.purchaseLine = null;
   }
 
   bindHangarControls() {
@@ -97,6 +111,7 @@ export class HangarScreen {
       const hull = event.target.closest?.('[data-hangar-hull]');
       const hullId = hull?.dataset.hangarHull ?? null;
       const locked = Boolean(hull?.disabled);
+      this.endPurchaseLine();
       refs.hullLock.hidden = !locked;
       refs.hullLock.textContent = locked ? hullLockText(hullId) : '';
       this.emit('hangar-hull-hovered', { hullId, locked });
@@ -105,6 +120,7 @@ export class HangarScreen {
     refs.hulls?.addEventListener('focusin', previewHull);
     ['pointerleave', 'focusout'].forEach((type) =>
       refs.hulls?.addEventListener(type, () => {
+        this.endPurchaseLine();
         refs.hullLock.hidden = true;
         this.emit('hangar-hull-hovered', { hullId: null });
       })
@@ -149,6 +165,7 @@ export class HangarScreen {
 
   closeHangar() {
     if (!this.hangarState.isOpen) return;
+    this.endPurchaseLine();
     const refs = this.refs;
     this.showScreen('hangar', { overlay: true, show: false });
     refs.overlay.setAttribute('aria-hidden', 'true');

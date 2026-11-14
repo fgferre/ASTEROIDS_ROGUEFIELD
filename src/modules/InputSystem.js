@@ -19,6 +19,7 @@ import {
   buildMovementCommandPayload,
   enqueueActionCommand,
 } from './input/commandPayloads.js';
+import { asArray } from './upgradeCatalog.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
@@ -57,10 +58,6 @@ function stickNavDirection(x = 0, y = 0) {
     return x > 0 ? 'right' : 'left';
   }
   return y > 0 ? 'down' : 'up';
-}
-
-function ensureArray(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 function clone(value) {
@@ -231,8 +228,8 @@ class InputSystem {
     }
 
     return {
-      keyboard: ensureArray(binding.keyboard).filter(Boolean),
-      gamepad: ensureArray(binding.gamepad).filter(Boolean),
+      keyboard: asArray(binding.keyboard).filter(Boolean),
+      gamepad: asArray(binding.gamepad).filter(Boolean),
     };
   }
 
@@ -991,7 +988,7 @@ class InputSystem {
   }
 
   registerKeyboardBindings(action, bindings = []) {
-    const entries = ensureArray(bindings);
+    const entries = asArray(bindings);
     entries.forEach((binding) => {
       const normalized = this.normalizeKeyboardBinding(binding);
       if (!normalized) {
@@ -1005,7 +1002,7 @@ class InputSystem {
   }
 
   registerGamepadBindings(action, bindings = []) {
-    const entries = ensureArray(bindings);
+    const entries = asArray(bindings);
     entries.forEach((binding) => {
       const parsed = this.parseGamepadBinding(binding);
       if (!parsed) {

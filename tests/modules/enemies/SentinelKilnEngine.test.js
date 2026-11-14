@@ -45,7 +45,7 @@ const inWedge = (boss, i, distance = 150) => {
 };
 
 describe('Sentinel Kiln Engine', () => {
-  it('is a Sentinel boss with 65 % of Warden Choir’s health on layer 10', () => {
+  it('is a Sentinel boss with 55 % of Warden Choir’s health on layer 10', () => {
     const { boss } = createKiln();
     const base = 1500 * 1.2 ** (KILN.layer - 1);
     const choir = base * WARDEN_KINDS.choir.healthFactor;
@@ -56,7 +56,7 @@ describe('Sentinel Kiln Engine', () => {
     expect(boss.displayName).toBe('Kiln Engine');
     expect(KILN.layer).toBe(10);
     expect(boss.maxHealth).toBe(Math.ceil(base * KILN.healthFactor));
-    expect(boss.maxHealth / choir).toBeCloseTo(0.65, 3);
+    expect(boss.maxHealth / choir).toBeCloseTo(0.55, 3);
   });
 
   it('burns the ship only in a hot wedge, only while burning, a tick at a time', () => {
@@ -163,12 +163,28 @@ describe('Sentinel Kiln Engine', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(10, 'warning', 'kiln-engine')).toEqual({
-      key: 'sentinel:kiln-engine:warning',
+      key: 'boss:kiln-engine:warning',
       speaker: 'KILN ENGINE',
       text: 'Furnace lit. Core temperature rising. One hull, unlisted, entering the fire.',
     });
     expect(wardenTransmission(10, 'defeated', 'kiln-engine').text).toBe(
-      'Kiln Engine cold. The Core will remember the temperature it lost.'
+      'Kiln Engine cold. Heat released: all of it. Seams: one, opening.'
     );
+  });
+  it('announces its attack each time the hot wedges ignite', () => {
+    const { boss, eventBus } = createKiln();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, () => boss.sectors);
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, () => boss.sectors?.phase === 'burn');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+    runUntil(boss, () => boss.sectors?.phase === 'warn');
+    expect(attacks()).toHaveLength(1);
+    runUntil(boss, () => boss.sectors?.phase === 'burn');
+    expect(attacks()).toHaveLength(2);
   });
 });

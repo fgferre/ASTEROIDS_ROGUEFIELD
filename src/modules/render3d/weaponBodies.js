@@ -6,11 +6,10 @@
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
+import { SHINE, shiny } from './hullModel.js';
 
-// proposta 20/10: bodies of each kind at once, and their metal.
+// proposta 20/10: bodies of each kind at once.
 export const WEAPON_BODY_CAPACITY = 48;
-const BLADE_METAL = { roughness: 0.45, metalness: 0.7 };
-const CASING_METAL = { roughness: 0.65, metalness: 0.45 };
 
 // A shard: a flat diamond, long along +x (its travel), thin in y.
 function bladeGeometry(THREE) {
@@ -40,11 +39,13 @@ export class WeaponBodies {
     const mesh = (geometry, metal) => {
       const instanced = new THREE.InstancedMesh(
         geometry,
-        new THREE.MeshStandardMaterial({
-          color: PALETTE.hullLit,
-          flatShading: true,
-          ...metal,
-        }),
+        shiny(
+          new THREE.MeshStandardMaterial({
+            color: PALETTE.hullLit,
+            flatShading: true,
+            ...metal,
+          })
+        ),
         WEAPON_BODY_CAPACITY
       );
       instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -54,8 +55,9 @@ export class WeaponBodies {
       scene.add(instanced);
       return instanced;
     };
-    this.blades = mesh(bladeGeometry(THREE), BLADE_METAL);
-    this.casings = mesh(casingGeometry(THREE), CASING_METAL);
+    // polished blades, painted casings (hullModel.js SHINE)
+    this.blades = mesh(bladeGeometry(THREE), SHINE.steel);
+    this.casings = mesh(casingGeometry(THREE), SHINE.paint);
     this.matrix = new THREE.Matrix4();
     this.quaternion = new THREE.Quaternion();
     this.position = new THREE.Vector3();

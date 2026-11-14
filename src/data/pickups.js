@@ -69,7 +69,7 @@ export const PICKUP_TOKEN = deepFreeze({
   lifetime: 18, // s on the field, proposta 17/10
   blinkTime: 3, // s before expiry the token blinks
   radius: 12, // drawn token radius, px
-  pickupRadius: 28, // player overlap distance, px
+  pickupRadius: 40, // player overlap distance, px; proposta 13/11 (was 28)
   driftSpeed: 14, // px/s initial drift, proposta 17/10
   driftDamping: 0.6, // fraction of drift speed lost per second
   fieldMargin: 24, // px kept from the field edge

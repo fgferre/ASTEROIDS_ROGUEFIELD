@@ -4,7 +4,8 @@ import { listContent } from '../content/registry.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
 
 // The three places the run descends through (docs/NORTE.md §7 pillar 1),
-// five layers each. Every number here is a proposta 18/10 — the owner's play
+// five layers each, and the places only a sector flies to (`sectorOnly`: the
+// Crucible), past the run's layers and never part of it. Every number here is a proposta 18/10 — the owner's play
 // decides.
 //
 // sky: [centre, rim] of the nebula's dark base, far behind the stars.
@@ -17,13 +18,38 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // musicTheme: id of the procedural theme MusicMixer plays in this biome.
 // tint: the 2D renderer's full-canvas overlay (screen: lifts the blacks).
 //
-// One file per biome in src/content/biomes/, listed by `order`.
-export const BIOMES = deepFreeze(listContent('biomes'));
+// One file per biome in src/content/biomes/, listed by `order`. BIOMES are
+// the run's: their ranges tile layers 1..RUN_FINAL_LAYER.
+const PLACES = deepFreeze(listContent('biomes'));
+export const BIOMES = Object.freeze(PLACES.filter((b) => !b.sectorOnly));
 
-/** The biome of a layer (1-based); layers past the table stay in the last. */
-export function biomeForLayer(layer) {
+// A sector's look over its biome, made once per sector.
+const LOOKS = new Map();
+
+/**
+ * The biome of a layer (1-based); layers past the table stay in the last.
+ * With a `sector` on its own layers: its `sectorOnly` biome when it names
+ * one; with its `look` (src/data/sectors.js), the biome with the look's
+ * fields over its own, and `place` the sector's id.
+ */
+export function biomeForLayer(layer, sector = null) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
-  return BIOMES.find((b) => n <= b.layers[1]) || BIOMES[BIOMES.length - 1];
+  const inSector =
+    Boolean(sector) && n >= sector.layers[0] && n <= sector.layers[1];
+  const biome =
+    (inSector && PLACES.find((b) => b.sectorOnly && b.id === sector.biome)) ||
+    BIOMES.find((b) => n <= b.layers[1]) ||
+    BIOMES[BIOMES.length - 1];
+  if (!inSector || !sector.look || sector.biome !== biome.id) {
+    return biome;
+  }
+  if (!LOOKS.has(sector.id)) {
+    LOOKS.set(
+      sector.id,
+      deepFreeze({ ...biome, ...sector.look, place: sector.id })
+    );
+  }
+  return LOOKS.get(sector.id);
 }
 
 /** Seconds a biome change takes to cross-fade. */
@@ -46,9 +72,9 @@ export class BiomeTransition {
     this.fresh = true;
   }
 
-  /** Call on every layer start. */
-  enterLayer(layer) {
-    const biome = biomeForLayer(layer);
+  /** Call on every layer start, with the run's sector (or null). */
+  enterLayer(layer, sector = null) {
+    const biome = biomeForLayer(layer, sector);
     if (this.fresh) {
       this.fresh = false;
       this.from = biome;

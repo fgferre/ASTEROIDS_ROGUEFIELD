@@ -133,9 +133,10 @@ export function createSamplePlayer(sfx) {
     return index;
   }
 
-  function stopVoice(voice, now) {
+  function stopVoice(voice, now, fade = SAMPLE_PLAYBACK.stealFadeSeconds) {
     voices.splice(voices.indexOf(voice), 1);
-    const end = now + SAMPLE_PLAYBACK.stealFadeSeconds;
+    const end = now + fade;
+    voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.linearRampToValueAtTime(0, end);
     voice.source.stop(end);
@@ -203,12 +204,20 @@ export function createSamplePlayer(sfx) {
     const buffer = buffers[pickVariation(id, buffers.length, rng)];
     const { pitchSpread, gainSpreadDb } = SAMPLE_PLAYBACK;
     const spread = 1 + rng.range(-pitchSpread, pitchSpread);
-    const { climb } = SAMPLE_CUES[cue];
+    const { climb, loop } = SAMPLE_CUES[cue];
     const rate = climb ? climbRate(id, climb, now) : spread;
     const gain = context.createGain();
-    gain.gain.value = dbToGain(
+    const level = dbToGain(
       (entry.gain ?? 0) + rng.range(-gainSpreadDb, gainSpreadDb)
     );
+    gain.gain.value = level;
+    if (loop) {
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(
+        level,
+        now + SAMPLE_PLAYBACK.loopFadeSeconds
+      );
+    }
     connectVoice(gain, SAMPLE_CUES[cue], args);
     if (entry.reverb !== null && entry.reverb !== undefined) {
       sfx.sendToReverb(gain, entry.reverb);
@@ -217,6 +226,11 @@ export function createSamplePlayer(sfx) {
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = rate;
+    if (loop) {
+      source.loop = true;
+      source.loopStart = entry.loopStart ?? 0;
+      source.loopEnd = entry.loopEnd ?? buffer.duration;
+    }
     source.connect(gain);
     source.start(now);
     lastStart.set(id, now);
@@ -225,8 +239,17 @@ export function createSamplePlayer(sfx) {
       priority,
       source,
       gain,
-      endsAt: now + buffer.duration / rate,
+      endsAt: loop ? Infinity : now + buffer.duration / rate,
     });
+  }
+
+  /** Fades out every playing voice of the sample ids `ids` over `fade` s. */
+  function stop(ids, fade) {
+    const now = sfx.context?.currentTime;
+    if (now === undefined) return;
+    voices
+      .filter((voice) => ids.includes(voice.id) && voice.endsAt > now)
+      .forEach((voice) => stopVoice(voice, now, fade));
   }
 
   /**
@@ -234,7 +257,12 @@ export function createSamplePlayer(sfx) {
    * dropped it), else false and the cue synthesizes.
    */
   function play(cue, args = []) {
-    const id = sampleIdFor(cue, args);
+    const picked = sampleIdFor(cue, args);
+    // A variant with no file yet (a weapon without a shot of its own) plays
+    // the cue's own sample, not the old synthesis.
+    const own = SAMPLE_CUES[cue]?.sample;
+    const id =
+      picked && !ready.has(picked) && typeof own === 'string' ? own : picked;
     const sample = id && ready.get(id);
     if (!sample) return false;
     sfx.trackPerformance(cue);
@@ -246,5 +274,6 @@ export function createSamplePlayer(sfx) {
     load,
     decode,
     play,
+    stop,
   });
 }

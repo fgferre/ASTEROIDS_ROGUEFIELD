@@ -72,8 +72,9 @@ export default {
     if (!live || !target) return;
     enemy.fireTimer -= deltaTime;
     if (enemy.fireTimer <= params.telegraph) {
+      // The aim is fixed as the ring appears: what is shown is where it lands.
       const charging = !enemy.aim;
-      enemy.aim = leadPoint(player, target, params.lead);
+      enemy.aim ??= leadPoint(player, target, params.lead);
       enemy.rotation = Math.atan2(enemy.aim.y - enemy.y, enemy.aim.x - enemy.x);
       if (charging) {
         enemy.emitEvent(params.telegraphEvent, { target: enemy.aim });

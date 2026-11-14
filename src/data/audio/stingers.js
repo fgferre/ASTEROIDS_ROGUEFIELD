@@ -85,6 +85,23 @@ export const TRANSMISSION_VOICE = Object.freeze({
       formantHz: 800,
       formantQ: 4,
     }),
+    // Sovereign: two orders that do not agree — a tritone, low and wide
+    // (proposta 12/11, not auditioned by the owner).
+    SOVEREIGN: Object.freeze({
+      grains: 12,
+      type: 'sawtooth',
+      notes: Object.freeze([36, 42]), // C2 F#2
+      formantHz: 600,
+      formantQ: 5,
+    }),
+    // The Wake: a human crew on a radio, warm and mid-pitched.
+    WAKE: Object.freeze({
+      grains: 8,
+      type: 'triangle',
+      notes: Object.freeze([52, 55]), // E3 G3
+      formantHz: 1100,
+      formantQ: 3,
+    }),
     'HERALD OF DUST': Object.freeze({
       grains: 10,
       type: 'square',

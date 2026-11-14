@@ -58,3 +58,12 @@ export const AUDIO_BIG_MOMENT_DUCK = Object.freeze({
   holdMs: 70,
   releaseMs: 150,
 });
+
+// The recorded story lines (audio/voiceLines.js): the voice bus's own level
+// under its slider, and the music's duck while a voice speaks (held for the
+// line; a voice cut short lets it back up over `recoverMs`).
+export const AUDIO_VOICE = Object.freeze({
+  gainDb: 0,
+  duck: Object.freeze({ depthDb: 4, attackMs: 150, releaseMs: 600 }),
+  recoverMs: 300,
+});

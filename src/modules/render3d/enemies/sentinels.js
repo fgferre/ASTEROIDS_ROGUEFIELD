@@ -15,6 +15,7 @@ import { createKilnEngine } from './sentinels/kilnEngine.js';
 import { createSentinelKit } from './sentinels/kit.js';
 import { createPrismCrown } from './sentinels/prismCrown.js';
 import { createQuarryMaw } from './sentinels/quarryMaw.js';
+import { createSovereign } from './sentinels/sovereign.js';
 
 /** View kinds the Sentinels draw: `boss-<kind>`. */
 export const SENTINEL_VIEW_KINDS = Object.keys(SENTINEL_KINDS).map(
@@ -37,6 +38,7 @@ export function createSentinelViews(kit, recipeViews) {
       createPrismCrown,
       createFoundryMother,
       createInterdictor,
+      createSovereign,
     ].map((make) => {
       const view = make(sentinelKit);
       return [view.kind, view];

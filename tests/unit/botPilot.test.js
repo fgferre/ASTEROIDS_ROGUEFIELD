@@ -274,6 +274,25 @@ describe('hazardAt', () => {
     expect(hazardAt(world, 300, 200, 0)).toBe(0);
   });
 
+  it('a closing cage keeps its doorway wide, as the game builds it', () => {
+    // 400 px closing 250 px/s: in 1 s it is 150 px, its top doorway still
+    // 130 px wide (stubs 10 px), not scaled down with the cage
+    const world = zoneWorld({
+      type: 'grid',
+      x: 400,
+      y: 300,
+      size: 400,
+      open: 0,
+      door: 130,
+      closing: -250,
+      fences: [],
+      phase: 'solid',
+      timer: 2,
+    });
+    expect(hazardAt(world, 435, 225, 1)).toBeLessThan(1);
+    expect(hazardAt(world, 470, 225, 1)).toBeGreaterThanOrEqual(1);
+  });
+
   it('a moving body is extrapolated by its velocity, across the wrap', () => {
     const world = makeWorld({
       movers: [{ x: 790, y: 300, vx: 100, vy: 0, radius: 5 }],
@@ -351,9 +370,48 @@ describe('decide', () => {
     expect(decide(shielded, KNOBS).shield).toBe(true);
   });
 
+  it('steps out of a barrier that will be there', () => {
+    // A solid wall through (400, 300), turning down onto the ship 60 px
+    // below it: safe now, hit where the wall will be.
+    const wall = {
+      type: 'barrier',
+      x: 400,
+      y: 300,
+      angle: 0,
+      spin: 0.4,
+      gapAt: -300,
+      gapWidth: 100,
+      span: [-400, 400],
+      phase: 'solid',
+      timer: 3,
+    };
+    const world = makeWorld({ zones: [wall], ship: { x: 600, y: 360 } });
+    expect(hazardAt(world, 600, 360, 0)).toBe(0);
+    expect(hazardAt(world, 600, 360, 0.7)).toBeGreaterThanOrEqual(1);
+    const plan = decide(world, KNOBS);
+    expect(plan.dir).not.toBe(0);
+    expect(pathHazard(world, plan.dir)).toBeLessThan(pathHazard(world, 0));
+  });
+
+  it('closes on a target beyond its weapon’s reach', () => {
+    // 220 px off a boss's rim: a firing gap for a long gun, out of a 180 px
+    // scatter gun's reach.
+    const boss = { x: 200, y: 300, radius: 50, open: 0 };
+    const world = makeWorld({ boss, ship: { x: 470, reach: 180 } });
+    expect(DIRECTIONS[decide(world, KNOBS).dir]?.x).toBeLessThan(0);
+  });
+
   it('goes for an orb when nothing threatens', () => {
     const world = makeWorld({ loot: [{ x: 600, y: 300 }] });
     expect(decide(world, KNOBS).dir).toBe(3);
+  });
+
+  it('goes for a heart lying close to the edge', () => {
+    const world = makeWorld({
+      loot: [{ x: 300, y: 575 }],
+      ship: { x: 300, y: 550 },
+    });
+    expect(DIRECTIONS[decide(world, KNOBS).dir]?.y).toBeGreaterThan(0.5);
   });
 });
 

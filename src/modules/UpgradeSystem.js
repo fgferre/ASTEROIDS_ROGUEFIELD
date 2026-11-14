@@ -593,6 +593,7 @@ class UpgradeSystem extends BaseSystem {
       summary,
       effects,
       prerequisites,
+      familyComplete: this.isFamilyComplete(definition.family),
     });
 
     console.log(
@@ -687,6 +688,25 @@ class UpgradeSystem extends BaseSystem {
         this.eventBus?.emit?.('apex-unlocked', { family: family.id });
       }
     });
+  }
+
+  // The build holds every card of the family (at any rank), but for a card
+  // it can no longer take because one it holds from the same family excludes
+  // it: the ship carries one weapon and thermal has two (the owner, 13/11:
+  // "a segunda arma não conta").
+  isFamilyComplete(familyId) {
+    if (!UPGRADE_FAMILIES[familyId]) return false;
+    const cards = this.upgradeDefinitions.filter(
+      (definition) => definition.family === familyId
+    );
+    const held = ({ id }) => this.getUpgradeCount(id) > 0;
+    const shutOut = (card) =>
+      cards.some(
+        (other) =>
+          held(other) &&
+          (other.excludes.includes(card.id) || card.excludes.includes(other.id))
+      );
+    return cards.every((card) => held(card) || shutOut(card));
   }
 
   describeFamilyProgress(definition) {

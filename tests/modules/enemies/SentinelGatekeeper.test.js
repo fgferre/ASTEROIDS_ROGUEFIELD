@@ -3,10 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { BOSS_KINDS, WARDEN_KINDS } from '../../../src/data/enemies/boss.js';
 import { wardenTransmission } from '../../../src/modules/ui/transmissions.js';
 import SentinelGatekeeper from '../../../src/modules/enemies/types/SentinelGatekeeper.js';
+import {
+  barrierHits,
+  barrierOffset,
+} from '../../../src/modules/enemies/boss/barrier.js';
+import { SHIP_REACH } from '../../../src/modules/enemies/boss/playerTarget.js';
 
 const GATE = BOSS_KINDS.gatekeeper;
 const STEP = 1 / 60;
 const SHIP = { x: 700, y: 300 };
+
+// Whether the solid barrier touches a ship standing at `point`.
+const hits = (b, point) =>
+  barrierHits(b, point, SHIP_REACH, GATE.barrier.thickness);
 
 // A Gatekeeper at (x, y) facing +x.
 const createGate = (x = 400, y = 300) => {
@@ -71,7 +80,7 @@ describe('Sentinel Gatekeeper', () => {
       const { boss } = createGate(at.x, at.y);
       runUntil(boss, 'barrier-windup', target(ship));
       const b = boss.barrier;
-      const { along } = boss.barrierOffset(ship);
+      const { along } = barrierOffset(b, ship);
       expect(b.gapWidth).toBe(GATE.barrier.gapWidth);
       expect(b.gapAt - b.gapWidth / 2).toBeGreaterThanOrEqual(b.span[0]);
       expect(b.gapAt + b.gapWidth / 2).toBeLessThanOrEqual(b.span[1]);
@@ -85,15 +94,15 @@ describe('Sentinel Gatekeeper', () => {
     const b = boss.barrier;
     const wall = onBarrier(b, 0);
     expect(b.solid).toBe(0);
-    expect(boss.barrierHits(wall)).toBe(false);
+    expect(hits(b, wall)).toBe(false);
 
     for (let t = 0; t < 2 && b.phase !== 'solid'; t += STEP) {
       boss.updateBarrier(STEP, null);
     }
     expect(b.solid).toBe(1);
-    expect(boss.barrierHits(wall)).toBe(true);
-    expect(boss.barrierHits(onBarrier(b, b.gapAt))).toBe(false);
-    expect(boss.barrierHits({ x: wall.x + 200, y: wall.y })).toBe(false);
+    expect(hits(b, wall)).toBe(true);
+    expect(hits(b, onBarrier(b, b.gapAt))).toBe(false);
+    expect(hits(b, { x: wall.x + 200, y: wall.y })).toBe(false);
 
     // Flying into it from the ship's side (+x): hurt, and sent back.
     const velocity = { vx: -150, vy: 0 };
@@ -177,12 +186,25 @@ describe('Sentinel Gatekeeper', () => {
 
   it('speaks its own lines by kind', () => {
     expect(wardenTransmission(5, 'warning', 'gatekeeper')).toEqual({
-      key: 'sentinel:gatekeeper:warning',
+      key: 'boss:gatekeeper:warning',
       speaker: 'GATEKEEPER',
       text: 'Lane closed. Gate holds. You are not on the manifest.',
     });
     expect(wardenTransmission(5, 'defeated', 'gatekeeper').text).toBe(
       'Gate open. One hull through. Prime has been told.'
     );
+  });
+  it('announces its attack once, as the barrier turns solid', () => {
+    const { boss, eventBus } = createGate();
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
+    runUntil(boss, 'barrier-windup');
+    expect(attacks()).toHaveLength(0);
+    runUntil(boss, 'lane-windup');
+    expect(boss.barrier.phase).toBe('solid');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
   });
 });

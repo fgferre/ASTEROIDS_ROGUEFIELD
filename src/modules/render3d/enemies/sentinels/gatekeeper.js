@@ -1,4 +1,5 @@
 import { PALETTE } from '../../../../data/constants/palette.js';
+import { SENTINEL_KINDS } from '../../../../data/enemies/boss.js';
 import { colorOf } from '../../batches.js';
 import {
   RIM,
@@ -10,6 +11,8 @@ import {
   range,
   mirrorZ,
   half,
+  lensGain,
+  progressOf,
 } from './kit.js';
 
 export function createGatekeeper(sk) {
@@ -18,6 +21,8 @@ export function createGatekeeper(sk) {
     kit,
     recipeViews,
     panelMaterial,
+    emitterMaterial,
+    lens,
     hull,
     dark,
     steel,
@@ -160,6 +165,39 @@ export function createGatekeeper(sk) {
     ]);
   }
   const gateDoors = [gateDoor(1), gateDoor(-1)];
+  // The barrier's projectors: on each tower, a polished barrel looking out
+  // along the barrier's line (the towers sit on it), a collar at its mouth
+  // round the lens; the lens charges as the barrier warns and burns while
+  // it holds. On each door's nose a ram lamp lights as the strip winds up.
+  const GATE_PROJECTOR = [GATE_TOWER[0], 0.36, GATE_TOWER[1] + 0.25];
+  const gateProjectors = merge(
+    [1, -1].flatMap((side) => [
+      {
+        geometry: drum(0.075, 0.2, 8, 'z'),
+        color: steel,
+        position: [
+          GATE_PROJECTOR[0],
+          GATE_PROJECTOR[1],
+          side * GATE_PROJECTOR[2],
+        ],
+      },
+      {
+        geometry: drum(0.1, 0.04, 8, 'z'),
+        color: steel,
+        position: [
+          GATE_PROJECTOR[0],
+          GATE_PROJECTOR[1],
+          side * (GATE_PROJECTOR[2] + 0.1),
+        ],
+      },
+      {
+        geometry: box(0.1, 0.16, 0.08),
+        color: dark,
+        position: [GATE_PROJECTOR[0], GATE_PROJECTOR[1] - 0.1, side * 0.84],
+      },
+    ])
+  );
+  const GATE = SENTINEL_KINDS.gatekeeper;
   const reactorGeometry = box(0.26, 0.03, 0.48);
   const GATE_LIGHTS = Object.freeze({
     parts: [],
@@ -182,8 +220,22 @@ export function createGatekeeper(sk) {
       pivot.position.set(GATE_TOWER[0], 0, side * GATE_TOWER[1]);
       pivot.add(new THREE.Mesh(geometry, panelMaterial));
       group.add(pivot);
-      return { pivot, side };
+      // the ram lamp on its nose
+      const ram = lens(pivot, [0.56, 0.3, side * -0.3], 0.045);
+      return { pivot, side, ram };
     });
+    group.add(new THREE.Mesh(gateProjectors, emitterMaterial));
+    const projectors = [1, -1].map((side) =>
+      lens(
+        group,
+        [
+          GATE_PROJECTOR[0],
+          GATE_PROJECTOR[1],
+          side * (GATE_PROJECTOR[2] + 0.13),
+        ],
+        0.085
+      )
+    );
     const coreMaterial = new THREE.MeshStandardMaterial({
       color: colorOf(THREE, '#1a0e06'),
       emissive: colorOf(THREE, PALETTE.shot),
@@ -196,7 +248,8 @@ export function createGatekeeper(sk) {
     group.add(core);
     kit.scene.add(group);
     const lane = kit.createTelegraph();
-    const barrier = kit.createTelegraph(4);
+    const barrier = kit.createTelegraph(4, 0, 2);
+    barrier.width = GATE.barrier.thickness;
     const telegraphs = new THREE.Group();
     telegraphs.add(lane.group, barrier.group);
     kit.scene.add(telegraphs);
@@ -207,7 +260,13 @@ export function createGatekeeper(sk) {
       coreMaterial,
       rims: [kit.rim(group, kit.circleRim, RIM)],
       rimColor: kit.rimColors.boss,
-      glows: lights.lights,
+      projectors,
+      glows: [
+        ...lights.lights,
+        ...projectors,
+        ...doors.map((door) => door.ram),
+        ...barrier.sparks,
+      ],
       telegraph: { group: telegraphs, lane, barrier },
       id: null,
     };
@@ -227,6 +286,18 @@ export function createGatekeeper(sk) {
       boss.getHitFlash() * CORE_FLASH * (0.2 + open);
     const { group, lane, barrier } = view.telegraph;
     group.visible = true;
+    // the projectors charge with the barrier's warning and burn while it
+    // holds; the ram lamps with the strip
+    const wall = boss.barrier;
+    const projector = wall
+      ? lensGain(wall.phase === 'warn', progressOf(wall), wall.solid ?? 1)
+      : lensGain(false, 0, 0);
+    for (const glow of view.projectors) kit.setGain(glow.tone, projector);
+    const strip = boss.telegraph?.type === 'lane' ? boss.telegraph : null;
+    const ram = strip
+      ? lensGain(!strip.charging, progressOf(strip), 1)
+      : lensGain(false, 0, 0);
+    for (const door of view.doors) kit.setGain(door.ram.tone, ram);
     kit.updateTelegraph(lane, boss, radius);
     kit.updateTelegraph(barrier, { telegraph: boss.barrier }, radius);
   }

@@ -1,13 +1,12 @@
-import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_KINDS, wardenComponents } from '../../../data/enemies/boss.js';
+import { driftToCentre } from '../boss/drift.js';
+import { SHIP_REACH } from '../boss/playerTarget.js';
 import { BossEnemy } from './BossEnemy.js';
 
 const MOTHER = BOSS_KINDS['foundry-mother'];
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
 const BAYS = 2;
-// The ship's hull when the player does not say (px).
-const SHIP_REACH = 16;
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 const wrapAngle = (angle) => {
@@ -26,7 +25,9 @@ const wrapAngle = (angle) => {
 //   stagger  — `stagger` s, still and shut; its next vent is `scrapVent` s
 //              longer;
 //   sweep    — two opposite arms show their ring segments for `arms.warn` s,
-//              placed so the ship sits mid-swing, then swing `cycle.sweepArc`
+//              placed so the ship sits mid-swing and reaching `arms.lead` px
+//              past the ship's distance (within `arms.outer`..`maxReach`),
+//              then swing `cycle.sweepArc`
 //              degrees in `cycle.sweepTime` s (direction alternating each
 //              cycle); a tick every `burnTick` s while the ship's centre is in
 //              a swinging segment; rocks and enemies ignore them;
@@ -41,7 +42,9 @@ const wrapAngle = (angle) => {
 //              the segment), width, inner, outer }], solid 0..1, phase
 //              'warn'|'sweep', timer, duration };
 //   armAngle — radians, arm 0's direction (arm 1 is opposite);
-//   armReach — 0..1, the arms folded (0) or extended (1).
+//   armReach — 0..1, the arms folded (0) or extended (1);
+//   armOuter — px, the claw's distance at armReach 1: this swing's reach,
+//              the segments' `outer` (the same number draws and hits).
 export class SentinelFoundryMother extends BossEnemy {
   initialize(config = {}) {
     super.initialize({
@@ -81,6 +84,7 @@ export class SentinelFoundryMother extends BossEnemy {
     this.arms = null;
     this.armAngle = 0;
     this.armReach = 0;
+    this.armOuter = MOTHER.arms.outer;
     this.sweepFrom = 0;
     this.sweepArc = 0;
     this.sweeps = 0;
@@ -184,7 +188,7 @@ export class SentinelFoundryMother extends BossEnemy {
         }
         break;
       default:
-        this.driftToCentre(deltaTime);
+        driftToCentre(this, deltaTime, MOTHER.drift);
         if (this.foundryTimer <= 0 && position) {
           this.beginAssembly(cycle, position);
         }
@@ -217,25 +221,6 @@ export class SentinelFoundryMother extends BossEnemy {
     const keep = Math.max(0, 1 - 4 * deltaTime);
     this.vx *= keep;
     this.vy *= keep;
-  }
-
-  // Toward mid-field, slowing as it arrives.
-  driftToCentre(deltaTime) {
-    this.movementStrategy = 'linear';
-    const { acceleration, maxSpeed, arrive } = MOTHER.drift;
-    const dx = GAME_WIDTH / 2 - this.x;
-    const dy = GAME_HEIGHT / 2 - this.y;
-    const distance = Math.hypot(dx, dy);
-    const wanted = distance > 1 ? maxSpeed * Math.min(1, distance / arrive) : 0;
-    const wx = distance > 1 ? (dx / distance) * wanted : 0;
-    const wy = distance > 1 ? (dy / distance) * wanted : 0;
-    const step = acceleration * deltaTime;
-    const ex = wx - this.vx;
-    const ey = wy - this.vy;
-    const gap = Math.hypot(ex, ey);
-    const k = gap > step ? step / gap : 1;
-    this.vx += ex * k;
-    this.vy += ey * k;
   }
 
   // ASSEMBLE: a bay opens only if its escort stays inside the cap.
@@ -287,11 +272,15 @@ export class SentinelFoundryMother extends BossEnemy {
   // SWEEP: arm 0 starts half a swing behind the ship's bearing, so the ship
   // sits mid-swing; the direction alternates each cycle.
   beginSweep(cycle, position) {
-    const { warn } = MOTHER.arms;
+    const { warn, outer, lead, maxReach } = MOTHER.arms;
     const turn = this.sweeps % 2 === 0 ? 1 : -1;
     const bearing = position
       ? Math.atan2(position.y - this.y, position.x - this.x)
       : this.armAngle;
+    const distance = position
+      ? Math.hypot(position.x - this.x, position.y - this.y)
+      : 0;
+    this.armOuter = Math.min(maxReach, Math.max(outer, distance + lead));
     this.foundryState = 'sweep';
     this.foundryTimer = warn;
     this.sweepArc = turn * cycle.sweepArc * DEG;
@@ -317,6 +306,12 @@ export class SentinelFoundryMother extends BossEnemy {
       if (this.foundryTimer > 0) return;
       Object.assign(a, { phase: 'sweep', solid: 1 });
       this.foundryTimer = a.duration = cycle.sweepTime;
+      // The arms swing: their sound (eventCues `boss-attack-started`).
+      this.getEventBus()?.emit?.('boss-attack-started', {
+        enemy: this,
+        enemyId: this.id,
+        position: { x: this.x, y: this.y },
+      });
     }
     const progress = clamp01(1 - this.foundryTimer / a.duration);
     this.armAngle = this.sweepFrom + this.sweepArc * progress;
@@ -330,7 +325,7 @@ export class SentinelFoundryMother extends BossEnemy {
 
   placeArms() {
     const a = this.arms;
-    const { inner, outer, width } = MOTHER.arms;
+    const { inner, width } = MOTHER.arms;
     a.x = this.x;
     a.y = this.y;
     a.timer = Math.max(0, this.foundryTimer);
@@ -338,7 +333,7 @@ export class SentinelFoundryMother extends BossEnemy {
       angle: wrapAngle(this.armAngle + i * Math.PI),
       width: width * DEG,
       inner,
-      outer,
+      outer: this.armOuter,
     }));
   }
 

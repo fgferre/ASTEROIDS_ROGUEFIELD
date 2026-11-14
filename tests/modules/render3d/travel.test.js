@@ -1,0 +1,256 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { SECTORS } from '../../../src/data/sectors.js';
+import { ShipMotion } from '../../../src/modules/render3d/travel/motion.js';
+import { ShotPlan } from '../../../src/modules/render3d/travel/shots.js';
+import {
+  MomentClock,
+  travelMoments,
+} from '../../../src/modules/render3d/travel/moments.js';
+import {
+  WorldMap,
+  placeFrame,
+} from '../../../src/modules/render3d/travel/world.js';
+import {
+  linePauses,
+  travelLeg,
+} from '../../../src/modules/render3d/travelScene.js';
+
+const THREE = {};
+new Function(
+  'exports',
+  'module',
+  readFileSync(
+    new URL('../../../src/public/libs/three.min.js', import.meta.url),
+    'utf8'
+  )
+)(THREE, {});
+
+const frame = (id) =>
+  placeFrame(id, {
+    position: new THREE.Vector3(),
+    heading: new THREE.Vector3(),
+    angle: 0,
+  });
+
+// A journey to `to` planned as the scene plans it, landing on the origin
+// headed up the field.
+function fly(to, durationMs = 9000) {
+  const leg = travelLeg(to);
+  const map = new WorldMap(THREE).set(frame(leg.to), new THREE.Vector3(), 0);
+  const motion = new ShipMotion(THREE);
+  motion.plan(
+    map,
+    frame(leg.from),
+    frame(leg.to),
+    durationMs,
+    leg.jumps ? 0.36 : null,
+    !leg.from
+  );
+  return { leg, map, motion };
+}
+
+describe('the journey between sectors', () => {
+  it('jumps only into a new chapter and on the opening', () => {
+    expect(travelLeg('debris-wake')).toMatchObject({ from: null, jumps: true });
+    expect(travelLeg('salvage-lanes').jumps).toBe(false);
+    expect(travelLeg('furnace-drift').jumps).toBe(true);
+    expect(travelLeg('crystal-choir').jumps).toBe(false);
+    expect(travelLeg('the-crucible')).toMatchObject({
+      from: 'wardens-reach',
+      jumps: true,
+    });
+  });
+
+  it('places every place once, the place left where it stands when reached', () => {
+    const seen = SECTORS.map((s) => frame(s.look.backdrop).position);
+    seen.forEach((p, i) =>
+      seen
+        .slice(i + 1)
+        .forEach((q) => expect(p.distanceTo(q)).toBeGreaterThan(500))
+    );
+    // Salvage Lanes, seen from the journey leaving it and from the one
+    // reaching it, is the same spot of the world.
+    const out = fly('prime-gate');
+    const back = new THREE.Vector3();
+    out.map.point(frame('salvage-lanes').position, back);
+    const into = fly('salvage-lanes');
+    const there = new THREE.Vector3();
+    into.map.point(frame('salvage-lanes').position, there);
+    expect(there.length()).toBeCloseTo(0, 6);
+    // The two maps differ by a turn and a shift only: distances hold.
+    const a = new THREE.Vector3();
+    out.map.point(frame('debris-wake').position, a);
+    const b = new THREE.Vector3();
+    into.map.point(frame('debris-wake').position, b);
+    expect(a.distanceTo(back)).toBeCloseTo(b.distanceTo(there), 3);
+  });
+
+  it('leaves its place at rest nosed as it stood and lands on the spawn headed up the field', () => {
+    ['salvage-lanes', 'furnace-drift', 'the-crucible'].forEach((to) => {
+      const { leg, map, motion } = fly(to);
+      const start = new THREE.Vector3();
+      map.point(frame(leg.from).position, start);
+      const heading = new THREE.Vector3();
+      map.direction(frame(leg.from).heading, heading);
+      const p = new THREE.Vector3();
+      const f = new THREE.Vector3();
+      expect(Math.abs(motion.at(0, p, f))).toBeLessThan(5);
+      expect(p.distanceTo(start)).toBeLessThan(1e-3);
+      expect(f.dot(heading)).toBeGreaterThan(0.999);
+      expect(Math.abs(motion.at(1, p, f))).toBeLessThan(5);
+      expect(p.length()).toBeLessThan(1e-2);
+      expect(f.z).toBeLessThan(-0.999);
+    });
+  });
+
+  it('never slides or runs back: speed stays ahead of the nose', () => {
+    const { motion } = fly('salvage-lanes');
+    const p = new THREE.Vector3();
+    const q = new THREE.Vector3();
+    const f = new THREE.Vector3();
+    for (let t = 0.02; t < 0.98; t += 0.02) {
+      motion.at(t, p, f);
+      motion.at(t + 0.001, q);
+      const step = q.sub(p);
+      expect(step.dot(f)).toBeGreaterThan(0);
+      expect(step.normalize().dot(f)).toBeGreaterThan(0.95);
+    }
+  });
+
+  it('holds every shot long enough to read at any length, cutting into pauses', () => {
+    const inserts = ['engines', 'gate', 'flyover'];
+    [7000, 16000].forEach((durationMs) => {
+      ['salvage-lanes', 'furnace-drift'].forEach((to) => {
+        const { motion } = fly(to, durationMs);
+        const shots = new ShotPlan(THREE);
+        shots.plan(motion, durationMs, []);
+        const cuts = [0, ...shots.cuts, 1];
+        for (let i = 1; i < cuts.length; i += 1) {
+          const min = inserts.includes(shots.kinds[i - 1]) ? 749 : 1099;
+          expect((cuts[i] - cuts[i - 1]) * durationMs).toBeGreaterThanOrEqual(
+            min
+          );
+        }
+      });
+    });
+    const pauses = linePauses([{ text: 'x'.repeat(40) }], 10000);
+    expect(pauses[0][0]).toBeCloseTo(0.1);
+    expect(pauses[0][1]).toBeCloseTo(0.3);
+  });
+
+  it('cuts more often the longer the journey', () => {
+    const count = (to, durationMs) => {
+      const { motion } = fly(to, durationMs);
+      const shots = new ShotPlan(THREE);
+      shots.plan(
+        motion,
+        durationMs,
+        [],
+        {},
+        Math.max(0.72, 1 - 2600 / durationMs)
+      );
+      return shots.kinds.length;
+    };
+    expect(count('the-crucible', 16000)).toBeGreaterThanOrEqual(7);
+    expect(count('the-crucible', 16000)).toBeGreaterThan(
+      count('furnace-drift', 7000)
+    );
+    expect(count('salvage-lanes', 7000)).toBeGreaterThanOrEqual(4);
+  });
+
+  it('banks without snapping where a turn meets a straight', () => {
+    ['furnace-drift', 'the-crucible'].forEach((to) => {
+      const { motion } = fly(to, 9000);
+      let last = null;
+      for (let t = 0; t <= 1; t += 1 / 540) {
+        if (Math.abs(t - 0.36) < 0.01) {
+          last = null;
+          continue;
+        }
+        motion.sample(t);
+        if (last !== null)
+          expect(Math.abs(motion.bank - last)).toBeLessThan(0.06);
+        last = motion.bank;
+      }
+    });
+  });
+
+  it('leaves by a gate through the gate, nose along its way', () => {
+    const leg = travelLeg('furnace-drift');
+    const map = new WorldMap(THREE).set(frame(leg.to), new THREE.Vector3(), 0);
+    const start = new THREE.Vector3();
+    map.point(frame(leg.from).position, start);
+    const gate = start.clone().add(new THREE.Vector3(500, -1400, -300));
+    const motion = new ShipMotion(THREE);
+    motion.plan(map, frame(leg.from), frame(leg.to), 8000, 0.36, false, gate);
+    const p = new THREE.Vector3();
+    const f = new THREE.Vector3();
+    motion.at(motion.gateAt, p, f);
+    expect(p.distanceTo(gate)).toBeLessThan(1);
+    expect(f.y).toBeLessThan(-0.5);
+    const q = new THREE.Vector3();
+    for (let t = 0.02; t < 0.35; t += 0.01) {
+      motion.at(t, p, f);
+      motion.at(t + 0.001, q);
+      expect(q.sub(p).normalize().dot(f)).toBeGreaterThan(0.95);
+    }
+  });
+
+  it('times its sounds off the film: in order, the warp only on a jump, the charge ending on the leap', () => {
+    [7000, 16000].forEach((durationMs) => {
+      ['salvage-lanes', 'furnace-drift'].forEach((to) => {
+        const { leg, motion } = fly(to, durationMs);
+        const shots = new ShotPlan(THREE);
+        shots.plan(motion, durationMs, []);
+        const moments = travelMoments(motion, shots, durationMs, 0.72, 0.375);
+        const ids = moments.map((m) => m.id);
+        const at = (id) => moments.find((m) => m.id === id).t;
+        moments.forEach((m, i) => {
+          expect(m.t).toBeGreaterThanOrEqual(i ? moments[i - 1].t : 0);
+          expect(m.t).toBeLessThanOrEqual(1);
+        });
+        expect(ids.at(-1)).toBe('brake');
+        expect(at('burn')).toBeGreaterThan(at('ignite'));
+        const passes = moments.filter((m) => m.id === 'flyby');
+        expect(passes.length).toBeLessThanOrEqual(2);
+        if (!leg.jumps) {
+          expect(passes.length).toBeGreaterThanOrEqual(1);
+          expect(ids).not.toContain('charge');
+          expect(ids).not.toContain('leap');
+          expect(ids).not.toContain('dropout');
+          return;
+        }
+        expect(at('leap')).toBe(motion.jumpAt);
+        expect((at('leap') - at('charge')) * durationMs).toBeCloseTo(2200);
+        expect(at('dropout')).toBeGreaterThan(at('leap'));
+        // the leap and the drop-out are not shared with a fly-by
+        passes.forEach((m) => {
+          const clear =
+            m.t < at('leap') - 1300 / durationMs ||
+            m.t > at('dropout') + 600 / durationMs;
+          expect(clear).toBe(true);
+        });
+      });
+    });
+  });
+
+  it('plays its moments once each as t passes them, none late, and ends once', () => {
+    const heard = [];
+    const clock = new MomentClock((id) => heard.push(id));
+    clock.tick(0.5, 10000); // not started: silent
+    clock.start([
+      { id: 'ignite', t: 0.1 },
+      { id: 'burn', t: 0.12 },
+      { id: 'flyby', t: 0.3 },
+      { id: 'brake', t: 0.72 },
+    ]);
+    clock.tick(0.11, 10000);
+    clock.tick(0.13, 10000);
+    clock.tick(0.13, 10000);
+    clock.tick(0.9, 10000); // a late frame: the fly-by is stale, the stop is not
+    clock.stop();
+    clock.stop();
+    expect(heard).toEqual(['ignite', 'burn', 'brake', 'end']);
+  });
+});

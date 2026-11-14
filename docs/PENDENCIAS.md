@@ -4,23 +4,31 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 21.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
 
-## O BASTÃO — onde as sessões pararam (12/11) — A CAMPANHA ESTÁ NO RAMO `campanha/setores`, ESPERANDO ELE JOGAR
+## O BASTÃO — onde as sessões pararam (13/11) — TUDO ESTÁ NA `main` E PUBLICADO
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi
 feito… quer dizer que isso é definitivo e que está bom o suficiente… você mesmo deve perceber e avaliar"_ — e autorizou
-conversas paralelas. A `main` está parada em 21/10 (PR #302: correções de combate e de telas feitas por outro agente).
-Todo o trabalho de 12/11 está só no ramo `campanha/setores` (retomar por ele, não pela `main`): mapa de campanha,
-fases com camadas e chefe próprios, três Sentinels, os três cascos em placas; o detalhe está no `PLAN.md`. A visão do
+conversas paralelas. A campanha de nove fases (seis Sentinels, três Wardens) entrou na `main` pela PR #303 (12/11) e está publicada. O
+trabalho de 12–13/11 entrou pela PR #305 (13/11, por ordem dele); o detalhe está no `PLAN.md`. A visão do
 jogo é `docs/GAME_DESIGN_MASTER_PLAN.md` (22/10). Conteúdo hoje: 16 inimigos, 7 armas, 39 cartas, 3 cascos, 15 camadas
 na descida, 3 biomas, 3 Wardens, 3 Heralds, Sentinels por fase; o golden trace tem 26 cenários. Dois pedidos dele
 estão em conversas paralelas: audição de som e painel menor em imagens. Ele ainda não jogou nada de 12/11.
+**13/11:** ele respondeu à página de decisões (`src/exported-assets/decisoes/`, fora do git) e escolheu os sons dos
+sete chefes novos; as respostas viraram os itens 26 (complemento) e 27–32 abaixo. Ainda não publicar: _"quero jogar
+antes"_. Autorizou regravar o golden trace (feito) e arquivar as sessões e ramos de 12/11.
+**13/11 à noite:** depois de aprovar por imagem e de ouvido a viagem (filme, sons, trilha, vozes), os ataques dos
+chefes, o brilho e as vozes de todos os personagens, ele mandou: _"Vamos comittar, mergear, limpar e publicar"_ → a
+PR #305 entrou na `main` e o site tem a campanha de dez fases. **Ele ainda não jogou nada de 12–13/11**: decide
+jogando a luta do Interdictor (e se os aparelhos levam tiro), os volumes de voz/trilha, a cura, o alarme de casco
+baixo. Audição aberta, sem resposta: `src/exported-assets/audicao-armas-inimigos/` (dezesseis sons). Trabalho novo
+sai de um ramo novo a partir da `main`.
 
 **Como retomar (conversa local, qualquer máquina):**
 
-1. `git checkout campanha/setores && git pull && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
+1. `git checkout main && git pull && git checkout -b <ramo novo> && npm ci && npm run done` (gate = lint + formato + testes + build; o golden trace de
    26 cenários prova comportamento igual). Jogo: `npm run dev` → `http://localhost:5500/ASTEROIDS_ROGUEFIELD/`. Captura: o
    navegador embutido da conversa local (não há scripts de sonda ou captura no repo).
 2. Ler, nesta ordem: este BASTÃO; `PLAN.md` (Rodada 15, oito frentes em ordem); `CONTENT.md` (como adicionar inimigo,
@@ -35,19 +43,9 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 (i) **"às vezes menos é mais"** — a primeira câmera diretora foi rejeitada por overengineering; a de dois estados
 (perto/aberta) foi aprovada.
 
-**Estado (20/10):**
-
-- **Feito e aprovado por ele:** a fábrica de conteúdo (Rodada 0: `src/content` com registro automático — 10 inimigos,
-  6 chefes, 3 armas, 39 cartas, 4 cascos, 15 camadas, 3 biomas; cena `?content=<id>&count=&fire=1`; teto de 1.200
-  linhas por arquivo); a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir nada"_); a câmera
-  de dois estados (_"está boa, pode fechar"_) e as chegadas dos Wardens (_"aprovado"_); a arena com volume de qualquer
-  ângulo.
-- **Rodada 15, frentes 1–4, na `main` (PR #299, 20/10; não há mais ramos nem cópias de ajudantes):** sons
-  escolhidos por ele (19 amostras, `SOUND.md`) e o motor da nave com as camadas que ele escolheu; economia (curva
-  120 + 40·(n−2)^1.7, ~45 cartas, arma garantida nos níveis 3 e 7, raridade por carta, Warden com vida fixa); 15
-  cartas refeitas; orbes com peso; baús com cerimônia e 3 pickups novos; HUD de instrumento (encaixes, presets,
-  cápsula de escudo/casco, radar, editor; `HUD.md`); telas novas de level-up, baú e fim; 4 armas, 6 inimigos e 4
-  formações; o Anel 3D de todos os lados (`?scene=ring` em dev); correções de duas revisões.
+- **Aprovado por ele (até 20/10):** a janela inteira com tela cheia (_"tudo está rodando liso, não precisa medir
+  nada"_); a câmera de dois estados (_"está boa, pode fechar"_); as chegadas dos Wardens (_"aprovado"_); a arena com
+  volume de qualquer ângulo; os sons que escolheu (`SOUND.md`).
 - **Veredito dele, jogando (20/10):** _"por enquanto eu diria que a gente está numa fase beta. O jogo ainda não tem
   conteúdo suficiente… algo que a gente tem aqui para poucos minutos de jogo… nada do trabalho que a gente fez é
   perdido, mas eu acho que falta uma visão grande das fases, da história e do mapa"_.
@@ -65,15 +63,10 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
     mude totalmente o cenário"_; uma árvore de habilidades, equipamentos e melhorias liberada aos poucos com o dinheiro
     ganho, como no Vampire Survivors, pensada junto com a evolução e o tempo para vencer cada desafio; ligar tudo num
     roteiro que faça sentido (item 19).
-- **Próximo, nesta ordem (aprovado por ele em 20/10: _"a próxima conversa começa pela visão do jogo"_):** (1) a visão do jogo num documento que ele aprova
-  antes de mais conteúdo — capítulos → fases → ondas → chefe, o mapa, a história (item 19) e a árvore de desbloqueios
-  com moeda (frente 6), com o tempo de jogo de cada pedaço; (2) o conteúdo da frente 5 feito para essa estrutura; (3)
-  painel menor (escala dos encaixes no preset, por imagem); (4) a revisão do som e da trilha (tiro mais sutil, graves no
-  motor, o som do início, a trilha de tensão; a música da introdução fica); (5) balanceamento por último.
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
-- **Abertos dele:** itens 2, 15, 16, 18, 19 e 20 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Abertos dele:** itens 2, 15, 16, 18, 19, 20 e 21–26 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
@@ -98,7 +91,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 ## Som (palavras dele, 20/10)
 
 - **(18)** _"O som do jogo SFX precisa renascer do zero praticamente, tudo muito ruim também."_ → Rodada 15, frente 2:
-  amostras geradas pela skill local dele `/sfx-generator` (TangoFlux) e CC0 onde o modelo falha, página de audição
+  amostras geradas pela skill local dele `/sfx-generator` (AudioLDM) e CC0 onde o modelo falha, página de audição
   `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
   disser que o som está à altura do jogo.
 
@@ -130,3 +123,91 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
   Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
   antes de código; fecha quando ele aprovar as naves novas.
+
+## Campanha (palavras dele, 12/11, jogando no site)
+
+- **(21)** Passagem de fase: _"quando você passa de fase, mata o boss… e escolhe seguir no jogo para a próxima etapa,
+  todas as coisas da tela somem, então não dá nem para pegar os spoils, os orbes que estão na tela, não aparece aquele
+  countdown como aparecia antes."_ Fecha quando ele passar de fase e conseguir recolher o que caiu.
+- **(22)** Primeiro boss: _"a segunda etapa dele, não inova, não fica mais difícil, nada muda. Ele continua jogando 3
+  asteroides que são muito fáceis de destruir. Deveria ter um desafio um pouco maior na segunda etapa dele."_
+- **(23)** _"todos os upgrades que eu peguei desapareceram de uma etapa para outra, assim que eu dei próximo setor…
+  Mais grave ainda."_ Fecha quando ele seguir para o próximo setor com a nave como estava.
+- **(24)** Lugares e viagens (depois de ver a prancha das nove fases só com cores): _"tem que ter cenários diferentes,
+  mas percebe que já é uma arena 3D, o próprio anel por trás faz parte dessa ambientação. Então, talvez uma fase
+  poderia ser mais próxima do anel, até dentro do anel em algum momento, em volta do anel, num planeta de fundo, um
+  planeta próximo, perto de uma estrela, um campo de asteroides gigantes ao fundo… Um cemitério de naves enormes… um
+  disco protoplanetário… tem que pensar no roteiro que você escreveu… o roteiro é que pode prever isso. E entre uma
+  fase e outra, a nave pode se deslocar, entrar no hiperespaço… na hora do jogo, tudo bem ser isométrico… Mas na hora
+  que você vai de um lugar para o outro, os cutscenes e tal, são horas interessantes para a gente brincar com essas
+  possibilidades, já que a gente está se esmerando em fazer um mundo que é todo 3D."_ São ideias, não lista fechada.
+  Fecha quando ele vir as fases em lugares diferentes e as viagens.
+- **(25)** Chefe final: _"o Final Boss tem que ser algo assim muito, muito diferente. Tipo, super bem feito, detalhado,
+  um modelo diferenciado, tipo… aquela nave que no filme dos Guardiões da Galáxia era do pai do Star-Lord? Algo naquele
+  gênero… Ou até mesmo a própria nave do Star-Lord… seria muito legal ter um modelo mais diferenciado, assim, inspirado
+  em coisas mais bacanas. Óbvio que pode ser adaptado para nossa estética."_ Inspiração, não cópia. Fecha quando ele
+  aprovar o modelo do Sovereign por imagem.
+- **(26)** Materiais: _"Eu não sei porque que a gente deixou tudo fosco. Acho que podia ter coisas que tivessem materiais
+  mais reflexivos e brilhosos também. Não sei se isso penaliza muito o jogo, mas por quê, né? Por que não?"_ → o fosco
+  veio do `docs/NORTE.md` (luz só como informação); a cena já tem ambiente para reflexo, custo quase nulo. Primeiro no
+  Sovereign, por imagem; depois onde fizer sentido (cristais, metais de nave, chefes).
+  **13/11, ao aprovar a pedra de ouro polida:** _"falei de brilho nos materiais, mas acho que nave, vidros, metais,
+  todos podem ter um pouco de brilho de acordo com o material real… se for aço inoxidável tem brilho, se é vidro, tem
+  brilho e daí por diante. Metais geralmente têm brilho, entendeu meu pedido? Talvez você já tenha feito isso, só estou
+  explicando."_ → o brilho segue o material de verdade em tudo (máquinas, chefes, estruturas), não só onde é "joia".
+  **Veredito dele (13/11, página `src/exported-assets/materiais/`):** máquinas inimigas _"Ficou bom"_; suas naves
+  _"Preferia como era antes"_ (os canos voltaram ao acabamento de antes); guardiões e chefes _"Ficou bom"_; lugares e
+  combate _"Ficou bom"_; no geral _"É isso: brilho pelo material, sem exagero"_.
+- **(27)** Equilíbrio como no Vampire Survivors (13/11, ao não escolher alvo para a fase final): _"acho que temos que
+  repensar o equilíbrio como é hoje em Vampire Survivors (nossa inspiração além do Asteroids). Hoje você só consegue
+  avançar no Vampire Survivors depois que começa a comprar itens de power-ups na loja com a moeda do jogo. Já havia
+  pedido um estudo sobre isso, deve estar no repo. Precisamos lançar isso para ser investigado e implementado
+  corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
+  (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
+  lá, não calibrar a campanha para ser vencível sem loja.
+- **(28)** Itens fora da tela e área de coleta (13/11): _"os corações muitas vezes ficam para fora da tela e precisam
+  voltar para a arena assim como as orbes. Os demais itens também talvez estejam passando pela mesma coisa… tenho
+  dúvidas se precisamos aumentar um pouco a área de atuação do collect da nave para pegar um pouco mais facilmente esses
+  itens (não acho que eles devam ser magnéticos como são as orbes)."_ → coração agora sempre cai dentro da arena
+  (13/11); conferir baús e outros itens; a área de coleta é dúvida dele: propor com número, ele decide.
+  **Decisão dele (13/11, página `decisoes-2`):** _"Sim: aumenta para a proposta e regrava a partida dos testes"_
+  (corações 25 → 40, itens 28 → 40).
+- **(29)** Sortear e banir ao passar de fase (13/11): _"Tudo segue junto: usos gastos continuam gastos."_ E a conquista
+  Full Set: _"Prefiro a meta difícil: família completa."_ Na família de fogo, que tem duas cartas de arma (13/11):
+  _"A segunda arma não conta: fecha com todas as outras cartas da família."_
+- **(30)** Som ao pegar coração (13/11): _"Quero um som: prepare opções para eu ouvir."_
+- **(31)** Ataques dos chefes (13/11, sobre a jaula do Interdictor): _"mas como a nave lança essa grade? Isso não
+  deveria ser um material de verdade? Tem que ter algo real e físico ou um dispositivo que gere esse campo, uma arma…
+  acho particularmente que o efeito está muito sem graça e feio… aliás todas as miras e efeitos de dano e armas dos
+  bosses estão muito sem graça, deveria tudo isso ser revisto e polido."_ Fecha quando ele aprovar por imagem e jogando.
+  **Veredito dele por imagem (13/11, página `chefes-ataques`):** os sete chefes _"Ficou bom"_ (Interdictor refeito
+  incluído); no geral _"A direção é essa"_. Atirar nos aparelhos da jaula: _"Decido depois de jogar a luta nova."_
+  Os cinco retoques seguintes (fim da jaula, anel de aviso, setas do Gatekeeper, sucção do Maw, feixe do Sovereign):
+  _"Ficou bom"_. Falta ele jogar.
+- **(32)** Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
+  de fase, tipo os cutscenes, imaginei que a nave estaria realmente viajando no espaço 3D do universo que criamos, indo
+  de uma localização para outra. E acho que a nave precisa respeitar essa movimentação dentro do cenário, usando seus
+  motores ou talvez, dependendo da distância, entrando em dobra, mas o movimento da nave tem que ser real, de virar de
+  frente para onde ela está indo e ir. A câmera tem que ser interessante, como num filme de Star Wars que segue um
+  X-wing. Precisa polir."_ Fecha quando ele vir a viagem nova.
+  **13/11, depois de ver os vídeos da viagem refeita** (as três: _"Está no caminho certo"_): _"Quero mais cara de
+  filme: câmera mais ousada, mais cortes… está na direção certa, mas acho que o polimento pode ser levado mais para
+  cara de filme e integrando melhor com as localizações 3D."_
+  **13/11, depois de ver os filmes com som e voz** (quatro viagens: _"Ficou bom"_; sons e vozes: _"Sons e vozes estão
+  bons"_): _"Agora sim: é essa a cara."_ Os dois planos refeitos depois (mergulho pelo portão, cristais aparecendo
+  antes): _"Ficou bom"_.
+- **(33)** Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
+  couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
+  audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o
+  projeto ainda não tem.
+  **Escolhas dele para os sons da viagem (13/11, audição em `src/exported-assets/audicao-viagem/`):**
+  _"queima=B carga-dobra=A passagem=C ignicao=B salto=A saida=C"_. Autorizou baixar um modelo de voz livre
+  (_"Sim, pode baixar"_) para a audição das vozes. Escolheu também o som do coração (_"coracao=A"_, já no jogo) e os
+  sete dos chefes (já no jogo).
+  **Trilha da viagem (13/11, audição em `src/exported-assets/audicao-trilha/`):** _"trilha=B"_ — B (um tema da
+  viagem) _"Gostei"_; A (a música viaja junto) _"Não gostei"_; C (quase silêncio) _"Não gostei"_.
+  **Vozes escolhidas (13/11, audição em `src/exported-assets/audicao-vozes/`):** _"ring=bf_emma/tratada
+  wake=bm_george/tratada sovereign=am_onyx/tratada"_. Faltam as vozes dos outros que falam (Wardens, Sentinels,
+  Heralds): audição antes de entrar.
+  **Vozes dos outros doze (13/11, audição em `src/exported-assets/audicao-vozes-2/`):** _"prime=A choir=C null=A
+  quarry-maw=A gatekeeper=A kiln-engine=A prism-crown=A foundry-mother=A interdictor=A dust=A heat=A silence=A"_.

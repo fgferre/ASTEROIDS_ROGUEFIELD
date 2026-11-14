@@ -11,7 +11,13 @@ import {
   range,
   ring,
   hex,
+  lensGain,
+  progressOf,
 } from './kit.js';
+
+const TAU = Math.PI * 2;
+// proposta 13/11: how fast (1/s) the furnace turns a vent to each wedge.
+const KILN_AIM = 5;
 
 export function createKilnEngine(sk) {
   const {
@@ -19,6 +25,8 @@ export function createKilnEngine(sk) {
     kit,
     recipeViews,
     panelMaterial,
+    emitterMaterial,
+    lens,
     hull,
     dark,
     steel,
@@ -101,6 +109,19 @@ export function createKilnEngine(sk) {
     },
   ]);
   const kilnMouth = drum(0.62, 0.02, 12);
+  // Each vent's lip: a polished frame round the dark slot the heat pours
+  // from (its lens, the glow in the slot, lights with its wedge).
+  const KILN_VENT = 0.75;
+  const kilnLips = merge(
+    ring(6, KILN_VENT + 0.01).flatMap(([x, z, angle]) =>
+      [0.155, 0.005].map((y) => ({
+        geometry: box(0.06, 0.03, 0.36),
+        color: steel,
+        position: [x, y, z],
+        rotationY: -angle,
+      }))
+    )
+  );
   const KILN_LIGHTS = Object.freeze({
     parts: [],
     lights: [{ at: [0, 0.2, 0.5], dir: [0, 1, 0.4], size: 0.04 }],
@@ -133,13 +154,15 @@ export function createKilnEngine(sk) {
     });
     const mouth = new THREE.Mesh(kilnMouth, coreMaterial);
     mouth.position.set(0, 0.285, 0);
-    group.add(mouth);
+    group.add(mouth, new THREE.Mesh(kilnLips, emitterMaterial));
+    const vents = ring(6, KILN_VENT + 0.02).map(([x, z, angle]) => ({
+      angle,
+      glow: lens(group, [x, 0.08, z], 0.07),
+    }));
     kit.scene.add(group);
     const sectors = kit.createTelegraph(0, KILN.sectors.count / 2);
-    const pools = kit.createTelegraph(
-      0,
-      Math.max(...KILN.cycle.map((c) => c.slagShots))
-    );
+    const shots = Math.max(...KILN.cycle.map((c) => c.slagShots));
+    const pools = kit.createTelegraph(0, shots, shots);
     const telegraphs = new THREE.Group();
     telegraphs.add(sectors.group, pools.group);
     kit.scene.add(telegraphs);
@@ -150,17 +173,67 @@ export function createKilnEngine(sk) {
       coreMaterial,
       rims: [kit.rim(group, kit.circleRim, RIM)],
       rimColor: kit.rimColors.boss,
-      glows: lights.lights,
+      vents,
+      yaw: null,
+      last: null,
+      bound: null,
+      glows: [
+        ...lights.lights,
+        ...vents.map((vent) => vent.glow),
+        ...pools.sparks,
+      ],
       telegraph: { group: telegraphs, sectors, pools },
       poolState: { type: 'pools', pools: [], x: 0, y: 0, timer: 0 },
       id: null,
     };
   }
 
+  // The furnace's turn (field radians): its own while it drifts; with the
+  // wedges up it turns, eased, so a vent faces the middle of every wedge
+  // (one face per wedge), the nearest way round. A pooled view taken by a
+  // new Kiln starts square.
+  function aimVents(view, boss, time) {
+    const own = boss.rotation ?? 0;
+    if (view.bound !== view.id) {
+      view.bound = view.id;
+      view.yaw = own;
+      view.last = null;
+    }
+    const dt =
+      view.last === null ? 0 : Math.min(0.1, Math.max(0, time - view.last));
+    view.last = time;
+    const s = boss.sectors;
+    const step = TAU / 6;
+    const want = s ? s.angle + TAU / s.count / 2 : own;
+    const turn = s
+      ? ((((want - view.yaw) % step) + step * 1.5) % step) - step / 2
+      : Math.atan2(Math.sin(want - view.yaw), Math.cos(want - view.yaw));
+    view.yaw += turn * (1 - Math.exp(-KILN_AIM * dt));
+    return view.yaw;
+  }
+
+  // A vent glows with the wedge it faces: charging while the wedge warns,
+  // pouring while it burns, dark otherwise.
+  function lightVents(view, boss) {
+    const s = boss.sectors;
+    const width = s ? TAU / s.count : 1;
+    for (const vent of view.vents) {
+      let gain = lensGain(false, 0, 0);
+      if (s) {
+        const along = vent.angle + view.yaw - s.angle;
+        const wedge = Math.floor((((along % TAU) + TAU) % TAU) / width);
+        if ((wedge + s.offset) % 2 === 0) {
+          gain = lensGain(s.phase === 'warn', progressOf(s), 1);
+        }
+      }
+      kit.setGain(vent.glow.tone, gain);
+    }
+  }
+
   function updateKilnEngine(view, boss, time) {
     const radius = boss.radius || KILN.radius;
     view.object.scale.setScalar(radius);
-    view.object.rotation.y = -(boss.rotation ?? 0);
+    view.object.rotation.y = -aimVents(view, boss, time);
     const open = clamp01(boss.ventOpen ?? 0);
     const swing = KILN_FIN_SWING * open * open * (3 - 2 * open);
     for (const pivot of view.fins) pivot.rotation.z = -swing;
@@ -168,6 +241,7 @@ export function createKilnEngine(sk) {
       CORE_COLD +
       open * (CORE_HOT + 0.3 * Math.sin(time * CORE_BEAT)) +
       boss.getHitFlash() * CORE_FLASH * (0.2 + open);
+    lightVents(view, boss);
     const { group, sectors, pools } = view.telegraph;
     group.visible = true;
     kit.updateTelegraph(sectors, { telegraph: boss.sectors }, radius);

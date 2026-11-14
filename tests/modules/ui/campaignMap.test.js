@@ -1,22 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CampaignMap,
   campaignChapters,
+  campaignMarkup,
   defaultSectorRow,
   sectorRowsMarkup,
 } from '../../../src/modules/ui/CampaignMap.js';
 import { sectorById } from '../../../src/data/sectors.js';
 
-const records = (sectorsWon = [], sectorTimes = {}, bestLayer = 0) => ({
+const records = (
+  sectorsWon = [],
+  sectorTimes = {},
+  bestLayer = 0,
+  endings = []
+) => ({
   sectorsWon,
   sectorTimes,
   bestLayer,
+  endings,
 });
 
 const CHAPTER_ONE = ['debris-wake', 'salvage-lanes', 'prime-gate'];
 
 describe('campaign map', () => {
-  it('reads each chapter cleared, open or locked from its sectors, then three chapters with no signal', () => {
+  it('reads each chapter cleared, open or locked from its sectors, then two chapters with no signal', () => {
     const states = (won) =>
       campaignChapters(records(won)).map(({ numeral, state }) => [
         numeral,
@@ -26,7 +33,7 @@ describe('campaign map', () => {
       ['I', 'open'],
       ['II', 'locked'],
       ['III', 'locked'],
-      ['IV', 'nosignal'],
+      ['IV', 'locked'],
       ['V', 'nosignal'],
       ['VI', 'nosignal'],
     ]);
@@ -38,7 +45,7 @@ describe('campaign map', () => {
   });
 
   it("lists a chapter's sectors with code, name, end boss, layers and state", () => {
-    const [one, two, three] = campaignChapters(
+    const [one, two, three, four] = campaignChapters(
       records(['debris-wake'], { 'debris-wake': 252 })
     );
     expect(one.title).toBe('CHAPTER I — THE OUTER RING');
@@ -116,6 +123,18 @@ describe('campaign map', () => {
       boss: 'Warden: Null',
       lock: 'Defeat Sentinel Interdictor to unlock',
     });
+    expect(four.title).toBe('FINALE — THE CRUCIBLE');
+    expect(four.name).toBe('THE CRUCIBLE');
+    expect(four.sectors).toEqual([
+      expect.objectContaining({
+        code: 'A',
+        name: 'THE CRUCIBLE',
+        boss: 'Sovereign',
+        layers: 5,
+        state: 'locked',
+        lock: 'Defeat Warden Null to unlock',
+      }),
+    ]);
 
     const rows = sectorRowsMarkup(one.sectors);
     expect(rows).toContain('id="campaign-sector-debris-wake"');
@@ -123,6 +142,14 @@ describe('campaign map', () => {
     expect(rows).toContain(
       'Locked<span class="campaign-sector__why">Defeat Sentinel Gatekeeper to unlock</span>'
     );
+  });
+
+  it('lets only the first open chapter call, however many are open', () => {
+    // A profile from before the campaign: past two Wardens in the Descent.
+    const markup = campaignMarkup(campaignChapters(records([], {}, 12)));
+    expect(markup.match(/is-open/g).length).toBeGreaterThan(1);
+    expect(markup.match(/is-next/g)).toHaveLength(1);
+    expect(markup).toMatch(/id="campaign-chapter-1" class="[^"]*is-next/);
   });
 
   it('opens on the first open sector, else the last cleared', () => {
@@ -138,7 +165,39 @@ describe('campaign map', () => {
       'quarantine-grid',
       'wardens-reach',
     ];
-    expect(defaultSectorRow(rowsOf(all)).id).toBe('wardens-reach');
+    expect(defaultSectorRow(rowsOf(all)).id).toBe('the-crucible');
+    expect(defaultSectorRow(rowsOf([...all, 'the-crucible'])).id).toBe(
+      'the-crucible'
+    );
+  });
+
+  it('marks the endings reached on the last sector, which stays open to play again like every sector', () => {
+    const all = [
+      ...CHAPTER_ONE,
+      'furnace-drift',
+      'crystal-choir',
+      'dense-core',
+      'assembly-graveyard',
+      'quarantine-grid',
+      'wardens-reach',
+      'the-crucible',
+    ];
+    const rows = campaignChapters(records(all, {}, 0, ['stewardship'])).flatMap(
+      (node) => node.sectors
+    );
+    expect(rows.filter((row) => row.endings).map((row) => row.id)).toEqual([
+      'the-crucible',
+    ]);
+    expect(rows.at(-1).endings).toEqual([
+      { id: 'severance', title: 'Severance', reached: false },
+      { id: 'stewardship', title: 'Stewardship', reached: true },
+    ]);
+    expect(rows.every((row) => row.state === 'cleared')).toBe(true);
+    const markup = sectorRowsMarkup(rows.slice(-1));
+    expect(markup).toContain(
+      'class="campaign-ending is-reached" data-ending="stewardship"'
+    );
+    expect(markup).toContain('class="campaign-ending" data-ending="severance"');
   });
 
   it('a chapter shows its rows; Launch carries the selected row, and a locked one cannot launch', () => {
@@ -151,10 +210,16 @@ describe('campaign map', () => {
       detailHeadStart: text(),
       launchBtn: { dataset: {}, disabled: false },
     };
-    const map = new CampaignMap({ refs });
+    const prepareTravel = vi.fn();
+    const map = new CampaignMap({ refs, prepareTravel });
     map.chapters = campaignChapters(records(['debris-wake']));
 
     map.selectSector('salvage-lanes');
+    // The journey this Launch would fly readies its voices now.
+    expect(prepareTravel).toHaveBeenCalledWith({
+      sector: 'salvage-lanes',
+      source: 'campaign-launch-btn',
+    });
     expect(refs.detailTitle.textContent).toBe('CHAPTER I — THE OUTER RING');
     expect(refs.sectors.innerHTML.match(/data-campaign-row=/g)).toHaveLength(3);
     expect(refs.launchBtn).toEqual({

@@ -14,8 +14,7 @@ import {
   formatRangeValue,
   renderSettingField,
 } from './settings/fieldRenderers.js';
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
+import { asArray } from '../upgradeCatalog.js';
 
 export class SettingsPanel {
   /**
@@ -127,7 +126,7 @@ export class SettingsPanel {
         (category) => category.id === 'accessibility'
       );
       if (accessibilityFallback) {
-        ensureArray(accessibilityFallback.fields).forEach((field) => {
+        asArray(accessibilityFallback.fields).forEach((field) => {
           accessibility[field.key] = field.default;
         });
       }
@@ -136,7 +135,7 @@ export class SettingsPanel {
         (category) => category.id === 'video'
       );
       if (videoFallback) {
-        ensureArray(videoFallback.fields).forEach((field) => {
+        asArray(videoFallback.fields).forEach((field) => {
           video[field.key] = field.default;
         });
       }
@@ -200,7 +199,7 @@ export class SettingsPanel {
       );
     }
 
-    ensureArray(settingsRefs.closeButtons).forEach((button) => {
+    asArray(settingsRefs.closeButtons).forEach((button) => {
       button.addEventListener('mouseenter', () => {
         // Only emit if settings menu is visible
         if (
@@ -378,17 +377,12 @@ export class SettingsPanel {
   }
 
   applyVideoSettings(values = {}, derived = null) {
-    const root = document.documentElement;
     const hudScale = Number.isFinite(Number(derived?.hudScale))
       ? Number(derived.hudScale)
       : Number.isFinite(Number(values.hudScale))
         ? Number(values.hudScale)
         : 1;
     const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
-
-    if (root) {
-      root.dataset.hudScale = String(baseScale);
-    }
 
     this.setHudBaseScale(baseScale);
 
@@ -692,7 +686,7 @@ export class SettingsPanel {
 
     const values = this.settings?.getCategoryValues(categoryId) || {};
 
-    ensureArray(category.fields).forEach((field) => {
+    asArray(category.fields).forEach((field) => {
       const element = renderSettingField(
         categoryId,
         field,
@@ -827,8 +821,8 @@ export class SettingsPanel {
     const { categoryId, fieldKey, slot } = this.settingsState.capture;
     const current = this.settings.getSetting(categoryId, fieldKey) || {};
     const updated = {
-      keyboard: ensureArray(current.keyboard).slice(),
-      gamepad: ensureArray(current.gamepad).slice(),
+      keyboard: asArray(current.keyboard).slice(),
+      gamepad: asArray(current.gamepad).slice(),
     };
 
     const field = this.getFieldDefinition(categoryId, fieldKey);
@@ -878,8 +872,7 @@ export class SettingsPanel {
     }
 
     return (
-      ensureArray(category.fields).find((field) => field.key === fieldKey) ||
-      null
+      asArray(category.fields).find((field) => field.key === fieldKey) || null
     );
   }
 }

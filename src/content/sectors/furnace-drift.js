@@ -16,6 +16,21 @@ export default {
   biome: 'dense-core',
   layers: [6, 10],
   headStart: 9, // proposta 12/11
+  // proposta 12/11: hot orange haze, ember dust, a strong warm key.
+  look: {
+    backdrop: 'furnace-drift',
+    sky: ['#0c0705', '#030202'],
+    hazeColor: '#d2621a',
+    hazeDensity: 1.35,
+    veinColor: '#ffa030',
+    veinDensity: 0.8,
+    dustColor: '#ffb050',
+    keyColor: '#ffb878',
+    keyIntensity: 1.7,
+    fillColor: '#8a401e',
+    debris: 0.4,
+    tint: 'rgba(255, 130, 40, 0.12)',
+  },
   boss: 'kiln-engine',
   // proposta 12/11: every number below
   stages: [
@@ -36,8 +51,10 @@ export default {
       warden: false,
     },
     {
-      rocks: rockCurve(8),
-      roster: [{ role: 'skirmisher', count: 2, from: 8, every: 10, elite: 0 }],
+      // One layer's rocks fewer and a slower trickle of Drones: the Herald
+      // is the stage (measured 12/11: it ran four to five minutes).
+      rocks: rockCurve(7),
+      roster: [{ role: 'skirmisher', count: 2, from: 8, every: 16, elite: 0 }],
       surges: [],
       formations: [],
       events: [],
@@ -45,19 +62,26 @@ export default {
       herald: 'heat',
     },
     {
-      rocks: rockCurve(9),
+      rocks: rockCurve(8),
+      // One Caster at a time: its blast is wider than the ship can fly out
+      // of (measured 12/11: only a dash clears it), so two of them asked
+      // for a dash every 1.6 s, the dash's whole cooldown.
       roster: [
-        { role: 'artillery', count: 2, from: 10, every: 14, elite: 0.15 },
+        { role: 'artillery', count: 1, from: 10, every: 12, elite: 0 },
+        { role: 'skirmisher', count: 2, from: 16, every: 14, elite: 0 },
       ],
+      // proposta 12/11: a Mote swarm of 3 and a ring of 6 (were 5 and 8):
+      // the chapter's first sector killed the good bot here 4 times in 12
       surges: [
-        { at: 40, roles: ['skirmisher'], count: 5, label: 'Mote swarm' },
+        { at: 40, roles: ['skirmisher'], count: 3, label: 'Mote swarm' },
       ],
-      formations: [formation('ring', { role: 'swarmer', count: 8, at: 25 })],
+      formations: [formation('ring', { role: 'swarmer', count: 6, at: 25 })],
       events: [fieldEvent('solar-flare', 35)],
       warden: false,
     },
     {
-      rocks: rockCurve(10),
+      // Two layers' rocks fewer: the fight is the Kiln's fire, not the field.
+      rocks: rockCurve(8),
       roster: [],
       surges: [],
       formations: [],

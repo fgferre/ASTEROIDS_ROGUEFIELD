@@ -94,11 +94,13 @@ class PhysicsSystem extends BaseSystem {
       getNearbyEnemies,
     });
 
-    // New SpatialHash-based collision system
+    // New SpatialHash-based collision system, at one cell size: the cell size
+    // orders the query results, and its resize ran on the wall clock, so a
+    // replay on a slower machine could collide differently.
     this.spatialHash = new SpatialHash(this.cellSize, {
       maxObjects: 8,
       maxDepth: 4,
-      dynamicResize: true,
+      dynamicResize: false,
     });
 
     // Legacy spatial index for backward compatibility

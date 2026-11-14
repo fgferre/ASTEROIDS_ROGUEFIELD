@@ -68,10 +68,12 @@ const FLARE_LIGHT = `
 
 /**
  * The veil in `scene`. Returns `flare(x, z, color)` (world x/z of a point
- * on the edge) and `update(dt)`, which fades the flares.
+ * on the edge), `update(dt)`, which fades the flares, and `setLevel(level)`
+ * 0..1, how much of it shows (a journey's end fades it in).
  */
 export function createFieldVeil(THREE, scene) {
   const color = colorOf(THREE, VEIL_COLOR);
+  const uLevel = { value: 1 };
   const group = new THREE.Group();
   const flares = Array.from({ length: FLARE.count }, () => ({
     at: new THREE.Vector4(0, 0, 0, 0),
@@ -98,13 +100,15 @@ export function createFieldVeil(THREE, scene) {
     new THREE.ShaderMaterial({
       vertexShader: PLANE_VERTEX,
       fragmentShader: `
+        uniform float uLevel;
         varying vec2 vPos;
         ${RECT_DISTANCE}
         void main() {
           float a = smoothstep(0.0, ${BEYOND_FADE.toFixed(1)}, outside(vPos));
-          gl_FragColor = vec4(0.0, 0.0, 0.0, a * ${BEYOND_DARKNESS.toFixed(2)});
+          gl_FragColor = vec4(0.0, 0.0, 0.0, a * ${BEYOND_DARKNESS.toFixed(2)} * uLevel);
         }
       `,
+      uniforms: { uLevel },
       transparent: true,
       depthWrite: false,
     }),
@@ -115,10 +119,11 @@ export function createFieldVeil(THREE, scene) {
   // The glow along the edge, on both sides of it.
   plane(
     new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: color }, ...flareUniforms },
+      uniforms: { uColor: { value: color }, uLevel, ...flareUniforms },
       vertexShader: PLANE_VERTEX,
       fragmentShader: `
         uniform vec3 uColor;
+        uniform float uLevel;
         varying vec2 vPos;
         ${RECT_DISTANCE}
         ${FLARE_LIGHT}
@@ -126,7 +131,7 @@ export function createFieldVeil(THREE, scene) {
           float d = abs(outside(vPos));
           float g = exp(-d / ${EDGE_WIDTH.toFixed(1)});
           vec3 flare = flareLight(vPos, exp(-d / ${FLARE.across.toFixed(1)}));
-          gl_FragColor = vec4(uColor * g * ${EDGE_GLOW.toFixed(2)} + flare, 1.0);
+          gl_FragColor = vec4((uColor * g * ${EDGE_GLOW.toFixed(2)} + flare) * uLevel, 1.0);
         }
       `,
       transparent: true,
@@ -140,7 +145,7 @@ export function createFieldVeil(THREE, scene) {
   // The curtain: four walls of light on the edges, brightest at the base,
   // fading up to its top and down to the skirt's foot.
   const curtain = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: color }, ...flareUniforms },
+    uniforms: { uColor: { value: color }, uLevel, ...flareUniforms },
     vertexShader: `
       varying float vY;
       varying vec2 vPos;
@@ -153,6 +158,7 @@ export function createFieldVeil(THREE, scene) {
     `,
     fragmentShader: `
       uniform vec3 uColor;
+      uniform float uLevel;
       varying float vY;
       varying vec2 vPos;
       ${FLARE_LIGHT}
@@ -160,7 +166,7 @@ export function createFieldVeil(THREE, scene) {
         float k = vY > 0.0 ? vY / ${CURTAIN_HEIGHT.toFixed(1)} : -vY / ${CURTAIN_SKIRT.toFixed(1)};
         float rise = max(0.0, 1.0 - k);
         vec3 flare = flareLight(vPos, rise) * 0.5;
-        gl_FragColor = vec4(uColor * rise * rise * ${CURTAIN_GLOW.toFixed(2)} + flare, 1.0);
+        gl_FragColor = vec4((uColor * rise * rise * ${CURTAIN_GLOW.toFixed(2)} + flare) * uLevel, 1.0);
       }
     `,
     transparent: true,
@@ -195,6 +201,9 @@ export function createFieldVeil(THREE, scene) {
       flares.forEach(({ at }) => {
         at.z = Math.max(0, at.z - dt / FLARE.fade);
       });
+    },
+    setLevel(level) {
+      uLevel.value = level;
     },
   };
 }

@@ -3,11 +3,12 @@
 // (buttresses, windows, armour, hangar doors), plating, pipes, pods and fins
 // under the keel, a mast under each rib, the bare skeleton where the hull is
 // gone and, at a torn end, the decks and bulkheads the break cut open.
-// Level 2 (near) adds cables, broken teeth on the torn walls, hatches and
-// vents on the deck plates, rails and brackets. Each level draws from its own
-// stream per module, so level 2 keeps every part of level 1.
+// Level 2 (near) adds cables, broken teeth on the torn walls, rails and
+// brackets. The deck of an intact module is ringDeck.js's. Each level draws
+// from its own stream per module, so level 2 keeps every part of level 1.
 
 import { createSeededRandom } from '../asteroidMesh.js';
+import { cityDeck } from './ringDeck.js';
 import { RING, RING_LOOK } from './ringShape.js';
 
 const { width: W, hull: H, rim: h, wall, keel: K } = RING;
@@ -468,6 +469,7 @@ export function moduleDetail(kit, i, shape, { s0, s1, tone, rib }) {
     tornEnd(kit, shape.torn, mid, near);
     skeleton(kit, shape.frames[0], tone, mid, near, shape.torn.into);
   } else shape.frames.forEach((f) => skeleton(kit, f, tone, mid, near));
+  if (shape.deck) cityDeck(kit, i, shape.deck, tone);
   if (rib) {
     // A mast hung under the rib, a light at its tip.
     const s = s1 + RING.seam / 2;
@@ -517,22 +519,8 @@ export function moduleDetail(kit, i, shape, { s0, s1, tone, rib }) {
         );
       }
     });
-    // Hatches and vents on the deck plates, brackets over the conduit.
-    shape.plates.forEach((p) => {
-      const count = Math.floor(near.between(0, 2.6));
-      for (let g = 0; g < count; g += 1) {
-        const vent = near.random() < 0.4;
-        put(
-          box,
-          p.s + near.between(-p.along / 3, p.along / 3),
-          p.r + near.between(-p.across / 3, p.across / 3),
-          p.top + (vent ? 0.6 : 0.25),
-          vent ? [2, 1.2, 4] : [near.between(3, 6), 0.5, near.between(3, 6)],
-          tone * (vent ? 0.6 : 1.2)
-        );
-      }
-    });
-    if (shape.plates.length) {
+    // Brackets over the conduit.
+    if (shape.deck) {
       for (let s = s0 + 4; s < s1; s += 8)
         put(box, s, 0, 2.6, [9, 0.6, 1.2], tone);
     }

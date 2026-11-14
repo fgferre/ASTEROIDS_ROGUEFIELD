@@ -1,5 +1,5 @@
 // Mirrors PickupSystem tokens as machined pucks (fieldTokens.js), instanced
-// per kind: a matte body and its light (rim, glyph, hover lens) in the
+// per kind: a satin body and its light (rim, glyph, hover lens) in the
 // pickup colour, which pulses and goes dark in the blink steps of the last
 // seconds. Each token hovers and rocks a little. At most POOL drawn. Chests
 // come in the same list and are chestMirror.js's.
@@ -8,6 +8,7 @@ import { PICKUP_KINDS, PICKUP_TOKEN } from '../../data/pickups.js';
 import { rgbOf } from './batches.js';
 import { tokenParts } from './fieldTokens.js';
 import { InstanceBatch } from './glowBatch.js';
+import { SHINE } from './hullModel.js';
 import { addRimLight } from './rimLight.js';
 
 const POOL = 8;
@@ -26,8 +27,7 @@ export class PickupMirror {
     const bodyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
         vertexColors: true,
-        metalness: 0.2,
-        roughness: 0.75,
+        ...SHINE.paint,
       })
     );
     const lightMaterial = new THREE.MeshBasicMaterial({

@@ -1,7 +1,7 @@
 # Asset Sourcing — Hybrid Model (Phase 1, 2026-05-13, LOCK)
 
 Phase 1 PROC-17 lock. Documents the hybrid model already locked in
-`.planning/PROJECT.md` Key Decisions row "Asset sourcing model = hybrid".
+the project's Key Decisions (asset sourcing model = hybrid).
 
 This LOCK applies to the v1 / v2 development period. Any new sources added during
 Phases 2-6b extend the licensing audit table below; the model itself does not change
@@ -29,7 +29,7 @@ sources + an AI-draft policy where applicable.
   frames).
 - **Secondary:** Lucide icons (ISC license) for action / state glyphs (settings gear,
   pause, mute, etc.). Lucide is the established icon source already integrated in the
-  project per `.planning/codebase/INTEGRATIONS.md`.
+  project.
 
 ### Music / SFX
 
@@ -46,7 +46,7 @@ sources + an AI-draft policy where applicable.
 ### Visual concepts (mood-board)
 
 - **Reference-only.** Mixed-source references collected in `docs/NORTE.md`
-  and the (on-demand) `docs/visual-direction/` thumbnails directory. **No assets are
+  and any on-demand thumbnails. **No assets are
   imported from these references** — they inform direction, not implementation.
   The PROC-15 first-cut doc enforces this scope.
 
@@ -55,18 +55,18 @@ sources + an AI-draft policy where applicable.
 Per CONTEXT D-30, the licensing audit table is the deliverable's hard core. Every
 external source currently used in the project gets a row. The 4 seed rows below
 correspond to the integrations already enumerated in
-`.planning/codebase/INTEGRATIONS.md` (NASA imagery via `MenuBackgroundSystem.js`,
+the project integrations (NASA imagery via `MenuBackgroundSystem.js`,
 Google Fonts Orbitron + Rajdhani, Lucide icons). Phase 2-6b plans append rows for
 any new sources.
 
-| Source                                              | License                                     | Attribution required                                                       | Attribution target        | Audit date |
-| --------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- | ------------------------- | ---------- |
-| NASA imagery (via `MenuBackgroundSystem.js` fetch)  | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy)                    | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Orbitron                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Rajdhani                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | docs/credits.md (Phase 7) | 2026-05-13 |
-| Lucide icons                                        | ISC                                         | No (ISC permits use without notice; credit recommended)                    | docs/credits.md (Phase 7) | 2026-05-13 |
-| AudioLDM `cvssp/audioldm-s-full-v2` (generated SFX) | CC BY-NC-SA 4.0 (model weights)             | Yes; the generated files are shared under the same licence, non-commercial | in-game credits           | 2026-10-20 |
-| Kenney Interface, Sci-Fi and Impact Sounds          | CC0 1.0                                     | No (credit recommended)                                                    | in-game credits           | 2026-10-20 |
+| Source                                              | License                                     | Attribution required                                                       | Attribution target | Audit date |
+| --------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- | ------------------ | ---------- |
+| NASA imagery (via `MenuBackgroundSystem.js` fetch)  | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy)                    | in-game credits    | 2026-05-13 |
+| Google Fonts — Orbitron                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | in-game credits    | 2026-05-13 |
+| Google Fonts — Rajdhani                             | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless)  | in-game credits    | 2026-05-13 |
+| Lucide icons                                        | ISC                                         | No (ISC permits use without notice; credit recommended)                    | in-game credits    | 2026-05-13 |
+| AudioLDM `cvssp/audioldm-s-full-v2` (generated SFX) | CC BY-NC-SA 4.0 (model weights)             | Yes; the generated files are shared under the same licence, non-commercial | in-game credits    | 2026-10-20 |
+| Kenney Interface, Sci-Fi and Impact Sounds          | CC0 1.0                                     | No (credit recommended)                                                    | in-game credits    | 2026-10-20 |
 
 **Audit cadence:** Phase 2-6b plans re-audit any row older than 6 months from the
 plan's start date. Lucide / Orbitron / Rajdhani are all under permissive licenses
@@ -88,25 +88,12 @@ explicit roles:
   art draft. The shipped sprites are developer-authored or licensed CC0. Used Phase
   6a (visual direction lock) and Phase 6b (sprite polish).
 
-**No AI in shipped assets** — deliberate constraint to keep licensing clean (AI
-training-data provenance is contested) and the "developer-made + CC0" model intact.
-Any future deviation from this policy requires a CONTEXT-level decision and a new
-audit-table row category.
+**Exception: SFX.** Shipped sound effects are samples generated with AudioLDM (and
+Kenney CC0), chosen by ear by the owner; see `SOUND.md` and the audit table. Music
+and sprites follow the rule above: AI output is reference or draft only.
 
-## Attribution file plan
+## Attribution
 
-`docs/credits.md` is deferred to Phase 7 (consolidated with the trusted-circle list
-from PROC-16). When created, it will consolidate:
-
-- Every row in this licensing audit table (the `Attribution target` column points to
-  it for each row currently requiring or recommending attribution).
-- PROC-16 trusted-circle members who provided closed-beta feedback (Phase 7
-  deliverable).
-- Any new Phase 2-6b asset sources added to the audit table during development.
-
-**This table SEEDS that future doc.** The Phase 7 `docs/credits.md` plan reads the
-audit table as its source of truth.
+Attribution lives in the in-game credits. This audit table is its source of truth.
 
 ---
-
-_LOCK. See PROC-17 in .planning/REQUIREMENTS.md._

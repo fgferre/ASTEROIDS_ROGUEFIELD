@@ -15,7 +15,22 @@ export default {
   name: 'SALVAGE LANES',
   biome: 'outer-ring',
   layers: [1, 5],
-  headStart: 0, // proposta 12/11
+  headStart: 2, // proposta 12/11: entered from the map, a ship that came through the sector before has about this
+  // proposta 12/11: a shipping lane picked clean, under teal work lights.
+  look: {
+    backdrop: 'salvage-lanes',
+    sky: ['#05100e', '#010504'],
+    hazeColor: '#2f8a7e',
+    hazeDensity: 1.15,
+    veinColor: '#7ce0c0',
+    veinDensity: 0.12,
+    dustColor: '#bfe8dc',
+    keyColor: '#f0fff8',
+    fillColor: '#3f7a70',
+    debris: 0.5,
+    structures: 0.7,
+    tint: 'rgba(60, 170, 150, 0.06)',
+  },
   boss: 'gatekeeper',
   // proposta 12/11: every number below
   stages: [
@@ -23,7 +38,16 @@ export default {
       rocks: rockCurve(1),
       roster: [{ role: 'skirmisher', count: 1, from: 12, every: 14, elite: 0 }],
       surges: [ROCKFALL],
-      formations: [],
+      // The schedule still runs: a convoy of Drones crosses on its lane.
+      formations: [
+        formation('sweep', {
+          role: 'skirmisher',
+          count: 3,
+          at: 24,
+          spacing: 180,
+          speed: 120,
+        }),
+      ],
       events: [],
       warden: false,
     },

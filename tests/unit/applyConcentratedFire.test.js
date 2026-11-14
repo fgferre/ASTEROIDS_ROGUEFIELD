@@ -8,8 +8,6 @@
  *
  * Lane clamp for kind:'target' is `Math.min(spacing, targetRadius + BULLET_SIZE)` so
  * outer lanes never exceed the target's effective hit radius (radius + bullet radius).
- *
- * Reference: .planning/phases/01-profiling-baseline-pre-flight-deliverables/01.07-aim-centerline-toggles-PLAN.md
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';

@@ -6,6 +6,7 @@
 // eye or lens sits (in a dark socket) and where its outline runs (its
 // waist).
 
+import { SHINE } from '../hullModel.js';
 import {
   blade,
   bladeTop,
@@ -152,7 +153,8 @@ export function ramModel(kit) {
       hull(plate),
       dark(plateSeam),
       dark(mirrorZ(plateSeam)),
-      dark(head),
+      // the battering head is bare steel (hullModel.js SHINE)
+      { ...dark(head), shine: SHINE.steel },
       hull(belly),
       dark(keel),
       hull(barb),

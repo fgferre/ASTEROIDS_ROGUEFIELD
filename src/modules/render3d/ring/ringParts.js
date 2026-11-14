@@ -156,9 +156,12 @@ export function ringParts(
     } else shape.stubs.push({ s0, s1, k, height });
     put(box, s, k * (W / 2 + 1), -H * 0.45, [3, 3, len], tone * 1.15);
   };
+  // proposta 13/11: close up a lamp the far one's size reads as a slab of
+  // light; the close levels keep it lamp-sized.
+  const lamp = kit.lod === 0 ? [3, 2, 3] : [1.2, 0.7, 1.6];
   const runningLights = (s, idle) => {
-    put(box, s, -side, h + 1, [3, 2, 3], 1, idle, 1.4);
-    put(box, s, side, h + 1, [3, 2, 3], 1, idle, 1.4);
+    put(box, s, -side, h + lamp[1] / 2, lamp, 1, idle, 1.4);
+    put(box, s, side, h + lamp[1] / 2, lamp, 1, idle, 1.4);
   };
   // The keel under the hull, s0 to s1, and the conduit along its bottom
   // (`bridge` longer, across the seams to the next keel).
@@ -192,58 +195,55 @@ export function ringParts(
     rimWall(s0, s1, 1, tone);
     put(box, s, 0, -H / 2, [floorWidth, H, len], tone * 0.8);
     // Two lanes of deck plates, a few gone, either side of the conduit;
-    // now and then a block of machinery on them.
+    // now and then a block of machinery on them, or a hall rising off one
+    // lane, a dead light on its roof. Close up the deck is a city instead
+    // (ringDeck.js).
     const lane = (floorWidth - 8) / 2;
-    [-1, 1].forEach((k) => {
-      let at = s0 + 1;
-      while (at < s1 - 4) {
-        const long = Math.min(s1 - 1 - at, between(9, 22));
-        if (random() > 0.12) {
-          const tall = between(1, 2.6);
-          put(
-            box,
-            at + long / 2,
-            k * (4 + lane / 2),
-            0.5,
-            [lane - 1.5, tall, long - 1.5],
-            tone * between(0.6, 1.5)
-          );
-          shape.plates.push({
-            s: at + long / 2,
-            r: k * (4 + lane / 2),
-            top: 0.5 + tall / 2,
-            across: lane - 1.5,
-            along: long - 1.5,
-          });
+    kit.only(kit.lod === 0, () => {
+      [-1, 1].forEach((k) => {
+        let at = s0 + 1;
+        while (at < s1 - 4) {
+          const long = Math.min(s1 - 1 - at, between(9, 22));
+          if (random() > 0.12) {
+            const tall = between(1, 2.6);
+            put(
+              box,
+              at + long / 2,
+              k * (4 + lane / 2),
+              0.5,
+              [lane - 1.5, tall, long - 1.5],
+              tone * between(0.6, 1.5)
+            );
+          }
+          at += long;
         }
-        at += long;
+      });
+      if (random() < 0.5) {
+        const size = between(5, 10);
+        put(
+          box,
+          between(s0 + 8, s1 - 8),
+          (random() < 0.5 ? -1 : 1) * between(10, lane),
+          between(2, 4),
+          [size, between(3, 7), size * between(0.8, 2)],
+          tone * between(0.9, 1.4)
+        );
+      }
+      if (random() < 0.14) {
+        const tall = between(7, 14);
+        const r = (random() < 0.5 ? -1 : 1) * (4 + lane / 2);
+        put(
+          box,
+          s,
+          r,
+          tall / 2,
+          [lane * between(0.7, 1), tall, len * between(0.45, 0.8)],
+          tone * 1.2
+        );
+        put(box, s, r, tall + 1, [3, 2, 3], 1, 0, 1.4);
       }
     });
-    if (random() < 0.5) {
-      const size = between(5, 10);
-      put(
-        box,
-        between(s0 + 8, s1 - 8),
-        (random() < 0.5 ? -1 : 1) * between(10, lane),
-        between(2, 4),
-        [size, between(3, 7), size * between(0.8, 2)],
-        tone * between(0.9, 1.4)
-      );
-    }
-    // Now and then a hall rising off one lane, a dead light on its roof.
-    if (random() < 0.14) {
-      const tall = between(7, 14);
-      const r = (random() < 0.5 ? -1 : 1) * (4 + lane / 2);
-      put(
-        box,
-        s,
-        r,
-        tall / 2,
-        [lane * between(0.7, 1), tall, len * between(0.45, 0.8)],
-        tone * 1.2
-      );
-      put(box, s, r, tall + 1, [3, 2, 3], 1, 0, 1.4);
-    }
+    shape.deck = { s0, s1 };
     put(box, s, 0, 1.2, [6, 2.5, len + seam], 0.6, 0, 1.6);
     runningLights(s, random() < 0.75 ? RING_LOOK.idle * 0.6 : 0);
     belly(s0 + 0.5, s1 - 0.5, tone, seam + 1);
@@ -356,7 +356,7 @@ export function ringParts(
     shape = {
       walls: [],
       stubs: [],
-      plates: [],
+      deck: null,
       frames: [],
       belly: null,
       torn: null,
@@ -400,7 +400,16 @@ export function ringParts(
             [wall + 4, H + h + 14, 8],
             tone
           );
-          put(box, s, k * side, h + 15, [4, 2, 4], 1, RING_LOOK.idle, 1.6);
+          put(
+            box,
+            s,
+            k * side,
+            h + 14 + lamp[1] / 2,
+            lamp,
+            1,
+            RING_LOOK.idle,
+            1.6
+          );
         });
         put(box, s, 0, h + 12, [W + 4, 3, 8], tone * 1.4);
       }

@@ -58,6 +58,36 @@ export class DeathSnapshot {
     return this.deathSnapshot || this.gameState?.deathSnapshot || null;
   }
 
+  /**
+   * The ship's build (level, cards, hull max), to carry into the next sector:
+   * `restoreBuild` puts it back on freshly reset systems, at full health.
+   */
+  captureBuild() {
+    const player = this.resolveServiceInstance('player');
+    const progression = this.resolveServiceInstance('progression');
+    return {
+      progression: progression.serialize(),
+      // Card choices the win left unmade (levels from the spoils).
+      owed: progression.owedLevelUpOffers(),
+      maxHealth: player.maxHealth,
+      upgrades: Array.isArray(player.upgrades) ? [...player.upgrades] : null,
+    };
+  }
+
+  restoreBuild(build) {
+    const player = this.resolveServiceInstance('player');
+    const progression = this.resolveServiceInstance('progression');
+    progression.restoreState(build.progression);
+    this.reapplyProgressionUpgrades({
+      progression,
+      snapshot: build.progression,
+    });
+    if (build.upgrades) player.upgrades = [...build.upgrades];
+    if (build.maxHealth > 0) player.maxHealth = build.maxHealth;
+    player.health = player.maxHealth;
+    progression.emitExperienceChanged();
+  }
+
   createDeathSnapshot() {
     const player = this.resolveServiceInstance('player');
     const enemies = this.resolveServiceInstance('enemies');

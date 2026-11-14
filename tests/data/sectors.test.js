@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { listContent } from '../../src/content/registry.js';
-import { BIOMES } from '../../src/data/biomes.js';
+import { BIOMES, biomeForLayer } from '../../src/data/biomes.js';
 import { FIELD_EVENTS, FORMATIONS } from '../../src/data/layerParts.js';
-import { LAYERS } from '../../src/data/layers.js';
+import { directorFor } from '../../src/data/layers.js';
 import {
   SECTORS,
   chapterSectors,
@@ -26,6 +26,7 @@ describe('sector table', () => {
       [3, 'A'],
       [3, 'B'],
       [3, 'C'],
+      [4, 'A'],
     ]);
     expect(SECTORS.slice(3).map((s) => [s.id, s.order, s.name])).toEqual([
       ['furnace-drift', 4, 'FURNACE DRIFT'],
@@ -34,14 +35,15 @@ describe('sector table', () => {
       ['assembly-graveyard', 7, 'ASSEMBLY GRAVEYARD'],
       ['quarantine-grid', 8, 'QUARANTINE GRID'],
       ['wardens-reach', 9, 'NULL BOUNDARY'],
+      ['the-crucible', 10, 'THE CRUCIBLE'],
     ]);
     SECTORS.forEach((sector) => {
-      const biome = BIOMES.find((b) => b.id === sector.biome);
+      const biome = listContent('biomes').find((b) => b.id === sector.biome);
       const [first, last] = sector.layers;
       expect(first).toBeGreaterThanOrEqual(biome.layers[0]);
       expect(last).toBeLessThanOrEqual(biome.layers[1]);
       expect(first).toBeLessThanOrEqual(last);
-      expect(LAYERS[last - 1].warden).toBe(true);
+      expect(directorFor(last).warden).toBe(true);
     });
   });
 
@@ -62,7 +64,7 @@ describe('sector table', () => {
       stages.forEach((stage, i) => {
         expect(stage.warden, `${id} stage ${i + 1}`).toBe(first + i === last);
         // HUD, music and warnings read the global flag for the same layer.
-        expect(stage.warden).toBe(LAYERS[first + i - 1].warden);
+        expect(stage.warden).toBe(directorFor(first + i).warden);
         const roles = [
           ...stage.roster.map((entry) => entry.role),
           ...stage.formations.map((entry) => entry.role),
@@ -136,6 +138,7 @@ describe('sector table', () => {
     });
     expect(sectorStage(graveyard, 12).formations).toEqual([
       expect.objectContaining({ kind: 'swarm', role: 'swarmer', count: 8 }),
+      expect.objectContaining({ kind: 'wall', role: 'skirmisher', count: 6 }),
     ]);
     expect(sectorStage(graveyard, 13).events).toEqual([
       expect.objectContaining({ kind: 'sensor-jam', at: 30 }),
@@ -150,7 +153,7 @@ describe('sector table', () => {
     });
     const grid = sectorById('quarantine-grid');
     expect(sectorStage(grid, 11).roster).toEqual([
-      expect.objectContaining({ role: 'marksman', count: 1 }),
+      expect.objectContaining({ role: 'marksman', count: 2 }),
       expect.objectContaining({ role: 'flanker', count: 1 }),
     ]);
     expect(sectorStage(grid, 12)).toMatchObject({
@@ -164,7 +167,12 @@ describe('sector table', () => {
       ],
       events: [expect.objectContaining({ kind: 'sensor-jam', at: 30 })],
     });
-    expect(sectorStage(grid, 13).herald).toBe('silence');
+    expect(sectorStage(grid, 13).herald).toBeUndefined();
+    expect(sectorStage(grid, 13)).toMatchObject({
+      formations: [
+        expect.objectContaining({ kind: 'ring', role: 'flanker', count: 4 }),
+      ],
+    });
     expect(sectorStage(grid, 14)).toMatchObject({
       formations: [
         expect.objectContaining({ kind: 'ring', role: 'swarmer', count: 10 }),
@@ -176,7 +184,23 @@ describe('sector table', () => {
       bossKind: 'interdictor',
       castLayer: 15,
     });
-    expect(sectorStage(sectorById('prime-gate'), 2)).toBeNull();
+    const crucible = sectorById('the-crucible');
+    expect(sectorStage(crucible, 16)).toMatchObject({ castLayer: 20 });
+    expect(sectorStage(crucible, 18).herald).toBeUndefined();
+    expect(sectorStage(crucible, 19).roster).toHaveLength(4);
+    expect(sectorStage(crucible, 20)).toMatchObject({
+      warden: true,
+      bossKind: 'sovereign',
+    });
+    expect(sectorStage(crucible, 15)).toBeNull();
+    // The Warden's sector has its own stages and no `boss`: the Warden ends it.
+    const gate = sectorById('prime-gate');
+    expect(sectorStage(gate, 2).roster).toEqual([
+      expect.objectContaining({ role: 'sniper' }),
+    ]);
+    expect(sectorStage(gate, 5)).toMatchObject({ warden: true });
+    expect(sectorStage(gate, 5).bossKind).toBeUndefined();
+    expect(sectorStage({ ...gate, stages: undefined }, 2)).toBeNull();
     expect(sectorStage(null, 2)).toBeNull();
   });
 
@@ -193,7 +217,32 @@ describe('sector table', () => {
       'quarantine-grid'
     );
     expect(nextSector(sectorById('quarantine-grid')).id).toBe('wardens-reach');
-    expect(nextSector(sectorById('wardens-reach'))).toBeNull();
+    expect(nextSector(sectorById('wardens-reach')).id).toBe('the-crucible');
+    expect(nextSector(sectorById('the-crucible'))).toBeNull();
     expect(sectorById('nowhere')).toBeNull();
+  });
+
+  it("lays a sector's look over its biome on its own layers only", () => {
+    const wake = sectorById('debris-wake');
+    const ring = BIOMES.find((b) => b.id === 'outer-ring');
+    const place = biomeForLayer(2, wake);
+    Object.keys(ring).forEach((field) =>
+      expect(place[field]).toEqual(wake.look[field] ?? ring[field])
+    );
+    expect(place.place).toBe('debris-wake');
+    expect(biomeForLayer(6, wake)).toBe(biomeForLayer(6));
+    const bare = { ...sectorById('prime-gate'), look: undefined };
+    expect(biomeForLayer(2, bare)).toBe(ring);
+    expect(biomeForLayer(2)).toBe(ring);
+  });
+
+  it('flies the Crucible in its own place, which the descent never reaches', () => {
+    const crucible = sectorById('the-crucible');
+    expect(crucible).toMatchObject({ chapter: 4, layers: [16, 20] });
+    expect(biomeForLayer(16, crucible).id).toBe('crucible');
+    expect(biomeForLayer(20, crucible).title).toBe('FINALE — THE CRUCIBLE');
+    expect(biomeForLayer(16).id).toBe('wardens-reach');
+    expect(biomeForLayer(21, crucible).id).toBe('wardens-reach');
+    expect(BIOMES.map((b) => b.id)).not.toContain('crucible');
   });
 });

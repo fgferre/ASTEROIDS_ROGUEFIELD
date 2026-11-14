@@ -1,9 +1,9 @@
+import { asArray } from '../upgradeCatalog.js';
+
 // src/modules/ui/CreditsOverlay.js
 //
 // The Credits overlay over the main menu: opens on request, closes on its
 // buttons, a backdrop click or Escape, and gives the focus back to its opener.
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 export class CreditsOverlay {
   /**
@@ -45,7 +45,7 @@ export class CreditsOverlay {
       });
     }
 
-    ensureArray(creditsRefs.closeButtons).forEach((button) => {
+    asArray(creditsRefs.closeButtons).forEach((button) => {
       button.addEventListener('mouseenter', () => {
         // Only emit if credits menu is visible
         if (

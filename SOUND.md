@@ -1,6 +1,8 @@
 # SOUND.md
 
-Every sound effect is a real sample the owner chose by ear; code only plays, varies and mixes them. The ship engine is sample layers too (`src/public/audio/engine/`, driven by `src/modules/audio/shipEngine.js`), with the old synthesized loop kept only as the fallback when its files fail to load. Music and the other continuous hums stay procedural. Read this before adding or changing a sound.
+A sound effect becomes a real sample when the owner has chosen it by ear; code only plays, varies and mixes them. About sixty cues are still the old synthesis (count of 13/11: four weapons' shots, the Harmonic beam, the Scatter burst, most enemy machines, boss phase and defeat, pickups, stingers); an audition for the sixteen most heard is waiting on him (`src/exported-assets/audicao-armas-inimigos/`, out of git). The ship engine is sample layers too (`src/public/audio/engine/`, driven by `src/modules/audio/shipEngine.js`), with the old synthesized loop kept only as the fallback when its files fail to load. Music and the other continuous hums stay procedural. Read this before adding or changing a sound.
+
+Spoken lines (13/11): every speaker has a voice he cast by ear. The 122 recordings live in `src/public/audio/voice/` with `manifest.json` (each voice's recipe, each line's text and seconds); they were rendered on his Mac with Kokoro-82M (Apache-2.0) by the scripts kept in `~/.voz-ai/projetos/asteroids-roguefield/`. A recording plays only while its text equals the game's line: after editing a line in `src/data/story.js`, render it again or it falls back to the synthesized voice. The journey between sectors has its own score, the motif he chose (`src/modules/audio/journeyCue.js`, data in `src/data/audio/music.js`), and six sampled effects timed off the film (`src/modules/render3d/travel/moments.js`).
 
 ## Palette (from `docs/NORTE.md`: dark stone, light inside)
 

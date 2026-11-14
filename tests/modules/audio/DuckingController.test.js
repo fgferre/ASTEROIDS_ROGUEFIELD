@@ -15,7 +15,7 @@ import { createAudioContextStub } from '../../__helpers__/stubs.js';
 //
 // Topology under test (multiplicative BY TOPOLOGY — the controller owns dedicated
 // nodes that REST at 1.0 and never reads/writes the slider stages):
-//   music:   musicPauseFadeGain → musicDuckGain (rests 1.0) → musicGain (slider)
+//   music:   musicPauseFadeGain → musicDuckGain → musicVoiceDuckGain → musicGain
 //   effects: SFX content        → effectsDuckGain (rests 1.0) → effectsGain (slider)
 // ---------------------------------------------------------------------------
 
@@ -103,9 +103,9 @@ describe('DuckingController — Task 2: dedicated duck nodes + SC3 envelope', ()
   });
 
   describe('splice: old direct connection disconnected BEFORE the duck node is connected', () => {
-    it('music: musicPauseFadeGain disconnects, then routes pauseFade→duck→slider', () => {
+    it('music: musicPauseFadeGain disconnects, then routes pauseFade→duck→voice duck→slider', () => {
       const fx = makeSpliceFixtures();
-      initController(fx);
+      const controller = initController(fx);
 
       // The old direct connection (pauseFade → musicGain) was disconnected.
       expect(fx.musicPauseFadeGain.node.disconnect).toHaveBeenCalled();
@@ -116,8 +116,11 @@ describe('DuckingController — Task 2: dedicated duck nodes + SC3 envelope', ()
       expect(fx.musicPauseFadeGain.node.connect).toHaveBeenCalledWith(
         musicDuck
       );
-      // ...and the duck node connects to the slider stage.
-      expect(musicDuck.connect).toHaveBeenCalledWith(fx.musicGain.node);
+      // ...the duck node to the voice's own duck stage, and that to the
+      // slider stage.
+      const voiceDuck = controller.musicVoiceDuckGain;
+      expect(musicDuck.connect).toHaveBeenCalledWith(voiceDuck);
+      expect(voiceDuck.connect).toHaveBeenCalledWith(fx.musicGain.node);
 
       // Disconnect ordering: the disconnect was invoked before the reconnect.
       const disconnectOrder =
@@ -240,6 +243,40 @@ describe('DuckingController — Task 2: dedicated duck nodes + SC3 envelope', ()
       const setOrder =
         musicDuck.gain.setValueAtTime.mock.invocationCallOrder[0];
       expect(cancelOrder).toBeLessThan(setOrder);
+    });
+  });
+
+  describe("a voice's duck and the short ducks never cancel each other", () => {
+    it('a big moment leaves the held voice duck alone; the voice ending leaves the big moment alone', () => {
+      const fx = makeSpliceFixtures();
+      const controller = initController(fx);
+      const musicDuck = fx.createdGains[0];
+      const voiceDuck = controller.musicVoiceDuckGain;
+
+      controller.duck({ bus: 'voice', depthDb: 4, holdMs: 5000 });
+      voiceDuck.gain.cancelScheduledValues.mockClear();
+      voiceDuck.gain.setValueAtTime.mockClear();
+      voiceDuck.gain.exponentialRampToValueAtTime.mockClear();
+
+      // A level-up during the line: its envelope is on its own stage.
+      controller.duck({ bus: 'music', depthDb: 6, holdMs: 70 });
+      expect(voiceDuck.gain.cancelScheduledValues).not.toHaveBeenCalled();
+      expect(voiceDuck.gain.setValueAtTime).not.toHaveBeenCalled();
+      expect(
+        voiceDuck.gain.exponentialRampToValueAtTime
+      ).not.toHaveBeenCalled();
+
+      // The voice cut short lets only its own stage back up.
+      musicDuck.gain.cancelScheduledValues.mockClear();
+      musicDuck.gain.setValueAtTime.mockClear();
+      musicDuck.gain.exponentialRampToValueAtTime.mockClear();
+      controller.duck({ bus: 'voice', depthDb: 0, holdMs: 0, releaseMs: 0 });
+      expect(musicDuck.gain.cancelScheduledValues).not.toHaveBeenCalled();
+      expect(musicDuck.gain.setValueAtTime).not.toHaveBeenCalled();
+      expect(
+        musicDuck.gain.exponentialRampToValueAtTime
+      ).not.toHaveBeenCalled();
+      expect(voiceDuck.gain.exponentialRampToValueAtTime).toHaveBeenCalled();
     });
   });
 

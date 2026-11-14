@@ -17,6 +17,7 @@ import {
   DASH_INVULNERABILITY,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../data/constants/gameplay.js';
+import { cageFences } from '../modules/enemies/types/SentinelInterdictor.js';
 
 /**
  * The bot's skill. `reactionMs`: a plan acts this long after the world it
@@ -209,11 +210,14 @@ function lines(z, x, y, t, r) {
 function barrier(z, x, y, t, r) {
   if (z.phase === 'fade') return 0;
   if (z.phase === 'warn' ? !from(z.timer, t) : !until(z.timer, t)) return 0;
-  const ux = Math.cos(z.angle);
-  const uy = Math.sin(z.angle);
+  // solid, a turning wall keeps turning as seen (spin, rad/s); its span is
+  // the field's width along the line, so a turned one spans the field too
+  const turn = z.phase === 'solid' ? (z.spin || 0) * t : 0;
+  const ux = Math.cos(z.angle + turn);
+  const uy = Math.sin(z.angle + turn);
   const along = (x - z.x) * ux + (y - z.y) * uy;
   const off = Math.abs(-(x - z.x) * uy + (y - z.y) * ux);
-  const [lo, hi] = z.span || [-1000, 1000];
+  const [lo, hi] = turn ? [-Infinity, Infinity] : z.span || [-1000, 1000];
   const gap = Math.abs(along - z.gapAt) - z.gapWidth / 2;
   const outside = Math.max(0, lo - along, along - hi);
   // the gap's edges are posts: the distance to the solid pieces
@@ -285,7 +289,20 @@ function arms(z, x, y, t) {
 function grid(z, x, y, t, r) {
   if (z.phase === 'fade') return 0;
   if (z.phase === 'warn' ? !from(z.timer, t) : !until(z.timer, t)) return 0;
-  return segments(z.fences, x, y, LINE_HALF + r);
+  // solid, a closing cage keeps closing round its centre as seen (closing,
+  // px/s of its side): its fences where they will be, rebuilt as the game
+  // does (the doorway keeps its width, its stubs shorten)
+  const fences =
+    z.phase === 'solid' && z.closing && z.size > 0
+      ? cageFences(
+          z.x,
+          z.y,
+          Math.max(0, z.size + z.closing * t),
+          z.open,
+          z.door
+        )
+      : z.fences;
+  return segments(fences, x, y, LINE_HALF + r);
 }
 
 function lock(z, x, y, t) {
@@ -442,36 +459,45 @@ function pathDanger(world, path, knobs, safeUntil) {
   return { total, soon };
 }
 
-const wrapDistance = (world, ax, ay, bx, by) =>
-  Math.hypot(wrapDelta(bx - ax, world.width), wrapDelta(by - ay, world.height));
-
 // What a path is pulled toward and kept off; loot only when it is `safe`.
 function intentScore(world, end, start, safe) {
   let score = 0;
-  // off the edges: across the wrap the turret loses its aim and new foes
-  // come in there
-  const edge = Math.min(
-    end.x,
-    world.width - end.x,
-    end.y,
-    world.height - end.y
-  );
-  score -= EDGE_WEIGHT * Math.max(0, 1 - edge / EDGE_GAP);
-  // loot: the nearest worth having, closer by the end of the path
+  const edgeOf = (p) =>
+    Math.min(p.x, world.width - p.x, p.y, world.height - p.y);
+  // a boss beyond the weapon's reach comes first: loot it never got to (a
+  // heart in a corner) held a scatter gun 340 px off one for 15 minutes
+  const boss = world.boss;
+  const reach = world.ship.reach ?? Infinity;
+  const outOfReach =
+    boss &&
+    Math.hypot(boss.x - start.x, boss.y - start.y) - boss.radius > reach;
+  const chase = safe && !outOfReach;
+  // loot: the nearest worth having, closer by the end of the path; straight
+  // distances, as the edge term keeps it off the wrap (loot just across it
+  // held the ship against the wall for minutes)
   let best = null;
   let bestDistance = LOOT_REACH;
   for (const item of world.loot) {
-    const d = wrapDistance(world, start.x, start.y, item.x, item.y);
+    // a heart dropped past the edge can never be picked up: not worth waiting for
+    const outside =
+      item.x < 0 || item.x > world.width || item.y < 0 || item.y > world.height;
+    if (outside) continue;
+    const d = Math.hypot(item.x - start.x, item.y - start.y);
     if (d < bestDistance) {
       best = item;
       bestDistance = d;
     }
   }
-  if (best && safe) {
-    const gain =
-      bestDistance - wrapDistance(world, end.x, end.y, best.x, best.y);
+  if (best && chase) {
+    const gain = bestDistance - Math.hypot(best.x - end.x, best.y - end.y);
     score += (LOOT_WEIGHT * gain) / Math.max(40, world.ship.maxSpeed * 0.5);
   }
+  // off the edges: across the wrap the turret loses its aim and new foes
+  // come in there; loot it goes for lets it as close as the loot lies (a
+  // heart 25 px in held it just out of reach for twenty minutes)
+  const edgeGap =
+    best && chase ? Math.max(1, Math.min(EDGE_GAP, edgeOf(best))) : EDGE_GAP;
+  score -= EDGE_WEIGHT * Math.max(0, 1 - edgeOf(end) / edgeGap);
   // a moving ship is a harder target: keep some way on
   const terminal = world.ship.acceleration / Math.max(0.1, world.ship.damping);
   score += MOVE_WEIGHT * Math.min(1, Math.hypot(end.vx, end.vy) / terminal);
@@ -487,10 +513,12 @@ function intentScore(world, end, start, safe) {
       foeGap = gap;
     }
   }
-  const boss = world.boss;
+  // inside the weapon's reach (px from the muzzle): a firing gap past it
+  // hits nothing (a scatter gun, reach 180, sat 340 px off a boss)
   if (boss) {
     const open = boss.open > 0.5;
-    const want = boss.radius + (open ? OPEN_GAP : FIRING_GAP + 50);
+    const gap = Math.min(open ? OPEN_GAP : FIRING_GAP + 50, reach);
+    const want = boss.radius + gap;
     const d = Math.hypot(end.x - boss.x, end.y - boss.y);
     score -= (RANGE_WEIGHT * Math.abs(d - want)) / 200;
     // a raised plate soaks the front: go round it
@@ -500,7 +528,7 @@ function intentScore(world, end, start, safe) {
     }
   } else if (foe) {
     const d = Math.hypot(end.x - foe.x, end.y - foe.y) - foe.radius;
-    score -= (RANGE_WEIGHT * Math.abs(d - FIRING_GAP)) / 200;
+    score -= (RANGE_WEIGHT * Math.abs(d - Math.min(FIRING_GAP, reach))) / 200;
   }
   return score;
 }

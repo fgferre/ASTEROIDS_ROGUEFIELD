@@ -2,12 +2,12 @@
  * Playtest: the bot (src/bootstrap/botPilot.js) flies sector runs headless
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
- * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good]`.
+ * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
  */
 
 import { afterAll, beforeEach, describe, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import { SECTORS, localLayer } from '../../src/data/sectors.js';
+import { SECTORS, chapterSectors, localLayer } from '../../src/data/sectors.js';
 import { createBotDriver } from '../../src/bootstrap/botPilotAdapter.js';
 import {
   createHeadlessGame,
@@ -20,7 +20,11 @@ const FPS = Math.round(1 / STEP_SECONDS);
 const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
-const SEED = 1;
+// Seeds both the bot's miss rolls and the world (the run's seed).
+const SEED = Number(process.env.PLAYTEST_SEED || 1);
+// PLAYTEST_CARRY=1: as in the campaign, the bot first wins the chapter's
+// earlier sectors and arrives with that build (the victory screen's carry).
+const CARRY = process.env.PLAYTEST_CARRY === '1';
 // Kept before the fake timers: a long run hands the event loop a turn now
 // and then, or the worker cannot answer Vitest ("Timeout calling onTaskUpdate").
 const realTimeout = globalThis.setTimeout;
@@ -39,6 +43,8 @@ async function playSector(sector) {
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
+  // The run takes its world seed from the difficulty's first beginRun.
+  session.resolveServiceInstance('difficulty').runSeed = SEED;
   const driver = createBotDriver({
     services,
     eventBus,
@@ -61,7 +67,30 @@ async function playSector(sector) {
   let bossDown = false;
   eventBus.on('boss-defeated', () => (bossDown = true));
 
-  session.startNewRun({ source: 'test', sector: sector.id });
+  const earlier = CARRY
+    ? chapterSectors(sector.chapter).filter((s) => s.order < sector.order)
+    : [];
+  for (const [index, before] of earlier.entries()) {
+    session.startNewRun({
+      source: 'test',
+      sector: before.id,
+      carry: index > 0,
+    });
+    for (let frame = 0; frame < LIMIT_MINUTES * 60 * FPS; frame += 1) {
+      if (frame % (30 * FPS) === 0) await breathe();
+      driver.step();
+      game.step();
+      if (session.getSessionState() === 'victory') break;
+      if (player.isDead) throw new Error(`playtest: died in ${before.id}`);
+    }
+  }
+  bossDown = false;
+  session.startNewRun({
+    source: 'test',
+    sector: sector.id,
+    carry: earlier.length > 0,
+  });
+  const startLevel = progression.getLevel();
   const [, lastLayer] = sector.layers;
   const report = { sector, layers: [], boss: null, outcome: null, frames: 0 };
   let layer = null;
@@ -127,6 +156,7 @@ async function playSector(sector) {
   }
   report.cards = [...driver.cards];
   report.level = progression.getLevel();
+  report.startLevel = startLevel;
   return report;
 }
 
@@ -144,6 +174,9 @@ function printReport(report) {
   const lines = [
     `\n=== ${sector.id} (${sector.code}, layers ${sector.layers.join('-')}, boss ${sector.boss || 'warden'}) — bot ${PRESET}`,
     `  outcome: ${outcomeText(report)}; total ${clock(report.frames)}`,
+    ...(CARRY
+      ? [`  arrived at level ${report.startLevel} (carried build)`]
+      : []),
   ];
   for (const layer of report.layers) {
     lines.push(

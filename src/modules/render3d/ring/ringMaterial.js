@@ -6,6 +6,7 @@
 // runs along the arc from the break.
 
 import { colorOf } from '../batches.js';
+import { SHINE } from '../hullModel.js';
 import { RING, RING_LOOK } from './ringShape.js';
 
 // The victory epilogue's "wake" (FieldBackdrop.setWake): the seams, conduits,
@@ -74,8 +75,7 @@ export function ringMaterial(THREE) {
   };
   const material = new THREE.MeshStandardMaterial({
     color: colorOf(THREE, RING_LOOK.albedo),
-    roughness: RING_LOOK.roughness,
-    metalness: RING_LOOK.metalness,
+    ...SHINE.worn,
     vertexColors: true,
   });
   material.onBeforeCompile = (shader) => {

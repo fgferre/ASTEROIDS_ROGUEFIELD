@@ -3,6 +3,7 @@ import {
   GAME_WIDTH,
   SHIP_SIZE,
 } from '../../../core/GameConstants.js';
+import { ASTEROID_EDGE_SPAWN_MARGIN } from '../../../data/constants/gameplay.js';
 import { clamp, lerp } from '../../../utils/mathHelpers.js';
 import {
   length,
@@ -437,8 +438,15 @@ export const wrapScreenEdges = (enemy, bounds = DEFAULT_BOUNDS) => {
   const wrapThreshold =
     enemy.wrapMargin ?? Math.max(enemy.radius ?? enemy.size ?? 40, 100);
 
-  // Wrap destination should be close to visible edge so asteroids can drift into view
-  const wrapDestination = enemy.radius ?? enemy.size ?? 40;
+  // A rock re-enters as far out as rocks spawn, so it crosses that margin
+  // before it can touch a ship hugging the edge (re-entering one radius out,
+  // it landed on such a ship). The margin stays under the threshold above, so
+  // a rock heading in is never wrapped back out.
+  const radius = enemy.radius ?? enemy.size ?? 40;
+  const wrapDestination =
+    enemy.type === 'asteroid'
+      ? Math.max(radius, ASTEROID_EDGE_SPAWN_MARGIN)
+      : radius;
 
   // Wrap horizontally: if goes off left, appear on right (and vice versa)
   if (enemy.x < left - wrapThreshold) enemy.x = right + wrapDestination;

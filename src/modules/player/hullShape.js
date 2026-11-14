@@ -82,7 +82,6 @@ export function computeHullMetrics(hullDefinition) {
     outline,
     boundingRadius,
     shieldPadding,
-    outlinePath: buildClosedPath(outline),
   };
 }
 

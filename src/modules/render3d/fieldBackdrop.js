@@ -4,10 +4,12 @@
 // real depth in front of the space behind them (spaceField.js). Each biome
 // (src/data/biomes.js) decides through setLook() how many far fragments
 // drift below, how much of the intact Ring shows and the haze the broken
-// Ring sits in.
+// Ring sits in; a sector's place sets its own scenery there instead
+// (places/placeSets.js).
 
 import { createSeededRandom } from './asteroidMesh.js';
 import { colorOf } from './batches.js';
+import { PlaceSets } from './places/placeSets.js';
 import { BrokenRing } from './ring/brokenRing.js';
 import { RING_LOOK } from './ring/ringShape.js';
 
@@ -89,6 +91,9 @@ export class FieldBackdrop {
     this.ring = new BrokenRing(THREE);
     scene.add(this.ring.object);
 
+    // The sector's place (places/placeSets.js), in the Ring's haze.
+    this.places = new PlaceSets(THREE, scene, this.ring.uniforms.uHaze.value);
+
     this.structures = ringStructures(THREE);
     scene.add(this.structures.group);
     this.structureColor = colorOf(THREE, STRUCTURE_COLOR);
@@ -135,6 +140,7 @@ export class FieldBackdrop {
   /** A biome look from BiomeController. */
   setLook(look) {
     this.structureShare = look.structures;
+    this.places.setLook(look);
     this.applyStructures();
     // The haze the broken Ring sits in: the biome's sky and its clouds.
     this.ring.uniforms.uHaze.value
@@ -154,24 +160,42 @@ export class FieldBackdrop {
     this.debris.instanceMatrix.needsUpdate = true;
   }
 
-  /** The Ring's wake, 0 (dead) to 1 (lit along its arc), for the epilogue. */
+  /**
+   * The epilogue's wake, 0 to 1: the place's set answers its boss's fall,
+   * and the Ring lights along its arc where it wakes (applyStructures).
+   */
   setWake(wake) {
     if (wake === this.wake) return;
     this.wake = wake;
-    this.ring.uniforms.uWake.value = wake;
-    this.structures.dark.color
-      .copy(this.structureColor)
-      .lerp(this.structureWakeColor, wake);
+    this.places.wake = wake;
     this.applyStructures();
   }
 
-  // The biome's share of the intact Ring, raised to full while it wakes.
+  /** The journey's arrival at the place's set (places/placeSets.js). */
+  setArrival(arrival) {
+    this.places.setArrival(arrival);
+    this.applyStructures();
+  }
+
+  // The biome's share of the intact Ring, raised to full while it wakes;
+  // a place's set stands instead of it (and of the broken Ring, unless the
+  // set keeps it, which fades out as the set fades in), except in the wake.
+  // The Ring wakes only where the story has it wake: not in a place whose
+  // set sleeps through the win (places/index.js `wakes`).
   applyStructures() {
     const { group, dark, edge } = this.structures;
-    const share = Math.max(this.structureShare, this.wake);
+    const { hidesRing, hidesStructures, sleeps } = this.places;
+    const wake = this.wake * (1 - Math.min(1, sleeps));
+    this.ring.uniforms.uWake.value = wake;
+    dark.color.copy(this.structureColor).lerp(this.structureWakeColor, wake);
+    const ring = 1 - Math.min(1, hidesRing * (1 - wake));
+    this.ring.object.visible = ring > 0.001;
+    this.ring.material.opacity = ring;
+    this.ring.material.transparent = ring < 0.999;
+    const share = Math.max(this.structureShare * (1 - hidesStructures), wake);
     group.visible = share > 0.001;
     dark.opacity = share;
     edge.opacity =
-      share * (STRUCTURE_EDGE_ALPHA + (1 - STRUCTURE_EDGE_ALPHA) * this.wake);
+      share * (STRUCTURE_EDGE_ALPHA + (1 - STRUCTURE_EDGE_ALPHA) * wake);
   }
 }

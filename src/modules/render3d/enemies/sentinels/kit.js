@@ -2,8 +2,10 @@
 // maps (made once), the modelling helpers, the tones, and the core-heat
 // constants. A view file destructures what it needs from the kit.
 
+import { PALETTE } from '../../../../data/constants/palette.js';
 import { bakeHullMaps } from '../../bakedMaps.js';
 import { colorOf } from '../../batches.js';
+import { SHINE, shiny } from '../../hullModel.js';
 import { mergeStatic } from '../../mergeStatic.js';
 import { addRimLight } from '../../rimLight.js';
 
@@ -18,6 +20,17 @@ export const CORE_FLASH = 0.9;
 const PANEL_TILE = 1.6;
 const MAW_MAP_SEED = 0x51a7;
 export const clamp01 = (x) => Math.max(0, Math.min(1, x));
+// proposta 13/11: an emitter's lens (× the threat red): dark glass at rest,
+// a light growing as its attack warns, burning while it is live.
+export const LENS = { idle: 0.12, warn: 2.2, live: 2.8 };
+/** How far a timed state ({ timer, duration }) has run, 0..1. */
+export const progressOf = (t) =>
+  clamp01(1 - t.timer / (t.duration > 0 ? t.duration : 1));
+/** A lens's gain: `warning` with `progress` 0..1, else `live` 0..1. */
+export const lensGain = (warning, progress, live) =>
+  warning
+    ? LENS.idle + (LENS.warn - LENS.idle) * progress * progress
+    : LENS.idle + (LENS.live - LENS.idle) * live;
 export const range = (from, to, n) =>
   Array.from({ length: n }, (_, i) => from + ((to - from) * i) / (n - 1));
 export const mirrorZ = (points) => points.map(([x, z]) => [x, -z]).reverse();
@@ -41,21 +54,55 @@ export const hex = (radius, turn = 0) =>
 export function createSentinelKit(kit, recipeViews) {
   const { THREE } = kit;
   const { hull, dark } = kit.tones;
-  // Worn steel (teeth, rolls, rams), soot (inside the mouth) and old hazard
-  // paint: matte tones in the vertex colours, like hull and dark.
+  // Bare steel (teeth, rolls, rams), soot (inside the mouth) and old hazard
+  // paint: tones in the vertex colours, like hull and dark.
   const steel = hull.clone().multiplyScalar(1.7);
   const soot = dark.clone().multiplyScalar(0.55);
   const paint = colorOf(THREE, '#7a5a1c');
-  const maps = bakeHullMaps(THREE, kit.mapSeed + MAW_MAP_SEED);
-  Object.values(maps).forEach((map) => map.repeat.set(PANEL_TILE, PANEL_TILE));
-  // clone() drops the rim patch: add it again
-  const panelMaterial = addRimLight(kit.plateMaterial.clone());
-  Object.assign(panelMaterial, maps, {
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    aoMapIntensity: 0.8,
-    vertexColors: true,
-  });
-  panelMaterial.color.setRGB(1, 1, 1);
+  // Sovereign's: a pale lacquered shell and its inlays, gold and bronze on
+  // polished metal, a dark amber lacquer inside. Next to no blue in the
+  // warm ones, or the bosses' violet light turns them pink.
+  const ivory = colorOf(THREE, '#c4b9a3');
+  const bone = colorOf(THREE, '#a89a80');
+  const gold = colorOf(THREE, '#d4a440');
+  const bronze = colorOf(THREE, '#6e4a1c');
+  const lacquer = colorOf(THREE, '#5e4e14');
+  // The panelled hull: the plate material with baked maps of its own seed,
+  // `tile` panels per unit of hull, tones in the vertex colours.
+  function hullMaterial(seed, tile = PANEL_TILE) {
+    const maps = bakeHullMaps(THREE, kit.mapSeed + seed);
+    Object.values(maps).forEach((map) => map.repeat.set(tile, tile));
+    // clone() drops the shine and rim patches: add them again
+    const material = addRimLight(shiny(kit.plateMaterial.clone()));
+    Object.assign(material, maps, {
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      aoMapIntensity: 0.8,
+      vertexColors: true,
+    });
+    material.color.setRGB(1, 1, 1);
+    return material;
+  }
+  const panelMaterial = hullMaterial(MAW_MAP_SEED);
+  // The weapon parts (projectors, muzzles, vents' lips, lenses' housings):
+  // polished steel, its highlight capped like the ship's hull so it shines
+  // without blowing out. Tones in the vertex colours; one per view.
+  const emitterMaterial = shiny(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      ...SHINE.steel,
+      flatShading: true,
+    })
+  );
+  addRimLight(emitterMaterial);
+  // A lens on `parent` at `at` ([x, y, z]), `size` across: a glow of the
+  // view (drawn by the glow batch, no draw of its own), set with lensGain.
+  const lens = (parent, at, size) =>
+    kit.glow(
+      parent,
+      kit.tone(PALETTE.threat, LENS.idle),
+      size,
+      new THREE.Vector3(...at)
+    );
 
   // A slab: `outline` ([x, z]) from y0 up to y1, its edges chamfered by
   // `bevel`.
@@ -89,10 +136,20 @@ export function createSentinelKit(kit, recipeViews) {
     if (axis === 'z') geometry.rotateX(Math.PI / 2);
     return geometry;
   }
+  // The tones that name a metal of their own (hullModel.js SHINE): bare
+  // steel gleams, soot stays dull; the rest is the material's paint.
+  const shineOf = new Map([
+    [steel, SHINE.steel],
+    [soot, SHINE.worn],
+  ]);
   function merge(parts) {
     const geometry = mergeStatic(
       THREE,
-      parts.map((part) => ({ flat: true, ...part }))
+      parts.map((part) => ({
+        flat: true,
+        shine: shineOf.get(part.color),
+        ...part,
+      }))
     );
     geometry.setAttribute('uv2', geometry.getAttribute('uv'));
     return geometry;
@@ -114,7 +171,15 @@ export function createSentinelKit(kit, recipeViews) {
     steel,
     soot,
     paint,
+    ivory,
+    bone,
+    gold,
+    bronze,
+    lacquer,
     panelMaterial,
+    hullMaterial,
+    emitterMaterial,
+    lens,
     slab,
     box,
     drum,

@@ -68,11 +68,14 @@ export function getHudCss() {
 
             .cockpit-frame {
                 position: absolute; width: 100%; height: 100%; z-index: 11; pointer-events: none;
+                transition: opacity var(--motion-base, 0.3s);
                 background: linear-gradient(135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(-135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(45deg, rgba(5,5,5,0.5) 2%, transparent 10%),
                             linear-gradient(-45deg, rgba(5,5,5,0.5) 2%, transparent 10%);
             }
+            /* Under the letterbox the picture is the scene's alone (the jump's white-out). */
+            body:has(.letterbox.is-showing) .cockpit-frame { opacity: 0; }
 
 
             /* NEXT WAVE */
@@ -130,12 +133,14 @@ export function getHudCss() {
             .letterbox::before { top: 0; transform: translateY(-100%); }
             .letterbox::after { bottom: 0; transform: translateY(100%); }
             .letterbox.is-showing::before, .letterbox.is-showing::after { transform: translateY(0); }
+            .hud-frame, [data-slot='hull-ring'], [data-slot='recharges'], .hud-direction { transition: opacity 0.6s; }
+            #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction { opacity: 0; }
 
             /* BOSS INTRO */
-            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
+            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 92vw; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
             .boss-intro.is-showing { opacity: 1; visibility: visible; }
             .layer-banner.is-leaving, .boss-intro.is-leaving { opacity: 0; }
-            .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; white-space: nowrap; }
+            .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; text-align: center; text-wrap: balance; }
             .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
             .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
 
@@ -157,11 +162,12 @@ export function getHudCss() {
             body.hud-high-contrast :is(.stat-block, .feed-row, .transmission) { background: var(--surface); outline: 2px solid var(--line); }
             body.hud-high-contrast :is(.mode-chip, .xp-bar-container, .bar-segment, .boss-bar-container, .onboarding-tip) { border-width: 2px; }
 
-            /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
-            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }
+            /* ONBOARDING TIP (first run, top centre under the boss bar slot); one line until it would
+               reach a top corner column (the Classic radar, 170 px + margins, the widest), then it wraps */
+            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; width: max-content; max-width: calc(min(100cqw, 100cqh * 16 / 9) - 404px * var(--hud-u)); box-sizing: border-box; opacity: 0; visibility: hidden; }
             .onboarding-tip.is-showing { opacity: 1; visibility: visible; }
             .onboarding-tip.is-leaving { opacity: 0; }
-            .onboarding-tip__keys { display: flex; gap: var(--space-1); }
+            .onboarding-tip__keys { display: flex; flex: none; gap: var(--space-1); }
             .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
             .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
 

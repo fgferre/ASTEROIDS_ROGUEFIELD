@@ -14,6 +14,7 @@ import {
   EXPLOSION_DEFAULT_SIZE,
   EXPLOSION_SIZE_BY_ENEMY_TYPE,
 } from '../../data/audio/explosions.js';
+import { SAMPLE_CUES, SAMPLE_PLAYBACK } from '../../data/audio/samples.js';
 import { GAME_WIDTH } from '../../core/GameConstants.js';
 import { getContent } from '../../content/registry.js';
 import { createBatchedCues } from './sfx/batched.js';
@@ -836,6 +837,38 @@ class SFXBus {
 
   playLeechBurst(options) {
     return this._machines.playLeechBurst(options);
+  }
+
+  // A Warden's signature attack: only its sample (samples.js picks it by
+  // `options.kind`); nothing is synthesized while it is not loaded.
+  playBossAttack() {}
+
+  // A health heart picked up: only its sample.
+  playHeartPickup() {}
+
+  // The journey between sectors: only its samples (samples.js picks a
+  // moment's by its id; the burn loops until stopped).
+  playTravelMoment() {}
+
+  playTravelBurn() {}
+
+  /** The burn fades out (the ship brakes in). */
+  stopTravelBurn() {
+    this.samples.stop(
+      [SAMPLE_CUES.playTravelBurn.sample],
+      SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+  }
+
+  /** The journey is over (ended, skipped, torn down): all its sounds fade. */
+  stopTravelSounds() {
+    this.samples.stop(
+      [
+        SAMPLE_CUES.playTravelBurn.sample,
+        ...Object.values(SAMPLE_CUES.playTravelMoment.sample),
+      ],
+      SAMPLE_PLAYBACK.cutFadeSeconds
+    );
   }
 
   // --- Stingers and transmissions (sfx/stingers.js) ---

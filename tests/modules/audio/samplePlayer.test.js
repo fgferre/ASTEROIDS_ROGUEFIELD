@@ -1,4 +1,7 @@
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
+import { AUDIO_EVENT_CUES } from '../../../src/data/audio/eventCues.js';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
 import { sampleIdFor } from '../../../src/modules/audio/samplePlayer.js';
 import {
@@ -16,6 +19,17 @@ import {
 // The sample layer (SOUND.md): a cue whose sample is loaded plays it, varied
 // and within the voice rules, on the synthesis's bus; any other cue
 // synthesizes as before.
+
+const SFX = '../../../src/public/audio/sfx/';
+const SFX_BUDGET_BYTES = 3 * 1024 * 1024; // SOUND.md
+
+function folderBytes(dir) {
+  return readdirSync(dir).reduce((sum, name) => {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    return sum + (stat.isDirectory() ? folderBytes(path) : stat.size);
+  }, 0);
+}
 
 /** A bus on stub nodes whose buffer sources record what they play. */
 function makeBus() {
@@ -276,5 +290,153 @@ describe('sample layer', () => {
     bus.playExplosion('small', { pan: 0, distance: null });
     expect(context.createOscillator).toHaveBeenCalled();
     expect(sources.filter((s) => s.buffer?.path)).toHaveLength(1);
+  });
+
+  it("a weapon without a shot of its own plays the lance's sample, not the old synthesis", async () => {
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(
+      fetchFor({ 'lance-shot': sample(['lance-shot/1.mp3']) })
+    );
+
+    bus.playLaserShot({ weaponId: 'arc-caster' });
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('lance-shot/1.mp3');
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('each Warden attack plays its own file once, not again inside its gap, at the boss', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const kinds = Object.entries(SAMPLE_CUES.playBossAttack.pick.samples);
+    expect(kinds).toHaveLength(7);
+
+    for (const [kind, id] of kinds) {
+      const entry = manifest[id];
+      expect(entry, id).toBeDefined();
+      entry.files.forEach((file) =>
+        expect(existsSync(new URL(`${SFX}${file}`, import.meta.url))).toBe(true)
+      );
+      expect(entry.cap).toBe(1);
+
+      const { bus, context, sources } = makeBus();
+      await bus.samples.load(fetchFor({ [id]: entry }));
+      const ambientInput = vi.spyOn(bus, '_ambientInput');
+      const play = (time) => {
+        context.currentTime = time;
+        bus.playBossAttack({ kind, pan: -0.3, distance: null });
+      };
+
+      play(0);
+      expect(sources).toHaveLength(1);
+      expect(sources[0].buffer.path).toBe(`${id}/1.mp3`);
+      expect(ambientInput).toHaveBeenCalledWith(-0.3, null);
+      play(entry.gap / 1000 - 0.01);
+      expect(sources).toHaveLength(1);
+      play(entry.gap / 1000 + 0.01);
+      expect(sources).toHaveLength(2);
+      expect(context.createOscillator).not.toHaveBeenCalled();
+    }
+
+    // A boss with no attack sound plays nothing at all.
+    const { bus, context, sources } = makeBus();
+    bus.playBossAttack({ kind: 'prime', pan: 0, distance: null });
+    expect(sources).toHaveLength(0);
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('a health heart pickup plays its own file once, not again inside its gap', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const entry = manifest['heart-pickup'];
+    expect(entry.cap).toBe(1);
+    expect(
+      existsSync(new URL(`${SFX}${entry.files[0]}`, import.meta.url))
+    ).toBe(true);
+    expect(
+      AUDIO_EVENT_CUES.find((row) => row.on === 'health-heart-collected').cue
+    ).toBe('playHeartPickup');
+
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(fetchFor({ 'heart-pickup': entry }));
+    const play = (time) => {
+      context.currentTime = time;
+      bus.playHeartPickup();
+    };
+    play(0);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('heart-pickup/1.mp3');
+    play(entry.gap / 1000 - 0.01);
+    expect(sources).toHaveLength(1);
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('the journey plays each moment by its id, loops the burn faded in, and fades it all out at the end', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const ids = [
+      SAMPLE_CUES.playTravelBurn.sample,
+      ...Object.values(SAMPLE_CUES.playTravelMoment.sample),
+    ];
+    expect(ids).toHaveLength(6);
+    const entries = Object.fromEntries(ids.map((id) => [id, manifest[id]]));
+    ids.forEach((id) =>
+      expect(
+        existsSync(new URL(`${SFX}${entries[id].files[0]}`, import.meta.url))
+      ).toBe(true)
+    );
+
+    const { bus, context, sources } = makeBus();
+    const gains = [];
+    context.createGain = vi.fn(() => {
+      const node = createGainStub();
+      gains.push(node);
+      return node;
+    });
+    await bus.samples.load(fetchFor(entries));
+    bus.playTravelMoment('ignite');
+    bus.playTravelMoment('burn'); // the loop's own cue starts it
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('travel-ignite/1.mp3');
+
+    bus.playTravelBurn();
+    const burn = sources[1];
+    const burnEntry = entries['travel-burn'];
+    expect(burn.loop).toBe(true);
+    expect(burn.loopStart).toBe(burnEntry.loopStart);
+    expect(burn.loopEnd).toBe(burnEntry.loopEnd);
+    const burnGain = gains.at(-1).gain;
+    expect(burnGain.setValueAtTime).toHaveBeenCalledWith(0, 0);
+    expect(burnGain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      expect.any(Number),
+      SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+
+    // Still looping long after its file's length; braking fades it out.
+    context.currentTime = 30;
+    bus.playTravelMoment('leap');
+    expect(burn.stop).not.toHaveBeenCalled();
+    bus.stopTravelBurn();
+    expect(burn.stop).toHaveBeenCalledWith(
+      30 + SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+
+    // The end (or a skip) fades whatever still plays.
+    bus.playTravelBurn();
+    bus.stopTravelSounds();
+    [2, 3].forEach((i) =>
+      expect(sources[i].stop).toHaveBeenCalledWith(
+        30 + SAMPLE_PLAYBACK.cutFadeSeconds
+      )
+    );
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('the sfx folder stays within its size budget', () => {
+    expect(
+      folderBytes(new URL(SFX, import.meta.url).pathname)
+    ).toBeLessThanOrEqual(SFX_BUDGET_BYTES);
   });
 });

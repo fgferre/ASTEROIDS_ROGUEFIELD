@@ -1,5 +1,10 @@
 # Asteroids Roguefield — visão de jogo e plano mestre
 
+> **Nota (12/11/2026): este documento é a proposta de HORIZONTE de 22/10.** Onde divergir de `docs/ROTEIRO.md`, do
+> `PLAN.md` ou do código, esses vencem. Diferenças conhecidas:
+> seis capítulos aqui, três mais um final no jogo; Sovereign é o chefe final, não um sexto Warden;
+> Sentinels e fases selecionáveis já existem; 14–18 min na primeira fase não é a medida atual; "quatro cascos" são três.
+
 Proposta de design · 22/10/2026 · para revisão do dono antes da implementação.
 
 **A promessa:** pilotar uma nave pequena por um cemitério orbital, transformar destroços em uma máquina de combate absurda e descobrir por que o Anel continua tentando reconstruir um mundo que morreu.

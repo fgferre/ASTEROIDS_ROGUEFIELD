@@ -21,13 +21,13 @@ The risk surface is therefore narrower than the original 3-candidate exercise im
 - Atari's mark would only become a concern if a launch surface (itch.io / Steam) flagged it; in that case the fallback is to add a distinguishing prefix or stylization (`AR: Roguefield`, `Roguefield`, etc.).
 - Phase 7 attorney clearance pass remains the safety net — it confirms the chosen name doesn't conflict and produces the final lockup.
 
-**No 3-candidate audit done.** That exercise (USPTO TESS + EUIPO eSearch table) was framed for the original assumption that "Asteroids" had to be replaced wholesale. With the lighter framing, the audit becomes a Phase 7 step. If the developer changes their mind before Phase 7 and wants candidates again, the original 3-candidate methodology is preserved in `.planning/phases/01-profiling-baseline-pre-flight-deliverables/01-CONTEXT.md` decisions D-25/D-26.
+**No 3-candidate audit done.** That exercise (USPTO TESS + EUIPO eSearch table) was framed for the original assumption that "Asteroids" had to be replaced wholesale. With the lighter framing, the audit becomes a Phase 7 step.
 
 ## Tagline (first cut)
 
 **Working tagline:** _Can you beat the field?_
 
-One-liner that invites the loop without overselling. Direction kept short / kinetic / asking-the-player. Phase 7 trusted-circle pass may refine, but this carries through closed beta as-is.
+One-liner that invites the loop without overselling. Direction kept short / kinetic / asking-the-player. A later pass may refine, but this carries through closed beta as-is.
 
 ## Capsule art direction notes (NOT final art — Phase 7)
 
@@ -48,4 +48,4 @@ Direction (Claude-recommended per developer request "sugestao sua relevante e cr
 
 ---
 
-_Name chosen Phase 1; final brand assets (capsule art + logo + attorney clearance) lock Phase 7. See .planning/REQUIREMENTS.md PROC-13._
+_Name chosen Phase 1; final brand assets (capsule art + logo + attorney clearance) lock Phase 7._

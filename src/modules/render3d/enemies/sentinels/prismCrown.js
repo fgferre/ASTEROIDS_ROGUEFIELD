@@ -10,7 +10,13 @@ import {
   clamp01,
   ring,
   hex,
+  progressOf,
 } from './kit.js';
+
+// proposta 13/11: how hot the gem burns as the beams charge and while they
+// fire (on top of its own heat), and how far the panes turn red when lit.
+const GEM_CHARGE = [1.4, 2.2];
+const PANE_LIT = 0.85;
 
 export function createPrismCrown(sk) {
   const {
@@ -18,6 +24,7 @@ export function createPrismCrown(sk) {
     kit,
     recipeViews,
     panelMaterial,
+    emitterMaterial,
     hull,
     dark,
     steel,
@@ -63,8 +70,8 @@ export function createPrismCrown(sk) {
   ]);
   // The gem: a bipyramid, taller than wide.
   const crownGem = new THREE.OctahedronGeometry(0.3).scale(1, 1.25, 1);
-  // A mirror, its face toward +x: the frame (posts, sills, a foot) and the
-  // pane in it.
+  // A mirror, its face toward +x: the frame (posts, sills, a foot), in
+  // polished steel as the weapon part it is, and the pane in it.
   const crownFrame = merge([
     ...[0.31, -0.31].map((z) => ({
       geometry: box(0.07, 0.56, 0.06),
@@ -75,6 +82,7 @@ export function createPrismCrown(sk) {
     { geometry: box(0.09, 0.06, 0.68), color: dark, position: [0, -0.06, 0] },
     { geometry: drum(0.16, 0.1, 8), color: dark, position: [0, -0.14, 0] },
   ]);
+  const paneColor = colorOf(THREE, '#9fe8ff');
   const crownPane = box(0.03, 0.48, 0.56);
   crownPane.translate(0, 0.21, 0);
   const CROWN_LIGHTS = Object.freeze({
@@ -108,14 +116,14 @@ export function createPrismCrown(sk) {
     const mirrors = Array.from({ length: CROWN_MIRRORS }, () => {
       const mirror = new THREE.Group();
       mirror.add(
-        new THREE.Mesh(crownFrame, panelMaterial),
+        new THREE.Mesh(crownFrame, emitterMaterial),
         new THREE.Mesh(crownPane, mirrorMaterial)
       );
       group.add(mirror);
       return mirror;
     });
     kit.scene.add(group);
-    const beams = kit.createTelegraph(CROWN_MIRRORS * 2);
+    const beams = kit.createTelegraph(CROWN_MIRRORS * 2, 0, CROWN_MIRRORS * 2);
     const telegraphs = new THREE.Group();
     telegraphs.add(beams.group);
     kit.scene.add(telegraphs);
@@ -127,7 +135,7 @@ export function createPrismCrown(sk) {
       coreMaterial,
       rims: [kit.rim(group, kit.circleRim, RIM)],
       rimColor: kit.rimColors.boss,
-      glows: lights.lights,
+      glows: [...lights.lights, ...beams.sparks],
       telegraph: { group: telegraphs, beams },
       id: null,
     };
@@ -149,9 +157,21 @@ export function createPrismCrown(sk) {
       );
     });
     const open = clamp01(boss.crownOpen ?? 0);
-    view.mirrorMaterial.emissiveIntensity = 0.6 * (1 - open);
+    // the gem is the emitter: it gathers light while the beams warn and
+    // burns while they fire; the panes it feeds turn red as they reflect
+    const b = boss.beams;
+    const warning = b?.phase === 'warn';
+    const charge = b
+      ? warning
+        ? GEM_CHARGE[0] * progressOf(b) ** 2
+        : GEM_CHARGE[1] * (0.85 + 0.15 * Math.sin(time * 40))
+      : 0;
+    const lit = b ? (warning ? 0.3 * progressOf(b) : 1) * PANE_LIT : 0;
+    view.mirrorMaterial.emissive.copy(paneColor).lerp(kit.threatColor, lit);
+    view.mirrorMaterial.emissiveIntensity = 0.6 * (1 - open) + lit;
     view.coreMaterial.emissiveIntensity =
       CORE_COLD +
+      charge +
       open * (CORE_HOT + 0.3 * Math.sin(time * CORE_BEAT)) +
       boss.getHitFlash() * CORE_FLASH * (0.2 + open);
     view.telegraph.group.visible = true;

@@ -535,7 +535,7 @@ export default class GameSessionService {
    * announces itself with `replay: true` on 'game-started': a replayed run has
    * no side effects on the viewer's save (Salvage) or pad (rumble).
    */
-  startNewRun({ source = 'unknown', daily, bossRush, sector } = {}) {
+  startNewRun({ source = 'unknown', daily, bossRush, sector, carry } = {}) {
     const replay = Boolean(this.replayStart);
     if (replay) {
       ({ daily, bossRush, sector } = this.replayStart);
@@ -570,10 +570,14 @@ export default class GameSessionService {
     this.setRetryCount(1);
     this.retry.setRetryButtonEnabled(true);
 
-    this._suppressWaveKickoff = false;
+    // The reset below must not start the first layer (a progression reset
+    // does, on the playing screen): this run starts it, or its head start.
+    this._suppressWaveKickoff = true;
     this.runEnd.endless = false;
     this.runEnd.bossRushWardens = 0;
     updateRecords({ newRun: true });
+    // `carry` (the victory screen's next sector): the ship keeps its build.
+    const build = carry && !replay ? this.snapshots.captureBuild() : null;
     // Before the reset: the first layer's rock count already follows it.
     const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
     if (waveManager) {
@@ -591,9 +595,20 @@ export default class GameSessionService {
     }
 
     this.applyConfiguredPlayerHull();
+    if (build) this.snapshots.restoreBuild(build);
+    this._suppressWaveKickoff = false;
 
-    // A head start holds the first layer until its picks are made.
-    if (!this.sector?.headStart) {
+    // A head start holds the first layer until its picks are made; a carried
+    // build only takes the picks it is short of.
+    const levelsCarried = build
+      ? this.resolveServiceInstance('progression').level - 1
+      : 0;
+    const headStart = Math.max(
+      0,
+      (this.sector?.headStart ?? 0) - levelsCarried
+    );
+    const owed = build?.owed ?? [];
+    if (!headStart && owed.length === 0) {
       this.ensureWaveKickoff({ reason: 'session-start' });
     }
 
@@ -632,6 +647,7 @@ export default class GameSessionService {
       bossRush: this.bossRush,
       sector: this.sector?.id ?? null,
       replay,
+      carried: Boolean(build),
     });
     if (difficulty.isDaily()) {
       this.eventBus.emit('daily-started', { seed });
@@ -644,7 +660,7 @@ export default class GameSessionService {
     }
 
     this.setSessionState('running', { reason: 'start-new-run' });
-    this.headStart.begin(this.sector?.headStart ?? 0);
+    this.headStart.begin(headStart, owed);
 
     if (this.gameState) {
       this.gameState.lastTime =

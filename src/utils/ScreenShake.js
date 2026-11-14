@@ -304,12 +304,6 @@ export const ShakePresets = {
     duration: 0.35,
   },
 
-  // Shield impact
-  shieldImpact: {
-    trauma: 0.35,
-    duration: 0.25,
-  },
-
   // Volatile explosion
   volatileExplosion: {
     trauma: 0.6,

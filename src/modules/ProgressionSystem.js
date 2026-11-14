@@ -53,6 +53,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.pendingLevelUpScreens = [];
     this.levelUpScreenTimer = 0;
+    this.offersHeld = false;
 
     const comboTimeout = Number.isFinite(PROGRESSION_COMBO_TIMEOUT)
       ? Math.max(0, Number(PROGRESSION_COMBO_TIMEOUT))
@@ -122,6 +123,18 @@ class ProgressionSystem extends UpgradeSystem {
     this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'player-reset', silent: true, force: true });
+    });
+
+    // A won run deals no cards: the choices wait for the next sector (the
+    // carried build's `owed`) or for the endless run to go on.
+    this.registerEventListener('run-won', () => {
+      this.offersHeld = true;
+    });
+    this.registerEventListener('run-continued', () => {
+      this.offersHeld = false;
+    });
+    this.registerEventListener('game-started', () => {
+      this.offersHeld = false;
     });
 
     this.registerEventListener('player-died', () => {
@@ -352,7 +365,7 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   updatePendingLevelUpScreens(dt) {
-    if (this.pendingLevelUpScreens.length === 0) {
+    if (this.offersHeld || this.pendingLevelUpScreens.length === 0) {
       return;
     }
 
@@ -368,25 +381,47 @@ class ProgressionSystem extends UpgradeSystem {
   // next before play resumes. The cards are rolled when shown, so they follow
   // the earlier picks. Returns false when none is waiting.
   openNextLevelUpOffer() {
-    if (this.pendingLevelUpScreens.length === 0) {
+    const offer = this.dealNextLevelUpOffer();
+    if (!offer) {
       return false;
     }
 
-    const level = this.pendingLevelUpScreens.shift();
-    const { options, poolSize, totalDefinitions } = this.prepareUpgradeOptions(
-      PROGRESSION_UPGRADE_ROLL_COUNT,
-      { level }
-    );
     this.eventBus?.emit?.('upgrade-options-ready', {
-      level,
-      options,
-      poolSize,
-      totalDefinitions,
+      ...offer,
       inventory: this.getUpgradeProgressSnapshot(),
       synergies: this.getSynergySnapshot(),
-      autoResolved: options.length === 0,
+      autoResolved: offer.options.length === 0,
     });
     return true;
+  }
+
+  // Deals the next waiting level's cards without showing them: { level,
+  // options, poolSize, totalDefinitions }, or null when none is waiting.
+  dealNextLevelUpOffer() {
+    if (this.pendingLevelUpScreens.length === 0) {
+      return null;
+    }
+    const level = this.pendingLevelUpScreens.shift();
+    return {
+      level,
+      ...this.prepareUpgradeOptions(PROGRESSION_UPGRADE_ROLL_COUNT, { level }),
+    };
+  }
+
+  /**
+   * The levels whose card choice has not been made: the one on screen (its
+   * cards are dealt, none picked) and those waiting. `queueLevelUpOffers`
+   * puts them back in line (a build carried into the next sector).
+   */
+  owedLevelUpOffers() {
+    return [
+      ...(this.pendingUpgradeOptions.length > 0 ? [this.level] : []),
+      ...this.pendingLevelUpScreens,
+    ];
+  }
+
+  queueLevelUpOffers(levels) {
+    this.pendingLevelUpScreens.push(...levels);
   }
 
   // XP from `level` to the next: the initial requirement, plus a step that
@@ -512,6 +547,10 @@ class ProgressionSystem extends UpgradeSystem {
       experienceToNext: safeNumber(this.experienceToNext, 100),
       totalExperience: safeNumber(this.totalExperience, 0),
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
+      // The level-up screen's budget left, and the cards banished this run.
+      rerollsLeft: this.rerollsLeft,
+      banishesLeft: this.banishesLeft,
+      banishedUpgrades: Array.from(this.banishedUpgrades),
       comboState: {
         comboCount: safeNumber(this.currentCombo, 0),
         comboTimer: safeNumber(this.comboTimer, 0),
@@ -535,6 +574,15 @@ class ProgressionSystem extends UpgradeSystem {
       ? snapshot.appliedUpgrades
       : [];
     this.appliedUpgrades = new Map(entries);
+    if (Number.isFinite(snapshot.rerollsLeft)) {
+      this.rerollsLeft = snapshot.rerollsLeft;
+    }
+    if (Number.isFinite(snapshot.banishesLeft)) {
+      this.banishesLeft = snapshot.banishesLeft;
+    }
+    if (Array.isArray(snapshot.banishedUpgrades)) {
+      this.banishedUpgrades = new Set(snapshot.banishedUpgrades);
+    }
     // Upgrade-driven numbers start clean: the caller re-applies every rank
     // (the session's deathSnapshot.reapplyProgressionUpgrades), synergies included.
     this.activeSynergies.clear();

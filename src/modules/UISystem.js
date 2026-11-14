@@ -9,12 +9,7 @@ import {
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
-import {
-  localLayer,
-  nextSector,
-  sectorById,
-  sectorTitle,
-} from '../data/sectors.js';
+import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -42,11 +37,12 @@ import {
   TransmissionQueue,
   bossRushTransmission,
   chapterTransmission,
+  stageTransmission,
   deathTransmission,
   hangarTransmission,
   heraldTransmission,
   sightingTransmission,
-  victoryTransmission,
+  winTransmissions,
   wardenTransmission,
 } from './ui/transmissions.js';
 import {
@@ -92,19 +88,12 @@ class UISystem extends BaseSystem {
       hud: () => this.tacticalHud.layout,
       // The session's pause flag alone: no pause screen, no fixed steps.
       holdSim: (held) => this.getService('game-state')?.setPaused(held),
-      bindSkip: (skip) => {
-        // Capture on window runs before every other key handler: the key
-        // only skips (a held key's repeats are swallowed too).
-        const onKey = (event) => {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          if (!event.repeat) skip();
-        };
-        window.addEventListener('keydown', onKey, true);
-        return () => window.removeEventListener('keydown', onKey, true);
-      },
+      // A head start holds the first layer: its title card waits for it.
       onIntroEnd: () =>
+        this.getService('enemies')?.waveManager.waveInProgress &&
         this.handleLayerStarted({ wave: this.transmissionLayer }),
+      speak: (entry) => this.queueTransmission(entry),
+      hush: () => this.transmissions?.clear(),
     });
     this.onboarding = new Onboarding(
       {
@@ -172,13 +161,14 @@ class UISystem extends BaseSystem {
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
       progression: () => this.getService('progression'),
+      headStart: () => this.getService('game-session').headStart,
       combat: () => this.getService('combat'),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
-      showCardsTip: () => this.showOnboardingCardsTip(),
+      showCardsTip: (headStart) => this.showOnboardingCardsTip(headStart),
       prefersReducedMotion: () => this.prefersReducedMotion(),
-      previewBuild: (card) => this.tacticalHud.layout?.previewBuildCard(card),
+      hud: () => this.tacticalHud.layout,
     });
     this.chestCeremony = new ChestCeremony({
       refs: this.domRefs.chest,
@@ -211,6 +201,7 @@ class UISystem extends BaseSystem {
       difficulty: () => this.getService('difficulty'),
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
+      cinematics: this.cinematics,
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,
@@ -247,6 +238,7 @@ class UISystem extends BaseSystem {
       showScreen: (name, options) => this.showScreen(name, options),
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('campaign', isOpen, payload),
+      prepareTravel: (start) => this.cinematics.prepareTravel(start),
     });
     this.codexScreen = new CodexScreen({
       refs: this.domRefs.codex,
@@ -269,19 +261,20 @@ class UISystem extends BaseSystem {
     if (this.tacticalHud.layout) {
       this.transmissions = new TransmissionQueue(
         this.tacticalHud.layout,
-        ({ speaker, key, text }) => {
+        ({ speaker, key, text }, onScreenMs) => {
           this.lastTransmission = { speaker, text };
-          this.eventBus.emit('transmission-shown', { speaker, key });
+          const shown = { speaker, key, text, onScreenMs };
+          this.eventBus.emit('transmission-shown', shown);
         },
-        ({ key }) => {
-          this.eventBus.emit('transmission-finished', { key });
-        }
+        (entry) => this.eventBus.emit('transmission-finished', entry),
+        (entry) => this.eventBus.emit('transmission-cut', entry),
+        (entry) => this.eventBus.emit('transmission-dropped', entry)
       );
     }
     this.tacticalHud.updateAAATacticalHudFromServices({ force: true });
 
     this.pauseScreen.bindPauseControls();
-    this.runEndScreens.bindCopySeedLink();
+    this.runEndScreens.bindControls();
     this.levelUpScreen.bindLevelUpControls();
     this.chestCeremony.bindControls();
     this.settingsPanel.bindSettingsControls();
@@ -371,12 +364,11 @@ class UISystem extends BaseSystem {
     this.transmissionLayer = layer;
     const sector = this.getService('game-session')?.sector ?? null;
     this.sector = sector;
+    this.cinematics.prepareLayer(layer, sector, this.bossRush);
     // The intro's end shows this layer's title card.
-    if (this.cinematics.introActive) {
-      return;
-    }
+    if (this.cinematics.introActive) return;
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
-    const biome = biomeForLayer(layer);
+    const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;
     const stage = this.bossRush ? bossRushStage(layer) : 0;
     // A sector run counts its layers from its own first one.
@@ -388,13 +380,16 @@ class UISystem extends BaseSystem {
         ? bossRushStageTitle(stage)
         : firstOfBiome
           ? sectorTitle(sector, biome.title)
-          : layer > RUN_FINAL_LAYER
+          : layer > RUN_FINAL_LAYER && !sector
             ? 'DEEP FIELD'
             : '',
     });
     if (firstOfBiome) {
-      this.queueTransmission(chapterTransmission(biome.id));
+      this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
     }
+    const said =
+      sector && stageTransmission(sector.id, localLayer(sector, layer));
+    if (said) this.queueTransmission(said);
     if (stage === 1) {
       this.queueTransmission(bossRushTransmission());
     }
@@ -403,14 +398,13 @@ class UISystem extends BaseSystem {
   /** Queues a Warden transmission and keeps the frame loop that plays it. */
   queueTransmission(entry, { interrupt = false } = {}) {
     const queue = this.transmissions;
-    if (!queue || !entry) {
-      return;
-    }
+    if (!queue || !entry) return;
     if (interrupt) {
       queue.interrupt(entry);
     } else {
       queue.push(entry);
     }
+    this.eventBus.emit('transmission-queued', entry);
     if (this.transmissionRaf) {
       return;
     }
@@ -476,6 +470,11 @@ class UISystem extends BaseSystem {
       this.cinematics.endArrival();
     });
 
+    // A boss with a line for its final phase speaks it as the phase begins.
+    this.registerEventListener('boss-phase-changed', ({ enemy, phase }) => {
+      if (phase !== enemy.phaseCount - 1) return;
+      this.queueTransmission(wardenTransmission(0, 'last', enemy.bossKind));
+    });
     this.registerEventListener('boss-defeated', (payload = {}) => {
       // A Warden whose death won the run: 'run-won' speaks for it.
       if (this.runWon) return;
@@ -485,9 +484,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('player-died', () => {
-      if (this.runWon) {
-        return;
-      }
+      if (this.runWon) return;
       this.pilotDown = true;
       // Cards dealt on the step the ship died close: the death plays out.
       this.chestCeremony.clear();
@@ -496,7 +493,11 @@ class UISystem extends BaseSystem {
       }
       this.lastTransmission = null;
       this.queueTransmission(
-        deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
+        deathTransmission(
+          this.getRandomFork('base'),
+          this.transmissionLayer,
+          this.sector
+        ),
         { interrupt: true }
       );
     });
@@ -655,23 +656,22 @@ class UISystem extends BaseSystem {
       this.chestCeremony.clear();
       this.lastTransmission = null;
       this.cinematics.startEpilogue();
-      // A chapter before the last ends on its Warden's own last words.
-      const line = nextSector(sectorById(sector))
-        ? wardenTransmission(wave, 'defeated', sectorById(sector).boss)
-        : victoryTransmission();
-      this.queueTransmission(line, { interrupt: true });
+      const [last, ...after] = winTransmissions(wave, sectorById(sector)?.boss);
+      this.queueTransmission(last, { interrupt: true });
+      after.forEach((line) => this.queueTransmission(line));
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;
       this.cinematics.release();
     });
-    this.registerEventListener('game-started', () => {
+    this.registerEventListener('game-started', (payload = {}) => {
       this.runWon = false;
       this.pilotDown = false;
       this.chestCeremony.clear();
-      this.runEndScreens.noteRunStart();
+      this.runEndScreens.noteRunStart(payload);
       this.transmissions?.clear();
       this.cinematics.stop();
+      this.cinematics.armTravel(payload);
       // After startNewRun has unpaused: the intro holds the first step.
       queueMicrotask(() => this.cinematics.startIntro());
       this.removeOnboardingCardsTip();
@@ -697,12 +697,13 @@ class UISystem extends BaseSystem {
       this.onboarding.cardPicked();
       this.removeOnboardingCardsTip();
     });
-    // No cards once the run has ended: over the victory or under the game over.
+    // No cards once the run has ended: over the victory or under the game
+    // over; a run's first cards wait for its journey and intro.
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
-      if (this.runWon || this.pilotDown) {
-        return;
-      }
-      this.levelUpScreen.handleUpgradeOptions(payload);
+      if (this.runWon || this.pilotDown) return;
+      this.cinematics.afterTravel(() =>
+        this.levelUpScreen.handleUpgradeOptions(payload)
+      );
     });
     this.registerEventListener('upgrade-rerolled', (payload = {}) => {
       this.levelUpScreen.refreshLevelUpOptions(payload);
@@ -1011,8 +1012,6 @@ class UISystem extends BaseSystem {
     this.showScreen(screenName, { emitEvent: false });
   }
 
-  // Legacy Standard HUD update methods removed.
-
   showScreen(screenName, options = {}) {
     const { overlay = false, show = true, emitEvent = true } = options;
     try {
@@ -1024,12 +1023,10 @@ class UISystem extends BaseSystem {
 
         // Keep game-ui visible for pause, card and run end overlays
         if (
-          (screenName === 'pause' ||
-            screenName === 'levelup' ||
-            screenName === 'chest' ||
-            screenName === 'gameover' ||
-            screenName === 'victory') &&
-          show
+          show &&
+          ['pause', 'levelup', 'chest', 'gameover', 'victory'].includes(
+            screenName
+          )
         ) {
           const gameUI = document.getElementById('game-ui');
           if (gameUI) gameUI.classList.remove('hidden');
@@ -1169,10 +1166,9 @@ class UISystem extends BaseSystem {
   }
 
   /** The cards tip in the level-up footer, on the first level-up only. */
-  showOnboardingCardsTip() {
-    const text = this.onboarding.cardsTip(
-      this.getService('input').getActiveDevice()
-    );
+  showOnboardingCardsTip(headStart) {
+    const device = this.getService('input').getActiveDevice();
+    const text = this.onboarding.cardsTip(device, headStart);
     const content = document.querySelector('#levelup-screen .levelup-content');
     if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
       return;

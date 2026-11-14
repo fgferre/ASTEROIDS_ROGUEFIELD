@@ -259,16 +259,23 @@ describe('golden trace', () => {
   const title = SAME_ARCH
     ? '$name plays as recorded'
     : '$name plays the same twice';
-  it.each(SCENARIOS)(title, async (scenario) => {
-    // Each scenario runs seconds of blocking play; without a turn of the event
-    // loop between them the worker cannot answer Vitest, and a file over 60 s
-    // (CI, playing everything twice) ends in "Timeout calling onTaskUpdate".
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const trace = traceScenario(scenario);
-    traced[scenario.name] = trace;
-    if (UPDATE) return;
-    const expected = SAME_ARCH ? golden[scenario.name] : traceAgain(scenario);
-    const message = divergence(scenario.name, trace, expected);
-    if (message) throw new Error(message);
-  });
+  it.each(SCENARIOS)(
+    title,
+    async (scenario) => {
+      // Each scenario runs seconds of blocking play; without a turn of the event
+      // loop between them the worker cannot answer Vitest, and a file over 60 s
+      // (CI, playing everything twice) ends in "Timeout calling onTaskUpdate".
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const trace = traceScenario(scenario);
+      traced[scenario.name] = trace;
+      if (UPDATE) return;
+      const expected = SAME_ARCH ? golden[scenario.name] : traceAgain(scenario);
+      const message = divergence(scenario.name, trace, expected);
+      if (message) throw new Error(message);
+      // A scenario is 2–8 s of blocking play alone and passed the suite's 20 s
+      // three times on 13/11 with the machine busy: a divergence fails at once,
+      // so the long limit only spares false alarms.
+    },
+    120000
+  );
 });
