@@ -108,4 +108,17 @@ describe('RockInstances', () => {
     expect(aSurface.getX(0)).toBeCloseTo(0.9);
     expect(aSurface.getX(total - 1)).toBeCloseTo(0.9);
   });
+
+  it('releases the old GPU buffers when a mesh grows', () => {
+    const { rocks } = setup();
+    const mesh = rocks.meshes.stone[0];
+    const disposed = [];
+    mesh.addEventListener('dispose', () => disposed.push('mesh'));
+    mesh.geometry.addEventListener('dispose', () => disposed.push('geometry'));
+    rocks.begin();
+    for (let i = 0; i <= ROCK_INSTANCE_CAP; i += 1) {
+      rocks.push(rockView('stone', 0, i));
+    }
+    expect(disposed).toEqual(['mesh', 'geometry']);
+  });
 });

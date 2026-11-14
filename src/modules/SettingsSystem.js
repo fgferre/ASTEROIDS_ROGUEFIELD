@@ -8,6 +8,7 @@ import {
   normalizeDependencies,
   resolveEventBus,
 } from '../core/serviceUtils.js';
+import { asArray } from './upgradeCatalog.js';
 
 const VISUAL_CATEGORIES = new Set([
   'accessibility',
@@ -35,10 +36,6 @@ function deepClone(value) {
     console.warn('[SettingsSystem] Failed to clone value:', error);
     return value;
   }
-}
-
-function ensureArray(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 class SettingsSystem {
@@ -231,7 +228,7 @@ class SettingsSystem {
       case 'binding':
         return this.normalizeBindingValue(field, rawValue);
       case 'select': {
-        const options = ensureArray(field.options);
+        const options = asArray(field.options);
         if (options.length === 0) {
           return rawValue ?? field.default ?? null;
         }
@@ -262,7 +259,7 @@ class SettingsSystem {
       const maxBindings = Math.max(
         1,
         Number(field.metadata?.[device]?.max) ||
-          ensureArray(defaultValue[device]).length ||
+          asArray(defaultValue[device]).length ||
           2
       );
       const rawList =
@@ -270,7 +267,7 @@ class SettingsSystem {
         typeof rawValue === 'object' &&
         Array.isArray(rawValue[device])
           ? rawValue[device]
-          : ensureArray(defaultValue[device]);
+          : asArray(defaultValue[device]);
 
       const seen = new Set();
       const cleaned = [];

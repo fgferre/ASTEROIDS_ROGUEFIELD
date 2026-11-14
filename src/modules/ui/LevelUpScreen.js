@@ -17,8 +17,7 @@ import {
   paintCard,
   weaponOfCard,
 } from './upgradeCard.js';
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
+import { asArray } from '../upgradeCatalog.js';
 
 // Level-up cards and the victory buttons ignore input this long after showing.
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
@@ -140,7 +139,7 @@ export class LevelUpScreen {
   }
 
   showLevelUpScreen(data = {}) {
-    const options = ensureArray(data.options || data.availableUpgrades);
+    const options = asArray(data.options || data.availableUpgrades);
 
     if (!options.length) {
       if (data.autoResolved) {
@@ -241,7 +240,7 @@ export class LevelUpScreen {
     if (!this.levelUpState.isVisible) {
       return;
     }
-    const options = ensureArray(payload.options);
+    const options = asArray(payload.options);
     if (!options.length) {
       this.resetLevelUpState();
       this.showGameUI();
@@ -358,7 +357,7 @@ export class LevelUpScreen {
   // Cards out (ui/levelUpTransition.js) toward the HUD's build instrument,
   // input locked, then back to the run.
   leaveLevelUp(upgradeId) {
-    const buttons = ensureArray(this.levelUpState.buttons);
+    const buttons = asArray(this.levelUpState.buttons);
     this.levelUpState.lockedUntil = Infinity;
     this.levelUpState.exitTimer = playLevelUpExit({
       screen: document.getElementById('levelup-screen'),
@@ -371,7 +370,7 @@ export class LevelUpScreen {
   }
 
   handleUpgradeOptions(payload = {}) {
-    const options = ensureArray(payload.options || payload.availableUpgrades);
+    const options = asArray(payload.options || payload.availableUpgrades);
     this.levelUpState.poolSize = Number.isFinite(Number(payload.poolSize))
       ? Number(payload.poolSize)
       : options.length;
@@ -394,7 +393,7 @@ export class LevelUpScreen {
   }
 
   focusLevelUpOption(index) {
-    const buttons = ensureArray(this.levelUpState.buttons);
+    const buttons = asArray(this.levelUpState.buttons);
     if (!buttons.length) {
       this.levelUpState.focusIndex = -1;
       return;
@@ -456,7 +455,7 @@ export class LevelUpScreen {
   }
 
   moveLevelUpFocus(direction) {
-    const buttons = ensureArray(this.levelUpState.buttons);
+    const buttons = asArray(this.levelUpState.buttons);
     if (!buttons.length) {
       return;
     }
@@ -510,7 +509,7 @@ export class LevelUpScreen {
   }
 
   disableLevelUpOptions() {
-    ensureArray(this.levelUpState.buttons).forEach((button) => {
+    asArray(this.levelUpState.buttons).forEach((button) => {
       if (button) {
         button.disabled = true;
       }
@@ -518,7 +517,7 @@ export class LevelUpScreen {
   }
 
   enableLevelUpOptions() {
-    ensureArray(this.levelUpState.buttons).forEach((button) => {
+    asArray(this.levelUpState.buttons).forEach((button) => {
       if (button) {
         button.disabled = false;
       }
@@ -528,7 +527,7 @@ export class LevelUpScreen {
   resetLevelUpState() {
     clearTimeout(this.levelUpState.exitTimer);
     document.getElementById('levelup-screen')?.classList.remove('is-leaving');
-    ensureArray(this.levelUpState.buttons).forEach((button) => {
+    asArray(this.levelUpState.buttons).forEach((button) => {
       if (button) {
         button.classList.remove('is-focused');
         button.disabled = false;

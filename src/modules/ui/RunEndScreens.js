@@ -25,8 +25,7 @@ import {
   timelineMarkup,
   timelineModel,
 } from './runTimeline.js';
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
+import { asArray } from '../upgradeCatalog.js';
 
 const ENDINGS = Object.keys(STORY.ending);
 
@@ -63,7 +62,7 @@ export function endingChoiceMarkup() {
  */
 function runNumbers(data, outcome) {
   const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
-  const timeline = ensureArray(data.stats?.timeline);
+  const timeline = asArray(data.stats?.timeline);
   const last = timeline[timeline.length - 1];
   const end =
     outcome === 'victory' && last?.kind === 'warden'

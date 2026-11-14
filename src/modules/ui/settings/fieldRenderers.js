@@ -11,8 +11,7 @@ import {
   instrumentCatalog,
   readUserPresets,
 } from '../hud/editor/layoutStore.js';
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
+import { asArray } from '../../upgradeCatalog.js';
 
 export function renderSettingField(categoryId, field, value, values = {}) {
   if (field.control === 'segmented') {
@@ -146,7 +145,7 @@ function renderSelectField(categoryId, field, value) {
   select.dataset.settingKey = field.key;
   select.dataset.settingCategory = categoryId;
 
-  const options = ensureArray(field.options);
+  const options = asArray(field.options);
   const optionLabels =
     (field.optionLabels && typeof field.optionLabels === 'object'
       ? field.optionLabels
@@ -240,7 +239,7 @@ function renderHudEditField(categoryId, field, value) {
   button.textContent = 'Edit HUD Layout';
   wrapper.appendChild(button);
 
-  const saved = ensureArray(value).length;
+  const saved = asArray(value).length;
   const description = document.createElement('p');
   description.className = 'settings-field__description';
   description.textContent = `${field.description} ${
@@ -268,7 +267,7 @@ function renderSegmentedField(categoryId, field, value) {
   group.setAttribute('role', 'group');
   group.setAttribute('aria-labelledby', label.id);
   const current = value ?? field.default;
-  ensureArray(field.options).forEach((option) => {
+  asArray(field.options).forEach((option) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'settings-segment';
@@ -318,12 +317,12 @@ function renderBindingField(categoryId, field, value = {}) {
 
   const devices = ['keyboard', 'gamepad'];
   devices.forEach((device) => {
-    const bindings = ensureArray(value?.[device]);
+    const bindings = asArray(value?.[device]);
     const metadata = field.metadata?.[device] || {};
     const maxSlots = Math.max(
       Number(metadata.max) ||
         bindings.length ||
-        ensureArray(field.default?.[device]).length,
+        asArray(field.default?.[device]).length,
       1
     );
 

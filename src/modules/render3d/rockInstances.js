@@ -94,12 +94,16 @@ export class RockInstances {
 
   // Doubles a full mesh's instance buffers, keeping what this frame already
   // packed; new buffer objects, so the renderer uploads them at their size.
+  // The old GL buffers are freed first (mesh and geometry dispose; the
+  // renderer re-creates whatever is still in use on the next draw).
   grow(mesh) {
     const bigger = (attribute) => {
       const array = new Float32Array(attribute.array.length * 2);
       array.set(attribute.array);
       return this.instanceBuffer(array, attribute.itemSize);
     };
+    mesh.dispose();
+    mesh.geometry.dispose();
     mesh.instanceMatrix = bigger(mesh.instanceMatrix);
     Object.keys(ROCK_ATTRIBUTES).forEach((name) =>
       mesh.geometry.setAttribute(name, bigger(mesh.geometry.attributes[name]))
