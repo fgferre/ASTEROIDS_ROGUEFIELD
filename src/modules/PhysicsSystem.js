@@ -80,7 +80,6 @@ class PhysicsSystem extends BaseSystem {
     this.contact = new PlayerContact({
       impacts: this.impacts,
       emit,
-      ensureSpatialIndex: () => this.ensureSpatialIndex(),
       getNearbyEnemies,
       maxEnemyRadius,
     });
@@ -103,11 +102,6 @@ class PhysicsSystem extends BaseSystem {
       dynamicResize: false,
     });
 
-    // Legacy spatial index for backward compatibility
-    const enemyIndex = new Map();
-    this.enemyIndex = enemyIndex;
-    this.asteroidIndex = enemyIndex; // Legacy alias for backward compatibility
-    this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
     this.missingEnemyWarningLogged = false;
@@ -314,9 +308,7 @@ class PhysicsSystem extends BaseSystem {
     this.activeEnemies.clear();
     this.activeBosses.clear();
     this.bossCollisionState.clear();
-    this.enemyIndex.clear();
     this.spatialHash.clear();
-    this.indexDirty = false;
     this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
   }
 
@@ -367,7 +359,6 @@ class PhysicsSystem extends BaseSystem {
 
     if (!this.activeEnemies.has(enemy)) {
       this.activeEnemies.add(enemy);
-      this.indexDirty = true;
 
       if (isBossEnemy(enemy)) {
         this.activeBosses.add(enemy);
@@ -394,8 +385,6 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (this.activeEnemies.delete(enemy)) {
-      this.indexDirty = true;
-
       if (isBossEnemy(enemy)) {
         this.activeBosses.delete(enemy);
         this.clearBossPhysicsState(enemy);
@@ -433,8 +422,6 @@ class PhysicsSystem extends BaseSystem {
         this.clearBossPhysicsState(enemy);
       }
     });
-
-    this.indexDirty = true;
   }
 
   cleanupDestroyedAsteroids() {
@@ -544,51 +531,6 @@ class PhysicsSystem extends BaseSystem {
 
   clearBossPhysicsState(reference) {
     this.impacts.clearBossPhysicsState(reference);
-  }
-
-  ensureSpatialIndex() {
-    if (!this.indexDirty) {
-      return;
-    }
-
-    if (!this.activeEnemies.size) {
-      if (this.enemyIndex.size) {
-        this.enemyIndex.clear();
-      }
-      this.indexDirty = false;
-      return;
-    }
-
-    this.rebuildSpatialIndex();
-  }
-
-  rebuildSpatialIndex() {
-    this.enemyIndex.clear();
-
-    if (!this.activeEnemies.size) {
-      this.indexDirty = false;
-      return;
-    }
-
-    const cellSize = this.cellSize;
-
-    this.activeEnemies.forEach((asteroid) => {
-      if (!asteroid || asteroid.destroyed) {
-        return;
-      }
-
-      const cellX = Math.floor(asteroid.x / cellSize);
-      const cellY = Math.floor(asteroid.y / cellSize);
-      const key = `${cellX}:${cellY}`;
-      let bucket = this.enemyIndex.get(key);
-      if (!bucket) {
-        bucket = [];
-        this.enemyIndex.set(key, bucket);
-      }
-      bucket.push(asteroid);
-    });
-
-    this.indexDirty = false;
   }
 
   /**
@@ -706,7 +648,6 @@ class PhysicsSystem extends BaseSystem {
     }
 
     this.bootstrapCompleted = true;
-    this.indexDirty = true;
     this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
     this._snapshotFallbackWarningIssued = false;
     this.warnOnBossTrackingMismatch({ reason: 'snapshot-import' });
@@ -739,16 +680,9 @@ class PhysicsSystem extends BaseSystem {
     this.updateSpatialHash();
 
     if (!this.activeEnemies.size) {
-      if (this.enemyIndex.size) {
-        this.enemyIndex.clear();
-      }
-      this.indexDirty = false;
       this.spatialHash.clear();
       return;
     }
-
-    this.indexDirty = true;
-    this.ensureSpatialIndex();
 
     // Track performance
     this.performanceMetrics.frameTime = performance.now() - startTime;
@@ -909,7 +843,6 @@ class PhysicsSystem extends BaseSystem {
       spatialHashStats: this.spatialHash.getStats(),
       activeEnemies: this.activeEnemies.size,
       activeAsteroids: this.activeEnemies.size,
-      indexCells: this.enemyIndex.size,
     };
   }
 

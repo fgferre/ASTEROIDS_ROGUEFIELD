@@ -19,20 +19,17 @@ export class PlayerContact {
   /**
    * `impacts`: the ImpactFeedback (boss contact feedback, screen shake).
    * `emit(name, payload)`: sends shield-deflected and player-took-damage.
-   * `ensureSpatialIndex()`: brings the spatial index up to date before the query.
    * `getNearbyEnemies(x, y, radius)`: the boss-aware spatial query.
    * `maxEnemyRadius()`: the widest enemy radius seen, which pads the query.
    */
   constructor({
     impacts,
     emit,
-    ensureSpatialIndex,
     getNearbyEnemies,
     maxEnemyRadius,
   }) {
     this.impacts = impacts;
     this.emit = emit;
-    this.ensureSpatialIndex = ensureSpatialIndex;
     this.getNearbyEnemies = getNearbyEnemies;
     this.maxEnemyRadius = maxEnemyRadius;
   }
@@ -366,8 +363,6 @@ export class PlayerContact {
     ) {
       return summary;
     }
-
-    this.ensureSpatialIndex();
 
     const context = this.buildPlayerCollisionContext(player);
     const queryRadius = Math.max(
