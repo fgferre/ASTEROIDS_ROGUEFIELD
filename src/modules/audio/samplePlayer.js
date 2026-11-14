@@ -257,7 +257,12 @@ export function createSamplePlayer(sfx) {
    * dropped it), else false and the cue synthesizes.
    */
   function play(cue, args = []) {
-    const id = sampleIdFor(cue, args);
+    const picked = sampleIdFor(cue, args);
+    // A variant with no file yet (a weapon without a shot of its own) plays
+    // the cue's own sample, not the old synthesis.
+    const own = SAMPLE_CUES[cue]?.sample;
+    const id =
+      picked && !ready.has(picked) && typeof own === 'string' ? own : picked;
     const sample = id && ready.get(id);
     if (!sample) return false;
     sfx.trackPerformance(cue);

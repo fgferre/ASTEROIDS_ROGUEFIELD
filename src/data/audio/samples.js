@@ -30,7 +30,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const SAMPLE_CUES = deepFreeze({
   // A weapon listed here has a shot of its own; until the manifest has its
-  // files it plays the lance's synthesis (the others play the lance's).
+  // files it plays the lance's sample, like the others.
   playLaserShot: {
     sample: 'lance-shot',
     pick: {

@@ -292,6 +292,18 @@ describe('sample layer', () => {
     expect(sources.filter((s) => s.buffer?.path)).toHaveLength(1);
   });
 
+  it("a weapon without a shot of its own plays the lance's sample, not the old synthesis", async () => {
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(
+      fetchFor({ 'lance-shot': sample(['lance-shot/1.mp3']) })
+    );
+
+    bus.playLaserShot({ weaponId: 'arc-caster' });
+    expect(sources).toHaveLength(1);
+    expect(sources[0].buffer.path).toBe('lance-shot/1.mp3');
+    expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
   it('each Warden attack plays its own file once, not again inside its gap, at the boss', async () => {
     const manifest = JSON.parse(
       readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
