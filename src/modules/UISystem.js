@@ -378,7 +378,7 @@ class UISystem extends BaseSystem {
         ? bossRushStageTitle(stage)
         : firstOfBiome
           ? sectorTitle(sector, biome.title)
-          : layer > RUN_FINAL_LAYER
+          : layer > RUN_FINAL_LAYER && !sector
             ? 'DEEP FIELD'
             : '',
     });

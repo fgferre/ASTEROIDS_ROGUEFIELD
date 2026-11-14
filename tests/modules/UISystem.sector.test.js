@@ -43,4 +43,21 @@ describe('UISystem on a sector run', () => {
       chapter: 'CHAPTER I — THE OUTER RING · DEBRIS WAKE',
     });
   });
+  it('the Crucible, past the last layer of the descent, is not called the Deep Field', () => {
+    const showLayerBanner = vi.fn();
+    const ui = {
+      tacticalHud: { layout: { showLayerBanner } },
+      cinematics: { introActive: false },
+      queueTransmission: vi.fn(),
+      getService: (name) =>
+        name === 'game-session' ? { sector: sectorById('the-crucible') } : null,
+    };
+
+    UISystem.prototype.handleLayerStarted.call(ui, { wave: 17 });
+
+    expect(showLayerBanner).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ chapter: '' })
+    );
+  });
 });
