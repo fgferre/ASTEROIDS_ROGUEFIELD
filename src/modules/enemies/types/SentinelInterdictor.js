@@ -260,10 +260,11 @@ export class SentinelInterdictor extends BossEnemy {
     const { x, y } = this.placeCage(ahead, size);
     let near = Infinity;
     cageSides(x, y, size).forEach((s, i) => {
-      const mid = Math.hypot(
-        (s.x1 + s.x2) / 2 - this.x,
-        (s.y1 + s.y2) / 2 - this.y
-      );
+      const mx = (s.x1 + s.x2) / 2;
+      const my = (s.y1 + s.y2) / 2;
+      // never on the field's edge: out by it, the ship wraps across the field
+      if (mx <= 0 || my <= 0 || mx >= GAME_WIDTH || my >= GAME_HEIGHT) return;
+      const mid = Math.hypot(mx - this.x, my - this.y);
       if (mid < near) {
         near = mid;
         this.openSide = i;
@@ -465,15 +466,28 @@ export class SentinelInterdictor extends BossEnemy {
       const side = Math.sign(off) || -Math.sign(moving) || 1;
       return { x: nx * side, y: ny * side };
     });
+    const g = this.grid;
+    const h = g.size / 2;
+    const inside = Math.abs(ship.x - g.x) <= h && Math.abs(ship.y - g.y) <= h;
     const squeezed = pushes.some((a) =>
       pushes.some((b) => a.x * b.x + a.y * b.y < -0.5)
     );
-    const g = this.grid;
-    const out = cageSides(0, 0, 1)[g.open];
-    // the doorway side's normal points in: out is against it
-    const door = { x: out.y2 - out.y1, y: -(out.x2 - out.x1) };
+    let kicks = pushes;
+    if (!inside) {
+      // outside the cage, only ever away from it (13/11 review: a ship behind
+      // the back fence of a nearly closed cage touched both side fences and
+      // was spat through the cage)
+      const dx = ship.x - clamp(ship.x, g.x - h, g.x + h);
+      const dy = ship.y - clamp(ship.y, g.y - h, g.y + h);
+      const d = Math.hypot(dx, dy);
+      kicks = [{ x: dx / d, y: dy / d }];
+    } else if (squeezed) {
+      const out = cageSides(0, 0, 1)[g.open];
+      // the doorway side's normal points in: out is against it
+      kicks = [{ x: out.y2 - out.y1, y: -(out.x2 - out.x1) }];
+    }
     if (velocity) {
-      for (const push of squeezed ? [door] : pushes) {
+      for (const push of kicks) {
         const moving = velocity.vx * push.x + velocity.vy * push.y;
         const kick = Math.max(0, INTERDICTOR.grid.push - moving);
         velocity.vx += push.x * kick;

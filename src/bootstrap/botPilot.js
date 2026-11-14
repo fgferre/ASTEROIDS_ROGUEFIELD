@@ -17,6 +17,7 @@ import {
   DASH_INVULNERABILITY,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../data/constants/gameplay.js';
+import { cageFences } from '../modules/enemies/types/SentinelInterdictor.js';
 
 /**
  * The bot's skill. `reactionMs`: a plan acts this long after the world it
@@ -289,20 +290,18 @@ function grid(z, x, y, t, r) {
   if (z.phase === 'fade') return 0;
   if (z.phase === 'warn' ? !from(z.timer, t) : !until(z.timer, t)) return 0;
   // solid, a closing cage keeps closing round its centre as seen (closing,
-  // px/s of its side): its fences where they will be
-  const k =
-    z.phase === 'solid' && z.closing && z.size > 0
-      ? Math.max(0, z.size + z.closing * t) / z.size
-      : 1;
+  // px/s of its side): its fences where they will be, rebuilt as the game
+  // does (the doorway keeps its width, its stubs shorten)
   const fences =
-    k === 1
-      ? z.fences
-      : (z.fences || []).map((f) => ({
-          x1: z.x + (f.x1 - z.x) * k,
-          y1: z.y + (f.y1 - z.y) * k,
-          x2: z.x + (f.x2 - z.x) * k,
-          y2: z.y + (f.y2 - z.y) * k,
-        }));
+    z.phase === 'solid' && z.closing && z.size > 0
+      ? cageFences(
+          z.x,
+          z.y,
+          Math.max(0, z.size + z.closing * t),
+          z.open,
+          z.door
+        )
+      : z.fences;
   return segments(fences, x, y, LINE_HALF + r);
 }
 

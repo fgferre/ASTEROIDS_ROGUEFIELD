@@ -224,6 +224,44 @@ describe('Sentinel Interdictor', () => {
     expect(hits(system, 'boss-barrier')).toBe(1);
   });
 
+  it('pushes a ship behind the back fence of a nearly closed cage away, not through it', () => {
+    const { boss } = createInterdictor(100, 100);
+    runUntil(boss, () => boss.grid);
+    const grid = boss.grid;
+    runUntil(boss, () => grid.phase === 'solid', target(grid));
+    runUntil(boss, () => grid.size < 40, target(grid));
+    // 5 px outside the side opposite the doorway, on its middle
+    const back = sideMiddle(grid, (grid.open + 2) % 4);
+    const away = { x: back.x - grid.x, y: back.y - grid.y };
+    const length = Math.hypot(away.x, away.y);
+    const spot = {
+      x: back.x + (away.x / length) * 5,
+      y: back.y + (away.y / length) * 5,
+    };
+    // the back fence and both side fences' ends touch it
+    expect(boss.fencesHit(spot).length).toBeGreaterThanOrEqual(3);
+    const behind = target(spot);
+    boss.handlePhaseIntro(STEP, behind);
+    const v = behind.player.velocity;
+    expect((v.vx * away.x + v.vy * away.y) / length).toBeGreaterThanOrEqual(
+      INTERDICTOR.grid.push * 0.99
+    );
+  });
+
+  it('never opens the doorway on the field’s edge, even in a corner', () => {
+    // its body in a cage clamped into the bottom-left corner: the nearest
+    // side to it is the left one, on the field's edge
+    const { boss } = createInterdictor(80, 500);
+    boss.beginGrid(boss.cycle(), { x: 40, y: 560 });
+    const grid = boss.grid;
+    expect(grid.closes).toBe(false);
+    expect(grid.x - grid.size / 2).toBe(0);
+    expect(grid.y + grid.size / 2).toBe(GAME_HEIGHT);
+    const door = sideMiddle(grid, grid.open);
+    expect(door.x).toBeGreaterThan(0);
+    expect(door.y).toBeLessThan(GAME_HEIGHT);
+  });
+
   it('closes the solid cage round its centre, the doorway still open', () => {
     const { boss } = createInterdictor(100, 100);
     runUntil(boss, () => boss.grid);

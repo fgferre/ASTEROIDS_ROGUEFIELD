@@ -274,6 +274,25 @@ describe('hazardAt', () => {
     expect(hazardAt(world, 300, 200, 0)).toBe(0);
   });
 
+  it('a closing cage keeps its doorway wide, as the game builds it', () => {
+    // 400 px closing 250 px/s: in 1 s it is 150 px, its top doorway still
+    // 130 px wide (stubs 10 px), not scaled down with the cage
+    const world = zoneWorld({
+      type: 'grid',
+      x: 400,
+      y: 300,
+      size: 400,
+      open: 0,
+      door: 130,
+      closing: -250,
+      fences: [],
+      phase: 'solid',
+      timer: 2,
+    });
+    expect(hazardAt(world, 435, 225, 1)).toBeLessThan(1);
+    expect(hazardAt(world, 470, 225, 1)).toBeGreaterThanOrEqual(1);
+  });
+
   it('a moving body is extrapolated by its velocity, across the wrap', () => {
     const world = makeWorld({
       movers: [{ x: 790, y: 300, vx: 100, vy: 0, radius: 5 }],
