@@ -126,6 +126,29 @@ describe('TransmissionQueue', () => {
     expect(finished).toEqual(['boss:null:defeated']);
   });
 
+  it('reports each line still waiting dropped when the queue is cleared', () => {
+    const hud = fakeHud();
+    const finished = [];
+    const dropped = [];
+    const queue = new TransmissionQueue(
+      hud,
+      () => {},
+      (entry) => finished.push(entry.key),
+      () => {},
+      (entry) => dropped.push(entry.key)
+    );
+    queue.push(wardenTransmission(5, 'warning'));
+    queue.push(wardenTransmission(5, 'defeated'));
+    queue.push(victoryTransmission());
+    queue.update(0);
+    // A banner cuts the line on air: it waits again, but is not dropped.
+    hud.busy = true;
+    queue.update(500);
+    queue.clear();
+    expect(finished).toEqual(['boss:prime:warning']);
+    expect(dropped).toEqual(['boss:prime:defeated', 'victory']);
+  });
+
   it('shows the whole line at once with reduced motion', () => {
     const hud = fakeHud();
     const queue = new TransmissionQueue(hud, () => {});

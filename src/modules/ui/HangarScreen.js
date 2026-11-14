@@ -68,7 +68,7 @@ export class HangarScreen {
   // stops and its recording is let go.
   endPurchaseLine() {
     if (!this.purchaseLine) return;
-    this.emit('transmission-finished', { key: this.purchaseLine.key });
+    this.emit('transmission-finished', this.purchaseLine);
     this.purchaseLine = null;
   }
 

@@ -10,8 +10,13 @@
  * dedicated gain nodes — musicDuckGain and effectsDuckGain — that REST at 1.0
  * and splices them into the serial chains:
  *
- *   music:   musicPauseFadeGain → musicDuckGain (rests 1.0) → musicGain (slider)
+ *   music:   musicPauseFadeGain → musicDuckGain → musicVoiceDuckGain → musicGain (slider)
  *   effects: SFX content        → effectsDuckGain (rests 1.0) → effectsGain (slider)
+ *
+ * musicVoiceDuckGain (bus 'voice') is a stage of its own for a story line's
+ * long duck: the short ducks (big moments, low health) re-anchor only their
+ * own stage, so they never cut the voice's duck short and the voice's end
+ * never lifts theirs; overlapping, the two multiply.
  *
  * Because the stages are serial gains, the duck factor MULTIPLIES the slider
  * value automatically — the controller NEVER reads or writes the slider stages
@@ -59,6 +64,7 @@ class DuckingController {
     // --- runtime state ---
     this.context = null;
     this.musicDuckGain = null;
+    this.musicVoiceDuckGain = null;
     this.effectsDuckGain = null;
 
     // Splice endpoints (held so dispose can restore the direct connections).
@@ -95,10 +101,10 @@ class DuckingController {
 
     const now = context.currentTime;
 
-    // --- musicDuckGain: rests at 1.0, spliced between pauseFade and musicGain ---
+    // --- musicDuckGain → musicVoiceDuckGain: rest at 1.0, spliced between
+    // pauseFade and musicGain ---
     this.musicDuckGain = context.createGain();
     this._restNode(this.musicDuckGain, now);
-    this.musicDuckGain.connect(this._musicSpliceTo);
     // EXPLICIT disconnect of the old direct path BEFORE reconnecting through the
     // duck node (review: no double path).
     if (this._musicSpliceFrom) {
@@ -112,6 +118,11 @@ class DuckingController {
     if (this._effectsSpliceTo) {
       this.effectsDuckGain.connect(this._effectsSpliceTo);
     }
+
+    this.musicVoiceDuckGain = context.createGain();
+    this._restNode(this.musicVoiceDuckGain, now);
+    this.musicDuckGain.connect(this.musicVoiceDuckGain);
+    this.musicVoiceDuckGain.connect(this._musicSpliceTo);
 
     this.initialized = true;
   }
@@ -140,7 +151,8 @@ class DuckingController {
    * @param {number} [options.holdMs]
    * @param {number} [options.releaseMs]
    * @param {number} [options.startTime] - context.currentTime domain; default now.
-   * @param {'music'|'effects'|'both'} [options.bus='music']
+   * @param {'music'|'effects'|'both'|'voice'} [options.bus='music'] - 'voice'
+   *   is the music's own stage for a story line's duck.
    */
   duck(options = {}) {
     if (!this.initialized || !this.context) return;
@@ -172,6 +184,7 @@ class DuckingController {
     const targets = [];
     if (bus === 'music' || bus === 'both') targets.push(this.musicDuckGain);
     if (bus === 'effects' || bus === 'both') targets.push(this.effectsDuckGain);
+    if (bus === 'voice') targets.push(this.musicVoiceDuckGain);
 
     targets.forEach((node) => {
       this._applyEnvelope(node, anchorTime, factor, attackS, holdS, releaseS);
@@ -239,6 +252,7 @@ class DuckingController {
     // Restore the direct music connection: disconnect the duck node, reconnect
     // pauseFade straight to the slider stage.
     this._safeDisconnect(this.musicDuckGain);
+    this._safeDisconnect(this.musicVoiceDuckGain);
     if (this._musicSpliceFrom) {
       this._safeDisconnect(this._musicSpliceFrom);
       if (this._musicSpliceTo) {
@@ -249,6 +263,7 @@ class DuckingController {
     this._safeDisconnect(this.effectsDuckGain);
 
     this.musicDuckGain = null;
+    this.musicVoiceDuckGain = null;
     this.effectsDuckGain = null;
     this._musicSpliceFrom = null;
     this._musicSpliceTo = null;

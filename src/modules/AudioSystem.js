@@ -132,19 +132,21 @@ class AudioSystem extends BaseSystem {
     this.duckingController = new DuckingController();
 
     // The recorded story lines (./audio/voiceLines.js), on their own bus
-    // (the Voices slider); the music ducks under them.
+    // (the Voices slider); the music ducks under them (on its own stage, see
+    // DuckingController), unless the voices are off.
     this.voiceLines = createVoicePlayer({
       getContext: () => this.context,
       getDestination: () => this.voiceGain,
+      audible: () => this.volumeState.voice > 0 && !this.volumeState.muteAll,
       duck: (seconds) =>
         this.duckingController.duck({
-          bus: 'music',
+          bus: 'voice',
           ...AUDIO_VOICE.duck,
           holdMs: seconds * 1000,
         }),
       unduck: () =>
         this.duckingController.duck({
-          bus: 'music',
+          bus: 'voice',
           depthDb: 0,
           attackMs: AUDIO_VOICE.recoverMs,
           holdMs: 0,
@@ -824,6 +826,11 @@ class AudioSystem extends BaseSystem {
     }
     this.journeyCue.stop();
     clearTimeout(this.chapterStingerTimer);
+    this.chapterStingerTimer = null;
+    this.journeyFlown = false;
+    this.chapterClaimed = false;
+    // Leaving a run (a new one, the menu): no line goes on speaking.
+    this.voiceLines.clear();
     this.runEnemyCount = 0;
     this.listenerX = GAME_WIDTH / 2;
     this.listenerY = GAME_HEIGHT / 2;
@@ -848,6 +855,8 @@ class AudioSystem extends BaseSystem {
       this.sfxBus.dispose();
     }
     this.journeyCue.stop();
+    this.voiceLines.clear();
+    this.voiceLines.expect([]);
     // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
     if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
       this.musicMixer.dispose();

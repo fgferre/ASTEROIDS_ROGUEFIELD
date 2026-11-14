@@ -25,8 +25,6 @@ describe('Hangar screen', () => {
     screen.hangarState.isOpen = true;
     screen.closeHangar();
     screen.closeHangar();
-    expect(emit.mock.calls.slice(2)).toEqual([
-      ['transmission-finished', { key: line.key }],
-    ]);
+    expect(emit.mock.calls.slice(2)).toEqual([['transmission-finished', line]]);
   });
 });

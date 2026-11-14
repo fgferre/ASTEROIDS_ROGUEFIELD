@@ -47,14 +47,16 @@ export const AUDIO_EVENT_HANDLERS = {
   },
 
   // A story line (audio/voiceLines.js): readied as it is queued, played as
-  // it shows (a line without a recording gets the synthesized voice), its
-  // voice stopped when a banner cuts it and released once it is done.
+  // it shows (a line without a recording gets the synthesized voice; a
+  // recorded one with the voices off stays silent), its voice stopped when a
+  // banner cuts it and released once it is done or dropped.
   voiceQueued(audio, payload) {
-    if (payload) audio.voiceLines.prepare(payload);
+    if (payload) audio.voiceLines.queue(payload);
   },
-  // Lines about to be queued (a journey offered) are readied ahead.
+  // Lines about to be queued (a journey offered) are readied ahead, in place
+  // of the ones readied before.
   voiceComing(audio, payload) {
-    payload?.entries?.forEach((entry) => audio.voiceLines.prepare(entry));
+    audio.voiceLines.expect(payload?.entries);
   },
   voiceShown(audio, payload) {
     if (!audio.voiceLines.play(payload ?? {})) {
@@ -62,9 +64,9 @@ export const AUDIO_EVENT_HANDLERS = {
     }
   },
   voiceStopped(audio, payload, eventName) {
-    const key = payload?.key ?? null;
-    if (eventName === 'transmission-finished') audio.voiceLines.release(key);
-    else audio.voiceLines.stop(key);
+    if (!payload) return;
+    if (eventName === 'transmission-cut') audio.voiceLines.stop(payload);
+    else audio.voiceLines.release(payload);
   },
 
   // The player's position: the pan and distance reference of every cue.
@@ -124,15 +126,36 @@ export const AUDIO_EVENT_HANDLERS = {
     if (!Number.isFinite(wave) || wave <= 0) return;
     audio.musicMixer.setTheme(musicThemeForLayer(wave));
     const chapterTheme = chapterThemeForLayer(wave);
-    if (chapterTheme) {
-      // A journey that opens the sector plays the chapter's motif itself and
-      // is planned a few frames after this (journeyPlanned): the stinger
-      // waits that long, so the motif is not heard twice.
+    // A journey that opens the sector plays the chapter's motif itself: a
+    // layer started after it (a head start's) has no stinger, and one
+    // started before it waits for it (cinematicStarted), so the motif is not
+    // heard twice.
+    const claimed = audio.chapterClaimed;
+    audio.chapterClaimed = false;
+    if (chapterTheme && !claimed) {
       clearTimeout(audio.chapterStingerTimer);
-      audio.chapterStingerTimer = setTimeout(
-        () => audio.sfxBus.playChapterStinger(chapterTheme),
-        CHAPTER_STINGER_WAIT_MS
-      );
+      audio.chapterStingerTimer = setTimeout(() => {
+        audio.chapterStingerTimer = null;
+        audio.sfxBus.playChapterStinger(chapterTheme);
+      }, CHAPTER_STINGER_WAIT_MS);
+    }
+  },
+
+  // The run start's opening (ui/runCinematics.js), sent as the run starts,
+  // not from a frame. A journey claims the chapter's motif (waveStarted). An
+  // intro with no journey before it: the lines readied for a journey this
+  // start does not fly are let go.
+  cinematicStarted(audio, payload) {
+    if (payload?.kind === 'travel') {
+      audio.journeyFlown = true;
+      if (audio.chapterStingerTimer) {
+        clearTimeout(audio.chapterStingerTimer);
+        audio.chapterStingerTimer = null;
+      } else {
+        audio.chapterClaimed = true;
+      }
+    } else if (payload?.kind === 'intro' && !audio.journeyFlown) {
+      audio.voiceLines.expect([]);
     }
   },
 
@@ -152,7 +175,6 @@ export const AUDIO_EVENT_HANDLERS = {
   // down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
     if (audio.journeyCue.play(payload ?? {})) {
-      clearTimeout(audio.chapterStingerTimer);
       audio.musicMixer.holdForJourney(true);
     }
   },
@@ -208,7 +230,10 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sfxBus.engine.stop();
   },
 
+  // Back on the menu (from the map, a victory, a run): lines readied for a
+  // journey not taken are let go.
   screen(audio, payload) {
+    if (payload?.screen === 'menu') audio.voiceLines.expect([]);
     audio._handleScreenChanged(payload);
   },
 

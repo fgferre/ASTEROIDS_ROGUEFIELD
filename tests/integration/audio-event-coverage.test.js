@@ -264,16 +264,34 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
     });
   });
 
-  it('a journey planned right after the sector starts keeps the chapter stinger silent: its score plays the motif', () => {
+  it('a journey flown as the sector starts keeps the chapter stinger silent, however late its first frame: its score plays the motif', () => {
     const { audio, eventBus } = resolveRealAudioService();
-    audio.journeyCue = { play: vi.fn(() => true), end: vi.fn(), stop: vi.fn() };
     const chapter = vi.spyOn(audio.sfxBus, 'playChapterStinger');
     vi.useFakeTimers();
 
+    // The journey starts as the run starts; travel-planned waits a frame.
     eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
-    eventBus.emit('travel-planned', { moments: [], duration: 10 });
+    eventBus.emit('cinematic-started', { kind: 'travel' });
+    vi.advanceTimersByTime(2000);
+    expect(chapter).not.toHaveBeenCalled();
+
+    // A head start's first layer starts after the journey: no stinger
+    // either; the next chapter's has one.
+    audio.reset();
+    eventBus.emit('cinematic-started', { kind: 'travel' });
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
     vi.advanceTimersByTime(500);
     expect(chapter).not.toHaveBeenCalled();
+    eventBus.emit('wave-started', { wave: 11, totalEnemies: 10 });
+    vi.advanceTimersByTime(500);
+    expect(chapter).toHaveBeenCalledTimes(1);
+
+    // A run start with no journey (its intro) keeps it.
+    audio.reset();
+    eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+    eventBus.emit('cinematic-started', { kind: 'intro' });
+    vi.advanceTimersByTime(500);
+    expect(chapter).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -638,17 +656,56 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     audio.destroy();
   });
 
-  it('voice-lines-coming → each coming line readied ahead of its showing', () => {
+  it('a recorded line ducks the music on its own stage (not with the voices off) and leaving the run stops it', async () => {
+    await loadVoiceManifest(async () => ({ json: async () => voiceManifest }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      }))
+    );
     const { audio, eventBus } = resolveRealAudioService();
-    const prepare = vi.fn();
-    audio.voiceLines = { prepare };
-    eventBus.emit('voice-lines-coming', {
-      entries: [{ key: 'travel:x:0' }, { key: 'chapter:x' }],
+    audio.voiceGain = audio.context.createGain();
+    const sources = [];
+    audio.context.createBufferSource = vi.fn(() => {
+      const source = { connect() {}, start: vi.fn(), stop: vi.fn() };
+      sources.push(source);
+      return source;
     });
-    expect(prepare.mock.calls.map(([entry]) => entry.key)).toEqual([
-      'travel:x:0',
-      'chapter:x',
-    ]);
+    const duck = vi.spyOn(audio.duckingController, 'duck');
+    const line = { speaker: 'THE RING', key: 'victory', text: STORY.victory };
+    const say = async () => {
+      eventBus.emit('transmission-queued', line);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      eventBus.emit('transmission-shown', line);
+    };
+
+    await say();
+    expect(sources).toHaveLength(1);
+    expect(duck).toHaveBeenCalledWith(
+      expect.objectContaining({ bus: 'voice' })
+    );
+    audio.reset();
+    expect(sources[0].stop).toHaveBeenCalled();
+
+    duck.mockClear();
+    audio.updateVolumeState({ voiceVolume: 0 });
+    await say();
+    expect(sources).toHaveLength(2);
+    expect(duck).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+    audio.destroy();
+  });
+
+  it('voice-lines-coming → the coming lines readied ahead of their showing', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const expectLines = vi.fn();
+    audio.voiceLines = { expect: expectLines, clear: vi.fn() };
+    const entries = [{ key: 'travel:x:0' }, { key: 'chapter:x' }];
+    eventBus.emit('voice-lines-coming', { entries });
+    expect(expectLines).toHaveBeenCalledWith(entries);
     audio.destroy();
   });
 

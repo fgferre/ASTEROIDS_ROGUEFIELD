@@ -159,14 +159,22 @@ export function victoryTransmission() {
  * `view` is the HUD (isBannerBusy, showTransmission, typeTransmission,
  * hideTransmission); `onShown(entry)` fires each time a line starts,
  * `onFinished(entry)` once it is done for good: held to the end, or dropped;
- * `onCut(entry)` when a banner cuts it (it plays again afterwards).
+ * `onCut(entry)` when a banner cuts it (it plays again afterwards);
+ * `onDropped(entry)` for each line still waiting when the queue clears.
  */
 export class TransmissionQueue {
-  constructor(view, onShown, onFinished = () => {}, onCut = () => {}) {
+  constructor(
+    view,
+    onShown,
+    onFinished = () => {},
+    onCut = () => {},
+    onDropped = () => {}
+  ) {
     this.view = view;
     this.onShown = onShown;
     this.onFinished = onFinished;
     this.onCut = onCut;
+    this.onDropped = onDropped;
     this.pending = [];
     this.current = null;
     // A line a banner cut: still on air for whoever waits on it.
@@ -192,6 +200,7 @@ export class TransmissionQueue {
   clear() {
     const { current } = this;
     const onAir = current?.entry ?? this.cut;
+    const dropped = this.pending.filter((entry) => entry !== onAir);
     this.pending = [];
     this.current = null;
     this.cut = null;
@@ -201,6 +210,7 @@ export class TransmissionQueue {
     if (onAir) {
       this.onFinished(onAir);
     }
+    dropped.forEach((entry) => this.onDropped(entry));
   }
 
   update(nowMs, reducedMotion = false) {

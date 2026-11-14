@@ -156,6 +156,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'transmission-shown', run: 'voiceShown' },
   { on: 'transmission-cut', run: 'voiceStopped' },
   { on: 'transmission-finished', run: 'voiceStopped' },
+  { on: 'transmission-dropped', run: 'voiceStopped' },
   { on: 'pickup-spawned', cue: 'playPickupSpawned', panX: 'x' },
 
   // Enemy shots, by the firing machine (the batcher reads the shot's fields):
@@ -245,6 +246,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   // sample, the burn's loop on and off, and all of it fading when it ends.
   // Its score (audio/journeyCue.js) is laid out from the plan as it starts
   // and stops early on a skip; the sector's music hands over at the end.
+  { on: 'cinematic-started', run: 'cinematicStarted' },
   { on: 'travel-planned', run: 'journeyPlanned' },
   { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
   { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },

@@ -202,30 +202,44 @@ describe('the journey fits its spoken lines', () => {
 
 describe('createVoicePlayer', () => {
   const line = chapterTransmission('outer-ring');
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-  async function readyPlayer() {
+  // A player whose decoded buffers name the file they came from.
+  function makePlayer({ audible = () => true, fail = () => false } = {}) {
     const context = createAudioContextStub();
+    context.decodeAudioData = vi.fn(async (file) => ({ file, duration: 2 }));
     const sources = [];
     context.createBufferSource = vi.fn(() => {
       const source = { connect() {}, start: vi.fn(), stop: vi.fn() };
       sources.push(source);
       return source;
     });
+    const fetched = [];
     const duck = vi.fn();
     const unduck = vi.fn();
     const player = createVoicePlayer({
       getContext: () => context,
       getDestination: () => ({}),
+      audible,
       duck,
       unduck,
-      fetchFile: async () => ({ arrayBuffer: async () => new ArrayBuffer(8) }),
+      fetchFile: async (file) => {
+        fetched.push(file);
+        if (fail(file)) throw new Error('offline');
+        return { arrayBuffer: async () => file };
+      },
     });
-    player.prepare(line);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    return { player, sources, duck, unduck };
+    return { player, sources, fetched, duck, unduck };
   }
 
-  it('plays a prepared line and ducks the music', async () => {
+  async function readyPlayer(options) {
+    const made = makePlayer(options);
+    made.player.queue(line);
+    await settle();
+    return made;
+  }
+
+  it('plays a queued line and ducks the music', async () => {
     const { player, sources, duck } = await readyPlayer();
     expect(player.play(line)).toBe(true);
     expect(sources).toHaveLength(1);
@@ -236,7 +250,7 @@ describe('createVoicePlayer', () => {
   it('a cleared line stops its voice and lets the music back up', async () => {
     const { player, sources, unduck } = await readyPlayer();
     player.play(line);
-    player.release(line.key);
+    player.release(line);
     expect(sources[0].stop).toHaveBeenCalled();
     expect(unduck).toHaveBeenCalled();
   });
@@ -244,7 +258,7 @@ describe('createVoicePlayer', () => {
   it("another line's end leaves the voice playing", async () => {
     const { player, sources } = await readyPlayer();
     player.play(line);
-    player.stop('chapter:dense-core');
+    player.stop(chapterTransmission('dense-core'));
     expect(sources[0].stop).not.toHaveBeenCalled();
   });
 
@@ -256,5 +270,75 @@ describe('createVoicePlayer', () => {
     };
     expect(player.play(edited)).toBe(false);
     expect(sources).toHaveLength(0);
+  });
+
+  it("a line under a shared key plays its own recording, never the other's", async () => {
+    const sector = chapterTransmission('dense-core', 'dense-core');
+    const biome = chapterTransmission('dense-core');
+    const { player, sources } = makePlayer();
+    // The map readies the sector's line; Descent then says the biome's.
+    player.expect([sector]);
+    player.queue(biome);
+    await settle();
+    player.play(biome);
+    expect(sources[0].buffer.file).toBe(
+      manifest.lines['chapter:dense-core@biome'].file
+    );
+    player.queue(sector);
+    await settle();
+    player.play(sector);
+    expect(sources[1].buffer.file).toBe(
+      manifest.lines['chapter:dense-core'].file
+    );
+  });
+
+  it('lets go of what it readied once nothing wants it, and retries a failed load', async () => {
+    // As the map offers it: the journey's lines, then the sector's chapter.
+    const journey = [
+      ...travelTransmissions('dense-core'),
+      chapterTransmission('dense-core', 'dense-core'),
+    ];
+    const offline = { file: voiceFor(journey[0]).file };
+    const { player, fetched } = makePlayer({
+      fail: (file) => file === offline.file,
+    });
+    const fetches = (entry) =>
+      fetched.filter((file) => file === voiceFor(entry).file).length;
+    player.expect(journey);
+    await settle();
+    // A failed line is fetched again when asked for again.
+    offline.file = null;
+    player.queue(journey[0]);
+    expect(fetches(journey[0])).toBe(2);
+    // Asked again while kept: no new fetch.
+    player.queue(journey[1]);
+    expect(fetches(journey[1])).toBe(1);
+    await settle();
+    // Another offer replaces this one: its lines not queued go.
+    player.expect([line]);
+    player.queue(journey[2]);
+    expect(fetches(journey[2])).toBe(2);
+    // A queued line dropped unshown goes too (journey[1] was queued once).
+    player.release(journey[1]);
+    player.queue(journey[1]);
+    expect(fetches(journey[1])).toBe(2);
+  });
+
+  it('with the voices off a line ducks nothing (its source still plays)', async () => {
+    const { player, sources, duck } = await readyPlayer({
+      audible: () => false,
+    });
+    expect(player.play(line)).toBe(true);
+    expect(sources).toHaveLength(1);
+    expect(duck).not.toHaveBeenCalled();
+  });
+
+  it('leaving a run fades the voice, and a line left over from it stays silent', async () => {
+    const { player, sources } = await readyPlayer();
+    player.play(line);
+    player.clear();
+    expect(sources[0].stop).toHaveBeenCalled();
+    expect(player.play(line)).toBe(true);
+    expect(sources).toHaveLength(1);
   });
 });

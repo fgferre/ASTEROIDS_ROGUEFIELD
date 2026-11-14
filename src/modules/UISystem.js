@@ -265,8 +265,9 @@ class UISystem extends BaseSystem {
           this.lastTransmission = { speaker, text };
           this.eventBus.emit('transmission-shown', { speaker, key, text });
         },
-        ({ key }) => this.eventBus.emit('transmission-finished', { key }),
-        ({ key }) => this.eventBus.emit('transmission-cut', { key })
+        (entry) => this.eventBus.emit('transmission-finished', entry),
+        (entry) => this.eventBus.emit('transmission-cut', entry),
+        (entry) => this.eventBus.emit('transmission-dropped', entry)
       );
     }
     this.tacticalHud.updateAAATacticalHudFromServices({ force: true });
@@ -395,9 +396,7 @@ class UISystem extends BaseSystem {
   /** Queues a Warden transmission and keeps the frame loop that plays it. */
   queueTransmission(entry, { interrupt = false } = {}) {
     const queue = this.transmissions;
-    if (!queue || !entry) {
-      return;
-    }
+    if (!queue || !entry) return;
     if (interrupt) {
       queue.interrupt(entry);
     } else {

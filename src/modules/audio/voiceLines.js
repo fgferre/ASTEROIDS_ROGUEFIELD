@@ -29,8 +29,8 @@ export async function loadVoiceManifest(
   }
 }
 
-/** The recording ({ file, seconds, … }) of `entry` ({ key, text, speaker }), or null. */
-export function voiceFor({ key, text, speaker } = {}) {
+// The manifest id of `entry`'s recording, or null.
+function recordingId({ key, text, speaker } = {}) {
   for (const id of [key, `${key}@biome`]) {
     const line = recordings[id];
     if (
@@ -38,50 +38,89 @@ export function voiceFor({ key, text, speaker } = {}) {
       line.text === text &&
       (!line.only || STORY.speaker[line.only] === speaker)
     ) {
-      return line;
+      return id;
     }
   }
   return null;
 }
 
+/** The recording ({ file, seconds, … }) of `entry` ({ key, text, speaker }), or null. */
+export function voiceFor(entry) {
+  const id = recordingId(entry);
+  return id ? recordings[id] : null;
+}
+
 /**
  * `getContext()`/`getDestination()` the live AudioContext and the voice
- * bus; `duck(seconds)` lowers the music under a voice, `unduck()` lets it
- * back up when one stops early.
+ * bus; `audible()` false while the voices are off (no duck then);
+ * `duck(seconds)` lowers the music under a voice, `unduck()` lets it back up
+ * when one stops early. Recordings are cached by their manifest id, never by
+ * a line's key (a sector's chapter line and its biome's share one), and kept
+ * only while a queued line or the coming set (`expect`) wants them.
  */
 export function createVoicePlayer({
   getContext,
   getDestination,
+  audible = () => true,
   duck = () => {},
   unduck = () => {},
   fetchFile = (path) => fetchAudioFile('voice', path),
 }) {
-  const loads = new Map(); // key → Promise<AudioBuffer | null>
-  const ready = new Map(); // key → AudioBuffer
-  let playing = null; // { key, source, gain }
-  let waiting = null; // { key, until } a shown line whose file is not ready
+  const loads = new Map(); // id → Promise<AudioBuffer | null>
+  const ready = new Map(); // id → AudioBuffer
+  const queued = new Map(); // id → how many queued lines say it
+  let coming = new Set(); // ids readied for lines about to be queued
+  let playing = null; // { id, source, gain }
+  let waiting = null; // { id, until } a shown line whose file is not ready
 
-  /** Fetch and decode `entry`'s recording (no-op without one). */
-  function prepare(entry) {
-    const line = voiceFor(entry);
+  // Fetch and decode recording `id`; a failed load is tried again next time.
+  function load(id) {
     const context = getContext();
-    if (!line || !context || loads.has(entry.key)) return;
-    const { key } = entry;
-    const load = fetchFile(line.file)
+    if (!id || !context || loads.has(id)) return;
+    const load = fetchFile(recordings[id].file)
       .then((response) => response.arrayBuffer())
       .then((bytes) => context.decodeAudioData(bytes))
       .then((buffer) => {
-        if (loads.get(key) === load) ready.set(key, buffer);
+        if (loads.get(id) === load) ready.set(id, buffer);
         return buffer;
       })
       .catch((error) => {
-        console.warn(`[Voice] "${key}" did not load; it stays silent.`, error);
+        if (loads.get(id) === load) loads.delete(id);
+        console.warn(`[Voice] "${id}" did not load; it stays silent.`, error);
         return null;
       });
-    loads.set(key, load);
+    loads.set(id, load);
   }
 
-  function start(key, buffer) {
+  // Lets go of `id`'s buffer unless a queued line or the coming set wants it.
+  function drop(id) {
+    if (queued.has(id) || coming.has(id)) return;
+    loads.delete(id);
+    ready.delete(id);
+  }
+
+  /** `entry` is queued: its recording loads and is kept until it is done. */
+  function queue(entry) {
+    const id = recordingId(entry);
+    if (!id) return;
+    queued.set(id, (queued.get(id) ?? 0) + 1);
+    coming.delete(id);
+    load(id);
+  }
+
+  /**
+   * Lines about to be queued (a journey offered) load ahead; they replace
+   * the previous set, whose lines not queued since are let go (`[]` lets
+   * them all go).
+   */
+  function expect(entries = []) {
+    const before = coming;
+    coming = new Set(entries.map(recordingId).filter(Boolean));
+    before.forEach(drop);
+    coming.forEach(load);
+  }
+
+  function start(id, buffer) {
     const context = getContext();
     const destination = getDestination();
     if (!context || !destination) return;
@@ -94,38 +133,42 @@ export function createVoicePlayer({
       if (playing?.source === source) playing = null;
     };
     source.start();
-    playing = { key, source, gain };
-    duck(buffer.duration);
+    playing = { id, source, gain };
+    if (audible()) duck(buffer.duration);
   }
 
   /**
    * `entry` shows: its recording plays (the one before stops). True when it
-   * has one (even if it ends up silent, not ready in time), else false.
+   * has one (even if it ends up silent: not ready in time, or no longer
+   * queued, a line left over from a run that ended), else false.
    */
   function play(entry) {
     stop();
     const context = getContext();
-    if (!context || !voiceFor(entry)) return false;
-    const { key } = entry;
-    prepare(entry);
-    if (ready.has(key)) {
-      start(key, ready.get(key));
+    const id = recordingId(entry);
+    if (!id) return false;
+    if (!context || !queued.has(id)) return true;
+    load(id);
+    if (ready.has(id)) {
+      start(id, ready.get(id));
       return true;
     }
-    const ask = { key, until: context.currentTime + LATE_START_S };
+    const ask = { id, until: context.currentTime + LATE_START_S };
     waiting = ask;
-    loads.get(key)?.then((buffer) => {
+    loads.get(id)?.then((buffer) => {
       if (waiting !== ask) return;
       waiting = null;
-      if (buffer && context.currentTime <= ask.until) start(key, buffer);
+      if (buffer && context.currentTime <= ask.until) start(id, buffer);
     });
     return true;
   }
 
-  /** Fades out the voice (only `key`'s, when given). */
-  function stop(key = null) {
-    if (key === null || waiting?.key === key) waiting = null;
-    if (!playing || (key !== null && playing.key !== key)) return;
+  /** Fades out the voice (only `entry`'s, when given). */
+  function stop(entry = null) {
+    const id = entry && recordingId(entry);
+    if (entry && !id) return;
+    if (!entry || waiting?.id === id) waiting = null;
+    if (!playing || (entry && playing.id !== id)) return;
     const { source, gain } = playing;
     playing = null;
     const now = getContext().currentTime;
@@ -136,12 +179,26 @@ export function createVoicePlayer({
     unduck();
   }
 
-  /** `key`'s line is done for good: its voice stops and its buffer goes. */
-  function release(key) {
-    stop(key);
-    loads.delete(key);
-    ready.delete(key);
+  /** `entry` is done for good (shown, or dropped): its voice stops and its buffer goes. */
+  function release(entry) {
+    stop(entry);
+    const id = recordingId(entry);
+    if (!id) return;
+    const left = (queued.get(id) ?? 0) - 1;
+    if (left > 0) queued.set(id, left);
+    else queued.delete(id);
+    drop(id);
   }
 
-  return Object.freeze({ prepare, play, stop, release });
+  /**
+   * A run is left: the voice fades and every queued line is let go (the
+   * coming set stays, for the run it readies).
+   */
+  function clear() {
+    stop();
+    queued.clear();
+    [...loads.keys()].forEach(drop);
+  }
+
+  return Object.freeze({ queue, expect, play, stop, release, clear });
 }
