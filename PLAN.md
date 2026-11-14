@@ -86,6 +86,11 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
     calibragem geral da campanha espera essa direção.
     Páginas de decisão servidas em `localhost:5500/ASTEROIDS_ROGUEFIELD/exported-assets/<nome>/` (fora do git):
     `viagem`, `chefes-ataques`, `audicao-*`, `decisoes`.
+    14/11: os dezesseis sons que ele escolheu (tiro de quatro armas, feixe da Harmonic, estouro da Scatter, rajada
+    do Hunter, trava da mira, os três do Caster, troca de fase e derrota de chefe, ataque de Prime, Choir e Null)
+    estão instalados no ramo `som/armas-inimigos`, conferidos numa partida no navegador; não publicado — ele decide.
+    Volumes são proposta 14/11; restam cerca de cinquenta sons sintetizados (próxima audição: máquinas inimigas,
+    coletas, vinhetas).
 
 Lição de 13/11: nunca esperar com `pgrep -f "<comando>"` (o próprio vigia casa com o padrão; travou um ajudante 7 h)
 — a medição roda como um comando só, em segundo plano. O app aceita no máximo quatro ajudantes ao mesmo tempo.

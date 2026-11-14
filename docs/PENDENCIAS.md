@@ -6,7 +6,7 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
 
-## O BASTÃO — onde as sessões pararam (13/11) — TUDO ESTÁ NA `main` E PUBLICADO
+## O BASTÃO — onde as sessões pararam (14/11) — a `main` está publicada; os 16 sons de 14/11 esperam no ramo `som/armas-inimigos`
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi
@@ -23,8 +23,8 @@ antes"_. Autorizou regravar o golden trace (feito) e arquivar as sessões e ramo
 chefes, o brilho e as vozes de todos os personagens, ele mandou: _"Vamos comittar, mergear, limpar e publicar"_ → a
 PR #305 entrou na `main` e o site tem a campanha de dez fases. **Ele ainda não jogou nada de 12–13/11**: decide
 jogando a luta do Interdictor (e se os aparelhos levam tiro), os volumes de voz/trilha, a cura, o alarme de casco
-baixo. Audição aberta, sem resposta: `src/exported-assets/audicao-armas-inimigos/` (dezesseis sons). Trabalho novo
-sai de um ramo novo a partir da `main`.
+baixo. Trabalho novo sai de um ramo novo a partir da `main` (o primeiro: `som/armas-inimigos`, os dezesseis sons
+que ele escolheu em 13/11, item 18).
 
 **Como retomar (conversa local, qualquer máquina):**
 
@@ -94,6 +94,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   amostras geradas pela skill local dele `/sfx-generator` (AudioLDM) e CC0 onde o modelo falha, página de audição
   `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
   disser que o som está à altura do jogo.
+  **13/11 (audição `src/exported-assets/audicao-armas-inimigos/`, dezesseis sons que ainda eram síntese ou mudos):**
+  _"arc-caster=A shard-halo=A furnace-corona=A seeker-swarm=A harmonic-beam=A scatter-flak=A hunter-rajada=A
+  mira-trava=A caster-carga=A caster-disparo=A caster-impacto=A chefe-fase=B chefe-derrota=B prime-ataque=C
+  coro-ataque=B null-ataque=A"_.
 
 ## Fundo (palavras dele, 18/10, noite)
 

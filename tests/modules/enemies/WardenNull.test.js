@@ -34,7 +34,7 @@ describe('Warden Null', () => {
   });
 
   it('phase 2 opens the shell and inverts the XP pull after a ring', () => {
-    const { boss, xpOrbs } = createNull();
+    const { boss, eventBus, xpOrbs } = createNull();
     boss.takeDamage(boss.maxHealth * 0.4);
     expect(boss.currentPhase).toBe(1);
 
@@ -48,13 +48,24 @@ describe('Warden Null', () => {
       5
     );
 
+    // The inversion announces its attack once, as it goes live.
+    const attacks = () =>
+      eventBus.emit.mock.calls.filter(
+        ([name]) => name === 'boss-attack-started'
+      );
     let sawWindup = false;
     for (let t = 0; t < NULL.firstPullDelay + NULL.pullWindup; t += STEP) {
       boss.handlePhaseAssault(STEP, null);
-      sawWindup ||= boss.pullState === 'windup';
+      if (boss.pullState === 'windup') {
+        sawWindup = true;
+        expect(attacks()).toHaveLength(0);
+      }
     }
     expect(sawWindup).toBe(true);
     expect(boss.pullState).toBe('inverting');
+    expect(attacks()).toHaveLength(1);
+    expect(attacks()[0][1].enemy).toBe(boss);
+    expect(attacks()[0][1].position).toEqual({ x: boss.x, y: boss.y });
     expect(xpOrbs.startGlobalPull).toHaveBeenCalledTimes(1);
     expect(xpOrbs.startGlobalPull).toHaveBeenCalledWith(
       NULL.pullDuration,

@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { AUDIO_EVENT_CUES } from '../../../src/data/audio/eventCues.js';
 import SFXBus from '../../../src/modules/audio/SFXBus.js';
-import { sampleIdFor } from '../../../src/modules/audio/samplePlayer.js';
+import {
+  interceptSampleCues,
+  sampleIdFor,
+} from '../../../src/modules/audio/samplePlayer.js';
 import {
   SAMPLE_CUES,
   SAMPLE_PLAYBACK,
@@ -309,7 +312,7 @@ describe('sample layer', () => {
       readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
     );
     const kinds = Object.entries(SAMPLE_CUES.playBossAttack.pick.samples);
-    expect(kinds).toHaveLength(7);
+    expect(kinds).toHaveLength(10);
 
     for (const [kind, id] of kinds) {
       const entry = manifest[id];
@@ -327,6 +330,8 @@ describe('sample layer', () => {
         bus.playBossAttack({ kind, pan: -0.3, distance: null });
       };
 
+      // A ring or volley of shots calls it once per shot, the same frame.
+      play(0);
       play(0);
       expect(sources).toHaveLength(1);
       expect(sources[0].buffer.path).toBe(`${id}/1.mp3`);
@@ -340,7 +345,7 @@ describe('sample layer', () => {
 
     // A boss with no attack sound plays nothing at all.
     const { bus, context, sources } = makeBus();
-    bus.playBossAttack({ kind: 'prime', pan: 0, distance: null });
+    bus.playBossAttack({ kind: 'dust', pan: 0, distance: null });
     expect(sources).toHaveLength(0);
     expect(context.createOscillator).not.toHaveBeenCalled();
   });
@@ -432,6 +437,85 @@ describe('sample layer', () => {
       )
     );
     expect(context.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('each sound of the 14/11 audition plays its own file in place of its synthesis', async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const at = { pan: 0.2, distance: null };
+    // [cue, its arguments, the sample it plays]; the Warden attacks have
+    // their own test above.
+    const bus = [
+      ['playLaserShot', [{ weaponId: 'arc-caster' }], 'arc-caster-shot'],
+      ['playLaserShot', [{ weaponId: 'shard-halo' }], 'shard-halo-cut'],
+      [
+        'playLaserShot',
+        [{ weaponId: 'furnace-corona' }],
+        'furnace-corona-pulse',
+      ],
+      ['playLaserShot', [{ weaponId: 'seeker-swarm' }], 'seeker-swarm-launch'],
+      ['playHarmonicBeam', [at], 'harmonic-beam'],
+      ['playFlakBurst', [at], 'scatter-flak'],
+      ['playHunterBurst', [at], 'hunter-burst'],
+      ['playTargetLock', [{ lockCount: 1 }], 'target-lock'],
+      ['playCasterCharge', [at], 'caster-charge'],
+      ['playCasterLaunch', [{ ...at, toPan: -0.4 }], 'caster-launch'],
+      ['playCasterImpact', [at], 'caster-impact'],
+    ];
+    const facade = [
+      ['playBossPhaseChange', [{ phase: 1 }], 'boss-phase-change'],
+      ['playBossDefeated', [{}], 'boss-defeated'],
+    ];
+
+    for (const [cue, args, id] of [...bus, ...facade]) {
+      const entry = manifest[id];
+      expect(entry, id).toBeDefined();
+      expect(
+        existsSync(new URL(`${SFX}${entry.files[0]}`, import.meta.url))
+      ).toBe(true);
+      expect(sampleIdFor(cue, args)).toBe(id);
+
+      const made = makeBus();
+      // The lance's sample is there too: a weapon must not fall back to it.
+      await made.bus.samples.load(
+        fetchFor({ [id]: entry, 'lance-shot': manifest['lance-shot'] })
+      );
+      // A facade cue is the AudioSystem's own: a stand-in with every one.
+      const synthesis = vi.fn();
+      const isFacade = facade.some(([name]) => name === cue);
+      const target = isFacade
+        ? Object.fromEntries(
+            Object.keys(SAMPLE_CUES)
+              .filter((name) => SAMPLE_CUES[name].facade)
+              .map((name) => [name, synthesis])
+          )
+        : made.bus;
+      if (isFacade) {
+        interceptSampleCues(target, made.bus.samples, { facade: true });
+      }
+      target[cue](...args);
+      expect(made.sources, cue).toHaveLength(1);
+      expect(made.sources[0].buffer.path).toBe(`${id}/1.mp3`);
+      expect(synthesis).not.toHaveBeenCalled();
+      expect(made.context.createOscillator).not.toHaveBeenCalled();
+    }
+  });
+
+  it("the Hunter's burst plays once per burst, though the game calls it once per shot", async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const entry = manifest['hunter-burst'];
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(fetchFor({ 'hunter-burst': entry }));
+    // Three shots 0.15 s apart (hunter.js burstDelay), a burst every 3.5 s.
+    [0, 0.15, 0.3, 3.5, 3.65, 3.8].forEach((time) => {
+      context.currentTime = time;
+      bus.playHunterBurst({ pan: 0, distance: null });
+    });
+    expect(sources).toHaveLength(2);
+    expect(sources.map((s) => s.start.mock.calls[0][0])).toEqual([0, 3.5]);
   });
 
   it('the sfx folder stays within its size budget', () => {
