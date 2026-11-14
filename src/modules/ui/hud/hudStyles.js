@@ -137,10 +137,10 @@ export function getHudCss() {
             #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction { opacity: 0; }
 
             /* BOSS INTRO */
-            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
+            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 92vw; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
             .boss-intro.is-showing { opacity: 1; visibility: visible; }
             .layer-banner.is-leaving, .boss-intro.is-leaving { opacity: 0; }
-            .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; white-space: nowrap; }
+            .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; text-align: center; text-wrap: balance; }
             .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
             .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
 

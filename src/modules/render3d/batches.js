@@ -16,17 +16,20 @@ export function colorOf(THREE, css) {
 // Parsed linear colors, keyed by the CSS string the simulation stores.
 const colorCache = new Map();
 export function rgbOf(THREE, css) {
-  let rgb = colorCache.get(css);
+  // THREE.Color ignores alpha and warns about it each time: drop it here, once
+  // per distinct colour (alpha lives in the caller's own alpha channel).
+  const key = css && css.replace(/^(rgb|hsl)a\((.*),[^,]*\)$/, '$1($2)');
+  let rgb = colorCache.get(key);
   if (!rgb) {
     const color = new THREE.Color();
     try {
-      color.setStyle(css || '#ffffff');
+      color.setStyle(key || '#ffffff');
     } catch {
       color.set(0xffffff);
     }
     color.convertSRGBToLinear();
     rgb = [color.r, color.g, color.b];
-    colorCache.set(css, rgb);
+    colorCache.set(key, rgb);
   }
   return rgb;
 }
