@@ -543,6 +543,45 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     );
   });
 
+  it('Prime’s charge and the Choir’s chorus play their attack from their shots; nothing else does', () => {
+    const shot = (bossKind, meta) => ({
+      enemyType: 'boss',
+      enemy: { type: 'boss', bossKind, x: 200, y: 300 },
+      position: { x: 200, y: 300 },
+      meta,
+    });
+    expectDelegates(
+      'enemy-fired',
+      shot('prime', { pattern: 'charge-burst', stage: 'start' }),
+      'playBossAttack',
+      ([options]) => {
+        expect(options.kind).toBe('prime');
+        expect(options.pan).toBeLessThan(0);
+      }
+    );
+    expectDelegates(
+      'enemy-fired',
+      shot('choir', { pattern: 'chorus' }),
+      'playBossAttack',
+      ([options]) => expect(options.kind).toBe('choir')
+    );
+
+    const { audio, eventBus } = resolveRealAudioService();
+    const attack = vi.spyOn(audio.sfxBus, 'playBossAttack');
+    eventBus.emit(
+      'enemy-fired',
+      shot('prime', { pattern: 'charge-burst', stage: 'end' })
+    );
+    eventBus.emit(
+      'enemy-fired',
+      shot('null', { pattern: 'charge-burst', stage: 'start' })
+    );
+    eventBus.emit('enemy-fired', shot('prime', { pattern: 'volley' }));
+    expect(attack).not.toHaveBeenCalled();
+    attack.mockRestore();
+    audio.destroy();
+  });
+
   it('ram-charged → playRamCharge', () => {
     expectDelegates(
       'ram-charged',

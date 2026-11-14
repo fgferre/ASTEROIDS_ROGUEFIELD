@@ -109,6 +109,26 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     at: 'source',
     fields: { kind: 'enemy.bossKind' },
   },
+  // Prime's charge and the Choir's chorus go live with a ring or a volley of
+  // shots (enemy-fired, one per shot): the attack's sample, once (its gap).
+  {
+    on: 'enemy-fired',
+    cue: 'playBossAttack',
+    when: {
+      'enemy.bossKind': 'prime',
+      'meta.pattern': 'charge-burst',
+      'meta.stage': 'start',
+    },
+    at: 'source',
+    fields: { kind: 'enemy.bossKind' },
+  },
+  {
+    on: 'enemy-fired',
+    cue: 'playBossAttack',
+    when: { 'meta.pattern': 'chorus' },
+    at: 'source',
+    fields: { kind: 'enemy.bossKind' },
+  },
   // Support machines' own cues, at the machine's position.
   { on: 'ram-charged', cue: 'playRamCharge', at: 'source' },
   { on: 'weaver-tether-laid', cue: 'playWeaverTether', at: 'source' },

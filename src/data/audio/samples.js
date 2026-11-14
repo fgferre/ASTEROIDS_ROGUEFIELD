@@ -29,8 +29,8 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const SAMPLE_CUES = deepFreeze({
-  // A weapon listed here has a shot of its own; until the manifest has its
-  // files it plays the lance's sample, like the others.
+  // A weapon listed here has a shot of its own (audition 14/11); a weapon not
+  // listed, or one whose files are missing, plays the lance's sample.
   playLaserShot: {
     sample: 'lance-shot',
     pick: {
@@ -44,6 +44,12 @@ export const SAMPLE_CUES = deepFreeze({
     },
     bus: 'protected',
   },
+  // The Harmonic's beam and the Scatter's bolts bursting, over the shot
+  // (audition 14/11). Gains, caps and gaps in the manifest: proposta 14/11.
+  playHarmonicBeam: { sample: 'harmonic-beam', bus: 'ambient', spatialArg: 0 },
+  playFlakBurst: { sample: 'scatter-flak', bus: 'ambient', spatialArg: 0 },
+  // The ship's aim locking onto a new target.
+  playTargetLock: { sample: 'target-lock', bus: 'protected' },
   playBulletHit: { sample: 'bullet-hit', bus: 'protected' },
   playAsteroidBreak: { sample: 'rock-break', bus: 'ambient' },
   playExplosion: {
@@ -80,9 +86,24 @@ export const SAMPLE_CUES = deepFreeze({
     bus: 'ambient',
   },
   playDroneFire: { sample: 'enemy-shot', bus: 'ambient', spatialArg: 0 },
+  // The Hunter's clip holds its whole burst (three shots 0.15 s apart); the
+  // game fires once per shot, so the manifest's 400 ms gap keeps the first.
+  playHunterBurst: { sample: 'hunter-burst', bus: 'ambient', spatialArg: 0 },
+  // The Caster's mortar: charge, launch, impact (audition 14/11).
+  playCasterCharge: { sample: 'caster-charge', bus: 'ambient', spatialArg: 0 },
+  playCasterLaunch: { sample: 'caster-launch', bus: 'ambient', spatialArg: 0 },
+  playCasterImpact: { sample: 'caster-impact', bus: 'ambient', spatialArg: 0 },
   playBossRoar: { sample: 'warden-arrival', bus: 'ambient', facade: true },
-  // A Warden's signature attack, by its kind (eventCues `boss-attack-started`;
-  // audition 13/11). Gains, cap 1 and gaps in the manifest: proposta 13/11.
+  // Every boss's phase change and defeat (audition 14/11).
+  playBossPhaseChange: {
+    sample: 'boss-phase-change',
+    bus: 'ambient',
+    facade: true,
+  },
+  playBossDefeated: { sample: 'boss-defeated', bus: 'ambient', facade: true },
+  // A Warden's signature attack, by its kind (eventCues `boss-attack-started`,
+  // and Prime's charge and the Choir's chorus from their shots; auditions
+  // 13/11 and 14/11). Gains, cap 1 and gaps in the manifest: propostas.
   playBossAttack: {
     pick: {
       path: 'kind',
@@ -94,6 +115,9 @@ export const SAMPLE_CUES = deepFreeze({
         'foundry-mother': 'foundry-mother-sweep',
         interdictor: 'interdictor-cage',
         sovereign: 'sovereign-protect',
+        prime: 'prime-charge',
+        choir: 'choir-chorus',
+        null: 'null-pull',
       },
     },
     bus: 'ambient',

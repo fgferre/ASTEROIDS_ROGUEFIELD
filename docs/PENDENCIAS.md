@@ -6,7 +6,7 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
 
-## O BASTÃO — onde as sessões pararam (13/11) — TUDO ESTÁ NA `main` E PUBLICADO
+## O BASTÃO — onde as sessões pararam (14/11) — a `main` está publicada; os 16 sons de 14/11 esperam no ramo `som/armas-inimigos`
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi

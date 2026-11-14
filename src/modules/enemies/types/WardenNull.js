@@ -154,6 +154,12 @@ export class WardenNull extends BossEnemy {
             NULL.pullAcceleration,
             -1
           );
+        // The pull inverts: its sound (eventCues `boss-attack-started`).
+        this.getEventBus()?.emit?.('boss-attack-started', {
+          enemy: this,
+          enemyId: this.id,
+          position: { x: this.x, y: this.y },
+        });
       }
       return;
     }

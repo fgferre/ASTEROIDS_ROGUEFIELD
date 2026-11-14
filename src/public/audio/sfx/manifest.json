@@ -462,5 +462,229 @@
         "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 3, 50 steps, prompt: A spaceship flying past a fixed camera, fast doppler whoosh of an engine passing by, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick C)"
       }
     ]
+  },
+  "arc-caster-shot": {
+    "files": ["arc-caster-shot/1.mp3"],
+    "gain": -15,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "arc-caster-shot/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A single short soft electric zap, a quick rounded spark crackle in the mid frequencies, quick clean decay, high quality game sound effect, dry, no music; cut 0.22 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "shard-halo-cut": {
+    "files": ["shard-halo-cut/1.mp3"],
+    "gain": -16,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "shard-halo-cut/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A single quick soft blade swish, a short airy whoosh ending in a light glassy ting, quick clean decay, high quality game sound effect, dry, no music; cut 0.2 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "furnace-corona-pulse": {
+    "files": ["furnace-corona-pulse/1.mp3"],
+    "gain": -14,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "furnace-corona-pulse/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A single short soft fire whoomp, a warm rounded puff of flame, quick clean decay, high quality game sound effect, dry, no music; cut 0.25 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "seeker-swarm-launch": {
+    "files": ["seeker-swarm-launch/1.mp3"],
+    "gain": -15,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "seeker-swarm-launch/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single short soft missile launch, a quick rounded thunk with a brief hiss, quick clean decay, high quality game sound effect, dry, no music; cut 0.25 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "harmonic-beam": {
+    "files": ["harmonic-beam/1.mp3"],
+    "gain": -12,
+    "priority": 4,
+    "cap": 2,
+    "gap": 60,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "harmonic-beam/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single short sci-fi plasma beam shot, a smooth rounded zap with a resonant hum, quick clean decay, high quality game sound effect, dry, no music; cut 0.25 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "scatter-flak": {
+    "files": ["scatter-flak/1.mp3"],
+    "gain": -16,
+    "priority": 2,
+    "cap": 3,
+    "gap": 40,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "scatter-flak/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single small soft pop, a tiny muffled burst with a light crackle, quick clean decay, high quality game sound effect, dry, no music; cut 0.2 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "hunter-burst": {
+    "files": ["hunter-burst/1.mp3"],
+    "gain": -13,
+    "priority": 2,
+    "cap": 2,
+    "gap": 400,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "hunter-burst/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, exciter, prompt: A single rough sci-fi blaster shot, gritty buzzy zap, distorted and harsh, high quality game sound effect, dry, no music; one shot cut 0.14 s, three at 0.15 s spacing (pitch 1.00/0.97/1.03, gain 0/-1/-2 dB) (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "target-lock": {
+    "files": ["target-lock/1.mp3"],
+    "gain": -16,
+    "priority": 2,
+    "cap": 1,
+    "gap": 120,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "target-lock/1.mp3",
+        "origin": "Kenney Interface Sounds select_007.ogg over Interface Sounds select_007.ogg (at 0.07 s, -2 dB, rate 1.12) (CC0 1.0), post-processed; cut 0.16 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "caster-charge": {
+    "files": ["caster-charge/1.mp3"],
+    "gain": -14,
+    "priority": 2,
+    "cap": 2,
+    "gap": 100,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "caster-charge/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, exciter, prompt: A high pitched electronic whine rising quickly in pitch, a sci-fi weapon charging up, gritty buzz, high quality game sound effect, dry, no music; cut 0.45 s ending at the loudest point; volume ramp -12 to 0 dB (a charge rising) (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "caster-launch": {
+    "files": ["caster-launch/1.mp3"],
+    "gain": -12,
+    "priority": 2,
+    "cap": 3,
+    "gap": 60,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "caster-launch/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A mortar shell launching, a hollow thump followed by a short falling whistle, high quality game sound effect, dry, no music; cut 0.6 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "caster-impact": {
+    "files": ["caster-impact/1.mp3"],
+    "gain": -10,
+    "priority": 3,
+    "cap": 3,
+    "gap": 60,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "caster-impact/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A mortar shell hitting the ground, a punchy thump with a sharp crackle, high quality game sound effect, dry, no music; cut 0.6 s from the strongest hit's onset (audition 14/11, pick A)"
+      }
+    ]
+  },
+  "boss-phase-change": {
+    "files": ["boss-phase-change/1.mp3"],
+    "gain": -4,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1000,
+    "reverb": -8,
+    "origins": [
+      {
+        "file": "boss-phase-change/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A massive metal structure cracking and reconfiguring, ominous low horn and resonant metal clang, huge space, cinematic game sound effect, no music; strongest 2.0 s window (audition 14/11, pick B)"
+      }
+    ]
+  },
+  "boss-defeated": {
+    "files": ["boss-defeated/1.mp3"],
+    "gain": -3,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1000,
+    "reverb": -6,
+    "origins": [
+      {
+        "file": "boss-defeated/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A giant mechanical titan powering down, a descending deep whine with metal creaks and a final heavy boom, cinematic game sound effect, no music; strongest 3.0 s window (audition 14/11, pick B)"
+      }
+    ]
+  },
+  "prime-charge": {
+    "files": ["prime-charge/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "prime-charge/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A huge armored machine charging, heavy engines surging with a metallic scream, powerful, cinematic game sound effect, no music; strongest 2.0 s window (audition 14/11, pick C)"
+      }
+    ]
+  },
+  "choir-chorus": {
+    "files": ["choir-chorus/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "choir-chorus/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, exciter, prompt: An eerie ancient choir chant swelling with a metallic resonant hum, three voices, cinematic game sound effect, no music; strongest 2.5 s window (audition 14/11, pick B)"
+      }
+    ]
+  },
+  "null-pull": {
+    "files": ["null-pull/1.mp3"],
+    "gain": -6,
+    "priority": 6,
+    "cap": 1,
+    "gap": 1500,
+    "reverb": -12,
+    "origins": [
+      {
+        "file": "null-pull/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A deep dark void hum, a reversed suction pulling away, ominous low drone with a metallic whirl, cinematic game sound effect, no music; strongest 3.0 s window (audition 14/11, pick A)"
+      }
+    ]
   }
 }
