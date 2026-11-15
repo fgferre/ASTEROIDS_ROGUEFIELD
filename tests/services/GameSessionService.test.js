@@ -36,6 +36,7 @@ function createServiceHarness(options = {}) {
     position: { x: 10, y: 15 },
     upgrades: [],
     respawn: vi.fn(),
+    setInvulnerableTimer: vi.fn(),
     reset: vi.fn(),
     getPosition: vi.fn(() => ({ x: 10, y: 15 })),
     activateShield: vi.fn(),

@@ -17,6 +17,8 @@ const GAME_OVER_SCREEN_DELAY_MS = 3000;
 const GAME_OVER_SCREEN_MAX_DELAY_MS = 6500; // proposta 18/10
 // The win leaves time to gather the spoils: every orb flies to the ship (a
 // Magnet's pull) and the break timer counts the seconds down to the screen.
+// Nothing hurts the ship meanwhile: it is invulnerable until the screen can
+// open (the cap).
 const VICTORY_SPOILS_SECONDS = 6; // proposta 12/11 (2.5 s: the owner could not gather anything)
 const VICTORY_SCREEN_DELAY_MS = VICTORY_SPOILS_SECONDS * 1000;
 const VICTORY_SCREEN_MAX_DELAY_MS = 9000; // proposta 12/11
@@ -96,6 +98,13 @@ export class RunEnd {
       pullAcceleration
     );
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
+    const player = this.resolveServiceInstance('player');
+    player.setInvulnerableTimer(
+      Math.max(
+        player.invulnerableTimer || 0,
+        VICTORY_SCREEN_MAX_DELAY_MS / 1000
+      )
+    );
     this.eventBus.emit('run-won', {
       wave: payload.wave,
       hullId: this.getConfiguredHullId(),
