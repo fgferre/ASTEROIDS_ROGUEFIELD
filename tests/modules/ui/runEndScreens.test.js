@@ -65,15 +65,20 @@ describe('Run end screens', () => {
     expect(gameOver.seed.textContent).toBe('Seed 42 · Veteran');
   });
 
-  it('the death screen wakes its buttons after the lockout, the retry left first with the ⏎ hint', () => {
+  it('the death screen wakes its buttons after the lockout, the retry left first, bright and with the ⏎ hint', () => {
     vi.useFakeTimers();
     const focused = [];
     const button = () => {
+      const classes = new Set();
       const node = {
         disabled: false,
         children: [],
         prepend: (...nodes) => node.children.unshift(...nodes),
         focus: () => focused.push(node),
+        classList: {
+          toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+        },
+        bright: () => classes.has('end-btn--primary'),
       };
       return node;
     };
@@ -103,11 +108,14 @@ describe('Run end screens', () => {
       return [retryBtn, restartBtn, quitBtn].map(({ disabled }) => disabled);
     };
 
+    const bright = () => [retryBtn, restartBtn].map((b) => b.bright());
+
     expect(die()).toEqual([true, true, true]);
     expect(retryBtn.children).toEqual(hints);
+    expect(bright()).toEqual([true, false]);
     vi.advanceTimersByTime(SCREEN_INPUT_LOCKOUT_MS);
     expect(focused).toEqual([retryBtn]);
-    // The retry spent stays off; New mission takes the hint and the focus.
+    // The retry spent stays off; New mission takes the look, hint and focus.
     retryBtn.disabled = true;
     die();
     vi.advanceTimersByTime(SCREEN_INPUT_LOCKOUT_MS);
@@ -117,6 +125,7 @@ describe('Run end screens', () => {
       false,
     ]);
     expect(restartBtn.children).toEqual(hints);
+    expect(bright()).toEqual([false, true]);
     expect(focused).toEqual([retryBtn, restartBtn]);
     vi.useRealTimers();
   });

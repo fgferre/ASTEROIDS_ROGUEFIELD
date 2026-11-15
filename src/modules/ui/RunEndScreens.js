@@ -235,11 +235,15 @@ export class RunEndScreens {
     });
     refs.seed.textContent = this.difficulty().runLabel();
     refs.copySeedBtn.textContent = 'Copy seed link';
-    // The run's retry, while it's left, comes first: the ⏎ / A hint, and the
-    // focus once the buttons wake after the lockout, so a key held through
-    // the death neither spends it nor starts a new run. A retry spent stays off.
+    // The run's retry, while it's left, comes first: the bright look, the
+    // ⏎ / A hint, and the focus once the buttons wake after the lockout, so
+    // a key held through the death neither spends it nor starts a new run.
+    // A retry spent stays off.
     const { retryBtn, restartBtn, quitBtn } = refs;
     const primary = retryBtn && !retryBtn.disabled ? retryBtn : restartBtn;
+    [restartBtn, retryBtn].forEach((button) =>
+      button?.classList.toggle('end-btn--primary', button === primary)
+    );
     primary?.prepend(...refs.hints);
     const buttons = [restartBtn, retryBtn, quitBtn].filter(
       (button) => button && !button.disabled
