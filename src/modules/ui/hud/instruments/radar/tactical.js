@@ -91,6 +91,10 @@ const CSS = `
             .rt { --rt-u: calc(var(--hud-scale-effective, 1.2) / 1.2); --rt-boss-light: color-mix(in srgb, var(--boss) 55%, white); position: relative; width: calc(${SIZE}px * var(--rt-u)); height: calc(${SIZE}px * var(--rt-u)); pointer-events: none; }
             .rt > *, .rt-frame > * { position: absolute; inset: 0; width: 100%; height: 100%; }
             .rt svg { display: block; overflow: visible; }
+            /* The glyphs (cloned into each blip's <use>) set box-sizing instead of
+               the global 'inherit', so a new transform on a <use> does not restyle
+               its clone: that restyle got dearer with every new value (Chrome). */
+            [id^='rt-g-'], [id^='rt-g-'] * { box-sizing: border-box; }
             .rt-frame { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             .rt[data-mode='threat'] .rt-frame { opacity: 1; transition-duration: 0ms; }
             .rt[data-mode='warden'] .rt-frame { opacity: 0.55; }

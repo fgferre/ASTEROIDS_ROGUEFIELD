@@ -31,8 +31,9 @@ const SEGMENT_PATHS = Array.from({ length: SEGMENTS }, (_, i) => {
   return `<path class="hr-track" d="${d}"/><path class="hr-lit" d="${d}" pathLength="1" stroke-dasharray="0 1"/><path class="hr-lost" d="${d}" pathLength="1" stroke-dasharray="0 1"/>`;
 }).join('');
 
-// The paths sit in one <g>: in Chrome, a move of the ring restyles its direct
-// children (style.css's `box-sizing: inherit`), so one group, not 30 paths.
+// The paths sit in one <g> that sets box-sizing itself: with style.css's
+// `box-sizing: inherit`, each move of the ring would restyle its children in
+// Chrome, a restyle that gets dearer with every new position.
 const MARKUP = `
         <div class="hr">
           <div class="hr-dark"></div>
@@ -46,6 +47,7 @@ const CSS = `
             .hr.is-low .hr-dark { opacity: 1; }
             .hr-ring { position: absolute; left: 0; top: 0; width: calc(${SIZE}px * var(--hud-u)); height: calc(${SIZE}px * var(--hud-u)); overflow: visible; transform: translate(-50%, -50%); opacity: 0; transition: opacity var(--motion-base) var(--ease-out); }
             .hr.is-ring .hr-ring { opacity: 1; }
+            .hr-ring > g { box-sizing: border-box; }
             .hr-ring path { fill: none; stroke-width: 3; }
             .hr-track { stroke: rgba(230, 238, 248, 0.2); }
             .hr-lit { stroke: var(--text); }

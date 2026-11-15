@@ -50,6 +50,9 @@ const CSS = `
             }
             .wd-marker { position: absolute; width: 0; height: 0; display: none; pointer-events: none; }
             .wd-marker.is-on { display: block; }
+            /* Set, not the global 'inherit': moving the marker then does not restyle
+               its parts, a restyle that got dearer with every new position (Chrome). */
+            .wd-marker > * { box-sizing: border-box; }
             .wd-marker svg { position: absolute; left: calc(-24px * var(--hud-u)); top: calc(-24px * var(--hud-u)); width: calc(48px * var(--hud-u)); height: calc(48px * var(--hud-u)); overflow: visible; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--boss) 80%, transparent)); }
             .wd-chevron { fill: var(--boss-light); }
             .wd-dist { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 600; font-size: calc(var(--text-sm) * var(--hud-u)); letter-spacing: 0.08em; color: var(--boss-light); white-space: nowrap; text-shadow: 0 1px 2px rgba(2, 4, 8, 0.9); }
