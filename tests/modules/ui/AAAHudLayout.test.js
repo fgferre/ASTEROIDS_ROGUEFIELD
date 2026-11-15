@@ -523,6 +523,15 @@ describe('AAAHudLayout timed notice', () => {
     expect(shown()).toBeNull();
   });
 
+  it('tells while it holds the tip slot', () => {
+    const { hud } = tipHud();
+    expect(hud.isNoticeShowing()).toBe(false);
+    hud.showTimedNotice(['T'], 'AIM MANUAL');
+    expect(hud.isNoticeShowing()).toBe(true);
+    vi.advanceTimersByTime(TIMED_NOTICE_MS);
+    expect(hud.isNoticeShowing()).toBe(false);
+  });
+
   it('restarts its time when a second notice replaces it', () => {
     const { hud, shown } = tipHud();
     hud.showTimedNotice(['T'], 'AIM MANUAL');

@@ -168,9 +168,18 @@ export class Onboarding {
   /**
    * One simulation step. `moving`: any thrust/strafe held; `shieldReady`:
    * the ship has a shield to raise; `bannerBusy`: a HUD banner owns the
-   * screen, so a new tip waits.
+   * screen, so a new tip waits; `tipCovered`: a timed notice covers the tip
+   * on screen, so its time waits.
    */
-  update(dt, { moving = false, shieldReady = false, bannerBusy = false } = {}) {
+  update(
+    dt,
+    {
+      moving = false,
+      shieldReady = false,
+      bannerBusy = false,
+      tipCovered = false,
+    } = {}
+  ) {
     const id = this.current;
     if (!id) {
       return;
@@ -194,6 +203,9 @@ export class Onboarding {
       this.shownFor = 0;
       this.view.showTip(id);
       this.onStep(id);
+      return;
+    }
+    if (tipCovered) {
       return;
     }
     this.shownFor += dt;

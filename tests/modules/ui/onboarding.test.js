@@ -121,6 +121,23 @@ describe('Onboarding', () => {
     expect(view.showing).toBe('shield');
   });
 
+  it("holds a tip's time while a notice covers it", () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    expect(view.showing).toBe('dash');
+    run(onboarding, DASH_TIP_SECONDS - 1);
+    run(onboarding, 4, { tipCovered: true });
+    expect(view.showing).toBe('dash');
+    run(onboarding, 1 + STEP);
+    expect(view.showing).toBeNull();
+  });
+
   it('brings a tip that ran out back next run, until the third time', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,

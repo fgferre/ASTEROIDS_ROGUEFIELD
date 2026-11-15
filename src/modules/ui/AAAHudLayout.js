@@ -509,6 +509,11 @@ export class AAAHudLayout {
     }, ms);
   }
 
+  /** True while a timed notice holds the tip slot (showTimedNotice). */
+  isNoticeShowing() {
+    return Boolean(this._noticeTimer);
+  }
+
   _renderTip(keys, text) {
     const tip = this.els?.onboardingTip;
     if (!tip) {

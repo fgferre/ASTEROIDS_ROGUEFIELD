@@ -976,6 +976,7 @@ class UISystem extends BaseSystem {
         moving: moving.up || moving.down || moving.left || moving.right,
         shieldReady: this.getService('player').getShieldState().maxHits > 0,
         bannerBusy: Boolean(this.tacticalHud.layout?.isBannerBusy()),
+        tipCovered: Boolean(this.tacticalHud.layout?.isNoticeShowing()),
       });
     }
   }
