@@ -316,7 +316,7 @@ describe('HUD instruments', () => {
     expect(hud.els.nextWaveBox.classList.contains('visible')).toBe(false);
   });
 
-  it('classic feed: a row already first is not prepended again', () => {
+  it('classic feed: a repeat re-inserts its row even when already first', () => {
     const feed = Object.create(getInstrument('feed', 'classic'));
     const el = fakeElement();
     const prepend = vi.fn();
@@ -325,10 +325,7 @@ describe('HUD instruments', () => {
     feed.later = () => 1;
     feed.cancel = () => {};
 
-    feed.push('xp', 'xp', () => {});
-    expect(prepend).not.toHaveBeenCalled();
-
-    feed.list.firstElementChild = fakeElement();
+    // The re-insert is what replays the row's entrance in the browser.
     feed.push('xp', 'xp', () => {});
     expect(prepend).toHaveBeenCalledWith(el);
   });

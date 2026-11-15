@@ -43,10 +43,12 @@ export default {
   update() {},
 
   push(key, tone, render) {
-    // A row still on screen keeps counting and moves back to the top.
+    // A row still on screen keeps counting and moves back to the top. It is
+    // re-inserted even when already first: that replays its entrance, which
+    // is how a repeat shows.
     let row = this.rows.find((entry) => entry.key === key);
     if (row) {
-      if (this.list.firstElementChild !== row.el) this.list.prepend(row.el);
+      this.list.prepend(row.el);
       this.rows = [row, ...this.rows.filter((entry) => entry !== row)];
     } else {
       const el = document.createElement('div');
