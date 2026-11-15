@@ -200,6 +200,8 @@ class PlayerSystem extends BaseSystem {
       'shieldMaxHP',
     ]);
     this.invulnerableTimer = 0;
+    // The win's invulnerability (guardSteadily) leaves the ship unblinking.
+    this.steadyGuard = false;
     // A Warden's entrance holds the ship (holdControls).
     this.controlHoldTimer = 0;
 
@@ -486,6 +488,7 @@ class PlayerSystem extends BaseSystem {
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
     }
+    if (this.invulnerableTimer === 0) this.steadyGuard = false;
 
     // Emitir evento para outros sistemas
     // Usamos o método 'emitSilently' para não poluir o console a cada frame.
@@ -768,6 +771,21 @@ class PlayerSystem extends BaseSystem {
   }
 
   /**
+   * The win's protection (runEnd.js): invulnerable for at least `seconds`,
+   * the ship steady instead of a hit's blink (playerMirror.js).
+   */
+  guardSteadily(seconds) {
+    this.invulnerableTimer = Math.max(this.invulnerableTimer, seconds);
+    this.steadyGuard = true;
+  }
+
+  /** Ends guardSteadily's protection (the run goes on past the win). */
+  endSteadyGuard() {
+    this.invulnerableTimer = 0;
+    this.steadyGuard = false;
+  }
+
+  /**
    * A Warden's entrance (enemies/boss/arrival.js): for `seconds` of world
    * time the ship takes no steering, dash or fire, and nothing hurts it.
    */
@@ -859,6 +877,7 @@ class PlayerSystem extends BaseSystem {
     this.flight.brakingDamping = 0;
     this.flight.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
+    this.steadyGuard = false;
     this.controlHoldTimer = 0;
     this.flight.driftFactor = 0;
 

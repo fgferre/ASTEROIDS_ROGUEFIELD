@@ -98,12 +98,8 @@ export class RunEnd {
       pullAcceleration
     );
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
-    const player = this.resolveServiceInstance('player');
-    player.setInvulnerableTimer(
-      Math.max(
-        player.invulnerableTimer || 0,
-        VICTORY_SCREEN_MAX_DELAY_MS / 1000
-      )
+    this.resolveServiceInstance('player').guardSteadily(
+      VICTORY_SCREEN_MAX_DELAY_MS / 1000
     );
     this.eventBus.emit('run-won', {
       wave: payload.wave,
@@ -143,6 +139,7 @@ export class RunEnd {
     // so the ship comes back the way a Retry brings it (full hull, a safe
     // spot, a moment of invulnerability).
     const player = this.resolveServiceInstance('player');
+    player.endSteadyGuard();
     if (player.isDead) {
       player.health = player.maxHealth;
       player.respawn(this.findSafeSpawnPoint(), 3);

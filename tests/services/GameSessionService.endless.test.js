@@ -160,6 +160,19 @@ describe('endless run past the final Warden', () => {
     expect(player.invulnerableTimer).toBeGreaterThanOrEqual(9);
   });
 
+  it("ends the win's steady protection when the run goes on", () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player } = game.services;
+
+    game.eventBus.emit('boss-defeated', { wave: 15 });
+    expect(player.steadyGuard).toBe(true);
+
+    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(player.invulnerableTimer).toBe(0);
+    expect(player.steadyGuard).toBe(false);
+  });
+
   it('keeps a longer invulnerability the ship already had at the win', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test' });
