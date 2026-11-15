@@ -687,6 +687,10 @@ class UISystem extends BaseSystem {
         this.pilotDown = false;
       }
     });
+    this.registerEventListener('combat-mode-toggled', (toggled) => {
+      this.showOnboardingTip('mode', toggled);
+      this.eventBus?.emit('onboarding-step', { id: 'mode' });
+    });
     this.registerEventListener('player-dashed', () => {
       this.onboarding.dashed();
     });
@@ -1138,8 +1142,8 @@ class UISystem extends BaseSystem {
     );
   }
 
-  /** The in-play tip `id`, naming the keys or buttons the player bound. */
-  showOnboardingTip(id) {
+  /** The in-play tip `id` (or the timed toggle notice) with the bound keys. */
+  showOnboardingTip(id, toggled = null) {
     const controls =
       this.resolveSettingsService()?.getCategoryValues('controls') || {};
     const device = this.getService('input').getActiveDevice();
@@ -1151,6 +1155,8 @@ class UISystem extends BaseSystem {
       'moveRight',
       'dash',
       'activateShield',
+      'toggleAimMode',
+      'toggleSpreadMode',
     ].forEach((action) => {
       keys[action] = this.settingsPanel.formatBindingLabel(
         controls[action]?.[device]?.[0],
@@ -1160,9 +1166,11 @@ class UISystem extends BaseSystem {
     const prompt = onboardingPrompts(
       keys,
       this.getService('player')?.controlScheme,
-      device
+      device,
+      toggled
     )[id];
-    this.tacticalHud.layout?.showOnboardingTip(prompt.keys, prompt.text);
+    const show = toggled ? 'showTimedNotice' : 'showOnboardingTip';
+    this.tacticalHud.layout?.[show](prompt.keys, prompt.text);
   }
 
   /** The cards tip in the level-up footer, on the first level-up only. */

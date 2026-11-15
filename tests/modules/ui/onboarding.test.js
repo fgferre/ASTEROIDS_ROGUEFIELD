@@ -15,6 +15,7 @@ import {
   Onboarding,
   SHIELD_TIP_SECONDS,
   TIP_EXPIRIES_TO_DONE,
+  modeNotice,
   onboardingPrompts,
 } from '../../../src/modules/ui/onboarding.js';
 
@@ -293,6 +294,35 @@ describe('Onboarding', () => {
       CARDS_TIP_TEXT_HEAD_START_GAMEPAD
     );
     expect(CARDS_TIP_TEXT_HEAD_START_GAMEPAD).toMatch(/\bRB equips/);
+  });
+
+  it('names the new mode, its key and the way back for each toggle', () => {
+    const keys = { toggleAimMode: 'T', toggleSpreadMode: 'G' };
+    const pad = { toggleAimMode: 'Y', toggleSpreadMode: 'X' };
+    const notices = [
+      [{ kind: 'aim', mode: 'auto' }, keys, 'keyboard', 'T', /^AIM AUTO\b/],
+      [{ kind: 'aim', mode: 'manual' }, keys, 'keyboard', 'T', /nose/],
+      [{ kind: 'aim', mode: 'manual' }, pad, 'gamepad', 'Y', /right stick/],
+      [{ kind: 'aim', mode: 'auto' }, pad, 'gamepad', 'Y', /^AIM AUTO\b/],
+      [{ kind: 'spread', mode: 'fan' }, keys, 'keyboard', 'G', /^SPREAD FAN\b/],
+      [
+        { kind: 'spread', mode: 'concentrated' },
+        pad,
+        'gamepad',
+        'X',
+        /^SPREAD CONC\b/,
+      ],
+    ];
+    notices.forEach(([toggled, bound, device, key, pattern]) => {
+      const notice = modeNotice(toggled, bound, device);
+      expect(notice.keys).toEqual([key]);
+      expect(notice.text).toMatch(pattern);
+      expect(notice.text).toMatch(/Press again/);
+      expect(notice.text.length).toBeLessThanOrEqual(70);
+    });
+    expect(
+      modeNotice({ kind: 'aim', mode: 'manual' }, pad, 'gamepad').text
+    ).not.toMatch(/nose/);
   });
 
   it('is off when the Settings toggle is off', () => {

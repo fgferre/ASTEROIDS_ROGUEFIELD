@@ -36,14 +36,37 @@ export const ONBOARDING_STEP_IDS = [...PLAY_STEPS, 'cards', 'cardsHeadStart'];
 const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
 
 /**
+ * The notice when T or G changed a mode in play: `toggled` is CombatSystem's
+ * `combat-mode-toggled` payload ({ kind: 'aim' | 'spread', mode }), `keys`
+ * the bound labels ({ toggleAimMode, toggleSpreadMode }). Manual aim fires
+ * along the turret: on the nose, or along the right stick while it is held.
+ */
+export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
+  const texts = {
+    auto: 'AIM AUTO · the turret finds targets. Press again for manual.',
+    manual:
+      device === 'gamepad'
+        ? 'AIM MANUAL · aim with the right stick. Press again for auto.'
+        : 'AIM MANUAL · shots fly where the nose points. Press again for auto.',
+    fan: 'SPREAD FAN · extra shots fan out wide. Press again to concentrate.',
+    concentrated:
+      'SPREAD CONC · extra shots fly side by side. Press again to fan.',
+  };
+  const key = kind === 'aim' ? keys.toggleAimMode : keys.toggleSpreadMode;
+  return { keys: key ? [key] : [], text: texts[mode] };
+}
+
+/**
  * Prompt content per step. `keys` are the labels of the bound keys or pad
- * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield });
- * `device` is the last one used ('keyboard' | 'gamepad').
+ * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield,
+ * toggleAimMode, toggleSpreadMode }); `device` is the last one used
+ * ('keyboard' | 'gamepad'); `toggled` adds the `mode` notice (modeNotice).
  */
 export function onboardingPrompts(
   keys,
   scheme = 'modern',
-  device = 'keyboard'
+  device = 'keyboard',
+  toggled = null
 ) {
   const padMove = {
     keys: ['L-Stick'],
@@ -72,6 +95,7 @@ export function onboardingPrompts(
       keys: [keys.activateShield],
       text: 'Raise your shield before a hit lands.',
     },
+    mode: toggled && modeNotice(toggled, keys, device),
   };
 }
 

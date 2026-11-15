@@ -95,7 +95,6 @@ export class LevelUpScreen {
     this.showCardsTip = showCardsTip;
     this.prefersReducedMotion = prefersReducedMotion;
     this.hud = hud;
-    this.noticeTimer = null;
     // "Equip for me" armed: the timer that disarms it, or null.
     this.equipArmTimer = null;
     this.levelUpState = {
@@ -490,14 +489,9 @@ export class LevelUpScreen {
     const families = this.headStart().equipRest();
     this.showGameUI();
     const build = families.map(({ name, cards: n }) => `${name} ${n}`);
-    const hud = this.hud();
-    hud?.showOnboardingTip(
+    this.hud()?.showTimedNotice(
       [],
-      `Equipped ${cards} card${cards === 1 ? '' : 's'}: ${build.join(' · ')}`
-    );
-    clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(
-      () => hud?.hideOnboardingTip(),
+      `Equipped ${cards} card${cards === 1 ? '' : 's'}: ${build.join(' · ')}`,
       EQUIPPED_NOTICE_MS
     );
   }
