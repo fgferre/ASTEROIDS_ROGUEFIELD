@@ -14,6 +14,7 @@ import {
   ONBOARDING_STORAGE_KEY,
   Onboarding,
   SHIELD_TIP_SECONDS,
+  TIP_EXPIRIES_TO_DONE,
   onboardingPrompts,
 } from '../../../src/modules/ui/onboarding.js';
 
@@ -84,7 +85,7 @@ describe('Onboarding', () => {
     expect(view.showing).toBe('move');
   });
 
-  it('lets the shield tip leave on its own', () => {
+  it('sets an unused shield tip aside for the run, not forever', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
       JSON.stringify({ done: ['move', 'dash'] })
@@ -96,10 +97,13 @@ describe('Onboarding', () => {
     expect(view.showing).toBe('shield');
     run(onboarding, SHIELD_TIP_SECONDS + STEP, { shieldReady: true });
     expect(view.showing).toBeNull();
-    expect(saved()).toContain('shield');
+    expect(saved()).not.toContain('shield');
+    run(onboarding, ONBOARDING_GAP_SECONDS + 1, { shieldReady: true });
+    expect(view.showing).toBeNull(); // not again in this run
+    expect(onboarding.complete).toBe(false);
   });
 
-  it('lets the dash tip leave on its own if the player never dashes', () => {
+  it('lets the next tip follow a dash tip that ran out', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
       JSON.stringify({ done: ['move'] })
@@ -111,7 +115,59 @@ describe('Onboarding', () => {
     expect(view.showing).toBe('dash');
     run(onboarding, DASH_TIP_SECONDS + STEP);
     expect(view.showing).toBeNull();
+    expect(saved()).not.toContain('dash');
+    run(onboarding, ONBOARDING_GAP_SECONDS + STEP, { shieldReady: true });
+    expect(view.showing).toBe('shield');
+  });
+
+  it('brings a tip that ran out back next run, until the third time', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move', 'shield'] })
+    );
+    const view = fakeView();
+    for (let time = 1; time <= TIP_EXPIRIES_TO_DONE; time += 1) {
+      const onboarding = new Onboarding(view);
+      onboarding.start();
+      onboarding.update(STEP);
+      expect(view.showing).toBe('dash');
+      run(onboarding, DASH_TIP_SECONDS + STEP);
+      expect(saved().includes('dash')).toBe(time === TIP_EXPIRIES_TO_DONE);
+      onboarding.stop();
+    }
+    const after = new Onboarding(view);
+    after.start();
+    expect(after.current).toBeNull();
+  });
+
+  it('counts the shield raised while its tip is up', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move', 'dash'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP, { shieldReady: true });
+    onboarding.shieldRaised();
+    expect(view.showing).toBeNull();
+    expect(saved()).toContain('shield');
+  });
+
+  it('counts a dash made later in the run the tip ran out in', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move', 'shield'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    run(onboarding, DASH_TIP_SECONDS + STEP);
+    expect(saved()).not.toContain('dash');
+    onboarding.dashed();
     expect(saved()).toContain('dash');
+    expect(view.showing).toBeNull();
   });
 
   it('shows the cards tip on the first level-up and counts the pick', () => {
@@ -124,10 +180,54 @@ describe('Onboarding', () => {
     expect(saved()).toEqual(['cards']);
   });
 
-  it('remembers finished tips across runs until replayed', () => {
+  it('shows the head-start cards tip once, after the ordinary one', () => {
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.cardsTip()).toBe(CARDS_TIP_TEXT);
+    onboarding.cardPicked();
+    expect(onboarding.cardsTip('keyboard', true)).toBe(
+      CARDS_TIP_TEXT_HEAD_START
+    );
+    onboarding.cardPicked();
+    expect(onboarding.cardsTip('keyboard', true)).toBeNull();
+    expect(saved()).toContain('cardsHeadStart');
+  });
+
+  it('counts the head-start cards tip as the ordinary one too', () => {
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    onboarding.cardsTip('keyboard', true);
+    onboarding.cardPicked();
+    expect(onboarding.cardsTip()).toBeNull();
+    expect(saved()).toEqual(
+      expect.arrayContaining(['cards', 'cardsHeadStart'])
+    );
+  });
+
+  it('still teaches the head start to a record from before it', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
       JSON.stringify({ done: ['move', 'dash', 'shield', 'cards'] })
+    );
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.current).toBeNull();
+    expect(onboarding.cardsTip()).toBeNull();
+    expect(onboarding.cardsTip('keyboard', true)).toBe(
+      CARDS_TIP_TEXT_HEAD_START
+    );
+    onboarding.cardPicked();
+    expect(onboarding.complete).toBe(true);
+    expect(onboarding.active).toBe(false);
+  });
+
+  it('remembers finished tips across runs until replayed', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({
+        done: ['move', 'dash', 'shield', 'cards', 'cardsHeadStart'],
+        expired: { dash: 2 },
+      })
     );
     const done = new Onboarding(fakeView());
     done.start();
@@ -135,6 +235,10 @@ describe('Onboarding', () => {
     expect(done.cardsTip()).toBeNull();
 
     done.replay();
+    expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY))).toEqual({
+      done: [],
+      expired: {},
+    });
     const again = new Onboarding(fakeView());
     again.start();
     expect(again.current).toBe('move');
