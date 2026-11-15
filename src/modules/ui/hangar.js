@@ -23,10 +23,64 @@ export function salvageLine(award) {
   };
 }
 
+const hullPrice = (hullId) =>
+  HANGAR_ITEMS.find((entry) => entry.unlocksHull === hullId).cost;
+
 /** Over a hovered locked hull's silhouette: "🔒 LOCKED · 400 SALVAGE". */
 export function hullLockText(hullId) {
-  const item = HANGAR_ITEMS.find((entry) => entry.unlocksHull === hullId);
-  return `🔒 LOCKED · ${item.cost} SALVAGE`;
+  return `🔒 LOCKED · ${hullPrice(hullId)} SALVAGE`;
+}
+
+/** A locked hull on the menu: "🔒 400 Salvage in the Hangar". */
+export function hullUnlockText(hullId) {
+  return `🔒 ${hullPrice(hullId)} Salvage in the Hangar`;
+}
+
+// A hull's stats against the Interceptor's, in the order they are listed;
+// `lowerIsBetter`: a shorter dash cooldown is the better one.
+const HULL_STATS = [
+  { key: 'maxHealth', label: 'Hull' },
+  { key: 'maxSpeed', label: 'Speed' },
+  { key: 'acceleration', label: 'Thrust' },
+  { key: 'dashCooldown', label: 'Dash cooldown', lowerIsBetter: true },
+];
+
+/**
+ * What a hull does: its `role` and, for each stat off the baseline, a signed
+ * percent ("Hull +35%") with `better` for the markup's colour. A hull with
+ * none off it reads "Standard hull, speed and dash".
+ */
+export function hullTraits(hull) {
+  const stats = HULL_STATS.filter(({ key }) => hull.stats[key] !== 1).map(
+    ({ key, label, lowerIsBetter }) => {
+      const percent = Math.round((hull.stats[key] - 1) * 100);
+      return {
+        text: `${label} ${percent > 0 ? '+' : ''}${percent}%`,
+        better: lowerIsBetter ? percent < 0 : percent > 0,
+      };
+    }
+  );
+  return {
+    role: hull.role,
+    stats,
+    plain: stats.length === 0 ? 'Standard hull, speed and dash' : null,
+  };
+}
+
+/** The hull's name and traits as one line of markup; `lock` (optional) ends it. */
+export function hullTraitsMarkup(hull, lock = '') {
+  const { role, stats, plain } = hullTraits(hull);
+  const parts = [
+    `<span class="hull-traits__name">${hull.name}</span>`,
+    `<span class="hull-traits__role">${role}</span>`,
+    ...(plain ? [plain] : []),
+    ...stats.map(
+      (stat) =>
+        `<span class="hull-traits__stat ${stat.better ? 'is-better' : 'is-worse'}">${stat.text}</span>`
+    ),
+    ...(lock ? [`<span class="hull-traits__lock">${lock}</span>`] : []),
+  ];
+  return parts.join(' · ');
 }
 
 /** One upgrade card: name, effect, cost and OWNED or a BUY button. */

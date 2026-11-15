@@ -1,7 +1,7 @@
 // src/data/hangar.js
 
 import { deepFreeze } from '../utils/deepFreeze.js';
-import { BASTION_HULL_ID, SOLAR_SLICER_HULL_ID } from './shipModels.js';
+import { bastion, solarSlicer } from './shipModels.js';
 import { RUN_FINAL_LAYER } from './constants/gameplay.js';
 
 // The Hangar (docs/NORTE.md §7 pillar 7): Salvage earned per run buys small
@@ -52,6 +52,9 @@ export const BASE_MODIFIERS = deepFreeze({
   pickupRadiusMultiplier: 1,
 });
 
+// A hull item's line, from the hull's own `role`: "Bastion — tough, slow."
+const hullEffect = (hull) => `${hull.name} — ${hull.role.toLowerCase()}.`;
+
 // `modifiers`: keys ending in Multiplier multiply, the others add.
 export const HANGAR_ITEMS = deepFreeze([
   {
@@ -92,15 +95,15 @@ export const HANGAR_ITEMS = deepFreeze([
   {
     id: 'solar-slicer-hull',
     name: 'Solar Slicer Hull',
-    effect: 'Solar Slicer — lighter blade hull: faster, thinner.',
+    effect: hullEffect(solarSlicer),
     cost: 400, // proposta 18/10
-    unlocksHull: SOLAR_SLICER_HULL_ID,
+    unlocksHull: solarSlicer.id,
   },
   {
     id: 'bastion-hull',
     name: 'Bastion Hull',
-    effect: 'Bastion — heavy escort hull: tougher, slower.',
+    effect: hullEffect(bastion),
     cost: 520, // proposta 18/10
-    unlocksHull: BASTION_HULL_ID,
+    unlocksHull: bastion.id,
   },
 ]);

@@ -77,14 +77,13 @@
             <section
               id="menu-ship-selector"
               class="menu-ship-selector"
-              aria-labelledby="menu-ship-selector-label"
+              aria-label="Hull selection"
             >
               <p
                 id="menu-ship-selector-label"
-                class="menu-ship-selector__label"
-              >
-                Hull Selection
-              </p>
+                class="menu-ship-selector__label hull-traits"
+                aria-live="polite"
+              ></p>
               <div
                 id="menu-ship-selector-options"
                 class="menu-ship-selector__options"
@@ -589,13 +588,20 @@
               aria-label="Permanent upgrades"
             ></ul>
             <div class="hangar-hull-bay">
-              <div class="hangar-hull-stage-frame">
-                <canvas
-                  id="hangar-hull-stage"
-                  class="hangar-hull-stage"
-                  aria-hidden="true"
-                ></canvas>
-                <p id="hangar-hull-lock" class="hangar-hull-lock" hidden></p>
+              <div class="hangar-hull-view">
+                <div class="hangar-hull-stage-frame">
+                  <canvas
+                    id="hangar-hull-stage"
+                    class="hangar-hull-stage"
+                    aria-hidden="true"
+                  ></canvas>
+                  <p id="hangar-hull-lock" class="hangar-hull-lock" hidden></p>
+                </div>
+                <p
+                  id="hangar-hull-info"
+                  class="hangar-hull-info hull-traits"
+                  aria-live="polite"
+                ></p>
               </div>
               <div
                 id="hangar-hulls"

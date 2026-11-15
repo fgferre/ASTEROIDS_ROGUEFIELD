@@ -54,4 +54,39 @@ describe('Main menu mode line', () => {
     nav.fire('focusout', { relatedTarget: null });
     expect(hint.textContent).toBe('Campaign');
   });
+
+  it('the hull line follows the hovered or focused chip, else the selected hull', () => {
+    const chip = (hullId) => {
+      const node = { dataset: { hullId } };
+      node.closest = () => node;
+      return node;
+    };
+    const [slicer, bastion] = [chip('solar-slicer'), chip('bastion')];
+    const chips = fakeNode([slicer, bastion]);
+    const line = { innerHTML: '' };
+    const menu = new MainMenu({
+      refs: { shipSelectorOptions: chips, shipSelectorLabel: line },
+      settings: {
+        getCategoryValues: () => ({ selectedHull: 'default-hull' }),
+      },
+      hangar: () => ({
+        hullFor: (id) => id,
+        isHullUnlocked: (id) => id !== 'bastion',
+      }),
+    });
+    menu.bindHullLine();
+    menu.showHullLine();
+    expect(line.innerHTML).toContain('Balanced');
+
+    chips.fire('pointerover', { target: bastion });
+    expect(line.innerHTML).toContain('Tough, slow');
+    expect(line.innerHTML).toContain('520 Salvage in the Hangar');
+
+    chips.fire('focusin', { target: slicer });
+    expect(line.innerHTML).toContain('Fast, fragile');
+    expect(line.innerHTML).not.toContain('Hangar');
+
+    chips.fire('pointerleave');
+    expect(line.innerHTML).toContain('Balanced');
+  });
 });

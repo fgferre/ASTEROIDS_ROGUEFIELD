@@ -662,14 +662,39 @@ select {
   pointer-events: auto;
 }
 
+/* What the hovered, focused or selected hull does: one line, the height
+   the old "Hull Selection" label had. */
 .menu-ship-selector__label {
+  height: 16.8px;
   margin: 0 0 var(--space-3);
-  color: var(--text-dim);
-  font-family: var(--font-display);
-  font-size: var(--text-xs);
-  letter-spacing: 0.2em;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 16.8px;
   text-align: center;
-  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A hull's name, role and stat percents (ui/hangar.js hullTraitsMarkup) */
+.hull-traits {
+  color: var(--text-dim);
+}
+
+.hull-traits__name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.hull-traits__role {
+  color: var(--text);
+}
+
+.hull-traits__stat.is-better {
+  color: var(--status);
+}
+
+.hull-traits__stat.is-worse {
+  color: var(--danger);
 }
 
 .menu-ship-selector__options {
@@ -1647,11 +1672,26 @@ kbd {
   gap: var(--space-3);
 }
 
+/* The stage with what the hull does under it (ui/hangar.js hullTraits) */
+.hangar-hull-view {
+  flex: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hangar-hull-info {
+  min-height: 1.4em;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  text-align: center;
+}
+
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */
 .hangar-hull-stage-frame {
   position: relative;
-  flex: 2;
-  min-width: 0;
 }
 
 .hangar-hull-stage {

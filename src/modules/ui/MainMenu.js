@@ -11,10 +11,11 @@ import {
 } from '../../data/shipModels.js';
 import { isBossRushUnlocked, loadRecords } from '../../services/runRecords.js';
 import { menuStatusItems, menuStatusMarkup } from './menuStatus.js';
+import { hullTraitsMarkup, hullUnlockText } from './hangar.js';
 
 export class MainMenu {
   /**
-   * `refs`: the menu's nodes { screen, shipSelector, shipSelectorOptions, status, bossRushBtn, bossRushLock }.
+   * `refs`: the menu's nodes { screen, shipSelector, shipSelectorOptions, shipSelectorLabel, status, bossRushBtn, bossRushLock, nav, hint }.
    * `settings`: the settings service (selected hull, graphics quality), or none.
    * `emit(name, payload)`: sends ui-hover.
    * `hangar()`: the hangar service (unlocked hulls, Salvage).
@@ -72,7 +73,33 @@ export class MainMenu {
     }
 
     this.buildMenuShipSelectorButtons();
+    this.bindHullLine();
     this.refreshMenuShipSelector();
+  }
+
+  // The line over the hull chips says what the hovered or focused hull does,
+  // otherwise the selected one; a locked hull also says where to unlock it.
+  showHullLine(hullId = this.getSelectedHullId()) {
+    const line = this.refs.shipSelectorLabel;
+    if (!line) return;
+    const lock = this.hangar().isHullUnlocked(hullId)
+      ? ''
+      : hullUnlockText(hullId);
+    line.innerHTML = hullTraitsMarkup(getShipModelById(hullId), lock);
+  }
+
+  bindHullLine() {
+    const chips = this.refs.shipSelectorOptions;
+    const showChip = (event) => {
+      const chip = event.target.closest?.('[data-hull-id]');
+      if (chip) this.showHullLine(chip.dataset.hullId);
+    };
+    chips.addEventListener('pointerover', showChip);
+    chips.addEventListener('focusin', showChip);
+    chips.addEventListener('pointerleave', () => this.showHullLine());
+    chips.addEventListener('focusout', (event) => {
+      if (!chips.contains(event.relatedTarget)) this.showHullLine();
+    });
   }
 
   buildMenuShipSelectorButtons() {
@@ -163,9 +190,9 @@ export class MainMenu {
         const locked = !hangar.isHullUnlocked(button.dataset.hullId);
         button.disabled = locked;
         button.classList.toggle('is-locked', locked);
-        button.title = locked ? 'Unlock in the Hangar' : '';
       });
 
+    this.showHullLine(selectedHullId);
     this.renderMenuShipSelectorPreviews();
   }
 

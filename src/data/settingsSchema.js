@@ -45,6 +45,10 @@ const SETTINGS_SCHEMA = [
         type: 'select',
         label: 'Ship Hull',
         description: 'Choose the playable hull used for the next run.',
+        // Picked in the menu and the Hangar; kept out of the Settings panel,
+        // so its resets leave it alone.
+        hidden: true,
+        keepOnReset: true,
         default: DEFAULT_HULL_ID,
         options: HULL_OPTION_IDS,
         optionLabels: HULL_OPTION_LABELS,
