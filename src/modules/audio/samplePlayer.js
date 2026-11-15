@@ -232,6 +232,11 @@ export function createSamplePlayer(sfx) {
       source.loopEnd = entry.loopEnd ?? buffer.duration;
     }
     source.connect(gain);
+    // Stopped early or run out, the voice leaves the mixer once it has ended.
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+    };
     source.start(now);
     lastStart.set(id, now);
     voices.push({

@@ -248,7 +248,12 @@ describe('createVoicePlayer', () => {
     context.decodeAudioData = vi.fn(async (file) => ({ file, duration: 2 }));
     const sources = [];
     context.createBufferSource = vi.fn(() => {
-      const source = { connect() {}, start: vi.fn(), stop: vi.fn() };
+      const source = {
+        connect() {},
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      };
       sources.push(source);
       return source;
     });
@@ -292,6 +297,14 @@ describe('createVoicePlayer', () => {
     player.release(line);
     expect(sources[0].stop).toHaveBeenCalled();
     expect(unduck).toHaveBeenCalled();
+  });
+
+  it('a line that ended leaves the mixer, not before', async () => {
+    const { player, sources } = await readyPlayer();
+    player.play(line);
+    expect(sources[0].disconnect).not.toHaveBeenCalled();
+    sources[0].onended();
+    expect(sources[0].disconnect).toHaveBeenCalled();
   });
 
   it("another line's end leaves the voice playing", async () => {

@@ -146,6 +146,8 @@ export function createVoicePlayer({
     source.connect(gain);
     source.onended = () => {
       if (playing?.source === source) playing = null;
+      source.disconnect();
+      gain.disconnect();
     };
     source.start();
     playing = { id, source, gain };
