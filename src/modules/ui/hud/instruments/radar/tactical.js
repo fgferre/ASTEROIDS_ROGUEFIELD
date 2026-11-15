@@ -231,6 +231,9 @@ export default {
     this.labels = pool(q('.rt-labels'), LABEL_POOL, () =>
       document.createElement('span')
     );
+    this.blipCount = 0;
+    this.hazeCount = 0;
+    this.labelCount = 0;
     this.mode = null;
     this.jammed = null;
     this.ringsRange = null;
@@ -277,7 +280,8 @@ export default {
 
   drawBlips(blips) {
     let labels = 0;
-    for (let i = 0; i < this.blips.length; i += 1) {
+    const count = Math.min(blips.length, this.blips.length);
+    for (let i = 0; i < count; i += 1) {
       const slot = this.blips[i];
       const b = blips[i];
       show(slot, Boolean(b));
@@ -303,13 +307,19 @@ export default {
       setStyle(label, 'left', `${f(((C + b.x * r) / SIZE) * 100)}%`);
       setStyle(label, 'top', `${f(((C + b.y * r) / SIZE) * 100)}%`);
     }
-    for (let i = labels; i < this.labels.length; i += 1) {
+    for (let i = count; i < this.blipCount; i += 1) {
+      show(this.blips[i], false);
+    }
+    for (let i = labels; i < this.labelCount; i += 1) {
       show(this.labels[i], false);
     }
+    this.blipCount = count;
+    this.labelCount = labels;
   },
 
   drawHaze(haze) {
-    for (let i = 0; i < this.hazes.length; i += 1) {
+    const count = Math.min(haze.length, this.hazes.length);
+    for (let i = 0; i < count; i += 1) {
       const slot = this.hazes[i];
       const h = haze[i];
       show(slot, Boolean(h));
@@ -320,6 +330,10 @@ export default {
       write(slot, 'cy', f(C + h.y * RIM));
       write(slot, 'r', f(Math.min(9, 4 + 1.2 * Math.sqrt(h.weight))));
     }
+    for (let i = count; i < this.hazeCount; i += 1) {
+      show(this.hazes[i], false);
+    }
+    this.hazeCount = count;
   },
 
   destroy() {

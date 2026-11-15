@@ -119,6 +119,96 @@ describe('EnemyMirror', () => {
     expect(orb.rotation.y).toBe(0);
   });
 
+  it('skips hidden pooled matrix trees and resumes Three recursion when shown', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const mine = (id, x, y, radius, rotation) => ({
+      id,
+      type: 'mine',
+      x,
+      y,
+      radius,
+      rotation,
+      getHitFlash: () => 0,
+    });
+    mirror.update([mine('first', 120, 180, 12, 0.25)], 0);
+    const view = mirror.views.get('first');
+    const root = view.object;
+    const parent = new THREE.Object3D();
+    const leaf = new THREE.Object3D();
+    root.add(parent);
+    parent.add(leaf);
+    parent.position.set(1, 2, 3);
+    parent.rotation.set(0.1, 0.2, 0.3);
+    leaf.position.set(4, 5, 6);
+    leaf.rotation.set(0.4, 0.5, 0.6);
+
+    const expectNativeWorldMatrices = () => {
+      const referenceRoot = new THREE.Object3D();
+      const referenceParent = new THREE.Object3D();
+      const referenceLeaf = new THREE.Object3D();
+      referenceRoot.position.copy(root.position);
+      referenceRoot.rotation.copy(root.rotation);
+      referenceRoot.scale.copy(root.scale);
+      referenceRoot.add(referenceParent);
+      referenceParent.position.copy(parent.position);
+      referenceParent.rotation.copy(parent.rotation);
+      referenceParent.scale.copy(parent.scale);
+      referenceParent.add(referenceLeaf);
+      referenceLeaf.position.copy(leaf.position);
+      referenceLeaf.rotation.copy(leaf.rotation);
+      referenceLeaf.scale.copy(leaf.scale);
+      referenceRoot.updateMatrixWorld(true);
+
+      const normalized = (elements) =>
+        elements.map((value) => (Object.is(value, -0) ? 0 : value));
+      expect(normalized(root.matrixWorld.elements)).toEqual(
+        normalized(referenceRoot.matrixWorld.elements)
+      );
+      expect(normalized(parent.matrixWorld.elements)).toEqual(
+        normalized(referenceParent.matrixWorld.elements)
+      );
+      expect(normalized(leaf.matrixWorld.elements)).toEqual(
+        normalized(referenceLeaf.matrixWorld.elements)
+      );
+    };
+
+    root.updateMatrixWorld(true);
+    expectNativeWorldMatrices();
+    const previousLeafWorld = leaf.matrixWorld.clone();
+    const updateParent = vi.spyOn(parent, 'updateMatrixWorld');
+    const updateLeaf = vi.spyOn(leaf, 'updateMatrixWorld');
+
+    mirror.update([], 0); // release hides and pools the root
+    expect(root.visible).toBe(false);
+    parent.position.set(7, 8, 9);
+    leaf.position.set(-3, 2, 11);
+    root.updateMatrixWorld(true);
+    expect(updateParent).not.toHaveBeenCalled();
+    expect(updateLeaf).not.toHaveBeenCalled();
+    expect(leaf.matrixWorld.elements).toEqual(previousLeafWorld.elements);
+
+    // Warm-up temporarily makes pooled roots visible so their materials compile.
+    root.visible = true;
+    root.updateMatrixWorld(true);
+    expect(updateParent).toHaveBeenCalledTimes(1);
+    expect(updateLeaf).toHaveBeenCalledTimes(1);
+    expectNativeWorldMatrices();
+
+    root.visible = false;
+    updateParent.mockClear();
+    updateLeaf.mockClear();
+    leaf.position.set(12, -4, 3);
+    root.updateMatrixWorld(true);
+    expect(updateParent).not.toHaveBeenCalled();
+    expect(updateLeaf).not.toHaveBeenCalled();
+
+    mirror.update([mine('second', 420, 270, 20, -0.75)], 0);
+    expect(mirror.views.get('second')).toBe(view);
+    expect(root.visible).toBe(true);
+    root.updateMatrixWorld(true);
+    expectNativeWorldMatrices();
+  });
+
   it('draws the Quarry Maw with jaws that open and a core that heats', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const maw = {
