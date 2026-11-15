@@ -22,7 +22,11 @@ import {
   StepInterpolator,
   interpolationDisabledByUrl,
 } from '../../core/interpolation.js';
-import { AutoQuality, qualityFromUrl } from '../../core/qualityPresets.js';
+import {
+  AutoQuality,
+  QUALITY_PRESETS,
+  qualityFromUrl,
+} from '../../core/qualityPresets.js';
 import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
@@ -674,8 +678,28 @@ class Renderer3D extends BaseSystem {
 
   // Programs for the scene's materials (pooled views included) as the
   // frame draws them: into the composer's target, or the screen without it.
+  // Once per program variant the presets use (shadows on/off, surface maps
+  // on/off), the current preset's last: a quality step in a fight then finds
+  // its programs built (compiling them there froze a frame 150 ms, seconds
+  // on a cold shader cache). Programs keep the uniforms of their last build.
   compileScene() {
+    const q = this.quality.settings;
+    const variants = new Map();
+    Object.values(QUALITY_PRESETS).forEach((p) =>
+      variants.set(`${p.shadows > 0}/${p.surfaceMaps}`, p)
+    );
+    variants.delete(`${q.shadows > 0}/${q.surfaceMaps}`);
+    [...variants.values(), q].forEach((p) => {
+      this.compileVariant(p.shadows > 0, p.surfaceMaps);
+    });
+  }
+
+  compileVariant(shadows, surfaceMaps) {
     const t = this.three;
+    t.renderer.shadowMap.enabled = shadows;
+    t.key.castShadow = shadows;
+    t.enemies.setSurfaceMaps(surfaceMaps);
+    t.player.setSurfaceMaps(surfaceMaps);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.renderer.setRenderTarget(
       this.graphics.postProcessing ? t.composer.readBuffer : null
