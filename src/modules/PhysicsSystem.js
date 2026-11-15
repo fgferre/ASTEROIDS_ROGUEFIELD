@@ -717,31 +717,30 @@ class PhysicsSystem extends BaseSystem {
       return candidateList;
     }
 
-    const enriched = candidateList.slice();
-    const seen = new Set(candidateList);
     const detectionRadius = Math.max(0, radius);
+    let enriched = candidateList;
 
-    this.activeBosses.forEach((boss) => {
+    for (const boss of this.activeBosses) {
       if (
         !boss ||
         boss.destroyed ||
         !this.activeEnemies.has(boss) ||
         (boss.intangible && !includeIntangible)
       ) {
-        return;
+        continue;
       }
 
-      if (seen.has(boss)) {
-        return;
+      if (enriched.includes(boss)) {
+        continue;
       }
 
       if (!Number.isFinite(boss.x) || !Number.isFinite(boss.y)) {
-        return;
+        continue;
       }
 
       const effectiveRadius = resolveEnemySpatialRadius(boss);
       if (!Number.isFinite(effectiveRadius) || effectiveRadius <= 0) {
-        return;
+        continue;
       }
 
       const dx = boss.x - x;
@@ -749,14 +748,16 @@ class PhysicsSystem extends BaseSystem {
       const maxDistance = detectionRadius + effectiveRadius;
 
       if (maxDistance <= 0) {
-        return;
+        continue;
       }
 
       if (dx * dx + dy * dy <= maxDistance * maxDistance) {
+        if (enriched === candidateList) {
+          enriched = candidateList.slice();
+        }
         enriched.push(boss);
-        seen.add(boss);
       }
-    });
+    }
 
     return enriched;
   }

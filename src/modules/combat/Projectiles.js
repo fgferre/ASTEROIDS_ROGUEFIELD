@@ -400,7 +400,7 @@ export class Projectiles {
     let collisionContext = null;
     const hitsToEmit = [];
 
-    const activeBullets = [];
+    let activeCount = 0;
 
     let trailPoints = 0;
     for (let i = 0; i < this.enemyBullets.length; i += 1) {
@@ -526,7 +526,8 @@ export class Projectiles {
       }
 
       if (bullet.life > 0 && !bullet.hit) {
-        activeBullets.push(bullet);
+        this.enemyBullets[activeCount] = bullet;
+        activeCount += 1;
       } else {
         if (!bullet.destroyReason) {
           bullet.destroyReason = bullet.hit ? 'hit-player' : 'expired';
@@ -565,7 +566,7 @@ export class Projectiles {
       }
     }
 
-    this.enemyBullets = activeBullets;
+    this.enemyBullets.length = activeCount;
     this.projectilePerf.projectileEnemyTrailPoints = trailPoints;
 
     for (let i = 0; i < hitsToEmit.length; i += 1) {
@@ -672,16 +673,19 @@ export class Projectiles {
     });
 
     // Return expired bullets to pool and remove from active list
-    const activeBullets = [];
-    for (const bullet of this.bullets) {
+    const bullets = this.bullets;
+    let activeCount = 0;
+    for (let i = 0; i < bullets.length; i += 1) {
+      const bullet = bullets[i];
       if (bullet.life > 0 && !bullet.hit) {
-        activeBullets.push(bullet);
+        bullets[activeCount] = bullet;
+        activeCount += 1;
       } else {
         // Return to pool
         GamePools.bullets.release(bullet);
       }
     }
-    this.bullets = activeBullets;
+    bullets.length = activeCount;
     this.projectilePerf.projectilePlayerTrailPoints = trailPoints;
   }
 
