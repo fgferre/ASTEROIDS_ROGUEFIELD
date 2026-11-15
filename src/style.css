@@ -597,10 +597,10 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(var(--space-2), 1.4vh, var(--space-4));
+  --menu-gap: clamp(var(--space-2), 1.4vh, var(--space-4));
+  gap: var(--menu-gap);
   padding: clamp(0px, 2vh - 8px, var(--space-5)) var(--space-5);
   width: min(720px, 94vw);
-  --menu-hint-height: 20px;
 }
 
 .menu-screen__title {
@@ -646,14 +646,10 @@ select {
   color: var(--accent);
 }
 
-/* Empty box the 3D hull (MenuHullPreview) is framed into; it gives up the
-   height of the mode line and its gap, so the menu is no taller for it. */
+/* Empty box the 3D hull (MenuHullPreview) is framed into */
 .menu-hull-stage {
   width: min(100%, 420px);
-  height: calc(
-    clamp(72px, 30vh - 120px, 240px) - var(--menu-hint-height) -
-      clamp(var(--space-2), 1.4vh, var(--space-4))
-  );
+  height: clamp(72px, 30vh - 120px, 240px);
 }
 
 .menu-ship-selector {
@@ -666,7 +662,7 @@ select {
    the old "Hull Selection" label had. */
 .menu-ship-selector__label {
   height: 16.8px;
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   overflow: hidden;
   font-size: var(--text-sm);
   line-height: 16.8px;
@@ -774,16 +770,28 @@ select {
   grid-column: 1 / -1;
 }
 
+/* The mode line, the selector label's tighter margin, the buttons' and the
+   key hints' tighter gaps pay for the mode line, so the menu and its 3D hull
+   keep the height they had without it. */
+.menu-screen__nav.menu-grid {
+  gap: var(--space-2);
+}
+
+.menu-screen__content .controls-hints {
+  row-gap: var(--space-1);
+}
+
 /* What the hovered or focused menu button does (MainMenu.bindModeHints):
-   one line of fixed height, so nothing moves as it changes. */
+   one line of fixed height, so nothing moves as it changes; it sits close
+   under the buttons it explains. */
 .menu-hint {
   width: min(100%, 30rem);
-  height: var(--menu-hint-height);
-  margin: 0;
+  height: 20px;
+  margin: calc(2px - var(--menu-gap)) 0 0;
   overflow: hidden;
   color: var(--text-dim);
   font-size: var(--text-sm);
-  line-height: var(--menu-hint-height);
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1672,10 +1680,12 @@ kbd {
   gap: var(--space-3);
 }
 
-/* The stage with what the hull does under it (ui/hangar.js hullTraits) */
+/* The stage with what the hull does under it (ui/hangar.js hullTraits): the
+   line comes out of the stage's height, so the list keeps its room. */
 .hangar-hull-view {
   flex: 2;
   min-width: 0;
+  height: clamp(150px, 28vh, 240px);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -1692,12 +1702,14 @@ kbd {
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */
 .hangar-hull-stage-frame {
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 .hangar-hull-stage {
   display: block;
   width: 100%;
-  height: clamp(150px, 28vh, 240px);
+  height: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
