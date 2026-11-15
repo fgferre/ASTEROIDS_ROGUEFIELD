@@ -46,7 +46,7 @@ export default {
     // A row still on screen keeps counting and moves back to the top.
     let row = this.rows.find((entry) => entry.key === key);
     if (row) {
-      this.list.prepend(row.el);
+      if (this.list.firstElementChild !== row.el) this.list.prepend(row.el);
       this.rows = [row, ...this.rows.filter((entry) => entry !== row)];
     } else {
       const el = document.createElement('div');

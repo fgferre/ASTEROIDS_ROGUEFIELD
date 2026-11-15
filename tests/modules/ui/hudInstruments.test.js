@@ -275,4 +275,61 @@ describe('HUD instruments', () => {
     expect(labels[0].textContent).toBe('12');
     expect(labels[1].style.display).toBe('none');
   });
+
+  it('next-wave timer: the same second and label write nothing, a change writes', () => {
+    const writes = [];
+    const spy = (name) => {
+      const el = fakeElement();
+      let text = '';
+      Object.defineProperty(el, 'textContent', {
+        get: () => text,
+        set: (v) => {
+          writes.push(name);
+          text = v;
+        },
+      });
+      Object.defineProperty(el, 'innerText', {
+        get: () => text,
+        set: (v) => {
+          writes.push(name);
+          text = v;
+        },
+      });
+      return el;
+    };
+    const hud = new AAAHudLayout();
+    hud._nextWave = { seconds: null, label: null };
+    hud.els = {
+      nextWaveBox: fakeElement(),
+      nextWaveLabel: spy('label'),
+      nextWaveTimer: spy('timer'),
+    };
+
+    for (let i = 0; i < 5; i += 1) hud.updateNextWaveTimer(7.4, 'WAVE');
+    expect(writes).toEqual(['timer', 'label']);
+    expect(hud.els.nextWaveBox.classList.contains('visible')).toBe(true);
+
+    hud.updateNextWaveTimer(6.2, 'WAVE');
+    expect(writes).toEqual(['timer', 'label', 'timer']);
+
+    hud.updateNextWaveTimer(0, 'WAVE');
+    expect(hud.els.nextWaveBox.classList.contains('visible')).toBe(false);
+  });
+
+  it('classic feed: a row already first is not prepended again', () => {
+    const feed = Object.create(getInstrument('feed', 'classic'));
+    const el = fakeElement();
+    const prepend = vi.fn();
+    feed.list = { firstElementChild: el, prepend };
+    feed.rows = [{ key: 'xp', el, timer: null }];
+    feed.later = () => 1;
+    feed.cancel = () => {};
+
+    feed.push('xp', 'xp', () => {});
+    expect(prepend).not.toHaveBeenCalled();
+
+    feed.list.firstElementChild = fakeElement();
+    feed.push('xp', 'xp', () => {});
+    expect(prepend).toHaveBeenCalledWith(el);
+  });
 });
