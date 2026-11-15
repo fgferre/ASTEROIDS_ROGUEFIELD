@@ -57,6 +57,30 @@ describe('HangarService', () => {
     expect(awarded).toEqual([99, 23]);
   });
 
+  it('pays a quit from the pause menu like a death, and never twice', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const awarded = [];
+    eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
+
+    eventBus.emit('game-started', {});
+    eventBus.emit('run-abandoned', summary(9, 47));
+    expect(hangar.salvage).toBe(99);
+    eventBus.emit('run-abandoned', summary(9, 47));
+    eventBus.emit('player-died', summary(9, 47));
+    expect(hangar.salvage).toBe(99);
+    expect(awarded).toEqual([99]);
+  });
+
+  it('pays nothing for a replay that is quit', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+
+    eventBus.emit('game-started', { replay: true });
+    eventBus.emit('run-abandoned', summary(9, 47));
+    expect(hangar.salvage).toBe(0);
+  });
+
   it('pays a sector run the layers it played and its victory', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ eventBus, difficulty: atRate(1) });

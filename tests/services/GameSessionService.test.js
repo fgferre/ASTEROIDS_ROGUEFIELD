@@ -59,7 +59,10 @@ function createServiceHarness(options = {}) {
     getSetting: vi.fn((categoryId, key) => settingsState[categoryId]?.[key]),
   };
 
-  const world = { reset: vi.fn() };
+  const world = {
+    reset: vi.fn(),
+    buildRunSummary: vi.fn(() => ({ wave: { current: 4 }, stats: {} })),
+  };
   const progression = {
     serialize: vi.fn(() => ({ level: 3 })),
     restoreState: vi.fn(() => true),
@@ -370,6 +373,33 @@ describe('GameSessionService lifecycle flows', () => {
     expect(
       eventBus.emit.mock.calls.filter((call) => call[0] === 'screen-changed')
     ).toHaveLength(1);
+  });
+
+  it('pays the run out once when quitting from the pause menu while playing', () => {
+    const { service, eventBus } = createServiceHarness();
+    service.setScreen('playing');
+    service.setPaused(true);
+    vi.useFakeTimers();
+
+    service.exitToMenu({ source: 'pause-menu' });
+    service.exitToMenu({ source: 'pause-menu' });
+
+    const abandoned = eventBus.emit.mock.calls.filter(
+      (call) => call[0] === 'run-abandoned'
+    );
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0][1]).toEqual({ wave: { current: 4 }, stats: {} });
+  });
+
+  it('does not emit run-abandoned when leaving from the game over screen', () => {
+    const { service, eventBus } = createServiceHarness();
+    service.setScreen('gameover');
+
+    service.exitToMenu({ source: 'game-over' });
+
+    expect(
+      eventBus.emit.mock.calls.filter((call) => call[0] === 'run-abandoned')
+    ).toHaveLength(0);
   });
 
   it('emits screen-changed once when starting a new run', () => {

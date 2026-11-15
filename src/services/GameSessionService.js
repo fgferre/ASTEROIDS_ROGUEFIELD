@@ -768,6 +768,11 @@ export default class GameSessionService {
         const ui = this.resolveServiceInstance('ui');
 
         this.setSessionState('quitting', { reason: 'exit-to-menu' });
+        // Quitting pays the Salvage the run earned (HangarService).
+        this.eventBus.emit(
+          'run-abandoned',
+          this.resolveServiceInstance('world')?.buildRunSummary() ?? {}
+        );
         this.runEnd.clearPendingGameOverTransition();
         const wasPaused = this.isPaused();
         this.setPaused(false);
