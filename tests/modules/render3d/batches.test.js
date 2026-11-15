@@ -4,6 +4,7 @@ import {
   CapsuleBatch,
   RibbonBatch,
   SHOT_SHAPES,
+  rgbOf,
 } from '../../../src/modules/render3d/batches.js';
 
 const THREE = {};
@@ -17,6 +18,17 @@ new Function(
 )(THREE, {});
 
 const WHITE = [1, 1, 1];
+
+describe('rgbOf', () => {
+  it('returns the same shared colour for a repeated string, alpha dropped', () => {
+    const a = rgbOf(THREE, 'rgba(255, 0, 0, 0.5)');
+    expect(rgbOf(THREE, 'rgba(255, 0, 0, 0.5)')).toBe(a);
+    expect(rgbOf(THREE, 'rgb(255, 0, 0)')).toBe(a);
+    expect(a[0]).toBeCloseTo(1);
+    expect(a[1]).toBe(0);
+    expect(rgbOf(THREE, undefined)).toEqual([1, 1, 1]);
+  });
+});
 
 describe('RibbonBatch', () => {
   it('turns light about its own line and keeps floor marks flat', () => {

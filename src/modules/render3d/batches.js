@@ -15,7 +15,11 @@ export function colorOf(THREE, css) {
 
 // Parsed linear colors, keyed by the CSS string the simulation stores.
 const colorCache = new Map();
+// Same results keyed by the raw string: a repeat call does no string work.
+const rawCache = new Map();
 export function rgbOf(THREE, css) {
+  const hit = rawCache.get(css);
+  if (hit) return hit;
   // THREE.Color ignores alpha and warns about it each time: drop it here, once
   // per distinct colour (alpha lives in the caller's own alpha channel).
   const key = css && css.replace(/^(rgb|hsl)a\((.*),[^,]*\)$/, '$1($2)');
@@ -31,6 +35,7 @@ export function rgbOf(THREE, css) {
     rgb = [color.r, color.g, color.b];
     colorCache.set(key, rgb);
   }
+  rawCache.set(css, rgb);
   return rgb;
 }
 
