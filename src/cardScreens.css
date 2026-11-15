@@ -777,6 +777,17 @@ article.card {
   color: var(--danger);
 }
 
+/* Armed: the next press makes the picks. */
+#levelup-equip-btn.is-armed {
+  color: var(--accent);
+  text-shadow: 0 0 calc(10 * var(--u))
+    color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+#levelup-equip-btn.is-armed kbd {
+  border-color: var(--accent);
+}
+
 .cards-screen .levelup-hint {
   margin: calc(12 * var(--u)) 0 0;
   text-align: center;
