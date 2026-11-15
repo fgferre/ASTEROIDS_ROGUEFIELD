@@ -16,7 +16,9 @@ export function colorOf(THREE, css) {
 // Parsed linear colors, keyed by the CSS string the simulation stores.
 const colorCache = new Map();
 // Same results keyed by the raw string: a repeat call does no string work.
+// Particles carry a random alpha in theirs, so it is emptied when it fills.
 const rawCache = new Map();
+const RAW_CACHE_MAX = 4096;
 export function rgbOf(THREE, css) {
   const hit = rawCache.get(css);
   if (hit) return hit;
@@ -35,6 +37,7 @@ export function rgbOf(THREE, css) {
     rgb = [color.r, color.g, color.b];
     colorCache.set(key, rgb);
   }
+  if (rawCache.size >= RAW_CACHE_MAX) rawCache.clear();
   rawCache.set(css, rgb);
   return rgb;
 }

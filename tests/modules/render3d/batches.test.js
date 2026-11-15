@@ -28,6 +28,14 @@ describe('rgbOf', () => {
     expect(a[1]).toBe(0);
     expect(rgbOf(THREE, undefined)).toEqual([1, 1, 1]);
   });
+
+  it('keeps the shared colour through a flood of one-off alpha strings', () => {
+    const a = rgbOf(THREE, 'rgb(0, 255, 0)');
+    for (let i = 0; i < 10000; i++) {
+      expect(rgbOf(THREE, `rgba(0, 255, 0, ${i / 10000})`)).toBe(a);
+    }
+    expect(rgbOf(THREE, 'rgb(0, 255, 0)')).toBe(a);
+  });
 });
 
 describe('RibbonBatch', () => {
