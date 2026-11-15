@@ -15,6 +15,8 @@ const LOW_PERCENT = 30;
 const CRITICAL_PERCENT = 15;
 export const HIT_SHOW_MS = 2000;
 export const GLITCH_MS = 350;
+// The ring's fade (--motion-base): it follows the ship until faded out.
+const FADE_MS = 250;
 
 const f = (n) => Math.round(n * 10) / 10;
 const point = (deg) => {
@@ -29,11 +31,13 @@ const SEGMENT_PATHS = Array.from({ length: SEGMENTS }, (_, i) => {
   return `<path class="hr-track" d="${d}"/><path class="hr-lit" d="${d}" pathLength="1" stroke-dasharray="0 1"/><path class="hr-lost" d="${d}" pathLength="1" stroke-dasharray="0 1"/>`;
 }).join('');
 
+// The paths sit in one <g>: in Chrome, a move of the ring restyles its direct
+// children (style.css's `box-sizing: inherit`), so one group, not 30 paths.
 const MARKUP = `
         <div class="hr">
           <div class="hr-dark"></div>
           <div class="hr-glitch" aria-hidden="true"><i></i><i></i><i></i></div>
-          <svg class="hr-ring" viewBox="${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}" aria-hidden="true">${SEGMENT_PATHS}</svg>
+          <svg class="hr-ring" viewBox="${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}" aria-hidden="true"><g>${SEGMENT_PATHS}</g></svg>
         </div>`;
 
 const CSS = `
@@ -84,6 +88,7 @@ export default {
     this.hitUntil = 0;
     this.lostFrom = null;
     this.glitchUntil = 0;
+    this.ringUntil = 0;
     this.shown = {};
   },
 
@@ -108,7 +113,8 @@ export default {
     this.toggle('is-low', low);
     this.toggle('is-ring', showRing);
     this.toggle('is-glitching', now < this.glitchUntil);
-    if (ship) {
+    if (showRing) this.ringUntil = now + FADE_MS;
+    if (ship && now < this.ringUntil) {
       const left = `${((ship.x / 800) * 100).toFixed(2)}%`;
       const top = `${((ship.y / 600) * 100).toFixed(2)}%`;
       if (left !== this.shown.left)

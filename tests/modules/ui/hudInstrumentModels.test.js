@@ -174,6 +174,25 @@ describe('HUD instrument models', () => {
     expect(has('.hr', 'is-low')).toBe(false);
   });
 
+  it('hull ring: hidden and faded, it stops following the ship; it catches up the frame it shows', () => {
+    const { model, part } = mount('hull-ring', 'instrument');
+    const at = (now, hull, ship) =>
+      model.update({ now, ship, hull, maxHull: 100 });
+
+    at(0, 100, { x: 400, y: 300 });
+    at(1000, 100, { x: 200, y: 150 });
+    expect(part('.hr-ring').style.left).not.toBe('25.00%');
+    at(1100, 70, { x: 200, y: 450 });
+    expect(part('.hr-ring').style.left).toBe('25.00%');
+    expect(part('.hr-ring').style.top).toBe('75.00%');
+    // Fading out after the 2 s window, it still follows; faded, it stops.
+    at(3050, 70, { x: 200, y: 450 });
+    at(3150, 70, { x: 600, y: 300 });
+    expect(part('.hr-ring').style.left).toBe('75.00%');
+    at(3400, 70, { x: 400, y: 300 });
+    expect(part('.hr-ring').style.left).toBe('75.00%');
+  });
+
   it('on the ship: each drawn frame moves the hull ring and the recharges onto the ship as drawn, their state kept', () => {
     const hud = new AAAHudLayout();
     const ring = mount('hull-ring', 'instrument');
