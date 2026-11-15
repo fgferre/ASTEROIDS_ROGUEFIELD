@@ -600,6 +600,7 @@ select {
   gap: clamp(var(--space-2), 1.4vh, var(--space-4));
   padding: clamp(0px, 2vh - 8px, var(--space-5)) var(--space-5);
   width: min(720px, 94vw);
+  --menu-hint-height: 20px;
 }
 
 .menu-screen__title {
@@ -645,10 +646,14 @@ select {
   color: var(--accent);
 }
 
-/* Empty box the 3D hull (MenuHullPreview) is framed into */
+/* Empty box the 3D hull (MenuHullPreview) is framed into; it gives up the
+   height of the mode line and its gap, so the menu is no taller for it. */
 .menu-hull-stage {
   width: min(100%, 420px);
-  height: clamp(72px, 30vh - 120px, 240px);
+  height: calc(
+    clamp(72px, 30vh - 120px, 240px) - var(--menu-hint-height) -
+      clamp(var(--space-2), 1.4vh, var(--space-4))
+  );
 }
 
 .menu-ship-selector {
@@ -742,6 +747,20 @@ select {
    second; an even last action is alone on its row and spans it */
 .menu-screen__nav.menu-grid > :last-child:nth-child(even) {
   grid-column: 1 / -1;
+}
+
+/* What the hovered or focused menu button does (MainMenu.bindModeHints):
+   one line of fixed height, so nothing moves as it changes. */
+.menu-hint {
+  width: min(100%, 30rem);
+  height: var(--menu-hint-height);
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  line-height: var(--menu-hint-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-screen__button {

@@ -143,6 +143,8 @@ export function cacheStaticNodes() {
       status: document.getElementById('menu-status') || null,
       bossRushBtn: document.getElementById('boss-rush-btn') || null,
       bossRushLock: document.getElementById('boss-rush-lock') || null,
+      nav: document.querySelector('#menu-screen .menu-screen__nav') || null,
+      hint: document.getElementById('menu-hint') || null,
     },
   };
 }

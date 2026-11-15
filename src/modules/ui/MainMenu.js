@@ -234,7 +234,41 @@ export class MainMenu {
       });
   }
 
+  // The line under the menu buttons says what the button under the pointer
+  // or holding the focus does; otherwise the focused button's, else the
+  // first (Campaign). One line for every button, never empty.
+  bindModeHints() {
+    const { nav, hint } = this.refs;
+    if (!nav || !hint) return;
+    let hovered = null;
+    const show = (button) => {
+      hint.textContent = (
+        button ?? nav.querySelector('[data-hint]')
+      ).dataset.hint;
+    };
+    const focused = () => {
+      const active = document.activeElement;
+      return nav.contains(active) && active.dataset?.hint ? active : null;
+    };
+    nav.addEventListener('pointerover', (event) => {
+      hovered = event.target.closest('[data-hint]');
+      if (hovered) show(hovered);
+    });
+    nav.addEventListener('pointerleave', () => {
+      hovered = null;
+      show(focused());
+    });
+    nav.addEventListener('focusin', (event) => {
+      show(event.target.closest('[data-hint]'));
+    });
+    nav.addEventListener('focusout', (event) => {
+      if (!nav.contains(event.relatedTarget)) show(hovered);
+    });
+    show(focused());
+  }
+
   bindMainMenuControls() {
+    this.bindModeHints();
     // Generic UI Hover Sound Delegation
     // Listens for all menu buttons and interactive elements
     if (typeof document !== 'undefined') {

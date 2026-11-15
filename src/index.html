@@ -97,6 +97,7 @@
                 id="menu-campaign-btn"
                 class="menu-screen__button menu-screen__button--primary"
                 type="button"
+                data-hint="Ten sectors, one at a time; each win is kept and opens the next."
               >
                 Campaign
               </button>
@@ -104,7 +105,7 @@
                 id="start-game-btn"
                 class="menu-screen__button"
                 type="button"
-                title="All three chapters in one run"
+                data-hint="All three chapters in one run."
               >
                 Descent
               </button>
@@ -112,7 +113,7 @@
                 id="daily-field-btn"
                 class="menu-screen__button"
                 type="button"
-                title="Today's field: the same seed for everyone, Veteran difficulty"
+                data-hint="Today's field, the same for everyone. Always Veteran difficulty."
               >
                 Daily Field
               </button>
@@ -120,7 +121,7 @@
                 id="boss-rush-btn"
                 class="menu-screen__button menu-screen__button--stacked"
                 type="button"
-                title="The three Wardens back to back"
+                data-hint="The three Wardens back to back."
               >
                 Boss Rush
                 <span id="boss-rush-lock" class="menu-screen__lock hidden"
@@ -131,6 +132,7 @@
                 id="menu-hangar-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Spend Salvage on permanent upgrades and new hulls."
               >
                 Hangar
               </button>
@@ -138,6 +140,7 @@
                 id="menu-codex-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Every enemy you have logged, and your achievements."
               >
                 Codex
               </button>
@@ -145,6 +148,7 @@
                 id="open-settings-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Gameplay, controls, interface, graphics, audio and accessibility."
               >
                 Settings
               </button>
@@ -152,10 +156,12 @@
                 id="menu-credits-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="The people behind the game, and the original 2D version."
               >
                 Credits
               </button>
             </nav>
+            <p id="menu-hint" class="menu-hint" aria-live="polite"></p>
             <ul
               class="controls-hints"
               data-device="keyboard"
