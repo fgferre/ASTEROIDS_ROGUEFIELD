@@ -763,7 +763,11 @@ export class CapsuleBatch {
 
   end() {
     this.mesh.count = this.count;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.count === 0) return;
+    const matrices = this.mesh.instanceMatrix;
+    matrices.updateRange.offset = 0;
+    matrices.updateRange.count = this.count * 16;
+    matrices.needsUpdate = true;
     this.tint.updateRange.offset = 0;
     this.tint.updateRange.count = this.count * 4;
     this.tint.needsUpdate = true;
