@@ -270,6 +270,8 @@ export function setupThree(seeded) {
     ...bloomPass.renderTargetsVertical,
   ].forEach((rt) => {
     rt.texture.type = THREE.HalfFloatType;
+    // Full-screen quads only: nothing reads or tests depth here.
+    rt.depthBuffer = false;
   });
   bloomPass.blackMip = new THREE.DataTexture(new Uint8Array(4), 1, 1);
   bloomPass.blackMip.needsUpdate = true;
