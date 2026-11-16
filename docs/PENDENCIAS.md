@@ -101,6 +101,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   rochas; anel, zoom e som tocam mesmo sem nada para frear. Opções conversadas, sem escolha: disparar na hora com a
   onda do tamanho da freada; só depois do dash; só tirar o espetáculo. Ele também perguntou: _"temos que repensar a
   fisica da nave para criar mais dificuldade?"_ (a nave inverte em ~0,22 s com qualquer velocidade) — sem decisão.
+  Reaberto no mesmo dia: _"eu tenho dúvida ainda se a gente está com a melhor dinâmica de propulsores… os jogos
+  oficiais de asteroids, eu acho que usavam essa dinâmica. Nesse cenário, eu acredito que as cartas de freio
+  funcionavam de outra forma… Preciso de ajuda para tomar essa decisão."_ Ramo `jogo/pilotagem`: quatro jeitos para
+  jogar lado a lado (A moderno de hoje, B clássico de hoje, C clássico com deslize, D moderno com deslize), cartão de
+  decisão na página dele. Espera a escolha dele, jogando; depois, os três pontos de efeito dos propulsores.
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 
