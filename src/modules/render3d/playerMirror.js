@@ -6,13 +6,13 @@
 // rim, with a dark glass canopy, cached per hull and upgrade levels. The only
 // strong light is the thrusters (hull accent: cyan Interceptor, amber Solar
 // Slicer): glowing throats, cones with a white core that stretch with
-// thrust, side puffs on strafe at the wingtip ports, a point light and a
-// ribbon trail. Dash afterimages, the invulnerability blink and the shield
-// impact flash mirror the 2D PlayerSystem render. In the modern scheme the
-// dorsal turret turns on its own to the simulation's turret heading; its
-// barrel tips sit on the sim's muzzle point. With multi-lock (Targeting
-// Matrix rank 3) thin layers stack on its axis, one per lock past the
-// primary, each turned to its own sim heading.
+// thrust, turn-jet needles at the RCS ports, retro flames at the nose, a
+// point light and a ribbon trail. Dash afterimages, the invulnerability
+// blink and the shield impact flash mirror the 2D PlayerSystem render. In
+// the modern scheme the dorsal turret turns on its own to the simulation's
+// turret heading; its barrel tips sit on the sim's muzzle point. With
+// multi-lock (Targeting Matrix rank 3) thin layers stack on its axis, one per
+// lock past the primary, each turned to its own sim heading.
 
 import {
   DASH_GHOST_COUNT,
@@ -54,23 +54,10 @@ const TRAIL_LENGTH = 22;
 const BANK_STRAFE = (22 * Math.PI) / 180;
 const BANK_YAW = (8 * Math.PI) / 180;
 const BANK_SMOOTH_S = 0.18;
-// The engines at idle (proposta 15/11): no jet, the throats at IDLE_GLOW, a
-// faint ship light at IDLE_LIGHT and a short dim ember in each nozzle
-// (IDLE_EMBER opacity, IDLE_EMBER_LENGTH long, no white core), all breathing
-// by ±IDLE_BREATH over IDLE_BREATH_S; under thrust they rise to the old 1.8
-// and 2.6 and the ember gives way to the flame.
-const IDLE_GLOW = 1.2;
-const IDLE_LIGHT = 0.35;
-const IDLE_EMBER = 0.3;
-const IDLE_EMBER_LENGTH = 2.8;
-const IDLE_BREATH = 0.2;
-const IDLE_BREATH_S = 3.2;
-// Main-flame mock-ups (maquete 16/11): four ideas, each behind its own
-// switch so the owner can keep some and drop others.
-// (a) Propulsors card: each level makes the flame longer and tighter, the
-// core longer and hotter, steadier; from SHOCK_LEVEL pressure diamonds ride
-// along it. The hue never changes.
-const FLAME_LEVEL_SHAPE = true;
+// The main flame (proposta 16/11, the owner's pick from mock-ups).
+// Propulsors card: each level makes the flame longer and tighter, the core
+// longer and hotter, steadier; from SHOCK_LEVEL pressure diamonds ride along
+// it. The hue never changes.
 const LEVEL_LENGTH = 0.2; // + flame length per level
 const LEVEL_TIGHTEN = 0.1; // − flame width per level
 const LEVEL_CORE = 0.04; // + the core's share of the flame per level
@@ -79,20 +66,19 @@ const LEVEL_DIM = 0.09; // − flame-body brightness per level: more nozzles, ne
 const LEVEL_STEADY = 0.014; // − flicker per level
 const SHOCK_LEVEL = 5;
 const SHOCK_AT = [0.3, 0.5, 0.68]; // along the flame, nozzle to tip
-// (b) Start burst: pilot thrust while the speed along the nose is far below
-// cruise overshoots; the cruise flame is CRUISE_SCALE of the old one.
-const FLAME_START_BURST = true;
+// Start burst: pilot thrust while the speed along the nose is far below
+// cruise overshoots; in play the cruise flame is CRUISE_SCALE of the
+// journey's (travelScene.js), which has no start.
 const CRUISE_SCALE = 0.75;
 const BURST_LENGTH = 1.1; // + length at full burst
 const BURST_WIDTH = 0.35; // + width at full burst
 const BURST_HEAT = 0.5; // + core brightness at full burst
 const BURST_FROM = 0.25; // share of cruise speed: full burst below,
 const BURST_TO = 0.7; // none past
-// (c) A flame per hull: `flame: { length, width }` in the hull's visual.
-const FLAME_PER_HULL = true;
-// (d) Low-hull sputter: from SPUTTER_FROM of the hull down to SPUTTER_FULL
-// the flame flickers unevenly, cuts out for a frame or two and spits embers.
-const FLAME_SPUTTER = true;
+// Each hull's flame proportions: `flame: { length, width }` in its visual.
+// Low-hull sputter: from SPUTTER_FROM of the hull down to SPUTTER_FULL the
+// flame flickers unevenly, cuts out for a frame or two and the nozzles spit
+// embers, also at rest.
 const SPUTTER_FROM = 0.33;
 const SPUTTER_FULL = 0.15;
 const SPUTTER_FLICKER = 0.45; // flicker depth at full sputter
@@ -113,6 +99,19 @@ const hash = (n) => {
 
 // The nose jets' puffs, a share of the wingtip ones (proposta 15/11).
 const NOSE_PUFF = 0.8;
+// The side jets (proposta 16/11, the owner's pick from mock-ups).
+// The turn jets as dry needles with a white-hot root that snap on and off
+// with the turn; the RCS System level shows in the shape (longer and
+// thinner, a twin needle from 3, an ignition snap at 5).
+const RCS_HOLD_S = 0.05; // a lit needle stays at least this long
+const RCS_FADE_S = 0.03; // then drops out this fast
+const RCS_SNAP_S = 0.09; // level 5: the bright snap at the port on ignition
+// A brake at the front: a pair of retro flames blowing forward from the
+// nose, lit by the retro (reversal, coast brake), stronger and wider per
+// Braking System level; at 3 the emergency brake flares a hard forward fan.
+const RETRO_FLARE_S = 0.4;
+const FLARE_RAYS = [60, 42, 26]; // the fan's reach, middle ray out (field units)
+const TURN_KEYS = ['turnL', 'turnR'];
 // Each shot pushes the hull back along the nose for the muzzle frames.
 const RECOIL_DIP = 2;
 // Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10), its
@@ -184,6 +183,39 @@ void main() {
     * (1.0 - smoothstep(1.0 - aa, 1.0, r));
   gl_FragColor = vec4(uColor * band, 1.0);
 }`;
+
+// The turn jets and retro flames: a cone along -x from its base at the
+// origin (like the flames' `cone`), vertex-coloured white-hot at the base,
+// the hull's accent along its length and dark at the tip. Repainted per hull.
+function needleGeometry(THREE) {
+  const needle = new THREE.ConeGeometry(1, 1, 10, 8, true);
+  needle.rotateZ(Math.PI / 2);
+  needle.translate(-0.5, 0, 0);
+  const count = needle.getAttribute('position').count;
+  needle.setAttribute(
+    'color',
+    new THREE.BufferAttribute(new Float32Array(count * 3), 3)
+  );
+  needle.userData.cached = true;
+  return needle;
+}
+
+function paintNeedle(needle, accent) {
+  const position = needle.getAttribute('position');
+  const color = needle.getAttribute('color');
+  for (let i = 0; i < position.count; i += 1) {
+    const t = Math.min(1, Math.max(0, -position.getX(i))); // 0 root, 1 tip
+    const hot = Math.max(0, 1 - t / 0.28) ** 2 * 1.6;
+    const body = 1.6 * (1 - t) ** 1.4;
+    color.setXYZ(
+      i,
+      accent.r * body + hot,
+      accent.g * body + hot,
+      accent.b * body + hot
+    );
+  }
+  color.needsUpdate = true;
+}
 
 // Hull and visual-upgrade levels: what the built geometry depends on.
 function hullKeyOf(hull, levels) {
@@ -257,7 +289,6 @@ export class PlayerMirror {
       });
     this.flameMaterial = glow();
     this.coreMaterial = glow();
-    this.puffMaterial = glow();
     this.nozzleMaterial = glow();
     this.accent = new THREE.Color();
     this.warmLight = new THREE.Color(1, 0.85, 0.7);
@@ -343,6 +374,41 @@ export class PlayerMirror {
     this.hullKey = null;
     this.flames = [];
     this.puffs = [];
+    // The turn jets and retro flames: one needle geometry, white materials
+    // tinted by its vertex colours; one per turn side so a fading needle and
+    // a fresh one on the other flank keep their own strength.
+    this.needle = needleGeometry(THREE);
+    const tinted = () => {
+      const material = glow();
+      material.vertexColors = true;
+      return material;
+    };
+    this.rcsJets = {
+      turnL: { amount: 0, hold: 0, snap: 0, material: tinted() },
+      turnR: { amount: 0, hold: 0, snap: 0, material: tinted() },
+    };
+    this.snapMaterial = tinted();
+    this.retroMaterial = tinted();
+    this.flareMaterial = tinted();
+    this.retros = [];
+    // the emergency brake's fan, in field space along the motion it stops
+    // (the nose may have swung away by then); rays from the middle out
+    this.flareFan = new THREE.Group();
+    [0, -1, 1, -2, 2].forEach((ray) => {
+      const mesh = new THREE.Mesh(this.needle, this.flareMaterial);
+      mesh.rotation.y = Math.PI + ray * 0.42;
+      mesh.userData.ray = Math.abs(ray);
+      this.flareFan.add(mesh);
+    });
+    this.flareFan.visible = false;
+    scene.add(this.flareFan);
+    this.flareReady = false;
+    this.flareDirX = 1;
+    this.flareDirY = 0;
+    this.flare = 0;
+    this.braking = false;
+    this.flareMaterial.color.setScalar(1.5);
+    this.fxTime = null;
     this.trailX = new Float32Array(TRAIL_LENGTH);
     this.trailY = new Float32Array(TRAIL_LENGTH);
     this.trailCount = 0;
@@ -401,12 +467,13 @@ export class PlayerMirror {
     this.flames = [];
     this.puffs = [];
     this.embers = [];
+    this.retros = [];
+    this.flareReady = false;
 
     // Thrusters take the hull's accent (amber Solar Slicer); the rim and
     // edges stay player cyan.
     this.accent = colorOf(THREE, geometry.accent);
     this.thrustRgb = rgbOf(THREE, geometry.accent);
-    this.puffMaterial.color.copy(this.accent).multiplyScalar(1.4);
     this.shockMaterial.color
       .copy(this.accent)
       .lerp(this.warmLight, 0.6)
@@ -415,10 +482,7 @@ export class PlayerMirror {
       .copy(this.accent)
       .lerp(this.warmLight, 0.5)
       .multiplyScalar(1.6);
-    this.flameShape = (FLAME_PER_HULL && hull.visual.flame) || {
-      length: 1,
-      width: 1,
-    };
+    this.flameShape = hull.visual.flame;
     this.bladeEdgeMaterial.color.copy(this.accent).multiplyScalar(1.3);
 
     const key = hullKeyOf(hull, levels);
@@ -450,7 +514,7 @@ export class PlayerMirror {
       core.position.copy(flame.position);
       this.ship.add(throat, flame, core);
       const shocks = [];
-      if (FLAME_LEVEL_SHAPE && levels.thruster >= SHOCK_LEVEL) {
+      if (levels.thruster >= SHOCK_LEVEL) {
         SHOCK_AT.forEach(() => {
           const shock = new THREE.Mesh(this.diamond, this.shockMaterial);
           shock.position.copy(flame.position);
@@ -460,41 +524,34 @@ export class PlayerMirror {
       }
       this.flames.push({ flame, core, shocks, r: nozzle.r, x: nozzle.exitX });
     });
-    if (FLAME_SPUTTER) {
-      for (let i = 0; i < SPUTTER_EMBERS; i += 1) {
-        const ember = new THREE.Mesh(this.diamond, this.emberMaterial);
-        ember.visible = false;
-        this.ship.add(ember);
-        this.embers.push(ember);
-      }
+    for (let i = 0; i < SPUTTER_EMBERS; i += 1) {
+      const ember = new THREE.Mesh(this.diamond, this.emberMaterial);
+      ember.visible = false;
+      this.ship.add(ember);
+      this.embers.push(ember);
     }
 
-    // The turn couple (thrusters.js), blowing outboard: a wingtip puff at
+    // The turn couple (thrusters.js), blowing outboard: a wingtip needle at
     // each aft RCS port, lit when the nose swings away from its flank, and a
     // smaller one at each nose port (the hull's 2D spark port), lit when the
     // nose swings toward the other flank.
-    const addPuff = (position, port, size) => {
-      const puff = new THREE.Mesh(this.cone, this.puffMaterial);
-      puff.position.fromArray(position);
-      puff.rotation.y = port ? -Math.PI / 2 : Math.PI / 2;
-      puff.visible = false;
-      this.ship.add(puff);
-      // the wingtip on the port flank and the starboard nose jet turn the
-      // nose to port
-      const aft = size === 1;
-      this.puffs.push({ puff, size, turnL: aft === port });
-    };
+    paintNeedle(this.needle, this.accent);
+    // the wingtip on the port flank and the starboard nose jet turn the nose
+    // to port
     geometry.rcsPorts.forEach((port, i) =>
-      addPuff(built.tips[i], port.y < 0, 1)
+      this.addNeedles(built.tips[i], port.y < 0, 1, port.y < 0, levels.rcs)
     );
     ['noseLeft', 'noseRight'].forEach((kind) => {
       const { x, y } = getHullThrusterPort(kind, hull);
-      addPuff(
+      this.addNeedles(
         [x / VISUAL_SCALE, NOZZLE_HEIGHT, y / VISUAL_SCALE],
         y < 0,
-        NOSE_PUFF
+        NOSE_PUFF,
+        y >= 0,
+        levels.rcs
       );
     });
+    this.addRetros(hull, levels.braking);
 
     const hullMesh = new THREE.Mesh(built.hull, this.hullMaterials);
     hullMesh.name = 'hull';
@@ -528,6 +585,7 @@ export class PlayerMirror {
       this.trailCount = 0;
       player?.dashGhosts?.forEach((ghost) => this.hiddenGhosts.add(ghost));
       this.hideGhosts();
+      this.flareFan.visible = false;
       return;
     }
     const levels = player.getHullVisualLevels();
@@ -550,23 +608,16 @@ export class PlayerMirror {
     this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
-    this.lightEngines(
-      main,
-      levels.thruster,
-      time,
-      this.startBurst(player, cos, sin),
-      player.maxHealth > 0 ? player.health / player.maxHealth : 1
-    );
-    for (let i = 0; i < this.puffs.length; i += 1) {
-      const { puff, size, turnL } = this.puffs[i];
-      const amount = (turnL ? thrust.turnL : thrust.turnR) || 0;
-      puff.visible = amount > 0.02;
-      puff.scale.set((2 + 6 * amount) * size, 1.2 * size, 1.2 * size);
-    }
-    this.puffMaterial.opacity = Math.min(
-      1,
-      Math.max(thrust.turnL || 0, thrust.turnR || 0)
-    );
+    this.lightEngines(main, levels.thruster, time, {
+      burst: this.startBurst(player, cos, sin),
+      hull: player.maxHealth > 0 ? player.health / player.maxHealth : 1,
+      cruise: CRUISE_SCALE,
+    });
+    const dt =
+      this.fxTime === null ? 0 : Math.min(0.1, Math.max(0, time - this.fxTime));
+    this.fxTime = time;
+    this.lightNeedles(player.lastThrusterState, dt);
+    this.lightRetros(player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     // Blink while invulnerable after a hit; the dash's own i-frames and the
@@ -612,31 +663,35 @@ export class PlayerMirror {
   }
 
   /**
-   * The main engines at `main` thrust (0..1), flames longer with the
-   * thruster upgrade `level`; the ship light warmer and brighter under
-   * thrust, bumped briefly by each shot. The journey (travelScene.js) lights
-   * them on a ship the simulation holds still.
+   * The main engines at `main` thrust (0..1), flames longer and tighter with
+   * the thruster upgrade `level`; the ship light warmer and brighter under
+   * thrust, bumped briefly by each shot. In play `burst` is the start burst
+   * (startBurst), `hull` the hull's share left and `cruise` the cruise
+   * flame's scale; the journey (travelScene.js) lights them on a ship the
+   * simulation holds still, with none of these.
    */
-  lightEngines(main, level = 0, time = 0, burst = 0, hull = 1) {
-    const lv = FLAME_LEVEL_SHAPE ? level || 0 : 0;
+  lightEngines(
+    main,
+    level = 0,
+    time = 0,
+    { burst = 0, hull = 1, cruise = 1 } = {}
+  ) {
     const kick = burst * main;
     const length =
-      (5 + 18 * main * (FLAME_START_BURST ? CRUISE_SCALE : 1)) *
-      (FLAME_LEVEL_SHAPE ? 1 + LEVEL_LENGTH * lv : 1 + 0.1 * (level || 0)) *
+      (5 + 18 * main * cruise) *
+      (1 + LEVEL_LENGTH * level) *
       (1 + BURST_LENGTH * kick) *
       this.flameShape.length;
     const width =
-      (1 - LEVEL_TIGHTEN * lv) *
+      (1 - LEVEL_TIGHTEN * level) *
       (1 + BURST_WIDTH * kick) *
       this.flameShape.width;
-    const coreLength = length * (0.5 + LEVEL_CORE * lv);
-    const flickerDepth = 0.1 - LEVEL_STEADY * lv;
-    const danger = FLAME_SPUTTER
-      ? Math.min(
-          1,
-          Math.max(0, (SPUTTER_FROM - hull) / (SPUTTER_FROM - SPUTTER_FULL))
-        )
-      : 0;
+    const coreLength = length * (0.5 + LEVEL_CORE * level);
+    const flickerDepth = 0.1 - LEVEL_STEADY * level;
+    const danger = Math.min(
+      1,
+      Math.max(0, (SPUTTER_FROM - hull) / (SPUTTER_FROM - SPUTTER_FULL))
+    );
     const cutChance =
       danger > 0
         ? SPUTTER_CUT[0] + (SPUTTER_CUT[1] - SPUTTER_CUT[0]) * danger
@@ -644,14 +699,11 @@ export class PlayerMirror {
     const slot = Math.floor(time * SPUTTER_HZ);
     // the whole engine stalls now and then, a nozzle alone a little more often
     const stall = hash(slot * 0.37 + 5) < cutChance * 0.7;
-    // At idle no jet, only the throats, a faint light and a short ember,
-    // breathing slowly (the owner's pick).
-    const breath =
-      1 + IDLE_BREATH * Math.sin((time * Math.PI * 2) / IDLE_BREATH_S);
+    // stopped, nothing burns: only the throats (the owner's pick)
     const burning = main > 0.02;
     for (let i = 0; i < this.flames.length; i += 1) {
       const { flame, core, shocks, r } = this.flames[i];
-      // (d) uneven flicker and a cut now and then on a failing hull
+      // uneven flicker and a cut now and then on a failing hull
       const u = time * 13 + i * 7.3;
       const k = Math.floor(u);
       const f = u - k;
@@ -660,44 +712,36 @@ export class PlayerMirror {
       const flicker =
         (1 - flickerDepth + flickerDepth * Math.sin(time * 40 + i * 1.7)) *
         (1 - SPUTTER_FLICKER * danger * noise);
-      const reach = burning ? length * flicker : IDLE_EMBER_LENGTH * breath;
-      flame.visible = !cut;
-      core.visible = burning && !cut;
-      flame.scale.set(
-        burning ? reach : reach * (1 - 0.5 * danger * noise),
-        r * 0.95 * (burning ? width : 1),
-        r * 0.95 * (burning ? width : 1)
-      );
-      const coreWidth = r * width * (0.47 - 0.03 * lv);
+      const lit = burning && !cut;
+      flame.visible = lit;
+      core.visible = lit;
+      flame.scale.set(length * flicker, r * 0.95 * width, r * 0.95 * width);
+      const coreWidth = r * width * (0.47 - 0.03 * level);
       core.scale.set(coreLength * flicker, coreWidth, coreWidth);
       for (let s = 0; s < shocks.length; s += 1) {
         const shock = shocks[s];
-        shock.visible = burning && !cut;
+        shock.visible = lit;
         shock.position.x = flame.position.x - length * flicker * SHOCK_AT[s];
         const size = r * width * 0.55 * (1 - 0.22 * s);
         shock.scale.set(length * 0.06, size, size);
       }
     }
     this.lightEmbers(danger, time);
-    this.flameMaterial.opacity = burning
-      ? Math.min(1, main * 1.2)
-      : IDLE_EMBER * breath;
-    this.coreMaterial.opacity = Math.min(1, main * 1.1) * (1 - LEVEL_THIN * lv);
+    this.flameMaterial.opacity = Math.min(1, main * 1.2);
+    this.coreMaterial.opacity =
+      Math.min(1, main * 1.1) * (1 - LEVEL_THIN * level);
     this.flameMaterial.color
       .copy(this.accent)
-      .multiplyScalar(1.8 * (1 - LEVEL_DIM * lv));
+      .multiplyScalar(1.8 * (1 - LEVEL_DIM * level));
     const heat = 1.7 * (1 + BURST_HEAT * kick);
     this.coreMaterial.color.setRGB(heat, heat, heat * 0.94);
     this.shockMaterial.opacity = Math.min(1, main * 1.1);
-    const glow = IDLE_GLOW * breath;
     this.nozzleMaterial.color
       .copy(this.accent)
-      .multiplyScalar(glow + (1.8 - glow) * main);
+      .multiplyScalar(0.5 + 1.3 * main);
     this.light.color.copy(this.accent).lerp(this.warmLight, 0.35 * main);
     this.light.intensity =
-      IDLE_LIGHT * breath * (1 - main) +
-      2.6 * main +
-      (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+      2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
     if (danger > 0) {
       this.light.intensity *= stall
         ? 0.2
@@ -706,14 +750,12 @@ export class PlayerMirror {
   }
 
   /**
-   * (b) How hard the pilot is accelerating, 0..1: his own thrust (not the
+   * How hard the pilot is accelerating, 0..1: his own thrust (not the
    * coast brake, not a dash) while the speed along the nose is far below
    * cruise (acceleration over damping, ~90 px/s).
    */
   startBurst(player, cos, sin) {
-    if (!FLAME_START_BURST || player.enginesIdle || player.dashTimer > 0) {
-      return 0;
-    }
+    if (player.enginesIdle || player.dashTimer > 0) return 0;
     const { velocity, flight } = player;
     const cruise = flight.acceleration / flight.baseLinearDamping;
     const along = (velocity.vx * cos + velocity.vy * sin) / cruise;
@@ -721,7 +763,7 @@ export class PlayerMirror {
   }
 
   /**
-   * (d) Dying embers spat from the nozzles on a failing hull: each lives
+   * Dying embers spat from the nozzles on a failing hull: each lives
    * EMBER_LIFE, drifting aft and shrinking; more of them as `danger` rises.
    */
   lightEmbers(danger, time) {
@@ -829,6 +871,157 @@ export class PlayerMirror {
     return this.bank;
   }
 
+  // One RCS port's needles, blowing outboard: the jet, a shorter twin
+  // inboard of it from level 3 and the ignition snap at level 5.
+  addNeedles(position, port, size, turnL, level) {
+    const { THREE } = this;
+    const jet = this.rcsJets[turnL ? 'turnL' : 'turnR'];
+    const make = (material, dx) => {
+      const mesh = new THREE.Mesh(this.needle, material);
+      mesh.position.fromArray(position);
+      mesh.position.x += dx;
+      mesh.rotation.y = port ? -Math.PI / 2 : Math.PI / 2;
+      mesh.visible = false;
+      this.ship.add(mesh);
+      return mesh;
+    };
+    const inboard = position[0] > 0 ? -1 : 1;
+    this.puffs.push({
+      puff: make(jet.material, 0),
+      size,
+      turnL,
+      length: (4.5 + 2.2 * level) * size,
+      radius: (0.7 - 0.06 * level) * size,
+      twin: level >= 3 ? make(jet.material, 1.8 * inboard * size) : null,
+      snap: level >= 5 ? make(this.snapMaterial, 0) : null,
+    });
+  }
+
+  // Each side's needles at the pilot's turn (the raw step state, not
+  // the eased one): on at once, held RCS_HOLD_S, then out in RCS_FADE_S.
+  lightNeedles(state, dt) {
+    let snap = 0;
+    for (let i = 0; i < TURN_KEYS.length; i += 1) {
+      const jet = this.rcsJets[TURN_KEYS[i]];
+      const target = state[TURN_KEYS[i]] || 0;
+      if (target > 0.02) {
+        if (jet.amount < 0.05) jet.snap = RCS_SNAP_S;
+        jet.amount = 0.5 + 0.5 * Math.min(1, target);
+        jet.hold = RCS_HOLD_S;
+      } else if (jet.hold > 0) {
+        jet.hold -= dt;
+      } else {
+        jet.amount =
+          jet.amount < 0.05 ? 0 : jet.amount * Math.exp(-dt / RCS_FADE_S);
+      }
+      jet.material.opacity = Math.min(1, jet.amount * 1.2);
+      snap = Math.max(snap, jet.snap);
+    }
+    this.snapMaterial.opacity = snap / RCS_SNAP_S;
+    for (let i = 0; i < this.puffs.length; i += 1) {
+      const {
+        puff,
+        size,
+        turnL,
+        length,
+        radius,
+        twin,
+        snap: flash,
+      } = this.puffs[i];
+      const jet = turnL ? this.rcsJets.turnL : this.rcsJets.turnR;
+      const reach = length * (0.55 + 0.45 * jet.amount);
+      puff.visible = jet.amount > 0.02;
+      puff.scale.set(reach, radius, radius);
+      if (twin) {
+        twin.visible = puff.visible;
+        twin.scale.set(reach * 0.65, radius * 0.8, radius * 0.8);
+      }
+      if (flash) {
+        const k = jet.snap / RCS_SNAP_S;
+        flash.visible = k > 0;
+        flash.scale.set(
+          2.4 * size,
+          (1.2 + 1.8 * k) * size,
+          (1.2 + 1.8 * k) * size
+        );
+      }
+    }
+    for (let i = 0; i < TURN_KEYS.length; i += 1) {
+      const jet = this.rcsJets[TURN_KEYS[i]];
+      jet.snap = Math.max(0, jet.snap - dt);
+    }
+  }
+
+  // The retro pair at the nose ports, splayed outboard and blowing
+  // forward, longer, wider and splayed more per Braking System level (a
+  // second, outer pair from 2); at 3 the emergency brake's fan is armed.
+  addRetros(hull, level) {
+    const { THREE } = this;
+    const add = (x, z, angle, length, radius) => {
+      const mesh = new THREE.Mesh(this.needle, this.retroMaterial);
+      mesh.position.set(x, NOZZLE_HEIGHT, z);
+      mesh.rotation.y = Math.PI + angle;
+      mesh.visible = false;
+      this.ship.add(mesh);
+      this.retros.push({ mesh, length, radius });
+    };
+    const length = 6 + 3 * level;
+    const radius = 0.7 + 0.15 * level;
+    const splay = ((10 + 5 * level) * Math.PI) / 180;
+    ['noseLeft', 'noseRight'].forEach((kind) => {
+      const { x, y } = getHullThrusterPort(kind, hull);
+      const side = y < 0 ? 1 : -1;
+      const px = x / VISUAL_SCALE;
+      const pz = y / VISUAL_SCALE;
+      add(px, pz, side * splay, length, radius);
+      if (level >= 2) {
+        add(px - 2, pz * 1.6, side * (splay + 0.4), length * 0.6, radius * 0.8);
+      }
+    });
+    this.flareReady = level >= 3;
+  }
+
+  // The retros at the eased retro `aux`, so the coast brake fades with
+  // speed. The emergency brake's start (Braking System 3) fires the fan for
+  // RETRO_FLARE_S: rays thrown ahead of the motion it stops, the middle one
+  // longest, snapping out and fading.
+  lightRetros(player, geometry, aux, dt) {
+    const { brakeTimer, brakeFrom } = player.maneuvers;
+    const braking = brakeTimer > 0;
+    if (braking && !this.braking && this.flareReady) {
+      this.flare = RETRO_FLARE_S;
+      this.flareFan.rotation.y = -Math.atan2(brakeFrom.vy, brakeFrom.vx);
+      this.flareDirX = Math.cos(-this.flareFan.rotation.y);
+      this.flareDirY = Math.sin(-this.flareFan.rotation.y);
+    }
+    this.braking = braking;
+    for (let i = 0; i < this.retros.length; i += 1) {
+      const { mesh, length, radius } = this.retros[i];
+      mesh.visible = aux > 0.02;
+      mesh.scale.set(length * (0.6 + 0.4 * aux), radius, radius);
+    }
+    this.retroMaterial.opacity = Math.min(1, aux * 2.5);
+    const f = this.flare / RETRO_FLARE_S;
+    this.flare = Math.max(0, this.flare - dt);
+    this.flareFan.visible = f > 0;
+    if (f <= 0) return;
+    const { x, y } = player.position;
+    const ahead = geometry.extent * 0.4;
+    this.flareFan.position.set(
+      x + this.flareDirX * ahead - HALF_W,
+      NOZZLE_HEIGHT * VISUAL_SCALE,
+      y + this.flareDirY * ahead - HALF_H
+    );
+    const out = 1 - (1 - Math.min(1, (1 - f) * 4)) ** 2;
+    const rays = this.flareFan.children;
+    for (let i = 0; i < rays.length; i += 1) {
+      const reach = FLARE_RAYS[rays[i].userData.ray];
+      const width = 3 - 0.6 * rays[i].userData.ray;
+      rays[i].scale.set(reach * (0.35 + 0.65 * out), width, width);
+    }
+    this.flareMaterial.opacity = f ** 0.8;
+  }
+
   updateGhosts(list) {
     const ghosts = list || [];
     for (let i = 0; i < this.ghosts.length; i += 1) {
@@ -879,5 +1072,16 @@ export class PlayerMirror {
     this.bankTime = null;
     this.dashGuard = false;
     this.hideGhosts();
+    this.flare = 0;
+    this.flareFan.visible = false;
+    this.braking = false;
+    this.fxTime = null;
+    for (let i = 0; i < TURN_KEYS.length; i += 1) {
+      Object.assign(this.rcsJets[TURN_KEYS[i]], {
+        amount: 0,
+        hold: 0,
+        snap: 0,
+      });
+    }
   }
 }

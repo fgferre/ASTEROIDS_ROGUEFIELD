@@ -22,6 +22,7 @@ export class PlayerThrusters {
    * `getThrusterPort(kind)`: the current hull's port for 'main', 'aux', 'left' or 'right' (the aft wingtips), 'noseLeft' or 'noseRight', in hull space.
    * `getLocalToWorld(x, y)`: a hull-space point in the world, at the ship's position and angle now.
    * `getLocalDirection(dx, dy)`: a hull-space direction in the world, at the ship's angle now.
+   * `getAccent()`: the current hull's accent (a PALETTE key); the exhaust sparks take it.
    */
   constructor({
     getEventBus,
@@ -29,12 +30,14 @@ export class PlayerThrusters {
     getThrusterPort,
     getLocalToWorld,
     getLocalDirection,
+    getAccent,
   }) {
     this.getEventBus = getEventBus;
     this.getShipPosition = getShipPosition;
     this.getThrusterPort = getThrusterPort;
     this.getLocalToWorld = getLocalToWorld;
     this.getLocalDirection = getLocalDirection;
+    this.getAccent = getAccent;
 
     // === VISUAL UPGRADE LEVELS ===
     this.thrusterVisualLevel = 0;
@@ -97,6 +100,7 @@ export class PlayerThrusters {
         visualLevel:
           type === 'main' ? this.thrusterVisualLevel : this.brakingVisualLevel,
         isAutomatic, // the coast brake sounds softer than the pilot's thrust
+        accent: this.getAccent(),
       });
       this.lastThrusterState[key] = intensity;
     }
@@ -117,6 +121,7 @@ export class PlayerThrusters {
           side, // the engine sound pans its puffs by it
           visualLevel: this.rcsVisualLevel,
           isAutomatic: false,
+          accent: this.getAccent(),
         });
       });
       this.lastThrusterState[key] = intensity;

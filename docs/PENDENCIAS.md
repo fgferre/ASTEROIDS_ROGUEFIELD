@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 34.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 35.**
 
 ## O BASTÃO — onde as sessões pararam (14/11) — TUDO ESTÁ NA `main` E PUBLICADO (os 16 sons de 14/11 entraram pela PR #306, por ordem dele: _"Pode publicar"_)
 
@@ -81,6 +81,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 - **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
   Em 20/10, perguntado se ainda sente: _"ainda demora"_ → Rodada 15, frente 7.
+- **(34)** Freio de emergência (carta Braking System, nível 3) (16/11): _"esse freio não é bom, não funciona, sem
+  vantagem"_; sobre consertar agora: _"vamos deixar esse freio de lado por enquanto"_. Medido no jogo rodando em 16/11:
+  numa inversão normal a nave já parou sozinha (~0,23 s) quando o freio dispara (0,25 s) e ele atrasa a volta em
+  ~0,13 s; só ajuda logo depois de um dash; a onda só empurra inimigos pequenos a até ~120 px, sem dano, e não mexe em
+  rochas; anel, zoom e som tocam mesmo sem nada para frear. Opções conversadas, sem escolha: disparar na hora com a
+  onda do tamanho da freada; só depois do dash; só tirar o espetáculo. Ele também perguntou: _"temos que repensar a
+  fisica da nave para criar mais dificuldade?"_ (a nave inverte em ~0,22 s com qualquer velocidade) — sem decisão.
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 

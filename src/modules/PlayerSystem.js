@@ -183,6 +183,7 @@ class PlayerSystem extends BaseSystem {
       getThrusterPort: (kind) => getHullThrusterPort(kind, this.currentHull),
       getLocalToWorld: (x, y) => this.getLocalToWorld(x, y),
       getLocalDirection: (dx, dy) => this.getLocalDirection(dx, dy),
+      getAccent: () => this.currentHull.visual.accent,
     });
     exposeFields(this, this.thrusters, ['lastThrusterState', 'thrusterVisual']);
 

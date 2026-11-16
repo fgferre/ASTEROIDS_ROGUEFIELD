@@ -97,7 +97,8 @@ export class PlayerEffects {
       data.direction.y,
       data.intensity,
       data.type,
-      data.visualLevel || 0
+      data.visualLevel || 0,
+      PALETTE[data.accent]
     );
 
     if (
@@ -179,7 +180,8 @@ export class PlayerEffects {
     dirY,
     intensity = 1,
     type = 'main',
-    visualLevel = 0
+    visualLevel = 0,
+    accent = PALETTE.player
   ) {
     if (this.particleDensity() < 0.1) return; // Optimization
 
@@ -262,15 +264,16 @@ export class PlayerEffects {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
-      // One light, the player's (docs/NORTE.md §2): white-hot core, cyan
-      // body, dimmer cyan tail. Upgrade tiers change count, speed and
-      // spread above, not the hue.
+      // One light, the player's (docs/NORTE.md §2): white-hot core, a body
+      // in the hull's accent (cyan, amber on Solar Slicer and Bastion),
+      // dimmer tail. Upgrade tiers change count, speed and spread above, not
+      // the hue.
       let color;
       const t = this.randomFloat(thrusterFork);
       const hot = colorPalette === 'neon' ? 0.6 : 0.8;
       if (t > hot) color = PALETTE.text;
-      else if (t > 0.35) color = PALETTE.player;
-      else color = withAlpha(PALETTE.player, 0.55);
+      else if (t > 0.35) color = accent;
+      else color = withAlpha(accent, 0.55);
 
       this.particleEffects.particles.push(
         this.createParticle(
