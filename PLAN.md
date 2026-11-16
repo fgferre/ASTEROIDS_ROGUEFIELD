@@ -43,12 +43,18 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
        também gira (70°/s sem carta → 135°/s no nível 3). O endereço dos três links continua igual.
 5. [ ] Visual do canhão no nariz e a hora em que vira torre (o dono notou que o canhão deitado sobre o nariz parece
        levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
+       Cartão entregue (16/11): `quadro/cartoes/pilotagem-direcao.html`, opções A (como está), B (torre escondida, cano
+       curto embutido na ponta do nariz: housing e lente ocultos, `barrels.scale` (0,8; 0,55; 0,55), boca em x = 21,5;
+       a boca do tiro na simulação está em 11,5 e teria de ir junto) e C (`barrels.scale.x` 0,6). Espera a escolha dele.
 6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
        pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
        não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
        Já no código (16/11, sucessora, decisão pequena): no deslize, com a Braking System instalada, o fogo de freio do
-       nariz acende ao soltar o empuxo (`coastBrake` em `flight.js`); sem a carta, nada acende. Falta a foto de antes e
-       depois disso e os três pontos de gosto.
+       nariz acende ao soltar o empuxo (`coastBrake` em `flight.js`); sem a carta, nada acende. Foto de antes e
+       depois no cartão.
+       Propostas no mesmo cartão: agulha de giro ×2,5 no comprimento e cor 1,3; freio do nível 3 com o leque a 0,55 e
+       as chamas a 0,7; clarão do motor em `PALETTE[accent]` do casco (`PlayerEffects.js`), e o espelho em
+       `fieldMirrors.js` só repinta a cor quando a opacidade muda: corrigir junto. Espera a escolha dele.
 7. [x] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
