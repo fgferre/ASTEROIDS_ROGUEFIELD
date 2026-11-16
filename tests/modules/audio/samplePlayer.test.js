@@ -43,6 +43,7 @@ function makeBus() {
       buffer: null,
       playbackRate: { value: 1 },
       connect: vi.fn(),
+      disconnect: vi.fn(),
       start: vi.fn(),
       stop: vi.fn(),
     };
@@ -142,6 +143,24 @@ describe('sample layer', () => {
     expect(sources).toHaveLength(3);
     expect(sources[0].stop).toHaveBeenCalled();
     expect(live(sources)).toEqual([sources[1], sources[2]]);
+  });
+
+  it('a voice leaves the mixer only once its source has ended', async () => {
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(
+      fetchFor({ 'lance-shot': sample(['lance-shot/1.mp3'], { cap: 1 }) })
+    );
+    context.currentTime = 0;
+    bus.playLaserShot();
+    context.currentTime = 0.5;
+    bus.playLaserShot();
+
+    // The stolen voice is fading out: still connected until `ended`.
+    expect(sources[0].stop).toHaveBeenCalled();
+    expect(sources[0].disconnect).not.toHaveBeenCalled();
+    sources[0].onended();
+    expect(sources[0].disconnect).toHaveBeenCalled();
+    expect(sources[1].disconnect).not.toHaveBeenCalled();
   });
 
   it('a run of XP pickups climbs a semitone each, up to +7, and starts over after a pause', async () => {

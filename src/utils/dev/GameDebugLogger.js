@@ -3,6 +3,7 @@ import { IS_DEV } from '../../core/env.js';
 const MAX_LOG_ENTRIES = 50000;
 const TRIM_BATCH_SIZE = 10000;
 const STORAGE_KEY = 'game-debug-log';
+const PERSIST_DELAY_MS = 1000;
 
 const safeStringify = (value) => {
   if (value === undefined) {
@@ -24,6 +25,8 @@ export class GameDebugLogger {
   static isEnabled = false;
   static entries = [];
   static sessionStart = null;
+  static persistTimer = null;
+  static lifecycleBound = false;
 
   static init() {
     if (this.isEnabled) {
@@ -51,7 +54,22 @@ export class GameDebugLogger {
       console.warn('[GameDebugLogger] Failed to clear previous log', error);
     }
 
+    this.bindLifecycleFlush();
     this.log('INIT', 'GameDebugLogger initialized');
+  }
+
+  static bindLifecycleFlush() {
+    if (this.lifecycleBound) {
+      return;
+    }
+
+    this.lifecycleBound = true;
+    window.addEventListener('pagehide', () => this.persist());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.persist();
+      }
+    });
   }
 
   static getTimestamp() {
@@ -95,10 +113,17 @@ export class GameDebugLogger {
       this.entries.unshift(trimmedEntry);
     }
 
-    this.persist();
+    if (this.persistTimer === null) {
+      this.persistTimer = setTimeout(() => this.persist(), PERSIST_DELAY_MS);
+    }
   }
 
   static persist() {
+    if (this.persistTimer !== null) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+
     if (!this.isEnabled) {
       return;
     }
@@ -147,6 +172,11 @@ export class GameDebugLogger {
   static clear() {
     if (!this.isEnabled) {
       return;
+    }
+
+    if (this.persistTimer !== null) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
     }
 
     this.entries = [];

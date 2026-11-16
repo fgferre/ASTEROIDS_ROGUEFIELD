@@ -154,6 +154,38 @@ function foldBloom(bloomPass, passes) {
   });
 }
 
+// After the sRGB step (`encoders`, one per frame) only SMAA reads the
+// picture: it waits in a target with no depth buffer instead of the
+// composer's second one, which carried a depth nobody reads. Half-float
+// still, so SMAA finds the same edges (an 8-bit one saves ~1 ms more at
+// 2560×1600 on an M1 but flips a few hundred edge pixels). The buffers no
+// longer swap: readBuffer stays the scene's, and SMAA, always last, reads
+// writeBuffer.
+function displayTarget(THREE, composer, encoders, smaaPass) {
+  const scene = composer.renderTarget1;
+  const display = new THREE.WebGLRenderTarget(scene.width, scene.height, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+    type: THREE.HalfFloatType,
+    depthBuffer: false,
+  });
+  composer.renderTarget2.dispose();
+  composer.renderTarget2 = display;
+  composer.readBuffer = scene;
+  composer.writeBuffer = display;
+  encoders.forEach((pass) => {
+    pass.needsSwap = false;
+  });
+  smaaPass.render = (renderer, writeBuffer) =>
+    THREE.SMAAPass.prototype.render.call(
+      smaaPass,
+      renderer,
+      writeBuffer,
+      writeBuffer
+    );
+}
+
 // `seeded` runs object creation inside the menu's seeded Math.random swap
 // (Three.js draws UUIDs from it).
 export function setupThree(seeded) {
@@ -238,6 +270,8 @@ export function setupThree(seeded) {
     ...bloomPass.renderTargetsVertical,
   ].forEach((rt) => {
     rt.texture.type = THREE.HalfFloatType;
+    // Full-screen quads only: nothing reads or tests depth here.
+    rt.depthBuffer = false;
   });
   bloomPass.blackMip = new THREE.DataTexture(new Uint8Array(4), 1, 1);
   bloomPass.blackMip.needsUpdate = true;
@@ -252,7 +286,11 @@ export function setupThree(seeded) {
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
   const smaaPass = new THREE.SMAAPass(width, height);
+  // its weights read only the edges' red and green: two bytes a pixel, not four
+  smaaPass.edgesRT.texture.format = THREE.RGFormat;
+  smaaPass.edgesRT.texture.internalFormat = 'RG8';
   composer.addPass(smaaPass);
+  displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 
   // Drawn after the composer: text stays crisp, never bloomed.
   const overlay = new THREE.Scene();

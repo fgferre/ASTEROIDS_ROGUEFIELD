@@ -42,6 +42,9 @@ const MARKUP = `
 const CSS = `
             .rc { position: absolute; left: 0; top: 0; width: calc(${SIZE}px * var(--hud-u)); height: calc(${SIZE}px * var(--hud-u)); overflow: visible; pointer-events: none; transform: translate(-50%, -50%); }
             .rc.is-hidden { display: none; }
+            /* Set, not the global 'inherit': moving .rc then does not restyle its
+               groups, a restyle that got dearer with every new position (Chrome). */
+            .rc > g { box-sizing: border-box; }
             .rc-dash, .rc-shield { opacity: 0; transition: opacity var(--motion-base) var(--ease-out); transform-origin: 0 0; }
             .rc-dash.is-on, .rc-shield.is-on { opacity: 1; }
             .rc path { fill: none; stroke-linecap: round; }

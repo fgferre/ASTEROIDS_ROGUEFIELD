@@ -68,4 +68,32 @@ describe('Projectiles', () => {
     projectiles.updateEnemyBullets(0.3);
     expect(projectiles.enemyBullets).toHaveLength(0);
   });
+
+  it('compacts the shot arrays in place, keeping survivors in order', () => {
+    const projectiles = makeProjectiles();
+    for (let i = 0; i < 3; i += 1) {
+      projectiles.createEnemyBullet({
+        position: { x: 400, y: 300 },
+        velocity: { x: 0, y: 0 },
+        projectile: { lifetime: i === 1 ? 0.1 : 5 },
+      });
+      projectiles.createBullet({ x: 400, y: 300 }, { x: 500, y: 300 }, 10);
+    }
+    projectiles.bullets[1].life = 0.01;
+
+    const enemyList = projectiles.enemyBullets;
+    const playerList = projectiles.bullets;
+    const enemyKept = [enemyList[0], enemyList[2]];
+    const playerKept = [playerList[0], playerList[2]];
+
+    projectiles.updateEnemyBullets(0.3);
+    projectiles.updateBullets(0.3);
+
+    expect(projectiles.enemyBullets).toBe(enemyList);
+    expect(projectiles.bullets).toBe(playerList);
+    expect(enemyList).toEqual(enemyKept);
+    expect(playerList).toEqual(playerKept);
+    expect(enemyList[0]).toBe(enemyKept[0]);
+    expect(playerList[1]).toBe(playerKept[1]);
+  });
 });

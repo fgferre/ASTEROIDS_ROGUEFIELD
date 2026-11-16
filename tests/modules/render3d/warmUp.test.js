@@ -56,16 +56,24 @@ function warmable() {
   ];
   scene.add(...batches);
   const pass = () => ({ enabled: false });
+  const variants = [];
+  const shadowMap = { enabled: true };
   renderer.three = {
     scene,
     overlay: new THREE.Scene(),
     camera: new THREE.PerspectiveCamera(),
+    key: { castShadow: true },
     renderer: {
+      shadowMap,
       setRenderTarget: vi.fn(),
-      compile: (root) =>
+      compile: (root) => {
+        variants.push(
+          `${shadowMap.enabled}/${renderer.three.player.surfaceMaps}`
+        );
         root.traverse(
           (object) => object.material && compiled.add(object.material)
-        ),
+        );
+      },
       render: vi.fn(),
     },
     composer: { readBuffer: {}, render: vi.fn() },
@@ -77,7 +85,7 @@ function warmable() {
     enemies: new EnemyMirror(THREE, scene, seeded, null),
     player: new PlayerMirror(THREE, scene, seeded),
   };
-  return { renderer, compiled, batches };
+  return { renderer, compiled, batches, variants };
 }
 
 describe('Renderer3D.warmUp', () => {
@@ -165,5 +173,19 @@ describe('Renderer3D.warmUp', () => {
     progress.forEach((value, i) =>
       expect(value).toBeGreaterThan(i ? progress[i - 1] : 0)
     );
+  });
+
+  it('compiles every preset program variant, the current preset last', () => {
+    const { renderer, variants } = warmable();
+    renderer.compileScene();
+    // scene and overlay per variant; ultra (shadows, maps) last
+    expect(variants.filter((_, i) => i % 2 === 0)).toEqual([
+      'false/true',
+      'false/false',
+      'true/true',
+    ]);
+    expect(renderer.three.renderer.shadowMap.enabled).toBe(true);
+    expect(renderer.three.key.castShadow).toBe(true);
+    expect(renderer.three.player.surfaceMaps).toBe(true);
   });
 });

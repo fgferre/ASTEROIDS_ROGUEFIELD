@@ -99,6 +99,9 @@ class MenuBackgroundSystem extends BaseSystem {
       totalSteps: 0,
       currentStep: 0,
       pendingStart: false, // True if start() was called during loading
+      // The opaque loading screen still covers the canvas (through the game's
+      // shader warm-up): frames keep the scene moving but skip drawing.
+      covered: false,
       onProgress: null, // Callback: (progress: 0-1, message: string) => void
       onComplete: null, // Callback: () => void
     };
@@ -518,9 +521,15 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   setupLoadingScreen() {
-    loadingScreen.setupLoadingScreen((onProgress, onComplete) =>
-      this.setLoadingCallbacks(onProgress, onComplete)
-    );
+    loadingScreen.setupLoadingScreen((onProgress, hide) => {
+      this.loadingState.covered = true;
+      // The frame the screen fades onto is drawn before it starts to fade.
+      this.setLoadingCallbacks(onProgress, () => {
+        this.loadingState.covered = false;
+        if (this.isActive) this.renderFrame();
+        hide();
+      });
+    });
   }
 
   bootstrapScene() {
@@ -998,6 +1007,16 @@ class MenuBackgroundSystem extends BaseSystem {
       this.customFX.uniforms.time.value = this.elapsedTime;
     }
 
+    if (!this.loadingState.covered) {
+      this.renderFrame();
+    }
+
+    if (this.stats) {
+      this.stats.end();
+    }
+  }
+
+  renderFrame() {
     if (this.composer) {
       this.composer.render();
     } else {
@@ -1005,10 +1024,6 @@ class MenuBackgroundSystem extends BaseSystem {
     }
     if (this.hangarOpen) {
       this.copyHangarStage();
-    }
-
-    if (this.stats) {
-      this.stats.end();
     }
   }
 

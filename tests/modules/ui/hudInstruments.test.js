@@ -210,6 +210,55 @@ describe('HUD instruments', () => {
     expect(shown()[0].style.opacity).toBe('0.35');
   });
 
+  it('tactical radar clears vanished contacts, labels and haze and restores reused slots', () => {
+    const { slot, radar } = mountRadar('tactical');
+    const crowded = state([
+      { kind: 'machine', rim: true, angle: Math.PI, x: -1, y: 0, count: 12 },
+      {
+        kind: 'herald',
+        rim: true,
+        angle: 0,
+        x: 1,
+        y: 0,
+        count: 1,
+        distance: 950,
+      },
+      { kind: 'rock', x: 0.2, y: 0, size: 0.02, inView: true },
+    ]);
+    crowded.haze = [
+      { x: 0.1, y: 0.2, weight: 3, inView: true },
+      { x: -0.1, y: -0.2, weight: 5, inView: false },
+    ];
+    const shown = (selector) =>
+      slot
+        .querySelector(selector)
+        .children.filter((el) => el.style.display !== 'none');
+    radar.update(crowded);
+    expect(shown('.rt-blips')).toHaveLength(3);
+    expect(shown('.rt-labels').map((el) => el.textContent)).toEqual([
+      '12',
+      '950 m',
+    ]);
+    expect(shown('.rt-hazes')).toHaveLength(2);
+
+    radar.update(state([crowded.blips[2]]));
+    expect(shown('.rt-blips')).toHaveLength(1);
+    expect(shown('.rt-blips')[0].attributes.href).toBe('#rt-g-dot');
+    expect(shown('.rt-labels')).toHaveLength(0);
+    expect(shown('.rt-hazes')).toHaveLength(0);
+    radar.update(state([]));
+    radar.update(state([]));
+    expect(shown('.rt-blips')).toHaveLength(0);
+
+    radar.update(crowded);
+    expect(shown('.rt-blips')).toHaveLength(3);
+    expect(shown('.rt-labels').map((el) => el.textContent)).toEqual([
+      '12',
+      '950 m',
+    ]);
+    expect(shown('.rt-hazes')).toHaveLength(2);
+  });
+
   it('tactical radar: a crowd beyond the range is one wedge with its count', () => {
     const { slot, radar } = mountRadar('tactical');
     radar.update(
@@ -225,5 +274,59 @@ describe('HUD instruments', () => {
     const labels = slot.querySelector('.rt-labels').children;
     expect(labels[0].textContent).toBe('12');
     expect(labels[1].style.display).toBe('none');
+  });
+
+  it('next-wave timer: the same second and label write nothing, a change writes', () => {
+    const writes = [];
+    const spy = (name) => {
+      const el = fakeElement();
+      let text = '';
+      Object.defineProperty(el, 'textContent', {
+        get: () => text,
+        set: (v) => {
+          writes.push(name);
+          text = v;
+        },
+      });
+      Object.defineProperty(el, 'innerText', {
+        get: () => text,
+        set: (v) => {
+          writes.push(name);
+          text = v;
+        },
+      });
+      return el;
+    };
+    const hud = new AAAHudLayout();
+    hud._nextWave = { seconds: null, label: null };
+    hud.els = {
+      nextWaveBox: fakeElement(),
+      nextWaveLabel: spy('label'),
+      nextWaveTimer: spy('timer'),
+    };
+
+    for (let i = 0; i < 5; i += 1) hud.updateNextWaveTimer(7.4, 'WAVE');
+    expect(writes).toEqual(['timer', 'label']);
+    expect(hud.els.nextWaveBox.classList.contains('visible')).toBe(true);
+
+    hud.updateNextWaveTimer(6.2, 'WAVE');
+    expect(writes).toEqual(['timer', 'label', 'timer']);
+
+    hud.updateNextWaveTimer(0, 'WAVE');
+    expect(hud.els.nextWaveBox.classList.contains('visible')).toBe(false);
+  });
+
+  it('classic feed: a repeat re-inserts its row even when already first', () => {
+    const feed = Object.create(getInstrument('feed', 'classic'));
+    const el = fakeElement();
+    const prepend = vi.fn();
+    feed.list = { firstElementChild: el, prepend };
+    feed.rows = [{ key: 'xp', el, timer: null }];
+    feed.later = () => 1;
+    feed.cancel = () => {};
+
+    // The re-insert is what replays the row's entrance in the browser.
+    feed.push('xp', 'xp', () => {});
+    expect(prepend).toHaveBeenCalledWith(el);
   });
 });

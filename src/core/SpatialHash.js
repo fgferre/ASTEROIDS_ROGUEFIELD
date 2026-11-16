@@ -175,17 +175,30 @@ export class SpatialHash {
       return this.insert(object, x, y, radius);
     }
 
-    const newBounds = this.calculateBounds(x, y, radius);
-    const newCells = this.getCellsForBounds(newBounds);
-    const newCellSet = new Set(newCells);
-
-    // Check if object moved to different cells
     const oldCells = objectData.cells;
+    const minX = x - radius;
+    const minY = y - radius;
+    const maxX = x + radius;
+    const maxY = y + radius;
+    const cellSize = this.cellSize;
+    const startX = Math.floor(minX / cellSize);
+    const endX = Math.floor(maxX / cellSize);
+    const startY = Math.floor(minY / cellSize);
+    const endY = Math.floor(maxY / cellSize);
+    const oldBounds = objectData.bounds;
     const cellsChanged =
-      oldCells.size !== newCellSet.size ||
-      [...oldCells].some((cell) => !newCellSet.has(cell));
+      Math.floor(oldBounds.minX / cellSize) !== startX ||
+      Math.floor(oldBounds.maxX / cellSize) !== endX ||
+      Math.floor(oldBounds.minY / cellSize) !== startY ||
+      Math.floor(oldBounds.maxY / cellSize) !== endY;
+    let newBounds = oldBounds;
+    let newCellSet = oldCells;
 
     if (cellsChanged) {
+      newBounds = { minX, minY, maxX, maxY };
+      const newCells = this.getCellsForBounds(newBounds);
+      newCellSet = new Set(newCells);
+
       // Remove from old cells
       for (const cellKey of oldCells) {
         const cell = this.grid.get(cellKey);
@@ -204,6 +217,11 @@ export class SpatialHash {
         }
         this.grid.get(cellKey).add(object);
       }
+    } else {
+      oldBounds.minX = minX;
+      oldBounds.minY = minY;
+      oldBounds.maxX = maxX;
+      oldBounds.maxY = maxY;
     }
 
     // Update object metadata

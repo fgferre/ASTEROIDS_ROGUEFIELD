@@ -91,7 +91,11 @@ export class WeaponBodies {
   }
 
   end() {
-    this.blades.instanceMatrix.needsUpdate = true;
-    this.casings.instanceMatrix.needsUpdate = true;
+    for (const mesh of [this.blades, this.casings]) {
+      if (mesh.count === 0) continue;
+      mesh.instanceMatrix.updateRange.offset = 0;
+      mesh.instanceMatrix.updateRange.count = mesh.count * 16;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 }

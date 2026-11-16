@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import { shieldStatus } from '../../../src/modules/ui/TacticalHud.js';
+import { getHudCss } from '../../../src/modules/ui/hud/hudStyles.js';
 import { getInstrument } from '../../../src/modules/ui/hud/instruments/registry.js';
 import { runClock } from '../../../src/modules/ui/hud/instruments/run-info/instrument.js';
 import { fakeDocument, fakeElement } from '../../__helpers__/fakeHudDom.js';
@@ -172,6 +173,25 @@ describe('HUD instrument models', () => {
     at(9700, 0);
     expect(has('.hr', 'is-ring')).toBe(false);
     expect(has('.hr', 'is-low')).toBe(false);
+  });
+
+  it('hull ring: hidden and faded, it stops following the ship; it catches up the frame it shows', () => {
+    const { model, part } = mount('hull-ring', 'instrument');
+    const at = (now, hull, ship) =>
+      model.update({ now, ship, hull, maxHull: 100 });
+
+    at(0, 100, { x: 400, y: 300 });
+    at(1000, 100, { x: 200, y: 150 });
+    expect(part('.hr-ring').style.left).not.toBe('25.00%');
+    at(1100, 70, { x: 200, y: 450 });
+    expect(part('.hr-ring').style.left).toBe('25.00%');
+    expect(part('.hr-ring').style.top).toBe('75.00%');
+    // Fading out after the 2 s window, it still follows; faded, it stops.
+    at(3050, 70, { x: 200, y: 450 });
+    at(3150, 70, { x: 600, y: 300 });
+    expect(part('.hr-ring').style.left).toBe('75.00%');
+    at(3400, 70, { x: 400, y: 300 });
+    expect(part('.hr-ring').style.left).toBe('75.00%');
   });
 
   it('on the ship: each drawn frame moves the hull ring and the recharges onto the ship as drawn, their state kept', () => {
@@ -406,5 +426,34 @@ describe('HUD feed models', () => {
     expect(part('.hud-feed').children).toHaveLength(1);
     vi.advanceTimersByTime(1650);
     expect(part('.hud-feed').children).toHaveLength(0);
+  });
+});
+
+// In Chrome, a child left on style.css's `box-sizing: inherit` is restyled
+// with its parent, and that restyle gets dearer with every new position, so
+// what moves each frame sets box-sizing on its children itself.
+describe('HUD parts that move every frame', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', fakeDocument());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const setsBoxSizing = (css, selector) =>
+    expect(css).toContain(`${selector} { box-sizing: border-box; }`);
+
+  it.each([
+    ['radar', 'tactical', `[id^='rt-g-'], [id^='rt-g-'] *`],
+    ['recharges', 'instrument', '.rc > g'],
+    ['hull-ring', 'instrument', '.hr-ring > g'],
+    ['warden', 'instrument', '.wd-marker > *'],
+  ])(
+    '%s %s: its moved part does not restyle its children',
+    (slot, id, selector) => {
+      setsBoxSizing(mount(slot, id).container.innerHTML, selector);
+    }
+  );
+
+  it('edge arrows: an arrow moved does not restyle its glyph and label', () => {
+    setsBoxSizing(getHudCss(), '.edge-arrow > *');
   });
 });

@@ -93,6 +93,9 @@ export function getHudCss() {
             .damage-arc { position: absolute; width: 150px; height: 34px; opacity: 0; box-sizing: border-box; border-top: 4px solid var(--danger); border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: radial-gradient(ellipse at 50% 0%, var(--danger-soft), transparent 70%); filter: drop-shadow(0 0 6px var(--danger)); }
             .damage-arc.is-on { opacity: 0.95; }
             .edge-arrow { position: absolute; width: 0; height: 0; --arrow-tone: var(--arrow-color, var(--status)); }
+            /* Set, not the global 'inherit': moving an arrow then does not restyle
+               its parts, a restyle that got dearer with every new position (Chrome). */
+            .edge-arrow > * { box-sizing: border-box; }
             .edge-arrow[data-kind='warden'] { --arrow-tone: var(--danger); }
             .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
             .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
