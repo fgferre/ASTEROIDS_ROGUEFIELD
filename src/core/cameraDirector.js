@@ -1,20 +1,23 @@
-// The gameplay camera director (PLAN.md 14.2b, second version, approved by the
-// owner on 19/10/2026): top-down while playing, in two states. Near follows
-// the ship at today's tilt, a little ahead toward the aim, with a slow drift
-// when calm, and may show some space past the field's edge. Wide shows the
-// whole field from nearly straight above: at the end of a wave (for the
-// orbs), when something about to hit is off the near shot (it opens before
-// it arrives), when enemies close in from several sides, when the ship is
-// about to cross an edge, when a boss is off the near shot, and for short
-// looks (a wave starting, an elite out of sight, a boss's announced attack,
-// a boss arriving). Once open it stays open a while. The ship is always on
-// screen, except in the live scene of a Warden's entrance: low and moving,
-// it follows the shot in the Warden's own recipe while the Warden flies in
-// (enemies/boss/arrival.js) and hands back to the play view the moment it
-// closes up. Every number is in data/constants/camera.js and the Wardens'
-// recipes (src/content/bosses/). Pure: the renderer
-// poses the perspective camera from `pose` with the same math (cameraShot.js,
-// render3d/cameraRig.js).
+// The gameplay camera director (PLAN.md 14.2b; the near framing the owner
+// chose by playing on 16/11/2026): top-down while playing, in two states.
+// Near shows the field's whole width across the middle of the screen,
+// tilted: it never moves sideways and follows the ship up and down, a
+// little ahead toward the aim, with a slow drift when calm, and may show
+// some space past the top and bottom edges. Wide shows the whole field from
+// nearly straight above: at the end of a wave (for the orbs), when something
+// about to hit is out of the near view (it opens before it arrives), when
+// enemies close in from several sides out of view, when a boss or Herald is
+// not wholly in view, and for short looks (a wave starting, an elite or an
+// announced attack out of sight, a boss arriving). A look lasts its own
+// time; a danger keeps the view open a while after it is gone. A boss
+// falling or breaking a phase dives the view back near, leaning toward it.
+// The ship is always on screen, except in the live scene of a Warden's
+// entrance: low and moving, it follows the shot in the Warden's own recipe
+// while the Warden flies in (enemies/boss/arrival.js) and hands back to the
+// play view the moment it closes up. Every number is in
+// data/constants/camera.js and the Wardens' recipes (src/content/bosses/).
+// Pure: the renderer poses the perspective camera from `pose` with the same
+// math (cameraShot.js, render3d/cameraRig.js).
 
 import { CAMERA_DIRECTOR } from '../data/constants/camera.js';
 import { fieldFitDistance, projectToScreen, shotExtent } from './cameraShot.js';
@@ -63,8 +66,8 @@ export function createDirectorScene() {
     hasAim: false,
     aimX: 0,
     aimY: 0,
-    // The look-ahead the camera asks for (camera.js lookAheadFor).
-    leadX: 0,
+    // The look-ahead the camera asks for, up and down (camera.js
+    // lookAheadFor).
     leadY: 0,
     // Live lists, read in place: enemies (x, y, vx, vy, radius, type,
     // destroyed), hostile shots (x, y, vx, vy, radius, active, hit) and XP
@@ -93,6 +96,10 @@ export function createDirector({
   // Seconds left: the cleared wave's orbs, and the short looks.
   let clearedFor = 0;
   let glanceFor = 0;
+  // Seconds left of the dive: near, whatever else asks for wide.
+  let diveFor = 0;
+  // Where the boss that dived the view was, and its radius (0: none).
+  const fallen = { x: 0, y: 0, radius: 0 };
   // Seconds the springs stay quick after an entrance hands back.
   let handbackFor = 0;
   let clock = 0;
@@ -152,6 +159,18 @@ export function createDirector({
     );
   }
 
+  // A boss's or Herald's body on `shot`: `reach` times its radius around it,
+  // all of it inside the screen.
+  function bodyIn(shot, e, reach) {
+    const r = (e.radius || 0) * reach;
+    return (
+      onScreen(shot, nearAngles, e.x - r, e.y, 1) &&
+      onScreen(shot, nearAngles, e.x + r, e.y, 1) &&
+      onScreen(shot, nearAngles, e.x, e.y - r, 1) &&
+      onScreen(shot, nearAngles, e.x, e.y + r, 1)
+    );
+  }
+
   // The wide shot: centred on the field, as close as it can be with the four
   // corners inside the margin.
   function updateWide() {
@@ -180,28 +199,52 @@ export function createDirector({
     fits(hi);
   }
 
-  // The near shot: the ship, a little ahead, at most `beyondEdge` of the
-  // half-view past the field's edge.
+  // The near shot: the field's width fills the screen across its middle,
+  // centred; up and down it follows the ship a little ahead, at most
+  // `beyondEdge` of the half-view past the field's top or bottom edge. In a
+  // dive it leans toward the boss that fell.
   function updateNear(scene) {
-    const fit = fieldFitDistance(nearAngles, lens, fieldWidth, fieldHeight);
-    near.distance = fit / T.near.zoom;
+    near.distance = fieldWidth / 2 / (lens.tanV * lens.aspect);
     const e = shotExtent(near.distance, nearAngles, lens, extent);
-    let x = scene.x;
-    let y = scene.y;
-    const lead = Math.hypot(scene.leadX, scene.leadY);
-    if (!reducedMotion && lead > 1e-6) {
-      const span = e.left + e.right;
-      const k = Math.min(lead, T.near.lead * span) / lead;
-      x += scene.leadX * k;
-      y += scene.leadY * k;
-    }
+    const y = scene.y + (reducedMotion ? 0 : scene.leadY);
     const keep = 1 - T.near.beyondEdge;
-    const clampAxis = (v, low, high, size) =>
-      low + high >= size
-        ? (low + size - high) / 2
-        : Math.max(low, Math.min(size - high, v));
-    near.x = clampAxis(x, e.left * keep, e.right * keep, fieldWidth);
-    near.y = clampAxis(y, e.up * keep, e.down * keep, fieldHeight);
+    const low = e.up * keep;
+    const high = fieldHeight - e.down * keep;
+    near.x = fieldWidth / 2;
+    near.y = low >= high ? (low + high) / 2 : Math.max(low, Math.min(high, y));
+    if (diveFor > 0 && fallen.radius > 0) towardFoe(scene, fallen);
+  }
+
+  // The near shot moves toward `foe` (a boss or Herald) just far enough to
+  // show it whole, and never so far that the ship leaves its margin.
+  function towardFoe(scene, foe) {
+    const fromX = near.x;
+    const fromY = near.y;
+    const at = (k) => {
+      near.x = fromX + (foe.x - fromX) * k;
+      near.y = fromY + (foe.y - fromY) * k;
+    };
+    const shipIn = () =>
+      onScreen(near, nearAngles, scene.x, scene.y, SHIP_SHOWN);
+    const foeIn = () => bodyIn(near, foe, T.modelReach);
+    // Where `ok` turns from `start` to the opposite along the move.
+    const cross = (ok, start) => {
+      let a = 0;
+      let b = 1;
+      for (let i = 0; i < BISECT_STEPS; i += 1) {
+        const k = (a + b) / 2;
+        at(k);
+        if (ok() === start) a = k;
+        else b = k;
+      }
+      return start ? a : b;
+    };
+    // The least move that shows it, and the most the ship allows.
+    at(0);
+    const show = foeIn() ? 0 : cross(foeIn, false);
+    at(1);
+    const most = shipIn() ? 1 : cross(shipIn, true);
+    at(Math.min(show, most));
   }
 
   // --- what opens the wide view -------------------------------------------
@@ -213,8 +256,8 @@ export function createDirector({
     for (let i = 0; i < enemies.length; i += 1) {
       const e = enemies[i];
       if (!e || e.destroyed) continue;
-      if (e.type === 'boss') {
-        if (!onScreen(near, nearAngles, e.x, e.y, SHOWN)) return true;
+      if (e.type === 'boss' || e.type === 'herald') {
+        if (!bodyIn(near, e, 1)) return true;
         continue;
       }
       const dx = e.x - sx;
@@ -253,7 +296,8 @@ export function createDirector({
     return false;
   }
 
-  // Enemies close on at least `surroundSides` of the four sides of the ship.
+  // Enemies close, out of the near shot, on at least `surroundSides` of the
+  // four sides of the ship.
   function surrounded(scene) {
     let sides = 0;
     const r2 = T.surroundRange * T.surroundRange;
@@ -264,23 +308,13 @@ export function createDirector({
       const dx = e.x - scene.x;
       const dy = e.y - scene.y;
       if (dx * dx + dy * dy > r2) continue;
+      if (onScreen(near, nearAngles, e.x, e.y, SHOWN)) continue;
       if (Math.abs(dx) >= Math.abs(dy)) sides |= dx >= 0 ? 1 : 4;
       else sides |= dy >= 0 ? 8 : 2;
     }
     let count = 0;
     for (let b = sides; b; b >>= 1) count += b & 1;
     return count >= T.surroundSides;
-  }
-
-  // The ship reaches a field edge within `edgeAhead` s.
-  function edgeAhead(scene) {
-    const ahead = (pos, v, size) =>
-      (v > 1 && (size - pos) / v <= T.edgeAhead) ||
-      (v < -1 && pos / -v <= T.edgeAhead);
-    return (
-      ahead(scene.x, scene.vx, fieldWidth) ||
-      ahead(scene.y, scene.vy, fieldHeight)
-    );
   }
 
   function orbsLeft(scene) {
@@ -317,10 +351,15 @@ export function createDirector({
     goal.yaw = side * (90 + along(shot.turn)) * DEG;
   }
 
-  function wantsWide(scene) {
-    if (clearedFor > 0 && orbsLeft(scene)) return true;
-    if (glanceFor > 0) return true;
-    return threatOffNear(scene) || surrounded(scene) || edgeAhead(scene);
+  // A look (a glance, a cleared wave's orbs) is wide for its own time.
+  function looking(scene) {
+    return glanceFor > 0 || (clearedFor > 0 && orbsLeft(scene));
+  }
+
+  // A danger keeps the view open `wideHold` s after it is gone: it may come
+  // back.
+  function holdFor(scene) {
+    return threatOffNear(scene) || surrounded(scene) ? T.wideHold : 0;
   }
 
   // 1 when nothing threatens close by, fading to 0 as something nears.
@@ -410,18 +449,31 @@ export function createDirector({
 
     /**
      * A game event: 'cleared' (a wave's end: open for its orbs), or a short
-     * wide look: 'waveStart', 'elite' (only when `target` is off the near
-     * shot), 'telegraph' (a boss's announced attack), 'bossArrival'.
+     * wide look: 'waveStart', 'elite', 'telegraph' (an announced attack),
+     * 'bossArrival'. A look at a `target` already in the near shot is
+     * skipped. 'dive' (a boss falling or breaking a phase, `target` where
+     * it is with its radius): back near at once and for `dive` s, whatever
+     * else asks for wide, leaning toward it.
      */
     trigger(kind, target = null) {
       if (kind === 'cleared') {
         clearedFor = T.clearedHold;
         return;
       }
+      if (kind === 'dive') {
+        fallen.x = target?.x ?? 0;
+        fallen.y = target?.y ?? 0;
+        fallen.radius = target?.radius ?? 0;
+        diveFor = T.dive;
+        wideFor = 0;
+        glanceFor = 0;
+        handbackFor = T.arrival.handbackFor;
+        return;
+      }
       const seconds = T.glance[kind];
       if (seconds === undefined) return;
-      if (kind === 'elite' && target) {
-        if (onScreen(near, nearAngles, target.x, target.y, SHOWN)) return;
+      if (target && onScreen(near, nearAngles, target.x, target.y, SHOWN)) {
+        return;
       }
       glanceFor = Math.max(glanceFor, seconds);
     },
@@ -437,6 +489,7 @@ export function createDirector({
       wideFor = 0;
       clearedFor = 0;
       glanceFor = 0;
+      diveFor = 0;
       handbackFor = 0;
       sliding = false;
       director.snap();
@@ -444,12 +497,14 @@ export function createDirector({
 
     /**
      * The shot this frame for `scene` (with a ship). `zoomPulse` scales how
-     * close the near shot is (the dash, brake and level-up kicks).
+     * close the settled shot is, near or wide (the dash, brake and level-up
+     * kicks); not a Warden's entrance.
      */
     update(scene, dt, zoomPulse = 1) {
       const step = Math.max(0, dt);
       clock += step;
-      clearedFor = Math.max(0, clearedFor - step);
+      clearedFor = Math.max(0, clearedFor - (diveFor > 0 ? 0 : step));
+      diveFor = Math.max(0, diveFor - step);
       glanceFor = Math.max(0, glanceFor - step);
       handbackFor = Math.max(0, handbackFor - step);
       updateWide();
@@ -462,9 +517,9 @@ export function createDirector({
       } else if (forced) {
         state = forced;
       } else {
-        if (wantsWide(scene)) wideFor = T.wideHold;
-        else wideFor = Math.max(0, wideFor - step);
-        state = wideFor > 0 ? 'wide' : 'near';
+        wideFor = Math.max(wideFor - step, holdFor(scene));
+        const open = looking(scene) || wideFor > 0;
+        state = open && diveFor === 0 ? 'wide' : 'near';
       }
       if (before === 'arrival' && !warden) handbackFor = T.arrival.handbackFor;
 
@@ -472,7 +527,7 @@ export function createDirector({
       const live = state === 'arrival';
       goal.x = isWide ? wide.x : near.x;
       goal.y = isWide ? wide.y : near.y;
-      goal.distance = isWide ? wide.distance : near.distance / zoomPulse;
+      goal.distance = isWide ? wide.distance : near.distance;
       goal.tilt = isWide ? wideAngles.tilt : nearAngles.tilt;
       goal.yaw = 0;
       if (live) frameArrival(warden);
@@ -547,7 +602,7 @@ export function createDirector({
 
       pose.x = px.value + driftX;
       pose.y = py.value + driftY;
-      pose.distance = dist.value;
+      pose.distance = live ? dist.value : dist.value / zoomPulse;
       pose.tilt = tilt.value;
       pose.yaw = yaw.value;
       pose.roll = lean;

@@ -5,8 +5,9 @@
 // (setReach); headless, the flat view is the shot.
 //
 // Modes: 'dynamic' (default) hands the shot to the camera director
-// (cameraDirector.js, PLAN.md 14.2b): top-down, near the ship or wide on the
-// whole field, and free to show past the field's edge; 'classic' is the plain
+// (cameraDirector.js, PLAN.md 14.2b): top-down, near (the field's width,
+// following the ship up and down) or wide on the whole field, and free to
+// show past the field's edge; 'classic' is the plain
 // follow with a dead zone and a smoothed lag (`?camera=1`, or Settings →
 // Graphics), which is also what the dynamic mode does without a scene;
 // 'static' is the fixed full-field view (`?camera=0`). Dev: `?moment=near` or
@@ -31,7 +32,7 @@ const PULSE_ATTACK = 0.3;
 
 // Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX;
 // a full LOOK_AHEAD_MAX along the nose when it leads on the hull. The
-// director caps it further, to a share of the view.
+// director, which never moves sideways, uses its up-and-down part.
 export const LOOK_AHEAD_MAX = 90;
 const LOOK_AHEAD_GAIN = 0.5;
 
@@ -196,7 +197,6 @@ export function createCamera({
       advancePulse(dt);
       if (mode === 'dynamic' && scene.hasShip) {
         lookAheadFor(scene, targetX, targetY, leadOut, lead);
-        scene.leadX = leadOut.x;
         scene.leadY = leadOut.y;
         directed = director.update(scene, dt, pulseFactor);
         camera.x = directed.x;
@@ -295,8 +295,8 @@ export function createCamera({
     },
 
     /**
-     * A game event for the director: 'cleared', 'waveStart', 'elite' (with
-     * where it spawned), 'telegraph' or 'bossArrival'.
+     * A game event for the director: 'cleared', 'waveStart', 'elite' or
+     * 'telegraph' (with where it comes from), 'bossArrival' or 'dive'.
      */
     trigger(kind, target) {
       if (enabled && mode === 'dynamic') director.trigger(kind, target);

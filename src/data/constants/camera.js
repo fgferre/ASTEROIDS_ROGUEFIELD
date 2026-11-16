@@ -10,33 +10,41 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const CAMERA_DIRECTOR = deepFreeze({
-  // Near: follows the ship at today's tilt. `zoom` is how close, over the
-  // farthest shot that fits inside the field at that tilt ("como na foto
-  // Perto"); `lead` the share of the view it moves ahead toward the aim;
-  // `beyondEdge` how much of the half-view may show past the field's edge.
-  near: { tilt: 18, zoom: 1.3, lead: 0.12, beyondEdge: 0.4 },
+  // Near (the owner's pick by playing, 16/11/2026): the field's full width across the
+  // screen at this tilt, following the ship up and down; `beyondEdge` is how
+  // much of the half-view may show past the field's top or bottom edge.
+  near: { tilt: 18, beyondEdge: 0.4 },
 
   // Wide: nearly straight down, the whole field and some space around it;
   // `margin` is the share of the screen kept free around the field.
   wide: { tilt: 5, margin: 0.05 },
 
-  // How long the wide view stays at least once open, and at most for the
-  // orbs of a cleared wave (it closes earlier when they are all collected).
+  // How long the wide view stays open after a threat or a crowd is gone
+  // (it may come back), and at most for the orbs of a cleared wave (it
+  // closes as soon as they are all collected).
   wideHold: 3,
   clearedHold: 5,
-  // Short wide looks: a wave starting, an elite out of sight, a boss's
-  // announced attack, a boss arriving (until the live scene exists).
+  // Short wide looks, each wide for just its own time: a wave starting, an
+  // elite or an announced attack out of sight, a boss arriving (until the
+  // live scene exists).
   glance: { waveStart: 2, elite: 2.5, telegraph: 2, bossArrival: 3 },
+  // proposta 16/11: a boss falling or breaking a phase (and a Herald
+  // falling) dives the view back near at once, quickly, and holds it there
+  // this long while it breaks apart; then the cleared wave's look opens.
+  dive: 1.2,
+  // proposta 16/11: how far past a boss's radius its drawn model reaches on
+  // screen (parts past the hull, height in the tilted view), for the dive to
+  // show it whole.
+  modelReach: 1.5,
 
   // What opens the wide view during play: something that will hit within
   // `threatHorizon` s is off the near shot (so it opens before it arrives);
-  // enemies within `surroundRange` on at least `surroundSides` of the four
-  // sides around the ship; the ship reaching an edge within `edgeAhead` s.
+  // enemies out of the near shot within `surroundRange` on at least
+  // `surroundSides` of the four sides around the ship.
   threatHorizon: 2,
   fastThreatSpeed: 140,
   surroundRange: 300,
   surroundSides: 3,
-  edgeAhead: 0.45,
 
   // Springs (about the time to arrive): the view opens fast and closes in
   // slowly; the tilt eases between near and wide.
