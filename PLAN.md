@@ -88,7 +88,7 @@ ordem; cada ciclo fecha com `npm run done`, piloto (`npm run playtest`), captura
     `viagem`, `chefes-ataques`, `audicao-*`, `decisoes`.
     14/11: os dezesseis sons que ele escolheu (tiro de quatro armas, feixe da Harmonic, estouro da Scatter, rajada
     do Hunter, trava da mira, os três do Caster, troca de fase e derrota de chefe, ataque de Prime, Choir e Null)
-    estão instalados no ramo `som/armas-inimigos`, conferidos numa partida no navegador; não publicado — ele decide.
+    estão instalados e publicados (PR #306, por ordem dele), conferidos numa partida no navegador.
     Volumes são proposta 14/11; restam cerca de cinquenta sons sintetizados (próxima audição: máquinas inimigas,
     coletas, vinhetas).
 
