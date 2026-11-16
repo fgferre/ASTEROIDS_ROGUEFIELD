@@ -90,6 +90,7 @@ export default {
   id: 'solar-slicer',
   order: 2,
   name: 'Solar Slicer',
+  role: 'Fast, fragile',
   // Collision, shield and the menu preview's base plate follow the blades.
   outline: [
     { x: SHIP_SIZE * 1.35, y: 0 },

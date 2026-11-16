@@ -88,6 +88,7 @@ export default {
   id: 'default-hull',
   order: 1,
   name: 'Interceptor',
+  role: 'Balanced',
   outline: [
     { x: SHIP_SIZE, y: 0 },
     { x: -SHIP_SIZE / 2, y: -SHIP_SIZE / 2 },

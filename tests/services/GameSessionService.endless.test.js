@@ -147,6 +147,42 @@ describe('endless run past the final Warden', () => {
     expect(game.session.getSessionState()).toBe('running');
   });
 
+  it('makes the ship safe from the final Warden falling until the victory screen can open', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player } = game.services;
+
+    game.eventBus.emit('boss-defeated', { wave: 5 });
+    expect(player.invulnerableTimer).toBeLessThan(9);
+
+    game.eventBus.emit('boss-defeated', { wave: 15 });
+    expect(game.session.getSessionState()).toBe('victory');
+    expect(player.invulnerableTimer).toBeGreaterThanOrEqual(9);
+  });
+
+  it("ends the win's steady protection when the run goes on", () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player } = game.services;
+
+    game.eventBus.emit('boss-defeated', { wave: 15 });
+    expect(player.steadyGuard).toBe(true);
+
+    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(player.invulnerableTimer).toBe(0);
+    expect(player.steadyGuard).toBe(false);
+  });
+
+  it('keeps a longer invulnerability the ship already had at the win', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player } = game.services;
+    player.setInvulnerableTimer(30);
+
+    game.eventBus.emit('boss-defeated', { wave: 15 });
+    expect(player.invulnerableTimer).toBe(30);
+  });
+
   it('deals the card choices gained during the win once the run goes on', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test' });

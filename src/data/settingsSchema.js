@@ -28,11 +28,7 @@ const DEFAULT_BINDING_METADATA = {
   },
 };
 
-const HULL_OPTIONS = getAllShipModels();
-const HULL_OPTION_IDS = HULL_OPTIONS.map((hull) => hull.id);
-const HULL_OPTION_LABELS = Object.fromEntries(
-  HULL_OPTIONS.map((hull) => [hull.id, hull?.name || hull?.id || ''])
-);
+const HULL_OPTION_IDS = getAllShipModels().map((hull) => hull.id);
 
 const SETTINGS_SCHEMA = [
   {
@@ -43,11 +39,12 @@ const SETTINGS_SCHEMA = [
       {
         key: 'selectedHull',
         type: 'select',
-        label: 'Ship Hull',
-        description: 'Choose the playable hull used for the next run.',
+        // Picked in the menu and the Hangar; kept out of the Settings panel,
+        // so its resets leave it alone.
+        hidden: true,
+        keepOnReset: true,
         default: DEFAULT_HULL_ID,
         options: HULL_OPTION_IDS,
-        optionLabels: HULL_OPTION_LABELS,
       },
       {
         key: 'difficulty',

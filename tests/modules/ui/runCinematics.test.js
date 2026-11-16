@@ -204,6 +204,33 @@ describe('RunCinematics', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
+  it("a skip drops the ending's lines and shows the final card once, leaving no hint", () => {
+    const { ui, hud, hush, skip } = setup();
+    const hint = () => hud.els.cinematicHint.classList.contains('is-showing');
+    const onEnd = vi.fn();
+    ui.cinematics.playEnding('stewardship', onEnd);
+    expect(hint()).toBe(true);
+
+    skip();
+    expect(hush).toHaveBeenCalledTimes(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(hint()).toBe(false);
+    skip();
+    vi.advanceTimersByTime(60_000);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+
+    // Played out, it hides the hint too; a new run's stop drops it unseen.
+    ui.cinematics.playEnding('stewardship', onEnd);
+    vi.advanceTimersByTime(60_000);
+    expect(onEnd).toHaveBeenCalledTimes(2);
+    expect(hint()).toBe(false);
+    ui.cinematics.playEnding('stewardship', onEnd);
+    ui.cinematics.stop();
+    vi.advanceTimersByTime(60_000);
+    expect(onEnd).toHaveBeenCalledTimes(2);
+    expect(hint()).toBe(false);
+  });
+
   it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {
     const { ui, hud, renderer, events, held } = setup();
     const warden = { x: 400, y: 84 };
@@ -380,6 +407,54 @@ describe('RunCinematics', () => {
       expect.stringMatching(/^chapter:/),
     ]);
     expect(banners.length).toBeGreaterThan(0);
+  });
+
+  it('the press that picked the ending does not skip it; the next press does', () => {
+    // Window capture listeners run first on each event, as in the browser:
+    // one bound during an event's own handler misses that event.
+    const listeners = new Map();
+    vi.stubGlobal('window', {
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (id) => clearTimeout(id),
+      addEventListener: (type, fn) => listeners.set(type, fn),
+      removeEventListener: (type, fn) => {
+        if (listeners.get(type) === fn) listeners.delete(type);
+      },
+      requestAnimationFrame: () => 1,
+      cancelAnimationFrame: () => {},
+    });
+    const cinematics = new RunCinematics({
+      eventBus: { emit: () => {} },
+      renderer: () => null,
+      hud: () => null,
+      holdSim: () => {},
+      hush: () => {},
+    });
+    const onEnd = vi.fn();
+    const dispatch = (type, repeat = false, target = () => {}) => {
+      listeners.get(type)?.({
+        type,
+        code: 'Enter',
+        repeat,
+        preventDefault() {},
+        stopImmediatePropagation() {},
+      });
+      target();
+    };
+
+    // Enter on the choice button: its keydown picks the ending, then is held.
+    dispatch('keydown', false, () => cinematics.playEnding('severance', onEnd));
+    dispatch('keydown', true);
+    dispatch('keyup');
+    expect(onEnd).not.toHaveBeenCalled();
+    // A click that picks it: its pointerdown came before the click.
+    cinematics.stop();
+    dispatch('pointerdown');
+    cinematics.playEnding('severance', onEnd);
+    expect(onEnd).not.toHaveBeenCalled();
+
+    dispatch('pointerdown');
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   it("swallows a skip key's repeats after the skip until it is released", () => {

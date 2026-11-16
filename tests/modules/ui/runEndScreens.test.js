@@ -4,6 +4,7 @@ import {
   RunEndScreens,
   endingChoiceMarkup,
 } from '../../../src/modules/ui/RunEndScreens.js';
+import { SCREEN_INPUT_LOCKOUT_MS } from '../../../src/modules/ui/LevelUpScreen.js';
 import { STORY } from '../../../src/data/story.js';
 import { loadRecords } from '../../../src/services/runRecords.js';
 
@@ -62,6 +63,71 @@ describe('Run end screens', () => {
       'Your best is <b>Layer 12</b>. Three layers to go.'
     );
     expect(gameOver.seed.textContent).toBe('Seed 42 · Veteran');
+  });
+
+  it('the death screen wakes its buttons after the lockout, the retry left first, bright and with the ⏎ hint', () => {
+    vi.useFakeTimers();
+    const focused = [];
+    const button = () => {
+      const classes = new Set();
+      const node = {
+        disabled: false,
+        children: [],
+        prepend: (...nodes) => node.children.unshift(...nodes),
+        focus: () => focused.push(node),
+        classList: {
+          toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+        },
+        bright: () => classes.has('end-btn--primary'),
+      };
+      return node;
+    };
+    const [retryBtn, restartBtn, quitBtn] = [button(), button(), button()];
+    const hints = ['⏎', 'A'];
+    const screens = new RunEndScreens({
+      refs: {
+        gameOver: {
+          body: {},
+          invite: {},
+          seed: {},
+          copySeedBtn: {},
+          retryBtn,
+          restartBtn,
+          quitBtn,
+          hints,
+        },
+      },
+      showScreen: () => {},
+      progression: () => null,
+      difficulty: () => ({ runLabel: () => '' }),
+      hangar: () => ({ lastAward: { amount: 0, total: 0 } }),
+      lastTransmission: () => null,
+    });
+    const die = () => {
+      screens.showGameOverScreen({ data: { wave: 3, stats: {} } });
+      return [retryBtn, restartBtn, quitBtn].map(({ disabled }) => disabled);
+    };
+
+    const bright = () => [retryBtn, restartBtn].map((b) => b.bright());
+
+    expect(die()).toEqual([true, true, true]);
+    expect(retryBtn.children).toEqual(hints);
+    expect(bright()).toEqual([true, false]);
+    vi.advanceTimersByTime(SCREEN_INPUT_LOCKOUT_MS);
+    expect(focused).toEqual([retryBtn]);
+    // The retry spent stays off; New mission takes the look, hint and focus.
+    retryBtn.disabled = true;
+    die();
+    vi.advanceTimersByTime(SCREEN_INPUT_LOCKOUT_MS);
+    expect([retryBtn, restartBtn, quitBtn].map((b) => b.disabled)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(restartBtn.children).toEqual(hints);
+    expect(bright()).toEqual([false, true]);
+    expect(focused).toEqual([retryBtn, restartBtn]);
+    vi.useRealTimers();
   });
 
   function victoryScreen() {

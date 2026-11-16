@@ -49,6 +49,8 @@ export class PauseScreen {
     this.openHudEditor = openHudEditor;
     this.currentPauseState = false;
     this.quitConfirm = { button: null, label: '', timeoutId: null };
+    // The Escape held now disarmed a quit on the pause screen.
+    this.escapeDisarms = false;
   }
 
   bindPauseControls() {
@@ -82,12 +84,15 @@ export class PauseScreen {
           return;
         }
 
+        // A panel over the pause takes Escape: no quit left armed under it.
+        this.cancelQuitConfirm();
         this.emit('settings-menu-requested', { source: 'pause' });
       });
     }
 
     pauseRefs.editHudBtn?.addEventListener('click', () => {
       if (this.currentPauseState) {
+        this.cancelQuitConfirm();
         this.openHudEditor();
       }
     });
@@ -124,11 +129,21 @@ export class PauseScreen {
       });
     }
 
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
+    // Escape disarms a quit. On the pause screen that press, and its repeats
+    // while held, stop here: the game would read it as resume.
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key !== 'Escape') return;
+        if (!event.repeat) {
+          this.escapeDisarms =
+            this.currentPauseState && Boolean(this.quitConfirm.button);
+        }
+        if (this.escapeDisarms) event.stopImmediatePropagation();
         this.cancelQuitConfirm();
-      }
-    });
+      },
+      true
+    );
   }
 
   confirmQuit(button) {

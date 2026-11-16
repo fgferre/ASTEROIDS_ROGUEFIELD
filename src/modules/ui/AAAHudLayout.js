@@ -33,6 +33,8 @@ const CHAPTER_BANNER_MS = 3000;
 const WARNING_TONES = ['surge', 'event'];
 const BOSS_INTRO_MS = 1500;
 const BOSS_BAR_HOLD_MS = 1000;
+/** A timed notice in the tip slot (an aim or spread toggle) stays this long. */
+export const TIMED_NOTICE_MS = 4000;
 // Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
 const ASTEROID_FEED_NAME = 'Fragment';
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
@@ -72,6 +74,8 @@ export class AAAHudLayout {
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
     this._onboardingHideTimer = null;
+    this._noticeTimer = null;
+    this._tip = null;
     this._bossBarHeldUntil = 0;
   }
 
@@ -214,6 +218,8 @@ export class AAAHudLayout {
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
     this._onboardingHideTimer = null;
+    this._noticeTimer = null;
+    this._tip = null;
     this._bossBarHeldUntil = 0;
   }
 
@@ -466,8 +472,49 @@ export class AAAHudLayout {
     }, FADE_OUT_MS);
   }
 
-  /** First-run tip under the top HUD: key chips and one line. */
+  /**
+   * First-run tip under the top HUD: key chips and one line. A timed notice
+   * on screen keeps the slot; the tip shows once it ends.
+   */
   showOnboardingTip(keys, text) {
+    this._tip = { keys, text };
+    if (!this._noticeTimer) {
+      this._renderTip(keys, text);
+    }
+  }
+
+  hideOnboardingTip() {
+    this._tip = null;
+    if (!this._noticeTimer) {
+      this._fadeTip();
+    }
+  }
+
+  /**
+   * A short notice in the tip slot that leaves on its own after `ms`; a tip
+   * it covered comes back, and a second notice restarts the time.
+   */
+  showTimedNotice(keys, text, ms = TIMED_NOTICE_MS) {
+    if (this._noticeTimer) {
+      this._cancel(this._noticeTimer);
+    }
+    this._renderTip(keys, text);
+    this._noticeTimer = this._later(() => {
+      this._noticeTimer = null;
+      if (this._tip) {
+        this._renderTip(this._tip.keys, this._tip.text);
+      } else {
+        this._fadeTip();
+      }
+    }, ms);
+  }
+
+  /** True while a timed notice holds the tip slot (showTimedNotice). */
+  isNoticeShowing() {
+    return Boolean(this._noticeTimer);
+  }
+
+  _renderTip(keys, text) {
     const tip = this.els?.onboardingTip;
     if (!tip) {
       return;
@@ -489,7 +536,7 @@ export class AAAHudLayout {
     replay(tip, 'is-showing');
   }
 
-  hideOnboardingTip() {
+  _fadeTip() {
     const tip = this.els?.onboardingTip;
     if (!tip || !tip.classList.contains('is-showing')) {
       return;

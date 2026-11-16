@@ -77,14 +77,13 @@
             <section
               id="menu-ship-selector"
               class="menu-ship-selector"
-              aria-labelledby="menu-ship-selector-label"
+              aria-label="Hull selection"
             >
               <p
                 id="menu-ship-selector-label"
-                class="menu-ship-selector__label"
-              >
-                Hull Selection
-              </p>
+                class="menu-ship-selector__label hull-traits"
+                aria-live="polite"
+              ></p>
               <div
                 id="menu-ship-selector-options"
                 class="menu-ship-selector__options"
@@ -97,6 +96,7 @@
                 id="menu-campaign-btn"
                 class="menu-screen__button menu-screen__button--primary"
                 type="button"
+                data-hint="Ten sectors, one at a time; each win is kept and opens the next."
               >
                 Campaign
               </button>
@@ -104,7 +104,7 @@
                 id="start-game-btn"
                 class="menu-screen__button"
                 type="button"
-                title="All three chapters in one run"
+                data-hint="All three chapters in one run."
               >
                 Descent
               </button>
@@ -112,7 +112,7 @@
                 id="daily-field-btn"
                 class="menu-screen__button"
                 type="button"
-                title="Today's field: the same seed for everyone, Veteran difficulty"
+                data-hint="Today's field, the same for everyone. Always Veteran difficulty."
               >
                 Daily Field
               </button>
@@ -120,7 +120,7 @@
                 id="boss-rush-btn"
                 class="menu-screen__button menu-screen__button--stacked"
                 type="button"
-                title="The three Wardens back to back"
+                data-hint="The three Wardens back to back."
               >
                 Boss Rush
                 <span id="boss-rush-lock" class="menu-screen__lock hidden"
@@ -131,6 +131,7 @@
                 id="menu-hangar-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Spend Salvage on permanent upgrades and new hulls."
               >
                 Hangar
               </button>
@@ -138,6 +139,7 @@
                 id="menu-codex-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Every enemy you have logged, and your achievements."
               >
                 Codex
               </button>
@@ -145,6 +147,7 @@
                 id="open-settings-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="Gameplay, controls, interface, graphics, audio and accessibility."
               >
                 Settings
               </button>
@@ -152,10 +155,12 @@
                 id="menu-credits-btn"
                 class="menu-screen__button"
                 type="button"
+                data-hint="The people behind the game, and the original 2D version."
               >
                 Credits
               </button>
             </nav>
+            <p id="menu-hint" class="menu-hint" aria-live="polite"></p>
             <ul
               class="controls-hints"
               data-device="keyboard"
@@ -240,10 +245,11 @@
               id="levelup-equip-btn"
               class="lu-ghost lu-ghost--auto levelup-action hidden"
               type="button"
+              aria-pressed="false"
             >
               <kbd data-device="keyboard">Q</kbd>
               <kbd data-device="gamepad">RB</kbd>
-              Equip for me
+              <span data-label>Equip for me</span>
             </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
@@ -582,13 +588,20 @@
               aria-label="Permanent upgrades"
             ></ul>
             <div class="hangar-hull-bay">
-              <div class="hangar-hull-stage-frame">
-                <canvas
-                  id="hangar-hull-stage"
-                  class="hangar-hull-stage"
-                  aria-hidden="true"
-                ></canvas>
-                <p id="hangar-hull-lock" class="hangar-hull-lock" hidden></p>
+              <div class="hangar-hull-view">
+                <div class="hangar-hull-stage-frame">
+                  <canvas
+                    id="hangar-hull-stage"
+                    class="hangar-hull-stage"
+                    aria-hidden="true"
+                  ></canvas>
+                  <p id="hangar-hull-lock" class="hangar-hull-lock" hidden></p>
+                </div>
+                <p
+                  id="hangar-hull-info"
+                  class="hangar-hull-info hull-traits"
+                  aria-live="polite"
+                ></p>
               </div>
               <div
                 id="hangar-hulls"

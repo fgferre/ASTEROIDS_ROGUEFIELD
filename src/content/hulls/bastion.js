@@ -93,6 +93,7 @@ export default {
   id: 'bastion',
   order: 3,
   name: 'Bastion',
+  role: 'Tough, slow',
   outline: [
     { x: SHIP_SIZE * 0.98, y: 0 },
     { x: SHIP_SIZE * 0.42, y: -SHIP_SIZE * 0.24 },

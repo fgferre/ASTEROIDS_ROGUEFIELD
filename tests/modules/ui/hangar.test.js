@@ -7,9 +7,13 @@ import HangarService, {
 import {
   hangarItemMarkup,
   hullLockText,
+  hullTraits,
+  hullTraitsMarkup,
+  hullUnlockText,
   salvageBalanceText,
   salvageLine,
 } from '../../../src/modules/ui/hangar.js';
+import { getShipModelById } from '../../../src/data/shipModels.js';
 
 describe('Hangar screen', () => {
   let restoreDom;
@@ -49,6 +53,37 @@ describe('Hangar screen', () => {
   it('prices a locked hull for its preview', () => {
     expect(hullLockText('solar-slicer')).toBe('🔒 LOCKED · 400 SALVAGE');
     expect(hullLockText('bastion')).toBe('🔒 LOCKED · 520 SALVAGE');
+    expect(hullUnlockText('bastion')).toBe('🔒 520 Salvage in the Hangar');
+  });
+
+  it('describes each hull from its role and stats, lower dash cooldown better', () => {
+    const traits = (id) => {
+      const { role, stats, plain } = hullTraits(getShipModelById(id));
+      return [role, plain, ...stats.map((s) => `${s.text} ${s.better}`)];
+    };
+    expect(traits('default-hull')).toEqual([
+      'Balanced',
+      'Standard hull, speed and dash',
+    ]);
+    expect(traits('solar-slicer')).toEqual([
+      'Fast, fragile',
+      null,
+      'Hull -20% false',
+      'Speed +15% true',
+      'Thrust +15% true',
+      'Dash cooldown -15% true',
+    ]);
+    expect(traits('bastion')).toEqual([
+      'Tough, slow',
+      null,
+      'Hull +35% true',
+      'Speed -10% false',
+      'Thrust -15% false',
+      'Dash cooldown +20% false',
+    ]);
+    expect(hullTraitsMarkup(getShipModelById('bastion'), 'lock')).toMatch(
+      /^<span class="hull-traits__name">Bastion<\/span> · <span class="hull-traits__role">Tough, slow<\/span> · <span class="hull-traits__stat is-better">Hull \+35%<\/span>.* · <span class="hull-traits__lock">lock<\/span>$/
+    );
   });
 
   it('writes the run end salvage line', () => {

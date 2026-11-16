@@ -687,6 +687,9 @@ export class SettingsPanel {
     const values = this.settings?.getCategoryValues(categoryId) || {};
 
     asArray(category.fields).forEach((field) => {
+      if (field.hidden) {
+        return;
+      }
       const element = renderSettingField(
         categoryId,
         field,

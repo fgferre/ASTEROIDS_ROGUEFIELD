@@ -75,15 +75,30 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
   mirrorLocks(t, combat);
 
   const orbs = xpOrbs?.xpOrbs || [];
-  let orbActive = false;
-  for (let i = 0; i < orbs.length && !orbActive; i += 1) {
-    orbActive = Boolean(orbs[i] && !orbs[i].collected);
-  }
-  if (orbActive) {
-    const radius = player.getMagnetismRadius() || xpOrbs.getMagnetismRadius();
+  const radius = player.getMagnetismRadius() || xpOrbs.getMagnetismRadius();
+  const gain = magnetRingGain(orbs, px, py, radius);
+  if (gain > 0) {
     const dashes = Math.max(12, Math.round((Math.PI * 2 * radius) / 6));
-    ribbons.circle(px, py, radius, OVERLAY_H, t.accentRgb, 1, 0.25, dashes);
+    ribbons.circle(px, py, radius, OVERLAY_H, t.accentRgb, 1, gain, dashes);
   }
+}
+
+// The pull ring fades out as the nearest orb is 1.5 pull radii away.
+const MAGNET_RING_FADE = 1.5;
+const MAGNET_RING_GAIN = 0.25;
+
+// How strongly the pull ring shows: full while an uncollected orb is inside
+// the pull radius, none once the nearest is MAGNET_RING_FADE radii away.
+export function magnetRingGain(orbs, px, py, radius) {
+  let nearest = Infinity;
+  for (let i = 0; i < orbs.length; i += 1) {
+    const orb = orbs[i];
+    if (orb && !orb.collected) {
+      nearest = Math.min(nearest, Math.hypot(orb.x - px, orb.y - py));
+    }
+  }
+  const away = (nearest / radius - 1) / (MAGNET_RING_FADE - 1);
+  return MAGNET_RING_GAIN * Math.min(1, Math.max(0, 1 - away));
 }
 
 // An Aegis's ward (behaviors/ward.js): a faint lime link to each machine it

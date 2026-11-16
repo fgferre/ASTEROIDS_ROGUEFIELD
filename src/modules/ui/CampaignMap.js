@@ -4,7 +4,8 @@
 // the chapters along it and the chapters still to come, each cleared, open
 // or locked from its sectors (src/data/sectors.js) and the run records; the
 // selected chapter's sectors as rows under it, and Launch for the selected
-// row (GameSessionService's MenuButtons starts the run from the button's
+// row (Enter, Space or the pad's confirm on that row presses it too;
+// GameSessionService's MenuButtons starts the run from the button's
 // data-sector). A sector run that ends back in the menu reopens the map.
 // The campaign's last sector carries a pip per ending (data/story.js), lit
 // once the profile has reached it.
@@ -265,6 +266,13 @@ export class CampaignMap {
         this.closeMap();
         return;
       }
+      // Enter, Space or the pad's confirm (no pointer: detail 0) on the row
+      // already selected launches it, as Launch would.
+      const row = event.target.closest?.('[data-campaign-row]');
+      if (event.detail === 0 && row?.dataset.campaignRow === this.selectedId) {
+        if (!refs.launchBtn.disabled) refs.launchBtn.click();
+        return;
+      }
       this.selectFrom(event.target);
     });
     // The pad's d-pad moves the focus: the focused chapter or row is the
@@ -272,30 +280,36 @@ export class CampaignMap {
     refs.overlay.addEventListener('focusin', (event) =>
       this.selectFrom(event.target)
     );
-    document.addEventListener('keydown', (event) => {
-      if (!this.mapState.isOpen) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.closeMap();
-        return;
-      }
-      const onChapter = document.activeElement?.closest?.(
-        '[data-campaign-chapter]'
-      );
-      const onRow = document.activeElement?.closest?.('[data-campaign-row]');
-      const move = {
-        ArrowLeft: onChapter && (() => this.stepChapter(-1)),
-        ArrowRight: onChapter && (() => this.stepChapter(1)),
-        ArrowDown: onChapter
-          ? () => this.focusRow(this.selectedId)
-          : onRow && (() => this.stepRow(1)),
-        ArrowUp: onRow && (() => this.stepRow(-1)),
-      }[event.key];
-      if (move) {
-        event.preventDefault();
-        move();
-      }
-    });
+    // Heard on the way down (capture): InputSystem stops ArrowDown at the
+    // document before a bubbling listener would hear it.
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (!this.mapState.isOpen) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.closeMap();
+          return;
+        }
+        const onChapter = document.activeElement?.closest?.(
+          '[data-campaign-chapter]'
+        );
+        const onRow = document.activeElement?.closest?.('[data-campaign-row]');
+        const move = {
+          ArrowLeft: onChapter && (() => this.stepChapter(-1)),
+          ArrowRight: onChapter && (() => this.stepChapter(1)),
+          ArrowDown: onChapter
+            ? () => this.focusRow(this.selectedId)
+            : onRow && (() => this.stepRow(1)),
+          ArrowUp: onRow && (() => this.stepRow(-1)),
+        }[event.key];
+        if (move) {
+          event.preventDefault();
+          move();
+        }
+      },
+      true
+    );
   }
 
   /** A click or focus on a chapter node or a sector row selects it. */

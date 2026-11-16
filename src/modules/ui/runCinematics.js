@@ -14,7 +14,8 @@
 // Ring wakes, the victory line plays over it, and the victory screen waits
 // for it to end. Ending (the campaign's last win, after the choice): the
 // epilogue's shot holds while the ending's lines play and the Ring answers
-// through its wake; then the final card. Warden entrance: letterbox bars over the live shot until
+// through its wake, under the skip hint; any key, click or pad button drops
+// the lines left; then the final card. Warden entrance: letterbox bars over the live shot until
 // the Warden closes up ('boss-arrived'); the run plays on, slowed (no hold,
 // no skip). A renderer that can't move the camera (2D, reduced motion,
 // `?camera=0`) refuses them all, and the run keeps the plain banner; a
@@ -179,6 +180,7 @@ export class RunCinematics {
     this.handOff = null;
     this.unbindSkip = null;
     this.afterEpilogue = null;
+    this.afterEnding = null;
     this.travelTo = null;
     // Cards dealt while a journey is armed or plays, shown after the intro.
     this.cards = null;
@@ -308,6 +310,11 @@ export class RunCinematics {
    * eases from the intro's pose back to the ship.
    */
   skip() {
+    if (this.kind === 'ending') {
+      this.hush();
+      this.endEnding();
+      return;
+    }
     if (this.kind === 'travel') {
       this.hush();
       this.endTravel();
@@ -337,7 +344,8 @@ export class RunCinematics {
   /**
    * The ending picked (data/story.js STORY.ending): its lines play, timed
    * as a journey's, while the held shot's wake eases to the ending's own
-   * (none without the 3D camera); `onEnd` runs once they are done.
+   * (none without the 3D camera); `onEnd` runs once, when they are done
+   * or skipped. The press that picked it has gone by when the skip binds.
    */
   playEnding(ending, onEnd) {
     this.stop();
@@ -350,10 +358,16 @@ export class RunCinematics {
       'ending'
     );
     lines.forEach((entry) => this.speak(entry));
-    this.begin('ending', durationMs, () => {
-      this.finish();
-      onEnd();
-    });
+    this.afterEnding = onEnd;
+    this.begin('ending', durationMs, () => this.endEnding());
+    this.hud()?.showCinematicHint(true);
+    this.unbindSkip = this.bindSkip(() => this.skip());
+  }
+
+  endEnding() {
+    const show = this.afterEnding;
+    this.finish();
+    show();
   }
 
   /**
@@ -432,6 +446,7 @@ export class RunCinematics {
     if (kind === 'arrival' || kind === 'travel') {
       this.hud()?.showLetterbox(false);
     }
+    if (kind === 'ending') this.hud()?.showCinematicHint(false);
     clearTimeout(this.timer);
     clearTimeout(this.handOff);
     this.unbindSkip?.();
@@ -439,6 +454,7 @@ export class RunCinematics {
     this.handOff = null;
     this.unbindSkip = null;
     this.afterEpilogue = null;
+    this.afterEnding = null;
     this.kind = null;
     this.eventBus.emit('cinematic-ended', { kind });
   }

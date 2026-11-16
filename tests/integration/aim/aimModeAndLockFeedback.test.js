@@ -447,6 +447,23 @@ describe('FIX-05 centerline invariant + toggles', () => {
       eventBus.emit('toggle-aim-mode', { screen: 'menu' });
       expect(combat.getAimMode()).toBe('auto');
     });
+
+    it('announces a toggle that changed a mode in play, and only that', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      const toggled = [];
+      eventBus.on('combat-mode-toggled', (payload) => toggled.push(payload));
+      eventBus.emit('toggle-aim-mode', { screen: 'menu' });
+      eventBus.emit('toggle-spread-mode', { screen: 'pause' });
+      combat.resetModeState();
+      expect(toggled).toEqual([]);
+
+      eventBus.emit('toggle-aim-mode', { screen: 'playing' });
+      eventBus.emit('toggle-spread-mode', { screen: 'playing' });
+      expect(toggled).toEqual([
+        { kind: 'aim', mode: 'manual' },
+        { kind: 'spread', mode: 'fan' },
+      ]);
+    });
   });
 
   describe('lock feedback state by targetingUpgradeLevel + aimMode', () => {

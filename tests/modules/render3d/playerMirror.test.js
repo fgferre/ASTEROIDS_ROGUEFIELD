@@ -235,6 +235,17 @@ describe('PlayerMirror', () => {
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
   });
 
+  it("blinks through a hit's invulnerability but holds steady through the win's", () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.invulnerableTimer = 1;
+    mirror.update(player, ribbons, 0.03);
+    expect(mirror.blink.value).toBeGreaterThan(0);
+
+    player.guardSteadily(9);
+    mirror.update(player, ribbons, 0.03);
+    expect(mirror.blink.value).toBe(0);
+  });
+
   it('draws no afterimage dropped while Blink hides the ship', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const hidden = { x: 100, y: 300, angle: 0, age: 0 };
