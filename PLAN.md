@@ -1,3 +1,49 @@
+# Pilotagem e tiro como cartas — frente 2 do ramo `jogo/pilotagem` (16/11/2026)
+
+O dono escolheu, jogando, a direção nova (cartão `quadro/cartoes/pilotagem.html`, letra E): a partida começa no
+clássico com deslize e com o tiro saindo do nariz; a mira automática vira carta; as cartas de pilotagem levam a uma
+carta final que libera o voo moderno, com uma tela de aviso que espera o Enter (_"um pequeno tutorialzinho na tela"_).
+Deslize sem carta de freio: _"Está no ponto"_. Este ramo é o tronco da direção: as outras conversas partem dele;
+mantenha-o jogável e guardado (`git push -u origin jogo/pilotagem`). O que é de outras conversas (quadro, seção 3A):
+cartas no geral (ordem, famílias, as que dependem da mira automática, como Targeting Matrix), avisos na tela, piloto
+automático de teste, equilíbrio. Notou algo nelas: uma linha para a coordenadora, não resolva.
+
+Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avisar; a partida gravada dos testes
+(golden trace) não se regrava aqui; nada de rebalancear inimigos, chefes ou curva.
+
+## O que já existe (commits 12053f38 e 4e1e1435)
+
+- `?flight=glide` (`PlayerFlight.glide`, `src/modules/player/flight.js`; números em `src/data/constants/physics.js`,
+  bloco GLIDE): sem freio automático, arrasto 0,35/s, aceleração ×0,7, teto ×0,6 (132 px/s), ré clássica ×0,5; sem o
+  empurrão do tiro na nave (`PlayerSystem`, `weapon-fired`). A Braking System já age no deslize: o arrasto dela soma
+  só ao soltar (nível 3: para em 0,75 s). RCS e Main Thrusters já agem (empuxo e teto).
+- `?aim=nose` (`PlayerSystem.noseAim`): canhão preso ao nariz (`updateTurret`), sem mira por stick
+  (`getAimStick`), e o `CombatSystem` segura o modo de mira manual que já existia (sem a tecla T voltar para o auto).
+- `?controls=classic` já existia (`resolveControlScheme`). O E é a soma dos três links.
+- Medidas (A/B hoje × C/D/E): máxima 88 × 132 px/s; soltar até parar 0,4 s × 7,4 s (nível 3: 0,25 × 0,75 s).
+
+## Passos (em ordem; marque [x])
+
+1. [ ] Um jeito de começar a partida na direção nova sem os três links: um só parâmetro (por exemplo
+   `?direcao=nova`) que liga os três estados no início de cada partida e os devolve a cada partida nova (hoje são
+   lidos só no construtor). Sem o parâmetro, nada muda.
+2. [ ] Carta nova da mira automática: ao pegar, `noseAim` desliga e o `CombatSystem` volta ao modo auto. Só aparece
+   na direção nova: as cartas só conhecem pré-requisitos de nível e de carta (`src/modules/upgradePrerequisites.js`);
+   é preciso um pré-requisito de "direção nova", ou outra forma de tirar a carta do sorteio do jeito de hoje.
+3. [ ] Carta final do voo moderno: exige o fim das cartas de pilotagem (proposta: Braking System 3 e RCS System 3;
+   número de equilíbrio, mostre ao dono). Ao pegar, a tela de aviso explica as teclas novas e espera o Enter; só
+   então `controlScheme` vira 'modern' e `flight.glide` desliga.
+4. [ ] Freio, agilidade e motor refeitos para o deslize: textos que digam o que fazem no deslize (frear ao soltar;
+   o freio de emergência como a parada rápida); o RCS também acelera o giro no clássico (hoje só o empuxo). Os
+   textos só mudam na direção nova enquanto o padrão for o de hoje.
+5. [ ] Visual do canhão no nariz e a hora em que vira torre (o dono notou que o canhão deitado sobre o nariz parece
+   levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
+6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
+   pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
+   não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
+7. [ ] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
+8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
+
 # Modernização do Asteroid Roguefield — plano (12/11/2026)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; o que fecha
