@@ -111,6 +111,16 @@ class EnemyDamageSystem {
     }
 
     if (killed) {
+      // A machine's death already set `destroyed` (RecipeEnemy.onDestroyed),
+      // so destroyAsteroid returns early: its kill is counted here instead.
+      // A boss counts its own (EnemyBossSystem).
+      if (
+        asteroid.destroyed &&
+        asteroid.type !== 'boss' &&
+        this.context.sessionStats
+      ) {
+        this.context.sessionStats.totalKills += 1;
+      }
       const fragments = this.destroyAsteroid(asteroid, {
         cause,
         createFragments: options.createFragments !== false,
