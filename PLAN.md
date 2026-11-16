@@ -54,10 +54,10 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
        leque a 0,55 e as chamas paradas no tamanho do nível 2 (×0,7 encurtaria o nível 3 abaixo do 2); clarão do motor
        na cor do casco e o espelho repinta quando só a cor muda; chama de freio no deslize com a Braking System.
 7. [x] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
-   Cartas de pilotagem (resposta dele, 16/11: quase não apareceram, a Auto Turret nunca): medido em 2000 partidas,
-   só 1 oferta em 4 trazia uma; a carta final saía em 2 de 100 até o nível 25. No link, a cada dois níveis uma vaga
-   da oferta é de pilotagem (`UPGRADE_PILOT_OFFER_EVERY`, como a vaga de arma): Auto Turret por volta do nível 2,
-   Flight Computer por volta do 18 para quem caça. Provisório, no cartão `pilotagem-canhao`.
+       Cartas de pilotagem (resposta dele, 16/11: quase não apareceram, a Auto Turret nunca): medido em 2000 partidas,
+       só 1 oferta em 4 trazia uma; a carta final saía em 2 de 100 até o nível 25. No link, a cada dois níveis uma vaga
+       da oferta é de pilotagem (`UPGRADE_PILOT_OFFER_EVERY`, como a vaga de arma): Auto Turret por volta do nível 2,
+       Flight Computer por volta do 18 para quem caça. Provisório, no cartão `pilotagem-canhao`.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
 # Modernização do Asteroid Roguefield — plano (12/11/2026)
