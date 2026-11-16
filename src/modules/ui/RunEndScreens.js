@@ -79,7 +79,7 @@ function runNumbers(data, outcome) {
 
 export class RunEndScreens {
   /**
-   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
+   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn, quitBtn, hints }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
    * A sector run's screens (`data.sector`, runEnd.js) speak of its chapter.
    * `showScreen(name, options)`: shows the gameover or victory overlay.
    * `progression()`: the progression service (the build), or none.
@@ -107,7 +107,7 @@ export class RunEndScreens {
     this.hangar = hangar;
     this.lastTransmission = lastTransmission;
     this.cinematics = cinematics;
-    this.victoryLockoutTimer = null;
+    this.lockoutTimer = null;
     this.bestAtStart = 0;
     // A `?replay=` run ('game-started'): it never opens the choice.
     this.replay = false;
@@ -235,7 +235,29 @@ export class RunEndScreens {
     });
     refs.seed.textContent = this.difficulty().runLabel();
     refs.copySeedBtn.textContent = 'Copy seed link';
-    refs.restartBtn?.focus({ preventScroll: true });
+    // The run's retry, while it's left, comes first: the bright look, the
+    // ⏎ / A hint, and the focus once the buttons wake after the lockout, so
+    // a key held through the death neither spends it nor starts a new run.
+    // A retry spent stays off.
+    const { retryBtn, restartBtn, quitBtn } = refs;
+    const primary = retryBtn && !retryBtn.disabled ? retryBtn : restartBtn;
+    [restartBtn, retryBtn].forEach((button) =>
+      button?.classList.toggle('end-btn--primary', button === primary)
+    );
+    primary?.prepend(...refs.hints);
+    const buttons = [restartBtn, retryBtn, quitBtn].filter(
+      (button) => button && !button.disabled
+    );
+    buttons.forEach((button) => {
+      button.disabled = true;
+    });
+    clearTimeout(this.lockoutTimer);
+    this.lockoutTimer = setTimeout(() => {
+      buttons.forEach((button) => {
+        button.disabled = false;
+      });
+      primary?.focus({ preventScroll: true });
+    }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
   /**
@@ -309,8 +331,8 @@ export class RunEndScreens {
     buttons.forEach((button) => {
       if (button) button.disabled = true;
     });
-    clearTimeout(this.victoryLockoutTimer);
-    this.victoryLockoutTimer = setTimeout(() => {
+    clearTimeout(this.lockoutTimer);
+    this.lockoutTimer = setTimeout(() => {
       buttons.forEach((button) => {
         if (button) button.disabled = false;
       });
@@ -339,8 +361,8 @@ export class RunEndScreens {
     buttons.forEach((button) => {
       button.disabled = true;
     });
-    clearTimeout(this.victoryLockoutTimer);
-    this.victoryLockoutTimer = setTimeout(() => {
+    clearTimeout(this.lockoutTimer);
+    this.lockoutTimer = setTimeout(() => {
       buttons.forEach((button) => {
         button.disabled = false;
       });

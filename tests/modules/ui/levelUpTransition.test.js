@@ -231,6 +231,39 @@ describe('Level-up card transition', () => {
       expect(cards[0].classes.has('is-focused')).toBe(false);
       expect(document.activeElement).toBe(cards[1]);
     });
+
+    it('a card key badge picks that card as a click would: locked, then taken, then banished', () => {
+      let onKey;
+      document.addEventListener = (name, fn) => {
+        if (name === 'keydown') onKey = fn;
+      };
+      const progression = {
+        applyUpgrade: vi.fn(() => false),
+        banishUpgrade: vi.fn(),
+      };
+      const levelUp = new LevelUpScreen({
+        refs: {},
+        progression: () => progression,
+      });
+      levelUp.bindLevelUpControls();
+      Object.assign(levelUp.levelUpState, {
+        isVisible: true,
+        buttons: ['a', 'b', 'c'].map((id) => fakeNode(undefined, id)),
+        lockedUntil: Date.now() + 1,
+      });
+      const press = (key) => onKey({ key, preventDefault() {} });
+
+      press('2');
+      expect(progression.applyUpgrade).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      press('2');
+      expect(progression.applyUpgrade).toHaveBeenCalledWith('b');
+      levelUp.setBanishMode(true);
+      press('3');
+      press('4');
+      expect(progression.banishUpgrade).toHaveBeenCalledTimes(1);
+      expect(progression.banishUpgrade).toHaveBeenCalledWith('c');
+    });
   });
 });
 

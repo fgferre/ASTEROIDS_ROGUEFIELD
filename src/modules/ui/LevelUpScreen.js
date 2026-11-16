@@ -19,7 +19,7 @@ import {
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
 
-// Level-up cards and the victory buttons ignore input this long after showing.
+// Level-up cards and the run end's buttons ignore input this long after showing.
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
 // The picks that set the run's direction get their own strip.
 const FIRST_PICKS = ['First pick', 'Second pick', 'Third pick'];
@@ -112,11 +112,16 @@ export class LevelUpScreen {
     banishBtn?.addEventListener('click', () => this.toggleBanishMode());
     equipBtn?.addEventListener('click', () => this.equipForMe());
 
+    // A card's key badge (1, 2, 3) picks it as a click on it would.
     document.addEventListener('keydown', (event) => {
       if (!this.levelUpState.isVisible || event.repeat) {
         return;
       }
-      if (event.code === 'KeyR') {
+      const card = this.levelUpState.buttons[Number(event.key) - 1];
+      if (card) {
+        event.preventDefault();
+        this.selectUpgrade(card.dataset.upgradeId);
+      } else if (event.code === 'KeyR') {
         this.rerollLevelUpOptions();
       } else if (event.code === 'KeyB') {
         this.toggleBanishMode();

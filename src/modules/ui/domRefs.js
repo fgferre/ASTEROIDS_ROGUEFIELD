@@ -44,6 +44,8 @@ export function cacheStaticNodes() {
       retryBtn: document.getElementById('retry-game-btn') || null,
       restartBtn: document.getElementById('restart-game-btn') || null,
       quitBtn: document.getElementById('quit-game-btn') || null,
+      // The ⏎ / A hint, on the button the screen focuses.
+      hints: [...document.querySelectorAll('#restart-game-btn kbd')],
     },
     victory: {
       body: document.getElementById('victory-body') || null,
