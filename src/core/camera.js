@@ -295,8 +295,8 @@ export function createCamera({
     },
 
     /**
-     * A game event for the director: 'cleared', 'waveStart', 'elite' (with
-     * where it spawned), 'telegraph' or 'bossArrival'.
+     * A game event for the director: 'cleared', 'waveStart', 'elite' or
+     * 'telegraph' (with where it comes from), or 'bossArrival'.
      */
     trigger(kind, target) {
       if (enabled && mode === 'dynamic') director.trigger(kind, target);

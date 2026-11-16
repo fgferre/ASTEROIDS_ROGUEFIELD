@@ -6,8 +6,9 @@
 // orbs), when something about to hit is off the near shot (it opens before
 // it arrives), when enemies close in from several sides, when the ship is
 // about to cross an edge, when a boss is off the near shot, and for short
-// looks (a wave starting, an elite out of sight, a boss's announced attack,
-// a boss arriving). Once open it stays open a while. The ship is always on
+// looks (a wave starting, an elite or an announced attack out of sight, a
+// boss arriving). A look lasts its own time; a danger keeps the view open a
+// while after it is gone. The ship is always on
 // screen, except in the live scene of a Warden's entrance: low and moving,
 // it follows the shot in the Warden's own recipe while the Warden flies in
 // (enemies/boss/arrival.js) and hands back to the play view the moment it
@@ -317,10 +318,16 @@ export function createDirector({
     goal.yaw = side * (90 + along(shot.turn)) * DEG;
   }
 
-  function wantsWide(scene) {
-    if (clearedFor > 0 && orbsLeft(scene)) return true;
-    if (glanceFor > 0) return true;
-    return threatOffNear(scene) || surrounded(scene) || edgeAhead(scene);
+  // A look (a glance, a cleared wave's orbs) is wide for its own time.
+  function looking(scene) {
+    return glanceFor > 0 || (clearedFor > 0 && orbsLeft(scene));
+  }
+
+  // How long a danger keeps the view open after it is gone: a threat may
+  // come back (wideHold), an edge crossing is over once crossed (edgeHold).
+  function holdFor(scene) {
+    if (threatOffNear(scene) || surrounded(scene)) return T.wideHold;
+    return edgeAhead(scene) ? T.edgeHold : 0;
   }
 
   // 1 when nothing threatens close by, fading to 0 as something nears.
@@ -410,8 +417,9 @@ export function createDirector({
 
     /**
      * A game event: 'cleared' (a wave's end: open for its orbs), or a short
-     * wide look: 'waveStart', 'elite' (only when `target` is off the near
-     * shot), 'telegraph' (a boss's announced attack), 'bossArrival'.
+     * wide look: 'waveStart', 'elite', 'telegraph' (an announced attack),
+     * 'bossArrival'. A look at a `target` already in the near shot is
+     * skipped.
      */
     trigger(kind, target = null) {
       if (kind === 'cleared') {
@@ -420,8 +428,8 @@ export function createDirector({
       }
       const seconds = T.glance[kind];
       if (seconds === undefined) return;
-      if (kind === 'elite' && target) {
-        if (onScreen(near, nearAngles, target.x, target.y, SHOWN)) return;
+      if (target && onScreen(near, nearAngles, target.x, target.y, SHOWN)) {
+        return;
       }
       glanceFor = Math.max(glanceFor, seconds);
     },
@@ -444,7 +452,8 @@ export function createDirector({
 
     /**
      * The shot this frame for `scene` (with a ship). `zoomPulse` scales how
-     * close the near shot is (the dash, brake and level-up kicks).
+     * close the settled shot is, near or wide (the dash, brake and level-up
+     * kicks); not a Warden's entrance.
      */
     update(scene, dt, zoomPulse = 1) {
       const step = Math.max(0, dt);
@@ -462,9 +471,8 @@ export function createDirector({
       } else if (forced) {
         state = forced;
       } else {
-        if (wantsWide(scene)) wideFor = T.wideHold;
-        else wideFor = Math.max(0, wideFor - step);
-        state = wideFor > 0 ? 'wide' : 'near';
+        wideFor = Math.max(wideFor - step, holdFor(scene));
+        state = looking(scene) || wideFor > 0 ? 'wide' : 'near';
       }
       if (before === 'arrival' && !warden) handbackFor = T.arrival.handbackFor;
 
@@ -472,7 +480,7 @@ export function createDirector({
       const live = state === 'arrival';
       goal.x = isWide ? wide.x : near.x;
       goal.y = isWide ? wide.y : near.y;
-      goal.distance = isWide ? wide.distance : near.distance / zoomPulse;
+      goal.distance = isWide ? wide.distance : near.distance;
       goal.tilt = isWide ? wideAngles.tilt : nearAngles.tilt;
       goal.yaw = 0;
       if (live) frameArrival(warden);
@@ -547,7 +555,7 @@ export function createDirector({
 
       pose.x = px.value + driftX;
       pose.y = py.value + driftY;
-      pose.distance = dist.value;
+      pose.distance = live ? dist.value : dist.value / zoomPulse;
       pose.tilt = tilt.value;
       pose.yaw = yaw.value;
       pose.roll = lean;

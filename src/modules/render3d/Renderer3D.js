@@ -246,8 +246,9 @@ class Renderer3D extends BaseSystem {
         this.three?.veil.flare(x - HALF_W, y - HALF_H, PALETTE.threat);
       }
     });
-    this.registerEventListener('boss-telegraph', () => {
-      this.camera.trigger('telegraph');
+    // A look at an announced attack, only when its source is out of sight.
+    this.registerEventListener('boss-telegraph', (payload) => {
+      this.camera.trigger('telegraph', payload?.enemy);
     });
     // A boss falling mid-run: a short push from above.
     this.registerEventListener('boss-defeated', () => {
@@ -448,7 +449,7 @@ class Renderer3D extends BaseSystem {
     if (!warden || this.failed || this.camera.mode !== 'dynamic') {
       return false;
     }
-    this.camera.trigger('bossArrival', warden);
+    this.camera.trigger('bossArrival');
     return !this.reducedMotion;
   }
 

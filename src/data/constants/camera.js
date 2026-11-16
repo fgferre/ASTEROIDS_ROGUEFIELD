@@ -20,13 +20,18 @@ export const CAMERA_DIRECTOR = deepFreeze({
   // `margin` is the share of the screen kept free around the field.
   wide: { tilt: 5, margin: 0.05 },
 
-  // How long the wide view stays at least once open, and at most for the
-  // orbs of a cleared wave (it closes earlier when they are all collected).
+  // How long the wide view stays open after a threat or a crowd is gone
+  // (it may come back), and at most for the orbs of a cleared wave (it
+  // closes as soon as they are all collected).
   wideHold: 3,
   clearedHold: 5,
-  // Short wide looks: a wave starting, an elite out of sight, a boss's
-  // announced attack, a boss arriving (until the live scene exists).
+  // Short wide looks, each wide for just its own time: a wave starting, an
+  // elite or an announced attack out of sight, a boss arriving (until the
+  // live scene exists).
   glance: { waveStart: 2, elite: 2.5, telegraph: 2, bossArrival: 3 },
+  // proposta 15/11: how long the wide view stays open once the ship has
+  // crossed an edge (or turned away from it); the owner's play decides.
+  edgeHold: 0.6,
 
   // What opens the wide view during play: something that will hit within
   // `threatHorizon` s is off the near shot (so it opens before it arrives);

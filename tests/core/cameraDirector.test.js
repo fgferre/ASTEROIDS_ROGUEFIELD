@@ -152,6 +152,40 @@ describe('camera director', () => {
     expect(d.moment).toBe('wide');
   });
 
+  it('closes soon after the ship has crossed the edge', () => {
+    const d = director();
+    run(d, scene(600, 300), 3);
+    d.update(scene(720, 300, { vx: 260 }), DT);
+    // Wrapped to the far side, flying on away from the edge it left.
+    run(d, scene(20, 300, { vx: 260 }), T.edgeHold - 0.1);
+    expect(d.moment).toBe('wide');
+    run(d, scene(60, 300, { vx: 260 }), 0.2);
+    expect(d.moment).toBe('near');
+  });
+
+  it('a zoom pulse reaches its size at once, near and wide, and keeps the follow', () => {
+    for (const forced of ['near', 'wide']) {
+      const d = director();
+      d.force(forced);
+      const settled = run(d, scene(400, 300), 3).distance;
+      expect(d.update(scene(400, 300), DT, 1.1).distance, forced).toBeCloseTo(
+        settled / 1.1,
+        3
+      );
+    }
+    // The ship on the move: the shot follows it the same with a pulse on.
+    const plain = director();
+    const pulsed = director();
+    let x = 200;
+    for (const d of [plain, pulsed]) run(d, scene(x, 300, { vx: 160 }), 1);
+    for (let t = 0; t < 1; t += DT) {
+      x += 160 * DT;
+      const a = plain.update(scene(x, 300, { vx: 160 }), DT);
+      const b = pulsed.update(scene(x, 300, { vx: 160 }), DT, 0.94);
+      expect(Math.abs(a.x - b.x)).toBeLessThan(1);
+    }
+  });
+
   it('opens when a boss is off the near shot', () => {
     const d = director();
     run(d, scene(100, 300), 3);
@@ -160,15 +194,38 @@ describe('camera director', () => {
     expect(d.moment).toBe('wide');
   });
 
-  it('stays wide at least a while, then eases back near', () => {
+  it('a look is wide for its own time, then eases back near', () => {
     const d = director();
     run(d, scene(400, 300), 2);
     d.trigger('waveStart');
-    run(d, scene(400, 300), T.glance.waveStart + T.wideHold - 0.2);
+    run(d, scene(400, 300), T.glance.waveStart - 0.1);
     expect(d.moment).toBe('wide');
-    const pose = run(d, scene(400, 300), 3);
+    run(d, scene(400, 300), 0.2);
     expect(d.moment).toBe('near');
+    const pose = run(d, scene(400, 300), 3);
     expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+  });
+
+  it('a threat keeps the view open a while after it is gone', () => {
+    const d = director();
+    run(d, scene(100, 300), 3);
+    const boss = { type: 'boss', x: 720, y: 300, radius: 80 };
+    run(d, scene(100, 300, { enemies: [boss] }), 0.5);
+    run(d, scene(100, 300), T.wideHold - 0.2);
+    expect(d.moment).toBe('wide');
+    run(d, scene(100, 300), 0.4);
+    expect(d.moment).toBe('near');
+  });
+
+  it('looks at an announced attack only when it comes from out of sight', () => {
+    const d = director();
+    run(d, scene(400, 300), 2);
+    d.trigger('telegraph', { x: 440, y: 300 });
+    d.update(scene(400, 300), DT);
+    expect(d.moment).toBe('near');
+    d.trigger('telegraph', { x: 790, y: 20 });
+    d.update(scene(400, 300), DT);
+    expect(d.moment).toBe('wide');
   });
 
   it('opens for the orbs of a cleared wave and closes once they are taken', () => {
