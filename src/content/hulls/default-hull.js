@@ -59,6 +59,8 @@ const visual = {
   ],
   nozzleLength: 0.14 * S,
   nozzleLengthPerLevel: 0.025 * S,
+  // main flame proportions (playerMirror.js, maquete 16/11): the twin flame as it was
+  flame: { length: 1, width: 1 },
   retroPorts: [pt(0.3, -0.21), pt(0.3, 0.21)],
   cockpit: { from: pt(0.4, 0), to: pt(0.66, 0), width: 0.07 * S },
   // layered plates: a needle prow, armoured shoulders and a vented spine,
@@ -96,11 +98,16 @@ export default {
     { x: -SHIP_SIZE / 2, y: SHIP_SIZE / 2 },
   ],
   shieldPadding: 12,
+  // Logical units: the 3D hull's own points × VISUAL_SCALE (render3d/hullModel.js),
+  // so the sparks leave the drawn ports; left/right are the aft wingtip jets,
+  // noseLeft/noseRight the nose jets of the turn couple.
   thrusterPorts: {
     main: { x: -SHIP_SIZE * 0.95, y: 0 },
     aux: { x: SHIP_SIZE * 0.95, y: 0 },
-    left: { x: 0, y: -SHIP_SIZE * 0.95 },
-    right: { x: 0, y: SHIP_SIZE * 0.95 },
+    left: { x: -SHIP_SIZE * 0.81, y: -SHIP_SIZE * 0.86 },
+    right: { x: -SHIP_SIZE * 0.81, y: SHIP_SIZE * 0.86 },
+    noseLeft: { x: SHIP_SIZE * 0.81, y: -SHIP_SIZE * 0.16 },
+    noseRight: { x: SHIP_SIZE * 0.81, y: SHIP_SIZE * 0.16 },
   },
   stats: {
     acceleration: 1,

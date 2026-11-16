@@ -21,6 +21,14 @@ const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 // Thruster embers keep their lifetimes.
 const XP_SPARK_LIFE_SCALE = 1.5; // was 1
 
+// Finer thruster sparks (proposta 15/11, judged by playing): the size factor
+// of the main engine's and the other jets' sparks (were 1.5 and 1), and the
+// main engine's count at thruster level 5 and 3 (were 4.0 and 2.5).
+const MAIN_SPARK_SIZE = 0.7;
+const JET_SPARK_SIZE = 0.5;
+const MAIN_SPARKS_ULTRA = 2.2;
+const MAIN_SPARKS_PLASMA = 1.6;
+
 export class PlayerEffects {
   /**
    * `particleEffects`: the effects' Particles; every particle lands in its list, and its shockwaves, hit markers and muzzle-flash queue are used directly.
@@ -89,7 +97,8 @@ export class PlayerEffects {
       data.direction.y,
       data.intensity,
       data.type,
-      data.visualLevel || 0
+      data.visualLevel || 0,
+      PALETTE[data.accent]
     );
 
     if (
@@ -171,7 +180,8 @@ export class PlayerEffects {
     dirY,
     intensity = 1,
     type = 'main',
-    visualLevel = 0
+    visualLevel = 0,
+    accent = PALETTE.player
   ) {
     if (this.particleDensity() < 0.1) return; // Optimization
 
@@ -190,14 +200,14 @@ export class PlayerEffects {
     if (type === 'main') {
       if (visualLevel >= 5) {
         // ULTRA AFTERBURNER
-        countMultiplier = 4.0; // Huge density
+        countMultiplier = MAIN_SPARKS_ULTRA;
         speedMultiplier = 2.5; // Very fast jets
         spreadFactor = 0.3; // Tight focused beam
         lifeMultiplier = 0.6; // Short intense life
         colorPalette = 'neon';
       } else if (visualLevel >= 3) {
         // PLASMA JET
-        countMultiplier = 2.5;
+        countMultiplier = MAIN_SPARKS_PLASMA;
         speedMultiplier = 1.8;
         spreadFactor = 0.6;
         colorPalette = 'blue';
@@ -254,15 +264,16 @@ export class PlayerEffects {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
-      // One light, the player's (docs/NORTE.md §2): white-hot core, cyan
-      // body, dimmer cyan tail. Upgrade tiers change count, speed and
-      // spread above, not the hue.
+      // One light, the player's (docs/NORTE.md §2): white-hot core, a body
+      // in the hull's accent (cyan, amber on Solar Slicer and Bastion),
+      // dimmer tail. Upgrade tiers change count, speed and spread above, not
+      // the hue.
       let color;
       const t = this.randomFloat(thrusterFork);
       const hot = colorPalette === 'neon' ? 0.6 : 0.8;
       if (t > hot) color = PALETTE.text;
-      else if (t > 0.35) color = PALETTE.player;
-      else color = withAlpha(PALETTE.player, 0.55);
+      else if (t > 0.35) color = accent;
+      else color = withAlpha(accent, 0.55);
 
       this.particleEffects.particles.push(
         this.createParticle(
@@ -272,7 +283,7 @@ export class PlayerEffects {
           vy + (this.randomFloat(thrusterFork) - 0.5) * 10,
           color,
           (1.5 + this.randomFloat(thrusterFork) * 2) *
-            (type === 'main' ? 1.5 : 1), // Size
+            (type === 'main' ? MAIN_SPARK_SIZE : JET_SPARK_SIZE), // Size
           (0.2 + this.randomFloat(thrusterFork) * 0.3) * lifeMultiplier, // Life
           'thruster'
         )

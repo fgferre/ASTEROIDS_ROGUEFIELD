@@ -183,6 +183,7 @@ class PlayerSystem extends BaseSystem {
       getThrusterPort: (kind) => getHullThrusterPort(kind, this.currentHull),
       getLocalToWorld: (x, y) => this.getLocalToWorld(x, y),
       getLocalDirection: (dx, dy) => this.getLocalDirection(dx, dy),
+      getAccent: () => this.currentHull.visual.accent,
     });
     exposeFields(this, this.thrusters, ['lastThrusterState', 'thrusterVisual']);
 
@@ -958,12 +959,7 @@ class PlayerSystem extends BaseSystem {
     this.maneuvers.resetDashState();
 
     // Reset thruster state to stop any active sounds
-    this.thrusters.lastThrusterState = {
-      main: 0,
-      aux: 0,
-      sideL: 0,
-      sideR: 0,
-    };
+    this.thrusters.resetState();
 
     // Give invulnerability
     this.invulnerableTimer = invulnerabilityDuration;

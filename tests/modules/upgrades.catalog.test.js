@@ -184,6 +184,20 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     expect(rock.health).toBe(100 - 12);
   });
 
+  it('Cinder Trail and Ion Trail: the coast brake on the main engine drops no trail', () => {
+    const { combat, eventBus } = makeCombat();
+    takeCard(eventBus, 'cinder_trail', 2);
+    takeCard(eventBus, 'propulsors', 5);
+    eventBus.emit('thruster-effect', {
+      type: 'main',
+      intensity: 1,
+      isAutomatic: true,
+      position: { x: 205, y: 300 },
+    });
+    expect(combat.cards.cinders).toHaveLength(0);
+    expect(combat.cards.ions).toHaveLength(0);
+  });
+
   it('Main Thrusters 5: the ion trail hurts machines it touches, half on bosses, never rocks', () => {
     const drone = makeEnemy('drone', 200, 300);
     const boss = makeEnemy('boss', 230, 300, { type: 'boss' });

@@ -31,6 +31,14 @@ const DRIFT_SETTINGS = {
   brakeReduction: 0.4,
 };
 
+// Shown thrust only (proposta 15/11, the owner judges by playing): in the
+// modern scheme the main flame is full within ~50° of the move, and the
+// retro shows this much of a straight reversal.
+const SHOWN_MAIN_GAIN = 1.6;
+const SHOWN_RETRO_SHARE = 0.7;
+
+const clamp01 = (value) => Math.max(0, Math.min(1, value));
+
 // The same heading within -π..π (the player's angles and the turret's).
 export function wrapAngle(angle) {
   while (angle > Math.PI) angle -= Math.PI * 2;
@@ -82,14 +90,14 @@ export class PlayerFlight {
 
     const move = modern ? getModernMove(input) : null;
 
-    // Thruster intensities (lógica do original)
+    // The thrusters' forces (lógica do original); what they show is at the end.
     let thrMain = input.up ? 1 : 0;
     let thrAux = input.down ? 1 : 0;
     // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
     let thrSideR = input.left ? 1 : 0; // CCW torque
     let thrSideL = input.right ? 1 : 0; // CW torque
     if (modern) {
-      // Main flame while moving (the hull turns onto the motion); side puffs
+      // Main push while moving (the hull turns onto the motion); side push
       // on the part of the move off the nose.
       const lateral = move ? move.x * right.x + move.y * right.y : 0;
       thrMain = move ? 1 : 0;
@@ -98,11 +106,9 @@ export class PlayerFlight {
       thrSideR = Math.max(0, -lateral);
     }
 
-    // Track if thrusters are manually controlled (for audio distinction)
+    // The pilot's own thrust (the Reactor's idle bonus, the coast brake's arming).
     const isMainManual = modern ? Boolean(move) : input.up;
     const isAuxManual = !modern && input.down;
-    // Classic sides only turn on A/D; modern ones damp the drift without a move.
-    const isSideManual = !modern || Boolean(move);
     const noManualThrust = !isMainManual && !isAuxManual;
     const dashing = this.maneuvers.dashTimer > 0;
     // RCS System: under thrust, push and drag both scale, so the same top
@@ -121,6 +127,8 @@ export class PlayerFlight {
     // Auto-brake quando não há input linear
     const noLinearInput = modern ? !move : !input.up && !input.down;
     const speed = Math.hypot(this.ship.velocity.vx, this.ship.velocity.vy);
+    const velocityAlongNose =
+      this.ship.velocity.vx * fwd.x + this.ship.velocity.vy * fwd.y;
 
     if (noLinearInput) {
       this.driftFactor = Math.min(
@@ -139,8 +147,7 @@ export class PlayerFlight {
 
     // Auto-damping thrusters (activate without manual input)
     if (noLinearInput && speed > 2) {
-      const proj =
-        this.ship.velocity.vx * fwd.x + this.ship.velocity.vy * fwd.y;
+      const proj = velocityAlongNose;
       const kBase = Math.max(
         0.35,
         Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8))
@@ -244,16 +251,41 @@ export class PlayerFlight {
       );
     }
 
-    // What the thrusters show and sound for this step.
+    // What the thrusters show and sound for this step (thrusters.js): what
+    // the pilot asked for, never the solver's corrections above.
+    let pilotMain = input.up ? 1 : 0;
+    let pilotAux = input.down ? 1 : 0;
+    let pilotTurn = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    if (modern) {
+      // Main flame once the nose is near the move, retro first on a reversal;
+      // the turn jets follow the nose's own swing.
+      const cos = move ? move.x * fwd.x + move.y * fwd.y : 0;
+      pilotMain = clamp01(cos * SHOWN_MAIN_GAIN);
+      pilotAux = clamp01(-cos) * SHOWN_RETRO_SHARE;
+      pilotTurn = move
+        ? Math.max(
+            -1,
+            Math.min(1, this.ship.angularVelocity / SHIP_HEADING_TURN_RATE)
+          )
+        : 0;
+    }
+    // The auto-brake, when it acts: + on the retro (moving nose-first), - on
+    // the main engine, as strong as the speed is near the top.
+    const coastBrake =
+      noLinearInput && speed > 2
+        ? (velocityAlongNose < 0 ? -1 : 1) *
+          clamp01(speed / (this.maxSpeed * 0.8))
+        : 0;
     return {
       fwd,
-      thrMain,
-      thrAux,
-      thrSideL,
-      thrSideR,
+      pilotMain,
+      pilotAux,
+      pilotTurn,
+      coastBrake,
+      speed,
+      dashing,
       isMainManual,
       isAuxManual,
-      isSideManual,
     };
   }
 

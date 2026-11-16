@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { TURRET_BARREL_LENGTH } from '../../../src/data/constants/physics.js';
+import {
+  SHIP_HEADING_TURN_RATE,
+  TURRET_BARREL_LENGTH,
+} from '../../../src/data/constants/physics.js';
 import {
   ALL_HULLS,
   bastion,
@@ -116,7 +119,9 @@ describe('PlayerMirror', () => {
 
   it('builds the Interceptor in plates, its wingtips following the RCS upgrade', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    const stock = mirror.puffs.map(({ puff }) => Math.abs(puff.position.z));
+    const stock = mirror.puffs
+      .filter(({ size }) => size === 1)
+      .map(({ puff }) => Math.abs(puff.position.z));
     expect(stock).toHaveLength(2);
     // lit leading edges, one per wing
     const edge = mirror.ship.children.find((child) => child.name === 'edge');
@@ -145,9 +150,13 @@ describe('PlayerMirror', () => {
         if (object.isMesh) meshes += 1;
         if (object.isLineSegments) lines += 1;
       });
-      // hull + canopy + per nozzle (throat, flame, core) + one puff per port
+      // hull + canopy + per nozzle (throat, flame, core) + one puff per
+      // wingtip port + the two nose jets + the two retro flames + the six
+      // sputter embers
       const { nozzles, rcsPorts } = mirror.geometry;
-      expect(meshes, hull.id).toBe(2 + 3 * nozzles.length + rcsPorts.length);
+      expect(meshes, hull.id).toBe(
+        2 + 3 * nozzles.length + rcsPorts.length + 2 + 2 + 6
+      );
       expect(lines, hull.id).toBeLessThanOrEqual(3);
     });
   });
@@ -177,28 +186,171 @@ describe('PlayerMirror', () => {
     expect(mirror.shieldRadius).toBeGreaterThan(0);
   });
 
-  it('lights the side puff on the strafing flank only', () => {
+  it('lights the turn couple: a nose swinging to starboard shows the starboard wingtip and the port nose jet', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.thrusterVisual.sideL = 1;
-    player.lastThrusterState.sideL = 1;
+    player.lastThrusterState.turnR = 1;
     mirror.update(player, ribbons, 0);
-    const shown = mirror.puffs.filter(({ puff }) => puff.visible);
-    expect(shown.map(({ left }) => left)).toEqual([true]);
+    const shown = mirror.puffs
+      .filter(({ puff }) => puff.visible)
+      .map(({ puff }) => ({
+        fore: puff.position.x > 0,
+        starboard: puff.position.z > 0,
+      }));
+    expect(shown).toEqual(
+      expect.arrayContaining([
+        { fore: false, starboard: true },
+        { fore: true, starboard: false },
+      ])
+    );
+    expect(shown).toHaveLength(2);
   });
 
-  it('banks into a held strafe up to 22°, then relaxes level', () => {
+  it('lights the mirrored couple on a port turn, with a twin needle from RCS level 3', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const turnLeft = (level) => {
+      player.thrusters.rcsVisualLevel = level;
+      player.lastThrusterState.turnL = 1;
+      mirror.update(player, ribbons, 0);
+      return mirror.puffs.filter(({ puff }) => puff.visible);
+    };
+    const stock = turnLeft(0);
+    expect(
+      stock.map(({ puff }) => ({
+        fore: puff.position.x > 0,
+        starboard: puff.position.z > 0,
+      }))
+    ).toEqual(
+      expect.arrayContaining([
+        { fore: false, starboard: false },
+        { fore: true, starboard: true },
+      ])
+    );
+    expect(stock).toHaveLength(2);
+    expect(stock.every(({ twin }) => twin === null)).toBe(true);
+
+    const upgraded = turnLeft(3);
+    expect(upgraded).toHaveLength(2);
+    expect(upgraded.every(({ twin }) => twin.visible)).toBe(true);
+  });
+
+  it('makes the main flame longer and tighter per Propulsors level, with pressure diamonds only at 5', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const flames = [0, 1, 3, 5].map((level) => {
+      player.thrusters.thrusterVisualLevel = level;
+      mirror.update(player, ribbons, 0);
+      mirror.lightEngines(1, level, 0);
+      const { flame, shocks } = mirror.flames[0];
+      return { length: flame.scale.x, width: flame.scale.y, shocks };
+    });
+    for (let i = 1; i < flames.length; i += 1) {
+      expect(flames[i].length).toBeGreaterThan(flames[i - 1].length);
+      expect(flames[i].width).toBeLessThan(flames[i - 1].width);
+    }
+    expect(flames.map(({ shocks }) => shocks.length)).toEqual([0, 0, 0, 3]);
+    expect(flames[3].shocks.every((shock) => shock.visible)).toBe(true);
+  });
+
+  it('overshoots the flame leaving rest and settles at cruise', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const flameAt = (speed) => {
+      player.angle = 0;
+      player.velocity.vx = speed;
+      player.velocity.vy = 0;
+      player.enginesIdle = false;
+      player.lastThrusterState.main = 1;
+      for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
+      return mirror.flames[0].flame.scale.x;
+    };
+    const cruise = player.flight.acceleration / player.flight.baseLinearDamping;
+    expect(flameAt(0)).toBeGreaterThan(1.8 * flameAt(cruise));
+  });
+
+  it("shapes each hull's flame by its hull data", () => {
+    const flameOf = (hull) => {
+      const { mirror } = mirrorFor(hull);
+      mirror.lightEngines(1, 0, 0);
+      const { flame, r } = mirror.flames[0];
+      return { length: flame.scale.x, width: flame.scale.y / (r * 0.95) };
+    };
+    const stock = flameOf(defaultHull);
+    [defaultHull, solarSlicer, bastion].forEach((hull) => {
+      const { length, width } = flameOf(hull);
+      expect(length / stock.length, hull.id).toBeCloseTo(
+        hull.visual.flame.length,
+        6
+      );
+      expect(width, hull.id).toBeCloseTo(hull.visual.flame.width, 6);
+    });
+    expect(bastion.visual.flame.width).toBeGreaterThan(1);
+    expect(solarSlicer.visual.flame.length).toBeGreaterThan(1);
+  });
+
+  it('sputters and drops embers only under a third of the hull, also at rest', () => {
+    const { mirror } = mirrorFor(defaultHull);
+    const watch = (main, hull) => {
+      let cuts = 0;
+      let embers = 0;
+      for (let t = 0; t < 3; t += 1 / 60) {
+        mirror.lightEngines(main, 0, t, { hull });
+        if (main > 0 && !mirror.flames[0].flame.visible) cuts += 1;
+        embers += mirror.embers.filter((ember) => ember.visible).length;
+      }
+      return { cuts, embers };
+    };
+    expect(watch(1, 0.4)).toEqual({ cuts: 0, embers: 0 });
+    const failing = watch(1, 0.2);
+    expect(failing.cuts).toBeGreaterThan(0);
+    expect(failing.embers).toBeGreaterThan(0);
+    expect(watch(0, 0.2).embers).toBeGreaterThan(0);
+  });
+
+  it('lights the retro flames with the brake, longer and doubled with the Braking System', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const retrosAt = (level, aux) => {
+      player.thrusters.brakingVisualLevel = level;
+      player.lastThrusterState.aux = aux;
+      for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
+      return mirror.retros;
+    };
+    expect(retrosAt(0, 0).some(({ mesh }) => mesh.visible)).toBe(false);
+    const stock = retrosAt(0, 1);
+    expect(stock).toHaveLength(2);
+    expect(stock.every(({ mesh }) => mesh.visible)).toBe(true);
+    const stockLength = stock[0].mesh.scale.x;
+    const upgraded = retrosAt(2, 1);
+    expect(upgraded).toHaveLength(4);
+    expect(upgraded[0].mesh.scale.x).toBeGreaterThan(stockLength);
+  });
+
+  it('draws nothing at the engines of an idle ship on a full hull', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const engines = [
+      ...mirror.flames.flatMap(({ flame, core }) => [flame, core]),
+      ...mirror.embers,
+      ...mirror.puffs.map(({ puff }) => puff),
+      ...mirror.retros.map(({ mesh }) => mesh),
+    ];
+    for (let t = 0; t < 4; t += 0.1) {
+      mirror.update(player, ribbons, t);
+      expect(engines.filter((mesh) => mesh.visible)).toEqual([]);
+      expect(mirror.light.intensity).toBe(0);
+      expect(mirror.nozzleMaterial.color.r).toBeCloseTo(mirror.accent.r * 0.5);
+      expect(mirror.nozzleMaterial.color.b).toBeCloseTo(mirror.accent.b * 0.5);
+    }
+  });
+
+  it('banks into a full modern swing up to 22° plus the 8° of yaw, then relaxes level', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.controlScheme = 'modern';
-    player.angularVelocity = 0;
-    player.lastThrusterState.sideL = 1;
+    player.angularVelocity = SHIP_HEADING_TURN_RATE;
     let time = 0;
     for (let i = 0; i < 120; i += 1) {
       time += 1 / 60;
       mirror.update(player, ribbons, time);
     }
-    expect(mirror.group.rotation.x).toBeCloseTo((22 * Math.PI) / 180, 3);
+    expect(mirror.group.rotation.x).toBeCloseTo((30 * Math.PI) / 180, 3);
 
-    player.lastThrusterState.sideL = 0;
+    player.angularVelocity = 0;
     for (let i = 0; i < 120; i += 1) {
       time += 1 / 60;
       mirror.update(player, ribbons, time);
@@ -209,7 +361,6 @@ describe('PlayerMirror', () => {
   it('banks only on the yaw rate in classic controls', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.controlScheme = 'classic';
-    player.lastThrusterState.sideL = 1;
     player.angularVelocity = -100;
     let time = 0;
     for (let i = 0; i < 120; i += 1) {

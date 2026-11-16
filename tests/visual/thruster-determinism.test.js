@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PALETTE, withAlpha } from '../../src/data/constants/palette.js';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
 import { createSettingsStub } from '../__helpers__/stubs.js';
@@ -85,5 +86,24 @@ describe('HV-06: Thruster particle determinism', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("paints the sparks in the hull's accent the event carries, the hot core white", () => {
+    const { system } = createEffectsSystem('thruster-accent');
+    system.particles = [];
+    for (let i = 0; i < 20; i += 1) {
+      system.playerEffects.onThruster({
+        position: { x: 100, y: 200 },
+        direction: { x: 0, y: -1 },
+        intensity: 1,
+        type: 'main',
+        visualLevel: 5,
+        accent: 'shot',
+      });
+    }
+    const colors = new Set(system.particles.map((p) => p.color));
+    expect(colors).toEqual(
+      new Set([PALETTE.text, PALETTE.shot, withAlpha(PALETTE.shot, 0.55)])
+    );
   });
 });

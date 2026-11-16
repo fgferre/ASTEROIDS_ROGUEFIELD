@@ -65,6 +65,8 @@ const visual = {
   ],
   nozzleLength: 0.13 * S,
   nozzleLengthPerLevel: 0.025 * S,
+  // main flame proportions (playerMirror.js, maquete 16/11): wide, short, heavy
+  flame: { length: 0.75, width: 1.3 },
   retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
   cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
   // a blunt, slab-sided body on a flat belly, thick delta wings, armour
@@ -108,11 +110,16 @@ export default {
     { x: SHIP_SIZE * 0.42, y: SHIP_SIZE * 0.24 },
   ],
   shieldPadding: 14,
+  // Logical units: the 3D hull's own points × VISUAL_SCALE (render3d/hullModel.js),
+  // so the sparks leave the drawn ports; left/right are the aft wingtip jets,
+  // noseLeft/noseRight the nose jets of the turn couple.
   thrusterPorts: {
     main: { x: -SHIP_SIZE * 1.0, y: 0 },
     aux: { x: SHIP_SIZE * 1.0, y: 0 },
-    left: { x: -SHIP_SIZE * 0.62, y: -SHIP_SIZE * 0.82 },
-    right: { x: -SHIP_SIZE * 0.62, y: SHIP_SIZE * 0.82 },
+    left: { x: -SHIP_SIZE * 0.78, y: -SHIP_SIZE * 1.21 },
+    right: { x: -SHIP_SIZE * 0.78, y: SHIP_SIZE * 1.21 },
+    noseLeft: { x: SHIP_SIZE * 0.92, y: -SHIP_SIZE * 0.22 },
+    noseRight: { x: SHIP_SIZE * 0.92, y: SHIP_SIZE * 0.22 },
   },
   // proposta 18/10: the heavy hull also waits longer between dashes.
   stats: {

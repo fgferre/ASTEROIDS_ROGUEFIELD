@@ -6,13 +6,23 @@
 // the thruster, RCS and braking visual levels the cards raise. PlayerSystem
 // owns one and tells it each step's thrust.
 
+// Below this speed the coast brake disarms until the pilot thrusts again.
+const COAST_DISARM_SPEED = 12; // px/s
+// A jet under this share is off (proposta 16/11). The nose settles onto its
+// heading asymptotically, so the turn share never reaches zero by itself, and
+// a burning jet throws at least one spark a step: flying straight, the side
+// of the last turn sparked forever.
+const SHOWN_MIN = 0.08;
+const shown = (share) => (share >= SHOWN_MIN ? share : 0);
+
 export class PlayerThrusters {
   /**
    * `getEventBus()`: the player's event bus, read live; the thruster events go out on it.
    * `getShipPosition()`: the ship's position object itself; the stop events carry it.
-   * `getThrusterPort(kind)`: the current hull's port for 'main', 'aux', 'left' or 'right', in hull space.
+   * `getThrusterPort(kind)`: the current hull's port for 'main', 'aux', 'left' or 'right' (the aft wingtips), 'noseLeft' or 'noseRight', in hull space.
    * `getLocalToWorld(x, y)`: a hull-space point in the world, at the ship's position and angle now.
    * `getLocalDirection(dx, dy)`: a hull-space direction in the world, at the ship's angle now.
+   * `getAccent()`: the current hull's accent (a PALETTE key); the exhaust sparks take it.
    */
   constructor({
     getEventBus,
@@ -20,12 +30,14 @@ export class PlayerThrusters {
     getThrusterPort,
     getLocalToWorld,
     getLocalDirection,
+    getAccent,
   }) {
     this.getEventBus = getEventBus;
     this.getShipPosition = getShipPosition;
     this.getThrusterPort = getThrusterPort;
     this.getLocalToWorld = getLocalToWorld;
     this.getLocalDirection = getLocalDirection;
+    this.getAccent = getAccent;
 
     // === VISUAL UPGRADE LEVELS ===
     this.thrusterVisualLevel = 0;
@@ -33,102 +45,86 @@ export class PlayerThrusters {
     this.brakingVisualLevel = 0;
 
     // === THRUSTER STATE TRACKING (for audio) ===
-    this.lastThrusterState = {
-      main: 0,
-      aux: 0,
-      sideL: 0,
-      sideR: 0,
-    };
-    this.thrusterVisual = { main: 0, aux: 0, sideL: 0, sideR: 0 };
+    // What the thrusters show this step (0..1): the main engine, the retro,
+    // and the turn couple swinging the nose to port (turnL) or starboard (turnR).
+    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.thrusterVisual = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    // The coast brake shows only after the pilot's own thrust or a dash.
+    this.coastArmed = false;
   }
 
   // === EFEITOS DE THRUSTER ===
   // Emitir eventos SEMPRE (não só na mudança) para manter visuais funcionando
   // AudioSystem usa timeout de inatividade para detectar quando parar os loops
-  // `fwd`: the hull's nose, a unit vector; the rest is updateMovement's thrust.
+  // `step`: flight.js updateMovement's display fields. The thrusters show what
+  // the pilot asked for: idle, a shot's recoil or a knockback show nothing
+  // (the auto-brake still acts, silently); after the pilot's own thrust or a
+  // dash, coasting shows one brake jet along the nose that fades with speed.
   emitThrusterEffects({
     fwd,
-    thrMain,
-    thrAux,
-    thrSideL,
-    thrSideR,
+    pilotMain,
+    pilotAux,
+    pilotTurn,
+    coastBrake,
+    speed,
+    dashing,
     isMainManual,
     isAuxManual,
-    isSideManual,
   }) {
-    // Main thruster (forward)
-    if (thrMain > 0 || this.lastThrusterState.main > 0) {
-      const mainThrusterPort = this.getThrusterPort('main');
-      const thrusterPos = this.getLocalToWorld(
-        mainThrusterPort.x,
-        mainThrusterPort.y
-      );
-      this.getEventBus()?.emit?.('thruster-effect', {
-        position: thrusterPos,
-        direction: { x: fwd.x, y: fwd.y },
-        intensity: thrMain,
-        type: 'main',
-        visualLevel: this.thrusterVisualLevel,
-        isAutomatic: !isMainManual, // Flag para distinguir auto-damping de input manual
-      });
-      this.lastThrusterState.main = thrMain;
-    }
+    if (isMainManual || isAuxManual || dashing) this.coastArmed = true;
+    else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
+    const coasting = coastBrake !== 0;
+    const brake = coasting && this.coastArmed && !dashing ? coastBrake : 0;
+    const main = shown(coasting ? -brake : pilotMain);
+    const aux = shown(coasting ? brake : pilotAux);
 
-    // Aux thruster (braking)
-    if (thrAux > 0 || this.lastThrusterState.aux > 0) {
-      const auxThrusterPort = this.getThrusterPort('aux');
-      const thrusterPos = this.getLocalToWorld(
-        auxThrusterPort.x,
-        auxThrusterPort.y
-      );
-      this.getEventBus()?.emit?.('thruster-effect', {
-        position: thrusterPos,
-        direction: { x: -fwd.x, y: -fwd.y },
-        intensity: thrAux,
-        type: 'aux',
-        visualLevel: this.brakingVisualLevel,
-        isAutomatic: !isAuxManual, // Flag para distinguir auto-damping de input manual
-      });
-      this.lastThrusterState.aux = thrAux;
-    }
+    this.emitJet('main', main, fwd, 'main', 1, coasting);
+    this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
+    // A turn shows as the couple that would cause it: nose swinging to
+    // starboard, the aft starboard wingtip and the port nose jet blow
+    // outboard; mirrored to port. The sound pans to the turn's side.
+    this.emitTurn('turnR', shown(pilotTurn), 'right', 'noseLeft');
+    this.emitTurn('turnL', shown(-pilotTurn), 'left', 'noseRight');
+  }
 
-    // Side thrusters (emit both L and R for visuals, audio will aggregate)
-    if (thrSideL > 0 || this.lastThrusterState.sideL > 0) {
-      const leftThrusterPort = this.getThrusterPort('left');
-      const thrusterPos = this.getLocalToWorld(
-        leftThrusterPort.x,
-        leftThrusterPort.y
-      );
-      const dir = this.getLocalDirection(0, 1);
+  // One jet's event while it burns, and a last one at 0 when it stops.
+  // `sign`: along the nose (main) or against it (retro).
+  emitJet(key, intensity, fwd, type, sign, isAutomatic) {
+    if (intensity > 0 || this.lastThrusterState[key] > 0) {
+      const port = this.getThrusterPort(type);
       this.getEventBus()?.emit?.('thruster-effect', {
-        position: thrusterPos,
-        direction: dir,
-        intensity: thrSideL,
-        type: 'side',
-        side: 'left', // the engine sound pans its puffs by it
-        visualLevel: this.rcsVisualLevel,
-        isAutomatic: !isSideManual,
+        position: this.getLocalToWorld(port.x, port.y),
+        direction: { x: sign * fwd.x, y: sign * fwd.y },
+        intensity,
+        type,
+        visualLevel:
+          type === 'main' ? this.thrusterVisualLevel : this.brakingVisualLevel,
+        isAutomatic, // the coast brake sounds softer than the pilot's thrust
+        accent: this.getAccent(),
       });
-      this.lastThrusterState.sideL = thrSideL;
+      this.lastThrusterState[key] = intensity;
     }
+  }
 
-    if (thrSideR > 0 || this.lastThrusterState.sideR > 0) {
-      const rightThrusterPort = this.getThrusterPort('right');
-      const thrusterPos = this.getLocalToWorld(
-        rightThrusterPort.x,
-        rightThrusterPort.y
-      );
-      const dir = this.getLocalDirection(0, -1);
-      this.getEventBus()?.emit?.('thruster-effect', {
-        position: thrusterPos,
-        direction: dir,
-        intensity: thrSideR,
-        type: 'side',
-        side: 'right',
-        visualLevel: this.rcsVisualLevel,
-        isAutomatic: !isSideManual,
+  // The turn couple's two jets: the aft wingtip on `side` and the nose jet
+  // on the other flank, each blowing outboard.
+  emitTurn(key, intensity, side, nosePort) {
+    if (intensity > 0 || this.lastThrusterState[key] > 0) {
+      [side, nosePort].forEach((kind) => {
+        const port = this.getThrusterPort(kind);
+        this.getEventBus()?.emit?.('thruster-effect', {
+          position: this.getLocalToWorld(port.x, port.y),
+          // the sparks fly against `direction`: outboard of the port's flank
+          direction: this.getLocalDirection(0, port.y < 0 ? 1 : -1),
+          intensity,
+          type: 'side',
+          side, // the engine sound pans its puffs by it
+          visualLevel: this.rcsVisualLevel,
+          isAutomatic: false,
+          accent: this.getAccent(),
+        });
       });
-      this.lastThrusterState.sideR = thrSideR;
+      this.lastThrusterState[key] = intensity;
     }
   }
 
@@ -144,7 +140,7 @@ export class PlayerThrusters {
   updateThrusterVisual() {
     const visual = this.thrusterVisual;
     const target = this.lastThrusterState;
-    ['main', 'aux', 'sideL', 'sideR'].forEach((key) => {
+    ['main', 'aux', 'turnL', 'turnR'].forEach((key) => {
       visual[key] += ((target[key] || 0) - visual[key]) * 0.35;
       if (visual[key] < 0.005) visual[key] = 0;
     });
@@ -181,8 +177,8 @@ export class PlayerThrusters {
     }
 
     const sideIntensity = Math.max(
-      this.lastThrusterState.sideL,
-      this.lastThrusterState.sideR
+      this.lastThrusterState.turnL,
+      this.lastThrusterState.turnR
     );
     if (sideIntensity > 0) {
       eventBus.emit('thruster-effect', {
@@ -194,12 +190,12 @@ export class PlayerThrusters {
       });
     }
 
-    // Reset state
-    this.lastThrusterState = {
-      main: 0,
-      aux: 0,
-      sideL: 0,
-      sideR: 0,
-    };
+    this.resetState();
+  }
+
+  /** Nothing burning, the coast brake disarmed (death, reset, respawn). */
+  resetState() {
+    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.coastArmed = false;
   }
 }
