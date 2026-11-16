@@ -939,3 +939,27 @@ body.flashing-reduced .card.is-revealing {
 .chest-continue.is-ready {
   opacity: 1;
 }
+
+/* The new flight's briefing (ui/FlightBriefing.js): the Flight Computer's
+   keys, read before the run goes on. */
+.flight-keys {
+  display: grid;
+  grid-template-columns: auto minmax(0, 26em);
+  gap: calc(14 * var(--u)) calc(28 * var(--u));
+  align-items: baseline;
+  margin: 0;
+  font-size: calc(24 * var(--fs));
+}
+
+.flight-keys dt {
+  font-family: var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  text-align: right;
+}
+
+.flight-keys dd {
+  margin: 0;
+  color: var(--text);
+}

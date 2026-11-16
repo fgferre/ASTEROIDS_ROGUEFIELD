@@ -414,6 +414,7 @@ describe('Level-up card choices', () => {
       {
         levelUpScreen,
         chestCeremony: { openNext: () => false, clear: () => {} },
+        flightBriefing: { openNext: () => false },
         onboarding: { cardPicked: () => {} },
         tacticalHud: { refreshHudFromServices: () => {} },
         queueTransmission: () => {},

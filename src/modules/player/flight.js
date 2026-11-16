@@ -241,7 +241,10 @@ export class PlayerFlight {
       this.updateFacing(deltaTime, move);
     } else {
       // Restaurando a lógica de aceleração e amortecimento angular do app.js original
-      const rotationAccel = this.rotationSpeed * deltaTime;
+      // In glide the RCS System turns the hull quicker too: its pull and its
+      // top turn rate (pull ÷ angular damping) both × agility.
+      const rotationAccel =
+        this.rotationSpeed * (glide ? this.agility : 1) * deltaTime;
       let angularAccel = 0;
       if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
       if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'

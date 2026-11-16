@@ -8,6 +8,7 @@
 // decides what a level-up offers first).
 
 import { listContent } from '../../content/registry.js';
+import { newFlightFromUrl } from '../../modules/player/newFlight.js';
 import { deepFreeze } from '../../utils/deepFreeze.js';
 import { UPGRADE_CATEGORIES } from './categories.js';
 
@@ -29,8 +30,26 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
   ],
 }));
 
+/**
+ * The cards of the flight in play: the new flight (?direcao=nova) adds its own
+ * (`newFlight`) and reads the piloting cards' glide text (`newFlightText`,
+ * over `text`); without it the catalog is today's.
+ */
+export function cardsForFlight(cards, newFlight) {
+  return cards
+    .filter((card) => newFlight || !card.newFlight)
+    .map((card) =>
+      newFlight && card.newFlightText
+        ? { ...card, text: { ...card.text, ...card.newFlightText } }
+        : card
+    );
+}
+
 const UPGRADE_LIBRARY = deepFreeze(
-  [...listContent('cards'), ...WEAPON_CARDS].sort((a, b) => a.order - b.order)
+  [
+    ...cardsForFlight(listContent('cards'), newFlightFromUrl()),
+    ...WEAPON_CARDS,
+  ].sort((a, b) => a.order - b.order)
 );
 export const WEAPON_CARD_IDS = Object.freeze(WEAPON_CARDS.map(({ id }) => id));
 

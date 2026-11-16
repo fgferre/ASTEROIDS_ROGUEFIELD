@@ -90,6 +90,45 @@ describe('PlayerSystem control schemes', () => {
     expect(player.getTurretAngle()).toBe(player.angle);
   });
 
+  it('the new flight (?direcao=nova) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      controlScheme: 'modern',
+      newFlight: true,
+    });
+    const flying = () => [
+      player.controlScheme,
+      player.flight.glide,
+      player.noseAim,
+    ];
+    expect(flying()).toEqual(['classic', true, true]);
+
+    eventBus.emit('upgrade-auto-aim', {});
+    eventBus.emit('modern-flight-engaged');
+    expect(flying()).toEqual(['modern', false, false]);
+
+    player.reset();
+    expect(flying()).toEqual(['classic', true, true]);
+  });
+
+  it('in glide the RCS System turns the hull quicker too', () => {
+    const turnAfterHalfSecond = (agility) => {
+      const player = makePlayer({ left: true }, 'classic');
+      player.flight.glide = true;
+      player.flight.agility = agility;
+      player.angle = 0;
+      steps(player, 30);
+      return -player.angle;
+    };
+
+    expect(turnAfterHalfSecond(1.9)).toBeGreaterThan(
+      turnAfterHalfSecond(1) * 1.8
+    );
+  });
+
   it('the turret turns onto the aim point on its own, and the muzzle follows it', () => {
     const player = makePlayer({ right: true });
     player.angle = 0;

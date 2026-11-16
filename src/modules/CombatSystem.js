@@ -252,6 +252,12 @@ class CombatSystem extends BaseSystem {
       });
     });
 
+    // The new flight's Auto Turret card: the cannon leaves the nose for the
+    // auto aim (PlayerSystem lifts noseAim on the same event).
+    this.registerEventListener('upgrade-auto-aim', () => {
+      this.targeting.setAimMode('auto');
+    });
+
     this.registerEventListener('toggle-aim-mode', (data = {}) => {
       const screen = data?.screen;
       if (screen !== 'playing') {

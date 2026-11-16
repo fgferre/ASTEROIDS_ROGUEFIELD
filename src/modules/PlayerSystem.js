@@ -6,6 +6,7 @@ import { HullArt } from './player/hullArt.js';
 import { computeHullMetrics, getHullThrusterPort } from './player/hullShape.js';
 import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
+import { newFlightFromUrl } from './player/newFlight.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
@@ -123,6 +124,9 @@ class PlayerSystem extends BaseSystem {
         )?.hullControl
       );
     this.noseAim = noseAimFromUrl();
+    // The new flight (?direcao=nova): each run starts classic, gliding, aimed
+    // by the nose; cards lift each of the three (beginNewFlight).
+    this.newFlight = config?.newFlight ?? newFlightFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
     // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
@@ -174,6 +178,7 @@ class PlayerSystem extends BaseSystem {
       maneuvers: this.maneuvers,
       glide: glideFromUrl(),
     });
+    if (this.newFlight) this.beginNewFlight();
     exposeFields(this, this.flight, [
       'driftFactor',
       'maxSpeed',
@@ -265,9 +270,23 @@ class PlayerSystem extends BaseSystem {
 
     // Hull Control applies live, mid-run too.
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.controlScheme = resolveControlScheme(payload.values.hullControl);
+      // The new flight's scheme is the cards' (beginNewFlight), not the setting's.
+      if (payload?.values && !this.newFlight) {
+        this.setFlightScheme(
+          resolveControlScheme(payload.values.hullControl),
+          this.flight.glide
+        );
       }
+    });
+
+    // The new flight's cards: the turret turns on its own (CombatSystem goes
+    // back to auto aim on the same event)...
+    this.registerEventListener('upgrade-auto-aim', () => {
+      this.noseAim = false;
+    });
+    // ...and, once the pilot has read the briefing (UISystem), today's flight.
+    this.registerEventListener('modern-flight-engaged', () => {
+      this.setFlightScheme('modern', false);
     });
 
     this.registerEventListener('upgrade-damage-boost', (data) => {
@@ -930,6 +949,19 @@ class PlayerSystem extends BaseSystem {
     this.bossRepairFraction = 0;
   }
 
+  /** The new flight's start: classic, gliding, the cannon on the nose. */
+  beginNewFlight() {
+    this.noseAim = true;
+    this.setFlightScheme('classic', true);
+  }
+
+  /** The scheme and glide the cards set; the HUD's key hints follow. */
+  setFlightScheme(scheme, glide) {
+    this.controlScheme = scheme;
+    this.flight.glide = glide;
+    this.eventBus?.emit?.('control-scheme-changed', { scheme });
+  }
+
   reset() {
     super.reset();
 
@@ -956,6 +988,7 @@ class PlayerSystem extends BaseSystem {
     this.lastDamageSource = null;
     this.isDead = false;
     this.isRetrying = false;
+    if (this.newFlight) this.beginNewFlight();
   }
 
   markDead() {

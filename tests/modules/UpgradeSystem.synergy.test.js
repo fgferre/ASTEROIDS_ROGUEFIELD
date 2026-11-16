@@ -3,7 +3,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
-import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import UPGRADE_LIBRARY, {
+  cardsForFlight,
+} from '../../src/data/upgrades/index.js';
 import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
 import {
@@ -41,9 +43,10 @@ function listSourceFiles(dir) {
 
 describe('upgrade families', () => {
   it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
-    // Every card file plus every weapon's own card, nothing else.
+    // Every card file plus every weapon's own card, nothing else; the new
+    // flight's own cards (?direcao=nova) only with its link.
     expect(UPGRADE_LIBRARY).toHaveLength(
-      listContent('cards').length +
+      listContent('cards').filter((card) => !card.newFlight).length +
         listContent('weapons').filter((weapon) => weapon.card).length
     );
     const counts = {};
@@ -64,8 +67,13 @@ describe('upgrade families', () => {
     const source = listSourceFiles(join(process.cwd(), 'src'))
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
+    // Today's cards and the new flight's (?direcao=nova) own.
+    const cards = [
+      ...UPGRADE_LIBRARY,
+      ...listContent('cards').filter((card) => card.newFlight),
+    ];
     const effects = [
-      ...UPGRADE_LIBRARY.flatMap((upgrade) =>
+      ...cards.flatMap((upgrade) =>
         upgrade.levels.flatMap((level) => level.effects)
       ),
       ...Object.values(UPGRADE_FAMILIES).flatMap((f) => f.bonus.effects),
@@ -80,6 +88,26 @@ describe('upgrade families', () => {
         true
       );
     });
+  });
+
+  it("the new flight (?direcao=nova) adds its own cards and reads the glide texts; without it the catalog is today's", () => {
+    const ids = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
+    expect(ids(false)).not.toContain('auto_aim');
+    expect(ids(false)).not.toContain('flight_computer');
+    expect(ids(true)).toEqual(
+      expect.arrayContaining(['auto_aim', 'flight_computer'])
+    );
+
+    const braking = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).find(
+        (card) => card.id === 'braking_system'
+      ).text;
+    expect(braking(false)).toBe(
+      listContent('cards').find((card) => card.id === 'braking_system').text
+    );
+    expect(braking(true).name).toBe('Braking System');
+    expect(braking(true).summary).toMatch(/glide/);
   });
 });
 
