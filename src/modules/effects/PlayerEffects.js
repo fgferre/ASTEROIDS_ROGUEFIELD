@@ -12,7 +12,6 @@ import { DASH_SHAKE } from '../../data/constants/gameplay.js';
 import { DEATH_SLOW_MO, LEVEL_UP_SLOW_MO } from './GameTime.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
-const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
@@ -106,8 +105,10 @@ export class PlayerEffects {
       typeof data.intensity === 'number' &&
       data.intensity >= MAIN_THRUSTER_FLASH_THRESHOLD
     ) {
+      // in the hull's own colour (the owner's pick 16/11: amber hulls
+      // flashed blue)
       this.addScreenFlash(
-        MAIN_THRUSTER_FLASH_COLOR,
+        PALETTE[data.accent],
         MAIN_THRUSTER_FLASH_DURATION,
         MAIN_THRUSTER_FLASH_INTENSITY
       );

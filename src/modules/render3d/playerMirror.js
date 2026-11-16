@@ -106,11 +106,18 @@ const NOSE_PUFF = 0.8;
 const RCS_HOLD_S = 0.05; // a lit needle stays at least this long
 const RCS_FADE_S = 0.03; // then drops out this fast
 const RCS_SNAP_S = 0.09; // level 5: the bright snap at the port on ignition
+// Without the card the needle is 2.5 times today's level-0 length and a
+// little brighter (the owner's pick 16/11, glide turns lasted unseen); the
+// levels never draw it shorter.
+const RCS_MIN_LENGTH = 11.25;
+const RCS_GLOW = 1.3;
 // A brake at the front: a pair of retro flames blowing forward from the
 // nose, lit by the retro (reversal, coast brake), stronger and wider per
 // Braking System level; at 3 the emergency brake flares a hard forward fan.
 const RETRO_FLARE_S = 0.4;
-const FLARE_RAYS = [60, 42, 26]; // the fan's reach, middle ray out (field units)
+// The fan and the flames stop growing at 2 (the owner's pick 16/11: the
+// level-3 brake drew too big; the fan is 0.55 of its first size).
+const FLARE_RAYS = [33, 23, 14.3]; // the fan's reach, middle ray out (field units)
 const TURN_KEYS = ['turnL', 'turnR'];
 // Each shot pushes the hull back along the nose for the muzzle frames.
 const RECOIL_DIP = 2;
@@ -387,6 +394,9 @@ export class PlayerMirror {
       turnL: { amount: 0, hold: 0, snap: 0, material: tinted() },
       turnR: { amount: 0, hold: 0, snap: 0, material: tinted() },
     };
+    TURN_KEYS.forEach((k) =>
+      this.rcsJets[k].material.color.setScalar(RCS_GLOW)
+    );
     this.snapMaterial = tinted();
     this.retroMaterial = tinted();
     this.flareMaterial = tinted();
@@ -890,7 +900,7 @@ export class PlayerMirror {
       puff: make(jet.material, 0),
       size,
       turnL,
-      length: (4.5 + 2.2 * level) * size,
+      length: Math.max(RCS_MIN_LENGTH, 4.5 + 2.2 * level) * size,
       radius: (0.7 - 0.06 * level) * size,
       twin: level >= 3 ? make(jet.material, 1.8 * inboard * size) : null,
       snap: level >= 5 ? make(this.snapMaterial, 0) : null,
@@ -965,8 +975,8 @@ export class PlayerMirror {
       this.ship.add(mesh);
       this.retros.push({ mesh, length, radius });
     };
-    const length = 6 + 3 * level;
-    const radius = 0.7 + 0.15 * level;
+    const length = 6 + 3 * Math.min(level, 2);
+    const radius = 0.7 + 0.15 * Math.min(level, 2);
     const splay = ((10 + 5 * level) * Math.PI) / 180;
     ['noseLeft', 'noseRight'].forEach((kind) => {
       const { x, y } = getHullThrusterPort(kind, hull);
@@ -1016,7 +1026,7 @@ export class PlayerMirror {
     const rays = this.flareFan.children;
     for (let i = 0; i < rays.length; i += 1) {
       const reach = FLARE_RAYS[rays[i].userData.ray];
-      const width = 3 - 0.6 * rays[i].userData.ray;
+      const width = 1.65 - 0.33 * rays[i].userData.ray;
       rays[i].scale.set(reach * (0.35 + 0.65 * out), width, width);
     }
     this.flareMaterial.opacity = f ** 0.8;
