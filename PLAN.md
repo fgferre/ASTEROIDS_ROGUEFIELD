@@ -46,7 +46,10 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
 6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
        pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
        não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
-7. [ ] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
+       Já no código (16/11, sucessora, decisão pequena): no deslize, com a Braking System instalada, o fogo de freio do
+       nariz acende ao soltar o empuxo (`coastBrake` em `flight.js`); sem a carta, nada acende. Falta a foto de antes e
+       depois disso e os três pontos de gosto.
+7. [x] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
 # Modernização do Asteroid Roguefield — plano (12/11/2026)

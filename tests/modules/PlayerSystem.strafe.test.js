@@ -114,6 +114,20 @@ describe('PlayerSystem control schemes', () => {
     expect(flying()).toEqual(['classic', true, true]);
   });
 
+  it('in glide only the Braking System lights the retro once the thrust is let go', () => {
+    const coastBrake = (brakingDamping) => {
+      const player = makePlayer({}, 'classic');
+      player.flight.glide = true;
+      player.flight.brakingDamping = brakingDamping;
+      player.angle = 0;
+      player.velocity = { vx: 100, vy: 0 };
+      return player.flight.updateMovement(DELTA_TIME, {}).coastBrake;
+    };
+
+    expect(coastBrake(0)).toBe(0);
+    expect(coastBrake(2)).toBeGreaterThan(0.5);
+  });
+
   it('in glide the RCS System turns the hull quicker too', () => {
     const turnAfterHalfSecond = (agility) => {
       const player = makePlayer({ left: true }, 'classic');

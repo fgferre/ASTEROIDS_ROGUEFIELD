@@ -110,7 +110,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   gente liberasse o jeito moderno de pilotar nave como se fosse um final upgrade… Isso ia criar uma dificuldade muito
   maior. Na verdade, hoje está muito fácil o jogo."_ Tiro saindo do nariz no começo e a mira automática como carta;
   trocar as teclas na carta final: _"a gente pode simplesmente fazer um pequeno tutorialzinho na tela, que a pessoa
-  tem que dar enter para seguir"_. Virou o jeito E no mesmo cartão; espera ele jogar.
+  tem que dar enter para seguir"_. Virou o jeito E no mesmo cartão. Jogou e escolheu: _"E — Seguir a direção nova:
+  começa no E, o resto vira carta"_; o deslize sem carta de freio: _"Está no ponto"_; os efeitos dos propulsores: _"eu
+  acho que é uma coisa que a gente precisa resolver sim"_; e perguntou do bico: _"percebi uma mudança no angulo que a
+  nave está aparecendo para camera, como se ela tivesse com o bico para cima… (nao estou criticando quero entender de
+  onde vem a mudança)"_. Ramo `jogo/pilotagem`, link `?direcao=nova`: partida inteira na direção nova (cartas Auto
+  Turret e Flight Computer, tela do Enter, freio e RCS refeitos para o deslize). Espera ele jogar e os cartões de
+  gosto (canhão no nariz, propulsores, o que a carta final exige).
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 
