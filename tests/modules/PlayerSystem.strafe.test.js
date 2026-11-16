@@ -63,6 +63,22 @@ describe('PlayerSystem control schemes', () => {
     expect(player.angle).toBeCloseTo(-Math.PI / 2, 2);
   });
 
+  it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
+    const speedAfterRelease = (scheme, glide) => {
+      const player = makePlayer({}, scheme);
+      player.flight.glide = glide;
+      player.angle = 0;
+      player.velocity = { vx: 100, vy: 0 };
+      steps(player, 60);
+      return Math.hypot(player.velocity.vx, player.velocity.vy);
+    };
+
+    for (const scheme of ['modern', 'classic']) {
+      expect(speedAfterRelease(scheme, false)).toBeLessThan(5);
+      expect(speedAfterRelease(scheme, true)).toBeGreaterThan(65);
+    }
+  });
+
   it('the turret turns onto the aim point on its own, and the muzzle follows it', () => {
     const player = makePlayer({ right: true });
     player.angle = 0;

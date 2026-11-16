@@ -8,6 +8,10 @@
 // the thruster events with the thrust this returns.
 
 import {
+  GLIDE_ACCEL_SCALE,
+  GLIDE_LINEAR_DAMPING,
+  GLIDE_RETRO_SHARE,
+  GLIDE_SPEED_SCALE,
   MODERN_MOVE_ACCEL,
   SHIP_ACCELERATION,
   SHIP_ANGULAR_DAMPING,
@@ -50,10 +54,12 @@ export class PlayerFlight {
   /**
    * `ship`: the player's velocity, angle, angularVelocity and controlScheme, read and set live.
    * `maneuvers`: the player's PlayerManeuvers; a dash in progress or easing off lifts the speed cap.
+   * `glide`: glide flight (?flight=glide) in either scheme: no auto-brake, light drag, a lower top speed.
    */
-  constructor({ ship, maneuvers }) {
+  constructor({ ship, maneuvers, glide = false }) {
     this.ship = ship;
     this.maneuvers = maneuvers;
+    this.glide = glide;
     this.driftFactor = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
@@ -81,6 +87,7 @@ export class PlayerFlight {
   updateMovement(deltaTime, input) {
     // COPIAR EXATAMENTE da função updatePlayerMovement() original
     const modern = this.ship.controlScheme === 'modern';
+    const glide = this.glide;
     const fwd = {
       x: Math.cos(this.ship.angle),
       y: Math.sin(this.ship.angle),
@@ -92,7 +99,7 @@ export class PlayerFlight {
 
     // The thrusters' forces (lógica do original); what they show is at the end.
     let thrMain = input.up ? 1 : 0;
-    let thrAux = input.down ? 1 : 0;
+    let thrAux = input.down ? (glide ? GLIDE_RETRO_SHARE : 1) : 0;
     // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
     let thrSideR = input.left ? 1 : 0; // CCW torque
     let thrSideL = input.right ? 1 : 0; // CW torque
@@ -122,7 +129,8 @@ export class PlayerFlight {
     const drag = this.baseLinearDamping * deltaTime;
     const push =
       agility === 1 ? 1 : Math.expm1(drag * agility) / Math.expm1(drag);
-    const accelStep = this.acceleration * push * deltaTime;
+    const accelStep =
+      this.acceleration * (glide ? GLIDE_ACCEL_SCALE : 1) * push * deltaTime;
 
     // Auto-brake quando não há input linear
     const noLinearInput = modern ? !move : !input.up && !input.down;
@@ -145,8 +153,8 @@ export class PlayerFlight {
     const driftBrakeScale =
       1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
 
-    // Auto-damping thrusters (activate without manual input)
-    if (noLinearInput && speed > 2) {
+    // Auto-damping thrusters (activate without manual input); glide has none.
+    if (noLinearInput && speed > 2 && !glide) {
       const proj = velocityAlongNose;
       const kBase = Math.max(
         0.35,
@@ -198,7 +206,8 @@ export class PlayerFlight {
     // sluggish. The auto-damping thrusters (above) still fire during coast;
     // brakingDamping is the additive component layered on top of base.
     const effectiveDamping =
-      (this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0)) *
+      ((glide ? GLIDE_LINEAR_DAMPING : this.baseLinearDamping) +
+        (noManualThrust ? this.brakingDamping : 0)) *
       agility;
     // A dash carries its burst undamped, under a raised speed cap.
     if (!dashing) {
@@ -213,7 +222,10 @@ export class PlayerFlight {
       : this.maneuvers.dashDecayTimer / DASH_DECAY_SECONDS;
     const dashCap =
       DASH_SPEED_CAP_MULTIPLIER * this.maneuvers.dashDistanceMultiplier;
-    const speedCap = this.maxSpeed * (1 + (dashCap - 1) * dashCapFraction);
+    const speedCap =
+      this.maxSpeed *
+      (glide ? GLIDE_SPEED_SCALE : 1) *
+      (1 + (dashCap - 1) * dashCapFraction);
     const currentSpeed = Math.hypot(
       this.ship.velocity.vx,
       this.ship.velocity.vy
@@ -272,7 +284,7 @@ export class PlayerFlight {
     // The auto-brake, when it acts: + on the retro (moving nose-first), - on
     // the main engine, as strong as the speed is near the top.
     const coastBrake =
-      noLinearInput && speed > 2
+      noLinearInput && speed > 2 && !glide
         ? (velocityAlongNose < 0 ? -1 : 1) *
           clamp01(speed / (this.maxSpeed * 0.8))
         : 0;

@@ -44,6 +44,17 @@ function controlSchemeFromUrl() {
   return null;
 }
 
+// Glide flight for `?flight=glide` (proposta 16/11, the owner judges by playing).
+function glideFromUrl() {
+  try {
+    return (
+      new URLSearchParams(window.location.search).get('flight') === 'glide'
+    );
+  } catch {
+    return false; // no window (Node tests)
+  }
+}
+
 /** The scheme to fly: the URL flag wins over the Hull Control setting. */
 export function resolveControlScheme(setting) {
   return (
@@ -147,7 +158,11 @@ class PlayerSystem extends BaseSystem {
       'dashRammed',
       'dashContactDamage',
     ]);
-    this.flight = new PlayerFlight({ ship, maneuvers: this.maneuvers });
+    this.flight = new PlayerFlight({
+      ship,
+      maneuvers: this.maneuvers,
+      glide: glideFromUrl(),
+    });
     exposeFields(this, this.flight, [
       'driftFactor',
       'maxSpeed',
@@ -426,9 +441,12 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
-          // ...and a small kick to the hull, the same path as the dash.
-          this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
-          this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
+          // ...and a small kick to the hull, the same path as the dash;
+          // none in glide, where nothing would bleed it off.
+          if (!this.flight.glide) {
+            this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
+            this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
+          }
         }
       }
     });
