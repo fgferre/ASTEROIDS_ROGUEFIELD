@@ -56,15 +56,22 @@ const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
 function step(world, state, combo, dt) {
   const { glide } = world.ship;
   const dashing = state.dashLeft > 0;
+  // The RCS System: under a push (not in a dash) push and drag scale, and the
+  // turn is quicker at all times (player/flight.js).
+  const agility =
+    !combo.push || dashing || state.decayLeft > 0 ? 1 : glide.agility;
   if (combo.push) {
     const push = combo.push > 0 ? 1 : glide.retro;
-    const accel = glide.accel * push * dt;
+    const drag = glide.baseDamping * dt;
+    const scale =
+      agility === 1 ? 1 : Math.expm1(drag * agility) / Math.expm1(drag);
+    const accel = glide.accel * push * scale * dt;
     state.vx += Math.cos(state.angle) * accel * Math.sign(combo.push);
     state.vy += Math.sin(state.angle) * accel * Math.sign(combo.push);
   }
   if (!dashing) {
     const keep = Math.exp(
-      -(glide.damping + (combo.push ? 0 : glide.braking)) * dt
+      -(glide.damping + (combo.push ? 0 : glide.braking)) * agility * dt
     );
     state.vx *= keep;
     state.vy *= keep;
@@ -78,7 +85,7 @@ function step(world, state, combo, dt) {
     state.vx *= cap / speed;
     state.vy *= cap / speed;
   }
-  state.spin += combo.turn * glide.turn * dt;
+  state.spin += combo.turn * glide.turn * glide.agility * dt;
   state.spin *= Math.exp(-glide.turnDamping * dt);
   state.spin = Math.max(-glide.turn, Math.min(glide.turn, state.spin));
   state.angle = wrapAngle(state.angle + state.spin * dt);
@@ -193,7 +200,8 @@ export function decideGlide(seen, knobs, previous = COAST, state = {}) {
   const { ship } = world;
   const safeUntil = ship.invulnerable || 0;
   const held = KEY_COMBOS[previous];
-  const target = chooseTarget(world, state);
+  const { glide } = ship;
+  const target = glide.noseAim ? chooseTarget(world, state) : null;
   // The shared loot, edge and firing-gap terms read the ship's push and drag.
   const intentWorld = {
     ...world,
@@ -211,7 +219,7 @@ export function decideGlide(seen, knobs, previous = COAST, state = {}) {
       const end = path.at(-1);
       let score = -DANGER_WEIGHT * danger.total;
       score += intentScore(intentWorld, end, ship, danger.total < 0.05);
-      score += AIM_WEIGHT * aimScore(world, path, target);
+      if (glide.noseAim) score += AIM_WEIGHT * aimScore(world, path, target);
       score -= TURN_COST * (Math.abs(first.turn) + Math.abs(second.turn));
       score -= PUSH_COST * (Math.abs(first.push) + Math.abs(second.push));
       if (i === previous && j === previous) score += STEADY_BONUS;

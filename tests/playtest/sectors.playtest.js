@@ -4,7 +4,7 @@
  * summary table. Not part of `npm test`: run it with `npm run playtest`
  * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
  * PLAYTEST_FLIGHT=glide flies the classic glide with the cannon on the nose
- * (`?controls=classic&flight=glide&aim=nose`); PLAYTEST_SEED may be a range
+ * (`?direcao=nova`: classic, gliding, cannon on the nose); PLAYTEST_SEED may be a range
  * ('1-10'); PLAYTEST_OUT names a JSON file the rows are written to.
  */
 
@@ -29,8 +29,7 @@ const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
 const FLIGHT = process.env.PLAYTEST_FLIGHT === 'glide' ? 'glide' : 'modern';
-const FLIGHT_SEARCH =
-  FLIGHT === 'glide' ? '?controls=classic&flight=glide&aim=nose' : '';
+const FLIGHT_SEARCH = FLIGHT === 'glide' ? '?direcao=nova' : '';
 const OUT = process.env.PLAYTEST_OUT || '';
 // Seeds both the bot's miss rolls and the world (the run's seed): one, or a
 // range like '1-10'.
@@ -102,7 +101,14 @@ async function playSector(sector, seed) {
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
   session.resolveServiceInstance('difficulty').runSeed = seed;
-  if (FLIGHT === 'glide' && !(player.noseAim && player.flight.glide)) {
+  if (
+    FLIGHT === 'glide' &&
+    !(
+      player.noseAim &&
+      player.flight.glide &&
+      player.controlScheme === 'classic'
+    )
+  ) {
     throw new Error('playtest: the glide address did not switch the flight on');
   }
   const driver = createBotDriver({
@@ -269,6 +275,8 @@ function toRow(r) {
     waves: r.sector.layers[1] - r.sector.layers[0] + 1,
     cause: r.outcome.by || null,
     level: r.level,
+    autoAim: r.cards.includes('auto_aim'),
+    flightComputer: r.cards.includes('flight_computer'),
     turningPct: share(watch.turning, watch.frames),
     pushPct: share(watch.pushing, watch.frames),
     reversePct: share(watch.reversing, watch.frames),

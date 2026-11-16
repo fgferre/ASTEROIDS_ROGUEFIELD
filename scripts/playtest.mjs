@@ -88,6 +88,7 @@ function compare() {
         (m, i) => `${pad(m.seed, 5)}${pad(runText(m), 46)}${runText(glide[i])}`
       ),
       `${pad('mid', 5)}${pad(`${med(modern, 'seconds')}s ${med(modern, 'kills')}k w${med(modern, 'wave')}`, 46)}${med(glide, 'seconds')}s ${med(glide, 'kills')}k w${med(glide, 'wave')}`,
+      `glide: Auto Turret taken in ${glide.filter((r) => r.autoAim).length} of ${glide.length} runs, Flight Computer in ${glide.filter((r) => r.flightComputer).length}`,
       `glide watch (median): turning ${med(glide, 'turningPct')}%, pushing ${med(glide, 'pushPct')}%, back key ${med(glide, 'reversePct')}%, braking ${med(glide, 'brakePct')}%; aimed at a foe in reach ${med(glide, 'aimedPct')}%, near an edge ${med(glide, 'edgePct')}%, mean speed ${med(glide, 'meanSpeed')} px/s`,
     ];
     process.stdout.write(`${lines.join('\n')}\n`);

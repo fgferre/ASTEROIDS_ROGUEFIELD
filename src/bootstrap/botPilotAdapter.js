@@ -114,6 +114,9 @@ function glideOf(player, combat) {
   const { flight } = player;
   return {
     step: FIXED_STEP_SECONDS,
+    noseAim: player.noseAim,
+    agility: flight.agility,
+    baseDamping: flight.baseLinearDamping,
     accel: flight.acceleration * GLIDE_ACCEL_SCALE,
     retro: GLIDE_RETRO_SHARE,
     damping: GLIDE_LINEAR_DAMPING,
@@ -300,6 +303,11 @@ export function createBotDriver({
   let frame = 0;
   eventBus.on('upgrade-options-ready', (payload = {}) => {
     offer = payload.options || [];
+  });
+  // The Flight Computer card stops the run on a briefing that waits for
+  // Enter (ui/FlightBriefing.js); the bot reads it at once and presses it.
+  eventBus.on('upgrade-modern-flight', () => {
+    eventBus.emit('modern-flight-engaged');
   });
 
   return {
