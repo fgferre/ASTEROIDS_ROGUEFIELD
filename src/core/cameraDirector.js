@@ -1,7 +1,7 @@
 // The gameplay camera director (PLAN.md 14.2b; the near framing the owner
-// chose by playing on 15/11/2026): top-down while playing, in two states.
-// Near shows the field's whole width across the middle of the screen, from
-// today's tilt: it never moves sideways and follows the ship up and down, a
+// chose by playing on 16/11/2026): top-down while playing, in two states.
+// Near shows the field's whole width across the middle of the screen,
+// tilted: it never moves sideways and follows the ship up and down, a
 // little ahead toward the aim, with a slow drift when calm, and may show
 // some space past the top and bottom edges. Wide shows the whole field from
 // nearly straight above: at the end of a wave (for the orbs), when something
