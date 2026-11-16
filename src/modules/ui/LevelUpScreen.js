@@ -6,7 +6,8 @@
 // through the cards' exit animation. The first three picks name themselves
 // and show where each family leads; the HUD's build instrument previews the
 // highlighted card's cell. During a sector's head start a counter shows the
-// pick, and "Equip for me" makes the picks left (session/headStart.js).
+// pick, and "Equip for me" makes the picks left (session/headStart.js):
+// its first press only arms it, the second within EQUIP_CONFIRM_MS confirms.
 
 import { PROGRESSION_INITIAL_LEVEL } from '../../core/GameConstants.js';
 import { playLevelUpExit, staggerCardEntry } from './levelUpTransition.js';
@@ -25,6 +26,8 @@ export const SCREEN_INPUT_LOCKOUT_MS = 400;
 const FIRST_PICKS = ['First pick', 'Second pick', 'Third pick'];
 // How long the line naming an automatic build stays up.
 export const EQUIPPED_NOTICE_MS = 5000;
+// An armed "Equip for me" waits this long for the confirming press.
+export const EQUIP_CONFIRM_MS = 3000;
 
 /**
  * The HUD's build and XP instruments stay lit through a card screen's dim:
@@ -92,7 +95,8 @@ export class LevelUpScreen {
     this.showCardsTip = showCardsTip;
     this.prefersReducedMotion = prefersReducedMotion;
     this.hud = hud;
-    this.noticeTimer = null;
+    // "Equip for me" armed: the timer that disarms it, or null.
+    this.equipArmTimer = null;
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -127,20 +131,25 @@ export class LevelUpScreen {
         this.toggleBanishMode();
       } else if (event.code === 'KeyQ') {
         this.equipForMe();
-      } else if (event.key === 'Escape' && this.levelUpState.banishMode) {
-        this.setBanishMode(false);
+      } else if (event.key === 'Escape') {
+        this.backOut();
       }
     });
   }
 
-  /** A pad press here: reroll, banish, equip for me, or back out of banish mode. */
+  /** A pad press here: reroll, banish, equip for me, or back out. */
   handleGamepadNav(action) {
     if (action === 'reroll') this.rerollLevelUpOptions();
     else if (action === 'banish') this.toggleBanishMode();
     else if (action === 'tabNext') this.equipForMe();
-    else if (action === 'back' && this.levelUpState.banishMode) {
-      this.setBanishMode(false);
-    }
+    else if (action === 'back') this.backOut();
+  }
+
+  // Escape or the pad's back: an armed "Equip for me" disarms and nothing
+  // else happens; otherwise banish mode ends.
+  backOut() {
+    if (this.equipArmTimer) this.disarmEquip();
+    else if (this.levelUpState.banishMode) this.setBanishMode(false);
   }
 
   showLevelUpScreen(data = {}) {
@@ -204,6 +213,7 @@ export class LevelUpScreen {
       : options.length;
     this.levelUpState.focusIndex = -1;
     this.levelUpState.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
+    this.disarmEquip();
     this.setBanishMode(false);
     this.updateLevelUpActionButtons();
     this.renderHeader();
@@ -280,6 +290,7 @@ export class LevelUpScreen {
     if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
       return;
     }
+    this.disarmEquip();
     this.progression()?.rerollUpgradeOptions();
   }
 
@@ -291,6 +302,7 @@ export class LevelUpScreen {
     if (!this.levelUpState.banishMode && !(progression?.banishesLeft > 0)) {
       return;
     }
+    this.disarmEquip();
     this.setBanishMode(!this.levelUpState.banishMode);
   }
 
@@ -338,6 +350,7 @@ export class LevelUpScreen {
       return;
     }
 
+    this.disarmEquip();
     const progression = this.progression();
 
     if (this.levelUpState.banishMode) {
@@ -435,26 +448,50 @@ export class LevelUpScreen {
     );
   }
 
-  // The head start's picks left, made at once (one pick sound: the cue's
-  // throttle); back to play, and the HUD's tip line names the build.
+  // Q, RB or a click on "Equip for me": the first press arms it (the button
+  // says how many picks it makes), the second while armed makes them.
   equipForMe() {
     const progress = this.headStart().progress();
     if (!this.levelUpState.isVisible || this.isLevelUpLocked() || !progress) {
       return;
     }
+    const cards = progress.total - progress.pick + 1;
+    if (this.equipArmTimer) {
+      this.disarmEquip();
+      this.equipRest(cards);
+      return;
+    }
+    this.setBanishMode(false);
+    const { equipBtn } = this.refs;
+    equipBtn?.classList.add('is-armed');
+    equipBtn?.setAttribute('aria-pressed', 'true');
+    const label = equipBtn?.querySelector('[data-label]');
+    if (label) {
+      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? Press again`;
+    }
+    this.equipArmTimer = setTimeout(() => this.disarmEquip(), EQUIP_CONFIRM_MS);
+  }
+
+  disarmEquip() {
+    clearTimeout(this.equipArmTimer);
+    this.equipArmTimer = null;
+    const { equipBtn } = this.refs;
+    equipBtn?.classList.remove('is-armed');
+    equipBtn?.setAttribute('aria-pressed', 'false');
+    const label = equipBtn?.querySelector('[data-label]');
+    if (label) label.textContent = 'Equip for me';
+  }
+
+  // The head start's `cards` picks left, made at once (one pick sound: the
+  // cue's throttle); back to play, and the HUD's tip line names the build.
+  equipRest(cards) {
     this.disableLevelUpOptions();
     const families = this.headStart().equipRest();
     this.showGameUI();
-    const cards = progress.total - progress.pick + 1;
     const build = families.map(({ name, cards: n }) => `${name} ${n}`);
-    const hud = this.hud();
-    hud?.showOnboardingTip(
+    this.hud()?.showTimedNotice(
       [],
-      `Equipped ${cards} card${cards === 1 ? '' : 's'}: ${build.join(' · ')}`
-    );
-    clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(
-      () => hud?.hideOnboardingTip(),
+      `Equipped ${cards} card${cards === 1 ? '' : 's'}: ${build.join(' · ')}`,
       EQUIPPED_NOTICE_MS
     );
   }
@@ -538,6 +575,7 @@ export class LevelUpScreen {
         button.disabled = false;
       }
     });
+    this.disarmEquip();
     this.setBanishMode(false);
     if (this.levelUpState.isVisible) this.hud()?.previewBuildCard(null);
 

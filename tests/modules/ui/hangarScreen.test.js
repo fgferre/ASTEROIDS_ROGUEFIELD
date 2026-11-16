@@ -27,4 +27,42 @@ describe('Hangar screen', () => {
     screen.closeHangar();
     expect(emit.mock.calls.slice(2)).toEqual([['transmission-finished', line]]);
   });
+
+  it('shows what the hovered or focused hull does, else the selected one', () => {
+    const listeners = {};
+    const hulls = {
+      addEventListener: (type, fn) => (listeners[type] = fn),
+    };
+    const hullInfo = { innerHTML: '' };
+    const screen = new HangarScreen({
+      refs: {
+        overlay: { addEventListener: vi.fn() },
+        hulls,
+        hullInfo,
+        hullLock: { hidden: true, textContent: '' },
+      },
+      emit: vi.fn(),
+      selectedHullId: () => 'default-hull',
+    });
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+    screen.bindHangarControls();
+    vi.unstubAllGlobals();
+    const button = { dataset: { hangarHull: 'bastion' }, disabled: true };
+    button.closest = () => button;
+
+    listeners.pointerover({ target: button });
+    expect(hullInfo.innerHTML).toContain('Tough, slow');
+    listeners.focusin({
+      target: {
+        ...button,
+        dataset: { hangarHull: 'solar-slicer' },
+        closest() {
+          return this;
+        },
+      },
+    });
+    expect(hullInfo.innerHTML).toContain('Fast, fragile');
+    listeners.pointerleave();
+    expect(hullInfo.innerHTML).toContain('Balanced');
+  });
 });

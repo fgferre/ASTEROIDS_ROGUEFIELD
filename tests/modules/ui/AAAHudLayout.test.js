@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AAAHudLayout,
+  TIMED_NOTICE_MS,
   bossSegments,
   comboTier,
   damageArcAngle,
@@ -456,5 +457,89 @@ describe('AAAHudLayout kill feed', () => {
     hud.addKillFeed('boss', true);
 
     expect(keys).toEqual(['kill:Warden Choir', 'kill:Elite Warden Prime']);
+  });
+});
+
+describe('AAAHudLayout timed notice', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.stubGlobal('window', {
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (id) => clearTimeout(id),
+    });
+    vi.stubGlobal('document', { createElement: fakeHudElement });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function tipHud() {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      onboardingTip: fakeHudElement(),
+      onboardingKeys: fakeHudElement(),
+      onboardingText: fakeHudElement(),
+    };
+    const shown = () =>
+      hud.els.onboardingTip.classList.contains('is-showing') &&
+      !hud.els.onboardingTip.classList.contains('is-leaving')
+        ? {
+            keys: hud.els.onboardingKeys.children.map((c) => c.textContent),
+            text: hud.els.onboardingText.textContent,
+          }
+        : null;
+    return { hud, shown };
+  }
+
+  it('shows the key and the line, then leaves on its own', () => {
+    const { hud, shown } = tipHud();
+    hud.showTimedNotice(['T'], 'AIM MANUAL');
+    expect(shown()).toEqual({ keys: ['T'], text: 'AIM MANUAL' });
+    vi.advanceTimersByTime(TIMED_NOTICE_MS - 1);
+    expect(shown()).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(shown()).toBeNull();
+  });
+
+  it('covers a first-run tip and gives it back afterwards', () => {
+    const { hud, shown } = tipHud();
+    hud.showOnboardingTip(['⇧ Shift'], 'Dash');
+    hud.showTimedNotice(['G'], 'SPREAD FAN');
+    expect(shown().text).toBe('SPREAD FAN');
+    vi.advanceTimersByTime(TIMED_NOTICE_MS);
+    expect(shown()).toEqual({ keys: ['⇧ Shift'], text: 'Dash' });
+    hud.hideOnboardingTip(); // the tip can still be completed
+    expect(shown()).toBeNull();
+  });
+
+  it('does not bring back a tip that ended under the notice', () => {
+    const { hud, shown } = tipHud();
+    hud.showOnboardingTip(['E'], 'Shield');
+    hud.showTimedNotice(['T'], 'AIM AUTO');
+    hud.hideOnboardingTip();
+    expect(shown().text).toBe('AIM AUTO');
+    vi.advanceTimersByTime(TIMED_NOTICE_MS);
+    expect(shown()).toBeNull();
+  });
+
+  it('tells while it holds the tip slot', () => {
+    const { hud } = tipHud();
+    expect(hud.isNoticeShowing()).toBe(false);
+    hud.showTimedNotice(['T'], 'AIM MANUAL');
+    expect(hud.isNoticeShowing()).toBe(true);
+    vi.advanceTimersByTime(TIMED_NOTICE_MS);
+    expect(hud.isNoticeShowing()).toBe(false);
+  });
+
+  it('restarts its time when a second notice replaces it', () => {
+    const { hud, shown } = tipHud();
+    hud.showTimedNotice(['T'], 'AIM MANUAL');
+    vi.advanceTimersByTime(TIMED_NOTICE_MS - 1000);
+    hud.showTimedNotice(['T'], 'AIM AUTO');
+    vi.advanceTimersByTime(TIMED_NOTICE_MS - 1);
+    expect(shown().text).toBe('AIM AUTO');
+    vi.advanceTimersByTime(1);
+    expect(shown()).toBeNull();
   });
 });

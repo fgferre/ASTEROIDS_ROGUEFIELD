@@ -238,4 +238,49 @@ describe('campaign map', () => {
       `Starts with ${sectorById('furnace-drift').headStart} card picks`
     );
   });
+
+  it('Enter, Space or the pad confirm on the selected row launches it; a mouse click only selects', () => {
+    vi.stubGlobal('document', { addEventListener: () => {} });
+    const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
+    const text = () => ({ textContent: '', hidden: false });
+    let onClick;
+    const refs = {
+      overlay: {
+        addEventListener: (name, fn) => {
+          if (name === 'click') onClick = fn;
+        },
+      },
+      nodes: list(),
+      sectors: list(),
+      detailTitle: text(),
+      detailHeadStart: text(),
+      launchBtn: { dataset: {}, disabled: false, click: vi.fn() },
+    };
+    const map = new CampaignMap({ refs, prepareTravel: () => {} });
+    map.bindCampaignControls();
+    map.chapters = campaignChapters(records(['debris-wake']));
+    const click = (id, detail) =>
+      onClick({
+        detail,
+        target: {
+          closest: (selector) =>
+            selector === '[data-campaign-row]'
+              ? { dataset: { campaignRow: id } }
+              : null,
+        },
+      });
+
+    map.selectSector('debris-wake');
+    click('salvage-lanes', 1);
+    expect(map.selectedId).toBe('salvage-lanes');
+    click('salvage-lanes', 1);
+    expect(refs.launchBtn.click).not.toHaveBeenCalled();
+    click('salvage-lanes', 0);
+    expect(refs.launchBtn.click).toHaveBeenCalledTimes(1);
+
+    map.selectSector('prime-gate');
+    click('prime-gate', 0);
+    expect(refs.launchBtn.click).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
 });

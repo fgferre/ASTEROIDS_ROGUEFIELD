@@ -83,6 +83,7 @@ export function cacheStaticNodes() {
       list: document.getElementById('hangar-list') || null,
       hulls: document.getElementById('hangar-hulls') || null,
       hullLock: document.getElementById('hangar-hull-lock') || null,
+      hullInfo: document.getElementById('hangar-hull-info') || null,
       balance: document.getElementById('hangar-balance') || null,
       openBtn: document.getElementById('menu-hangar-btn') || null,
       backBtn: document.getElementById('hangar-back-btn') || null,
@@ -140,9 +141,13 @@ export function cacheStaticNodes() {
       shipSelector: document.getElementById('menu-ship-selector') || null,
       shipSelectorOptions:
         document.getElementById('menu-ship-selector-options') || null,
+      shipSelectorLabel:
+        document.getElementById('menu-ship-selector-label') || null,
       status: document.getElementById('menu-status') || null,
       bossRushBtn: document.getElementById('boss-rush-btn') || null,
       bossRushLock: document.getElementById('boss-rush-lock') || null,
+      nav: document.querySelector('#menu-screen .menu-screen__nav') || null,
+      hint: document.getElementById('menu-hint') || null,
     },
   };
 }

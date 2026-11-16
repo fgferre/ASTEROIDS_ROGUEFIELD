@@ -7,13 +7,14 @@
 import {
   hangarItemMarkup,
   hullLockText,
+  hullTraitsMarkup,
   salvageBalanceText,
 } from './hangar.js';
-import { getAllShipModels } from '../../data/shipModels.js';
+import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
   /**
-   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, balance, openBtn, backBtn, closeBtn }.
+   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn }.
    * `settings`: the settings service; a hull button selects that hull.
    * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
    *   transmission events (its voice, audio/voiceLines.js).
@@ -114,6 +115,7 @@ export class HangarScreen {
       this.endPurchaseLine();
       refs.hullLock.hidden = !locked;
       refs.hullLock.textContent = locked ? hullLockText(hullId) : '';
+      if (hullId) this.showHullInfo(hullId);
       this.emit('hangar-hull-hovered', { hullId, locked });
     };
     refs.hulls?.addEventListener('pointerover', previewHull);
@@ -122,6 +124,7 @@ export class HangarScreen {
       refs.hulls?.addEventListener(type, () => {
         this.endPurchaseLine();
         refs.hullLock.hidden = true;
+        this.showHullInfo();
         this.emit('hangar-hull-hovered', { hullId: null });
       })
     );
@@ -150,6 +153,14 @@ export class HangarScreen {
         }>${this.hullName(hull)}${locked ? ' · Locked' : ''}</button>`;
       })
       .join('');
+    this.showHullInfo(selected);
+  }
+
+  // Under the stage: what the hovered or focused hull does, else the
+  // selected one's.
+  showHullInfo(hullId = this.selectedHullId()) {
+    if (!this.refs.hullInfo) return;
+    this.refs.hullInfo.innerHTML = hullTraitsMarkup(getShipModelById(hullId));
   }
 
   openHangar() {

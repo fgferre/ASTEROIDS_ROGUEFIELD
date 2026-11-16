@@ -450,12 +450,13 @@ export class PlayerMirror {
     );
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
-    // Blink while invulnerable after a hit; the dash's own i-frames do not.
+    // Blink while invulnerable after a hit; the dash's own i-frames and the
+    // win's steady guard do not.
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
     else if (!invulnerable) this.dashGuard = false;
     this.blink.value =
-      invulnerable && !this.dashGuard
+      invulnerable && !this.dashGuard && !player.steadyGuard
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
     const dashShield = invulnerable && this.dashGuard;

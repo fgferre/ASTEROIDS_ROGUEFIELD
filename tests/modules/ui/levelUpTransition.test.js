@@ -5,7 +5,10 @@ import { LEVEL_UP_SCREEN_DELAY_SECONDS } from '../../../src/core/GameConstants.j
 import RandomService from '../../../src/core/RandomService.js';
 import ProgressionSystem from '../../../src/modules/ProgressionSystem.js';
 import UISystem from '../../../src/modules/UISystem.js';
-import { LevelUpScreen } from '../../../src/modules/ui/LevelUpScreen.js';
+import {
+  EQUIP_CONFIRM_MS,
+  LevelUpScreen,
+} from '../../../src/modules/ui/LevelUpScreen.js';
 import {
   CARD_STAGGER_MS,
   LEVELUP_EXIT_MS,
@@ -263,6 +266,115 @@ describe('Level-up card transition', () => {
       press('4');
       expect(progression.banishUpgrade).toHaveBeenCalledTimes(1);
       expect(progression.banishUpgrade).toHaveBeenCalledWith('c');
+    });
+
+    describe('Equip for me', () => {
+      // A head start at pick 2 of 5; `press(code)` is a key, `repeat` held.
+      function equipTable() {
+        let onKey;
+        document.addEventListener = (name, fn) => {
+          if (name === 'keydown') onKey = fn;
+        };
+        const label = { textContent: 'Equip for me' };
+        const equipBtn = {
+          ...fakeNode(),
+          attrs: {},
+          setAttribute(name, value) {
+            this.attrs[name] = value;
+          },
+          querySelector: () => label,
+          addEventListener: () => {},
+        };
+        const headStart = {
+          progress: () => ({ pick: 2, total: 5 }),
+          equipRest: vi.fn(() => []),
+        };
+        const progression = {
+          applyUpgrade: vi.fn(() => false),
+          banishUpgrade: vi.fn(),
+        };
+        const levelUp = new LevelUpScreen({
+          refs: { equipBtn },
+          progression: () => progression,
+          headStart: () => headStart,
+          showGameUI: vi.fn(),
+          hud: () => null,
+        });
+        levelUp.bindLevelUpControls();
+        Object.assign(levelUp.levelUpState, {
+          isVisible: true,
+          buttons: ['a', 'b', 'c'].map((id) => fakeNode(undefined, id)),
+        });
+        const press = (key, code, repeat = false) =>
+          onKey({ key, code, repeat, preventDefault() {} });
+        const armed = () => equipBtn.classes.has('is-armed');
+        return { levelUp, equipBtn, label, headStart, press, armed };
+      }
+
+      it('the first press only arms it and says how many picks; the second equips', () => {
+        const { equipBtn, label, headStart, press, armed } = equipTable();
+
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+        expect(armed()).toBe(true);
+        expect(equipBtn.attrs['aria-pressed']).toBe('true');
+        expect(label.textContent).toBe('Equip 4 cards? Press again');
+
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).toHaveBeenCalledTimes(1);
+        expect(armed()).toBe(false);
+        expect(label.textContent).toBe('Equip for me');
+      });
+
+      it('disarms by itself after 3 seconds', () => {
+        const { headStart, press, armed } = equipTable();
+
+        press('q', 'KeyQ');
+        vi.advanceTimersByTime(EQUIP_CONFIRM_MS);
+        expect(armed()).toBe(false);
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+        expect(armed()).toBe(true);
+      });
+
+      it('Escape only disarms it', () => {
+        const { levelUp, headStart, press, armed } = equipTable();
+
+        press('q', 'KeyQ');
+        press('Escape', 'Escape');
+        expect(armed()).toBe(false);
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+        expect(levelUp.levelUpState.banishMode).toBe(false);
+      });
+
+      it('a card pick disarms it, and arming leaves banish mode', () => {
+        const { levelUp, headStart, press, armed } = equipTable();
+
+        levelUp.setBanishMode(true);
+        press('q', 'KeyQ');
+        expect(levelUp.levelUpState.banishMode).toBe(false);
+        press('1', 'Digit1');
+        expect(armed()).toBe(false);
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+      });
+
+      it('a held key neither arms nor confirms, and the lockout holds both presses', () => {
+        const { levelUp, headStart, press, armed } = equipTable();
+
+        press('q', 'KeyQ', true);
+        expect(armed()).toBe(false);
+        press('q', 'KeyQ');
+        press('q', 'KeyQ', true);
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+        levelUp.levelUpState.lockedUntil = Date.now() + 1;
+        press('q', 'KeyQ');
+        expect(headStart.equipRest).not.toHaveBeenCalled();
+        levelUp.disarmEquip();
+        press('q', 'KeyQ');
+        expect(armed()).toBe(false);
+      });
     });
   });
 });

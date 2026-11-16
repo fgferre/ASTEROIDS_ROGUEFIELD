@@ -2,7 +2,9 @@
 
 // First-run tips taught in play (NORTE §7 pillar 5): one small prompt at a
 // time, each dismissed by doing the thing. Finished steps persist, so a tip
-// never shows again until the Settings toggle replays them.
+// never shows again until the Settings toggle replays them. A dash or shield
+// tip that runs out unused is only set aside for the run: it comes back on
+// the next one, until it has run out TIP_EXPIRIES_TO_DONE times.
 
 import { loadJSON, saveJSON } from '../../core/storage.js';
 
@@ -15,6 +17,8 @@ export const MOVE_HOLD_SECONDS = 0.6;
 export const SHIELD_TIP_SECONDS = 6;
 /** The dash tip leaves on its own after this long on screen. */
 export const DASH_TIP_SECONDS = 10; // proposta 12/11
+/** A timed tip that ran out unused this many times is not shown again. */
+export const TIP_EXPIRIES_TO_DONE = 3;
 export const CARDS_TIP_TEXT = 'Pick a card. R rerolls, B banishes.';
 export const CARDS_TIP_TEXT_GAMEPAD = 'Pick a card. X rerolls, Y banishes.';
 /** The same tip during a head start, where "Equip for me" makes the rest. */
@@ -23,19 +27,46 @@ export const CARDS_TIP_TEXT_HEAD_START =
 export const CARDS_TIP_TEXT_HEAD_START_GAMEPAD =
   'Pick a card. X rerolls, Y banishes, RB equips the rest.';
 
-/** In-play tips in order; `cards` lives on the level-up screen instead. */
+/**
+ * In-play tips in order; `cards` lives on the level-up screen instead, and
+ * `cardsHeadStart` is its head-start variant (a superset of its text).
+ */
 const PLAY_STEPS = ['move', 'dash', 'shield'];
-export const ONBOARDING_STEP_IDS = [...PLAY_STEPS, 'cards'];
+export const ONBOARDING_STEP_IDS = [...PLAY_STEPS, 'cards', 'cardsHeadStart'];
+const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
+
+/**
+ * The notice when T or G changed a mode in play: `toggled` is CombatSystem's
+ * `combat-mode-toggled` payload ({ kind: 'aim' | 'spread', mode }), `keys`
+ * the bound labels ({ toggleAimMode, toggleSpreadMode }). Manual aim fires
+ * along the turret: on the nose, or along the right stick while it is held.
+ */
+export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
+  const texts = {
+    auto: 'AIM AUTO · the turret finds targets. Press again for manual.',
+    manual:
+      device === 'gamepad'
+        ? 'AIM MANUAL · aim with the right stick. Press again for auto.'
+        : 'AIM MANUAL · shots fly where the nose points. Press again for auto.',
+    fan: 'SPREAD FAN · extra shots fan out wide. Press again to concentrate.',
+    concentrated:
+      'SPREAD CONC · extra shots fly side by side. Press again to fan.',
+  };
+  const key = kind === 'aim' ? keys.toggleAimMode : keys.toggleSpreadMode;
+  return { keys: key ? [key] : [], text: texts[mode] };
+}
 
 /**
  * Prompt content per step. `keys` are the labels of the bound keys or pad
- * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield });
- * `device` is the last one used ('keyboard' | 'gamepad').
+ * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield,
+ * toggleAimMode, toggleSpreadMode }); `device` is the last one used
+ * ('keyboard' | 'gamepad'); `toggled` adds the `mode` notice (modeNotice).
  */
 export function onboardingPrompts(
   keys,
   scheme = 'modern',
-  device = 'keyboard'
+  device = 'keyboard',
+  toggled = null
 ) {
   const padMove = {
     keys: ['L-Stick'],
@@ -64,6 +95,7 @@ export function onboardingPrompts(
       keys: [keys.activateShield],
       text: 'Raise your shield before a hit lands.',
     },
+    mode: toggled && modeNotice(toggled, keys, device),
   };
 }
 
@@ -75,9 +107,15 @@ export class Onboarding {
   constructor(view, onStep = () => {}) {
     this.view = view;
     this.onStep = onStep;
-    this.done = new Set(loadJSON(ONBOARDING_STORAGE_KEY)?.done || []);
+    const stored = loadJSON(ONBOARDING_STORAGE_KEY);
+    this.done = new Set(stored?.done || []);
+    /** How many times each timed tip ran out unused, across runs. */
+    this.expired = { ...stored?.expired };
+    /** Timed tips that ran out unused in this run: set aside until the next. */
+    this.setAside = new Set();
     this.active = false;
-    this.cardsShown = false;
+    /** The cards variant on screen this run ('cards' | 'cardsHeadStart'). */
+    this.cardsShown = null;
     this.reset();
   }
 
@@ -97,7 +135,10 @@ export class Onboarding {
     if (!this.active) {
       return null;
     }
-    return PLAY_STEPS.find((id) => !this.done.has(id)) || null;
+    return (
+      PLAY_STEPS.find((id) => !this.done.has(id) && !this.setAside.has(id)) ||
+      null
+    );
   }
 
   /** A run starts: teach whatever is left. */
@@ -112,22 +153,33 @@ export class Onboarding {
       this.view.hideTip();
     }
     this.active = false;
-    this.cardsShown = false;
+    this.cardsShown = null;
+    this.setAside.clear();
     this.reset();
   }
 
   /** The Settings toggle was turned back on: every tip shows again. */
   replay() {
     this.done.clear();
-    saveJSON(ONBOARDING_STORAGE_KEY, { done: [] });
+    this.expired = {};
+    this.save();
   }
 
   /**
    * One simulation step. `moving`: any thrust/strafe held; `shieldReady`:
    * the ship has a shield to raise; `bannerBusy`: a HUD banner owns the
-   * screen, so a new tip waits.
+   * screen, so a new tip waits; `tipCovered`: a timed notice covers the tip
+   * on screen, so its time waits.
    */
-  update(dt, { moving = false, shieldReady = false, bannerBusy = false } = {}) {
+  update(
+    dt,
+    {
+      moving = false,
+      shieldReady = false,
+      bannerBusy = false,
+      tipCovered = false,
+    } = {}
+  ) {
     const id = this.current;
     if (!id) {
       return;
@@ -153,32 +205,55 @@ export class Onboarding {
       this.onStep(id);
       return;
     }
+    if (tipCovered) {
+      return;
+    }
     this.shownFor += dt;
-    const expiry = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS }[id];
-    if (this.shownFor >= expiry) {
-      this.finish(id);
+    if (this.shownFor >= TIP_SECONDS[id]) {
+      this.expire(id);
     }
   }
 
   dashed() {
-    if (this.current === 'dash') {
-      this.finish('dash');
-    }
+    this.acted('dash');
   }
 
   shieldRaised() {
-    if (this.current === 'shield') {
-      this.finish('shield');
+    this.acted('shield');
+  }
+
+  /** Doing the thing during its tip, or after it ran out this run, counts. */
+  acted(id) {
+    if (this.current === id) {
+      this.finish(id);
+    } else if (this.setAside.has(id)) {
+      this.setAside.delete(id);
+      this.markDone(id);
     }
+  }
+
+  /** The tip ran out unused: set aside for this run, done on the last time. */
+  expire(id) {
+    this.expired[id] = (this.expired[id] || 0) + 1;
+    if (this.expired[id] >= TIP_EXPIRIES_TO_DONE) {
+      this.finish(id);
+      return;
+    }
+    this.view.hideTip();
+    this.reset();
+    this.gap = ONBOARDING_GAP_SECONDS;
+    this.setAside.add(id);
+    this.save();
   }
 
   /** Footer text for the level-up screen, or null once learned. */
   cardsTip(device = 'keyboard', headStart = false) {
-    if (!this.active || this.done.has('cards')) {
+    const id = headStart ? 'cardsHeadStart' : 'cards';
+    if (!this.active || this.done.has(id)) {
       return null;
     }
-    if (!this.cardsShown) {
-      this.cardsShown = true;
+    if (this.cardsShown !== id) {
+      this.cardsShown = id;
       this.onStep('cards');
     }
     if (headStart) {
@@ -189,11 +264,17 @@ export class Onboarding {
     return device === 'gamepad' ? CARDS_TIP_TEXT_GAMEPAD : CARDS_TIP_TEXT;
   }
 
-  /** A card was picked; the tip counts once it was on screen. */
+  /**
+   * A card was picked; the tip counts once it was on screen. The head-start
+   * text holds the ordinary one, so it teaches both.
+   */
   cardPicked() {
-    if (this.cardsShown && !this.done.has('cards')) {
+    if (this.cardsShown === 'cardsHeadStart') {
+      this.markDone('cardsHeadStart', 'cards');
+    } else if (this.cardsShown === 'cards') {
       this.markDone('cards');
     }
+    this.cardsShown = null;
   }
 
   finish(id) {
@@ -205,11 +286,18 @@ export class Onboarding {
     this.markDone(id);
   }
 
-  markDone(id) {
-    this.done.add(id);
-    saveJSON(ONBOARDING_STORAGE_KEY, { done: [...this.done] });
+  markDone(...ids) {
+    ids.forEach((id) => this.done.add(id));
+    this.save();
     if (this.complete) {
       this.active = false;
     }
+  }
+
+  save() {
+    saveJSON(ONBOARDING_STORAGE_KEY, {
+      done: [...this.done],
+      expired: this.expired,
+    });
   }
 }

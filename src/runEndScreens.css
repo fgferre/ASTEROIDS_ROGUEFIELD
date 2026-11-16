@@ -740,9 +740,9 @@ body:has(.end-screen:not(.hidden)) .next-wave-box {
 }
 
 /* The ending (RunEndScreens.chooseEnding): the HUD gives way to its
-   transmission, and Severance dims the field as the Ring goes out; a new
+   transmission and skip hint, and Severance dims the field as the Ring goes out; a new
    run lifts both. */
-.game-field.is-ending #hud-layer > :not(.transmission) {
+.game-field.is-ending #hud-layer > :not(.transmission, .cinematic-hint) {
   opacity: 0;
   transition: opacity 0.6s ease-out;
 }

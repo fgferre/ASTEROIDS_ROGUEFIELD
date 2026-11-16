@@ -244,6 +244,10 @@ class CombatSystem extends BaseSystem {
       }
       const next = this.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
       this.setSpreadMode(next);
+      this.eventBus?.emit?.('combat-mode-toggled', {
+        kind: 'spread',
+        mode: next,
+      });
     });
 
     this.registerEventListener('toggle-aim-mode', (data = {}) => {
@@ -253,7 +257,11 @@ class CombatSystem extends BaseSystem {
       }
       const next = this.aimMode === 'auto' ? 'manual' : 'auto';
       this.targeting.setAimMode(next);
+      this.eventBus?.emit?.('combat-mode-toggled', { kind: 'aim', mode: next });
     });
+
+    // `combat-mode-toggled` ({ kind: 'aim' | 'spread', mode }) tells the HUD a
+    // toggle changed the mode in play; the run-start reset stays silent.
 
     // Enemy projectiles are forwarded to the combat system by EnemySystem.
     // Subscribing here would duplicate the handling and spawn two bullets.

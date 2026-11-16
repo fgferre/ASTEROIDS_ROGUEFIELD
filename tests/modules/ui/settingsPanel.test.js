@@ -73,8 +73,31 @@ describe('Settings panel', () => {
       const rendered = renderCategory(category)
         .filter((node) => node.dataset?.settingKey)
         .map((node) => node.dataset.settingKey);
-      expect(rendered).toEqual(category.fields.map((field) => field.key));
+      expect(rendered).toEqual(
+        category.fields
+          .filter((field) => !field.hidden)
+          .map((field) => field.key)
+      );
     });
+  });
+
+  it('keeps the hull out of the panel while the setting still defaults and validates', () => {
+    const gameplay = SETTINGS_SCHEMA.find((c) => c.id === 'gameplay');
+    const rendered = renderCategory(gameplay).map((n) => n.dataset?.settingKey);
+    expect(rendered).not.toContain('selectedHull');
+
+    const settings = new SettingsSystem({ eventBus: new EventBus() });
+    expect(settings.getSetting('gameplay', 'selectedHull')).toBe(
+      'default-hull'
+    );
+    settings.setSetting('gameplay', 'selectedHull', 'bastion');
+    settings.resetCategory('gameplay');
+    settings.resetAll();
+    expect(settings.getSetting('gameplay', 'selectedHull')).toBe('bastion');
+    settings.setSetting('gameplay', 'selectedHull', 'no-such-hull');
+    expect(settings.getSetting('gameplay', 'selectedHull')).toBe(
+      'default-hull'
+    );
   });
 
   it('shows quality and camera as segmented choices with a live preview', () => {
