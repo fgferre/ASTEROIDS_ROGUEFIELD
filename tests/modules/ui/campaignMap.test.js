@@ -283,4 +283,54 @@ describe('campaign map', () => {
     expect(refs.launchBtn.click).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
+
+  it('the down arrow goes from the chapter to its selected row, then down the rows, heard before InputSystem can stop it', () => {
+    // The node holding the focus: inside a chapter, or inside a sector row.
+    const focusOn = (kind) => ({
+      closest: (selector) =>
+        selector === `[data-campaign-${kind}]` ? {} : null,
+    });
+    const fakeDocument = { activeElement: focusOn('chapter') };
+    let onKey;
+    let capture;
+    fakeDocument.addEventListener = (name, fn, options) => {
+      onKey = fn;
+      capture = options;
+    };
+    vi.stubGlobal('document', fakeDocument);
+    const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
+    const text = () => ({ textContent: '', hidden: false });
+    const refs = {
+      overlay: { addEventListener: () => {} },
+      nodes: list(),
+      sectors: list(),
+      detailTitle: text(),
+      detailHeadStart: text(),
+      launchBtn: { dataset: {}, disabled: false },
+    };
+    const focused = [];
+    // A row that takes the focus is the selection, as focusin makes it.
+    refs.sectors.querySelector = (selector) => ({
+      focus: () => {
+        const id = selector.match(/"(.+)"/)[1];
+        focused.push(id);
+        fakeDocument.activeElement = focusOn('row');
+        map.selectSector(id);
+      },
+    });
+    const map = new CampaignMap({ refs, prepareTravel: () => {} });
+    map.bindCampaignControls();
+    map.chapters = campaignChapters(records(['debris-wake']));
+    map.selectSector('salvage-lanes');
+    map.mapState.isOpen = true;
+    const press = (key) => onKey({ key, preventDefault: () => {} });
+
+    // InputSystem stops ArrowDown at the document on the way down, so only a
+    // capture listener still hears it.
+    expect(capture).toBe(true);
+    press('ArrowDown');
+    press('ArrowDown');
+    expect(focused).toEqual(['salvage-lanes', 'prime-gate']);
+    vi.unstubAllGlobals();
+  });
 });

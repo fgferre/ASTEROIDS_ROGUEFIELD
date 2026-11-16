@@ -280,30 +280,36 @@ export class CampaignMap {
     refs.overlay.addEventListener('focusin', (event) =>
       this.selectFrom(event.target)
     );
-    document.addEventListener('keydown', (event) => {
-      if (!this.mapState.isOpen) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.closeMap();
-        return;
-      }
-      const onChapter = document.activeElement?.closest?.(
-        '[data-campaign-chapter]'
-      );
-      const onRow = document.activeElement?.closest?.('[data-campaign-row]');
-      const move = {
-        ArrowLeft: onChapter && (() => this.stepChapter(-1)),
-        ArrowRight: onChapter && (() => this.stepChapter(1)),
-        ArrowDown: onChapter
-          ? () => this.focusRow(this.selectedId)
-          : onRow && (() => this.stepRow(1)),
-        ArrowUp: onRow && (() => this.stepRow(-1)),
-      }[event.key];
-      if (move) {
-        event.preventDefault();
-        move();
-      }
-    });
+    // Heard on the way down (capture): InputSystem stops ArrowDown at the
+    // document before a bubbling listener would hear it.
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (!this.mapState.isOpen) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.closeMap();
+          return;
+        }
+        const onChapter = document.activeElement?.closest?.(
+          '[data-campaign-chapter]'
+        );
+        const onRow = document.activeElement?.closest?.('[data-campaign-row]');
+        const move = {
+          ArrowLeft: onChapter && (() => this.stepChapter(-1)),
+          ArrowRight: onChapter && (() => this.stepChapter(1)),
+          ArrowDown: onChapter
+            ? () => this.focusRow(this.selectedId)
+            : onRow && (() => this.stepRow(1)),
+          ArrowUp: onRow && (() => this.stepRow(-1)),
+        }[event.key];
+        if (move) {
+          event.preventDefault();
+          move();
+        }
+      },
+      true
+    );
   }
 
   /** A click or focus on a chapter node or a sector row selects it. */
