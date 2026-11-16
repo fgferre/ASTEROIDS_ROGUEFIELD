@@ -106,6 +106,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   funcionavam de outra forma… Preciso de ajuda para tomar essa decisão."_ Ramo `jogo/pilotagem`: quatro jeitos para
   jogar lado a lado (A moderno de hoje, B clássico de hoje, C clássico com deslize, D moderno com deslize), cartão de
   decisão na página dele. Espera a escolha dele, jogando; depois, os três pontos de efeito dos propulsores.
+  Ideia dele, no mesmo dia: _"E se a gente transformasse o jeito clássico de verdade no padrão do início do jogo? E a
+  gente liberasse o jeito moderno de pilotar nave como se fosse um final upgrade… Isso ia criar uma dificuldade muito
+  maior. Na verdade, hoje está muito fácil o jogo."_ Tiro saindo do nariz no começo e a mira automática como carta;
+  trocar as teclas na carta final: _"a gente pode simplesmente fazer um pequeno tutorialzinho na tela, que a pessoa
+  tem que dar enter para seguir"_. Virou o jeito E no mesmo cartão; espera ele jogar.
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 
