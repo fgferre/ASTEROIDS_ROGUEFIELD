@@ -113,4 +113,13 @@ describe('PlayerSystem thrusters show the pilot, not the solver', () => {
     expect(aft.y).toBeLessThan(0);
     expect(nose.y).toBeGreaterThan(0);
   });
+
+  it('flying straight after a turn, the turn jets go out (the nose never quite reaches its heading)', () => {
+    const { fly } = makePlayer();
+    fly({ up: true }, 60);
+    fly({ right: true }, 60);
+    const straight = fly({ right: true }, 120);
+    expect(straight.filter((e) => e.type === 'side')).toEqual([]);
+    expect(straight.some((e) => e.type === 'main')).toBe(true);
+  });
 });

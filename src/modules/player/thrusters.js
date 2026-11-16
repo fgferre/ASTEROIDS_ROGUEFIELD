@@ -8,6 +8,12 @@
 
 // Below this speed the coast brake disarms until the pilot thrusts again.
 const COAST_DISARM_SPEED = 12; // px/s
+// A jet under this share is off (proposta 16/11). The nose settles onto its
+// heading asymptotically, so the turn share never reaches zero by itself, and
+// a burning jet throws at least one spark a step: flying straight, the side
+// of the last turn sparked forever.
+const SHOWN_MIN = 0.08;
+const shown = (share) => (share >= SHOWN_MIN ? share : 0);
 
 export class PlayerThrusters {
   /**
@@ -66,16 +72,16 @@ export class PlayerThrusters {
     else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
     const coasting = coastBrake !== 0;
     const brake = coasting && this.coastArmed && !dashing ? coastBrake : 0;
-    const main = coasting ? Math.max(0, -brake) : pilotMain;
-    const aux = coasting ? Math.max(0, brake) : pilotAux;
+    const main = shown(coasting ? -brake : pilotMain);
+    const aux = shown(coasting ? brake : pilotAux);
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
     // A turn shows as the couple that would cause it: nose swinging to
     // starboard, the aft starboard wingtip and the port nose jet blow
     // outboard; mirrored to port. The sound pans to the turn's side.
-    this.emitTurn('turnR', Math.max(0, pilotTurn), 'right', 'noseLeft');
-    this.emitTurn('turnL', Math.max(0, -pilotTurn), 'left', 'noseRight');
+    this.emitTurn('turnR', shown(pilotTurn), 'right', 'noseLeft');
+    this.emitTurn('turnL', shown(-pilotTurn), 'left', 'noseRight');
   }
 
   // One jet's event while it burns, and a last one at 0 when it stops.
