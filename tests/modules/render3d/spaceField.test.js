@@ -105,6 +105,7 @@ describe('SpaceField', () => {
       setRenderTarget: vi.fn(),
       render: vi.fn(),
     };
+    space.setLayers(QUALITY_PRESETS.low.spaceLayers);
     scene.onBeforeRender(renderer, scene, posed(18, 580));
     scene.onBeforeRender(renderer, scene, posed(18, 580));
     expect(renderer.render).toHaveBeenCalledTimes(1);
@@ -116,6 +117,52 @@ describe('SpaceField', () => {
     expect(space.far.material.uniforms.uMap.value).toBe(
       space.farTarget.texture
     );
+  });
+
+  it('drifts the mid bands through baked keys, the next one baked in strips', () => {
+    const scene = new THREE.Scene();
+    const space = new SpaceField(THREE, scene);
+    const baked = [];
+    const renderer = {
+      getRenderTarget: () => null,
+      setRenderTarget: (target) => {
+        if (space.midMap.keys.includes(target)) {
+          const { uTime } = space.midMap.material.uniforms;
+          const rows = target.scissorTest ? target.scissor.w : 'all';
+          baked.push([space.midMap.keys.indexOf(target), uTime.value, rows]);
+        }
+      },
+      render: () => {},
+    };
+    const frameAt = (time) => {
+      space.time.value = time;
+      baked.length = 0;
+      scene.onBeforeRender(renderer, scene, posed(18, 580));
+      return baked.slice();
+    };
+    const { refresh, strips, texture } = NEBULA_MID;
+    const row = texture / strips;
+    const { uniforms } = space.mid.material;
+    // the first frame bakes both shown keys whole, and the next key's first strip
+    expect(frameAt(0)).toEqual([
+      [0, 0, 'all'],
+      [1, refresh, 'all'],
+      [2, 2 * refresh, row],
+    ]);
+    expect(uniforms.uBlend.value).toBe(0);
+    // halfway, half of the next key is baked
+    expect(frameAt(refresh / 2)).toEqual([[2, 2 * refresh, row * 8]]);
+    expect(uniforms.uBlend.value).toBeCloseTo(0.5);
+    // past the key, the rest of it is finished and the keys move on by one
+    const next = space.midMap.keys[2].texture;
+    expect(frameAt(refresh * 1.25)[0]).toEqual([2, 2 * refresh, row * 7]);
+    expect(uniforms.uMap1.value).toBe(next);
+    expect(uniforms.uBlend.value).toBeCloseTo(0.25);
+    // a jump bakes the shown keys anew
+    expect(frameAt(refresh * 40).slice(0, 2)).toEqual([
+      [0, 40 * refresh, 'all'],
+      [1, 41 * refresh, 'all'],
+    ]);
   });
 
   it('draws the live layers by quality: far only on low, mid from medium, all from high', () => {

@@ -43,7 +43,9 @@ export default {
   update() {},
 
   push(key, tone, render) {
-    // A row still on screen keeps counting and moves back to the top.
+    // A row still on screen keeps counting and moves back to the top. It is
+    // re-inserted even when already first: that replays its entrance, which
+    // is how a repeat shows.
     let row = this.rows.find((entry) => entry.key === key);
     if (row) {
       this.list.prepend(row.el);

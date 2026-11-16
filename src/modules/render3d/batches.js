@@ -15,7 +15,13 @@ export function colorOf(THREE, css) {
 
 // Parsed linear colors, keyed by the CSS string the simulation stores.
 const colorCache = new Map();
+// Same results keyed by the raw string: a repeat call does no string work.
+// Particles carry a random alpha in theirs, so it is emptied when it fills.
+const rawCache = new Map();
+const RAW_CACHE_MAX = 4096;
 export function rgbOf(THREE, css) {
+  const hit = rawCache.get(css);
+  if (hit) return hit;
   // THREE.Color ignores alpha and warns about it each time: drop it here, once
   // per distinct colour (alpha lives in the caller's own alpha channel).
   const key = css && css.replace(/^(rgb|hsl)a\((.*),[^,]*\)$/, '$1($2)');
@@ -31,6 +37,8 @@ export function rgbOf(THREE, css) {
     rgb = [color.r, color.g, color.b];
     colorCache.set(key, rgb);
   }
+  if (rawCache.size >= RAW_CACHE_MAX) rawCache.clear();
+  rawCache.set(css, rgb);
   return rgb;
 }
 
@@ -758,7 +766,11 @@ export class CapsuleBatch {
 
   end() {
     this.mesh.count = this.count;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.count === 0) return;
+    const matrices = this.mesh.instanceMatrix;
+    matrices.updateRange.offset = 0;
+    matrices.updateRange.count = this.count * 16;
+    matrices.needsUpdate = true;
     this.tint.updateRange.offset = 0;
     this.tint.updateRange.count = this.count * 4;
     this.tint.needsUpdate = true;

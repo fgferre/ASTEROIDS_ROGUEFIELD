@@ -180,7 +180,6 @@
 			this.highPassUniforms[ 'luminosityThreshold' ].value = this.threshold;
 			this.fsQuad.material = this.materialHighPassFilter;
 			renderer.setRenderTarget( this.renderTargetBright );
-			renderer.clear();
 			this.fsQuad.render( renderer ); // 2. Blur All the mips progressively
 
 			let inputRenderTarget = this.renderTargetBright;
@@ -191,12 +190,10 @@
 				this.separableBlurMaterials[ i ].uniforms[ 'colorTexture' ].value = inputRenderTarget.texture;
 				this.separableBlurMaterials[ i ].uniforms[ 'direction' ].value = UnrealBloomPass.BlurDirectionX;
 				renderer.setRenderTarget( this.renderTargetsHorizontal[ i ] );
-				renderer.clear();
 				this.fsQuad.render( renderer );
 				this.separableBlurMaterials[ i ].uniforms[ 'colorTexture' ].value = this.renderTargetsHorizontal[ i ].texture;
 				this.separableBlurMaterials[ i ].uniforms[ 'direction' ].value = UnrealBloomPass.BlurDirectionY;
 				renderer.setRenderTarget( this.renderTargetsVertical[ i ] );
-				renderer.clear();
 				this.fsQuad.render( renderer );
 				inputRenderTarget = this.renderTargetsVertical[ i ];
 

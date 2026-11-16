@@ -247,8 +247,6 @@ for (let i = 0; i < ASTEROID_COUNT; i += 1) {
   physics.registerAsteroid(asteroid);
 }
 
-physics.ensureSpatialIndex();
-
 let nearbyCount = 0;
 physics.forEachNearbyAsteroid({ x: 0, y: 0 }, 260, () => {
   nearbyCount += 1;

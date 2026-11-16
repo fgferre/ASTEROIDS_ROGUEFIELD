@@ -378,7 +378,16 @@ function createKit(THREE, scene, seeded, dissolve) {
   // Machine views: `accents` are the materials (and glow tones) whose base
   // color is the threat/elite accent, `rims` the outlines (in `rimColor`
   // unless a rim has its own colour), `glows` the eyes/lenses/nodes.
+  // Three updates hidden subtrees too. Pooled views have no drawn anchors;
+  // reacquiring them (or warm-up showing everything) resumes normal updates.
+  function updateVisibleMatrixWorld(force) {
+    if (this.visible) {
+      THREE.Object3D.prototype.updateMatrixWorld.call(this, force);
+    }
+  }
+
   function view(kind, object, parts) {
+    object.updateMatrixWorld = updateVisibleMatrixWorld;
     return {
       kind,
       object,

@@ -17,6 +17,7 @@ export class TextSprites {
     // color → (value → texture), so a frame builds no keys
     this.caches = new Map();
     this.cached = 0;
+    this.tick = 0;
     this.sprites = [];
     this.count = 0;
     for (let i = 0; i < capacity; i += 1) {
@@ -49,6 +50,27 @@ export class TextSprites {
     this.cached = 0;
   }
 
+  // drop only the entry used longest ago; a texture still on a sprite is
+  // re-uploaded by three on its next draw, so this is safe
+  evictOldest() {
+    let oldest = null;
+    let oldestMap = null;
+    let oldestKey;
+    this.caches.forEach((map) => {
+      map.forEach((entry, key) => {
+        if (!oldest || entry.used < oldest.used) {
+          oldest = entry;
+          oldestMap = map;
+          oldestKey = key;
+        }
+      });
+    });
+    if (!oldest) return;
+    oldest.texture.dispose();
+    oldestMap.delete(oldestKey);
+    this.cached -= 1;
+  }
+
   texture(value, color) {
     let cache = this.caches.get(color);
     if (!cache) {
@@ -56,8 +78,12 @@ export class TextSprites {
       this.caches.set(color, cache);
     }
     let entry = cache.get(value);
-    if (entry) return entry;
-    if (this.cached >= MAX_CACHED) this.clearCache();
+    this.tick += 1;
+    if (entry) {
+      entry.used = this.tick;
+      return entry;
+    }
+    if (this.cached >= MAX_CACHED) this.evictOldest();
     const text = String(value);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -78,7 +104,7 @@ export class TextSprites {
     ctx.fillText(text, width / 2, height / 2);
     const texture = this.seeded(() => new this.THREE.CanvasTexture(canvas));
     texture.encoding = this.THREE.sRGBEncoding;
-    entry = { texture, aspect: width / height };
+    entry = { texture, aspect: width / height, used: this.tick };
     cache.set(value, entry);
     this.cached += 1;
     return entry;

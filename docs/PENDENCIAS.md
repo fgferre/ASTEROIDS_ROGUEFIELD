@@ -6,7 +6,20 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 35.**
 
-## O BASTÃO — onde as sessões pararam (14/11) — TUDO ESTÁ NA `main` E PUBLICADO (os 16 sons de 14/11 entraram pela PR #306, por ordem dele: _"Pode publicar"_)
+## O BASTÃO — onde as sessões pararam (16/11) — a `main` está publicada até a PR #311; abertos: a câmera (ramo `camera/luta-de-perto`) e a fluidez (ramo `perf/fluidez`, só no computador dele)
+
+**15–16/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** ele reafirmou o modo dono — _"que se
+sentisse dono do projeto, para passar por cima dessas coisas"_: escolha antiga não é motivo para deixar de melhorar —
+e pediu _"tudo que vc fizer eu quero o antes e depois para comparar aonde eles mudam"_. Duas auditorias de fora
+(Gemini) foram conferidas ponto a ponto rodando o jogo; os consertos entraram pelas PRs #308–#311 por ordem dele
+(_"Pode juntar"_, _"Conserte"_). Sugestão de outro modelo não se descarta em uma linha (_"um modelo realmente
+inteligente trouxe esses pontos"_): fechar a conta proposta por proposta — feita, feita de outro jeito e por quê, não
+feita e por quê. **Câmera:** ele jogou três enquadramentos e escolheu — _"Fica a C"_ (o campo enche a tela na
+largura); os defeitos da câmera de 19/10 foram corrigidos e ela mergulha para perto na queda de chefe (esses números
+ele ainda não julgou em separado). **Fluidez** (`perf/fluidez`, sem mudança de imagem): pronta e conferida, espera ele
+dizer se publica — _"Quero jogar antes"_ (14/11); a versão de teste que ele jogou em 16/11 já a incluía. Ele decide
+jogando: o Salvage ao sair pela pausa e por máquina abatida, os corações, o canto seguro da Foundry Mother, os Casters
+em uníssono, a morte dos Heralds, o som de ataque de Prime e Choir no aviso (tudo na última linha do `BACKLOG.md`).
 
 **Estado em 12/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** em 12/11 ele entregou o projeto —
 _"Esse projeto é seu… Decida o que fazer"_, _"o projeto está sendo tocado por você"_, _"não necessariamente algo que foi

@@ -5,6 +5,40 @@ import RandomService from '../../src/core/RandomService.js';
 
 const testRandom = new RandomService('spatial-hash-test');
 
+function legacyUpdate(hash, object, x, y, radius) {
+  const objectData = hash.objects.get(object);
+  if (!objectData) return hash.insert(object, x, y, radius);
+
+  const newBounds = hash.calculateBounds(x, y, radius);
+  const newCells = hash.getCellsForBounds(newBounds);
+  const newCellSet = new Set(newCells);
+  const oldCells = objectData.cells;
+  const cellsChanged =
+    oldCells.size !== newCellSet.size ||
+    [...oldCells].some((cell) => !newCellSet.has(cell));
+
+  if (cellsChanged) {
+    for (const cellKey of oldCells) {
+      const cell = hash.grid.get(cellKey);
+      if (cell) {
+        cell.delete(object);
+        if (cell.size === 0) hash.dirtyCells.add(cellKey);
+      }
+    }
+    for (const cellKey of newCells) {
+      if (!hash.grid.has(cellKey)) hash.grid.set(cellKey, new Set());
+      hash.grid.get(cellKey).add(object);
+    }
+  }
+
+  objectData.x = x;
+  objectData.y = y;
+  objectData.radius = radius;
+  objectData.bounds = newBounds;
+  objectData.cells = newCellSet;
+  return true;
+}
+
 describe('SpatialHash', () => {
   const createFixture = () => ({
     spatialHash: new SpatialHash(32), // 32px cell size for testing
@@ -206,6 +240,97 @@ describe('SpatialHash', () => {
       expect(result).toBe(true);
       expect(spatialHash.objectCount).toBe(2);
       expect(spatialHash.objects.has(testObjects.player)).toBe(true);
+    });
+
+    it('keeps bounds and cell metadata when movement stays in the same cell range', () => {
+      const { spatialHash, testObjects } = createFixture();
+      spatialHash.insert(testObjects.bullet, 50, 50, 5);
+      const objectData = spatialHash.objects.get(testObjects.bullet);
+      const { bounds, cells } = objectData;
+
+      spatialHash.update(testObjects.bullet, 52, 49, 5);
+
+      expect(objectData.bounds).toBe(bounds);
+      expect(objectData.cells).toBe(cells);
+      expect(objectData).toMatchObject({
+        x: 52,
+        y: 49,
+        radius: 5,
+        bounds: { minX: 47, minY: 44, maxX: 57, maxY: 54 },
+      });
+    });
+
+    it('matches legacy query membership and order across movement and rebucketing', () => {
+      const actual = new SpatialHash(32, { dynamicResize: false });
+      const reference = new SpatialHash(32, { dynamicResize: false });
+      const objects = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+      const initial = [
+        [objects[0], 10, 10, 4],
+        [objects[1], -20, -15, 9],
+        [objects[2], 66, 40, 12],
+      ];
+      for (const [object, x, y, radius] of initial) {
+        actual.insert(object, x, y, radius);
+        reference.insert(object, x, y, radius);
+      }
+
+      const assertEquivalent = () => {
+        expect([...actual.grid.keys()]).toEqual([...reference.grid.keys()]);
+        for (const [key, actualCell] of actual.grid) {
+          expect([...actualCell]).toEqual([...reference.grid.get(key)]);
+        }
+        for (const object of objects) {
+          const actualData = actual.objects.get(object);
+          const referenceData = reference.objects.get(object);
+          if (!referenceData) {
+            expect(actualData).toBeUndefined();
+            continue;
+          }
+          expect(actualData).toMatchObject({
+            x: referenceData.x,
+            y: referenceData.y,
+            radius: referenceData.radius,
+            bounds: referenceData.bounds,
+          });
+          expect([...actualData.cells]).toEqual([...referenceData.cells]);
+        }
+        for (const [x, y, radius] of [
+          [0, 0, 100],
+          [-30, -20, 24],
+          [64, 32, 18],
+        ]) {
+          expect(actual.query(x, y, radius)).toEqual(
+            reference.query(x, y, radius)
+          );
+          expect(actual.query(x, y, radius, { sorted: false })).toEqual(
+            reference.query(x, y, radius, { sorted: false })
+          );
+        }
+      };
+
+      const updates = [
+        [objects[0], 12, 11, 4], // same range
+        [objects[1], -23, -18, 9], // same negative range
+        [objects[0], 30, 11, 4], // cross a cell boundary
+        [objects[2], 66, 40, 25], // radius changes the range
+        [objects[1], -23, -18, 18], // larger negative range
+      ];
+      for (const [object, x, y, radius] of updates) {
+        actual.update(object, x, y, radius);
+        legacyUpdate(reference, object, x, y, radius);
+        assertEquivalent();
+      }
+
+      actual.remove(objects[1]);
+      reference.remove(objects[1]);
+      assertEquivalent();
+      actual.insert(objects[1], -4, -4, 6);
+      reference.insert(objects[1], -4, -4, 6);
+      assertEquivalent();
+
+      actual.resize(48);
+      reference.resize(48);
+      assertEquivalent();
     });
   });
 

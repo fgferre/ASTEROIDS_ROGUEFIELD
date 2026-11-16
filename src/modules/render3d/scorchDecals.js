@@ -234,10 +234,18 @@ export class ScorchDecals {
       n += 1;
     }
     this.mesh.count = n;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.fade.needsUpdate = true;
-    this.heat.needsUpdate = true;
-    this.seed.needsUpdate = true;
+    if (n === 0) return n;
+    const attributes = [
+      this.mesh.instanceMatrix,
+      this.fade,
+      this.heat,
+      this.seed,
+    ];
+    for (const attribute of attributes) {
+      attribute.updateRange.offset = 0;
+      attribute.updateRange.count = n * attribute.itemSize;
+      attribute.needsUpdate = true;
+    }
     return n;
   }
 

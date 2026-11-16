@@ -35,10 +35,11 @@ cristal exposto, olho de máquina, escudo). A informação é luz; o resto é ma
 - **Fundo com volume, não vazio.** Névoa cósmica em duas camadas com parallax, poeira à deriva na camada do meio,
   poucas estrelas (≈120, brancas, 1–2 px, sem confete colorido), vinheta suave. Ao fundo, longe, a curvatura do
   Anel partido como silhueta escura — a "paisagem" que dá escala.
-- **Câmera.** Zoom 1.3× com follow suave (o campo lógico continua 800×600; a câmera enquadra ~615×460 e segue a
-  nave com atraso de ~0,25 s, com margem morta). Shake é translação + 1° de rotação máxima. Zoom-in curto em
-  level-up e morte. **Isto é decisão de produto tomada em 17/10 pelo dono ao pedir "reimaginar tudo"; se ele
-  reprovar jogando, volta à câmera fixa com uma flag.**
+- **Câmera.** Dois estados, aprovados por ele jogando (19–20/10): perto e aberta. Perto: o campo enche a tela na
+  largura, inclinada 18°, e a câmera só acompanha a nave para cima e para baixo (escolha dele jogando três opções
+  em 16/11: _"Fica a C"_). Aberta: o campo inteiro, quase de cima, só para o que não se vê — ameaça ou chefe fora
+  do quadro, começo de onda, coleta. Trancos curtos de zoom no impulso, no freio, no level-up, na morte e na queda
+  de chefe; quando um chefe cai, a câmera mergulha para perto. Os números ficam em `src/data/constants/camera.js`.
 - **Movimento.** Rastros persistentes de luz (propulsor, tiro), faíscas esticadas pela velocidade, anéis de
   choque, flash branco de 60 ms em qualquer dano a inimigo.
 

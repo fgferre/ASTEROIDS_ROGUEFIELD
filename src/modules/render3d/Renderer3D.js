@@ -17,12 +17,17 @@ import {
 } from '../../core/camera.js';
 import { epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
+import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
   interpolationDisabledByUrl,
 } from '../../core/interpolation.js';
-import { AutoQuality, qualityFromUrl } from '../../core/qualityPresets.js';
+import {
+  AutoQuality,
+  QUALITY_PRESETS,
+  qualityFromUrl,
+} from '../../core/qualityPresets.js';
 import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
@@ -246,11 +251,14 @@ class Renderer3D extends BaseSystem {
         this.three?.veil.flare(x - HALF_W, y - HALF_H, PALETTE.threat);
       }
     });
-    this.registerEventListener('boss-telegraph', () => {
-      this.camera.trigger('telegraph');
+    // A look at an announced attack, only when its source is out of sight.
+    this.registerEventListener('boss-telegraph', (payload) => {
+      this.camera.trigger('telegraph', payload?.enemy);
     });
-    // A boss falling mid-run: a short push from above.
-    this.registerEventListener('boss-defeated', () => {
+    // A boss falling mid-run: the view dives back near, with a short push
+    // from above.
+    this.registerEventListener('boss-defeated', ({ enemy } = {}) => {
+      this.camera.trigger('dive', enemy);
       if (!this.reducedMotion) {
         this.camera.pulseZoom(
           CAMERA_ZOOM * CAMERA_DIRECTOR.bossDown.zoom,
@@ -281,8 +289,12 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('player-took-damage', () => {
       this.impact.kick(KICK_PLAYER_HIT);
     });
-    this.registerEventListener('boss-phase-changed', () => {
+    this.registerEventListener('boss-phase-changed', ({ enemy } = {}) => {
       this.impact.kick(KICK_BOSS_PHASE);
+      this.camera.trigger('dive', enemy);
+    });
+    this.registerEventListener('herald-defeated', ({ kind, x, y } = {}) => {
+      this.camera.trigger('dive', { x, y, radius: HERALD_KINDS[kind]?.radius });
     });
     this.registerEventListener('player-dashed', () => {
       this.impact.kick(KICK_DASH);
@@ -448,7 +460,7 @@ class Renderer3D extends BaseSystem {
     if (!warden || this.failed || this.camera.mode !== 'dynamic') {
       return false;
     }
-    this.camera.trigger('bossArrival', warden);
+    this.camera.trigger('bossArrival');
     return !this.reducedMotion;
   }
 
@@ -674,8 +686,28 @@ class Renderer3D extends BaseSystem {
 
   // Programs for the scene's materials (pooled views included) as the
   // frame draws them: into the composer's target, or the screen without it.
+  // Once per program variant the presets use (shadows on/off, surface maps
+  // on/off), the current preset's last: a quality step in a fight then finds
+  // its programs built (compiling them there froze a frame 150 ms, seconds
+  // on a cold shader cache). Programs keep the uniforms of their last build.
   compileScene() {
+    const q = this.quality.settings;
+    const variants = new Map();
+    Object.values(QUALITY_PRESETS).forEach((p) =>
+      variants.set(`${p.shadows > 0}/${p.surfaceMaps}`, p)
+    );
+    variants.delete(`${q.shadows > 0}/${q.surfaceMaps}`);
+    [...variants.values(), q].forEach((p) => {
+      this.compileVariant(p.shadows > 0, p.surfaceMaps);
+    });
+  }
+
+  compileVariant(shadows, surfaceMaps) {
     const t = this.three;
+    t.renderer.shadowMap.enabled = shadows;
+    t.key.castShadow = shadows;
+    t.enemies.setSurfaceMaps(surfaceMaps);
+    t.player.setSurfaceMaps(surfaceMaps);
     markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.renderer.setRenderTarget(
       this.graphics.postProcessing ? t.composer.readBuffer : null

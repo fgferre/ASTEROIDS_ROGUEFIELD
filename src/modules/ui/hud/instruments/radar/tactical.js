@@ -91,6 +91,10 @@ const CSS = `
             .rt { --rt-u: calc(var(--hud-scale-effective, 1.2) / 1.2); --rt-boss-light: color-mix(in srgb, var(--boss) 55%, white); position: relative; width: calc(${SIZE}px * var(--rt-u)); height: calc(${SIZE}px * var(--rt-u)); pointer-events: none; }
             .rt > *, .rt-frame > * { position: absolute; inset: 0; width: 100%; height: 100%; }
             .rt svg { display: block; overflow: visible; }
+            /* The glyphs (cloned into each blip's <use>) set box-sizing instead of
+               the global 'inherit', so a new transform on a <use> does not restyle
+               its clone: that restyle got dearer with every new value (Chrome). */
+            [id^='rt-g-'], [id^='rt-g-'] * { box-sizing: border-box; }
             .rt-frame { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             .rt[data-mode='threat'] .rt-frame { opacity: 1; transition-duration: 0ms; }
             .rt[data-mode='warden'] .rt-frame { opacity: 0.55; }
@@ -231,6 +235,9 @@ export default {
     this.labels = pool(q('.rt-labels'), LABEL_POOL, () =>
       document.createElement('span')
     );
+    this.blipCount = 0;
+    this.hazeCount = 0;
+    this.labelCount = 0;
     this.mode = null;
     this.jammed = null;
     this.ringsRange = null;
@@ -277,7 +284,8 @@ export default {
 
   drawBlips(blips) {
     let labels = 0;
-    for (let i = 0; i < this.blips.length; i += 1) {
+    const count = Math.min(blips.length, this.blips.length);
+    for (let i = 0; i < count; i += 1) {
       const slot = this.blips[i];
       const b = blips[i];
       show(slot, Boolean(b));
@@ -303,13 +311,19 @@ export default {
       setStyle(label, 'left', `${f(((C + b.x * r) / SIZE) * 100)}%`);
       setStyle(label, 'top', `${f(((C + b.y * r) / SIZE) * 100)}%`);
     }
-    for (let i = labels; i < this.labels.length; i += 1) {
+    for (let i = count; i < this.blipCount; i += 1) {
+      show(this.blips[i], false);
+    }
+    for (let i = labels; i < this.labelCount; i += 1) {
       show(this.labels[i], false);
     }
+    this.blipCount = count;
+    this.labelCount = labels;
   },
 
   drawHaze(haze) {
-    for (let i = 0; i < this.hazes.length; i += 1) {
+    const count = Math.min(haze.length, this.hazes.length);
+    for (let i = 0; i < count; i += 1) {
       const slot = this.hazes[i];
       const h = haze[i];
       show(slot, Boolean(h));
@@ -320,6 +334,10 @@ export default {
       write(slot, 'cy', f(C + h.y * RIM));
       write(slot, 'r', f(Math.min(9, 4 + 1.2 * Math.sqrt(h.weight))));
     }
+    for (let i = count; i < this.hazeCount; i += 1) {
+      show(this.hazes[i], false);
+    }
+    this.hazeCount = count;
   },
 
   destroy() {

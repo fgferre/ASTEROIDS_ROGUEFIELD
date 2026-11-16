@@ -609,6 +609,7 @@ export class AAAHudLayout {
 
     const query = (selector) => root.querySelector(selector);
 
+    this._nextWave = { seconds: null, label: null };
     this.els = {
       nextWaveBox: query('#el-wave-alert'),
       nextWaveLabel: query('#el-wave-alert .next-wave-label'),
@@ -821,14 +822,26 @@ export class AAAHudLayout {
     }
 
     const safeSeconds = Number.isFinite(seconds) ? Math.ceil(seconds) : 0;
+    const shown = this._nextWave;
     if (safeSeconds <= 0) {
-      nextWaveBox.classList.remove('visible');
+      if (shown.seconds !== 0) {
+        shown.seconds = 0;
+        nextWaveBox.classList.remove('visible');
+      }
       return;
     }
 
-    nextWaveBox.classList.add('visible');
-    nextWaveTimer.innerText = safeSeconds;
-    this.els.nextWaveLabel.textContent = label;
+    if (shown.seconds === 0 || shown.seconds === null) {
+      nextWaveBox.classList.add('visible');
+    }
+    if (shown.seconds !== safeSeconds) {
+      shown.seconds = safeSeconds;
+      nextWaveTimer.innerText = safeSeconds;
+    }
+    if (shown.label !== label) {
+      shown.label = label;
+      this.els.nextWaveLabel.textContent = label;
+    }
   }
 
   /**

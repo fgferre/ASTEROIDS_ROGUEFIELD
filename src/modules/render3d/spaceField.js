@@ -3,7 +3,8 @@
 // camera parallaxes them against each other, smaller, dimmer and bluer the
 // deeper they sit; a dozen bright stars with a soft cross; a nebula in three
 // depths (a far plane baked once into a texture, which the sky carries to
-// every view ray, live mid bands and near wisps); soft dust clouds between
+// every view ray, mid bands baked anew as they drift, live near wisps); soft
+// dust clouds between
 // the field and the stars; and sparse dust
 // in a thin slab around the plane, lit by the ship. Each biome recolours the
 // nebula, the clouds and the dust through setLook(). One draw call per layer;
@@ -11,6 +12,13 @@
 
 import { createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
+import {
+  DriftingMap,
+  FAR_BAKE_FRAGMENT,
+  FAR_BAKE_VERTEX,
+  MID_BAKE_FRAGMENT,
+  NOISE,
+} from './nebulaBake.js';
 
 // proposta 18/10: depth below the play plane, star count, size range (px at
 // a 900-px-tall frame), brightness, share of the cool tint and of the
@@ -73,13 +81,20 @@ export const NEBULA_FAR = {
   rim: [1.24, 1],
   graze: [0.2, 0.45],
 };
-// MID: broad soft bands of haze, live (3 octaves, two calls), drifting at
-// `drift` noise units/s; `gain` of the haze added, `veil` of what lies
-// behind (the far stars, the far nebula) hidden under a full band.
+// MID: broad soft bands of haze (3 octaves, two calls), drifting at `drift`
+// noise units/s; `gain` of the haze added, `veil` of what lies behind (the
+// far stars, the far nebula) hidden under a full band. The drift is far
+// too slow to compute every pixel every frame: the bands are baked over the
+// whole plane into a `texture`-texel half-float map (8 MB) at every
+// `refresh` seconds of space time, and the plane cross-fades from one such
+// key to the next while the one after is baked, `strips` rows at a time.
 export const NEBULA_MID = {
   depth: 2700,
   scale: 1900,
   drift: 0.004,
+  texture: 2048,
+  refresh: 1,
+  strips: 16,
   gain: 0.2,
   veil: 0.22,
   graze: [0.2, 0.5],
@@ -249,7 +264,7 @@ void main() {
     : vec4(2.0, 2.0, 2.0, 1.0);
 }`;
 
-// The live nebula planes: world position for the noise and, in the FADING
+// The live near plane: world position for the noise and, in the FADING
 // version of each plane (SpaceField.showPlanes), for how much of it is left
 // at its distance from the camera (DEPTH_FADE) and its angle to the ray
 // (`graze`); the still version skips that work.
@@ -275,75 +290,10 @@ float planeFade() {
 #endif
 }`;
 
-const NOISE = `
-vec2 hash2(vec2 p) {
-  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-  return -1.0 + 2.0 * fract(sin(p) * 43758.5453);
-}
-float noise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(dot(hash2(i), f), dot(hash2(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
-    mix(dot(hash2(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
-      dot(hash2(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x),
-    u.y);
-}
-float fbm(vec2 p) {
-  float s = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 4; i++) {
-    s += a * noise(p);
-    p = p * 2.03 + vec2(1.7, 9.2);
-    a *= 0.5;
-  }
-  return s;
-}
-float fbm3(vec2 p) {
-  float s = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 3; i++) {
-    s += a * noise(p);
-    p = p * 2.03 + vec2(1.7, 9.2);
-    a *= 0.5;
-  }
-  return s;
-}`;
-
-// The far nebula's bake (once, into a render target over the far plane's
-// footprint): gradient-noise fbm, domain-warped twice: a very low-frequency
-// mask keeps most of the sky black and gathers the gas into a few regions;
-// inside them broad clouds (r, stored before squaring so the dark end keeps
-// its precision in 8 bits) and thin filaments (g).
-const FAR_BAKE_VERTEX = `
-uniform vec2 uOrigin;
-uniform float uSize;
-varying vec2 vPos;
-void main() {
-  vPos = uOrigin + vec2(uv.x - 0.5, 0.5 - uv.y) * uSize;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
-}`;
-
-const FAR_BAKE_FRAGMENT = `
-uniform float uScale;
-varying vec2 vPos;
-${NOISE}
-void main() {
-  vec2 p = vPos / uScale;
-  vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
-  vec2 r = vec2(fbm(p + 3.0 * q + vec2(1.7, 9.2)), fbm(p + 3.0 * q + vec2(8.3, 2.8)));
-  float n = fbm(p * 1.4 + 2.5 * r);
-  float region = smoothstep(-0.05, 0.3, fbm(p * 0.45 + vec2(3.1, 7.7)));
-  float cloud = smoothstep(-0.05, 0.45, n) * region;
-  float filament = 1.0 - smoothstep(0.0, 0.035, abs(fbm(p * 2.2 + 2.0 * r + 7.3)));
-  float veins = filament * smoothstep(0.0, 0.3, n) * region;
-  gl_FragColor = vec4(cloud, veins, 0.0, 1.0);
-}`;
-
 // The far layer has two meshes and one shader. Its plane, drawn first and
 // writing depth, reads the map straight from a varying (the cheap read on
-// tile GPUs) and alone fills every top-down shot; the sky box (SKY), drawn
+// tile GPUs; the mid plane reads its keys the same way) and alone fills
+// every top-down shot; the sky box (SKY), drawn
 // after it at the far depth while a fade is in view, shades only where the
 // plane is not (past it or past the far clip), finding the same point along
 // the ray.
@@ -423,27 +373,26 @@ void main() {
   gl_FragColor = vec4(color, 1.0);
 }`;
 
-// Mid bands: a warped, sideways-stretched fbm; premultiplied, so the haze
-// adds and the band's veil hides a share of what is behind.
+// On the plane (the far plane's vertex shader), the fbm between two baked
+// keys, uBlend of the way to the second, then shaped into a band;
+// premultiplied, so the haze adds and the band's veil hides a share of what
+// is behind.
 const MID_FRAGMENT = `
-uniform float uTime;
-uniform float uScale;
-uniform float uDrift;
+uniform sampler2D uMap0;
+uniform sampler2D uMap1;
+uniform float uBlend;
 uniform vec3 uHaze;
 uniform float uGain;
 uniform float uVeil;
+varying vec2 vUv;
 ${PLANE_FADE}
-${NOISE}
 void main() {
   float fade = planeFade();
   if (fade <= 0.0) {
     gl_FragColor = vec4(0.0);
     return;
   }
-  vec2 p = vWorld.xz / uScale + vec2(11.3, -4.1);
-  float t = uTime * uDrift;
-  float w = fbm3(p * 0.7 + vec2(t, -0.6 * t));
-  float n = fbm3(vec2(p.x * 0.6, p.y * 1.4) + 1.8 * w + vec2(-0.5 * t, t));
+  float n = mix(texture2D(uMap0, vUv).r, texture2D(uMap1, vUv).r, uBlend);
   float band = smoothstep(-0.12, 0.38, n);
   band *= band;
   gl_FragColor = vec4(uHaze * band * uGain, band * uVeil) * fade;
@@ -778,8 +727,9 @@ export class SpaceField {
   // the sky behind them. The far plane and the sky show a target baked
   // before the first frame the scene draws (scene.onBeforeRender is where
   // the renderer is known), mipmapped for the shallow rays and mirrored past
-  // its edge. Each plane comes twice, still and FADING (showPlanes); both
-  // sit in the scene, so the loading screen compiles both.
+  // its edge; the mid plane, keys baked there as its bands drift (DriftingMap).
+  // Each plane comes twice, still and FADING (showPlanes); both sit in the
+  // scene, so the loading screen compiles both.
   buildNebula(THREE, scene) {
     this.planes = [];
     const plane = (key, depth, options, renderOrder) => {
@@ -824,22 +774,25 @@ export class SpaceField {
     });
     this.bakeScene = new THREE.Scene();
     this.bakeCamera = new THREE.Camera();
-    const quad = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
+    const bakeMaterial = (uniforms, fragmentShader) =>
       new THREE.ShaderMaterial({
-        uniforms: {
-          uOrigin: { value: new THREE.Vector2(far.cx, far.cz) },
-          uSize: { value: far.half * 2.2 },
-          uScale: { value: scale },
-        },
+        uniforms,
         vertexShader: FAR_BAKE_VERTEX,
-        fragmentShader: FAR_BAKE_FRAGMENT,
+        fragmentShader,
         depthTest: false,
         depthWrite: false,
-      })
+      });
+    this.farBake = bakeMaterial(
+      {
+        uOrigin: { value: new THREE.Vector2(far.cx, far.cz) },
+        uSize: { value: far.half * 2.2 },
+        uScale: { value: scale },
+      },
+      FAR_BAKE_FRAGMENT
     );
-    quad.frustumCulled = false;
-    this.bakeScene.add(quad);
+    this.bakeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
+    this.bakeQuad.frustumCulled = false;
+    this.bakeScene.add(this.bakeQuad);
     this.baked = false;
     scene.onBeforeRender = (renderer, _scene, camera) => {
       this.bake(renderer);
@@ -894,8 +847,29 @@ export class SpaceField {
     this.sky.renderOrder = -39;
     scene.add(this.sky);
 
+    const mid = layerSpan(NEBULA_MID.depth);
+    this.midMap = new DriftingMap(
+      THREE,
+      bakeMaterial(
+        {
+          uOrigin: { value: new THREE.Vector2(mid.cx, mid.cz) },
+          uSize: { value: PLANE_HALF * 2 },
+          uScale: { value: NEBULA_MID.scale },
+          uDrift: { value: NEBULA_MID.drift },
+          uTime: { value: 0 },
+        },
+        MID_BAKE_FRAGMENT
+      ),
+      NEBULA_MID
+    );
     this.midUniforms = {
-      ...live(NEBULA_MID),
+      uCenter: { value: new THREE.Vector2(mid.cx, mid.cz) },
+      uSize: { value: PLANE_HALF * 2 },
+      uMap0: { value: null },
+      uMap1: { value: null },
+      uBlend: { value: 0 },
+      uFade: fade,
+      uGraze: { value: new THREE.Vector2(...NEBULA_MID.graze) },
       uHaze: { value: new THREE.Color() },
       uGain: { value: 0 },
       uVeil: { value: NEBULA_MID.veil },
@@ -905,7 +879,7 @@ export class SpaceField {
       NEBULA_MID.depth,
       {
         uniforms: this.midUniforms,
-        vertexShader: NEBULA_VERTEX,
+        vertexShader: FAR_VERTEX,
         fragmentShader: MID_FRAGMENT,
         transparent: true,
         premultipliedAlpha: true,
@@ -939,14 +913,33 @@ export class SpaceField {
     this.showPlanes();
   }
 
-  // The far nebula's structure, drawn once into its target.
+  // The far nebula's structure, drawn once into its target; the mid bands'
+  // keys while that plane is drawn.
   bake(renderer) {
-    if (this.baked) return;
-    this.baked = true;
-    const target = renderer.getRenderTarget();
-    renderer.setRenderTarget(this.farTarget);
-    renderer.render(this.bakeScene, this.bakeCamera);
+    if (!this.baked) {
+      this.baked = true;
+      this.bakeInto(renderer, this.farTarget, this.farBake);
+    }
+    if (this.layerCount < SPACE_LAYERS.mid) return;
+    const map = this.midMap;
+    map.update(this.time.value, (target, from, rows) =>
+      this.bakeInto(renderer, target, map.material, from, rows)
+    );
+    this.midUniforms.uMap0.value = map.keys[0].texture;
+    this.midUniforms.uMap1.value = map.keys[1].texture;
+    this.midUniforms.uBlend.value = map.blend;
+  }
+
+  // `material` drawn over `target` (all of it, or `rows` texel rows from
+  // `from`), the frame's target restored.
+  bakeInto(renderer, target, material, from = 0, rows = 0) {
+    this.bakeQuad.material = material;
+    target.scissor.set(0, from, target.width, rows);
+    target.scissorTest = rows > 0;
+    const frame = renderer.getRenderTarget();
     renderer.setRenderTarget(target);
+    renderer.render(this.bakeScene, this.bakeCamera);
+    renderer.setRenderTarget(frame);
   }
 
   // Whether `camera` can see a layer fade (FADE_FROM), before the frame's
