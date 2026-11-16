@@ -94,3 +94,15 @@ describe('layer modifiers (endless run)', () => {
     });
   });
 });
+
+describe('the endless field event', () => {
+  const eventKind = (layer, seed) => directorFor(layer, seed).events[0].kind;
+
+  it('is the same for one seed and differs between seeds', () => {
+    expect(eventKind(17, 42)).toBe(eventKind(17, 42));
+    const kinds = new Set(
+      [1, 2, 3, 4, 5, 6, 7, 8].map((s) => eventKind(17, s))
+    );
+    expect(kinds.size).toBeGreaterThan(1);
+  });
+});

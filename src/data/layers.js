@@ -106,7 +106,7 @@ const BEYOND_EVENT_AT = 30;
  * layer 15's escort, the rest built on layer 14. Counted from 14: rocks +2 per
  * layer (capped at the on-screen limit), roster counts ×1.08 per layer, elite
  * chance +0.03 per layer up to 0.5. Non-Warden layers get one field event at
- * 30 s, its kind rolled from a seed per layer. Every layer carries its
+ * 30 s, its kind rolled from the run seed and the layer. Every layer carries its
  * modifier id (modifierFor).
  */
 function beyond(layer, runSeed) {
@@ -131,7 +131,7 @@ function beyond(layer, runSeed) {
       ? []
       : [
           fieldEvent(
-            new RandomService(`field-event:${layer}`).pick(
+            new RandomService(`field-event:${runSeed}:${layer}`).pick(
               Object.keys(FIELD_EVENTS)
             ),
             BEYOND_EVENT_AT

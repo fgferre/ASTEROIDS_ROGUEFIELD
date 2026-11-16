@@ -12,6 +12,23 @@ import {
 
 const AIMING_CONFIG = COMBAT_AIMING_UPGRADE_CONFIG || {};
 
+// px the outer lane keeps inside the target's hit radius (radius + bullet
+// radius). Measured 15/11/2026 in the headless game: 7 is the smallest margin
+// at which every lane of a 3- or 4-shot volley lands on a still mite (r 9)
+// and on small rocks (r 12) crossing at 70 and 180 px/s.
+const LANE_MARGIN = 7;
+
+// The gap between parallel lanes on `enemy`: the nominal spacing, shrunk so
+// the outer lanes of `count` stay LANE_MARGIN inside the hit radius. Lanes
+// stay evenly spaced.
+function laneStep(spacing, count, enemy) {
+  const reach = Math.max(
+    0,
+    (enemy?.radius || 16) + COMBAT_BULLET_RADIUS - LANE_MARGIN
+  );
+  return Math.min(spacing, (2 * reach) / (count - 1));
+}
+
 export function applyMultishotSpread(
   playerPos,
   targetPos,
@@ -64,18 +81,7 @@ export function computeParallelOffset(
   }
 
   const spacing = AIMING_CONFIG.multiLock?.parallelSpacing ?? 10;
-
-  let magnitude = offsetIndex * spacing;
-  const targetRadius = enemy?.radius || 16;
-  // Lane clamp per FIX-05 (plan 01.07 Task 3): keep lanes inside the target's
-  // effective hit radius (radius + bullet radius). Tighter than the legacy
-  // `Math.max(spacing, targetRadius * radiusMultiplier)`. Fix-pass-2 (C7b):
-  // use the gameplay-domain alias COMBAT_BULLET_RADIUS (mirrors BULLET_SIZE
-  // numerically; pinned by the F10 test). The artifact contract in
-  // 01.07-aim-centerline-toggles-PLAN.md promises this name as the source
-  // of truth for combat clamp math.
-  const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
-  magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
+  const magnitude = offsetIndex * laneStep(spacing, duplicateCount, enemy);
 
   const perpX = (-dy / distance) * magnitude;
   const perpY = (dx / distance) * magnitude;
@@ -94,9 +100,8 @@ export function computeParallelOffset(
  * For shotCount=1, returns a single entry with zero perpendicular offset.
  *
  * For `kind:'target'`, both `fireOrigin` and `aimPoint` are shifted by the same
- * perpendicular vector (parallel lanes). Lane magnitude is clamped to
- * `Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS)` so outer lanes never
- * exceed the target's effective hit radius.
+ * perpendicular vector (parallel lanes), evenly spaced by `laneStep` so the
+ * outer lanes land inside the target's hit radius.
  *
  * For `kind:'direction'`, the helper does NOT consult a target — perpendicular
  * offsets use the fixed `spacing` only; aim points sit at +1000 along the angle
@@ -155,21 +160,12 @@ export function applyConcentratedFire(w, input, shotCount) {
     const perpX = -dy / distance;
     const perpY = dx / distance;
 
-    const targetRadius = enemy.radius || 16;
-    // Fix-pass-2 (C7b): use the gameplay-domain alias COMBAT_BULLET_RADIUS
-    // here too (mirrors the computeParallelOffset clamp). Mirrors BULLET_SIZE
-    // numerically; pinned by the F10 test.
-    const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
+    const step = laneStep(spacing, count, enemy);
 
     const slotCenter = (count - 1) / 2;
     const results = [];
     for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
-      const offsetIndex = shotIndex - slotCenter;
-      const rawMagnitude = offsetIndex * spacing;
-      const magnitude = Math.max(
-        -clampLimit,
-        Math.min(clampLimit, rawMagnitude)
-      );
+      const magnitude = (shotIndex - slotCenter) * step;
 
       const shotPerpX = perpX * magnitude;
       const shotPerpY = perpY * magnitude;
@@ -200,7 +196,7 @@ export function applyConcentratedFire(w, input, shotCount) {
     const dxUnit = Math.cos(angle);
     const dyUnit = Math.sin(angle);
 
-    // Perpendicular unit vector (no targetRadius reference — clamp is not used).
+    // Perpendicular unit vector (no target: lanes at the nominal spacing).
     const perpX = -dyUnit;
     const perpY = dxUnit;
 

@@ -340,6 +340,18 @@ describe('WaveManager field events', () => {
     );
   });
 
+  it("leaves a Magnet pickup's pull on when a Gravity Well starts", () => {
+    const field = createField();
+    field.xpOrbs.globalPull = { remaining: 5, target: null };
+    startLayer(field, 4);
+    field.active.push({ type: 'asteroid', destroyed: false });
+
+    field.manager.update(30);
+
+    expect(eventsOf(field, 'field-event-started')[0].kind).toBe('gravity-well');
+    expect(field.xpOrbs.startGlobalPull).not.toHaveBeenCalled();
+  });
+
   it('stuns every machine and flashes the screen on a Solar Flare', () => {
     const field = createField();
     startLayer(field, 7);

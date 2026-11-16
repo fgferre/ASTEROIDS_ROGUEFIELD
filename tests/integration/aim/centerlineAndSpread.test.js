@@ -96,7 +96,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
-  describe('computeParallelOffset lane clamp tightened to ±(targetRadius + BULLET_SIZE)', () => {
+  describe('lanes on a target are evenly spaced inside ±(targetRadius + BULLET_SIZE)', () => {
     it('4-shot concentrated burst at radius-8 asteroid keeps all 4 lanes within ±(8 + BULLET_SIZE)', () => {
       const { combat } = setupCombatHarness();
       const playerPos = { x: 0, y: 0 };
@@ -113,10 +113,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
     });
 
-    it('lane offsets at radius-50 (big) capped at spacing (not at the wider radius+BULLET_SIZE)', () => {
-      // With spacing=14 and a radius-50 enemy, the clamp is min(14, 53) = 14.
-      // The middle lanes (offsetIndex ±0.5 for shotCount=4) sit at ±7, outer
-      // lanes at ±21 → clamped to ±14. Verify the outermost lane is exactly 14.
+    it('lane offsets at radius-50 (big) keep the nominal 14 px spacing', () => {
+      // Four lanes 14 px apart (±7, ±21) all fit inside a radius-50 enemy.
       const { combat } = setupCombatHarness();
       const playerPos = { x: 0, y: 0 };
       const enemy = { id: 'e1', x: 300, y: 0, radius: 50 };
@@ -126,10 +124,28 @@ describe('FIX-05 centerline invariant + toggles', () => {
         4,
         { damage: 10, multishot: 4 }
       );
-      results.forEach((entry) => {
-        // |perpOffset| ≤ spacing (14) for any lane.
-        expect(Math.abs(entry.aimPoint.y)).toBeLessThanOrEqual(14 + 0.0001);
-      });
+      const lanes = results.map((entry) => entry.aimPoint.y);
+      [21, 7, -7, -21].forEach((offset, index) =>
+        expect(Math.abs(lanes[index])).toBeCloseTo(Math.abs(offset), 5)
+      );
+    });
+
+    it('a small rock (radius 12) gets 4 evenly spaced lanes, the outer ones inside its hit radius', () => {
+      const { combat } = setupCombatHarness();
+      const enemy = { id: 'e1', x: 300, y: 0, radius: 12 };
+
+      const lanes = combat
+        .applyConcentratedFire(
+          { kind: 'target', enemy, fireOrigin: { x: 0, y: 0 } },
+          4,
+          { damage: 10, multishot: 4 }
+        )
+        .map((entry) => entry.aimPoint.y)
+        .sort((a, b) => a - b);
+
+      const gaps = lanes.slice(1).map((lane, index) => lane - lanes[index]);
+      gaps.forEach((gap) => expect(gap).toBeCloseTo(gaps[0], 5));
+      expect(lanes[3]).toBeLessThan(12 + BULLET_SIZE - 5);
     });
   });
 
