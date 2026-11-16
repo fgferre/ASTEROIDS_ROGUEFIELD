@@ -151,10 +151,10 @@ describe('PlayerMirror', () => {
         if (object.isLineSegments) lines += 1;
       });
       // hull + canopy + per nozzle (throat, flame, core) + one puff per
-      // wingtip port + the two nose jets
+      // wingtip port + the two nose jets + the six sputter embers
       const { nozzles, rcsPorts } = mirror.geometry;
       expect(meshes, hull.id).toBe(
-        2 + 3 * nozzles.length + rcsPorts.length + 2
+        2 + 3 * nozzles.length + rcsPorts.length + 2 + 6
       );
       expect(lines, hull.id).toBeLessThanOrEqual(3);
     });

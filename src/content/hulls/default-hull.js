@@ -59,6 +59,8 @@ const visual = {
   ],
   nozzleLength: 0.14 * S,
   nozzleLengthPerLevel: 0.025 * S,
+  // main flame proportions (playerMirror.js, maquete 16/11): the twin flame as it was
+  flame: { length: 1, width: 1 },
   retroPorts: [pt(0.3, -0.21), pt(0.3, 0.21)],
   cockpit: { from: pt(0.4, 0), to: pt(0.66, 0), width: 0.07 * S },
   // layered plates: a needle prow, armoured shoulders and a vented spine,

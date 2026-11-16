@@ -65,6 +65,8 @@ const visual = {
   ],
   nozzleLength: 0.13 * S,
   nozzleLengthPerLevel: 0.025 * S,
+  // main flame proportions (playerMirror.js, maquete 16/11): wide, short, heavy
+  flame: { length: 0.75, width: 1.3 },
   retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
   cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
   // a blunt, slab-sided body on a flat belly, thick delta wings, armour

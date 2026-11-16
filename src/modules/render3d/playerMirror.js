@@ -65,6 +65,52 @@ const IDLE_EMBER = 0.3;
 const IDLE_EMBER_LENGTH = 2.8;
 const IDLE_BREATH = 0.2;
 const IDLE_BREATH_S = 3.2;
+// Main-flame mock-ups (maquete 16/11): four ideas, each behind its own
+// switch so the owner can keep some and drop others.
+// (a) Propulsors card: each level makes the flame longer and tighter, the
+// core longer and hotter, steadier; from SHOCK_LEVEL pressure diamonds ride
+// along it. The hue never changes.
+const FLAME_LEVEL_SHAPE = true;
+const LEVEL_LENGTH = 0.2; // + flame length per level
+const LEVEL_TIGHTEN = 0.1; // − flame width per level
+const LEVEL_CORE = 0.04; // + the core's share of the flame per level
+const LEVEL_THIN = 0.07; // − core opacity per level: a thinner, sharper line
+const LEVEL_DIM = 0.09; // − flame-body brightness per level: more nozzles, never a blob
+const LEVEL_STEADY = 0.014; // − flicker per level
+const SHOCK_LEVEL = 5;
+const SHOCK_AT = [0.3, 0.5, 0.68]; // along the flame, nozzle to tip
+// (b) Start burst: pilot thrust while the speed along the nose is far below
+// cruise overshoots; the cruise flame is CRUISE_SCALE of the old one.
+const FLAME_START_BURST = true;
+const CRUISE_SCALE = 0.75;
+const BURST_LENGTH = 1.1; // + length at full burst
+const BURST_WIDTH = 0.35; // + width at full burst
+const BURST_HEAT = 0.5; // + core brightness at full burst
+const BURST_FROM = 0.25; // share of cruise speed: full burst below,
+const BURST_TO = 0.7; // none past
+// (c) A flame per hull: `flame: { length, width }` in the hull's visual.
+const FLAME_PER_HULL = true;
+// (d) Low-hull sputter: from SPUTTER_FROM of the hull down to SPUTTER_FULL
+// the flame flickers unevenly, cuts out for a frame or two and spits embers.
+const FLAME_SPUTTER = true;
+const SPUTTER_FROM = 0.33;
+const SPUTTER_FULL = 0.15;
+const SPUTTER_FLICKER = 0.45; // flicker depth at full sputter
+const SPUTTER_HZ = 30; // cut-out slots per second
+const SPUTTER_CUT = [0.02, 0.24]; // the engine's cut chance per slot
+const SPUTTER_EMBERS = 6;
+const EMBER_LIFE = 0.5; // seconds
+
+const smoothstep = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+// Deterministic 0..1 noise for the render (never the sim's RNG).
+const hash = (n) => {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+
 // The nose jets' puffs, a share of the wingtip ones (proposta 15/11).
 const NOSE_PUFF = 0.8;
 // Each shot pushes the hull back along the nose for the muzzle frames.
@@ -211,7 +257,6 @@ export class PlayerMirror {
       });
     this.flameMaterial = glow();
     this.coreMaterial = glow();
-    this.coreMaterial.color.setRGB(1.7, 1.7, 1.6);
     this.puffMaterial = glow();
     this.nozzleMaterial = glow();
     this.accent = new THREE.Color();
@@ -221,6 +266,13 @@ export class PlayerMirror {
     cone.rotateZ(Math.PI / 2);
     cone.translate(-0.5, 0, 0);
     this.cone = cone;
+    // a lozenge for the shock diamonds and the sputter embers
+    this.diamond = new THREE.OctahedronGeometry(1, 0);
+    this.diamond.userData.cached = true;
+    this.shockMaterial = glow();
+    this.emberMaterial = glow();
+    this.flameShape = { length: 1, width: 1 };
+    this.embers = [];
 
     this.light = new THREE.PointLight(
       colorOf(THREE, PALETTE.player),
@@ -348,13 +400,25 @@ export class PlayerMirror {
     });
     this.flames = [];
     this.puffs = [];
+    this.embers = [];
 
     // Thrusters take the hull's accent (amber Solar Slicer); the rim and
     // edges stay player cyan.
     this.accent = colorOf(THREE, geometry.accent);
     this.thrustRgb = rgbOf(THREE, geometry.accent);
-    this.flameMaterial.color.copy(this.accent).multiplyScalar(1.8);
     this.puffMaterial.color.copy(this.accent).multiplyScalar(1.4);
+    this.shockMaterial.color
+      .copy(this.accent)
+      .lerp(this.warmLight, 0.6)
+      .multiplyScalar(1.5);
+    this.emberMaterial.color
+      .copy(this.accent)
+      .lerp(this.warmLight, 0.5)
+      .multiplyScalar(1.6);
+    this.flameShape = (FLAME_PER_HULL && hull.visual.flame) || {
+      length: 1,
+      width: 1,
+    };
     this.bladeEdgeMaterial.color.copy(this.accent).multiplyScalar(1.3);
 
     const key = hullKeyOf(hull, levels);
@@ -385,8 +449,25 @@ export class PlayerMirror {
       flame.position.set(nozzle.exitX, NOZZLE_HEIGHT, nozzle.y);
       core.position.copy(flame.position);
       this.ship.add(throat, flame, core);
-      this.flames.push({ flame, core, r: nozzle.r });
+      const shocks = [];
+      if (FLAME_LEVEL_SHAPE && levels.thruster >= SHOCK_LEVEL) {
+        SHOCK_AT.forEach(() => {
+          const shock = new THREE.Mesh(this.diamond, this.shockMaterial);
+          shock.position.copy(flame.position);
+          this.ship.add(shock);
+          shocks.push(shock);
+        });
+      }
+      this.flames.push({ flame, core, shocks, r: nozzle.r, x: nozzle.exitX });
     });
+    if (FLAME_SPUTTER) {
+      for (let i = 0; i < SPUTTER_EMBERS; i += 1) {
+        const ember = new THREE.Mesh(this.diamond, this.emberMaterial);
+        ember.visible = false;
+        this.ship.add(ember);
+        this.embers.push(ember);
+      }
+    }
 
     // The turn couple (thrusters.js), blowing outboard: a wingtip puff at
     // each aft RCS port, lit when the nose swings away from its flank, and a
@@ -469,7 +550,13 @@ export class PlayerMirror {
     this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
-    this.lightEngines(main, levels.thruster, time);
+    this.lightEngines(
+      main,
+      levels.thruster,
+      time,
+      this.startBurst(player, cos, sin),
+      player.maxHealth > 0 ? player.health / player.maxHealth : 1
+    );
     for (let i = 0; i < this.puffs.length; i += 1) {
       const { puff, size, turnL } = this.puffs[i];
       const amount = (turnL ? thrust.turnL : thrust.turnR) || 0;
@@ -530,25 +617,78 @@ export class PlayerMirror {
    * thrust, bumped briefly by each shot. The journey (travelScene.js) lights
    * them on a ship the simulation holds still.
    */
-  lightEngines(main, level = 0, time = 0) {
-    const length = (5 + 18 * main) * (1 + 0.1 * (level || 0));
+  lightEngines(main, level = 0, time = 0, burst = 0, hull = 1) {
+    const lv = FLAME_LEVEL_SHAPE ? level || 0 : 0;
+    const kick = burst * main;
+    const length =
+      (5 + 18 * main * (FLAME_START_BURST ? CRUISE_SCALE : 1)) *
+      (FLAME_LEVEL_SHAPE ? 1 + LEVEL_LENGTH * lv : 1 + 0.1 * (level || 0)) *
+      (1 + BURST_LENGTH * kick) *
+      this.flameShape.length;
+    const width =
+      (1 - LEVEL_TIGHTEN * lv) *
+      (1 + BURST_WIDTH * kick) *
+      this.flameShape.width;
+    const coreLength = length * (0.5 + LEVEL_CORE * lv);
+    const flickerDepth = 0.1 - LEVEL_STEADY * lv;
+    const danger = FLAME_SPUTTER
+      ? Math.min(
+          1,
+          Math.max(0, (SPUTTER_FROM - hull) / (SPUTTER_FROM - SPUTTER_FULL))
+        )
+      : 0;
+    const cutChance =
+      danger > 0
+        ? SPUTTER_CUT[0] + (SPUTTER_CUT[1] - SPUTTER_CUT[0]) * danger
+        : 0;
+    const slot = Math.floor(time * SPUTTER_HZ);
+    // the whole engine stalls now and then, a nozzle alone a little more often
+    const stall = hash(slot * 0.37 + 5) < cutChance * 0.7;
     // At idle no jet, only the throats, a faint light and a short ember,
     // breathing slowly (the owner's pick).
     const breath =
       1 + IDLE_BREATH * Math.sin((time * Math.PI * 2) / IDLE_BREATH_S);
     const burning = main > 0.02;
     for (let i = 0; i < this.flames.length; i += 1) {
-      const { flame, core, r } = this.flames[i];
-      const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
+      const { flame, core, shocks, r } = this.flames[i];
+      // (d) uneven flicker and a cut now and then on a failing hull
+      const u = time * 13 + i * 7.3;
+      const k = Math.floor(u);
+      const f = u - k;
+      const noise = hash(k) + (hash(k + 1) - hash(k)) * f * f * (3 - 2 * f);
+      const cut = stall || hash(slot * 3.1 + i * 17.7) < cutChance * 0.5;
+      const flicker =
+        (1 - flickerDepth + flickerDepth * Math.sin(time * 40 + i * 1.7)) *
+        (1 - SPUTTER_FLICKER * danger * noise);
       const reach = burning ? length * flicker : IDLE_EMBER_LENGTH * breath;
-      core.visible = burning;
-      flame.scale.set(reach, r * 0.95, r * 0.95);
-      core.scale.set(length * 0.5 * flicker, r * 0.45, r * 0.45);
+      flame.visible = !cut;
+      core.visible = burning && !cut;
+      flame.scale.set(
+        burning ? reach : reach * (1 - 0.5 * danger * noise),
+        r * 0.95 * (burning ? width : 1),
+        r * 0.95 * (burning ? width : 1)
+      );
+      const coreWidth = r * width * (0.47 - 0.03 * lv);
+      core.scale.set(coreLength * flicker, coreWidth, coreWidth);
+      for (let s = 0; s < shocks.length; s += 1) {
+        const shock = shocks[s];
+        shock.visible = burning && !cut;
+        shock.position.x = flame.position.x - length * flicker * SHOCK_AT[s];
+        const size = r * width * 0.55 * (1 - 0.22 * s);
+        shock.scale.set(length * 0.06, size, size);
+      }
     }
+    this.lightEmbers(danger, time);
     this.flameMaterial.opacity = burning
       ? Math.min(1, main * 1.2)
       : IDLE_EMBER * breath;
-    this.coreMaterial.opacity = Math.min(1, main * 1.1);
+    this.coreMaterial.opacity = Math.min(1, main * 1.1) * (1 - LEVEL_THIN * lv);
+    this.flameMaterial.color
+      .copy(this.accent)
+      .multiplyScalar(1.8 * (1 - LEVEL_DIM * lv));
+    const heat = 1.7 * (1 + BURST_HEAT * kick);
+    this.coreMaterial.color.setRGB(heat, heat, heat * 0.94);
+    this.shockMaterial.opacity = Math.min(1, main * 1.1);
     const glow = IDLE_GLOW * breath;
     this.nozzleMaterial.color
       .copy(this.accent)
@@ -558,6 +698,51 @@ export class PlayerMirror {
       IDLE_LIGHT * breath * (1 - main) +
       2.6 * main +
       (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+    if (danger > 0) {
+      this.light.intensity *= stall
+        ? 0.2
+        : 1 - 0.5 * danger * hash(slot * 0.71);
+    }
+  }
+
+  /**
+   * (b) How hard the pilot is accelerating, 0..1: his own thrust (not the
+   * coast brake, not a dash) while the speed along the nose is far below
+   * cruise (acceleration over damping, ~90 px/s).
+   */
+  startBurst(player, cos, sin) {
+    if (!FLAME_START_BURST || player.enginesIdle || player.dashTimer > 0) {
+      return 0;
+    }
+    const { velocity, flight } = player;
+    const cruise = flight.acceleration / flight.baseLinearDamping;
+    const along = (velocity.vx * cos + velocity.vy * sin) / cruise;
+    return 1 - smoothstep(BURST_FROM, BURST_TO, along);
+  }
+
+  /**
+   * (d) Dying embers spat from the nozzles on a failing hull: each lives
+   * EMBER_LIFE, drifting aft and shrinking; more of them as `danger` rises.
+   */
+  lightEmbers(danger, time) {
+    for (let j = 0; j < this.embers.length; j += 1) {
+      const ember = this.embers[j];
+      const u = time / EMBER_LIFE + j / this.embers.length;
+      const c = Math.floor(u);
+      const phase = u - c;
+      ember.visible =
+        danger > 0 && hash(c * 5.3 + j * 11.1) < 0.2 + 0.7 * danger;
+      if (!ember.visible) continue;
+      const { flame, r } =
+        this.flames[Math.floor(hash(c * 2.7 + j) * this.flames.length)];
+      ember.position.set(
+        flame.position.x - 1.5 - 12 * phase,
+        flame.position.y + (hash(c + j * 3.3) - 0.5) * r,
+        flame.position.z + (hash(c * 1.9 + j) - 0.5) * r * (0.5 + 2 * phase)
+      );
+      const size = r * 0.5 * (1 - phase);
+      ember.scale.set(size * 1.8, size, size);
+    }
   }
 
   // One layer per sim heading (PlayerSystem turretLayers), turned like the
