@@ -18,6 +18,7 @@ import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { LevelUpScreen } from './ui/LevelUpScreen.js';
 import { ChestCeremony } from './ui/ChestCeremony.js';
+import { FlightBriefing } from './ui/FlightBriefing.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay } from './ui/CreditsOverlay.js';
@@ -52,6 +53,8 @@ import {
 } from './ui/gamepadNav.js';
 
 const STEP_ACTIONS = new Set(['up', 'down', 'left', 'right']);
+// The overlays that pause a run over its HUD: cards, chest, flight briefing.
+const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -179,6 +182,7 @@ class UISystem extends BaseSystem {
       cardChoiceOpen: () => this.levelUpScreen.levelUpState.isVisible,
       prefersReducedMotion: () => this.prefersReducedMotion(),
     });
+    this.flightBriefing = new FlightBriefing(this.domRefs.flight, this);
     this.pauseScreen = new PauseScreen({
       refs: this.domRefs.pause,
       gameOverQuitBtn: this.domRefs.gameOver.quitBtn,
@@ -749,10 +753,11 @@ class UISystem extends BaseSystem {
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
       if (payload?.values) {
         this.settingsPanel.refreshCategory('controls');
-        document.body.dataset.controls = resolveControlScheme(
-          payload.values.hullControl
-        );
       }
+    });
+    // The key hints follow the scheme in play (PlayerSystem).
+    this.registerEventListener('control-scheme-changed', ({ scheme }) => {
+      document.body.dataset.controls = scheme;
     });
 
     this.registerEventListener('settings-visual-changed', (payload = {}) => {
@@ -992,7 +997,7 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (screenName === 'levelup' || screenName === 'chest') {
+    if (CARD_OVERLAYS.includes(screenName)) {
       this.showScreen(screenName, {
         overlay: true,
         show: true,
@@ -1029,7 +1034,7 @@ class UISystem extends BaseSystem {
         // Keep game-ui visible for pause, card and run end overlays
         if (
           show &&
-          ['pause', 'levelup', 'chest', 'gameover', 'victory'].includes(
+          ['pause', ...CARD_OVERLAYS, 'gameover', 'victory'].includes(
             screenName
           )
         ) {
@@ -1038,11 +1043,7 @@ class UISystem extends BaseSystem {
         }
 
         // The session service pauses the game on any non-'playing' screen.
-        if (
-          (screenName === 'levelup' || screenName === 'chest') &&
-          show &&
-          emitEvent
-        ) {
+        if (CARD_OVERLAYS.includes(screenName) && show && emitEvent) {
           this.eventBus?.emit?.('screen-changed', { screen: screenName });
         }
         return;
@@ -1116,6 +1117,7 @@ class UISystem extends BaseSystem {
         });
       }
       if (this.chestCeremony.openNext()) return;
+      if (this.flightBriefing.openNext()) return;
     }
     this.showScreen('playing', options);
     this.tacticalHud.refreshHudFromServices(true);

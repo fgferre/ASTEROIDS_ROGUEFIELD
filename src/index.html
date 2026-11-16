@@ -288,6 +288,50 @@
           </button>
         </div>
       </div>
+      <div
+        id="flight-screen"
+        class="screen cards-screen hidden"
+        tabindex="-1"
+        role="dialog"
+        aria-labelledby="flight-title"
+      >
+        <div class="levelup-content flight-content">
+          <h2 class="lu-title chest-title">
+            <span class="lu-rule" aria-hidden="true"></span>
+            <span id="flight-title" class="chest-title__name"
+              >Flight Computer</span
+            >
+            <span class="chest-title__count">New controls</span>
+            <span class="lu-rule is-right" aria-hidden="true"></span>
+          </h2>
+          <dl class="flight-keys">
+            <dt>
+              <span data-device="keyboard"
+                ><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span
+              >
+              <span data-device="gamepad">Left stick</span>
+            </dt>
+            <dd>
+              Fly up, left, down and right on the screen. The nose turns to
+              follow.
+            </dd>
+            <dt>Let go</dt>
+            <dd>The ship stops by itself. No more drifting.</dd>
+            <dt>Fire</dt>
+            <dd>The turret keeps aiming on its own.</dd>
+          </dl>
+          <button
+            id="flight-continue-btn"
+            class="end-btn end-btn--primary chest-continue is-ready"
+            type="button"
+            tabindex="-1"
+          >
+            <kbd data-device="keyboard">⏎</kbd>
+            <kbd data-device="gamepad">A</kbd>
+            Fly
+          </button>
+        </div>
+      </div>
 
       <!-- Pause Screen: the recap's card layout (header, build card, actions) -->
       <div id="pause-screen" class="screen hidden">

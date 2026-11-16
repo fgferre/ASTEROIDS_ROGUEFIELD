@@ -24,24 +24,38 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
 
 ## Passos (em ordem; marque [x])
 
-1. [ ] Um jeito de começar a partida na direção nova sem os três links: um só parâmetro (por exemplo
+1. [x] Um jeito de começar a partida na direção nova sem os três links: um só parâmetro (por exemplo
        `?direcao=nova`) que liga os três estados no início de cada partida e os devolve a cada partida nova (hoje são
        lidos só no construtor). Sem o parâmetro, nada muda.
-2. [ ] Carta nova da mira automática: ao pegar, `noseAim` desliga e o `CombatSystem` volta ao modo auto. Só aparece
+2. [x] Carta nova da mira automática: ao pegar, `noseAim` desliga e o `CombatSystem` volta ao modo auto. Só aparece
        na direção nova: as cartas só conhecem pré-requisitos de nível e de carta (`src/modules/upgradePrerequisites.js`);
        é preciso um pré-requisito de "direção nova", ou outra forma de tirar a carta do sorteio do jeito de hoje.
-3. [ ] Carta final do voo moderno: exige o fim das cartas de pilotagem (proposta: Braking System 3 e RCS System 3;
+3. [x] Carta final do voo moderno: exige o fim das cartas de pilotagem (proposta: Braking System 3 e RCS System 3;
        número de equilíbrio, mostre ao dono). Ao pegar, a tela de aviso explica as teclas novas e espera o Enter; só
        então `controlScheme` vira 'modern' e `flight.glide` desliga.
-4. [ ] Freio, agilidade e motor refeitos para o deslize: textos que digam o que fazem no deslize (frear ao soltar;
+4. [x] Freio, agilidade e motor refeitos para o deslize: textos que digam o que fazem no deslize (frear ao soltar;
        o freio de emergência como a parada rápida); o RCS também acelera o giro no clássico (hoje só o empuxo). Os
        textos só mudam na direção nova enquanto o padrão for o de hoje.
+       Feito (16/11, sucessora): `?direcao=nova` (`src/modules/player/newFlight.js`) liga os três a cada partida
+       (`PlayerSystem.beginNewFlight`); cartas `auto_aim` (Auto Turret, nível 2) e `flight_computer` (exige Braking 3,
+       RCS 3 e a Auto Turret, porque o voo moderno vira a nave para onde ela anda); as duas só entram no catálogo com o
+       link (`cardsForFlight`), e Braking/RCS leem `newFlightText`. Tela do Enter: `ui/FlightBriefing.js`. RCS no deslize
+       também gira (70°/s sem carta → 135°/s no nível 3). O endereço dos três links continua igual.
 5. [ ] Visual do canhão no nariz e a hora em que vira torre (o dono notou que o canhão deitado sobre o nariz parece
        levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
+       Cartão entregue (16/11): `quadro/cartoes/pilotagem-direcao.html`, opções A (como está), B (torre escondida, cano
+       curto embutido na ponta do nariz: housing e lente ocultos, `barrels.scale` (0,8; 0,55; 0,55), boca em x = 21,5;
+       a boca do tiro na simulação está em 11,5 e teria de ir junto) e C (`barrels.scale.x` 0,6). Espera a escolha dele.
 6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
        pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
        não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
-7. [ ] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
+       Já no código (16/11, sucessora, decisão pequena): no deslize, com a Braking System instalada, o fogo de freio do
+       nariz acende ao soltar o empuxo (`coastBrake` em `flight.js`); sem a carta, nada acende. Foto de antes e
+       depois no cartão.
+       Propostas no mesmo cartão: agulha de giro ×2,5 no comprimento e cor 1,3; freio do nível 3 com o leque a 0,55 e
+       as chamas a 0,7; clarão do motor em `PALETTE[accent]` do casco (`PlayerEffects.js`), e o espelho em
+       `fieldMirrors.js` só repinta a cor quando a opacidade muda: corrigir junto. Espera a escolha dele.
+7. [x] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
 # Modernização do Asteroid Roguefield — plano (12/11/2026)

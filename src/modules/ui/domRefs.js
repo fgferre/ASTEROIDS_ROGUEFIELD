@@ -36,6 +36,10 @@ export function cacheStaticNodes() {
       cards: document.getElementById('chest-cards') || null,
       continueBtn: document.getElementById('chest-continue-btn') || null,
     },
+    flight: {
+      screen: document.getElementById('flight-screen') || null,
+      continueBtn: document.getElementById('flight-continue-btn') || null,
+    },
     gameOver: {
       body: document.getElementById('gameover-body') || null,
       invite: document.getElementById('gameover-invite') || null,

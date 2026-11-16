@@ -241,7 +241,10 @@ export class PlayerFlight {
       this.updateFacing(deltaTime, move);
     } else {
       // Restaurando a lógica de aceleração e amortecimento angular do app.js original
-      const rotationAccel = this.rotationSpeed * deltaTime;
+      // In glide the RCS System turns the hull quicker too: its pull and its
+      // top turn rate (pull ÷ angular damping) both × agility.
+      const rotationAccel =
+        this.rotationSpeed * (glide ? this.agility : 1) * deltaTime;
       let angularAccel = 0;
       if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
       if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
@@ -282,11 +285,15 @@ export class PlayerFlight {
         : 0;
     }
     // The auto-brake, when it acts: + on the retro (moving nose-first), - on
-    // the main engine, as strong as the speed is near the top.
+    // the main engine, as strong as the speed is near the top. Glide has none
+    // but the Braking System's, which shows the same way.
+    const brakes = !glide || this.brakingDamping > 0;
     const coastBrake =
-      noLinearInput && speed > 2 && !glide
+      noLinearInput && speed > 2 && brakes
         ? (velocityAlongNose < 0 ? -1 : 1) *
-          clamp01(speed / (this.maxSpeed * 0.8))
+          clamp01(
+            speed / (this.maxSpeed * (glide ? GLIDE_SPEED_SCALE : 1) * 0.8)
+          )
         : 0;
     return {
       fwd,
