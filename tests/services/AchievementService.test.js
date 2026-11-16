@@ -208,6 +208,35 @@ describe('AchievementService', () => {
     expect(unlocked).toContain('full-set');
   });
 
+  it('full-set is reachable in a family whose weapon another family’s weapon shuts out', () => {
+    const { eventBus, unlocked } = setup();
+    const progression = new ProgressionSystem({
+      random: new RandomService(7),
+      eventBus,
+      player: {},
+      ui: {},
+      effects: {},
+      'xp-orbs': { attachProgression: () => {} },
+    });
+    progression.level = 10;
+    const isWeapon = ({ excludes }) => (excludes ?? []).length > 0;
+    const weaponOf = (family) =>
+      UPGRADE_LIBRARY.find((card) => card.family === family && isWeapon(card));
+    const arc = UPGRADE_LIBRARY.filter(({ family }) => family === 'arc').filter(
+      (card) => !isWeapon(card)
+    );
+    expect(progression.applyUpgrade(weaponOf('thermal').id)).toBe(true);
+    progression.applyUpgrade('multishot'); // the Targeting Suite needs it
+
+    arc.slice(0, -1).forEach(({ id }) => progression.applyUpgrade(id));
+    expect(progression.isFamilyComplete('arc')).toBe(false);
+    expect(unlocked).not.toContain('full-set');
+
+    progression.applyUpgrade(arc.at(-1).id);
+    expect(progression.isFamilyComplete('arc')).toBe(true);
+    expect(unlocked).toContain('full-set');
+  });
+
   it('herald-hunter counts each Herald kind once, across sessions', () => {
     const { eventBus, service, unlocked } = setup();
     eventBus.emit('herald-defeated', { kind: 'dust' });
