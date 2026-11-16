@@ -17,6 +17,8 @@ const DEG = Math.PI / 180;
 const tanV = Math.tan((FOV * Math.PI) / 360);
 const T = CAMERA_DIRECTOR;
 const SHAPES = [9 / 16, 1, 4 / 3, 16 / 9, 21 / 9, 32 / 9];
+// The near shot's distance at 16:9: the field's width across the screen.
+const NEAR_DISTANCE = W / 2 / (tanV * (16 / 9));
 
 function director(aspect = 16 / 9) {
   const d = createDirector({ fieldWidth: W, fieldHeight: H });
@@ -64,27 +66,41 @@ describe('camera director', () => {
     expect(timeToHit(5, 0, 0, 0, 10)).toBe(0);
   });
 
-  it('follows the ship near, at today’s tilt, with the ship central', () => {
+  it('follows the ship near, at its tilt, with the ship central', () => {
     const d = director();
     const pose = run(d, scene(400, 300), 3);
     expect(d.moment).toBe('near');
     expect(pose.tilt).toBeCloseTo(T.near.tilt * DEG, 3);
-    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+    expect(pose.distance).toBeCloseTo(NEAR_DISTANCE, -1);
     const p = screenOf(pose, 16 / 9, 400, 300);
     expect(Math.abs(p.x)).toBeLessThan(0.15);
     expect(Math.abs(p.y)).toBeLessThan(0.15);
   });
 
-  it('near, may show past the field edge, but no more than allowed', () => {
+  it('near shows the field’s width across the screen, never moving sideways', () => {
+    for (const aspect of [16 / 9, 4 / 3]) {
+      const d = director(aspect);
+      for (const sx of [100, 700]) {
+        const pose = run(d, scene(sx, 300), 3);
+        expect(pose.x, `aspect ${aspect}`).toBeCloseTo(W / 2, -1);
+        expect(screenOf(pose, aspect, 0, pose.y).x).toBeCloseTo(-1, 1);
+        expect(screenOf(pose, aspect, W, pose.y).x).toBeCloseTo(1, 1);
+      }
+      expect(shown(run(d, scene(400, 10), 3), aspect, 400, 0)).toBe(true);
+      expect(shown(run(d, scene(400, 590), 3), aspect, 400, H)).toBe(true);
+    }
+  });
+
+  it('near, may show past the top edge, but no more than allowed', () => {
     const d = director();
-    const pose = run(d, scene(10, 300), 3);
+    const pose = run(d, scene(400, 10), 3);
     expect(d.moment).toBe('near');
-    // Past the edge: the field's left edge is on screen, right of its border.
-    const edge = screenOf(pose, 16 / 9, 0, 300);
-    expect(edge.x).toBeGreaterThan(-1);
+    // Past the edge: the field's top edge is on screen, below its border.
+    const edge = screenOf(pose, 16 / 9, 400, 0);
+    expect(edge.y).toBeLessThan(1);
     // But at most `beyondEdge` of the half-view lies past it.
-    expect(edge.x).toBeLessThanOrEqual(-1 + 2 * T.near.beyondEdge * 0.5 + 0.05);
-    expect(shown(pose, 16 / 9, 10, 300, 0.95)).toBe(true);
+    expect(edge.y).toBeGreaterThanOrEqual(1 - T.near.beyondEdge - 0.05);
+    expect(shown(pose, 16 / 9, 400, 10, 0.95)).toBe(true);
   });
 
   it('wide shows the whole field from nearly above, at every window shape', () => {
@@ -134,33 +150,29 @@ describe('camera director', () => {
     expect(d.moment).toBe('near');
   });
 
-  it('opens when enemies close in from several sides', () => {
-    const d = director();
+  it('opens when enemies close in from several sides out of view (a wide window)', () => {
+    const d = director(21 / 9);
     const around = [
-      { type: 'drone', x: 650, y: 300 },
-      { type: 'drone', x: 150, y: 300 },
-      { type: 'drone', x: 400, y: 80 },
+      { type: 'drone', x: 400, y: 70 },
+      { type: 'drone', x: 400, y: 540 },
+      { type: 'drone', x: 205, y: 105 },
     ];
     run(d, scene(400, 300, { enemies: around }), 0.5);
     expect(d.moment).toBe('wide');
   });
 
-  it('opens just before the ship crosses a field edge', () => {
+  it('stays near through an edge crossing, either way', () => {
     const d = director();
     run(d, scene(600, 300), 3);
-    d.update(scene(720, 300, { vx: 260 }), DT);
-    expect(d.moment).toBe('wide');
-  });
-
-  it('closes soon after the ship has crossed the edge', () => {
-    const d = director();
-    run(d, scene(600, 300), 3);
-    d.update(scene(720, 300, { vx: 260 }), DT);
-    // Wrapped to the far side, flying on away from the edge it left.
-    run(d, scene(20, 300, { vx: 260 }), T.edgeHold - 0.1);
-    expect(d.moment).toBe('wide');
-    run(d, scene(60, 300, { vx: 260 }), 0.2);
-    expect(d.moment).toBe('near');
+    for (const [x, y, vx, vy] of [
+      [790, 300, 260, 0],
+      [10, 300, 260, 0],
+      [400, 590, 0, 260],
+      [400, 10, 0, 260],
+    ]) {
+      run(d, scene(x, y, { vx, vy }), 0.2);
+      expect(d.moment, `${x},${y}`).toBe('near');
+    }
   });
 
   it('a zoom pulse reaches its size at once, near and wide, and keeps the follow', () => {
@@ -176,13 +188,13 @@ describe('camera director', () => {
     // The ship on the move: the shot follows it the same with a pulse on.
     const plain = director();
     const pulsed = director();
-    let x = 200;
-    for (const d of [plain, pulsed]) run(d, scene(x, 300, { vx: 160 }), 1);
+    let y = 150;
+    for (const d of [plain, pulsed]) run(d, scene(400, y, { vy: 160 }), 1);
     for (let t = 0; t < 1; t += DT) {
-      x += 160 * DT;
-      const a = plain.update(scene(x, 300, { vx: 160 }), DT);
-      const b = pulsed.update(scene(x, 300, { vx: 160 }), DT, 0.94);
-      expect(Math.abs(a.x - b.x)).toBeLessThan(1);
+      y += 160 * DT;
+      const a = plain.update(scene(400, y, { vy: 160 }), DT);
+      const b = pulsed.update(scene(400, y, { vy: 160 }), DT, 0.94);
+      expect(Math.abs(a.y - b.y)).toBeLessThan(1);
     }
   });
 
@@ -199,17 +211,17 @@ describe('camera director', () => {
 
   it('opens when a boss is off the near shot', () => {
     const d = director();
-    run(d, scene(100, 300), 3);
-    const boss = { type: 'boss', x: 720, y: 300, radius: 80 };
-    d.update(scene(100, 300, { enemies: [boss] }), DT);
+    run(d, scene(400, 100), 3);
+    const boss = { type: 'boss', x: 400, y: 540, radius: 80 };
+    d.update(scene(400, 100, { enemies: [boss] }), DT);
     expect(d.moment).toBe('wide');
   });
 
   it('opens for a Herald off the near shot, like a boss', () => {
     const d = director();
-    run(d, scene(100, 300), 3);
-    const herald = { type: 'herald', x: 720, y: 300, radius: 34 };
-    d.update(scene(100, 300, { enemies: [herald] }), DT);
+    run(d, scene(400, 100), 3);
+    const herald = { type: 'herald', x: 400, y: 540, radius: 34 };
+    d.update(scene(400, 100, { enemies: [herald] }), DT);
     expect(d.moment).toBe('wide');
   });
 
@@ -217,7 +229,7 @@ describe('camera director', () => {
     const d = director();
     run(d, scene(400, 300), 3);
     // Its centre is on screen, a core on its orbit is not.
-    const choir = { type: 'boss', x: 400, y: 190, radius: 118 };
+    const choir = { type: 'boss', x: 400, y: 450, radius: 118 };
     d.update(scene(400, 300, { enemies: [choir] }), DT);
     expect(d.moment).toBe('wide');
   });
@@ -232,26 +244,21 @@ describe('camera director', () => {
     const orbs = [{ x: 700, y: 520, collected: false }];
     const pose = run(d, scene(400, 300, { orbs }), T.dive - 0.1);
     expect(d.moment).toBe('near');
-    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+    expect(pose.distance).toBeCloseTo(NEAR_DISTANCE, -1);
     run(d, scene(400, 300, { orbs }), 0.2);
     expect(d.moment).toBe('wide');
   });
 
   it('a dive leans toward the boss that fell, then lets go', () => {
-    for (const framing of ['a', 'c']) {
-      const d = director();
-      d.setFraming(framing);
-      const settled = run(d, scene(150, 300), 3).x;
-      const boss = { x: 560, y: 300, radius: 60 };
-      d.trigger('dive', boss);
-      const pose = run(d, scene(150, 300), T.dive - 0.1);
-      // Its body on screen (the lean aims at modelReach times its radius).
-      expect(shown(pose, 16 / 9, boss.x + boss.radius, boss.y), framing).toBe(
-        true
-      );
-      expect(shown(pose, 16 / 9, 150, 300, 0.95), framing).toBe(true);
-      expect(run(d, scene(150, 300), 3).x, framing).toBeCloseTo(settled, -1);
-    }
+    const d = director();
+    const settled = run(d, scene(400, 100), 3).y;
+    const boss = { x: 400, y: 480, radius: 60 };
+    d.trigger('dive', boss);
+    const pose = run(d, scene(400, 100), T.dive - 0.1);
+    // Its body on screen (the lean aims at modelReach times its radius).
+    expect(shown(pose, 16 / 9, boss.x, boss.y + boss.radius)).toBe(true);
+    expect(shown(pose, 16 / 9, 400, 100, 0.95)).toBe(true);
+    expect(run(d, scene(400, 100), 3).y).toBeCloseTo(settled, -1);
   });
 
   it('a look is wide for its own time, then eases back near', () => {
@@ -263,17 +270,17 @@ describe('camera director', () => {
     run(d, scene(400, 300), 0.2);
     expect(d.moment).toBe('near');
     const pose = run(d, scene(400, 300), 3);
-    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+    expect(pose.distance).toBeCloseTo(NEAR_DISTANCE, -1);
   });
 
   it('a threat keeps the view open a while after it is gone', () => {
     const d = director();
-    run(d, scene(100, 300), 3);
-    const boss = { type: 'boss', x: 720, y: 300, radius: 80 };
-    run(d, scene(100, 300, { enemies: [boss] }), 0.5);
-    run(d, scene(100, 300), T.wideHold - 0.2);
+    run(d, scene(400, 100), 3);
+    const boss = { type: 'boss', x: 400, y: 540, radius: 80 };
+    run(d, scene(400, 100, { enemies: [boss] }), 0.5);
+    run(d, scene(400, 100), T.wideHold - 0.2);
     expect(d.moment).toBe('wide');
-    run(d, scene(100, 300), 0.4);
+    run(d, scene(400, 100), 0.4);
     expect(d.moment).toBe('near');
   });
 
@@ -341,8 +348,8 @@ describe('camera director', () => {
   it('with reduced motion: no drift or lead, and the wide view cuts in', () => {
     const d = director();
     d.setReducedMotion(true);
-    const a = run(d, scene(400, 300, { leadX: 90, leadY: 0 }), 2);
-    expect(a.x).toBeCloseTo(400, 3);
+    const a = run(d, scene(400, 300, { leadY: 60 }), 2);
+    expect(a.y).toBeCloseTo(300, 3);
     expect(a.roll).toBe(0);
     expect(a.rollMax).toBe(0);
     d.trigger('waveStart');
@@ -351,30 +358,30 @@ describe('camera director', () => {
     expect(cut.tilt).toBeCloseTo(T.wide.tilt * DEG, 6);
   });
 
-  it('leads toward the aim when near', () => {
+  it('leads up and down toward the aim when near', () => {
     const d = director();
-    const pose = run(d, scene(400, 300, { leadX: 90, leadY: 0 }), 3);
-    expect(pose.x).toBeGreaterThan(430);
+    const pose = run(d, scene(400, 300, { leadY: 60 }), 3);
+    expect(pose.y).toBeGreaterThan(330);
   });
 
   it('keeps the ship on screen through a wrap, then slides; cuts under reduced motion', () => {
     const d = director();
     d.force('near');
-    run(d, scene(790, 300), 3);
-    const wrap = d.update(scene(10, 300), DT);
-    expect(shown(wrap, 16 / 9, 10, 300)).toBe(true);
-    const first = wrap.x;
-    const next = run(d, scene(10, 300), 4 * DT).x;
-    const settled = run(d, scene(10, 300), 3).x;
+    run(d, scene(400, 590), 3);
+    const wrap = d.update(scene(400, 10), DT);
+    expect(shown(wrap, 16 / 9, 400, 10)).toBe(true);
+    const first = wrap.y;
+    const next = run(d, scene(400, 10), 4 * DT).y;
+    const settled = run(d, scene(400, 10), 3).y;
     expect(next).toBeLessThan(first - 1);
     expect(next).toBeGreaterThan(settled + 1);
 
     const r = director();
     r.force('near');
     r.setReducedMotion(true);
-    run(r, scene(790, 300), 3);
-    const cut = r.update(scene(10, 300), DT).x;
-    expect(cut).toBeCloseTo(run(r, scene(10, 300), 3).x, 0);
+    run(r, scene(400, 590), 3);
+    const cut = r.update(scene(400, 10), DT).y;
+    expect(cut).toBeCloseTo(run(r, scene(400, 10), 3).y, 0);
   });
 });
 
@@ -439,38 +446,6 @@ describe('camera director, a Warden’s entrance', () => {
       const pose = d.update(scene(400, 300, { enemies: [boss] }), DT);
       expect(d.moment).not.toBe('arrival');
       expect(pose.yaw).toBe(0);
-    }
-  });
-});
-
-describe('camera director, the framing trial', () => {
-  it('duel: moves toward a boss in reach so both are shown, the ship in its margin', () => {
-    const d = director();
-    d.setFraming('b');
-    const boss = { type: 'boss', x: 560, y: 300, radius: 72 };
-    const pose = run(d, scene(150, 300, { enemies: [boss] }), 3);
-    expect(d.moment).toBe('near');
-    for (const [x, y] of [
-      [boss.x - boss.radius, boss.y],
-      [boss.x + boss.radius, boss.y],
-    ]) {
-      expect(shown(pose, 16 / 9, x, y)).toBe(true);
-    }
-    expect(shown(pose, 16 / 9, 150, 300, 0.95)).toBe(true);
-  });
-
-  it('width: the field fills the screen across, centred, both top and bottom reachable', () => {
-    for (const aspect of [16 / 9, 4 / 3]) {
-      const d = director(aspect);
-      d.setFraming('c');
-      for (const sx of [100, 700]) {
-        const pose = run(d, scene(sx, 300), 3);
-        expect(pose.x, `aspect ${aspect}`).toBeCloseTo(W / 2, -1);
-        expect(screenOf(pose, aspect, 0, pose.y).x).toBeCloseTo(-1, 1);
-        expect(screenOf(pose, aspect, W, pose.y).x).toBeCloseTo(1, 1);
-      }
-      expect(shown(run(d, scene(400, 10), 3), aspect, 400, 0)).toBe(true);
-      expect(shown(run(d, scene(400, 590), 3), aspect, 400, H)).toBe(true);
     }
   });
 });

@@ -5,8 +5,9 @@
 // (setReach); headless, the flat view is the shot.
 //
 // Modes: 'dynamic' (default) hands the shot to the camera director
-// (cameraDirector.js, PLAN.md 14.2b): top-down, near the ship or wide on the
-// whole field, and free to show past the field's edge; 'classic' is the plain
+// (cameraDirector.js, PLAN.md 14.2b): top-down, near (the field's width,
+// following the ship up and down) or wide on the whole field, and free to
+// show past the field's edge; 'classic' is the plain
 // follow with a dead zone and a smoothed lag (`?camera=1`, or Settings →
 // Graphics), which is also what the dynamic mode does without a scene;
 // 'static' is the fixed full-field view (`?camera=0`). Dev: `?moment=near` or
@@ -17,7 +18,6 @@
 import {
   createDirector,
   createDirectorScene,
-  FRAMINGS,
   MOMENTS,
 } from './cameraDirector.js';
 import { IS_DEV } from './env.js';
@@ -32,7 +32,7 @@ const PULSE_ATTACK = 0.3;
 
 // Look-ahead: half the distance to the aim point, at most LOOK_AHEAD_MAX;
 // a full LOOK_AHEAD_MAX along the nose when it leads on the hull. The
-// director caps it further, to a share of the view.
+// director, which never moves sideways, uses its up-and-down part.
 export const LOOK_AHEAD_MAX = 90;
 const LOOK_AHEAD_GAIN = 0.5;
 
@@ -57,46 +57,6 @@ function momentFromUrl() {
   } catch {
     return null; // no window (Node tests)
   }
-}
-
-// Framing trial, for the owner to compare by playing (`?framing=a|b|c`, also
-// in the published build): C cycles the director's framing and a label
-// names it for 2 s. Without the flag nothing of it exists.
-const FRAMING_LABELS = {
-  a: 'CAMERA A - TODAY',
-  b: 'CAMERA B - DUEL',
-  c: 'CAMERA C - WIDTH',
-};
-function installFramingTrial(director) {
-  let name = null;
-  try {
-    name = new URLSearchParams(window.location.search).get('framing');
-  } catch {
-    return; // no window (Node tests)
-  }
-  if (!FRAMINGS.includes(name)) return;
-  const label = document.createElement('div');
-  label.style.cssText =
-    'position:fixed;top:14%;left:50%;transform:translateX(-50%);z-index:10000;padding:6px 14px;background:rgba(0,0,0,0.65);color:#fff;font:600 20px monospace;letter-spacing:2px;pointer-events:none;display:none';
-  document.body.appendChild(label);
-  let hide = 0;
-  const show = () => {
-    director.setFraming(name);
-    label.textContent = FRAMING_LABELS[name];
-    label.style.display = 'block';
-    clearTimeout(hide);
-    hide = setTimeout(() => (label.style.display = 'none'), 2000);
-  };
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      if (event.code !== 'KeyC' || event.repeat) return;
-      name = FRAMINGS[(FRAMINGS.indexOf(name) + 1) % FRAMINGS.length];
-      show();
-    },
-    true
-  );
-  show();
 }
 
 /** The mode to run: the URL flag wins over the Graphics setting. */
@@ -190,7 +150,6 @@ export function createCamera({
   let pulseFactor = 1;
   const director = createDirector({ fieldWidth, fieldHeight });
   director.force(momentFromUrl());
-  installFramingTrial(director);
   // The director's shot of the last update, null when it did not direct.
   let directed = null;
   const leadOut = { x: 0, y: 0 };
@@ -238,7 +197,6 @@ export function createCamera({
       advancePulse(dt);
       if (mode === 'dynamic' && scene.hasShip) {
         lookAheadFor(scene, targetX, targetY, leadOut, lead);
-        scene.leadX = leadOut.x;
         scene.leadY = leadOut.y;
         directed = director.update(scene, dt, pulseFactor);
         camera.x = directed.x;

@@ -1,21 +1,23 @@
-// The gameplay camera director (PLAN.md 14.2b, second version, approved by the
-// owner on 19/10/2026): top-down while playing, in two states. Near follows
-// the ship at today's tilt, a little ahead toward the aim, with a slow drift
-// when calm, and may show some space past the field's edge. Wide shows the
-// whole field from nearly straight above: at the end of a wave (for the
-// orbs), when something about to hit is off the near shot (it opens before
-// it arrives), when enemies close in from several sides, when the ship is
-// about to cross an edge, when a boss is off the near shot, and for short
-// looks (a wave starting, an elite or an announced attack out of sight, a
-// boss arriving). A look lasts its own time; a danger keeps the view open a
-// while after it is gone. The ship is always on
-// screen, except in the live scene of a Warden's entrance: low and moving,
-// it follows the shot in the Warden's own recipe while the Warden flies in
-// (enemies/boss/arrival.js) and hands back to the play view the moment it
-// closes up. Every number is in data/constants/camera.js and the Wardens'
-// recipes (src/content/bosses/). Pure: the renderer
-// poses the perspective camera from `pose` with the same math (cameraShot.js,
-// render3d/cameraRig.js).
+// The gameplay camera director (PLAN.md 14.2b; the near framing the owner
+// chose by playing on 15/11/2026): top-down while playing, in two states.
+// Near shows the field's whole width across the middle of the screen, from
+// today's tilt: it never moves sideways and follows the ship up and down, a
+// little ahead toward the aim, with a slow drift when calm, and may show
+// some space past the top and bottom edges. Wide shows the whole field from
+// nearly straight above: at the end of a wave (for the orbs), when something
+// about to hit is out of the near view (it opens before it arrives), when
+// enemies close in from several sides out of view, when a boss or Herald is
+// not wholly in view, and for short looks (a wave starting, an elite or an
+// announced attack out of sight, a boss arriving). A look lasts its own
+// time; a danger keeps the view open a while after it is gone. A boss
+// falling or breaking a phase dives the view back near, leaning toward it.
+// The ship is always on screen, except in the live scene of a Warden's
+// entrance: low and moving, it follows the shot in the Warden's own recipe
+// while the Warden flies in (enemies/boss/arrival.js) and hands back to the
+// play view the moment it closes up. Every number is in
+// data/constants/camera.js and the Wardens' recipes (src/content/bosses/).
+// Pure: the renderer poses the perspective camera from `pose` with the same
+// math (cameraShot.js, render3d/cameraRig.js).
 
 import { CAMERA_DIRECTOR } from '../data/constants/camera.js';
 import { fieldFitDistance, projectToScreen, shotExtent } from './cameraShot.js';
@@ -31,8 +33,6 @@ const SHOWN = 0.9;
 const SHIP_SHOWN = 0.95;
 // The states, for dev scenes (`?moment=near|wide`).
 export const MOMENTS = Object.freeze(['near', 'wide']);
-// Framing trial (camera.js, `?framing=`): 'a' today, 'b' duel, 'c' width.
-export const FRAMINGS = Object.freeze(['a', 'b', 'c']);
 
 function smoothstep(t) {
   const x = Math.max(0, Math.min(1, t));
@@ -66,8 +66,8 @@ export function createDirectorScene() {
     hasAim: false,
     aimX: 0,
     aimY: 0,
-    // The look-ahead the camera asks for (camera.js lookAheadFor).
-    leadX: 0,
+    // The look-ahead the camera asks for, up and down (camera.js
+    // lookAheadFor).
     leadY: 0,
     // Live lists, read in place: enemies (x, y, vx, vy, radius, type,
     // destroyed), hostile shots (x, y, vx, vy, radius, active, hit) and XP
@@ -88,7 +88,6 @@ export function createDirector({
   let lens = { tanV: Math.tan(19 * DEG), aspect: 4 / 3 };
   let reducedMotion = false;
   let forced = null;
-  let framing = 'a';
 
   // 'near', 'wide' or 'arrival' (a Warden's entrance).
   let state = 'near';
@@ -200,54 +199,25 @@ export function createDirector({
     fits(hi);
   }
 
-  // The near shot: the ship, a little ahead, at most `beyondEdge` of the
-  // half-view past the field's edge. Framing 'c': the field's width fills
-  // the screen across its middle, centred; framing 'b': moved toward a boss.
+  // The near shot: the field's width fills the screen across its middle,
+  // centred; up and down it follows the ship a little ahead, at most
+  // `beyondEdge` of the half-view past the field's top or bottom edge. In a
+  // dive it leans toward the boss that fell.
   function updateNear(scene) {
-    const fit = fieldFitDistance(nearAngles, lens, fieldWidth, fieldHeight);
-    near.distance =
-      framing === 'c'
-        ? fieldWidth / 2 / (lens.tanV * lens.aspect)
-        : fit / T.near.zoom;
+    near.distance = fieldWidth / 2 / (lens.tanV * lens.aspect);
     const e = shotExtent(near.distance, nearAngles, lens, extent);
-    let x = scene.x;
-    let y = scene.y;
-    const lead = Math.hypot(scene.leadX, scene.leadY);
-    if (!reducedMotion && lead > 1e-6) {
-      const span = e.left + e.right;
-      const k = Math.min(lead, T.near.lead * span) / lead;
-      x += scene.leadX * k;
-      y += scene.leadY * k;
-    }
+    const y = scene.y + (reducedMotion ? 0 : scene.leadY);
     const keep = 1 - T.near.beyondEdge;
-    const clampAxis = (v, low, high, size) =>
-      low + high >= size
-        ? (low + size - high) / 2
-        : Math.max(low, Math.min(size - high, v));
-    near.x =
-      framing === 'c'
-        ? fieldWidth / 2
-        : clampAxis(x, e.left * keep, e.right * keep, fieldWidth);
-    near.y = clampAxis(y, e.up * keep, e.down * keep, fieldHeight);
+    const low = e.up * keep;
+    const high = fieldHeight - e.down * keep;
+    near.x = fieldWidth / 2;
+    near.y = low >= high ? (low + high) / 2 : Math.max(low, Math.min(high, y));
     if (diveFor > 0 && fallen.radius > 0) towardFoe(scene, fallen);
-    else if (framing === 'b') towardFoe(scene, foeOf(scene));
-  }
-
-  function foeOf(scene) {
-    return scene.enemies.find(
-      (e) =>
-        e &&
-        !e.destroyed &&
-        !e.arrival &&
-        (e.type === 'boss' || e.type === 'herald')
-    );
   }
 
   // The near shot moves toward `foe` (a boss or Herald) just far enough to
-  // show it whole, and never so far that the ship leaves its margin: in a
-  // dive toward the one that fell, and always in framing 'b'.
+  // show it whole, and never so far that the ship leaves its margin.
   function towardFoe(scene, foe) {
-    if (!foe) return;
     const fromX = near.x;
     const fromY = near.y;
     const at = (k) => {
@@ -347,17 +317,6 @@ export function createDirector({
     return count >= T.surroundSides;
   }
 
-  // The ship reaches a field edge within `edgeAhead` s.
-  function edgeAhead(scene) {
-    const ahead = (pos, v, size) =>
-      (v > 1 && (size - pos) / v <= T.edgeAhead) ||
-      (v < -1 && pos / -v <= T.edgeAhead);
-    return (
-      ahead(scene.x, scene.vx, fieldWidth) ||
-      ahead(scene.y, scene.vy, fieldHeight)
-    );
-  }
-
   function orbsLeft(scene) {
     const orbs = scene.orbs;
     for (let i = 0; i < orbs.length; i += 1) {
@@ -397,12 +356,10 @@ export function createDirector({
     return glanceFor > 0 || (clearedFor > 0 && orbsLeft(scene));
   }
 
-  // How long a danger keeps the view open after it is gone: a threat may
-  // come back (wideHold), an edge crossing is over once crossed (edgeHold;
-  // framing 'c' shows a crossing without it).
+  // A danger keeps the view open `wideHold` s after it is gone: it may come
+  // back.
   function holdFor(scene) {
-    if (threatOffNear(scene) || surrounded(scene)) return T.wideHold;
-    return framing !== 'c' && edgeAhead(scene) ? T.edgeHold : 0;
+    return threatOffNear(scene) || surrounded(scene) ? T.wideHold : 0;
   }
 
   // 1 when nothing threatens close by, fading to 0 as something nears.
@@ -483,11 +440,6 @@ export function createDirector({
 
     setReducedMotion(flag) {
       reducedMotion = Boolean(flag);
-    },
-
-    /** The framing trial (camera.js): 'a', 'b' or 'c' (FRAMINGS). */
-    setFraming(name) {
-      framing = FRAMINGS.includes(name) ? name : 'a';
     },
 
     /** Dev scenes (`?moment=`): hold this state; null frees it. */
