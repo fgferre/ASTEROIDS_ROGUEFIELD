@@ -90,7 +90,6 @@ function setup({ plays = true } = {}) {
       }),
     speak: (entry) => spoken.push(entry),
     hush,
-    records: () => ({ sectorsWon: [] }),
   });
   // A run start: wave 1 starts (its banner queued), then the intro.
   const startRun = () => {
@@ -278,32 +277,30 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.introActive).toBe(true);
   });
 
-  it('flies a journey for a carried start and the first-ever first-sector launch, not otherwise', () => {
-    const none = { sectorsWon: [] };
-    const won = { sectorsWon: ['debris-wake'] };
+  it('flies a journey for a carried start and every campaign-map launch, never a retry, a Descent or a replay', () => {
     const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
-    expect(
-      travelDestination({ sector: 'salvage-lanes', carried: true }, won)
-    ).toBe('salvage-lanes');
-    expect(travelDestination(launch, none)).toBe('debris-wake');
-    expect(travelDestination(launch, won)).toBe(null);
-    expect(
-      travelDestination({ ...launch, sector: 'salvage-lanes' }, none)
-    ).toBe(null);
-    expect(
-      travelDestination({ ...launch, source: 'retry-game-btn' }, none)
-    ).toBe(null);
+    expect(travelDestination({ sector: 'salvage-lanes', carried: true })).toBe(
+      'salvage-lanes'
+    );
+    expect(travelDestination(launch)).toBe('debris-wake');
+    expect(travelDestination({ ...launch, sector: 'salvage-lanes' })).toBe(
+      'salvage-lanes'
+    );
+    expect(travelDestination({ ...launch, source: 'retry-game-btn' })).toBe(
+      null
+    );
     expect(travelDestination({ sector: null, source: 'start-game-btn' })).toBe(
       null
     );
     expect(
-      travelDestination(
-        { sector: 'salvage-lanes', carried: true, replay: true },
-        won
-      )
+      travelDestination({
+        sector: 'salvage-lanes',
+        carried: true,
+        replay: true,
+      })
     ).toBe(null);
     expect(
-      travelDestination({}, none, { kind: 'travel', sector: 'furnace-drift' })
+      travelDestination({}, { kind: 'travel', sector: 'furnace-drift' })
     ).toBe('furnace-drift');
   });
 
@@ -311,7 +308,6 @@ describe('RunCinematics', () => {
     const emit = vi.fn();
     const cinematics = new RunCinematics({
       eventBus: { emit },
-      records: () => ({ sectorsWon: [] }),
     });
     const keys = () => emit.mock.lastCall[1].entries.map((entry) => entry.key);
     const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };

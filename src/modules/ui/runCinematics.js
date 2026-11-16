@@ -31,7 +31,6 @@ import {
 import { IS_DEV } from '../../core/env.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
 import { STORY } from '../../data/story.js';
-import { loadRecords } from '../../services/runRecords.js';
 import {
   TRANSMISSION_CHARS_PER_SECOND,
   endingTransmissions,
@@ -46,13 +45,13 @@ const ARRIVAL_LIMIT_MS = 6000;
 
 /**
  * The sector a run start flies to first, or null: the sector a carried start
- * (the victory screen's Next Sector) begins, or the first sector launched
- * from the campaign map before any sector was ever won. Never a replay. A
- * dev `freeze` of kind 'travel' flies any start to its sector (or the first).
+ * (the victory screen's Next Sector) begins, or any sector launched from the
+ * campaign map — every launch, won before or not (the owner's choice, 16/11:
+ * the skip key is there). Never a retry or a replay. A dev `freeze` of kind
+ * 'travel' flies any start to its sector (or the first).
  */
 export function travelDestination(
   { sector, carried, source, replay } = {},
-  records = { sectorsWon: [] },
   freeze = null
 ) {
   if (replay) return null;
@@ -60,12 +59,7 @@ export function travelDestination(
     return sectorById(freeze.sector)?.id ?? SECTORS[0].id;
   }
   if (!sectorById(sector)) return null;
-  if (carried) return sector;
-  const opening =
-    source === 'campaign-launch-btn' &&
-    sector === SECTORS[0].id &&
-    records.sectorsWon.length === 0;
-  return opening ? sector : null;
+  return carried || source === 'campaign-launch-btn' ? sector : null;
 }
 
 /**
@@ -153,7 +147,7 @@ export class RunCinematics {
    * showCinematicHint, showLetterbox). `holdSim(flag)` stops or restarts
    * the fixed step; `bindSkip(fn)` listens for the skip and returns the
    * unbind; `onIntroEnd()` shows the layer banner; `speak(entry)` queues a
-   * transmission and `hush()` drops them all; `records()` the run records.
+   * transmission and `hush()` drops them all.
    */
   constructor({
     eventBus,
@@ -164,7 +158,6 @@ export class RunCinematics {
     onIntroEnd,
     speak = () => {},
     hush = () => {},
-    records = loadRecords,
   }) {
     this.eventBus = eventBus;
     this.renderer = renderer;
@@ -174,7 +167,6 @@ export class RunCinematics {
     this.onIntroEnd = onIntroEnd;
     this.speak = speak;
     this.hush = hush;
-    this.records = records;
     this.kind = null;
     this.timer = null;
     this.handOff = null;
@@ -198,7 +190,7 @@ export class RunCinematics {
    */
   armTravel(start) {
     const freeze = IS_DEV ? cinematicFreezeFromUrl() : null;
-    this.travelTo = travelDestination(start, this.records(), freeze);
+    this.travelTo = travelDestination(start, freeze);
     this.cards = this.travelTo ? [] : null;
     this.readyVoices(start, this.travelTo);
   }
@@ -208,7 +200,7 @@ export class RunCinematics {
    * Sector, the campaign map's Launch): its voices load now, as below.
    */
   prepareTravel(start) {
-    this.readyVoices(start, travelDestination(start, this.records()));
+    this.readyVoices(start, travelDestination(start));
   }
 
   /**
