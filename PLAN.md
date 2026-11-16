@@ -25,22 +25,22 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
 ## Passos (em ordem; marque [x])
 
 1. [ ] Um jeito de começar a partida na direção nova sem os três links: um só parâmetro (por exemplo
-   `?direcao=nova`) que liga os três estados no início de cada partida e os devolve a cada partida nova (hoje são
-   lidos só no construtor). Sem o parâmetro, nada muda.
+       `?direcao=nova`) que liga os três estados no início de cada partida e os devolve a cada partida nova (hoje são
+       lidos só no construtor). Sem o parâmetro, nada muda.
 2. [ ] Carta nova da mira automática: ao pegar, `noseAim` desliga e o `CombatSystem` volta ao modo auto. Só aparece
-   na direção nova: as cartas só conhecem pré-requisitos de nível e de carta (`src/modules/upgradePrerequisites.js`);
-   é preciso um pré-requisito de "direção nova", ou outra forma de tirar a carta do sorteio do jeito de hoje.
+       na direção nova: as cartas só conhecem pré-requisitos de nível e de carta (`src/modules/upgradePrerequisites.js`);
+       é preciso um pré-requisito de "direção nova", ou outra forma de tirar a carta do sorteio do jeito de hoje.
 3. [ ] Carta final do voo moderno: exige o fim das cartas de pilotagem (proposta: Braking System 3 e RCS System 3;
-   número de equilíbrio, mostre ao dono). Ao pegar, a tela de aviso explica as teclas novas e espera o Enter; só
-   então `controlScheme` vira 'modern' e `flight.glide` desliga.
+       número de equilíbrio, mostre ao dono). Ao pegar, a tela de aviso explica as teclas novas e espera o Enter; só
+       então `controlScheme` vira 'modern' e `flight.glide` desliga.
 4. [ ] Freio, agilidade e motor refeitos para o deslize: textos que digam o que fazem no deslize (frear ao soltar;
-   o freio de emergência como a parada rápida); o RCS também acelera o giro no clássico (hoje só o empuxo). Os
-   textos só mudam na direção nova enquanto o padrão for o de hoje.
+       o freio de emergência como a parada rápida); o RCS também acelera o giro no clássico (hoje só o empuxo). Os
+       textos só mudam na direção nova enquanto o padrão for o de hoje.
 5. [ ] Visual do canhão no nariz e a hora em que vira torre (o dono notou que o canhão deitado sobre o nariz parece
-   levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
+       levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
 6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
-   pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
-   não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
+       pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
+       não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
 7. [ ] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
