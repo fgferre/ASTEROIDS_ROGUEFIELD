@@ -32,6 +32,14 @@ export const CAMERA_DIRECTOR = deepFreeze({
   // proposta 15/11: how long the wide view stays open once the ship has
   // crossed an edge (or turned away from it); the owner's play decides.
   edgeHold: 0.6,
+  // proposta 15/11: a boss falling or breaking a phase (and a Herald
+  // falling) dives the view back near at once, quickly, and holds it there
+  // this long while it breaks apart; then the cleared wave's look opens.
+  dive: 1.2,
+  // proposta 15/11: how far past a boss's radius its drawn model reaches on
+  // screen (parts past the hull, height in the tilted view), for the duel
+  // framing to show it whole.
+  modelReach: 1.5,
 
   // What opens the wide view during play: something that will hit within
   // `threatHorizon` s is off the near shot (so it opens before it arrives);

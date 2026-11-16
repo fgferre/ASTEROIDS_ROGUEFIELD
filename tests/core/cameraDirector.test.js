@@ -205,6 +205,55 @@ describe('camera director', () => {
     expect(d.moment).toBe('wide');
   });
 
+  it('opens for a Herald off the near shot, like a boss', () => {
+    const d = director();
+    run(d, scene(100, 300), 3);
+    const herald = { type: 'herald', x: 720, y: 300, radius: 34 };
+    d.update(scene(100, 300, { enemies: [herald] }), DT);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('counts a boss with part of its body out of the shot as out (the Choir’s cores)', () => {
+    const d = director();
+    run(d, scene(400, 300), 3);
+    // Its centre is on screen, a core on its orbit is not.
+    const choir = { type: 'boss', x: 400, y: 190, radius: 118 };
+    d.update(scene(400, 300, { enemies: [choir] }), DT);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('dives back near when a boss falls, then opens for the orbs', () => {
+    const d = director();
+    run(d, scene(400, 300), 2);
+    d.trigger('waveStart');
+    run(d, scene(400, 300), 1);
+    d.trigger('dive');
+    d.trigger('cleared');
+    const orbs = [{ x: 700, y: 520, collected: false }];
+    const pose = run(d, scene(400, 300, { orbs }), T.dive - 0.1);
+    expect(d.moment).toBe('near');
+    expect(pose.zoom).toBeCloseTo(T.near.zoom, 1);
+    run(d, scene(400, 300, { orbs }), 0.2);
+    expect(d.moment).toBe('wide');
+  });
+
+  it('a dive leans toward the boss that fell, then lets go', () => {
+    for (const framing of ['a', 'c']) {
+      const d = director();
+      d.setFraming(framing);
+      const settled = run(d, scene(150, 300), 3).x;
+      const boss = { x: 560, y: 300, radius: 60 };
+      d.trigger('dive', boss);
+      const pose = run(d, scene(150, 300), T.dive - 0.1);
+      // Its body on screen (the lean aims at modelReach times its radius).
+      expect(shown(pose, 16 / 9, boss.x + boss.radius, boss.y), framing).toBe(
+        true
+      );
+      expect(shown(pose, 16 / 9, 150, 300, 0.95), framing).toBe(true);
+      expect(run(d, scene(150, 300), 3).x, framing).toBeCloseTo(settled, -1);
+    }
+  });
+
   it('a look is wide for its own time, then eases back near', () => {
     const d = director();
     run(d, scene(400, 300), 2);

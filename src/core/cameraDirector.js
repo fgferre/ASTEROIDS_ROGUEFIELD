@@ -97,6 +97,10 @@ export function createDirector({
   // Seconds left: the cleared wave's orbs, and the short looks.
   let clearedFor = 0;
   let glanceFor = 0;
+  // Seconds left of the dive: near, whatever else asks for wide.
+  let diveFor = 0;
+  // Where the boss that dived the view was, and its radius (0: none).
+  const fallen = { x: 0, y: 0, radius: 0 };
   // Seconds the springs stay quick after an entrance hands back.
   let handbackFor = 0;
   let clock = 0;
@@ -153,6 +157,18 @@ export function createDirector({
       screen.front &&
       Math.abs(screen.x) <= margin &&
       Math.abs(screen.y) <= margin
+    );
+  }
+
+  // A boss's or Herald's body on `shot`: `reach` times its radius around it,
+  // all of it inside the screen.
+  function bodyIn(shot, e, reach) {
+    const r = (e.radius || 0) * reach;
+    return (
+      onScreen(shot, nearAngles, e.x - r, e.y, 1) &&
+      onScreen(shot, nearAngles, e.x + r, e.y, 1) &&
+      onScreen(shot, nearAngles, e.x, e.y - r, 1) &&
+      onScreen(shot, nearAngles, e.x, e.y + r, 1)
     );
   }
 
@@ -213,35 +229,34 @@ export function createDirector({
         ? fieldWidth / 2
         : clampAxis(x, e.left * keep, e.right * keep, fieldWidth);
     near.y = clampAxis(y, e.up * keep, e.down * keep, fieldHeight);
-    if (framing === 'b') towardFoe(scene);
+    if (diveFor > 0 && fallen.radius > 0) towardFoe(scene, fallen);
+    else if (framing === 'b') towardFoe(scene, foeOf(scene));
   }
 
-  // Framing 'b': the near shot moves toward the boss or Herald just far
-  // enough to show it whole, and never so far that the ship leaves its
-  // margin.
-  function towardFoe(scene) {
-    const foe = scene.enemies.find(
+  function foeOf(scene) {
+    return scene.enemies.find(
       (e) =>
         e &&
         !e.destroyed &&
         !e.arrival &&
         (e.type === 'boss' || e.type === 'herald')
     );
+  }
+
+  // The near shot moves toward `foe` (a boss or Herald) just far enough to
+  // show it whole, and never so far that the ship leaves its margin: in a
+  // dive toward the one that fell, and always in framing 'b'.
+  function towardFoe(scene, foe) {
     if (!foe) return;
     const fromX = near.x;
     const fromY = near.y;
-    const r = foe.radius || 0;
     const at = (k) => {
       near.x = fromX + (foe.x - fromX) * k;
       near.y = fromY + (foe.y - fromY) * k;
     };
     const shipIn = () =>
       onScreen(near, nearAngles, scene.x, scene.y, SHIP_SHOWN);
-    const foeIn = () =>
-      onScreen(near, nearAngles, foe.x - r, foe.y, SHOWN) &&
-      onScreen(near, nearAngles, foe.x + r, foe.y, SHOWN) &&
-      onScreen(near, nearAngles, foe.x, foe.y - r, SHOWN) &&
-      onScreen(near, nearAngles, foe.x, foe.y + r, SHOWN);
+    const foeIn = () => bodyIn(near, foe, T.modelReach);
     // Where `ok` turns from `start` to the opposite along the move.
     const cross = (ok, start) => {
       let a = 0;
@@ -271,8 +286,8 @@ export function createDirector({
     for (let i = 0; i < enemies.length; i += 1) {
       const e = enemies[i];
       if (!e || e.destroyed) continue;
-      if (e.type === 'boss') {
-        if (!onScreen(near, nearAngles, e.x, e.y, SHOWN)) return true;
+      if (e.type === 'boss' || e.type === 'herald') {
+        if (!bodyIn(near, e, 1)) return true;
         continue;
       }
       const dx = e.x - sx;
@@ -484,11 +499,23 @@ export function createDirector({
      * A game event: 'cleared' (a wave's end: open for its orbs), or a short
      * wide look: 'waveStart', 'elite', 'telegraph' (an announced attack),
      * 'bossArrival'. A look at a `target` already in the near shot is
-     * skipped.
+     * skipped. 'dive' (a boss falling or breaking a phase, `target` where
+     * it is with its radius): back near at once and for `dive` s, whatever
+     * else asks for wide, leaning toward it.
      */
     trigger(kind, target = null) {
       if (kind === 'cleared') {
         clearedFor = T.clearedHold;
+        return;
+      }
+      if (kind === 'dive') {
+        fallen.x = target?.x ?? 0;
+        fallen.y = target?.y ?? 0;
+        fallen.radius = target?.radius ?? 0;
+        diveFor = T.dive;
+        wideFor = 0;
+        glanceFor = 0;
+        handbackFor = T.arrival.handbackFor;
         return;
       }
       const seconds = T.glance[kind];
@@ -510,6 +537,7 @@ export function createDirector({
       wideFor = 0;
       clearedFor = 0;
       glanceFor = 0;
+      diveFor = 0;
       handbackFor = 0;
       sliding = false;
       director.snap();
@@ -523,7 +551,8 @@ export function createDirector({
     update(scene, dt, zoomPulse = 1) {
       const step = Math.max(0, dt);
       clock += step;
-      clearedFor = Math.max(0, clearedFor - step);
+      clearedFor = Math.max(0, clearedFor - (diveFor > 0 ? 0 : step));
+      diveFor = Math.max(0, diveFor - step);
       glanceFor = Math.max(0, glanceFor - step);
       handbackFor = Math.max(0, handbackFor - step);
       updateWide();
@@ -537,7 +566,8 @@ export function createDirector({
         state = forced;
       } else {
         wideFor = Math.max(wideFor - step, holdFor(scene));
-        state = looking(scene) || wideFor > 0 ? 'wide' : 'near';
+        const open = looking(scene) || wideFor > 0;
+        state = open && diveFor === 0 ? 'wide' : 'near';
       }
       if (before === 'arrival' && !warden) handbackFor = T.arrival.handbackFor;
 

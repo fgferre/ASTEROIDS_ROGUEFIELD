@@ -17,6 +17,7 @@ import {
 } from '../../core/camera.js';
 import { epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
+import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
@@ -250,8 +251,10 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('boss-telegraph', (payload) => {
       this.camera.trigger('telegraph', payload?.enemy);
     });
-    // A boss falling mid-run: a short push from above.
-    this.registerEventListener('boss-defeated', () => {
+    // A boss falling mid-run: the view dives back near, with a short push
+    // from above.
+    this.registerEventListener('boss-defeated', ({ enemy } = {}) => {
+      this.camera.trigger('dive', enemy);
       if (!this.reducedMotion) {
         this.camera.pulseZoom(
           CAMERA_ZOOM * CAMERA_DIRECTOR.bossDown.zoom,
@@ -282,8 +285,12 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('player-took-damage', () => {
       this.impact.kick(KICK_PLAYER_HIT);
     });
-    this.registerEventListener('boss-phase-changed', () => {
+    this.registerEventListener('boss-phase-changed', ({ enemy } = {}) => {
       this.impact.kick(KICK_BOSS_PHASE);
+      this.camera.trigger('dive', enemy);
+    });
+    this.registerEventListener('herald-defeated', ({ kind, x, y } = {}) => {
+      this.camera.trigger('dive', { x, y, radius: HERALD_KINDS[kind]?.radius });
     });
     this.registerEventListener('player-dashed', () => {
       this.impact.kick(KICK_DASH);
