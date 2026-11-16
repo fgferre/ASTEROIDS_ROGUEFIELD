@@ -17,6 +17,7 @@
 import {
   createDirector,
   createDirectorScene,
+  FRAMINGS,
   MOMENTS,
 } from './cameraDirector.js';
 import { IS_DEV } from './env.js';
@@ -56,6 +57,46 @@ function momentFromUrl() {
   } catch {
     return null; // no window (Node tests)
   }
+}
+
+// Framing trial, for the owner to compare by playing (`?framing=a|b|c`, also
+// in the published build): C cycles the director's framing and a label
+// names it for 2 s. Without the flag nothing of it exists.
+const FRAMING_LABELS = {
+  a: 'CAMERA A - TODAY',
+  b: 'CAMERA B - DUEL',
+  c: 'CAMERA C - WIDTH',
+};
+function installFramingTrial(director) {
+  let name = null;
+  try {
+    name = new URLSearchParams(window.location.search).get('framing');
+  } catch {
+    return; // no window (Node tests)
+  }
+  if (!FRAMINGS.includes(name)) return;
+  const label = document.createElement('div');
+  label.style.cssText =
+    'position:fixed;top:14%;left:50%;transform:translateX(-50%);z-index:10000;padding:6px 14px;background:rgba(0,0,0,0.65);color:#fff;font:600 20px monospace;letter-spacing:2px;pointer-events:none;display:none';
+  document.body.appendChild(label);
+  let hide = 0;
+  const show = () => {
+    director.setFraming(name);
+    label.textContent = FRAMING_LABELS[name];
+    label.style.display = 'block';
+    clearTimeout(hide);
+    hide = setTimeout(() => (label.style.display = 'none'), 2000);
+  };
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.code !== 'KeyC' || event.repeat) return;
+      name = FRAMINGS[(FRAMINGS.indexOf(name) + 1) % FRAMINGS.length];
+      show();
+    },
+    true
+  );
+  show();
 }
 
 /** The mode to run: the URL flag wins over the Graphics setting. */
@@ -149,6 +190,7 @@ export function createCamera({
   let pulseFactor = 1;
   const director = createDirector({ fieldWidth, fieldHeight });
   director.force(momentFromUrl());
+  installFramingTrial(director);
   // The director's shot of the last update, null when it did not direct.
   let directed = null;
   const leadOut = { x: 0, y: 0 };

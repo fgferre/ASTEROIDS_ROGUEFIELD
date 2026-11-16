@@ -186,6 +186,17 @@ describe('camera director', () => {
     }
   });
 
+  it('counts only enemies out of the near shot as closing in around it', () => {
+    const d = director();
+    const around = [
+      { type: 'drone', x: 550, y: 300 },
+      { type: 'drone', x: 250, y: 300 },
+      { type: 'drone', x: 400, y: 190 },
+    ];
+    run(d, scene(400, 300, { enemies: around }), 1);
+    expect(d.moment).toBe('near');
+  });
+
   it('opens when a boss is off the near shot', () => {
     const d = director();
     run(d, scene(100, 300), 3);
@@ -379,6 +390,38 @@ describe('camera director, a Warden’s entrance', () => {
       const pose = d.update(scene(400, 300, { enemies: [boss] }), DT);
       expect(d.moment).not.toBe('arrival');
       expect(pose.yaw).toBe(0);
+    }
+  });
+});
+
+describe('camera director, the framing trial', () => {
+  it('duel: moves toward a boss in reach so both are shown, the ship in its margin', () => {
+    const d = director();
+    d.setFraming('b');
+    const boss = { type: 'boss', x: 560, y: 300, radius: 72 };
+    const pose = run(d, scene(150, 300, { enemies: [boss] }), 3);
+    expect(d.moment).toBe('near');
+    for (const [x, y] of [
+      [boss.x - boss.radius, boss.y],
+      [boss.x + boss.radius, boss.y],
+    ]) {
+      expect(shown(pose, 16 / 9, x, y)).toBe(true);
+    }
+    expect(shown(pose, 16 / 9, 150, 300, 0.95)).toBe(true);
+  });
+
+  it('width: the field fills the screen across, centred, both top and bottom reachable', () => {
+    for (const aspect of [16 / 9, 4 / 3]) {
+      const d = director(aspect);
+      d.setFraming('c');
+      for (const sx of [100, 700]) {
+        const pose = run(d, scene(sx, 300), 3);
+        expect(pose.x, `aspect ${aspect}`).toBeCloseTo(W / 2, -1);
+        expect(screenOf(pose, aspect, 0, pose.y).x).toBeCloseTo(-1, 1);
+        expect(screenOf(pose, aspect, W, pose.y).x).toBeCloseTo(1, 1);
+      }
+      expect(shown(run(d, scene(400, 10), 3), aspect, 400, 0)).toBe(true);
+      expect(shown(run(d, scene(400, 590), 3), aspect, 400, H)).toBe(true);
     }
   });
 });

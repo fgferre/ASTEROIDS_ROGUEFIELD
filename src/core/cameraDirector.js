@@ -31,6 +31,8 @@ const SHOWN = 0.9;
 const SHIP_SHOWN = 0.95;
 // The states, for dev scenes (`?moment=near|wide`).
 export const MOMENTS = Object.freeze(['near', 'wide']);
+// Framing trial (camera.js, `?framing=`): 'a' today, 'b' duel, 'c' width.
+export const FRAMINGS = Object.freeze(['a', 'b', 'c']);
 
 function smoothstep(t) {
   const x = Math.max(0, Math.min(1, t));
@@ -86,6 +88,7 @@ export function createDirector({
   let lens = { tanV: Math.tan(19 * DEG), aspect: 4 / 3 };
   let reducedMotion = false;
   let forced = null;
+  let framing = 'a';
 
   // 'near', 'wide' or 'arrival' (a Warden's entrance).
   let state = 'near';
@@ -182,10 +185,14 @@ export function createDirector({
   }
 
   // The near shot: the ship, a little ahead, at most `beyondEdge` of the
-  // half-view past the field's edge.
+  // half-view past the field's edge. Framing 'c': the field's width fills
+  // the screen across its middle, centred; framing 'b': moved toward a boss.
   function updateNear(scene) {
     const fit = fieldFitDistance(nearAngles, lens, fieldWidth, fieldHeight);
-    near.distance = fit / T.near.zoom;
+    near.distance =
+      framing === 'c'
+        ? fieldWidth / 2 / (lens.tanV * lens.aspect)
+        : fit / T.near.zoom;
     const e = shotExtent(near.distance, nearAngles, lens, extent);
     let x = scene.x;
     let y = scene.y;
@@ -201,8 +208,58 @@ export function createDirector({
       low + high >= size
         ? (low + size - high) / 2
         : Math.max(low, Math.min(size - high, v));
-    near.x = clampAxis(x, e.left * keep, e.right * keep, fieldWidth);
+    near.x =
+      framing === 'c'
+        ? fieldWidth / 2
+        : clampAxis(x, e.left * keep, e.right * keep, fieldWidth);
     near.y = clampAxis(y, e.up * keep, e.down * keep, fieldHeight);
+    if (framing === 'b') towardFoe(scene);
+  }
+
+  // Framing 'b': the near shot moves toward the boss or Herald just far
+  // enough to show it whole, and never so far that the ship leaves its
+  // margin.
+  function towardFoe(scene) {
+    const foe = scene.enemies.find(
+      (e) =>
+        e &&
+        !e.destroyed &&
+        !e.arrival &&
+        (e.type === 'boss' || e.type === 'herald')
+    );
+    if (!foe) return;
+    const fromX = near.x;
+    const fromY = near.y;
+    const r = foe.radius || 0;
+    const at = (k) => {
+      near.x = fromX + (foe.x - fromX) * k;
+      near.y = fromY + (foe.y - fromY) * k;
+    };
+    const shipIn = () =>
+      onScreen(near, nearAngles, scene.x, scene.y, SHIP_SHOWN);
+    const foeIn = () =>
+      onScreen(near, nearAngles, foe.x - r, foe.y, SHOWN) &&
+      onScreen(near, nearAngles, foe.x + r, foe.y, SHOWN) &&
+      onScreen(near, nearAngles, foe.x, foe.y - r, SHOWN) &&
+      onScreen(near, nearAngles, foe.x, foe.y + r, SHOWN);
+    // Where `ok` turns from `start` to the opposite along the move.
+    const cross = (ok, start) => {
+      let a = 0;
+      let b = 1;
+      for (let i = 0; i < BISECT_STEPS; i += 1) {
+        const k = (a + b) / 2;
+        at(k);
+        if (ok() === start) a = k;
+        else b = k;
+      }
+      return start ? a : b;
+    };
+    // The least move that shows it, and the most the ship allows.
+    at(0);
+    const show = foeIn() ? 0 : cross(foeIn, false);
+    at(1);
+    const most = shipIn() ? 1 : cross(shipIn, true);
+    at(Math.min(show, most));
   }
 
   // --- what opens the wide view -------------------------------------------
@@ -254,7 +311,8 @@ export function createDirector({
     return false;
   }
 
-  // Enemies close on at least `surroundSides` of the four sides of the ship.
+  // Enemies close, out of the near shot, on at least `surroundSides` of the
+  // four sides of the ship.
   function surrounded(scene) {
     let sides = 0;
     const r2 = T.surroundRange * T.surroundRange;
@@ -265,6 +323,7 @@ export function createDirector({
       const dx = e.x - scene.x;
       const dy = e.y - scene.y;
       if (dx * dx + dy * dy > r2) continue;
+      if (onScreen(near, nearAngles, e.x, e.y, SHOWN)) continue;
       if (Math.abs(dx) >= Math.abs(dy)) sides |= dx >= 0 ? 1 : 4;
       else sides |= dy >= 0 ? 8 : 2;
     }
@@ -324,10 +383,11 @@ export function createDirector({
   }
 
   // How long a danger keeps the view open after it is gone: a threat may
-  // come back (wideHold), an edge crossing is over once crossed (edgeHold).
+  // come back (wideHold), an edge crossing is over once crossed (edgeHold;
+  // framing 'c' shows a crossing without it).
   function holdFor(scene) {
     if (threatOffNear(scene) || surrounded(scene)) return T.wideHold;
-    return edgeAhead(scene) ? T.edgeHold : 0;
+    return framing !== 'c' && edgeAhead(scene) ? T.edgeHold : 0;
   }
 
   // 1 when nothing threatens close by, fading to 0 as something nears.
@@ -408,6 +468,11 @@ export function createDirector({
 
     setReducedMotion(flag) {
       reducedMotion = Boolean(flag);
+    },
+
+    /** The framing trial (camera.js): 'a', 'b' or 'c' (FRAMINGS). */
+    setFraming(name) {
+      framing = FRAMINGS.includes(name) ? name : 'a';
     },
 
     /** Dev scenes (`?moment=`): hold this state; null frees it. */
