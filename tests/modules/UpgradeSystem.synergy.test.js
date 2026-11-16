@@ -5,6 +5,7 @@ import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY, {
   cardsForFlight,
+  pilotCardIds,
 } from '../../src/data/upgrades/index.js';
 import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
@@ -108,6 +109,19 @@ describe('upgrade families', () => {
     );
     expect(braking(true).name).toBe('Braking System');
     expect(braking(true).summary).toMatch(/glide/);
+  });
+
+  it('the piloting cards are the Flight Computer and every card on its way; none without the new flight', () => {
+    const pilots = (newFlight) =>
+      pilotCardIds(cardsForFlight(listContent('cards'), newFlight));
+    expect(pilots(false)).toEqual([]);
+    expect([...pilots(true)].sort()).toEqual([
+      'auto_aim',
+      'braking_system',
+      'flight_computer',
+      'propulsors',
+      'rcs_system',
+    ]);
   });
 });
 

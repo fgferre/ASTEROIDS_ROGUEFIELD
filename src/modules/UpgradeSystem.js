@@ -8,10 +8,12 @@ import {
   UPGRADE_RARITY_WEIGHT_CAPS,
   UPGRADE_FAMILY_STEER_PER_CARD,
   UPGRADE_WEAPON_OFFER_LEVELS,
+  UPGRADE_PILOT_OFFER_EVERY,
 } from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, {
   UPGRADE_CATEGORIES,
   WEAPON_CARD_IDS,
+  pilotCardIds,
 } from '../data/upgrades/index.js';
 import {
   UPGRADE_FAMILIES,
@@ -81,6 +83,7 @@ class UpgradeSystem extends BaseSystem {
     this.resetRunUpgradeActions();
     this.upgradeDefinitions = buildUpgradeDefinitions(UPGRADE_LIBRARY);
     this.upgradeLookup = buildUpgradeLookup(this.upgradeDefinitions);
+    this.pilotCardIds = pilotCardIds(this.upgradeDefinitions);
     this.upgradeCategoryMap = buildUpgradeCategoryMap(UPGRADE_CATEGORIES);
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.refreshInjectedServices({ force: true });
@@ -144,7 +147,8 @@ class UpgradeSystem extends BaseSystem {
   // === SISTEMA DE UPGRADES ===
   // `exclude`: ids drawn only if the rest of the pool runs out (reroll).
   // `level`: the pilot level the offer is for; at UPGRADE_WEAPON_OFFER_LEVELS
-  // one slot, at random, holds a weapon card while the run has none.
+  // one slot, at random, holds a weapon card while the run has none; in the
+  // new flight, at every UPGRADE_PILOT_OFFER_EVERY levels, a piloting card.
   prepareUpgradeOptions(
     count = PROGRESSION_UPGRADE_ROLL_COUNT,
     { exclude = [], level = this.level } = {}
@@ -179,10 +183,13 @@ class UpgradeSystem extends BaseSystem {
     const preferred = eligible.filter(
       (d) => !avoided(d) || (!newElsewhere && isNew(d))
     );
-    const weapons = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
-      ? preferred.filter(({ id }) => WEAPON_CARD_IDS.includes(id))
-      : [];
-    const selection = this.rollUpgradeDefinitions(weapons, 1);
+    const slotIds = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
+      ? WEAPON_CARD_IDS
+      : level % UPGRADE_PILOT_OFFER_EVERY === 0
+        ? this.pilotCardIds
+        : [];
+    const slotted = preferred.filter(({ id }) => slotIds.includes(id));
+    const selection = this.rollUpgradeDefinitions(slotted, 1);
     selection.push(
       ...this.rollUpgradeDefinitions(
         preferred.filter((definition) => !selection.includes(definition)),
@@ -202,10 +209,10 @@ class UpgradeSystem extends BaseSystem {
         )
       );
     }
-    if (weapons.length > 0) {
-      const [weapon] = selection.splice(0, 1);
+    if (slotted.length > 0) {
+      const [held] = selection.splice(0, 1);
       const slot = this.selectionRandom().int(0, selection.length);
-      selection.splice(slot, 0, weapon);
+      selection.splice(slot, 0, held);
     }
     const options = selection
       .map((definition) => this.buildUpgradeOption(definition))

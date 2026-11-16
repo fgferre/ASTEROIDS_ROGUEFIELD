@@ -51,6 +51,24 @@ const UPGRADE_LIBRARY = deepFreeze(
     ...WEAPON_CARDS,
   ].sort((a, b) => a.order - b.order)
 );
+/**
+ * The new flight's piloting cards: the Flight Computer and every card on its
+ * way (its prerequisites, followed down); none when it is not in `cards`.
+ */
+export function pilotCardIds(cards) {
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  const ids = [];
+  const visit = (id) => {
+    if (ids.includes(id) || !byId.has(id)) return;
+    ids.push(id);
+    (byId.get(id).prerequisites ?? [])
+      .filter(({ type }) => type === 'upgrade')
+      .forEach((prerequisite) => visit(prerequisite.id));
+  };
+  visit('flight_computer');
+  return ids;
+}
+
 export const WEAPON_CARD_IDS = Object.freeze(WEAPON_CARDS.map(({ id }) => id));
 
 export { UPGRADE_CATEGORIES };

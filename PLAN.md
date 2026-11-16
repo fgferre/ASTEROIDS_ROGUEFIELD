@@ -45,17 +45,19 @@ Regras desta frente: sem link o jogo continua o de hoje até a coordenadora avis
        levantar o bico; a câmera também deixa de se adiantar para o alvo sem mira automática). Gosto: mostre fotos.
        Cartão entregue (16/11): `quadro/cartoes/pilotagem-direcao.html`, opções A (como está), B (torre escondida, cano
        curto embutido na ponta do nariz: housing e lente ocultos, `barrels.scale` (0,8; 0,55; 0,55), boca em x = 21,5;
-       a boca do tiro na simulação está em 11,5 e teria de ir junto) e C (`barrels.scale.x` 0,6). Espera a escolha dele.
-6. [ ] Os três pontos dos propulsores: a agulha de giro sem carta pode estar pequena; o freio desenhado no nível 3
-       pode estar grande; o clarão de tela com o motor no máximo continua azul nos cascos âmbar. No deslize, o retro
-       não acende ao soltar (`coastBrake` é 0): decidir se o freio da Braking System deve aparecer.
-       Já no código (16/11, sucessora, decisão pequena): no deslize, com a Braking System instalada, o fogo de freio do
-       nariz acende ao soltar o empuxo (`coastBrake` em `flight.js`); sem a carta, nada acende. Foto de antes e
-       depois no cartão.
-       Propostas no mesmo cartão: agulha de giro ×2,5 no comprimento e cor 1,3; freio do nível 3 com o leque a 0,55 e
-       as chamas a 0,7; clarão do motor em `PALETTE[accent]` do casco (`PlayerEffects.js`), e o espelho em
-       `fieldMirrors.js` só repinta a cor quando a opacidade muda: corrigir junto. Espera a escolha dele.
+       a boca do tiro na simulação está em 11,5 e teria de ir junto) e C (`barrels.scale.x` 0,6). Resposta dele: a hora
+       da torre "Ficou bom"; o visual voltou como pergunta ("começamos no clássico com o canhão na frente, depois… troca
+       da arma primária para… a torre que gira"). Sim é a resposta; só o visual de A/B/C de novo, uma vez, em
+       `quadro/cartoes/pilotagem-canhao.html` (sugestão: B). Espera a escolha dele.
+6. [x] Os três pontos dos propulsores (respostas dele, 16/11: os quatro "Ficou bom"). Feito: agulha de giro sem
+       carta com 11,25 de comprimento (2,5× a de antes) e brilho 1,3, sem nível que a encurte; freio do nível 3 com o
+       leque a 0,55 e as chamas paradas no tamanho do nível 2 (×0,7 encurtaria o nível 3 abaixo do 2); clarão do motor
+       na cor do casco e o espelho repinta quando só a cor muda; chama de freio no deslize com a Braking System.
 7. [x] Reescrever `docs/NORTE.md` seção 4b com a direção nova.
+   Cartas de pilotagem (resposta dele, 16/11: quase não apareceram, a Auto Turret nunca): medido em 2000 partidas,
+   só 1 oferta em 4 trazia uma; a carta final saía em 2 de 100 até o nível 25. No link, a cada dois níveis uma vaga
+   da oferta é de pilotagem (`UPGRADE_PILOT_OFFER_EVERY`, como a vaga de arma): Auto Turret por volta do nível 2,
+   Flight Computer por volta do 18 para quem caça. Provisório, no cartão `pilotagem-canhao`.
 8. [ ] Fechar: `npm run gate`, fotos de antes e depois, item 34 de `docs/PENDENCIAS.md`, commit e push do ramo.
 
 # Modernização do Asteroid Roguefield — plano (12/11/2026)
