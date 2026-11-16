@@ -958,12 +958,7 @@ class PlayerSystem extends BaseSystem {
     this.maneuvers.resetDashState();
 
     // Reset thruster state to stop any active sounds
-    this.thrusters.lastThrusterState = {
-      main: 0,
-      aux: 0,
-      sideL: 0,
-      sideR: 0,
-    };
+    this.thrusters.resetState();
 
     // Give invulnerability
     this.invulnerableTimer = invulnerabilityDuration;

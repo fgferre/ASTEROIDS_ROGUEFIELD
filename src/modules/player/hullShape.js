@@ -9,8 +9,10 @@ import { SHIP_SIZE } from '../../core/GameConstants.js';
 const DEFAULT_THRUSTER_PORTS = Object.freeze({
   main: Object.freeze({ x: -SHIP_SIZE * 0.95, y: 0 }),
   aux: Object.freeze({ x: SHIP_SIZE * 0.95, y: 0 }),
-  left: Object.freeze({ x: 0, y: -SHIP_SIZE * 0.95 }),
-  right: Object.freeze({ x: 0, y: SHIP_SIZE * 0.95 }),
+  left: Object.freeze({ x: -SHIP_SIZE * 0.81, y: -SHIP_SIZE * 0.86 }),
+  right: Object.freeze({ x: -SHIP_SIZE * 0.81, y: SHIP_SIZE * 0.86 }),
+  noseLeft: Object.freeze({ x: SHIP_SIZE * 0.81, y: -SHIP_SIZE * 0.16 }),
+  noseRight: Object.freeze({ x: SHIP_SIZE * 0.81, y: SHIP_SIZE * 0.16 }),
 });
 
 export const buildClosedPath = (vertices) => {

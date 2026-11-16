@@ -20,11 +20,13 @@ import {
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import {
+  SHIP_HEADING_TURN_RATE,
   SHIP_MAX_SPEED,
   SHIP_ROTATION_SPEED,
   TURRET_PIVOT_X,
 } from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
+import { getHullThrusterPort } from '../player/hullShape.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import {
   CANOPY_GLASS,
@@ -45,13 +47,26 @@ import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
-// Banking (PLAN.md R5.9, proposta 18/10): roll into the strafe input and the
-// yaw rate, eased with a time constant so it saturates and relaxes smoothly.
+// Banking (PLAN.md R5.9, proposta 18/10): roll into the modern strafe (the
+// nose swinging onto the move) and the yaw rate, eased with a time constant so it saturates and relaxes smoothly.
 // Both come from the simulation (input, angular velocity), never from the
 // interpolated pose.
 const BANK_STRAFE = (22 * Math.PI) / 180;
 const BANK_YAW = (8 * Math.PI) / 180;
 const BANK_SMOOTH_S = 0.18;
+// The engines at idle (proposta 15/11): no jet, the throats at IDLE_GLOW, a
+// faint ship light at IDLE_LIGHT and a short dim ember in each nozzle
+// (IDLE_EMBER opacity, IDLE_EMBER_LENGTH long, no white core), all breathing
+// by ±IDLE_BREATH over IDLE_BREATH_S; under thrust they rise to the old 1.8
+// and 2.6 and the ember gives way to the flame.
+const IDLE_GLOW = 1.2;
+const IDLE_LIGHT = 0.35;
+const IDLE_EMBER = 0.3;
+const IDLE_EMBER_LENGTH = 2.8;
+const IDLE_BREATH = 0.2;
+const IDLE_BREATH_S = 3.2;
+// The nose jets' puffs, a share of the wingtip ones (proposta 15/11).
+const NOSE_PUFF = 0.8;
 // Each shot pushes the hull back along the nose for the muzzle frames.
 const RECOIL_DIP = 2;
 // Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10), its
@@ -373,14 +388,31 @@ export class PlayerMirror {
       this.flames.push({ flame, core, r: nozzle.r });
     });
 
-    // Strafe puffs at the wingtip RCS ports, pointing outboard (as in 2D).
-    geometry.rcsPorts.forEach((port, i) => {
+    // The turn couple (thrusters.js), blowing outboard: a wingtip puff at
+    // each aft RCS port, lit when the nose swings away from its flank, and a
+    // smaller one at each nose port (the hull's 2D spark port), lit when the
+    // nose swings toward the other flank.
+    const addPuff = (position, port, size) => {
       const puff = new THREE.Mesh(this.cone, this.puffMaterial);
-      puff.position.fromArray(built.tips[i]);
-      puff.rotation.y = port.y < 0 ? -Math.PI / 2 : Math.PI / 2;
+      puff.position.fromArray(position);
+      puff.rotation.y = port ? -Math.PI / 2 : Math.PI / 2;
       puff.visible = false;
       this.ship.add(puff);
-      this.puffs.push({ puff, left: port.y < 0 });
+      // the wingtip on the port flank and the starboard nose jet turn the
+      // nose to port
+      const aft = size === 1;
+      this.puffs.push({ puff, size, turnL: aft === port });
+    };
+    geometry.rcsPorts.forEach((port, i) =>
+      addPuff(built.tips[i], port.y < 0, 1)
+    );
+    ['noseLeft', 'noseRight'].forEach((kind) => {
+      const { x, y } = getHullThrusterPort(kind, hull);
+      addPuff(
+        [x / VISUAL_SCALE, NOZZLE_HEIGHT, y / VISUAL_SCALE],
+        y < 0,
+        NOSE_PUFF
+      );
     });
 
     const hullMesh = new THREE.Mesh(built.hull, this.hullMaterials);
@@ -439,14 +471,14 @@ export class PlayerMirror {
     const main = thrust.main || 0;
     this.lightEngines(main, levels.thruster, time);
     for (let i = 0; i < this.puffs.length; i += 1) {
-      const { puff, left } = this.puffs[i];
-      const amount = (left ? thrust.sideL : thrust.sideR) || 0;
+      const { puff, size, turnL } = this.puffs[i];
+      const amount = (turnL ? thrust.turnL : thrust.turnR) || 0;
       puff.visible = amount > 0.02;
-      puff.scale.set(2 + 6 * amount, 1.2, 1.2);
+      puff.scale.set((2 + 6 * amount) * size, 1.2 * size, 1.2 * size);
     }
     this.puffMaterial.opacity = Math.min(
       1,
-      Math.max(thrust.sideL || 0, thrust.sideR || 0)
+      Math.max(thrust.turnL || 0, thrust.turnR || 0)
     );
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
@@ -500,22 +532,32 @@ export class PlayerMirror {
    */
   lightEngines(main, level = 0, time = 0) {
     const length = (5 + 18 * main) * (1 + 0.1 * (level || 0));
+    // At idle no jet, only the throats, a faint light and a short ember,
+    // breathing slowly (the owner's pick).
+    const breath =
+      1 + IDLE_BREATH * Math.sin((time * Math.PI * 2) / IDLE_BREATH_S);
+    const burning = main > 0.02;
     for (let i = 0; i < this.flames.length; i += 1) {
       const { flame, core, r } = this.flames[i];
       const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
-      flame.visible = main > 0.02;
-      core.visible = flame.visible;
-      flame.scale.set(length * flicker, r * 0.95, r * 0.95);
+      const reach = burning ? length * flicker : IDLE_EMBER_LENGTH * breath;
+      core.visible = burning;
+      flame.scale.set(reach, r * 0.95, r * 0.95);
       core.scale.set(length * 0.5 * flicker, r * 0.45, r * 0.45);
     }
-    this.flameMaterial.opacity = Math.min(1, main * 1.2);
+    this.flameMaterial.opacity = burning
+      ? Math.min(1, main * 1.2)
+      : IDLE_EMBER * breath;
     this.coreMaterial.opacity = Math.min(1, main * 1.1);
+    const glow = IDLE_GLOW * breath;
     this.nozzleMaterial.color
       .copy(this.accent)
-      .multiplyScalar(0.5 + 1.3 * main);
+      .multiplyScalar(glow + (1.8 - glow) * main);
     this.light.color.copy(this.accent).lerp(this.warmLight, 0.35 * main);
     this.light.intensity =
-      2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+      IDLE_LIGHT * breath * (1 - main) +
+      2.6 * main +
+      (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
   }
 
   // One layer per sim heading (PlayerSystem turretLayers), turned like the
@@ -581,8 +623,9 @@ export class PlayerMirror {
   }
 
   /**
-   * Roll target: strafe input (modern only; classic A/D is torque) plus the
-   * yaw rate, eased toward with BANK_SMOOTH_S. Returns radians.
+   * Roll target: in the modern scheme the nose's swing onto the move (the
+   * strafe share, full at SHIP_HEADING_TURN_RATE), plus the yaw rate in both,
+   * eased toward with BANK_SMOOTH_S. Returns radians.
    */
   updateBank(player, time) {
     const dt =
@@ -590,15 +633,12 @@ export class PlayerMirror {
         ? 0
         : Math.min(0.1, Math.max(0, time - this.bankTime));
     this.bankTime = time;
-    const thrust = player.lastThrusterState || {};
+    const turn = player.angularVelocity || 0;
     const strafe =
       player.controlScheme === 'modern'
-        ? (thrust.sideL || 0) - (thrust.sideR || 0)
+        ? Math.max(-1, Math.min(1, turn / SHIP_HEADING_TURN_RATE))
         : 0;
-    const yaw = Math.max(
-      -1,
-      Math.min(1, (player.angularVelocity || 0) / SHIP_ROTATION_SPEED)
-    );
+    const yaw = Math.max(-1, Math.min(1, turn / SHIP_ROTATION_SPEED));
     const target = BANK_STRAFE * strafe + BANK_YAW * yaw;
     this.bank += (target - this.bank) * (1 - Math.exp(-dt / BANK_SMOOTH_S));
     return this.bank;

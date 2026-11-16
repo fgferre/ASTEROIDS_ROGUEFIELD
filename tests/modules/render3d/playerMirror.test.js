@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { TURRET_BARREL_LENGTH } from '../../../src/data/constants/physics.js';
+import {
+  SHIP_HEADING_TURN_RATE,
+  TURRET_BARREL_LENGTH,
+} from '../../../src/data/constants/physics.js';
 import {
   ALL_HULLS,
   bastion,
@@ -116,7 +119,9 @@ describe('PlayerMirror', () => {
 
   it('builds the Interceptor in plates, its wingtips following the RCS upgrade', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    const stock = mirror.puffs.map(({ puff }) => Math.abs(puff.position.z));
+    const stock = mirror.puffs
+      .filter(({ size }) => size === 1)
+      .map(({ puff }) => Math.abs(puff.position.z));
     expect(stock).toHaveLength(2);
     // lit leading edges, one per wing
     const edge = mirror.ship.children.find((child) => child.name === 'edge');
@@ -145,9 +150,12 @@ describe('PlayerMirror', () => {
         if (object.isMesh) meshes += 1;
         if (object.isLineSegments) lines += 1;
       });
-      // hull + canopy + per nozzle (throat, flame, core) + one puff per port
+      // hull + canopy + per nozzle (throat, flame, core) + one puff per
+      // wingtip port + the two nose jets
       const { nozzles, rcsPorts } = mirror.geometry;
-      expect(meshes, hull.id).toBe(2 + 3 * nozzles.length + rcsPorts.length);
+      expect(meshes, hull.id).toBe(
+        2 + 3 * nozzles.length + rcsPorts.length + 2
+      );
       expect(lines, hull.id).toBeLessThanOrEqual(3);
     });
   });
@@ -177,28 +185,37 @@ describe('PlayerMirror', () => {
     expect(mirror.shieldRadius).toBeGreaterThan(0);
   });
 
-  it('lights the side puff on the strafing flank only', () => {
+  it('lights the turn couple: a nose swinging to starboard shows the starboard wingtip and the port nose jet', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.thrusterVisual.sideL = 1;
-    player.lastThrusterState.sideL = 1;
+    player.lastThrusterState.turnR = 1;
     mirror.update(player, ribbons, 0);
-    const shown = mirror.puffs.filter(({ puff }) => puff.visible);
-    expect(shown.map(({ left }) => left)).toEqual([true]);
+    const shown = mirror.puffs
+      .filter(({ puff }) => puff.visible)
+      .map(({ puff }) => ({
+        fore: puff.position.x > 0,
+        starboard: puff.position.z > 0,
+      }));
+    expect(shown).toEqual(
+      expect.arrayContaining([
+        { fore: false, starboard: true },
+        { fore: true, starboard: false },
+      ])
+    );
+    expect(shown).toHaveLength(2);
   });
 
-  it('banks into a held strafe up to 22°, then relaxes level', () => {
+  it('banks into a full modern swing up to 22° plus the 8° of yaw, then relaxes level', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.controlScheme = 'modern';
-    player.angularVelocity = 0;
-    player.lastThrusterState.sideL = 1;
+    player.angularVelocity = SHIP_HEADING_TURN_RATE;
     let time = 0;
     for (let i = 0; i < 120; i += 1) {
       time += 1 / 60;
       mirror.update(player, ribbons, time);
     }
-    expect(mirror.group.rotation.x).toBeCloseTo((22 * Math.PI) / 180, 3);
+    expect(mirror.group.rotation.x).toBeCloseTo((30 * Math.PI) / 180, 3);
 
-    player.lastThrusterState.sideL = 0;
+    player.angularVelocity = 0;
     for (let i = 0; i < 120; i += 1) {
       time += 1 / 60;
       mirror.update(player, ribbons, time);
@@ -209,7 +226,6 @@ describe('PlayerMirror', () => {
   it('banks only on the yaw rate in classic controls', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.controlScheme = 'classic';
-    player.lastThrusterState.sideL = 1;
     player.angularVelocity = -100;
     let time = 0;
     for (let i = 0; i < 120; i += 1) {
