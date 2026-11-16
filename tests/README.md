@@ -25,6 +25,7 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 
 - `npm run playtest` flies all nine sector runs headless with the bot pilot (`src/bootstrap/botPilot.js`, fed by `botPilotAdapter.js`), a mortal ship and one life each, and prints a report per sector and a summary table. About 3 minutes (a better bot lives longer, so it runs longer).
 - `npm run playtest -- good` picks the `good` bot (default `average`); `npm run playtest -- <sector-id> [average|good] [seed]` flies one sector; the seed (default 1, env `PLAYTEST_SEED`) seeds both the world and the bot, so a sector is judged over several seeds. `PLAYTEST_CARRY=1` makes the bot win the chapter's earlier sectors first and arrive with that build, as in the campaign.
+- `--flight=glide` flies the classic glide with the cannon on the nose (`?controls=classic&flight=glide&aim=nose`, `src/bootstrap/botPilotGlide.js`); the seed may be a range (`1-10`). `npm run playtest -- debris-wake --table 1-10` runs both skills in both ways of flying, one after the other, and prints today's flight and the glide side by side.
 - It runs `tests/playtest/*.playtest.js` through `vitest.playtest.config.js` (`scripts/playtest.mjs` passes the choice and the seed in the environment), so `npm test` and the gate never run it.
 - The bot reads only what the screen shows (bodies, bullets, telegraphs and their timers, a boss's open plates); its skill is the named knobs in `PRESETS`. Its numbers are a probe, not a verdict: the owner's play judges difficulty.
 

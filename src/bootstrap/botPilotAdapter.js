@@ -7,8 +7,14 @@
 
 import { BOSS_KINDS } from '../data/enemies/boss.js';
 import { DASH_IMPULSE } from '../data/constants/gameplay.js';
+import {
+  GLIDE_ACCEL_SCALE,
+  GLIDE_LINEAR_DAMPING,
+  GLIDE_RETRO_SHARE,
+  GLIDE_SPEED_SCALE,
+} from '../data/constants/physics.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
-import { createFixedStepper } from '../core/fixedStep.js';
+import { FIXED_STEP_SECONDS, createFixedStepper } from '../core/fixedStep.js';
 import { createBotPilot, pickCard } from './botPilot.js';
 
 // A Sentinel's own hazards, besides its `telegraph`, by field name.
@@ -88,7 +94,7 @@ function seenRate(shape, value, time, memory, turn = false) {
 
 // The turret's reach with the weapon it carries (px): what its shots or
 // strikes get to, never past the turret's own targeting range.
-function weaponReach(combat) {
+export function weaponReach(combat) {
   const form = combat.weaponForm;
   const shot =
     form?.projectile?.range ??
@@ -100,6 +106,23 @@ function weaponReach(combat) {
   const reach = Math.max(0, ...reaches);
   const targeting = combat.targeting?.targetingRange ?? Infinity;
   return reach > 0 ? Math.min(reach, targeting) : targeting;
+}
+
+// The classic glide's numbers as flight.js applies them, for the bot's own
+// rollouts (botPilotGlide.js): push and drag, the cap, the turn, the shot.
+function glideOf(player, combat) {
+  const { flight } = player;
+  return {
+    step: FIXED_STEP_SECONDS,
+    accel: flight.acceleration * GLIDE_ACCEL_SCALE,
+    retro: GLIDE_RETRO_SHARE,
+    damping: GLIDE_LINEAR_DAMPING,
+    braking: flight.brakingDamping,
+    maxSpeed: flight.maxSpeed * GLIDE_SPEED_SCALE,
+    turn: flight.rotationSpeed,
+    turnDamping: flight.angularDamping,
+    bulletSpeed: combat.bulletSpeed,
+  };
 }
 
 /**
@@ -127,6 +150,10 @@ export function readWorld(services, time, memory = new WeakMap()) {
       !shield.isShieldActive &&
       !(shield.shieldCooldownTimer > 0),
     invulnerable: player.invulnerableTimer || 0,
+    angle: player.angle,
+    spin: player.angularVelocity,
+    glide:
+      player.flight.glide && player.noseAim ? glideOf(player, combat) : null,
     reach: weaponReach(combat),
     health: player.health,
     maxHealth: player.maxHealth,
@@ -278,6 +305,8 @@ export function createBotDriver({
   return {
     pilot,
     cards,
+    /** The key codes held after the last step(). */
+    held: () => held,
     step() {
       if (offer) {
         const id = pickCard(offer);
