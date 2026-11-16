@@ -6,8 +6,8 @@
  *   - `{ kind: 'target', enemy, predictedAim?, fireOrigin? }` → concentrated fire on a specific enemy.
  *   - `{ kind: 'direction', angle, originPos }` → concentrated fire in a direction from an origin.
  *
- * Lane clamp for kind:'target' is `Math.min(spacing, targetRadius + BULLET_SIZE)` so
- * outer lanes never exceed the target's effective hit radius (radius + bullet radius).
+ * Lanes for kind:'target' are evenly spaced: the nominal spacing, shrunk so the
+ * outer lanes stay inside the target's hit radius (radius + bullet radius) with a margin.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
@@ -96,7 +96,7 @@ describe('applyConcentratedFire', () => {
       });
     });
 
-    it('lanes clamped to ±(radius + BULLET_SIZE) for small radius 8, shotCount 4 (all within hitbox silhouette)', () => {
+    it('lanes stay inside ±(radius + BULLET_SIZE) for small radius 8, shotCount 4 (all within hitbox silhouette)', () => {
       const combat = makeCombat();
       const playerPos = { x: 0, y: 0 };
       const enemy = { id: 'e1', x: 300, y: 0, radius: 8 };

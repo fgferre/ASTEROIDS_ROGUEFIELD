@@ -52,9 +52,11 @@ export class LayerEvents {
     if (kind === 'gravity-well') {
       point = this.pickGravityWellPoint(point);
       const { pullSpeed, pullAcceleration } = FIELD_EVENTS[kind];
-      this.enemySystem
-        .getCachedXPOrbs?.()
-        ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
+      // One pull at a time: a Magnet pickup the ship has on keeps its pull.
+      const orbs = this.enemySystem.getCachedXPOrbs?.();
+      if (orbs && !orbs.globalPull) {
+        orbs.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
+      }
     } else if (kind === 'solar-flare') {
       // A phased Shade (`intangible`) is out of reach of the flare; rocks
       // drift on (EnemyUpdateSystem stuns machines only).

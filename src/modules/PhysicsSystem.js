@@ -417,6 +417,7 @@ class PhysicsSystem extends BaseSystem {
 
     toRemove.forEach((enemy) => {
       this.activeEnemies.delete(enemy);
+      if (enemy) this.spatialHash.remove(enemy);
       if (isBossEnemy(enemy)) {
         this.activeBosses.delete(enemy);
         this.clearBossPhysicsState(enemy);

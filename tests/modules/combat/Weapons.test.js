@@ -4,7 +4,8 @@ import { WEAPON_EVOLUTIONS } from '../../../src/data/weapons.js';
 
 const target = { id: 'e1', x: 600, y: 300, radius: 20 };
 
-function makeWeapons() {
+// `lead`: the lock's lead point (Targeting's aim for a travelling shot).
+function makeWeapons(lead = { x: 600, y: 300 }) {
   const shots = [];
   const emitted = [];
   const player = {
@@ -16,18 +17,18 @@ function makeWeapons() {
     currentTarget: target,
     currentTargetLocks: [target],
     currentLockAssignments: [],
-    predictedAimPointsMap: new Map([['e1', { x: 600, y: 300 }]]),
+    predictedAimPointsMap: new Map([['e1', lead]]),
     targetingUpgradeLevel: 0,
     aimMode: 'auto',
     stickAim: null,
     computeAllocatedShots: (enemy, stats) => stats.multishot,
-    getPredictedTargetPosition: () => ({ x: 600, y: 300 }),
+    getPredictedTargetPosition: () => lead,
     usingDynamicPrediction: () => false,
-    getPrimaryAimPoint: () => ({ x: 600, y: 300 }),
+    getPrimaryAimPoint: () => lead,
   };
   const weapons = new Weapons({
     player: () => player,
-    enemies: () => ({ forEachActiveEnemy: () => {} }),
+    enemies: () => ({ forEachActiveEnemy: (callback) => callback(target) }),
     targeting: () => targeting,
     createBullet: (from, to, damage) => shots.push({ from, to, damage }),
     hitEnemy: () => {},
@@ -58,6 +59,30 @@ describe('Weapons', () => {
         }),
       },
     ]);
+  });
+
+  it('aims a beam where a crossing lock is now, not at its lead point', () => {
+    const { weapons } = makeWeapons({ x: 600, y: 340 });
+    weapons.shootCooldown = 0;
+    weapons.takeWeapon('harmonic');
+    weapons.shots = 3; // the 4th shot is the beam
+
+    weapons.handleShooting(0.016, { multishot: 1, damage: 10 });
+
+    expect(weapons.beams).toHaveLength(1);
+    expect(weapons.beams[0].angle).toBeCloseTo(
+      Math.atan2(300 - 300, 600 - 410)
+    );
+  });
+
+  it('still leads a crossing lock with a travelling shot', () => {
+    const { weapons, shots } = makeWeapons({ x: 600, y: 340 });
+    weapons.shootCooldown = 0;
+
+    weapons.handleShooting(0.016, { multishot: 1, damage: 10 });
+
+    expect(shots).toHaveLength(1);
+    expect(shots[0].to).toEqual({ x: 600, y: 340 });
   });
 
   it('evolves the lance and shows it in the weapon state', () => {
