@@ -55,6 +55,16 @@ function glideFromUrl() {
   }
 }
 
+// Nose aim for `?aim=nose` (proposta 16/11): the cannon fixed on the nose,
+// aimed by turning the hull; CombatSystem holds the manual aim mode for it.
+function noseAimFromUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('aim') === 'nose';
+  } catch {
+    return false; // no window (Node tests)
+  }
+}
+
 /** The scheme to fly: the URL flag wins over the Hull Control setting. */
 export function resolveControlScheme(setting) {
   return (
@@ -112,6 +122,7 @@ class PlayerSystem extends BaseSystem {
           'controls'
         )?.hullControl
       );
+    this.noseAim = noseAimFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
     // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
@@ -553,7 +564,7 @@ class PlayerSystem extends BaseSystem {
 
   /** The held right-stick aim direction for this step, or null (auto). */
   getAimStick() {
-    return this.aimStick;
+    return this.noseAim ? null : this.aimStick;
   }
 
   // Both schemes: the turret turns along the right stick while it is held,
@@ -566,7 +577,9 @@ class PlayerSystem extends BaseSystem {
       : this.aimPoint
         ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
         : this.angle;
-    this.turretAngle = this.turnTurret(this.turretAngle, goal, deltaTime);
+    this.turretAngle = this.noseAim
+      ? this.angle
+      : this.turnTurret(this.turretAngle, goal, deltaTime);
     // Each extra layer turns onto its own lock the same way; without one it
     // follows the turret.
     for (let i = 0; i < this.turretLayers.length; i += 1) {

@@ -257,6 +257,10 @@ class CombatSystem extends BaseSystem {
       if (screen !== 'playing') {
         return;
       }
+      // Nose aim (?aim=nose) has no auto aim to toggle to.
+      if (this.cachedPlayer.noseAim) {
+        return;
+      }
       const next = this.aimMode === 'auto' ? 'manual' : 'auto';
       this.targeting.setAimMode(next);
       this.eventBus?.emit?.('combat-mode-toggled', { kind: 'aim', mode: next });
@@ -435,6 +439,9 @@ class CombatSystem extends BaseSystem {
       !player._quitExplosionHidden &&
       !player.controlsHeld
     ) {
+      if (player.noseAim && this.targeting.aimMode !== 'manual') {
+        this.targeting.setAimMode('manual');
+      }
       this.targeting.updateStickAim(player.getAimStick());
       this.targeting.updateTargeting(deltaTime);
       player.setAimPoint(this.targeting.getPrimaryAimPoint());

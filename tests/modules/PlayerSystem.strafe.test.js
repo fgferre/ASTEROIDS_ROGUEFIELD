@@ -79,6 +79,17 @@ describe('PlayerSystem control schemes', () => {
     }
   });
 
+  it('nose aim (?aim=nose) holds the cannon on the nose, whatever the aim point', () => {
+    const player = makePlayer({ left: true }, 'classic');
+    player.noseAim = true;
+    player.angle = 0;
+    player.setAimPoint({ x: 400, y: -1e6 }); // target straight up
+    steps(player, 20);
+
+    expect(player.angle).toBeLessThan(-0.1);
+    expect(player.getTurretAngle()).toBe(player.angle);
+  });
+
   it('the turret turns onto the aim point on its own, and the muzzle follows it', () => {
     const player = makePlayer({ right: true });
     player.angle = 0;
