@@ -50,6 +50,10 @@ export const FIRE_PATTERNS = Object.freeze({
   seeker: fireSeeker,
 });
 
+// Patterns that land on the firing frame: aimed where the lock is now, not
+// at the lead point a travelling shot needs.
+const INSTANT_PATTERNS = new Set(['beam', 'chain']);
+
 export class Weapons {
   /**
    * `player()`: the player service (position, muzzle point, turret angle).
@@ -84,6 +88,7 @@ export class Weapons {
     this.tuning = tuning;
 
     this.lastShotTime = 0;
+    this.instantShot = false; // true while a beam or chain fires
     this.shootCooldown = Number.isFinite(COMBAT_SHOOT_COOLDOWN)
       ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
       : 0.3;
@@ -116,7 +121,15 @@ export class Weapons {
     const pattern = this.weapon.fire.find(
       (entry) => !entry.every || this.shots % entry.every === 0
     );
+    this.instantShot = INSTANT_PATTERNS.has(pattern.pattern);
     FIRE_PATTERNS[pattern.pattern](this, pattern, playerPos, playerStats);
+    this.instantShot = false;
+  }
+
+  // Where a shot at `enemy` goes: where it is now for an instant pattern,
+  // else `lead` (its lead point).
+  aimPointFor(enemy, lead) {
+    return this.instantShot ? { x: enemy.x, y: enemy.y } : lead;
   }
 
   // `stream`: the weapon's projectile down the lock lanes, or straight ahead
@@ -669,12 +682,15 @@ export class Weapons {
   }
 
   // Where a beam or a fan goes from `origin` (the muzzle): along the
-  // right stick, onto the primary lock's lead point in auto, along the turret
-  // otherwise.
+  // right stick, onto the primary lock in auto (aimPointFor), along the
+  // turret otherwise.
   getWeaponAngle(origin) {
     const targeting = this.targeting();
+    const target = targeting.currentTarget;
     const aim =
-      targeting.aimMode === 'manual' ? null : targeting.getPrimaryAimPoint();
+      targeting.aimMode === 'manual' || !target
+        ? null
+        : this.aimPointFor(target, targeting.getPrimaryAimPoint());
     const stick = targeting.stickAim;
     if (stick) return Math.atan2(stick.y, stick.x);
     return aim
@@ -683,10 +699,10 @@ export class Weapons {
   }
 
   // Multi-lock (Targeting Matrix rank 3, several locks, auto aim, as the
-  // stream reads it): one entry per lock in order, with its lead point, the
-  // barrel tip of the turret layer aimed at it (PlayerSystem.getMuzzlePoint:
-  // every pattern's shots at that lock leave there) and the angle from that
-  // tip to the lead point; null otherwise.
+  // stream reads it): one entry per lock in order, with its aim point
+  // (aimPointFor), the barrel tip of the turret layer aimed at it
+  // (PlayerSystem.getMuzzlePoint: every pattern's shots at that lock leave
+  // there) and the angle from that tip to the aim point; null otherwise.
   getLockAims() {
     const targeting = this.targeting();
     if (
@@ -699,12 +715,13 @@ export class Weapons {
     }
     const player = this.player();
     return targeting.currentLockAssignments.map(({ enemy, predictedAim }) => {
-      const origin = player.getMuzzlePoint(predictedAim);
+      const point = this.aimPointFor(enemy, predictedAim);
+      const origin = player.getMuzzlePoint(point);
       return {
         enemyId: enemy.id,
-        point: predictedAim,
+        point,
         origin,
-        angle: Math.atan2(predictedAim.y - origin.y, predictedAim.x - origin.x),
+        angle: Math.atan2(point.y - origin.y, point.x - origin.x),
       };
     });
   }
