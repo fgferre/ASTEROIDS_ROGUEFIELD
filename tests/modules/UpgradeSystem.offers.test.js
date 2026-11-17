@@ -237,7 +237,7 @@ describe('level-up offers', () => {
             !progression.pilotCardIds.includes(id) &&
             !WEAPON_CARD_IDS.includes(id)
         )
-        .slice(0, 8 - extra.length)
+        .slice(0, UPGRADE_CARD_SLOTS - extra.length)
         .map(({ id }) => id);
       [...ids, ...extra].forEach((id) =>
         progression.appliedUpgrades.set(id, 1)
@@ -249,7 +249,7 @@ describe('level-up offers', () => {
         progression.appliedUpgrades.set(id, card(progression, id).levels.length)
       );
 
-    it('with 8 held, regular offers only rank up held cards', () => {
+    it('with the slots full, regular offers only rank up held cards', () => {
       for (let seed = 1; seed <= 20; seed += 1) {
         const progression = fill(createProgression(5, seed));
         // Nothing held is maxed here: every held card has a rank to take.
@@ -265,7 +265,7 @@ describe('level-up offers', () => {
       }
     });
 
-    it('with 8 held and nothing to rank, positions fill with trail cards, then the fallback', () => {
+    it('with the slots full and nothing to rank, positions fill with trail cards, then the fallback', () => {
       const progression = fill(createProgression(5));
       maxOut(progression);
       const trail = progression.trailSlotIds();
@@ -310,7 +310,7 @@ describe('level-up offers', () => {
       const progression = fill(createProgression(5));
       expect(progression.applyUpgrade('salvage_cache')).toBe(true);
       expect(progression.applyUpgrade('salvage_cache')).toBe(true);
-      expect(progression.getCardSlots().used).toBe(8);
+      expect(progression.getCardSlots().used).toBe(UPGRADE_CARD_SLOTS);
     });
 
     it('getCardSlots ignores trail cards and counts the weapon card', () => {

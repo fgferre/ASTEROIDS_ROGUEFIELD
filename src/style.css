@@ -956,7 +956,7 @@ select {
 
 .pause-run .run-slots {
   display: grid;
-  grid-template-columns: repeat(4, 46px);
+  grid-template-columns: repeat(5, 46px);
   justify-content: space-between;
   gap: var(--space-2);
 }

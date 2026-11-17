@@ -89,8 +89,9 @@ export const UPGRADE_WEAPON_OFFER_LEVELS = Object.freeze([3, 7]); // proposta 20
 // with it, Auto Turret around level 2 and the Flight Computer around 18).
 export const UPGRADE_PILOT_OFFER_EVERY = 2;
 // Distinct cards a run holds, the piloting trail aside (the owner's plan,
-// 16/11: a limit that is felt). New flight only.
-export const UPGRADE_CARD_SLOTS = 8;
+// 16/11: a limit that is felt; he raised it from 8 to 10 after playing).
+// New flight only.
+export const UPGRADE_CARD_SLOTS = 10;
 // Per-run level-up rerolls and banishes (proposta 18/10).
 export const PROGRESSION_UPGRADE_REROLLS_PER_RUN = 1;
 export const PROGRESSION_UPGRADE_BANISHES_PER_RUN = 1;
