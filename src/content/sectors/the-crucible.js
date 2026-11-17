@@ -1,7 +1,7 @@
 // A sector: the campaign's last chapter, one sector long, in its own place
 // (the `crucible` biome, past the run's layers), won at Sovereign. Its
 // stages call back the three chapters in turn (the Outer Ring's drones and
-// swarms, the Core's casters, the Reach's Shades and Seekers),
+// swarms, the Core's casters, the Reach's Shades and Hunters),
 // then all of them at once before the centre.
 import { fieldEvent, formation, rockCurve } from '../../data/layerParts.js';
 

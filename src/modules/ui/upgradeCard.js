@@ -493,7 +493,9 @@ export function cardMarkup(definition, state, { weapon, key = null, held }) {
   const trail = state.trail
     ? `<span class="card__trail"><i class="card__trail-mark" aria-hidden="true"></i>Trail · step ${state.trail.step} of ${state.trail.total}</span>`
     : '';
-  return `${heldMark}${trail}<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
+  // The trail's cards show no rarity.
+  const rarity = state.piloting ? '' : rarityMarkup(definition);
+  return `${heldMark}${trail}<span class="card__top">${rarity}${kbd}</span>
     <span class="card__id">${iconMarkup(definition)}<span class="card__names">
       <span class="card__name">${definition.text?.name ?? definition.id}</span>
       <span class="card__tag">${tag}<span class="card__state">${stateLabel(state.rank, max)}</span></span>
