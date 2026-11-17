@@ -62,7 +62,6 @@ export default class EffectsSystem extends BaseSystem {
       randomCentered: randomHelpers.randomCentered,
       createMuzzleFlash: (x, y, dirX, dirY) =>
         this.playerEffects.createMuzzleFlash(x, y, dirX, dirY),
-      hitMarkersEnabled: () => this.hitMarkersEnabled,
       damageNumbersEnabled: () => this.damageNumbersEnabled,
     });
 
@@ -447,7 +446,6 @@ export default class EffectsSystem extends BaseSystem {
 
     this.particleEffects.updateParticles(effectDelta);
     this.particleEffects.updateShockwaves(effectDelta);
-    this.particleEffects.updateHitMarkers(effectDelta);
     this.particleEffects.updateDamageTexts(effectDelta);
     this.bossTransitions.updateBossTransitions(effectDelta);
     this.particleEffects.updateAmbient(effectDelta);
@@ -474,10 +472,6 @@ export default class EffectsSystem extends BaseSystem {
 
   get shockwaves() {
     return this.particleEffects.shockwaves;
-  }
-
-  get hitMarkers() {
-    return this.particleEffects.hitMarkers;
   }
 
   get damageTexts() {

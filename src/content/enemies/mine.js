@@ -99,8 +99,7 @@ export default {
   tags: ['enemy', 'explosive', 'area-of-effect'],
   affixes: ['shielded', 'splitter', 'warded'],
   explodesOnDeath: true,
-  // threat orange-red (17/11; was amber, the player's shot colour)
-  projectileColor: 'rgba(255, 112, 56, 0.92)',
+  projectileColor: 'rgba(255, 204, 102, 0.9)',
   // Its proximity movement draws its drift; its weapon component and its
   // fuse both set it off.
   seeded: true,

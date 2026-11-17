@@ -517,9 +517,8 @@ export function createHeraldViews(kit, recipeViews) {
       kit.merged('herald-heat-seam', heatSeamParts),
       seamMaterial
     );
-    // the warning in threat red, like every other boss's (17/11; was amber)
     const warnMaterial = new THREE.MeshBasicMaterial({
-      color: colorOf(THREE, PALETTE.threat),
+      color: colorOf(THREE, PALETTE.shot),
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,

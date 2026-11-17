@@ -42,7 +42,7 @@ import {
 } from './fieldMirrors.js';
 import { FormationMarks } from './formationMarks.js';
 import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
-import { DECAL_KIND } from './scorchDecals.js';
+import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
 import { ImpactKick } from './impactPass.js';
@@ -309,8 +309,10 @@ class Renderer3D extends BaseSystem {
     // The hull took it: the lens kicks. The shield took it all: no kick and
     // no hurt blink (the i-frames still run; only their look is held).
     this.registerEventListener('player-took-damage', (payload = {}) => {
-      if (hullLoss(payload) > 0) this.impact.kick(KICK_PLAYER_HIT);
-      else this.three?.player.holdBlink(performance.now() / 1000 + 0.5);
+      if (hullLoss(payload) > 0) {
+        this.impact.kick(KICK_PLAYER_HIT);
+        this.strikeHull(payload);
+      } else this.three?.player.holdBlink(performance.now() / 1000 + 0.5);
     });
     this.registerEventListener('boss-phase-changed', ({ enemy } = {}) => {
       this.impact.kick(KICK_BOSS_PHASE);
@@ -871,7 +873,9 @@ class Renderer3D extends BaseSystem {
       this.cachedPickups
     );
     mirrorEffects(t, effects, this.impact);
-    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke);
+    // Hit Markers (Settings): the molten slag off struck metal
+    this.hitSparks.slagOn = effects?.hitMarkersEnabled !== false;
+    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke, t.glow);
     this.killPops.update(dt, t.glow, this.flashScale);
     this.formationMarks.update(dt, t.ribbons, t.threatRgb);
     mirrorWards(t, enemyList);
@@ -984,6 +988,36 @@ class Renderer3D extends BaseSystem {
       alive ? player.position.y - HALF_H : 0,
       alive ? ship.shieldRadius : 0
     );
+  }
+
+  // The hull was struck (17/11, efeito/impacto): on the side the blow came
+  // from it throws sparks and molten slag, a rock that rammed it adds chips
+  // and dust, and the plate there glows white-hot and cools to a dark scar.
+  strikeHull(payload) {
+    const t = this.three;
+    const pos = this.cachedPlayer?.position;
+    if (!t || !pos || !t.player.group.visible) return;
+    const from = payload.damageSource;
+    let dx = from ? from.x - pos.x : 0;
+    let dy = from ? from.y - pos.y : 0;
+    if (Math.hypot(dx, dy) < 1e-3) {
+      const threat = this.threatDirection();
+      dx = threat.x;
+      dy = threat.y;
+    }
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-3) return;
+    const reach = t.player.shieldRadius / 1.7;
+    const x = pos.x + (dx / len) * reach * 0.8;
+    const y = pos.y + (dy / len) * reach * 0.8;
+    this.hitSparks.emit(x, y, dx, dy, -dx, -dy, true, SPARK_KIND.metal);
+    if (payload.cause === 'collision') {
+      this.hitSparks.emit(x, y, dx, dy, -dx, -dy, false, SPARK_KIND.rock);
+    }
+    const view = this.shipView || (this.shipView = { id: SHIP_DECAL_ID });
+    view.object = t.player.group;
+    view.reach = reach;
+    t.decals.hit(view, dx, dy, DECAL_KIND.metal);
   }
 
   // Logical direction from the ship to the nearest threat (enemy shot or

@@ -56,25 +56,6 @@ SpaceParticle.resolveRandom = function resolveRandom(random) {
   return SpaceParticle._fallbackRandom;
 };
 
-class HitMarker {
-  constructor(x, y, killed, damage) {
-    this.x = x;
-    this.y = y;
-    this.killed = killed;
-    this.damage = damage;
-    this.life = 0.3;
-    this.maxLife = 0.3;
-    this.size = killed ? 12 : 8;
-    this.expansion = 0;
-  }
-
-  update(deltaTime) {
-    this.life -= deltaTime;
-    this.expansion += deltaTime * 20;
-    return this.life > 0;
-  }
-}
-
 // Damage numbers with weight (PLAN.md R5.9, proposta 18/10): size grows with
 // the log of the damage, colour steps white → amber → red, and each number
 // pops in past its size before settling. Renderer3D draws them.
@@ -148,4 +129,4 @@ class DamageText {
   }
 }
 
-export { DamageText, HitMarker, SpaceParticle };
+export { DamageText, SpaceParticle };

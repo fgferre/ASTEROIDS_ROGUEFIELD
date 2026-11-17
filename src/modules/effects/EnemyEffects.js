@@ -541,7 +541,14 @@ export class EnemyEffects {
     }
 
     const death = getContent('enemies', enemyType)?.effects?.death ?? 'debris';
+    const { particles } = this.particleEffects;
+    const from = particles.length;
     this[DEATH_EFFECTS[death]](asteroid, context);
+    // a machine breaks into pieces of hull, not chips of rock (17/11)
+    if (enemyType === 'asteroid') return;
+    for (let i = from; i < particles.length; i += 1) {
+      if (particles[i]?.type === 'debris') particles[i].material = 'metal';
+    }
   }
 
   // Rock chips and embers in the rock's colors, sized by the rock.

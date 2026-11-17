@@ -68,7 +68,8 @@ const SETTINGS_SCHEMA = [
         key: 'hitMarkers',
         type: 'toggle',
         label: 'Hit Markers',
-        description: 'Visual crosshair feedback when shots connect.',
+        description:
+          'Sparks and molten fragments where your shots strike metal.',
         default: true,
       },
       {

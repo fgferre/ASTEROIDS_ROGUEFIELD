@@ -335,6 +335,7 @@ export class PlayerContact {
       position: { ...player.position },
       playerPosition: { x: player.position.x, y: player.position.y },
       damageSource: { x: asteroid.x, y: asteroid.y },
+      cause: 'collision',
       // what reached the hull (0 when the shield took it all)
       healthDamage: Math.max(0, (healthBefore ?? remaining) - remaining),
     });

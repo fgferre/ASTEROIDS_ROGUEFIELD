@@ -29,9 +29,9 @@ const outer = {
   bladeRadius: 10,
 };
 
-// Hot pale amber over a white-hot core: the player's family (17/11; the light
-// violet it had was the Wardens' colour).
-const colors = { edge: '#ffcf8a', core: PALETTE.text };
+// Light violet like the Gravitic Lance's (the palette has no such tone),
+// over a white-hot core.
+const colors = { edge: '#b38cff', core: PALETTE.text };
 
 export default {
   id: 'shard-halo',

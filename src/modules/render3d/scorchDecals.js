@@ -19,6 +19,9 @@ const DECAL_LEAN = 0.8; // how far the mark climbs toward the rock's top
 // proposta 17/11 (efeito/impacto, was a 0.5 s ember on rock only): the
 // heat of each material and how much of its spot it covers.
 export const DECAL_KIND = Object.freeze({ rock: 0, metal: 1 });
+// The player's ship is no enemy view: its marks live under this id
+// (shipView(), Renderer3D).
+export const SHIP_DECAL_ID = 'ship';
 const EMBER_TIME = [1.8, 0.7]; // s, rock / metal
 const ROCK_SIZE = 1.6; // × the 18/10 mark
 const METAL_SIZE = [7, 16, 0.75]; // a machine's mark: min, max, × its radius
@@ -193,7 +196,8 @@ export class ScorchDecals {
     this.budget -= 1;
     const { object } = view;
     const len = Math.hypot(nx, ny) || 1;
-    const radius = object.scale.x || 1;
+    // `reach`: a view's size when its object is not scaled by it (the ship)
+    const radius = view.reach || object.scale.x || 1;
     this.dir
       .set(
         (nx / len) * (1 - DECAL_LEAN * 0.5),
@@ -265,7 +269,11 @@ export class ScorchDecals {
       const slot = this.slots[i];
       if (!slot.view) continue;
       slot.age += dt;
-      if (slot.age >= DECAL_LIFE || views.get(slot.id) !== slot.view) {
+      const live =
+        slot.id === SHIP_DECAL_ID
+          ? slot.view.object.visible
+          : views.get(slot.id) === slot.view;
+      if (slot.age >= DECAL_LIFE || !live) {
         slot.view = null;
         this.count -= 1;
         continue;

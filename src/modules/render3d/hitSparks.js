@@ -1,7 +1,8 @@
 // Short-lived impact bursts the 3D renderer adds on top of the EffectsSystem
 // particles, drawn into the shared batches (no extra draw calls):
 // - HitSparks: what a hit knocks off the surface it struck, by material.
-//   Metal throws a cone of hot streaks glancing along the ricochet; rock
+//   Metal throws a cone of hot streaks glancing along the ricochet and a few
+//   drops of molten slag that cool as they fly (the Hit Markers setting); rock
 //   spits a few slower molten droplets that cool from orange to dull red and
 //   a puff of grey dust; the shield sheds cyan-white flecks.
 // - MuzzleFlashes: a 2-frame hot pulse at the nose for each player shot.
@@ -64,6 +65,18 @@ const EMBER_COOL = [0.55, 0.06, 0.01];
 const SHIELD_RGB = [0.35, 1.6, 1.9];
 const SHIELD_HOT = [1.6, 2.0, 2.0];
 
+// proposta 17/11: molten slag off struck metal, white-hot to dull red.
+const SLAG_POOL = 64;
+const SLAG_PER_HIT = 3;
+const SLAG_PER_KILL = 6;
+const SLAG_SPEED = [60, 160];
+const SLAG_LIFE = [0.35, 0.75]; // s
+const SLAG_DRAG = 2.5; // 1/s
+const SLAG_CONE = 1.0; // rad around the ricochet
+const SLAG_SIZE = [1.4, 2.4];
+const SLAG_HOT = [2.6, 2.0, 1.2];
+const SLAG_HEIGHT = 3.5;
+
 // proposta 17/11: rock dust, matte grey puffs that drift off the hit.
 const DUST_POOL = 48;
 const DUST_PER_HIT = 2;
@@ -86,6 +99,7 @@ const MUZZLE_HEIGHT = 5;
 const POP_POOL = 16;
 const POP_TIME = 0.16; // s
 const POP_SIZE = 2.6; // × the machine's radius
+const POP_MAX = 34; // a big machine's pop stays a core flash, not a halo
 const POP_HEIGHT = 6;
 const POP_HOT = [2.4, 2.1, 1.7];
 const POP_WARM = [2.0, 0.6, 0.12];
@@ -121,6 +135,16 @@ export class HitSparks {
     this.dustVy = new Float32Array(DUST_POOL);
     this.dustAge = new Float32Array(DUST_POOL).fill(DUST_LIFE);
     this.dustNext = 0;
+    this.slagX = new Float32Array(SLAG_POOL);
+    this.slagY = new Float32Array(SLAG_POOL);
+    this.slagVx = new Float32Array(SLAG_POOL);
+    this.slagVy = new Float32Array(SLAG_POOL);
+    this.slagLife = new Float32Array(SLAG_POOL);
+    this.slagMax = new Float32Array(SLAG_POOL);
+    this.slagSize = new Float32Array(SLAG_POOL);
+    this.slagNext = 0;
+    // the Hit Markers setting: off, no slag (Renderer3D sets it)
+    this.slagOn = true;
     this.roll = 0;
     this.scratch = [0, 0, 0];
   }
@@ -175,6 +199,28 @@ export class HitSparks {
       this.kind[i] = kind;
     }
     if (kind === SPARK_KIND.rock) this.puff(x, y, nx, ny);
+    else if (kind === SPARK_KIND.metal && this.slagOn) {
+      this.slag(x, y, base, killed ? SLAG_PER_KILL : SLAG_PER_HIT);
+    }
+  }
+
+  // Molten drops thrown around the ricochet direction `base` (rad).
+  slag(x, y, base, count) {
+    for (let k = 0; k < count; k += 1) {
+      const i = this.slagNext;
+      this.slagNext = (this.slagNext + 1) % SLAG_POOL;
+      const a = base + (this.rand() * 2 - 1) * SLAG_CONE;
+      const v = SLAG_SPEED[0] + (SLAG_SPEED[1] - SLAG_SPEED[0]) * this.rand();
+      const life = SLAG_LIFE[0] + (SLAG_LIFE[1] - SLAG_LIFE[0]) * this.rand();
+      this.slagX[i] = x;
+      this.slagY[i] = y;
+      this.slagVx[i] = Math.cos(a) * v;
+      this.slagVy[i] = Math.sin(a) * v;
+      this.slagLife[i] = life;
+      this.slagMax[i] = life;
+      this.slagSize[i] =
+        SLAG_SIZE[0] + (SLAG_SIZE[1] - SLAG_SIZE[0]) * this.rand();
+    }
   }
 
   // Grey dust drifting off the struck face.
@@ -193,7 +239,7 @@ export class HitSparks {
   }
 
   /** Advances by `dt` s and draws into `ribbons` (and the dust into `smoke`). */
-  update(dt, ribbons, rgb, hotRgb, smoke) {
+  update(dt, ribbons, rgb, hotRgb, smoke, glow) {
     for (let i = 0; i < SPARK_POOL; i += 1) {
       if (!(this.life[i] > 0)) continue;
       this.life[i] -= dt;
@@ -234,6 +280,32 @@ export class HitSparks {
         gain
       );
     }
+    if (glow) {
+      const drag = Math.exp(-SLAG_DRAG * dt);
+      for (let i = 0; i < SLAG_POOL; i += 1) {
+        if (!(this.slagLife[i] > 0)) continue;
+        this.slagLife[i] -= dt;
+        if (this.slagLife[i] <= 0) continue;
+        this.slagVx[i] *= drag;
+        this.slagVy[i] *= drag;
+        const x = (this.slagX[i] += this.slagVx[i] * dt);
+        const y = (this.slagY[i] += this.slagVy[i] * dt);
+        const heat = this.slagLife[i] / this.slagMax[i];
+        const color = mix3(this.scratch, EMBER_COOL, SLAG_HOT, heat ** 0.7);
+        const size = this.slagSize[i] * (0.6 + 0.4 * heat);
+        glow.push(x, SLAG_HEIGHT, y, color, size, 1, 1.4);
+        ribbons.streak(
+          x - this.slagVx[i] * 0.04,
+          y - this.slagVy[i] * 0.04,
+          x,
+          y,
+          SLAG_HEIGHT,
+          color,
+          size * 0.5,
+          0.9 * heat
+        );
+      }
+    }
     if (!smoke) return;
     for (let i = 0; i < DUST_POOL; i += 1) {
       if (!(this.dustAge[i] < DUST_LIFE)) continue;
@@ -258,6 +330,7 @@ export class HitSparks {
   clear() {
     this.life.fill(0);
     this.dustAge.fill(DUST_LIFE);
+    this.slagLife.fill(0);
   }
 }
 
@@ -330,7 +403,7 @@ export class KillPops {
     this.next = (this.next + 1) % POP_POOL;
     this.x[i] = x;
     this.y[i] = y;
-    this.size[i] = Math.max(10, radius * POP_SIZE);
+    this.size[i] = Math.max(10, Math.min(POP_MAX, radius * POP_SIZE));
     this.age[i] = 0;
   }
 
