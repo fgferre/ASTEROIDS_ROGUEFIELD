@@ -534,6 +534,12 @@ select {
   visibility: hidden;
 }
 
+/* No ship behind Press Start (the owner, 17/11): the hull preview hides
+   while its stage box has no size. */
+.menu-screen--gated .menu-hull-stage {
+  display: none;
+}
+
 .loading-screen--gate .loading-screen__content {
   display: none;
 }
