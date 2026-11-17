@@ -18,23 +18,23 @@ Use a versão "turbo" com o modelo de linguagem pequeno (cabe em 8 GB de placa d
 Tudo instrumental (nas letras, só `[instrumental]`), 44,1 kHz, salvo em MP3 192 kbps.
 
 1. **fase1-a.mp3, fase1-b.mp3, fase1-c.mp3** — três versões (sementes diferentes) deste pedido, 120 segundos,
-   96 BPM, Ré menor, se a interface aceitar andamento e tom:
-   > Video game soundtrack, space exploration, lonely but hopeful, gentle forward motion. D minor (dorian), 96 BPM,
-   > 4/4. Calm half: warm analog synth pad, felt piano melody of four rising notes, soft plucked synth arpeggio, round
-   > sub bass. Intense half: the same melody on a bright synth lead, punchy electronic drums, pulsing eighth-note synth
-   > bass, low toms. Structure: intro 4 bars (pad only), calm 20 bars, intense 20 bars, outro 4 bars.
-   > Instrumental only, no vocals, no lyrics. No harsh high frequencies, no sustained whistling or buzzing tones.
-   > Mixed for a video game: leave room in the mids for sound effects. Steady tempo from start to end. The last bar
-   > returns to the first chord so the track loops seamlessly.
-   Se a interface pedir tags curtas em vez de texto longo, use: `instrumental, cinematic electronic, space, video game
-   soundtrack, felt piano, analog synth pad, synth arpeggio, electronic drums, D minor, 96 bpm, hopeful, melancholic`
-   e coloque a estrutura nas letras: `[intro]` `[instrumental]` `[verse]` `[instrumental]` `[chorus]` `[instrumental]` `[outro]`.
+   128 BPM, Ré menor, se a interface aceitar andamento e tom. ATENÇÃO: o Felipe recusou uma primeira rodada por soar
+   "música de relaxamento"; o jogo é um tiro de nave arcade, sombrio. Nada calmo, nada ambiente, nada de piano.
+   > Dark arcade space shooter soundtrack, sinister and driving, darksynth / cyberpunk electronic with cinematic
+   > menace. D minor, 128 BPM, 4/4, steady tempo. Punchy drums from the very first bar, aggressive pulsing sawtooth
+   > bass, ominous low synth brass stabs, a short memorable minor-key lead riff. First half: tense and sparser but
+   > already driving (kick, bass pulse, hi-hats, dark pad). Second half: full intensity, same riff louder with snare
+   > and distorted bass. Not relaxing, not ambient, no chill, no lo-fi, no piano. Instrumental only, no vocals.
+   > The last bar returns to the first chord so the track loops seamlessly.
+   Se a interface pedir tags curtas em vez de texto longo, use: `instrumental, darksynth, cyberpunk, dark electronic,
+   arcade space shooter, aggressive sawtooth bass, punchy drums, sinister, driving, D minor, 128 bpm` e coloque a
+   estrutura nas letras: `[intro]` `[instrumental]` `[verse]` `[instrumental]` `[chorus]` `[instrumental]` `[outro]`.
 
 2. **chefe1-a.mp3, chefe1-b.mp3** — o chefe da fase 1 como uma variação sombria da mesma música (ideia do Felipe: o
    chefe continua a melodia da fase, só que sinistro). Use a melhor das três versões da fase como música de origem no
-   modo "cover" (ou "repaint"/"audio to audio", o que existir) com este pedido, 90 segundos, mesmo andamento (96 BPM):
+   modo "cover" (ou "repaint"/"audio to audio", o que existir) com este pedido, 90 segundos, mesmo andamento (128 BPM):
    > Same melody, dark and sinister boss battle variation. Heavier: distorted synth bass, big drums, low brass, wordless
-   > choir (no words). Same key (D minor) and same tempo (96 BPM). Instrumental only, no vocals.
+   > choir (no words). Same key (D minor) and same tempo (128 BPM). Instrumental only, no vocals.
    Teste duas forças de "cover" (uma mais fiel à origem, outra mais livre) e diga qual é qual.
 
 Anote, para cada arquivo: tempo de geração, memória de vídeo no pico, configuração usada (modelo, passos, semente,
