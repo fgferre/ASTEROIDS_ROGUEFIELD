@@ -53,6 +53,7 @@ class SectorScore {
     this._held = false;
     this._paused = false;
     this._bossOn = false;
+    this._hasBoss = false;
     this._nodes = null;
     this._sources = [];
     this._stingers = null;
@@ -77,7 +78,7 @@ class SectorScore {
     try {
       [stage, boss, this._stingers] = await Promise.all([
         this.load(context, score.stage),
-        this.load(context, score.boss),
+        score.boss ? this.load(context, score.boss) : null,
         this._loadStingers(),
       ]);
     } catch (error) {
@@ -142,10 +143,9 @@ class SectorScore {
       source.start(startAt, loopStart);
       return source;
     };
-    this._sources = [
-      play(stageBuffer, lowpass),
-      play(bossBuffer, nodes.bossFade),
-    ];
+    this._sources = [play(stageBuffer, lowpass)];
+    if (bossBuffer) this._sources.push(play(bossBuffer, nodes.bossFade));
+    this._hasBoss = !!bossBuffer;
 
     lowpass.connect(nodes.dangerGain);
     nodes.dangerGain.connect(nodes.stageFade);
@@ -162,10 +162,13 @@ class SectorScore {
   _followDanger(immediate = false) {
     const nodes = this._nodes;
     if (!nodes) return;
-    const open = Math.min(
-      1,
-      Math.max(0, (this.mixer.runIntensity || 0) / MIX.dangerFull)
-    );
+    const open =
+      this._bossOn && !this._hasBoss
+        ? 1
+        : Math.min(
+            1,
+            Math.max(0, (this.mixer.runIntensity || 0) / MIX.dangerFull)
+          );
     const cutoff =
       MIX.lowpassCalmHz * (MIX.lowpassOpenHz / MIX.lowpassCalmHz) ** open;
     const level =
@@ -194,6 +197,8 @@ class SectorScore {
     const { stageFade, bossFade } = this._nodes;
     if (this._bossOn === toBoss) return;
     this._bossOn = toBoss;
+    // No boss track: the Warden only opens the stage fully.
+    if (!this._hasBoss) return;
     const now = this.context.currentTime;
     const curve = (param, to) => {
       const from = typeof param.value === 'number' ? param.value : 1 - to;

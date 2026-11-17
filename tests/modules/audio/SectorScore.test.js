@@ -93,6 +93,21 @@ describe('SectorScore', () => {
     ).toBeCloseTo(0);
   });
 
+  it('crystal-choir has no boss track: one source, the Warden opens the stage fully', async () => {
+    await score.start('crystal-choir');
+    expect(rec.sources).toHaveLength(1);
+    const { lowpass, dangerGain } = score._nodes;
+    const before = rec.sources.length;
+    score.onBossEvent('boss-warning');
+    expect(rec.sources).toHaveLength(before + 1); // the stinger
+    score._followDanger(true);
+    expect(lowpass.frequency.setTargetAtTime.mock.calls.at(-1)[0]).toBe(18000);
+    expect(dangerGain.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBe(1);
+    score.onBossEvent('boss-defeated');
+    score._followDanger(true);
+    expect(lowpass.frequency.setTargetAtTime.mock.calls.at(-1)[0]).toBe(900);
+  });
+
   it('stop() gives the mixer back and stops the sources', async () => {
     await score.start('debris-wake');
     const sources = [...rec.sources];
