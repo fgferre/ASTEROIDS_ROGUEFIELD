@@ -19,6 +19,7 @@ const bolt = {
   trailPoints: 4, // a short tracer, not a lance trail
   burst: {
     radius: 40, // logical px, to the enemy's rim
+    burstReach: 10, // px more per Recoil Dampers pierce (proposta 17/11)
     damageMultiplier: 0.6, // × lance damage, once per enemy per volley
     duration: 0.22, // seconds on screen
   },
@@ -41,6 +42,18 @@ export default {
   fire: [fan],
   projectile: bolt,
   colors,
+  // Its own family is kinetic and the bolts don't pierce: Railshot and the
+  // Coilgun widen the bursts instead (proposta 17/11).
+  familyForms: {
+    carries: [],
+    kinetic: { burstScale: [1.3, 1.6] },
+    lines: {
+      kinetic: [
+        'flak bursts 30% wider',
+        'flak bursts 60% wider, bolts 25% harder',
+      ],
+    },
+  },
   card: {
     id: 'scatter_coil',
     order: 9,

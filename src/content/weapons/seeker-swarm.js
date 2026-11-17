@@ -34,6 +34,7 @@ const missile = {
   trailPoints: 12,
   burst: {
     radius: 28, // px, to the enemy's rim
+    burstReach: 10, // px more per Recoil Dampers pierce (proposta 17/11)
     damageMultiplier: 0.4, // × lance damage, to what is round the hit
     duration: 0.25, // seconds on screen
   },
@@ -51,6 +52,19 @@ export default {
   fire: [salvo],
   projectile: missile,
   colors,
+  // Its missiles are lance hits and already run every family's form; this
+  // only gives the kinetic one its own wording and a wider burst at Railshot
+  // [3] or the Coilgun [5] (proposta 17/11).
+  familyForms: {
+    carries: [],
+    kinetic: { burstScale: [1.5, 2] },
+    lines: {
+      kinetic: [
+        'missile bursts 50% wider',
+        'missile bursts twice as wide, missiles 25% harder',
+      ],
+    },
+  },
   evolution: {
     id: 'swarm-rack',
     name: 'Swarm Rack',

@@ -68,10 +68,8 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
-    // Railshot only pierces, and flak bolts do not.
-    expect(line('scatter_coil', 1, 2).note).toBe(
-      'Also completes Railshot (not with Scatter Coil yet).'
-    );
+    // Railshot widens the Scatter's own flak bursts.
+    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
   });
 
   it('a new card short of a milestone shows where its family leads', () => {
@@ -112,24 +110,20 @@ describe('upgrade card build line', () => {
       'pulses hit 15% harder and throw further',
       'pulses hit 30% harder and throw twice as far',
     ]);
-    // Flak bolts do not pierce, but Coilgun's damage reaches them.
+    // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
     expect(what('multishot', 0, 'scatter')).toEqual([
-      'not with Scatter Coil yet',
-      'lances pierce everything',
+      'flak bursts 30% wider',
+      'flak bursts 60% wider, bolts 25% harder',
     ]);
     // Its own family evolves the weapon itself.
     expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
       'every 3rd pulse is a nova'
     );
-    expect(
-      buildLine(card('multishot'), {
-        rank: 1,
-        owned: 2,
-        weapon: held('seeker-swarm'),
-      }).note
-    ).toBe(
-      'not with Seeker Swarm yet · Momentum +12% top speed and acceleration'
-    );
+    // The Seeker Swarm's missiles burst: its own kinetic wording.
+    expect(what('multishot', 0, 'seeker-swarm')).toEqual([
+      'missile bursts 50% wider',
+      'missile bursts twice as wide, missiles 25% harder',
+    ]);
   });
 
   it('the card face reads the text for the weapon in hand', () => {

@@ -7,6 +7,11 @@ import RandomService from '../../../src/core/RandomService.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 import ProgressionSystem from '../../../src/modules/ProgressionSystem.js';
 import { WEAPON_FORMS } from '../../../src/data/weapons.js';
+import { burstFlak } from '../../../src/modules/combat/beamAndFan.js';
+import {
+  familyLine,
+  notWithWeapon,
+} from '../../../src/modules/ui/upgradeCard.js';
 import { knockbackSpeed } from '../../../src/modules/combat/HitResolution.js';
 import {
   ringRadius,
@@ -878,5 +883,77 @@ describe("a weapon's own evolution and Apex", () => {
     progression.applyUpgrade('arc_caster');
     expect(combat.getWeaponState().name).toBe('Forked Arc');
     expect(combat.weapons.hasEvolution('arc')).toBe(false);
+  });
+  describe('burst width (proposta 17/11)', () => {
+    const burstRadius = (weaponId, setup) => {
+      const { combat, eventBus } = armed(weaponId, []);
+      setup(combat, eventBus);
+      burstFlak(combat.weapons, {
+        x: 300,
+        y: 300,
+        vx: 1,
+        vy: 0,
+        shrapnel: 1,
+        colors: {},
+        volley: { struck: [], bursts: 0 },
+        projectile: WEAPON_FORMS[weaponId].base.projectile,
+      });
+      return combat.flakBursts[0].maxRadius;
+    };
+    const dampers = (combat, bus) =>
+      bus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'recoil_dampers',
+        level: 1,
+        pierceBonus: 1,
+      });
+
+    it('Recoil Dampers: the Scatter flak bursts 10 px further, the Seeker missile bursts 10 px further', () => {
+      expect(burstRadius('scatter', () => {})).toBe(40);
+      expect(burstRadius('scatter', dampers)).toBe(50);
+      expect(burstRadius('seeker-swarm', () => {})).toBe(28);
+      expect(burstRadius('seeker-swarm', dampers)).toBe(38);
+    });
+
+    it('Scatter: Railshot widens the flak burst by 30%, the Apex by 60%', () => {
+      expect(
+        burstRadius('scatter', (c) => c.weapons.evolveWeapon('kinetic'))
+      ).toBeCloseTo(52, 9);
+      expect(
+        burstRadius('scatter', (c) => c.weapons.apexWeapon('kinetic'))
+      ).toBeCloseTo(64, 9);
+    });
+
+    it('Seeker: Railshot widens the missile burst by 50%, the Apex doubles it', () => {
+      expect(
+        burstRadius('seeker-swarm', (c) => c.weapons.evolveWeapon('kinetic'))
+      ).toBeCloseTo(42, 9);
+      expect(
+        burstRadius('seeker-swarm', (c) => c.weapons.apexWeapon('kinetic'))
+      ).toBe(56);
+      expect(
+        burstRadius('seeker-swarm', (c, bus) => {
+          c.weapons.evolveWeapon('kinetic');
+          dampers(c, bus);
+        })
+      ).toBeCloseTo(57, 9);
+    });
+
+    it('Seeker: its kinetic family line is its own, and the other families keep the lance wording', () => {
+      expect(familyLine('kinetic', 'seeker-swarm')).toBe(
+        'missile bursts 50% wider'
+      );
+      expect(familyLine('kinetic', 'seeker-swarm', true)).toMatch(/twice/);
+      expect(familyLine('thermal', 'seeker-swarm')).toBeNull();
+      expect(notWithWeapon('kinetic', 'seeker-swarm')).toBeNull();
+    });
+
+    it('Seeker: a missile hit still runs the other families (burn from Incendiary)', () => {
+      const target = enemy('t', 300, 300);
+      const { combat, enemies } = armed('seeker-swarm', [target]);
+      combat.weapons.evolveWeapon('thermal');
+      combat.handleShooting(1, STATS);
+      combat.processBulletHit(combat.bullets[0], target, enemies);
+      expect(combat.burns.has(target)).toBe(true);
+    });
   });
 });
