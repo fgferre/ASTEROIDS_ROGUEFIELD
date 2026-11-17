@@ -515,6 +515,135 @@ select {
   border-radius: 60% 50% 40% 50% / 40% 60% 50% 50%;
 }
 
+/* PRESS START gate: after loading, the same screen goes see-through over the
+   live menu scene and shows the title and one button. */
+.loading-screen__gate {
+  display: none;
+}
+
+.loading-screen--gate {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 9, 16, 0.1) 35%,
+    rgba(2, 9, 16, 0.6) 100%
+  );
+}
+
+/* The menu's panels wait out of sight; its canvas is the scene behind. */
+.menu-screen--gated .menu-screen__overlay {
+  visibility: hidden;
+}
+
+.loading-screen--gate .loading-screen__content {
+  display: none;
+}
+
+.loading-screen--gate .loading-screen__gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  padding: var(--space-5);
+}
+
+.loading-screen__gate-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: -100px;
+  text-align: center;
+  font-family: var(--font-display);
+  text-shadow: 0 4px 22px #020711;
+}
+
+.loading-screen__gate-title span {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.65em;
+  padding-left: 0.65em;
+  color: #a7c9d7;
+}
+
+.loading-screen__gate-title strong {
+  font-size: clamp(28px, 7.5vw, 70px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: #e3f2f7;
+}
+
+.loading-screen__gate-action {
+  position: absolute;
+  bottom: 17%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+}
+
+.loading-screen__press-start {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  padding: 14px 20px;
+  cursor: pointer;
+  text-shadow: 0 0 18px rgba(0, 242, 255, 0.4);
+}
+
+.loading-screen__gate-action > span {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+@media (max-width: 560px) {
+  .loading-screen__gate-title {
+    margin-top: -75px;
+  }
+
+  .loading-screen__gate-title span {
+    font-size: 15px;
+    letter-spacing: 0.4em;
+    padding-left: 0.4em;
+  }
+
+  .loading-screen__gate-title strong {
+    font-size: clamp(24px, 7.5vw, 41px);
+  }
+
+  .loading-screen__gate-action {
+    bottom: 23%;
+  }
+
+  .loading-screen__press-start {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body:not(.motion-reduced) .loading-screen__press-start {
+    animation: pressStartPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pressStartPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .loading-asteroid {
     animation: floatAsteroid 3s ease-in-out infinite;
