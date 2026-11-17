@@ -115,6 +115,7 @@
    families keep their shapes too. */
 :root[data-color-vision='assist'] {
   --danger: #ff8c1a;
+  --rarity-rare: #56b4e9;
   --rarity-cursed: #cc79a7;
   --family-kinetic: #56b4e9;
   --family-thermal: #d55e00;
