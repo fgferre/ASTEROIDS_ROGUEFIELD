@@ -97,10 +97,10 @@ describe('upgrade card build line', () => {
       buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
         (step) => step.what
       );
-    // The Arc Caster lands no lance hit: Railshot and Coilgun miss it.
+    // The Arc Caster carries it too: its own wording.
     expect(what('multishot', 0, 'arc-caster')).toEqual([
-      'not with Arc Caster yet',
-      'not with Arc Caster yet',
+      'jumps keep 90% of their strength',
+      'jumps keep full strength, casts hit 25% harder',
     ]);
     // The Shard Halo carries it too: its own wording.
     expect(what('multishot', 0, 'shard-halo')).toEqual([
@@ -125,10 +125,10 @@ describe('upgrade card build line', () => {
       buildLine(card('multishot'), {
         rank: 1,
         owned: 2,
-        weapon: held('arc-caster'),
+        weapon: held('seeker-swarm'),
       }).note
     ).toBe(
-      'not with Arc Caster yet · Momentum +12% top speed and acceleration'
+      'not with Seeker Swarm yet · Momentum +12% top speed and acceleration'
     );
   });
 

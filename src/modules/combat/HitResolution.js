@@ -67,20 +67,23 @@ export class HitResolution {
     // A projectile, or what a beam or a flak burst lands: the chain, blade
     // and heat hits of the other weapons, which evolve on their own, and the
     // cards' arcs bring no lance evolution. A weapon with `familyForms` runs
-    // those of its own heat or blade hits.
+    // those of its own heat, blade or arc hits (the cards' arcs are kind
+    // `chain`: never).
     const lanceHit =
       Boolean(bullet.projectile) ||
       bullet.kind === 'beam' ||
       bullet.kind === 'shrapnel';
     const familyHit =
       Boolean(weapons.weapon.familyForms) &&
-      (bullet.kind === 'heat' || bullet.kind === 'blade');
+      (bullet.kind === 'heat' ||
+        bullet.kind === 'blade' ||
+        bullet.kind === 'arc');
     // Chain Capacitor without the Chain Lance: some projectiles, pulses and
     // cuts hit twice.
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
-      (bullet.projectile || familyHit) &&
+      (bullet.projectile || (familyHit && bullet.kind !== 'arc')) &&
       !weapons.hasEvolution('arc') &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {

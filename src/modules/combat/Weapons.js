@@ -541,6 +541,7 @@ export class Weapons {
     this.orbitTurn = 0;
     this.orbitShot = null;
     this.auraPulses = 0;
+    this.chainCasts = 0;
     this.orbitSounded = false;
     this.aura = null;
     this.pulses = [];

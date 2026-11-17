@@ -90,16 +90,19 @@ export default {
         },
       ],
     },
+    // proposta 17/11
     'arc-caster': {
       levels: [
-        {},
         {
           description:
-            'Leads fast targets, but lightning strikes at once: the Arc Caster gains nothing.',
-          highlights: [`Only rank 3 changes it: fire rate +${FIRE_RATE}%.`],
+            'Jumps deal +10% damage to elites, heralds and bosses. Lightning strikes at once: the locks add nothing.',
         },
         {
-          description: `Fire rate +${FIRE_RATE}%. The extra locks add nothing: the Arc Caster casts at one.`,
+          description:
+            'Jumps deal +20% damage to elites, heralds and bosses. Lightning strikes at once: the lead adds nothing.',
+        },
+        {
+          description: `Fire rate +${FIRE_RATE}%. The jumps keep their +20% on elites, heralds and bosses.`,
         },
       ],
     },

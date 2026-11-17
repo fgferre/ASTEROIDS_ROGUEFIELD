@@ -106,10 +106,32 @@ export function fireChain(w, chain, playerPos, playerStats) {
     bolt: true,
     life: BOLT_LIFE,
   };
+  // A weapon with `familyForms`: one budget a cast (a well every `pullEvery`
+  // casts), the kinetic form's hops that keep more and hit harder, and the
+  // cards' damage per enemy (proposta 17/11).
+  const forms = w.weapon.familyForms;
+  const { kick, falloff: kept } = kineticOf(w);
+  w.chainCasts = (w.chainCasts ?? 0) + 1;
+  const shot = forms
+    ? {
+        ...forms.perShot,
+        pulls: w.chainCasts % forms.pullEvery === 0 ? forms.perShot.pulls : 0,
+      }
+    : null;
+  const falloff = Math.max(chain.falloff, kept ?? 0);
   const link = (source, target, damage) => {
     w.cards().addArc(source, target, style);
     const along = Math.atan2(target.y - source.y, target.x - source.x);
-    strike(w, 'arc', target, source.x, source.y, along, damage);
+    strike(
+      w,
+      'arc',
+      target,
+      source.x,
+      source.y,
+      along,
+      forms ? formDamage(w, damage, kick, target, playerPos) : damage,
+      forms ? { shot } : null
+    );
   };
 
   const firsts = chainTargets(w, chain, origin, angle);
@@ -118,10 +140,12 @@ export function fireChain(w, chain, playerPos, playerStats) {
   const visited = [...firsts];
   const jumps =
     Math.min(chain.maxJumps, chain.jumps + extraShots(playerStats)) +
-    (w.cards().cardEffects.chainCapacitor?.extraJumps ?? 0);
+    (w.cards().cardEffects.chainCapacitor?.extraJumps ?? 0) +
+    // Recoil Dampers: a jump per pierce rank, past the cap (proposta 17/11).
+    (chain.pierceJumps ?? 0) * w.cards().pierceBonus;
   let front = firsts;
   for (let hop = 0; hop < jumps && front.length; hop += 1) {
-    damage *= chain.falloff;
+    damage *= falloff;
     const next = [];
     front.forEach((source) => {
       enemiesNear(w, source.x, source.y, chain.jumpRange, visited)
@@ -145,7 +169,12 @@ export function fireChain(w, chain, playerPos, playerStats) {
     };
     w.cards().addArc(start, { ...end, radius: 0 }, style);
   }
-  setCooldown(w, chain);
+  // Overcharge Coil: a cast comes sooner, the cube root of the lance's speed
+  // gain (a weapon with `familyForms`, proposta 17/11).
+  const charge = forms ? Math.cbrt(w.bulletSpeed / BULLET_SPEED) : 1;
+  setCooldown(w, {
+    cooldownMultiplier: chain.cooldownMultiplier / charge,
+  });
   emitFired(w, chain.pattern, playerPos, end, firsts.length);
 }
 
@@ -192,13 +221,18 @@ function formDamage(w, base, kick, enemy, from) {
 }
 
 // The kinetic form's damage and shove factors for a weapon with `familyForms`
-// (Railshot, or the Coilgun Apex); 1 and 1 when it carries none.
+// (Railshot, or the Coilgun Apex), and the chain's kept fraction a hop; 1,
+// 1 and null when it carries none.
 function kineticOf(w) {
   const forms = w.weapon.familyForms;
   const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
   return forms?.carries.includes('kinetic') && stage >= 0
-    ? { kick: forms.kinetic.damage[stage], push: forms.kinetic.push[stage] }
-    : { kick: 1, push: 1 };
+    ? {
+        kick: forms.kinetic.damage[stage],
+        push: forms.kinetic.push?.[stage] ?? 1,
+        falloff: forms.kinetic.falloff?.[stage] ?? null,
+      }
+    : { kick: 1, push: 1, falloff: null };
 }
 
 /**

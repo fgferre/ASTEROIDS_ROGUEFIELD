@@ -142,6 +142,174 @@ describe('fire patterns', () => {
     expect(empty.arcs).toHaveLength(1);
   });
 
+  describe('chain: the families and the six cards', () => {
+    const cast = firstOf('arc-caster');
+    const forms = WEAPON_FORMS['arc-caster'].base.familyForms;
+    const line = (n = 4, extra = {}) =>
+      Array.from({ length: n }, (_, i) =>
+        enemy(`e${i}`, 200 + i * 100, 300, extra)
+      );
+    const cast1 = (who, setup = () => {}, stats = STATS) => {
+      const { combat, eventBus, enemies } = armed('arc-caster', who);
+      setup(combat, eventBus);
+      combat.handleShooting(1, stats);
+      return { combat, enemies, eventBus };
+    };
+    const dealt = (who) => 100 - who.health;
+
+    it('thermal: every hop sets its target burning; the field does not', () => {
+      const { combat } = cast1(line(), (c) =>
+        c.weapons.evolveWeapon('thermal')
+      );
+      expect(combat.cards.burns.size).toBe(cast.jumps + 1);
+      const field = cast1(line(), (c) => c.weapons.evolveWeapon('field'));
+      expect(field.combat.cards.burns.size).toBe(0);
+    });
+
+    it('field: every hop slows; the Singularity opens one well every 2nd cast, at the first enemy', () => {
+      const slowed = cast1(line(), (c) => c.weapons.evolveWeapon('field'));
+      expect(slowed.combat.cards.slows.size).toBe(cast.jumps + 1);
+      expect(slowed.combat.cards.wells).toHaveLength(0);
+
+      const who = line();
+      const { combat } = armed('arc-caster', who);
+      combat.weapons.apexWeapon('field');
+      combat.handleShooting(1, STATS);
+      expect(combat.cards.wells).toHaveLength(0);
+      combat.handleShooting(1, STATS);
+      expect(combat.cards.wells).toHaveLength(forms.perShot.pulls);
+    });
+
+    it('salvage: Prospector pays on the arc kills', () => {
+      const weak = enemy('weak', 200, 300, { health: 1 });
+      const { combat, enemies } = armed('arc-caster', [weak]);
+      enemies.rewardManager = {
+        stats: { totalOrbsDropped: 0 },
+        createXPOrbs: vi.fn(),
+      };
+      const damage = enemies.applyDamage;
+      enemies.applyDamage = (target, amount, ...rest) => {
+        const result = damage(target, amount, ...rest);
+        if (result.killed) enemies.rewardManager.stats.totalOrbsDropped += 4;
+        return result;
+      };
+      combat.weapons.evolveWeapon('salvage');
+      combat.handleShooting(1, STATS);
+      expect(enemies.rewardManager.createXPOrbs).toHaveBeenCalledTimes(1);
+    });
+
+    it('kinetic: Railshot keeps 90% a hop, Coilgun full strength and +25% a cast', () => {
+      const hops = (stage) => {
+        const who = line();
+        cast1(who, (c) => {
+          if (stage >= 0) c.weapons.evolveWeapon('kinetic');
+          if (stage === 1) c.weapons.apexWeapon('kinetic');
+        });
+        return who.map(dealt);
+      };
+      const base = hops(-1);
+      const rail = hops(0);
+      const coil = hops(1);
+      rail.forEach((d, hop) => {
+        expect(d).toBeCloseTo(DAMAGE * forms.kinetic.falloff[0] ** hop, 6);
+      });
+      coil.forEach((d) =>
+        expect(d).toBeCloseTo(DAMAGE * forms.kinetic.damage[1], 6)
+      );
+      expect(base[2]).toBeCloseTo(DAMAGE * cast.falloff ** 2, 6);
+    });
+
+    it("the cards' own arcs are not family hits: no burn off a Capacitor Bank spark", () => {
+      const [target] = line(1);
+      const { combat } = armed('arc-caster', [target]);
+      combat.weapons.evolveWeapon('thermal');
+      combat.cards.strikeArc({ x: 100, y: 300, radius: 0 }, target, 5);
+      expect(target.health).toBeLessThan(100);
+      expect(combat.cards.burns.size).toBe(0);
+    });
+
+    it('Chain Capacitor: only the extra jump, no double hit', () => {
+      const who = line(6);
+      cast1(who, (c) => {
+        c.cards.cardEffects.chainCapacitor = {
+          extraJumps: 1,
+          doubleHitChance: 1,
+        };
+      });
+      expect(dealt(who[0])).toBeCloseTo(DAMAGE, 6);
+      expect(dealt(who[cast.jumps + 1])).toBeGreaterThan(0);
+    });
+
+    it('Overcharge Coil: casts come sooner, the cube root of the lance speed gain', () => {
+      const { combat, eventBus } = armed('arc-caster', []);
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'overcharge_coil',
+        level: 1,
+        bulletSpeedMultiplier: 1.15,
+      });
+      combat.handleShooting(1, STATS);
+      expect(combat.lastShotTime).toBeCloseTo(
+        -combat.shootCooldown * (cast.cooldownMultiplier / Math.cbrt(1.15) - 1),
+        9
+      );
+    });
+
+    it('Recoil Dampers: a jump per rank, past the Multishot cap', () => {
+      const who = line(cast.maxJumps + 4);
+      cast1(
+        who,
+        (c, bus) =>
+          bus.emit('upgrade-weapon-tuning', {
+            upgradeId: 'recoil_dampers',
+            level: 1,
+            pierceBonus: 1,
+          }),
+        { multishot: 9, damage: DAMAGE }
+      );
+      const struck = who.filter((target) => target.health < 100);
+      expect(struck).toHaveLength(cast.maxJumps + 1 + cast.pierceJumps);
+    });
+
+    it('Thermal Lens: cast damage +15% on every hop', () => {
+      const who = line();
+      cast1(who, (c) => {
+        c.cards.cardEffects.thermalLens = { lanceDamageMultiplier: 1.15 };
+      });
+      who.forEach((target, hop) =>
+        expect(dealt(target)).toBeCloseTo(
+          DAMAGE * cast.falloff ** hop * 1.15,
+          6
+        )
+      );
+    });
+
+    it('Afterburn Lance: hops far from the ship hit harder', () => {
+      const who = line(2);
+      cast1(who, (c) => {
+        c.cards.cardEffects.longBurn = { bonusPer100px: 0.2, maxDistance: 400 };
+      });
+      expect(dealt(who[0])).toBeCloseTo(DAMAGE * (1 + 0.2 * 1), 6);
+      expect(dealt(who[1])).toBeCloseTo(
+        DAMAGE * cast.falloff * (1 + 0.2 * 2),
+        6
+      );
+    });
+
+    it('Targeting Matrix: threat focus only for elites, heralds and bosses', () => {
+      const focus = (extra) => {
+        const who = line(1, extra);
+        cast1(who, (c, bus) =>
+          bus.emit('upgrade-threat-focus', { damageMultiplier: 1.2 })
+        );
+        return dealt(who[0]);
+      };
+      expect(focus({})).toBeCloseTo(DAMAGE, 6);
+      expect(focus({ elite: true })).toBeCloseTo(DAMAGE * 1.2, 6);
+      expect(focus({ type: 'herald' })).toBeCloseTo(DAMAGE * 1.2, 6);
+      expect(focus({ type: 'boss' })).toBeCloseTo(DAMAGE * 1.2, 6);
+    });
+  });
+
   it('orbit: blades ride their ring and cut an enemy once a cycle; a shot starts the next cycle', () => {
     const halo = firstOf('shard-halo');
     const target = enemy('target', SHIP.x + halo.radius, SHIP.y);

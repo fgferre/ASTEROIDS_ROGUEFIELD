@@ -352,24 +352,24 @@ describe('level-up offers', () => {
     const furnaceCard = cardOf('furnace-corona');
     const haloCard = cardOf('shard-halo');
     const casterCard = cardOf('arc-caster');
+    const swarmCard = cardOf('seeker-swarm');
     const eligibleIds = (progression) =>
       progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
 
-    it('the new flight leaves a dead card out with Arc Caster held, not with the default cannon; Furnace Corona and Shard Halo keep it', () => {
+    it('the new flight leaves a dead card out with Seeker Swarm held, not with the default cannon; Furnace Corona, Shard Halo and Arc Caster keep it', () => {
       const progression = createProgression(9);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.set(furnaceCard, 1);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.delete(furnaceCard);
-      progression.appliedUpgrades.set(haloCard, 1);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.delete(haloCard);
-      progression.appliedUpgrades.set(casterCard, 1);
-      expect(eligibleIds(progression)).not.toContain('overcharge_coil');
+      expect(eligibleIds(progression)).toContain('recoil_dampers');
+      [furnaceCard, haloCard, casterCard].forEach((card) => {
+        progression.appliedUpgrades.set(card, 1);
+        expect(eligibleIds(progression)).toContain('recoil_dampers');
+        progression.appliedUpgrades.delete(card);
+      });
+      progression.appliedUpgrades.set(swarmCard, 1);
+      expect(eligibleIds(progression)).not.toContain('recoil_dampers');
       for (let seed = 1; seed <= 30; seed += 1) {
         const held = createProgression(9, seed);
-        held.appliedUpgrades.set(casterCard, 1);
-        expect(offerIds(held)).not.toContain('overcharge_coil');
+        held.appliedUpgrades.set(swarmCard, 1);
+        expect(offerIds(held)).not.toContain('recoil_dampers');
       }
     });
 

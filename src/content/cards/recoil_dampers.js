@@ -4,7 +4,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 export default {
   id: 'recoil_dampers',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['scatter', 'arc-caster', 'seeker-swarm'],
+  deadFor: ['scatter', 'seeker-swarm'],
   order: 11,
   category: 'offense',
   family: 'kinetic',
@@ -27,6 +27,14 @@ export default {
   },
   // The Furnace's ring reaches past Multishot's cap (firePatterns.js).
   weaponText: {
+    // proposta 17/11
+    'arc-caster': {
+      levels: [
+        {
+          description: 'Every cast jumps once more, past the Multishot cap.',
+        },
+      ],
+    },
     'shard-halo': {
       levels: [
         {
