@@ -1421,11 +1421,6 @@ kbd {
   color: var(--xp);
 }
 
-.credits-support__link.is-pending {
-  color: var(--text-dim);
-  font-style: italic;
-}
-
 .menu-screen__button--support {
   color: var(--xp);
   border-color: color-mix(in srgb, var(--xp) 55%, transparent);
