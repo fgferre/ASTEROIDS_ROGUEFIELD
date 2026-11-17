@@ -261,6 +261,8 @@ export class DeathBursts {
         rotation: 0,
         rotationSpeed: 0,
         rgb: [0, 0, 0],
+        // a machine's own pieces: torn hull plates (DebrisChunks)
+        material: 'metal',
       });
     }
     this.next = 0;

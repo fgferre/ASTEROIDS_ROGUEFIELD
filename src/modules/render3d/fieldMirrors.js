@@ -178,6 +178,7 @@ export function mirrorEffects(t, effects, impact) {
     const rgb = rgbOf(THREE, p.color);
     if (p.type === 'debris') {
       t.debris.push(p, rgb);
+      if (p.material === 'metal') glowHotPlate(t, p);
       continue;
     }
     // climbing or sinking with the chunks (debrisChunks.js), so a burst opens
@@ -275,6 +276,35 @@ export function mirrorEffects(t, effects, impact) {
     // a new flash of another colour at the same strength repaints too
     if (alpha > 0) t.flash.style.background = t.flashColor = screenFlash.color;
   }
+}
+
+// A torn plate fresh off a machine still glows at its broken edge: some of
+// them (HOT_PLATE_SHARE) carry heat that drops white → orange → red over
+// their life (17/11, efeito/impacto).
+const HOT_PLATE_SHARE = 0.45;
+const HOT_PLATE = [2.4, 1.3, 0.45];
+const COOL_PLATE = [0.6, 0.08, 0.01];
+const plateRgb = [0, 0, 0];
+function glowHotPlate(t, p) {
+  const seed = p.rotationSpeed || p.maxLife || 1;
+  const roll = Math.sin(seed * 91.17 + 3.1) * 43758.5453;
+  if (roll - Math.floor(roll) > HOT_PLATE_SHARE) return;
+  const heat = p.maxLife > 0 ? Math.max(0, p.life / p.maxLife) : 0;
+  if (heat <= 0.05) return;
+  const age = Math.max(0, (p.maxLife || 0) - (p.life || 0));
+  const up = t.debris.lift(p, seed, age);
+  for (let k = 0; k < 3; k += 1) {
+    plateRgb[k] = COOL_PLATE[k] + (HOT_PLATE[k] - COOL_PLATE[k]) * heat;
+  }
+  t.glow.push(
+    p.x,
+    2.5 + up,
+    p.y,
+    plateRgb,
+    p.size * 1.2 * (0.5 + heat),
+    heat,
+    1.2
+  );
 }
 
 // Only big blasts kick the lens; strength grows with the wave's reach.

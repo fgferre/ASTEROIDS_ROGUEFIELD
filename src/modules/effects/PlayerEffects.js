@@ -117,24 +117,11 @@ export class PlayerEffects {
 
   onBulletHit(data) {
     if (data?.position) {
-      const effectiveDamage = Number.isFinite(data?.effectiveDamage)
-        ? data.effectiveDamage
-        : Number.isFinite(data?.damage)
-          ? data.damage
-          : 0;
-      const blocked = Boolean(data?.blocked);
-      if (!blocked && (effectiveDamage > 0 || data.killed)) {
-        this.particleEffects.createHitMarker(
-          data.position,
-          data.killed || false,
-          effectiveDamage
-        );
-      }
       this.createBulletImpact(
         data.position,
         { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
         data.killed || false,
-        { blocked }
+        { blocked: Boolean(data?.blocked) }
       );
     }
   }
