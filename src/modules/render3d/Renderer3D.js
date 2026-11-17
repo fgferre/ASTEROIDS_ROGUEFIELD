@@ -377,10 +377,15 @@ class Renderer3D extends BaseSystem {
         rock ? SPARK_KIND.rock : SPARK_KIND.metal
       );
       // what survives the hit keeps its heat where it was struck: a rock a
-      // patch of lava, a machine a white-hot spot, and the machine jolts
-      if (!enemy || !bullet || data.killed || isBossEnemy(enemy)) return;
+      // patch of lava, a machine a white-hot spot, and the machine jolts; a
+      // machine it kills breaks with the shot's push
+      if (!enemy || !bullet || isBossEnemy(enemy)) return;
       const view = this.three?.enemies.views.get(enemy.id || enemy);
       if (!view) return;
+      if (data.killed) {
+        if (!rock) this.three.enemies.killedBy(view, bullet.vx, bullet.vy);
+        return;
+      }
       if (rock) this.three.decals.hit(view, nx, ny, DECAL_KIND.rock);
       else if (!view.kind.startsWith('herald')) {
         this.three.decals.hit(view, nx, ny, DECAL_KIND.metal);

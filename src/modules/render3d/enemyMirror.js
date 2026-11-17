@@ -24,6 +24,7 @@ import { getContent, listContent } from '../../content/registry.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';
+import { shown } from './fracture.js';
 import { createAffixViews } from './enemies/affixes.js';
 import { createHeraldViews } from './enemies/heralds.js';
 import { createMachineViews } from './enemies/machines.js';
@@ -51,9 +52,16 @@ const JOLT_TIME = 0.12;
 const JOLT_MAX = 2.2;
 const JOLT_MIN = 0.8;
 const JOLT_REFERENCE = 20;
-const BURST_MIN = 6;
-const BURST_MAX = 12;
+const BURST_MIN = 8;
+const BURST_MAX = 16;
+const BURST_PER_RADIUS = 1 / 1.6;
 const WARDEN_BURST = 24;
+// proposta 17/11: a machine breaks into BREAK_PIECES of its own build (4 +
+// radius / 2.5, within [min, max]); the pieces carry its momentum and the
+// killing shot's push (px/s); its eyes go out in LIGHTS_OUT s.
+const BREAK_PIECES = [9, 16];
+const KILL_PUSH = 24;
+export const LIGHTS_OUT = 0.15;
 // One seed for every baked map set (bakedMaps.js): the rocks' and the
 // Wardens' plates.
 const MAP_SEED = 4242.7;
@@ -106,13 +114,6 @@ function hashId(id) {
 }
 
 // A batched part's anchor and its parents up to the view's root are shown.
-function shown(anchor) {
-  for (let node = anchor; node && !node.isScene; node = node.parent) {
-    if (!node.visible) return false;
-  }
-  return true;
-}
-
 /**
  * Lit, opaque meshes under `root` cast and receive the key light's shadow
  * (Renderer3D); glows, lenses and anything see-through stay out of it.
@@ -650,7 +651,8 @@ export class EnemyMirror {
       this.dissolve.start(
         this.burnOf(view),
         this.kit.accentOf(view),
-        view.radius || 12
+        view.radius || 12,
+        this.breakOf(view)
       )
     );
     compile();
@@ -700,8 +702,15 @@ export class EnemyMirror {
       const { position } = view.object;
       view.shadowDistance = Math.hypot(position.x - x, position.z - z);
       view.casters.forEach((mesh) => (mesh.castShadow = false));
-      // a phased Shade casts none: the depth pass ignores its dissolve
-      if (view.shadowDistance <= SHADOW_RADIUS && !view.phased) near.push(view);
+      // a phased Shade or a breaking machine casts none: the depth pass
+      // ignores the burn's shader
+      if (
+        view.shadowDistance <= SHADOW_RADIUS &&
+        !view.phased &&
+        !view.dissolve?.broken
+      ) {
+        near.push(view);
+      }
     };
     this.views.forEach(consider);
     this.dissolve.slots.forEach((slot) => consider(slot.view));
@@ -790,16 +799,18 @@ export class EnemyMirror {
   }
 
   // The live views' outlines and glows, then the glows of the burning ones,
-  // shrinking to nothing over the burn (their outlines go dark at once).
+  // shrinking to nothing over the burn, or at once for a machine that breaks
+  // (their outlines go dark at once).
   packBatches() {
     this.rimBatch.begin();
     this.glows.begin();
     this.views.forEach(this.packView);
     const { slots } = this.dissolve;
     for (let i = 0; i < slots.length; i += 1) {
-      const { view, age } = slots[i];
+      const { view, age, breaks } = slots[i];
       if (view?.glows?.length) {
-        this.packGlows(view, Math.max(0, 1 - age / DISSOLVE_SECONDS));
+        const out = breaks ? LIGHTS_OUT : DISSOLVE_SECONDS;
+        this.packGlows(view, Math.max(0, 1 - age / out));
       }
     }
     this.rimBatch.end();
@@ -826,7 +837,6 @@ export class EnemyMirror {
     }
   }
 
-  /** The simulation killed `enemy` (asteroid splits excluded). */
   /** A shot flying (vx, vy) hit the machine `view` for `damage`. */
   jolt(view, vx, vy, damage) {
     const len = Math.hypot(vx, vy);
@@ -840,20 +850,36 @@ export class EnemyMirror {
     view.joltAt = performance.now() / 1000;
   }
 
+  /** The shot flying (vx, vy) that killed the machine `view` pushes its pieces. */
+  killedBy(view, vx, vy) {
+    const len = Math.hypot(vx, vy) || 1;
+    view.shotX = (vx / len) * KILL_PUSH;
+    view.shotY = (vy / len) * KILL_PUSH;
+  }
+
+  /** The simulation killed `enemy` (asteroid splits excluded). */
   markDead(enemy) {
     this.dead.add(enemy.id || enemy);
   }
 
-  // The view burns in place; a burst of accent chunks flies out (rocks
-  // already shed stone debris through EffectsSystem). The Warden's phase
-  // breaks have their own pieces: only its final death bursts, bigger, lit.
+  // A machine breaks into its own pieces as it burns, and hull plates fly out;
+  // a rock or a boss burns in place (rocks already shed stone debris through
+  // EffectsSystem). The Warden's phase breaks have their own pieces: only its
+  // final death bursts, bigger, lit.
   die(key, view) {
     this.views.delete(key);
     if (view.phased) this.machineViews.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
     const accent = this.kit.accentOf(view);
-    this.dissolve.start(this.burnOf(view), accent, view.radius);
+    this.dissolve.start(
+      this.burnOf(view),
+      accent,
+      view.radius,
+      this.breakOf(view)
+    );
+    view.shotX = 0;
+    view.shotY = 0;
     if (view.kind === 'asteroid') return;
     const x = view.object.position.x + HALF_W;
     const y = view.object.position.z + HALF_H;
@@ -861,7 +887,7 @@ export class EnemyMirror {
       this.bursts.spawn(x, y, view.radius, accent, WARDEN_BURST);
       this.bursts.flash(x, y, accent);
     } else {
-      const count = Math.round(view.radius / 2);
+      const count = Math.round(view.radius * BURST_PER_RADIUS);
       this.bursts.spawn(
         x,
         y,
@@ -872,10 +898,31 @@ export class EnemyMirror {
     }
   }
 
+  // How a machine breaks (DissolvePool.start); a rock, a boss or a herald
+  // burns whole.
+  breakOf(view) {
+    const { kind } = view;
+    if (
+      kind === 'asteroid' ||
+      kind.startsWith('boss') ||
+      kind.startsWith('herald')
+    ) {
+      return null;
+    }
+    const [min, max] = BREAK_PIECES;
+    return {
+      count: Math.max(min, Math.min(max, Math.round(4 + view.radius / 2.5))),
+      pushX: (view.vx || 0) + (view.shotX || 0),
+      pushZ: (view.vy || 0) + (view.shotY || 0),
+    };
+  }
+
   // Every machine: its pose, the Elite look and its affixes, then what its
   // own look lights or moves.
   updateMachine(view, enemy, time, flash) {
     const { object } = view;
+    view.vx = enemy.vx || 0;
+    view.vy = enemy.vy || 0;
     object.scale.setScalar(enemy.radius || 12);
     object.rotation.y = -(enemy.rotation || 0);
     // a hit knocks the hull back along the shot, and it settles (jolt())

@@ -10,6 +10,13 @@
 // hull/plate materials included), all bound to that view's own uniforms; a
 // death swaps the twins in and the end swaps the originals back. Twins of one
 // source share one program, so no material is cloned per death.
+//
+// A machine breaks instead (fracture.js): its meshes take a copy of their
+// geometry with each vertex tagged by its piece, and the same twins throw the
+// pieces out, spin them and burn them away, slower; the noise stays on each
+// piece (its rest position), so a piece burns as it tumbles.
+
+import { brokenOf, shown } from './fracture.js';
 
 // proposta 18/10: duration, concurrency, burn look.
 export const DISSOLVE_SECONDS = 0.35;
@@ -19,6 +26,20 @@ const THRESHOLD_TO = 0.86;
 const EDGE_WIDTH = 0.09; // band above the threshold, in noise units
 const EDGE_GLOW = 2.4; // × accent, added after tone mapping
 const NOISE_CELLS = 2.4; // noise cells per enemy radius
+
+// proposta 17/11: a machine breaking into its own pieces.
+export const BREAK_SECONDS = 1.1;
+const BREAK_FROM = 0.12; // below the noise: whole pieces at first
+const BREAK_EASE = 1.3; // the holes come late, then fast
+const BREAK_BAND = 0.16; // a wider hot band than a burn's: the metal glows
+const BREAK_EMBER = [1, 0.42, 0.1]; // the band's colour, not the accent
+const BREAK_SPEED = 62; // px/s at radius 14, ± 45 %
+const BREAK_DRAG = 2.4; // 1/s: they pop apart, then drift
+const BREAK_LIFT = 0.35; // how much of a piece's height pushes it up
+const BREAK_SCATTER = 0.9; // a piece's own sideways way, × the outward one
+const SPIN_MIN = 2.5; // rad/s
+const SPIN_RANGE = 6;
+const SPIN_DRAG = 0.8; // 1/s
 
 // proposta 18/10: chunk burst.
 export const BURST_CAPACITY = 96;
@@ -31,6 +52,7 @@ const WARDEN_FLASH = 4;
 const DISSOLVE_HEAD = `
 uniform float uDissolve;
 uniform float uDissolveGlow;
+uniform float uDissolveBand;
 uniform float uDissolveScale;
 uniform vec3 uDissolveSeed;
 uniform vec3 uDissolveEdge;
@@ -53,6 +75,41 @@ float dslvNoise(vec3 x) {
 }
 `;
 
+// A piece's turn: about its own random axis, slowing.
+const BREAK_HEAD = `
+attribute vec4 aPiece;
+uniform float uExplode;
+uniform float uExplodeSpeed;
+uniform vec3 uExplodePush;
+vec3 explodeTurn(vec3 v) {
+  float r = aPiece.w;
+  vec3 k = normalize(vec3(fract(r * 7.13), fract(r * 3.71), fract(r * 5.37)) - 0.5 + 0.001);
+  float spin = (${SPIN_MIN.toFixed(2)} + ${SPIN_RANGE.toFixed(2)} * fract(r * 11.3)) * (r > 0.5 ? 1.0 : -1.0);
+  float a = spin * (1.0 - exp(-${SPIN_DRAG.toFixed(2)} * uExplode)) / ${SPIN_DRAG.toFixed(2)};
+  float c = cos(a);
+  return v * c + cross(k, v) * sin(a) + k * dot(k, v) * (1.0 - c);
+}
+`;
+
+// Out from the hull's centre (a little up) and off to its own side (a long
+// hull would only break along its length), at its own speed, carried by the
+// machine's momentum and the killing shot; turning about its own centre.
+const BREAK_VERTEX = `
+  vec3 dslvRest = transformed;
+  if (uExplode > 0.0) {
+    vec3 piece = aPiece.xyz;
+    float r = aPiece.w;
+    vec3 away = vec3(piece.x, piece.y * ${BREAK_LIFT.toFixed(2)}, piece.z);
+    float far = length(away);
+    float side = 6.2832 * fract(r * 31.7);
+    away = normalize((far > 0.001 ? away / far : vec3(0.0))
+      + ${BREAK_SCATTER.toFixed(2)} * vec3(cos(side), 0.0, sin(side)) + vec3(0.0, 0.001, 0.0));
+    float drift = (1.0 - exp(-${BREAK_DRAG.toFixed(2)} * uExplode)) / ${BREAK_DRAG.toFixed(2)};
+    vec3 velocity = away * uExplodeSpeed * (0.7 + 0.6 * fract(r * 17.0))
+      + uExplodePush * (0.5 + fract(r * 23.0));
+    transformed = piece + explodeTurn(transformed - piece) + velocity * drift;
+  }`;
+
 // Chained after the source material's own patch (rock cracks, hot core).
 function patchDissolve(shader, renderer) {
   this.dissolveBase.call(this, shader, renderer);
@@ -60,12 +117,21 @@ function patchDissolve(shader, renderer) {
   shader.vertexShader = shader.vertexShader
     .replace(
       '#include <common>',
-      '#include <common>\nvarying vec3 vDissolvePos;'
+      `#include <common>\nvarying vec3 vDissolvePos;\n${BREAK_HEAD}`
+    )
+    .replace(
+      '#include <beginnormal_vertex>',
+      `#include <beginnormal_vertex>
+      if (uExplode > 0.0) objectNormal = explodeTurn(objectNormal);`
+    )
+    .replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>${BREAK_VERTEX}`
     )
     .replace(
       '#include <project_vertex>',
       `#include <project_vertex>
-      vDissolvePos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+      vDissolvePos = (modelMatrix * vec4(dslvRest, 1.0)).xyz;`
     );
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\n${DISSOLVE_HEAD}`)
@@ -75,7 +141,7 @@ function patchDissolve(shader, renderer) {
       vec3 dslvP = vDissolvePos * uDissolveScale + uDissolveSeed;
       float dslvN = 0.65 * dslvNoise(dslvP) + 0.35 * dslvNoise(dslvP * 2.7 + 11.0);
       if (dslvN < uDissolve) discard;
-      float dslvEdge = 1.0 - smoothstep(uDissolve, uDissolve + ${EDGE_WIDTH.toFixed(3)}, dslvN);`
+      float dslvEdge = 1.0 - smoothstep(uDissolve, uDissolve + uDissolveBand, dslvN);`
     )
     .replace(
       '#include <tonemapping_fragment>',
@@ -98,15 +164,21 @@ export class DissolvePool {
     this.finish = finish;
     this.slots = [];
     for (let i = 0; i < DISSOLVE_CAP; i += 1) {
-      this.slots.push({ view: null, age: 0 });
+      this.slots.push({ view: null, age: 0, breaks: false });
     }
+    this.push = new THREE.Vector3();
+    this.toLocal = new THREE.Matrix3();
     this.count = 0;
     this.collecting = null;
     this.collect = (node) => this.collectNode(node);
   }
 
-  /** Starts burning `view` (already out of the mirror's id map). */
-  start(view, accent, radius) {
+  /**
+   * Starts burning `view` (already out of the mirror's id map); with
+   * `breakUp` ({ count, pushX, pushZ }: pieces, momentum in px/s) it breaks
+   * into its own pieces as it burns.
+   */
+  start(view, accent, radius, breakUp = null) {
     // a free slot, else the oldest burn ends now
     let slot = this.slots[0];
     for (let i = 0; i < this.slots.length && slot.view; i += 1) {
@@ -127,6 +199,7 @@ export class DissolvePool {
     u.uDissolveGlow.value = EDGE_GLOW;
     u.uDissolveScale.value = NOISE_CELLS / Math.max(4, radius);
     u.uDissolveEdge.value.copy(accent);
+    u.uDissolveBand.value = EDGE_WIDTH;
     const seed = view.seed || 0;
     u.uDissolveSeed.value.set(
       (seed % 997) * 0.37,
@@ -134,9 +207,70 @@ export class DissolvePool {
       ((seed >>> 20) % 983) * 0.43
     );
     view.object.visible = true;
+    u.uExplode.value = 0;
+    if (breakUp) {
+      u.uDissolve.value = BREAK_FROM;
+      u.uDissolveBand.value = BREAK_BAND;
+      u.uDissolveEdge.value.setRGB(...BREAK_EMBER);
+      this.breakUp(view, radius, breakUp);
+    }
     slot.view = view;
     slot.age = 0;
+    slot.breaks = Boolean(breakUp);
     this.count += 1;
+  }
+
+  // Meshes laid at one parent's origin break together, led by the one with
+  // the most vertices (the hull); any other mesh breaks on its own.
+  breakUp(view, radius, { count, pushX, pushZ }) {
+    const parts = view.dissolve;
+    const frames = new Map();
+    for (let i = 0; i < parts.meshes.length; i += 1) {
+      const mesh = parts.meshes[i];
+      if (!shown(mesh)) continue;
+      const rest =
+        mesh.position.lengthSq() === 0 &&
+        mesh.quaternion.w === 1 &&
+        mesh.scale.x === 1 &&
+        mesh.scale.y === 1 &&
+        mesh.scale.z === 1;
+      const key = rest ? mesh.parent : mesh;
+      if (!frames.has(key)) frames.set(key, []);
+      frames.get(key).push(mesh);
+    }
+    let lead = null;
+    frames.forEach((meshes) => {
+      const hull = meshes.reduce((a, b) =>
+        b.geometry.getAttribute('position').count >
+        a.geometry.getAttribute('position').count
+          ? b
+          : a
+      );
+      lead ??= hull;
+      for (let i = 0; i < meshes.length; i += 1) {
+        const mesh = meshes[i];
+        parts.geometries.push(mesh, mesh.geometry);
+        mesh.geometry = brokenOf(
+          this.THREE,
+          hull.geometry,
+          mesh.geometry,
+          count
+        );
+      }
+    });
+    if (!lead) return;
+    parts.broken = true;
+    // speeds in the hull's own units: its world scale and turn undone
+    view.object.updateMatrixWorld(true);
+    const k = Math.max(0.7, Math.min(4, radius / 14));
+    const u = parts.uniforms;
+    u.uExplode.value = 1e-4;
+    u.uExplodeSpeed.value =
+      (BREAK_SPEED * Math.sqrt(k)) / lead.matrixWorld.getMaxScaleOnAxis();
+    this.toLocal.setFromMatrix4(lead.matrixWorld).invert();
+    u.uExplodePush.value
+      .copy(this.push.set(pushX, 0, pushZ))
+      .applyMatrix3(this.toLocal);
   }
 
   partsOf(view) {
@@ -146,15 +280,22 @@ export class DissolvePool {
         uniforms: {
           uDissolve: { value: 0 },
           uDissolveGlow: { value: 0 },
+          uDissolveBand: { value: EDGE_WIDTH },
           uDissolveScale: { value: 1 },
           uDissolveSeed: { value: new THREE.Vector3() },
           uDissolveEdge: { value: new THREE.Color() },
+          uExplode: { value: 0 },
+          uExplodeSpeed: { value: 0 },
+          uExplodePush: { value: new THREE.Vector3() },
         },
         twins: new Map(),
         meshes: [],
         sources: [],
         lines: [],
         lineVisible: [],
+        // a break's meshes and their own geometries, in pairs
+        geometries: [],
+        broken: false,
       };
     }
     return view.dissolve;
@@ -200,14 +341,17 @@ export class DissolvePool {
       const slot = this.slots[i];
       if (!slot.view) continue;
       slot.age += dt;
-      const p = slot.age / DISSOLVE_SECONDS;
+      const p = slot.age / (slot.breaks ? BREAK_SECONDS : DISSOLVE_SECONDS);
       if (p >= 1) {
         this.end(slot);
         continue;
       }
       const u = slot.view.dissolve.uniforms;
-      u.uDissolve.value = THRESHOLD_FROM + (THRESHOLD_TO - THRESHOLD_FROM) * p;
+      u.uDissolve.value = slot.breaks
+        ? BREAK_FROM + (THRESHOLD_TO - BREAK_FROM) * p ** BREAK_EASE
+        : THRESHOLD_FROM + (THRESHOLD_TO - THRESHOLD_FROM) * p;
       u.uDissolveGlow.value = EDGE_GLOW * (1 - p * p);
+      if (slot.breaks) u.uExplode.value = Math.max(1e-4, slot.age);
     }
   }
 
@@ -220,6 +364,13 @@ export class DissolvePool {
     for (let i = 0; i < parts.lines.length; i += 1) {
       parts.lines[i].visible = parts.lineVisible[i];
     }
+    const { geometries } = parts;
+    for (let i = 0; i < geometries.length; i += 2) {
+      geometries[i].geometry = geometries[i + 1];
+    }
+    geometries.length = 0;
+    parts.broken = false;
+    parts.uniforms.uExplode.value = 0;
     view.object.visible = false;
     slot.view = null;
     this.count -= 1;
