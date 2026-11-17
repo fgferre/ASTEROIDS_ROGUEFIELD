@@ -8,7 +8,7 @@
 // so damage is light: a hit lights the cracks amber. Every few seconds one
 // rock flies in from off frame at a visible target; a hard hit shatters the
 // smaller rock into glowing pieces (or into chunks, if it is small), cracks
-// the bigger one, and throws embers, chunks, a shockwave and a flash of
+// the bigger one, and throws embers, chunks, a glow and a flash of
 // light. With `still` (reduced motion) nothing moves and nothing is thrown.
 
 import { PALETTE } from '../../data/constants/palette.js';
@@ -69,7 +69,7 @@ const BOTH = 1.5;
 const PIECES = { count: [2, 4], share: [0.35, 0.6], speed: [12, 40] };
 const DUST = 3;
 const MAX_ROCKS = 28;
-// Effects: embers, chunks, shockwaves and lights, all pooled; each burst
+// Effects: sparks, embers, chunks, glows and lights, all pooled; each burst
 // scales them by its power (explode).
 // Sparks are streaks along their flight (the game's hit sparks); embers the
 // few glowing bits that drift on after them.
@@ -118,20 +118,20 @@ void main() {
   vPos = position.xy;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
-// A thin ring and a soft halo inside it, fading as it grows.
+// The burst's light, on a quad facing the shot.
 const WAVE_FRAGMENT = `
 uniform vec3 uColor;
 uniform float uAge;
 varying vec2 vPos;
 void main() {
   float d = length(vPos);
-  float ring = 1.0 - smoothstep(0.0, 0.05, abs(d - 0.92));
-  float halo = smoothstep(1.0, 0.3, d) * 0.12;
-  float fade = (1.0 - uAge) * (1.0 - uAge);
-  // The hot core of the blast, gone in the first instants.
+  // Only light, no ring (the owner, 17/11: "o impacto só gera luz e
+  // detritos, nao tem onda de choque"): a hot core gone in an instant and a
+  // soft glow fading after it.
   float core = exp(-d * 6.0) * pow(1.0 - uAge, 8.0) * 3.0;
+  float glow = exp(-d * 2.5) * pow(1.0 - uAge, 3.0) * 0.35;
   vec3 hot = mix(uColor, vec3(1.0, 0.92, 0.8), 0.6);
-  gl_FragColor = vec4(uColor * (ring + halo) * fade * 2.0 + hot * core, 1.0);
+  gl_FragColor = vec4(hot * core + uColor * glow, 1.0);
 }`;
 
 /**
