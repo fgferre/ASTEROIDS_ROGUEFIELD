@@ -547,9 +547,12 @@ class ProgressionSystem extends UpgradeSystem {
       experienceToNext: safeNumber(this.experienceToNext, 100),
       totalExperience: safeNumber(this.totalExperience, 0),
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
-      // The level-up screen's budget left, and the cards banished this run.
+      // The level-up screen's budget left, the card held for the next
+      // offer, and the cards banished this run.
       rerollsLeft: this.rerollsLeft,
       banishesLeft: this.banishesLeft,
+      holdsLeft: this.holdsLeft,
+      heldCard: this.heldCard,
       banishedUpgrades: Array.from(this.banishedUpgrades),
       comboState: {
         comboCount: safeNumber(this.currentCombo, 0),
@@ -579,6 +582,12 @@ class ProgressionSystem extends UpgradeSystem {
     }
     if (Number.isFinite(snapshot.banishesLeft)) {
       this.banishesLeft = snapshot.banishesLeft;
+    }
+    if (Number.isFinite(snapshot.holdsLeft)) {
+      this.holdsLeft = snapshot.holdsLeft;
+    }
+    if (snapshot.heldCard !== undefined) {
+      this.heldCard = snapshot.heldCard;
     }
     if (Array.isArray(snapshot.banishedUpgrades)) {
       this.banishedUpgrades = new Set(snapshot.banishedUpgrades);

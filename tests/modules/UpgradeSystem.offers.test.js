@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
+import { BASE_MODIFIERS } from '../../src/data/hangar.js';
+import {
+  createHeadlessGame,
+  installDomStubs,
+} from '../__helpers__/headlessGame.js';
 import RandomService from '../../src/core/RandomService.js';
 import { listContent } from '../../src/content/registry.js';
 import { WEAPON_CARD_IDS } from '../../src/data/upgrades/index.js';
@@ -15,7 +20,9 @@ import { FAMILY_APEX_THRESHOLD } from '../../src/data/upgrades/families.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
-const createProgression = (level, seed = 7) => {
+// `contract`: the hangar's run contract fields (openCards, sealed, holds,
+// startingCard) over its base modifiers; none: no hangar at all.
+const createProgression = (level, seed = 7, contract = null) => {
   const progression = new ProgressionSystem({
     random: new RandomService(seed),
     eventBus: createEventBusMock(),
@@ -23,6 +30,9 @@ const createProgression = (level, seed = 7) => {
     ui: {},
     effects: {},
     'xp-orbs': { attachProgression: () => {} },
+    ...(contract && {
+      hangar: { getModifiers: () => ({ ...BASE_MODIFIERS, ...contract }) },
+    }),
   });
   progression.level = level;
   return progression;
@@ -373,6 +383,121 @@ describe('level-up offers', () => {
       expect(eligibleIds(progression)).not.toContain('targeting_suite');
       progression.appliedUpgrades.set('auto_aim', 1);
       expect(eligibleIds(progression)).toContain('targeting_suite');
+    });
+  });
+
+  describe("the hangar's run contract", () => {
+    const pilotLevel = UPGRADE_PILOT_OFFER_EVERY * 2;
+
+    it('the default contract deals the same offers as no contract, seed for seed', () => {
+      const defaults = {
+        openCards: null,
+        sealed: [],
+        holds: 0,
+        startingCard: null,
+      };
+      for (let seed = 1; seed <= 20; seed += 1) {
+        [1, UPGRADE_WEAPON_OFFER_LEVELS[0], pilotLevel, 9].forEach((level) => {
+          const plain = createProgression(level, seed);
+          const contracted = createProgression(level, seed, defaults);
+          expect(offerIds(contracted)).toEqual(offerIds(plain));
+          expect(offerIds(contracted)).toEqual(offerIds(plain));
+        });
+      }
+    });
+
+    it('a card outside the open cards is never offered; the trail still is', () => {
+      const openCards = ['shield', 'plasma', 'multishot', 'heat_sink'];
+      for (let seed = 1; seed <= 30; seed += 1) {
+        const progression = createProgression(pilotLevel, seed, { openCards });
+        const ids = offerIds(progression);
+        expect(ids.some((id) => progression.pilotCardIds.includes(id))).toBe(
+          true
+        );
+        ids
+          .filter((id) => !progression.pilotCardIds.includes(id))
+          .forEach((id) => expect(openCards).toContain(id));
+      }
+    });
+
+    it('a sealed card is never offered, nor drawn as a banished card replacement', () => {
+      const sealed = ['shield', 'plasma'];
+      for (let seed = 1; seed <= 40; seed += 1) {
+        const progression = createProgression(5, seed, { sealed });
+        sealed.forEach((id) => expect(offerIds(progression)).not.toContain(id));
+        const [first] = progression.pendingUpgradeOptions;
+        const banished = progression.banishUpgrade(first.id);
+        sealed.forEach((id) =>
+          expect(banished.map((option) => option.id)).not.toContain(id)
+        );
+      }
+    });
+
+    it('the starting card is held when the run begins, once', () => {
+      const restoreDom = installDomStubs();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        const game = createHeadlessGame();
+        const hangar = game.session.resolveServiceInstance('hangar');
+        hangar.getModifiers = () => ({
+          ...BASE_MODIFIERS,
+          startingCard: 'propulsors',
+        });
+        game.session.startNewRun({ source: 'test' });
+        for (let step = 0; step < 30; step += 1) game.step();
+        expect(game.services.progression.getUpgradeCount('propulsors')).toBe(1);
+      } finally {
+        restoreDom();
+        vi.restoreAllMocks();
+      }
+    });
+
+    it('a starting card the trail would not offer now is ignored', () => {
+      // Not a piloting card; a trail card short of its prerequisites.
+      ['shield', 'flight_computer'].forEach((startingCard) => {
+        const progression = createProgression(1, 7, { startingCard });
+        progression.applyStartingCard();
+        expect(progression.getUpgradeCount(startingCard)).toBe(0);
+      });
+    });
+
+    it('a held card comes back in the next offer, and spends a hold', () => {
+      let returned = 0;
+      for (let seed = 1; seed <= 20; seed += 1) {
+        const progression = createProgression(5, seed, { holds: 2 });
+        const [, second] = offerIds(progression, 5);
+        expect(progression.holdUpgrade(second)).not.toBeNull();
+        expect(progression.holdsLeft).toBe(1);
+        // One per screen; a reroll of that screen keeps the hold.
+        expect(progression.holdUpgrade(second)).toBeNull();
+        progression.rerollUpgradeOptions();
+        expect(progression.heldCard).not.toBeNull();
+        progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+
+        // Unless the pick ruled it out (another weapon card).
+        const open = progression
+          .getEligibleUpgradeDefinitions()
+          .some(({ id }) => id === second);
+        const next = offerIds(progression, 6);
+        if (open) {
+          expect(next).toContain(second);
+          returned += 1;
+        }
+        expect(next).toHaveLength(3);
+        expect(progression.heldCard).toBeNull();
+      }
+      expect(returned).toBeGreaterThan(10);
+    });
+
+    it('no hold without holds left or beside a single card', () => {
+      const none = createProgression(5);
+      const [first] = offerIds(none, 5);
+      expect(none.holdUpgrade(first)).toBeNull();
+
+      const single = createProgression(5, 7, { holds: 1 });
+      single.prepareUpgradeOptions(1, { level: 5 });
+      expect(single.holdUpgrade(single.pendingUpgradeOptions[0].id)).toBeNull();
+      expect(single.holdsLeft).toBe(1);
     });
   });
 });

@@ -242,6 +242,17 @@
               <span class="lu-ghost__n" data-count>1</span>
             </button>
             <button
+              id="levelup-hold-btn"
+              class="lu-ghost lu-ghost--hold levelup-action hidden"
+              type="button"
+              aria-pressed="false"
+            >
+              <kbd data-device="keyboard">H</kbd>
+              <kbd data-device="gamepad">LB</kbd>
+              Hold
+              <span class="lu-ghost__n" data-count>0</span>
+            </button>
+            <button
               id="levelup-equip-btn"
               class="lu-ghost lu-ghost--auto levelup-action hidden"
               type="button"
@@ -254,6 +265,15 @@
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
             Pick a card to banish it for the rest of the run.
+            <span data-device="keyboard">Esc</span>
+            <span data-device="gamepad">B</span> cancels.
+          </p>
+          <p
+            id="levelup-hold-hint"
+            class="levelup-hint levelup-hint--hold hidden"
+            role="status"
+          >
+            Pick a card to hold it for the next level-up.
             <span data-device="keyboard">Esc</span>
             <span data-device="gamepad">B</span> cancels.
           </p>

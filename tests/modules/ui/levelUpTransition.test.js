@@ -271,6 +271,101 @@ describe('Level-up card transition', () => {
       expect(progression.banishUpgrade).toHaveBeenCalledWith('c');
     });
 
+    describe('Hold', () => {
+      // A Hold button with `holds` for the run, over three cards a, b, c.
+      function holdTable(holds) {
+        let onKey;
+        document.addEventListener = (name, fn) => {
+          if (name === 'keydown') onKey = fn;
+        };
+        const count = { textContent: '' };
+        const holdBtn = {
+          ...fakeNode(),
+          attrs: {},
+          classList: {
+            toggle(name, on) {
+              holdBtn.hidden = name === 'hidden' ? on : holdBtn.hidden;
+            },
+          },
+          setAttribute(name, value) {
+            this.attrs[name] = value;
+          },
+          querySelector: () => count,
+          addEventListener: () => {},
+        };
+        const definition = (id) => ({
+          id,
+          family: 'thermal',
+          rarity: 'common',
+          levels: [{}],
+          text: { name: id, levels: [{ description: 'Fire rate +11%.' }] },
+        });
+        const progression = {
+          holdsPerRun: holds,
+          holdsLeft: holds,
+          heldCard: null,
+          upgradeLookup: new Map(
+            ['a', 'b', 'c'].map((id) => [id, definition(id)])
+          ),
+          getUpgradeCount: () => 0,
+          getFamilyCounts: () => ({ thermal: 0 }),
+          pilotCardIds: [],
+          applyUpgrade: vi.fn(() => false),
+          holdUpgrade: vi.fn((id) => {
+            progression.heldCard = { id, level: 4 };
+            progression.holdsLeft -= 1;
+            return [];
+          }),
+        };
+        const levelUp = new LevelUpScreen({
+          refs: { holdBtn },
+          progression: () => progression,
+          combat: () => ({ getWeaponState: () => ({}) }),
+        });
+        levelUp.bindLevelUpControls();
+        Object.assign(levelUp.levelUpState, {
+          isVisible: true,
+          options: ['a', 'b', 'c'].map((id) => ({ id })),
+          buttons: ['a', 'b', 'c'].map((id) => fakeNode(undefined, id)),
+        });
+        levelUp.updateLevelUpActionButtons();
+        const press = (key, code) =>
+          onKey({ key, code, repeat: false, preventDefault() {} });
+        return { levelUp, holdBtn, count, progression, press };
+      }
+
+      it('the button is hidden when the run has no holds, and H does nothing', () => {
+        const { levelUp, holdBtn, progression, press } = holdTable(0);
+        expect(holdBtn.hidden).toBe(true);
+        press('h', 'KeyH');
+        expect(levelUp.levelUpState.holdMode).toBe(false);
+        press('2', 'Digit2');
+        expect(progression.holdUpgrade).not.toHaveBeenCalled();
+      });
+
+      it('H then a card holds it and marks its face; the next pick takes a card as usual', () => {
+        const { levelUp, holdBtn, count, progression, press } = holdTable(2);
+        expect(holdBtn.hidden).toBe(false);
+        expect(count.textContent).toBe('2');
+
+        press('h', 'KeyH');
+        expect(holdBtn.attrs['aria-pressed']).toBe('true');
+        press('2', 'Digit2');
+        expect(progression.holdUpgrade).toHaveBeenCalledWith('b');
+        expect(progression.applyUpgrade).not.toHaveBeenCalled();
+        expect(levelUp.levelUpState.holdMode).toBe(false);
+        expect(levelUp.levelUpState.buttons[1].innerHTML).toContain('Held');
+        expect(count.textContent).toBe('1');
+        // One hold per screen: H no longer enters hold mode.
+        expect(holdBtn.disabled).toBe(true);
+        press('h', 'KeyH');
+        expect(levelUp.levelUpState.holdMode).toBe(false);
+
+        press('1', 'Digit1');
+        expect(progression.applyUpgrade).toHaveBeenCalledWith('a');
+      });
+    });
+
     describe('Equip for me', () => {
       // A head start at pick 2 of 5; `press(code)` is a key, `repeat` held.
       function equipTable() {
