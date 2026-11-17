@@ -72,18 +72,18 @@ export function onboardingPrompts(
     keys: ['L-Stick'],
     text:
       scheme === 'classic'
-        ? 'Turn and thrust with the left stick. The turret aims on its own; the right stick aims it by hand.'
-        : 'Move with the left stick. The turret aims on its own; the right stick aims it by hand.',
+        ? 'Turn and thrust with the left stick. The cannon fires on its own.'
+        : 'Move with the left stick. The cannon fires on its own.',
   };
   const keyboardMove =
     scheme === 'classic'
       ? {
           keys: [keys.moveLeft, keys.moveUp, keys.moveRight],
-          text: 'Turn and thrust. The turret aims and fires on its own.',
+          text: 'Turn and thrust. The cannon fires on its own.',
         }
       : {
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
-          text: 'Move with WASD. The turret aims and fires on its own.',
+          text: 'Move with WASD. The cannon fires on its own.',
         };
   return {
     move: device === 'gamepad' ? padMove : keyboardMove,

@@ -38,7 +38,7 @@ describe('Keyboard controls hints', () => {
           'E shield',
           'R reroll',
           'B banish',
-          'Turret auto-aims',
+          'Shooting is automatic',
         ])
       );
       expect(modern.join(' ')).not.toMatch(/turn|thrust/);
