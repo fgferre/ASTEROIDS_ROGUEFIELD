@@ -26,6 +26,8 @@ export function cacheStaticNodes() {
       rerollBtn: document.getElementById('levelup-reroll-btn') || null,
       banishBtn: document.getElementById('levelup-banish-btn') || null,
       banishHint: document.getElementById('levelup-banish-hint') || null,
+      holdBtn: document.getElementById('levelup-hold-btn') || null,
+      holdHint: document.getElementById('levelup-hold-hint') || null,
       headStart: document.getElementById('levelup-headstart') || null,
       equipBtn: document.getElementById('levelup-equip-btn') || null,
       run: document.getElementById('levelup-run') || null,

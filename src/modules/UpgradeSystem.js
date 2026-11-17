@@ -97,7 +97,9 @@ class UpgradeSystem extends BaseSystem {
     this.resetRunUpgradeActions();
   }
 
-  // Per-run reroll/banish budget and the upgrades banished this run.
+  // Per-run reroll/banish/hold budget, the upgrades banished this run, and
+  // the hangar's run contract: the cards open to the draw (null: all), the
+  // cards sealed out of it, and a piloting card to start with.
   resetRunUpgradeActions() {
     const hangar =
       resolveService('hangar', this.dependencies)?.getModifiers() ??
@@ -107,6 +109,26 @@ class UpgradeSystem extends BaseSystem {
     this.banishesLeft =
       PROGRESSION_UPGRADE_BANISHES_PER_RUN + hangar.extraBanishes;
     this.banishedUpgrades = new Set();
+    this.openCards = hangar.openCards ? new Set(hangar.openCards) : null;
+    this.sealedCards = new Set(hangar.sealed ?? []);
+    this.holdsPerRun = hangar.holds ?? 0;
+    this.holdsLeft = this.holdsPerRun;
+    // { id, level }: the card held on the level-up screen of `level`.
+    this.heldCard = null;
+    this.startingCard = hangar.startingCard ?? null;
+  }
+
+  // At run start, after the reset: the contract's starting piloting card,
+  // rank 1, when the trail would offer it now; otherwise nothing.
+  applyStartingCard() {
+    const id = this.startingCard;
+    if (
+      id &&
+      this.trailSlotIds().includes(id) &&
+      this.getEligibleUpgradeDefinitions().some((d) => d.id === id)
+    ) {
+      this.applyUpgrade(id);
+    }
   }
 
   refreshInjectedServices(options = {}) {
@@ -160,6 +182,7 @@ class UpgradeSystem extends BaseSystem {
   ) {
     this.offerLevel = level;
     const eligible = this.getEligibleUpgradeDefinitions();
+    const kept = this.takeHeldCard(eligible, level);
 
     const fallbackCount = Number.isFinite(PROGRESSION_UPGRADE_FALLBACK_COUNT)
       ? Math.max(1, Math.floor(PROGRESSION_UPGRADE_FALLBACK_COUNT))
@@ -199,10 +222,13 @@ class UpgradeSystem extends BaseSystem {
         ? this.trailSlotIds()
         : [];
     const slotted = preferred.filter(
-      ({ id }) =>
-        slotIds.includes(id) && (held({ id }) || this.pilotCardIds.includes(id))
+      (definition) =>
+        definition !== kept &&
+        slotIds.includes(definition.id) &&
+        (held(definition) || this.pilotCardIds.includes(definition.id))
     );
     const selection = this.rollUpgradeDefinitions(slotted, 1);
+    if (kept) selection.push(kept);
     selection.push(
       ...this.rollUpgradeDefinitions(
         preferred.filter(
@@ -248,6 +274,23 @@ class UpgradeSystem extends BaseSystem {
       poolSize: eligible.length,
       totalDefinitions: this.upgradeDefinitions.length,
     };
+  }
+
+  // A card held on an earlier level-up's screen, for the offer of `level`:
+  // its definition while it can still be taken (a piloting card only while
+  // the trail allows it), else null. The hold is then spent either way; a
+  // reroll of the screen it was held on keeps it.
+  takeHeldCard(eligible, level) {
+    if (!this.heldCard || this.heldCard.level === level) return null;
+    const { id } = this.heldCard;
+    this.heldCard = null;
+    const definition = eligible.find((d) => d.id === id);
+    if (!definition) return null;
+    const pilot = this.pilotCardIds.includes(id);
+    const fits = pilot
+      ? this.trailSlotIds().includes(id)
+      : !this.slotsFull() || this.getUpgradeCount(id) > 0;
+    return fits ? definition : null;
   }
 
   // Slots full and the offer short: more trail cards the trail allows, then
@@ -316,7 +359,18 @@ class UpgradeSystem extends BaseSystem {
       (definition) =>
         !definition.fallback &&
         this.isUpgradeSelectable(definition) &&
-        !this.isDeadForWeapon(definition)
+        !this.isDeadForWeapon(definition) &&
+        !this.isOutOfContract(definition)
+    );
+  }
+
+  // The hangar's run contract leaves out a card not open or sealed (never
+  // the piloting trail; the fallback cards are drawn apart).
+  isOutOfContract({ id }) {
+    return (
+      !this.pilotCardIds.includes(id) &&
+      ((this.openCards !== null && !this.openCards.has(id)) ||
+        this.sealedCards.has(id))
     );
   }
 
@@ -447,6 +501,25 @@ class UpgradeSystem extends BaseSystem {
       banishesLeft: this.banishesLeft,
     });
     return options;
+  }
+
+  // Holds an offered card for the next level-up's offer (one per screen, and
+  // only beside another card to take now). Returns the options, or null when
+  // not allowed.
+  holdUpgrade(upgradeId) {
+    const current = asArray(this.pendingUpgradeOptions);
+    if (
+      this.holdsLeft <= 0 ||
+      this.heldCard ||
+      current.length < 2 ||
+      !current.some((option) => option.id === upgradeId)
+    ) {
+      return null;
+    }
+
+    this.heldCard = { id: upgradeId, level: this.offerLevel };
+    this.holdsLeft -= 1;
+    return current;
   }
 
   getRandomUpgrades(count = 3) {
@@ -727,6 +800,8 @@ class UpgradeSystem extends BaseSystem {
 
     // A fallback card is spent on the pick, never held.
     if (definition.fallback) this.appliedUpgrades.delete(upgradeId);
+    // The held card taken on its own screen: the hold is spent.
+    if (this.heldCard?.id === upgradeId) this.heldCard = null;
     this.pendingUpgradeOptions = [];
 
     return true;

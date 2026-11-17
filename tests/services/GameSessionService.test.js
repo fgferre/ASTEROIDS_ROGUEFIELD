@@ -71,6 +71,7 @@ function createServiceHarness(options = {}) {
     applyUpgradeEffects: vi.fn(),
     getAllUpgrades: vi.fn(() => []),
     refreshInjectedServices: vi.fn(),
+    applyStartingCard: vi.fn(),
   };
 
   const enemies = {

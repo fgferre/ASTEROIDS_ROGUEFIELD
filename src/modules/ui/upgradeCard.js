@@ -374,13 +374,15 @@ export function cardClasses(definition) {
 /**
  * The card's inner markup (phrasing content: it sits in a button on the
  * level-up). `key`: the number shown top right, or null (a chest's card).
+ * `held`: the card is held for the next level-up's offer.
  */
-export function cardMarkup(definition, state, { weapon, key = null }) {
+export function cardMarkup(definition, state, { weapon, key = null, held }) {
   const line = buildLine(definition, { ...state, weapon });
   const kbd = key === null ? '' : `<kbd class="card__key">${key}</kbd>`;
+  const heldMark = held ? '<span class="card__held">Held</span>' : '';
   const swapped = weaponOfCard(definition.id);
   if (swapped) {
-    return `${WEAPON_FRAME}<span class="card__top">${rarityMarkup(definition)}<span class="card__wtag">Weapon</span>${kbd}</span>
+    return `${WEAPON_FRAME}${heldMark}<span class="card__top">${rarityMarkup(definition)}<span class="card__wtag">Weapon</span>${kbd}</span>
       <span class="card__wname">${swapped.name}</span>
       ${patternMarkup(swapped)}
       <span class="card__fx">${swapped.description}</span>
@@ -399,7 +401,7 @@ export function cardMarkup(definition, state, { weapon, key = null }) {
   const trail = state.trail
     ? `<span class="card__trail"><i class="card__trail-mark" aria-hidden="true"></i>Trail · step ${state.trail.step} of ${state.trail.total}</span>`
     : '';
-  return `${trail}<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
+  return `${heldMark}${trail}<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
     <span class="card__id">${iconMarkup(definition)}<span class="card__names">
       <span class="card__name">${definition.text?.name ?? definition.id}</span>
       <span class="card__tag">${tag}<span class="card__state">${stateLabel(state.rank, max)}</span></span>

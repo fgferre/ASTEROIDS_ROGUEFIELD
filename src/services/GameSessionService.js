@@ -595,7 +595,9 @@ export default class GameSessionService {
     }
 
     this.applyConfiguredPlayerHull();
+    // A carried build already holds its starting card.
     if (build) this.snapshots.restoreBuild(build);
+    else this.resolveServiceInstance('progression').applyStartingCard();
     this._suppressWaveKickoff = false;
 
     // A head start holds the first layer until its picks are made; a carried
