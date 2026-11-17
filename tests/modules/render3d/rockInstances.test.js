@@ -29,6 +29,8 @@ const rockView = (family, shape, x) => {
       seed: new THREE.Vector3(1, 2, 3),
       glow: [0.8, 0.35, 0.05, 0.2],
       surface: [0.9, 0.1],
+      hit: [new Float32Array(4), new Float32Array(4)],
+      heat: 0,
     },
   };
 };
@@ -71,12 +73,12 @@ describe('RockInstances', () => {
     const matrix = new THREE.Matrix4();
     mesh.getMatrixAt(1, matrix);
     expect(matrix.elements[12]).toBe(20);
-    const { aBase, aGlow, aSurface } = mesh.geometry.attributes;
+    const { aBase, aGlow } = mesh.geometry.attributes;
     expect(aBase.getZ(1)).toBe(1);
     expect(Array.from(aGlow.array.slice(4, 8))).toEqual(
       [0.8, 0.35, 0.05, 0.2].map(Math.fround)
     );
-    expect(aSurface.getX(0)).toBeCloseTo(0.9);
+    expect(aBase.getW(0)).toBeCloseTo(0.9);
 
     // next frame without them: the mesh goes dark (no draw call)
     rocks.begin();
@@ -103,10 +105,10 @@ describe('RockInstances', () => {
       mesh.getMatrixAt(i, matrix);
       expect(matrix.elements[12]).toBe(i);
     });
-    const { aGlow, aSurface } = mesh.geometry.attributes;
+    const { aGlow, aBase } = mesh.geometry.attributes;
     expect(aGlow.count).toBe(mesh.instanceMatrix.count);
-    expect(aSurface.getX(0)).toBeCloseTo(0.9);
-    expect(aSurface.getX(total - 1)).toBeCloseTo(0.9);
+    expect(aBase.getW(0)).toBeCloseTo(0.9);
+    expect(aBase.getW(total - 1)).toBeCloseTo(0.9);
   });
 
   it('releases the old GPU buffers when a mesh grows', () => {

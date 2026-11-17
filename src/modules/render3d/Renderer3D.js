@@ -356,6 +356,8 @@ class Renderer3D extends BaseSystem {
       const enemy = data?.enemy;
       if (!enemy) return;
       if (!data.fragments?.length) this.three?.enemies.markDead(enemy);
+      else if (enemy.type === 'asteroid')
+        this.three?.enemies.splitRock(enemy, data.fragments);
       if (enemy.type !== 'asteroid' && !isBossEnemy(enemy)) {
         this.killPops.emit(enemy.x, enemy.y, enemy.radius || 12);
       }
@@ -386,8 +388,10 @@ class Renderer3D extends BaseSystem {
         if (!rock) this.three.enemies.killedBy(view, bullet.vx, bullet.vy);
         return;
       }
-      if (rock) this.three.decals.hit(view, nx, ny, DECAL_KIND.rock);
-      else if (!view.kind.startsWith('herald')) {
+      if (rock) {
+        this.three.decals.hit(view, nx, ny, DECAL_KIND.rock);
+        this.three.enemies.rockViews.struck(view, nx, ny);
+      } else if (!view.kind.startsWith('herald')) {
         this.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
         if (!this.reducedMotion) {
           this.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);

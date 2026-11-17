@@ -679,9 +679,9 @@ describe('EnemyMirror', () => {
       );
       const mesh = mirror.rocks.meshes[view.family][view.shape];
       expect(mesh.count, variant).toBe(1);
-      const { aBase, aSurface } = mesh.geometry.attributes;
+      const { aBase } = mesh.geometry.attributes;
       colors.add(new THREE.Color().fromArray(aBase.array).getHexString());
-      expect(aSurface.getX(0), variant).toBeCloseTo(
+      expect(aBase.getW(0), variant).toBeCloseTo(
         VARIANT_LOOKS[variant].roughness
       );
       mirror.update([], 0);
@@ -709,9 +709,9 @@ describe('EnemyMirror', () => {
     );
     const view = mirror.views.get('g');
     const mesh = mirror.rocks.meshes.stone[view.shape];
-    const { aBase, aSurface } = mesh.geometry.attributes;
+    const { aBase, aVein } = mesh.geometry.attributes;
     expect(aBase.getX(0)).toBeGreaterThan(1);
-    expect(aSurface.getY(0)).toBeCloseTo(VARIANT_LOOKS.gold.metalness);
+    expect(aVein.getW(0)).toBeCloseTo(VARIANT_LOOKS.gold.metalness);
     expect(mirror.rockFamilies.stone.defines.ROCK_SHEEN).toBe('');
   });
 
