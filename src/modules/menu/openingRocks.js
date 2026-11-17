@@ -36,37 +36,61 @@ const HOT = 1.6;
 const COOL = 2.5;
 const FLASH_SECONDS = 0.08;
 // Throws: the first after `first` s, then every `every` s; the thrower
-// crosses to its target in `travel` s (very fast) from just off frame.
+// flies in from just off frame at `speed` frame half-heights a second, slow
+// or very fast, small or big, so hits range from a knock to a blast.
 const THROW = {
   first: [2.5, 4],
   every: [6, 11],
-  travel: [0.6, 0.95],
-  r: [11, 22],
+  speed: [0.8, 5],
+  r: [6, 26],
 };
-// A thrown rock hitting this fast (units/s, relative) breaks rocks; slower
-// hits, and rocks knocked into each other, bounce.
-const IMPACT_SPEED = 60;
-// Rocks under BREAKS radius shatter when hit hard; the bigger one cracks.
+// A hit's power (the owner, 17/11: "proporcional a velocidade... pedras
+// menores menos inercia e momento, explosao e efeitos proporcionais"): its
+// energy, a quarter of the pair's mean radius cubed times the closing speed
+// squared, the speed in frame half-heights a second and the radii over the
+// shot's scale; over that of two radius-`r` rocks meeting at `speed`, to the
+// `curve` power, within `range`. Under `bounce` frame half-heights a second
+// rocks only bounce. A hit spends the rocks' speed: they keep `keep` of it.
+const POWER = {
+  r: 15,
+  speed: 2,
+  curve: 0.4,
+  range: [0.15, 2.5],
+  bounce: 0.4,
+  keep: 0.25,
+};
+// Rocks under BREAKS radius shatter when hit at power 1 (the smaller of the
+// two, or both past `both`); a harder hit breaks bigger ones, a softer one
+// only cracks them.
 const BREAKS = 24;
-// Pieces: how many, their share of the parent radius, outward speed; pieces
-// smaller than DUST only become chunks.
+const BOTH = 1.5;
+// Pieces: how many, their share of the parent radius, outward speed (× the
+// power's push); pieces smaller than DUST only become chunks.
 const PIECES = { count: [2, 4], share: [0.35, 0.6], speed: [12, 40] };
 const DUST = 3;
 const MAX_ROCKS = 28;
-// Effects: embers, chunks, shockwaves and lights, all pooled.
-const EMBERS = { pool: 480, life: [0.6, 1.6], speed: [40, 200], drag: 1.6 };
+// Effects: embers, chunks, shockwaves and lights, all pooled; each burst
+// scales them by its power (explode).
+// Sparks are streaks along their flight (the game's hit sparks); embers the
+// few glowing bits that drift on after them.
+const SPARKS = {
+  pool: 400,
+  life: [0.35, 0.9],
+  speed: [80, 320],
+  trail: 0.045,
+  drag: 2.2,
+};
+const EMBERS = { pool: 160, life: [0.8, 1.8], speed: [20, 90], drag: 1.6 };
 const CHUNKS = {
-  pool: 90,
+  pool: 120,
   life: [1.2, 2.4],
   speed: [20, 90],
   size: [0.8, 2.4],
 };
-const WAVES = { pool: 4, life: 0.6, reach: 4.5 };
-const LIGHTS = { pool: 3, peak: 9, reach: 10, decay: 0.2 };
-// A burst spans this many times the radius of the rock that broke.
-const BURST = 1.5;
-// Camera shake: units per unit of impact radius, its decay (s).
-const SHAKE = { amount: 0.06, decay: 0.35 };
+const WAVES = { pool: 4, life: 0.4, reach: 3.2 };
+const LIGHTS = { pool: 3, peak: 6, reach: 14, decay: 0.2 };
+// Camera shake: units per unit of burst size and power, its cap and decay (s).
+const SHAKE = { amount: 0.05, max: 4, decay: 0.35 };
 
 const EMBER_VERTEX = `
 attribute float aAge;
@@ -104,7 +128,10 @@ void main() {
   float ring = 1.0 - smoothstep(0.0, 0.05, abs(d - 0.92));
   float halo = smoothstep(1.0, 0.3, d) * 0.12;
   float fade = (1.0 - uAge) * (1.0 - uAge);
-  gl_FragColor = vec4(uColor * (ring + halo) * fade * 2.0, 1.0);
+  // The hot core of the blast, gone in the first instants.
+  float core = exp(-d * 6.0) * pow(1.0 - uAge, 8.0) * 3.0;
+  vec3 hot = mix(uColor, vec3(1.0, 0.92, 0.8), 0.6);
+  gl_FragColor = vec4(uColor * (ring + halo) * fade * 2.0 + hot * core, 1.0);
 }`;
 
 /**
@@ -273,27 +300,42 @@ export function createOpeningRocks({
     return Math.abs(u) < 0.6 && v > -0.95 && v < 0.7;
   }
 
-  // Throws one rock at a visible target off the title; false when none.
-  function throwRock() {
+  // Throws one rock at a visible target off the title, crossing in
+  // at `speed` (THROW), of radius `size` (before the shot's scale); false
+  // when none.
+  // `near` [u, v] (captures): the target nearest that point of the frame.
+  function throwRock(
+    speed = between(THROW.speed),
+    size = between(THROW.r),
+    near = null
+  ) {
     const pool = rocks.filter(
       (r) => !r.thrown && inView(r.position, 0.1) && !onTitle(r.position)
     );
     if (!pool.length) return false;
-    const target = pool[Math.floor(random() * pool.length)];
-    const travel = between(THROW.travel);
-    const aim = target.position
-      .clone()
-      .addScaledVector(target.velocity, travel);
-    const radius = between(THROW.r) * scale;
-    // From the nearer side edge, a little off the target's height and depth.
-    const side = aim.x < 0 ? -1 : 1;
-    const z = aim.z * between([0.85, 1.15]);
+    const off = (r) =>
+      Math.hypot(
+        r.position.x / halfW(r.position.z) - near[0],
+        r.position.y / halfH(r.position.z) - near[1]
+      );
+    const target = near
+      ? pool.reduce((best, r) => (off(r) < off(best) ? r : best))
+      : pool[Math.floor(random() * pool.length)];
+    // From the nearer side edge, a little off the target's height and depth;
+    // no bigger on screen than the biggest drifting rock.
+    const at = target.position;
+    const side = at.x < 0 ? -1 : 1;
+    const z = at.z * between([0.85, 1.15]);
+    const radius = Math.min(size * scale, APPARENT * halfH(z));
     const start = new THREE.Vector3(
       side * (halfW(z) + radius * 2),
-      aim.y + between([-0.5, 0.5]) * halfH(z),
+      at.y + between([-0.5, 0.5]) * halfH(z),
       z
     );
-    const velocity = aim.clone().sub(start).divideScalar(travel);
+    // Led to where the target will be when it arrives.
+    const travel = at.distanceTo(start) / (speed * halfH(z));
+    const aim = at.clone().addScaledVector(target.velocity, travel);
+    const velocity = aim.sub(start).divideScalar(travel);
     const rock = addRock({ position: start, velocity, radius });
     if (rock) {
       rock.thrown = true;
@@ -333,6 +375,40 @@ export function createOpeningRocks({
   emberPoints.frustumCulled = false;
   fx.add(emberPoints);
 
+  // Each spark is a segment, its head hot and its tail dark.
+  const sparks = {
+    position: new Float32Array(SPARKS.pool * 3),
+    velocity: new Float32Array(SPARKS.pool * 3),
+    age: new Float32Array(SPARKS.pool).fill(1),
+    life: new Float32Array(SPARKS.pool).fill(1),
+    ends: new Float32Array(SPARKS.pool * 6),
+    colors: new Float32Array(SPARKS.pool * 6),
+    next: 0,
+  };
+  const sparkGeometry = new THREE.BufferGeometry();
+  sparkGeometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(sparks.ends, 3)
+  );
+  sparkGeometry.setAttribute(
+    'color',
+    new THREE.BufferAttribute(sparks.colors, 3)
+  );
+  const sparkLines = new THREE.LineSegments(
+    sparkGeometry,
+    new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    })
+  );
+  sparkLines.frustumCulled = false;
+  fx.add(sparkLines);
+  const white = new THREE.Color(1, 0.95, 0.85);
+  const sparkColor = new THREE.Color();
+
   const chunkMesh = new THREE.InstancedMesh(
     createAsteroidGeometry(THREE, 41.7, { detail: 1 }),
     new THREE.MeshStandardMaterial({
@@ -366,7 +442,7 @@ export function createOpeningRocks({
     );
     mesh.visible = false;
     fx.add(mesh);
-    return { mesh, age: 1, reach: 1 };
+    return { mesh, age: 1, life: WAVES.life, reach: 1 };
   });
   let nextWave = 0;
 
@@ -381,31 +457,49 @@ export function createOpeningRocks({
   const shake = { amount: 0 };
 
   // `size`: the radius that broke; the burst reads bigger than the rock.
-  function explode(at, radius, heat) {
-    const size = radius * BURST;
-    const ember = Math.round(30 + size * 2.2 * heat);
+  // A burst of `size` (units) at `power`: at 1 it spans 1.7 × `size`; a
+  // stronger hit throws more embers and chunks, faster and for longer, a
+  // wider ring, a brighter flash and a harder shake.
+  function explode(at, size, power) {
+    const burst = size * (0.8 + 0.9 * power);
+    const push = 0.45 + 0.65 * power;
+    const spark = Math.min(180, Math.round(8 + 45 * power + burst * 0.6));
+    for (let i = 0; i < spark; i += 1) {
+      const n = sparks.next;
+      sparks.next = (n + 1) % SPARKS.pool;
+      axis.set(random() - 0.5, random() - 0.5, random() - 0.5).normalize();
+      at.toArray(sparks.position, n * 3);
+      axis
+        .multiplyScalar(between(SPARKS.speed) * push)
+        .toArray(sparks.velocity, n * 3);
+      sparks.age[n] = 0;
+      sparks.life[n] = between(SPARKS.life) * (0.5 + 0.5 * power);
+    }
+    const ember = Math.round(3 + 12 * power);
     for (let i = 0; i < ember; i += 1) {
       const n = embers.next;
       embers.next = (n + 1) % EMBERS.pool;
       axis.set(random() - 0.5, random() - 0.5, random() - 0.5).normalize();
-      const speed = between(EMBERS.speed) * (0.5 + 0.5 * heat);
       at.toArray(embers.position, n * 3);
-      axis.multiplyScalar(speed).toArray(embers.velocity, n * 3);
+      axis
+        .multiplyScalar(between(EMBERS.speed) * push)
+        .toArray(embers.velocity, n * 3);
       embers.age[n] = 0;
-      embers.life[n] = between(EMBERS.life);
-      embers.size[n] = between([1.2, 3.2]);
+      embers.life[n] = between(EMBERS.life) * (0.5 + 0.5 * power);
+      embers.size[n] = between([0.8, 1.8]);
     }
-    const count = Math.min(14, Math.round(4 + size * 0.35));
+    const count = Math.min(24, Math.round(2 + 9 * power));
+    const chunkSize = Math.min(2.5, (0.5 + 0.4 * power) * (burst / 14));
     for (let i = 0; i < count; i += 1) {
       if (chunks.length >= CHUNKS.pool) chunks.shift();
       axis.set(random() - 0.5, random() - 0.5, random() - 0.5).normalize();
       chunks.push({
         position: at.clone(),
-        velocity: axis.clone().multiplyScalar(between(CHUNKS.speed)),
+        velocity: axis.clone().multiplyScalar(between(CHUNKS.speed) * push),
         axis: axis.clone(),
         angle: random() * 6.28,
         rate: between([2, 7]),
-        size: between(CHUNKS.size) * Math.min(2, 0.5 + size / 14),
+        size: between(CHUNKS.size) * chunkSize,
         age: 0,
         life: between(CHUNKS.life),
       });
@@ -413,19 +507,24 @@ export function createOpeningRocks({
     const wave = waves[nextWave];
     nextWave = (nextWave + 1) % waves.length;
     wave.age = 0;
+    wave.life = WAVES.life + 0.3 * power;
     // Never wider than a share of the frame, however near the burst.
-    wave.reach = Math.min(size * WAVES.reach, halfH(Math.min(at.z, -1)) * 0.22);
+    const frame = halfH(Math.min(at.z, -1)) * (0.1 + 0.07 * Math.min(power, 2));
+    wave.reach = Math.min(burst * WAVES.reach, frame);
     wave.mesh.position.copy(at);
     wave.mesh.visible = true;
     const light = lights[nextLight];
     nextLight = (nextLight + 1) % lights.length;
     light.position.copy(at);
-    light.intensity = LIGHTS.peak * Math.min(1.5, 0.4 + size / 20) * heat;
-    light.distance = size * LIGHTS.reach * 4;
-    shake.amount = Math.max(shake.amount, SHAKE.amount * size * heat);
+    light.intensity = LIGHTS.peak * Math.min(1.6, 0.3 + 0.6 * power);
+    light.distance = burst * LIGHTS.reach;
+    shake.amount = Math.max(
+      shake.amount,
+      Math.min(SHAKE.max, SHAKE.amount * burst * power)
+    );
   }
 
-  function shatter(rock, at) {
+  function shatter(rock, power) {
     const family = {};
     const pieces = Math.floor(between(PIECES.count) + 0.5);
     for (let i = 0; i < pieces; i += 1) {
@@ -438,28 +537,39 @@ export function createOpeningRocks({
       const velocity = rock.velocity
         .clone()
         .multiplyScalar(0.4)
-        .addScaledVector(axis, between(PIECES.speed));
+        .addScaledVector(axis, between(PIECES.speed) * (0.5 + 0.6 * power));
       const piece = addRock({
         position,
         velocity,
         radius,
         stage: 2,
-        heat: 1,
+        heat: Math.min(1, 0.35 + 0.45 * power),
         family,
       });
       if (piece) piece.spinRate *= 3;
     }
-    explode(at, rock.radius, 1);
     removeRock(rock);
   }
 
-  function crack(rock) {
-    rock.stage = Math.min(3, rock.stage + 1);
-    rock.heat = 1;
+  function crack(rock, power) {
+    rock.stage = Math.min(3, rock.stage + (power > 1.2 ? 2 : 1));
+    rock.heat = Math.max(rock.heat, Math.min(1, 0.4 + 0.4 * power));
     rock.flash = FLASH_SECONDS;
   }
 
-  // Sphere against sphere; a hard hit breaks, a soft one bounces.
+  // The power of a hit at `closing` units/s, depth `z`, between radii `ra`
+  // and `rb` (POWER).
+  function powerOf(closing, z, ra, rb) {
+    const speed = closing / halfH(Math.min(z, -1));
+    const mean = (ra + rb) / 2 / scale;
+    const energy = 0.25 * mean ** 3 * speed ** 2;
+    const reference = 0.25 * POWER.r ** 3 * POWER.speed ** 2;
+    const [low, high] = POWER.range;
+    return Math.min(high, Math.max(low, (energy / reference) ** POWER.curve));
+  }
+
+  // Sphere against sphere; a thrown rock's hit breaks and bursts by its
+  // power, any other contact bounces.
   function collide(a, b) {
     // Pieces of one rock fly apart through each other.
     if (a.family && a.family === b.family) return;
@@ -478,19 +588,30 @@ export function createOpeningRocks({
     b.velocity.addScaledVector(normal, impulse * ma * 0.6);
     // Only a thrown rock breaks things: a knocked rock bounces, so one
     // throw never sets off a chain; nor does a hit over the title.
-    if (closing < IMPACT_SPEED || !(a.thrown || b.thrown) || onTitle(at)) {
-      return;
-    }
+    const slow = closing / halfH(Math.min(at.z, -1)) < POWER.bounce;
+    if (slow || !(a.thrown || b.thrown) || onTitle(at)) return;
+    const power = powerOf(closing, at.z, a.radius, b.radius);
+    const breaks = BREAKS * scale * (0.5 + 0.5 * power);
+    const small = Math.min(a.radius, b.radius);
+    explode(at, small + 0.3 * Math.max(a.radius, b.radius), power);
     [a, b].forEach((rock) => {
       const other = rock === a ? b : a;
-      if (rock.radius < BREAKS * scale && rock.radius <= other.radius * 1.25) {
-        shatter(rock, at);
+      rock.velocity.multiplyScalar(POWER.keep);
+      rock.thrown = false;
+      const smaller = rock.radius <= other.radius * 1.25;
+      if (rock.radius < breaks && (smaller || power > BOTH)) {
+        shatter(rock, power);
       } else {
-        crack(rock);
+        crack(rock, power);
       }
     });
-    if (rocks.includes(a) && rocks.includes(b))
-      explode(at, Math.min(a.radius, b.radius), 0.7);
+  }
+
+  // One burst at (u, v) across the frame, mid-box, of `size` units at
+  // `power` (the cost of the biggest one is measured this way).
+  function burstAt(u, v, size, power) {
+    const z = -(field.near + field.far) / 2;
+    explode(boxPoint(u, v, z).clone(), size * scale, power);
   }
 
   let throwIn = between(THROW.first);
@@ -498,6 +619,9 @@ export function createOpeningRocks({
 
   return {
     shake,
+    // For captures: a throw or a burst on demand.
+    hurl: throwRock,
+    burstAt,
     update(dt, time, still, pointScale) {
       if (!still) {
         throwIn -= dt;
@@ -565,6 +689,33 @@ export function createOpeningRocks({
           embers.position[n * 3 + c] += embers.velocity[n * 3 + c] * step;
         }
       }
+      const trail = SPARKS.trail;
+      const sparkDrag = Math.exp(-SPARKS.drag * step);
+      for (let n = 0; n < SPARKS.pool; n += 1) {
+        if (sparks.age[n] >= 1 && sparks.colors[n * 6] === 0) continue;
+        const o = n * 3;
+        const e = n * 6;
+        sparks.age[n] = Math.min(1, sparks.age[n] + step / sparks.life[n]);
+        const left = 1 - sparks.age[n];
+        for (let c = 0; c < 3; c += 1) {
+          sparks.velocity[o + c] *= sparkDrag;
+          sparks.position[o + c] += sparks.velocity[o + c] * step;
+          sparks.ends[e + c] = sparks.position[o + c];
+          sparks.ends[e + 3 + c] =
+            sparks.position[o + c] - sparks.velocity[o + c] * trail;
+        }
+        // White-hot at birth, amber as it cools, out at the end.
+        sparkColor
+          .copy(amber)
+          .lerp(white, left * left)
+          .multiplyScalar(3 * left ** 1.5);
+        sparkColor.toArray(sparks.colors, e);
+        sparks.colors[e + 3] = 0;
+        sparks.colors[e + 4] = 0;
+        sparks.colors[e + 5] = 0;
+      }
+      sparkGeometry.attributes.position.needsUpdate = true;
+      sparkGeometry.attributes.color.needsUpdate = true;
       emberGeometry.attributes.position.needsUpdate = true;
       emberGeometry.attributes.aAge.needsUpdate = true;
       emberGeometry.attributes.aSize.needsUpdate = true;
@@ -592,7 +743,7 @@ export function createOpeningRocks({
 
       waves.forEach((wave) => {
         if (wave.age >= 1) return;
-        wave.age = Math.min(1, wave.age + step / WAVES.life);
+        wave.age = Math.min(1, wave.age + step / wave.life);
         const grow = 1 - (1 - wave.age) ** 3;
         wave.mesh.scale.setScalar(Math.max(0.01, wave.reach * grow));
         wave.mesh.material.uniforms.uAge.value = wave.age;

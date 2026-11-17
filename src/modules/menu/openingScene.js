@@ -265,6 +265,8 @@ export function createOpeningScene(menu, random, shotName = null) {
   let overlayHidden = false;
   return {
     name,
+    // Its rocks, for captures (rocks.burstAt).
+    rocks,
     world,
     camera,
     composer,
