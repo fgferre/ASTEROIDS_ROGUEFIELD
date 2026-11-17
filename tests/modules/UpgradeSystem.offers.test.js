@@ -161,7 +161,20 @@ describe('level-up offers', () => {
     const between = createProgression(UPGRADE_PILOT_OFFER_EVERY * 2 + 1);
     between.pilotCardIds = pilots;
     const plain = Array.from({ length: 60 }, () => holds(between));
-    expect(plain.some((held) => !held)).toBe(true);
+    expect(plain.some((held) => held)).toBe(false);
+  });
+
+  it('a piloting card never appears outside the trail slot, over many seeds', () => {
+    const pilots = ['magfield', 'shield'];
+    for (let seed = 1; seed <= 60; seed += 1) {
+      [1, 5, 9, 11].forEach((level) => {
+        const progression = createProgression(level, seed);
+        progression.pilotCardIds = pilots;
+        expect(
+          offerIds(progression).filter((id) => pilots.includes(id))
+        ).toEqual([]);
+      });
+    }
   });
 
   it('the level-3 offer holds a weapon card while the run has none; if declined, the level-7 offer again', () => {

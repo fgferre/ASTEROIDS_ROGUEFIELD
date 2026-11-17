@@ -13,6 +13,7 @@ import { PlayerThrusters } from './player/thrusters.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
+  GLIDE_SPEED_SCALE,
   SHIP_ACCELERATION,
   SHIP_ANGULAR_DAMPING,
   SHIP_LINEAR_DAMPING,
@@ -35,6 +36,10 @@ import {
 // on its own in both. Settings → Controls → Hull Control, or ?controls=classic.
 
 // 'classic' for `?controls=classic`, else null.
+// Momentum Rounds: the share of the top speed that switches it on (proposta
+// 16/11).
+const MOMENTUM_SPEED_FRACTION = 0.6;
+
 function controlSchemeFromUrl() {
   try {
     const value = new URLSearchParams(window.location.search).get('controls');
@@ -368,6 +373,16 @@ class PlayerSystem extends BaseSystem {
     // (takeDamage, getStats); each keeps its latest rank's number.
     this.registerEventListener('upgrade-reactor-bleed', (data) => {
       this.idleDamageMultiplier = data.idleDamageMultiplier;
+    });
+    // Momentum Rounds: damage while at 60% of the top speed flown right now.
+    this.registerEventListener('upgrade-momentum-rounds', (data) => {
+      this.speedDamageMultiplier = data.speedDamageMultiplier;
+    });
+    // Close Quarters: CombatSystem scans for enemies within `radius` once per
+    // frame and scales the stats it hands the weapons.
+    this.registerEventListener('upgrade-close-quarters', (data) => {
+      this.closeDamageMultiplier = data.closeDamageMultiplier;
+      this.closeRadius = data.radius;
     });
     this.registerEventListener('upgrade-idle-guard', (data) => {
       this.idleDamageReduction = data.damageReduction;
@@ -859,10 +874,12 @@ class PlayerSystem extends BaseSystem {
       health: this.health,
       maxHealth: this.maxHealth,
       maxHP: this.maxHealth, // Alias for consistency
-      // Reactor Bleed: harder shots while the engines are idle.
-      damage: this.enginesIdle
-        ? this.damage * this.idleDamageMultiplier
-        : this.damage,
+      // Reactor Bleed: harder shots while the engines are idle; Momentum
+      // Rounds: while fast.
+      damage:
+        (this.enginesIdle
+          ? this.damage * this.idleDamageMultiplier
+          : this.damage) * this.momentumDamageFactor(),
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
       shieldLevel: this.shield.shieldUpgradeLevel,
@@ -870,6 +887,19 @@ class PlayerSystem extends BaseSystem {
       shieldCooldown: this.shield.shieldMaxCooldown,
       recoilOffset: this.recoilOffset, // Expose recoil for rendering
     };
+  }
+
+  // Momentum Rounds: the card's multiplier while the ship's speed is at least
+  // MOMENTUM_SPEED_FRACTION of the top speed it flies under now (glide's is
+  // lower), else 1.
+  momentumDamageFactor() {
+    if (this.speedDamageMultiplier === 1) return 1;
+    const topSpeed =
+      this.flight.maxSpeed * (this.flight.glide ? GLIDE_SPEED_SCALE : 1);
+    const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
+    return speed >= topSpeed * MOMENTUM_SPEED_FRACTION
+      ? this.speedDamageMultiplier
+      : 1;
   }
 
   // === SETTERS (para reset, teleport, etc.) ===
@@ -948,6 +978,9 @@ class PlayerSystem extends BaseSystem {
   // What the hull and shot cards above change, back to none.
   resetCardStats() {
     this.idleDamageMultiplier = 1;
+    this.speedDamageMultiplier = 1;
+    this.closeDamageMultiplier = 1;
+    this.closeRadius = 0;
     this.idleDamageReduction = 0;
     this.hullArmor = 0;
     this.levelUpRepair = 0;

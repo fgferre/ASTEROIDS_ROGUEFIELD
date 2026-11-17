@@ -44,6 +44,7 @@ function ceremony({ reducedMotion = false } = {}) {
     upgradeLookup: new Map(UPGRADE_LIBRARY.map((card) => [card.id, card])),
     getUpgradeCount: (id) => counts.get(id) ?? 0,
     getFamilyCounts: () => ({ thermal: 1 }),
+    pilotCardIds: [],
   };
   const refs = {
     screen: node(),

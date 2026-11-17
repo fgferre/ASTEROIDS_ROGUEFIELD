@@ -149,6 +149,7 @@ class UpgradeSystem extends BaseSystem {
   // `level`: the pilot level the offer is for; at UPGRADE_WEAPON_OFFER_LEVELS
   // one slot, at random, holds a weapon card while the run has none; in the
   // new flight, at every UPGRADE_PILOT_OFFER_EVERY levels, a piloting card.
+  // The piloting trail comes only through that slot, never the regular draw.
   prepareUpgradeOptions(
     count = PROGRESSION_UPGRADE_ROLL_COUNT,
     { exclude = [], level = this.level } = {}
@@ -178,6 +179,7 @@ class UpgradeSystem extends BaseSystem {
     // A reroll avoids the current cards, but keeps the ones the run doesn't
     // own in the draw when no other card is new.
     const avoided = ({ id }) => exclude.includes(id);
+    const regular = ({ id }) => !this.pilotCardIds.includes(id);
     const isNew = ({ id }) => this.getUpgradeCount(id) === 0;
     const newElsewhere = eligible.some((d) => !avoided(d) && isNew(d));
     const preferred = eligible.filter(
@@ -192,14 +194,19 @@ class UpgradeSystem extends BaseSystem {
     const selection = this.rollUpgradeDefinitions(slotted, 1);
     selection.push(
       ...this.rollUpgradeDefinitions(
-        preferred.filter((definition) => !selection.includes(definition)),
+        preferred.filter(
+          (definition) => regular(definition) && !selection.includes(definition)
+        ),
         cappedCount - selection.length,
         selection
       )
     );
     if (selection.length < cappedCount) {
       const repeats = eligible.filter(
-        (definition) => avoided(definition) && !selection.includes(definition)
+        (definition) =>
+          regular(definition) &&
+          avoided(definition) &&
+          !selection.includes(definition)
       );
       selection.push(
         ...this.rollUpgradeDefinitions(
@@ -311,8 +318,15 @@ class UpgradeSystem extends BaseSystem {
 
     const eligible = this.getEligibleUpgradeDefinitions();
     const offeredIds = current.map((option) => option.id);
+    // A banished piloting card is replaced from the trail, anything else
+    // from the regular draw.
+    const trail = this.pilotCardIds.includes(upgradeId);
     const [replacement] = this.rollUpgradeDefinitions(
-      eligible.filter((definition) => !offeredIds.includes(definition.id)),
+      eligible.filter(
+        (definition) =>
+          !offeredIds.includes(definition.id) &&
+          this.pilotCardIds.includes(definition.id) === trail
+      ),
       1,
       current.filter((option) => option.id !== upgradeId)
     );
@@ -658,7 +672,9 @@ class UpgradeSystem extends BaseSystem {
     Object.keys(UPGRADE_FAMILIES).forEach((id) => {
       counts[id] = 0;
     });
+    // The piloting trail is outside the families: it never counts.
     this.appliedUpgrades.forEach((level, upgradeId) => {
+      if (this.pilotCardIds.includes(upgradeId)) return;
       const family = this.upgradeLookup?.get(upgradeId)?.family;
       if (level > 0 && family in counts) {
         counts[family] += 1;

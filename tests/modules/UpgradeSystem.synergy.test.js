@@ -125,6 +125,31 @@ describe('upgrade families', () => {
   });
 });
 
+describe('the piloting trail and the families', () => {
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => cleanupGlobalState());
+
+  it('family counts ignore the piloting cards', () => {
+    const progression = createProgression(createEventBusMock());
+    progression.pilotCardIds = ['magfield'];
+    progression.appliedUpgrades.set('magfield', 1);
+    const family = progression.upgradeLookup.get('magfield').family;
+    expect(progression.getFamilyCounts()[family]).toBe(0);
+    progression.pilotCardIds = [];
+    expect(progression.getFamilyCounts()[family]).toBe(1);
+  });
+
+  it('the new kinetic cards exist only with the new flight', () => {
+    const ids = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
+    expect(ids(false)).not.toContain('momentum_rounds');
+    expect(ids(false)).not.toContain('close_quarters');
+    expect(ids(true)).toEqual(
+      expect.arrayContaining(['momentum_rounds', 'close_quarters'])
+    );
+  });
+});
+
 describe('3-of-a-kind synergy', () => {
   let eventBus;
   let progression;

@@ -126,7 +126,8 @@ export function cardState(progression, id, { granted = false } = {}) {
   const rank = granted ? count : count + 1;
   const familyCards = progression.getFamilyCounts()[definition.family] ?? 0;
   const owned = granted && rank === 1 ? familyCards - 1 : familyCards;
-  return { definition, rank, owned };
+  const piloting = progression.pilotCardIds.includes(id);
+  return { definition, rank, owned, piloting };
 }
 
 /**
@@ -135,7 +136,7 @@ export function cardState(progression, id, { granted = false } = {}) {
  * or 'plain'; `label`, `note`, and a `track` ({ on, fresh, total, notch })
  * with its `end` text. `weapon`: the held one ({ weaponId, chip }).
  */
-export function buildLine(definition, { rank, owned, weapon }) {
+export function buildLine(definition, { rank, owned, weapon, piloting }) {
   const { family } = definition;
   const isNew = rank === 1;
   const after = owned + (isNew ? 1 : 0);
@@ -162,6 +163,14 @@ export function buildLine(definition, { rank, owned, weapon }) {
       note: evolved
         ? `Also completes ${evolved.name}.`
         : 'One weapon card per run.',
+    };
+  }
+  // The piloting trail is outside the families: no count to show.
+  if (piloting) {
+    return {
+      kind: 'plain',
+      label: 'Piloting trail',
+      note: definition.text?.levels?.[rank - 1]?.highlights?.[0] ?? '',
     };
   }
   if (!UPGRADE_FAMILIES[family]) {
