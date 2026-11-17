@@ -78,6 +78,13 @@ const LAYER_BARREL = [
   -7.6, 0, 1, -7.6, 0.45, 1, -6.3, 0.45, 2, -6.3, 0.3, 2, -0.6, 0.3, 3, -0.6,
   0.42, 3, 0, 0.42, 0, 0, 0.18, 0, -0.4, 0.18, 0, -0.4, 0, 0,
 ];
+// The nose cannon (seatNoseGun): the barrels' scale [along, across], the
+// axis's height above the nose's top (field units) and the nose's length
+// back from its tip whose top the barrels lie on (hull units). Set so the
+// Interceptor's matches the owner's mock-up (muzzle 21.5, axis 4.8).
+const NOSE_GUN_SCALE = [0.8, 0.55];
+const NOSE_GUN_CLEAR = 0.7;
+const NOSE_SPAN = 2;
 
 // The steel tone (hullTones).
 const STEEL = 4;
@@ -422,8 +429,8 @@ export const steelTone = (THREE) => hullTones(THREE)[STEEL];
  * muzzle brakes, dark bores and the lens hood, plus the amber lens), one
  * merged mesh per moving part in `material` (vertex `tones`; an array of
  * HULL_FINISHES materials: glossy housings, steel barrels). Returns
- * { group, housing, housingLow, barrels, barrelY } (the barrels' axis
- * height); seatTurret() fits it to a hull.
+ * { group, housing, housingLow, barrels, lens, barrelY } (the barrels' axis
+ * height); seatTurret() fits it to a hull, seatNoseGun() to its nose.
  */
 export function buildTurret(THREE, material, tones, lensMaterial) {
   // [finish, surface] pairs → one mesh
@@ -472,7 +479,14 @@ export function buildTurret(THREE, material, tones, lensMaterial) {
   barrels.add(gun, lens);
   const group = new THREE.Group();
   group.add(housing, housingLow, barrels);
-  return { group, housing, housingLow, barrels, barrelY: TURRET_BARREL_Y };
+  return {
+    group,
+    housing,
+    housingLow,
+    barrels,
+    lens,
+    barrelY: TURRET_BARREL_Y,
+  };
 }
 
 /**
@@ -524,8 +538,34 @@ export function seatTurret(turret, visual, model) {
   const low = visual.turret === 'low';
   turret.housing.visible = !low;
   turret.housingLow.visible = low;
-  turret.barrels.position.y = low ? -TURRET_LOW_DROP : 0;
+  turret.lens.visible = true;
+  turret.barrels.scale.setScalar(1);
+  turret.barrels.position.set(0, low ? -TURRET_LOW_DROP : 0, 0);
   turret.group.position.set(TURRET_PIVOT_X, model.deckY * VISUAL_SCALE, 0);
+}
+
+/**
+ * The new flight's nose cannon (option B, the owner's pick 16/11), on a
+ * turret seatTurret() has seated: no housing and no lens, the barrels shorter
+ * and slimmer, set into the `model`'s nose with the muzzle at `muzzleX`
+ * (field units ahead of the hull centre, the hull's `noseMuzzle`) and the
+ * axis NOSE_GUN_CLEAR above the nose's top. Returns the barrels' rest x.
+ */
+export function seatNoseGun(turret, model, muzzleX) {
+  const [along, across] = NOSE_GUN_SCALE;
+  turret.housing.visible = false;
+  turret.housingLow.visible = false;
+  turret.lens.visible = false;
+  turret.barrels.scale.set(along, across, across);
+  turret.barrels.position.set(
+    muzzleX - TURRET_PIVOT_X - TURRET_BARREL_LENGTH * along,
+    model.noseTop * VISUAL_SCALE +
+      NOSE_GUN_CLEAR -
+      turret.group.position.y -
+      TURRET_BARREL_Y * across,
+    0
+  );
+  return turret.barrels.position.x;
 }
 
 /** A nozzle's hot throat: a glowing lens in its bell's mouth. */
@@ -559,7 +599,8 @@ export function edgeLines(THREE, model, materials) {
  * draws only the first range of the same buffers (the dash
  * afterimages); the canopy's glass; the edge segments by kind ({ edge,
  * bladeEdge }); the wingtip points (RCS ports) in the panels' order; the
- * deck height at the turret pivot.
+ * deck height at the turret pivot; `noseTop`, the hull's top over its last
+ * NOSE_SPAN on the centreline.
  */
 export function buildHullModel(THREE, geometry, tones) {
   const colors = tones.map((c) => c.clone().multiplyScalar(geometry.albedo));
@@ -569,7 +610,25 @@ export function buildHullModel(THREE, geometry, tones) {
     colors,
     TURRET_PIVOT_X / VISUAL_SCALE
   );
-  return { ...mergeHull(THREE, plates, raised), ...rest };
+  const merged = mergeHull(THREE, plates, raised);
+  return { ...merged, ...rest, noseTop: noseTopOf(merged.hull) };
+}
+
+// The top of a hull geometry over its last NOSE_SPAN, within a unit of the
+// centreline (hull units).
+function noseTopOf(hull) {
+  const position = hull.getAttribute('position');
+  let tip = -Infinity;
+  for (let i = 0; i < position.count; i += 1) {
+    tip = Math.max(tip, position.getX(i));
+  }
+  let top = -Infinity;
+  for (let i = 0; i < position.count; i += 1) {
+    if (position.getX(i) >= tip - NOSE_SPAN && Math.abs(position.getZ(i)) < 1) {
+      top = Math.max(top, position.getY(i));
+    }
+  }
+  return top;
 }
 
 // The hull's parts as one vertex-coloured geometry, fuselage and wings

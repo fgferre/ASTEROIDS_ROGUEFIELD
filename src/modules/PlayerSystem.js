@@ -745,9 +745,14 @@ class PlayerSystem extends BaseSystem {
   /**
    * World point lances and the beam leave from: the turret's barrel tip.
    * With `toward` (multi-lock), the tip of the turret layer aimed at that
-   * point, wherever the layer has turned so far.
+   * point, wherever the layer has turned so far. With the cannon on the nose
+   * (noseAim), the nose cannon's muzzle (the hull's `noseMuzzle`).
    */
   getMuzzlePoint(toward = null) {
+    if (this.noseAim) {
+      const hull = this.currentHull ?? shipModels.defaultHull;
+      return this.getLocalToWorld(hull.noseMuzzle, 0);
+    }
     const pivot = this.getTurretPivot();
     const angle = toward
       ? Math.atan2(toward.y - pivot.y, toward.x - pivot.x)
