@@ -18,6 +18,7 @@ import { createMenuAsteroidField } from './menu/asteroidField.js';
 import { createMenuAsteroidMaterials } from './menu/asteroidMaterials.js';
 import * as atmosphere from './menu/atmosphere.js';
 import { orbitCamera } from './menu/cameraOrbit.js';
+import { createOpeningScene, openingShotFromUrl } from './menu/openingScene.js';
 import * as loadingScreen from './menu/loadingScreen.js';
 import * as menuSettings from './menu/menuSettings.js';
 import * as rendering from './menu/rendering.js';
@@ -587,6 +588,9 @@ class MenuBackgroundSystem extends BaseSystem {
     this.createAtmosphere();
     this.setupPostProcessing();
     this.setupImpactEffects();
+    // Prototype (17/11): the new opening scene in place of the belt.
+    const shot = openingShotFromUrl();
+    if (shot) this.opening = createOpeningScene(this, shot);
 
     // Start async preloading for heavy assets
     this.withSeededMathRandom(() => this.preloadAssets());
@@ -947,21 +951,10 @@ class MenuBackgroundSystem extends BaseSystem {
     this.elapsedTime += delta;
     this.rogueSpawnTimer += delta;
 
-    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
-    this.updateAdaptiveQuality(delta);
-
-    if (this.rogueSpawnTimer >= this.config.rogueSpawnInterval) {
-      this.spawnRogueAsteroid();
-      this.rogueSpawnTimer = 0;
-    }
-
-    // F4: 30Hz fixed step with max 1 catch-up (decorative menu doesn't need 60Hz physics)
-    this.world.step(1 / 30, delta, 1);
-
-    this.asteroidField.updateAsteroids(delta);
-
-    while (this.activeAsteroids.length < this.config.baseFieldCount) {
-      this.spawnBeltAsteroid();
+    if (this.opening) {
+      this.opening.update(delta, this.hullReducedMotion);
+    } else {
+      this.animateBelt(delta);
     }
 
     const timer = orbitCamera(this.camera, this.elapsedTime);
@@ -979,21 +972,23 @@ class MenuBackgroundSystem extends BaseSystem {
       this.hullReducedMotion
     );
 
-    atmosphere.updateAtmosphere(
-      this.nebulas,
-      this.dustSystem,
-      this.elapsedTime,
-      delta
-    );
+    if (!this.opening) {
+      atmosphere.updateAtmosphere(
+        this.nebulas,
+        this.dustSystem,
+        this.elapsedTime,
+        delta
+      );
 
-    this.starfield.updateStarLayers(timer, this.elapsedTime);
+      this.starfield.updateStarLayers(timer, this.elapsedTime);
 
-    this.updateExplosions(delta);
+      this.updateExplosions(delta);
 
-    // Atualizar efeitos cinematográficos de impacto (flash, detritos, poeira)
-    // Nota: camera shake é aplicado antes do lookAt (linhas acima)
-    if (this.impactEffect) {
-      this.impactEffect.update(delta);
+      // Atualizar efeitos cinematográficos de impacto (flash, detritos, poeira)
+      // Nota: camera shake é aplicado antes do lookAt (linhas acima)
+      if (this.impactEffect) {
+        this.impactEffect.update(delta);
+      }
     }
 
     // Procedural asteroid shader is optional; menu currently uses PBR materials.
@@ -1016,8 +1011,30 @@ class MenuBackgroundSystem extends BaseSystem {
     }
   }
 
+  // The belt's frame: quality, rogue spawns, physics, the field.
+  animateBelt(delta) {
+    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
+    this.updateAdaptiveQuality(delta);
+
+    if (this.rogueSpawnTimer >= this.config.rogueSpawnInterval) {
+      this.spawnRogueAsteroid();
+      this.rogueSpawnTimer = 0;
+    }
+
+    // F4: 30Hz fixed step with max 1 catch-up (decorative menu doesn't need 60Hz physics)
+    this.world.step(1 / 30, delta, 1);
+
+    this.asteroidField.updateAsteroids(delta);
+
+    while (this.activeAsteroids.length < this.config.baseFieldCount) {
+      this.spawnBeltAsteroid();
+    }
+  }
+
   renderFrame() {
-    if (this.composer) {
+    if (this.opening) {
+      this.withSeededMathRandom(() => this.opening.render());
+    } else if (this.composer) {
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);
@@ -1083,6 +1100,7 @@ class MenuBackgroundSystem extends BaseSystem {
     if (this.composer) {
       this.composer.setSize(width, height);
     }
+    this.opening?.resize(width, height);
 
     this.starfield.updateStarLayerSizes();
   }
