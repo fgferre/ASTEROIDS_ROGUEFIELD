@@ -266,7 +266,7 @@ describe('AudioSystem random scope synchronization', () => {
     expect(firstGain.gain.value).toBe(1);
   });
 
-  it('stops the menu track for settings and credits overlays opened from the menu', async () => {
+  it('keeps the menu track muffled under settings and stops it for credits', async () => {
     vi.useFakeTimers();
 
     const { audio, eventBus, mediaElements } = createMenuMusicHarness();
@@ -276,6 +276,7 @@ describe('AudioSystem random scope synchronization', () => {
     await Promise.resolve();
 
     const menuElement = mediaElements[0];
+    const muffle = audio.fileTrackManager._muffle;
 
     eventBus.emit('ui-overlay-visibility-changed', {
       overlay: 'settings',
@@ -284,8 +285,9 @@ describe('AudioSystem random scope synchronization', () => {
     });
     vi.advanceTimersByTime(audio.menuTrackConfig.fadeOutMs);
 
-    expect(audio.menuTrackState.currentScreen).toBe('settings');
-    expect(menuElement.pause).toHaveBeenCalledTimes(1);
+    expect(menuElement.pause).not.toHaveBeenCalled();
+    expect(muffle.lowpass.frequency.value).toBe(700);
+    expect(muffle.gain.gain.value).toBe(0.5);
 
     eventBus.emit('ui-overlay-visibility-changed', {
       overlay: 'settings',
@@ -293,7 +295,8 @@ describe('AudioSystem random scope synchronization', () => {
       source: 'menu',
     });
 
-    expect(menuElement.play).toHaveBeenCalledTimes(2);
+    expect(muffle.lowpass.frequency.value).toBe(20000);
+    expect(muffle.gain.gain.value).toBe(1);
     expect(audio.fileTrackState.currentScreen).toBe('menu');
 
     eventBus.emit('ui-overlay-visibility-changed', {
@@ -304,7 +307,7 @@ describe('AudioSystem random scope synchronization', () => {
     vi.advanceTimersByTime(audio.menuTrackConfig.fadeOutMs);
 
     expect(audio.menuTrackState.currentScreen).toBe('credits');
-    expect(menuElement.pause).toHaveBeenCalledTimes(2);
+    expect(menuElement.pause).toHaveBeenCalledTimes(1);
 
     eventBus.emit('ui-overlay-visibility-changed', {
       overlay: 'credits',
@@ -312,7 +315,7 @@ describe('AudioSystem random scope synchronization', () => {
       source: 'menu',
     });
 
-    expect(menuElement.play).toHaveBeenCalledTimes(3);
+    expect(menuElement.play).toHaveBeenCalledTimes(2);
     expect(audio.fileTrackState.currentScreen).toBe('menu');
   });
 
@@ -384,10 +387,12 @@ describe('AudioSystem random scope synchronization', () => {
     expect(audio.musicGain.gain.value).toBeCloseTo(0.3);
     expect(trackGain.gain.value).toBe(1);
     // Plan 02.06: file tracks join at the music DUCK node (rests 1.0) so they
-    // duck WITH the music; the duck node (then the voice's own duck stage)
-    // is wired into the musicGain slider stage. The track gain stays
-    // independent of the slider value.
-    expect(trackGain.connect).toHaveBeenCalledWith(
+    // duck WITH the music, through the shared muffle (open at rest); the duck
+    // node (then the voice's own duck stage) is wired into the musicGain
+    // slider stage. The track gain stays independent of the slider value.
+    const muffle = audio.fileTrackManager._muffle;
+    expect(trackGain.connect).toHaveBeenCalledWith(muffle.lowpass);
+    expect(muffle.gain.connect).toHaveBeenCalledWith(
       audio.duckingController.musicDuckGain
     );
     const { musicDuckGain, musicVoiceDuckGain } = audio.duckingController;
