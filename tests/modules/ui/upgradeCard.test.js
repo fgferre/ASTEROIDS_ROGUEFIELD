@@ -304,3 +304,17 @@ describe('honest text about the hangar and the trail', () => {
     expect(offer(progression, 'multishot')).toContain('Kinetic');
   });
 });
+
+describe('upgrade card icons', () => {
+  it('the kinetic cards draw their own icon, not the family glyph', () => {
+    for (const id of ['momentum_rounds', 'close_quarters']) {
+      const html = cardMarkup(
+        card(id),
+        { rank: 1, owned: 0 },
+        { weapon: lance }
+      );
+      expect(html).toContain('class="card__icon"');
+      expect(html).not.toContain('translate(5 5)');
+    }
+  });
+});

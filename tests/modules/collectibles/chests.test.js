@@ -216,6 +216,23 @@ describe('chests', () => {
     }
   });
 
+  it('never grants a piloting-trail step, and with the card slots full only ranks up', () => {
+    const random = new RandomService(5);
+    const progression = progressionAt(10);
+    for (let i = 0; i < 60; i += 1) {
+      expect(progression.pilotCardIds).not.toContain(
+        pickChestCard(progression, random).id
+      );
+    }
+
+    progression.slotsFull = () => true;
+    expect(pickChestCard(progression, random)).toBeNull();
+    progression.applyUpgrade('shield');
+    for (let i = 0; i < 20; i += 1) {
+      expect(pickChestCard(progression, random).id).toBe('shield');
+    }
+  });
+
   it('waits while a card choice is queued or on screen, then opens', () => {
     const game = startGame();
     const { progression } = game.services;
