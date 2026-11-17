@@ -32,6 +32,10 @@ if (!FLIGHTS.includes(flight)) {
     `playtest: --flight is ${FLIGHTS.join(' or ')} (default new)`
   );
 }
+const trilha = flag('trilha') || '';
+if (trilha && !['b', 'c', 'd'].includes(trilha)) {
+  throw new Error("playtest: --trilha is b, c or d (default: today's order)");
+}
 const table = args.includes('--table');
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
 const [sector = '', seed = ''] = args.filter(
@@ -73,6 +77,7 @@ function compare() {
       run({
         PLAYTEST_PRESET: p,
         PLAYTEST_FLIGHT: f,
+        PLAYTEST_TRILHA: trilha,
         PLAYTEST_SECTOR: sector || 'debris-wake',
         PLAYTEST_SEED: seed || '1-10',
         PLAYTEST_OUT: out,
@@ -106,6 +111,7 @@ if (table) {
 const result = run({
   PLAYTEST_PRESET: preset,
   PLAYTEST_FLIGHT: flight,
+  PLAYTEST_TRILHA: trilha,
   PLAYTEST_SECTOR: sector,
   PLAYTEST_SEED: seed,
 });

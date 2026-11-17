@@ -2,6 +2,11 @@
 // the flight address (`?direcao=antiga`) once, when it loads, so the address
 // has to be on the page before anything else is imported. The new flight is
 // the default and needs no address.
-if (process.env.PLAYTEST_FLIGHT === 'old') {
-  globalThis.window = { location: { search: '?direcao=antiga' } };
+// `PLAYTEST_TRILHA=b|c` adds the trail-order address (`?trilha=`).
+const address = [
+  process.env.PLAYTEST_FLIGHT === 'old' && 'direcao=antiga',
+  process.env.PLAYTEST_TRILHA && `trilha=${process.env.PLAYTEST_TRILHA}`,
+].filter(Boolean);
+if (address.length) {
+  globalThis.window = { location: { search: `?${address.join('&')}` } };
 }

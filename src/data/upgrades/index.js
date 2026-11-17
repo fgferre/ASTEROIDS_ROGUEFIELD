@@ -8,7 +8,10 @@
 // decides what a level-up offers first).
 
 import { listContent } from '../../content/registry.js';
-import { newFlightFromUrl } from '../../modules/player/newFlight.js';
+import {
+  newFlightFromUrl,
+  trailOrderFromUrl,
+} from '../../modules/player/newFlight.js';
 import { deepFreeze } from '../../utils/deepFreeze.js';
 import { UPGRADE_CATEGORIES } from './categories.js';
 
@@ -37,7 +40,7 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
  * over `text`) and its `newFlightPrerequisites` (added to `prerequisites`);
  * without it the catalog is today's.
  */
-export function cardsForFlight(cards, newFlight) {
+export function cardsForFlight(cards, newFlight, trailOrder = 'a') {
   return cards
     .filter((card) => newFlight || !card.newFlight)
     .map((card) =>
@@ -55,7 +58,36 @@ export function cardsForFlight(cards, newFlight) {
             ],
           }
         : card
-    );
+    )
+    .map((card) => (newFlight ? withTrailOrder(card, trailOrder) : card));
+}
+
+// Temporary (`?trilha=`): the owner picks one (cartas-trilha, 17/11); then
+// this goes. Only the Auto Turret moves along the trail.
+function withTrailOrder(card, trailOrder) {
+  if (card.id !== 'auto_aim') return card;
+  if (trailOrder === 'b') {
+    return {
+      ...card,
+      rarity: 'rare',
+      prerequisites: [
+        ...(card.prerequisites ?? []),
+        { type: 'upgrade', id: 'propulsors', level: 1 },
+        { type: 'upgrade', id: 'braking_system', level: 1 },
+      ],
+    };
+  }
+  if (trailOrder === 'd') {
+    return {
+      ...card,
+      prerequisites: [
+        ...(card.prerequisites ?? []),
+        { type: 'upgrade', id: 'propulsors', level: 1 },
+      ],
+    };
+  }
+  if (trailOrder === 'c') return { ...card, rarity: 'rare', unlockLevel: 8 };
+  return card;
 }
 
 /**
@@ -77,7 +109,11 @@ export function textForWeapon(card, weaponId) {
 
 const UPGRADE_LIBRARY = deepFreeze(
   [
-    ...cardsForFlight(listContent('cards'), newFlightFromUrl()),
+    ...cardsForFlight(
+      listContent('cards'),
+      newFlightFromUrl(),
+      trailOrderFromUrl()
+    ),
     ...WEAPON_CARDS,
   ].sort((a, b) => a.order - b.order)
 );
