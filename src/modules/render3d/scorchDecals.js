@@ -1,5 +1,8 @@
-// Scorch marks where shots hit a rock: a small dark burn with an ember that
-// cools in half a second, fading out over a few seconds. One InstancedMesh
+// Where a shot hits, the surface heats. On a rock a patch turns to lava: a
+// white-hot core that cools through orange to a dull red, its molten veins
+// glowing longest, then a dark burn that fades over a few seconds. On a
+// machine's metal a smaller spot glows white-hot and dies in under half a
+// second, leaving a dark dent. One InstancedMesh
 // (one draw call) of quads; each mark keeps its pose in its rock's local
 // space, so it turns and drifts with the rock and dies with its view. The
 // mark sits where a ray from above the hit side meets the real (displaced)
@@ -13,34 +16,45 @@ const DECAL_MIN = 5;
 const DECAL_MAX = 14;
 const DECAL_LIFT = 0.35; // world units off the surface
 const DECAL_LEAN = 0.8; // how far the mark climbs toward the rock's top
-const EMBER_TIME = 0.5; // s
-const CHAR_ALPHA = 0.8;
-const EMBER = [2.2, 0.75, 0.22]; // linear, hot enough to bloom a little
+// proposta 17/11 (efeito/impacto, was a 0.5 s ember on rock only): the
+// heat of each material and how much of its spot it covers.
+export const DECAL_KIND = Object.freeze({ rock: 0, metal: 1 });
+const EMBER_TIME = [1.8, 0.7]; // s, rock / metal
+const ROCK_SIZE = 1.6; // × the 18/10 mark
+const METAL_SIZE = [7, 16, 0.75]; // a machine's mark: min, max, × its radius
+const KIND_CHAR = [0.8, 0.45]; // how dark the burn
+const CHAR_ALPHA = 1;
+// at most this many new marks a frame: each one casts a ray at its target
+const HITS_PER_FRAME = 6;
 
 const DECAL_VERTEX = `
 attribute float aFade;
 attribute float aHeat;
 attribute float aSeed;
+attribute float aKind;
 varying vec2 vUv;
 varying float vFade;
 varying float vHeat;
 varying float vSeed;
+varying float vKind;
 void main() {
   vUv = uv * 2.0 - 1.0;
   vFade = aFade;
   vHeat = aHeat;
   vSeed = aSeed;
+  vKind = aKind;
   gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
 }`;
 
-// Premultiplied: rgb darkens what is behind by alpha and adds the ember.
+// Premultiplied: rgb darkens what is behind by alpha and adds the heat.
+// Heat colour by temperature: white-hot, orange, dull red.
 const DECAL_FRAGMENT = `
-uniform vec3 uEmber;
 uniform float uChar;
 varying vec2 vUv;
 varying float vFade;
 varying float vHeat;
 varying float vSeed;
+varying float vKind;
 float decalHash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7)) + vSeed * 43.7) * 43758.5453);
 }
@@ -59,10 +73,18 @@ void main() {
   float n = decalNoise(vUv * 3.0 + vSeed * 7.0) * 0.6 + decalNoise(vUv * 7.0) * 0.4;
   float shape = 1.0 - smoothstep(0.25, 1.0, r + (n - 0.5) * 0.55);
   if (shape <= 0.0) discard;
-  float a = shape * uChar * vFade;
-  float core = 1.0 - smoothstep(0.0, 0.55, r + (n - 0.5) * 0.3);
-  vec3 ember = uEmber * core * vHeat * vHeat;
-  gl_FragColor = vec4(vec3(0.004, 0.003, 0.002) * a + ember, a);
+  float metal = step(0.5, vKind);
+  float a = shape * uChar * vFade * mix(${KIND_CHAR[0].toFixed(2)}, ${KIND_CHAR[1].toFixed(2)}, metal);
+  float h = vHeat;
+  vec3 heat = mix(vec3(0.5, 0.035, 0.0), vec3(2.3, 0.72, 0.15), smoothstep(0.0, 0.55, h));
+  heat = mix(heat, vec3(2.9, 2.35, 1.5), smoothstep(0.72, 1.0, h));
+  float core = 1.0 - smoothstep(0.0, mix(0.62, 0.7, metal), r + (n - 0.5) * 0.3);
+  // molten veins through the patch: they stay lit after the crust darkens
+  float veins = 1.0 - smoothstep(0.0, 0.16, abs(decalNoise(vUv * 4.5 + vSeed * 3.0) - 0.5));
+  float molten = mix(veins * 0.9, 0.55 + 0.6 * veins, smoothstep(0.35, 0.85, h));
+  float lit = core * mix(molten * pow(h, 0.7), 1.4 * pow(h, 1.2), metal);
+  // 0.8: marks stacked by a stream of hits saturate a little later
+  gl_FragColor = vec4(vec3(0.004, 0.003, 0.002) * a + heat * lit * 0.8, a);
 }`;
 
 export class ScorchDecals {
@@ -74,6 +96,7 @@ export class ScorchDecals {
         view: null,
         age: 0,
         seed: 0,
+        kind: 0,
         local: new THREE.Matrix4(),
       });
     }
@@ -81,6 +104,7 @@ export class ScorchDecals {
     this.count = 0;
     this.enabled = true;
     this.roll = 0;
+    this.budget = HITS_PER_FRAME;
 
     const geometry = new THREE.PlaneGeometry(1, 1);
     this.fade = new THREE.InstancedBufferAttribute(
@@ -95,17 +119,21 @@ export class ScorchDecals {
       new Float32Array(DECAL_CAP),
       1
     );
-    [this.fade, this.heat, this.seed].forEach((attribute) =>
+    this.kind = new THREE.InstancedBufferAttribute(
+      new Float32Array(DECAL_CAP),
+      1
+    );
+    [this.fade, this.heat, this.seed, this.kind].forEach((attribute) =>
       attribute.setUsage(THREE.DynamicDrawUsage)
     );
     geometry.setAttribute('aFade', this.fade);
     geometry.setAttribute('aHeat', this.heat);
     geometry.setAttribute('aSeed', this.seed);
+    geometry.setAttribute('aKind', this.kind);
     this.mesh = new THREE.InstancedMesh(
       geometry,
       new THREE.ShaderMaterial({
         uniforms: {
-          uEmber: { value: new THREE.Vector3(...EMBER) },
           uChar: { value: CHAR_ALPHA },
         },
         vertexShader: DECAL_VERTEX,
@@ -154,12 +182,15 @@ export class ScorchDecals {
   }
 
   /**
-   * A shot hit the rock `view` (an EnemyMirror asteroid view): `nx, ny` the
-   * logical direction from its centre to the hit. False when the ray finds
-   * no surface (the rock is gone or the call came before its first frame).
+   * A shot hit `view` (an EnemyMirror view) made of `kind` (DECAL_KIND):
+   * `nx, ny` the logical direction from its centre to the hit. False when
+   * the ray finds no surface (the target is gone or the call came before
+   * its first frame) or this frame's marks are spent.
    */
-  hit(view, nx, ny) {
-    if (!this.enabled || !view?.object?.visible) return false;
+  hit(view, nx, ny, kind = DECAL_KIND.rock) {
+    if (!this.enabled || !view?.object?.visible || this.budget <= 0)
+      return false;
+    this.budget -= 1;
     const { object } = view;
     const len = Math.hypot(nx, ny) || 1;
     const radius = object.scale.x || 1;
@@ -174,18 +205,32 @@ export class ScorchDecals {
     this.origin.copy(object.position).addScaledVector(this.dir, radius * 3);
     this.raycaster.set(this.origin, this.dir.negate());
     this.hits.length = 0;
-    object.raycast(this.raycaster, this.hits);
-    if (!this.hits.length) return false;
-    let best = this.hits[0];
-    for (let i = 1; i < this.hits.length; i += 1) {
-      if (this.hits[i].distance < best.distance) best = this.hits[i];
+    // a rock is one mesh; a machine is a group of parts
+    if (kind === DECAL_KIND.rock) object.raycast(this.raycaster, this.hits);
+    else this.raycaster.intersectObject(object, true, this.hits);
+    let best = null;
+    for (let i = 0; i < this.hits.length; i += 1) {
+      const h = this.hits[i];
+      if (!h.face || !h.object.visible || h.object.material?.transparent)
+        continue;
+      if (!best || h.distance < best.distance) best = h;
     }
-    this.normal.copy(best.face.normal).transformDirection(object.matrixWorld);
+    if (!best) return false;
+    this.normal
+      .copy(best.face.normal)
+      .transformDirection(best.object.matrixWorld);
 
-    const size = Math.max(
-      DECAL_MIN,
-      Math.min(DECAL_MAX, (radius / 1.08) * DECAL_SIZE)
-    );
+    // a machine's group is scaled by its radius; a rock's mesh by ~1.08 ×
+    const size =
+      kind === DECAL_KIND.rock
+        ? Math.max(
+            DECAL_MIN,
+            Math.min(DECAL_MAX, (radius / 1.08) * DECAL_SIZE)
+          ) * ROCK_SIZE
+        : Math.max(
+            METAL_SIZE[0],
+            Math.min(METAL_SIZE[1], radius * METAL_SIZE[2])
+          );
     this.quaternion.setFromUnitVectors(this.zAxis, this.normal);
     this.spin.setFromAxisAngle(this.zAxis, this.rand() * Math.PI * 2);
     this.quaternion.multiply(this.spin);
@@ -201,6 +246,7 @@ export class ScorchDecals {
     slot.id = view.id;
     slot.age = 0;
     slot.seed = this.rand();
+    slot.kind = kind;
     slot.local
       .copy(this.inverse.copy(object.matrixWorld).invert())
       .multiply(this.world);
@@ -213,6 +259,7 @@ export class ScorchDecals {
    * rocks moved this frame.
    */
   update(dt, views) {
+    this.budget = HITS_PER_FRAME;
     let n = 0;
     for (let i = 0; i < DECAL_CAP; i += 1) {
       const slot = this.slots[i];
@@ -229,8 +276,9 @@ export class ScorchDecals {
       this.mesh.setMatrixAt(n, this.world);
       const t = slot.age / DECAL_LIFE;
       this.fade.array[n] = 1 - t * t;
-      this.heat.array[n] = Math.max(0, 1 - slot.age / EMBER_TIME);
+      this.heat.array[n] = Math.max(0, 1 - slot.age / EMBER_TIME[slot.kind]);
       this.seed.array[n] = slot.seed;
+      this.kind.array[n] = slot.kind;
       n += 1;
     }
     this.mesh.count = n;
@@ -240,6 +288,7 @@ export class ScorchDecals {
       this.fade,
       this.heat,
       this.seed,
+      this.kind,
     ];
     for (const attribute of attributes) {
       attribute.updateRange.offset = 0;

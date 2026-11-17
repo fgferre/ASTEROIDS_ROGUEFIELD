@@ -7,7 +7,13 @@ import { EnemyEffects } from './effects/EnemyEffects.js';
 import { GameTime } from './effects/GameTime.js';
 import { Particles } from './effects/Particles.js';
 import { PlayerEffects } from './effects/PlayerEffects.js';
-import { PLAYER_HIT_SHAKE, ScreenFeedback } from './effects/ScreenFeedback.js';
+import {
+  PLAYER_HIT_SHAKE,
+  SHIELD_SOAK_SHAKE,
+  ScreenFeedback,
+  hullFlashIntensity,
+  hullLoss,
+} from './effects/ScreenFeedback.js';
 
 export default class EffectsSystem extends BaseSystem {
   constructor(config = {}) {
@@ -367,17 +373,26 @@ export default class EffectsSystem extends BaseSystem {
       if (data?.position) this.playerEffects.createOrbFusionEffect(data);
     });
 
-    this.registerEventListener('player-took-damage', () => {
+    this.registerEventListener('player-took-damage', (payload = {}) => {
+      const lost = hullLoss(payload);
+      if (lost <= 0) {
+        // the shield took it whole: no red, no freeze
+        this.screenFeedback.addScreenShake(
+          SHIELD_SOAK_SHAKE.intensity,
+          SHIELD_SOAK_SHAKE.duration
+        );
+        return;
+      }
       this.screenFeedback.addScreenShake(
         PLAYER_HIT_SHAKE.intensity,
         PLAYER_HIT_SHAKE.duration
       );
 
-      // Red damage flash
+      // Red damage flash, as strong as the loss
       this.screenFeedback.addScreenFlash(
         withAlpha(PALETTE.threat, 0.4),
         0.25,
-        0.3
+        hullFlashIntensity(lost, payload.max)
       );
 
       // Brief freeze frame for impact

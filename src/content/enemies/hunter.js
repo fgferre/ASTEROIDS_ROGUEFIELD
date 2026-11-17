@@ -133,7 +133,8 @@ export default {
   pool: { initial: 5, max: 12 },
   tags: ['enemy', 'hostile', 'ranged', 'elite'],
   affixes: ['shielded', 'swift', 'volatile', 'splitter', 'warded'],
-  projectileColor: 'rgba(80, 220, 255, 0.9)',
+  // threat red (17/11; was cyan, the ship's own colour)
+  projectileColor: 'rgba(255, 58, 58, 0.95)',
   // Its movement and weapon components fly and shoot it.
   seeded: true,
   behaviors: deepFreeze({

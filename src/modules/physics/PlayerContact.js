@@ -262,6 +262,7 @@ export class PlayerContact {
       damage = Math.max(0, Math.floor(damageOverride));
     }
     result.damage = damage;
+    const healthBefore = player.health;
     const remaining = player.takeDamage(damage, asteroid);
     result.remainingHealth = typeof remaining === 'number' ? remaining : null;
 
@@ -334,6 +335,8 @@ export class PlayerContact {
       position: { ...player.position },
       playerPosition: { x: player.position.x, y: player.position.y },
       damageSource: { x: asteroid.x, y: asteroid.y },
+      // what reached the hull (0 when the shield took it all)
+      healthDamage: Math.max(0, (healthBefore ?? remaining) - remaining),
     });
 
     if (remaining <= 0) {

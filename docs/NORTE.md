@@ -41,7 +41,9 @@ cristal exposto, olho de máquina, escudo). A informação é luz; o resto é ma
   do quadro, começo de onda, coleta. Trancos curtos de zoom no impulso, no freio, no level-up, na morte e na queda
   de chefe; quando um chefe cai, a câmera mergulha para perto. Os números ficam em `src/data/constants/camera.js`.
 - **Movimento.** Rastros persistentes de luz (propulsor, tiro), faíscas esticadas pela velocidade, anéis de
-  choque, flash branco de 60 ms em qualquer dano a inimigo.
+  choque. Onde o tiro pega, o material reage (17/11, pedido dele: _"aonde tiros pegam [...] deveriam haver
+  repercursoes físicas"_): a pedra esquenta e um pedaço vira brasa; o metal faísca, fica incandescente no ponto e dá um
+  tranco; o escudo acende onde foi atingido. Tela vermelha só quando o casco perde; matar não pinta a tela.
 
 ## 3. Folha de entidades
 

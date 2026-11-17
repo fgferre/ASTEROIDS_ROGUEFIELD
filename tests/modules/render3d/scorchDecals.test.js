@@ -72,9 +72,23 @@ describe('ScorchDecals', () => {
 
   it(`never holds more than ${DECAL_CAP} marks: the oldest gives way`, () => {
     const { decals, view, views } = setup();
-    for (let i = 0; i < DECAL_CAP + 10; i += 1) decals.hit(view, 1, i * 0.1);
+    // one mark a frame: a frame only takes a few (the budget below)
+    for (let i = 0; i < DECAL_CAP + 10; i += 1) {
+      decals.hit(view, 1, i * 0.1);
+      decals.update(0, views);
+    }
     expect(decals.count).toBe(DECAL_CAP);
     expect(decals.update(0, views)).toBe(DECAL_CAP);
+  });
+
+  it('casts only a few rays a frame: the rest of the hits leave no mark', () => {
+    const { decals, view, views } = setup();
+    let made = 0;
+    for (let i = 0; i < 20; i += 1) if (decals.hit(view, 1, i * 0.1)) made += 1;
+    expect(made).toBeGreaterThan(0);
+    expect(made).toBeLessThan(20);
+    decals.update(0, views);
+    expect(decals.hit(view, 1, 0)).toBe(true);
   });
 
   it('does nothing when the preset turns marks off', () => {

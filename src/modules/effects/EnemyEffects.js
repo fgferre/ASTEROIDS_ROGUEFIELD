@@ -346,7 +346,6 @@ export class EnemyEffects {
 
     this.addScreenShake('droneDestroyed');
     this.addHitStop('spark-burst');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
     for (let i = 0; i < sparkCount; i += 1) {
@@ -433,7 +432,6 @@ export class EnemyEffects {
 
     this.addScreenShake('hunterDestroyed');
     this.addHitStop('shock-burst');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
     this.particleEffects.createShockwaveEffect({
       position,
       radius: radius * 2.4,

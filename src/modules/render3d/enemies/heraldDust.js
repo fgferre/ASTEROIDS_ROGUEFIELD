@@ -207,7 +207,7 @@ const DUST_LOOK = Object.freeze({
     at,
     dir: [0, 1, 0],
     size: 0.115,
-    color: 'shot',
+    color: 'threat', // the count-in is a warning (17/11; was amber)
   })),
 });
 
@@ -223,12 +223,12 @@ export function createDustView(kit, recipeViews) {
   function createDust() {
     const view = look.create('herald-dust');
     // the haze: a slow ring of dust grains, faceted and lit (they read as
-    // grit from any side), half see-through; charging warms them amber,
+    // grit from any side), half see-through; charging warms them threat red,
     // never into the bloom
     const haze = new THREE.Group();
     const hazeMaterial = new THREE.MeshStandardMaterial({
       color: colorOf(THREE, PALETTE.rockLit),
-      emissive: colorOf(THREE, PALETTE.shot),
+      emissive: colorOf(THREE, PALETTE.threat),
       emissiveIntensity: 0,
       metalness: 0.1,
       roughness: 0.9,

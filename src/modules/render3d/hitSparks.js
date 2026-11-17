@@ -1,27 +1,77 @@
 // Short-lived impact bursts the 3D renderer adds on top of the EffectsSystem
 // particles, drawn into the shared batches (no extra draw calls):
-// - HitSparks: a cone of streaks glancing off the surface a bullet hit (the
-//   EffectsSystem burst is omnidirectional, so it reads as a puff, not a hit).
+// - HitSparks: what a hit knocks off the surface it struck, by material.
+//   Metal throws a cone of hot streaks glancing along the ricochet; rock
+//   spits a few slower molten droplets that cool from orange to dull red and
+//   a puff of grey dust; the shield sheds cyan-white flecks.
 // - MuzzleFlashes: a 2-frame hot pulse at the nose for each player shot.
+// - KillPops: a machine that dies flashes white-hot at its own core (instead
+//   of the whole screen), then the heat drops through orange.
 // Plain typed arrays, filled from events and drained in render(); jitter is
 // a hash of a running counter, so it never touches Math.random.
 
-// proposta 17/10: cone shape, speeds and lives of the hit sparks.
-const SPARK_POOL = 120;
-const SPARKS_PER_HIT = 8;
-const SPARKS_PER_KILL = 10;
-const CONE_HALF_ANGLE = 0.55; // rad
+export const SPARK_KIND = Object.freeze({ metal: 0, rock: 1, shield: 2 });
+
+// proposta 17/11 (efeito/impacto): per material, count / speed / life / drag.
+const SPARK_POOL = 160;
+const KINDS = [
+  // metal: the cone of 17/10, a little longer-lived
+  {
+    hit: 8,
+    kill: 10,
+    speed: [170, 340],
+    life: [0.09, 0.2],
+    drag: 7,
+    cone: 0.55,
+    hot: 2,
+    width: 1.3,
+    gain: 2.2,
+    maxLength: 13,
+  },
+  // rock: molten droplets, slower and longer, thick and short
+  {
+    hit: 5,
+    kill: 7,
+    speed: [70, 170],
+    life: [0.28, 0.6],
+    drag: 3.2,
+    cone: 0.85,
+    hot: 1,
+    width: 1.9,
+    gain: 1.9,
+    maxLength: 6,
+  },
+  // shield: flecks off the hex shell
+  {
+    hit: 6,
+    kill: 6,
+    speed: [140, 260],
+    life: [0.07, 0.15],
+    drag: 8,
+    cone: 0.9,
+    hot: 2,
+    width: 1.1,
+    gain: 2.0,
+    maxLength: 10,
+  },
+];
 const REFLECT_MIX = 0.6; // how much the cone leans along the ricochet
-const SPARK_SPEED_MIN = 170;
-const SPARK_SPEED_MAX = 340;
-const SPARK_LIFE_MIN = 0.08;
-const SPARK_LIFE_MAX = 0.16;
-const SPARK_DRAG = 7; // 1/s
 const SPARK_STRETCH = 0.035; // streak length per unit of speed
-const SPARK_MAX_LENGTH = 13;
-const SPARK_WIDTH = 1.3;
-const SPARK_GAIN = 2.2;
 const SPARK_HEIGHT = 3;
+// linear rgb: a droplet cools from yellow-orange to a dull red as it flies
+const EMBER_HOT = [2.0, 0.78, 0.2];
+const EMBER_COOL = [0.55, 0.06, 0.01];
+const SHIELD_RGB = [0.35, 1.6, 1.9];
+const SHIELD_HOT = [1.6, 2.0, 2.0];
+
+// proposta 17/11: rock dust, matte grey puffs that drift off the hit.
+const DUST_POOL = 48;
+const DUST_PER_HIT = 2;
+const DUST_LIFE = 0.7; // s
+const DUST_SPEED = 26;
+const DUST_SIZE = [5, 13]; // grows over its life
+const DUST_ALPHA = 0.42;
+const DUST_RGB = [0.16, 0.15, 0.14];
 
 // proposta 17/10: muzzle pulse.
 const MUZZLE_POOL = 8;
@@ -32,11 +82,26 @@ const MUZZLE_CORE = 6;
 const MUZZLE_LENGTH = 12;
 const MUZZLE_HEIGHT = 5;
 
+// proposta 17/11: the kill pop at the machine's core.
+const POP_POOL = 16;
+const POP_TIME = 0.16; // s
+const POP_SIZE = 2.6; // × the machine's radius
+const POP_HEIGHT = 6;
+const POP_HOT = [2.4, 2.1, 1.7];
+const POP_WARM = [2.0, 0.6, 0.12];
+
 function hash01(n) {
   let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
+}
+
+function mix3(out, a, b, k) {
+  out[0] = a[0] + (b[0] - a[0]) * k;
+  out[1] = a[1] + (b[1] - a[1]) * k;
+  out[2] = a[2] + (b[2] - a[2]) * k;
+  return out;
 }
 
 export class HitSparks {
@@ -48,8 +113,16 @@ export class HitSparks {
     this.life = new Float32Array(SPARK_POOL);
     this.maxLife = new Float32Array(SPARK_POOL);
     this.hot = new Uint8Array(SPARK_POOL);
+    this.kind = new Uint8Array(SPARK_POOL);
     this.next = 0;
+    this.dustX = new Float32Array(DUST_POOL);
+    this.dustY = new Float32Array(DUST_POOL);
+    this.dustVx = new Float32Array(DUST_POOL);
+    this.dustVy = new Float32Array(DUST_POOL);
+    this.dustAge = new Float32Array(DUST_POOL).fill(DUST_LIFE);
+    this.dustNext = 0;
     this.roll = 0;
+    this.scratch = [0, 0, 0];
   }
 
   rand() {
@@ -58,10 +131,11 @@ export class HitSparks {
   }
 
   /**
-   * A cone at (x, y) around the surface normal (nx, ny), leaning along the
-   * ricochet of the incoming direction (dx, dy). Vectors need not be unit.
+   * A burst at (x, y) around the surface normal (nx, ny), leaning along the
+   * ricochet of the incoming direction (dx, dy); `kind` a SPARK_KIND (the
+   * material that was hit). Vectors need not be unit.
    */
-  emit(x, y, nx, ny, dx, dy, killed) {
+  emit(x, y, nx, ny, dx, dy, killed, kind = SPARK_KIND.metal) {
     let nl = Math.hypot(nx, ny);
     const dl = Math.hypot(dx, dy);
     if (nl < 1e-3) {
@@ -81,33 +155,51 @@ export class HitSparks {
       ax += (ux - 2 * dot * nx) * REFLECT_MIX;
       ay += (uy - 2 * dot * ny) * REFLECT_MIX;
     }
+    const spec = KINDS[kind] || KINDS[0];
     const base = Math.atan2(ay, ax);
-    const count = killed ? SPARKS_PER_KILL : SPARKS_PER_HIT;
+    const count = killed ? spec.kill : spec.hit;
     for (let k = 0; k < count; k += 1) {
       const i = this.next;
       this.next = (this.next + 1) % SPARK_POOL;
-      const angle = base + (this.rand() * 2 - 1) * CONE_HALF_ANGLE;
+      const angle = base + (this.rand() * 2 - 1) * spec.cone;
       const speed =
-        SPARK_SPEED_MIN + (SPARK_SPEED_MAX - SPARK_SPEED_MIN) * this.rand();
-      const life =
-        SPARK_LIFE_MIN + (SPARK_LIFE_MAX - SPARK_LIFE_MIN) * this.rand();
+        spec.speed[0] + (spec.speed[1] - spec.speed[0]) * this.rand();
+      const life = spec.life[0] + (spec.life[1] - spec.life[0]) * this.rand();
       this.x[i] = x;
       this.y[i] = y;
       this.vx[i] = Math.cos(angle) * speed;
       this.vy[i] = Math.sin(angle) * speed;
       this.life[i] = life;
       this.maxLife[i] = life;
-      this.hot[i] = k < 2 ? 1 : 0;
+      this.hot[i] = k < spec.hot ? 1 : 0;
+      this.kind[i] = kind;
+    }
+    if (kind === SPARK_KIND.rock) this.puff(x, y, nx, ny);
+  }
+
+  // Grey dust drifting off the struck face.
+  puff(x, y, nx, ny) {
+    for (let k = 0; k < DUST_PER_HIT; k += 1) {
+      const i = this.dustNext;
+      this.dustNext = (this.dustNext + 1) % DUST_POOL;
+      const a = Math.atan2(ny, nx) + (this.rand() * 2 - 1) * 0.9;
+      const s = DUST_SPEED * (0.5 + this.rand());
+      this.dustX[i] = x + nx * 2;
+      this.dustY[i] = y + ny * 2;
+      this.dustVx[i] = Math.cos(a) * s;
+      this.dustVy[i] = Math.sin(a) * s;
+      this.dustAge[i] = 0;
     }
   }
 
-  /** Advances by `dt` s and draws into `ribbons`. */
-  update(dt, ribbons, rgb, hotRgb) {
-    const drag = Math.exp(-SPARK_DRAG * dt);
+  /** Advances by `dt` s and draws into `ribbons` (and the dust into `smoke`). */
+  update(dt, ribbons, rgb, hotRgb, smoke) {
     for (let i = 0; i < SPARK_POOL; i += 1) {
       if (!(this.life[i] > 0)) continue;
       this.life[i] -= dt;
       if (this.life[i] <= 0) continue;
+      const spec = KINDS[this.kind[i]];
+      const drag = Math.exp(-spec.drag * dt);
       this.vx[i] *= drag;
       this.vy[i] *= drag;
       this.x[i] += this.vx[i] * dt;
@@ -117,23 +209,55 @@ export class HitSparks {
       const vy = this.vy[i];
       const speed = Math.hypot(vx, vy);
       if (speed < 1) continue;
-      const length = Math.min(SPARK_MAX_LENGTH, speed * SPARK_STRETCH);
+      const length = Math.max(
+        1.2,
+        Math.min(spec.maxLength, speed * SPARK_STRETCH)
+      );
       const k = length / speed;
+      let color;
+      let gain = spec.gain * fade;
+      if (this.kind[i] === SPARK_KIND.rock) {
+        // cools as it flies; the light dies with the heat, not linearly
+        color = mix3(this.scratch, EMBER_COOL, EMBER_HOT, fade);
+        gain = spec.gain * (0.35 + 0.65 * fade);
+      } else if (this.kind[i] === SPARK_KIND.shield) {
+        color = this.hot[i] ? SHIELD_HOT : SHIELD_RGB;
+      } else color = this.hot[i] ? hotRgb : rgb;
       ribbons.streak(
         this.x[i] - vx * k,
         this.y[i] - vy * k,
         this.x[i],
         this.y[i],
         SPARK_HEIGHT,
-        this.hot[i] ? hotRgb : rgb,
-        SPARK_WIDTH * (0.5 + 0.5 * fade),
-        SPARK_GAIN * fade
+        color,
+        spec.width * (0.5 + 0.5 * fade),
+        gain
+      );
+    }
+    if (!smoke) return;
+    for (let i = 0; i < DUST_POOL; i += 1) {
+      if (!(this.dustAge[i] < DUST_LIFE)) continue;
+      this.dustAge[i] += dt;
+      const t = Math.min(1, this.dustAge[i] / DUST_LIFE);
+      const slow = Math.exp(-2.5 * dt);
+      this.dustVx[i] *= slow;
+      this.dustVy[i] *= slow;
+      this.dustX[i] += this.dustVx[i] * dt;
+      this.dustY[i] += this.dustVy[i] * dt;
+      smoke.push(
+        this.dustX[i],
+        4,
+        this.dustY[i],
+        DUST_RGB,
+        DUST_SIZE[0] + (DUST_SIZE[1] - DUST_SIZE[0]) * t,
+        DUST_ALPHA * (1 - t) * (1 - t)
       );
     }
   }
 
   clear() {
     this.life.fill(0);
+    this.dustAge.fill(DUST_LIFE);
   }
 }
 
@@ -187,5 +311,59 @@ export class MuzzleFlashes {
 
   clear() {
     this.frames.fill(0);
+  }
+}
+
+export class KillPops {
+  constructor() {
+    this.x = new Float32Array(POP_POOL);
+    this.y = new Float32Array(POP_POOL);
+    this.size = new Float32Array(POP_POOL);
+    this.age = new Float32Array(POP_POOL).fill(POP_TIME);
+    this.next = 0;
+    this.scratch = [0, 0, 0];
+  }
+
+  /** A machine of `radius` died at (x, y). */
+  emit(x, y, radius) {
+    const i = this.next;
+    this.next = (this.next + 1) % POP_POOL;
+    this.x[i] = x;
+    this.y[i] = y;
+    this.size[i] = Math.max(10, radius * POP_SIZE);
+    this.age[i] = 0;
+  }
+
+  /** `scale`: Reduce Flashing's dimmer (1 normally). */
+  update(dt, glow, scale = 1) {
+    for (let i = 0; i < POP_POOL; i += 1) {
+      if (!(this.age[i] < POP_TIME)) continue;
+      const t = this.age[i] / POP_TIME;
+      this.age[i] += dt;
+      const color = mix3(this.scratch, POP_HOT, POP_WARM, t);
+      const k = (1 - t) * scale;
+      glow.push(
+        this.x[i],
+        POP_HEIGHT,
+        this.y[i],
+        color,
+        this.size[i] * (0.7 + 0.5 * t),
+        k,
+        1.5
+      );
+      glow.push(
+        this.x[i],
+        POP_HEIGHT + 0.5,
+        this.y[i],
+        POP_HOT,
+        this.size[i] * 0.35 * (1 - t),
+        k,
+        2
+      );
+    }
+  }
+
+  clear() {
+    this.age.fill(POP_TIME);
   }
 }
