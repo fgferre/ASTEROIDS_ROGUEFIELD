@@ -17,6 +17,5 @@ export default {
   bloomScale: 1,
   debris: 0.35,
   structures: 0,
-  musicTheme: 'outer-ring',
   tint: 'rgba(120, 150, 200, 0)',
 };

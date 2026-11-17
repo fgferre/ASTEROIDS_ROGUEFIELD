@@ -346,6 +346,24 @@ describe('AudioSystem random scope synchronization', () => {
     expect(played('end-credits')).toBe(1);
   });
 
+  it('the death screen plays the whole game-over piece and a retry lets it go', async () => {
+    const { audio, eventBus, mediaElements } = createMenuMusicHarness();
+    eventBus.emit('screen-changed', { screen: 'menu' });
+    await audio.init();
+    await Promise.resolve();
+    const element = () =>
+      mediaElements.find((el) => el.src.includes('game-over'));
+    const stop = vi.spyOn(audio.sectorScore, 'stop');
+
+    eventBus.emit('screen-changed', { screen: 'gameover' });
+    expect(element().play).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledWith();
+
+    const stopTrack = vi.spyOn(audio, 'stopFileTrack');
+    eventBus.emit('screen-changed', { screen: 'playing' });
+    expect(stopTrack).toHaveBeenCalledWith('game-over');
+  });
+
   it('keeps track gain separate from master and music volume propagation', async () => {
     const { audio, eventBus } = createMenuMusicHarness();
 

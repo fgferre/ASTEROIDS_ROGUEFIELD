@@ -43,6 +43,7 @@ const FILE_TRACK_IDS = Object.freeze({
   VICTORY_FINAL: 'victory-final',
   ENDING_CHOICE: 'ending-choice',
   END_CREDITS: 'end-credits',
+  GAME_OVER: 'game-over',
 });
 
 const MENU_OPENING_TRACK_URL = new URL(
@@ -100,6 +101,14 @@ const FILE_TRACK_CATALOG = Object.freeze({
     loop: false,
     fadeInMs: 1500,
     fadeOutMs: 2000,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  // The death screen: the whole "signal lost" piece, once, until he leaves.
+  [FILE_TRACK_IDS.GAME_OVER]: Object.freeze({
+    src: scoreUrl('game-over.mp3'),
+    loop: false,
+    fadeInMs: 300,
+    fadeOutMs: 1200,
     preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
   }),
 });

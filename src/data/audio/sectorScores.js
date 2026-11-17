@@ -62,12 +62,40 @@ export const SECTOR_SCORES = Object.freeze({
   }),
 });
 
+// A run with no sector (Descent, Daily Field, Boss Rush, the Deep Field) plays
+// the score of the chapter its layer is in. These reuse the campaign sectors
+// whose Warden ends that chapter: Warden Prime ends layer 5, the Choir 10,
+// Null 15; from layer 16 on (Deep Field) the Crucible.
+const CHAPTER_SCORES = [
+  [5, 'prime-gate'],
+  [10, 'dense-core'],
+  [15, 'wardens-reach'],
+];
+export const chapterScoreForLayer = (layer) =>
+  CHAPTER_SCORES.find(([last]) => layer <= last)?.[1] ?? 'the-crucible';
+
 // Short one-shots, shared by every sector with a score.
 export const SECTOR_SCORE_STINGERS = Object.freeze({
   bossWarning: url('sting-boss-warning.mp3'),
   sectorCleared: url('sting-sector-cleared.mp3'),
-  signalLost: url('sting-signal-lost.mp3'),
 });
+
+// Musical one-shots of the run, played in any run (audio/musicStings.js).
+export const MUSIC_STINGS = Object.freeze({
+  elite: url('sting-elite.mp3'),
+  surge: url('sting-surge.mp3'),
+  deepField: url('sting-deep-field.mp3'),
+});
+
+// The journey between sectors plays the recording of its destination's
+// chapter (1-4); each file's jump hit is this many seconds in.
+export const JOURNEY_CUES = Object.freeze({
+  1: url('journey-outer-ring.mp3'),
+  2: url('journey-dense-core.mp3'),
+  3: url('journey-wardens-reach.mp3'),
+  4: url('journey-crucible.mp3'),
+});
+export const JOURNEY_CUE_HIT_SECONDS = 6;
 
 // Feel values (proposta): the danger (0..1, MusicMixer.runIntensity) opens
 // the stage's lowpass and lifts its level; the boss and the ends crossfade.
@@ -75,8 +103,8 @@ export const SECTOR_SCORE_MIX = Object.freeze({
   startAt: 0.1, // seconds ahead of now both tracks are scheduled
   fadeInSeconds: 2.5,
   fadeOutSeconds: 1.5,
+  chapterFadeSeconds: 2.5, // a sectorless run changing chapter
   victoryFadeSeconds: 3,
-  mixerFadeSeconds: 1.5,
   bossCrossfadeSeconds: 6,
   clearedCrossfadeSeconds: 4,
   pollMs: 200,

@@ -1,40 +1,5 @@
 // src/data/audio/stingers.js
-// One-shot musical stingers (chapter, Warden) and the Warden transmission voice.
-
-// Chapter stinger: the biome theme's three-note motif, on its first layer.
-export const CHAPTER_STINGER = Object.freeze({
-  octave: 2, // above the theme root
-  type: 'triangle',
-  spacingSeconds: 0.22,
-  noteSeconds: 0.9,
-  lastNoteSeconds: 1.8,
-  gain: 0.09,
-  reverbSendDb: -8,
-});
-
-// Warden stinger (boss-warning, one layer before the Warden): a low brass
-// hit on the Warden root plus a rising noise/sine riser into the next layer.
-export const WARDEN_STINGER = Object.freeze({
-  hit: Object.freeze({
-    notes: Object.freeze([36, 43, 48]), // C2, G2, C3 (MIDI)
-    detuneCents: 8,
-    gain: 0.16,
-    attackSeconds: 0.02,
-    seconds: 1.4,
-    filterStart: 2200,
-    filterEnd: 260,
-  }),
-  riser: Object.freeze({
-    seconds: 1.6,
-    gain: 0.07,
-    filterStart: 400,
-    filterEnd: 4800,
-    toneStart: 130.8, // C3
-    toneEnd: 523.3, // C5
-    toneGain: 0.04,
-  }),
-  reverbSendDb: -9,
-});
+// The Warden transmission voice.
 
 // Warden transmission "voice" (proposta 18/10): a short granular burst under
 // the squelch — `grains` short grains spread over `seconds`, each a low

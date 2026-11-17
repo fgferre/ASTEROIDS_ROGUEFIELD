@@ -10,6 +10,7 @@ import { registerAudioEventCues } from './audio/eventDispatch.js';
 import { interceptSampleCues } from './audio/samplePlayer.js';
 import { createVoicePlayer, loadVoiceManifest } from './audio/voiceLines.js';
 import { createJourneyCue } from './audio/journeyCue.js';
+import { createMusicStings } from './audio/musicStings.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -118,16 +119,11 @@ class AudioSystem extends BaseSystem {
     this.listenerY = GAME_HEIGHT / 2;
     this.runEnemyCount = 0;
 
-    // MusicMixer (INFRA-02 / AUDIO-01) — composed inside the stable `audio`
-    // service (RESEARCH A3). Construction does NO AudioContext work; init() is
-    // called from AudioSystem.init() once the context + buses exist. The event
-    // table's music steps (./audio/eventHandlers.js) drive it.
-    this.musicMixer = new MusicMixer({
-      randomScope: this.randomScopes?.families?.music || this.random,
-    });
+    // MusicMixer: the run's danger (no sound) that the recorded scores follow.
+    // The event table's music steps (./audio/eventHandlers.js) drive it.
+    this.musicMixer = new MusicMixer();
 
-    // The recorded music of a sector that has one (data/audio/sectorScores.js);
-    // it silences the mixer while it plays. Joins the music chain at the duck
+    // The recorded music (data/audio/sectorScores.js). Joins the music chain at the duck
     // node, like the file tracks (init below).
     this.sectorScore = new SectorScore({ mixer: this.musicMixer });
 
@@ -171,9 +167,16 @@ class AudioSystem extends BaseSystem {
         }),
     });
 
-    // The journey's score (./audio/journeyCue.js), on the music path at the
+    // The journey's recorded score (./audio/journeyCue.js), on the music path at the
     // duck stage, like the file tracks.
     this.journeyCue = createJourneyCue({
+      getContext: () => this.context,
+      getDestination: () =>
+        this.duckingController.musicDuckGain || this.musicGain,
+    });
+
+    // The recorded one-shots (elite, surge, deep field), on the music path.
+    this.musicStings = createMusicStings({
       getContext: () => this.context,
       getDestination: () =>
         this.duckingController.musicDuckGain || this.musicGain,
@@ -355,13 +358,6 @@ class AudioSystem extends BaseSystem {
       this.voiceGain.connect(this.masterLimiter);
 
       this.applyVolumeToNodes();
-      // AUDIO-01: the adaptive 4-layer music now lives in MusicMixer. It builds
-      // its graph here (after the context + buses exist) and connects its
-      // pauseFadeGain straight to musicGain (the slider stage). 02.06 re-splices
-      // the duck node between pauseFadeGain and musicGain. The run (wave,
-      // density, HP) drives its intensity; the boss arc overrides upwards.
-      this.musicMixer.init(this.context, this.musicGain);
-
       // AUDIO-03 (D-11): splice the DEDICATED duck nodes. The controller creates
       // musicDuckGain (rests 1.0) between musicPauseFadeGain and musicGain, and
       // effectsDuckGain (rests 1.0) before effectsGain — each with explicit
@@ -369,7 +365,6 @@ class AudioSystem extends BaseSystem {
       // never writes the slider stages. Music content (mixer + file tracks) now
       // routes into musicDuckGain; SFX content routes into effectsDuckGain.
       this.duckingController.init(this.context, {
-        musicSpliceFrom: this.musicMixer.musicPauseFadeGain,
         musicSpliceTo: this.musicGain,
         effectsSpliceTo: this.effectsGain,
       });
@@ -587,6 +582,12 @@ class AudioSystem extends BaseSystem {
     // The endings' music ends with the victory: any other screen lets it go.
     if (payload?.screen && payload.screen !== 'victory') {
       END_SCREEN_TRACKS.forEach((trackId) => this.stopFileTrack(trackId));
+    }
+    // The death screen plays its own piece; any other screen lets it go.
+    if (payload?.screen === 'gameover') {
+      this.playFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
+    } else if (payload?.screen) {
+      this.stopFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
     }
   }
 
@@ -868,16 +869,12 @@ class AudioSystem extends BaseSystem {
     this.pendingSoundQueue.length = 0;
     this.resumePromise = null;
 
-    // AUDIO-01: the adaptive music now lives in MusicMixer — back to a fresh
-    // run (no wave, no density, no boss floor) on a new run/replay.
+    // Back to a fresh danger (no wave, no density) on a new run/replay.
     if (this.musicMixer) {
       this.musicMixer.resetRun();
     }
     this.sectorScore.reset();
     this.journeyCue.stop();
-    clearTimeout(this.chapterStingerTimer);
-    this.chapterStingerTimer = null;
-    this.chapterClaimed = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();
     this.runEnemyCount = 0;
@@ -907,10 +904,8 @@ class AudioSystem extends BaseSystem {
     this.sectorScore.reset();
     this.voiceLines.clear();
     this.voiceLines.expect([]);
-    // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
-    if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
-      this.musicMixer.dispose();
-    }
+    // Stop the MusicMixer's smoothing timer.
+    this.musicMixer?.dispose();
     // Tear down the FileTrackManager (idempotent; detaches all track nodes).
     if (
       this.fileTrackManager &&

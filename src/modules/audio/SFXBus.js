@@ -871,19 +871,7 @@ class SFXBus {
     );
   }
 
-  // --- Stingers and transmissions (sfx/stingers.js) ---
-
-  playEliteSpawned() {
-    return this._stingers.playEliteSpawned();
-  }
-
-  playSurgeSting() {
-    return this._stingers.playSurgeSting();
-  }
-
-  playDeepFieldEntry() {
-    return this._stingers.playDeepFieldEntry();
-  }
+  // --- Transmissions (sfx/stingers.js) ---
 
   playTransmission() {
     return this._stingers.playTransmission();
@@ -891,14 +879,6 @@ class SFXBus {
 
   playTransmissionVoice(speaker) {
     return this._stingers.playTransmissionVoice(speaker);
-  }
-
-  playChapterStinger(themeId) {
-    return this._stingers.playChapterStinger(themeId);
-  }
-
-  playWardenStinger() {
-    return this._stingers.playWardenStinger();
   }
 
   // --- Progression, pickups and rewards (sfx/progression.js) ---
