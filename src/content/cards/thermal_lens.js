@@ -29,6 +29,34 @@ export default {
       },
     ],
   },
+  // What the lens reaches with each weapon (Projectiles, beamAndFan.js).
+  weaponText: {
+    harmonic: {
+      levels: [
+        {
+          description:
+            'Beam length +40%. The lances between beams gain nothing.',
+          highlights: ['The beam reaches further; its damage stays the same.'],
+        },
+      ],
+    },
+    scatter: {
+      levels: [
+        {
+          description: 'Flak bolt and shrapnel damage +15%.',
+          highlights: ['Every bolt and its burst hit harder.'],
+        },
+      ],
+    },
+    'seeker-swarm': {
+      levels: [
+        {
+          description: 'Missile and burst damage +15%.',
+          highlights: ['Missiles bred from a wreck too.'],
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,
