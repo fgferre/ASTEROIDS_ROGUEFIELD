@@ -408,7 +408,7 @@ export function createRockViews(kit) {
     g[0] = glow;
     g[1] = reveal;
     g[2] = Math.max(0.035 + stage * 0.012, look.width || 0);
-    g[3] = flash * 0.45;
+    g[3] = flash * 0.6;
     object.updateMatrixWorld();
     rocks.push(view);
   }

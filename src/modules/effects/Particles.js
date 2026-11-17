@@ -9,7 +9,7 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { GamePools } from '../../core/GamePools.js';
 import { SHIELD_SHOCKWAVE_RADIUS } from '../../data/constants/gameplay.js';
-import { DamageText, HitMarker } from '../EffectEntities.js';
+import { DamageText } from '../EffectEntities.js';
 
 // Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
 // and a few faint amber crystal motes drifting through the camera view, so the
@@ -43,25 +43,21 @@ export class Particles {
   /**
    * `randomRange(min, max, fork)`, `randomCentered(span, fork)`: the effects' random helpers; a particle's spin rolls from 'particles', the ambient drift from 'colors'.
    * `createMuzzleFlash(x, y, dirX, dirY)`: the effects' muzzle-flash burst; the queue flushes into it.
-   * `hitMarkersEnabled()`: the hit markers setting; off means no markers.
    * `damageNumbersEnabled()`: the damage numbers setting; off means no floating numbers.
    */
   constructor({
     randomRange,
     randomCentered,
     createMuzzleFlash,
-    hitMarkersEnabled,
     damageNumbersEnabled,
   }) {
     this.randomRange = randomRange;
     this.randomCentered = randomCentered;
     this.createMuzzleFlash = createMuzzleFlash;
-    this.hitMarkersEnabled = hitMarkersEnabled;
     this.damageNumbersEnabled = damageNumbersEnabled;
 
     this.particles = [];
     this.shockwaves = [];
-    this.hitMarkers = [];
     this.damageTexts = [];
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
@@ -75,7 +71,6 @@ export class Particles {
   reset() {
     this.particles = [];
     this.shockwaves = [];
-    this.hitMarkers = [];
     this.damageTexts = [];
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
@@ -96,6 +91,7 @@ export class Particles {
     particle.maxLife = life;
     particle.alpha = 1;
     particle.type = type;
+    particle.material = null; // 'metal': a machine's, not a rock's (EnemyEffects)
     particle.rotation = this.randomRange(0, Math.PI * 2, 'particles');
     particle.rotationSpeed = this.randomCentered(4, 'particles');
     particle.active = true;
@@ -302,25 +298,6 @@ export class Particles {
     }
 
     shockwaves.length = writeIndex;
-  }
-
-  createHitMarker(position, killed, damage) {
-    if (!this.hitMarkersEnabled()) return;
-    this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
-  }
-
-  updateHitMarkers(deltaTime) {
-    const markers = this.hitMarkers;
-    let writeIndex = 0;
-
-    for (let i = 0; i < markers.length; i += 1) {
-      const marker = markers[i];
-      if (marker && marker.update(deltaTime)) {
-        markers[writeIndex++] = marker;
-      }
-    }
-
-    markers.length = writeIndex;
   }
 
   createFloatingDamageText(x, y, damage, isCritical = false) {

@@ -258,7 +258,9 @@ export function patchRockShader(shader) {
         float edge = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
         totalEmissiveRadiance += uRimColor * uRim * pow(edge, 2.2);
       }
-      totalEmissiveRadiance += vec3(ROCK_FLASH);`
+      // a hit only warms the rock a touch: the heat lives where it struck
+      // (scorchDecals.js). 17/11; was a flat white flash, a cut-out.
+      totalEmissiveRadiance += vec3(1.0, 0.4, 0.11) * ROCK_FLASH * 0.06;`
     )
     .replace(
       '#include <tonemapping_fragment>',

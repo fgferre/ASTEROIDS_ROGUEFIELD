@@ -346,7 +346,6 @@ export class EnemyEffects {
 
     this.addScreenShake('droneDestroyed');
     this.addHitStop('spark-burst');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
     for (let i = 0; i < sparkCount; i += 1) {
@@ -433,7 +432,6 @@ export class EnemyEffects {
 
     this.addScreenShake('hunterDestroyed');
     this.addHitStop('shock-burst');
-    this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
     this.particleEffects.createShockwaveEffect({
       position,
       radius: radius * 2.4,
@@ -543,7 +541,14 @@ export class EnemyEffects {
     }
 
     const death = getContent('enemies', enemyType)?.effects?.death ?? 'debris';
+    const { particles } = this.particleEffects;
+    const from = particles.length;
     this[DEATH_EFFECTS[death]](asteroid, context);
+    // a machine breaks into pieces of hull, not chips of rock (17/11)
+    if (enemyType === 'asteroid') return;
+    for (let i = from; i < particles.length; i += 1) {
+      if (particles[i]?.type === 'debris') particles[i].material = 'metal';
+    }
   }
 
   // Rock chips and embers in the rock's colors, sized by the rock.

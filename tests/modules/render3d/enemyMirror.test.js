@@ -732,7 +732,7 @@ describe('EnemyMirror', () => {
     const { aGlow } = mesh.geometry.attributes;
     expect(aGlow.getX(0)).toBeCloseTo(1.15);
     expect(aGlow.getY(0)).toBeCloseTo(0.65);
-    expect(aGlow.getW(0)).toBeCloseTo(0.45);
+    expect(aGlow.getW(0)).toBeCloseTo(0.6);
     const matrix = new THREE.Matrix4();
     mesh.getMatrixAt(0, matrix);
     expect(matrix.elements[12]).toBe(100);

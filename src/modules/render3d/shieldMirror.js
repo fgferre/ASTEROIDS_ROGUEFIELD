@@ -43,6 +43,8 @@ const SHIELD_FRAGMENT = `
 uniform vec3 uColor;
 uniform float uCells;
 uniform float uLevel;
+uniform float uTime;
+uniform float uFlicker;
 uniform float uAppear;
 uniform vec2 uHitDir;
 uniform float uHitAge;
@@ -71,7 +73,12 @@ void main() {
   // grows out from the poles while raised (the equator is ~1.24 out)
   float reach = uAppear * 1.45;
   float shown = 1.0 - smoothstep(reach - 0.15, reach, length(cell));
-  float light = (0.05 + 0.5 * edge) * (0.35 + 0.65 * fresnel) * (0.45 + 0.55 * uLevel);
+  // a spent shell dims, and near the end its tiles flicker (17/11: the
+  // remaining share was all but invisible at 0.45 + 0.55 × level)
+  float light = (0.05 + 0.5 * edge) * (0.35 + 0.65 * fresnel) * (0.2 + 0.8 * uLevel);
+  float weak = 1.0 - smoothstep(0.15, 0.36, uLevel);
+  light *= 1.0 - weak * 0.45 * uFlicker * (0.5 + 0.5 * sin(uTime * 31.0 + shieldHash(id) * 40.0));
+  float hot = 0.0;
 
   // hit: tiles facing the impact light up; a ripple runs over the shell
   if (uHitAge >= 0.0) {
@@ -80,6 +87,8 @@ void main() {
     float tiles = (1.0 - smoothstep(0.1, 0.7, d)) * (1.0 - k) * (1.0 - k);
     float ring = exp(-pow((d - k * 1.6) / 0.12, 2.0)) * (1.0 - k);
     light += tiles * (0.25 + 0.9 * edge) + ring * (0.15 + 0.6 * edge);
+    // the struck tiles go white-hot for a moment: the shell took it
+    hot += tiles * (0.35 + 0.9 * edge) * (1.0 - k);
   }
 
   // break: every tile flares, then drops out on its own beat
@@ -89,7 +98,7 @@ void main() {
     if (k > beat) discard;
     light += (0.4 + 1.2 * edge) * (1.0 - k / beat) * uBreakFlare;
   }
-  gl_FragColor = vec4(uColor * light * shown, 1.0);
+  gl_FragColor = vec4((uColor * light + vec3(0.9) * hot) * shown, 1.0);
 }`;
 
 export class ShieldMirror {
@@ -99,6 +108,8 @@ export class ShieldMirror {
       uColor: { value: new THREE.Color(rgb[0], rgb[1], rgb[2]) },
       uCells: { value: HEX_CELLS },
       uLevel: { value: 1 },
+      uTime: { value: 0 },
+      uFlicker: { value: 1 },
       uAppear: { value: 0 },
       uHitDir: { value: new THREE.Vector2(1, 0) },
       uHitAge: { value: -1 },
@@ -138,6 +149,11 @@ export class ShieldMirror {
     if (len > 0) this.uniforms.uHitDir.value.set(dx / len, dy / len);
   }
 
+  /** Reduce Flashing stills the flicker of a nearly spent shell. */
+  setFlicker(on) {
+    this.uniforms.uFlicker.value = on ? 1 : 0;
+  }
+
   /** `flare`: the break flare's strength (Reduce Flashing lowers it). */
   break(time, flare = 1) {
     this.brokenAt = time;
@@ -155,6 +171,7 @@ export class ShieldMirror {
     if (!visible) return false;
     const u = this.uniforms;
     u.uLevel.value = Math.max(0, Math.min(1, level));
+    u.uTime.value = time % 1000;
     u.uAppear.value = breaking
       ? 1
       : Math.min(1, (time - this.raisedAt) / APPEAR_TIME);

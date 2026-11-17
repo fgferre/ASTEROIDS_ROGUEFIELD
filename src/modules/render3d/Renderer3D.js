@@ -41,7 +41,10 @@ import {
   mirrorProjectiles,
 } from './fieldMirrors.js';
 import { FormationMarks } from './formationMarks.js';
-import { HitSparks, MuzzleFlashes } from './hitSparks.js';
+import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
+import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
+import { hullLoss } from '../effects/ScreenFeedback.js';
+import { isBossEnemy } from '../physics/bossTuning.js';
 import { ImpactKick } from './impactPass.js';
 import {
   mirrorBossTransitions,
@@ -163,6 +166,7 @@ class Renderer3D extends BaseSystem {
     };
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
+    this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
     this.formationMarks = new FormationMarks();
     this.biome = new BiomeTransition();
@@ -276,6 +280,22 @@ class Renderer3D extends BaseSystem {
       const time = performance.now() / 1000;
       const dir = this.threatDirection();
       this.three?.shield.hit(time, dir.x, dir.y);
+      // flecks off the shell where it was struck
+      const pos = this.cachedPlayer?.position;
+      const len = Math.hypot(dir.x, dir.y);
+      if (pos && len > 0) {
+        const r = (this.three?.player.shieldRadius || 20) * 0.9;
+        this.hitSparks.emit(
+          pos.x + (dir.x / len) * r,
+          pos.y + (dir.y / len) * r,
+          dir.x,
+          dir.y,
+          -dir.x,
+          -dir.y,
+          false,
+          SPARK_KIND.shield
+        );
+      }
     });
     this.registerEventListener('shield-activated', () => {
       this.three?.shield.activate(performance.now() / 1000);
@@ -286,8 +306,13 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
     });
-    this.registerEventListener('player-took-damage', () => {
-      this.impact.kick(KICK_PLAYER_HIT);
+    // The hull took it: the lens kicks. The shield took it all: no kick and
+    // no hurt blink (the i-frames still run; only their look is held).
+    this.registerEventListener('player-took-damage', (payload = {}) => {
+      if (hullLoss(payload) > 0) {
+        this.impact.kick(KICK_PLAYER_HIT);
+        this.strikeHull(payload);
+      } else this.three?.player.holdBlink(performance.now() / 1000 + 0.5);
     });
     this.registerEventListener('boss-phase-changed', ({ enemy } = {}) => {
       this.impact.kick(KICK_BOSS_PHASE);
@@ -325,33 +350,42 @@ class Renderer3D extends BaseSystem {
       const dy = Math.sin(angle || 0);
       this.hitSparks.emit(position.x, position.y, dx, dy, dx, dy, false);
     });
-    // a split asteroid lives on as its fragments: only real deaths burn
+    // a split asteroid lives on as its fragments: only real deaths burn;
+    // a machine that dies flashes at its own core
     this.registerEventListener('enemy-destroyed', (data) => {
-      if (data?.enemy && !data.fragments?.length) {
-        this.three?.enemies.markDead(data.enemy);
+      const enemy = data?.enemy;
+      if (!enemy) return;
+      if (!data.fragments?.length) this.three?.enemies.markDead(enemy);
+      if (enemy.type !== 'asteroid' && !isBossEnemy(enemy)) {
+        this.killPops.emit(enemy.x, enemy.y, enemy.radius || 12);
       }
     });
     this.registerEventListener('bullet-hit', (data) => {
       const { position, enemy, bullet } = data || {};
       if (!position || data.blocked) return;
+      const rock = enemy?.type === 'asteroid';
+      const nx = enemy ? position.x - enemy.x : 0;
+      const ny = enemy ? position.y - enemy.y : 0;
       this.hitSparks.emit(
         position.x,
         position.y,
-        enemy ? position.x - enemy.x : 0,
-        enemy ? position.y - enemy.y : 0,
+        nx,
+        ny,
         bullet?.vx || 0,
         bullet?.vy || 0,
-        Boolean(data.killed)
+        Boolean(data.killed),
+        rock ? SPARK_KIND.rock : SPARK_KIND.metal
       );
-      // a rock that survives the hit keeps a scorch mark
-      if (enemy?.type === 'asteroid' && bullet && !data.killed) {
-        const view = this.three?.enemies.views.get(enemy.id || enemy);
-        if (view) {
-          this.three.decals.hit(
-            view,
-            position.x - enemy.x,
-            position.y - enemy.y
-          );
+      // what survives the hit keeps its heat where it was struck: a rock a
+      // patch of lava, a machine a white-hot spot, and the machine jolts
+      if (!enemy || !bullet || data.killed || isBossEnemy(enemy)) return;
+      const view = this.three?.enemies.views.get(enemy.id || enemy);
+      if (!view) return;
+      if (rock) this.three.decals.hit(view, nx, ny, DECAL_KIND.rock);
+      else if (!view.kind.startsWith('herald')) {
+        this.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
+        if (!this.reducedMotion) {
+          this.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);
         }
       }
     });
@@ -630,6 +664,7 @@ class Renderer3D extends BaseSystem {
     this.three?.shield.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
+    this.killPops.clear();
     this.muzzles.clear();
     this.biome.reset();
     this.interp?.clear();
@@ -838,7 +873,10 @@ class Renderer3D extends BaseSystem {
       this.cachedPickups
     );
     mirrorEffects(t, effects, this.impact);
-    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb);
+    // Hit Markers (Settings): the molten slag off struck metal
+    this.hitSparks.slagOn = effects?.hitMarkersEnabled !== false;
+    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke, t.glow);
+    this.killPops.update(dt, t.glow, this.flashScale);
     this.formationMarks.update(dt, t.ribbons, t.threatRgb);
     mirrorWards(t, enemyList);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
@@ -941,6 +979,7 @@ class Renderer3D extends BaseSystem {
     const { shield, player: ship } = this.three;
     const state = player?.getShieldState();
     const alive = ship.group.visible && player?.position;
+    shield.setFlicker(this.flashScale === 1);
     shield.update(
       time,
       Boolean(alive && state?.isActive),
@@ -949,6 +988,36 @@ class Renderer3D extends BaseSystem {
       alive ? player.position.y - HALF_H : 0,
       alive ? ship.shieldRadius : 0
     );
+  }
+
+  // The hull was struck (17/11, efeito/impacto): on the side the blow came
+  // from it throws sparks and molten slag, a rock that rammed it adds chips
+  // and dust, and the plate there glows white-hot and cools to a dark scar.
+  strikeHull(payload) {
+    const t = this.three;
+    const pos = this.cachedPlayer?.position;
+    if (!t || !pos || !t.player.group.visible) return;
+    const from = payload.damageSource;
+    let dx = from ? from.x - pos.x : 0;
+    let dy = from ? from.y - pos.y : 0;
+    if (Math.hypot(dx, dy) < 1e-3) {
+      const threat = this.threatDirection();
+      dx = threat.x;
+      dy = threat.y;
+    }
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-3) return;
+    const reach = t.player.shieldRadius / 1.7;
+    const x = pos.x + (dx / len) * reach * 0.8;
+    const y = pos.y + (dy / len) * reach * 0.8;
+    this.hitSparks.emit(x, y, dx, dy, -dx, -dy, true, SPARK_KIND.metal);
+    if (payload.cause === 'collision') {
+      this.hitSparks.emit(x, y, dx, dy, -dx, -dy, false, SPARK_KIND.rock);
+    }
+    const view = this.shipView || (this.shipView = { id: SHIP_DECAL_ID });
+    view.object = t.player.group;
+    view.reach = reach;
+    t.decals.hit(view, dx, dy, DECAL_KIND.metal);
   }
 
   // Logical direction from the ship to the nearest threat (enemy shot or

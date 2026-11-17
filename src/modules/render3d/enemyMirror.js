@@ -43,6 +43,14 @@ import { RimBatch, rimLoop } from './rimBatch.js';
 import { addRimLight } from './rimLight.js';
 
 // proposta 18/10: chunks a death throws (machines by radius; final Warden).
+// proposta 17/11 (efeito/impacto): a hit knocks a machine's hull back along
+// the shot by up to JOLT_MAX world units (× damage / JOLT_REFERENCE), and it
+// settles in JOLT_TIME s. Only the picture moves; the sim keeps its own
+// knockback.
+const JOLT_TIME = 0.12;
+const JOLT_MAX = 2.2;
+const JOLT_MIN = 0.8;
+const JOLT_REFERENCE = 20;
 const BURST_MIN = 6;
 const BURST_MAX = 12;
 const WARDEN_BURST = 24;
@@ -819,6 +827,19 @@ export class EnemyMirror {
   }
 
   /** The simulation killed `enemy` (asteroid splits excluded). */
+  /** A shot flying (vx, vy) hit the machine `view` for `damage`. */
+  jolt(view, vx, vy, damage) {
+    const len = Math.hypot(vx, vy);
+    if (len < 1e-3) return;
+    const reach = Math.min(
+      JOLT_MAX,
+      Math.max(JOLT_MIN, (JOLT_MAX * (damage || 0)) / JOLT_REFERENCE)
+    );
+    view.joltX = (vx / len) * reach;
+    view.joltY = (vy / len) * reach;
+    view.joltAt = performance.now() / 1000;
+  }
+
   markDead(enemy) {
     this.dead.add(enemy.id || enemy);
   }
@@ -857,6 +878,13 @@ export class EnemyMirror {
     const { object } = view;
     object.scale.setScalar(enemy.radius || 12);
     object.rotation.y = -(enemy.rotation || 0);
+    // a hit knocks the hull back along the shot, and it settles (jolt())
+    const jolt = time - (view.joltAt ?? -Infinity);
+    if (jolt >= 0 && jolt < JOLT_TIME) {
+      const k = (1 - jolt / JOLT_TIME) ** 2;
+      object.position.x += view.joltX * k;
+      object.position.z += view.joltY * k;
+    }
     this.applyElite(view, enemy.elite === true);
     if (view.eliteRing) view.eliteRing.rotation.y = time * 0.5;
     if (enemy.affixes?.length || view.affix?.group.visible) {

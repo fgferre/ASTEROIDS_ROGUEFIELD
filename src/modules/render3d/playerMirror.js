@@ -277,6 +277,7 @@ export class PlayerMirror {
     this.hullMaps = maps;
     this.surfaceMaps = true;
     this.blink = blink;
+    this.blinkHeldUntil = -Infinity;
     const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
     this.canopyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
@@ -586,6 +587,11 @@ export class PlayerMirror {
   }
 
   /** Mirrors the player; feeds its thruster trail into `ribbons`. */
+  /** No hurt blink until `time` s: the shield took the hit whole. */
+  holdBlink(time) {
+    this.blinkHeldUntil = time;
+  }
+
   update(player, ribbons, time) {
     const hidden =
       !player ||
@@ -638,13 +644,16 @@ export class PlayerMirror {
     this.lightRetros(player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
-    // Blink while invulnerable after a hit; the dash's own i-frames and the
-    // win's steady guard do not.
+    // Blink while invulnerable after a hit; the dash's own i-frames, the
+    // win's steady guard and a hit the shield took whole (holdBlink) do not.
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
     else if (!invulnerable) this.dashGuard = false;
     this.blink.value =
-      invulnerable && !this.dashGuard && !player.steadyGuard
+      invulnerable &&
+      !this.dashGuard &&
+      !player.steadyGuard &&
+      time >= this.blinkHeldUntil
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
     const dashShield = invulnerable && this.dashGuard;
