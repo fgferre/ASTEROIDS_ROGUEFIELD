@@ -608,7 +608,13 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
-    if (!['settings', 'credits', 'campaign'].includes(overlay)) {
+    // Settings from the menu keep its music, muffled like the in-run pause.
+    if (overlay === 'settings') {
+      this.fileTrackManager?.setMuffled(isOpen && source === 'menu');
+      return;
+    }
+
+    if (!['credits', 'campaign'].includes(overlay)) {
       return;
     }
 
@@ -652,7 +658,7 @@ class AudioSystem extends BaseSystem {
     }
 
     // The track of the menu and the overlays opened from it; the others stop
-    // (a settings overlay or a run has none).
+    // (a run has none).
     const wanted = MENU_SCREEN_TRACKS[currentScreen];
     Object.values(MENU_SCREEN_TRACKS).forEach((trackId) => {
       // playFileTrack delegates to FileTrackManager.playTrack, which routes the
