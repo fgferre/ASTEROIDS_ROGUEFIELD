@@ -10,6 +10,7 @@ import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
+import { STORY } from '../data/story.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -375,18 +376,20 @@ class UISystem extends BaseSystem {
     const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;
     const stage = this.bossRush ? bossRushStage(layer) : 0;
+    const chapter = stage
+      ? bossRushStageTitle(stage)
+      : firstOfBiome
+        ? sectorTitle(sector, biome.title)
+        : layer > RUN_FINAL_LAYER && !sector
+          ? 'DEEP FIELD'
+          : '';
     // A sector run counts its layers from its own first one.
     hud.showLayerBanner(sector ? localLayer(sector, layer) : layer, {
       boss,
       sentinel: Boolean(sector?.boss),
       bossRush: this.bossRush,
-      chapter: stage
-        ? bossRushStageTitle(stage)
-        : firstOfBiome
-          ? sectorTitle(sector, biome.title)
-          : layer > RUN_FINAL_LAYER && !sector
-            ? 'DEEP FIELD'
-            : '',
+      chapter,
+      context: sector && !stage && firstOfBiome ? STORY.context[sector.id] : '',
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));

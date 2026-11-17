@@ -47,6 +47,7 @@ function setup({ plays = true } = {}) {
     }),
     layerBannerTitle: fakeElement(),
     layerBannerSub: fakeElement(),
+    layerBannerNote: fakeElement(),
     cinematicHint: fakeElement(),
     letterbox: fakeElement(),
   };

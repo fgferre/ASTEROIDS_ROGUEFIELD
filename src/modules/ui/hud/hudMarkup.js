@@ -34,6 +34,7 @@ export function getHudHtml() {
                 <div class="layer-banner__title" id="ui-layer-banner-title">LAYER 1</div>
                 <div class="layer-banner__line"></div>
                 <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
+                <div class="layer-banner__note" id="ui-layer-banner-note"></div>
             </div>
             <div class="cinematic-hint" id="ui-cinematic-hint">PRESS ANY KEY TO SKIP</div>
             <div class="letterbox" id="ui-letterbox" aria-hidden="true"></div>
@@ -41,6 +42,7 @@ export function getHudHtml() {
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
                 <div class="boss-intro__sub" id="ui-boss-intro-sub">Guardian of the Ring</div>
+                <div class="boss-intro__note" id="ui-boss-intro-note"></div>
                 <div class="boss-intro__line"></div>
             </div>
             <div class="onboarding-tip" id="ui-onboarding-tip" role="status">

@@ -16,6 +16,12 @@ import { SECTORS, sectorBossTier } from '../../data/sectors.js';
 import { ENDING_SECTOR, STORY } from '../../data/story.js';
 import { isSectorUnlocked, loadRecords } from '../../services/runRecords.js';
 import { formatRunTime } from './runRecap.js';
+import {
+  chapterTransmission,
+  stageTransmission,
+  travelTransmissions,
+  wardenTransmission,
+} from './transmissions.js';
 
 /** Chapters along the arc: the real ones, then chapters with no signal yet. */
 export const CAMPAIGN_NODE_COUNT = 6;
@@ -138,6 +144,58 @@ export function defaultSectorRow(rows) {
   );
 }
 
+const shownName = (sector) =>
+  sector.name.replace(/\b(\w)(\w*)/g, (_, a, b) => a + b.toLowerCase());
+const sectorLabel = (sector, index) => `${index + 1} · ${shownName(sector)}`;
+
+/**
+ * The Wake's log: its prologue, then an entry per sector won (in campaign
+ * order, titled with its place in the campaign), and `next`, the first
+ * sector not won yet (null when all are).
+ */
+export function wakeLogEntries(records) {
+  const entries = [{ title: 'Before launch', text: STORY.log.prologue }];
+  let next = null;
+  SECTORS.forEach((sector, index) => {
+    const title = sectorLabel(sector, index);
+    if (records.sectorsWon.includes(sector.id)) {
+      entries.push({ title, text: STORY.log[sector.id] });
+    } else if (!next) {
+      next = { title };
+    }
+  });
+  return { entries, next };
+}
+
+/**
+ * Every line said in the sectors won, in order: the journey, the arrival,
+ * the stages, then the end boss's warning, last and defeated lines.
+ */
+export function wakeTranscript(records) {
+  return SECTORS.flatMap((sector) => {
+    if (!records.sectorsWon.includes(sector.id)) return [];
+    const kind = sector.boss ?? bossKindForLayer(sector.layers[1]);
+    const stages = Array.from(
+      { length: sector.layers[1] - sector.layers[0] + 1 },
+      (_, i) => stageTransmission(sector.id, i + 1)
+    );
+    const lines = [
+      ...travelTransmissions(sector.id),
+      chapterTransmission(null, sector.id),
+      ...stages,
+      ...['warning', 'last', 'defeated'].map((moment) =>
+        wardenTransmission(sector.layers[1], moment, kind)
+      ),
+    ]
+      .filter((entry) => entry?.text)
+      .map((entry) => ({
+        speaker: entry.label ?? entry.speaker,
+        text: entry.text,
+      }));
+    return [{ sector: shownName(sector), lines }];
+  });
+}
+
 function stateLine(node) {
   switch (node.state) {
     case 'cleared':
@@ -247,6 +305,8 @@ export class CampaignMap {
     this.chapters = [];
     this.chapter = null;
     this.selectedId = null;
+    this.records = null;
+    this.reading = false;
     // A sector run is on: the menu it ends in opens the map again.
     this.returnToMap = false;
   }
@@ -254,6 +314,10 @@ export class CampaignMap {
   bindCampaignControls() {
     const refs = this.refs;
     if (!refs.overlay) return;
+    refs.logToggle?.addEventListener('click', () => {
+      this.reading = !this.reading;
+      this.renderLog();
+    });
     refs.openBtn?.addEventListener('click', () => this.openMap());
     [refs.backBtn, refs.closeBtn].forEach((button) =>
       button?.addEventListener('click', () => this.closeMap())
@@ -398,9 +462,57 @@ export class CampaignMap {
     this.prepareTravel({ sector: id, source: 'campaign-launch-btn' });
   }
 
+  /** The log panel: the Wake's log, or (`reading`) every line said so far. */
+  renderLog() {
+    const { logBody, logToggle } = this.refs;
+    if (!logBody) return;
+    const add = (parent, tag, className, text) => {
+      const node = document.createElement(tag);
+      node.className = className;
+      node.textContent = text;
+      parent.append(node);
+      return node;
+    };
+    const transcript = wakeTranscript(this.records);
+    const count = transcript.reduce((n, { lines }) => n + lines.length, 0);
+    logBody.replaceChildren();
+    if (this.reading) {
+      transcript.forEach(({ sector, lines }) => {
+        const group = add(logBody, 'div', 'campaign-log__entry', '');
+        add(group, 'div', 'campaign-log__title', sector);
+        lines.forEach(({ speaker, text }) => {
+          const row = add(group, 'p', 'campaign-log__line', ` — ${text}`);
+          const who = document.createElement('span');
+          who.className = 'campaign-log__speaker';
+          who.textContent = speaker;
+          row.prepend(who);
+        });
+      });
+      logToggle.textContent = 'Back to log';
+      logToggle.hidden = false;
+      logBody.scrollTop = 0;
+      return;
+    }
+    const { entries, next } = wakeLogEntries(this.records);
+    entries.forEach(({ title, text }) => {
+      const entry = add(logBody, 'div', 'campaign-log__entry', '');
+      add(entry, 'div', 'campaign-log__title', title);
+      add(entry, 'p', 'campaign-log__text', text);
+    });
+    if (next) {
+      add(logBody, 'p', 'campaign-log__next', `${next.title} — not flown yet`);
+    }
+    logToggle.textContent = `Transmissions logged: ${count} · Read again`;
+    logToggle.hidden = count === 0;
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
   openMap() {
     const refs = this.refs;
-    this.chapters = campaignChapters(loadRecords());
+    this.records = loadRecords();
+    this.reading = false;
+    this.renderLog();
+    this.chapters = campaignChapters(this.records);
     this.chapter = null;
     refs.nodes.innerHTML = campaignMarkup(this.chapters);
     this.mapState = { isOpen: true, trigger: document.activeElement };

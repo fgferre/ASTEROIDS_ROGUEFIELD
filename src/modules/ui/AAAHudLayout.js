@@ -250,6 +250,7 @@ export class AAAHudLayout {
       bossRush = false,
       delayMs = 0,
       chapter = '',
+      context = '',
     } = {}
   ) {
     let title = boss
@@ -259,6 +260,7 @@ export class AAAHudLayout {
     this._showBanner(title, {
       tone: boss ? 'boss' : null,
       subtitle: chapter,
+      note: context,
       delayMs,
       durationMs: chapter ? CHAPTER_BANNER_MS : LAYER_BANNER_MS,
     });
@@ -329,6 +331,7 @@ export class AAAHudLayout {
     {
       tone = null,
       subtitle = '',
+      note = '',
       delayMs = 0,
       durationMs = LAYER_BANNER_MS,
     } = {}
@@ -345,6 +348,7 @@ export class AAAHudLayout {
     this._bannerTimer = this._later(() => {
       this.els.layerBannerTitle.textContent = title;
       this.els.layerBannerSub.textContent = subtitle;
+      this.els.layerBannerNote.textContent = note;
       banner.classList.toggle('is-boss', tone === 'boss');
       banner.classList.toggle('is-surge', tone === 'surge');
       banner.classList.toggle('is-event', tone === 'event');
@@ -402,7 +406,7 @@ export class AAAHudLayout {
    * Boss name card, queued after a layer banner still on screen; the boss bar
    * stays hidden until the card is gone.
    */
-  showBossIntro(name, subtitle) {
+  showBossIntro(name, subtitle, note = '') {
     const card = this.els?.bossIntro;
     if (!card) {
       return;
@@ -415,6 +419,7 @@ export class AAAHudLayout {
     this._later(() => {
       this.els.bossIntroName.textContent = name || 'Warden Prime';
       this.els.bossIntroSub.textContent = subtitle || 'Guardian of the Ring';
+      this.els.bossIntroNote.textContent = note;
       card.classList.remove('is-leaving');
       replay(card, 'is-showing');
       this._later(() => {
@@ -617,11 +622,13 @@ export class AAAHudLayout {
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
+      layerBannerNote: query('#ui-layer-banner-note'),
       cinematicHint: query('#ui-cinematic-hint'),
       letterbox: query('#ui-letterbox'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
       bossIntroSub: query('#ui-boss-intro-sub'),
+      bossIntroNote: query('#ui-boss-intro-note'),
       transmission: query('#ui-transmission'),
       transmissionSpeaker: query('#ui-transmission-speaker'),
       transmissionLine: query('#ui-transmission-line'),
