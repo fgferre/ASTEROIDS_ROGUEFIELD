@@ -3,12 +3,21 @@
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
  * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
+ * PLAYTEST_FLIGHT=old flies the old flight (`?direcao=antiga`); by default it
+ * flies the new one (classic glide, cannon on the nose, the default of the game).
+ * PLAYTEST_SEED may be a range ('1-10'); PLAYTEST_OUT names a JSON file the
+ * rows are written to.
  */
 
+import { writeFileSync } from 'node:fs';
 import { afterAll, beforeEach, describe, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { SECTORS, chapterSectors, localLayer } from '../../src/data/sectors.js';
-import { createBotDriver } from '../../src/bootstrap/botPilotAdapter.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../src/core/GameConstants.js';
+import {
+  createBotDriver,
+  weaponReach,
+} from '../../src/bootstrap/botPilotAdapter.js';
 import {
   createHeadlessGame,
   installDomStubs,
@@ -20,8 +29,18 @@ const FPS = Math.round(1 / STEP_SECONDS);
 const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
-// Seeds both the bot's miss rolls and the world (the run's seed).
-const SEED = Number(process.env.PLAYTEST_SEED || 1);
+const FLIGHT = process.env.PLAYTEST_FLIGHT === 'old' ? 'old' : 'new';
+const FLIGHT_SEARCH = FLIGHT === 'old' ? '?direcao=antiga' : '';
+const OUT = process.env.PLAYTEST_OUT || '';
+// Seeds both the bot's miss rolls and the world (the run's seed): one, or a
+// range like '1-10'.
+const [seedFrom, seedTo = seedFrom] = (process.env.PLAYTEST_SEED || '1')
+  .split('-')
+  .map(Number);
+const SEEDS = Array.from(
+  { length: seedTo - seedFrom + 1 },
+  (_, i) => seedFrom + i
+);
 // PLAYTEST_CARRY=1: as in the campaign, the bot first wins the chapter's
 // earlier sectors and arrives with that build (the victory screen's carry).
 const CARRY = process.env.PLAYTEST_CARRY === '1';
@@ -38,18 +57,64 @@ const clock = (frames) => {
 const sourceName = (source) =>
   source ? source.bossKind || source.displayName || source.type : null;
 
+// What the pilot's flying looks like frame by frame (the table's sanity
+// columns): how often the hull is turning, near an edge, and, with a foe in
+// reach, how often the cannon on the nose points at it.
+function watchFrame(watch, player, enemies, combat, held) {
+  watch.frames += 1;
+  watch.speed += Math.hypot(player.velocity.vx, player.velocity.vy);
+  if (Math.abs(player.angularVelocity) > 0.6) watch.turning += 1;
+  // Braking the way this flight allows: the push against the drift, with the
+  // back key while drifting nose-first or W while drifting tail-first.
+  const along =
+    player.velocity.vx * Math.cos(player.angle) +
+    player.velocity.vy * Math.sin(player.angle);
+  if (held.includes('KeyW')) watch.pushing += 1;
+  if (held.includes('KeyS')) watch.reversing += 1;
+  if (
+    (held.includes('KeyS') && along > 20) ||
+    (held.includes('KeyW') && along < -20)
+  ) {
+    watch.braking += 1;
+  }
+  const { x, y } = player.position;
+  if (Math.min(x, GAME_WIDTH - x, y, GAME_HEIGHT - y) < 40) watch.edge += 1;
+  const reach = weaponReach(combat);
+  let near = false;
+  let aimed = false;
+  enemies.forEachActiveEnemy((e) => {
+    if (e.destroyed) return;
+    const gap = Math.hypot(e.x - x, e.y - y);
+    if (gap > reach + (e.radius || 10)) return;
+    near = true;
+    const bearing = Math.atan2(e.y - y, e.x - x) - player.angle;
+    const off = Math.abs(Math.atan2(Math.sin(bearing), Math.cos(bearing)));
+    if (off < Math.atan2((e.radius || 10) + 4, gap) + 0.05) aimed = true;
+  });
+  if (near) watch.foeInReach += 1;
+  if (aimed) watch.aimed += 1;
+}
+
 /** One sector run, start to victory, death or the time limit. */
-async function playSector(sector) {
+async function playSector(sector, seed) {
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
-  session.resolveServiceInstance('difficulty').runSeed = SEED;
+  session.resolveServiceInstance('difficulty').runSeed = seed;
+  const onGlide = Boolean(
+    player.noseAim && player.flight.glide && player.controlScheme === 'classic'
+  );
+  if (onGlide !== (FLIGHT === 'new')) {
+    throw new Error(
+      `playtest: the address did not switch to the ${FLIGHT} flight`
+    );
+  }
   const driver = createBotDriver({
     services,
     eventBus,
     preset: PRESET,
-    seed: SEED,
+    seed,
   });
 
   // What hurt the ship this step: a boss hazard's cause, an enemy shot, or
@@ -92,7 +157,26 @@ async function playSector(sector) {
   });
   const startLevel = progression.getLevel();
   const [, lastLayer] = sector.layers;
-  const report = { sector, layers: [], boss: null, outcome: null, frames: 0 };
+  const report = {
+    sector,
+    seed,
+    layers: [],
+    hitCauses: {},
+    boss: null,
+    outcome: null,
+    frames: 0,
+    watch: {
+      frames: 0,
+      turning: 0,
+      pushing: 0,
+      reversing: 0,
+      braking: 0,
+      edge: 0,
+      foeInReach: 0,
+      aimed: 0,
+      speed: 0,
+    },
+  };
   let layer = null;
   let lastHit = null;
   for (let frame = 0; frame < LIMIT_MINUTES * 60 * FPS; frame += 1) {
@@ -107,6 +191,7 @@ async function playSector(sector) {
     driver.step();
     game.step();
     report.frames = frame + 1;
+    watchFrame(report.watch, player, enemies, services.combat, driver.held());
     if (layer) layer.end = frame + 1;
     if (player.health < health) {
       if (layer) {
@@ -115,6 +200,7 @@ async function playSector(sector) {
       }
       lastHit =
         cause || `contact (${sourceName(player.lastDamageSource) || '?'})`;
+      report.hitCauses[lastHit] = (report.hitCauses[lastHit] || 0) + 1;
     }
     if (!report.boss && wave === lastLayer) {
       const boss = enemies.getActiveEnemies().find((e) => e.type === 'boss');
@@ -157,6 +243,8 @@ async function playSector(sector) {
   report.cards = [...driver.cards];
   report.level = progression.getLevel();
   report.startLevel = startLevel;
+  report.kills = enemies.sessionStats.totalKills;
+  report.wave = layer?.number ?? sector.layers[0];
   return report;
 }
 
@@ -169,10 +257,39 @@ function outcomeText({ outcome, frames, sector }) {
   return `timed out at ${LIMIT_MINUTES}:00`;
 }
 
+// One run as the plain numbers the comparison table (scripts/playtest.mjs) reads.
+function toRow(r) {
+  const { watch } = r;
+  const share = (n, of) => (of ? Math.round((100 * n) / of) : 0);
+  return {
+    sector: r.sector.id,
+    seed: r.seed,
+    preset: PRESET,
+    flight: FLIGHT,
+    outcome: r.outcome.kind,
+    seconds: Math.round(r.frames / FPS),
+    kills: r.kills,
+    wave: r.wave,
+    localWave: localLayer(r.sector, r.wave),
+    waves: r.sector.layers[1] - r.sector.layers[0] + 1,
+    cause: r.outcome.by || null,
+    level: r.level,
+    autoAim: r.cards.includes('auto_aim'),
+    flightComputer: r.cards.includes('flight_computer'),
+    turningPct: share(watch.turning, watch.frames),
+    pushPct: share(watch.pushing, watch.frames),
+    reversePct: share(watch.reversing, watch.frames),
+    brakePct: share(watch.braking, watch.frames),
+    edgePct: share(watch.edge, watch.frames),
+    aimedPct: share(watch.aimed, watch.foeInReach),
+    meanSpeed: Math.round(watch.speed / Math.max(1, watch.frames)),
+  };
+}
+
 function printReport(report) {
   const { sector, boss } = report;
   const lines = [
-    `\n=== ${sector.id} (${sector.code}, layers ${sector.layers.join('-')}, boss ${sector.boss || 'warden'}) — bot ${PRESET}`,
+    `\n=== ${sector.id} seed ${report.seed} (${sector.code}, layers ${sector.layers.join('-')}, boss ${sector.boss || 'warden'}) — bot ${PRESET}`,
     `  outcome: ${outcomeText(report)}; total ${clock(report.frames)}`,
     ...(CARRY
       ? [`  arrived at level ${report.startLevel} (carried build)`]
@@ -191,6 +308,10 @@ function printReport(report) {
   } else {
     lines.push('  boss: never reached');
   }
+  const causes = Object.entries(report.hitCauses).sort((a, b) => b[1] - a[1]);
+  if (causes.length) {
+    lines.push(`  hits by: ${causes.map(([c, n]) => `${c} ${n}`).join(', ')}`);
+  }
   if (report.outcome.kind === 'died') {
     lines.push(`  killed by: ${report.outcome.by || 'unknown'}`);
   }
@@ -203,22 +324,34 @@ function printSummary(reports) {
     const hits = r.layers.reduce((sum, l) => sum + l.hits, 0);
     return [
       r.sector.id,
+      String(r.seed),
       outcomeText(r),
       clock(r.frames),
       String(r.boss?.level ?? r.level),
       r.boss ? `${Math.round((r.boss.end - r.boss.start) / FPS)} s` : '-',
       String(Math.round(hull)),
       String(hits),
+      String(r.kills),
     ];
   });
-  const head = ['sector', 'outcome', 'time', 'lvl', 'boss', 'hull-', 'hits'];
+  const head = [
+    'sector',
+    'seed',
+    'outcome',
+    'time',
+    'lvl',
+    'boss',
+    'hull-',
+    'hits',
+    'kills',
+  ];
   const widths = head.map((h, i) =>
     Math.max(h.length, ...rows.map((row) => row[i].length))
   );
   const line = (cells) => cells.map((c, i) => c.padEnd(widths[i])).join('  ');
   print(
     [
-      `\nSUMMARY — bot ${PRESET}, seed ${SEED}`,
+      `\nSUMMARY — bot ${PRESET}, flight ${FLIGHT}`,
       line(head),
       ...rows.map(line),
     ].join('\n')
@@ -232,6 +365,7 @@ const reports = [];
 describe(`playtest (${PRESET})`, () => {
   beforeEach(() => {
     const restoreDom = installDomStubs();
+    globalThis.window.location.search = FLIGHT_SEARCH;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
       vi.spyOn(console, method).mockImplementation(() => {});
@@ -247,14 +381,17 @@ describe(`playtest (${PRESET})`, () => {
     };
   });
 
-  afterAll(() => printSummary(reports));
+  afterAll(() => {
+    printSummary(reports);
+    if (OUT) writeFileSync(OUT, JSON.stringify(reports.map(toRow)));
+  });
 
-  it.each(chosen.map((sector) => [sector.id, sector]))(
-    '%s',
-    async (_, sector) => {
-      const report = await playSector(sector);
-      reports.push(report);
-      printReport(report);
-    }
+  const cases = chosen.flatMap((sector) =>
+    SEEDS.map((seed) => [`${sector.id} seed ${seed}`, sector, seed])
   );
+  it.each(cases)('%s', async (_, sector, seed) => {
+    const report = await playSector(sector, seed);
+    reports.push(report);
+    printReport(report);
+  });
 });
