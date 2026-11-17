@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENDING_SECTOR, STORY } from '../../src/data/story.js';
 import { BIOMES } from '../../src/data/biomes.js';
-import { BOSS_KINDS } from '../../src/data/enemies/boss.js';
+import { BOSS_KINDS, bossKindForLayer } from '../../src/data/enemies/boss.js';
 import {
   chapterTransmission,
   stageTransmission,
@@ -120,5 +120,15 @@ describe('story', () => {
   it('is frozen', () => {
     expect(Object.isFrozen(STORY.boss.prime)).toBe(true);
     expect(Object.isFrozen(STORY.death)).toBe(true);
+  });
+
+  it('has a short arrival line and a log entry per sector, and a line per sector end boss', () => {
+    SECTORS.forEach((sector) => {
+      expect(STORY.context[sector.id].length).toBeLessThan(90);
+      expect(STORY.log[sector.id]).toBeTruthy();
+      const kind = sector.boss ?? bossKindForLayer(sector.layers[1]);
+      expect(STORY.bossContext[kind]).toBeTruthy();
+    });
+    expect(STORY.log.prologue).toBeTruthy();
   });
 });

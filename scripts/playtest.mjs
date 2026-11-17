@@ -5,6 +5,9 @@
 //   npm run playtest -- dense-core [good]  one sector
 //   npm run playtest -- dense-core good 3  one sector, world and bot seed 3
 //   npm run playtest -- dense-core good 1-10  seeds 1 to 10, in a row
+//   npm run playtest -- debris-wake average 1-10 --difficulty=pressure-5
+//                                          difficulty: pilot, veteran, warden,
+//                                          pressure-1..5 (none = the game's default)
 //   npm run playtest -- --flight=old       the old flight (?direcao=antiga); the
 //                                          default is the new one (glide, cannon on the nose)
 //   npm run playtest -- debris-wake --table 1-10
@@ -36,6 +39,7 @@ const trilha = flag('trilha') || '';
 if (trilha && !['b', 'c', 'd'].includes(trilha)) {
   throw new Error("playtest: --trilha is b, c or d (default: today's order)");
 }
+const difficulty = flag('difficulty') || '';
 const table = args.includes('--table');
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
 const [sector = '', seed = ''] = args.filter(
@@ -54,7 +58,7 @@ function run(env) {
     {
       cwd: ROOT,
       stdio: table ? 'ignore' : 'inherit',
-      env: { ...process.env, ...env },
+      env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
     }
   );
 }

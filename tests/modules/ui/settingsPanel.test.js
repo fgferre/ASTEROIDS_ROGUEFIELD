@@ -5,6 +5,7 @@ import SETTINGS_SCHEMA from '../../../src/data/settingsSchema.js';
 import { settingPreview } from '../../../src/modules/ui/settingsPreview.js';
 import SettingsSystem from '../../../src/modules/SettingsSystem.js';
 import { EventBus } from '../../../src/core/EventBus.js';
+import { SETTINGS_SECTIONS } from '../../../src/modules/ui/settings/settingsGroups.js';
 
 // Just enough DOM for the settings renderer: elements with children,
 // dataset, attributes and a class-name querySelector.
@@ -35,26 +36,51 @@ function fakeElement(tag) {
       };
       return visit(this);
     },
+    querySelectorAll() {
+      return [];
+    },
     set innerHTML(_value) {
       this.children = [];
     },
   };
 }
 
-const defaultsOf = (category) =>
-  Object.fromEntries(category.fields.map((f) => [f.key, f.default]));
+const SECTION_IDS = SETTINGS_SECTIONS.map((section) => section.id);
 
-function renderCategory(category) {
+// Every settings row of a rendered section, however deep (groups, folds).
+function rowsOf(node, rows = []) {
+  for (const child of node.children ?? []) {
+    if (child.className?.split(' ').includes('settings-field')) {
+      rows.push(child);
+    }
+    rowsOf(child, rows);
+  }
+  return rows;
+}
+
+// `changes`: [category, key, value] set before the section is drawn.
+function renderSection(sectionId, callbacks = {}, changes = []) {
   const container = fakeElement('div');
+  const settings = new SettingsSystem({ eventBus: new EventBus() });
+  changes.forEach(([category, key, value]) =>
+    settings.setSetting(category, key, value)
+  );
   const panel = new SettingsPanel({
     refs: { container },
-    settings: { getCategoryValues: () => defaultsOf(category) },
+    settings,
     schema: SETTINGS_SCHEMA,
     livePreset: () => null,
+    ...callbacks,
   });
-  panel.renderSettingsPanel(category.id);
-  return container.children;
+  panel.renderSettingsPanel(sectionId);
+  const rows = rowsOf(container);
+  const row = (key) => rows.find((node) => node.dataset.settingKey === key);
+  return { panel, settings, rows, row };
 }
+
+const isGreyed = (row) => row.className.split(' ').includes('is-inactive');
+const reasonOf = (row) =>
+  row.querySelector('.settings-field__description').textContent;
 
 describe('Settings panel', () => {
   let restoreDom;
@@ -68,22 +94,26 @@ describe('Settings panel', () => {
     restoreDom();
   });
 
-  it('renders every schema key in its section, none lost', () => {
-    SETTINGS_SCHEMA.forEach((category) => {
-      const rendered = renderCategory(category)
-        .filter((node) => node.dataset?.settingKey)
-        .map((node) => node.dataset.settingKey);
-      expect(rendered).toEqual(
-        category.fields
-          .filter((field) => !field.hidden)
-          .map((field) => field.key)
-      );
-    });
+  it('shows every visible schema field exactly once across the six sections', () => {
+    const shown = SECTION_IDS.flatMap((id) =>
+      renderSection(id).rows.map(
+        (row) => `${row.dataset.settingCategory}.${row.dataset.settingKey}`
+      )
+    );
+    const visible = SETTINGS_SCHEMA.flatMap((category) =>
+      category.fields
+        .filter((field) => !field.hidden)
+        .map((field) => `${category.id}.${field.key}`)
+    );
+    expect(SECTION_IDS).toHaveLength(6);
+    expect(visible).toHaveLength(44);
+    expect([...shown].sort()).toEqual([...visible].sort());
   });
 
   it('keeps the hull out of the panel while the setting still defaults and validates', () => {
-    const gameplay = SETTINGS_SCHEMA.find((c) => c.id === 'gameplay');
-    const rendered = renderCategory(gameplay).map((n) => n.dataset?.settingKey);
+    const rendered = SECTION_IDS.flatMap((id) =>
+      renderSection(id).rows.map((row) => row.dataset.settingKey)
+    );
     expect(rendered).not.toContain('selectedHull');
 
     const settings = new SettingsSystem({ eventBus: new EventBus() });
@@ -101,9 +131,7 @@ describe('Settings panel', () => {
   });
 
   it('shows quality and camera as segmented choices with a live preview', () => {
-    const graphics = SETTINGS_SCHEMA.find((c) => c.id === 'graphics');
-    const fields = renderCategory(graphics);
-    const quality = fields.find((n) => n.dataset?.settingKey === 'quality');
+    const quality = renderSection('graphics').row('quality');
     const segments = quality.querySelector('.settings-segmented').children;
 
     expect(segments.map((s) => s.dataset.segmentValue)).toEqual([
@@ -115,7 +143,7 @@ describe('Settings panel', () => {
     ]);
     expect(segments[0].attributes['aria-pressed']).toBe('true');
     expect(quality.querySelector('.settings-preview')).not.toBeNull();
-    const camera = fields.find((n) => n.dataset?.settingKey === 'cameraMode');
+    const camera = renderSection('game').row('cameraMode');
     expect(camera.querySelector('.settings-segmented').children).toHaveLength(
       2
     );
@@ -128,10 +156,96 @@ describe('Settings panel', () => {
     expect(
       settingPreview('quality', 'auto', { livePreset: 'medium' }).text
     ).toMatch(/^Auto: Running Medium, one step down below 50 fps\. Bloom 85%/);
-    expect(
-      settingPreview('bloom', true, { postProcessing: false })
-    ).toMatchObject({ glow: false });
+    expect(settingPreview('bloom', true)).toMatchObject({ glow: true });
+    expect(settingPreview('bloom', false)).toMatchObject({ glow: false });
     expect(settingPreview('masterVolume', 1)).toBeNull();
+  });
+
+  it('resets exactly what the section shows, bindings included', () => {
+    const { panel, settings } = renderSection('game');
+    settings.setSetting('graphics', 'cameraMode', 'classic');
+    settings.setSetting('controls', 'cameraLead', 'hull');
+    settings.setSetting('graphics', 'quality', 'low');
+    settings.setSetting('controls', 'vibration', false);
+
+    panel.resetActiveSection();
+
+    expect(settings.getSetting('graphics', 'cameraMode')).toBe('dynamic');
+    expect(settings.getSetting('controls', 'cameraLead')).toBe('aim');
+    expect(settings.getSetting('graphics', 'quality')).toBe('low');
+    expect(settings.getSetting('controls', 'vibration')).toBe(false);
+
+    const moved = { keyboard: ['KeyJ'], gamepad: [] };
+    settings.setSetting('controls', 'dash', moved);
+    panel.settingsState.activeSection = 'controls';
+    panel.resetActiveSection();
+    expect(settings.getSetting('controls', 'dash')).not.toEqual(moved);
+    expect(settings.getSetting('controls', 'vibration')).toBe(true);
+    expect(settings.getSetting('graphics', 'quality')).toBe('low');
+  });
+
+  it('greys Camera Lead with the Classic camera, with its reason', () => {
+    expect(isGreyed(renderSection('game').row('cameraLead'))).toBe(false);
+
+    const { row } = renderSection('game', {}, [
+      ['graphics', 'cameraMode', 'classic'],
+    ]);
+    expect(isGreyed(row('cameraLead'))).toBe(true);
+    expect(reasonOf(row('cameraLead'))).toBe('Only with the Dynamic camera.');
+  });
+
+  it('greys the four effects when Post-Processing is off', () => {
+    const { row } = renderSection('graphics', {}, [
+      ['graphics', 'postProcessing', false],
+    ]);
+
+    ['bloom', 'bloomIntensity', 'chromaticAberration', 'antialiasing'].forEach(
+      (key) => {
+        expect(isGreyed(row(key))).toBe(true);
+        expect(reasonOf(row(key))).toBe('Needs Post-Processing.');
+      }
+    );
+    expect(isGreyed(row('postProcessing'))).toBe(false);
+    expect(isGreyed(row('quality'))).toBe(false);
+  });
+
+  it('greys Hull Control in the new flight and shows the flight in use', () => {
+    const { row } = renderSection('controls', {}, [
+      ['controls', 'hullControl', 'modern'],
+    ]);
+    const walk = (node) => [node, ...(node.children || []).flatMap(walk)];
+    const pressed = walk(row('hullControl')).filter(
+      (node) =>
+        node.dataset?.segmentValue && node.attributes['aria-pressed'] === 'true'
+    );
+    expect(isGreyed(row('hullControl'))).toBe(true);
+    expect(pressed.map((node) => node.dataset.segmentValue)).toEqual([
+      'classic',
+    ]);
+  });
+
+  it('greys Damage Numbers while the game draws none', () => {
+    const { row } = renderSection('hud');
+    expect(isGreyed(row('damageNumbers'))).toBe(true);
+    expect(reasonOf(row('damageNumbers'))).toBe(
+      'The game shows no damage numbers for now.'
+    );
+    expect(isGreyed(row('hitMarkers'))).toBe(false);
+  });
+
+  it('greys Difficulty while a Pressure rung is on', () => {
+    expect(
+      isGreyed(
+        renderSection('game', {
+          getService: () => ({ getPressure: () => 0 }),
+        }).row('difficulty')
+      )
+    ).toBe(false);
+    const { row } = renderSection('game', {
+      getService: () => ({ getPressure: () => 1 }),
+    });
+    expect(isGreyed(row('difficulty'))).toBe(true);
+    expect(reasonOf(row('difficulty'))).toMatch(/^Pressure I is on/);
   });
 
   it('closes on Esc from every screen, but not during binding capture', () => {

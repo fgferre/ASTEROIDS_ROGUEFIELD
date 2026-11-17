@@ -1,12 +1,12 @@
 // src/modules/ui/CampaignMap.js
 //
-// The campaign map over the main menu ("THE RING"): an arc of the Ring with
-// the chapters along it and the chapters still to come, each cleared, open
-// or locked from its sectors (src/data/sectors.js) and the run records; the
-// selected chapter's sectors as rows under it, and Launch for the selected
-// row (Enter, Space or the pad's confirm on that row presses it too;
-// GameSessionService's MenuButtons starts the run from the button's
-// data-sector). A sector run that ends back in the menu reopens the map.
+// The campaign tab of the main menu ("THE RING"): a row of the Ring's chapters
+// and the chapters still to come, each cleared, open or locked from its
+// sectors (src/data/sectors.js) and the run records; the selected chapter's
+// sectors as rows, and Launch for the selected row (Enter, Space or the pad's
+// confirm on that row presses it too; GameSessionService's MenuButtons starts
+// the run from the button's data-sector). The panel is drawn each time the
+// menu is shown; a sector run that ends back in the menu returns to the tab.
 // The campaign's last sector carries a pip per ending (data/story.js), lit
 // once the profile has reached it.
 
@@ -16,23 +16,17 @@ import { SECTORS, sectorBossTier } from '../../data/sectors.js';
 import { ENDING_SECTOR, STORY } from '../../data/story.js';
 import { isSectorUnlocked, loadRecords } from '../../services/runRecords.js';
 import { formatRunTime } from './runRecap.js';
+import {
+  chapterTransmission,
+  stageTransmission,
+  travelTransmissions,
+  wardenTransmission,
+} from './transmissions.js';
 
 /** Chapters along the arc: the real ones, then chapters with no signal yet. */
 export const CAMPAIGN_NODE_COUNT = 6;
 
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI'];
-
-// The arc: a segment of a circle centred below the view (viewBox 1000×260).
-const ARC = { cx: 500, cy: 1400, r: 1300, edge: 0.38, span: 0.33 };
-
-const arcPoint = (angle) => ({
-  x: ARC.cx + ARC.r * Math.sin(angle),
-  y: ARC.cy - ARC.r * Math.cos(angle),
-});
-
-/** The angle of node `index` (0-based) along the arc. */
-const nodeAngle = (index) =>
-  -ARC.span + (index * 2 * ARC.span) / (CAMPAIGN_NODE_COUNT - 1);
 
 const titleCase = (id) =>
   id.replace(
@@ -138,6 +132,58 @@ export function defaultSectorRow(rows) {
   );
 }
 
+const shownName = (sector) =>
+  sector.name.replace(/\b(\w)(\w*)/g, (_, a, b) => a + b.toLowerCase());
+const sectorLabel = (sector, index) => `${index + 1} · ${shownName(sector)}`;
+
+/**
+ * The Wake's log: its prologue, then an entry per sector won (in campaign
+ * order, titled with its place in the campaign), and `next`, the first
+ * sector not won yet (null when all are).
+ */
+export function wakeLogEntries(records) {
+  const entries = [{ title: 'Before launch', text: STORY.log.prologue }];
+  let next = null;
+  SECTORS.forEach((sector, index) => {
+    const title = sectorLabel(sector, index);
+    if (records.sectorsWon.includes(sector.id)) {
+      entries.push({ title, text: STORY.log[sector.id] });
+    } else if (!next) {
+      next = { title };
+    }
+  });
+  return { entries, next };
+}
+
+/**
+ * Every line said in the sectors won, in order: the journey, the arrival,
+ * the stages, then the end boss's warning, last and defeated lines.
+ */
+export function wakeTranscript(records) {
+  return SECTORS.flatMap((sector) => {
+    if (!records.sectorsWon.includes(sector.id)) return [];
+    const kind = sector.boss ?? bossKindForLayer(sector.layers[1]);
+    const stages = Array.from(
+      { length: sector.layers[1] - sector.layers[0] + 1 },
+      (_, i) => stageTransmission(sector.id, i + 1)
+    );
+    const lines = [
+      ...travelTransmissions(sector.id),
+      chapterTransmission(null, sector.id),
+      ...stages,
+      ...['warning', 'last', 'defeated'].map((moment) =>
+        wardenTransmission(sector.layers[1], moment, kind)
+      ),
+    ]
+      .filter((entry) => entry?.text)
+      .map((entry) => ({
+        speaker: entry.label ?? entry.speaker,
+        text: entry.text,
+      }));
+    return [{ sector: shownName(sector), lines }];
+  });
+}
+
 function stateLine(node) {
   switch (node.state) {
     case 'cleared':
@@ -188,84 +234,60 @@ export function sectorRowsMarkup(rows) {
     .join('');
 }
 
-function arcPath(from, to) {
-  const a = arcPoint(from);
-  const b = arcPoint(to);
-  return `M${a.x.toFixed(1)} ${a.y.toFixed(1)}A${ARC.r} ${ARC.r} 0 0 1 ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
-}
-
 /**
- * The arc and its chapter nodes: real chapters are buttons
+ * The chapter nodes in a row: real chapters are buttons
  * (`data-campaign-chapter`), the chapters to come are not selectable. The
  * first open chapter is the one that calls (`is-next`); a profile from
  * before the campaign can have several open at once. CSS: .campaign-* in
  * style.css.
  */
 export function campaignMarkup(chapters) {
-  const lastReal = chapters.filter((node) => node.sectors.length).length - 1;
-  const reach = chapters.reduce(
-    (last, node, i) =>
-      node.sectors.length && node.state !== 'locked' ? i : last,
-    0
-  );
   const next = chapters.findIndex((node) => node.state === 'open');
-  const svg = `<svg class="campaign-arc" viewBox="0 0 1000 260" aria-hidden="true">
-    <path class="campaign-arc__ring" d="${arcPath(-ARC.edge, nodeAngle(lastReal))}"/>
-    <path class="campaign-arc__ring is-dark" d="${arcPath(nodeAngle(lastReal), ARC.edge)}"/>
-    <path class="campaign-arc__reach" d="${arcPath(nodeAngle(0), nodeAngle(reach))}"/>
-  </svg>`;
-  const items = chapters
+  return chapters
     .map((node, i) => {
-      const { x, y } = arcPoint(nodeAngle(i));
-      const style = `left: ${(x / 10).toFixed(2)}%; top: ${((y / 260) * 100).toFixed(2)}%`;
       const inner = `<span class="campaign-node__dot" aria-hidden="true"></span>
         <span class="campaign-node__numeral">${node.numeral}</span>
         <span class="campaign-node__name">${node.name || '—'}</span>
         <span class="campaign-node__state">${stateLine(node)}</span>`;
       if (!node.sectors.length) {
-        return `<div class="campaign-node is-nosignal" style="${style}">${inner}</div>`;
+        return `<div class="campaign-node is-nosignal">${inner}</div>`;
       }
-      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}${i === next ? ' is-next' : ''}" style="${style}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
+      return `<button type="button" id="campaign-chapter-${node.chapter}" class="campaign-node is-${node.state}${i === next ? ' is-next' : ''}" data-campaign-chapter="${node.chapter}" aria-pressed="false">${inner}</button>`;
     })
     .join('');
-  return `${svg}${items}`;
 }
 
 export class CampaignMap {
   /**
-   * `refs`: the overlay's nodes { overlay, nodes, detailTitle, sectors, detailHeadStart, launchBtn, openBtn, backBtn, closeBtn }.
-   * `showScreen(name, options)`: shows or hides the overlay.
-   * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
+   * `refs`: the menu's nodes { root, nodes, detailTitle, sectors, detailHeadStart, launchBtn, logBody, logToggle, openBtn, mainMenuBtn }.
+   * `showTab()`: shows the menu's Campaign tab.
    * `prepareTravel(start)`: readies the journey a Launch would fly.
    */
-  constructor({ refs, showScreen, announceVisibility, prepareTravel }) {
+  constructor({ refs, showTab, prepareTravel }) {
     this.refs = refs;
-    this.showScreen = showScreen;
-    this.announceVisibility = announceVisibility;
+    this.showTab = showTab;
     this.prepareTravel = prepareTravel;
-    this.mapState = { isOpen: false, trigger: null };
     this.chapters = [];
     this.chapter = null;
     this.selectedId = null;
-    // A sector run is on: the menu it ends in opens the map again.
+    this.records = null;
+    this.reading = false;
+    // A sector run is on: the menu it ends in returns to the Campaign tab.
     this.returnToMap = false;
   }
 
   bindCampaignControls() {
     const refs = this.refs;
-    if (!refs.overlay) return;
-    refs.openBtn?.addEventListener('click', () => this.openMap());
-    [refs.backBtn, refs.closeBtn].forEach((button) =>
-      button?.addEventListener('click', () => this.closeMap())
-    );
+    if (!refs.root) return;
+    refs.logToggle?.addEventListener('click', () => {
+      this.reading = !this.reading;
+      this.renderLog();
+    });
+    refs.openBtn?.addEventListener('click', () => this.render());
     refs.mainMenuBtn?.addEventListener('click', () => {
       this.returnToMap = false;
     });
-    refs.overlay.addEventListener('click', (event) => {
-      if (event.target === refs.overlay) {
-        this.closeMap();
-        return;
-      }
+    refs.root.addEventListener('click', (event) => {
       // Enter, Space or the pad's confirm (no pointer: detail 0) on the row
       // already selected launches it, as Launch would.
       const row = event.target.closest?.('[data-campaign-row]');
@@ -277,7 +299,7 @@ export class CampaignMap {
     });
     // The pad's d-pad moves the focus: the focused chapter or row is the
     // selection.
-    refs.overlay.addEventListener('focusin', (event) =>
+    refs.root.addEventListener('focusin', (event) =>
       this.selectFrom(event.target)
     );
     // Heard on the way down (capture): InputSystem stops ArrowDown at the
@@ -285,12 +307,9 @@ export class CampaignMap {
     document.addEventListener(
       'keydown',
       (event) => {
-        if (!this.mapState.isOpen) return;
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          this.closeMap();
-          return;
-        }
+        // Only on the Campaign tab, with the menu in view (not over a run
+        // or an overlay).
+        if (!this.visible()) return;
         const onChapter = document.activeElement?.closest?.(
           '[data-campaign-chapter]'
         );
@@ -310,6 +329,11 @@ export class CampaignMap {
       },
       true
     );
+  }
+
+  /** The panel is in view: the menu is shown, on the Campaign tab. */
+  visible() {
+    return this.refs.sectors.checkVisibility({ visibilityProperty: true });
   }
 
   /** A click or focus on a chapter node or a sector row selects it. */
@@ -367,7 +391,7 @@ export class CampaignMap {
       button.classList.toggle('is-selected', active);
       button.setAttribute('aria-pressed', String(active));
     });
-    refs.detailTitle.textContent = node.title;
+    refs.detailTitle.textContent = node.title.replace(' — ', ' / ');
     refs.sectors.innerHTML = sectorRowsMarkup(node.sectors);
     const keep = node.sectors.some((row) => row.id === this.selectedId);
     this.selectSector(
@@ -398,44 +422,81 @@ export class CampaignMap {
     this.prepareTravel({ sector: id, source: 'campaign-launch-btn' });
   }
 
-  openMap() {
+  /** The log panel: the Wake's log, or (`reading`) every line said so far. */
+  renderLog() {
+    const { logBody, logToggle } = this.refs;
+    if (!logBody) return;
+    const add = (parent, tag, className, text) => {
+      const node = document.createElement(tag);
+      node.className = className;
+      node.textContent = text;
+      parent.append(node);
+      return node;
+    };
+    const transcript = wakeTranscript(this.records);
+    const count = transcript.reduce((n, { lines }) => n + lines.length, 0);
+    logBody.replaceChildren();
+    if (this.reading) {
+      transcript.forEach(({ sector, lines }) => {
+        const group = add(logBody, 'div', 'campaign-log__entry', '');
+        add(group, 'div', 'campaign-log__title', sector);
+        lines.forEach(({ speaker, text }) => {
+          const row = add(group, 'p', 'campaign-log__line', ` — ${text}`);
+          const who = document.createElement('span');
+          who.className = 'campaign-log__speaker';
+          who.textContent = speaker;
+          row.prepend(who);
+        });
+      });
+      logToggle.textContent = 'Back to log';
+      logToggle.hidden = false;
+      logBody.scrollTop = 0;
+      return;
+    }
+    const { entries, next } = wakeLogEntries(this.records);
+    entries.forEach(({ title, text }) => {
+      const entry = add(logBody, 'div', 'campaign-log__entry', '');
+      add(entry, 'div', 'campaign-log__title', title);
+      add(entry, 'p', 'campaign-log__text', text);
+    });
+    if (next) {
+      add(logBody, 'p', 'campaign-log__next', `${next.title} — not flown yet`);
+    }
+    logToggle.textContent = `Transmissions logged: ${count} · Read again`;
+    logToggle.hidden = count === 0;
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  /** The panel drawn from the records: the ring, the Wake log, the default sector. */
+  render() {
     const refs = this.refs;
-    this.chapters = campaignChapters(loadRecords());
+    this.records = loadRecords();
+    this.reading = false;
+    this.renderLog();
+    this.chapters = campaignChapters(this.records);
     this.chapter = null;
     refs.nodes.innerHTML = campaignMarkup(this.chapters);
-    this.mapState = { isOpen: true, trigger: document.activeElement };
-    this.showScreen('campaign', { overlay: true, show: true });
-    refs.overlay.setAttribute('aria-hidden', 'false');
-    this.announceVisibility(true, { source: 'menu' });
     const row = defaultSectorRow(this.chapters.flatMap((node) => node.sectors));
     this.selectSector(row.id);
-    this.focusChapter(row.chapter);
   }
 
-  closeMap() {
-    if (!this.mapState.isOpen) return;
-    const refs = this.refs;
-    this.showScreen('campaign', { overlay: true, show: false });
-    refs.overlay.setAttribute('aria-hidden', 'true');
-    this.announceVisibility(false, { source: 'menu' });
-    this.mapState.trigger?.focus?.({ preventScroll: true });
-    this.mapState = { isOpen: false, trigger: null };
-  }
-
-  /** 'game-started': only a sector run comes back to the map. */
+  /** 'game-started': only a sector run comes back to the Campaign tab. */
   noteRunStart(sectorId) {
     this.returnToMap = Boolean(sectorId);
   }
 
-  /** The main menu is shown: after a sector run, the map opens over it. */
+  /** The main menu is shown: draw the panel; after a sector run, show it. */
   menuShown() {
+    this.render();
     if (!this.returnToMap) return;
     // Once the menu has settled: leaving a run shows it twice (the session,
-    // then its 'screen-changed'), and each showing closes the map.
+    // then its 'screen-changed'), and each showing draws the panel anew.
     queueMicrotask(() => {
       if (!this.returnToMap) return;
       this.returnToMap = false;
-      this.openMap();
+      this.showTab();
+      this.render();
+      this.focusRow(this.selectedId);
     });
   }
 }

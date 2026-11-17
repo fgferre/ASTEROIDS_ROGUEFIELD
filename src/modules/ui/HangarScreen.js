@@ -1,20 +1,29 @@
 // src/modules/ui/HangarScreen.js
 //
-// The Hangar overlay over the main menu: Salvage balance, the items to buy,
-// the hull picker with its 3D preview and lock caption, and the Ring's line
-// for a purchase.
+// The Hangar overlay over the main menu: Salvage balance and five tabs.
+// Ship: the items to buy, the hull picker with its 3D preview and lock
+// caption, and the Ring's line for a purchase. Licences: weapons and cards to
+// license and switch on or off. Control: rungs of rerolls, banishes, Hold,
+// Seal and the Flight School, then the cards sealed and the Flight School's
+// card. Medals: the wall of medals and
+// what each pays. Pressure: the ladder above Warden, a rung to pick.
 
 import {
   hangarItemMarkup,
   hullLockText,
   hullTraitsMarkup,
+  launchSetupMarkup,
+  licenseMarkup,
+  medalMarkup,
+  pressureLadderMarkup,
+  pressureNoteText,
   salvageBalanceText,
 } from './hangar.js';
 import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
   /**
-   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn }.
+   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, licenses, control, launch, medals, pressure, pressureNote }.
    * `settings`: the settings service; a hull button selects that hull.
    * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
    *   transmission events (its voice, audio/voiceLines.js).
@@ -47,6 +56,7 @@ export class HangarScreen {
     this.refreshShipSelector = refreshShipSelector;
     this.hangarState = { isOpen: false, trigger: null };
     this.purchaseLine = null;
+    this.tab = 'ship';
   }
 
   // The run's transmission banner is hidden in the menu: the Ring's line
@@ -85,12 +95,68 @@ export class HangarScreen {
         this.closeHangar();
         return;
       }
+      const tab = event.target.closest('[data-hangar-tab]');
+      if (tab) {
+        this.tab = tab.dataset.hangarTab;
+        this.endPurchaseLine();
+        this.renderHangar();
+        return;
+      }
+      const rung = event.target.closest('[data-hangar-pressure]');
+      if (rung) {
+        this.hangar().setPressure(Number(rung.dataset.hangarPressure));
+        this.renderHangar();
+        refs.pressure
+          .querySelector(
+            `[data-hangar-pressure="${rung.dataset.hangarPressure}"]`
+          )
+          ?.focus({ preventScroll: true });
+        return;
+      }
+      const license = event.target.closest(
+        '[data-hangar-license-buy], [data-hangar-license-on]'
+      );
+      if (license) {
+        const { hangarLicenseBuy, hangarLicenseOn } = license.dataset;
+        if (hangarLicenseBuy) this.hangar().buyLicense(hangarLicenseBuy);
+        else {
+          this.hangar().setLicenseOn(
+            hangarLicenseOn,
+            license.getAttribute('aria-pressed') !== 'true'
+          );
+        }
+        const id = hangarLicenseBuy ?? hangarLicenseOn;
+        this.renderHangar();
+        refs.licenses
+          .querySelector(`[data-hangar-license="${id}"] .hangar-item__action`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
+      const choice = event.target.closest(
+        '[data-hangar-seal], [data-hangar-start]'
+      );
+      if (choice) {
+        const { hangarSeal, hangarStart } = choice.dataset;
+        if (hangarSeal) this.hangar().toggleSeal(hangarSeal);
+        else {
+          this.hangar().setStartingCard(
+            hangarStart === 'none' ? null : hangarStart
+          );
+        }
+        const attr = hangarSeal ? 'data-hangar-seal' : 'data-hangar-start';
+        this.renderHangar();
+        refs.launch
+          .querySelector(`[${attr}="${hangarSeal ?? hangarStart}"]`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
       const buy = event.target.closest('[data-hangar-buy]');
       if (buy) {
         const id = buy.dataset.hangarBuy;
+        const list = buy.closest('.hangar-list');
         this.hangar().buy(id);
         this.renderHangar();
-        refs.list
+        list
           .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
           ?.focus({ preventScroll: true });
         return;
@@ -140,6 +206,36 @@ export class HangarScreen {
     const refs = this.refs;
     const hangar = this.hangar();
     refs.balance.textContent = salvageBalanceText(hangar.salvage);
+    const medals = hangar.getMedals();
+    refs.tabs.forEach((button) => {
+      const active = button.dataset.hangarTab === this.tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+      if (button.dataset.hangarTab === 'medals') {
+        button.textContent = `Medals · ${
+          medals.filter((medal) => medal.unlockedAt).length
+        }/${medals.length}`;
+      }
+    });
+    refs.panels.forEach((panel) => {
+      panel.hidden = panel.dataset.hangarPanel !== this.tab;
+    });
+    refs.licenses.innerHTML = hangar.getLicenses().map(licenseMarkup).join('');
+    refs.control.innerHTML = hangar
+      .getControlItems()
+      .map(hangarItemMarkup)
+      .join('');
+    refs.launch.innerHTML = launchSetupMarkup({
+      sealSlots: hangar.contractTotal('seals'),
+      sealed: hangar.getSealed(),
+      openCards: hangar.getOpenCards(),
+      flightSchool: Boolean(hangar.owned['flight-school']),
+      schoolCards: hangar.getFlightSchoolCards(),
+      startingCard: hangar.startingCard,
+    });
+    refs.medals.innerHTML = medals.map(medalMarkup).join('');
+    refs.pressureNote.textContent = pressureNoteText(hangar.pressure.open);
+    refs.pressure.innerHTML = pressureLadderMarkup(hangar.pressure);
     refs.list.innerHTML = hangar.getItems().map(hangarItemMarkup).join('');
     const selected = this.selectedHullId();
     refs.hulls.innerHTML = getAllShipModels()

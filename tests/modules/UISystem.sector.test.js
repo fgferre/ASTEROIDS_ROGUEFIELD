@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import UISystem from '../../src/modules/UISystem.js';
 import { sectorById } from '../../src/data/sectors.js';
+import { STORY } from '../../src/data/story.js';
 
 describe('UISystem on a sector run', () => {
   it("the layer banner counts the sector's layers from its first one", () => {
@@ -20,6 +21,7 @@ describe('UISystem on a sector run', () => {
       sentinel: false,
       bossRush: undefined,
       chapter: 'CHAPTER II — THE DENSE CORE · RESONANCE CHAMBER',
+      context: STORY.context['dense-core'],
     });
     expect(ui.transmissionLayer).toBe(6);
   });
@@ -41,6 +43,7 @@ describe('UISystem on a sector run', () => {
       sentinel: true,
       bossRush: undefined,
       chapter: 'CHAPTER I — THE OUTER RING · DEBRIS WAKE',
+      context: STORY.context['debris-wake'],
     });
   });
   it('the Crucible, past the last layer of the descent, is not called the Deep Field', () => {

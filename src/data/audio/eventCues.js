@@ -206,7 +206,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   // The run-following music: wave progress, the layer's theme, the chapter
   // stinger on a biome's first layer; the boss arc overrides it upwards.
   { on: 'wave-started', run: 'waveStarted' },
-  { on: 'boss-warning', cue: 'playWardenStinger' },
+  { on: 'boss-warning', run: 'wardenStinger' },
   { on: 'boss-warning', run: 'bossArc' },
   { on: 'boss-spawned', cue: 'playBossRoar', facade: true, payload: true },
   { on: 'boss-spawned', run: 'bossArc' },
@@ -261,6 +261,9 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
   { on: 'game-started', cue: 'playUIStartGame' },
+  { on: 'game-started', run: 'sectorScoreStart' },
+  { on: 'run-won', run: 'runWon' },
+  { on: 'sector-picked', run: 'sectorScorePrefetch' },
 
   // The journey between sectors (render3d/travel/moments.js): each moment's
   // sample, the burn's loop on and off, and all of it fading when it ends.

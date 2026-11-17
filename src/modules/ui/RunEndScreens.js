@@ -26,6 +26,7 @@ import {
   timelineModel,
 } from './runTimeline.js';
 import { asArray } from '../upgradeCatalog.js';
+import { EndCredits } from './EndCredits.js';
 
 const ENDINGS = Object.keys(STORY.ending);
 
@@ -98,6 +99,7 @@ export class RunEndScreens {
     hangar,
     lastTransmission,
     cinematics,
+    announceOverlay = () => {},
   }) {
     this.refs = refs;
     this.showScreen = showScreen;
@@ -107,6 +109,13 @@ export class RunEndScreens {
     this.hangar = hangar;
     this.lastTransmission = lastTransmission;
     this.cinematics = cinematics;
+    this.announceOverlay = announceOverlay;
+    this.endCredits = new EndCredits({
+      refs: refs.endCredits ?? {},
+      showScreen,
+      announceVisibility: (isOpen, payload) =>
+        announceOverlay('end-credits', isOpen, payload),
+    });
     this.lockoutTimer = null;
     this.bestAtStart = 0;
     // A `?replay=` run ('game-started'): it never opens the choice.
@@ -357,6 +366,7 @@ export class RunEndScreens {
     const options = this.refs.victory.choiceOptions;
     options.innerHTML = endingChoiceMarkup();
     this.showScreen('ending', { overlay: true, show: true });
+    this.announceOverlay('ending', true);
     const buttons = this.choiceButtons();
     buttons.forEach((button) => {
       button.disabled = true;
@@ -379,7 +389,8 @@ export class RunEndScreens {
   /**
    * An ending picked on the choice: recorded once, the choice leaves, its
    * lines play over the held shot, the HUD down to its transmission, as the
-   * Ring answers (Severance also dims the field), then the final card.
+   * Ring answers (Severance also dims the field), then the end credits and
+   * the final card.
    * False when no choice is open.
    */
   chooseEnding(ending) {
@@ -387,17 +398,19 @@ export class RunEndScreens {
     if (!payload || !STORY.ending[ending]) return false;
     this.choice = null;
     this.showScreen('ending', { overlay: true, show: false });
+    this.announceOverlay('ending', false);
     updateRecords({ ending });
     const field = this.refs.victory.field;
     field?.classList.add('is-ending');
     field?.classList.toggle('is-severed', ending === 'severance');
     this.cinematics.playEnding(ending, () =>
-      this.showVictoryScreen(payload, ending)
+      this.endCredits.play(() => this.showVictoryScreen(payload, ending))
     );
     return true;
   }
 
   bindControls() {
+    this.endCredits.bindControls();
     this.bindCopySeedLink();
     this.bindEndingChoice();
   }

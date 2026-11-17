@@ -8,7 +8,6 @@ export const GAMEPAD_NAV_SCREENS = Object.freeze([
   'settings',
   'codex',
   'hangar',
-  'campaign',
   'credits',
   'gameover',
   'levelup',

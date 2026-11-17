@@ -200,6 +200,9 @@ export class RunCinematics {
    * Sector, the campaign map's Launch): its voices load now, as below.
    */
   prepareTravel(start) {
+    // The sector's music is fetched meanwhile (audio/SectorScore.js).
+    if (start.sector)
+      this.eventBus.emit('sector-picked', { sector: start.sector });
     this.readyVoices(start, travelDestination(start));
   }
 

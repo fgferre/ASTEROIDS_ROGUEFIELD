@@ -35,8 +35,7 @@ export function qualityPresetSummary(preset) {
 
 /**
  * The preview for `key` at `value`, or null for fields without one.
- * `context.livePreset` is the preset Auto is running now (null before a run);
- * `context.postProcessing` gates bloom.
+ * `context.livePreset` is the preset Auto is running now (null before a run).
  */
 export function settingPreview(key, value, context = {}) {
   if (key === 'quality') {
@@ -62,8 +61,8 @@ export function settingPreview(key, value, context = {}) {
     return {
       text:
         value === 'classic'
-          ? 'Classic: A/D turn, W thrusts along the nose; the turret still aims on its own.'
-          : 'Modern: WASD moves on the screen, the turret aims on its own.',
+          ? 'Classic: A/D turn, W thrusts along the nose.'
+          : 'Modern: WASD moves on the screen.',
     };
   }
   if (key === 'cameraLead') {
@@ -75,11 +74,13 @@ export function settingPreview(key, value, context = {}) {
     };
   }
   if (key === 'bloom') {
-    const on = value !== false && context.postProcessing !== false;
-    let text = 'Glow off: flat light on shots and thrusters.';
-    if (on) text = 'Glow on: shots, thrusters and blasts bloom.';
-    else if (value !== false) text = 'Needs Post-Processing on to glow.';
-    return { text, glow: on };
+    const on = value !== false;
+    return {
+      text: on
+        ? 'Glow on: shots, thrusters and blasts bloom.'
+        : 'Glow off: flat light on shots and thrusters.',
+      glow: on,
+    };
   }
   return null;
 }

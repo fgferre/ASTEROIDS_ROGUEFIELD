@@ -96,19 +96,27 @@ export function cacheStaticNodes() {
       openBtn: document.getElementById('menu-hangar-btn') || null,
       backBtn: document.getElementById('hangar-back-btn') || null,
       closeBtn: document.getElementById('hangar-close-btn') || null,
+      tabs: Array.from(document.querySelectorAll('[data-hangar-tab]')),
+      panels: Array.from(document.querySelectorAll('[data-hangar-panel]')),
+      licenses: document.getElementById('hangar-licenses') || null,
+      control: document.getElementById('hangar-control') || null,
+      launch: document.getElementById('hangar-launch') || null,
+      medals: document.getElementById('hangar-medals') || null,
+      pressure: document.getElementById('hangar-pressure') || null,
+      pressureNote: document.getElementById('hangar-pressure-note') || null,
     },
     campaign: {
-      overlay: document.getElementById('campaign-screen') || null,
+      root: document.getElementById('menu-prep') || null,
       nodes: document.getElementById('campaign-nodes') || null,
       detailTitle: document.getElementById('campaign-detail-title') || null,
       sectors: document.getElementById('campaign-sectors') || null,
       detailHeadStart:
         document.getElementById('campaign-detail-head-start') || null,
       launchBtn: document.getElementById('campaign-launch-btn') || null,
+      logBody: document.getElementById('campaign-log-body') || null,
+      logToggle: document.getElementById('campaign-log-toggle') || null,
       openBtn: document.getElementById('menu-campaign-btn') || null,
-      backBtn: document.getElementById('campaign-back-btn') || null,
-      closeBtn: document.getElementById('campaign-close-btn') || null,
-      // The final card's Main menu: the menu it ends in keeps the map shut.
+      // The final card's Main menu: the menu it ends in does not return to the Campaign tab.
       mainMenuBtn: document.getElementById('victory-menu-btn') || null,
     },
     settings: {
@@ -120,6 +128,11 @@ export function cacheStaticNodes() {
         document.getElementById('settings-close-btn'),
         document.getElementById('settings-close-footer-btn'),
       ].filter(Boolean),
+    },
+    endCredits: {
+      overlay: document.getElementById('end-credits-screen') || null,
+      roll: document.getElementById('end-credits-roll') || null,
+      continueBtn: document.getElementById('end-credits-continue-btn') || null,
     },
     credits: {
       overlay: document.getElementById('credits-screen') || null,
@@ -154,8 +167,12 @@ export function cacheStaticNodes() {
       status: document.getElementById('menu-status') || null,
       bossRushBtn: document.getElementById('boss-rush-btn') || null,
       bossRushLock: document.getElementById('boss-rush-lock') || null,
-      nav: document.querySelector('#menu-screen .menu-screen__nav') || null,
+      nav: document.getElementById('menu-prep') || null,
+      tabs: document.getElementById('menu-prep-tabs') || null,
       hint: document.getElementById('menu-hint') || null,
+      prepDifficulty: document.getElementById('prep-difficulty') || null,
+      beforeLaunch: document.getElementById('prep-before-launch') || null,
+      hangarBtn: document.getElementById('menu-hangar-btn') || null,
     },
   };
 }

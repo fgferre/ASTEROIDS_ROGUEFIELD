@@ -13,97 +13,107 @@ import {
 } from '../hud/editor/layoutStore.js';
 import { asArray } from '../../upgradeCatalog.js';
 
-export function renderSettingField(categoryId, field, value, values = {}) {
+// `options.inactive`: why the row is greyed (SettingsPanel decides): the
+// reason replaces the description and the controls are disabled.
+// `options.device`: the device a binding row shows.
+export function renderSettingField(
+  categoryId,
+  field,
+  value,
+  values = {},
+  options = {}
+) {
   if (field.control === 'segmented') {
-    return renderSegmentedField(categoryId, field, value);
+    return renderSegmentedField(categoryId, field, value, options);
   }
   switch (field.type) {
     case 'hudLayout':
-      return renderHudLayoutField(categoryId, field, value, values);
+      return renderHudLayoutField(categoryId, field, value, values, options);
     case 'hudPresets':
-      return renderHudEditField(categoryId, field, value);
+      return renderHudEditField(categoryId, field, value, options);
     case 'toggle':
-      return renderToggleField(categoryId, field, value);
+      return renderToggleField(categoryId, field, value, options);
     case 'range':
-      return renderRangeField(categoryId, field, value);
+      return renderRangeField(categoryId, field, value, options);
     case 'select':
-      return renderSelectField(categoryId, field, value);
+      return renderSelectField(categoryId, field, value, options);
     case 'binding':
-      return renderBindingField(categoryId, field, value);
+      return renderBindingField(categoryId, field, value, options);
     default: {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'settings-field';
-      const label = document.createElement('span');
-      label.className = 'settings-field__label';
-      label.textContent = field.label || field.key;
-      wrapper.appendChild(label);
-      if (field.description) {
-        const description = document.createElement('p');
-        description.className = 'settings-field__description';
-        description.textContent = field.description;
-        wrapper.appendChild(description);
-      }
+      const { wrapper } = fieldShell('div', categoryId, field, options);
       return wrapper;
     }
   }
 }
 
-function renderToggleField(categoryId, field, value) {
-  const wrapper = document.createElement('label');
-  wrapper.className = 'settings-field settings-field--toggle';
+// One row: `.settings-field__body` (label, description, the preview line the
+// panel adds) on the left, `.settings-field__control` on the right.
+function fieldShell(tag, categoryId, field, options, modifier = '') {
+  const wrapper = document.createElement(tag);
+  wrapper.className = `settings-field${modifier ? ` ${modifier}` : ''}${
+    options.inactive ? ' is-inactive' : ''
+  }`;
   wrapper.dataset.settingKey = field.key;
   wrapper.dataset.settingCategory = categoryId;
-
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = Boolean(value ?? field.default);
-  input.dataset.settingKey = field.key;
-  input.dataset.settingCategory = categoryId;
-  wrapper.appendChild(input);
 
   const body = document.createElement('div');
   body.className = 'settings-field__body';
-
   const label = document.createElement('span');
   label.className = 'settings-field__label';
-  label.textContent = field.label;
+  label.textContent = field.label || field.key;
   body.appendChild(label);
-
-  if (field.description) {
+  const note =
+    options.inactive || (options.hideDescription ? '' : field.description);
+  if (note) {
     const description = document.createElement('p');
     description.className = 'settings-field__description';
-    description.textContent = field.description;
+    description.textContent = note;
     body.appendChild(description);
   }
-
   wrapper.appendChild(body);
+
+  const control = document.createElement('div');
+  control.className = 'settings-field__control';
+  wrapper.appendChild(control);
+  return { wrapper, body, label, control };
+}
+
+function renderToggleField(categoryId, field, value, options) {
+  const { wrapper, control } = fieldShell(
+    'label',
+    categoryId,
+    field,
+    options,
+    'settings-field--toggle'
+  );
+  const on = Boolean(value ?? field.default);
+
+  const state = document.createElement('span');
+  state.className = 'settings-field__state';
+  state.textContent = on ? 'On' : 'Off';
+  control.appendChild(state);
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = on;
+  input.disabled = Boolean(options.inactive);
+  input.dataset.settingKey = field.key;
+  input.dataset.settingCategory = categoryId;
+  control.appendChild(input);
   return wrapper;
 }
 
-function renderRangeField(categoryId, field, value) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'settings-field settings-field--range';
-  wrapper.dataset.settingKey = field.key;
-  wrapper.dataset.settingCategory = categoryId;
-
-  const header = document.createElement('div');
-  header.className = 'settings-field__header';
-
-  const label = document.createElement('span');
-  label.className = 'settings-field__label';
-  label.textContent = field.label;
-  header.appendChild(label);
-
-  const valueDisplay = document.createElement('span');
-  valueDisplay.className = 'settings-field__value';
-  valueDisplay.dataset.valueFor = field.key;
+function renderRangeField(categoryId, field, value, options) {
+  const { wrapper, control } = fieldShell(
+    'div',
+    categoryId,
+    field,
+    options,
+    'settings-field--range'
+  );
   const numericValue = Number.isFinite(Number(value))
     ? Number(value)
     : Number(field.default ?? field.min ?? 0);
-  valueDisplay.textContent = formatRangeValue(field, numericValue);
-  header.appendChild(valueDisplay);
-
-  wrapper.appendChild(header);
 
   const slider = document.createElement('input');
   slider.type = 'range';
@@ -111,47 +121,47 @@ function renderRangeField(categoryId, field, value) {
   slider.max = field.max ?? 1;
   slider.step = field.step ?? 0.1;
   slider.value = String(numericValue);
+  slider.disabled = Boolean(options.inactive);
   slider.dataset.settingKey = field.key;
   slider.dataset.settingCategory = categoryId;
   slider.className = 'settings-range-input';
-  wrapper.appendChild(slider);
+  slider.setAttribute('aria-label', field.label || field.key);
+  control.appendChild(slider);
 
-  if (field.description) {
-    const description = document.createElement('p');
-    description.className = 'settings-field__description';
-    description.textContent = field.description;
-    wrapper.appendChild(description);
-  }
-
+  const valueDisplay = document.createElement('span');
+  valueDisplay.className = 'settings-field__value';
+  valueDisplay.dataset.valueFor = field.key;
+  valueDisplay.textContent = formatRangeValue(field, numericValue);
+  control.appendChild(valueDisplay);
   return wrapper;
 }
 
-function renderSelectField(categoryId, field, value) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'settings-field settings-field--select';
-  wrapper.dataset.settingKey = field.key;
-  wrapper.dataset.settingCategory = categoryId;
-
-  const label = document.createElement('label');
+function renderSelectField(categoryId, field, value, options = {}) {
+  const { wrapper, label, control } = fieldShell(
+    'div',
+    categoryId,
+    field,
+    options,
+    'settings-field--select'
+  );
   const selectId = `setting-${categoryId}-${field.key}`;
-  label.className = 'settings-field__label';
-  label.setAttribute('for', selectId);
-  label.textContent = field.label || field.key;
-  wrapper.appendChild(label);
+  // A label for the select, not a bare span.
+  label.setAttribute('id', `${selectId}-label`);
 
   const select = document.createElement('select');
   select.id = selectId;
   select.className = 'settings-select-input';
   select.dataset.settingKey = field.key;
   select.dataset.settingCategory = categoryId;
+  select.setAttribute('aria-labelledby', `${selectId}-label`);
 
-  const options = asArray(field.options);
+  const choices = asArray(field.options);
   const optionLabels =
     (field.optionLabels && typeof field.optionLabels === 'object'
       ? field.optionLabels
       : {}) || {};
 
-  options.forEach((optionValue) => {
+  choices.forEach((optionValue) => {
     const optionElement = document.createElement('option');
     optionElement.value = optionValue;
     optionElement.textContent =
@@ -164,43 +174,36 @@ function renderSelectField(categoryId, field, value) {
       ? value
       : typeof field.default === 'string'
         ? field.default
-        : options[0];
+        : choices[0];
 
   if (defaultValue !== undefined && defaultValue !== null) {
     select.value = defaultValue;
   }
 
-  if (options.length === 0) {
+  if (choices.length === 0 || options.inactive) {
     select.disabled = true;
   }
 
-  wrapper.appendChild(select);
-
-  if (field.description) {
-    const description = document.createElement('p');
-    description.className = 'settings-field__description';
-    description.textContent = field.description;
-    wrapper.appendChild(description);
-  }
-
+  control.appendChild(select);
   return wrapper;
 }
 
 // The active HUD layout: the built-in presets, then the player's own.
-function renderHudLayoutField(categoryId, field, value, values) {
-  const options = allPresets(
+function renderHudLayoutField(categoryId, field, value, values, options) {
+  const layouts = allPresets(
     readUserPresets(values.hudPresets, instrumentCatalog())
   ).map(({ id, name, builtIn }) => ({ id, name, builtIn }));
   const wrapper = renderSelectField(
     categoryId,
     { ...field, options: [] },
-    value
+    value,
+    options
   );
   const select = wrapper.querySelector('.settings-select-input');
-  select.disabled = false;
+  select.disabled = Boolean(options.inactive);
   [
-    ['Presets', options.filter((option) => option.builtIn)],
-    ['Your Layouts', options.filter((option) => !option.builtIn)],
+    ['Presets', layouts.filter((layout) => layout.builtIn)],
+    ['Your Layouts', layouts.filter((layout) => !layout.builtIn)],
   ].forEach(([label, group]) => {
     if (group.length === 0) return;
     const optgroup = document.createElement('optgroup');
@@ -213,7 +216,7 @@ function renderHudLayoutField(categoryId, field, value, values) {
     });
     select.appendChild(optgroup);
   });
-  select.value = options.some((option) => option.id === value)
+  select.value = layouts.some((layout) => layout.id === value)
     ? value
     : field.default;
   return wrapper;
@@ -221,46 +224,40 @@ function renderHudLayoutField(categoryId, field, value, values) {
 
 // The way into the HUD editor (SettingsPanel opens it), with the count of
 // layouts saved.
-function renderHudEditField(categoryId, field, value) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'settings-field settings-field--wide';
-  wrapper.dataset.settingKey = field.key;
-  wrapper.dataset.settingCategory = categoryId;
-
-  const label = document.createElement('span');
-  label.className = 'settings-field__label';
-  label.textContent = field.label;
-  wrapper.appendChild(label);
+function renderHudEditField(categoryId, field, value, options) {
+  const saved = asArray(value).length;
+  const { wrapper, control } = fieldShell(
+    'div',
+    categoryId,
+    {
+      ...field,
+      description: `${field.description} ${
+        saved === 1 ? '1 layout saved.' : `${saved || 'No'} layouts saved.`
+      }`,
+    },
+    options,
+    'settings-field--wide'
+  );
 
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'btn btn--secondary settings-hud-edit';
   button.dataset.action = 'edit-hud-layout';
   button.textContent = 'Edit HUD Layout';
-  wrapper.appendChild(button);
-
-  const saved = asArray(value).length;
-  const description = document.createElement('p');
-  description.className = 'settings-field__description';
-  description.textContent = `${field.description} ${
-    saved === 1 ? '1 layout saved.' : `${saved || 'No'} layouts saved.`
-  }`;
-  wrapper.appendChild(description);
+  control.appendChild(button);
   return wrapper;
 }
 
 // A select shown as one button per option; a click sets it at once.
-function renderSegmentedField(categoryId, field, value) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'settings-field settings-field--wide';
-  wrapper.dataset.settingKey = field.key;
-  wrapper.dataset.settingCategory = categoryId;
-
-  const label = document.createElement('span');
-  label.className = 'settings-field__label';
+function renderSegmentedField(categoryId, field, value, options) {
+  const { wrapper, label, control } = fieldShell(
+    'div',
+    categoryId,
+    field,
+    options,
+    'settings-field--wide'
+  );
   label.id = `setting-${categoryId}-${field.key}-label`;
-  label.textContent = field.label;
-  wrapper.appendChild(label);
 
   const group = document.createElement('div');
   group.className = 'settings-segmented';
@@ -271,6 +268,7 @@ function renderSegmentedField(categoryId, field, value) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'settings-segment';
+    button.disabled = Boolean(options.inactive);
     button.dataset.settingKey = field.key;
     button.dataset.settingCategory = categoryId;
     button.dataset.segmentValue = option;
@@ -278,88 +276,49 @@ function renderSegmentedField(categoryId, field, value) {
     button.textContent = field.optionLabels?.[option] ?? option;
     group.appendChild(button);
   });
-  wrapper.appendChild(group);
-
-  if (field.description) {
-    const description = document.createElement('p');
-    description.className = 'settings-field__description';
-    description.textContent = field.description;
-    wrapper.appendChild(description);
-  }
+  control.appendChild(group);
   return wrapper;
 }
 
-function renderBindingField(categoryId, field, value = {}) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'settings-field settings-field--binding';
-  wrapper.dataset.settingKey = field.key;
-  wrapper.dataset.settingCategory = categoryId;
+// A binding row: the label (the reason, when greyed) and the capture
+// buttons of one device, `options.device` (keyboard when unset).
+function renderBindingField(categoryId, field, value = {}, options = {}) {
+  const device = options.device || 'keyboard';
+  // A binding row names the action; only the reason adds a line.
+  const { wrapper, control } = fieldShell(
+    'div',
+    categoryId,
+    field,
+    { ...options, hideDescription: true },
+    'settings-field--binding'
+  );
 
-  const header = document.createElement('div');
-  header.className = 'settings-field__header';
+  const bindings = asArray(value?.[device]);
+  const metadata = field.metadata?.[device] || {};
+  const maxSlots = Math.max(
+    Number(metadata.max) ||
+      bindings.length ||
+      asArray(field.default?.[device]).length,
+    1
+  );
 
-  const label = document.createElement('span');
-  label.className = 'settings-field__label';
-  label.textContent = field.label;
-  header.appendChild(label);
-
-  if (field.description) {
-    const description = document.createElement('p');
-    description.className = 'settings-field__description';
-    description.textContent = field.description;
-    header.appendChild(description);
+  for (let slot = 0; slot < maxSlots; slot += 1) {
+    const bindingValue = bindings[slot] ?? '';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'settings-binding-btn';
+    button.disabled = Boolean(options.inactive);
+    button.dataset.action = 'capture-binding';
+    button.dataset.settingKey = field.key;
+    button.dataset.settingCategory = categoryId;
+    button.dataset.bindingDevice = device;
+    button.dataset.slot = String(slot);
+    button.dataset.label = bindingValue;
+    button.textContent = bindingValue
+      ? formatBindingLabel(bindingValue, device)
+      : 'Set';
+    control.appendChild(button);
   }
-
-  wrapper.appendChild(header);
-
-  const groups = document.createElement('div');
-  groups.className = 'settings-binding__groups';
-
-  const devices = ['keyboard', 'gamepad'];
-  devices.forEach((device) => {
-    const bindings = asArray(value?.[device]);
-    const metadata = field.metadata?.[device] || {};
-    const maxSlots = Math.max(
-      Number(metadata.max) ||
-        bindings.length ||
-        asArray(field.default?.[device]).length,
-      1
-    );
-
-    const deviceGroup = document.createElement('div');
-    deviceGroup.className = `settings-binding__group settings-binding__group--${device}`;
-
-    const deviceTitle = document.createElement('span');
-    deviceTitle.className = 'settings-binding__device';
-    deviceTitle.textContent =
-      metadata.label || (device === 'keyboard' ? 'Keyboard' : 'Gamepad');
-    deviceGroup.appendChild(deviceTitle);
-
-    const list = document.createElement('div');
-    list.className = 'settings-binding__list';
-
-    for (let slot = 0; slot < maxSlots; slot += 1) {
-      const bindingValue = bindings[slot] ?? '';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'settings-binding-btn';
-      button.dataset.action = 'capture-binding';
-      button.dataset.settingKey = field.key;
-      button.dataset.settingCategory = categoryId;
-      button.dataset.device = device;
-      button.dataset.slot = String(slot);
-      button.dataset.label = bindingValue;
-      button.textContent = bindingValue
-        ? formatBindingLabel(bindingValue, device)
-        : 'Set';
-      list.appendChild(button);
-    }
-
-    deviceGroup.appendChild(list);
-    groups.appendChild(deviceGroup);
-  });
-
-  wrapper.appendChild(groups);
   return wrapper;
 }
 

@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
+import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { updateRecords } from '../../../src/services/runRecords.js';
 import {
   CampaignMap,
   campaignChapters,
   campaignMarkup,
   defaultSectorRow,
   sectorRowsMarkup,
+  wakeLogEntries,
+  wakeTranscript,
 } from '../../../src/modules/ui/CampaignMap.js';
-import { sectorById } from '../../../src/data/sectors.js';
+import { SECTORS, sectorById } from '../../../src/data/sectors.js';
 
 const records = (
   sectorsWon = [],
@@ -220,7 +224,7 @@ describe('campaign map', () => {
       sector: 'salvage-lanes',
       source: 'campaign-launch-btn',
     });
-    expect(refs.detailTitle.textContent).toBe('CHAPTER I — THE OUTER RING');
+    expect(refs.detailTitle.textContent).toBe('CHAPTER I / THE OUTER RING');
     expect(refs.sectors.innerHTML.match(/data-campaign-row=/g)).toHaveLength(3);
     expect(refs.launchBtn).toEqual({
       dataset: { sector: 'salvage-lanes' },
@@ -231,7 +235,7 @@ describe('campaign map', () => {
     expect(refs.launchBtn.disabled).toBe(true);
 
     map.selectChapter(2);
-    expect(refs.detailTitle.textContent).toBe('CHAPTER II — THE DENSE CORE');
+    expect(refs.detailTitle.textContent).toBe('CHAPTER II / THE DENSE CORE');
     expect(refs.launchBtn.dataset.sector).toBe('furnace-drift');
     expect(refs.launchBtn.disabled).toBe(true);
     expect(refs.detailHeadStart.textContent).toBe(
@@ -245,7 +249,7 @@ describe('campaign map', () => {
     const text = () => ({ textContent: '', hidden: false });
     let onClick;
     const refs = {
-      overlay: {
+      root: {
         addEventListener: (name, fn) => {
           if (name === 'click') onClick = fn;
         },
@@ -301,9 +305,9 @@ describe('campaign map', () => {
     const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
     const text = () => ({ textContent: '', hidden: false });
     const refs = {
-      overlay: { addEventListener: () => {} },
+      root: { addEventListener: () => {} },
       nodes: list(),
-      sectors: list(),
+      sectors: { ...list(), checkVisibility: () => true },
       detailTitle: text(),
       detailHeadStart: text(),
       launchBtn: { dataset: {}, disabled: false },
@@ -322,7 +326,6 @@ describe('campaign map', () => {
     map.bindCampaignControls();
     map.chapters = campaignChapters(records(['debris-wake']));
     map.selectSector('salvage-lanes');
-    map.mapState.isOpen = true;
     const press = (key) => onKey({ key, preventDefault: () => {} });
 
     // InputSystem stops ArrowDown at the document on the way down, so only a
@@ -332,5 +335,115 @@ describe('campaign map', () => {
     press('ArrowDown');
     expect(focused).toEqual(['salvage-lanes', 'prime-gate']);
     vi.unstubAllGlobals();
+  });
+
+  it('is drawn in the menu, not opened: no overlay, Escape does nothing, and the arrows only count while the panel is in view', () => {
+    const fakeDocument = { activeElement: null };
+    let onKey;
+    fakeDocument.addEventListener = (name, fn) => (onKey = fn);
+    vi.stubGlobal('document', fakeDocument);
+    const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
+    const text = () => ({ textContent: '', hidden: false });
+    let visible = true;
+    const refs = {
+      root: { addEventListener: () => {} },
+      nodes: list(),
+      sectors: { ...list(), checkVisibility: () => visible },
+      detailTitle: text(),
+      detailHeadStart: text(),
+      launchBtn: { dataset: {}, disabled: false },
+    };
+    const map = new CampaignMap({ refs, prepareTravel: () => {} });
+    map.bindCampaignControls();
+    expect(map.openMap).toBeUndefined();
+    expect(map.closeMap).toBeUndefined();
+    map.chapters = campaignChapters(records(['debris-wake']));
+    map.selectSector('salvage-lanes');
+    const focused = [];
+    refs.sectors.querySelector = (selector) => ({
+      focus: () => focused.push(selector.match(/"(.+)"/)[1]),
+    });
+    fakeDocument.activeElement = {
+      closest: (selector) => (selector === '[data-campaign-row]' ? {} : null),
+    };
+    const preventDefault = vi.fn();
+    onKey({ key: 'Escape', preventDefault });
+    expect(preventDefault).not.toHaveBeenCalled();
+    visible = false;
+    onKey({ key: 'ArrowDown', preventDefault });
+    expect(focused).toEqual([]);
+    visible = true;
+    onKey({ key: 'ArrowDown', preventDefault });
+    expect(focused).toEqual(['prime-gate']);
+    vi.unstubAllGlobals();
+  });
+
+  it('draws the panel each time the menu is shown; after a sector run it also shows the Campaign tab and focuses the next sector', async () => {
+    const restoreDom = installDomStubs();
+    updateRecords({ sectorWon: 'debris-wake', sectorTime: 250 });
+    const list = () => ({
+      innerHTML: '',
+      querySelectorAll: () => [],
+      querySelector: () => ({ focus }),
+    });
+    const text = () => ({
+      textContent: '',
+      hidden: false,
+      replaceChildren() {},
+    });
+    const focus = vi.fn();
+    const refs = {
+      root: { addEventListener: () => {} },
+      nodes: list(),
+      sectors: list(),
+      detailTitle: text(),
+      detailHeadStart: text(),
+      launchBtn: { dataset: {}, disabled: false },
+    };
+    const showTab = vi.fn();
+    const map = new CampaignMap({ refs, showTab, prepareTravel: () => {} });
+    vi.spyOn(map, 'renderLog').mockImplementation(() => {});
+
+    map.menuShown();
+    expect(refs.nodes.innerHTML).toContain('data-campaign-chapter="1"');
+    expect(refs.launchBtn.dataset.sector).toBe('salvage-lanes');
+    expect(showTab).not.toHaveBeenCalled();
+    expect(focus).not.toHaveBeenCalled();
+
+    map.noteRunStart('debris-wake');
+    map.menuShown();
+    map.menuShown();
+    await Promise.resolve();
+    expect(showTab).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(map.returnToMap).toBe(false);
+    restoreDom();
+  });
+
+  it("logs the prologue, an entry per sector won and the next one, and the lines said so far under the speaker's label", () => {
+    expect(wakeLogEntries(records())).toEqual({
+      entries: [expect.objectContaining({ title: 'Before launch' })],
+      next: { title: '1 · Debris Wake' },
+    });
+    expect(wakeTranscript(records())).toEqual([]);
+    const won = records(['debris-wake']);
+    const { entries, next } = wakeLogEntries(won);
+    expect(entries.map(({ title }) => title)).toEqual([
+      'Before launch',
+      '1 · Debris Wake',
+    ]);
+    expect(next).toEqual({ title: '2 · Salvage Lanes' });
+    const [debris] = wakeTranscript(won);
+    expect(debris.sector).toBe('Debris Wake');
+    expect(debris.lines).toContainEqual({
+      speaker: 'WAKE · YOUR SHIP',
+      text: 'That signal could keep our lights on. Bring back what you can.',
+    });
+    expect(debris.lines.map(({ text }) => text)).toContain(
+      'Debris Wake. What the Ring let go of. All of it is still counted.'
+    );
+    expect(
+      wakeLogEntries(records(SECTORS.map(({ id }) => id))).next
+    ).toBeNull();
   });
 });

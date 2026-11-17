@@ -316,6 +316,36 @@ describe('AudioSystem random scope synchronization', () => {
     expect(audio.fileTrackState.currentScreen).toBe('menu');
   });
 
+  it('plays the screens outside the sectors with their own music', async () => {
+    const { audio, eventBus, mediaElements } = createMenuMusicHarness();
+    eventBus.emit('screen-changed', { screen: 'menu' });
+    await audio.init();
+    await Promise.resolve();
+    const played = (name) =>
+      mediaElements.find((element) => element.src.includes(name))?.play.mock
+        .calls.length;
+    const overlay = (name, isOpen, source) =>
+      eventBus.emit('ui-overlay-visibility-changed', {
+        overlay: name,
+        isOpen,
+        source,
+      });
+
+    overlay('campaign', true, 'menu');
+    expect(played('campaign-map')).toBe(1);
+    overlay('credits', true, 'menu');
+    expect(played('Asteroids')).toBe(1);
+
+    eventBus.emit('run-won', { sector: 'debris-wake' });
+    expect(played('victory-final')).toBeUndefined();
+    eventBus.emit('run-won', { sector: 'the-crucible' });
+    expect(played('victory-final')).toBe(1);
+    overlay('ending', true);
+    expect(played('ending-choice')).toBe(1);
+    overlay('end-credits', true);
+    expect(played('end-credits')).toBe(1);
+  });
+
   it('keeps track gain separate from master and music volume propagation', async () => {
     const { audio, eventBus } = createMenuMusicHarness();
 

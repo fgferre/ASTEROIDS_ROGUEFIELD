@@ -5,8 +5,10 @@ import {
   DAILY_DIFFICULTY,
   DEFAULT_DIFFICULTY,
   DIFFICULTY_LABELS,
-  DIFFICULTY_PRESETS,
+  RUN_DIFFICULTIES,
   difficultyId,
+  pressureId,
+  pressureRung,
 } from '../data/difficulty.js';
 
 export const DAILY_STORAGE_KEY = 'roguefield:daily:v1';
@@ -90,8 +92,9 @@ function urlParam(name) {
 
 /**
  * The run's difficulty and seed. The preset comes from, in order: a replay
- * being played, the Daily Field (always Veteran), `?difficulty=` and the
- * `gameplay.difficulty` setting. It is locked when a run begins, so changing
+ * being played, the Daily Field (always Veteran), `?difficulty=` (a preset or
+ * a Pressure rung), the Pressure rung chosen in the Hangar (`setPressure`)
+ * and the `gameplay.difficulty` setting. It is locked when a run begins, so changing
  * the setting mid-run applies from the next run. The seed is the boot seed
  * (`?seed=`, else the random source; see GameSessionService) for the first
  * normal run and a fresh one for each later run, unless the boot seed was
@@ -112,6 +115,17 @@ export default class DifficultyService {
     this.daily = false;
     this.dateKey = null;
     this.runDifficulty = null;
+    this.pressure = 0;
+  }
+
+  /** The Pressure rung the Hangar chose for the next runs, 0 for none. */
+  setPressure(rung) {
+    this.pressure = rung;
+  }
+
+  /** The current run's Pressure rung, 0 when it flies a preset. */
+  getPressure() {
+    return pressureRung(this.getDifficulty());
   }
 
   /** The preset the next run would fly. */
@@ -120,6 +134,7 @@ export default class DifficultyService {
     if (this.daily) return DAILY_DIFFICULTY;
     return (
       this.urlDifficulty ??
+      (this.pressure > 0 ? pressureId(this.pressure) : null) ??
       difficultyId(this.settings.getSetting('gameplay', 'difficulty')) ??
       DEFAULT_DIFFICULTY
     );
@@ -131,7 +146,7 @@ export default class DifficultyService {
   }
 
   getModifiers() {
-    return DIFFICULTY_PRESETS[this.getDifficulty()];
+    return RUN_DIFFICULTIES[this.getDifficulty()];
   }
 
   /**

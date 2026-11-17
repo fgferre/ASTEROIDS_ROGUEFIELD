@@ -10,6 +10,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
+import { pressureRung } from '../../src/data/difficulty.js';
 import { afterAll, beforeEach, describe, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { SECTORS, chapterSectors, localLayer } from '../../src/data/sectors.js';
@@ -44,6 +45,8 @@ const SEEDS = Array.from(
 // PLAYTEST_CARRY=1: as in the campaign, the bot first wins the chapter's
 // earlier sectors and arrives with that build (the victory screen's carry).
 const CARRY = process.env.PLAYTEST_CARRY === '1';
+// PLAYTEST_DIFFICULTY: a preset or 'pressure-N'; empty keeps the game's default.
+const DIFFICULTY = process.env.PLAYTEST_DIFFICULTY || '';
 // Kept before the fake timers: a long run hands the event loop a turn now
 // and then, or the worker cannot answer Vitest ("Timeout calling onTaskUpdate").
 const realTimeout = globalThis.setTimeout;
@@ -101,7 +104,15 @@ async function playSector(sector, seed) {
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
-  session.resolveServiceInstance('difficulty').runSeed = seed;
+  const difficulty = session.resolveServiceInstance('difficulty');
+  difficulty.runSeed = seed;
+  if (pressureRung(DIFFICULTY)) {
+    difficulty.setPressure(pressureRung(DIFFICULTY));
+  } else if (DIFFICULTY) {
+    session
+      .resolveServiceInstance('settings')
+      .setSetting('gameplay', 'difficulty', DIFFICULTY);
+  }
   const onGlide = Boolean(
     player.noseAim && player.flight.glide && player.controlScheme === 'classic'
   );
@@ -244,6 +255,7 @@ async function playSector(sector, seed) {
   report.level = progression.getLevel();
   report.startLevel = startLevel;
   report.kills = enemies.sessionStats.totalKills;
+  report.difficulty = difficulty.getDifficulty();
   report.wave = layer?.number ?? sector.layers[0];
   return report;
 }
@@ -266,6 +278,7 @@ function toRow(r) {
     seed: r.seed,
     preset: PRESET,
     flight: FLIGHT,
+    difficulty: r.difficulty,
     outcome: r.outcome.kind,
     seconds: Math.round(r.frames / FPS),
     kills: r.kills,
@@ -325,6 +338,7 @@ function printSummary(reports) {
     return [
       r.sector.id,
       String(r.seed),
+      r.difficulty,
       outcomeText(r),
       clock(r.frames),
       String(r.boss?.level ?? r.level),
@@ -337,6 +351,7 @@ function printSummary(reports) {
   const head = [
     'sector',
     'seed',
+    'difficulty',
     'outcome',
     'time',
     'lvl',

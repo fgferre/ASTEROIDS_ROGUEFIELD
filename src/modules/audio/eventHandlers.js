@@ -5,6 +5,9 @@ import {
   resolveExplosionSize,
   resolveStereoPan,
 } from './SFXBus.js';
+import { SECTOR_SCORE_MIX as MIX } from '../../data/audio/sectorScores.js';
+import { ENDING_SECTOR } from '../../data/story.js';
+import { FILE_TRACK_IDS } from './FileTrackManager.js';
 import {
   biomeThemeForLayer,
   chapterThemeForLayer,
@@ -157,6 +160,29 @@ export const AUDIO_EVENT_HANDLERS = {
   // Boss arc → MusicMixer (D-04): overrides the run intensity upwards.
   bossArc(audio, payload, eventName) {
     audio.musicMixer.setIntensityFromBossEvent(eventName, payload);
+    audio.sectorScore.onBossEvent(eventName);
+  },
+
+  // The synthesized Warden stinger, unless a recorded score brings its own.
+  wardenStinger(audio) {
+    if (!audio.sectorScore.active) audio.sfxBus.playWardenStinger();
+  },
+
+  // A sector with a recorded score plays it instead of the mixer.
+  sectorScoreStart(audio, payload) {
+    audio.sectorScore.start(payload?.sector);
+  },
+
+  // A sector is picked (the map, the result screen): its music is fetched.
+  sectorScorePrefetch(audio, payload) {
+    audio.sectorScore.prefetch(payload?.sector);
+  },
+
+  // The campaign's last sector won: its score fades out, the victory plays.
+  runWon(audio, payload) {
+    if (payload?.sector !== ENDING_SECTOR) return;
+    audio.sectorScore.stop({ seconds: MIX.victoryFadeSeconds });
+    audio.playFileTrack(FILE_TRACK_IDS.VICTORY_FINAL);
   },
 
   // After the Warden, the music hands back to the biome's theme.
@@ -171,17 +197,20 @@ export const AUDIO_EVENT_HANDLERS = {
   journeyPlanned(audio, payload) {
     if (audio.journeyCue.play(payload ?? {})) {
       audio.musicMixer.holdForJourney(true);
+      audio.sectorScore.holdForJourney(true);
     }
   },
   journeyEnded(audio) {
     audio.journeyCue.end();
     audio.musicMixer.holdForJourney(false);
+    audio.sectorScore.holdForJourney(false);
   },
 
   // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
   // freeze, no drift).
   pauseMusic(audio, payload) {
     audio.musicMixer.pause(!!payload?.isPaused);
+    audio.sectorScore.pause(!!payload?.isPaused);
   },
 
   // Low health warning + low-HP duck (AUDIO-03, D-11). Both fire on the
@@ -229,6 +258,15 @@ export const AUDIO_EVENT_HANDLERS = {
   // journey not taken are let go.
   screen(audio, payload) {
     if (payload?.screen === 'menu') audio.voiceLines.expect([]);
+    const score = audio.sectorScore;
+    if (payload?.screen === 'menu') score.stop();
+    else if (payload?.screen === 'gameover') {
+      score.stop({ stinger: 'signalLost' });
+    } else if (payload?.screen === 'victory') {
+      score.stop({ seconds: MIX.victoryFadeSeconds });
+    } else if (payload?.source === 'retry-complete' && !score.active) {
+      score.start(score.sectorId);
+    }
     audio._handleScreenChanged(payload);
   },
 

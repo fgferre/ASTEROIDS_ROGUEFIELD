@@ -163,6 +163,16 @@ export class MenuButtons {
         });
         break;
       }
+      case 'menu-support-btn': {
+        preventDefault();
+        this.emitCreditsMenuRequest({
+          open: true,
+          source: 'menu',
+          triggerId: 'menu-support-btn',
+          section: 'support',
+        });
+        break;
+      }
       default:
         break;
     }
@@ -173,6 +183,7 @@ export class MenuButtons {
     source,
     restoreFocus = false,
     triggerId,
+    section,
   } = {}) {
     if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
       return;
@@ -183,6 +194,7 @@ export class MenuButtons {
       restoreFocus,
       source,
       triggerId,
+      section,
     });
   }
 
