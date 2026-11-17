@@ -98,7 +98,7 @@ describe('HangarService', () => {
     expect(hangar.lastAward.amount).toBe(2 * SALVAGE_PER_CARD_CACHE);
   });
 
-  it('pays a quit from the pause menu like a death, and never twice', () => {
+  it('pays a quit from the pause menu its cleared layers and kills, once', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({
       ...base,
@@ -110,11 +110,17 @@ describe('HangarService', () => {
 
     eventBus.emit('game-started', {});
     eventBus.emit('run-abandoned', summary(9, 47));
-    expect(hangar.salvage).toBe(99);
+    expect(hangar.salvage).toBe(89);
     eventBus.emit('run-abandoned', summary(9, 47));
-    eventBus.emit('player-died', summary(9, 47));
-    expect(hangar.salvage).toBe(99);
-    expect(awarded).toEqual([99]);
+    expect(awarded).toEqual([89]);
+
+    // A quit in the first layer pays its kills only; a death there, the layer.
+    eventBus.emit('game-started', {});
+    eventBus.emit('run-abandoned', summary(1, 12));
+    expect(hangar.lastAward.amount).toBe(2);
+    eventBus.emit('game-started', {});
+    eventBus.emit('player-died', summary(1, 12));
+    expect(hangar.lastAward.amount).toBe(12);
   });
 
   it('pays nothing for a replay that is quit', () => {

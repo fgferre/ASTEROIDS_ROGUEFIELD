@@ -133,7 +133,11 @@ export default class HangarService {
       this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
     });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
-    eventBus.on('run-abandoned', (summary = {}) => this.award(summary));
+    // A quit from the pause pays the layers already cleared, not the one in
+    // play (the owner's call, 17/11): start-and-quit no longer earns.
+    eventBus.on('run-abandoned', (summary = {}) =>
+      this.award(summary, { quit: true })
+    );
     eventBus.on('screen-changed', (payload = {}) => {
       if (payload.screen === 'victory') this.award(payload.data);
     });
@@ -200,9 +204,10 @@ export default class HangarService {
 
   /**
    * Pays what this run is worth, scaled by the difficulty's salvage
-   * multiplier, beyond what it was already paid.
+   * multiplier, beyond what it was already paid; a `quit` leaves out the
+   * layer in play.
    */
-  award(runSummary = {}) {
+  award(runSummary = {}, { quit = false } = {}) {
     if (this.replay) {
       // A replay pays nothing: the viewer's Salvage stays as it is.
       this.lastAward = {
@@ -214,10 +219,11 @@ export default class HangarService {
       return this.lastAward;
     }
     const wave = runSummary.wave;
+    const layer = typeof wave === 'number' ? wave : wave?.current;
     const multiplier = this.difficulty.getModifiers().salvage;
     const worth = Math.round(
       (runSalvage({
-        layer: typeof wave === 'number' ? wave : wave?.current,
+        layer: quit ? layer - 1 : layer,
         kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
         won: this.won,
         bossRushWardens: this.bossRush ? this.bossRushWardens : null,

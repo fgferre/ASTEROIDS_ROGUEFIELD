@@ -215,6 +215,10 @@ export function inactiveReason(ref, state) {
         ? `Pressure ${ROMAN[rung] ?? rung} is on, set in the Hangar. Turn it off there to use this.`
         : null;
     }
+    // Nothing sends the hit event the floating numbers wait for (17/11): greyed
+    // until the effects work decides whether they come back.
+    case 'gameplay.damageNumbers':
+      return 'The game shows no damage numbers for now.';
     case 'controls.hullControl':
       return state.newFlight
         ? 'Your cards choose the flight: every run starts in Classic glide; the Flight Computer card switches to Modern.'

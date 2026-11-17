@@ -7,16 +7,11 @@ import { asArray } from '../upgradeCatalog.js';
 // buttons, a backdrop click or Escape, and gives the focus back to its opener.
 // The menu's Support button opens it at its support section.
 
-/** Every `[data-support-email]` link shows the support address, or that it is coming. */
+/** Every `[data-support-email]` link shows the support address and opens the player's mail program on it. */
 export function fillSupportEmail(root = document) {
   root.querySelectorAll('[data-support-email]').forEach((link) => {
-    link.textContent = SUPPORT_EMAIL || 'Address coming soon';
-    link.classList.toggle('is-pending', !SUPPORT_EMAIL);
-    if (SUPPORT_EMAIL) {
-      link.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Supporting Asteroid Roguefield')}`;
-    } else {
-      link.removeAttribute('href');
-    }
+    link.textContent = SUPPORT_EMAIL;
+    link.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Supporting Asteroid Roguefield')}`;
   });
 }
 

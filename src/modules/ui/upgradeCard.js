@@ -43,6 +43,10 @@ const CARD_ICONS = Object.freeze({
   magfield:
     '<path d="M11 7V21A9 9 0 0 0 29 21V7"/><path d="M11 7H16V20.5A4 4 0 0 0 24 20.5V7H29"/>',
   ram_plating: '<path d="M6 10L34 20L6 30Z"/><path d="M14 16L24 20L14 24"/>',
+  momentum_rounds:
+    '<circle cx="30" cy="20" r="5"/><path d="M5 13H21M9 20H20M5 27H21"/>',
+  close_quarters:
+    '<path d="M7 14V7H14M26 7H33V14M33 26V33H26M14 33H7V26"/><circle cx="20" cy="20" r="4"/>',
 });
 const CURSED_ICON =
   '<path d="M20 5L35 33H5Z"/><path d="M20 15V24M20 28.5V29"/>';
