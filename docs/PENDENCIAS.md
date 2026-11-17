@@ -121,8 +121,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   depois quando adquirirmos a habaolidade que destrava a mira automática, seria uma troca da arma primária para esse
   modelo de tiro na torre que gira... faz sentido para vc?"_ (sim); agulha, freio 3, clarão e freio no deslize:
   _"Ficou bom"_ (aplicados). A ideia da loja no hangar com fichas ficou com a coordenadora. No link, a cada dois
-  níveis uma carta de pilotagem é garantida na oferta (provisório). Espera ele jogar e o cartão
-  `pilotagem-canhao` (visual do canhão do começo, quantas cartas de pilotagem).
+  níveis uma carta de pilotagem é garantida na oferta. Respondeu o cartão seguinte: canhão do começo _"B: cano curto
+  embutido no nariz"_ (feito nos três cascos, a torre volta com a Auto Turret) e as cartas de pilotagem _"Joguei:
+  ficou na medida"_.
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 

@@ -10,7 +10,9 @@
 // point light and a ribbon trail. Dash afterimages, the invulnerability
 // blink and the shield impact flash mirror the 2D PlayerSystem render. In
 // the modern scheme the dorsal turret turns on its own to the simulation's
-// turret heading; its barrel tips sit on the sim's muzzle point. With
+// turret heading; its barrel tips sit on the sim's muzzle point. With the
+// cannon on the nose (the new flight) a short cannon set into the nose tip
+// stands in for it, its muzzle on the sim's too. With
 // multi-lock (Targeting Matrix rank 3) thin layers stack on its axis, one per
 // lock past the primary, each turned to its own sim heading.
 
@@ -39,6 +41,7 @@ import {
   buildTurretLayer,
   edgeLines,
   hullTones,
+  seatNoseGun,
   seatTurret,
   throatGeometry,
 } from './hullModel.js';
@@ -503,7 +506,8 @@ export class PlayerMirror {
       this.hullCache.set(key, model);
     }
     const built = this.hullCache.get(key);
-    seatTurret(this.turretParts, hull.visual, built);
+    this.built = built;
+    this.seatGun(player.noseAim, hull);
 
     const lines = {
       edge: this.edgeMaterial,
@@ -614,7 +618,11 @@ export class PlayerMirror {
     this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
     this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
     this.turret.rotation.y = -(player.turretAngle - angle);
-    this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
+    if (player.noseAim !== this.noseGun) {
+      this.seatGun(player.noseAim, player.currentHull);
+    }
+    this.barrels.position.x =
+      this.barrelsX + (this.muzzleFrames > 0 ? -TURRET_RECOIL : 0);
     this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
@@ -795,6 +803,17 @@ export class PlayerMirror {
       const size = r * 0.5 * (1 - phase);
       ember.scale.set(size * 1.8, size, size);
     }
+  }
+
+  // The turret seated on the current hull or, with the cannon on the nose
+  // (`nose`, the sim's noseAim), the nose cannon set into the hull's nose
+  // with its muzzle on the sim's; seated again whenever the aim moves.
+  seatGun(nose, hull) {
+    seatTurret(this.turretParts, hull.visual, this.built);
+    this.barrelsX = nose
+      ? seatNoseGun(this.turretParts, this.built, hull.noseMuzzle)
+      : 0;
+    this.noseGun = nose;
   }
 
   // One layer per sim heading (PlayerSystem turretLayers), turned like the
