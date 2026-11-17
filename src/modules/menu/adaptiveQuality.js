@@ -1,10 +1,8 @@
 // src/modules/menu/adaptiveQuality.js
 //
 // The menu's adaptive quality: it watches the frame rate and steps between
-// four levels (low to ultra), each setting bloom, chromatic aberration,
-// impact-FX density and asteroid shader detail. MenuBackgroundSystem keeps
-// the state object and calls these with what they touch; the bodies came
-// from it unchanged.
+// four levels (low to ultra); the opening scene drops its bloom at low
+// (openingScene.js setQuality). MenuBackgroundSystem keeps the state object.
 
 import { debugLog } from '../../core/debugLogging.js';
 
@@ -23,33 +21,11 @@ export function createAdaptiveQualityState() {
     // Adjustment cooldown (prevent rapid changes)
     adjustmentCooldown: 0,
     adjustmentCooldownDuration: 2.0, // seconds between quality changes
-    // Quality level definitions - reduced chromatic aberration for clarity
     levels: [
-      // The Monolith study is sharp (no heavy bloom/aberration); keep post FX subtle.
-      {
-        name: 'low',
-        shaderDetail: 0.0,
-        bloomStrength: 0.0,
-        chromaticAberration: 0.0,
-      },
-      {
-        name: 'medium',
-        shaderDetail: 0.5,
-        bloomStrength: 0.05,
-        chromaticAberration: 0.0,
-      },
-      {
-        name: 'high',
-        shaderDetail: 1.0,
-        bloomStrength: 0.1,
-        chromaticAberration: 0.0,
-      },
-      {
-        name: 'ultra',
-        shaderDetail: 1.5,
-        bloomStrength: 0.15,
-        chromaticAberration: 0.0,
-      },
+      { name: 'low' },
+      { name: 'medium' },
+      { name: 'high' },
+      { name: 'ultra' },
     ],
   };
 }
@@ -107,37 +83,4 @@ export function updateAdaptiveQuality(aq, delta, applyQualityLevel) {
         `升级 to "${aq.levels[aq.currentLevel].name}"`
     );
   }
-}
-
-/**
- * Applies a quality level to all relevant systems.
- * @param {object} aq - the state from createAdaptiveQualityState()
- * @param {number} level - index into aq.levels
- * @param {object} targets - bloomPass, customFX and impactEffect (each
- *   optional), and updateAsteroidShaderDetail(detail)
- */
-export function applyQualityLevel(aq, level, targets) {
-  const config = aq.levels[level];
-  if (!config) return;
-
-  // Update bloom pass
-  if (targets.bloomPass) {
-    targets.bloomPass.strength = config.bloomStrength;
-  }
-
-  // Update chromatic aberration in custom FX + toggle pass enabled state (F3)
-  if (targets.customFX && targets.customFX.uniforms) {
-    targets.customFX.uniforms.amount.value = config.chromaticAberration;
-    const grainValue = targets.customFX.uniforms.grainAmount?.value ?? 0;
-    targets.customFX.enabled =
-      config.chromaticAberration !== 0 || grainValue !== 0;
-  }
-
-  // Update impact effects quality level
-  if (targets.impactEffect) {
-    targets.impactEffect.setQualityLevel(level);
-  }
-
-  // Update asteroid material shader detail
-  targets.updateAsteroidShaderDetail(config.shaderDetail);
 }

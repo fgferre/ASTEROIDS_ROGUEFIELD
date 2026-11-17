@@ -1,27 +1,24 @@
 // src/modules/MenuBackgroundSystem.js
 //
-// The Three.js scene behind the main menu: an asteroid belt orbited by a
-// slow camera under the NASA starfield, with the chosen hull framed in
-// front. This file orchestrates (boot, preload, the frame loop, settings,
-// screens, the seeded random) and owns the scene's state; the parts live in
-// ./menu/: rendering (renderer, lights, post), starfield, atmosphere,
-// asteroidMaterials (+ asteroidNoise), asteroidField, adaptiveQuality,
-// cameraOrbit, menuSettings, loadingScreen and threeUuid.
+// The Three.js scene behind the main menu: the opening scene (the game's own
+// space, broken Ring and rocks, one of three shots drawn each time the game
+// opens, rocks hurled into each other now and then) with the chosen hull
+// framed in front by the menu's own scene. This file orchestrates (boot, the
+// loading the game's shader warm-up waits on, the frame loop, settings,
+// screens, the seeded random) and owns that state; the parts live in
+// ./menu/: openingScene (+ openingRocks), rendering (the renderer and the
+// hull's key light), adaptiveQuality, cameraOrbit, loadingScreen and
+// threeUuid.
 
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
-import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
 import { MenuHullPreview } from './MenuHullPreview.js';
 import * as quality from './menu/adaptiveQuality.js';
-import { createMenuAsteroidField } from './menu/asteroidField.js';
-import { createMenuAsteroidMaterials } from './menu/asteroidMaterials.js';
-import * as atmosphere from './menu/atmosphere.js';
 import { orbitCamera } from './menu/cameraOrbit.js';
 import * as loadingScreen from './menu/loadingScreen.js';
-import * as menuSettings from './menu/menuSettings.js';
+import { createOpeningScene, openingShotFromUrl } from './menu/openingScene.js';
 import * as rendering from './menu/rendering.js';
-import * as stars from './menu/starfield.js';
 import * as threeUuid from './menu/threeUuid.js';
 
 class MenuBackgroundSystem extends BaseSystem {
@@ -45,14 +42,8 @@ class MenuBackgroundSystem extends BaseSystem {
       serviceName: 'menu-background',
       randomForkLabels: {
         base: 'menu.base',
-        starfield: 'menu.starfield',
-        assets: 'menu.assets',
-        belt: 'menu.belt',
         asteroids: 'menu.asteroids',
-        fragments: 'menu.fragments',
-        materials: 'menu.materials',
         threeUuid: 'menu.three-uuid',
-        atmosphere: 'menu.atmosphere',
       },
     });
     this._initialRandomSnapshot = initialRandomSnapshot
@@ -80,8 +71,7 @@ class MenuBackgroundSystem extends BaseSystem {
       Boolean(this.canvas);
 
     this.THREE = this.ready ? window.THREE : null;
-    this.CANNON = this.ready ? window.CANNON : null;
-    this.ready = this.ready && Boolean(this.THREE) && Boolean(this.CANNON);
+    this.ready = this.ready && Boolean(this.THREE);
 
     this._threeMathUtilsState = threeUuid.createThreeMathUtilsState();
 
@@ -89,7 +79,6 @@ class MenuBackgroundSystem extends BaseSystem {
     this.isActive = false;
     this.clock = null;
     this.elapsedTime = 0;
-    this.rogueSpawnTimer = 0;
 
     // Pre-loading state
     this.loadingState = {
@@ -109,59 +98,12 @@ class MenuBackgroundSystem extends BaseSystem {
     this.scene = null;
     this.camera = null;
     this.renderer = null;
-    this.world = null;
+    // The opening scene, built while the loading screen shows.
+    this.opening = null;
 
-    this.starLayers = [];
-    this.baseGeometries = [];
-    this.baseMaterials = [];
-    this.monolithMaterials = [];
-    this.asteroidPool = [];
-    this.activeAsteroids = [];
-    this.proceduralAsteroidCount = 0;
-    this.hasProceduralAsteroids = false;
-    this.objectsToDeactivate = [];
-    this.explosions = [];
-    // F9: pre-allocated explosion light pool to avoid new PointLight() per explosion
-    this._explosionLightPool = [];
-    this._explosionLightPoolSize = 4;
-
-    this.config = {
-      // Higher tessellation is required for "Monolith-like" silhouettes.
-      // Reduce density to keep performance stable.
-      maxAsteroids: 28,
-      baseFieldCount: 18,
-      rogueSpawnInterval: 15,
-      cullingDistanceSqr: 300 * 300,
-      fadeOutDuration: 1.25,
-      fragmentationThreshold: 60,
-      maxFragmentationLevel: 2,
-    };
-
-    // Phase 3: Adaptive Quality System
     this.adaptiveQuality = quality.createAdaptiveQualityState();
-    this.currentShaderDetail =
-      this.adaptiveQuality.levels[this.adaptiveQuality.currentLevel]
-        ?.shaderDetail ?? 1.0;
-
     this.stats = this.resolveStatsPanel();
-    this.alphaToCoverageEnabled = false;
-
-    this.normalIntensity = menuSettings.resolveInitialNormalIntensity(() =>
-      this.getSettingsService()
-    );
     this.unsubscribeFromSettings = null;
-
-    // The scene's parts (./menu/); each reads what it needs through a kit.
-    this.starfield = stars.createMenuStarfield(this._createStarfieldKit());
-    this.asteroidMaterials = createMenuAsteroidMaterials(
-      this._createAsteroidMaterialsKit()
-    );
-    this.asteroidField = createMenuAsteroidField(
-      this._createAsteroidFieldKit()
-    );
-
-    this.handleVideoSettingsChanged =
-      this.handleVideoSettingsChanged.bind(this);
 
     this.handleResize = this.handleResize.bind(this);
     this.handleScreenChanged = this.handleScreenChanged.bind(this);
@@ -175,15 +117,11 @@ class MenuBackgroundSystem extends BaseSystem {
       });
       this.registerEventHooks();
       this.setupSettingsSubscription();
-      // Note: syncInitialState is now called from preloadAssets when complete
+      // Note: syncInitialState is called from preloadAssets when complete
+    } else if (!this.canvas) {
+      console.warn('[MenuBackgroundSystem] Canvas element not found.');
     } else {
-      if (!this.canvas) {
-        console.warn('[MenuBackgroundSystem] Canvas element not found.');
-      } else {
-        console.warn(
-          '[MenuBackgroundSystem] Required libraries not available. Three.js or Cannon.js missing.'
-        );
-      }
+      console.warn('[MenuBackgroundSystem] Three.js is not available.');
     }
   }
 
@@ -337,171 +275,15 @@ class MenuBackgroundSystem extends BaseSystem {
       window.removeEventListener('resize', this.handleResize);
     }
 
-    // Destroy impact effects (libera memória dos pools)
-    if (this.impactEffect) {
-      this.impactEffect.destroy();
-      this.impactEffect = null;
+    if (typeof this.unsubscribeFromSettings === 'function') {
+      this.unsubscribeFromSettings();
+      this.unsubscribeFromSettings = null;
     }
 
     super.destroy();
 
     this.stop();
     this.restoreOriginalThreeUuidGenerator();
-  }
-
-  /**
-   * The kits the scene parts get instead of the system (the SFXBus._createKit
-   * pattern): live getters, so a field replaced later (at boot, or by a test)
-   * is honoured; setters only for values the part updates; the system's own
-   * helpers. Frozen.
-   */
-  _createStarfieldKit() {
-    const system = this;
-    return Object.freeze({
-      get THREE() {
-        return system.THREE;
-      },
-      get scene() {
-        return system.scene;
-      },
-      get camera() {
-        return system.camera;
-      },
-      get renderer() {
-        return system.renderer;
-      },
-      get nebulas() {
-        return system.nebulas;
-      },
-      get dustSystem() {
-        return system.dustSystem;
-      },
-      get starLayers() {
-        return system.starLayers;
-      },
-      set starLayers(layers) {
-        system.starLayers = layers;
-      },
-      randomFloat: (name) => system.randomFloat(name),
-      createStarTexture: () => system.createStarTexture(),
-    });
-  }
-
-  _createAsteroidMaterialsKit() {
-    const system = this;
-    return Object.freeze({
-      get THREE() {
-        return system.THREE;
-      },
-      get adaptiveQuality() {
-        return system.adaptiveQuality;
-      },
-      get baseMaterials() {
-        return system.baseMaterials;
-      },
-      get monolithMaterials() {
-        return system.monolithMaterials;
-      },
-      get activeAsteroids() {
-        return system.activeAsteroids;
-      },
-      get camera() {
-        return system.camera;
-      },
-      get keyLight() {
-        return system.keyLight;
-      },
-      get elapsedTime() {
-        return system.elapsedTime;
-      },
-      get normalIntensity() {
-        return system.normalIntensity;
-      },
-      set normalIntensity(value) {
-        system.normalIntensity = value;
-      },
-      get currentShaderDetail() {
-        return system.currentShaderDetail;
-      },
-      set currentShaderDetail(value) {
-        system.currentShaderDetail = value;
-      },
-      randomFloat: (name) => system.randomFloat(name),
-    });
-  }
-
-  _createAsteroidFieldKit() {
-    const system = this;
-    return Object.freeze({
-      get THREE() {
-        return system.THREE;
-      },
-      get CANNON() {
-        return system.CANNON;
-      },
-      get scene() {
-        return system.scene;
-      },
-      get world() {
-        return system.world;
-      },
-      get config() {
-        return system.config;
-      },
-      get renderer() {
-        return system.renderer;
-      },
-      get camera() {
-        return system.camera;
-      },
-      get composer() {
-        return system.composer;
-      },
-      get customFX() {
-        return system.customFX;
-      },
-      get elapsedTime() {
-        return system.elapsedTime;
-      },
-      get impactEffect() {
-        return system.impactEffect;
-      },
-      get asteroidPool() {
-        return system.asteroidPool;
-      },
-      get activeAsteroids() {
-        return system.activeAsteroids;
-      },
-      get objectsToDeactivate() {
-        return system.objectsToDeactivate;
-      },
-      get baseGeometries() {
-        return system.baseGeometries;
-      },
-      get baseMaterials() {
-        return system.baseMaterials;
-      },
-      get explosions() {
-        return system.explosions;
-      },
-      get explosionLightPool() {
-        return system._explosionLightPool;
-      },
-      get proceduralAsteroidCount() {
-        return system.proceduralAsteroidCount;
-      },
-      set proceduralAsteroidCount(value) {
-        system.proceduralAsteroidCount = value;
-      },
-      get hasProceduralAsteroids() {
-        return system.hasProceduralAsteroids;
-      },
-      set hasProceduralAsteroids(value) {
-        system.hasProceduralAsteroids = value;
-      },
-      randomFloat: (name) => system.randomFloat(name),
-      withSeededMathRandom: (fn) => system.withSeededMathRandom(fn),
-    });
   }
 
   getService(name) {
@@ -533,12 +315,12 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   bootstrapScene() {
-    const { THREE, CANNON } = this;
+    const { THREE } = this;
 
+    // The menu's own scene: the hull preview, hanging off the camera (camera
+    // children only render with the camera in the scene), under its key
+    // light. The opening scene draws behind it.
     this.scene = new THREE.Scene();
-    // Reduced fog density for clearer distant objects
-    this.scene.fog = new THREE.FogExp2(0x000104, 0.003);
-
     this.camera = new THREE.PerspectiveCamera(
       60,
       this.getAspectRatio(),
@@ -546,33 +328,12 @@ class MenuBackgroundSystem extends BaseSystem {
       10000
     );
     this.camera.position.set(0, 0, 100);
+    this.scene.add(this.camera);
 
     this.renderer = rendering.createMenuRenderer(THREE, this.canvas);
-    this.enableAlphaToCoverage();
-
-    this.world = new CANNON.World();
-    this.world.gravity.set(0, 0, 0);
-    this.world.broadphase = new CANNON.NaiveBroadphase();
-    this.world.solver.iterations = 5;
-
     this.clock = new THREE.Clock();
-
-    // F10: initialize reusable temporaries
-    this.asteroidField.createTemporaries();
-
-    // F9: pre-allocate explosion light pool
-    for (let i = 0; i < this._explosionLightPoolSize; i++) {
-      const light = new THREE.PointLight(0xffaa66, 0, 140, 2);
-      light.visible = false;
-      this.scene.add(light);
-      this._explosionLightPool.push(light);
-    }
-
-    // Quick setup (non-blocking)
     this.keyLight = rendering.createLighting(THREE, this.scene);
-    // The chosen hull, framed into the menu's stage box (camera children
-    // only render with the camera in the scene).
-    this.scene.add(this.camera);
+
     this.hullPreview = new MenuHullPreview(THREE, this.camera);
     this.hullStage = document.getElementById('menu-hull-stage');
     // While the Hangar is open the hull frames into its stage instead, and
@@ -582,45 +343,21 @@ class MenuBackgroundSystem extends BaseSystem {
     this.hangarOpen = false;
     this.hoveredHull = null;
     this.hoveredHullLocked = false;
-    // Lightweight placeholder while NASA starfield loads during preload.
-    this.starfield.createFallbackStarLayers();
-    this.createAtmosphere();
-    this.setupPostProcessing();
-    this.setupImpactEffects();
 
-    // Start async preloading for heavy assets
     this.withSeededMathRandom(() => this.preloadAssets());
   }
 
   /**
-   * Asynchronously preloads heavy assets (geometries, materials, asteroid pool).
-   * Uses chunked loading to avoid blocking the main thread.
+   * Builds the opening scene and draws it once (its programs compile and the
+   * nebula bakes) while the loading screen still covers the canvas, one
+   * step a task so the page stays responsive.
    */
   async preloadAssets() {
     const ls = this.loadingState;
     ls.isLoading = true;
     ls.isReady = false;
     ls.progress = 0;
-
-    const starfieldStepCount = 1;
-    const geometryCount = 10;
-    const materialCount = 12;
-    const monolithMaterialCount = 0;
-    const poolSize = this.config.maxAsteroids;
-    const impactEffectsStepCount = 1; // Pre-load impact effects
-    const impactWarmupStepCount = 1; // Compile first-impact render path
-
-    // Total steps: geometries + materials + pool chunks + field setup + impact effects
-    const poolChunks = Math.ceil(poolSize / 10); // Create 10 pool items per chunk
-    ls.totalSteps =
-      starfieldStepCount +
-      geometryCount +
-      materialCount +
-      monolithMaterialCount +
-      poolChunks +
-      impactEffectsStepCount +
-      impactWarmupStepCount +
-      1;
+    ls.totalSteps = 2;
     ls.currentStep = 0;
 
     const updateProgress = (message) => {
@@ -630,74 +367,22 @@ class MenuBackgroundSystem extends BaseSystem {
         ls.onProgress(ls.progress, message);
       }
     };
-
-    // Helper to yield to main thread
     const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
 
     try {
-      // Phase 0: Load NASA starfield (matches the standalone mockup).
-      await this.starfield.createNasaStarfieldLayers();
-      updateProgress('Loading NASA starfield');
+      await yieldToMain();
+      this.opening = createOpeningScene(
+        this,
+        () => this.randomFloat('asteroids'),
+        openingShotFromUrl()
+      );
+      updateProgress('Building the field');
       await yieldToMain();
 
-      // Phase 1: Create geometries (one per frame)
-      for (let i = 0; i < geometryCount; i++) {
-        const geometry = this.asteroidMaterials.createDeformedIcosahedron();
-        this.baseGeometries.push(geometry);
-        updateProgress(`Creating geometry ${i + 1}/${geometryCount}`);
-        await yieldToMain();
-      }
+      this.opening.update(0, true);
+      this.opening.render();
+      updateProgress('Lighting the field');
 
-      // Phase 2: Create materials (one per frame)
-      // Single-technique policy: menu asteroids use one unified procedural
-      // material pipeline (PBR + 3D noise with triplanar mixing).
-      for (let i = 0; i < materialCount; i++) {
-        const seed = this.randomFloat('materials') * 100;
-        const material =
-          this.asteroidMaterials.createTriplanarAsteroidMaterial(seed);
-        this.baseMaterials.push(material);
-        updateProgress(`Creating materials ${i + 1}/${materialCount}`);
-        await yieldToMain();
-      }
-
-      // Apply normal intensity to all materials
-      this.updateNormalIntensity(this.normalIntensity);
-
-      // Phase 3: Create asteroid pool in chunks
-      for (let chunk = 0; chunk < poolChunks; chunk++) {
-        const chunkStart = chunk * 10;
-        const chunkEnd = Math.min(chunkStart + 10, poolSize);
-
-        for (let i = chunkStart; i < chunkEnd; i++) {
-          if (this.asteroidPool.length < poolSize) {
-            this.asteroidField.createPoolableAsteroid();
-          }
-        }
-
-        updateProgress(
-          `Creating asteroid pool ${Math.min((chunk + 1) * 10, poolSize)}/${poolSize}`
-        );
-        await yieldToMain();
-      }
-
-      // Phase 4: Pre-load impact effects (pools de flash, debris, dust)
-      if (this.impactEffect) {
-        this.impactEffect.preload();
-        updateProgress('Loading impact effects');
-        await yieldToMain();
-      }
-
-      // Phase 5: Prepare initial asteroid field so impact warmup renders against
-      // the same lit materials that the player sees once the menu is visible.
-      this.asteroidField.prepareInitialField();
-      updateProgress('Preparing asteroid field');
-      await yieldToMain();
-
-      // Phase 6: Warm the real first-impact path (lights + debris + dust uploads)
-      await this.asteroidField.warmupFirstImpactPath();
-      updateProgress('Warming impact pipeline');
-
-      // Mark loading complete
       ls.isLoading = false;
       ls.isReady = true;
       ls.progress = 1;
@@ -739,97 +424,15 @@ class MenuBackgroundSystem extends BaseSystem {
     return this.loadingState.progress;
   }
 
-  setupPostProcessing() {
-    Object.assign(
-      this,
-      rendering.setupPostProcessing({
-        THREE: this.THREE,
-        scene: this.scene,
-        camera: this.camera,
-        renderer: this.renderer,
-        adaptiveQuality: this.adaptiveQuality,
-      })
-    );
-  }
-
-  enableAlphaToCoverage() {
-    if (!this.renderer) {
-      return;
-    }
-
-    try {
-      const gl = this.renderer.getContext();
-      if (gl && typeof gl.SAMPLE_ALPHA_TO_COVERAGE !== 'undefined') {
-        gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-        this.alphaToCoverageEnabled = true;
-      }
-    } catch (error) {
-      console.warn(
-        '[MenuBackgroundSystem] Failed to enable alpha-to-coverage.',
-        error
-      );
-      this.alphaToCoverageEnabled = false;
-    }
-  }
-
-  setupImpactEffects() {
-    const { THREE, scene, camera } = this;
-    if (!THREE || !scene || !camera) return;
-
-    // Criar sistema de efeitos de impacto cinematográficos
-    this.impactEffect = new AsteroidImpactEffect(THREE, scene, camera, {
-      qualityLevels: {
-        0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 }, // low
-        1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 }, // medium
-        2: { debris: 150, dust: 120, flashIntensity: 5.0, shakeAmount: 0.5 }, // high
-        3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }, // ultra
-      },
-      initialQualityLevel: this.adaptiveQuality?.currentLevel || 2,
-      randomFloat: () => this.randomFloat('fragments'),
-    });
-  }
-
-  createStarTexture() {
-    return stars.createStarTexture(this.THREE);
-  }
-
-  createAtmosphere() {
-    const created = atmosphere.createAtmosphere({
-      THREE: this.THREE,
-      scene: this.scene,
-      ensureRandom: (name) => this.ensureRandom(name),
-      createStarTexture: () => this.createStarTexture(),
-    });
-    if (created) {
-      Object.assign(this, created);
-    }
-  }
-
-  fetchNasaBinaryAsset(filename, baseCandidates, timeoutMs) {
-    return stars.fetchNasaBinaryAsset(filename, baseCandidates, timeoutMs);
-  }
-
-  updateNormalIntensity(rawValue) {
-    this.asteroidMaterials.updateNormalIntensity(rawValue);
-  }
-
+  // Any settings change may pick another hull or turn reduced motion on.
   setupSettingsSubscription() {
     try {
       const settings = this.getSettingsService();
       if (!settings || typeof settings.subscribe !== 'function') {
         return;
       }
-
-      if (typeof this.unsubscribeFromSettings === 'function') {
-        this.unsubscribeFromSettings();
-        this.unsubscribeFromSettings = null;
-      }
-
       this.unsubscribeFromSettings = settings.subscribe(
-        menuSettings.createSettingsListener(settings, {
-          syncHullPreview: () => this.syncHullPreview(),
-          updateNormalIntensity: (value) => this.updateNormalIntensity(value),
-        }),
+        () => this.syncHullPreview(),
         { immediate: true }
       );
     } catch (error) {
@@ -859,69 +462,12 @@ class MenuBackgroundSystem extends BaseSystem {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
-  handleVideoSettingsChanged(event = {}) {
-    menuSettings.applyVideoSettingsChange(event, (value) =>
-      this.updateNormalIntensity(value)
-    );
-  }
-
-  spawnBeltAsteroid(options) {
-    this.asteroidField.spawnBeltAsteroid(options);
-  }
-
-  spawnRogueAsteroid() {
-    this.asteroidField.spawnRogueAsteroid();
-  }
-
-  deactivateAsteroid(asteroid) {
-    this.asteroidField.deactivateAsteroid(asteroid);
-  }
-
-  startFadeOut(asteroid) {
-    this.asteroidField.startFadeOut(asteroid);
-  }
-
-  createExplosion(position) {
-    this.asteroidField.createExplosion(position);
-  }
-
-  clearActiveExplosions() {
-    this.asteroidField.clearActiveExplosions();
-  }
-
-  updateExplosions(delta) {
-    this.asteroidField.updateExplosions(delta);
-  }
-
+  // The menu's adaptive quality follows the frame rate; the opening scene
+  // drops its bloom at the low level.
   updateAdaptiveQuality(delta) {
     quality.updateAdaptiveQuality(this.adaptiveQuality, delta, (level) =>
-      this.applyQualityLevel(level)
+      this.opening?.setQuality(level)
     );
-  }
-
-  applyQualityLevel(level) {
-    quality.applyQualityLevel(this.adaptiveQuality, level, {
-      bloomPass: this.bloomPass,
-      customFX: this.customFX,
-      impactEffect: this.impactEffect,
-      updateAsteroidShaderDetail: (detail) =>
-        this.asteroidMaterials.updateAsteroidShaderDetail(detail),
-    });
-  }
-
-  /**
-   * Gets the current FPS from the adaptive quality system.
-   */
-  getCurrentFps() {
-    return this.adaptiveQuality.lastFps;
-  }
-
-  /**
-   * Gets the current quality level name.
-   */
-  getCurrentQualityLevel() {
-    const aq = this.adaptiveQuality;
-    return aq.levels[aq.currentLevel]?.name || 'unknown';
   }
 
   resolveStatsPanel() {
@@ -941,87 +487,30 @@ class MenuBackgroundSystem extends BaseSystem {
 
     const delta = Math.min(this.clock.getDelta(), 0.05);
     this.stats = this.stats || this.resolveStatsPanel();
-    if (this.stats) {
-      this.stats.begin();
-    }
+    this.stats?.begin();
     this.elapsedTime += delta;
-    this.rogueSpawnTimer += delta;
 
-    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
     this.updateAdaptiveQuality(delta);
+    this.opening.update(delta, this.hullReducedMotion);
 
-    if (this.rogueSpawnTimer >= this.config.rogueSpawnInterval) {
-      this.spawnRogueAsteroid();
-      this.rogueSpawnTimer = 0;
-    }
-
-    // F4: 30Hz fixed step with max 1 catch-up (decorative menu doesn't need 60Hz physics)
-    this.world.step(1 / 30, delta, 1);
-
-    this.asteroidField.updateAsteroids(delta);
-
-    while (this.activeAsteroids.length < this.config.baseFieldCount) {
-      this.spawnBeltAsteroid();
-    }
-
-    const timer = orbitCamera(this.camera, this.elapsedTime);
-
-    // Aplicar camera shake ANTES do lookAt (offset à posição calculada)
-    if (this.impactEffect) {
-      this.impactEffect.updateCameraShake(delta);
-    }
-
+    // The menu camera circles (its key light turns about the hull with it).
+    orbitCamera(this.camera, this.elapsedTime);
     this.camera.lookAt(0, 0, 0);
-
     this.hullPreview.update(
       delta,
       this.hangarOpen ? this.hangarStage : this.hullStage,
       this.hullReducedMotion
     );
 
-    atmosphere.updateAtmosphere(
-      this.nebulas,
-      this.dustSystem,
-      this.elapsedTime,
-      delta
-    );
-
-    this.starfield.updateStarLayers(timer, this.elapsedTime);
-
-    this.updateExplosions(delta);
-
-    // Atualizar efeitos cinematográficos de impacto (flash, detritos, poeira)
-    // Nota: camera shake é aplicado antes do lookAt (linhas acima)
-    if (this.impactEffect) {
-      this.impactEffect.update(delta);
-    }
-
-    // Procedural asteroid shader is optional; menu currently uses PBR materials.
-    // Keep calls guarded to avoid unnecessary work.
-    if (this.hasProceduralAsteroids) {
-      this.asteroidMaterials.updateProceduralMaterialUniforms();
-      this.asteroidMaterials.updateAsteroidShaderTime(this.elapsedTime);
-    }
-
-    if (this.customFX && this.customFX.uniforms) {
-      this.customFX.uniforms.time.value = this.elapsedTime;
-    }
-
     if (!this.loadingState.covered) {
       this.renderFrame();
     }
 
-    if (this.stats) {
-      this.stats.end();
-    }
+    this.stats?.end();
   }
 
   renderFrame() {
-    if (this.composer) {
-      this.composer.render();
-    } else {
-      this.renderer.render(this.scene, this.camera);
-    }
+    this.opening.render();
     if (this.hangarOpen) {
       this.copyHangarStage();
     }
@@ -1046,7 +535,6 @@ class MenuBackgroundSystem extends BaseSystem {
       this.clock.getDelta();
     }
     this.elapsedTime = 0;
-    this.rogueSpawnTimer = 0;
     this.animationFrame = requestAnimationFrame(this.animate);
   }
 
@@ -1064,9 +552,6 @@ class MenuBackgroundSystem extends BaseSystem {
     if (this.clock) {
       this.clock.stop();
     }
-    this.activeAsteroids.forEach((asteroid) => {
-      asteroid.body.sleep();
-    });
   }
 
   handleResize() {
@@ -1079,12 +564,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.camera.aspect = this.getAspectRatio(width, height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
-
-    if (this.composer) {
-      this.composer.setSize(width, height);
-    }
-
-    this.starfield.updateStarLayerSizes();
+    this.opening?.resize(width, height);
   }
 
   handleScreenChanged(event) {
@@ -1142,10 +622,6 @@ class MenuBackgroundSystem extends BaseSystem {
       this.hoveredHullLocked = Boolean(event?.locked);
       this.syncHullPreview();
     });
-    this.registerEventListener(
-      'settings-video-changed',
-      this.handleVideoSettingsChanged
-    );
   }
 
   syncInitialState() {
