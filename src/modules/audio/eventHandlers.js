@@ -5,7 +5,10 @@ import {
   resolveExplosionSize,
   resolveStereoPan,
 } from './SFXBus.js';
-import { SECTOR_SCORE_MIX as MIX } from '../../data/audio/sectorScores.js';
+import {
+  SECTOR_SCORE_MIX as MIX,
+  chapterScoreForLayer,
+} from '../../data/audio/sectorScores.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
 import {
@@ -128,6 +131,7 @@ export const AUDIO_EVENT_HANDLERS = {
     const wave = Number(payload?.wave);
     if (!Number.isFinite(wave) || wave <= 0) return;
     audio.musicMixer.setTheme(musicThemeForLayer(wave));
+    audio.sectorScore.playChapter(chapterScoreForLayer(wave));
     const chapterTheme = chapterThemeForLayer(wave);
     // A journey that opens the sector plays the chapter's motif itself: a
     // layer started after it (a head start's) has no stinger, and one

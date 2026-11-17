@@ -60,6 +60,7 @@ class SectorScore {
     this._prefetch = null;
     this.context = null;
     this.target = null;
+    this._chapterId = null; // the chapter score of a sectorless run
     this.sectorId = null; // the sector with a score: kept to restart a retry
     this.active = false;
     this._token = 0;
@@ -102,7 +103,27 @@ class SectorScore {
   /** Play the sector's score; a sector without one leaves the mixer alone. */
   async start(sectorId) {
     this.sectorId = sectorId ?? null;
+    this._chapterId = null;
     this._stopNow();
+    // A run with no sector is scored by chapter (playChapter): the mixer
+    // stays silent from the start, not only once a score has loaded.
+    if (!sectorId) this.mixer.setSilenced(true, 0);
+    return this._play(sectorId);
+  }
+
+  /**
+   * A run with no sector (Descent, Daily, Boss Rush, Deep Field): the score of
+   * the layer's chapter. A change fades the playing one out and brings the
+   * next in; a campaign sector's own score is left alone.
+   */
+  async playChapter(sectorId) {
+    if (this.sectorId || this._chapterId === sectorId) return;
+    this._chapterId = sectorId;
+    this.stop({ seconds: MIX.chapterFadeSeconds });
+    return this._play(sectorId);
+  }
+
+  async _play(sectorId) {
     const score = SECTOR_SCORES[sectorId];
     if (!score || !this.context || !this.target) return;
     const token = ++this._token;
@@ -341,6 +362,7 @@ class SectorScore {
   reset() {
     this._stopNow();
     this.sectorId = null;
+    this._chapterId = null;
     this._held = false;
   }
 }

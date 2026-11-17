@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SectorScore from '../../../src/modules/audio/SectorScore.js';
-import { SECTOR_SCORES } from '../../../src/data/audio/sectorScores.js';
+import {
+  SECTOR_SCORES,
+  chapterScoreForLayer,
+} from '../../../src/data/audio/sectorScores.js';
 
 // A Web Audio stand-in recording the sources made and the gain params written.
 function fakeContext() {
@@ -62,6 +65,31 @@ describe('SectorScore', () => {
     await score.start('no-such-sector');
     expect(rec.sources).toHaveLength(0);
     expect(mixer.setSilenced).not.toHaveBeenCalledWith(true, expect.anything());
+  });
+
+  it('a run with no sector plays the score of the layer chapter and switches with it; a sector run ignores that', async () => {
+    const chapter = (layer) => score.playChapter(chapterScoreForLayer(layer));
+    const load = vi.fn(async (_context, url) => ({ ...buffer(), url }));
+    score = new SectorScore({ mixer, load });
+    score.init(rec.context, target);
+    await score.start(undefined);
+    expect(mixer.setSilenced).toHaveBeenCalledWith(true, 0);
+    await chapter(1);
+    const played = () =>
+      load.mock.calls.map(([, url]) => url).filter((u) => /stage/.test(u));
+    expect(played().at(-1)).toBe(SECTOR_SCORES['prime-gate'].stage);
+    await chapter(5);
+    expect(played()).toHaveLength(1);
+    await chapter(6);
+    expect(played().at(-1)).toBe(SECTOR_SCORES['dense-core'].stage);
+    await chapter(16);
+    expect(played().at(-1)).toBe(SECTOR_SCORES['the-crucible'].stage);
+    expect(chapterScoreForLayer(11)).toBe('wardens-reach');
+
+    load.mockClear();
+    await score.start('debris-wake');
+    await chapter(6);
+    expect(played()).toEqual([SECTOR_SCORES['debris-wake'].stage]);
   });
 
   it('debris-wake: two looping sources start together, loop as long as the track, mixer silenced', async () => {
