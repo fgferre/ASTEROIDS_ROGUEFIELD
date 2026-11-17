@@ -11,6 +11,7 @@ import {
   hangarTransmission,
   heraldTransmission,
   runVoiceLines,
+  travelTransmissions,
   sightingTransmission,
   victoryTransmission,
   wardenTransmission,
@@ -39,6 +40,21 @@ function fakeHud() {
 }
 
 describe('TransmissionQueue', () => {
+  it("shows a line's label in the strip and keeps its voice key", () => {
+    const hud = fakeHud();
+    const [first, second] = travelTransmissions('debris-wake');
+    expect(first.key).toBe('travel:debris-wake:0');
+    expect(first.speaker).toBe(STORY.speaker.wake);
+    const queue = new TransmissionQueue(hud, () => {});
+    queue.push(first);
+    queue.update(0);
+    expect(hud.showing).toBe('WAKE · YOUR SHIP');
+    queue.clear();
+    queue.push(second);
+    queue.update(0);
+    expect(hud.showing).toBe(STORY.speaker.wake);
+  });
+
   it('waits for the banner to clear, then types one line at a time', () => {
     const hud = fakeHud();
     const shown = [];

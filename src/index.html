@@ -644,37 +644,52 @@
               ✕
             </button>
           </header>
-          <div
-            id="campaign-nodes"
-            class="campaign-map"
-            role="group"
-            aria-label="Chapters"
-          ></div>
-          <section class="campaign-detail" aria-live="polite">
-            <div class="campaign-detail__text">
-              <h3 id="campaign-detail-title" class="campaign-detail__title">
-                —
-              </h3>
+          <div class="campaign-body">
+            <div class="campaign-main">
               <div
-                id="campaign-sectors"
-                class="campaign-sectors"
+                id="campaign-nodes"
+                class="campaign-map"
                 role="group"
-                aria-label="Sectors"
+                aria-label="Chapters"
               ></div>
-              <p
-                id="campaign-detail-head-start"
-                class="campaign-detail__line"
-                hidden
-              ></p>
+              <section class="campaign-detail" aria-live="polite">
+                <div class="campaign-detail__text">
+                  <h3 id="campaign-detail-title" class="campaign-detail__title">
+                    —
+                  </h3>
+                  <div
+                    id="campaign-sectors"
+                    class="campaign-sectors"
+                    role="group"
+                    aria-label="Sectors"
+                  ></div>
+                  <p
+                    id="campaign-detail-head-start"
+                    class="campaign-detail__line"
+                    hidden
+                  ></p>
+                </div>
+                <button
+                  id="campaign-launch-btn"
+                  class="btn btn--primary campaign-detail__launch"
+                  type="button"
+                >
+                  Launch
+                </button>
+              </section>
             </div>
-            <button
-              id="campaign-launch-btn"
-              class="btn btn--primary campaign-detail__launch"
-              type="button"
-            >
-              Launch
-            </button>
-          </section>
+            <aside id="campaign-log" class="campaign-log" aria-label="Wake log">
+              <h3 class="campaign-log__heading">WAKE LOG</h3>
+              <p class="campaign-log__sub">What we know so far</p>
+              <div id="campaign-log-body" class="campaign-log__body"></div>
+              <button
+                id="campaign-log-toggle"
+                class="campaign-log__toggle"
+                type="button"
+                hidden
+              ></button>
+            </aside>
+          </div>
           <footer class="credits-footer">
             <button
               id="campaign-back-btn"

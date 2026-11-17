@@ -1769,6 +1769,137 @@ kbd {
   gap: var(--space-4);
 }
 
+/* The map and its detail keep their size; the Wake log sits beside them on a
+   wide window, under them on a narrow one */
+.campaign-body {
+  display: grid;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.campaign-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* a window too narrow for the column scrolls the dialog instead */
+.campaign-dialog:has(.campaign-log) {
+  overflow-y: auto;
+}
+
+@media (min-width: 1100px) {
+  .campaign-dialog {
+    width: min(1340px, 96vw);
+  }
+
+  .campaign-body {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    align-items: start;
+  }
+}
+
+.campaign-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+}
+
+.campaign-log__heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.campaign-log__sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.campaign-log__body {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 40vh;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+@media (min-width: 1100px) {
+  .campaign-log__body {
+    max-height: 46vh;
+  }
+}
+
+.campaign-log__entry {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.campaign-log__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.campaign-log__text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.campaign-log__next {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.campaign-log__toggle {
+  align-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.campaign-log__toggle:hover {
+  color: var(--text);
+}
+
+.campaign-log__toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.campaign-log__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.campaign-log__speaker {
+  font-weight: 700;
+  color: var(--text);
+}
+
 .campaign-map {
   position: relative;
   /* Never taller than a third of the window: the dialog fits 720 p */

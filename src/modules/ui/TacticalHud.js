@@ -9,6 +9,7 @@ import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { bossTier } from '../../data/enemies/boss.js';
 import { localLayer } from '../../data/sectors.js';
+import { STORY } from '../../data/story.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
 import { buildRadarState, createRadarMemory } from './hud/radar.js';
@@ -475,7 +476,8 @@ export class TacticalHud {
           this.layout?.showBossIntro(
             data?.enemy?.displayName &&
               tieredName(data.enemy.displayName, next.tier),
-            data?.enemy?.subtitle
+            data?.enemy?.subtitle,
+            STORY.bossContext[data?.enemy?.bossKind] ?? ''
           );
         }
         next.active = true;

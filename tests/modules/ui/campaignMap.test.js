@@ -5,8 +5,10 @@ import {
   campaignMarkup,
   defaultSectorRow,
   sectorRowsMarkup,
+  wakeLogEntries,
+  wakeTranscript,
 } from '../../../src/modules/ui/CampaignMap.js';
-import { sectorById } from '../../../src/data/sectors.js';
+import { SECTORS, sectorById } from '../../../src/data/sectors.js';
 
 const records = (
   sectorsWon = [],
@@ -332,5 +334,32 @@ describe('campaign map', () => {
     press('ArrowDown');
     expect(focused).toEqual(['salvage-lanes', 'prime-gate']);
     vi.unstubAllGlobals();
+  });
+
+  it("logs the prologue, an entry per sector won and the next one, and the lines said so far under the speaker's label", () => {
+    expect(wakeLogEntries(records())).toEqual({
+      entries: [expect.objectContaining({ title: 'Before launch' })],
+      next: { title: '1 · Debris Wake' },
+    });
+    expect(wakeTranscript(records())).toEqual([]);
+    const won = records(['debris-wake']);
+    const { entries, next } = wakeLogEntries(won);
+    expect(entries.map(({ title }) => title)).toEqual([
+      'Before launch',
+      '1 · Debris Wake',
+    ]);
+    expect(next).toEqual({ title: '2 · Salvage Lanes' });
+    const [debris] = wakeTranscript(won);
+    expect(debris.sector).toBe('Debris Wake');
+    expect(debris.lines).toContainEqual({
+      speaker: 'WAKE · YOUR SHIP',
+      text: 'That signal could keep our lights on. Bring back what you can.',
+    });
+    expect(debris.lines.map(({ text }) => text)).toContain(
+      'Debris Wake. What the Ring let go of. All of it is still counted.'
+    );
+    expect(
+      wakeLogEntries(records(SECTORS.map(({ id }) => id))).next
+    ).toBeNull();
   });
 });

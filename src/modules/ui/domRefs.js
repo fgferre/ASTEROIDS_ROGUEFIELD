@@ -97,6 +97,8 @@ export function cacheStaticNodes() {
       detailHeadStart:
         document.getElementById('campaign-detail-head-start') || null,
       launchBtn: document.getElementById('campaign-launch-btn') || null,
+      logBody: document.getElementById('campaign-log-body') || null,
+      logToggle: document.getElementById('campaign-log-toggle') || null,
       openBtn: document.getElementById('menu-campaign-btn') || null,
       backBtn: document.getElementById('campaign-back-btn') || null,
       closeBtn: document.getElementById('campaign-close-btn') || null,

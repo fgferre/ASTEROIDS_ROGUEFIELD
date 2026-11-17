@@ -57,6 +57,65 @@ export const STORY = deepFreeze({
     'the-crucible':
       'The Crucible. All orders arrive here. Two of them cannot both be obeyed.',
   },
+  // Written, not spoken: where the pilot is and why, under the chapter title
+  // as a sector run begins.
+  context: {
+    'debris-wake':
+      "The Ring's scrapyard. Our power signal is somewhere in here.",
+    'salvage-lanes': "The Ring's old cargo route. The signal leads through it.",
+    'prime-gate': 'The outer wall of the Ring. The way in is a guarded gate.',
+    'furnace-drift':
+      'Inside the Ring, where the core vents its heat. The power we came for.',
+    'crystal-choir': 'A crack in the Ring, sealed with singing crystal.',
+    'dense-core': 'A vast hall inside the Ring. The cracks are wider here.',
+    'assembly-graveyard': "The Ring's shipyards. Something is still building.",
+    'quarantine-grid': "A fence of beacons in a dark planet's shadow.",
+    'wardens-reach':
+      'Where the Ring was cut in two. Nothing is charted past here.',
+    'the-crucible':
+      'The centre of the Ring. Whatever gives the orders is here.',
+  },
+  // Written under a boss's name card, keyed by its kind: what the machine is.
+  bossContext: {
+    'quarry-maw': 'A mining machine that still eats stone, and counts it.',
+    gatekeeper: 'Keeper of the cargo lane. We are not on its list.',
+    prime: 'The first Warden: an old guard machine, posted at the gate.',
+    'kiln-engine': 'A furnace machine that keeps the core burning.',
+    'prism-crown': 'It still holds the note of six silent voices.',
+    choir: 'The last three of the nine voices that sang the Ring shut.',
+    'foundry-mother': "Continuance's last builder. It never stops.",
+    interdictor: 'The keeper of the quarantine. Nothing leaves.',
+    null: 'The last Warden, guarding the cut. It asks for silence.',
+    sovereign: 'The voice at the centre. It obeys two orders at once.',
+  },
+  // The Wake's log on the campaign map: what happened and what the crew
+  // guesses it means, one entry per sector won (keyed by sector), after the
+  // one written before the first launch. It never tells what has not
+  // happened yet.
+  log: {
+    prologue:
+      'We are the Wake, an old freighter, and our reactors are failing. A power signal is coming from the Field: the wreck of the Ring, a giant structure broken a thousand years ago. We fly our interceptors by remote link. We can lose a hull, not a pilot.',
+    'debris-wake':
+      "We came for scrap. But every piece out here is still being counted, and a mining machine was still eating the stone. Abandoned places don't do that.",
+    'salvage-lanes':
+      "The cargo convoys still run on a schedule a thousand years old. A gate machine closed the lane because we're not on its list. Someone is still dispatching all this. My guess: whoever keeps the gate ahead.",
+    'prime-gate':
+      'Its keeper was a Warden, an old guard machine. It said you were counted, and that the Ring is broken, not abandoned. Somebody is still looking after this place. Past the gate is the heat we came for.',
+    'furnace-drift':
+      "Deep in, the Ring's core still burns. Every furnace you put out, our reactors climb. My guess: the heat rides home on the same signal that called us. Whatever this place is, it's feeding us.",
+    'crystal-choir':
+      "Nine machine voices once sang a crack in the Ring shut; the logs call it a seam. Six of them are crystal now. When the crown that kept their note went dark, the seam stayed open. Mara finally slept. I didn't.",
+    'dense-core':
+      "The last three voices said it as they broke: they weren't guarding a treasure, they were holding something shut. Every machine we stop, the cracks open wider. I think we're the ones opening them. We have our power. We could turn back now.",
+    'assembly-graveyard':
+      "Shipyards building the same hull, again and again, on an order nobody closed. The Ring says it stores eleven million citizens. I don't think they're people any more. I think they're records: memories it kept when it couldn't keep them alive.",
+    'quarantine-grid':
+      "These fences point inward. They weren't keeping us out; they were keeping something in. The beacons repeat the name the foundry wore: Continuance. Nobody aboard knows what it is.",
+    'wardens-reach':
+      "The operators cut their own Ring here and left one guard. Null kept something asleep for a thousand years, and with your last shot it woke. Our charts end here. The signal doesn't.",
+    'the-crucible':
+      'At the centre, Continuance was keeping two promises at once: protect its people, and rebuild them out of anything, us included. In the end it handed the choice to you.',
+  },
   // The journey to each sector (docs/ROTEIRO.md), keyed by the sector it
   // flies to: the opening to the first, then one between each pair. Spoken
   // in order over the travel scene (src/modules/ui/runCinematics.js) by the
@@ -65,6 +124,8 @@ export const STORY = deepFreeze({
     'debris-wake': [
       {
         speaker: 'wake',
+        // the Wake's first word says whose ship it is
+        label: 'WAKE · YOUR SHIP',
         text: 'That signal could keep our lights on. Bring back what you can.',
       },
       {
