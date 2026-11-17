@@ -1,6 +1,7 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import SFXBus from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
+import SectorScore from './audio/SectorScore.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
@@ -113,6 +114,11 @@ class AudioSystem extends BaseSystem {
     this.musicMixer = new MusicMixer({
       randomScope: this.randomScopes?.families?.music || this.random,
     });
+
+    // The recorded music of a sector that has one (data/audio/sectorScores.js);
+    // it silences the mixer while it plays. Joins the music chain at the duck
+    // node, like the file tracks (init below).
+    this.sectorScore = new SectorScore({ mixer: this.musicMixer });
 
     // FileTrackManager (INFRA-02) — owns the MP3 streaming catalog + media graph
     // + rejection-safe, resume-race-hardened, ordered playback starts. Composed
@@ -387,6 +393,11 @@ class AudioSystem extends BaseSystem {
         this.context,
         this.duckingController.musicDuckGain || this.musicGain,
         (thunk) => this.ensureRunning(thunk)
+      );
+
+      this.sectorScore.init(
+        this.context,
+        this.duckingController.musicDuckGain || this.musicGain
       );
 
       this._syncMenuTrackForCurrentScreen();
@@ -824,6 +835,7 @@ class AudioSystem extends BaseSystem {
     if (this.musicMixer) {
       this.musicMixer.resetRun();
     }
+    this.sectorScore.reset();
     this.journeyCue.stop();
     clearTimeout(this.chapterStingerTimer);
     this.chapterStingerTimer = null;
@@ -854,6 +866,7 @@ class AudioSystem extends BaseSystem {
       this.sfxBus.dispose();
     }
     this.journeyCue.stop();
+    this.sectorScore.reset();
     this.voiceLines.clear();
     this.voiceLines.expect([]);
     // Stop the MusicMixer lookahead + release its nodes (no leaked timer).

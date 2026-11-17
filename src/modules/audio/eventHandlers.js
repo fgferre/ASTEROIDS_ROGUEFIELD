@@ -5,6 +5,7 @@ import {
   resolveExplosionSize,
   resolveStereoPan,
 } from './SFXBus.js';
+import { SECTOR_SCORE_MIX as MIX } from '../../data/audio/sectorScores.js';
 import {
   biomeThemeForLayer,
   chapterThemeForLayer,
@@ -157,6 +158,12 @@ export const AUDIO_EVENT_HANDLERS = {
   // Boss arc → MusicMixer (D-04): overrides the run intensity upwards.
   bossArc(audio, payload, eventName) {
     audio.musicMixer.setIntensityFromBossEvent(eventName, payload);
+    audio.sectorScore.onBossEvent(eventName);
+  },
+
+  // A sector with a recorded score plays it instead of the mixer.
+  sectorScoreStart(audio, payload) {
+    audio.sectorScore.start(payload?.sector);
   },
 
   // After the Warden, the music hands back to the biome's theme.
@@ -171,17 +178,20 @@ export const AUDIO_EVENT_HANDLERS = {
   journeyPlanned(audio, payload) {
     if (audio.journeyCue.play(payload ?? {})) {
       audio.musicMixer.holdForJourney(true);
+      audio.sectorScore.holdForJourney(true);
     }
   },
   journeyEnded(audio) {
     audio.journeyCue.end();
     audio.musicMixer.holdForJourney(false);
+    audio.sectorScore.holdForJourney(false);
   },
 
   // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
   // freeze, no drift).
   pauseMusic(audio, payload) {
     audio.musicMixer.pause(!!payload?.isPaused);
+    audio.sectorScore.pause(!!payload?.isPaused);
   },
 
   // Low health warning + low-HP duck (AUDIO-03, D-11). Both fire on the
@@ -229,6 +239,15 @@ export const AUDIO_EVENT_HANDLERS = {
   // journey not taken are let go.
   screen(audio, payload) {
     if (payload?.screen === 'menu') audio.voiceLines.expect([]);
+    const score = audio.sectorScore;
+    if (payload?.screen === 'menu') score.stop();
+    else if (payload?.screen === 'gameover') {
+      score.stop({ stinger: 'signalLost' });
+    } else if (payload?.screen === 'victory') {
+      score.stop({ seconds: MIX.victoryFadeSeconds });
+    } else if (payload?.source === 'retry-complete' && !score.active) {
+      score.start(score.sectorId);
+    }
     audio._handleScreenChanged(payload);
   },
 
