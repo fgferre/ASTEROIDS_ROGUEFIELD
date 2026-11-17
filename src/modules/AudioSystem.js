@@ -33,6 +33,17 @@ import {
 } from '../data/audio/mix.js';
 import { dbToGain } from './audio/MusicThemes.js';
 
+const MENU_SCREEN_TRACKS = Object.freeze({
+  menu: FILE_TRACK_MANAGER_IDS.MENU_OPENING,
+  campaign: FILE_TRACK_MANAGER_IDS.CAMPAIGN_MAP,
+  credits: FILE_TRACK_MANAGER_IDS.THANKS,
+});
+const END_SCREEN_TRACKS = Object.freeze([
+  FILE_TRACK_MANAGER_IDS.VICTORY_FINAL,
+  FILE_TRACK_MANAGER_IDS.ENDING_CHOICE,
+  FILE_TRACK_MANAGER_IDS.END_CREDITS,
+]);
+
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -573,6 +584,10 @@ class AudioSystem extends BaseSystem {
 
     this.sfxBus.playMenuTransition();
     this._syncMenuTrackForCurrentScreen();
+    // The endings' music ends with the victory: any other screen lets it go.
+    if (payload?.screen && payload.screen !== 'victory') {
+      END_SCREEN_TRACKS.forEach((trackId) => this.stopFileTrack(trackId));
+    }
   }
 
   _handleOverlayVisibilityChanged(payload = {}) {
@@ -580,7 +595,19 @@ class AudioSystem extends BaseSystem {
     const isOpen = Boolean(payload?.isOpen);
     const source = typeof payload?.source === 'string' ? payload.source : null;
 
-    if (!['settings', 'credits'].includes(overlay)) {
+    // The endings' own music: the choice plays until one is picked, the credits
+    // from their roll until the menu takes over (_handleScreenChanged).
+    if (overlay === 'ending') {
+      if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      else this.stopFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      return;
+    }
+    if (overlay === 'end-credits') {
+      if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.END_CREDITS);
+      return;
+    }
+
+    if (!['settings', 'credits', 'campaign'].includes(overlay)) {
       return;
     }
 
@@ -600,6 +627,16 @@ class AudioSystem extends BaseSystem {
       if (this.menuTrackState) {
         this.menuTrackState.currentScreen = 'menu';
       }
+      if (overlay === 'campaign') {
+        // A Launch closes the map just before its 'screen-changed': let that
+        // settle, so the menu track does not blip in between.
+        queueMicrotask(() => {
+          if (this.fileTrackManager?.currentScreen === 'menu') {
+            this._syncMenuTrackForCurrentScreen();
+          }
+        });
+        return;
+      }
     } else {
       return;
     }
@@ -613,14 +650,15 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
-    if (currentScreen === 'menu') {
+    // The track of the menu and the overlays opened from it; the others stop
+    // (a settings overlay or a run has none).
+    const wanted = MENU_SCREEN_TRACKS[currentScreen];
+    Object.values(MENU_SCREEN_TRACKS).forEach((trackId) => {
       // playFileTrack delegates to FileTrackManager.playTrack, which routes the
       // start through the centralized ensureRunning gate (resume-race-safe).
-      this.playFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
-      return;
-    }
-
-    this.stopFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
+      if (trackId === wanted) this.playFileTrack(trackId);
+      else this.stopFileTrack(trackId);
+    });
   }
 
   // --- File-track delegators (FileTrackManager is the owner; INFRA-02) --------

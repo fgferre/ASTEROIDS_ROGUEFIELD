@@ -157,6 +157,8 @@ describe('Level-up card transition', () => {
         getUpgradeCount: () => 0,
         getFamilyCounts: () => ({ thermal: 0 }),
         pilotCardIds: [],
+        openCards: null,
+        sealedCards: new Set(),
       };
       UISystem.prototype.setupEventListeners.call({
         levelUpScreen: new LevelUpScreen({
@@ -219,6 +221,8 @@ describe('Level-up card transition', () => {
           getUpgradeCount: () => 0,
           getFamilyCounts: () => ({ thermal: 0 }),
           pilotCardIds: [],
+          openCards: null,
+          sealedCards: new Set(),
         }),
         combat: () => ({ getWeaponState: () => ({}) }),
         emit: () => {},
@@ -310,6 +314,8 @@ describe('Level-up card transition', () => {
           getUpgradeCount: () => 0,
           getFamilyCounts: () => ({ thermal: 0 }),
           pilotCardIds: [],
+          openCards: null,
+          sealedCards: new Set(),
           applyUpgrade: vi.fn(() => false),
           holdUpgrade: vi.fn((id) => {
             progression.heldCard = { id, level: 4 };

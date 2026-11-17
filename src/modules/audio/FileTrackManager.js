@@ -38,12 +38,23 @@ const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
 
 const FILE_TRACK_IDS = Object.freeze({
   MENU_OPENING: 'menu-opening',
+  CAMPAIGN_MAP: 'campaign-map',
+  THANKS: 'thanks',
+  VICTORY_FINAL: 'victory-final',
+  ENDING_CHOICE: 'ending-choice',
+  END_CREDITS: 'end-credits',
 });
 
 const MENU_OPENING_TRACK_URL = new URL(
   '../../../assets/Music/Alone Among Orbits.mp3',
   import.meta.url
 ).href;
+
+const musicUrl = (file) =>
+  new URL(`../../../assets/Music/${file}`, import.meta.url).href;
+// Vite resolves one folder per template: the score/ files need their own.
+const scoreUrl = (file) =>
+  new URL(`../../../assets/Music/score/${file}`, import.meta.url).href;
 
 const FILE_TRACK_CATALOG = Object.freeze({
   [FILE_TRACK_IDS.MENU_OPENING]: Object.freeze({
@@ -52,6 +63,42 @@ const FILE_TRACK_CATALOG = Object.freeze({
     fadeInMs: 1500,
     fadeOutMs: 800,
     preloadPolicy: FILE_TRACK_PRELOAD_POLICY.EAGER,
+  }),
+  // The screens outside the sectors (the owner's chosen music).
+  [FILE_TRACK_IDS.CAMPAIGN_MAP]: Object.freeze({
+    src: scoreUrl('campaign-map.mp3'),
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 800,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.THANKS]: Object.freeze({
+    src: musicUrl('Asteroids.mp3'),
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 800,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.VICTORY_FINAL]: Object.freeze({
+    src: scoreUrl('victory-final.mp3'),
+    loop: false,
+    fadeInMs: 1500,
+    fadeOutMs: 1500,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.ENDING_CHOICE]: Object.freeze({
+    src: scoreUrl('ending-choice.mp3'),
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 1200,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.END_CREDITS]: Object.freeze({
+    src: scoreUrl('end-credits.mp3'),
+    loop: false,
+    fadeInMs: 1500,
+    fadeOutMs: 2000,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
   }),
 });
 

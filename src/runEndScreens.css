@@ -421,6 +421,12 @@ body:has(.end-screen:not(.hidden)) .next-wave-box {
   border-radius: 2px;
 }
 
+.end-fam__note {
+  margin-left: calc(8 * var(--u));
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 .end-empty {
   margin: calc(12 * var(--u)) 0 0;
   color: var(--text-dim);

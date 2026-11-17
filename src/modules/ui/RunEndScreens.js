@@ -99,7 +99,7 @@ export class RunEndScreens {
     hangar,
     lastTransmission,
     cinematics,
-    announceEndCredits,
+    announceOverlay = () => {},
   }) {
     this.refs = refs;
     this.showScreen = showScreen;
@@ -109,10 +109,12 @@ export class RunEndScreens {
     this.hangar = hangar;
     this.lastTransmission = lastTransmission;
     this.cinematics = cinematics;
+    this.announceOverlay = announceOverlay;
     this.endCredits = new EndCredits({
       refs: refs.endCredits ?? {},
       showScreen,
-      announceVisibility: announceEndCredits ?? (() => {}),
+      announceVisibility: (isOpen, payload) =>
+        announceOverlay('end-credits', isOpen, payload),
     });
     this.lockoutTimer = null;
     this.bestAtStart = 0;
@@ -364,6 +366,7 @@ export class RunEndScreens {
     const options = this.refs.victory.choiceOptions;
     options.innerHTML = endingChoiceMarkup();
     this.showScreen('ending', { overlay: true, show: true });
+    this.announceOverlay('ending', true);
     const buttons = this.choiceButtons();
     buttons.forEach((button) => {
       button.disabled = true;
@@ -395,6 +398,7 @@ export class RunEndScreens {
     if (!payload || !STORY.ending[ending]) return false;
     this.choice = null;
     this.showScreen('ending', { overlay: true, show: false });
+    this.announceOverlay('ending', false);
     updateRecords({ ending });
     const field = this.refs.victory.field;
     field?.classList.add('is-ending');
