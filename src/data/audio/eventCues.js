@@ -262,7 +262,6 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
   { on: 'game-started', cue: 'playUIStartGame' },
   { on: 'game-started', run: 'sectorScoreStart' },
-  { on: 'run-continued', run: 'sectorScoreResume' },
 
   // The journey between sectors (render3d/travel/moments.js): each moment's
   // sample, the burn's loop on and off, and all of it fading when it ends.

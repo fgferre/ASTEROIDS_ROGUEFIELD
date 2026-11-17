@@ -171,12 +171,6 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sectorScore.start(payload?.sector);
   },
 
-  // "Continue" after a victory: the score the screen faded out comes back.
-  sectorScoreResume(audio) {
-    const score = audio.sectorScore;
-    if (!score.active) score.start(score.sectorId);
-  },
-
   // After the Warden, the music hands back to the biome's theme.
   biomeTheme(audio) {
     audio.musicMixer.setTheme(

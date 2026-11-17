@@ -16,23 +16,4 @@ describe('registerAudioEventCues', () => {
 
     expect(playHarmonicBeam.mock.calls[0][0].pan).toBeLessThan(0);
   });
-
-  it('run-continued brings back the score the victory screen stopped', () => {
-    const listeners = new Map();
-    const sectorScore = {
-      active: false,
-      sectorId: 'prime-gate',
-      start: vi.fn(),
-    };
-    const audio = {
-      sectorScore,
-      sfxBus: { playDeepFieldEntry: vi.fn() },
-      registerEventListener: (name, fn) => listeners.set(name, fn),
-    };
-    registerAudioEventCues(audio);
-
-    listeners.get('run-continued')({ fromLayer: 20 });
-
-    expect(sectorScore.start).toHaveBeenCalledWith('prime-gate');
-  });
 });
