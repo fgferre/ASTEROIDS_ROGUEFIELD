@@ -18,7 +18,12 @@ describe('hull, shot and flight cards on the player', () => {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
     const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
-    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    const player = new PlayerSystem({
+      eventBus,
+      input,
+      'command-queue': null,
+      newFlight: false,
+    });
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     return { player, eventBus, movement };

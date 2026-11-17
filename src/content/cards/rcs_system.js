@@ -54,7 +54,7 @@ export default {
       },
     ],
   },
-  // The new flight (?direcao=nova) reads this over `text`: in glide the RCS
+  // The new flight (the default; ?direcao=antiga is the old flight) reads this over `text`: in glide the RCS
   // also turns the hull quicker (flight.js). Measured 16/11: turn rate 70°/s
   // bare; top speed (132 px/s) from a standstill in 0.72 s bare.
   newFlightText: {

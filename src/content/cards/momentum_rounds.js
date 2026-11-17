@@ -1,11 +1,11 @@
-// The new flight only (`newFlight`, ?direcao=nova). The numbers are proposals
+// The new flight only (`newFlight`; ?direcao=antiga leaves it out). The numbers are proposals
 // (16/11), the owner's to judge by playing.
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'momentum_rounds',
   newFlight: true,
-  order: 44,
+  order: 48,
   category: 'offense',
   family: 'kinetic',
   rarity: 'common',

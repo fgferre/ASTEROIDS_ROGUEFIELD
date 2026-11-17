@@ -1,11 +1,11 @@
-// The new flight only (`newFlight`, ?direcao=nova). The numbers are proposals
+// The new flight only (`newFlight`; ?direcao=antiga leaves it out). The numbers are proposals
 // (16/11), the owner's to judge by playing.
 import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'close_quarters',
   newFlight: true,
-  order: 45,
+  order: 49,
   category: 'offense',
   family: 'kinetic',
   rarity: 'rare',

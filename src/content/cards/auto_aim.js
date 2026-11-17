@@ -1,11 +1,11 @@
-// The new flight only (`newFlight`, ?direcao=nova): the run starts with the
+// The new flight only (`newFlight`, the default; `?direcao=antiga` is the old one): the run starts with the
 // cannon fixed on the nose, aimed by turning the hull; this card frees the
 // turret onto today's auto aim. Family, rarity and level: proposta 16/11, the
 // cards' own conversation settles where it sits in a run.
 export default {
   id: 'auto_aim',
   newFlight: true,
-  order: 42,
+  order: 46,
   category: 'offense',
   family: 'maneuver',
   rarity: 'common',

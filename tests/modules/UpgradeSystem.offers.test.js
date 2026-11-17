@@ -145,11 +145,11 @@ describe('level-up offers', () => {
     expect(offerIds(progression)).toHaveLength(3);
   });
 
-  it('in the new flight every UPGRADE_PILOT_OFFER_EVERY levels one slot holds a piloting card; today none', () => {
+  it('in the new flight every UPGRADE_PILOT_OFFER_EVERY levels one slot holds a piloting card', () => {
     const pilots = ['magfield', 'shield'];
     const holds = (progression) =>
       offerIds(progression).some((id) => pilots.includes(id));
-    expect(createProgression(1).pilotCardIds).toEqual([]);
+    expect(createProgression(1).pilotCardIds).not.toEqual([]);
     for (let seed = 1; seed <= 40; seed += 1) {
       const progression = createProgression(
         UPGRADE_PILOT_OFFER_EVERY * 2,

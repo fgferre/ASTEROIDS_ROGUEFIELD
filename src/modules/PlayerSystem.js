@@ -129,7 +129,7 @@ class PlayerSystem extends BaseSystem {
         )?.hullControl
       );
     this.noseAim = noseAimFromUrl();
-    // The new flight (?direcao=nova): each run starts classic, gliding, aimed
+    // The new flight (the default; ?direcao=antiga is the old flight): each run starts classic, gliding, aimed
     // by the nose; cards lift each of the three (beginNewFlight).
     this.newFlight = config?.newFlight ?? newFlightFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.

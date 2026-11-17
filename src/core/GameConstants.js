@@ -81,9 +81,10 @@ export const UPGRADE_FAMILY_STEER_PER_CARD = 0.5; // proposta 20/10
 // Pilot levels whose offer holds a weapon card while the run has none: the
 // second is the second chance if the first was turned down.
 export const UPGRADE_WEAPON_OFFER_LEVELS = Object.freeze([3, 7]); // proposta 20/10
-// The new flight (?direcao=nova): the piloting trail (the Flight Computer's
-// chain) comes only through one slot, at every pilot level divisible by this;
-// it is outside the regular draw and the family counts (provisional, 16/11: without it a quarter of the
+// The new flight (the default; ?direcao=antiga is the old flight): the
+// piloting trail (the Flight Computer's chain) comes only through one slot, at
+// every pilot level divisible by this; it is outside the regular draw and the
+// family counts (provisional, 16/11: without it a quarter of the
 // offers held one and the Flight Computer came in 2 of 100 runs by level 25;
 // with it, Auto Turret around level 2 and the Flight Computer around 18).
 export const UPGRADE_PILOT_OFFER_EVERY = 2;
