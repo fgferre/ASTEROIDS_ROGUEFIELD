@@ -5,9 +5,10 @@
 //   npm run playtest -- dense-core [good]  one sector
 //   npm run playtest -- dense-core good 3  one sector, world and bot seed 3
 //   npm run playtest -- dense-core good 1-10  seeds 1 to 10, in a row
-//   npm run playtest -- --flight=glide     the classic glide, cannon on the nose
+//   npm run playtest -- --flight=old       the old flight (?direcao=antiga); the
+//                                          default is the new one (glide, cannon on the nose)
 //   npm run playtest -- debris-wake --table 1-10
-//       the comparison table: both skills, today's flight and the glide,
+//       the comparison table: both skills, the new flight and the old one,
 //       seeds 1 to 10, one sector (default debris-wake)
 //
 // Hands the choice to tests/playtest/sectors.playtest.js through the
@@ -21,13 +22,15 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PRESETS = ['average', 'good'];
-const FLIGHTS = ['modern', 'glide'];
+const FLIGHTS = ['new', 'old'];
 const args = process.argv.slice(2);
 const flag = (name) =>
   args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
-const flight = flag('flight') || 'modern';
+const flight = flag('flight') || 'new';
 if (!FLIGHTS.includes(flight)) {
-  throw new Error(`playtest: --flight is ${FLIGHTS.join(' or ')}`);
+  throw new Error(
+    `playtest: --flight is ${FLIGHTS.join(' or ')} (default new)`
+  );
 }
 const table = args.includes('--table');
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
@@ -78,18 +81,18 @@ function compare() {
     }
   }
   for (const p of PRESETS) {
-    const modern = rows[`${p}/modern`];
-    const glide = rows[`${p}/glide`];
+    const old = rows[`${p}/old`];
+    const glide = rows[`${p}/new`];
     const med = (list, key) => median(list.map((r) => r[key]));
     const lines = [
-      `\n== bot ${p}: ${modern[0].sector}, today's flight | classic glide, nose aim ==`,
-      `${pad('seed', 5)}${pad('today: time kills wave, death', 46)}glide: time kills wave, death`,
-      ...modern.map(
+      `\n== bot ${p}: ${old[0].sector}, old flight | new flight (glide, nose cannon) ==`,
+      `${pad('seed', 5)}${pad('old: time kills wave, death', 46)}new: time kills wave, death`,
+      ...old.map(
         (m, i) => `${pad(m.seed, 5)}${pad(runText(m), 46)}${runText(glide[i])}`
       ),
-      `${pad('mid', 5)}${pad(`${med(modern, 'seconds')}s ${med(modern, 'kills')}k w${med(modern, 'wave')}`, 46)}${med(glide, 'seconds')}s ${med(glide, 'kills')}k w${med(glide, 'wave')}`,
-      `glide: Auto Turret taken in ${glide.filter((r) => r.autoAim).length} of ${glide.length} runs, Flight Computer in ${glide.filter((r) => r.flightComputer).length}`,
-      `glide watch (median): turning ${med(glide, 'turningPct')}%, pushing ${med(glide, 'pushPct')}%, back key ${med(glide, 'reversePct')}%, braking ${med(glide, 'brakePct')}%; aimed at a foe in reach ${med(glide, 'aimedPct')}%, near an edge ${med(glide, 'edgePct')}%, mean speed ${med(glide, 'meanSpeed')} px/s`,
+      `${pad('mid', 5)}${pad(`${med(old, 'seconds')}s ${med(old, 'kills')}k w${med(old, 'wave')}`, 46)}${med(glide, 'seconds')}s ${med(glide, 'kills')}k w${med(glide, 'wave')}`,
+      `new: Auto Turret taken in ${glide.filter((r) => r.autoAim).length} of ${glide.length} runs, Flight Computer in ${glide.filter((r) => r.flightComputer).length}`,
+      `new-flight watch (median): turning ${med(glide, 'turningPct')}%, pushing ${med(glide, 'pushPct')}%, back key ${med(glide, 'reversePct')}%, braking ${med(glide, 'brakePct')}%; aimed at a foe in reach ${med(glide, 'aimedPct')}%, near an edge ${med(glide, 'edgePct')}%, mean speed ${med(glide, 'meanSpeed')} px/s`,
     ];
     process.stdout.write(`${lines.join('\n')}\n`);
   }

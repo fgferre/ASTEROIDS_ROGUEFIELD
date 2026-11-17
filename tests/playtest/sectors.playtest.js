@@ -3,9 +3,10 @@
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
  * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
- * PLAYTEST_FLIGHT=glide flies the classic glide with the cannon on the nose
- * (`?direcao=nova`: classic, gliding, cannon on the nose); PLAYTEST_SEED may be a range
- * ('1-10'); PLAYTEST_OUT names a JSON file the rows are written to.
+ * PLAYTEST_FLIGHT=old flies the old flight (`?direcao=antiga`); by default it
+ * flies the new one (classic glide, cannon on the nose, the default of the game).
+ * PLAYTEST_SEED may be a range ('1-10'); PLAYTEST_OUT names a JSON file the
+ * rows are written to.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -28,8 +29,8 @@ const FPS = Math.round(1 / STEP_SECONDS);
 const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
-const FLIGHT = process.env.PLAYTEST_FLIGHT === 'glide' ? 'glide' : 'modern';
-const FLIGHT_SEARCH = FLIGHT === 'glide' ? '?direcao=nova' : '';
+const FLIGHT = process.env.PLAYTEST_FLIGHT === 'old' ? 'old' : 'new';
+const FLIGHT_SEARCH = FLIGHT === 'old' ? '?direcao=antiga' : '';
 const OUT = process.env.PLAYTEST_OUT || '';
 // Seeds both the bot's miss rolls and the world (the run's seed): one, or a
 // range like '1-10'.
@@ -101,15 +102,13 @@ async function playSector(sector, seed) {
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
   session.resolveServiceInstance('difficulty').runSeed = seed;
-  if (
-    FLIGHT === 'glide' &&
-    !(
-      player.noseAim &&
-      player.flight.glide &&
-      player.controlScheme === 'classic'
-    )
-  ) {
-    throw new Error('playtest: the glide address did not switch the flight on');
+  const onGlide = Boolean(
+    player.noseAim && player.flight.glide && player.controlScheme === 'classic'
+  );
+  if (onGlide !== (FLIGHT === 'new')) {
+    throw new Error(
+      `playtest: the address did not switch to the ${FLIGHT} flight`
+    );
   }
   const driver = createBotDriver({
     services,

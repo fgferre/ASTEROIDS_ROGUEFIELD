@@ -156,7 +156,9 @@ export function readWorld(services, time, memory = new WeakMap()) {
     angle: player.angle,
     spin: player.angularVelocity,
     glide:
-      player.flight.glide && player.noseAim ? glideOf(player, combat) : null,
+      player.flight.glide && player.controlScheme === 'classic'
+        ? glideOf(player, combat)
+        : null,
     reach: weaponReach(combat),
     health: player.health,
     maxHealth: player.maxHealth,
