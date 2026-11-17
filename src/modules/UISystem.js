@@ -243,9 +243,7 @@ class UISystem extends BaseSystem {
     });
     this.campaignMap = new CampaignMap({
       refs: this.domRefs.campaign,
-      showScreen: (name, options) => this.showScreen(name, options),
-      announceVisibility: (isOpen, payload) =>
-        this.emitOverlayVisibilityChanged('campaign', isOpen, payload),
+      showTab: () => this.mainMenu.setPrepTab('campaign'),
       prepareTravel: (start) => this.cinematics.prepareTravel(start),
     });
     this.codexScreen = new CodexScreen({
@@ -853,7 +851,6 @@ class UISystem extends BaseSystem {
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
         else if (id === 'codex') this.codexScreen.closeCodex();
         else if (id === 'hangar') this.hangarScreen.closeHangar();
-        else if (id === 'campaign') this.campaignMap.closeMap();
         else if (id === 'credits') {
           this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
         } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
@@ -1080,7 +1077,6 @@ class UISystem extends BaseSystem {
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
-      this.campaignMap.closeMap();
 
       document.body?.classList.remove('is-credits-open');
 

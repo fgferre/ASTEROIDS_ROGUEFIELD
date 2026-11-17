@@ -90,3 +90,37 @@ describe('Main menu mode line', () => {
     expect(line.innerHTML).toContain('Balanced');
   });
 });
+
+describe('Main menu mode tabs', () => {
+  it('shows one tab at a time, marks it, and starts on Campaign', () => {
+    const tab = (prepTab) => {
+      const attrs = {};
+      return {
+        dataset: { prepTab },
+        attrs,
+        setAttribute: (name, value) => (attrs[name] = value),
+        removeAttribute: (name) => delete attrs[name],
+      };
+    };
+    const tabs = ['campaign', 'descent', 'daily', 'bossrush'].map(tab);
+    const strip = fakeNode(tabs);
+    strip.querySelectorAll = () => tabs;
+    const nav = { dataset: {} };
+    const menu = new MainMenu({ refs: { nav, tabs: strip } });
+    menu.bindPrepTabs();
+    expect(nav.dataset.activeTab).toBe('campaign');
+    expect(tabs[0].attrs).toEqual({
+      'aria-selected': 'true',
+      'aria-current': 'true',
+    });
+
+    strip.fire('click', { target: { closest: () => tabs[2] } });
+    expect(nav.dataset.activeTab).toBe('daily');
+    expect(menu.prepTab).toBe('daily');
+    expect(tabs[2].attrs['aria-current']).toBe('true');
+    expect(tabs[0].attrs).toEqual({ 'aria-selected': 'false' });
+
+    menu.setPrepTab('campaign');
+    expect(nav.dataset.activeTab).toBe('campaign');
+  });
+});

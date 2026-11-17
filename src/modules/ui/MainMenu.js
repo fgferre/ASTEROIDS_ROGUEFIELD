@@ -1,8 +1,9 @@
 // src/modules/ui/MainMenu.js
 //
-// The main menu: the ship selector with its hull previews, the records strip
-// under the title, the Boss Rush lock, and the hover sound for every menu
-// button on any screen.
+// The main menu, the mission preparation screen: the mode tabs (Campaign,
+// Descent, Daily Field, Boss Rush) and the panel of the one showing, the ship
+// selector with its hull previews, the records strip under the title, the
+// Boss Rush lock, and the hover sound for every menu button on any screen.
 
 import {
   DEFAULT_HULL_ID,
@@ -15,7 +16,7 @@ import { hullTraitsMarkup, hullUnlockText } from './hangar.js';
 
 export class MainMenu {
   /**
-   * `refs`: the menu's nodes { screen, shipSelector, shipSelectorOptions, shipSelectorLabel, status, bossRushBtn, bossRushLock, nav, hint }.
+   * `refs`: the menu's nodes { screen, shipSelector, shipSelectorOptions, shipSelectorLabel, status, bossRushBtn, bossRushLock, nav, tabs, hint }.
    * `settings`: the settings service (selected hull, graphics quality), or none.
    * `emit(name, payload)`: sends ui-hover.
    * `hangar()`: the hangar service (unlocked hulls, Salvage).
@@ -47,6 +48,29 @@ export class MainMenu {
     this.livePreset = livePreset;
     this.menuShipSelectorRefreshFrame = null;
     this._lastHoverTarget = null;
+    // The mode tab showing; it is kept while the page lives.
+    this.prepTab = 'campaign';
+  }
+
+  /** Shows one mode's panel and Launch (CSS keys on `data-active-tab`). */
+  setPrepTab(tab) {
+    const { nav, tabs } = this.refs;
+    this.prepTab = tab;
+    nav.dataset.activeTab = tab;
+    tabs.querySelectorAll('[data-prep-tab]').forEach((button) => {
+      const active = button.dataset.prepTab === tab;
+      button.setAttribute('aria-selected', String(active));
+      if (active) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
+    });
+  }
+
+  bindPrepTabs() {
+    this.refs.tabs.addEventListener('click', (event) => {
+      const tab = event.target.closest('[data-prep-tab]');
+      if (tab) this.setPrepTab(tab.dataset.prepTab);
+    });
+    this.setPrepTab(this.prepTab);
   }
 
   getSelectedHullId() {
@@ -261,9 +285,8 @@ export class MainMenu {
       });
   }
 
-  // The line under the menu buttons says what the button under the pointer
-  // or holding the focus does; otherwise the focused button's, else the
-  // first (Campaign). One line for every button, never empty.
+  // The footer line says what the tab or link under the pointer or holding
+  // the focus does; otherwise the focused one's, else the first (Campaign). One line, never empty.
   bindModeHints() {
     const { nav, hint } = this.refs;
     if (!nav || !hint) return;
@@ -295,6 +318,7 @@ export class MainMenu {
   }
 
   bindMainMenuControls() {
+    this.bindPrepTabs();
     this.bindModeHints();
     // Generic UI Hover Sound Delegation
     // Listens for all menu buttons and interactive elements

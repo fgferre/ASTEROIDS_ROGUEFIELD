@@ -106,7 +106,7 @@ export function cacheStaticNodes() {
       pressureNote: document.getElementById('hangar-pressure-note') || null,
     },
     campaign: {
-      overlay: document.getElementById('campaign-screen') || null,
+      root: document.getElementById('menu-prep') || null,
       nodes: document.getElementById('campaign-nodes') || null,
       detailTitle: document.getElementById('campaign-detail-title') || null,
       sectors: document.getElementById('campaign-sectors') || null,
@@ -116,9 +116,7 @@ export function cacheStaticNodes() {
       logBody: document.getElementById('campaign-log-body') || null,
       logToggle: document.getElementById('campaign-log-toggle') || null,
       openBtn: document.getElementById('menu-campaign-btn') || null,
-      backBtn: document.getElementById('campaign-back-btn') || null,
-      closeBtn: document.getElementById('campaign-close-btn') || null,
-      // The final card's Main menu: the menu it ends in keeps the map shut.
+      // The final card's Main menu: the menu it ends in does not return to the Campaign tab.
       mainMenuBtn: document.getElementById('victory-menu-btn') || null,
     },
     settings: {
@@ -169,7 +167,8 @@ export function cacheStaticNodes() {
       status: document.getElementById('menu-status') || null,
       bossRushBtn: document.getElementById('boss-rush-btn') || null,
       bossRushLock: document.getElementById('boss-rush-lock') || null,
-      nav: document.querySelector('#menu-screen .menu-screen__nav') || null,
+      nav: document.getElementById('menu-prep') || null,
+      tabs: document.getElementById('menu-prep-tabs') || null,
       hint: document.getElementById('menu-hint') || null,
     },
   };
