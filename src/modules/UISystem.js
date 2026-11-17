@@ -208,8 +208,7 @@ class UISystem extends BaseSystem {
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
-      announceEndCredits: (isOpen, payload) =>
-        this.emitOverlayVisibilityChanged('end-credits', isOpen, payload),
+      announceOverlay: (...args) => this.emitOverlayVisibilityChanged(...args),
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,

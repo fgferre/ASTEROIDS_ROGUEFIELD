@@ -6,6 +6,8 @@ import {
   resolveStereoPan,
 } from './SFXBus.js';
 import { SECTOR_SCORE_MIX as MIX } from '../../data/audio/sectorScores.js';
+import { ENDING_SECTOR } from '../../data/story.js';
+import { FILE_TRACK_IDS } from './FileTrackManager.js';
 import {
   biomeThemeForLayer,
   chapterThemeForLayer,
@@ -169,6 +171,13 @@ export const AUDIO_EVENT_HANDLERS = {
   // A sector with a recorded score plays it instead of the mixer.
   sectorScoreStart(audio, payload) {
     audio.sectorScore.start(payload?.sector);
+  },
+
+  // The campaign's last sector won: its score fades out, the victory plays.
+  runWon(audio, payload) {
+    if (payload?.sector !== ENDING_SECTOR) return;
+    audio.sectorScore.stop({ seconds: MIX.victoryFadeSeconds });
+    audio.playFileTrack(FILE_TRACK_IDS.VICTORY_FINAL);
   },
 
   // After the Warden, the music hands back to the biome's theme.
