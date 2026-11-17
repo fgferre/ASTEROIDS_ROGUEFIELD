@@ -588,9 +588,12 @@ class MenuBackgroundSystem extends BaseSystem {
     this.createAtmosphere();
     this.setupPostProcessing();
     this.setupImpactEffects();
-    // Prototype (17/11): the new opening scene in place of the belt.
-    const shot = openingShotFromUrl();
-    if (shot) this.opening = createOpeningScene(this, shot);
+    // The opening scene (17/11) in place of the belt.
+    this.opening = createOpeningScene(
+      this,
+      () => this.randomFloat('asteroids'),
+      openingShotFromUrl()
+    );
 
     // Start async preloading for heavy assets
     this.withSeededMathRandom(() => this.preloadAssets());
@@ -904,6 +907,7 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   applyQualityLevel(level) {
+    this.opening?.setQuality(level);
     quality.applyQualityLevel(this.adaptiveQuality, level, {
       bloomPass: this.bloomPass,
       customFX: this.customFX,
@@ -950,6 +954,9 @@ class MenuBackgroundSystem extends BaseSystem {
     }
     this.elapsedTime += delta;
     this.rogueSpawnTimer += delta;
+
+    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
+    this.updateAdaptiveQuality(delta);
 
     if (this.opening) {
       this.opening.update(delta, this.hullReducedMotion);
@@ -1011,11 +1018,8 @@ class MenuBackgroundSystem extends BaseSystem {
     }
   }
 
-  // The belt's frame: quality, rogue spawns, physics, the field.
+  // The belt's frame: rogue spawns, physics, the field.
   animateBelt(delta) {
-    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
-    this.updateAdaptiveQuality(delta);
-
     if (this.rogueSpawnTimer >= this.config.rogueSpawnInterval) {
       this.spawnRogueAsteroid();
       this.rogueSpawnTimer = 0;
@@ -1033,7 +1037,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
   renderFrame() {
     if (this.opening) {
-      this.withSeededMathRandom(() => this.opening.render());
+      this.opening.render();
     } else if (this.composer) {
       this.composer.render();
     } else {
