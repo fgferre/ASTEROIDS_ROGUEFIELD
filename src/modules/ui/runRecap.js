@@ -12,6 +12,8 @@ import { trackFamily } from './hud/instruments/build/instrument.js';
 import {
   brief,
   familyColor,
+  FIFTH_IN_HANGAR,
+  fifthInHangar,
   familyForm,
   glyphMarkup,
   shortName,
@@ -79,6 +81,7 @@ export function collectBuild(progression, combat) {
       bonusName: family?.bonus.name ?? null,
       owned: counts[id] ?? upgrades.length,
       active: active.has(id),
+      fifthShort: Boolean(family) && fifthInHangar(progression, id),
       upgrades,
     };
   });
@@ -100,7 +103,7 @@ function mainForm(weapon, counts) {
 const CARDS_LEFT = ['', 'one card', 'two cards', 'three cards'];
 
 // "Apex 4/5 · one card from Solar Flare", or what the Apex does.
-function familyGoal(family, owned, weaponId) {
+function familyGoal(family, owned, weaponId, fifthShort) {
   if (owned >= FAMILY_APEX_THRESHOLD) {
     const apex = familyForm(family, weaponId, true);
     return `<b>Apex</b> · ${brief(apex.description).toLowerCase()}`;
@@ -111,7 +114,8 @@ function familyGoal(family, owned, weaponId) {
   const reached = apex
     ? `Apex ${owned}/${FAMILY_APEX_THRESHOLD}`
     : `${owned}/${FAMILY_SYNERGY_THRESHOLD}`;
-  return `<b>${reached}</b> · ${CARDS_LEFT[target - owned]} from ${form}`;
+  const hangar = apex && fifthShort ? ` · ${FIFTH_IN_HANGAR}` : '';
+  return `<b>${reached}</b> · ${CARDS_LEFT[target - owned]} from ${form}${hangar}`;
 }
 
 function endFamilyMarkup(family) {
@@ -130,11 +134,14 @@ function endFamilyMarkup(family) {
     family.active && family.bonusName
       ? `<span class="end-fam__tag">${family.bonusName}</span>`
       : '';
+  const note = family.fifthShort
+    ? `<span class="end-fam__note">${FIFTH_IN_HANGAR}</span>`
+    : '';
   const cards = family.upgrades
     .map(({ name, level }) => `<b>${name}</b><sup>${level}</sup>`)
     .join(' · ');
   const color = known ? familyColor(family.id) : 'var(--text-dim)';
-  return `<li class="end-fam" style="--fam: ${color}"><span class="end-fam__name">${family.name}</span><span class="end-fam__pips">${glyphs}</span><span class="end-fam__count">${count}</span><span class="end-fam__cards">${tag}${cards}</span></li>`;
+  return `<li class="end-fam" style="--fam: ${color}"><span class="end-fam__name">${family.name}</span><span class="end-fam__pips">${glyphs}</span><span class="end-fam__count">${count}</span><span class="end-fam__cards">${tag}${cards}${note}</span></li>`;
 }
 
 /**
@@ -157,6 +164,9 @@ export function endBuildMarkup(build) {
           `<span class="end-chip" style="--fam: ${familyColor(evolution.family)}">${shortName(evolution.name)}</span>`
       ),
   ].join('');
+  const fifthShort = Object.fromEntries(
+    build.families.map(({ id, fifthShort }) => [id, fifthShort])
+  );
   const trackId = main?.family ?? trackFamily(counts)?.family ?? null;
   const owned = counts[trackId] ?? 0;
   const cells = trackMarkup({
@@ -166,7 +176,7 @@ export function endBuildMarkup(build) {
     notch: FAMILY_SYNERGY_THRESHOLD,
   });
   const track = trackId
-    ? `<p class="end-wtrack" style="--fam: ${familyColor(trackId)}"><span class="end-wtrack__fam">${UPGRADE_FAMILIES[trackId].name}</span><span class="track">${cells}</span><span class="end-wtrack__goal">${familyGoal(trackId, owned, weapon.weaponId)}</span></p>`
+    ? `<p class="end-wtrack" style="--fam: ${familyColor(trackId)}"><span class="end-wtrack__fam">${UPGRADE_FAMILIES[trackId].name}</span><span class="track">${cells}</span><span class="end-wtrack__goal">${familyGoal(trackId, owned, weapon.weaponId, fifthShort[trackId])}</span></p>`
     : '';
   const families = build.families.length
     ? `<ul class="end-fams">${build.families.map(endFamilyMarkup).join('')}</ul>`

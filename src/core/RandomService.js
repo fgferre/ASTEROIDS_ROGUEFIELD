@@ -2,7 +2,7 @@ const UINT32_MAX = 0xffffffff;
 const UINT32_FACTOR = 1 / (UINT32_MAX + 1);
 const SEED_HISTORY_LIMIT = 10;
 
-function hashString(input) {
+export function hashString(input) {
   let hash = 0;
   for (let i = 0; i < input.length; i += 1) {
     hash = (hash << 5) - hash + input.charCodeAt(i);
