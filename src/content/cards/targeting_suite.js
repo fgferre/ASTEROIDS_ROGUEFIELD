@@ -33,6 +33,8 @@ export default {
   icon: '🎯',
   themeColor: '#FFD166',
   unlockLevel: 3,
+  // Weapons it does nothing for before rank 3 (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo'],
   // The nose cannon has no lock, so the suite needs the turret first.
   newFlightPrerequisites: [
     {
