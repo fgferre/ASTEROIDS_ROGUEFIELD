@@ -39,7 +39,7 @@ export { FIELD_EVENTS };
  * radar reaches `radarRange` of its usual range. Magnetic Storm: every XP
  * spark drifts at `driftSpeed` px/s, turning up to `driftTurn` rad/s at
  * random, and the ship's pull is ×`pullScale`. Hunters' Moon: the roster is
- * only `roles` (Seekers' and Rams'), each count ×`countScale`; surges keep
+ * only `roles` (Hunters' and Rams'), each count ×`countScale`; surges keep
  * their size with those roles. Glass Field: every rock spawns Volatile.
  */
 export const MODIFIER_FROM = 16;

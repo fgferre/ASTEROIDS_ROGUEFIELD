@@ -632,10 +632,11 @@ describe('HangarService', () => {
       expect(hangar.setStartingCard('propulsors')).toBe(false);
 
       const { hangar: school } = open(0, { 'flight-school': true });
-      expect(school.getFlightSchoolCards()).toEqual(['propulsors', 'auto_aim']);
+      expect(school.getFlightSchoolCards()).toEqual(['propulsors']);
       expect(school.setStartingCard('braking_system')).toBe(false);
-      expect(school.setStartingCard('auto_aim')).toBe(true);
-      expect(school.getModifiers().startingCard).toBe('auto_aim');
+      expect(school.setStartingCard('auto_aim')).toBe(false);
+      expect(school.setStartingCard('propulsors')).toBe(true);
+      expect(school.getModifiers().startingCard).toBe('propulsors');
     });
   });
 });
