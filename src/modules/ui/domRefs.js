@@ -92,6 +92,11 @@ export function cacheStaticNodes() {
       openBtn: document.getElementById('menu-hangar-btn') || null,
       backBtn: document.getElementById('hangar-back-btn') || null,
       closeBtn: document.getElementById('hangar-close-btn') || null,
+      tabs: Array.from(document.querySelectorAll('[data-hangar-tab]')),
+      panels: Array.from(document.querySelectorAll('[data-hangar-panel]')),
+      medals: document.getElementById('hangar-medals') || null,
+      pressure: document.getElementById('hangar-pressure') || null,
+      pressureNote: document.getElementById('hangar-pressure-note') || null,
     },
     campaign: {
       overlay: document.getElementById('campaign-screen') || null,

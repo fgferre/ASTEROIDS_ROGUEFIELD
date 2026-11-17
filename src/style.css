@@ -1672,6 +1672,178 @@ kbd {
   letter-spacing: 0.08em;
 }
 
+/* Hangar tabs: only the chosen panel shows */
+.hangar-dialog .credits-body[hidden] {
+  display: none;
+}
+
+/* The medal wall: earned in gold, the rest dashed, the key medal in accent */
+.medal-wall {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-2);
+}
+
+.medal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--xp) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--xp) 6%, var(--panel-inset));
+}
+
+.medal .medal__glyph {
+  flex: 0 0 38px;
+  height: 38px;
+  font-size: 20px;
+}
+
+.medal__text {
+  min-width: 0;
+}
+
+.medal__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.medal__desc {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  color: var(--text-dim);
+}
+
+.medal__reward {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--xp);
+}
+
+.medal.is-locked {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+}
+
+.medal.is-locked .medal__glyph {
+  color: var(--neutral);
+  text-shadow: none;
+  opacity: 0.55;
+}
+
+.medal.is-locked .medal__reward {
+  color: var(--text-dim);
+}
+
+.medal.is-key {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.medal.is-key .medal__reward {
+  color: var(--accent);
+}
+
+/* The Pressure ladder: one button per rung */
+.pressure-note {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.pressure-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pressure-rung__pick {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pressure-rung__pick:hover:not(:disabled),
+.pressure-rung__pick:focus-visible {
+  border-color: var(--accent-line);
+}
+
+.pressure-rung.is-selected .pressure-rung__pick {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.pressure-rung__pick:disabled {
+  cursor: default;
+}
+
+.pressure-rung.is-locked .pressure-rung__pick {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+.pressure-rung__numeral {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  text-align: center;
+}
+
+.pressure-rung.is-selected .pressure-rung__numeral {
+  color: var(--accent);
+}
+
+.pressure-rung__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pressure-rung__name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pressure-rung__stats {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.pressure-rung__pay {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--xp);
+}
+
 /* The hull view beside the hull buttons */
 .hangar-hull-bay {
   order: -1;

@@ -625,7 +625,36 @@
               ✕
             </button>
           </header>
-          <div class="credits-body">
+          <div class="codex-tabs" role="tablist" aria-label="Hangar sections">
+            <button
+              class="codex-tab is-active"
+              type="button"
+              role="tab"
+              data-hangar-tab="ship"
+              aria-selected="true"
+            >
+              Ship
+            </button>
+            <button
+              class="codex-tab"
+              type="button"
+              role="tab"
+              data-hangar-tab="medals"
+              aria-selected="false"
+            >
+              Medals
+            </button>
+            <button
+              class="codex-tab"
+              type="button"
+              role="tab"
+              data-hangar-tab="pressure"
+              aria-selected="false"
+            >
+              Pressure
+            </button>
+          </div>
+          <div class="credits-body" data-hangar-panel="ship">
             <ul
               id="hangar-list"
               class="hangar-list"
@@ -654,6 +683,17 @@
                 aria-label="Hull"
               ></div>
             </div>
+          </div>
+          <div class="credits-body" data-hangar-panel="medals" hidden>
+            <ul id="hangar-medals" class="medal-wall" aria-label="Medals"></ul>
+          </div>
+          <div class="credits-body" data-hangar-panel="pressure" hidden>
+            <p id="hangar-pressure-note" class="pressure-note"></p>
+            <ul
+              id="hangar-pressure"
+              class="pressure-ladder"
+              aria-label="Pressure"
+            ></ul>
           </div>
           <footer class="credits-footer">
             <button

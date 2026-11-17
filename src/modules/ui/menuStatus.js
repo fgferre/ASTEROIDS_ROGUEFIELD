@@ -4,7 +4,7 @@
 // the Boss Rush best, Salvage, Codex and achievement counts, the difficulty and the 3D quality. Reads the services; MainMenu
 // redraws it whenever the menu shows or one of them changes.
 
-import { DIFFICULTY_LABELS } from '../../data/difficulty.js';
+import { DIFFICULTY_LABELS, pressureNumeral } from '../../data/difficulty.js';
 import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
 import { formatRunTime } from './runRecap.js';
 
@@ -39,6 +39,17 @@ export function menuStatusItems({
     ['Best layer', String(records.bestLayer)],
     ['Daily best', daily > 0 ? String(daily) : '—'],
     ['Boss Rush', bossRushBest(records.bossRushStage, records.bossRushTime)],
+    // Once Pressure is open: the highest rung won.
+    ...(hangar.pressure?.open > 0
+      ? [
+          [
+            'Pressure won',
+            hangar.pressure.best > 0
+              ? pressureNumeral(hangar.pressure.best)
+              : '—',
+          ],
+        ]
+      : []),
     ['Salvage', String(hangar.salvage)],
     [
       'Codex',

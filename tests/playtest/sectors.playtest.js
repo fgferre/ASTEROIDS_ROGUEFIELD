@@ -2,10 +2,11 @@
  * Playtest: the bot (src/bootstrap/botPilot.js) flies sector runs headless
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
- * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
+ * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed] [--difficulty=<id>]`.
  */
 
 import { afterAll, beforeEach, describe, it, vi } from 'vitest';
+import { pressureRung } from '../../src/data/difficulty.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { SECTORS, chapterSectors, localLayer } from '../../src/data/sectors.js';
 import { createBotDriver } from '../../src/bootstrap/botPilotAdapter.js';
@@ -24,6 +25,8 @@ const ONLY = process.env.PLAYTEST_SECTOR || '';
 const SEED = Number(process.env.PLAYTEST_SEED || 1);
 // PLAYTEST_CARRY=1: as in the campaign, the bot first wins the chapter's
 // earlier sectors and arrives with that build (the victory screen's carry).
+// PLAYTEST_DIFFICULTY: a preset or 'pressure-N'; empty keeps the game's default.
+const DIFFICULTY = process.env.PLAYTEST_DIFFICULTY || '';
 const CARRY = process.env.PLAYTEST_CARRY === '1';
 // Kept before the fake timers: a long run hands the event loop a turn now
 // and then, or the worker cannot answer Vitest ("Timeout calling onTaskUpdate").
@@ -44,7 +47,15 @@ async function playSector(sector) {
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
-  session.resolveServiceInstance('difficulty').runSeed = SEED;
+  const difficulty = session.resolveServiceInstance('difficulty');
+  difficulty.runSeed = SEED;
+  if (pressureRung(DIFFICULTY)) {
+    difficulty.setPressure(pressureRung(DIFFICULTY));
+  } else if (DIFFICULTY) {
+    session
+      .resolveServiceInstance('settings')
+      .setSetting('gameplay', 'difficulty', DIFFICULTY);
+  }
   const driver = createBotDriver({
     services,
     eventBus,
@@ -157,6 +168,8 @@ async function playSector(sector) {
   report.cards = [...driver.cards];
   report.level = progression.getLevel();
   report.startLevel = startLevel;
+  report.kills = enemies.sessionStats.totalKills;
+  report.difficulty = difficulty.getDifficulty();
   return report;
 }
 
@@ -172,7 +185,7 @@ function outcomeText({ outcome, frames, sector }) {
 function printReport(report) {
   const { sector, boss } = report;
   const lines = [
-    `\n=== ${sector.id} (${sector.code}, layers ${sector.layers.join('-')}, boss ${sector.boss || 'warden'}) — bot ${PRESET}`,
+    `\n=== ${sector.id} (${sector.code}, layers ${sector.layers.join('-')}, boss ${sector.boss || 'warden'}) — bot ${PRESET}, ${report.difficulty}, kills ${report.kills}`,
     `  outcome: ${outcomeText(report)}; total ${clock(report.frames)}`,
     ...(CARRY
       ? [`  arrived at level ${report.startLevel} (carried build)`]

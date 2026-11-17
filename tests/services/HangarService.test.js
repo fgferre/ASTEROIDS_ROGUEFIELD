@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { PROGRESSION_UPGRADE_REROLLS_PER_RUN } from '../../src/core/GameConstants.js';
@@ -8,6 +8,7 @@ import {
 } from '../__helpers__/headlessGame.js';
 import HangarService, {
   HANGAR_STORAGE_KEY,
+  HANGAR_STORAGE_KEY_V1,
 } from '../../src/services/HangarService.js';
 import {
   BASTION_HULL_ID,
@@ -15,7 +16,16 @@ import {
   SOLAR_SLICER_HULL_ID,
 } from '../../src/data/shipModels.js';
 
-const atRate = (salvage) => ({ getModifiers: () => ({ salvage }) });
+const atRate = (salvage) => ({
+  getModifiers: () => ({ salvage }),
+  setPressure: () => {},
+  getPressure: () => 0,
+});
+
+const base = {
+  difficulty: atRate(1),
+  achievements: { getEntries: () => [] },
+};
 
 const summary = (layer, kills) => ({
   wave: { current: layer },
@@ -40,26 +50,40 @@ describe('HangarService', () => {
 
   it('pays 10 per layer and 1 per 5 kills, a retried run only its difference', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     const awarded = [];
     eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
 
     eventBus.emit('game-started', {});
     eventBus.emit('player-died', summary(9, 47));
-    expect(hangar.lastAward).toEqual({ amount: 99, total: 99, multiplier: 1 });
+    expect(hangar.lastAward).toEqual({
+      amount: 99,
+      total: 99,
+      multiplier: 1,
+      medals: 0,
+    });
 
     eventBus.emit('player-died', summary(11, 60)); // after a retry
     expect(hangar.lastAward).toEqual({
       amount: 122,
       total: 122,
       multiplier: 1,
+      medals: 0,
     });
     expect(awarded).toEqual([99, 23]);
   });
 
   it('pays a quit from the pause menu like a death, and never twice', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     const awarded = [];
     eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
 
@@ -74,7 +98,11 @@ describe('HangarService', () => {
 
   it('pays nothing for a replay that is quit', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
 
     eventBus.emit('game-started', { replay: true });
     eventBus.emit('run-abandoned', summary(9, 47));
@@ -83,7 +111,11 @@ describe('HangarService', () => {
 
   it('pays a sector run the layers it played and its victory', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
 
     eventBus.emit('game-started', { sector: 'dense-core' });
     eventBus.emit('run-won', { wave: 10, sector: 'dense-core' });
@@ -96,7 +128,11 @@ describe('HangarService', () => {
 
   it('adds each Salvage Cache picked up to the run', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(2) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(2),
+    });
     eventBus.emit('game-started', {});
     eventBus.emit('pickup-collected', { kind: 'salvage' });
     eventBus.emit('pickup-collected', { kind: 'magnet' });
@@ -111,7 +147,11 @@ describe('HangarService', () => {
 
   it('adds 150 for a victory and 25 per endless layer', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     eventBus.emit('game-started', {});
     eventBus.emit('run-won', { wave: 15 });
     eventBus.emit('screen-changed', {
@@ -126,7 +166,11 @@ describe('HangarService', () => {
 
   it('pays a Boss Rush clear 15 per Warden plus 150, not the layer-15 pay', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     eventBus.emit('game-started', { bossRush: true });
     [5, 10, 15].forEach((wave) => eventBus.emit('boss-defeated', { wave }));
     eventBus.emit('run-won', { wave: 15 });
@@ -139,7 +183,11 @@ describe('HangarService', () => {
 
   it('pays a Boss Rush death per Warden felled, then a normal run pays by layer again', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     eventBus.emit('game-started', { bossRush: true });
     eventBus.emit('boss-defeated', { wave: 5 });
     eventBus.emit('player-died', summary(10, 40)); // died at the second Warden
@@ -154,14 +202,23 @@ describe('HangarService', () => {
   it("pays a replayed run nothing, then the viewer's own run in full", () => {
     stock(40);
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1),
+    });
     const awarded = [];
     eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
 
     eventBus.emit('game-started', { replay: true });
     eventBus.emit('player-died', summary(9, 47));
     expect(hangar.salvage).toBe(40);
-    expect(hangar.lastAward).toEqual({ amount: 0, total: 40, multiplier: 1 });
+    expect(hangar.lastAward).toEqual({
+      amount: 0,
+      total: 40,
+      multiplier: 1,
+      medals: 0,
+    });
     expect(JSON.parse(localStorage.getItem(HANGAR_STORAGE_KEY)).salvage).toBe(
       40
     );
@@ -182,20 +239,25 @@ describe('HangarService', () => {
 
   it('scales the payout by the difficulty salvage multiplier', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus, difficulty: atRate(1.3) });
+    const hangar = new HangarService({
+      ...base,
+      eventBus,
+      difficulty: atRate(1.3),
+    });
     eventBus.emit('game-started', {});
     eventBus.emit('player-died', summary(9, 47)); // 99 at Veteran
     expect(hangar.lastAward).toEqual({
       amount: 129,
       total: 129,
       multiplier: 1.3,
+      medals: 0,
     });
   });
 
   it('buys once with enough Salvage and persists through storage', () => {
     stock(200);
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus });
+    const hangar = new HangarService({ ...base, eventBus });
     const bought = [];
     eventBus.on('hangar-purchased', ({ id }) => bought.push(id));
 
@@ -204,13 +266,13 @@ describe('HangarService', () => {
     expect(hangar.buy('reinforced-plating')).toBe(false); // 0 left
     expect(bought).toEqual(['salvage-magnet']);
 
-    const next = new HangarService({ eventBus: new EventBus() });
+    const next = new HangarService({ ...base, eventBus: new EventBus() });
     expect(next.salvage).toBe(0);
     expect(next.owned).toEqual({ 'salvage-magnet': true });
   });
 
   it('turns owned items into run modifiers and gates the bought hulls', () => {
-    const none = new HangarService({ eventBus: new EventBus() });
+    const none = new HangarService({ ...base, eventBus: new EventBus() });
     expect(none.getModifiers()).toEqual({
       hullMultiplier: 1,
       extraRerolls: 0,
@@ -230,7 +292,7 @@ describe('HangarService', () => {
       'solar-slicer-hull': true,
       'bastion-hull': true,
     });
-    const all = new HangarService({ eventBus: new EventBus() });
+    const all = new HangarService({ ...base, eventBus: new EventBus() });
     expect(all.getModifiers()).toEqual({
       hullMultiplier: 1.05,
       extraRerolls: 1,
@@ -253,5 +315,165 @@ describe('HangarService', () => {
     expect(progression.rerollsLeft).toBe(
       PROGRESSION_UPGRADE_REROLLS_PER_RUN + 1
     );
+  });
+
+  describe('medals and Pressure', () => {
+    const medal = (id, reward, unlockedAt = '2026-11-01T00:00:00.000Z') => ({
+      id,
+      reward,
+      unlockedAt,
+    });
+    const withMedals = (entries) => ({ getEntries: () => entries });
+    const pressureAt = (initial = 0) => {
+      const difficulty = {
+        ...atRate(1),
+        rung: initial,
+        setPressure: vi.fn((rung) => {
+          difficulty.rung = rung;
+        }),
+        getPressure: () => difficulty.rung,
+      };
+      return difficulty;
+    };
+    const stockV2 = (extra) =>
+      localStorage.setItem(
+        HANGAR_STORAGE_KEY,
+        JSON.stringify({ salvage: 0, owned: {}, ...extra })
+      );
+    const saved = () => JSON.parse(localStorage.getItem(HANGAR_STORAGE_KEY));
+    const openRung = (open, selected, difficulty = pressureAt(selected)) => {
+      stockV2({ pressure: { open, selected, best: 0 } });
+      const eventBus = new EventBus();
+      const hangar = new HangarService({
+        ...base,
+        eventBus,
+        difficulty,
+      });
+      return { eventBus, hangar, difficulty };
+    };
+
+    it('moves a v1 save to v2 with nothing lost, leaving the v1 key alone', () => {
+      const v1 = JSON.stringify({
+        salvage: 75,
+        owned: { 'dash-coils': true, 'retired-item': true },
+      });
+      localStorage.setItem(HANGAR_STORAGE_KEY_V1, v1);
+      const hangar = new HangarService({
+        ...base,
+        eventBus: new EventBus(),
+      });
+      expect(hangar.salvage).toBe(75);
+      expect(hangar.owned).toEqual({
+        'dash-coils': true,
+        'retired-item': true,
+      });
+      expect(hangar.pressure).toEqual({ open: 0, selected: 0, best: 0 });
+      expect(localStorage.getItem(HANGAR_STORAGE_KEY)).toBeNull();
+
+      hangar.persist();
+      expect(saved()).toMatchObject({
+        version: 2,
+        salvage: 75,
+        owned: { 'dash-coils': true, 'retired-item': true },
+      });
+      expect(localStorage.getItem(HANGAR_STORAGE_KEY_V1)).toBe(v1);
+    });
+
+    it('pays the medals an old save already holds once, at load', () => {
+      localStorage.setItem(
+        HANGAR_STORAGE_KEY_V1,
+        JSON.stringify({ salvage: 10, owned: {} })
+      );
+      const achievements = withMedals([
+        medal('first-light', { salvage: 25 }),
+        medal('ring-breaker', { license: 'deflector_shield' }),
+        medal('deep-field', { salvage: 250 }, null),
+      ]);
+      const first = new HangarService({
+        ...base,
+        eventBus: new EventBus(),
+        achievements,
+      });
+      expect(first.salvage).toBe(35);
+      expect(first.licenses).toEqual({ deflector_shield: true });
+      expect(first.medalsPaid).toEqual({
+        'first-light': true,
+        'ring-breaker': true,
+      });
+
+      const second = new HangarService({
+        ...base,
+        eventBus: new EventBus(),
+        achievements,
+      });
+      expect(second.salvage).toBe(35);
+      expect(second.licenses).toEqual({ deflector_shield: true });
+    });
+
+    it('pays a medal unlocked in play once and counts it in the run award', () => {
+      const eventBus = new EventBus();
+      const hangar = new HangarService({
+        ...base,
+        eventBus,
+        achievements: withMedals([]),
+      });
+      eventBus.emit('game-started', {});
+      eventBus.emit('achievement-unlocked', { id: 'first-light' });
+      eventBus.emit('achievement-unlocked', { id: 'first-light' });
+      expect(hangar.salvage).toBe(25);
+
+      eventBus.emit('player-died', summary(3, 0));
+      expect(hangar.lastAward.medals).toBe(25);
+      expect(hangar.lastAward.total).toBe(25 + 30);
+      expect(saved().medalsPaid).toEqual({ 'first-light': true });
+    });
+
+    it('opens rung 1 with First Victory, refuses a rung above the open one, flies the saved rung', () => {
+      const eventBus = new EventBus();
+      const hangar = new HangarService({
+        ...base,
+        eventBus,
+        achievements: withMedals([]),
+      });
+      expect(hangar.setPressure(1)).toBe(false);
+
+      eventBus.emit('achievement-unlocked', { id: 'first-victory' });
+      expect(hangar.salvage).toBe(100);
+      expect(hangar.pressure.open).toBe(1);
+      expect(hangar.setPressure(2)).toBe(false);
+      expect(hangar.setPressure(1)).toBe(true);
+      expect(saved().pressure.selected).toBe(1);
+
+      const { difficulty } = openRung(3, 2);
+      expect(difficulty.setPressure).toHaveBeenCalledWith(2);
+    });
+
+    it('opens the next rung on a win at the highest open one, caps at 5', () => {
+      const { eventBus, hangar, difficulty } = openRung(2, 2);
+      eventBus.emit('run-won', { wave: 15 });
+      expect(hangar.pressure).toEqual({ open: 3, selected: 2, best: 2 });
+      expect(saved().pressure).toEqual({ open: 3, selected: 2, best: 2 });
+
+      difficulty.rung = 1;
+      eventBus.emit('run-won', { wave: 15 });
+      expect(hangar.pressure).toEqual({ open: 3, selected: 2, best: 2 });
+
+      difficulty.rung = 5;
+      hangar.pressure.open = 5;
+      eventBus.emit('run-won', { wave: 15 });
+      expect(hangar.pressure).toMatchObject({ open: 5, best: 5 });
+    });
+
+    it('counts nothing for a win in Boss Rush, a replay, or on a rung not yet open', () => {
+      const { eventBus, hangar, difficulty } = openRung(2, 2);
+      eventBus.emit('game-started', { bossRush: true });
+      eventBus.emit('run-won', { wave: 15 });
+      eventBus.emit('game-started', { replay: true });
+      eventBus.emit('run-won', { wave: 15 });
+      eventBus.emit('game-started', {});
+      difficulty.rung = 4;
+      eventBus.emit('run-won', { wave: 15 });
+      expect(hangar.pressure).toEqual({ open: 2, selected: 2, best: 0 });
+    });
   });
 });

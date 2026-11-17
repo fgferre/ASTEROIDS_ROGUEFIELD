@@ -10,10 +10,21 @@ import {
   hullTraits,
   hullTraitsMarkup,
   hullUnlockText,
+  medalRewardText,
+  pressureLadderMarkup,
   salvageBalanceText,
   salvageLine,
 } from '../../../src/modules/ui/hangar.js';
 import { getShipModelById } from '../../../src/data/shipModels.js';
+
+const stubs = {
+  difficulty: {
+    getModifiers: () => ({ salvage: 1 }),
+    setPressure: () => {},
+    getPressure: () => 0,
+  },
+  achievements: { getEntries: () => [] },
+};
 
 describe('Hangar screen', () => {
   let restoreDom;
@@ -27,7 +38,7 @@ describe('Hangar screen', () => {
 
   it('lists the seven upgrades and the Salvage balance', () => {
     localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 130 }));
-    const hangar = new HangarService({ eventBus: new EventBus() });
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
     const markup = hangar.getItems().map(hangarItemMarkup).join('');
 
     expect(markup.match(/<li /g)).toHaveLength(7);
@@ -42,7 +53,7 @@ describe('Hangar screen', () => {
 
   it('shows OWNED once bought', () => {
     localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 120 }));
-    const hangar = new HangarService({ eventBus: new EventBus() });
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
     hangar.buy('reinforced-plating');
 
     expect(cardOf(hangar, 'reinforced-plating')).toContain('OWNED');
@@ -94,6 +105,37 @@ describe('Hangar screen', () => {
     expect(salvageLine({ amount: 129, total: 340, multiplier: 1.3 })).toEqual({
       amount: '+129',
       text: 'salvage (×1.3 difficulty) · 340 to spend in the Hangar',
+    });
+  });
+
+  it('writes what a medal pays: Salvage, a licensed card by name, Pressure', () => {
+    expect(medalRewardText({ salvage: 50 })).toBe('+50 Salvage');
+    expect(medalRewardText({ license: 'arc_lattice' })).toBe(
+      'License · Arc Lattice'
+    );
+    expect(medalRewardText({ salvage: 100, opensPressure: true })).toBe(
+      'Opens Pressure · +100 Salvage'
+    );
+  });
+
+  it('disables the Pressure rungs above the open one and marks the selected', () => {
+    const markup = pressureLadderMarkup({ open: 2, selected: 2, best: 1 });
+    const button = (n) =>
+      markup.match(new RegExp(`data-hangar-pressure="${n}"[^>]*>`))[0];
+
+    expect(button(0)).not.toContain('disabled');
+    expect(button(1)).not.toContain('disabled');
+    expect(button(2)).toContain('aria-pressed="true"');
+    expect(button(3)).toContain('disabled');
+    expect(button(5)).toContain('disabled');
+    expect(markup).toContain('Pressure II · selected');
+    expect(markup).toContain('Pressure I · won');
+  });
+
+  it('names the medals Salvage a run paid in its salvage line', () => {
+    expect(salvageLine({ amount: 99, total: 440, medals: 100 })).toEqual({
+      amount: '+99',
+      text: 'salvage · +100 from medals · 440 to spend in the Hangar',
     });
   });
 });

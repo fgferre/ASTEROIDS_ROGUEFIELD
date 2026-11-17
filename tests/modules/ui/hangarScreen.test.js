@@ -65,4 +65,63 @@ describe('Hangar screen', () => {
     listeners.pointerleave();
     expect(hullInfo.innerHTML).toContain('Balanced');
   });
+
+  it('a tab click shows only its panel; a rung click picks that rung', () => {
+    let click;
+    const panel = (name) => ({ dataset: { hangarPanel: name }, hidden: false });
+    const tab = (name) => ({
+      dataset: { hangarTab: name },
+      classList: { toggle: vi.fn() },
+      setAttribute: vi.fn(),
+      textContent: '',
+    });
+    const panels = ['ship', 'medals', 'pressure'].map(panel);
+    const medalsTab = tab('medals');
+    const rungButton = { dataset: { hangarPressure: '2' } };
+    const hangar = {
+      salvage: 0,
+      pressure: { open: 2, selected: 0, best: 0 },
+      getMedals: () => [{ id: 'first-light', unlockedAt: null, reward: {} }],
+      getItems: () => [],
+      isHullUnlocked: () => true,
+      setPressure: vi.fn(),
+    };
+    const screen = new HangarScreen({
+      refs: {
+        overlay: {
+          addEventListener: (type, fn) => type === 'click' && (click = fn),
+        },
+        tabs: [tab('ship'), medalsTab, tab('pressure')],
+        panels,
+        medals: { innerHTML: '' },
+        pressure: { innerHTML: '', querySelector: () => null },
+        pressureNote: { textContent: '' },
+        list: { innerHTML: '' },
+        hulls: { innerHTML: '', addEventListener: vi.fn() },
+        hullInfo: { innerHTML: '' },
+        hullLock: { hidden: true, textContent: '' },
+        balance: { textContent: '' },
+      },
+      hangar: () => hangar,
+      selectedHullId: () => 'default-hull',
+      hullName: (hull) => hull.id,
+      emit: vi.fn(),
+    });
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+    screen.bindHangarControls();
+    vi.unstubAllGlobals();
+
+    click({
+      target: { closest: (sel) => (sel.includes('tab') ? medalsTab : null) },
+    });
+    expect(panels.map((p) => p.hidden)).toEqual([true, false, true]);
+    expect(medalsTab.textContent).toBe('Medals · 0/1');
+
+    click({
+      target: {
+        closest: (sel) => (sel.includes('pressure') ? rungButton : null),
+      },
+    });
+    expect(hangar.setPressure).toHaveBeenCalledWith(2);
+  });
 });

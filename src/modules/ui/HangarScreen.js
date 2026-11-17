@@ -1,20 +1,24 @@
 // src/modules/ui/HangarScreen.js
 //
-// The Hangar overlay over the main menu: Salvage balance, the items to buy,
-// the hull picker with its 3D preview and lock caption, and the Ring's line
-// for a purchase.
+// The Hangar overlay over the main menu: Salvage balance and three tabs.
+// Ship: the items to buy, the hull picker with its 3D preview and lock
+// caption, and the Ring's line for a purchase. Medals: the wall of medals and
+// what each pays. Pressure: the ladder above Warden, a rung to pick.
 
 import {
   hangarItemMarkup,
   hullLockText,
   hullTraitsMarkup,
+  medalMarkup,
+  pressureLadderMarkup,
+  pressureNoteText,
   salvageBalanceText,
 } from './hangar.js';
 import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
   /**
-   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn }.
+   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, medals, pressure, pressureNote }.
    * `settings`: the settings service; a hull button selects that hull.
    * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
    *   transmission events (its voice, audio/voiceLines.js).
@@ -47,6 +51,7 @@ export class HangarScreen {
     this.refreshShipSelector = refreshShipSelector;
     this.hangarState = { isOpen: false, trigger: null };
     this.purchaseLine = null;
+    this.tab = 'ship';
   }
 
   // The run's transmission banner is hidden in the menu: the Ring's line
@@ -83,6 +88,24 @@ export class HangarScreen {
     refs.overlay.addEventListener('click', (event) => {
       if (event.target === refs.overlay) {
         this.closeHangar();
+        return;
+      }
+      const tab = event.target.closest('[data-hangar-tab]');
+      if (tab) {
+        this.tab = tab.dataset.hangarTab;
+        this.endPurchaseLine();
+        this.renderHangar();
+        return;
+      }
+      const rung = event.target.closest('[data-hangar-pressure]');
+      if (rung) {
+        this.hangar().setPressure(Number(rung.dataset.hangarPressure));
+        this.renderHangar();
+        refs.pressure
+          .querySelector(
+            `[data-hangar-pressure="${rung.dataset.hangarPressure}"]`
+          )
+          ?.focus({ preventScroll: true });
         return;
       }
       const buy = event.target.closest('[data-hangar-buy]');
@@ -140,6 +163,23 @@ export class HangarScreen {
     const refs = this.refs;
     const hangar = this.hangar();
     refs.balance.textContent = salvageBalanceText(hangar.salvage);
+    const medals = hangar.getMedals();
+    refs.tabs.forEach((button) => {
+      const active = button.dataset.hangarTab === this.tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+      if (button.dataset.hangarTab === 'medals') {
+        button.textContent = `Medals · ${
+          medals.filter((medal) => medal.unlockedAt).length
+        }/${medals.length}`;
+      }
+    });
+    refs.panels.forEach((panel) => {
+      panel.hidden = panel.dataset.hangarPanel !== this.tab;
+    });
+    refs.medals.innerHTML = medals.map(medalMarkup).join('');
+    refs.pressureNote.textContent = pressureNoteText(hangar.pressure.open);
+    refs.pressure.innerHTML = pressureLadderMarkup(hangar.pressure);
     refs.list.innerHTML = hangar.getItems().map(hangarItemMarkup).join('');
     const selected = this.selectedHullId();
     refs.hulls.innerHTML = getAllShipModels()
