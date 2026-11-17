@@ -77,76 +77,67 @@
         ></canvas>
         <div class="menu-screen__overlay">
           <div
+            id="menu-prep"
             class="menu-screen__content"
             role="region"
             aria-labelledby="menu-screen-title"
             tabindex="-1"
+            data-active-tab="campaign"
           >
             <h1 id="menu-screen-title" class="menu-screen__title">
-              ASTEROID ROGUEFIELD
+              ASTEROID<br /><strong>ROGUEFIELD</strong>
             </h1>
             <p id="menu-status" class="menu-status" aria-label="Records"></p>
             <div
-              id="menu-hull-stage"
-              class="menu-hull-stage"
-              aria-hidden="true"
-            ></div>
-            <section
-              id="menu-ship-selector"
-              class="menu-ship-selector"
-              aria-label="Hull selection"
+              id="menu-prep-tabs"
+              class="prep-tabs"
+              role="tablist"
+              aria-label="Game mode"
             >
-              <p
-                id="menu-ship-selector-label"
-                class="menu-ship-selector__label hull-traits"
-                aria-live="polite"
-              ></p>
-              <div
-                id="menu-ship-selector-options"
-                class="menu-ship-selector__options"
-                role="group"
-                aria-label="Ship hull selection"
-              ></div>
-            </section>
-            <nav class="menu-screen__nav menu-grid" aria-label="Main Menu">
               <button
                 id="menu-campaign-btn"
-                class="menu-screen__button menu-screen__button--primary"
+                class="prep-tab"
                 type="button"
+                role="tab"
+                data-prep-tab="campaign"
                 data-hint="Ten sectors, one at a time; each win is kept and opens the next."
               >
                 Campaign
               </button>
               <button
-                id="start-game-btn"
-                class="menu-screen__button"
+                class="prep-tab"
                 type="button"
+                role="tab"
+                data-prep-tab="descent"
                 data-hint="All three chapters in one run."
               >
                 Descent
               </button>
               <button
-                id="daily-field-btn"
-                class="menu-screen__button"
+                class="prep-tab"
                 type="button"
+                role="tab"
+                data-prep-tab="daily"
                 data-hint="Today's field, the same for everyone. Always Veteran difficulty."
               >
                 Daily Field
               </button>
               <button
-                id="boss-rush-btn"
-                class="menu-screen__button menu-screen__button--stacked"
+                class="prep-tab"
                 type="button"
+                role="tab"
+                data-prep-tab="bossrush"
                 data-hint="The three Wardens back to back."
               >
-                Boss Rush
-                <span id="boss-rush-lock" class="menu-screen__lock hidden"
-                  >Defeat Warden Prime to unlock</span
+                Boss Rush<span class="prep-tab__lock" aria-hidden="true"
+                  >&#128274;&#xFE0E;</span
                 >
               </button>
+            </div>
+            <nav class="prep-links" aria-label="Main Menu">
               <button
                 id="menu-hangar-btn"
-                class="menu-screen__button"
+                class="menu-screen__button menu-screen__button--link"
                 type="button"
                 data-hint="Spend Salvage on permanent upgrades and new hulls."
               >
@@ -154,7 +145,7 @@
               </button>
               <button
                 id="menu-codex-btn"
-                class="menu-screen__button"
+                class="menu-screen__button menu-screen__button--link"
                 type="button"
                 data-hint="Every enemy you have logged, and your achievements."
               >
@@ -162,66 +153,213 @@
               </button>
               <button
                 id="open-settings-btn"
-                class="menu-screen__button"
+                class="menu-screen__button menu-screen__button--link"
                 type="button"
                 data-hint="Gameplay, controls, interface, graphics, audio and accessibility."
               >
                 Settings
               </button>
-              <button
-                id="menu-credits-btn"
-                class="menu-screen__button"
-                type="button"
-                data-hint="The people behind the game, and the original 2D version."
-              >
-                Credits
-              </button>
-              <button
-                id="menu-support-btn"
-                class="menu-screen__button menu-screen__button--support"
-                type="button"
-                data-hint="Free, no ads, nothing locked: how to help the next update happen."
-              >
-                ♥ Support
-              </button>
             </nav>
-            <p id="menu-hint" class="menu-hint" aria-live="polite"></p>
-            <ul
-              class="controls-hints"
-              data-device="keyboard"
-              aria-label="Controls"
+            <div class="prep-main">
+              <section
+                class="prep-panel"
+                role="tabpanel"
+                data-prep-for="campaign"
+              >
+                <h2 id="campaign-detail-title" class="campaign-detail__title">
+                  —
+                </h2>
+                <div
+                  id="campaign-sectors"
+                  class="campaign-sectors"
+                  role="group"
+                  aria-label="Sectors"
+                ></div>
+                <p
+                  id="campaign-detail-head-start"
+                  class="campaign-detail__line"
+                  hidden
+                ></p>
+              </section>
+              <section
+                class="prep-panel"
+                role="tabpanel"
+                data-prep-for="descent"
+              >
+                <h2 class="campaign-detail__title">THE DESCENT</h2>
+                <p class="prep-panel__objective">
+                  All three chapters in one run.
+                </p>
+              </section>
+              <section class="prep-panel" role="tabpanel" data-prep-for="daily">
+                <h2 class="campaign-detail__title">DAILY FIELD</h2>
+                <p class="prep-panel__objective">
+                  Today's field, the same for everyone. Always Veteran
+                  difficulty.
+                </p>
+              </section>
+              <section
+                class="prep-panel"
+                role="tabpanel"
+                data-prep-for="bossrush"
+              >
+                <h2 class="campaign-detail__title">BOSS RUSH</h2>
+                <p class="prep-panel__objective">
+                  The three Wardens back to back.
+                </p>
+              </section>
+              <div id="prep-before-launch"></div>
+              <div class="prep-launch">
+                <div id="prep-difficulty"></div>
+                <button
+                  id="campaign-launch-btn"
+                  class="btn btn--primary prep-launch__btn"
+                  type="button"
+                  data-prep-for="campaign"
+                >
+                  Launch
+                </button>
+                <button
+                  id="start-game-btn"
+                  class="btn btn--primary prep-launch__btn"
+                  type="button"
+                  data-prep-for="descent"
+                >
+                  Launch Descent
+                </button>
+                <button
+                  id="daily-field-btn"
+                  class="btn btn--primary prep-launch__btn"
+                  type="button"
+                  data-prep-for="daily"
+                >
+                  Launch Daily Field
+                </button>
+                <button
+                  id="boss-rush-btn"
+                  class="btn btn--primary prep-launch__btn"
+                  type="button"
+                  data-prep-for="bossrush"
+                >
+                  Launch Boss Rush
+                  <span id="boss-rush-lock" class="menu-screen__lock hidden"
+                    >Defeat Warden Prime to unlock</span
+                  >
+                </button>
+              </div>
+            </div>
+            <div class="prep-side">
+              <div
+                id="menu-hull-stage"
+                class="menu-hull-stage"
+                aria-hidden="true"
+              ></div>
+              <section
+                id="menu-ship-selector"
+                class="menu-ship-selector"
+                aria-label="Hull selection"
+              >
+                <p
+                  id="menu-ship-selector-label"
+                  class="menu-ship-selector__label hull-traits"
+                  aria-live="polite"
+                ></p>
+                <div
+                  id="menu-ship-selector-options"
+                  class="menu-ship-selector__options"
+                  role="group"
+                  aria-label="Ship hull selection"
+                ></div>
+              </section>
+              <aside
+                id="campaign-log"
+                class="campaign-log"
+                aria-label="Wake log"
+                data-prep-for="campaign"
+              >
+                <h3 class="campaign-log__heading">WAKE LOG</h3>
+                <p class="campaign-log__sub">What we know so far</p>
+                <div id="campaign-log-body" class="campaign-log__body"></div>
+                <button
+                  id="campaign-log-toggle"
+                  class="campaign-log__toggle"
+                  type="button"
+                  hidden
+                ></button>
+              </aside>
+            </div>
+            <section
+              class="prep-ring"
+              aria-label="The Ring"
+              data-prep-for="campaign"
             >
-              <li data-scheme="modern"><kbd>WASD</kbd> move</li>
-              <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-              <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
-              <li><kbd>Shift</kbd> dash</li>
-              <li><kbd>E</kbd> shield</li>
-              <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
-              <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
-              <li><kbd>R</kbd> reroll</li>
-              <li><kbd>B</kbd> banish</li>
-              <li><kbd>Esc</kbd> pause</li>
-              <li class="controls-hints__note" data-scheme="modern">
-                Shooting is automatic
-              </li>
-              <li class="controls-hints__note" data-scheme="classic">
-                Shooting is automatic
-              </li>
-            </ul>
-            <ul
-              class="controls-hints"
-              data-device="gamepad"
-              aria-label="Gamepad controls"
-            >
-              <li><kbd>L-Stick</kbd> move</li>
-              <li><kbd>R-Stick</kbd> aim</li>
-              <li><kbd>RT</kbd> dash</li>
-              <li><kbd>LT</kbd> shield</li>
-              <li><kbd>X</kbd> spread mode</li>
-              <li><kbd>Y</kbd> aim mode</li>
-              <li><kbd>Start</kbd> pause</li>
-              <li class="controls-hints__note">Shooting is automatic</li>
-            </ul>
+              <h3 class="prep-ring__label">THE RING</h3>
+              <div
+                id="campaign-nodes"
+                class="campaign-map"
+                role="group"
+                aria-label="Chapters"
+              ></div>
+            </section>
+            <footer class="prep-footer">
+              <div class="prep-footer__hints">
+                <p id="menu-hint" class="menu-hint" aria-live="polite"></p>
+                <ul
+                  class="controls-hints"
+                  data-device="keyboard"
+                  aria-label="Controls"
+                >
+                  <li data-scheme="modern"><kbd>WASD</kbd> move</li>
+                  <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+                  <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
+                  <li><kbd>Shift</kbd> dash</li>
+                  <li><kbd>E</kbd> shield</li>
+                  <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
+                  <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
+                  <li><kbd>R</kbd> reroll</li>
+                  <li><kbd>B</kbd> banish</li>
+                  <li><kbd>Esc</kbd> pause</li>
+                  <li class="controls-hints__note" data-scheme="modern">
+                    Shooting is automatic
+                  </li>
+                  <li class="controls-hints__note" data-scheme="classic">
+                    Shooting is automatic
+                  </li>
+                </ul>
+                <ul
+                  class="controls-hints"
+                  data-device="gamepad"
+                  aria-label="Gamepad controls"
+                >
+                  <li><kbd>L-Stick</kbd> move</li>
+                  <li><kbd>R-Stick</kbd> aim</li>
+                  <li><kbd>RT</kbd> dash</li>
+                  <li><kbd>LT</kbd> shield</li>
+                  <li><kbd>X</kbd> spread mode</li>
+                  <li><kbd>Y</kbd> aim mode</li>
+                  <li><kbd>Start</kbd> pause</li>
+                  <li class="controls-hints__note">Shooting is automatic</li>
+                </ul>
+              </div>
+              <div class="prep-footer__links">
+                <button
+                  id="menu-credits-btn"
+                  class="menu-screen__button menu-screen__button--link"
+                  type="button"
+                  data-hint="The people behind the game, and the original 2D version."
+                >
+                  Credits
+                </button>
+                <button
+                  id="menu-support-btn"
+                  class="menu-screen__button menu-screen__button--link menu-screen__button--support"
+                  type="button"
+                  data-hint="Free, no ads, nothing locked: how to help the next update happen."
+                >
+                  ♥ Support
+                </button>
+              </div>
+            </footer>
           </div>
         </div>
       </div>
@@ -799,85 +937,6 @@
           <footer class="credits-footer">
             <button
               id="hangar-back-btn"
-              class="btn btn--secondary"
-              type="button"
-            >
-              Back to Menu
-            </button>
-          </footer>
-        </div>
-      </div>
-
-      <!-- Campaign map: the Ring's chapters (ui/CampaignMap.js) -->
-      <div
-        id="campaign-screen"
-        class="screen screen--overlay hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="campaign-title"
-        aria-hidden="true"
-      >
-        <div class="credits-dialog campaign-dialog">
-          <header class="credits-header">
-            <h2 id="campaign-title" class="credits-title">The Ring</h2>
-            <button
-              id="campaign-close-btn"
-              class="credits-close-btn"
-              type="button"
-              aria-label="Close campaign map"
-            >
-              ✕
-            </button>
-          </header>
-          <div class="campaign-body">
-            <div class="campaign-main">
-              <div
-                id="campaign-nodes"
-                class="campaign-map"
-                role="group"
-                aria-label="Chapters"
-              ></div>
-              <section class="campaign-detail" aria-live="polite">
-                <div class="campaign-detail__text">
-                  <h3 id="campaign-detail-title" class="campaign-detail__title">
-                    —
-                  </h3>
-                  <div
-                    id="campaign-sectors"
-                    class="campaign-sectors"
-                    role="group"
-                    aria-label="Sectors"
-                  ></div>
-                  <p
-                    id="campaign-detail-head-start"
-                    class="campaign-detail__line"
-                    hidden
-                  ></p>
-                </div>
-                <button
-                  id="campaign-launch-btn"
-                  class="btn btn--primary campaign-detail__launch"
-                  type="button"
-                >
-                  Launch
-                </button>
-              </section>
-            </div>
-            <aside id="campaign-log" class="campaign-log" aria-label="Wake log">
-              <h3 class="campaign-log__heading">WAKE LOG</h3>
-              <p class="campaign-log__sub">What we know so far</p>
-              <div id="campaign-log-body" class="campaign-log__body"></div>
-              <button
-                id="campaign-log-toggle"
-                class="campaign-log__toggle"
-                type="button"
-                hidden
-              ></button>
-            </aside>
-          </div>
-          <footer class="credits-footer">
-            <button
-              id="campaign-back-btn"
               class="btn btn--secondary"
               type="button"
             >
