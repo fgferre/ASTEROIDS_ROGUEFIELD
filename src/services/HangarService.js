@@ -1,7 +1,7 @@
 // src/services/HangarService.js
 
 import { ACHIEVEMENTS } from '../data/achievements.js';
-import { PRESSURE_RUNGS } from '../data/difficulty.js';
+import { DIFFICULTY_LABELS, PRESSURE_RUNGS } from '../data/difficulty.js';
 import {
   BASE_MODIFIERS,
   CONTROL_ITEMS,
@@ -111,6 +111,12 @@ export default class HangarService {
     eventBus.on('pickup-collected', ({ kind } = {}) => {
       if (kind === 'salvage') this.cacheSalvage += PICKUP_KINDS.salvage.salvage;
     });
+    // Salvage a run earns in play beyond pickups, e.g. a card offer with
+    // nothing left to offer (progression plan H5): paid at the run's end with
+    // the rest, at the difficulty's rate.
+    eventBus.on('salvage-bonus', ({ amount = 0 } = {}) => {
+      this.cacheSalvage += Math.max(0, Math.floor(Number(amount) || 0));
+    });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
     eventBus.on('run-abandoned', (summary = {}) => this.award(summary));
     eventBus.on('screen-changed', (payload = {}) => {
@@ -212,6 +218,7 @@ export default class HangarService {
       amount: this.runAwarded,
       total: this.salvage,
       multiplier,
+      difficulty: DIFFICULTY_LABELS[this.difficulty.getDifficulty()],
       medals: this.runMedalSalvage,
     };
     if (amount > 0) {

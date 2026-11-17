@@ -20,6 +20,7 @@ const atRate = (salvage) => ({
   getModifiers: () => ({ salvage }),
   setPressure: () => {},
   getPressure: () => 0,
+  getDifficulty: () => 'veteran',
 });
 
 const base = {
@@ -64,6 +65,7 @@ describe('HangarService', () => {
       amount: 99,
       total: 99,
       multiplier: 1,
+      difficulty: 'Veteran',
       medals: 0,
     });
 
@@ -72,9 +74,19 @@ describe('HangarService', () => {
       amount: 122,
       total: 122,
       multiplier: 1,
+      difficulty: 'Veteran',
       medals: 0,
     });
     expect(awarded).toEqual([99, 23]);
+  });
+
+  it('pays a Salvage bonus earned in play with the run, at its rate', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ ...base, eventBus });
+    eventBus.emit('game-started', {});
+    eventBus.emit('salvage-bonus', { amount: 30 });
+    eventBus.emit('player-died', summary(0, 0));
+    expect(hangar.lastAward.amount).toBe(30);
   });
 
   it('pays a quit from the pause menu like a death, and never twice', () => {
@@ -250,6 +262,7 @@ describe('HangarService', () => {
       amount: 129,
       total: 129,
       multiplier: 1.3,
+      difficulty: 'Veteran',
       medals: 0,
     });
   });

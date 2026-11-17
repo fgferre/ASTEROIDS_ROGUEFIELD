@@ -107,6 +107,14 @@ describe('Hangar screen', () => {
       amount: '+129',
       text: 'salvage (×1.3 difficulty) · 340 to spend in the Hangar',
     });
+    expect(
+      salvageLine({
+        amount: 150,
+        total: 340,
+        multiplier: 1.5,
+        difficulty: 'Pressure I',
+      }).text
+    ).toBe('salvage (×1.5 Pressure I) · 340 to spend in the Hangar');
   });
 
   it('writes what a medal pays: Salvage, a licensed card by name, Pressure', () => {
