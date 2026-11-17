@@ -21,7 +21,7 @@ function fakeElement() {
   };
 }
 
-function boot(search) {
+function boot(search, pad = { pads: [] }) {
   const screen = fakeElement();
   const menu = fakeElement();
   menu.classes.add('hidden');
@@ -35,8 +35,11 @@ function boot(search) {
   };
   const docListeners = {};
   vi.stubGlobal('window', { location: { search } });
-  vi.stubGlobal('navigator', { getGamepads: () => [] });
-  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('navigator', { getGamepads: () => pad.pads });
+  vi.stubGlobal('requestAnimationFrame', (fn) => {
+    pad.frame = fn;
+    return 1;
+  });
   vi.stubGlobal('cancelAnimationFrame', () => {});
   vi.stubGlobal('document', {
     getElementById: (id) => byId[id] ?? null,
@@ -85,6 +88,31 @@ describe('loading screen PRESS START gate', () => {
     const { screen, menu } = boot('');
     screen.listeners.click();
     expect(menu.classes.has('hidden')).toBe(false);
+  });
+
+  it('opens the menu on pad A or Start, once', () => {
+    const pad = { pads: [{ buttons: [{ pressed: false }] }] };
+    const { menu, menuButton } = boot('', pad);
+    pad.frame();
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.frame();
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    expect(menuButton.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a pad button already held when the gate appears', () => {
+    const held = Array(10).fill({ pressed: false });
+    held[9] = { pressed: true };
+    const pad = { pads: [{ buttons: held }] };
+    const { menu } = boot('', pad);
+    pad.frame();
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    pad.pads = [{ buttons: [{ pressed: false }] }];
+    pad.frame();
+    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.frame();
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(
