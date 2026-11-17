@@ -19,7 +19,7 @@ const PER_VARIANT = DEBRIS_CAPACITY / VARIANTS;
 // proposta 17/11 (efeito/impacto): hull plates for machines.
 const PLATE_VARIANTS = 3;
 const PER_PLATE = 32;
-const PLATE_RADIUS = 1.5; // × particle size
+const PLATE_RADIUS = 0.8; // × particle size: shrapnel beside the hull's own pieces
 const PLATE_THICKNESS = 0.18; // × the plate's radius
 const PLATE_SHINE = { metalness: 0.5, roughness: 0.34, envMapIntensity: 1.3 };
 const PLATE_GREY = [0.32, 0.33, 0.36];
