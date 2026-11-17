@@ -42,18 +42,18 @@ describe('death recap', () => {
         position: null,
         source: {
           type: 'hunter',
-          displayName: 'Elite Seeker',
+          displayName: 'Elite Hunter',
           elite: true,
         },
       })
     );
     expect(source).toEqual({
       type: 'hunter',
-      displayName: 'Elite Seeker',
+      displayName: 'Elite Hunter',
       elite: true,
       bossKind: null,
     });
-    expect(`Killed by ${killerName(source)}`).toBe('Killed by Elite Seeker');
+    expect(`Killed by ${killerName(source)}`).toBe('Killed by Elite Hunter');
   });
 
   it('names the Warden by kind when its snapshot carries no display name', () => {

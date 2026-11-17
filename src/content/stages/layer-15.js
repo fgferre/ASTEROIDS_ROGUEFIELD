@@ -1,4 +1,4 @@
-// Layer 15: the final Warden with a Seeker escort.
+// Layer 15: the final Warden with a Hunter escort.
 import { rockCurve } from '../../data/layerParts.js';
 
 export default {

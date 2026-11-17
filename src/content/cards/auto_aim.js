@@ -13,7 +13,9 @@ export default {
   rarity: 'common',
   icon: '🎯',
   themeColor: '#FFD166',
-  unlockLevel: 2,
+  // The owner's choice, 17/11: the engine first, the turret certain at level 6.
+  unlockLevel: 6,
+  newFlightPrerequisites: [{ type: 'upgrade', id: 'propulsors', level: 1 }],
   tags: ['aim', 'turret'],
   text: {
     name: 'Auto Turret',

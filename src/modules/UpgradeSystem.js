@@ -363,6 +363,16 @@ class UpgradeSystem extends BaseSystem {
   // piloting card (the owner's plan, 16/11: a trail of its own to the last
   // card).
   trailSlotIds() {
+    // Once the Auto Turret is eligible and not held, the slot offers it and
+    // nothing else.
+    const turret = this.upgradeLookup.get('auto_aim');
+    if (
+      turret &&
+      this.getUpgradeCount('auto_aim') === 0 &&
+      this.isUpgradeSelectable(turret)
+    ) {
+      return ['auto_aim'];
+    }
     if (this.getUpgradeCount('flight_computer') > 0) return this.pilotCardIds;
     return this.pilotCardIds.filter(
       (id) => this.getUpgradeCount(id) < (this.trailSteps.get(id) ?? 0)

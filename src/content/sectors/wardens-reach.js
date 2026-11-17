@@ -1,6 +1,6 @@
 // A sector: a stretch of a chapter played on its own (src/data/sectors.js),
 // won at its Warden (no `boss`: Warden Null ends it), with its own
-// stages: Shades, tanks and Seekers, one danger added per stage.
+// stages: Shades, tanks and Hunters, one danger added per stage.
 import { fieldEvent, formation } from '../../data/layerParts.js';
 
 export default {

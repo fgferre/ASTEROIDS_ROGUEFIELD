@@ -382,6 +382,7 @@ describe('level-up offers', () => {
     it('the trail still offers auto_aim with Furnace Corona held', () => {
       const progression = createProgression(9);
       progression.appliedUpgrades.set(furnaceCard, 1);
+      progression.appliedUpgrades.set('propulsors', 1);
       expect(eligibleIds(progression)).toContain('auto_aim');
     });
 

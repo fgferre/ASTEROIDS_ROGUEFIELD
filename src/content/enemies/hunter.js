@@ -49,7 +49,7 @@ const band = (back, front, half) => [
  */
 export const HUNTER_CONFIG = deepFreeze({
   key: 'hunter',
-  displayName: 'Seeker',
+  displayName: 'Hunter',
   radius: 16,
   health: 48,
   acceleration: 220,
