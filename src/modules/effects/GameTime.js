@@ -22,6 +22,13 @@ const HIT_STOP = Object.freeze({
 // A kind re-triggers at most once per this many seconds of game time, so a
 // multishot that kills three smalls freezes once.
 const HIT_STOP_COOLDOWN = 0.1;
+// Less freezing when the fight gets thick (17/11, efeito/impacto, proposta):
+// a small freeze (a hit-stop, the player's hit; under SMALL_FREEZE s) skips
+// when another small one began less than SMALL_FREEZE_GAP s ago, so a burst
+// of hits weighs once instead of stuttering. Big moments (a boss's phase or
+// fall, the ship's death) always freeze.
+export const SMALL_FREEZE = 0.2;
+export const SMALL_FREEZE_GAP = 0.4;
 // Slow-motion beats (was: level-up a 0.2 s freeze at 40 %, death none). The
 // scale holds, then eases back to 1 over `ease` s; the camera zoom pulses to
 // `zoom` (base 1.3) and back over the same total time.
@@ -58,6 +65,7 @@ export class GameTime {
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
+    this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
   }
@@ -84,6 +92,7 @@ export class GameTime {
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
+    this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
   }
@@ -184,6 +193,10 @@ export class GameTime {
 
     if (finalDuration <= 0) {
       return;
+    }
+    if (finalDuration < SMALL_FREEZE) {
+      if (this.hitStopClock < this.smallFreezeReadyAt) return;
+      this.smallFreezeReadyAt = this.hitStopClock + SMALL_FREEZE_GAP;
     }
 
     // A lighter freeze landing on a running one must not lift its floor.

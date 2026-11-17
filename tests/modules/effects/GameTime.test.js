@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GameTime,
   LEVEL_UP_SLOW_MO,
+  SMALL_FREEZE_GAP,
 } from '../../../src/modules/effects/GameTime.js';
 
 describe('GameTime', () => {
@@ -47,5 +48,23 @@ describe('GameTime', () => {
     expect(reduced.deltas).toEqual(full.deltas);
     expect(full.emitted).toEqual(['camera-zoom-pulse']);
     expect(reduced.emitted).toEqual([]);
+  });
+
+  it('lets a burst of small freezes weigh once; a big one always freezes', () => {
+    const time = new GameTime({ emit: () => {}, motionReduced: () => false });
+    const step = 1 / 60;
+    time.addFreezeFrame(0.12, 0.15);
+    for (let i = 0; i < 10; i += 1) time.update(step);
+    // the first freeze is over, but the gap since it began is not
+    time.addFreezeFrame(0.12, 0.15);
+    expect(time.update(step)).toBe(step);
+    time.addFreezeFrame(0.5, 0.3);
+    expect(time.update(step)).toBeLessThan(step);
+
+    const later = new GameTime({ emit: () => {}, motionReduced: () => false });
+    later.addFreezeFrame(0.12, 0.15);
+    for (let t = 0; t < SMALL_FREEZE_GAP + 0.05; t += step) later.update(step);
+    later.addFreezeFrame(0.12, 0.15);
+    expect(later.update(step)).toBeLessThan(step);
   });
 });
