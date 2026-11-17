@@ -183,6 +183,9 @@ class CombatSystem extends BaseSystem {
     this.registerEventListener('upgrade-long-burn', (data) => {
       this.cards.cardEffects.longBurn = data;
     });
+    this.registerEventListener('upgrade-threat-focus', (data) => {
+      this.cards.cardEffects.threatFocus = data;
+    });
     this.registerEventListener('upgrade-execute-damage', (data) => {
       this.cards.cardEffects.executeDamage = data;
     });

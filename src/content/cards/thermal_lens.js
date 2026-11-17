@@ -4,7 +4,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 export default {
   id: 'thermal_lens',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
+  deadFor: ['arc-caster'],
   order: 12,
   category: 'offense',
   family: 'thermal',
@@ -31,6 +31,22 @@ export default {
   },
   // What the lens reaches with each weapon (Projectiles, beamAndFan.js).
   weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description: 'Cut damage +15%.',
+          highlights: ['Every blade takes it.'],
+        },
+      ],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description: 'Pulse damage +15%.',
+          highlights: ['Every enemy in the ring takes it.'],
+        },
+      ],
+    },
     harmonic: {
       levels: [
         {

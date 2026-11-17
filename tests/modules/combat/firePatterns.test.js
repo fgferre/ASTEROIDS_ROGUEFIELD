@@ -7,6 +7,7 @@ import RandomService from '../../../src/core/RandomService.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 import ProgressionSystem from '../../../src/modules/ProgressionSystem.js';
 import { WEAPON_FORMS } from '../../../src/data/weapons.js';
+import { knockbackSpeed } from '../../../src/modules/combat/HitResolution.js';
 import {
   ringRadius,
   tickWeaponField,
@@ -169,18 +170,169 @@ describe('fire patterns', () => {
     expect(combat.blades).toHaveLength(halo.blades + 2);
   });
 
-  it('orbit: a blade cut brings no lance evolution: with the Chain Lance it does not arc', () => {
+  describe('orbit: the families and the six cards', () => {
     const halo = firstOf('shard-halo');
-    const target = enemy('target', SHIP.x + halo.radius, SHIP.y);
-    const next = enemy('next', SHIP.x + halo.radius + 60, SHIP.y);
-    const { combat } = armed('shard-halo', [target, next]);
-    combat.weapons.evolveWeapon('arc');
-    expect(combat.weapons.hasEvolution('arc')).toBe(true);
+    const forms = WEAPON_FORMS['shard-halo'].base.familyForms;
+    const at = (id, x, y, extra) => enemy(id, SHIP.x + x, SHIP.y + y, extra);
+    // Five enemies on the first blade's ring, all within its reach.
+    const crowd = () =>
+      [-6, -3, 0, 3, 6].map((dy, i) => at(`c${i}`, halo.radius, dy));
+    const cut = (who, setup = () => {}, stats = STATS) => {
+      const { combat, eventBus } = armed('shard-halo', who);
+      setup(combat, eventBus);
+      tickWeaponField(combat.weapons, 0.01, stats);
+      return combat;
+    };
+    const lone = (extra) => at('t', halo.radius, 0, extra);
+    const dealt = (who) => 100 - who.health;
+    const plain = () =>
+      dealt(
+        (() => {
+          const t = lone();
+          cut([t]);
+          return t;
+        })()
+      );
 
-    tickWeaponField(combat.weapons, 0.01, STATS);
-    expect(target.health).toBeLessThan(100);
-    expect(next.health).toBe(100);
-    expect(combat.arcs).toHaveLength(0);
+    it('thermal: a cut sets the enemy burning, not the field', () => {
+      const t = lone();
+      const combat = cut([t], (c) => c.weapons.evolveWeapon('thermal'));
+      expect(combat.cards.burns.size).toBe(1);
+      const f = lone();
+      const field = cut([f], (c) => c.weapons.evolveWeapon('field'));
+      expect(field.cards.slows.size).toBe(0);
+    });
+
+    it('arc: a cycle cutting five enemies starts one chain; Storm forks it', () => {
+      const combat = cut(crowd(), (c) => c.weapons.evolveWeapon('arc'));
+      expect(combat.arcs).toHaveLength(forms.perShot.chains);
+      const storm = cut(crowd(), (c) => c.weapons.apexWeapon('arc'));
+      expect(storm.arcs.length).toBeGreaterThan(1);
+      // The next cycle gets a new budget.
+      combat.handleShooting(1, STATS);
+      tickWeaponField(combat.weapons, 0.01, STATS);
+      expect(combat.arcs).toHaveLength(2 * forms.perShot.chains);
+    });
+
+    it('kinetic: Railshot and Coilgun cut harder and shove further', () => {
+      const run = (stage) => {
+        const t = lone();
+        cut([t], (c) => {
+          if (stage >= 0) c.weapons.evolveWeapon('kinetic');
+          if (stage === 1) c.weapons.apexWeapon('kinetic');
+        });
+        return { dealt: dealt(t), speed: Math.hypot(t.vx, t.vy) };
+      };
+      const base = run(-1);
+      [0, 1].forEach((stage) => {
+        const heavy = run(stage);
+        expect(heavy.dealt).toBeCloseTo(
+          base.dealt * forms.kinetic.damage[stage],
+          6
+        );
+        expect(heavy.speed).toBeCloseTo(
+          knockbackSpeed(heavy.dealt) * forms.kinetic.push[stage],
+          6
+        );
+      });
+    });
+
+    it('salvage: Prospector pays on the cut kills', () => {
+      const weak = lone({ health: 1 });
+      const { combat, enemies } = armed('shard-halo', [weak]);
+      enemies.rewardManager = {
+        stats: { totalOrbsDropped: 0 },
+        createXPOrbs: vi.fn(),
+      };
+      const damage = enemies.applyDamage;
+      enemies.applyDamage = (target, amount, ...rest) => {
+        const result = damage(target, amount, ...rest);
+        if (result.killed) enemies.rewardManager.stats.totalOrbsDropped += 4;
+        return result;
+      };
+      combat.weapons.evolveWeapon('salvage');
+      tickWeaponField(combat.weapons, 0.01, STATS);
+      expect(enemies.rewardManager.createXPOrbs).toHaveBeenCalledTimes(1);
+    });
+
+    it('Chain Capacitor: a cut can land twice', () => {
+      const twice = lone();
+      cut([twice], (c) => {
+        c.cards.cardEffects.chainCapacitor = {
+          extraJumps: 1,
+          doubleHitChance: 1,
+        };
+      });
+      expect(dealt(twice)).toBeCloseTo(plain() * 2, 6);
+    });
+
+    it('Overcharge Coil: the blades spin faster, the cube root of the lance speed gain', () => {
+      const turn = (gain) => {
+        const { combat, eventBus } = armed('shard-halo', []);
+        if (gain) {
+          eventBus.emit('upgrade-weapon-tuning', {
+            upgradeId: 'overcharge_coil',
+            level: 1,
+            bulletSpeedMultiplier: gain,
+          });
+        }
+        tickWeaponField(combat.weapons, 0.1, STATS);
+        return combat.blades[0].around;
+      };
+      expect(turn(1.15)).toBeCloseTo(turn(0) * Math.cbrt(1.15), 6);
+    });
+
+    it('Recoil Dampers: the blades cut 4 px wider', () => {
+      const far = () => lone({ x: SHIP.x + halo.radius + 10 + 10 + 2 });
+      const t = far();
+      cut([t]);
+      expect(dealt(t)).toBe(0);
+      const wide = far();
+      cut([wide], (c, bus) =>
+        bus.emit('upgrade-weapon-tuning', {
+          upgradeId: 'recoil_dampers',
+          level: 1,
+          pierceBonus: 1,
+        })
+      );
+      expect(dealt(wide)).toBeGreaterThan(0);
+    });
+
+    it('Thermal Lens: cut damage +15%', () => {
+      const t = lone();
+      cut([t], (c) => {
+        c.cards.cardEffects.thermalLens = { lanceDamageMultiplier: 1.15 };
+      });
+      expect(dealt(t)).toBeCloseTo(plain() * 1.15, 6);
+    });
+
+    it('Afterburn Lance: more damage the further the enemy is from the ship', () => {
+      const burn = (x) => {
+        const t = at('t', x, 0);
+        cut([t], (c) => {
+          c.cards.cardEffects.longBurn = {
+            bonusPer100px: 0.2,
+            maxDistance: 400,
+          };
+        });
+        return dealt(t);
+      };
+      expect(burn(halo.radius)).toBeCloseTo(plain() * (1 + 0.2 * 0.44), 6);
+    });
+
+    it('Targeting Matrix: threat focus only for elites, heralds and bosses', () => {
+      const focus = (extra) => {
+        const t = lone(extra);
+        cut([t], (c, bus) =>
+          bus.emit('upgrade-threat-focus', { damageMultiplier: 1.2 })
+        );
+        return dealt(t);
+      };
+      expect(focus({})).toBeCloseTo(plain(), 6);
+      expect(focus({ elite: true })).toBeCloseTo(plain() * 1.2, 6);
+      expect(focus({ type: 'herald' })).toBeCloseTo(plain() * 1.2, 6);
+      expect(focus({ type: 'boss' })).toBeCloseTo(plain() * 1.2, 6);
+    });
   });
 
   it('orbit: the evolved ring breathes out to its reach and back', () => {
@@ -211,16 +363,211 @@ describe('fire patterns', () => {
     expect(inside.health).toBeCloseTo(100 - 2 * pulse, 6);
   });
 
-  it('aura: a pulse brings no lance evolution: with the Singularity it opens no well', () => {
-    const inside = enemy('inside', SHIP.x + 40, SHIP.y);
-    const { combat } = armed('furnace-corona', [inside]);
-    combat.weapons.apexWeapon('field');
-    expect(combat.weapons.hasApex('field')).toBe(true);
+  it('aura: it carries the families it declares, not its own thermal: the field slows, the Singularity opens one well every 2nd pulse, the budget caps it', () => {
+    const crowd = () =>
+      [
+        [130, 300],
+        [100, 335],
+        [70, 300],
+        [100, 265],
+        [135, 325],
+      ].map(([x, y], i) => enemy(`c${i}`, x, y));
+    const slowed = armed('furnace-corona', crowd());
+    slowed.combat.weapons.evolveWeapon('field');
+    slowed.combat.handleShooting(1, STATS);
+    expect(slowed.combat.cards.slows.size).toBe(5);
+    expect(slowed.combat.cards.wells).toHaveLength(0);
 
+    const { combat } = armed('furnace-corona', crowd());
+    combat.weapons.apexWeapon('field');
     combat.handleShooting(1, STATS);
-    expect(inside.health).toBeLessThan(100);
-    expect(combat.cards.wells).toHaveLength(0);
-    expect(combat.cards.pulls.size).toBe(0);
+    expect(combat.cards.wells).toHaveLength(0); // the well: every 2nd pulse
+    combat.handleShooting(1, STATS);
+    expect(combat.cards.wells).toHaveLength(1);
+    expect(combat.cards.slows.size).toBe(0);
+
+    const thermal = armed('furnace-corona', crowd());
+    thermal.combat.weapons.evolveWeapon('thermal');
+    thermal.combat.handleShooting(1, STATS);
+    expect(thermal.combat.cards.burns.size).toBe(0);
+  });
+
+  it('aura: a pulse hitting five enemies starts at most two chains; Storm forks them', () => {
+    const crowd = () =>
+      [
+        [130, 300],
+        [100, 335],
+        [70, 300],
+        [100, 265],
+        [135, 325],
+      ].map(([x, y], i) => enemy(`c${i}`, x, y));
+    const { combat } = armed('furnace-corona', crowd());
+    combat.weapons.evolveWeapon('arc');
+    combat.handleShooting(1, STATS);
+    expect(combat.arcs).toHaveLength(
+      WEAPON_FORMS['furnace-corona'].base.familyForms.perShot.chains
+    );
+    const storm = armed('furnace-corona', crowd());
+    storm.combat.weapons.apexWeapon('arc');
+    storm.combat.handleShooting(1, STATS);
+    expect(storm.combat.arcs.length).toBeGreaterThan(2);
+  });
+
+  it('aura: a lance hit with no shot budget starts a chain every time', () => {
+    const [a, b, c] = [
+      enemy('a', 150, 300),
+      enemy('b', 200, 300),
+      enemy('c', 250, 300),
+    ];
+    const { combat, enemies } = makeRun([a, b, c]);
+    combat.weapons.evolveWeapon('arc');
+    const hit = (extra) => ({
+      projectile: {},
+      x: 150,
+      y: 300,
+      vx: 1,
+      vy: 0,
+      damage: 5,
+      hit: false,
+      ...extra,
+    });
+    combat.hits.processBulletHit(hit(), a, enemies);
+    combat.hits.processBulletHit(hit(), c, enemies);
+    expect(combat.cards.arcs).toHaveLength(2);
+    combat.hits.processBulletHit(hit({ shot: { chains: 0 } }), b, enemies);
+    expect(combat.cards.arcs).toHaveLength(2);
+  });
+
+  it('aura: Railshot and Coilgun make the pulse heavier and throw further', () => {
+    const forms = WEAPON_FORMS['furnace-corona'].base.familyForms.kinetic;
+    const stats = { multishot: 1, damage: 20 };
+    const pulse = (stage) => {
+      const target = enemy('t', 140, 300);
+      const { combat } = armed('furnace-corona', [target]);
+      if (stage >= 0) combat.weapons.evolveWeapon('kinetic');
+      if (stage === 1) combat.weapons.apexWeapon('kinetic');
+      combat.handleShooting(1, stats);
+      return { dealt: 100 - target.health, vx: target.vx };
+    };
+    const plain = pulse(-1);
+    [0, 1].forEach((stage) => {
+      const heavy = pulse(stage);
+      expect(heavy.dealt).toBeCloseTo(plain.dealt * forms.damage[stage], 6);
+      expect(heavy.vx).toBeCloseTo(
+        knockbackSpeed(heavy.dealt) * forms.push[stage],
+        6
+      );
+    });
+  });
+
+  it('aura: Prospector and Motherlode pay on the pulse kills', () => {
+    const weak = enemy('weak', 140, 300, { health: 1 });
+    const { combat, enemies } = armed('furnace-corona', [weak]);
+    enemies.rewardManager = {
+      stats: { totalOrbsDropped: 0 },
+      createXPOrbs: vi.fn(),
+    };
+    const damage = enemies.applyDamage;
+    enemies.applyDamage = (target, amount, ...rest) => {
+      const result = damage(target, amount, ...rest);
+      if (result.killed) enemies.rewardManager.stats.totalOrbsDropped += 4;
+      return result;
+    };
+    combat.weapons.evolveWeapon('salvage');
+    combat.handleShooting(1, STATS);
+    expect(enemies.rewardManager.createXPOrbs).toHaveBeenCalledTimes(1);
+  });
+
+  describe('aura: the six cards', () => {
+    const pulse = (setup, who = enemy('t', 140, 300), stats = STATS) => {
+      const { combat, eventBus } = armed('furnace-corona', [who]);
+      setup(combat, eventBus);
+      combat.handleShooting(1, stats);
+      return who;
+    };
+    const base = () => pulse(() => {});
+    const dealt = (who) => 100 - who.health;
+
+    it('Chain Capacitor: a pulse hit can land twice', () => {
+      const twice = pulse((combat) => {
+        combat.cards.cardEffects.chainCapacitor = {
+          extraJumps: 1,
+          doubleHitChance: 1,
+        };
+      });
+      expect(dealt(twice)).toBeCloseTo(dealt(base()) * 2, 6);
+    });
+
+    it('Overcharge Coil: pulses come sooner, the cube root of the lance speed gain', () => {
+      const who = enemy('t', 140, 300);
+      const { combat, eventBus } = armed('furnace-corona', [who]);
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'overcharge_coil',
+        level: 1,
+        bulletSpeedMultiplier: 1.15,
+      });
+      combat.handleShooting(1, STATS);
+      const once = dealt(who);
+      const wait =
+        (combat.shootCooldown * firstOf('furnace-corona').cooldownMultiplier) /
+        Math.cbrt(1.15);
+      combat.handleShooting(wait + 1e-6, STATS);
+      expect(dealt(who)).toBeCloseTo(2 * once, 6);
+    });
+
+    it('Recoil Dampers: the ring reaches 20 px further, past the Multishot cap', () => {
+      const far = () => enemy('far', 100 + 78 + 10 + 18, 300);
+      expect(dealt(pulse(() => {}, far()))).toBe(0);
+      const reached = pulse(
+        (combat, bus) =>
+          bus.emit('upgrade-weapon-tuning', {
+            upgradeId: 'recoil_dampers',
+            level: 1,
+            pierceBonus: 1,
+          }),
+        far()
+      );
+      expect(dealt(reached)).toBeGreaterThan(0);
+    });
+
+    it('Thermal Lens: pulse damage +15%', () => {
+      const lens = pulse((combat) => {
+        combat.cards.cardEffects.thermalLens = { lanceDamageMultiplier: 1.15 };
+      });
+      expect(dealt(lens)).toBeCloseTo(dealt(base()) * 1.15, 6);
+    });
+
+    it('Afterburn Lance: more damage the further the enemy is from the ship', () => {
+      const burn = (x) =>
+        pulse(
+          (combat) => {
+            combat.cards.cardEffects.longBurn = {
+              bonusPer100px: 0.2,
+              maxDistance: 400,
+            };
+          },
+          enemy('t', x, 300)
+        );
+      const plain = dealt(pulse(() => {}, enemy('t', 160, 300)));
+      expect(dealt(burn(160))).toBeCloseTo(plain * 1.12, 6);
+      expect(dealt(burn(130))).toBeLessThan(dealt(burn(160)));
+    });
+
+    it('Targeting Matrix: threat focus only for elites, heralds and bosses', () => {
+      const focus = (extra) =>
+        dealt(
+          pulse(
+            (combat, bus) =>
+              bus.emit('upgrade-threat-focus', { damageMultiplier: 1.2 }),
+            enemy('t', 140, 300, extra)
+          )
+        );
+      const plain = dealt(base());
+      expect(focus({})).toBeCloseTo(plain, 6);
+      expect(focus({ elite: true })).toBeCloseTo(plain * 1.2, 6);
+      expect(focus({ type: 'herald' })).toBeCloseTo(plain * 1.2, 6);
+      expect(focus({ type: 'boss' })).toBeCloseTo(plain * 1.2, 6);
+    });
   });
 
   it('aura: the Apex pulse sets what survives burning', () => {

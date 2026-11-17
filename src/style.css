@@ -920,6 +920,19 @@ select {
   width: min(960px, 94vw);
 }
 
+/* A short window: the run tray makes the panel taller, so it tightens to
+   fit without scrolling (1280x800 overflowed by 57 px). */
+@media (max-height: 860px) {
+  .pause-content:has(.pause-run:not(.hidden)) {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+  }
+
+  .pause-content:has(.pause-run:not(.hidden)) .controls-hints {
+    padding-top: var(--space-3);
+  }
+}
+
 .pause-build:has(.pause-run:not(.hidden)) {
   display: grid;
   grid-template-columns: 1fr 350px;

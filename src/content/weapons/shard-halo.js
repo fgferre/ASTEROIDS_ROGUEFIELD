@@ -12,6 +12,7 @@ const halo = {
   bladeRadius: 10, // px a blade cuts round itself
   damageMultiplier: 1.4, // × lance damage, a cut
   cooldownMultiplier: 1.2, // × the lance's cooldown: one cut per enemy per blade
+  pierceReach: 4, // px of bladeRadius for each Recoil Dampers rank (proposta 16/11)
 };
 
 // Field ×3: the halo breathes out and back.
@@ -47,6 +48,27 @@ export default {
     pierce: false,
     trailPoints: null,
     burst: null,
+  },
+  // The families whose lance forms a cut carries (HitResolution), the budget
+  // one orbit cycle shares, and what each form does (proposta 16/11);
+  // `kinetic` and `lines` read [form at 3, Apex at 5]. Field is its own.
+  familyForms: {
+    carries: ['thermal', 'arc', 'salvage', 'kinetic'],
+    perShot: { chains: 1, pulls: 0 }, // a cycle starts at most 1 chain
+    pullEvery: 1,
+    kinetic: { damage: [1.1, 1.25], push: [2, 3] },
+    lines: {
+      thermal: ['cuts set enemies burning', 'burns spread'],
+      kinetic: [
+        'cuts hit 10% harder and shove enemies off the hull',
+        'cuts hit 25% harder, shoved three times as far',
+      ],
+      arc: ['one cut a cycle arcs on', 'that arc jumps 3 times and forks'],
+      salvage: [
+        'cut kills drop 25% more orbs',
+        'cut kills drop twice the orbs',
+      ],
+    },
   },
   colors,
   evolution: {

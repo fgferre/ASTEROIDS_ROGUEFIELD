@@ -10,6 +10,8 @@
 // breeds) and `steerSeeker` turns a missile in flight. Hits land through
 // Weapons.hitEnemy, like a beam's.
 
+import { BULLET_SPEED } from '../../data/constants/gameplay.js';
+
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
 // A chain with nothing in reach crackles out this much of its range; its
@@ -33,7 +35,7 @@ function setCooldown(w, entry) {
 
 // A hit of `kind` on `enemy`'s rim facing (fromX, fromY), shoving it along
 // `angle`; returns the hit's result (null when the enemy is already gone).
-function strike(w, kind, enemy, fromX, fromY, angle, damage) {
+function strike(w, kind, enemy, fromX, fromY, angle, damage, extra = null) {
   if (enemy.destroyed) return null;
   const dx = enemy.x - fromX;
   const dy = enemy.y - fromY;
@@ -48,6 +50,7 @@ function strike(w, kind, enemy, fromX, fromY, angle, damage) {
       vy: Math.sin(angle) * w.bulletSpeed,
       damage,
       hit: false,
+      ...extra,
     },
     enemy
   );
@@ -166,6 +169,38 @@ function chainTargets(w, chain, origin, angle) {
   return firsts.slice(0, chain.bolts);
 }
 
+// What a pulse or a cut of a weapon with `familyForms` deals to `enemy` from
+// the ship's centre: the kinetic `kick`, Thermal Lens, Afterburn Lance (by
+// distance ship -> enemy) and the threat focus (proposta 16/11).
+function formDamage(w, base, kick, enemy, from) {
+  const { thermalLens, longBurn, threatFocus } = w.cards().cardEffects;
+  let damage = base * kick * (thermalLens?.lanceDamageMultiplier ?? 1);
+  if (longBurn) {
+    const reach = Math.min(
+      Math.hypot(enemy.x - from.x, enemy.y - from.y),
+      longBurn.maxDistance
+    );
+    damage *= 1 + (longBurn.bonusPer100px * reach) / 100;
+  }
+  if (
+    threatFocus &&
+    (enemy.elite || enemy.type === 'herald' || enemy.type === 'boss')
+  ) {
+    damage *= threatFocus.damageMultiplier;
+  }
+  return damage;
+}
+
+// The kinetic form's damage and shove factors for a weapon with `familyForms`
+// (Railshot, or the Coilgun Apex); 1 and 1 when it carries none.
+function kineticOf(w) {
+  const forms = w.weapon.familyForms;
+  const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
+  return forms?.carries.includes('kinetic') && stage >= 0
+    ? { kick: forms.kinetic.damage[stage], push: forms.kinetic.push[stage] }
+    : { kick: 1, push: 1 };
+}
+
 /**
  * `orbit`: a ring of `blades` blades (Multishot adds one each, up to
  * `maxBlades`) `radius` px round the ship, turning at `spin` rad/s (below 0
@@ -177,6 +212,9 @@ function chainTargets(w, chain, origin, angle) {
  */
 export function fireOrbit(w, orbit) {
   w.bladeCuts.clear();
+  // One budget for the cycle's cuts (a weapon with `familyForms`).
+  const forms = w.weapon.familyForms;
+  w.orbitShot = forms ? { ...forms.perShot } : null;
   w.orbitSounded = false;
   setCooldown(w, orbit);
 }
@@ -193,12 +231,22 @@ export function ringRadius(ring, clock) {
 
 function tickOrbit(w, rings, centre, deltaTime, playerStats) {
   w.orbitClock += deltaTime;
+  // Overcharge Coil: the blades spin faster, the cube root of the lance's
+  // speed gain (+5/10/15% at ranks 1-3, proposta 16/11).
+  const forms = w.weapon.familyForms;
+  w.orbitTurn +=
+    deltaTime * (forms ? Math.cbrt(w.bulletSpeed / BULLET_SPEED) : 1);
+  if (forms && !w.orbitShot) w.orbitShot = { ...forms.perShot };
+  const { kick, push } = kineticOf(w);
   const extra = extraShots(playerStats);
   const cuts = [];
   rings.forEach((ring, r) => {
     const count = Math.min(ring.maxBlades, ring.blades + extra);
     const radius = ringRadius(ring, w.orbitClock);
-    const turn = w.orbitClock * ring.spin;
+    // Recoil Dampers: the blades cut wider (proposta 16/11).
+    const reach =
+      ring.bladeRadius + (ring.pierceReach ?? 0) * w.cards().pierceBonus;
+    const turn = w.orbitTurn * ring.spin;
     const travel = Math.sign(ring.spin) * (Math.PI / 2);
     for (let i = 0; i < count; i += 1) {
       const a = turn + (TAU * i) / count;
@@ -211,7 +259,7 @@ function tickOrbit(w, rings, centre, deltaTime, playerStats) {
         x,
         y,
         angle: heading,
-        size: ring.bladeRadius,
+        size: reach,
         cx: centre.x,
         cy: centre.y,
         radius,
@@ -220,17 +268,33 @@ function tickOrbit(w, rings, centre, deltaTime, playerStats) {
         index: i,
       });
       const slot = r * 64 + i;
-      enemiesNear(w, x, y, ring.bladeRadius).forEach((enemy) => {
+      enemiesNear(w, x, y, reach).forEach((enemy) => {
         let cut = w.bladeCuts.get(slot);
         if (!cut) w.bladeCuts.set(slot, (cut = new Set()));
         if (cut.has(enemy)) return;
         cut.add(enemy);
-        cuts.push([enemy, x, y, heading, damageOf(playerStats, ring)]);
+        const base = damageOf(playerStats, ring);
+        cuts.push([
+          enemy,
+          x,
+          y,
+          heading,
+          forms ? formDamage(w, base, kick, enemy, centre) : base,
+        ]);
       });
     }
   });
   cuts.forEach(([enemy, x, y, heading, damage]) =>
-    strike(w, 'blade', enemy, x, y, heading, damage)
+    strike(
+      w,
+      'blade',
+      enemy,
+      x,
+      y,
+      heading,
+      damage,
+      forms ? { shot: w.orbitShot, push } : null
+    )
   );
   // The weapon sounds once a cycle, on its first cut.
   if (cuts.length && !w.orbitSounded) {
@@ -247,12 +311,24 @@ function tickOrbit(w, rings, centre, deltaTime, playerStats) {
  * pulse shows for `duration` s; between pulses the ring heats up.
  */
 export function fireAura(w, aura, playerPos, playerStats) {
-  const radius = auraRadius(aura, playerStats);
-  const damage = damageOf(playerStats, aura);
+  const radius = auraRadius(w, aura, playerStats);
+  const base = damageOf(playerStats, aura);
   const { x, y } = playerPos;
+  const forms = w.weapon.familyForms;
+  const { kick, push } = kineticOf(w);
+  // One budget for the whole pulse: its chains, and a well every
+  // `pullEvery` pulses.
+  w.auraPulses = (w.auraPulses ?? 0) + 1;
+  const shot = forms
+    ? {
+        ...forms.perShot,
+        pulls: w.auraPulses % forms.pullEvery === 0 ? forms.perShot.pulls : 0,
+      }
+    : null;
   enemiesNear(w, x, y, radius).forEach((enemy) => {
     const out = Math.atan2(enemy.y - y, enemy.x - x);
-    const result = strike(w, 'heat', enemy, x, y, out, damage);
+    const damage = formDamage(w, base, kick, enemy, playerPos);
+    const result = strike(w, 'heat', enemy, x, y, out, damage, { shot, push });
     if (aura.burn && result && !result.killed && !enemy.destroyed) {
       w.cards().ignite(enemy, damage, aura.burn);
     }
@@ -265,12 +341,22 @@ export function fireAura(w, aura, playerPos, playerStats) {
     maxLife: aura.duration,
     colors: w.weapon.colors,
   });
-  setCooldown(w, aura);
+  // Overcharge Coil: a pulse comes sooner, the cube root of the lance's
+  // speed gain (+5/10/15% rate at ranks 1-3, proposta 16/11).
+  const charge = forms ? Math.cbrt(w.bulletSpeed / BULLET_SPEED) : 1;
+  setCooldown(w, {
+    cooldownMultiplier: aura.cooldownMultiplier / charge,
+  });
   emitFired(w, aura.pattern, playerPos);
 }
 
-const auraRadius = (aura, playerStats) =>
-  Math.min(aura.maxRadius, aura.radius + aura.growth * extraShots(playerStats));
+// Multishot widens the ring up to its cap; Recoil Dampers reach past it.
+const auraRadius = (w, aura, playerStats) =>
+  Math.min(
+    aura.maxRadius,
+    aura.radius + aura.growth * extraShots(playerStats)
+  ) +
+  (aura.pierceReach ?? 0) * w.cards().pierceBonus;
 
 // The ring between pulses: the weapon's last aura entry (the one every shot
 // can fire), `heat` 0 → 1 as the next pulse comes due.
@@ -281,7 +367,7 @@ function tickAura(w, aura, centre, playerStats) {
   w.aura = {
     x: centre.x,
     y: centre.y,
-    radius: auraRadius(aura, playerStats),
+    radius: auraRadius(w, aura, playerStats),
     heat: Math.min(1, Math.max(0, since / wait)),
     colors: w.weapon.colors,
   };

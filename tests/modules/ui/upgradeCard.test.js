@@ -97,10 +97,20 @@ describe('upgrade card build line', () => {
       buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
         (step) => step.what
       );
-    // The Furnace Corona lands no lance hit: Railshot and Coilgun miss it.
+    // The Arc Caster lands no lance hit: Railshot and Coilgun miss it.
+    expect(what('multishot', 0, 'arc-caster')).toEqual([
+      'not with Arc Caster yet',
+      'not with Arc Caster yet',
+    ]);
+    // The Shard Halo carries it too: its own wording.
+    expect(what('multishot', 0, 'shard-halo')).toEqual([
+      'cuts hit 10% harder and shove enemies off the hull',
+      'cuts hit 25% harder, shoved three times as far',
+    ]);
+    // The Furnace Corona carries the family: its own wording.
     expect(what('multishot', 0, 'furnace-corona')).toEqual([
-      'not with Furnace Corona yet',
-      'not with Furnace Corona yet',
+      'pulses hit 15% harder and throw further',
+      'pulses hit 30% harder and throw twice as far',
     ]);
     // Flak bolts do not pierce, but Coilgun's damage reaches them.
     expect(what('multishot', 0, 'scatter')).toEqual([
@@ -115,10 +125,10 @@ describe('upgrade card build line', () => {
       buildLine(card('multishot'), {
         rank: 1,
         owned: 2,
-        weapon: held('shard-halo'),
+        weapon: held('arc-caster'),
       }).note
     ).toBe(
-      'not with Shard Halo yet · Momentum +12% top speed and acceleration'
+      'not with Arc Caster yet · Momentum +12% top speed and acceleration'
     );
   });
 
