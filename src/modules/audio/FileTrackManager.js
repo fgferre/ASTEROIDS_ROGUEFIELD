@@ -50,8 +50,10 @@ const MENU_OPENING_TRACK_URL = new URL(
   import.meta.url
 ).href;
 
-const musicUrl = (file) =>
-  new URL(`../../../assets/Music/${file}`, import.meta.url).href;
+const THANKS_TRACK_URL = new URL(
+  '../../../assets/Music/Asteroids.mp3',
+  import.meta.url
+).href;
 // Vite resolves one folder per template: the score/ files need their own.
 const scoreUrl = (file) =>
   new URL(`../../../assets/Music/score/${file}`, import.meta.url).href;
@@ -73,7 +75,7 @@ const FILE_TRACK_CATALOG = Object.freeze({
     preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
   }),
   [FILE_TRACK_IDS.THANKS]: Object.freeze({
-    src: musicUrl('Asteroids.mp3'),
+    src: THANKS_TRACK_URL,
     loop: true,
     fadeInMs: 1500,
     fadeOutMs: 800,
