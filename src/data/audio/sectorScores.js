@@ -57,6 +57,7 @@ export const SECTOR_SCORES = Object.freeze({
   }),
   'crystal-choir': Object.freeze({
     stage: url('crystal-choir-stage.mp3'),
+    boss: url('crystal-choir-boss.mp3'),
     loopSeconds: 153.588,
   }),
 });
