@@ -278,6 +278,7 @@ function toRow(r) {
     seed: r.seed,
     preset: PRESET,
     flight: FLIGHT,
+    difficulty: r.difficulty,
     outcome: r.outcome.kind,
     seconds: Math.round(r.frames / FPS),
     kills: r.kills,
@@ -337,6 +338,7 @@ function printSummary(reports) {
     return [
       r.sector.id,
       String(r.seed),
+      r.difficulty,
       outcomeText(r),
       clock(r.frames),
       String(r.boss?.level ?? r.level),
@@ -349,6 +351,7 @@ function printSummary(reports) {
   const head = [
     'sector',
     'seed',
+    'difficulty',
     'outcome',
     'time',
     'lvl',
