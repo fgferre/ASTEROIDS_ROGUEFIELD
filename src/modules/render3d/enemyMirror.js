@@ -25,6 +25,7 @@ import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';
 import { shown } from './fracture.js';
+import { BIG_MACHINE_RADIUS } from '../effects/EnemyEffects.js';
 import { createAffixViews } from './enemies/affixes.js';
 import { createHeraldViews } from './enemies/heralds.js';
 import { createMachineViews } from './enemies/machines.js';
@@ -60,6 +61,8 @@ const WARDEN_BURST = 24;
 // radius / 2.5, within [min, max]); the pieces carry its momentum and the
 // killing shot's push (px/s); its eyes go out in LIGHTS_OUT s.
 const BREAK_PIECES = [9, 16];
+// a boss, a Sentinel or a herald breaks the same way, into more pieces
+const BOSS_PIECES = [16, 24];
 const KILL_PUSH = 24;
 export const LIGHTS_OUT = 0.15;
 // One seed for every baked map set (bakedMaps.js): the rocks' and the
@@ -898,22 +901,19 @@ export class EnemyMirror {
     }
   }
 
-  // How a machine breaks (DissolvePool.start); a rock, a boss or a herald
-  // burns whole.
+  // How a machine breaks (DissolvePool.start): a boss, a Sentinel or a
+  // herald too, into more pieces; a big machine's pieces start incandescent.
+  // A rock burns whole.
   breakOf(view) {
     const { kind } = view;
-    if (
-      kind === 'asteroid' ||
-      kind.startsWith('boss') ||
-      kind.startsWith('herald')
-    ) {
-      return null;
-    }
-    const [min, max] = BREAK_PIECES;
+    if (kind === 'asteroid') return null;
+    const boss = kind.startsWith('boss') || kind.startsWith('herald');
+    const [min, max] = boss ? BOSS_PIECES : BREAK_PIECES;
     return {
       count: Math.max(min, Math.min(max, Math.round(4 + view.radius / 2.5))),
       pushX: (view.vx || 0) + (view.shotX || 0),
       pushZ: (view.vy || 0) + (view.shotY || 0),
+      heat: !boss && view.radius >= BIG_MACHINE_RADIUS ? 1 : 0,
     };
   }
 

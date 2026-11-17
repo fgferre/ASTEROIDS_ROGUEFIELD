@@ -40,6 +40,10 @@ const BREAK_SCATTER = 0.9; // a piece's own sideways way, × the outward one
 const SPIN_MIN = 2.5; // rad/s
 const SPIN_RANGE = 6;
 const SPIN_DRAG = 0.8; // 1/s
+// proposta 17/11: a big machine's pieces start incandescent all over (× the
+// ember colour, added after tone mapping) and cool in BREAK_HEAT_TIME s.
+const BREAK_HEAT = 0.6;
+const BREAK_HEAT_TIME = 0.3;
 
 // proposta 18/10: chunk burst.
 export const BURST_CAPACITY = 96;
@@ -53,6 +57,7 @@ const DISSOLVE_HEAD = `
 uniform float uDissolve;
 uniform float uDissolveGlow;
 uniform float uDissolveBand;
+uniform float uBreakHeat;
 uniform float uDissolveScale;
 uniform vec3 uDissolveSeed;
 uniform vec3 uDissolveEdge;
@@ -146,7 +151,7 @@ function patchDissolve(shader, renderer) {
     .replace(
       '#include <tonemapping_fragment>',
       `#include <tonemapping_fragment>
-      gl_FragColor.rgb += uDissolveEdge * dslvEdge * uDissolveGlow;`
+      gl_FragColor.rgb += uDissolveEdge * (dslvEdge * uDissolveGlow + uBreakHeat);`
     );
 }
 
@@ -164,7 +169,7 @@ export class DissolvePool {
     this.finish = finish;
     this.slots = [];
     for (let i = 0; i < DISSOLVE_CAP; i += 1) {
-      this.slots.push({ view: null, age: 0, breaks: false });
+      this.slots.push({ view: null, age: 0, breaks: false, heat: 0 });
     }
     this.push = new THREE.Vector3();
     this.toLocal = new THREE.Matrix3();
@@ -217,6 +222,8 @@ export class DissolvePool {
     slot.view = view;
     slot.age = 0;
     slot.breaks = Boolean(breakUp);
+    slot.heat = breakUp?.heat || 0;
+    u.uBreakHeat.value = BREAK_HEAT * slot.heat;
     this.count += 1;
   }
 
@@ -279,6 +286,7 @@ export class DissolvePool {
           uDissolve: { value: 0 },
           uDissolveGlow: { value: 0 },
           uDissolveBand: { value: EDGE_WIDTH },
+          uBreakHeat: { value: 0 },
           uDissolveScale: { value: 1 },
           uDissolveSeed: { value: new THREE.Vector3() },
           uDissolveEdge: { value: new THREE.Color() },
@@ -353,6 +361,10 @@ export class DissolvePool {
         : THRESHOLD_FROM + (THRESHOLD_TO - THRESHOLD_FROM) * p;
       u.uDissolveGlow.value = EDGE_GLOW * (1 - p * p);
       if (slot.breaks) u.uExplode.value = Math.max(1e-4, slot.age);
+      if (slot.heat) {
+        const cool = Math.max(0, 1 - slot.age / BREAK_HEAT_TIME);
+        u.uBreakHeat.value = BREAK_HEAT * slot.heat * cool * cool;
+      }
     }
   }
 
@@ -372,6 +384,7 @@ export class DissolvePool {
     geometries.length = 0;
     parts.broken = false;
     parts.uniforms.uExplode.value = 0;
+    parts.uniforms.uBreakHeat.value = 0;
     view.object.visible = false;
     slot.view = null;
     this.count -= 1;
