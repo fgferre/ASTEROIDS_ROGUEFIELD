@@ -156,6 +156,36 @@ export function brief(text) {
 }
 
 /**
+ * "5th card in the hangar": the hangar's contract leaves a family fewer than
+ * five cards this run (open and not sealed, or already held; the trail and
+ * the fallback cards are outside the families), so its Apex opens there.
+ */
+export const FIFTH_IN_HANGAR = '5th card in the hangar';
+
+export function fifthInHangar(progression, family) {
+  if (progression.openCards === null && progression.sealedCards.size === 0) {
+    return false;
+  }
+  let reachable = 0;
+  progression.upgradeLookup.forEach((definition, id) => {
+    if (
+      definition.family !== family ||
+      definition.fallback ||
+      progression.pilotCardIds.includes(id)
+    ) {
+      return;
+    }
+    if (
+      progression.getUpgradeCount(id) > 0 ||
+      !progression.isOutOfContract(definition)
+    ) {
+      reachable += 1;
+    }
+  });
+  return reachable < FAMILY_APEX_THRESHOLD;
+}
+
+/**
  * Where a card stands before it is applied: `rank` the rank it brings,
  * `owned` the family's distinct cards without it. `granted`: it was just
  * applied (a chest's card).
@@ -164,7 +194,8 @@ export function cardState(progression, id, { granted = false } = {}) {
   const definition = progression.upgradeLookup.get(id);
   const count = progression.getUpgradeCount(id);
   const rank = granted ? count : count + 1;
-  const familyCards = progression.getFamilyCounts()[definition.family] ?? 0;
+  const { family } = definition;
+  const familyCards = progression.getFamilyCounts()[family] ?? 0;
   const owned = granted && rank === 1 ? familyCards - 1 : familyCards;
   const piloting = progression.pilotCardIds.includes(id);
   // A step of the trail toward the Flight Computer: which one it is.
@@ -173,7 +204,11 @@ export function cardState(progression, id, { granted = false } = {}) {
     const { done, total } = trailProgress(progression);
     trail = { step: done + (granted ? 0 : 1), total };
   }
-  return { definition, rank, owned, piloting, trail };
+  const fifthShort =
+    !piloting &&
+    family in UPGRADE_FAMILIES &&
+    fifthInHangar(progression, family);
+  return { definition, rank, owned, piloting, trail, fifthShort };
 }
 
 /**
@@ -182,7 +217,10 @@ export function cardState(progression, id, { granted = false } = {}) {
  * or 'plain'; `label`, `note`, and a `track` ({ on, fresh, total, notch })
  * with its `end` text. `weapon`: the held one ({ weaponId, chip }).
  */
-export function buildLine(definition, { rank, owned, weapon, piloting }) {
+export function buildLine(
+  definition,
+  { rank, owned, weapon, piloting, fifthShort = false }
+) {
   const { family } = definition;
   const isNew = rank === 1;
   const after = owned + (isNew ? 1 : 0);
@@ -265,7 +303,11 @@ export function buildLine(definition, { rank, owned, weapon, piloting }) {
         notWithWeapon(family, weapon.weaponId, apex) ??
         familyLine(family, weapon.weaponId, apex) ??
         lowerFirst(brief(form.description));
-      return { at, name: form.name, what };
+      return {
+        at,
+        name: form.name,
+        what: apex && fifthShort ? `${what} · ${FIFTH_IN_HANGAR}` : what,
+      };
     });
   return {
     kind: 'path',
@@ -436,9 +478,10 @@ export function cardMarkup(definition, state, { weapon, key = null, held }) {
   const level =
     textForWeapon(definition, weapon.weaponId)?.levels?.[state.rank - 1] ?? {};
   const family = UPGRADE_FAMILIES[definition.family];
-  const tag = family
-    ? `${glyphMarkup(definition.family)}${family.name}<span class="card__sep">·</span>`
-    : '';
+  const tag =
+    family && !state.piloting
+      ? `${glyphMarkup(definition.family)}${family.name}<span class="card__sep">·</span>`
+      : '';
   const note =
     line.kind !== 'plain' && level.highlights?.[0]
       ? `<span class="card__fx2">${level.highlights[0]}</span>`

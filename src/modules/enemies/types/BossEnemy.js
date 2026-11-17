@@ -12,7 +12,6 @@ import {
   BOSS_CONFIG,
   WARDEN_KINDS,
 } from '../../../data/enemies/boss.js';
-import { UPGRADE_BOSS_DAMAGE_SCALAR } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -233,15 +232,11 @@ export class BossEnemy extends BaseEnemy {
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
-    const baseContactDamage =
-      config.contactDamage ?? defaults.contactDamage ?? 45;
-    const baseProjectileDamage =
-      config.projectileDamage ?? defaults.projectileDamage ?? 35;
-    const upgradeDamageFactor =
-      1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
-    this.contactDamage = Math.round(baseContactDamage * upgradeDamageFactor);
+    this.contactDamage = Math.round(
+      config.contactDamage ?? defaults.contactDamage ?? 45
+    );
     this.projectileDamage = Math.round(
-      baseProjectileDamage * upgradeDamageFactor
+      config.projectileDamage ?? defaults.projectileDamage ?? 35
     );
 
     this.safeDistance = Number.isFinite(config.safeDistance)

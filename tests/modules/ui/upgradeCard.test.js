@@ -190,7 +190,7 @@ describe('upgrade card build line', () => {
 
 describe('card slots and piloting trail', () => {
   // The new flight's catalog, with `held` cards at their ranks.
-  const run = (held) => {
+  const run = (held, openCards = null) => {
     const applied = new Map(Object.entries(held));
     const pilot = pilotCardIds(UPGRADE_LIBRARY);
     const ids = [...applied.keys()].filter((id) => !pilot.includes(id));
@@ -200,6 +200,10 @@ describe('card slots and piloting trail', () => {
       trailSteps: trailSteps(UPGRADE_LIBRARY),
       getUpgradeCount: (id) => applied.get(id) ?? 0,
       getFamilyCounts: () => ({}),
+      openCards,
+      sealedCards: new Set(),
+      isOutOfContract: ({ id }) =>
+        !pilot.includes(id) && openCards !== null && !openCards.has(id),
       getCardSlots: () => ({ used: ids.length, max: 8, ids }),
     };
   };
@@ -252,5 +256,51 @@ describe('card slots and piloting trail', () => {
       'Trail · step 4 of 9'
     );
     expect(cardState(progression, 'plasma').trail).toBeNull();
+  });
+});
+
+describe('honest text about the hangar and the trail', () => {
+  const pilot = pilotCardIds(UPGRADE_LIBRARY);
+  const fourPerFamily = new Set(
+    [
+      'plasma',
+      'heat_sink',
+      'afterburn_lance',
+      'cinder_trail',
+      'multishot',
+    ].concat(['ballast_rounds', 'recoil_dampers', 'momentum_rounds'])
+  );
+  const run = (openCards) => ({
+    upgradeLookup: new Map(UPGRADE_LIBRARY.map((entry) => [entry.id, entry])),
+    pilotCardIds: pilot,
+    trailSteps: trailSteps(UPGRADE_LIBRARY),
+    getUpgradeCount: () => 0,
+    getFamilyCounts: () => ({}),
+    openCards,
+    sealedCards: new Set(),
+    isOutOfContract: ({ id }) =>
+      !pilot.includes(id) && openCards !== null && !openCards.has(id),
+  });
+  const offer = (progression, id) => {
+    const state = cardState(progression, id);
+    return cardMarkup(state.definition, state, { weapon: lance });
+  };
+
+  it('a family with only four open cards says its 5th opens in the hangar', () => {
+    expect(offer(run(fourPerFamily), 'heat_sink')).toContain(
+      '5th card in the hangar'
+    );
+  });
+
+  it('with every card open the path says nothing of the hangar', () => {
+    expect(offer(run(null), 'heat_sink')).not.toContain('hangar');
+  });
+
+  it('a piloting-trail card shows no family tag; a regular card keeps it', () => {
+    const progression = run(null);
+    const trailCard = offer(progression, 'braking_system');
+    expect(trailCard).not.toContain('Kinetic');
+    expect(trailCard).toContain('New');
+    expect(offer(progression, 'multishot')).toContain('Kinetic');
   });
 });
