@@ -301,13 +301,16 @@ export class DissolvePool {
     return view.dissolve;
   }
 
-  // Meshes take their twin; outlines just go dark for the burn.
+  // Meshes take their twin (one per material of a multi-material mesh);
+  // outlines just go dark for the burn.
   collectNode(node) {
     const parts = this.collecting.dissolve;
     if (node.isMesh) {
       parts.meshes.push(node);
       parts.sources.push(node.material);
-      node.material = this.twinOf(parts, node.material);
+      node.material = Array.isArray(node.material)
+        ? node.material.map((m) => this.twinOf(parts, m))
+        : this.twinOf(parts, node.material);
     } else if (node.isLine) {
       parts.lines.push(node);
       parts.lineVisible.push(node.visible);

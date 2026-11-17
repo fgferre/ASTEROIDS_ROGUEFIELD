@@ -859,7 +859,12 @@ class Renderer3D extends BaseSystem {
       // A boss view may name its own light (Sovereign: pale gold).
       t.wardenLight.color.copy(warden.light ?? t.wardenLightColor);
     }
-    t.player.update(player, t.ribbons, time);
+    t.player.update(
+      player,
+      t.ribbons,
+      time,
+      dt * (effects?.gameTime?.scale ?? 1)
+    );
     if (travel) {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
@@ -867,7 +872,8 @@ class Renderer3D extends BaseSystem {
       this.trackShip(player);
     }
     this.mirrorShield(player, time);
-    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
+    // a breaking ship casts none: the depth pass draws it whole
+    if (!t.player.breaking) markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
     mirrorProjectiles(t, this.cachedCombat);
     mirrorPickups(

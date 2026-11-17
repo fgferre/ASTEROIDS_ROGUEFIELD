@@ -68,6 +68,9 @@ export class GameTime {
     this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
+    // the world's speed on the last running step (1: full; the 3D view
+    // slows what it animates on its own by it)
+    this.scale = 1;
   }
 
   // The world's delta for this step: the real one scaled by the freeze
@@ -84,6 +87,7 @@ export class GameTime {
     let delta = baseDelta;
     delta *= this.updateFreezeFrameState(baseDelta);
     delta *= this.updateTimeDilationState(baseDelta);
+    if (baseDelta > 0) this.scale = delta / baseDelta;
     return delta;
   }
 
@@ -95,6 +99,7 @@ export class GameTime {
     this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
+    this.scale = 1;
   }
 
   updateFreezeFrameState(baseDelta) {

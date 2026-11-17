@@ -50,6 +50,17 @@ describe('GameTime', () => {
     expect(reduced.emitted).toEqual([]);
   });
 
+  it("tells the world's speed on its last running step", () => {
+    const time = new GameTime({ emit: () => {}, motionReduced: () => false });
+    expect(time.scale).toBe(1);
+    time.addFreezeFrame(0.5, 0.3);
+    const step = time.update(1 / 60);
+    expect(time.scale).toBeCloseTo(step * 60);
+    expect(time.scale).toBeLessThan(1);
+    time.reset();
+    expect(time.scale).toBe(1);
+  });
+
   it('lets a burst of small freezes weigh once; a big one always freezes', () => {
     const time = new GameTime({ emit: () => {}, motionReduced: () => false });
     const step = 1 / 60;
