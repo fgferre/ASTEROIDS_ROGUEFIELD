@@ -267,11 +267,13 @@ export function mirrorEffects(t, effects, impact) {
       : 0;
   if (
     Math.abs(alpha - t.flashAlpha) > 0.01 ||
-    (alpha === 0 && t.flashAlpha !== 0)
+    (alpha === 0 && t.flashAlpha !== 0) ||
+    (alpha > 0 && screenFlash.color !== t.flashColor)
   ) {
     t.flashAlpha = alpha;
     t.flash.style.opacity = String(alpha);
-    if (alpha > 0) t.flash.style.background = screenFlash.color;
+    // a new flash of another colour at the same strength repaints too
+    if (alpha > 0) t.flash.style.background = t.flashColor = screenFlash.color;
   }
 }
 

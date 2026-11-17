@@ -50,6 +50,7 @@ describe('content scene on a live run', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
+    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     vi.useFakeTimers();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});

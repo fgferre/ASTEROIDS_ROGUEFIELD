@@ -7,6 +7,7 @@ import {
   UPGRADE_RARITY_WEIGHT_CAPS,
   UPGRADE_FAMILY_STEER_PER_CARD,
   UPGRADE_WEAPON_OFFER_LEVELS,
+  UPGRADE_PILOT_OFFER_EVERY,
 } from '../../src/core/GameConstants.js';
 import { FAMILY_APEX_THRESHOLD } from '../../src/data/upgrades/families.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
@@ -142,6 +143,25 @@ describe('level-up offers', () => {
     // None left to find: offers still fill with owned cards.
     progression.appliedUpgrades.set('magfield', 1);
     expect(offerIds(progression)).toHaveLength(3);
+  });
+
+  it('in the new flight every UPGRADE_PILOT_OFFER_EVERY levels one slot holds a piloting card', () => {
+    const pilots = ['magfield', 'shield'];
+    const holds = (progression) =>
+      offerIds(progression).some((id) => pilots.includes(id));
+    expect(createProgression(1).pilotCardIds).not.toEqual([]);
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const progression = createProgression(
+        UPGRADE_PILOT_OFFER_EVERY * 2,
+        seed
+      );
+      progression.pilotCardIds = pilots;
+      expect(holds(progression)).toBe(true);
+    }
+    const between = createProgression(UPGRADE_PILOT_OFFER_EVERY * 2 + 1);
+    between.pilotCardIds = pilots;
+    const plain = Array.from({ length: 60 }, () => holds(between));
+    expect(plain.some((held) => !held)).toBe(true);
   });
 
   it('the level-3 offer holds a weapon card while the run has none; if declined, the level-7 offer again', () => {

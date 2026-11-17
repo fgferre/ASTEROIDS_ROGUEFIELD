@@ -115,8 +115,15 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   acho que é uma coisa que a gente precisa resolver sim"_; e perguntou do bico: _"percebi uma mudança no angulo que a
   nave está aparecendo para camera, como se ela tivesse com o bico para cima… (nao estou criticando quero entender de
   onde vem a mudança)"_. Ramo `jogo/pilotagem`, link `?direcao=nova`: partida inteira na direção nova (cartas Auto
-  Turret e Flight Computer, tela do Enter, freio e RCS refeitos para o deslize). Espera ele jogar e os cartões de
-  gosto (canhão no nariz, propulsores, o que a carta final exige).
+  Turret e Flight Computer, tela do Enter, freio e RCS refeitos para o deslize). Jogou e respondeu o cartão: carta final
+  _"chega na hora certa"_, mas _"nao apareceu quase nenhuma carta de meljhoria de thrusters nem manouver (ou
+  nennhuma)"_ e _"nao consegui ativar a autoturret"_; sobre o canhão: _"começamos no clássico com o canhao na frente,
+  depois quando adquirirmos a habaolidade que destrava a mira automática, seria uma troca da arma primária para esse
+  modelo de tiro na torre que gira... faz sentido para vc?"_ (sim); agulha, freio 3, clarão e freio no deslize:
+  _"Ficou bom"_ (aplicados). A ideia da loja no hangar com fichas ficou com a coordenadora. No link, a cada dois
+  níveis uma carta de pilotagem é garantida na oferta. Respondeu o cartão seguinte: canhão do começo _"B: cano curto
+  embutido no nariz"_ (feito nos três cascos, a torre volta com a Auto Turret) e as cartas de pilotagem _"Joguei:
+  ficou na medida"_.
 
 ## HUD e janela (palavras dele, 19/10, manhã)
 

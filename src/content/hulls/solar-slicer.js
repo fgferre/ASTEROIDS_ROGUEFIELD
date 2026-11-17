@@ -108,6 +108,10 @@ export default {
     { x: SHIP_SIZE * 0.1, y: SHIP_SIZE * 0.13 },
   ],
   shieldPadding: 14,
+  // The new flight's nose cannon (PlayerSystem.getMuzzlePoint): its muzzle,
+  // px ahead of the hull centre, 1.25 past the 3D nose tip (the form's first
+  // station × VISUAL_SCALE); playerMirror.js lays its barrels there.
+  noseMuzzle: 28.6,
   // Logical units: the 3D hull's own points × VISUAL_SCALE (render3d/hullModel.js),
   // so the sparks leave the drawn ports; left/right are the aft wingtip jets,
   // noseLeft/noseRight the nose jets of the turn couple.

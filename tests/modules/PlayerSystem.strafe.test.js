@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayerSystem, {
   resolveControlScheme,
 } from '../../src/modules/PlayerSystem.js';
+import {
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
+} from '../../src/data/constants/physics.js';
+import shipModels from '../../src/data/shipModels.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -26,6 +31,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus,
       input,
       'command-queue': null,
+      newFlight: false,
       controlScheme,
     });
     player.position = { x: 400, y: 300 };
@@ -90,7 +96,33 @@ describe('PlayerSystem control schemes', () => {
     expect(player.getTurretAngle()).toBe(player.angle);
   });
 
-  it('the new flight (?direcao=nova) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
+  it("with the cannon on the nose shots leave the hull's nose muzzle; the Auto Turret card brings back the turret's", () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      newFlight: true,
+    });
+    player.setHull(shipModels.bastion);
+    player.position = { x: 400, y: 300 };
+    player.angle = Math.PI / 2; // nose down the screen
+    player.turretAngle = Math.PI / 2;
+    const muzzle = () => {
+      const { x, y } = player.getMuzzlePoint();
+      return [x, y].map((v) => Math.round(v * 100) / 100);
+    };
+
+    expect(muzzle()).toEqual([400, 300 + shipModels.bastion.noseMuzzle]);
+
+    eventBus.emit('upgrade-auto-aim', {});
+    expect(muzzle()).toEqual([
+      400,
+      300 + TURRET_PIVOT_X + TURRET_BARREL_LENGTH,
+    ]);
+  });
+
+  it('the new flight (the default) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
@@ -195,6 +227,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus: createEventBusMock(),
       input: { getMovementInput: vi.fn(() => ({})) },
       'command-queue': null,
+      newFlight: false,
       settings: settings('classic'),
     });
     expect(player.controlScheme).toBe('classic');

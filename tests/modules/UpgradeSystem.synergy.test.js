@@ -5,6 +5,7 @@ import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY, {
   cardsForFlight,
+  pilotCardIds,
 } from '../../src/data/upgrades/index.js';
 import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
@@ -43,10 +44,10 @@ function listSourceFiles(dir) {
 
 describe('upgrade families', () => {
   it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
-    // Every card file plus every weapon's own card, nothing else; the new
-    // flight's own cards (?direcao=nova) only with its link.
+    // Every card file plus every weapon's own card, nothing else (the new
+    // flight's own cards are in the catalog by default).
     expect(UPGRADE_LIBRARY).toHaveLength(
-      listContent('cards').filter((card) => !card.newFlight).length +
+      listContent('cards').length +
         listContent('weapons').filter((weapon) => weapon.card).length
     );
     const counts = {};
@@ -67,11 +68,8 @@ describe('upgrade families', () => {
     const source = listSourceFiles(join(process.cwd(), 'src'))
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
-    // Today's cards and the new flight's (?direcao=nova) own.
-    const cards = [
-      ...UPGRADE_LIBRARY,
-      ...listContent('cards').filter((card) => card.newFlight),
-    ];
+    // The catalog in play: the new flight's cards are in it by default.
+    const cards = UPGRADE_LIBRARY;
     const effects = [
       ...cards.flatMap((upgrade) =>
         upgrade.levels.flatMap((level) => level.effects)
@@ -90,7 +88,7 @@ describe('upgrade families', () => {
     });
   });
 
-  it("the new flight (?direcao=nova) adds its own cards and reads the glide texts; without it the catalog is today's", () => {
+  it("the new flight (the default) adds its own cards and reads the glide texts; with ?direcao=antiga the catalog is today's", () => {
     const ids = (newFlight) =>
       cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
     expect(ids(false)).not.toContain('auto_aim');
@@ -108,6 +106,19 @@ describe('upgrade families', () => {
     );
     expect(braking(true).name).toBe('Braking System');
     expect(braking(true).summary).toMatch(/glide/);
+  });
+
+  it('the piloting cards are the Flight Computer and every card on its way; none without the new flight', () => {
+    const pilots = (newFlight) =>
+      pilotCardIds(cardsForFlight(listContent('cards'), newFlight));
+    expect(pilots(false)).toEqual([]);
+    expect([...pilots(true)].sort()).toEqual([
+      'auto_aim',
+      'braking_system',
+      'flight_computer',
+      'propulsors',
+      'rcs_system',
+    ]);
   });
 });
 

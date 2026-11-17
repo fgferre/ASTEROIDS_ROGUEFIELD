@@ -30,6 +30,7 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: legacyInputService,
       'command-queue': legacyQueue,
+      newFlight: false,
     });
 
     baselinePlayer.position = { x: 320, y: 240 };
@@ -75,6 +76,7 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: commandInputService,
       'command-queue': commandQueue,
+      newFlight: false,
     });
 
     queuePlayer.position = { x: 320, y: 240 };
@@ -134,6 +136,7 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: inputService,
       'command-queue': commandQueue,
+      newFlight: false,
     });
 
     player.angle = 0;
