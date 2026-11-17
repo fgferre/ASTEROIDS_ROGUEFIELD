@@ -10,25 +10,10 @@ function menuReadyToAnimate() {
     clock: { getDelta: () => 1 / 60 },
     stats: null,
     updateAdaptiveQuality: vi.fn(),
-    spawnBeltAsteroid: vi.fn(),
-    world: { step: vi.fn() },
-    activeAsteroids: [],
-    nebulas: null,
-    dustSystem: null,
-    updateExplosions: vi.fn(),
-    impactEffect: null,
-    hasProceduralAsteroids: false,
-    customFX: null,
-    composer: { render: vi.fn() },
+    opening: { update: vi.fn(), render: vi.fn() },
     hullPreview: { update: vi.fn() },
     camera: { position: { x: 0, y: 0, z: 0 }, lookAt: vi.fn() },
   });
-  system.config = { ...system.config, baseFieldCount: 0 };
-  system.starfield = { updateStarLayers: vi.fn() };
-  system.asteroidField = {
-    updateAsteroids: vi.fn(),
-    updateExplosions: vi.fn(),
-  };
   return system;
 }
 
@@ -39,7 +24,7 @@ describe('MenuBackgroundSystem behind the loading screen', () => {
     try {
       const system = menuReadyToAnimate();
       const order = [];
-      system.composer.render = vi.fn(() => order.push('render'));
+      system.opening.render = vi.fn(() => order.push('render'));
       // The loading screen's element: hiding it adds the `hidden` class.
       const screen = {
         classList: { add: () => order.push('hide'), remove: () => {} },
@@ -49,7 +34,7 @@ describe('MenuBackgroundSystem behind the loading screen', () => {
 
       system.animate();
       system.animate();
-      expect(system.world.step).toHaveBeenCalledTimes(2);
+      expect(system.opening.update).toHaveBeenCalledTimes(2);
       expect(order).toEqual([]);
 
       system.loadingState.onComplete();
