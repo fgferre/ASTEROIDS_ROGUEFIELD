@@ -19,10 +19,15 @@ import {
 const AUDIBLE = 1e-4;
 const CURVE_POINTS = 64;
 
-async function fetchAndDecode(context, url) {
+async function fetchBytes(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  return context.decodeAudioData(await response.arrayBuffer());
+  return response.arrayBuffer();
+}
+
+// `bytes`: the file already fetched (prefetch), decoded here.
+async function fetchAndDecode(context, url, bytes) {
+  return context.decodeAudioData(bytes ?? (await fetchBytes(url)));
 }
 
 function firstAudibleSeconds(buffer) {
@@ -40,11 +45,19 @@ class SectorScore {
   /**
    * @param {object} deps
    * @param {object} deps.mixer - the MusicMixer (setSilenced, runIntensity).
-   * @param {(context, url) => Promise<AudioBuffer>} [deps.load]
+   * @param {(context, url, bytes?) => Promise<AudioBuffer>} [deps.load]
+   * @param {(url) => Promise<ArrayBuffer>} [deps.fetchBytes]
    */
-  constructor({ mixer, load = fetchAndDecode }) {
+  constructor({
+    mixer,
+    load = fetchAndDecode,
+    fetchBytes: fetchFile = fetchBytes,
+  }) {
     this.mixer = mixer;
     this.load = load;
+    this.fetchBytes = fetchFile;
+    // The one sector picked, its two files fetched and not yet decoded.
+    this._prefetch = null;
     this.context = null;
     this.target = null;
     this.sectorId = null; // the sector with a score: kept to restart a retry
@@ -64,6 +77,28 @@ class SectorScore {
     this.target = target;
   }
 
+  /**
+   * A sector is picked: fetch its two files now (not decoded), keeping only
+   * this sector's bytes, so start() does not wait for the download.
+   */
+  prefetch(sectorId) {
+    const score = SECTOR_SCORES[sectorId];
+    if (!score || this._prefetch?.sectorId === sectorId) return;
+    const bytes = Promise.all([
+      this.fetchBytes(score.stage),
+      this.fetchBytes(score.boss),
+    ]).catch(() => null);
+    this._prefetch = { sectorId, bytes };
+  }
+
+  /** The prefetched bytes of `sectorId` (once: start decodes them) or null. */
+  async _takePrefetch(sectorId) {
+    const prefetch = this._prefetch;
+    if (prefetch?.sectorId !== sectorId) return null;
+    this._prefetch = null;
+    return prefetch.bytes;
+  }
+
   /** Play the sector's score; a sector without one leaves the mixer alone. */
   async start(sectorId) {
     this.sectorId = sectorId ?? null;
@@ -75,9 +110,10 @@ class SectorScore {
     let stage;
     let boss;
     try {
+      const bytes = await this._takePrefetch(sectorId);
       [stage, boss, this._stingers] = await Promise.all([
-        this.load(context, score.stage),
-        this.load(context, score.boss),
+        this.load(context, score.stage, bytes?.[0]),
+        this.load(context, score.boss, bytes?.[1]),
         this._loadStingers(),
       ]);
     } catch (error) {

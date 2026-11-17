@@ -263,6 +263,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'game-started', cue: 'playUIStartGame' },
   { on: 'game-started', run: 'sectorScoreStart' },
   { on: 'run-won', run: 'runWon' },
+  { on: 'sector-picked', run: 'sectorScorePrefetch' },
 
   // The journey between sectors (render3d/travel/moments.js): each moment's
   // sample, the burn's loop on and off, and all of it fading when it ends.

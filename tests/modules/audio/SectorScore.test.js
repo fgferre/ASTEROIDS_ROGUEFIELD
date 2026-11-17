@@ -79,6 +79,23 @@ describe('SectorScore', () => {
     expect(mixer.setSilenced).toHaveBeenCalledWith(true, expect.any(Number));
   });
 
+  it('start() decodes the bytes prefetched when the sector was picked, without fetching again', async () => {
+    const fetchBytes = vi.fn(async (url) => new ArrayBuffer(url.length));
+    const load = vi.fn(async () => buffer());
+    score = new SectorScore({ mixer, load, fetchBytes });
+    score.init(rec.context, target);
+    score.prefetch('debris-wake');
+    await score.start('debris-wake');
+    const { stage, boss } = SECTOR_SCORES['debris-wake'];
+    expect(fetchBytes.mock.calls.map(([url]) => url)).toEqual([stage, boss]);
+    expect(load).toHaveBeenCalledWith(
+      rec.context,
+      stage,
+      expect.any(ArrayBuffer)
+    );
+    expect(rec.sources).toHaveLength(2);
+  });
+
   it('boss-warning plays the stinger and crossfades the boss in, the stage out', async () => {
     await score.start('debris-wake');
     const { bossFade, stageFade } = score._nodes;

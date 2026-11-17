@@ -173,6 +173,11 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sectorScore.start(payload?.sector);
   },
 
+  // A sector is picked (the map, the result screen): its music is fetched.
+  sectorScorePrefetch(audio, payload) {
+    audio.sectorScore.prefetch(payload?.sector);
+  },
+
   // The campaign's last sector won: its score fades out, the victory plays.
   runWon(audio, payload) {
     if (payload?.sector !== ENDING_SECTOR) return;

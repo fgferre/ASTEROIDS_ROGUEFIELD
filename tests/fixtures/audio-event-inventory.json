@@ -47,6 +47,7 @@
   "run-won",
   "salvage-awarded",
   "screen-changed",
+  "sector-picked",
   "settings-audio-changed",
   "shade-phased-in",
   "shade-phased-out",
