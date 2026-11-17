@@ -54,17 +54,16 @@ describe('SectorScore', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     rec = fakeContext();
-    mixer = { runIntensity: 0, setSilenced: vi.fn() };
+    mixer = { runIntensity: 0 };
     target = {};
     score = new SectorScore({ mixer, load: async () => buffer() });
     score.init(rec.context, target);
   });
   afterEach(() => vi.useRealTimers());
 
-  it('a sector without a score plays nothing and leaves the mixer alone', async () => {
+  it('a sector without a score plays nothing', async () => {
     await score.start('no-such-sector');
     expect(rec.sources).toHaveLength(0);
-    expect(mixer.setSilenced).not.toHaveBeenCalledWith(true, expect.anything());
   });
 
   it('a run with no sector plays the score of the layer chapter and switches with it; a sector run ignores that', async () => {
@@ -73,7 +72,6 @@ describe('SectorScore', () => {
     score = new SectorScore({ mixer, load });
     score.init(rec.context, target);
     await score.start(undefined);
-    expect(mixer.setSilenced).toHaveBeenCalledWith(true, 0);
     await chapter(1);
     const played = () =>
       load.mock.calls.map(([, url]) => url).filter((u) => /stage/.test(u));
@@ -92,7 +90,7 @@ describe('SectorScore', () => {
     expect(played()).toEqual([SECTOR_SCORES['debris-wake'].stage]);
   });
 
-  it('debris-wake: two looping sources start together, loop as long as the track, mixer silenced', async () => {
+  it('debris-wake: two looping sources start together, loop as long as the track', async () => {
     await score.start('debris-wake');
     const [stage, boss] = rec.sources;
     expect(rec.sources).toHaveLength(2);
@@ -104,7 +102,6 @@ describe('SectorScore', () => {
       SECTOR_SCORES['debris-wake'].loopSeconds,
       6
     );
-    expect(mixer.setSilenced).toHaveBeenCalledWith(true, expect.any(Number));
   });
 
   it('start() decodes the bytes prefetched when the sector was picked, without fetching again', async () => {
@@ -138,18 +135,11 @@ describe('SectorScore', () => {
     ).toBeCloseTo(0);
   });
 
-  it('stop() keeps the mixer silent and stops the sources; reset gives it back', async () => {
+  it('stop() stops the sources', async () => {
     await score.start('debris-wake');
     const sources = [...rec.sources];
-    mixer.setSilenced.mockClear();
     score.stop();
-    expect(mixer.setSilenced).not.toHaveBeenCalledWith(
-      false,
-      expect.anything()
-    );
     sources.forEach((source) => expect(source.stop).toHaveBeenCalled());
     expect(score.active).toBe(false);
-    score.reset();
-    expect(mixer.setSilenced).toHaveBeenLastCalledWith(false, 0);
   });
 });

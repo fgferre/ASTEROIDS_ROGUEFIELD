@@ -191,15 +191,15 @@ describe('audio manifest wiring (assertManagerWired first consumer)', () => {
   });
 });
 
-describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
+describe('boss-warning → recorded score delegation', () => {
   // Registration proves a listener exists; delegation proves the listener
-  // actually drives the MusicMixer (review fix: registration ≠ delegation).
-  // Emitting through the REAL container must call the COMPOSED mixer instance.
-  it('emitting boss-warning invokes musicMixer.setIntensityFromBossEvent exactly once', () => {
+  // actually drives the score (review fix: registration ≠ delegation).
+  // Emitting through the REAL container must call the COMPOSED score instance.
+  it('emitting boss-warning invokes sectorScore.onBossEvent exactly once', () => {
     const { audio, eventBus } = resolveRealAudioService();
     expect(audio.musicMixer).toBeDefined();
 
-    const spy = vi.spyOn(audio.musicMixer, 'setIntensityFromBossEvent');
+    const spy = vi.spyOn(audio.sectorScore, 'onBossEvent');
     eventBus.emit('boss-warning', { wave: 4, nextBossWave: 5 });
 
     expect(spy).toHaveBeenCalledTimes(1);
@@ -209,9 +209,9 @@ describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
     if (typeof audio.destroy === 'function') audio.destroy();
   });
 
-  it('the boss arc drives only the MusicMixer (no legacy music controller)', () => {
+  it('the boss arc drives only the recorded score (no legacy music controller)', () => {
     const { audio, eventBus } = resolveRealAudioService();
-    const spy = vi.spyOn(audio.musicMixer, 'setIntensityFromBossEvent');
+    const spy = vi.spyOn(audio.sectorScore, 'onBossEvent');
 
     eventBus.emit('boss-spawned', {});
     expect(spy.mock.calls[0][0]).toBe('boss-spawned');
@@ -237,36 +237,11 @@ describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
   });
 });
 
-describe('music themes follow the run (wave / boss events)', () => {
-  function withAudio(run) {
-    const { audio, eventBus } = resolveRealAudioService();
-    const setTheme = vi.spyOn(audio.musicMixer, 'setTheme');
-    run({ eventBus, setTheme });
-    vi.restoreAllMocks();
-    audio.destroy();
-  }
-
-  it('wave-started on a biome’s first layer picks its theme', () => {
-    withAudio(({ eventBus, setTheme }) => {
-      eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
-      expect(setTheme).toHaveBeenCalledWith('dense-core');
-    });
-  });
-
-  it('a Warden layer takes the warden theme; boss-defeated hands back to the biome', () => {
-    withAudio(({ eventBus, setTheme }) => {
-      eventBus.emit('wave-started', { wave: 10, totalEnemies: 1 });
-      expect(setTheme).toHaveBeenLastCalledWith('warden');
-
-      eventBus.emit('boss-defeated', {});
-      expect(setTheme).toHaveBeenLastCalledWith('dense-core');
-    });
-  });
-
-  it('travel-planned lays out the journey score and holds the layers; its end hands over', () => {
+describe('the journey holds the music', () => {
+  it('travel-planned lays out the journey score and holds the score; its end hands over', () => {
     const { audio, eventBus } = resolveRealAudioService();
     audio.journeyCue = { play: vi.fn(() => true), end: vi.fn(), stop: vi.fn() };
-    const hold = vi.spyOn(audio.musicMixer, 'holdForJourney');
+    const hold = vi.spyOn(audio.sectorScore, 'holdForJourney');
     const plan = { moments: [{ id: 'ignite', at: 1.4 }], duration: 10 };
 
     eventBus.emit('game-started', { sector: 'dense-core' });

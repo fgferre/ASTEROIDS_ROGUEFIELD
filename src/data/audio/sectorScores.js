@@ -105,7 +105,6 @@ export const SECTOR_SCORE_MIX = Object.freeze({
   fadeOutSeconds: 1.5,
   chapterFadeSeconds: 2.5, // a sectorless run changing chapter
   victoryFadeSeconds: 3,
-  mixerFadeSeconds: 1.5,
   bossCrossfadeSeconds: 6,
   clearedCrossfadeSeconds: 4,
   pollMs: 200,

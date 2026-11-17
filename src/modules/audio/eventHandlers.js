@@ -12,7 +12,6 @@ import {
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
-import { biomeThemeForLayer, musicThemeForLayer } from './MusicThemes.js';
 
 /**
  * Pan + distance mix of an enemy-side cue from its source position; no
@@ -118,19 +117,16 @@ export const AUDIO_EVENT_HANDLERS = {
     setRunEnemyCount(audio, audio.runEnemyCount - 1 + fragments);
   },
 
-  // Progress + wave enemy total, the layer's theme (the Warden's on boss
-  // layers) and the chapter's score.
+  // Progress + wave enemy total, and the chapter's score.
   waveStarted(audio, payload) {
     audio.updateWaveMusicIntensity(payload);
     const wave = Number(payload?.wave);
     if (!Number.isFinite(wave) || wave <= 0) return;
-    audio.musicMixer.setTheme(musicThemeForLayer(wave));
     audio.sectorScore.playChapter(chapterScoreForLayer(wave));
   },
 
-  // Boss arc → MusicMixer (D-04): overrides the run intensity upwards.
+  // Boss arc → the recorded score's stinger and crossfade.
   bossArc(audio, payload, eventName) {
-    audio.musicMixer.setIntensityFromBossEvent(eventName, payload);
     audio.sectorScore.onBossEvent(eventName);
   },
 
@@ -145,7 +141,7 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.musicStings.play('deepField');
   },
 
-  // A sector with a recorded score plays it instead of the mixer.
+  // A sector with a recorded score plays it.
   sectorScoreStart(audio, payload) {
     audio.sectorScore.start(payload?.sector);
     audio.musicStings.prefetch();
@@ -165,31 +161,21 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.playFileTrack(FILE_TRACK_IDS.VICTORY_FINAL);
   },
 
-  // After the Warden, the music hands back to the biome's theme.
-  biomeTheme(audio) {
-    audio.musicMixer.setTheme(
-      biomeThemeForLayer(audio.musicMixer.runState.wave)
-    );
-  },
-
   // The journey's score (./journeyCue.js), the recording of the destination
   // sector's chapter (the run's sector, set as it started), plays alone, the
   // layers held down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
     const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
     if (audio.journeyCue.play({ ...payload, chapter })) {
-      audio.musicMixer.holdForJourney(true);
       audio.sectorScore.holdForJourney(true);
     }
   },
   journeyEnded(audio) {
     audio.journeyCue.end();
-    audio.musicMixer.holdForJourney(false);
     audio.sectorScore.holdForJourney(false);
   },
 
-  // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
-  // freeze, no drift).
+  // Pause: the danger holds still and the score goes underwater.
   pauseMusic(audio, payload) {
     audio.musicMixer.pause(!!payload?.isPaused);
     audio.sectorScore.pause(!!payload?.isPaused);

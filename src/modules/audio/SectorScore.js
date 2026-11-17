@@ -1,8 +1,7 @@
 // The recorded music of a campaign sector (data/audio/sectorScores.js): a
 // looping stage track and a boss track of the same length that play
-// sample-synced, the boss one silent until a Warden warns. While it plays the
-// procedural MusicMixer is silenced; the danger (the mixer's run intensity)
-// opens and lifts the stage track. Three one-shot stingers mark the boss
+// sample-synced, the boss one silent until a Warden warns. The run's danger
+// (the mixer's run intensity) opens and lifts the stage track. Three one-shot stingers mark the boss
 // warning, the sector cleared and the signal lost.
 //
 //   stage → lowpass (danger) → dangerGain → stageFade ┐
@@ -44,7 +43,7 @@ function firstAudibleSeconds(buffer) {
 class SectorScore {
   /**
    * @param {object} deps
-   * @param {object} deps.mixer - the MusicMixer (setSilenced, runIntensity).
+   * @param {object} deps.mixer - the MusicMixer (runIntensity).
    * @param {(context, url, bytes?) => Promise<AudioBuffer>} [deps.load]
    * @param {(url) => Promise<ArrayBuffer>} [deps.fetchBytes]
    */
@@ -100,14 +99,11 @@ class SectorScore {
     return prefetch.bytes;
   }
 
-  /** Play the sector's score; a sector without one leaves the mixer alone. */
+  /** Play the sector's score; a sector without one plays nothing. */
   async start(sectorId) {
     this.sectorId = sectorId ?? null;
     this._chapterId = null;
     this._stopNow();
-    // A run with no sector is scored by chapter (playChapter): the mixer
-    // stays silent from the start, not only once a score has loaded.
-    if (!sectorId) this.mixer.setSilenced(true, 0);
     return this._play(sectorId);
   }
 
@@ -146,7 +142,6 @@ class SectorScore {
     this._build(stage, boss, score.loopSeconds);
     this.active = true;
     this._bossOn = false;
-    this.mixer.setSilenced(true, MIX.mixerFadeSeconds);
     this._fadeOutput(this._held ? 0 : 1, MIX.fadeInSeconds);
     this._pollHandle = setInterval(() => this._followDanger(), MIX.pollMs);
     this._followDanger(true);
@@ -311,10 +306,8 @@ class SectorScore {
   }
 
   /**
-   * Fade the score out. `stinger` names a stinger played as it goes. The
-   * mixer stays silent, so the old drone doesn't return under the end
-   * screens; the next run's reset gives it back. Drops the buffers once the
-   * sources are stopped.
+   * Fade the score out. `stinger` names a stinger played as it goes.
+   * screens. Drops the buffers once the sources are stopped.
    */
   stop({ seconds = MIX.fadeOutSeconds, stinger = null } = {}) {
     this._token++;
@@ -324,10 +317,9 @@ class SectorScore {
     this._teardown(this.context.currentTime + seconds);
   }
 
-  /** Immediately, for a new start or reset: no fade, no stinger; the mixer is given back. */
+  /** Immediately, for a new start or reset: no fade, no stinger. */
   _stopNow() {
     this._token++;
-    this.mixer.setSilenced(false, 0);
     if (!this.active && !this._nodes) return;
     this._teardown(this.context.currentTime);
   }
@@ -358,7 +350,7 @@ class SectorScore {
     this.active = false;
   }
 
-  /** AudioSystem.reset / destroy: back to nothing, the mixer restored. */
+  /** AudioSystem.reset / destroy: back to nothing. */
   reset() {
     this._stopNow();
     this.sectorId = null;

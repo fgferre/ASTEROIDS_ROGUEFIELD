@@ -203,8 +203,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     at: 'source',
   },
 
-  // The run-following music: wave progress and the layer's theme (the
-  // chapter's score crossfades in); the boss arc overrides it upwards.
+  // The run-following music: wave progress and the chapter's score (it
+  // crossfades in); the boss arc crossfades the Warden's track.
   { on: 'wave-started', run: 'waveStarted' },
   { on: 'boss-warning', run: 'bossArc' },
   { on: 'boss-spawned', cue: 'playBossRoar', facade: true, payload: true },
@@ -218,7 +218,6 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'boss-phase-changed', run: 'bossArc' },
   { on: 'boss-defeated', cue: 'playBossDefeated', facade: true, payload: true },
   { on: 'boss-defeated', run: 'bossArc' },
-  { on: 'boss-defeated', run: 'biomeTheme' },
 
   { on: 'bullet-hit', run: 'bulletHit' },
   { on: 'player-took-damage', cue: 'playShipHit' },

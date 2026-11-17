@@ -17,6 +17,5 @@ export default {
   bloomScale: 1.2,
   debris: 1,
   structures: 0,
-  musicTheme: 'dense-core',
   tint: 'rgba(255, 140, 50, 0.08)',
 };
