@@ -14,6 +14,7 @@ import UPGRADE_LIBRARY, {
   UPGRADE_CATEGORIES,
   WEAPON_CARD_IDS,
   pilotCardIds,
+  trailSteps,
 } from '../data/upgrades/index.js';
 import {
   UPGRADE_FAMILIES,
@@ -84,6 +85,7 @@ class UpgradeSystem extends BaseSystem {
     this.upgradeDefinitions = buildUpgradeDefinitions(UPGRADE_LIBRARY);
     this.upgradeLookup = buildUpgradeLookup(this.upgradeDefinitions);
     this.pilotCardIds = pilotCardIds(this.upgradeDefinitions);
+    this.trailSteps = trailSteps(this.upgradeDefinitions);
     this.upgradeCategoryMap = buildUpgradeCategoryMap(UPGRADE_CATEGORIES);
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.refreshInjectedServices({ force: true });
@@ -188,7 +190,7 @@ class UpgradeSystem extends BaseSystem {
     const slotIds = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
       ? WEAPON_CARD_IDS
       : level % UPGRADE_PILOT_OFFER_EVERY === 0
-        ? this.pilotCardIds
+        ? this.trailSlotIds()
         : [];
     const slotted = preferred.filter(({ id }) => slotIds.includes(id));
     const selection = this.rollUpgradeDefinitions(slotted, 1);
@@ -232,6 +234,17 @@ class UpgradeSystem extends BaseSystem {
       poolSize: eligible.length,
       totalDefinitions: this.upgradeDefinitions.length,
     };
+  }
+
+  // The trail's slot: while the Flight Computer is not held, only the steps
+  // still short of the rank its way asks for (trailSteps); after it, any
+  // piloting card (the owner's plan, 16/11: a trail of its own to the last
+  // card).
+  trailSlotIds() {
+    if (this.getUpgradeCount('flight_computer') > 0) return this.pilotCardIds;
+    return this.pilotCardIds.filter(
+      (id) => this.getUpgradeCount(id) < (this.trailSteps.get(id) ?? 0)
+    );
   }
 
   getEligibleUpgradeDefinitions() {
@@ -325,7 +338,9 @@ class UpgradeSystem extends BaseSystem {
       eligible.filter(
         (definition) =>
           !offeredIds.includes(definition.id) &&
-          this.pilotCardIds.includes(definition.id) === trail
+          (trail
+            ? this.trailSlotIds().includes(definition.id)
+            : !this.pilotCardIds.includes(definition.id))
       ),
       1,
       current.filter((option) => option.id !== upgradeId)

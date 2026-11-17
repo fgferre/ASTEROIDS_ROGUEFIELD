@@ -145,23 +145,36 @@ describe('level-up offers', () => {
     expect(offerIds(progression)).toHaveLength(3);
   });
 
-  it('in the new flight every UPGRADE_PILOT_OFFER_EVERY levels one slot holds a piloting card', () => {
-    const pilots = ['magfield', 'shield'];
+  it('every UPGRADE_PILOT_OFFER_EVERY levels one slot holds a step of the piloting trail; between, none', () => {
+    const level = UPGRADE_PILOT_OFFER_EVERY * 2;
+    const pilots = createProgression(1).pilotCardIds;
     const holds = (progression) =>
       offerIds(progression).some((id) => pilots.includes(id));
-    expect(createProgression(1).pilotCardIds).not.toEqual([]);
     for (let seed = 1; seed <= 40; seed += 1) {
-      const progression = createProgression(
-        UPGRADE_PILOT_OFFER_EVERY * 2,
-        seed
-      );
-      progression.pilotCardIds = pilots;
-      expect(holds(progression)).toBe(true);
+      expect(holds(createProgression(level, seed))).toBe(true);
     }
-    const between = createProgression(UPGRADE_PILOT_OFFER_EVERY * 2 + 1);
-    between.pilotCardIds = pilots;
+    const between = createProgression(level + 1);
     const plain = Array.from({ length: 60 }, () => holds(between));
     expect(plain.some((held) => held)).toBe(false);
+  });
+
+  it('the trail offers only the steps toward the Flight Computer until it is held', () => {
+    const level = UPGRADE_PILOT_OFFER_EVERY * 4;
+    const trailCard = (progression) =>
+      offerIds(progression).find((id) => progression.pilotCardIds.includes(id));
+    // Thrusters already at 1: never thrusters again while the way is open.
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const progression = createProgression(level, seed);
+      progression.appliedUpgrades.set('propulsors', 1);
+      expect(trailCard(progression)).not.toBe('propulsors');
+    }
+    // Every step taken: the Flight Computer is the trail's card.
+    const ready = createProgression(level);
+    ready.appliedUpgrades.set('propulsors', 1);
+    ready.appliedUpgrades.set('braking_system', 3);
+    ready.appliedUpgrades.set('rcs_system', 3);
+    ready.appliedUpgrades.set('auto_aim', 1);
+    expect(trailCard(ready)).toBe('flight_computer');
   });
 
   it('a piloting card never appears outside the trail slot, over many seeds', () => {
