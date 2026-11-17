@@ -97,10 +97,15 @@ describe('upgrade card build line', () => {
       buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
         (step) => step.what
       );
-    // The Furnace Corona lands no lance hit: Railshot and Coilgun miss it.
+    // The Shard Halo lands no lance hit: Railshot and Coilgun miss it.
+    expect(what('multishot', 0, 'shard-halo')).toEqual([
+      'not with Shard Halo yet',
+      'not with Shard Halo yet',
+    ]);
+    // The Furnace Corona carries the family: its own wording.
     expect(what('multishot', 0, 'furnace-corona')).toEqual([
-      'not with Furnace Corona yet',
-      'not with Furnace Corona yet',
+      'pulses hit 15% harder and throw further',
+      'pulses hit 30% harder and throw twice as far',
     ]);
     // Flak bolts do not pierce, but Coilgun's damage reaches them.
     expect(what('multishot', 0, 'scatter')).toEqual([

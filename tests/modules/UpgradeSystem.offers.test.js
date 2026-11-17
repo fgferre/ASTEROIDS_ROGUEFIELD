@@ -350,17 +350,23 @@ describe('level-up offers', () => {
     const furnaceCard = listContent('weapons').find(
       ({ id }) => id === 'furnace-corona'
     ).card.id;
+    const haloCard = listContent('weapons').find(
+      ({ id }) => id === 'shard-halo'
+    ).card.id;
     const eligibleIds = (progression) =>
       progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
 
-    it('the new flight leaves a dead card out with Furnace Corona held, not with the default cannon', () => {
+    it('the new flight leaves a dead card out with Shard Halo held, not with the default cannon; Furnace Corona keeps it', () => {
       const progression = createProgression(9);
       expect(eligibleIds(progression)).toContain('overcharge_coil');
       progression.appliedUpgrades.set(furnaceCard, 1);
+      expect(eligibleIds(progression)).toContain('overcharge_coil');
+      progression.appliedUpgrades.delete(furnaceCard);
+      progression.appliedUpgrades.set(haloCard, 1);
       expect(eligibleIds(progression)).not.toContain('overcharge_coil');
       for (let seed = 1; seed <= 30; seed += 1) {
         const held = createProgression(9, seed);
-        held.appliedUpgrades.set(furnaceCard, 1);
+        held.appliedUpgrades.set(haloCard, 1);
         expect(offerIds(held)).not.toContain('overcharge_coil');
       }
     });
@@ -448,7 +454,7 @@ describe('level-up offers', () => {
     });
 
     it('Targeting Matrix gives a weapon that never aims only its fire rate', () => {
-      expect(shown('targeting_suite', 'furnace-corona').description).toContain(
+      expect(shown('targeting_suite', 'shard-halo').description).toContain(
         'never aims: nothing changes for it'
       );
       expect(shown('targeting_suite', 'shard-halo', 2).description).toBe(

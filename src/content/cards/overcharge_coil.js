@@ -3,7 +3,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 export default {
   id: 'overcharge_coil',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
+  deadFor: ['shard-halo', 'arc-caster'],
   order: 7,
   category: 'offense',
   family: 'arc',
@@ -33,6 +33,16 @@ export default {
         highlights: ['Rounds land almost where you point.'],
       },
     ],
+  },
+  // The Furnace's pulses come sooner (firePatterns.js).
+  weaponText: {
+    'furnace-corona': {
+      levels: [
+        { description: 'Pulses come 5% sooner.' },
+        { description: 'Pulses come 10% sooner (cumulative).' },
+        { description: 'Pulses come 15% sooner (cumulative).' },
+      ],
+    },
   },
   levels: [
     {

@@ -12,7 +12,7 @@ const BOLT_RANGE = scatter.projectile.range;
 export default {
   id: 'afterburn_lance',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
+  deadFor: ['shard-halo', 'arc-caster'],
   order: 5,
   category: 'offense',
   family: 'thermal',
@@ -50,6 +50,11 @@ export default {
   // The bonus rides a projectile's own hit (HitResolution): not the beam,
   // not the shrapnel.
   weaponText: {
+    'furnace-corona': {
+      levels: BONUS.map((bonus, rank) => ({
+        description: `Pulses deal +${bonus}% damage per 100 px between the ship and the enemy: the ring's edge burns hotter. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      })),
+    },
     scatter: {
       levels: BONUS.map((bonus, rank) => ({
         description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%. Lock-on range +${LOCK_RANGE[rank]}%.`,

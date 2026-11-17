@@ -538,6 +538,7 @@ export class Weapons {
     this.blades = [];
     this.bladeCuts = new Map();
     this.orbitClock = 0;
+    this.auraPulses = 0;
     this.orbitSounded = false;
     this.aura = null;
     this.pulses = [];

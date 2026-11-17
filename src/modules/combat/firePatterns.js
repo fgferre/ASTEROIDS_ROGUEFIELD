@@ -10,6 +10,8 @@
 // breeds) and `steerSeeker` turns a missile in flight. Hits land through
 // Weapons.hitEnemy, like a beam's.
 
+import { BULLET_SPEED } from '../../data/constants/gameplay.js';
+
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
 // A chain with nothing in reach crackles out this much of its range; its
@@ -33,7 +35,7 @@ function setCooldown(w, entry) {
 
 // A hit of `kind` on `enemy`'s rim facing (fromX, fromY), shoving it along
 // `angle`; returns the hit's result (null when the enemy is already gone).
-function strike(w, kind, enemy, fromX, fromY, angle, damage) {
+function strike(w, kind, enemy, fromX, fromY, angle, damage, extra = null) {
   if (enemy.destroyed) return null;
   const dx = enemy.x - fromX;
   const dy = enemy.y - fromY;
@@ -48,6 +50,7 @@ function strike(w, kind, enemy, fromX, fromY, angle, damage) {
       vy: Math.sin(angle) * w.bulletSpeed,
       damage,
       hit: false,
+      ...extra,
     },
     enemy
   );
@@ -247,12 +250,45 @@ function tickOrbit(w, rings, centre, deltaTime, playerStats) {
  * pulse shows for `duration` s; between pulses the ring heats up.
  */
 export function fireAura(w, aura, playerPos, playerStats) {
-  const radius = auraRadius(aura, playerStats);
-  const damage = damageOf(playerStats, aura);
+  const radius = auraRadius(w, aura, playerStats);
+  const base = damageOf(playerStats, aura);
   const { x, y } = playerPos;
+  const forms = w.weapon.familyForms;
+  const cards = w.cards().cardEffects;
+  // Kinetic form / Apex: a heavier pulse and a longer throw (proposta 16/11).
+  const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
+  const kinetic = forms?.carries.includes('kinetic') && stage >= 0;
+  const kick = kinetic ? forms.kinetic.damage[stage] : 1;
+  const push = kinetic ? forms.kinetic.push[stage] : 1;
+  // One budget for the whole pulse: its chains, and a well every
+  // `pullEvery` pulses.
+  w.auraPulses = (w.auraPulses ?? 0) + 1;
+  const shot = forms
+    ? {
+        ...forms.perShot,
+        pulls: w.auraPulses % forms.pullEvery === 0 ? forms.perShot.pulls : 0,
+      }
+    : null;
   enemiesNear(w, x, y, radius).forEach((enemy) => {
     const out = Math.atan2(enemy.y - y, enemy.x - x);
-    const result = strike(w, 'heat', enemy, x, y, out, damage);
+    let damage = base * kick * (cards.thermalLens?.lanceDamageMultiplier ?? 1);
+    // Afterburn Lance: the ring's edge burns hotter.
+    const { longBurn, threatFocus } = cards;
+    if (longBurn) {
+      const reach = Math.min(
+        Math.hypot(enemy.x - x, enemy.y - y),
+        longBurn.maxDistance
+      );
+      damage *= 1 + (longBurn.bonusPer100px * reach) / 100;
+    }
+    // Targeting Matrix: more damage to elites, heralds and bosses.
+    if (
+      threatFocus &&
+      (enemy.elite || enemy.type === 'herald' || enemy.type === 'boss')
+    ) {
+      damage *= threatFocus.damageMultiplier;
+    }
+    const result = strike(w, 'heat', enemy, x, y, out, damage, { shot, push });
     if (aura.burn && result && !result.killed && !enemy.destroyed) {
       w.cards().ignite(enemy, damage, aura.burn);
     }
@@ -265,12 +301,22 @@ export function fireAura(w, aura, playerPos, playerStats) {
     maxLife: aura.duration,
     colors: w.weapon.colors,
   });
-  setCooldown(w, aura);
+  // Overcharge Coil: a pulse comes sooner, the cube root of the lance's
+  // speed gain (+5/10/15% rate at ranks 1-3, proposta 16/11).
+  const charge = forms ? Math.cbrt(w.bulletSpeed / BULLET_SPEED) : 1;
+  setCooldown(w, {
+    cooldownMultiplier: aura.cooldownMultiplier / charge,
+  });
   emitFired(w, aura.pattern, playerPos);
 }
 
-const auraRadius = (aura, playerStats) =>
-  Math.min(aura.maxRadius, aura.radius + aura.growth * extraShots(playerStats));
+// Multishot widens the ring up to its cap; Recoil Dampers reach past it.
+const auraRadius = (w, aura, playerStats) =>
+  Math.min(
+    aura.maxRadius,
+    aura.radius + aura.growth * extraShots(playerStats)
+  ) +
+  (aura.pierceReach ?? 0) * w.cards().pierceBonus;
 
 // The ring between pulses: the weapon's last aura entry (the one every shot
 // can fire), `heat` 0 → 1 as the next pulse comes due.
@@ -281,7 +327,7 @@ function tickAura(w, aura, centre, playerStats) {
   w.aura = {
     x: centre.x,
     y: centre.y,
-    radius: auraRadius(aura, playerStats),
+    radius: auraRadius(w, aura, playerStats),
     heat: Math.min(1, Math.max(0, since / wait)),
     colors: w.weapon.colors,
   };

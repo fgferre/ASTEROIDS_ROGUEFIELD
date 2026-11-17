@@ -4,7 +4,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 export default {
   id: 'chain_capacitor',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['furnace-corona', 'shard-halo'],
+  deadFor: ['shard-halo'],
   order: 38,
   category: 'utility',
   family: 'arc',
@@ -31,6 +31,14 @@ export default {
   // Who hits twice with each weapon (HitResolution), or the Arc Caster's
   // extra jump (firePatterns.js).
   weaponText: {
+    'furnace-corona': {
+      levels: [
+        {
+          description:
+            'With the Chain Lance: each chain jumps once more. Otherwise: 10% of pulse hits land twice.',
+        },
+      ],
+    },
     scatter: {
       levels: [
         {
