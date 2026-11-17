@@ -68,7 +68,10 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
-    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
+    // Railshot only pierces, and flak bolts do not.
+    expect(line('scatter_coil', 1, 2).note).toBe(
+      'Also completes Railshot (not with Scatter Coil yet).'
+    );
   });
 
   it('a new card short of a milestone shows where its family leads', () => {
@@ -86,6 +89,49 @@ describe('upgrade card build line', () => {
       'the ship vanishes',
     ]);
     expect(line('heat_sink', 1, 3).steps.map(({ at }) => at)).toEqual([5]);
+  });
+
+  it('a family form that does nothing for the weapon in hand says so', () => {
+    const held = (weaponId) => ({ weaponId, chip: weaponId });
+    const what = (id, owned, weaponId) =>
+      buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
+        (step) => step.what
+      );
+    // The Furnace Corona lands no lance hit: Railshot and Coilgun miss it.
+    expect(what('multishot', 0, 'furnace-corona')).toEqual([
+      'not with Furnace Corona yet',
+      'not with Furnace Corona yet',
+    ]);
+    // Flak bolts do not pierce, but Coilgun's damage reaches them.
+    expect(what('multishot', 0, 'scatter')).toEqual([
+      'not with Scatter Coil yet',
+      'lances pierce everything',
+    ]);
+    // Its own family evolves the weapon itself.
+    expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
+      'every 3rd pulse is a nova'
+    );
+    expect(
+      buildLine(card('multishot'), {
+        rank: 1,
+        owned: 2,
+        weapon: held('shard-halo'),
+      }).note
+    ).toBe(
+      'not with Shard Halo yet · Momentum +12% top speed and acceleration'
+    );
+  });
+
+  it('the card face reads the text for the weapon in hand', () => {
+    const face = (weaponId) =>
+      cardMarkup(
+        card('multishot'),
+        { rank: 1, owned: 0 },
+        { weapon: { weaponId, chip: weaponId } }
+      );
+    expect(face('lance')).toContain('Fires one additional projectile');
+    expect(face('furnace-corona')).toContain('The ring reaches');
+    expect(face('furnace-corona')).not.toContain('projectile');
   });
 
   it('a cursed card has no family to build', () => {

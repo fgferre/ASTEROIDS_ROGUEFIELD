@@ -15,6 +15,7 @@ import UPGRADE_LIBRARY, {
   UPGRADE_CATEGORIES,
   WEAPON_CARD_IDS,
   pilotCardIds,
+  textForWeapon,
   trailSteps,
 } from '../data/upgrades/index.js';
 import {
@@ -597,7 +598,8 @@ class UpgradeSystem extends BaseSystem {
     const levels = asArray(definition.levels);
     const maxLevel = levels.length;
     const category = this.resolveUpgradeCategory(definition.category);
-    const text = definition.text || {};
+    // The text with the weapon in hand (a card can act differently with it).
+    const text = textForWeapon(definition, this.currentWeaponId()) || {};
     const levelTexts = asArray(text.levels);
     const hasNextLevel = currentLevel < maxLevel;
     const nextLevelDefinition = hasNextLevel ? levels[currentLevel] : null;

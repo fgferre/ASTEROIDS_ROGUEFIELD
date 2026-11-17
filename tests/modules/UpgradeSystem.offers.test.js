@@ -386,6 +386,86 @@ describe('level-up offers', () => {
     });
   });
 
+  describe('card text for the weapon in hand', () => {
+    // The next rank's text the offer shows for `id`, with `weaponId` held
+    // and `id` already at `rank`.
+    const shown = (id, weaponId = 'lance', rank = 0) => {
+      const progression = createProgression(9);
+      if (weaponId !== 'lance') {
+        const weapon = listContent('weapons').find((w) => w.id === weaponId);
+        progression.appliedUpgrades.set(weapon.card.id, 1);
+      }
+      if (rank) progression.appliedUpgrades.set(id, rank);
+      return progression.buildUpgradeOption(card(progression, id)).nextLevel;
+    };
+
+    it("a weapon's override replaces what it names at that rank and keeps the rest", () => {
+      expect(shown('chain_capacitor', 'arc-caster')).toMatchObject({
+        title: 'Spare Charge',
+        description: 'Every cast jumps once more.',
+        highlights: ['On top of the jumps Multishot adds.'],
+      });
+      const scatter = shown('chain_capacitor', 'scatter');
+      expect(scatter.description).toContain('flak bolts have a 10% chance');
+      expect(scatter.highlights).toEqual(shown('chain_capacitor').highlights);
+      // Another weapon reads the base text.
+      expect(shown('chain_capacitor', 'shard-halo').description).toBe(
+        shown('chain_capacitor').description
+      );
+    });
+
+    it('Plasma Gun names every weapon, not projectiles', () => {
+      expect(shown('plasma', 'furnace-corona').description).toBe(
+        'Every weapon deals immediately +25% damage.'
+      );
+    });
+
+    it('Arc Lattice strikes on its own, not where the cannon aims', () => {
+      expect(shown('arc_lattice', 'shard-halo').highlights[0]).toBe(
+        'It needs no aim: it strikes beside any weapon.'
+      );
+    });
+
+    it('Multishot says what grows with each weapon', () => {
+      expect(shown('multishot', 'lance', 1).description).toBe(
+        'Adds a third projectile per sequence.'
+      );
+      expect(shown('multishot', 'furnace-corona').description).toBe(
+        'The ring reaches 10 px further: 88 px.'
+      );
+      expect(shown('multishot', 'scatter', 2).description).toBe(
+        'Another flak bolt per volley: 8 in the fan.'
+      );
+      expect(shown('multishot', 'harmonic').description).toContain(
+        'the beam stays single'
+      );
+    });
+
+    it('Thermal Lens names the flak with the Scatter Coil', () => {
+      expect(shown('thermal_lens', 'scatter').description).toBe(
+        'Flak bolt and shrapnel damage +15%.'
+      );
+    });
+
+    it('Targeting Matrix gives a weapon that never aims only its fire rate', () => {
+      expect(shown('targeting_suite', 'furnace-corona').description).toContain(
+        'never aims: nothing changes for it'
+      );
+      expect(shown('targeting_suite', 'shard-halo', 2).description).toBe(
+        'Fire rate +9%. The locks add nothing: the Shard Halo never aims.'
+      );
+      expect(shown('targeting_suite', 'lance', 2).description).toBe(
+        'Locks one threat per shot of the volley, up to four, and fires at all of them. Fire rate +9%.'
+      );
+    });
+
+    it('Afterburn Lance caps the flak bonus at the bolt range', () => {
+      expect(shown('afterburn_lance', 'scatter').description).toBe(
+        'Flak bolts deal +10% damage per 100 px flown: they burst by 180 px, so up to +18%. Lock-on range +15%.'
+      );
+    });
+  });
+
   describe("the hangar's run contract", () => {
     const pilotLevel = UPGRADE_PILOT_OFFER_EVERY * 2;
 

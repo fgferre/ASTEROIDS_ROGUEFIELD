@@ -1,7 +1,13 @@
 import { PALETTE } from '../../data/constants/palette.js';
+import scatter from '../weapons/scatter.js';
 
 // Rounds that hit harder the further they flew (numbers: proposta 20/10).
 const MAX_DISTANCE = 400; // px of flight that still adds damage
+// Per rank: the bonus per 100 px and the lock range, cumulative (+%).
+const BONUS = [10, 15, 20];
+const LOCK_RANGE = [15, 32, 52];
+// A flak bolt bursts by the end of its range: the most it can fly.
+const BOLT_RANGE = scatter.projectile.range;
 
 export default {
   id: 'afterburn_lance',
@@ -40,6 +46,21 @@ export default {
         highlights: ['Hits the edge of the Field before it reaches you.'],
       },
     ],
+  },
+  // The bonus rides a projectile's own hit (HitResolution): not the beam,
+  // not the shrapnel.
+  weaponText: {
+    scatter: {
+      levels: BONUS.map((bonus, rank) => ({
+        description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%. Lock-on range +${LOCK_RANGE[rank]}%.`,
+        highlights: ['Only the bolt’s own hit: its shrapnel gains nothing.'],
+      })),
+    },
+    harmonic: {
+      levels: BONUS.map((bonus, rank) => ({
+        description: `Lances deal +${bonus}% damage per 100 px flown (up to +${(bonus * MAX_DISTANCE) / 100}%); the beam gains nothing. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      })),
+    },
   },
   levels: [
     {

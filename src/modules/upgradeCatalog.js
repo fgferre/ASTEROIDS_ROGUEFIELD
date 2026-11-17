@@ -105,6 +105,8 @@ export function normalizeUpgradeDefinition(entry) {
     name: entry.name || '',
     description: entry.description || '',
     text,
+    // Text for a weapon the card acts differently with (textForWeapon).
+    weaponText: entry.weaponText ?? null,
     levels,
   };
 }

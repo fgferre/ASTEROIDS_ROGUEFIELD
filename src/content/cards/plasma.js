@@ -16,7 +16,7 @@ export default {
     levels: [
       {
         title: 'Fusion Coil',
-        description: 'Standard projectiles deal immediately +25% damage.',
+        description: 'Every weapon deals immediately +25% damage.',
         highlights: ['Multiplier applied directly to base damage.'],
       },
       {
