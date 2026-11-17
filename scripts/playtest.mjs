@@ -36,8 +36,10 @@ if (!FLIGHTS.includes(flight)) {
   );
 }
 const trilha = flag('trilha') || '';
-if (trilha && !['b', 'c', 'd'].includes(trilha)) {
-  throw new Error("playtest: --trilha is b, c or d (default: today's order)");
+if (trilha && !['b', 'c', 'd', 'e'].includes(trilha)) {
+  throw new Error(
+    "playtest: --trilha is b, c, d or e (default: today's order)"
+  );
 }
 const difficulty = flag('difficulty') || '';
 const table = args.includes('--table');

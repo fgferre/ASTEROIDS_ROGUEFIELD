@@ -77,6 +77,16 @@ function withTrailOrder(card, trailOrder) {
       ],
     };
   }
+  if (trailOrder === 'e') {
+    return {
+      ...card,
+      unlockLevel: 6,
+      prerequisites: [
+        ...(card.prerequisites ?? []),
+        { type: 'upgrade', id: 'propulsors', level: 1 },
+      ],
+    };
+  }
   if (trailOrder === 'd') {
     return {
       ...card,

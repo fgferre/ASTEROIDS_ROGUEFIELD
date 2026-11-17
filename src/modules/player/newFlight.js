@@ -19,14 +19,15 @@ export function newFlightFromUrl() {
 /**
  * Temporary: the order of the piloting trail for the Auto Turret, `?trilha=b`
  * (after the engine and the brakes), `?trilha=c` (from level 8) or
- * `?trilha=d` (after the engine only); 'a' (today)
+ * `?trilha=d` (after the engine only), `?trilha=e` (level 6, after the
+ * engine, alone in the trail's slot; trail cards without rarity); 'a' (today)
  * when absent or without window. The owner picks one (cartas-trilha, 17/11);
  * then this goes.
  */
 export function trailOrderFromUrl() {
   try {
     const order = new URLSearchParams(window.location.search).get('trilha');
-    return order === 'b' || order === 'c' || order === 'd' ? order : 'a';
+    return ['b', 'c', 'd', 'e'].includes(order) ? order : 'a';
   } catch {
     return 'a';
   }
