@@ -224,6 +224,15 @@ describe('Settings panel', () => {
     ]);
   });
 
+  it('greys Damage Numbers while the game draws none', () => {
+    const { row } = renderSection('hud');
+    expect(isGreyed(row('damageNumbers'))).toBe(true);
+    expect(reasonOf(row('damageNumbers'))).toBe(
+      'The game shows no damage numbers for now.'
+    );
+    expect(isGreyed(row('hitMarkers'))).toBe(false);
+  });
+
   it('greys Difficulty while a Pressure rung is on', () => {
     expect(
       isGreyed(
