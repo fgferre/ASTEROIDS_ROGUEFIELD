@@ -171,7 +171,7 @@ class AudioSystem extends BaseSystem {
         }),
     });
 
-    // The journey's score (./audio/journeyCue.js), on the music path at the
+    // The journey's recorded score (./audio/journeyCue.js), on the music path at the
     // duck stage, like the file tracks.
     this.journeyCue = createJourneyCue({
       getContext: () => this.context,

@@ -9,6 +9,7 @@ import {
   SECTOR_SCORE_MIX as MIX,
   chapterScoreForLayer,
 } from '../../data/audio/sectorScores.js';
+import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
 import {
@@ -177,9 +178,11 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sectorScore.start(payload?.sector);
   },
 
-  // A sector is picked (the map, the result screen): its music is fetched.
+  // A sector is picked (the map, the result screen): its music and its
+  // journey's cue are fetched.
   sectorScorePrefetch(audio, payload) {
     audio.sectorScore.prefetch(payload?.sector);
+    audio.journeyCue.prefetch(sectorById(payload?.sector)?.chapter);
   },
 
   // The campaign's last sector won: its score fades out, the victory plays.
@@ -196,10 +199,12 @@ export const AUDIO_EVENT_HANDLERS = {
     );
   },
 
-  // The journey's score (./journeyCue.js) plays alone, the layers held
-  // down; at its end (or a skip) the sector's music comes in.
+  // The journey's score (./journeyCue.js), the recording of the destination
+  // sector's chapter (the run's sector, set as it started), plays alone, the
+  // layers held down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
-    if (audio.journeyCue.play(payload ?? {})) {
+    const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
+    if (audio.journeyCue.play({ ...payload, chapter })) {
       audio.musicMixer.holdForJourney(true);
       audio.sectorScore.holdForJourney(true);
     }

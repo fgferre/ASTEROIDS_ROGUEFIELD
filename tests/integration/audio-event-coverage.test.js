@@ -315,8 +315,9 @@ describe('music themes + stingers follow the run (wave / boss events)', () => {
     const hold = vi.spyOn(audio.musicMixer, 'holdForJourney');
     const plan = { moments: [{ id: 'ignite', at: 1.4 }], duration: 10 };
 
+    eventBus.emit('game-started', { sector: 'dense-core' });
     eventBus.emit('travel-planned', plan);
-    expect(audio.journeyCue.play).toHaveBeenCalledWith(plan);
+    expect(audio.journeyCue.play).toHaveBeenCalledWith({ ...plan, chapter: 2 });
     expect(hold).toHaveBeenLastCalledWith(true);
 
     eventBus.emit('travel-moment', { id: 'brake' });
