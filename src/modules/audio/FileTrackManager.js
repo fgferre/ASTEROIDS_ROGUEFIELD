@@ -31,6 +31,10 @@
  *     MediaElementSource instance is created exactly once and reused.
  */
 
+import { SECTOR_SCORE_MIX as PAUSE_MIX } from '../../data/audio/sectorScores.js';
+
+const MUFFLE_OPEN_HZ = 20000;
+
 const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
   EAGER: 'eager',
   DEFERRED: 'deferred',
@@ -180,6 +184,18 @@ class FileTrackManager {
 
     this.context = context;
     this.targetNode = targetNode || null;
+    // Every track passes one shared muffle (a lowpass and a gain), open by
+    // default; settings opened from the menu close it like the in-run pause.
+    this._muffle = null;
+    if (this.targetNode) {
+      const lowpass = context.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(MUFFLE_OPEN_HZ, context.currentTime);
+      const gain = context.createGain();
+      lowpass.connect(gain);
+      gain.connect(this.targetNode);
+      this._muffle = { lowpass, gain };
+    }
     this._ensureRunning =
       typeof ensureRunning === 'function' ? ensureRunning : null;
     this.initialized = true;
@@ -293,8 +309,9 @@ class FileTrackManager {
     if (!state.trackGain) {
       state.trackGain = this.context.createGain();
       state.trackGain.gain.setValueAtTime(0, now);
-      if (this.targetNode && typeof state.trackGain.connect === 'function') {
-        state.trackGain.connect(this.targetNode);
+      const input = this._muffle?.lowpass || this.targetNode;
+      if (input && typeof state.trackGain.connect === 'function') {
+        state.trackGain.connect(input);
       }
     }
 
@@ -642,6 +659,23 @@ class FileTrackManager {
     state._retryQueued = false;
   }
 
+  /** Muffle every track (lowpass + lower gain) or open them back. */
+  setMuffled(muffled) {
+    if (!this._muffle) return;
+    const { lowpass, gain } = this._muffle;
+    const now = this.context.currentTime;
+    const end = now + PAUSE_MIX.pauseRampSeconds;
+    lowpass.frequency.cancelScheduledValues(now);
+    lowpass.frequency.setValueAtTime(lowpass.frequency.value, now);
+    lowpass.frequency.exponentialRampToValueAtTime(
+      muffled ? PAUSE_MIX.pauseLowpassHz : MUFFLE_OPEN_HZ,
+      end
+    );
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(muffled ? PAUSE_MIX.pauseGain : 1, end);
+  }
+
   /**
    * Tear down ALL tracks and detach the manager. Idempotent (guarded). After
    * dispose no track node is connected and no retry is pending.
@@ -653,6 +687,8 @@ class FileTrackManager {
       this.evictTrack(trackId);
     });
 
+    this._muffle?.gain.disconnect();
+    this._muffle = null;
     this.activeTrackId = null;
     this.currentScreen = null;
     this.context = null;
