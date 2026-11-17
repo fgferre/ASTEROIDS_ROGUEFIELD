@@ -397,6 +397,10 @@ class PlayerSystem extends BaseSystem {
     this.registerEventListener('upgrade-boss-repair', (data) => {
       this.bossRepairFraction = data.fraction;
     });
+    // Hull Patch: an instant repair of a fraction of the max hull.
+    this.registerEventListener('upgrade-hull-repair', (data) => {
+      this.heal(this.maxHealth * data.fraction);
+    });
     this.registerEventListener('player-leveled-up', () => {
       if (this.levelUpRepair > 0) this.heal(this.levelUpRepair);
     });

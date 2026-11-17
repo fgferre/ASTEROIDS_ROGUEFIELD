@@ -28,6 +28,7 @@ export function cacheStaticNodes() {
       banishHint: document.getElementById('levelup-banish-hint') || null,
       headStart: document.getElementById('levelup-headstart') || null,
       equipBtn: document.getElementById('levelup-equip-btn') || null,
+      run: document.getElementById('levelup-run') || null,
     },
     chest: {
       screen: document.getElementById('chest-screen') || null,
@@ -72,6 +73,7 @@ export function cacheStaticNodes() {
       build: document.getElementById('pause-build-block') || null,
       tools: document.getElementById('pause-build-tools') || null,
       seed: document.getElementById('pause-run-seed') || null,
+      run: document.getElementById('pause-build-run') || null,
     },
     codex: {
       overlay: document.getElementById('codex-screen') || null,

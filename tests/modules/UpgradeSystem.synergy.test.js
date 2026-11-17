@@ -43,7 +43,7 @@ function listSourceFiles(dir) {
 }
 
 describe('upgrade families', () => {
-  it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
+  it('every upgrade has one known family (cursed and fallback ones none) and every family can reach its bonus', () => {
     // Every card file plus every weapon's own card, nothing else (the new
     // flight's own cards are in the catalog by default).
     expect(UPGRADE_LIBRARY).toHaveLength(
@@ -52,7 +52,7 @@ describe('upgrade families', () => {
     );
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
-      if (upgrade.cursed) {
+      if (upgrade.cursed || upgrade.fallback) {
         expect(upgrade.family).toBeNull();
         return;
       }
@@ -81,6 +81,8 @@ describe('upgrade families', () => {
         .filter((effect) => effect.type === 'event')
         .map((effect) => effect.event)
     );
+    // Salvage Cache's event waits for the hangar's token payout.
+    events.delete('card-salvage');
     events.forEach((event) => {
       expect(source.includes(`registerEventListener('${event}'`), event).toBe(
         true

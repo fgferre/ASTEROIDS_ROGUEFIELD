@@ -8,6 +8,7 @@ import {
   UPGRADE_FAMILY_STEER_PER_CARD,
   UPGRADE_WEAPON_OFFER_LEVELS,
   UPGRADE_PILOT_OFFER_EVERY,
+  UPGRADE_CARD_SLOTS,
 } from '../../src/core/GameConstants.js';
 import { FAMILY_APEX_THRESHOLD } from '../../src/data/upgrades/families.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
@@ -117,10 +118,15 @@ describe('level-up offers', () => {
 
   it('every offer holds a card the run does not own yet, while any remain', () => {
     const progression = createProgression(10);
+    // The old flight's draw: the card slots are the new flight's cap.
+    progression.pilotCardIds = [];
     // Own one rank of every card but Magnetic Field (one weapon card, which
     // rules the other out).
     progression.upgradeDefinitions
-      .filter(({ id }) => id !== 'magfield' && id !== WEAPON_CARD_IDS[1])
+      .filter(
+        ({ id, fallback }) =>
+          !fallback && id !== 'magfield' && id !== WEAPON_CARD_IDS[1]
+      )
       .forEach(({ id }) => progression.appliedUpgrades.set(id, 1));
     expect(
       progression
@@ -218,5 +224,114 @@ describe('level-up offers', () => {
     for (let i = 0; i < 40; i += 1) {
       expect(hasWeapon(offerIds(armed))).toBe(false);
     }
+  });
+
+  describe('card slots', () => {
+    // Eight distinct cards held, the piloting trail and the weapons aside.
+    const fill = (progression, extra = []) => {
+      const ids = progression.upgradeDefinitions
+        .filter(
+          ({ id, fallback }) =>
+            !fallback &&
+            !progression.pilotCardIds.includes(id) &&
+            !WEAPON_CARD_IDS.includes(id)
+        )
+        .slice(0, 8 - extra.length)
+        .map(({ id }) => id);
+      [...ids, ...extra].forEach((id) =>
+        progression.appliedUpgrades.set(id, 1)
+      );
+      return progression;
+    };
+    const maxOut = (progression) =>
+      progression.appliedUpgrades.forEach((_, id) =>
+        progression.appliedUpgrades.set(id, card(progression, id).levels.length)
+      );
+
+    it('with 8 held, regular offers only rank up held cards', () => {
+      for (let seed = 1; seed <= 20; seed += 1) {
+        const progression = fill(createProgression(5, seed));
+        // Nothing held is maxed here: every held card has a rank to take.
+        const held = [...progression.appliedUpgrades.keys()];
+        const rankable = held.filter(
+          (id) =>
+            progression.getUpgradeCount(id) <
+            card(progression, id).levels.length
+        );
+        offerIds(progression, 5)
+          .filter((id) => !progression.pilotCardIds.includes(id))
+          .forEach((id) => expect(rankable).toContain(id));
+      }
+    });
+
+    it('with 8 held and nothing to rank, positions fill with trail cards, then the fallback', () => {
+      const progression = fill(createProgression(5));
+      maxOut(progression);
+      const trail = progression.trailSlotIds();
+      const ids = offerIds(progression, 5);
+      expect(ids).toHaveLength(3);
+      // Every trail card the way allows (the rest wait on prerequisites).
+      const open = progression
+        .getEligibleUpgradeDefinitions()
+        .filter(({ id }) => trail.includes(id))
+        .map(({ id }) => id);
+      expect(open.length).toBeGreaterThan(0);
+      open.forEach((id) => expect(ids).toContain(id));
+      ids
+        .filter((id) => !trail.includes(id))
+        .forEach((id) => expect(['hull_patch', 'salvage_cache']).toContain(id));
+      // No trail card left to offer: the offer is fallback cards alone.
+      progression.pilotCardIds.forEach((id) =>
+        progression.appliedUpgrades.set(id, 3)
+      );
+      progression.trailSlotIds = () => [];
+      expect(offerIds(progression, 5).sort()).toEqual([
+        'hull_patch',
+        'salvage_cache',
+      ]);
+    });
+
+    it('offers Hull Patch when the hull is hurt, Salvage Cache when it is full', () => {
+      const progression = fill(createProgression(5));
+      maxOut(progression);
+      progression.trailSlotIds = () => [];
+      progression.playerService = {
+        getStats: () => ({ health: 50, maxHealth: 100 }),
+      };
+      expect(offerIds(progression, 5)[0]).toBe('hull_patch');
+      progression.playerService = {
+        getStats: () => ({ health: 100, maxHealth: 100 }),
+      };
+      expect(offerIds(progression, 5)[0]).toBe('salvage_cache');
+    });
+
+    it('a fallback pick is spent, never held, and can come again', () => {
+      const progression = fill(createProgression(5));
+      expect(progression.applyUpgrade('salvage_cache')).toBe(true);
+      expect(progression.applyUpgrade('salvage_cache')).toBe(true);
+      expect(progression.getCardSlots().used).toBe(8);
+    });
+
+    it('getCardSlots ignores trail cards and counts the weapon card', () => {
+      const progression = createProgression(5);
+      progression.appliedUpgrades.set('propulsors', 1);
+      progression.appliedUpgrades.set('shield', 1);
+      progression.appliedUpgrades.set(WEAPON_CARD_IDS[0], 1);
+      expect(progression.getCardSlots()).toEqual({
+        used: 2,
+        max: UPGRADE_CARD_SLOTS,
+        ids: ['shield', WEAPON_CARD_IDS[0]],
+      });
+    });
+
+    it('the old flight has no cap', () => {
+      const progression = fill(createProgression(5));
+      progression.pilotCardIds = [];
+      expect(progression.slotsFull()).toBe(false);
+      const fresh = offerIds(progression, 5).filter(
+        (id) => progression.getUpgradeCount(id) === 0
+      );
+      expect(fresh.length).toBeGreaterThan(0);
+    });
   });
 });

@@ -167,7 +167,8 @@ describe('content scene on a live run', () => {
     it('is applied, with rocks and Motes ahead', () => {
       const { first } = play('cards', item);
 
-      expect(first.cardRank).toBe(1);
+      // A fallback card is spent on the pick, never held.
+      expect(first.cardRank).toBe(item.fallback ? 0 : 1);
       expect(countType(first.enemies, 'asteroid')).toBe(6);
       expect(countType(first.enemies, 'drone')).toBe(3);
     });

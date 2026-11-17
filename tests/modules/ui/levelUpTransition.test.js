@@ -213,6 +213,7 @@ describe('Level-up card transition', () => {
         text: { name: 'a', levels: [{ description: 'Fire rate +11%.' }] },
       };
       const levelUp = new LevelUpScreen({
+        refs: {},
         progression: () => ({
           upgradeLookup: new Map([['a', definition]]),
           getUpgradeCount: () => 0,

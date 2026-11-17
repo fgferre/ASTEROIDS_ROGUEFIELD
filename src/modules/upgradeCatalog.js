@@ -88,6 +88,8 @@ export function normalizeUpgradeDefinition(entry) {
       : UPGRADE_RARITIES[0],
     // A big boost with a real cost; no family.
     cursed: entry.cursed === true,
+    // A card offered only when the offer can't be filled; never held.
+    fallback: entry.fallback === true,
     icon: entry.icon || '✨',
     themeColor:
       entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,

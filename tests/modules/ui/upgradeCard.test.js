@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import UPGRADE_LIBRARY from '../../../src/data/upgrades/index.js';
+import UPGRADE_LIBRARY, {
+  pilotCardIds,
+  trailSteps,
+} from '../../../src/data/upgrades/index.js';
 import { UPGRADE_FAMILIES } from '../../../src/data/upgrades/families.js';
 import {
   buildLine,
   cardMarkup,
+  cardState,
   familyColor,
+  runTrayMarkup,
 } from '../../../src/modules/ui/upgradeCard.js';
 
 const card = (id) => UPGRADE_LIBRARY.find((entry) => entry.id === id);
@@ -130,5 +135,72 @@ describe('upgrade card build line', () => {
     expect(assist['--rarity-rare']).toBeTruthy();
     expect(assist['--rarity-cursed']).toBeTruthy();
     expect(assist['--rarity-rare']).not.toBe(assist['--rarity-cursed']);
+  });
+});
+
+describe('card slots and piloting trail', () => {
+  // The new flight's catalog, with `held` cards at their ranks.
+  const run = (held) => {
+    const applied = new Map(Object.entries(held));
+    const pilot = pilotCardIds(UPGRADE_LIBRARY);
+    const ids = [...applied.keys()].filter((id) => !pilot.includes(id));
+    return {
+      upgradeLookup: new Map(UPGRADE_LIBRARY.map((entry) => [entry.id, entry])),
+      pilotCardIds: pilot,
+      trailSteps: trailSteps(UPGRADE_LIBRARY),
+      getUpgradeCount: (id) => applied.get(id) ?? 0,
+      getFamilyCounts: () => ({}),
+      getCardSlots: () => ({ used: ids.length, max: 8, ids }),
+    };
+  };
+  const build = {
+    plasma: 2,
+    multishot: 1,
+    heat_sink: 1,
+    shield: 1,
+    scatter_coil: 1,
+    propulsors: 1,
+    braking_system: 2,
+  };
+  const count = (html, name) => html.split(name).length - 1;
+
+  it('counts the held cards outside the trail, the weapon card first', () => {
+    const html = runTrayMarkup(run(build));
+    expect(html).toContain('5<small>/8</small>');
+    expect(html.indexOf('is-weapon')).toBeLessThan(html.indexOf('<em>2</em>'));
+    expect(count(html, 'run-slot is-empty')).toBe(3);
+    expect(html).not.toContain('Full · upgrades only');
+  });
+
+  it('a new card shows as a ghost in the next free slot; a trail or fallback card does not', () => {
+    const progression = run(build);
+    expect(runTrayMarkup(progression, { ghost: 'magfield' })).toContain(
+      'is-ghost'
+    );
+    ['braking_system', 'hull_patch', 'plasma'].forEach((ghost) =>
+      expect(runTrayMarkup(progression, { ghost })).not.toContain('is-ghost')
+    );
+  });
+
+  it('full at eight: amber count, the tag, and no ghost', () => {
+    const full = { ...build, magfield: 1, cinder_trail: 1, static_shell: 1 };
+    const html = runTrayMarkup(run(full), { ghost: 'wide_net' });
+    expect(html).toContain('is-full');
+    expect(html).toContain('Full · upgrades only');
+    expect(html).not.toContain('is-ghost');
+  });
+
+  it('the trail counts its steps and rings the one an offered card brings', () => {
+    const progression = run(build);
+    const html = runTrayMarkup(progression, { offered: ['braking_system'] });
+    expect(html).toContain('3<small>/9</small>');
+    expect(html).toContain('Brakes 2/3');
+    expect(count(html, 'trail-map__ring')).toBe(1);
+    const state = cardState(progression, 'braking_system');
+    expect(state.trail).toEqual({ step: 4, total: 9 });
+    expect(cardMarkup(state.definition, state, { weapon: lance })).toContain(
+      'Trail · step 4 of 9'
+    );
+    expect(cardState(progression, 'plasma').trail).toBeNull();
   });
 });
