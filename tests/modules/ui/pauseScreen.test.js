@@ -20,6 +20,8 @@ describe('Pause screen', () => {
       showScreen: () => {},
       progression: () => ({
         pilotCardIds: [],
+        openCards: null,
+        sealedCards: new Set(),
         rerollsLeft: 2,
         banishesLeft: 1,
         upgradeLookup: new Map(),

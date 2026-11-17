@@ -45,6 +45,8 @@ function ceremony({ reducedMotion = false } = {}) {
     getUpgradeCount: (id) => counts.get(id) ?? 0,
     getFamilyCounts: () => ({ thermal: 1 }),
     pilotCardIds: [],
+    openCards: null,
+    sealedCards: new Set(),
   };
   const refs = {
     screen: node(),
