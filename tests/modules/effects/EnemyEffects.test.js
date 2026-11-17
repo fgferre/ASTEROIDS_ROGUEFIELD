@@ -52,6 +52,28 @@ describe('EnemyEffects', () => {
     expect(hitStops).toHaveLength(3);
   });
 
+  it('marks the pieces a machine breaks into as metal, a rock’s as not', () => {
+    const { effects, particleEffects } = createEnemyEffects();
+    effects.createAsteroidExplosion({ type: 'husk', x: 10, y: 10, radius: 20 });
+    const machine = particleEffects.particles.filter(
+      (p) => p.type === 'debris'
+    );
+    expect(machine.length).toBeGreaterThan(0);
+    machine.forEach((p) => expect(p.material).toBe('metal'));
+
+    particleEffects.particles.length = 0;
+    effects.createAsteroidExplosion({
+      type: 'asteroid',
+      size: 'small',
+      x: 10,
+      y: 10,
+      radius: 12,
+    });
+    particleEffects.particles
+      .filter((p) => p.type === 'debris')
+      .forEach((p) => expect(p.material).toBeUndefined());
+  });
+
   it('scales an asteroid burst by the particle density it is given', () => {
     const asteroid = { size: 'medium', radius: 22, x: 50, y: 50 };
     const full = createEnemyEffects(1);

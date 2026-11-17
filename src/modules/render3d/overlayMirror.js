@@ -20,39 +20,6 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
     player.position;
 
   if (effects) {
-    const markers = effects.hitMarkers || [];
-    for (let i = 0; i < markers.length; i += 1) {
-      const m = markers[i];
-      if (!m) continue;
-      const alpha = Math.max(0, m.life / m.maxLife);
-      const r = m.size + m.expansion;
-      const k = m.killed ? Math.SQRT1_2 : 1;
-      const a = r * k;
-      const b = m.killed ? a : 0;
-      const gain = 0.7 * alpha;
-      // two bars of light that face the camera, never a flat cross
-      ribbons.tube(
-        m.x - a,
-        m.y - b,
-        m.x + a,
-        m.y + b,
-        OVERLAY_H,
-        t.textRgb,
-        1.2,
-        gain
-      );
-      ribbons.tube(
-        m.x + b,
-        m.y - a,
-        m.x - b,
-        m.y + a,
-        OVERLAY_H,
-        t.textRgb,
-        1.2,
-        gain
-      );
-    }
-
     const texts = effects.damageTexts || [];
     for (let i = 0; i < texts.length; i += 1) {
       const d = texts[i];
