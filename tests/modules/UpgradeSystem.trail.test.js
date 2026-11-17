@@ -32,7 +32,7 @@ const trailIds = (progression, level) => {
     .filter((id) => progression.pilotCardIds.includes(id));
 };
 
-describe('?trilha=e, the Auto Turret alone in the trail slot from level 6', () => {
+describe('the trail, the Auto Turret alone in the trail slot from level 6', () => {
   beforeEach(() => setupGlobalMocks());
   afterEach(() => {
     cleanupGlobalState();
@@ -40,7 +40,7 @@ describe('?trilha=e, the Auto Turret alone in the trail slot from level 6', () =
   });
 
   it('level 2 offers the engine, and the turret is not eligible before level 6', async () => {
-    const { progression } = await load('?trilha=e');
+    const { progression } = await load('');
     expect(trailIds(progression, 2)).toEqual(['propulsors']);
     progression.applyUpgrade('propulsors');
     progression.level = 4;
@@ -50,7 +50,7 @@ describe('?trilha=e, the Auto Turret alone in the trail slot from level 6', () =
   });
 
   it('from level 6 the slot offers only the turret until it is held', async () => {
-    const { progression } = await load('?trilha=e');
+    const { progression } = await load('');
     progression.applyUpgrade('propulsors');
     for (const level of [6, 8, 10]) {
       expect(trailIds(progression, level)).toEqual(['auto_aim']);
@@ -59,27 +59,16 @@ describe('?trilha=e, the Auto Turret alone in the trail slot from level 6', () =
     expect(trailIds(progression, 12)).not.toContain('auto_aim');
   });
 
-  it('the trail cards show no rarity, other cards and other orders keep it', async () => {
+  it('the trail cards show no rarity, other cards keep it', async () => {
     const face = (ui, progression, id) => {
       const state = ui.cardState(progression, id);
       return ui.cardMarkup(state.definition, state, {
         weapon: { weaponId: 'lance', chip: 'LANCE' },
       });
     };
-    const e = await load('?trilha=e');
+    const e = await load('');
     expect(face(e.ui, e.progression, 'propulsors')).not.toContain('card__rar');
     expect(face(e.ui, e.progression, 'propulsors')).toContain('Trail · step');
     expect(face(e.ui, e.progression, 'plasma')).toContain('card__rar-name');
-    const a = await load('');
-    expect(face(a.ui, a.progression, 'propulsors')).toContain('card__rar-name');
-  });
-
-  it('the default order keeps the turret from level 1 data, not alone in the slot', async () => {
-    const { progression } = await load('');
-    progression.level = 6;
-    expect(progression.trailSlotIds()).toEqual(
-      expect.arrayContaining(['propulsors'])
-    );
-    expect(progression.trailOrder).toBe('a');
   });
 });

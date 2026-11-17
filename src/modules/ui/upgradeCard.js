@@ -15,7 +15,6 @@ import {
   UPGRADE_FAMILIES,
 } from '../../data/upgrades/families.js';
 import { textForWeapon } from '../../data/upgrades/index.js';
-import { trailOrderFromUrl } from '../player/newFlight.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS, WEAPONS } from '../../data/weapons.js';
 
 // Each family's shape, 12 × 12: thermal a drop, kinetic a disc, arc a bolt,
@@ -494,11 +493,8 @@ export function cardMarkup(definition, state, { weapon, key = null, held }) {
   const trail = state.trail
     ? `<span class="card__trail"><i class="card__trail-mark" aria-hidden="true"></i>Trail · step ${state.trail.step} of ${state.trail.total}</span>`
     : '';
-  // Temporary (?trilha=e): the trail's cards show no rarity.
-  const rarity =
-    state.piloting && trailOrderFromUrl() === 'e'
-      ? ''
-      : rarityMarkup(definition);
+  // The trail's cards show no rarity.
+  const rarity = state.piloting ? '' : rarityMarkup(definition);
   return `${heldMark}${trail}<span class="card__top">${rarity}${kbd}</span>
     <span class="card__id">${iconMarkup(definition)}<span class="card__names">
       <span class="card__name">${definition.text?.name ?? definition.id}</span>

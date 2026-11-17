@@ -169,7 +169,8 @@ describe('AchievementService', () => {
     const arc = UPGRADE_LIBRARY.filter(({ family }) => family === 'arc');
     expect(arc.length).toBeGreaterThan(3);
     progression.applyUpgrade('multishot'); // the Targeting Suite needs it
-    progression.applyUpgrade('auto_aim'); // and, in the new flight, the turret
+    progression.applyUpgrade('propulsors'); // and, in the new flight, the turret
+    progression.applyUpgrade('auto_aim'); // after the engine
 
     arc.slice(0, -1).forEach(({ id }) => {
       expect(progression.applyUpgrade(id)).toBe(true);
@@ -229,7 +230,8 @@ describe('AchievementService', () => {
     );
     expect(progression.applyUpgrade(weaponOf('thermal').id)).toBe(true);
     progression.applyUpgrade('multishot'); // the Targeting Suite needs it
-    progression.applyUpgrade('auto_aim'); // and, in the new flight, the turret
+    progression.applyUpgrade('propulsors'); // and, in the new flight, the turret
+    progression.applyUpgrade('auto_aim'); // after the engine
 
     arc.slice(0, -1).forEach(({ id }) => progression.applyUpgrade(id));
     expect(progression.isFamilyComplete('arc')).toBe(false);

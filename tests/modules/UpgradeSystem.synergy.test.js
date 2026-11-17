@@ -6,7 +6,6 @@ import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY, {
   cardsForFlight,
   pilotCardIds,
-  trailSteps,
 } from '../../src/data/upgrades/index.js';
 import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
@@ -122,39 +121,6 @@ describe('upgrade families', () => {
       'propulsors',
       'rcs_system',
     ]);
-  });
-
-  it('the temporary trail orders move only the Auto Turret, and only in the new flight', () => {
-    const turret = (newFlight, order) =>
-      cardsForFlight(listContent('cards'), newFlight, order).find(
-        (card) => card.id === 'auto_aim'
-      );
-    const today = turret(true, 'a');
-    expect(turret(true)).toEqual(today);
-    expect(today.rarity).toBe('common');
-
-    const afterBrakes = turret(true, 'b');
-    expect(afterBrakes.rarity).toBe('rare');
-    expect(afterBrakes.prerequisites).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'propulsors', level: 1 }),
-        expect.objectContaining({ id: 'braking_system', level: 1 }),
-      ])
-    );
-    const steps = trailSteps(cardsForFlight(listContent('cards'), true, 'b'));
-    expect(steps.get('auto_aim')).toBe(1);
-    expect(steps.get('propulsors')).toBeGreaterThanOrEqual(1);
-    expect(steps.get('braking_system')).toBeGreaterThanOrEqual(1);
-
-    const afterEngine = turret(true, 'd');
-    expect(afterEngine.rarity).toBe('common');
-    expect(afterEngine.prerequisites).toEqual([
-      expect.objectContaining({ id: 'propulsors', level: 1 }),
-    ]);
-
-    const late = turret(true, 'c');
-    expect(late).toMatchObject({ rarity: 'rare', unlockLevel: 8 });
-    expect(turret(false, 'c')).toBeUndefined();
   });
 });
 

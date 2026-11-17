@@ -23,7 +23,6 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   FAMILY_APEX_THRESHOLD,
 } from '../data/upgrades/families.js';
-import { trailOrderFromUrl } from './player/newFlight.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { hashString } from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -93,7 +92,6 @@ class UpgradeSystem extends BaseSystem {
     this.upgradeLookup = buildUpgradeLookup(this.upgradeDefinitions);
     this.pilotCardIds = pilotCardIds(this.upgradeDefinitions);
     this.trailSteps = trailSteps(this.upgradeDefinitions);
-    this.trailOrder = trailOrderFromUrl(); // temporary (?trilha=)
     this.upgradeCategoryMap = buildUpgradeCategoryMap(UPGRADE_CATEGORIES);
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.refreshInjectedServices({ force: true });
@@ -365,11 +363,10 @@ class UpgradeSystem extends BaseSystem {
   // piloting card (the owner's plan, 16/11: a trail of its own to the last
   // card).
   trailSlotIds() {
-    // Temporary (?trilha=e): once the Auto Turret is eligible and not held,
-    // the slot offers it and nothing else.
+    // Once the Auto Turret is eligible and not held, the slot offers it and
+    // nothing else.
     const turret = this.upgradeLookup.get('auto_aim');
     if (
-      this.trailOrder === 'e' &&
       turret &&
       this.getUpgradeCount('auto_aim') === 0 &&
       this.isUpgradeSelectable(turret)
