@@ -66,7 +66,6 @@ export const SECTOR_SCORES = Object.freeze({
 export const SECTOR_SCORE_STINGERS = Object.freeze({
   bossWarning: url('sting-boss-warning.mp3'),
   sectorCleared: url('sting-sector-cleared.mp3'),
-  signalLost: url('sting-signal-lost.mp3'),
 });
 
 // Feel values (proposta): the danger (0..1, MusicMixer.runIntensity) opens

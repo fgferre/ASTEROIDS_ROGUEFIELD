@@ -260,9 +260,8 @@ export const AUDIO_EVENT_HANDLERS = {
     if (payload?.screen === 'menu') audio.voiceLines.expect([]);
     const score = audio.sectorScore;
     if (payload?.screen === 'menu') score.stop();
-    else if (payload?.screen === 'gameover') {
-      score.stop({ stinger: 'signalLost' });
-    } else if (payload?.screen === 'victory') {
+    else if (payload?.screen === 'gameover') score.stop();
+    else if (payload?.screen === 'victory') {
       score.stop({ seconds: MIX.victoryFadeSeconds });
     } else if (payload?.source === 'retry-complete' && !score.active) {
       score.start(score.sectorId);

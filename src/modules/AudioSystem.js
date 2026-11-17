@@ -588,6 +588,12 @@ class AudioSystem extends BaseSystem {
     if (payload?.screen && payload.screen !== 'victory') {
       END_SCREEN_TRACKS.forEach((trackId) => this.stopFileTrack(trackId));
     }
+    // The death screen plays its own piece; any other screen lets it go.
+    if (payload?.screen === 'gameover') {
+      this.playFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
+    } else if (payload?.screen) {
+      this.stopFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
+    }
   }
 
   _handleOverlayVisibilityChanged(payload = {}) {
