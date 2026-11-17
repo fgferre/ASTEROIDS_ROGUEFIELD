@@ -161,6 +161,11 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sectorScore.onBossEvent(eventName);
   },
 
+  // The synthesized Warden stinger, unless a recorded score brings its own.
+  wardenStinger(audio) {
+    if (!audio.sectorScore.active) audio.sfxBus.playWardenStinger();
+  },
+
   // A sector with a recorded score plays it instead of the mixer.
   sectorScoreStart(audio, payload) {
     audio.sectorScore.start(payload?.sector);

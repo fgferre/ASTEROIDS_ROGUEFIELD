@@ -206,7 +206,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   // The run-following music: wave progress, the layer's theme, the chapter
   // stinger on a biome's first layer; the boss arc overrides it upwards.
   { on: 'wave-started', run: 'waveStarted' },
-  { on: 'boss-warning', cue: 'playWardenStinger' },
+  { on: 'boss-warning', run: 'wardenStinger' },
   { on: 'boss-warning', run: 'bossArc' },
   { on: 'boss-spawned', cue: 'playBossRoar', facade: true, payload: true },
   { on: 'boss-spawned', run: 'bossArc' },
