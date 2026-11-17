@@ -189,6 +189,7 @@ class MusicMixer {
     this.layers = {};
     this.lowpass = null;
     this.musicPauseFadeGain = null;
+    this.silenceGain = null;
     this.percussionGain = null;
     this._percussionNoise = null;
     this._percussionTarget = 0;
@@ -258,8 +259,15 @@ class MusicMixer {
     pauseFade.gain.setValueAtTime(1, now);
     this.musicPauseFadeGain = pauseFade;
 
-    // lowpass → pauseFade → targetNode (slider stage)
-    lowpass.connect(pauseFade);
+    // --- silenceGain: a recorded sector score replaces the mixer (setSilenced);
+    // the journey's score is not routed through the mixer, so it is unaffected ---
+    const silence = context.createGain();
+    silence.gain.setValueAtTime(1, now);
+    this.silenceGain = silence;
+
+    // lowpass → silence → pauseFade → targetNode (slider stage)
+    lowpass.connect(silence);
+    silence.connect(pauseFade);
     if (targetNode) {
       pauseFade.connect(targetNode);
     }
@@ -551,6 +559,23 @@ class MusicMixer {
         ? MUSIC_JOURNEY.holdSeconds
         : MUSIC_THEME_CROSSFADE.seconds,
     });
+  }
+
+  /**
+   * A recorded sector score plays instead of the mixer: its output ramps to 0
+   * (or back to 1) over `seconds`. The run intensity keeps being computed.
+   *
+   * @param {boolean} silenced
+   * @param {number} [seconds]
+   */
+  setSilenced(silenced, seconds = 0) {
+    if (!this.initialized || !this.context) return;
+    this._rampParam(
+      this.silenceGain?.gain,
+      silenced ? 0 : 1,
+      this.context.currentTime,
+      seconds
+    );
   }
 
   /** The run's level, the boss floor, the journey's hold and arrival. @private */
@@ -1104,6 +1129,10 @@ class MusicMixer {
       this._cancel(this.lowpass.frequency, now);
       this._safeDisconnect(this.lowpass);
     }
+    if (this.silenceGain) {
+      this._cancel(this.silenceGain.gain, now);
+      this._safeDisconnect(this.silenceGain);
+    }
     if (this.musicPauseFadeGain) {
       this._cancel(this.musicPauseFadeGain.gain, now);
       this._safeDisconnect(this.musicPauseFadeGain);
@@ -1112,6 +1141,7 @@ class MusicMixer {
     this.layers = {};
     this.lowpass = null;
     this.musicPauseFadeGain = null;
+    this.silenceGain = null;
     this.percussionGain = null;
     this._percussionNoise = null;
     this.targetNode = null;
