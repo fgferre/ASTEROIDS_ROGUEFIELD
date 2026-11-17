@@ -63,7 +63,9 @@
   /* A card's rarity and an upgrade family's accent (cardScreens.css,
      ui/upgradeCard.js familyAccent), which Colorblind Mode swaps below */
   --rarity-common: color-mix(in srgb, var(--neutral) 70%, var(--text));
-  --rarity-rare: var(--accent);
+  /* Not the focus ring's cyan: a rare card read as the selected one (the
+     owner's call, 17/11). */
+  --rarity-rare: #56b4e9;
   --rarity-epic: var(--xp);
   --rarity-cursed: color-mix(in srgb, var(--boss) 55%, white);
   --family-kinetic: var(--accent);
@@ -113,7 +115,6 @@
    families keep their shapes too. */
 :root[data-color-vision='assist'] {
   --danger: #ff8c1a;
-  --rarity-rare: #56b4e9;
   --rarity-cursed: #cc79a7;
   --family-kinetic: #56b4e9;
   --family-thermal: #d55e00;
