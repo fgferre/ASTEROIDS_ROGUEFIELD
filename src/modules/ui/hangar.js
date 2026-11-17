@@ -35,7 +35,7 @@ export function salvageLine(award) {
 }
 
 const cardOf = (id) => UPGRADE_LIBRARY.find((card) => card.id === id);
-const cardName = (id) => cardOf(id)?.text.name ?? id;
+export const cardName = (id) => cardOf(id)?.text.name ?? id;
 
 /**
  * One licence: the card's name, "Weapon" or its family and summary, then a

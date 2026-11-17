@@ -11,8 +11,16 @@ import {
   getShipModelById,
 } from '../../data/shipModels.js';
 import { isBossRushUnlocked, loadRecords } from '../../services/runRecords.js';
+import {
+  DAILY_DIFFICULTY,
+  DIFFICULTY_LABELS,
+  DIFFICULTY_PRESETS,
+  difficultyId,
+  pressureId,
+  pressureRung,
+} from '../../data/difficulty.js';
 import { menuStatusItems, menuStatusMarkup } from './menuStatus.js';
-import { hullTraitsMarkup, hullUnlockText } from './hangar.js';
+import { cardName, hullTraitsMarkup, hullUnlockText } from './hangar.js';
 
 export class MainMenu {
   /**
@@ -57,6 +65,7 @@ export class MainMenu {
     const { nav, tabs } = this.refs;
     this.prepTab = tab;
     nav.dataset.activeTab = tab;
+    this.refreshPrepSlots();
     tabs.querySelectorAll('[data-prep-tab]').forEach((button) => {
       const active = button.dataset.prepTab === tab;
       button.setAttribute('aria-selected', String(active));
@@ -71,6 +80,106 @@ export class MainMenu {
       if (tab) this.setPrepTab(tab.dataset.prepTab);
     });
     this.setPrepTab(this.prepTab);
+  }
+
+  // The two slots beside Launch: the difficulty list (the presets and the open
+  // Pressure rungs) and the read-only summary of the Hangar's launch choices.
+  // The markup is rebuilt only when it changes, so an open list is not closed.
+  refreshPrepSlots() {
+    const { prepDifficulty, beforeLaunch } = this.refs;
+    if (!prepDifficulty || !beforeLaunch) return;
+    this.setSlot(prepDifficulty, this.difficultyMarkup());
+    this.setSlot(beforeLaunch, this.beforeLaunchMarkup());
+  }
+
+  setSlot(slot, markup) {
+    if (slot.dataset.markup === markup) return;
+    slot.dataset.markup = markup;
+    slot.innerHTML = markup;
+  }
+
+  difficultyMarkup() {
+    const hangar = this.hangar();
+    const daily = this.prepTab === 'daily';
+    const rungs = hangar.pressure.open;
+    const ids = [
+      ...Object.keys(DIFFICULTY_PRESETS),
+      ...Array.from({ length: rungs }, (_, index) => pressureId(index + 1)),
+    ];
+    const preset =
+      difficultyId(this.settings?.getSetting('gameplay', 'difficulty')) ??
+      'veteran';
+    const selected = daily
+      ? DAILY_DIFFICULTY
+      : hangar.pressure.selected > 0
+        ? pressureId(hangar.pressure.selected)
+        : preset;
+    const options = ids
+      .map(
+        (id) =>
+          `<option value="${id}"${id === selected ? ' selected' : ''}>${DIFFICULTY_LABELS[id]}</option>`
+      )
+      .join('');
+    const note = daily
+      ? 'Daily Field is always Veteran'
+      : rungs > 0
+        ? 'Rungs open in the Hangar'
+        : '';
+    return `<label class="prep-field__label" for="prep-difficulty-select">Difficulty</label>
+      <select id="prep-difficulty-select" class="prep-field__select"${daily ? ' disabled' : ''}>${options}</select>${
+        note ? `<p class="prep-field__note">${note}</p>` : ''
+      }`;
+  }
+
+  beforeLaunchMarkup() {
+    const hangar = this.hangar();
+    const school = Boolean(hangar.owned['flight-school']);
+    if (hangar.contractTotal('seals') <= 0 && !school) return '';
+    const chip = (text) => `<span class="prep-chip">${text}</span>`;
+    const chips = [];
+    if (hangar.contractTotal('seals') > 0) {
+      const sealed = hangar.getSealed().map(cardName);
+      chips.push(
+        chip(
+          sealed.length
+            ? `Seal · ${sealed.join(', ')} out of the draw`
+            : 'Seal · nothing sealed'
+        )
+      );
+    }
+    if (school) {
+      chips.push(
+        chip(
+          hangar.startingCard
+            ? `Flight School · start with ${cardName(hangar.startingCard)}`
+            : 'Flight School · no card'
+        )
+      );
+    }
+    return `<span class="prep-field__label">Before launch</span>
+      <div class="prep-chips">${chips.join('')}</div>
+      <button type="button" class="prep-link" data-open-hangar>Change in Hangar →</button>`;
+  }
+
+  bindPrepSlots() {
+    const { prepDifficulty, beforeLaunch, hangarBtn } = this.refs;
+    prepDifficulty?.addEventListener('change', (event) => {
+      const value = event.target.value;
+      const hangar = this.hangar();
+      const rung = pressureRung(value);
+      if (rung > 0) {
+        hangar.setPressure(rung);
+      } else {
+        this.settings.setSetting('gameplay', 'difficulty', value, {
+          source: 'ui',
+        });
+        if (hangar.pressure.selected > 0) hangar.setPressure(0);
+      }
+      this.refreshMenuStatus();
+    });
+    beforeLaunch?.addEventListener('click', (event) => {
+      if (event.target.closest?.('[data-open-hangar]')) hangarBtn?.click();
+    });
   }
 
   getSelectedHullId() {
@@ -217,11 +326,13 @@ export class MainMenu {
       });
 
     this.showHullLine(selectedHullId);
+    this.refreshPrepSlots();
     this.renderMenuShipSelectorPreviews();
   }
 
   // The records strip under the menu title (ui/menuStatus.js).
   refreshMenuStatus() {
+    this.refreshPrepSlots();
     const strip = this.refs.status;
     if (!strip) {
       return;
@@ -319,6 +430,7 @@ export class MainMenu {
 
   bindMainMenuControls() {
     this.bindPrepTabs();
+    this.bindPrepSlots();
     this.bindModeHints();
     // Generic UI Hover Sound Delegation
     // Listens for all menu buttons and interactive elements

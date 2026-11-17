@@ -124,3 +124,89 @@ describe('Main menu mode tabs', () => {
     expect(nav.dataset.activeTab).toBe('campaign');
   });
 });
+
+describe('Main menu launch row', () => {
+  const slot = () => {
+    const slot = { innerHTML: '', dataset: {}, listeners: {} };
+    slot.addEventListener = (type, fn) => (slot.listeners[type] = fn);
+    return slot;
+  };
+  function build({ pressure, owned = {}, seals = 0, sealed = [], start } = {}) {
+    const calls = { pressure: [], settings: [], hangarClicks: 0 };
+    const hangar = {
+      pressure: { open: 2, selected: 0, ...pressure },
+      owned,
+      startingCard: start ?? null,
+      contractTotal: () => seals,
+      getSealed: () => sealed,
+      setPressure: (rung) => calls.pressure.push(rung),
+    };
+    const refs = {
+      prepDifficulty: slot(),
+      beforeLaunch: slot(),
+      hangarBtn: { click: () => calls.hangarClicks++ },
+    };
+    const menu = new MainMenu({
+      refs,
+      settings: {
+        getSetting: () => 'veteran',
+        setSetting: (...args) => calls.settings.push(args),
+      },
+      hangar: () => hangar,
+    });
+    menu.refreshMenuStatus = () => menu.refreshPrepSlots();
+    menu.bindPrepSlots();
+    menu.refreshPrepSlots();
+    return { menu, refs, calls };
+  }
+  const labels = (html) =>
+    [...html.matchAll(/<option[^>]*>([^<]+)</g)].map((m) => m[1]);
+
+  it('lists the presets and exactly the open rungs', () => {
+    const { refs } = build();
+    expect(labels(refs.prepDifficulty.innerHTML)).toEqual([
+      'Pilot',
+      'Veteran',
+      'Warden',
+      'Pressure I',
+      'Pressure II',
+    ]);
+  });
+
+  it('picks a rung through the Hangar, and a preset by clearing the rung', () => {
+    const { refs, calls } = build({ pressure: { selected: 1 } });
+    expect(refs.prepDifficulty.innerHTML).toContain(
+      'value="pressure-1" selected'
+    );
+    refs.prepDifficulty.listeners.change({ target: { value: 'pressure-2' } });
+    expect(calls.pressure).toEqual([2]);
+    refs.prepDifficulty.listeners.change({ target: { value: 'warden' } });
+    expect(calls.settings).toEqual([
+      ['gameplay', 'difficulty', 'warden', { source: 'ui' }],
+    ]);
+    expect(calls.pressure).toEqual([2, 0]);
+  });
+
+  it('the Daily Field tab locks the list on Veteran', () => {
+    const { menu, refs } = build({ pressure: { selected: 1 } });
+    menu.prepTab = 'daily';
+    menu.refreshPrepSlots();
+    expect(refs.prepDifficulty.innerHTML).toContain('disabled');
+    expect(refs.prepDifficulty.innerHTML).toContain('value="veteran" selected');
+  });
+
+  it('Before launch is empty without a Seal or the Flight School, then names the choices', () => {
+    expect(build().refs.beforeLaunch.innerHTML).toBe('');
+    const { refs, calls } = build({
+      seals: 1,
+      sealed: ['cinder_trail'],
+      owned: { 'flight-school': true },
+    });
+    expect(refs.beforeLaunch.innerHTML).toContain('out of the draw');
+    expect(refs.beforeLaunch.innerHTML).toContain('Flight School · no card');
+    refs.beforeLaunch.listeners.click({
+      target: { closest: () => ({}) },
+    });
+    expect(calls.hangarClicks).toBe(1);
+  });
+});

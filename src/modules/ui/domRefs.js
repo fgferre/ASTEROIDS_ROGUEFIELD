@@ -170,6 +170,9 @@ export function cacheStaticNodes() {
       nav: document.getElementById('menu-prep') || null,
       tabs: document.getElementById('menu-prep-tabs') || null,
       hint: document.getElementById('menu-hint') || null,
+      prepDifficulty: document.getElementById('prep-difficulty') || null,
+      beforeLaunch: document.getElementById('prep-before-launch') || null,
+      hangarBtn: document.getElementById('menu-hangar-btn') || null,
     },
   };
 }
