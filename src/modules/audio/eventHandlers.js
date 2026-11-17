@@ -12,19 +12,12 @@ import {
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
-import {
-  biomeThemeForLayer,
-  chapterThemeForLayer,
-  musicThemeForLayer,
-} from './MusicThemes.js';
+import { biomeThemeForLayer, musicThemeForLayer } from './MusicThemes.js';
 
 /**
  * Pan + distance mix of an enemy-side cue from its source position; no
  * distance mix when the position is unknown.
  */
-// How long the chapter stinger waits for a journey to claim its motif.
-const CHAPTER_STINGER_WAIT_MS = 400;
-
 export function sourceSpatial(audio, data) {
   const position = data?.position || data?.enemy || null;
   const known = Number.isFinite(position?.x) && Number.isFinite(position?.y);
@@ -126,40 +119,13 @@ export const AUDIO_EVENT_HANDLERS = {
   },
 
   // Progress + wave enemy total, the layer's theme (the Warden's on boss
-  // layers) and the chapter stinger on a biome's first layer.
+  // layers) and the chapter's score.
   waveStarted(audio, payload) {
     audio.updateWaveMusicIntensity(payload);
     const wave = Number(payload?.wave);
     if (!Number.isFinite(wave) || wave <= 0) return;
     audio.musicMixer.setTheme(musicThemeForLayer(wave));
     audio.sectorScore.playChapter(chapterScoreForLayer(wave));
-    const chapterTheme = chapterThemeForLayer(wave);
-    // A journey that opens the sector plays the chapter's motif itself: a
-    // layer started after it (a head start's) has no stinger, and one
-    // started before it waits for it (cinematicStarted), so the motif is not
-    // heard twice.
-    const claimed = audio.chapterClaimed;
-    audio.chapterClaimed = false;
-    if (chapterTheme && !claimed) {
-      clearTimeout(audio.chapterStingerTimer);
-      audio.chapterStingerTimer = setTimeout(() => {
-        audio.chapterStingerTimer = null;
-        audio.sfxBus.playChapterStinger(chapterTheme);
-      }, CHAPTER_STINGER_WAIT_MS);
-    }
-  },
-
-  // The run start's opening (ui/runCinematics.js), sent as the run starts,
-  // not from a frame. A journey claims the chapter's motif (waveStarted).
-  cinematicStarted(audio, payload) {
-    if (payload?.kind === 'travel') {
-      if (audio.chapterStingerTimer) {
-        clearTimeout(audio.chapterStingerTimer);
-        audio.chapterStingerTimer = null;
-      } else {
-        audio.chapterClaimed = true;
-      }
-    }
   },
 
   // Boss arc → MusicMixer (D-04): overrides the run intensity upwards.
@@ -168,14 +134,21 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sectorScore.onBossEvent(eventName);
   },
 
-  // The synthesized Warden stinger, unless a recorded score brings its own.
-  wardenStinger(audio) {
-    if (!audio.sectorScore.active) audio.sfxBus.playWardenStinger();
+  // Recorded musical one-shots (./musicStings.js), in any run.
+  eliteSting(audio) {
+    audio.musicStings.play('elite');
+  },
+  surgeSting(audio) {
+    audio.musicStings.play('surge');
+  },
+  deepFieldSting(audio) {
+    audio.musicStings.play('deepField');
   },
 
   // A sector with a recorded score plays it instead of the mixer.
   sectorScoreStart(audio, payload) {
     audio.sectorScore.start(payload?.sector);
+    audio.musicStings.prefetch();
   },
 
   // A sector is picked (the map, the result screen): its music and its

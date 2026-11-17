@@ -77,16 +77,16 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   },
   { on: 'enemy-spawned', run: 'enemySpawned' },
   { on: 'enemy-telegraph', cue: 'playEnemyTelegraph', at: 'source' },
-  { on: 'elite-spawned', cue: 'playEliteSpawned' },
+  { on: 'elite-spawned', run: 'eliteSting' },
   { on: 'weapon-beam-fired', cue: 'playHarmonicBeam', panX: 'position.x' },
   { on: 'weapon-evolved', cue: 'playWeaponEvolved', duck: true },
   { on: 'upgrade-rerolled', cue: 'playCardReroll' },
   { on: 'upgrade-banished', cue: 'playCardBanish' },
   { on: 'codex-discovered', cue: 'playCodexDiscovered' },
-  { on: 'surge-started', cue: 'playSurgeSting' },
+  { on: 'surge-started', run: 'surgeSting' },
   // A formation's marks light up on an edge: the surge's warning sting.
-  { on: 'formation-warned', cue: 'playSurgeSting' },
-  { on: 'run-continued', cue: 'playDeepFieldEntry' },
+  { on: 'formation-warned', run: 'surgeSting' },
+  { on: 'run-continued', run: 'deepFieldSting' },
   { on: 'salvage-awarded', cue: 'playSalvageAwarded', arg: 'amount' },
   { on: 'hangar-purchased', cue: 'playHangarPurchase' },
   { on: 'onboarding-step', cue: 'playTipChime' },
@@ -203,10 +203,9 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     at: 'source',
   },
 
-  // The run-following music: wave progress, the layer's theme, the chapter
-  // stinger on a biome's first layer; the boss arc overrides it upwards.
+  // The run-following music: wave progress and the layer's theme (the
+  // chapter's score crossfades in); the boss arc overrides it upwards.
   { on: 'wave-started', run: 'waveStarted' },
-  { on: 'boss-warning', run: 'wardenStinger' },
   { on: 'boss-warning', run: 'bossArc' },
   { on: 'boss-spawned', cue: 'playBossRoar', facade: true, payload: true },
   { on: 'boss-spawned', run: 'bossArc' },
@@ -269,7 +268,6 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   // sample, the burn's loop on and off, and all of it fading when it ends.
   // Its score (audio/journeyCue.js) is laid out from the plan as it starts
   // and stops early on a skip; the sector's music hands over at the end.
-  { on: 'cinematic-started', run: 'cinematicStarted' },
   { on: 'travel-planned', run: 'journeyPlanned' },
   { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
   { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },

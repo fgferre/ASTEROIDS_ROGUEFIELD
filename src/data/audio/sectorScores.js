@@ -80,6 +80,13 @@ export const SECTOR_SCORE_STINGERS = Object.freeze({
   sectorCleared: url('sting-sector-cleared.mp3'),
 });
 
+// Musical one-shots of the run, played in any run (audio/musicStings.js).
+export const MUSIC_STINGS = Object.freeze({
+  elite: url('sting-elite.mp3'),
+  surge: url('sting-surge.mp3'),
+  deepField: url('sting-deep-field.mp3'),
+});
+
 // The journey between sectors plays the recording of its destination's
 // chapter (1-4); each file's jump hit is this many seconds in.
 export const JOURNEY_CUES = Object.freeze({

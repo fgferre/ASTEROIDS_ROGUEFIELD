@@ -10,6 +10,7 @@ import { registerAudioEventCues } from './audio/eventDispatch.js';
 import { interceptSampleCues } from './audio/samplePlayer.js';
 import { createVoicePlayer, loadVoiceManifest } from './audio/voiceLines.js';
 import { createJourneyCue } from './audio/journeyCue.js';
+import { createMusicStings } from './audio/musicStings.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -174,6 +175,13 @@ class AudioSystem extends BaseSystem {
     // The journey's recorded score (./audio/journeyCue.js), on the music path at the
     // duck stage, like the file tracks.
     this.journeyCue = createJourneyCue({
+      getContext: () => this.context,
+      getDestination: () =>
+        this.duckingController.musicDuckGain || this.musicGain,
+    });
+
+    // The recorded one-shots (elite, surge, deep field), on the music path.
+    this.musicStings = createMusicStings({
       getContext: () => this.context,
       getDestination: () =>
         this.duckingController.musicDuckGain || this.musicGain,
@@ -881,9 +889,6 @@ class AudioSystem extends BaseSystem {
     }
     this.sectorScore.reset();
     this.journeyCue.stop();
-    clearTimeout(this.chapterStingerTimer);
-    this.chapterStingerTimer = null;
-    this.chapterClaimed = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();
     this.runEnemyCount = 0;
