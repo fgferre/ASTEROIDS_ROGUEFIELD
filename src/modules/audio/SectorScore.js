@@ -290,23 +290,24 @@ class SectorScore {
   }
 
   /**
-   * Fade the score out and give the mixer back. `stinger` names a stinger
-   * played as it goes. Drops the buffers once the sources are stopped.
+   * Fade the score out. `stinger` names a stinger played as it goes. The
+   * mixer stays silent, so the old drone doesn't return under the end
+   * screens; the next run's reset gives it back. Drops the buffers once the
+   * sources are stopped.
    */
   stop({ seconds = MIX.fadeOutSeconds, stinger = null } = {}) {
     this._token++;
     if (!this.active) return;
     if (stinger) this._playStinger(stinger);
     this._fadeOutput(0, seconds);
-    this.mixer.setSilenced(false, MIX.mixerFadeSeconds);
     this._teardown(this.context.currentTime + seconds);
   }
 
-  /** Immediately, for a new start or reset: no fade, no stinger. */
+  /** Immediately, for a new start or reset: no fade, no stinger; the mixer is given back. */
   _stopNow() {
     this._token++;
-    if (!this.active && !this._nodes) return;
     this.mixer.setSilenced(false, 0);
+    if (!this.active && !this._nodes) return;
     this._teardown(this.context.currentTime);
   }
 

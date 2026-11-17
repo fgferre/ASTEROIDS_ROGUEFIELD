@@ -110,15 +110,18 @@ describe('SectorScore', () => {
     ).toBeCloseTo(0);
   });
 
-  it('stop() gives the mixer back and stops the sources', async () => {
+  it('stop() keeps the mixer silent and stops the sources; reset gives it back', async () => {
     await score.start('debris-wake');
     const sources = [...rec.sources];
+    mixer.setSilenced.mockClear();
     score.stop();
-    expect(mixer.setSilenced).toHaveBeenLastCalledWith(
+    expect(mixer.setSilenced).not.toHaveBeenCalledWith(
       false,
-      expect.any(Number)
+      expect.anything()
     );
     sources.forEach((source) => expect(source.stop).toHaveBeenCalled());
     expect(score.active).toBe(false);
+    score.reset();
+    expect(mixer.setSilenced).toHaveBeenLastCalledWith(false, 0);
   });
 });
