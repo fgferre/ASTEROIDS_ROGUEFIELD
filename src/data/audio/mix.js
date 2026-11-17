@@ -31,8 +31,6 @@ export const AUDIO_REVERB_SEND_DB = Object.freeze({
   shield: -13,
   levelUp: -12,
   boss: -10,
-  elite: -11,
-  deepFieldEntry: -10,
 });
 
 // Enemy-side cues pan by source x relative to the player.

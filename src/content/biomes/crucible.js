@@ -20,6 +20,5 @@ export default {
   bloomScale: 1.25, // proposta 12/11
   debris: 0.5, // proposta 12/11
   structures: 1,
-  musicTheme: 'wardens-reach',
   tint: 'rgba(255, 214, 150, 0.07)',
 };

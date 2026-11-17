@@ -5,22 +5,18 @@ import {
   resolveExplosionSize,
   resolveStereoPan,
 } from './SFXBus.js';
-import { SECTOR_SCORE_MIX as MIX } from '../../data/audio/sectorScores.js';
+import {
+  SECTOR_SCORE_MIX as MIX,
+  chapterScoreForLayer,
+} from '../../data/audio/sectorScores.js';
+import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
-import {
-  biomeThemeForLayer,
-  chapterThemeForLayer,
-  musicThemeForLayer,
-} from './MusicThemes.js';
 
 /**
  * Pan + distance mix of an enemy-side cue from its source position; no
  * distance mix when the position is unknown.
  */
-// How long the chapter stinger waits for a journey to claim its motif.
-const CHAPTER_STINGER_WAIT_MS = 400;
-
 export function sourceSpatial(audio, data) {
   const position = data?.position || data?.enemy || null;
   const known = Number.isFinite(position?.x) && Number.isFinite(position?.y);
@@ -121,61 +117,41 @@ export const AUDIO_EVENT_HANDLERS = {
     setRunEnemyCount(audio, audio.runEnemyCount - 1 + fragments);
   },
 
-  // Progress + wave enemy total, the layer's theme (the Warden's on boss
-  // layers) and the chapter stinger on a biome's first layer.
+  // Progress + wave enemy total, and the chapter's score.
   waveStarted(audio, payload) {
     audio.updateWaveMusicIntensity(payload);
     const wave = Number(payload?.wave);
     if (!Number.isFinite(wave) || wave <= 0) return;
-    audio.musicMixer.setTheme(musicThemeForLayer(wave));
-    const chapterTheme = chapterThemeForLayer(wave);
-    // A journey that opens the sector plays the chapter's motif itself: a
-    // layer started after it (a head start's) has no stinger, and one
-    // started before it waits for it (cinematicStarted), so the motif is not
-    // heard twice.
-    const claimed = audio.chapterClaimed;
-    audio.chapterClaimed = false;
-    if (chapterTheme && !claimed) {
-      clearTimeout(audio.chapterStingerTimer);
-      audio.chapterStingerTimer = setTimeout(() => {
-        audio.chapterStingerTimer = null;
-        audio.sfxBus.playChapterStinger(chapterTheme);
-      }, CHAPTER_STINGER_WAIT_MS);
-    }
+    audio.sectorScore.playChapter(chapterScoreForLayer(wave));
   },
 
-  // The run start's opening (ui/runCinematics.js), sent as the run starts,
-  // not from a frame. A journey claims the chapter's motif (waveStarted).
-  cinematicStarted(audio, payload) {
-    if (payload?.kind === 'travel') {
-      if (audio.chapterStingerTimer) {
-        clearTimeout(audio.chapterStingerTimer);
-        audio.chapterStingerTimer = null;
-      } else {
-        audio.chapterClaimed = true;
-      }
-    }
-  },
-
-  // Boss arc → MusicMixer (D-04): overrides the run intensity upwards.
+  // Boss arc → the recorded score's stinger and crossfade.
   bossArc(audio, payload, eventName) {
-    audio.musicMixer.setIntensityFromBossEvent(eventName, payload);
     audio.sectorScore.onBossEvent(eventName);
   },
 
-  // The synthesized Warden stinger, unless a recorded score brings its own.
-  wardenStinger(audio) {
-    if (!audio.sectorScore.active) audio.sfxBus.playWardenStinger();
+  // Recorded musical one-shots (./musicStings.js), in any run.
+  eliteSting(audio) {
+    audio.musicStings.play('elite');
+  },
+  surgeSting(audio) {
+    audio.musicStings.play('surge');
+  },
+  deepFieldSting(audio) {
+    audio.musicStings.play('deepField');
   },
 
-  // A sector with a recorded score plays it instead of the mixer.
+  // A sector with a recorded score plays it.
   sectorScoreStart(audio, payload) {
     audio.sectorScore.start(payload?.sector);
+    audio.musicStings.prefetch();
   },
 
-  // A sector is picked (the map, the result screen): its music is fetched.
+  // A sector is picked (the map, the result screen): its music and its
+  // journey's cue are fetched.
   sectorScorePrefetch(audio, payload) {
     audio.sectorScore.prefetch(payload?.sector);
+    audio.journeyCue.prefetch(sectorById(payload?.sector)?.chapter);
   },
 
   // The campaign's last sector won: its score fades out, the victory plays.
@@ -185,29 +161,21 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.playFileTrack(FILE_TRACK_IDS.VICTORY_FINAL);
   },
 
-  // After the Warden, the music hands back to the biome's theme.
-  biomeTheme(audio) {
-    audio.musicMixer.setTheme(
-      biomeThemeForLayer(audio.musicMixer.runState.wave)
-    );
-  },
-
-  // The journey's score (./journeyCue.js) plays alone, the layers held
-  // down; at its end (or a skip) the sector's music comes in.
+  // The journey's score (./journeyCue.js), the recording of the destination
+  // sector's chapter (the run's sector, set as it started), plays alone, the
+  // layers held down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
-    if (audio.journeyCue.play(payload ?? {})) {
-      audio.musicMixer.holdForJourney(true);
+    const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
+    if (audio.journeyCue.play({ ...payload, chapter })) {
       audio.sectorScore.holdForJourney(true);
     }
   },
   journeyEnded(audio) {
     audio.journeyCue.end();
-    audio.musicMixer.holdForJourney(false);
     audio.sectorScore.holdForJourney(false);
   },
 
-  // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
-  // freeze, no drift).
+  // Pause: the danger holds still and the score goes underwater.
   pauseMusic(audio, payload) {
     audio.musicMixer.pause(!!payload?.isPaused);
     audio.sectorScore.pause(!!payload?.isPaused);
@@ -260,9 +228,8 @@ export const AUDIO_EVENT_HANDLERS = {
     if (payload?.screen === 'menu') audio.voiceLines.expect([]);
     const score = audio.sectorScore;
     if (payload?.screen === 'menu') score.stop();
-    else if (payload?.screen === 'gameover') {
-      score.stop({ stinger: 'signalLost' });
-    } else if (payload?.screen === 'victory') {
+    else if (payload?.screen === 'gameover') score.stop();
+    else if (payload?.screen === 'victory') {
       score.stop({ seconds: MIX.victoryFadeSeconds });
     } else if (payload?.source === 'retry-complete' && !score.active) {
       score.start(score.sectorId);
