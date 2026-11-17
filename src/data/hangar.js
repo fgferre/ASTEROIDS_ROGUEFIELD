@@ -13,6 +13,9 @@ export const SALVAGE_KILLS_PER_POINT = 5; // proposta 18/10: 1 Salvage per 5 kil
 export const SALVAGE_VICTORY_BONUS = 150; // proposta 18/10
 export const SALVAGE_PER_ENDLESS_LAYER = 25; // proposta 18/10
 export const BOSS_RUSH_SALVAGE_PER_WARDEN = 15; // proposta 18/10
+// Salvage for a card pick taken as the Salvage Cache (slots full, nothing to
+// level up), paid at the run's end at the difficulty's rate. Proposta 16/11.
+export const SALVAGE_PER_CARD_CACHE = 25;
 
 /**
  * Salvage a run is worth: layers reached, kills, victory and endless depth.

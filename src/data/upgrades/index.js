@@ -17,6 +17,7 @@ import { UPGRADE_CATEGORIES } from './categories.js';
 const armed = listContent('weapons').filter((weapon) => weapon.card);
 const WEAPON_CARDS = armed.map(({ id, card }) => ({
   ...card,
+  weaponId: id,
   excludes: armed
     .filter((other) => other.card !== card)
     .map((other) => other.card.id),
@@ -33,7 +34,8 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
 /**
  * The cards of the flight in play: the new flight (the default; ?direcao=antiga is the old flight) adds its own
  * (`newFlight`) and reads the piloting cards' glide text (`newFlightText`,
- * over `text`); without it the catalog is today's.
+ * over `text`) and its `newFlightPrerequisites` (added to `prerequisites`);
+ * without it the catalog is today's.
  */
 export function cardsForFlight(cards, newFlight) {
   return cards
@@ -41,6 +43,17 @@ export function cardsForFlight(cards, newFlight) {
     .map((card) =>
       newFlight && card.newFlightText
         ? { ...card, text: { ...card.text, ...card.newFlightText } }
+        : card
+    )
+    .map((card) =>
+      newFlight && card.newFlightPrerequisites
+        ? {
+            ...card,
+            prerequisites: [
+              ...(card.prerequisites ?? []),
+              ...card.newFlightPrerequisites,
+            ],
+          }
         : card
     );
 }
@@ -67,6 +80,24 @@ export function pilotCardIds(cards) {
   };
   visit('flight_computer');
   return ids;
+}
+
+/**
+ * The trail's steps: the rank of each piloting card the Flight Computer's way
+ * asks for (its prerequisites, followed down), the Flight Computer at 1.
+ */
+export function trailSteps(cards) {
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  const steps = new Map();
+  pilotCardIds(cards).forEach((id) => {
+    if (id === 'flight_computer') steps.set(id, 1);
+    (byId.get(id).prerequisites ?? [])
+      .filter(({ type }) => type === 'upgrade')
+      .forEach(({ id: step, level = 1 }) =>
+        steps.set(step, Math.max(steps.get(step) ?? 0, level))
+      );
+  });
+  return steps;
 }
 
 export const WEAPON_CARD_IDS = Object.freeze(WEAPON_CARDS.map(({ id }) => id));

@@ -799,6 +799,264 @@ article.card {
   color: var(--text-dim);
 }
 
+/* A piloting trail card: a cyan diamond on its top edge and its step. */
+.card:has(.card__trail) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.card:has(.card__trail)::before {
+  background: var(--accent);
+}
+
+.card__trail {
+  margin: calc(-6 * var(--u)) 0 calc(8 * var(--u));
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: calc(10.5 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card__trail-mark {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(17 * var(--u));
+  height: calc(17 * var(--u));
+  background: rgba(6, 9, 16, 0.96);
+  border: 2px solid var(--accent);
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 calc(10 * var(--u))
+    color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.card__trail-mark::after {
+  content: '';
+  position: absolute;
+  inset: calc(3.5 * var(--u));
+  background: var(--accent);
+}
+
+/* The run's tray (LevelUpScreen.renderRunTray, upgradeCard.runTrayMarkup):
+   the card slots on the left, the piloting trail's map on the right. Last
+   in the column, under the onboarding tip. The pause panel's second column
+   reuses its parts (style.css). */
+.cards-screen .run-tray {
+  order: 1;
+  display: flex;
+  gap: calc(28 * var(--u));
+  margin-top: calc(26 * var(--u));
+  padding: calc(16 * var(--u)) calc(24 * var(--u)) calc(18 * var(--u));
+  background: rgba(6, 9, 16, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.cards-screen .run-tray__trail {
+  padding-left: calc(28 * var(--u));
+  border-left: 1px solid var(--line);
+}
+
+.run-tray__head {
+  display: flex;
+  align-items: baseline;
+  gap: calc(10 * var(--u));
+  margin: 0 0 calc(12 * var(--u));
+}
+
+.run-tray__lbl {
+  font-family: var(--font-display);
+  font-size: calc(11 * var(--fs));
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.run-tray__trail .run-tray__lbl {
+  color: var(--accent);
+}
+
+.run-tray__n {
+  font-family: var(--font-display);
+  font-size: calc(17 * var(--fs));
+  font-weight: 700;
+  color: var(--text);
+}
+
+.run-tray__trail .run-tray__n {
+  color: var(--accent);
+}
+
+.run-tray__n small {
+  font-size: 0.6em;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.run-tray__cards.is-full .run-tray__n {
+  color: var(--amber);
+}
+
+.run-tray__full {
+  align-self: center;
+  padding: calc(2 * var(--u)) calc(7 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(9.5 * var(--fs));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid color-mix(in srgb, var(--amber) 70%, transparent);
+  border-radius: 2px;
+}
+
+.run-tray__note {
+  font-size: calc(12 * var(--fs));
+  color: var(--text-faint);
+}
+
+.run-slots {
+  display: flex;
+  gap: calc(8 * var(--u));
+}
+
+/* A slot: the card's line drawing in its family colour, its rank in the
+   corner; the weapon gold with a cut corner; an empty one dashed. */
+.run-slot {
+  --fam: var(--text-dim);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(46 * var(--u));
+  height: calc(46 * var(--u));
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--fam) 8%, rgba(6, 9, 16, 0.7));
+  border: 1px solid color-mix(in srgb, var(--fam) 55%, transparent);
+  border-bottom: 3px solid var(--fam);
+  font-style: normal;
+}
+
+.run-slot .card__icon {
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  stroke-width: 2.4;
+  filter: none;
+}
+
+.run-slot em {
+  position: absolute;
+  right: calc(3 * var(--u));
+  bottom: calc(1 * var(--u));
+  font-family: var(--font-ui);
+  font-size: calc(12 * var(--fs));
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.run-slot.is-weapon {
+  clip-path: polygon(
+    calc(10 * var(--u)) 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 calc(10 * var(--u))
+  );
+}
+
+.run-slot.is-ghost {
+  background: none;
+  border: 1px dashed var(--fam);
+  clip-path: none;
+}
+
+.run-slot.is-ghost .card__icon {
+  opacity: 0.6;
+}
+
+.run-slot.is-empty {
+  background: none;
+  border: 1px dashed rgba(230, 238, 248, 0.2);
+}
+
+/* The trail's map: done steps filled cyan, the step an offered card brings
+   ringed, the Flight Computer gold. */
+.trail-map {
+  display: block;
+  width: calc(380 * var(--u));
+  height: auto;
+  overflow: visible;
+}
+
+.trail-map__edge {
+  fill: none;
+  stroke: rgba(230, 238, 248, 0.28);
+  stroke-width: 1.2;
+}
+
+.trail-map__edge.is-done {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.trail-map__node {
+  fill: rgba(6, 9, 16, 0.9);
+  stroke: rgba(230, 238, 248, 0.5);
+  stroke-width: 1.2;
+}
+
+.trail-map__node.is-done {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.trail-map__node.is-offered {
+  fill: var(--text);
+  stroke: none;
+}
+
+.trail-map__ring {
+  fill: rgba(6, 9, 16, 0.9);
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+
+.trail-map__goal {
+  fill: rgba(6, 9, 16, 0.9);
+  stroke: var(--xp);
+  stroke-width: 1.8;
+}
+
+.trail-map__goal.is-done {
+  fill: var(--xp);
+}
+
+.trail-map__lbl {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  fill: rgba(230, 238, 248, 0.45);
+}
+
+.trail-map__lbl.is-on {
+  font-weight: 700;
+  fill: var(--text);
+}
+
+.trail-map__lbl.is-done {
+  font-weight: 600;
+  fill: var(--accent);
+}
+
+.trail-map__lbl.is-goal {
+  font-weight: 700;
+  fill: var(--xp);
+}
+
 /* Cards in and out (ui/levelUpTransition.js): rise in staggered by
    --enter-delay; on a pick the chosen card shrinks toward the HUD's build
    instrument (--fly-x/--fly-y), the rest fall away and the overlay clears. */

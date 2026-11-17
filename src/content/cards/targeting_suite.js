@@ -7,6 +7,15 @@ export default {
   icon: '🎯',
   themeColor: '#FFD166',
   unlockLevel: 3,
+  // The nose cannon has no lock, so the suite needs the turret first.
+  newFlightPrerequisites: [
+    {
+      type: 'upgrade',
+      id: 'auto_aim',
+      level: 1,
+      text: 'Requires Auto Turret installed.',
+    },
+  ],
   tags: ['aim', 'tactical', 'weaponry'],
   text: {
     name: 'Targeting Matrix',

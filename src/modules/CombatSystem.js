@@ -431,10 +431,28 @@ class CombatSystem extends BaseSystem {
     this.projectiles.updateBullets(deltaTime);
   }
 
+  enemyWithin(player, radius) {
+    const { x, y } = player.position;
+    const enemies = this.cachedEnemies.getActiveEnemies();
+    for (let i = 0; i < enemies.length; i += 1) {
+      const enemy = enemies[i];
+      if (enemy.intangible) continue;
+      if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) return true;
+    }
+    return false;
+  }
+
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
     const player = this.cachedPlayer;
     const playerStats = player.getStats();
+    // Close Quarters: one scan a frame, here where the enemies are known, so
+    // the bonus reaches every weapon through the stats they are handed.
+    if (playerStats && player.closeDamageMultiplier > 1) {
+      playerStats.damage *= this.enemyWithin(player, player.closeRadius)
+        ? player.closeDamageMultiplier
+        : 1;
+    }
     this.lastKnownPlayerStats = playerStats || null;
 
     // Only target and shoot when ship hull exists (visible and alive) and

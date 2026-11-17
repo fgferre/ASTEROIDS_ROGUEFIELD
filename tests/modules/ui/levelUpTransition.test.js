@@ -156,6 +156,7 @@ describe('Level-up card transition', () => {
         upgradeLookup: new Map(['a', 'b', 'c'].map((id) => [id, card(id)])),
         getUpgradeCount: () => 0,
         getFamilyCounts: () => ({ thermal: 0 }),
+        pilotCardIds: [],
       };
       UISystem.prototype.setupEventListeners.call({
         levelUpScreen: new LevelUpScreen({
@@ -212,10 +213,12 @@ describe('Level-up card transition', () => {
         text: { name: 'a', levels: [{ description: 'Fire rate +11%.' }] },
       };
       const levelUp = new LevelUpScreen({
+        refs: {},
         progression: () => ({
           upgradeLookup: new Map([['a', definition]]),
           getUpgradeCount: () => 0,
           getFamilyCounts: () => ({ thermal: 0 }),
+          pilotCardIds: [],
         }),
         combat: () => ({ getWeaponState: () => ({}) }),
         emit: () => {},

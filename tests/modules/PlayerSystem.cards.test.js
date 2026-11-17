@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayerSystem from '../../src/modules/PlayerSystem.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import { cardsForFlight } from '../../src/data/upgrades/index.js';
+import { listContent } from '../../src/content/registry.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -29,7 +31,10 @@ describe('hull, shot and flight cards on the player', () => {
 
   // Emits a card's event effects, `ranks` of them, the way UpgradeSystem does.
   function takeCard(eventBus, id, ranks) {
-    const card = UPGRADE_LIBRARY.find((entry) => entry.id === id);
+    const card = [
+      ...UPGRADE_LIBRARY,
+      ...cardsForFlight(listContent('cards'), true),
+    ].find((entry) => entry.id === id);
     card.levels
       .slice(0, ranks)
       .forEach((level) =>
@@ -51,6 +56,23 @@ describe('hull, shot and flight cards on the player', () => {
     expect(player.getStats().damage).toBe(base * 2);
     movement.right = true;
     player.update(DELTA_TIME);
+    expect(player.getStats().damage).toBe(base);
+  });
+
+  it('Momentum Rounds 3: x1.45 damage from 60% of the top speed, gliding top speed included', () => {
+    const { player, eventBus } = makePlayer();
+    const base = player.getStats().damage;
+    takeCard(eventBus, 'momentum_rounds', 3);
+    const top = player.flight.maxSpeed;
+    player.velocity = { vx: top * 0.59, vy: 0 };
+    expect(player.getStats().damage).toBe(base);
+    player.velocity = { vx: top * 0.6, vy: 0 };
+    expect(player.getStats().damage).toBeCloseTo(base * 1.45, 6);
+    // Gliding, the top speed it measures against is the lower one.
+    player.flight.glide = true;
+    player.velocity = { vx: top * 0.4, vy: 0 };
+    expect(player.getStats().damage).toBeCloseTo(base * 1.45, 6);
+    player.velocity = { vx: top * 0.3, vy: 0 };
     expect(player.getStats().damage).toBe(base);
   });
 

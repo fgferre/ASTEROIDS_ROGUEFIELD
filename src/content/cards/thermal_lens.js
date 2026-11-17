@@ -3,6 +3,8 @@ import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'thermal_lens',
+  // Weapons it does nothing for (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
   order: 12,
   category: 'offense',
   family: 'thermal',

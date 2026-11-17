@@ -126,7 +126,14 @@ export function cardState(progression, id, { granted = false } = {}) {
   const rank = granted ? count : count + 1;
   const familyCards = progression.getFamilyCounts()[definition.family] ?? 0;
   const owned = granted && rank === 1 ? familyCards - 1 : familyCards;
-  return { definition, rank, owned };
+  const piloting = progression.pilotCardIds.includes(id);
+  // A step of the trail toward the Flight Computer: which one it is.
+  let trail = null;
+  if (piloting && rank <= (progression.trailSteps.get(id) ?? 0)) {
+    const { done, total } = trailProgress(progression);
+    trail = { step: done + (granted ? 0 : 1), total };
+  }
+  return { definition, rank, owned, piloting, trail };
 }
 
 /**
@@ -135,7 +142,7 @@ export function cardState(progression, id, { granted = false } = {}) {
  * or 'plain'; `label`, `note`, and a `track` ({ on, fresh, total, notch })
  * with its `end` text. `weapon`: the held one ({ weaponId, chip }).
  */
-export function buildLine(definition, { rank, owned, weapon }) {
+export function buildLine(definition, { rank, owned, weapon, piloting }) {
   const { family } = definition;
   const isNew = rank === 1;
   const after = owned + (isNew ? 1 : 0);
@@ -162,6 +169,14 @@ export function buildLine(definition, { rank, owned, weapon }) {
       note: evolved
         ? `Also completes ${evolved.name}.`
         : 'One weapon card per run.',
+    };
+  }
+  // The piloting trail is outside the families: no count to show.
+  if (piloting) {
+    return {
+      kind: 'plain',
+      label: 'Piloting trail',
+      note: definition.text?.levels?.[rank - 1]?.highlights?.[0] ?? '',
     };
   }
   if (!UPGRADE_FAMILIES[family]) {
@@ -381,7 +396,10 @@ export function cardMarkup(definition, state, { weapon, key = null }) {
     line.kind !== 'plain' && level.highlights?.[0]
       ? `<span class="card__fx2">${level.highlights[0]}</span>`
       : '';
-  return `<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
+  const trail = state.trail
+    ? `<span class="card__trail"><i class="card__trail-mark" aria-hidden="true"></i>Trail · step ${state.trail.step} of ${state.trail.total}</span>`
+    : '';
+  return `${trail}<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
     <span class="card__id">${iconMarkup(definition)}<span class="card__names">
       <span class="card__name">${definition.text?.name ?? definition.id}</span>
       <span class="card__tag">${tag}<span class="card__state">${stateLabel(state.rank, max)}</span></span>
@@ -394,4 +412,193 @@ export function cardMarkup(definition, state, { weapon, key = null }) {
 /** Sets a card element's family colour (`--fam`). */
 export function paintCard(element, definition) {
   element.style.setProperty('--fam', familyColor(definition.family));
+}
+
+// ---------- The run's card slots and piloting trail ----------
+// The level-up's tray under the cards and the pause panel's right column
+// (the owner's pick "C" of 16/11). A slot is a card held at rank 1 or more
+// outside the piloting trail; the weapon card counts.
+
+// A weapon card's slot: a fan of shots.
+const WEAPON_ICON =
+  '<path d="M9 20L31 8M9 20L33 14M9 20H34M9 20L33 26M9 20L31 32"/><circle cx="7" cy="20" r="2.5"/>';
+
+/** The held cards in slots, the weapon card first: `{ ids, used, max }`. */
+export function cardSlots(progression) {
+  const { ids, used, max } = progression.getCardSlots();
+  const weaponFirst = (id) => (weaponOfCard(id) ? 0 : 1);
+  return {
+    ids: [...ids].sort((a, b) => weaponFirst(a) - weaponFirst(b)),
+    used,
+    max,
+  };
+}
+
+/** Each trail step's rank held of the rank it needs, and the steps done of all. */
+export function trailProgress(progression) {
+  const steps = new Map();
+  let done = 0;
+  let total = 0;
+  progression.trailSteps.forEach((need, id) => {
+    const have = Math.min(progression.getUpgradeCount(id), need);
+    steps.set(id, { have, need });
+    done += have;
+    total += need;
+  });
+  return { steps, done, total };
+}
+
+function slotMarkup(progression, id, ghost = false) {
+  const definition = progression.upgradeLookup.get(id);
+  const weapon = Boolean(weaponOfCard(id));
+  const drawing = weapon
+    ? `<svg class="card__icon" viewBox="0 0 40 40" aria-hidden="true">${WEAPON_ICON}</svg>`
+    : iconMarkup(definition);
+  const rank = progression.getUpgradeCount(id);
+  const classes = `run-slot${weapon ? ' is-weapon' : ''}${ghost ? ' is-ghost' : ''}`;
+  const color = weapon ? 'var(--xp)' : familyColor(definition.family);
+  const name = definition.text?.name ?? definition.id;
+  return `<i class="${classes}" style="--fam: ${color}" title="${name}">${drawing}${
+    weapon || ghost ? '' : `<em>${rank}</em>`
+  }</i>`;
+}
+
+// The trail's map: Thrusters splits into a Brakes lane and an RCS lane, the
+// Turret runs its own, and all three meet at the Flight Computer. A node per
+// rank a step needs (columns COL apart, lanes LANE apart).
+const COL = 34;
+const LANE = 26;
+const MAP_X = 70;
+const MAP_Y = 22;
+const at = (col, lane) => [MAP_X + col * COL, MAP_Y + lane * LANE];
+
+function diamond([x, y], r, className) {
+  return `<path class="${className}" d="M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z"/>`;
+}
+
+function trailMapMarkup({ steps }, offered) {
+  const step = (id) => steps.get(id) ?? { have: 0, need: 1 };
+  const lanes = ['braking_system', 'rcs_system'];
+  const last = Math.max(...lanes.map((id) => step(id).need));
+  const start = at(0, 0.5);
+  const turret = at(Math.ceil(last / 2), 2);
+  const goal = at(last + 1.5, 1);
+  const edges = [];
+  const nodes = [];
+  const edge = (points, done) =>
+    edges.push(
+      `<path class="trail-map__edge${done ? ' is-done' : ''}" d="M${points.map((p) => p.join(' ')).join('L')}"/>`
+    );
+  // A node: done (filled), the step an offered card brings, or still open.
+  const node = (point, id, index, r = 5) => {
+    const { have } = step(id);
+    if (index < have) nodes.push(diamond(point, r, 'trail-map__node is-done'));
+    else if (index === have && offered.includes(id)) {
+      nodes.push(diamond(point, r + 3.5, 'trail-map__ring'));
+      nodes.push(diamond(point, r - 1, 'trail-map__node is-offered'));
+    } else nodes.push(diamond(point, r, 'trail-map__node'));
+  };
+  const label = ([x, y], text, id, anchor = 'start') => {
+    const { have, need } = step(id);
+    const state =
+      have >= need
+        ? ' is-done'
+        : have > 0 || offered.includes(id)
+          ? ' is-on'
+          : '';
+    return `<text class="trail-map__lbl${state}" x="${x}" y="${y}" text-anchor="${anchor}">${text}</text>`;
+  };
+  const count = (id) =>
+    step(id).need > 1 ? ` ${step(id).have}/${step(id).need}` : '';
+
+  lanes.forEach((id, lane) => {
+    const { have, need } = step(id);
+    edge([start, at(0.5, lane), at(1, lane)], have > 0);
+    for (let i = 1; i < need; i += 1) {
+      edge([at(i, lane), at(i + 1, lane)], have > i);
+    }
+    edge([at(need, lane), at(last + 1, lane), goal], have >= need);
+    for (let i = 0; i < need; i += 1) node(at(i + 1, lane), id, i);
+  });
+  const turretDone = step('auto_aim').have >= step('auto_aim').need;
+  edge([turret, at(last + 1, 2), goal], turretDone);
+  node(start, 'propulsors', 0);
+  node(turret, 'auto_aim', 0);
+  const goalStep = step('flight_computer');
+  nodes.push(
+    diamond(
+      goal,
+      7,
+      `trail-map__goal${goalStep.have >= goalStep.need ? ' is-done' : ''}`
+    )
+  );
+  if (goalStep.have < goalStep.need && offered.includes('flight_computer')) {
+    nodes.push(diamond(goal, 11, 'trail-map__ring'));
+  }
+  const labels = [
+    label(
+      [start[0] - 9, start[1] + 3.5],
+      `Thrusters${count('propulsors')}`,
+      'propulsors',
+      'end'
+    ),
+    label(
+      [at(1, 0)[0] - 6, MAP_Y - 10],
+      `Brakes${count('braking_system')}`,
+      'braking_system'
+    ),
+    label(
+      [at(1, 1)[0] - 6, MAP_Y + LANE - 8],
+      `RCS${count('rcs_system')}`,
+      'rcs_system'
+    ),
+    label(
+      [turret[0] - 9, turret[1] + 3.5],
+      `Turret${count('auto_aim')}`,
+      'auto_aim',
+      'end'
+    ),
+    `<text class="trail-map__lbl is-goal" x="${goal[0] + 11}" y="${goal[1] - 1}"><tspan>Flight</tspan><tspan x="${goal[0] + 11}" dy="12">Computer</tspan></text>`,
+  ];
+  const width = goal[0] + 66;
+  const height = MAP_Y + 2 * LANE + 8;
+  return `<svg class="trail-map" viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges.join('')}${nodes.join('')}${labels.join('')}</svg>`;
+}
+
+/**
+ * The tray's two parts: the card slots ("CARDS 5/8", amber and "Full ·
+ * upgrades only" when full) and the trail map. `ghost`: the highlighted
+ * offer, shown dashed in the next free slot when it would take one;
+ * `offered`: the level-up's cards, whose trail steps ring on the map.
+ */
+export function runTrayMarkup(
+  progression,
+  { ghost = null, offered = [] } = {}
+) {
+  const slots = cardSlots(progression);
+  const full = slots.used >= slots.max;
+  const takesSlot =
+    ghost &&
+    !full &&
+    progression.getUpgradeCount(ghost) === 0 &&
+    !progression.pilotCardIds.includes(ghost) &&
+    !progression.upgradeLookup.get(ghost).fallback;
+  const boxes = Array.from({ length: slots.max }, (_, i) => {
+    if (i < slots.used) return slotMarkup(progression, slots.ids[i]);
+    if (i === slots.used && takesSlot)
+      return slotMarkup(progression, ghost, true);
+    return '<i class="run-slot is-empty"></i>';
+  }).join('');
+  const trail = trailProgress(progression);
+  const tag = full
+    ? '<span class="run-tray__full">Full · upgrades only</span>'
+    : '';
+  return `<div class="run-tray__part run-tray__cards${full ? ' is-full' : ''}">
+      <p class="run-tray__head"><span class="run-tray__lbl">Cards</span><b class="run-tray__n">${slots.used}<small>/${slots.max}</small></b>${tag}</p>
+      <div class="run-slots">${boxes}</div>
+    </div>
+    <div class="run-tray__part run-tray__trail">
+      <p class="run-tray__head"><span class="run-tray__lbl">Piloting trail</span><b class="run-tray__n">${trail.done}<small>/${trail.total}</small></b><span class="run-tray__note">not a card slot</span></p>
+      ${trailMapMarkup(trail, offered)}
+    </div>`;
 }

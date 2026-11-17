@@ -8,6 +8,7 @@ import {
   HANGAR_ITEMS,
   LICENSES,
   runSalvage,
+  SALVAGE_PER_CARD_CACHE,
 } from '../data/hangar.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { sectorById } from '../data/sectors.js';
@@ -111,11 +112,10 @@ export default class HangarService {
     eventBus.on('pickup-collected', ({ kind } = {}) => {
       if (kind === 'salvage') this.cacheSalvage += PICKUP_KINDS.salvage.salvage;
     });
-    // Salvage a run earns in play beyond pickups, e.g. a card offer with
-    // nothing left to offer (progression plan H5): paid at the run's end with
-    // the rest, at the difficulty's rate.
-    eventBus.on('salvage-bonus', ({ amount = 0 } = {}) => {
-      this.cacheSalvage += Math.max(0, Math.floor(Number(amount) || 0));
+    // The Salvage Cache card: a pick with nothing left to offer, paid with the
+    // rest at the run's end, at the difficulty's rate.
+    eventBus.on('card-salvage', () => {
+      this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
     });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
     eventBus.on('run-abandoned', (summary = {}) => this.award(summary));

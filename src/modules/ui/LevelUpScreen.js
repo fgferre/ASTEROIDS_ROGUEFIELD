@@ -8,6 +8,8 @@
 // highlighted card's cell. During a sector's head start a counter shows the
 // pick, and "Equip for me" makes the picks left (session/headStart.js):
 // its first press only arms it, the second within EQUIP_CONFIRM_MS confirms.
+// With the new flight, a tray under the cards shows the run's card slots and
+// its piloting trail.
 
 import { PROGRESSION_INITIAL_LEVEL } from '../../core/GameConstants.js';
 import { playLevelUpExit, staggerCardEntry } from './levelUpTransition.js';
@@ -16,6 +18,7 @@ import {
   cardMarkup,
   cardState,
   paintCard,
+  runTrayMarkup,
   weaponOfCard,
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
@@ -61,7 +64,7 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, headStart, equipBtn }.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, headStart, equipBtn, run }.
    * `progression()`: the progression service (offers, rerolls, banishes, picks), or none.
    * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
@@ -435,6 +438,23 @@ export class LevelUpScreen {
 
     this.levelUpState.focusIndex = safeIndex;
     this.previewFocusedCard();
+    this.renderRunTray();
+  }
+
+  // The card slots and the piloting trail under the cards (the new flight
+  // only): the highlighted card, if new, as a ghost in the next free slot.
+  renderRunTray() {
+    const { run } = this.refs;
+    const progression = this.progression();
+    if (!run || !progression) return;
+    const shown = progression.pilotCardIds.length > 0;
+    run.classList.toggle('hidden', !shown);
+    if (!shown) return;
+    const { options, focusIndex } = this.levelUpState;
+    run.innerHTML = runTrayMarkup(progression, {
+      ghost: options[focusIndex]?.id,
+      offered: options.map(({ id }) => id),
+    });
   }
 
   // The highlighted card's cell on the HUD: a card new to its family adds one.

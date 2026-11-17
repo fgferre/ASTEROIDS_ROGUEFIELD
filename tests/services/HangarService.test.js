@@ -10,6 +10,7 @@ import HangarService, {
   HANGAR_STORAGE_KEY,
   HANGAR_STORAGE_KEY_V1,
 } from '../../src/services/HangarService.js';
+import { SALVAGE_PER_CARD_CACHE } from '../../src/data/hangar.js';
 import {
   BASTION_HULL_ID,
   DEFAULT_HULL_ID,
@@ -80,13 +81,14 @@ describe('HangarService', () => {
     expect(awarded).toEqual([99, 23]);
   });
 
-  it('pays a Salvage bonus earned in play with the run, at its rate', () => {
+  it('pays each Salvage Cache card with the run, at its rate', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ ...base, eventBus });
     eventBus.emit('game-started', {});
-    eventBus.emit('salvage-bonus', { amount: 30 });
+    eventBus.emit('card-salvage', {});
+    eventBus.emit('card-salvage', {});
     eventBus.emit('player-died', summary(0, 0));
-    expect(hangar.lastAward.amount).toBe(30);
+    expect(hangar.lastAward.amount).toBe(2 * SALVAGE_PER_CARD_CACHE);
   });
 
   it('pays a quit from the pause menu like a death, and never twice', () => {
