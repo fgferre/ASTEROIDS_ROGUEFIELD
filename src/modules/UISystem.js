@@ -161,6 +161,7 @@ class UISystem extends BaseSystem {
       setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
       openHudEditor: () => this.openHudEditor(),
+      getService: (name) => this.getService(name),
     });
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
@@ -964,11 +965,9 @@ class UISystem extends BaseSystem {
     });
   }
 
-  /**
-   * After each drawn frame (app.js), paused too: the HUD on field points
+  /** After each drawn frame (app.js), paused too: the HUD on field points
    * (the hull ring, the recharges, edge arrows, damage arcs) and the
-   * editor's frames for the on-ship ones, where this frame drew them.
-   */
+   * editor's frames for the on-ship ones, where this frame drew them. */
   placeOnField() {
     this.tacticalHud.placeOnField();
     this.hudEditor.followShip();

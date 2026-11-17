@@ -1,9 +1,10 @@
 // src/modules/ui/SettingsPanel.js
 //
 // The Settings overlay, opened from the menu or over a stopped run:
-// category tabs, one control per schema field with its live preview, key
-// and pad binding capture, and the accessibility and video preferences
-// applied to the page as they change.
+// six sections (settings/settingsGroups.js) with a left navigation, one
+// control per schema field with its live preview, greyed when another
+// setting makes it useless, key and pad binding capture, and the
+// accessibility and video preferences applied to the page as they change.
 
 import { settingPreview } from './settingsPreview.js';
 import {
@@ -14,6 +15,13 @@ import {
   formatRangeValue,
   renderSettingField,
 } from './settings/fieldRenderers.js';
+import {
+  SETTINGS_SECTIONS,
+  inactiveReason,
+  sectionFieldRefs,
+  splitFieldRef,
+} from './settings/settingsGroups.js';
+import { newFlightFromUrl } from '../player/newFlight.js';
 import { asArray } from '../upgradeCatalog.js';
 
 export class SettingsPanel {
@@ -26,7 +34,9 @@ export class SettingsPanel {
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
    * `setHudBaseScale(scale)`: the HUD scale setting; HUD and viewport follow.
    * `livePreset()`: the preset Auto quality runs now (Graphics preview).
-   * `openHudEditor()`: Interface → Edit HUD Layout.
+   * `openHudEditor()`: HUD & text → Edit HUD Layout.
+   * `getService(name)`: the live 'difficulty' (Pressure rung, greys Difficulty)
+   *   and 'player' (cannon on the nose, greys the aim-mode key).
    */
   constructor({
     refs,
@@ -38,6 +48,7 @@ export class SettingsPanel {
     setHudBaseScale,
     livePreset,
     openHudEditor,
+    getService,
   }) {
     this.refs = refs;
     this.pauseSettingsBtn = pauseSettingsBtn;
@@ -48,12 +59,15 @@ export class SettingsPanel {
     this.setHudBaseScale = setHudBaseScale;
     this.livePreset = livePreset;
     this.openHudEditor = openHudEditor;
+    this.getService = getService;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
       isOpen: false,
       source: 'menu',
-      activeCategory: 'graphics',
+      activeSection: SETTINGS_SECTIONS[0].id,
+      bindingDevice: 'keyboard',
+      folds: {},
       capture: null,
       previousFocus: null,
     };
@@ -70,21 +84,31 @@ export class SettingsPanel {
     return Boolean(this.settingsState.capture);
   }
 
-  /** Redraws `categoryId` when it is the one on screen. */
+  get activeSection() {
+    return SETTINGS_SECTIONS.find(
+      (section) => section.id === this.settingsState.activeSection
+    );
+  }
+
+  /** True when the section on screen shows a field stored under `categoryId`. */
+  showsCategory(categoryId) {
+    return sectionFieldRefs(this.activeSection).some(
+      (ref) => splitFieldRef(ref).categoryId === categoryId
+    );
+  }
+
+  /** Redraws the section on screen when it shows a field of `categoryId`. */
   refreshCategory(categoryId) {
-    if (
-      this.settingsState.isOpen &&
-      this.settingsState.activeCategory === categoryId
-    ) {
-      this.renderSettingsPanel(categoryId);
+    if (this.settingsState.isOpen && this.showsCategory(categoryId)) {
+      this.renderSettingsPanel();
     }
   }
 
-  /** LB/RB on a pad: the previous or next category, its tab focused. */
+  /** LB/RB on a pad: the previous or next section, its nav item focused. */
   cycleCategory(step) {
-    const ids = this.settingsSchema.map((category) => category.id);
-    const index = ids.indexOf(this.settingsState.activeCategory);
-    this.switchSettingsCategory(ids[(index + step + ids.length) % ids.length]);
+    const ids = SETTINGS_SECTIONS.map((section) => section.id);
+    const index = ids.indexOf(this.settingsState.activeSection);
+    this.switchSettingsSection(ids[(index + step + ids.length) % ids.length]);
     this.refs.tabs
       ?.querySelector('.settings-tab.is-active')
       ?.focus({ preventScroll: true });
@@ -105,10 +129,6 @@ export class SettingsPanel {
     this.settingsSchema.forEach((category) => {
       this.schemaByCategory.set(category.id, category);
     });
-
-    if (!this.schemaByCategory.has(this.settingsState.activeCategory)) {
-      this.settingsState.activeCategory = this.settingsSchema[0]?.id || 'audio';
-    }
   }
 
   bootstrapSettingsState() {
@@ -158,7 +178,7 @@ export class SettingsPanel {
           ) {
             return;
           }
-          const button = event.target.closest('[data-settings-category]');
+          const button = event.target.closest('[data-settings-section]');
           if (button) {
             this.emit('ui-hover', {
               source: 'settings-menu',
@@ -169,15 +189,12 @@ export class SettingsPanel {
         true
       ); // Use capture phase for delegation
       settingsRefs.tabs.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-settings-category]');
+        const button = event.target.closest('[data-settings-section]');
         if (!button) {
           return;
         }
         event.preventDefault();
-        const categoryId = button.dataset.settingsCategory;
-        if (categoryId) {
-          this.switchSettingsCategory(categoryId);
-        }
+        this.switchSettingsSection(button.dataset.settingsSection);
       });
     }
 
@@ -235,7 +252,7 @@ export class SettingsPanel {
       });
       settingsRefs.resetBtn.addEventListener('click', (event) => {
         event.preventDefault();
-        this.resetActiveSettingsCategory();
+        this.resetActiveSection();
       });
     }
 
@@ -313,24 +330,50 @@ export class SettingsPanel {
 
     this.followFullscreenChange(change);
 
+    // A reset of everything carries no category: redraw for it too.
     if (
       this.settingsState.isOpen &&
-      change.category === this.settingsState.activeCategory
+      (!change.category || this.showsCategory(change.category))
     ) {
-      // The redraw replaces the focused control: focus its twin after.
-      const focused = document.activeElement;
-      const key = focused?.dataset?.settingKey;
-      const segment = focused?.dataset?.segmentValue;
-      this.renderSettingsPanel(this.settingsState.activeCategory);
-      if (key) {
-        const selector = segment
-          ? `[data-setting-key="${key}"][data-segment-value="${segment}"]`
-          : `input[data-setting-key="${key}"], select[data-setting-key="${key}"]`;
-        this.refs.container
-          .querySelector(selector)
-          ?.focus({ preventScroll: true });
+      // The slider being dragged keeps its element (and the drag).
+      const dragged = document.activeElement;
+      if (
+        dragged?.type === 'range' &&
+        dragged.dataset?.settingKey === change.key
+      ) {
+        return;
       }
+      this.redrawKeepingFocus();
     }
+  }
+
+  // The redraw replaces the focused control: focus its twin after.
+  redrawKeepingFocus() {
+    const {
+      settingKey,
+      settingCategory,
+      segmentValue,
+      bindingDevice,
+      slot,
+      action,
+    } = document.activeElement?.dataset ?? {};
+    this.renderSettingsPanel();
+    if (!settingKey && action !== 'binding-device') {
+      return;
+    }
+    const attribute = (name, value) =>
+      value === undefined ? '' : `[data-${name}="${value}"]`;
+    const selector =
+      action === 'binding-device'
+        ? `[data-action="binding-device"]${attribute('binding-device', bindingDevice)}`
+        : `[data-setting-key="${settingKey}"]${attribute(
+            'setting-category',
+            settingCategory
+          )}${attribute('segment-value', segmentValue)}${attribute(
+            'binding-device',
+            bindingDevice
+          )}${attribute('slot', slot)}`;
+    this.refs.container.querySelector(selector)?.focus({ preventScroll: true });
   }
 
   handleVisualPreferencesChange(payload = {}) {
@@ -455,8 +498,7 @@ export class SettingsPanel {
     }
 
     const fieldKey = target.dataset.settingKey;
-    const categoryId =
-      target.dataset.settingCategory || this.settingsState.activeCategory;
+    const categoryId = target.dataset.settingCategory;
     if (!fieldKey || !this.settings || !categoryId) {
       return;
     }
@@ -493,8 +535,7 @@ export class SettingsPanel {
     }
 
     const fieldKey = target.dataset.settingKey;
-    const categoryId =
-      target.dataset.settingCategory || this.settingsState.activeCategory;
+    const categoryId = target.dataset.settingCategory;
     if (!fieldKey || !this.settings || !categoryId) {
       return;
     }
@@ -524,6 +565,13 @@ export class SettingsPanel {
       this.openHudEditor();
       return;
     }
+    const deviceButton = event.target.closest('[data-action="binding-device"]');
+    if (deviceButton) {
+      this.cancelBindingCapture();
+      this.settingsState.bindingDevice = deviceButton.dataset.bindingDevice;
+      this.redrawKeepingFocus();
+      return;
+    }
     const captureButton = event.target.closest(
       '[data-action="capture-binding"]'
     );
@@ -533,33 +581,35 @@ export class SettingsPanel {
     }
   }
 
-  switchSettingsCategory(categoryId) {
-    if (!categoryId || !this.schemaByCategory.has(categoryId)) {
-      return;
-    }
-
-    if (this.settingsState.activeCategory === categoryId) {
+  switchSettingsSection(sectionId) {
+    if (
+      !SETTINGS_SECTIONS.some((section) => section.id === sectionId) ||
+      this.settingsState.activeSection === sectionId
+    ) {
       return;
     }
 
     this.cancelBindingCapture();
-    this.settingsState.activeCategory = categoryId;
-    this.renderSettingsCategories();
-    this.renderSettingsPanel(categoryId);
+    this.settingsState.activeSection = sectionId;
+    this.renderSettingsNav();
+    this.renderSettingsPanel();
   }
 
-  resetActiveSettingsCategory() {
+  /** Resets exactly the fields the section on screen shows. */
+  resetActiveSection() {
     if (!this.settings) {
       return;
     }
 
-    const categoryId = this.settingsState.activeCategory;
-    if (!categoryId) {
-      return;
-    }
-
-    this.settings.resetCategory(categoryId, { source: 'ui' });
-    this.renderSettingsPanel(categoryId);
+    this.cancelBindingCapture();
+    sectionFieldRefs(this.activeSection).forEach((ref) => {
+      const { categoryId, key } = splitFieldRef(ref);
+      if (this.getFieldDefinition(categoryId, key)?.keepOnReset) {
+        return;
+      }
+      this.settings.resetSetting(categoryId, key, { source: 'ui' });
+    });
+    this.renderSettingsPanel();
   }
 
   openSettingsPanel(source = 'menu') {
@@ -573,8 +623,8 @@ export class SettingsPanel {
     // Capture focus before opening
     this.settingsState.previousFocus = document.activeElement;
 
-    this.renderSettingsCategories();
-    this.renderSettingsPanel(this.settingsState.activeCategory);
+    this.renderSettingsNav();
+    this.renderSettingsPanel();
 
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
@@ -582,7 +632,7 @@ export class SettingsPanel {
     this.announceVisibility(true, { source });
 
     const activeTab = overlay.querySelector(
-      '[data-settings-category].is-active'
+      '[data-settings-section].is-active'
     );
     if (activeTab instanceof HTMLElement) {
       activeTab.focus();
@@ -638,7 +688,7 @@ export class SettingsPanel {
     if (resumeRun && source === 'playing') this.emit('toggle-pause');
   }
 
-  renderSettingsCategories() {
+  renderSettingsNav() {
     const tabs = this.refs.tabs;
     if (!tabs) {
       return;
@@ -646,83 +696,166 @@ export class SettingsPanel {
 
     tabs.innerHTML = '';
 
-    this.settingsSchema.forEach((category) => {
+    SETTINGS_SECTIONS.forEach((section) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'settings-tab';
-      button.dataset.settingsCategory = category.id;
-      button.textContent = category.label || category.id;
-      if (category.id === this.settingsState.activeCategory) {
+      button.dataset.settingsSection = section.id;
+      const title = document.createElement('span');
+      title.className = 'settings-tab__title';
+      title.textContent = section.title;
+      button.appendChild(title);
+      const sub = document.createElement('small');
+      sub.className = 'settings-tab__sub';
+      sub.textContent = section.sub;
+      button.appendChild(sub);
+      if (section.id === this.settingsState.activeSection) {
         button.classList.add('is-active');
         button.setAttribute('aria-current', 'true');
       }
       tabs.appendChild(button);
     });
+
+    if (this.refs.resetBtn) {
+      this.refs.resetBtn.textContent = `Reset ${this.activeSection.title}`;
+    }
   }
 
-  renderSettingsPanel(categoryId) {
+  // What greys a row, read afresh at every render.
+  inactiveState(valuesByCategory) {
+    return {
+      value: (categoryId, key) => valuesByCategory[categoryId]?.[key],
+      pressureRung: this.getService?.('difficulty')?.getPressure() ?? 0,
+      newFlight: newFlightFromUrl(),
+      // Out of a run (opened from the menu) there is no cannon: counts as nose.
+      aimByNose:
+        this.settingsState.source === 'menu' ||
+        (this.getService?.('player')?.noseAim ?? true),
+      // The flight the cards gave this run (every run starts classic).
+      flightInUse:
+        (this.settingsState.source !== 'menu' &&
+          this.getService?.('player')?.controlScheme) ||
+        'classic',
+    };
+  }
+
+  renderSettingsPanel(sectionId = this.settingsState.activeSection) {
     const container = this.refs.container;
     if (!container) {
       return;
     }
 
-    const category = this.schemaByCategory.get(categoryId);
+    const section = SETTINGS_SECTIONS.find((item) => item.id === sectionId);
+    // A redraw keeps the folds as the player left them.
+    container.querySelectorAll('details[data-fold-title]').forEach((fold) => {
+      this.settingsState.folds[fold.dataset.foldTitle] = fold.open;
+    });
     container.innerHTML = '';
 
-    if (!category) {
-      const message = document.createElement('p');
-      message.className = 'settings-empty-state';
-      message.textContent = 'Settings category unavailable.';
-      container.appendChild(message);
-      return;
-    }
+    const heading = document.createElement('div');
+    heading.className = 'settings-page-title';
+    const title = document.createElement('h3');
+    title.textContent = section.title;
+    heading.appendChild(title);
+    const intro = document.createElement('p');
+    intro.textContent = section.intro;
+    heading.appendChild(intro);
+    container.appendChild(heading);
 
-    if (category.description) {
-      const description = document.createElement('p');
-      description.className = 'settings-category-description';
-      description.textContent = category.description;
-      container.appendChild(description);
-    }
-
-    const values = this.settings?.getCategoryValues(categoryId) || {};
-
-    asArray(category.fields).forEach((field) => {
-      if (field.hidden) {
-        return;
-      }
-      const element = renderSettingField(
-        categoryId,
-        field,
-        values[field.key],
-        values
-      );
-      if (!element) {
-        return;
-      }
-      const preview = settingPreview(
-        field.key,
-        values[field.key] ?? field.default,
-        {
-          livePreset: this.livePreset(),
-          postProcessing: values.postProcessing,
-        }
-      );
-      if (preview) {
-        const line = document.createElement('p');
-        line.className = 'settings-preview';
-        line.dataset.previewFor = field.key;
-        if ('glow' in preview) {
-          const dot = document.createElement('span');
-          dot.className = `settings-preview__glow${preview.glow ? ' is-on' : ''}`;
-          line.appendChild(dot);
-        }
-        line.appendChild(document.createTextNode(preview.text));
-        (element.querySelector('.settings-field__body') || element).appendChild(
-          line
-        );
-      }
-      container.appendChild(element);
+    const valuesByCategory = {};
+    this.settingsSchema.forEach((category) => {
+      valuesByCategory[category.id] =
+        this.settings?.getCategoryValues(category.id) || {};
     });
+    const state = this.inactiveState(valuesByCategory);
+    const row = (ref) => this.renderSettingRow(ref, valuesByCategory, state);
+
+    section.groups.forEach((group) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'settings-group';
+      if (group.title) {
+        const groupTitle = document.createElement('h4');
+        groupTitle.className = 'settings-group__title';
+        groupTitle.textContent = group.title;
+        wrapper.appendChild(groupTitle);
+      }
+      if (group.bindings) {
+        wrapper.appendChild(this.renderDeviceSwitch());
+      }
+      asArray(group.fields).forEach((ref) => wrapper.appendChild(row(ref)));
+      asArray(group.folds).forEach((fold) => {
+        const details = document.createElement('details');
+        details.className = 'settings-fold';
+        details.dataset.foldTitle = fold.title;
+        details.open =
+          this.settingsState.folds[fold.title] ?? fold.open ?? false;
+        const summary = document.createElement('summary');
+        summary.textContent = fold.title;
+        details.appendChild(summary);
+        fold.fields.forEach((ref) => details.appendChild(row(ref)));
+        wrapper.appendChild(details);
+      });
+      container.appendChild(wrapper);
+    });
+  }
+
+  // Keyboard | Gamepad: which device's slots the binding rows show.
+  renderDeviceSwitch() {
+    const group = document.createElement('div');
+    group.className = 'settings-device-switch';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Binding device');
+    ['keyboard', 'gamepad'].forEach((device) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'settings-device-btn';
+      button.dataset.action = 'binding-device';
+      button.dataset.bindingDevice = device;
+      button.setAttribute(
+        'aria-pressed',
+        String(this.settingsState.bindingDevice === device)
+      );
+      button.textContent = device === 'keyboard' ? 'Keyboard' : 'Gamepad';
+      group.appendChild(button);
+    });
+    return group;
+  }
+
+  renderSettingRow(ref, valuesByCategory, state) {
+    const { categoryId, key } = splitFieldRef(ref);
+    const field = this.getFieldDefinition(categoryId, key);
+    const values = valuesByCategory[categoryId];
+    const inactive = inactiveReason(ref, state);
+    // Greyed by the new flight, Hull Control shows the flight in use, not the
+    // stored choice (kept for ?direcao=antiga).
+    const shown =
+      inactive && ref === 'controls.hullControl'
+        ? state.flightInUse
+        : values[key];
+    const element = renderSettingField(categoryId, field, shown, values, {
+      device: this.settingsState.bindingDevice,
+      inactive,
+    });
+    const preview = inactive
+      ? null
+      : settingPreview(key, values[key] ?? field.default, {
+          livePreset: this.livePreset(),
+        });
+    if (preview) {
+      const line = document.createElement('p');
+      line.className = 'settings-preview';
+      line.dataset.previewFor = key;
+      if ('glow' in preview) {
+        const dot = document.createElement('span');
+        dot.className = `settings-preview__glow${preview.glow ? ' is-on' : ''}`;
+        line.appendChild(dot);
+      }
+      line.appendChild(document.createTextNode(preview.text));
+      (element.querySelector('.settings-field__body') || element).appendChild(
+        line
+      );
+    }
+    return element;
   }
 
   updateRangeDisplay(fieldKey, field, value) {
@@ -752,7 +885,7 @@ export class SettingsPanel {
 
     const settingKey = button.dataset.settingKey;
     const categoryId = button.dataset.settingCategory || 'controls';
-    const device = button.dataset.device;
+    const device = button.dataset.bindingDevice;
     const slot = Number(button.dataset.slot ?? '0');
 
     if (!settingKey || !device || Number.isNaN(slot)) {
@@ -853,7 +986,7 @@ export class SettingsPanel {
 
     this.emit('input-binding-capture', { state: 'end' });
 
-    this.renderSettingsPanel(this.settingsState.activeCategory);
+    this.renderSettingsPanel();
   }
 
   cancelBindingCapture() {
