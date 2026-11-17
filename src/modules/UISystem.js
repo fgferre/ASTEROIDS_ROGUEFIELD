@@ -160,6 +160,7 @@ class UISystem extends BaseSystem {
       setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
       openHudEditor: () => this.openHudEditor(),
+      getService: (name) => this.getService(name),
     });
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,

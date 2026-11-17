@@ -87,7 +87,7 @@ const SETTINGS_SCHEMA = [
         type: 'toggle',
         label: 'Show Onboarding Tips',
         description:
-          'Short in-play tips on your first run. Turning this back on shows them again.',
+          'Thrust, turn and dash tips on your first runs. Turning this back on shows them again.',
         default: true,
       },
     ],
@@ -104,7 +104,7 @@ const SETTINGS_SCHEMA = [
         control: 'segmented',
         label: 'Hull Control',
         description:
-          'Modern: WASD moves on the screen and the hull faces the motion. Classic: A/D turn the hull and W thrusts, Asteroids-style. The turret aims on its own in both.',
+          'Modern: WASD moves on the screen and the hull faces the motion. Classic: A/D turn the hull and W thrusts, Asteroids-style.',
         options: ['modern', 'classic'],
         optionLabels: { modern: 'Modern', classic: 'Classic' },
         default: 'modern',
@@ -151,8 +151,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveLeft',
         type: 'binding',
-        label: 'Strafe Left',
-        description: 'Slide to port; the nose stays on the target.',
+        label: 'Turn Left',
+        description: 'Turns the hull. In Modern flight, slides to port.',
         default: {
           keyboard: ['KeyA', 'ArrowLeft'],
           gamepad: GAMEPAD_BINDINGS.moveLeft,
@@ -165,8 +165,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveRight',
         type: 'binding',
-        label: 'Strafe Right',
-        description: 'Slide to starboard; the nose stays on the target.',
+        label: 'Turn Right',
+        description: 'Turns the hull. In Modern flight, slides to starboard.',
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
           gamepad: GAMEPAD_BINDINGS.moveRight,
@@ -264,8 +264,7 @@ const SETTINGS_SCHEMA = [
         key: 'toggleSpreadMode',
         type: 'binding',
         label: 'Toggle Spread Mode',
-        description:
-          'Switch between concentrated and fan burst shape (FIX-05).',
+        description: 'Switch between concentrated and fan burst shape.',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD],
           gamepad: GAMEPAD_BINDINGS.toggleSpreadMode,
@@ -280,7 +279,7 @@ const SETTINGS_SCHEMA = [
         type: 'binding',
         label: 'Toggle Aim Mode',
         description:
-          'Switch between auto-aim and manual ship-nose aim (FIX-05).',
+          "After the Auto Turret card: switch between the turret's own aim and aiming by the nose.",
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM],
           gamepad: GAMEPAD_BINDINGS.toggleAimMode,
