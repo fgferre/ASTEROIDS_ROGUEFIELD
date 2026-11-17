@@ -3,8 +3,6 @@ import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'thermal_lens',
-  // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['arc-caster'],
   order: 12,
   category: 'offense',
   family: 'thermal',
@@ -31,6 +29,15 @@ export default {
   },
   // What the lens reaches with each weapon (Projectiles, beamAndFan.js).
   weaponText: {
+    // proposta 17/11
+    'arc-caster': {
+      levels: [
+        {
+          description: 'Cast damage +15%.',
+          highlights: ['Every jump takes it.'],
+        },
+      ],
+    },
     'shard-halo': {
       levels: [
         {

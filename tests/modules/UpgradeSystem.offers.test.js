@@ -352,25 +352,31 @@ describe('level-up offers', () => {
     const furnaceCard = cardOf('furnace-corona');
     const haloCard = cardOf('shard-halo');
     const casterCard = cardOf('arc-caster');
+    const swarmCard = cardOf('seeker-swarm');
     const eligibleIds = (progression) =>
       progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
 
-    it('the new flight leaves a dead card out with Arc Caster held, not with the default cannon; Furnace Corona and Shard Halo keep it', () => {
+    it('no regular card is dead for any weapon now; the filter still drops a card with `deadFor` for the weapon held, never in the old flight or on the trail', () => {
       const progression = createProgression(9);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.set(furnaceCard, 1);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.delete(furnaceCard);
-      progression.appliedUpgrades.set(haloCard, 1);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.delete(haloCard);
-      progression.appliedUpgrades.set(casterCard, 1);
-      expect(eligibleIds(progression)).not.toContain('overcharge_coil');
-      for (let seed = 1; seed <= 30; seed += 1) {
-        const held = createProgression(9, seed);
-        held.appliedUpgrades.set(casterCard, 1);
-        expect(offerIds(held)).not.toContain('overcharge_coil');
-      }
+      expect(
+        progression.upgradeDefinitions.filter(
+          ({ id, deadFor }) =>
+            deadFor.length && !progression.pilotCardIds.includes(id)
+        )
+      ).toEqual([]);
+      [furnaceCard, haloCard, casterCard, swarmCard].forEach((card) => {
+        progression.appliedUpgrades.set(card, 1);
+        expect(eligibleIds(progression)).toContain('recoil_dampers');
+        progression.appliedUpgrades.delete(card);
+      });
+      const synthetic = { id: 'synthetic', deadFor: ['seeker-swarm'] };
+      progression.appliedUpgrades.set(swarmCard, 1);
+      expect(progression.isDeadForWeapon(synthetic)).toBe(true);
+      expect(
+        progression.isDeadForWeapon({ ...synthetic, deadFor: ['lance'] })
+      ).toBe(false);
+      progression.pilotCardIds = [];
+      expect(progression.isDeadForWeapon(synthetic)).toBe(false);
     });
 
     it('the trail still offers auto_aim with Furnace Corona held', () => {

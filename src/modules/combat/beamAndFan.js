@@ -191,7 +191,15 @@ export function fireFan(w, fan, playerPos, playerStats) {
 // as the bolts (so the evolutions apply).
 export function burstFlak(w, bolt) {
   const { x, y, volley } = bolt;
-  const { radius, duration } = bolt.projectile.burst;
+  const { burst } = bolt.projectile;
+  const { duration } = burst;
+  // Recoil Dampers widen it (proposta 17/11); a weapon whose `familyForms`
+  // has a kinetic `burstScale` widens it again at Railshot or the Coilgun.
+  const scales = w.weapon.familyForms?.kinetic?.burstScale;
+  const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
+  const radius =
+    (burst.radius + (burst.burstReach ?? 0) * w.cards().pierceBonus) *
+    (scales && stage >= 0 ? scales[stage] : 1);
   const struck = [];
   w.forEachSolidEnemy((enemy) => {
     if (volley.struck.includes(enemy)) return;

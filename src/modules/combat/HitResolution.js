@@ -67,20 +67,23 @@ export class HitResolution {
     // A projectile, or what a beam or a flak burst lands: the chain, blade
     // and heat hits of the other weapons, which evolve on their own, and the
     // cards' arcs bring no lance evolution. A weapon with `familyForms` runs
-    // those of its own heat or blade hits.
+    // those of its own heat, blade or arc hits (the cards' arcs are kind
+    // `chain`: never).
     const lanceHit =
       Boolean(bullet.projectile) ||
       bullet.kind === 'beam' ||
       bullet.kind === 'shrapnel';
     const familyHit =
       Boolean(weapons.weapon.familyForms) &&
-      (bullet.kind === 'heat' || bullet.kind === 'blade');
+      (bullet.kind === 'heat' ||
+        bullet.kind === 'blade' ||
+        bullet.kind === 'arc');
     // Chain Capacitor without the Chain Lance: some projectiles, pulses and
     // cuts hit twice.
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
-      (bullet.projectile || familyHit) &&
+      (bullet.projectile || (familyHit && bullet.kind !== 'arc')) &&
       !weapons.hasEvolution('arc') &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
@@ -211,7 +214,13 @@ export class HitResolution {
         );
       }
       if (lanceHit || familyHit) {
-        this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
+        this.applyEvolutionHit(
+          enemy,
+          requestedDamage,
+          damageResult,
+          bullet,
+          lanceHit
+        );
       }
       if (bullet.seeker?.breed > 0 && damageResult.killed) {
         breedSeekers(weapons, bullet, enemy);
@@ -285,11 +294,13 @@ export class HitResolution {
   // Burn, slow and chain on a lance, beam or flak hit, or on a hit of a
   // weapon's `familyForms` (only the families it carries; its `shot` budget
   // caps the chains and wells); an Apex replaces its family's first stage.
-  applyEvolutionHit(enemy, damage, result, hit) {
+  applyEvolutionHit(enemy, damage, result, hit, lanceHit = false) {
     const weapons = this.weapons();
     const cards = this.cards();
     if (!weapons.evolutions.length) return;
-    const forms = weapons.weapon.familyForms;
+    // A projectile, beam or flak hit runs every family's form, whatever the
+    // weapon's `familyForms` carries.
+    const forms = lanceHit ? null : weapons.weapon.familyForms;
     const carries = (family) => !forms || forms.carries.includes(family);
     // A chain or a well costs the shot one; with no `shot` they are free.
     const spend = (key) => {
