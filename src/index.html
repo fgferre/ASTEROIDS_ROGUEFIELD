@@ -159,6 +159,14 @@
               >
                 Credits
               </button>
+              <button
+                id="menu-support-btn"
+                class="menu-screen__button menu-screen__button--support"
+                type="button"
+                data-hint="Free, no ads, nothing locked: how to help the next update happen."
+              >
+                ♥ Support
+              </button>
             </nav>
             <p id="menu-hint" class="menu-hint" aria-live="polite"></p>
             <ul
@@ -508,12 +516,50 @@
             </button>
           </header>
           <div class="credits-body" tabindex="0">
-            <p class="credits-description">
-              Asteroid Roguefield is an independent project focused on exploring
-              modular space combat systems. This prototype brings together
-              contributions in design, code, and sound effects to enable rapid
-              iteration cycles.
+            <p class="credits-studio">Pipo Labs</p>
+            <p class="credits-byline">
+              A game by Felipe Ferreira<br />and a crew of AI agents
             </p>
+            <p class="credits-description">
+              Designed, directed and play-tested by Felipe, built one evening at
+              a time with AI agents writing the code beside him. Every idea,
+              choice and final call was his.
+            </p>
+            <dl class="credits-list">
+              <div class="credits-entry">
+                <dt>Music</dt>
+                <dd>Opening theme "Alone Among Orbits" by Felipe Ferreira</dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Code, art and tools</dt>
+                <dd>
+                  AI agents directed by Felipe: Claude (Anthropic), with help
+                  from Codex and Gemini
+                </dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Voices</dt>
+                <dd>Kokoro-82M (Apache 2.0), rendered offline</dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Sound Design</dt>
+                <dd>
+                  Sound effects generated with AudioLDM (Liu et al., CC BY-NC-SA
+                  4.0; the generated files are shared under the same licence)
+                  and from Kenney's Interface, Sci-Fi and Impact Sounds (CC0);
+                  music and engines synthesized in the game
+                </dd>
+              </div>
+            </dl>
+            <section id="credits-support" class="credits-support" tabindex="-1">
+              <h3 class="credits-support__title">♥ Support the game</h3>
+              <p>
+                Free, no ads, nothing locked. If it gave you a good run and you
+                would like to chip in, write to Pipo Labs and ask how. It
+                unlocks nothing; it only helps the next update happen.
+              </p>
+              <a class="credits-support__link" data-support-email href="#"></a>
+            </section>
             <p class="credits-description">
               The game began as a Canvas 2D arena. That original build is kept
               as it was, next to this one.
@@ -529,29 +575,6 @@
                 Play the original 2D game
               </a>
             </p>
-            <dl class="credits-list">
-              <div class="credits-entry">
-                <dt>Creative Direction</dt>
-                <dd>Roguefield Labs Team</dd>
-              </div>
-              <div class="credits-entry">
-                <dt>Programming</dt>
-                <dd>Modular architecture by community contributors</dd>
-              </div>
-              <div class="credits-entry">
-                <dt>Sound Design</dt>
-                <dd>
-                  Sound effects generated with AudioLDM (Liu et al., CC BY-NC-SA
-                  4.0; the generated files are shared under the same licence)
-                  and from Kenney's Interface, Sci-Fi and Impact Sounds (CC0);
-                  music and engines synthesized in the game
-                </dd>
-              </div>
-              <div class="credits-entry">
-                <dt>Documentation</dt>
-                <dd>Compiled from workshops and playtests</dd>
-              </div>
-            </dl>
           </div>
           <footer class="credits-footer">
             <button
@@ -915,6 +938,57 @@
       </div>
 
       <!-- The ending's choice, after the campaign's last win (ui/RunEndScreens.js) -->
+      <div
+        id="end-credits-screen"
+        class="screen screen--overlay end-credits hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="end-credits-title"
+      >
+        <div class="end-credits__viewport">
+          <div id="end-credits-roll" class="end-credits__roll">
+            <p class="end-credits__thanks">Thank you for playing</p>
+            <p class="end-credits__label">Pipo Labs presents</p>
+            <h2 id="end-credits-title" class="end-credits__title">
+              Asteroid Roguefield
+            </h2>
+            <p class="end-credits__label">A game by</p>
+            <p class="end-credits__name">
+              Felipe Ferreira<br />and a crew of AI agents
+            </p>
+            <p class="end-credits__label">
+              Designed, directed and play-tested by
+            </p>
+            <p class="end-credits__name">Felipe Ferreira</p>
+            <p class="end-credits__label">Music</p>
+            <p class="end-credits__name">Felipe Ferreira</p>
+            <p class="end-credits__label">Code, art and tools</p>
+            <p class="end-credits__name">
+              Claude (Anthropic), with help from Codex and Gemini
+            </p>
+            <p class="end-credits__label">Voices</p>
+            <p class="end-credits__name">Kokoro-82M</p>
+            <p class="end-credits__label">Sound effects</p>
+            <p class="end-credits__name">AudioLDM · Kenney</p>
+            <p class="end-credits__label">And you</p>
+            <p class="end-credits__name">for flying the whole field</p>
+          </div>
+        </div>
+        <footer class="end-credits__footer">
+          <p class="end-credits__support">
+            <b>♥</b> Support the game: write to Pipo Labs at
+            <a class="credits-support__link" data-support-email href="#"></a>
+          </p>
+          <button
+            id="end-credits-continue-btn"
+            class="btn btn--secondary"
+            type="button"
+          >
+            Continue
+          </button>
+        </footer>
+      </div>
+
       <div
         id="ending-screen"
         class="screen screen--overlay end-screen end-screen--win end-screen--choice hidden"

@@ -131,6 +131,11 @@ export function cacheStaticNodes() {
         document.getElementById('settings-close-footer-btn'),
       ].filter(Boolean),
     },
+    endCredits: {
+      overlay: document.getElementById('end-credits-screen') || null,
+      roll: document.getElementById('end-credits-roll') || null,
+      continueBtn: document.getElementById('end-credits-continue-btn') || null,
+    },
     credits: {
       overlay: document.getElementById('credits-screen') || null,
       primaryAction: document.getElementById('credits-back-btn') || null,

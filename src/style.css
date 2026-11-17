@@ -1419,6 +1419,159 @@ kbd {
   justify-content: flex-end;
 }
 
+/* Who made it: the studio, the byline */
+.credits-studio {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.credits-byline {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1.2;
+  color: var(--text);
+}
+
+/* Support: in the gold of the rewards, a link to write to Pipo Labs */
+.credits-support {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--xp) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--xp) 7%, transparent);
+  outline: none;
+}
+
+.credits-support:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.credits-support__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--xp);
+}
+
+.credits-support p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-dim);
+}
+
+.credits-support__link {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--xp);
+}
+
+.credits-support__link.is-pending {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.menu-screen__button--support {
+  color: var(--xp);
+  border-color: color-mix(in srgb, var(--xp) 55%, transparent);
+}
+
+/* End credits: the names roll up over the field */
+.end-credits {
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 4, 8, 0.45),
+    rgba(2, 4, 8, 0.9)
+  );
+  text-align: center;
+}
+
+.end-credits__viewport {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
+}
+
+.end-credits__roll {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 0 var(--space-4);
+  transform: translateY(100vh);
+}
+
+.end-credits__roll.is-rolling {
+  animation: end-credits-roll 48s linear forwards;
+}
+
+@keyframes end-credits-roll {
+  to {
+    transform: translateY(calc(-100% + 55vh));
+  }
+}
+
+.end-credits__thanks {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-lg);
+  color: var(--text-dim);
+}
+
+.end-credits__label {
+  margin: var(--space-6) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.end-credits__title {
+  margin: var(--space-2) 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.end-credits__name {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.end-credits__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+
+.end-credits__support {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.end-credits__support b {
+  color: var(--xp);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .end-credits__roll.is-rolling {
+    animation-duration: 0.01s;
+  }
+}
+
 @media (max-width: 540px) {
   .credits-dialog {
     padding: var(--space-5);

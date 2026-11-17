@@ -199,7 +199,7 @@ class UISystem extends BaseSystem {
       openHudEditor: () => this.openHudEditor(),
     });
     this.runEndScreens = new RunEndScreens({
-      refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
+      refs: this.domRefs,
       showScreen: (name, options) => this.showScreen(name, options),
       progression: () => this.getService('progression'),
       combat: () => this.getService('combat'),
@@ -207,6 +207,8 @@ class UISystem extends BaseSystem {
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
+      announceEndCredits: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('end-credits', isOpen, payload),
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,
@@ -308,11 +310,9 @@ class UISystem extends BaseSystem {
     }
   }
 
-  /**
-   * Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
+  /** Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
    * editor over a paused run's HUD, or over the idle field from the menu;
-   * the screens it covers come back when it closes.
-   */
+   * the screens it covers come back when it closes. */
   openHudEditor() {
     if (this.hudEditor.isOpen || !this.tacticalHud.layout) {
       return;
@@ -813,12 +813,10 @@ class UISystem extends BaseSystem {
     return null;
   }
 
-  /**
-   * One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
+  /** One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
    * the focus, A activates, B goes back, LB/RB switch tabs, X/Y reroll and
    * banish on the level-up screen (whose cards already follow the move and
-   * confirm bindings).
-   */
+   * confirm bindings). */
   handleGamepadNav(action) {
     // The HUD editor drives its instruments; its dialogs and panels move
     // the focus like any screen.

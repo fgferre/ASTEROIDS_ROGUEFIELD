@@ -1,9 +1,24 @@
+import { SUPPORT_EMAIL } from '../../data/credits.js';
 import { asArray } from '../upgradeCatalog.js';
 
 // src/modules/ui/CreditsOverlay.js
 //
 // The Credits overlay over the main menu: opens on request, closes on its
 // buttons, a backdrop click or Escape, and gives the focus back to its opener.
+// The menu's Support button opens it at its support section.
+
+/** Every `[data-support-email]` link shows the support address, or that it is coming. */
+export function fillSupportEmail(root = document) {
+  root.querySelectorAll('[data-support-email]').forEach((link) => {
+    link.textContent = SUPPORT_EMAIL || 'Address coming soon';
+    link.classList.toggle('is-pending', !SUPPORT_EMAIL);
+    if (SUPPORT_EMAIL) {
+      link.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Supporting Asteroid Roguefield')}`;
+    } else {
+      link.removeAttribute('href');
+    }
+  });
+}
 
 export class CreditsOverlay {
   /**
@@ -33,6 +48,7 @@ export class CreditsOverlay {
   bindCreditsControls() {
     if (typeof document !== 'undefined') {
       document.addEventListener('keydown', this.handleCreditsKeyDown);
+      fillSupportEmail();
     }
 
     const creditsRefs = this.refs;
@@ -82,10 +98,10 @@ export class CreditsOverlay {
       return;
     }
 
-    this.openCreditsOverlay(payload?.triggerId);
+    this.openCreditsOverlay(payload?.triggerId, payload?.section);
   }
 
-  openCreditsOverlay(triggerId = null) {
+  openCreditsOverlay(triggerId = null, section = null) {
     const creditsRefs = this.refs;
     const overlay = creditsRefs?.overlay;
     if (!overlay) {
@@ -114,11 +130,15 @@ export class CreditsOverlay {
     document.body?.classList.add('is-credits-open');
     this.announceVisibility(true, { source: 'menu' });
 
+    const support =
+      section === 'support' ? overlay.querySelector('#credits-support') : null;
+    support?.scrollIntoView({ block: 'center' });
     const focusTarget =
+      support ||
       creditsRefs?.primaryAction ||
       overlay.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
     if (focusTarget instanceof HTMLElement) {
-      focusTarget.focus();
+      focusTarget.focus({ preventScroll: Boolean(support) });
     }
   }
 
