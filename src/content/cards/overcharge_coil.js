@@ -2,6 +2,8 @@ import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'overcharge_coil',
+  // Weapons it does nothing for (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
   order: 7,
   category: 'offense',
   family: 'arc',

@@ -4,6 +4,8 @@
 // cards' own conversation settles where it sits in a run.
 export default {
   id: 'auto_aim',
+  // Weapons it does nothing for (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo'],
   newFlight: true,
   order: 46,
   category: 'offense',

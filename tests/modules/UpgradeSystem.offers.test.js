@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
+import { listContent } from '../../src/content/registry.js';
 import { WEAPON_CARD_IDS } from '../../src/data/upgrades/index.js';
 import {
   UPGRADE_RARITY_BASE_WEIGHTS,
@@ -332,6 +333,46 @@ describe('level-up offers', () => {
         (id) => progression.getUpgradeCount(id) === 0
       );
       expect(fresh.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('cards that do nothing for the weapon in hand', () => {
+    const furnaceCard = listContent('weapons').find(
+      ({ id }) => id === 'furnace-corona'
+    ).card.id;
+    const eligibleIds = (progression) =>
+      progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
+
+    it('the new flight leaves a dead card out with Furnace Corona held, not with the default cannon', () => {
+      const progression = createProgression(9);
+      expect(eligibleIds(progression)).toContain('overcharge_coil');
+      progression.appliedUpgrades.set(furnaceCard, 1);
+      expect(eligibleIds(progression)).not.toContain('overcharge_coil');
+      for (let seed = 1; seed <= 30; seed += 1) {
+        const held = createProgression(9, seed);
+        held.appliedUpgrades.set(furnaceCard, 1);
+        expect(offerIds(held)).not.toContain('overcharge_coil');
+      }
+    });
+
+    it('the trail still offers auto_aim with Furnace Corona held', () => {
+      const progression = createProgression(9);
+      progression.appliedUpgrades.set(furnaceCard, 1);
+      expect(eligibleIds(progression)).toContain('auto_aim');
+    });
+
+    it('the old flight keeps a dead card eligible', () => {
+      const progression = createProgression(9);
+      progression.pilotCardIds = [];
+      progression.appliedUpgrades.set(furnaceCard, 1);
+      expect(eligibleIds(progression)).toContain('overcharge_coil');
+    });
+
+    it('the targeting suite needs the turret first in the new flight', () => {
+      const progression = createProgression(9);
+      expect(eligibleIds(progression)).not.toContain('targeting_suite');
+      progression.appliedUpgrades.set('auto_aim', 1);
+      expect(eligibleIds(progression)).toContain('targeting_suite');
     });
   });
 });

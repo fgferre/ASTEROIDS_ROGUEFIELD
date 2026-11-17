@@ -25,6 +25,7 @@ import {
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
+import { DEFAULT_WEAPON_ID } from '../data/weapons.js';
 import { MAGNETISM_FORCE } from '../data/constants/gameplay.js';
 import {
   DEFAULT_UPGRADE_CATEGORY,
@@ -313,7 +314,27 @@ class UpgradeSystem extends BaseSystem {
   getEligibleUpgradeDefinitions() {
     return asArray(this.upgradeDefinitions).filter(
       (definition) =>
-        !definition.fallback && this.isUpgradeSelectable(definition)
+        !definition.fallback &&
+        this.isUpgradeSelectable(definition) &&
+        !this.isDeadForWeapon(definition)
+    );
+  }
+
+  // The weapon the run fires: its weapon card's, else the default cannon.
+  currentWeaponId() {
+    const weaponCard = this.upgradeDefinitions.find(
+      ({ weaponId, id }) => weaponId && this.getUpgradeCount(id) > 0
+    );
+    return weaponCard?.weaponId ?? DEFAULT_WEAPON_ID;
+  }
+
+  // The new flight's draw leaves out a card that does nothing for the weapon
+  // in hand (never the piloting trail).
+  isDeadForWeapon({ id, deadFor }) {
+    return (
+      this.pilotCardIds.length > 0 &&
+      !this.pilotCardIds.includes(id) &&
+      deadFor.includes(this.currentWeaponId())
     );
   }
 

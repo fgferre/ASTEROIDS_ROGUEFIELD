@@ -5,6 +5,8 @@ const MAX_DISTANCE = 400; // px of flight that still adds damage
 
 export default {
   id: 'afterburn_lance',
+  // Weapons it does nothing for (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
   order: 5,
   category: 'offense',
   family: 'thermal',

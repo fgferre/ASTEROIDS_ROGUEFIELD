@@ -3,6 +3,8 @@ import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'chain_capacitor',
+  // Weapons it does nothing for (the draw leaves it out).
+  deadFor: ['furnace-corona', 'shard-halo'],
   order: 38,
   category: 'utility',
   family: 'arc',
