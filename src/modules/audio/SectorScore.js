@@ -101,6 +101,12 @@ class SectorScore {
 
   /** Play the sector's score; a sector without one plays nothing. */
   async start(sectorId) {
+    // A sectorless run's first wave can start its chapter score in the same
+    // instant as the run itself: keep it rather than cut it.
+    if (!sectorId && this._chapterId) {
+      this.sectorId = null;
+      return undefined;
+    }
     this.sectorId = sectorId ?? null;
     this._chapterId = null;
     this._stopNow();

@@ -90,6 +90,14 @@ describe('SectorScore', () => {
     expect(played()).toEqual([SECTOR_SCORES['debris-wake'].stage]);
   });
 
+  it('a sectorless run whose first wave started the chapter score keeps it when the run start arrives', async () => {
+    await score.playChapter(chapterScoreForLayer(1));
+    const sources = [...rec.sources];
+    await score.start(undefined);
+    expect(score.active).toBe(true);
+    sources.forEach((source) => expect(source.stop).not.toHaveBeenCalled());
+  });
+
   it('debris-wake: two looping sources start together, loop as long as the track', async () => {
     await score.start('debris-wake');
     const [stage, boss] = rec.sources;
