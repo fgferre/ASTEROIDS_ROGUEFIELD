@@ -194,7 +194,7 @@ class UISystem extends BaseSystem {
       openHudEditor: () => this.openHudEditor(),
     });
     this.runEndScreens = new RunEndScreens({
-      refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
+      refs: this.domRefs,
       showScreen: (name, options) => this.showScreen(name, options),
       progression: () => this.getService('progression'),
       combat: () => this.getService('combat'),
@@ -202,6 +202,8 @@ class UISystem extends BaseSystem {
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
+      announceEndCredits: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('end-credits', isOpen, payload),
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,

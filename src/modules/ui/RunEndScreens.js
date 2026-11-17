@@ -26,6 +26,7 @@ import {
   timelineModel,
 } from './runTimeline.js';
 import { asArray } from '../upgradeCatalog.js';
+import { EndCredits } from './EndCredits.js';
 
 const ENDINGS = Object.keys(STORY.ending);
 
@@ -98,6 +99,7 @@ export class RunEndScreens {
     hangar,
     lastTransmission,
     cinematics,
+    announceEndCredits,
   }) {
     this.refs = refs;
     this.showScreen = showScreen;
@@ -107,6 +109,11 @@ export class RunEndScreens {
     this.hangar = hangar;
     this.lastTransmission = lastTransmission;
     this.cinematics = cinematics;
+    this.endCredits = new EndCredits({
+      refs: refs.endCredits ?? {},
+      showScreen,
+      announceVisibility: announceEndCredits ?? (() => {}),
+    });
     this.lockoutTimer = null;
     this.bestAtStart = 0;
     // A `?replay=` run ('game-started'): it never opens the choice.
@@ -379,7 +386,8 @@ export class RunEndScreens {
   /**
    * An ending picked on the choice: recorded once, the choice leaves, its
    * lines play over the held shot, the HUD down to its transmission, as the
-   * Ring answers (Severance also dims the field), then the final card.
+   * Ring answers (Severance also dims the field), then the end credits and
+   * the final card.
    * False when no choice is open.
    */
   chooseEnding(ending) {
@@ -392,12 +400,13 @@ export class RunEndScreens {
     field?.classList.add('is-ending');
     field?.classList.toggle('is-severed', ending === 'severance');
     this.cinematics.playEnding(ending, () =>
-      this.showVictoryScreen(payload, ending)
+      this.endCredits.play(() => this.showVictoryScreen(payload, ending))
     );
     return true;
   }
 
   bindControls() {
+    this.endCredits.bindControls();
     this.bindCopySeedLink();
     this.bindEndingChoice();
   }
