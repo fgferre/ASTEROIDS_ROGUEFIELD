@@ -3,12 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { listContent } from '../../../src/content/registry.js';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
-import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
+import { BREAK_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import {
   EnemyMirror,
   FOG_DIM,
   FOG_FADE_SECONDS,
   KNOWN_KINDS,
+  LIGHTS_OUT,
   SHADOW_CASTERS,
   SHADOW_RADIUS,
   VARIANT_LOOKS,
@@ -887,11 +888,11 @@ describe('EnemyMirror', () => {
 
     mirror.markDead(ram);
     mirror.update([mine], 0, 0); // the burn starts
-    mirror.update([mine], 0, DISSOLVE_SECONDS / 4);
+    mirror.update([mine], 0, LIGHTS_OUT / 4); // a breaking machine's eyes go out
     expect(mesh.count).toBe(2);
     expect(size(1)).toBeCloseTo(lens * 0.75);
 
-    mirror.update([], 0, DISSOLVE_SECONDS);
+    mirror.update([], 0, BREAK_SECONDS);
     expect(mesh.count).toBe(0);
     expect(mesh.visible).toBe(false);
   });
@@ -1049,7 +1050,7 @@ describe('EnemyMirror', () => {
     mirror.markDead(shade);
     mirror.update([caster], 0, 0); // the burn starts from the real material
     expect(view.dissolve.sources).toEqual([mirror.machineMaterial]);
-    mirror.update([caster], 0, DISSOLVE_SECONDS);
+    mirror.update([caster], 0, BREAK_SECONDS);
     expect(view.body.material).toBe(mirror.machineMaterial);
   });
 
