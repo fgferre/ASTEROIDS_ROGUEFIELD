@@ -112,10 +112,11 @@ export function deathTransmission(random, layer, sector = null) {
 
 // Lines spoken in order ({ speaker key, text }), keyed `${key}:${index}`.
 const spokenInOrder = (lines, key, holdMs) =>
-  lines.map(({ speaker, text }, i) => ({
+  lines.map(({ speaker, text, label }, i) => ({
     key: `${key}:${i}`,
     speaker: STORY.speaker[speaker],
     text,
+    ...(label && { label }),
     ...(holdMs && { holdMs }),
   }));
 
@@ -297,7 +298,7 @@ export class TransmissionQueue {
       const entry = this.pending.shift();
       this.cut = null;
       this.current = { entry, startedAt: nowMs, typed: -1 };
-      this.view.showTransmission(entry.speaker);
+      this.view.showTransmission(entry.label ?? entry.speaker);
       const typingMs = typingMsOf(entry);
       this.onShown(entry, typingMs + holdMsFor(entry, typingMs));
     }

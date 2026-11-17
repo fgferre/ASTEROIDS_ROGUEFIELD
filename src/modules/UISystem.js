@@ -10,6 +10,7 @@ import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
+import { STORY } from '../data/story.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { resolveControlScheme } from './PlayerSystem.js';
@@ -199,7 +200,7 @@ class UISystem extends BaseSystem {
       openHudEditor: () => this.openHudEditor(),
     });
     this.runEndScreens = new RunEndScreens({
-      refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
+      refs: this.domRefs,
       showScreen: (name, options) => this.showScreen(name, options),
       progression: () => this.getService('progression'),
       combat: () => this.getService('combat'),
@@ -207,6 +208,8 @@ class UISystem extends BaseSystem {
       hangar: () => this.getService('hangar'),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
+      announceEndCredits: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('end-credits', isOpen, payload),
     });
     this.creditsOverlay = new CreditsOverlay({
       refs: this.domRefs.credits,
@@ -240,9 +243,7 @@ class UISystem extends BaseSystem {
     });
     this.campaignMap = new CampaignMap({
       refs: this.domRefs.campaign,
-      showScreen: (name, options) => this.showScreen(name, options),
-      announceVisibility: (isOpen, payload) =>
-        this.emitOverlayVisibilityChanged('campaign', isOpen, payload),
+      showTab: () => this.mainMenu.setPrepTab('campaign'),
       prepareTravel: (start) => this.cinematics.prepareTravel(start),
     });
     this.codexScreen = new CodexScreen({
@@ -308,11 +309,9 @@ class UISystem extends BaseSystem {
     }
   }
 
-  /**
-   * Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
+  /** Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
    * editor over a paused run's HUD, or over the idle field from the menu;
-   * the screens it covers come back when it closes.
-   */
+   * the screens it covers come back when it closes. */
   openHudEditor() {
     if (this.hudEditor.isOpen || !this.tacticalHud.layout) {
       return;
@@ -376,18 +375,20 @@ class UISystem extends BaseSystem {
     const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;
     const stage = this.bossRush ? bossRushStage(layer) : 0;
+    const chapter = stage
+      ? bossRushStageTitle(stage)
+      : firstOfBiome
+        ? sectorTitle(sector, biome.title)
+        : layer > RUN_FINAL_LAYER && !sector
+          ? 'DEEP FIELD'
+          : '';
     // A sector run counts its layers from its own first one.
     hud.showLayerBanner(sector ? localLayer(sector, layer) : layer, {
       boss,
       sentinel: Boolean(sector?.boss),
       bossRush: this.bossRush,
-      chapter: stage
-        ? bossRushStageTitle(stage)
-        : firstOfBiome
-          ? sectorTitle(sector, biome.title)
-          : layer > RUN_FINAL_LAYER && !sector
-            ? 'DEEP FIELD'
-            : '',
+      chapter,
+      context: sector && !stage && firstOfBiome ? STORY.context[sector.id] : '',
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
@@ -811,12 +812,10 @@ class UISystem extends BaseSystem {
     return null;
   }
 
-  /**
-   * One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
+  /** One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
    * the focus, A activates, B goes back, LB/RB switch tabs, X/Y reroll and
    * banish on the level-up screen (whose cards already follow the move and
-   * confirm bindings).
-   */
+   * confirm bindings). */
   handleGamepadNav(action) {
     // The HUD editor drives its instruments; its dialogs and panels move
     // the focus like any screen.
@@ -852,7 +851,6 @@ class UISystem extends BaseSystem {
         if (id === 'settings') this.settingsPanel.closeSettingsPanel();
         else if (id === 'codex') this.codexScreen.closeCodex();
         else if (id === 'hangar') this.hangarScreen.closeHangar();
-        else if (id === 'campaign') this.campaignMap.closeMap();
         else if (id === 'credits') {
           this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
         } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
@@ -964,11 +962,9 @@ class UISystem extends BaseSystem {
     });
   }
 
-  /**
-   * After each drawn frame (app.js), paused too: the HUD on field points
+  /** After each drawn frame (app.js), paused too: the HUD on field points
    * (the hull ring, the recharges, edge arrows, damage arcs) and the
-   * editor's frames for the on-ship ones, where this frame drew them.
-   */
+   * editor's frames for the on-ship ones, where this frame drew them. */
   placeOnField() {
     this.tacticalHud.placeOnField();
     this.hudEditor.followShip();
@@ -1081,7 +1077,6 @@ class UISystem extends BaseSystem {
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
-      this.campaignMap.closeMap();
 
       document.body?.classList.remove('is-credits-open');
 

@@ -224,6 +224,7 @@ describe('AAAHudLayout layer modifier', () => {
       layerBanner: fakeElement(),
       layerBannerTitle: fakeElement(),
       layerBannerSub: fakeElement(),
+      layerBannerNote: fakeElement(),
     };
     hud.showLayerBanner(17);
     hud.showModifierBanner('Glass Field', '#5eead4');
@@ -239,12 +240,29 @@ describe('AAAHudLayout layer modifier', () => {
     expect(banner.style['--modifier-color']).toBe('#5eead4');
   });
 
+  it('shows the arrival note under the subtitle, then clears it for a banner without one', () => {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      layerBanner: fakeElement(),
+      layerBannerTitle: fakeElement(),
+      layerBannerSub: fakeElement(),
+      layerBannerNote: fakeElement(),
+    };
+    hud.showLayerBanner(1, { chapter: 'CHAPTER I', context: 'A scrapyard.' });
+    vi.advanceTimersByTime(0);
+    expect(hud.els.layerBannerNote.textContent).toBe('A scrapyard.');
+    hud.showSurgeBanner('Rockfall');
+    vi.advanceTimersByTime(0);
+    expect(hud.els.layerBannerNote.textContent).toBe('');
+  });
+
   it('shows an EVENT that falls with a SURGE after it, not over it', () => {
     const hud = new AAAHudLayout();
     hud.els = {
       layerBanner: fakeElement(),
       layerBannerTitle: fakeElement(),
       layerBannerSub: fakeElement(),
+      layerBannerNote: fakeElement(),
     };
     hud.showSurgeBanner('Rockfall');
     hud.showFieldEventBanner('Solar Flare');
@@ -264,6 +282,7 @@ describe('AAAHudLayout layer modifier', () => {
       layerBanner: fakeElement(),
       layerBannerTitle: fakeElement(),
       layerBannerSub: fakeElement(),
+      layerBannerNote: fakeElement(),
     };
     hud.showLayerBanner(5, {
       boss: true,

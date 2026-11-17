@@ -3,8 +3,6 @@ import { PALETTE } from '../../data/constants/palette.js';
 
 export default {
   id: 'thermal_lens',
-  // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['furnace-corona', 'shard-halo', 'arc-caster'],
   order: 12,
   category: 'offense',
   family: 'thermal',
@@ -28,6 +26,59 @@ export default {
         ],
       },
     ],
+  },
+  // What the lens reaches with each weapon (Projectiles, beamAndFan.js).
+  weaponText: {
+    // proposta 17/11
+    'arc-caster': {
+      levels: [
+        {
+          description: 'Cast damage +15%.',
+          highlights: ['Every jump takes it.'],
+        },
+      ],
+    },
+    'shard-halo': {
+      levels: [
+        {
+          description: 'Cut damage +15%.',
+          highlights: ['Every blade takes it.'],
+        },
+      ],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description: 'Pulse damage +15%.',
+          highlights: ['Every enemy in the ring takes it.'],
+        },
+      ],
+    },
+    harmonic: {
+      levels: [
+        {
+          description:
+            'Beam length +40%. The lances between beams gain nothing.',
+          highlights: ['The beam reaches further; its damage stays the same.'],
+        },
+      ],
+    },
+    scatter: {
+      levels: [
+        {
+          description: 'Flak bolt and shrapnel damage +15%.',
+          highlights: ['Every bolt and its burst hit harder.'],
+        },
+      ],
+    },
+    'seeker-swarm': {
+      levels: [
+        {
+          description: 'Missile and burst damage +15%.',
+          highlights: ['Missiles bred from a wreck too.'],
+        },
+      ],
+    },
   },
   levels: [
     {

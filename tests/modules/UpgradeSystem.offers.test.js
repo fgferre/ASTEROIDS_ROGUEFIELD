@@ -347,22 +347,36 @@ describe('level-up offers', () => {
   });
 
   describe('cards that do nothing for the weapon in hand', () => {
-    const furnaceCard = listContent('weapons').find(
-      ({ id }) => id === 'furnace-corona'
-    ).card.id;
+    const cardOf = (weaponId) =>
+      listContent('weapons').find(({ id }) => id === weaponId).card.id;
+    const furnaceCard = cardOf('furnace-corona');
+    const haloCard = cardOf('shard-halo');
+    const casterCard = cardOf('arc-caster');
+    const swarmCard = cardOf('seeker-swarm');
     const eligibleIds = (progression) =>
       progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
 
-    it('the new flight leaves a dead card out with Furnace Corona held, not with the default cannon', () => {
+    it('no regular card is dead for any weapon now; the filter still drops a card with `deadFor` for the weapon held, never in the old flight or on the trail', () => {
       const progression = createProgression(9);
-      expect(eligibleIds(progression)).toContain('overcharge_coil');
-      progression.appliedUpgrades.set(furnaceCard, 1);
-      expect(eligibleIds(progression)).not.toContain('overcharge_coil');
-      for (let seed = 1; seed <= 30; seed += 1) {
-        const held = createProgression(9, seed);
-        held.appliedUpgrades.set(furnaceCard, 1);
-        expect(offerIds(held)).not.toContain('overcharge_coil');
-      }
+      expect(
+        progression.upgradeDefinitions.filter(
+          ({ id, deadFor }) =>
+            deadFor.length && !progression.pilotCardIds.includes(id)
+        )
+      ).toEqual([]);
+      [furnaceCard, haloCard, casterCard, swarmCard].forEach((card) => {
+        progression.appliedUpgrades.set(card, 1);
+        expect(eligibleIds(progression)).toContain('recoil_dampers');
+        progression.appliedUpgrades.delete(card);
+      });
+      const synthetic = { id: 'synthetic', deadFor: ['seeker-swarm'] };
+      progression.appliedUpgrades.set(swarmCard, 1);
+      expect(progression.isDeadForWeapon(synthetic)).toBe(true);
+      expect(
+        progression.isDeadForWeapon({ ...synthetic, deadFor: ['lance'] })
+      ).toBe(false);
+      progression.pilotCardIds = [];
+      expect(progression.isDeadForWeapon(synthetic)).toBe(false);
     });
 
     it('the trail still offers auto_aim with Furnace Corona held', () => {
@@ -383,6 +397,86 @@ describe('level-up offers', () => {
       expect(eligibleIds(progression)).not.toContain('targeting_suite');
       progression.appliedUpgrades.set('auto_aim', 1);
       expect(eligibleIds(progression)).toContain('targeting_suite');
+    });
+  });
+
+  describe('card text for the weapon in hand', () => {
+    // The next rank's text the offer shows for `id`, with `weaponId` held
+    // and `id` already at `rank`.
+    const shown = (id, weaponId = 'lance', rank = 0) => {
+      const progression = createProgression(9);
+      if (weaponId !== 'lance') {
+        const weapon = listContent('weapons').find((w) => w.id === weaponId);
+        progression.appliedUpgrades.set(weapon.card.id, 1);
+      }
+      if (rank) progression.appliedUpgrades.set(id, rank);
+      return progression.buildUpgradeOption(card(progression, id)).nextLevel;
+    };
+
+    it("a weapon's override replaces what it names at that rank and keeps the rest", () => {
+      expect(shown('chain_capacitor', 'arc-caster')).toMatchObject({
+        title: 'Spare Charge',
+        description: 'Every cast jumps once more.',
+        highlights: ['On top of the jumps Multishot adds.'],
+      });
+      const scatter = shown('chain_capacitor', 'scatter');
+      expect(scatter.description).toContain('flak bolts have a 10% chance');
+      expect(scatter.highlights).toEqual(shown('chain_capacitor').highlights);
+      // Another weapon reads the base text.
+      expect(shown('chain_capacitor', 'lance').description).toBe(
+        shown('chain_capacitor').description
+      );
+    });
+
+    it('Plasma Gun names every weapon, not projectiles', () => {
+      expect(shown('plasma', 'furnace-corona').description).toBe(
+        'Every weapon deals immediately +25% damage.'
+      );
+    });
+
+    it('Arc Lattice strikes on its own, not where the cannon aims', () => {
+      expect(shown('arc_lattice', 'shard-halo').highlights[0]).toBe(
+        'It needs no aim: it strikes beside any weapon.'
+      );
+    });
+
+    it('Multishot says what grows with each weapon', () => {
+      expect(shown('multishot', 'lance', 1).description).toBe(
+        'Adds a third projectile per sequence.'
+      );
+      expect(shown('multishot', 'furnace-corona').description).toBe(
+        'The ring reaches 10 px further: 88 px.'
+      );
+      expect(shown('multishot', 'scatter', 2).description).toBe(
+        'Another flak bolt per volley: 8 in the fan.'
+      );
+      expect(shown('multishot', 'harmonic').description).toContain(
+        'the beam stays single'
+      );
+    });
+
+    it('Thermal Lens names the flak with the Scatter Coil', () => {
+      expect(shown('thermal_lens', 'scatter').description).toBe(
+        'Flak bolt and shrapnel damage +15%.'
+      );
+    });
+
+    it('Targeting Matrix gives a weapon that never aims threat focus and its fire rate', () => {
+      expect(shown('targeting_suite', 'shard-halo').description).toContain(
+        '+10% damage to elites, heralds and bosses'
+      );
+      expect(shown('targeting_suite', 'shard-halo', 2).description).toBe(
+        'Fire rate +9%. The cuts keep their +20% on elites, heralds and bosses.'
+      );
+      expect(shown('targeting_suite', 'lance', 2).description).toBe(
+        'Locks one threat per shot of the volley, up to four, and fires at all of them. Fire rate +9%.'
+      );
+    });
+
+    it('Afterburn Lance caps the flak bonus at the bolt range', () => {
+      expect(shown('afterburn_lance', 'scatter').description).toBe(
+        'Flak bolts deal +10% damage per 100 px flown: they burst by 180 px, so up to +18%. Lock-on range +15%.'
+      );
     });
   });
 

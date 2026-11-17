@@ -1,3 +1,7 @@
+// Rank 3's cooldown: every weapon fires this much faster.
+const MULTI_LOCK_COOLDOWN = 0.92;
+const FIRE_RATE = Math.round((1 / MULTI_LOCK_COOLDOWN - 1) * 100);
+
 export default {
   id: 'targeting_suite',
   order: 3,
@@ -43,14 +47,95 @@ export default {
       },
       {
         title: 'Coordinated Locks',
-        description:
-          'Activates a battery of four independent cannons prioritizing critical threats in parallel.',
+        description: `Locks one threat per shot of the volley, up to four, and fires at all of them. Fire rate +${FIRE_RATE}%.`,
         highlights: [
           'Available only with Multishot installed (Lvl 1+).',
           'Coordinates up to four locks and can concentrate fire on a single imminent target.',
         ],
       },
     ],
+  },
+  // What the locks and the lead do for each weapon (Weapons, beamAndFan.js,
+  // firePatterns.js; the lead is reckoned at lance speed).
+  weaponText: {
+    harmonic: {
+      levels: [
+        {},
+        {},
+        {
+          description: `Locks one threat per shot of the volley, up to four: the lances split among them and each lock gets its own beam. Fire rate +${FIRE_RATE}%.`,
+        },
+      ],
+    },
+    scatter: {
+      levels: [
+        {},
+        {
+          description: 'Aims the fan ahead of fast targets, reducing misses.',
+        },
+        {
+          description: `Locks one threat per shot of the volley, up to four, and splits the fan's bolts among them. Fire rate +${FIRE_RATE}%.`,
+        },
+      ],
+    },
+    'seeker-swarm': {
+      levels: [
+        {},
+        {
+          description:
+            'Salvos leave toward where fast targets will be; the missiles steer themselves anyway.',
+        },
+        {
+          description: `Locks one threat per shot of the volley, up to four; the missiles go for the locks first. Fire rate +${FIRE_RATE}%.`,
+        },
+      ],
+    },
+    // proposta 17/11
+    'arc-caster': {
+      levels: [
+        {
+          description:
+            'Jumps deal +10% damage to elites, heralds and bosses. Lightning strikes at once: the locks add nothing.',
+        },
+        {
+          description:
+            'Jumps deal +20% damage to elites, heralds and bosses. Lightning strikes at once: the lead adds nothing.',
+        },
+        {
+          description: `Fire rate +${FIRE_RATE}%. The jumps keep their +20% on elites, heralds and bosses.`,
+        },
+      ],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description:
+            'Pulses deal +10% damage to elites, heralds and bosses. The Furnace never aims: the locks add nothing.',
+        },
+        {
+          description:
+            'Pulses deal +20% damage to elites, heralds and bosses. The Furnace never aims: the lead adds nothing.',
+        },
+        {
+          description: `Fire rate +${FIRE_RATE}%. The pulses keep their +20% on elites, heralds and bosses.`,
+        },
+      ],
+    },
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'Cuts deal +10% damage to elites, heralds and bosses. The Halo never aims: the locks add nothing.',
+        },
+        {
+          description:
+            'Cuts deal +20% damage to elites, heralds and bosses. The Halo never aims: the lead adds nothing.',
+        },
+        {
+          description: `Fire rate +${FIRE_RATE}%. The cuts keep their +20% on elites, heralds and bosses.`,
+        },
+      ],
+    },
   },
   levels: [
     {
@@ -62,6 +147,11 @@ export default {
           payload: {
             resetWeights: true,
           },
+        },
+        {
+          type: 'event',
+          event: 'upgrade-threat-focus',
+          payload: { damageMultiplier: 1.1 }, // proposta 16/11, Furnace only
         },
       ],
     },
@@ -78,6 +168,11 @@ export default {
               fallbackLeadTime: 0.32,
             },
           },
+        },
+        {
+          type: 'event',
+          event: 'upgrade-threat-focus',
+          payload: { damageMultiplier: 1.2 }, // proposta 16/11, Furnace only
         },
       ],
     },
@@ -97,7 +192,7 @@ export default {
           event: 'upgrade-aiming-suite',
           payload: {
             multiLockTargets: 4,
-            cooldownMultiplier: 0.92,
+            cooldownMultiplier: MULTI_LOCK_COOLDOWN,
           },
         },
       ],

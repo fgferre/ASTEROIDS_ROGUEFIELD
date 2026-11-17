@@ -68,6 +68,7 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
+    // Railshot widens the Scatter's own flak bursts.
     expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
   });
 
@@ -86,6 +87,55 @@ describe('upgrade card build line', () => {
       'the ship vanishes',
     ]);
     expect(line('heat_sink', 1, 3).steps.map(({ at }) => at)).toEqual([5]);
+  });
+
+  it('a family form that does nothing for the weapon in hand says so', () => {
+    const held = (weaponId) => ({ weaponId, chip: weaponId });
+    const what = (id, owned, weaponId) =>
+      buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
+        (step) => step.what
+      );
+    // The Arc Caster carries it too: its own wording.
+    expect(what('multishot', 0, 'arc-caster')).toEqual([
+      'jumps keep 90% of their strength',
+      'jumps keep full strength, casts hit 25% harder',
+    ]);
+    // The Shard Halo carries it too: its own wording.
+    expect(what('multishot', 0, 'shard-halo')).toEqual([
+      'cuts hit 10% harder and shove enemies off the hull',
+      'cuts hit 25% harder, shoved three times as far',
+    ]);
+    // The Furnace Corona carries the family: its own wording.
+    expect(what('multishot', 0, 'furnace-corona')).toEqual([
+      'pulses hit 15% harder and throw further',
+      'pulses hit 30% harder and throw twice as far',
+    ]);
+    // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
+    expect(what('multishot', 0, 'scatter')).toEqual([
+      'flak bursts 30% wider',
+      'flak bursts 60% wider, bolts 25% harder',
+    ]);
+    // Its own family evolves the weapon itself.
+    expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
+      'every 3rd pulse is a nova'
+    );
+    // The Seeker Swarm's missiles burst: its own kinetic wording.
+    expect(what('multishot', 0, 'seeker-swarm')).toEqual([
+      'missile bursts 50% wider',
+      'missile bursts twice as wide, missiles 25% harder',
+    ]);
+  });
+
+  it('the card face reads the text for the weapon in hand', () => {
+    const face = (weaponId) =>
+      cardMarkup(
+        card('multishot'),
+        { rank: 1, owned: 0 },
+        { weapon: { weaponId, chip: weaponId } }
+      );
+    expect(face('lance')).toContain('Fires one additional projectile');
+    expect(face('furnace-corona')).toContain('The ring reaches');
+    expect(face('furnace-corona')).not.toContain('projectile');
   });
 
   it('a cursed card has no family to build', () => {

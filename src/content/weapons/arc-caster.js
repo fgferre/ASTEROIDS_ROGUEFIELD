@@ -9,6 +9,7 @@ const cast = {
   bolts: 1, // first enemies struck at once
   jumps: 3, // hops after the first; each Multishot shot past the first adds one
   maxJumps: 6,
+  pierceJumps: 1, // jumps for each Recoil Dampers rank, past the cap (proposta 17/11)
   jumpRange: 120, // px from a struck enemy's centre to the next one's rim
   falloff: 0.8, // × the hop before
   fork: 1, // branches a hop
@@ -49,6 +50,30 @@ export default {
     pierce: false,
     trailPoints: null,
     burst: null,
+  },
+  // The families whose lance forms a hop carries (HitResolution), the budget
+  // one cast shares, and what each form does (proposta 17/11); `kinetic` and
+  // `lines` read [form at 3, Apex at 5]. Arc is its own.
+  familyForms: {
+    carries: ['thermal', 'field', 'salvage', 'kinetic'],
+    perShot: { chains: 0, pulls: 1 },
+    pullEvery: 2, // a well every 2nd cast, at the cast's first enemy
+    kinetic: { falloff: [0.9, 1], damage: [1, 1.25] },
+    lines: {
+      thermal: ['every jump sets its target burning', 'burns spread'],
+      field: [
+        'every jump slows its target',
+        'every 2nd cast drags the crowd to its first strike',
+      ],
+      salvage: [
+        'arc kills drop 25% more orbs',
+        'arc kills drop twice the orbs',
+      ],
+      kinetic: [
+        'jumps keep 90% of their strength',
+        'jumps keep full strength, casts hit 25% harder',
+      ],
+    },
   },
   colors: { arc: PALETTE.status },
   evolution: {

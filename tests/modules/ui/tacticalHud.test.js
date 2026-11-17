@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TacticalHud } from '../../../src/modules/ui/TacticalHud.js';
+import { STORY } from '../../../src/data/story.js';
 
 describe('Tactical HUD', () => {
   it("pushes the ship's hull, shield and kills into the layout each frame", () => {
@@ -195,7 +196,8 @@ describe('Tactical HUD', () => {
 
     expect(layout.showBossIntro).toHaveBeenCalledWith(
       'Sentinel Quarry Maw',
-      'It still eats stone'
+      'It still eats stone',
+      STORY.bossContext['quarry-maw']
     );
     expect(layout.updateBoss).toHaveBeenLastCalledWith(
       true,

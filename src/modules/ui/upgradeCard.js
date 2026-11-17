@@ -14,6 +14,7 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../data/upgrades/families.js';
+import { textForWeapon } from '../../data/upgrades/index.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS, WEAPONS } from '../../data/weapons.js';
 
 // Each family's shape, 12 × 12: thermal a drop, kinetic a disc, arc a bolt,
@@ -89,6 +90,45 @@ export function familyForm(family, weaponId, apex = false) {
   return own ?? lance ?? dash;
 }
 
+// The patterns whose hits carry the lance evolutions (HitResolution's
+// `lanceHit`: a projectile, a beam, a flak burst); chain, aura and orbit
+// hits do not.
+const LANCE_HIT_PATTERNS = new Set(['stream', 'beam', 'fan', 'seeker']);
+
+/**
+ * The weapon's own wording of a family's form (its `familyForms.lines`), or
+ * null when the weapon does not carry the family.
+ */
+export function familyLine(family, weaponId, apex = false) {
+  return WEAPONS[weaponId]?.familyForms?.lines[family]?.[apex ? 1 : 0] ?? null;
+}
+
+/**
+ * "not with Shard Halo yet" when the family's lance form does nothing for
+ * the weapon: it fires no lance hit, or the form only pierces and its
+ * projectile does not; null for the weapon's own forms, the dash, or a form
+ * that reaches it (a family the weapon carries too).
+ */
+export function notWithWeapon(family, weaponId, apex = false) {
+  const weapon = WEAPONS[weaponId];
+  const lance = (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family];
+  if (
+    !weapon ||
+    !lance ||
+    familyForm(family, weaponId, apex) !== lance ||
+    familyLine(family, weaponId, apex)
+  ) {
+    return null;
+  }
+  const hits = weapon.fire.some(({ pattern }) =>
+    LANCE_HIT_PATTERNS.has(pattern)
+  );
+  const onlyPierce = lance.pierce && !lance.damageMultiplier;
+  return !hits || (onlyPierce && !weapon.projectile.pierce)
+    ? `not with ${weapon.name} yet`
+    : null;
+}
+
 /** "Incendiary Lance" → "Incendiary" (the HUD instrument's short form). */
 export const shortName = (name) => name.replace(/ Lance$/, '');
 
@@ -158,32 +198,31 @@ export function buildLine(definition, { rank, owned, weapon, piloting }) {
     (after === FAMILY_SYNERGY_THRESHOLD || after === FAMILY_APEX_THRESHOLD);
 
   if (swapped) {
-    const evolved = completes
-      ? familyForm(family, swapped.id, after === FAMILY_APEX_THRESHOLD)
-      : null;
+    const apex = after === FAMILY_APEX_THRESHOLD;
+    const evolved = completes ? familyForm(family, swapped.id, apex) : null;
+    const notYet = evolved && notWithWeapon(family, swapped.id, apex);
     return {
       kind: 'weapon',
       label: 'Replaces',
       from: weapon.chip,
       to: swapped.name.toUpperCase(),
       note: evolved
-        ? `Also completes ${evolved.name}.`
+        ? `Also completes ${evolved.name}${notYet ? ` (${notYet})` : ''}.`
         : 'One weapon card per run.',
     };
   }
+  const highlight =
+    textForWeapon(definition, weapon.weaponId)?.levels?.[rank - 1]
+      ?.highlights?.[0] ?? '';
   // The piloting trail is outside the families: no count to show.
   if (piloting) {
-    return {
-      kind: 'plain',
-      label: 'Piloting trail',
-      note: definition.text?.levels?.[rank - 1]?.highlights?.[0] ?? '',
-    };
+    return { kind: 'plain', label: 'Piloting trail', note: highlight };
   }
   if (!UPGRADE_FAMILIES[family]) {
     return {
       kind: 'plain',
       label: definition.cursed ? 'Cursed · no family' : 'No family',
-      note: definition.text?.levels?.[rank - 1]?.highlights?.[0] ?? '',
+      note: highlight,
     };
   }
   const familyName = UPGRADE_FAMILIES[family].name;
@@ -191,14 +230,18 @@ export function buildLine(definition, { rank, owned, weapon, piloting }) {
     const apex = after === FAMILY_APEX_THRESHOLD;
     const form = familyForm(family, weapon.weaponId, apex);
     const bonus = UPGRADE_FAMILIES[family].bonus;
+    const what =
+      notWithWeapon(family, weapon.weaponId, apex) ??
+      familyLine(family, weapon.weaponId, apex) ??
+      clause(form.description);
     return {
       kind: 'completes',
       label: apex ? 'Completes · Apex' : 'Completes',
       title: form.name,
       note:
         apex || form === bonus
-          ? clause(form.description)
-          : `${clause(form.description)} · ${bonus.name} ${clause(bonus.description)}`,
+          ? what
+          : `${what} · ${bonus.name} ${clause(bonus.description)}`,
       track: familyTrack,
       end: `Apex ${after}/${FAMILY_APEX_THRESHOLD}`,
     };
@@ -216,12 +259,13 @@ export function buildLine(definition, { rank, owned, weapon, piloting }) {
   const steps = [FAMILY_SYNERGY_THRESHOLD, FAMILY_APEX_THRESHOLD]
     .filter((at) => at > after)
     .map((at) => {
-      const form = familyForm(
-        family,
-        weapon.weaponId,
-        at === FAMILY_APEX_THRESHOLD
-      );
-      return { at, name: form.name, what: lowerFirst(brief(form.description)) };
+      const apex = at === FAMILY_APEX_THRESHOLD;
+      const form = familyForm(family, weapon.weaponId, apex);
+      const what =
+        notWithWeapon(family, weapon.weaponId, apex) ??
+        familyLine(family, weapon.weaponId, apex) ??
+        lowerFirst(brief(form.description));
+      return { at, name: form.name, what };
     });
   return {
     kind: 'path',
@@ -389,7 +433,8 @@ export function cardMarkup(definition, state, { weapon, key = null, held }) {
       ${buildLineMarkup(line)}`;
   }
   const max = definition.levels.length;
-  const level = definition.text?.levels?.[state.rank - 1] ?? {};
+  const level =
+    textForWeapon(definition, weapon.weaponId)?.levels?.[state.rank - 1] ?? {};
   const family = UPGRADE_FAMILIES[definition.family];
   const tag = family
     ? `${glyphMarkup(definition.family)}${family.name}<span class="card__sep">·</span>`

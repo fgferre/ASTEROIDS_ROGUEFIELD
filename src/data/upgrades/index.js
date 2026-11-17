@@ -58,6 +58,23 @@ export function cardsForFlight(cards, newFlight) {
     );
 }
 
+/**
+ * A card's text with `weaponId` in hand: its `weaponText[weaponId].levels`
+ * over `text.levels`, rank by rank (what the override leaves out keeps the
+ * base). Read when the card is shown, not here: the weapon changes mid-run.
+ */
+export function textForWeapon(card, weaponId) {
+  const levels = card.weaponText?.[weaponId]?.levels;
+  if (!levels) return card.text;
+  return {
+    ...card.text,
+    levels: card.text.levels.map((level, rank) => ({
+      ...level,
+      ...levels[rank],
+    })),
+  };
+}
+
 const UPGRADE_LIBRARY = deepFreeze(
   [
     ...cardsForFlight(listContent('cards'), newFlightFromUrl()),
