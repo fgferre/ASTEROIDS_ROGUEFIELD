@@ -2,7 +2,13 @@
 
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { PRESSURE_RUNGS } from '../data/difficulty.js';
-import { BASE_MODIFIERS, HANGAR_ITEMS, runSalvage } from '../data/hangar.js';
+import {
+  BASE_MODIFIERS,
+  CONTROL_ITEMS,
+  HANGAR_ITEMS,
+  LICENSES,
+  runSalvage,
+} from '../data/hangar.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { sectorById } from '../data/sectors.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
@@ -12,7 +18,9 @@ import { loadJSON, saveJSON } from '../core/storage.js';
 export const HANGAR_STORAGE_KEY_V1 = 'roguefield:hangar:v1';
 export const HANGAR_STORAGE_KEY = 'roguefield:hangar:v2';
 
-const ITEMS_BY_ID = new Map(HANGAR_ITEMS.map((item) => [item.id, item]));
+const ALL_ITEMS = [...HANGAR_ITEMS, ...CONTROL_ITEMS];
+const ITEMS_BY_ID = new Map(ALL_ITEMS.map((item) => [item.id, item]));
+const LICENSES_BY_ID = new Map(LICENSES.map((entry) => [entry.id, entry]));
 const MEDALS_BY_ID = new Map(ACHIEVEMENTS.map((entry) => [entry.id, entry]));
 
 // id → true maps of the save; an id the game no longer sells is kept.
@@ -29,9 +37,9 @@ const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
  * The v2 save from what storage holds: the v2 save itself, else the v1 one
  * moved over with nothing lost (its Salvage and every item it owned), else an
  * empty Hangar.
- * - `owned`: shop items bought; `licenses`: cards licensed, bought or paid by
- *   a medal; `licensesOff`: licensed cards switched off (free, reversible);
- * - `seals`: seal rungs bought; `flightSchool`: the Flight School bought;
+ * - `owned`: shop items bought (the Ship tab's and the control rungs, Seal
+ *   and Flight School included); `licenses`: cards licensed, bought or paid
+ *   by a medal; `licensesOff`: licensed cards switched off (free, reversible);
  * - `medalsPaid`: medals whose reward was paid, so each pays once;
  * - `pressure`: `open` (highest rung open), `selected` (the rung the next
  *   runs fly, 0 for none) and `best` (highest rung won).
@@ -47,8 +55,6 @@ export function loadHangarSave() {
     owned: idSet(stored.owned),
     licenses: idSet(stored.licenses),
     licensesOff: idSet(stored.licensesOff),
-    seals: count(stored.seals),
-    flightSchool: Boolean(stored.flightSchool),
     medalsPaid: idSet(stored.medalsPaid),
     pressure: {
       open,
@@ -215,9 +221,21 @@ export default class HangarService {
     return this.lastAward;
   }
 
+  /** Why an item cannot be bought yet: the rung before it, or its medal. */
+  lockOf(item) {
+    if (item.requires && !this.owned[item.requires]) {
+      return { item: ITEMS_BY_ID.get(item.requires).name };
+    }
+    if (item.requiresMedal && !this.medalsPaid[item.requiresMedal]) {
+      return { medal: MEDALS_BY_ID.get(item.requiresMedal).title };
+    }
+    return null;
+  }
+
   buy(id) {
     const item = ITEMS_BY_ID.get(id);
     if (!item || this.owned[id] || this.salvage < item.cost) return false;
+    if (this.lockOf(item)) return false;
     this.salvage -= item.cost;
     this.owned[id] = true;
     this.persist();
@@ -232,25 +250,68 @@ export default class HangarService {
       owned: this.owned,
       licenses: this.licenses,
       licensesOff: this.licensesOff,
-      seals: this.seals,
-      flightSchool: this.flightSchool,
       medalsPaid: this.medalsPaid,
       pressure: this.pressure,
     });
   }
 
-  /** Every item in shop order, with `owned` and `affordable`. */
-  getItems() {
-    return HANGAR_ITEMS.map((item) => ({
+  /** Every item of `items` in shop order, with `owned`, `affordable` and `lock`. */
+  getItems(items = HANGAR_ITEMS) {
+    return items.map((item) => ({
       ...item,
       owned: Boolean(this.owned[item.id]),
       affordable: this.salvage >= item.cost,
+      lock: this.lockOf(item),
+    }));
+  }
+
+  getControlItems() {
+    return this.getItems(CONTROL_ITEMS);
+  }
+
+  /** Buys a licence on sale; it starts switched on. */
+  buyLicense(id) {
+    const entry = LICENSES_BY_ID.get(id);
+    if (!entry || this.licenses[id] || this.salvage < entry.cost) return false;
+    this.salvage -= entry.cost;
+    this.licenses[id] = true;
+    this.persist();
+    this.eventBus.emit('hangar-purchased', { id, owned: { ...this.owned } });
+    return true;
+  }
+
+  /** Switches a held licence on or off, free: off takes the card out of the draw. */
+  setLicenseOn(id, on) {
+    if (!this.licenses[id]) return false;
+    if (on) delete this.licensesOff[id];
+    else this.licensesOff[id] = true;
+    this.persist();
+    return true;
+  }
+
+  /**
+   * The licences on sale, then the ones medals pay, each with `owned`, `on`,
+   * `affordable` and, for a medal's, `medal` (its title).
+   */
+  getLicenses() {
+    const fromMedals = ACHIEVEMENTS.filter(
+      (entry) => entry.reward?.license
+    ).map((entry) => ({
+      id: entry.reward.license,
+      kind: 'card',
+      medal: entry.title,
+    }));
+    return [...LICENSES, ...fromMedals].map((entry) => ({
+      ...entry,
+      owned: Boolean(this.licenses[entry.id]),
+      on: Boolean(this.licenses[entry.id]) && !this.licensesOff[entry.id],
+      affordable: entry.cost !== undefined && this.salvage >= entry.cost,
     }));
   }
 
   getModifiers() {
     const modifiers = { ...BASE_MODIFIERS };
-    HANGAR_ITEMS.forEach((item) => {
+    ALL_ITEMS.forEach((item) => {
       if (!this.owned[item.id]) return;
       Object.entries(item.modifiers ?? {}).forEach(([key, value]) => {
         modifiers[key] = key.endsWith('Multiplier')

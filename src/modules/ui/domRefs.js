@@ -94,6 +94,8 @@ export function cacheStaticNodes() {
       closeBtn: document.getElementById('hangar-close-btn') || null,
       tabs: Array.from(document.querySelectorAll('[data-hangar-tab]')),
       panels: Array.from(document.querySelectorAll('[data-hangar-panel]')),
+      licenses: document.getElementById('hangar-licenses') || null,
+      control: document.getElementById('hangar-control') || null,
       medals: document.getElementById('hangar-medals') || null,
       pressure: document.getElementById('hangar-pressure') || null,
       pressureNote: document.getElementById('hangar-pressure-note') || null,

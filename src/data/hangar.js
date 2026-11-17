@@ -107,3 +107,103 @@ export const HANGAR_ITEMS = deepFreeze([
     unlocksHull: bastion.id,
   },
 ]);
+
+// Control of the draw (progression plan H3, prices "proposta 16/11"): never
+// raw power. A rung of a ladder sells after the one before it (`requires`);
+// the Flight School after the First Victory medal (`requiresMedal`). Rerolls
+// and banishes add to the run's like the items above; Hold, Seal and the
+// Flight School are read by the card draw through the Hangar's contract.
+export const CONTROL_ITEMS = deepFreeze([
+  {
+    id: 'reroll-1',
+    name: 'Reroll I',
+    effect: '+1 reroll per run',
+    cost: 200,
+    modifiers: { extraRerolls: 1 },
+  },
+  {
+    id: 'reroll-2',
+    name: 'Reroll II',
+    effect: '+1 reroll per run',
+    cost: 400,
+    requires: 'reroll-1',
+    modifiers: { extraRerolls: 1 },
+  },
+  {
+    id: 'reroll-3',
+    name: 'Reroll III',
+    effect: '+1 reroll per run',
+    cost: 700,
+    requires: 'reroll-2',
+    modifiers: { extraRerolls: 1 },
+  },
+  {
+    id: 'banish-1',
+    name: 'Banish I',
+    effect: '+1 banish per run',
+    cost: 200,
+    modifiers: { extraBanishes: 1 },
+  },
+  {
+    id: 'banish-2',
+    name: 'Banish II',
+    effect: '+1 banish per run',
+    cost: 400,
+    requires: 'banish-1',
+    modifiers: { extraBanishes: 1 },
+  },
+  {
+    id: 'banish-3',
+    name: 'Banish III',
+    effect: '+1 banish per run',
+    cost: 700,
+    requires: 'banish-2',
+    modifiers: { extraBanishes: 1 },
+  },
+  {
+    id: 'seal-1',
+    name: 'Seal I',
+    effect: 'Seal 1 card out of the draw before launch',
+    cost: 400,
+    contract: { seals: 1 },
+  },
+  {
+    id: 'seal-2',
+    name: 'Seal II',
+    effect: 'Seal 1 more card out of the draw',
+    cost: 800,
+    requires: 'seal-1',
+    contract: { seals: 1 },
+  },
+  {
+    id: 'hold',
+    name: 'Hold',
+    effect: 'Keep one offered card for the next level',
+    cost: 600,
+    contract: { holds: 1 },
+  },
+  {
+    id: 'flight-school',
+    name: 'Flight School',
+    effect: 'Launch with a piloting card of your choice',
+    cost: 500,
+    requiresMedal: 'first-victory',
+    contract: { flightSchool: true },
+  },
+]);
+
+// Licences (plan H3): the weapons and cards left out of the starting draw.
+// A licence bought stays; switching it off (free) takes the card out of the
+// draw. Seven more cards are licensed by medals (data/achievements.js).
+export const LICENSES = deepFreeze([
+  { id: 'furnace_corona', kind: 'weapon', cost: 325 },
+  { id: 'shard_halo', kind: 'weapon', cost: 325 },
+  { id: 'harmonic_resonator', kind: 'weapon', cost: 325 },
+  { id: 'seeker_swarm', kind: 'weapon', cost: 325 },
+  { id: 'chain_capacitor', kind: 'card', cost: 250 },
+  { id: 'phase_skin', kind: 'card', cost: 250 },
+  { id: 'reactive_brake', kind: 'card', cost: 250 },
+  { id: 'glass_cannon', kind: 'card', cost: 250 },
+  { id: 'overclocked_core', kind: 'card', cost: 250 },
+  { id: 'blood_ledger', kind: 'card', cost: 250 },
+]);

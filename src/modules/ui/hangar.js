@@ -31,8 +31,40 @@ export function salvageLine(award) {
   };
 }
 
-const cardName = (id) =>
-  UPGRADE_LIBRARY.find((card) => card.id === id)?.text.name ?? id;
+const cardOf = (id) => UPGRADE_LIBRARY.find((card) => card.id === id);
+const cardName = (id) => cardOf(id)?.text.name ?? id;
+
+/**
+ * One licence: the card's name, "Weapon" or its family and summary, then a
+ * BUY button, the medal that pays it, or an ON / OFF switch once held.
+ */
+export function licenseMarkup(license) {
+  const card = cardOf(license.id);
+  const kind =
+    license.kind === 'weapon'
+      ? 'Weapon'
+      : card?.family
+        ? `${card.family} card`
+        : 'Cursed card';
+  let action;
+  if (license.owned) {
+    action = `<button type="button" class="btn btn--secondary hangar-item__action hangar-license__switch${
+      license.on ? ' is-on' : ''
+    }" data-hangar-license-on="${license.id}" aria-pressed="${license.on}">${license.on ? 'ON' : 'OFF'}</button>`;
+  } else if (license.medal) {
+    action = `<span class="hangar-item__action hangar-item__locked">🏅 ${license.medal}</span>`;
+  } else {
+    action = `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-license-buy="${license.id}"${
+      license.affordable ? '' : ' disabled'
+    }>BUY · ${license.cost}</button>`;
+  }
+  return `<li class="hangar-item${license.owned ? ' is-owned' : ''}" data-hangar-license="${license.id}">
+    <div class="hangar-item__text">
+      <h3 class="hangar-item__name">${cardName(license.id)}</h3>
+      <p class="hangar-item__effect"><span class="hangar-license__kind">${kind}</span> · ${card?.text.summary ?? ''}</p>
+    </div>
+    ${action}</li>`;
+}
 
 /** What a medal pays: "+50 Salvage", "License · Arc Lattice", "Opens Pressure · +100 Salvage". */
 export function medalRewardText(reward = {}) {
@@ -169,13 +201,22 @@ export function hullTraitsMarkup(hull, lock = '') {
   return parts.join(' · ');
 }
 
-/** One upgrade card: name, effect, cost and OWNED or a BUY button. */
+/**
+ * One upgrade card: name, effect, cost and OWNED, a BUY button, or what it
+ * waits for (`lock`: the rung before it, or a medal).
+ */
 export function hangarItemMarkup(item) {
   const action = item.owned
     ? '<span class="hangar-item__action hangar-item__owned" tabindex="-1">OWNED</span>'
-    : `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-buy="${item.id}"${
-        item.affordable ? '' : ' disabled'
-      }>BUY · ${item.cost}</button>`;
+    : item.lock
+      ? `<span class="hangar-item__action hangar-item__locked">🔒 ${
+          item.lock.medal
+            ? `Medal · ${item.lock.medal}`
+            : `After ${item.lock.item}`
+        }</span>`
+      : `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-buy="${item.id}"${
+          item.affordable ? '' : ' disabled'
+        }>BUY · ${item.cost}</button>`;
   return `<li class="hangar-item${item.owned ? ' is-owned' : ''}" data-hangar-item="${item.id}">
     <div class="hangar-item__text">
       <h3 class="hangar-item__name">${item.name}</h3>

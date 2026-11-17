@@ -83,6 +83,8 @@ describe('Hangar screen', () => {
       pressure: { open: 2, selected: 0, best: 0 },
       getMedals: () => [{ id: 'first-light', unlockedAt: null, reward: {} }],
       getItems: () => [],
+      getControlItems: () => [],
+      getLicenses: () => [],
       isHullUnlocked: () => true,
       setPressure: vi.fn(),
     };
@@ -97,6 +99,8 @@ describe('Hangar screen', () => {
         pressure: { innerHTML: '', querySelector: () => null },
         pressureNote: { textContent: '' },
         list: { innerHTML: '' },
+        licenses: { innerHTML: '' },
+        control: { innerHTML: '' },
         hulls: { innerHTML: '', addEventListener: vi.fn() },
         hullInfo: { innerHTML: '' },
         hullLock: { hidden: true, textContent: '' },
@@ -123,5 +127,64 @@ describe('Hangar screen', () => {
       },
     });
     expect(hangar.setPressure).toHaveBeenCalledWith(2);
+  });
+
+  it('a licence BUY click buys it; an ON click switches it off', () => {
+    let click;
+    const hangar = {
+      salvage: 0,
+      pressure: { open: 0, selected: 0, best: 0 },
+      getMedals: () => [],
+      getItems: () => [],
+      getControlItems: () => [],
+      getLicenses: () => [],
+      isHullUnlocked: () => true,
+      buyLicense: vi.fn(),
+      setLicenseOn: vi.fn(),
+    };
+    const screen = new HangarScreen({
+      refs: {
+        overlay: {
+          addEventListener: (type, fn) => type === 'click' && (click = fn),
+        },
+        tabs: [],
+        panels: [],
+        medals: { innerHTML: '' },
+        pressure: { innerHTML: '', querySelector: () => null },
+        pressureNote: { textContent: '' },
+        list: { innerHTML: '' },
+        licenses: { innerHTML: '', querySelector: () => null },
+        control: { innerHTML: '' },
+        hulls: { innerHTML: '', addEventListener: vi.fn() },
+        hullInfo: { innerHTML: '' },
+        hullLock: { hidden: true, textContent: '' },
+        balance: { textContent: '' },
+      },
+      hangar: () => hangar,
+      selectedHullId: () => 'default-hull',
+      hullName: (hull) => hull.id,
+      emit: vi.fn(),
+    });
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+    screen.bindHangarControls();
+    vi.unstubAllGlobals();
+    const hit = (attr, button) => ({
+      target: { closest: (sel) => (sel.includes(attr) ? button : null) },
+    });
+
+    click(
+      hit('data-hangar-license-buy', {
+        dataset: { hangarLicenseBuy: 'shard_halo' },
+      })
+    );
+    expect(hangar.buyLicense).toHaveBeenCalledWith('shard_halo');
+
+    click(
+      hit('data-hangar-license-on', {
+        dataset: { hangarLicenseOn: 'shard_halo' },
+        getAttribute: () => 'true',
+      })
+    );
+    expect(hangar.setLicenseOn).toHaveBeenCalledWith('shard_halo', false);
   });
 });

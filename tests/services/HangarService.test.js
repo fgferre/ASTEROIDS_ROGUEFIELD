@@ -476,4 +476,72 @@ describe('HangarService', () => {
       expect(hangar.pressure).toEqual({ open: 2, selected: 2, best: 0 });
     });
   });
+
+  describe('control and licences', () => {
+    const open = (salvage) => {
+      stock(salvage);
+      const eventBus = new EventBus();
+      return { eventBus, hangar: new HangarService({ ...base, eventBus }) };
+    };
+
+    it('sells a reroll rung only after the one before it; owned rungs add up', () => {
+      const { hangar } = open(1000);
+      expect(hangar.buy('reroll-2')).toBe(false);
+      expect(hangar.salvage).toBe(1000);
+      expect(hangar.buy('reroll-1')).toBe(true);
+      expect(hangar.buy('reroll-2')).toBe(true);
+      expect(hangar.salvage).toBe(400);
+      expect(hangar.getModifiers().extraRerolls).toBe(2);
+    });
+
+    it('holds the Flight School until the First Victory medal is paid', () => {
+      const { eventBus, hangar } = open(1000);
+      const school = hangar
+        .getControlItems()
+        .find((i) => i.id === 'flight-school');
+      expect(school.lock).toEqual({ medal: 'First Victory' });
+      expect(hangar.buy('flight-school')).toBe(false);
+
+      eventBus.emit('achievement-unlocked', { id: 'first-victory' });
+      expect(hangar.lockOf(school)).toBeNull();
+      expect(hangar.buy('flight-school')).toBe(true);
+    });
+
+    it('buys a licence once, switched on; the switch survives a reload', () => {
+      const { hangar } = open(500);
+      expect(hangar.buyLicense('shard_halo')).toBe(true);
+      expect(hangar.buyLicense('shard_halo')).toBe(false);
+      expect(hangar.salvage).toBe(175);
+      expect(hangar.getLicenses().find((l) => l.id === 'shard_halo').on).toBe(
+        true
+      );
+
+      expect(hangar.setLicenseOn('shard_halo', false)).toBe(true);
+      const again = new HangarService({ ...base, eventBus: new EventBus() });
+      const held = again.getLicenses().find((l) => l.id === 'shard_halo');
+      expect(held).toMatchObject({ owned: true, on: false });
+      again.setLicenseOn('shard_halo', true);
+      expect(again.licensesOff).toEqual({});
+    });
+
+    it('refuses to switch a licence it does not hold', () => {
+      const { hangar } = open(500);
+      expect(hangar.setLicenseOn('shard_halo', false)).toBe(false);
+      expect(hangar.licensesOff).toEqual({});
+    });
+
+    it('lists the ten licences on sale, then the seven medals pay', () => {
+      const { eventBus, hangar } = open(0);
+      const list = hangar.getLicenses();
+      expect(list.slice(0, 10).every((l) => l.cost && !l.medal)).toBe(true);
+      expect(list.slice(10)).toHaveLength(7);
+      expect(list.slice(10).every((l) => l.medal && !l.owned)).toBe(true);
+
+      eventBus.emit('achievement-unlocked', { id: 'ring-breaker' });
+      const paid = hangar
+        .getLicenses()
+        .find((l) => l.id === 'deflector_shield');
+      expect(paid).toMatchObject({ owned: true, on: true });
+    });
+  });
 });

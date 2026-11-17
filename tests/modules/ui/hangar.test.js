@@ -10,6 +10,7 @@ import {
   hullTraits,
   hullTraitsMarkup,
   hullUnlockText,
+  licenseMarkup,
   medalRewardText,
   pressureLadderMarkup,
   salvageBalanceText,
@@ -137,5 +138,35 @@ describe('Hangar screen', () => {
       amount: '+99',
       text: 'salvage · +100 from medals · 440 to spend in the Hangar',
     });
+  });
+
+  it('shows what a locked control item waits for, with no BUY', () => {
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
+    const control = (id) =>
+      hangarItemMarkup(hangar.getControlItems().find((i) => i.id === id));
+
+    expect(control('reroll-2')).toContain('🔒 After Reroll I');
+    expect(control('reroll-2')).not.toContain('data-hangar-buy');
+    expect(control('flight-school')).toContain('🔒 Medal · First Victory');
+    expect(control('reroll-1')).toContain('BUY · 200</button>');
+  });
+
+  it('writes a licence: BUY on sale, its medal, an ON / OFF switch once held', () => {
+    localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 400 }));
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
+    const card = (id) =>
+      licenseMarkup(hangar.getLicenses().find((l) => l.id === id));
+
+    expect(card('shard_halo')).toContain('Shard Halo');
+    expect(card('shard_halo')).toContain(
+      'data-hangar-license-buy="shard_halo"'
+    );
+    expect(card('deflector_shield')).toContain('🏅 Ring Breaker');
+    expect(card('deflector_shield')).not.toContain('data-hangar-license-buy');
+
+    hangar.buyLicense('shard_halo');
+    expect(card('shard_halo')).toContain('aria-pressed="true">ON</button>');
+    hangar.setLicenseOn('shard_halo', false);
+    expect(card('shard_halo')).toContain('aria-pressed="false">OFF</button>');
   });
 });

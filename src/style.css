@@ -1677,6 +1677,42 @@ kbd {
   display: none;
 }
 
+/* Control: three columns, so each ladder (rerolls, banishes, seals) is a row */
+.hangar-list--ladders {
+  grid-template-columns: repeat(3, 1fr);
+  align-content: start;
+}
+
+.hangar-list--ladders .hangar-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.hangar-list--ladders .hangar-item__action {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* A control rung or licence waiting for the one before it, or a medal */
+.hangar-item__locked {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.hangar-license__kind {
+  text-transform: capitalize;
+  color: var(--text);
+}
+
+.hangar-license__switch {
+  min-width: 64px;
+}
+
+.hangar-license__switch.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* The medal wall: earned in gold, the rest dashed, the key medal in accent */
 .medal-wall {
   list-style: none;

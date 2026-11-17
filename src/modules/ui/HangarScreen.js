@@ -1,14 +1,17 @@
 // src/modules/ui/HangarScreen.js
 //
-// The Hangar overlay over the main menu: Salvage balance and three tabs.
+// The Hangar overlay over the main menu: Salvage balance and five tabs.
 // Ship: the items to buy, the hull picker with its 3D preview and lock
-// caption, and the Ring's line for a purchase. Medals: the wall of medals and
+// caption, and the Ring's line for a purchase. Licences: weapons and cards to
+// license and switch on or off. Control: rungs of rerolls, banishes, Hold,
+// Seal and the Flight School. Medals: the wall of medals and
 // what each pays. Pressure: the ladder above Warden, a rung to pick.
 
 import {
   hangarItemMarkup,
   hullLockText,
   hullTraitsMarkup,
+  licenseMarkup,
   medalMarkup,
   pressureLadderMarkup,
   pressureNoteText,
@@ -18,7 +21,7 @@ import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
   /**
-   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, medals, pressure, pressureNote }.
+   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, licenses, control, medals, pressure, pressureNote }.
    * `settings`: the settings service; a hull button selects that hull.
    * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
    *   transmission events (its voice, audio/voiceLines.js).
@@ -108,12 +111,32 @@ export class HangarScreen {
           ?.focus({ preventScroll: true });
         return;
       }
+      const license = event.target.closest(
+        '[data-hangar-license-buy], [data-hangar-license-on]'
+      );
+      if (license) {
+        const { hangarLicenseBuy, hangarLicenseOn } = license.dataset;
+        if (hangarLicenseBuy) this.hangar().buyLicense(hangarLicenseBuy);
+        else {
+          this.hangar().setLicenseOn(
+            hangarLicenseOn,
+            license.getAttribute('aria-pressed') !== 'true'
+          );
+        }
+        const id = hangarLicenseBuy ?? hangarLicenseOn;
+        this.renderHangar();
+        refs.licenses
+          .querySelector(`[data-hangar-license="${id}"] .hangar-item__action`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
       const buy = event.target.closest('[data-hangar-buy]');
       if (buy) {
         const id = buy.dataset.hangarBuy;
+        const list = buy.closest('.hangar-list');
         this.hangar().buy(id);
         this.renderHangar();
-        refs.list
+        list
           .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
           ?.focus({ preventScroll: true });
         return;
@@ -177,6 +200,11 @@ export class HangarScreen {
     refs.panels.forEach((panel) => {
       panel.hidden = panel.dataset.hangarPanel !== this.tab;
     });
+    refs.licenses.innerHTML = hangar.getLicenses().map(licenseMarkup).join('');
+    refs.control.innerHTML = hangar
+      .getControlItems()
+      .map(hangarItemMarkup)
+      .join('');
     refs.medals.innerHTML = medals.map(medalMarkup).join('');
     refs.pressureNote.textContent = pressureNoteText(hangar.pressure.open);
     refs.pressure.innerHTML = pressureLadderMarkup(hangar.pressure);

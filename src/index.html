@@ -639,6 +639,24 @@
               class="codex-tab"
               type="button"
               role="tab"
+              data-hangar-tab="licenses"
+              aria-selected="false"
+            >
+              Licences
+            </button>
+            <button
+              class="codex-tab"
+              type="button"
+              role="tab"
+              data-hangar-tab="control"
+              aria-selected="false"
+            >
+              Control
+            </button>
+            <button
+              class="codex-tab"
+              type="button"
+              role="tab"
               data-hangar-tab="medals"
               aria-selected="false"
             >
@@ -683,6 +701,28 @@
                 aria-label="Hull"
               ></div>
             </div>
+          </div>
+          <div class="credits-body" data-hangar-panel="licenses" hidden>
+            <p class="pressure-note">
+              Licences put weapons and cards in the draw; switch one off, free,
+              to keep it out. They take effect with the new card draw.
+            </p>
+            <ul
+              id="hangar-licenses"
+              class="hangar-list"
+              aria-label="Licences"
+            ></ul>
+          </div>
+          <div class="credits-body" data-hangar-panel="control" hidden>
+            <p class="pressure-note">
+              Control over the draw, never raw power. Rerolls and banishes work
+              now; Hold, Seal and the Flight School with the new card draw.
+            </p>
+            <ul
+              id="hangar-control"
+              class="hangar-list hangar-list--ladders"
+              aria-label="Control"
+            ></ul>
           </div>
           <div class="credits-body" data-hangar-panel="medals" hidden>
             <ul id="hangar-medals" class="medal-wall" aria-label="Medals"></ul>
