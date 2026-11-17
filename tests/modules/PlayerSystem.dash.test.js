@@ -32,7 +32,12 @@ describe('PlayerSystem dash', () => {
     const movement = { up: false, down: false, left: false, right: false };
     Object.assign(movement, held);
     const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
-    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    const player = new PlayerSystem({
+      eventBus,
+      input,
+      'command-queue': null,
+      newFlight: false,
+    });
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     player.angle = 0;
@@ -136,7 +141,12 @@ describe('Maneuver cards on the dash', () => {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
     const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
-    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    const player = new PlayerSystem({
+      eventBus,
+      input,
+      'command-queue': null,
+      newFlight: false,
+    });
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     player.angle = 0;

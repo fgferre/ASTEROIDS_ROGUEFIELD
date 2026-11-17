@@ -31,7 +31,7 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
 }));
 
 /**
- * The cards of the flight in play: the new flight (?direcao=nova) adds its own
+ * The cards of the flight in play: the new flight (the default; ?direcao=antiga is the old flight) adds its own
  * (`newFlight`) and reads the piloting cards' glide text (`newFlightText`,
  * over `text`); without it the catalog is today's.
  */

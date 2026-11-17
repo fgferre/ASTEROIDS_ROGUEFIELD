@@ -14,6 +14,7 @@ function makePlayer(controlScheme = 'modern') {
     eventBus,
     input: { getMovementInput: () => ({}) },
     'command-queue': null,
+    newFlight: false,
     controlScheme,
   });
   player.controlScheme = controlScheme;

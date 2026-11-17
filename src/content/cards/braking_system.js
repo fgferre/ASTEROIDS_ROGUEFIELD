@@ -42,7 +42,7 @@ export default {
       },
     ],
   },
-  // The new flight (?direcao=nova) reads this over `text`: in glide the
+  // The new flight (the default; ?direcao=antiga is the old flight) reads this over `text`: in glide the
   // brakes act when the thrust is let go (measured 16/11 from top speed,
   // 132 px/s, to under 10 px/s: 7.4 s bare, 2.0 / 1.2 / 0.75 s per level).
   newFlightText: {

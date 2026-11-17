@@ -1,4 +1,4 @@
-// The new flight only (`newFlight`, ?direcao=nova): the last piloting card.
+// The new flight only (`newFlight`, the default; `?direcao=antiga` is the old one): the last piloting card.
 // The run starts in classic glide flight; this card brings today's modern
 // flight, after a briefing that pauses the run and waits for Enter
 // (ui/FlightBriefing.js). What it asks for is a balance number (proposta
@@ -7,7 +7,7 @@
 export default {
   id: 'flight_computer',
   newFlight: true,
-  order: 43,
+  order: 47,
   category: 'mobility',
   family: 'kinetic',
   rarity: 'epic',
