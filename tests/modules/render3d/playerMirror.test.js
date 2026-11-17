@@ -40,6 +40,7 @@ function mirrorFor(hull) {
     eventBus: createEventBusMock(),
     input: { getMovementInput: () => ({}) },
     'command-queue': null,
+    newFlight: false,
   });
   player.setHull(hull);
   const mirror = new PlayerMirror(THREE, new THREE.Scene(), (fn) => fn());

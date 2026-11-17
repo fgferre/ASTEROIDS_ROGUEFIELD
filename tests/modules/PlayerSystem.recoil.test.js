@@ -14,6 +14,7 @@ describe('PlayerSystem shot recoil', () => {
       eventBus,
       input: { getMovementInput: () => ({}) },
       'command-queue': null,
+      newFlight: false,
     });
     player.velocity = { vx: 0, vy: 0 };
     const shot = {

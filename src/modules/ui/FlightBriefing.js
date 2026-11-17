@@ -1,6 +1,6 @@
 // src/modules/ui/FlightBriefing.js
 //
-// The new flight's briefing (?direcao=nova; the owner, 16/11: "um pequeno
+// The new flight's briefing (the default; the owner, 16/11: "um pequeno
 // tutorialzinho na tela, que a pessoa tem que dar enter para seguir"): the
 // Flight Computer card waits for the card and chest screens to close, then
 // pauses the run on its new keys; Continue (the confirm key or pad button, or

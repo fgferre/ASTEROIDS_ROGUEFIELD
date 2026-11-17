@@ -31,6 +31,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus,
       input,
       'command-queue': null,
+      newFlight: false,
       controlScheme,
     });
     player.position = { x: 400, y: 300 };
@@ -121,7 +122,7 @@ describe('PlayerSystem control schemes', () => {
     ]);
   });
 
-  it('the new flight (?direcao=nova) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
+  it('the new flight (the default) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
@@ -226,6 +227,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus: createEventBusMock(),
       input: { getMovementInput: vi.fn(() => ({})) },
       'command-queue': null,
+      newFlight: false,
       settings: settings('classic'),
     });
     expect(player.controlScheme).toBe('classic');

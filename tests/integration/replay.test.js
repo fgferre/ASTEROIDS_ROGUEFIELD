@@ -92,6 +92,7 @@ describe('run replay', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
+    window.location.search = '?direcao=antiga'; // these runs fly today's flight
   });
 
   afterEach(() => {
