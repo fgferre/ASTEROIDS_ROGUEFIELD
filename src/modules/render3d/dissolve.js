@@ -250,11 +250,9 @@ export class DissolvePool {
       for (let i = 0; i < meshes.length; i += 1) {
         const mesh = meshes[i];
         parts.geometries.push(mesh, mesh.geometry);
-        mesh.geometry = brokenOf(
-          this.THREE,
-          hull.geometry,
-          mesh.geometry,
-          count
+        // seeded: Three names each new geometry with Math.random
+        mesh.geometry = this.seeded(() =>
+          brokenOf(this.THREE, hull.geometry, mesh.geometry, count)
         );
       }
     });
