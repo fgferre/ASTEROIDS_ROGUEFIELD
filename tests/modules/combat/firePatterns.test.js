@@ -170,18 +170,169 @@ describe('fire patterns', () => {
     expect(combat.blades).toHaveLength(halo.blades + 2);
   });
 
-  it('orbit: a blade cut brings no lance evolution: with the Chain Lance it does not arc', () => {
+  describe('orbit: the families and the six cards', () => {
     const halo = firstOf('shard-halo');
-    const target = enemy('target', SHIP.x + halo.radius, SHIP.y);
-    const next = enemy('next', SHIP.x + halo.radius + 60, SHIP.y);
-    const { combat } = armed('shard-halo', [target, next]);
-    combat.weapons.evolveWeapon('arc');
-    expect(combat.weapons.hasEvolution('arc')).toBe(true);
+    const forms = WEAPON_FORMS['shard-halo'].base.familyForms;
+    const at = (id, x, y, extra) => enemy(id, SHIP.x + x, SHIP.y + y, extra);
+    // Five enemies on the first blade's ring, all within its reach.
+    const crowd = () =>
+      [-6, -3, 0, 3, 6].map((dy, i) => at(`c${i}`, halo.radius, dy));
+    const cut = (who, setup = () => {}, stats = STATS) => {
+      const { combat, eventBus } = armed('shard-halo', who);
+      setup(combat, eventBus);
+      tickWeaponField(combat.weapons, 0.01, stats);
+      return combat;
+    };
+    const lone = (extra) => at('t', halo.radius, 0, extra);
+    const dealt = (who) => 100 - who.health;
+    const plain = () =>
+      dealt(
+        (() => {
+          const t = lone();
+          cut([t]);
+          return t;
+        })()
+      );
 
-    tickWeaponField(combat.weapons, 0.01, STATS);
-    expect(target.health).toBeLessThan(100);
-    expect(next.health).toBe(100);
-    expect(combat.arcs).toHaveLength(0);
+    it('thermal: a cut sets the enemy burning, not the field', () => {
+      const t = lone();
+      const combat = cut([t], (c) => c.weapons.evolveWeapon('thermal'));
+      expect(combat.cards.burns.size).toBe(1);
+      const f = lone();
+      const field = cut([f], (c) => c.weapons.evolveWeapon('field'));
+      expect(field.cards.slows.size).toBe(0);
+    });
+
+    it('arc: a cycle cutting five enemies starts one chain; Storm forks it', () => {
+      const combat = cut(crowd(), (c) => c.weapons.evolveWeapon('arc'));
+      expect(combat.arcs).toHaveLength(forms.perShot.chains);
+      const storm = cut(crowd(), (c) => c.weapons.apexWeapon('arc'));
+      expect(storm.arcs.length).toBeGreaterThan(1);
+      // The next cycle gets a new budget.
+      combat.handleShooting(1, STATS);
+      tickWeaponField(combat.weapons, 0.01, STATS);
+      expect(combat.arcs).toHaveLength(2 * forms.perShot.chains);
+    });
+
+    it('kinetic: Railshot and Coilgun cut harder and shove further', () => {
+      const run = (stage) => {
+        const t = lone();
+        cut([t], (c) => {
+          if (stage >= 0) c.weapons.evolveWeapon('kinetic');
+          if (stage === 1) c.weapons.apexWeapon('kinetic');
+        });
+        return { dealt: dealt(t), speed: Math.hypot(t.vx, t.vy) };
+      };
+      const base = run(-1);
+      [0, 1].forEach((stage) => {
+        const heavy = run(stage);
+        expect(heavy.dealt).toBeCloseTo(
+          base.dealt * forms.kinetic.damage[stage],
+          6
+        );
+        expect(heavy.speed).toBeCloseTo(
+          knockbackSpeed(heavy.dealt) * forms.kinetic.push[stage],
+          6
+        );
+      });
+    });
+
+    it('salvage: Prospector pays on the cut kills', () => {
+      const weak = lone({ health: 1 });
+      const { combat, enemies } = armed('shard-halo', [weak]);
+      enemies.rewardManager = {
+        stats: { totalOrbsDropped: 0 },
+        createXPOrbs: vi.fn(),
+      };
+      const damage = enemies.applyDamage;
+      enemies.applyDamage = (target, amount, ...rest) => {
+        const result = damage(target, amount, ...rest);
+        if (result.killed) enemies.rewardManager.stats.totalOrbsDropped += 4;
+        return result;
+      };
+      combat.weapons.evolveWeapon('salvage');
+      tickWeaponField(combat.weapons, 0.01, STATS);
+      expect(enemies.rewardManager.createXPOrbs).toHaveBeenCalledTimes(1);
+    });
+
+    it('Chain Capacitor: a cut can land twice', () => {
+      const twice = lone();
+      cut([twice], (c) => {
+        c.cards.cardEffects.chainCapacitor = {
+          extraJumps: 1,
+          doubleHitChance: 1,
+        };
+      });
+      expect(dealt(twice)).toBeCloseTo(plain() * 2, 6);
+    });
+
+    it('Overcharge Coil: the blades spin faster, the cube root of the lance speed gain', () => {
+      const turn = (gain) => {
+        const { combat, eventBus } = armed('shard-halo', []);
+        if (gain) {
+          eventBus.emit('upgrade-weapon-tuning', {
+            upgradeId: 'overcharge_coil',
+            level: 1,
+            bulletSpeedMultiplier: gain,
+          });
+        }
+        tickWeaponField(combat.weapons, 0.1, STATS);
+        return combat.blades[0].around;
+      };
+      expect(turn(1.15)).toBeCloseTo(turn(0) * Math.cbrt(1.15), 6);
+    });
+
+    it('Recoil Dampers: the blades cut 4 px wider', () => {
+      const far = () => lone({ x: SHIP.x + halo.radius + 10 + 10 + 2 });
+      const t = far();
+      cut([t]);
+      expect(dealt(t)).toBe(0);
+      const wide = far();
+      cut([wide], (c, bus) =>
+        bus.emit('upgrade-weapon-tuning', {
+          upgradeId: 'recoil_dampers',
+          level: 1,
+          pierceBonus: 1,
+        })
+      );
+      expect(dealt(wide)).toBeGreaterThan(0);
+    });
+
+    it('Thermal Lens: cut damage +15%', () => {
+      const t = lone();
+      cut([t], (c) => {
+        c.cards.cardEffects.thermalLens = { lanceDamageMultiplier: 1.15 };
+      });
+      expect(dealt(t)).toBeCloseTo(plain() * 1.15, 6);
+    });
+
+    it('Afterburn Lance: more damage the further the enemy is from the ship', () => {
+      const burn = (x) => {
+        const t = at('t', x, 0);
+        cut([t], (c) => {
+          c.cards.cardEffects.longBurn = {
+            bonusPer100px: 0.2,
+            maxDistance: 400,
+          };
+        });
+        return dealt(t);
+      };
+      expect(burn(halo.radius)).toBeCloseTo(plain() * (1 + 0.2 * 0.44), 6);
+    });
+
+    it('Targeting Matrix: threat focus only for elites, heralds and bosses', () => {
+      const focus = (extra) => {
+        const t = lone(extra);
+        cut([t], (c, bus) =>
+          bus.emit('upgrade-threat-focus', { damageMultiplier: 1.2 })
+        );
+        return dealt(t);
+      };
+      expect(focus({})).toBeCloseTo(plain(), 6);
+      expect(focus({ elite: true })).toBeCloseTo(plain() * 1.2, 6);
+      expect(focus({ type: 'herald' })).toBeCloseTo(plain() * 1.2, 6);
+      expect(focus({ type: 'boss' })).toBeCloseTo(plain() * 1.2, 6);
+    });
   });
 
   it('orbit: the evolved ring breathes out to its reach and back', () => {

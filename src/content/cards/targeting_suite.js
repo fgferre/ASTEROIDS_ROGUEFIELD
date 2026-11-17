@@ -2,28 +2,6 @@
 const MULTI_LOCK_COOLDOWN = 0.92;
 const FIRE_RATE = Math.round((1 / MULTI_LOCK_COOLDOWN - 1) * 100);
 
-// A weapon that never aims (the orbit) gains only rank 3's rate.
-const neverAims = (name) => {
-  const highlights = [
-    `Only rank 3 changes the ${name}: fire rate +${FIRE_RATE}%.`,
-  ];
-  return {
-    levels: [
-      {
-        description: `Ranks the threats for the lock, but the ${name} never aims: nothing changes for it.`,
-        highlights,
-      },
-      {
-        description: `Leads fast targets, but the ${name} never aims: nothing changes for it.`,
-        highlights,
-      },
-      {
-        description: `Fire rate +${FIRE_RATE}%. The locks add nothing: the ${name} never aims.`,
-      },
-    ],
-  };
-};
-
 export default {
   id: 'targeting_suite',
   order: 3,
@@ -33,8 +11,6 @@ export default {
   icon: '🎯',
   themeColor: '#FFD166',
   unlockLevel: 3,
-  // Weapons it does nothing for before rank 3 (the draw leaves it out).
-  deadFor: ['shard-halo'],
   // The nose cannon has no lock, so the suite needs the turret first.
   newFlightPrerequisites: [
     {
@@ -142,7 +118,21 @@ export default {
         },
       ],
     },
-    'shard-halo': neverAims('Shard Halo'),
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'Cuts deal +10% damage to elites, heralds and bosses. The Halo never aims: the locks add nothing.',
+        },
+        {
+          description:
+            'Cuts deal +20% damage to elites, heralds and bosses. The Halo never aims: the lead adds nothing.',
+        },
+        {
+          description: `Fire rate +${FIRE_RATE}%. The cuts keep their +20% on elites, heralds and bosses.`,
+        },
+      ],
+    },
   },
   levels: [
     {

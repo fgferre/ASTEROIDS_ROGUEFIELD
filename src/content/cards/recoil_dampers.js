@@ -4,7 +4,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 export default {
   id: 'recoil_dampers',
   // Weapons it does nothing for (the draw leaves it out).
-  deadFor: ['scatter', 'shard-halo', 'arc-caster', 'seeker-swarm'],
+  deadFor: ['scatter', 'arc-caster', 'seeker-swarm'],
   order: 11,
   category: 'offense',
   family: 'kinetic',
@@ -27,6 +27,13 @@ export default {
   },
   // The Furnace's ring reaches past Multishot's cap (firePatterns.js).
   weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description: 'The blades cut 4 px wider (10 px to 14 px).',
+        },
+      ],
+    },
     'furnace-corona': {
       levels: [
         {

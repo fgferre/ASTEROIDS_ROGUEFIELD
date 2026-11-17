@@ -347,26 +347,28 @@ describe('level-up offers', () => {
   });
 
   describe('cards that do nothing for the weapon in hand', () => {
-    const furnaceCard = listContent('weapons').find(
-      ({ id }) => id === 'furnace-corona'
-    ).card.id;
-    const haloCard = listContent('weapons').find(
-      ({ id }) => id === 'shard-halo'
-    ).card.id;
+    const cardOf = (weaponId) =>
+      listContent('weapons').find(({ id }) => id === weaponId).card.id;
+    const furnaceCard = cardOf('furnace-corona');
+    const haloCard = cardOf('shard-halo');
+    const casterCard = cardOf('arc-caster');
     const eligibleIds = (progression) =>
       progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
 
-    it('the new flight leaves a dead card out with Shard Halo held, not with the default cannon; Furnace Corona keeps it', () => {
+    it('the new flight leaves a dead card out with Arc Caster held, not with the default cannon; Furnace Corona and Shard Halo keep it', () => {
       const progression = createProgression(9);
       expect(eligibleIds(progression)).toContain('overcharge_coil');
       progression.appliedUpgrades.set(furnaceCard, 1);
       expect(eligibleIds(progression)).toContain('overcharge_coil');
       progression.appliedUpgrades.delete(furnaceCard);
       progression.appliedUpgrades.set(haloCard, 1);
+      expect(eligibleIds(progression)).toContain('overcharge_coil');
+      progression.appliedUpgrades.delete(haloCard);
+      progression.appliedUpgrades.set(casterCard, 1);
       expect(eligibleIds(progression)).not.toContain('overcharge_coil');
       for (let seed = 1; seed <= 30; seed += 1) {
         const held = createProgression(9, seed);
-        held.appliedUpgrades.set(haloCard, 1);
+        held.appliedUpgrades.set(casterCard, 1);
         expect(offerIds(held)).not.toContain('overcharge_coil');
       }
     });
@@ -415,7 +417,7 @@ describe('level-up offers', () => {
       expect(scatter.description).toContain('flak bolts have a 10% chance');
       expect(scatter.highlights).toEqual(shown('chain_capacitor').highlights);
       // Another weapon reads the base text.
-      expect(shown('chain_capacitor', 'shard-halo').description).toBe(
+      expect(shown('chain_capacitor', 'lance').description).toBe(
         shown('chain_capacitor').description
       );
     });
@@ -453,12 +455,12 @@ describe('level-up offers', () => {
       );
     });
 
-    it('Targeting Matrix gives a weapon that never aims only its fire rate', () => {
+    it('Targeting Matrix gives a weapon that never aims threat focus and its fire rate', () => {
       expect(shown('targeting_suite', 'shard-halo').description).toContain(
-        'never aims: nothing changes for it'
+        '+10% damage to elites, heralds and bosses'
       );
       expect(shown('targeting_suite', 'shard-halo', 2).description).toBe(
-        'Fire rate +9%. The locks add nothing: the Shard Halo never aims.'
+        'Fire rate +9%. The cuts keep their +20% on elites, heralds and bosses.'
       );
       expect(shown('targeting_suite', 'lance', 2).description).toBe(
         'Locks one threat per shot of the volley, up to four, and fires at all of them. Fire rate +9%.'
