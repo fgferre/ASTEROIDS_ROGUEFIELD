@@ -1728,10 +1728,17 @@ kbd {
   display: none;
 }
 
-/* Control: three columns, so each ladder (rerolls, banishes, seals) is a row */
+/* Control: three columns, so each ladder (rerolls, banishes, seals) is a row;
+   the whole tab scrolls, rungs and the pickers under them together */
+.hangar-dialog .credits-body[data-hangar-panel='control'] {
+  overflow-y: auto;
+}
+
 .hangar-list--ladders {
   grid-template-columns: repeat(3, 1fr);
   align-content: start;
+  flex: none;
+  overflow: visible;
 }
 
 .hangar-list--ladders .hangar-item {
@@ -1742,6 +1749,45 @@ kbd {
 .hangar-list--ladders .hangar-item__action {
   align-self: flex-start;
   margin-top: auto;
+}
+
+/* Under the control rungs: cards sealed and the Flight School's card */
+.hangar-launch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hangar-launch:empty {
+  display: none;
+}
+
+.hangar-launch__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.hangar-chip {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.hangar-chip.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hangar-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* A control rung or licence waiting for the one before it, or a medal */

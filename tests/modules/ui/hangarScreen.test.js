@@ -85,6 +85,12 @@ describe('Hangar screen', () => {
       getItems: () => [],
       getControlItems: () => [],
       getLicenses: () => [],
+      contractTotal: () => 0,
+      getSealed: () => [],
+      getOpenCards: () => new Set(),
+      owned: {},
+      getFlightSchoolCards: () => [],
+      startingCard: null,
       isHullUnlocked: () => true,
       setPressure: vi.fn(),
     };
@@ -101,6 +107,7 @@ describe('Hangar screen', () => {
         list: { innerHTML: '' },
         licenses: { innerHTML: '' },
         control: { innerHTML: '' },
+        launch: { innerHTML: '', querySelector: () => null },
         hulls: { innerHTML: '', addEventListener: vi.fn() },
         hullInfo: { innerHTML: '' },
         hullLock: { hidden: true, textContent: '' },
@@ -129,7 +136,7 @@ describe('Hangar screen', () => {
     expect(hangar.setPressure).toHaveBeenCalledWith(2);
   });
 
-  it('a licence BUY click buys it; an ON click switches it off', () => {
+  it('a licence BUY click buys it, ON switches it off; a chip seals or picks', () => {
     let click;
     const hangar = {
       salvage: 0,
@@ -138,9 +145,17 @@ describe('Hangar screen', () => {
       getItems: () => [],
       getControlItems: () => [],
       getLicenses: () => [],
+      contractTotal: () => 0,
+      getSealed: () => [],
+      getOpenCards: () => new Set(),
+      owned: {},
+      getFlightSchoolCards: () => [],
+      startingCard: null,
       isHullUnlocked: () => true,
       buyLicense: vi.fn(),
       setLicenseOn: vi.fn(),
+      toggleSeal: vi.fn(),
+      setStartingCard: vi.fn(),
     };
     const screen = new HangarScreen({
       refs: {
@@ -155,6 +170,7 @@ describe('Hangar screen', () => {
         list: { innerHTML: '' },
         licenses: { innerHTML: '', querySelector: () => null },
         control: { innerHTML: '' },
+        launch: { innerHTML: '', querySelector: () => null },
         hulls: { innerHTML: '', addEventListener: vi.fn() },
         hullInfo: { innerHTML: '' },
         hullLock: { hidden: true, textContent: '' },
@@ -186,5 +202,10 @@ describe('Hangar screen', () => {
       })
     );
     expect(hangar.setLicenseOn).toHaveBeenCalledWith('shard_halo', false);
+
+    click(hit('data-hangar-seal', { dataset: { hangarSeal: 'plasma' } }));
+    expect(hangar.toggleSeal).toHaveBeenCalledWith('plasma');
+    click(hit('data-hangar-start', { dataset: { hangarStart: 'none' } }));
+    expect(hangar.setStartingCard).toHaveBeenCalledWith(null);
   });
 });

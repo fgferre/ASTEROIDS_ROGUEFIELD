@@ -191,8 +191,50 @@ export const CONTROL_ITEMS = deepFreeze([
     effect: 'Launch with a piloting card of your choice',
     cost: 500,
     requiresMedal: 'first-victory',
-    contract: { flightSchool: true },
   },
+]);
+
+// The piloting track (plan): outside the card slots, never in the starting
+// draw, a licence or a seal. The Flight School starts a run on one of its
+// first steps (the ones with no prerequisite).
+export const PILOT_TRACK = deepFreeze([
+  'propulsors',
+  'braking_system',
+  'rcs_system',
+  'auto_aim',
+  'flight_computer',
+]);
+
+// The starting draw (plan, decided by the lead): four combat cards a family,
+// the ones that close its bonus of 3, and the Scatter and Arc Caster weapons.
+// Every other card comes from a licence, bought or paid by a medal.
+export const STARTING_DRAW = deepFreeze([
+  'plasma',
+  'heat_sink',
+  'afterburn_lance',
+  'cinder_trail',
+  'multishot',
+  'ballast_rounds',
+  'recoil_dampers',
+  'close_quarters',
+  'overcharge_coil',
+  'static_shell',
+  'capacitor_bank',
+  'targeting_suite',
+  'shield',
+  'ablative_plating',
+  'grav_anchor',
+  'gravity_brake',
+  'afterburner',
+  'gyro_servos',
+  'inertial_dampers',
+  'ram_plating',
+  'magfield',
+  'core_extractor',
+  'wide_net',
+  'scrap_compactor',
+  'scatter_coil',
+  'arc_caster',
 ]);
 
 // Licences (plan H3): the weapons and cards left out of the starting draw.
@@ -204,6 +246,7 @@ export const LICENSES = deepFreeze([
   { id: 'harmonic_resonator', kind: 'weapon', cost: 325 },
   { id: 'seeker_swarm', kind: 'weapon', cost: 325 },
   { id: 'chain_capacitor', kind: 'card', cost: 250 },
+  { id: 'momentum_rounds', kind: 'card', cost: 250 },
   { id: 'phase_skin', kind: 'card', cost: 250 },
   { id: 'reactive_brake', kind: 'card', cost: 250 },
   { id: 'glass_cannon', kind: 'card', cost: 250 },

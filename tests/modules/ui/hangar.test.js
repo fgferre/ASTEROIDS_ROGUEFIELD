@@ -10,6 +10,7 @@ import {
   hullTraits,
   hullTraitsMarkup,
   hullUnlockText,
+  launchSetupMarkup,
   licenseMarkup,
   medalRewardText,
   pressureLadderMarkup,
@@ -176,5 +177,34 @@ describe('Hangar screen', () => {
     expect(card('shard_halo')).toContain('aria-pressed="true">ON</button>');
     hangar.setLicenseOn('shard_halo', false);
     expect(card('shard_halo')).toContain('aria-pressed="false">OFF</button>');
+  });
+
+  it('shows the seal and Flight School pickers only once bought', () => {
+    const setup = {
+      sealSlots: 0,
+      sealed: [],
+      openCards: new Set(['plasma', 'multishot']),
+      flightSchool: false,
+      schoolCards: ['propulsors'],
+      startingCard: null,
+    };
+    expect(launchSetupMarkup(setup)).toBe('');
+
+    const full = launchSetupMarkup({
+      ...setup,
+      sealSlots: 1,
+      sealed: ['plasma'],
+      flightSchool: true,
+      startingCard: 'propulsors',
+    });
+    expect(full).toContain('Sealed out of the draw · 1/1');
+    expect(full).toContain('data-hangar-seal="plasma" aria-pressed="true"');
+    expect(full).toMatch(
+      /data-hangar-seal="multishot" aria-pressed="false" disabled/
+    );
+    expect(full).toContain(
+      'data-hangar-start="propulsors" aria-pressed="true"'
+    );
+    expect(full).toContain('data-hangar-start="none" aria-pressed="false"');
   });
 });

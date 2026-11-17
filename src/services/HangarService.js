@@ -7,9 +7,12 @@ import {
   CONTROL_ITEMS,
   HANGAR_ITEMS,
   LICENSES,
+  PILOT_TRACK,
   runSalvage,
   SALVAGE_PER_CARD_CACHE,
+  STARTING_DRAW,
 } from '../data/hangar.js';
+import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { sectorById } from '../data/sectors.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
@@ -23,6 +26,11 @@ const ALL_ITEMS = [...HANGAR_ITEMS, ...CONTROL_ITEMS];
 const ITEMS_BY_ID = new Map(ALL_ITEMS.map((item) => [item.id, item]));
 const LICENSES_BY_ID = new Map(LICENSES.map((entry) => [entry.id, entry]));
 const MEDALS_BY_ID = new Map(ACHIEVEMENTS.map((entry) => [entry.id, entry]));
+// The piloting cards the Flight School may launch with: the track's first
+// steps, the ones with no prerequisite.
+const FLIGHT_SCHOOL_CARDS = PILOT_TRACK.filter(
+  (id) => !UPGRADE_LIBRARY.find((card) => card.id === id)?.prerequisites?.length
+);
 
 // id → true maps of the save; an id the game no longer sells is kept.
 const idSet = (value) =>
@@ -43,7 +51,9 @@ const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
  *   by a medal; `licensesOff`: licensed cards switched off (free, reversible);
  * - `medalsPaid`: medals whose reward was paid, so each pays once;
  * - `pressure`: `open` (highest rung open), `selected` (the rung the next
- *   runs fly, 0 for none) and `best` (highest rung won).
+ *   runs fly, 0 for none) and `best` (highest rung won);
+ * - `sealed`: cards sealed out of the next runs' draw; `startingCard`: the
+ *   piloting card the Flight School launches with (null for none).
  */
 export function loadHangarSave() {
   const stored =
@@ -62,6 +72,11 @@ export function loadHangarSave() {
       selected: Math.min(open, count(pressure.selected)),
       best: Math.min(PRESSURE_RUNGS.length, count(pressure.best)),
     },
+    sealed: Array.isArray(stored.sealed)
+      ? stored.sealed.filter((id) => typeof id === 'string')
+      : [],
+    startingCard:
+      typeof stored.startingCard === 'string' ? stored.startingCard : null,
   };
 }
 
@@ -259,6 +274,8 @@ export default class HangarService {
       licensesOff: this.licensesOff,
       medalsPaid: this.medalsPaid,
       pressure: this.pressure,
+      sealed: this.sealed,
+      startingCard: this.startingCard,
     });
   }
 
@@ -316,6 +333,67 @@ export default class HangarService {
     }));
   }
 
+  /** The cards a run may draw: the starting draw and the licences switched on. */
+  getOpenCards() {
+    const licensed = Object.keys(this.licenses).filter(
+      (id) => !this.licensesOff[id]
+    );
+    return new Set([...STARTING_DRAW, ...licensed]);
+  }
+
+  /** The total of a contract field (`seals`, `holds`) over the items owned. */
+  contractTotal(key) {
+    return CONTROL_ITEMS.reduce(
+      (total, item) =>
+        total + (this.owned[item.id] ? item.contract?.[key] ?? 0 : 0),
+      0
+    );
+  }
+
+  /** The cards sealed that still count: open ones, up to the Seal rungs owned. */
+  getSealed() {
+    const open = this.getOpenCards();
+    return this.sealed
+      .filter((id) => open.has(id))
+      .slice(0, this.contractTotal('seals'));
+  }
+
+  /** Seals an open card out of the next runs' draw, or unseals it. */
+  toggleSeal(id) {
+    if (this.sealed.includes(id)) {
+      this.sealed = this.sealed.filter((entry) => entry !== id);
+    } else if (
+      this.getOpenCards().has(id) &&
+      this.getSealed().length < this.contractTotal('seals')
+    ) {
+      this.sealed = [...this.getSealed(), id];
+    } else {
+      return false;
+    }
+    this.persist();
+    return true;
+  }
+
+  /** The piloting cards the Flight School may launch with. */
+  getFlightSchoolCards() {
+    return FLIGHT_SCHOOL_CARDS;
+  }
+
+  /** Picks the Flight School's card (null for none); needs the item owned. */
+  setStartingCard(id) {
+    if (!this.owned['flight-school']) return false;
+    if (id !== null && !FLIGHT_SCHOOL_CARDS.includes(id)) return false;
+    this.startingCard = id;
+    this.persist();
+    return true;
+  }
+
+  /**
+   * What a run starts with: the items' numbers, then the contract the card
+   * draw reads (progression plan H6): `openCards`, `sealed`, `holds` and
+   * `startingCard`. The piloting track and the fallback cards stay outside
+   * `openCards` and `sealed`; the draw handles them.
+   */
   getModifiers() {
     const modifiers = { ...BASE_MODIFIERS };
     ALL_ITEMS.forEach((item) => {
@@ -326,6 +404,14 @@ export default class HangarService {
           : modifiers[key] + value;
       });
     });
+    modifiers.openCards = this.getOpenCards();
+    modifiers.sealed = new Set(this.getSealed());
+    modifiers.holds = this.contractTotal('holds');
+    modifiers.startingCard =
+      this.owned['flight-school'] &&
+      FLIGHT_SCHOOL_CARDS.includes(this.startingCard)
+        ? this.startingCard
+        : null;
     return modifiers;
   }
 

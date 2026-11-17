@@ -4,13 +4,15 @@
 // Ship: the items to buy, the hull picker with its 3D preview and lock
 // caption, and the Ring's line for a purchase. Licences: weapons and cards to
 // license and switch on or off. Control: rungs of rerolls, banishes, Hold,
-// Seal and the Flight School. Medals: the wall of medals and
+// Seal and the Flight School, then the cards sealed and the Flight School's
+// card. Medals: the wall of medals and
 // what each pays. Pressure: the ladder above Warden, a rung to pick.
 
 import {
   hangarItemMarkup,
   hullLockText,
   hullTraitsMarkup,
+  launchSetupMarkup,
   licenseMarkup,
   medalMarkup,
   pressureLadderMarkup,
@@ -21,7 +23,7 @@ import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
   /**
-   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, licenses, control, medals, pressure, pressureNote }.
+   * `refs`: the overlay's nodes { overlay, list, hulls, hullLock, hullInfo, balance, openBtn, backBtn, closeBtn, tabs, panels, licenses, control, launch, medals, pressure, pressureNote }.
    * `settings`: the settings service; a hull button selects that hull.
    * `emit(name, payload)`: sends hangar-hull-hovered and the purchase line's
    *   transmission events (its voice, audio/voiceLines.js).
@@ -130,6 +132,24 @@ export class HangarScreen {
           ?.focus({ preventScroll: true });
         return;
       }
+      const choice = event.target.closest(
+        '[data-hangar-seal], [data-hangar-start]'
+      );
+      if (choice) {
+        const { hangarSeal, hangarStart } = choice.dataset;
+        if (hangarSeal) this.hangar().toggleSeal(hangarSeal);
+        else {
+          this.hangar().setStartingCard(
+            hangarStart === 'none' ? null : hangarStart
+          );
+        }
+        const attr = hangarSeal ? 'data-hangar-seal' : 'data-hangar-start';
+        this.renderHangar();
+        refs.launch
+          .querySelector(`[${attr}="${hangarSeal ?? hangarStart}"]`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
       const buy = event.target.closest('[data-hangar-buy]');
       if (buy) {
         const id = buy.dataset.hangarBuy;
@@ -205,6 +225,14 @@ export class HangarScreen {
       .getControlItems()
       .map(hangarItemMarkup)
       .join('');
+    refs.launch.innerHTML = launchSetupMarkup({
+      sealSlots: hangar.contractTotal('seals'),
+      sealed: hangar.getSealed(),
+      openCards: hangar.getOpenCards(),
+      flightSchool: Boolean(hangar.owned['flight-school']),
+      schoolCards: hangar.getFlightSchoolCards(),
+      startingCard: hangar.startingCard,
+    });
     refs.medals.innerHTML = medals.map(medalMarkup).join('');
     refs.pressureNote.textContent = pressureNoteText(hangar.pressure.open);
     refs.pressure.innerHTML = pressureLadderMarkup(hangar.pressure);

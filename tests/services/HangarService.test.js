@@ -10,7 +10,14 @@ import HangarService, {
   HANGAR_STORAGE_KEY,
   HANGAR_STORAGE_KEY_V1,
 } from '../../src/services/HangarService.js';
-import { SALVAGE_PER_CARD_CACHE } from '../../src/data/hangar.js';
+import {
+  LICENSES,
+  PILOT_TRACK,
+  SALVAGE_PER_CARD_CACHE,
+  STARTING_DRAW,
+} from '../../src/data/hangar.js';
+import { ACHIEVEMENTS } from '../../src/data/achievements.js';
+import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import {
   BASTION_HULL_ID,
   DEFAULT_HULL_ID,
@@ -288,7 +295,7 @@ describe('HangarService', () => {
 
   it('turns owned items into run modifiers and gates the bought hulls', () => {
     const none = new HangarService({ ...base, eventBus: new EventBus() });
-    expect(none.getModifiers()).toEqual({
+    expect(none.getModifiers()).toMatchObject({
       hullMultiplier: 1,
       extraRerolls: 0,
       extraBanishes: 0,
@@ -308,7 +315,7 @@ describe('HangarService', () => {
       'bastion-hull': true,
     });
     const all = new HangarService({ ...base, eventBus: new EventBus() });
-    expect(all.getModifiers()).toEqual({
+    expect(all.getModifiers()).toMatchObject({
       hullMultiplier: 1.05,
       extraRerolls: 1,
       extraBanishes: 1,
@@ -545,18 +552,84 @@ describe('HangarService', () => {
       expect(hangar.licensesOff).toEqual({});
     });
 
-    it('lists the ten licences on sale, then the seven medals pay', () => {
+    it('lists the eleven licences on sale, then the seven medals pay', () => {
       const { eventBus, hangar } = open(0);
       const list = hangar.getLicenses();
-      expect(list.slice(0, 10).every((l) => l.cost && !l.medal)).toBe(true);
-      expect(list.slice(10)).toHaveLength(7);
-      expect(list.slice(10).every((l) => l.medal && !l.owned)).toBe(true);
+      expect(list.slice(0, 11).every((l) => l.cost && !l.medal)).toBe(true);
+      expect(list.slice(11)).toHaveLength(7);
+      expect(list.slice(11).every((l) => l.medal && !l.owned)).toBe(true);
 
       eventBus.emit('achievement-unlocked', { id: 'ring-breaker' });
       const paid = hangar
         .getLicenses()
         .find((l) => l.id === 'deflector_shield');
       expect(paid).toMatchObject({ owned: true, on: true });
+    });
+  });
+
+  describe('the contract the card draw reads', () => {
+    const open = (salvage, owned = {}) => {
+      stock(salvage, owned);
+      const eventBus = new EventBus();
+      return { eventBus, hangar: new HangarService({ ...base, eventBus }) };
+    };
+
+    it('places every card once: starting draw, a licence, the track or a fallback', () => {
+      const medalLicenses = ACHIEVEMENTS.map((a) => a.reward?.license).filter(
+        Boolean
+      );
+      const places = [
+        ...STARTING_DRAW,
+        ...LICENSES.map((l) => l.id),
+        ...medalLicenses,
+        ...PILOT_TRACK,
+        ...UPGRADE_LIBRARY.filter((card) => card.fallback).map((c) => c.id),
+      ];
+      expect(new Set(places).size).toBe(places.length);
+      expect([...places].sort()).toEqual(
+        UPGRADE_LIBRARY.map((card) => card.id).sort()
+      );
+    });
+
+    it('opens only the starting draw with nothing bought, nothing extra', () => {
+      const { hangar } = open(0);
+      expect(hangar.getModifiers()).toMatchObject({
+        openCards: new Set(STARTING_DRAW),
+        sealed: new Set(),
+        holds: 0,
+        startingCard: null,
+      });
+    });
+
+    it('opens a licensed card while it is on, and closes it when off', () => {
+      const { hangar } = open(500);
+      hangar.buyLicense('shard_halo');
+      expect(hangar.getModifiers().openCards.has('shard_halo')).toBe(true);
+      hangar.setLicenseOn('shard_halo', false);
+      expect(hangar.getModifiers().openCards.has('shard_halo')).toBe(false);
+    });
+
+    it('seals open cards up to the Seal rungs owned, and keeps them', () => {
+      const { hangar } = open(0, { 'seal-1': true });
+      expect(hangar.toggleSeal('shard_halo')).toBe(false);
+      expect(hangar.toggleSeal('plasma')).toBe(true);
+      expect(hangar.toggleSeal('multishot')).toBe(false);
+      const again = new HangarService({ ...base, eventBus: new EventBus() });
+      expect(again.getModifiers().sealed).toEqual(new Set(['plasma']));
+      expect(again.toggleSeal('plasma')).toBe(true);
+      expect(again.getModifiers().sealed).toEqual(new Set());
+    });
+
+    it('counts a Hold per item and launches the Flight School card', () => {
+      const { hangar } = open(0, { hold: true });
+      expect(hangar.getModifiers().holds).toBe(1);
+      expect(hangar.setStartingCard('propulsors')).toBe(false);
+
+      const { hangar: school } = open(0, { 'flight-school': true });
+      expect(school.getFlightSchoolCards()).toEqual(['propulsors', 'auto_aim']);
+      expect(school.setStartingCard('braking_system')).toBe(false);
+      expect(school.setStartingCard('auto_aim')).toBe(true);
+      expect(school.getModifiers().startingCard).toBe('auto_aim');
     });
   });
 });

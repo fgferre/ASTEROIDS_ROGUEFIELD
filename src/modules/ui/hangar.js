@@ -69,6 +69,54 @@ export function licenseMarkup(license) {
     ${action}</li>`;
 }
 
+/**
+ * Under the control rungs, once a Seal or the Flight School is owned: the
+ * open cards to seal out of the next runs' draw (up to `sealSlots`) and the
+ * piloting card the Flight School launches with.
+ */
+export function launchSetupMarkup({
+  sealSlots,
+  sealed,
+  openCards,
+  flightSchool,
+  schoolCards,
+  startingCard,
+}) {
+  const chip = (attr, id, label, pressed, disabled = false) =>
+    `<button type="button" class="hangar-chip${pressed ? ' is-on' : ''}" ${attr}="${id}" aria-pressed="${pressed}"${
+      disabled ? ' disabled' : ''
+    }>${label}</button>`;
+  const sections = [];
+  if (sealSlots > 0) {
+    const full = sealed.length >= sealSlots;
+    const chips = [...openCards]
+      .map((id) => {
+        const on = sealed.includes(id);
+        return chip('data-hangar-seal', id, cardName(id), on, full && !on);
+      })
+      .join('');
+    sections.push(`<section class="hangar-launch__part">
+      <h3 class="hangar-item__name">Sealed out of the draw · ${sealed.length}/${sealSlots}</h3>
+      <div class="hangar-launch__chips">${chips}</div></section>`);
+  }
+  if (flightSchool) {
+    const chips = [null, ...schoolCards]
+      .map((id) =>
+        chip(
+          'data-hangar-start',
+          id ?? 'none',
+          id ? cardName(id) : 'None',
+          id === startingCard
+        )
+      )
+      .join('');
+    sections.push(`<section class="hangar-launch__part">
+      <h3 class="hangar-item__name">Flight School · launch with</h3>
+      <div class="hangar-launch__chips">${chips}</div></section>`);
+  }
+  return sections.join('');
+}
+
 /** What a medal pays: "+50 Salvage", "License · Arc Lattice", "Opens Pressure · +100 Salvage". */
 export function medalRewardText(reward = {}) {
   return [
