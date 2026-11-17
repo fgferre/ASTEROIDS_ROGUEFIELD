@@ -30,6 +30,7 @@ import {
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { getHullThrusterPort } from '../player/hullShape.js';
 import { bakeHullMaps } from './bakedMaps.js';
+import { DissolvePool } from './dissolve.js';
 import {
   CANOPY_GLASS,
   HULL_FINISHES,
@@ -50,6 +51,10 @@ import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
+// proposta 17/11 (efeito/impacto): the ship's death breaks it into SHIP_PIECES
+// of its own build, thrown as a machine of SHIP_BREAK_RADIUS would be.
+const SHIP_PIECES = 14;
+const SHIP_BREAK_RADIUS = 18;
 // Banking (PLAN.md R5.9, proposta 18/10): roll into the modern strafe (the
 // nose swinging onto the move) and the yaw rate, eased with a time constant so it saturates and relaxes smoothly.
 // Both come from the simulation (input, angular velocity), never from the
@@ -241,6 +246,12 @@ export class PlayerMirror {
     this.ship = new THREE.Group();
     this.group.add(this.ship);
     scene.add(this.group);
+    // the ship's death: its own burn (startBreak)
+    this.burn = new DissolvePool(THREE, seeded, () => this.endBreak());
+    this.breakView = { object: this.group, seed: 7, radius: SHIP_BREAK_RADIUS };
+    this.breakHidden = [];
+    this.breaking = false;
+    this.wasDead = false;
 
     // One material per finish (HULL_FINISHES: satin paint, glossy accents,
     // polished steel); the tones ride in the vertex colours, the paint and
@@ -463,6 +474,11 @@ export class PlayerMirror {
     ALL_HULLS.forEach((hull) => {
       this.seeded(() => this.rebuild(player, hull, levels));
       compile();
+      // and as it breaks (the death's twins)
+      this.startBreak(player);
+      compile();
+      this.burn.clear();
+      this.group.visible = true;
     });
     this.hullKey = null;
   }
@@ -592,7 +608,57 @@ export class PlayerMirror {
     this.blinkHeldUntil = time;
   }
 
-  update(player, ribbons, time) {
+  /**
+   * The ship's death (docs/NORTE.md: every hit is physical): its solid parts
+   * come apart into the pieces of its own build and burn away (the machines'
+   * break, dissolve.js), carried by its momentum; its flames, glows and light
+   * go out at once.
+   */
+  startBreak(player) {
+    this.breaking = true;
+    this.light.intensity = 0;
+    this.blink.value = 0;
+    this.flareFan.visible = false;
+    this.hideGhosts();
+    this.group.traverse((node) => {
+      if (!node.isMesh) return;
+      node.castShadow = false;
+      const material = [].concat(node.material)[0];
+      const solid = material?.isMeshStandardMaterial && !material.transparent;
+      if (solid || !node.visible) return;
+      node.visible = false;
+      this.breakHidden.push(node);
+    });
+    const v = player.velocity || {};
+    this.burn.start(this.breakView, this.accent, SHIP_BREAK_RADIUS, {
+      count: SHIP_PIECES,
+      pushX: v.vx || 0,
+      pushZ: v.vy || 0,
+    });
+  }
+
+  // The burn's end (or a new run during it): the glows come back for the
+  // next ship.
+  endBreak() {
+    this.breaking = false;
+    this.breakHidden.forEach((node) => (node.visible = true));
+    this.breakHidden.length = 0;
+  }
+
+  /** `worldDt`: the world's step in s (slow motion included), for the death's break. */
+  update(player, ribbons, time, worldDt = 0) {
+    const dead = Boolean(player?.isDead);
+    if (dead && !this.wasDead && this.group.visible && !this.breaking) {
+      this.startBreak(player);
+    }
+    this.wasDead = dead;
+    if (this.breaking) {
+      if (dead) {
+        this.burn.update(worldDt);
+        return;
+      }
+      this.burn.clear();
+    }
     const hidden =
       !player ||
       player.isDead ||
