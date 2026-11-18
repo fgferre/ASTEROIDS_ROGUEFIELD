@@ -60,7 +60,7 @@ import {
   mirrorBossTransitions,
   mirrorLocks,
   mirrorOverlays,
-  mirrorWards,
+  WardLinks,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
@@ -184,6 +184,7 @@ class Renderer3D extends BaseSystem {
     this.shotWisps = new ShotWisps();
     this.pickupFx = new PickupFx();
     this.formationMarks = new FormationMarks();
+    this.wardLinks = new WardLinks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
     // with distance from the camera target (the rig's focus).
@@ -760,6 +761,7 @@ class Renderer3D extends BaseSystem {
     this.muzzles.clear();
     this.shotWisps.clear();
     this.pickupFx.clear();
+    this.wardLinks.clear();
     this.biome.reset();
     this.interp?.clear();
   }
@@ -986,7 +988,7 @@ class Renderer3D extends BaseSystem {
     this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke, t.glow);
     this.killPops.update(dt, t.glow, this.flashScale);
     this.formationMarks.update(dt, t.ribbons, t.threatRgb);
-    mirrorWards(t, enemyList);
+    this.wardLinks.update(dt, t, enemyList, this.flashScale);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();
     }
