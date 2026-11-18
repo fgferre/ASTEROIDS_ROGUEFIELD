@@ -94,7 +94,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 - **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
   Em 20/10, perguntado se ainda sente: _"ainda demora"_ → Rodada 15, frente 7.
-- **(34)** Freio de emergência (carta Braking System, nível 3) (16/11): _"esse freio não é bom, não funciona, sem
+- **(34)** _[feito: freio refeito para o deslize, ele disse "Ficou bom"; conferência 18/11]_ Freio de emergência (carta Braking System, nível 3) (16/11): _"esse freio não é bom, não funciona, sem
   vantagem"_; sobre consertar agora: _"vamos deixar esse freio de lado por enquanto"_. Medido no jogo rodando em 16/11:
   numa inversão normal a nave já parou sozinha (~0,23 s) quando o freio dispara (0,25 s) e ele atrasa a volta em
   ~0,13 s; só ajuda logo depois de um dash; a onda só empurra inimigos pequenos a até ~120 px, sem dano, e não mexe em
@@ -144,7 +144,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 ## Fundo (palavras dele, 18/10, noite)
 
-- **(15)** _"Eu olhando bem no fundo aqui, eu percebo uma faixa mais escura no fundo, como se fosse um ribbon, um
+- **(15)** _[feito; conferência 18/11]_ _"Eu olhando bem no fundo aqui, eu percebo uma faixa mais escura no fundo, como se fosse um ribbon, um
   stripe, que eu não entendo do que se trata. Parece um defeito."_ / _"Ao invés de só tirar, me explica qual era a
   intenção. Talvez seja algo importante para a história."_ (18/10, noite). É o **Anel partido** (`fieldBackdrop.js`,
   NORTE §1–2): o campo de jogo é o campo de destroços de uma megaestrutura em anel; a faixa é um pedaço dela, longe
@@ -156,7 +156,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 ## História (palavras dele, 20/10)
 
-- **(19)** Sobre o Anel remodelado: _"mesma estrutura, mas ela tem que ser 3d de verdade por todos os lados pois acho
+- **(19)** _[feito; conferência 18/11]_ Sobre o Anel remodelado: _"mesma estrutura, mas ela tem que ser 3d de verdade por todos os lados pois acho
   que no futuro numa fase nova, podemos viajar para região desse ring, mostrar a viagem acontecer e mais etapas da
   história acontecerem lá. essa viagem poderia ser até mesmo mostrando a nave por trás em 3a pessoa sabe? como num
   cutscene e ter diálogos acontecendo, etc temos que refinar melhor esse roteiro o drama nele, a surpresa, a
@@ -173,14 +173,14 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 ## Campanha (palavras dele, 12/11, jogando no site)
 
-- **(21)** Passagem de fase: _"quando você passa de fase, mata o boss… e escolhe seguir no jogo para a próxima etapa,
+- **(21)** _[feito; conferência 18/11]_ Passagem de fase: _"quando você passa de fase, mata o boss… e escolhe seguir no jogo para a próxima etapa,
   todas as coisas da tela somem, então não dá nem para pegar os spoils, os orbes que estão na tela, não aparece aquele
   countdown como aparecia antes."_ Fecha quando ele passar de fase e conseguir recolher o que caiu.
-- **(22)** Primeiro boss: _"a segunda etapa dele, não inova, não fica mais difícil, nada muda. Ele continua jogando 3
+- **(22)** _[feito; conferência 18/11]_ Primeiro boss: _"a segunda etapa dele, não inova, não fica mais difícil, nada muda. Ele continua jogando 3
   asteroides que são muito fáceis de destruir. Deveria ter um desafio um pouco maior na segunda etapa dele."_
-- **(23)** _"todos os upgrades que eu peguei desapareceram de uma etapa para outra, assim que eu dei próximo setor…
+- **(23)** _[feito; conferência 18/11]_ _"todos os upgrades que eu peguei desapareceram de uma etapa para outra, assim que eu dei próximo setor…
   Mais grave ainda."_ Fecha quando ele seguir para o próximo setor com a nave como estava.
-- **(24)** Lugares e viagens (depois de ver a prancha das nove fases só com cores): _"tem que ter cenários diferentes,
+- **(24)** _[feito; conferência 18/11]_ Lugares e viagens (depois de ver a prancha das nove fases só com cores): _"tem que ter cenários diferentes,
   mas percebe que já é uma arena 3D, o próprio anel por trás faz parte dessa ambientação. Então, talvez uma fase
   poderia ser mais próxima do anel, até dentro do anel em algum momento, em volta do anel, num planeta de fundo, um
   planeta próximo, perto de uma estrela, um campo de asteroides gigantes ao fundo… Um cemitério de naves enormes… um
@@ -194,7 +194,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   gênero… Ou até mesmo a própria nave do Star-Lord… seria muito legal ter um modelo mais diferenciado, assim, inspirado
   em coisas mais bacanas. Óbvio que pode ser adaptado para nossa estética."_ Inspiração, não cópia. Fecha quando ele
   aprovar o modelo do Sovereign por imagem.
-- **(26)** Materiais: _"Eu não sei porque que a gente deixou tudo fosco. Acho que podia ter coisas que tivessem materiais
+- **(26)** _[feito; conferência 18/11]_ Materiais: _"Eu não sei porque que a gente deixou tudo fosco. Acho que podia ter coisas que tivessem materiais
   mais reflexivos e brilhosos também. Não sei se isso penaliza muito o jogo, mas por quê, né? Por que não?"_ → o fosco
   veio do `docs/NORTE.md` (luz só como informação); a cena já tem ambiente para reflexo, custo quase nulo. Primeiro no
   Sovereign, por imagem; depois onde fizer sentido (cristais, metais de nave, chefes).
@@ -212,17 +212,17 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
   (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
   lá, não calibrar a campanha para ser vencível sem loja.
-- **(28)** Itens fora da tela e área de coleta (13/11): _"os corações muitas vezes ficam para fora da tela e precisam
+- **(28)** _[feito; conferência 18/11]_ Itens fora da tela e área de coleta (13/11): _"os corações muitas vezes ficam para fora da tela e precisam
   voltar para a arena assim como as orbes. Os demais itens também talvez estejam passando pela mesma coisa… tenho
   dúvidas se precisamos aumentar um pouco a área de atuação do collect da nave para pegar um pouco mais facilmente esses
   itens (não acho que eles devam ser magnéticos como são as orbes)."_ → coração agora sempre cai dentro da arena
   (13/11); conferir baús e outros itens; a área de coleta é dúvida dele: propor com número, ele decide.
   **Decisão dele (13/11, página `decisoes-2`):** _"Sim: aumenta para a proposta e regrava a partida dos testes"_
   (corações 25 → 40, itens 28 → 40).
-- **(29)** Sortear e banir ao passar de fase (13/11): _"Tudo segue junto: usos gastos continuam gastos."_ E a conquista
+- **(29)** _[feito; conferência 18/11]_ Sortear e banir ao passar de fase (13/11): _"Tudo segue junto: usos gastos continuam gastos."_ E a conquista
   Full Set: _"Prefiro a meta difícil: família completa."_ Na família de fogo, que tem duas cartas de arma (13/11):
   _"A segunda arma não conta: fecha com todas as outras cartas da família."_
-- **(30)** Som ao pegar coração (13/11): _"Quero um som: prepare opções para eu ouvir."_
+- **(30)** _[feito; conferência 18/11]_ Som ao pegar coração (13/11): _"Quero um som: prepare opções para eu ouvir."_
 - **(31)** Ataques dos chefes (13/11, sobre a jaula do Interdictor): _"mas como a nave lança essa grade? Isso não
   deveria ser um material de verdade? Tem que ter algo real e físico ou um dispositivo que gere esse campo, uma arma…
   acho particularmente que o efeito está muito sem graça e feio… aliás todas as miras e efeitos de dano e armas dos
@@ -231,7 +231,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   incluído); no geral _"A direção é essa"_. Atirar nos aparelhos da jaula: _"Decido depois de jogar a luta nova."_
   Os cinco retoques seguintes (fim da jaula, anel de aviso, setas do Gatekeeper, sucção do Maw, feixe do Sovereign):
   _"Ficou bom"_. Falta ele jogar.
-- **(32)** Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
+- **(32)** _[feito; conferência 18/11]_ Viagem entre fases (13/11): _"De uma forma geral acho que avançamos, mas vejo oportunidades ainda. As trocas
   de fase, tipo os cutscenes, imaginei que a nave estaria realmente viajando no espaço 3D do universo que criamos, indo
   de uma localização para outra. E acho que a nave precisa respeitar essa movimentação dentro do cenário, usando seus
   motores ou talvez, dependendo da distância, entrando em dobra, mas o movimento da nave tem que ser real, de virar de
@@ -243,7 +243,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   **13/11, depois de ver os filmes com som e voz** (quatro viagens: _"Ficou bom"_; sons e vozes: _"Sons e vozes estão
   bons"_): _"Agora sim: é essa a cara."_ Os dois planos refeitos depois (mergulho pelo portão, cristais aparecendo
   antes): _"Ficou bom"_.
-- **(33)** Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
+- **(33)** _[feito; conferência 18/11]_ Som da viagem (13/11): _"também está sem som para mim, acho que tem que pensar na direção de SFX e trilha se
   couber, falas também seriam bem-vindas… as vozes que têm legenda seriam muito interessantes de serem ouvidas."_ →
   audição antes de código (SFX da viagem, trilha, vozes do Anel e do Wake); voz falada pede um modelo de voz que o
   projeto ainda não tem.
