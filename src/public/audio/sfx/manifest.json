@@ -774,5 +774,49 @@
         "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 8 steps, cfg 1.0, prompt: TrackType: SFX. A heavy metal toggle switch flipped once: a short dry click with a soft low thump. Very short, zero ring. Close mic, dry, no reverb.; cut to 0.3 s; level of ui-select (proposta 17/11)"
       }
     ]
+  },
+  "reactor-stutter": {
+    "files": ["reactor-stutter/1.mp3"],
+    "gain": -13,
+    "priority": 0,
+    "cap": 1,
+    "gap": 0,
+    "reverb": null,
+    "loopStart": 0.1,
+    "loopEnd": 4.1,
+    "origins": [
+      {
+        "file": "reactor-stutter/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: A damaged reactor humming low and steady, the hum stuttering and sputtering now and then with electric crackle. Continuous. Close mic, dry, no reverb.; 4.0 s from 1.0 s cut to a seamless loop (proposta 17/11)"
+      }
+    ]
+  },
+  "signal-pulse": {
+    "files": ["signal-pulse/1.mp3"],
+    "gain": -11,
+    "priority": 0,
+    "cap": 1,
+    "gap": 300,
+    "reverb": -14,
+    "origins": [
+      {
+        "file": "signal-pulse/1.mp3",
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 2, 8 steps, cfg 1.0, prompt: TrackType: SFX. A single deep soft sonar pulse, low and round, slow decay. Close mic, dry.; cut to 1.1 s (proposta 17/11)"
+      }
+    ]
+  },
+  "hatch-open": {
+    "files": ["hatch-open/1.mp3"],
+    "gain": -8,
+    "priority": 0,
+    "cap": 1,
+    "gap": 500,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "hatch-open/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 4, 50 steps, prompt: A heavy spaceship hatch unlocking and sliding open: a metal clunk, then a short hydraulic hiss. Close mic, dry, no reverb.; cut to 0.9 s, exciter (proposta 17/11)"
+      }
+    ]
   }
 }
