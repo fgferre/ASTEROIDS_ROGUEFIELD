@@ -13,6 +13,8 @@
 //   lanes) light one, at their mean origin and along their mean heading.
 // - KillPops: a machine that dies flashes white-hot at its own core (instead
 //   of the whole screen), then the heat drops through orange.
+// - ShotWisps: an enemy shot that burns out in the air frays into a few wisps
+//   of its own light that run on a little along its path and fade.
 // Plain typed arrays, filled from events and drained in render(); jitter is
 // a hash of a running counter, so it never touches Math.random.
 
@@ -22,6 +24,7 @@ export const SPARK_KIND = Object.freeze({
   shield: 2,
   blast: 3,
   burn: 4,
+  gold: 5,
 });
 
 // proposta 17/11 (efeito/impacto): per material, count / speed / life / drag.
@@ -93,6 +96,20 @@ const KINDS = [
     gain: 1.8,
     maxLength: 5,
   },
+  // proposta vfx-6 gold: an Elite's six orbiting blades flung out with its
+  // pieces as it dies
+  {
+    hit: 6,
+    kill: 6,
+    speed: [180, 300],
+    life: [0.35, 0.55],
+    drag: 3.5,
+    cone: Math.PI,
+    hot: 0,
+    width: 1.8,
+    gain: 2.2,
+    maxLength: 9,
+  },
 ];
 const REFLECT_MIX = 0.6; // how much the cone leans along the ricochet
 const SPARK_STRETCH = 0.035; // streak length per unit of speed
@@ -119,6 +136,7 @@ const SLAG_HEIGHT = 3.5;
 const BLAST_SLAG = [4, 8];
 const BURN_SLAG = [2, 4];
 const BLAST_RGB = [2.2, 0.85, 0.22];
+const GOLD_RGB = [1.9, 1.35, 0.3]; // linear, the Elite's gold
 
 // proposta 17/11: rock dust, matte grey puffs that drift off the hit.
 const DUST_POOL = 48;
@@ -146,6 +164,27 @@ const POP_MAX = 34; // a big machine's pop stays a core flash, not a halo
 const POP_HEIGHT = 6;
 const POP_HOT = [2.4, 2.1, 1.7];
 const POP_WARM = [2.0, 0.6, 0.12];
+
+// proposta vfx-6: the wisps of a burned-out enemy shot, threads laid across
+// its width that fan outward: pool, wisps per shot, speed (× the shot's), the
+// outer threads' turn off its heading (rad), how far across (× its radius)
+// and back along its path (px) they start, life (s), drag, length (s of
+// travel), width (× its radius), gain and height (the shot's, fieldMirrors).
+const WISP_POOL = 64;
+const WISP_COUNT = 5;
+const WISP_SPEED = [0.35, 0.7];
+const WISP_SPREAD = 0.5;
+const WISP_SIDE = 2.5;
+const WISP_BACK = 10;
+const WISP_LIFE = [0.25, 0.5];
+const WISP_DRAG = 2.5;
+const WISP_LENGTH = 0.1;
+const WISP_WIDTH = 0.75;
+const WISP_GAIN = 1.4;
+// s the wisps take to light, while they part (born together they would pile
+// into one bright blot)
+const WISP_RISE = 0.05;
+const WISP_HEIGHT = 3;
 
 function hash01(n) {
   let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
@@ -318,6 +357,8 @@ export class HitSparks {
         color = this.hot[i] ? SHIELD_HOT : SHIELD_RGB;
       } else if (kind === SPARK_KIND.blast) {
         color = this.hot[i] ? SLAG_HOT : BLAST_RGB;
+      } else if (kind === SPARK_KIND.gold) {
+        color = GOLD_RGB;
       } else color = this.hot[i] ? hotRgb : rgb;
       ribbons.streak(
         this.x[i] - vx * k,
@@ -508,5 +549,85 @@ export class KillPops {
 
   clear() {
     this.age.fill(POP_TIME);
+  }
+}
+
+export class ShotWisps {
+  constructor() {
+    this.x = new Float32Array(WISP_POOL);
+    this.y = new Float32Array(WISP_POOL);
+    this.vx = new Float32Array(WISP_POOL);
+    this.vy = new Float32Array(WISP_POOL);
+    this.life = new Float32Array(WISP_POOL);
+    this.maxLife = new Float32Array(WISP_POOL);
+    this.width = new Float32Array(WISP_POOL);
+    this.rgb = new Array(WISP_POOL).fill(null);
+    this.next = 0;
+    this.roll = 0;
+  }
+
+  rand() {
+    this.roll += 1;
+    return hash01(this.roll);
+  }
+
+  /** A shot of `radius` and colour `rgb` burned out at (x, y), flying (vx, vy). */
+  emit(x, y, vx, vy, radius, rgb) {
+    const speed = Math.hypot(vx, vy);
+    if (speed < 1) return;
+    const heading = Math.atan2(vy, vx);
+    const ux = vx / speed;
+    const uy = vy / speed;
+    for (let k = 0; k < WISP_COUNT; k += 1) {
+      const i = this.next;
+      this.next = (this.next + 1) % WISP_POOL;
+      // across the shot, -1 → 1, a thread on each side turning outward
+      const across =
+        ((k + 0.5) / WISP_COUNT) * 2 - 1 + (this.rand() - 0.5) * 0.3;
+      const angle = heading + across * WISP_SPREAD;
+      const v =
+        speed * (WISP_SPEED[0] + (WISP_SPEED[1] - WISP_SPEED[0]) * this.rand());
+      const side = across * WISP_SIDE * radius;
+      const back = this.rand() * WISP_BACK;
+      const life = WISP_LIFE[0] + (WISP_LIFE[1] - WISP_LIFE[0]) * this.rand();
+      this.x[i] = x - uy * side - ux * back;
+      this.y[i] = y + ux * side - uy * back;
+      this.vx[i] = Math.cos(angle) * v;
+      this.vy[i] = Math.sin(angle) * v;
+      this.life[i] = life;
+      this.maxLife[i] = life;
+      this.width[i] = radius * WISP_WIDTH;
+      this.rgb[i] = rgb;
+    }
+  }
+
+  update(dt, ribbons) {
+    const drag = Math.exp(-WISP_DRAG * dt);
+    for (let i = 0; i < WISP_POOL; i += 1) {
+      if (!(this.life[i] > 0)) continue;
+      this.life[i] -= dt;
+      if (this.life[i] <= 0) continue;
+      const vx = (this.vx[i] *= drag);
+      const vy = (this.vy[i] *= drag);
+      const x = (this.x[i] += vx * dt);
+      const y = (this.y[i] += vy * dt);
+      const fade = this.life[i] / this.maxLife[i];
+      const rise = Math.min(1, (this.maxLife[i] - this.life[i]) / WISP_RISE);
+      const length = WISP_LENGTH * (0.4 + 0.6 * fade);
+      ribbons.streak(
+        x - vx * length,
+        y - vy * length,
+        x,
+        y,
+        WISP_HEIGHT,
+        this.rgb[i],
+        this.width[i] * (0.4 + 0.6 * fade),
+        WISP_GAIN * fade * rise
+      );
+    }
+  }
+
+  clear() {
+    this.life.fill(0);
   }
 }

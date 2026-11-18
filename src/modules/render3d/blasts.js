@@ -19,6 +19,12 @@ export const BLAST_LOOK = Object.freeze({
   flak: { size: 0.42, fire: 0.15, life: 0.45, smoke: 0.4 },
   // a Seeker Swarm missile: a full fireball rolling into smoke
   seeker: { size: 1.5, fire: 0.4, life: 1.1, smoke: 0.8 },
+  // proposta vfx-6: a missile spent at the end of its range on nothing, its
+  // motor cut: a small pop of fire and a puff of smoke
+  spent: { size: 0.55, fire: 0.2, life: 0.75, smoke: 0.7 },
+  // proposta vfx-6: a Caster's shell landing, a fireball well inside its
+  // warning circle, rolling into smoke
+  shell: { size: 0.55, fire: 0.3, life: 0.95, smoke: 0.85 },
 });
 
 const BLAST_VERTEX = `

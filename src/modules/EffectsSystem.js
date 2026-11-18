@@ -351,6 +351,10 @@ export default class EffectsSystem extends BaseSystem {
       this.enemyEffects.createShellImpactEffect(data)
     );
 
+    this.registerEventListener('bulwark-plate-broken', (data) =>
+      this.enemyEffects.createPlateBreak(data)
+    );
+
     this.registerEventListener('asteroid-volatile-trail', (data) =>
       this.enemyEffects.spawnVolatileTrail(data)
     );
