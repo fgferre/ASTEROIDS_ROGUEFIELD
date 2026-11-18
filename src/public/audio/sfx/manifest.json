@@ -281,7 +281,7 @@
   },
   "interdictor-cage": {
     "files": ["interdictor-cage/1.mp3"],
-    "gain": -6,
+    "gain": -5,
     "priority": 6,
     "cap": 1,
     "gap": 1500,
@@ -289,7 +289,7 @@
     "origins": [
       {
         "file": "interdictor-cage/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: An electric fence hum rising as a containment field tightens, then a sharp electric snap, sci-fi energy cage closing, cinematic game sound effect, no music (audition 13/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 2, 8 steps, cfg 1.0, prompt: TrackType: SFX. An electric fence hum rising as a containment field tightens, then a sharp electric snap. About one and a half seconds. Close mic, light room.; cut 1.5 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 2)"
       }
     ]
   },
@@ -409,7 +409,7 @@
   },
   "travel-charge": {
     "files": ["travel-charge/1.mp3"],
-    "gain": -6,
+    "gain": -7,
     "priority": 3,
     "cap": 1,
     "gap": 500,
@@ -417,7 +417,7 @@
     "origins": [
       {
         "file": "travel-charge/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: Sci-fi warp drive charging, energy winding up with a rising tone that tightens before the leap, cinematic sci-fi game sound effect, clean and bright, no music, no voice (audition 13/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 16 steps, cfg 1.5, prompt: TrackType: SFX. A large capacitor bank charging with a smooth rising whine and a deep hum building underneath, two seconds. Clean. Close mic.; cut 2.2 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 2)"
       }
     ]
   },
@@ -493,20 +493,6 @@
   },
   "furnace-corona-pulse": {
     "files": ["furnace-corona-pulse/1.mp3"],
-    "gain": -14,
-    "priority": 4,
-    "cap": 4,
-    "gap": 30,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "furnace-corona-pulse/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A single short soft fire whoomp, a warm rounded puff of flame, quick clean decay, high quality game sound effect, dry, no music; cut 0.25 s from the strongest hit's onset (audition 14/11, pick A)"
-      }
-    ]
-  },
-  "seeker-swarm-launch": {
-    "files": ["seeker-swarm-launch/1.mp3"],
     "gain": -15,
     "priority": 4,
     "cap": 4,
@@ -514,8 +500,22 @@
     "reverb": null,
     "origins": [
       {
+        "file": "furnace-corona-pulse/1.mp3",
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 6, 8 steps, cfg 1.0, prompt: TrackType: SFX. A single short soft fire whoomp: a warm rounded puff of flame bursting once. Very short, clean decay. Close mic, dry, no reverb.; cut 0.25 s from the strongest hit's onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 2)"
+      }
+    ]
+  },
+  "seeker-swarm-launch": {
+    "files": ["seeker-swarm-launch/1.mp3"],
+    "gain": -16,
+    "priority": 4,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
         "file": "seeker-swarm-launch/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single short soft missile launch, a quick rounded thunk with a brief hiss, quick clean decay, high quality game sound effect, dry, no music; cut 0.25 s from the strongest hit's onset (audition 14/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 6, 16 steps, cfg 1.5, prompt: TrackType: SFX. A bottle rocket firing from a tube: a soft pop and a quick fading hiss. Close mic, dry, no reverb.; cut 0.25 s from the strongest hit's onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 2)"
       }
     ]
   },
