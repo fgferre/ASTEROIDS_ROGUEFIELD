@@ -362,7 +362,7 @@ export class EnemyEffects {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.3,
           Math.sin(angle) * speed + velocity.y * 0.3,
-          ENEMY_FX.spark,
+          i % 3 === 0 ? ENEMY_FX.deathSparkDim : ENEMY_FX.deathSpark,
           2 + this.randomFloat('explosions') * 2.2,
           0.32 + this.randomFloat('explosions') * 0.18,
           'spark'
@@ -380,7 +380,7 @@ export class EnemyEffects {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.25,
           Math.sin(angle) * speed + velocity.y * 0.25,
-          ENEMY_FX.glow,
+          ENEMY_FX.deathGlow,
           3 + this.randomFloat('explosions') * 2.8,
           0.4 + this.randomFloat('explosions') * 0.18,
           'normal'
@@ -437,14 +437,6 @@ export class EnemyEffects {
 
     this.addScreenShake('hunterDestroyed');
     this.addHitStop('shock-burst');
-    this.particleEffects.createShockwaveEffect({
-      position,
-      radius: radius * 2.4,
-      duration: 0.42,
-      baseWidth: 16,
-      maxAlpha: 0.55,
-      color: withAlpha(PALETTE.threat, 0.5),
-    });
 
     const sparkCount = this.getScaledParticleCount(
       18 + Math.round(radius * 1.5)
@@ -452,7 +444,7 @@ export class EnemyEffects {
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed = 150 + this.randomFloat('explosions') * 170;
-      const color = i % 3 === 0 ? ENEMY_FX.sparkDim : ENEMY_FX.spark;
+      const color = i % 3 === 0 ? ENEMY_FX.deathSparkDim : ENEMY_FX.deathSpark;
       this.particleEffects.particles.push(
         this.createParticle(
           position.x,
@@ -477,7 +469,7 @@ export class EnemyEffects {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.22,
           Math.sin(angle) * speed + velocity.y * 0.22,
-          ENEMY_FX.glow,
+          ENEMY_FX.deathGlow,
           4.8 + this.randomFloat('explosions') * 3.4,
           0.46 + this.randomFloat('explosions') * 0.24,
           'normal'

@@ -42,6 +42,8 @@ import {
 } from './fieldMirrors.js';
 import { FormationMarks } from './formationMarks.js';
 import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
+import { BLAST_LOOK } from './blasts.js';
+import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { strikeOf } from './enemies/rocks.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
@@ -167,6 +169,7 @@ class Renderer3D extends BaseSystem {
     };
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
+    this.burnMarks = new BurnMarks();
     this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
     this.formationMarks = new FormationMarks();
@@ -343,13 +346,30 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('weapon-beam-fired', (data) => {
       this.impact.kick(data.kick);
     });
-    // Flak shrapnel: a spark cone along the bolt's flight.
+    // A burst (flak, a missile) explodes: a fireball rolling into soot, hot
+    // streaks all round and incandescent fragments.
     this.registerEventListener('flak-burst', (data) => {
-      const { position, angle } = data || {};
+      const { position, angle, radius, look } = data || {};
       if (!position) return;
+      const missile = look === 'seeker';
+      this.three?.blasts.emit(
+        position.x,
+        position.y,
+        radius || 30,
+        missile ? BLAST_LOOK.seeker : BLAST_LOOK.flak
+      );
       const dx = Math.cos(angle || 0);
       const dy = Math.sin(angle || 0);
-      this.hitSparks.emit(position.x, position.y, dx, dy, dx, dy, false);
+      this.hitSparks.emit(
+        position.x,
+        position.y,
+        dx,
+        dy,
+        dx,
+        dy,
+        missile,
+        SPARK_KIND.blast
+      );
     });
     // a split asteroid lives on as its fragments: only real deaths burn;
     // a machine that dies flashes at its own core
@@ -675,6 +695,7 @@ class Renderer3D extends BaseSystem {
     this.three?.bursts.clear();
     this.three?.player.reset();
     this.three?.decals.clear();
+    this.three?.blasts.clear();
     this.three?.shield.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
@@ -859,7 +880,15 @@ class Renderer3D extends BaseSystem {
     }
     const { focus } = this.cameraRig;
     const fog = t.enemies.updateFog(dt, this.denseFog, focus.x, focus.z);
+    this.burnMarks.update(
+      dt,
+      this.cachedCombat,
+      player,
+      this.three,
+      this.hitSparks
+    );
     t.decals.update(dt, t.enemies.views);
+    t.blasts.update(dt, t.camera, this.flashScale);
     t.veil.update(dt);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
