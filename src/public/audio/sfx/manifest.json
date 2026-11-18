@@ -267,7 +267,7 @@
   },
   "foundry-mother-sweep": {
     "files": ["foundry-mother-sweep/1.mp3"],
-    "gain": -6,
+    "gain": -3,
     "priority": 6,
     "cap": 1,
     "gap": 1500,
@@ -275,7 +275,7 @@
     "origins": [
       {
         "file": "foundry-mother-sweep/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A giant hydraulic robotic arm swinging with motor whine then a massive metal crash, heavy and gritty, high quality game sound effect, no music (audition 13/11, pick C)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 6, 8 steps, cfg 1.0, prompt: TrackType: SFX. A huge machine limb sweeping through the air with a rising hydraulic hiss, ending in a deep metallic bang. Close mic.; cut 1.5 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 18/11, batch 3)"
       }
     ]
   },
@@ -303,7 +303,7 @@
     "origins": [
       {
         "file": "sovereign-protect/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: Enormous ceramic plates sliding closed, solemn heavy stone grinding with a low bell-like machine tone, ancient colossal mechanism, cinematic game sound effect, no music (audition 13/11, pick B)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 4, 16 steps, cfg 1.5, prompt: TrackType: SFX. Heavy stone slabs grinding shut with a deep resonant bell hum underneath. Light room.; cut 1.5 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 18/11, batch 3)"
       }
     ]
   },
@@ -647,7 +647,7 @@
   },
   "prime-charge": {
     "files": ["prime-charge/1.mp3"],
-    "gain": -6,
+    "gain": -7,
     "priority": 6,
     "cap": 1,
     "gap": 1500,
@@ -655,7 +655,7 @@
     "origins": [
       {
         "file": "prime-charge/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, exciter, prompt: A huge armored machine charging, heavy engines surging with a metallic scream, powerful, cinematic game sound effect, no music; strongest 2.0 s window (audition 14/11, pick C)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 3, 8 steps, cfg 1.0, prompt: TrackType: SFX. A giant war machine powering up and lunging forward, a roaring engine surge with a high metallic screech. Close mic.; cut 2.0 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 18/11, batch 3)"
       }
     ]
   },
@@ -669,7 +669,7 @@
     "origins": [
       {
         "file": "choir-chorus/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, exciter, prompt: An eerie ancient choir chant swelling with a metallic resonant hum, three voices, cinematic game sound effect, no music; strongest 2.5 s window (audition 14/11, pick B)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 5, 8 steps, cfg 1.0, prompt: TrackType: SFX. Three deep male voices humming one dark sustained chord through a large metal pipe, a slow swell. Light room.; cut 2.5 s from the first onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 18/11, batch 3)"
       }
     ]
   },

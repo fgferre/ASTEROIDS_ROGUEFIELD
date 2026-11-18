@@ -387,11 +387,12 @@ export default class EffectsSystem extends BaseSystem {
         PLAYER_HIT_SHAKE.duration
       );
 
-      // Red damage flash, as strong as the loss
+      // Red damage flash at the screen's edges, as strong as the loss
       this.screenFeedback.addScreenFlash(
         withAlpha(PALETTE.threat, 0.4),
         0.25,
-        hullFlashIntensity(lost, payload.max)
+        hullFlashIntensity(lost, payload.max),
+        { edges: true }
       );
 
       // Brief freeze frame for impact

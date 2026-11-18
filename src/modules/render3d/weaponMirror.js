@@ -44,13 +44,20 @@ const NEEDLE_WIDTH = 0.4;
 // proposta 18/10: beam layers, outer glow → white core: [colour, width ×
 // beam width, gain]. Additive, so the core reads hottest where they overlap.
 // The fourth entry is the layer's length (× beam length): inner layers stop
-// short so the tip tapers into the end glow instead of ending square.
+// short so the tip tapers into the end glow instead of ending square. Lot 5
+// (efeito/impacto): the outer haze is narrower and fainter, and the nose glow
+// sits a little ahead of the ship and smaller (BEAM_NOSE), so the strong
+// beam no longer covers the ship as it fires.
 const BEAM_LAYERS = [
-  ['glow', 3.4, 0.1, 0.92],
-  ['glow', 2, 0.22, 0.96],
+  ['glow', 2.2, 0.045, 0.92],
+  ['glow', 1.5, 0.16, 0.96],
   ['mid', 1, 0.85, 0.97],
   ['core', 0.35, 2.4, 0.93],
 ];
+// The beam's nose glow: how far along the beam (× its length) and how wide
+// (× beam width); the end glow's width.
+const BEAM_NOSE = [0.08, 1.3];
+const BEAM_END = 1.6;
 
 // proposta 20/10: the field weapons' looks. A blade: matte shard (half
 // length, half width × its cut radius) with a glowing edge along its outer
@@ -712,8 +719,24 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
       );
     });
     const glowRgb = rgbOf(THREE, colors.glow);
-    glow.push(beam.x, BEAM_H + 1, beam.y, glowRgb, beam.width * 3.2, k, 1.6);
-    glow.push(beam.ex, BEAM_H, beam.ey, glowRgb, beam.width * 3, 0.7 * k);
+    const [along, nose] = BEAM_NOSE;
+    glow.push(
+      beam.x + (beam.ex - beam.x) * along,
+      BEAM_H + 1,
+      beam.y + (beam.ey - beam.y) * along,
+      glowRgb,
+      beam.width * nose,
+      k,
+      1.6
+    );
+    glow.push(
+      beam.ex,
+      BEAM_H,
+      beam.ey,
+      glowRgb,
+      beam.width * BEAM_END,
+      0.7 * k
+    );
     flashes.observe(beam, glowRgb);
   });
 }
