@@ -5,6 +5,7 @@ import {
   buildWake,
   setWakeLight,
 } from '../../../../src/modules/render3d/travel/wake.js';
+import { lightWake } from '../../../../src/modules/render3d/travel/wakeRig.js';
 
 // The vendored r128 build is UMD: evaluated with an `exports` object it
 // fills that object instead of a global.
@@ -48,6 +49,18 @@ describe('the Wake', () => {
     setWakeLight(engines[2], 0);
     expect(engines[2].children[0].material.color.r).toBe(0);
     expect(engines[0].children[0].material.color.r).toBe(1);
+  });
+
+  it('takes a light rig that rides with it, the sun on the asked flank', () => {
+    const fresh = buildWake(THREE);
+    const { sun, rim, fill } = lightWake(THREE, fresh, 1);
+    [sun, rim, fill].forEach((light) =>
+      expect(fresh.group.children).toContain(light)
+    );
+    expect(sun.castShadow).toBe(true);
+    // Starboard is +z.
+    expect(sun.position.z).toBeGreaterThan(0);
+    expect(rim.position.z).toBeLessThan(0);
   });
 
   it('marks the hangar, the bridge and the engines for the scene', () => {

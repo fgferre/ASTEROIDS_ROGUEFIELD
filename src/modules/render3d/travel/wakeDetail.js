@@ -84,21 +84,24 @@ export function fittings(kit, at) {
       );
     }
   };
-  // A row of small lit windows on a dark band.
+  // A row of small windows in a dark recessed band, some lit, each its own
+  // brightness.
   const windows = (fx, ft, w, lit = 0.6) => {
-    patch(fx, ft, w, 0.42, 0.05, 0.19, paint(C.dark));
-    const count = Math.max(1, Math.floor(w / 0.55));
+    patch(fx, ft, w, 0.46, 0.05, 0.2, paint(C.mid));
+    patch(fx, ft, w - 0.12, 0.3, 0.25, 0.02, paint(C.soot));
+    const count = Math.max(1, Math.floor(w / 0.44));
     for (let n = 0; n < count; n += 1) {
       if (random() > lit) continue;
-      const x = fx + ((n + 0.5) / count - 0.5) * ((w - 0.2) / length);
+      const x = fx + ((n + 0.5) / count - 0.5) * ((w - 0.3) / length);
+      const warm = random() < 0.2;
       patch(
         x,
         ft,
-        0.32,
-        0.18,
-        0.24,
-        0.03,
-        paint(random() < 0.7 ? C.glass : C.amber, 0.9 + random() * 0.6),
+        0.26,
+        0.14,
+        0.27,
+        0.02,
+        paint(warm ? '#ffc983' : '#8fd4ff', 0.35 + random() * 0.8),
         'windows'
       );
     }

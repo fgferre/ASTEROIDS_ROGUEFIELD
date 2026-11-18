@@ -261,7 +261,7 @@ export function createKit(THREE, seed, tile) {
   // A light: a small hot box standing `size` off the surface at `at`, and
   // its pool on that surface (set `<set>Pools`).
   const lamp = (set, at, normal, css, options = {}) => {
-    const { size = 0.16, gain = 2.6, spill = 1.5, spillGain = 0.5 } = options;
+    const { size = 0.16, gain = 2.6, spill = 1.8, spillGain = 0.6 } = options;
     const n = normal.clone().normalize();
     const c = at.clone().addScaledVector(n, size / 2);
     const h = size / 2;

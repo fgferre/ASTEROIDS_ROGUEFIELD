@@ -6,8 +6,8 @@
 
 // The concept's palette (sRGB).
 export const WAKE_COLORS = Object.freeze({
-  light: '#a6a9aa',
-  grey: '#83878b',
+  light: '#9da1a3',
+  grey: '#7a7f83',
   mid: '#5f6368',
   dark: '#44474c',
   soot: '#17191c',

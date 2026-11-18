@@ -65,13 +65,16 @@ function fbm(random, cells, octaves) {
 
 // Bare surfaces under the paint (sRGB, 0..1).
 const STEEL = [0.3, 0.31, 0.33];
-const RUST = [0.42, 0.24, 0.15];
+const RUST = [0.37, 0.21, 0.14];
 const STENCIL = [0.86, 0.86, 0.82];
+// What a rust run does to the paint under it.
+const RUN = [0.74, 0.55, 0.42];
 const BRIGHT_STEEL = [0.46, 0.47, 0.49];
 
 // A surface being painted: per texel, relief `height`, a `shade` on whatever
 // shows, the `paint` left (1 → 0 bare), what the bare surface is (`bare`
-// colour, `rust` 0..1 for its finish) and extra `dirt` (roughness).
+// colour, `rust` 0..1 for its finish), extra `dirt` (roughness) and rust
+// `stain` run over the paint.
 function sheet(size) {
   const n = size * size;
   return {
@@ -82,6 +85,7 @@ function sheet(size) {
     bare: new Float32Array(n * 3),
     rust: new Float32Array(n),
     dirt: new Float32Array(n),
+    stain: new Float32Array(n),
   };
 }
 const setBare = (s, i, rgb, rust = 0) => {
@@ -126,8 +130,9 @@ function label(s, random, x, y, rows, width, glyph, tile) {
   }
 }
 
-// Dirt run down from (x, y): `length` texels toward −v, `width` across.
-function streak(s, x, y, length, width, strength, tile) {
+// Dirt run down from (x, y): `length` texels toward −v, `width` across;
+// `stain` (0..1) makes it a rust run.
+function streak(s, x, y, length, width, strength, tile, stain = 0) {
   each(
     s,
     x - width * 2,
@@ -141,6 +146,7 @@ function streak(s, x, y, length, width, strength, tile) {
       const k = strength * across * along * along;
       s.shade[i] *= 1 - k;
       s.dirt[i] = Math.max(s.dirt[i], k);
+      s.stain[i] = Math.max(s.stain[i], stain * across * along);
     }
   );
 }
@@ -205,8 +211,9 @@ function finish(THREE, s, { strength, tile }) {
       const paint = s.paint[i];
       const shade = clamp01(s.shade[i]);
       for (let c = 0; c < 3; c += 1) {
+        const painted = mix(1, RUN[c], s.stain[i]);
         color[p + c] = Math.round(
-          255 * clamp01(mix(s.bare[i * 3 + c], 1, paint) * shade)
+          255 * clamp01(mix(s.bare[i * 3 + c], painted, paint) * shade)
         );
       }
       color[p + 3] = Math.round(255 * paint);
@@ -281,7 +288,10 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
   const random = createSeededRandom(seed);
   const s = sheet(size);
   const k = size / 1024;
-  const chips = fbm(random, 28, 4);
+  const coarse = fbm(random, 28, 4);
+  const fine = fbm(random, 72, 3);
+  // Flaked, not dotted: ragged edges on the chips.
+  const chips = (u, v) => coarse(u, v) * 0.62 + fine(u, v) * 0.38;
   const rustAt = fbm(random, 9, 3);
   const blotch = fbm(random, 5, 3);
   // Where the paint has had a hard life: chips gather there.
@@ -363,9 +373,9 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
         s,
         i,
         chips(u, v),
-        edge * (0.06 + zone * 0.12) + zone * 0.07,
+        edge * (0.07 + zone * 0.15) + zone * 0.07,
         rustAt(u, v),
-        0.78
+        0.745
       );
     });
     if (kind === 'label') {
@@ -381,19 +391,33 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
       );
     }
     // Dirt run down from the plate's lower seam and from its bolts.
-    const runs = 1 + Math.floor(random() * 4);
+    const runs = 2 + Math.floor(random() * 5);
     for (let n = 0; n < runs; n += 1) {
+      const rusty = random() < 0.35;
       streak(
         s,
         x0 + random() * w,
         y0 + 1,
-        (40 + random() * 170) * k,
+        (40 + random() * 200) * k,
         (1.5 + random() * 5) * k,
-        0.18 + random() * 0.3,
-        true
+        rusty ? 0.14 + random() * 0.14 : 0.2 + random() * 0.32,
+        true,
+        rusty ? 0.5 + random() * 0.4 : 0
       );
     }
   });
+  // Broad, soft dirt down the whole plating.
+  for (let n = 0; n < 16; n += 1) {
+    streak(
+      s,
+      random() * size,
+      random() * size,
+      (220 + random() * 320) * k,
+      (14 + random() * 28) * k,
+      0.1 + random() * 0.14,
+      true
+    );
+  }
   for (let n = 0; n < 18; n += 1) {
     scratch(
       s,
@@ -407,7 +431,7 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
   for (let i = 0; i < size * size; i += 1) {
     const u = (i % size) / size;
     const v = Math.floor(i / size) / size;
-    s.shade[i] *= (0.84 + blotch(u, v) * 0.24) * (0.95 + grain(u, v) * 0.1);
+    s.shade[i] *= (0.76 + blotch(u, v) * 0.3) * (0.95 + grain(u, v) * 0.1);
     s.height[i] += (grain(u, v) - 0.5) * 0.05;
   }
   return finish(THREE, s, { strength: 2 * k, tile: true });
