@@ -49,4 +49,19 @@ describe('MuzzleFlashes', () => {
     volley(); // the next volley lights its own
     expect(muzzles.update(batches, batches, [1, 1, 1], [1, 1, 1])).toBe(2);
   });
+
+  it('puts a volley of parallel lanes in the middle, facing forward', () => {
+    const muzzles = new MuzzleFlashes();
+    const streaks = [];
+    const glow = { push() {} };
+    const ribbons = { streak: (...args) => streaks.push(args) };
+    // Multishot's three lanes, 10 px apart across the ship's heading (+x)
+    [-10, 0, 10].forEach((y) => muzzles.emit(0, 300 + y, 1, 0));
+    muzzles.update(glow, ribbons, [1, 1, 1], [1, 1, 1]);
+
+    const [x0, y0, x1, y1] = streaks[0];
+    expect(y0).toBeCloseTo(300, 5);
+    expect(y1).toBeCloseTo(300, 5);
+    expect(x1).toBeGreaterThan(x0);
+  });
 });
