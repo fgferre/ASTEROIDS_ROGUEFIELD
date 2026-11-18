@@ -1125,22 +1125,47 @@ describe('EnemyMirror', () => {
     expect(mirror.badgeMaterials()).toBe(mirror.badges);
   });
 
-  it('keeps a knocked machine facing its course, and lets an aiming one turn at once', () => {
+  it('keeps a knocked machine facing where its engine pushes, and lets an aiming one snap to its aim', () => {
     const view = { id: 'drone-1', vx: 0, vy: 0 };
-    const toShip = { rotation: Math.PI, vx: -60, vy: 0 };
-    expect(hullHeading(view, toShip, 0)).toBe(Math.PI);
-    view.vx = -60;
-    // a shot knocks it back: the sim now faces away, the hull does not
-    const knocked = { rotation: 0, vx: 65, vy: 0 };
-    expect(hullHeading(view, knocked, 1 / 60)).toBe(Math.PI);
-    view.vx = 65;
-    expect(hullHeading(view, knocked, 0.3)).toBe(Math.PI);
-    // after the hold it turns toward its course, a step at a time
-    const after = hullHeading(view, knocked, 0.45);
-    expect(Math.abs(after)).toBeLessThan(Math.PI);
-    expect(Math.abs(after)).toBeGreaterThan(Math.PI - 7 * 0.16);
-    // a machine that aims (its heading is not its course) is never held
-    const aiming = { rotation: 1, vx: 65, vy: 0 };
-    expect(hullHeading(view, aiming, 0.5)).toBe(1);
+    let time = 0;
+    let vx = -40;
+    hullHeading(view, { rotation: Math.PI, vx, vy: 0 }, time);
+    const step = (rotation, nextVx) => {
+      view.vx = vx;
+      vx = nextVx;
+      time += 1 / 60;
+      return hullHeading(view, { rotation, vx, vy: 0 }, time);
+    };
+    // flying at the ship (-x), its engine pushing it on
+    for (let i = 0; i < 5; i += 1) step(Math.PI, vx - 4);
+    // a shot knocks it away: the sim faces away, its engine still pushes back
+    expect(step(Math.PI, 65)).toBe(Math.PI);
+    for (let i = 0; i < 10; i += 1) {
+      expect(step(0, vx - 4)).toBe(Math.PI);
+    }
+    // a machine that aims (its heading is not its course) soon snaps to it
+    let aim = 0;
+    for (let i = 0; i < 12; i += 1) aim = step(1, vx - 4);
+    expect(aim).toBe(1);
+  });
+
+  it('turns a knocked machine toward where its engine pushes, not where the knock sends it', () => {
+    // at rest, then knocked away from the ship (+x) by the first shot
+    const view = { id: 'drone-2', vx: 0, vy: 0 };
+    hullHeading(view, { rotation: 0, vx: 0, vy: 0 }, 0);
+    view.vx = 0;
+    let vx = 65;
+    let time = 1 / 60;
+    hullHeading(view, { rotation: 0, vx, vy: 0 }, time);
+    view.vx = vx;
+    // its engine pushes it back toward the ship (-x) while it still drifts away
+    let heading = 0;
+    for (let i = 0; i < 10; i += 1) {
+      vx -= 4;
+      time += 1 / 60;
+      heading = hullHeading(view, { rotation: 0, vx, vy: 0 }, time);
+      view.vx = vx;
+    }
+    expect(Math.abs(heading)).toBeGreaterThan(0.5);
   });
 });

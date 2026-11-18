@@ -55,14 +55,21 @@ const JOLT_MIN = 0.8;
 const JOLT_REFERENCE = 20;
 // proposta 17/11 (efeito/impacto): a machine that faces its own course is
 // not spun round when a hit knocks it back (under fire a Drone flipped
-// 180° and back 12–14 times in 2 s, 6–9 in the published game). A jump in
-// its velocity of over KNOCK_DV px/s in one frame, more than any engine
-// makes, is a knock; for KNOCK_HOLD s after one its hull keeps the heading
-// it had, then turns to its course at up to TURN_RATE rad/s. Only the
-// picture turns: the sim keeps its heading and its knockback.
+// 180° and back 12–14 times in 2 s, 6–9 in the published game). Its
+// engine's push is the change in its velocity a frame (blended by
+// STEER_BLEND), leaving out jumps over KNOCK_DV px/s, which only a knock
+// makes. While it moves against that push, being knocked back, its hull
+// faces the push, where it wants to go; otherwise its course. The hull
+// turns at up to TURN_RATE rad/s (over at most TURN_STEP s a frame). A
+// machine counts as facing its course for COURSE_GRACE s after it last did
+// (turning, not snapping, meanwhile): the drawn frame blends two sim steps,
+// and the blend of a reversing heading is not its velocity's. Only the picture turns: the sim keeps its
+// heading and its knockback.
 const KNOCK_DV = 30;
-const KNOCK_HOLD = 0.4;
+const COURSE_GRACE = 0.15;
+const STEER_BLEND = 0.2;
 const TURN_RATE = 7;
+const TURN_STEP = 1 / 30;
 const BURST_MIN = 8;
 const BURST_MAX = 16;
 const BURST_PER_RADIUS = 1 / 1.6;
@@ -137,7 +144,7 @@ function turnBetween(from, to) {
 
 /**
  * The heading (rad) a machine's hull shows this frame: its own, except that
- * a knock does not spin one that faces its course (see KNOCK_*). Reads the
+ * a knock does not spin one that faces its course (see KNOCK_DV). Reads the
  * view's velocity from the frame before, so call it before storing this one.
  */
 export function hullHeading(view, enemy, time) {
@@ -148,20 +155,37 @@ export function hullHeading(view, enemy, time) {
     view.headingId = view.id;
     view.heading = want;
     view.headingAt = time;
-    view.knockAt = -Infinity;
+    view.steerX = 0;
+    view.steerY = 0;
+    view.coursedAt = -Infinity;
     return want;
   }
-  if (Math.hypot(vx - view.vx, vy - view.vy) > KNOCK_DV) view.knockAt = time;
-  const dt = Math.max(0, time - view.headingAt);
-  view.headingAt = time;
-  const course =
-    Math.hypot(vx, vy) > 1 &&
-    Math.abs(turnBetween(want, Math.atan2(vy, vx))) < 1e-3;
-  if (!course) view.heading = want;
-  else if (time - view.knockAt >= KNOCK_HOLD) {
-    const turn = turnBetween(view.heading, want);
-    view.heading += Math.sign(turn) * Math.min(Math.abs(turn), TURN_RATE * dt);
+  const dvx = vx - view.vx;
+  const dvy = vy - view.vy;
+  const knock = Math.hypot(dvx, dvy) > KNOCK_DV;
+  if (!knock) {
+    view.steerX += (dvx - view.steerX) * STEER_BLEND;
+    view.steerY += (dvy - view.steerY) * STEER_BLEND;
   }
+  const dt = Math.min(TURN_STEP, Math.max(0, time - view.headingAt));
+  view.headingAt = time;
+  // faces its course (as a slow one too: its heading is its velocity's)
+  const course =
+    (vx !== 0 || vy !== 0) &&
+    Math.abs(turnBetween(want, Math.atan2(vy, vx))) < 1e-3;
+  if (course) view.coursedAt = time;
+  // one that aims snaps; the frame a knock lands, the sim's heading still
+  // shows the old course
+  if (time - view.coursedAt > COURSE_GRACE && !knock) {
+    view.heading = want;
+    return want;
+  }
+  const pushed =
+    Math.hypot(view.steerX, view.steerY) > 1e-3 &&
+    vx * view.steerX + vy * view.steerY < 0;
+  const target = pushed ? Math.atan2(view.steerY, view.steerX) : want;
+  const turn = turnBetween(view.heading, target);
+  view.heading += Math.sign(turn) * Math.min(Math.abs(turn), TURN_RATE * dt);
   return view.heading;
 }
 
