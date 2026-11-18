@@ -57,6 +57,9 @@ describe('the Wake', () => {
       expect(wake.group.children).toContain(light)
     );
     expect(sun.castShadow).toBe(true);
+    // Drawn once: the ship is static under a sun that rides with it.
+    expect(sun.shadow.autoUpdate).toBe(false);
+    expect(sun.shadow.needsUpdate).toBe(true);
     // Starboard is +z.
     expect(sun.position.z).toBeGreaterThan(0);
     expect(rim.position.z).toBeLessThan(0);

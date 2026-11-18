@@ -21,6 +21,8 @@ const SHADOW = { half: 1900, tall: 1200, near: 500, far: 11000, map: 4096 };
 /**
  * Adds the rig to a built Wake ({ group }): returns { sun, rim, fill }.
  * `side` (-1 port, 1 starboard) is the flank the sun falls on.
+ * Place the ship first: the shadows are drawn once, where it stands (set
+ * sun.shadow.needsUpdate after moving it).
  */
 export function lightWake(THREE, wake, side = -1) {
   const lamp = ({ color, intensity, from }) => {
@@ -50,5 +52,10 @@ export function lightWake(THREE, wake, side = -1) {
     far: SHADOW.far,
   });
   sun.shadow.camera.updateProjectionMatrix();
+  // The ship is static and the sun rides with it: its shadows are drawn
+  // once, not every frame. After moving or turning the ship, ask for them
+  // again (sun.shadow.needsUpdate = true).
+  sun.shadow.autoUpdate = false;
+  sun.shadow.needsUpdate = true;
   return { sun, rim: lamp(RIM), fill: lamp(FILL) };
 }
