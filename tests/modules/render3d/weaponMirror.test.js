@@ -102,4 +102,27 @@ describe('weapon mirror', () => {
     expect(drawn.tube).toBe(3); // channel, glow, core along one line
     expect(drawn.streak).toBeGreaterThan(0); // metal sprayed out the far side
   });
+
+  it('lights the Harmonic beam a little ahead of the ship, not over it', () => {
+    const combat = makeCombat();
+    const white = '#ffffff';
+    combat.beams.push({
+      x: 100,
+      y: 300,
+      ex: 600,
+      ey: 300,
+      width: 10,
+      life: 0.1,
+      maxLife: 0.1,
+      colors: { glow: white, mid: white, core: white },
+    });
+    const glows = [];
+    const batches = makeBatches({});
+    batches.glow.push = (x, height, y, rgb, size) => glows.push({ x, size });
+    mirrorWeaponEffects(THREE, combat, batches, { observe() {}, light() {} });
+
+    const [nose] = glows;
+    expect(nose.x).toBeGreaterThan(100);
+    expect(nose.x - nose.size).toBeGreaterThan(100); // clear of the ship
+  });
 });
