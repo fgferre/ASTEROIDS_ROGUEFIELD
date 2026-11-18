@@ -28,6 +28,11 @@ export const DEATH_EFFECTS = Object.freeze({
 // The flash of an enemy whose file names none (`effects.fire: null` names no
 // flash).
 const DEFAULT_FIRE_EFFECT = 'muzzle-flash';
+// proposta 17/11 (efeito/impacto): a big machine's fall (the Bulwark, the
+// Anvil) has its own beat, where it had none: a 'heavy' stop (GameTime) and a
+// shake. The 3D side lights its pieces from the same size.
+export const BIG_MACHINE_RADIUS = 21;
+const BIG_FALL_SHAKE = { intensity: 6, duration: 0.25 };
 
 // Light lingers (docs/NORTE.md §2): PROPOSAL from 17/10, judged by playing.
 // A multiplier on the old lifetimes: asteroid explosion embers were
@@ -540,7 +545,8 @@ export class EnemyEffects {
       return;
     }
 
-    const death = getContent('enemies', enemyType)?.effects?.death ?? 'debris';
+    const machine = getContent('enemies', enemyType);
+    const death = machine?.effects?.death ?? 'debris';
     const { particles } = this.particleEffects;
     const from = particles.length;
     this[DEATH_EFFECTS[death]](asteroid, context);
@@ -548,6 +554,10 @@ export class EnemyEffects {
     if (enemyType === 'asteroid') return;
     for (let i = from; i < particles.length; i += 1) {
       if (particles[i]?.type === 'debris') particles[i].material = 'metal';
+    }
+    if (machine && (asteroid.radius || 0) >= BIG_MACHINE_RADIUS) {
+      this.addHitStop('heavy');
+      this.addScreenShake(BIG_FALL_SHAKE.intensity, BIG_FALL_SHAKE.duration);
     }
   }
 

@@ -63,6 +63,15 @@ const pad = (text, width) => String(text).padEnd(width);
 const median = (list) =>
   [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)];
 
+const trailText = (r) =>
+  [
+    ['motor', r.trail.motor],
+    ['brake/agil', r.trail.brake],
+    ['aim', r.trail.aim],
+  ]
+    .map(([name, t]) => `${name} ${t ? `L${t.level}@${t.seconds}s` : '-'}`)
+    .join('  ');
+
 const runText = (r) =>
   `${r.seconds}s ${r.kills}k w${r.wave} ${r.outcome === 'died' ? (r.cause || '?').replace(/^shot /, 'tiro ') : r.outcome}`;
 
@@ -98,6 +107,25 @@ function compare() {
       `new: Auto Turret taken in ${glide.filter((r) => r.autoAim).length} of ${glide.length} runs, Flight Computer in ${glide.filter((r) => r.flightComputer).length}`,
       `new-flight watch (median): turning ${med(glide, 'turningPct')}%, pushing ${med(glide, 'pushPct')}%, back key ${med(glide, 'reversePct')}%, braking ${med(glide, 'brakePct')}%; aimed at a foe in reach ${med(glide, 'aimedPct')}%, near an edge ${med(glide, 'edgePct')}%, mean speed ${med(glide, 'meanSpeed')} px/s`,
     ];
+    const taken = (list, key) => list.filter((r) => r.trail[key]);
+    const when = (list, key) => {
+      const hit = taken(list, key);
+      if (!hit.length) return '-';
+      const level = median(hit.map((r) => r.trail[key].level));
+      const seconds = median(hit.map((r) => r.trail[key].seconds));
+      return `${hit.length}/${list.length}, mid L${level} @${seconds}s`;
+    };
+    lines.push(
+      `trail (${p}), new flight: ${glide.map((r) => `seed ${r.seed}: ${trailText(r)}`).join('\n  ')}`,
+      ...[
+        ['old', old],
+        ['new', glide],
+      ].map(
+        ([name, list]) =>
+          `trail taken, ${name} flight: motor ${when(list, 'motor')}; brake/agility ${when(list, 'brake')}; Auto Turret ${when(list, 'aim')}`
+      ),
+      `wins: old ${old.filter((r) => r.outcome === 'won').length}/${old.length}, new ${glide.filter((r) => r.outcome === 'won').length}/${glide.length}`
+    );
     process.stdout.write(`${lines.join('\n')}\n`);
   }
 }

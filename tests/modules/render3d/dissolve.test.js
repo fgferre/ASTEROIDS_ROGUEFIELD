@@ -154,6 +154,37 @@ describe('DissolvePool', () => {
     expect(uExplode.value).toBe(0);
   });
 
+  it('lights a big machine’s pieces as they break, then cools them', () => {
+    const { mirror } = setup();
+    const anvil = { ...mote('v'), type: 'anvil', radius: 26 };
+    mirror.update([anvil], 0, 0);
+    const view = mirror.views.get('v');
+    mirror.markDead(anvil);
+    mirror.update([], 0, 0);
+    const { uBreakHeat } = view.dissolve.uniforms;
+    expect(uBreakHeat.value).toBeGreaterThan(0.5);
+    mirror.update([], 0, 0.5);
+    expect(uBreakHeat.value).toBe(0);
+
+    const drone = mote('d');
+    mirror.update([drone], 0, 0);
+    const small = mirror.views.get('d');
+    mirror.markDead(drone);
+    mirror.update([], 0, 0);
+    expect(small.dissolve.uniforms.uBreakHeat.value).toBe(0);
+  });
+
+  it('breaks a boss into more pieces than a machine', () => {
+    const { mirror } = setup();
+    const view = mirror.acquire('boss-choir');
+    view.radius = 48;
+    const plan = mirror.breakOf(view);
+    expect(view.kind).toBe('boss-choir');
+    expect(plan.count).toBeGreaterThan(16); // a machine's cap
+    expect(plan.heat).toBe(0);
+    expect(mirror.breakOf({ kind: 'asteroid', radius: 30 })).toBeNull();
+  });
+
   it('caps concurrent burns, ending the oldest first', () => {
     const { mirror } = setup();
     const enemies = [];
