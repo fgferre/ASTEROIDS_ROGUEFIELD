@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath } from '../../core/cinematics.js';
+import { epiloguePath, introPath, storyTold } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -64,6 +64,7 @@ import {
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
@@ -129,6 +130,8 @@ class Renderer3D extends BaseSystem {
     this.three = null;
     // The journey between sectors (travelScene.js), built with the scene.
     this.travel = null;
+    // The story before the first campaign's journey (storyScene.js).
+    this.story = null;
     this.failed = false;
     this.graphics = {
       bloom: true,
@@ -543,6 +546,30 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
+   * The story before the first campaign's journey (ui/runCinematics.js),
+   * in its own scene. False when nothing would move, as playIntro.
+   */
+  playStory() {
+    if (!this.ready()) return false;
+    if (!this.startCinematic(holdIntroStart, 1, true, 'story')) return false;
+    const freeze = this.cameraRig.cinematicFreeze;
+    if (!this.story.built) this.warmStory();
+    this.story.start(freeze?.kind === 'story' ? freeze.t : null);
+    return true;
+  }
+
+  /** The story is over: the field's scene is drawn again. */
+  endStory() {
+    this.story?.stop();
+    this.story?.dispose();
+  }
+
+  // Seeded: three names what the story builds and draws with Math.random.
+  warmStory() {
+    this.seeded(() => this.story.warm(this.three.camera));
+  }
+
+  /**
    * The journey is over: the Ring and the field are back, and the run's
    * sector shows its own place already (its first layer may wait for cards).
    */
@@ -740,6 +767,7 @@ class Renderer3D extends BaseSystem {
     this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
     this.travel?.stop();
+    this.story?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -762,6 +790,9 @@ class Renderer3D extends BaseSystem {
   setup() {
     this.three = setupThree(this.seeded);
     this.travel = new TravelScene(this.three, (event, payload) =>
+      this.eventBus?.emit(event, payload)
+    );
+    this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
     this.applyQuality();
@@ -798,6 +829,8 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
+      // The story's freighter (seconds): only for a player yet to see it.
+      () => storyTold() || this.warmStory(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();
@@ -897,6 +930,7 @@ class Renderer3D extends BaseSystem {
     const effects = this.cachedEffects;
     const enemyList = this.cachedEnemies?.getActiveEnemies() || [];
     const travel = this.travel?.active ? this.travel : null;
+    const story = this.story?.active ? this.story : null;
     this.cameraRig.updateCamera(
       this.three,
       player,
@@ -912,6 +946,7 @@ class Renderer3D extends BaseSystem {
 
     const t = this.three;
     travel?.frame(t.camera, t.height);
+    story?.frame(t.camera, time);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -955,7 +990,10 @@ class Renderer3D extends BaseSystem {
       time,
       dt * (effects?.gameTime?.scale ?? 1)
     );
-    if (travel) {
+    if (story) {
+      story.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
+      this.shipOnScreen = null;
+    } else if (travel) {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
     } else {
@@ -1032,8 +1070,11 @@ class Renderer3D extends BaseSystem {
     );
 
     t.renderer.info.reset();
+    // The story draws its own scene in the field's place.
+    const drawn = story ? story.scene : t.scene;
+    t.composer.passes[0].scene = drawn;
     if (this.graphics.postProcessing) t.composer.render(dt);
-    else t.renderer.render(t.scene, t.camera);
+    else t.renderer.render(drawn, t.camera);
     t.renderer.autoClear = false;
     t.renderer.render(t.overlay, t.camera);
     t.renderer.autoClear = true;

@@ -128,6 +128,11 @@ export function travelTransmissions(to, holdMs) {
   return spokenInOrder(STORY.travel[to] ?? [], `travel:${to}`, holdMs);
 }
 
+/** The story's lines (STORY.prologue), in order; `holdMs` as above. */
+export function prologueTransmissions(holdMs) {
+  return spokenInOrder(STORY.prologue, 'prologue', holdMs);
+}
+
 /** An ending's two lines (STORY.ending), in order; `holdMs` as above. */
 export function endingTransmissions(ending, holdMs) {
   return spokenInOrder(STORY.ending[ending].lines, `ending:${ending}`, holdMs);

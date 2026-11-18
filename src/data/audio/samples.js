@@ -146,6 +146,18 @@ export const SAMPLE_CUES = deepFreeze({
     bus: 'ambient',
   },
   playTravelBurn: { sample: 'travel-burn', bus: 'ambient', loop: true },
+  // The story before the first journey (eventCues `story-moment`, by the
+  // moment's id: render3d/storyScene.js): the reactors' stutter loops from
+  // the first shot to the launch.
+  playStoryMoment: {
+    sample: {
+      pulse: 'signal-pulse',
+      hangar: 'hatch-open',
+      launch: 'travel-ignite',
+    },
+    bus: 'ambient',
+  },
+  playStoryReactor: { sample: 'reactor-stutter', bus: 'ambient', loop: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
   playUIStartGame: { sample: 'run-start', bus: 'ambient' },

@@ -174,6 +174,12 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.journeyCue.end();
     audio.sectorScore.holdForJourney(false);
   },
+  holdScore(audio) {
+    audio.sectorScore.holdForJourney(true);
+  },
+  releaseScore(audio) {
+    audio.sectorScore.holdForJourney(false);
+  },
 
   // Pause: the danger holds still and the score goes underwater.
   pauseMusic(audio, payload) {

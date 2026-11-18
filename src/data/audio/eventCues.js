@@ -276,4 +276,13 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
   { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
   { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
+  // The story before the first journey (render3d/storyScene.js): each
+  // moment's sample, the reactors' loop from its first shot to the launch,
+  // the sector's music held under it (its journey holds it on after).
+  { on: 'story-moment', cue: 'playStoryMoment', arg: 'id' },
+  { on: 'story-moment', cue: 'playStoryReactor', when: { id: 'wake' } },
+  { on: 'story-moment', run: 'holdScore', when: { id: 'wake' } },
+  { on: 'story-moment', cue: 'stopStoryReactor', when: { id: 'launch' } },
+  { on: 'story-moment', cue: 'stopStorySounds', when: { id: 'end' } },
+  { on: 'story-moment', run: 'releaseScore', when: { id: 'end' } },
 ]);

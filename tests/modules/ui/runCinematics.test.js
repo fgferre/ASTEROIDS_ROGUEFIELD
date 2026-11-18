@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   EPILOGUE_MS,
   INTRO_MS,
+  STORY_MS,
+  STORY_SHOT_MS,
   endingPath,
   epiloguePath,
 } from '../../../src/core/cinematics.js';
@@ -14,6 +16,7 @@ import {
 } from '../../../src/modules/ui/runCinematics.js';
 import {
   endingTransmissions,
+  prologueTransmissions,
   runVoiceLines,
   travelTransmissions,
 } from '../../../src/modules/ui/transmissions.js';
@@ -314,8 +317,10 @@ describe('RunCinematics', () => {
     const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
     cinematics.prepareTravel(launch);
     expect(emit.mock.lastCall[0]).toBe('voice-lines-coming');
+    // The story is untold: its lines come too.
     expect(keys()).toEqual([
       ...travelTransmissions('debris-wake').map((entry) => entry.key),
+      ...prologueTransmissions().map((entry) => entry.key),
       ...runVoiceLines(launch).map((entry) => entry.key),
     ]);
     expect(keys()).toContain('chapter:debris-wake');
@@ -368,6 +373,43 @@ describe('RunCinematics', () => {
     vi.advanceTimersByTime(500);
     expect(banners).toHaveLength(1);
     expect(card).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the story on the first campaign launch only, a line opening each shot; a skip flies on to the journey', () => {
+    const stored = new Map();
+    vi.stubGlobal('window', {
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (id) => clearTimeout(id),
+      localStorage: {
+        getItem: (key) => stored.get(key) ?? null,
+        setItem: (key, value) => stored.set(key, value),
+      },
+    });
+    const { ui, renderer, spoken, hush, skip } = setup();
+    renderer.playStory = vi.fn(() => true);
+    renderer.endStory = vi.fn();
+    const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
+    ui.cinematics.armTravel(launch);
+    ui.cinematics.startIntro();
+    expect(ui.cinematics.kind).toBe('story');
+    expect(renderer.playTravel).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(STORY_SHOT_MS[0] + STORY_SHOT_MS[1]);
+    expect(spoken.map(({ key }) => key)).toEqual(['prologue:0', 'prologue:1']);
+
+    skip();
+    expect(hush).toHaveBeenCalledTimes(1);
+    expect(renderer.endStory).toHaveBeenCalledTimes(1);
+    expect(ui.cinematics.kind).toBe('travel');
+    vi.advanceTimersByTime(STORY_MS);
+    const told = spoken.filter(({ key }) => key.startsWith('prologue'));
+    expect(told).toHaveLength(2);
+
+    // Told: the next campaign launch flies straight to its journey.
+    ui.cinematics.stop();
+    ui.cinematics.armTravel(launch);
+    ui.cinematics.startIntro();
+    expect(ui.cinematics.kind).toBe('travel');
+    expect(renderer.playStory).toHaveBeenCalledTimes(1);
   });
 
   it('plays a journey as plain lines when the camera cannot move', () => {

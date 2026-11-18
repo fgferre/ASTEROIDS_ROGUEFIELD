@@ -113,11 +113,14 @@ describe('Renderer3D.warmUp', () => {
     const bind = vi.spyOn(enemies, 'bind');
     const rebuild = vi.spyOn(player, 'rebuild');
     const progress = [];
+    // The story is untold here: its freighter is made too.
+    renderer.story = { warm: vi.fn() };
 
     const done = renderer.warmUp((value) => progress.push(value));
     await vi.runAllTimersAsync();
     await done;
     vi.useRealTimers();
+    expect(renderer.story.warm).toHaveBeenCalledTimes(1);
 
     const kinds = create.mock.calls.map(([kind]) => kind);
     for (const kind of [...KNOWN_KINDS, 'boss-choir', 'boss-null']) {

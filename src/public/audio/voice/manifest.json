@@ -831,6 +831,36 @@
       "speaker": "ring",
       "text": "Warden Null is silent. The Ring hears a pilot at its center. It begins to wake.",
       "seconds": 5.01
+    },
+    "prologue:0": {
+      "file": "wake/prologue_0.mp3",
+      "speaker": "wake",
+      "text": "This is the Wake.",
+      "seconds": 1.5
+    },
+    "prologue:1": {
+      "file": "wake/prologue_1.mp3",
+      "speaker": "wake",
+      "text": "Our reactors are failing.",
+      "seconds": 2.13
+    },
+    "prologue:2": {
+      "file": "wake/prologue_2.mp3",
+      "speaker": "wake",
+      "text": "A power signal. Coming from the Field.",
+      "seconds": 2.73
+    },
+    "prologue:3": {
+      "file": "wake/prologue_3.mp3",
+      "speaker": "wake",
+      "text": "The wreck of the Ring. Broken a thousand years ago.",
+      "seconds": 3.49
+    },
+    "prologue:4": {
+      "file": "wake/prologue_4.mp3",
+      "speaker": "wake",
+      "text": "We fly our interceptors by remote link.",
+      "seconds": 3.04
     }
   }
 }

@@ -871,6 +871,30 @@ class SFXBus {
     );
   }
 
+  // The story before the first journey: only its samples, as above.
+  playStoryMoment() {}
+
+  playStoryReactor() {}
+
+  /** The reactors' loop fades (the interceptor launches). */
+  stopStoryReactor() {
+    this.samples.stop(
+      [SAMPLE_CUES.playStoryReactor.sample],
+      SAMPLE_PLAYBACK.loopFadeSeconds
+    );
+  }
+
+  /** The story is over (ended, skipped, torn down): all its sounds fade. */
+  stopStorySounds() {
+    this.samples.stop(
+      [
+        SAMPLE_CUES.playStoryReactor.sample,
+        ...Object.values(SAMPLE_CUES.playStoryMoment.sample),
+      ],
+      SAMPLE_PLAYBACK.cutFadeSeconds
+    );
+  }
+
   // --- Transmissions (sfx/stingers.js) ---
 
   playTransmission() {
