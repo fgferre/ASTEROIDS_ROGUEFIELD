@@ -687,48 +687,6 @@
       }
     ]
   },
-  "press-start": {
-    "files": ["run-start/1.mp3"],
-    "gain": -8,
-    "priority": 0,
-    "cap": 1,
-    "gap": 200,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "run-start/1.mp3",
-        "origin": "Stand-in: run-start's file until the press start sound arrives (card começo, 17/11)"
-      }
-    ]
-  },
-  "launch-confirm": {
-    "files": ["ui-select/1.mp3"],
-    "gain": -10,
-    "priority": 0,
-    "cap": 2,
-    "gap": 40,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "ui-select/1.mp3",
-        "origin": "Stand-in: ui-select's file until the Launch confirmation arrives (card começo, 17/11)"
-      }
-    ]
-  },
-  "remote-link": {
-    "files": ["travel-charge/1.mp3"],
-    "gain": -6,
-    "priority": 3,
-    "cap": 1,
-    "gap": 500,
-    "reverb": -12,
-    "origins": [
-      {
-        "file": "travel-charge/1.mp3",
-        "origin": "Stand-in: travel-charge's file until the remote-link sound arrives (card começo, 17/11)"
-      }
-    ]
-  },
   "title-start": {
     "files": ["title-start/1.mp3"],
     "gain": -11,
