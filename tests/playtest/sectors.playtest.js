@@ -252,6 +252,7 @@ async function playSector(sector, seed) {
       report.outcome.kind === 'died' ? 'pilot died' : 'time limit';
   }
   report.cards = [...driver.cards];
+  report.taken = [...driver.taken];
   report.level = progression.getLevel();
   report.startLevel = startLevel;
   report.kills = enemies.sessionStats.totalKills;
@@ -267,6 +268,12 @@ function outcomeText({ outcome, frames, sector }) {
     return `died on layer ${outcome.layer}/${last} at ${clock(outcome.at)}`;
   }
   return `timed out at ${LIMIT_MINUTES}:00`;
+}
+
+// The first card of `ids` taken, as { level, seconds }, or null.
+function trailStep(taken, ids) {
+  const card = taken.find(({ id }) => ids.includes(id));
+  return card ? { level: card.level, seconds: Math.round(card.seconds) } : null;
 }
 
 // One run as the plain numbers the comparison table (scripts/playtest.mjs) reads.
@@ -287,6 +294,13 @@ function toRow(r) {
     waves: r.sector.layers[1] - r.sector.layers[0] + 1,
     cause: r.outcome.by || null,
     level: r.level,
+    // The piloting trail: when (level, seconds) the engine, the brake or the
+    // agility, and the Auto Turret were taken; null when not.
+    trail: {
+      motor: trailStep(r.taken, ['propulsors']),
+      brake: trailStep(r.taken, ['braking_system', 'rcs_system']),
+      aim: trailStep(r.taken, ['auto_aim']),
+    },
     autoAim: r.cards.includes('auto_aim'),
     flightComputer: r.cards.includes('flight_computer'),
     turningPct: share(watch.turning, watch.frames),

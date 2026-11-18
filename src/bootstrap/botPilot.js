@@ -605,14 +605,22 @@ export function keysFor(dir) {
   };
 }
 
+// The piloting trail of the new flight, in the order a player walks it: the
+// engine, then the brake or the agility, then the Auto Turret.
+const TRAIL = [['propulsors'], ['braking_system', 'rcs_system'], ['auto_aim']];
+
 /**
- * The card policy, one place to change it: never a cursed card; a weapon
- * first, then damage, then survivability, then the rest; ties keep the
- * offer's order. Returns the chosen option's id, or null.
+ * The card policy, one place to change it: a card of the piloting trail first
+ * (engine, brake or agility, Auto Turret: the player who follows the path);
+ * never a cursed card; then a weapon, then damage, then survivability, then
+ * the rest; ties keep the offer's order. Returns the chosen option's id, or
+ * null.
  */
 export function pickCard(options = []) {
   const rank = (option) => {
     if (option.cursed) return -1;
+    const step = TRAIL.findIndex((ids) => ids.includes(option.id));
+    if (step >= 0) return 10 - step;
     const tags = option.tags || [];
     const category = option.category?.id ?? option.category;
     if (tags.includes('weapon')) return 4;
