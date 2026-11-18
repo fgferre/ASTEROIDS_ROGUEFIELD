@@ -3,8 +3,11 @@
 // bloom. The same pass lays a fine film grain and a soft vignette over every
 // frame when the quality preset allows them, and it ends in the sRGB step,
 // so the output pass only runs on frames it does not (sceneSetup.js).
-// ImpactKick holds the decaying strength and the grain's per-frame seed
-// (plain JS, so it runs in Node tests); createImpactPass builds the pass.
+// The same pass bends space round the ship while the Gravity Brake is held
+// (a lens: the band between LENS_INNER and its reach is pulled inward, red
+// a little more than blue). ImpactKick holds the decaying strength, the
+// lens and the grain's per-frame seed (plain JS, so it runs in Node tests);
+// createImpactPass builds the pass.
 
 // proposta 17/10: peak values (subtle by design) and decay.
 export const IMPACT_MAX_ABERRATION_PX = 3;
@@ -15,6 +18,24 @@ const IMPACT_FLOOR = 0.02;
 // darkening at the corners. Both deliberately faint.
 export const FILM_GRAIN = 0.025;
 export const VIGNETTE = 0.3;
+// proposta 17/11 (efeito/impacto, approved as a painted mock-up): the
+// lens. The ship's own disc (× the reach) is left whole; the band beyond it
+// is pulled in by up to the pull (× the reach) at its middle, from LENS_PULL[0]
+// at the card's weakest slow (LENS_SLOW[0]) to LENS_PULL[1] at its strongest;
+// red bends LENS_SPLIT more and blue as much less.
+export const LENS_INNER = 0.2;
+const LENS_PULL = [0.155, 0.21];
+const LENS_SLOW = [0.2, 0.5];
+const LENS_SPLIT = 0.1;
+
+/** The lens's pull for a Gravity Brake that slows by `slowFraction`. */
+export function lensPull(slowFraction) {
+  const t = Math.min(
+    1,
+    Math.max(0, (slowFraction - LENS_SLOW[0]) / (LENS_SLOW[1] - LENS_SLOW[0]))
+  );
+  return LENS_PULL[0] + (LENS_PULL[1] - LENS_PULL[0]) * t;
+}
 
 /**
  * GLSL for a pass that reads the composer's scene: `sceneAt(uv)` is the
@@ -42,6 +63,9 @@ const IMPACT_SHADER = {
     uVignette: { value: 0 },
     tBloom: { value: null },
     uBloom: { value: 0 },
+    uLensAt: { value: null },
+    uLensReach: { value: null },
+    uLens: { value: 0 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -57,7 +81,21 @@ uniform float uBlur;
 uniform float uGrain;
 uniform float uSeed;
 uniform float uVignette;
+uniform vec2 uLensAt;
+uniform vec2 uLensReach;
+uniform float uLens;
 varying vec2 vUv;
+// Where the lens shows uv from: inside its band, a point pulled toward
+// its centre (\`k\` scales the pull per colour).
+vec2 lensUv(vec2 uv, float k) {
+  if (uLens <= 0.0) return uv;
+  vec2 d = (uv - uLensAt) / uLensReach;
+  float r = length(d);
+  if (r >= 1.0 || r <= ${LENS_INNER.toFixed(2)}) return uv;
+  float band = (r - ${LENS_INNER.toFixed(2)}) / ${(1 - LENS_INNER).toFixed(2)};
+  float pull = uLens * k * sin(3.14159265 * band);
+  return uLensAt + d / r * (r - pull) * uLensReach;
+}
 float grainHash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031 + uSeed);
   q += dot(q, q.yzx + 33.33);
@@ -71,11 +109,17 @@ void main() {
     vec3 sum = vec3(0.0);
     for (int i = 0; i < 6; i++) {
       vec2 uv = vUv - dir * uBlur * float(i) / 5.0;
-      sum.r += sceneAt(uv + shift).r;
-      sum.g += sceneAt(uv).g;
-      sum.b += sceneAt(uv - shift).b;
+      sum.r += sceneAt(lensUv(uv, ${(1 + LENS_SPLIT).toFixed(2)}) + shift).r;
+      sum.g += sceneAt(lensUv(uv, 1.0)).g;
+      sum.b += sceneAt(lensUv(uv, ${(1 - LENS_SPLIT).toFixed(2)}) - shift).b;
     }
     color = sum / 6.0;
+  } else if (uLens > 0.0) {
+    color = vec3(
+      sceneAt(lensUv(vUv, ${(1 + LENS_SPLIT).toFixed(2)})).r,
+      sceneAt(lensUv(vUv, 1.0)).g,
+      sceneAt(lensUv(vUv, ${(1 - LENS_SPLIT).toFixed(2)})).b
+    );
   } else {
     color = sceneAt(vUv);
   }
@@ -94,6 +138,8 @@ void main() {
 export function createImpactPass(THREE) {
   const pass = new THREE.ShaderPass(IMPACT_SHADER);
   pass.uniforms.uTexel.value = new THREE.Vector2(1, 1);
+  pass.uniforms.uLensAt.value = new THREE.Vector2(0.5, 0.5);
+  pass.uniforms.uLensReach.value = new THREE.Vector2(0.1, 0.1);
   pass.enabled = false;
   return pass;
 }
@@ -106,6 +152,19 @@ export class ImpactKick {
     this.frame = 0;
     // Reduce Flashing (Settings → Accessibility) sets it to 0.3
     this.scale = 1;
+    // the Gravity Brake's lens, in screen uv: centre, reach (x, y), pull
+    this.lensAt = [0.5, 0.5];
+    this.lensReach = [0.1, 0.1];
+    this.lensPull = 0;
+  }
+
+  /** Bends space round (x, y) out to (rx, ry), screen uv; pull 0 is none. */
+  lens(x, y, rx, ry, pull) {
+    this.lensAt[0] = x;
+    this.lensAt[1] = y;
+    this.lensReach[0] = Math.max(1e-4, rx);
+    this.lensReach[1] = Math.max(1e-4, ry);
+    this.lensPull = pull;
   }
 
   /** Spikes the kick to `strength` (0..1); never lowers a running one. */
@@ -133,9 +192,12 @@ export class ImpactKick {
    * vignette (with post-processing on). The pass runs for either.
    */
   apply(pass, width, height, active, grain = false) {
-    pass.enabled = active || grain;
+    pass.enabled = active || grain || this.lensPull > 0;
     if (!pass.enabled) return;
     const { uniforms } = pass;
+    uniforms.uLens.value = this.lensPull;
+    uniforms.uLensAt.value.set(this.lensAt[0], this.lensAt[1]);
+    uniforms.uLensReach.value.set(this.lensReach[0], this.lensReach[1]);
     uniforms.uTexel.value.set(1 / width, 1 / height);
     uniforms.uAberration.value = active ? this.aberration : 0;
     uniforms.uBlur.value = active ? this.blur : 0;
