@@ -8,6 +8,7 @@ import { createAsteroidGeometry, createSeededRandom } from '../asteroidMesh.js';
 import { bakeRockMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
+import { SPARK_KIND } from '../hitSparks.js';
 import { RockInstances } from '../rockInstances.js';
 import { createRockBreak } from './rockBreak.js';
 import {
@@ -95,6 +96,8 @@ export const strikeOf = (enemy) => STRIKE[enemy.variant] || 'rock';
 
 // A Parasite's pulse is at its fastest within this many logical pixels.
 const PARASITE_NEAR = 80;
+// a crushed rock's chips and dust leave this far off the mouth's facing (rad)
+const CRUSH_SPRAY = 1.5;
 const PARASITE_FAR = 360;
 // Baked surface maps (bakedMaps.js): rock maps tile every 1/ROCK_TILE rock
 // radii, sampled triplanar; crystal facets take only a faint normal.
@@ -292,6 +295,7 @@ export function createRockViews(kit) {
   // and lean and its variant's look; a rock ignited alive keeps its shape.
   function bindRock(view, enemy) {
     const seed = view.seed;
+    view.body = enemy;
     if (view.boundId !== enemy.id) {
       view.boundId = enemy.id;
       breaks.adopt(view, enemy);
@@ -373,6 +377,22 @@ export function createRockViews(kit) {
     rocks.push(view);
   }
 
+  // A rock a Quarry Maw swallowed (its crushedIn) is crushed in the mouth:
+  // its pieces (rockBreak.js) and its own chips and dust (the shot's, by
+  // material) leave out of the jaws' sides. False for any other.
+  function crushRock(view, sparks) {
+    const at = view.body?.crushedIn;
+    if (!at) return false;
+    const kind = SPARK_KIND[strikeOf(view.body)];
+    view.body = null;
+    breaks.crush(view, at.facing);
+    for (const side of [1, -1]) {
+      const a = at.facing + side * CRUSH_SPRAY;
+      sparks?.emit(at.x, at.y, Math.cos(a), Math.sin(a), 0, 0, true, kind);
+    }
+    return true;
+  }
+
   return {
     rocks,
     rockFamilies,
@@ -384,6 +404,7 @@ export function createRockViews(kit) {
     struck: breaks.struck,
     split: breaks.split,
     crumble: breaks.crumble,
+    crush: crushRock,
     updateBreaks: breaks.update,
   };
 }
