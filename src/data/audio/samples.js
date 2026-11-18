@@ -64,6 +64,15 @@ export const SAMPLE_CUES = deepFreeze({
   playShipHit: { sample: 'ship-hit', bus: 'protected' },
   playShieldImpact: { sample: 'shield-impact', bus: 'protected' },
   playShieldBreak: { sample: 'shield-break', bus: 'protected' },
+  // The shield switched on, a warship's attack charging, a shot on the
+  // Sentinel's plate (audition 17/11; gains match today's synthesis).
+  playShieldActivate: { sample: 'shield-activate', bus: 'protected' },
+  playEnemyTelegraph: {
+    sample: 'enemy-telegraph',
+    bus: 'ambient',
+    spatialArg: 0,
+  },
+  playBulwarkPlateHit: { sample: 'plate-hit', bus: 'ambient', spatialArg: 0 },
   playXPCollect: {
     sample: 'xp-collect',
     bus: 'ambient',

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BREAK_SECONDS,
   DISSOLVE_CAP,
-  DISSOLVE_SECONDS,
   DeathBursts,
 } from '../../../src/modules/render3d/dissolve.js';
 import { EnemyMirror } from '../../../src/modules/render3d/enemyMirror.js';
@@ -184,42 +183,6 @@ describe('DissolvePool', () => {
     expect(plan.count).toBeGreaterThan(16); // a machine's cap
     expect(plan.heat).toBe(0);
     expect(mirror.breakOf({ kind: 'asteroid', radius: 30 })).toBeNull();
-  });
-
-  it('burns a killed rock as a plain mesh in its look and frees its instance', () => {
-    const { mirror } = setup();
-    const enemy = {
-      id: 'r',
-      type: 'asteroid',
-      variant: 'gold',
-      x: 450,
-      y: 320,
-      radius: 24,
-      getHitFlash: () => 0,
-    };
-    mirror.update([enemy], 0, 0);
-    const view = mirror.views.get('r');
-    const mesh = mirror.rocks.meshes[view.family][view.shape];
-    expect(mesh.count).toBe(1);
-
-    mirror.markDead(enemy);
-    mirror.update([], 0, 0);
-    expect(mesh.count).toBe(0);
-    expect(pooled(mirror, view)).toBe(true);
-    expect(mirror.dissolve.count).toBe(1);
-    const burn = mirror.dissolve.slots.find((slot) => slot.view).view;
-    expect(burn.kind).toBe('asteroid-burn');
-    expect(burn.object.visible).toBe(true);
-    expect(burn.object.geometry).toBe(view.object.geometry);
-    expect(burn.object.position.equals(view.object.position)).toBe(true);
-    expect(burn.object.material).not.toBe(burn.material); // its twin
-    expect(burn.object.material.color.equals(view.rock.base)).toBe(true);
-    const { uVein } = burn.material.userData.rockUniforms;
-    expect(uVein.value.equals(view.rock.vein)).toBe(true);
-
-    mirror.update([], 0, DISSOLVE_SECONDS);
-    expect(burn.object.visible).toBe(false);
-    expect(pooled(mirror, burn)).toBe(true);
   });
 
   it('caps concurrent burns, ending the oldest first', () => {

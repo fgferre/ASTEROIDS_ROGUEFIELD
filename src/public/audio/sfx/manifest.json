@@ -687,6 +687,52 @@
       }
     ]
   },
+  "shield-activate": {
+    "files": ["shield-activate/1.mp3"],
+    "gain": -6,
+    "priority": 5,
+    "cap": 1,
+    "gap": 200,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "shield-activate/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 2, 50 steps, prompt: A thick glass dome locking into place around a steel hull, with a low electric hum underneath. Quick swell, half a second, fast decay. Close mic, dry, no reverb.; cut to 0.8 s, exciter (audition 17/11, pick C)"
+      }
+    ]
+  },
+  "enemy-telegraph": {
+    "files": ["enemy-telegraph/1.mp3"],
+    "gain": -13,
+    "priority": 3,
+    "cap": 3,
+    "gap": 80,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "enemy-telegraph/1.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: An industrial capacitor charging with a harsh rising whine and electric crackle. Short, ends abruptly. Close mic, dry, no reverb.; cut to 0.6 s, exciter (audition 17/11, pick D)"
+      }
+    ]
+  },
+  "plate-hit": {
+    "files": ["plate-hit/1.mp3", "plate-hit/2.mp3"],
+    "gain": -8,
+    "priority": 2,
+    "cap": 4,
+    "gap": 30,
+    "reverb": null,
+    "origins": [
+      {
+        "file": "plate-hit/1.mp3",
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 8 steps, cfg 1.0, prompt: TrackType: SFX. A steel bolt striking a thick iron plate. One dull heavy clank, zero ring, very fast decay. Close mic, dry, no reverb.; cut to 0.5 s (audition 17/11, pick C)"
+      },
+      {
+        "file": "plate-hit/2.mp3",
+        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: A steel bolt striking a thick iron plate. One dull heavy clank, zero ring, very fast decay. Close mic, dry, no reverb.; cut to 0.5 s, exciter, -7.2 dB to match 1.mp3 (audition 17/11, pick D)"
+      }
+    ]
+  },
   "title-start": {
     "files": ["title-start/1.mp3"],
     "gain": -9,
