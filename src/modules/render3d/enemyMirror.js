@@ -25,6 +25,7 @@ import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';
 import { shown } from './fracture.js';
+import { BIG_MACHINE_RADIUS } from '../effects/EnemyEffects.js';
 import { createAffixViews } from './enemies/affixes.js';
 import { createHeraldViews } from './enemies/heralds.js';
 import { createMachineViews } from './enemies/machines.js';
@@ -60,6 +61,8 @@ const WARDEN_BURST = 24;
 // radius / 2.5, within [min, max]); the pieces carry its momentum and the
 // killing shot's push (px/s); its eyes go out in LIGHTS_OUT s.
 const BREAK_PIECES = [9, 16];
+// a boss, a Sentinel or a herald breaks the same way, into more pieces
+const BOSS_PIECES = [16, 24];
 const KILL_PUSH = 24;
 export const LIGHTS_OUT = 0.15;
 // One seed for every baked map set (bakedMaps.js): the rocks' and the
@@ -581,8 +584,6 @@ export class EnemyMirror {
     switch (kind) {
       case 'asteroid':
         return this.rockViews.createRock();
-      case 'asteroid-burn':
-        return this.rockViews.createBurnRock();
       case 'boss':
       case 'boss-choir':
       case 'boss-null':
@@ -647,14 +648,17 @@ export class EnemyMirror {
     views.forEach((view) => {
       if (view.affix) view.affix.group.visible = false;
     });
-    views.forEach((view) =>
-      this.dissolve.start(
-        this.burnOf(view),
-        this.kit.accentOf(view),
-        view.radius || 12,
-        this.breakOf(view)
-      )
-    );
+    // a rock does not burn: it breaks (rockBreak.js)
+    views
+      .filter((view) => view.kind !== 'asteroid')
+      .forEach((view) =>
+        this.dissolve.start(
+          view,
+          this.kit.accentOf(view),
+          view.radius || 12,
+          this.breakOf(view)
+        )
+      );
     compile();
     this.dissolve.clear();
     return views;
@@ -675,19 +679,6 @@ export class EnemyMirror {
       );
     }
     return 'unknown';
-  }
-
-  /**
-   * `view` as it should burn: a rock gives its instance back (to the pool)
-   * and a plain rock mesh takes over its pose and look; any other view
-   * burns itself.
-   */
-  burnOf(view) {
-    if (view.kind !== 'asteroid') return view;
-    const burn = this.acquire('asteroid-burn');
-    this.rockViews.dressBurn(burn, view);
-    this.pool(view);
-    return burn;
   }
 
   /**
@@ -793,6 +784,7 @@ export class EnemyMirror {
       }
     });
     if (this.dead.size) this.dead.forEach(this.pruneDead);
+    this.rockViews.updateBreaks(dt);
     this.rocks.end();
     this.packBatches();
     return warden;
@@ -857,30 +849,34 @@ export class EnemyMirror {
     view.shotY = (vy / len) * KILL_PUSH;
   }
 
+  /** `enemy`, a rock, split into `fragments`: they are its pieces (rockBreak.js). */
+  splitRock(enemy, fragments) {
+    this.rockViews.split(this.views.get(enemy.id || enemy), enemy, fragments);
+  }
+
   /** The simulation killed `enemy` (asteroid splits excluded). */
   markDead(enemy) {
     this.dead.add(enemy.id || enemy);
   }
 
   // A machine breaks into its own pieces as it burns, and hull plates fly out;
-  // a rock or a boss burns in place (rocks already shed stone debris through
-  // EffectsSystem). The Warden's phase breaks have their own pieces: only its
-  // final death bursts, bigger, lit.
+  // a rock falls apart into pieces of itself (rockBreak.js); a boss burns in
+  // place. The Warden's phase breaks have their own pieces: only its final
+  // death bursts, bigger, lit.
   die(key, view) {
     this.views.delete(key);
+    if (view.kind === 'asteroid') {
+      this.rockViews.crumble(view);
+      this.pool(view);
+      return;
+    }
     if (view.phased) this.machineViews.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
     const accent = this.kit.accentOf(view);
-    this.dissolve.start(
-      this.burnOf(view),
-      accent,
-      view.radius,
-      this.breakOf(view)
-    );
+    this.dissolve.start(view, accent, view.radius, this.breakOf(view));
     view.shotX = 0;
     view.shotY = 0;
-    if (view.kind === 'asteroid') return;
     const x = view.object.position.x + HALF_W;
     const y = view.object.position.z + HALF_H;
     if (view.kind.startsWith('boss')) {
@@ -898,22 +894,19 @@ export class EnemyMirror {
     }
   }
 
-  // How a machine breaks (DissolvePool.start); a rock, a boss or a herald
-  // burns whole.
+  // How a machine breaks (DissolvePool.start): a boss, a Sentinel or a
+  // herald too, into more pieces; a big machine's pieces start incandescent.
+  // A rock burns whole.
   breakOf(view) {
     const { kind } = view;
-    if (
-      kind === 'asteroid' ||
-      kind.startsWith('boss') ||
-      kind.startsWith('herald')
-    ) {
-      return null;
-    }
-    const [min, max] = BREAK_PIECES;
+    if (kind === 'asteroid') return null;
+    const boss = kind.startsWith('boss') || kind.startsWith('herald');
+    const [min, max] = boss ? BOSS_PIECES : BREAK_PIECES;
     return {
       count: Math.max(min, Math.min(max, Math.round(4 + view.radius / 2.5))),
       pushX: (view.vx || 0) + (view.shotX || 0),
       pushZ: (view.vy || 0) + (view.shotY || 0),
+      heat: !boss && view.radius >= BIG_MACHINE_RADIUS ? 1 : 0,
     };
   }
 

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BREAK_SECONDS,
   DISSOLVE_CAP,
-  DISSOLVE_SECONDS,
   DeathBursts,
 } from '../../../src/modules/render3d/dissolve.js';
 import { EnemyMirror } from '../../../src/modules/render3d/enemyMirror.js';
@@ -155,40 +154,35 @@ describe('DissolvePool', () => {
     expect(uExplode.value).toBe(0);
   });
 
-  it('burns a killed rock as a plain mesh in its look and frees its instance', () => {
+  it('lights a big machine’s pieces as they break, then cools them', () => {
     const { mirror } = setup();
-    const enemy = {
-      id: 'r',
-      type: 'asteroid',
-      variant: 'gold',
-      x: 450,
-      y: 320,
-      radius: 24,
-      getHitFlash: () => 0,
-    };
-    mirror.update([enemy], 0, 0);
-    const view = mirror.views.get('r');
-    const mesh = mirror.rocks.meshes[view.family][view.shape];
-    expect(mesh.count).toBe(1);
-
-    mirror.markDead(enemy);
+    const anvil = { ...mote('v'), type: 'anvil', radius: 26 };
+    mirror.update([anvil], 0, 0);
+    const view = mirror.views.get('v');
+    mirror.markDead(anvil);
     mirror.update([], 0, 0);
-    expect(mesh.count).toBe(0);
-    expect(pooled(mirror, view)).toBe(true);
-    expect(mirror.dissolve.count).toBe(1);
-    const burn = mirror.dissolve.slots.find((slot) => slot.view).view;
-    expect(burn.kind).toBe('asteroid-burn');
-    expect(burn.object.visible).toBe(true);
-    expect(burn.object.geometry).toBe(view.object.geometry);
-    expect(burn.object.position.equals(view.object.position)).toBe(true);
-    expect(burn.object.material).not.toBe(burn.material); // its twin
-    expect(burn.object.material.color.equals(view.rock.base)).toBe(true);
-    const { uVein } = burn.material.userData.rockUniforms;
-    expect(uVein.value.equals(view.rock.vein)).toBe(true);
+    const { uBreakHeat } = view.dissolve.uniforms;
+    expect(uBreakHeat.value).toBeGreaterThan(0.5);
+    mirror.update([], 0, 0.5);
+    expect(uBreakHeat.value).toBe(0);
 
-    mirror.update([], 0, DISSOLVE_SECONDS);
-    expect(burn.object.visible).toBe(false);
-    expect(pooled(mirror, burn)).toBe(true);
+    const drone = mote('d');
+    mirror.update([drone], 0, 0);
+    const small = mirror.views.get('d');
+    mirror.markDead(drone);
+    mirror.update([], 0, 0);
+    expect(small.dissolve.uniforms.uBreakHeat.value).toBe(0);
+  });
+
+  it('breaks a boss into more pieces than a machine', () => {
+    const { mirror } = setup();
+    const view = mirror.acquire('boss-choir');
+    view.radius = 48;
+    const plan = mirror.breakOf(view);
+    expect(view.kind).toBe('boss-choir');
+    expect(plan.count).toBeGreaterThan(16); // a machine's cap
+    expect(plan.heat).toBe(0);
+    expect(mirror.breakOf({ kind: 'asteroid', radius: 30 })).toBeNull();
   });
 
   it('caps concurrent burns, ending the oldest first', () => {
