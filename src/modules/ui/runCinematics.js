@@ -24,6 +24,7 @@
 import {
   EPILOGUE_MS,
   INTRO_MS,
+  STORY_MS,
   TRAVEL,
   cinematicFreezeFromUrl,
   endingPath,
@@ -55,7 +56,7 @@ export function travelDestination(
   freeze = null
 ) {
   if (replay) return null;
-  if (freeze?.kind === 'travel') {
+  if (freeze?.kind === 'travel' || freeze?.kind === 'story') {
     return sectorById(freeze.sector)?.id ?? SECTORS[0].id;
   }
   if (!sectorById(sector)) return null;
@@ -174,13 +175,16 @@ export class RunCinematics {
     this.afterEpilogue = null;
     this.afterEnding = null;
     this.travelTo = null;
+    // The first campaign's journey tells the story first (startStory).
+    this.tellsStory = false;
+    this.storyTo = null;
     // Cards dealt while a journey is armed or plays, shown after the intro.
     this.cards = null;
   }
 
   /** The run's opening plays: its journey or its intro. */
   get introActive() {
-    return this.kind === 'intro' || this.kind === 'travel';
+    return ['intro', 'travel', 'story'].includes(this.kind);
   }
 
   /**
@@ -191,6 +195,7 @@ export class RunCinematics {
   armTravel(start) {
     const freeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.travelTo = travelDestination(start, freeze);
+    this.tellsStory = Boolean(this.travelTo) && freeze?.kind === 'story';
     this.cards = this.travelTo ? [] : null;
     this.readyVoices(start, this.travelTo);
   }
@@ -247,6 +252,7 @@ export class RunCinematics {
     this.stop();
     const to = this.travelTo;
     this.travelTo = null;
+    if (to && this.tellsStory && this.startStory(to)) return true;
     if (to && this.startTravel(to)) return true;
     // No flight (reduced motion, no 3D): the lines play as they come.
     if (to) travelTransmissions(to).forEach((entry) => this.speak(entry));
@@ -293,6 +299,27 @@ export class RunCinematics {
     return true;
   }
 
+  /** The story before the first journey, to sector `to`; false without 3D. */
+  startStory(to) {
+    this.tellsStory = false;
+    if (!this.renderer()?.playStory?.()) return false;
+    this.begin('story', STORY_MS, () => this.endStory(to));
+    this.hud()?.cancelBanner();
+    this.hud()?.showCinematicHint(true);
+    this.hud()?.showLetterbox(true, true);
+    this.holdSim(true);
+    this.storyTo = to;
+    this.unbindSkip = this.bindSkip(() => this.skip());
+    return true;
+  }
+
+  // The story is told: the journey flies on from it.
+  endStory(to) {
+    this.finish();
+    this.renderer()?.endStory();
+    if (!this.startTravel(to) && !this.playIntro()) this.endIntro();
+  }
+
   // The flight ends on the intro's first pose: the intro goes on from it.
   endTravel() {
     this.finish();
@@ -308,6 +335,11 @@ export class RunCinematics {
     if (this.kind === 'ending') {
       this.hush();
       this.endEnding();
+      return;
+    }
+    if (this.kind === 'story') {
+      this.hush();
+      this.endStory(this.storyTo);
       return;
     }
     if (this.kind === 'travel') {
@@ -411,6 +443,7 @@ export class RunCinematics {
     if (this.kind === 'travel') {
       this.renderer()?.endTravel();
     }
+    if (this.kind === 'story') this.renderer()?.endStory();
     if (this.kind) {
       this.finish();
     }
@@ -438,7 +471,7 @@ export class RunCinematics {
 
   finish() {
     const { kind } = this;
-    if (kind === 'arrival' || kind === 'travel') {
+    if (kind === 'arrival' || kind === 'travel' || kind === 'story') {
       this.hud()?.showLetterbox(false);
     }
     if (kind === 'ending') this.hud()?.showCinematicHint(false);

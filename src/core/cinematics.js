@@ -34,6 +34,13 @@ export const TRAVEL = Object.freeze({
   handOffMs: 1000, // proposta 12/11
 });
 
+// The story before the first campaign's journey (render3d/storyScene.js):
+// its six shots' lengths, ms, in order. proposta 18/11.
+export const STORY_SHOT_MS = Object.freeze([
+  4500, 4300, 4300, 4300, 4000, 4000,
+]);
+export const STORY_MS = STORY_SHOT_MS.reduce((sum, ms) => sum + ms, 0);
+
 export const FOLLOW_TILT = 18;
 const INTRO_DISTANCE = 3.2;
 const INTRO_TILT = 32;
@@ -50,15 +57,15 @@ const WAKE_START = 0.2;
  * cinematic's camera at t while it plays. `?cinematic=travel&t=0.4` makes
  * any run start fly the journey, frozen at t, to `&sector=<id>` (the opening
  * to the first sector without it); without `t` that journey plays on
- * (to film it). Null without the flag.
+ * (to film it). `?cinematic=story&t=` does the same with the story before it. Null without the flag.
  */
 export function cinematicFreezeFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
     const kind = params.get('cinematic');
     const t = Number(params.get('t'));
-    if (!['intro', 'epilogue', 'travel'].includes(kind)) return null;
-    const plays = kind === 'travel' && !params.has('t');
+    if (!['intro', 'epilogue', 'travel', 'story'].includes(kind)) return null;
+    const plays = ['travel', 'story'].includes(kind) && !params.has('t');
     return {
       kind,
       t: plays ? null : Number.isFinite(t) ? t : 0.5,
