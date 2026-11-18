@@ -453,9 +453,10 @@ export function createTelegraphs(kit) {
 
   // The Prism Crown's beams (two per mirror: core → mirror, mirror → edge),
   // as wide as they burn: while they warn a guide charges out from the gem
-  // to each mirror, then on to the edge; burning, full and bright, a flare
-  // on each mirror and sparks where each beam meets the edge (sparks: one
-  // per beam).
+  // to each mirror, then on to the edge; burning, a flare on each mirror and
+  // sparks where each beam meets the edge (sparks: one per beam). Lot 5
+  // (efeito/impacto): burning beams and flares at about half their old light,
+  // so they no longer wash the screen and the ship inside one stays visible.
   function updatePrism(parts, t, ox, oy, progress) {
     parts.warn.visible = false;
     parts.group.rotation.y = 0;
@@ -476,7 +477,7 @@ export function createTelegraphs(kit) {
         color: kit.threatColor,
         warn: warning,
         progress,
-        gain: warning ? 0.6 + 0.5 * progress : 1,
+        gain: warning ? 0.6 + 0.5 * progress : 0.5,
         front: warning
           ? Math.min(1, Math.max(0, 2 * progress - leg)) * length
           : Infinity,
@@ -484,7 +485,7 @@ export function createTelegraphs(kit) {
       });
       // the mirror (end of a first leg) and the edge (end of a second)
       const reached = warning ? 2 * progress - leg >= 1 : true;
-      const gain = warning ? 0.8 * progress : (leg ? 2.6 : 2) * flicker;
+      const gain = warning ? 0.8 * progress : (leg ? 1.1 : 0.9) * flicker;
       if (reached) {
         spark(
           parts,
