@@ -5,6 +5,7 @@ import {
   IMPACT_MAX_BLUR,
   ImpactKick,
   VIGNETTE,
+  lensPull,
 } from '../../../src/modules/render3d/impactPass.js';
 import Renderer3D from '../../../src/modules/render3d/Renderer3D.js';
 
@@ -42,6 +43,9 @@ describe('ImpactKick grain and vignette', () => {
       uGrain: { value: 0 },
       uSeed: { value: 0 },
       uVignette: { value: 0 },
+      uLens: { value: 0 },
+      uLensAt: { value: { set() {} } },
+      uLensReach: { value: { set() {} } },
     },
   });
 
@@ -70,6 +74,19 @@ describe('ImpactKick grain and vignette', () => {
     expect(p.enabled).toBe(true);
     expect(p.uniforms.uGrain.value).toBe(0);
     expect(p.uniforms.uVignette.value).toBe(0);
+  });
+
+  it('runs the pass for the Gravity Brake lens alone, bending harder the more it slows', () => {
+    const impact = new ImpactKick();
+    const p = pass();
+    impact.lens(0.2, 0.5, 0.15, 0.2, lensPull(0.2));
+    impact.apply(p, 800, 600, false, false);
+    expect(p.enabled).toBe(true);
+    expect(p.uniforms.uLens.value).toBeGreaterThan(0);
+    expect(lensPull(0.5)).toBeGreaterThan(lensPull(0.2));
+    impact.lens(0.5, 0.5, 0.1, 0.1, 0);
+    impact.apply(p, 800, 600, false, false);
+    expect(p.enabled).toBe(false);
   });
 });
 

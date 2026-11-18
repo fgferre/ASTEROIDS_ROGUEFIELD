@@ -48,7 +48,7 @@ import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { strikeOf } from './enemies/rocks.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
-import { ImpactKick } from './impactPass.js';
+import { ImpactKick, lensPull } from './impactPass.js';
 import {
   mirrorBossTransitions,
   mirrorLocks,
@@ -168,6 +168,8 @@ class Renderer3D extends BaseSystem {
       if (turns) holder[key] = out.angle;
     };
     this.impact = new ImpactKick();
+    this.lensSide = { x: 0, y: 0 };
+    this.lensAhead = { x: 0, y: 0 };
     this.hitSparks = new HitSparks();
     this.burnMarks = new BurnMarks();
     this.killPops = new KillPops();
@@ -464,6 +466,28 @@ class Renderer3D extends BaseSystem {
     this.shipOnScreen = at
       ? this.worldToScreen(at.x, at.y, this.shipPoint)
       : null;
+  }
+
+  // The Gravity Brake bends space round the ship out to its reach (the
+  // impact pass's lens), harder the more the card slows; `allowed` with the
+  // screen pass on.
+  aimLens(player, allowed) {
+    const brake = this.cachedCombat?.cards?.cardEffects?.gravityBrake;
+    const at = this.shipOnScreen;
+    if (!allowed || !brake || !at || player?.isDead) {
+      this.impact.lens(0.5, 0.5, 0.1, 0.1, 0);
+      return;
+    }
+    const { x, y } = player.position;
+    const side = this.worldToScreen(x + brake.radius, y, this.lensSide);
+    const ahead = this.worldToScreen(x, y + brake.radius, this.lensAhead);
+    this.impact.lens(
+      at.x / GAME_WIDTH,
+      1 - at.y / GAME_HEIGHT,
+      Math.hypot(side.x - at.x, side.y - at.y) / GAME_WIDTH,
+      Math.hypot(ahead.x - at.x, ahead.y - at.y) / GAME_HEIGHT,
+      lensPull(brake.slowFraction)
+    );
   }
 
   /**
@@ -959,6 +983,10 @@ class Renderer3D extends BaseSystem {
     t.texts.end();
     t.debris.end();
     t.bodies.end();
+    this.aimLens(
+      player,
+      this.graphics.postProcessing && this.quality.settings.impactPass
+    );
     this.impact.apply(
       t.impactPass,
       t.width,
