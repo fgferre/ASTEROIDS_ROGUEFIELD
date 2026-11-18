@@ -423,6 +423,7 @@ export function setupThree(seeded) {
     shockwaves,
     flash,
     flashAlpha: 0,
+    flashEdges: false,
     width: 0,
     height: 0,
     canvasWidth: 0,

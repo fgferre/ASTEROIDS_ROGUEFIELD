@@ -8,7 +8,9 @@
 //   (flak, a missile) throws hot streaks all round and incandescent
 //   fragments that cool as they fly; a burning hull sheds slow embers and
 //   drips slag.
-// - MuzzleFlashes: a 2-frame hot pulse at the nose for each player shot.
+// - MuzzleFlashes: a 2-frame hot pulse at the nose for each player volley:
+//   the shots fired between two frames (the Scatter Coil's five, Multishot's
+//   lanes) light one, at their mean origin and along their mean heading.
 // - KillPops: a machine that dies flashes white-hot at its own core (instead
 //   of the whole screen), then the heat drops through orange.
 // Plain typed arrays, filled from events and drained in render(); jitter is
@@ -389,22 +391,41 @@ export class MuzzleFlashes {
     this.dx = new Float32Array(MUZZLE_POOL);
     this.dy = new Float32Array(MUZZLE_POOL);
     this.frames = new Uint8Array(MUZZLE_POOL);
+    this.shots = new Uint8Array(MUZZLE_POOL);
     this.next = 0;
+    this.volley = -1; // the slot this frame's shots add up in
   }
 
   /** A shot from (x, y) along the unit direction (dx, dy). */
   emit(x, y, dx, dy) {
-    const i = this.next;
-    this.next = (this.next + 1) % MUZZLE_POOL;
-    this.x[i] = x + dx * MUZZLE_OFFSET;
-    this.y[i] = y + dy * MUZZLE_OFFSET;
-    this.dx[i] = dx;
-    this.dy[i] = dy;
-    this.frames[i] = MUZZLE_FRAMES;
+    let i = this.volley;
+    if (i < 0) {
+      i = this.volley = this.next;
+      this.next = (this.next + 1) % MUZZLE_POOL;
+      this.x[i] = this.y[i] = this.dx[i] = this.dy[i] = 0;
+      this.shots[i] = 0;
+      this.frames[i] = MUZZLE_FRAMES;
+    }
+    this.x[i] += x + dx * MUZZLE_OFFSET;
+    this.y[i] += y + dy * MUZZLE_OFFSET;
+    this.dx[i] += dx;
+    this.dy[i] += dy;
+    this.shots[i] = Math.min(255, this.shots[i] + 1);
   }
 
   /** Draws the live pulses; returns how many were drawn this frame. */
   update(glow, ribbons, rgb, hotRgb) {
+    // this frame's volley: its sums become its mean origin and heading
+    const v = this.volley;
+    if (v >= 0) {
+      const n = this.shots[v];
+      const length = Math.hypot(this.dx[v], this.dy[v]) || 1;
+      this.x[v] /= n;
+      this.y[v] /= n;
+      this.dx[v] /= length;
+      this.dy[v] /= length;
+      this.volley = -1;
+    }
     let drawn = 0;
     for (let i = 0; i < MUZZLE_POOL; i += 1) {
       const frames = this.frames[i];
@@ -432,6 +453,7 @@ export class MuzzleFlashes {
 
   clear() {
     this.frames.fill(0);
+    this.volley = -1;
   }
 }
 
