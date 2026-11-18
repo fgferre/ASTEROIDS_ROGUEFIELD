@@ -8,6 +8,7 @@ import {
   EnemyMirror,
   FOG_DIM,
   FOG_FADE_SECONDS,
+  hullHeading,
   KNOWN_KINDS,
   LIGHTS_OUT,
   SHADOW_CASTERS,
@@ -1122,5 +1123,24 @@ describe('EnemyMirror', () => {
     expect(baked).toHaveLength(AFFIX_IDS.length);
     baked.forEach((level) => expect(level).toBeGreaterThan(0));
     expect(mirror.badgeMaterials()).toBe(mirror.badges);
+  });
+
+  it('keeps a knocked machine facing its course, and lets an aiming one turn at once', () => {
+    const view = { id: 'drone-1', vx: 0, vy: 0 };
+    const toShip = { rotation: Math.PI, vx: -60, vy: 0 };
+    expect(hullHeading(view, toShip, 0)).toBe(Math.PI);
+    view.vx = -60;
+    // a shot knocks it back: the sim now faces away, the hull does not
+    const knocked = { rotation: 0, vx: 65, vy: 0 };
+    expect(hullHeading(view, knocked, 1 / 60)).toBe(Math.PI);
+    view.vx = 65;
+    expect(hullHeading(view, knocked, 0.3)).toBe(Math.PI);
+    // after the hold it turns toward its course, a step at a time
+    const after = hullHeading(view, knocked, 0.45);
+    expect(Math.abs(after)).toBeLessThan(Math.PI);
+    expect(Math.abs(after)).toBeGreaterThan(Math.PI - 7 * 0.16);
+    // a machine that aims (its heading is not its course) is never held
+    const aiming = { rotation: 1, vx: 65, vy: 0 };
+    expect(hullHeading(view, aiming, 0.5)).toBe(1);
   });
 });

@@ -53,6 +53,16 @@ const JOLT_TIME = 0.12;
 const JOLT_MAX = 2.2;
 const JOLT_MIN = 0.8;
 const JOLT_REFERENCE = 20;
+// proposta 17/11 (efeito/impacto): a machine that faces its own course is
+// not spun round when a hit knocks it back (under fire a Drone flipped
+// 180° and back 12–14 times in 2 s, 6–9 in the published game). A jump in
+// its velocity of over KNOCK_DV px/s in one frame, more than any engine
+// makes, is a knock; for KNOCK_HOLD s after one its hull keeps the heading
+// it had, then turns to its course at up to TURN_RATE rad/s. Only the
+// picture turns: the sim keeps its heading and its knockback.
+const KNOCK_DV = 30;
+const KNOCK_HOLD = 0.4;
+const TURN_RATE = 7;
 const BURST_MIN = 8;
 const BURST_MAX = 16;
 const BURST_PER_RADIUS = 1 / 1.6;
@@ -115,6 +125,44 @@ export function hashId(id) {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+// The signed turn (rad, -π..π) from heading `from` to `to`.
+function turnBetween(from, to) {
+  const d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) return d - Math.PI * 2;
+  if (d < -Math.PI) return d + Math.PI * 2;
+  return d;
+}
+
+/**
+ * The heading (rad) a machine's hull shows this frame: its own, except that
+ * a knock does not spin one that faces its course (see KNOCK_*). Reads the
+ * view's velocity from the frame before, so call it before storing this one.
+ */
+export function hullHeading(view, enemy, time) {
+  const want = enemy.rotation || 0;
+  const vx = enemy.vx || 0;
+  const vy = enemy.vy || 0;
+  if (view.headingId !== view.id) {
+    view.headingId = view.id;
+    view.heading = want;
+    view.headingAt = time;
+    view.knockAt = -Infinity;
+    return want;
+  }
+  if (Math.hypot(vx - view.vx, vy - view.vy) > KNOCK_DV) view.knockAt = time;
+  const dt = Math.max(0, time - view.headingAt);
+  view.headingAt = time;
+  const course =
+    Math.hypot(vx, vy) > 1 &&
+    Math.abs(turnBetween(want, Math.atan2(vy, vx))) < 1e-3;
+  if (!course) view.heading = want;
+  else if (time - view.knockAt >= KNOCK_HOLD) {
+    const turn = turnBetween(view.heading, want);
+    view.heading += Math.sign(turn) * Math.min(Math.abs(turn), TURN_RATE * dt);
+  }
+  return view.heading;
 }
 
 // A batched part's anchor and its parents up to the view's root are shown.
@@ -915,10 +963,10 @@ export class EnemyMirror {
   // own look lights or moves.
   updateMachine(view, enemy, time, flash) {
     const { object } = view;
+    object.rotation.y = -hullHeading(view, enemy, time);
     view.vx = enemy.vx || 0;
     view.vy = enemy.vy || 0;
     object.scale.setScalar(enemy.radius || 12);
-    object.rotation.y = -(enemy.rotation || 0);
     // a hit knocks the hull back along the shot, and it settles (jolt())
     const jolt = time - (view.joltAt ?? -Infinity);
     if (jolt >= 0 && jolt < JOLT_TIME) {
