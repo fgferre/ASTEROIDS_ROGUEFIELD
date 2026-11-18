@@ -8,57 +8,104 @@
 
 export const ROCK_INSTANCE_CAP = 64;
 
-// Per-instance attributes → item size: base colour (linear, × the baked
-// rock colour), vein colour, crack-noise seed, glow (crack glow, reveal,
-// width, hit flash) and surface (roughness, metalness).
+// Per-instance attributes → item size, packed to stay within a GPU's
+// attribute slots: base colour (linear, × the baked rock colour) and
+// roughness, vein colour and metalness, crack-noise seed, glow (crack glow,
+// reveal, width, hit flash), the first struck point the cracks grow from
+// (rock-space direction, reach; reach 0 = cracks everywhere), the last one
+// and the heat of a cut face (rockCut.js).
 export const ROCK_ATTRIBUTES = {
-  aBase: 3,
-  aVein: 3,
+  aBase: 4,
+  aVein: 4,
   aSeed: 3,
   aGlow: 4,
-  aSurface: 2,
+  aHit: 4,
+  aHit2: 4,
 };
 
 export class RockInstances {
   /** `materials`: family → shared material; `geometries`: the rock shapes. */
   constructor(THREE, scene, geometries, materials) {
     this.THREE = THREE;
+    this.scene = scene;
+    this.materials = materials;
     this.meshes = {};
     this.counts = {};
+    // shape slots past the fixed shapes: a cut rock's own geometry
+    this.fixed = geometries.length;
+    this.free = [];
     Object.entries(materials).forEach(([family, material]) => {
       this.counts[family] = geometries.map(() => 0);
-      this.meshes[family] = geometries.map((shape) => {
-        // shares the shape's vertex buffers; only the instance data is its own
-        const geometry = new THREE.BufferGeometry();
-        Object.entries(shape.attributes).forEach(([name, attribute]) =>
-          geometry.setAttribute(name, attribute)
-        );
-        if (shape.index) geometry.setIndex(shape.index);
-        Object.entries(ROCK_ATTRIBUTES).forEach(([name, size]) =>
-          geometry.setAttribute(
-            name,
-            this.instanceBuffer(
-              new Float32Array(ROCK_INSTANCE_CAP * size),
-              size
-            )
-          )
-        );
-        const mesh = new THREE.InstancedMesh(
-          geometry,
-          material,
-          ROCK_INSTANCE_CAP
-        );
-        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        // instances spread over the whole field: the mesh has no useful bounds
-        mesh.frustumCulled = false;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.count = 0;
-        mesh.visible = false;
-        scene.add(mesh);
-        return mesh;
-      });
+      this.meshes[family] = geometries.map((shape) =>
+        this.createMesh(shape, material, ROCK_INSTANCE_CAP)
+      );
     });
+  }
+
+  createMesh(shape, material, cap) {
+    const { THREE } = this;
+    const mesh = new THREE.InstancedMesh(
+      this.shareShape(shape, null, cap),
+      material,
+      cap
+    );
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // instances spread over the whole field: the mesh has no useful bounds
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.count = 0;
+    mesh.visible = false;
+    this.scene.add(mesh);
+    return mesh;
+  }
+
+  // A geometry that shares the shape's vertex buffers and has its own (or
+  // `from`'s) instance data.
+  shareShape(shape, from, cap) {
+    const geometry = new this.THREE.BufferGeometry();
+    Object.entries(shape.attributes).forEach(([name, attribute]) =>
+      geometry.setAttribute(name, attribute)
+    );
+    if (shape.index) geometry.setIndex(shape.index);
+    Object.entries(ROCK_ATTRIBUTES).forEach(([name, size]) =>
+      geometry.setAttribute(
+        name,
+        from?.attributes[name] ||
+          this.instanceBuffer(new Float32Array(cap * size), size)
+      )
+    );
+    return geometry;
+  }
+
+  /**
+   * A shape of its own for one cut rock (live or a falling piece); returns
+   * its slot for `view.shape`. Slots are reused: freeShape gives one back.
+   */
+  addShape(shape) {
+    const slot = this.free.pop();
+    Object.entries(this.materials).forEach(([family, material]) => {
+      const meshes = this.meshes[family];
+      if (slot === undefined) {
+        meshes.push(this.createMesh(shape, material, 2));
+        this.counts[family].push(0);
+        return;
+      }
+      const mesh = meshes[slot];
+      const old = mesh.geometry;
+      mesh.geometry = this.shareShape(shape, old, 0);
+      old.dispose();
+    });
+    return slot ?? this.meshes.stone.length - 1;
+  }
+
+  /** The cut shape in `slot` is done: its GPU buffers are freed. */
+  freeShape(slot) {
+    if (slot < this.fixed) return;
+    Object.values(this.meshes).forEach((meshes) =>
+      meshes[slot].geometry.dispose()
+    );
+    this.free.push(slot);
   }
 
   begin() {
@@ -77,12 +124,16 @@ export class RockInstances {
     if (n >= mesh.instanceMatrix.count) this.grow(mesh);
     mesh.setMatrixAt(n, view.object.matrixWorld);
     const { attributes } = mesh.geometry;
-    const { base, vein, seed, glow, surface } = view.rock;
-    base.toArray(attributes.aBase.array, n * 3);
-    vein.toArray(attributes.aVein.array, n * 3);
+    const { base, vein, seed, glow, surface, hit, heat } = view.rock;
+    base.toArray(attributes.aBase.array, n * 4);
+    attributes.aBase.array[n * 4 + 3] = surface[0];
+    vein.toArray(attributes.aVein.array, n * 4);
+    attributes.aVein.array[n * 4 + 3] = surface[1];
     seed.toArray(attributes.aSeed.array, n * 3);
     attributes.aGlow.array.set(glow, n * 4);
-    attributes.aSurface.array.set(surface, n * 2);
+    attributes.aHit.array.set(hit[0], n * 4);
+    attributes.aHit2.array.set(hit[1], n * 4);
+    attributes.aHit2.array[n * 4 + 3] = heat;
     counts[view.shape] = n + 1;
   }
 
