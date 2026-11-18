@@ -44,6 +44,7 @@ import { FormationMarks } from './formationMarks.js';
 import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
 import { BLAST_LOOK } from './blasts.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
+import { strikeOf } from './enemies/rocks.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
 import { ImpactKick } from './impactPass.js';
@@ -390,6 +391,8 @@ class Renderer3D extends BaseSystem {
       const enemy = data?.enemy;
       if (!enemy) return;
       if (!data.fragments?.length) this.three?.enemies.markDead(enemy);
+      else if (enemy.type === 'asteroid')
+        this.three?.enemies.splitRock(enemy, data.fragments);
       if (enemy.type !== 'asteroid' && !isBossEnemy(enemy)) {
         this.killPops.emit(enemy.x, enemy.y, enemy.radius || 12);
       }
@@ -398,6 +401,8 @@ class Renderer3D extends BaseSystem {
       const { position, enemy, bullet } = data || {};
       if (!position || data.blocked) return;
       const rock = enemy?.type === 'asteroid';
+      // what a rock is made of: stone, metal (iron) or glass (crystal)
+      const strike = rock ? strikeOf(enemy) : 'metal';
       const nx = enemy ? position.x - enemy.x : 0;
       const ny = enemy ? position.y - enemy.y : 0;
       this.hitSparks.emit(
@@ -408,7 +413,7 @@ class Renderer3D extends BaseSystem {
         bullet?.vx || 0,
         bullet?.vy || 0,
         Boolean(data.killed),
-        rock ? SPARK_KIND.rock : SPARK_KIND.metal
+        SPARK_KIND[strike]
       );
       // what survives the hit keeps its heat where it was struck: a rock a
       // patch of lava, a machine a white-hot spot, and the machine jolts; a
@@ -420,8 +425,12 @@ class Renderer3D extends BaseSystem {
         if (!rock) this.three.enemies.killedBy(view, bullet.vx, bullet.vy);
         return;
       }
-      if (rock) this.three.decals.hit(view, nx, ny, DECAL_KIND.rock);
-      else if (!view.kind.startsWith('herald')) {
+      if (rock) {
+        if (DECAL_KIND[strike] !== undefined) {
+          this.three.decals.hit(view, nx, ny, DECAL_KIND[strike]);
+        }
+        this.three.enemies.rockViews.struck(view, nx, ny);
+      } else if (!view.kind.startsWith('herald')) {
         this.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
         if (!this.reducedMotion) {
           this.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);

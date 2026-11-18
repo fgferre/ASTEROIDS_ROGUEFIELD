@@ -241,11 +241,7 @@ export class VolatileEffects {
 
     this.addScreenShake(7 + radius * 0.025, 0.32);
     this.addScreenFlash(withAlpha(PALETTE.shot, 0.55), 0.26, 0.24);
-
-    this.particleEffects.createExplosionShockwave({
-      position,
-      radius: radius * 1.05,
-    });
+    // no rings: the rock bursts from inside (pedras, 17/11)
 
     const particleTotal = this.getScaledParticleCount(
       22 + Math.floor(radius / 5)

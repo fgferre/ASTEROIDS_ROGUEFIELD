@@ -585,25 +585,9 @@ export class EnemyEffects {
     if (asteroid.size === 'small') {
       this.addScreenShake(2 + radius * 0.01, 0.12);
       this.addHitStop('small');
-      // Small shockwave
-      this.particleEffects.createShockwaveEffect({
-        position: { x: asteroid.x, y: asteroid.y },
-        radius: 60,
-        duration: 0.3,
-        color: sparkColor,
-        baseWidth: 6,
-      });
     } else if (asteroid.size === 'medium') {
       this.addScreenShake(4 + radius * 0.012, 0.18);
       this.addHitStop('medium');
-      // Medium shockwave
-      this.particleEffects.createShockwaveEffect({
-        position: { x: asteroid.x, y: asteroid.y },
-        radius: 120,
-        duration: 0.4,
-        color: sparkColor,
-        baseWidth: 10,
-      });
     } else if (asteroid.size === 'large') {
       this.addScreenShake(8 + radius * 0.015, 0.28);
       this.addHitStop('large');
@@ -612,14 +596,6 @@ export class EnemyEffects {
         0.22,
         0.12
       );
-      // Massive shockwave
-      this.particleEffects.createShockwaveEffect({
-        position: { x: asteroid.x, y: asteroid.y },
-        radius: 250,
-        duration: 0.6,
-        color: sparkColor,
-        baseWidth: 20,
-      });
     }
 
     for (let i = 0; i < particleCount; i += 1) {
