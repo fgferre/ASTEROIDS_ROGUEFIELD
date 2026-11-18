@@ -49,6 +49,7 @@ import {
   ShotWisps,
 } from './hitSparks.js';
 import { BLAST_LOOK } from './blasts.js';
+import { PickupFx } from './pickupFx.js';
 import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { strikeOf } from './enemies/rocks.js';
@@ -181,6 +182,7 @@ class Renderer3D extends BaseSystem {
     this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
     this.shotWisps = new ShotWisps();
+    this.pickupFx = new PickupFx();
     this.formationMarks = new FormationMarks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
@@ -447,6 +449,14 @@ class Renderer3D extends BaseSystem {
         radius || 4,
         color ? rgbOf(THREE, color) : threatRgb
       );
+    });
+    // a pickup taken breaks into bits that fly into the ship, then the hull
+    // answers (pickupFx.js)
+    this.registerEventListener('pickup-collected', ({ kind, x, y } = {}) => {
+      this.pickupFx.emit(kind, x, y);
+    });
+    this.registerEventListener('health-heart-collected', (data) => {
+      this.pickupFx.emit('heart', data.position.x, data.position.y);
     });
     this.registerEventListener('bullet-created', (data) => {
       const { from, bullet } = data || {};
@@ -749,6 +759,7 @@ class Renderer3D extends BaseSystem {
     this.killPops.clear();
     this.muzzles.clear();
     this.shotWisps.clear();
+    this.pickupFx.clear();
     this.biome.reset();
     this.interp?.clear();
   }
@@ -980,6 +991,7 @@ class Renderer3D extends BaseSystem {
       t.player.flashMuzzle();
     }
     this.shotWisps.update(dt, t.ribbons);
+    this.pickupFx.update(dt, t, player, this.flashScale, this.reducedMotion);
     mirrorOverlays(
       t,
       player,

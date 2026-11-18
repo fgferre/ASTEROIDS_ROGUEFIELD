@@ -51,7 +51,6 @@ export const PICKUP_KINDS = deepFreeze({
     weight: 1, // proposta 20/10
     // s every machine but a Warden, and its shots in flight, stand still
     duration: 2.5, // proposta 20/10
-    shockwaveRadius: 560, // px
   },
   salvage: {
     id: 'salvage',
