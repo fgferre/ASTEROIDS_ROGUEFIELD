@@ -87,4 +87,19 @@ describe('weapon mirror', () => {
     expect(lights).toHaveLength(1);
     expect(lights[0][0]).toBe(220); // at its last point
   });
+
+  it('draws a bolt as one straight rail with the kinetic family', () => {
+    const combat = makeCombat();
+    combat.evolveWeapon('kinetic');
+    combat.cards.arcs.push(boltArc());
+    const drawn = {};
+    mirrorWeaponEffects(THREE, combat, makeBatches(drawn), {
+      observe() {},
+      light() {},
+    });
+
+    expect(drawn.path).toBeUndefined();
+    expect(drawn.tube).toBe(3); // channel, glow, core along one line
+    expect(drawn.streak).toBeGreaterThan(0); // metal sprayed out the far side
+  });
 });

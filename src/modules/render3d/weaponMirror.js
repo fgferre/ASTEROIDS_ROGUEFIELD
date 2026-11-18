@@ -93,6 +93,20 @@ const BOLT_LIGHT = 0.6;
 const BOLT_HEAVY = 1.3;
 const BOLT_THERMAL = '#ff8a2a';
 const BOLT_HOT = [2.4, 2.2, 2];
+// With the kinetic family (Railshot, the Coilgun) the bolt is a rail:
+// straight, thick and white-blue, [width, gain] per layer, and it goes
+// through the hull, spraying RAIL_SPRAY streaks of molten metal out of the
+// far side within RAIL_CONE rad at [min, + up to] px a life.
+const RAIL_RGB = '#9ff6ff';
+const RAIL_CHANNEL = [5, 0.35];
+const RAIL_GLOW = [2.4, 1];
+const RAIL_CORE = [1.3, 3.2];
+const RAIL_SPRAY = 9;
+const RAIL_CONE = 1.1;
+const RAIL_SPEED = [18, 34];
+const RAIL_FLARE = 9;
+const RAIL_LIGHT = 0.6;
+const RAIL_EMBER = [2.2, 0.9, 0.25];
 const boltX = new Float32Array(64);
 const boltY = new Float32Array(64);
 const lit = new WeakSet(); // bolts whose strike already lit the hull
@@ -237,6 +251,52 @@ function pushBolt(batches, flashes, arc, n, k, s, rgb, familyRgb, white) {
   glow.push(end.x, ARC_H, end.y, BOLT_HOT, BOLT_FLARE[0] * s, k, 2.2);
   glow.push(end.x, ARC_H, end.y, familyRgb, BOLT_FLARE[1] * s, 0.35 * k, 1.4);
   lightStrike(flashes, arc, end.x, end.y, [0.9, 0.95, 1], BOLT_LIGHT);
+}
+
+// A rail from `arc`'s first point to its last (see RAIL_*).
+function pushRail(batches, flashes, arc, k, s, railRgb, white) {
+  const { ribbons, glow } = batches;
+  const from = arc.points[0];
+  const end = arc.points[arc.points.length - 1];
+  const length = Math.hypot(end.x - from.x, end.y - from.y) || 1;
+  const ux = (end.x - from.x) / length;
+  const uy = (end.y - from.y) / length;
+  const rail = (rgb, [width, gain], fade) =>
+    ribbons.tube(
+      from.x,
+      from.y,
+      end.x,
+      end.y,
+      ARC_H,
+      rgb,
+      width * s,
+      gain * fade
+    );
+  rail(railRgb, RAIL_CHANNEL, k);
+  rail(railRgb, RAIL_GLOW, k);
+  rail(white, RAIL_CORE, k * k);
+  // through the hull: molten metal sprays out of the far side
+  const t = 1 - k;
+  for (let i = 0; i < RAIL_SPRAY; i += 1) {
+    const angle =
+      Math.atan2(uy, ux) + (glint(i * 2.7, end.x) - 0.5) * RAIL_CONE;
+    const r0 = (RAIL_SPEED[0] + RAIL_SPEED[1] * glint(end.y, i * 1.3)) * t;
+    const r1 = r0 + 4 + 8 * k;
+    const c = Math.cos(angle);
+    const sn = Math.sin(angle);
+    ribbons.streak(
+      end.x + c * r0,
+      end.y + sn * r0,
+      end.x + c * r1,
+      end.y + sn * r1,
+      ARC_H,
+      i % 3 === 0 ? BOLT_HOT : RAIL_EMBER,
+      1.6,
+      2 * k
+    );
+  }
+  glow.push(end.x, ARC_H, end.y, BOLT_HOT, RAIL_FLARE * s * k, 1, 2.2);
+  lightStrike(flashes, arc, end.x, end.y, [0.7, 0.95, 1], RAIL_LIGHT);
 }
 
 /**
@@ -584,12 +644,14 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     );
   });
 
-  // a bolt's forks wear its family's colour
+  // a bolt's forks wear its family's colour; the kinetic family's is a rail
   const familyRgb = combat.weapons.hasEvolution('thermal')
     ? rgbOf(THREE, BOLT_THERMAL)
     : combat.weapons.hasEvolution('field')
       ? rgbOf(THREE, WEAPON_EVOLUTIONS.field.look.trail)
       : null;
+  const rail = combat.weapons.hasEvolution('kinetic');
+  const railRgb = rgbOf(THREE, RAIL_RGB);
   const lanceArc = combat.lanceLook.arc || PALETTE.player;
   combat.arcs.forEach((arc) => {
     const k = arc.life / arc.maxLife;
@@ -604,17 +666,19 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     }
     if (arc.bolt) {
       const s = arc.heavy ? BOLT_HEAVY : 1;
-      pushBolt(
-        batches,
-        flashes,
-        arc,
-        n,
-        k,
-        s,
-        arcRgb,
-        familyRgb || arcRgb,
-        white
-      );
+      if (rail) pushRail(batches, flashes, arc, k, s, railRgb, white);
+      else
+        pushBolt(
+          batches,
+          flashes,
+          arc,
+          n,
+          k,
+          s,
+          arcRgb,
+          familyRgb || arcRgb,
+          white
+        );
       return;
     }
     const layer = (rgb, width, gain) =>
