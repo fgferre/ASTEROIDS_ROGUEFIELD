@@ -72,6 +72,7 @@ export class ScreenFeedback {
       duration: 0,
       color: PALETTE.text,
       intensity: 0,
+      edges: false,
     };
     this.flashGap = 0;
   }
@@ -98,6 +99,7 @@ export class ScreenFeedback {
       duration: 0,
       color: PALETTE.text,
       intensity: 0,
+      edges: false,
     };
   }
 
@@ -238,7 +240,9 @@ export class ScreenFeedback {
     this.screenShake.add(trauma, finalDuration);
   }
 
-  addScreenFlash(color, duration, intensity) {
+  // `edges`: the flash reddens the screen's edges and leaves the centre (the
+  // ship) clear, as a hull loss does (lot 5, efeito/impacto).
+  addScreenFlash(color, duration, intensity, { edges = false } = {}) {
     if (!this.damageFlashEnabled()) {
       return;
     }
@@ -267,5 +271,6 @@ export class ScreenFeedback {
     this.screenFlash.duration = finalDuration;
     this.screenFlash.timer = finalDuration;
     this.screenFlash.intensity = finalIntensity;
+    this.screenFlash.edges = edges;
   }
 }

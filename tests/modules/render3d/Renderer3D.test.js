@@ -148,6 +148,39 @@ describe('Renderer3D brake ring', () => {
   });
 });
 
+describe('Renderer3D hull flash', () => {
+  it('reddens only the edges for a hull loss; a pickup flash stays whole', () => {
+    const eventBus = new EventBus();
+    const effects = new EffectsSystem({
+      eventBus,
+      random: new RandomService('hull-flash'),
+      audio: {},
+      settings: { getCategoryValues: () => null },
+    });
+    const flash = { style: {} };
+    const renderer = Object.create(Renderer3D.prototype);
+    renderer.three = {
+      shockwaves: [],
+      flashes: { observe: () => false },
+      flash,
+      flashAlpha: 0,
+      flashEdges: false,
+    };
+
+    eventBus.emit('player-took-damage', { damage: 12, max: 100 });
+    renderer.mirrorEffects({ screenFlash: effects.screenFlash });
+    expect(flash.style.background).toMatch(/^radial-gradient/);
+    expect(Number(flash.style.opacity)).toBeGreaterThan(
+      effects.screenFlash.intensity
+    );
+
+    effects.addScreenFlash('#ffffff', 0.3, 0.2);
+    renderer.mirrorEffects({ screenFlash: effects.screenFlash });
+    expect(flash.style.background).toBe('#ffffff');
+    expect(Number(flash.style.opacity)).toBeCloseTo(0.2, 5);
+  });
+});
+
 describe('Renderer3D shadows', () => {
   it('builds a resized shadow map inside a seeded frame, into the frame target', () => {
     // three r128: shadowMap.render reads the per-frame light state, which

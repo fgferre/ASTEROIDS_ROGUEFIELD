@@ -3,7 +3,7 @@
 // XP orbs and hearts, ambient chips, particles, shockwaves and the screen
 // flash.
 
-import { PALETTE } from '../../data/constants/palette.js';
+import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { getOrbConfig } from '../xp/orbClasses.js';
 import { HALF_H, HALF_W, SHOT_SHAPES, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
@@ -16,6 +16,11 @@ import {
 } from './weaponMirror.js';
 
 const MAX_TRAIL_POINTS = 64;
+// Lot 5 (efeito/impacto): a hull loss reddens the screen's edges and darkens
+// its corners, the centre (where the ship is) clear; EDGE_FLASH_GAIN makes up
+// for the smaller area, so it reads as strong as the old full-screen red.
+const EDGE_FLASH = `radial-gradient(ellipse at center, transparent 40%, ${withAlpha(PALETTE.threat, 0.45)} 72%, rgba(70, 0, 6, 0.95) 100%)`;
+const EDGE_FLASH_GAIN = 2.2;
 const WHITE = [1, 1, 1];
 // Shockwaves kick the impact pass only from KICK_WAVE_RADIUS up, full at
 // KICK_WAVE_FULL.
@@ -266,15 +271,23 @@ export function mirrorEffects(t, effects, impact) {
     screenFlash && screenFlash.timer > 0 && screenFlash.duration > 0
       ? (screenFlash.timer / screenFlash.duration) * screenFlash.intensity
       : 0;
+  const edges = alpha > 0 && screenFlash.edges;
   if (
     Math.abs(alpha - t.flashAlpha) > 0.01 ||
     (alpha === 0 && t.flashAlpha !== 0) ||
-    (alpha > 0 && screenFlash.color !== t.flashColor)
+    (alpha > 0 &&
+      (screenFlash.color !== t.flashColor || edges !== t.flashEdges))
   ) {
     t.flashAlpha = alpha;
-    t.flash.style.opacity = String(alpha);
-    // a new flash of another colour at the same strength repaints too
-    if (alpha > 0) t.flash.style.background = t.flashColor = screenFlash.color;
+    t.flash.style.opacity = String(
+      edges ? Math.min(1, alpha * EDGE_FLASH_GAIN) : alpha
+    );
+    // a new flash of another colour or shape at the same strength repaints too
+    if (alpha > 0) {
+      t.flashColor = screenFlash.color;
+      t.flashEdges = edges;
+      t.flash.style.background = edges ? EDGE_FLASH : screenFlash.color;
+    }
   }
 }
 
