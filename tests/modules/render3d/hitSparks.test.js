@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   HitSparks,
+  MuzzleFlashes,
   SPARK_KIND,
 } from '../../../src/modules/render3d/hitSparks.js';
 
@@ -33,5 +34,19 @@ describe('HitSparks', () => {
     expect(longest(rock)).toBeGreaterThan(longest(metal));
     expect([...rock.dustAge].filter((a) => a === 0).length).toBeGreaterThan(0);
     expect([...metal.dustAge].filter((a) => a === 0).length).toBe(0);
+  });
+});
+
+describe('MuzzleFlashes', () => {
+  it('lights one flash at the nose per volley, not one per shot', () => {
+    const muzzles = new MuzzleFlashes();
+    const batches = { push() {}, streak() {} };
+    const volley = () => {
+      for (let i = -2; i <= 2; i += 1) muzzles.emit(0, 0, 1, i * 0.1);
+    };
+    volley(); // the Scatter Coil's five shots between two frames
+    expect(muzzles.update(batches, batches, [1, 1, 1], [1, 1, 1])).toBe(1);
+    volley(); // the next volley lights its own
+    expect(muzzles.update(batches, batches, [1, 1, 1], [1, 1, 1])).toBe(2);
   });
 });

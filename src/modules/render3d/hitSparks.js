@@ -8,7 +8,8 @@
 //   (flak, a missile) throws hot streaks all round and incandescent
 //   fragments that cool as they fly; a burning hull sheds slow embers and
 //   drips slag.
-// - MuzzleFlashes: a 2-frame hot pulse at the nose for each player shot.
+// - MuzzleFlashes: a 2-frame hot pulse at the nose for each player volley:
+//   the shots fired between two frames (the Scatter Coil's five) light one.
 // - KillPops: a machine that dies flashes white-hot at its own core (instead
 //   of the whole screen), then the heat drops through orange.
 // Plain typed arrays, filled from events and drained in render(); jitter is
@@ -390,10 +391,13 @@ export class MuzzleFlashes {
     this.dy = new Float32Array(MUZZLE_POOL);
     this.frames = new Uint8Array(MUZZLE_POOL);
     this.next = 0;
+    this.volley = false;
   }
 
   /** A shot from (x, y) along the unit direction (dx, dy). */
   emit(x, y, dx, dy) {
+    if (this.volley) return;
+    this.volley = true;
     const i = this.next;
     this.next = (this.next + 1) % MUZZLE_POOL;
     this.x[i] = x + dx * MUZZLE_OFFSET;
@@ -405,6 +409,7 @@ export class MuzzleFlashes {
 
   /** Draws the live pulses; returns how many were drawn this frame. */
   update(glow, ribbons, rgb, hotRgb) {
+    this.volley = false;
     let drawn = 0;
     for (let i = 0; i < MUZZLE_POOL; i += 1) {
       const frames = this.frames[i];
@@ -432,6 +437,7 @@ export class MuzzleFlashes {
 
   clear() {
     this.frames.fill(0);
+    this.volley = false;
   }
 }
 
