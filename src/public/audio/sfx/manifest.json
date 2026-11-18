@@ -689,7 +689,7 @@
   },
   "title-start": {
     "files": ["title-start/1.mp3"],
-    "gain": -11,
+    "gain": -9,
     "priority": 0,
     "cap": 1,
     "gap": 500,
@@ -697,7 +697,7 @@
     "origins": [
       {
         "file": "title-start/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 3, 50 steps, prompt: A massive steel blast door slamming shut far away, one deep muffled boom, then a cold rush of air rising, with a dark echo tail. Close mic, dark room.; cut to 1.5 s, exciter; level of run-start (proposta 17/11)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 4, 8 steps, cfg 1.0, prompt: TrackType: SFX. A huge steel blast door slamming shut in a large empty hangar: one deep low boom, then a long dark rumbling decay. Low frequencies only. Close mic.; cut to 1.5 s; the take of 144 closest in shape and weight to the AudioLDM one it replaces; level of run-start (proposta 17/11)"
       }
     ]
   },
@@ -711,7 +711,7 @@
     "origins": [
       {
         "file": "mission-call/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: Shortwave radio static and crackling interference, then the signal locks in and the noise clears. Close mic, dry, no reverb.; first 1.3 s band-passed 350-3200 Hz, clearing into a 165 Hz tone with two soft harmonics, 1.8 s (proposta 17/11)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 16 steps, cfg 1.5, prompt: TrackType: SFX. An old radio tuning through static, harsh crackles and hiss, no music, no voice. Close mic, dry.; first 1.3 s band-passed 350-3200 Hz, clearing into a 165 Hz tone with two soft harmonics, 1.8 s; closest take to the AudioLDM one it replaces (proposta 17/11)"
       }
     ]
   },
