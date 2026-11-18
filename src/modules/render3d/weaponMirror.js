@@ -68,15 +68,34 @@ const AURA_H = 2.5;
 const AURA_CORE = 1.6;
 const AURA_HAZE = 14;
 const PULSE_FROM = 0.55;
-// A weapon's bolt (the chain pattern): a thin white-hot core in a narrow
-// glow of its colour kept under the bloom threshold, so only the core blooms
-// and the field stays dark between bolts; the Apex's a little wider.
-const BOLT_GLOW = 1.6;
-const BOLT_GLOW_GAIN = 0.35;
-const BOLT_CORE = 0.5;
-const BOLT_CORE_GAIN = 1.1;
-const BOLT_TIP = 5;
+// proposta 17/11 (efeito/impacto, approved as a mock-up): a weapon's bolt
+// (the chain pattern) is lightning. A wide channel in its family's colour
+// (BOLT_THERMAL, the field's violet, else its own) round a glow of its own
+// colour and a white-hot core, [width, gain] each; it re-strikes
+// BOLT_STRIKES times over its life, its kinks jumping up to BOLT_JITTER px.
+// Short forks leave its kinks (a kink forks when its hash is under
+// BOLT_FORK_CHANCE): three segments, [min, + up to] px long, each turning up
+// to BOLT_FORK_BEND rad. Where it strikes the metal flares like a weld
+// ([white-hot, family glow] sizes) and lights the hull once. The Apex's
+// bolts are BOLT_HEAVY wider.
+const BOLT_STRIKES = 5;
+const BOLT_JITTER = 10;
+const BOLT_CHANNEL = [4, 0.32];
+const BOLT_GLOW = [2.2, 1];
+const BOLT_CORE = [0.9, 2.4];
+const BOLT_FORK_CHANCE = 0.75;
+const BOLT_FORK_LENGTH = [14, 16];
+const BOLT_FORK_BEND = 1.2;
+const BOLT_FORK = [1.6, 0.9]; // the fork's channel; its core is white
+const BOLT_FORK_CORE = [0.45, 1.4];
+const BOLT_FLARE = [7, 10];
+const BOLT_LIGHT = 0.6;
 const BOLT_HEAVY = 1.3;
+const BOLT_THERMAL = '#ff8a2a';
+const BOLT_HOT = [2.4, 2.2, 2];
+const boltX = new Float32Array(64);
+const boltY = new Float32Array(64);
+const lit = new WeakSet(); // bolts whose strike already lit the hull
 // proposta 17/11 (efeito/impacto, lote 4): the field family's grip, where
 // rings were. Static crawling on a held hull: arcs per machine, kinks each,
 // re-struck every STATIC_FRAMES frames; height over the plane (+ × radius),
@@ -133,6 +152,91 @@ function pushStatic(ribbons, enemy, rgb, white, strength) {
     ribbons.path(STATIC_KINKS, h, rgb, STATIC_GLOW, 0.8 * strength, Infinity);
     ribbons.path(STATIC_KINKS, h, white, STATIC_CORE, strength, Infinity);
   }
+}
+
+// The bolt's strike lights the hull round it, once.
+function lightStrike(flashes, arc, x, y, rgb, intensity) {
+  if (lit.has(arc)) return;
+  lit.add(arc);
+  flashes.light(x, y, rgb[0], rgb[1], rgb[2], intensity);
+}
+
+// Lightning through `arc`'s n points (see BOLT_*); `s` its width scale.
+function pushBolt(batches, flashes, arc, n, k, s, rgb, familyRgb, white) {
+  const { ribbons, glow } = batches;
+  const { points } = arc;
+  const { px, py } = ribbons;
+  const strike = Math.floor((1 - k) * BOLT_STRIKES);
+  for (let i = 0; i < n; i += 1) {
+    const inner = i > 0 && i < n - 1;
+    const { x, y } = points[i];
+    px[i] = inner
+      ? x + (glint(x * 0.37 + strike * 1.7, y + strike) - 0.5) * BOLT_JITTER
+      : x;
+    py[i] = inner
+      ? y + (glint(y * 0.41 + strike * 2.3, x + strike) - 0.5) * BOLT_JITTER
+      : y;
+    boltX[i] = px[i];
+    boltY[i] = py[i];
+  }
+  ribbons.path(
+    n,
+    ARC_H,
+    familyRgb,
+    BOLT_CHANNEL[0] * s,
+    BOLT_CHANNEL[1] * k,
+    Infinity
+  );
+  ribbons.path(n, ARC_H, rgb, BOLT_GLOW[0] * s, BOLT_GLOW[1] * k, Infinity);
+  ribbons.path(n, ARC_H, white, BOLT_CORE[0] * s, BOLT_CORE[1] * k, Infinity);
+  for (let i = 1; i < n - 1; i += 1) {
+    if (glint(i * 3.1 + strike, boltX[i]) > BOLT_FORK_CHANCE) continue;
+    const along = Math.atan2(
+      boltY[i + 1] - boltY[i - 1],
+      boltX[i + 1] - boltX[i - 1]
+    );
+    const side = glint(i, strike * 1.3) > 0.5 ? 1 : -1;
+    let angle = along + side * (0.5 + 0.5 * glint(strike, i * 1.9));
+    const step =
+      ((BOLT_FORK_LENGTH[0] +
+        BOLT_FORK_LENGTH[1] * glint(i * 7.7, strike * 3.3)) *
+        s) /
+      3;
+    let x = boltX[i];
+    let y = boltY[i];
+    for (let q = 0; q < 3; q += 1) {
+      const nx = x + Math.cos(angle) * step;
+      const ny = y + Math.sin(angle) * step;
+      const fade = k * (1 - q / 3);
+      ribbons.tube(
+        x,
+        y,
+        nx,
+        ny,
+        ARC_H,
+        familyRgb,
+        BOLT_FORK[0] * s,
+        BOLT_FORK[1] * fade
+      );
+      ribbons.tube(
+        x,
+        y,
+        nx,
+        ny,
+        ARC_H,
+        white,
+        BOLT_FORK_CORE[0] * s,
+        BOLT_FORK_CORE[1] * fade
+      );
+      x = nx;
+      y = ny;
+      angle += (glint(q + i, strike) - 0.5) * BOLT_FORK_BEND;
+    }
+  }
+  const end = points[points.length - 1];
+  glow.push(end.x, ARC_H, end.y, BOLT_HOT, BOLT_FLARE[0] * s, k, 2.2);
+  glow.push(end.x, ARC_H, end.y, familyRgb, BOLT_FLARE[1] * s, 0.35 * k, 1.4);
+  lightStrike(flashes, arc, end.x, end.y, [0.9, 0.95, 1], BOLT_LIGHT);
 }
 
 /**
@@ -480,6 +584,12 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     );
   });
 
+  // a bolt's forks wear its family's colour
+  const familyRgb = combat.weapons.hasEvolution('thermal')
+    ? rgbOf(THREE, BOLT_THERMAL)
+    : combat.weapons.hasEvolution('field')
+      ? rgbOf(THREE, WEAPON_EVOLUTIONS.field.look.trail)
+      : null;
   const lanceArc = combat.lanceLook.arc || PALETTE.player;
   combat.arcs.forEach((arc) => {
     const k = arc.life / arc.maxLife;
@@ -494,24 +604,17 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     }
     if (arc.bolt) {
       const s = arc.heavy ? BOLT_HEAVY : 1;
-      ribbons.path(
+      pushBolt(
+        batches,
+        flashes,
+        arc,
         n,
-        ARC_H,
+        k,
+        s,
         arcRgb,
-        BOLT_GLOW * s,
-        BOLT_GLOW_GAIN * k,
-        Infinity
+        familyRgb || arcRgb,
+        white
       );
-      ribbons.path(
-        n,
-        ARC_H,
-        white,
-        BOLT_CORE * s,
-        BOLT_CORE_GAIN * k,
-        Infinity
-      );
-      const end = points[points.length - 1];
-      glow.push(end.x, ARC_H, end.y, arcRgb, BOLT_TIP * s, 0.35 * k);
       return;
     }
     const layer = (rgb, width, gain) =>
