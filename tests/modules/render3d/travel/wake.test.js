@@ -52,10 +52,9 @@ describe('the Wake', () => {
   });
 
   it('takes a light rig that rides with it, the sun on the asked flank', () => {
-    const fresh = buildWake(THREE);
-    const { sun, rim, fill } = lightWake(THREE, fresh, 1);
+    const { sun, rim, fill } = lightWake(THREE, wake, 1);
     [sun, rim, fill].forEach((light) =>
-      expect(fresh.group.children).toContain(light)
+      expect(wake.group.children).toContain(light)
     );
     expect(sun.castShadow).toBe(true);
     // Starboard is +z.

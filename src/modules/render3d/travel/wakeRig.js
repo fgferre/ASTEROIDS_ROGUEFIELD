@@ -11,8 +11,10 @@
 // proposta 17/11: the rig's colours, strengths and directions (ship frame:
 // +x the bow, y up, -z port).
 const SUN = { color: '#ffe2c4', intensity: 2.0, from: [0.55, 0.8, -0.75] };
-const RIM = { color: '#86a9ff', intensity: 0.9, from: [-0.7, 0.25, 0.65] };
-const FILL = { color: '#7f93c8', intensity: 0.28, from: [0.2, -1, -0.3] };
+// The rim is nearly white: it is the only light on the stern seen from aft,
+// and a blue one paints the dark plating blue.
+const RIM = { color: '#cfd8ea', intensity: 0.85, from: [-0.7, 0.3, 0.6] };
+const FILL = { color: '#aab6cf', intensity: 0.3, from: [0.2, -1, -0.3] };
 // The sun's shadow box, in world units about the ship, and its map.
 const SHADOW = { half: 1900, tall: 1200, near: 500, far: 11000, map: 4096 };
 

@@ -192,10 +192,10 @@ function buildBlock(kit) {
       1.9,
       false
     );
-    for (let x = -16; x > -34; x -= 3.3) {
+    for (let x = -16.6; x > -34; x -= 3.3) {
       lamp(
         'lamps',
-        V(x, BASE.yl + 0.25, (BASE.hw + 0.24) * s),
+        V(x, BASE.yl - 0.05, (BASE.hw + 0.5) * s),
         V(0, 0, s),
         C.amber,
         { size: 0.13, spill: 1.3 }
@@ -232,8 +232,175 @@ function buildBlock(kit) {
   );
 }
 
+// Under and along the stern: an armour belt on the lower chine, ribs where
+// the block widens to the engines, two hanging pods and a keel fin, vented
+// and lit.
+function buildUnderside(kit) {
+  const { V, add, box, body, profile, lamp, paint, random } = kit;
+  const steel = { roughness: 0.5, metalness: 0.6 };
+
+  // The belt: a heavy rail on the lower chine, brackets under it.
+  add(
+    'hull',
+    box(
+      -34.6,
+      -15.2,
+      BASE.yl - 0.45,
+      BASE.yl + 0.35,
+      BASE.hw - 0.1,
+      BASE.hw + 0.45
+    ),
+    paint(C.mid),
+    { mirror: true }
+  );
+  add(
+    'hull',
+    box(
+      -34.4,
+      -15.4,
+      BASE.yl + 0.35,
+      BASE.yl + 0.5,
+      BASE.hw - 0.1,
+      BASE.hw + 0.3
+    ),
+    paint(C.orange),
+    { mirror: true }
+  );
+  for (let x = -15.8; x > -34.6; x -= 1.65) {
+    add(
+      'hull',
+      box(
+        x - 0.3,
+        x,
+        BASE.yl - 1.2,
+        BASE.yl - 0.45,
+        BASE.hw - 0.6,
+        BASE.hw + 0.3
+      ),
+      paint(C.dark),
+      { mirror: true }
+    );
+  }
+
+  // Ribs on the flare from the stern block to the engine block.
+  for (let n = 0; n < 7; n += 1) {
+    const t = (n + 0.5) / 7;
+    const x = AFT.x + (BLOCK.x - AFT.x) * t;
+    const z = AFT.hw + (BLOCK.hw - AFT.hw) * t;
+    add(
+      'hull',
+      box(x - 0.16, x + 0.16, -2.6, 2.9, z - 0.3, z + 0.32),
+      paint(n % 3 ? C.dark : C.orange),
+      { mirror: true, shine: steel }
+    );
+  }
+
+  // Two pods under the bilges: flat on top, their ends sloped.
+  const pod = (x0, x1, zc, w, top, bottom) => {
+    const ring = (x, k, wk) =>
+      [
+        [-0.7, 1],
+        [-1, 0.7],
+        [-1, 0.1],
+        [-0.8, 0],
+        [0.8, 0],
+        [1, 0.1],
+        [1, 0.7],
+        [0.7, 1],
+      ].map(([a, f]) => V(x, top - f * (top - bottom) * k, zc + a * w * wk));
+    return body([
+      ring(x0, 0.25, 0.8),
+      ring(x0 - 2.2, 1, 1),
+      ring(x1 + 2.6, 1, 1),
+      ring(x1, 0.35, 0.85),
+    ]);
+  };
+  add('hull', pod(-17.2, -33.6, 6.3, 1.6, -3.8, -8.5), paint(C.mid), {
+    mirror: true,
+    shine: steel,
+  });
+  // Armour plates, vents and a fin on each pod.
+  const cuts = [-19.6, -23.4, -27.3, -31.2];
+  cuts.forEach((x, n) => {
+    add(
+      'hull',
+      box(x - 3.6, x - 0.12, -7.15, -5.0, 7.8, 8.02),
+      paint(n === 1 ? C.orange : random() < 0.5 ? C.grey : C.light),
+      { mirror: true }
+    );
+    add(
+      'hull',
+      box(x - 3.5, x - 0.2, -8.62, -8.5, 5.3, 7.3),
+      paint(n % 2 ? C.dark : C.grey),
+      { mirror: true }
+    );
+  });
+  for (let x = -24.0; x > -27.0; x -= 0.32) {
+    add('hull', box(x - 0.12, x, -6.9, -5.3, 8.0, 8.12), paint(C.soot), {
+      mirror: true,
+    });
+  }
+  add(
+    'hull',
+    profile(
+      [
+        [-21, -8.5],
+        [-23.5, -9.6],
+        [-31.5, -9.6],
+        [-32.6, -8.5],
+      ],
+      6.15,
+      6.45
+    ),
+    paint(C.dark),
+    { mirror: true }
+  );
+  [-1, 1].forEach((s) => {
+    [-21.2, -25.6, -30.2].forEach((x) =>
+      lamp('lamps', V(x, -6.4, 8.04 * s), V(0, 0, s), C.amber, {
+        size: 0.12,
+        spill: 1,
+      })
+    );
+    lamp('floods', V(-17.6, -6.6, 6.3 * s), V(1, 0, 0), C.flood, {
+      size: 0.14,
+      gain: 1.8,
+      spill: 1.4,
+      spillGain: 0.3,
+    });
+  });
+
+  // The keel fin down the middle, ribbed, lamps under it.
+  add(
+    'hull',
+    profile(
+      [
+        [-17.6, -6.9],
+        [-20.4, -9.0],
+        [-34.0, -9.0],
+        [-36.6, -6.6],
+      ],
+      -1.0,
+      1.0
+    ),
+    paint(C.dark),
+    { shine: steel }
+  );
+  add('hull', box(-33.4, -21.0, -9.25, -9.0, -0.6, 0.6), paint(C.orange));
+  for (let x = -21.8; x > -33.5; x -= 1.4) {
+    add('hull', box(x - 0.22, x, -8.9, -7.2, -1.12, 1.12), paint(C.grey));
+  }
+  [-23, -28, -32.6].forEach((x) =>
+    lamp('lamps', V(x, -9.25, 0), V(0, -1, 0), C.amber, {
+      size: 0.14,
+      spill: 1.2,
+    })
+  );
+}
+
 export function buildStern(kit) {
   buildBlock(kit);
+  buildUnderside(kit);
   const bridge = buildBridge(kit);
   const engines = buildEngines(kit);
   return { bridge, engines };
