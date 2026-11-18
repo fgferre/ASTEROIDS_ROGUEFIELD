@@ -300,6 +300,8 @@ export function createBotDriver({
   const pilot = createBotPilot({ preset, knobs, seed });
   const memory = new WeakMap();
   const cards = [];
+  // Each card taken, with the level it came at and when (seconds into the run).
+  const taken = [];
   let offer = null;
   let held = [];
   let frame = 0;
@@ -315,13 +317,18 @@ export function createBotDriver({
   return {
     pilot,
     cards,
+    taken,
     /** The key codes held after the last step(). */
     held: () => held,
     step() {
       if (offer) {
         const id = pickCard(offer);
         offer = null;
-        if (id && services.progression.applyUpgrade(id)) cards.push(id);
+        const level = services.progression.getLevel();
+        if (id && services.progression.applyUpgrade(id)) {
+          cards.push(id);
+          taken.push({ id, level, seconds: frame * stepSeconds });
+        }
       }
       const keys = pilot.step(readWorld(services, frame * stepSeconds, memory));
       const next = Object.keys(KEYS)

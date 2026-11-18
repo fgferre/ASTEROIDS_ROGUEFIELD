@@ -471,4 +471,19 @@ describe('pickCard', () => {
       'shield'
     );
   });
+
+  it('takes the piloting trail first: engine, then brake or agility, then Auto Turret', () => {
+    const plasma = card('plasma', 'offense', ['weapon']);
+    expect(pickCard([plasma, card('propulsors', 'mobility')])).toBe(
+      'propulsors'
+    );
+    expect(
+      pickCard([
+        card('auto_aim', 'offense'),
+        card('rcs_system', 'mobility'),
+        plasma,
+      ])
+    ).toBe('rcs_system');
+    expect(pickCard([plasma, card('auto_aim', 'offense')])).toBe('auto_aim');
+  });
 });
