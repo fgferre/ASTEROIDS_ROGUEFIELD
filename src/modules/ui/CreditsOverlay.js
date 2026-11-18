@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL } from '../../data/credits.js';
+import { SUPPORT_EMAIL, SUPPORT_SHOWN } from '../../data/credits.js';
 import { asArray } from '../upgradeCatalog.js';
 
 // src/modules/ui/CreditsOverlay.js
@@ -7,8 +7,14 @@ import { asArray } from '../upgradeCatalog.js';
 // buttons, a backdrop click or Escape, and gives the focus back to its opener.
 // The menu's Support button opens it at its support section.
 
-/** Every `[data-support-email]` link shows the support address and opens the player's mail program on it. */
-export function fillSupportEmail(root = document) {
+/**
+ * Every `[data-support-email]` link shows the support address and opens the player's mail program on it;
+ * every `[data-support]` node shows only while `shown` (data/credits.js SUPPORT_SHOWN).
+ */
+export function fillSupport(root = document, shown = SUPPORT_SHOWN) {
+  root.querySelectorAll('[data-support]').forEach((node) => {
+    node.style.display = shown ? '' : 'none';
+  });
   root.querySelectorAll('[data-support-email]').forEach((link) => {
     link.textContent = SUPPORT_EMAIL;
     link.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Supporting Asteroid Roguefield')}`;
@@ -43,7 +49,7 @@ export class CreditsOverlay {
   bindCreditsControls() {
     if (typeof document !== 'undefined') {
       document.addEventListener('keydown', this.handleCreditsKeyDown);
-      fillSupportEmail();
+      fillSupport();
     }
 
     const creditsRefs = this.refs;

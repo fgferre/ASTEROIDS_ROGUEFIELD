@@ -352,6 +352,7 @@
                 </button>
                 <button
                   id="menu-support-btn"
+                  data-support
                   class="menu-screen__button menu-screen__button--link menu-screen__button--support"
                   type="button"
                   data-hint="Free, no ads, nothing locked: how to help the next update happen."
@@ -707,7 +708,12 @@
                 </dd>
               </div>
             </dl>
-            <section id="credits-support" class="credits-support" tabindex="-1">
+            <section
+              id="credits-support"
+              class="credits-support"
+              tabindex="-1"
+              data-support
+            >
               <h3 class="credits-support__title">♥ Support the game</h3>
               <p>
                 Free, no ads, nothing locked. If it gave you a good run and you
@@ -1052,7 +1058,7 @@
           </div>
         </div>
         <footer class="end-credits__footer">
-          <p class="end-credits__support">
+          <p class="end-credits__support" data-support>
             <b>♥</b> Support the game: write to Pipo Labs at
             <a class="credits-support__link" data-support-email href="#"></a>
           </p>
