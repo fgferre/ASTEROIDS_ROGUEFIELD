@@ -32,7 +32,7 @@ import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { HALF_H, HALF_W, rgbOf } from './batches.js';
+import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
 import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import {
@@ -48,13 +48,11 @@ import {
   SPARK_KIND,
   ShotWisps,
 } from './hitSparks.js';
-import { BLAST_LOOK } from './blasts.js';
 import { PickupFx } from './pickupFx.js';
 import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
-import { strikeOf } from './enemies/rocks.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
-import { isBossEnemy } from '../physics/bossTuning.js';
+import { registerEffectEvents } from './effectEvents.js';
 import { ImpactKick, lensPull } from './impactPass.js';
 import {
   mirrorBossTransitions,
@@ -361,106 +359,7 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('weapon-beam-fired', (data) => {
       this.impact.kick(data.kick);
     });
-    // A burst (flak, a missile) explodes: a fireball rolling into soot, hot
-    // streaks all round and incandescent fragments.
-    this.registerEventListener('flak-burst', (data) => {
-      const { position, angle, radius, look, fizzled } = data || {};
-      if (!position) return;
-      // a missile spent on nothing at the end of its range pops small
-      const missile = look === 'seeker' && !fizzled;
-      const kind = look === 'seeker' ? (missile ? 'seeker' : 'spent') : 'flak';
-      this.burst(position, radius || 30, kind, angle || 0, missile);
-    });
-    // a Caster's shell lands in fire, smoke and pieces of its casing
-    this.registerEventListener('caster-shell-landed', (data) => {
-      if (data?.position) this.burst(data.position, data.radius, 'shell', 0);
-    });
-    // a split asteroid lives on as its fragments: only real deaths burn;
-    // a machine that dies flashes at its own core
-    this.registerEventListener('enemy-destroyed', (data) => {
-      const enemy = data?.enemy;
-      if (!enemy) return;
-      if (!data.fragments?.length) this.three?.enemies.markDead(enemy);
-      else if (enemy.type === 'asteroid')
-        this.three?.enemies.splitRock(enemy, data.fragments);
-      if (enemy.type !== 'asteroid' && !isBossEnemy(enemy)) {
-        this.killPops.emit(enemy.x, enemy.y, enemy.radius || 12);
-        // an Elite's gold blades fly off with its pieces
-        const { x, y } = enemy;
-        if (enemy.elite)
-          this.hitSparks.emit(x, y, 1, 0, 0, 0, true, SPARK_KIND.gold);
-      }
-    });
-    this.registerEventListener('bullet-hit', (data) => {
-      const { position, enemy, bullet } = data || {};
-      if (!position || data.blocked) return;
-      const rock = enemy?.type === 'asteroid';
-      // what a rock is made of: stone, metal (iron) or glass (crystal)
-      const strike = rock ? strikeOf(enemy) : 'metal';
-      const nx = enemy ? position.x - enemy.x : 0;
-      const ny = enemy ? position.y - enemy.y : 0;
-      this.hitSparks.emit(
-        position.x,
-        position.y,
-        nx,
-        ny,
-        bullet?.vx || 0,
-        bullet?.vy || 0,
-        Boolean(data.killed),
-        SPARK_KIND[strike]
-      );
-      // what survives the hit keeps its heat where it was struck: a rock a
-      // patch of lava, a machine a white-hot spot, and the machine jolts; a
-      // machine it kills breaks with the shot's push
-      if (!enemy || !bullet || isBossEnemy(enemy)) return;
-      const view = this.three?.enemies.views.get(enemy.id || enemy);
-      if (!view) return;
-      if (data.killed) {
-        if (!rock) this.three.enemies.killedBy(view, bullet.vx, bullet.vy);
-        return;
-      }
-      if (rock) {
-        if (DECAL_KIND[strike] !== undefined) {
-          this.three.decals.hit(view, nx, ny, DECAL_KIND[strike]);
-        }
-        this.three.enemies.rockViews.struck(view, nx, ny);
-      } else if (!view.kind.startsWith('herald')) {
-        this.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
-        if (!this.reducedMotion) {
-          this.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);
-        }
-      }
-    });
-    // an enemy shot that burns out in the air frays into wisps of its light
-    this.registerEventListener('enemy-bullet-expired', (data) => {
-      const { position, velocity, color, radius } = data || {};
-      if (!position || !velocity || !this.three) return;
-      const { THREE, threatRgb } = this.three;
-      this.shotWisps.emit(
-        position.x,
-        position.y,
-        velocity.x,
-        velocity.y,
-        radius || 4,
-        color ? rgbOf(THREE, color) : threatRgb
-      );
-    });
-    // a pickup taken breaks into bits that fly into the ship, then the hull
-    // answers (pickupFx.js)
-    this.registerEventListener('pickup-collected', ({ kind, x, y } = {}) => {
-      this.pickupFx.emit(kind, x, y);
-    });
-    this.registerEventListener('health-heart-collected', (data) => {
-      this.pickupFx.emit('heart', data.position.x, data.position.y);
-    });
-    this.registerEventListener('bullet-created', (data) => {
-      const { from, bullet } = data || {};
-      if (!from || !bullet) return;
-      const speed = Math.hypot(bullet.vx || 0, bullet.vy || 0);
-      if (speed <= 0) return;
-      this.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
-      this.three?.player.recoilToward(this.cachedPlayer, bullet.vx, bullet.vy);
-    });
+    registerEffectEvents(this);
   }
 
   /**
@@ -1118,15 +1017,6 @@ class Renderer3D extends BaseSystem {
   }
 
   // The field's particles, shockwaves and screen flash (fieldMirrors.js).
-  // A burst in fire and smoke (blasts.js, BLAST_LOOK[look]) with its hot
-  // streaks and fragments thrown round `angle`; `heavy`: a missile's share.
-  burst(position, radius, look, angle, heavy = false) {
-    const { x, y } = position;
-    this.three?.blasts.emit(x, y, radius, BLAST_LOOK[look]);
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    this.hitSparks.emit(x, y, dx, dy, dx, dy, heavy, SPARK_KIND.blast);
-  }
 
   mirrorEffects(effects) {
     mirrorEffects(this.three, effects, this.impact);
