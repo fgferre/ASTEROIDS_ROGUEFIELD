@@ -87,6 +87,12 @@ export const VARIANT_LOOKS = {
     crystal: true,
   },
 };
+// What a shot strikes on each variant (a hitSparks SPARK_KIND; a
+// scorchDecals DECAL_KIND where it leaves a mark): iron is metal, crystal
+// glass (cold glints, no scorch); the rest stone. pedras, 17/11.
+const STRIKE = { iron: 'metal', crystal: 'shield' };
+export const strikeOf = (enemy) => STRIKE[enemy.variant] || 'rock';
+
 // A Parasite's pulse is at its fastest within this many logical pixels.
 const PARASITE_NEAR = 80;
 const PARASITE_FAR = 360;
@@ -224,6 +230,7 @@ export function createRockViews(kit) {
         surface: [1, 0],
         hit: [new Float32Array(4), new Float32Array(4)],
         heat: 0,
+        tint: 0,
       },
     };
   }
@@ -299,6 +306,7 @@ export function createRockViews(kit) {
     view.lean = (random() - 0.5) * 1.2;
     const look = VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common;
     view.look = look;
+    view.variant = enemy.variant;
     view.pulse = view.spinPhase;
     view.lastTime = null;
     view.family = look.crystal ? 'crystal' : 'stone';

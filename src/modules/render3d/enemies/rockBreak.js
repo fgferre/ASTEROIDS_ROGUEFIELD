@@ -7,6 +7,9 @@
 import { createSeededRandom } from '../asteroidMesh.js';
 import { cutRock } from './rockCut.js';
 
+// The colour each variant's inside glows in when it breaks (rockShader.js
+// ROCK_TINT): lava, a dense core's cold light, blood, gold, lit glass.
+const CUT_TINTS = { denseCore: 1, parasite: 2, gold: 3, crystal: 4 };
 // a cut face's heat, 1 → 0, over this many seconds
 export const CUT_COOL_SECONDS = 1.4;
 // a fragment starts where its piece was and eases onto its own position
@@ -23,6 +26,13 @@ const CRUMBLE_PIECES = [4, 5, 6];
 const CRUMBLE_SPEED = [1.6, 2.8];
 const CRUMBLE_SHRINK = 0.18;
 const CRUMBLE_LIFE = 0.55;
+// A crystal's or gold's shell: it shatters into this many shards, this
+// much faster, and its fragments (rolled anew, mostly plain stone: the
+// game's rule) come out from inside, growing over EMERGE_SECONDS.
+const SHELLS = { crystal: 1, gold: 1 };
+const SHELL_SHARDS = 9;
+const SHELL_SPEED = 1.6;
+const EMERGE_SECONDS = 0.22;
 // a split's pieces not claimed by a fragment view within this long are dropped
 const PENDING_SECONDS = 1;
 
@@ -68,6 +78,17 @@ export function createRockBreak(kit, rocks) {
   }
 
   function splitInto(view, enemy, fragments) {
+    if (SHELLS[enemy.variant]) {
+      crumbleInto(view, SHELL_SHARDS, SHELL_SPEED);
+      fragments.forEach((f) =>
+        pending.set(f.id, {
+          emerge: true,
+          world: view.object.position.clone(),
+          born: clock,
+        })
+      );
+      return;
+    }
     const dirs = fragments.map((f, i) => {
       let x = f.x - enemy.x;
       let z = f.y - enemy.y;
@@ -96,6 +117,7 @@ export function createRockBreak(kit, rocks) {
         geometry: piece.geometry,
         turn: object.quaternion.clone(),
         world,
+        tint: CUT_TINTS[enemy.variant] || 0,
         born: clock,
       });
     });
@@ -113,6 +135,7 @@ export function createRockBreak(kit, rocks) {
     view.rock.hit[0].fill(0);
     view.rock.hit[1].fill(0);
     view.rock.heat = 0;
+    view.rock.tint = view.piece?.tint || 0;
   }
 
   /**
@@ -122,7 +145,14 @@ export function createRockBreak(kit, rocks) {
    */
   function settle(view, enemy, dt) {
     const { piece, object, rock } = view;
-    if (piece && !piece.shaped) {
+    if (piece?.emerge) {
+      piece.age = (piece.age ?? -dt) + dt;
+      const k = Math.min(1, piece.age / EMERGE_SECONDS);
+      if (k < 1) {
+        object.position.lerp(piece.world, (1 - k) * (1 - k));
+        object.scale.multiplyScalar(0.35 + 0.65 * k);
+      } else view.piece = null;
+    } else if (piece && !piece.shaped) {
       // baked so that the fragment's own turn shows the rock's turn now
       q.copy(object.quaternion).invert().multiply(piece.turn);
       piece.geometry.applyMatrix4(m.makeRotationFromQuaternion(q));
@@ -160,10 +190,10 @@ export function createRockBreak(kit, rocks) {
     kit.seeded(() => crumbleInto(view));
   }
 
-  function crumbleInto(view) {
+  function crumbleInto(view, pieces, speedScale = 1) {
     const random = randomOf(view, 57);
     const r = view.radius || 12;
-    const count = CRUMBLE_PIECES[r <= 14 ? 0 : r <= 26 ? 1 : 2];
+    const count = pieces || CRUMBLE_PIECES[r <= 14 ? 0 : r <= 26 ? 1 : 2];
     const start = random() * Math.PI * 2;
     const dirs = [];
     for (let i = 0; i < count; i += 1) {
@@ -185,6 +215,7 @@ export function createRockBreak(kit, rocks) {
         part.scale.setScalar(size0);
         const speed =
           scale *
+          speedScale *
           (CRUMBLE_SPEED[0] + random() * (CRUMBLE_SPEED[1] - CRUMBLE_SPEED[0]));
         debris.push({
           family: view.family,
@@ -211,6 +242,7 @@ export function createRockBreak(kit, rocks) {
             surface: rock.surface.slice(),
             hit: [new Float32Array(4), new Float32Array(4)],
             heat: 1,
+            tint: CUT_TINTS[view.variant] || rock.tint,
           },
         });
       }

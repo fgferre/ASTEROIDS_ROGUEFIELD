@@ -31,6 +31,8 @@ varying vec2 vRockSurface;
 varying vec4 vRockHit;
 varying vec4 vRockHit2;
 varying float vRockHeat;
+varying float vRockTint;
+#define ROCK_TINT vRockTint
 #define ROCK_HIT vRockHit
 #define ROCK_HIT2 vRockHit2
 #define ROCK_HEAT vRockHeat
@@ -50,6 +52,7 @@ uniform vec3 uSeed;
 uniform vec4 uHit;
 uniform vec4 uHit2;
 uniform float uHeat;
+#define ROCK_TINT 0.0
 #define ROCK_HIT uHit
 #define ROCK_HIT2 uHit2
 #define ROCK_HEAT uHeat
@@ -136,7 +139,8 @@ export function patchRockShader(shader) {
       varying vec4 vRockHit2;
       varying float vRockHeat;
       attribute vec4 aVein;
-      attribute vec3 aSeed;
+      attribute vec4 aSeed;
+      varying float vRockTint;
       attribute vec4 aBase;
       varying vec4 vRockGlow;
       varying vec3 vRockVein;
@@ -168,7 +172,8 @@ export function patchRockShader(shader) {
       vRockHit2 = vec4(aHit2.xyz, aHit.w);
       vRockHeat = aHit2.w;
       vRockVein = aVein.rgb;
-      vRockSeed = aSeed;
+      vRockSeed = aSeed.xyz;
+      vRockTint = aSeed.w;
       vRockBase = aBase.rgb;
       vRockSurface = vec2(aBase.w, aVein.w);
       #endif
@@ -300,7 +305,14 @@ export function patchRockShader(shader) {
         float lava = 1.0 - smoothstep(0.0, 0.14,
           rockCracks(vRockPos * 4.0 + ROCK_SEED.yzx).x);
         float hot = cutHeat * cutHeat * (0.45 + 0.55 * lava);
-        totalEmissiveRadiance += ROCK_VEIN * 1.1 * smoothstep(0.03, 0.5, hot)
+        // the inside of what broke: lava (in its vein colour), a dense core's
+        // cold light, a parasite's blood, molten gold, lit glass
+        vec3 inside = ROCK_VEIN;
+        if (ROCK_TINT > 0.5) inside = vec3(0.3, 0.55, 1.5);
+        if (ROCK_TINT > 1.5) inside = vec3(1.3, 0.03, 0.08);
+        if (ROCK_TINT > 2.5) inside = vec3(1.5, 0.95, 0.2);
+        if (ROCK_TINT > 3.5) inside = vec3(0.65, 1.0, 1.5);
+        totalEmissiveRadiance += inside * 1.1 * smoothstep(0.03, 0.5, hot)
           + vec3(0.8, 0.5, 0.25) * smoothstep(0.75, 1.0, hot);
       }
       #endif

@@ -10,14 +10,15 @@ export const ROCK_INSTANCE_CAP = 64;
 
 // Per-instance attributes → item size, packed to stay within a GPU's
 // attribute slots: base colour (linear, × the baked rock colour) and
-// roughness, vein colour and metalness, crack-noise seed, glow (crack glow,
+// roughness, vein colour and metalness, crack-noise seed and the colour a
+// cut face glows in (rocks.js CUT_TINTS), glow (crack glow,
 // reveal, width, hit flash), the first struck point the cracks grow from
 // (rock-space direction, reach; reach 0 = cracks everywhere), the last one
 // and the heat of a cut face (rockCut.js).
 export const ROCK_ATTRIBUTES = {
   aBase: 4,
   aVein: 4,
-  aSeed: 3,
+  aSeed: 4,
   aGlow: 4,
   aHit: 4,
   aHit2: 4,
@@ -129,7 +130,8 @@ export class RockInstances {
     attributes.aBase.array[n * 4 + 3] = surface[0];
     vein.toArray(attributes.aVein.array, n * 4);
     attributes.aVein.array[n * 4 + 3] = surface[1];
-    seed.toArray(attributes.aSeed.array, n * 3);
+    seed.toArray(attributes.aSeed.array, n * 4);
+    attributes.aSeed.array[n * 4 + 3] = view.rock.tint;
     attributes.aGlow.array.set(glow, n * 4);
     attributes.aHit.array.set(hit[0], n * 4);
     attributes.aHit2.array.set(hit[1], n * 4);
