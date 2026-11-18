@@ -85,9 +85,6 @@ describe('CardEffects', () => {
     expect(shots[0].y).toBeCloseTo(295, 9);
     expect(frozen.x).toBe(160);
     expect(shots[1].y).toBe(300);
-    // what it held is drawn (weaponMirror)
-    expect(cards.braked).toEqual([moving]);
-    expect(cards.brakedShots).toEqual([shots[0]]);
   });
 
   it('a burn set again faster than it ticks still ticks on its own interval', () => {

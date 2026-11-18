@@ -618,14 +618,6 @@ class CombatSystem extends BaseSystem {
     return this.cards.pulls;
   }
 
-  get braked() {
-    return this.cards.braked;
-  }
-
-  get brakedShots() {
-    return this.cards.brakedShots;
-  }
-
   get cinders() {
     return this.cards.cinders;
   }

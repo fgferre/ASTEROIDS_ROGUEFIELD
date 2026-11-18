@@ -1,8 +1,7 @@
 // Weapon looks in 3D (docs/NORTE.md §7 pillar 4): evolved lances, beams,
 // flak bolts and bursts, chain arcs, orbit blades, the aura's ring and
 // pulses, seeker missiles, the thruster trails and the field's grip (the
-// static on what it slows, what falls into a Singularity, what the Gravity
-// Brake drags),
+// static on what it slows, what falls into a Singularity),
 // drawn into the shared batches from CombatSystem's state. Beams, bolts,
 // bursts, blades, rings and missiles carry the `colors` of the weapon that
 // fired them; the lance's come from data/weapons.js. Light keeps its body
@@ -83,7 +82,6 @@ const BOLT_HEAVY = 1.3;
 // re-struck every STATIC_FRAMES frames; height over the plane (+ × radius),
 // widths and gains. A Singularity's well: WELL_STREAKS bits of matter
 // spiralling in (WELL_TURN rad over the pull), its dark core and a glint.
-// A shot the Gravity Brake drags leaves a short violet wake (× its speed).
 const STATIC_ARCS = 2;
 const STATIC_KINKS = 4;
 const STATIC_FRAMES = 4;
@@ -96,8 +94,6 @@ const WELL_TURN = 2.6;
 const WELL_TAIL = 0.08; // of the pull
 const WELL_CORE = 9;
 const WELL_DARK = [0.012, 0.006, 0.02];
-const DRAG_WAKE = 0.06; // s of travel
-const DRAG_H = 4;
 let staticFrame = 0;
 // A seeker: casing half length and width, exhaust flame, nose light.
 const SEEKER_H = 4;
@@ -440,25 +436,6 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   combat.slows.forEach((entry, enemy) => {
     pushStatic(ribbons, enemy, fieldRgb, white, 1);
   });
-  // The Gravity Brake drags what is near the ship: the same static on the
-  // machines, a violet wake behind the shots it holds back.
-  combat.braked.forEach((enemy) => {
-    if (!combat.slows.has(enemy))
-      pushStatic(ribbons, enemy, fieldRgb, white, 0.6);
-  });
-  combat.brakedShots.forEach((shot) => {
-    ribbons.tube(
-      shot.x - (shot.vx || 0) * DRAG_WAKE,
-      shot.y - (shot.vy || 0) * DRAG_WAKE,
-      shot.x,
-      shot.y,
-      DRAG_H,
-      fieldRgb,
-      2.4,
-      0.7
-    );
-  });
-
   // Singularity: each pulled machine crackles harder; at each hit point
   // matter spirals in to a dark core over the pull.
   const singularityRgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);

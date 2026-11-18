@@ -179,9 +179,6 @@ export class CardEffects {
     this.burns = new Map();
     this.slows = new Map();
     this.pulls = new Map();
-    // what the Gravity Brake held back on its last step (drawn, lote 4)
-    this.braked = [];
-    this.brakedShots = [];
     this.cardEffects = {};
     this.cardRolls = 0;
     this.cinders = [];
@@ -500,13 +497,11 @@ export class CardEffects {
       }
       enemy.x -= (enemy.vx || 0) * drag;
       enemy.y -= (enemy.vy || 0) * drag;
-      this.braked.push(enemy);
     });
     this.enemyBullets().forEach((shot) => {
       if (shot.stasisTimer > 0 || !inField(shot)) return;
       shot.x -= (shot.vx || 0) * drag;
       shot.y -= (shot.vy || 0) * drag;
-      this.brakedShots.push(shot);
     });
   }
 
@@ -574,8 +569,6 @@ export class CardEffects {
       });
     }
 
-    this.braked.length = 0;
-    this.brakedShots.length = 0;
     if (gravityBrake && !player.isDead) {
       this.applyGravityBrake(gravityBrake, deltaTime);
     }
