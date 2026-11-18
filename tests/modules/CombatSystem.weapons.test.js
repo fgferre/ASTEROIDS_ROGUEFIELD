@@ -430,6 +430,10 @@ describe('Scatter Coil', () => {
 
     expect(combat.bullets).toHaveLength(0);
     expect(bursts).toHaveBeenCalledTimes(FAN.bolts);
+    // one burst caught the centre enemy; the rest burned out on nothing
+    expect(bursts.mock.calls.filter(([burst]) => !burst.fizzled)).toHaveLength(
+      1
+    );
     expect(combat.flakBursts).toHaveLength(FAN.bolts);
     expect(combat.flakBursts.filter((burst) => burst.lit)).toHaveLength(1);
     const burst = combat.flakBursts[2];

@@ -358,14 +358,16 @@ class Renderer3D extends BaseSystem {
     // A burst (flak, a missile) explodes: a fireball rolling into soot, hot
     // streaks all round and incandescent fragments.
     this.registerEventListener('flak-burst', (data) => {
-      const { position, angle, radius, look } = data || {};
+      const { position, angle, radius, look, fizzled } = data || {};
       if (!position) return;
-      const missile = look === 'seeker';
+      // a missile spent on nothing at the end of its range pops small
+      const spent = look === 'seeker' && fizzled;
+      const missile = look === 'seeker' && !fizzled;
       this.three?.blasts.emit(
         position.x,
         position.y,
         radius || 30,
-        missile ? BLAST_LOOK.seeker : BLAST_LOOK.flak
+        BLAST_LOOK[spent ? 'spent' : missile ? 'seeker' : 'flak']
       );
       const dx = Math.cos(angle || 0);
       const dy = Math.sin(angle || 0);

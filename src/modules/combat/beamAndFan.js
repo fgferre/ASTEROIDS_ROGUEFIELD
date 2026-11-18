@@ -247,5 +247,8 @@ export function burstFlak(w, bolt) {
     angle,
     hits: struck.length,
     look: bolt.projectile.look,
+    // it reached the end of its range and caught nothing (the renderer pops
+    // a spent missile small)
+    fizzled: bolt.life <= 0 && struck.length === 0,
   });
 }
