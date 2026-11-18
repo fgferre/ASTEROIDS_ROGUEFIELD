@@ -13,6 +13,7 @@ const RING_DEPTH = 0.22;
 const RING_JITTER = 0.06;
 const HEART_PULL = 0.15;
 const CUT_HEAT = [1, 0.55, 0.25]; // rim, ring, heart
+const NORMAL_JITTER = 1.1;
 
 const fract = (x) => x - Math.floor(x);
 // rockShader.js rockHash, per component
@@ -178,14 +179,20 @@ function closePiece(THREE, tris, position, normal, color, random, bulk) {
     }
     return p;
   };
-  const inside = color ? [0.32, 0.3, 0.29] : [1, 1, 1];
+  const inside = color ? [0.13, 0.12, 0.115] : [1, 1, 1];
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
+  // a break is rough: each corner's normal is tipped at random, so the
+  // flat cut face catches the light unevenly instead of as one sheet
   const face = (p, q, r, hp, hq, hr) => {
     const n = b.copy(q).sub(p).cross(a.copy(r).sub(p)).normalize();
     [p, q, r].forEach((v) => {
       pos.push(v.x, v.y, v.z);
-      nor.push(n.x, n.y, n.z);
+      const tx = n.x + (random() - 0.5) * NORMAL_JITTER;
+      const ty = n.y + (random() - 0.5) * NORMAL_JITTER;
+      const tz = n.z + (random() - 0.5) * NORMAL_JITTER;
+      const len = Math.hypot(tx, ty, tz) || 1;
+      nor.push(tx / len, ty / len, tz / len);
       col.push(...inside);
     });
     cut.push(hp, hq, hr);
