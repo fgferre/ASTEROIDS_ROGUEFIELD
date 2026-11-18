@@ -298,13 +298,15 @@ export function patchRockShader(shader) {
         totalEmissiveRadiance += ROCK_VEIN * crack * ROCK_GLOW;
       }
       #ifdef ROCK_CUT
-      // a fresh cut (rockCut.js): its rim hottest, lava veins in the break,
-      // in the rock's own vein colour, white where hottest; cools with heat
+      // a fresh cut (rockCut.js): dark stone crossed by lava lines, in the
+      // rock's own vein colour, white where hottest; cools with heat. Only
+      // the lines glow: a face lit whole showed its jagged rim as yellow
+      // paper teeth (the owner chose lines only, 17/11)
       float cutHeat = vRockCut * ROCK_HEAT;
       if (cutHeat > 0.001) {
         float lava = 1.0 - smoothstep(0.0, 0.14,
           rockCracks(vRockPos * 4.0 + ROCK_SEED.yzx).x);
-        float hot = cutHeat * cutHeat * (0.45 + 0.55 * lava);
+        float hot = cutHeat * lava;
         // the inside of what broke: lava (in its vein colour), a dense core's
         // cold light, a parasite's blood, molten gold, lit glass
         vec3 inside = ROCK_VEIN;
