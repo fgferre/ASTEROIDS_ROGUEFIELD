@@ -50,11 +50,14 @@ function clearUntilLayer(game, layer) {
   }
 }
 
-const click = (game, id) =>
+// A menu click, without the remote link's screen (remoteLink.js) between.
+const click = (game, id) => {
+  game.session.menuButtons.linkIn = (options, start) => start();
   game.session.handleDocumentClick({
     target: { closest: () => ({ id }) },
     preventDefault() {},
   });
+};
 
 describe('Boss Rush', () => {
   let restoreDom;

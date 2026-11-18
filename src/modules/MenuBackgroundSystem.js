@@ -303,15 +303,18 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   setupLoadingScreen() {
-    loadingScreen.setupLoadingScreen((onProgress, hide) => {
-      this.loadingState.covered = true;
-      // The frame the screen fades onto is drawn before it starts to fade.
-      this.setLoadingCallbacks(onProgress, () => {
-        this.loadingState.covered = false;
-        if (this.isActive) this.renderFrame();
-        hide();
-      });
-    });
+    loadingScreen.setupLoadingScreen(
+      (onProgress, hide) => {
+        this.loadingState.covered = true;
+        // The frame the screen fades onto is drawn before it starts to fade.
+        this.setLoadingCallbacks(onProgress, () => {
+          this.loadingState.covered = false;
+          if (this.isActive) this.renderFrame();
+          hide();
+        });
+      },
+      () => this.eventBus?.emit('press-start')
+    );
   }
 
   bootstrapScene() {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupLoadingScreen } from '../../../src/modules/menu/loadingScreen.js';
 
 function fakeElement() {
@@ -21,7 +21,9 @@ function fakeElement() {
   };
 }
 
-function boot(search, pad = { pads: [] }) {
+const clock = { now: 0 };
+
+function boot(search, pad = { pads: [] }, { awake = true, onStart } = {}) {
   const screen = fakeElement();
   const menu = fakeElement();
   menu.classes.add('hidden');
@@ -35,7 +37,11 @@ function boot(search, pad = { pads: [] }) {
   };
   const docListeners = {};
   vi.stubGlobal('window', { location: { search } });
-  vi.stubGlobal('navigator', { getGamepads: () => pad.pads });
+  vi.stubGlobal('navigator', {
+    getGamepads: () => pad.pads,
+    userActivation: { hasBeenActive: awake },
+  });
+  vi.stubGlobal('performance', { now: () => clock.now });
   vi.stubGlobal('requestAnimationFrame', (fn) => {
     pad.frame = fn;
     return 1;
@@ -47,7 +53,10 @@ function boot(search, pad = { pads: [] }) {
     removeEventListener: (type) => delete docListeners[type],
   });
   let complete;
-  setupLoadingScreen((_progress, onComplete) => (complete = onComplete));
+  setupLoadingScreen(
+    (_progress, onComplete) => (complete = onComplete),
+    onStart
+  );
   complete();
   return { screen, menu, menuButton, button, docListeners };
 }
@@ -59,6 +68,11 @@ const enter = () => ({
 });
 
 describe('loading screen PRESS START gate', () => {
+  beforeEach(() => {
+    clock.now = 0;
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -77,6 +91,9 @@ describe('loading screen PRESS START gate', () => {
     const event = enter();
     docListeners.keydown(event);
     expect(event.preventDefault).toHaveBeenCalled();
+    expect(screen.classes.has('loading-screen--starting')).toBe(true);
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
     expect(menu.classes.has('hidden')).toBe(false);
     expect(screen.classes.has('hidden')).toBe(true);
@@ -87,6 +104,7 @@ describe('loading screen PRESS START gate', () => {
   it('opens the menu on a click', () => {
     const { screen, menu } = boot('');
     screen.listeners.click();
+    vi.advanceTimersByTime(1000);
     expect(menu.classes.has('hidden')).toBe(false);
   });
 
@@ -97,6 +115,7 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
     pad.pads = [{ buttons: [{ pressed: true }] }];
     pad.frame();
+    vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
     expect(menuButton.focus).toHaveBeenCalledTimes(1);
   });
@@ -112,7 +131,29 @@ describe('loading screen PRESS START gate', () => {
     pad.frame();
     pad.pads = [{ buttons: [{ pressed: true }] }];
     pad.frame();
+    vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
+  });
+
+  it('asleep before any gesture: the first key wakes it, a later one starts', () => {
+    const onStart = vi.fn();
+    const { screen, docListeners } = boot('', undefined, {
+      awake: false,
+      onStart,
+    });
+    expect(screen.classes.has('loading-screen--asleep')).toBe(true);
+    // The capture listener (the wake) and the key listener hear the same key.
+    const wake = docListeners.pointerdown;
+    wake();
+    docListeners.keydown(enter());
+    expect(screen.classes.has('loading-screen--asleep')).toBe(false);
+    clock.now = 300;
+    docListeners.keydown(enter());
+    expect(onStart).not.toHaveBeenCalled();
+    clock.now = 600;
+    docListeners.keydown(enter());
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.classes.has('loading-screen--starting')).toBe(true);
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(
