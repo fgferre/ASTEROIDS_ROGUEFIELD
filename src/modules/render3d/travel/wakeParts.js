@@ -161,19 +161,25 @@ export function createKit(THREE, seed, tile) {
     const from = away || V(centre.x, 0, 0);
     if (normal.dot(new THREE.Vector3().subVectors(centre, from)) < 0)
       normal.negate();
-    const ring = (h) =>
+    const ring = (h, draw = 0) =>
       corners.map((p) => {
         const toCentre = new THREE.Vector3().subVectors(centre, p);
-        const pull = Math.min(0.45, inset / Math.max(1e-6, toCentre.length()));
+        const pull = Math.min(
+          0.45,
+          (inset + draw) / Math.max(1e-6, toCentre.length())
+        );
         return p
           .clone()
           .addScaledVector(toCentre, pull)
           .addScaledVector(normal, h);
       });
-    return skin(THREE, [ring(lift), ring(lift + thick)], {
-      start: 'flat',
-      end: 'flat',
-    });
+    // A chamfered top edge: it is what catches the light.
+    const cut = Math.min(0.05, Math.abs(thick) * 0.3);
+    return skin(
+      THREE,
+      [ring(lift), ring(lift + thick - cut), ring(lift + thick, cut * 1.6)],
+      { start: 'flat', end: 'flat' }
+    );
   };
   // A rod of `sides` between two points.
   const tube = (from, to, radius, sides = 6, open = false) => {

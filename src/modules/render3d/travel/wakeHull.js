@@ -213,3 +213,30 @@ export function wakeMark(kit, origin, side, height, word = true) {
     x0 += width + 0.16;
   });
 }
+
+// The stern's stations (wakeStern.js, wakeBridge.js, wakeEngines.js): the tall
+// aft block, then the engine block.
+export const STERN_BASE = {
+  x: -14,
+  hw: 8.9,
+  tw: 5.8,
+  kw: 4.8,
+  yt: 6.8,
+  yh: 3.5,
+  yl: -3.1,
+  yb: -7.2,
+};
+export const STERN_AFT = { ...STERN_BASE, x: -35 };
+// The engine block: wider and flatter, to carry three engines abreast.
+export const ENGINE_BLOCK = {
+  x: -39,
+  hw: 10.4,
+  tw: 7.0,
+  kw: 6.4,
+  yt: 5.4,
+  yh: 3.4,
+  yl: -3.8,
+  yb: -6.6,
+};
+export const ENGINE_TAIL = { ...ENGINE_BLOCK, x: -45.5 };
+export const STERN_DECK = STERN_BASE.yt;
