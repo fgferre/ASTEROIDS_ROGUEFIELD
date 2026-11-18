@@ -26,6 +26,11 @@ const CRUMBLE_PIECES = [4, 5, 6];
 const CRUMBLE_SPEED = [1.6, 2.8];
 const CRUMBLE_SHRINK = 0.18;
 const CRUMBLE_LIFE = 0.55;
+// a rock crushed in a Quarry Maw's mouth: pieces, how much faster, and how
+// far off the jaws' facing they leave (rad: out of the sides, a little ahead)
+const CRUSH_PIECES = 9;
+const CRUSH_SPEED = 1.4;
+const CRUSH_SIDE = 1.45;
 // A crystal's or gold's shell: it shatters into this many shards, this
 // much faster, and its fragments (rolled anew, mostly plain stone: the
 // game's rule) come out from inside, growing over EMERGE_SECONDS.
@@ -190,14 +195,25 @@ export function createRockBreak(kit, rocks) {
     kit.seeded(() => crumbleInto(view));
   }
 
-  function crumbleInto(view, pieces, speedScale = 1) {
+  /**
+   * `view`'s rock was crushed in a mouth facing `facing` (rad, logical):
+   * its pieces leave out of the jaws' sides.
+   */
+  function crush(view, facing) {
+    kit.seeded(() => crumbleInto(view, CRUSH_PIECES, CRUSH_SPEED, facing));
+  }
+
+  function crumbleInto(view, pieces, speedScale = 1, facing = null) {
     const random = randomOf(view, 57);
     const r = view.radius || 12;
     const count = pieces || CRUMBLE_PIECES[r <= 14 ? 0 : r <= 26 ? 1 : 2];
     const start = random() * Math.PI * 2;
     const dirs = [];
     for (let i = 0; i < count; i += 1) {
-      const a = start + (i / count) * Math.PI * 2;
+      const a =
+        facing === null
+          ? start + (i / count) * Math.PI * 2
+          : facing + (i % 2 ? 1 : -1) * CRUSH_SIDE + (random() - 0.5) * 0.6;
       dirs.push(toRock(view, Math.cos(a), (random() - 0.5) * 0.6, Math.sin(a)));
     }
     const { object, rock } = view;
@@ -282,5 +298,5 @@ export function createRockBreak(kit, rocks) {
     }
   }
 
-  return { struck, split, adopt, settle, crumble, update };
+  return { struck, split, adopt, settle, crumble, crush, update };
 }

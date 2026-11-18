@@ -811,7 +811,7 @@ export class EnemyMirror {
   // --- per frame -------------------------------------------------------------
 
   /** Mirrors `enemies`; returns the Warden view (for its light) or null. */
-  update(enemies, time, dt = 0) {
+  update(enemies, time, dt = 0, sparks = null) {
     this.frame += 1;
     this.dissolve.update(dt);
     this.rocks.begin();
@@ -853,7 +853,10 @@ export class EnemyMirror {
     this.views.forEach((view, key) => {
       if (view.stamp !== this.frame) {
         if (this.dead.delete(key)) this.die(key, view);
-        else this.release(key, view);
+        else if (this.rockViews.crush(view, sparks)) {
+          this.views.delete(key);
+          this.pool(view);
+        } else this.release(key, view);
       }
     });
     if (this.dead.size) this.dead.forEach(this.pruneDead);

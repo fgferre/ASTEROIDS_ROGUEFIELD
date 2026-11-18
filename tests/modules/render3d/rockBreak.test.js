@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DeathBursts } from '../../../src/modules/render3d/dissolve.js';
 import { EnemyMirror } from '../../../src/modules/render3d/enemyMirror.js';
 
@@ -77,5 +77,41 @@ describe('rock breaking', () => {
     });
     const shapes = kids.map((k) => mirror.views.get(k.id).shape);
     expect(new Set(shapes).size).toBe(3);
+  });
+
+  it('a rock the Quarry Maw swallows is crushed in its mouth: pieces and dust out of the sides, the core flaring', () => {
+    const mirror = mirrorOf();
+    const maw = {
+      id: 'maw',
+      type: 'boss',
+      bossKind: 'quarry-maw',
+      x: 400,
+      y: 300,
+      radius: 66,
+      facing: 0,
+      jawOpen: 1,
+      swallowedTotal: 0,
+      getHitFlash: () => 0,
+    };
+    const enemy = rock('r', 460, 300, 20);
+    const sparks = { emit: vi.fn() };
+    mirror.update([maw, enemy], 0, 0, sparks);
+    const core = mirror.views.get('maw').coreMaterial;
+    const before = core.emissiveIntensity;
+
+    enemy.destroyed = true;
+    enemy.crushedIn = { x: 459, y: 300, facing: 0 };
+    maw.swallowedTotal = 1;
+    mirror.update([maw], 0, 0.016, sparks);
+    expect(mirror.views.has('r')).toBe(false);
+    const pieces = mirror.rocks.meshes.stone
+      .slice(mirror.rocks.fixed)
+      .filter((m) => m.count);
+    expect(pieces.length).toBeGreaterThan(3);
+    expect(core.emissiveIntensity).toBeGreaterThan(before + 1);
+    // one spray to each side of the jaws
+    expect(sparks.emit).toHaveBeenCalledTimes(2);
+    const [[, , , upY], [, , , downY]] = sparks.emit.mock.calls;
+    expect(upY * downY).toBeLessThan(0);
   });
 });

@@ -22,6 +22,9 @@ const JAW_SWING = 0.85;
 // proposta 13/11: the mouth's flash as a salvo leaves it (gain) and how fast
 // it fades (1/s).
 const SALVO_FLASH = [3, 9];
+// a rock crushed in the mouth: the crucible and the mouth's light flare
+// (gains) and fade (1/s), in their own colour
+const CRUSH_FLASH = [1.4, 2, 7];
 
 // Top-view outlines ([x, z], counter-clockwise seen from above with +z down
 // the page), mirrored where they span the centre line.
@@ -258,6 +261,8 @@ export function createQuarryMaw(sk) {
       mouth,
       salvo: 0,
       flash: -Infinity,
+      eaten: 0,
+      crushed: -Infinity,
       kind,
       object: group,
       jaws,
@@ -296,10 +301,16 @@ export function createQuarryMaw(sk) {
       );
     }
     const flash = boss.getHitFlash();
+    if ((boss.swallowedTotal ?? 0) !== view.eaten) {
+      if ((boss.swallowedTotal ?? 0) > view.eaten) view.crushed = time;
+      view.eaten = boss.swallowedTotal ?? 0;
+    }
+    const crush = Math.exp(-CRUSH_FLASH[2] * (time - view.crushed));
     view.coreMaterial.emissiveIntensity =
       CORE_COLD +
       open * (CORE_HOT + 0.3 * Math.sin(time * CORE_BEAT)) +
-      flash * CORE_FLASH * (0.2 + open);
+      flash * CORE_FLASH * (0.2 + open) +
+      crush * CRUSH_FLASH[0];
     const t = boss.telegraph;
     if ((boss.salvo ?? 0) !== view.salvo) {
       if ((boss.salvo ?? 0) > view.salvo) view.flash = time;
@@ -311,7 +322,9 @@ export function createQuarryMaw(sk) {
       : lensGain(false, 0, 0);
     kit.setGain(
       view.mouth.tone,
-      mouth + SALVO_FLASH[0] * Math.exp(-SALVO_FLASH[1] * (time - view.flash))
+      mouth +
+        SALVO_FLASH[0] * Math.exp(-SALVO_FLASH[1] * (time - view.flash)) +
+        crush * CRUSH_FLASH[1]
     );
     kit.updateTelegraph(view.telegraph, boss, radius);
   }
