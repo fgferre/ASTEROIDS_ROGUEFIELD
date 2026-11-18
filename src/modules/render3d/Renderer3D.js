@@ -34,7 +34,7 @@ import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
-import { VIEW_KINDS, hashId, markShadowCasters } from './enemyMirror.js';
+import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import {
   mirrorEffects,
   mirrorPickups,
@@ -43,6 +43,7 @@ import {
 import { FormationMarks } from './formationMarks.js';
 import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
 import { BLAST_LOOK } from './blasts.js';
+import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { strikeOf } from './enemies/rocks.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
@@ -73,20 +74,6 @@ const DASH_ZOOM_PULSE = 0.94;
 const DASH_ZOOM_PULSE_SECONDS = 0.3;
 const BRAKE_ZOOM_PULSE = 1.04;
 const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
-// proposta 17/11 (efeito/impacto, lote 4): how far round from the ship's
-// side a burn's ticks bite (rad, the whole spread), how far out (× radius),
-// and the soot rising off the bite: puffs, cycle (s), drift and rise
-// (world units over a cycle), height, size (start, end), alpha, colour.
-const BURN_SPREAD = 1.8;
-const BURN_REACH = 0.6;
-const BURN_WISPS = 3;
-const BURN_WISP_TIME = 0.9;
-const BURN_WISP_DRIFT = 10;
-const BURN_WISP_RISE = 8;
-const BURN_WISP_H = 7;
-const BURN_WISP_SIZE = [4, 11];
-const BURN_WISP_ALPHA = 0.45;
-const BURN_SOOT = [0.14, 0.12, 0.11];
 // The ship's hull panels cast; its turret, nozzles and canopy (radius under
 // this, world units) only receive.
 const SHIP_MIN_CASTER = 5;
@@ -182,8 +169,7 @@ class Renderer3D extends BaseSystem {
     };
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
-    this.burnTicks = new WeakMap(); // burn entry → its last bite
-    this.burnClock = 0;
+    this.burnMarks = new BurnMarks();
     this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
     this.formationMarks = new FormationMarks();
@@ -894,7 +880,13 @@ class Renderer3D extends BaseSystem {
     }
     const { focus } = this.cameraRig;
     const fog = t.enemies.updateFog(dt, this.denseFog, focus.x, focus.z);
-    this.markBurns(this.cachedCombat, player, dt);
+    this.burnMarks.update(
+      dt,
+      this.cachedCombat,
+      player,
+      this.three,
+      this.hitSparks
+    );
     t.decals.update(dt, t.enemies.views);
     t.blasts.update(dt, t.camera, this.flashScale);
     t.veil.update(dt);
@@ -1044,80 +1036,6 @@ class Renderer3D extends BaseSystem {
       alive ? player.position.x - HALF_W : 0,
       alive ? player.position.y - HALF_H : 0,
       alive ? ship.shieldRadius : 0
-    );
-  }
-
-  // A burn bites the hull at each tick (lote 4): a molten mark where it
-  // bites, on the side facing the ship (where the shots came from), slow
-  // embers and drips of slag; a rock gets a hit's lava patch. The Solar
-  // Flare's burns throw more. While it burns, soot rises off the bite.
-  markBurns(combat, player, dt) {
-    const burns = combat?.burns;
-    if (!burns?.size || !this.three) return;
-    this.burnClock += dt;
-    const flare = combat.weapons.hasApex('thermal');
-    const ship = player?.position;
-    burns.forEach((entry, enemy) => {
-      const r = enemy.radius || 12;
-      let bite = this.burnTicks.get(entry);
-      if (bite?.ticks !== entry.ticksLeft) {
-        const toShip = ship
-          ? Math.atan2(ship.y - enemy.y, ship.x - enemy.x)
-          : 0;
-        const seed = hashId(enemy.id) % 9973;
-        const h = Math.sin(seed * 12.9898 + entry.ticksLeft * 78.233);
-        const jitter = h * 43758.5453 - Math.floor(h * 43758.5453) - 0.5;
-        const angle = toShip + jitter * BURN_SPREAD;
-        bite = {
-          ticks: entry.ticksLeft,
-          nx: Math.cos(angle),
-          ny: Math.sin(angle),
-          seed,
-        };
-        this.burnTicks.set(entry, bite);
-        this.biteBurn(enemy, bite, flare);
-      }
-      const x = enemy.x + bite.nx * r * BURN_REACH;
-      const y = enemy.y + bite.ny * r * BURN_REACH;
-      for (let i = 0; i < BURN_WISPS; i += 1) {
-        const age =
-          (this.burnClock / BURN_WISP_TIME +
-            i / BURN_WISPS +
-            bite.seed * 0.01) %
-          1;
-        this.three.smoke.push(
-          x + bite.nx * age * BURN_WISP_DRIFT,
-          BURN_WISP_H + age * BURN_WISP_RISE,
-          y + bite.ny * age * BURN_WISP_DRIFT,
-          BURN_SOOT,
-          BURN_WISP_SIZE[0] + (BURN_WISP_SIZE[1] - BURN_WISP_SIZE[0]) * age,
-          BURN_WISP_ALPHA * Math.sin(Math.PI * age)
-        );
-      }
-    });
-  }
-
-  biteBurn(enemy, { nx, ny }, flare) {
-    const r = enemy.radius || 12;
-    const rock = enemy.type === 'asteroid';
-    this.hitSparks.emit(
-      enemy.x + nx * r * BURN_REACH,
-      enemy.y + ny * r * BURN_REACH,
-      nx,
-      ny,
-      0,
-      0,
-      flare,
-      rock ? SPARK_KIND.rock : SPARK_KIND.burn
-    );
-    if (isBossEnemy(enemy)) return;
-    const view = this.three.enemies.views.get(enemy.id || enemy);
-    if (!view || view.kind.startsWith('herald')) return;
-    this.three.decals.hit(
-      view,
-      nx,
-      ny,
-      rock ? DECAL_KIND.rock : DECAL_KIND.burn
     );
   }
 
