@@ -23,6 +23,7 @@ import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
+import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
@@ -319,6 +320,7 @@ export function setupThree(seeded) {
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
   const decals = new ScorchDecals(THREE, scene);
+  const blasts = new Blasts(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
     scene,
@@ -406,6 +408,7 @@ export function setupThree(seeded) {
     pickups,
     chests,
     decals,
+    blasts,
     shield,
     ribbons,
     lances,

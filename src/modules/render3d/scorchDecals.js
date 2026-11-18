@@ -2,7 +2,8 @@
 // white-hot core that cools through orange to a dull red, its molten veins
 // glowing longest, then a dark burn that fades over a few seconds. On a
 // machine's metal a smaller spot glows white-hot and dies in under half a
-// second, leaving a dark dent. One InstancedMesh
+// second, leaving a dark dent. A burning hull (the thermal family's burn)
+// glows where each tick bites, molten like the lava, and chars. One InstancedMesh
 // (one draw call) of quads; each mark keeps its pose in its rock's local
 // space, so it turns and drifts with the rock and dies with its view. The
 // mark sits where a ray from above the hit side meets the real (displaced)
@@ -18,11 +19,12 @@ const DECAL_LIFT = 0.35; // world units off the surface
 const DECAL_LEAN = 0.8; // how far the mark climbs toward the rock's top
 // proposta 17/11 (efeito/impacto, was a 0.5 s ember on rock only): the
 // heat of each material and how much of its spot it covers.
-export const DECAL_KIND = Object.freeze({ rock: 0, metal: 1 });
+export const DECAL_KIND = Object.freeze({ rock: 0, metal: 1, burn: 2 });
 // The player's ship is no enemy view: its marks live under this id
 // (shipView(), Renderer3D).
 export const SHIP_DECAL_ID = 'ship';
-const EMBER_TIME = [1.8, 0.7]; // s, rock / metal
+const EMBER_TIME = [1.8, 0.7, 1.6]; // s, rock / metal / burn
+const BURN_SIZE = 1.6; // × a machine's mark (proposta 17/11, lote 4)
 const ROCK_SIZE = 1.6; // × the 18/10 mark
 const METAL_SIZE = [7, 16, 0.75]; // a machine's mark: min, max, × its radius
 const KIND_CHAR = [0.8, 0.45]; // how dark the burn
@@ -76,7 +78,8 @@ void main() {
   float n = decalNoise(vUv * 3.0 + vSeed * 7.0) * 0.6 + decalNoise(vUv * 7.0) * 0.4;
   float shape = 1.0 - smoothstep(0.25, 1.0, r + (n - 0.5) * 0.55);
   if (shape <= 0.0) discard;
-  float metal = step(0.5, vKind);
+  // a burn is metal that melts: the lava's look, on a hull
+  float metal = step(0.5, vKind) * step(vKind, 1.5);
   float a = shape * uChar * vFade * mix(${KIND_CHAR[0].toFixed(2)}, ${KIND_CHAR[1].toFixed(2)}, metal);
   float h = vHeat;
   vec3 heat = mix(vec3(0.5, 0.035, 0.0), vec3(2.3, 0.72, 0.15), smoothstep(0.0, 0.55, h));
@@ -234,7 +237,7 @@ export class ScorchDecals {
         : Math.max(
             METAL_SIZE[0],
             Math.min(METAL_SIZE[1], radius * METAL_SIZE[2])
-          );
+          ) * (kind === DECAL_KIND.burn ? BURN_SIZE : 1);
     this.quaternion.setFromUnitVectors(this.zAxis, this.normal);
     this.spin.setFromAxisAngle(this.zAxis, this.rand() * Math.PI * 2);
     this.quaternion.multiply(this.spin);

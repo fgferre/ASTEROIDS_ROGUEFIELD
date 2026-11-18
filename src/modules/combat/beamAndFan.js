@@ -246,5 +246,6 @@ export function burstFlak(w, bolt) {
     radius,
     angle,
     hits: struck.length,
+    look: bolt.projectile.look,
   });
 }

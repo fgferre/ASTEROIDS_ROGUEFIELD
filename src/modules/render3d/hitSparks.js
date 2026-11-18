@@ -4,14 +4,23 @@
 //   Metal throws a cone of hot streaks glancing along the ricochet and a few
 //   drops of molten slag that cool as they fly (the Hit Markers setting); rock
 //   spits a few slower molten droplets that cool from orange to dull red and
-//   a puff of grey dust; the shield sheds cyan-white flecks.
+//   a puff of grey dust; the shield sheds cyan-white flecks. A burst
+//   (flak, a missile) throws hot streaks all round and incandescent
+//   fragments that cool as they fly; a burning hull sheds slow embers and
+//   drips slag.
 // - MuzzleFlashes: a 2-frame hot pulse at the nose for each player shot.
 // - KillPops: a machine that dies flashes white-hot at its own core (instead
 //   of the whole screen), then the heat drops through orange.
 // Plain typed arrays, filled from events and drained in render(); jitter is
 // a hash of a running counter, so it never touches Math.random.
 
-export const SPARK_KIND = Object.freeze({ metal: 0, rock: 1, shield: 2 });
+export const SPARK_KIND = Object.freeze({
+  metal: 0,
+  rock: 1,
+  shield: 2,
+  blast: 3,
+  burn: 4,
+});
 
 // proposta 17/11 (efeito/impacto): per material, count / speed / life / drag.
 const SPARK_POOL = 160;
@@ -55,6 +64,33 @@ const KINDS = [
     gain: 2.0,
     maxLength: 10,
   },
+  // proposta 17/11 (lote 4) blast: hot streaks all round a burst; `kill`
+  // is a missile's
+  {
+    hit: 14,
+    kill: 22,
+    speed: [180, 420],
+    life: [0.12, 0.32],
+    drag: 5,
+    cone: Math.PI,
+    hot: 5,
+    width: 1.4,
+    gain: 2.4,
+    maxLength: 16,
+  },
+  // burn: slow embers off a burning hull, cooling like rock's droplets
+  {
+    hit: 4,
+    kill: 7,
+    speed: [35, 110],
+    life: [0.35, 0.8],
+    drag: 2,
+    cone: 1.2,
+    hot: 1,
+    width: 1.5,
+    gain: 1.8,
+    maxLength: 5,
+  },
 ];
 const REFLECT_MIX = 0.6; // how much the cone leans along the ricochet
 const SPARK_STRETCH = 0.035; // streak length per unit of speed
@@ -76,6 +112,11 @@ const SLAG_CONE = 1.0; // rad around the ricochet
 const SLAG_SIZE = [1.4, 2.4];
 const SLAG_HOT = [2.6, 2.0, 1.2];
 const SLAG_HEIGHT = 3.5;
+// proposta 17/11 (lote 4): incandescent fragments a burst throws (flak /
+// missile) and the drips a burn tick sheds; never behind Hit Markers.
+const BLAST_SLAG = [4, 8];
+const BURN_SLAG = [2, 4];
+const BLAST_RGB = [2.2, 0.85, 0.22];
 
 // proposta 17/11: rock dust, matte grey puffs that drift off the hit.
 const DUST_POOL = 48;
@@ -201,15 +242,19 @@ export class HitSparks {
     if (kind === SPARK_KIND.rock) this.puff(x, y, nx, ny);
     else if (kind === SPARK_KIND.metal && this.slagOn) {
       this.slag(x, y, base, killed ? SLAG_PER_KILL : SLAG_PER_HIT);
+    } else if (kind === SPARK_KIND.blast) {
+      this.slag(x, y, base, BLAST_SLAG[killed ? 1 : 0], Math.PI);
+    } else if (kind === SPARK_KIND.burn) {
+      this.slag(x, y, base, BURN_SLAG[killed ? 1 : 0]);
     }
   }
 
-  // Molten drops thrown around the ricochet direction `base` (rad).
-  slag(x, y, base, count) {
+  // Molten drops thrown within `cone` rad of the direction `base` (rad).
+  slag(x, y, base, count, cone = SLAG_CONE) {
     for (let k = 0; k < count; k += 1) {
       const i = this.slagNext;
       this.slagNext = (this.slagNext + 1) % SLAG_POOL;
-      const a = base + (this.rand() * 2 - 1) * SLAG_CONE;
+      const a = base + (this.rand() * 2 - 1) * cone;
       const v = SLAG_SPEED[0] + (SLAG_SPEED[1] - SLAG_SPEED[0]) * this.rand();
       const life = SLAG_LIFE[0] + (SLAG_LIFE[1] - SLAG_LIFE[0]) * this.rand();
       this.slagX[i] = x;
@@ -262,12 +307,15 @@ export class HitSparks {
       const k = length / speed;
       let color;
       let gain = spec.gain * fade;
-      if (this.kind[i] === SPARK_KIND.rock) {
+      const kind = this.kind[i];
+      if (kind === SPARK_KIND.rock || kind === SPARK_KIND.burn) {
         // cools as it flies; the light dies with the heat, not linearly
         color = mix3(this.scratch, EMBER_COOL, EMBER_HOT, fade);
         gain = spec.gain * (0.35 + 0.65 * fade);
-      } else if (this.kind[i] === SPARK_KIND.shield) {
+      } else if (kind === SPARK_KIND.shield) {
         color = this.hot[i] ? SHIELD_HOT : SHIELD_RGB;
+      } else if (kind === SPARK_KIND.blast) {
+        color = this.hot[i] ? SLAG_HOT : BLAST_RGB;
       } else color = this.hot[i] ? hotRgb : rgb;
       ribbons.streak(
         this.x[i] - vx * k,
