@@ -115,9 +115,9 @@ function buildBow(kit) {
   }));
   fittings(kit, bilge).scatter({ density: 0.3, cell: [2.8, 1.8], lit: false });
   const deck = facet(V, a, b, 'deck');
-  armour('hull', deck, cuts(6, 0.4), [0.34, 0.68, 1], (i, j) => ({
-    color: j && i % 3 === 0 ? paint(C.mid) : grey(),
-    thick: 0.12,
+  armour('hull', deck, cuts(6, 0.4), [0, 0.34, 0.68, 1], (i, j) => ({
+    color: j === 0 || (j === 2 && i % 3 === 0) ? paint(C.mid) : grey(),
+    thick: j ? 0.12 : 0.08,
   }));
   armour('hull', facet(V, a, b, 'keel'), cuts(4, 0.4), [0, 0.7], () => ({
     color: paint(C.mid),

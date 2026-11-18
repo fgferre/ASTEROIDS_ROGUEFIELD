@@ -126,10 +126,27 @@ function buildBlock(kit) {
     cell: [2.4, 1.3],
     keep: (fx, ft) => ft < 0.36 || ft > 0.62,
   });
-  armour('hull', facet(V, BASE, AFT, 'deck'), cuts(5, 0.4), [0.82, 1], () => ({
-    color: grey(),
-    thick: 0.12,
-  }));
+  armour(
+    'hull',
+    facet(V, BASE, AFT, 'deck'),
+    cuts(6, 0.4),
+    [0, 0.45, 0.82, 1],
+    (i, j) => ({
+      color: j === 2 ? grey() : paint(i % 2 ? C.mid : C.grey),
+      thick: 0.12,
+    })
+  );
+  armour(
+    'hull',
+    facet(V, AFT, BLOCK, 'deck'),
+    [0.06, 0.94],
+    [0, 0.5, 1],
+    (i, j) => ({
+      color: paint(j ? C.grey : C.mid),
+      thick: 0.12,
+      lift: 0.04,
+    })
+  );
   const bilge = facet(V, BASE, AFT, 'bilge');
   armour('hull', bilge, cuts(6, 0.5), [0, 0.5, 1], (i, j) => ({
     color: j ? paint(C.grey) : grey(),
