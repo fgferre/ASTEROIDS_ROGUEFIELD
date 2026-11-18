@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { EnemyEffects } from '../../../src/modules/effects/EnemyEffects.js';
 
-const createEnemyEffects = (density = 1, hitStops = []) => {
+const createEnemyEffects = (
+  density = 1,
+  hitStops = [],
+  randomFloat = () => 0.5
+) => {
   const particleEffects = {
     particles: [],
     createShockwaveEffect: () => {},
@@ -9,8 +13,15 @@ const createEnemyEffects = (density = 1, hitStops = []) => {
   };
   const effects = new EnemyEffects({
     particleEffects,
-    createParticle: (x, y, vx, vy, color, size, life, type) => ({ type }),
-    randomFloat: () => 0.5,
+    createParticle: (x, y, vx, vy, color, size, life, type) => ({
+      x,
+      y,
+      vx,
+      vy,
+      size,
+      type,
+    }),
+    randomFloat,
     randomRange: (min) => min,
     getRandomFork: () => null,
     getScaledParticleCount: (count) => Math.round(count * density),
@@ -108,5 +119,25 @@ describe('EnemyEffects', () => {
     // a medium rock: 8 chips at full density, each with a lit chip beside it
     expect(full.particleEffects.particles).toHaveLength(16);
     expect(reduced.particleEffects.particles).toHaveLength(8);
+  });
+
+  it('throws a broken plate’s pieces of metal out of its front, toward the shot', () => {
+    let roll = 0;
+    const cycle = () => ((roll += 1) * 0.37) % 1;
+    const { effects, particleEffects } = createEnemyEffects(1, [], cycle);
+    const facing = Math.PI / 2; // the plate faces +y
+    effects.createPlateBreak({
+      enemy: { x: 100, y: 100, vx: 0, vy: 0, radius: 22, facing },
+    });
+
+    const pieces = particleEffects.particles.filter((p) => p.type === 'debris');
+    expect(pieces.length).toBeGreaterThanOrEqual(6);
+    expect(pieces.length).toBeLessThanOrEqual(9);
+    particleEffects.particles.forEach((p) => {
+      if (p.type === 'debris') expect(p.material).toBe('metal');
+      expect(p.y).toBeGreaterThan(110); // off the face, ahead of the hull
+      const off = Math.abs(Math.atan2(p.vy, p.vx) - facing);
+      expect(off).toBeLessThanOrEqual(0.6 + 1e-9); // out of the face
+    });
   });
 });

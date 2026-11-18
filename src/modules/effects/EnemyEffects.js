@@ -39,6 +39,10 @@ const BIG_FALL_SHAKE = { intensity: 6, duration: 0.25 };
 // 0.32–0.54 s (secondary 0.28–0.46 s). Stone chips are mass, not light, and
 // are unchanged.
 const EXPLOSION_EMBER_LIFE_SCALE = 1.3; // was 1
+// proposta 18/11 (efeito/impacto): a frontal plate that breaks throws its
+// pieces within ±spread rad of its facing, from ±width × its radius along
+// its face, `scale`× a death's chips.
+const PLATE_BREAK = { spread: 0.6, width: 0.7, scale: 1.4 };
 
 export class EnemyEffects {
   /**
@@ -542,19 +546,51 @@ export class EnemyEffects {
     const { particles } = this.particleEffects;
     const from = particles.length;
     this[DEATH_EFFECTS[death]](asteroid, context);
-    // a machine breaks into pieces of hull, not chips of rock (17/11)
     if (enemyType === 'asteroid') return;
-    for (let i = from; i < particles.length; i += 1) {
-      if (particles[i]?.type === 'debris') particles[i].material = 'metal';
-    }
+    this.markMetal(from);
     if (machine && (asteroid.radius || 0) >= BIG_MACHINE_RADIUS) {
       this.addHitStop('heavy');
       this.addScreenShake(BIG_FALL_SHAKE.intensity, BIG_FALL_SHAKE.duration);
     }
   }
 
-  // Rock chips and embers in the rock's colors, sized by the rock.
-  createDebris(asteroid) {
+  // A machine breaks into pieces of hull, not chips of rock (17/11): the
+  // debris from particle `from` on is metal.
+  markMetal(from) {
+    const { particles } = this.particleEffects;
+    for (let i = from; i < particles.length; i += 1) {
+      if (particles[i]?.type === 'debris') particles[i].material = 'metal';
+    }
+  }
+
+  // A frontal plate (the Bulwark's, a Shielded elite's) that breaks: its
+  // pieces, some hot at the edge (fieldMirrors), and a few embers thrown
+  // out of its face, toward the shot; the cyan deflection plays as well.
+  createPlateBreak({ enemy } = {}) {
+    if (!enemy) return;
+    const facing = enemy.facing ?? 0;
+    const radius = enemy.radius || 0;
+    const from = this.particleEffects.particles.length;
+    this.createDebris(
+      {
+        x: enemy.x + Math.cos(facing) * radius,
+        y: enemy.y + Math.sin(facing) * radius,
+        vx: enemy.vx,
+        vy: enemy.vy,
+        radius,
+      },
+      null,
+      { angle: facing, ...PLATE_BREAK }
+    );
+    this.markMetal(from);
+  }
+
+  // Rock chips and embers in the rock's colors, sized by the rock. `aim`
+  // (`{ angle, spread, width, scale }`) throws them within ±spread rad of
+  // `angle` instead of all round, from ±width × the radius along the face
+  // it points out of, `scale`× their size and without the side embers (a
+  // broken plate).
+  createDebris(asteroid, _context, aim = null) {
     const variantColors =
       typeof asteroid.getVariantColors === 'function'
         ? asteroid.getVariantColors()
@@ -598,13 +634,21 @@ export class EnemyEffects {
       );
     }
 
+    const scale = aim?.scale ?? 1;
     for (let i = 0; i < particleCount; i += 1) {
-      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const roll = this.randomFloat('explosions');
+      const angle = aim
+        ? aim.angle + (roll * 2 - 1) * aim.spread
+        : roll * Math.PI * 2;
       const speed = (40 + this.randomFloat('explosions') * 80) * speedScale;
 
-      const offset = radius * 0.5 * (this.randomFloat('explosions') - 0.5);
-      const spawnX = asteroid.x + Math.cos(angle) * offset;
-      const spawnY = asteroid.y + Math.sin(angle) * offset;
+      const place = this.randomFloat('explosions');
+      const offset = aim
+        ? (place * 2 - 1) * radius * aim.width
+        : radius * 0.5 * (place - 0.5);
+      const along = aim ? aim.angle + Math.PI / 2 : angle;
+      const spawnX = asteroid.x + Math.cos(along) * offset;
+      const spawnY = asteroid.y + Math.sin(along) * offset;
 
       const debris = this.createParticle(
         spawnX,
@@ -612,7 +656,7 @@ export class EnemyEffects {
         Math.cos(angle) * speed + parentVx * momentumScale,
         Math.sin(angle) * speed + parentVy * momentumScale,
         debrisColor,
-        2 + this.randomFloat('explosions') * 3.2,
+        (2 + this.randomFloat('explosions') * 3.2) * scale,
         0.6 + this.randomFloat('explosions') * 0.45,
         'debris'
       );
@@ -626,14 +670,14 @@ export class EnemyEffects {
         Math.cos(angle) * speed * 1.25 + parentVx * momentumScale,
         Math.sin(angle) * speed * 1.25 + parentVy * momentumScale,
         ember ? sparkColor : PALETTE.rockLit,
-        1.6 + this.randomFloat('explosions') * 1.6,
+        (1.6 + this.randomFloat('explosions') * 1.6) * scale,
         (0.32 + this.randomFloat('explosions') * 0.22) *
           (ember ? EXPLOSION_EMBER_LIFE_SCALE : 1),
         ember ? 'spark' : 'debris'
       );
       this.particleEffects.particles.push(spark);
 
-      if (this.randomFloat('explosions') < 0.35) {
+      if (this.randomFloat('explosions') < 0.35 && !aim) {
         const secondary = new SpaceParticle(
           asteroid.x,
           asteroid.y,
