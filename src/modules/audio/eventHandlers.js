@@ -173,6 +173,16 @@ export const AUDIO_EVENT_HANDLERS = {
   journeyEnded(audio) {
     audio.journeyCue.end();
     audio.sectorScore.holdForJourney(false);
+    audio.storyIgnited = false;
+  },
+  // Each journey moment's sample; the story's launch just played the
+  // ignition (storyIgnited), so the journey after it starts without its own.
+  travelMoment(audio, { id } = {}) {
+    if (id === 'ignite' && audio.storyIgnited) return;
+    audio.sfxBus.playTravelMoment(id);
+  },
+  storyIgnited(audio) {
+    audio.storyIgnited = true;
   },
   holdScore(audio) {
     audio.sectorScore.holdForJourney(true);

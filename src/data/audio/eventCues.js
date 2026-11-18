@@ -271,18 +271,20 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   // Its score (audio/journeyCue.js) is laid out from the plan as it starts
   // and stops early on a skip; the sector's music hands over at the end.
   { on: 'travel-planned', run: 'journeyPlanned' },
-  { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
+  { on: 'travel-moment', run: 'travelMoment' },
   { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },
   { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
   { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
   { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
   // The story before the first journey (render3d/storyScene.js): each
   // moment's sample, the reactors' loop from its first shot to the launch,
-  // the sector's music held under it (its journey holds it on after).
+  // the sector's music held under it (its journey holds it on after); its
+  // launch's ignition is the journey's, which then starts without its own.
   { on: 'story-moment', cue: 'playStoryMoment', arg: 'id' },
   { on: 'story-moment', cue: 'playStoryReactor', when: { id: 'wake' } },
   { on: 'story-moment', run: 'holdScore', when: { id: 'wake' } },
   { on: 'story-moment', cue: 'stopStoryReactor', when: { id: 'launch' } },
+  { on: 'story-moment', run: 'storyIgnited', when: { id: 'launch' } },
   { on: 'story-moment', cue: 'stopStorySounds', when: { id: 'end' } },
   { on: 'story-moment', run: 'releaseScore', when: { id: 'end' } },
 ]);

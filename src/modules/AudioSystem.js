@@ -111,6 +111,8 @@ class AudioSystem extends BaseSystem {
 
     // Low health warning state
     this.lowHealthWarning = false;
+    // The story's launch just played the journey's ignition (eventHandlers).
+    this.storyIgnited = false;
 
     // Run-following music inputs: the player's position (pan + distance
     // reference for enemy-side cues) and the wave's enemies alive or still to spawn (density proxy:
@@ -881,6 +883,7 @@ class AudioSystem extends BaseSystem {
     }
     this.sectorScore.reset();
     this.journeyCue.stop();
+    this.storyIgnited = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();
     this.runEnemyCount = 0;

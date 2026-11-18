@@ -718,6 +718,36 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('travel-moment', { id: 'end' }, 'stopTravelSounds');
   });
 
+  it('the journey ignites, but not right after the story’s launch did', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const travel = vi.spyOn(audio.sfxBus, 'playTravelMoment');
+    const story = vi.spyOn(audio.sfxBus, 'playStoryMoment');
+    const ignitions = () =>
+      travel.mock.calls.filter(([id]) => id === 'ignite').length +
+      story.mock.calls.filter(([id]) => id === 'launch').length;
+    // Without the story: the journey's own ignition.
+    eventBus.emit('travel-moment', { id: 'ignite' });
+    eventBus.emit('travel-moment', { id: 'end' });
+    expect(ignitions()).toBe(1);
+    // With it: the launch's ignition only; the journey's other sounds stay.
+    eventBus.emit('story-moment', { id: 'launch' });
+    eventBus.emit('story-moment', { id: 'end' });
+    eventBus.emit('travel-moment', { id: 'ignite' });
+    eventBus.emit('travel-moment', { id: 'leap' });
+    eventBus.emit('travel-moment', { id: 'end' });
+    expect(ignitions()).toBe(2);
+    expect(travel).toHaveBeenCalledWith('leap');
+    // The next journey ignites again.
+    eventBus.emit('travel-moment', { id: 'ignite' });
+    eventBus.emit('travel-moment', { id: 'end' });
+    expect(ignitions()).toBe(3);
+    // A story skipped before its launch: the journey ignites.
+    eventBus.emit('story-moment', { id: 'end' });
+    eventBus.emit('travel-moment', { id: 'ignite' });
+    expect(ignitions()).toBe(4);
+    audio.destroy();
+  });
+
   it('xp-orb-fused → playOrbFusion', () => {
     expectDelegates(
       'xp-orb-fused',
