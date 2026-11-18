@@ -160,11 +160,21 @@ function buildBow(kit) {
       [name === 'deck' ? 0.3 : 0, 1],
       () => ({
         color: paint(
-          name === 'side' ? C.soot : name === 'deck' ? C.grey : C.dark
+          name === 'side' ? C.mid : name === 'deck' ? C.grey : C.dark
         ),
         thick: 0.14,
       })
     )
+  );
+  fittings(kit, facet(V, c, d, 'side')).windows(0.45, 0.28, 3.2, 0.85);
+  // Wash lights under the belt, so the lower hull reads in the dark.
+  [0.1, 0.36, 0.62, 0.88].forEach((fx) =>
+    fittings(kit, bilge).light(fx, 0.12, 'floods', C.flood, {
+      size: 0.12,
+      gain: 2,
+      spill: 2.6,
+      spillGain: 0.3,
+    })
   );
   // An orange brow along the nose's upper chine, and the dark face with its
   // slit of light.

@@ -137,6 +137,14 @@ function buildBlock(kit) {
     skip: j === 1 && i % 3 === 2,
   }));
   fittings(kit, bilge).scatter({ density: 0.3, cell: [2.8, 1.8], lit: false });
+  [0.08, 0.3, 0.52, 0.74, 0.94].forEach((fx) =>
+    fittings(kit, bilge).light(fx, 0.12, 'floods', C.flood, {
+      size: 0.12,
+      gain: 2,
+      spill: 2.6,
+      spillGain: 0.3,
+    })
+  );
   armour('hull', facet(V, BASE, AFT, 'keel'), cuts(5, 0.4), [0, 0.7], () => ({
     color: paint(C.mid),
     thick: 0.2,
@@ -226,9 +234,10 @@ function buildBlock(kit) {
   }
   [-3.4, 0, 3.4].forEach((z) =>
     lamp('floods', V(BASE.x + 0.02, 6.5, z), V(1, 0, 0), C.flood, {
-      size: 0.22,
-      gain: 3,
-      spill: 1.6,
+      size: 0.12,
+      gain: 1.3,
+      spill: 1.3,
+      spillGain: 0.3,
     })
   );
 }
@@ -237,8 +246,6 @@ function buildBridge(kit) {
   const { V, add, box, body, plate, tube, lathe, lamp, railing, paint } = kit;
   const { random } = kit;
   const steel = paint(C.steel);
-  const lit = () =>
-    paint(random() < 0.72 ? C.glass : C.amber, 0.8 + random() * 0.6);
   // A house: a plan with its forward corners cut, from y0 to y1.
   const house = (x0, x1, hz, cut, y0, y1, css) =>
     add(
@@ -258,24 +265,44 @@ function buildBridge(kit) {
       ),
       paint(css)
     );
-  // Portholes along a house's sides and across its front.
+  // A band of small windows along a house's sides and across its front.
+  const pane = () =>
+    random() < 0.8
+      ? paint('#8fd4ff', 0.35 + random() * 0.8)
+      : paint('#ffc983', 0.5 + random() * 0.6);
   const portholes = (x0, x1, hz, y, front) => {
+    add(
+      'hull',
+      box(x0 - 0.2, x1 + 0.2, y - 0.1, y + 0.3, hz, hz + 0.05),
+      paint(C.soot),
+      {
+        mirror: true,
+      }
+    );
     [1, -1].forEach((s) => {
-      for (let x = x0; x < x1; x += 0.9) {
-        if (random() < 0.5) continue;
+      for (let x = x0; x < x1; x += 0.52) {
+        if (random() < 0.42) continue;
         add(
           'windows',
-          box(x, x + 0.34, y, y + 0.2, hz * s, (hz + 0.04) * s),
-          lit(),
+          box(x, x + 0.32, y, y + 0.2, (hz + 0.05) * s, (hz + 0.08) * s),
+          pane(),
           { uv: false }
         );
       }
     });
-    for (let z = -hz + 1.5; z < hz - 1.6; z += 0.8) {
+    add(
+      'hull',
+      box(front, front + 0.05, y - 0.1, y + 0.3, -hz + 1.4, hz - 1.4),
+      paint(C.soot)
+    );
+    for (let z = -hz + 1.6; z < hz - 1.8; z += 0.52) {
       if (random() < 0.3) continue;
-      add('windows', box(front, front + 0.04, y, y + 0.2, z, z + 0.34), lit(), {
-        uv: false,
-      });
+      add(
+        'windows',
+        box(front + 0.05, front + 0.08, y, y + 0.2, z, z + 0.32),
+        pane(),
+        { uv: false }
+      );
     }
   };
   const rails = (x0, x1, hz, y) =>
@@ -335,6 +362,27 @@ function buildBridge(kit) {
   clutter(-33.4, -21, 4.0, L1 + 0.14, L2);
   house(-34.3, -18.6, 4.6, 1.2, L2, L2 + 0.14, C.mid);
   rails(-34, -19.9, 4.5, L2 + 0.14);
+  // Stairs up the sides, deck to walkway to walkway.
+  [
+    [-23.5, DECK, -20.6, L1 + 0.14, 4.62, 5.15],
+    [-27, L1 + 0.14, -24.4, L2 + 0.14, 4.02, 4.5],
+  ].forEach(([xa, ya, xb, yb, z0, z1]) =>
+    add(
+      'hull',
+      kit.profile(
+        [
+          [xa, ya],
+          [xa + 0.7, ya],
+          [xb + 0.7, yb],
+          [xb, yb],
+        ],
+        z0,
+        z1
+      ),
+      paint(C.dark),
+      { mirror: true }
+    )
+  );
   // Lifeboats slung under the first walkway.
   [-31.5, -27.4, -23.3].forEach((x) => {
     add(
@@ -403,8 +451,8 @@ function buildBridge(kit) {
       const level = 0.7 + random() * 0.6;
       // Each pane brighter low down, where the consoles glow.
       [
-        [0.36, 0.54, '#9adcff', 1.2],
-        [0.54, 0.88, '#2f9cf0', 0.75],
+        [0.36, 0.54, '#9adcff', 0.95],
+        [0.54, 0.88, '#2f9cf0', 0.6],
       ].forEach(([t0, t1, css, gain]) =>
         add(
           'windows',
@@ -456,7 +504,8 @@ function buildBridge(kit) {
       spill: 0,
     });
     lamp('floods', V(-18.5, y1, 3.7 * s), V(0, -1, 0), C.flood, {
-      size: 0.16,
+      size: 0.12,
+      gain: 1.5,
       spill: 0,
     });
   });
@@ -626,7 +675,7 @@ function buildBridge(kit) {
 
   // --- The funnel behind the bridge ---------------------------------------------
   const cap = DECK + 5.4;
-  house(-39.2, -35.6, 2.6, 0.5, BLOCK.yt, cap, C.dark);
+  house(-39.2, -35.6, 2.6, 0.5, BLOCK.yt, cap, C.mid);
   add('hull', box(-39.5, -35.4, cap, cap + 0.3, -2.9, 2.9), paint(C.orange));
   [-1.3, 0, 1.3].forEach((z) =>
     add(
@@ -637,15 +686,24 @@ function buildBridge(kit) {
     )
   );
   for (let y = DECK + 0.6; y < cap - 0.5; y += 0.4) {
-    add('hull', box(-38.8, -36, y, y + 0.14, 2.6, 2.7), paint(C.mid), {
+    add('hull', box(-38.8, -36, y, y + 0.14, 2.6, 2.7), paint(C.dark), {
       mirror: true,
     });
+    add('hull', box(-39.3, -39.2, y, y + 0.14, -1.9, 1.9), paint(C.dark));
   }
+  add(
+    'hull',
+    box(-39.32, -39.2, DECK + 0.2, cap - 0.2, 2.0, 2.5),
+    paint(C.grey),
+    {
+      mirror: true,
+    }
+  );
   return [-19.5, y0 + 1.1, 0];
 }
 
 function buildEngines(kit) {
-  const { V, add, box, lathe, lamp, pool, paint } = kit;
+  const { V, add, box, lathe, plate, lamp, pool, paint } = kit;
   const face = TAIL.x;
   const aft = V(-1, 0, 0);
   ENGINES.forEach(({ z, r }, i) => {
@@ -688,13 +746,28 @@ function buildEngines(kit) {
         at,
         aft
       ),
-      paint(C.dark),
-      { smooth: true, shine: { roughness: 0.5, metalness: 0.6 } }
+      paint(C.mid),
+      { shine: { roughness: 0.5, metalness: 0.55 } }
     );
+    // Gussets from the cowl down the bell.
+    for (let n = 0; n < 8; n += 1) {
+      const a = ((n + 0.5) / 8) * Math.PI * 2;
+      const out = (d, k) =>
+        V(at.x - d, at.y + Math.cos(a) * k * r, at.z + Math.sin(a) * k * r);
+      add(
+        'hull',
+        plate(
+          [out(1.1, 1.16), out(3.0, 1.03), out(3.0, 0.9), out(1.1, 0.88)],
+          -0.06,
+          0.12
+        ),
+        paint(n % 2 ? C.grey : C.dark)
+      );
+    }
     // The fire inside: the bell's wall glowing hotter toward the throat,
     // dark rings standing in it, a white core.
     const set = `engine${i}`;
-    const steps = 10;
+    const steps = 24;
     for (let n = 0; n < steps; n += 1) {
       const [t0, t1] = [n / steps, (n + 1) / steps];
       const k = (t) => 0.93 - 0.63 * t;
@@ -710,7 +783,7 @@ function buildEngines(kit) {
           at,
           aft
         ),
-        paint(C.engine, 0.1 * 28 ** ((n + 0.5) / steps)),
+        paint('#2f8fff', 0.045 * 60 ** ((n + 0.5) / steps)),
         { uv: false, smooth: true }
       );
     }
@@ -723,8 +796,8 @@ function buildEngines(kit) {
         set,
         lathe(
           [
-            [(k - 0.035) * r, d + 0.02],
-            [(k + 0.035) * r, d],
+            [(k - 0.03) * r, d + 0.02],
+            [(k + 0.03) * r, d],
           ],
           24,
           at,
@@ -734,10 +807,31 @@ function buildEngines(kit) {
         { uv: false, smooth: true }
       )
     );
-    add(`${set}Pools`, pool(along(0.95), aft, r * 0.5), paint('#dcefff', 2.6), {
-      uv: false,
-    });
-    add(`${set}Pools`, pool(along(2.6), aft, r * 0.95), paint(C.engine, 0.7), {
+    // Vanes down the throat, dark against the fire.
+    for (let n = 0; n < 12; n += 1) {
+      const a = (n / 12) * Math.PI * 2;
+      const out = (d, k) =>
+        V(at.x - d, at.y + Math.cos(a) * k * r, at.z + Math.sin(a) * k * r);
+      add(
+        set,
+        plate(
+          [out(4.0, 0.9), out(4.0, 0.74), out(2.0, 0.42), out(2.0, 0.52)],
+          -0.03,
+          0.06
+        ),
+        paint('#020a12'),
+        { uv: false }
+      );
+    }
+    add(
+      `${set}Pools`,
+      pool(along(0.95), aft, r * 0.46),
+      paint('#dcefff', 2.4),
+      {
+        uv: false,
+      }
+    );
+    add(`${set}Pools`, pool(along(2.6), aft, r * 0.9), paint(C.engine, 0.45), {
       uv: false,
     });
     add(`${set}Pools`, pool(along(4.5), aft, r * 1.7), paint(C.engine, 0.22), {
@@ -756,7 +850,44 @@ function buildEngines(kit) {
       spill: 0,
     });
   });
+  [3.55, -3.55].forEach((z) => {
+    add(
+      'hull',
+      box(face - 0.3, face, 1.5, 3.2, z - 1.3, z + 1.3),
+      paint(C.light)
+    );
+    add(
+      'hull',
+      box(face - 0.4, face, 2.0, 2.7, z - 0.9, z + 0.9),
+      paint(C.dark)
+    );
+    add(
+      'hull',
+      box(face - 0.3, face, -4.2, -3.0, z - 1.3, z + 1.3),
+      paint(C.light)
+    );
+  });
+  add('hull', box(face - 0.3, face, -4.2, 3.2, 9.75, 10.2), paint(C.orange), {
+    mirror: true,
+  });
   add('hull', box(face - 0.9, face, 3.2, 3.7, -9.6, 9.6), paint(C.grey));
+  [-6.6, -2.2, 2.2, 6.6].forEach((z, n) => {
+    add(
+      'hull',
+      box(face - 0.14, face, 3.85, 5.25, z - 2.05, z + 2.05),
+      paint(n % 3 ? C.light : C.grey)
+    );
+    add(
+      'hull',
+      box(face - 0.14, face, -6.4, -4.75, z - 2.05, z + 2.05),
+      paint(n % 2 ? C.grey : C.mid)
+    );
+    add(
+      'hull',
+      box(face - 0.24, face, 4.2, 4.9, z - 1.2, z + 1.2),
+      paint(C.dark)
+    );
+  });
   add('hull', box(face - 0.5, face, -4.6, -4.2, -9.2, 9.2), paint(C.grey));
   [1, -1].forEach((s) => {
     lamp('lamps', V(face - 0.9, 3.45, 8.8 * s), aft, C.amber, {

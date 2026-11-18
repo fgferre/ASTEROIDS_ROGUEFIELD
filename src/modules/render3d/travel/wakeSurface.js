@@ -67,7 +67,7 @@ function fbm(random, cells, octaves) {
 const STEEL = [0.3, 0.31, 0.33];
 const RUST = [0.42, 0.24, 0.15];
 const STENCIL = [0.86, 0.86, 0.82];
-const BRIGHT_STEEL = [0.62, 0.63, 0.65];
+const BRIGHT_STEEL = [0.46, 0.47, 0.49];
 
 // A surface being painted: per texel, relief `height`, a `shade` on whatever
 // shows, the `paint` left (1 → 0 bare), what the bare surface is (`bare`
@@ -363,7 +363,7 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
         s,
         i,
         chips(u, v),
-        edge * (0.06 + zone * 0.12) + zone * 0.1,
+        edge * (0.06 + zone * 0.12) + zone * 0.07,
         rustAt(u, v),
         0.78
       );
@@ -394,7 +394,7 @@ export function bakeWakeHull(THREE, seed, size = 1024) {
       );
     }
   });
-  for (let n = 0; n < 28; n += 1) {
+  for (let n = 0; n < 18; n += 1) {
     scratch(
       s,
       random() * size,

@@ -7,7 +7,7 @@
 
 import { WAKE_COLORS as C } from './wakeHull.js';
 
-/** A facet's fittings: { patch, vent, hatch, unit, windows, pipes, strip, scatter }. */
+/** A facet's fittings: { patch, vent, hatch, unit, windows, pipes, strip, light, scatter }. */
 export function fittings(kit, at) {
   const { V, add, plate, tube, lamp, paint, random } = kit;
   const origin = at(0, 0);
@@ -122,6 +122,22 @@ export function fittings(kit, at) {
   // A trim strip along the facet at `ft`.
   const strip = (fx0, fx1, ft, h, color, lift = 0.1, thick = 0.16) =>
     patch((fx0 + fx1) / 2, ft, (fx1 - fx0) * length, h, lift, thick, color);
+  // A lamp on the facet at (fx, ft), on both sides of the ship.
+  const light = (fx, ft, set, css, options) => {
+    const p = at(fx, ft);
+    [1, -1].forEach((s) =>
+      lamp(
+        set,
+        V(p.x, p.y, p.z * s).addScaledVector(
+          V(normal.x, normal.y, normal.z * s),
+          options?.lift || 0.2
+        ),
+        V(normal.x, normal.y, normal.z * s),
+        css,
+        options
+      )
+    );
+  };
   // Fittings scattered over a grid of cells about `cell` in size; `keep`
   // (fx, ft) → false leaves a cell bare (the mark, a trench).
   const scatter = ({ density = 0.4, cell = [2.6, 1.5], keep, lit = true }) => {
@@ -150,6 +166,7 @@ export function fittings(kit, at) {
     windows,
     pipes,
     strip,
+    light,
     scatter,
     length,
     height,

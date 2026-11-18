@@ -18,8 +18,9 @@ const GANTRIES = [-13, -4.9, 3.2, 11.3, 19.4];
 const FRAME = 0.57;
 // A container: length, height, width; five columns across.
 const BOX = { length: 6.1, height: 2.5, width: 2.3, pitch: 2.45 };
+// The bay and the column the deck crane's container hangs over.
 const CRANE_BAY = 2;
-const CRANE_COLUMN = 3;
+const CRANE_COLUMN = 1;
 
 export function buildCargoDeck(kit) {
   const {
@@ -308,58 +309,128 @@ export function buildCargoDeck(kit) {
     }
   }
 
-  // --- The overhead crane, one container on the hook ---------------------------
+  // --- The overhead crane, parked ------------------------------------------------
   add(
     'hull',
     box(GANTRIES[0] - 0.5, X1 - 0.1, 6.45, 6.8, 4.3, 4.7),
     paint(C.dark),
-    {
-      mirror: true,
-    }
+    { mirror: true }
   );
-  const cx = (GANTRIES[CRANE_BAY] + GANTRIES[CRANE_BAY + 1]) / 2;
-  const cz = (CRANE_COLUMN - 2) * BOX.pitch;
+  const px = (GANTRIES[1] + GANTRIES[2]) / 2;
   [-0.75, 0.35].forEach((dx) =>
     add(
       'hull',
-      box(cx + dx, cx + dx + 0.4, 6.8, 7.5, -5.2, 5.2),
+      box(px + dx, px + dx + 0.4, 6.8, 7.5, -5.2, 5.2),
       paint(C.yellow)
     )
   );
-  add('hull', box(cx - 1.1, cx + 1.1, 6.8, 7.2, 4.1, 4.9), paint(C.dark), {
+  add('hull', box(px - 1.1, px + 1.1, 6.8, 7.2, 4.1, 4.9), paint(C.dark), {
     mirror: true,
   });
+  add('hull', box(px - 0.7, px + 0.7, 7.5, 8.0, 1.2, 2.8), paint(C.mid));
+  add('hull', box(px - 0.45, px + 0.45, 6.2, 6.8, 1.5, 2.5), paint(C.orange));
+  lamp('floods', V(px, 6.2, 2), V(0, -1, 0), C.flood, { size: 0.16, spill: 0 });
+
+  // --- The deck crane on the port side, a container on its hook ----------------
+  const cx = (GANTRIES[CRANE_BAY] + GANTRIES[CRANE_BAY + 1]) / 2;
+  const cz = (CRANE_COLUMN - 2) * BOX.pitch;
+  const gx = GANTRIES[CRANE_BAY];
   add(
     'hull',
-    box(cx - 0.7, cx + 0.7, 7.5, 8.0, cz - 0.8, cz + 0.8),
-    paint(C.mid)
+    tube(V(gx, 6.45, -6.9), V(gx, 7.3, -6.9), 0.75, 10),
+    paint(C.dark),
+    {
+      smooth: true,
+    }
   );
+  add('hull', box(gx - 0.7, gx + 0.8, 7.3, 8.6, -7.6, -6.2), paint(C.yellow));
+  add('hull', box(gx - 2.0, gx - 0.7, 7.3, 8.2, -7.5, -6.3), paint(C.dark));
+  add('hull', box(gx - 0.8, gx + 0.9, 8.6, 8.72, -7.7, -6.1), paint(C.mid));
   add(
-    'hull',
-    box(cx - 0.45, cx + 0.45, 6.2, 6.8, cz - 0.5, cz + 0.5),
-    paint(C.orange)
+    'windows',
+    box(gx + 0.8, gx + 0.83, 7.85, 8.4, -7.4, -6.4),
+    paint('#8fd4ff', 0.9),
+    { uv: false }
   );
-  const hook = 2.3;
+  const foot = V(gx + 0.6, 8.3, -6.9);
+  const tip = V(cx, 11.3, cz);
+  const dir = tip.clone().sub(foot);
+  const across = dir
+    .clone()
+    .cross(V(0, 1, 0))
+    .normalize();
+  const chord = (side, rise, t) =>
+    foot
+      .clone()
+      .addScaledVector(dir, t)
+      .addScaledVector(across, side * (0.4 - 0.3 * t))
+      .add(V(0, rise * (0.75 - 0.6 * t), 0));
+  [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+  ].forEach(([side, rise]) =>
+    add(
+      'hull',
+      tube(chord(side, rise, 0), chord(side, rise, 1), 0.1, 4, true),
+      paint(C.yellow)
+    )
+  );
+  for (let n = 0; n < 7; n += 1) {
+    const [t0, t1] = [n / 7, (n + 0.5) / 7];
+    [1, -1].forEach((side) => {
+      add(
+        'hull',
+        tube(chord(side, 0, t0), chord(0, 1, t1), 0.05, 4, true),
+        paint(C.yellow)
+      );
+      add(
+        'hull',
+        tube(chord(0, 1, t1), chord(side, 0, t0 + 1 / 7), 0.05, 4, true),
+        paint(C.yellow)
+      );
+    });
+    add(
+      'hull',
+      tube(chord(1, 0, t0), chord(-1, 0, t0), 0.05, 4, true),
+      paint(C.yellow)
+    );
+  }
+  // The mast and the stays that hold the boom up.
+  const mast = V(gx - 0.4, 10.6, -6.9);
+  [0.5, -0.5].forEach((z) => {
+    add(
+      'hull',
+      tube(V(gx - 0.5, 8.7, -6.9 + z), mast, 0.07, 4, true),
+      paint(C.yellow)
+    );
+    add('hull', tube(mast, chord(z * 2, 0, 0.92), 0.03, 4, true), steel, {
+      shine: STEEL,
+    });
+  });
+  add('hull', tube(mast, V(gx - 1.8, 8.2, -6.9), 0.03, 4, true), steel, {
+    shine: STEEL,
+  });
+  const hook = 3.3;
+  const lid = hook + BOX.height;
   container(cx, hook, cz, false);
   add(
     'hull',
-    box(
-      cx - 3.0,
-      cx + 3.0,
-      hook + BOX.height,
-      hook + BOX.height + 0.16,
-      cz - 1.1,
-      cz + 1.1
-    ),
+    box(cx - 3.0, cx + 3.0, lid, lid + 0.16, cz - 1.1, cz + 1.1),
     paint(C.yellow)
+  );
+  add(
+    'hull',
+    box(cx - 0.3, cx + 0.3, lid + 0.9, lid + 1.3, cz - 0.3, cz + 0.3),
+    paint(C.dark)
   );
   [-1, 1].forEach((sx) =>
     [-1, 1].forEach((sz) =>
       add(
         'hull',
         tube(
-          V(cx + sx * 2.7, hook + BOX.height + 0.16, cz + sz * 0.9),
-          V(cx + sx * 0.4, 6.3, cz + sz * 0.35),
+          V(cx + sx * 2.7, lid + 0.16, cz + sz * 0.9),
+          V(cx + sx * 0.2, lid + 0.95, cz + sz * 0.2),
           0.035,
           4,
           true
@@ -369,43 +440,92 @@ export function buildCargoDeck(kit) {
       )
     )
   );
-  lamp('floods', V(cx, 6.2, cz), V(0, -1, 0), C.flood, { size: 0.2, spill: 0 });
-
-  // --- The hangar under the spine ------------------------------------------------
-  const mouth = 16;
-  add('hull', box(6, mouth, -7.8, -6.4, -3.4, 3.4), paint(C.mid));
-  add('hull', box(6.4, mouth - 0.6, -7.95, -7.8, -3.0, 3.0), paint(C.dark));
-  add('hull', box(mouth, mouth + 0.06, -7.6, -6.65, -2.9, 2.9), paint(C.soot));
-  add(
-    'windows',
-    box(mouth + 0.06, mouth + 0.1, -6.8, -6.7, -2.7, 2.7),
-    paint(C.glass, 1.8),
-    { uv: false }
-  );
-  add(
-    'windows',
-    box(mouth + 0.06, mouth + 0.1, -7.55, -7.47, -2.7, 2.7),
-    paint(C.glass, 1.0),
-    { uv: false }
-  );
-  add('hull', box(mouth, mouth + 5.5, -7.62, -7.46, -0.35, 0.35), steel, {
+  add('hull', tube(V(cx, lid + 1.3, cz), tip, 0.035, 4, true), steel, {
     shine: STEEL,
   });
-  [1, -1].forEach((s) => {
+  lamp('floods', tip.clone().add(V(0, -0.15, 0)), V(0, -1, 0), C.flood, {
+    size: 0.18,
+    spill: 0,
+  });
+  lamp('beacons', mast, V(0, 1, 0), C.beacon, { size: 0.1, spill: 0 });
+
+  // --- The hangar under the spine: the drones leave by its forward mouth -------
+  const mouth = 16;
+  add(
+    'hull',
+    cross(
+      [
+        [-3.6, -6.4],
+        [3.6, -6.4],
+        [3.6, -7.4],
+        [3.0, -8.0],
+        [-3.0, -8.0],
+        [-3.6, -7.4],
+      ],
+      4.5,
+      mouth
+    ),
+    paint(C.grey)
+  );
+  for (let x = 5; x < mouth - 1; x += 2.1) {
+    add('hull', box(x, x + 1.8, -7.3, -6.6, 3.6, 3.72), paint(C.light), {
+      mirror: true,
+    });
+    add('hull', box(x + 0.5, x + 1.3, -7.1, -6.85, 3.72, 3.76), paint(C.soot), {
+      mirror: true,
+    });
+    add(
+      'windows',
+      box(x + 0.6, x + 1.2, -7.05, -6.9, 3.76, 3.79),
+      paint('#8fd4ff', 0.5 + random() * 0.6),
+      { uv: false, mirror: true }
+    );
+  }
+  // The mouth: a dark bay, hazard-striped jambs, a lit lintel and sill.
+  add('hull', box(mouth, mouth + 0.05, -7.75, -6.6, -3.0, 3.0), paint(C.soot));
+  add(
+    'hull',
+    box(mouth - 0.1, mouth + 0.3, -6.6, -6.4, -3.6, 3.6),
+    paint(C.orange)
+  );
+  for (let n = 0; n < 6; n += 1) {
+    const y = -7.9 + n * 0.22;
     add(
       'hull',
-      box(mouth - 0.1, mouth + 0.2, -7.8, -6.4, 2.9 * s, 3.4 * s),
-      paint(C.orange)
+      box(mouth - 0.1, mouth + 0.3, y, y + 0.22, 3.0, 3.6),
+      paint(n % 2 ? C.yellow : C.soot),
+      { mirror: true }
     );
-    lamp('lamps', V(mouth + 0.2, -6.55, 3.15 * s), V(1, 0, 0), C.amber, {
+  }
+  add(
+    'windows',
+    box(mouth + 0.05, mouth + 0.09, -6.78, -6.68, -2.8, 2.8),
+    paint(C.glass, 1.6),
+    { uv: false }
+  );
+  for (let z = -2.4; z <= 2.4; z += 0.8) {
+    add(
+      'windows',
+      box(mouth + 0.05, mouth + 0.09, -7.5, -6.95, z - 0.05, z + 0.05),
+      paint(C.glass, 0.5),
+      { uv: false }
+    );
+  }
+  add('hull', box(mouth, mouth + 5.5, -7.92, -7.76, -0.4, 0.4), steel, {
+    shine: STEEL,
+  });
+  add('hull', box(mouth, mouth + 0.6, -8.0, -7.75, -3.0, 3.0), paint(C.mid));
+  [1, -1].forEach((s) => {
+    lamp('lamps', V(mouth + 0.3, -6.5, 3.3 * s), V(1, 0, 0), C.amber, {
       size: 0.14,
+      spill: 0,
     });
-    for (let x = mouth + 1; x < mouth + 5.5; x += 1.5) {
-      lamp('floods', V(x, -7.46, 0.25 * s), V(0, 1, 0), C.glass, {
-        size: 0.08,
+    for (let x = mouth + 0.8; x < mouth + 5.5; x += 1.1) {
+      lamp('floods', V(x, -7.76, 0.3 * s), V(0, 1, 0), C.glass, {
+        size: 0.07,
         spill: 0,
       });
     }
   });
-  return { hangar: [mouth + 0.3, -7.1, 0] };
+  return { hangar: [mouth + 0.3, -7.2, 0] };
 }

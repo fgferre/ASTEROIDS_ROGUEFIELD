@@ -14,7 +14,7 @@ export const WAKE_COLORS = Object.freeze({
   orange: '#d9591b',
   yellow: '#dfa53a',
   steel: '#7d8187',
-  white: '#e6e6e0',
+  white: '#cfd0cc',
   cargo: ['#2f63a3', '#a63b30', '#d6a13a', '#b59f7e', '#2f63a3', '#3f6f69'],
   amber: '#ffb347',
   flood: '#bfe3ff',
