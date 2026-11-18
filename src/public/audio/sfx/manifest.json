@@ -29,7 +29,7 @@
   },
   "lance-shot": {
     "files": ["lance-shot/1.mp3"],
-    "gain": -15,
+    "gain": -14,
     "priority": 4,
     "cap": 4,
     "gap": 30,
@@ -37,7 +37,7 @@
     "origins": [
       {
         "file": "lance-shot/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 13, 50 steps, prompt: A single short mellow sci-fi laser shot, soft rounded pew in the mid frequencies, quick clean decay, high quality game sound effect, dry, no music; cut to 0.2 s (audition 12/11, pick C)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 2, 8 steps, cfg 1.0, prompt: TrackType: SFX. One short mellow laser blaster shot: a smooth rounded zap sliding down in pitch. Very short, clean decay. Close mic, dry.; cut 0.2 s from the strongest hit's onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 1)"
       }
     ]
   },
@@ -465,7 +465,7 @@
   },
   "arc-caster-shot": {
     "files": ["arc-caster-shot/1.mp3"],
-    "gain": -15,
+    "gain": -13,
     "priority": 4,
     "cap": 4,
     "gap": 30,
@@ -473,13 +473,13 @@
     "origins": [
       {
         "file": "arc-caster-shot/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, prompt: A single short soft electric zap, a quick rounded spark crackle in the mid frequencies, quick clean decay, high quality game sound effect, dry, no music; cut 0.22 s from the strongest hit's onset (audition 14/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 2, 8 steps, cfg 1.0, prompt: TrackType: SFX. A single short electric spark zap: a quick crackle of electricity jumping a gap, mid frequencies. Very short, clean decay. Close mic, dry, no reverb.; cut 0.22 s from the strongest hit's onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 1)"
       }
     ]
   },
   "shard-halo-cut": {
     "files": ["shard-halo-cut/1.mp3"],
-    "gain": -16,
+    "gain": -15,
     "priority": 4,
     "cap": 4,
     "gap": 30,
@@ -487,7 +487,7 @@
     "origins": [
       {
         "file": "shard-halo-cut/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 11, 50 steps, prompt: A single quick soft blade swish, a short airy whoosh ending in a light glassy ting, quick clean decay, high quality game sound effect, dry, no music; cut 0.2 s from the strongest hit's onset (audition 14/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 5, 8 steps, cfg 1.0, prompt: TrackType: SFX. A single quick blade swish through the air ending in a light glassy ting. Very short. Close mic, dry, no reverb.; cut 0.2 s from the strongest hit's onset; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 1)"
       }
     ]
   },
@@ -577,7 +577,7 @@
   },
   "caster-charge": {
     "files": ["caster-charge/1.mp3"],
-    "gain": -14,
+    "gain": -13,
     "priority": 2,
     "cap": 2,
     "gap": 100,
@@ -585,7 +585,7 @@
     "origins": [
       {
         "file": "caster-charge/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 12, 50 steps, exciter, prompt: A high pitched electronic whine rising quickly in pitch, a sci-fi weapon charging up, gritty buzz, high quality game sound effect, dry, no music; cut 0.45 s ending at the loudest point; volume ramp -12 to 0 dB (a charge rising) (audition 14/11, pick A)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 5, 16 steps, cfg 1.5, prompt: TrackType: SFX. An electric motor spinning up fast, a rising buzzy whine climbing in pitch. Close mic, dry, no reverb.; cut 0.45 s ending at the loudest point; volume ramp -12 to 0 dB; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 1)"
       }
     ]
   },
@@ -711,7 +711,7 @@
     "origins": [
       {
         "file": "enemy-telegraph/1.mp3",
-        "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 1, 50 steps, prompt: An industrial capacitor charging with a harsh rising whine and electric crackle. Short, ends abruptly. Close mic, dry, no reverb.; cut to 0.6 s, exciter (audition 17/11, pick D)"
+        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 5, 16 steps, cfg 1.5, prompt: TrackType: SFX. An industrial capacitor charging with a harsh rising whine and electric crackle. Short, ends abruptly. Close mic, dry, no reverb.; cut to 0.6 s; the take of 36 closest to the AudioLDM one it replaces, level matched (swap audition 17/11, batch 1)"
       }
     ]
   },
@@ -812,48 +812,6 @@
       {
         "file": "hatch-open/1.mp3",
         "origin": "AudioLDM cvssp/audioldm-s-full-v2 (CC BY-NC-SA 4.0), seed 4, 50 steps, prompt: A heavy spaceship hatch unlocking and sliding open: a metal clunk, then a short hydraulic hiss. Close mic, dry, no reverb.; cut to 0.9 s, exciter (proposta 17/11)"
-      }
-    ]
-  },
-  "title-start": {
-    "files": ["title-start/1.mp3"],
-    "gain": -9,
-    "priority": 0,
-    "cap": 1,
-    "gap": 500,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "title-start/1.mp3",
-        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 4, 8 steps, cfg 1.0, prompt: TrackType: SFX. A huge steel blast door slamming shut in a large empty hangar: one deep low boom, then a long dark rumbling decay. Low frequencies only. Close mic.; cut to 1.5 s; the take of 144 closest in shape and weight to the AudioLDM one it replaces; level of run-start (proposta 17/11)"
-      }
-    ]
-  },
-  "mission-call": {
-    "files": ["mission-call/1.mp3"],
-    "gain": -13,
-    "priority": 0,
-    "cap": 1,
-    "gap": 500,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "mission-call/1.mp3",
-        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 16 steps, cfg 1.5, prompt: TrackType: SFX. An old radio tuning through static, harsh crackles and hiss, no music, no voice. Close mic, dry.; first 1.3 s band-passed 350-3200 Hz, clearing into a 165 Hz tone with two soft harmonics, 1.8 s; closest take to the AudioLDM one it replaces (proposta 17/11)"
-      }
-    ]
-  },
-  "launch-confirm": {
-    "files": ["launch-confirm/1.mp3"],
-    "gain": -14,
-    "priority": 0,
-    "cap": 1,
-    "gap": 200,
-    "reverb": null,
-    "origins": [
-      {
-        "file": "launch-confirm/1.mp3",
-        "origin": "Stable Audio 3 Small SFX (Stability AI Community License), seed 1, 8 steps, cfg 1.0, prompt: TrackType: SFX. A heavy metal toggle switch flipped once: a short dry click with a soft low thump. Very short, zero ring. Close mic, dry, no reverb.; cut to 0.3 s; level of ui-select (proposta 17/11)"
       }
     ]
   }
