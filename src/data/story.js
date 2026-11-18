@@ -116,6 +116,19 @@ export const STORY = deepFreeze({
     'the-crucible':
       'At the centre, Continuance was keeping two promises at once: protect its people, and rebuild them out of anything, us included. In the end it handed the choice to you.',
   },
+  // The story before the first campaign's journey (render3d/storyScene.js):
+  // one line at the start of each of its shots, in order (the last shot,
+  // the launch, has none).
+  prologue: [
+    { speaker: 'wake', text: 'This is the Wake.' },
+    { speaker: 'wake', text: 'Our reactors are failing.' },
+    { speaker: 'wake', text: 'A power signal. Coming from the Field.' },
+    {
+      speaker: 'wake',
+      text: 'The wreck of the Ring. Broken a thousand years ago.',
+    },
+    { speaker: 'wake', text: 'We fly our interceptors by remote link.' },
+  ],
   // The journey to each sector (docs/ROTEIRO.md), keyed by the sector it
   // flies to: the opening to the first, then one between each pair. Spoken
   // in order over the travel scene (src/modules/ui/runCinematics.js) by the

@@ -22,6 +22,7 @@ import {
   chapterTransmission,
   deathTransmission,
   endingTransmissions,
+  prologueTransmissions,
   hangarTransmission,
   heraldTransmission,
   holdMsFor,
@@ -80,6 +81,7 @@ function everyLine() {
   Object.keys(STORY.ending).forEach((ending) =>
     lines.push(...endingTransmissions(ending))
   );
+  lines.push(...prologueTransmissions());
   lines.push(bossRushTransmission(), victoryTransmission());
   return lines.filter(Boolean);
 }

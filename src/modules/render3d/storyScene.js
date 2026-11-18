@@ -6,7 +6,9 @@
 // a camera move about the ship. It is drawn in a scene of its own (the
 // field's scene is not drawn meanwhile), lit by the Wake's own rig; the Ring
 // and the player's ship are borrowed into it while it plays. Everything is a
-// function of t (0..1): `?cinematic=story&t=` freezes a frame.
+// function of t (0..1): `?cinematic=story&t=` freezes a frame. Its sounds
+// follow it ('story-moment', data/audio/eventCues.js): each shot's id as it
+// opens, 'pulse' as the signal peaks, 'end' when it stops.
 
 import { STORY_MS, STORY_SHOT_MS, easeInOut } from '../../core/cinematics.js';
 import { STORY_SKY, buildStorySky } from './story/storySky.js';
@@ -126,11 +128,19 @@ const LAUNCH = {
   idle: 0.15,
   thrust: 0.6,
 };
+// The frames warm() draws: each shot's middle (t).
+const MIDDLES = STORY_SHOT_MS.map(
+  (ms, i) =>
+    (STORY_SHOT_MS.slice(0, i).reduce((a, b) => a + b, 0) + ms / 2) / STORY_MS
+);
 
 export class StoryScene {
-  constructor(t) {
+  constructor(t, emit = () => {}) {
     const { THREE } = t;
     this.t = t;
+    this.emit = emit;
+    this.cued = null;
+    this.beat = null;
     this.THREE = THREE;
     this.active = false;
     this.built = false;
@@ -204,11 +214,36 @@ export class StoryScene {
     return new this.THREE.CanvasTexture(canvas);
   }
 
+  /**
+   * Builds it and draws a frame of each shot through the composer (what a
+   * shot sees is all it compiles and uploads), so nothing is made as it
+   * plays.
+   */
+  warm(camera) {
+    const { t } = this;
+    const shown = t.player.group.visible;
+    this.start();
+    const pass = t.composer.passes[0];
+    const field = pass.scene;
+    pass.scene = this.scene;
+    MIDDLES.forEach((at) => {
+      this.frozenAt = at;
+      this.frame(camera, 0);
+      this.poseShip(t.player, 1, 0);
+      t.composer.render(0);
+    });
+    pass.scene = field;
+    this.stop();
+    t.player.group.visible = shown;
+  }
+
   /** Plays it from now; `frozenAt` (dev) holds one t. */
   start(frozenAt = null) {
     this.build();
     this.startedAt = performance.now();
     this.frozenAt = frozenAt;
+    this.cued = null;
+    this.beat = null;
     this.baseFov = null;
     this.borrow();
     this.active = true;
@@ -231,6 +266,7 @@ export class StoryScene {
   stop() {
     if (!this.active) return;
     this.active = false;
+    if (this.cued) this.emit('story-moment', { id: 'end' });
     const { t } = this;
     const ring = t.backdrop.ring;
     ring.follow = this.ringWas.follow;
@@ -243,6 +279,30 @@ export class StoryScene {
       t.camera.far = this.baseFar;
       t.camera.updateProjectionMatrix();
     }
+  }
+
+  /**
+   * Lets go of what build() made, once it has been told (it plays once per
+   * player); build() makes it anew.
+   */
+  dispose() {
+    if (!this.built) return;
+    const { environment } = this.scene;
+    this.scene.traverse((object) => {
+      // A sprite's quad is three's own, shared by every sprite.
+      if (!object.isSprite) object.geometry?.dispose();
+      [object.material].flat().forEach((material) => {
+        if (!material) return;
+        Object.values(material).forEach((value) => {
+          if (value?.isTexture && value !== environment) value.dispose();
+        });
+        material.dispose();
+      });
+    });
+    this.rig.sun.shadow.map?.dispose();
+    this.scene = null;
+    this.wake = null;
+    this.built = false;
   }
 
   get progress() {
@@ -265,6 +325,7 @@ export class StoryScene {
   frame(camera, time) {
     const t = this.progress;
     const [shot, k] = this.shotAt(t);
+    if (this.frozenAt === null) this.cue(shot, time);
     this.placeShip(shot, k);
     const about = (name) => this[name] ?? this.origin;
     const e = easeInOut(k);
@@ -305,6 +366,19 @@ export class StoryScene {
     const flicker = 0.55 + 0.45 * Math.sin(time * 23) * Math.sin(time * 7.3);
     setWakeLight(this.wake.lights.engines[0], failing ? 0.05 : 1);
     setWakeLight(this.wake.lights.engines[1], failing ? flicker : 1);
+  }
+
+  // Its sounds: each shot's as it opens, the signal's as it peaks.
+  cue(shot, time) {
+    if (shot !== this.cued) {
+      this.cued = shot;
+      this.emit('story-moment', { id: shot.id });
+    }
+    const beat = Math.floor(time / SIGNAL.period);
+    if (shot.id === 'signal' && beat !== this.beat) {
+      this.emit('story-moment', { id: 'pulse' });
+    }
+    this.beat = beat;
   }
 
   // The interceptor: hidden till the hangar, dropped out under it, then off

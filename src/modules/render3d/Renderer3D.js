@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath } from '../../core/cinematics.js';
+import { epiloguePath, introPath, storyTold } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -528,8 +528,7 @@ class Renderer3D extends BaseSystem {
     if (!this.ready()) return false;
     if (!this.startCinematic(holdIntroStart, 1, true, 'story')) return false;
     const freeze = this.cameraRig.cinematicFreeze;
-    // Built seeded: three names what it makes with Math.random.
-    this.seeded(() => this.story.build());
+    if (!this.story.built) this.warmStory();
     this.story.start(freeze?.kind === 'story' ? freeze.t : null);
     return true;
   }
@@ -537,6 +536,12 @@ class Renderer3D extends BaseSystem {
   /** The story is over: the field's scene is drawn again. */
   endStory() {
     this.story?.stop();
+    this.story?.dispose();
+  }
+
+  // Seeded: three names what the story builds and draws with Math.random.
+  warmStory() {
+    this.seeded(() => this.story.warm(this.three.camera));
   }
 
   /**
@@ -759,7 +764,9 @@ class Renderer3D extends BaseSystem {
     this.travel = new TravelScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
-    this.story = new StoryScene(this.three);
+    this.story = new StoryScene(this.three, (event, payload) =>
+      this.eventBus?.emit(event, payload)
+    );
     this.applyQuality();
   }
 
@@ -794,6 +801,8 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
+      // The story's freighter (seconds): only for a player yet to see it.
+      () => storyTold() || this.warmStory(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();
