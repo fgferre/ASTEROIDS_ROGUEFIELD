@@ -165,6 +165,9 @@ const WISP_DRAG = 2.5;
 const WISP_LENGTH = 0.1;
 const WISP_WIDTH = 0.75;
 const WISP_GAIN = 1.4;
+// s the wisps take to light, while they part (born together they would pile
+// into one bright blot)
+const WISP_RISE = 0.05;
 const WISP_HEIGHT = 3;
 
 function hash01(n) {
@@ -591,6 +594,7 @@ export class ShotWisps {
       const x = (this.x[i] += vx * dt);
       const y = (this.y[i] += vy * dt);
       const fade = this.life[i] / this.maxLife[i];
+      const rise = Math.min(1, (this.maxLife[i] - this.life[i]) / WISP_RISE);
       const length = WISP_LENGTH * (0.4 + 0.6 * fade);
       ribbons.streak(
         x - vx * length,
@@ -600,7 +604,7 @@ export class ShotWisps {
         WISP_HEIGHT,
         this.rgb[i],
         this.width[i] * (0.4 + 0.6 * fade),
-        WISP_GAIN * fade
+        WISP_GAIN * fade * rise
       );
     }
   }
