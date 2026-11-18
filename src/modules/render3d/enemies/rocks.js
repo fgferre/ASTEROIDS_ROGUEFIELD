@@ -374,7 +374,7 @@ export function createRockViews(kit) {
     g[2] = Math.max(0.035 + stage * 0.012, look.width || 0);
     g[3] = flash * 0.6;
     object.updateMatrixWorld();
-    rocks.push(view);
+    if (!view.hidden) rocks.push(view);
   }
 
   // A rock a Quarry Maw swallowed (its crushedIn) is crushed in the mouth:

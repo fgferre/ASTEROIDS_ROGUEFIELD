@@ -40,6 +40,12 @@ const SHELL_SPEED = 1.6;
 const EMERGE_SECONDS = 0.22;
 // a split's pieces not claimed by a fragment view within this long are dropped
 const PENDING_SECONDS = 1;
+// cuts a frame (each well under a millisecond): a Pulse breaks every rock on
+// the field at once, so past this many the rest wait their turn, nearest the
+// ship first (the break runs outward with the Pulse's ring), each still
+// drawn whole where it broke, and its fragments hidden, until its cut
+const CUTS_PER_FRAME = 4;
+const WAIT_FLASH = 0.6;
 
 /**
  * @param {object} kit - the mirror's toolkit (THREE, scene).
@@ -49,6 +55,8 @@ export function createRockBreak(kit, rocks) {
   const { THREE } = kit;
   const pending = new Map();
   const debris = [];
+  const queue = [];
+  let spent = 0;
   const q = new THREE.Quaternion();
   const m = new THREE.Matrix4();
   let clock = 0;
@@ -73,20 +81,91 @@ export function createRockBreak(kit, rocks) {
     view.struck = true;
   }
 
+  // `view`'s rock as it broke: what its cut and its stand-in need, so the
+  // view can go back to the pool. Its cut shape's slot (a rock that was a
+  // piece) is held until its own cut is done.
+  function still(view) {
+    const { object, rock } = view;
+    // a bare pose, not an Object3D (whose id would draw on Math.random)
+    const pose = {
+      geometry: object.geometry,
+      position: object.position.clone(),
+      quaternion: object.quaternion.clone(),
+      scale: object.scale.clone(),
+      matrixWorld: new THREE.Matrix4(),
+    };
+    pose.matrixWorld.compose(pose.position, pose.quaternion, pose.scale);
+    const kept = {
+      seed: view.seed,
+      radius: view.radius,
+      variant: view.variant,
+      family: view.family,
+      shape: view.shape,
+      slot: view.cut,
+      object: pose,
+      rock: {
+        ...rock,
+        base: rock.base.clone(),
+        vein: rock.vein.clone(),
+        seed: rock.seed.clone(),
+        glow: rock.glow.slice(),
+        surface: rock.surface.slice(),
+        hit: rock.hit.map((h) => h.slice()),
+      },
+    };
+    view.cut = undefined;
+    return kept;
+  }
+
+  // Cut now if this frame has room and no rock is waiting, else in turn,
+  // lit meanwhile with a struck rock's full flash (rocks.js updateRock).
+  function inTurn(view, enemy, cut, split = false) {
+    const job = { kept: still(view), cut, split };
+    if (!queue.length && spent < CUTS_PER_FRAME) {
+      run(job);
+      return;
+    }
+    job.kept.rock.glow[3] = WAIT_FLASH;
+    const ship = enemy?.system?.getCachedPlayer?.()?.position;
+    job.born = clock;
+    job.far = ship ? Math.hypot(enemy.x - ship.x, enemy.y - ship.y) : 0;
+    let at = queue.length;
+    while (
+      at > 0 &&
+      queue[at - 1].born === clock &&
+      queue[at - 1].far > job.far
+    )
+      at -= 1;
+    queue.splice(at, 0, job);
+  }
+
+  function run(job) {
+    spent += 1;
+    kit.seeded(() => job.cut(job.kept));
+    if (job.kept.slot !== undefined) rocks.freeShape(job.kept.slot);
+  }
+
   /**
    * `view`'s rock split into `fragments` (live Asteroids): its geometry is
    * cut into one piece per fragment, facing where each one spawned.
    */
   function split(view, enemy, fragments) {
     if (!view || !fragments.length) return;
-    kit.seeded(() => splitInto(view, enemy, fragments));
+    const whole = { variant: enemy.variant, x: enemy.x, y: enemy.y };
+    const parts = fragments.map((f) => {
+      const piece = { waiting: true, born: clock };
+      pending.set(f.id, piece);
+      return { x: f.x, y: f.y, piece };
+    });
+    inTurn(view, enemy, (kept) => splitInto(kept, whole, parts), true);
   }
 
   function splitInto(view, enemy, fragments) {
     if (SHELLS[enemy.variant]) {
       crumbleInto(view, SHELL_SHARDS, SHELL_SPEED);
       fragments.forEach((f) =>
-        pending.set(f.id, {
+        Object.assign(f.piece, {
+          waiting: false,
           emerge: true,
           world: view.object.position.clone(),
           born: clock,
@@ -118,7 +197,8 @@ export function createRockBreak(kit, rocks) {
         .multiplyScalar(object.scale.x)
         .applyQuaternion(object.quaternion)
         .add(object.position);
-      pending.set(fragments[i].id, {
+      Object.assign(fragments[i].piece, {
+        waiting: false,
         geometry: piece.geometry,
         turn: object.quaternion.clone(),
         world,
@@ -150,6 +230,9 @@ export function createRockBreak(kit, rocks) {
    */
   function settle(view, enemy, dt) {
     const { piece, object, rock } = view;
+    // its rock is still waiting for its cut (drawn whole meanwhile)
+    view.hidden = Boolean(piece?.waiting);
+    if (view.hidden) return;
     if (piece?.emerge) {
       piece.age = (piece.age ?? -dt) + dt;
       const k = Math.min(1, piece.age / EMERGE_SECONDS);
@@ -192,7 +275,7 @@ export function createRockBreak(kit, rocks) {
 
   /** `view`'s rock died whole: it falls apart into hot pieces of itself. */
   function crumble(view) {
-    kit.seeded(() => crumbleInto(view));
+    inTurn(view, view.body, (kept) => crumbleInto(kept));
   }
 
   /**
@@ -200,7 +283,9 @@ export function createRockBreak(kit, rocks) {
    * its pieces leave out of the jaws' sides.
    */
   function crush(view, facing) {
-    kit.seeded(() => crumbleInto(view, CRUSH_PIECES, CRUSH_SPEED, facing));
+    inTurn(view, null, (kept) =>
+      crumbleInto(kept, CRUSH_PIECES, CRUSH_SPEED, facing)
+    );
   }
 
   function crumbleInto(view, pieces, speedScale = 1, facing = null) {
@@ -265,11 +350,25 @@ export function createRockBreak(kit, rocks) {
     );
   }
 
-  /** Per frame, between the instances' begin and end: pieces fly and go. */
+  /**
+   * Per frame, between the instances' begin and end: waiting rocks are cut
+   * in turn (one split now shows whole this frame still, its fragments
+   * take their pieces next frame), the rest drawn whole; pieces fly and go.
+   */
   function update(dt) {
     clock += dt;
+    const shown = [];
+    while (queue.length && spent < CUTS_PER_FRAME) {
+      const job = queue.shift();
+      run(job);
+      if (job.split) shown.push(job);
+    }
+    spent = 0;
+    queue.forEach((job) => rocks.push(job.kept));
+    shown.forEach((job) => rocks.push(job.kept));
     pending.forEach((piece, id) => {
-      if (clock - piece.born > PENDING_SECONDS) pending.delete(id);
+      if (!piece.waiting && clock - piece.born > PENDING_SECONDS)
+        pending.delete(id);
     });
     for (let i = debris.length - 1; i >= 0; i -= 1) {
       const d = debris[i];

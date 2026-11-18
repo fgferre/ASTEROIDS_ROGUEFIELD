@@ -79,6 +79,81 @@ describe('rock breaking', () => {
     expect(new Set(shapes).size).toBe(3);
   });
 
+  it('a Pulse breaking a whole field: four cuts a frame, nearest the ship first, the rest drawn whole until their turn', () => {
+    const mirror = mirrorOf();
+    const ship = { position: { x: 0, y: 300 } };
+    const system = { getCachedPlayer: () => ship };
+    // far first, so the frame's first four (cut at once) are the far ones
+    const field = [1000, 900, 800, 700, 600, 500, 400, 300, 200, 100].map(
+      (x) => ({ ...rock(`r${x}`, x, 300, 12), system })
+    );
+    mirror.update(field, 0, 0);
+    const { fixed } = mirror.rocks;
+    const pieces = () =>
+      mirror.rocks.meshes.stone.slice(fixed).filter((m) => m.count).length;
+    const whole = () => {
+      const xs = [];
+      mirror.rocks.meshes.stone.slice(0, fixed).forEach((mesh) => {
+        for (let i = 0; i < mesh.count; i += 1)
+          xs.push(Math.round(mesh.instanceMatrix.array[i * 16 + 12]));
+      });
+      return xs.sort((a, b) => a - b);
+    };
+    const offset = mirror.views.get('r100').object.position.x - 100;
+
+    field.forEach((enemy) => mirror.markDead(enemy));
+    mirror.update([], 0.016, 0.016);
+    expect(pieces()).toBe(4 * 4);
+    expect(whole()).toEqual(
+      [100, 200, 300, 400, 500, 600].map((x) => x + offset)
+    );
+    mirror.update([], 0.032, 0.016);
+    expect(pieces()).toBe(8 * 4);
+    expect(whole()).toEqual([500, 600].map((x) => x + offset));
+    mirror.update([], 0.048, 0.016);
+    expect(pieces()).toBe(10 * 4);
+    expect(whole()).toEqual([]);
+  });
+
+  it('a split waiting its turn: the rock stays whole and its fragments hidden, then they take its pieces', () => {
+    const mirror = mirrorOf();
+    const parents = [0, 1, 2, 3, 4].map((i) =>
+      rock(`p${i}`, 100 + i * 120, 300, 35)
+    );
+    mirror.update(parents, 0, 0);
+    const kids = parents.map((p) => [
+      rock(`${p.id}a`, p.x + 20, p.y, 22),
+      rock(`${p.id}b`, p.x - 20, p.y, 22),
+    ]);
+    parents.forEach((p, i) => mirror.splitRock(p, kids[i]));
+    mirror.update(kids.flat(), 0.016, 0.016);
+    const { fixed } = mirror.rocks;
+    const shaped = (id) => mirror.views.get(id).shape >= fixed;
+    expect(
+      kids
+        .slice(0, 4)
+        .flat()
+        .every((k) => shaped(k.id))
+    ).toBe(true);
+    const late = kids[4];
+    expect(late.some((k) => shaped(k.id))).toBe(false);
+    expect(late.every((k) => mirror.views.get(k.id).hidden)).toBe(true);
+    const drawnWhole = mirror.rocks.meshes.stone
+      .slice(0, fixed)
+      .reduce((n, m) => n + m.count, 0);
+    expect(drawnWhole).toBe(1);
+
+    // its turn comes at the end of the next frame; its fragments show after
+    mirror.update(kids.flat(), 0.032, 0.016);
+    mirror.update(kids.flat(), 0.048, 0.016);
+    late.forEach((k) => {
+      const view = mirror.views.get(k.id);
+      expect(view.hidden).toBe(false);
+      expect(view.shape).toBeGreaterThanOrEqual(fixed);
+      expect(view.rock.heat).toBeGreaterThan(0.9);
+    });
+  });
+
   it('a rock the Quarry Maw swallows is crushed in its mouth: pieces and dust out of the sides, the core flaring', () => {
     const mirror = mirrorOf();
     const maw = {
