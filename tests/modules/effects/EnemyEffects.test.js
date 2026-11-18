@@ -74,6 +74,29 @@ describe('EnemyEffects', () => {
       .forEach((p) => expect(p.material).toBeUndefined());
   });
 
+  it('gives a big machine’s fall a heavy stop; a small machine and a rock keep theirs', () => {
+    const hitStops = [];
+    const { effects } = createEnemyEffects(1, hitStops);
+    effects.createAsteroidExplosion({
+      type: 'anvil',
+      x: 10,
+      y: 10,
+      radius: 26,
+    });
+    expect(hitStops).toEqual(['heavy']);
+
+    hitStops.length = 0;
+    effects.createAsteroidExplosion({ type: 'husk', x: 10, y: 10, radius: 20 });
+    effects.createAsteroidExplosion({
+      type: 'asteroid',
+      size: 'large',
+      x: 10,
+      y: 10,
+      radius: 40,
+    });
+    expect(hitStops).toEqual(['large']);
+  });
+
   it('scales an asteroid burst by the particle density it is given', () => {
     const asteroid = { size: 'medium', radius: 22, x: 50, y: 50 };
     const full = createEnemyEffects(1);

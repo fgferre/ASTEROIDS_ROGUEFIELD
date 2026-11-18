@@ -18,6 +18,7 @@ const HIT_STOP = Object.freeze({
   'spark-burst': { duration: 0.05, scale: 0.3 }, // the Mote's, was none
   'shock-burst': { duration: 0.09, scale: 0.25 }, // the Hunter's, was none
   blast: { duration: 0.12, scale: 0.18 }, // the Tether's, was 0.14-0.26 s by radius
+  heavy: { duration: 0.22, scale: 0.2 }, // a big machine's fall (17/11), was none
 });
 // A kind re-triggers at most once per this many seconds of game time, so a
 // multishot that kills three smalls freezes once.
