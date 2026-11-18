@@ -946,6 +946,8 @@ export class EnemyMirror {
     if (view.phased) this.machineViews.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
+    // an Elite's blades fly off with its pieces (Renderer3D's gold sparks)
+    if (view.eliteRing) view.eliteRing.visible = false;
     const accent = this.kit.accentOf(view);
     this.dissolve.start(view, accent, view.radius, this.breakOf(view));
     view.shotX = 0;
@@ -999,7 +1001,10 @@ export class EnemyMirror {
       object.position.z += view.joltY * k;
     }
     this.applyElite(view, enemy.elite === true);
-    if (view.eliteRing) view.eliteRing.rotation.y = time * 0.5;
+    if (view.eliteRing) {
+      view.eliteRing.visible = view.elite;
+      view.eliteRing.rotation.y = time * 0.5;
+    }
     if (enemy.affixes?.length || view.affix?.group.visible) {
       this.affixViews.updateAffixes(view, enemy, time);
     }

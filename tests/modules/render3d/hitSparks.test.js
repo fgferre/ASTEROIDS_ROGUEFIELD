@@ -38,6 +38,18 @@ describe('HitSparks', () => {
   });
 });
 
+describe('HitSparks gold', () => {
+  it("flings an Elite's six gold blades out all round", () => {
+    const sparks = new HitSparks();
+    sparks.emit(100, 100, 1, 0, 0, 0, true, SPARK_KIND.gold);
+    const live = [...sparks.life.keys()].filter((i) => sparks.life[i] > 0);
+    expect(live).toHaveLength(6);
+    const left = live.filter((i) => sparks.vx[i] < 0).length;
+    expect(left).toBeGreaterThan(0); // all round, not one way
+    expect(left).toBeLessThan(6);
+  });
+});
+
 describe('MuzzleFlashes', () => {
   it('lights one flash at the nose per volley, not one per shot', () => {
     const muzzles = new MuzzleFlashes();

@@ -24,6 +24,7 @@ export const SPARK_KIND = Object.freeze({
   shield: 2,
   blast: 3,
   burn: 4,
+  gold: 5,
 });
 
 // proposta 17/11 (efeito/impacto): per material, count / speed / life / drag.
@@ -95,6 +96,20 @@ const KINDS = [
     gain: 1.8,
     maxLength: 5,
   },
+  // proposta vfx-6 gold: an Elite's six orbiting blades flung out with its
+  // pieces as it dies
+  {
+    hit: 6,
+    kill: 6,
+    speed: [180, 300],
+    life: [0.35, 0.55],
+    drag: 3.5,
+    cone: Math.PI,
+    hot: 0,
+    width: 1.8,
+    gain: 2.2,
+    maxLength: 9,
+  },
 ];
 const REFLECT_MIX = 0.6; // how much the cone leans along the ricochet
 const SPARK_STRETCH = 0.035; // streak length per unit of speed
@@ -121,6 +136,7 @@ const SLAG_HEIGHT = 3.5;
 const BLAST_SLAG = [4, 8];
 const BURN_SLAG = [2, 4];
 const BLAST_RGB = [2.2, 0.85, 0.22];
+const GOLD_RGB = [1.9, 1.35, 0.3]; // linear, the Elite's gold
 
 // proposta 17/11: rock dust, matte grey puffs that drift off the hit.
 const DUST_POOL = 48;
@@ -341,6 +357,8 @@ export class HitSparks {
         color = this.hot[i] ? SHIELD_HOT : SHIELD_RGB;
       } else if (kind === SPARK_KIND.blast) {
         color = this.hot[i] ? SLAG_HOT : BLAST_RGB;
+      } else if (kind === SPARK_KIND.gold) {
+        color = GOLD_RGB;
       } else color = this.hot[i] ? hotRgb : rgb;
       ribbons.streak(
         this.x[i] - vx * k,

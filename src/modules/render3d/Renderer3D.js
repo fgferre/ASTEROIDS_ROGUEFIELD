@@ -382,6 +382,10 @@ class Renderer3D extends BaseSystem {
         this.three?.enemies.splitRock(enemy, data.fragments);
       if (enemy.type !== 'asteroid' && !isBossEnemy(enemy)) {
         this.killPops.emit(enemy.x, enemy.y, enemy.radius || 12);
+        // an Elite's gold blades fly off with its pieces
+        const { x, y } = enemy;
+        if (enemy.elite)
+          this.hitSparks.emit(x, y, 1, 0, 0, 0, true, SPARK_KIND.gold);
       }
     });
     this.registerEventListener('bullet-hit', (data) => {
