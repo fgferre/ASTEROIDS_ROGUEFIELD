@@ -20,36 +20,34 @@ describe('weapon mirror', () => {
     if (!GamePools.initialized) GamePools.initialize();
   });
 
-  it("draws the Solar Flare's glow on a burn only while the lance carries the thermal Apex", () => {
+  it('holds a slowed enemy with static on its hull, not a ring round it', () => {
     const combat = new CombatSystem({
       eventBus: createEventBusMock(),
       player: { isDead: false, getPosition: () => ({ x: 100, y: 300 }) },
       enemies: { forEachActiveEnemy: () => {}, applyDamage: () => ({}) },
       physics: { forEachBulletCollision: () => {} },
     });
-    const burning = { id: 'burning', x: 200, y: 300, radius: 10 };
-    combat.cards.ignite(burning, 10, {
-      duration: 1.5,
-      ticks: 3,
-      damageFraction: 0.3,
-    });
-    const glowsOnBurn = () => {
-      const glows = [];
-      const batches = {
-        ribbons: { ring() {}, tube() {}, path() {}, px: [], py: [] },
-        glow: { push: (x, height, y) => glows.push([x, y]) },
-      };
-      mirrorWeaponEffects(THREE, combat, batches, { observe() {} });
-      return glows.filter(([x, y]) => x === burning.x && y === burning.y)
-        .length;
+    const slowed = { id: 'drone-7', x: 200, y: 300, radius: 10 };
+    combat.cards.slows.set(slowed, { id: slowed.id, timer: 0.4 });
+    const drawn = { ring: 0, path: 0 };
+    const px = [];
+    const batches = {
+      ribbons: {
+        ring: () => (drawn.ring += 1),
+        tube() {},
+        streak() {},
+        path: () => (drawn.path += 1),
+        px,
+        py: [],
+      },
+      glow: { push() {} },
+      smoke: { push() {} },
     };
+    mirrorWeaponEffects(THREE, combat, batches, { observe() {} });
 
-    // Sunheart: the Furnace Corona's own Apex.
-    combat.weapons.takeWeapon('furnace-corona');
-    combat.weapons.apexWeapon('thermal');
-    expect(glowsOnBurn()).toBe(1);
-
-    combat.weapons.takeWeapon('lance');
-    expect(glowsOnBurn()).toBe(2);
+    expect(drawn.ring).toBe(0);
+    expect(drawn.path).toBeGreaterThan(0);
+    // laid over the hull, not round it
+    expect(Math.abs(px[0] - slowed.x)).toBeLessThan(slowed.radius * 1.5);
   });
 });

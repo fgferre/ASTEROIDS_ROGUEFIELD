@@ -106,7 +106,8 @@ export {
   FOG_NEAR,
 } from './enemies/rockShader.js';
 
-function hashId(id) {
+/** A stable 32-bit hash of an enemy id (ids are strings). */
+export function hashId(id) {
   const text = String(id);
   let h = 2166136261;
   for (let i = 0; i < text.length; i += 1) {
