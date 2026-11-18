@@ -364,26 +364,13 @@ class Renderer3D extends BaseSystem {
       const { position, angle, radius, look, fizzled } = data || {};
       if (!position) return;
       // a missile spent on nothing at the end of its range pops small
-      const spent = look === 'seeker' && fizzled;
       const missile = look === 'seeker' && !fizzled;
-      this.three?.blasts.emit(
-        position.x,
-        position.y,
-        radius || 30,
-        BLAST_LOOK[spent ? 'spent' : missile ? 'seeker' : 'flak']
-      );
-      const dx = Math.cos(angle || 0);
-      const dy = Math.sin(angle || 0);
-      this.hitSparks.emit(
-        position.x,
-        position.y,
-        dx,
-        dy,
-        dx,
-        dy,
-        missile,
-        SPARK_KIND.blast
-      );
+      const kind = look === 'seeker' ? (missile ? 'seeker' : 'spent') : 'flak';
+      this.burst(position, radius || 30, kind, angle || 0, missile);
+    });
+    // a Caster's shell lands in fire, smoke and pieces of its casing
+    this.registerEventListener('caster-shell-landed', (data) => {
+      if (data?.position) this.burst(data.position, data.radius, 'shell', 0);
     });
     // a split asteroid lives on as its fragments: only real deaths burn;
     // a machine that dies flashes at its own core
@@ -1086,6 +1073,16 @@ class Renderer3D extends BaseSystem {
   }
 
   // The field's particles, shockwaves and screen flash (fieldMirrors.js).
+  // A burst in fire and smoke (blasts.js, BLAST_LOOK[look]) with its hot
+  // streaks and fragments thrown round `angle`; `heavy`: a missile's share.
+  burst(position, radius, look, angle, heavy = false) {
+    const { x, y } = position;
+    this.three?.blasts.emit(x, y, radius, BLAST_LOOK[look]);
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    this.hitSparks.emit(x, y, dx, dy, dx, dy, heavy, SPARK_KIND.blast);
+  }
+
   mirrorEffects(effects) {
     mirrorEffects(this.three, effects, this.impact);
   }

@@ -36,6 +36,20 @@ const createEnemyEffects = (
 };
 
 describe('EnemyEffects', () => {
+  it('lands a Caster shell as a shake only: no rings, sparks or glow (its fire is 3D)', () => {
+    const { effects, particleEffects } = createEnemyEffects();
+    let rings = 0;
+    particleEffects.createExplosionShockwave = () => (rings += 1);
+
+    effects.createShellImpactEffect({
+      position: { x: 100, y: 100 },
+      radius: 90,
+    });
+
+    expect(rings).toBe(0);
+    expect(particleEffects.particles).toHaveLength(0);
+  });
+
   it('plays a mine blast once even when the mine explodes twice', () => {
     const { effects, particleEffects } = createEnemyEffects();
     const mine = { type: 'mine', x: 100, y: 100 };
