@@ -69,6 +69,30 @@ describe('Projectiles', () => {
     expect(projectiles.enemyBullets).toHaveLength(0);
   });
 
+  it('announces an enemy shot that burns out in the air, not one that leaves the field', () => {
+    const emitted = [];
+    const projectiles = makeProjectiles(emitted);
+    projectiles.createEnemyBullet({
+      position: { x: 400, y: 300 },
+      velocity: { x: 100, y: 0 },
+      projectile: { lifetime: 0.5 },
+    });
+    projectiles.createEnemyBullet({
+      position: { x: 790, y: 300 },
+      velocity: { x: 100, y: 0 },
+      projectile: { lifetime: 5 },
+    });
+
+    projectiles.updateEnemyBullets(0.3); // the second leaves the field
+    projectiles.updateEnemyBullets(0.3); // the first burns out
+    const expired = emitted.filter(
+      ({ name }) => name === 'enemy-bullet-expired'
+    );
+    expect(expired).toHaveLength(1);
+    expect(expired[0].payload.position.x).toBeCloseTo(460, 3);
+    expect(expired[0].payload.velocity).toEqual({ x: 100, y: 0 });
+  });
+
   it('compacts the shot arrays in place, keeping survivors in order', () => {
     const projectiles = makeProjectiles();
     for (let i = 0; i < 3; i += 1) {

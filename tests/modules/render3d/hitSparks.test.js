@@ -3,6 +3,7 @@ import {
   HitSparks,
   MuzzleFlashes,
   SPARK_KIND,
+  ShotWisps,
 } from '../../../src/modules/render3d/hitSparks.js';
 
 describe('HitSparks', () => {
@@ -63,5 +64,29 @@ describe('MuzzleFlashes', () => {
     expect(y0).toBeCloseTo(300, 5);
     expect(y1).toBeCloseTo(300, 5);
     expect(x1).toBeGreaterThan(x0);
+  });
+});
+
+describe('ShotWisps', () => {
+  it('frays a burned-out shot into wisps of its colour that run on and fade', () => {
+    const wisps = new ShotWisps();
+    const red = [1, 0, 0];
+    wisps.emit(100, 100, 300, 0, 4, red);
+    const drawn = [];
+    wisps.update(0.2, { streak: (...args) => drawn.push(args) });
+
+    expect(drawn.length).toBeGreaterThan(2);
+    drawn.forEach(([x0, , x1, , , rgb]) => {
+      expect(rgb).toBe(red);
+      expect(x1).toBeGreaterThan(100); // on along its path
+      expect(x1).toBeGreaterThan(x0);
+    });
+
+    for (let step = 0; step < 7; step += 1) {
+      wisps.update(0.05, { streak() {} });
+    }
+    const late = [];
+    wisps.update(0.05, { streak: (...args) => late.push(args) });
+    expect(late).toHaveLength(0);
   });
 });

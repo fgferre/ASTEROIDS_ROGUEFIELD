@@ -32,7 +32,7 @@ import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { HALF_H, HALF_W } from './batches.js';
+import { HALF_H, HALF_W, rgbOf } from './batches.js';
 import { CameraRig } from './cameraRig.js';
 import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import {
@@ -41,7 +41,13 @@ import {
   mirrorProjectiles,
 } from './fieldMirrors.js';
 import { FormationMarks } from './formationMarks.js';
-import { HitSparks, KillPops, MuzzleFlashes, SPARK_KIND } from './hitSparks.js';
+import {
+  HitSparks,
+  KillPops,
+  MuzzleFlashes,
+  SPARK_KIND,
+  ShotWisps,
+} from './hitSparks.js';
 import { BLAST_LOOK } from './blasts.js';
 import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
@@ -174,6 +180,7 @@ class Renderer3D extends BaseSystem {
     this.burnMarks = new BurnMarks();
     this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
+    this.shotWisps = new ShotWisps();
     this.formationMarks = new FormationMarks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
@@ -424,6 +431,20 @@ class Renderer3D extends BaseSystem {
           this.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);
         }
       }
+    });
+    // an enemy shot that burns out in the air frays into wisps of its light
+    this.registerEventListener('enemy-bullet-expired', (data) => {
+      const { position, velocity, color, radius } = data || {};
+      if (!position || !velocity || !this.three) return;
+      const { THREE, threatRgb } = this.three;
+      this.shotWisps.emit(
+        position.x,
+        position.y,
+        velocity.x,
+        velocity.y,
+        radius || 4,
+        color ? rgbOf(THREE, color) : threatRgb
+      );
     });
     this.registerEventListener('bullet-created', (data) => {
       const { from, bullet } = data || {};
@@ -725,6 +746,7 @@ class Renderer3D extends BaseSystem {
     this.hitSparks.clear();
     this.killPops.clear();
     this.muzzles.clear();
+    this.shotWisps.clear();
     this.biome.reset();
     this.interp?.clear();
   }
@@ -955,6 +977,7 @@ class Renderer3D extends BaseSystem {
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();
     }
+    this.shotWisps.update(dt, t.ribbons);
     mirrorOverlays(
       t,
       player,
