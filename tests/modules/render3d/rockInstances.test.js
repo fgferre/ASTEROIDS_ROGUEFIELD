@@ -31,6 +31,7 @@ const rockView = (family, shape, x) => {
       surface: [0.9, 0.1],
       hit: [new Float32Array(4), new Float32Array(4)],
       heat: 0,
+      tint: 0,
     },
   };
 };
