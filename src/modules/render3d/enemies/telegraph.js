@@ -395,7 +395,9 @@ export function createTelegraphs(kit) {
   // round its gap, `parts.width` px thick (the hit's), and a post at each
   // side of the gap. Warning, a guide runs out both ways from where the boss
   // stood; solid, it locks with a flash at the posts and holds, energy
-  // running out along it; fading, it dims.
+  // running out along it; fading, it dims. Lot 5 (efeito/impacto): solid, it
+  // burns at about half its old light and flash, red and firm, so it no
+  // longer blurs what is near it.
   function updateBarrier(parts, t, progress) {
     parts.warn.visible = false;
     const [from, to] = t.span || [-1000, 1000];
@@ -405,7 +407,7 @@ export function createTelegraphs(kit) {
     const held = t.phase === 'solid' ? t.duration - t.timer : Infinity;
     const lock = Math.max(0, 1 - held / LOCK_FLASH);
     const solid = t.solid ?? 1;
-    const gain = warning ? 0.55 + 0.45 * progress : solid * (1 + 1.5 * lock);
+    const gain = warning ? 0.55 + 0.45 * progress : solid * (0.6 + 0.5 * lock);
     const front = warning ? progress * 1.2 * Math.max(-from, to) : Infinity;
     const walls = [
       [from, lo - from],
@@ -444,10 +446,10 @@ export function createTelegraphs(kit) {
         color: kit.threatColor,
         warn: false,
         progress,
-        gain: warning ? 0.5 + 0.5 * progress : solid * (1 + 2.5 * lock),
+        gain: warning ? 0.5 + 0.5 * progress : solid * (0.6 + 0.8 * lock),
         core: 0,
       });
-      spark(parts, i, at, 0, 4, 8, 3 * lock * solid, kit.threatColor);
+      spark(parts, i, at, 0, 4, 8, 1.2 * lock * solid, kit.threatColor);
     });
   }
 
