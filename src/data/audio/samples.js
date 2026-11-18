@@ -140,6 +140,12 @@ export const SAMPLE_CUES = deepFreeze({
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
   playUIStartGame: { sample: 'run-start', bus: 'ambient' },
+  // The press start, Launch and the remote link into a run (eventCues; the
+  // owner's card, 17/11). Each plays a stand-in file until its own arrives:
+  // swapping it is the manifest entry's `files` and `origins`.
+  playPressStart: { sample: 'press-start', bus: 'ambient' },
+  playLaunchConfirm: { sample: 'launch-confirm', bus: 'ambient' },
+  playRemoteLink: { sample: 'remote-link', bus: 'ambient' },
   playPauseOpen: { sample: 'pause-open', bus: 'ambient' },
   playPauseClose: { sample: 'pause-close', bus: 'ambient' },
 });

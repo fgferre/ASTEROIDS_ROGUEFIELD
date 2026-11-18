@@ -1022,6 +1022,20 @@ class SFXBus {
     return this._interface.playUIStartGame();
   }
 
+  // The start's own moments (the owner's card, 17/11): sample slots
+  // (data/audio/samples.js) over today's synthesis until their sounds arrive.
+  playPressStart() {
+    return this._interface.playUIStartGame();
+  }
+
+  playLaunchConfirm() {
+    return this._interface.playUISelect();
+  }
+
+  playRemoteLink() {
+    return this._interface.playMenuTransition();
+  }
+
   // --- Thruster loops (sfx/thrusters.js): the engine's fallback ---
 
   startThrusterLoop(type, intensity, isAutomatic) {

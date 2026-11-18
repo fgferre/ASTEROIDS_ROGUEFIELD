@@ -611,6 +611,175 @@ select {
   color: var(--text-dim);
 }
 
+/* Asleep until the page's first gesture (loadingScreen.js): the button waits
+   dim and still; the first touch lights it, with the music. */
+.loading-screen--asleep .loading-screen__press-start {
+  opacity: 0.45;
+  animation: none !important;
+}
+
+/* The start: the button flares and blinks, the title fades and the scene goes
+   dark (1 s); then the screen fades off the menu. */
+.loading-screen--starting {
+  pointer-events: none;
+  transition: background-color 0.55s ease-out 0.35s;
+  background-color: rgba(1, 3, 6, 0.94);
+}
+
+.loading-screen--starting.hidden {
+  transition-duration: 0.6s;
+}
+
+.loading-screen--starting .loading-screen__press-start {
+  animation: pressStartBlink 0.5s steps(1, end) both !important;
+  background: #c8fdff;
+  color: #00262b;
+  text-shadow: none;
+  box-shadow: 0 0 42px rgba(170, 250, 255, 0.95);
+}
+
+.loading-screen--starting .loading-screen__gate {
+  transition: opacity 0.5s ease-in 0.4s;
+  opacity: 0;
+}
+
+@keyframes pressStartBlink {
+  0%,
+  33%,
+  67% {
+    opacity: 1;
+  }
+
+  17%,
+  50%,
+  83% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The remote link into a run (modules/ui/remoteLink.js): dark, static and
+   the Wake's lines, then the static clears onto the run. */
+.btn.is-launching {
+  background: #e8feff;
+  color: #00262b;
+  box-shadow: 0 0 34px rgba(170, 250, 255, 0.95);
+}
+
+.remote-link {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #020304;
+  animation: remoteLinkIn 0.25s ease-in both;
+}
+
+.remote-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--noise);
+  background-size: 384px 240px;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  animation: remoteLinkNoise 0.24s steps(3) infinite;
+}
+
+.remote-link__lines {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(340px, 80vw);
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.16em;
+  color: #7fe9f2;
+  transition: opacity 0.2s;
+}
+
+.remote-link__line {
+  white-space: pre;
+  animation: remoteLinkLine 0.2s steps(4, end) both;
+}
+
+.remote-link__line span {
+  color: #e9f6ff;
+}
+
+.remote-link--clearing {
+  pointer-events: none;
+  animation: remoteLinkClear var(--clear) ease-in both;
+}
+
+.remote-link--clearing::before {
+  animation:
+    remoteLinkNoise 0.24s steps(3) infinite,
+    remoteLinkNoiseOut var(--clear) ease-in both;
+}
+
+.remote-link--clearing .remote-link__lines {
+  opacity: 0;
+}
+
+@keyframes remoteLinkIn {
+  0%,
+  40% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes remoteLinkLine {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes remoteLinkNoise {
+  33% {
+    background-position: 61px 37px;
+  }
+
+  67% {
+    background-position: -23px 91px;
+  }
+}
+
+@keyframes remoteLinkClear {
+  from {
+    background-color: rgba(2, 3, 4, 0.55);
+  }
+
+  to {
+    background-color: rgba(2, 3, 4, 0);
+  }
+}
+
+@keyframes remoteLinkNoiseOut {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 560px) {
   .loading-screen__gate-title {
     margin-top: -75px;
