@@ -433,26 +433,20 @@ export class PlayerEffects {
     );
   }
 
-  // Level 5 shield: deflective explosion when shield breaks
+  // Level 5 shield: the ring of its burst as it breaks (the shield itself
+  // deals the damage, player/shield.js).
   createShieldDeflectiveExplosion(data) {
     if (!data?.position) return;
 
     this.particleEffects.createShockwaveEffect({
       position: data.position,
-      radius: 200, // AoE damage radius
+      radius: data.radius,
       color: withAlpha(PALETTE.player, 0.6),
     });
 
     // Screen effects
     this.addScreenShake(12, 0.4);
     this.addScreenFlash(withAlpha(PALETTE.player, 0.4), 0.3, 0.2);
-
-    // Emit damage event for enemies in radius
-    this.emit('shield-explosion-damage', {
-      position: data.position,
-      radius: 200,
-      damage: 50, // AoE damage amount
-    });
   }
 
   createXPCollectEffect(x, y) {

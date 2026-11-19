@@ -18,19 +18,17 @@ export default {
   ],
   text: {
     name: 'Deflection Matrix',
-    summary:
-      'Implements an activateable shield capable of absorbing direct impacts.',
+    summary: 'Implements an activatable shield that absorbs damage.',
     lore: 'Experimental system that redistributes reactor energy to a fast directional field.',
     levels: [
       {
         title: 'Initial Field',
-        description:
-          'Activateable shield absorbs up to 3 impacts before recharging.',
+        description: 'Activatable shield absorbs 50 damage before recharging.',
         highlights: ['Unlocks ability on configured key (default: E).'],
       },
       {
         title: 'Reinforced Plating',
-        description: 'Capacity increased to 4 impacts per activation.',
+        description: 'Shield capacity raised to 75 damage.',
         highlights: [
           'Ideal for withstanding medium barrages without immediate recharge.',
         ],
@@ -42,12 +40,13 @@ export default {
       },
       {
         title: 'Advanced Matrix',
-        description: 'Final capacity of 5 impacts per activation.',
+        description: 'Shield capacity raised to 100 damage.',
         highlights: ['Sustains confrontations against aggressive swarms.'],
       },
       {
         title: 'Deflector Overload',
-        description: 'Further reduces total shield cooldown.',
+        description:
+          'Capacity 125 damage and a shorter recharge. When the shield breaks, it explodes and damages nearby enemies.',
         highlights: ['Unlocks rapid recharge for successive counter-attacks.'],
       },
     ],
