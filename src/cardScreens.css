@@ -888,6 +888,45 @@ body.touch-play #levelup-equip-btn.is-armed ~ .levelup-cancel {
   display: flex;
 }
 
+/* Touch, iPad and up: the 1920 layout scaled to the window drew the cards'
+   text at 5 to 10 px; a floor on the unit and the type, small labels 12 px. */
+body.touch-play :is(#levelup-screen, #chest-screen, #flight-screen) {
+  --u: max(min(calc(100vw / 1920), calc(100vh / 1080)), 0.62px);
+  --fs: calc(
+    max(min(calc(100vw / 1920), calc(100vh / 1080)), 0.8px) * var(--text-scale)
+  );
+}
+
+/* The larger type needs wider cards; the iPad's width has the room. */
+body.touch-play :is(#levelup-screen, #chest-screen) .card {
+  width: calc(430 * var(--u));
+}
+
+body.touch-play
+  :is(#levelup-screen, #chest-screen)
+  :is(
+    .lu-level small,
+    .lu-picks__lbl,
+    .lu-headstart,
+    .card__held,
+    .card__rar-name,
+    .card__tag,
+    .card__lbl,
+    .card__end,
+    .card__at,
+    .card__wtag,
+    .card__arrow,
+    .card__trail,
+    .levelup-hint,
+    .run-tray__lbl,
+    .run-tray__full,
+    .run-tray__note,
+    .run-slot em,
+    .run-tray__n small
+  ) {
+  font-size: var(--text-xs);
+}
+
 /* Phone held sideways: the cards share the width inside the safe areas, text
    at least 12 px; the column scrolls under the actions, which stay in view. */
 @media (max-height: 500px) {
@@ -945,31 +984,6 @@ body.touch-play #levelup-equip-btn.is-armed ~ .levelup-cancel {
 
   body.touch-play #levelup-screen .run-tray {
     order: 2;
-  }
-
-  body.touch-play
-    :is(#levelup-screen, #chest-screen)
-    :is(
-      .lu-level small,
-      .lu-picks__lbl,
-      .lu-headstart,
-      .card__held,
-      .card__rar-name,
-      .card__tag,
-      .card__lbl,
-      .card__end,
-      .card__at,
-      .card__wtag,
-      .card__arrow,
-      .card__trail,
-      .levelup-hint,
-      .run-tray__lbl,
-      .run-tray__full,
-      .run-tray__note,
-      .run-slot em,
-      .run-tray__n small
-    ) {
-    font-size: var(--text-xs);
   }
 }
 
@@ -1445,10 +1459,11 @@ body.touch-play :is(#chest-screen, #flight-screen) .chest-continue {
     margin-top: var(--space-3);
     padding: 0 var(--space-6);
   }
+}
 
-  body.touch-play
-    :is(#chest-screen, #flight-screen)
-    :is(.chest-title__count, .chest-continue) {
-    font-size: var(--text-xs);
-  }
+/* The count and Continue at 12 px on every touch screen. */
+body.touch-play
+  :is(#chest-screen, #flight-screen)
+  :is(.chest-title__count, .chest-continue) {
+  font-size: var(--text-xs);
 }
