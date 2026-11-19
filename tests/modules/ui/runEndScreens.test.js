@@ -42,7 +42,7 @@ describe('Run end screens', () => {
             { kind: 'death', time: 872, layer: 9, killer: null },
           ],
         },
-        killedBy: { type: 'hunter', displayName: 'Elite Seeker', elite: true },
+        killedBy: { type: 'hunter', displayName: 'Elite Hunter', elite: true },
       },
     });
 
@@ -53,7 +53,7 @@ describe('Run end screens', () => {
     const body = gameOver.body.innerHTML;
     expect(body).toContain('Layer 9<small>of 15</small>');
     expect(body).toContain(
-      'Killed by an <span class="end-killer__who">Elite Seeker</span>'
+      'Killed by an <span class="end-killer__who">Elite Hunter</span>'
     );
     expect(body).toContain('Pilot down.');
     expect(body).toContain('×48 combo');

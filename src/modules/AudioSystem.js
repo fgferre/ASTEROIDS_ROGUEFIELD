@@ -1,6 +1,7 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import SFXBus from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
+import SectorScore from './audio/SectorScore.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
@@ -9,6 +10,7 @@ import { registerAudioEventCues } from './audio/eventDispatch.js';
 import { interceptSampleCues } from './audio/samplePlayer.js';
 import { createVoicePlayer, loadVoiceManifest } from './audio/voiceLines.js';
 import { createJourneyCue } from './audio/journeyCue.js';
+import { createMusicStings } from './audio/musicStings.js';
 import * as bossVoice from './audio/bossVoice.js';
 import {
   createThrusterState,
@@ -31,6 +33,17 @@ import {
   AUDIO_VOICE,
 } from '../data/audio/mix.js';
 import { dbToGain } from './audio/MusicThemes.js';
+
+const MENU_SCREEN_TRACKS = Object.freeze({
+  menu: FILE_TRACK_MANAGER_IDS.MENU_OPENING,
+  campaign: FILE_TRACK_MANAGER_IDS.CAMPAIGN_MAP,
+  credits: FILE_TRACK_MANAGER_IDS.THANKS,
+});
+const END_SCREEN_TRACKS = Object.freeze([
+  FILE_TRACK_MANAGER_IDS.VICTORY_FINAL,
+  FILE_TRACK_MANAGER_IDS.ENDING_CHOICE,
+  FILE_TRACK_MANAGER_IDS.END_CREDITS,
+]);
 
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -98,6 +111,8 @@ class AudioSystem extends BaseSystem {
 
     // Low health warning state
     this.lowHealthWarning = false;
+    // The story's launch just played the journey's ignition (eventHandlers).
+    this.storyIgnited = false;
 
     // Run-following music inputs: the player's position (pan + distance
     // reference for enemy-side cues) and the wave's enemies alive or still to spawn (density proxy:
@@ -106,13 +121,13 @@ class AudioSystem extends BaseSystem {
     this.listenerY = GAME_HEIGHT / 2;
     this.runEnemyCount = 0;
 
-    // MusicMixer (INFRA-02 / AUDIO-01) — composed inside the stable `audio`
-    // service (RESEARCH A3). Construction does NO AudioContext work; init() is
-    // called from AudioSystem.init() once the context + buses exist. The event
-    // table's music steps (./audio/eventHandlers.js) drive it.
-    this.musicMixer = new MusicMixer({
-      randomScope: this.randomScopes?.families?.music || this.random,
-    });
+    // MusicMixer: the run's danger (no sound) that the recorded scores follow.
+    // The event table's music steps (./audio/eventHandlers.js) drive it.
+    this.musicMixer = new MusicMixer();
+
+    // The recorded music (data/audio/sectorScores.js). Joins the music chain at the duck
+    // node, like the file tracks (init below).
+    this.sectorScore = new SectorScore({ mixer: this.musicMixer });
 
     // FileTrackManager (INFRA-02) — owns the MP3 streaming catalog + media graph
     // + rejection-safe, resume-race-hardened, ordered playback starts. Composed
@@ -154,9 +169,16 @@ class AudioSystem extends BaseSystem {
         }),
     });
 
-    // The journey's score (./audio/journeyCue.js), on the music path at the
+    // The journey's recorded score (./audio/journeyCue.js), on the music path at the
     // duck stage, like the file tracks.
     this.journeyCue = createJourneyCue({
+      getContext: () => this.context,
+      getDestination: () =>
+        this.duckingController.musicDuckGain || this.musicGain,
+    });
+
+    // The recorded one-shots (elite, surge, deep field), on the music path.
+    this.musicStings = createMusicStings({
       getContext: () => this.context,
       getDestination: () =>
         this.duckingController.musicDuckGain || this.musicGain,
@@ -338,13 +360,6 @@ class AudioSystem extends BaseSystem {
       this.voiceGain.connect(this.masterLimiter);
 
       this.applyVolumeToNodes();
-      // AUDIO-01: the adaptive 4-layer music now lives in MusicMixer. It builds
-      // its graph here (after the context + buses exist) and connects its
-      // pauseFadeGain straight to musicGain (the slider stage). 02.06 re-splices
-      // the duck node between pauseFadeGain and musicGain. The run (wave,
-      // density, HP) drives its intensity; the boss arc overrides upwards.
-      this.musicMixer.init(this.context, this.musicGain);
-
       // AUDIO-03 (D-11): splice the DEDICATED duck nodes. The controller creates
       // musicDuckGain (rests 1.0) between musicPauseFadeGain and musicGain, and
       // effectsDuckGain (rests 1.0) before effectsGain — each with explicit
@@ -352,7 +367,6 @@ class AudioSystem extends BaseSystem {
       // never writes the slider stages. Music content (mixer + file tracks) now
       // routes into musicDuckGain; SFX content routes into effectsDuckGain.
       this.duckingController.init(this.context, {
-        musicSpliceFrom: this.musicMixer.musicPauseFadeGain,
         musicSpliceTo: this.musicGain,
         effectsSpliceTo: this.effectsGain,
       });
@@ -387,6 +401,11 @@ class AudioSystem extends BaseSystem {
         this.context,
         this.duckingController.musicDuckGain || this.musicGain,
         (thunk) => this.ensureRunning(thunk)
+      );
+
+      this.sectorScore.init(
+        this.context,
+        this.duckingController.musicDuckGain || this.musicGain
       );
 
       this._syncMenuTrackForCurrentScreen();
@@ -562,6 +581,16 @@ class AudioSystem extends BaseSystem {
 
     this.sfxBus.playMenuTransition();
     this._syncMenuTrackForCurrentScreen();
+    // The endings' music ends with the victory: any other screen lets it go.
+    if (payload?.screen && payload.screen !== 'victory') {
+      END_SCREEN_TRACKS.forEach((trackId) => this.stopFileTrack(trackId));
+    }
+    // The death screen plays its own piece; any other screen lets it go.
+    if (payload?.screen === 'gameover') {
+      this.playFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
+    } else if (payload?.screen) {
+      this.stopFileTrack(FILE_TRACK_MANAGER_IDS.GAME_OVER);
+    }
   }
 
   _handleOverlayVisibilityChanged(payload = {}) {
@@ -569,7 +598,25 @@ class AudioSystem extends BaseSystem {
     const isOpen = Boolean(payload?.isOpen);
     const source = typeof payload?.source === 'string' ? payload.source : null;
 
-    if (!['settings', 'credits'].includes(overlay)) {
+    // The endings' own music: the choice plays until one is picked, the credits
+    // from their roll until the menu takes over (_handleScreenChanged).
+    if (overlay === 'ending') {
+      if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      else this.stopFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      return;
+    }
+    if (overlay === 'end-credits') {
+      if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.END_CREDITS);
+      return;
+    }
+
+    // Settings from the menu keep its music, muffled like the in-run pause.
+    if (overlay === 'settings') {
+      this.fileTrackManager?.setMuffled(isOpen && source === 'menu');
+      return;
+    }
+
+    if (!['credits', 'campaign'].includes(overlay)) {
       return;
     }
 
@@ -589,6 +636,16 @@ class AudioSystem extends BaseSystem {
       if (this.menuTrackState) {
         this.menuTrackState.currentScreen = 'menu';
       }
+      if (overlay === 'campaign') {
+        // A Launch closes the map just before its 'screen-changed': let that
+        // settle, so the menu track does not blip in between.
+        queueMicrotask(() => {
+          if (this.fileTrackManager?.currentScreen === 'menu') {
+            this._syncMenuTrackForCurrentScreen();
+          }
+        });
+        return;
+      }
     } else {
       return;
     }
@@ -602,14 +659,15 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
-    if (currentScreen === 'menu') {
+    // The track of the menu and the overlays opened from it; the others stop
+    // (a run has none).
+    const wanted = MENU_SCREEN_TRACKS[currentScreen];
+    Object.values(MENU_SCREEN_TRACKS).forEach((trackId) => {
       // playFileTrack delegates to FileTrackManager.playTrack, which routes the
       // start through the centralized ensureRunning gate (resume-race-safe).
-      this.playFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
-      return;
-    }
-
-    this.stopFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
+      if (trackId === wanted) this.playFileTrack(trackId);
+      else this.stopFileTrack(trackId);
+    });
   }
 
   // --- File-track delegators (FileTrackManager is the owner; INFRA-02) --------
@@ -819,15 +877,13 @@ class AudioSystem extends BaseSystem {
     this.pendingSoundQueue.length = 0;
     this.resumePromise = null;
 
-    // AUDIO-01: the adaptive music now lives in MusicMixer — back to a fresh
-    // run (no wave, no density, no boss floor) on a new run/replay.
+    // Back to a fresh danger (no wave, no density) on a new run/replay.
     if (this.musicMixer) {
       this.musicMixer.resetRun();
     }
+    this.sectorScore.reset();
     this.journeyCue.stop();
-    clearTimeout(this.chapterStingerTimer);
-    this.chapterStingerTimer = null;
-    this.chapterClaimed = false;
+    this.storyIgnited = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();
     this.runEnemyCount = 0;
@@ -854,12 +910,11 @@ class AudioSystem extends BaseSystem {
       this.sfxBus.dispose();
     }
     this.journeyCue.stop();
+    this.sectorScore.reset();
     this.voiceLines.clear();
     this.voiceLines.expect([]);
-    // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
-    if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
-      this.musicMixer.dispose();
-    }
+    // Stop the MusicMixer's smoothing timer.
+    this.musicMixer?.dispose();
     // Tear down the FileTrackManager (idempotent; detaches all track nodes).
     if (
       this.fileTrackManager &&

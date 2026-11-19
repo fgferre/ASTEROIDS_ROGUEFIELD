@@ -14,6 +14,7 @@ import {
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 import PlayerSystem from '../../../src/modules/PlayerSystem.js';
 import { HALF_H, HALF_W } from '../../../src/modules/render3d/batches.js';
+import { BREAK_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
@@ -40,6 +41,7 @@ function mirrorFor(hull) {
     eventBus: createEventBusMock(),
     input: { getMovementInput: () => ({}) },
     'command-queue': null,
+    newFlight: false,
   });
   player.setHull(hull);
   const mirror = new PlayerMirror(THREE, new THREE.Scene(), (fn) => fn());
@@ -409,6 +411,39 @@ describe('PlayerMirror', () => {
     mirror.update(player, ribbons, 0.15);
     expect(mirror.ghosts[0].visible).toBe(false);
     expect(mirror.ghosts[1].visible).toBe(true);
+  });
+
+  it('breaks into its own pieces when it dies, its flames out, then hides', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const hull = mirror.ship.children.find((child) => child.name === 'hull');
+    const whole = hull.geometry;
+    const [flame] = mirror.flames;
+    player.velocity = { vx: 50, vy: 0 };
+    player.markDead();
+    mirror.update(player, ribbons, 0.1, 0.016);
+
+    expect(mirror.breaking).toBe(true);
+    expect(mirror.group.visible).toBe(true);
+    expect(hull.geometry.getAttribute('aPiece')).toBeDefined();
+    expect(Array.isArray(hull.material)).toBe(true); // its finishes' twins
+    expect(flame.flame.visible).toBe(false);
+    expect(hull.castShadow).toBe(false);
+
+    mirror.update(player, ribbons, 2, BREAK_SECONDS);
+    expect(mirror.breaking).toBe(false);
+    expect(mirror.group.visible).toBe(false);
+    expect(hull.geometry).toBe(whole);
+    expect(hull.material).toBe(mirror.hullMaterials);
+  });
+
+  it('ends the break when a new run brings the ship back', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.markDead();
+    mirror.update(player, ribbons, 0.1, 0.016);
+    player.isDead = false;
+    mirror.update(player, ribbons, 0.2, 0.016);
+    expect(mirror.breaking).toBe(false);
+    expect(mirror.group.visible).toBe(true);
   });
 
   it('keeps the count of lights shown while Blink hides the ship', () => {

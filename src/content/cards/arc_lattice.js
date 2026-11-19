@@ -24,7 +24,7 @@ export default {
         title: 'Thin Wire',
         description:
           'Every 1.2 s an arc strikes the nearest enemy within 160 px for a full shot of damage.',
-        highlights: ['It fires whatever the cannon is aiming at.'],
+        highlights: ['It needs no aim: it strikes beside any weapon.'],
       },
       {
         title: 'Mesh',

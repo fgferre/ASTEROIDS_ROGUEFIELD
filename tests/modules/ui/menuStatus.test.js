@@ -55,6 +55,26 @@ describe('Main menu status strip', () => {
     );
   });
 
+  it('adds a Pressure won row only once Pressure is open', () => {
+    const rows = (pressure) =>
+      menuStatusItems({
+        records: { bestLayer: 0, bossRushStage: 0, bossRushTime: 0 },
+        quality: 'auto',
+        ...fakeServices(),
+        hangar: { salvage: 0, pressure },
+      }).map(([label, value]) => `${label}: ${value}`);
+
+    expect(rows({ open: 0, selected: 0, best: 0 }).join()).not.toContain(
+      'Pressure'
+    );
+    expect(rows({ open: 1, selected: 0, best: 0 })).toContain(
+      'Pressure won: —'
+    );
+    expect(rows({ open: 3, selected: 0, best: 2 })).toContain(
+      'Pressure won: II'
+    );
+  });
+
   it('shows the Boss Rush best as the fastest clear, else the furthest Warden', () => {
     expect(bossRushBest(3, 452)).toBe('7:32');
     expect(bossRushBest(2, 0)).toBe('Warden 2/3');

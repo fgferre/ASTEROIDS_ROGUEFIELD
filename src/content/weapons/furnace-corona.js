@@ -13,6 +13,7 @@ const corona = {
   burn: null, // { duration, ticks, damageFraction }: sets what survives burning
   duration: 0.3, // seconds the pulse shows
   cooldownMultiplier: 2, // × the lance's cooldown between pulses
+  pierceReach: 20, // px of reach for each Recoil Dampers rank, past the cap (proposta 16/11)
 };
 
 // Thermal ×3: every 3rd pulse is a nova that reaches twice as far.
@@ -43,6 +44,33 @@ export default {
     pierce: false,
     trailPoints: null,
     burst: null,
+  },
+  // The families whose lance forms the pulse carries (HitResolution), the
+  // budget one pulse shares, and what each form does (proposta 16/11);
+  // `kinetic` and `lines` read [form at 3, Apex at 5]. Thermal is its own.
+  familyForms: {
+    carries: ['arc', 'field', 'salvage', 'kinetic'],
+    perShot: { chains: 2, pulls: 1 }, // a pulse starts at most 2 chains and 1 well
+    pullEvery: 2, // the well: every 2nd pulse (one each pulse doubled the Lance's gain)
+    kinetic: { damage: [1.15, 1.3], push: [1.5, 2] },
+    lines: {
+      kinetic: [
+        'pulses hit 15% harder and throw further',
+        'pulses hit 30% harder and throw twice as far',
+      ],
+      arc: [
+        'a pulse arcs on from 2 of its hits',
+        'those arcs jump 3 times and fork',
+      ],
+      field: [
+        'pulses slow what they burn',
+        'every 2nd pulse drags the crowd into the ring',
+      ],
+      salvage: [
+        'pulse kills drop 25% more orbs',
+        'pulse kills drop twice the orbs',
+      ],
+    },
   },
   // The incendiary orange of a burning lance, over its white-hot core.
   colors: { heat: PALETTE.shot, core: '#ffc98a' },

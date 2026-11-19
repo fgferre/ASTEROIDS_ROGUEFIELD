@@ -532,6 +532,15 @@ export class Projectiles {
         if (!bullet.destroyReason) {
           bullet.destroyReason = bullet.hit ? 'hit-player' : 'expired';
         }
+        // burned out in the air (the renderer frays it into wisps)
+        if (bullet.destroyReason === 'expired') {
+          this.emit('enemy-bullet-expired', {
+            position: { x: bullet.x, y: bullet.y },
+            velocity: { x: bullet.vx, y: bullet.vy },
+            color: bullet.color,
+            radius: bullet.radius,
+          });
+        }
         if (!bullet.destroyed) {
           bullet.destroyed = true;
         }

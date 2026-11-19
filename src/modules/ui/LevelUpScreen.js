@@ -2,12 +2,14 @@
 //
 // The level-up screen (the owner's mock-ups of 20/10): "LEVEL n", one card
 // per upgrade offered (ui/upgradeCard.js), keyboard, mouse and pad focus over
-// them, reroll and banish, and the pick that sends the run back to play
+// them, reroll, banish and hold, and the pick that sends the run back to play
 // through the cards' exit animation. The first three picks name themselves
 // and show where each family leads; the HUD's build instrument previews the
 // highlighted card's cell. During a sector's head start a counter shows the
 // pick, and "Equip for me" makes the picks left (session/headStart.js):
 // its first press only arms it, the second within EQUIP_CONFIRM_MS confirms.
+// With the new flight, a tray under the cards shows the run's card slots and
+// its piloting trail.
 
 import { PROGRESSION_INITIAL_LEVEL } from '../../core/GameConstants.js';
 import { playLevelUpExit, staggerCardEntry } from './levelUpTransition.js';
@@ -16,6 +18,7 @@ import {
   cardMarkup,
   cardState,
   paintCard,
+  runTrayMarkup,
   weaponOfCard,
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
@@ -61,8 +64,8 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, headStart, equipBtn }.
-   * `progression()`: the progression service (offers, rerolls, banishes, picks), or none.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, run }.
+   * `progression()`: the progression service (offers, rerolls, banishes, holds, picks), or none.
    * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
    * `emit(name, payload)`: sends ui-hover.
@@ -106,14 +109,16 @@ export class LevelUpScreen {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      holdMode: false,
       exitTimer: null,
     };
   }
 
   bindLevelUpControls() {
-    const { rerollBtn, banishBtn, equipBtn } = this.refs;
+    const { rerollBtn, banishBtn, holdBtn, equipBtn } = this.refs;
     rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
     banishBtn?.addEventListener('click', () => this.toggleBanishMode());
+    holdBtn?.addEventListener('click', () => this.toggleHoldMode());
     equipBtn?.addEventListener('click', () => this.equipForMe());
 
     // A card's key badge (1, 2, 3) picks it as a click on it would.
@@ -129,6 +134,8 @@ export class LevelUpScreen {
         this.rerollLevelUpOptions();
       } else if (event.code === 'KeyB') {
         this.toggleBanishMode();
+      } else if (event.code === 'KeyH') {
+        this.toggleHoldMode();
       } else if (event.code === 'KeyQ') {
         this.equipForMe();
       } else if (event.key === 'Escape') {
@@ -137,19 +144,21 @@ export class LevelUpScreen {
     });
   }
 
-  /** A pad press here: reroll, banish, equip for me, or back out. */
+  /** A pad press here: reroll, banish, hold (LB), equip for me, or back out. */
   handleGamepadNav(action) {
     if (action === 'reroll') this.rerollLevelUpOptions();
     else if (action === 'banish') this.toggleBanishMode();
+    else if (action === 'tabPrev') this.toggleHoldMode();
     else if (action === 'tabNext') this.equipForMe();
     else if (action === 'back') this.backOut();
   }
 
   // Escape or the pad's back: an armed "Equip for me" disarms and nothing
-  // else happens; otherwise banish mode ends.
+  // else happens; otherwise banish or hold mode ends.
   backOut() {
     if (this.equipArmTimer) this.disarmEquip();
     else if (this.levelUpState.banishMode) this.setBanishMode(false);
+    else if (this.levelUpState.holdMode) this.setHoldMode(false);
   }
 
   showLevelUpScreen(data = {}) {
@@ -215,6 +224,7 @@ export class LevelUpScreen {
     this.levelUpState.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
     this.disarmEquip();
     this.setBanishMode(false);
+    this.setHoldMode(false);
     this.updateLevelUpActionButtons();
     this.renderHeader();
 
@@ -280,6 +290,24 @@ export class LevelUpScreen {
         count.textContent = `${left}`;
       }
     });
+    // Hold: shown only when the run's contract gives holds.
+    const { holdBtn } = this.refs;
+    if (holdBtn) {
+      holdBtn.classList.toggle('hidden', !(progression?.holdsPerRun > 0));
+      holdBtn.disabled = !this.canHold();
+      const count = holdBtn.querySelector('[data-count]');
+      if (count) count.textContent = `${progression?.holdsLeft ?? 0}`;
+    }
+  }
+
+  // A hold left, none made on this screen, and another card to take now.
+  canHold() {
+    const progression = this.progression();
+    return (
+      progression?.holdsLeft > 0 &&
+      !progression.heldCard &&
+      this.levelUpState.options.length >= 2
+    );
   }
 
   isLevelUpLocked() {
@@ -303,7 +331,44 @@ export class LevelUpScreen {
       return;
     }
     this.disarmEquip();
+    this.setHoldMode(false);
     this.setBanishMode(!this.levelUpState.banishMode);
+  }
+
+  toggleHoldMode() {
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
+      return;
+    }
+    if (!this.levelUpState.holdMode && !this.canHold()) {
+      return;
+    }
+    this.disarmEquip();
+    this.setBanishMode(false);
+    this.setHoldMode(!this.levelUpState.holdMode);
+  }
+
+  // Hold pick mode: the next card chosen is held for the next level-up's
+  // offer, then the pick goes on as usual.
+  setHoldMode(active) {
+    this.levelUpState.holdMode = active;
+    const { holdBtn, holdHint } = this.refs;
+    holdBtn?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    holdHint?.classList.toggle('hidden', !active);
+    document
+      .getElementById('levelup-screen')
+      ?.classList.toggle('is-holding', active);
+  }
+
+  // The held card's face gets its marker; the other cards stay as dealt.
+  holdCard(upgradeId) {
+    this.setHoldMode(false);
+    if (!this.progression()?.holdUpgrade(upgradeId)) return;
+    const index = this.levelUpState.options.findIndex(
+      ({ id }) => id === upgradeId
+    );
+    const button = this.levelUpState.buttons[index];
+    if (button) this.fillCard(button, upgradeId, index);
+    this.updateLevelUpActionButtons();
   }
 
   // Banish pick mode: the next card chosen is banished instead of taken.
@@ -326,10 +391,7 @@ export class LevelUpScreen {
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
     paintCard(button, state.definition);
-    button.innerHTML = cardMarkup(state.definition, state, {
-      weapon: this.combat().getWeaponState(),
-      key: index + 1,
-    });
+    this.fillCard(button, option.id, index);
     button.addEventListener('click', () => this.selectUpgrade(option.id));
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
@@ -339,6 +401,16 @@ export class LevelUpScreen {
     button.addEventListener('focus', () => this.focusLevelUpOption(index));
 
     return button;
+  }
+
+  fillCard(button, upgradeId, index) {
+    const progression = this.progression();
+    const state = cardState(progression, upgradeId);
+    button.innerHTML = cardMarkup(state.definition, state, {
+      weapon: this.combat().getWeaponState(),
+      key: index + 1,
+      held: progression.heldCard?.id === upgradeId,
+    });
   }
 
   selectUpgrade(upgradeId) {
@@ -355,6 +427,11 @@ export class LevelUpScreen {
 
     if (this.levelUpState.banishMode) {
       progression?.banishUpgrade(upgradeId);
+      return;
+    }
+
+    if (this.levelUpState.holdMode) {
+      this.holdCard(upgradeId);
       return;
     }
 
@@ -435,6 +512,23 @@ export class LevelUpScreen {
 
     this.levelUpState.focusIndex = safeIndex;
     this.previewFocusedCard();
+    this.renderRunTray();
+  }
+
+  // The card slots and the piloting trail under the cards (the new flight
+  // only): the highlighted card, if new, as a ghost in the next free slot.
+  renderRunTray() {
+    const { run } = this.refs;
+    const progression = this.progression();
+    if (!run || !progression) return;
+    const shown = progression.pilotCardIds.length > 0;
+    run.classList.toggle('hidden', !shown);
+    if (!shown) return;
+    const { options, focusIndex } = this.levelUpState;
+    run.innerHTML = runTrayMarkup(progression, {
+      ghost: options[focusIndex]?.id,
+      offered: options.map(({ id }) => id),
+    });
   }
 
   // The highlighted card's cell on the HUD: a card new to its family adds one.
@@ -462,6 +556,7 @@ export class LevelUpScreen {
       return;
     }
     this.setBanishMode(false);
+    this.setHoldMode(false);
     const { equipBtn } = this.refs;
     equipBtn?.classList.add('is-armed');
     equipBtn?.setAttribute('aria-pressed', 'true');
@@ -577,6 +672,7 @@ export class LevelUpScreen {
     });
     this.disarmEquip();
     this.setBanishMode(false);
+    this.setHoldMode(false);
     if (this.levelUpState.isVisible) this.hud()?.previewBuildCard(null);
 
     this.levelUpState = {
@@ -588,6 +684,7 @@ export class LevelUpScreen {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      holdMode: false,
       exitTimer: null,
     };
   }

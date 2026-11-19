@@ -15,6 +15,7 @@ describe('bot driver', () => {
   let restoreDom;
   beforeEach(() => {
     restoreDom = installDomStubs();
+    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -30,9 +31,13 @@ describe('bot driver', () => {
     const { services, eventBus } = game;
     const driver = createBotDriver({ services, eventBus, preset: 'good' });
     game.session.startNewRun({ source: 'test', sector: 'dense-core' });
+    // Rocks come and go as the pilot clears them: one seen in the window is
+    // the field, whatever the last frame holds.
+    let sawRock = false;
     for (let frame = 0; frame < 14 * 60; frame += 1) {
       driver.step();
       game.step();
+      sawRock ||= readWorld(services, 6).movers.some((m) => m.kind === 'rock');
     }
     expect(driver.cards).toHaveLength(sectorById('dense-core').headStart);
     expect(services.enemies.waveManager.currentWave).toBe(6);
@@ -41,6 +46,6 @@ describe('bot driver', () => {
 
     const world = readWorld(services, 6);
     expect(world.ship.health).toBeGreaterThan(0);
-    expect(world.movers.some((m) => m.kind === 'rock')).toBe(true);
+    expect(sawRock).toBe(true);
   });
 });

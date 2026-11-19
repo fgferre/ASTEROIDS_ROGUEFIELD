@@ -14,6 +14,7 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../data/upgrades/families.js';
+import { textForWeapon } from '../../data/upgrades/index.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS, WEAPONS } from '../../data/weapons.js';
 
 // Each family's shape, 12 × 12: thermal a drop, kinetic a disc, arc a bolt,
@@ -42,6 +43,10 @@ const CARD_ICONS = Object.freeze({
   magfield:
     '<path d="M11 7V21A9 9 0 0 0 29 21V7"/><path d="M11 7H16V20.5A4 4 0 0 0 24 20.5V7H29"/>',
   ram_plating: '<path d="M6 10L34 20L6 30Z"/><path d="M14 16L24 20L14 24"/>',
+  momentum_rounds:
+    '<circle cx="30" cy="20" r="5"/><path d="M5 13H21M9 20H20M5 27H21"/>',
+  close_quarters:
+    '<path d="M7 14V7H14M26 7H33V14M33 26V33H26M14 33H7V26"/><circle cx="20" cy="20" r="4"/>',
 });
 const CURSED_ICON =
   '<path d="M20 5L35 33H5Z"/><path d="M20 15V24M20 28.5V29"/>';
@@ -89,6 +94,45 @@ export function familyForm(family, weaponId, apex = false) {
   return own ?? lance ?? dash;
 }
 
+// The patterns whose hits carry the lance evolutions (HitResolution's
+// `lanceHit`: a projectile, a beam, a flak burst); chain, aura and orbit
+// hits do not.
+const LANCE_HIT_PATTERNS = new Set(['stream', 'beam', 'fan', 'seeker']);
+
+/**
+ * The weapon's own wording of a family's form (its `familyForms.lines`), or
+ * null when the weapon does not carry the family.
+ */
+export function familyLine(family, weaponId, apex = false) {
+  return WEAPONS[weaponId]?.familyForms?.lines[family]?.[apex ? 1 : 0] ?? null;
+}
+
+/**
+ * "not with Shard Halo yet" when the family's lance form does nothing for
+ * the weapon: it fires no lance hit, or the form only pierces and its
+ * projectile does not; null for the weapon's own forms, the dash, or a form
+ * that reaches it (a family the weapon carries too).
+ */
+export function notWithWeapon(family, weaponId, apex = false) {
+  const weapon = WEAPONS[weaponId];
+  const lance = (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family];
+  if (
+    !weapon ||
+    !lance ||
+    familyForm(family, weaponId, apex) !== lance ||
+    familyLine(family, weaponId, apex)
+  ) {
+    return null;
+  }
+  const hits = weapon.fire.some(({ pattern }) =>
+    LANCE_HIT_PATTERNS.has(pattern)
+  );
+  const onlyPierce = lance.pierce && !lance.damageMultiplier;
+  return !hits || (onlyPierce && !weapon.projectile.pierce)
+    ? `not with ${weapon.name} yet`
+    : null;
+}
+
 /** "Incendiary Lance" → "Incendiary" (the HUD instrument's short form). */
 export const shortName = (name) => name.replace(/ Lance$/, '');
 
@@ -116,6 +160,36 @@ export function brief(text) {
 }
 
 /**
+ * "5th card in the hangar": the hangar's contract leaves a family fewer than
+ * five cards this run (open and not sealed, or already held; the trail and
+ * the fallback cards are outside the families), so its Apex opens there.
+ */
+export const FIFTH_IN_HANGAR = '5th card in the hangar';
+
+export function fifthInHangar(progression, family) {
+  if (progression.openCards === null && progression.sealedCards.size === 0) {
+    return false;
+  }
+  let reachable = 0;
+  progression.upgradeLookup.forEach((definition, id) => {
+    if (
+      definition.family !== family ||
+      definition.fallback ||
+      progression.pilotCardIds.includes(id)
+    ) {
+      return;
+    }
+    if (
+      progression.getUpgradeCount(id) > 0 ||
+      !progression.isOutOfContract(definition)
+    ) {
+      reachable += 1;
+    }
+  });
+  return reachable < FAMILY_APEX_THRESHOLD;
+}
+
+/**
  * Where a card stands before it is applied: `rank` the rank it brings,
  * `owned` the family's distinct cards without it. `granted`: it was just
  * applied (a chest's card).
@@ -124,9 +198,21 @@ export function cardState(progression, id, { granted = false } = {}) {
   const definition = progression.upgradeLookup.get(id);
   const count = progression.getUpgradeCount(id);
   const rank = granted ? count : count + 1;
-  const familyCards = progression.getFamilyCounts()[definition.family] ?? 0;
+  const { family } = definition;
+  const familyCards = progression.getFamilyCounts()[family] ?? 0;
   const owned = granted && rank === 1 ? familyCards - 1 : familyCards;
-  return { definition, rank, owned };
+  const piloting = progression.pilotCardIds.includes(id);
+  // A step of the trail toward the Flight Computer: which one it is.
+  let trail = null;
+  if (piloting && rank <= (progression.trailSteps.get(id) ?? 0)) {
+    const { done, total } = trailProgress(progression);
+    trail = { step: done + (granted ? 0 : 1), total };
+  }
+  const fifthShort =
+    !piloting &&
+    family in UPGRADE_FAMILIES &&
+    fifthInHangar(progression, family);
+  return { definition, rank, owned, piloting, trail, fifthShort };
 }
 
 /**
@@ -135,7 +221,10 @@ export function cardState(progression, id, { granted = false } = {}) {
  * or 'plain'; `label`, `note`, and a `track` ({ on, fresh, total, notch })
  * with its `end` text. `weapon`: the held one ({ weaponId, chip }).
  */
-export function buildLine(definition, { rank, owned, weapon }) {
+export function buildLine(
+  definition,
+  { rank, owned, weapon, piloting, fifthShort = false }
+) {
   const { family } = definition;
   const isNew = rank === 1;
   const after = owned + (isNew ? 1 : 0);
@@ -151,24 +240,31 @@ export function buildLine(definition, { rank, owned, weapon }) {
     (after === FAMILY_SYNERGY_THRESHOLD || after === FAMILY_APEX_THRESHOLD);
 
   if (swapped) {
-    const evolved = completes
-      ? familyForm(family, swapped.id, after === FAMILY_APEX_THRESHOLD)
-      : null;
+    const apex = after === FAMILY_APEX_THRESHOLD;
+    const evolved = completes ? familyForm(family, swapped.id, apex) : null;
+    const notYet = evolved && notWithWeapon(family, swapped.id, apex);
     return {
       kind: 'weapon',
       label: 'Replaces',
       from: weapon.chip,
       to: swapped.name.toUpperCase(),
       note: evolved
-        ? `Also completes ${evolved.name}.`
+        ? `Also completes ${evolved.name}${notYet ? ` (${notYet})` : ''}.`
         : 'One weapon card per run.',
     };
+  }
+  const highlight =
+    textForWeapon(definition, weapon.weaponId)?.levels?.[rank - 1]
+      ?.highlights?.[0] ?? '';
+  // The piloting trail is outside the families: no count to show.
+  if (piloting) {
+    return { kind: 'plain', label: 'Piloting trail', note: highlight };
   }
   if (!UPGRADE_FAMILIES[family]) {
     return {
       kind: 'plain',
       label: definition.cursed ? 'Cursed · no family' : 'No family',
-      note: definition.text?.levels?.[rank - 1]?.highlights?.[0] ?? '',
+      note: highlight,
     };
   }
   const familyName = UPGRADE_FAMILIES[family].name;
@@ -176,14 +272,18 @@ export function buildLine(definition, { rank, owned, weapon }) {
     const apex = after === FAMILY_APEX_THRESHOLD;
     const form = familyForm(family, weapon.weaponId, apex);
     const bonus = UPGRADE_FAMILIES[family].bonus;
+    const what =
+      notWithWeapon(family, weapon.weaponId, apex) ??
+      familyLine(family, weapon.weaponId, apex) ??
+      clause(form.description);
     return {
       kind: 'completes',
       label: apex ? 'Completes · Apex' : 'Completes',
       title: form.name,
       note:
         apex || form === bonus
-          ? clause(form.description)
-          : `${clause(form.description)} · ${bonus.name} ${clause(bonus.description)}`,
+          ? what
+          : `${what} · ${bonus.name} ${clause(bonus.description)}`,
       track: familyTrack,
       end: `Apex ${after}/${FAMILY_APEX_THRESHOLD}`,
     };
@@ -201,12 +301,17 @@ export function buildLine(definition, { rank, owned, weapon }) {
   const steps = [FAMILY_SYNERGY_THRESHOLD, FAMILY_APEX_THRESHOLD]
     .filter((at) => at > after)
     .map((at) => {
-      const form = familyForm(
-        family,
-        weapon.weaponId,
-        at === FAMILY_APEX_THRESHOLD
-      );
-      return { at, name: form.name, what: lowerFirst(brief(form.description)) };
+      const apex = at === FAMILY_APEX_THRESHOLD;
+      const form = familyForm(family, weapon.weaponId, apex);
+      const what =
+        notWithWeapon(family, weapon.weaponId, apex) ??
+        familyLine(family, weapon.weaponId, apex) ??
+        lowerFirst(brief(form.description));
+      return {
+        at,
+        name: form.name,
+        what: apex && fifthShort ? `${what} · ${FIFTH_IN_HANGAR}` : what,
+      };
     });
   return {
     kind: 'path',
@@ -359,29 +464,38 @@ export function cardClasses(definition) {
 /**
  * The card's inner markup (phrasing content: it sits in a button on the
  * level-up). `key`: the number shown top right, or null (a chest's card).
+ * `held`: the card is held for the next level-up's offer.
  */
-export function cardMarkup(definition, state, { weapon, key = null }) {
+export function cardMarkup(definition, state, { weapon, key = null, held }) {
   const line = buildLine(definition, { ...state, weapon });
   const kbd = key === null ? '' : `<kbd class="card__key">${key}</kbd>`;
+  const heldMark = held ? '<span class="card__held">Held</span>' : '';
   const swapped = weaponOfCard(definition.id);
   if (swapped) {
-    return `${WEAPON_FRAME}<span class="card__top">${rarityMarkup(definition)}<span class="card__wtag">Weapon</span>${kbd}</span>
+    return `${WEAPON_FRAME}${heldMark}<span class="card__top">${rarityMarkup(definition)}<span class="card__wtag">Weapon</span>${kbd}</span>
       <span class="card__wname">${swapped.name}</span>
       ${patternMarkup(swapped)}
       <span class="card__fx">${swapped.description}</span>
       ${buildLineMarkup(line)}`;
   }
   const max = definition.levels.length;
-  const level = definition.text?.levels?.[state.rank - 1] ?? {};
+  const level =
+    textForWeapon(definition, weapon.weaponId)?.levels?.[state.rank - 1] ?? {};
   const family = UPGRADE_FAMILIES[definition.family];
-  const tag = family
-    ? `${glyphMarkup(definition.family)}${family.name}<span class="card__sep">·</span>`
-    : '';
+  const tag =
+    family && !state.piloting
+      ? `${glyphMarkup(definition.family)}${family.name}<span class="card__sep">·</span>`
+      : '';
   const note =
     line.kind !== 'plain' && level.highlights?.[0]
       ? `<span class="card__fx2">${level.highlights[0]}</span>`
       : '';
-  return `<span class="card__top">${rarityMarkup(definition)}${kbd}</span>
+  const trail = state.trail
+    ? `<span class="card__trail"><i class="card__trail-mark" aria-hidden="true"></i>Trail · step ${state.trail.step} of ${state.trail.total}</span>`
+    : '';
+  // The trail's cards show no rarity.
+  const rarity = state.piloting ? '' : rarityMarkup(definition);
+  return `${heldMark}${trail}<span class="card__top">${rarity}${kbd}</span>
     <span class="card__id">${iconMarkup(definition)}<span class="card__names">
       <span class="card__name">${definition.text?.name ?? definition.id}</span>
       <span class="card__tag">${tag}<span class="card__state">${stateLabel(state.rank, max)}</span></span>
@@ -394,4 +508,193 @@ export function cardMarkup(definition, state, { weapon, key = null }) {
 /** Sets a card element's family colour (`--fam`). */
 export function paintCard(element, definition) {
   element.style.setProperty('--fam', familyColor(definition.family));
+}
+
+// ---------- The run's card slots and piloting trail ----------
+// The level-up's tray under the cards and the pause panel's right column
+// (the owner's pick "C" of 16/11). A slot is a card held at rank 1 or more
+// outside the piloting trail; the weapon card counts.
+
+// A weapon card's slot: a fan of shots.
+const WEAPON_ICON =
+  '<path d="M9 20L31 8M9 20L33 14M9 20H34M9 20L33 26M9 20L31 32"/><circle cx="7" cy="20" r="2.5"/>';
+
+/** The held cards in slots, the weapon card first: `{ ids, used, max }`. */
+export function cardSlots(progression) {
+  const { ids, used, max } = progression.getCardSlots();
+  const weaponFirst = (id) => (weaponOfCard(id) ? 0 : 1);
+  return {
+    ids: [...ids].sort((a, b) => weaponFirst(a) - weaponFirst(b)),
+    used,
+    max,
+  };
+}
+
+/** Each trail step's rank held of the rank it needs, and the steps done of all. */
+export function trailProgress(progression) {
+  const steps = new Map();
+  let done = 0;
+  let total = 0;
+  progression.trailSteps.forEach((need, id) => {
+    const have = Math.min(progression.getUpgradeCount(id), need);
+    steps.set(id, { have, need });
+    done += have;
+    total += need;
+  });
+  return { steps, done, total };
+}
+
+function slotMarkup(progression, id, ghost = false) {
+  const definition = progression.upgradeLookup.get(id);
+  const weapon = Boolean(weaponOfCard(id));
+  const drawing = weapon
+    ? `<svg class="card__icon" viewBox="0 0 40 40" aria-hidden="true">${WEAPON_ICON}</svg>`
+    : iconMarkup(definition);
+  const rank = progression.getUpgradeCount(id);
+  const classes = `run-slot${weapon ? ' is-weapon' : ''}${ghost ? ' is-ghost' : ''}`;
+  const color = weapon ? 'var(--xp)' : familyColor(definition.family);
+  const name = definition.text?.name ?? definition.id;
+  return `<i class="${classes}" style="--fam: ${color}" title="${name}">${drawing}${
+    weapon || ghost ? '' : `<em>${rank}</em>`
+  }</i>`;
+}
+
+// The trail's map: Thrusters splits into a Brakes lane and an RCS lane, the
+// Turret runs its own, and all three meet at the Flight Computer. A node per
+// rank a step needs (columns COL apart, lanes LANE apart).
+const COL = 34;
+const LANE = 26;
+const MAP_X = 70;
+const MAP_Y = 22;
+const at = (col, lane) => [MAP_X + col * COL, MAP_Y + lane * LANE];
+
+function diamond([x, y], r, className) {
+  return `<path class="${className}" d="M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z"/>`;
+}
+
+function trailMapMarkup({ steps }, offered) {
+  const step = (id) => steps.get(id) ?? { have: 0, need: 1 };
+  const lanes = ['braking_system', 'rcs_system'];
+  const last = Math.max(...lanes.map((id) => step(id).need));
+  const start = at(0, 0.5);
+  const turret = at(Math.ceil(last / 2), 2);
+  const goal = at(last + 1.5, 1);
+  const edges = [];
+  const nodes = [];
+  const edge = (points, done) =>
+    edges.push(
+      `<path class="trail-map__edge${done ? ' is-done' : ''}" d="M${points.map((p) => p.join(' ')).join('L')}"/>`
+    );
+  // A node: done (filled), the step an offered card brings, or still open.
+  const node = (point, id, index, r = 5) => {
+    const { have } = step(id);
+    if (index < have) nodes.push(diamond(point, r, 'trail-map__node is-done'));
+    else if (index === have && offered.includes(id)) {
+      nodes.push(diamond(point, r + 3.5, 'trail-map__ring'));
+      nodes.push(diamond(point, r - 1, 'trail-map__node is-offered'));
+    } else nodes.push(diamond(point, r, 'trail-map__node'));
+  };
+  const label = ([x, y], text, id, anchor = 'start') => {
+    const { have, need } = step(id);
+    const state =
+      have >= need
+        ? ' is-done'
+        : have > 0 || offered.includes(id)
+          ? ' is-on'
+          : '';
+    return `<text class="trail-map__lbl${state}" x="${x}" y="${y}" text-anchor="${anchor}">${text}</text>`;
+  };
+  const count = (id) =>
+    step(id).need > 1 ? ` ${step(id).have}/${step(id).need}` : '';
+
+  lanes.forEach((id, lane) => {
+    const { have, need } = step(id);
+    edge([start, at(0.5, lane), at(1, lane)], have > 0);
+    for (let i = 1; i < need; i += 1) {
+      edge([at(i, lane), at(i + 1, lane)], have > i);
+    }
+    edge([at(need, lane), at(last + 1, lane), goal], have >= need);
+    for (let i = 0; i < need; i += 1) node(at(i + 1, lane), id, i);
+  });
+  const turretDone = step('auto_aim').have >= step('auto_aim').need;
+  edge([turret, at(last + 1, 2), goal], turretDone);
+  node(start, 'propulsors', 0);
+  node(turret, 'auto_aim', 0);
+  const goalStep = step('flight_computer');
+  nodes.push(
+    diamond(
+      goal,
+      7,
+      `trail-map__goal${goalStep.have >= goalStep.need ? ' is-done' : ''}`
+    )
+  );
+  if (goalStep.have < goalStep.need && offered.includes('flight_computer')) {
+    nodes.push(diamond(goal, 11, 'trail-map__ring'));
+  }
+  const labels = [
+    label(
+      [start[0] - 9, start[1] + 3.5],
+      `Thrusters${count('propulsors')}`,
+      'propulsors',
+      'end'
+    ),
+    label(
+      [at(1, 0)[0] - 6, MAP_Y - 10],
+      `Brakes${count('braking_system')}`,
+      'braking_system'
+    ),
+    label(
+      [at(1, 1)[0] - 6, MAP_Y + LANE - 8],
+      `RCS${count('rcs_system')}`,
+      'rcs_system'
+    ),
+    label(
+      [turret[0] - 9, turret[1] + 3.5],
+      `Turret${count('auto_aim')}`,
+      'auto_aim',
+      'end'
+    ),
+    `<text class="trail-map__lbl is-goal" x="${goal[0] + 11}" y="${goal[1] - 1}"><tspan>Flight</tspan><tspan x="${goal[0] + 11}" dy="12">Computer</tspan></text>`,
+  ];
+  const width = goal[0] + 66;
+  const height = MAP_Y + 2 * LANE + 8;
+  return `<svg class="trail-map" viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges.join('')}${nodes.join('')}${labels.join('')}</svg>`;
+}
+
+/**
+ * The tray's two parts: the card slots ("CARDS 5/8", amber and "Full ·
+ * upgrades only" when full) and the trail map. `ghost`: the highlighted
+ * offer, shown dashed in the next free slot when it would take one;
+ * `offered`: the level-up's cards, whose trail steps ring on the map.
+ */
+export function runTrayMarkup(
+  progression,
+  { ghost = null, offered = [] } = {}
+) {
+  const slots = cardSlots(progression);
+  const full = slots.used >= slots.max;
+  const takesSlot =
+    ghost &&
+    !full &&
+    progression.getUpgradeCount(ghost) === 0 &&
+    !progression.pilotCardIds.includes(ghost) &&
+    !progression.upgradeLookup.get(ghost).fallback;
+  const boxes = Array.from({ length: slots.max }, (_, i) => {
+    if (i < slots.used) return slotMarkup(progression, slots.ids[i]);
+    if (i === slots.used && takesSlot)
+      return slotMarkup(progression, ghost, true);
+    return '<i class="run-slot is-empty"></i>';
+  }).join('');
+  const trail = trailProgress(progression);
+  const tag = full
+    ? '<span class="run-tray__full">Full · upgrades only</span>'
+    : '';
+  return `<div class="run-tray__part run-tray__cards${full ? ' is-full' : ''}">
+      <p class="run-tray__head"><span class="run-tray__lbl">Cards</span><b class="run-tray__n">${slots.used}<small>/${slots.max}</small></b>${tag}</p>
+      <div class="run-slots">${boxes}</div>
+    </div>
+    <div class="run-tray__part run-tray__trail">
+      <p class="run-tray__head"><span class="run-tray__lbl">Piloting trail</span><b class="run-tray__n">${trail.done}<small>/${trail.total}</small></b><span class="run-tray__note">not a card slot</span></p>
+      ${trailMapMarkup(trail, offered)}
+    </div>`;
 }

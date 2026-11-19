@@ -3,7 +3,7 @@
 // XP orbs and hearts, ambient chips, particles, shockwaves and the screen
 // flash.
 
-import { PALETTE } from '../../data/constants/palette.js';
+import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { getOrbConfig } from '../xp/orbClasses.js';
 import { HALF_H, HALF_W, SHOT_SHAPES, rgbOf } from './batches.js';
 import { smoothstep } from './cameraRig.js';
@@ -16,6 +16,11 @@ import {
 } from './weaponMirror.js';
 
 const MAX_TRAIL_POINTS = 64;
+// Lot 5 (efeito/impacto): a hull loss reddens the screen's edges and darkens
+// its corners, the centre (where the ship is) clear; EDGE_FLASH_GAIN makes up
+// for the smaller area, so it reads as strong as the old full-screen red.
+const EDGE_FLASH = `radial-gradient(ellipse at center, transparent 40%, ${withAlpha(PALETTE.threat, 0.45)} 72%, rgba(70, 0, 6, 0.95) 100%)`;
+const EDGE_FLASH_GAIN = 2.2;
 const WHITE = [1, 1, 1];
 // Shockwaves kick the impact pass only from KICK_WAVE_RADIUS up, full at
 // KICK_WAVE_FULL.
@@ -178,6 +183,7 @@ export function mirrorEffects(t, effects, impact) {
     const rgb = rgbOf(THREE, p.color);
     if (p.type === 'debris') {
       t.debris.push(p, rgb);
+      if (p.material === 'metal') glowHotPlate(t, p);
       continue;
     }
     // climbing or sinking with the chunks (debrisChunks.js), so a burst opens
@@ -265,14 +271,53 @@ export function mirrorEffects(t, effects, impact) {
     screenFlash && screenFlash.timer > 0 && screenFlash.duration > 0
       ? (screenFlash.timer / screenFlash.duration) * screenFlash.intensity
       : 0;
+  const edges = alpha > 0 && screenFlash.edges;
   if (
     Math.abs(alpha - t.flashAlpha) > 0.01 ||
-    (alpha === 0 && t.flashAlpha !== 0)
+    (alpha === 0 && t.flashAlpha !== 0) ||
+    (alpha > 0 &&
+      (screenFlash.color !== t.flashColor || edges !== t.flashEdges))
   ) {
     t.flashAlpha = alpha;
-    t.flash.style.opacity = String(alpha);
-    if (alpha > 0) t.flash.style.background = screenFlash.color;
+    t.flash.style.opacity = String(
+      edges ? Math.min(1, alpha * EDGE_FLASH_GAIN) : alpha
+    );
+    // a new flash of another colour or shape at the same strength repaints too
+    if (alpha > 0) {
+      t.flashColor = screenFlash.color;
+      t.flashEdges = edges;
+      t.flash.style.background = edges ? EDGE_FLASH : screenFlash.color;
+    }
   }
+}
+
+// A torn plate fresh off a machine still glows at its broken edge: some of
+// them (HOT_PLATE_SHARE) carry heat that drops white → orange → red over
+// their life (17/11, efeito/impacto).
+const HOT_PLATE_SHARE = 0.45;
+const HOT_PLATE = [2.4, 1.3, 0.45];
+const COOL_PLATE = [0.6, 0.08, 0.01];
+const plateRgb = [0, 0, 0];
+function glowHotPlate(t, p) {
+  const seed = p.rotationSpeed || p.maxLife || 1;
+  const roll = Math.sin(seed * 91.17 + 3.1) * 43758.5453;
+  if (roll - Math.floor(roll) > HOT_PLATE_SHARE) return;
+  const heat = p.maxLife > 0 ? Math.max(0, p.life / p.maxLife) : 0;
+  if (heat <= 0.05) return;
+  const age = Math.max(0, (p.maxLife || 0) - (p.life || 0));
+  const up = t.debris.lift(p, seed, age);
+  for (let k = 0; k < 3; k += 1) {
+    plateRgb[k] = COOL_PLATE[k] + (HOT_PLATE[k] - COOL_PLATE[k]) * heat;
+  }
+  t.glow.push(
+    p.x,
+    2.5 + up,
+    p.y,
+    plateRgb,
+    p.size * 1.2 * (0.5 + heat),
+    heat,
+    1.2
+  );
 }
 
 // Only big blasts kick the lens; strength grows with the wave's reach.

@@ -31,6 +31,10 @@
  *     MediaElementSource instance is created exactly once and reused.
  */
 
+import { SECTOR_SCORE_MIX as PAUSE_MIX } from '../../data/audio/sectorScores.js';
+
+const MUFFLE_OPEN_HZ = 20000;
+
 const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
   EAGER: 'eager',
   DEFERRED: 'deferred',
@@ -38,12 +42,26 @@ const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
 
 const FILE_TRACK_IDS = Object.freeze({
   MENU_OPENING: 'menu-opening',
+  CAMPAIGN_MAP: 'campaign-map',
+  THANKS: 'thanks',
+  VICTORY_FINAL: 'victory-final',
+  ENDING_CHOICE: 'ending-choice',
+  END_CREDITS: 'end-credits',
+  GAME_OVER: 'game-over',
 });
 
 const MENU_OPENING_TRACK_URL = new URL(
   '../../../assets/Music/Alone Among Orbits.mp3',
   import.meta.url
 ).href;
+
+const THANKS_TRACK_URL = new URL(
+  '../../../assets/Music/Asteroids.mp3',
+  import.meta.url
+).href;
+// Vite resolves one folder per template: the score/ files need their own.
+const scoreUrl = (file) =>
+  new URL(`../../../assets/Music/score/${file}`, import.meta.url).href;
 
 const FILE_TRACK_CATALOG = Object.freeze({
   [FILE_TRACK_IDS.MENU_OPENING]: Object.freeze({
@@ -52,6 +70,50 @@ const FILE_TRACK_CATALOG = Object.freeze({
     fadeInMs: 1500,
     fadeOutMs: 800,
     preloadPolicy: FILE_TRACK_PRELOAD_POLICY.EAGER,
+  }),
+  // The screens outside the sectors (the owner's chosen music).
+  [FILE_TRACK_IDS.CAMPAIGN_MAP]: Object.freeze({
+    src: scoreUrl('campaign-map.mp3'),
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 800,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.THANKS]: Object.freeze({
+    src: THANKS_TRACK_URL,
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 800,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.VICTORY_FINAL]: Object.freeze({
+    src: scoreUrl('victory-final.mp3'),
+    loop: false,
+    fadeInMs: 1500,
+    fadeOutMs: 1500,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.ENDING_CHOICE]: Object.freeze({
+    src: scoreUrl('ending-choice.mp3'),
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 1200,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  [FILE_TRACK_IDS.END_CREDITS]: Object.freeze({
+    src: scoreUrl('end-credits.mp3'),
+    loop: false,
+    fadeInMs: 1500,
+    fadeOutMs: 2000,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
+  }),
+  // The death screen: the whole "signal lost" piece, once, until he leaves.
+  [FILE_TRACK_IDS.GAME_OVER]: Object.freeze({
+    src: scoreUrl('game-over.mp3'),
+    loop: false,
+    fadeInMs: 300,
+    fadeOutMs: 1200,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.DEFERRED,
   }),
 });
 
@@ -122,6 +184,18 @@ class FileTrackManager {
 
     this.context = context;
     this.targetNode = targetNode || null;
+    // Every track passes one shared muffle (a lowpass and a gain), open by
+    // default; settings opened from the menu close it like the in-run pause.
+    this._muffle = null;
+    if (this.targetNode) {
+      const lowpass = context.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.setValueAtTime(MUFFLE_OPEN_HZ, context.currentTime);
+      const gain = context.createGain();
+      lowpass.connect(gain);
+      gain.connect(this.targetNode);
+      this._muffle = { lowpass, gain };
+    }
     this._ensureRunning =
       typeof ensureRunning === 'function' ? ensureRunning : null;
     this.initialized = true;
@@ -235,8 +309,9 @@ class FileTrackManager {
     if (!state.trackGain) {
       state.trackGain = this.context.createGain();
       state.trackGain.gain.setValueAtTime(0, now);
-      if (this.targetNode && typeof state.trackGain.connect === 'function') {
-        state.trackGain.connect(this.targetNode);
+      const input = this._muffle?.lowpass || this.targetNode;
+      if (input && typeof state.trackGain.connect === 'function') {
+        state.trackGain.connect(input);
       }
     }
 
@@ -584,6 +659,23 @@ class FileTrackManager {
     state._retryQueued = false;
   }
 
+  /** Muffle every track (lowpass + lower gain) or open them back. */
+  setMuffled(muffled) {
+    if (!this._muffle) return;
+    const { lowpass, gain } = this._muffle;
+    const now = this.context.currentTime;
+    const end = now + PAUSE_MIX.pauseRampSeconds;
+    lowpass.frequency.cancelScheduledValues(now);
+    lowpass.frequency.setValueAtTime(lowpass.frequency.value, now);
+    lowpass.frequency.exponentialRampToValueAtTime(
+      muffled ? PAUSE_MIX.pauseLowpassHz : MUFFLE_OPEN_HZ,
+      end
+    );
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(muffled ? PAUSE_MIX.pauseGain : 1, end);
+  }
+
   /**
    * Tear down ALL tracks and detach the manager. Idempotent (guarded). After
    * dispose no track node is connected and no retry is pending.
@@ -595,6 +687,8 @@ class FileTrackManager {
       this.evictTrack(trackId);
     });
 
+    this._muffle?.gain.disconnect();
+    this._muffle = null;
     this.activeTrackId = null;
     this.currentScreen = null;
     this.context = null;

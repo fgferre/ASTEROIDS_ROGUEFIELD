@@ -10,10 +10,23 @@ import {
   hullTraits,
   hullTraitsMarkup,
   hullUnlockText,
+  launchSetupMarkup,
+  licenseMarkup,
+  medalRewardText,
+  pressureLadderMarkup,
   salvageBalanceText,
   salvageLine,
 } from '../../../src/modules/ui/hangar.js';
 import { getShipModelById } from '../../../src/data/shipModels.js';
+
+const stubs = {
+  difficulty: {
+    getModifiers: () => ({ salvage: 1 }),
+    setPressure: () => {},
+    getPressure: () => 0,
+  },
+  achievements: { getEntries: () => [] },
+};
 
 describe('Hangar screen', () => {
   let restoreDom;
@@ -27,7 +40,7 @@ describe('Hangar screen', () => {
 
   it('lists the seven upgrades and the Salvage balance', () => {
     localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 130 }));
-    const hangar = new HangarService({ eventBus: new EventBus() });
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
     const markup = hangar.getItems().map(hangarItemMarkup).join('');
 
     expect(markup.match(/<li /g)).toHaveLength(7);
@@ -42,7 +55,7 @@ describe('Hangar screen', () => {
 
   it('shows OWNED once bought', () => {
     localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 120 }));
-    const hangar = new HangarService({ eventBus: new EventBus() });
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
     hangar.buy('reinforced-plating');
 
     expect(cardOf(hangar, 'reinforced-plating')).toContain('OWNED');
@@ -95,5 +108,103 @@ describe('Hangar screen', () => {
       amount: '+129',
       text: 'salvage (×1.3 difficulty) · 340 to spend in the Hangar',
     });
+    expect(
+      salvageLine({
+        amount: 150,
+        total: 340,
+        multiplier: 1.5,
+        difficulty: 'Pressure I',
+      }).text
+    ).toBe('salvage (×1.5 Pressure I) · 340 to spend in the Hangar');
+  });
+
+  it('writes what a medal pays: Salvage, a licensed card by name, Pressure', () => {
+    expect(medalRewardText({ salvage: 50 })).toBe('+50 Salvage');
+    expect(medalRewardText({ license: 'arc_lattice' })).toBe(
+      'License · Arc Lattice'
+    );
+    expect(medalRewardText({ salvage: 100, opensPressure: true })).toBe(
+      'Opens Pressure · +100 Salvage'
+    );
+  });
+
+  it('disables the Pressure rungs above the open one and marks the selected', () => {
+    const markup = pressureLadderMarkup({ open: 2, selected: 2, best: 1 });
+    const button = (n) =>
+      markup.match(new RegExp(`data-hangar-pressure="${n}"[^>]*>`))[0];
+
+    expect(button(0)).not.toContain('disabled');
+    expect(button(1)).not.toContain('disabled');
+    expect(button(2)).toContain('aria-pressed="true"');
+    expect(button(3)).toContain('disabled');
+    expect(button(5)).toContain('disabled');
+    expect(markup).toContain('Pressure II · selected');
+    expect(markup).toContain('Pressure I · won');
+  });
+
+  it('names the medals Salvage a run paid in its salvage line', () => {
+    expect(salvageLine({ amount: 99, total: 440, medals: 100 })).toEqual({
+      amount: '+99',
+      text: 'salvage · +100 from medals · 440 to spend in the Hangar',
+    });
+  });
+
+  it('shows what a locked control item waits for, with no BUY', () => {
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
+    const control = (id) =>
+      hangarItemMarkup(hangar.getControlItems().find((i) => i.id === id));
+
+    expect(control('reroll-2')).toContain('🔒 After Reroll I');
+    expect(control('reroll-2')).not.toContain('data-hangar-buy');
+    expect(control('flight-school')).toContain('🔒 Medal · First Victory');
+    expect(control('reroll-1')).toContain('BUY · 200</button>');
+  });
+
+  it('writes a licence: BUY on sale, its medal, an ON / OFF switch once held', () => {
+    localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify({ salvage: 400 }));
+    const hangar = new HangarService({ ...stubs, eventBus: new EventBus() });
+    const card = (id) =>
+      licenseMarkup(hangar.getLicenses().find((l) => l.id === id));
+
+    expect(card('shard_halo')).toContain('Shard Halo');
+    expect(card('shard_halo')).toContain(
+      'data-hangar-license-buy="shard_halo"'
+    );
+    expect(card('deflector_shield')).toContain('🏅 Ring Breaker');
+    expect(card('deflector_shield')).not.toContain('data-hangar-license-buy');
+
+    hangar.buyLicense('shard_halo');
+    expect(card('shard_halo')).toContain('aria-pressed="true">ON</button>');
+    hangar.setLicenseOn('shard_halo', false);
+    expect(card('shard_halo')).toContain('aria-pressed="false">OFF</button>');
+  });
+
+  it('shows the seal and Flight School pickers only once bought', () => {
+    const setup = {
+      sealSlots: 0,
+      sealed: [],
+      openCards: new Set(['plasma', 'multishot']),
+      flightSchool: false,
+      schoolCards: ['propulsors'],
+      startingCard: null,
+    };
+    expect(launchSetupMarkup(setup)).toBe('');
+
+    const full = launchSetupMarkup({
+      ...setup,
+      sealSlots: 1,
+      sealed: ['plasma'],
+      flightSchool: true,
+      startingCard: 'propulsors',
+    });
+    expect(full).toContain('Sealed out of the draw · 1/1');
+    expect(full).toContain('data-hangar-seal="plasma" aria-pressed="true"');
+    expect(full).toMatch(
+      /data-hangar-seal="multishot" aria-pressed="false" disabled/
+    );
+    expect(full).toContain(
+      'data-hangar-start="propulsors" aria-pressed="true"'
+    );
+    expect(full).toContain('data-hangar-start="none" aria-pressed="false"');
   });
 });

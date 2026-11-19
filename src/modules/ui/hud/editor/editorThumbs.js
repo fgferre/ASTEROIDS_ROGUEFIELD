@@ -25,7 +25,7 @@ const PAD = 8;
 const FEED_ROWS = [
   ['kill', 'Mote', '×3'],
   ['xp', '+48 XP', ''],
-  ['kill', 'Seeker', ''],
+  ['kill', 'Hunter', ''],
 ];
 
 /** The Warden bar's sample: a three-phase Warden in its second phase. */

@@ -88,6 +88,12 @@ export function normalizeUpgradeDefinition(entry) {
       : UPGRADE_RARITIES[0],
     // A big boost with a real cost; no family.
     cursed: entry.cursed === true,
+    // A card offered only when the offer can't be filled; never held.
+    fallback: entry.fallback === true,
+    // Weapons it does nothing for: the new flight's draw leaves it out.
+    deadFor: asArray(entry.deadFor),
+    // The weapon a weapon card swaps in.
+    weaponId: typeof entry.weaponId === 'string' ? entry.weaponId : null,
     icon: entry.icon || '✨',
     themeColor:
       entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,
@@ -99,6 +105,8 @@ export function normalizeUpgradeDefinition(entry) {
     name: entry.name || '',
     description: entry.description || '',
     text,
+    // Text for a weapon the card acts differently with (textForWeapon).
+    weaponText: entry.weaponText ?? null,
     levels,
   };
 }

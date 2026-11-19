@@ -64,11 +64,26 @@ export class HitResolution {
     const cards = this.cards();
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
     let requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
-    // Chain Capacitor without the Chain Lance: some projectiles hit twice.
+    // A projectile, or what a beam or a flak burst lands: the chain, blade
+    // and heat hits of the other weapons, which evolve on their own, and the
+    // cards' arcs bring no lance evolution. A weapon with `familyForms` runs
+    // those of its own heat, blade or arc hits (the cards' arcs are kind
+    // `chain`: never).
+    const lanceHit =
+      Boolean(bullet.projectile) ||
+      bullet.kind === 'beam' ||
+      bullet.kind === 'shrapnel';
+    const familyHit =
+      Boolean(weapons.weapon.familyForms) &&
+      (bullet.kind === 'heat' ||
+        bullet.kind === 'blade' ||
+        bullet.kind === 'arc');
+    // Chain Capacitor without the Chain Lance: some projectiles, pulses and
+    // cuts hit twice.
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
-      bullet.projectile &&
+      (bullet.projectile || (familyHit && bullet.kind !== 'arc')) &&
       !weapons.hasEvolution('arc') &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
@@ -108,15 +123,11 @@ export class HitResolution {
             descriptors: enemy.generateFragments(),
           }
         : null;
-    // A projectile, or what a beam or a flak burst lands: the chain, blade
-    // and heat hits of the other weapons, which evolve on their own, and the
-    // cards' arcs bring no lance evolution.
-    const lanceHit =
-      Boolean(bullet.projectile) ||
-      bullet.kind === 'beam' ||
-      bullet.kind === 'shrapnel';
     const rewards =
-      lanceHit && weapons.hasEvolution('salvage')
+      (lanceHit ||
+        (familyHit &&
+          weapons.weapon.familyForms.carries.includes('salvage'))) &&
+      weapons.hasEvolution('salvage')
         ? enemiesSystem.rewardManager
         : null;
     const orbsBefore = rewards ? rewards.stats.totalOrbsDropped : 0;
@@ -202,8 +213,14 @@ export class HitResolution {
           rewards.stats.totalOrbsDropped - orbsBefore
         );
       }
-      if (lanceHit) {
-        this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
+      if (lanceHit || familyHit) {
+        this.applyEvolutionHit(
+          enemy,
+          requestedDamage,
+          damageResult,
+          bullet,
+          lanceHit
+        );
       }
       if (bullet.seeker?.breed > 0 && damageResult.killed) {
         breedSeekers(weapons, bullet, enemy);
@@ -233,7 +250,7 @@ export class HitResolution {
       enemy,
       bullet.vx || 0,
       bullet.vy || 0,
-      knockbackSpeed(damage)
+      knockbackSpeed(damage) * (bullet.push ?? 1)
     );
   }
 
@@ -274,14 +291,26 @@ export class HitResolution {
     rewards.createXPOrbs(enemy, extra, ORB_VALUE);
   }
 
-  // Burn, slow and chain on a lance, beam or flak hit; an Apex replaces its
-  // family's first stage.
-  applyEvolutionHit(enemy, damage, result, hit) {
+  // Burn, slow and chain on a lance, beam or flak hit, or on a hit of a
+  // weapon's `familyForms` (only the families it carries; its `shot` budget
+  // caps the chains and wells); an Apex replaces its family's first stage.
+  applyEvolutionHit(enemy, damage, result, hit, lanceHit = false) {
     const weapons = this.weapons();
     const cards = this.cards();
     if (!weapons.evolutions.length) return;
+    // A projectile, beam or flak hit runs every family's form, whatever the
+    // weapon's `familyForms` carries.
+    const forms = lanceHit ? null : weapons.weapon.familyForms;
+    const carries = (family) => !forms || forms.carries.includes(family);
+    // A chain or a well costs the shot one; with no `shot` they are free.
+    const spend = (key) => {
+      if (!hit.shot) return true;
+      if (hit.shot[key] <= 0) return false;
+      hit.shot[key] -= 1;
+      return true;
+    };
     const alive = !result.killed && !enemy.destroyed;
-    if (alive && weapons.hasEvolution('thermal')) {
+    if (alive && carries('thermal') && weapons.hasEvolution('thermal')) {
       cards.ignite(
         enemy,
         damage,
@@ -290,11 +319,12 @@ export class HitResolution {
       );
     }
     // Bosses move on scripts, not on velocity: no slow and no pull.
-    if (weapons.hasApex('field')) {
-      cards.pullToward(enemy, alive, hit.x, hit.y);
+    if (carries('field') && weapons.hasApex('field')) {
+      if (spend('pulls')) cards.pullToward(enemy, alive, hit.x, hit.y);
     } else if (
       alive &&
       enemy.type !== 'boss' &&
+      carries('field') &&
       weapons.hasEvolution('field')
     ) {
       cards.slows.set(enemy, {
@@ -302,7 +332,7 @@ export class HitResolution {
         timer: WEAPON_EVOLUTIONS.field.slow.duration,
       });
     }
-    if (weapons.hasEvolution('arc')) {
+    if (carries('arc') && weapons.hasEvolution('arc') && spend('chains')) {
       const { chain } = WEAPON_EVOLUTIONS.arc;
       const storm = weapons.hasApex('arc') ? WEAPON_APEX.arc.chain : null;
       cards.chainFrom(

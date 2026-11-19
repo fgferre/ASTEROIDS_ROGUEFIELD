@@ -1,4 +1,4 @@
-// Layers 11–12: Seekers and Bulwarks, Twains from 11, Anvils from 12 (a
+// Layers 11–12: Hunters and Bulwarks, Twains from 11, Anvils from 12 (a
 // wall of tanks).
 import { formation, rockCurve } from '../../data/layerParts.js';
 

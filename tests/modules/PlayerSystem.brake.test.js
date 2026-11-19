@@ -53,6 +53,7 @@ describe('PlayerSystem brake upgrade (FIX-02)', () => {
       eventBus,
       input,
       'command-queue': null,
+      newFlight: false,
     });
     // Reset to a clean starting state — PlayerSystem constructor sets defaults
     // but other test cases below mutate position/velocity directly, so we
@@ -177,7 +178,12 @@ describe('Braking System 3: emergency brake', () => {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
     const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
-    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    const player = new PlayerSystem({
+      eventBus,
+      input,
+      'command-queue': null,
+      newFlight: false,
+    });
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy };
     eventBus.emit('upgrade-emergency-brake', brake);

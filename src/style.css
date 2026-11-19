@@ -63,7 +63,9 @@
   /* A card's rarity and an upgrade family's accent (cardScreens.css,
      ui/upgradeCard.js familyAccent), which Colorblind Mode swaps below */
   --rarity-common: color-mix(in srgb, var(--neutral) 70%, var(--text));
-  --rarity-rare: var(--accent);
+  /* Not the focus ring's cyan: a rare card read as the selected one (the
+     owner's call, 17/11). */
+  --rarity-rare: #56b4e9;
   --rarity-epic: var(--xp);
   --rarity-cursed: color-mix(in srgb, var(--boss) 55%, white);
   --family-kinetic: var(--accent);
@@ -515,6 +517,310 @@ select {
   border-radius: 60% 50% 40% 50% / 40% 60% 50% 50%;
 }
 
+/* PRESS START gate: after loading, the same screen goes see-through over the
+   live menu scene and shows the title and one button. */
+.loading-screen__gate {
+  display: none;
+}
+
+.loading-screen--gate {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 9, 16, 0.1) 35%,
+    rgba(2, 9, 16, 0.6) 100%
+  );
+}
+
+/* The menu's panels wait out of sight; its canvas is the scene behind. */
+.menu-screen--gated .menu-screen__overlay {
+  visibility: hidden;
+}
+
+/* No ship behind Press Start (the owner, 17/11): the hull preview hides
+   while its stage box has no size. */
+.menu-screen--gated .menu-hull-stage {
+  display: none;
+}
+
+.loading-screen--gate .loading-screen__content {
+  display: none;
+}
+
+.loading-screen--gate .loading-screen__gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  padding: var(--space-5);
+}
+
+.loading-screen__gate-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: -100px;
+  text-align: center;
+  font-family: var(--font-display);
+  text-shadow: 0 4px 22px #020711;
+}
+
+.loading-screen__gate-title span {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.65em;
+  padding-left: 0.65em;
+  color: #a7c9d7;
+}
+
+.loading-screen__gate-title strong {
+  font-size: clamp(28px, 7.5vw, 70px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: #e3f2f7;
+}
+
+.loading-screen__gate-action {
+  position: absolute;
+  bottom: 17%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+}
+
+.loading-screen__press-start {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  padding: 14px 20px;
+  cursor: pointer;
+  text-shadow: 0 0 18px rgba(0, 242, 255, 0.4);
+}
+
+.loading-screen__gate-action > span {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+/* Asleep until the page's first gesture (loadingScreen.js): the button waits
+   dim and still; the first touch lights it, with the music. */
+.loading-screen--asleep .loading-screen__press-start {
+  opacity: 0.45;
+  animation: none !important;
+}
+
+/* The start: the button flares and blinks, the title fades and the scene goes
+   dark (1 s); then the screen fades off the menu. */
+.loading-screen--starting {
+  pointer-events: none;
+  transition: background-color 0.55s ease-out 0.35s;
+  background-color: rgba(1, 3, 6, 0.94);
+}
+
+.loading-screen--starting.hidden {
+  transition-duration: 0.6s;
+}
+
+.loading-screen--starting .loading-screen__press-start {
+  animation: pressStartBlink 0.5s steps(1, end) both !important;
+  background: #c8fdff;
+  color: #00262b;
+  text-shadow: none;
+  box-shadow: 0 0 42px rgba(170, 250, 255, 0.95);
+}
+
+.loading-screen--starting .loading-screen__gate {
+  transition: opacity 0.5s ease-in 0.4s;
+  opacity: 0;
+}
+
+@keyframes pressStartBlink {
+  0%,
+  33%,
+  67% {
+    opacity: 1;
+  }
+
+  17%,
+  50%,
+  83% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The remote link into a run (modules/ui/remoteLink.js): dark, static and
+   the Wake's lines, then the static clears onto the run. */
+.btn.is-launching {
+  background: #e8feff;
+  color: #00262b;
+  box-shadow: 0 0 34px rgba(170, 250, 255, 0.95);
+}
+
+.remote-link {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #020304;
+  animation: remoteLinkIn 0.25s ease-in both;
+}
+
+.remote-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--noise);
+  background-size: 384px 240px;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  animation: remoteLinkNoise 0.24s steps(3) infinite;
+}
+
+.remote-link__lines {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(340px, 80vw);
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.16em;
+  color: #7fe9f2;
+  transition: opacity 0.2s;
+}
+
+.remote-link__line {
+  white-space: pre;
+  animation: remoteLinkLine 0.2s steps(4, end) both;
+}
+
+.remote-link__line span {
+  color: #e9f6ff;
+}
+
+.remote-link--clearing {
+  pointer-events: none;
+  animation: remoteLinkClear var(--clear) ease-in both;
+}
+
+.remote-link--clearing::before {
+  animation:
+    remoteLinkNoise 0.24s steps(3) infinite,
+    remoteLinkNoiseOut var(--clear) ease-in both;
+}
+
+.remote-link--clearing .remote-link__lines {
+  opacity: 0;
+}
+
+@keyframes remoteLinkIn {
+  0%,
+  40% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes remoteLinkLine {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes remoteLinkNoise {
+  33% {
+    background-position: 61px 37px;
+  }
+
+  67% {
+    background-position: -23px 91px;
+  }
+}
+
+@keyframes remoteLinkClear {
+  from {
+    background-color: rgba(2, 3, 4, 0.55);
+  }
+
+  to {
+    background-color: rgba(2, 3, 4, 0);
+  }
+}
+
+@keyframes remoteLinkNoiseOut {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .loading-screen__gate-title {
+    margin-top: -75px;
+  }
+
+  .loading-screen__gate-title span {
+    font-size: 15px;
+    letter-spacing: 0.4em;
+    padding-left: 0.4em;
+  }
+
+  .loading-screen__gate-title strong {
+    font-size: clamp(24px, 7.5vw, 41px);
+  }
+
+  .loading-screen__gate-action {
+    bottom: 23%;
+  }
+
+  .loading-screen__press-start {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body:not(.motion-reduced) .loading-screen__press-start {
+    animation: pressStartPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pressStartPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .loading-asteroid {
     animation: floatAsteroid 3s ease-in-out infinite;
@@ -580,65 +886,78 @@ select {
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Spacing, title, hull stage and buttons shrink with the window height so
-     the whole menu fits down to 720 px tall. */
-  padding: clamp(var(--space-3), 3vh, var(--space-6));
+  padding: clamp(var(--space-3), 2.4vh, var(--space-5)) var(--space-6);
   pointer-events: none;
-  text-align: center;
+  text-align: left;
   z-index: 2;
+  /* The scene stays behind: a scrim on the left keeps the text legible, the
+     ship's side stays clear. */
+  background: linear-gradient(
+      90deg,
+      rgba(5, 11, 19, 0.92),
+      rgba(5, 11, 19, 0.82) 48%,
+      rgba(5, 11, 19, 0.12) 72%
+    ),
+    linear-gradient(0deg, rgba(5, 11, 19, 0.92), transparent 28%);
 }
 
+/* The mission preparation screen: top bar, status, mode tabs, the mode's
+   panel beside the hull, the Ring strip, the footer. */
 .menu-screen__content {
   pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  --menu-gap: clamp(var(--space-2), 1.4vh, var(--space-4));
-  gap: var(--menu-gap);
-  padding: clamp(0px, 2vh - 8px, var(--space-5)) var(--space-5);
-  width: min(720px, 94vw);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'brand links'
+    'status status'
+    'tabs tabs'
+    'main side'
+    'ring ring'
+    'foot foot';
+  column-gap: var(--space-6);
+  width: min(1280px, 100%);
+  height: 100%;
+  margin: 0 auto;
 }
 
 .menu-screen__title {
+  grid-area: brand;
+  align-self: center;
+  margin: 0 0 var(--space-2);
   font-family: var(--font-display);
-  font-weight: 900;
-  font-size: clamp(
-    var(--text-2xl),
-    min(5.5vw, 7vh),
-    calc(var(--text-2xl) * 1.8)
-  );
-  letter-spacing: 0.12em;
-  line-height: 1.1;
+  font-weight: 500;
+  font-size: var(--text-xs);
+  letter-spacing: 0.2em;
+  line-height: 1.6;
   color: var(--text);
   text-transform: uppercase;
-  text-shadow:
-    -2px 0 color-mix(in srgb, var(--danger) 55%, transparent),
-    2px 0 var(--accent-line),
-    0 0 24px var(--accent-line);
   user-select: none;
 }
 
-/* Records strip under the title (ui/menuStatus.js) */
+.menu-screen__title strong {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+/* Records strip under the top bar (ui/menuStatus.js): one small dim line */
 .menu-status {
+  grid-area: status;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-1) var(--space-4);
-  margin-top: calc(var(--space-2) * -1);
+  gap: 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 
 .menu-status__item + .menu-status__item::before {
   content: '·';
-  margin-right: var(--space-4);
+  margin-right: var(--space-3);
   color: var(--line);
 }
 
@@ -648,13 +967,13 @@ select {
 
 /* Empty box the 3D hull (MenuHullPreview) is framed into */
 .menu-hull-stage {
-  width: min(100%, 420px);
-  height: clamp(72px, 30vh - 120px, 240px);
+  flex: none;
+  width: min(100%, 300px);
+  height: clamp(90px, 20vh, 176px);
 }
 
 .menu-ship-selector {
-  width: min(100%, 42rem);
-  margin: 0 auto;
+  width: 100%;
   pointer-events: auto;
 }
 
@@ -695,17 +1014,18 @@ select {
 
 .menu-ship-selector__options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: var(--space-2);
 }
 
 .menu-ship-selector__option {
   appearance: none;
   width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  gap: var(--space-1);
+  padding: var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-strong);
@@ -729,8 +1049,8 @@ select {
 }
 
 .menu-ship-selector__preview {
-  flex: 0 0 48px;
-  width: 48px;
+  flex: 0 0 auto;
+  width: 32px;
   height: auto;
   aspect-ratio: 1;
 }
@@ -738,10 +1058,11 @@ select {
 .menu-ship-selector__name {
   min-width: 0;
   overflow: hidden;
+  max-width: 100%;
   color: var(--text);
   font-family: var(--font-display);
-  font-size: var(--text-xs);
-  text-align: left;
+  font-size: 10px;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: 0.12em;
@@ -764,30 +1085,16 @@ select {
   grid-column: 1 / -1;
 }
 
-/* Main menu: Campaign spans the first row, Descent and Daily Field share the
-   second; an even last action is alone on its row and spans it */
-.menu-screen__nav.menu-grid > :last-child:nth-child(even) {
-  grid-column: 1 / -1;
-}
-
-/* The mode line, the selector label's tighter margin, the buttons' and the
-   key hints' tighter gaps pay for the mode line, so the menu and its 3D hull
-   keep the height they had without it. */
-.menu-screen__nav.menu-grid {
-  gap: var(--space-2);
-}
-
 .menu-screen__content .controls-hints {
   row-gap: var(--space-1);
+  justify-content: flex-start;
 }
 
-/* What the hovered or focused menu button does (MainMenu.bindModeHints):
-   one line of fixed height, so nothing moves as it changes; it sits close
-   under the buttons it explains. */
+/* What the hovered or focused tab or link does (MainMenu.bindModeHints):
+   one line of fixed height, so nothing moves as it changes. */
 .menu-hint {
-  width: min(100%, 30rem);
   height: 20px;
-  margin: calc(2px - var(--menu-gap)) 0 0;
+  margin: 0;
   overflow: hidden;
   color: var(--text-dim);
   font-size: var(--text-sm);
@@ -846,18 +1153,6 @@ select {
 }
 
 @media (max-width: 768px) {
-  .menu-screen__title {
-    letter-spacing: 0.08em;
-  }
-
-  .menu-ship-selector {
-    width: min(100%, 320px);
-  }
-
-  .menu-ship-selector__options {
-    grid-template-columns: 1fr;
-  }
-
   .menu-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -911,6 +1206,70 @@ select {
 }
 
 .pause-actions {
+  width: 100%;
+}
+
+/* The new flight: the panel widens, the build on the left, the run's card
+   slots and piloting trail on the right (cardScreens.css draws them). */
+.pause-content:has(.pause-run:not(.hidden)) {
+  width: min(960px, 94vw);
+}
+
+/* A short window: the run tray makes the panel taller, so it tightens to
+   fit without scrolling (1280x800 overflowed by 57 px). */
+@media (max-height: 860px) {
+  .pause-content:has(.pause-run:not(.hidden)) {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+  }
+
+  .pause-content:has(.pause-run:not(.hidden)) .controls-hints {
+    padding-top: var(--space-3);
+  }
+}
+
+.pause-build:has(.pause-run:not(.hidden)) {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  column-gap: var(--space-4);
+  align-items: start;
+}
+
+.pause-build > :not(.pause-run) {
+  grid-column: 1;
+}
+
+.pause-run {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pause-run .run-tray__part {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+}
+
+.pause-run .run-tray__head {
+  justify-content: space-between;
+}
+
+.pause-run .run-tray__note {
+  display: none;
+}
+
+.pause-run .run-slots {
+  display: grid;
+  grid-template-columns: repeat(5, 46px);
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pause-run .trail-map {
   width: 100%;
 }
 
@@ -986,8 +1345,8 @@ kbd {
    SETTINGS
    ============================================ */
 .settings-container {
-  width: min(880px, 94vw);
-  max-height: min(680px, 90vh);
+  width: min(940px, 96vw);
+  max-height: min(740px, 92vh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1011,12 +1370,17 @@ kbd {
   font-size: var(--text-lg);
 }
 
-/* Codex layout: tabs across the top, cards below */
+.settings-saved {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+/* Left navigation, a divider, then the section */
 .settings-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  padding: 0 var(--space-5);
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1024,73 +1388,150 @@ kbd {
 
 .settings-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-4) var(--space-4) var(--space-4) 0;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings-tabs .settings-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  color: var(--text);
+}
+
+.settings-tab__sub {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.settings-tabs .settings-tab:hover {
+  background: var(--panel-inset);
+}
+
+.settings-tabs .settings-tab.is-active {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .settings-content {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  align-content: start;
-  gap: var(--space-3);
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  padding: var(--space-4) var(--space-2) var(--space-5) var(--space-5);
   scrollbar-width: thin;
   scrollbar-color: var(--neutral) transparent;
 }
 
-.settings-category-description,
-.settings-field--wide,
-.settings-field--binding,
-.settings-field--range {
-  grid-column: 1 / -1;
+.settings-page-title {
+  margin-bottom: var(--space-5);
 }
 
-.settings-category-description {
-  font-size: var(--text-sm);
-  line-height: 1.5;
+.settings-page-title h3 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-page-title p {
+  margin: 0;
+  font-size: var(--text-md);
   color: var(--text-dim);
 }
 
-.settings-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--panel-inset);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+.settings-group__title {
+  margin: var(--space-5) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
-.settings-field__header {
+.settings-group:first-of-type .settings-group__title {
+  margin-top: 0;
+}
+
+/* One row: label and description left, the control right */
+.settings-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 250px);
+  gap: var(--space-5);
+  align-items: center;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-field--wide {
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 330px);
+}
+
+.settings-field--binding {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: var(--space-2) 0;
+}
+
+.settings-field__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .settings-field__label {
-  font-size: var(--text-md);
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 600;
   color: var(--text);
 }
 
 .settings-field__description {
+  max-width: 440px;
+  margin: 0;
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--text-dim);
 }
 
+.settings-field--binding .settings-field__label {
+  font-size: var(--text-md);
+}
+
+.settings-field__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .settings-field__value {
+  min-width: 42px;
+  text-align: right;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--accent);
+  font-variant-numeric: tabular-nums;
 }
 
 .settings-field--toggle {
-  flex-direction: row;
-  align-items: center;
   cursor: pointer;
 }
 
@@ -1101,22 +1542,15 @@ kbd {
   accent-color: var(--accent);
 }
 
-.settings-field--toggle .settings-field__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.settings-field--range .settings-field__header {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+.settings-field__state {
+  min-width: 26px;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
 }
 
 .settings-range-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   accent-color: var(--accent);
 }
 
@@ -1127,6 +1561,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
+  font-family: inherit;
   font-size: var(--text-md);
   font-weight: 500;
 }
@@ -1139,6 +1574,7 @@ kbd {
 /* Segmented choice (quality, camera): one button per option */
 .settings-segmented {
   display: flex;
+  flex: 1;
   flex-wrap: wrap;
   gap: var(--space-1);
   padding: var(--space-1);
@@ -1149,8 +1585,8 @@ kbd {
 
 .settings-segment {
   flex: 1 1 0;
-  min-width: 4.5rem;
-  padding: var(--space-2) var(--space-3);
+  min-width: 3.4rem;
+  padding: var(--space-2) var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1158,7 +1594,7 @@ kbd {
   font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   transition:
@@ -1183,6 +1619,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin: var(--space-2) 0 0;
   padding: var(--space-2) var(--space-3);
   border-left: 2px solid var(--accent);
   border-radius: var(--radius-sm);
@@ -1206,38 +1643,55 @@ kbd {
     0 0 14px var(--accent);
 }
 
-.settings-field--toggle .settings-preview {
-  margin-top: var(--space-1);
+/* A row another setting makes useless: dimmed, its reason in place of the text */
+.settings-field.is-inactive {
+  opacity: 0.55;
 }
 
-.settings-binding__groups {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.settings-field.is-inactive .settings-field__description {
+  color: var(--text);
 }
 
-.settings-binding__group {
+.settings-field.is-inactive,
+.settings-field.is-inactive * {
+  cursor: default;
+}
+
+.settings-fold {
+  margin-top: var(--space-5);
+}
+
+.settings-fold summary {
+  padding: var(--space-2) 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settings-device-switch {
   display: flex;
-  flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.settings-device-btn {
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
 }
 
-.settings-binding__device {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
+.settings-device-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.settings-binding__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.settings-field--binding .settings-field__control {
+  flex-wrap: wrap;
 }
 
 .settings-binding-btn {
@@ -1245,6 +1699,7 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  min-width: 120px;
   min-height: 36px;
   padding: 0 var(--space-4);
   border: 1px solid var(--line);
@@ -1265,7 +1720,7 @@ kbd {
   font-style: italic;
 }
 
-.settings-binding-btn:hover {
+.settings-binding-btn:hover:not(:disabled) {
   background: var(--accent-soft);
   border-color: var(--accent-line);
 }
@@ -1296,23 +1751,69 @@ kbd {
   text-align: center;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   .settings-container {
     max-height: 95vh;
   }
 
+  .settings-saved {
+    display: none;
+  }
+
+  .settings-close-btn {
+    margin-left: auto;
+  }
+
   .settings-body {
-    padding: var(--space-4);
-    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 0 var(--space-4);
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    padding: var(--space-3) 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .settings-tabs .settings-tab {
+    flex: 0 0 auto;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-md);
+  }
+
+  .settings-content {
+    padding: var(--space-4) 0;
+  }
+
+  .settings-field,
+  .settings-field--wide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .settings-field--binding {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-field--toggle {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-field__control {
+    justify-content: flex-start;
   }
 
   .settings-footer {
-    flex-direction: column;
-    align-items: stretch;
+    padding: var(--space-3) var(--space-4);
   }
 
   .settings-footer .btn {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 }
 
@@ -1366,6 +1867,154 @@ kbd {
 .credits-footer {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Who made it: the studio, the byline */
+.credits-studio {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.credits-byline {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1.2;
+  color: var(--text);
+}
+
+/* Support: in the gold of the rewards, a link to write to Pipo Labs */
+.credits-support {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--xp) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--xp) 7%, transparent);
+  outline: none;
+}
+
+.credits-support:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.credits-support__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--xp);
+}
+
+.credits-support p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-dim);
+}
+
+.credits-support__link {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--xp);
+}
+
+.menu-screen__button--support {
+  color: var(--xp);
+  border-color: color-mix(in srgb, var(--xp) 55%, transparent);
+}
+
+/* End credits: the names roll up over the field */
+.end-credits {
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 4, 8, 0.45),
+    rgba(2, 4, 8, 0.9)
+  );
+  text-align: center;
+}
+
+.end-credits__viewport {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
+}
+
+.end-credits__roll {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 0 var(--space-4);
+  transform: translateY(100vh);
+}
+
+.end-credits__roll.is-rolling {
+  animation: end-credits-roll 48s linear forwards;
+}
+
+@keyframes end-credits-roll {
+  to {
+    transform: translateY(calc(-100% + 55vh));
+  }
+}
+
+.end-credits__thanks {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-lg);
+  color: var(--text-dim);
+}
+
+.end-credits__label {
+  margin: var(--space-6) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.end-credits__title {
+  margin: var(--space-2) 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.end-credits__name {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.end-credits__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+
+.end-credits__support {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.end-credits__support b {
+  color: var(--xp);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .end-credits__roll.is-rolling {
+    animation-duration: 0.01s;
+  }
 }
 
 @media (max-width: 540px) {
@@ -1672,6 +2321,260 @@ kbd {
   letter-spacing: 0.08em;
 }
 
+/* Hangar tabs: only the chosen panel shows */
+.hangar-dialog .credits-body[hidden] {
+  display: none;
+}
+
+/* Control: three columns, so each ladder (rerolls, banishes, seals) is a row;
+   the whole tab scrolls, rungs and the pickers under them together */
+.hangar-dialog .credits-body[data-hangar-panel='control'] {
+  overflow-y: auto;
+}
+
+.hangar-list--ladders {
+  grid-template-columns: repeat(3, 1fr);
+  align-content: start;
+  flex: none;
+  overflow: visible;
+}
+
+.hangar-list--ladders .hangar-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.hangar-list--ladders .hangar-item__action {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* Under the control rungs: cards sealed and the Flight School's card */
+.hangar-launch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hangar-launch:empty {
+  display: none;
+}
+
+.hangar-launch__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.hangar-chip {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.hangar-chip.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hangar-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A control rung or licence waiting for the one before it, or a medal */
+.hangar-item__locked {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.hangar-license__kind {
+  text-transform: capitalize;
+  color: var(--text);
+}
+
+.hangar-license__switch {
+  min-width: 64px;
+}
+
+.hangar-license__switch.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The medal wall: earned in gold, the rest dashed, the key medal in accent */
+.medal-wall {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-2);
+}
+
+.medal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--xp) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--xp) 6%, var(--panel-inset));
+}
+
+.medal .medal__glyph {
+  flex: 0 0 38px;
+  height: 38px;
+  font-size: 20px;
+}
+
+.medal__text {
+  min-width: 0;
+}
+
+.medal__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.medal__desc {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  color: var(--text-dim);
+}
+
+.medal__reward {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--xp);
+}
+
+.medal.is-locked {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+}
+
+.medal.is-locked .medal__glyph {
+  color: var(--neutral);
+  text-shadow: none;
+  opacity: 0.55;
+}
+
+.medal.is-locked .medal__reward {
+  color: var(--text-dim);
+}
+
+.medal.is-key {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.medal.is-key .medal__reward {
+  color: var(--accent);
+}
+
+/* The Pressure ladder: one button per rung */
+.pressure-note {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.pressure-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pressure-rung__pick {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pressure-rung__pick:hover:not(:disabled),
+.pressure-rung__pick:focus-visible {
+  border-color: var(--accent-line);
+}
+
+.pressure-rung.is-selected .pressure-rung__pick {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.pressure-rung__pick:disabled {
+  cursor: default;
+}
+
+.pressure-rung.is-locked .pressure-rung__pick {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+.pressure-rung__numeral {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  text-align: center;
+}
+
+.pressure-rung.is-selected .pressure-rung__numeral {
+  color: var(--accent);
+}
+
+.pressure-rung__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pressure-rung__name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pressure-rung__stats {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.pressure-rung__pay {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--xp);
+}
+
 /* The hull view beside the hull buttons */
 .hangar-hull-bay {
   order: -1;
@@ -1761,66 +2664,127 @@ kbd {
   cursor: not-allowed;
 }
 
-/* Campaign map (ui/CampaignMap.js): an arc of the Ring with its chapters,
-   the selected one's detail under it */
-.campaign-dialog {
-  width: min(960px, 94vw);
-  max-height: min(680px, 92vh);
-  gap: var(--space-4);
+/* Campaign tab (ui/CampaignMap.js): the chapter's sectors in the mode panel,
+   the Ring's chapters in a row under it, the Wake log beside the hull */
+.campaign-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 7.5rem;
+  max-height: 220px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+}
+
+.campaign-log__heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.campaign-log__sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.campaign-log__body {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  /* It opens scrolled to the newest entry: the older text fades out above. */
+  mask-image: linear-gradient(transparent, #000 var(--space-6));
+}
+
+.campaign-log__entry {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.campaign-log__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.campaign-log__text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.campaign-log__next {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.campaign-log__toggle {
+  align-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.campaign-log__toggle:hover {
+  color: var(--text);
+}
+
+.campaign-log__toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.campaign-log__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.campaign-log__speaker {
+  font-weight: 700;
+  color: var(--text);
 }
 
 .campaign-map {
-  position: relative;
-  /* Never taller than a third of the window: the dialog fits 720 p */
-  width: min(100%, calc(32vh * 1000 / 260));
-  aspect-ratio: 1000 / 260;
-  margin: 0 auto var(--space-5);
-}
-
-.campaign-arc {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.campaign-arc path {
-  fill: none;
-  vector-effect: non-scaling-stroke;
-}
-
-.campaign-arc__ring {
-  stroke: var(--neutral);
-  stroke-width: 1;
-  opacity: 0.6;
-}
-
-.campaign-arc__ring.is-dark {
-  stroke-dasharray: 3 6;
-  opacity: 0.35;
-}
-
-.campaign-arc__reach {
-  stroke: var(--accent-line);
-  stroke-width: 1.5;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
 .campaign-node {
-  position: absolute;
-  width: 8.5rem;
-  transform: translate(-50%, -7px);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
-  padding: 0 0 var(--space-1);
+  padding: var(--space-1) 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font-family: var(--font-display);
-  text-align: center;
+  text-align: left;
   appearance: none;
 }
 
@@ -1829,9 +2793,9 @@ button.campaign-node {
 }
 
 .campaign-node__dot {
-  width: 14px;
-  height: 14px;
-  margin-bottom: var(--space-2);
+  width: 12px;
+  height: 12px;
+  margin-bottom: var(--space-1);
   border: 1px solid var(--neutral);
   border-radius: 50%;
   background: var(--bg);
@@ -1912,29 +2876,13 @@ button.campaign-node {
   }
 }
 
-.campaign-detail {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel-inset);
-}
-
-.campaign-detail__text {
-  flex: 1;
-  display: grid;
-  gap: var(--space-1);
-}
-
 .campaign-detail__title {
-  margin: 0;
+  margin: 0 0 var(--space-2);
   font-family: var(--font-display);
-  font-size: var(--text-md);
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
 }
 
 .campaign-detail__line {
@@ -2069,9 +3017,343 @@ button.campaign-node {
   outline-offset: var(--focus-offset);
 }
 
-.campaign-detail__launch {
-  flex: 0 0 auto;
-  min-width: 9rem;
+/* Mission preparation screen (MainMenu.setPrepTab): the mode tabs, one panel
+   and one Launch per tab, the footer */
+.prep-links {
+  grid-area: links;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-2);
+}
+
+.menu-screen__button.menu-screen__button--link {
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.menu-screen__button.menu-screen__button--link:hover {
+  color: var(--accent);
+}
+
+.menu-screen__button.menu-screen__button--link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.prep-footer .menu-screen__button--link {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.prep-footer .menu-screen__button--support {
+  color: var(--xp);
+}
+
+.prep-tabs {
+  grid-area: tabs;
+  display: flex;
+  gap: var(--space-5);
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.prep-tab {
+  appearance: none;
+  padding: var(--space-3) 0 calc(var(--space-3) - 2px);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prep-tab:hover {
+  color: var(--text);
+}
+
+.prep-tab[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.prep-tab:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 4px;
+}
+
+.prep-tab__lock {
+  display: none;
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.menu-screen__content:has(#boss-rush-btn:disabled) .prep-tab__lock {
+  display: inline;
+}
+
+/* One panel, one Launch (and the Campaign-only Wake log and Ring) per tab */
+.menu-screen__content:not([data-active-tab='campaign'])
+  [data-prep-for='campaign'],
+.menu-screen__content:not([data-active-tab='descent'])
+  [data-prep-for='descent'],
+.menu-screen__content:not([data-active-tab='daily']) [data-prep-for='daily'],
+.menu-screen__content:not([data-active-tab='bossrush'])
+  [data-prep-for='bossrush'] {
+  display: none;
+}
+
+.prep-main {
+  grid-area: main;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4) 0;
+}
+
+.prep-panel__objective {
+  margin: 0;
+  max-width: 28rem;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+#prep-difficulty:empty,
+#prep-before-launch:empty {
+  display: none;
+}
+
+#prep-difficulty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 11rem;
+}
+
+#prep-before-launch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.prep-field__label {
+  font-size: var(--text-xs);
+  font-variant: small-caps;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  color: var(--text-dim);
+}
+
+.prep-field__select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+}
+
+.prep-field__select:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.prep-field__select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.prep-field__select:disabled {
+  color: var(--text-dim);
+}
+
+.prep-field__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.prep-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.prep-chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.prep-link {
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.prep-link:hover {
+  color: var(--accent);
+}
+
+.prep-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.prep-main .campaign-detail__line {
+  margin: var(--space-2) 0 0;
+}
+
+.prep-launch {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.prep-launch__btn {
+  flex: 1;
+  max-width: 20rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-md);
+}
+
+.prep-launch__btn:disabled {
+  border-color: var(--line);
+  background: var(--surface-strong);
+  color: var(--text-dim);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.prep-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-1) 0;
+}
+
+.prep-ring {
+  grid-area: ring;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.prep-ring__label {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.prep-footer {
+  grid-area: foot;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.prep-footer__hints {
+  min-width: 0;
+}
+
+.prep-footer .controls-hints__note {
+  flex-basis: auto;
+}
+
+.prep-footer__links {
+  display: flex;
+  gap: var(--space-4);
+}
+
+@media (max-width: 700px) {
+  .menu-screen__overlay {
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-4);
+    background: rgba(5, 11, 19, 0.88);
+  }
+
+  .menu-screen__content {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: none;
+    grid-template-areas:
+      'brand links'
+      'status status'
+      'tabs tabs'
+      'main main'
+      'side side'
+      'ring ring'
+      'foot foot';
+    height: auto;
+  }
+
+  .campaign-sector {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  }
+
+  .campaign-sector__boss,
+  .campaign-sector__layers {
+    display: none;
+  }
+
+  .prep-main {
+    overflow: visible;
+    padding: 0;
+  }
+
+  .prep-launch__btn {
+    max-width: none;
+  }
+
+  .menu-hull-stage {
+    height: 110px;
+  }
+
+  .campaign-log {
+    max-height: 220px;
+  }
+
+  .campaign-map {
+    grid-template-columns: repeat(6, 8rem);
+    overflow-x: auto;
+  }
+
+  .prep-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ============================================

@@ -12,6 +12,32 @@ import { ScreenShake, ShakePresets } from '../../utils/ScreenShake.js';
 // Numeric shake intensity becomes trauma as intensity / divisor (was 15).
 const SHAKE_INTENSITY_DIVISOR = 10;
 export const PLAYER_HIT_SHAKE = { intensity: 7, duration: 0.35 }; // was 8 / 0.3 s; 7 keeps a hit (trauma 0.7) below death/boss (1.0)
+// One signal for each thing (proposta 17/11, efeito/impacto): the red flash
+// only when the hull loses, and stronger the more it loses — a typical hit
+// (12 % of the hull) keeps the old 0.3; chips go fainter, big hits brighter.
+// A hit the shield takes whole gives a small shake and nothing red.
+export const SHIELD_SOAK_SHAKE = { intensity: 2.5, duration: 0.12 };
+const HULL_FLASH = Object.freeze({
+  typical: 0.12,
+  at: 0.3,
+  min: 0.15,
+  max: 0.45,
+});
+
+/** Hull points a 'player-took-damage' payload cost (0: the shield took it). */
+export function hullLoss(payload = {}) {
+  const lost = Number.isFinite(payload.healthDamage)
+    ? payload.healthDamage
+    : payload.damage;
+  return Number.isFinite(lost) ? Math.max(0, lost) : 0;
+}
+
+/** Red flash strength for losing `lost` of `max` hull. */
+export function hullFlashIntensity(lost, max) {
+  const share = max > 0 ? lost / max : HULL_FLASH.typical;
+  const k = HULL_FLASH.at * Math.sqrt(share / HULL_FLASH.typical);
+  return Math.min(HULL_FLASH.max, Math.max(HULL_FLASH.min, k));
+}
 // Settings → Accessibility → Reduce Flashing: flashes at 30 % strength, at
 // most one every 0.34 s (under WCAG's three a second); ones too faint to see
 // at that strength are dropped so they never hold the window.
@@ -46,6 +72,7 @@ export class ScreenFeedback {
       duration: 0,
       color: PALETTE.text,
       intensity: 0,
+      edges: false,
     };
     this.flashGap = 0;
   }
@@ -72,6 +99,7 @@ export class ScreenFeedback {
       duration: 0,
       color: PALETTE.text,
       intensity: 0,
+      edges: false,
     };
   }
 
@@ -212,7 +240,9 @@ export class ScreenFeedback {
     this.screenShake.add(trauma, finalDuration);
   }
 
-  addScreenFlash(color, duration, intensity) {
+  // `edges`: the flash reddens the screen's edges and leaves the centre (the
+  // ship) clear, as a hull loss does (lot 5, efeito/impacto).
+  addScreenFlash(color, duration, intensity, { edges = false } = {}) {
     if (!this.damageFlashEnabled()) {
       return;
     }
@@ -241,5 +271,6 @@ export class ScreenFeedback {
     this.screenFlash.duration = finalDuration;
     this.screenFlash.timer = finalDuration;
     this.screenFlash.intensity = finalIntensity;
+    this.screenFlash.edges = edges;
   }
 }

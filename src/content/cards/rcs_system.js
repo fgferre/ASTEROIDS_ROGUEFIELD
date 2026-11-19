@@ -54,6 +54,45 @@ export default {
       },
     ],
   },
+  // The new flight (the default; ?direcao=antiga is the old flight) reads this over `text`: in glide the RCS
+  // also turns the hull quicker (flight.js). Measured 16/11: turn rate 70°/s
+  // bare; top speed (132 px/s) from a standstill in 0.72 s bare.
+  newFlightText: {
+    summary:
+      'Maneuvering thrusters bite harder: the hull turns faster and gets to speed sooner, at the same top speed.',
+    levels: [
+      {
+        title: 'Basic RCS',
+        description:
+          'Turns 30% faster (90° a second instead of 70°) and reaches top speed in 0.55 s instead of 0.7 s.',
+        highlights: ['Top speed is unchanged: that is Main Thrusters.'],
+      },
+      {
+        title: 'Active RCS',
+        description: '60% faster: turns at 110° a second, top speed in 0.45 s.',
+        highlights: ['Swing the nose onto a target before it moves.'],
+      },
+      {
+        title: 'Enhanced RCS',
+        description: '90% faster: turns at 135° a second, top speed in 0.35 s.',
+        highlights: [
+          'With Braking System 3 too, the Flight Computer can show up.',
+        ],
+      },
+      {
+        title: 'Vector RCS',
+        description:
+          '2.2 times as fast: turns at 155° a second, top speed in 0.3 s.',
+        highlights: ['Spin round and fire back the way you came.'],
+      },
+      {
+        title: 'Omni-directional RCS',
+        description:
+          '2.6 times as fast: turns at 180° a second, top speed in 0.27 s.',
+        highlights: ['A half turn in just over a second from a standstill.'],
+      },
+    ],
+  },
   levels: [
     {
       rank: 1,

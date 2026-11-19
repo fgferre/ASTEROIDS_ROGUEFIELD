@@ -7,34 +7,12 @@
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { SpaceParticle } from '../EffectEntities.js';
 
-// A Caster shell landing: lighter than the Volatile rock's blast it used to
-// borrow (shake 7 + radius × 0.025 for 0.32 s, a full-screen flash, ~110
-// particles), since 2-4 Casters land one every 3.2 s each. No flash, the same
-// shockwave, about half the particles, all amber like the shot.
+// A Caster shell landing: a light shake. Its fire, smoke and casing pieces
+// are the 3D renderer's (Renderer3D on 'caster-shell-landed', blasts.js), in
+// place of the two rings, sparks and glow it had (proposta vfx-6).
 const SHELL_IMPACT = Object.freeze({
   shake: 4, // proposta 18/10
   shakeSeconds: 0.25, // proposta 18/10
-  shockwaveScale: 1.05, // proposta 18/10: × the blast radius
-  sparks: 36, // proposta 18/10
-  sparkSpeedMin: 70, // proposta 18/10: px/s
-  sparkSpeedMax: 210, // proposta 18/10
-  sparkAlphaMin: 0.7, // proposta 18/10
-  sparkAlphaMax: 0.9, // proposta 18/10
-  sparkSizeMin: 2, // proposta 18/10
-  sparkSizeMax: 3.6, // proposta 18/10
-  sparkLifeMin: 0.3, // proposta 18/10: s
-  sparkLifeMax: 0.5, // proposta 18/10
-  embers: 18, // proposta 18/10: slower, they linger
-  emberSpeedMax: 45, // proposta 18/10: px/s
-  emberAlpha: 0.5, // proposta 18/10
-  emberSizeMin: 1.2, // proposta 18/10
-  emberSizeMax: 2.2, // proposta 18/10
-  emberLifeMin: 0.6, // proposta 18/10: s
-  emberLifeMax: 1, // proposta 18/10
-  emberReach: 0.45, // proposta 18/10: × the blast radius
-  glowScale: 0.2, // proposta 18/10: × the blast radius
-  glowAlpha: 0.45, // proposta 18/10
-  glowLife: 0.35, // proposta 18/10: s
 });
 
 export class VolatileEffects {
@@ -241,11 +219,7 @@ export class VolatileEffects {
 
     this.addScreenShake(7 + radius * 0.025, 0.32);
     this.addScreenFlash(withAlpha(PALETTE.shot, 0.55), 0.26, 0.24);
-
-    this.particleEffects.createExplosionShockwave({
-      position,
-      radius: radius * 1.05,
-    });
+    // no rings: the rock bursts from inside (pedras, 17/11)
 
     const particleTotal = this.getScaledParticleCount(
       22 + Math.floor(radius / 5)
@@ -319,71 +293,8 @@ export class VolatileEffects {
     );
   }
 
-  // SHELL_IMPACT; rolls from the 'volatility' fork, which the shell's
-  // borrowed Volatile blast drew from before.
-  createShellImpactEffect({ position, radius }) {
-    const fx = SHELL_IMPACT;
-    const { x, y } = position;
-    const roll = (min, max) =>
-      min + this.randomFloat('volatility') * (max - min);
-
-    this.addScreenShake(fx.shake, fx.shakeSeconds);
-    this.particleEffects.createExplosionShockwave({
-      position,
-      radius: radius * fx.shockwaveScale,
-    });
-
-    const sparks = this.getScaledParticleCount(fx.sparks);
-    for (let i = 0; i < sparks; i += 1) {
-      const angle = roll(0, Math.PI * 2);
-      const speed = roll(fx.sparkSpeedMin, fx.sparkSpeedMax);
-      this.particleEffects.particles.push(
-        new SpaceParticle(
-          x,
-          y,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          withAlpha(PALETTE.shot, roll(fx.sparkAlphaMin, fx.sparkAlphaMax)),
-          roll(fx.sparkSizeMin, fx.sparkSizeMax),
-          roll(fx.sparkLifeMin, fx.sparkLifeMax),
-          'spark',
-          this.getRandomFork('volatility')
-        )
-      );
-    }
-
-    const embers = this.getScaledParticleCount(fx.embers);
-    for (let i = 0; i < embers; i += 1) {
-      const angle = roll(0, Math.PI * 2);
-      const distance = roll(0, radius * fx.emberReach);
-      const speed = roll(0, fx.emberSpeedMax);
-      this.particleEffects.particles.push(
-        new SpaceParticle(
-          x + Math.cos(angle) * distance,
-          y + Math.sin(angle) * distance,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          withAlpha(PALETTE.shot, fx.emberAlpha),
-          roll(fx.emberSizeMin, fx.emberSizeMax),
-          roll(fx.emberLifeMin, fx.emberLifeMax),
-          'normal',
-          this.getRandomFork('volatility')
-        )
-      );
-    }
-
-    this.particleEffects.particles.push(
-      new SpaceParticle(
-        x,
-        y,
-        0,
-        0,
-        withAlpha(PALETTE.shot, fx.glowAlpha),
-        radius * fx.glowScale,
-        fx.glowLife,
-        'normal',
-        this.getRandomFork('volatility')
-      )
-    );
+  // The shell landing shakes the view (SHELL_IMPACT).
+  createShellImpactEffect() {
+    this.addScreenShake(SHELL_IMPACT.shake, SHELL_IMPACT.shakeSeconds);
   }
 }

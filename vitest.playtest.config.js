@@ -10,6 +10,11 @@ export default {
   test: {
     ...config.test,
     include: ['tests/playtest/**/*.playtest.js'],
+    // First: the card catalog reads the flight address when it loads.
+    setupFiles: [
+      'tests/playtest/flightAddress.js',
+      ...(config.test.setupFiles || []),
+    ],
     testTimeout: 0,
   },
 };

@@ -18,6 +18,7 @@ import {
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../data/constants/gameplay.js';
 import { cageFences } from '../modules/enemies/types/SentinelInterdictor.js';
+import { decideGlide, glideKeys } from './botPilotGlide.js';
 
 /**
  * The bot's skill. `reactionMs`: a plan acts this long after the world it
@@ -440,7 +441,7 @@ export function rollout(world, dir, knobs, dash = false, held = null) {
  * Danger along a path: the weighted total (nearer counts more) and the
  * worst within CLOSE s of acting.
  */
-function pathDanger(world, path, knobs, safeUntil) {
+export function pathDanger(world, path, knobs, safeUntil) {
   const lead = leadOf(knobs);
   let total = 0;
   let soon = 0;
@@ -460,7 +461,7 @@ function pathDanger(world, path, knobs, safeUntil) {
 }
 
 // What a path is pulled toward and kept off; loot only when it is `safe`.
-function intentScore(world, end, start, safe) {
+export function intentScore(world, end, start, safe) {
   let score = 0;
   const edgeOf = (p) =>
     Math.min(p.x, world.width - p.x, p.y, world.height - p.y);
@@ -604,14 +605,22 @@ export function keysFor(dir) {
   };
 }
 
+// The piloting trail of the new flight, in the order a player walks it: the
+// engine, then the brake or the agility, then the Auto Turret.
+const TRAIL = [['propulsors'], ['braking_system', 'rcs_system'], ['auto_aim']];
+
 /**
- * The card policy, one place to change it: never a cursed card; a weapon
- * first, then damage, then survivability, then the rest; ties keep the
- * offer's order. Returns the chosen option's id, or null.
+ * The card policy, one place to change it: a card of the piloting trail first
+ * (engine, brake or agility, Auto Turret: the player who follows the path);
+ * never a cursed card; then a weapon, then damage, then survivability, then
+ * the rest; ties keep the offer's order. Returns the chosen option's id, or
+ * null.
  */
 export function pickCard(options = []) {
   const rank = (option) => {
     if (option.cursed) return -1;
+    const step = TRAIL.findIndex((ids) => ids.includes(option.id));
+    if (step >= 0) return 10 - step;
     const tags = option.tags || [];
     const category = option.category?.id ?? option.category;
     if (tags.includes('weapon')) return 4;
@@ -643,8 +652,9 @@ export function createBotPilot({
   const noticed = new Map(); // a hazard → the time it is missed until
   const queue = [];
   let nextPlan = 0;
-  let previous = 0;
-  let current = { dir: 0, dash: false, shield: false };
+  let previous;
+  let current = { dir: null, dash: false, shield: false };
+  const aiming = {}; // the glide's foe, kept between plans
   let fresh = false;
 
   // The world without the hazards this pilot has not noticed yet.
@@ -672,7 +682,10 @@ export function createBotPilot({
     skill,
     step(world) {
       if (world.time + 1e-9 >= nextPlan) {
-        const plan = decide(perceive(world), skill, previous);
+        const seen = perceive(world);
+        const plan = seen.ship.glide
+          ? decideGlide(seen, skill, previous, aiming)
+          : decide(seen, skill, previous);
         previous = plan.dir;
         queue.push({ at: world.time + skill.reactionMs / 1000, plan });
         nextPlan = world.time + 1 / skill.planHz;
@@ -682,7 +695,7 @@ export function createBotPilot({
         fresh = true;
       }
       const keys = {
-        ...keysFor(current.dir),
+        ...(world.ship.glide ? glideKeys : keysFor)(current.dir),
         dash: fresh && current.dash,
         shield: fresh && current.shield,
       };

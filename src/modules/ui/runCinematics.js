@@ -20,13 +20,21 @@
 // no skip). A renderer that can't move the camera (2D, reduced motion,
 // `?camera=0`) refuses them all, and the run keeps the plain banner; a
 // journey's lines then play as ordinary transmissions.
+// Story: the first campaign launch (once per player) tells it before its
+// journey (render3d/storyScene.js): six shots of the Wake under the
+// letterbox, a line opening each; a skip goes on to the journey.
 
 import {
   EPILOGUE_MS,
   INTRO_MS,
+  STORY_LINE_LEAD_MS,
+  STORY_MS,
+  STORY_SHOT_MS,
   TRAVEL,
   cinematicFreezeFromUrl,
   endingPath,
+  markStoryTold,
+  storyTold,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
@@ -35,6 +43,7 @@ import {
   TRANSMISSION_CHARS_PER_SECOND,
   endingTransmissions,
   holdMsFor,
+  prologueTransmissions,
   runVoiceLines,
   travelTransmissions,
 } from './transmissions.js';
@@ -42,6 +51,8 @@ import {
 // The bars leave when the Warden closes up; this only covers one that never
 // does (released mid-entrance).
 const ARRIVAL_LIMIT_MS = 6000;
+// A story line's hold once typed (its voice holds it longer).
+const STORY_LINE_HOLD_MS = 600;
 
 /**
  * The sector a run start flies to first, or null: the sector a carried start
@@ -55,11 +66,22 @@ export function travelDestination(
   freeze = null
 ) {
   if (replay) return null;
-  if (freeze?.kind === 'travel') {
+  if (freeze?.kind === 'travel' || freeze?.kind === 'story') {
     return sectorById(freeze.sector)?.id ?? SECTORS[0].id;
   }
   if (!sectorById(sector)) return null;
   return carried || source === 'campaign-launch-btn' ? sector : null;
+}
+
+/**
+ * Whether a run `start` flying to `to` tells the story first: the first
+ * campaign launch (the story untold), or any start under a dev `freeze` of
+ * kind 'story'.
+ */
+export function tellsStory({ source } = {}, to, freeze = null) {
+  if (!to) return false;
+  if (freeze?.kind === 'story') return true;
+  return source === 'campaign-launch-btn' && !storyTold();
 }
 
 /**
@@ -174,13 +196,17 @@ export class RunCinematics {
     this.afterEpilogue = null;
     this.afterEnding = null;
     this.travelTo = null;
+    // The first campaign's journey tells the story first (startStory).
+    this.tellsStory = false;
+    this.storyTo = null;
+    this.lineTimers = [];
     // Cards dealt while a journey is armed or plays, shown after the intro.
     this.cards = null;
   }
 
   /** The run's opening plays: its journey or its intro. */
   get introActive() {
-    return this.kind === 'intro' || this.kind === 'travel';
+    return ['intro', 'travel', 'story'].includes(this.kind);
   }
 
   /**
@@ -191,6 +217,7 @@ export class RunCinematics {
   armTravel(start) {
     const freeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.travelTo = travelDestination(start, freeze);
+    this.tellsStory = tellsStory(start, this.travelTo, freeze);
     this.cards = this.travelTo ? [] : null;
     this.readyVoices(start, this.travelTo);
   }
@@ -200,6 +227,9 @@ export class RunCinematics {
    * Sector, the campaign map's Launch): its voices load now, as below.
    */
   prepareTravel(start) {
+    // The sector's music is fetched meanwhile (audio/SectorScore.js).
+    if (start.sector)
+      this.eventBus.emit('sector-picked', { sector: start.sector });
     this.readyVoices(start, travelDestination(start));
   }
 
@@ -210,6 +240,7 @@ export class RunCinematics {
    */
   readyVoices(start, to) {
     const entries = to ? travelTransmissions(to) : [];
+    if (tellsStory(start, to)) entries.push(...prologueTransmissions());
     entries.push(...runVoiceLines(start));
     this.eventBus.emit('voice-lines-coming', { entries });
   }
@@ -244,6 +275,7 @@ export class RunCinematics {
     this.stop();
     const to = this.travelTo;
     this.travelTo = null;
+    if (to && this.tellsStory && this.startStory(to)) return true;
     if (to && this.startTravel(to)) return true;
     // No flight (reduced motion, no 3D): the lines play as they come.
     if (to) travelTransmissions(to).forEach((entry) => this.speak(entry));
@@ -290,6 +322,35 @@ export class RunCinematics {
     return true;
   }
 
+  /** The story before the first journey, to sector `to`; false without 3D. */
+  startStory(to) {
+    this.tellsStory = false;
+    if (!this.renderer()?.playStory?.()) return false;
+    markStoryTold();
+    this.begin('story', STORY_MS, () => this.endStory(to));
+    this.hud()?.cancelBanner();
+    this.hud()?.showCinematicHint(true);
+    this.hud()?.showLetterbox(true, true);
+    this.holdSim(true);
+    this.storyTo = to;
+    // Each line opens its shot, held short so the next shot's finds the
+    // channel clear.
+    let shotAt = STORY_LINE_LEAD_MS;
+    prologueTransmissions(STORY_LINE_HOLD_MS).forEach((entry, i) => {
+      this.lineTimers.push(setTimeout(() => this.speak(entry), shotAt));
+      shotAt += STORY_SHOT_MS[i];
+    });
+    this.unbindSkip = this.bindSkip(() => this.skip());
+    return true;
+  }
+
+  // The story is told: the journey flies on from it.
+  endStory(to) {
+    this.finish();
+    this.renderer()?.endStory();
+    if (!this.startTravel(to) && !this.playIntro()) this.endIntro();
+  }
+
   // The flight ends on the intro's first pose: the intro goes on from it.
   endTravel() {
     this.finish();
@@ -305,6 +366,11 @@ export class RunCinematics {
     if (this.kind === 'ending') {
       this.hush();
       this.endEnding();
+      return;
+    }
+    if (this.kind === 'story') {
+      this.hush();
+      this.endStory(this.storyTo);
       return;
     }
     if (this.kind === 'travel') {
@@ -408,6 +474,7 @@ export class RunCinematics {
     if (this.kind === 'travel') {
       this.renderer()?.endTravel();
     }
+    if (this.kind === 'story') this.renderer()?.endStory();
     if (this.kind) {
       this.finish();
     }
@@ -435,12 +502,14 @@ export class RunCinematics {
 
   finish() {
     const { kind } = this;
-    if (kind === 'arrival' || kind === 'travel') {
+    if (kind === 'arrival' || kind === 'travel' || kind === 'story') {
       this.hud()?.showLetterbox(false);
     }
     if (kind === 'ending') this.hud()?.showCinematicHint(false);
     clearTimeout(this.timer);
     clearTimeout(this.handOff);
+    this.lineTimers.forEach(clearTimeout);
+    this.lineTimers = [];
     this.unbindSkip?.();
     this.timer = null;
     this.handOff = null;

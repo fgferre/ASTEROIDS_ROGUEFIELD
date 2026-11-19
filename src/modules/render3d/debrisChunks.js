@@ -1,6 +1,7 @@
-// Rock debris as real chunks: a few low-poly irregular rocks (the asteroid
-// generator at the lowest detail), one InstancedMesh per variant, lit by the
-// scene lights like the asteroids (docs/NORTE.md §2: matte mass). Each
+// Debris as real chunks: a few low-poly irregular rocks (the asteroid
+// generator at the lowest detail) and, for a machine that breaks up, a few
+// torn hull plates (thin, angular, with a metal glint); one InstancedMesh per
+// variant, lit by the scene lights (docs/NORTE.md §2: matte mass). Each
 // EffectsSystem 'debris' particle becomes one instance that tumbles on its
 // own axis and shrinks away at the end of its life. The simulation throws
 // them flat across the field; each also climbs or sinks at its own slope as
@@ -15,6 +16,14 @@ import { SHINE } from './hullModel.js';
 const VARIANTS = 4;
 export const DEBRIS_CAPACITY = 160;
 const PER_VARIANT = DEBRIS_CAPACITY / VARIANTS;
+// proposta 17/11 (efeito/impacto): hull plates for machines.
+const PLATE_VARIANTS = 3;
+const PER_PLATE = 32;
+const PLATE_RADIUS = 0.8; // × particle size: shrapnel beside the hull's own pieces
+const PLATE_THICKNESS = 0.18; // × the plate's radius
+const PLATE_SHINE = { metalness: 0.5, roughness: 0.34, envMapIntensity: 1.3 };
+const PLATE_GREY = [0.32, 0.33, 0.36];
+const PLATE_PAINTED = 0.35; // share of plates that keep the machine's paint
 const CHUNK_RADIUS = 1.3; // × particle size
 const CHUNK_HEIGHT = 2;
 const SHRINK_FROM = 0.3; // last 30 % of life
@@ -28,6 +37,23 @@ const LIFT_SINE = 0.75;
 function hash01(v) {
   const s = Math.sin(v * 12.9898 + 78.233) * 43758.5453;
   return s - Math.floor(s);
+}
+
+// A torn plate: an irregular five-sided slab, centred, radius ~1.
+function plateGeometry(THREE, seed) {
+  const shape = new THREE.Shape();
+  for (let k = 0; k < 5; k += 1) {
+    const a = ((k + (hash01(seed + k) - 0.5) * 0.6) / 5) * Math.PI * 2;
+    const r = 0.55 + 0.45 * hash01(seed + 10 + k);
+    if (k === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: PLATE_THICKNESS,
+    bevelEnabled: false,
+  });
+  geometry.center();
+  return geometry;
 }
 
 export class DebrisChunks {
@@ -62,6 +88,28 @@ export class DebrisChunks {
       mesh.frustumCulled = false;
       scene.add(mesh);
       this.meshes.push(mesh);
+    }
+    this.plateMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      ...PLATE_SHINE,
+      flatShading: true,
+    });
+    this.plates = [];
+    this.plateCounts = new Int32Array(PLATE_VARIANTS);
+    for (let v = 0; v < PLATE_VARIANTS; v += 1) {
+      const mesh = new THREE.InstancedMesh(
+        plateGeometry(THREE, 7 + v * 13),
+        this.plateMaterial,
+        PER_PLATE
+      );
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      for (let i = 0; i < PER_PLATE; i += 1) mesh.setColorAt(i, white);
+      mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      mesh.count = 0;
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.plates.push(mesh);
     }
     this.matrix = new THREE.Matrix4();
     this.quaternion = new THREE.Quaternion();
@@ -106,6 +154,7 @@ export class DebrisChunks {
 
   begin() {
     this.counts.fill(0);
+    this.plateCounts.fill(0);
     this.total = 0;
   }
 
@@ -113,14 +162,18 @@ export class DebrisChunks {
   push(p, rgb) {
     if (this.total >= this.limit) return;
     const seed = p.rotationSpeed || p.maxLife || 1;
-    let v = Math.floor(hash01(seed) * VARIANTS);
-    for (let tries = 0; this.counts[v] >= PER_VARIANT; tries += 1) {
-      if (tries === VARIANTS - 1) return;
-      v = (v + 1) % VARIANTS;
+    const metal = p.material === 'metal';
+    const kinds = metal ? PLATE_VARIANTS : VARIANTS;
+    const cap = metal ? PER_PLATE : PER_VARIANT;
+    const counts = metal ? this.plateCounts : this.counts;
+    let v = Math.floor(hash01(seed) * kinds);
+    for (let tries = 0; counts[v] >= cap; tries += 1) {
+      if (tries === kinds - 1) return;
+      v = (v + 1) % kinds;
     }
     const lifeFrac = p.maxLife > 0 ? Math.max(0, p.life / p.maxLife) : 1;
     const shrink = Math.min(1, lifeFrac / SHRINK_FROM);
-    const r = p.size * CHUNK_RADIUS * shrink;
+    const r = p.size * (metal ? PLATE_RADIUS : CHUNK_RADIUS) * shrink;
     if (r <= 0.05) return;
 
     const age = Math.max(0, (p.maxLife || 0) - (p.life || 0));
@@ -140,27 +193,39 @@ export class DebrisChunks {
     this.quaternion.setFromAxisAngle(this.axis, spin);
     const height = this.lift(p, seed, age);
     this.position.set(p.x - HALF_W, CHUNK_HEIGHT + r + height, p.y - HALF_H);
-    // flattened a little, like chips off a surface
-    this.scale.set(r, r * (0.6 + 0.3 * hash01(seed + 4)), r);
+    // a rock chip flattened a little, like a chip off a surface; a plate is
+    // already thin
+    if (metal) this.scale.set(r, r, r);
+    else this.scale.set(r, r * (0.6 + 0.3 * hash01(seed + 4)), r);
     this.matrix.compose(this.position, this.quaternion, this.scale);
 
-    const mesh = this.meshes[v];
-    const i = this.counts[v];
+    const mesh = metal ? this.plates[v] : this.meshes[v];
+    const i = counts[v];
     mesh.setMatrixAt(i, this.matrix);
-    mesh.setColorAt(i, this.color.setRGB(rgb[0], rgb[1], rgb[2]));
-    this.counts[v] = i + 1;
+    if (metal && hash01(seed + 6) >= PLATE_PAINTED) {
+      const k = 0.8 + 0.4 * hash01(seed + 7);
+      this.color.setRGB(
+        PLATE_GREY[0] * k,
+        PLATE_GREY[1] * k,
+        PLATE_GREY[2] * k
+      );
+    } else this.color.setRGB(rgb[0], rgb[1], rgb[2]);
+    mesh.setColorAt(i, this.color);
+    counts[v] = i + 1;
     this.total += 1;
   }
 
   end() {
-    for (let v = 0; v < VARIANTS; v += 1) {
-      const mesh = this.meshes[v];
-      const count = this.counts[v];
+    const close = (mesh, count) => {
       mesh.count = count;
       mesh.visible = count > 0;
-      if (!count) continue;
+      if (!count) return;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
+    };
+    for (let v = 0; v < VARIANTS; v += 1) close(this.meshes[v], this.counts[v]);
+    for (let v = 0; v < PLATE_VARIANTS; v += 1) {
+      close(this.plates[v], this.plateCounts[v]);
     }
   }
 

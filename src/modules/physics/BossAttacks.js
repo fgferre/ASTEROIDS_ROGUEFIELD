@@ -241,6 +241,7 @@ export class BossAttacks {
             scaledDamage > 0 &&
             (!player.invulnerableTimer || player.invulnerableTimer <= 0)
           ) {
+            const healthBefore = player.health;
             const remaining = player.takeDamage(scaledDamage, boss);
             playerResult.remainingHealth =
               typeof remaining === 'number' ? remaining : null;
@@ -254,6 +255,11 @@ export class BossAttacks {
               position: { ...player.position },
               playerPosition: { x: player.position.x, y: player.position.y },
               damageSource: { x: originX, y: originY },
+              // what reached the hull (0 when the shield took it all)
+              healthDamage:
+                typeof remaining === 'number'
+                  ? Math.max(0, (healthBefore ?? remaining) - remaining)
+                  : scaledDamage,
             });
 
             if (typeof remaining === 'number' && remaining <= 0) {

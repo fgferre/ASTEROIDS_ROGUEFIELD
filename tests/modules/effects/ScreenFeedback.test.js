@@ -3,6 +3,8 @@ import RandomService from '../../../src/core/RandomService.js';
 import {
   PLAYER_HIT_SHAKE,
   ScreenFeedback,
+  hullFlashIntensity,
+  hullLoss,
 } from '../../../src/modules/effects/ScreenFeedback.js';
 
 describe('ScreenFeedback', () => {
@@ -25,5 +27,18 @@ describe('ScreenFeedback', () => {
     expect(feedback.screenShake.trauma).toBeCloseTo(0.315, 10);
     feedback.update(0.2);
     expect(feedback.screenShake.trauma).toBeCloseTo(0, 10);
+  });
+
+  it('counts only what reached the hull: a hit the shield took whole is 0', () => {
+    expect(hullLoss({ damage: 12, healthDamage: 0 })).toBe(0);
+    expect(hullLoss({ damage: 12, healthDamage: 5 })).toBe(5);
+    expect(hullLoss({ damage: 12 })).toBe(12);
+  });
+
+  it('reddens the screen as much as the hull lost', () => {
+    expect(hullFlashIntensity(12, 100)).toBeCloseTo(0.3, 5);
+    expect(hullFlashIntensity(3, 100)).toBeLessThan(0.3);
+    expect(hullFlashIntensity(30, 100)).toBeGreaterThan(0.3);
+    expect(hullFlashIntensity(100, 100)).toBeLessThanOrEqual(0.45);
   });
 });

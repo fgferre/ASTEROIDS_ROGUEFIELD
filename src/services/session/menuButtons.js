@@ -11,6 +11,8 @@ export class MenuButtons {
    * `eventBus`: emits 'credits-menu-requested' and 'settings-menu-requested'.
    * `startNewRun({ source, daily, bossRush, sector })`, `requestRetry({ source })`,
    * `exitToMenu({ source })`, `continueBeyondVictory()`: the session's flows.
+   * `linkIn(options, start, button)`: plays the way into a run started from
+   * the menu, calling `start` under it (absent: `start` at once).
    */
   constructor({
     eventBus,
@@ -18,12 +20,14 @@ export class MenuButtons {
     requestRetry,
     exitToMenu,
     continueBeyondVictory,
+    linkIn = (options, start) => start(),
   }) {
     this.eventBus = eventBus;
     this.startNewRun = startNewRun;
     this.requestRetry = requestRetry;
     this.exitToMenu = exitToMenu;
     this.continueBeyondVictory = continueBeyondVictory;
+    this.linkIn = linkIn;
     this.domClickHandler = (event) => this.handleDocumentClick(event);
     this.domClickUnsubscribe = null;
   }
@@ -110,11 +114,13 @@ export class MenuButtons {
         // run that just ended.
         const restart =
           id === 'restart-game-btn' || id === 'victory-restart-btn';
-        this.startNewRun({
+        const options = {
           source: id,
           daily: restart ? undefined : id === 'daily-field-btn',
           bossRush: restart ? undefined : id === 'boss-rush-btn',
-        });
+        };
+        if (restart) this.startNewRun(options);
+        else this.linkIn(options, () => this.startNewRun(options), button);
         break;
       }
       case 'campaign-launch-btn':
@@ -123,11 +129,13 @@ export class MenuButtons {
         this.emitCreditsMenuRequest({ open: false, source: id });
         // The button carries the sector it starts.
         // From the victory screen the ship goes on as it is.
-        this.startNewRun({
+        const options = {
           source: id,
           sector: button.dataset.sector,
           carry: id === 'victory-next-btn',
-        });
+        };
+        if (options.carry) this.startNewRun(options);
+        else this.linkIn(options, () => this.startNewRun(options), button);
         break;
       }
       case 'retry-game-btn': {
@@ -163,6 +171,16 @@ export class MenuButtons {
         });
         break;
       }
+      case 'menu-support-btn': {
+        preventDefault();
+        this.emitCreditsMenuRequest({
+          open: true,
+          source: 'menu',
+          triggerId: 'menu-support-btn',
+          section: 'support',
+        });
+        break;
+      }
       default:
         break;
     }
@@ -173,6 +191,7 @@ export class MenuButtons {
     source,
     restoreFocus = false,
     triggerId,
+    section,
   } = {}) {
     if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
       return;
@@ -183,6 +202,7 @@ export class MenuButtons {
       restoreFocus,
       source,
       triggerId,
+      section,
     });
   }
 

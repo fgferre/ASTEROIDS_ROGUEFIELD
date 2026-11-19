@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath } from '../../core/cinematics.js';
+import { epiloguePath, introPath, storyTold } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -41,16 +41,28 @@ import {
   mirrorProjectiles,
 } from './fieldMirrors.js';
 import { FormationMarks } from './formationMarks.js';
-import { HitSparks, MuzzleFlashes } from './hitSparks.js';
-import { ImpactKick } from './impactPass.js';
+import {
+  HitSparks,
+  KillPops,
+  MuzzleFlashes,
+  SPARK_KIND,
+  ShotWisps,
+} from './hitSparks.js';
+import { PickupFx } from './pickupFx.js';
+import { BurnMarks } from './burnMarks.js';
+import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
+import { hullLoss } from '../effects/ScreenFeedback.js';
+import { registerEffectEvents } from './effectEvents.js';
+import { ImpactKick, lensPull } from './impactPass.js';
 import {
   mirrorBossTransitions,
   mirrorLocks,
   mirrorOverlays,
-  mirrorWards,
+  WardLinks,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
@@ -116,6 +128,8 @@ class Renderer3D extends BaseSystem {
     this.three = null;
     // The journey between sectors (travelScene.js), built with the scene.
     this.travel = null;
+    // The story before the first campaign's journey (storyScene.js).
+    this.story = null;
     this.failed = false;
     this.graphics = {
       bloom: true,
@@ -162,9 +176,16 @@ class Renderer3D extends BaseSystem {
       if (turns) holder[key] = out.angle;
     };
     this.impact = new ImpactKick();
+    this.lensSide = { x: 0, y: 0 };
+    this.lensAhead = { x: 0, y: 0 };
     this.hitSparks = new HitSparks();
+    this.burnMarks = new BurnMarks();
+    this.killPops = new KillPops();
     this.muzzles = new MuzzleFlashes();
+    this.shotWisps = new ShotWisps();
+    this.pickupFx = new PickupFx();
     this.formationMarks = new FormationMarks();
+    this.wardLinks = new WardLinks();
     this.biome = new BiomeTransition();
     // Dense Fog (endless layer modifier): the far rocks and the space dim,
     // with distance from the camera target (the rig's focus).
@@ -276,6 +297,22 @@ class Renderer3D extends BaseSystem {
       const time = performance.now() / 1000;
       const dir = this.threatDirection();
       this.three?.shield.hit(time, dir.x, dir.y);
+      // flecks off the shell where it was struck
+      const pos = this.cachedPlayer?.position;
+      const len = Math.hypot(dir.x, dir.y);
+      if (pos && len > 0) {
+        const r = (this.three?.player.shieldRadius || 20) * 0.9;
+        this.hitSparks.emit(
+          pos.x + (dir.x / len) * r,
+          pos.y + (dir.y / len) * r,
+          dir.x,
+          dir.y,
+          -dir.x,
+          -dir.y,
+          false,
+          SPARK_KIND.shield
+        );
+      }
     });
     this.registerEventListener('shield-activated', () => {
       this.three?.shield.activate(performance.now() / 1000);
@@ -286,8 +323,13 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
     });
-    this.registerEventListener('player-took-damage', () => {
-      this.impact.kick(KICK_PLAYER_HIT);
+    // The hull took it: the lens kicks. The shield took it all: no kick and
+    // no hurt blink (the i-frames still run; only their look is held).
+    this.registerEventListener('player-took-damage', (payload = {}) => {
+      if (hullLoss(payload) > 0) {
+        this.impact.kick(KICK_PLAYER_HIT);
+        this.strikeHull(payload);
+      } else this.three?.player.holdBlink(performance.now() / 1000 + 0.5);
     });
     this.registerEventListener('boss-phase-changed', ({ enemy } = {}) => {
       this.impact.kick(KICK_BOSS_PHASE);
@@ -317,52 +359,7 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('weapon-beam-fired', (data) => {
       this.impact.kick(data.kick);
     });
-    // Flak shrapnel: a spark cone along the bolt's flight.
-    this.registerEventListener('flak-burst', (data) => {
-      const { position, angle } = data || {};
-      if (!position) return;
-      const dx = Math.cos(angle || 0);
-      const dy = Math.sin(angle || 0);
-      this.hitSparks.emit(position.x, position.y, dx, dy, dx, dy, false);
-    });
-    // a split asteroid lives on as its fragments: only real deaths burn
-    this.registerEventListener('enemy-destroyed', (data) => {
-      if (data?.enemy && !data.fragments?.length) {
-        this.three?.enemies.markDead(data.enemy);
-      }
-    });
-    this.registerEventListener('bullet-hit', (data) => {
-      const { position, enemy, bullet } = data || {};
-      if (!position || data.blocked) return;
-      this.hitSparks.emit(
-        position.x,
-        position.y,
-        enemy ? position.x - enemy.x : 0,
-        enemy ? position.y - enemy.y : 0,
-        bullet?.vx || 0,
-        bullet?.vy || 0,
-        Boolean(data.killed)
-      );
-      // a rock that survives the hit keeps a scorch mark
-      if (enemy?.type === 'asteroid' && bullet && !data.killed) {
-        const view = this.three?.enemies.views.get(enemy.id || enemy);
-        if (view) {
-          this.three.decals.hit(
-            view,
-            position.x - enemy.x,
-            position.y - enemy.y
-          );
-        }
-      }
-    });
-    this.registerEventListener('bullet-created', (data) => {
-      const { from, bullet } = data || {};
-      if (!from || !bullet) return;
-      const speed = Math.hypot(bullet.vx || 0, bullet.vy || 0);
-      if (speed <= 0) return;
-      this.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
-      this.three?.player.recoilToward(this.cachedPlayer, bullet.vx, bullet.vy);
-    });
+    registerEffectEvents(this);
   }
 
   /**
@@ -398,6 +395,28 @@ class Renderer3D extends BaseSystem {
       : null;
   }
 
+  // The Gravity Brake bends space round the ship out to its reach (the
+  // impact pass's lens), harder the more the card slows; `allowed` with the
+  // screen pass on.
+  aimLens(player, allowed) {
+    const brake = this.cachedCombat?.cards?.cardEffects?.gravityBrake;
+    const at = this.shipOnScreen;
+    if (!allowed || !brake || !at || player?.isDead) {
+      this.impact.lens(0.5, 0.5, 0.1, 0.1, 0);
+      return;
+    }
+    const { x, y } = player.position;
+    const side = this.worldToScreen(x + brake.radius, y, this.lensSide);
+    const ahead = this.worldToScreen(x, y + brake.radius, this.lensAhead);
+    this.impact.lens(
+      at.x / GAME_WIDTH,
+      1 - at.y / GAME_HEIGHT,
+      Math.hypot(side.x - at.x, side.y - at.y) / GAME_WIDTH,
+      Math.hypot(ahead.x - at.x, ahead.y - at.y) / GAME_HEIGHT,
+      lensPull(brake.slowFraction)
+    );
+  }
+
   /**
    * Runs the intro descent over `durationMs`, then hands back to the follow
    * camera. False when nothing would move (WebGL failed, `?camera=0`,
@@ -423,6 +442,30 @@ class Renderer3D extends BaseSystem {
       freeze?.kind === 'travel' ? freeze.t : null
     );
     return true;
+  }
+
+  /**
+   * The story before the first campaign's journey (ui/runCinematics.js),
+   * in its own scene. False when nothing would move, as playIntro.
+   */
+  playStory() {
+    if (!this.ready()) return false;
+    if (!this.startCinematic(holdIntroStart, 1, true, 'story')) return false;
+    const freeze = this.cameraRig.cinematicFreeze;
+    if (!this.story.built) this.warmStory();
+    this.story.start(freeze?.kind === 'story' ? freeze.t : null);
+    return true;
+  }
+
+  /** The story is over: the field's scene is drawn again. */
+  endStory() {
+    this.story?.stop();
+    this.story?.dispose();
+  }
+
+  // Seeded: three names what the story builds and draws with Math.random.
+  warmStory() {
+    this.seeded(() => this.story.warm(this.three.camera));
   }
 
   /**
@@ -623,14 +666,20 @@ class Renderer3D extends BaseSystem {
     this.shipOnScreen = null;
     this.three?.backdrop.setWake(0);
     this.travel?.stop();
+    this.story?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
     this.three?.decals.clear();
+    this.three?.blasts.clear();
     this.three?.shield.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
+    this.killPops.clear();
     this.muzzles.clear();
+    this.shotWisps.clear();
+    this.pickupFx.clear();
+    this.wardLinks.clear();
     this.biome.reset();
     this.interp?.clear();
   }
@@ -640,6 +689,9 @@ class Renderer3D extends BaseSystem {
   setup() {
     this.three = setupThree(this.seeded);
     this.travel = new TravelScene(this.three, (event, payload) =>
+      this.eventBus?.emit(event, payload)
+    );
+    this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
     this.applyQuality();
@@ -676,6 +728,8 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
+      // The story's freighter (seconds): only for a player yet to see it.
+      () => storyTold() || this.warmStory(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();
@@ -775,6 +829,7 @@ class Renderer3D extends BaseSystem {
     const effects = this.cachedEffects;
     const enemyList = this.cachedEnemies?.getActiveEnemies() || [];
     const travel = this.travel?.active ? this.travel : null;
+    const story = this.story?.active ? this.story : null;
     this.cameraRig.updateCamera(
       this.three,
       player,
@@ -790,6 +845,7 @@ class Renderer3D extends BaseSystem {
 
     const t = this.three;
     travel?.frame(t.camera, t.height);
+    story?.frame(t.camera, time);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -804,13 +860,21 @@ class Renderer3D extends BaseSystem {
     t.debris.begin();
     t.bodies.begin();
 
-    const warden = t.enemies.update(enemyList, time, dt);
+    const warden = t.enemies.update(enemyList, time, dt, this.hitSparks);
     if (t.key.castShadow) {
       t.enemies.budgetShadows(t.key.target.position.x, t.key.target.position.z);
     }
     const { focus } = this.cameraRig;
     const fog = t.enemies.updateFog(dt, this.denseFog, focus.x, focus.z);
+    this.burnMarks.update(
+      dt,
+      this.cachedCombat,
+      player,
+      this.three,
+      this.hitSparks
+    );
     t.decals.update(dt, t.enemies.views);
+    t.blasts.update(dt, t.camera, this.flashScale);
     t.veil.update(dt);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
@@ -819,15 +883,24 @@ class Renderer3D extends BaseSystem {
       // A boss view may name its own light (Sovereign: pale gold).
       t.wardenLight.color.copy(warden.light ?? t.wardenLightColor);
     }
-    t.player.update(player, t.ribbons, time);
-    if (travel) {
+    t.player.update(
+      player,
+      t.ribbons,
+      time,
+      dt * (effects?.gameTime?.scale ?? 1)
+    );
+    if (story) {
+      story.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
+      this.shipOnScreen = null;
+    } else if (travel) {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
     } else {
       this.trackShip(player);
     }
     this.mirrorShield(player, time);
-    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
+    // a breaking ship casts none: the depth pass draws it whole
+    if (!t.player.breaking) markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
     mirrorProjectiles(t, this.cachedCombat);
     mirrorPickups(
@@ -838,12 +911,17 @@ class Renderer3D extends BaseSystem {
       this.cachedPickups
     );
     mirrorEffects(t, effects, this.impact);
-    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb);
+    // Hit Markers (Settings): the molten slag off struck metal
+    this.hitSparks.slagOn = effects?.hitMarkersEnabled !== false;
+    this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke, t.glow);
+    this.killPops.update(dt, t.glow, this.flashScale);
     this.formationMarks.update(dt, t.ribbons, t.threatRgb);
-    mirrorWards(t, enemyList);
+    this.wardLinks.update(dt, t, enemyList, this.flashScale);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();
     }
+    this.shotWisps.update(dt, t.ribbons);
+    this.pickupFx.update(dt, t, player, this.flashScale, this.reducedMotion);
     mirrorOverlays(
       t,
       player,
@@ -872,6 +950,10 @@ class Renderer3D extends BaseSystem {
     t.texts.end();
     t.debris.end();
     t.bodies.end();
+    this.aimLens(
+      player,
+      this.graphics.postProcessing && this.quality.settings.impactPass
+    );
     this.impact.apply(
       t.impactPass,
       t.width,
@@ -887,8 +969,11 @@ class Renderer3D extends BaseSystem {
     );
 
     t.renderer.info.reset();
+    // The story draws its own scene in the field's place.
+    const drawn = story ? story.scene : t.scene;
+    t.composer.passes[0].scene = drawn;
     if (this.graphics.postProcessing) t.composer.render(dt);
-    else t.renderer.render(t.scene, t.camera);
+    else t.renderer.render(drawn, t.camera);
     t.renderer.autoClear = false;
     t.renderer.render(t.overlay, t.camera);
     t.renderer.autoClear = true;
@@ -932,6 +1017,7 @@ class Renderer3D extends BaseSystem {
   }
 
   // The field's particles, shockwaves and screen flash (fieldMirrors.js).
+
   mirrorEffects(effects) {
     mirrorEffects(this.three, effects, this.impact);
   }
@@ -941,6 +1027,7 @@ class Renderer3D extends BaseSystem {
     const { shield, player: ship } = this.three;
     const state = player?.getShieldState();
     const alive = ship.group.visible && player?.position;
+    shield.setFlicker(this.flashScale === 1);
     shield.update(
       time,
       Boolean(alive && state?.isActive),
@@ -949,6 +1036,36 @@ class Renderer3D extends BaseSystem {
       alive ? player.position.y - HALF_H : 0,
       alive ? ship.shieldRadius : 0
     );
+  }
+
+  // The hull was struck (17/11, efeito/impacto): on the side the blow came
+  // from it throws sparks and molten slag, a rock that rammed it adds chips
+  // and dust, and the plate there glows white-hot and cools to a dark scar.
+  strikeHull(payload) {
+    const t = this.three;
+    const pos = this.cachedPlayer?.position;
+    if (!t || !pos || !t.player.group.visible) return;
+    const from = payload.damageSource;
+    let dx = from ? from.x - pos.x : 0;
+    let dy = from ? from.y - pos.y : 0;
+    if (Math.hypot(dx, dy) < 1e-3) {
+      const threat = this.threatDirection();
+      dx = threat.x;
+      dy = threat.y;
+    }
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-3) return;
+    const reach = t.player.shieldRadius / 1.7;
+    const x = pos.x + (dx / len) * reach * 0.8;
+    const y = pos.y + (dy / len) * reach * 0.8;
+    this.hitSparks.emit(x, y, dx, dy, -dx, -dy, true, SPARK_KIND.metal);
+    if (payload.cause === 'collision') {
+      this.hitSparks.emit(x, y, dx, dy, -dx, -dy, false, SPARK_KIND.rock);
+    }
+    const view = this.shipView || (this.shipView = { id: SHIP_DECAL_ID });
+    view.object = t.player.group;
+    view.reach = reach;
+    t.decals.hit(view, dx, dy, DECAL_KIND.metal);
   }
 
   // Logical direction from the ship to the nearest threat (enemy shot or

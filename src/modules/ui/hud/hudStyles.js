@@ -115,6 +115,8 @@ export function getHudCss() {
             .layer-banner.is-boss .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
             .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
             .layer-banner__sub:empty { display: none; }
+            .layer-banner__note, .boss-intro__note { max-width: min(560px, 80vw); font-family: var(--font-ui); font-size: calc(var(--text-md) * 1.15); font-weight: 500; letter-spacing: 0.02em; text-align: center; text-wrap: balance; color: var(--text); opacity: 0.9; text-shadow: 0 0 12px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.95); }
+            .layer-banner__note:empty, .boss-intro__note:empty { display: none; }
             .layer-banner.is-surge .layer-banner__title { color: var(--danger); text-shadow: 0 0 18px var(--danger), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-surge .layer-banner__line { background: linear-gradient(90deg, transparent, var(--danger) 20%, var(--danger) 80%, transparent); box-shadow: 0 0 12px var(--danger); }
             .layer-banner.is-surge .layer-banner__sub { color: var(--danger); }

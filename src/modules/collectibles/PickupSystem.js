@@ -249,21 +249,12 @@ export class PickupSystem extends BaseSystem {
   // (the Solar Flare's stun; rocks drift on); CombatSystem freezes the shots
   // in flight.
   fireStasis() {
-    const { duration, shockwaveRadius, color } = PICKUP_KINDS.stasis;
+    const { duration } = PICKUP_KINDS.stasis;
     this.enemies.forEachActiveEnemy((enemy) => {
       if (['asteroid', 'boss'].includes(enemy.type) || enemy.intangible) return;
       enemy.stunTimer = Math.max(enemy.stunTimer || 0, duration);
     });
     this.eventBus.emit('stasis-started', { duration });
-    const position = this.player.getPosition();
-    this.effects.createShockwaveEffect({
-      position: { x: position.x, y: position.y },
-      radius: shockwaveRadius,
-      duration: 0.7,
-      baseWidth: 18,
-      color: withAlpha(color, 0.6),
-    });
-    this.effects.addScreenFlash(withAlpha(color, 0.3), 0.3, 0.2);
   }
 
   // A ring of XP orbs round the cache, in reach of the ship that took it.

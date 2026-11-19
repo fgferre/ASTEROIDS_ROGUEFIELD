@@ -28,6 +28,14 @@ varying vec3 vRockVein;
 varying vec3 vRockSeed;
 varying vec3 vRockBase;
 varying vec2 vRockSurface;
+varying vec4 vRockHit;
+varying vec4 vRockHit2;
+varying float vRockHeat;
+varying float vRockTint;
+#define ROCK_TINT vRockTint
+#define ROCK_HIT vRockHit
+#define ROCK_HIT2 vRockHit2
+#define ROCK_HEAT vRockHeat
 #define ROCK_GLOW vRockGlow.x
 #define ROCK_REVEAL vRockGlow.y
 #define ROCK_WIDTH vRockGlow.z
@@ -41,6 +49,13 @@ uniform float uWidth;
 uniform float uFlash;
 uniform vec3 uVein;
 uniform vec3 uSeed;
+uniform vec4 uHit;
+uniform vec4 uHit2;
+uniform float uHeat;
+#define ROCK_TINT 0.0
+#define ROCK_HIT uHit
+#define ROCK_HIT2 uHit2
+#define ROCK_HEAT uHeat
 #define ROCK_GLOW uGlow
 #define ROCK_REVEAL uReveal
 #define ROCK_WIDTH uWidth
@@ -51,6 +66,9 @@ uniform vec3 uSeed;
 uniform float uRim;
 uniform vec3 uRimColor;
 varying vec3 vRockPos;
+#ifdef ROCK_CUT
+varying float vRockCut;
+#endif
 #ifdef ROCK_FOG
 uniform float uFogDim;
 uniform vec2 uFogCenter;
@@ -115,15 +133,24 @@ export function patchRockShader(shader) {
       #endif
       #ifdef ROCK_INSTANCED
       attribute vec4 aGlow;
-      attribute vec3 aVein;
-      attribute vec3 aSeed;
-      attribute vec3 aBase;
-      attribute vec2 aSurface;
+      attribute vec4 aHit;
+      attribute vec4 aHit2;
+      varying vec4 vRockHit;
+      varying vec4 vRockHit2;
+      varying float vRockHeat;
+      attribute vec4 aVein;
+      attribute vec4 aSeed;
+      varying float vRockTint;
+      attribute vec4 aBase;
       varying vec4 vRockGlow;
       varying vec3 vRockVein;
       varying vec3 vRockSeed;
       varying vec3 vRockBase;
       varying vec2 vRockSurface;
+      #endif
+      #ifdef ROCK_CUT
+      attribute float cut;
+      varying float vRockCut;
       #endif
       #ifdef ROCK_NORMAL
       varying vec3 vRockNormal;
@@ -136,12 +163,19 @@ export function patchRockShader(shader) {
       '#include <begin_vertex>',
       `#include <begin_vertex>
       vRockPos = position;
+      #ifdef ROCK_CUT
+      vRockCut = cut;
+      #endif
       #ifdef ROCK_INSTANCED
       vRockGlow = aGlow;
-      vRockVein = aVein;
-      vRockSeed = aSeed;
-      vRockBase = aBase;
-      vRockSurface = aSurface;
+      vRockHit = aHit;
+      vRockHit2 = vec4(aHit2.xyz, aHit.w);
+      vRockHeat = aHit2.w;
+      vRockVein = aVein.rgb;
+      vRockSeed = aSeed.xyz;
+      vRockTint = aSeed.w;
+      vRockBase = aBase.rgb;
+      vRockSurface = vec2(aBase.w, aVein.w);
       #endif
       #ifdef ROCK_NORMAL
       vRockNormal = objectNormal;
@@ -249,16 +283,48 @@ export function patchRockShader(shader) {
         float wall = 1.0 - smoothstep(ROCK_WIDTH * 0.4, ROCK_WIDTH, c.x);
         float fine = 1.0 - smoothstep(0.0, ROCK_WIDTH * 0.5,
           rockCracks(vRockPos * 5.1 + ROCK_SEED.zxy).x);
+        // a rock struck at known points cracks only around them (reach 0:
+        // everywhere), every cell there opening
+        float near = 1.0;
+        if (ROCK_HIT.w > 0.0) {
+          vec3 dir = normalize(vRockPos);
+          near = max(
+            1.0 - smoothstep(ROCK_HIT.w * 0.6, ROCK_HIT.w, distance(dir, ROCK_HIT.xyz)),
+            1.0 - smoothstep(ROCK_HIT2.w * 0.6, ROCK_HIT2.w, distance(dir, ROCK_HIT2.xyz)));
+        }
         float crack = max(wall, fine * 0.7 * step(0.6, ROCK_REVEAL))
-          * step(c.y, ROCK_REVEAL);
+          * step(c.y, max(ROCK_REVEAL, near * 0.85)) * near;
         diffuseColor.rgb *= 1.0 - 0.7 * crack;
         totalEmissiveRadiance += ROCK_VEIN * crack * ROCK_GLOW;
       }
+      #ifdef ROCK_CUT
+      // a fresh cut (rockCut.js): dark stone crossed by lava lines, in the
+      // rock's own vein colour, white where hottest; cools with heat. Only
+      // the lines glow: a face lit whole showed its jagged rim as yellow
+      // paper teeth (the owner chose lines only, 17/11)
+      float cutHeat = vRockCut * ROCK_HEAT;
+      if (cutHeat > 0.001) {
+        float lava = 1.0 - smoothstep(0.0, 0.14,
+          rockCracks(vRockPos * 4.0 + ROCK_SEED.yzx).x);
+        float hot = cutHeat * lava;
+        // the inside of what broke: lava (in its vein colour), a dense core's
+        // cold light, a parasite's blood, molten gold, lit glass
+        vec3 inside = ROCK_VEIN;
+        if (ROCK_TINT > 0.5) inside = vec3(0.3, 0.55, 1.5);
+        if (ROCK_TINT > 1.5) inside = vec3(1.3, 0.03, 0.08);
+        if (ROCK_TINT > 2.5) inside = vec3(1.5, 0.95, 0.2);
+        if (ROCK_TINT > 3.5) inside = vec3(0.65, 1.0, 1.5);
+        totalEmissiveRadiance += inside * 1.1 * smoothstep(0.03, 0.5, hot)
+          + vec3(0.8, 0.5, 0.25) * smoothstep(0.75, 1.0, hot);
+      }
+      #endif
       if (uRim > 0.001) {
         float edge = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
         totalEmissiveRadiance += uRimColor * uRim * pow(edge, 2.2);
       }
-      totalEmissiveRadiance += vec3(ROCK_FLASH);`
+      // a hit only warms the rock a touch: the heat lives where it struck
+      // (scorchDecals.js). 17/11; was a flat white flash, a cut-out.
+      totalEmissiveRadiance += vec3(1.0, 0.4, 0.11) * ROCK_FLASH * 0.06;`
     )
     .replace(
       '#include <tonemapping_fragment>',
@@ -279,6 +345,9 @@ export function rockUniforms(THREE, vein) {
     uFlash: { value: 0 },
     uVein: { value: vein },
     uSeed: { value: new THREE.Vector3() },
+    uHit: { value: new THREE.Vector4() },
+    uHit2: { value: new THREE.Vector4() },
+    uHeat: { value: 0 },
     uRim: { value: 0 },
     uRimColor: { value: colorOf(THREE, CRYSTAL_RIM) },
   };

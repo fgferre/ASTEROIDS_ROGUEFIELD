@@ -71,7 +71,7 @@ export function installDomStubs() {
   globalThis.window = {
     addEventListener: noop,
     removeEventListener: noop,
-    location: { search: '' },
+    location: { search: previous.window?.location?.search ?? '' },
     localStorage: globalThis.localStorage,
   };
   return () => {

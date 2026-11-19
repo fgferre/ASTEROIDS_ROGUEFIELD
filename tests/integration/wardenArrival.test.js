@@ -20,6 +20,7 @@ describe('Warden entrance', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
+    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
       vi.spyOn(console, method).mockImplementation(() => {});
     }

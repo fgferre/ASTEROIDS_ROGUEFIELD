@@ -81,24 +81,23 @@ export const UPGRADE_FAMILY_STEER_PER_CARD = 0.5; // proposta 20/10
 // Pilot levels whose offer holds a weapon card while the run has none: the
 // second is the second chance if the first was turned down.
 export const UPGRADE_WEAPON_OFFER_LEVELS = Object.freeze([3, 7]); // proposta 20/10
+// The new flight (the default; ?direcao=antiga is the old flight): the
+// piloting trail (the Flight Computer's chain) comes only through one slot, at
+// every pilot level divisible by this; it is outside the regular draw and the
+// family counts (provisional, 16/11: without it a quarter of the
+// offers held one and the Flight Computer came in 2 of 100 runs by level 25;
+// with it, Auto Turret around level 2 and the Flight Computer around 18).
+export const UPGRADE_PILOT_OFFER_EVERY = 2;
+// Distinct cards a run holds, the piloting trail aside (the owner's plan,
+// 16/11: a limit that is felt; he raised it from 8 to 10 after playing).
+// New flight only.
+export const UPGRADE_CARD_SLOTS = 10;
 // Per-run level-up rerolls and banishes (proposta 18/10).
 export const PROGRESSION_UPGRADE_REROLLS_PER_RUN = 1;
 export const PROGRESSION_UPGRADE_BANISHES_PER_RUN = 1;
 export const PROGRESSION_COMBO_TIMEOUT = 3.0;
 export const PROGRESSION_COMBO_MULTIPLIER_STEP = 0.1;
 export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;
-
-// === BOSS DIFFICULTY SCALING (Phase 0 — FIX-04) ===
-// Boss damage scalar per cumulative upgrade-level sum (sum of
-// progressionService.appliedUpgrades values). Warden health no longer scales
-// with cards: each Warden has its own `healthFactor` (src/content/bosses/).
-// FIX-04 Task 4 follow-up (2026-05-13): dropped from 0.05 -> 0.00 after live
-// playtest at 0.18 / 0.05 killed the 6-upgrade player. The harness stub didn't
-// model player vulnerability, so the damage bump (1.30x at sum=6) wasn't
-// reflected as a lethality risk. HP scaling alone meets the "boss not melted
-// by 15-upgrade builds" goal; damage scaling can be re-introduced in a later
-// phase if 15-upgrade builds trivialize the boss after HP scaling is in place.
-export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.0;
 
 // Re-export all constants from focused files for backward compatibility
 export * from '../data/constants/physics.js';

@@ -3,7 +3,13 @@
 // The Hangar screen and the Salvage line of the run recaps (docs/NORTE.md §7
 // pillar 7). Markup only; HangarScreen wires the buttons.
 
+import {
+  DIFFICULTY_PRESETS,
+  PRESSURE_RUNGS,
+  pressureNumeral,
+} from '../../data/difficulty.js';
 import { HANGAR_ITEMS } from '../../data/hangar.js';
+import UPGRADE_LIBRARY from '../../data/upgrades/index.js';
 
 export function salvageBalanceText(salvage) {
   return `Salvage ${salvage}`;
@@ -12,15 +18,178 @@ export function salvageBalanceText(salvage) {
 /**
  * The run end's salvage: `amount` ("+120") and the line after it, "salvage ·
  * 340 to spend in the Hangar"; off the Veteran rate it names the difficulty
- * multiplier: "salvage (×1.3 difficulty) · …".
+ * multiplier and names it: "salvage (×1.3 Warden) · …"; medals paid during the run
+ * add "+100 from medals".
  */
 export function salvageLine(award) {
   const multiplier = award?.multiplier ?? 1;
-  const rate = multiplier === 1 ? '' : ` (×${multiplier} difficulty)`;
+  const rate =
+    multiplier === 1
+      ? ''
+      : ` (×${multiplier} ${award?.difficulty ?? 'difficulty'})`;
+  const medals = award?.medals ? ` · +${award.medals} from medals` : '';
   return {
     amount: `+${award?.amount ?? 0}`,
-    text: `salvage${rate} · ${award?.total ?? 0} to spend in the Hangar`,
+    text: `salvage${rate}${medals} · ${award?.total ?? 0} to spend in the Hangar`,
   };
+}
+
+const cardOf = (id) => UPGRADE_LIBRARY.find((card) => card.id === id);
+export const cardName = (id) => cardOf(id)?.text.name ?? id;
+
+/**
+ * One licence: the card's name, "Weapon" or its family and summary, then a
+ * BUY button, the medal that pays it, or an ON / OFF switch once held.
+ */
+export function licenseMarkup(license) {
+  const card = cardOf(license.id);
+  const kind =
+    license.kind === 'weapon'
+      ? 'Weapon'
+      : card?.family
+        ? `${card.family} card`
+        : 'Cursed card';
+  let action;
+  if (license.owned) {
+    action = `<button type="button" class="btn btn--secondary hangar-item__action hangar-license__switch${
+      license.on ? ' is-on' : ''
+    }" data-hangar-license-on="${license.id}" aria-pressed="${license.on}">${license.on ? 'ON' : 'OFF'}</button>`;
+  } else if (license.medal) {
+    action = `<span class="hangar-item__action hangar-item__locked">🏅 ${license.medal}</span>`;
+  } else {
+    action = `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-license-buy="${license.id}"${
+      license.affordable ? '' : ' disabled'
+    }>BUY · ${license.cost}</button>`;
+  }
+  return `<li class="hangar-item${license.owned ? ' is-owned' : ''}" data-hangar-license="${license.id}">
+    <div class="hangar-item__text">
+      <h3 class="hangar-item__name">${cardName(license.id)}</h3>
+      <p class="hangar-item__effect"><span class="hangar-license__kind">${kind}</span> · ${card?.text.summary ?? ''}</p>
+    </div>
+    ${action}</li>`;
+}
+
+/**
+ * Under the control rungs, once a Seal or the Flight School is owned: the
+ * open cards to seal out of the next runs' draw (up to `sealSlots`) and the
+ * piloting card the Flight School launches with.
+ */
+export function launchSetupMarkup({
+  sealSlots,
+  sealed,
+  openCards,
+  flightSchool,
+  schoolCards,
+  startingCard,
+}) {
+  const chip = (attr, id, label, pressed, disabled = false) =>
+    `<button type="button" class="hangar-chip${pressed ? ' is-on' : ''}" ${attr}="${id}" aria-pressed="${pressed}"${
+      disabled ? ' disabled' : ''
+    }>${label}</button>`;
+  const sections = [];
+  if (sealSlots > 0) {
+    const full = sealed.length >= sealSlots;
+    const chips = [...openCards]
+      .map((id) => {
+        const on = sealed.includes(id);
+        return chip('data-hangar-seal', id, cardName(id), on, full && !on);
+      })
+      .join('');
+    sections.push(`<section class="hangar-launch__part">
+      <h3 class="hangar-item__name">Sealed out of the draw · ${sealed.length}/${sealSlots}</h3>
+      <div class="hangar-launch__chips">${chips}</div></section>`);
+  }
+  if (flightSchool) {
+    const chips = [null, ...schoolCards]
+      .map((id) =>
+        chip(
+          'data-hangar-start',
+          id ?? 'none',
+          id ? cardName(id) : 'None',
+          id === startingCard
+        )
+      )
+      .join('');
+    sections.push(`<section class="hangar-launch__part">
+      <h3 class="hangar-item__name">Flight School · launch with</h3>
+      <div class="hangar-launch__chips">${chips}</div></section>`);
+  }
+  return sections.join('');
+}
+
+/** What a medal pays: "+50 Salvage", "License · Arc Lattice", "Opens Pressure · +100 Salvage". */
+export function medalRewardText(reward = {}) {
+  return [
+    ...(reward.opensPressure ? ['Opens Pressure'] : []),
+    ...(reward.license ? [`License · ${cardName(reward.license)}`] : []),
+    ...(reward.salvage ? [`+${reward.salvage} Salvage`] : []),
+  ].join(' · ');
+}
+
+/** One medal on the wall: glyph, title, what to do (with progress), what it pays. */
+export function medalMarkup(medal) {
+  const earned = Boolean(medal.unlockedAt);
+  const progress =
+    !earned && medal.target ? ` · ${medal.progress} / ${medal.target}` : '';
+  const reward = medalRewardText(medal.reward);
+  const key = medal.reward?.opensPressure ? ' is-key' : '';
+  return `<li class="medal ${earned ? 'is-earned' : 'is-locked'}${key}" data-medal="${medal.id}">
+    <span class="achievement-card__glyph medal__glyph" aria-hidden="true">${medal.glyph}</span>
+    <div class="medal__text">
+      <h3 class="medal__title">${medal.title}</h3>
+      <p class="medal__desc">${medal.description}${progress}</p>
+      <p class="medal__reward">${earned ? `✓ ${reward} · paid` : reward}</p>
+    </div></li>`;
+}
+
+const percent = (factor) => `+${Math.round((factor - 1) * 100)}%`;
+
+/**
+ * The Pressure ladder: "Off" (the Settings difficulty), then each rung with
+ * what it does, its Salvage rate and whether it is open and selected.
+ */
+export function pressureLadderMarkup({ open, selected, best }) {
+  const off = `<li class="pressure-rung${selected === 0 ? ' is-selected' : ''}">
+    <button type="button" class="pressure-rung__pick" data-hangar-pressure="0" aria-pressed="${selected === 0}"${
+      open === 0 ? ' disabled' : ''
+    }>
+      <span class="pressure-rung__numeral">—</span>
+      <span class="pressure-rung__text"><span class="pressure-rung__name">Off</span>
+      <span class="pressure-rung__stats">Your difficulty, as chosen in Settings</span></span>
+      <span class="pressure-rung__pay">Salvage ×${DIFFICULTY_PRESETS.pilot.salvage} – ×${DIFFICULTY_PRESETS.warden.salvage}</span>
+    </button></li>`;
+  const rungs = PRESSURE_RUNGS.map((rung, index) => {
+    const n = index + 1;
+    const numeral = pressureNumeral(n);
+    const locked = n > open;
+    const isSelected = n === selected;
+    const stats = locked
+      ? `🔒 ${n === 1 ? 'Win your first run to open' : `Win at Pressure ${pressureNumeral(n - 1)} to open`}`
+      : `Enemy hull ${percent(rung.enemyHp)} · hits ${percent(rung.enemyDamage)} · fields ${percent(rung.spawnCount)}`;
+    const tags = [
+      ...(isSelected ? ['selected'] : []),
+      ...(n <= best ? ['won'] : []),
+    ];
+    return `<li class="pressure-rung${isSelected ? ' is-selected' : ''}${locked ? ' is-locked' : ''}">
+    <button type="button" class="pressure-rung__pick" data-hangar-pressure="${n}" aria-pressed="${isSelected}"${
+      locked ? ' disabled' : ''
+    }>
+      <span class="pressure-rung__numeral">${numeral}</span>
+      <span class="pressure-rung__text"><span class="pressure-rung__name">Pressure ${numeral}${
+        tags.length ? ` · ${tags.join(' · ')}` : ''
+      }</span>
+      <span class="pressure-rung__stats">${stats}</span></span>
+      <span class="pressure-rung__pay">Salvage ×${rung.salvage}</span>
+    </button></li>`;
+  });
+  return [off, ...rungs].join('');
+}
+
+/** The line over the ladder. */
+export function pressureNoteText(open) {
+  return open === 0
+    ? 'Win your first run, a sector of the map or the descent, to open Pressure: rungs above Warden that pay more Salvage.'
+    : 'Rungs above Warden. A chosen rung replaces the Settings difficulty; a run won on the highest open rung opens the next. The Daily Field stays on Veteran.';
 }
 
 const hullPrice = (hullId) =>
@@ -83,13 +252,22 @@ export function hullTraitsMarkup(hull, lock = '') {
   return parts.join(' · ');
 }
 
-/** One upgrade card: name, effect, cost and OWNED or a BUY button. */
+/**
+ * One upgrade card: name, effect, cost and OWNED, a BUY button, or what it
+ * waits for (`lock`: the rung before it, or a medal).
+ */
 export function hangarItemMarkup(item) {
   const action = item.owned
     ? '<span class="hangar-item__action hangar-item__owned" tabindex="-1">OWNED</span>'
-    : `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-buy="${item.id}"${
-        item.affordable ? '' : ' disabled'
-      }>BUY · ${item.cost}</button>`;
+    : item.lock
+      ? `<span class="hangar-item__action hangar-item__locked">🔒 ${
+          item.lock.medal
+            ? `Medal · ${item.lock.medal}`
+            : `After ${item.lock.item}`
+        }</span>`
+      : `<button type="button" class="btn btn--secondary hangar-item__action" data-hangar-buy="${item.id}"${
+          item.affordable ? '' : ' disabled'
+        }>BUY · ${item.cost}</button>`;
   return `<li class="hangar-item${item.owned ? ' is-owned' : ''}" data-hangar-item="${item.id}">
     <div class="hangar-item__text">
       <h3 class="hangar-item__name">${item.name}</h3>

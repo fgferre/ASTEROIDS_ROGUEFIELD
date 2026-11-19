@@ -2,13 +2,15 @@
 //
 // The pause overlay: resume, settings, the HUD editor and quit (quit asks
 // twice, here and on the death screen), the run's build as the run end
-// shows it with the rerolls and banishes left, where the run is and its seed.
+// shows it with the rerolls and banishes left, where the run is and its seed;
+// with the new flight, the run's card slots and piloting trail beside it.
 
 import { collectBuild, endBuildMarkup, runLocationLine } from './runRecap.js';
+import { runTrayMarkup } from './upgradeCard.js';
 
 export class PauseScreen {
   /**
-   * `refs`: the overlay's nodes { resumeBtn, settingsBtn, editHudBtn, exitBtn, location, build, tools, seed }.
+   * `refs`: the overlay's nodes { resumeBtn, settingsBtn, editHudBtn, exitBtn, location, build, tools, seed, run }.
    * `gameOverQuitBtn`: the death recap's Quit, which asks twice too.
    * `emit(name, payload)`: sends ui-hover, toggle-pause, settings-menu-requested, exit-to-menu-requested.
    * `showScreen(name, options)`: shows or hides the pause overlay.
@@ -199,7 +201,8 @@ export class PauseScreen {
   }
 
   // The pause panel: the run end's build block (runRecap.endBuildMarkup),
-  // plus the rerolls and banishes left and where the run is.
+  // plus the rerolls and banishes left and where the run is; the card slots
+  // and the trail in a second column (the panel widens, style.css).
   renderPauseBuild() {
     const refs = this.refs;
     const progression = this.progression();
@@ -215,5 +218,8 @@ export class PauseScreen {
     );
     refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
     refs.seed.textContent = this.difficulty().runLabel();
+    const piloting = progression.pilotCardIds.length > 0;
+    refs.run.classList.toggle('hidden', !piloting);
+    refs.run.innerHTML = piloting ? runTrayMarkup(progression) : '';
   }
 }

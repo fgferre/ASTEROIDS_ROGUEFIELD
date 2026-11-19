@@ -10,11 +10,18 @@ describe('Pause screen', () => {
   afterEach(() => restoreDom());
 
   it('renders the build, tools left, layer and seed from the services', () => {
-    const refs = { build: {}, location: {}, tools: {}, seed: {} };
+    const hidden = new Set();
+    const run = {
+      classList: { toggle: (name, on) => hidden[on ? 'add' : 'delete'](name) },
+    };
+    const refs = { build: {}, location: {}, tools: {}, seed: {}, run };
     const pause = new PauseScreen({
       refs,
       showScreen: () => {},
       progression: () => ({
+        pilotCardIds: [],
+        openCards: null,
+        sealedCards: new Set(),
         rerollsLeft: 2,
         banishesLeft: 1,
         upgradeLookup: new Map(),
@@ -37,6 +44,9 @@ describe('Pause screen', () => {
     expect(refs.location.textContent).toMatch(/^Layer 3 · /);
     expect(refs.tools.textContent).toBe('Rerolls 2 · Banishes 1');
     expect(refs.seed.textContent).toBe('Seed 42 · Veteran');
+    // The old flight has no piloting trail: no card slots column.
+    expect(hidden.has('hidden')).toBe(true);
+    expect(run.innerHTML).toBe('');
   });
 
   it('Escape with the quit armed only disarms it: the game never hears that press', () => {

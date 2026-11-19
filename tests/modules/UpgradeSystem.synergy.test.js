@@ -3,7 +3,10 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
-import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
+import UPGRADE_LIBRARY, {
+  cardsForFlight,
+  pilotCardIds,
+} from '../../src/data/upgrades/index.js';
 import { normalizeUpgradeDefinition } from '../../src/modules/upgradeCatalog.js';
 import { listContent } from '../../src/content/registry.js';
 import {
@@ -40,15 +43,16 @@ function listSourceFiles(dir) {
 }
 
 describe('upgrade families', () => {
-  it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
-    // Every card file plus every weapon's own card, nothing else.
+  it('every upgrade has one known family (cursed and fallback ones none) and every family can reach its bonus', () => {
+    // Every card file plus every weapon's own card, nothing else (the new
+    // flight's own cards are in the catalog by default).
     expect(UPGRADE_LIBRARY).toHaveLength(
       listContent('cards').length +
         listContent('weapons').filter((weapon) => weapon.card).length
     );
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
-      if (upgrade.cursed) {
+      if (upgrade.cursed || upgrade.fallback) {
         expect(upgrade.family).toBeNull();
         return;
       }
@@ -64,8 +68,10 @@ describe('upgrade families', () => {
     const source = listSourceFiles(join(process.cwd(), 'src'))
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
+    // The catalog in play: the new flight's cards are in it by default.
+    const cards = UPGRADE_LIBRARY;
     const effects = [
-      ...UPGRADE_LIBRARY.flatMap((upgrade) =>
+      ...cards.flatMap((upgrade) =>
         upgrade.levels.flatMap((level) => level.effects)
       ),
       ...Object.values(UPGRADE_FAMILIES).flatMap((f) => f.bonus.effects),
@@ -75,11 +81,71 @@ describe('upgrade families', () => {
         .filter((effect) => effect.type === 'event')
         .map((effect) => effect.event)
     );
+    // Salvage Cache's event waits for the hangar's token payout.
+    events.delete('card-salvage');
     events.forEach((event) => {
       expect(source.includes(`registerEventListener('${event}'`), event).toBe(
         true
       );
     });
+  });
+
+  it("the new flight (the default) adds its own cards and reads the glide texts; with ?direcao=antiga the catalog is today's", () => {
+    const ids = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
+    expect(ids(false)).not.toContain('auto_aim');
+    expect(ids(false)).not.toContain('flight_computer');
+    expect(ids(true)).toEqual(
+      expect.arrayContaining(['auto_aim', 'flight_computer'])
+    );
+
+    const braking = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).find(
+        (card) => card.id === 'braking_system'
+      ).text;
+    expect(braking(false)).toBe(
+      listContent('cards').find((card) => card.id === 'braking_system').text
+    );
+    expect(braking(true).name).toBe('Braking System');
+    expect(braking(true).summary).toMatch(/glide/);
+  });
+
+  it('the piloting cards are the Flight Computer and every card on its way; none without the new flight', () => {
+    const pilots = (newFlight) =>
+      pilotCardIds(cardsForFlight(listContent('cards'), newFlight));
+    expect(pilots(false)).toEqual([]);
+    expect([...pilots(true)].sort()).toEqual([
+      'auto_aim',
+      'braking_system',
+      'flight_computer',
+      'propulsors',
+      'rcs_system',
+    ]);
+  });
+});
+
+describe('the piloting trail and the families', () => {
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => cleanupGlobalState());
+
+  it('family counts ignore the piloting cards', () => {
+    const progression = createProgression(createEventBusMock());
+    progression.pilotCardIds = ['magfield'];
+    progression.appliedUpgrades.set('magfield', 1);
+    const family = progression.upgradeLookup.get('magfield').family;
+    expect(progression.getFamilyCounts()[family]).toBe(0);
+    progression.pilotCardIds = [];
+    expect(progression.getFamilyCounts()[family]).toBe(1);
+  });
+
+  it('the new kinetic cards exist only with the new flight', () => {
+    const ids = (newFlight) =>
+      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
+    expect(ids(false)).not.toContain('momentum_rounds');
+    expect(ids(false)).not.toContain('close_quarters');
+    expect(ids(true)).toEqual(
+      expect.arrayContaining(['momentum_rounds', 'close_quarters'])
+    );
   });
 });
 

@@ -15,6 +15,7 @@ import { RunEnd } from './session/runEnd.js';
 import { HeadStart } from './session/headStart.js';
 import { RetryCountdown } from './session/retryCountdown.js';
 import { MenuButtons } from './session/menuButtons.js';
+import { playRemoteLink, remoteLinkLines } from '../modules/ui/remoteLink.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -149,6 +150,13 @@ export default class GameSessionService {
       requestRetry: (options) => this.requestRetry(options),
       exitToMenu: (payload) => this.exitToMenu(payload),
       continueBeyondVictory: () => this.continueBeyondVictory(),
+      linkIn: (options, start, button) =>
+        playRemoteLink({
+          lines: remoteLinkLines(options, this.resolveHullDefinition()?.name),
+          button,
+          onConnect: start,
+          eventBus: this.eventBus,
+        }),
     });
 
     if (
@@ -595,7 +603,9 @@ export default class GameSessionService {
     }
 
     this.applyConfiguredPlayerHull();
+    // A carried build already holds its starting card.
     if (build) this.snapshots.restoreBuild(build);
+    else this.resolveServiceInstance('progression').applyStartingCard();
     this._suppressWaveKickoff = false;
 
     // A head start holds the first layer until its picks are made; a carried

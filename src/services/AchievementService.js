@@ -5,6 +5,7 @@ import { HANGAR_ITEMS } from '../data/hangar.js';
 import { BASTION_HULL_ID } from '../data/shipModels.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { loadJSON, saveJSON } from '../core/storage.js';
+import { loadRecords } from './runRecords.js';
 
 export const ACHIEVEMENTS_STORAGE_KEY = 'roguefield:achievements:v1';
 
@@ -29,6 +30,9 @@ const HULL_ITEM_IDS = HANGAR_ITEMS.filter((item) => item.unlocksHull).map(
   (item) => item.id
 );
 const DEEP_FIELD_LAYER = 20;
+// Medals only a won run gives: a save holding one, or a sector won or an
+// ending reached in the records, already has its First Victory.
+const VICTORY_ACHIEVEMENTS = ['null-and-void', 'cursed-run', 'iron-escort'];
 
 /**
  * Local achievements: `unlocked[id] = isoDate`, `progress[id] = n` for the
@@ -46,6 +50,7 @@ export default class AchievementService {
     this.hullClean = true;
     this.cursedHeld = false;
     this.bossRush = false;
+    this.grantPastVictory();
 
     eventBus.on('game-started', () => {
       this.cursedHeld = false;
@@ -80,6 +85,7 @@ export default class AchievementService {
     // Winning the descent: a sector run wins only its chapter (Null's own
     // achievement still comes from its death, on 'boss-defeated').
     eventBus.on('run-won', (payload = {}) => {
+      if (!this.bossRush) this.unlock('first-victory');
       if (payload.sector) return;
       this.unlock('null-and-void');
       if (this.cursedHeld) this.unlock('cursed-run');
@@ -104,6 +110,22 @@ export default class AchievementService {
       if (CURSED_UPGRADES.has(payload.upgradeId)) this.cursedHeld = true;
       if (payload.familyComplete) this.unlock('full-set');
     });
+  }
+
+  /**
+   * A save from before the First Victory medal that already won a run gets
+   * it on load, quietly: the Hangar pays it with the others it finds.
+   */
+  grantPastVictory() {
+    if (this.unlocked['first-victory']) return;
+    const records = loadRecords();
+    const won =
+      records.sectorsWon.length > 0 ||
+      records.endings.length > 0 ||
+      VICTORY_ACHIEVEMENTS.some((id) => this.unlocked[id]);
+    if (!won) return;
+    this.unlocked['first-victory'] = new Date().toISOString();
+    this.persist();
   }
 
   /** Adds one to a countable achievement; unlocks it at its target. */

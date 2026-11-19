@@ -10,7 +10,9 @@
 // point light and a ribbon trail. Dash afterimages, the invulnerability
 // blink and the shield impact flash mirror the 2D PlayerSystem render. In
 // the modern scheme the dorsal turret turns on its own to the simulation's
-// turret heading; its barrel tips sit on the sim's muzzle point. With
+// turret heading; its barrel tips sit on the sim's muzzle point. With the
+// cannon on the nose (the new flight) a short cannon set into the nose tip
+// stands in for it, its muzzle on the sim's too. With
 // multi-lock (Targeting Matrix rank 3) thin layers stack on its axis, one per
 // lock past the primary, each turned to its own sim heading.
 
@@ -28,6 +30,7 @@ import {
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { getHullThrusterPort } from '../player/hullShape.js';
 import { bakeHullMaps } from './bakedMaps.js';
+import { DissolvePool } from './dissolve.js';
 import {
   CANOPY_GLASS,
   HULL_FINISHES,
@@ -39,6 +42,7 @@ import {
   buildTurretLayer,
   edgeLines,
   hullTones,
+  seatNoseGun,
   seatTurret,
   throatGeometry,
 } from './hullModel.js';
@@ -47,6 +51,10 @@ import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
+// proposta 17/11 (efeito/impacto): the ship's death breaks it into SHIP_PIECES
+// of its own build, thrown as a machine of SHIP_BREAK_RADIUS would be.
+const SHIP_PIECES = 14;
+const SHIP_BREAK_RADIUS = 18;
 // Banking (PLAN.md R5.9, proposta 18/10): roll into the modern strafe (the
 // nose swinging onto the move) and the yaw rate, eased with a time constant so it saturates and relaxes smoothly.
 // Both come from the simulation (input, angular velocity), never from the
@@ -106,11 +114,18 @@ const NOSE_PUFF = 0.8;
 const RCS_HOLD_S = 0.05; // a lit needle stays at least this long
 const RCS_FADE_S = 0.03; // then drops out this fast
 const RCS_SNAP_S = 0.09; // level 5: the bright snap at the port on ignition
+// Without the card the needle is 2.5 times today's level-0 length and a
+// little brighter (the owner's pick 16/11, glide turns lasted unseen); the
+// levels never draw it shorter.
+const RCS_MIN_LENGTH = 11.25;
+const RCS_GLOW = 1.3;
 // A brake at the front: a pair of retro flames blowing forward from the
 // nose, lit by the retro (reversal, coast brake), stronger and wider per
 // Braking System level; at 3 the emergency brake flares a hard forward fan.
 const RETRO_FLARE_S = 0.4;
-const FLARE_RAYS = [60, 42, 26]; // the fan's reach, middle ray out (field units)
+// The fan and the flames stop growing at 2 (the owner's pick 16/11: the
+// level-3 brake drew too big; the fan is 0.55 of its first size).
+const FLARE_RAYS = [33, 23, 14.3]; // the fan's reach, middle ray out (field units)
 const TURN_KEYS = ['turnL', 'turnR'];
 // Each shot pushes the hull back along the nose for the muzzle frames.
 const RECOIL_DIP = 2;
@@ -231,6 +246,12 @@ export class PlayerMirror {
     this.ship = new THREE.Group();
     this.group.add(this.ship);
     scene.add(this.group);
+    // the ship's death: its own burn (startBreak)
+    this.burn = new DissolvePool(THREE, seeded, () => this.endBreak());
+    this.breakView = { object: this.group, seed: 7, radius: SHIP_BREAK_RADIUS };
+    this.breakHidden = [];
+    this.breaking = false;
+    this.wasDead = false;
 
     // One material per finish (HULL_FINISHES: satin paint, glossy accents,
     // polished steel); the tones ride in the vertex colours, the paint and
@@ -267,6 +288,7 @@ export class PlayerMirror {
     this.hullMaps = maps;
     this.surfaceMaps = true;
     this.blink = blink;
+    this.blinkHeldUntil = -Infinity;
     const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
     this.canopyMaterial = addRimLight(
       new THREE.MeshStandardMaterial({
@@ -387,6 +409,9 @@ export class PlayerMirror {
       turnL: { amount: 0, hold: 0, snap: 0, material: tinted() },
       turnR: { amount: 0, hold: 0, snap: 0, material: tinted() },
     };
+    TURN_KEYS.forEach((k) =>
+      this.rcsJets[k].material.color.setScalar(RCS_GLOW)
+    );
     this.snapMaterial = tinted();
     this.retroMaterial = tinted();
     this.flareMaterial = tinted();
@@ -449,6 +474,11 @@ export class PlayerMirror {
     ALL_HULLS.forEach((hull) => {
       this.seeded(() => this.rebuild(player, hull, levels));
       compile();
+      // and as it breaks (the death's twins)
+      this.startBreak(player);
+      compile();
+      this.burn.clear();
+      this.group.visible = true;
     });
     this.hullKey = null;
   }
@@ -493,7 +523,8 @@ export class PlayerMirror {
       this.hullCache.set(key, model);
     }
     const built = this.hullCache.get(key);
-    seatTurret(this.turretParts, hull.visual, built);
+    this.built = built;
+    this.seatGun(player.noseAim, hull);
 
     const lines = {
       edge: this.edgeMaterial,
@@ -572,7 +603,62 @@ export class PlayerMirror {
   }
 
   /** Mirrors the player; feeds its thruster trail into `ribbons`. */
-  update(player, ribbons, time) {
+  /** No hurt blink until `time` s: the shield took the hit whole. */
+  holdBlink(time) {
+    this.blinkHeldUntil = time;
+  }
+
+  /**
+   * The ship's death (docs/NORTE.md: every hit is physical): its solid parts
+   * come apart into the pieces of its own build and burn away (the machines'
+   * break, dissolve.js), carried by its momentum; its flames, glows and light
+   * go out at once.
+   */
+  startBreak(player) {
+    this.breaking = true;
+    this.light.intensity = 0;
+    this.blink.value = 0;
+    this.flareFan.visible = false;
+    this.hideGhosts();
+    this.group.traverse((node) => {
+      if (!node.isMesh) return;
+      node.castShadow = false;
+      const material = [].concat(node.material)[0];
+      const solid = material?.isMeshStandardMaterial && !material.transparent;
+      if (solid || !node.visible) return;
+      node.visible = false;
+      this.breakHidden.push(node);
+    });
+    const v = player.velocity || {};
+    this.burn.start(this.breakView, this.accent, SHIP_BREAK_RADIUS, {
+      count: SHIP_PIECES,
+      pushX: v.vx || 0,
+      pushZ: v.vy || 0,
+    });
+  }
+
+  // The burn's end (or a new run during it): the glows come back for the
+  // next ship.
+  endBreak() {
+    this.breaking = false;
+    this.breakHidden.forEach((node) => (node.visible = true));
+    this.breakHidden.length = 0;
+  }
+
+  /** `worldDt`: the world's step in s (slow motion included), for the death's break. */
+  update(player, ribbons, time, worldDt = 0) {
+    const dead = Boolean(player?.isDead);
+    if (dead && !this.wasDead && this.group.visible && !this.breaking) {
+      this.startBreak(player);
+    }
+    this.wasDead = dead;
+    if (this.breaking) {
+      if (dead) {
+        this.burn.update(worldDt);
+        return;
+      }
+      this.burn.clear();
+    }
     const hidden =
       !player ||
       player.isDead ||
@@ -604,7 +690,11 @@ export class PlayerMirror {
     this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
     this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
     this.turret.rotation.y = -(player.turretAngle - angle);
-    this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
+    if (player.noseAim !== this.noseGun) {
+      this.seatGun(player.noseAim, player.currentHull);
+    }
+    this.barrels.position.x =
+      this.barrelsX + (this.muzzleFrames > 0 ? -TURRET_RECOIL : 0);
     this.updateLayers(player.turretLayers, angle);
 
     const main = thrust.main || 0;
@@ -620,13 +710,16 @@ export class PlayerMirror {
     this.lightRetros(player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
-    // Blink while invulnerable after a hit; the dash's own i-frames and the
-    // win's steady guard do not.
+    // Blink while invulnerable after a hit; the dash's own i-frames, the
+    // win's steady guard and a hit the shield took whole (holdBlink) do not.
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
     else if (!invulnerable) this.dashGuard = false;
     this.blink.value =
-      invulnerable && !this.dashGuard && !player.steadyGuard
+      invulnerable &&
+      !this.dashGuard &&
+      !player.steadyGuard &&
+      time >= this.blinkHeldUntil
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
     const dashShield = invulnerable && this.dashGuard;
@@ -787,6 +880,17 @@ export class PlayerMirror {
     }
   }
 
+  // The turret seated on the current hull or, with the cannon on the nose
+  // (`nose`, the sim's noseAim), the nose cannon set into the hull's nose
+  // with its muzzle on the sim's; seated again whenever the aim moves.
+  seatGun(nose, hull) {
+    seatTurret(this.turretParts, hull.visual, this.built);
+    this.barrelsX = nose
+      ? seatNoseGun(this.turretParts, this.built, hull.noseMuzzle)
+      : 0;
+    this.noseGun = nose;
+  }
+
   // One layer per sim heading (PlayerSystem turretLayers), turned like the
   // turret; the rest hide.
   updateLayers(headings, angle) {
@@ -890,7 +994,7 @@ export class PlayerMirror {
       puff: make(jet.material, 0),
       size,
       turnL,
-      length: (4.5 + 2.2 * level) * size,
+      length: Math.max(RCS_MIN_LENGTH, 4.5 + 2.2 * level) * size,
       radius: (0.7 - 0.06 * level) * size,
       twin: level >= 3 ? make(jet.material, 1.8 * inboard * size) : null,
       snap: level >= 5 ? make(this.snapMaterial, 0) : null,
@@ -965,8 +1069,8 @@ export class PlayerMirror {
       this.ship.add(mesh);
       this.retros.push({ mesh, length, radius });
     };
-    const length = 6 + 3 * level;
-    const radius = 0.7 + 0.15 * level;
+    const length = 6 + 3 * Math.min(level, 2);
+    const radius = 0.7 + 0.15 * Math.min(level, 2);
     const splay = ((10 + 5 * level) * Math.PI) / 180;
     ['noseLeft', 'noseRight'].forEach((kind) => {
       const { x, y } = getHullThrusterPort(kind, hull);
@@ -1016,7 +1120,7 @@ export class PlayerMirror {
     const rays = this.flareFan.children;
     for (let i = 0; i < rays.length; i += 1) {
       const reach = FLARE_RAYS[rays[i].userData.ray];
-      const width = 3 - 0.6 * rays[i].userData.ray;
+      const width = 1.65 - 0.33 * rays[i].userData.ray;
       rays[i].scale.set(reach * (0.35 + 0.65 * out), width, width);
     }
     this.flareMaterial.opacity = f ** 0.8;

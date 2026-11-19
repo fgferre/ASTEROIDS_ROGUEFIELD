@@ -333,11 +333,12 @@ export function createServiceManifest(context = {}) {
       name: 'hangar',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'difficulty'],
+      dependencies: ['event-bus', 'difficulty', 'achievements'],
       factory: ({ resolved }) =>
         new HangarService({
           eventBus: resolved['event-bus'],
           difficulty: resolved['difficulty'],
+          achievements: resolved['achievements'],
         }),
     },
     {

@@ -6,12 +6,14 @@ import { HullArt } from './player/hullArt.js';
 import { computeHullMetrics, getHullThrusterPort } from './player/hullShape.js';
 import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
+import { newFlightFromUrl } from './player/newFlight.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
+  GLIDE_SPEED_SCALE,
   SHIP_ACCELERATION,
   SHIP_ANGULAR_DAMPING,
   SHIP_LINEAR_DAMPING,
@@ -34,6 +36,10 @@ import {
 // on its own in both. Settings → Controls → Hull Control, or ?controls=classic.
 
 // 'classic' for `?controls=classic`, else null.
+// Momentum Rounds: the share of the top speed that switches it on (proposta
+// 16/11).
+const MOMENTUM_SPEED_FRACTION = 0.6;
+
 function controlSchemeFromUrl() {
   try {
     const value = new URLSearchParams(window.location.search).get('controls');
@@ -42,6 +48,27 @@ function controlSchemeFromUrl() {
     // no window (Node tests)
   }
   return null;
+}
+
+// Glide flight for `?flight=glide` (proposta 16/11, the owner judges by playing).
+function glideFromUrl() {
+  try {
+    return (
+      new URLSearchParams(window.location.search).get('flight') === 'glide'
+    );
+  } catch {
+    return false; // no window (Node tests)
+  }
+}
+
+// Nose aim for `?aim=nose` (proposta 16/11): the cannon fixed on the nose,
+// aimed by turning the hull; CombatSystem holds the manual aim mode for it.
+function noseAimFromUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('aim') === 'nose';
+  } catch {
+    return false; // no window (Node tests)
+  }
 }
 
 /** The scheme to fly: the URL flag wins over the Hull Control setting. */
@@ -101,6 +128,10 @@ class PlayerSystem extends BaseSystem {
           'controls'
         )?.hullControl
       );
+    this.noseAim = noseAimFromUrl();
+    // The new flight (the default; ?direcao=antiga is the old flight): each run starts classic, gliding, aimed
+    // by the nose; cards lift each of the three (beginNewFlight).
+    this.newFlight = config?.newFlight ?? newFlightFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
     // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
@@ -147,7 +178,12 @@ class PlayerSystem extends BaseSystem {
       'dashRammed',
       'dashContactDamage',
     ]);
-    this.flight = new PlayerFlight({ ship, maneuvers: this.maneuvers });
+    this.flight = new PlayerFlight({
+      ship,
+      maneuvers: this.maneuvers,
+      glide: glideFromUrl(),
+    });
+    if (this.newFlight) this.beginNewFlight();
     exposeFields(this, this.flight, [
       'driftFactor',
       'maxSpeed',
@@ -239,9 +275,23 @@ class PlayerSystem extends BaseSystem {
 
     // Hull Control applies live, mid-run too.
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.controlScheme = resolveControlScheme(payload.values.hullControl);
+      // The new flight's scheme is the cards' (beginNewFlight), not the setting's.
+      if (payload?.values && !this.newFlight) {
+        this.setFlightScheme(
+          resolveControlScheme(payload.values.hullControl),
+          this.flight.glide
+        );
       }
+    });
+
+    // The new flight's cards: the turret turns on its own (CombatSystem goes
+    // back to auto aim on the same event)...
+    this.registerEventListener('upgrade-auto-aim', () => {
+      this.noseAim = false;
+    });
+    // ...and, once the pilot has read the briefing (UISystem), today's flight.
+    this.registerEventListener('modern-flight-engaged', () => {
+      this.setFlightScheme('modern', false);
     });
 
     this.registerEventListener('upgrade-damage-boost', (data) => {
@@ -324,6 +374,16 @@ class PlayerSystem extends BaseSystem {
     this.registerEventListener('upgrade-reactor-bleed', (data) => {
       this.idleDamageMultiplier = data.idleDamageMultiplier;
     });
+    // Momentum Rounds: damage while at 60% of the top speed flown right now.
+    this.registerEventListener('upgrade-momentum-rounds', (data) => {
+      this.speedDamageMultiplier = data.speedDamageMultiplier;
+    });
+    // Close Quarters: CombatSystem scans for enemies within `radius` once per
+    // frame and scales the stats it hands the weapons.
+    this.registerEventListener('upgrade-close-quarters', (data) => {
+      this.closeDamageMultiplier = data.closeDamageMultiplier;
+      this.closeRadius = data.radius;
+    });
     this.registerEventListener('upgrade-idle-guard', (data) => {
       this.idleDamageReduction = data.damageReduction;
     });
@@ -336,6 +396,10 @@ class PlayerSystem extends BaseSystem {
     });
     this.registerEventListener('upgrade-boss-repair', (data) => {
       this.bossRepairFraction = data.fraction;
+    });
+    // Hull Patch: an instant repair of a fraction of the max hull.
+    this.registerEventListener('upgrade-hull-repair', (data) => {
+      this.heal(this.maxHealth * data.fraction);
     });
     this.registerEventListener('player-leveled-up', () => {
       if (this.levelUpRepair > 0) this.heal(this.levelUpRepair);
@@ -426,9 +490,12 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
-          // ...and a small kick to the hull, the same path as the dash.
-          this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
-          this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
+          // ...and a small kick to the hull, the same path as the dash;
+          // none in glide, where nothing would bleed it off.
+          if (!this.flight.glide) {
+            this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
+            this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
+          }
         }
       }
     });
@@ -535,7 +602,7 @@ class PlayerSystem extends BaseSystem {
 
   /** The held right-stick aim direction for this step, or null (auto). */
   getAimStick() {
-    return this.aimStick;
+    return this.noseAim ? null : this.aimStick;
   }
 
   // Both schemes: the turret turns along the right stick while it is held,
@@ -548,7 +615,9 @@ class PlayerSystem extends BaseSystem {
       : this.aimPoint
         ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
         : this.angle;
-    this.turretAngle = this.turnTurret(this.turretAngle, goal, deltaTime);
+    this.turretAngle = this.noseAim
+      ? this.angle
+      : this.turnTurret(this.turretAngle, goal, deltaTime);
     // Each extra layer turns onto its own lock the same way; without one it
     // follows the turret.
     for (let i = 0; i < this.turretLayers.length; i += 1) {
@@ -695,9 +764,14 @@ class PlayerSystem extends BaseSystem {
   /**
    * World point lances and the beam leave from: the turret's barrel tip.
    * With `toward` (multi-lock), the tip of the turret layer aimed at that
-   * point, wherever the layer has turned so far.
+   * point, wherever the layer has turned so far. With the cannon on the nose
+   * (noseAim), the nose cannon's muzzle (the hull's `noseMuzzle`).
    */
   getMuzzlePoint(toward = null) {
+    if (this.noseAim) {
+      const hull = this.currentHull ?? shipModels.defaultHull;
+      return this.getLocalToWorld(hull.noseMuzzle, 0);
+    }
     const pivot = this.getTurretPivot();
     const angle = toward
       ? Math.atan2(toward.y - pivot.y, toward.x - pivot.x)
@@ -804,10 +878,12 @@ class PlayerSystem extends BaseSystem {
       health: this.health,
       maxHealth: this.maxHealth,
       maxHP: this.maxHealth, // Alias for consistency
-      // Reactor Bleed: harder shots while the engines are idle.
-      damage: this.enginesIdle
-        ? this.damage * this.idleDamageMultiplier
-        : this.damage,
+      // Reactor Bleed: harder shots while the engines are idle; Momentum
+      // Rounds: while fast.
+      damage:
+        (this.enginesIdle
+          ? this.damage * this.idleDamageMultiplier
+          : this.damage) * this.momentumDamageFactor(),
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
       shieldLevel: this.shield.shieldUpgradeLevel,
@@ -815,6 +891,19 @@ class PlayerSystem extends BaseSystem {
       shieldCooldown: this.shield.shieldMaxCooldown,
       recoilOffset: this.recoilOffset, // Expose recoil for rendering
     };
+  }
+
+  // Momentum Rounds: the card's multiplier while the ship's speed is at least
+  // MOMENTUM_SPEED_FRACTION of the top speed it flies under now (glide's is
+  // lower), else 1.
+  momentumDamageFactor() {
+    if (this.speedDamageMultiplier === 1) return 1;
+    const topSpeed =
+      this.flight.maxSpeed * (this.flight.glide ? GLIDE_SPEED_SCALE : 1);
+    const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
+    return speed >= topSpeed * MOMENTUM_SPEED_FRACTION
+      ? this.speedDamageMultiplier
+      : 1;
   }
 
   // === SETTERS (para reset, teleport, etc.) ===
@@ -893,10 +982,26 @@ class PlayerSystem extends BaseSystem {
   // What the hull and shot cards above change, back to none.
   resetCardStats() {
     this.idleDamageMultiplier = 1;
+    this.speedDamageMultiplier = 1;
+    this.closeDamageMultiplier = 1;
+    this.closeRadius = 0;
     this.idleDamageReduction = 0;
     this.hullArmor = 0;
     this.levelUpRepair = 0;
     this.bossRepairFraction = 0;
+  }
+
+  /** The new flight's start: classic, gliding, the cannon on the nose. */
+  beginNewFlight() {
+    this.noseAim = true;
+    this.setFlightScheme('classic', true);
+  }
+
+  /** The scheme and glide the cards set; the HUD's key hints follow. */
+  setFlightScheme(scheme, glide) {
+    this.controlScheme = scheme;
+    this.flight.glide = glide;
+    this.eventBus?.emit?.('control-scheme-changed', { scheme });
   }
 
   reset() {
@@ -925,6 +1030,7 @@ class PlayerSystem extends BaseSystem {
     this.lastDamageSource = null;
     this.isDead = false;
     this.isRetrying = false;
+    if (this.newFlight) this.beginNewFlight();
   }
 
   markDead() {

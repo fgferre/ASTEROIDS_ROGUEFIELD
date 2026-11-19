@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import UPGRADE_LIBRARY from '../../../src/data/upgrades/index.js';
+import UPGRADE_LIBRARY, {
+  pilotCardIds,
+  trailSteps,
+} from '../../../src/data/upgrades/index.js';
 import { UPGRADE_FAMILIES } from '../../../src/data/upgrades/families.js';
 import {
   buildLine,
   cardMarkup,
+  cardState,
   familyColor,
+  runTrayMarkup,
 } from '../../../src/modules/ui/upgradeCard.js';
 
 const card = (id) => UPGRADE_LIBRARY.find((entry) => entry.id === id);
@@ -63,6 +68,7 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
+    // Railshot widens the Scatter's own flak bursts.
     expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
   });
 
@@ -81,6 +87,55 @@ describe('upgrade card build line', () => {
       'the ship vanishes',
     ]);
     expect(line('heat_sink', 1, 3).steps.map(({ at }) => at)).toEqual([5]);
+  });
+
+  it('a family form that does nothing for the weapon in hand says so', () => {
+    const held = (weaponId) => ({ weaponId, chip: weaponId });
+    const what = (id, owned, weaponId) =>
+      buildLine(card(id), { rank: 1, owned, weapon: held(weaponId) }).steps.map(
+        (step) => step.what
+      );
+    // The Arc Caster carries it too: its own wording.
+    expect(what('multishot', 0, 'arc-caster')).toEqual([
+      'jumps keep 90% of their strength',
+      'jumps keep full strength, casts hit 25% harder',
+    ]);
+    // The Shard Halo carries it too: its own wording.
+    expect(what('multishot', 0, 'shard-halo')).toEqual([
+      'cuts hit 10% harder and shove enemies off the hull',
+      'cuts hit 25% harder, shoved three times as far',
+    ]);
+    // The Furnace Corona carries the family: its own wording.
+    expect(what('multishot', 0, 'furnace-corona')).toEqual([
+      'pulses hit 15% harder and throw further',
+      'pulses hit 30% harder and throw twice as far',
+    ]);
+    // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
+    expect(what('multishot', 0, 'scatter')).toEqual([
+      'flak bursts 30% wider',
+      'flak bursts 60% wider, bolts 25% harder',
+    ]);
+    // Its own family evolves the weapon itself.
+    expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
+      'every 3rd pulse is a nova'
+    );
+    // The Seeker Swarm's missiles burst: its own kinetic wording.
+    expect(what('multishot', 0, 'seeker-swarm')).toEqual([
+      'missile bursts 50% wider',
+      'missile bursts twice as wide, missiles 25% harder',
+    ]);
+  });
+
+  it('the card face reads the text for the weapon in hand', () => {
+    const face = (weaponId) =>
+      cardMarkup(
+        card('multishot'),
+        { rank: 1, owned: 0 },
+        { weapon: { weaponId, chip: weaponId } }
+      );
+    expect(face('lance')).toContain('Fires one additional projectile');
+    expect(face('furnace-corona')).toContain('The ring reaches');
+    expect(face('furnace-corona')).not.toContain('projectile');
   });
 
   it('a cursed card has no family to build', () => {
@@ -130,5 +185,136 @@ describe('upgrade card build line', () => {
     expect(assist['--rarity-rare']).toBeTruthy();
     expect(assist['--rarity-cursed']).toBeTruthy();
     expect(assist['--rarity-rare']).not.toBe(assist['--rarity-cursed']);
+  });
+});
+
+describe('card slots and piloting trail', () => {
+  // The new flight's catalog, with `held` cards at their ranks.
+  const run = (held, openCards = null) => {
+    const applied = new Map(Object.entries(held));
+    const pilot = pilotCardIds(UPGRADE_LIBRARY);
+    const ids = [...applied.keys()].filter((id) => !pilot.includes(id));
+    return {
+      upgradeLookup: new Map(UPGRADE_LIBRARY.map((entry) => [entry.id, entry])),
+      pilotCardIds: pilot,
+      trailSteps: trailSteps(UPGRADE_LIBRARY),
+      getUpgradeCount: (id) => applied.get(id) ?? 0,
+      getFamilyCounts: () => ({}),
+      openCards,
+      sealedCards: new Set(),
+      isOutOfContract: ({ id }) =>
+        !pilot.includes(id) && openCards !== null && !openCards.has(id),
+      getCardSlots: () => ({ used: ids.length, max: 8, ids }),
+    };
+  };
+  const build = {
+    plasma: 2,
+    multishot: 1,
+    heat_sink: 1,
+    shield: 1,
+    scatter_coil: 1,
+    propulsors: 1,
+    braking_system: 2,
+  };
+  const count = (html, name) => html.split(name).length - 1;
+
+  it('counts the held cards outside the trail, the weapon card first', () => {
+    const html = runTrayMarkup(run(build));
+    expect(html).toContain('5<small>/8</small>');
+    expect(html.indexOf('is-weapon')).toBeLessThan(html.indexOf('<em>2</em>'));
+    expect(count(html, 'run-slot is-empty')).toBe(3);
+    expect(html).not.toContain('Full · upgrades only');
+  });
+
+  it('a new card shows as a ghost in the next free slot; a trail or fallback card does not', () => {
+    const progression = run(build);
+    expect(runTrayMarkup(progression, { ghost: 'magfield' })).toContain(
+      'is-ghost'
+    );
+    ['braking_system', 'hull_patch', 'plasma'].forEach((ghost) =>
+      expect(runTrayMarkup(progression, { ghost })).not.toContain('is-ghost')
+    );
+  });
+
+  it('full at eight: amber count, the tag, and no ghost', () => {
+    const full = { ...build, magfield: 1, cinder_trail: 1, static_shell: 1 };
+    const html = runTrayMarkup(run(full), { ghost: 'wide_net' });
+    expect(html).toContain('is-full');
+    expect(html).toContain('Full · upgrades only');
+    expect(html).not.toContain('is-ghost');
+  });
+
+  it('the trail counts its steps and rings the one an offered card brings', () => {
+    const progression = run(build);
+    const html = runTrayMarkup(progression, { offered: ['braking_system'] });
+    expect(html).toContain('3<small>/9</small>');
+    expect(html).toContain('Brakes 2/3');
+    expect(count(html, 'trail-map__ring')).toBe(1);
+    const state = cardState(progression, 'braking_system');
+    expect(state.trail).toEqual({ step: 4, total: 9 });
+    expect(cardMarkup(state.definition, state, { weapon: lance })).toContain(
+      'Trail · step 4 of 9'
+    );
+    expect(cardState(progression, 'plasma').trail).toBeNull();
+  });
+});
+
+describe('honest text about the hangar and the trail', () => {
+  const pilot = pilotCardIds(UPGRADE_LIBRARY);
+  const fourPerFamily = new Set(
+    [
+      'plasma',
+      'heat_sink',
+      'afterburn_lance',
+      'cinder_trail',
+      'multishot',
+    ].concat(['ballast_rounds', 'recoil_dampers', 'momentum_rounds'])
+  );
+  const run = (openCards) => ({
+    upgradeLookup: new Map(UPGRADE_LIBRARY.map((entry) => [entry.id, entry])),
+    pilotCardIds: pilot,
+    trailSteps: trailSteps(UPGRADE_LIBRARY),
+    getUpgradeCount: () => 0,
+    getFamilyCounts: () => ({}),
+    openCards,
+    sealedCards: new Set(),
+    isOutOfContract: ({ id }) =>
+      !pilot.includes(id) && openCards !== null && !openCards.has(id),
+  });
+  const offer = (progression, id) => {
+    const state = cardState(progression, id);
+    return cardMarkup(state.definition, state, { weapon: lance });
+  };
+
+  it('a family with only four open cards says its 5th opens in the hangar', () => {
+    expect(offer(run(fourPerFamily), 'heat_sink')).toContain(
+      '5th card in the hangar'
+    );
+  });
+
+  it('with every card open the path says nothing of the hangar', () => {
+    expect(offer(run(null), 'heat_sink')).not.toContain('hangar');
+  });
+
+  it('a piloting-trail card shows no family tag; a regular card keeps it', () => {
+    const progression = run(null);
+    const trailCard = offer(progression, 'braking_system');
+    expect(trailCard).not.toContain('Kinetic');
+    expect(trailCard).toContain('New');
+    expect(offer(progression, 'multishot')).toContain('Kinetic');
+  });
+});
+
+describe('upgrade card icons', () => {
+  it('the kinetic cards draw their own icon, not the family glyph', () => {
+    for (const id of ['momentum_rounds', 'close_quarters']) {
+      const html = cardMarkup(
+        card(id),
+        { rank: 1, owned: 0 },
+        { weapon: lance }
+      );
+      expect(html).toContain('class="card__icon"');
+      expect(html).not.toContain('translate(5 5)');
+    }
   });
 });

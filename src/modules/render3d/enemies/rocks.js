@@ -1,6 +1,6 @@
 // Rock views: the Ring's fragments, drawn instanced (rockInstances.js) as
 // procedural rocks whose cracks light up with damage; each asteroid
-// variant's look (VARIANT_LOOKS); the single-mesh rock a kill burns as;
+// variant's look (VARIANT_LOOKS); how they break (rockBreak.js);
 // Dense Fog's fade and the baked surface maps' quality toggle.
 
 import { PALETTE } from '../../../data/constants/palette.js';
@@ -8,7 +8,9 @@ import { createAsteroidGeometry, createSeededRandom } from '../asteroidMesh.js';
 import { bakeRockMaps } from '../bakedMaps.js';
 import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
+import { SPARK_KIND } from '../hitSparks.js';
 import { RockInstances } from '../rockInstances.js';
+import { createRockBreak } from './rockBreak.js';
 import {
   FOG_DIM,
   FOG_FADE_SECONDS,
@@ -86,8 +88,16 @@ export const VARIANT_LOOKS = {
     crystal: true,
   },
 };
+// What a shot strikes on each variant (a hitSparks SPARK_KIND; a
+// scorchDecals DECAL_KIND where it leaves a mark): iron is metal, crystal
+// glass (cold glints, no scorch); the rest stone. pedras, 17/11.
+const STRIKE = { iron: 'metal', crystal: 'shield' };
+export const strikeOf = (enemy) => STRIKE[enemy.variant] || 'rock';
+
 // A Parasite's pulse is at its fastest within this many logical pixels.
 const PARASITE_NEAR = 80;
+// a crushed rock's chips and dust leave this far off the mouth's facing (rad)
+const CRUSH_SPRAY = 1.5;
 const PARASITE_FAR = 360;
 // Baked surface maps (bakedMaps.js): rock maps tile every 1/ROCK_TILE rock
 // radii, sampled triplanar; crystal facets take only a faint normal.
@@ -138,6 +148,12 @@ export function createRockViews(kit) {
       detail: ROCK_DETAIL,
     });
     paintRock(THREE, geometry, seed);
+    // no cut face on a whole rock (rockCut.js gives cut pieces theirs)
+    const count = geometry.getAttribute('position').count;
+    geometry.setAttribute(
+      'cut',
+      new THREE.Float32BufferAttribute(new Float32Array(count), 1)
+    );
     rockGeometries.push(geometry);
   }
   const rockMaps = bakeRockMaps(THREE, kit.mapSeed);
@@ -172,6 +188,7 @@ export function createRockViews(kit) {
     rockGeometries,
     rockFamilies
   );
+  const breaks = createRockBreak(kit, rocks);
 
   // The instanced rocks' two shared materials: stone (each variant's colour
   // and surface come per instance) and Crystal, with its cold rim.
@@ -189,6 +206,7 @@ export function createRockViews(kit) {
     });
     [stone, crystal].forEach((material) => {
       material.defines.ROCK_INSTANCED = '';
+      material.defines.ROCK_CUT = '';
       material.onBeforeCompile = patchRockShader;
       trackRockMaterial(material);
     });
@@ -213,31 +231,10 @@ export function createRockViews(kit) {
         seed: new THREE.Vector3(),
         glow: [0, 0, 0, 0],
         surface: [1, 0],
+        hit: [new Float32Array(4), new Float32Array(4)],
+        heat: 0,
+        tint: 0,
       },
-    };
-  }
-
-  // A killed rock leaves its instance and burns as one of these (burnOf).
-  function createBurnRock() {
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true });
-    material.userData.rockUniforms = rockUniforms(
-      THREE,
-      colorOf(THREE, PALETTE.shot)
-    );
-    material.userData.rockMaps = stoneMaps;
-    material.defines.ROCK_SHEEN = '';
-    material.onBeforeCompile = patchRockShader;
-    trackRockMaterial(material);
-    const mesh = new THREE.Mesh(rockGeometries[0], material);
-    mesh.rotation.order = 'YXZ';
-    kit.scene.add(mesh);
-    return {
-      kind: 'asteroid-burn',
-      object: mesh,
-      material,
-      stone: material,
-      crystal: null,
-      id: null,
     };
   }
 
@@ -252,49 +249,6 @@ export function createRockViews(kit) {
     material.userData.rockUniforms = rockUniforms;
     material.userData.rockMaps = crystalMaps;
     return material;
-  }
-
-  function createCrystal(view) {
-    const material = crystalMaterial(view.stone.userData.rockUniforms);
-    material.onBeforeCompile = patchRockShader;
-    trackRockMaterial(material);
-    return material;
-  }
-
-  // A killed rock's burn view (EnemyMirror.burnOf) takes over its pose and
-  // look; the rock leaves its instance.
-  function dressBurn(burn, view) {
-    const { look, rock, object } = view;
-    if (look.crystal && !burn.crystal) {
-      burn.crystal = kit.seeded(() => createCrystal(burn));
-    }
-    const material = look.crystal ? burn.crystal : burn.stone;
-    burn.material = material;
-    burn.object.material = material;
-    burn.object.geometry = object.geometry;
-    burn.object.position.copy(object.position);
-    burn.object.rotation.copy(object.rotation);
-    burn.object.scale.copy(object.scale);
-    burn.seed = view.seed;
-    burn.radius = view.radius;
-    // a twin from an earlier burn copied the look it had then
-    [material, burn.dissolve?.twins.get(material)].forEach((target) => {
-      if (!target) return;
-      target.color.copy(rock.base);
-      target.roughness = rock.surface[0];
-      target.metalness = rock.surface[1];
-    });
-    const uniforms = material.userData.rockUniforms;
-    uniforms.uVein.value.copy(rock.vein);
-    uniforms.uSeed.value.copy(rock.seed);
-    uniforms.uRim.value = look.rim || 0;
-    [
-      uniforms.uGlow.value,
-      uniforms.uReveal.value,
-      uniforms.uWidth.value,
-      uniforms.uFlash.value,
-    ] = rock.glow;
-    object.visible = false;
   }
 
   // Every rock material: surface maps per preset, Dense Fog dimming.
@@ -337,17 +291,26 @@ export function createRockViews(kit) {
     rockMaterials.forEach(applySurfaceMaps);
   }
 
-  // A rock view takes its seed's shape, spin and lean and its variant's look.
+  // A rock view takes its seed's shape (or the piece it was cut as), spin
+  // and lean and its variant's look; a rock ignited alive keeps its shape.
   function bindRock(view, enemy) {
     const seed = view.seed;
-    view.shape = seed % ROCK_SHAPES;
-    view.object.geometry = rockGeometries[view.shape];
+    view.body = enemy;
+    if (view.boundId !== enemy.id) {
+      view.boundId = enemy.id;
+      breaks.adopt(view, enemy);
+    }
+    if (view.cut === undefined) {
+      view.shape = seed % ROCK_SHAPES;
+      view.object.geometry = rockGeometries[view.shape];
+    }
     const random = createSeededRandom((seed % 100000) + 1);
     view.spinRate = (0.25 + random() * 0.5) * (random() < 0.5 ? -1 : 1);
     view.spinPhase = random() * Math.PI * 2;
     view.lean = (random() - 0.5) * 1.2;
     const look = VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common;
     view.look = look;
+    view.variant = enemy.variant;
     view.pulse = view.spinPhase;
     view.lastTime = null;
     view.family = look.crystal ? 'crystal' : 'stone';
@@ -389,11 +352,12 @@ export function createRockViews(kit) {
     object.rotation.y = -(enemy.rotation || 0);
     object.rotation.x = view.spinPhase + time * view.spinRate;
     object.rotation.z = view.lean;
+    const dt = view.lastTime === null ? 0 : Math.max(0, time - view.lastTime);
+    breaks.settle(view, enemy, dt);
     const stage = Math.max(0, Math.min(3, enemy.crackStage || 0));
     let glow = CRACK_GLOW[stage];
     let reveal = CRACK_REVEAL[stage];
     if (look.vein) {
-      const dt = view.lastTime === null ? 0 : Math.max(0, time - view.lastTime);
       view.pulse += dt * TAU * pulseRate(look, enemy);
       let veins = look.veinGlow;
       if (look.floor !== undefined) {
@@ -408,20 +372,39 @@ export function createRockViews(kit) {
     g[0] = glow;
     g[1] = reveal;
     g[2] = Math.max(0.035 + stage * 0.012, look.width || 0);
-    g[3] = flash * 0.45;
+    g[3] = flash * 0.6;
     object.updateMatrixWorld();
-    rocks.push(view);
+    if (!view.hidden) rocks.push(view);
+  }
+
+  // A rock a Quarry Maw swallowed (its crushedIn) is crushed in the mouth:
+  // its pieces (rockBreak.js) and its own chips and dust (the shot's, by
+  // material) leave out of the jaws' sides. False for any other.
+  function crushRock(view, sparks) {
+    const at = view.body?.crushedIn;
+    if (!at) return false;
+    const kind = SPARK_KIND[strikeOf(view.body)];
+    view.body = null;
+    breaks.crush(view, at.facing);
+    for (const side of [1, -1]) {
+      const a = at.facing + side * CRUSH_SPRAY;
+      sparks?.emit(at.x, at.y, Math.cos(a), Math.sin(a), 0, 0, true, kind);
+    }
+    return true;
   }
 
   return {
     rocks,
     rockFamilies,
     createRock,
-    createBurnRock,
-    dressBurn,
     bindRock,
     updateRock,
     updateFog,
     refreshSurfaceMaps,
+    struck: breaks.struck,
+    split: breaks.split,
+    crumble: breaks.crumble,
+    crush: crushRock,
+    updateBreaks: breaks.update,
   };
 }

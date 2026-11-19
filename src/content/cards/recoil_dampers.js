@@ -23,6 +23,38 @@ export default {
       },
     ],
   },
+  // The Furnace's ring reaches past Multishot's cap (firePatterns.js).
+  weaponText: {
+    // proposta 17/11
+    'arc-caster': {
+      levels: [
+        {
+          description: 'Every cast jumps once more, past the Multishot cap.',
+        },
+      ],
+    },
+    'shard-halo': {
+      levels: [
+        {
+          description: 'The blades cut 4 px wider (10 px to 14 px).',
+        },
+      ],
+    },
+    scatter: {
+      levels: [{ description: 'Flak bursts reach 10 px further.' }],
+    },
+    'seeker-swarm': {
+      levels: [{ description: 'Missile bursts reach 10 px further.' }],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description:
+            'The pulse reaches 20 px further, past the Multishot cap.',
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,

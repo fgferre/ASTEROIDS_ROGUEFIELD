@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { listContent } from '../../../src/content/registry.js';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
-import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
+import { BREAK_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import {
   EnemyMirror,
   FOG_DIM,
   FOG_FADE_SECONDS,
+  hullHeading,
   KNOWN_KINDS,
+  LIGHTS_OUT,
   SHADOW_CASTERS,
   SHADOW_RADIUS,
   VARIANT_LOOKS,
@@ -678,9 +680,9 @@ describe('EnemyMirror', () => {
       );
       const mesh = mirror.rocks.meshes[view.family][view.shape];
       expect(mesh.count, variant).toBe(1);
-      const { aBase, aSurface } = mesh.geometry.attributes;
+      const { aBase } = mesh.geometry.attributes;
       colors.add(new THREE.Color().fromArray(aBase.array).getHexString());
-      expect(aSurface.getX(0), variant).toBeCloseTo(
+      expect(aBase.getW(0), variant).toBeCloseTo(
         VARIANT_LOOKS[variant].roughness
       );
       mirror.update([], 0);
@@ -708,9 +710,9 @@ describe('EnemyMirror', () => {
     );
     const view = mirror.views.get('g');
     const mesh = mirror.rocks.meshes.stone[view.shape];
-    const { aBase, aSurface } = mesh.geometry.attributes;
+    const { aBase, aVein } = mesh.geometry.attributes;
     expect(aBase.getX(0)).toBeGreaterThan(1);
-    expect(aSurface.getY(0)).toBeCloseTo(VARIANT_LOOKS.gold.metalness);
+    expect(aVein.getW(0)).toBeCloseTo(VARIANT_LOOKS.gold.metalness);
     expect(mirror.rockFamilies.stone.defines.ROCK_SHEEN).toBe('');
   });
 
@@ -732,7 +734,7 @@ describe('EnemyMirror', () => {
     const { aGlow } = mesh.geometry.attributes;
     expect(aGlow.getX(0)).toBeCloseTo(1.15);
     expect(aGlow.getY(0)).toBeCloseTo(0.65);
-    expect(aGlow.getW(0)).toBeCloseTo(0.45);
+    expect(aGlow.getW(0)).toBeCloseTo(0.6);
     const matrix = new THREE.Matrix4();
     mesh.getMatrixAt(0, matrix);
     expect(matrix.elements[12]).toBe(100);
@@ -887,11 +889,11 @@ describe('EnemyMirror', () => {
 
     mirror.markDead(ram);
     mirror.update([mine], 0, 0); // the burn starts
-    mirror.update([mine], 0, DISSOLVE_SECONDS / 4);
+    mirror.update([mine], 0, LIGHTS_OUT / 4); // a breaking machine's eyes go out
     expect(mesh.count).toBe(2);
     expect(size(1)).toBeCloseTo(lens * 0.75);
 
-    mirror.update([], 0, DISSOLVE_SECONDS);
+    mirror.update([], 0, BREAK_SECONDS);
     expect(mesh.count).toBe(0);
     expect(mesh.visible).toBe(false);
   });
@@ -1049,7 +1051,7 @@ describe('EnemyMirror', () => {
     mirror.markDead(shade);
     mirror.update([caster], 0, 0); // the burn starts from the real material
     expect(view.dissolve.sources).toEqual([mirror.machineMaterial]);
-    mirror.update([caster], 0, DISSOLVE_SECONDS);
+    mirror.update([caster], 0, BREAK_SECONDS);
     expect(view.body.material).toBe(mirror.machineMaterial);
   });
 
@@ -1121,5 +1123,49 @@ describe('EnemyMirror', () => {
     expect(baked).toHaveLength(AFFIX_IDS.length);
     baked.forEach((level) => expect(level).toBeGreaterThan(0));
     expect(mirror.badgeMaterials()).toBe(mirror.badges);
+  });
+
+  it('keeps a knocked machine facing where its engine pushes, and lets an aiming one snap to its aim', () => {
+    const view = { id: 'drone-1', vx: 0, vy: 0 };
+    let time = 0;
+    let vx = -40;
+    hullHeading(view, { rotation: Math.PI, vx, vy: 0 }, time);
+    const step = (rotation, nextVx) => {
+      view.vx = vx;
+      vx = nextVx;
+      time += 1 / 60;
+      return hullHeading(view, { rotation, vx, vy: 0 }, time);
+    };
+    // flying at the ship (-x), its engine pushing it on
+    for (let i = 0; i < 5; i += 1) step(Math.PI, vx - 4);
+    // a shot knocks it away: the sim faces away, its engine still pushes back
+    expect(step(Math.PI, 65)).toBe(Math.PI);
+    for (let i = 0; i < 10; i += 1) {
+      expect(step(0, vx - 4)).toBe(Math.PI);
+    }
+    // a machine that aims (its heading is not its course) soon snaps to it
+    let aim = 0;
+    for (let i = 0; i < 12; i += 1) aim = step(1, vx - 4);
+    expect(aim).toBe(1);
+  });
+
+  it('turns a knocked machine toward where its engine pushes, not where the knock sends it', () => {
+    // at rest, then knocked away from the ship (+x) by the first shot
+    const view = { id: 'drone-2', vx: 0, vy: 0 };
+    hullHeading(view, { rotation: 0, vx: 0, vy: 0 }, 0);
+    view.vx = 0;
+    let vx = 65;
+    let time = 1 / 60;
+    hullHeading(view, { rotation: 0, vx, vy: 0 }, time);
+    view.vx = vx;
+    // its engine pushes it back toward the ship (-x) while it still drifts away
+    let heading = 0;
+    for (let i = 0; i < 10; i += 1) {
+      vx -= 4;
+      time += 1 / 60;
+      heading = hullHeading(view, { rotation: 0, vx, vy: 0 }, time);
+      view.vx = vx;
+    }
+    expect(Math.abs(heading)).toBeGreaterThan(0.5);
   });
 });

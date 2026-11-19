@@ -64,6 +64,15 @@ export const SAMPLE_CUES = deepFreeze({
   playShipHit: { sample: 'ship-hit', bus: 'protected' },
   playShieldImpact: { sample: 'shield-impact', bus: 'protected' },
   playShieldBreak: { sample: 'shield-break', bus: 'protected' },
+  // The shield switched on, a warship's attack charging, a shot on the
+  // Sentinel's plate (audition 17/11; gains match today's synthesis).
+  playShieldActivate: { sample: 'shield-activate', bus: 'protected' },
+  playEnemyTelegraph: {
+    sample: 'enemy-telegraph',
+    bus: 'ambient',
+    spatialArg: 0,
+  },
+  playBulwarkPlateHit: { sample: 'plate-hit', bus: 'ambient', spatialArg: 0 },
   playXPCollect: {
     sample: 'xp-collect',
     bus: 'ambient',
@@ -137,9 +146,26 @@ export const SAMPLE_CUES = deepFreeze({
     bus: 'ambient',
   },
   playTravelBurn: { sample: 'travel-burn', bus: 'ambient', loop: true },
+  // The story before the first journey (eventCues `story-moment`, by the
+  // moment's id: render3d/storyScene.js): the reactors' stutter loops from
+  // the first shot to the launch.
+  playStoryMoment: {
+    sample: {
+      pulse: 'signal-pulse',
+      hangar: 'hatch-open',
+      launch: 'travel-ignite',
+    },
+    bus: 'ambient',
+  },
+  playStoryReactor: { sample: 'reactor-stutter', bus: 'ambient', loop: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
   playUIStartGame: { sample: 'run-start', bus: 'ambient' },
+  // The press start, Launch and the remote link into a run (eventCues; the
+  // owner's card, 17/11).
+  playPressStart: { sample: 'title-start', bus: 'ambient' },
+  playLaunchConfirm: { sample: 'launch-confirm', bus: 'ambient' },
+  playRemoteLink: { sample: 'mission-call', bus: 'ambient' },
   playPauseOpen: { sample: 'pause-open', bus: 'ambient' },
   playPauseClose: { sample: 'pause-close', bus: 'ambient' },
 });

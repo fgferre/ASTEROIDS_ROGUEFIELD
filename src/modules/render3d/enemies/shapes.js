@@ -58,19 +58,42 @@ export function spline(flat) {
  * `end` cap the first/last ring with a fan: 'flat' on its own vertices (a
  * crisp lip), 'smooth' on the ring's. `flip` reverses the faces; `orient`
  * flips them instead when they face inward (the enclosed volume < 0).
+ * `uv`: baked-map coordinates in model units, u down the rings (their
+ * centres' path) and v round each ring; a cap's are its plane's own.
  */
 export function skin(THREE, rings, options = {}) {
-  const { start, end, open = false, flip = false, orient = true } = options;
+  const {
+    start,
+    end,
+    open = false,
+    flip = false,
+    orient = true,
+    uv = false,
+  } = options;
   const n = rings[0].length;
   const spans = open ? n - 1 : n;
   const position = [];
+  const uvs = [];
   const index = [];
-  const push = (p) => {
+  const push = (p, u = 0, v = 0) => {
     position.push(p.x, p.y, p.z);
+    uvs.push(u, v);
     return position.length / 3 - 1;
   };
   const face = (a, b, c) => (flip ? index.push(a, c, b) : index.push(a, b, c));
-  rings.forEach((ring) => ring.forEach(push));
+  const centreOf = (ring) =>
+    ring
+      .reduce((sum, p) => sum.add(p), new THREE.Vector3())
+      .divideScalar(ring.length);
+  let along = 0;
+  rings.forEach((ring, i) => {
+    if (i > 0) along += centreOf(ring).distanceTo(centreOf(rings[i - 1]));
+    let round = 0;
+    ring.forEach((p, j) => {
+      if (j > 0) round += p.distanceTo(ring[j - 1]);
+      push(p, along, round);
+    });
+  });
   for (let i = 0; i + 1 < rings.length; i += 1) {
     for (let j = 0; j < spans; j += 1) {
       const a = i * n + j;
@@ -82,11 +105,18 @@ export function skin(THREE, rings, options = {}) {
   const cap = (ring, style, first) => {
     if (!style) return;
     let base = first ? 0 : (rings.length - 1) * n;
+    const centre = centreOf(ring);
+    // The cap's plane: drop the axis its ring spreads least along.
+    const spread = ['x', 'y', 'z'].map((k) =>
+      ring.reduce((m, p) => Math.max(m, Math.abs(p[k] - centre[k])), 0)
+    );
+    const [a, b] = ['x', 'y', 'z'].filter(
+      (_, k) => k !== spread.indexOf(Math.min(...spread))
+    );
+    const flatUv = (p) => [p[a], p[b]];
     if (style === 'flat') base = position.length / 3;
-    if (style === 'flat') ring.forEach(push);
-    const centre = new THREE.Vector3();
-    ring.forEach((p) => centre.add(p));
-    const c = push(centre.divideScalar(ring.length));
+    if (style === 'flat') ring.forEach((p) => push(p, ...flatUv(p)));
+    const c = push(centre, ...flatUv(centre));
     for (let j = 0; j < spans; j += 1) {
       const a = base + j;
       const b = base + ((j + 1) % n);
@@ -101,6 +131,7 @@ export function skin(THREE, rings, options = {}) {
     'position',
     new THREE.Float32BufferAttribute(position, 3)
   );
+  if (uv) geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(index);
   if (orient && volume(THREE, geometry) < 0) reverse(geometry);
   geometry.computeVertexNormals();

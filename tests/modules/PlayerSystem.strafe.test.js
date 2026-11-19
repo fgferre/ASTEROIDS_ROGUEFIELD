@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayerSystem, {
   resolveControlScheme,
 } from '../../src/modules/PlayerSystem.js';
+import {
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
+} from '../../src/data/constants/physics.js';
+import shipModels from '../../src/data/shipModels.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -26,6 +31,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus,
       input,
       'command-queue': null,
+      newFlight: false,
       controlScheme,
     });
     player.position = { x: 400, y: 300 };
@@ -61,6 +67,112 @@ describe('PlayerSystem control schemes', () => {
     expect(player.velocity.vy).toBeLessThan(-50);
     expect(Math.abs(player.velocity.vx)).toBeLessThan(20);
     expect(player.angle).toBeCloseTo(-Math.PI / 2, 2);
+  });
+
+  it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
+    const speedAfterRelease = (scheme, glide) => {
+      const player = makePlayer({}, scheme);
+      player.flight.glide = glide;
+      player.angle = 0;
+      player.velocity = { vx: 100, vy: 0 };
+      steps(player, 60);
+      return Math.hypot(player.velocity.vx, player.velocity.vy);
+    };
+
+    for (const scheme of ['modern', 'classic']) {
+      expect(speedAfterRelease(scheme, false)).toBeLessThan(5);
+      expect(speedAfterRelease(scheme, true)).toBeGreaterThan(65);
+    }
+  });
+
+  it('nose aim (?aim=nose) holds the cannon on the nose, whatever the aim point', () => {
+    const player = makePlayer({ left: true }, 'classic');
+    player.noseAim = true;
+    player.angle = 0;
+    player.setAimPoint({ x: 400, y: -1e6 }); // target straight up
+    steps(player, 20);
+
+    expect(player.angle).toBeLessThan(-0.1);
+    expect(player.getTurretAngle()).toBe(player.angle);
+  });
+
+  it("with the cannon on the nose shots leave the hull's nose muzzle; the Auto Turret card brings back the turret's", () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      newFlight: true,
+    });
+    player.setHull(shipModels.bastion);
+    player.position = { x: 400, y: 300 };
+    player.angle = Math.PI / 2; // nose down the screen
+    player.turretAngle = Math.PI / 2;
+    const muzzle = () => {
+      const { x, y } = player.getMuzzlePoint();
+      return [x, y].map((v) => Math.round(v * 100) / 100);
+    };
+
+    expect(muzzle()).toEqual([400, 300 + shipModels.bastion.noseMuzzle]);
+
+    eventBus.emit('upgrade-auto-aim', {});
+    expect(muzzle()).toEqual([
+      400,
+      300 + TURRET_PIVOT_X + TURRET_BARREL_LENGTH,
+    ]);
+  });
+
+  it('the new flight (the default) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      controlScheme: 'modern',
+      newFlight: true,
+    });
+    const flying = () => [
+      player.controlScheme,
+      player.flight.glide,
+      player.noseAim,
+    ];
+    expect(flying()).toEqual(['classic', true, true]);
+
+    eventBus.emit('upgrade-auto-aim', {});
+    eventBus.emit('modern-flight-engaged');
+    expect(flying()).toEqual(['modern', false, false]);
+
+    player.reset();
+    expect(flying()).toEqual(['classic', true, true]);
+  });
+
+  it('in glide only the Braking System lights the retro once the thrust is let go', () => {
+    const coastBrake = (brakingDamping) => {
+      const player = makePlayer({}, 'classic');
+      player.flight.glide = true;
+      player.flight.brakingDamping = brakingDamping;
+      player.angle = 0;
+      player.velocity = { vx: 100, vy: 0 };
+      return player.flight.updateMovement(DELTA_TIME, {}).coastBrake;
+    };
+
+    expect(coastBrake(0)).toBe(0);
+    expect(coastBrake(2)).toBeGreaterThan(0.5);
+  });
+
+  it('in glide the RCS System turns the hull quicker too', () => {
+    const turnAfterHalfSecond = (agility) => {
+      const player = makePlayer({ left: true }, 'classic');
+      player.flight.glide = true;
+      player.flight.agility = agility;
+      player.angle = 0;
+      steps(player, 30);
+      return -player.angle;
+    };
+
+    expect(turnAfterHalfSecond(1.9)).toBeGreaterThan(
+      turnAfterHalfSecond(1) * 1.8
+    );
   });
 
   it('the turret turns onto the aim point on its own, and the muzzle follows it', () => {
@@ -115,6 +227,7 @@ describe('PlayerSystem control schemes', () => {
       eventBus: createEventBusMock(),
       input: { getMovementInput: vi.fn(() => ({})) },
       'command-queue': null,
+      newFlight: false,
       settings: settings('classic'),
     });
     expect(player.controlScheme).toBe('classic');

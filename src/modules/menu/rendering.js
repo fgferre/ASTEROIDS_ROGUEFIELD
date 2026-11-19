@@ -1,10 +1,10 @@
 // src/modules/menu/rendering.js
 //
-// How the menu scene reaches the screen: the WebGL2 renderer, the lights
-// (one distant sun at a grazing angle, a faint cool fill, a whisper of
-// ambient) and the post chain (bloom, a chromatic-aberration/grain pass,
-// SMAA). Builders only: MenuBackgroundSystem stores what they return. The
-// bodies came from it unchanged.
+// The menu's WebGL2 renderer and the lights of its own scene, the hull
+// preview's (one distant sun at a grazing angle, a faint cool fill, a
+// whisper of ambient); the opening scene brings its own post chain
+// (openingScene.js). Builders only: MenuBackgroundSystem stores what they
+// return.
 
 import { debugLog } from '../../core/debugLogging.js';
 
@@ -57,117 +57,6 @@ export function createMenuRenderer(THREE, canvas) {
   }
 
   return renderer;
-}
-
-/**
- * The post chain over the menu scene; returns { composer, bloomPass,
- * customFX, smaaPass } (only the passes this Three build has), or {} when
- * there is no EffectComposer.
- */
-export function setupPostProcessing({
-  THREE,
-  scene,
-  camera,
-  renderer,
-  adaptiveQuality,
-}) {
-  const post = {};
-  if (!THREE || !renderer || !THREE.EffectComposer) return post;
-
-  post.composer = new THREE.EffectComposer(renderer);
-
-  const renderPass = new THREE.RenderPass(scene, camera);
-  post.composer.addPass(renderPass);
-
-  const fxConfig =
-    adaptiveQuality?.levels?.[adaptiveQuality.currentLevel] ?? null;
-  const bloomStrength =
-    typeof fxConfig?.bloomStrength === 'number' ? fxConfig.bloomStrength : 0.1;
-  const chromaticAberration =
-    typeof fxConfig?.chromaticAberration === 'number'
-      ? fxConfig.chromaticAberration
-      : 0.0;
-
-  // 1. Unreal Bloom Pass - reduced for clarity
-  if (THREE.UnrealBloomPass) {
-    post.bloomPass = new THREE.UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      bloomStrength,
-      0.2, // Radius: tighter bloom
-      0.92 // Threshold: only very bright spots bloom
-    );
-    post.composer.addPass(post.bloomPass);
-  }
-
-  // 2. Custom FX: Chromatic Aberration + Filmic Grain
-  if (THREE.ShaderPass) {
-    post.customFX = createCustomFXPass(THREE);
-    if (post.customFX?.uniforms?.amount) {
-      post.customFX.uniforms.amount.value = chromaticAberration;
-    }
-    // F3: disable pass when both effects are zero (avoids 3 texture samples/pixel for no result)
-    const grainValue = post.customFX?.uniforms?.grainAmount?.value ?? 0;
-    post.customFX.enabled = chromaticAberration !== 0 || grainValue !== 0;
-    post.composer.addPass(post.customFX);
-  }
-
-  // 3. SMAA Anti-aliasing
-  if (THREE.SMAAPass) {
-    const pixelRatio = renderer.getPixelRatio();
-    post.smaaPass = new THREE.SMAAPass(
-      window.innerWidth * pixelRatio,
-      window.innerHeight * pixelRatio
-    );
-    post.composer.addPass(post.smaaPass);
-  }
-
-  return post;
-}
-
-function createCustomFXPass(THREE) {
-  const shader = {
-    uniforms: {
-      tDiffuse: { value: null },
-      amount: { value: 0.0 },
-      grainAmount: { value: 0.0 }, // Keep sharp by default (study parity)
-      time: { value: 0.0 },
-    },
-    vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-        }
-      `,
-    fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform float amount;
-        uniform float grainAmount;
-        uniform float time;
-        varying vec2 vUv;
-
-        float random(vec2 p) {
-          return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-        }
-
-        void main() {
-          vec2 uv = vUv;
-
-          // Very subtle Chromatic Aberration (R/B shift)
-          float r = texture2D(tDiffuse, uv + vec2(amount, 0.0)).r;
-          float g = texture2D(tDiffuse, uv).g;
-          float b = texture2D(tDiffuse, uv - vec2(amount, 0.0)).b;
-
-          vec3 color = vec3(r, g, b);
-
-          float noise = (random(uv + time * 0.01) - 0.5) * grainAmount;
-          color += noise;
-
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `,
-  };
-  return new THREE.ShaderPass(shader);
 }
 
 /** Adds the menu's lights to `scene`; returns the key light (the sun). */

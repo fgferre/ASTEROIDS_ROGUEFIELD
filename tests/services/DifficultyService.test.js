@@ -7,7 +7,11 @@ import DifficultyService, {
   seedLink,
 } from '../../src/services/DifficultyService.js';
 import GameSessionService from '../../src/services/GameSessionService.js';
-import { DIFFICULTY_PRESETS } from '../../src/data/difficulty.js';
+import {
+  DIFFICULTY_PRESETS,
+  PRESSURE_RUNGS,
+  difficultyId,
+} from '../../src/data/difficulty.js';
 
 const settingsWith = (difficulty) => ({
   getSetting: (category, key) =>
@@ -174,5 +178,27 @@ describe('DifficultyService', () => {
     expect(service.recordRun({ layer: 4, time: 120 })).not.toBeNull();
     service.beginRun({ daily: false });
     expect(service.getDifficulty()).toBe('pilot');
+  });
+
+  it('flies the Hangar Pressure rung over the setting; the Daily Field stays Veteran', () => {
+    const service = new DifficultyService({
+      settings: settingsWith('pilot'),
+      bootSeed: 1,
+    });
+    service.setPressure(2);
+    service.beginRun({ daily: false });
+    expect(service.getDifficulty()).toBe('pressure-2');
+    expect(service.getModifiers()).toBe(PRESSURE_RUNGS[1]);
+    expect(service.getPressure()).toBe(2);
+    expect(service.runLabel()).toContain('PRESSURE II');
+
+    service.beginRun({ daily: true });
+    expect(service.getDifficulty()).toBe('veteran');
+    expect(service.getPressure()).toBe(0);
+  });
+
+  it('accepts pressure-1..5 as a run difficulty, not pressure-9', () => {
+    expect(difficultyId('pressure-3')).toBe('pressure-3');
+    expect(difficultyId('pressure-9')).toBeNull();
   });
 });

@@ -250,9 +250,11 @@ export class SentinelQuarryMaw extends BossEnemy {
         maxSpeed: MAW.rockPullMaxSpeed,
       },
       (point, margin) => this.inCone(point, margin),
-      () => {
+      (rock) => {
         this.swallowed += 1;
         this.swallowedTotal += 1;
+        // for the drawing only: where it was crushed, and the jaws' facing
+        rock.crushedIn = { x: mouth.x, y: mouth.y, facing: this.facing };
       }
     );
 

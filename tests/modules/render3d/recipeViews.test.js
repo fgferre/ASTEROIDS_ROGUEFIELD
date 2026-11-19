@@ -44,7 +44,7 @@ new Function(
 // loaded again, on this one, before the tests.
 let EnemyMirror;
 let KNOWN_KINDS;
-let DISSOLVE_SECONDS;
+let BREAK_SECONDS;
 
 const enemy = (id, type, extra = {}) => ({
   id,
@@ -71,7 +71,7 @@ describe('an enemy’s 3D look from its content file alone', () => {
     ({ EnemyMirror, KNOWN_KINDS } = await import(
       '../../../src/modules/render3d/enemyMirror.js'
     ));
-    ({ DISSOLVE_SECONDS } = await import(
+    ({ BREAK_SECONDS } = await import(
       '../../../src/modules/render3d/dissolve.js'
     ));
   });
@@ -158,7 +158,7 @@ describe('an enemy’s 3D look from its content file alone', () => {
     mirror.markDead(sentryEnemy);
     mirror.update([], 0, 0);
     expect(view.dissolve.sources).toContain(mirror.machineMaterial);
-    mirror.update([], 0, DISSOLVE_SECONDS);
+    mirror.update([], 0, BREAK_SECONDS);
     expect(mirror.pools.get('sentry')).toEqual([view]);
     mirror.update([enemy('t', 'sentry')], 0);
     expect(mirror.views.get('t')).toBe(view);

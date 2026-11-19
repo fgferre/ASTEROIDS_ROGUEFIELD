@@ -395,7 +395,9 @@ export function createTelegraphs(kit) {
   // round its gap, `parts.width` px thick (the hit's), and a post at each
   // side of the gap. Warning, a guide runs out both ways from where the boss
   // stood; solid, it locks with a flash at the posts and holds, energy
-  // running out along it; fading, it dims.
+  // running out along it; fading, it dims. Lot 5 (efeito/impacto): solid, it
+  // burns at about half its old light and flash, red and firm, so it no
+  // longer blurs what is near it.
   function updateBarrier(parts, t, progress) {
     parts.warn.visible = false;
     const [from, to] = t.span || [-1000, 1000];
@@ -405,7 +407,7 @@ export function createTelegraphs(kit) {
     const held = t.phase === 'solid' ? t.duration - t.timer : Infinity;
     const lock = Math.max(0, 1 - held / LOCK_FLASH);
     const solid = t.solid ?? 1;
-    const gain = warning ? 0.55 + 0.45 * progress : solid * (1 + 1.5 * lock);
+    const gain = warning ? 0.55 + 0.45 * progress : solid * (0.6 + 0.5 * lock);
     const front = warning ? progress * 1.2 * Math.max(-from, to) : Infinity;
     const walls = [
       [from, lo - from],
@@ -444,18 +446,19 @@ export function createTelegraphs(kit) {
         color: kit.threatColor,
         warn: false,
         progress,
-        gain: warning ? 0.5 + 0.5 * progress : solid * (1 + 2.5 * lock),
+        gain: warning ? 0.5 + 0.5 * progress : solid * (0.6 + 0.8 * lock),
         core: 0,
       });
-      spark(parts, i, at, 0, 4, 8, 3 * lock * solid, kit.threatColor);
+      spark(parts, i, at, 0, 4, 8, 1.2 * lock * solid, kit.threatColor);
     });
   }
 
   // The Prism Crown's beams (two per mirror: core → mirror, mirror → edge),
   // as wide as they burn: while they warn a guide charges out from the gem
-  // to each mirror, then on to the edge; burning, full and bright, a flare
-  // on each mirror and sparks where each beam meets the edge (sparks: one
-  // per beam).
+  // to each mirror, then on to the edge; burning, a flare on each mirror and
+  // sparks where each beam meets the edge (sparks: one per beam). Lot 5
+  // (efeito/impacto): burning beams and flares at about half their old light,
+  // so they no longer wash the screen and the ship inside one stays visible.
   function updatePrism(parts, t, ox, oy, progress) {
     parts.warn.visible = false;
     parts.group.rotation.y = 0;
@@ -476,7 +479,7 @@ export function createTelegraphs(kit) {
         color: kit.threatColor,
         warn: warning,
         progress,
-        gain: warning ? 0.6 + 0.5 * progress : 1,
+        gain: warning ? 0.6 + 0.5 * progress : 0.5,
         front: warning
           ? Math.min(1, Math.max(0, 2 * progress - leg)) * length
           : Infinity,
@@ -484,7 +487,7 @@ export function createTelegraphs(kit) {
       });
       // the mirror (end of a first leg) and the edge (end of a second)
       const reached = warning ? 2 * progress - leg >= 1 : true;
-      const gain = warning ? 0.8 * progress : (leg ? 2.6 : 2) * flicker;
+      const gain = warning ? 0.8 * progress : (leg ? 1.1 : 0.9) * flicker;
       if (reached) {
         spark(
           parts,

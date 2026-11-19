@@ -291,7 +291,7 @@ describe('Onboarding', () => {
     };
     const prompts = onboardingPrompts(buttons, 'modern', 'gamepad');
     expect(prompts.move.keys).toEqual(['L-Stick']);
-    expect(prompts.move.text).toMatch(/right stick/);
+    expect(prompts.move.text).toMatch(/left stick/);
     expect(prompts.dash.keys).toEqual(['RT']);
     expect(prompts.shield.keys).toEqual(['LT']);
 

@@ -39,4 +39,31 @@ describe('menu buttons', () => {
       ],
     ]);
   });
+
+  it('a run from the menu starts under the remote link; a run from a run does not', () => {
+    const startNewRun = vi.fn();
+    const linked = [];
+    const linkIn = (options, start) => linked.push([options.source, start]);
+    const buttons = new MenuButtons({ eventBus: null, startNewRun, linkIn });
+
+    click(buttons, 'campaign-launch-btn', { sector: 'debris-wake' });
+    click(buttons, 'boss-rush-btn');
+    click(buttons, 'victory-next-btn', { sector: 'salvage-lanes' });
+    click(buttons, 'restart-game-btn');
+
+    expect(linked.map(([source]) => source)).toEqual([
+      'campaign-launch-btn',
+      'boss-rush-btn',
+    ]);
+    expect(startNewRun.mock.calls.map(([o]) => o.source)).toEqual([
+      'victory-next-btn',
+      'restart-game-btn',
+    ]);
+    linked[0][1]();
+    expect(startNewRun).toHaveBeenLastCalledWith({
+      source: 'campaign-launch-btn',
+      sector: 'debris-wake',
+      carry: false,
+    });
+  });
 });

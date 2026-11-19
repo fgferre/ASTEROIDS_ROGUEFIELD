@@ -871,19 +871,31 @@ class SFXBus {
     );
   }
 
-  // --- Stingers and transmissions (sfx/stingers.js) ---
+  // The story before the first journey: only its samples, as above.
+  playStoryMoment() {}
 
-  playEliteSpawned() {
-    return this._stingers.playEliteSpawned();
+  playStoryReactor() {}
+
+  /** The reactors' loop fades (the interceptor launches). */
+  stopStoryReactor() {
+    this.samples.stop(
+      [SAMPLE_CUES.playStoryReactor.sample],
+      SAMPLE_PLAYBACK.loopFadeSeconds
+    );
   }
 
-  playSurgeSting() {
-    return this._stingers.playSurgeSting();
+  /** The story is over (ended, skipped, torn down): all its sounds fade. */
+  stopStorySounds() {
+    this.samples.stop(
+      [
+        SAMPLE_CUES.playStoryReactor.sample,
+        ...Object.values(SAMPLE_CUES.playStoryMoment.sample),
+      ],
+      SAMPLE_PLAYBACK.cutFadeSeconds
+    );
   }
 
-  playDeepFieldEntry() {
-    return this._stingers.playDeepFieldEntry();
-  }
+  // --- Transmissions (sfx/stingers.js) ---
 
   playTransmission() {
     return this._stingers.playTransmission();
@@ -891,14 +903,6 @@ class SFXBus {
 
   playTransmissionVoice(speaker) {
     return this._stingers.playTransmissionVoice(speaker);
-  }
-
-  playChapterStinger(themeId) {
-    return this._stingers.playChapterStinger(themeId);
-  }
-
-  playWardenStinger() {
-    return this._stingers.playWardenStinger();
   }
 
   // --- Progression, pickups and rewards (sfx/progression.js) ---
@@ -1040,6 +1044,20 @@ class SFXBus {
 
   playUIStartGame() {
     return this._interface.playUIStartGame();
+  }
+
+  // The start's own moments (the owner's card, 17/11): sample slots
+  // (data/audio/samples.js) over today's synthesis until their sounds arrive.
+  playPressStart() {
+    return this._interface.playUIStartGame();
+  }
+
+  playLaunchConfirm() {
+    return this._interface.playUISelect();
+  }
+
+  playRemoteLink() {
+    return this._interface.playMenuTransition();
   }
 
   // --- Thruster loops (sfx/thrusters.js): the engine's fallback ---

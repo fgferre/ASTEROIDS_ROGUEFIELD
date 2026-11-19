@@ -8,6 +8,7 @@ import RandomService from '../../src/core/RandomService.js';
 import AchievementService, {
   ACHIEVEMENTS_STORAGE_KEY,
 } from '../../src/services/AchievementService.js';
+import { RECORDS_STORAGE_KEY } from '../../src/services/runRecords.js';
 
 describe('AchievementService', () => {
   let restoreDom;
@@ -93,7 +94,7 @@ describe('AchievementService', () => {
       hullId: BASTION_HULL_ID,
       sector: 'dense-core',
     });
-    expect(unlocked).toEqual([]);
+    expect(unlocked).toEqual(['first-victory']);
 
     eventBus.emit('boss-defeated', { bossKind: 'null' });
     eventBus.emit('run-won', { wave: 15, sector: 'wardens-reach' });
@@ -168,6 +169,8 @@ describe('AchievementService', () => {
     const arc = UPGRADE_LIBRARY.filter(({ family }) => family === 'arc');
     expect(arc.length).toBeGreaterThan(3);
     progression.applyUpgrade('multishot'); // the Targeting Suite needs it
+    progression.applyUpgrade('propulsors'); // and, in the new flight, the turret
+    progression.applyUpgrade('auto_aim'); // after the engine
 
     arc.slice(0, -1).forEach(({ id }) => {
       expect(progression.applyUpgrade(id)).toBe(true);
@@ -227,6 +230,8 @@ describe('AchievementService', () => {
     );
     expect(progression.applyUpgrade(weaponOf('thermal').id)).toBe(true);
     progression.applyUpgrade('multishot'); // the Targeting Suite needs it
+    progression.applyUpgrade('propulsors'); // and, in the new flight, the turret
+    progression.applyUpgrade('auto_aim'); // after the engine
 
     arc.slice(0, -1).forEach(({ id }) => progression.applyUpgrade(id));
     expect(progression.isFamilyComplete('arc')).toBe(false);
@@ -270,5 +275,45 @@ describe('AchievementService', () => {
     );
     expect(entries.find((e) => e.id === 'scrapper').progress).toBe(3);
     expect(next.unlocked).toEqual([]);
+  });
+
+  it('first-victory comes on a won run, never on a Boss Rush clear', () => {
+    const { eventBus, unlocked } = setup();
+    eventBus.emit('wave-started', { wave: 1, bossRush: true });
+    eventBus.emit('run-won', { wave: 15 });
+    expect(unlocked).not.toContain('first-victory');
+
+    eventBus.emit('wave-started', { wave: 1, bossRush: false });
+    eventBus.emit('run-won', { wave: 15 });
+    expect(unlocked).toContain('first-victory');
+  });
+
+  it.each([
+    [
+      'a sector won in the records',
+      RECORDS_STORAGE_KEY,
+      { sectorsWon: ['dense-core'] },
+    ],
+    [
+      'an old null-and-void',
+      ACHIEVEMENTS_STORAGE_KEY,
+      { unlocked: { 'null-and-void': '2026-10-01T00:00:00.000Z' } },
+    ],
+  ])('grants first-victory quietly to a save with %s', (_, key, stored) => {
+    localStorage.setItem(key, JSON.stringify(stored));
+    const eventBus = new EventBus();
+    const unlocked = [];
+    eventBus.on('achievement-unlocked', ({ id }) => unlocked.push(id));
+    const service = new AchievementService({ eventBus });
+
+    const entry = service.getEntries().find((e) => e.id === 'first-victory');
+    expect(entry.unlockedAt).toBeTruthy();
+    expect(unlocked).toEqual([]);
+  });
+
+  it('leaves first-victory locked for a save that never won', () => {
+    const service = new AchievementService({ eventBus: new EventBus() });
+    const entry = service.getEntries().find((e) => e.id === 'first-victory');
+    expect(entry.unlockedAt).toBeNull();
   });
 });

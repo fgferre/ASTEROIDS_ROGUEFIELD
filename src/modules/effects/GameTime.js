@@ -16,12 +16,20 @@ const HIT_STOP = Object.freeze({
   medium: { duration: 0.08, scale: 0.25 }, // was none
   large: { duration: 0.18, scale: 0.24 }, // unchanged
   'spark-burst': { duration: 0.05, scale: 0.3 }, // the Mote's, was none
-  'shock-burst': { duration: 0.09, scale: 0.25 }, // the Seeker's, was none
+  'shock-burst': { duration: 0.09, scale: 0.25 }, // the Hunter's, was none
   blast: { duration: 0.12, scale: 0.18 }, // the Tether's, was 0.14-0.26 s by radius
+  heavy: { duration: 0.22, scale: 0.2 }, // a big machine's fall (17/11), was none
 });
 // A kind re-triggers at most once per this many seconds of game time, so a
 // multishot that kills three smalls freezes once.
 const HIT_STOP_COOLDOWN = 0.1;
+// Less freezing when the fight gets thick (17/11, efeito/impacto, proposta):
+// a small freeze (a hit-stop, the player's hit; under SMALL_FREEZE s) skips
+// when another small one began less than SMALL_FREEZE_GAP s ago, so a burst
+// of hits weighs once instead of stuttering. Big moments (a boss's phase or
+// fall, the ship's death) always freeze.
+export const SMALL_FREEZE = 0.2;
+export const SMALL_FREEZE_GAP = 0.4;
 // Slow-motion beats (was: level-up a 0.2 s freeze at 40 %, death none). The
 // scale holds, then eases back to 1 over `ease` s; the camera zoom pulses to
 // `zoom` (base 1.3) and back over the same total time.
@@ -58,8 +66,12 @@ export class GameTime {
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
+    this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
+    // the world's speed on the last running step (1: full; the 3D view
+    // slows what it animates on its own by it)
+    this.scale = 1;
   }
 
   // The world's delta for this step: the real one scaled by the freeze
@@ -76,6 +88,7 @@ export class GameTime {
     let delta = baseDelta;
     delta *= this.updateFreezeFrameState(baseDelta);
     delta *= this.updateTimeDilationState(baseDelta);
+    if (baseDelta > 0) this.scale = delta / baseDelta;
     return delta;
   }
 
@@ -84,8 +97,10 @@ export class GameTime {
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
+    this.smallFreezeReadyAt = 0;
     this.pendingZoomPulse = null;
     this.timeDilation = idleTimeDilation();
+    this.scale = 1;
   }
 
   updateFreezeFrameState(baseDelta) {
@@ -184,6 +199,10 @@ export class GameTime {
 
     if (finalDuration <= 0) {
       return;
+    }
+    if (finalDuration < SMALL_FREEZE) {
+      if (this.hitStopClock < this.smallFreezeReadyAt) return;
+      this.smallFreezeReadyAt = this.hitStopClock + SMALL_FREEZE_GAP;
     }
 
     // A lighter freeze landing on a running one must not lift its floor.

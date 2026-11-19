@@ -41,7 +41,9 @@ cristal exposto, olho de máquina, escudo). A informação é luz; o resto é ma
   do quadro, começo de onda, coleta. Trancos curtos de zoom no impulso, no freio, no level-up, na morte e na queda
   de chefe; quando um chefe cai, a câmera mergulha para perto. Os números ficam em `src/data/constants/camera.js`.
 - **Movimento.** Rastros persistentes de luz (propulsor, tiro), faíscas esticadas pela velocidade, anéis de
-  choque, flash branco de 60 ms em qualquer dano a inimigo.
+  choque. Onde o tiro pega, o material reage (17/11, pedido dele: _"aonde tiros pegam [...] deveriam haver
+  repercursoes físicas"_): a pedra esquenta e um pedaço vira brasa; o metal faísca, fica incandescente no ponto e dá um
+  tranco; o escudo acende onde foi atingido. Tela vermelha só quando o casco perde; matar não pinta a tela.
 
 ## 3. Folha de entidades
 
@@ -70,7 +72,7 @@ vinda da borda longe do jogador, anunciada por uma faixa "SURGE" na tela. Build:
 entram como propostas com os números ao lado; ele aprova ou reverte jogando.** Fim de run: vitória no Warden da
 camada 15 (modo infinito só se ele pedir).
 
-## 4b. O salto (decidido em 17/10, noite, a pedido dele: "falta um salto enorme… câmera dinâmica, zoom, movimento lateral, quase 3D visto de cima")
+## 4b. O salto (decidido em 17/10, noite, a pedido dele: "falta um salto enorme… câmera dinâmica, zoom, movimento lateral, quase 3D visto de cima"; pilotagem revista em 16/11)
 
 - **O gameplay passa a ser desenhado em Three.js (WebGL)**, como o menu já é: cena 3D vista de cima com inclinação
   de ~18°, luz-chave direcional + preenchimento frio, asteroides como malhas 3D procedurais (o gerador do menu,
@@ -79,8 +81,15 @@ camada 15 (modo infinito só se ele pedir).
   entidades em malhas. O jogo 2D original fica como peça de museu em `/classic/`.
 - **Câmera dinâmica:** follow com dead zone e antecipação, dolly que afasta na velocidade e aproxima no combate,
   shake por deslocamento da câmera. Mesma lógica de `src/core/camera.js`, agora dirigindo uma câmera perspectiva.
-- **Movimento lateral:** A/D passam a ser strafe (deslocamento lateral); W/S empuxo; a nave aponta para onde se
-  move ou para o alvo da mira; dash em Shift. Controle à la twin-stick sem o segundo stick (a mira é automática).
+- **Pilotagem que se conquista (direção nova, escolhida por ele jogando em 16/11; atrás de `?direcao=nova` até ele
+  mandar publicar):** a partida começa no voo clássico com deslize — A/D giram o casco, W acelera, S dá ré, e a
+  nave não para sozinha — e o tiro sai do nariz, mirado girando a nave. As cartas tiram uma muleta de cada vez:
+  Braking System freia ao soltar (no nível 3, o freio de emergência é a parada rápida), RCS System gira e acelera
+  mais rápido, Main Thrusters dá empuxo e velocidade, Auto Turret solta o canhão para mirar sozinho. A carta final,
+  Flight Computer (exige Braking 3, RCS 3 e a Auto Turret), entrega o voo moderno — WASD move nos eixos da tela, a
+  nave aponta para onde vai e para ao soltar, dash em Shift — depois de uma tela que pausa a luta e espera o Enter.
+  Nas palavras dele: _"isso ia criar uma dificuldade muito maior"_. O voo moderno de antes (mira automática desde o
+  início) é o que a carta final devolve.
 - A regra de §2 continua valendo em 3D: massa fosca, luz só onde há energia.
 
 ## 5. O que não fazemos

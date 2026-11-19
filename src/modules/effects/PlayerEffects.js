@@ -6,13 +6,11 @@
 // and the death explosion. EffectsSystem owns it and its player listeners
 // land here.
 
-import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 import { DASH_SHAKE } from '../../data/constants/gameplay.js';
 import { DEATH_SLOW_MO, LEVEL_UP_SLOW_MO } from './GameTime.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
-const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
@@ -106,8 +104,10 @@ export class PlayerEffects {
       typeof data.intensity === 'number' &&
       data.intensity >= MAIN_THRUSTER_FLASH_THRESHOLD
     ) {
+      // in the hull's own colour (the owner's pick 16/11: amber hulls
+      // flashed blue)
       this.addScreenFlash(
-        MAIN_THRUSTER_FLASH_COLOR,
+        PALETTE[data.accent],
         MAIN_THRUSTER_FLASH_DURATION,
         MAIN_THRUSTER_FLASH_INTENSITY
       );
@@ -116,24 +116,11 @@ export class PlayerEffects {
 
   onBulletHit(data) {
     if (data?.position) {
-      const effectiveDamage = Number.isFinite(data?.effectiveDamage)
-        ? data.effectiveDamage
-        : Number.isFinite(data?.damage)
-          ? data.damage
-          : 0;
-      const blocked = Boolean(data?.blocked);
-      if (!blocked && (effectiveDamage > 0 || data.killed)) {
-        this.particleEffects.createHitMarker(
-          data.position,
-          data.killed || false,
-          effectiveDamage
-        );
-      }
       this.createBulletImpact(
         data.position,
         { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
         data.killed || false,
-        { blocked }
+        { blocked: Boolean(data?.blocked) }
       );
     }
   }
@@ -550,28 +537,23 @@ export class PlayerEffects {
     this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
   }
 
+  // The ship's death (proposta 17/11, efeito/impacto): the 3D ship breaks
+  // into its own pieces (playerMirror.js); here a white flash of 0.03 s at
+  // 0.3 (game time, slowed by the death: about 0.2 s seen; was a
+  // 0.4 s wash at 0.6, which hid it), sparks and hull plates, and no rings.
   createEpicShipExplosion(position) {
-    // EPIC DEATH EXPLOSION - High velocity fragments + massive shockwave
-
-    // Huge freeze frame for dramatic impact
     this.addFreezeFrame(0.35, 0.4);
-
-    // Massive screen shake
     this.addScreenShake(15, 0.6);
+    this.addScreenFlash(withAlpha(PALETTE.text, 0.8), 0.03, 0.3);
 
-    // Bright white flash
-    this.addScreenFlash(withAlpha(PALETTE.text, 0.8), 0.4, 0.6);
-
-    // HIGH VELOCITY FRAGMENTS (50-80 particles)
+    // 24-40 fragments at 250-500 px/s: half light (the ship's cyan,
+    // white-hot), half torn hull plates
     const fragmentCount = this.getScaledParticleCount(
-      50 + this.randomFloat('explosions') * 30
+      24 + this.randomFloat('explosions') * 16
     );
     for (let i = 0; i < fragmentCount; i++) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
-      // HIGH VELOCITY: 250-500 px/s
       const speed = 250 + this.randomFloat('explosions') * 250;
-
-      // Half light (the ship's cyan, white-hot), half matte hull chips
       const colorChoice = this.randomFloat('explosions');
       const light = colorChoice < 0.5;
       let color;
@@ -579,53 +561,21 @@ export class PlayerEffects {
       else if (colorChoice < 0.5) color = PALETTE.player;
       else if (colorChoice < 0.75) color = PALETTE.hullLit;
       else color = PALETTE.hull;
-
-      // Large fragments
       const size = 3 + this.randomFloat('explosions') * 4;
-
-      // Long lifetime
       const life = 0.6 + this.randomFloat('explosions') * 0.4;
-
-      this.particleEffects.particles.push(
-        this.createParticle(
-          position.x,
-          position.y,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          color,
-          size,
-          life,
-          light ? 'spark' : 'debris'
-        )
+      const fragment = this.createParticle(
+        position.x,
+        position.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        color,
+        size,
+        life,
+        light ? 'spark' : 'debris'
       );
+      if (!light) fragment.material = 'metal';
+      this.particleEffects.particles.push(fragment);
     }
-
-    // MASSIVE DESTRUCTIVE SHOCKWAVE (70% of screen)
-    const screenWidth = GAME_WIDTH || 1920;
-    const screenHeight = GAME_HEIGHT || 1080;
-    const maxDimension = Math.max(screenWidth, screenHeight);
-    const shockwaveRadius = maxDimension * 0.7; // 70% of screen
-
-    this.particleEffects.createShockwaveEffect({
-      position: position,
-      radius: shockwaveRadius,
-      duration: 0.8, // Longer duration
-      color: withAlpha(PALETTE.player, 0.6),
-      baseWidth: 8, // Thick wave
-      maxAlpha: 0.8, // Very visible
-    });
-
-    // Secondary inner shockwave (more intense)
-    setTimeout(() => {
-      this.particleEffects.createShockwaveEffect({
-        position: position,
-        radius: shockwaveRadius * 0.5,
-        duration: 0.5,
-        color: withAlpha(PALETTE.text, 0.7),
-        baseWidth: 6,
-        maxAlpha: 0.9,
-      });
-    }, 100);
   }
 
   createLevelUpExplosion(player) {

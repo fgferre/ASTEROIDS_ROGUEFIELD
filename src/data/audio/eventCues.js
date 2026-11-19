@@ -77,16 +77,16 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   },
   { on: 'enemy-spawned', run: 'enemySpawned' },
   { on: 'enemy-telegraph', cue: 'playEnemyTelegraph', at: 'source' },
-  { on: 'elite-spawned', cue: 'playEliteSpawned' },
+  { on: 'elite-spawned', run: 'eliteSting' },
   { on: 'weapon-beam-fired', cue: 'playHarmonicBeam', panX: 'position.x' },
   { on: 'weapon-evolved', cue: 'playWeaponEvolved', duck: true },
   { on: 'upgrade-rerolled', cue: 'playCardReroll' },
   { on: 'upgrade-banished', cue: 'playCardBanish' },
   { on: 'codex-discovered', cue: 'playCodexDiscovered' },
-  { on: 'surge-started', cue: 'playSurgeSting' },
+  { on: 'surge-started', run: 'surgeSting' },
   // A formation's marks light up on an edge: the surge's warning sting.
-  { on: 'formation-warned', cue: 'playSurgeSting' },
-  { on: 'run-continued', cue: 'playDeepFieldEntry' },
+  { on: 'formation-warned', run: 'surgeSting' },
+  { on: 'run-continued', run: 'deepFieldSting' },
   { on: 'salvage-awarded', cue: 'playSalvageAwarded', arg: 'amount' },
   { on: 'hangar-purchased', cue: 'playHangarPurchase' },
   { on: 'onboarding-step', cue: 'playTipChime' },
@@ -203,10 +203,9 @@ export const AUDIO_EVENT_CUES = Object.freeze([
     at: 'source',
   },
 
-  // The run-following music: wave progress, the layer's theme, the chapter
-  // stinger on a biome's first layer; the boss arc overrides it upwards.
+  // The run-following music: wave progress and the chapter's score (it
+  // crossfades in); the boss arc crossfades the Warden's track.
   { on: 'wave-started', run: 'waveStarted' },
-  { on: 'boss-warning', cue: 'playWardenStinger' },
   { on: 'boss-warning', run: 'bossArc' },
   { on: 'boss-spawned', cue: 'playBossRoar', facade: true, payload: true },
   { on: 'boss-spawned', run: 'bossArc' },
@@ -219,7 +218,6 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'boss-phase-changed', run: 'bossArc' },
   { on: 'boss-defeated', cue: 'playBossDefeated', facade: true, payload: true },
   { on: 'boss-defeated', run: 'bossArc' },
-  { on: 'boss-defeated', run: 'biomeTheme' },
 
   { on: 'bullet-hit', run: 'bulletHit' },
   { on: 'player-took-damage', cue: 'playShipHit' },
@@ -261,16 +259,32 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
   { on: 'game-started', cue: 'playUIStartGame' },
+  { on: 'press-start', cue: 'playPressStart' },
+  { on: 'remote-link-opened', cue: 'playLaunchConfirm' },
+  { on: 'remote-link-opened', cue: 'playRemoteLink' },
+  { on: 'game-started', run: 'sectorScoreStart' },
+  { on: 'run-won', run: 'runWon' },
+  { on: 'sector-picked', run: 'sectorScorePrefetch' },
 
   // The journey between sectors (render3d/travel/moments.js): each moment's
   // sample, the burn's loop on and off, and all of it fading when it ends.
   // Its score (audio/journeyCue.js) is laid out from the plan as it starts
   // and stops early on a skip; the sector's music hands over at the end.
-  { on: 'cinematic-started', run: 'cinematicStarted' },
   { on: 'travel-planned', run: 'journeyPlanned' },
-  { on: 'travel-moment', cue: 'playTravelMoment', arg: 'id' },
+  { on: 'travel-moment', run: 'travelMoment' },
   { on: 'travel-moment', cue: 'playTravelBurn', when: { id: 'burn' } },
   { on: 'travel-moment', cue: 'stopTravelBurn', when: { id: 'brake' } },
   { on: 'travel-moment', cue: 'stopTravelSounds', when: { id: 'end' } },
   { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
+  // The story before the first journey (render3d/storyScene.js): each
+  // moment's sample, the reactors' loop from its first shot to the launch,
+  // the sector's music held under it (its journey holds it on after); its
+  // launch's ignition is the journey's, which then starts without its own.
+  { on: 'story-moment', cue: 'playStoryMoment', arg: 'id' },
+  { on: 'story-moment', cue: 'playStoryReactor', when: { id: 'wake' } },
+  { on: 'story-moment', run: 'holdScore', when: { id: 'wake' } },
+  { on: 'story-moment', cue: 'stopStoryReactor', when: { id: 'launch' } },
+  { on: 'story-moment', run: 'storyIgnited', when: { id: 'launch' } },
+  { on: 'story-moment', cue: 'stopStorySounds', when: { id: 'end' } },
+  { on: 'story-moment', run: 'releaseScore', when: { id: 'end' } },
 ]);

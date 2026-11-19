@@ -183,6 +183,9 @@ class CombatSystem extends BaseSystem {
     this.registerEventListener('upgrade-long-burn', (data) => {
       this.cards.cardEffects.longBurn = data;
     });
+    this.registerEventListener('upgrade-threat-focus', (data) => {
+      this.cards.cardEffects.threatFocus = data;
+    });
     this.registerEventListener('upgrade-execute-damage', (data) => {
       this.cards.cardEffects.executeDamage = data;
     });
@@ -252,9 +255,19 @@ class CombatSystem extends BaseSystem {
       });
     });
 
+    // The new flight's Auto Turret card: the cannon leaves the nose for the
+    // auto aim (PlayerSystem lifts noseAim on the same event).
+    this.registerEventListener('upgrade-auto-aim', () => {
+      this.targeting.setAimMode('auto');
+    });
+
     this.registerEventListener('toggle-aim-mode', (data = {}) => {
       const screen = data?.screen;
       if (screen !== 'playing') {
+        return;
+      }
+      // Nose aim (?aim=nose) has no auto aim to toggle to.
+      if (this.cachedPlayer.noseAim) {
         return;
       }
       const next = this.aimMode === 'auto' ? 'manual' : 'auto';
@@ -421,10 +434,28 @@ class CombatSystem extends BaseSystem {
     this.projectiles.updateBullets(deltaTime);
   }
 
+  enemyWithin(player, radius) {
+    const { x, y } = player.position;
+    const enemies = this.cachedEnemies.getActiveEnemies();
+    for (let i = 0; i < enemies.length; i += 1) {
+      const enemy = enemies[i];
+      if (enemy.intangible) continue;
+      if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) return true;
+    }
+    return false;
+  }
+
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
     const player = this.cachedPlayer;
     const playerStats = player.getStats();
+    // Close Quarters: one scan a frame, here where the enemies are known, so
+    // the bonus reaches every weapon through the stats they are handed.
+    if (playerStats && player.closeDamageMultiplier > 1) {
+      playerStats.damage *= this.enemyWithin(player, player.closeRadius)
+        ? player.closeDamageMultiplier
+        : 1;
+    }
     this.lastKnownPlayerStats = playerStats || null;
 
     // Only target and shoot when ship hull exists (visible and alive) and
@@ -435,6 +466,9 @@ class CombatSystem extends BaseSystem {
       !player._quitExplosionHidden &&
       !player.controlsHeld
     ) {
+      if (player.noseAim && this.targeting.aimMode !== 'manual') {
+        this.targeting.setAimMode('manual');
+      }
       this.targeting.updateStickAim(player.getAimStick());
       this.targeting.updateTargeting(deltaTime);
       player.setAimPoint(this.targeting.getPrimaryAimPoint());

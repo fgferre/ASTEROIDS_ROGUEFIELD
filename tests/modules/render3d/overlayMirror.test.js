@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  WardLinks,
   magnetRingGain,
   mirrorOverlays,
 } from '../../../src/modules/render3d/overlayMirror.js';
@@ -39,5 +40,43 @@ describe('mirrorOverlays magnet ring', () => {
   it('draws the ring only while an orb is near', () => {
     expect(draw(50)).toHaveBeenCalledTimes(1);
     expect(draw(400)).not.toHaveBeenCalled();
+  });
+});
+
+describe('WardLinks', () => {
+  it('snaps a link that drops: two halves pull back to their ends and are gone after', () => {
+    const segment = vi.fn();
+    const streak = vi.fn();
+    const t = { ribbons: { segment, streak }, statusRgb: [0.7, 1, 0] };
+    const ally = { id: 'ally', alive: true, x: 100, y: 0 };
+    const aegis = { id: 'aegis', alive: true, x: 0, y: 0, wardRatio: 1 };
+    aegis.wardLinks = [ally];
+    const links = new WardLinks();
+    const step = (dt) => {
+      segment.mockClear();
+      streak.mockClear();
+      links.update(dt, t, [aegis, ally], 1);
+      return segment.mock.calls.map(([ax, , bx]) => ({ ax, bx }));
+    };
+
+    expect(step(0.016)).toEqual([{ ax: 0, bx: 100 }]);
+
+    aegis.wardLinks = [];
+    const first = step(0.03);
+    expect(first).toHaveLength(2);
+    const [fromAegis, fromAlly] = first;
+    expect(fromAegis.ax).toBe(0);
+    expect(fromAlly.ax).toBe(100);
+    expect(fromAegis.bx).toBeLessThan(fromAlly.bx); // broken between
+    expect(streak).toHaveBeenCalled(); // sparks from the break
+
+    const later = step(0.1);
+    expect(later[0].bx).toBeLessThan(fromAegis.bx);
+    expect(later[1].bx).toBeGreaterThan(fromAlly.bx);
+
+    step(0.3);
+    expect(segment).not.toHaveBeenCalled();
+    expect(step(0.3)).toEqual([]);
+    expect(streak).not.toHaveBeenCalled();
   });
 });

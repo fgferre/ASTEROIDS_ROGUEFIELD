@@ -14,6 +14,7 @@ describe('right-stick manual aim', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
+    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     fake = installFakeGamepad();
   });
 
