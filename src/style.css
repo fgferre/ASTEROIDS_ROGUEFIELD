@@ -711,44 +711,24 @@ select {
   grid-area: 1 / 1;
 }
 
-.opening__tips {
-  position: relative;
-  width: min(640px, 84vw);
-  height: 1.5em;
+.opening__line {
+  width: min(760px, 90vw);
+  margin: 0;
   font-family: var(--font-ui);
-  font-size: clamp(14px, 1.6vmin + 6px, 20px);
-  letter-spacing: 0.04em;
+  font-size: clamp(14px, 1.4vmin + 6px, 19px);
+  letter-spacing: 0.05em;
   text-align: center;
   color: #a7c9d7;
   transition: opacity 0.4s;
 }
 
-.opening__tips p {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  animation: openingTip 12s linear infinite;
+/* A true step (loadingLines.js) in the accent, marked; a joke stays pale. */
+.opening__line.is-real {
+  color: var(--accent);
 }
 
-.opening__tips p:nth-child(2) {
-  animation-delay: 4s;
-}
-
-.opening__tips p:nth-child(3) {
-  animation-delay: 8s;
-}
-
-@keyframes openingTip {
-  4%,
-  30% {
-    opacity: 1;
-  }
-
-  34%,
-  100% {
-    opacity: 0;
-  }
+.opening__line.is-real::before {
+  content: '› ';
 }
 
 .opening__continue {
@@ -771,7 +751,7 @@ select {
 }
 
 .loading-screen--ready .opening__jet,
-.loading-screen--ready .opening__tips {
+.loading-screen--ready .opening__line {
   opacity: 0;
 }
 
@@ -822,20 +802,11 @@ select {
   .opening__rocks {
     display: none;
   }
-
-  .opening__tips p:first-child {
-    opacity: 1;
-  }
 }
 
 body.motion-reduced .opening__rocks,
 html[data-motion='reduced'] .opening__rocks {
   display: none;
-}
-
-body.motion-reduced .opening__tips p:first-child,
-html[data-motion='reduced'] .opening__tips p:first-child {
-  opacity: 1;
 }
 
 /* PRESS START gate: after loading, the same screen goes see-through over the

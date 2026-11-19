@@ -20,6 +20,7 @@ function fakeElement() {
       add: (c) => classes.add(c),
       remove: (...names) => names.forEach((c) => classes.delete(c)),
       contains: (c) => classes.has(c),
+      toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)),
     },
     addEventListener: (type, fn) => (listeners[type] = fn),
     removeEventListener: (type) => delete listeners[type],
@@ -38,7 +39,10 @@ function boot(
 ) {
   const screen = fakeElement();
   const hint = { textContent: 'Enter, click or Ⓐ to begin' };
-  screen.querySelector.mockReturnValue(hint);
+  const line = fakeElement();
+  screen.querySelector.mockImplementation((sel) =>
+    sel === '.opening__line' ? line : hint
+  );
   const menu = fakeElement();
   menu.classes.add('hidden');
   const menuButton = fakeElement();
@@ -68,10 +72,12 @@ function boot(
     body: { dataset: { inputDevice: device } },
   });
   let complete;
-  setupLoadingScreen(
-    (_progress, onComplete) => (complete = onComplete),
-    onStart
-  );
+  let progress;
+  setupLoadingScreen((onProgress, onComplete) => {
+    progress = onProgress;
+    complete = onComplete;
+  }, onStart);
+  if (via === 'loading') return { screen, line, progress, complete };
   complete();
   // The opening: a click (a gesture) or a pad press goes on to the gate.
   if (via === 'click') screen.listeners.click();
@@ -153,6 +159,35 @@ describe('loading screen opening', () => {
     const { screen } = boot('', { pads: [] }, { awake: false, via: 'pad' });
     expect(screen.classes.has('loading-screen--gate')).toBe(true);
     expect(screen.classes.has('loading-screen--asleep')).toBe(true);
+  });
+});
+
+describe('loading screen line', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('names the true step, a joke between, the new step at once', () => {
+    const { line, progress, complete } = boot('', undefined, {
+      via: 'loading',
+    });
+    expect(line.textContent).toBe('Building the asteroid field');
+    expect(line.classes.has('is-real')).toBe(true);
+    vi.advanceTimersByTime(2400);
+    expect(line.classes.has('is-real')).toBe(false);
+    progress(0.3);
+    expect(line.textContent).toBe('Lighting the field and painting the nebula');
+    progress(0.7);
+    expect(line.textContent).toBe(
+      'Preparing the battle effects for your graphics card · 25%'
+    );
+    complete();
+    const shown = line.textContent;
+    vi.advanceTimersByTime(10000);
+    expect(line.textContent).toBe(shown); // the turns stop once loaded
   });
 });
 

@@ -28,6 +28,8 @@ describe('MenuBackgroundSystem behind the loading screen', () => {
       // The loading screen's element: hiding it adds the `hidden` class.
       const screen = {
         classList: { add: () => order.push('hide'), remove: () => {} },
+        // the loading line
+        querySelector: () => ({ classList: { toggle: () => {} } }),
       };
       vi.stubGlobal('document', { getElementById: () => screen });
       system.setupLoadingScreen();

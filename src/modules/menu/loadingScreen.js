@@ -14,6 +14,7 @@
 // start. The start blinks the button and fades into the menu (the owner's
 // card, 17/11).
 
+import { LOADING_JOKES, loadingStep } from '../../data/loadingLines.js';
 import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
 
 const WAKE_HINT = 'Press any key';
@@ -26,6 +27,8 @@ const WAKE_GRACE_MS = 500;
 const START_EFFECT_MS = 1000;
 // The opening's fade off the scene (style.css .loading-screen--leaving).
 const LEAVE_MS = 600;
+// The loading line: the true step and a joke take turns this often.
+const LINE_MS = 2400;
 
 /**
  * Sets up the loading screen: the opening follows the preload, then a press
@@ -45,11 +48,33 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     return;
   }
 
+  // The loading line: what is loading now, a joke between (loadingLines.js).
+  const line = loadingScreen.querySelector('.opening__line');
+  let step = loadingStep(0);
+  let joke = Date.now() % LOADING_JOKES.length;
+  let joking = false;
+  function drawLine() {
+    line.textContent = joking ? LOADING_JOKES[joke] : step;
+    line.classList.toggle('is-real', !joking);
+  }
+  const lineTimer = setInterval(() => {
+    joking = !joking;
+    if (joking) joke = (joke + 1) % LOADING_JOKES.length;
+    drawLine();
+  }, LINE_MS);
+  drawLine();
+
   setLoadingCallbacks(
     (progress) => {
       loadingScreen.style.setProperty('--load', progress.toFixed(3));
+      const now = loadingStep(progress);
+      // A new step shows at once; the percent climbs only on the step's turn.
+      if (now.split(' · ')[0] !== step.split(' · ')[0]) joking = false;
+      step = now;
+      if (!joking) drawLine();
     },
     () => {
+      clearInterval(lineTimer);
       if (!shouldShowGate()) {
         finish();
         return;
