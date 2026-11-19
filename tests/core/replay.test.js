@@ -164,7 +164,7 @@ describe('replay recording', () => {
       mode: 'daily',
       date: '2026-10-18',
     }).toJSON();
-    expect(json.version).toBe(6);
+    expect(json.version).toBe(REPLAY_VERSION);
     expect(deserialize(serialize(json))).toMatchObject({
       mode: 'daily',
       date: '2026-10-18',

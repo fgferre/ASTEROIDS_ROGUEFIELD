@@ -11,8 +11,9 @@
 // picks (and the rerolls/banishes before them) are recorded in order and
 // re-applied at the next frame boundary, which is when a player's click lands
 // too (the loop stops stepping on level-up). A chest's cards, which wait for
-// Continue, go on their own once the last has had its reveal; the run is
-// paused under them, so the moment they go does not change it.
+// Continue, go on their own once the last has had its reveal, and the flight
+// briefing as soon as it takes Continue; the run is paused under them, so the
+// moment they go does not change it.
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 import { CHEST_REVEAL_MS } from '../modules/ui/ChestCeremony.js';
@@ -148,6 +149,12 @@ export function createReplayController({
     }
   });
 
+  eventBus.on('upgrade-held', (payload = {}) => {
+    if (recorder && payload.upgradeId) {
+      recorder.recordHold(runStep(), payload.upgradeId);
+    }
+  });
+
   eventBus.on('upgrade-options-ready', (payload = {}) => {
     if (player && (payload.options || []).length > 0) {
       pickPending = true;
@@ -181,15 +188,16 @@ export function createReplayController({
       };
     },
     /**
-     * Once per frame, before the fixed steps: passes a chest's cards, and
-     * applies a pending replay pick after the rerolls/banishes recorded
-     * before it.
+     * Once per frame, before the fixed steps: passes a chest's cards and the
+     * flight briefing (as soon as it takes Continue), and applies a pending
+     * replay pick after the rerolls/banishes/holds recorded before it.
      */
     tick() {
       if (!player) {
         return;
       }
       passChestCards();
+      ui.flightBriefing.continue();
       if (!pickPending) {
         return;
       }
@@ -199,7 +207,9 @@ export function createReplayController({
         const options =
           entry.action === 'reroll'
             ? progression.rerollUpgradeOptions()
-            : progression.banishUpgrade(entry.upgradeId);
+            : entry.action === 'hold'
+              ? progression.holdUpgrade(entry.upgradeId)
+              : progression.banishUpgrade(entry.upgradeId);
         if (options?.length === 0) {
           // Banished the last card: the screen closed with no pick.
           ui.showGameUI();

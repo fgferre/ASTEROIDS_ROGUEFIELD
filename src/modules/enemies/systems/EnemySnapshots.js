@@ -253,6 +253,10 @@ export class EnemySnapshots {
       maxHealth: safeNumber(enemy.maxHealth),
       spawnedBy: enemy.spawnedBy ?? null,
       spawnedByBossId: enemy.spawnedByBossId ?? null,
+      // An Elite's affixes (EnemyFactory.applyElite), a Herald's kind.
+      elite: Boolean(enemy.elite),
+      affixes: [...(enemy.affixes ?? [])],
+      heraldKind: enemy.heraldKind ?? null,
     };
   }
 
@@ -453,7 +457,7 @@ export class EnemySnapshots {
     }
 
     if (restoredPhase !== null) {
-      boss.currentPhase = restoredPhase;
+      boss.currentPhase = 0;
       boss.nextPhaseIndex = Math.min(
         restoredPhase,
         boss.phaseHealthThresholds.length
@@ -473,6 +477,13 @@ export class EnemySnapshots {
     }
 
     boss.applyPhaseMovement(true);
+    // Each phase it had reached is entered again as advancePhase enters it
+    // (a Sovereign's split, the Null's shed shell), without the flash.
+    for (let phase = 1; phase <= (restoredPhase ?? 0); phase += 1) {
+      boss.currentPhase = phase;
+      boss.applyPhaseMovement(true);
+      boss.enterPhase(phase - 1);
+    }
 
     return boss;
   }
@@ -507,6 +518,9 @@ export class EnemySnapshots {
       radius: safeNumber(snapshot.radius, null),
       spawnedBy: snapshot.spawnedBy ?? null,
       spawnedByBossId: snapshot.spawnedByBossId ?? null,
+      elite: snapshot.elite,
+      affixes: snapshot.affixes,
+      heraldKind: snapshot.heraldKind ?? undefined,
       randomScope: 'snapshot',
       poolId: snapshot.poolId,
     };

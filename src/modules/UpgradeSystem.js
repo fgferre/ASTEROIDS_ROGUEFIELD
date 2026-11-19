@@ -544,6 +544,7 @@ class UpgradeSystem extends BaseSystem {
 
     this.heldCard = { id: upgradeId, level: this.offerLevel };
     this.holdsLeft -= 1;
+    this.eventBus?.emit?.('upgrade-held', { upgradeId });
     return current;
   }
 

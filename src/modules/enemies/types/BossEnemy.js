@@ -703,8 +703,17 @@ export class BossEnemy extends BaseEnemy {
   }
 
   advancePhase() {
+    const before = this.currentPhase;
     Phases.advancePhase(this);
+    if (this.currentPhase !== before) this.enterPhase(before);
   }
+
+  /**
+   * A boss's own setup on entering `this.currentPhase` from `before`: after
+   * advancePhase, and again for each phase a retry's snapshot had reached
+   * (EnemySnapshots.applyBossSnapshot).
+   */
+  enterPhase() {}
 
   onDestroyed(source, context = {}) {
     GameDebugLogger.log('STATE', 'Boss destroyed', {

@@ -44,10 +44,7 @@ export class WardenNull extends BossEnemy {
     this.pullTimer = NULL.pullInterval;
   }
 
-  advancePhase() {
-    const before = this.currentPhase;
-    super.advancePhase();
-    if (this.currentPhase === before) return;
+  enterPhase() {
     if (this.currentPhase === 1) {
       this.chargeCooldown = NULL.openChargeCooldown;
       this.pullTimer = NULL.firstPullDelay;

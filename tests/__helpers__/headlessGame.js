@@ -95,6 +95,7 @@ export function createHeadlessGame() {
   const eventBus = new EventBus();
   const ui = {
     chestCeremony: { current: null },
+    flightBriefing: { continue() {} },
     handleBossEvent() {},
     showGameUI() {},
     showScreen() {},

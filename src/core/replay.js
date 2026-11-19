@@ -9,7 +9,7 @@
 // replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 6;
+export const REPLAY_VERSION = 7;
 // Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
 // Versions 1-2 had no level-up rerolls/banishes (version 3); their picks are
 // ids only and load unchanged.
@@ -20,7 +20,8 @@ export const REPLAY_VERSION = 6;
 // Versions 1-5 had no mode (version 6); they load as a normal run, the way
 // they always played back. They had no control scheme either: they play with
 // the viewer's.
-const READABLE_VERSIONS = new Set([1, 2, 3, 4, 5, REPLAY_VERSION]);
+// Versions 1-6 had no level-up holds (version 7); they load unchanged.
+const READABLE_VERSIONS = new Set([1, 2, 3, 4, 5, 6, REPLAY_VERSION]);
 const LEGACY_DIFFICULTY = 'veteran';
 const LEGACY_MODE = 'normal';
 
@@ -144,6 +145,10 @@ export function createRecorder({
     recordBanish(step, upgradeId) {
       upgrades.push([step, { type: 'banish', id: upgradeId }]);
     },
+    /** Level-up screen hold of `upgradeId`, before the pick (version 7). */
+    recordHold(step, upgradeId) {
+      upgrades.push([step, { type: 'hold', id: upgradeId }]);
+    },
     get steps() {
       return steps;
     },
@@ -193,7 +198,7 @@ export function createPlayer(recording) {
     /**
      * Next recorded level-up action, in order; null when none are left. A
      * pick is `{ step, upgradeId }`; a reroll `{ step, action: 'reroll' }`; a
-     * banish `{ step, action: 'banish', upgradeId }`.
+     * banish or a hold `{ step, action: 'banish' | 'hold', upgradeId }`.
      */
     takeUpgrade() {
       if (nextUpgrade >= upgrades.length) return null;
@@ -202,9 +207,9 @@ export function createPlayer(recording) {
       if (typeof entry === 'string') {
         return { step, upgradeId: entry };
       }
-      return entry.type === 'banish'
-        ? { step, action: 'banish', upgradeId: entry.id }
-        : { step, action: 'reroll' };
+      return entry.type === 'reroll'
+        ? { step, action: 'reroll' }
+        : { step, action: entry.type, upgradeId: entry.id };
     },
     isFinished(step) {
       return step >= steps;
