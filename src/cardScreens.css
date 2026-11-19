@@ -847,7 +847,7 @@ article.card {
    or an armed "Equip for me" waits for the next tap. */
 body[data-input-device='touch']
   #levelup-screen
-  :is([data-device='keyboard'], .card__key, .levelup-hint__keys) {
+  :is(.card__key, .levelup-hint__keys) {
   display: none;
 }
 

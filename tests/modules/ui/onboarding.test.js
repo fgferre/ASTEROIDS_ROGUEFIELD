@@ -359,6 +359,17 @@ describe('Onboarding', () => {
     ).not.toMatch(/nose/);
   });
 
+  it('names no key by touch, where the mode word is tapped', () => {
+    const unbound = { toggleAimMode: 'Set', toggleSpreadMode: 'Set' };
+    const notice = modeNotice(
+      { kind: 'spread', mode: 'fan' },
+      unbound,
+      'touch'
+    );
+    expect(notice.keys).toEqual([]);
+    expect(notice.text).toMatch(/^SPREAD FAN\b.*Tap again/);
+  });
+
   it('is off when the Settings toggle is off', () => {
     const settings = new SettingsSystem({ eventBus: createEventBusMock() });
     const ui = {

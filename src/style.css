@@ -1338,8 +1338,10 @@ select {
 }
 
 /* Hints for the last device used (UISystem sets data-input-device). */
-body[data-input-device='gamepad'] [data-device='keyboard'],
-body:not([data-input-device='gamepad']) [data-device='gamepad'] {
+body:is([data-input-device='gamepad'], [data-input-device='touch'])
+  [data-device='keyboard'],
+body:not([data-input-device='gamepad']) [data-device='gamepad'],
+body:not([data-input-device='touch']) [data-device='touch'] {
   display: none;
 }
 
@@ -1795,6 +1797,12 @@ kbd {
   border-color: var(--accent);
   color: var(--accent);
   box-shadow: var(--glow-accent);
+}
+
+/* By touch no key or pad button can answer a capture (the note says so). */
+body[data-input-device='touch'] .settings-binding-btn {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .settings-footer {
