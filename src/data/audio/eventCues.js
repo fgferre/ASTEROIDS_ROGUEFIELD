@@ -255,6 +255,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'pause-state-changed', cue: 'playPauseOpen', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseClose', unless: 'isPaused' },
   { on: 'screen-changed', run: 'screen' },
+  { on: 'opening-left', run: 'openingLeft' },
   { on: 'ui-overlay-visibility-changed', run: 'overlay' },
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },

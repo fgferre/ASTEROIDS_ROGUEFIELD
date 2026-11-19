@@ -35,7 +35,7 @@ const clock = { now: 0 };
 function boot(
   search,
   pad = { pads: [] },
-  { awake = true, onStart, device, via = 'click' } = {}
+  { awake = true, onStart, onLeave, device, via = 'click' } = {}
 ) {
   const screen = fakeElement();
   const hint = { textContent: 'Enter, click or Ⓐ to begin' };
@@ -73,10 +73,14 @@ function boot(
   });
   let complete;
   let progress;
-  setupLoadingScreen((onProgress, onComplete) => {
-    progress = onProgress;
-    complete = onComplete;
-  }, onStart);
+  setupLoadingScreen(
+    (onProgress, onComplete) => {
+      progress = onProgress;
+      complete = onComplete;
+    },
+    onStart,
+    onLeave
+  );
   if (via === 'loading') return { screen, line, progress, complete };
   complete();
   // The opening: a click (a gesture) or a pad press goes on to the gate.
@@ -292,12 +296,28 @@ describe('loading screen PRESS START gate', () => {
     expect(hint.textContent).toBe('Tap to begin');
   });
 
+  it('lets the music in only on the press that leaves the opening', () => {
+    const onLeave = vi.fn();
+    const { screen, progress, complete } = boot('', undefined, {
+      onLeave,
+      via: 'loading',
+    });
+    progress(0.5);
+    complete();
+    expect(onLeave).not.toHaveBeenCalled();
+    screen.listeners.click();
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(
     'shows the menu directly with %s',
     (search) => {
+      const onLeave = vi.fn();
       const { screen, menu, docListeners } = boot(search, undefined, {
+        onLeave,
         via: 'none',
       });
+      expect(onLeave).toHaveBeenCalledTimes(1);
       expect(menu.classes.has('hidden')).toBe(false);
       expect(screen.classes.has('hidden')).toBe(true);
       expect(docListeners.keydown).toBeUndefined();

@@ -139,6 +139,11 @@ class AudioSystem extends BaseSystem {
     // driven by screen/overlay events, not by the media graph.
     this.fileTrackManager = new FileTrackManager();
     this.currentScreen = null;
+    // The opening holds the menu's music until the press that leaves it
+    // ('opening-left'), even when an earlier touch already woke the audio.
+    this.openingHeld =
+      typeof document !== 'undefined' &&
+      Boolean(document.getElementById('loading-screen'));
 
     // DuckingController (INFRA-02 / AUDIO-03) — owns DEDICATED duck nodes
     // (musicDuckGain/effectsDuckGain) that REST at 1.0 and splice into both
@@ -656,7 +661,7 @@ class AudioSystem extends BaseSystem {
 
   _syncMenuTrackForCurrentScreen() {
     const currentScreen = this.fileTrackManager?.currentScreen;
-    if (!currentScreen) {
+    if (!currentScreen || this.openingHeld) {
       return;
     }
 

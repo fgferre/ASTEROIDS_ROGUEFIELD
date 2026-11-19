@@ -238,6 +238,12 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sfxBus.engine.stop();
   },
 
+  // The press that leaves the opening lets the menu's music in.
+  openingLeft(audio) {
+    audio.openingHeld = false;
+    audio._syncMenuTrackForCurrentScreen();
+  },
+
   // Back on the menu (from the map, a victory, a run): lines readied for a
   // journey not taken are let go.
   screen(audio, payload) {

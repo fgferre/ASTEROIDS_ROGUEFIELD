@@ -7,8 +7,9 @@
 // start press fades it out, shows the menu screen and the element leaves the
 // DOM. It came from MenuBackgroundSystem.js.
 //
-// The press that leaves the opening is the page's first gesture, so the music
-// is on (AudioSystem hears it) and the gate comes up awake: one press starts.
+// The music waits for the press that leaves the opening (`onLeave`), even if
+// an earlier touch woke the audio (Felipe, 19/11); that press is a gesture,
+// so the music is on and the gate comes up awake: one press starts.
 // A pad press cannot wake the music, so after one the gate sleeps as before:
 // the first touch or key wakes it, and the music with it; the next one is the
 // start. The start blinks the button and fades into the menu (the owner's
@@ -36,8 +37,9 @@ const LINE_MS = 2400;
  * @param {(onProgress: Function, onComplete: Function) => void}
  *   setLoadingCallbacks - the system's
  * @param {() => void} [onStart] - the start press (its sound)
+ * @param {() => void} [onLeave] - the opening is left (the music may begin)
  */
-export function setupLoadingScreen(setLoadingCallbacks, onStart) {
+export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
   if (typeof document === 'undefined') return;
 
   const loadingScreen = document.getElementById('loading-screen');
@@ -76,6 +78,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     () => {
       clearInterval(lineTimer);
       if (!shouldShowGate()) {
+        onLeave?.();
         finish();
         return;
       }
@@ -112,6 +115,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
       document.removeEventListener('keydown', onKey);
       loadingScreen.removeEventListener('click', onClick);
       cancelAnimationFrame(rafId);
+      onLeave?.();
       const morph = morphIntoTitle(loadingScreen);
       loadingScreen.classList.add('loading-screen--leaving');
       let timer = 0;
