@@ -1,7 +1,7 @@
 # Asteroids Roguefield — visão de jogo e plano mestre
 
-> **Nota (12/11/2026): este documento é a proposta de HORIZONTE de 22/10.** Onde divergir de `docs/ROTEIRO.md`, do
-> `PLAN.md` ou do código, esses vencem. Diferenças conhecidas:
+> **Nota (12/11/2026): este documento é a proposta de HORIZONTE de 22/10.** Onde divergir de `docs/ROTEIRO.md` ou do
+> código, esses vencem. Diferenças conhecidas:
 > seis capítulos aqui, três mais um final no jogo; Sovereign é o chefe final, não um sexto Warden;
 > Sentinels e fases selecionáveis já existem; 14–18 min na primeira fase não é a medida atual; "quatro cascos" são três.
 
@@ -759,7 +759,7 @@ Conservar massa fosca e luz informativa. Não substituir identidade de lugar por
 
 ### 14.3 Áudio e cerimônias
 
-Preservar a música de introdução feita pelo dono. Os sons de tiro contínuo, motor, início e trilha de tensão já receberam críticas dele e continuam sujeitos à revisão prevista no `PLAN.md`. Cada arma precisa de um som que comunique ritmo sem cansar em 20 minutos; três armas simultâneas tornam isso mais importante.
+Preservar a música de introdução feita pelo dono. Os sons de tiro contínuo, motor, início e trilha de tensão já receberam críticas dele e continuam sujeitos à revisão do som (`docs/PENDENCIAS.md`, item 18). Cada arma precisa de um som que comunique ritmo sem cansar em 20 minutos; três armas simultâneas tornam isso mais importante.
 
 Avisos de Ram, mina, sniper, campo gravitacional e chefes devem ser distinguíveis. Música acompanha território e fase de tensão, mas não precisa acrescentar frequências agudas para parecer difícil. Audição antes de implementação; não regenerar assets nesta etapa.
 
