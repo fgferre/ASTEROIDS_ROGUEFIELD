@@ -3892,6 +3892,25 @@ body.touch-play .menu-ship-selector__name {
   }
 }
 
+/* Phone in Safari, its bars showing (not installed): too short for four
+   tabs over Credits and Support, so those two join the top row. */
+@media (max-height: 340px) {
+  body.touch-play .menu-screen__content {
+    grid-template-areas:
+      'brand  flinks links  links'
+      'tabs   status status status'
+      'tabs   panel  panel  side'
+      'tabs   ring   ring   ring'
+      'tabs   hints  diff   launch';
+  }
+
+  body.touch-play .prep-footer__links {
+    flex-direction: row;
+    align-self: start;
+    padding-right: 0;
+  }
+}
+
 /* Hangar, Settings and Credits by touch: every button and tab finger-sized,
    the support e-mail a full-height target. */
 body.touch-play :is(.settings-close-btn, .credits-close-btn) {
@@ -4147,6 +4166,11 @@ body.touch-play {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* The dev build's perf overlay would sit over Launch and Codex on a phone. */
+body.touch-play #perf-overlay {
+  display: none;
 }
 
 .touch-layer {
