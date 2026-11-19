@@ -24,6 +24,7 @@ import {
   exposeRandomDebugControls,
   reseedRandomScopes,
 } from './audio/randomScopes.js';
+import { IS_DEV } from '../core/env.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
@@ -904,6 +905,10 @@ class AudioSystem extends BaseSystem {
       clearInterval(this.thrusterInactivityCheckInterval);
       this.thrusterInactivityCheckInterval = null;
     }
+    if (this.performanceStatsInterval) {
+      clearInterval(this.performanceStatsInterval);
+      this.performanceStatsInterval = null;
+    }
     // Tear down SFXBus: stop thruster loops, clean batcher/pool/cache, detach the
     // ambient/protected buses (idempotent).
     if (this.sfxBus && typeof this.sfxBus.dispose === 'function') {
@@ -937,10 +942,10 @@ class AudioSystem extends BaseSystem {
    * Inicia o sistema de monitoramento de performance
    */
   _startPerformanceMonitoring() {
-    if (!this.performanceMonitor.enabled) return;
+    if (!IS_DEV || !this.performanceMonitor.enabled) return;
 
     // Update performance stats every second
-    setInterval(() => {
+    this.performanceStatsInterval = setInterval(() => {
       this._updatePerformanceStats();
     }, 1000);
   }

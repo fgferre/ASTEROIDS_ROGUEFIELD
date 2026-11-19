@@ -50,9 +50,12 @@ export default class AchievementService {
     this.hullClean = true;
     this.cursedHeld = false;
     this.bossRush = false;
+    // A replayed run is someone else's play: it counts and unlocks nothing.
+    this.replay = false;
     this.grantPastVictory();
 
-    eventBus.on('game-started', () => {
+    eventBus.on('game-started', ({ replay = false } = {}) => {
+      this.replay = replay;
       this.cursedHeld = false;
       this.count('survivor');
     });
@@ -78,7 +81,7 @@ export default class AchievementService {
       if (this.hullClean) this.unlock('untouchable');
     });
     eventBus.on('herald-defeated', ({ kind } = {}) => {
-      if (!kind || this.heraldsFelled.includes(kind)) return;
+      if (!kind || this.replay || this.heraldsFelled.includes(kind)) return;
       this.heraldsFelled.push(kind);
       this.count('herald-hunter');
     });
@@ -130,7 +133,7 @@ export default class AchievementService {
 
   /** Adds one to a countable achievement; unlocks it at its target. */
   count(id) {
-    if (this.unlocked[id]) return;
+    if (this.replay || this.unlocked[id]) return;
     this.progress[id] = (this.progress[id] ?? 0) + 1;
     if (this.progress[id] >= BY_ID.get(id).target) {
       this.unlock(id);
@@ -140,7 +143,7 @@ export default class AchievementService {
   }
 
   unlock(id) {
-    if (this.unlocked[id]) return;
+    if (this.replay || this.unlocked[id]) return;
     this.unlocked[id] = new Date().toISOString();
     this.persist();
     this.eventBus.emit('achievement-unlocked', {

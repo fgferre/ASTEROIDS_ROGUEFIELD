@@ -110,8 +110,7 @@ export class SentinelGatekeeper extends BossEnemy {
   }
 
   // The phase step restores the phase movement; mid-attack it stays put.
-  advancePhase() {
-    super.advancePhase();
+  enterPhase() {
     if (this.gateState !== 'reposition') this.movementStrategy = 'linear';
   }
 

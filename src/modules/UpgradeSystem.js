@@ -24,7 +24,6 @@ import {
   FAMILY_APEX_THRESHOLD,
 } from '../data/upgrades/families.js';
 import { BaseSystem } from '../core/BaseSystem.js';
-import { hashString } from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
 import { DEFAULT_WEAPON_ID } from '../data/weapons.js';
@@ -78,8 +77,6 @@ class UpgradeSystem extends BaseSystem {
     };
 
     super(dependencies, mergedOptions);
-    // A fresh system draws like a reset one, from the seed it was built on.
-    this.reseedForksFromRunSeed();
   }
 
   initialize() {
@@ -98,18 +95,7 @@ class UpgradeSystem extends BaseSystem {
   }
 
   onReset() {
-    this.reseedForksFromRunSeed();
     this.resetRunUpgradeActions();
-  }
-
-  // The base reset sends the forks back to the seed they had at construction;
-  // the draw must follow the run's seed (the shared random's, already reset
-  // for this run), without drawing from the shared stream.
-  reseedForksFromRunSeed() {
-    for (const [name, label] of Object.entries(this.randomForkLabels)) {
-      this.randomForks[name]?.reset(hashString(`${this.random.seed}:${label}`));
-    }
-    this.captureRandomForkSeeds();
   }
 
   // Per-run reroll/banish/hold budget, the upgrades banished this run, and
@@ -544,6 +530,7 @@ class UpgradeSystem extends BaseSystem {
 
     this.heldCard = { id: upgradeId, level: this.offerLevel };
     this.holdsLeft -= 1;
+    this.eventBus?.emit?.('upgrade-held', { upgradeId });
     return current;
   }
 

@@ -34,6 +34,10 @@ const SHIELD_LEVEL_CONFIG = {
   },
 };
 
+// Level 5: the shield bursts as it breaks, hurting what is near (the card
+// says so); EnemySystem applies the damage, PlayerEffects draws the ring.
+const SHIELD_EXPLOSION = { radius: 200, damage: 50 };
+
 export class PlayerShield {
   /**
    * `getEventBus()`: the player's event bus, read live; every shield event goes out on it.
@@ -198,6 +202,11 @@ export class PlayerShield {
       this.getEventBus()?.emit?.('shield-deflective-explosion', {
         position,
         level: this.shieldUpgradeLevel,
+        radius: SHIELD_EXPLOSION.radius,
+      });
+      this.getEventBus()?.emit?.('shield-explosion-damage', {
+        position,
+        ...SHIELD_EXPLOSION,
       });
     }
 

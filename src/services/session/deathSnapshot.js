@@ -519,6 +519,12 @@ export class DeathSnapshot {
       }
     });
 
+    // The Flight Computer's briefing was read when the card was taken: a
+    // restored build flies modern at once, with no second briefing.
+    if (progression.getUpgradeCount('flight_computer') > 0) {
+      this.resolveServiceInstance('player').setFlightScheme('modern', false);
+    }
+
     return { reapplied, total, errors };
   }
 }

@@ -12,11 +12,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  setupGlobalMocks,
-  cleanupGlobalState,
-  createTestContainer,
-} from '../__helpers__/setup.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 

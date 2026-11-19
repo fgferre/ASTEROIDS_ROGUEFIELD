@@ -1,6 +1,6 @@
 // src/services/DifficultyService.js
 
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { holdSaves, loadJSON, saveJSON } from '../core/storage.js';
 import {
   DAILY_DIFFICULTY,
   DEFAULT_DIFFICULTY,
@@ -169,6 +169,7 @@ export default class DifficultyService {
     this.dateKey = this.daily ? this.replayDateKey ?? this.todayKey() : null;
     this.runDifficulty = this.getSelectedDifficulty();
     this.replayRun = this.replayDifficulty !== null;
+    holdSaves(this.replayRun);
     this.replayDifficulty = null;
     this.replayDateKey = null;
     if (!this.daily) {

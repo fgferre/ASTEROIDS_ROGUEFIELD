@@ -326,7 +326,6 @@ export class PickupSystem extends BaseSystem {
     this.pickups = [];
     this.chests.reset();
     this.overchargeRemaining = 0;
-    this.layer = 1;
     this.reseedRandom();
   }
 }

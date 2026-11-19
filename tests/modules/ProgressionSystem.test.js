@@ -2,11 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
-import {
-  setupGlobalMocks,
-  cleanupGlobalState,
-  createTestContainer,
-} from '../__helpers__/setup.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 
 const noop = () => {};
 

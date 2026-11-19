@@ -397,5 +397,19 @@ export function createRockBreak(kit, rocks) {
     }
   }
 
-  return { struck, split, adopt, settle, crumble, crush, update };
+  /** The mirror was cleared (reset, quit, retry): nothing is left to cut or fall. */
+  function clear() {
+    queue.forEach((job) => {
+      if (job.kept.slot !== undefined) rocks.freeShape(job.kept.slot);
+    });
+    queue.length = 0;
+    debris.forEach((d) => rocks.freeShape(d.shape));
+    debris.length = 0;
+    pending.clear();
+    spent = 0;
+  }
+
+  rocks.onClear = clear;
+
+  return { struck, split, adopt, settle, crumble, crush, update, clear };
 }

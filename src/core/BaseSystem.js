@@ -3,7 +3,7 @@ import {
   resolveEventBus,
   resolveService,
 } from './serviceUtils.js';
-import RandomService from './RandomService.js';
+import RandomService, { hashString } from './RandomService.js';
 import { IS_DEV } from './env.js';
 
 /**
@@ -85,8 +85,9 @@ class BaseSystem {
         );
       }
 
-      // Capture initial seeds
-      this.captureRandomForkSeeds();
+      // Seeded as every run reset seeds them (reseedRandomForks), so a system
+      // built for a seed and one reset to it draw the same.
+      this.reseedRandomForks();
     }
 
     // Setup performance monitoring if enabled
@@ -219,7 +220,7 @@ class BaseSystem {
   }
 
   /**
-   * Reset all forks to their captured seeds.
+   * Reset all forks to seeds derived from the run's seed (the shared random's).
    *
    * @param {Object} [options] - Reseeding options
    * @param {boolean} [options.refreshForks=false] - Recreate forks from scratch
@@ -235,21 +236,15 @@ class BaseSystem {
         this.random,
         this.randomForkLabels
       );
-      this.captureRandomForkSeeds();
-      return;
     }
 
-    if (!this.randomForkSeeds) {
-      this.captureRandomForkSeeds();
-    }
-
+    // The forks follow the run's seed (the shared random's, already reset for
+    // this run), not the one they were built on.
     Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (!fork || typeof fork.reset !== 'function') return;
+      const label = this.randomForkLabels?.[name];
+      if (!fork || typeof fork.reset !== 'function' || !label) return;
 
-      const storedSeed = this.randomForkSeeds?.[name];
-      if (storedSeed !== undefined) {
-        fork.reset(storedSeed);
-      }
+      fork.reset(hashString(`${this.random.seed}:${label}`));
     });
 
     this.captureRandomForkSeeds();

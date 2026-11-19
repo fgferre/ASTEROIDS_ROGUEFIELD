@@ -447,6 +447,7 @@ export default class EffectsSystem extends BaseSystem {
   update(deltaTime) {
     const baseDelta = Number.isFinite(deltaTime) ? Math.max(0, deltaTime) : 0;
     const effectDelta = this.gameTime.update(baseDelta);
+    this.bossTransitions.advanceBursts(baseDelta);
     this.screenFeedback.update(effectDelta);
 
     this.particleEffects.updateParticles(effectDelta);

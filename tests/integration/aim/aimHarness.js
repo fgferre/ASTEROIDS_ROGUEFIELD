@@ -3,7 +3,7 @@
  * Seed: AIM_REGRESSION_SEED = 0xA1A1 (shared per D-05 so fixture diffs are reviewable).
  */
 
-import { createTestContainer } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 
 const AIM_REGRESSION_SEED = 0xa1a1;

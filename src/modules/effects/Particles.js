@@ -69,6 +69,8 @@ export class Particles {
 
   // Empty lists; the ambient view stays until the next frame sets it.
   reset() {
+    // Give the live ones back, or the pool counts them in use forever.
+    for (const particle of this.particles) this.releaseParticle(particle);
     this.particles = [];
     this.shockwaves = [];
     this.damageTexts = [];

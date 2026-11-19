@@ -382,18 +382,6 @@ describe('run replay', () => {
     expect(replay.services.player.controlScheme).toBe('modern');
   });
 
-  it('plays a recording without a mode (version 5) as a normal run', () => {
-    const { live, recording } = recordRun();
-    const recorded = live.snapshot();
-    const { mode, date, ...v5 } = recording;
-    expect([mode, date]).toEqual(['normal', null]);
-
-    const replay = replayRun(deserialize({ ...v5, version: 5 }));
-    expect(replay.session.bossRush).toBe(false);
-    expect(replay.services.difficulty.isDaily()).toBe(false);
-    expect(replay.snapshot()).toEqual(recorded);
-  });
-
   it("leaves the viewer's Salvage and pad alone, then pays and rumbles for their own run", () => {
     const fake = installFakeGamepad();
     try {

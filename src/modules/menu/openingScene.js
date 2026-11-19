@@ -275,11 +275,19 @@ export function createOpeningScene(menu, random, shotName = null) {
     setQuality(level) {
       bloomPass.enabled = level > 0;
     },
+    // The composer's own pixel ratio is 1: it takes the drawing buffer's
+    // size, not CSS pixels, or the menu would render at a fraction of them.
     resize(width, height) {
-      composer.setSize(width, height);
+      const buffer = renderer.getDrawingBufferSize(new THREE.Vector2());
+      composer.setSize(buffer.x, buffer.y);
       camera.aspect = width / Math.max(1, height);
       camera.updateProjectionMatrix();
       output.uniforms.uAspect.value = camera.aspect;
+    },
+    // While the menu is stopped (in play) its big targets shrink to 1x1;
+    // resize() brings them back, with no object rebuilt.
+    release() {
+      composer.setSize(1, 1);
     },
     update(dt, still) {
       // Only the hull stays of the menu's own scene (its belt never spawns).

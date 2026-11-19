@@ -26,6 +26,10 @@ export class FlightBriefing {
     ui.registerEventListener('upgrade-modern-flight', () => {
       this.pending = true;
     });
+    // Already flying modern (a carried or retried build): nothing to brief.
+    ui.registerEventListener('control-scheme-changed', ({ scheme } = {}) => {
+      if (scheme === 'modern') this.pending = false;
+    });
     ui.registerEventListener('input-confirmed', () => this.continue());
     // A run starts or ends: nothing waits, nothing shows.
     ['game-started', 'player-died', 'run-won'].forEach((name) =>

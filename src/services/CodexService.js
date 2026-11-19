@@ -19,7 +19,12 @@ export default class CodexService {
     this.eventBus = eventBus;
     this.layer = 1;
     this.seen = loadJSON(CODEX_STORAGE_KEY)?.seen ?? {};
+    // A replayed run is someone else's play: it meets nothing for this save.
+    this.replay = false;
 
+    eventBus.on('game-started', ({ replay = false } = {}) => {
+      this.replay = replay;
+    });
     eventBus.on('wave-started', (payload = {}) => {
       this.layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     });
@@ -46,7 +51,7 @@ export default class CodexService {
 
   record(entity, { kill = false } = {}) {
     const id = codexIdOf(entity);
-    if (!KNOWN_IDS.has(id)) return;
+    if (this.replay || !KNOWN_IDS.has(id)) return;
     let entry = this.seen[id];
     if (!entry) {
       entry = { firstLayer: this.layer, kills: 0 };

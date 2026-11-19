@@ -1042,6 +1042,12 @@ export class EnemyMirror {
     if (view.phased) this.machineViews.phaseShade(view, 0);
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
+    if (view.cut !== undefined) {
+      // a cut rock's own shape goes back; the view binds afresh
+      this.rocks.freeShape(view.cut);
+      view.cut = undefined;
+      view.boundId = undefined;
+    }
     this.views.delete(key);
     this.pool(view);
   }

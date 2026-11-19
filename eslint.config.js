@@ -29,7 +29,7 @@ export default [
       'dist/**',
       'coverage/**',
       'node_modules/**',
-      'exported-assets/**',
+      '**/exported-assets/**',
       'src/public/libs/**',
       '.planning/**',
       '.claude/**',

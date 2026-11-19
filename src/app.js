@@ -23,6 +23,7 @@ import {
   createReplayController,
   fetchRecording,
   getReplayUrl,
+  showReplayNotice,
 } from './bootstrap/replaySession.js';
 import {
   DEFAULT_POOL_CONFIG,
@@ -614,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         recording = await fetchRecording(replayUrl);
       } catch (error) {
         console.error('[replay] Could not load recording:', error);
+        showReplayNotice(error);
       }
     }
 

@@ -175,9 +175,7 @@ export class Sovereign extends BossEnemy {
   }
 
   // It always steers itself; the last phase gives both orders at once.
-  advancePhase() {
-    const before = this.currentPhase;
-    super.advancePhase();
+  enterPhase(before) {
     this.movementStrategy = 'linear';
     if (this.currentPhase >= 2 && before < 2) this.beginSplit();
   }

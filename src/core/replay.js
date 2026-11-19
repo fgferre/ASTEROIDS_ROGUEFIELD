@@ -9,20 +9,9 @@
 // replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 6;
-// Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
-// Versions 1-2 had no level-up rerolls/banishes (version 3); their picks are
-// ids only and load unchanged.
-// Versions 1-3 had no analog sticks (version 4); their entries are
-// [step, mask] only and decode with the sticks centred.
-// Versions 1-4 had no difficulty (version 5); they load as Veteran, the only
-// difficulty there was.
-// Versions 1-5 had no mode (version 6); they load as a normal run, the way
-// they always played back. They had no control scheme either: they play with
-// the viewer's.
-const READABLE_VERSIONS = new Set([1, 2, 3, 4, 5, REPLAY_VERSION]);
-const LEGACY_DIFFICULTY = 'veteran';
-const LEGACY_MODE = 'normal';
+export const REPLAY_VERSION = 8;
+// Recordings before version 8 drew their random streams from the page's boot
+// seed, not the run's, so they no longer play back the same and are refused.
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -36,11 +25,11 @@ export const INPUT_FRAME_FIELDS = Object.freeze([
   'shield',
   'spread',
   'aim',
-  'dash', // version 2
+  'dash',
 ]);
 
 // Held stick axes in -1..1 (screen axes, y down): left stick move, right
-// stick aim. Stored after the mask as integers (version 4).
+// stick aim. Stored after the mask as integers.
 export const INPUT_ANALOG_FIELDS = Object.freeze([
   'moveX',
   'moveY',
@@ -102,15 +91,14 @@ export function decodeInputFrame(mask, analog = []) {
  * starting at 0 for the first simulated step of the run. `mode` is 'normal',
  * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
  * which its seed is drawn from, and null on any other run. `sector` is a
- * sector run's sector id (a 'normal' run), null on any other; recordings
- * without it load as null. `controls` is the
+ * sector run's sector id (a 'normal' run), null on any other. `controls` is the
  * hull control scheme flown, 'modern' or 'classic'.
  */
 export function createRecorder({
   seed,
   hull = null,
-  difficulty = LEGACY_DIFFICULTY,
-  mode = LEGACY_MODE,
+  difficulty = 'veteran',
+  mode = 'normal',
   date = null,
   sector = null,
   controls = null,
@@ -136,13 +124,17 @@ export function createRecorder({
     recordUpgrade(step, upgradeId) {
       upgrades.push([step, upgradeId]);
     },
-    /** Level-up screen reroll, before the pick (version 3). */
+    /** Level-up screen reroll, before the pick. */
     recordReroll(step) {
       upgrades.push([step, { type: 'reroll' }]);
     },
-    /** Level-up screen banish of `upgradeId`, before the pick (version 3). */
+    /** Level-up screen banish of `upgradeId`, before the pick. */
     recordBanish(step, upgradeId) {
       upgrades.push([step, { type: 'banish', id: upgradeId }]);
+    },
+    /** Level-up screen hold of `upgradeId`, before the pick. */
+    recordHold(step, upgradeId) {
+      upgrades.push([step, { type: 'hold', id: upgradeId }]);
     },
     get steps() {
       return steps;
@@ -193,7 +185,7 @@ export function createPlayer(recording) {
     /**
      * Next recorded level-up action, in order; null when none are left. A
      * pick is `{ step, upgradeId }`; a reroll `{ step, action: 'reroll' }`; a
-     * banish `{ step, action: 'banish', upgradeId }`.
+     * banish or a hold `{ step, action: 'banish' | 'hold', upgradeId }`.
      */
     takeUpgrade() {
       if (nextUpgrade >= upgrades.length) return null;
@@ -202,9 +194,9 @@ export function createPlayer(recording) {
       if (typeof entry === 'string') {
         return { step, upgradeId: entry };
       }
-      return entry.type === 'banish'
-        ? { step, action: 'banish', upgradeId: entry.id }
-        : { step, action: 'reroll' };
+      return entry.type === 'reroll'
+        ? { step, action: 'reroll' }
+        : { step, action: entry.type, upgradeId: entry.id };
     },
     isFinished(step) {
       return step >= steps;
@@ -218,7 +210,7 @@ export function serialize(recording) {
 
 export function deserialize(text) {
   const data = typeof text === 'string' ? JSON.parse(text) : text;
-  if (!data || !READABLE_VERSIONS.has(data.version)) {
+  if (!data || data?.version !== REPLAY_VERSION) {
     throw new Error(
       `[replay] Unsupported recording version ${data?.version} (expected ${REPLAY_VERSION})`
     );
@@ -230,8 +222,8 @@ export function deserialize(text) {
     version: data.version,
     seed: data.seed,
     hull: data.hull ?? null,
-    difficulty: data.difficulty ?? LEGACY_DIFFICULTY,
-    mode: data.mode ?? LEGACY_MODE,
+    difficulty: data.difficulty,
+    mode: data.mode,
     date: data.date ?? null,
     sector: data.sector ?? null,
     controls: data.controls ?? null,
