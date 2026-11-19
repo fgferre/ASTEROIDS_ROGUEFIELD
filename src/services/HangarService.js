@@ -16,7 +16,7 @@ import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { sectorById } from '../data/sectors.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
 
 /** The first save: `{ salvage, owned }`. Read once, never written again. */
 export const HANGAR_STORAGE_KEY_V1 = 'roguefield:hangar:v1';
@@ -85,8 +85,8 @@ export function loadHangarSave() {
  * Salvage earned per run, spent in the Hangar on permanent upgrades, kept in
  * localStorage. A run pays out on each death, on victory and on a quit from the
  * pause menu; a retried run
- * only pays the difference, so it is never paid twice. A replayed run pays
- * nothing. A Boss Rush run pays
+ * only pays the difference, so it is never paid twice. A replayed run or a
+ * demo scene pays nothing (storage.js). A Boss Rush run pays
  * per Warden felled instead of per layer, a sector run per layer it played
  * (`runSalvage`); every Salvage Cache
  * picked up adds its bonus on top. Systems read
@@ -143,9 +143,8 @@ export default class HangarService {
     });
   }
 
-  startRun({ bossRush = false, replay = false, sector = null } = {}) {
+  startRun({ bossRush = false, sector = null } = {}) {
     this.won = false;
-    this.replay = replay;
     this.bossRush = bossRush;
     this.sector = sectorById(sector);
     this.bossRushWardens = 0;
@@ -176,7 +175,7 @@ export default class HangarService {
    */
   climbPressure() {
     const rung = this.difficulty.getPressure();
-    if (this.replay || this.bossRush || rung === 0) return;
+    if (isProgressHeld() || this.bossRush || rung === 0) return;
     if (rung > this.pressure.open) return;
     this.pressure.best = Math.max(this.pressure.best, rung);
     if (rung === this.pressure.open) {
@@ -208,8 +207,8 @@ export default class HangarService {
    * layer in play.
    */
   award(runSummary = {}, { quit = false } = {}) {
-    if (this.replay) {
-      // A replay pays nothing: the viewer's Salvage stays as it is.
+    if (isProgressHeld()) {
+      // A replay or a demo pays nothing: the viewer's Salvage stays as it is.
       this.lastAward = {
         amount: 0,
         total: this.salvage,
@@ -272,7 +271,7 @@ export default class HangarService {
   }
 
   persist() {
-    saveJSON(HANGAR_STORAGE_KEY, {
+    saveProgress(HANGAR_STORAGE_KEY, {
       version: 2,
       salvage: this.salvage,
       owned: this.owned,

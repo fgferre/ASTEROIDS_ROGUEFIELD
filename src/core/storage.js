@@ -16,17 +16,29 @@ export function loadJSON(key) {
   }
 }
 
-// A replayed run is someone else's play: nothing is saved while it lasts
-// (DifficultyService.beginRun holds saves for it).
-let savesHeld = false;
+// A replayed run is someone else's play and a demo scene (`?content=`,
+// `?profile=`) nobody's: neither keeps any progress. DifficultyService.beginRun
+// holds it for such a run, the way back to the menu lets it go; settings and
+// the rest of saveJSON are never held.
+let progressHeld = false;
 
-export function holdSaves(hold) {
-  savesHeld = hold;
+export function holdProgress(hold) {
+  progressHeld = hold;
+}
+
+/** True while the run in play keeps no progress (medals, Codex, Salvage). */
+export function isProgressHeld() {
+  return progressHeld;
+}
+
+/** saveJSON for progress: records, medals, Codex, Hangar, story, daily. */
+export function saveProgress(key, value) {
+  if (!progressHeld) saveJSON(key, value);
 }
 
 export function saveJSON(key, value) {
   try {
-    if (savesHeld || typeof window === 'undefined' || !window.localStorage) {
+    if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
     window.localStorage.setItem(key, JSON.stringify(value));

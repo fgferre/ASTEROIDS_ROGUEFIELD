@@ -1,4 +1,5 @@
 import { afterEach, vi } from 'vitest';
+import { holdProgress } from '../../src/core/storage.js';
 
 const hasOwn = Object.prototype.hasOwnProperty;
 let previousGlobalsStack = null;
@@ -72,4 +73,6 @@ afterEach(() => {
   }
 
   vi.restoreAllMocks();
+  // A test that started a replay or a demo run must not hold the next one's saves.
+  holdProgress(false);
 });

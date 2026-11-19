@@ -4,7 +4,7 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
 import { HANGAR_ITEMS } from '../data/hangar.js';
 import { BASTION_HULL_ID } from '../data/shipModels.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
 import { loadRecords } from './runRecords.js';
 
 export const ACHIEVEMENTS_STORAGE_KEY = 'roguefield:achievements:v1';
@@ -50,12 +50,9 @@ export default class AchievementService {
     this.hullClean = true;
     this.cursedHeld = false;
     this.bossRush = false;
-    // A replayed run is someone else's play: it counts and unlocks nothing.
-    this.replay = false;
     this.grantPastVictory();
 
-    eventBus.on('game-started', ({ replay = false } = {}) => {
-      this.replay = replay;
+    eventBus.on('game-started', () => {
       this.cursedHeld = false;
       this.count('survivor');
     });
@@ -81,7 +78,8 @@ export default class AchievementService {
       if (this.hullClean) this.unlock('untouchable');
     });
     eventBus.on('herald-defeated', ({ kind } = {}) => {
-      if (!kind || this.replay || this.heraldsFelled.includes(kind)) return;
+      if (!kind || isProgressHeld() || this.heraldsFelled.includes(kind))
+        return;
       this.heraldsFelled.push(kind);
       this.count('herald-hunter');
     });
@@ -133,7 +131,8 @@ export default class AchievementService {
 
   /** Adds one to a countable achievement; unlocks it at its target. */
   count(id) {
-    if (this.replay || this.unlocked[id]) return;
+    // A replay or a demo scene counts and unlocks nothing (storage.js).
+    if (isProgressHeld() || this.unlocked[id]) return;
     this.progress[id] = (this.progress[id] ?? 0) + 1;
     if (this.progress[id] >= BY_ID.get(id).target) {
       this.unlock(id);
@@ -143,7 +142,7 @@ export default class AchievementService {
   }
 
   unlock(id) {
-    if (this.replay || this.unlocked[id]) return;
+    if (isProgressHeld() || this.unlocked[id]) return;
     this.unlocked[id] = new Date().toISOString();
     this.persist();
     this.eventBus.emit('achievement-unlocked', {
@@ -153,7 +152,7 @@ export default class AchievementService {
   }
 
   persist() {
-    saveJSON(ACHIEVEMENTS_STORAGE_KEY, {
+    saveProgress(ACHIEVEMENTS_STORAGE_KEY, {
       unlocked: this.unlocked,
       progress: this.progress,
       heraldsFelled: this.heraldsFelled,

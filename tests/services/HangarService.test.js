@@ -6,6 +6,7 @@ import {
   createHeadlessGame,
   installDomStubs,
 } from '../__helpers__/headlessGame.js';
+import { holdProgress } from '../../src/core/storage.js';
 import HangarService, {
   HANGAR_STORAGE_KEY,
   HANGAR_STORAGE_KEY_V1,
@@ -131,7 +132,8 @@ describe('HangarService', () => {
       difficulty: atRate(1),
     });
 
-    eventBus.emit('game-started', { replay: true });
+    holdProgress(true);
+    eventBus.emit('game-started', {});
     eventBus.emit('run-abandoned', summary(9, 47));
     expect(hangar.salvage).toBe(0);
   });
@@ -237,7 +239,8 @@ describe('HangarService', () => {
     const awarded = [];
     eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
 
-    eventBus.emit('game-started', { replay: true });
+    holdProgress(true);
+    eventBus.emit('game-started', {});
     eventBus.emit('player-died', summary(9, 47));
     expect(hangar.salvage).toBe(40);
     expect(hangar.lastAward).toEqual({
@@ -250,7 +253,8 @@ describe('HangarService', () => {
       40
     );
 
-    eventBus.emit('game-started', { replay: true });
+    holdProgress(true);
+    eventBus.emit('game-started', {});
     eventBus.emit('run-won', { wave: 15 });
     eventBus.emit('screen-changed', {
       screen: 'victory',
@@ -258,6 +262,7 @@ describe('HangarService', () => {
     });
     expect(hangar.salvage).toBe(40);
 
+    holdProgress(false);
     eventBus.emit('game-started', {});
     eventBus.emit('player-died', summary(9, 47));
     expect(hangar.salvage).toBe(40 + 99);
@@ -496,8 +501,10 @@ describe('HangarService', () => {
       const { eventBus, hangar, difficulty } = openRung(2, 2);
       eventBus.emit('game-started', { bossRush: true });
       eventBus.emit('run-won', { wave: 15 });
-      eventBus.emit('game-started', { replay: true });
+      holdProgress(true);
+      eventBus.emit('game-started', {});
       eventBus.emit('run-won', { wave: 15 });
+      holdProgress(false);
       eventBus.emit('game-started', {});
       difficulty.rung = 4;
       eventBus.emit('run-won', { wave: 15 });
