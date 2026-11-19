@@ -151,4 +151,15 @@ describe('save slots', () => {
     expect(localStorage.getItem('roguefield:slot2:records:v1')).not.toBeNull();
     expect(getActiveSlot()).toBe(1);
   });
+
+  it('says whether a chosen slot was kept, so a refused one is not reloaded into', () => {
+    expect(chooseSlot(2)).toBe(true);
+    const set = localStorage.setItem;
+    localStorage.setItem = (key, value) => {
+      if (key === SLOTS_STORAGE_KEY) throw new Error('QuotaExceededError');
+      set(key, value);
+    };
+    expect(chooseSlot(3)).toBe(false);
+    expect(resolveActiveSlot()).toBe(2);
+  });
 });

@@ -5,6 +5,7 @@ import { pilotSummaries } from '../../src/services/pilots.js';
 import { localDay, updateRecords } from '../../src/services/runRecords.js';
 import {
   deleteConfirmMarkup,
+  justChosen,
   lastFlownLabel,
   pilotCardMarkup,
 } from '../../src/modules/menu/pilotSelect.js';
@@ -112,5 +113,21 @@ describe('pilots', () => {
     expect(box.indexOf('data-confirm="cancel"')).toBeLessThan(
       box.indexOf('data-confirm="delete"')
     );
+  });
+
+  it('skips the pilots after a reload only when the chosen pilot is the one in play', () => {
+    const session = new Map();
+    window.sessionStorage = {
+      getItem: (key) => session.get(key) ?? null,
+      setItem: (key, value) => session.set(key, String(value)),
+      removeItem: (key) => session.delete(key),
+    };
+    session.set('roguefield:pilot-chosen', '2');
+    expect(justChosen()).toBe(false); // the page still plays pilot 1
+    chooseSlot(2);
+    resolveActiveSlot();
+    session.set('roguefield:pilot-chosen', '2');
+    expect(justChosen()).toBe(true);
+    expect(justChosen()).toBe(false); // once
   });
 });

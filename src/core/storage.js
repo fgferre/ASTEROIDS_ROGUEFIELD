@@ -63,11 +63,13 @@ export function slotStorageKey(key, slot = activeSlot) {
 }
 
 /**
- * Makes `slot` the one the next page load plays. The caller reloads: the
+ * Makes `slot` the one the next page load plays; true when the browser kept
+ * it (read back), false when storing it failed. The caller reloads: the
  * services read their pilot as they are built.
  */
 export function chooseSlot(slot) {
   saveJSON(SLOTS_STORAGE_KEY, { active: slot });
+  return readActiveSlot() === slot;
 }
 
 /** Removes `slot`'s pilot: exactly its SLOT_KEYS, nothing shared. */

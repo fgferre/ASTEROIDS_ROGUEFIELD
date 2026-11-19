@@ -71,12 +71,16 @@ export function deleteConfirmMarkup(summary, slot) {
     </div>`;
 }
 
-/** True once, on the entry right after a pilot was chosen. */
-function justChosen() {
+/**
+ * True once, on the entry right after a pilot was chosen, and only if that
+ * pilot is the one this page plays (a choice that did not stick shows the
+ * pilots again).
+ */
+export function justChosen() {
   try {
-    const chosen = window.sessionStorage?.getItem(CHOSEN_KEY) === '1';
+    const chosen = Number(window.sessionStorage?.getItem(CHOSEN_KEY));
     window.sessionStorage?.removeItem(CHOSEN_KEY);
-    return chosen;
+    return chosen === getActiveSlot();
   } catch {
     return false;
   }
@@ -114,6 +118,7 @@ export function openPilotSelect(onContinue) {
   document.body.appendChild(screen);
   let summaries = [];
   let confirming = null; // the slot the box asks about, or null
+  let refused = null; // a pilot the browser would not store as the next one
   let done = false;
   let rafId = 0;
   let held = padState();
@@ -121,7 +126,11 @@ export function openPilotSelect(onContinue) {
   function render(focusSelector) {
     summaries = pilotSummaries();
     screen.innerHTML = `<div class="credits-dialog pilot-dialog">
-        <header class="credits-header"><h2 id="pilot-screen-title" class="credits-title">Choose your pilot</h2></header>
+        <header class="credits-header"><h2 id="pilot-screen-title" class="credits-title">Choose your pilot</h2></header>${
+          refused
+            ? `<p class="pilot-error" role="alert">Pilot ${refused} could not be saved as the one to fly: this browser refused to store it. Pilot ${active} stays.</p>`
+            : ''
+        }
         <ul class="pilot-cards">${summaries
           .map((summary, i) =>
             pilotCardMarkup(summary, i + 1, i + 1 === active)
@@ -150,15 +159,21 @@ export function openPilotSelect(onContinue) {
 
   function choose(slot) {
     if (done) return;
-    leave();
     if (slot === active) {
+      leave();
       screen.remove();
       onContinue();
       return;
     }
-    chooseSlot(slot);
+    // Not stored: no reload into the wrong pilot; this screen says so.
+    if (!chooseSlot(slot)) {
+      refused = slot;
+      render(`[data-pilot-slot="${active}"]`);
+      return;
+    }
+    leave();
     try {
-      window.sessionStorage?.setItem(CHOSEN_KEY, '1');
+      window.sessionStorage?.setItem(CHOSEN_KEY, String(slot));
     } catch {
       // No session storage: the reloaded entry shows the pilots once more.
     }
