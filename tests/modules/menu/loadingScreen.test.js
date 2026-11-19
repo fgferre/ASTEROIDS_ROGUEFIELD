@@ -7,7 +7,7 @@ function fakeElement() {
   return {
     classes,
     listeners,
-    style: {},
+    style: { setProperty: vi.fn() },
     classList: {
       add: (c) => classes.add(c),
       remove: (...names) => names.forEach((c) => classes.delete(c)),
@@ -26,7 +26,7 @@ const clock = { now: 0 };
 function boot(
   search,
   pad = { pads: [] },
-  { awake = true, onStart, device } = {}
+  { awake = true, onStart, device, via = 'click' } = {}
 ) {
   const screen = fakeElement();
   const hint = { textContent: 'Enter, click or Ⓐ to begin' };
@@ -65,13 +65,67 @@ function boot(
     onStart
   );
   complete();
-  return { screen, menu, menuButton, button, docListeners, hint };
+  // The opening: a click (a gesture) or a pad press goes on to the gate.
+  if (via === 'click') screen.listeners.click();
+  if (via === 'pad') {
+    const idle = pad.pads;
+    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.frame();
+    pad.pads = idle;
+  }
+  if (via !== 'none') vi.advanceTimersByTime(600);
+  return { screen, menu, menuButton, button, docListeners, hint, pad };
 }
 
 const enter = () => ({
   key: 'Enter',
   repeat: false,
   preventDefault: vi.fn(),
+});
+
+describe('loading screen opening', () => {
+  beforeEach(() => {
+    clock.now = 0;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('asks for a press once loaded, the menu still hidden', () => {
+    const { screen, menu } = boot('', undefined, { via: 'none' });
+    expect(screen.classes.has('loading-screen--ready')).toBe(true);
+    expect(screen.classes.has('loading-screen--gate')).toBe(false);
+    expect(screen.style.setProperty).toHaveBeenCalledWith('--load', '1');
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
+  it('a click fades it into the gate, awake even before any gesture', () => {
+    const { screen } = boot('', undefined, { awake: false, via: 'none' });
+    screen.listeners.click();
+    expect(screen.classes.has('loading-screen--leaving')).toBe(true);
+    vi.advanceTimersByTime(600);
+    expect(screen.classes.has('loading-screen--gate')).toBe(true);
+    expect(screen.classes.has('loading-screen--asleep')).toBe(false);
+    expect(screen.classes.has('loading-screen--ready')).toBe(false);
+  });
+
+  it('any key goes on, a lone modifier does not', () => {
+    const { screen, docListeners } = boot('', undefined, { via: 'none' });
+    docListeners.keydown({ key: 'Shift', preventDefault: vi.fn() });
+    expect(screen.classes.has('loading-screen--leaving')).toBe(false);
+    docListeners.keydown({ key: 'x', preventDefault: vi.fn() });
+    vi.advanceTimersByTime(600);
+    expect(screen.classes.has('loading-screen--gate')).toBe(true);
+  });
+
+  it('a pad press goes on, and the gate sleeps (no music from a pad)', () => {
+    const { screen } = boot('', { pads: [] }, { awake: false, via: 'pad' });
+    expect(screen.classes.has('loading-screen--gate')).toBe(true);
+    expect(screen.classes.has('loading-screen--asleep')).toBe(true);
+  });
 });
 
 describe('loading screen PRESS START gate', () => {
@@ -147,6 +201,7 @@ describe('loading screen PRESS START gate', () => {
     const { screen, docListeners } = boot('', undefined, {
       awake: false,
       onStart,
+      via: 'pad',
     });
     expect(screen.classes.has('loading-screen--asleep')).toBe(true);
     // The capture listener (the wake) and the key listener hear the same key.
@@ -167,6 +222,7 @@ describe('loading screen PRESS START gate', () => {
     const { hint, docListeners } = boot('', undefined, {
       awake: false,
       device: 'touch',
+      via: 'pad',
     });
     expect(hint.textContent).toBe('Tap the screen');
     docListeners.pointerdown();
@@ -176,7 +232,9 @@ describe('loading screen PRESS START gate', () => {
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(
     'shows the menu directly with %s',
     (search) => {
-      const { screen, menu, docListeners } = boot(search);
+      const { screen, menu, docListeners } = boot(search, undefined, {
+        via: 'none',
+      });
       expect(menu.classes.has('hidden')).toBe(false);
       expect(screen.classes.has('hidden')).toBe(true);
       expect(docListeners.keydown).toBeUndefined();

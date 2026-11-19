@@ -1,6 +1,6 @@
 // src/data/credits.js
 //
-// The Pipo Labs address a player writes to about supporting the game: the
+// The Pipo Studio Labs address a player writes to about supporting the game: the
 // one place it lives (the credits window and the end credits show it, see
 // ui/CreditsOverlay.js).
 

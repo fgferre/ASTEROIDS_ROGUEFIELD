@@ -1,14 +1,18 @@
 // src/modules/menu/loadingScreen.js
 //
-// The boot loading screen (#loading-screen): its bar, percent and message
-// follow the menu's asset preload, then it becomes a PRESS START gate over the
-// live scene; a start press fades it out, shows the menu screen and the
-// element leaves the DOM. It came from MenuBackgroundSystem.js.
+// The boot loading screen (#loading-screen). First the opening (the owner's
+// option C, 19/11): the ship crosses its route as the menu's assets preload
+// (--load, 0..1); once loaded it asks for a tap, click or key, and that press
+// fades it off the live scene. Then the same screen is the PRESS START gate; a
+// start press fades it out, shows the menu screen and the element leaves the
+// DOM. It came from MenuBackgroundSystem.js.
 //
-// Until the page has had a gesture the gate sleeps (the browser keeps the
-// music off until then): the first touch wakes it, and the music with it
-// (AudioSystem hears the same gesture); the next one is the start. The start
-// blinks the button and fades into the menu (the owner's card, 17/11).
+// The press that leaves the opening is the page's first gesture, so the music
+// is on (AudioSystem hears it) and the gate comes up awake: one press starts.
+// A pad press cannot wake the music, so after one the gate sleeps as before:
+// the first touch or key wakes it, and the music with it; the next one is the
+// start. The start blinks the button and fades into the menu (the owner's
+// card, 17/11).
 
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
@@ -18,10 +22,12 @@ const TOUCH_HINT = 'Tap to begin';
 const WAKE_GRACE_MS = 500;
 // The start's blink and fade (style.css .loading-screen--starting).
 const START_EFFECT_MS = 1000;
+// The opening's fade off the scene (style.css .loading-screen--leaving).
+const LEAVE_MS = 600;
 
 /**
- * Sets up the loading screen UI and connects callbacks.
- * Automatically updates progress bar and hides loading when complete.
+ * Sets up the loading screen: the opening follows the preload, then a press
+ * hands over to the PRESS START gate.
  * @param {(onProgress: Function, onComplete: Function) => void}
  *   setLoadingCallbacks - the system's
  * @param {() => void} [onStart] - the start press (its sound)
@@ -30,9 +36,6 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
   if (typeof document === 'undefined') return;
 
   const loadingScreen = document.getElementById('loading-screen');
-  const progressFill = document.getElementById('loading-progress-fill');
-  const progressPercent = document.getElementById('loading-progress-percent');
-  const progressMessage = document.getElementById('loading-progress-message');
   const menuScreen = document.getElementById('menu-screen');
 
   if (!loadingScreen) {
@@ -41,29 +44,15 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
   }
 
   setLoadingCallbacks(
-    // onProgress callback
-    (progress, message) => {
-      const percent = Math.round(progress * 100);
-
-      if (progressFill) {
-        progressFill.style.width = `${percent}%`;
-      }
-
-      if (progressPercent) {
-        progressPercent.textContent = `${percent}%`;
-      }
-
-      if (progressMessage) {
-        progressMessage.textContent = message;
-      }
+    (progress) => {
+      loadingScreen.style.setProperty('--load', progress.toFixed(3));
     },
-    // onComplete callback
     () => {
       if (!shouldShowGate()) {
         finish();
         return;
       }
-      showGate();
+      showReady();
     }
   );
 
@@ -82,8 +71,61 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     }, 600);
   }
 
+  // Loaded: the opening asks for a press, which fades it into the gate.
+  function showReady() {
+    let rafId = 0;
+    let padHeld = padPressed();
+    // The game shows the menu at boot, under the loading screen: keep its
+    // panels out of sight (the scene canvas stays) until the player starts.
+    menuScreen?.classList.add('menu-screen--gated');
+    loadingScreen.style.setProperty('--load', '1');
+    loadingScreen.classList.add('loading-screen--ready');
+
+    function goOn(gesture) {
+      document.removeEventListener('keydown', onKey);
+      loadingScreen.removeEventListener('click', onClick);
+      cancelAnimationFrame(rafId);
+      loadingScreen.classList.add('loading-screen--leaving');
+      setTimeout(() => {
+        loadingScreen.classList.remove(
+          'loading-screen--ready',
+          'loading-screen--leaving'
+        );
+        showGate(gesture);
+      }, LEAVE_MS);
+    }
+
+    const onClick = () => goOn(true);
+
+    function onKey(event) {
+      if (
+        event.repeat ||
+        ['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      goOn(true);
+    }
+
+    function pollPad() {
+      const pressed = padPressed();
+      if (pressed && !padHeld) {
+        goOn(false);
+        return;
+      }
+      padHeld = pressed;
+      rafId = requestAnimationFrame(pollPad);
+    }
+
+    document.addEventListener('keydown', onKey);
+    loadingScreen.addEventListener('click', onClick);
+    rafId = requestAnimationFrame(pollPad);
+  }
+
   // The loading screen turns into the PRESS START gate over the live scene.
-  function showGate() {
+  // `gesture`: the opening was left by a touch, click or key (the music woke).
+  function showGate(gesture) {
     const button = document.getElementById('press-start-btn');
     const hint = loadingScreen.querySelector(
       '.loading-screen__gate-action > span'
@@ -94,7 +136,8 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     let started = false;
     let rafId = 0;
     let padHeld = padPressed();
-    let awakeAt = navigator.userActivation?.hasBeenActive ? -Infinity : null;
+    let awakeAt =
+      gesture || navigator.userActivation?.hasBeenActive ? -Infinity : null;
 
     function wake() {
       if (awakeAt !== null) return;
@@ -139,13 +182,6 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
       }
     }
 
-    function padPressed() {
-      const pads = navigator.getGamepads?.() ?? [];
-      return Array.from(pads).some(
-        (pad) => pad && (pad.buttons[0]?.pressed || pad.buttons[9]?.pressed)
-      );
-    }
-
     function pollPad() {
       const pressed = padPressed();
       if (pressed && !padHeld) {
@@ -156,9 +192,6 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
       rafId = requestAnimationFrame(pollPad);
     }
 
-    // The game shows the menu at boot, under the loading screen: keep its
-    // panels out of sight (the scene canvas stays) until the player starts.
-    menuScreen?.classList.add('menu-screen--gated');
     loadingScreen.classList.add('loading-screen--gate');
     if (awakeAt === null) {
       loadingScreen.classList.add('loading-screen--asleep');
@@ -172,6 +205,14 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     rafId = requestAnimationFrame(pollPad);
     button?.focus();
   }
+}
+
+// Pad A or Start, on any pad.
+function padPressed() {
+  const pads = navigator.getGamepads?.() ?? [];
+  return Array.from(pads).some(
+    (pad) => pad && (pad.buttons[0]?.pressed || pad.buttons[9]?.pressed)
+  );
 }
 
 // Boot paths that start a run or a scene without the player skip the gate.
