@@ -148,6 +148,10 @@ export class TouchControls {
       this.placePause();
       this.holdWhileUpright();
     });
+    // Home, the notification shade or a call took the screen mid-run.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pauseRun();
+    });
 
     const { default: nipplejs } = await import('nipplejs');
     const manager = nipplejs.create({
@@ -176,12 +180,18 @@ export class TouchControls {
     if (!isPortrait() || this.upright) {
       return;
     }
-    if (this.input.isGameRunning()) {
-      this.eventBus.emit('toggle-pause');
-    }
+    this.pauseRun();
     this.upright = waitAtDoor().then(() => {
       this.upright = null;
     });
+  }
+
+  /** The thumb lets go and a running run pauses (upright, or app left). */
+  pauseRun() {
+    this.stick = CENTRED;
+    if (this.input.isGameRunning()) {
+      this.eventBus.emit('toggle-pause');
+    }
   }
 
   /** The pause button sits just right of the clock's row (run-info). */
