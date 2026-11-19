@@ -14,6 +14,8 @@
 // start. The start blinks the button and fades into the menu (the owner's
 // card, 17/11).
 
+import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
+
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
 const TOUCH_WAKE_HINT = 'Tap the screen';
@@ -85,14 +87,30 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
       document.removeEventListener('keydown', onKey);
       loadingScreen.removeEventListener('click', onClick);
       cancelAnimationFrame(rafId);
+      const morph = morphIntoTitle(loadingScreen);
       loadingScreen.classList.add('loading-screen--leaving');
-      setTimeout(() => {
+      let timer = 0;
+      function toGate() {
+        clearTimeout(timer);
+        document.removeEventListener('keydown', toGate);
+        loadingScreen.removeEventListener('click', toGate);
         loadingScreen.classList.remove(
           'loading-screen--ready',
-          'loading-screen--leaving'
+          'loading-screen--leaving',
+          'loading-screen--morphing'
         );
         showGate(gesture);
-      }, LEAVE_MS);
+        if (morph) {
+          morph.classList.add('opening-morph--gone');
+          setTimeout(() => morph.remove(), LEAVE_MS);
+        }
+      }
+      timer = setTimeout(toGate, morph ? MORPH_MS : LEAVE_MS);
+      // A press during the morph skips to the gate; it does not start.
+      if (morph) {
+        document.addEventListener('keydown', toGate);
+        loadingScreen.addEventListener('click', toGate);
+      }
     }
 
     const onClick = () => goOn(true);

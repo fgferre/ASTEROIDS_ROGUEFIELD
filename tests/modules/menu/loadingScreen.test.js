@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupLoadingScreen } from '../../../src/modules/menu/loadingScreen.js';
+import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
+
+// The morph draws on a real page; here it either declines (null) or hands
+// back a stand-in overlay.
+vi.mock('../../../src/modules/menu/openingMorph.js', () => ({
+  MORPH_MS: 2000,
+  morphIntoTitle: vi.fn(() => null),
+}));
 
 function fakeElement() {
   const classes = new Set();
@@ -119,6 +127,26 @@ describe('loading screen opening', () => {
     docListeners.keydown({ key: 'x', preventDefault: vi.fn() });
     vi.advanceTimersByTime(600);
     expect(screen.classes.has('loading-screen--gate')).toBe(true);
+  });
+
+  it('with the morph, waits for it; a press meanwhile skips to the gate', () => {
+    const overlay = { classList: fakeElement().classList, remove: vi.fn() };
+    morphIntoTitle.mockReturnValueOnce(overlay).mockReturnValueOnce(overlay);
+    let { screen } = boot('', undefined, { via: 'none' });
+    screen.listeners.click();
+    vi.advanceTimersByTime(600);
+    expect(screen.classes.has('loading-screen--gate')).toBe(false);
+    vi.advanceTimersByTime(1400);
+    expect(screen.classes.has('loading-screen--gate')).toBe(true);
+    expect(overlay.classList.contains('opening-morph--gone')).toBe(true);
+    vi.advanceTimersByTime(600);
+    expect(overlay.remove).toHaveBeenCalled();
+
+    ({ screen } = boot('', undefined, { via: 'none' }));
+    screen.listeners.click();
+    screen.listeners.click(); // the impatient second press
+    expect(screen.classes.has('loading-screen--gate')).toBe(true);
+    expect(screen.classes.has('loading-screen--starting')).toBe(false);
   });
 
   it('a pad press goes on, and the gate sleeps (no music from a pad)', () => {

@@ -432,6 +432,23 @@ select {
   background: #03070d;
 }
 
+/* The studio's mark (index.html's #pipo-brand): its <symbol> sits in a
+   sizeless box; every use keeps the drawing's proportions. */
+.pipo-brand-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.pipo-brand {
+  display: block;
+  aspect-ratio: 430 / 361;
+  width: auto;
+  height: 56px;
+  overflow: visible;
+}
+
 /* The opening (option C, the owner's pick, 19/11): stars and outlined rocks
    drift, the ship crosses the route as --load (0..1) grows, tips take turns;
    loaded, it asks for a tap, click or key. Everything that moves is a
@@ -578,25 +595,29 @@ select {
 
 .opening__studio {
   position: absolute;
-  top: max(13%, 24px);
+  top: max(6%, 12px);
   left: 0;
   right: 0;
-  margin: 0;
-  text-align: center;
-  font-size: clamp(13px, 1.6vmin + 6px, 18px);
-  letter-spacing: 0.42em;
-  padding-left: 0.42em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6em;
+  font-family: var(--font-ui);
+  font-size: clamp(13px, 1.2vmin + 6px, 16px);
+  letter-spacing: 0.5em;
+  padding-left: 0.5em;
   color: #a7c9d7;
   animation: openingRise 1.4s ease-out both;
 }
 
-.opening__studio strong {
-  display: block;
-  margin-bottom: 0.5em;
-  font-size: 1.9em;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  color: #e3f2f7;
+/* The mark, sized by the screen's height so it clears the route. */
+.opening__brand {
+  height: min(150px, 28vh);
+}
+
+/* While it becomes the title (openingMorph.js) its overlay stands in. */
+.loading-screen--morphing .opening__brand {
+  visibility: hidden;
 }
 
 /* The route: dashes, the cyan trail behind the ship, the goal ring. */
@@ -782,7 +803,8 @@ select {
   }
 
   .opening__studio {
-    top: max(10%, 14px);
+    top: max(4%, 8px);
+    gap: 0.3em;
   }
 
   .opening__under {
@@ -845,7 +867,8 @@ html[data-motion='reduced'] .opening__tips p:first-child {
   display: none;
 }
 
-.loading-screen--gate .loading-screen__gate {
+.loading-screen--gate .loading-screen__gate,
+.loading-screen--measure .loading-screen__gate {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -853,6 +876,26 @@ html[data-motion='reduced'] .opening__tips p:first-child {
   position: absolute;
   inset: 0;
   padding: var(--space-5);
+}
+
+/* Laid out unseen, so the opening's morph can find the title (openingMorph). */
+.loading-screen--measure .loading-screen__gate {
+  visibility: hidden;
+}
+
+/* The morph's overlay: over everything, never in the way of a press. */
+.opening-morph {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10001;
+  pointer-events: none;
+  transition: opacity 0.5s ease-out;
+}
+
+.opening-morph--gone {
+  opacity: 0;
 }
 
 .loading-screen__gate-title {
@@ -2205,7 +2248,7 @@ kbd {
 
 /* Who made it: the studio, the byline */
 .credits-studio {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
   font-family: var(--font-display);
   font-size: var(--text-xs);
   letter-spacing: 0.32em;
@@ -2311,6 +2354,11 @@ kbd {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--accent);
+}
+
+.end-credits__label .pipo-brand {
+  height: 110px;
+  margin: 0 auto var(--space-3);
 }
 
 .end-credits__title {
