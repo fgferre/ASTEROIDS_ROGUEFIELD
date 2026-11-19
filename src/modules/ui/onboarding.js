@@ -44,17 +44,23 @@ const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
  * along the turret: on the nose, or along the right stick while it is held.
  */
 export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
+  // By touch the mode word itself is tapped: no key to name.
+  const touch = device === 'touch';
+  const again = touch ? 'Tap again' : 'Press again';
   const texts = {
-    auto: 'AIM AUTO · the turret finds targets. Press again for manual.',
+    auto: `AIM AUTO · the turret finds targets. ${again} for manual.`,
     manual:
       device === 'gamepad'
         ? 'AIM MANUAL · aim with the right stick. Press again for auto.'
-        : 'AIM MANUAL · shots fly where the nose points. Press again for auto.',
-    fan: 'SPREAD FAN · extra shots fan out wide. Press again to concentrate.',
-    concentrated:
-      'SPREAD CONC · extra shots fly side by side. Press again to fan.',
+        : `AIM MANUAL · shots fly where the nose points. ${again} for auto.`,
+    fan: `SPREAD FAN · extra shots fan out wide. ${again} to concentrate.`,
+    concentrated: `SPREAD CONC · extra shots fly side by side. ${again} to fan.`,
   };
-  const key = kind === 'aim' ? keys.toggleAimMode : keys.toggleSpreadMode;
+  const key = touch
+    ? null
+    : kind === 'aim'
+      ? keys.toggleAimMode
+      : keys.toggleSpreadMode;
   return { keys: key ? [key] : [], text: texts[mode] };
 }
 

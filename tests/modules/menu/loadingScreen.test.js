@@ -23,8 +23,14 @@ function fakeElement() {
 
 const clock = { now: 0 };
 
-function boot(search, pad = { pads: [] }, { awake = true, onStart } = {}) {
+function boot(
+  search,
+  pad = { pads: [] },
+  { awake = true, onStart, device } = {}
+) {
   const screen = fakeElement();
+  const hint = { textContent: 'Enter, click or Ⓐ to begin' };
+  screen.querySelector.mockReturnValue(hint);
   const menu = fakeElement();
   menu.classes.add('hidden');
   const menuButton = fakeElement();
@@ -51,6 +57,7 @@ function boot(search, pad = { pads: [] }, { awake = true, onStart } = {}) {
     getElementById: (id) => byId[id] ?? null,
     addEventListener: (type, fn) => (docListeners[type] = fn),
     removeEventListener: (type) => delete docListeners[type],
+    body: { dataset: { inputDevice: device } },
   });
   let complete;
   setupLoadingScreen(
@@ -58,7 +65,7 @@ function boot(search, pad = { pads: [] }, { awake = true, onStart } = {}) {
     onStart
   );
   complete();
-  return { screen, menu, menuButton, button, docListeners };
+  return { screen, menu, menuButton, button, docListeners, hint };
 }
 
 const enter = () => ({
@@ -154,6 +161,16 @@ describe('loading screen PRESS START gate', () => {
     docListeners.keydown(enter());
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(screen.classes.has('loading-screen--starting')).toBe(true);
+  });
+
+  it('names the tap by touch, asleep and awake', () => {
+    const { hint, docListeners } = boot('', undefined, {
+      awake: false,
+      device: 'touch',
+    });
+    expect(hint.textContent).toBe('Tap the screen');
+    docListeners.pointerdown();
+    expect(hint.textContent).toBe('Tap to begin');
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(

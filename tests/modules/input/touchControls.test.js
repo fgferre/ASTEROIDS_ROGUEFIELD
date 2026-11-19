@@ -88,4 +88,22 @@ describe('touch stick', () => {
       moveY: 0,
     });
   });
+
+  it('lets go and pauses a running run when the app leaves the screen', () => {
+    const emitted = [];
+    let running = true;
+    const touch = new TouchControls({
+      input: { isGameRunning: () => running },
+      player: facingRight,
+      eventBus: { emit: (name) => emitted.push(name) },
+      mode: 'teclas',
+    });
+    touch.stick = UP;
+    touch.pauseRun();
+    expect(touch.stick).toEqual({ x: 0, y: 0 });
+    expect(emitted).toEqual(['toggle-pause']);
+    running = false; // already paused, or in a menu: nothing toggles
+    touch.pauseRun();
+    expect(emitted).toEqual(['toggle-pause']);
+  });
 });

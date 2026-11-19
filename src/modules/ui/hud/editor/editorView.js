@@ -146,8 +146,11 @@ export function presetOptions(presets, activeId) {
   );
 }
 
-/** Keyboard or pad: how to drive the editor. */
+/** Keyboard, pad or touch: how to drive the editor. */
 export function hintText(device) {
+  if (device === 'touch') {
+    return 'Tap an instrument to select it · Drag to move · Undo, Redo and Done are in the bar';
+  }
   return device === 'gamepad'
     ? 'D-pad select · A move · LB / RB model · X show / hide · Y panels · B back'
     : 'Drag to move · Shift or Alt moves freely · Arrows nudge (Shift ×10) · Tab next · Ctrl+Z / Ctrl+Shift+Z · Esc done';

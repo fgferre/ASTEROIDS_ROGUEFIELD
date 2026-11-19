@@ -36,7 +36,7 @@ export function getHudHtml() {
                 <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
                 <div class="layer-banner__note" id="ui-layer-banner-note"></div>
             </div>
-            <div class="cinematic-hint" id="ui-cinematic-hint">PRESS ANY KEY TO SKIP</div>
+            <div class="cinematic-hint" id="ui-cinematic-hint"><span data-device="keyboard">PRESS ANY KEY TO SKIP</span><span data-device="gamepad">PRESS ANY KEY TO SKIP</span><span data-device="touch">TAP TO SKIP</span></div>
             <div class="letterbox" id="ui-letterbox" aria-hidden="true"></div>
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
