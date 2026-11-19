@@ -54,7 +54,5 @@ export function getHudHtml() {
                 <div class="transmission__rule"></div>
                 <div class="transmission__line" id="ui-transmission-line"></div>
             </div>
-
-            <div class="cockpit-frame"></div>
         `;
 }

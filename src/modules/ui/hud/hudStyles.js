@@ -22,6 +22,15 @@ export function getHudCss() {
                 /* The HUD's unit: 1 at a 1080p window with HUD Scale 100 % (viewportScaling.js) */
                 --hud-u: calc(var(--hud-scale-effective, 1.2) / 1.2);
                 --boss-light: color-mix(in srgb, var(--boss) 55%, white);
+                /* No dark field behind the instruments (Felipe, 18/11): the letters carry a thin dark
+                   outline, one stroke wide, and the drawn parts (hull capsule, radar rings, XP line,
+                   weapon track) the same stroke, so they hold over the field's glowing border. */
+                --hud-ink: 1px 0 0 rgba(2, 4, 8, 0.9), -1px 0 0 rgba(2, 4, 8, 0.9), 0 1px 0 rgba(2, 4, 8, 0.9),
+                    0 -1px 0 rgba(2, 4, 8, 0.9), 1px 1px 0 rgba(2, 4, 8, 0.7), -1px -1px 0 rgba(2, 4, 8, 0.7),
+                    1px -1px 0 rgba(2, 4, 8, 0.7), -1px 1px 0 rgba(2, 4, 8, 0.7);
+            }
+            .vt-gauge, [data-slot='radar'] svg, [data-slot='xp'] svg, .bd-track {
+                filter: drop-shadow(1px 0 0 rgba(2, 4, 8, 0.8)) drop-shadow(-1px 0 0 rgba(2, 4, 8, 0.8));
             }
             .hud-panel { pointer-events: auto; transition: opacity var(--motion-base, 0.3s); }
 
@@ -34,48 +43,19 @@ export function getHudCss() {
                 /* its slots size against it (cqw), e.g. the XP line between the corners */
                 container-type: size;
             }
-            /* The field's glowing border fades out under an instrument: a soft dark plate behind it,
-               reaching --plate-x / --plate-y past the instrument and feathered over its last 40 px
-               (the XP line's spans the bottom edge between the corners; the radar's is round). */
-            .hud-plate::before {
-                content: ''; position: absolute; z-index: -1; pointer-events: none;
-                inset: calc(var(--plate-y, -40px) * var(--hud-u)) calc(var(--plate-x, -48px) * var(--hud-u));
-                --feather: calc(40px * var(--hud-u));
-                --across: linear-gradient(to right, transparent, #000 var(--feather), #000 calc(100% - var(--feather)), transparent);
-                --down: linear-gradient(to bottom, transparent, #000 var(--feather), #000 calc(100% - var(--feather)), transparent);
-                background: rgba(2, 4, 8, 0.8);
-                -webkit-mask-image: var(--across), var(--down); -webkit-mask-composite: source-in;
-                mask-image: var(--across), var(--down); mask-composite: intersect;
-                transition: opacity var(--motion-base) var(--ease-out);
-            }
-            [data-slot='xp'] { --plate-x: -230px; }
-            [data-slot='radar'].hud-plate::before { inset: calc(-24px * var(--hud-u)); -webkit-mask-image: none; mask-image: none; background: radial-gradient(closest-side, rgba(2, 4, 8, 0.8) 72%, transparent); }
-            /* Only under what is drawn: the Warden bar while it is up, the feed while it has rows. */
-            [data-slot='warden'].hud-plate:not(:has(.is-on))::before, [data-slot='feed'].hud-plate:not(:has(.feed-row))::before { opacity: 0; }
-
             /* INSTRUMENTS: the mock-ups' finish (HUD.md). Glance 70 % (55 % while a Warden lives),
-               on demand 35 % until a change wakes it; a changed value pulses once. */
-            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: 0 1px 2px rgba(2, 4, 8, 0.9); pointer-events: none; }
+               on demand 60 % until a change wakes it; a changed value pulses once. */
+            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: var(--hud-ink); pointer-events: none; }
             .ins-lbl { font-family: var(--font-display); font-weight: 500; font-size: calc(var(--text-xs) * var(--hud-u)); letter-spacing: 0.2em; color: var(--text-dim); }
             .ins-glance { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             #hud-layer[data-hud-mode='warden'] .ins-glance { opacity: 0.55; }
-            .ins-demand { opacity: 0.35; transition: opacity var(--motion-base) var(--ease-out); }
+            .ins-demand { opacity: 0.6; transition: opacity var(--motion-base) var(--ease-out); }
             .ins-demand.is-awake { opacity: 1; }
             @media (prefers-reduced-motion: no-preference) {
                 html:not([data-motion='reduced']) body:not(.motion-reduced) .ins-pulse { animation: ins-pulse 120ms var(--ease-out) 1; }
             }
             @keyframes ins-pulse { 50% { transform: scale(1.06); filter: brightness(1.5); } }
 
-            .cockpit-frame {
-                position: absolute; width: 100%; height: 100%; z-index: 11; pointer-events: none;
-                transition: opacity var(--motion-base, 0.3s);
-                background: linear-gradient(135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(-135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(45deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(-45deg, rgba(5,5,5,0.5) 2%, transparent 10%);
-            }
-            /* Under the letterbox the picture is the scene's alone (the jump's white-out). */
-            body:has(.letterbox.is-showing) .cockpit-frame { opacity: 0; }
 
 
             /* NEXT WAVE */

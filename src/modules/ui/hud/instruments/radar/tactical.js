@@ -128,7 +128,7 @@ const CSS = `
             .rt[data-mode='warden'] .rt-o, .rt[data-mode='warden'] .rt-label { opacity: 0.55; }
             .rt[data-mode='warden'] .rt-o.is-dim { opacity: 0.25; }
             .rt[data-mode='warden'] .rt-o.k-warden { opacity: 1; }
-            .rt-label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 600; font-size: calc(var(--text-md) * var(--rt-u)); line-height: 1; color: var(--danger); white-space: nowrap; text-shadow: 0 1px 2px rgba(2, 4, 8, 0.9); }
+            .rt-label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 600; font-size: calc(var(--text-md) * var(--rt-u)); line-height: 1; color: var(--danger); white-space: nowrap; text-shadow: var(--hud-ink); }
             .rt-label.k-elite { color: var(--xp); }
             .rt-label.k-herald { font-size: calc(var(--text-xs) * var(--rt-u)); letter-spacing: 0.08em; color: var(--rt-boss-light); }
             .rt .rt-jam { inset: 50% 0 auto; height: auto; transform: translateY(-50%); display: none; text-align: center; font-family: var(--font-display); font-size: calc(var(--text-sm) * var(--rt-u)); font-weight: 700; letter-spacing: 0.3em; margin-right: -0.3em; color: var(--xp); text-shadow: 0 0 8px var(--xp), 0 1px 0 rgba(0, 0, 0, 0.8); }

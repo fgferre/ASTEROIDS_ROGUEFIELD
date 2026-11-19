@@ -102,15 +102,7 @@ export class AAAHudLayout {
     const hudLayer = document.createElement('div');
     hudLayer.id = 'hud-layer';
     hudLayer.innerHTML = getHudHtml();
-    const cockpitFrame = hudLayer.querySelector('.cockpit-frame');
-    if (cockpitFrame) {
-      cockpitFrame.remove();
-    }
-
     this._root.appendChild(hudLayer);
-    if (cockpitFrame) {
-      this._root.appendChild(cockpitFrame);
-    }
     this._layer = hudLayer;
 
     this._cacheElements();

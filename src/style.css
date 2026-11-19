@@ -4260,28 +4260,21 @@ body.is-paused .touch-layer {
   box-sizing: border-box;
 }
 
-/* Out from under the thumbs: hull up under the clock, weapon and modes up
-   under the radar, no feed; the mode words take a tap. */
-body.touch-play .hud-frame [data-slot='vitals'] {
-  top: calc(150px * var(--hud-u, 1)) !important;
-  bottom: auto !important;
-  transform-origin: top left !important;
-}
-
-body.touch-play .hud-frame [data-slot='build'] {
-  top: calc(230px * var(--hud-u, 1)) !important;
-  bottom: auto !important;
-  transform-origin: top right !important;
-}
-
-body.touch-play .hud-frame [data-slot='feed'] {
-  display: none !important;
-}
-
+/* The HUD's mode words take a tap. Where the instruments sit on a touch
+   screen is the HUD layout's (data/ui/hudPresets.js, screens). The tap
+   area reaches past the small letters, at least 44 px tall at the
+   smallest slot scale (0.6), without changing what is drawn. */
 body.touch-play .hud-frame [data-touch-action] {
-  padding: 6px 4px;
-  margin: -6px -4px;
+  position: relative;
   pointer-events: auto;
+}
+
+body.touch-play .hud-frame [data-touch-action]::after {
+  content: '';
+  position: absolute;
+  inset: 50% -4px auto;
+  height: 76px;
+  transform: translateY(-50%);
 }
 
 /* === First-run toast over the field === */

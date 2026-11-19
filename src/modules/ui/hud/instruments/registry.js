@@ -124,16 +124,12 @@ const px = (n) => `calc(${n}px * var(--hud-u, 1))`;
 // frame or 'screen' (the whole layer); x and y are px from that corner or
 // edge. Every call writes every placement property: a preset switch reuses
 // the container.
-function placeSlot(
-  container,
-  { anchor, x, y, scale, opacity, visible, plate }
-) {
+function placeSlot(container, { anchor, x, y, scale, opacity, visible }) {
   const { style } = container;
   const zoom = scale === 1 ? '' : `scale(${scale})`;
   style.position = 'absolute';
   style.top = style.bottom = style.left = style.right = '';
   style.transform = zoom;
-  container.classList.toggle('hud-plate', Boolean(plate));
   style.opacity = String(opacity);
   style.display = visible ? '' : 'none';
   if (anchor === 'screen') {

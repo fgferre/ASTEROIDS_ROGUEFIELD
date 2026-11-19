@@ -4,6 +4,7 @@ import {
   INSTALL_TEXT_IOS,
   PLAY_IN_BROWSER_TEXT,
   mobileGuard,
+  touchScreen,
 } from '../../src/bootstrap/mobileGuard.js';
 
 // Vitest runs in `environment: 'node'`: window/navigator/document are stubbed
@@ -132,6 +133,17 @@ describe('mobileGuard', () => {
 
     stubDevice({ searchString: '?desktop=FORCE' });
     expect(await mobileGuard()).toEqual({ touch: false });
+  });
+
+  it('names the touch screen the HUD lays out for: phone, tablet, or none', () => {
+    stubDevice({});
+    expect(touchScreen()).toBe('phone');
+    stubDevice({ screen: { width: 1180, height: 820 } });
+    expect(touchScreen()).toBe('tablet');
+    stubDevice({ touch: false });
+    expect(touchScreen()).toBeNull();
+    stubDevice({ searchString: '?desktop=force' });
+    expect(touchScreen()).toBeNull();
   });
 
   it('upright: the turn notice holds the boot until the device is sideways', async () => {
