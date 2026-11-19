@@ -190,6 +190,8 @@ select {
 #game-container {
   width: 100vw;
   height: 100vh;
+  /* iOS Safari: 100vh is the height with its bars hidden; dvh is what shows. */
+  height: 100dvh;
   position: relative;
   display: flex;
   align-items: center;
@@ -1297,7 +1299,7 @@ select {
       100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px
     );
     height: calc(
-      100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px
     );
     align-items: start;
     padding: var(--space-4) var(--space-5);
@@ -4231,7 +4233,7 @@ body.touch-play #perf-overlay {
 }
 
 .touch-layer {
-  --tu: clamp(1px, calc(100vh / 390), 1.25px);
+  --tu: clamp(1px, calc(100dvh / 390), 1.25px);
   position: absolute;
   inset: 0;
   z-index: 20;
