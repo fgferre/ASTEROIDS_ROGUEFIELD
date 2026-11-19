@@ -159,22 +159,22 @@ export function getHudCss() {
                smaller, the radio low and narrow, clear of the right thumb's DASH and SHIELD. */
             @container (max-height: 480px) {
                 .onboarding-tip { top: calc(12px + 186px * var(--hud-u)); max-width: min(560px, 66%); }
-                .layer-banner, .boss-intro { top: calc(50px + 186px * var(--hud-u)); gap: var(--space-1); }
-                .layer-banner__title { font-size: var(--text-xl); }
+                .layer-banner, .boss-intro { top: calc(54px + 186px * var(--hud-u)); gap: var(--space-1); }
+                .layer-banner__title { font-size: var(--text-lg); }
                 .layer-banner__sub, .boss-intro__sub, .layer-banner__note, .boss-intro__note { font-size: var(--text-sm); }
                 .boss-intro { padding-block: 0; }
                 .boss-intro__name { font-size: var(--text-2xl); }
-                .transmission, body.subtitles-large .transmission { bottom: 24px; width: min(440px, 52%); }
+                .transmission, body.subtitles-large .transmission { bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: min(440px, 52%); }
                 .transmission__line { font-size: var(--text-sm); line-height: 1.35; }
                 body.subtitles-large .transmission__line { font-size: var(--text-md); }
             }
             /* Under 330 px all three do not fit: the banner (a few seconds) takes the tip's band and the
-               tip waits under it, the banner drops its story line and the radio its rule. */
+               tip waits under it, the banners keep only their titles, the radio drops its rule. */
             @container (max-height: 330px) {
                 .layer-banner, .boss-intro { top: calc(12px + 186px * var(--hud-u)); gap: 2px; }
-                .layer-banner__title { font-size: var(--text-lg); }
                 #hud-layer:has(.layer-banner.is-showing, .boss-intro.is-showing) .onboarding-tip { opacity: 0; }
-                .layer-banner__note, .boss-intro__note, .transmission__rule { display: none; }
+                .boss-intro__name { font-size: var(--text-xl); }
+                .layer-banner__sub, .layer-banner__note, .boss-intro__sub, .boss-intro__note, .transmission__rule { display: none; }
             }
 
             @media (prefers-reduced-motion: no-preference) {
