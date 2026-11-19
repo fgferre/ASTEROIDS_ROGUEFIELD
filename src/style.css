@@ -1801,12 +1801,6 @@ kbd {
   box-shadow: var(--glow-accent);
 }
 
-/* By touch no key or pad button can answer a capture (the note says so). */
-body[data-input-device='touch'] .settings-binding-btn {
-  pointer-events: none;
-  opacity: 0.55;
-}
-
 .settings-footer {
   display: flex;
   justify-content: flex-end;
