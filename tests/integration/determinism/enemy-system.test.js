@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
-import { createTestContainer } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 
 function createEnemySystemWithSeed(seed) {
   const container = createTestContainer(seed);

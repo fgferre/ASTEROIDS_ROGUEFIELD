@@ -1,185 +1,33 @@
-// src/__tests__/physics/collision-accuracy.test.js
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SpatialHash } from '../../src/core/SpatialHash.js';
+// Bullet-vs-enemy collision through the real PhysicsSystem (spatial hash and
+// hit test included), checked against a brute-force reference.
+import { describe, it, expect, beforeEach } from 'vitest';
+import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
+import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import RandomService from '../../src/core/RandomService.js';
 
 const testRandom = new RandomService('collision-accuracy-test');
 
-// Mock GameConstants for testing
-vi.mock('../../src/core/GameConstants.js', () => ({
-  PHYSICS_CELL_SIZE: 64,
-  BULLET_SIZE: 2,
-  ASTEROID_SIZES: {
-    small: 12,
-    medium: 24,
-    large: 48,
-  },
-  ASTEROID_BASE_HEALTH: {
-    small: 25,
-    medium: 50,
-    large: 100,
-  },
-  SHIP_SIZE: 8,
-}));
-
-// Create a simplified PhysicsSystem for testing
-class TestPhysicsSystem {
-  constructor() {
-    this.cellSize = 64;
-    this.maxAsteroidRadius = 48;
-    this.activeAsteroids = new Set();
-    this.spatialHash = new SpatialHash(this.cellSize);
-    this.performanceMetrics = {
-      collisionChecks: 0,
-      spatialQueries: 0,
-    };
-  }
-
-  registerAsteroid(asteroid) {
-    if (!asteroid || asteroid.destroyed || this.activeAsteroids.has(asteroid)) {
-      return;
-    }
-
-    this.activeAsteroids.add(asteroid);
-    if (
-      Number.isFinite(asteroid.x) &&
-      Number.isFinite(asteroid.y) &&
-      Number.isFinite(asteroid.radius)
-    ) {
-      this.spatialHash.insert(
-        asteroid,
-        asteroid.x,
-        asteroid.y,
-        asteroid.radius
-      );
-    }
-  }
-
-  unregisterAsteroid(asteroid) {
-    if (!asteroid || !this.activeAsteroids.has(asteroid)) {
-      return;
-    }
-
-    this.activeAsteroids.delete(asteroid);
-    this.spatialHash.remove(asteroid);
-  }
-
-  updateSpatialHash() {
-    for (const asteroid of this.activeAsteroids) {
-      if (
-        !asteroid.destroyed &&
-        Number.isFinite(asteroid.x) &&
-        Number.isFinite(asteroid.y) &&
-        Number.isFinite(asteroid.radius)
-      ) {
-        this.spatialHash.update(
-          asteroid,
-          asteroid.x,
-          asteroid.y,
-          asteroid.radius
-        );
+// Reference: every bullet against every live asteroid, nearest touching one.
+function bruteForceCollisions(physics, bullets) {
+  const hits = [];
+  for (const bullet of bullets) {
+    if (bullet.hit) continue;
+    let best = null;
+    let bestSq = Infinity;
+    for (const asteroid of physics.activeEnemies) {
+      if (asteroid.destroyed) continue;
+      const dx = bullet.x - asteroid.x;
+      const dy = bullet.y - asteroid.y;
+      const sq = dx * dx + dy * dy;
+      const reach = BULLET_SIZE + asteroid.radius;
+      if (sq <= reach * reach && sq < bestSq) {
+        best = asteroid;
+        bestSq = sq;
       }
     }
+    if (best) hits.push({ bulletId: bullet.id, asteroidId: best.id });
   }
-
-  getNearbyAsteroids(x, y, radius) {
-    this.performanceMetrics.spatialQueries++;
-    const searchRadius = Math.max(radius, this.maxAsteroidRadius);
-    return this.spatialHash.query(x, y, searchRadius, {
-      filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed,
-    });
-  }
-
-  checkCircleCollision(x1, y1, r1, x2, y2, r2) {
-    const dx = x1 - x2;
-    const dy = y1 - y2;
-    const totalRadius = r1 + r2;
-    return dx * dx + dy * dy <= totalRadius * totalRadius;
-  }
-
-  forEachBulletCollision(bullets, handler) {
-    if (!Array.isArray(bullets) || typeof handler !== 'function') {
-      return;
-    }
-
-    const bulletRadius = 2; // BULLET_SIZE
-    const maxCheckRadius = bulletRadius + this.maxAsteroidRadius;
-
-    for (const bullet of bullets) {
-      if (!bullet || bullet.hit) continue;
-
-      const candidates = this.spatialHash.query(
-        bullet.x,
-        bullet.y,
-        maxCheckRadius,
-        {
-          filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed,
-        }
-      );
-
-      this.performanceMetrics.collisionChecks += candidates.length;
-
-      for (const asteroid of candidates) {
-        if (!asteroid) continue;
-
-        if (
-          this.checkCircleCollision(
-            bullet.x,
-            bullet.y,
-            bulletRadius,
-            asteroid.x,
-            asteroid.y,
-            asteroid.radius || 0
-          )
-        ) {
-          handler(bullet, asteroid);
-          break;
-        }
-      }
-    }
-  }
-
-  // Legacy naive collision detection for comparison
-  forEachBulletCollisionNaive(bullets, handler) {
-    if (!Array.isArray(bullets) || typeof handler !== 'function') {
-      return;
-    }
-
-    const bulletRadius = 2;
-
-    for (const bullet of bullets) {
-      if (!bullet || bullet.hit) continue;
-
-      for (const asteroid of this.activeAsteroids) {
-        if (!asteroid || asteroid.destroyed) continue;
-
-        this.performanceMetrics.collisionChecks++;
-
-        if (
-          this.checkCircleCollision(
-            bullet.x,
-            bullet.y,
-            bulletRadius,
-            asteroid.x,
-            asteroid.y,
-            asteroid.radius || 0
-          )
-        ) {
-          handler(bullet, asteroid);
-          break;
-        }
-      }
-    }
-  }
-
-  reset() {
-    this.activeAsteroids.clear();
-    this.spatialHash.clear();
-    this.performanceMetrics = {
-      collisionChecks: 0,
-      spatialQueries: 0,
-    };
-  }
+  return hits;
 }
 
 describe('Collision Accuracy Tests', () => {
@@ -188,7 +36,7 @@ describe('Collision Accuracy Tests', () => {
   let testBullets;
 
   beforeEach(() => {
-    physics = new TestPhysicsSystem();
+    physics = new PhysicsSystem({});
 
     // Create test asteroids in a grid pattern
     testAsteroids = [];
@@ -202,7 +50,7 @@ describe('Collision Accuracy Tests', () => {
           destroyed: false,
         };
         testAsteroids.push(asteroid);
-        physics.registerAsteroid(asteroid);
+        physics.registerEnemy(asteroid);
       }
     }
 
@@ -217,55 +65,39 @@ describe('Collision Accuracy Tests', () => {
   });
 
   describe('Collision Detection Accuracy', () => {
-    it('should detect all collisions that naive algorithm detects', () => {
+    it('should detect the same collisions as brute force, with fewer checks', () => {
       const spatialCollisions = [];
-      const naiveCollisions = [];
-
-      // Reset performance metrics
       physics.performanceMetrics.collisionChecks = 0;
-
-      // Test spatial hash collision detection
       physics.forEachBulletCollision(testBullets, (bullet, asteroid) => {
         spatialCollisions.push({
           bulletId: bullet.id,
           asteroidId: asteroid.id,
         });
       });
-
       const spatialChecks = physics.performanceMetrics.collisionChecks;
 
-      // Reset for naive test
-      physics.performanceMetrics.collisionChecks = 0;
+      const naiveCollisions = bruteForceCollisions(physics, testBullets);
+      const naiveChecks = testBullets.length * physics.activeEnemies.size;
 
-      // Test naive collision detection
-      physics.forEachBulletCollisionNaive(testBullets, (bullet, asteroid) => {
-        naiveCollisions.push({ bulletId: bullet.id, asteroidId: asteroid.id });
-      });
-
-      const naiveChecks = physics.performanceMetrics.collisionChecks;
-
-      // Should detect same collisions
-      expect(spatialCollisions.length).toBe(naiveCollisions.length);
-
-      // Sort for comparison
+      expect(naiveCollisions.length).toBeGreaterThan(0);
       const sortFn = (a, b) =>
         a.bulletId.localeCompare(b.bulletId) ||
         a.asteroidId.localeCompare(b.asteroidId);
       spatialCollisions.sort(sortFn);
       naiveCollisions.sort(sortFn);
-
       expect(spatialCollisions).toEqual(naiveCollisions);
 
       // Spatial hash should be more efficient (fewer checks)
       expect(spatialChecks).toBeLessThan(naiveChecks);
-
-      console.log(
-        `Spatial checks: ${spatialChecks}, Naive checks: ${naiveChecks}, Efficiency: ${(((naiveChecks - spatialChecks) / naiveChecks) * 100).toFixed(1)}% fewer checks`
-      );
     });
 
     it('should detect exact collision with touching circles', () => {
-      const bullet = { id: 'touching-bullet', x: 50, y: 72, hit: false }; // Exactly 22 units from center (20 + 2 = 22)
+      const bullet = {
+        id: 'touching-bullet',
+        x: 50,
+        y: 50 + 20 + BULLET_SIZE,
+        hit: false,
+      }; // Exactly asteroid radius + bullet radius from center
 
       const collisions = [];
       physics.forEachBulletCollision([bullet], (b, a) => {
@@ -277,7 +109,12 @@ describe('Collision Accuracy Tests', () => {
     });
 
     it('should not detect collision with separated circles', () => {
-      const bullet = { id: 'separated-bullet', x: 50, y: 73, hit: false }; // 23 units from center (> 20 + 2)
+      const bullet = {
+        id: 'separated-bullet',
+        x: 50,
+        y: 50 + 20 + BULLET_SIZE + 1,
+        hit: false,
+      }; // One unit past touching
 
       const collisions = [];
       physics.forEachBulletCollision([bullet], (b, a) => {
@@ -296,7 +133,7 @@ describe('Collision Accuracy Tests', () => {
         destroyed: false,
       };
 
-      physics.registerAsteroid(zeroRadiusAsteroid);
+      physics.registerEnemy(zeroRadiusAsteroid);
 
       const bullet = { id: 'zero-test', x: 300, y: 300, hit: false }; // Exactly on top
 
@@ -349,7 +186,7 @@ describe('Collision Accuracy Tests', () => {
           destroyed: false,
         };
         manyAsteroids.push(asteroid);
-        physics.registerAsteroid(asteroid);
+        physics.registerEnemy(asteroid);
       }
 
       const manyBullets = [];
@@ -371,7 +208,7 @@ describe('Collision Accuracy Tests', () => {
       });
 
       const endTime = performance.now();
-      const totalObjects = physics.activeAsteroids.size;
+      const totalObjects = physics.activeEnemies.size;
       const checksPerformed = physics.performanceMetrics.collisionChecks;
 
       // Should be much better than O(n²)
@@ -401,7 +238,7 @@ describe('Collision Accuracy Tests', () => {
             destroyed: false,
           };
           denseAsteroids.push(asteroid);
-          physics.registerAsteroid(asteroid);
+          physics.registerEnemy(asteroid);
         }
       }
 
@@ -429,7 +266,7 @@ describe('Collision Accuracy Tests', () => {
         destroyed: false,
       };
 
-      physics.registerAsteroid(negativeAsteroid);
+      physics.registerEnemy(negativeAsteroid);
 
       const bullet = { id: 'neg-bullet', x: -100, y: -100, hit: false };
 
@@ -451,7 +288,7 @@ describe('Collision Accuracy Tests', () => {
         destroyed: false,
       };
 
-      physics.registerAsteroid(largeAsteroid);
+      physics.registerEnemy(largeAsteroid);
 
       const bullet = { id: 'large-bullet', x: 10000, y: 10000, hit: false };
 
@@ -509,9 +346,9 @@ describe('Collision Accuracy Tests', () => {
           destroyed: false,
         };
 
-        physics.registerAsteroid(asteroid);
+        physics.registerEnemy(asteroid);
         physics.updateSpatialHash();
-        physics.unregisterAsteroid(asteroid);
+        physics.unregisterEnemy(asteroid);
       }
 
       // Validate spatial hash consistency
@@ -558,7 +395,7 @@ describe('Collision Accuracy Tests', () => {
         destroyed: false,
       };
 
-      physics.registerAsteroid(asteroid);
+      physics.registerEnemy(asteroid);
 
       // Move across cell boundary
       asteroid.x = 65;

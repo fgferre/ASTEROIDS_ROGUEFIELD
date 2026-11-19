@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createSfxSynthPort } from '../../../src/modules/audio/SfxSynthPort.js';
 import AudioSystem from '../../../src/modules/AudioSystem.js';
 import AudioBatcher from '../../../src/modules/AudioBatcher.js';
-import { createTestContainer } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 
 /**
  * 02.04 — SfxSynthPort + AudioBatcher cycle-break regression lock.

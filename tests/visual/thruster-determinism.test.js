@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PALETTE, withAlpha } from '../../src/data/constants/palette.js';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
-import { createTestContainer } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 import { createSettingsStub } from '../__helpers__/stubs.js';
 
 /**

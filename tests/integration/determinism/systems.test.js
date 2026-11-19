@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../../src/modules/enemies/managers/WaveManager.js';
 import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
-import { createTestContainer } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 
 function createEnemySystemStub(random) {
   const created = [];

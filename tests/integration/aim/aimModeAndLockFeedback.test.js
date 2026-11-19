@@ -10,8 +10,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {
   setupGlobalMocks,
   cleanupGlobalState,
-  createTestContainer,
 } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 import { BULLET_SIZE } from '../../../src/core/GameConstants.js';

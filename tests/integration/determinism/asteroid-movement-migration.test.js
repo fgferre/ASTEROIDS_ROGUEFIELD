@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createTestContainer } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
 import {
   GAME_WIDTH,

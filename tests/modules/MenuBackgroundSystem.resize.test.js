@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import MenuBackgroundSystem from '../../src/modules/MenuBackgroundSystem.js';
-import { createTestContainer } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 
 function menuWithStubs() {
   const random = createTestContainer('menu-resize').resolve('random');
