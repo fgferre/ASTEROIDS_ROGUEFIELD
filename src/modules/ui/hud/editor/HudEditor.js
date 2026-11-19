@@ -710,6 +710,8 @@ export class HudEditor {
     else if (pick('model')) this.setModel(pick('model').model);
     else if (pick('visible'))
       this.setVisible(pick('visible').visible === 'true');
+    else if (pick('nudge'))
+      this.nudge(...pick('nudge').nudge.split(',').map(Number));
     else if (pick('aspect')) this.setAspect(pick('aspect').aspect);
     else if (action) this.runAction(action);
   }
@@ -1113,6 +1115,10 @@ export class HudEditor {
             this.readingOrder().map((slot) => this.item(slot)),
             ({ slot, model }) => getInstrument(slot, model)?.name ?? model
           );
+      // Another instrument (or the list) opens at its top, not mid-scroll.
+      const shown = item?.slot ?? 'list';
+      if (shown !== s.inspectorShown) insp.scrollTop = 0;
+      s.inspectorShown = shown;
       if (item) this.mountThumbs(item);
       globalThis.lucide?.createIcons();
       if (focused) {

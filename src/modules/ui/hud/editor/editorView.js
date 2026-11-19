@@ -105,11 +105,11 @@ export function chromeMarkup() {
         <button type="button" class="hed-btn hed-btn--primary" data-action="done">${icon('check')}Done</button>
       </div>
       <div class="hed-bar__row">
-        <button type="button" class="hed-btn" data-action="undo" aria-label="Undo">${icon('undo-2')}Undo</button>
-        <button type="button" class="hed-btn" data-action="redo" aria-label="Redo">${icon('redo-2')}Redo</button>
+        <button type="button" class="hed-btn" data-action="undo" aria-label="Undo">${icon('undo-2')}<span class="hed-btn__text">Undo</span></button>
+        <button type="button" class="hed-btn" data-action="redo" aria-label="Redo">${icon('redo-2')}<span class="hed-btn__text">Redo</span></button>
         <span class="hed-sep"></span>
-        <button type="button" class="hed-btn" data-action="grid" aria-pressed="false">${icon('grid-3x3')}Grid</button>
-        <button type="button" class="hed-btn" data-action="safe" aria-pressed="false">${icon('scan')}Safe Area</button>
+        <button type="button" class="hed-btn" data-action="grid" aria-pressed="false" aria-label="Grid">${icon('grid-3x3')}<span class="hed-btn__text">Grid</span></button>
+        <button type="button" class="hed-btn" data-action="safe" aria-pressed="false" aria-label="Safe Area">${icon('scan')}<span class="hed-btn__text">Safe Area</span></button>
         <span class="hed-sep"></span>
         <span class="hed-label">Frame</span>
         <div class="hed-seg" role="group" aria-label="Preview window shape">${aspectButtons()}</div>
@@ -172,7 +172,7 @@ export function inspectorList(items, modelName) {
     <div class="hed-insp__head">
       <h3 class="hed-insp__title">Instruments</h3>
     </div>
-    <p class="hed-note">Click an instrument on the screen or press Tab. Drag it to move it.</p>
+    <p class="hed-note"><span data-device="keyboard">Click an instrument on the screen or press Tab.</span><span data-device="gamepad">Click an instrument on the screen or press Tab.</span><span data-device="touch">Tap an instrument on the screen.</span> Drag it to move it.</p>
     <div class="hed-rows">${rows}</div>`;
 }
 
@@ -181,6 +181,22 @@ const range = (control, label, value, { min, max }) => `
     <span class="hed-range__head"><span class="hed-label">${label}</span><output data-output="${control}">${percent(value)}</output></span>
     <input type="range" class="settings-range-input" data-control="${control}" min="${min}" max="${max}" step="0.05" value="${value}" />
   </label>`;
+
+// By touch, arrows that nudge the selected instrument 2 units a tap.
+const NUDGES = [
+  ['left', -2, 0],
+  ['up', 0, -2],
+  ['down', 0, 2],
+  ['right', 2, 0],
+];
+const nudgePad = `
+  <div class="hed-group hed-move" data-device="touch">
+    <span class="hed-label">Move</span>
+    <div class="hed-nudge" role="group" aria-label="Move">${NUDGES.map(
+      ([dir, dx, dy]) =>
+        `<button type="button" class="hed-btn hed-btn--icon" data-nudge="${dx},${dy}" aria-label="Move ${dir}">${icon(`arrow-${dir}`)}</button>`
+    ).join('')}</div>
+  </div>`;
 
 /**
  * The inspector for one item: its models (each card holds a live
@@ -203,6 +219,7 @@ export function inspectorItem(item, models) {
       <button type="button" class="hed-btn hed-btn--icon" data-action="deselect" aria-label="Close">${icon('x')}</button>
     </div>
     <p class="hed-insp__place" data-output="place">${esc(placeLabel(item))}</p>
+    ${onShip ? '' : nudgePad}
     <div class="hed-group">
       <span class="hed-label">Model</span>
       <div class="hed-models">${cards}</div>
