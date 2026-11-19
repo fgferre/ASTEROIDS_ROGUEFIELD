@@ -677,11 +677,13 @@ export class WaveManager {
    * deeper than layer 1 used to keep layer 1's six rocks).
    */
   startLayerFromSession() {
+    // A layer already under way (a run continued past its victory) keeps the
+    // plan it has.
     if (!this.waveInProgress) {
       this.startNextWave();
+      this.rocksTotal = this.layerRocks;
+      this.rockLayer = this.currentWave;
     }
-    this.rocksTotal = this.layerRocks;
-    this.rockLayer = this.currentWave;
     this.rocksActive = true;
   }
 

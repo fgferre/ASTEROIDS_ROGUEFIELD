@@ -15,7 +15,8 @@ import {
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;
 const AFTER_STEPS = 3 * 60;
-const BREAK_STEPS = 15 * 60;
+// Layer 15's own plan is 40 rocks, one every 0.5-1 s.
+const BREAK_STEPS = 60 * 60;
 
 function startOnLayer(game, layer) {
   const { enemies } = game.services;
