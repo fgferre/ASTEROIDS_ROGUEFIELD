@@ -205,16 +205,17 @@ export class GameTime {
       this.smallFreezeReadyAt = this.hitStopClock + SMALL_FREEZE_GAP;
     }
 
-    // A lighter freeze landing on a running one must not lift its floor.
-    this.freezeFrame.fade =
-      this.freezeFrame.timer > 0
-        ? Math.min(this.freezeFrame.fade, finalFade)
-        : finalFade;
+    // A lighter freeze landing on a running one must not lift its floor; one
+    // that starts after the last ended starts fresh (an ended long freeze kept
+    // its duration as the curve's span, and weakened every small one after).
+    const running = this.freezeFrame.timer > 0;
+    this.freezeFrame.fade = running
+      ? Math.min(this.freezeFrame.fade, finalFade)
+      : finalFade;
     this.freezeFrame.timer = Math.max(this.freezeFrame.timer, finalDuration);
-    this.freezeFrame.duration = Math.max(
-      this.freezeFrame.duration,
-      finalDuration
-    );
+    this.freezeFrame.duration = running
+      ? Math.max(this.freezeFrame.duration, finalDuration)
+      : finalDuration;
   }
 
   addHitStop(kind) {
