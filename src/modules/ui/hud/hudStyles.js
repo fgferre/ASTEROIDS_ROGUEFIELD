@@ -22,13 +22,9 @@ export function getHudCss() {
                 /* The HUD's unit: 1 at a 1080p window with HUD Scale 100 % (viewportScaling.js) */
                 --hud-u: calc(var(--hud-scale-effective, 1.2) / 1.2);
                 --boss-light: color-mix(in srgb, var(--boss) 55%, white);
-                /* No dark field behind the instruments (Felipe, 18/11): the letters carry a thin dark
-                   outline, one stroke wide, and the drawn parts (hull capsule, radar rings, XP line,
-                   weapon track) the same stroke, so they hold over the field's glowing border. */
-                --hud-ink: 1px 0 0 rgba(2, 4, 8, 0.9), -1px 0 0 rgba(2, 4, 8, 0.9), 0 1px 0 rgba(2, 4, 8, 0.9),
-                    0 -1px 0 rgba(2, 4, 8, 0.9), 1px 1px 0 rgba(2, 4, 8, 0.7), -1px -1px 0 rgba(2, 4, 8, 0.7),
-                    1px -1px 0 rgba(2, 4, 8, 0.7), -1px 1px 0 rgba(2, 4, 8, 0.7);
             }
+            /* No dark field behind the instruments: the letters carry --text-ink (style.css), the drawn
+               parts (hull capsule, radar rings, XP line, weapon track) the same thin stroke. */
             .vt-gauge, [data-slot='radar'] svg, [data-slot='xp'] svg, .bd-track {
                 filter: drop-shadow(1px 0 0 rgba(2, 4, 8, 0.8)) drop-shadow(-1px 0 0 rgba(2, 4, 8, 0.8));
             }
@@ -45,7 +41,7 @@ export function getHudCss() {
             }
             /* INSTRUMENTS: the mock-ups' finish (HUD.md). Glance 70 % (55 % while a Warden lives),
                on demand 60 % until a change wakes it; a changed value pulses once. */
-            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: var(--hud-ink); pointer-events: none; }
+            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: var(--text-ink); pointer-events: none; }
             .ins-lbl { font-family: var(--font-display); font-weight: 500; font-size: calc(var(--text-xs) * var(--hud-u)); letter-spacing: 0.2em; color: var(--text-dim); }
             .ins-glance { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             #hud-layer[data-hud-mode='warden'] .ins-glance { opacity: 0.55; }
@@ -61,7 +57,7 @@ export function getHudCss() {
             /* NEXT WAVE */
             .next-wave-box { position: absolute; top: 50%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-50%); font-family: var(--font-display, 'Orbitron', sans-serif); opacity: 0; transition: opacity var(--motion-base, 0.3s); pointer-events: none; z-index: 100; }
             .next-wave-box.visible { opacity: 1; }
-            .next-wave-label { font-size: var(--text-lg, 20px); color: var(--danger, #ff003c); letter-spacing: 6px; font-weight: 900; margin: 0; text-transform: uppercase; text-shadow: var(--hud-ink); line-height: 1.2; }
+            .next-wave-label { font-size: var(--text-lg, 20px); color: var(--danger, #ff003c); letter-spacing: 6px; font-weight: 900; margin: 0; text-transform: uppercase; text-shadow: var(--text-ink); line-height: 1.2; }
             .next-wave-timer { font-size: 4rem; line-height: 1; color: var(--text, #fff); font-weight: 900; text-shadow: 0 0 20px var(--danger, #ff003c), 2px 2px 0 #000; margin-top: var(--space-2, 8px); }
             .next-wave-box.visible .next-wave-timer { animation: alert-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
@@ -80,7 +76,7 @@ export function getHudCss() {
             .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
             .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
             .edge-arrow[data-kind='pickup'] .edge-arrow__glyph { transform-origin: 50% 50%; scale: 0.7; }
-            .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: var(--hud-ink); white-space: nowrap; }
+            .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: var(--text-ink); white-space: nowrap; }
             .edge-arrow[data-edge='left'] .edge-arrow__label { left: 34px; top: 0; }
             .edge-arrow[data-edge='right'] .edge-arrow__label { left: -34px; top: 0; }
             .edge-arrow[data-edge='top'] .edge-arrow__label { left: 0; top: 22px; }
@@ -93,9 +89,9 @@ export function getHudCss() {
             .layer-banner__line { width: 420px; max-width: 70%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent); box-shadow: var(--glow-accent); }
             .layer-banner.is-boss .layer-banner__title { color: var(--boss); text-shadow: 0 0 18px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-boss .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
-            .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: var(--hud-ink); }
+            .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: var(--text-ink); }
             .layer-banner__sub:empty { display: none; }
-            .layer-banner__note, .boss-intro__note { max-width: min(560px, 80vw); font-family: var(--font-ui); font-size: calc(var(--text-md) * 1.15); font-weight: 500; letter-spacing: 0.02em; text-align: center; text-wrap: balance; color: var(--text); opacity: 0.9; text-shadow: var(--hud-ink); }
+            .layer-banner__note, .boss-intro__note { max-width: min(560px, 80vw); font-family: var(--font-ui); font-size: calc(var(--text-md) * 1.15); font-weight: 500; letter-spacing: 0.02em; text-align: center; text-wrap: balance; color: var(--text); opacity: 0.9; text-shadow: var(--text-ink); }
             .layer-banner__note:empty, .boss-intro__note:empty { display: none; }
             .layer-banner.is-surge .layer-banner__title { color: var(--danger); text-shadow: 0 0 18px var(--danger), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-surge .layer-banner__line { background: linear-gradient(90deg, transparent, var(--danger) 20%, var(--danger) 80%, transparent); box-shadow: 0 0 12px var(--danger); }
@@ -110,7 +106,7 @@ export function getHudCss() {
             .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
-            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: var(--hud-ink); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
+            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: var(--text-ink); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
             .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
             /* Under the panels (z-index -1 in the HUD layer), over the field. */
             .letterbox { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
@@ -126,7 +122,7 @@ export function getHudCss() {
             .boss-intro.is-showing { opacity: 1; visibility: visible; }
             .layer-banner.is-leaving, .boss-intro.is-leaving { opacity: 0; }
             .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; text-align: center; text-wrap: balance; }
-            .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: var(--hud-ink); }
+            .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: var(--text-ink); }
             .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
 
             /* TRANSMISSION (Warden radio, bottom centre above the layer dial) */
@@ -135,7 +131,7 @@ export function getHudCss() {
             .transmission.is-leaving { opacity: 0; }
             .transmission__speaker { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.25em; color: var(--accent); text-shadow: 0 0 8px var(--accent-line); }
             .transmission__rule { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent); }
-            .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: var(--hud-ink), 0 0 6px var(--accent-line); }
+            .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: var(--text-ink), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
             /* Settings → Accessibility: Large Subtitles stacks on Text Size; Reduce Flashing stops the flicker */
             body.subtitles-large .transmission { width: min(760px, 90%); }
@@ -154,7 +150,7 @@ export function getHudCss() {
             .onboarding-tip.is-leaving { opacity: 0; }
             .onboarding-tip__keys { display: flex; flex: none; gap: var(--space-1); }
             .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
-            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); text-shadow: var(--hud-ink); }
+            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); text-shadow: var(--text-ink); }
 
             /* A phone held sideways (390 px tall, about 300 in Safari with its bars): the centre moments
                can come together (a first-run tip, the layer banner, the radio) and would sit on one
