@@ -45,3 +45,38 @@ describe('BossTransitions Warden arrival', () => {
     expect(speedAfterSpawn(travel + close + recover + 0.05, false)).toBe(1);
   });
 });
+
+describe('BossTransitions defeat bursts', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+
+  function defeatedEffects() {
+    const eventBus = new EventBus();
+    const effects = new EffectsSystem({
+      eventBus,
+      random: new RandomService('boss-defeat'),
+      audio: {},
+      settings: { getCategoryValues: vi.fn(() => null) },
+    });
+    eventBus.emit('boss-defeated', { position: { x: 400, y: 300 }, wave: 5 });
+    return effects;
+  }
+
+  it("fires its bursts 0.02 s apart in frame time, through the defeat's freeze, and not at all after a reset", () => {
+    const effects = defeatedEffects();
+    const { particles } = effects.particleEffects;
+    // The debris is there at once; the bursts are not.
+    const debris = new Set(particles);
+    const bursts = () => particles.filter((p) => !debris.has(p)).length;
+    effects.update(0.05);
+    // Due at 0, 0.02 and 0.04 s, though the freeze frame holds effect time.
+    expect(bursts()).toBe(3);
+    effects.update(0);
+    expect(bursts()).toBe(3);
+
+    effects.reset();
+    effects.update(2);
+    expect(effects.particleEffects.particles).toHaveLength(0);
+  });
+});

@@ -58,12 +58,15 @@ export class BossTransitions {
     this.applyTimeDilation = applyTimeDilation;
 
     this.bossTransitionEffects = [];
+    // Defeat explosion bursts still to fire (advanceBursts).
+    this.pendingBursts = [];
     this.activeBoss = { id: null, lastPhase: 0 };
   }
 
   // The borders go; the boss being tracked stays.
   reset() {
     this.bossTransitionEffects = [];
+    this.pendingBursts = [];
   }
 
   // EffectsSystem's boss listeners land here. A Warden spawns past the edge
@@ -307,6 +310,8 @@ export class BossTransitions {
     const preserveEvents = Array.isArray(options.preserveEvents)
       ? new Set(options.preserveEvents)
       : null;
+
+    this.pendingBursts = [];
 
     if (Array.isArray(this.bossTransitionEffects)) {
       if (preserveEvents && preserveEvents.size > 0) {
@@ -656,7 +661,6 @@ export class BossTransitions {
 
     const burstColor = palette.core;
     const burstCount = 50;
-    const scheduleBurst = typeof setTimeout === 'function';
 
     for (let i = 0; i < burstCount; i += 1) {
       const emitBurst = () => {
@@ -680,11 +684,7 @@ export class BossTransitions {
         this.particleEffects.particles.push(particle);
       };
 
-      if (scheduleBurst) {
-        setTimeout(emitBurst, i * 20);
-      } else {
-        emitBurst();
-      }
+      this.pendingBursts.push({ delay: i * 0.02, emitBurst });
     }
 
     const debris = config.debris || {};
@@ -833,6 +833,21 @@ export class BossTransitions {
       shakeIntensity: 20,
       particleCount: burstCount,
     });
+  }
+
+  // The defeat's bursts keep the frame's own time, not the effects' (they
+  // went off through the defeat's freeze frame on timers before): a pause,
+  // which steps nothing, holds them, and a reset drops them.
+  advanceBursts(deltaTime) {
+    if (!this.pendingBursts.length) return;
+    const due = [];
+    this.pendingBursts = this.pendingBursts.filter((burst) => {
+      burst.delay -= deltaTime;
+      if (burst.delay > 0) return true;
+      due.push(burst);
+      return false;
+    });
+    for (const burst of due) burst.emitBurst();
   }
 
   updateBossTransitions(deltaTime) {

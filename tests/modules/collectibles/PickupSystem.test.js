@@ -251,4 +251,25 @@ describe('PickupSystem', () => {
       expect(Math.hypot(orbX - x, orbY - y)).toBeCloseTo(burstRadius);
     }
   });
+
+  it('keeps the real layer when a run starts above layer 1', () => {
+    const rush = createHeadlessGame();
+    rush.session.startNewRun({ source: 'test', bossRush: true });
+    expect(rush.services.pickups.layer).toBe(5);
+
+    // A carried build owes no picks, so layer 6 starts before 'game-started'.
+    const game = createHeadlessGame();
+    const { progression, pickups } = game.services;
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    for (let i = 0; i < 25; i += 1) progression.applyLevelUp();
+    progression.pendingLevelUpScreens.length = 0;
+    progression.pendingUpgradeOptions = [];
+    game.session.startNewRun({
+      source: 'test',
+      sector: 'furnace-drift',
+      carry: true,
+    });
+    for (let s = 0; s < 3; s += 1) game.step();
+    expect(pickups.layer).toBe(6);
+  });
 });

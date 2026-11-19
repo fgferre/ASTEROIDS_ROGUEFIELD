@@ -7,6 +7,7 @@
 // return.
 
 import { debugLog } from '../../core/debugLogging.js';
+import { resolveDevicePixelRatio } from '../../core/viewport.js';
 
 export function createMenuRenderer(THREE, canvas) {
   // WebGL2 upgrade - enables #version 300 es shaders like the study
@@ -28,17 +29,9 @@ export function createMenuRenderer(THREE, canvas) {
   // Log WebGL version for debugging
   const glVersion = renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
   debugLog(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
-  const pixelRatio = window.devicePixelRatio || 1;
-  renderer.setPixelRatio(pixelRatio);
+  renderer.setPixelRatio(resolveDevicePixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x050916, 1);
-  renderer.shadowMap.enabled = true;
-  if (
-    typeof renderer.shadowMap.type !== 'undefined' &&
-    THREE?.PCFSoftShadowMap
-  ) {
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  }
   if (
     typeof renderer.outputEncoding !== 'undefined' &&
     THREE &&
@@ -68,17 +61,6 @@ export function createLighting(THREE, scene) {
   // Distant sun-like directional light (grazing angle for strong terminator).
   const keyLight = new THREE.DirectionalLight(0xfff0e6, 3.1);
   keyLight.position.set(560, 130, -240);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.bias = -0.00008;
-  keyLight.shadow.normalBias = 0.02;
-  const shadowCam = keyLight.shadow.camera;
-  shadowCam.near = 10;
-  shadowCam.far = 1400;
-  shadowCam.left = -320;
-  shadowCam.right = 320;
-  shadowCam.top = 320;
-  shadowCam.bottom = -320;
   scene.add(keyLight);
 
   // Very subtle cool fill to avoid pure-black crush while keeping contrast.

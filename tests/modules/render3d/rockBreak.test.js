@@ -189,4 +189,26 @@ describe('rock breaking', () => {
     const [[, , , upY], [, , , downY]] = sparks.emit.mock.calls;
     expect(upY * downY).toBeLessThan(0);
   });
+
+  it('clearing the mirror gives every cut slot back and empties the break, cycle after cycle', () => {
+    const mirror = mirrorOf();
+    const meshes = () => mirror.rocks.meshes.stone.length;
+    const cycle = (n) => {
+      const parent = rock(`p${n}`, 400, 300, 35);
+      const dying = rock(`d${n}`, 200, 300, 12);
+      mirror.update([parent, dying], 0, 0);
+      const kids = [rock(`a${n}`, 420, 300, 22), rock(`b${n}`, 390, 318, 22)];
+      mirror.splitRock(parent, kids);
+      mirror.markDead(dying);
+      mirror.update(kids, 0.016, 0.016);
+      mirror.clear();
+    };
+    cycle(0);
+    const { rocks } = mirror;
+    expect(rocks.free).toHaveLength(meshes() - rocks.fixed);
+    const size = meshes();
+    for (let n = 1; n < 5; n += 1) cycle(n);
+    expect(meshes()).toBe(size);
+    expect(rocks.free).toHaveLength(meshes() - rocks.fixed);
+  });
 });
