@@ -19,7 +19,6 @@ const item = (anchor, x, y, scale = 1) => ({
   scale,
   opacity: 1,
   visible: true,
-  plate: false,
 });
 const SIZE = { width: 200, height: 100 };
 const FRAME = hudFrame(1920, 1080);

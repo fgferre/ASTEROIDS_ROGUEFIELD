@@ -98,7 +98,8 @@ const CSS = `
             .rt-frame { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             .rt[data-mode='threat'] .rt-frame { opacity: 1; transition-duration: 0ms; }
             .rt[data-mode='warden'] .rt-frame { opacity: 0.55; }
-            .rt-disc { fill: var(--surface); }
+            /* the disc stays, a bit see-through (Felipe, 18/11): about half dark */
+            .rt-disc { fill: var(--surface); fill-opacity: 0.7; }
             .rt-ring { fill: none; stroke: rgba(230, 238, 248, 0.16); }
             .rt-ring-label { font-family: var(--font-display); font-weight: 500; font-size: 9.5px; fill: rgba(230, 238, 248, 0.45); }
             .rt-field { fill: none; stroke: rgba(0, 242, 255, 0.42); }
@@ -128,7 +129,7 @@ const CSS = `
             .rt[data-mode='warden'] .rt-o, .rt[data-mode='warden'] .rt-label { opacity: 0.55; }
             .rt[data-mode='warden'] .rt-o.is-dim { opacity: 0.25; }
             .rt[data-mode='warden'] .rt-o.k-warden { opacity: 1; }
-            .rt-label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 600; font-size: calc(var(--text-md) * var(--rt-u)); line-height: 1; color: var(--danger); white-space: nowrap; text-shadow: 0 1px 2px rgba(2, 4, 8, 0.9); }
+            .rt-label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 600; font-size: calc(var(--text-md) * var(--rt-u)); line-height: 1; color: var(--danger); white-space: nowrap; text-shadow: var(--text-ink); }
             .rt-label.k-elite { color: var(--xp); }
             .rt-label.k-herald { font-size: calc(var(--text-xs) * var(--rt-u)); letter-spacing: 0.08em; color: var(--rt-boss-light); }
             .rt .rt-jam { inset: 50% 0 auto; height: auto; transform: translateY(-50%); display: none; text-align: center; font-family: var(--font-display); font-size: calc(var(--text-sm) * var(--rt-u)); font-weight: 700; letter-spacing: 0.3em; margin-right: -0.3em; color: var(--xp); text-shadow: 0 0 8px var(--xp), 0 1px 0 rgba(0, 0, 0, 0.8); }

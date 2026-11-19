@@ -54,6 +54,17 @@ const isPhone = () =>
     window.screen?.height ?? window.innerHeight
   ) < PHONE_MAX_SIDE;
 
+/**
+ * The touch screen the game is played on, 'phone' or 'tablet' (the HUD has
+ * a layout for each, data/ui/hudPresets.js), or null when it is not played
+ * by touch: what mobileGuard below lets in.
+ */
+export function touchScreen() {
+  if (typeof window === 'undefined' || !isTouchDevice()) return null;
+  if (hasForceDesktopFlag()) return null;
+  return isPhone() ? 'phone' : 'tablet';
+}
+
 /** Running from the Home Screen (iOS's own flag, or the manifest's mode). */
 const isInstalled = () =>
   navigator.standalone === true ||

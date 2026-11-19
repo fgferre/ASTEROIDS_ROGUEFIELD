@@ -29,7 +29,7 @@ const MARKUP = `
 const CSS = `
             .stats-area { display: flex; flex-direction: column; gap: var(--space-3, 12px); }
             .stats-grid { display: flex; flex-direction: column; gap: var(--space-3, 12px); }
-            .stat-block { display: flex; flex-direction: column; background: linear-gradient(90deg, var(--surface, rgba(12, 20, 31, 0.65)) 0%, transparent 100%); padding: var(--space-1, 4px) var(--space-2, 8px) var(--space-1, 4px) var(--space-3, 12px); border-left: 3px solid var(--neutral, #00aaff); width: fit-content; min-width: 160px; }
+            .stat-block { display: flex; flex-direction: column; text-shadow: var(--text-ink); padding: var(--space-1, 4px) var(--space-2, 8px) var(--space-1, 4px) var(--space-3, 12px); border-left: 3px solid var(--neutral, #00aaff); width: fit-content; min-width: 160px; }
             .stat-label { font-size: var(--text-xs, 12px); color: var(--neutral, #00aaff); letter-spacing: 1px; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; font-weight: 700; }
             .stat-value { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: var(--text-xl, 28px); color: var(--text, #fff); line-height: 1.1; }
             .combo-box { margin-top: var(--space-2, 8px); }

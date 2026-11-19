@@ -3,7 +3,7 @@
 // The run's numbers, small, top left (HUD.md, on demand; owner's mock-up of
 // 20/10): the clock with the layer beside it, kills, and the combo while it
 // runs, in its tier's colour. Wakes to full strength when the layer, kills
-// or combo change and fades to 35 % 4 s later; the clock ticking alone does
+// or combo change and fades to 60 % 4 s later; the clock ticking alone does
 // not wake it. A new layer and a climbing combo pulse once.
 
 import {

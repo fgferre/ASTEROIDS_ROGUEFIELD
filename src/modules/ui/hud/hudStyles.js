@@ -23,6 +23,11 @@ export function getHudCss() {
                 --hud-u: calc(var(--hud-scale-effective, 1.2) / 1.2);
                 --boss-light: color-mix(in srgb, var(--boss) 55%, white);
             }
+            /* No dark field behind the instruments: the letters carry --text-ink (style.css), the drawn
+               parts (hull capsule, radar rings, XP line, weapon track) the same thin stroke. */
+            .vt-gauge, [data-slot='radar'] svg, [data-slot='xp'] svg, .bd-track {
+                filter: drop-shadow(1px 0 0 rgba(2, 4, 8, 0.8)) drop-shadow(-1px 0 0 rgba(2, 4, 8, 0.8));
+            }
             .hud-panel { pointer-events: auto; transition: opacity var(--motion-base, 0.3s); }
 
             /* SLOTS (data/ui/hudPresets.js): the instruments sit in a centred 16:9 frame, clear of
@@ -34,54 +39,25 @@ export function getHudCss() {
                 /* its slots size against it (cqw), e.g. the XP line between the corners */
                 container-type: size;
             }
-            /* The field's glowing border fades out under an instrument: a soft dark plate behind it,
-               reaching --plate-x / --plate-y past the instrument and feathered over its last 40 px
-               (the XP line's spans the bottom edge between the corners; the radar's is round). */
-            .hud-plate::before {
-                content: ''; position: absolute; z-index: -1; pointer-events: none;
-                inset: calc(var(--plate-y, -40px) * var(--hud-u)) calc(var(--plate-x, -48px) * var(--hud-u));
-                --feather: calc(40px * var(--hud-u));
-                --across: linear-gradient(to right, transparent, #000 var(--feather), #000 calc(100% - var(--feather)), transparent);
-                --down: linear-gradient(to bottom, transparent, #000 var(--feather), #000 calc(100% - var(--feather)), transparent);
-                background: rgba(2, 4, 8, 0.8);
-                -webkit-mask-image: var(--across), var(--down); -webkit-mask-composite: source-in;
-                mask-image: var(--across), var(--down); mask-composite: intersect;
-                transition: opacity var(--motion-base) var(--ease-out);
-            }
-            [data-slot='xp'] { --plate-x: -230px; }
-            [data-slot='radar'].hud-plate::before { inset: calc(-24px * var(--hud-u)); -webkit-mask-image: none; mask-image: none; background: radial-gradient(closest-side, rgba(2, 4, 8, 0.8) 72%, transparent); }
-            /* Only under what is drawn: the Warden bar while it is up, the feed while it has rows. */
-            [data-slot='warden'].hud-plate:not(:has(.is-on))::before, [data-slot='feed'].hud-plate:not(:has(.feed-row))::before { opacity: 0; }
-
             /* INSTRUMENTS: the mock-ups' finish (HUD.md). Glance 70 % (55 % while a Warden lives),
-               on demand 35 % until a change wakes it; a changed value pulses once. */
-            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: 0 1px 2px rgba(2, 4, 8, 0.9); pointer-events: none; }
+               on demand 60 % until a change wakes it; a changed value pulses once. */
+            .ins { color: var(--text); font-family: var(--font-ui); text-shadow: var(--text-ink); pointer-events: none; }
             .ins-lbl { font-family: var(--font-display); font-weight: 500; font-size: calc(var(--text-xs) * var(--hud-u)); letter-spacing: 0.2em; color: var(--text-dim); }
             .ins-glance { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             #hud-layer[data-hud-mode='warden'] .ins-glance { opacity: 0.55; }
-            .ins-demand { opacity: 0.35; transition: opacity var(--motion-base) var(--ease-out); }
+            .ins-demand { opacity: 0.6; transition: opacity var(--motion-base) var(--ease-out); }
             .ins-demand.is-awake { opacity: 1; }
             @media (prefers-reduced-motion: no-preference) {
                 html:not([data-motion='reduced']) body:not(.motion-reduced) .ins-pulse { animation: ins-pulse 120ms var(--ease-out) 1; }
             }
             @keyframes ins-pulse { 50% { transform: scale(1.06); filter: brightness(1.5); } }
 
-            .cockpit-frame {
-                position: absolute; width: 100%; height: 100%; z-index: 11; pointer-events: none;
-                transition: opacity var(--motion-base, 0.3s);
-                background: linear-gradient(135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(-135deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(45deg, rgba(5,5,5,0.5) 2%, transparent 10%),
-                            linear-gradient(-45deg, rgba(5,5,5,0.5) 2%, transparent 10%);
-            }
-            /* Under the letterbox the picture is the scene's alone (the jump's white-out). */
-            body:has(.letterbox.is-showing) .cockpit-frame { opacity: 0; }
 
 
             /* NEXT WAVE */
             .next-wave-box { position: absolute; top: 50%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-50%); font-family: var(--font-display, 'Orbitron', sans-serif); opacity: 0; transition: opacity var(--motion-base, 0.3s); pointer-events: none; z-index: 100; }
             .next-wave-box.visible { opacity: 1; }
-            .next-wave-label { font-size: var(--text-lg, 20px); color: var(--danger, #ff003c); letter-spacing: 6px; font-weight: 900; margin: 0; text-transform: uppercase; text-shadow: 0 0 15px rgba(0, 0, 0, 0.9); line-height: 1.2; }
+            .next-wave-label { font-size: var(--text-lg, 20px); color: var(--danger, #ff003c); letter-spacing: 6px; font-weight: 900; margin: 0; text-transform: uppercase; text-shadow: var(--text-ink); line-height: 1.2; }
             .next-wave-timer { font-size: 4rem; line-height: 1; color: var(--text, #fff); font-weight: 900; text-shadow: 0 0 20px var(--danger, #ff003c), 2px 2px 0 #000; margin-top: var(--space-2, 8px); }
             .next-wave-box.visible .next-wave-timer { animation: alert-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
@@ -100,7 +76,7 @@ export function getHudCss() {
             .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
             .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
             .edge-arrow[data-kind='pickup'] .edge-arrow__glyph { transform-origin: 50% 50%; scale: 0.7; }
-            .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); white-space: nowrap; }
+            .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: var(--text-ink); white-space: nowrap; }
             .edge-arrow[data-edge='left'] .edge-arrow__label { left: 34px; top: 0; }
             .edge-arrow[data-edge='right'] .edge-arrow__label { left: -34px; top: 0; }
             .edge-arrow[data-edge='top'] .edge-arrow__label { left: 0; top: 22px; }
@@ -113,9 +89,9 @@ export function getHudCss() {
             .layer-banner__line { width: 420px; max-width: 70%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent); box-shadow: var(--glow-accent); }
             .layer-banner.is-boss .layer-banner__title { color: var(--boss); text-shadow: 0 0 18px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-boss .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
-            .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
+            .layer-banner__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--text-dim); text-shadow: var(--text-ink); }
             .layer-banner__sub:empty { display: none; }
-            .layer-banner__note, .boss-intro__note { max-width: min(560px, 80vw); font-family: var(--font-ui); font-size: calc(var(--text-md) * 1.15); font-weight: 500; letter-spacing: 0.02em; text-align: center; text-wrap: balance; color: var(--text); opacity: 0.9; text-shadow: 0 0 12px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.95); }
+            .layer-banner__note, .boss-intro__note { max-width: min(560px, 80vw); font-family: var(--font-ui); font-size: calc(var(--text-md) * 1.15); font-weight: 500; letter-spacing: 0.02em; text-align: center; text-wrap: balance; color: var(--text); opacity: 0.9; text-shadow: var(--text-ink); }
             .layer-banner__note:empty, .boss-intro__note:empty { display: none; }
             .layer-banner.is-surge .layer-banner__title { color: var(--danger); text-shadow: 0 0 18px var(--danger), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-surge .layer-banner__line { background: linear-gradient(90deg, transparent, var(--danger) 20%, var(--danger) 80%, transparent); box-shadow: 0 0 12px var(--danger); }
@@ -130,7 +106,7 @@ export function getHudCss() {
             .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
-            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
+            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: var(--text-ink); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
             .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
             /* Under the panels (z-index -1 in the HUD layer), over the field. */
             .letterbox { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
@@ -142,20 +118,20 @@ export function getHudCss() {
             #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction { opacity: 0; }
 
             /* BOSS INTRO */
-            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 92vw; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
+            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 92vw; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
             .boss-intro.is-showing { opacity: 1; visibility: visible; }
             .layer-banner.is-leaving, .boss-intro.is-leaving { opacity: 0; }
             .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; text-align: center; text-wrap: balance; }
-            .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
+            .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: var(--text-ink); }
             .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
 
             /* TRANSMISSION (Warden radio, bottom centre above the layer dial) */
-            .transmission { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); width: min(640px, 80%); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-4); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 85; opacity: 0; visibility: hidden; }
+            .transmission { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); width: min(640px, 80%); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-4); pointer-events: none; z-index: 85; opacity: 0; visibility: hidden; }
             .transmission.is-showing { opacity: 1; visibility: visible; }
             .transmission.is-leaving { opacity: 0; }
             .transmission__speaker { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.25em; color: var(--accent); text-shadow: 0 0 8px var(--accent-line); }
             .transmission__rule { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent); }
-            .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
+            .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: var(--text-ink), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
             /* Settings → Accessibility: Large Subtitles stacks on Text Size; Reduce Flashing stops the flicker */
             body.subtitles-large .transmission { width: min(760px, 90%); }
@@ -169,12 +145,37 @@ export function getHudCss() {
 
             /* ONBOARDING TIP (first run, top centre under the boss bar slot); one line until it would
                reach a top corner column (the Classic radar, 170 px + margins, the widest), then it wraps */
-            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; width: max-content; max-width: calc(min(100cqw, 100cqh * 16 / 9) - 404px * var(--hud-u)); box-sizing: border-box; opacity: 0; visibility: hidden; }
+            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); border-left: 3px solid var(--accent); pointer-events: none; z-index: 80; width: max-content; max-width: calc(min(100cqw, 100cqh * 16 / 9) - 404px * var(--hud-u)); box-sizing: border-box; opacity: 0; visibility: hidden; }
             .onboarding-tip.is-showing { opacity: 1; visibility: visible; }
             .onboarding-tip.is-leaving { opacity: 0; }
             .onboarding-tip__keys { display: flex; flex: none; gap: var(--space-1); }
             .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
-            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); text-shadow: var(--text-ink); }
+
+            /* A phone held sideways (390 px tall, about 300 in Safari with its bars): the centre moments
+               can come together (a first-run tip, the layer banner, the radio) and would sit on one
+               another and on the hull and weapon, which the phone layout puts under the clock and the
+               radar (186 px down, in HUD units). They take bands under those: the tip, the banner made
+               smaller, the radio low and narrow, clear of the right thumb's DASH and SHIELD. */
+            @container (max-height: 480px) {
+                .onboarding-tip { top: calc(12px + 186px * var(--hud-u)); max-width: min(560px, 66%); }
+                .layer-banner, .boss-intro { top: calc(54px + 186px * var(--hud-u)); gap: var(--space-1); }
+                .layer-banner__title { font-size: var(--text-lg); }
+                .layer-banner__sub, .boss-intro__sub, .layer-banner__note, .boss-intro__note { font-size: var(--text-sm); }
+                .boss-intro { padding-block: 0; }
+                .boss-intro__name { font-size: var(--text-2xl); }
+                .transmission, body.subtitles-large .transmission { bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: min(440px, 52%); }
+                .transmission__line { font-size: var(--text-sm); line-height: 1.35; }
+                body.subtitles-large .transmission__line { font-size: var(--text-md); }
+            }
+            /* Under 330 px all three do not fit: the banner (a few seconds) takes the tip's band and the
+               tip waits under it, the banners keep only their titles, the radio drops its rule. */
+            @container (max-height: 330px) {
+                .layer-banner, .boss-intro { top: calc(12px + 186px * var(--hud-u)); gap: 2px; }
+                #hud-layer:has(.layer-banner.is-showing, .boss-intro.is-showing) .onboarding-tip { opacity: 0; }
+                .boss-intro__name { font-size: var(--text-xl); }
+                .layer-banner__sub, .layer-banner__note, .boss-intro__sub, .boss-intro__note, .transmission__rule { display: none; }
+            }
 
             @media (prefers-reduced-motion: no-preference) {
                 html:not([data-motion='reduced']) .damage-arc.is-on { animation: damage-arc-fade ${DAMAGE_ARC_MS}ms ease-in forwards; }

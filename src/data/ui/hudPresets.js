@@ -3,7 +3,8 @@
 // The HUD's built-in presets (Settings → Interface → HUD Layout; the
 // player's own, made in Edit HUD Layout, live in the settings: see
 // modules/ui/hud/editor/layoutStore.js). A preset is the
-// list of layout items: each places one slot and picks its model, a file
+// list of layout items (`screens` adds a list per touch screen, see below):
+// each places one slot and picks its model, a file
 // under src/modules/ui/hud/instruments/<slot>/ (see that folder's
 // registry.js for the slots, the anchors and what each model is fed).
 //   anchor   'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' |
@@ -12,8 +13,6 @@
 //            'screen': the whole window (instruments drawn on the ship)
 //   x, y     px from the anchor at a 1080p window, scaled with the HUD
 //   scale    0.6..1.6, grown from the anchored edge; opacity 0.2..1
-//   plate   a soft dark plate behind the slot: the field's glowing border
-//            fades out under it (HUD.md, Layout)
 //   visible  false leaves the slot empty
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
@@ -27,12 +26,10 @@ const item = (slot, model, anchor, x = 0, y = 0, more = {}) => ({
   scale: 1,
   opacity: 1,
   visible: true,
-  plate: false,
   ...more,
 });
 
-const plated = { plate: true };
-const small = (scale) => ({ ...plated, scale });
+const small = (scale) => ({ scale });
 
 export const HUD_PRESETS = deepFreeze({
   // The owner's approved mock-ups of 20/10 (HUD.md) and his pick for the
@@ -52,6 +49,38 @@ export const HUD_PRESETS = deepFreeze({
       item('xp', 'instrument', 'bottom-center', 0, 24, small(0.85)),
       item('build', 'instrument', 'bottom-right', 32, 24, small(0.8)),
     ],
+    // On a touch screen held sideways (bootstrap/mobileGuard.js touchScreen)
+    // the thumbs cover the bottom corners: the hull goes up under the clock
+    // and the weapon with its mode words under the radar (Felipe's pick on
+    // 18/11, "A"). The phone drops the feed and draws the rest a bit larger
+    // than its small window would; the iPad keeps the desktop's sizes.
+    screens: {
+      phone: [
+        item('hull-ring', 'instrument', 'screen'),
+        item('recharges', 'instrument', 'screen'),
+        item('run-info', 'instrument', 'top-left', 16, 14, small(0.9)),
+        item('warden', 'instrument', 'top-center', 0, 14, small(0.6)),
+        item('radar', 'tactical', 'top-right', 16, 14, small(0.7)),
+        item('feed', 'instrument', 'top-right', 16, 190, {
+          ...small(0.8),
+          visible: false,
+        }),
+        item('vitals', 'instrument', 'top-left', 16, 70, small(0.72)),
+        item('xp', 'instrument', 'bottom-center', 0, 14, small(0.7)),
+        item('build', 'instrument', 'top-right', 16, 150, small(0.8)),
+      ],
+      tablet: [
+        item('hull-ring', 'instrument', 'screen'),
+        item('recharges', 'instrument', 'screen'),
+        item('run-info', 'instrument', 'top-left', 24, 16, small(0.8)),
+        item('warden', 'instrument', 'top-center', 0, 16, small(0.75)),
+        item('radar', 'tactical', 'top-right', 24, 16, small(0.75)),
+        item('feed', 'instrument', 'top-right', 24, 222, small(0.8)),
+        item('vitals', 'instrument', 'top-left', 24, 68, small(0.65)),
+        item('xp', 'instrument', 'bottom-center', 0, 16, small(0.85)),
+        item('build', 'instrument', 'top-right', 24, 167, small(0.8)),
+      ],
+    },
   },
   // The HUD until 20/10, panel for panel where it sat in its old grid
   // (16 px margins, 220 px side columns).
@@ -79,18 +108,12 @@ export const HUD_PRESETS = deepFreeze({
       item('hull-ring', 'instrument', 'screen'),
       item('recharges', 'instrument', 'screen'),
       item('run-info', 'instrument', 'top-left', 32, 24, { visible: false }),
-      item('warden', 'instrument', 'top-center', 0, 24, plated),
-      item('radar', 'tactical', 'top-right', 24, 24, {
-        ...plated,
-        scale: 0.75,
-      }),
+      item('warden', 'instrument', 'top-center', 0, 24),
+      item('radar', 'tactical', 'top-right', 24, 24, small(0.75)),
       item('feed', 'instrument', 'top-right', 24, 228, { visible: false }),
-      item('vitals', 'instrument', 'bottom-center', 0, 56, {
-        ...plated,
-        scale: 0.8,
-      }),
-      item('xp', 'instrument', 'bottom-center', 0, 24, plated),
-      item('build', 'instrument', 'bottom-right', 32, 24, plated),
+      item('vitals', 'instrument', 'bottom-center', 0, 56, small(0.8)),
+      item('xp', 'instrument', 'bottom-center', 0, 24),
+      item('build', 'instrument', 'bottom-right', 32, 24),
     ],
   },
 });

@@ -4,7 +4,7 @@ import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 
 export const FADE_OUT_MS = 300;
 export const FEED_MAX_ROWS = 4;
-// HUD.md: an on-demand instrument fades to 35 % after 4 s without change.
+// HUD.md: an on-demand instrument fades to 60 % after 4 s without change.
 export const ON_DEMAND_MS = 4000;
 // The combo shows from its second kill.
 export const COMBO_VISIBLE_MIN = 2;
@@ -28,7 +28,7 @@ export function comboTier(multiplier) {
 /**
  * An on-demand instrument (HUD.md): `wake(now)` when its value changes,
  * `update(now)` each frame; `el` carries `is-awake` for ON_DEMAND_MS after
- * the last wake (the CSS fades it to 35 % when the class goes).
+ * the last wake (the CSS fades it to 60 % when the class goes).
  */
 export function onDemand(el) {
   let wokeAt = -Infinity;

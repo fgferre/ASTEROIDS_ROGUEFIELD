@@ -155,15 +155,9 @@ describe('HUD instruments', () => {
     expect(layout._instruments.get('xp').id).toBe('classic');
     expect(layout._instruments.get('radar').id).toBe('classic');
     expect(layout._instruments.has('recharges')).toBe(false);
-    expect(
-      layout._layer.slots.get('build').classList.contains('hud-plate')
-    ).toBe(false);
 
     hud.setLayout(getHudPreset('instrument').items);
     expect(layout._instruments.get('vitals').id).toBe('instrument');
-    expect(
-      layout._layer.slots.get('build').classList.contains('hud-plate')
-    ).toBe(true);
   });
 
   it('mounts the tactical radar by default and the classic one when the item picks it', () => {
