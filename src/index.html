@@ -454,11 +454,21 @@
               <kbd data-device="gamepad">RB</kbd>
               <span data-label>Equip for me</span>
             </button>
+            <!-- Touch only (cardScreens.css): Escape's back-out, by finger -->
+            <button
+              id="levelup-cancel-btn"
+              class="lu-ghost levelup-action levelup-cancel"
+              type="button"
+            >
+              Cancel
+            </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
             Pick a card to banish it for the rest of the run.
-            <span data-device="keyboard">Esc</span>
-            <span data-device="gamepad">B</span> cancels.
+            <span class="levelup-hint__keys"
+              ><span data-device="keyboard">Esc</span>
+              <span data-device="gamepad">B</span> cancels.</span
+            >
           </p>
           <p
             id="levelup-hold-hint"
@@ -466,8 +476,10 @@
             role="status"
           >
             Pick a card to hold it for the next level-up.
-            <span data-device="keyboard">Esc</span>
-            <span data-device="gamepad">B</span> cancels.
+            <span class="levelup-hint__keys"
+              ><span data-device="keyboard">Esc</span>
+              <span data-device="gamepad">B</span> cancels.</span
+            >
           </p>
           <div id="levelup-run" class="run-tray hidden"></div>
         </div>

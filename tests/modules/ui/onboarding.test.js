@@ -8,6 +8,7 @@ import {
   CARDS_TIP_TEXT_GAMEPAD,
   CARDS_TIP_TEXT_HEAD_START,
   CARDS_TIP_TEXT_HEAD_START_GAMEPAD,
+  CARDS_TIP_TEXT_TOUCH,
   DASH_TIP_SECONDS,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
@@ -319,6 +320,14 @@ describe('Onboarding', () => {
       CARDS_TIP_TEXT_HEAD_START_GAMEPAD
     );
     expect(CARDS_TIP_TEXT_HEAD_START_GAMEPAD).toMatch(/\bRB equips/);
+  });
+
+  it('names no keys by touch, plain or during a head start', () => {
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.cardsTip('touch')).toBe(CARDS_TIP_TEXT_TOUCH);
+    expect(onboarding.cardsTip('touch', true)).toBe(CARDS_TIP_TEXT_TOUCH);
+    expect(CARDS_TIP_TEXT_TOUCH).not.toMatch(/\b[RBQ]\b/);
   });
 
   it('names the new mode, its key and the way back for each toggle', () => {

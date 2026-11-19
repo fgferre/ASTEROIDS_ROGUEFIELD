@@ -30,6 +30,7 @@ export function cacheStaticNodes() {
       holdHint: document.getElementById('levelup-hold-hint') || null,
       headStart: document.getElementById('levelup-headstart') || null,
       equipBtn: document.getElementById('levelup-equip-btn') || null,
+      cancelBtn: document.getElementById('levelup-cancel-btn') || null,
       run: document.getElementById('levelup-run') || null,
     },
     chest: {

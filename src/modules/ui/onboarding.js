@@ -26,6 +26,8 @@ export const CARDS_TIP_TEXT_HEAD_START =
   'Pick a card. R rerolls, B banishes, Q equips the rest.';
 export const CARDS_TIP_TEXT_HEAD_START_GAMEPAD =
   'Pick a card. X rerolls, Y banishes, RB equips the rest.';
+/** By touch the actions are the buttons under the cards: no keys to name. */
+export const CARDS_TIP_TEXT_TOUCH = 'Pick a card.';
 
 /**
  * In-play tips in order; `cards` lives on the level-up screen instead, and
@@ -264,6 +266,9 @@ export class Onboarding {
     if (this.cardsShown !== id) {
       this.cardsShown = id;
       this.onStep('cards');
+    }
+    if (device === 'touch') {
+      return CARDS_TIP_TEXT_TOUCH;
     }
     if (headStart) {
       return device === 'gamepad'

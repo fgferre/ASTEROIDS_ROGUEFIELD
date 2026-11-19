@@ -1331,6 +1331,10 @@ select {
     grid-area: 3 / 2;
     padding-top: var(--space-2);
   }
+
+  body.touch-play #pause-screen .run-tray__n small {
+    font-size: var(--text-xs);
+  }
 }
 
 /* Hints for the last device used (UISystem sets data-input-device). */
@@ -3885,6 +3889,202 @@ body.touch-play .menu-ship-selector__name {
   body.touch-play .prep-launch__btn .menu-screen__lock {
     letter-spacing: 0;
     white-space: nowrap;
+  }
+}
+
+/* Hangar, Settings and Credits by touch: every button and tab finger-sized,
+   the support e-mail a full-height target. */
+body.touch-play :is(.settings-close-btn, .credits-close-btn) {
+  width: 44px;
+  height: 44px;
+}
+
+body.touch-play
+  :is(#hangar-screen, #settings-screen, #credits-screen)
+  :is(.btn, .codex-tab),
+body.touch-play
+  :is(
+    .hangar-hull,
+    .hangar-chip,
+    .settings-segment,
+    .settings-device-btn,
+    .settings-binding-btn,
+    .settings-select-input,
+    .settings-fold summary
+  ) {
+  min-height: 44px;
+}
+
+body.touch-play .settings-range-input {
+  height: 44px;
+}
+
+body.touch-play .credits-support__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Phone held sideways: each panel fills the screen inside the safe areas and
+   its content scrolls. Hangar: the tabs down a rail on the left, Back under
+   them. Settings: Reset and Done beside the close button, so the section
+   list stands whole. */
+@media (max-height: 500px) {
+  body.touch-play :is(#hangar-screen, #settings-screen, #credits-screen) {
+    padding: calc(env(safe-area-inset-top) + 6px)
+      calc(env(safe-area-inset-right) + 6px)
+      calc(env(safe-area-inset-bottom) + 4px)
+      calc(env(safe-area-inset-left) + 6px);
+  }
+
+  body.touch-play :is(.credits-dialog, .settings-container) {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  body.touch-play .credits-dialog {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4) var(--space-3);
+  }
+
+  body.touch-play .hangar-dialog {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head head'
+      'tabs panel'
+      'foot panel';
+    gap: var(--space-2) 14px;
+  }
+
+  body.touch-play .hangar-dialog .credits-header {
+    grid-area: head;
+  }
+
+  body.touch-play .hangar-dialog .codex-tabs {
+    grid-area: tabs;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-right: 10px;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  body.touch-play .hangar-dialog .codex-tab {
+    padding: 2px 10px;
+    border-bottom: 0;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-sm);
+    text-align: left;
+  }
+
+  body.touch-play .hangar-dialog .codex-tab.is-active {
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  body.touch-play .hangar-dialog .credits-body {
+    grid-area: panel;
+    overflow-y: auto;
+  }
+
+  body.touch-play .hangar-dialog .credits-footer {
+    grid-area: foot;
+    padding-right: 10px;
+    border-right: 1px solid var(--line);
+  }
+
+  body.touch-play #hangar-back-btn {
+    width: 100%;
+    padding: 0 var(--space-2);
+  }
+
+  body.touch-play :is(.hangar-list, .medal-wall, .pressure-ladder) {
+    flex: none;
+    overflow: visible;
+  }
+
+  body.touch-play .hangar-hulls {
+    gap: 6px;
+  }
+
+  body.touch-play .settings-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'title foot close'
+      'saved foot close'
+      'body  body body';
+    grid-template-rows: auto auto minmax(0, 1fr);
+    column-gap: 10px;
+    padding: var(--space-2) var(--space-4) 0;
+  }
+
+  body.touch-play .settings-header {
+    display: contents;
+  }
+
+  body.touch-play .settings-title {
+    grid-area: title;
+    align-self: end;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  body.touch-play .settings-saved {
+    grid-area: saved;
+    margin: 0;
+    font-size: var(--text-xs);
+  }
+
+  body.touch-play .settings-close-btn {
+    grid-area: close;
+    align-self: center;
+  }
+
+  body.touch-play .settings-footer {
+    grid-area: foot;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0;
+    border: 0;
+  }
+
+  body.touch-play .settings-footer .btn {
+    min-width: 0;
+    padding: 0 var(--space-4);
+  }
+
+  body.touch-play .settings-body {
+    grid-area: body;
+    grid-template-columns: 172px minmax(0, 1fr);
+    margin-top: var(--space-2);
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  body.touch-play .settings-tabs {
+    gap: var(--space-1);
+    padding: 6px 10px 6px 0;
+  }
+
+  body.touch-play .settings-tabs .settings-tab {
+    justify-content: center;
+    gap: 0;
+    min-height: 44px;
+    padding: 2px 10px;
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  body.touch-play .settings-content {
+    padding: var(--space-2) var(--space-1) var(--space-3) 14px;
+  }
+
+  body.touch-play .settings-group__title {
+    font-size: var(--text-xs);
   }
 }
 
