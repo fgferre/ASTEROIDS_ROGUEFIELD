@@ -182,5 +182,39 @@ export function getEditorCss() {
     .hed-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
     .hed-input { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 18px; font-weight: 600; }
     .hed-input--code { resize: none; font-family: var(--font-mono); font-size: 12px; font-weight: 400; line-height: 1.5; word-break: break-all; }
+
+    /* BY TOUCH (body.touch-play): 44 px targets, 12 px text, the bar and the inspector stacked
+       inside the safe areas, the inspector scrolling in what is left; Undo and Redo as icons. */
+    body.touch-play .hed { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; padding: 88px max(24px, env(safe-area-inset-right)) max(16px, calc(env(safe-area-inset-bottom) + 8px)) max(24px, env(safe-area-inset-left)); }
+    body.touch-play .hed-bar { position: relative; z-index: 1; top: auto; left: auto; transform: none; flex: none; align-self: center; width: min(1060px, 100%); }
+    body.touch-play .hed-bar__row { flex-wrap: wrap; row-gap: 6px; }
+    body.touch-play .hed-title { flex-basis: 100%; }
+    body.touch-play .hed-insp { position: relative; top: auto; left: auto; right: auto; flex: 0 1 auto; min-height: 0; max-height: none; }
+    body.touch-play .hed-insp > * { flex-shrink: 0; }
+    body.touch-play .hed-insp[data-side='left'] { align-self: flex-start; }
+    body.touch-play .hed-insp[data-side='right'] { align-self: flex-end; }
+    body.touch-play .hed :is(.hed-btn, .hed-select, .hed-menu button) { height: 44px; }
+    body.touch-play .hed :is(.hed-btn--icon, .hed-seg__btn) { min-width: 44px; }
+    body.touch-play .hed-btn--icon, body.touch-play .hed-btn:is([data-action='undo'], [data-action='redo']) { width: 44px; padding: 0; }
+    body.touch-play .hed-btn:is([data-action='undo'], [data-action='redo']) .hed-btn__text { display: none; }
+    body.touch-play .hed-seg__btn { flex: 1 0 auto; height: 44px; padding: 0 8px; }
+    body.touch-play .hed-row { height: 44px; }
+    body.touch-play .hed-range input { flex: none; }
+    body.touch-play :is(.hed-label, .hed-btn, .hed-seg__btn, .hed-model__name, .hed-tag, .hed-safe__label, .hed-readout, .hed-preview__label, .hed-hint) { font-size: 12px; }
+    body.touch-play .hed-move { flex-direction: row; align-items: center; justify-content: space-between; }
+    body.touch-play .hed-nudge { display: flex; gap: 6px; }
+    /* A phone held sideways: two rows without the title, the Layout and Frame labels or the
+       hint; Grid and Safe Area as icons too; the menu opens beside its button. */
+    @media (max-height: 500px) {
+      body.touch-play .hed { gap: 6px; padding-top: 80px; padding-bottom: max(8px, calc(env(safe-area-inset-bottom) + 4px)); }
+      body.touch-play .hed-bar { padding: 8px 10px; gap: 6px; }
+      body.touch-play .hed-bar__row { gap: 6px; }
+      body.touch-play :is(.hed-title, .hed-field > .hed-label, .hed-bar__row > .hed-label, .hed-hint) { display: none; }
+      body.touch-play .hed-select { min-width: 150px; }
+      body.touch-play .hed-btn:is([data-action='grid'], [data-action='safe']) { width: 44px; padding: 0; }
+      body.touch-play .hed-btn:is([data-action='grid'], [data-action='safe']) .hed-btn__text { display: none; }
+      body.touch-play .hed-menu { top: 0; right: calc(100% + 6px); }
+      body.touch-play .hed-insp { padding: 12px; gap: 10px; }
+    }
   `;
 }
