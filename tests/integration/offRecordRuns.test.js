@@ -8,6 +8,8 @@ import CodexService from '../../src/services/CodexService.js';
 import { HANGAR_STORAGE_KEY } from '../../src/services/HangarService.js';
 import { ACHIEVEMENTS_STORAGE_KEY } from '../../src/services/AchievementService.js';
 import { deserialize, serialize } from '../../src/core/replay.js';
+import { chooseSlot, resolveActiveSlot } from '../../src/core/storage.js';
+import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 
 let restoreDom;
 
@@ -17,6 +19,7 @@ beforeEach(() => {
 afterEach(() => {
   GamePools.releaseAll();
   restoreDom();
+  resolveActiveSlot();
 });
 
 const savedKeys = (setItem) =>
@@ -90,5 +93,56 @@ describe('runs that keep no progress', () => {
     expect(hangar.salvage).toBe(salvage);
     expect(hangar.achievements.unlocked.survivor).toBeUndefined();
     expect(codex.seen).toEqual({});
+  });
+
+  it('an empty pilot flies the default hull and leaves the shared settings as they were', () => {
+    // Slot 1 owns the Bastion and picked it; the settings are everyone's.
+    localStorage.setItem(
+      'roguefield:hangar:v2',
+      JSON.stringify({
+        version: 2,
+        salvage: 0,
+        owned: { 'bastion-hull': true },
+      })
+    );
+    localStorage.setItem(
+      'astro:settings:v1',
+      JSON.stringify({
+        gameplay: { selectedHull: BASTION_HULL_ID, difficulty: 'pilot' },
+        controls: { hullControl: 'modern' },
+      })
+    );
+    expect(createHeadlessGame().session.getConfiguredHullId()).toBe(
+      BASTION_HULL_ID
+    );
+    chooseSlot(2);
+    resolveActiveSlot();
+    const settings = localStorage.getItem('astro:settings:v1');
+
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    for (let i = 0; i < 120; i += 1) game.step();
+    game.session.exitToMenu({ source: 'test' });
+
+    expect(game.session.getConfiguredHullId()).not.toBe(BASTION_HULL_ID);
+    expect(localStorage.getItem('astro:settings:v1')).toBe(settings);
+    expect(localStorage.getItem('roguefield:hangar:v2')).toContain(
+      'bastion-hull'
+    );
+  });
+
+  it('a demo scene on pilot 2 writes nothing to pilot 2 nor pilot 1', () => {
+    chooseSlot(2);
+    resolveActiveSlot();
+    const game = createHeadlessGame({ seedSource: 'profile-harness' });
+    const setItem = vi.spyOn(window.localStorage, 'setItem');
+    game.session.startNewRun({ source: 'test' });
+    for (let i = 0; i < 60; i += 1) game.step();
+    game.eventBus.emit('wave-started', { wave: 15 });
+    game.eventBus.emit('run-abandoned', {
+      wave: 15,
+      stats: { totalKills: 40 },
+    });
+    expect(savedKeys(setItem)).toEqual([]);
   });
 });
