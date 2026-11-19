@@ -280,6 +280,14 @@ describe('Onboarding', () => {
     expect(onboardingPrompts(keys).dash.keys).toEqual(['⇧ Shift']);
   });
 
+  it('shows the gesture and the on-screen buttons on touch', () => {
+    const prompts = onboardingPrompts({}, 'classic', 'touch');
+    expect(prompts.move.keys).toEqual([]);
+    expect(prompts.move.text).toMatch(/left thumb/);
+    expect(prompts.dash.keys).toEqual(['DASH']);
+    expect(prompts.shield.keys).toEqual(['SHIELD']);
+  });
+
   it('names the pad buttons when the gamepad was used last', () => {
     const buttons = {
       moveUp: 'L-Stick ↑',

@@ -133,6 +133,7 @@ class UISystem extends BaseSystem {
       sector: () => this.sector,
       shieldKey: () => {
         const device = this.getService('input').getActiveDevice();
+        if (device === 'touch') return ''; // SHIELD is on screen
         return this.settingsPanel.formatBindingLabel(
           this.settings?.getSetting('controls', 'activateShield')?.[
             device

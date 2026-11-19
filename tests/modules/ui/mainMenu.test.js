@@ -125,6 +125,37 @@ describe('Main menu mode tabs', () => {
   });
 });
 
+describe('Main menu Wake log sheet', () => {
+  it('opens from its button, stays open on a tap inside, closes on X or a tap elsewhere', () => {
+    const nav = fakeNode();
+    const open = new Set();
+    nav.classList = {
+      toggle: (name, on) => (on ? open.add(name) : open.delete(name)),
+    };
+    // A tap target: `sheet` is its data-log-sheet, `inLog` whether it sits in the log.
+    const tap = (sheet, inLog = false) =>
+      nav.fire('click', {
+        target: {
+          closest: (selector) =>
+            selector === '[data-log-sheet]'
+              ? sheet && { dataset: { logSheet: sheet } }
+              : inLog,
+        },
+      });
+    new MainMenu({ refs: { nav } }).bindWakeLogSheet();
+
+    tap('open');
+    expect(open.has('is-log-open')).toBe(true);
+    tap(null, true);
+    expect(open.has('is-log-open')).toBe(true);
+    tap('close', true);
+    expect(open.has('is-log-open')).toBe(false);
+    tap('open');
+    tap(null);
+    expect(open.has('is-log-open')).toBe(false);
+  });
+});
+
 describe('Main menu launch row', () => {
   const slot = () => {
     const slot = { innerHTML: '', dataset: {}, listeners: {} };

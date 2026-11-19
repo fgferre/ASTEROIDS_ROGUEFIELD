@@ -60,7 +60,7 @@ export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
  * Prompt content per step. `keys` are the labels of the bound keys or pad
  * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield,
  * toggleAimMode, toggleSpreadMode }); `device` is the last one used
- * ('keyboard' | 'gamepad'); `toggled` adds the `mode` notice (modeNotice).
+ * ('keyboard' | 'gamepad' | 'touch'); `toggled` adds the `mode` notice (modeNotice).
  */
 export function onboardingPrompts(
   keys,
@@ -85,14 +85,23 @@ export function onboardingPrompts(
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
           text: 'Move with WASD. The cannon fires on its own.',
         };
+  // Touch: the gesture, and the on-screen buttons' own names.
+  const touchMove = {
+    keys: [],
+    text:
+      scheme === 'classic'
+        ? 'Put your left thumb down and point where to fly. The cannon fires on its own.'
+        : 'Put your left thumb down and drag to move. The cannon fires on its own.',
+  };
+  const touch = device === 'touch';
   return {
-    move: device === 'gamepad' ? padMove : keyboardMove,
+    move: touch ? touchMove : device === 'gamepad' ? padMove : keyboardMove,
     dash: {
-      keys: [keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
+      keys: [touch ? 'DASH' : keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
       text: "Dash through danger. You can't be hit mid-dash.",
     },
     shield: {
-      keys: [keys.activateShield],
+      keys: [touch ? 'SHIELD' : keys.activateShield],
       text: 'Raise your shield before a hit lands.',
     },
     mode: toggled && modeNotice(toggled, keys, device),
