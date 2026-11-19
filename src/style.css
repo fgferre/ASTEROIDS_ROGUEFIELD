@@ -4226,6 +4226,11 @@ body.touch-play #perf-overlay {
   display: none;
 }
 
+/* While a scene plays and a tap skips it, the fight's buttons step aside. */
+body.touch-play:has(.cinematic-hint.is-showing) .touch-layer {
+  visibility: hidden;
+}
+
 .touch-layer {
   --tu: clamp(1px, calc(100dvh / 390), 1.25px);
   position: absolute;
