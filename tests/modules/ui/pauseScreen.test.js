@@ -89,5 +89,9 @@ describe('Pause screen', () => {
     expect(classes.has('is-confirming')).toBe(false);
     // Nothing armed: the next Escape resumes as before.
     expect(escape()).toBe(false);
+    // By touch the second press is a tap.
+    document.body = { dataset: { inputDevice: 'touch' } };
+    pause.confirmQuit(exitBtn);
+    expect(exitBtn.textContent).toBe('Quit? Tap again');
   });
 });

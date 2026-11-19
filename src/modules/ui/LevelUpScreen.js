@@ -563,7 +563,9 @@ export class LevelUpScreen {
     equipBtn?.setAttribute('aria-pressed', 'true');
     const label = equipBtn?.querySelector('[data-label]');
     if (label) {
-      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? Press again`;
+      const again =
+        document.body?.dataset.inputDevice === 'touch' ? 'Tap' : 'Press';
+      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? ${again} again`;
     }
     this.equipArmTimer = setTimeout(() => this.disarmEquip(), EQUIP_CONFIRM_MS);
   }
