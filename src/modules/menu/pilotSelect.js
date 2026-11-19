@@ -5,15 +5,27 @@
 // over the gated menu; the focus waits on the pilot in play, so one tap,
 // Enter or pad Ⓐ goes on with it. Another pilot is a new page: its save is
 // read as the game boots (core/storage.js), so choosing one saves the choice
-// and reloads, and the reloaded entry skips this screen once.
+// and reloads, and the reloaded entry skips this screen once. A pilot is
+// deleted through a box whose focus starts on Cancel (the same card, answer
+// 3): deleting the one in play reloads back to this screen.
 
-import { chooseSlot, getActiveSlot } from '../../core/storage.js';
+import { chooseSlot, deleteSlot, getActiveSlot } from '../../core/storage.js';
 import { pilotSummaries } from '../../services/pilots.js';
 import { localDay } from '../../services/runRecords.js';
 
 // Set across the reload a choice makes: that entry goes straight on.
 const CHOSEN_KEY = 'roguefield:pilot-chosen';
 const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
+// The keys this screen answers; the rest (Tab, the browser's) pass.
+const SCREEN_KEYS = [
+  'ArrowLeft',
+  'ArrowUp',
+  'ArrowRight',
+  'ArrowDown',
+  'Enter',
+  ' ',
+  'Escape',
+];
 
 /** 'Today', or the day as '12 Nov'; '—' for none. */
 export function lastFlownLabel(day, today = localDay(new Date())) {
@@ -38,7 +50,25 @@ export function pilotCardMarkup(summary, slot, active) {
         <dt>Last flown</dt><dd>${lastFlownLabel(summary.lastRun)}</dd>
       </dl>`
     : `<p class="pilot-card__empty"><strong>Empty</strong>A new pilot starts at the first sector, and the story is told from the beginning.</p>`;
-  return `<li class="pilot-card${active ? ' is-active' : ''}">${head}${body}<button type="button" class="pilot-card__go" data-pilot-slot="${slot}">${action}</button></li>`;
+  const remove = summary
+    ? `<button type="button" class="pilot-card__delete" data-pilot-delete="${slot}">Delete</button>`
+    : '';
+  return `<li class="pilot-card${active ? ' is-active' : ''}">${head}${body}<div class="pilot-card__actions"><button type="button" class="pilot-card__go" data-pilot-slot="${slot}">${action}</button>${remove}</div></li>`;
+}
+
+/** The box that asks before a pilot is deleted; Cancel comes first. */
+export function deleteConfirmMarkup(summary, slot) {
+  const sectors = `${summary.sectorsWon} sector${summary.sectorsWon === 1 ? '' : 's'} won`;
+  const medals = `${summary.medals} medal${summary.medals === 1 ? '' : 's'}`;
+  return `<div class="pilot-confirm" role="alertdialog" aria-modal="true" aria-labelledby="pilot-confirm-title">
+      <h3 id="pilot-confirm-title">Delete Pilot ${slot}?</h3>
+      <p>Deepest layer ${summary.layer} · ${sectors} · ${medals} · ${summary.salvage} Salvage.</p>
+      <p>This cannot be undone.</p>
+      <div class="pilot-confirm__row">
+        <button type="button" class="pilot-confirm__cancel" data-confirm="cancel">Cancel</button>
+        <button type="button" class="pilot-confirm__delete" data-confirm="delete">Delete</button>
+      </div>
+    </div>`;
 }
 
 /** True once, on the entry right after a pilot was chosen. */
@@ -59,6 +89,7 @@ function padState() {
   const axis = pads.reduce((sum, pad) => sum + (pad.axes[0] ?? 0), 0);
   return {
     go: pressed(0) || pressed(9),
+    back: pressed(1),
     left: pressed(14) || axis < -0.5,
     right: pressed(15) || axis > 0.5,
   };
@@ -80,23 +111,46 @@ export function openPilotSelect(onContinue) {
   screen.setAttribute('role', 'dialog');
   screen.setAttribute('aria-modal', 'true');
   screen.setAttribute('aria-labelledby', 'pilot-screen-title');
-  screen.innerHTML = `<div class="credits-dialog pilot-dialog">
-      <header class="credits-header"><h2 id="pilot-screen-title" class="credits-title">Choose your pilot</h2></header>
-      <ul class="pilot-cards">${pilotSummaries()
-        .map((summary, i) => pilotCardMarkup(summary, i + 1, i + 1 === active))
-        .join('')}</ul>
-    </div>`;
   document.body.appendChild(screen);
-  const buttons = [...screen.querySelectorAll('[data-pilot-slot]')];
-  let chosen = false;
+  let summaries = [];
+  let confirming = null; // the slot the box asks about, or null
+  let done = false;
   let rafId = 0;
   let held = padState();
 
-  function choose(slot) {
-    if (chosen) return;
-    chosen = true;
+  function render(focusSelector) {
+    summaries = pilotSummaries();
+    screen.innerHTML = `<div class="credits-dialog pilot-dialog">
+        <header class="credits-header"><h2 id="pilot-screen-title" class="credits-title">Choose your pilot</h2></header>
+        <ul class="pilot-cards">${summaries
+          .map((summary, i) =>
+            pilotCardMarkup(summary, i + 1, i + 1 === active)
+          )
+          .join('')}</ul>
+      </div>${
+        confirming
+          ? `<div class="pilot-confirm__veil">${deleteConfirmMarkup(summaries[confirming - 1], confirming)}</div>`
+          : ''
+      }`;
+    screen.querySelector(focusSelector)?.focus({ preventScroll: true });
+  }
+
+  // The buttons the arrows step through: the box's while it is up.
+  const focusable = () => [
+    ...screen.querySelectorAll(
+      confirming ? '[data-confirm]' : '[data-pilot-slot], [data-pilot-delete]'
+    ),
+  ];
+
+  function leave() {
+    done = true;
     cancelAnimationFrame(rafId);
     document.removeEventListener('keydown', onKey, true);
+  }
+
+  function choose(slot) {
+    if (done) return;
+    leave();
     if (slot === active) {
       screen.remove();
       onContinue();
@@ -111,51 +165,77 @@ export function openPilotSelect(onContinue) {
     window.location.reload();
   }
 
-  function move(step) {
-    const at = buttons.indexOf(document.activeElement);
-    const next = (Math.max(0, at) + step + buttons.length) % buttons.length;
-    buttons[next].focus();
+  function ask(slot) {
+    confirming = slot;
+    render('[data-confirm="cancel"]');
   }
 
-  // Capture phase: the menu under this screen hears none of these keys.
+  function answer(remove) {
+    const slot = confirming;
+    confirming = null;
+    if (!remove) {
+      render(`[data-pilot-delete="${slot}"]`);
+      return;
+    }
+    deleteSlot(slot);
+    if (slot === active) {
+      // The pilot in play is in memory: a new page, back to this screen.
+      leave();
+      window.location.reload();
+      return;
+    }
+    render(`[data-pilot-slot="${active}"]`);
+  }
+
+  function activate(button) {
+    if (!button || done) return;
+    const { pilotSlot, pilotDelete, confirm } = button.dataset;
+    if (confirm) answer(confirm === 'delete');
+    else if (pilotDelete) ask(Number(pilotDelete));
+    else if (pilotSlot) choose(Number(pilotSlot));
+  }
+
+  function move(step) {
+    const buttons = focusable();
+    const at = buttons.indexOf(document.activeElement);
+    const next = (Math.max(0, at) + step + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  }
+
+  // Capture phase: the menu under this screen hears none of these keys. A
+  // held key's repeats do nothing, so a held Enter never reaches Delete.
   function onKey(event) {
+    if (!SCREEN_KEYS.includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
     if (event.repeat) return;
     const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[
       event.key
     ];
-    if (step) {
-      move(step);
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      const slot = Number(document.activeElement?.dataset?.pilotSlot);
-      choose(slot || active);
-    } else if (event.key !== 'Tab') {
-      return;
-    }
-    if (event.key !== 'Tab') {
-      event.preventDefault();
-      event.stopPropagation();
+    if (step) move(step);
+    else if (event.key === 'Escape' && confirming) answer(false);
+    else if (event.key === 'Enter' || event.key === ' ') {
+      const own = focusable().includes(document.activeElement);
+      activate(own ? document.activeElement : focusable()[0]);
     }
   }
 
   function pollPad() {
     const now = padState();
     if (now.go && !held.go) {
-      const slot = Number(document.activeElement?.dataset?.pilotSlot);
-      choose(slot || active);
-      return;
-    }
-    if (now.left && !held.left) move(-1);
-    if (now.right && !held.right) move(1);
+      const own = focusable().includes(document.activeElement);
+      activate(own ? document.activeElement : focusable()[0]);
+    } else if (now.back && !held.back && confirming) answer(false);
+    else if (now.left && !held.left) move(-1);
+    else if (now.right && !held.right) move(1);
     held = now;
-    rafId = requestAnimationFrame(pollPad);
+    if (!done) rafId = requestAnimationFrame(pollPad);
   }
 
-  buttons.forEach((button) =>
-    button.addEventListener('click', () =>
-      choose(Number(button.dataset.pilotSlot))
-    )
+  screen.addEventListener('click', (event) =>
+    activate(event.target.closest('button'))
   );
   document.addEventListener('keydown', onKey, true);
   rafId = requestAnimationFrame(pollPad);
-  buttons[active - 1].focus({ preventScroll: true });
+  render(`[data-pilot-slot="${active}"]`);
 }

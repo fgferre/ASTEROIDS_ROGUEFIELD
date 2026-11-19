@@ -4,6 +4,7 @@ import { chooseSlot, resolveActiveSlot } from '../../src/core/storage.js';
 import { pilotSummaries } from '../../src/services/pilots.js';
 import { localDay, updateRecords } from '../../src/services/runRecords.js';
 import {
+  deleteConfirmMarkup,
   lastFlownLabel,
   pilotCardMarkup,
 } from '../../src/modules/menu/pilotSelect.js';
@@ -88,5 +89,28 @@ describe('pilots', () => {
     const empty = pilotCardMarkup(null, 2, false);
     expect(empty).toContain('New pilot');
     expect(empty).toContain('story is told from the beginning');
+  });
+
+  it('offers Delete on a pilot only, and asks with Cancel first', () => {
+    const summary = {
+      layer: 4,
+      sectorsWon: 1,
+      sectors: 10,
+      medals: 2,
+      medalsTotal: 19,
+      salvage: 60,
+      lastRun: null,
+    };
+    expect(pilotCardMarkup(summary, 3, false)).toContain(
+      'data-pilot-delete="3"'
+    );
+    expect(pilotCardMarkup(null, 2, false)).not.toContain('data-pilot-delete');
+    const box = deleteConfirmMarkup(summary, 3);
+    expect(box).toContain('Delete Pilot 3?');
+    expect(box).toContain('1 sector won · 2 medals · 60 Salvage');
+    expect(box).toContain('cannot be undone');
+    expect(box.indexOf('data-confirm="cancel"')).toBeLessThan(
+      box.indexOf('data-confirm="delete"')
+    );
   });
 });
