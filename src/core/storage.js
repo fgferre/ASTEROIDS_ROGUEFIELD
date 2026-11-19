@@ -1,7 +1,8 @@
 // src/core/storage.js
 
 // The one localStorage wrapper: JSON in and out, never throws (private mode,
-// full quota and no `window` all read as "nothing stored").
+// full quota and no `window` all read as "nothing stored"), except
+// saveProgress given a key that is not a pilot's: that is a bug, said loudly.
 //
 // Three pilots (save slots), each with its own progress: the keys in
 // SLOT_KEYS, and only those, are the pilot's; everything else (settings, the
@@ -71,10 +72,9 @@ export function chooseSlot(slot) {
 
 /** Removes `slot`'s pilot: exactly its SLOT_KEYS, nothing shared. */
 export function deleteSlot(slot) {
-  const storage = browserStorage();
   SLOT_KEYS.forEach((key) => {
     try {
-      storage?.removeItem(slotStorageKey(key, slot));
+      browserStorage()?.removeItem(slotStorageKey(key, slot));
     } catch (error) {
       console.warn(`[storage] Failed to delete "${key}":`, error);
     }
