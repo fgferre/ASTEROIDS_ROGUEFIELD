@@ -98,8 +98,8 @@ const CSS = `
             .rt-frame { opacity: 0.7; transition: opacity var(--motion-base) var(--ease-out); }
             .rt[data-mode='threat'] .rt-frame { opacity: 1; transition-duration: 0ms; }
             .rt[data-mode='warden'] .rt-frame { opacity: 0.55; }
-            /* the disc stays, a bit see-through (Felipe, 18/11): about half dark */
-            .rt-disc { fill: var(--surface); fill-opacity: 0.7; }
+            /* the disc stays, see-through (Felipe, 18/11, and more so 19/11) */
+            .rt-disc { fill: var(--surface); fill-opacity: 0.4; }
             .rt-ring { fill: none; stroke: rgba(230, 238, 248, 0.16); }
             .rt-ring-label { font-family: var(--font-display); font-weight: 500; font-size: 9.5px; fill: rgba(230, 238, 248, 0.45); }
             .rt-field { fill: none; stroke: rgba(0, 242, 255, 0.42); }
