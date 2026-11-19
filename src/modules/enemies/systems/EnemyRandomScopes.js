@@ -2,7 +2,7 @@
 // EnemySystem's random scopes: the spawn/variants/fragments forks, the forks
 // asked for by name (wave-manager, enemy-rewards, ...), their seeds and the
 // per-scope sequence counters.
-import RandomService from '../../../core/RandomService.js';
+import RandomService, { hashString } from '../../../core/RandomService.js';
 import { resolveService } from '../../../core/serviceUtils.js';
 
 export class EnemyRandomScopes {
@@ -225,7 +225,10 @@ export class EnemyRandomScopes {
     });
   }
 
-  reseedRandomScopes({ resetSequences = false } = {}) {
+  // By default each scope goes to a seed derived from the run's seed (the base
+  // random's, already reset for this run); useStoredSeeds puts back the seeds a
+  // snapshot carried.
+  reseedRandomScopes({ resetSequences = false, useStoredSeeds = false } = {}) {
     if (!this.randomScopes) {
       return;
     }
@@ -233,6 +236,16 @@ export class EnemyRandomScopes {
     if (!this.randomScopeSeeds) {
       this.randomScopeSeeds = {};
       this.captureRandomScopeSeeds();
+    }
+
+    if (!useStoredSeeds) {
+      const runSeed = this.randomScopes.base?.seed;
+      Object.keys(this.randomScopes).forEach((scope) => {
+        if (scope === 'base' || !Number.isFinite(runSeed)) return;
+        const label =
+          this.randomScopeLabels?.[scope] || `enemy-system:${scope}`;
+        this.randomScopeSeeds[scope] = hashString(`${runSeed}:${label}`);
+      });
     }
 
     Object.entries(this.randomScopes).forEach(([scope, generator]) => {
@@ -293,7 +306,7 @@ export class EnemyRandomScopes {
 
     if (snapshot?.scopeSeeds && typeof snapshot.scopeSeeds === 'object') {
       this.randomScopeSeeds = { ...snapshot.scopeSeeds };
-      this.reseedRandomScopes({ resetSequences: false });
+      this.reseedRandomScopes({ resetSequences: false, useStoredSeeds: true });
     } else {
       this.reseedRandomScopes({ resetSequences: true });
     }

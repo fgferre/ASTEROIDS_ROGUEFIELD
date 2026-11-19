@@ -44,7 +44,7 @@ import { AFFIX_XP_BONUS } from '../../../data/enemies/affixes.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import { XP_ORB_BURST } from '../../../data/constants/gameplay.js';
 import { debugLog } from '../../../core/debugLogging.js';
-import RandomService from '../../../core/RandomService.js';
+import RandomService, { hashString } from '../../../core/RandomService.js';
 import {
   normalizeDependencies,
   resolveService,
@@ -890,11 +890,20 @@ export class RewardManager {
       this.initialRandomSeed = this.random.seed >>> 0;
     }
 
-    if (
-      this.initialRandomSeed !== undefined &&
-      typeof this.random.reset === 'function'
-    ) {
-      this.random.reset(this.initialRandomSeed);
+    // The stream follows the run's seed (the shared random's, already reset
+    // for this run); the seed it was built on is the fallback only.
+    const shared = this.enemySystem?.getRandomService?.();
+    const sharedSeed =
+      shared && shared !== this.random && Number.isFinite(shared.seed)
+        ? shared.seed
+        : null;
+    const seed =
+      sharedSeed !== null
+        ? hashString(`${sharedSeed}:reward-manager:random`)
+        : this.initialRandomSeed;
+
+    if (seed !== undefined && typeof this.random.reset === 'function') {
+      this.random.reset(seed);
     }
 
     this.randomSequence = 0;

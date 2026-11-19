@@ -223,3 +223,32 @@ export function createReplayController({
     },
   };
 }
+
+/**
+ * Tells the player, on screen, why a `?replay=` did not open. It stays until
+ * the first key or click: the loading screen outlasts any timer.
+ */
+export function showReplayNotice(error) {
+  const refused = /version/.test(error?.message ?? '');
+  const notice = document.createElement('div');
+  notice.textContent = refused
+    ? "This replay was made with an older version of the game and can't be played."
+    : "This replay couldn't be loaded.";
+  Object.assign(notice.style, {
+    position: 'fixed',
+    left: '50%',
+    bottom: '32px',
+    transform: 'translateX(-50%)',
+    zIndex: '10000',
+    padding: '10px 16px',
+    background: 'rgba(0, 0, 0, 0.8)',
+    color: '#eaf2ff',
+    font: 'inherit',
+    textAlign: 'center',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(notice);
+  const dismiss = () => notice.remove();
+  window.addEventListener('keydown', dismiss, { once: true });
+  window.addEventListener('pointerdown', dismiss, { once: true });
+}

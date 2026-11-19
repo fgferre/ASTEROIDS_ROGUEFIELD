@@ -82,7 +82,7 @@ describe('replay recording', () => {
     expect(player.takeUpgrade()).toBeNull();
   });
 
-  it('returns level-up rerolls and banishes in order with the picks (version 3)', () => {
+  it('returns level-up rerolls and banishes in order with the picks', () => {
     const recorder = createRecorder({ seed: 1 });
     recorder.record(0, createInputFrame());
     recorder.recordReroll(120);
@@ -111,12 +111,12 @@ describe('replay recording', () => {
     ).toThrow(/version/);
   });
 
-  it('records dash presses as bit 7 (version 2)', () => {
+  it('records dash presses as bit 7', () => {
     expect(REPLAY_VERSION).toBeGreaterThanOrEqual(2);
     expect(encodeInputFrame(createInputFrame({ dash: true }))).toBe(128);
   });
 
-  it('records quantized stick values only while a stick is off centre (version 4)', () => {
+  it('records quantized stick values only while a stick is off centre', () => {
     const recorder = createRecorder({ seed: 5 });
     const frames = [
       createInputFrame({ right: true, moveX: 0.8123, moveY: -0.004 }),
@@ -127,7 +127,6 @@ describe('replay recording', () => {
     frames.forEach((frame, step) => recorder.record(step, frame));
 
     const json = recorder.toJSON();
-    expect(json.version).toBeGreaterThanOrEqual(4);
     // Step 1 quantizes to the same frame as step 0, so it is not stored.
     expect(json.inputs).toEqual([
       [0, 8, 81, 0, 0, 0],
@@ -141,50 +140,29 @@ describe('replay recording', () => {
     });
   });
 
-  it('still reads version 3 recordings, with the sticks centred', () => {
-    const v3 = { version: 3, seed: 3, hull: null, steps: 1, inputs: [[0, 1]] };
-    const frame = createPlayer(deserialize(v3)).frameAt(0);
-    expect(frame.up).toBe(true);
-    expect([frame.moveX, frame.moveY, frame.aimX, frame.aimY]).toEqual([
-      0, 0, 0, 0,
-    ]);
-  });
-
-  it('records the difficulty (version 5); older recordings load as Veteran', () => {
-    const json = createRecorder({ seed: 9, difficulty: 'warden' }).toJSON();
-    expect(json.version).toBeGreaterThanOrEqual(5);
-    expect(deserialize(serialize(json)).difficulty).toBe('warden');
-    const v4 = { version: 4, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
-    expect(deserialize(v4).difficulty).toBe('veteran');
-  });
-
-  it('records the mode and Daily Field day (version 6); older recordings load as a normal run', () => {
+  it('records the difficulty, mode and Daily Field day', () => {
     const json = createRecorder({
       seed: 9,
+      difficulty: 'warden',
       mode: 'daily',
       date: '2026-10-18',
     }).toJSON();
     expect(json.version).toBe(REPLAY_VERSION);
     expect(deserialize(serialize(json))).toMatchObject({
+      difficulty: 'warden',
       mode: 'daily',
       date: '2026-10-18',
     });
-    const v5 = { version: 5, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
-    expect(deserialize(v5)).toMatchObject({ mode: 'normal', date: null });
   });
 
-  it('records the control scheme; recordings without one load as null', () => {
+  it('refuses recordings made before version 8', () => {
+    const old = { version: 7, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+    expect(() => deserialize(old)).toThrow(/version/);
+    expect(() => deserialize({ ...old, version: 1 })).toThrow(/version/);
+  });
+
+  it('records the control scheme', () => {
     const json = createRecorder({ seed: 9, controls: 'classic' }).toJSON();
     expect(deserialize(serialize(json)).controls).toBe('classic');
-    const v6 = { version: 6, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
-    expect(deserialize(v6).controls).toBeNull();
-  });
-
-  it('still reads version 1 recordings, with dash off', () => {
-    const v1 = { version: 1, seed: 3, hull: null, steps: 2, inputs: [[0, 17]] };
-    const player = createPlayer(deserialize(serialize(v1)));
-    expect(player.frameAt(1)).toEqual(
-      createInputFrame({ up: true, shield: true })
-    );
   });
 });
