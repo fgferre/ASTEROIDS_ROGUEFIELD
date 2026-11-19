@@ -9,9 +9,10 @@
 // replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 8;
-// Recordings before version 8 drew their random streams from the page's boot
-// seed, not the run's, so they no longer play back the same and are refused.
+export const REPLAY_VERSION = 9;
+// Recordings before version 9 are refused: 8 drew its random streams from the
+// page's boot seed, and before 9 none stored the run's Hangar setup, so they
+// no longer play back the same.
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -92,7 +93,8 @@ export function decodeInputFrame(mask, analog = []) {
  * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
  * which its seed is drawn from, and null on any other run. `sector` is a
  * sector run's sector id (a 'normal' run), null on any other. `controls` is the
- * hull control scheme flown, 'modern' or 'classic'.
+ * hull control scheme flown, 'modern' or 'classic'; `hangar` is the run's
+ * start-of-run Hangar setup (JSON-safe HangarService modifiers).
  */
 export function createRecorder({
   seed,
@@ -102,6 +104,7 @@ export function createRecorder({
   date = null,
   sector = null,
   controls = null,
+  hangar = null,
   version = REPLAY_VERSION,
 }) {
   const inputs = [];
@@ -149,6 +152,7 @@ export function createRecorder({
         date,
         sector,
         controls,
+        hangar,
         steps,
         inputs: inputs.map((entry) => [...entry]),
         upgrades: upgrades.map(([step, entry]) => [
@@ -227,6 +231,7 @@ export function deserialize(text) {
     date: data.date ?? null,
     sector: data.sector ?? null,
     controls: data.controls ?? null,
+    hangar: data.hangar ?? null,
     steps: data.steps,
     inputs: data.inputs,
     upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],

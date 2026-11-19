@@ -248,7 +248,8 @@ export const AUDIO_EVENT_HANDLERS = {
     else if (payload?.screen === 'victory') {
       score.stop({ seconds: MIX.victoryFadeSeconds });
     } else if (payload?.source === 'retry-complete' && !score.active) {
-      score.start(score.sectorId);
+      if (score.sectorId) score.start(score.sectorId);
+      else if (score.wantedChapter) score.playChapter(score.wantedChapter);
     }
     audio._handleScreenChanged(payload);
   },

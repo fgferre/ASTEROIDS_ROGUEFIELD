@@ -299,6 +299,7 @@ export function setupThree(seeded) {
 
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
+  watchContextRestore(THREE, renderer, scene, space);
   // The arena's border, shown when the camera looks past it (fieldVeil.js).
   const veil = createFieldVeil(THREE, scene);
   const biomes = new BiomeController(THREE, {
@@ -435,6 +436,16 @@ export function setupThree(seeded) {
     accentRgb: rgbOf(THREE, PALETTE.player),
     textRgb: rgbOf(THREE, PALETTE.text),
   };
+}
+
+// After a lost graphics context comes back, what was generated on the GPU is
+// empty: the reflection map is built again, the nebula's maps bake again.
+export function watchContextRestore(THREE, renderer, scene, space) {
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    scene.environment?.dispose();
+    scene.environment = buildEnvironment(THREE, renderer);
+    space.invalidateBakes();
+  });
 }
 
 // A dim reflection environment so metal reads as metal: black below, a

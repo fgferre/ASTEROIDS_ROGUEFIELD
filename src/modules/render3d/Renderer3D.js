@@ -266,9 +266,12 @@ class Renderer3D extends BaseSystem {
         payload.flare
       );
     });
-    // A formation's marks, and the edge lit where it comes in.
+    // A formation's marks, and the edge lit where it comes in. They end on
+    // the layer clock (emitted as the schedule sets the formation's time).
     this.registerEventListener('formation-warned', (payload) => {
-      for (const { x, y } of this.formationMarks.add(payload)) {
+      const clock = this.cachedEnemies?.waveManager?.layerElapsed ?? 0;
+      const until = clock + payload.warn;
+      for (const { x, y } of this.formationMarks.add({ ...payload, until })) {
         this.three?.veil.flare(x - HALF_W, y - HALF_H, PALETTE.threat);
       }
     });
@@ -915,7 +918,11 @@ class Renderer3D extends BaseSystem {
     this.hitSparks.slagOn = effects?.hitMarkersEnabled !== false;
     this.hitSparks.update(dt, t.ribbons, t.shotRgb, t.textRgb, t.smoke, t.glow);
     this.killPops.update(dt, t.glow, this.flashScale);
-    this.formationMarks.update(dt, t.ribbons, t.threatRgb);
+    this.formationMarks.update(
+      this.cachedEnemies?.waveManager?.layerElapsed ?? 0,
+      t.ribbons,
+      t.threatRgb
+    );
     this.wardLinks.update(dt, t, enemyList, this.flashScale);
     if (this.muzzles.update(t.glow, t.ribbons, t.shotRgb, t.textRgb) > 0) {
       t.player.flashMuzzle();

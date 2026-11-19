@@ -913,6 +913,13 @@ export class SpaceField {
     this.showPlanes();
   }
 
+  // A lost and restored graphics context empties the targets: the far
+  // structure bakes again, and the mid keys with the next frame.
+  invalidateBakes() {
+    this.baked = false;
+    this.midMap.key = NaN;
+  }
+
   // The far nebula's structure, drawn once into its target; the mid bands'
   // keys while that plane is drawn.
   bake(renderer) {

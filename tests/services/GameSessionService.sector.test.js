@@ -27,7 +27,8 @@ function startOnLayer(game, layer) {
   enemies.startNextWave();
 }
 
-function killBoss(game) {
+// `wait` false: back at the Warden's death, the spoils still to run.
+function killBoss(game, { wait = true } = {}) {
   const { enemies } = game.services;
   let boss = null;
   for (let step = 0; step < SPAWN_STEPS && !boss; step += 1) {
@@ -38,6 +39,7 @@ function killBoss(game) {
     boss.takeDamage(1e9);
     game.step();
   }
+  if (!wait) return boss;
   for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
   vi.advanceTimersByTime(8000);
   return boss;
@@ -295,6 +297,35 @@ describe('sector runs', () => {
       bestTime: 0,
       sectorsWon: ['prime-gate'],
     });
+  });
+
+  it("records the clear at the Warden's death, not after the spoils", () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    game.services.player.setInvulnerableTimer(1e9);
+    const clock = () => game.services.enemies.getSessionStats().timeElapsed;
+    let wonAt = null;
+    let victory = null;
+    game.eventBus.on('run-won', () => {
+      wonAt = clock();
+    });
+    game.eventBus.on('screen-changed', (payload) => {
+      if (payload.screen === 'victory') victory = payload.data;
+    });
+
+    startOnLayer(game, 5);
+    // Seconds of play, then the Warden dies.
+    for (let step = 0; step < 180; step += 1) game.step();
+    killBoss(game, { wait: false });
+    // The spoils' seconds run in play before the screen opens.
+    for (let step = 0; step < 600 && !victory; step += 1) {
+      game.step();
+      vi.advanceTimersByTime(1000 / 60);
+    }
+
+    expect(clock() - wonAt).toBeGreaterThan(1);
+    expect(victory.sector.time).toBe(Math.floor(wonAt));
+    expect(loadRecords().sectorTimes['prime-gate']).toBe(Math.floor(wonAt));
   });
 
   it('plays its own stages, cast from its last layer, and only in its run', () => {

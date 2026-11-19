@@ -4,6 +4,7 @@ import {
   SECTOR_SCORES,
   chapterScoreForLayer,
 } from '../../../src/data/audio/sectorScores.js';
+import { AUDIO_EVENT_HANDLERS } from '../../../src/modules/audio/eventHandlers.js';
 
 // A Web Audio stand-in recording the sources made and the gain params written.
 function fakeContext() {
@@ -149,5 +150,61 @@ describe('SectorScore', () => {
     score.stop();
     sources.forEach((source) => expect(source.stop).toHaveBeenCalled());
     expect(score.active).toBe(false);
+  });
+
+  it('a sectorless run that died plays its chapter score again on the retry and on the next wave', async () => {
+    const chapter = (layer) => score.playChapter(chapterScoreForLayer(layer));
+    // A retry comes back on the layer the ship died on, not the first.
+    expect(chapterScoreForLayer(12)).not.toBe(chapterScoreForLayer(1));
+    await chapter(12);
+    score.stop();
+    expect(score.active).toBe(false);
+    AUDIO_EVENT_HANDLERS.screen(
+      {
+        sectorScore: score,
+        voiceLines: { expect() {} },
+        _handleScreenChanged() {},
+      },
+      { screen: 'playing', source: 'retry-complete' }
+    );
+    await vi.waitFor(() => expect(score.active).toBe(true));
+    expect(score._chapterId).toBe(chapterScoreForLayer(12));
+    score.stop();
+    await chapter(12);
+    expect(score.active).toBe(true);
+  });
+
+  it('a boss that spawned while the score was still loading comes in when it is ready, warning or not', async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    score = new SectorScore({
+      mixer,
+      load: async () => {
+        await gate;
+        return buffer();
+      },
+    });
+    score.init(rec.context, target);
+    const loading = score.playChapter(chapterScoreForLayer(1));
+    score.onBossEvent('boss-spawned');
+    release();
+    await loading;
+    const { bossFade, stageFade } = score._nodes;
+    expect(
+      bossFade.gain.setValueCurveAtTime.mock.calls[0][0].at(-1)
+    ).toBeCloseTo(1);
+    expect(
+      stageFade.gain.setValueCurveAtTime.mock.calls[0][0].at(-1)
+    ).toBeCloseTo(0);
+  });
+
+  it('a boss that spawns with no warning before it brings the boss layer in, without the stinger', async () => {
+    await score.start('debris-wake');
+    const before = rec.sources.length;
+    score.onBossEvent('boss-spawned');
+    expect(rec.sources).toHaveLength(before);
+    expect(
+      score._nodes.bossFade.gain.setValueCurveAtTime.mock.calls[0][0].at(-1)
+    ).toBeCloseTo(1);
   });
 });

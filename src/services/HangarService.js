@@ -104,6 +104,7 @@ export default class HangarService {
     this.eventBus = eventBus;
     this.difficulty = difficulty;
     this.achievements = achievements;
+    this.replaySetup = null;
     Object.assign(this, loadHangarSave());
     this.difficulty.setPressure(this.pressure.selected);
     this.startRun();
@@ -400,6 +401,7 @@ export default class HangarService {
    * `openCards` and `sealed`; the draw handles them.
    */
   getModifiers() {
+    if (this.replaySetup) return { ...this.replaySetup };
     const modifiers = { ...BASE_MODIFIERS };
     ALL_ITEMS.forEach((item) => {
       if (!this.owned[item.id]) return;
@@ -418,6 +420,30 @@ export default class HangarService {
         ? this.startingCard
         : null;
     return modifiers;
+  }
+
+  /** The start-of-run setup, JSON-safe, for a recording. */
+  getRunSetup() {
+    const modifiers = this.getModifiers();
+    return {
+      ...modifiers,
+      openCards: [...modifiers.openCards],
+      sealed: [...modifiers.sealed],
+    };
+  }
+
+  /**
+   * A replay's recorded setup (or null) stands in for the profile's in
+   * `getModifiers()`; the profile itself is never touched.
+   */
+  useReplaySetup(setup) {
+    this.replaySetup = setup
+      ? {
+          ...setup,
+          openCards: new Set(setup.openCards),
+          sealed: new Set(setup.sealed),
+        }
+      : null;
   }
 
   isHullUnlocked(hullId) {

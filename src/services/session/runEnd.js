@@ -107,13 +107,16 @@ export class RunEnd {
       ...(this.sector && { sector: this.sector.id }),
     });
 
+    // The clear time is the Warden's death, not the screen's opening: the
+    // spoils and the last line that come between are no part of the record.
+    const clearTime = this.resolveServiceInstance('world')?.runClock();
     this.scheduleRunEndScreen(
       () => {
         const summary =
           this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
         const data = {
           ...summary,
-          ...this.recordRunReached(summary, { won: true }),
+          ...this.recordRunReached(summary, { won: true, clearTime }),
         };
         this.setScreen('victory');
         this.emitScreenChanged('victory', { source: 'run-won', data });
@@ -160,12 +163,14 @@ export class RunEnd {
    * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
    * reached. A sector run records only its clear (`won`) and returns
    * `{ sector: { id, time, bestTime, firstClear, next } }`, `next` the next
-   * sector's id on a win, else null.
+   * sector's id on a win, else null. `clearTime` (a win): the run's time when
+   * its last Warden fell, the one a clear records.
    */
-  recordRunReached(summary = {}, { won = false } = {}) {
+  recordRunReached(summary = {}, { won = false, clearTime } = {}) {
+    const runTime = clearTime ?? summary.stats?.timeElapsed;
     if (this.sector) {
       const { id } = this.sector;
-      const time = Math.floor(summary.stats?.timeElapsed ?? 0);
+      const time = Math.floor(runTime ?? 0);
       const firstClear = won && !loadRecords().sectorsWon.includes(id);
       const records = updateRecords(
         won ? { sectorWon: id, sectorTime: time } : {}
@@ -183,9 +188,7 @@ export class RunEnd {
     if (this.bossRush) {
       const records = updateRecords({
         bossRushTime:
-          this.bossRushWardens === BOSS_RUSH_LAYERS.length
-            ? summary.stats?.timeElapsed
-            : 0,
+          this.bossRushWardens === BOSS_RUSH_LAYERS.length ? runTime : 0,
       });
       return {
         bossRush: {

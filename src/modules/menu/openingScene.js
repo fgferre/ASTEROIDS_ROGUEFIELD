@@ -150,6 +150,10 @@ export function createOpeningScene(menu, random, shotName = null) {
   // The broken Ring only: the intact one belongs to the deepest place.
   backdrop.structures.group.visible = false;
   const space = new SpaceField(THREE, world);
+  // A lost graphics context that comes back finds the nebula's maps empty.
+  renderer.domElement.addEventListener('webglcontextrestored', () =>
+    space.invalidateBakes()
+  );
 
   // The post chain: the world in linear HDR, the game's bloom, sRGB out,
   // then the menu's scene over it and the edges smoothed.

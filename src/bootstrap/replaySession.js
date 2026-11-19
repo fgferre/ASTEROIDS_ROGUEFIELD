@@ -5,7 +5,8 @@
 // its mode from the session and its control scheme from the player. An armed
 // recording sets that service's difficulty and day and the session's start mode
 // before its run begins, and its hull and control scheme once the run has
-// started. The recorder lives on the session
+// started; its Hangar setup stands in for the viewer's until the run's reset
+// has read it. The recorder lives on the session
 // (`session.replayRecorder`). Input is captured and substituted at
 // InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
@@ -57,6 +58,7 @@ export function createReplayController({
   let viewerControls = null;
   const difficulty = session.resolveServiceInstance('difficulty');
   const playerService = session.resolveServiceInstance('player');
+  const hangar = session.resolveServiceInstance('hangar');
 
   const runStep = () => getStep() - runStartStep;
 
@@ -78,6 +80,8 @@ export function createReplayController({
   eventBus.on('game-started', ({ carried = false } = {}) => {
     runStartStep = getStep();
     pickPending = false;
+    // The run's reset has read the setup: the viewer's own is back.
+    hangar.useReplaySetup(null);
 
     if (armedRecording) {
       player = createPlayer(armedRecording);
@@ -117,6 +121,7 @@ export function createReplayController({
       date: difficulty.dateKey,
       sector: session.sector?.id ?? null,
       controls: playerService.controlScheme,
+      hangar: hangar.getRunSetup(),
     });
     session.replayRecorder = recorder;
     input.setInputSource(recordSource);
@@ -181,6 +186,7 @@ export function createReplayController({
     arm(recording) {
       armedRecording = recording;
       difficulty.useReplay(recording);
+      hangar.useReplaySetup(recording.hangar);
       session.replayStart = {
         daily: recording.mode === 'daily',
         bossRush: recording.mode === 'bossRush',

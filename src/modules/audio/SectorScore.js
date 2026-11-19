@@ -66,6 +66,8 @@ class SectorScore {
     this._held = false;
     this._paused = false;
     this._bossOn = false;
+    this._bossWanted = false; // a boss is on, whether or not loaded yet
+    this.wantedChapter = null;
     this._nodes = null;
     this._sources = [];
     this._stingers = null;
@@ -119,9 +121,11 @@ class SectorScore {
    * next in; a campaign sector's own score is left alone.
    */
   async playChapter(sectorId) {
+    // The chapter the run is on, kept through a stop: a retry plays it again.
+    this.wantedChapter = sectorId;
     if (this.sectorId || this._chapterId === sectorId) return;
-    this._chapterId = sectorId;
     this.stop({ seconds: MIX.chapterFadeSeconds });
+    this._chapterId = sectorId;
     return this._play(sectorId);
   }
 
@@ -148,6 +152,7 @@ class SectorScore {
     this._build(stage, boss, score.loopSeconds);
     this.active = true;
     this._bossOn = false;
+    if (this._bossWanted) this._crossfade(true, MIX.bossCrossfadeSeconds);
     this._fadeOutput(this._held ? 0 : 1, MIX.fadeInSeconds);
     this._pollHandle = setInterval(() => this._followDanger(), MIX.pollMs);
     this._followDanger(true);
@@ -236,11 +241,15 @@ class SectorScore {
 
   /** boss-warning / boss-defeated: the stinger and the crossfade. */
   onBossEvent(eventName) {
-    if (!this.active) return;
-    if (eventName === 'boss-warning') {
-      this._playStinger('bossWarning');
+    if (eventName === 'boss-warning' || eventName === 'boss-spawned') {
+      this._bossWanted = true;
+      if (!this.active) return;
+      // A boss that spawns without a warning brings the layer in, no stinger.
+      if (eventName === 'boss-warning') this._playStinger('bossWarning');
       this._crossfade(true, MIX.bossCrossfadeSeconds);
     } else if (eventName === 'boss-defeated') {
+      this._bossWanted = false;
+      if (!this.active) return;
       this._playStinger('sectorCleared');
       this._crossfade(false, MIX.clearedCrossfadeSeconds);
     }
@@ -317,6 +326,8 @@ class SectorScore {
    */
   stop({ seconds = MIX.fadeOutSeconds, stinger = null } = {}) {
     this._token++;
+    this._chapterId = null;
+    this._bossWanted = false;
     if (!this.active) return;
     if (stinger) this._playStinger(stinger);
     this._fadeOutput(0, seconds);
@@ -326,6 +337,7 @@ class SectorScore {
   /** Immediately, for a new start or reset: no fade, no stinger. */
   _stopNow() {
     this._token++;
+    this._bossWanted = false;
     if (!this.active && !this._nodes) return;
     this._teardown(this.context.currentTime);
   }
