@@ -948,7 +948,7 @@ body.touch-play #levelup-equip-btn.is-armed ~ .levelup-cancel {
   }
 
   body.touch-play
-    #levelup-screen
+    :is(#levelup-screen, #chest-screen)
     :is(
       .lu-level small,
       .lu-picks__lbl,
@@ -1394,4 +1394,61 @@ body.flashing-reduced .card.is-revealing {
 .flight-keys dd {
   margin: 0;
   color: var(--text);
+}
+
+/* Chest and Flight Computer by touch: no keys named, Continue / Fly a
+   finger-sized button. */
+body.touch-play[data-input-device='touch']
+  :is(#chest-screen, #flight-screen)
+  kbd {
+  display: none;
+}
+
+body.touch-play :is(#chest-screen, #flight-screen) .chest-continue {
+  min-height: 44px;
+}
+
+/* Phone held sideways, as the level-up: the smaller unit inside the safe
+   areas, the cards sharing the width, the column scrolling. */
+@media (max-height: 500px) {
+  body.touch-play :is(#chest-screen, #flight-screen) {
+    --u: 0.66px;
+    --fs: calc(0.8px * var(--text-scale));
+    padding: calc(env(safe-area-inset-top) + 6px)
+      calc(env(safe-area-inset-right) + 8px)
+      calc(env(safe-area-inset-bottom) + 4px)
+      calc(env(safe-area-inset-left) + 8px);
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .levelup-content {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  body.touch-play #chest-screen .chest-cards {
+    align-self: stretch;
+  }
+
+  body.touch-play #chest-screen .card {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .chest-title {
+    margin-bottom: var(--space-3);
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .chest-continue {
+    margin-top: var(--space-3);
+    padding: 0 var(--space-6);
+  }
+
+  body.touch-play
+    :is(#chest-screen, #flight-screen)
+    :is(.chest-title__count, .chest-continue) {
+    font-size: var(--text-xs);
+  }
 }
