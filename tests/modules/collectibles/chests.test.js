@@ -264,4 +264,32 @@ describe('chests', () => {
     tick(game, 1);
     expect(cards).toHaveLength(chest.cards);
   });
+
+  it("a win's held-back level-up does not keep the boss's chest shut", () => {
+    const game = startGame();
+    const { progression } = game.services;
+    const cards = grantedCards(game);
+    progression.level = 10;
+    // The boss's XP crossed a level during the spoils: its screen waits.
+    progression.offersHeld = true;
+    progression.pendingLevelUpScreens.push(11);
+    const chest = chestAtShip(game, 'warden');
+    tick(game, 6);
+    expect(chest.state).not.toBe('claimed');
+    expect(cards).toHaveLength(chest.granted);
+    expect(chest.granted).toBeGreaterThan(0);
+  });
+
+  it("the lid's sparks are drawn and go back to the pool", () => {
+    const game = startGame();
+    const { effects } = game.services;
+    const chest = chestAtShip(game, 'elite');
+    const before = effects.particles.length;
+    for (let i = 0; i < 600 && chest.state !== 'spent'; i += 1) {
+      tick(game, STEP_SECONDS);
+    }
+    expect(effects.particles.length - before).toBeGreaterThanOrEqual(14);
+    tick(game, 2);
+    expect(GamePools.particles.inUse.size).toBe(effects.particles.length);
+  });
 });

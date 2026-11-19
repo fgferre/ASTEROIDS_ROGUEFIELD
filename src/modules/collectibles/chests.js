@@ -110,10 +110,15 @@ export class Chests {
   }
 
   // A card choice queued (its screen opens after the level-up slow motion)
-  // or on screen: a chest's card must not land under it.
+  // or on screen: a chest's card must not land under it. Levels a win's
+  // spoils hold back (offersHeld) open no screen: the boss's chest goes on.
   cardChoiceUp() {
-    const { pendingLevelUpScreens, pendingUpgradeOptions } = this.progression;
-    return pendingLevelUpScreens.length > 0 || pendingUpgradeOptions.length > 0;
+    const { pendingLevelUpScreens, pendingUpgradeOptions, offersHeld } =
+      this.progression;
+    return (
+      pendingUpgradeOptions.length > 0 ||
+      (!offersHeld && pendingLevelUpScreens.length > 0)
+    );
   }
 
   open(chest) {
@@ -153,15 +158,17 @@ export class Chests {
     for (let i = 0; i < BURST.sparks; i += 1) {
       const angle = (i / BURST.sparks) * TAU;
       const speed = BURST.speed * (i % 2 ? 1.4 : 1);
-      this.effects.createParticle(
-        x,
-        y,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        color,
-        2.2,
-        0.6,
-        'spark'
+      this.effects.particles.push(
+        this.effects.createParticle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          2.2,
+          0.6,
+          'spark'
+        )
       );
     }
   }
