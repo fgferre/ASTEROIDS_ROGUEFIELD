@@ -236,8 +236,6 @@ class BaseSystem {
         this.random,
         this.randomForkLabels
       );
-      this.captureRandomForkSeeds();
-      return;
     }
 
     // The forks follow the run's seed (the shared random's, already reset for
