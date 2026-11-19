@@ -158,7 +158,10 @@ export class PauseScreen {
     this.cancelQuitConfirm();
     state.button = button;
     state.label = button.textContent;
-    button.textContent = 'Quit? Press again';
+    button.textContent =
+      document.body?.dataset.inputDevice === 'touch'
+        ? 'Quit? Tap again'
+        : 'Quit? Press again';
     button.classList.add('is-confirming');
     button.setAttribute('aria-live', 'polite');
     state.timeoutId = setTimeout(() => this.cancelQuitConfirm(), 3000);

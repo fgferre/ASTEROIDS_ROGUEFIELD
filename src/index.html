@@ -7,6 +7,17 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Asteroid Roguefield</title>
+    <!-- Home-screen app: full screen, sideways (public/manifest.webmanifest) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#020408" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Roguefield" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
     <link
       rel="icon"
       type="image/svg+xml"
@@ -135,6 +146,16 @@
               </button>
             </div>
             <nav class="prep-links" aria-label="Main Menu">
+              <!-- Phone only (style.css): opens the Wake log over the screen -->
+              <button
+                id="campaign-log-open"
+                class="menu-screen__button menu-screen__button--link campaign-log__open"
+                type="button"
+                data-prep-for="campaign"
+                data-log-sheet="open"
+              >
+                Wake Log
+              </button>
               <button
                 id="menu-hangar-btn"
                 class="menu-screen__button menu-screen__button--link"
@@ -286,6 +307,14 @@
                   type="button"
                   hidden
                 ></button>
+                <button
+                  class="campaign-log__close"
+                  type="button"
+                  data-log-sheet="close"
+                  aria-label="Close Wake log"
+                >
+                  ✕
+                </button>
               </aside>
             </div>
             <section
@@ -425,11 +454,21 @@
               <kbd data-device="gamepad">RB</kbd>
               <span data-label>Equip for me</span>
             </button>
+            <!-- Touch only (cardScreens.css): Escape's back-out, by finger -->
+            <button
+              id="levelup-cancel-btn"
+              class="lu-ghost levelup-action levelup-cancel"
+              type="button"
+            >
+              Cancel
+            </button>
           </div>
           <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
             Pick a card to banish it for the rest of the run.
-            <span data-device="keyboard">Esc</span>
-            <span data-device="gamepad">B</span> cancels.
+            <span class="levelup-hint__keys"
+              ><span data-device="keyboard">Esc</span>
+              <span data-device="gamepad">B</span> cancels.</span
+            >
           </p>
           <p
             id="levelup-hold-hint"
@@ -437,8 +476,10 @@
             role="status"
           >
             Pick a card to hold it for the next level-up.
-            <span data-device="keyboard">Esc</span>
-            <span data-device="gamepad">B</span> cancels.
+            <span class="levelup-hint__keys"
+              ><span data-device="keyboard">Esc</span>
+              <span data-device="gamepad">B</span> cancels.</span
+            >
           </p>
           <div id="levelup-run" class="run-tray hidden"></div>
         </div>
@@ -494,6 +535,7 @@
                 ><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span
               >
               <span data-device="gamepad">Left stick</span>
+              <span data-device="touch">Left thumb</span>
             </dt>
             <dd>
               Fly up, left, down and right on the screen. The nose turns to

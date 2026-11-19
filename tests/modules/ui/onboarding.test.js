@@ -8,6 +8,7 @@ import {
   CARDS_TIP_TEXT_GAMEPAD,
   CARDS_TIP_TEXT_HEAD_START,
   CARDS_TIP_TEXT_HEAD_START_GAMEPAD,
+  CARDS_TIP_TEXT_TOUCH,
   DASH_TIP_SECONDS,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
@@ -280,6 +281,14 @@ describe('Onboarding', () => {
     expect(onboardingPrompts(keys).dash.keys).toEqual(['⇧ Shift']);
   });
 
+  it('shows the gesture and the on-screen buttons on touch', () => {
+    const prompts = onboardingPrompts({}, 'classic', 'touch');
+    expect(prompts.move.keys).toEqual([]);
+    expect(prompts.move.text).toMatch(/left thumb/);
+    expect(prompts.dash.keys).toEqual(['DASH']);
+    expect(prompts.shield.keys).toEqual(['SHIELD']);
+  });
+
   it('names the pad buttons when the gamepad was used last', () => {
     const buttons = {
       moveUp: 'L-Stick ↑',
@@ -313,6 +322,14 @@ describe('Onboarding', () => {
     expect(CARDS_TIP_TEXT_HEAD_START_GAMEPAD).toMatch(/\bRB equips/);
   });
 
+  it('names no keys by touch, plain or during a head start', () => {
+    const onboarding = new Onboarding(fakeView());
+    onboarding.start();
+    expect(onboarding.cardsTip('touch')).toBe(CARDS_TIP_TEXT_TOUCH);
+    expect(onboarding.cardsTip('touch', true)).toBe(CARDS_TIP_TEXT_TOUCH);
+    expect(CARDS_TIP_TEXT_TOUCH).not.toMatch(/\b[RBQ]\b/);
+  });
+
   it('names the new mode, its key and the way back for each toggle', () => {
     const keys = { toggleAimMode: 'T', toggleSpreadMode: 'G' };
     const pad = { toggleAimMode: 'Y', toggleSpreadMode: 'X' };
@@ -340,6 +357,17 @@ describe('Onboarding', () => {
     expect(
       modeNotice({ kind: 'aim', mode: 'manual' }, pad, 'gamepad').text
     ).not.toMatch(/nose/);
+  });
+
+  it('names no key by touch, where the mode word is tapped', () => {
+    const unbound = { toggleAimMode: 'Set', toggleSpreadMode: 'Set' };
+    const notice = modeNotice(
+      { kind: 'spread', mode: 'fan' },
+      unbound,
+      'touch'
+    );
+    expect(notice.keys).toEqual([]);
+    expect(notice.text).toMatch(/^SPREAD FAN\b.*Tap again/);
   });
 
   it('is off when the Settings toggle is off', () => {

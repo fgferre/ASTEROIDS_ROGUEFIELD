@@ -105,7 +105,8 @@ describe('HUD instrument models', () => {
     expect(part('.bd-evo').textContent).toBe('Solar Flare');
     expect(part('.bd-apex').textContent).toBe('Apex 5/5');
     expect(part('.bd-track').classList.contains('is-apex')).toBe(true);
-    expect(part('.bd-modes').textContent).toBe('AIM AUTO · SPREAD CONC');
+    expect(part('.bd-aim').textContent).toBe('AIM AUTO');
+    expect(part('.bd-spread').textContent).toBe('SPREAD CONC');
 
     // A weapon with its own forms names them on its card's family.
     at({ arc: 2 }, [], 'arc-caster');

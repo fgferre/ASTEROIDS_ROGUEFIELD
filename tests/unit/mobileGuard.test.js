@@ -1,125 +1,120 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
-import { mobileGuard } from '../../src/bootstrap/mobileGuard.js';
+import {
+  INSTALL_TEXT_IOS,
+  PLAY_IN_BROWSER_TEXT,
+  mobileGuard,
+} from '../../src/bootstrap/mobileGuard.js';
 
-// A11Y-08 detection contract lock per CONTEXT D-07.
-//
-// Vitest runs in `environment: 'node'` (see vite.config.js test block), so
-// window/navigator/document are NOT provided. We stub them via vi.stubGlobal
-// on a per-test basis to simulate device profiles. cleanupGlobalState() in
-// the afterEach hook calls vi.restoreAllMocks(), unwinding the stubs.
-//
-// Four device profiles covered (D-07):
-//   1. desktop-mouse  → ontouchstart absent, maxTouchPoints=0, pointer:coarse false  → blocked: false
-//   2. laptop+touch   → ontouchstart present, maxTouchPoints=5, pointer:coarse false → blocked: false
-//   3. phone          → ontouchstart present, maxTouchPoints=5, pointer:coarse true  → blocked: true
-//   4. tablet         → ontouchstart absent, maxTouchPoints=10, pointer:coarse true  → blocked: true
-//   5. windows laptop → ontouchstart absent, maxTouchPoints=10, pointer:coarse false → blocked: false
-// Plus:
-//   - ?desktop=force override on a phone-shaped profile → blocked: false
-//   - Defensive null-canvas branch (document.getElementById returns null) → blocked: true
+// Vitest runs in `environment: 'node'`: window/navigator/document are stubbed
+// per test to simulate a device. A phone or tablet (coarse pointer plus a
+// touch signal) plays by touch, past the door notice: turn sideways, and on a
+// phone in the browser, add the game to the Home Screen (or play anyway).
 
-/**
- * Stubs window/navigator/document with the minimal surface the guard probes.
- *
- * @param {object} opts
- * @param {boolean} opts.ontouchstart - whether `'ontouchstart' in window` is true
- * @param {number} opts.maxTouchPoints - navigator.maxTouchPoints value
- * @param {boolean} opts.pointerCoarse - whether matchMedia('(pointer: coarse)').matches is true
- * @param {string} [opts.searchString=''] - window.location.search value (for ?desktop=force override)
- * @param {boolean} [opts.canvasMissing=false] - if true, document.getElementById returns null
- */
-function stubDeviceProfile({
-  ontouchstart,
-  maxTouchPoints,
-  pointerCoarse,
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+
+function fakeElement(tag) {
+  const classes = new Set();
+  const listeners = {};
+  return {
+    tag,
+    children: [],
+    textContent: '',
+    setAttribute: vi.fn(),
+    remove: vi.fn(),
+    appendChild(child) {
+      this.children.push(child);
+    },
+    addEventListener: (type, fn) => {
+      listeners[type] = fn;
+    },
+    click: () => listeners.click?.(),
+    classList: {
+      toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+      contains: (name) => classes.has(name),
+    },
+  };
+}
+
+function stubDevice({
+  touch = true,
+  width = 844,
+  height = 390,
+  screen = { width: 844, height: 390 },
+  standalone = false,
+  displayMode = 'browser',
   searchString = '',
-  canvasMissing = false,
 }) {
-  const matchMediaStub = vi.fn((query) => ({
-    matches: query === '(pointer: coarse)' ? pointerCoarse : false,
-    media: query,
-  }));
-
+  const listeners = {};
+  const session = new Map();
   const windowStub = {
     location: { search: searchString },
-    matchMedia: matchMediaStub,
+    innerWidth: width,
+    innerHeight: height,
+    screen,
+    sessionStorage: {
+      getItem: (key) => session.get(key) ?? null,
+      setItem: (key, value) => session.set(key, value),
+    },
+    matchMedia: vi.fn((query) => ({
+      matches:
+        query === '(pointer: coarse)'
+          ? touch
+          : query === `(display-mode: ${displayMode})`,
+    })),
+    addEventListener: vi.fn((type, fn) => {
+      listeners[type] = fn;
+    }),
+    removeEventListener: vi.fn((type) => {
+      delete listeners[type];
+    }),
+    ontouchstart: null,
   };
-  if (ontouchstart) {
-    // The detection probe uses `'ontouchstart' in window`, so the key must exist
-    // (value can be null, undefined, or a no-op handler — only `in` is checked).
-    windowStub.ontouchstart = null;
-  }
-
   vi.stubGlobal('window', windowStub);
-  vi.stubGlobal('navigator', { maxTouchPoints });
+  vi.stubGlobal('navigator', {
+    maxTouchPoints: touch ? 5 : 0,
+    standalone,
+    userAgent: IPHONE_UA,
+  });
 
-  const fillRectMock = vi.fn();
-  const fillTextMock = vi.fn();
-  const measureTextMock = vi.fn(() => ({ width: 200 }));
-  const ctxStub = {
-    fillRect: fillRectMock,
-    fillText: fillTextMock,
-    measureText: measureTextMock,
-    get fillStyle() {
-      return this._fillStyle;
-    },
-    set fillStyle(v) {
-      this._fillStyle = v;
-    },
-    get font() {
-      return this._font;
-    },
-    set font(v) {
-      this._font = v;
-    },
-    get textAlign() {
-      return this._textAlign;
-    },
-    set textAlign(v) {
-      this._textAlign = v;
-    },
-    get textBaseline() {
-      return this._textBaseline;
-    },
-    set textBaseline(v) {
-      this._textBaseline = v;
-    },
-  };
-
-  const canvasStub = canvasMissing
-    ? null
-    : {
-        width: 800,
-        height: 600,
-        getContext: vi.fn(() => ctxStub),
-      };
-
-  const loadingScreen = { classList: { add: vi.fn() } };
+  const created = [];
   const container = { appendChild: vi.fn() };
-  const elements = {
-    'game-canvas': canvasStub,
-    'loading-screen': loadingScreen,
-    'game-container': container,
-  };
-  const noticeStub = { setAttribute: vi.fn() };
-
   vi.stubGlobal('document', {
-    getElementById: vi.fn((id) => elements[id] ?? null),
-    createElement: vi.fn(() => noticeStub),
+    getElementById: vi.fn((id) => (id === 'game-container' ? container : null)),
+    createElement: vi.fn((tag) => {
+      const el = fakeElement(tag);
+      created.push(el);
+      return el;
+    }),
   });
 
   return {
-    ctxStub,
-    canvasStub,
-    fillRectMock,
-    fillTextMock,
-    measureTextMock,
-    loadingScreen,
     container,
-    noticeStub,
+    notice: () => container.appendChild.mock.calls[0]?.[0],
+    texts: () => created.map((el) => el.textContent).filter(Boolean),
+    button: () => created.find((el) => el.textContent === PLAY_IN_BROWSER_TEXT),
+    turn(w, h) {
+      windowStub.innerWidth = w;
+      windowStub.innerHeight = h;
+      listeners.resize?.();
+    },
   };
 }
+
+// The guard's promise, with whether it has resolved yet.
+function track() {
+  const state = { result: null };
+  state.pending = mobileGuard().then((value) => {
+    state.result = value;
+  });
+  return state;
+}
+
+const TABLET = {
+  screen: { width: 1180, height: 820 },
+  width: 1180,
+  height: 820,
+};
 
 describe('mobileGuard', () => {
   beforeEach(() => {
@@ -131,93 +126,54 @@ describe('mobileGuard', () => {
     vi.unstubAllGlobals();
   });
 
-  describe('detection heuristic', () => {
-    it('returns { blocked: false } on desktop with mouse only', () => {
-      stubDeviceProfile({
-        ontouchstart: false,
-        maxTouchPoints: 0,
-        pointerCoarse: false,
-      });
-      expect(mobileGuard()).toEqual({ blocked: false });
-    });
+  it('keeps the desktop path without a touch device, or with ?desktop=force', async () => {
+    stubDevice({ touch: false });
+    expect(await mobileGuard()).toEqual({ touch: false });
 
-    it('returns { blocked: false } on laptop with touchscreen (pointer is fine)', () => {
-      stubDeviceProfile({
-        ontouchstart: true,
-        maxTouchPoints: 5,
-        pointerCoarse: false,
-      });
-      expect(mobileGuard()).toEqual({ blocked: false });
-    });
-
-    it('returns { blocked: true } on phone (pointer: coarse)', () => {
-      const { fillTextMock, loadingScreen, container, noticeStub } =
-        stubDeviceProfile({
-          ontouchstart: true,
-          maxTouchPoints: 5,
-          pointerCoarse: true,
-        });
-      expect(mobileGuard()).toEqual({ blocked: true });
-      expect(fillTextMock).toHaveBeenCalledTimes(1);
-      expect(loadingScreen.classList.add).toHaveBeenCalledWith('hidden');
-      expect(container.appendChild).toHaveBeenCalledWith(noticeStub);
-      expect(noticeStub.setAttribute).toHaveBeenCalledWith('role', 'alert');
-    });
-
-    it('returns { blocked: true } on tablet (maxTouchPoints + pointer: coarse)', () => {
-      stubDeviceProfile({
-        ontouchstart: false,
-        maxTouchPoints: 10,
-        pointerCoarse: true,
-      });
-      expect(mobileGuard()).toEqual({ blocked: true });
-    });
-
-    it('returns { blocked: false } when maxTouchPoints is the only signal (Windows laptop)', () => {
-      stubDeviceProfile({
-        ontouchstart: false,
-        maxTouchPoints: 10,
-        pointerCoarse: false,
-      });
-      expect(mobileGuard()).toEqual({ blocked: false });
-    });
+    stubDevice({ searchString: '?desktop=FORCE' });
+    expect(await mobileGuard()).toEqual({ touch: false });
   });
 
-  describe('?desktop=force override', () => {
-    it('overrides the block on a phone-shaped touch device', () => {
-      const { fillTextMock } = stubDeviceProfile({
-        ontouchstart: true,
-        maxTouchPoints: 5,
-        pointerCoarse: true,
-        searchString: '?desktop=force',
-      });
-      expect(mobileGuard()).toEqual({ blocked: false });
-      // Notice MUST NOT be painted on the override path.
-      expect(fillTextMock).not.toHaveBeenCalled();
-    });
+  it('upright: the turn notice holds the boot until the device is sideways', async () => {
+    const device = stubDevice({ ...TABLET, width: 820, height: 1180 });
+    const guard = track();
+    await Promise.resolve();
+    expect(device.notice().classList.contains('is-upright')).toBe(true);
+    expect(device.texts()).toEqual(['Turn your device sideways to play']);
 
-    it('treats the override flag case-insensitively', () => {
-      stubDeviceProfile({
-        ontouchstart: true,
-        maxTouchPoints: 5,
-        pointerCoarse: true,
-        searchString: '?desktop=FORCE',
-      });
-      expect(mobileGuard()).toEqual({ blocked: false });
-    });
+    device.turn(1180, 820);
+    await guard.pending;
+    expect(guard.result).toEqual({ touch: true });
+    expect(device.notice().remove).toHaveBeenCalled();
   });
 
-  describe('defensive fallbacks', () => {
-    it('returns { blocked: true } when #game-canvas is missing', () => {
-      // Phone-shaped profile so detection triggers, then canvas resolves to null.
-      stubDeviceProfile({
-        ontouchstart: true,
-        maxTouchPoints: 5,
-        pointerCoarse: true,
-        canvasMissing: true,
-      });
-      // Safe default: still halt boot even when the notice cannot be painted.
-      expect(mobileGuard()).toEqual({ blocked: true });
-    });
+  it('phone in the browser: tells how to install, lets the player through on request', async () => {
+    const device = stubDevice({});
+    const guard = track();
+    await Promise.resolve();
+    expect(device.texts()).toContain(INSTALL_TEXT_IOS);
+    expect(device.notice().classList.contains('is-upright')).toBe(false);
+    expect(guard.result).toBeNull();
+
+    device.button().click();
+    await guard.pending;
+    expect(guard.result).toEqual({ touch: true });
+
+    // The choice holds for the session: no notice on the next load.
+    device.container.appendChild.mockClear();
+    expect(await mobileGuard()).toEqual({ touch: true });
+    expect(device.container.appendChild).not.toHaveBeenCalled();
+  });
+
+  it('phone installed (iOS flag or display mode), or a tablet: straight in when sideways', async () => {
+    for (const device of [
+      { standalone: true },
+      { displayMode: 'fullscreen' },
+      TABLET,
+    ]) {
+      const { container } = stubDevice(device);
+      expect(await mobileGuard()).toEqual({ touch: true });
+      expect(container.appendChild).not.toHaveBeenCalled();
+    }
   });
 });

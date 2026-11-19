@@ -11,6 +11,9 @@
 // blinks the button and fades into the menu (the owner's card, 17/11).
 
 const WAKE_HINT = 'Press any key';
+// By touch (UISystem's data-input-device) the hints name the tap instead.
+const TOUCH_WAKE_HINT = 'Tap the screen';
+const TOUCH_HINT = 'Tap to begin';
 // A second touch this soon after the waking one counts as the same touch.
 const WAKE_GRACE_MS = 500;
 // The start's blink and fade (style.css .loading-screen--starting).
@@ -85,6 +88,8 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     const hint = loadingScreen.querySelector(
       '.loading-screen__gate-action > span'
     );
+    const touch = document.body.dataset.inputDevice === 'touch';
+    if (hint && touch) hint.textContent = TOUCH_HINT;
     const awakeHint = hint?.textContent;
     let started = false;
     let rafId = 0;
@@ -157,7 +162,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
     loadingScreen.classList.add('loading-screen--gate');
     if (awakeAt === null) {
       loadingScreen.classList.add('loading-screen--asleep');
-      if (hint) hint.textContent = WAKE_HINT;
+      if (hint) hint.textContent = touch ? TOUCH_WAKE_HINT : WAKE_HINT;
       // Capture phase, beside AudioSystem's: the same gesture wakes both.
       document.addEventListener('pointerdown', wake, true);
       document.addEventListener('keydown', wake, true);

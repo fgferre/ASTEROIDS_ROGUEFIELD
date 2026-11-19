@@ -837,6 +837,156 @@ article.card {
   color: var(--text-dim);
 }
 
+/* Cancel stands in for Escape by touch only (below). */
+.levelup-cancel {
+  display: none;
+}
+
+/* Level-up by touch (body.touch-play, input/touchControls.js): no keys
+   named, the actions framed and finger-sized, and Cancel while banish, hold
+   or an armed "Equip for me" waits for the next tap. */
+body[data-input-device='touch']
+  #levelup-screen
+  :is(.card__key, .levelup-hint__keys) {
+  display: none;
+}
+
+body.touch-play #levelup-screen .levelup-actions {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+body.touch-play #levelup-screen .lu-ghost {
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  font-size: var(--text-sm);
+}
+
+body.touch-play #levelup-screen .lu-ghost__n {
+  font-size: var(--text-md);
+}
+
+body.touch-play #levelup-banish-btn[aria-pressed='true'] {
+  border-color: var(--danger);
+}
+
+body.touch-play #levelup-hold-btn[aria-pressed='true'] {
+  border-color: var(--xp);
+}
+
+body.touch-play #levelup-equip-btn.is-armed {
+  border-color: var(--accent);
+}
+
+body.touch-play #levelup-screen:is(.is-banishing, .is-holding) .levelup-cancel,
+body.touch-play #levelup-equip-btn.is-armed ~ .levelup-cancel {
+  display: flex;
+}
+
+/* Touch, iPad and up: the 1920 layout scaled to the window drew the cards'
+   text at 5 to 10 px; a floor on the unit and the type, small labels 12 px. */
+body.touch-play :is(#levelup-screen, #chest-screen, #flight-screen) {
+  --u: max(min(calc(100vw / 1920), calc(100vh / 1080)), 0.62px);
+  --fs: calc(
+    max(min(calc(100vw / 1920), calc(100vh / 1080)), 0.8px) * var(--text-scale)
+  );
+}
+
+/* The larger type needs wider cards; the iPad's width has the room. */
+body.touch-play :is(#levelup-screen, #chest-screen) .card {
+  width: calc(430 * var(--u));
+}
+
+body.touch-play
+  :is(#levelup-screen, #chest-screen)
+  :is(
+    .lu-level small,
+    .lu-picks__lbl,
+    .lu-headstart,
+    .card__held,
+    .card__rar-name,
+    .card__tag,
+    .card__lbl,
+    .card__end,
+    .card__at,
+    .card__wtag,
+    .card__arrow,
+    .card__trail,
+    .levelup-hint,
+    .run-tray__lbl,
+    .run-tray__full,
+    .run-tray__note,
+    .run-slot em,
+    .run-tray__n small
+  ) {
+  font-size: var(--text-xs);
+}
+
+/* Phone held sideways: the cards share the width inside the safe areas, text
+   at least 12 px; the column scrolls under the actions, which stay in view. */
+@media (max-height: 500px) {
+  body.touch-play #levelup-screen {
+    --u: 0.66px;
+    --fs: calc(0.8px * var(--text-scale));
+    padding: calc(env(safe-area-inset-top) + 6px)
+      calc(env(safe-area-inset-right) + 8px)
+      calc(env(safe-area-inset-bottom) + 4px)
+      calc(env(safe-area-inset-left) + 8px);
+  }
+
+  body.touch-play #levelup-screen .levelup-content {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  body.touch-play #levelup-screen .upgrades-grid {
+    align-self: stretch;
+  }
+
+  body.touch-play #levelup-screen .card {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Banish's and hold's line rides just over the actions. */
+  body.touch-play
+    #levelup-screen
+    :is(.levelup-actions, #levelup-banish-hint, #levelup-hold-hint) {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    align-self: stretch;
+    background: rgba(6, 9, 16, 0.92);
+  }
+
+  body.touch-play #levelup-screen .levelup-actions {
+    order: 1;
+    justify-content: center;
+    margin-top: var(--space-2);
+    padding: 6px 0;
+  }
+
+  body.touch-play
+    #levelup-screen
+    :is(#levelup-banish-hint, #levelup-hold-hint) {
+    bottom: 56px;
+    margin: 0;
+    padding-top: var(--space-1);
+  }
+
+  body.touch-play #levelup-screen .run-tray {
+    order: 2;
+  }
+}
+
 /* A piloting trail card: a cyan diamond on its top edge and its step. */
 .card:has(.card__trail) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
@@ -1258,4 +1408,62 @@ body.flashing-reduced .card.is-revealing {
 .flight-keys dd {
   margin: 0;
   color: var(--text);
+}
+
+/* Chest and Flight Computer by touch: no keys named, Continue / Fly a
+   finger-sized button. */
+body.touch-play[data-input-device='touch']
+  :is(#chest-screen, #flight-screen)
+  kbd {
+  display: none;
+}
+
+body.touch-play :is(#chest-screen, #flight-screen) .chest-continue {
+  min-height: 44px;
+}
+
+/* Phone held sideways, as the level-up: the smaller unit inside the safe
+   areas, the cards sharing the width, the column scrolling. */
+@media (max-height: 500px) {
+  body.touch-play :is(#chest-screen, #flight-screen) {
+    --u: 0.66px;
+    --fs: calc(0.8px * var(--text-scale));
+    padding: calc(env(safe-area-inset-top) + 6px)
+      calc(env(safe-area-inset-right) + 8px)
+      calc(env(safe-area-inset-bottom) + 4px)
+      calc(env(safe-area-inset-left) + 8px);
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .levelup-content {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  body.touch-play #chest-screen .chest-cards {
+    align-self: stretch;
+  }
+
+  body.touch-play #chest-screen .card {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .chest-title {
+    margin-bottom: var(--space-3);
+  }
+
+  body.touch-play :is(#chest-screen, #flight-screen) .chest-continue {
+    margin-top: var(--space-3);
+    padding: 0 var(--space-6);
+  }
+}
+
+/* The count and Continue at 12 px on every touch screen. */
+body.touch-play
+  :is(#chest-screen, #flight-screen)
+  :is(.chest-title__count, .chest-continue) {
+  font-size: var(--text-xs);
 }

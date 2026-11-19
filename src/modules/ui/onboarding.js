@@ -26,6 +26,8 @@ export const CARDS_TIP_TEXT_HEAD_START =
   'Pick a card. R rerolls, B banishes, Q equips the rest.';
 export const CARDS_TIP_TEXT_HEAD_START_GAMEPAD =
   'Pick a card. X rerolls, Y banishes, RB equips the rest.';
+/** By touch the actions are the buttons under the cards: no keys to name. */
+export const CARDS_TIP_TEXT_TOUCH = 'Pick a card.';
 
 /**
  * In-play tips in order; `cards` lives on the level-up screen instead, and
@@ -42,17 +44,23 @@ const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
  * along the turret: on the nose, or along the right stick while it is held.
  */
 export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
+  // By touch the mode word itself is tapped: no key to name.
+  const touch = device === 'touch';
+  const again = touch ? 'Tap again' : 'Press again';
   const texts = {
-    auto: 'AIM AUTO · the turret finds targets. Press again for manual.',
+    auto: `AIM AUTO · the turret finds targets. ${again} for manual.`,
     manual:
       device === 'gamepad'
         ? 'AIM MANUAL · aim with the right stick. Press again for auto.'
-        : 'AIM MANUAL · shots fly where the nose points. Press again for auto.',
-    fan: 'SPREAD FAN · extra shots fan out wide. Press again to concentrate.',
-    concentrated:
-      'SPREAD CONC · extra shots fly side by side. Press again to fan.',
+        : `AIM MANUAL · shots fly where the nose points. ${again} for auto.`,
+    fan: `SPREAD FAN · extra shots fan out wide. ${again} to concentrate.`,
+    concentrated: `SPREAD CONC · extra shots fly side by side. ${again} to fan.`,
   };
-  const key = kind === 'aim' ? keys.toggleAimMode : keys.toggleSpreadMode;
+  const key = touch
+    ? null
+    : kind === 'aim'
+      ? keys.toggleAimMode
+      : keys.toggleSpreadMode;
   return { keys: key ? [key] : [], text: texts[mode] };
 }
 
@@ -60,7 +68,7 @@ export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
  * Prompt content per step. `keys` are the labels of the bound keys or pad
  * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield,
  * toggleAimMode, toggleSpreadMode }); `device` is the last one used
- * ('keyboard' | 'gamepad'); `toggled` adds the `mode` notice (modeNotice).
+ * ('keyboard' | 'gamepad' | 'touch'); `toggled` adds the `mode` notice (modeNotice).
  */
 export function onboardingPrompts(
   keys,
@@ -85,14 +93,23 @@ export function onboardingPrompts(
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
           text: 'Move with WASD. The cannon fires on its own.',
         };
+  // Touch: the gesture, and the on-screen buttons' own names.
+  const touchMove = {
+    keys: [],
+    text:
+      scheme === 'classic'
+        ? 'Put your left thumb down and point where to fly. The cannon fires on its own.'
+        : 'Put your left thumb down and drag to move. The cannon fires on its own.',
+  };
+  const touch = device === 'touch';
   return {
-    move: device === 'gamepad' ? padMove : keyboardMove,
+    move: touch ? touchMove : device === 'gamepad' ? padMove : keyboardMove,
     dash: {
-      keys: [keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
+      keys: [touch ? 'DASH' : keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
       text: "Dash through danger. You can't be hit mid-dash.",
     },
     shield: {
-      keys: [keys.activateShield],
+      keys: [touch ? 'SHIELD' : keys.activateShield],
       text: 'Raise your shield before a hit lands.',
     },
     mode: toggled && modeNotice(toggled, keys, device),
@@ -255,6 +272,9 @@ export class Onboarding {
     if (this.cardsShown !== id) {
       this.cardsShown = id;
       this.onStep('cards');
+    }
+    if (device === 'touch') {
+      return CARDS_TIP_TEXT_TOUCH;
     }
     if (headStart) {
       return device === 'gamepad'

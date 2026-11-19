@@ -64,7 +64,7 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, run }.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, cancelBtn, run }.
    * `progression()`: the progression service (offers, rerolls, banishes, holds, picks), or none.
    * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
@@ -115,11 +115,12 @@ export class LevelUpScreen {
   }
 
   bindLevelUpControls() {
-    const { rerollBtn, banishBtn, holdBtn, equipBtn } = this.refs;
+    const { rerollBtn, banishBtn, holdBtn, equipBtn, cancelBtn } = this.refs;
     rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
     banishBtn?.addEventListener('click', () => this.toggleBanishMode());
     holdBtn?.addEventListener('click', () => this.toggleHoldMode());
     equipBtn?.addEventListener('click', () => this.equipForMe());
+    cancelBtn?.addEventListener('click', () => this.backOut());
 
     // A card's key badge (1, 2, 3) picks it as a click on it would.
     document.addEventListener('keydown', (event) => {
@@ -153,7 +154,7 @@ export class LevelUpScreen {
     else if (action === 'back') this.backOut();
   }
 
-  // Escape or the pad's back: an armed "Equip for me" disarms and nothing
+  // Escape, the pad's back or a tap on Cancel (touch only): an armed "Equip for me" disarms and nothing
   // else happens; otherwise banish or hold mode ends.
   backOut() {
     if (this.equipArmTimer) this.disarmEquip();
@@ -562,7 +563,9 @@ export class LevelUpScreen {
     equipBtn?.setAttribute('aria-pressed', 'true');
     const label = equipBtn?.querySelector('[data-label]');
     if (label) {
-      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? Press again`;
+      const again =
+        document.body?.dataset.inputDevice === 'touch' ? 'Tap' : 'Press';
+      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? ${again} again`;
     }
     this.equipArmTimer = setTimeout(() => this.disarmEquip(), EQUIP_CONFIRM_MS);
   }

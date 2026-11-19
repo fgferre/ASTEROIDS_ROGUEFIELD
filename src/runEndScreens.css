@@ -770,3 +770,127 @@ body:has(.end-screen:not(.hidden)) .next-wave-box {
   opacity: 1;
   transition: opacity 6s ease-in-out;
 }
+
+/* Run end by touch (body.touch-play): no keys named, every button and the
+   seed link finger-sized. */
+body.touch-play .end-btn,
+body.touch-play .end-copy,
+body.touch-play .ending-option {
+  min-height: 44px;
+}
+
+body.touch-play .end-copy {
+  padding: 0 var(--space-2);
+  border-bottom: 0;
+}
+
+body.touch-play[data-input-device='touch'] .end-screen kbd {
+  display: none;
+}
+
+/* Phone held sideways: the recap at the level-up's smaller unit, inside the
+   safe areas, text at least 12 px; the page scrolls and the two endings sit
+   side by side. */
+@media (max-height: 500px) {
+  body.touch-play .end-screen {
+    --u: 0.66px;
+    --fs: calc(0.8px * var(--text-scale));
+    padding: calc(env(safe-area-inset-top) + 4px)
+      calc(env(safe-area-inset-right) + 8px)
+      calc(env(safe-area-inset-bottom) + 4px)
+      calc(env(safe-area-inset-left) + 8px);
+  }
+
+  body.touch-play .end-screen {
+    overflow: hidden;
+  }
+
+  body.touch-play .end-content {
+    width: 100%;
+    max-width: calc(1040 * var(--u));
+    max-height: 100%;
+    overflow-y: auto;
+    padding-top: var(--space-2);
+  }
+
+  /* The run line is drawn in its own units, a third smaller on screen. */
+  body.touch-play .runline :is(.rl-title, .rl-sub, .rl-chapter) {
+    font-size: 18.5px;
+    letter-spacing: 0.5px;
+  }
+
+  body.touch-play
+    .end-screen
+    :is(
+      .end-lbl,
+      .end-chapter,
+      .end-kicker,
+      .end-badge,
+      .end-quote__who,
+      .end-chip,
+      .end-wtrack__fam,
+      .end-fam__name,
+      .end-fam__count,
+      .end-fam__tag,
+      .end-fam__cards sup,
+      .end-copy,
+      .end-endings,
+      .ending-stake__who,
+      .end-btn
+    ) {
+    font-size: var(--text-xs);
+  }
+
+  body.touch-play .end-screen :is(.end-btn__sub, .end-invite) {
+    font-size: var(--text-sm);
+  }
+
+  body.touch-play .end-invite {
+    margin-top: var(--space-3);
+  }
+
+  /* The buttons stay in view under the scrolling recap. */
+  body.touch-play .end-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: 6px 0;
+    background: rgba(6, 9, 16, 0.92);
+  }
+
+  body.touch-play .end-btn {
+    padding: 0 var(--space-4);
+    letter-spacing: 0.12em;
+  }
+
+  body.touch-play .end-btn--primary {
+    min-width: 0;
+  }
+
+  body.touch-play .end-seed {
+    margin: var(--space-2) 0 var(--space-1);
+  }
+
+  body.touch-play .end-screen--choice .ending-content {
+    width: 100%;
+    padding: var(--space-2) 0;
+  }
+
+  body.touch-play .end-screen--choice .ending-options {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  body.touch-play .end-screen--choice .ending-option {
+    min-height: 0;
+    padding: var(--space-3);
+  }
+
+  body.touch-play .ending-stake {
+    grid-template-columns: calc(120 * var(--u)) 1fr;
+    gap: var(--space-2);
+  }
+}

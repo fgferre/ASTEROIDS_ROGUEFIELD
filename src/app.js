@@ -14,6 +14,7 @@ import { IS_DEV } from './core/env.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
+import { TouchControls } from './modules/input/touchControls.js';
 import {
   activateProfileHarness,
   startRun,
@@ -185,7 +186,7 @@ function installReplayDownloadShortcut() {
   });
 }
 
-function init(recording = null) {
+function init(recording = null, touch = false) {
   if (DEV_MODE) {
     GameDebugLogger.init();
     GameDebugLogger.log('INIT', 'Game starting', {
@@ -253,6 +254,15 @@ function init(recording = null) {
 
     // Store services for use in game loop
     gameSystemServices = services;
+
+    if (touch) {
+      services.input.touch = new TouchControls({
+        input: services.input,
+        player: services.player,
+        eventBus: services['event-bus'],
+      });
+      void services.input.touch.mount();
+    }
 
     holdLoadingForWarmUp(services['menu-background'], services.renderer);
 
@@ -576,12 +586,8 @@ document.addEventListener('DOMContentLoaded', () => {
   void (async () => {
     bootstrapDebugLogging();
 
-    // A11Y-08: BLOCK on touch devices unless ?desktop=force override is present.
-    // Writes Canvas2D notice on the blocked path; no DI / no Three.js / no Web Audio.
-    const guard = mobileGuard();
-    if (guard.blocked) {
-      return;
-    }
+    // A touch device plays by touch, held sideways (waits while in portrait).
+    const { touch } = await mobileGuard();
 
     // ?scene=ring (dev): the broken Ring alone, orbited; no game runs.
     if (
@@ -611,6 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    init(recording);
+    init(recording, touch);
   })();
 });
