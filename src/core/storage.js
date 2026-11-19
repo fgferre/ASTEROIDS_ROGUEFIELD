@@ -81,12 +81,13 @@ export function deleteSlot(slot) {
   });
 }
 
-export function loadJSON(key) {
+/** `slot`: another pilot's copy of a pilot's key (the pilots screen). */
+export function loadJSON(key, slot = activeSlot) {
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
       return null;
     }
-    const raw = window.localStorage.getItem(slotStorageKey(key));
+    const raw = window.localStorage.getItem(slotStorageKey(key, slot));
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
     console.warn(`[storage] Failed to load "${key}":`, error);

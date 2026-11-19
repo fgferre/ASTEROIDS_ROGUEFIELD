@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupLoadingScreen } from '../../../src/modules/menu/loadingScreen.js';
 import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
+import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
 
 // The morph draws on a real page; here it either declines (null) or hands
 // back a stand-in overlay.
 vi.mock('../../../src/modules/menu/openingMorph.js', () => ({
   MORPH_MS: 2000,
   morphIntoTitle: vi.fn(() => null),
+}));
+// The pilots screen draws on a real page; here the pilot in play goes on.
+vi.mock('../../../src/modules/menu/pilotSelect.js', () => ({
+  openPilotSelect: vi.fn((onContinue) => onContinue()),
 }));
 
 function fakeElement() {
@@ -223,6 +228,20 @@ describe('loading screen PRESS START gate', () => {
     expect(screen.classes.has('hidden')).toBe(true);
     expect(menuButton.focus).toHaveBeenCalledTimes(1);
     expect(docListeners.keydown).toBeUndefined();
+  });
+
+  it('asks for the pilot before the menu opens', () => {
+    let goOn = null;
+    openPilotSelect.mockImplementationOnce((onContinue) => (goOn = onContinue));
+    const { screen, menu, menuButton, docListeners } = boot('');
+    docListeners.keydown(enter());
+    vi.advanceTimersByTime(1000);
+    expect(screen.classes.has('hidden')).toBe(true);
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    expect(menuButton.focus).not.toHaveBeenCalled();
+    goOn();
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    expect(menuButton.focus).toHaveBeenCalledTimes(1);
   });
 
   it('opens the menu on a click', () => {

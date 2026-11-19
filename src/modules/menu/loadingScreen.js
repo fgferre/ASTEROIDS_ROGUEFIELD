@@ -8,7 +8,8 @@
 // DOM. It came from MenuBackgroundSystem.js.
 //
 // The press that leaves the opening is the page's first gesture, so the music
-// is on (AudioSystem hears it) and the gate comes up awake: one press starts.
+// is on (AudioSystem hears it) and the gate comes up awake: one press starts
+// (and opens the pilots, pilotSelect.js, on the way to the menu).
 // A pad press cannot wake the music, so after one the gate sleeps as before:
 // the first touch or key wakes it, and the music with it; the next one is the
 // start. The start blinks the button and fades into the menu (the owner's
@@ -16,6 +17,7 @@
 
 import { LOADING_JOKES, loadingStep } from '../../data/loadingLines.js';
 import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
+import { openPilotSelect } from './pilotSelect.js';
 
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
@@ -207,9 +209,13 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart) {
       onStart?.();
       loadingScreen.classList.remove('loading-screen--asleep');
       loadingScreen.classList.add('loading-screen--starting');
+      // The pilots come next, over the still-gated menu (pilotSelect.js).
       setTimeout(() => {
-        finish();
-        menuScreen?.querySelector('button:not([disabled])')?.focus();
+        loadingScreen.classList.add('hidden');
+        openPilotSelect(() => {
+          finish();
+          menuScreen?.querySelector('button:not([disabled])')?.focus();
+        });
       }, START_EFFECT_MS);
     }
 

@@ -7,19 +7,21 @@ import { SECTORS } from '../data/sectors.js';
 export const RECORDS_STORAGE_KEY = 'roguefield:records:v1';
 
 /**
- * Best layer reached, longest run (seconds) and runs started, across runs;
+ * Best layer reached, longest run (seconds) and runs started, across runs,
+ * and the day the last one started (`lastRun`, 'YYYY-MM-DD' local, or null);
  * Boss Rush: the furthest Warden reached (1-3) and the fastest clear
  * (seconds, 0 before the first); sector runs: the ids won (`sectorsWon`) and
  * each one's fastest clear (`sectorTimes`, id → seconds); the campaign's
  * endings reached (`endings`, ids in the order found, data/story.js). A
  * sector run never raises `bestLayer` or `bestTime`.
  */
-export function loadRecords() {
-  const stored = loadJSON(RECORDS_STORAGE_KEY) ?? {};
+export function loadRecords(slot) {
+  const stored = loadJSON(RECORDS_STORAGE_KEY, slot) ?? {};
   return {
     bestLayer: Number(stored.bestLayer) || 0,
     bestTime: Number(stored.bestTime) || 0,
     runs: Number(stored.runs) || 0,
+    lastRun: typeof stored.lastRun === 'string' ? stored.lastRun : null,
     bossRushStage: Number(stored.bossRushStage) || 0,
     bossRushTime: Number(stored.bossRushTime) || 0,
     sectorsWon: Array.isArray(stored.sectorsWon) ? stored.sectorsWon : [],
@@ -49,6 +51,7 @@ export function updateRecords({
     bestLayer: Math.max(records.bestLayer, Math.floor(Number(layer) || 0)),
     bestTime: Math.max(records.bestTime, Math.floor(Number(time) || 0)),
     runs: records.runs + (newRun ? 1 : 0),
+    lastRun: newRun ? localDay(new Date()) : records.lastRun,
     bossRushStage: Math.max(
       records.bossRushStage,
       Math.floor(Number(bossRushStage) || 0)
@@ -96,4 +99,10 @@ export function isSectorUnlocked(sector, records = loadRecords()) {
     records.sectorsWon.includes(previous.id) ||
     records.bestLayer > previous.layers[1]
   );
+}
+
+/** 'YYYY-MM-DD' of `date` in the player's own time zone. */
+export function localDay(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

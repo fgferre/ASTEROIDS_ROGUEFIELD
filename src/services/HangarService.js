@@ -55,9 +55,11 @@ const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
  * - `sealed`: cards sealed out of the next runs' draw; `startingCard`: the
  *   piloting card the Flight School launches with (null for none).
  */
-export function loadHangarSave() {
+export function loadHangarSave(slot) {
   const stored =
-    loadJSON(HANGAR_STORAGE_KEY) ?? loadJSON(HANGAR_STORAGE_KEY_V1) ?? {};
+    loadJSON(HANGAR_STORAGE_KEY, slot) ??
+    loadJSON(HANGAR_STORAGE_KEY_V1, slot) ??
+    {};
   const pressure = stored.pressure ?? {};
   const open = Math.min(PRESSURE_RUNGS.length, count(pressure.open));
   return {
