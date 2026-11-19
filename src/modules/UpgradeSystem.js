@@ -77,8 +77,6 @@ class UpgradeSystem extends BaseSystem {
     };
 
     super(dependencies, mergedOptions);
-    // A fresh system draws like a reset one, from the seed it was built on.
-    this.reseedRandomForks();
   }
 
   initialize() {

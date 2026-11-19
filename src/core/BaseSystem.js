@@ -85,8 +85,9 @@ class BaseSystem {
         );
       }
 
-      // Capture initial seeds
-      this.captureRandomForkSeeds();
+      // Seeded as every run reset seeds them (reseedRandomForks), so a system
+      // built for a seed and one reset to it draw the same.
+      this.reseedRandomForks();
     }
 
     // Setup performance monitoring if enabled

@@ -39,7 +39,9 @@ export function expectDeterministicSequence(seq1, seq2, tolerance = 0.000001) {
  * expectWithinTolerance(0.3000004, 0.3, 0.00001);
  */
 export function expectWithinTolerance(value, expected, tolerance = 0.000001) {
-  expect(value).toBeCloseTo(expected, getPrecisionFromTolerance(tolerance));
+  // The tolerance as given: toBeCloseTo rounds it to decimal places (0.0169
+  // became 0.005).
+  expect(Math.abs(value - expected)).toBeLessThanOrEqual(tolerance);
 }
 
 /**
@@ -55,20 +57,6 @@ export function expectSameSeeds(snapshot1, snapshot2) {
   const normalizedB = pruneUndefined(snapshot2, true);
 
   expect(normalizedA).toEqual(normalizedB);
-}
-
-/**
- * Derive the precision argument for toBeCloseTo from a tolerance.
- *
- * @param {number} tolerance - Tolerance used to compare numeric values.
- * @returns {number} Precision argument suitable for toBeCloseTo.
- */
-function getPrecisionFromTolerance(tolerance) {
-  if (tolerance <= 0) {
-    return 5;
-  }
-  const precision = Math.abs(Math.round(Math.log10(1 / tolerance)));
-  return Number.isFinite(precision) ? precision : 5;
 }
 
 /**
