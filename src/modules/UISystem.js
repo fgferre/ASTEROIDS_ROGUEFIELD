@@ -13,7 +13,6 @@ import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
 import { STORY } from '../data/story.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { resolveControlScheme } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
@@ -254,10 +253,9 @@ class UISystem extends BaseSystem {
       codex: () => this.getService('codex'),
       achievements: () => this.getService('achievements'),
     });
-    // The static keyboard hints show the scheme in use (style.css).
-    document.body.dataset.controls = resolveControlScheme(
-      this.resolveSettingsService()?.getCategoryValues('controls')?.hullControl
-    );
+    // The static keyboard hints show the scheme the ship flies (style.css):
+    // the player's, which the new flight starts classic whatever the setting.
+    document.body.dataset.controls = this.getService('player').controlScheme;
 
     // Direct AAA HUD Activation, in the HUD Layout setting's layout
     this.followHudLayout(
