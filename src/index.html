@@ -43,24 +43,57 @@
     <div id="game-container">
       <!-- Loading Screen - Shown during asset preload -->
       <div id="loading-screen" class="loading-screen">
-        <div class="loading-screen__content">
-          <h1 class="loading-screen__title">ASTEROID ROGUEFIELD</h1>
-          <div class="loading-screen__progress-container">
-            <div class="loading-screen__progress-bar">
-              <div
-                id="loading-progress-fill"
-                class="loading-screen__progress-fill"
-              ></div>
-            </div>
-            <div class="loading-screen__progress-text">
-              <span id="loading-progress-percent">0%</span>
-              <span id="loading-progress-message">Initializing...</span>
+        <!-- The opening (the owner's option C, 19/11): the ship crosses the
+             route as the game loads; then a tap, click or key goes on. -->
+        <div class="loading-screen__content opening">
+          <div class="opening__stars opening__stars--far"></div>
+          <div class="opening__stars opening__stars--near"></div>
+          <div class="opening__rocks" aria-hidden="true">
+            <svg class="opening__rock" viewBox="0 0 100 100">
+              <polygon
+                points="97,54 85,69 68,78 51,85 36,79 23,71 3,59 8,40 18,28 37,14 57,10 66,24 91,37"
+              />
+            </svg>
+            <svg class="opening__rock" viewBox="0 0 100 100">
+              <polygon
+                points="93,48 85,62 71,73 61,87 36,84 21,67 6,62 17,43 24,29 32,21 50,21 73,25 83,40"
+              />
+            </svg>
+            <svg class="opening__rock" viewBox="0 0 100 100">
+              <polygon
+                points="90,55 91,63 69,78 60,82 28,84 25,74 17,61 15,40 20,26 30,15 50,12 69,19 82,32"
+              />
+            </svg>
+            <svg class="opening__rock" viewBox="0 0 100 100">
+              <polygon
+                points="84,54 95,68 70,82 55,81 33,75 8,69 15,51 10,34 25,23 51,19 75,16 82,30"
+              />
+            </svg>
+          </div>
+          <p class="opening__studio">
+            <strong>PIPO STUDIO LABS</strong>presents
+          </p>
+          <div class="opening__route" aria-hidden="true">
+            <span class="opening__trail"></span>
+            <span class="opening__end"></span>
+            <div class="opening__track">
+              <svg class="opening__ship" viewBox="0 0 26 22">
+                <path class="opening__jet" d="M2 9 L-9 11 L2 13 Z" />
+                <path d="M24 11 L4 2 L8 11 L4 20 Z" />
+              </svg>
             </div>
           </div>
-          <div class="loading-screen__asteroids">
-            <span class="loading-asteroid loading-asteroid--1"></span>
-            <span class="loading-asteroid loading-asteroid--2"></span>
-            <span class="loading-asteroid loading-asteroid--3"></span>
+          <div class="opening__under">
+            <div class="opening__tips">
+              <p>The cannon fires on its own: you fly, it aims.</p>
+              <p>Dash through danger. You can't be hit mid-dash.</p>
+              <p>Raise your shield before a hit lands.</p>
+            </div>
+            <p class="opening__continue">
+              <span data-device="keyboard">Press any key</span
+              ><span data-device="gamepad">Press Ⓐ</span
+              ><span data-device="touch">Tap to continue</span>
+            </p>
           </div>
         </div>
         <div class="loading-screen__gate" id="press-start-gate">
@@ -719,7 +752,7 @@
             </button>
           </header>
           <div class="credits-body" tabindex="0">
-            <p class="credits-studio">Pipo Labs</p>
+            <p class="credits-studio">Pipo Studio Labs</p>
             <p class="credits-byline">
               A game by Felipe Ferreira<br />and a crew of AI agents
             </p>
@@ -758,7 +791,7 @@
               <h3 class="credits-support__title">♥ Support the game</h3>
               <p>
                 Free, no ads, nothing locked. If it gave you a good run and you
-                would like to chip in, write to Pipo Labs and ask how. It
+                would like to chip in, write to Pipo Studio Labs and ask how. It
                 unlocks nothing; it only helps the next update happen.
               </p>
               <a class="credits-support__link" data-support-email href="#"></a>
@@ -1072,7 +1105,7 @@
         <div class="end-credits__viewport">
           <div id="end-credits-roll" class="end-credits__roll">
             <p class="end-credits__thanks">Thank you for playing</p>
-            <p class="end-credits__label">Pipo Labs presents</p>
+            <p class="end-credits__label">Pipo Studio Labs presents</p>
             <h2 id="end-credits-title" class="end-credits__title">
               Asteroid Roguefield
             </h2>
@@ -1100,7 +1133,7 @@
         </div>
         <footer class="end-credits__footer">
           <p class="end-credits__support">
-            <b>♥</b> Support the game: write to Pipo Labs at
+            <b>♥</b> Support the game: write to Pipo Studio Labs at
             <a class="credits-support__link" data-support-email href="#"></a>
           </p>
           <button

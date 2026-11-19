@@ -429,100 +429,391 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    ellipse at 50% 40%,
-    color-mix(in srgb, var(--hull) 70%, var(--bg)) 0%,
-    var(--bg) 70%
-  );
+  background: #03070d;
 }
 
-.loading-screen__content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-6);
-  max-width: 600px;
-  width: 100%;
-}
-
-.loading-screen__title {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--text);
-  text-shadow: var(--glow-accent);
-}
-
-.loading-screen__progress-container {
-  width: 100%;
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.loading-screen__progress-bar {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  background: var(--panel-inset);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.loading-screen__progress-fill {
+/* The opening (option C, the owner's pick, 19/11): stars and outlined rocks
+   drift, the ship crosses the route as --load (0..1) grows, tips take turns;
+   loaded, it asks for a tap, click or key. Everything that moves is a
+   transform or an opacity, so it keeps moving while shaders compile. */
+.opening {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0%;
-  background: linear-gradient(90deg, var(--accent-line), var(--accent));
-  box-shadow: var(--glow-accent);
-  transition: width var(--motion-fast) var(--ease-out);
+  inset: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  color: var(--text);
+  text-shadow: var(--text-ink);
+  transition: opacity 0.6s ease-in;
 }
 
-.loading-screen__progress-text {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
+.opening__stars {
+  position: absolute;
+  animation: openingDrift linear infinite;
+  will-change: transform;
 }
 
-#loading-progress-percent {
-  font-family: var(--font-mono);
-  color: var(--accent);
+.opening__stars--far {
+  --tile: 509px;
+  inset: -509px 0 0 -509px;
+  background-size: 509px 509px;
+  background-image: radial-gradient(
+      1px 1px at 165px 485px,
+      #6f8798 50%,
+      transparent 51%
+    ),
+    radial-gradient(1px 1px at 202px 333px, #9fb7c9 50%, transparent 51%),
+    radial-gradient(1px 1px at 37px 420px, #9fb7c9 50%, transparent 51%),
+    radial-gradient(1px 1px at 187px 298px, #9fb7c9 50%, transparent 51%),
+    radial-gradient(1px 1px at 465px 259px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 19px 44px, #c3d5e0 50%, transparent 51%),
+    radial-gradient(1px 1px at 214px 35px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 46px 282px, #c3d5e0 50%, transparent 51%),
+    radial-gradient(1px 1px at 30px 423px, #9fb7c9 50%, transparent 51%),
+    radial-gradient(1px 1px at 485px 114px, #9fb7c9 50%, transparent 51%),
+    radial-gradient(1px 1px at 295px 299px, #c3d5e0 50%, transparent 51%),
+    radial-gradient(1px 1px at 25px 499px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 23px 285px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 148px 214px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 276px 60px, #6f8798 50%, transparent 51%),
+    radial-gradient(1px 1px at 286px 417px, #6f8798 50%, transparent 51%);
+  opacity: 0.75;
+  animation-duration: 120s;
 }
 
-.loading-screen__asteroids {
-  display: flex;
-  gap: var(--space-6);
+.opening__stars--near {
+  --tile: 743px;
+  inset: -743px 0 0 -743px;
+  background-size: 743px 743px;
+  background-image: radial-gradient(
+      1.5px 1.5px at 105px 595px,
+      #cfe6f2 50%,
+      transparent 51%
+    ),
+    radial-gradient(1.5px 1.5px at 654px 192px, #8fdcea 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 99px 560px, #cfe6f2 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 64px 577px, #cfe6f2 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 633px 210px, #8fdcea 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 696px 544px, #8fdcea 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 321px 476px, #cfe6f2 50%, transparent 51%);
+  animation-duration: 70s;
 }
 
-.loading-asteroid {
+@keyframes openingDrift {
+  to {
+    transform: translateX(var(--tile));
+  }
+}
+
+.opening__rock {
+  position: absolute;
+  overflow: visible;
+  fill: none;
+  stroke: rgba(167, 201, 215, 0.34);
+  stroke-width: 1.2;
+  will-change: transform;
+  animation: openingRock linear infinite;
+}
+
+.opening__rock polygon {
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: openingSpin 30s linear infinite;
+}
+
+.opening__rock:nth-child(1) {
+  top: 36%;
+  width: 9vmin;
+  height: 9vmin;
+  animation-duration: 70s;
+  animation-delay: -20s;
+}
+
+.opening__rock:nth-child(2) {
+  top: 70%;
+  width: 15vmin;
+  height: 15vmin;
+  animation-duration: 55s;
+  animation-delay: -38s;
+}
+
+.opening__rock:nth-child(3) {
+  top: 30%;
+  width: 5vmin;
+  height: 5vmin;
+  animation-duration: 90s;
+  animation-delay: -70s;
+}
+
+.opening__rock:nth-child(4) {
+  top: 82%;
+  width: 6vmin;
+  height: 6vmin;
+  animation-duration: 80s;
+  animation-delay: -12s;
+}
+
+@keyframes openingRock {
+  from {
+    transform: translateX(110vw);
+  }
+
+  to {
+    transform: translateX(-30vw);
+  }
+}
+
+@keyframes openingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes openingRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.opening__studio {
+  position: absolute;
+  top: max(13%, 24px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: clamp(13px, 1.6vmin + 6px, 18px);
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  color: #a7c9d7;
+  animation: openingRise 1.4s ease-out both;
+}
+
+.opening__studio strong {
   display: block;
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(
-    circle at 30% 30%,
-    var(--neutral) 0%,
-    var(--hull) 75%
+  margin-bottom: 0.5em;
+  font-size: 1.9em;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: #e3f2f7;
+}
+
+/* The route: dashes, the cyan trail behind the ship, the goal ring. */
+.opening__route {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 58%;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(167, 201, 215, 0.3) 0 6px,
+    transparent 6px 12px
   );
-  border-radius: 40% 60% 50% 50% / 50% 40% 60% 50%;
-  opacity: 0.8;
 }
 
-.loading-asteroid--2 {
-  border-radius: 50% 40% 60% 50% / 60% 50% 40% 50%;
+.opening__trail {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0), var(--accent));
+  transform-origin: 0 50%;
+  transform: scaleX(var(--load, 0));
+  transition: transform 1.2s ease-out;
 }
 
-.loading-asteroid--3 {
-  border-radius: 60% 50% 40% 50% / 40% 60% 50% 50%;
+.opening__end {
+  position: absolute;
+  right: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(167, 201, 215, 0.6);
+  border-radius: 50%;
+}
+
+.opening__track {
+  position: absolute;
+  inset: 0;
+  transform: translateX(calc(var(--load, 0) * 100%));
+  transition: transform 1.2s ease-out;
+}
+
+.opening__ship {
+  position: absolute;
+  left: -14px;
+  top: -10px;
+  width: 26px;
+  height: 22px;
+  overflow: visible;
+  animation: openingBob 1.8s ease-in-out infinite;
+}
+
+.opening__ship path {
+  fill: #03070d;
+  stroke: #e3f2f7;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.opening__ship .opening__jet {
+  fill: var(--accent);
+  stroke: none;
+  transform-origin: 100% 50%;
+  transform-box: fill-box;
+  animation: openingJet 0.18s steps(2, end) infinite;
+}
+
+@keyframes openingBob {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes openingJet {
+  50% {
+    transform: scaleX(0.6);
+  }
+}
+
+/* Under the route: the tips while it loads, then the line that goes on. */
+.opening__under {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(58% + 26px);
+  display: grid;
+  justify-items: center;
+}
+
+.opening__under > * {
+  grid-area: 1 / 1;
+}
+
+.opening__tips {
+  position: relative;
+  width: min(640px, 84vw);
+  height: 1.5em;
+  font-family: var(--font-ui);
+  font-size: clamp(14px, 1.6vmin + 6px, 20px);
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #a7c9d7;
+  transition: opacity 0.4s;
+}
+
+.opening__tips p {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  animation: openingTip 12s linear infinite;
+}
+
+.opening__tips p:nth-child(2) {
+  animation-delay: 4s;
+}
+
+.opening__tips p:nth-child(3) {
+  animation-delay: 8s;
+}
+
+@keyframes openingTip {
+  4%,
+  30% {
+    opacity: 1;
+  }
+
+  34%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.opening__continue {
+  align-self: center;
+  margin: 0;
+  font-size: clamp(13px, 1.6vmin + 6px, 18px);
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+}
+
+/* Loaded (loadingScreen.js): the ship has arrived, the line asks to go on. */
+.loading-screen--ready .opening__end {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.loading-screen--ready .opening__jet,
+.loading-screen--ready .opening__tips {
+  opacity: 0;
+}
+
+.loading-screen--ready .opening__continue {
+  opacity: 1;
+  animation: openingBreath 2s ease-in-out 0.5s infinite;
+}
+
+@keyframes openingBreath {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Going on: the opening fades off the live scene, then the gate shows. */
+.loading-screen--leaving {
+  transition: background-color 0.6s ease-in;
+  background-color: rgba(3, 7, 13, 0);
+}
+
+.loading-screen--leaving .opening {
+  opacity: 0;
+}
+
+/* Phone held sideways with the browser's bars: a little higher. */
+@media (max-height: 420px) {
+  .opening__route {
+    top: 56%;
+  }
+
+  .opening__studio {
+    top: max(10%, 14px);
+  }
+
+  .opening__under {
+    top: calc(56% + 18px);
+  }
+}
+
+/* Reduced motion: nothing drifts; the ship still follows the loading. */
+@media (prefers-reduced-motion: reduce) {
+  .opening *,
+  .opening {
+    animation: none !important;
+  }
+
+  .opening__rocks {
+    display: none;
+  }
+
+  .opening__tips p:first-child {
+    opacity: 1;
+  }
+}
+
+body.motion-reduced .opening__rocks,
+html[data-motion='reduced'] .opening__rocks {
+  display: none;
+}
+
+body.motion-reduced .opening__tips p:first-child,
+html[data-motion='reduced'] .opening__tips p:first-child {
+  opacity: 1;
 }
 
 /* PRESS START gate: after loading, the same screen goes see-through over the
@@ -825,32 +1116,6 @@ select {
 
     50% {
       opacity: 0.55;
-    }
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .loading-asteroid {
-    animation: floatAsteroid 3s ease-in-out infinite;
-  }
-
-  .loading-asteroid--2 {
-    animation-delay: 0.5s;
-  }
-
-  .loading-asteroid--3 {
-    animation-delay: 1s;
-  }
-
-  @keyframes floatAsteroid {
-    0%,
-    100% {
-      transform: translateY(0) rotate(0deg);
-      opacity: 0.6;
-    }
-    50% {
-      transform: translateY(-10px) rotate(180deg);
-      opacity: 1;
     }
   }
 }
@@ -1956,7 +2221,7 @@ kbd {
   color: var(--text);
 }
 
-/* Support: in the gold of the rewards, a link to write to Pipo Labs */
+/* Support: in the gold of the rewards, a link to write to Pipo Studio Labs */
 .credits-support {
   margin: var(--space-5) 0;
   padding: var(--space-4);
