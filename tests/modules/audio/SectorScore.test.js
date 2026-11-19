@@ -207,4 +207,41 @@ describe('SectorScore', () => {
       score._nodes.bossFade.gain.setValueCurveAtTime.mock.calls[0][0].at(-1)
     ).toBeCloseTo(1);
   });
+
+  it('a stinger that fails to load only loses that stinger: the music still starts', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    score = new SectorScore({
+      mixer,
+      load: async (_context, url) => {
+        if (/sting-boss-warning/.test(url)) throw new Error('404');
+        return buffer();
+      },
+    });
+    score.init(rec.context, target);
+    await score.start('prime-gate');
+    expect(score.active).toBe(true);
+    expect(rec.sources).toHaveLength(2);
+  });
+
+  it('a slow stinger does not hold the music back; asked for before it arrived, it is skipped', async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    score = new SectorScore({
+      mixer,
+      load: async (_context, url) => {
+        if (/sting-boss-warning/.test(url)) await gate;
+        return buffer();
+      },
+    });
+    score.init(rec.context, target);
+    await score.start('prime-gate');
+    expect(score.active).toBe(true);
+    expect(rec.sources).toHaveLength(2);
+    score.onBossEvent('boss-warning');
+    expect(rec.sources).toHaveLength(2);
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    score.onBossEvent('boss-warning');
+    expect(rec.sources).toHaveLength(3);
+  });
 });

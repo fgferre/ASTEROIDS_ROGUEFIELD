@@ -27,12 +27,21 @@ export function getReplayUrl() {
   return new URLSearchParams(window.location.search).get('replay') || null;
 }
 
+/** A replay link that never answers must not hold the game at "Loading the game". */
+export const REPLAY_FETCH_TIMEOUT_MS = 10000;
+
 export async function fetchRecording(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REPLAY_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+    }
+    return deserialize(await response.text());
+  } finally {
+    clearTimeout(timer);
   }
-  return deserialize(await response.text());
 }
 
 /**

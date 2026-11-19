@@ -14,7 +14,8 @@ import {
 
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;
-const AFTER_STEPS = 3 * 60;
+// The spoils are 6 s of the run clock, which the Warden's freeze slows.
+const SPOILS_STEPS = 9 * 60;
 const BREAK_STEPS = 15 * 60;
 
 function killBoss(game) {
@@ -95,8 +96,11 @@ describe('Boss Rush', () => {
     }
     expect(enemies.waveManager.currentWave).toBe(15);
     wardens.push(killBoss(game).bossKind);
-    for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
-    vi.advanceTimersByTime(8000);
+    // The spoils run on the simulation's clock: steps, with the time passing.
+    for (let step = 0; step < SPOILS_STEPS; step += 1) {
+      game.step();
+      vi.advanceTimersByTime(1000 / 60);
+    }
 
     expect(wardens).toEqual(['prime', 'choir', 'null']);
     expect(game.session.getSessionState()).toBe('victory');
@@ -105,6 +109,12 @@ describe('Boss Rush', () => {
     expect(bossRush.stage).toBe(3);
     expect(bossRush.bestStage).toBe(3);
     expect(bossRush.bestTime).toBeGreaterThan(0);
+    // The clear is the last Warden's death; the screen opened later, after
+    // the spoils, and the badge still knows it is a new best.
+    expect(victories[0].data.stats.timeElapsed).toBeGreaterThan(
+      bossRush.bestTime + 1
+    );
+    expect(bossRush.newBest).toBe(true);
     expect(game.session.continueBeyondVictory()).toBe(false);
     // The layer records only count full runs.
     expect(loadRecords()).toMatchObject({

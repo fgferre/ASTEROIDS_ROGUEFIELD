@@ -147,12 +147,11 @@ export class RunEndScreens {
       firstClear: Boolean(data.sector?.firstClear),
       wardens,
       time,
-      // A Boss Rush and a sector run record the time the screen opened at
-      // (runEnd.js).
+      // A Boss Rush and a sector run record their clear time (runEnd.js).
       newBest:
         outcome === 'victory' &&
         (data.bossRush
-          ? data.bossRush.bestTime === Math.floor(data.stats?.timeElapsed ?? 0)
+          ? Boolean(data.bossRush.newBest)
           : sector
             ? data.sector.bestTime === data.sector.time
             : this.bestAtStart < RUN_FINAL_LAYER),
