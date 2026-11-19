@@ -341,6 +341,31 @@ describe('ship engine', () => {
     expect(ramps.at(-1)[1]).toBeGreaterThan(ramps.at(-2)[1]);
   });
 
+  it("the story's freighter and interceptor run as the game's engine, with no ignition of their own", async () => {
+    const { context, eventBus, sources, played, errors } = await makeAudio();
+    const frame = (engines) => {
+      context.currentTime += STEP;
+      eventBus.emit('story-engines', engines);
+    };
+    const loops = () => sources.filter((s) => s.loop).length;
+    const idle = loops();
+
+    // The opening shot: both engines lit; two copies of the engine's loops.
+    for (let i = 0; i < 30; i += 1) frame({ port: 1, starboard: 1 });
+    expect(loops()).toBe(idle * 3);
+    // The port engine dies (its light 0.05): the engine's cut-off.
+    for (let i = 0; i < 30; i += 1) frame({ port: 0.05, starboard: 0.6 });
+    expect(played()).toEqual(['cutoff.mp3']);
+    // The interceptor at idle in the hangar: a third copy, running at once.
+    for (let i = 0; i < 30; i += 1) {
+      frame({ port: 0.05, starboard: 0.6, ship: 0.15 });
+    }
+    expect(loops()).toBe(idle * 4);
+    expect(played()).not.toContain('ignition.mp3');
+    eventBus.emit('story-moment', { id: 'end' });
+    expect(errors).not.toHaveBeenCalled();
+  });
+
   it('a pause, and a step that never comes, stop it at rest without the cut-off', async () => {
     const { engine, errors, eventBus, fly, played } = await makeAudio();
     const bed = () =>

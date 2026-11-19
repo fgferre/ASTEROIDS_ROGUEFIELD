@@ -283,8 +283,12 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'story-moment', cue: 'playStoryMoment', arg: 'id' },
   { on: 'story-moment', cue: 'playStoryReactor', when: { id: 'wake' } },
   { on: 'story-moment', run: 'holdScore', when: { id: 'wake' } },
+  { on: 'story-moment', run: 'storyScore', when: { id: 'hangar' } },
   { on: 'story-moment', cue: 'stopStoryReactor', when: { id: 'launch' } },
   { on: 'story-moment', run: 'storyIgnited', when: { id: 'launch' } },
   { on: 'story-moment', cue: 'stopStorySounds', when: { id: 'end' } },
+  // Its engines, every frame, as the game's engine (audio/shipEngine.js).
+  { on: 'story-engines', run: 'storyEngines' },
+  { on: 'story-moment', run: 'storyEnginesEnd', when: { id: 'end' } },
   { on: 'story-moment', run: 'releaseScore', when: { id: 'end' } },
 ]);

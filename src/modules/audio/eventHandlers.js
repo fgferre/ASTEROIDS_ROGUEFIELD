@@ -9,6 +9,8 @@ import {
   SECTOR_SCORE_MIX as MIX,
   chapterScoreForLayer,
 } from '../../data/audio/sectorScores.js';
+import { STORY_MUSIC } from '../../data/audio/music.js';
+import { STORY_SHOT_MS } from '../../core/cinematics.js';
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
@@ -165,6 +167,8 @@ export const AUDIO_EVENT_HANDLERS = {
   // sector's chapter (the run's sector, set as it started), plays alone, the
   // layers held down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
+    // The story's music (STORY_MUSIC 'journey') already plays it on.
+    if (audio.storyScored) return;
     const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
     if (audio.journeyCue.play({ ...payload, chapter })) {
       audio.sectorScore.holdForJourney(true);
@@ -174,6 +178,7 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.journeyCue.end();
     audio.sectorScore.holdForJourney(false);
     audio.storyIgnited = false;
+    audio.storyScored = false;
   },
   // Each journey moment's sample; the story's launch just played the
   // ignition (storyIgnited), so the journey after it starts without its own.
@@ -184,8 +189,28 @@ export const AUDIO_EVENT_HANDLERS = {
   storyIgnited(audio) {
     audio.storyIgnited = true;
   },
+  storyEngines(audio, payload) {
+    audio.sfxBus.engine.followStory(payload ?? {});
+  },
+  storyEnginesEnd(audio) {
+    audio.sfxBus.engine.stopStory();
+  },
   holdScore(audio) {
+    if (STORY_MUSIC === 'sector') return;
     audio.sectorScore.holdForJourney(true);
+  },
+  // STORY_MUSIC 'journey': the journey's recording from the hangar shot, its
+  // hit on the launch (the next shot), on through the journey after.
+  storyScore(audio) {
+    if (STORY_MUSIC !== 'journey') return;
+    const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
+    const toLaunch = STORY_SHOT_MS[STORY_SHOT_MS.length - 2] / 1000;
+    const moments = [{ id: 'leap', at: toLaunch }];
+    // Its end is the journey's, unknown here: it always fades gently.
+    if (audio.journeyCue.play({ moments, duration: 0, chapter })) {
+      audio.sectorScore.holdForJourney(true);
+      audio.storyScored = true;
+    }
   },
   releaseScore(audio) {
     audio.sectorScore.holdForJourney(false);

@@ -6,6 +6,13 @@
 // destination chapter (data/audio/sectorScores.js). A journey cut short (a
 // skip: `end` more than `earlySeconds` before its plan) fades it over
 // `skipFadeSeconds`, else it fades over `fadeSeconds`.
+// proposta 19/11, for the owner to hear (card som-cena-1): the music under
+// the story (render3d/storyScene.js). 'none': the sector's held silent, as
+// before; 'sector': the sector's plays under it; 'journey': the journey's
+// recording comes in as the hangar opens, its hit on the launch, and plays
+// on through the journey that follows.
+export const STORY_MUSIC = 'none';
+
 export const MUSIC_JOURNEY = Object.freeze({
   earlySeconds: 0.25,
   skipFadeSeconds: 0.15,
