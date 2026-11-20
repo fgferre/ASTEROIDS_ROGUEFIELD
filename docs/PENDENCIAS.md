@@ -4,9 +4,28 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 35.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 38.**
 
-## O BASTÃO — onde as sessões pararam (18/11) — a `main` está publicada até a PR do `jogo/conjunto` (rodada 16–18/11)
+## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `jogo/conjunto` (rodada 19–20/11)
+
+**20/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a rodada de 19–20/11 vai ao ar por ordem dele —
+à pergunta "Publico o jogo com tudo, sem os pilotos?", _"Sim, publica"_ — pela PR do `jogo/conjunto` para a `main`.
+Entra: jogar no iPhone e no iPad pelo toque, com o painel novo (o radar mais transparente: _"Ficou bom"_) e as cartas
+no celular com a setinha que abre a carta (_"B — com a setinha que abre a carta"_; a trilha só com a conta); a
+abertura nova do Pipo Studio Labs (_"gostei mais da opcao C"_), com frases de carregamento no lugar das dicas, a música
+do menu só depois do toque que sai dela e a animação do robozinho (_"Ficou bom"_ aos três ajustes); a cena do
+cargueiro com os motores do jogo (_"Ficou bom"_) e a música nova feita no Flow Music desde a primeira cena
+(_"Nova 2"_); o escudo apertado sem a carta responde com a tremidinha e o bipe de hoje (_"B. Tremidinha"_, _"1. O bipe
+de hoje"_); as pedras dos setores do fundo, os impactos com a travadinha e o tiro perfurante; o menu sem a faixa
+escura; os consertos das quatro auditorias de fora, cada um provado no jogo; o site passa a esperar os testes antes de
+ir ao ar. **Fica de fora**, para a publicação seguinte: os três pilotos (`piloto/saves` em 98a69b16; juntar hoje briga
+com a tela de carregar). **Conferência (19/11), a lista inteira:** _"Está bom"_ ao primeiro chefe, aos ataques dos
+chefes, ao chefe final, à Mother e ao Interdictor, à dificuldade fase a fase, à pilotagem, ao começo da partida, à
+Stasis, ao radar e aos instrumentos, ao Boss Rush, aos nomes, aos sons e à música — por isso os itens 2, 16, 18, 25 e
+31 saíram da lista; o dano das pedras nos capítulos II e III ele não viu. **A rodada seguinte**, das observações dele:
+o tiro que empurra e gira a pedra onde tocou (35); o planeta e as placas de luz (36); vozes e roteiro (37); as naves
+do jogador (20); a abertura mais rápida (a compilação medida no carregamento, no `BACKLOG.md`). Trabalho novo sai de um
+ramo novo a partir da `main`.
 
 **18/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a rodada de 16–18/11 foi fechada e publicada
 por ordem dele — _"ok, está ok para publicar. vamos encerrar essa rodada de desenvolvimento e vamos deixar o github e
@@ -90,7 +109,7 @@ o que está aberto; (h) **maquete antes de código** para interface e câmera (e
 - **Avisos desta sessão:** o navegador escondido do app toca som — sair da página do jogo ao terminar e todo
   Playwright de ajudante com `--mute-audio`; ele não vê o painel do navegador quando não está na janela desta conversa
   (mandar o endereço local); até 4 ajudantes ao mesmo tempo (limite do app).
-- **Abertos dele:** itens 2, 16, 18, 20, 25, 27 e 31 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
+- **Abertos dele:** itens 20, 27, 35, 36 e 37 abaixo. `BACKLOG.md`: notas técnicas, não são dele.
 
 **Vereditos dele até aqui:** Rodadas 5–13 aprovadas jogando (M1, 60 fps; "é pouco conteúdo… Vampire Survivors são
 dias de desafio"); primeira câmera contínua rejeitada; câmera de dois estados e chegadas dos Wardens aprovadas
@@ -103,25 +122,18 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 ## Jogabilidade e sensação
 
-- **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
-  Em 20/10, perguntado se ainda sente: _"ainda demora"_ → Rodada 15, frente 7.
+- **(35)** Impacto do tiro na pedra (19/11, na conferência): _"acho que tem que ter um impacto do tiro que faça a
+  pedra se moviemntar, seja rodando um pouco, tem que ter uma física do impacto do tiro (memso que seja fake para
+  efeitos de arcade) o incandescente tem que ser aonde o tiro efetivamente tocou a pedra."_ Fecha quando ele aprovar
+  jogando.
 
-## HUD e janela (palavras dele, 19/10, manhã)
+## Som (palavras dele, 19/11)
 
-- **(16)** _"O radar está muito básico… todos os instrumentos do painel não condizem com a realidade nova de um projeto
-  AAA."_ / _"O app tem uma janela dinâmica… precisa se adaptar a isso também."_ → janela inteira feita; o resto é a
-  Rodada 15, frente 4 (`HUD.md`, instrumentos por maquete aprovada por ele). Fecha quando ele disser que o painel está à altura do jogo.
-
-## Som (palavras dele, 20/10)
-
-- **(18)** _"O som do jogo SFX precisa renascer do zero praticamente, tudo muito ruim também."_ → Rodada 15, frente 2:
-  amostras geradas pela skill local dele `/sfx-generator` (AudioLDM) e CC0 onde o modelo falha, página de audição
-  `?sound=` onde ele escolhe, `SOUND.md`, mix com ele jogando. Decisão dele: o jogo passa a carregar arquivos de áudio. Fecha quando ele
-  disser que o som está à altura do jogo.
-  **13/11 (audição `src/exported-assets/audicao-armas-inimigos/`, dezesseis sons que ainda eram síntese ou mudos):**
-  _"arc-caster=A shard-halo=A furnace-corona=A seeker-swarm=A harmonic-beam=A scatter-flak=A hunter-rajada=A
-  mira-trava=A caster-carga=A caster-disparo=A caster-impacto=A chefe-fase=B chefe-derrota=B prime-ataque=C
-  coro-ataque=B null-ataque=A"_.
+- **(37)** Vozes e roteiro (19/11, na conferência): _"sinto quie poderia ter mais efeito nessas vozes e acho que
+  falta emoçao certa na entonaçao, nao sei se isso é possivel para os modelos que temos usado para geracao."_ E da
+  cena da história: _"acho que a história falada da primeira cena do Wake nao faz sentido, está solta demais. tem que
+  rever esse roteiro de falas e diálogos, nao tem muita conexao entre uma frase e outra as vezes..."_ Da música: _"talvez
+  valha uma analise a mais em volumes e transicoes."_ Fecha quando ele aprovar ouvindo.
 
 ## Modelos 3D (palavras dele, 12/11)
 
@@ -129,15 +141,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   primeiro Quarry Maw; refeito no mesmo dia pela conversa principal, em placas com painéis — falta ele ver). E sobre as
   naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
   Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
-  antes de código; fecha quando ele aprovar as naves novas.
+  antes de código; fecha quando ele aprovar as naves novas. Na conferência de 19/11, "As naves do jogador estão
+  bonitas?": _"Precisa mexer"_.
 
 ## Campanha (palavras dele, 12/11, jogando no site)
 
-- **(25)** Chefe final: _"o Final Boss tem que ser algo assim muito, muito diferente. Tipo, super bem feito, detalhado,
-  um modelo diferenciado, tipo… aquela nave que no filme dos Guardiões da Galáxia era do pai do Star-Lord? Algo naquele
-  gênero… Ou até mesmo a própria nave do Star-Lord… seria muito legal ter um modelo mais diferenciado, assim, inspirado
-  em coisas mais bacanas. Óbvio que pode ser adaptado para nossa estética."_ Inspiração, não cópia. Fecha quando ele
-  aprovar o modelo do Sovereign por imagem.
 - **(27)** Equilíbrio como no Vampire Survivors (13/11, ao não escolher alvo para a fase final): _"acho que temos que
   repensar o equilíbrio como é hoje em Vampire Survivors (nossa inspiração além do Asteroids). Hoje você só consegue
   avançar no Vampire Survivors depois que começa a comprar itens de power-ups na loja com a moeda do jogo. Já havia
@@ -145,11 +153,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
   (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
   lá, não calibrar a campanha para ser vencível sem loja.
-- **(31)** Ataques dos chefes (13/11, sobre a jaula do Interdictor): _"mas como a nave lança essa grade? Isso não
-  deveria ser um material de verdade? Tem que ter algo real e físico ou um dispositivo que gere esse campo, uma arma…
-  acho particularmente que o efeito está muito sem graça e feio… aliás todas as miras e efeitos de dano e armas dos
-  bosses estão muito sem graça, deveria tudo isso ser revisto e polido."_ Fecha quando ele aprovar por imagem e jogando.
-  **Veredito dele por imagem (13/11, página `chefes-ataques`):** os sete chefes _"Ficou bom"_ (Interdictor refeito
-  incluído); no geral _"A direção é essa"_. Atirar nos aparelhos da jaula: _"Decido depois de jogar a luta nova."_
-  Os cinco retoques seguintes (fim da jaula, anel de aviso, setas do Gatekeeper, sucção do Maw, feixe do Sovereign):
-  _"Ficou bom"_. Falta ele jogar.
+
+## Cenário (palavras dele, 19/11, na conferência)
+
+- **(36)** Planeta e placas de luz (ao planeta da Quarantine Grid e ao creme do Crisol, _"Precisa mexer"_): _"acho
+  que tem umas oportunidades para deixar com cara mais de planeta, talvez nao tao proximo. QUe tipo de planeta é esse?
+  ele é 3d? ele tem rotacao? Ele era habitaado ou é? Ele está destruído? Pensar e resolver. Tem umas telas tb de outras
+  fases que tem umas placas de metal que parece que tem uma luz, mas essa luz é estranha nao parece acoplada direito
+  nas placas e confunde com orbes. (talvez na primeira fase, nao lembrio)"_ Imagem antes de código; fecha quando ele
+  aprovar por imagem.
