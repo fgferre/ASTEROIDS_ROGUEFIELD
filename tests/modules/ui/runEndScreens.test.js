@@ -290,6 +290,19 @@ describe('Run end screens', () => {
     expect(victory.body.innerHTML).toContain('New best');
   });
 
+  it('a sector won again in its best time: no New best on a tie', () => {
+    const { victory, win } = victoryScreen();
+    win({
+      id: 'dense-core',
+      time: 512,
+      bestTime: 512,
+      firstClear: false,
+      newBest: false,
+      next: 'wardens-reach',
+    });
+    expect(victory.body.innerHTML).not.toContain('New best');
+  });
+
   it('a sector won before its chapter ends: Sector cleared, by its name, and Next Sector', () => {
     const { victory, win } = victoryScreen();
     win({

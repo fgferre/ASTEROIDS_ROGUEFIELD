@@ -153,7 +153,7 @@ export class RunEndScreens {
         (data.bossRush
           ? Boolean(data.bossRush.newBest)
           : sector
-            ? data.sector.bestTime === data.sector.time
+            ? Boolean(data.sector.newBest)
             : this.bestAtStart < RUN_FINAL_LAYER),
     });
     if (final) {

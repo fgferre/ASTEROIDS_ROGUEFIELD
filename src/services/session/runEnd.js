@@ -185,7 +185,9 @@ export class RunEnd {
     if (this.sector) {
       const { id } = this.sector;
       const time = Math.floor(runTime ?? 0);
-      const firstClear = won && !loadRecords().sectorsWon.includes(id);
+      const before = loadRecords();
+      const firstClear = won && !before.sectorsWon.includes(id);
+      const beforeTime = Number(before.sectorTimes[id]) || 0;
       const records = updateRecords(
         won ? { sectorWon: id, sectorTime: time } : {}
       );
@@ -195,6 +197,8 @@ export class RunEnd {
           time,
           bestTime: records.sectorTimes[id] ?? 0,
           firstClear,
+          // The Boss Rush's rule: faster than the record before; a tie is not.
+          newBest: won && time > 0 && (beforeTime === 0 || time < beforeTime),
           next: won ? nextSector(this.sector)?.id ?? null : null,
         },
       };

@@ -1,6 +1,6 @@
 /**
- * The Boss Rush victory's "New best": a clear faster than the record before
- * it; tying the record is not one.
+ * A victory's "New best", in a Boss Rush and in a sector: a clear faster
+ * than the record before it; tying the record is not one.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -30,5 +30,18 @@ describe('Boss Rush "New best"', () => {
     expect(clearIn(110)).toBe(true);
     updateRecords({ bossRushTime: 100 });
     expect(clearIn(100.5)).toBe(false); // 1:40 again, by the second
+  });
+
+  it('a sector follows the same rule', () => {
+    const clearSector = (seconds) => {
+      const runEnd = new RunEnd({});
+      runEnd.sector = { id: 'dense-core' };
+      return runEnd.recordRunReached({}, { won: true, clearTime: seconds })
+        .sector.newBest;
+    };
+    expect(clearSector(300)).toBe(true);
+    expect(clearSector(300)).toBe(false);
+    expect(clearSector(310)).toBe(false);
+    expect(clearSector(290)).toBe(true);
   });
 });
