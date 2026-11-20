@@ -7,9 +7,10 @@ import {
 } from './SFXBus.js';
 import {
   SECTOR_SCORE_MIX as MIX,
+  STORY_CUE,
   chapterScoreForLayer,
 } from '../../data/audio/sectorScores.js';
-import { STORY_SHOT_MS } from '../../core/cinematics.js';
+import { storyTold } from '../../core/cinematics.js';
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
@@ -152,7 +153,11 @@ export const AUDIO_EVENT_HANDLERS = {
   // journey's cue are fetched.
   sectorScorePrefetch(audio, payload) {
     audio.sectorScore.prefetch(payload?.sector);
-    audio.journeyCue.prefetch(sectorById(payload?.sector)?.chapter);
+    audio.journeyCue.prefetch({
+      chapter: sectorById(payload?.sector)?.chapter,
+    });
+    // The first campaign launch tells the story first, under its own music.
+    if (!storyTold()) audio.journeyCue.prefetch({ url: STORY_CUE });
   },
 
   // The campaign's last sector won: its score fades out, the victory plays.
@@ -197,20 +202,19 @@ export const AUDIO_EVENT_HANDLERS = {
   holdScore(audio) {
     audio.sectorScore.holdForJourney(true);
   },
-  // The story's music (the owner's card som-cena-1, 19/11): the journey's
-  // recording from the hangar shot, its hit on the launch (the next shot), on
-  // through the journey after.
+  // The story's music (the owner's cards som-cena-1 and som-cena-2, 19/11):
+  // STORY_CUE from the first shot, on through the journey after it, which
+  // ends it (journeyEnded).
   storyScore(audio) {
-    const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
-    const toLaunch = STORY_SHOT_MS[STORY_SHOT_MS.length - 2] / 1000;
-    const moments = [{ id: 'leap', at: toLaunch }];
     // Its end is the journey's, unknown here: it always fades gently.
-    if (audio.journeyCue.play({ moments, duration: 0, chapter })) {
-      audio.sectorScore.holdForJourney(true);
+    // The sector's is held already (holdScore).
+    if (audio.journeyCue.play({ url: STORY_CUE, duration: 0 })) {
       audio.storyScored = true;
     }
   },
+  // The story's end; with its music on, the sector's waits for the journey's.
   releaseScore(audio) {
+    if (audio.storyScored) return;
     audio.sectorScore.holdForJourney(false);
   },
 
