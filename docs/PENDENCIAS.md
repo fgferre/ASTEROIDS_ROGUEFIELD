@@ -6,7 +6,17 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 38.**
 
-## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `jogo/conjunto` (rodada 19–20/11)
+## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `piloto/saves` (os save games, 20/11)
+
+**20/11, mais tarde (vale sobre o que estiver mais abaixo e disser outra coisa):** os save games vão ao ar por ordem
+dele — à pergunta "Publico os save games e a volta à tela inicial?", _"Sim, publica"_ — pela PR do `piloto/saves`
+para a `main`. Ele tinha perguntado: _"Eu não entendi aonde que ficou aquela questão que a gente conversou sobre ter
+os saving slots"_ e _"depois de muito tempo na tela do Mission Control, sem atividade, ou depois que a pessoa der ESC
+nessa tela, será que não valeria a pena voltar para a tela inicial do menu de Start?"_. Entra: três pilotos, cada um
+com o seu progresso, escolhidos depois do PRESS START; quem já joga vira o Piloto 1 com o progresso inteiro; no menu
+("Mission Control"), o Esc sem painel aberto e 2 minutos parado voltam à tela do PRESS START (_"2 minutos"_,
+_"Esmaece, música segue"_); a troca de piloto é por esse caminho. O parágrafo de baixo, que deixava os pilotos de fora,
+vale só para a publicação anterior.
 
 **20/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a rodada de 19–20/11 vai ao ar por ordem dele —
 à pergunta "Publico o jogo com tudo, sem os pilotos?", _"Sim, publica"_ — pela PR do `jogo/conjunto` para a `main`.

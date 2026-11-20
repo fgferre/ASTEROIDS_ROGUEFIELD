@@ -4,12 +4,15 @@
 // option C, 19/11): the ship crosses its route as the menu's assets preload
 // (--load, 0..1); once loaded it asks for a tap, click or key, and that press
 // fades it off the live scene. Then the same screen is the PRESS START gate; a
-// start press fades it out, shows the menu screen and the element leaves the
-// DOM. It came from MenuBackgroundSystem.js.
+// start press fades it out and shows the menu screen. Escape on the menu with
+// nothing open, or the menu left idle, brings the gate back (Felipe, 20/11),
+// and its press goes through the pilots again: the way to switch pilot. It
+// came from MenuBackgroundSystem.js.
 //
 // The music waits for the press that leaves the opening (`onLeave`), even if
 // an earlier touch woke the audio (Felipe, 19/11); that press is a gesture,
-// so the music is on and the gate comes up awake: one press starts.
+// so the music is on and the gate comes up awake: one press starts (and opens
+// the pilots, pilotSelect.js, on the way to the menu).
 // A pad press cannot wake the music, so after one the gate sleeps as before:
 // the first touch or key wakes it, and the music with it; the next one is the
 // start. The start blinks the button and fades into the menu (the owner's
@@ -17,6 +20,7 @@
 
 import { LOADING_JOKES, loadingStep } from '../../data/loadingLines.js';
 import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
+import { openPilotSelect } from './pilotSelect.js';
 
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
@@ -30,6 +34,10 @@ const START_EFFECT_MS = 1000;
 const LEAVE_MS = 600;
 // The loading line: the true step and a joke take turns this often.
 const LINE_MS = 2400;
+// No key, pointer or pad on the menu this long, nothing open: back to the
+// gate. A proposal; Felipe judges it by playing.
+export const MENU_IDLE_MS = 120000;
+const IDLE_CHECK_MS = 250;
 
 /**
  * Sets up the loading screen: the opening follows the preload, then a press
@@ -86,19 +94,48 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     }
   );
 
-  // Hides the screen, shows the menu and removes the element afterwards.
+  // Hides the screen and shows the menu; the screen stays for the way back.
   function finish() {
     loadingScreen.classList.add('hidden');
 
     if (menuScreen) {
       menuScreen.classList.remove('hidden', 'menu-screen--gated');
     }
+  }
 
-    setTimeout(() => {
-      if (loadingScreen.parentNode) {
-        loadingScreen.parentNode.removeChild(loadingScreen);
-      }
-    }, 600);
+  // The gate fades back over the live scene, the music playing on.
+  function backToGate() {
+    menuScreen.classList.add('menu-screen--gated');
+    loadingScreen.classList.remove('hidden', 'loading-screen--starting');
+    showGate(true);
+  }
+
+  // Escape with nothing open, or the idle time, takes the menu back to the
+  // gate. Capture phase: a panel's own Escape closes it first, and only that.
+  let watching = false;
+  function watchMenu() {
+    if (watching) return;
+    watching = true;
+    let lastInput = performance.now();
+    const input = () => (lastInput = performance.now());
+    const onMenu = () =>
+      !menuScreen.classList.contains('hidden') &&
+      !menuScreen.classList.contains('menu-screen--gated');
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        input();
+        if (event.key === 'Escape' && onMenu() && !panelOpen()) backToGate();
+      },
+      true
+    );
+    for (const type of ['pointerdown', 'pointermove', 'wheel']) {
+      window.addEventListener(type, input, true);
+    }
+    setInterval(() => {
+      if (!onMenu() || panelOpen() || padActive()) input();
+      else if (performance.now() - lastInput >= MENU_IDLE_MS) backToGate();
+    }, IDLE_CHECK_MS);
   }
 
   // Loaded: the opening asks for a press, which fades it into the gate.
@@ -211,9 +248,14 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       onStart?.();
       loadingScreen.classList.remove('loading-screen--asleep');
       loadingScreen.classList.add('loading-screen--starting');
+      // The pilots come next, over the still-gated menu (pilotSelect.js).
       setTimeout(() => {
-        finish();
-        menuScreen?.querySelector('button:not([disabled])')?.focus();
+        loadingScreen.classList.add('hidden');
+        openPilotSelect(() => {
+          finish();
+          watchMenu();
+          menuScreen?.querySelector('button:not([disabled])')?.focus();
+        });
       }, START_EFFECT_MS);
     }
 
@@ -260,6 +302,26 @@ function padPressed() {
   return Array.from(pads).some(
     (pad) => pad && (pad.buttons[0]?.pressed || pad.buttons[9]?.pressed)
   );
+}
+
+// Any button or stick on any pad: the menu is in use.
+function padActive() {
+  const pads = navigator.getGamepads?.() ?? [];
+  return Array.from(pads).some(
+    (pad) =>
+      pad &&
+      (pad.buttons.some((button) => button.pressed) ||
+        pad.axes.some((axis) => Math.abs(axis) > 0.5))
+  );
+}
+
+// Something over the menu that Escape closes first: a panel (Settings,
+// Credits, Codex, Hangar), a dialog, the pilots or the phone's Wake log.
+function panelOpen() {
+  if (document.querySelector('.pilot-screen, .is-log-open')) return true;
+  return Array.from(
+    document.querySelectorAll('.screen--overlay, [aria-modal="true"]')
+  ).some((el) => !el.closest('.hidden'));
 }
 
 // Boot paths that start a run or a scene without the player skip the gate.

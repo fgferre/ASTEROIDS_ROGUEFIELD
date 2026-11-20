@@ -27,6 +27,7 @@ describe('run records', () => {
       bestLayer: 9,
       bestTime: 600,
       runs: 0,
+      lastRun: null,
       bossRushStage: 3,
       bossRushTime: 420,
       sectorsWon: [],
