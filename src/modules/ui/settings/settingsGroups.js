@@ -4,7 +4,10 @@
 // (a small-caps title over rows) and folds (a <details> of rows). Only the
 // layout lives here: every field keeps the category it is stored under.
 // A field is 'category.key'. `bindings: true` marks the Controls group whose
-// rows follow the Keyboard | Gamepad switch.
+// rows follow the Keyboard | Gamepad switch. Touch Controls shows only on a
+// screen that does not declare touch (a phone or tablet always plays by it).
+
+import { declaresTouch } from '../../../bootstrap/mobileGuard.js';
 
 export const SETTINGS_SECTIONS = [
   {
@@ -31,7 +34,11 @@ export const SETTINGS_SECTIONS = [
     groups: [
       {
         title: 'Handling',
-        fields: ['controls.hullControl', 'controls.vibration'],
+        fields: [
+          'controls.hullControl',
+          ...(declaresTouch() ? [] : ['controls.touchControls']),
+          'controls.vibration',
+        ],
       },
       {
         title: 'Bindings',

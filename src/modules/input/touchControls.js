@@ -12,8 +12,9 @@
 // and thrust inputs as the keys; modern flight takes the stick's direction.
 // On a screen that declares a mouse (a car, a touch laptop) the last device
 // used rules: a finger turns touch play on, a key or pad turns it off;
-// `?touch=force` pins it on, mouse-type pointers working the stick and
-// buttons one at a time (a browser that sends its touches as a mouse).
+// Settings' Touch Controls on Always, or `?touch=force`, pins it on,
+// mouse-type pointers working the stick and buttons one at a time (a
+// browser that sends its touches as a mouse).
 
 import {
   hasForceTouchFlag,
@@ -93,6 +94,7 @@ const LAYER_HTML = `
 export class TouchControls {
   /**
    * `input`: InputSystem; `player`: PlayerSystem (the nose for 'aponta');
+   * `settings`: SettingsSystem (Touch Controls);
    * `declared`: the device says it is touch (mobileGuard), on for good;
    * `onShow`: called when touch play turns on or off on another screen.
    */
@@ -100,6 +102,7 @@ export class TouchControls {
     input,
     player,
     eventBus,
+    settings,
     mode = touchModeFromUrl(),
     declared = false,
     onShow = () => {},
@@ -107,6 +110,7 @@ export class TouchControls {
     this.input = input;
     this.player = player;
     this.eventBus = eventBus;
+    this.settings = settings;
     this.mode = mode;
     this.declared = declared;
     this.onShow = onShow;
@@ -139,7 +143,15 @@ export class TouchControls {
       if (!this.pinned) this.show(device === 'touch');
     });
     onFinger(() => this.input.setActiveDevice('touch'));
-    if (hasForceTouchFlag()) this.pin(true);
+    const pinned = () =>
+      hasForceTouchFlag() ||
+      this.settings.getSetting('controls', 'touchControls') === 'always';
+    this.eventBus.on('settings-changed', ({ category } = {}) => {
+      if (category === 'controls' && pinned() !== this.pinned) {
+        this.pin(pinned());
+      }
+    });
+    if (pinned()) this.pin(true);
   }
 
   /** Touch play kept on whatever device is used (`on`), or back to the last one. */

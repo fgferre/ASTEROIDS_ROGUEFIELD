@@ -127,7 +127,7 @@ describe('touch play on a screen that declares a mouse', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  async function computer(search = '') {
+  async function computer(search = '', touchControls = 'auto') {
     vi.stubGlobal('window', {
       location: { search },
       innerWidth: 1440,
@@ -152,16 +152,26 @@ describe('touch play on a screen that declares a mouse', () => {
         handlers['input-device-changed']?.({ device });
       },
     };
+    const settings = {
+      value: touchControls,
+      getSetting: () => settings.value,
+    };
     const shown = [];
     const touch = new Controls({
       input,
       player: facingRight,
       eventBus: { on: (name, handler) => (handlers[name] = handler) },
+      settings,
       onShow: () => shown.push(touch.on),
     });
     touch.layer = { hidden: true }; // built already: no DOM here
     touch.start();
-    return { touch, input, shown, touchScreen: guard.touchScreen };
+    // Settings' Touch Controls changed to `value`.
+    const choose = (value) => {
+      settings.value = value;
+      handlers['settings-changed']({ category: 'controls' });
+    };
+    return { touch, input, shown, choose, touchScreen: guard.touchScreen };
   }
 
   it('a finger turns it on, a key turns it off, a mouse click never does', async () => {
@@ -193,5 +203,18 @@ describe('touch play on a screen that declares a mouse', () => {
     const desktop = await computer('?desktop=force');
     listeners.pointerdown({ pointerType: 'touch' });
     expect(desktop.touch.on).toBe(false);
+  });
+
+  it("Settings' Touch Controls on Always pins it; back on Auto the last device rules", async () => {
+    const { touch, input, choose } = await computer();
+    choose('always');
+    input.setActiveDevice('keyboard');
+    expect(touch.on).toBe(true);
+    choose('auto');
+    expect(touch.on).toBe(false);
+
+    vi.resetModules();
+    const saved = await computer('', 'always');
+    expect(saved.touch.on).toBe(true);
   });
 });

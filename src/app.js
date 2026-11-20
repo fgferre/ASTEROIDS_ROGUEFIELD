@@ -262,6 +262,7 @@ function init(recording = null, touch = false) {
       input: services.input,
       player: services.player,
       eventBus: services['event-bus'],
+      settings: services.settings,
       declared: touch,
       onShow: () =>
         services.ui.followHudLayout(

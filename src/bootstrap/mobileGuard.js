@@ -26,6 +26,8 @@ let playInBrowserChosen = false;
 let touchShown = false;
 let fingerSeen = false;
 let fingerHandler = null;
+/** The pointer type of the last press since the boot, for screenReport. */
+let lastPress = null;
 
 export const TURN_TEXT = 'Turn your device sideways to play';
 export const INSTALL_TEXT_IOS =
@@ -59,6 +61,23 @@ const hasForceDesktopFlag = () => hasForceFlag(DESKTOP_FORCE_PARAM);
 /** ?touch=force: touch play from the start, mouse-type pointers included. */
 export const hasForceTouchFlag = () => hasForceFlag(TOUCH_FORCE_PARAM);
 
+/** A phone or tablet that says it is one (Touch Controls is not offered there). */
+export const declaresTouch = () =>
+  typeof window !== 'undefined' && isTouchDevice();
+
+/**
+ * What this screen tells the browser, for Settings' Touch Controls line: a
+ * photo of it says how a car or laptop declares itself.
+ */
+export function screenReport() {
+  const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+  return {
+    pointer: coarse ? 'touch' : 'mouse',
+    touchPoints: navigator.maxTouchPoints ?? 0,
+    lastPress: lastPress ?? 'none',
+  };
+}
+
 /** A screen that does not declare touch may still turn to it (not ?desktop=force). */
 export const mayTurnToTouch = () => !hasForceDesktopFlag();
 
@@ -76,7 +95,8 @@ export function onFinger(handler) {
   if (fingerSeen) handler();
 }
 
-function noteFinger(event) {
+function notePress(event) {
+  lastPress = event.pointerType;
   if (event.pointerType !== 'touch') return;
   fingerSeen = true;
   fingerHandler?.();
@@ -197,7 +217,7 @@ export async function mobileGuard() {
     return { touch: false };
   }
   if (!isTouchDevice()) {
-    window.addEventListener('pointerdown', noteFinger, true);
+    window.addEventListener('pointerdown', notePress, true);
     return { touch: false };
   }
   if (hasForceDesktopFlag()) {
