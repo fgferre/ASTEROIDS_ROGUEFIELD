@@ -9,7 +9,7 @@
 // journey between sectors flies its own camera (render3d/travelScene.js)
 // and ends on the intro's first pose.
 
-import { loadJSON, saveJSON } from './storage.js';
+import { loadJSON, saveProgress } from './storage.js';
 
 export const INTRO_MS = 3000;
 export const EPILOGUE_MS = 4000;
@@ -49,7 +49,7 @@ export const STORY_LINE_LEAD_MS = 400; // proposta 18/11
 // campaign launch; every later one flies straight to its journey.
 const STORY_TOLD_KEY = 'roguefield:story-told:v1';
 export const storyTold = () => loadJSON(STORY_TOLD_KEY) === true;
-export const markStoryTold = () => saveJSON(STORY_TOLD_KEY, true);
+export const markStoryTold = () => saveProgress(STORY_TOLD_KEY, true);
 
 export const FOLLOW_TILT = 18;
 const INTRO_DISTANCE = 3.2;

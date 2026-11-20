@@ -37,8 +37,8 @@ export class FormationMarks {
    * A warning's marks; returns the field points on its edge to light (up
    * to FLARES, at least FLARE_GAP apart; none for a ring).
    */
-  add({ points, warn, edge }) {
-    this.marks.push({ points, warn, left: warn });
+  add({ points, warn, until, edge }) {
+    this.marks.push({ points, warn, until });
     if (!edge || !ON_EDGE[edge]) return [];
     const along = edge === 'top' || edge === 'bottom' ? 'x' : 'y';
     const flares = [];
@@ -52,13 +52,19 @@ export class FormationMarks {
     return flares;
   }
 
-  /** Ages the marks by `dt` s and draws those still up into `ribbons`. */
-  update(dt, ribbons, rgb) {
-    this.marks = this.marks.filter((mark) => {
-      mark.left -= dt;
-      return mark.left > 0;
-    });
-    for (const { points, warn, left } of this.marks) {
+  /**
+   * Draws the marks still up into `ribbons`. `clock` is the layer clock
+   * (LayerSchedule.layerElapsed), the one the formation waits on, so pause,
+   * slow motion and hit-stop keep a ring and its formation together; a mark
+   * ends at its `until`, or when the clock went back before its warning
+   * began (a new layer).
+   */
+  update(clock, ribbons, rgb) {
+    this.marks = this.marks.filter(
+      ({ until, warn }) => clock < until && clock >= until - warn - 1e-6
+    );
+    for (const { points, warn, until } of this.marks) {
+      const left = until - clock;
       const progress = 1 - left / warn;
       const radius = RING_FROM + (RING_TO - RING_FROM) * progress;
       const gain =

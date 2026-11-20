@@ -47,7 +47,8 @@
 // vitals     { now, shield, maxShield, hull, maxHull, shieldMode ('locked':
 //            no shield card yet | 'ready' | 'active' | 'cooldown'),
 //            shieldSeconds and shieldCooldown (fraction) of the cooldown
-//            left, shieldKey (the bound key's label while ready) }
+//            left, shieldKey (the bound key's label while ready),
+//            shieldLockedPresses (shield presses with no card, a running count) }
 // hull-ring  { now, ship, shield, maxShield, hull, maxHull }
 // recharges  { now, ship, dash (1 right after a dash, 0 ready), shield (the
 //            broken shield's cooldown left, 0 when up or none) }
@@ -124,16 +125,12 @@ const px = (n) => `calc(${n}px * var(--hud-u, 1))`;
 // frame or 'screen' (the whole layer); x and y are px from that corner or
 // edge. Every call writes every placement property: a preset switch reuses
 // the container.
-function placeSlot(
-  container,
-  { anchor, x, y, scale, opacity, visible, plate }
-) {
+function placeSlot(container, { anchor, x, y, scale, opacity, visible }) {
   const { style } = container;
   const zoom = scale === 1 ? '' : `scale(${scale})`;
   style.position = 'absolute';
   style.top = style.bottom = style.left = style.right = '';
   style.transform = zoom;
-  container.classList.toggle('hud-plate', Boolean(plate));
   style.opacity = String(opacity);
   style.display = visible ? '' : 'none';
   if (anchor === 'screen') {

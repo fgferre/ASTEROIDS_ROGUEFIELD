@@ -96,6 +96,12 @@ export const JOURNEY_CUES = Object.freeze({
   4: url('journey-crucible.mp3'),
 });
 export const JOURNEY_CUE_HIT_SECONDS = 6;
+// The story before the first journey (render3d/storyScene.js) plays its own
+// recording (Flow Music "Story of the Wake", take 2, from 3.32 s): in from
+// its first shot, its hits on the ring shot, near the launch and on the
+// leap, held on until the journey after it ends (the owner's pick Nova 2,
+// card som-cena-3, 20/11).
+export const STORY_CUE = url('story-outer-ring.mp3');
 
 // Feel values (proposta): the danger (0..1, MusicMixer.runIntensity) opens
 // the stage's lowpass and lifts its level; the boss and the ends crossfade.

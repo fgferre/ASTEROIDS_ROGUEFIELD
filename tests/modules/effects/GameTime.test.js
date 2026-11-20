@@ -21,6 +21,20 @@ describe('GameTime', () => {
     expect(time.update(step)).toBe(step);
   });
 
+  it('a small kill freezes as hard after a long freeze has ended as on a fresh run', () => {
+    const step = 1 / 60;
+    const fresh = new GameTime({ emit: () => {}, motionReduced: () => false });
+    fresh.addHitStop('small');
+    const freshSpeed = fresh.update(step) / step;
+
+    // A Warden's death (0.5 s at 30 %), then a second of play.
+    const time = new GameTime({ emit: () => {}, motionReduced: () => false });
+    time.addFreezeFrame(0.5, 0.3);
+    for (let i = 0; i < 90; i += 1) time.update(step);
+    time.addHitStop('small');
+    expect(time.update(step) / step).toBeCloseTo(freshSpeed, 5);
+  });
+
   it('drops a running slow motion on reset (a new run or the menu)', () => {
     const time = new GameTime({ emit: () => {}, motionReduced: () => false });
     const step = 1 / 120;

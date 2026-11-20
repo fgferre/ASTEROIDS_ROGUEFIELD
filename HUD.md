@@ -12,14 +12,15 @@ Reuse `src/style.css` `:root` only: `--accent` #00f2ff (player, systems), `--dan
 
 ## Layout
 
-- A safe margin: no instrument sits on the field's glowing border; where the border passes behind an instrument it fades out under it.
+- No dark field behind any text or instrument (owner, 18/11): letters and drawn parts carry a thin dark outline, one stroke wide, and that is all.
+- On a touch screen held sideways the thumbs rest on the bottom corners: the Instrument layout has its own phone and tablet version, with the hull under the clock and the weapon under the radar.
 - In windows wider than 16:9 the instruments stay inside a centred 16:9 area, close to the action; taller windows keep the corners.
 
 ## Hierarchy
 
 1. **Now** (centre band, large, transient): Warden bar while a Warden lives; layer, surge and event banners; the incoming-layer count; low-hull state.
 2. **Glance** (corners, medium, always on): tactical radar top right; shield and hull bottom left as the owner's chosen capsule (20/10): ten separate hull cells inside a rounded capsule, the shield a cyan stroke running round it and filling with the shield's HP; the shield shows what it is in the game — not installed (thin grey outline), ready on its key, active, recharging (amber seconds); XP and level along the bottom edge; weapon with its evolution and Apex progress bottom right.
-3. **On demand** (small, fades to 35 % after 4 s without change): layer, elapsed time, kills, combo, pickup timers, kill feed.
+3. **On demand** (small, fades to 60 % after 4 s without change): layer, elapsed time, kills, combo, pickup timers, kill feed.
 4. **On the ship** (sized in screen pixels, so the wide camera does not shrink it): dash, shield and weapon-special recharges as thin arcs under the ship, shown only while recharging and for a 0.5 s pulse when ready; a segmented hull ring round the ship for 2 s after each hit and always below 30 % hull (as Dead Space puts health on the suit). Near death the warning grows: edge darkening, then a short image glitch below 15 % (Returnal).
 
 ## Motion

@@ -1,220 +1,170 @@
 // src/bootstrap/mobileGuard.js
 //
-// A11Y-08 (initial implementation) — Phase 1 of v2 milestone.
-//
-// Pre-DI device-capability gate. Halts boot on touch-capable devices and paints
-// a plain-Canvas2D "Desktop only" notice on #game-canvas. Runs BEFORE
-// initializeDevStatsPanel(), bootstrapServices(), DI container init, Three.js,
-// and Web Audio so the blocked path survives a future WebGL2 probe failure.
-//
-// Phase 6a (INFRA-11 / VIZ-01 / A11Y-08 verified) re-verifies this guard on
-// real hardware (Safari iOS+macOS, Firefox, Chromium); current Phase 1 coverage
-// is JSDOM unit test + developer self-smoke on the dev laptop.
-//
-// CONTEXT decisions honored:
-//   D-03 (revised): block only when `(pointer: coarse)` AND (ontouchstart OR maxTouchPoints>0).
-//   D-04: Pre-DI location; zero calls into Three.js / Web Audio / DIContainer on the blocked path.
-//   D-05: EN line ("Desktop only — keyboard + mouse required") stacked above PT-BR line
-//         ("Requer teclado e mouse (apenas desktop)"); monospace 16px Canvas2D fillText.
-//   D-06: ?desktop=force URL override (dev escape hatch, not a documented user feature).
-//   D-46: No new dependencies. Only built-in browser globals + the existing debugLog import.
-//   D-47: No new console.log on production paths; console.warn only on defensive branches.
+// Pre-DI touch-device gate. A phone or tablet (a coarse primary pointer plus a
+// touch signal) plays by touch (input/touchControls.js) held sideways. The
+// door notice holds the boot: upright, it asks to turn the device; on a phone
+// in the browser it also tells how to add the game to the Home Screen (full
+// screen), with a button to play in the browser anyway (remembered for the
+// session). TouchControls brings the turn notice back when turned upright
+// mid-run. `?desktop=force` keeps the desktop path on any device (captures).
 
 import { debugLog } from '../core/debugLogging.js';
 
 const DESKTOP_FORCE_PARAM = 'desktop';
 const DESKTOP_FORCE_VALUE = 'force';
+/** A screen whose short side is under this (CSS px) is a phone. */
+const PHONE_MAX_SIDE = 500;
+const PLAY_IN_BROWSER_KEY = 'roguefield:play-in-browser';
+/** The choice for this visit when sessionStorage is blocked (Safari private modes). */
+let playInBrowserChosen = false;
 
-const NOTICE_EN = 'Desktop only — keyboard + mouse required';
+export const TURN_TEXT = 'Turn your device sideways to play';
+export const INSTALL_TEXT_IOS =
+  'For full screen, add the game to your Home Screen: tap Share, then Add to Home Screen.';
+export const INSTALL_TEXT_OTHER =
+  'For full screen, add the game to your Home screen: open the browser menu and choose Add to Home screen.';
+export const PLAY_IN_BROWSER_TEXT = 'Play in the browser anyway';
 
 /**
- * Combined-OR touch detection per CONTEXT D-03.
- *
- * Each probe is guarded for non-browser environments (Vitest `environment: 'node'`).
- * Returns `true` if ANY signal indicates touch capability — intentionally
- * conservative (we'd rather block a touch-capable laptop than admit a phone).
- *
- * @returns {boolean}
+ * A coarse primary pointer plus one touch signal: Windows laptops report
+ * maxTouchPoints > 0 alone, so that is not enough.
  */
 function isTouchDevice() {
-  if (typeof window === 'undefined') {
+  if (!window.matchMedia?.('(pointer: coarse)')?.matches) {
     return false;
   }
-
-  let pointerCoarse = false;
-  if (typeof window.matchMedia === 'function') {
-    try {
-      const result = window.matchMedia('(pointer: coarse)');
-      pointerCoarse = Boolean(result && result.matches === true);
-    } catch (error) {
-      console.warn(
-        '[mobileGuard] matchMedia probe failed; treating pointer-coarse signal as false:',
-        error
-      );
-    }
-  }
-
-  if (!pointerCoarse) {
-    return false;
-  }
-
-  // Windows laptops report maxTouchPoints > 0 alone, so a coarse primary
-  // pointer plus one touch-capability signal is required to block.
   const hasTouchStart = 'ontouchstart' in window;
   const hasTouchPoints =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.maxTouchPoints === 'number' &&
-    navigator.maxTouchPoints > 0;
-
+    typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
   return hasTouchStart || hasTouchPoints;
 }
 
-/**
- * Returns true when ?desktop=force is present in the current URL.
- *
- * Mirrors the URLSearchParams parsing pattern in src/core/debugLogging.js
- * (readFromQueryString). Case-insensitive match on the value 'force'.
- *
- * @returns {boolean}
- */
+/** True when ?desktop=force is in the URL (case-insensitive value). */
 function hasForceDesktopFlag() {
-  if (typeof window === 'undefined' || !window.location) {
-    return false;
-  }
+  const params = new URLSearchParams(window.location?.search || '');
+  return (
+    params.get(DESKTOP_FORCE_PARAM)?.trim().toLowerCase() ===
+    DESKTOP_FORCE_VALUE
+  );
+}
 
+export const isPortrait = () => window.innerHeight > window.innerWidth;
+
+const isPhone = () =>
+  Math.min(
+    window.screen?.width ?? window.innerWidth,
+    window.screen?.height ?? window.innerHeight
+  ) < PHONE_MAX_SIDE;
+
+/**
+ * The touch screen the game is played on, 'phone' or 'tablet' (the HUD has
+ * a layout for each, data/ui/hudPresets.js), or null when it is not played
+ * by touch: what mobileGuard below lets in.
+ */
+export function touchScreen() {
+  if (typeof window === 'undefined' || !isTouchDevice()) return null;
+  if (hasForceDesktopFlag()) return null;
+  return isPhone() ? 'phone' : 'tablet';
+}
+
+/** Running from the Home Screen (iOS's own flag, or the manifest's mode). */
+const isInstalled = () =>
+  navigator.standalone === true ||
+  ['standalone', 'fullscreen'].some(
+    (mode) => window.matchMedia?.(`(display-mode: ${mode})`)?.matches
+  );
+
+function readPlayInBrowser() {
   try {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has(DESKTOP_FORCE_PARAM)) {
-      return false;
-    }
-
-    const value = params.get(DESKTOP_FORCE_PARAM);
-    if (typeof value !== 'string') {
-      return false;
-    }
-
-    return value.trim().toLowerCase() === DESKTOP_FORCE_VALUE;
-  } catch (error) {
-    console.warn(
-      '[mobileGuard] Failed to parse ?desktop flag from URL:',
-      error
-    );
+    return window.sessionStorage?.getItem(PLAY_IN_BROWSER_KEY) === '1';
+  } catch {
     return false;
   }
 }
 
-/**
- * Paints the stacked EN+PT-BR notice on #game-canvas. Returns false when the
- * canvas or 2D context cannot be resolved (defensive — the caller still halts
- * boot but the notice cannot be shown in that case).
- *
- * @returns {boolean} true when the notice was painted, false on defensive fallback.
- */
-function paintNotice() {
-  if (typeof document === 'undefined') {
-    console.warn(
-      '[mobileGuard] document is undefined; cannot paint notice (non-browser environment).'
-    );
-    return false;
-  }
-
-  const loading = document.getElementById('loading-screen');
-  if (loading) {
-    loading.classList.add('hidden');
-  }
-
-  const container = document.getElementById('game-container');
-  if (container && typeof document.createElement === 'function') {
-    const notice = document.createElement('div');
-    notice.className = 'desktop-only-notice';
-    notice.setAttribute('role', 'alert');
-    notice.textContent = NOTICE_EN;
-    container.appendChild(notice);
-  }
-
-  const canvas = document.getElementById('game-canvas');
-  if (!canvas) {
-    console.warn(
-      '[mobileGuard] Canvas2D unavailable; halting boot defensively (no #game-canvas element).'
-    );
-    return false;
-  }
-
-  let ctx;
+function rememberPlayInBrowser() {
+  playInBrowserChosen = true;
   try {
-    ctx = canvas.getContext('2d');
-  } catch (error) {
-    console.warn(
-      '[mobileGuard] Canvas2D unavailable; halting boot defensively:',
-      error
+    window.sessionStorage?.setItem(PLAY_IN_BROWSER_KEY, '1');
+  } catch {
+    // Blocked storage: the choice lives in memory for this visit.
+  }
+}
+
+/** A phone in the browser that has not chosen to play there this session. */
+function shouldAskToInstall() {
+  return (
+    isPhone() && !isInstalled() && !playInBrowserChosen && !readPlayInBrowser()
+  );
+}
+
+const line = (className, text) => {
+  const el = document.createElement('p');
+  el.className = className;
+  el.textContent = text;
+  return el;
+};
+
+/**
+ * The door notice: resolves once the device is sideways and, when `install`,
+ * the player chose to play in the browser. The turn line shows only while
+ * upright (`.is-upright`).
+ */
+export function waitAtDoor({ install = false } = {}) {
+  let asking = install;
+  if (!isPortrait() && !asking) {
+    return Promise.resolve();
+  }
+  const notice = document.createElement('div');
+  notice.className = 'door-notice';
+  notice.setAttribute('role', 'alert');
+  notice.appendChild(line('door-notice__turn', TURN_TEXT));
+  const skip = asking ? document.createElement('button') : null;
+  if (skip) {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+    notice.appendChild(
+      line('door-notice__install', ios ? INSTALL_TEXT_IOS : INSTALL_TEXT_OTHER)
     );
-    return false;
+    skip.type = 'button';
+    skip.className = 'btn door-notice__skip';
+    skip.textContent = PLAY_IN_BROWSER_TEXT;
+    notice.appendChild(skip);
   }
-
-  if (!ctx) {
-    console.warn(
-      '[mobileGuard] Canvas2D unavailable; halting boot defensively (getContext returned null).'
-    );
-    return false;
-  }
-
-  const width = canvas.width || 0;
-  const height = canvas.height || 0;
-
-  // Black background.
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, width, height);
-
-  // White monospace text, 16px, centered.
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const centerX = width / 2;
-  const centerY = height / 2;
-
-  // ctx.measureText is referenced by the unit test mock; calling it here keeps
-  // the stub surface honest even though textAlign='center' makes the result
-  // unnecessary for placement.
-  if (typeof ctx.measureText === 'function') {
-    try {
-      ctx.measureText(NOTICE_EN);
-    } catch (error) {
-      // measureText shouldn't throw under any normal browser — defensive only.
-      console.warn('[mobileGuard] measureText probe failed:', error);
-    }
-  }
-
-  ctx.fillText(NOTICE_EN, centerX, centerY);
-
-  return true;
+  document.getElementById('game-container')?.appendChild(notice);
+  return new Promise((resolve) => {
+    const check = () => {
+      notice.classList.toggle('is-upright', isPortrait());
+      if (isPortrait() || asking) {
+        return;
+      }
+      window.removeEventListener('resize', check);
+      notice.remove();
+      resolve();
+    };
+    skip?.addEventListener('click', () => {
+      asking = false;
+      rememberPlayInBrowser();
+      check();
+    });
+    window.addEventListener('resize', check);
+    check();
+  });
 }
 
 /**
- * Pre-DI mobile/touch boot gate.
+ * Resolves `{ touch }` when the boot may go on: at once on a desktop (or with
+ * ?desktop=force), on a touch device once it passed the door notice.
  *
- * Returns `{ blocked: true }` on touch-capable devices (unless ?desktop=force
- * override is present) and paints a plain-Canvas2D notice on #game-canvas.
- * The caller (src/app.js DOMContentLoaded handler) must early-return when
- * `blocked` is true; the notice is already painted by this function.
- *
- * Performs ZERO calls into Three.js, Web Audio (AudioContext), or the DI
- * container — verifiable by reading this file's import list (only `debugLog`
- * from ../core/debugLogging.js).
- *
- * @returns {{ blocked: boolean }}
+ * @returns {Promise<{ touch: boolean }>}
  */
-export function mobileGuard() {
+export async function mobileGuard() {
+  if (typeof window === 'undefined' || !isTouchDevice()) {
+    return { touch: false };
+  }
   if (hasForceDesktopFlag()) {
     debugLog('[mobileGuard] ?desktop=force override active');
-    return { blocked: false };
+    return { touch: false };
   }
-
-  if (!isTouchDevice()) {
-    return { blocked: false };
-  }
-
-  paintNotice();
-  return { blocked: true };
+  await waitAtDoor({ install: shouldAskToInstall() });
+  return { touch: true };
 }

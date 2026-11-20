@@ -3,7 +3,7 @@
 // The kill feed in the mock-ups' finish (HUD.md, on demand): the classic
 // feed's rows and counting, as fine right-aligned type with a small diamond
 // in the row's colour instead of a plate. Rows stay 6 s; the feed wakes to
-// full strength on each new row and fades to 35 % 4 s after the last.
+// full strength on each new row and fades to 60 % 4 s after the last.
 
 import { FEED_MAX_ROWS, ON_DEMAND_MS } from '../../hudCommon.js';
 import classic from './classic.js';

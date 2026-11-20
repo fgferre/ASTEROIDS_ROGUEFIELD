@@ -1,6 +1,6 @@
 // src/services/DifficultyService.js
 
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { holdProgress, loadJSON, saveProgress } from '../core/storage.js';
 import {
   DAILY_DIFFICULTY,
   DEFAULT_DIFFICULTY,
@@ -81,7 +81,7 @@ export function updateDailyRecord({ dateKey, layer = 0, time = 0 }) {
     bestLayer: Math.max(record.bestLayer, Math.floor(Number(layer) || 0)),
     bestTime: Math.max(record.bestTime, Math.floor(Number(time) || 0)),
   };
-  saveJSON(DAILY_STORAGE_KEY, next);
+  saveProgress(DAILY_STORAGE_KEY, next);
   return next;
 }
 
@@ -105,6 +105,8 @@ export default class DifficultyService {
   constructor({ settings, bootSeed, bootSeedSource, now = () => new Date() }) {
     this.settings = settings;
     this.pinnedSeed = !RANDOM_SEED_SOURCES.includes(bootSeedSource);
+    // A demo page (`?content=`, `?profile=`): every run on it keeps no progress.
+    this.demo = bootSeedSource === 'profile-harness';
     this.runSeed = bootSeed;
     this.bootSeedSpent = false;
     this.now = now;
@@ -169,6 +171,7 @@ export default class DifficultyService {
     this.dateKey = this.daily ? this.replayDateKey ?? this.todayKey() : null;
     this.runDifficulty = this.getSelectedDifficulty();
     this.replayRun = this.replayDifficulty !== null;
+    holdProgress(this.replayRun || this.demo);
     this.replayDifficulty = null;
     this.replayDateKey = null;
     if (!this.daily) {
@@ -178,6 +181,11 @@ export default class DifficultyService {
       this.bootSeedSpent = true;
     }
     return this.getRunSeed();
+  }
+
+  /** Back at the menu: the Hangar's purchases and the rest save again. */
+  endRun() {
+    holdProgress(false);
   }
 
   getRunSeed() {

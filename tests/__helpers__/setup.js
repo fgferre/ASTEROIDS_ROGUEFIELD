@@ -1,5 +1,5 @@
 import { afterEach, vi } from 'vitest';
-import { ServiceRegistry } from '../../src/core/ServiceRegistry.js';
+import { holdProgress } from '../../src/core/storage.js';
 
 const hasOwn = Object.prototype.hasOwnProperty;
 let previousGlobalsStack = null;
@@ -67,23 +67,12 @@ export function cleanupGlobalState() {
   }
 }
 
-/**
- * Create a ServiceRegistry test container with a deterministic random seed.
- *
- * @param {string} [seed='test-seed'] - Seed forwarded to the container factory.
- * @returns {ReturnType<typeof ServiceRegistry.createTestContainer>}
- * @example
- * const container = createTestContainer('audio-seed');
- * const random = container.resolve('RandomService');
- */
-export function createTestContainer(seed = 'test-seed') {
-  return ServiceRegistry.createTestContainer({ randomSeed: seed });
-}
-
 afterEach(() => {
   while (globalThis.__HAS_GLOBAL_MOCKS__) {
     cleanupGlobalState();
   }
 
   vi.restoreAllMocks();
+  // A test that started a replay or a demo run must not hold the next one's saves.
+  holdProgress(false);
 });

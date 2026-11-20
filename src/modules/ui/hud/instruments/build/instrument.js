@@ -30,7 +30,7 @@ const MARKUP = `
         <div class="bd">
           <div class="ins ins-demand bd-demand">
             <div class="bd-buffs"></div>
-            <div class="ins-lbl bd-modes"></div>
+            <div class="ins-lbl bd-modes"><span class="bd-aim" data-touch-action="toggleAimMode"></span> · <span class="bd-spread" data-touch-action="toggleSpreadMode"></span></div>
           </div>
           <div class="ins ins-glance bd-weapon">
             <div class="bd-name"></div>
@@ -109,7 +109,9 @@ export default {
     this.evo = q('.bd-evo');
     this.apex = q('.bd-apex');
     this.buffs = q('.bd-buffs');
-    this.modes = q('.bd-modes');
+    // Each mode word is its own toggle on touch (input/touchControls.js).
+    this.aimLabel = q('.bd-aim');
+    this.spreadLabel = q('.bd-spread');
     this.demand = onDemand(q('.bd-demand'));
     this.buffRows = new Map();
     this.shown = {};
@@ -142,11 +144,13 @@ export default {
       if (this.beams !== null) replay(this.name, 'ins-pulse');
       this.beams = state.beams;
     }
-    const modes = `AIM ${state.aimMode === 'manual' ? 'MANUAL' : 'AUTO'} · SPREAD ${state.spreadMode === 'fan' ? 'FAN' : 'CONC'}`;
-    if (modes !== shown.modes) {
+    const aim = `AIM ${state.aimMode === 'manual' ? 'MANUAL' : 'AUTO'}`;
+    const spread = `SPREAD ${state.spreadMode === 'fan' ? 'FAN' : 'CONC'}`;
+    if (`${aim} ${spread}` !== shown.modes) {
       if (shown.modes !== undefined) this.demand.wake(now);
-      shown.modes = modes;
-      this.modes.textContent = modes;
+      shown.modes = `${aim} ${spread}`;
+      this.aimLabel.textContent = aim;
+      this.spreadLabel.textContent = spread;
     }
     this.updateBuffs(state.buffs, now);
     this.demand.update(now);

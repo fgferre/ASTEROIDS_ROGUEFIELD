@@ -161,6 +161,14 @@ describe('Settings panel', () => {
     expect(settingPreview('masterVolume', 1)).toBeNull();
   });
 
+  it('names the thumb, not keys, under Hull Control by touch', () => {
+    expect(settingPreview('hullControl', 'classic').text).toMatch(/A\/D/);
+    vi.stubGlobal('document', { body: { dataset: { inputDevice: 'touch' } } });
+    expect(settingPreview('hullControl', 'classic').text).toMatch(/thumb/);
+    expect(settingPreview('hullControl', 'modern').text).not.toMatch(/WASD/);
+    vi.unstubAllGlobals();
+  });
+
   it('resets exactly what the section shows, bindings included', () => {
     const { panel, settings } = renderSection('game');
     settings.setSetting('graphics', 'cameraMode', 'classic');

@@ -1,7 +1,7 @@
 // src/services/CodexService.js
 
 import { CODEX_ENTRIES, codexIdOf } from '../data/codex.js';
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
 
 export const CODEX_STORAGE_KEY = 'roguefield:codex:v1';
 
@@ -19,7 +19,6 @@ export default class CodexService {
     this.eventBus = eventBus;
     this.layer = 1;
     this.seen = loadJSON(CODEX_STORAGE_KEY)?.seen ?? {};
-
     eventBus.on('wave-started', (payload = {}) => {
       this.layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     });
@@ -46,7 +45,8 @@ export default class CodexService {
 
   record(entity, { kill = false } = {}) {
     const id = codexIdOf(entity);
-    if (!KNOWN_IDS.has(id)) return;
+    // A replay or a demo scene meets nothing for this save (storage.js).
+    if (isProgressHeld() || !KNOWN_IDS.has(id)) return;
     let entry = this.seen[id];
     if (!entry) {
       entry = { firstLayer: this.layer, kills: 0 };
@@ -58,7 +58,7 @@ export default class CodexService {
   }
 
   persist() {
-    saveJSON(CODEX_STORAGE_KEY, { seen: this.seen });
+    saveProgress(CODEX_STORAGE_KEY, { seen: this.seen });
   }
 
   /** Every codex entry in descent order, with `seen` (null if never met). */

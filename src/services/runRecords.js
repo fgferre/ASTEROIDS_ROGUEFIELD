@@ -1,6 +1,6 @@
 // src/services/runRecords.js
 
-import { loadJSON, saveJSON } from '../core/storage.js';
+import { loadJSON, saveProgress } from '../core/storage.js';
 import { BOSS_RUSH_LAYERS } from '../data/layers.js';
 import { SECTORS } from '../data/sectors.js';
 
@@ -75,7 +75,7 @@ export function updateRecords({
     }
   }
   if (Object.keys(next).some((key) => next[key] !== records[key])) {
-    saveJSON(RECORDS_STORAGE_KEY, next);
+    saveProgress(RECORDS_STORAGE_KEY, next);
   }
   return next;
 }

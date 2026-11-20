@@ -35,6 +35,8 @@ export class RockInstances {
     // shape slots past the fixed shapes: a cut rock's own geometry
     this.fixed = geometries.length;
     this.free = [];
+    // what else holds slots (rockBreak.js): gives them back on clear
+    this.onClear = () => {};
     Object.entries(materials).forEach(([family, material]) => {
       this.counts[family] = geometries.map(() => 0);
       this.meshes[family] = geometries.map((shape) =>
@@ -182,5 +184,6 @@ export class RockInstances {
   clear() {
     this.begin();
     this.end();
+    this.onClear();
   }
 }

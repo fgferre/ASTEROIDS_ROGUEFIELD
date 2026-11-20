@@ -908,11 +908,8 @@ export default class GameSessionService {
       this.emitPauseState({ source: 'exit-to-menu' });
     }
 
-    if (payload?.source) {
-      debugLog(`Retornando ao menu (origem: ${payload.source}).`);
-    } else {
-      debugLog('Retornando ao menu.');
-    }
+    this.resolveServiceInstance('difficulty').endRun();
+    debugLog(`Retornando ao menu (origem: ${payload?.source ?? 'unknown'}).`);
 
     this.setSessionState('menu', {
       reason: 'exit-to-menu',

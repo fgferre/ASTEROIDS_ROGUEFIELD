@@ -428,10 +428,23 @@ export class MainMenu {
     show(focused());
   }
 
+  // On a phone the Wake log waits behind its top button and opens over the
+  // screen (style.css keys on `is-log-open`); its X, or a tap anywhere else on
+  // the screen, closes it.
+  bindWakeLogSheet() {
+    const { nav } = this.refs;
+    nav?.addEventListener('click', (event) => {
+      const sheet = event.target.closest('[data-log-sheet]')?.dataset.logSheet;
+      if (!sheet && event.target.closest('#campaign-log')) return;
+      nav.classList.toggle('is-log-open', sheet === 'open');
+    });
+  }
+
   bindMainMenuControls() {
     this.bindPrepTabs();
     this.bindPrepSlots();
     this.bindModeHints();
+    this.bindWakeLogSheet();
     // Generic UI Hover Sound Delegation
     // Listens for all menu buttons and interactive elements
     if (typeof document !== 'undefined') {

@@ -24,6 +24,7 @@ import {
   exposeRandomDebugControls,
   reseedRandomScopes,
 } from './audio/randomScopes.js';
+import { IS_DEV } from '../core/env.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
@@ -113,6 +114,8 @@ class AudioSystem extends BaseSystem {
     this.lowHealthWarning = false;
     // The story's launch just played the journey's ignition (eventHandlers).
     this.storyIgnited = false;
+    // The story's music runs on into the journey (eventHandlers storyScore).
+    this.storyScored = false;
 
     // Run-following music inputs: the player's position (pan + distance
     // reference for enemy-side cues) and the wave's enemies alive or still to spawn (density proxy:
@@ -138,6 +141,11 @@ class AudioSystem extends BaseSystem {
     // driven by screen/overlay events, not by the media graph.
     this.fileTrackManager = new FileTrackManager();
     this.currentScreen = null;
+    // The opening holds the menu's music until the press that leaves it
+    // ('opening-left'), even when an earlier touch already woke the audio.
+    this.openingHeld =
+      typeof document !== 'undefined' &&
+      Boolean(document.getElementById('loading-screen'));
 
     // DuckingController (INFRA-02 / AUDIO-03) — owns DEDICATED duck nodes
     // (musicDuckGain/effectsDuckGain) that REST at 1.0 and splice into both
@@ -655,7 +663,7 @@ class AudioSystem extends BaseSystem {
 
   _syncMenuTrackForCurrentScreen() {
     const currentScreen = this.fileTrackManager?.currentScreen;
-    if (!currentScreen) {
+    if (!currentScreen || this.openingHeld) {
       return;
     }
 
@@ -884,6 +892,7 @@ class AudioSystem extends BaseSystem {
     this.sectorScore.reset();
     this.journeyCue.stop();
     this.storyIgnited = false;
+    this.storyScored = false;
     // Leaving a run (a new one, the menu): no line goes on speaking.
     this.voiceLines.clear();
     this.runEnemyCount = 0;
@@ -903,6 +912,10 @@ class AudioSystem extends BaseSystem {
     if (this.thrusterInactivityCheckInterval) {
       clearInterval(this.thrusterInactivityCheckInterval);
       this.thrusterInactivityCheckInterval = null;
+    }
+    if (this.performanceStatsInterval) {
+      clearInterval(this.performanceStatsInterval);
+      this.performanceStatsInterval = null;
     }
     // Tear down SFXBus: stop thruster loops, clean batcher/pool/cache, detach the
     // ambient/protected buses (idempotent).
@@ -937,10 +950,10 @@ class AudioSystem extends BaseSystem {
    * Inicia o sistema de monitoramento de performance
    */
   _startPerformanceMonitoring() {
-    if (!this.performanceMonitor.enabled) return;
+    if (!IS_DEV || !this.performanceMonitor.enabled) return;
 
     // Update performance stats every second
-    setInterval(() => {
+    this.performanceStatsInterval = setInterval(() => {
       this._updatePerformanceStats();
     }, 1000);
   }

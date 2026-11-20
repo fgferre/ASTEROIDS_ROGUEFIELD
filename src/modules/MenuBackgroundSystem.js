@@ -313,7 +313,8 @@ class MenuBackgroundSystem extends BaseSystem {
           hide();
         });
       },
-      () => this.eventBus?.emit('press-start')
+      () => this.eventBus?.emit('press-start'),
+      () => this.eventBus?.emit('opening-left')
     );
   }
 
@@ -531,6 +532,8 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     this.isActive = true;
+    // The window may have changed, and stop() released the render targets.
+    this.handleResize();
     // A Hangar purchase may have unlocked the selected hull.
     this.syncHullPreview();
     if (this.clock) {
@@ -547,6 +550,7 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     this.isActive = false;
+    this.opening?.release();
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
@@ -558,7 +562,7 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   handleResize() {
-    if (!this.ready) {
+    if (!this.ready || !this.isActive) {
       return;
     }
 

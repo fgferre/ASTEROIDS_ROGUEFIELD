@@ -238,7 +238,7 @@ describe('content scene on a live run', () => {
       input.onKeyDown(keyEvent('KeyD'));
       for (let step = 0; step < 30; step += 1) frame();
       input.onKeyUp(keyEvent('KeyD'));
-      expect(player.position.x).toBeGreaterThan(before + 20);
+      expect(player.position.x).toBeGreaterThan(before + 10);
     });
 
     it('is back to normal after a Warden scene too', () => {

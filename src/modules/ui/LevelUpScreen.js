@@ -23,6 +23,10 @@ import {
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
 
+// A card's detail arrow on the phone, held sideways (cardScreens.css).
+const DETAIL_ARROW =
+  '<span class="card__more" aria-hidden="true"><i><svg viewBox="0 0 14 14"><path d="M3 5.5 7 9.5 11 5.5"/></svg></i></span>';
+
 // Level-up cards and the run end's buttons ignore input this long after showing.
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
 // The picks that set the run's direction get their own strip.
@@ -64,7 +68,7 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, run }.
+   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, cancelBtn, run }.
    * `progression()`: the progression service (offers, rerolls, banishes, holds, picks), or none.
    * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
@@ -115,11 +119,12 @@ export class LevelUpScreen {
   }
 
   bindLevelUpControls() {
-    const { rerollBtn, banishBtn, holdBtn, equipBtn } = this.refs;
+    const { rerollBtn, banishBtn, holdBtn, equipBtn, cancelBtn } = this.refs;
     rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
     banishBtn?.addEventListener('click', () => this.toggleBanishMode());
     holdBtn?.addEventListener('click', () => this.toggleHoldMode());
     equipBtn?.addEventListener('click', () => this.equipForMe());
+    cancelBtn?.addEventListener('click', () => this.backOut());
 
     // A card's key badge (1, 2, 3) picks it as a click on it would.
     document.addEventListener('keydown', (event) => {
@@ -153,7 +158,7 @@ export class LevelUpScreen {
     else if (action === 'back') this.backOut();
   }
 
-  // Escape or the pad's back: an armed "Equip for me" disarms and nothing
+  // Escape, the pad's back or a tap on Cancel (touch only): an armed "Equip for me" disarms and nothing
   // else happens; otherwise banish or hold mode ends.
   backOut() {
     if (this.equipArmTimer) this.disarmEquip();
@@ -392,7 +397,13 @@ export class LevelUpScreen {
     button.dataset.index = `${index}`;
     paintCard(button, state.definition);
     this.fillCard(button, option.id, index);
-    button.addEventListener('click', () => this.selectUpgrade(option.id));
+    button.addEventListener('click', (event) => {
+      if (event.target.closest('.card__more')) {
+        this.toggleCardDetail(button);
+        return;
+      }
+      this.selectUpgrade(option.id);
+    });
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
       // Keyboard focus follows: Enter and the highlight name the same card.
@@ -406,11 +417,21 @@ export class LevelUpScreen {
   fillCard(button, upgradeId, index) {
     const progression = this.progression();
     const state = cardState(progression, upgradeId);
-    button.innerHTML = cardMarkup(state.definition, state, {
-      weapon: this.combat().getWeaponState(),
-      key: index + 1,
-      held: progression.heldCard?.id === upgradeId,
-    });
+    button.innerHTML =
+      cardMarkup(state.definition, state, {
+        weapon: this.combat().getWeaponState(),
+        key: index + 1,
+        held: progression.heldCard?.id === upgradeId,
+      }) + DETAIL_ARROW;
+  }
+
+  // The phone's arrow (cardScreens.css): opens one card's detail, closing
+  // any other; a second tap closes it.
+  toggleCardDetail(button) {
+    const open = !button.classList.contains('is-open');
+    asArray(this.levelUpState.buttons).forEach((card) =>
+      card.classList.toggle('is-open', open && card === button)
+    );
   }
 
   selectUpgrade(upgradeId) {
@@ -562,7 +583,9 @@ export class LevelUpScreen {
     equipBtn?.setAttribute('aria-pressed', 'true');
     const label = equipBtn?.querySelector('[data-label]');
     if (label) {
-      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? Press again`;
+      const again =
+        document.body?.dataset.inputDevice === 'touch' ? 'Tap' : 'Press';
+      label.textContent = `Equip ${cards} card${cards === 1 ? '' : 's'}? ${again} again`;
     }
     this.equipArmTimer = setTimeout(() => this.disarmEquip(), EQUIP_CONFIRM_MS);
   }

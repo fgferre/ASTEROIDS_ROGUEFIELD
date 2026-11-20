@@ -12,8 +12,8 @@ import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
   setupGlobalMocks,
   cleanupGlobalState,
-  createTestContainer,
 } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 
 function createWaveManager(overrides = {}) {
   const bus = overrides.eventBus ?? eventBus;

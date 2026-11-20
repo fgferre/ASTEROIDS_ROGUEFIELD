@@ -20,8 +20,11 @@ const GAME_OVER_SCREEN_MAX_DELAY_MS = 6500; // proposta 18/10
 // Nothing hurts the ship meanwhile: it is invulnerable until the screen can
 // open (the cap).
 const VICTORY_SPOILS_SECONDS = 6; // proposta 12/11 (2.5 s: the owner could not gather anything)
-const VICTORY_SCREEN_DELAY_MS = VICTORY_SPOILS_SECONDS * 1000;
 const VICTORY_SCREEN_MAX_DELAY_MS = 9000; // proposta 12/11
+// The spoils' seconds run on the simulation's clock, the one the pull moves
+// on: a tab that stops drawing holds the screen back with them. This is how
+// often it is looked at.
+const SPOILS_CHECK_MS = 100;
 
 export class RunEnd {
   /**
@@ -107,20 +110,34 @@ export class RunEnd {
       ...(this.sector && { sector: this.sector.id }),
     });
 
-    this.scheduleRunEndScreen(
-      () => {
-        const summary =
-          this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
-        const data = {
-          ...summary,
-          ...this.recordRunReached(summary, { won: true }),
-        };
-        this.setScreen('victory');
-        this.emitScreenChanged('victory', { source: 'run-won', data });
-      },
-      VICTORY_SCREEN_DELAY_MS,
-      VICTORY_SCREEN_MAX_DELAY_MS
-    );
+    // The clear time is the Warden's death, not the screen's opening: the
+    // spoils and the last line that come between are no part of the record.
+    const world = this.resolveServiceInstance('world');
+    const clearTime = world?.runClock();
+    const open = () => {
+      const summary = world?.buildRunSummary() ?? {};
+      const data = {
+        ...summary,
+        ...this.recordRunReached(summary, { won: true, clearTime }),
+      };
+      this.setScreen('victory');
+      this.emitScreenChanged('victory', { source: 'run-won', data });
+    };
+    // Then a line on air may hold it, up to the cap's remainder.
+    const spent = () => world.runClock() - clearTime >= VICTORY_SPOILS_SECONDS;
+    const wait = () => {
+      if (!spent()) {
+        this.gameOverScreenTimeoutId = setTimeout(wait, SPOILS_CHECK_MS);
+        return;
+      }
+      this.scheduleRunEndScreen(
+        open,
+        0,
+        VICTORY_SCREEN_MAX_DELAY_MS - VICTORY_SPOILS_SECONDS * 1000
+      );
+    };
+    this.clearPendingGameOverTransition();
+    wait();
   }
 
   /**
@@ -160,13 +177,17 @@ export class RunEnd {
    * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
    * reached. A sector run records only its clear (`won`) and returns
    * `{ sector: { id, time, bestTime, firstClear, next } }`, `next` the next
-   * sector's id on a win, else null.
+   * sector's id on a win, else null. `clearTime` (a win): the run's time when
+   * its last Warden fell, the one a clear records.
    */
-  recordRunReached(summary = {}, { won = false } = {}) {
+  recordRunReached(summary = {}, { won = false, clearTime } = {}) {
+    const runTime = clearTime ?? summary.stats?.timeElapsed;
     if (this.sector) {
       const { id } = this.sector;
-      const time = Math.floor(summary.stats?.timeElapsed ?? 0);
-      const firstClear = won && !loadRecords().sectorsWon.includes(id);
+      const time = Math.floor(runTime ?? 0);
+      const before = loadRecords();
+      const firstClear = won && !before.sectorsWon.includes(id);
+      const beforeTime = Number(before.sectorTimes[id]) || 0;
       const records = updateRecords(
         won ? { sectorWon: id, sectorTime: time } : {}
       );
@@ -176,22 +197,25 @@ export class RunEnd {
           time,
           bestTime: records.sectorTimes[id] ?? 0,
           firstClear,
+          // The Boss Rush's rule: faster than the record before; a tie is not.
+          newBest: won && time > 0 && (beforeTime === 0 || time < beforeTime),
           next: won ? nextSector(this.sector)?.id ?? null : null,
         },
       };
     }
     if (this.bossRush) {
-      const records = updateRecords({
-        bossRushTime:
-          this.bossRushWardens === BOSS_RUSH_LAYERS.length
-            ? summary.stats?.timeElapsed
-            : 0,
-      });
+      const cleared = this.bossRushWardens === BOSS_RUSH_LAYERS.length;
+      const time = cleared ? Math.floor(runTime ?? 0) : 0;
+      const before = loadRecords().bossRushTime;
+      const records = updateRecords({ bossRushTime: time });
       return {
         bossRush: {
           stage: Math.min(this.bossRushWardens + 1, BOSS_RUSH_LAYERS.length),
           bestStage: records.bossRushStage,
           bestTime: records.bossRushTime,
+          // Settled here, on the clear time: the screen opens seconds later.
+          // Faster than the record before it; a tie is not a new best.
+          newBest: time > 0 && (before === 0 || time < before),
         },
       };
     }

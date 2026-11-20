@@ -781,6 +781,13 @@ export class SettingsPanel {
       }
       if (group.bindings) {
         wrapper.appendChild(this.renderDeviceSwitch());
+        // Shown by touch only (data-device), where a binding cannot be set.
+        const note = document.createElement('p');
+        note.className = 'settings-field__description';
+        note.dataset.device = 'touch';
+        note.textContent =
+          'Bindings take a keyboard or a gamepad. By touch, the left thumb steers; dash, shield and pause are on screen.';
+        wrapper.appendChild(note);
       }
       asArray(group.fields).forEach((ref) => wrapper.appendChild(row(ref)));
       asArray(group.folds).forEach((fold) => {

@@ -279,10 +279,6 @@ export function patchRockShader(shader) {
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
       if (ROCK_GLOW > 0.001) {
-        vec2 c = rockCracks(vRockPos * 2.3 + ROCK_SEED);
-        float wall = 1.0 - smoothstep(ROCK_WIDTH * 0.4, ROCK_WIDTH, c.x);
-        float fine = 1.0 - smoothstep(0.0, ROCK_WIDTH * 0.5,
-          rockCracks(vRockPos * 5.1 + ROCK_SEED.zxy).x);
         // a rock struck at known points cracks only around them (reach 0:
         // everywhere), every cell there opening
         float near = 1.0;
@@ -292,8 +288,17 @@ export function patchRockShader(shader) {
             1.0 - smoothstep(ROCK_HIT.w * 0.6, ROCK_HIT.w, distance(dir, ROCK_HIT.xyz)),
             1.0 - smoothstep(ROCK_HIT2.w * 0.6, ROCK_HIT2.w, distance(dir, ROCK_HIT2.xyz)));
         }
-        float crack = max(wall, fine * 0.7 * step(0.6, ROCK_REVEAL))
-          * step(c.y, max(ROCK_REVEAL, near * 0.85)) * near;
+        float crack = 0.0;
+        if (near > 0.0) {
+          vec2 c = rockCracks(vRockPos * 2.3 + ROCK_SEED);
+          float wall = 1.0 - smoothstep(ROCK_WIDTH * 0.4, ROCK_WIDTH, c.x);
+          float fine = ROCK_REVEAL >= 0.6
+            ? 1.0 - smoothstep(0.0, ROCK_WIDTH * 0.5,
+                rockCracks(vRockPos * 5.1 + ROCK_SEED.zxy).x)
+            : 0.0;
+          crack = max(wall, fine * 0.7)
+            * step(c.y, max(ROCK_REVEAL, near * 0.85)) * near;
+        }
         diffuseColor.rgb *= 1.0 - 0.7 * crack;
         totalEmissiveRadiance += ROCK_VEIN * crack * ROCK_GLOW;
       }

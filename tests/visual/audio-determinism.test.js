@@ -6,7 +6,7 @@ import {
   createBufferSourceStub,
   createOscillatorStub,
 } from '../__helpers__/stubs.js';
-import { createTestContainer } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 
 describe('AudioSystem RNG determinism', () => {
   function createAudioHarness(seed) {

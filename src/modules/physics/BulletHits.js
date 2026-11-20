@@ -61,7 +61,8 @@ export class BulletHits {
 
       for (let j = 0; j < candidates.length; j += 1) {
         const asteroid = candidates[j];
-        if (!asteroid) {
+        // A piercing lance is past what it went through: the next one counts.
+        if (!asteroid || bullet.pierced?.includes(asteroid)) {
           continue;
         }
         const collisionRadius = resolveEnemyCollisionRadius(asteroid);

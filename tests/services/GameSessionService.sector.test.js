@@ -17,6 +17,8 @@ import { sectorById } from '../../src/data/sectors.js';
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;
 const AFTER_STEPS = 3 * 60;
+// The spoils are 6 s of the run clock, which the Warden's freeze slows.
+const SPOILS_STEPS = 9 * 60;
 const PICK_STEPS = 60;
 
 function startOnLayer(game, layer) {
@@ -27,7 +29,8 @@ function startOnLayer(game, layer) {
   enemies.startNextWave();
 }
 
-function killBoss(game) {
+// `wait` false: back at the Warden's death, the spoils still to run.
+function killBoss(game, { wait = true } = {}) {
   const { enemies } = game.services;
   let boss = null;
   for (let step = 0; step < SPAWN_STEPS && !boss; step += 1) {
@@ -38,8 +41,12 @@ function killBoss(game) {
     boss.takeDamage(1e9);
     game.step();
   }
-  for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
-  vi.advanceTimersByTime(8000);
+  if (!wait) return boss;
+  // The spoils run on the simulation's clock: steps, with the time passing.
+  for (let step = 0; step < SPOILS_STEPS; step += 1) {
+    game.step();
+    vi.advanceTimersByTime(1000 / 60);
+  }
   return boss;
 }
 
@@ -272,7 +279,8 @@ describe('sector runs', () => {
     });
 
     startOnLayer(game, 5);
-    killBoss(game);
+    killBoss(game, { wait: false });
+    for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
 
     expect(game.session.getSessionState()).toBe('victory');
     // The break timer counts the spoils time down; the orbs fly to the ship.
@@ -280,6 +288,10 @@ describe('sector runs', () => {
     expect(isActive).toBe(false);
     expect(breakTimer).toBeGreaterThan(0);
     expect(breakTimer).toBeLessThan(6);
+    for (let step = 0; step < SPOILS_STEPS; step += 1) {
+      game.step();
+      vi.advanceTimersByTime(1000 / 60);
+    }
     expect(won).toEqual([expect.objectContaining({ sector: 'prime-gate' })]);
     expect(victories).toHaveLength(1);
     const { sector } = victories[0].data;
@@ -295,6 +307,57 @@ describe('sector runs', () => {
       bestTime: 0,
       sectorsWon: ['prime-gate'],
     });
+  });
+
+  it('gives the spoils their seconds of play, not of the wall clock', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    game.services.player.setInvulnerableTimer(1e9);
+    let victory = null;
+    game.eventBus.on('screen-changed', (payload) => {
+      if (payload.screen === 'victory') victory = payload.data;
+    });
+    startOnLayer(game, 5);
+    killBoss(game, { wait: false });
+
+    // A tab that stops drawing: time passes, no step runs, nothing is
+    // gathered, and the screen waits.
+    vi.advanceTimersByTime(10000);
+    expect(victory).toBeNull();
+    for (let step = 0; step < SPOILS_STEPS; step += 1) {
+      game.step();
+      vi.advanceTimersByTime(1000 / 60);
+    }
+    expect(victory).not.toBeNull();
+  });
+
+  it("records the clear at the Warden's death, not after the spoils", () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test', sector: 'prime-gate' });
+    game.services.player.setInvulnerableTimer(1e9);
+    const clock = () => game.services.enemies.getSessionStats().timeElapsed;
+    let wonAt = null;
+    let victory = null;
+    game.eventBus.on('run-won', () => {
+      wonAt = clock();
+    });
+    game.eventBus.on('screen-changed', (payload) => {
+      if (payload.screen === 'victory') victory = payload.data;
+    });
+
+    startOnLayer(game, 5);
+    // Seconds of play, then the Warden dies.
+    for (let step = 0; step < 180; step += 1) game.step();
+    killBoss(game, { wait: false });
+    // The spoils' seconds run in play before the screen opens.
+    for (let step = 0; step < 600 && !victory; step += 1) {
+      game.step();
+      vi.advanceTimersByTime(1000 / 60);
+    }
+
+    expect(clock() - wonAt).toBeGreaterThan(1);
+    expect(victory.sector.time).toBe(Math.floor(wonAt));
+    expect(loadRecords().sectorTimes['prime-gate']).toBe(Math.floor(wonAt));
   });
 
   it('plays its own stages, cast from its last layer, and only in its run', () => {

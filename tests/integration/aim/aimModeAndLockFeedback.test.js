@@ -10,8 +10,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {
   setupGlobalMocks,
   cleanupGlobalState,
-  createTestContainer,
 } from '../../__helpers__/setup.js';
+import { createTestContainer } from '../../__helpers__/test-container.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
 import { BULLET_SIZE } from '../../../src/core/GameConstants.js';
@@ -734,9 +734,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       withDOMStub(() => {
         const input = new InputSystem({ eventBus });
-        // Stub resolveGameScreen so the toggle path emits without needing
+        // Stub the running check so the toggle path emits without needing
         // a game-state service in the harness.
         input.resolveGameScreen = () => 'playing';
+        input.isGameRunning = () => true;
 
         // Build a fake keyboard event for the G key.
         const fakeEvent = (type) => ({

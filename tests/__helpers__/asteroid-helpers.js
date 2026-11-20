@@ -1,7 +1,7 @@
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { EnemySystem } from '../../src/modules/EnemySystem.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import { createTestContainer } from './setup.js';
+import { createTestContainer } from './test-container.js';
 
 export const TEST_SEED = 123456;
 export const SAMPLE_ASTEROID_COUNT = 1000;

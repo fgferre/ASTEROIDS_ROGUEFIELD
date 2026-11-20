@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { GamePools } from '../../../src/core/GamePools.js';
 import { Particles } from '../../../src/modules/effects/Particles.js';
 
 describe('Particles', () => {
@@ -7,6 +8,22 @@ describe('Particles', () => {
     randomCentered: () => 0,
     createMuzzleFlash: () => {},
     damageNumbersEnabled: () => true,
+  });
+
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+
+  it('gives its live particles back to the pool on reset', () => {
+    const before = GamePools.particles.inUse.size;
+    for (let i = 0; i < 5; i += 1) {
+      particles.particles.push(
+        particles.createParticle(0, 0, 0, 0, '#fff', 2, 1, 'normal')
+      );
+    }
+    expect(GamePools.particles.inUse.size).toBe(before + 5);
+    particles.reset();
+    expect(GamePools.particles.inUse.size).toBe(before);
   });
 
   it('drops a shockwave once it outlives its duration', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import MenuBackgroundSystem from '../../src/modules/MenuBackgroundSystem.js';
-import { createTestContainer } from '../__helpers__/setup.js';
+import { createTestContainer } from '../__helpers__/test-container.js';
 
 function menuReadyToAnimate() {
   const random = createTestContainer('menu-loading').resolve('random');
@@ -28,6 +28,8 @@ describe('MenuBackgroundSystem behind the loading screen', () => {
       // The loading screen's element: hiding it adds the `hidden` class.
       const screen = {
         classList: { add: () => order.push('hide'), remove: () => {} },
+        // the loading line
+        querySelector: () => ({ classList: { toggle: () => {} } }),
       };
       vi.stubGlobal('document', { getElementById: () => screen });
       system.setupLoadingScreen();

@@ -105,7 +105,8 @@ describe('HUD instrument models', () => {
     expect(part('.bd-evo').textContent).toBe('Solar Flare');
     expect(part('.bd-apex').textContent).toBe('Apex 5/5');
     expect(part('.bd-track').classList.contains('is-apex')).toBe(true);
-    expect(part('.bd-modes').textContent).toBe('AIM AUTO · SPREAD CONC');
+    expect(part('.bd-aim').textContent).toBe('AIM AUTO');
+    expect(part('.bd-spread').textContent).toBe('SPREAD CONC');
 
     // A weapon with its own forms names them on its card's family.
     at({ arc: 2 }, [], 'arc-caster');
@@ -363,6 +364,33 @@ describe('HUD instrument models', () => {
     expect(chip()).toBeGreaterThan(213.6);
     at(2000, 60);
     expect(chip()).toBeCloseTo(213.6);
+  });
+
+  it('vitals: a shield press with no card shakes once, from the next press on', () => {
+    const { model, has } = mount('vitals', 'instrument');
+    const at = (now, shieldLockedPresses) =>
+      model.update({
+        now,
+        shield: 0,
+        maxShield: 1,
+        hull: 100,
+        maxHull: 100,
+        shieldMode: 'locked',
+        shieldSeconds: 0,
+        shieldCooldown: 0,
+        shieldKey: '',
+        shieldLockedPresses,
+      });
+
+    // Presses from before it was mounted do not shake it.
+    at(0, 2);
+    expect(has('.vt', 'is-refused')).toBe(false);
+    at(100, 3);
+    expect(has('.vt', 'is-refused')).toBe(true);
+    at(650, 3);
+    expect(has('.vt', 'is-refused')).toBe(true);
+    at(700, 3);
+    expect(has('.vt', 'is-refused')).toBe(false);
   });
 
   it("vitals: the shield's state is read from the deflector as it runs", () => {

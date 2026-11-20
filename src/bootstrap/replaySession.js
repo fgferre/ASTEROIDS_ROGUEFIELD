@@ -5,14 +5,16 @@
 // its mode from the session and its control scheme from the player. An armed
 // recording sets that service's difficulty and day and the session's start mode
 // before its run begins, and its hull and control scheme once the run has
-// started. The recorder lives on the session
+// started; its Hangar setup stands in for the viewer's until the run's reset
+// has read it. The recorder lives on the session
 // (`session.replayRecorder`). Input is captured and substituted at
 // InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
 // re-applied at the next frame boundary, which is when a player's click lands
 // too (the loop stops stepping on level-up). A chest's cards, which wait for
-// Continue, go on their own once the last has had its reveal; the run is
-// paused under them, so the moment they go does not change it.
+// Continue, go on their own once the last has had its reveal, and the flight
+// briefing as soon as it takes Continue; the run is paused under them, so the
+// moment they go does not change it.
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 import { CHEST_REVEAL_MS } from '../modules/ui/ChestCeremony.js';
@@ -25,12 +27,21 @@ export function getReplayUrl() {
   return new URLSearchParams(window.location.search).get('replay') || null;
 }
 
+/** A replay link that never answers must not hold the game at "Loading the game". */
+export const REPLAY_FETCH_TIMEOUT_MS = 10000;
+
 export async function fetchRecording(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REPLAY_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+    }
+    return deserialize(await response.text());
+  } finally {
+    clearTimeout(timer);
   }
-  return deserialize(await response.text());
 }
 
 /**
@@ -56,6 +67,7 @@ export function createReplayController({
   let viewerControls = null;
   const difficulty = session.resolveServiceInstance('difficulty');
   const playerService = session.resolveServiceInstance('player');
+  const hangar = session.resolveServiceInstance('hangar');
 
   const runStep = () => getStep() - runStartStep;
 
@@ -77,6 +89,8 @@ export function createReplayController({
   eventBus.on('game-started', ({ carried = false } = {}) => {
     runStartStep = getStep();
     pickPending = false;
+    // The run's reset has read the setup: the viewer's own is back.
+    hangar.useReplaySetup(null);
 
     if (armedRecording) {
       player = createPlayer(armedRecording);
@@ -116,6 +130,7 @@ export function createReplayController({
       date: difficulty.dateKey,
       sector: session.sector?.id ?? null,
       controls: playerService.controlScheme,
+      hangar: hangar.getRunSetup(),
     });
     session.replayRecorder = recorder;
     input.setInputSource(recordSource);
@@ -148,6 +163,12 @@ export function createReplayController({
     }
   });
 
+  eventBus.on('upgrade-held', (payload = {}) => {
+    if (recorder && payload.upgradeId) {
+      recorder.recordHold(runStep(), payload.upgradeId);
+    }
+  });
+
   eventBus.on('upgrade-options-ready', (payload = {}) => {
     if (player && (payload.options || []).length > 0) {
       pickPending = true;
@@ -174,6 +195,7 @@ export function createReplayController({
     arm(recording) {
       armedRecording = recording;
       difficulty.useReplay(recording);
+      hangar.useReplaySetup(recording.hangar);
       session.replayStart = {
         daily: recording.mode === 'daily',
         bossRush: recording.mode === 'bossRush',
@@ -181,15 +203,16 @@ export function createReplayController({
       };
     },
     /**
-     * Once per frame, before the fixed steps: passes a chest's cards, and
-     * applies a pending replay pick after the rerolls/banishes recorded
-     * before it.
+     * Once per frame, before the fixed steps: passes a chest's cards and the
+     * flight briefing (as soon as it takes Continue), and applies a pending
+     * replay pick after the rerolls/banishes/holds recorded before it.
      */
     tick() {
       if (!player) {
         return;
       }
       passChestCards();
+      ui.flightBriefing.continue();
       if (!pickPending) {
         return;
       }
@@ -199,7 +222,9 @@ export function createReplayController({
         const options =
           entry.action === 'reroll'
             ? progression.rerollUpgradeOptions()
-            : progression.banishUpgrade(entry.upgradeId);
+            : entry.action === 'hold'
+              ? progression.holdUpgrade(entry.upgradeId)
+              : progression.banishUpgrade(entry.upgradeId);
         if (options?.length === 0) {
           // Banished the last card: the screen closed with no pick.
           ui.showGameUI();
@@ -212,4 +237,33 @@ export function createReplayController({
       }
     },
   };
+}
+
+/**
+ * Tells the player, on screen, why a `?replay=` did not open. It stays until
+ * the first key or click: the loading screen outlasts any timer.
+ */
+export function showReplayNotice(error) {
+  const refused = /version/.test(error?.message ?? '');
+  const notice = document.createElement('div');
+  notice.textContent = refused
+    ? "This replay was made with an older version of the game and can't be played."
+    : "This replay couldn't be loaded.";
+  Object.assign(notice.style, {
+    position: 'fixed',
+    left: '50%',
+    bottom: '32px',
+    transform: 'translateX(-50%)',
+    zIndex: '10000',
+    padding: '10px 16px',
+    background: 'rgba(0, 0, 0, 0.8)',
+    color: '#eaf2ff',
+    font: 'inherit',
+    textAlign: 'center',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(notice);
+  const dismiss = () => notice.remove();
+  window.addEventListener('keydown', dismiss, { once: true });
+  window.addEventListener('pointerdown', dismiss, { once: true });
 }

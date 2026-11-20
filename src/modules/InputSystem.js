@@ -22,7 +22,7 @@ import {
 import { asArray } from './upgradeCatalog.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
-const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
+export const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
 // Gameplay presses are applied at the next fixed step (not in the DOM handler)
 // so a recorded run replays them at the same step.
@@ -108,7 +108,9 @@ class InputSystem {
     // Pad sticks after the deadzone, read at each poll (see sampleInputFrame).
     this.padSticks = CENTRED_STICKS;
     this.padNavDirection = null;
-    // Last device used: 'keyboard' or 'gamepad' (tips and hints follow it).
+    // TouchControls on a touch device (app.js): its stick joins each step.
+    this.touch = null;
+    // Last device used: 'keyboard', 'gamepad' or 'touch' (tips and hints follow it).
     this.activeDevice = 'keyboard';
     this.menuPollFrame = null;
 
@@ -284,6 +286,12 @@ class InputSystem {
 
       eventBus.on('screen-changed', (payload = {}) => {
         if (payload?.screen !== 'playing') {
+          this.pendingStepPresses.clear();
+        }
+      });
+
+      eventBus.on('pause-state-changed', (payload = {}) => {
+        if (payload?.isPaused) {
           this.pendingStepPresses.clear();
         }
       });
@@ -633,12 +641,8 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      // A pad button pressed on the pause screen must not fire on resume.
-      const live =
-        source === 'gamepad'
-          ? this.isGameRunning()
-          : this.resolveGameScreen() === 'playing';
-      if (live) {
+      // A press made on the pause screen must not fire on resume.
+      if (this.isGameRunning()) {
         this.pendingStepPresses.add(stepField);
       }
       return;
@@ -678,10 +682,8 @@ class InputSystem {
 
   /** The device input for this step: held movement + presses since last step. */
   sampleInputFrame() {
-    const frame = createInputFrame({
-      ...this.getMovementBinaryState(),
-      ...this.padSticks,
-    });
+    const held = { ...this.getMovementBinaryState(), ...this.padSticks };
+    const frame = createInputFrame(this.touch ? this.touch.merge(held) : held);
     this.pendingStepPresses.forEach((field) => {
       frame[field] = true;
     });

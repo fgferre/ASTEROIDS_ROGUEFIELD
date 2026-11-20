@@ -63,6 +63,7 @@ function createServiceHarness(options = {}) {
   const world = {
     reset: vi.fn(),
     buildRunSummary: vi.fn(() => ({ wave: { current: 4 }, stats: {} })),
+    runClock: vi.fn(() => 0),
   };
   const progression = {
     serialize: vi.fn(() => ({ level: 3 })),

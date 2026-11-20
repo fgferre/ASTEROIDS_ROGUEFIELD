@@ -82,19 +82,23 @@ export function installDomStubs() {
   };
 }
 
-/** One game instance: real simulation services, stubbed UI and audio. */
-export function createHeadlessGame() {
+/**
+ * One game instance: real simulation services, stubbed UI and audio.
+ * `seedSource` is the boot's ('profile-harness' boots a demo page).
+ */
+export function createHeadlessGame({ seedSource = 'test' } = {}) {
   GamePools.releaseAll();
 
   const gameState = {
     screen: 'menu',
     isPaused: false,
     randomSeed: SEED,
-    randomSeedSource: 'test',
+    randomSeedSource: seedSource,
   };
   const eventBus = new EventBus();
   const ui = {
     chestCeremony: { current: null },
+    flightBriefing: { continue() {} },
     handleBossEvent() {},
     showGameUI() {},
     showScreen() {},
@@ -109,7 +113,12 @@ export function createHeadlessGame() {
 
   // Same registration as ServiceRegistry.setupServices, with the stubs above
   // and everything lazy so only the services resolved below are built.
-  const context = { gameState, seed: SEED, randomSeed: SEED };
+  const context = {
+    gameState,
+    seed: SEED,
+    randomSeed: SEED,
+    randomSeedSource: seedSource,
+  };
   const container = new DIContainer();
   container.verbose = false;
   for (const entry of createServiceManifest(context)) {

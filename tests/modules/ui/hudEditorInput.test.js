@@ -4,6 +4,7 @@ import {
   editorPad,
 } from '../../../src/modules/ui/hud/editor/editorInput.js';
 import { HudEditor } from '../../../src/modules/ui/hud/editor/HudEditor.js';
+import { inspectorItem } from '../../../src/modules/ui/hud/editor/editorView.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -59,5 +60,38 @@ describe('HUD editor close input', () => {
 
     expect(padRequestClose).toHaveBeenCalledOnce();
     expect(mouseRequestClose).toHaveBeenCalledOnce();
+  });
+
+  it('shows touch nudge arrows only for movable instruments and nudges 2 units a tap', () => {
+    const item = {
+      slot: 'vitals',
+      anchor: 'bottom-left',
+      x: 32,
+      y: 24,
+      scale: 1,
+      opacity: 1,
+      visible: true,
+      model: 'm',
+    };
+    const pad = inspectorItem(item, []);
+    expect(pad).toContain('class="hed-group hed-move" data-device="touch"');
+    expect(pad.match(/data-nudge=/g)).toHaveLength(4);
+    expect(inspectorItem({ ...item, anchor: 'screen' }, [])).not.toContain(
+      'data-nudge'
+    );
+
+    const editor = Object.create(HudEditor.prototype);
+    editor.state = { menu: false };
+    editor.dialogs = { isOpen: false };
+    editor.closeMenu = vi.fn();
+    editor.nudge = vi.fn();
+    const arrow = { dataset: { nudge: '0,-2' } };
+    editor.onClick({
+      target: {
+        closest: (selector) => (selector === '[data-nudge]' ? arrow : null),
+      },
+    });
+
+    expect(editor.nudge).toHaveBeenCalledWith(0, -2);
   });
 });

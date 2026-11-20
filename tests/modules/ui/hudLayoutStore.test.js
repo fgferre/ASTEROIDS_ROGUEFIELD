@@ -71,6 +71,29 @@ describe('HUD layouts: items, presets and codes', () => {
     expect(slotOf(minimal, 'xp')).toMatchObject({ visible: true });
   });
 
+  it('on a touch screen the Instrument preset is its own layout; the player’s stay as saved', () => {
+    const own = [{ id: 'user-1', name: 'Mine', items: instrument }];
+    const video = { hudLayout: 'instrument', hudPresets: own };
+    for (const screen of ['phone', 'tablet']) {
+      const items = activePreset(video, catalog, screen).items;
+      expect(sanitizeItems(items, catalog)).toEqual(items);
+      // the thumbs rest on the bottom corners: hull and weapon go up
+      expect(slotOf(items, 'vitals').anchor).toBe('top-left');
+      expect(slotOf(items, 'build').anchor).toBe('top-right');
+      const mine = { ...video, hudLayout: 'user-1' };
+      expect(activePreset(mine, catalog, screen).items).toEqual(instrument);
+      expect(
+        activePreset({ hudLayout: 'classic' }, catalog, screen).items
+      ).toBe(getHudPreset('classic').items);
+    }
+    expect(
+      slotOf(activePreset(video, catalog, 'phone').items, 'feed')
+    ).toMatchObject({ visible: false });
+    expect(activePreset(video, catalog, null).items).toBe(instrument);
+    // off a touch device (this test's window) the desktop layout
+    expect(activePreset(video, catalog).items).toBe(instrument);
+  });
+
   it('saves, renames, overwrites and deletes the player’s presets', () => {
     let presets = [];
     const first = addPreset(presets, 'Wide Radar', instrument);
@@ -160,6 +183,17 @@ describe('HUD layouts: items, presets and codes', () => {
     expect(
       decodeLayout(` ${code.slice(0, 20)}\n${code.slice(20)} `, catalog)
     ).toEqual({ ok: true, items });
+    // A code from when slots had a dark plate (flag 2) still reads.
+    const rows = JSON.parse(
+      atob(code.slice(CODE_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    const old =
+      CODE_PREFIX +
+      btoa(JSON.stringify(rows.map((row) => [...row.slice(0, 7), row[7] | 2])))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    expect(decodeLayout(old, catalog)).toEqual({ ok: true, items });
   });
 
   it('rejects bad codes with a line for the player, never a throw', () => {

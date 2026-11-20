@@ -234,7 +234,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'shield-hit', cue: 'playShieldImpact' },
   { on: 'shield-broken', cue: 'playShieldBreak' },
   { on: 'shield-recharged', cue: 'playShieldRecharged' },
-  { on: 'shield-activation-failed', cue: 'playShieldFail' },
+  // Tapping fast plays one blip, not a buzz.
+  { on: 'shield-activation-failed', cue: 'playShieldFail', throttleMs: 250 },
   { on: 'player-health-changed', run: 'playerHealth' },
   { on: 'player-healed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },
@@ -255,6 +256,7 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'pause-state-changed', cue: 'playPauseOpen', when: 'isPaused' },
   { on: 'pause-state-changed', cue: 'playPauseClose', unless: 'isPaused' },
   { on: 'screen-changed', run: 'screen' },
+  { on: 'opening-left', run: 'openingLeft' },
   { on: 'ui-overlay-visibility-changed', run: 'overlay' },
   { on: 'input-confirmed', cue: 'playUISelect' },
   { on: 'ui-hover', cue: 'playUIHover', throttleMs: 80 },
@@ -278,13 +280,18 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'travel-moment', run: 'journeyEnded', when: { id: 'end' } },
   // The story before the first journey (render3d/storyScene.js): each
   // moment's sample, the reactors' loop from its first shot to the launch,
-  // the sector's music held under it (its journey holds it on after); its
-  // launch's ignition is the journey's, which then starts without its own.
+  // its own music from the first shot over the sector's, held until the
+  // journey after it ends; its launch's ignition is the journey's, which then
+  // starts without its own.
   { on: 'story-moment', cue: 'playStoryMoment', arg: 'id' },
   { on: 'story-moment', cue: 'playStoryReactor', when: { id: 'wake' } },
   { on: 'story-moment', run: 'holdScore', when: { id: 'wake' } },
+  { on: 'story-moment', run: 'storyScore', when: { id: 'wake' } },
   { on: 'story-moment', cue: 'stopStoryReactor', when: { id: 'launch' } },
   { on: 'story-moment', run: 'storyIgnited', when: { id: 'launch' } },
   { on: 'story-moment', cue: 'stopStorySounds', when: { id: 'end' } },
+  // Its engines, every frame, as the game's engine (audio/shipEngine.js).
+  { on: 'story-engines', run: 'storyEngines' },
+  { on: 'story-moment', run: 'storyEnginesEnd', when: { id: 'end' } },
   { on: 'story-moment', run: 'releaseScore', when: { id: 'end' } },
 ]);

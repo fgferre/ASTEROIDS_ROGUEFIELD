@@ -242,6 +242,62 @@ describe('Level-up card transition', () => {
       expect(document.activeElement).toBe(cards[1]);
     });
 
+    it("the phone's arrow opens one card's detail without picking it; a tap on the card picks it", () => {
+      document.createElement = () => {
+        const listeners = {};
+        const node = fakeNode();
+        node.classList.toggle = (name, on) =>
+          on ? node.classes.add(name) : node.classes.delete(name);
+        node.classList.contains = (name) => node.classes.has(name);
+        return {
+          ...node,
+          addEventListener: (n, fn) => (listeners[n] = fn),
+          listeners,
+        };
+      };
+      const definition = {
+        id: 'a',
+        family: 'thermal',
+        rarity: 'common',
+        levels: [{}],
+        text: { name: 'a', levels: [{ description: 'Fire rate +11%.' }] },
+      };
+      const progression = {
+        upgradeLookup: new Map([['a', definition]]),
+        getUpgradeCount: () => 0,
+        getFamilyCounts: () => ({ thermal: 0 }),
+        pilotCardIds: [],
+        openCards: null,
+        sealedCards: new Set(),
+        applyUpgrade: vi.fn(() => false),
+      };
+      const levelUp = new LevelUpScreen({
+        refs: {},
+        progression: () => progression,
+        combat: () => ({ getWeaponState: () => ({}) }),
+      });
+      const cards = [0, 1].map((i) =>
+        levelUp.createUpgradeOptionButton({ id: 'a' }, i)
+      );
+      levelUp.levelUpState.buttons = cards;
+      const tap = (card, onArrow) =>
+        card.listeners.click({
+          target: { closest: () => (onArrow ? {} : null) },
+        });
+
+      expect(cards[0].innerHTML).toContain('card__more');
+      tap(cards[0], true);
+      expect(cards[0].classes.has('is-open')).toBe(true);
+      tap(cards[1], true);
+      expect(cards[0].classes.has('is-open')).toBe(false);
+      expect(cards[1].classes.has('is-open')).toBe(true);
+      tap(cards[1], true);
+      expect(cards[1].classes.has('is-open')).toBe(false);
+      expect(progression.applyUpgrade).not.toHaveBeenCalled();
+      tap(cards[0], false);
+      expect(progression.applyUpgrade).toHaveBeenCalledWith('a');
+    });
+
     it('a card key badge picks that card as a click would: locked, then taken, then banished', () => {
       let onKey;
       document.addEventListener = (name, fn) => {

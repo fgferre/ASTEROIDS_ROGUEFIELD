@@ -5,14 +5,17 @@
 // `video.hudPresets` in the settings service, [{ id, name, items }], and
 // `video.hudLayout` is the active one's id. A layout code ("Copy layout
 // code") is CODE_PREFIX and the items as base64url of a compact JSON array.
-// Everything here is pure: lists in, new lists out; nothing read from a
-// setting or a code is trusted before sanitizeItems has checked it.
+// Everything here is pure (lists in, new lists out) but for the touch
+// screen the built-ins are drawn for, read from the device unless passed;
+// nothing read from a setting or a code is trusted before sanitizeItems has
+// checked it.
 
 import {
   DEFAULT_HUD_PRESET,
   HUD_PRESETS,
   getHudPreset,
 } from '../../../../data/ui/hudPresets.js';
+import { touchScreen } from '../../../../bootstrap/mobileGuard.js';
 import { listInstruments } from '../instruments/registry.js';
 
 export const MAX_USER_PRESETS = 20;
@@ -81,7 +84,6 @@ function sanitizeItem(raw, catalog) {
     scale: hundredths(clamp(scale, SCALE_RANGE)),
     opacity: hundredths(clamp(opacity, OPACITY_RANGE)),
     visible: raw.visible !== false,
-    plate: Boolean(raw.plate),
   };
 }
 
@@ -147,33 +149,38 @@ export function readUserPresets(raw, catalog) {
   return presets;
 }
 
-/** Every preset, built-in first: { id, name, builtIn, items }. */
-export function allPresets(userPresets) {
+/**
+ * Every preset, built-in first: { id, name, builtIn, items }. A built-in
+ * with a layout for `screen` ('phone' | 'tablet', null off touch) gives that.
+ */
+export function allPresets(userPresets, screen = touchScreen()) {
   return [
-    ...Object.values(HUD_PRESETS).map(({ id, label, items }) => ({
+    ...Object.values(HUD_PRESETS).map(({ id, label, items, screens }) => ({
       id,
       name: label,
       builtIn: true,
-      items,
+      items: screens?.[screen] ?? items,
     })),
     ...userPresets.map((preset) => ({ ...preset, builtIn: false })),
   ];
 }
 
 /** The preset with `id`, or null. */
-export function findPreset(id, userPresets) {
-  return allPresets(userPresets).find((preset) => preset.id === id) ?? null;
+export function findPreset(id, userPresets, screen = touchScreen()) {
+  return (
+    allPresets(userPresets, screen).find((preset) => preset.id === id) ?? null
+  );
 }
 
 /**
  * The layout the settings ask for: `video.hudLayout`'s preset among the
  * built-ins and `video.hudPresets`, or the default preset when it is gone.
  */
-export function activePreset(video, catalog) {
+export function activePreset(video, catalog, screen = touchScreen()) {
   const userPresets = readUserPresets(video?.hudPresets, catalog);
   return (
-    findPreset(video?.hudLayout, userPresets) ??
-    findPreset(DEFAULT_HUD_PRESET, userPresets)
+    findPreset(video?.hudLayout, userPresets, screen) ??
+    findPreset(DEFAULT_HUD_PRESET, userPresets, screen)
   );
 }
 
@@ -246,7 +253,7 @@ export function encodeLayout(items) {
     item.y,
     Math.round(item.scale * 100),
     Math.round(item.opacity * 100),
-    (item.visible ? 1 : 0) | (item.plate ? 2 : 0),
+    item.visible ? 1 : 0, // a bit field: older codes set 2 for a dark plate
   ]);
   return CODE_PREFIX + toBase64Url(JSON.stringify(rows));
 }
@@ -284,7 +291,6 @@ export function decodeLayout(code, catalog) {
       scale: Number(scale) / 100,
       opacity: Number(opacity) / 100,
       visible: (flags & 1) === 1,
-      plate: (flags & 2) === 2,
     })),
     catalog
   );

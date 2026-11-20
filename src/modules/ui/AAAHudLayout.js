@@ -102,15 +102,7 @@ export class AAAHudLayout {
     const hudLayer = document.createElement('div');
     hudLayer.id = 'hud-layer';
     hudLayer.innerHTML = getHudHtml();
-    const cockpitFrame = hudLayer.querySelector('.cockpit-frame');
-    if (cockpitFrame) {
-      cockpitFrame.remove();
-    }
-
     this._root.appendChild(hudLayer);
-    if (cockpitFrame) {
-      this._root.appendChild(cockpitFrame);
-    }
     this._layer = hudLayer;
 
     this._cacheElements();
@@ -658,6 +650,7 @@ export class AAAHudLayout {
     shieldSeconds,
     shieldCooldown,
     shieldKey,
+    shieldLockedPresses,
   }) {
     const now = performance.now();
     const vitals = {
@@ -673,6 +666,7 @@ export class AAAHudLayout {
       shieldSeconds,
       shieldCooldown,
       shieldKey,
+      shieldLockedPresses,
     });
     this._feed('hull-ring', { ...vitals, now, ship });
     this._feed('recharges', { now, ship, dash, shield: shieldCooldown });

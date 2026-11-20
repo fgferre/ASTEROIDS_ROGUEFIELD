@@ -94,8 +94,7 @@ export class SentinelQuarryMaw extends BossEnemy {
   }
 
   // The phase step restores the phase movement; mid-intake it stays put.
-  advancePhase() {
-    super.advancePhase();
+  enterPhase() {
     if (this.mawState !== 'drift') this.movementStrategy = 'linear';
   }
 

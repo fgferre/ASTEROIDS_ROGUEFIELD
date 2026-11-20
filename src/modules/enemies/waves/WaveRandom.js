@@ -6,7 +6,7 @@
  * seeds that put them back (reseedRandomScopes).
  */
 
-import RandomService from '../../../core/RandomService.js';
+import RandomService, { hashString } from '../../../core/RandomService.js';
 
 export class WaveRandom {
   /**
@@ -186,6 +186,18 @@ export class WaveRandom {
     if (!this.randomScopeSeeds) {
       this.randomScopeSeeds = {};
       this.captureRandomScopeSeeds();
+    }
+
+    // Each scope follows the run's seed (the base random's, already reset for
+    // this run), not the one it was forked on.
+    const runSeed = this.randomScopes.base?.seed;
+    if (Number.isFinite(runSeed)) {
+      Object.keys(this.randomScopes).forEach((scope) => {
+        if (scope === 'base') return;
+        const label =
+          this.randomScopeLabels?.[scope] || `wave-manager:${scope}`;
+        this.randomScopeSeeds[scope] = hashString(`${runSeed}:${label}`);
+      });
     }
 
     Object.entries(this.randomScopes).forEach(([scope, generator]) => {
