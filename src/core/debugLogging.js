@@ -20,11 +20,16 @@ function getGlobalScope() {
 }
 
 function getStorage() {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    return window.localStorage;
-  }
-  if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
-    return globalThis.localStorage;
+  // Chrome's "block site data" throws on reading localStorage itself.
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage;
+    }
+    if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+      return globalThis.localStorage;
+    }
+  } catch {
+    // Blocked: the preference lives in memory for this visit.
   }
   return undefined;
 }

@@ -313,7 +313,8 @@ class MenuBackgroundSystem extends BaseSystem {
           hide();
         });
       },
-      () => this.eventBus?.emit('press-start')
+      () => this.eventBus?.emit('press-start'),
+      () => this.eventBus?.emit('opening-left')
     );
   }
 

@@ -927,8 +927,16 @@ body.touch-play
   font-size: var(--text-xs);
 }
 
-/* Phone held sideways: the cards share the width inside the safe areas, text
-   at least 12 px; the column scrolls under the actions, which stay in view. */
+/* A card's detail arrow shows on the phone only (below). */
+.card__more {
+  display: none;
+}
+
+/* Phone held sideways (Felipe's pick "B", 19/11): everything in view, no
+   scroll. The cards share the width and keep their essentials; a small arrow
+   on each opens its detail (the card widens, the others narrow to their name
+   and track). Under the cards one row: the run on the left (the trail as its
+   count only), the actions on the right. Sizes are the mock-up's, in --fs. */
 @media (max-height: 500px) {
   body.touch-play #levelup-screen {
     --u: 0.66px;
@@ -940,12 +948,55 @@ body.touch-play
   }
 
   body.touch-play #levelup-screen .levelup-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: stretch;
+    height: 100%;
     max-height: 100%;
-    overflow-y: auto;
-    padding-bottom: var(--space-2);
+    overflow: hidden;
+    padding: 0;
+  }
+
+  /* The bottom row's backdrop: what plays behind stays behind. */
+  body.touch-play #levelup-screen .levelup-content::before {
+    content: '';
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin: -4px -12px -6px;
+    background: rgba(6, 9, 16, 0.94);
+    border-top: 1px solid var(--line);
+  }
+
+  body.touch-play #levelup-screen .lu-head {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 16px;
+    margin: 0;
+  }
+
+  body.touch-play #levelup-screen .lu-rule {
+    display: none;
+  }
+
+  body.touch-play #levelup-screen .lu-level b {
+    font-size: calc(27.5 * var(--fs));
+  }
+
+  body.touch-play #levelup-screen .lu-picks {
+    margin: 0;
+    font-size: var(--text-xs);
   }
 
   body.touch-play #levelup-screen .upgrades-grid {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 0;
+    gap: 10px;
     align-self: stretch;
   }
 
@@ -954,36 +1005,317 @@ body.touch-play
     width: auto;
     min-width: 0;
     min-height: 0;
+    padding: 9px 12px 0;
+    overflow: hidden;
   }
 
-  /* Banish's and hold's line rides just over the actions. */
+  body.touch-play #levelup-screen .card__top {
+    padding-right: 38px;
+  }
+
+  body.touch-play #levelup-screen .card__id {
+    margin-top: 6px;
+    gap: 10px;
+  }
+
+  body.touch-play #levelup-screen .card__icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  body.touch-play #levelup-screen .card__name {
+    font-size: calc(21.25 * var(--fs));
+  }
+
+  body.touch-play #levelup-screen .card__tag {
+    margin-top: 3px;
+  }
+
+  body.touch-play #levelup-screen .card__fx {
+    margin: 8px 0 0;
+    font-size: calc(17.5 * var(--fs));
+    line-height: 1.3;
+  }
+
+  body.touch-play #levelup-screen .card:not(.is-open) .card__fx {
+    font-size: calc(18.75 * var(--fs));
+  }
+
+  body.touch-play #levelup-screen .card__build {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0 10px;
+    margin: auto -12px 0;
+    padding: 7px 12px 9px;
+  }
+
+  body.touch-play #levelup-screen .card__build--plain {
+    grid-template-columns: 1fr;
+  }
+
+  body.touch-play #levelup-screen .card__lbl {
+    white-space: nowrap;
+    letter-spacing: 0.12em;
+  }
+
+  body.touch-play #levelup-screen .card__row {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  body.touch-play #levelup-screen .card__row .track {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.touch-play #levelup-screen .card__at {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  /* Closed, a card keeps its effect and track; the rest waits behind the
+     arrow. */
   body.touch-play
     #levelup-screen
-    :is(.levelup-actions, #levelup-banish-hint, #levelup-hold-hint) {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    align-self: stretch;
-    background: rgba(6, 9, 16, 0.92);
+    .card:not(.is-open)
+    :is(.card__fx2, .card__why, .card__step) {
+    display: none;
   }
 
+  /* The arrow: its own target in the card's corner (a tap on it does not
+     pick the card), turned up while open. */
+  body.touch-play #levelup-screen .card__more {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+  }
+
+  body.touch-play #levelup-screen .card__trail ~ .card__more {
+    top: 22px;
+  }
+
+  body.touch-play #levelup-screen .card__more i {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid color-mix(in srgb, var(--fam) 70%, transparent);
+    border-radius: 50%;
+    background: rgba(6, 9, 16, 0.85);
+    transition: transform var(--motion-fast) var(--ease-out);
+  }
+
+  body.touch-play #levelup-screen .card__more svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__more i {
+    transform: rotate(180deg);
+    background: color-mix(in srgb, var(--fam) 30%, rgb(6, 9, 16));
+  }
+
+  /* One open: it takes two columns, the build on the right with its steps. */
+  body.touch-play #levelup-screen .upgrades-grid:has(.is-open) .card {
+    flex: 0.62 1 0;
+  }
+
+  body.touch-play #levelup-screen .upgrades-grid:has(.is-open) .card.is-open {
+    flex: 2 1 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    align-content: start;
+  }
+
+  body.touch-play #levelup-screen .card.is-open > :not(.card__build) {
+    grid-column: 1;
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__fx2 {
+    margin: 5px 0 0;
+    font-size: calc(16.25 * var(--fs));
+    line-height: 1.28;
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__build {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    grid-template-columns: 1fr;
+    align-content: start;
+    row-gap: 6px;
+    margin: 30px 0 10px;
+    padding: 0 0 0 14px;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__why {
+    font-size: calc(16.25 * var(--fs));
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 8px;
+    font-size: calc(15.6 * var(--fs));
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__step .card__at {
+    grid-row: 1 / span 2;
+  }
+
+  body.touch-play #levelup-screen .card.is-open .card__step b {
+    grid-column: 2;
+  }
+
+  /* The narrowed ones: name, trail step and track. */
+  body.touch-play
+    #levelup-screen
+    .upgrades-grid:has(.is-open)
+    .card:not(.is-open)
+    :is(.card__fx, .card__tag, .card__lbl) {
+    display: none;
+  }
+
+  body.touch-play
+    #levelup-screen
+    .upgrades-grid:has(.is-open)
+    .card:not(.is-open)
+    .card__rar-name {
+    visibility: hidden;
+  }
+
+  body.touch-play
+    #levelup-screen
+    .upgrades-grid:has(.is-open)
+    .card:not(.is-open)
+    .card__id {
+    margin-top: 14px;
+  }
+
+  body.touch-play
+    #levelup-screen
+    .upgrades-grid:has(.is-open)
+    .card:not(.is-open)
+    .card__name {
+    font-size: calc(18.75 * var(--fs));
+  }
+
+  body.touch-play
+    #levelup-screen
+    .upgrades-grid:has(.is-open)
+    .card:not(.is-open)
+    .card__trail {
+    max-width: calc(100% - 50px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    letter-spacing: 0.1em;
+  }
+
+  /* The bottom row: the run on the left, the actions on the right. */
   body.touch-play #levelup-screen .levelup-actions {
-    order: 1;
-    justify-content: center;
-    margin-top: var(--space-2);
-    padding: 6px 0;
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    flex-wrap: nowrap;
+    margin: 0;
+  }
+
+  body.touch-play #levelup-screen .run-tray {
+    grid-column: 1;
+    grid-row: 3;
+    justify-self: start;
+    align-self: center;
+    align-items: center;
+    gap: 18px;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+
+  body.touch-play #levelup-screen .run-tray__part {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+  }
+
+  body.touch-play #levelup-screen .run-tray__head {
+    gap: 6px;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  body.touch-play #levelup-screen .run-tray__n {
+    font-size: calc(17.5 * var(--fs));
+  }
+
+  /* The trail shows its count only (Felipe, 19/11). */
+  body.touch-play #levelup-screen :is(.run-tray__note, .trail-map) {
+    display: none;
+  }
+
+  body.touch-play #levelup-screen .run-slots {
+    gap: 3px;
+  }
+
+  body.touch-play #levelup-screen .run-slot {
+    width: 9px;
+    height: 13px;
+    min-width: 0;
+    padding: 0;
+  }
+
+  body.touch-play #levelup-screen .run-slot svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  body.touch-play #levelup-screen .run-slot em {
+    display: none;
+  }
+
+  /* Banish's and hold's line takes the run's place while it waits; the
+     run gives way, and never runs under the actions (Cancel widens them). */
+  body.touch-play #levelup-screen .run-tray {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  body.touch-play #levelup-screen:is(.is-banishing, .is-holding) .run-tray {
+    visibility: hidden;
   }
 
   body.touch-play
     #levelup-screen
     :is(#levelup-banish-hint, #levelup-hold-hint) {
-    bottom: 56px;
+    grid-column: 1;
+    grid-row: 3;
+    align-self: center;
+    z-index: 2;
     margin: 0;
-    padding-top: var(--space-1);
   }
 
-  body.touch-play #levelup-screen .run-tray {
-    order: 2;
+  body.touch-play #levelup-screen .onboarding-cards-tip {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    margin: 0;
   }
 }
 

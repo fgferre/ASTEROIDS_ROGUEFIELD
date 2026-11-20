@@ -94,11 +94,11 @@ export function deriveInitialSeed() {
  * @param {string} source
  */
 export function persistLastSeed(seed, source) {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return;
-  }
-
   try {
+    // Inside the try: blocked site data throws on reading localStorage.
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
     window.localStorage.setItem(
       RANDOM_STORAGE_KEYS.last,
       JSON.stringify({

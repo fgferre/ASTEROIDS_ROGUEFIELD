@@ -88,6 +88,8 @@ describe('AudioSystem random scope synchronization', () => {
         }
         return { tagName };
       }),
+      // No opening on this page: the menu's music is not held.
+      getElementById: vi.fn(() => null),
       dispatch(type, payload = {}) {
         if (!listeners.has(type)) {
           return;

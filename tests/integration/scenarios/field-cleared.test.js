@@ -14,6 +14,8 @@ import {
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;
 const AFTER_STEPS = 3 * 60;
+// The spoils are 6 s of the run clock, which the Warden's freeze slows.
+const SPOILS_STEPS = 9 * 60;
 
 function defeatBossOnLayer(layer) {
   const game = createHeadlessGame();
@@ -41,8 +43,11 @@ function defeatBossOnLayer(layer) {
     boss.takeDamage(1e9);
     game.step();
   }
-  for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
-  vi.advanceTimersByTime(6500);
+  // The spoils run on the simulation's clock: steps, with the time passing.
+  for (let step = 0; step < SPOILS_STEPS; step += 1) {
+    game.step();
+    vi.advanceTimersByTime(1000 / 60);
+  }
   for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
 
   return { game, boss, enemies, victories, won };

@@ -15,6 +15,8 @@ const DESKTOP_FORCE_VALUE = 'force';
 /** A screen whose short side is under this (CSS px) is a phone. */
 const PHONE_MAX_SIDE = 500;
 const PLAY_IN_BROWSER_KEY = 'roguefield:play-in-browser';
+/** The choice for this visit when sessionStorage is blocked (Safari private modes). */
+let playInBrowserChosen = false;
 
 export const TURN_TEXT = 'Turn your device sideways to play';
 export const INSTALL_TEXT_IOS =
@@ -72,12 +74,27 @@ const isInstalled = () =>
     (mode) => window.matchMedia?.(`(display-mode: ${mode})`)?.matches
   );
 
+function readPlayInBrowser() {
+  try {
+    return window.sessionStorage?.getItem(PLAY_IN_BROWSER_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberPlayInBrowser() {
+  playInBrowserChosen = true;
+  try {
+    window.sessionStorage?.setItem(PLAY_IN_BROWSER_KEY, '1');
+  } catch {
+    // Blocked storage: the choice lives in memory for this visit.
+  }
+}
+
 /** A phone in the browser that has not chosen to play there this session. */
 function shouldAskToInstall() {
   return (
-    isPhone() &&
-    !isInstalled() &&
-    window.sessionStorage?.getItem(PLAY_IN_BROWSER_KEY) !== '1'
+    isPhone() && !isInstalled() && !playInBrowserChosen && !readPlayInBrowser()
   );
 }
 
@@ -126,7 +143,7 @@ export function waitAtDoor({ install = false } = {}) {
     };
     skip?.addEventListener('click', () => {
       asking = false;
-      window.sessionStorage?.setItem(PLAY_IN_BROWSER_KEY, '1');
+      rememberPlayInBrowser();
       check();
     });
     window.addEventListener('resize', check);

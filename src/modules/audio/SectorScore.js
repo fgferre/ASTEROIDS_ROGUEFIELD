@@ -136,12 +136,13 @@ class SectorScore {
     const context = this.context;
     let stage;
     let boss;
+    // The stingers load on their own: the music never waits for them.
+    this._loadStingers((this._stingers = {}));
     try {
       const bytes = await this._takePrefetch(sectorId);
-      [stage, boss, this._stingers] = await Promise.all([
+      [stage, boss] = await Promise.all([
         this.load(context, score.stage, bytes?.[0]),
         this.load(context, score.boss, bytes?.[1]),
-        this._loadStingers(),
       ]);
     } catch (error) {
       console.warn('[SectorScore] could not load the score:', error);
@@ -158,14 +159,17 @@ class SectorScore {
     this._followDanger(true);
   }
 
-  async _loadStingers() {
-    const entries = await Promise.all(
-      Object.entries(SECTOR_SCORE_STINGERS).map(async ([name, url]) => [
-        name,
-        await this.load(this.context, url),
-      ])
-    );
-    return Object.fromEntries(entries);
+  /** Each stinger lands in `into` when it arrives; one that fails stays silent. */
+  _loadStingers(into) {
+    for (const [name, url] of Object.entries(SECTOR_SCORE_STINGERS)) {
+      this.load(this.context, url).then(
+        (buffer) => {
+          into[name] = buffer;
+        },
+        (error) =>
+          console.warn(`[SectorScore] could not load stinger ${name}:`, error)
+      );
+    }
   }
 
   _build(stageBuffer, bossBuffer, loopSeconds) {

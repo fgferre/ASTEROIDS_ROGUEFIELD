@@ -23,6 +23,10 @@ import {
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
 
+// A card's detail arrow on the phone, held sideways (cardScreens.css).
+const DETAIL_ARROW =
+  '<span class="card__more" aria-hidden="true"><i><svg viewBox="0 0 14 14"><path d="M3 5.5 7 9.5 11 5.5"/></svg></i></span>';
+
 // Level-up cards and the run end's buttons ignore input this long after showing.
 export const SCREEN_INPUT_LOCKOUT_MS = 400;
 // The picks that set the run's direction get their own strip.
@@ -393,7 +397,13 @@ export class LevelUpScreen {
     button.dataset.index = `${index}`;
     paintCard(button, state.definition);
     this.fillCard(button, option.id, index);
-    button.addEventListener('click', () => this.selectUpgrade(option.id));
+    button.addEventListener('click', (event) => {
+      if (event.target.closest('.card__more')) {
+        this.toggleCardDetail(button);
+        return;
+      }
+      this.selectUpgrade(option.id);
+    });
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
       // Keyboard focus follows: Enter and the highlight name the same card.
@@ -407,11 +417,21 @@ export class LevelUpScreen {
   fillCard(button, upgradeId, index) {
     const progression = this.progression();
     const state = cardState(progression, upgradeId);
-    button.innerHTML = cardMarkup(state.definition, state, {
-      weapon: this.combat().getWeaponState(),
-      key: index + 1,
-      held: progression.heldCard?.id === upgradeId,
-    });
+    button.innerHTML =
+      cardMarkup(state.definition, state, {
+        weapon: this.combat().getWeaponState(),
+        key: index + 1,
+        held: progression.heldCard?.id === upgradeId,
+      }) + DETAIL_ARROW;
+  }
+
+  // The phone's arrow (cardScreens.css): opens one card's detail, closing
+  // any other; a second tap closes it.
+  toggleCardDetail(button) {
+    const open = !button.classList.contains('is-open');
+    asArray(this.levelUpState.buttons).forEach((card) =>
+      card.classList.toggle('is-open', open && card === button)
+    );
   }
 
   selectUpgrade(upgradeId) {

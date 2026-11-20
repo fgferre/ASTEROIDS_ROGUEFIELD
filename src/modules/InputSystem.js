@@ -290,6 +290,12 @@ class InputSystem {
         }
       });
 
+      eventBus.on('pause-state-changed', (payload = {}) => {
+        if (payload?.isPaused) {
+          this.pendingStepPresses.clear();
+        }
+      });
+
       eventBus.on('game-started', (payload = {}) => {
         this.replaying = Boolean(payload.replay);
       });
@@ -635,12 +641,8 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      // A pad button pressed on the pause screen must not fire on resume.
-      const live =
-        source === 'gamepad'
-          ? this.isGameRunning()
-          : this.resolveGameScreen() === 'playing';
-      if (live) {
+      // A press made on the pause screen must not fire on resume.
+      if (this.isGameRunning()) {
         this.pendingStepPresses.add(stepField);
       }
       return;

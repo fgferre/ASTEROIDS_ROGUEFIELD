@@ -250,6 +250,7 @@ export class TacticalHud {
             ? shieldSeconds / player.shield.shieldMaxCooldown
             : 0,
         shieldKey: shieldMode === 'ready' ? this.shieldKey() : '',
+        shieldLockedPresses: player?.shield?.lockedPresses ?? 0,
       });
     }
 

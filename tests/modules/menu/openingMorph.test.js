@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   fitWord,
@@ -44,5 +45,16 @@ describe('opening morph geometry', () => {
       [0, 5],
       [10, 9],
     ]);
+  });
+
+  it("builds the opening's scene from the mark's own pieces", () => {
+    const html = readFileSync('src/index.html', 'utf8');
+    const start = html.indexOf('class="pipo-brand opening__brand"');
+    const scene = html.slice(start, html.indexOf('</svg>', start));
+    const refs = [...scene.matchAll(/href="#([\w-]+)"/g)].map((m) => m[1]);
+    expect(refs).toEqual(
+      expect.arrayContaining(['pipo-p1b', 'pipo-i', 'pipo-o', 'pipo-tag'])
+    );
+    refs.forEach((id) => expect(html).toContain(`id="${id}"`));
   });
 });

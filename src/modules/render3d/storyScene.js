@@ -364,8 +364,19 @@ export class StoryScene {
     // The reactors falter from the second shot on: the port engine dies.
     const failing = shot.id !== 'wake';
     const flicker = 0.55 + 0.45 * Math.sin(time * 23) * Math.sin(time * 7.3);
-    setWakeLight(this.wake.lights.engines[0], failing ? 0.05 : 1);
-    setWakeLight(this.wake.lights.engines[1], failing ? flicker : 1);
+    const port = failing ? 0.05 : 1;
+    const starboard = failing ? flicker : 1;
+    setWakeLight(this.wake.lights.engines[0], port);
+    setWakeLight(this.wake.lights.engines[1], starboard);
+    // The engines sound as they show (the game's engine, audio/shipEngine.js).
+    if (this.frozenAt === null) {
+      this.emit('story-engines', {
+        port,
+        starboard,
+        ship: this.shipShown ? this.thrust : 0,
+        shipSpeed: this.shipSpeed,
+      });
+    }
   }
 
   // Its sounds: each shot's as it opens, the signal's as it peaks.
@@ -391,6 +402,7 @@ export class StoryScene {
         this.at.set(...LAUNCH.inside).multiplyScalar(1 - easeInOut(k))
       );
       this.thrust = LAUNCH.idle;
+      this.shipSpeed = 0;
     } else {
       // Down clear of the keel first, then away under the bow.
       const [ahead, side] = LAUNCH.out;
@@ -398,6 +410,7 @@ export class StoryScene {
         this.at.set(ahead * k * k, LAUNCH.dive * (1 - (1 - k) ** 3), side * k)
       );
       this.thrust = LAUNCH.thrust * Math.min(1, k * 4);
+      this.shipSpeed = k;
     }
   }
 

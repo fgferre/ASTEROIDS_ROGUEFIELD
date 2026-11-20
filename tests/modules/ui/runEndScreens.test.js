@@ -184,7 +184,8 @@ describe('Run end screens', () => {
           sector,
         },
       });
-    return { victory, win, screens, showScreen, cinematics };
+    const show = (data) => screens.showVictoryScreen({ data });
+    return { victory, win, show, screens, showScreen, cinematics };
   }
 
   const CRUCIBLE = {
@@ -277,6 +278,29 @@ describe('Run end screens', () => {
       carried: true,
     });
     expect(victory.quitBtn.textContent).toBe('Campaign map');
+  });
+
+  it("a Boss Rush won shows New best from its clear, not the screen's later time", () => {
+    const { victory, show } = victoryScreen();
+    show({
+      wave: { current: 15 },
+      stats: { timeElapsed: 126, timeline: [] },
+      bossRush: { stage: 3, bestStage: 3, bestTime: 120, newBest: true },
+    });
+    expect(victory.body.innerHTML).toContain('New best');
+  });
+
+  it('a sector won again in its best time: no New best on a tie', () => {
+    const { victory, win } = victoryScreen();
+    win({
+      id: 'dense-core',
+      time: 512,
+      bestTime: 512,
+      firstClear: false,
+      newBest: false,
+      next: 'wardens-reach',
+    });
+    expect(victory.body.innerHTML).not.toContain('New best');
   });
 
   it('a sector won before its chapter ends: Sector cleared, by its name, and Next Sector', () => {

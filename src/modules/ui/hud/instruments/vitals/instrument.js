@@ -11,10 +11,13 @@
 //   active    the HP left, ACTIVE
 //   cooldown  the seconds left in amber over a thin amber bar
 // Taking the shield card lights the outline cyan round its length once
-// (Reduce Motion: a plain fade). A hull hit leaves a white chip that drains
+// (Reduce Motion: a plain fade). A shield press with no card shakes SHIELD
+// and NOT INSTALLED sideways once (Reduce Motion: they light amber instead).
+// A hull hit leaves a white chip that drains
 // into the cells; below 30 % the hull turns red.
 
 export const INSTALL_MS = 600;
+export const REFUSE_MS = 600;
 export const CHIP_HOLD_MS = 300;
 // Hull % per second the chip drains once its hold is over.
 export const CHIP_DRAIN = 60;
@@ -116,6 +119,17 @@ const CSS = `
                 .vt.is-installing .vt-install { animation-name: vt-install-fade; }
             }
             html[data-motion='reduced'] .vt.is-installing .vt-install, body.motion-reduced .vt.is-installing .vt-install { animation: vt-install-fade ${INSTALL_MS}ms ease-out forwards !important; animation-duration: ${INSTALL_MS}ms !important; }
+            /* A shield press with no card (Felipe's pick, painel-5): a small sideways shake;
+               with Reduce Motion the two words light amber instead. */
+            .vt.is-refused .vt-shield-readout { animation: vt-refuse-shake ${REFUSE_MS}ms ease-out, vt-refuse-lift ${REFUSE_MS}ms ease-out; }
+            .vt.is-refused .vt-locked { animation: vt-refuse-shake ${REFUSE_MS}ms ease-out; }
+            @media (prefers-reduced-motion: reduce) {
+                .vt.is-refused .vt-shield-readout, .vt.is-refused .vt-locked { animation-name: vt-refuse-glow; }
+            }
+            html[data-motion='reduced'] .vt.is-refused :is(.vt-shield-readout, .vt-locked), body.motion-reduced .vt.is-refused :is(.vt-shield-readout, .vt-locked) { animation: vt-refuse-glow ${REFUSE_MS}ms ease-out !important; }
+            @keyframes vt-refuse-shake { 0%, 80%, 100% { transform: none; } 12% { transform: translateX(${u(-6)}); } 30% { transform: translateX(${u(6)}); } 48% { transform: translateX(${u(-4)}); } 66% { transform: translateX(${u(2)}); } }
+            @keyframes vt-refuse-lift { 0%, 100% { opacity: 0.45; } 10%, 70% { opacity: 1; } }
+            @keyframes vt-refuse-glow { 0%, 100% { color: var(--vt-muted); } 12%, 55% { color: var(--vt-amber); opacity: 1; } }
             @keyframes vt-install { 0% { stroke-dashoffset: 1; opacity: 1; } 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
             @keyframes vt-install-fade { 0% { stroke-dashoffset: 0; opacity: 0; } 40% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }`;
 
@@ -142,6 +156,8 @@ export default {
     this.shown = {};
     this.mode = null;
     this.installUntil = 0;
+    this.refuseUntil = 0;
+    this.lockedPresses = null;
     this.lastHull = null;
     this.chip = 0;
     this.chipHoldUntil = 0;
@@ -161,6 +177,16 @@ export default {
       this.root.dataset.state = mode;
     });
     this.toggle('is-installing', now < this.installUntil);
+    // A new press with no shield card restarts the shake, even mid-shake.
+    const presses = state.shieldLockedPresses ?? 0;
+    if (this.lockedPresses !== null && presses > this.lockedPresses) {
+      this.refuseUntil = now + REFUSE_MS;
+      this.root.classList.remove('is-refused');
+      void this.root.offsetWidth;
+      this.shown['is-refused'] = null;
+    }
+    this.lockedPresses = presses;
+    this.toggle('is-refused', now < this.refuseUntil);
     this.toggle('is-critical', hull < LOW_HULL_PERCENT);
 
     this.set('hull', String(Math.round(hull)), (text) => {

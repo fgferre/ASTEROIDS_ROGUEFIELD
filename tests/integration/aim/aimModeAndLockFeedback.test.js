@@ -734,9 +734,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       withDOMStub(() => {
         const input = new InputSystem({ eventBus });
-        // Stub resolveGameScreen so the toggle path emits without needing
+        // Stub the running check so the toggle path emits without needing
         // a game-state service in the harness.
         input.resolveGameScreen = () => 'playing';
+        input.isGameRunning = () => true;
 
         // Build a fake keyboard event for the G key.
         const fakeEvent = (type) => ({
