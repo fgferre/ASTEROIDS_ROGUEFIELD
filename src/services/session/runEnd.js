@@ -202,6 +202,7 @@ export class RunEnd {
     if (this.bossRush) {
       const cleared = this.bossRushWardens === BOSS_RUSH_LAYERS.length;
       const time = cleared ? Math.floor(runTime ?? 0) : 0;
+      const before = loadRecords().bossRushTime;
       const records = updateRecords({ bossRushTime: time });
       return {
         bossRush: {
@@ -209,7 +210,8 @@ export class RunEnd {
           bestStage: records.bossRushStage,
           bestTime: records.bossRushTime,
           // Settled here, on the clear time: the screen opens seconds later.
-          newBest: time > 0 && records.bossRushTime === time,
+          // Faster than the record before it; a tie is not a new best.
+          newBest: time > 0 && (before === 0 || time < before),
         },
       };
     }
