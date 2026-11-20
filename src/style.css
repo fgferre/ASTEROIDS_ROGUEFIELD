@@ -4584,6 +4584,50 @@ body.is-paused .touch-layer {
   font-size: calc(var(--tu) * 12);
 }
 
+/* Pressed with no shield card: one small shake (Reduce Motion: it lights amber). */
+.touch-btn--shield.is-refused {
+  animation: touch-refuse-shake 600ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .touch-btn--shield.is-refused {
+    animation-name: touch-refuse-glow;
+  }
+}
+
+html[data-motion='reduced'] .touch-btn--shield.is-refused,
+body.motion-reduced .touch-btn--shield.is-refused {
+  animation: touch-refuse-glow 600ms ease-out !important;
+}
+
+@keyframes touch-refuse-shake {
+  0%,
+  80%,
+  100% {
+    transform: none;
+  }
+  12% {
+    transform: translateX(calc(var(--tu) * -5));
+  }
+  30% {
+    transform: translateX(calc(var(--tu) * 5));
+  }
+  48% {
+    transform: translateX(calc(var(--tu) * -3));
+  }
+  66% {
+    transform: translateX(calc(var(--tu) * 2));
+  }
+}
+
+@keyframes touch-refuse-glow {
+  12%,
+  55% {
+    color: #ffb347;
+    border-color: #ffb347;
+  }
+}
+
 /* Placed by the clock in play (TouchControls.placePause). */
 .touch-btn--pause {
   left: 30%;

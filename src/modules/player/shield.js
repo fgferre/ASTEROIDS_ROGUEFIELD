@@ -46,6 +46,8 @@ export class PlayerShield {
   constructor({ getEventBus, getPosition }) {
     this.getEventBus = getEventBus;
     this.getPosition = getPosition;
+    // Presses with no shield card, run after run: the vitals shake on each new one.
+    this.lockedPresses = 0;
     this.resetShieldState();
   }
 
@@ -123,6 +125,7 @@ export class PlayerShield {
 
   activateShield() {
     if (this.shieldUpgradeLevel <= 0) {
+      this.lockedPresses += 1;
       this.emitShieldActivationFailed('locked');
       return false;
     }

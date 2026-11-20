@@ -47,7 +47,8 @@
 // vitals     { now, shield, maxShield, hull, maxHull, shieldMode ('locked':
 //            no shield card yet | 'ready' | 'active' | 'cooldown'),
 //            shieldSeconds and shieldCooldown (fraction) of the cooldown
-//            left, shieldKey (the bound key's label while ready) }
+//            left, shieldKey (the bound key's label while ready),
+//            shieldLockedPresses (shield presses with no card, a running count) }
 // hull-ring  { now, ship, shield, maxShield, hull, maxHull }
 // recharges  { now, ship, dash (1 right after a dash, 0 ready), shield (the
 //            broken shield's cooldown left, 0 when up or none) }
