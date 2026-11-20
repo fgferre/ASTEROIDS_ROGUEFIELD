@@ -621,10 +621,11 @@ select {
 }
 
 /* The mark's scene while the game loads (Felipe's concept, 19/11), 7.3 s,
-   one timeline: the "o" is the robot from behind, antenna down; it twitches,
-   turns (its face comes round), tilts its head and blinks twice into smiling
-   eyes, then hops off over the letters (each dips, the i's dot springs),
-   shrinking to its place before the "p". At rest every part shows the end. */
+   one timeline: the "o" is the robot from behind, closed and white; it turns
+   (its hollow face comes round, the antenna springs up), tilts its head and
+   blinks twice into smiling eyes, then hops off over the letters (each dips,
+   the i's dot springs), round now and shrinking to its place before the "p".
+   At rest every part shows the end (the round shape is in the drawing). */
 .opening__brand
   :is(
     .om-rx,
@@ -632,6 +633,9 @@ select {
     .om-rs,
     .om-squash,
     .om-tilt,
+    .om-shell,
+    .om-hole,
+    .om-antpos,
     .om-ant,
     .om-face,
     .om-eyes,
@@ -664,7 +668,7 @@ select {
 }
 
 .opening__brand .om-squash {
-  transform-origin: 0 62px;
+  transform-origin: 0 54px;
   animation-name: om-squash;
 }
 
@@ -674,8 +678,20 @@ select {
 }
 
 .opening__brand .om-ant {
-  transform-origin: 5px -61px;
+  transform-origin: 6px -60px;
   animation-name: om-ant;
+}
+
+.opening__brand .om-shell {
+  animation-name: om-shell;
+}
+
+.opening__brand .om-hole {
+  animation-name: om-hole;
+}
+
+.opening__brand .om-antpos {
+  animation-name: om-antpos;
 }
 
 .opening__brand .om-face {
@@ -765,44 +781,44 @@ select {
     transform: translateY(52px);
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
-  69.51% {
-    transform: translateY(-119px);
+  69.47% {
+    transform: translateY(-112px);
     animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3);
   }
   71.92% {
-    transform: translateY(-69px);
+    transform: translateY(-61px);
     animation-timing-function: linear;
   }
   73.70% {
-    transform: translateY(-69px);
+    transform: translateY(-61px);
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
-  77.40% {
-    transform: translateY(-139px);
+  77.41% {
+    transform: translateY(-132px);
     animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3);
   }
   79.86% {
-    transform: translateY(-108px);
+    transform: translateY(-101px);
     animation-timing-function: linear;
   }
   81.64% {
-    transform: translateY(-108px);
+    transform: translateY(-101px);
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
   84.06% {
-    transform: translateY(-139px);
+    transform: translateY(-132px);
     animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3);
   }
   87.81% {
-    transform: translateY(-64px);
+    transform: translateY(-57px);
     animation-timing-function: linear;
   }
   89.59% {
-    transform: translateY(-64px);
+    transform: translateY(-57px);
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
-  92.05% {
-    transform: translateY(-117px);
+  92.08% {
+    transform: translateY(-110px);
     animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3);
   }
   96.58% {
@@ -944,75 +960,55 @@ select {
 
 @keyframes om-ant {
   0.00% {
-    transform: rotate(60deg);
+    transform: scale(0) rotate(0deg);
     animation-timing-function: linear;
   }
-  17.81% {
-    transform: rotate(60deg);
+  31.51% {
+    transform: scale(0) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1.4);
+  }
+  34.93% {
+    transform: scale(1) rotate(-16deg);
     animation-timing-function: ease-in-out;
-  }
-  19.18% {
-    transform: rotate(46deg);
-    animation-timing-function: ease-in-out;
-  }
-  20.55% {
-    transform: rotate(64deg);
-    animation-timing-function: ease-in-out;
-  }
-  21.92% {
-    transform: rotate(50deg);
-    animation-timing-function: ease-in-out;
-  }
-  23.56% {
-    transform: rotate(60deg);
-    animation-timing-function: linear;
-  }
-  32.88% {
-    transform: rotate(60deg);
-    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
   }
   37.67% {
-    transform: rotate(-16deg);
+    transform: scale(1) rotate(11deg);
     animation-timing-function: ease-in-out;
   }
-  40.41% {
-    transform: rotate(11deg);
+  40.00% {
+    transform: scale(1) rotate(-5deg);
     animation-timing-function: ease-in-out;
   }
-  42.74% {
-    transform: rotate(-5deg);
+  42.19% {
+    transform: scale(1) rotate(2deg);
     animation-timing-function: ease-in-out;
   }
-  44.93% {
-    transform: rotate(2deg);
-    animation-timing-function: ease-in-out;
-  }
-  46.58% {
-    transform: rotate(0deg);
+  43.84% {
+    transform: scale(1) rotate(0deg);
     animation-timing-function: linear;
   }
   64.66% {
-    transform: rotate(0deg);
+    transform: scale(1) rotate(0deg);
     animation-timing-function: ease-in-out;
   }
   66.44% {
-    transform: rotate(-14deg);
+    transform: scale(1) rotate(-14deg);
     animation-timing-function: ease-in-out;
   }
   69.86% {
-    transform: rotate(6deg);
+    transform: scale(1) rotate(6deg);
     animation-timing-function: ease-in-out;
   }
   96.58% {
-    transform: rotate(0deg);
+    transform: scale(1) rotate(0deg);
     animation-timing-function: ease-in-out;
   }
   97.95% {
-    transform: rotate(12deg);
+    transform: scale(1) rotate(12deg);
     animation-timing-function: ease-in-out;
   }
   100.00% {
-    transform: rotate(0deg);
+    transform: scale(1) rotate(0deg);
   }
 }
 
@@ -1021,12 +1017,12 @@ select {
     transform: translateX(-60px) scaleX(0.2);
     animation-timing-function: linear;
   }
-  26.03% {
+  21.92% {
     transform: translateX(-60px) scaleX(0.2);
     animation-timing-function: cubic-bezier(0.35, 0, 0.25, 1);
   }
-  36.99% {
-    transform: translateX(0) scaleX(1);
+  32.88% {
+    transform: none;
     animation-timing-function: linear;
   }
   100.00% {
@@ -1057,6 +1053,60 @@ select {
   }
   100.00% {
     transform: none;
+  }
+}
+
+@keyframes om-shell {
+  0.00% {
+    transform: none;
+    animation-timing-function: linear;
+  }
+  65.07% {
+    transform: none;
+    animation-timing-function: ease-in-out;
+  }
+  69.18% {
+    transform: scale(1, 0.871);
+    animation-timing-function: linear;
+  }
+  100.00% {
+    transform: scale(1, 0.871);
+  }
+}
+
+@keyframes om-hole {
+  0.00% {
+    transform: none;
+    animation-timing-function: linear;
+  }
+  65.07% {
+    transform: none;
+    animation-timing-function: ease-in-out;
+  }
+  69.18% {
+    transform: scale(1.4, 1.105);
+    animation-timing-function: linear;
+  }
+  100.00% {
+    transform: scale(1.4, 1.105);
+  }
+}
+
+@keyframes om-antpos {
+  0.00% {
+    transform: none;
+    animation-timing-function: linear;
+  }
+  65.07% {
+    transform: none;
+    animation-timing-function: ease-in-out;
+  }
+  69.18% {
+    transform: translateY(8px);
+    animation-timing-function: linear;
+  }
+  100.00% {
+    transform: translateY(8px);
   }
 }
 
