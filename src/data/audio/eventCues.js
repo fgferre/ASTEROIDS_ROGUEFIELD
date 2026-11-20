@@ -234,7 +234,8 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'shield-hit', cue: 'playShieldImpact' },
   { on: 'shield-broken', cue: 'playShieldBreak' },
   { on: 'shield-recharged', cue: 'playShieldRecharged' },
-  { on: 'shield-activation-failed', cue: 'playShieldFail' },
+  // Tapping fast plays one blip, not a buzz.
+  { on: 'shield-activation-failed', cue: 'playShieldFail', throttleMs: 250 },
   { on: 'player-health-changed', run: 'playerHealth' },
   { on: 'player-healed', run: 'playerHealth' },
   { on: 'thruster-effect', run: 'listener' },

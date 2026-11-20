@@ -650,6 +650,7 @@ export class AAAHudLayout {
     shieldSeconds,
     shieldCooldown,
     shieldKey,
+    shieldLockedPresses,
   }) {
     const now = performance.now();
     const vitals = {
@@ -665,6 +666,7 @@ export class AAAHudLayout {
       shieldSeconds,
       shieldCooldown,
       shieldKey,
+      shieldLockedPresses,
     });
     this._feed('hull-ring', { ...vitals, now, ship });
     this._feed('recharges', { now, ship, dash, shield: shieldCooldown });

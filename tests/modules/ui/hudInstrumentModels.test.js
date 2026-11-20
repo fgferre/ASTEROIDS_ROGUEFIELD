@@ -366,6 +366,33 @@ describe('HUD instrument models', () => {
     expect(chip()).toBeCloseTo(213.6);
   });
 
+  it('vitals: a shield press with no card shakes once, from the next press on', () => {
+    const { model, has } = mount('vitals', 'instrument');
+    const at = (now, shieldLockedPresses) =>
+      model.update({
+        now,
+        shield: 0,
+        maxShield: 1,
+        hull: 100,
+        maxHull: 100,
+        shieldMode: 'locked',
+        shieldSeconds: 0,
+        shieldCooldown: 0,
+        shieldKey: '',
+        shieldLockedPresses,
+      });
+
+    // Presses from before it was mounted do not shake it.
+    at(0, 2);
+    expect(has('.vt', 'is-refused')).toBe(false);
+    at(100, 3);
+    expect(has('.vt', 'is-refused')).toBe(true);
+    at(650, 3);
+    expect(has('.vt', 'is-refused')).toBe(true);
+    at(700, 3);
+    expect(has('.vt', 'is-refused')).toBe(false);
+  });
+
   it("vitals: the shield's state is read from the deflector as it runs", () => {
     expect(shieldStatus(undefined).mode).toBe('locked');
     expect(shieldStatus({ shieldUpgradeLevel: 0 }).mode).toBe('locked');

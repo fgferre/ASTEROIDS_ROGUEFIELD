@@ -53,6 +53,7 @@ describe('Tactical HUD', () => {
       shieldSeconds: 0,
       shieldCooldown: 0,
       shieldKey: 'E',
+      shieldLockedPresses: 0,
     });
     expect(layout.updateStats).toHaveBeenCalledWith({
       clock: '00:01:15',

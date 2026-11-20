@@ -30,6 +30,16 @@ describe('PlayerShield', () => {
     ]);
   });
 
+  it('counts the presses made with no shield card, and only those', () => {
+    const { shield } = shieldAt(0);
+    expect(shield.lockedPresses).toBe(1);
+    shield.activateShield();
+    expect(shield.lockedPresses).toBe(2);
+    const { shield: owned } = shieldAt(1);
+    owned.activateShield(); // already up: refused, but not for the card
+    expect(owned.lockedPresses).toBe(0);
+  });
+
   it('below level 5, breaking deals no damage', () => {
     const { shield, events } = shieldAt(4);
     shield.shieldTookDamage(1e6);

@@ -144,6 +144,14 @@ export class TouchControls {
       this.stick = CENTRED;
       requestAnimationFrame(() => this.placePause());
     });
+    // No shield card yet: the button shakes once per press, like the vitals.
+    const shield = this.layer.querySelector('.touch-btn--shield');
+    this.eventBus.on('shield-activation-failed', ({ reason } = {}) => {
+      if (reason !== 'locked') return;
+      shield.classList.remove('is-refused');
+      void shield.offsetWidth;
+      shield.classList.add('is-refused');
+    });
     window.addEventListener('resize', () => {
       this.placePause();
       this.holdWhileUpright();
