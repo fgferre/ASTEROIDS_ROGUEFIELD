@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setupLoadingScreen } from '../../../src/modules/menu/loadingScreen.js';
+import {
+  MENU_IDLE_MS,
+  setupLoadingScreen,
+} from '../../../src/modules/menu/loadingScreen.js';
 import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
 import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
 
@@ -59,7 +62,13 @@ function boot(
     'press-start-btn': button,
   };
   const docListeners = {};
-  vi.stubGlobal('window', { location: { search } });
+  const winListeners = {};
+  // What is open over the menu (panelOpen in loadingScreen.js).
+  const page = { overlays: [] };
+  vi.stubGlobal('window', {
+    location: { search },
+    addEventListener: (type, fn) => (winListeners[type] = fn),
+  });
   vi.stubGlobal('navigator', {
     getGamepads: () => pad.pads,
     userActivation: { hasBeenActive: awake },
@@ -75,6 +84,8 @@ function boot(
     addEventListener: (type, fn) => (docListeners[type] = fn),
     removeEventListener: (type) => delete docListeners[type],
     body: { dataset: { inputDevice: device } },
+    querySelector: () => null,
+    querySelectorAll: () => page.overlays,
   });
   let complete;
   let progress;
@@ -92,12 +103,22 @@ function boot(
   if (via === 'click') screen.listeners.click();
   if (via === 'pad') {
     const idle = pad.pads;
-    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.pads = [{ buttons: [{ pressed: true }], axes: [] }];
     pad.frame();
     pad.pads = idle;
   }
   if (via !== 'none') vi.advanceTimersByTime(600);
-  return { screen, menu, menuButton, button, docListeners, hint, pad };
+  return {
+    screen,
+    menu,
+    menuButton,
+    button,
+    docListeners,
+    winListeners,
+    page,
+    hint,
+    pad,
+  };
 }
 
 const enter = () => ({
@@ -256,11 +277,11 @@ describe('loading screen PRESS START gate', () => {
   });
 
   it('opens the menu on pad A or Start, once', () => {
-    const pad = { pads: [{ buttons: [{ pressed: false }] }] };
+    const pad = { pads: [{ buttons: [{ pressed: false }], axes: [] }] };
     const { menu, menuButton } = boot('', pad);
     pad.frame();
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
-    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.pads = [{ buttons: [{ pressed: true }], axes: [] }];
     pad.frame();
     vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
@@ -270,13 +291,13 @@ describe('loading screen PRESS START gate', () => {
   it('ignores a pad button already held when the gate appears', () => {
     const held = Array(10).fill({ pressed: false });
     held[9] = { pressed: true };
-    const pad = { pads: [{ buttons: held }] };
+    const pad = { pads: [{ buttons: held, axes: [] }] };
     const { menu } = boot('', pad);
     pad.frame();
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
-    pad.pads = [{ buttons: [{ pressed: false }] }];
+    pad.pads = [{ buttons: [{ pressed: false }], axes: [] }];
     pad.frame();
-    pad.pads = [{ buttons: [{ pressed: true }] }];
+    pad.pads = [{ buttons: [{ pressed: true }], axes: [] }];
     pad.frame();
     vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
@@ -326,6 +347,48 @@ describe('loading screen PRESS START gate', () => {
     expect(onLeave).not.toHaveBeenCalled();
     screen.listeners.click();
     expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  // Into the menu through the gate and the pilots.
+  function inMenu() {
+    const game = boot('');
+    game.docListeners.keydown(enter());
+    vi.advanceTimersByTime(1000);
+    return game;
+  }
+  const escape = () => ({ key: 'Escape' });
+
+  it('Escape on the menu brings the gate back, and its press goes through the pilots again', () => {
+    const { screen, menu, button, docListeners, winListeners } = inMenu();
+    openPilotSelect.mockClear();
+    winListeners.keydown(escape());
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    expect(screen.classes.has('hidden')).toBe(false);
+    expect(screen.classes.has('loading-screen--starting')).toBe(false);
+    expect(button.focus).toHaveBeenCalledTimes(2);
+    docListeners.keydown(enter());
+    vi.advanceTimersByTime(1000);
+    expect(openPilotSelect).toHaveBeenCalledTimes(1);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+  });
+
+  it('Escape with a panel open leaves the menu to the panel', () => {
+    const { menu, winListeners, page } = inMenu();
+    page.overlays = [{ closest: () => null }];
+    winListeners.keydown(escape());
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+  });
+
+  it('the menu left idle goes back to the gate; any input restarts the wait', () => {
+    const { menu, winListeners } = inMenu();
+    clock.now += MENU_IDLE_MS - 1000;
+    winListeners.pointermove();
+    clock.now += MENU_IDLE_MS - 1000;
+    vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    clock.now += 1000;
+    vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(
