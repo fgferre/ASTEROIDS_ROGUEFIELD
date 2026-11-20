@@ -420,8 +420,22 @@ export function morphIntoTitle(loadingScreen) {
   const body = robot.appendChild(
     brand.querySelector('.om-body').cloneNode(true)
   );
-  // Facing us now; the hidden mark's clip would hide the face.
+  // Facing us now, round and truly hollow over the game: the shell becomes
+  // its ring and the dark hole goes (the hidden mark's clip would hide the
+  // face).
   body.querySelector('[clip-path]').removeAttribute('clip-path');
+  body.querySelector('.om-hole').remove();
+  const shell = body.querySelector('.om-shell');
+  for (const [k, v] of Object.entries({
+    rx: 48,
+    ry: 48,
+    fill: 'none',
+    stroke: '#eaf3f7',
+    'stroke-width': 12,
+  })) {
+    shell.setAttribute(k, v);
+  }
+  shell.removeAttribute('transform');
   const fly = svg(
     'animateTransform',
     {
