@@ -9,7 +9,6 @@ import {
   SECTOR_SCORE_MIX as MIX,
   chapterScoreForLayer,
 } from '../../data/audio/sectorScores.js';
-import { STORY_MUSIC } from '../../data/audio/music.js';
 import { STORY_SHOT_MS } from '../../core/cinematics.js';
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
@@ -167,7 +166,7 @@ export const AUDIO_EVENT_HANDLERS = {
   // sector's chapter (the run's sector, set as it started), plays alone, the
   // layers held down; at its end (or a skip) the sector's music comes in.
   journeyPlanned(audio, payload) {
-    // The story's music (STORY_MUSIC 'journey') already plays it on.
+    // The story's music already plays it on (storyScore).
     if (audio.storyScored) return;
     const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
     if (audio.journeyCue.play({ ...payload, chapter })) {
@@ -196,13 +195,12 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sfxBus.engine.stopStory();
   },
   holdScore(audio) {
-    if (STORY_MUSIC === 'sector') return;
     audio.sectorScore.holdForJourney(true);
   },
-  // STORY_MUSIC 'journey': the journey's recording from the hangar shot, its
-  // hit on the launch (the next shot), on through the journey after.
+  // The story's music (the owner's card som-cena-1, 19/11): the journey's
+  // recording from the hangar shot, its hit on the launch (the next shot), on
+  // through the journey after.
   storyScore(audio) {
-    if (STORY_MUSIC !== 'journey') return;
     const chapter = sectorById(audio.sectorScore.sectorId)?.chapter;
     const toLaunch = STORY_SHOT_MS[STORY_SHOT_MS.length - 2] / 1000;
     const moments = [{ id: 'leap', at: toLaunch }];
