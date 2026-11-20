@@ -7,16 +7,25 @@
 // screen), with a button to play in the browser anyway (remembered for the
 // session). TouchControls brings the turn notice back when turned upright
 // mid-run. `?desktop=force` keeps the desktop path on any device (captures).
+// A screen that declares a mouse (a car, a touch laptop) plays by touch once a
+// finger touches it (onFinger) until a key or pad, or for good with
+// `?touch=force`, for a browser that sends its touches as a mouse
+// (input/touchControls.js decides; setTouchShown tells touchScreen).
 
 import { debugLog } from '../core/debugLogging.js';
 
 const DESKTOP_FORCE_PARAM = 'desktop';
 const DESKTOP_FORCE_VALUE = 'force';
+const TOUCH_FORCE_PARAM = 'touch';
 /** A screen whose short side is under this (CSS px) is a phone. */
 const PHONE_MAX_SIDE = 500;
 const PLAY_IN_BROWSER_KEY = 'roguefield:play-in-browser';
 /** The choice for this visit when sessionStorage is blocked (Safari private modes). */
 let playInBrowserChosen = false;
+/** Touch play is on where the device does not declare it (setTouchShown). */
+let touchShown = false;
+let fingerSeen = false;
+let fingerHandler = null;
 
 export const TURN_TEXT = 'Turn your device sideways to play';
 export const INSTALL_TEXT_IOS =
@@ -39,13 +48,38 @@ function isTouchDevice() {
   return hasTouchStart || hasTouchPoints;
 }
 
-/** True when ?desktop=force is in the URL (case-insensitive value). */
-function hasForceDesktopFlag() {
+/** True when ?<param>=force is in the URL (case-insensitive value). */
+function hasForceFlag(param) {
   const params = new URLSearchParams(window.location?.search || '');
-  return (
-    params.get(DESKTOP_FORCE_PARAM)?.trim().toLowerCase() ===
-    DESKTOP_FORCE_VALUE
-  );
+  return params.get(param)?.trim().toLowerCase() === DESKTOP_FORCE_VALUE;
+}
+
+const hasForceDesktopFlag = () => hasForceFlag(DESKTOP_FORCE_PARAM);
+
+/** ?touch=force: touch play from the start, mouse-type pointers included. */
+export const hasForceTouchFlag = () => hasForceFlag(TOUCH_FORCE_PARAM);
+
+/** A screen that does not declare touch may still turn to it (not ?desktop=force). */
+export const mayTurnToTouch = () => !hasForceDesktopFlag();
+
+/** Touch play turned on or off where the device does not declare it. */
+export function setTouchShown(on) {
+  touchShown = on;
+}
+
+/**
+ * Calls `handler` on each finger press since the boot (at once if one came
+ * already): a pointer of type touch, whatever the browser declares.
+ */
+export function onFinger(handler) {
+  fingerHandler = handler;
+  if (fingerSeen) handler();
+}
+
+function noteFinger(event) {
+  if (event.pointerType !== 'touch') return;
+  fingerSeen = true;
+  fingerHandler?.();
 }
 
 export const isPortrait = () => window.innerHeight > window.innerWidth;
@@ -59,11 +93,12 @@ const isPhone = () =>
 /**
  * The touch screen the game is played on, 'phone' or 'tablet' (the HUD has
  * a layout for each, data/ui/hudPresets.js), or null when it is not played
- * by touch: what mobileGuard below lets in.
+ * by touch: what mobileGuard below lets in, or a screen played by touch
+ * since (setTouchShown).
  */
 export function touchScreen() {
-  if (typeof window === 'undefined' || !isTouchDevice()) return null;
-  if (hasForceDesktopFlag()) return null;
+  if (typeof window === 'undefined' || hasForceDesktopFlag()) return null;
+  if (!touchShown && !isTouchDevice()) return null;
   return isPhone() ? 'phone' : 'tablet';
 }
 
@@ -158,7 +193,11 @@ export function waitAtDoor({ install = false } = {}) {
  * @returns {Promise<{ touch: boolean }>}
  */
 export async function mobileGuard() {
-  if (typeof window === 'undefined' || !isTouchDevice()) {
+  if (typeof window === 'undefined') {
+    return { touch: false };
+  }
+  if (!isTouchDevice()) {
+    window.addEventListener('pointerdown', noteFinger, true);
     return { touch: false };
   }
   if (hasForceDesktopFlag()) {
