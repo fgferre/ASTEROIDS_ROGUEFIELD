@@ -5393,6 +5393,78 @@ body.touch-play .hud-frame [data-touch-action]::after {
   color: var(--text-dim);
 }
 
+/* iPhone and iPad: the two steps to the Home Screen, with Safari's glyphs. */
+.door-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  font-family: var(--font-ui);
+}
+
+.door-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  text-align: left;
+  font-size: var(--text-md);
+}
+
+.door-step > b {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 13px;
+}
+
+.door-step__key {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #1c2128;
+  color: #4da3ff;
+}
+
+.door-step__key svg {
+  width: 28px;
+  height: 28px;
+}
+
+.door-step small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.door-notice [hidden],
+.prep-links [hidden] {
+  display: none;
+}
+
+.menu-install__icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 }
 

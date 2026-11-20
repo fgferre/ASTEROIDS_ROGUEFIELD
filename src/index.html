@@ -418,6 +418,23 @@
               >
                 Settings
               </button>
+              <!-- Only while the browser offers to install (installPrompt.js) -->
+              <button
+                id="menu-install-btn"
+                class="menu-screen__button menu-screen__button--link"
+                type="button"
+                data-hint="Install the game: full screen, from its own icon."
+                hidden
+              >
+                <svg
+                  class="menu-install__icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14" />
+                </svg>
+                Install
+              </button>
             </nav>
             <div class="prep-main">
               <section
