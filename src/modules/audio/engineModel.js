@@ -11,6 +11,7 @@
  *   engine.set({ thrust, lateral, speed, tier });   // any subset, any time
  *   engine.update(dt);                              // every frame
  *   engine.shot({ recoil }); engine.dash(); engine.brake(); engine.stop();
+ *   engine.running();   // already at its thrust, no ignition (a cinematic opens on it)
  *
  * Inputs (all clamped):
  *   thrust  0..1   main engine
@@ -370,11 +371,22 @@ export function createEngineModel({
     silenceOneshots();
   }
 
+  /** Already at its thrust (a cinematic opens on it): no ignition, no spin-up. */
+  function running() {
+    Object.assign(st, {
+      on: input.thrust > 0.04,
+      spool: input.thrust,
+      thrustS: input.thrust,
+      lastIgnition: ctx.currentTime,
+    });
+  }
+
   return {
     set,
     update,
     shot,
     stop,
+    running,
     dash: () => play('dash'),
     brake: () => play('brake'),
     /** Master level of the engine and its one-shots (linear). */

@@ -96,6 +96,12 @@ export const JOURNEY_CUES = Object.freeze({
   4: url('journey-crucible.mp3'),
 });
 export const JOURNEY_CUE_HIT_SECONDS = 6;
+// The story before the first journey (render3d/storyScene.js) plays the
+// whole recording the Outer Ring's journey cue is cut from (Flow Music j1-a,
+// from 10.48 s): in from its first shot, its hits near the line ending the
+// first shot, the hangar and the leap, held on until the journey after it
+// ends (the owner's version A, card som-cena-2, 19/11).
+export const STORY_CUE = url('story-outer-ring.mp3');
 
 // Feel values (proposta): the danger (0..1, MusicMixer.runIntensity) opens
 // the stage's lowpass and lifts its level; the boss and the ends crossfade.

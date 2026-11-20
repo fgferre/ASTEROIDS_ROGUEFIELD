@@ -61,4 +61,16 @@ describe('journeyCue: the recording of the destination chapter', () => {
     cue.end();
     expect(sources[0].stop).toHaveBeenCalledWith(context.currentTime + 0.15);
   });
+
+  it('plays any recording by its url, fetched once when prefetched', async () => {
+    const { cue, load } = setup();
+    const url = 'https://example.test/story.mp3';
+
+    cue.prefetch({ url });
+    expect(cue.play({ url, duration: 0 })).toBe(true);
+    await Promise.resolve();
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load.mock.calls[0][1]).toBe(url);
+  });
 });

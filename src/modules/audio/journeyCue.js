@@ -1,5 +1,6 @@
 // The journey's score: a recording per destination chapter
-// (JOURNEY_CUES, data/audio/sectorScores.js), played on the music path so
+// (JOURNEY_CUES, data/audio/sectorScores.js), or any recording given by its
+// `url` (the story's, STORY_CUE), played on the music path so
 // the music slider, Mute All and the voices' duck apply. Each file has its
 // "jump hit" JOURNEY_CUE_HIT_SECONDS in; a journey with a leap starts the
 // file so the hit lands on the leap, a hop's at the start. `end` fades it
@@ -26,30 +27,29 @@ export function createJourneyCue({
   getDestination,
   load = fetchAndDecode,
 }) {
-  const buffers = new Map(); // chapter -> Promise<AudioBuffer | null>
+  const buffers = new Map(); // url -> Promise<AudioBuffer | null>
   let playing = null; // { context, source, out, endAt, timer }
   let token = 0;
 
-  function buffer(chapter) {
-    const url = JOURNEY_CUES[chapter];
+  function buffer(url) {
     const context = getContext();
     if (!url || !context) return null;
-    if (!buffers.has(chapter)) {
+    if (!buffers.has(url)) {
       buffers.set(
-        chapter,
+        url,
         load(context, url).catch((error) => {
-          buffers.delete(chapter);
+          buffers.delete(url);
           console.warn('[journeyCue] could not load the cue:', error);
           return null;
         })
       );
     }
-    return buffers.get(chapter);
+    return buffers.get(url);
   }
 
-  /** The destination's cue is fetched ahead, so play() need not wait. */
-  function prefetch(chapter) {
-    buffer(chapter);
+  /** The destination's cue (or `url`) is fetched ahead, so play() need not wait. */
+  function prefetch({ chapter, url = JOURNEY_CUES[chapter] } = {}) {
+    buffer(url);
   }
 
   function release(cue) {
@@ -80,18 +80,23 @@ export function createJourneyCue({
   }
 
   /**
-   * Starts the recording of `chapter` for a journey whose `moments`
+   * Starts the recording of `chapter` (or `url`) for a journey whose `moments`
    * ([{ id, at }]) and end (`duration`) fall that many seconds from now.
    * False when nothing will play; true when it plays (once loaded).
    */
-  function play({ moments = [], duration, chapter } = {}) {
+  function play({
+    moments = [],
+    duration,
+    chapter,
+    url = JOURNEY_CUES[chapter],
+  } = {}) {
     stop();
     const context = getContext();
     if (!context || !getDestination() || context.state !== 'running') {
       return false;
     }
     if (!Number.isFinite(duration)) return false;
-    const pending = buffer(chapter);
+    const pending = buffer(url);
     if (!pending) return false;
 
     const mine = ++token;

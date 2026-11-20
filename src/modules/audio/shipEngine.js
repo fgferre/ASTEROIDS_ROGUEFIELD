@@ -53,6 +53,12 @@ export function engineTier(ranks) {
 
 const idleStep = () => ({ main: 0, retro: 0, left: 0, right: 0, automatic: 0 });
 
+// proposta 19/11 (the owner's ask: the cutscenes' engines as the game's): the
+// story's freighter (render3d/storyScene.js) runs each of its two engines as
+// this engine at this share of its light, the failing one cutting out and
+// the other faltering as their lights do.
+const FREIGHTER_THRUST = 0.6;
+
 /**
  * @param {import('./SFXBus.js').SfxKit} sfx - the bus toolkit (live context,
  *   protected destination, seeded scopes); never the bus itself.
@@ -67,6 +73,8 @@ export function createShipEngine(sfx) {
   let clock = null; // audio time of the last update
   let lastStepAt = null; // performance.now() of the last step; null at rest
   let shotPending = false;
+  let make = null; // () => a new model on the decoded files, once decoded
+  let story = null; // the story's engines: { port, starboard, ship, clock }
 
   /** Decode what was fetched, once the AudioContext and the buses exist. */
   async function decode() {
@@ -95,8 +103,17 @@ export function createShipEngine(sfx) {
       // The sample layer's seeded scope (reseeded per run), read live.
       const random = () =>
         sfx.resolveRandom(sfx.randomScopes?.families?.impact).float();
-      model = createEngineModel({ context, destination, buffers, random });
-      model.setVolume(dbToGain(manifest.level));
+      make = () => {
+        const engine = createEngineModel({
+          context,
+          destination,
+          buffers,
+          random,
+        });
+        engine.setVolume(dbToGain(manifest.level));
+        return engine;
+      };
+      model = make();
     } catch (error) {
       console.warn(
         '[Engine] The engine files did not decode; the thrusters stay synthesized.',
@@ -177,6 +194,46 @@ export function createShipEngine(sfx) {
     step = idleStep();
   }
 
+  /**
+   * One frame of the story: its freighter's two engines (`port`, `starboard`,
+   * each its light 0..1) and the interceptor (`ship`, its thrust; `shipSpeed`
+   * 0..1), each its own copy of this engine with the game's dynamics. The
+   * scene opens on running engines: they start with no ignition (the launch's
+   * is the story's one).
+   */
+  function followStory({ port = 0, starboard = 0, ship = 0, shipSpeed = 0 }) {
+    if (!make) return;
+    const now = sfx.context.currentTime;
+    if (!story) story = { port: make(), starboard: make(), ship: null };
+    story.port.set({ thrust: port * FREIGHTER_THRUST });
+    story.starboard.set({ thrust: starboard * FREIGHTER_THRUST });
+    if (!story.ship && ship > 0) {
+      story.ship = make();
+      story.ship.set({ thrust: ship, speed: shipSpeed });
+      story.ship.running();
+    }
+    story.ship?.set({ thrust: ship, speed: shipSpeed });
+    if (story.clock === undefined) {
+      story.port.running();
+      story.starboard.running();
+    }
+    const dt = story.clock === undefined ? 0 : now - story.clock;
+    [story.port, story.starboard, story.ship].forEach((engine) =>
+      engine?.update(dt)
+    );
+    story.clock = now;
+  }
+
+  /** The story is over: its engines fade and are let go. */
+  function stopStory() {
+    if (!story) return;
+    [story.port, story.starboard, story.ship].forEach((engine) => {
+      engine?.stop();
+      setTimeout(() => engine?.dispose(), 500);
+    });
+    story = null;
+  }
+
   /** At rest at once: pause, death, menu, a new run. */
   function stop() {
     model?.stop();
@@ -193,6 +250,8 @@ export function createShipEngine(sfx) {
     decode,
     follow,
     flightStep,
+    followStory,
+    stopStory,
     stop,
     /** The player's own shot: the duck and puffs land on the next step. */
     shot() {
@@ -221,6 +280,7 @@ export function createShipEngine(sfx) {
     dispose() {
       disposed = true;
       fetched = null;
+      stopStory();
       model?.dispose();
       model = null;
     },
