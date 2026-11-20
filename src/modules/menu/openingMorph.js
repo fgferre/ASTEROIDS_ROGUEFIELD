@@ -2,10 +2,11 @@
 //
 // The opening's way out (the owner's pick, 19/11): the studio's mark comes
 // apart and its strokes re-form as the PRESS START title, in the title's own
-// place, while the robot (the mark's "o") hops and flies off. It is a
-// throwaway SVG over the screen, animated by SMIL; the gate's real title takes
-// over when it ends. The game's letter is drawn here as single strokes (wide,
-// rounded corners) only for the way there.
+// place, while the robot crouches and flies off from wherever the opening's
+// scene has it (style.css's om- keyframes; a press can come mid-scene). It is
+// a throwaway SVG over the screen, animated by SMIL; the gate's real title
+// takes over when it ends. The game's letter is drawn here as single strokes
+// (wide, rounded corners) only for the way there.
 
 const NS = 'http://www.w3.org/2000/svg';
 const POINTS = 48;
@@ -283,9 +284,8 @@ function reducedMotion() {
  * measured in the fallback font).
  */
 export function morphIntoTitle(loadingScreen) {
-  const symbol = document.getElementById('pipo-brand');
   const brand = loadingScreen.querySelector('.opening__brand');
-  if (!symbol || !brand || reducedMotion()) return null;
+  if (!brand?.querySelector('.om-word') || reducedMotion()) return null;
   if (!document.fonts.check('600 16px Orbitron')) return null;
 
   // The gate's title, laid out unseen for one measurement.
@@ -298,19 +298,28 @@ export function morphIntoTitle(loadingScreen) {
   );
   loadingScreen.classList.remove('loading-screen--measure');
 
-  // The mark's units to the screen (the symbol's viewBox, centred, fitted).
-  const vb = symbol.viewBox.baseVal;
-  const at = brand.getBoundingClientRect();
-  const s = Math.min(at.width / vb.width, at.height / vb.height);
-  const ox = at.left + (at.width - vb.width * s) / 2 - vb.x * s;
-  const oy = at.top + (at.height - vb.height * s) / 2 - vb.y * s;
-  const toScreen = (pts) => pts.map(([x, y]) => [ox + x * s, oy + y * s]);
+  // Each piece where the scene has it now: a <use> of #pipo-brand's path(s),
+  // mapped by its own screen matrix (the scene's motion included).
+  const ref = (use) =>
+    document.getElementById(use.getAttribute('href').slice(1));
+  const paths = (use) => {
+    const el = ref(use);
+    return el.tagName === 'path' ? [el] : [...el.querySelectorAll('path')];
+  };
+  const toScreen = (m, pts) =>
+    pts.map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
   const strokes = (sel) =>
-    [...symbol.querySelectorAll(`${sel} path`)].map((p) =>
-      toScreen(pathPoints(p.getAttribute('d')))
+    [...brand.querySelectorAll(sel)].flatMap((use) =>
+      paths(use).map((p) =>
+        toScreen(use.getScreenCTM(), pathPoints(p.getAttribute('d')))
+      )
     );
-  const width = (sel) =>
-    parseFloat(symbol.querySelector(sel).getAttribute('stroke-width')) * s;
+  const scale = (el) => Math.hypot(el.getScreenCTM().a, el.getScreenCTM().b);
+  const width = (sel, units) => units * scale(brand.querySelector(sel));
+  const matrix = (el) => {
+    const m = el.getScreenCTM();
+    return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`;
+  };
 
   const overlay = svg('svg', {
     class: 'opening-morph',
@@ -378,32 +387,41 @@ export function morphIntoTitle(loadingScreen) {
   const bigStroke = big.cap * 0.17;
   const smallStroke = small.cap * 0.15;
   travel(
-    pairStrokes(strokes('.pipo-word'), fitWord('ROGUEFIELD', big, bigStroke)),
-    width('.pipo-word'),
+    pairStrokes(
+      strokes('.om-word use:not(.om-idot)'),
+      fitWord('ROGUEFIELD', big, bigStroke)
+    ),
+    width('.om-o use', 24),
     bigStroke,
     '#e3f2f7',
     0
   );
   travel(
-    pairStrokes(strokes('.pipo-tag'), fitWord('ASTEROID', small, smallStroke)),
-    width('.pipo-tag'),
+    pairStrokes(strokes('.om-tag'), fitWord('ASTEROID', small, smallStroke)),
+    width('.om-tag', 6.4),
     smallStroke,
     '#a7c9d7',
     0.1
   );
 
-  // The dots go out; the robot hops, then flies off the top right.
-  const mark = `matrix(${s} 0 0 ${s} ${ox} ${oy})`;
-  const dots = svg('g', { transform: mark }, overlay);
-  symbol
-    .querySelectorAll('.pipo-dot')
-    .forEach((c) => dots.appendChild(c.cloneNode()));
+  // The dots go out; the robot crouches, then flies off the top right.
+  const dots = svg('g', {}, overlay);
+  brand.querySelectorAll('.om-idot, .om-tdot').forEach((use) => {
+    const g = svg('g', { transform: matrix(use) }, dots);
+    g.appendChild(ref(use).cloneNode());
+  });
   animate(dots, { attributeName: 'opacity', values: '1;0', dur: '0.35s' });
   const flight = svg('g', {}, overlay);
-  const robot = svg('g', { transform: mark }, flight);
-  [...symbol.querySelector('.pipo-robot').children].forEach((c) =>
-    robot.appendChild(c.cloneNode(true))
+  const robot = svg(
+    'g',
+    { transform: matrix(brand.querySelector('.om-rs')) },
+    flight
   );
+  const body = robot.appendChild(
+    brand.querySelector('.om-body').cloneNode(true)
+  );
+  // Facing us now; the hidden mark's clip would hide the face.
+  body.querySelector('[clip-path]').removeAttribute('clip-path');
   const fly = svg(
     'animateTransform',
     {
