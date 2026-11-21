@@ -64,6 +64,7 @@ export class PlayerThrusters {
     fwd,
     pilotMain,
     pilotAux,
+    pilotForce,
     pilotTurn,
     coastBrake,
     speed,
@@ -75,8 +76,10 @@ export class PlayerThrusters {
     else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
     const coasting = coastBrake !== 0;
     const brake = coasting && this.coastArmed && !dashing ? coastBrake : 0;
-    const main = shown(coasting ? -brake : pilotMain);
-    const aux = shown(coasting ? brake : pilotAux);
+    // A stick's push scales a jet that burns, never puts one out: the trail
+    // cards drop on any burn of the main engine.
+    const main = shown(coasting ? -brake : pilotMain) * pilotForce;
+    const aux = shown(coasting ? brake : pilotAux) * pilotForce;
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);

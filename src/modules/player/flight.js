@@ -311,6 +311,9 @@ export class PlayerFlight {
       fwd,
       pilotMain,
       pilotAux,
+      // Modern on a pad: the left stick's push (1 for keys, the d-pad and
+      // touch); Classic's asks are already the push.
+      pilotForce: modern ? moveForce : 1,
       pilotTurn,
       coastBrake,
       speed,

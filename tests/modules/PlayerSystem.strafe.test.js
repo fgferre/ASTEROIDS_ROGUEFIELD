@@ -95,6 +95,32 @@ describe('PlayerSystem control schemes', () => {
     expect(halfLean).toBeLessThan(dpad * 0.6);
   });
 
+  it('Modern on a pad: the flame (and its sound) burns as hard as the stick pushes; keys and the d-pad stay full', () => {
+    const shownMain = (input) => {
+      const player = makePlayer();
+      player.angle = -Math.PI / 2; // nose up the screen, along the move
+      for (let i = 0; i < 20; i += 1) {
+        player.updateMovement(DELTA_TIME, {
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          ...input,
+        });
+        player.updatePosition(DELTA_TIME);
+      }
+      return player.lastThrusterState.main;
+    };
+    expect(shownMain({ up: true })).toBe(1);
+    expect(shownMain({ pad: true, moveX: 0, moveY: 0, up: true })).toBe(1);
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.5 })).toBeCloseTo(
+      0.5 ** 1.5,
+      2
+    );
+    // A barely leaning stick still burns (the trail cards drop on any burn).
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.05 })).toBeGreaterThan(0);
+  });
+
   it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
     const speedAfterRelease = (scheme, glide) => {
       const player = makePlayer({}, scheme);
