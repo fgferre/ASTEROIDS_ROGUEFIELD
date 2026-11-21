@@ -67,3 +67,29 @@ describe('SettingsSystem dash binding migration', () => {
     expect(controls.dash.gamepad).toEqual(['button:0']);
   });
 });
+
+describe('SettingsSystem with a save from before Damage Numbers left', () => {
+  let restoreDom;
+
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+  });
+
+  afterEach(() => {
+    restoreDom();
+  });
+
+  it('loads it, keeps Hit Markers off and drops the old key on the next save', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ gameplay: { damageNumbers: false, hitMarkers: false } })
+    );
+    const settings = new SettingsSystem({ eventBus: createEventBusMock() });
+    expect(settings.getSetting('gameplay', 'hitMarkers')).toBe(false);
+
+    settings.setSetting('gameplay', 'screenShake', 0.5);
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)).gameplay;
+    expect(saved.hitMarkers).toBe(false);
+    expect(saved).not.toHaveProperty('damageNumbers');
+  });
+});

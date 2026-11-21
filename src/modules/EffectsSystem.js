@@ -62,7 +62,6 @@ export default class EffectsSystem extends BaseSystem {
       randomCentered: randomHelpers.randomCentered,
       createMuzzleFlash: (x, y, dirX, dirY) =>
         this.playerEffects.createMuzzleFlash(x, y, dirX, dirY),
-      damageNumbersEnabled: () => this.damageNumbersEnabled,
     });
 
     this.screenFeedback = new ScreenFeedback({
@@ -137,7 +136,6 @@ export default class EffectsSystem extends BaseSystem {
       'EffectsSystem'
     );
     this.hitMarkersEnabled = true;
-    this.damageNumbersEnabled = true;
     this.motionReduced = false;
     this.flashingReduced = false;
     this.screenShakeScale = 1;
@@ -212,7 +210,6 @@ export default class EffectsSystem extends BaseSystem {
 
   applyGameplayPreferences(values = {}) {
     this.hitMarkersEnabled = values.hitMarkers !== false;
-    this.damageNumbersEnabled = values.damageNumbers !== false;
 
     if (Number.isFinite(values.screenShake)) {
       this.screenShakeScale = Math.max(
@@ -392,17 +389,6 @@ export default class EffectsSystem extends BaseSystem {
       this.gameTime.addFreezeFrame(0.12, 0.15);
     });
 
-    this.registerEventListener('enemy-took-damage', (data) => {
-      if (data?.enemy && Number.isFinite(data.damage)) {
-        this.particleEffects.createFloatingDamageText(
-          data.enemy.x,
-          data.enemy.y,
-          data.damage,
-          data.isCritical || false
-        );
-      }
-    });
-
     this.registerEventListener('shield-deflective-explosion', (data) =>
       this.playerEffects.createShieldDeflectiveExplosion(data)
     );
@@ -441,7 +427,6 @@ export default class EffectsSystem extends BaseSystem {
 
     this.particleEffects.updateParticles(effectDelta);
     this.particleEffects.updateShockwaves(effectDelta);
-    this.particleEffects.updateDamageTexts(effectDelta);
     this.bossTransitions.updateBossTransitions(effectDelta);
     this.particleEffects.updateAmbient(effectDelta);
 
@@ -467,10 +452,6 @@ export default class EffectsSystem extends BaseSystem {
 
   get shockwaves() {
     return this.particleEffects.shockwaves;
-  }
-
-  get damageTexts() {
-    return this.particleEffects.damageTexts;
   }
 
   get ambientChips() {

@@ -195,8 +195,8 @@ export function createAffixViews(kit) {
   function createAffixParts(view) {
     const group = new THREE.Group();
     const badges = [0, 1].map(() => {
-      // its material (badgeMaterials) is set per frame; the program is the
-      // damage numbers' (TextSprites), already compiled
+      // its material (badgeMaterials) is set per frame; its program is
+      // compiled at warm-up, where showAll puts every badge on show
       const sprite = new THREE.Sprite();
       sprite.scale.setScalar(BADGE_PX);
       sprite.renderOrder = 10;

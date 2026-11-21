@@ -106,7 +106,7 @@ describe('Settings panel', () => {
         .map((field) => `${category.id}.${field.key}`)
     );
     expect(SECTION_IDS).toHaveLength(6);
-    expect(visible).toHaveLength(45);
+    expect(visible).toHaveLength(44);
     expect([...shown].sort()).toEqual([...visible].sort());
   });
 
@@ -232,12 +232,10 @@ describe('Settings panel', () => {
     ]);
   });
 
-  it('greys Damage Numbers while the game draws none', () => {
+  it('shows Hit Markers in HUD & text, live, and no Damage Numbers row', () => {
     const { row } = renderSection('hud');
-    expect(isGreyed(row('damageNumbers'))).toBe(true);
-    expect(reasonOf(row('damageNumbers'))).toBe(
-      'The game shows no damage numbers for now.'
-    );
+    expect(row('damageNumbers')).toBeUndefined();
+    expect(row('hitMarkers')).toBeDefined();
     expect(isGreyed(row('hitMarkers'))).toBe(false);
   });
 

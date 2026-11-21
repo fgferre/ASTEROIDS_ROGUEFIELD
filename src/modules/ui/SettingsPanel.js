@@ -468,7 +468,6 @@ export class SettingsPanel {
       bloom: graphics?.bloom !== false,
       chromaticAberration: graphics?.chromaticAberration !== false,
       antialiasing: graphics?.antialiasing || 'SMAA',
-      damageNumbers: gameplay?.damageNumbers !== false,
       hitMarkers: gameplay?.hitMarkers !== false,
     };
   }

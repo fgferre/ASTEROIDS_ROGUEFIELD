@@ -27,7 +27,6 @@ import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
-import { TextSprites } from './textSprites.js';
 import { WeaponBodies } from './weaponBodies.js';
 
 export const FOV = 38;
@@ -38,7 +37,6 @@ export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
-const MAX_DAMAGE_TEXTS = 16;
 // proposta 18/10: the key light's shadow box follows the camera target: the
 // light sits KEY_SHADOW.distance away along its direction, the box spans the
 // shot (`span` × the camera range, clamped) and the biases keep rocks from
@@ -293,9 +291,8 @@ export function setupThree(seeded) {
   composer.addPass(smaaPass);
   displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 
-  // Drawn after the composer: text stays crisp, never bloomed.
+  // Drawn after the composer, never bloomed (the travel veil).
   const overlay = new THREE.Scene();
-  const texts = new TextSprites(THREE, overlay, seeded, MAX_DAMAGE_TEXTS);
 
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
@@ -392,7 +389,6 @@ export function setupThree(seeded) {
     bloomScale: bloomUrl.scale,
     bloomSet: bloomUrl.set,
     overlay,
-    texts,
     bossFlash,
     bossFlashKey: '',
     key,

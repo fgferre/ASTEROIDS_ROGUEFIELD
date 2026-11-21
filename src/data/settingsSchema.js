@@ -58,13 +58,6 @@ const SETTINGS_SCHEMA = [
         default: DEFAULT_DIFFICULTY,
       },
       {
-        key: 'damageNumbers',
-        type: 'toggle',
-        label: 'Damage Numbers',
-        description: 'Display floating numeric values when hitting enemies.',
-        default: true,
-      },
-      {
         key: 'hitMarkers',
         type: 'toggle',
         label: 'Hit Markers',
