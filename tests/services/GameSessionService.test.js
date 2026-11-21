@@ -141,6 +141,7 @@ function createServiceHarness(options = {}) {
       combat,
       renderer,
       difficulty: new DifficultyService({ settings, bootSeed: 1 }),
+      hangar: { useReplaySetup: vi.fn(), hullFor: (hullId) => hullId },
     },
     gameState,
   });
