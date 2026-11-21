@@ -150,7 +150,7 @@ describe('replay Hangar setup', () => {
     const [b0, bEnd] = run('B(empty)', (g) => {
       viewerHangar = g.session.resolveServiceInstance('hangar');
     });
-    expect(viewerHangar.getModifiers().hullMultiplier).toBe(1);
+    expect(viewerHangar.owned['reinforced-plating']).toBeFalsy();
     expect(viewerHangar.sealed).toEqual([]);
     expect(b0).toEqual({ ...a0, label: b0.label });
     expect(bEnd).toEqual({ ...aEnd, label: bEnd.label });
@@ -189,12 +189,55 @@ describe('replay Hangar setup', () => {
 
     expect(viewer.session.getConfiguredHullId()).not.toBe('bastion');
     expect(
-      viewer.session.resolveServiceInstance('hangar').getModifiers()
-        .hullMultiplier
-    ).toBe(1);
+      viewer.session.resolveServiceInstance('hangar').owned[
+        'reinforced-plating'
+      ]
+    ).toBeFalsy();
     expect(a0.hull).toBe('bastion');
     expect(a0.maxHealth).toBe(142);
     expect(b0).toEqual({ ...a0, label: b0.label });
     expect(bEnd).toEqual({ ...aEnd, label: bEnd.label });
+  });
+
+  it("retries a replay's death on the recorder's setup, not the viewer's", () => {
+    const live = createHeadlessGame();
+    const hangar = live.session.resolveServiceInstance('hangar');
+    hangar.owned['dash-coils'] = true;
+    hangar.owned['salvage-magnet'] = true;
+    live.session.startNewRun({ source: 'test' });
+    for (let i = 0; i < 60; i += 1) live.step();
+    const recording = deserialize(
+      serialize(live.session.replayRecorder.toJSON())
+    );
+
+    restoreDom();
+    restoreDom = installDomStubs();
+    const viewer = createHeadlessGame();
+    viewer.controller.arm(recording);
+    viewer.session.startNewRun({ source: 'test' });
+    for (let i = 0; i < 60; i += 1) {
+      viewer.controller.tick();
+      viewer.step();
+    }
+    const { player } = viewer.services;
+    const stats = () => ({
+      dashCooldown: player.maneuvers.dashCooldown,
+      magnetismRadius: player.magnetismRadius,
+    });
+    const atStart = stats();
+    const { snapshots } = viewer.session;
+    const snapshot = snapshots.createDeathSnapshot();
+    expect(snapshots.restoreFromSnapshot({ snapshot })).toBe(true);
+
+    expect(atStart.dashCooldown).toBeCloseTo(1.44);
+    expect(atStart.magnetismRadius).toBeCloseTo(126.5);
+    expect(stats()).toEqual(atStart);
+
+    // The viewer's next own run is back on the viewer's setup.
+    viewer.session.startNewRun({ source: 'test' });
+    expect(stats()).toEqual({ dashCooldown: 1.6, magnetismRadius: 110 });
+    expect(
+      viewer.session.replayRecorder.toJSON().hangar.dashCooldownMultiplier
+    ).toBe(1);
   });
 });

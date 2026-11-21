@@ -538,11 +538,11 @@ export default class GameSessionService {
    * Rush, false any other run; undefined keeps the last mode. `sector` (a
    * sector id) starts a sector run, never daily nor Boss Rush; null any other
    * run; undefined keeps the last one, unless `daily` or `bossRush` is given
-   * (a mode picked without a sector). An armed replay
-   * (`replayStart`) starts in its recorded mode and hull, whatever started the
-   * run, and announces itself with `replay: true` on 'game-started': a
-   * replayed run has no side effects on the viewer's save (Salvage) or pad
-   * (rumble).
+   * (a mode picked without a sector). An armed replay (`replayStart`) starts
+   * in its recorded mode and hull, on its Hangar setup (kept through a Retry;
+   * any other run drops it), whatever started the run, and announces itself
+   * with `replay: true` on 'game-started': a replayed run has no side effects
+   * on the viewer's save (Salvage) or pad (rumble).
    */
   startNewRun({ source = 'unknown', daily, bossRush, sector, carry } = {}) {
     const replay = Boolean(this.replayStart);
@@ -550,7 +550,7 @@ export default class GameSessionService {
     if (replay) {
       ({ daily, bossRush, sector, hull: hullId } = this.replayStart);
       this.replayStart = null;
-    }
+    } else this.resolveServiceInstance('hangar').useReplaySetup(null);
     if (sector !== undefined || daily !== undefined || bossRush !== undefined) {
       this.sector = sectorById(sector ?? null);
     }

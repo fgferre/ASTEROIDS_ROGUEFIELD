@@ -155,9 +155,10 @@ describe('replay recording', () => {
     });
   });
 
-  it('refuses recordings made before version 9', () => {
-    const old = { version: 8, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
+  it('refuses recordings made before version 10', () => {
+    const old = { version: 9, seed: 9, hull: null, steps: 1, inputs: [[0, 1]] };
     expect(() => deserialize(old)).toThrow(/version/);
+    expect(() => deserialize({ ...old, version: 8 })).toThrow(/version/);
     expect(() => deserialize({ ...old, version: 1 })).toThrow(/version/);
   });
 

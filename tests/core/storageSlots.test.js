@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../__helpers__/headlessGame.js';
 import {
   SLOTS_STORAGE_KEY,
@@ -176,5 +176,34 @@ describe('save slots', () => {
     };
     expect(chooseSlot(3)).toBe(false);
     expect(resolveActiveSlot()).toBe(2);
+  });
+});
+
+describe('a pilot another tab wrote', () => {
+  it('is an old copy here: none of it is written back until a reload', async () => {
+    const restoreDom = installDomStubs();
+    // A page whose window hears the other tabs' writes ('storage' events).
+    const events = new EventTarget();
+    window.addEventListener = events.addEventListener.bind(events);
+    vi.resetModules();
+    const storage = await import('../../src/core/storage.js');
+    storage.saveProgress('roguefield:hangar:v2', { salvage: 100 });
+    // Another tab, on the same pilot, buys in its Hangar.
+    localStorage.setItem(
+      'roguefield:hangar:v2',
+      JSON.stringify({ salvage: 40, owned: { plating: true } })
+    );
+    const write = new Event('storage');
+    write.key = 'roguefield:hangar:v2';
+    events.dispatchEvent(write);
+    expect(storage.isPilotStale()).toBe(true);
+    storage.saveProgress('roguefield:hangar:v2', { salvage: 130 });
+    expect(storage.loadJSON('roguefield:hangar:v2')).toEqual({
+      salvage: 40,
+      owned: { plating: true },
+    });
+    storage.resolveActiveSlot();
+    expect(storage.isPilotStale()).toBe(false);
+    restoreDom();
   });
 });

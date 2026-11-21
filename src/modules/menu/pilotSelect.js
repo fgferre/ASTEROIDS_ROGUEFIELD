@@ -7,9 +7,18 @@
 // read as the game boots (core/storage.js), so choosing one saves the choice
 // and reloads, and the reloaded entry skips this screen once. A pilot is
 // deleted through a box whose focus starts on Cancel (the same card, answer
-// 3): deleting the one in play reloads back to this screen.
+// 3): deleting the one in play reloads back to this screen. Another tab can
+// change the pilots under it: the screen shows them again as they are, a box
+// about a pilot deleted meanwhile deletes nothing, and Continue on a pilot this
+// page holds an old copy of reloads it (core/storage.js).
 
-import { chooseSlot, deleteSlot, getActiveSlot } from '../../core/storage.js';
+import {
+  chooseSlot,
+  deleteSlot,
+  getActiveSlot,
+  isPilotStale,
+  slotDeletions,
+} from '../../core/storage.js';
 import { pilotSummaries } from '../../services/pilots.js';
 import { localDay } from '../../services/runRecords.js';
 
@@ -118,6 +127,7 @@ export function openPilotSelect(onContinue) {
   document.body.appendChild(screen);
   let summaries = [];
   let confirming = null; // the slot the box asks about, or null
+  let confirmSeen = 0; // that pilot's deletion count as the box opened
   let refused = null; // a pilot the browser would not store as the next one
   let done = false;
   let rafId = 0;
@@ -125,6 +135,14 @@ export function openPilotSelect(onContinue) {
 
   function render(focusSelector) {
     summaries = pilotSummaries();
+    // The pilot the box asks about was deleted (in another tab) meanwhile.
+    if (
+      confirming &&
+      (!summaries[confirming - 1] || slotDeletions(confirming) !== confirmSeen)
+    ) {
+      confirming = null;
+      focusSelector = `[data-pilot-slot="${active}"]`;
+    }
     screen.innerHTML = `<div class="credits-dialog pilot-dialog">
         <header class="credits-header"><h2 id="pilot-screen-title" class="credits-title">Choose your pilot</h2></header>${
           refused
@@ -155,11 +173,20 @@ export function openPilotSelect(onContinue) {
     done = true;
     cancelAnimationFrame(rafId);
     document.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('storage', onStorage);
+  }
+
+  // Another tab changed the pilots: shown again as they are.
+  function onStorage() {
+    render(
+      confirming ? '[data-confirm="cancel"]' : `[data-pilot-slot="${active}"]`
+    );
   }
 
   function choose(slot) {
     if (done) return;
-    if (slot === active) {
+    // A pilot changed in another tab goes on through a new page, as any other.
+    if (slot === active && !isPilotStale()) {
       leave();
       screen.remove();
       onContinue();
@@ -182,6 +209,7 @@ export function openPilotSelect(onContinue) {
 
   function ask(slot) {
     confirming = slot;
+    confirmSeen = slotDeletions(slot);
     render('[data-confirm="cancel"]');
   }
 
@@ -192,7 +220,10 @@ export function openPilotSelect(onContinue) {
       render(`[data-pilot-delete="${slot}"]`);
       return;
     }
-    deleteSlot(slot);
+    if (!deleteSlot(slot, confirmSeen)) {
+      render(`[data-pilot-slot="${active}"]`);
+      return;
+    }
     if (slot === active) {
       // The pilot in play is in memory: a new page, back to this screen.
       leave();
@@ -251,6 +282,7 @@ export function openPilotSelect(onContinue) {
     activate(event.target.closest('button'))
   );
   document.addEventListener('keydown', onKey, true);
+  window.addEventListener('storage', onStorage);
   rafId = requestAnimationFrame(pollPad);
   render(`[data-pilot-slot="${active}"]`);
 }
