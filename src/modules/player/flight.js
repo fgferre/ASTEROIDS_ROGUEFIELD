@@ -98,18 +98,16 @@ export class PlayerFlight {
     const move = modern ? getModernMove(input) : null;
 
     // The pilot's asks, 0..1 (classicAsks); modern, the left stick's lean is
-    // the push along where it points.
-    const stickY = Number(input.moveY) || 0;
+    // the push along where it points, and the d-pad is full (a pad frame
+    // whose right stick aims still moves at full push on the d-pad).
     const {
       up: thrustIn,
       down: backIn,
       left: leftIn,
       right: rightIn,
     } = classicAsks(input);
-    const moveForce =
-      move && input.pad
-        ? padForce(input, Math.hypot(Number(input.moveX) || 0, stickY))
-        : 1;
+    const lean = Math.hypot(Number(input.moveX) || 0, Number(input.moveY) || 0);
+    const moveForce = move && input.pad && lean > 0 ? padForce(input, lean) : 1;
 
     // The thrusters' forces (lógica do original); what they show is at the end.
     let thrMain = thrustIn;

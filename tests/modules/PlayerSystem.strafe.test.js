@@ -69,6 +69,31 @@ describe('PlayerSystem control schemes', () => {
     expect(player.angle).toBeCloseTo(-Math.PI / 2, 2);
   });
 
+  it('on a pad, the d-pad moves at full push while the right stick aims; the left stick pushes as far as it leans', () => {
+    const fly = (input) => {
+      const player = makePlayer();
+      player.angle = -Math.PI / 2;
+      for (let i = 0; i < 30; i += 1) {
+        player.updateMovement(DELTA_TIME, {
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          ...input,
+        });
+        player.updatePosition(DELTA_TIME);
+      }
+      return Math.hypot(player.velocity.vx, player.velocity.vy);
+    };
+    const dpad = fly({ up: true });
+    expect(dpad).toBeGreaterThan(50);
+    const sticks = { pad: true, moveX: 0, moveY: 0, aimX: 0.8, aimY: 0 };
+    expect(fly({ ...sticks, up: true })).toBeCloseTo(dpad, 5);
+    const halfLean = fly({ ...sticks, moveY: -0.5 });
+    expect(halfLean).toBeGreaterThan(5);
+    expect(halfLean).toBeLessThan(dpad * 0.6);
+  });
+
   it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
     const speedAfterRelease = (scheme, glide) => {
       const player = makePlayer({}, scheme);
