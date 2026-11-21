@@ -654,10 +654,14 @@
                   data-device="gamepad"
                   aria-label="Gamepad controls"
                 >
-                  <li><kbd>L-Stick</kbd> move</li>
-                  <li><kbd>R-Stick</kbd> aim</li>
-                  <li><kbd>RT</kbd> dash</li>
-                  <li><kbd>LT</kbd> shield</li>
+                  <li data-scheme="modern"><kbd>L-Stick</kbd> move</li>
+                  <li data-scheme="modern"><kbd>R-Stick</kbd> aim</li>
+                  <li data-scheme="classic">
+                    <kbd>L-Stick</kbd> ↑ thrust ↓ reverse
+                  </li>
+                  <li data-scheme="classic"><kbd>R-Stick</kbd> ← → turn</li>
+                  <li><kbd>RB</kbd> dash</li>
+                  <li><kbd>LB</kbd> shield</li>
                   <li><kbd>X</kbd> spread mode</li>
                   <li><kbd>Y</kbd> aim mode</li>
                   <li><kbd>Start</kbd> pause</li>
@@ -835,6 +839,10 @@
               Fly up, left, down and right on the screen. The nose turns to
               follow.
             </dd>
+            <dt><span data-device="gamepad">Right stick</span></dt>
+            <dd data-device="gamepad">
+              Now aims the cannon by hand. It no longer turns the ship.
+            </dd>
             <dt>Let go</dt>
             <dd>The ship stops by itself. No more drifting.</dd>
             <dt>Fire</dt>
@@ -926,10 +934,12 @@
             data-device="gamepad"
             aria-label="Gamepad controls"
           >
-            <li><kbd>L-Stick</kbd> move</li>
-            <li><kbd>R-Stick</kbd> aim</li>
-            <li><kbd>RT</kbd> dash</li>
-            <li><kbd>LT</kbd> shield</li>
+            <li data-scheme="modern"><kbd>L-Stick</kbd> move</li>
+            <li data-scheme="modern"><kbd>R-Stick</kbd> aim</li>
+            <li data-scheme="classic"><kbd>L-Stick</kbd> ↑ thrust ↓ reverse</li>
+            <li data-scheme="classic"><kbd>R-Stick</kbd> ← → turn</li>
+            <li><kbd>RB</kbd> dash</li>
+            <li><kbd>LB</kbd> shield</li>
             <li><kbd>X</kbd> spread mode</li>
             <li><kbd>Y</kbd> aim mode</li>
             <li><kbd>Start</kbd> resume</li>

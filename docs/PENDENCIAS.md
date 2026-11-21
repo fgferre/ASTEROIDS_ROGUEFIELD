@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 39.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
 
 ## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `controle/toque-em-computador` (o toque em computador, 20/11)
 
@@ -152,6 +152,16 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   pedra se moviemntar, seja rodando um pouco, tem que ter uma física do impacto do tiro (memso que seja fake para
   efeitos de arcade) o incandescente tem que ser aonde o tiro efetivamente tocou a pedra."_ Fecha quando ele aprovar
   jogando.
+- **(39)** O controle de videogame (20/11, fim da noite, com o controle do Xbox): _"A movimentação em menus por
+  controle de videogame, eu estou testando no do Xbox, mas deve ser igual em qualquer controle, ela é impossível pelos
+  menus. Simplesmente não funciona. […] a gente tinha que repensar essa navegação como se esse jogo fosse meio que
+  nativo pro videogame […] quando é por ficha, às vezes os jogos fazem alguns para passar de uma ficha para outra,
+  usando o LB e o RB. […] Tem jogos que usam até um mouse, né, como o Halo […] a gente tem que ter sensibilidade de
+  quanto que a gente está apertando. […] num controle, o controle ele pode jogar pouca potência ou muita potência, né?
+  […] a gente pode criar um controle padrão, né, quando está usando o controle, em que a aceleração fica num analógico
+  e virar para a direita e para a esquerda fica em outro analógico. […] Acionar escudo, qual que seria a tecla mais
+  comum, o dash, qual que seria a tecla mais comum, né?"_ Texto inteiro em `quadro/respostas/controle-20-11.txt`.
+  Conversa própria, ramo `controle/videogame`; cartão `controle-1`. Fecha quando ele aprovar jogando com o controle.
 
 ## Som (palavras dele, 19/11)
 

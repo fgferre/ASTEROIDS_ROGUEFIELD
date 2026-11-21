@@ -209,3 +209,34 @@ describe('Hangar screen', () => {
     expect(hangar.setStartingCard).toHaveBeenCalledWith(null);
   });
 });
+
+describe('Hangar pad tabs', () => {
+  it('LB/RB click and focus the next shown tab, wrapping and skipping a hidden one', () => {
+    const tab = (hangarTab, shown = true) => ({
+      dataset: { hangarTab },
+      getClientRects: () => (shown ? [{}] : []),
+      click: vi.fn(),
+      focus: vi.fn(),
+    });
+    const [ship, hidden, cards, stats] = [
+      tab('ship'),
+      tab('lab', false),
+      tab('cards'),
+      tab('stats'),
+    ];
+    const screen = new HangarScreen({
+      refs: { tabs: [ship, hidden, cards, stats] },
+      emit: vi.fn(),
+    });
+
+    screen.cycleTab(1);
+    expect(hidden.click).not.toHaveBeenCalled();
+    expect(cards.click).toHaveBeenCalledTimes(1);
+    expect(cards.focus).toHaveBeenCalledWith({ preventScroll: true });
+
+    screen.tab = 'stats';
+    screen.cycleTab(1);
+    expect(ship.click).toHaveBeenCalledTimes(1);
+    expect(ship.focus).toHaveBeenCalled();
+  });
+});

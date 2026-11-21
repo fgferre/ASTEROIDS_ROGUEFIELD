@@ -46,10 +46,24 @@ describe('SettingsSystem dash binding migration', () => {
       toggleSpreadMode: { keyboard: ['KeyG'], gamepad: [] },
       toggleAimMode: { keyboard: ['KeyT'], gamepad: [] },
     });
-    expect(controls.activateShield.gamepad).toEqual(['button:6']);
+    expect(controls.activateShield.gamepad).toEqual(['button:4']);
     expect(controls.dash.gamepad).toEqual(['button:1']);
     expect(controls.toggleSpreadMode.gamepad).toEqual(['button:2']);
     expect(controls.toggleAimMode.gamepad).toEqual(['button:3']);
     expect(controls.vibration).toBe(true);
+  });
+
+  it('moves a save on the 18/10 table to the two sticks, keeping remaps', () => {
+    const controls = load({
+      moveUp: { keyboard: ['KeyW'], gamepad: ['axis:1:-', 'button:12'] },
+      moveLeft: { keyboard: ['KeyA'], gamepad: ['axis:0:-', 'button:14'] },
+      activateShield: { keyboard: ['KeyE'], gamepad: ['button:6'] },
+      dash: { keyboard: ['ShiftLeft'], gamepad: ['button:0'] },
+      vibration: true,
+    });
+    expect(controls.moveUp.gamepad).toEqual(['button:12']);
+    expect(controls.moveLeft.gamepad).toEqual(['button:14']);
+    expect(controls.activateShield.gamepad).toEqual(['button:4']);
+    expect(controls.dash.gamepad).toEqual(['button:0']);
   });
 });

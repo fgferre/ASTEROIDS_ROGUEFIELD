@@ -33,7 +33,13 @@ const STEP_PRESS_FIELDS = {
   dash: 'dash',
 };
 
-const CENTRED_STICKS = Object.freeze({ moveX: 0, moveY: 0, aimX: 0, aimY: 0 });
+const CENTRED_STICKS = Object.freeze({
+  moveX: 0,
+  moveY: 0,
+  aimX: 0,
+  aimY: 0,
+  pad: false,
+});
 
 /** Radial deadzone; past it the magnitude is rescaled to 0..1. */
 export function applyStickDeadzone(x = 0, y = 0) {
@@ -710,17 +716,7 @@ class InputSystem {
     }
   }
 
-  /**
-   * Resolve the current game screen state. Reads from the 'game-state' service
-   * if available; otherwise returns null and the listener falls through to a
-   * conservative no-op for the toggle actions (plan 01.07 Task 5/6).
-   *
-   * Implementation note: keydown press → 'pressed' phase → emitActionEvent fires
-   * only once per press (handleActionPress short-circuits via the `wasActive`
-   * gate at line 418), which gives us natural debouncing without extra state.
-   *
-   * @returns {string|null} The current game screen identifier (e.g. 'playing').
-   */
+  /** The game screen ('playing', …) from the 'game-state' service, or null. */
   resolveGameScreen() {
     const gameStateService = resolveService('game-state', this.dependencies);
     if (gameStateService && typeof gameStateService.getScreen === 'function') {
@@ -845,15 +841,24 @@ class InputSystem {
   readPadSticks(axes) {
     const move = applyStickDeadzone(axes[0], axes[1]);
     const aim = applyStickDeadzone(axes[2], axes[3]);
-    this.padSticks = { moveX: move.x, moveY: move.y, aimX: aim.x, aimY: aim.y };
-    if (move.x || move.y || aim.x || aim.y) {
-      this.setActiveDevice('gamepad');
-    }
+    const pad = Boolean(move.x || move.y || aim.x || aim.y);
+    this.padSticks = {
+      moveX: move.x,
+      moveY: move.y,
+      aimX: aim.x,
+      aimY: aim.y,
+      pad,
+    };
+    if (pad) this.setActiveDevice('gamepad');
 
     const direction = stickNavDirection(axes[0], axes[1]);
     if (direction !== this.padNavDirection) {
       this.padNavDirection = direction;
       this.emitPadNav(direction);
+    }
+    // Off play, the right stick scrolls the menu's lists (gamepadNav.js).
+    if (aim.y && !this.isGameRunning()) {
+      this.getEventBus()?.emit?.('gamepad-ui-scroll', { y: aim.y });
     }
   }
 

@@ -297,11 +297,18 @@ export class CampaignMap {
       }
       this.selectFrom(event.target);
     });
-    // The pad's d-pad moves the focus: the focused chapter or row is the
-    // selection.
-    refs.root.addEventListener('focusin', (event) =>
-      this.selectFrom(event.target)
-    );
+    // The d-pad moves the focus: the focused chapter or row is the
+    // selection. The pad's highlight passes over a locked one (it says
+    // Locked) without taking Launch away from the open one; A selects it.
+    refs.root.addEventListener('focusin', (event) => {
+      const node = event.target.closest?.(
+        '[data-campaign-row], [data-campaign-chapter]'
+      );
+      const padPassing =
+        document.body.dataset.inputDevice === 'gamepad' &&
+        node?.classList.contains('is-locked');
+      if (!padPassing) this.selectFrom(event.target);
+    });
     // Heard on the way down (capture): InputSystem stops ArrowDown at the
     // document before a bubbling listener would hear it.
     document.addEventListener(

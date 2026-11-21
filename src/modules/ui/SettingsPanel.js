@@ -84,6 +84,11 @@ export class SettingsPanel {
     return Boolean(this.settingsState.capture);
   }
 
+  /** 'keyboard' or 'gamepad' while a binding waits for its input. */
+  get captureDevice() {
+    return this.settingsState.capture?.device ?? null;
+  }
+
   get activeSection() {
     return SETTINGS_SECTIONS.find(
       (section) => section.id === this.settingsState.activeSection

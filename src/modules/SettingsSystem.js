@@ -9,6 +9,7 @@ import {
   resolveEventBus,
 } from '../core/serviceUtils.js';
 import { asArray } from './upgradeCatalog.js';
+import { PAD_BINDINGS_1810 } from '../data/constants/gamepad.js';
 
 const VISUAL_CATEGORIES = new Set([
   'accessibility',
@@ -155,6 +156,22 @@ class SettingsSystem {
 
     this.migrateShiftFromShieldToDash(stored.controls);
     this.migratePadBindings(stored.controls);
+    this.migrateTwoStickPad(stored.controls);
+  }
+
+  // Before 20/11 the left stick turned and thrust through bindings, with the
+  // shield on LT and the dash on RT. An action still on that default takes
+  // the two-stick table; a remapped one keeps its pick.
+  migrateTwoStickPad(storedControls) {
+    if (!storedControls) return;
+    Object.entries(PAD_BINDINGS_1810).forEach(([action, old]) => {
+      const binding = this.values.controls[action];
+      if (binding && JSON.stringify(binding.gamepad) === JSON.stringify(old)) {
+        binding.gamepad = [
+          ...this.findField('controls', action).default.gamepad,
+        ];
+      }
+    });
   }
 
   // Before 18/10 the pad raised the shield on X/LB and dashed on RB, with no

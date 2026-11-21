@@ -193,6 +193,82 @@ select {
   outline: none;
 }
 
+/* The pad's highlight, drawn by the game in every browser (gamepadNav.js;
+   Felipe's card controle-1, 20/11). Keyboard and mouse keep the ring above. */
+[data-input-device='gamepad'] :focus:not([tabindex='-1']) {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 7px rgba(0, 242, 255, 0.35),
+    0 0 26px 6px rgba(0, 242, 255, 0.55);
+}
+
+/* A list entered with A: the d-pad changes its value. */
+[data-input-device='gamepad'] .is-pad-editing:focus {
+  outline-color: #ffb347;
+  box-shadow:
+    0 0 0 7px rgba(255, 179, 71, 0.35),
+    0 0 26px 6px rgba(255, 179, 71, 0.5);
+}
+
+/* The buttons that work on the screen, while the pad is in use. */
+/* Centred under the overlays' panels; on the menu, in the header's gap. */
+.pad-hints {
+  position: fixed;
+  left: 50%;
+  bottom: 2px;
+  z-index: 10002;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 2px 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(0, 242, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(5, 10, 14, 0.8);
+  color: #cfe9ee;
+  font: 600 13px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.pad-hints[hidden] {
+  display: none;
+}
+
+.pad-hints[data-screen='menu'] {
+  top: 28px;
+  bottom: auto;
+  padding: 6px 10px;
+}
+
+.pad-hints__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pad-hints__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  border: 1.5px solid #00f2ff;
+  border-radius: 50%;
+  color: #00f2ff;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.pad-hints__glyph--wide {
+  min-width: 36px;
+  padding: 0 6px;
+  border-radius: 7px;
+}
+
 #game-container {
   width: 100vw;
   height: 100vh;

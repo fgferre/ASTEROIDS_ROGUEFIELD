@@ -250,7 +250,7 @@ describe('run replay', () => {
           progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
         }
         // The left stick sweeps a slow circle at part tilt; the right stick
-        // aims by hand every other second; RT dashes now and then.
+        // turns every other second; RB dashes now and then.
         const t = step / 60;
         const aiming = Math.floor(t) % 2 === 1;
         fake.set({
@@ -260,7 +260,7 @@ describe('run replay', () => {
             aiming ? Math.cos(2 * t) : 0,
             aiming ? Math.sin(2 * t) : 0,
           ],
-          pressed: step % 150 === 75 ? [PAD_BUTTON.RT] : [],
+          pressed: step % 150 === 75 ? [PAD_BUTTON.RB] : [],
         });
         live.step();
       }

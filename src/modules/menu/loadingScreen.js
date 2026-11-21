@@ -22,6 +22,7 @@
 import { LOADING_JOKES, loadingStep } from '../../data/loadingLines.js';
 import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
 import { openPilotSelect } from './pilotSelect.js';
+import { menuHome } from '../ui/gamepadNav.js';
 
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
@@ -115,14 +116,14 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
   // back to the gate. Capture phase: a panel's own Escape closes it first,
   // and only that.
   let watching = false;
+  const onMenu = () =>
+    !menuScreen.classList.contains('hidden') &&
+    !menuScreen.classList.contains('menu-screen--gated');
   function watchMenu() {
     if (watching) return;
     watching = true;
     let lastInput = performance.now();
     const input = () => (lastInput = performance.now());
-    const onMenu = () =>
-      !menuScreen.classList.contains('hidden') &&
-      !menuScreen.classList.contains('menu-screen--gated');
     window.addEventListener(
       'keydown',
       (event) => {
@@ -261,9 +262,15 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
         openPilotSelect(() => {
           finish();
           watchMenu();
-          menuScreen
-            ?.querySelector('button:not([disabled]):not(.menu-title-back)')
-            ?.focus();
+          // By pad, the highlight starts on Launch (gamepadNav.js); else the
+          // first button past the game's name (a stray Enter stays put).
+          const pad = document.body.dataset.inputDevice === 'gamepad';
+          (
+            (pad && menuHome(menuScreen)) ||
+            menuScreen?.querySelector(
+              'button:not([disabled]):not(.menu-title-back)'
+            )
+          )?.focus();
         });
       }, START_EFFECT_MS);
     }
@@ -303,6 +310,13 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     rafId = requestAnimationFrame(pollPad);
     button?.focus();
   }
+
+  // The pad's B on the menu (gamepadNav.js), as Escape.
+  return {
+    leaveMenu() {
+      if (watching && onMenu() && !panelOpen()) backToGate();
+    },
+  };
 }
 
 // Pad A or Start, on any pad.

@@ -46,13 +46,8 @@ import {
   winTransmissions,
   wardenTransmission,
 } from './ui/transmissions.js';
-import {
-  GAMEPAD_FOCUSABLE_SELECTOR,
-  GAMEPAD_NAV_SCREENS,
-  pickFocusTarget,
-} from './ui/gamepadNav.js';
+import { GamepadMenuNav } from './ui/gamepadNav.js';
 
-const STEP_ACTIONS = new Set(['up', 'down', 'left', 'right']);
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
 
@@ -228,6 +223,8 @@ class UISystem extends BaseSystem {
       player: () => this.getService('player'),
       livePreset: () => this.liveQualityPreset,
     });
+    this.padNav = new GamepadMenuNav(this);
+    this.padNav.watchScreens();
     this.hangarScreen = new HangarScreen({
       refs: this.domRefs.hangar,
       settings: this.settings,
@@ -783,7 +780,10 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
-      this.handleGamepadNav(payload.action);
+      this.padNav.handle(payload.action);
+    });
+    this.registerEventListener('gamepad-ui-scroll', (payload = {}) => {
+      this.padNav.scroll(payload.y);
     });
 
     this.registerEventListener('input-device-changed', (payload = {}) => {
@@ -797,126 +797,7 @@ class UISystem extends BaseSystem {
     if (this.onboarding.shown && this.onboarding.current) {
       this.showOnboardingTip(this.onboarding.current);
     }
-  }
-
-  /** The topmost visible screen a pad can navigate, or null during play. */
-  getGamepadNavScreen() {
-    for (const id of GAMEPAD_NAV_SCREENS) {
-      const element = document.getElementById(`${id}-screen`);
-      if (element && !element.classList.contains('hidden')) {
-        return { id, element };
-      }
-    }
-    return null;
-  }
-
-  /** One pad navigation press (InputSystem 'gamepad-ui-nav'): d-pad/stick move
-   * the focus, A activates, B goes back, LB/RB switch tabs, X/Y reroll and
-   * banish on the level-up screen (whose cards already follow the move and
-   * confirm bindings). */
-  handleGamepadNav(action) {
-    // The HUD editor drives its instruments; its dialogs and panels move
-    // the focus like any screen.
-    if (this.hudEditor.isOpen) {
-      const root = this.hudEditor.navRoot;
-      if (root && (STEP_ACTIONS.has(action) || action === 'confirm')) {
-        this.navigateFocus(root, action);
-      } else {
-        this.hudEditor.handlePadNav(action);
-      }
-      return;
-    }
-    const screen = this.getGamepadNavScreen();
-    if (!screen || this.settingsPanel.capturing) {
-      return;
-    }
-    const { id, element } = screen;
-
-    if (id === 'levelup') {
-      this.levelUpScreen.handleGamepadNav(action);
-      return;
-    }
-
-    switch (action) {
-      case 'up':
-      case 'down':
-      case 'left':
-      case 'right':
-      case 'confirm':
-        this.navigateFocus(element, action);
-        break;
-      case 'back':
-        if (id === 'settings') this.settingsPanel.closeSettingsPanel();
-        else if (id === 'codex') this.codexScreen.closeCodex();
-        else if (id === 'hangar') this.hangarScreen.closeHangar();
-        else if (id === 'credits') {
-          this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
-        } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
-        break;
-      case 'tabPrev':
-      case 'tabNext': {
-        const step = action === 'tabPrev' ? -1 : 1;
-        if (id === 'codex') {
-          this.codexScreen.cycleTab(step);
-        } else if (id === 'settings') {
-          this.settingsPanel.cycleCategory(step);
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  /** A d-pad move or A in `root`: the focus moves, or the focused control is pressed. */
-  navigateFocus(root, action) {
-    if (action !== 'confirm') {
-      this.moveGamepadFocus(root, action);
-      return;
-    }
-    const active = document.activeElement;
-    if (active && root.contains(active) && active !== root) {
-      active.click();
-    } else {
-      this.moveGamepadFocus(root, null);
-    }
-  }
-
-  /** Focus the nearest control `direction` of the focused one (null: first). */
-  moveGamepadFocus(root, direction) {
-    const active = document.activeElement;
-    const current = active && root.contains(active) ? active : null;
-    // Sliders and selects take left/right as a value change.
-    if (current && (direction === 'left' || direction === 'right')) {
-      const step = direction === 'left' ? -1 : 1;
-      if (current.type === 'range') {
-        if (step < 0) current.stepDown();
-        else current.stepUp();
-        current.dispatchEvent(new Event('input', { bubbles: true }));
-        current.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-      if (current.tagName === 'SELECT') {
-        const count = current.options.length;
-        current.selectedIndex = (current.selectedIndex + step + count) % count;
-        current.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-    }
-    const candidates = [
-      ...root.querySelectorAll(GAMEPAD_FOCUSABLE_SELECTOR),
-    ].filter(
-      (candidate) => candidate !== current && candidate.getClientRects().length
-    );
-    const index = pickFocusTarget(
-      current?.getBoundingClientRect() ?? null,
-      candidates.map((candidate) => candidate.getBoundingClientRect()),
-      direction
-    );
-    if (index >= 0) {
-      candidates[index].focus();
-      candidates[index].scrollIntoView?.({ block: 'nearest' });
-    }
+    this.padNav.refreshHints();
   }
 
   // The menu strip, the ship selector and the onboarding tips follow a
