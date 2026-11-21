@@ -75,6 +75,19 @@ export class MainMenu {
     });
   }
 
+  /** LB/RB on a pad: the previous or next mode shown; its tab button. */
+  cyclePrepTab(step) {
+    const buttons = [
+      ...this.refs.tabs.querySelectorAll('[data-prep-tab]:not([disabled])'),
+    ];
+    const index = buttons.findIndex(
+      (button) => button.dataset.prepTab === this.prepTab
+    );
+    const next = buttons[(index + step + buttons.length) % buttons.length];
+    if (next) this.setPrepTab(next.dataset.prepTab);
+    return next ?? null;
+  }
+
   bindPrepTabs() {
     this.refs.tabs.addEventListener('click', (event) => {
       const tab = event.target.closest('[data-prep-tab]');

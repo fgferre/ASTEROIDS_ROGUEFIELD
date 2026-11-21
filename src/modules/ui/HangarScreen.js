@@ -83,6 +83,20 @@ export class HangarScreen {
     this.purchaseLine = null;
   }
 
+  /** LB/RB on a pad: the previous or next tab shown, its button focused. */
+  cycleTab(step) {
+    const tabs = [...this.refs.tabs].filter(
+      (button) => button.getClientRects().length
+    );
+    const index = tabs.findIndex(
+      (button) => button.dataset.hangarTab === this.tab
+    );
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    if (!next) return;
+    next.click();
+    next.focus({ preventScroll: true });
+  }
+
   bindHangarControls() {
     const refs = this.refs;
     if (!refs.overlay) return;

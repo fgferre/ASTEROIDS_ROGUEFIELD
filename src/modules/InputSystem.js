@@ -710,17 +710,7 @@ class InputSystem {
     }
   }
 
-  /**
-   * Resolve the current game screen state. Reads from the 'game-state' service
-   * if available; otherwise returns null and the listener falls through to a
-   * conservative no-op for the toggle actions (plan 01.07 Task 5/6).
-   *
-   * Implementation note: keydown press → 'pressed' phase → emitActionEvent fires
-   * only once per press (handleActionPress short-circuits via the `wasActive`
-   * gate at line 418), which gives us natural debouncing without extra state.
-   *
-   * @returns {string|null} The current game screen identifier (e.g. 'playing').
-   */
+  /** The game screen ('playing', …) from the 'game-state' service, or null. */
   resolveGameScreen() {
     const gameStateService = resolveService('game-state', this.dependencies);
     if (gameStateService && typeof gameStateService.getScreen === 'function') {
@@ -854,6 +844,10 @@ class InputSystem {
     if (direction !== this.padNavDirection) {
       this.padNavDirection = direction;
       this.emitPadNav(direction);
+    }
+    // Off play, the right stick scrolls the menu's lists (gamepadNav.js).
+    if (aim.y && !this.isGameRunning()) {
+      this.getEventBus()?.emit?.('gamepad-ui-scroll', { y: aim.y });
     }
   }
 
