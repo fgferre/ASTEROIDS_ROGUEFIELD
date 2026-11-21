@@ -63,13 +63,15 @@ export function createJourneyCue({
    * wait; before the audio wakes (no context) only its bytes, decoded later.
    */
   function prefetch({ chapter, url = JOURNEY_CUES[chapter] } = {}) {
-    if (!url || buffers.has(url) || prefetched.has(url)) return;
-    if (getContext()) buffer(url);
-    else
-      prefetched.set(
-        url,
-        fetchFile(url).catch(() => null)
-      );
+    if (getContext()) {
+      buffer(url);
+      return;
+    }
+    if (!url || prefetched.has(url)) return;
+    prefetched.set(
+      url,
+      fetchFile(url).catch(() => null)
+    );
   }
 
   function release(cue) {

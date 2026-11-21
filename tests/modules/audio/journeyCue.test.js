@@ -93,6 +93,9 @@ describe('journeyCue: the recording of the destination chapter', () => {
     expect(load).not.toHaveBeenCalled();
 
     awake = context;
+    // Picked again once awake: decoded ahead, from the bytes already held.
+    cue.prefetch({ url });
+    expect(load).toHaveBeenCalledTimes(1);
     expect(cue.play({ url, duration: 0 })).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
