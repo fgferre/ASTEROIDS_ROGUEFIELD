@@ -6,7 +6,25 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
 
-## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `jogo/conjunto-3` (a quinta auditoria e os cristais, 21/11)
+## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
+
+**21/11, à noite (vale sobre o que estiver mais abaixo e disser outra coisa):** a sexta auditoria de fora vai ao ar
+por ordem dele — à pergunta "Publico os cinco consertos de pilotos e replays?", _"Sim, publica"_ — pela PR do
+`auditoria/seis` para a `main`. Ao relatório ele tinha dito _"o codex mandou um recado para vc verificar:"_, e valia a
+ordem do dia: _"Vamos resolver os problemas todos, verifica se são problemas mesmo e resolva."_ Avisado de que as
+gravações antigas deixam de tocar (_"Se as gravações antigas forem importantes para você, me diga antes de
+publicar."_), respondeu só _"Sim, publica"_. Entra:
+
+- pilotos em duas abas: a pergunta antiga de apagar só apaga o piloto sobre o qual perguntou;
+- a aba percebe que a outra mexeu no piloto dela, para de gravar, volta à tela inicial, e o Continue recarrega a página;
+- o botão de apagar velho não dá mais erro;
+- o mesmo piloto em duas abas não se sobrescreve;
+- replays na versão 10: as gravações de versão 9 são recusadas com o aviso que já existe;
+- o "tentar de novo" de um replay mantém as melhorias gravadas.
+
+**Fica de fora**, como na publicação anterior: as duas perguntas da abertura (cartão `abertura-7`); a segunda parte da
+abertura (o carregamento em fatias, espera o teste dele no Tesla); o planeta (36); o tiro na pedra com a cor da luz e a
+morte do chefe que treme duas vezes (35, 38); as vozes (37); as naves do jogador (20); as cartas por arma.
 
 **21/11, mais tarde (vale sobre o que estiver mais abaixo e disser outra coisa):** a quinta auditoria de fora e os
 cristais vão ao ar por ordem dele — à pergunta "Publico os consertos do Codex com os cristais novos?", _"Sim,
