@@ -192,6 +192,14 @@ describe('Settings panel', () => {
     expect(settings.getSetting('graphics', 'quality')).toBe('low');
   });
 
+  it("a Controls change from the game redraws keeping the pad's focus on its choice", () => {
+    const { panel } = renderSection('controls');
+    panel.settingsState.isOpen = true;
+    const keep = vi.spyOn(panel, 'redrawKeepingFocus');
+    panel.refreshCategory('controls');
+    expect(keep).toHaveBeenCalledOnce();
+  });
+
   it('greys Camera Lead with the Classic camera, with its reason', () => {
     expect(isGreyed(renderSection('game').row('cameraLead'))).toBe(false);
 
