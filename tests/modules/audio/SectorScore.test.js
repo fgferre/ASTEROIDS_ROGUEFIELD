@@ -143,6 +143,45 @@ describe('SectorScore', () => {
     expect(rec.sources).toHaveLength(2);
   });
 
+  it("two quick picks on the map keep the second sector's music, even when the first pick's journey cue arrives last", async () => {
+    const fetchBytes = vi.fn(async (url) => new ArrayBuffer(url.length));
+    const load = vi.fn(async () => buffer());
+    score = new SectorScore({ mixer, load, fetchBytes });
+    score.init(rec.context, target);
+    // Each chapter's journey cue lands when the test says; the story's at once.
+    const arrive = {};
+    const cues = {};
+    const audio = {
+      _afterMenuMusic: (prefetch) => prefetch(),
+      sectorScore: score,
+      journeyCue: {
+        prefetch: ({ chapter, url }) => {
+          if (url) return Promise.resolve(null);
+          cues[chapter] ??= new Promise((done) => (arrive[chapter] = done));
+          return cues[chapter];
+        },
+      },
+    };
+    AUDIO_EVENT_HANDLERS.sectorScorePrefetch(audio, { sector: 'debris-wake' });
+    AUDIO_EVENT_HANDLERS.sectorScorePrefetch(audio, { sector: 'dense-core' });
+    arrive[2](null); // Dense Core's chapter cue first
+    await vi.advanceTimersByTimeAsync(0);
+    arrive[1](null); // then Debris Wake's, late
+    await vi.advanceTimersByTimeAsync(0);
+
+    const fetched = () => fetchBytes.mock.calls.map(([url]) => url);
+    const dense = SECTOR_SCORES['dense-core'];
+    expect(fetched()).toEqual([dense.stage, dense.boss]);
+    await score.start('dense-core');
+    // The launch decodes the prefetched bytes: nothing is fetched again.
+    expect(load).toHaveBeenCalledWith(
+      rec.context,
+      dense.stage,
+      expect.any(ArrayBuffer)
+    );
+    expect(rec.sources).toHaveLength(2);
+  });
+
   it('boss-warning plays the stinger and crossfades the boss in, the stage out', async () => {
     await score.start('debris-wake');
     const { bossFade, stageFade } = score._nodes;
