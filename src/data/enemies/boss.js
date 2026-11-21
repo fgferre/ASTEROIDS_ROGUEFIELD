@@ -364,7 +364,9 @@ export const BOSS_EFFECTS_PRESETS = deepFreeze({
       duration: 0.6,
       intensity: 0.5,
     }),
-    freezeFrame: Object.freeze({ duration: 0.5, fade: 0.35 }),
+    // fade 0.3: the speed the fall ran at when a second, hard-coded stop
+    // (0.5 s from 30 %) landed with this one (21/11); the game time is unchanged
+    freezeFrame: Object.freeze({ duration: 0.5, fade: 0.3 }),
     slowMotion: Object.freeze({ scale: 0.38, hold: 0.32, duration: 1.1 }),
   }),
 });

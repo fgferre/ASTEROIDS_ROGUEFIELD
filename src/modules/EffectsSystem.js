@@ -7,9 +7,11 @@ import { EnemyEffects } from './effects/EnemyEffects.js';
 import { GameTime } from './effects/GameTime.js';
 import { Particles } from './effects/Particles.js';
 import { PlayerEffects } from './effects/PlayerEffects.js';
+import { ShakePresets } from '../utils/ScreenShake.js';
 import {
   PLAYER_HIT_SHAKE,
   SHIELD_SOAK_SHAKE,
+  BOSS_LOOT_FUSION_GAP,
   ScreenFeedback,
   hullFlashIntensity,
   hullLoss,
@@ -301,9 +303,10 @@ export default class EffectsSystem extends BaseSystem {
       this.bossTransitions.onPhaseChanged(payload)
     );
 
-    registerBossEvent('boss-defeated', (payload = {}) =>
-      this.bossTransitions.onDefeated(payload)
-    );
+    registerBossEvent('boss-defeated', (payload = {}) => {
+      this.bossTransitions.onDefeated(payload);
+      this.screenFeedback.bossFallHold = ShakePresets.bossDefeated.duration;
+    });
 
     this.registerEventListener('bullet-created', (data) =>
       this.playerEffects.onBulletCreated(data)
@@ -373,7 +376,15 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('xp-orb-fused', (data) => {
-      if (data?.position) this.playerEffects.createOrbFusionEffect(data);
+      if (!data?.position) return;
+      const quiet = this.screenFeedback.bossFallHold > 0;
+      if (quiet) {
+        this.screenFeedback.bossFallHold = Math.max(
+          this.screenFeedback.bossFallHold,
+          BOSS_LOOT_FUSION_GAP
+        );
+      }
+      this.playerEffects.createOrbFusionEffect(data, { screen: !quiet });
     });
 
     this.registerEventListener('player-took-damage', (payload = {}) => {
