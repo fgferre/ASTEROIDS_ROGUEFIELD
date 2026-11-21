@@ -612,9 +612,8 @@ select {
 
 /* The mark, sized by the screen's height so it clears the route. */
 .opening__brand {
-  --om-h: min(150px, 28vh);
   position: relative;
-  height: var(--om-h);
+  height: min(150px, 28vh);
 }
 
 /* While it becomes the title (openingMorph.js) its overlay stands in. */
@@ -627,7 +626,9 @@ select {
    the mark's 430:361 box: to its width, centred in its height. */
 .opening__brand .om-stage {
   height: 100%;
-  transform: translateY(50%) scale(tan(atan2(var(--om-h) * 430, 192052px)))
+  /* --om-s: the mark's height in the drawing's units (index.html sets it
+     before the first paint); without it, the full-height mark's. */
+  transform: translateY(50%) scale(var(--om-s, 0.3358))
     translate(135px, -47.5px);
 }
 
