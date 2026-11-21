@@ -12,10 +12,16 @@ import {
   JOURNEY_CUE_HIT_SECONDS,
 } from '../../data/audio/sectorScores.js';
 
-async function fetchAndDecode(context, url) {
+async function fetchBytes(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  return context.decodeAudioData(await response.arrayBuffer());
+  return response.arrayBuffer();
+}
+
+// `bytes`: the file prefetched before there was a context (null if it
+// failed: fetched again here).
+async function fetchAndDecode(context, url, bytes) {
+  return context.decodeAudioData((await bytes) ?? (await fetchBytes(url)));
 }
 
 /**
@@ -26,8 +32,11 @@ export function createJourneyCue({
   getContext,
   getDestination,
   load = fetchAndDecode,
+  fetchBytes: fetchFile = fetchBytes,
 }) {
   const buffers = new Map(); // url -> Promise<AudioBuffer | null>
+  // url -> Promise<ArrayBuffer | null>: fetched before the audio woke.
+  const prefetched = new Map();
   let playing = null; // { context, source, out, endAt, timer }
   let token = 0;
 
@@ -35,9 +44,11 @@ export function createJourneyCue({
     const context = getContext();
     if (!url || !context) return null;
     if (!buffers.has(url)) {
+      const bytes = prefetched.get(url);
+      prefetched.delete(url);
       buffers.set(
         url,
-        load(context, url).catch((error) => {
+        load(context, url, bytes).catch((error) => {
           buffers.delete(url);
           console.warn('[journeyCue] could not load the cue:', error);
           return null;
@@ -47,9 +58,18 @@ export function createJourneyCue({
     return buffers.get(url);
   }
 
-  /** The destination's cue (or `url`) is fetched ahead, so play() need not wait. */
+  /**
+   * The destination's cue (or `url`) is fetched ahead, so play() need not
+   * wait; before the audio wakes (no context) only its bytes, decoded later.
+   */
   function prefetch({ chapter, url = JOURNEY_CUES[chapter] } = {}) {
-    buffer(url);
+    if (!url || buffers.has(url) || prefetched.has(url)) return;
+    if (getContext()) buffer(url);
+    else
+      prefetched.set(
+        url,
+        fetchFile(url).catch(() => null)
+      );
   }
 
   function release(cue) {

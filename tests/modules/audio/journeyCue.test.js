@@ -73,4 +73,32 @@ describe('journeyCue: the recording of the destination chapter', () => {
     expect(load).toHaveBeenCalledTimes(1);
     expect(load.mock.calls[0][1]).toBe(url);
   });
+
+  it('prefetched before the audio wakes, the file is fetched then and decoded once it plays', async () => {
+    const { context, sources } = setup();
+    let awake = null;
+    const bytes = new ArrayBuffer(8);
+    const fetchBytes = vi.fn(async () => bytes);
+    const load = vi.fn(async () => ({ duration: 18 }));
+    const cue = createJourneyCue({
+      getContext: () => awake,
+      getDestination: () => ({ connect: vi.fn(), disconnect: vi.fn() }),
+      load,
+      fetchBytes,
+    });
+    const url = 'https://example.test/story.mp3';
+
+    cue.prefetch({ url });
+    expect(fetchBytes).toHaveBeenCalledWith(url);
+    expect(load).not.toHaveBeenCalled();
+
+    awake = context;
+    expect(cue.play({ url, duration: 0 })).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fetchBytes).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(await load.mock.calls[0][2]).toBe(bytes);
+    expect(sources[0].start).toHaveBeenCalled();
+  });
 });
