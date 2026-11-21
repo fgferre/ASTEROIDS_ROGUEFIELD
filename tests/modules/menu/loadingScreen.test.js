@@ -379,6 +379,17 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
+  it('Escape held to close a panel does not go on to the gate (key repeat)', () => {
+    const { menu, winListeners, page } = inMenu();
+    page.overlays = [{ closest: () => null }];
+    winListeners.keydown({ key: 'Escape', repeat: false });
+    page.overlays = []; // the panel's own Escape closed it
+    winListeners.keydown({ key: 'Escape', repeat: true });
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    winListeners.keydown({ key: 'Escape', repeat: false });
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
   it("the game's name on the menu brings the gate back, by touch or click, unless a panel is open", () => {
     const { menu, menuButton, page } = inMenu();
     page.overlays = [{ closest: () => null }];

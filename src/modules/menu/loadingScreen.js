@@ -128,7 +128,9 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       'keydown',
       (event) => {
         input();
-        if (event.key === 'Escape' && onMenu() && !panelOpen()) backToGate();
+        // A held Escape's repeats: its first press closed a panel, only that.
+        if (event.key === 'Escape' && !event.repeat && onMenu() && !panelOpen())
+          backToGate();
       },
       true
     );
