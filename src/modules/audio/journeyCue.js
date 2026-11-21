@@ -61,17 +61,18 @@ export function createJourneyCue({
   /**
    * The destination's cue (or `url`) is fetched ahead, so play() need not
    * wait; before the audio wakes (no context) only its bytes, decoded later.
+   * Resolves (never rejects) once the file is in.
    */
   function prefetch({ chapter, url = JOURNEY_CUES[chapter] } = {}) {
-    if (getContext()) {
-      buffer(url);
-      return;
+    if (getContext()) return buffer(url);
+    if (!url) return null;
+    if (!prefetched.has(url)) {
+      prefetched.set(
+        url,
+        fetchFile(url).catch(() => null)
+      );
     }
-    if (!url || prefetched.has(url)) return;
-    prefetched.set(
-      url,
-      fetchFile(url).catch(() => null)
-    );
+    return prefetched.get(url);
   }
 
   function release(cue) {

@@ -80,4 +80,31 @@ describe('AudioSystem menu music behind the opening', () => {
     expect(late).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("fetches the sector's music only once its story and journey music are in", async () => {
+    let arrive;
+    const cue = new Promise((resolve) => (arrive = resolve));
+    const audio = {
+      _afterMenuMusic: (prefetch) => prefetch(),
+      journeyCue: { prefetch: vi.fn(() => cue) },
+      sectorScore: { prefetch: vi.fn() },
+    };
+    AUDIO_EVENT_HANDLERS.sectorScorePrefetch(audio, { sector: 'debris-wake' });
+    await Promise.resolve();
+    expect(audio.journeyCue.prefetch).toHaveBeenCalled();
+    expect(audio.sectorScore.prefetch).not.toHaveBeenCalled();
+    arrive(null);
+    await cue;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(audio.sectorScore.prefetch).toHaveBeenCalledWith('debris-wake');
+
+    // A run of that sector started while the cues came in: nothing to fetch.
+    audio.sectorScore = { sectorId: 'debris-wake', prefetch: vi.fn() };
+    AUDIO_EVENT_HANDLERS.sectorScorePrefetch(audio, { sector: 'debris-wake' });
+    await cue;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(audio.sectorScore.prefetch).not.toHaveBeenCalled();
+  });
 });
