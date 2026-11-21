@@ -50,11 +50,27 @@ describe('opening morph geometry', () => {
   it("builds the opening's scene from the mark's own pieces", () => {
     const html = readFileSync('src/index.html', 'utf8');
     const start = html.indexOf('class="pipo-brand opening__brand"');
-    const scene = html.slice(start, html.indexOf('</svg>', start));
+    const scene = html.slice(start, html.indexOf('<span>presents', start));
     const refs = [...scene.matchAll(/href="#([\w-]+)"/g)].map((m) => m[1]);
     expect(refs).toEqual(
       expect.arrayContaining(['pipo-p1b', 'pipo-i', 'pipo-o', 'pipo-tag'])
     );
     refs.forEach((id) => expect(html).toContain(`id="${id}"`));
+  });
+
+  it("moves the scene's pieces as boxes, not groups inside one svg", () => {
+    // Safari froze the groups while the game held the page; boxes move.
+    const html = readFileSync('src/index.html', 'utf8');
+    const start = html.indexOf('class="pipo-brand opening__brand"');
+    const scene = html.slice(start, html.indexOf('<span>presents', start));
+    const css = readFileSync('src/style.css', 'utf8');
+    const moving = [
+      ...css.matchAll(
+        /\.opening__brand \.(om-[\w-]+) \{\n[^}]*animation-name/g
+      ),
+    ].map((m) => m[1]);
+    expect(moving.length).toBeGreaterThan(15);
+    moving.forEach((name) => expect(scene).toContain(`<div class="${name}">`));
+    expect(scene).not.toMatch(/<g /);
   });
 });

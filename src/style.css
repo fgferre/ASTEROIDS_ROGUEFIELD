@@ -612,7 +612,9 @@ select {
 
 /* The mark, sized by the screen's height so it clears the route. */
 .opening__brand {
-  height: min(150px, 28vh);
+  --om-h: min(150px, 28vh);
+  position: relative;
+  height: var(--om-h);
 }
 
 /* While it becomes the title (openingMorph.js) its overlay stands in. */
@@ -620,12 +622,56 @@ select {
   visibility: hidden;
 }
 
+/* The stage: the drawing's units as px, its origin at the drawing's 0 0,
+   scaled as a whole as the old viewBox (-135 -133 532 361) was fitted to
+   the mark's 430:361 box: to its width, centred in its height. */
+.opening__brand .om-stage {
+  height: 100%;
+  transform: translateY(50%) scale(tan(atan2(var(--om-h) * 430, 192052px)))
+    translate(135px, -47.5px);
+}
+
+/* Each piece is a box at its parent's origin; its drawing an <svg> that
+   shows all around that point. */
+.opening__brand div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.opening__brand svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+.opening__brand .om-word svg {
+  fill: none;
+  stroke: #eaf3f7;
+  stroke-width: 24px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The face shows only inside the head's oval. */
+.opening__brand .om-ball {
+  left: -52px;
+  top: -60px;
+  width: 104px;
+  height: 120px;
+  clip-path: ellipse(52px 60px);
+}
+
 /* The mark's scene while the game loads (Felipe's concept, 19/11), 7.3 s,
    one timeline: the "o" is the robot from behind, closed and white; it turns
    (its hollow face comes round, the antenna springs up), tilts its head and
    blinks twice into smiling eyes, then hops off over the letters (each dips,
    the i's dot springs), round now and shrinking to its place before the "p".
-   At rest every part shows the end (the round shape is in the drawing). */
+   At rest every part shows the end. */
 .opening__brand
   :is(
     .om-rx,
@@ -647,8 +693,6 @@ select {
     .om-p2,
     .om-idot
   ) {
-  transform-box: view-box;
-  transform-origin: 0 0;
   animation: 7.3s both;
 }
 
@@ -683,18 +727,23 @@ select {
 }
 
 .opening__brand .om-shell {
+  transform: scale(1, 0.871);
   animation-name: om-shell;
 }
 
 .opening__brand .om-hole {
+  transform: scale(1.4, 1.105);
   animation-name: om-hole;
 }
 
 .opening__brand .om-antpos {
+  transform: translateY(8px);
   animation-name: om-antpos;
 }
 
 .opening__brand .om-face {
+  left: 52px;
+  top: 60px;
   animation-name: om-face;
 }
 
@@ -703,6 +752,7 @@ select {
 }
 
 .opening__brand .om-smile {
+  opacity: 0;
   animation-name: om-smile;
 }
 

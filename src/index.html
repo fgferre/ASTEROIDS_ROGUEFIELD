@@ -177,100 +177,117 @@
                  from behind, turns, blinks, and hops over the letters to its
                  place before the "p". Its pieces come from #pipo-brand; the
                  drawing at rest is the end of the scene. -->
-            <svg
+            <div
               class="pipo-brand opening__brand"
-              viewBox="-135 -133 532 361"
               role="img"
               aria-label="Pipo Studio Labs"
             >
-              <clipPath id="om-ball"><ellipse rx="52" ry="60" /></clipPath>
-              <g
-                class="om-word"
-                fill="none"
-                stroke="#eaf3f7"
-                stroke-width="24"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <g class="om-p1">
-                  <use href="#pipo-p1s" />
-                  <use href="#pipo-p1b" />
-                </g>
-                <g class="om-i">
-                  <use href="#pipo-i" />
-                  <use class="om-idot" href="#pipo-idot" stroke="none" />
-                </g>
-                <g class="om-p2">
-                  <use href="#pipo-p2s" />
-                  <use href="#pipo-p2b" />
-                </g>
-                <g class="om-o"><use class="om-oring" href="#pipo-o" /></g>
-              </g>
-              <use class="om-tag" href="#pipo-tag" />
-              <use class="om-tdot" href="#pipo-tdot" />
-              <g class="om-rx">
-                <g class="om-ry">
-                  <g class="om-rs">
-                    <g class="om-body">
+              <!-- Every moving piece is a box of its own (an <svg> inside
+                   nested boxes), not a group inside one <svg>: Safari moves
+                   boxes even while the game holds the page, and froze the
+                   groups. The stage is the old viewBox (-135 -133 532 361),
+                   one px per unit, its origin at the drawing's 0 0. -->
+              <div class="om-stage">
+                <div class="om-word">
+                  <div class="om-p1">
+                    <svg>
+                      <use href="#pipo-p1s" />
+                      <use href="#pipo-p1b" />
+                    </svg>
+                  </div>
+                  <div class="om-i">
+                    <svg><use href="#pipo-i" /></svg>
+                    <div class="om-idot">
+                      <svg><use href="#pipo-idot" stroke="none" /></svg>
+                    </div>
+                  </div>
+                  <div class="om-p2">
+                    <svg>
+                      <use href="#pipo-p2s" />
+                      <use href="#pipo-p2b" />
+                    </svg>
+                  </div>
+                  <div class="om-o">
+                    <div class="om-oring">
+                      <svg><use href="#pipo-o" /></svg>
+                    </div>
+                  </div>
+                </div>
+                <svg>
+                  <use class="om-tag" href="#pipo-tag" />
+                  <use class="om-tdot" href="#pipo-tdot" />
+                </svg>
+                <div class="om-rx">
+                  <div class="om-ry">
+                    <div class="om-rs">
                       <!-- From behind, a closed white "o"; facing us, hollow
                            like the mark's own "o". Its resting shape is the
-                           end: round (the transform attributes), as the
-                           mark's robot used to be beside the "p". -->
-                      <g class="om-squash">
-                        <g class="om-tilt">
-                          <ellipse
-                            class="om-shell"
-                            rx="54"
-                            ry="62"
-                            transform="scale(1 0.871)"
-                            fill="#eaf3f7"
-                            stroke="#03070d"
-                            stroke-width="5"
-                          />
-                          <g clip-path="url(#om-ball)">
-                            <g class="om-face">
+                           end: round, as the mark's robot used to be beside
+                           the "p". -->
+                      <div class="om-squash">
+                        <div class="om-tilt">
+                          <div class="om-shell">
+                            <svg>
                               <ellipse
-                                class="om-hole"
-                                rx="30"
-                                ry="38"
-                                transform="scale(1.4 1.105)"
-                                fill="#03070d"
-                              />
-                              <g class="om-eyes" fill="#eaf3f7">
-                                <circle cx="-14" cy="-4" r="7" />
-                                <circle cx="14" cy="-4" r="7" />
-                              </g>
-                              <g
-                                class="om-smile"
-                                opacity="0"
-                                fill="none"
-                                stroke="#eaf3f7"
+                                rx="54"
+                                ry="62"
+                                fill="#eaf3f7"
+                                stroke="#03070d"
                                 stroke-width="5"
-                                stroke-linecap="round"
-                              >
-                                <path d="M-22 -1Q-14 -11 -6 -1" />
-                                <path d="M6 -1Q14 -11 22 -1" />
-                              </g>
-                            </g>
-                          </g>
-                          <g class="om-antpos" transform="translate(0 8)">
-                            <g class="om-ant">
-                              <path
-                                d="M6 -60L14 -84"
-                                stroke="#eaf3f7"
-                                stroke-width="7"
-                                stroke-linecap="round"
                               />
-                              <circle cx="17" cy="-92" r="12" fill="#ff7ab6" />
-                            </g>
-                          </g>
-                        </g>
-                      </g>
-                    </g>
-                  </g>
-                </g>
-              </g>
-            </svg>
+                            </svg>
+                          </div>
+                          <div class="om-ball">
+                            <div class="om-face">
+                              <div class="om-hole">
+                                <svg>
+                                  <ellipse rx="30" ry="38" fill="#03070d" />
+                                </svg>
+                              </div>
+                              <div class="om-eyes">
+                                <svg fill="#eaf3f7">
+                                  <circle cx="-14" cy="-4" r="7" />
+                                  <circle cx="14" cy="-4" r="7" />
+                                </svg>
+                              </div>
+                              <div class="om-smile">
+                                <svg
+                                  fill="none"
+                                  stroke="#eaf3f7"
+                                  stroke-width="5"
+                                  stroke-linecap="round"
+                                >
+                                  <path d="M-22 -1Q-14 -11 -6 -1" />
+                                  <path d="M6 -1Q14 -11 22 -1" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="om-antpos">
+                            <div class="om-ant">
+                              <svg>
+                                <path
+                                  d="M6 -60L14 -84"
+                                  stroke="#eaf3f7"
+                                  stroke-width="7"
+                                  stroke-linecap="round"
+                                />
+                                <circle
+                                  cx="17"
+                                  cy="-92"
+                                  r="12"
+                                  fill="#ff7ab6"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <span>presents</span>
           </div>
           <div class="opening__route" aria-hidden="true">
