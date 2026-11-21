@@ -99,6 +99,19 @@ describe('SectorScore', () => {
     sources.forEach((source) => expect(source.stop).not.toHaveBeenCalled());
   });
 
+  it('a campaign run whose first wave asks for the chapter score just before its start never fetches it', async () => {
+    const load = vi.fn(async () => buffer());
+    score = new SectorScore({ mixer, load });
+    score.init(rec.context, target);
+    const chapter = score.playChapter(chapterScoreForLayer(1));
+    await Promise.all([chapter, score.start('debris-wake')]);
+    const loaded = load.mock.calls.map(([, url]) => url);
+    const { stage, boss } = SECTOR_SCORES['prime-gate'];
+    expect(loaded).not.toContain(stage);
+    expect(loaded).not.toContain(boss);
+    expect(loaded).toContain(SECTOR_SCORES['debris-wake'].stage);
+  });
+
   it('debris-wake: two looping sources start together, loop as long as the track', async () => {
     await score.start('debris-wake');
     const [stage, boss] = rec.sources;

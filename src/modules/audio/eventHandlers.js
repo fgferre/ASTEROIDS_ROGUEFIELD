@@ -150,14 +150,25 @@ export const AUDIO_EVENT_HANDLERS = {
   },
 
   // A sector is picked (the map, the result screen): its music and its
-  // journey's cue are fetched.
+  // journey's cue are fetched, after the menu's music (_afterMenuMusic).
   sectorScorePrefetch(audio, payload) {
-    audio.sectorScore.prefetch(payload?.sector);
-    audio.journeyCue.prefetch({
-      chapter: sectorById(payload?.sector)?.chapter,
+    audio._afterMenuMusic(() => {
+      // What plays first downloads first: the story's music (the first
+      // campaign launch tells it, under its own) and the journey's, small
+      // files, then the sector's, which waits behind both.
+      const cues = [
+        !storyTold() && audio.journeyCue.prefetch({ url: STORY_CUE }),
+        audio.journeyCue.prefetch({
+          chapter: sectorById(payload?.sector)?.chapter,
+        }),
+      ];
+      Promise.all(cues).then(() => {
+        // A run started meanwhile has fetched its score itself.
+        if (audio.sectorScore.sectorId !== payload?.sector) {
+          audio.sectorScore.prefetch(payload?.sector);
+        }
+      });
     });
-    // The first campaign launch tells the story first, under its own music.
-    if (!storyTold()) audio.journeyCue.prefetch({ url: STORY_CUE });
   },
 
   // The campaign's last sector won: its score fades out, the victory plays.
@@ -265,9 +276,11 @@ export const AUDIO_EVENT_HANDLERS = {
     audio.sfxBus.engine.stop();
   },
 
-  // The press that leaves the opening lets the menu's music in.
+  // The press that leaves the opening lets the menu's music in, and the
+  // prefetches it held back (_afterMenuMusic).
   openingLeft(audio) {
     audio.openingHeld = false;
+    audio._openPrefetchGate();
     audio._syncMenuTrackForCurrentScreen();
   },
 
