@@ -33,7 +33,13 @@ const STEP_PRESS_FIELDS = {
   dash: 'dash',
 };
 
-const CENTRED_STICKS = Object.freeze({ moveX: 0, moveY: 0, aimX: 0, aimY: 0 });
+const CENTRED_STICKS = Object.freeze({
+  moveX: 0,
+  moveY: 0,
+  aimX: 0,
+  aimY: 0,
+  pad: false,
+});
 
 /** Radial deadzone; past it the magnitude is rescaled to 0..1. */
 export function applyStickDeadzone(x = 0, y = 0) {
@@ -835,10 +841,15 @@ class InputSystem {
   readPadSticks(axes) {
     const move = applyStickDeadzone(axes[0], axes[1]);
     const aim = applyStickDeadzone(axes[2], axes[3]);
-    this.padSticks = { moveX: move.x, moveY: move.y, aimX: aim.x, aimY: aim.y };
-    if (move.x || move.y || aim.x || aim.y) {
-      this.setActiveDevice('gamepad');
-    }
+    const pad = Boolean(move.x || move.y || aim.x || aim.y);
+    this.padSticks = {
+      moveX: move.x,
+      moveY: move.y,
+      aimX: aim.x,
+      aimY: aim.y,
+      pad,
+    };
+    if (pad) this.setActiveDevice('gamepad');
 
     const direction = stickNavDirection(axes[0], axes[1]);
     if (direction !== this.padNavDirection) {

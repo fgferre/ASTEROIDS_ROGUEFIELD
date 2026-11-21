@@ -60,11 +60,12 @@ describe('InputSystem gamepad', () => {
     // (0.41 - 0.2) / 0.8 = 0.2625, quantized to 1/100.
     let frame = step({ axes: [0.41, 0, 0, 0] });
     expect(frame.moveX).toBe(0.26);
-    expect(frame.right).toBe(false);
+    expect(frame.pad).toBe(true);
 
+    // The sticks fly by their tilt, not through the move bindings.
     frame = step({ axes: [1, 0, 0, -1] });
     expect(frame.moveX).toBe(1);
-    expect(frame.right).toBe(true);
+    expect(frame.right).toBe(false);
     expect([frame.aimX, frame.aimY]).toEqual([0, -1]);
 
     // The movement command carries the stick for PlayerSystem.
@@ -73,13 +74,14 @@ describe('InputSystem gamepad', () => {
       moveY: 0,
       aimX: 0,
       aimY: -1,
+      pad: true,
     });
   });
 
-  it('maps RT to dash, LT to shield and X/Y to the toggles, once per press', () => {
-    let frame = step({ pressed: [PAD_BUTTON.RT, PAD_BUTTON.LT] });
+  it('maps RB to dash, LB to shield and X/Y to the toggles, once per press', () => {
+    let frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
     expect(frame.dash && frame.shield).toBe(true);
-    frame = step({ pressed: [PAD_BUTTON.RT, PAD_BUTTON.LT] });
+    frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
     expect(frame.dash || frame.shield).toBe(false);
 
     frame = step({ pressed: [PAD_BUTTON.X, PAD_BUTTON.Y] });
@@ -89,10 +91,10 @@ describe('InputSystem gamepad', () => {
   it('ignores pad presses on the pause screen', () => {
     gameState.paused = true;
     input.pollGamepad();
-    fake.set({ pressed: [PAD_BUTTON.RT] });
+    fake.set({ pressed: [PAD_BUTTON.RB] });
     input.pollGamepad();
     gameState.paused = false;
-    expect(step({ pressed: [PAD_BUTTON.RT] }).dash).toBe(false);
+    expect(step({ pressed: [PAD_BUTTON.RB] }).dash).toBe(false);
   });
 
   it('follows the last device used and says so on change', () => {

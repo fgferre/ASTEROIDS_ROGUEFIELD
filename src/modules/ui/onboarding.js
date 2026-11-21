@@ -41,16 +41,21 @@ const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
  * The notice when T or G changed a mode in play: `toggled` is CombatSystem's
  * `combat-mode-toggled` payload ({ kind: 'aim' | 'spread', mode }), `keys`
  * the bound labels ({ toggleAimMode, toggleSpreadMode }). Manual aim fires
- * along the turret: on the nose, or along the right stick while it is held.
+ * along the turret: on the nose, or (pad, modern flight) along the right stick.
  */
-export function modeNotice({ kind, mode }, keys, device = 'keyboard') {
+export function modeNotice(
+  { kind, mode },
+  keys,
+  device = 'keyboard',
+  scheme = 'modern'
+) {
   // By touch the mode word itself is tapped: no key to name.
   const touch = device === 'touch';
   const again = touch ? 'Tap again' : 'Press again';
   const texts = {
     auto: `AIM AUTO · the turret finds targets. ${again} for manual.`,
     manual:
-      device === 'gamepad'
+      device === 'gamepad' && scheme === 'modern'
         ? 'AIM MANUAL · aim with the right stick. Press again for auto.'
         : `AIM MANUAL · shots fly where the nose points. ${again} for auto.`,
     fan: `SPREAD FAN · extra shots fan out wide. ${again} to concentrate.`,
@@ -76,13 +81,16 @@ export function onboardingPrompts(
   device = 'keyboard',
   toggled = null
 ) {
-  const padMove = {
-    keys: ['L-Stick'],
-    text:
-      scheme === 'classic'
-        ? 'Turn and thrust with the left stick. The cannon fires on its own.'
-        : 'Move with the left stick. The cannon fires on its own.',
-  };
+  const padMove =
+    scheme === 'classic'
+      ? {
+          keys: ['L-Stick', 'R-Stick'],
+          text: 'Thrust with the left stick, turn with the right. The cannon fires on its own.',
+        }
+      : {
+          keys: ['L-Stick'],
+          text: 'Move with the left stick. The cannon fires on its own.',
+        };
   const keyboardMove =
     scheme === 'classic'
       ? {
@@ -112,7 +120,7 @@ export function onboardingPrompts(
       keys: [touch ? 'SHIELD' : keys.activateShield],
       text: 'Raise your shield before a hit lands.',
     },
-    mode: toggled && modeNotice(toggled, keys, device),
+    mode: toggled && modeNotice(toggled, keys, device, scheme),
   };
 }
 

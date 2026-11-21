@@ -516,7 +516,11 @@ class PlayerSystem extends BaseSystem {
     }
 
     let movement = this.movementInput.readMovement(commandQueue, inputSystem);
-    this.aimStick = getAimStickDirection(movement);
+    // In the two-stick classic the right stick turns the hull: no hand aim.
+    this.aimStick =
+      movement.pad && this.controlScheme !== 'modern'
+        ? null
+        : getAimStickDirection(movement);
 
     this.shield.updateCooldown(deltaTime);
 

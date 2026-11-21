@@ -27,6 +27,9 @@ export const INPUT_FRAME_FIELDS = Object.freeze([
   'spread',
   'aim',
   'dash',
+  // The sticks are a pad's (Felipe's two-stick scheme, controle-1, 20/11):
+  // their tilt is the force. Last, so older recordings read it false.
+  'pad',
 ]);
 
 // Held stick axes in -1..1 (screen axes, y down): left stick move, right

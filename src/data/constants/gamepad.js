@@ -44,14 +44,20 @@ export const PAD_BUTTON_GLYPHS = Object.freeze([
 /** Axis pairs: 0/1 left stick (move), 2/3 right stick (aim). */
 export const PAD_STICK_GLYPHS = Object.freeze(['L-Stick', 'R-Stick']);
 
-/** Default gamepad bindings of the remappable actions (settings `controls`). */
+/**
+ * Default gamepad bindings of the remappable actions (settings `controls`):
+ * Felipe's picks on controle-1 (20/11), dash on RB and the shield on LB. The
+ * sticks fly by their tilt (flight.js, `pad` frames), not through bindings:
+ * classic, the left stick thrusts (up) and backs (down), the right one turns;
+ * modern, the left one points the way and the right one aims.
+ */
 export const GAMEPAD_BINDINGS = Object.freeze({
-  moveUp: ['axis:1:-', `button:${PAD_BUTTON.UP}`],
-  moveDown: ['axis:1:+', `button:${PAD_BUTTON.DOWN}`],
-  moveLeft: ['axis:0:-', `button:${PAD_BUTTON.LEFT}`],
-  moveRight: ['axis:0:+', `button:${PAD_BUTTON.RIGHT}`],
-  activateShield: [`button:${PAD_BUTTON.LT}`],
-  dash: [`button:${PAD_BUTTON.RT}`],
+  moveUp: [`button:${PAD_BUTTON.UP}`],
+  moveDown: [`button:${PAD_BUTTON.DOWN}`],
+  moveLeft: [`button:${PAD_BUTTON.LEFT}`],
+  moveRight: [`button:${PAD_BUTTON.RIGHT}`],
+  activateShield: [`button:${PAD_BUTTON.LB}`],
+  dash: [`button:${PAD_BUTTON.RB}`],
   pause: [`button:${PAD_BUTTON.START}`],
   openSettings: [`button:${PAD_BUTTON.VIEW}`],
   confirm: [`button:${PAD_BUTTON.A}`],
@@ -76,8 +82,24 @@ export const GAMEPAD_NAV_BUTTONS = Object.freeze({
   [PAD_BUTTON.RIGHT]: 'right',
 });
 
+/** The 18/10 table, before the two-stick scheme; a save still on it moves. */
+export const PAD_BINDINGS_1810 = Object.freeze({
+  moveUp: ['axis:1:-', `button:${PAD_BUTTON.UP}`],
+  moveDown: ['axis:1:+', `button:${PAD_BUTTON.DOWN}`],
+  moveLeft: ['axis:0:-', `button:${PAD_BUTTON.LEFT}`],
+  moveRight: ['axis:0:+', `button:${PAD_BUTTON.RIGHT}`],
+  activateShield: [`button:${PAD_BUTTON.LT}`],
+  dash: [`button:${PAD_BUTTON.RT}`],
+});
+
 /** Radial deadzone of both sticks; the rest is rescaled to 0..1. */
 export const GAMEPAD_STICK_DEADZONE = 0.2;
+/**
+ * A stick's force past the deadzone: rescaled tilt ^ this. 1.5, PROPOSAL
+ * 20/11: half the throw gives about a third of the push, for fine control;
+ * Felipe judges it on his Xbox pad.
+ */
+export const GAMEPAD_STICK_CURVE = 1.5;
 /** Right stick past this magnitude aims the turret by hand (no lock). */
 export const GAMEPAD_AIM_ENGAGE = 0.35;
 /** Left stick past this moves the menu focus once per push. */

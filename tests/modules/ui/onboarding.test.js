@@ -295,14 +295,14 @@ describe('Onboarding', () => {
       moveDown: 'L-Stick ↓',
       moveLeft: 'L-Stick ←',
       moveRight: 'L-Stick →',
-      dash: 'RT',
-      activateShield: 'LT',
+      dash: 'RB',
+      activateShield: 'LB',
     };
     const prompts = onboardingPrompts(buttons, 'modern', 'gamepad');
     expect(prompts.move.keys).toEqual(['L-Stick']);
     expect(prompts.move.text).toMatch(/left stick/);
-    expect(prompts.dash.keys).toEqual(['RT']);
-    expect(prompts.shield.keys).toEqual(['LT']);
+    expect(prompts.dash.keys).toEqual(['RB']);
+    expect(prompts.shield.keys).toEqual(['LB']);
 
     const onboarding = new Onboarding(fakeView());
     onboarding.start();
@@ -357,6 +357,21 @@ describe('Onboarding', () => {
     expect(
       modeNotice({ kind: 'aim', mode: 'manual' }, pad, 'gamepad').text
     ).not.toMatch(/nose/);
+  });
+
+  it('tells a classic-flight pad to thrust with one stick and turn with the other', () => {
+    const prompts = onboardingPrompts({}, 'classic', 'gamepad');
+    expect(prompts.move.keys).toEqual(['L-Stick', 'R-Stick']);
+    expect(prompts.move.text).toMatch(/left stick.*turn with the right/);
+  });
+
+  it('says shots fly along the nose for a classic-flight pad', () => {
+    const pad = { toggleAimMode: 'Y', toggleSpreadMode: 'X' };
+    const toggled = { kind: 'aim', mode: 'manual' };
+    expect(modeNotice(toggled, pad, 'gamepad', 'classic').text).toMatch(/nose/);
+    expect(modeNotice(toggled, pad, 'gamepad', 'modern').text).toMatch(
+      /right stick/
+    );
   });
 
   it('names no key by touch, where the mode word is tapped', () => {
