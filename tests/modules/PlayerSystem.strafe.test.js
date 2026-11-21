@@ -7,6 +7,7 @@ import {
   TURRET_PIVOT_X,
 } from '../../src/data/constants/physics.js';
 import shipModels from '../../src/data/shipModels.js';
+import { padForce } from '../../src/modules/player/movementInput.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -242,6 +243,36 @@ describe('PlayerSystem control schemes', () => {
 
     expect(player.angle).toBeGreaterThan(0.3); // the hull turned clockwise
     expect(player.getTurretAngle()).toBeCloseTo(-Math.PI / 2, 2);
+  });
+
+  it('the Stick Sensitivity setting sets how far a part-tilted stick pushes, mid-run too; full tilt is full push', () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      settings: {
+        getCategoryValues: (id) =>
+          id === 'controls' ? { stickSensitivity: 'high' } : null,
+      },
+    });
+    expect(player.stickSensitivity).toBe('high');
+    // The new flight (the default) takes it too, from the pause menu.
+    eventBus.emit('settings-controls-changed', {
+      values: { stickSensitivity: 'low' },
+    });
+    expect(player.stickSensitivity).toBe('low');
+
+    const push = (sensitivity, tilt) =>
+      padForce({ pad: true, sensitivity }, tilt);
+    expect(push('medium', 0.5)).toBeCloseTo(0.5 ** 1.5, 9);
+    expect(push('low', 0.5)).toBeLessThan(push('medium', 0.5));
+    expect(push('high', 0.5)).toBeCloseTo(0.5, 9);
+    for (const step of ['low', 'medium', 'high']) {
+      expect(push(step, 1)).toBe(1);
+    }
+    // A frame without the setting (no player stamped it) flies Medium.
+    expect(padForce({ pad: true }, 0.5)).toBeCloseTo(0.5 ** 1.5, 9);
   });
 
   it('flies the Hull Control setting, and ?controls=classic wins over it', () => {

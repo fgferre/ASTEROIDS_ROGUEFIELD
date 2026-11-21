@@ -4,9 +4,10 @@
 // the input the simulation consumed at each fixed step (see fixedStep.js). The recording stores that
 // per-step input run-length encoded (only the steps where it changes) plus the
 // upgrade picked at each level-up, in pick order, with any reroll or banish
-// made on the level-up screen before the pick. Analog stick values (gamepad)
-// are quantized before the simulation sees them, so the stored integers
-// replay exactly. Dependency-free on purpose:
+// made on the level-up screen before the pick, and the Stick Sensitivity at
+// the start and at each change (a pause's Settings). Analog stick values
+// (gamepad) are quantized before the simulation sees them, so the stored
+// integers replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
 export const REPLAY_VERSION = 10;
@@ -110,10 +111,12 @@ export function createRecorder({
   sector = null,
   controls = null,
   hangar = null,
+  stick = 'medium',
   version = REPLAY_VERSION,
 }) {
   const inputs = [];
   const upgrades = [];
+  const sticks = [[0, stick]];
   let lastKey = null;
   let steps = 0;
 
@@ -127,6 +130,10 @@ export function createRecorder({
         lastKey = key;
       }
       steps = Math.max(steps, step + 1);
+    },
+    /** Stick Sensitivity from `step` on (a change from the pause). */
+    recordStick(step, value) {
+      if (value !== sticks[sticks.length - 1][1]) sticks.push([step, value]);
     },
     /** Level-up pick, applied after `step` steps of the run. */
     recordUpgrade(step, upgradeId) {
@@ -158,6 +165,7 @@ export function createRecorder({
         sector,
         controls,
         hangar,
+        stick: sticks.map((entry) => [...entry]),
         steps,
         inputs: inputs.map((entry) => [...entry]),
         upgrades: upgrades.map(([step, entry]) => [
@@ -171,7 +179,7 @@ export function createRecorder({
 
 /** Plays back a recording produced by `createRecorder().toJSON()`. */
 export function createPlayer(recording) {
-  const { inputs, upgrades, steps } = recording;
+  const { inputs, upgrades, steps, stick } = recording;
   let cursor = 0;
   let nextUpgrade = 0;
 
@@ -207,6 +215,10 @@ export function createPlayer(recording) {
         ? { step, action: 'reroll' }
         : { step, action: entry.type, upgradeId: entry.id };
     },
+    /** The Stick Sensitivity flown at `step`. */
+    stickAt(step) {
+      return stick.findLast(([from]) => from <= step)[1];
+    },
     isFinished(step) {
       return step >= steps;
     },
@@ -237,6 +249,8 @@ export function deserialize(text) {
     sector: data.sector ?? null,
     controls: data.controls ?? null,
     hangar: data.hangar ?? null,
+    // Before the setting (21/11) every pad run flew Medium.
+    stick: Array.isArray(data.stick) ? data.stick : [[0, 'medium']],
     steps: data.steps,
     inputs: data.inputs,
     upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],

@@ -2,10 +2,11 @@
 //
 // Recording starts when a run starts ('game-started') and stops at death; the
 // run's seed, difficulty and Daily Field day come from the difficulty service,
-// its mode from the session and its control scheme from the player. An armed
-// recording sets that service's difficulty and day and the session's start mode
-// and hull before its run begins, and its control scheme once the run has
-// started; its Hangar setup stands in for the viewer's for the whole run, a
+// its mode from the session and its control scheme and Stick Sensitivity (and
+// each change of it from the pause) from the player. An armed recording sets
+// that service's difficulty and day and the session's start mode and hull
+// before its run begins, its control scheme once the run has started, and its
+// Stick Sensitivity at each step it feeds; its Hangar setup stands in for the viewer's for the whole run, a
 // Retry's restore included, until the session starts the next run. The
 // recorder lives on the session
 // (`session.replayRecorder`). Input is captured and substituted at
@@ -64,8 +65,10 @@ export function createReplayController({
   let pickPending = false;
   // When a replay's chest cards, all revealed, go (Date.now ms), or null.
   let chestDoneAt = null;
-  // The viewer's own control scheme while a replay flies the recorded one.
+  // The viewer's own control scheme and Stick Sensitivity while a replay flies
+  // the recorded ones.
   let viewerControls = null;
+  let viewerStick = null;
   const difficulty = session.resolveServiceInstance('difficulty');
   const playerService = session.resolveServiceInstance('player');
   const hangar = session.resolveServiceInstance('hangar');
@@ -79,6 +82,7 @@ export function createReplayController({
 
   const replaySource = () => {
     const frame = player.frameAt(runStep());
+    if (frame) playerService.stickSensitivity = player.stickAt(runStep());
     if (!frame) {
       // Recording over: hand control back to the devices.
       input.setInputSource(null);
@@ -93,6 +97,7 @@ export function createReplayController({
 
     if (armedRecording) {
       player = createPlayer(armedRecording);
+      viewerStick ??= playerService.stickSensitivity;
       if (['modern', 'classic'].includes(armedRecording.controls)) {
         viewerControls ??= playerService.controlScheme;
         playerService.controlScheme = armedRecording.controls;
@@ -107,6 +112,10 @@ export function createReplayController({
     if (viewerControls) {
       playerService.controlScheme = viewerControls;
       viewerControls = null;
+    }
+    if (viewerStick) {
+      playerService.stickSensitivity = viewerStick;
+      viewerStick = null;
     }
     // A run that carries a build from the sector before cannot be played
     // back from its seed alone: it is not recorded.
@@ -128,10 +137,20 @@ export function createReplayController({
       date: difficulty.dateKey,
       sector: session.sector?.id ?? null,
       controls: playerService.controlScheme,
+      stick: playerService.stickSensitivity,
       hangar: hangar.getRunSetup(),
     });
     session.replayRecorder = recorder;
     input.setInputSource(recordSource);
+  });
+
+  // A change from the pause: recorded for the run, or kept for the viewer's
+  // own next run while a replay flies the recorded one.
+  eventBus.on('settings-controls-changed', ({ values } = {}) => {
+    const value = values?.stickSensitivity;
+    if (!value) return;
+    if (recorder) recorder.recordStick(runStep(), value);
+    if (viewerStick) viewerStick = value;
   });
 
   eventBus.on('player-died', () => {
