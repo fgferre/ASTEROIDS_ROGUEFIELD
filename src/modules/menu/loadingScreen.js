@@ -5,7 +5,8 @@
 // (--load, 0..1); once loaded it asks for a tap, click or key, and that press
 // fades it off the live scene. Then the same screen is the PRESS START gate; a
 // start press fades it out and shows the menu screen. Escape on the menu with
-// nothing open, or the menu left idle, brings the gate back (Felipe, 20/11),
+// nothing open, the game's name on the menu (by touch: Felipe's pick B) or the
+// menu left idle brings the gate back (Felipe, 20/11),
 // and its press goes through the pilots again: the way to switch pilot. It
 // came from MenuBackgroundSystem.js.
 //
@@ -110,8 +111,9 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     showGate(true);
   }
 
-  // Escape with nothing open, or the idle time, takes the menu back to the
-  // gate. Capture phase: a panel's own Escape closes it first, and only that.
+  // Escape with nothing open, the game's name or the idle time takes the menu
+  // back to the gate. Capture phase: a panel's own Escape closes it first,
+  // and only that.
   let watching = false;
   function watchMenu() {
     if (watching) return;
@@ -132,6 +134,11 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     for (const type of ['pointerdown', 'pointermove', 'wheel']) {
       window.addEventListener(type, input, true);
     }
+    menuScreen
+      .querySelector('.menu-title-back')
+      ?.addEventListener('click', () => {
+        if (onMenu() && !panelOpen()) backToGate();
+      });
     setInterval(() => {
       if (!onMenu() || panelOpen() || padActive()) input();
       else if (performance.now() - lastInput >= MENU_IDLE_MS) backToGate();
@@ -254,7 +261,9 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
         openPilotSelect(() => {
           finish();
           watchMenu();
-          menuScreen?.querySelector('button:not([disabled])')?.focus();
+          menuScreen
+            ?.querySelector('button:not([disabled]):not(.menu-title-back)')
+            ?.focus();
         });
       }, START_EFFECT_MS);
     }

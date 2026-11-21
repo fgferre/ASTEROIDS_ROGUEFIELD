@@ -325,12 +325,20 @@
             id="menu-prep"
             class="menu-screen__content"
             role="region"
-            aria-labelledby="menu-screen-title"
+            aria-labelledby="menu-screen-name"
             tabindex="-1"
             data-active-tab="campaign"
           >
+            <!-- The name is the way back to the title, where the next press
+                 chooses the pilot (Felipe's pick B, 20/11; loadingScreen.js) -->
             <h1 id="menu-screen-title" class="menu-screen__title">
-              ASTEROID<br /><strong>ROGUEFIELD</strong>
+              <button type="button" class="menu-title-back">
+                <span class="menu-title-back__mark" aria-hidden="true">‹</span>
+                <span id="menu-screen-name">
+                  ASTEROID<br /><strong>ROGUEFIELD</strong>
+                </span>
+                <small class="menu-title-back__tip">Title · Switch pilot</small>
+              </button>
             </h1>
             <p id="menu-status" class="menu-status" aria-label="Records"></p>
             <div

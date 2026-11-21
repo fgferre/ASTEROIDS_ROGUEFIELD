@@ -1910,6 +1910,49 @@ html[data-motion='reduced'] .opening__brand * {
   letter-spacing: 0.08em;
 }
 
+/* The name is a button back to the title (Felipe's pick B, 20/11): the back
+   mark on its left, the small line under it. */
+.menu-title-back {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: start;
+  column-gap: var(--space-2);
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.menu-title-back__mark {
+  grid-row: 1 / span 2;
+  font-size: 2.4em;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.menu-title-back__tip {
+  grid-column: 2;
+  margin-top: 3px;
+  font: 600 9px / 1.4 var(--font-ui);
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.menu-title-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 /* Records strip under the top bar (ui/menuStatus.js): one small dim line */
 .menu-status {
   grid-area: status;
