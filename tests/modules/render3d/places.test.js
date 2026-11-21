@@ -60,6 +60,17 @@ describe('place backdrop sets', () => {
     expect(backdrop.structures.group.visible).toBe(true);
   });
 
+  it("leaves out the Crystal Choir's finer shards on the low quality preset", () => {
+    const backdrop = new FieldBackdrop(THREE, new THREE.Scene());
+    const choir = backdrop.places.built.get('crystal-choir');
+    expect(choir.detail.length).toBeGreaterThan(0);
+
+    backdrop.places.setDetail(false);
+    choir.detail.forEach((part) => expect(part.visible).toBe(false));
+    backdrop.places.setDetail(true);
+    choir.detail.forEach((part) => expect(part.visible).toBe(true));
+  });
+
   it("draws the Crystal Choir's crystals polished, lit from inside, their sheen capped", () => {
     const kit = createPlaceKit(THREE, new THREE.Color(), { under: 0.7 });
     buildCrystalChoir(THREE, kit);

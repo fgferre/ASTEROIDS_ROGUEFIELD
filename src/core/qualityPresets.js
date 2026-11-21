@@ -16,6 +16,8 @@
 // lower where shadows exist, so they read. `spaceLayers` (proposta 18/10):
 // depth layers of the space behind the field (spaceField SPACE_LAYERS) —
 // 1 the baked far nebula, 2 + the live mid bands, 3 + near wisps and clouds.
+// `placeDetail`: a place set's finer parts (PlaceSets.setDetail: the Crystal
+// Choir's every other shard) — off on the lowest preset.
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
@@ -32,6 +34,7 @@ export const QUALITY_PRESETS = {
     fillScale: 0.85,
     hemiScale: 0.9,
     spaceLayers: 3,
+    placeDetail: true,
   },
   high: {
     bloomScale: 1,
@@ -48,6 +51,7 @@ export const QUALITY_PRESETS = {
     fillScale: 0.85,
     hemiScale: 0.9,
     spaceLayers: 3,
+    placeDetail: true,
   },
   medium: {
     bloomScale: 0.85,
@@ -64,6 +68,7 @@ export const QUALITY_PRESETS = {
     fillScale: 1,
     hemiScale: 1,
     spaceLayers: 2,
+    placeDetail: true,
   },
   low: {
     bloomScale: 0.7,
@@ -80,6 +85,7 @@ export const QUALITY_PRESETS = {
     fillScale: 1,
     hemiScale: 1,
     spaceLayers: 1,
+    placeDetail: false,
   },
 };
 export const QUALITY_LEVELS = Object.keys(QUALITY_PRESETS);
