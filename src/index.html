@@ -291,17 +291,19 @@
             <script>
               // The stage's scale (style.css .om-stage): the old viewBox
               // fitted to the mark's 430:361 box by its width. Set here, before
-              // the first paint, not by CSS trigonometry: Safari 26 turned it
-              // upside down.
+              // the first paint, and whenever the mark's box changes (a turn,
+              // or shown after hidden); not by CSS trigonometry: Safari 26
+              // turned it upside down.
               (() => {
                 const brand = document.currentScript.previousElementSibling;
-                const fit = () =>
-                  brand.style.setProperty(
-                    '--om-s',
-                    (brand.getBoundingClientRect().height * 430) / 192052
-                  );
+                const fit = () => {
+                  const height = brand.getBoundingClientRect().height;
+                  if (height > 0) {
+                    brand.style.setProperty('--om-s', (height * 430) / 192052);
+                  }
+                };
                 fit();
-                addEventListener('resize', fit);
+                new ResizeObserver(fit).observe(brand);
               })();
             </script>
             <span>presents</span>
