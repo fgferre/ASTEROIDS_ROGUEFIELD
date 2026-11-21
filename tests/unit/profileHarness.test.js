@@ -60,10 +60,9 @@ function stubBrowserGlobals({ searchString = '' } = {}) {
       removeChild: vi.fn(),
     },
   });
-  vi.stubGlobal('URL', {
-    createObjectURL: vi.fn(() => 'blob://stub'),
-    revokeObjectURL: vi.fn(),
-  });
+  // Spies on the real URL: Vitest's module loader still constructs URLs.
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob://stub');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   vi.stubGlobal('Blob', vi.fn());
 }
 

@@ -30,10 +30,13 @@ describe('a restored graphics context', () => {
       render: vi.fn(),
     };
     const dispose = vi.fn();
-    const pmrem = vi.fn(() => ({
-      fromScene: () => ({ texture: { fresh: true, dispose } }),
-      dispose() {},
-    }));
+    // Called with `new`: a function, not an arrow (Vitest 4).
+    const pmrem = vi.fn(function () {
+      return {
+        fromScene: () => ({ texture: { fresh: true, dispose } }),
+        dispose() {},
+      };
+    });
     const fake = Object.assign(Object.create(THREE), {
       PMREMGenerator: pmrem,
     });

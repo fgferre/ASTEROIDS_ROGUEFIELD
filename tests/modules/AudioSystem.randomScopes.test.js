@@ -133,7 +133,10 @@ describe('AudioSystem random scope synchronization', () => {
     const AudioCtor = vi.fn(function AudioCtor(src = '') {
       return createAudioElement(src);
     });
-    const AudioContextCtor = vi.fn(() => context);
+    // Called with `new`: a function, not an arrow (Vitest 4).
+    const AudioContextCtor = vi.fn(function () {
+      return context;
+    });
 
     vi.stubGlobal('document', documentStub);
     vi.stubGlobal('Audio', AudioCtor);
