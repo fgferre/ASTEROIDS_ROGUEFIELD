@@ -72,6 +72,8 @@ const visual = {
   // a blunt, slab-sided body on a flat belly, thick delta wings, armour
   // slabs on the shoulders, stabilisers with the braking upgrade
   form: {
+    // Recess, wing, body, upper plate and exposed metal (sRGB).
+    tones: ['#1d252e', '#35414e', '#4c5965', '#707d86', '#938d85'],
     body: [
       [0.985, 0, 0.17, 0, 0],
       [0.97, 0.05, 0.17, 0.035, 0.03],

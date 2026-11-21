@@ -3,8 +3,8 @@
 // chamfered plates: a dark keel, the fuselage, lighter shoulder armour and a
 // spine with vents; wings cut from the fin panels with an armour plate on top,
 // a fence and a weapon rail at the tip; canards and canted tail fins; a banded
-// nacelle with an intake and a bell round every nozzle; a faceted canopy in
-// a dark socket. Each part has a finish: satin paint, glossier accent
+// nacelle with an intake and a bell round every nozzle; and an opaque remote
+// sensor with an optical window. Each part has a finish: satin paint, glossier accent
 // panels (shoulder and wing armour, tail fins, flaps) or polished steel
 // (nozzle bells and bands, intake rims, the weapon rail's barrel, trim
 // strips, the antenna and the chin sensor). hullModel.js calls it and merges
@@ -15,7 +15,7 @@ import { SHIP_SIZE } from '../../data/constants/physics.js';
 
 const S = SHIP_SIZE;
 // Tones, as hullTones (STEEL: the polished metal's own).
-const [DEEP, BASE, FIN, SPINE, STEEL] = [0, 1, 2, 3, 4];
+const [DEEP, BASE, FIN, SPINE, STEEL, ACCENT] = [0, 1, 2, 3, 4, 5];
 /** The finishes: the material each part draws in (hullModel.js HULL_FINISHES). */
 export const FINISH = Object.freeze({ paint: 0, gloss: 1, metal: 2 });
 const { gloss: GLOSS, metal: METAL } = FINISH;
@@ -32,9 +32,9 @@ const NOZZLE_HEIGHT = 2.6;
 
 /**
  * `geometry`: the hull's geometry (hullArt.js). `colors`: the hull tones
- * (hullTones) with the hull's albedo. Returns { plates, raised, canopy, edges,
+ * (hullTones or the hull's livery). Returns { plates, raised, canopy, edges,
  * tips, deckY }: `plates` (fuselage and wings: what a dash ghost draws) and
- * `raised` (the rest) as mergeStatic parts, the canopy's glass, the edge
+ * `raised` (the rest) as mergeStatic parts, the sensor window, the edge
  * segments, the wingtip points in the panels' order and the deck height at
  * `pivotX`.
  */
@@ -123,31 +123,41 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     const [cx, cy] = centroid(points);
     return points.map((p) => [cx + (p.x - cx) * k, cy + (p.y - cy) * k]);
   };
+  const between = ([ax, az], [bx, bz], t) => [
+    ax + (bx - ax) * t,
+    az + (bz - az) * t,
+  ];
 
   const [nose, tail] = [rows[0][0], rows[rows.length - 1][0]];
   const plates = [
     part(slab(outline(0.62, nose * 0.82), ...KEEL, 0.3, taper), DEEP),
-    part(slab(outline(1), ...FUSELAGE, 0.38, taper), FIN),
+    part(
+      slab(outline(1), ...FUSELAGE, 0.38, taper),
+      geometry.blades ? BASE : FIN
+    ),
   ];
   const raised = [
     part(
       slab(outline(0.74, nose * 0.5, tail * 0.92), ...SHOULDER, 0.26, taper),
-      SPINE,
+      geometry.blades ? FIN : SPINE,
       GLOSS
     ),
     part(
       slab(
-        outline(0.34, nose * 0.16, tail * 0.98),
+        outline(geometry.blades ? 0.46 : 0.5, nose * 0.16, tail * 0.98),
         SHOULDER[1] - 0.2,
         SPINE_TOP,
         0.2,
         taper
       ),
-      FIN
+      geometry.blades ? DEEP : FIN
     ),
     // vents across the spine astern, an antenna behind them
-    ...[0.7, 0.5, 0.3].map((t) =>
-      part(box(0.5, 0.16, 1.5, [tail * t, SPINE_TOP * tall(tail * t), 0]), DEEP)
+    ...[0.72, 0.56, 0.4].map((t) =>
+      part(
+        box(0.52, 0.12, 1.6, [tail * t, SPINE_TOP * tall(tail * t), 0]),
+        DEEP
+      )
     ),
     part(box(0.12, 1.5, 0.12, [tail * 0.86, SPINE_TOP + 0.4, 0]), STEEL, METAL),
     // a chin sensor under the prow
@@ -173,26 +183,39 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
         v.y = WING[0] + (v.y - WING[0]) * (1 - 0.35 * out);
       };
       plates.push(part(slab(points, ...WING, 0.2, thin), BASE));
+      const upper = inset(panel.points, geometry.blades ? 0.81 : 0.8);
       raised.push(
         part(
-          slab(inset(panel.points, 0.72), WING[1] - 0.2, WING_PLATE_TOP, 0.12),
-          SPINE,
-          GLOSS
+          slab(upper, WING[1] - 0.4, WING_PLATE_TOP, 0.16),
+          geometry.blades ? SPINE : BASE
         )
       );
-      // the lit leading edge (the panel's first side); a blade's burns in
-      // the accent, along its trailing edge too
-      const corner = (i, dx, h) => [points[i][0] + dx, h, points[i][1]];
-      const lit = geometry.blades ? 'bladeEdge' : 'edge';
-      line(lit, corner(0, 0.1, WING[1]), corner(1, 0.1, WING[1] - 0.25));
-      if (geometry.blades) {
-        for (let i = 1; i < points.length - 1; i += 1) {
-          line(
-            lit,
-            corner(i, -0.1, WING[1] - 0.25),
-            corner(i + 1, -0.1, WING[1] - 0.1)
-          );
-        }
+      // Interceptor's short wing markings and Solar Slicer's long blade inlays.
+      if (geometry.blades || form.canards) {
+        const blade = geometry.blades;
+        const [a, b] = inset(panel.points, 0.78);
+        const [c, d] = inset(panel.points, blade ? 0.56 : 0.38);
+        const start = blade ? 0.04 : 0.1;
+        const end = blade ? 0.96 : 0.54;
+        const front = between(a, b, start);
+        const tip = between(a, b, end);
+        raised.push(
+          part(
+            slab(
+              [front, tip, between(c, d, end), between(c, d, start)],
+              WING_PLATE_TOP - 0.1,
+              WING_PLATE_TOP + 0.04,
+              0.02
+            ),
+            ACCENT,
+            GLOSS
+          )
+        );
+        line(
+          blade ? 'bladeEdge' : 'edge',
+          [front[0], WING_PLATE_TOP + 0.05, front[1]],
+          [tip[0], WING_PLATE_TOP + 0.05, tip[1]]
+        );
       }
       const { x, y } = panel.rcsPort;
       tips.push([x, NOZZLE_HEIGHT, y]);
@@ -203,6 +226,7 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       if (form.pods) {
         raised.push(
           part(box(8.5, 0.75, 0.8, [x + 3.2, WING[0] + 0.2, y]), DEEP),
+          part(box(7.5, 0.12, 0.6, [x + 3.15, WING[0] + 0.62, y]), FIN, GLOSS),
           part(
             drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6),
             STEEL,
@@ -258,25 +282,32 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
         part(slab(points, WING[1], WING[1] + 0.55, 0.12), FIN, GLOSS)
       );
     } else if (panel.armor) {
-      // shoulder armour: a slab over the wing root and a smaller one on
-      // it, the accent trim along the lower slab's outboard edges
+      // Stepped shoulder armour with a transverse amber marking.
       const lower = inset(panel.points, 0.8);
       const top = WING_PLATE_TOP + 1.5;
+      const upper = inset(panel.points, 0.62);
+      const [a, b, c, d] = inset(panel.points, 0.48);
+      const frontIn = between(a, d, 0.35);
+      const frontOut = between(b, c, 0.35);
       raised.push(
-        part(slab(lower, WING[1] - 0.2, top, 0.3), FIN),
+        part(slab(lower, WING[1] - 0.3, top, 0.33), DEEP),
+        part(slab(upper, top - 0.2, top + 0.8, 0.25), SPINE, GLOSS),
         part(
-          slab(inset(panel.points, 0.5), top - 0.2, top + 0.8, 0.25),
-          SPINE,
+          slab(
+            [frontIn, frontOut, between(b, c, 0.54), between(a, d, 0.54)],
+            top + 0.76,
+            top + 0.84,
+            0.02
+          ),
+          ACCENT,
           GLOSS
         )
       );
-      lower.forEach((a, i) => {
-        const b = lower[(i + 1) % lower.length];
-        const outboard = sign * ((a[1] + b[1]) / 2 - cy);
-        if (outboard > 0.5) {
-          line('bladeEdge', [a[0], top + 0.05, a[1]], [b[0], top + 0.05, b[1]]);
-        }
-      });
+      line(
+        'bladeEdge',
+        [frontIn[0], top + 0.85, frontIn[1]],
+        [frontOut[0], top + 0.85, frontOut[1]]
+      );
     }
   });
 
@@ -286,12 +317,13 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     const fore = x + (form.nacelle ?? 0.3) * S;
     const at = [NOZZLE_HEIGHT, y];
     raised.push(
-      part(drum(fore, x, r * 1.25, r * 1.4, ...at), FIN),
+      part(drum(fore, x, r * 1.25, r * 1.4, ...at), BASE),
       part(
-        drum(fore + 0.2, fore - 0.25, r * 0.95, r * 0.95, ...at),
+        drum(fore + 0.2, fore - 0.35, r * 1.06, r * 1.23, ...at),
         STEEL,
         METAL
       ),
+      part(drum(fore + 0.24, fore + 0.18, r * 0.77, r * 0.78, ...at), DEEP),
       part(
         drum(fore - 0.9, fore - 1.6, r * 1.48, r * 1.48, ...at),
         STEEL,
@@ -303,7 +335,7 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     );
   });
 
-  // Canopy: faceted glass in a dark socket a size larger.
+  // The remote sensor uses the former canopy seat and stays below the turret.
   const length = cockpit.to.x - cockpit.from.x;
   const [front, back] = [cockpit.to.x + length * 0.25, cockpit.from.x - length];
   const half = cockpit.width * 1.5;
@@ -317,16 +349,21 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     return [...side, ...side.map(([x, z]) => [x, -z]).reverse()];
   };
   const seat = SHOULDER[1] * tall((front + back) / 2);
-  const lift = (form.canopy ?? 0.1) * S;
+  const lift = (form.canopy ?? 0.1) * S * 0.7;
+  const apertureX = front - (front - back) * 0.28;
   raised.push(
-    part(slab(canopyOutline(1.25), seat - 0.5, seat + 0.25, 0.12), DEEP)
+    part(slab(canopyOutline(1.25), seat - 0.5, seat + 0.25, 0.12), DEEP),
+    part(
+      slab(canopyOutline(1), seat - 0.2, seat + lift, 0.25),
+      geometry.blades ? BASE : SPINE
+    ),
+    part(box(0.42, 0.1, half * 0.97, [apertureX, seat + lift - 0.01, 0]), DEEP)
   );
-  const canopy = slab(
-    canopyOutline(1),
-    seat - 0.2,
-    seat + lift,
-    Math.min(0.45, lift / 2.5)
-  );
+  const canopy = box(0.16, 0.08, half * 0.74, [
+    apertureX,
+    seat + lift + 0.04,
+    0,
+  ]);
   canopy.computeVertexNormals();
   canopy.computeBoundingSphere();
 

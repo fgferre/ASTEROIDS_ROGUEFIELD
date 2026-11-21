@@ -147,8 +147,8 @@ const LAYER_RECOIL_FRAMES = MUZZLE_LIGHT_FRAMES + 1;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the hull's UVs are planar, in hull units). proposta 18/10: strengths.
 const HULL_TILE = 16;
-const HULL_NORMAL_SCALE = 0.5;
-const HULL_AO = 0.8;
+const HULL_NORMAL_SCALE = 0.14;
+const HULL_AO = 0.2;
 const HULL_MAP_SEED = 3131.9;
 
 // The specular cap (hullModel.js), then the cyan fresnel rim on the hull (a

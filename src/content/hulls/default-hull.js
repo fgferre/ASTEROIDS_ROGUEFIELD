@@ -67,6 +67,8 @@ const visual = {
   // swept blades with a weapon rail at each tip, canards, canted tail fins,
   // twin nacelles
   form: {
+    // Recess, wing, body, upper plate and exposed metal (sRGB).
+    tones: ['#222d3a', '#536677', '#8797a5', '#bbc7cc', '#d5c2a9'],
     body: [
       [1.0, 0, 0.15, 0, 0],
       [0.94, 0.028, 0.152, 0.022, 0.016],

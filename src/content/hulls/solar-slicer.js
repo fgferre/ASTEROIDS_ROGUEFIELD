@@ -70,6 +70,8 @@ const visual = {
   // a long ridged needle, thin lens-section blades, engine pods riding the
   // blade roots, tail fins with the braking upgrade
   form: {
+    // Recess, wing, body, upper plate and exposed metal (sRGB).
+    tones: ['#202735', '#606d7b', '#93a0aa', '#bcc4c8', '#c2925d'],
     body: [
       [1.35, 0, 0.15, 0, 0],
       [1.27, 0.02, 0.151, 0.018, 0.012],

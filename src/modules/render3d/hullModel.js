@@ -592,18 +592,21 @@ export function edgeLines(THREE, model, materials) {
 /**
  * A hull's model from its geometry (hullArt.js: panels with the upgrades
  * applied, nozzles, cockpit, `form` in SHIP_SIZE units) and `tones`
- * (hullTones, scaled here by the hull's albedo), shaped by hullSlabModel.js.
+ * (overridden by the hull's livery), shaped by hullSlabModel.js.
  * Returns { hull, ghost, canopy, edges, tips, deckY }: the static parts as
  * one vertex-coloured geometry with a draw group per finish (HULL_FINISHES
  * materials), fuselage and wings first, then the raised parts; `ghost`
  * draws only the first range of the same buffers (the dash
- * afterimages); the canopy's glass; the edge segments by kind ({ edge,
+ * afterimages); the sensor's optical window; the edge segments by kind ({ edge,
  * bladeEdge }); the wingtip points (RCS ports) in the panels' order; the
  * deck height at the turret pivot; `noseTop`, the hull's top over its last
  * NOSE_SPAN on the centreline.
  */
 export function buildHullModel(THREE, geometry, tones) {
-  const colors = tones.map((c) => c.clone().multiplyScalar(geometry.albedo));
+  const colors = geometry.form.tones
+    ? geometry.form.tones.map((hex) => colorOf(THREE, hex))
+    : tones.map((color) => color.clone().multiplyScalar(geometry.albedo));
+  colors.push(colorOf(THREE, geometry.accent).lerp(colors[1], 0.45));
   const { plates, raised, ...rest } = buildSlabHull(
     THREE,
     geometry,
