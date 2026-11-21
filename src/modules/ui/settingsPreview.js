@@ -6,6 +6,7 @@
 // UISystem renders it under the field and redraws it on every change.
 
 import { QUALITY_PRESETS, SLOW_FRAME_MS } from '../../core/qualityPresets.js';
+import { screenReport } from '../../bootstrap/mobileGuard.js';
 
 const title = (word) => word.charAt(0).toUpperCase() + word.slice(1);
 
@@ -77,6 +78,12 @@ export function settingPreview(key, value, context = {}) {
         value === 'hull'
           ? 'Hull: the camera looks ahead along the nose.'
           : 'Aim: the camera looks ahead toward your target.',
+    };
+  }
+  if (key === 'touchControls') {
+    const { pointer, touchPoints, lastPress } = screenReport();
+    return {
+      text: `This screen says: ${pointer} pointer · ${touchPoints} touch points · last press: ${lastPress}`,
     };
   }
   if (key === 'bloom') {

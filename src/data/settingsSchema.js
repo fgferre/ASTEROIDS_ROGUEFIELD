@@ -291,6 +291,17 @@ const SETTINGS_SCHEMA = [
         },
       },
       {
+        key: 'touchControls',
+        type: 'select',
+        control: 'segmented',
+        label: 'Touch Controls',
+        description:
+          'Auto: the stick and buttons show when a finger touches the screen, and hide when you press a key. Always: they stay, and a mouse can work them, for screens that send touches as a mouse.',
+        options: ['auto', 'always'],
+        optionLabels: { auto: 'Auto', always: 'Always' },
+        default: 'auto',
+      },
+      {
         key: 'vibration',
         type: 'toggle',
         label: 'Gamepad Vibration',

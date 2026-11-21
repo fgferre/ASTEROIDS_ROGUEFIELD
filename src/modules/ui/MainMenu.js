@@ -21,6 +21,7 @@ import {
 } from '../../data/difficulty.js';
 import { menuStatusItems, menuStatusMarkup } from './menuStatus.js';
 import { cardName, hullTraitsMarkup, hullUnlockText } from './hangar.js';
+import { install, onInstallable } from '../../bootstrap/installPrompt.js';
 
 export class MainMenu {
   /**
@@ -428,6 +429,16 @@ export class MainMenu {
     show(focused());
   }
 
+  /** Install, after Settings, while the browser offers it (Felipe's pick A). */
+  bindInstallButton() {
+    const button = this.refs.nav?.querySelector('#menu-install-btn');
+    if (!button) return;
+    onInstallable((available) => {
+      button.hidden = !available;
+    });
+    button.addEventListener('click', () => void install());
+  }
+
   // On a phone the Wake log waits behind its top button and opens over the
   // screen (style.css keys on `is-log-open`); its X, or a tap anywhere else on
   // the screen, closes it.
@@ -441,6 +452,7 @@ export class MainMenu {
   }
 
   bindMainMenuControls() {
+    this.bindInstallButton();
     this.bindPrepTabs();
     this.bindPrepSlots();
     this.bindModeHints();

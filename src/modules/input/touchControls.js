@@ -10,8 +10,20 @@
 // works like the pad (sideways turn, up thrusts, down brakes), 'aponta' turns
 // the nose toward the thumb and thrusts. Both are made of the same turn
 // and thrust inputs as the keys; modern flight takes the stick's direction.
+// On a screen that declares a mouse (a car, a touch laptop) the last device
+// used rules: a finger turns touch play on, a key or pad turns it off;
+// Settings' Touch Controls on Always, or `?touch=force`, pins it on,
+// mouse-type pointers working the stick and buttons one at a time (a
+// browser that sends its touches as a mouse).
 
-import { isPortrait, waitAtDoor } from '../../bootstrap/mobileGuard.js';
+import {
+  hasForceTouchFlag,
+  isPortrait,
+  mayTurnToTouch,
+  onFinger,
+  setTouchShown,
+  waitAtDoor,
+} from '../../bootstrap/mobileGuard.js';
 import { SHIP_ANGULAR_DAMPING } from '../../data/constants/physics.js';
 import { wrapAngle } from '../player/flight.js';
 import {
@@ -80,15 +92,101 @@ const LAYER_HTML = `
   <button type="button" class="touch-btn touch-btn--pause" data-touch-action="pause" aria-label="Pause"></button>`;
 
 export class TouchControls {
-  /** `input`: InputSystem; `player`: PlayerSystem (the nose for 'aponta'). */
-  constructor({ input, player, eventBus, mode = touchModeFromUrl() }) {
+  /**
+   * `input`: InputSystem; `player`: PlayerSystem (the nose for 'aponta');
+   * `settings`: SettingsSystem (Touch Controls);
+   * `declared`: the device says it is touch (mobileGuard), on for good;
+   * `onShow`: called when touch play turns on or off on another screen.
+   */
+  constructor({
+    input,
+    player,
+    eventBus,
+    settings,
+    mode = touchModeFromUrl(),
+    declared = false,
+    onShow = () => {},
+  }) {
     this.input = input;
     this.player = player;
     this.eventBus = eventBus;
+    this.settings = settings;
     this.mode = mode;
+    this.declared = declared;
+    this.onShow = onShow;
     this.stick = CENTRED;
+    this.on = false;
+    this.pinned = false;
+    this.screen = null;
+    this.layer = null;
     // The turn notice's wait while the device is upright, else null.
     this.upright = null;
+  }
+
+  /** On for good on a touch device; elsewhere, a finger turns it on. */
+  start() {
+    if (!this.declared && !mayTurnToTouch()) {
+      return;
+    }
+    this.eventBus.on('screen-changed', ({ screen } = {}) => {
+      this.screen = screen;
+      this.stick = CENTRED;
+      this.syncLayer();
+    });
+    if (this.declared) {
+      // Tips name the touch gestures from the start; a key or pad takes over.
+      this.input.setActiveDevice('touch');
+      this.show(true);
+      return;
+    }
+    this.eventBus.on('input-device-changed', ({ device } = {}) => {
+      if (!this.pinned) this.show(device === 'touch');
+    });
+    onFinger(() => this.input.setActiveDevice('touch'));
+    const pinned = () =>
+      hasForceTouchFlag() ||
+      this.settings.getSetting('controls', 'touchControls') === 'always';
+    this.eventBus.on('settings-changed', ({ category } = {}) => {
+      if (category === 'controls' && pinned() !== this.pinned) {
+        this.pin(pinned());
+      }
+    });
+    if (pinned()) this.pin(true);
+  }
+
+  /** Touch play kept on whatever device is used (`on`), or back to the last one. */
+  pin(on) {
+    this.pinned = on;
+    if (on) this.input.setActiveDevice('touch');
+    this.show(on || this.input.getActiveDevice() === 'touch');
+  }
+
+  show(on) {
+    if (on === this.on) {
+      return;
+    }
+    this.on = on;
+    document.body.classList.toggle('touch-play', on);
+    if (!this.declared) {
+      setTouchShown(on);
+      this.onShow();
+    }
+    if (on && !this.layer) {
+      void this.mount();
+    }
+    this.syncLayer();
+  }
+
+  /** The stick and buttons show in play while touch play is on. */
+  syncLayer() {
+    if (!this.layer) {
+      return;
+    }
+    this.layer.hidden = !this.on || this.screen !== 'playing';
+    if (this.layer.hidden) {
+      this.stick = CENTRED;
+    }
+    requestAnimationFrame(() => this.placePause());
   }
 
   /** The device's step values with the touch stick added (pad sticks win). */
@@ -107,13 +205,11 @@ export class TouchControls {
   }
 
   /**
-   * Builds the layer over the field, shown only in play. nipplejs is loaded
-   * here: it reads the window on import, and desktops never fetch it.
+   * Builds the layer over the field once, the first time touch play turns
+   * on. nipplejs is loaded here: it reads the window on import, and a
+   * desktop never touched never fetches it.
    */
   async mount(root = document.getElementById('game-ui')) {
-    document.body.classList.add('touch-play');
-    // Tips name the touch gestures from the start; a key or pad takes over.
-    this.input.setActiveDevice('touch');
     this.layer = document.createElement('div');
     this.layer.className = 'touch-layer';
     this.layer.hidden = true;
@@ -139,11 +235,6 @@ export class TouchControls {
       this.input.handleActionRelease(action, 'touch', { device: 'touch' });
     });
 
-    this.eventBus.on('screen-changed', ({ screen } = {}) => {
-      this.layer.hidden = screen !== 'playing';
-      this.stick = CENTRED;
-      requestAnimationFrame(() => this.placePause());
-    });
     // No shield card yet: the button shakes once per press, like the vitals.
     const shield = this.layer.querySelector('.touch-btn--shield');
     this.eventBus.on('shield-activation-failed', ({ reason } = {}) => {
@@ -158,7 +249,7 @@ export class TouchControls {
     });
     // Home, the notification shade or a call took the screen mid-run.
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) this.pauseRun();
+      if (document.hidden && this.on) this.pauseRun();
     });
 
     const { default: nipplejs } = await import('nipplejs');
@@ -185,7 +276,8 @@ export class TouchControls {
 
   /** Turned upright: the run pauses and the turn notice shows until sideways. */
   holdWhileUpright() {
-    if (!isPortrait() || this.upright) {
+    // A computer's window may be taller than wide: no turn notice there.
+    if (!this.declared || !isPortrait() || this.upright) {
       return;
     }
     this.pauseRun();

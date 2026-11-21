@@ -256,14 +256,20 @@ function init(recording = null, touch = false) {
     // Store services for use in game loop
     gameSystemServices = services;
 
-    if (touch) {
-      services.input.touch = new TouchControls({
-        input: services.input,
-        player: services.player,
-        eventBus: services['event-bus'],
-      });
-      void services.input.touch.mount();
-    }
+    // Touch play: on a touch device for good, elsewhere once a finger
+    // touches; the HUD takes the touch layout while it is on.
+    services.input.touch = new TouchControls({
+      input: services.input,
+      player: services.player,
+      eventBus: services['event-bus'],
+      settings: services.settings,
+      declared: touch,
+      onShow: () =>
+        services.ui.followHudLayout(
+          services.settings.getCategoryValues('video')
+        ),
+    });
+    services.input.touch.start();
 
     holdLoadingForWarmUp(services['menu-background'], services.renderer);
 

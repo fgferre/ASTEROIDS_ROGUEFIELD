@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import {
+  INSTALLED_TEXT,
   INSTALL_TEXT_IOS,
+  INSTALL_TEXT_OFFER,
+  INSTALL_TEXT_OTHER,
   PLAY_IN_BROWSER_TEXT,
   mobileGuard,
   touchScreen,
@@ -13,6 +16,8 @@ import {
 // phone in the browser, add the game to the Home Screen (or play anyway).
 
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+const IPAD_AS_MAC_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)';
+const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 
 function fakeElement(tag) {
   const classes = new Set();
@@ -45,6 +50,7 @@ function stubDevice({
   standalone = false,
   displayMode = 'browser',
   searchString = '',
+  userAgent = IPHONE_UA,
 }) {
   const listeners = {};
   const session = new Map();
@@ -75,7 +81,7 @@ function stubDevice({
   vi.stubGlobal('navigator', {
     maxTouchPoints: touch ? 5 : 0,
     standalone,
-    userAgent: IPHONE_UA,
+    userAgent,
   });
 
   const created = [];
@@ -94,6 +100,8 @@ function stubDevice({
     notice: () => container.appendChild.mock.calls[0]?.[0],
     texts: () => created.map((el) => el.textContent).filter(Boolean),
     button: () => created.find((el) => el.textContent === PLAY_IN_BROWSER_TEXT),
+    created,
+    fire: (type, event) => listeners[type]?.(event),
     turn(w, h) {
       windowStub.innerWidth = w;
       windowStub.innerHeight = h;
@@ -111,10 +119,19 @@ function track() {
   return state;
 }
 
+// A new module copy (the visit's play-in-browser choice starts unmade), its
+// door left waiting.
+async function freshGuard() {
+  vi.resetModules();
+  const guard = await import('../../src/bootstrap/mobileGuard.js');
+  void guard.mobileGuard();
+}
+
 const TABLET = {
   screen: { width: 1180, height: 820 },
   width: 1180,
   height: 820,
+  userAgent: ANDROID_UA,
 };
 
 describe('mobileGuard', () => {
@@ -177,7 +194,53 @@ describe('mobileGuard', () => {
     expect(device.container.appendChild).not.toHaveBeenCalled();
   });
 
-  it('phone installed (iOS flag or display mode), or a tablet: straight in when sideways', async () => {
+  it('iPad in the browser (even calling itself a Mac): the two steps, drawn', async () => {
+    const device = stubDevice({ ...TABLET, userAgent: IPAD_AS_MAC_UA });
+    await freshGuard();
+    await Promise.resolve();
+    expect(device.texts()).toContain(INSTALL_TEXT_IOS);
+    const steps = device.created.filter((el) => el.className === 'door-step');
+    expect(steps.map((el) => el.innerHTML)).toEqual([
+      expect.stringContaining('Tap Share'),
+      expect.stringContaining('Add to Home Screen'),
+    ]);
+  });
+
+  it("Android phone: the browser's Install button while it offers one", async () => {
+    const device = stubDevice({ userAgent: ANDROID_UA });
+    await freshGuard();
+    await Promise.resolve();
+    const text = device.created.find(
+      (el) => el.className === 'door-notice__install'
+    );
+    const installButton = device.created.find(
+      (el) => el.textContent === 'Install'
+    );
+    expect([text.textContent, installButton.hidden]).toEqual([
+      INSTALL_TEXT_OTHER,
+      true,
+    ]);
+
+    let accept;
+    const offer = {
+      preventDefault: vi.fn(),
+      prompt: vi.fn(),
+      userChoice: new Promise((resolve) => (accept = resolve)),
+    };
+    device.fire('beforeinstallprompt', offer);
+    expect([text.textContent, installButton.hidden]).toEqual([
+      INSTALL_TEXT_OFFER,
+      false,
+    ]);
+
+    installButton.click();
+    expect(offer.prompt).toHaveBeenCalled();
+    accept({ outcome: 'accepted' });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(text.textContent).toBe(INSTALLED_TEXT);
+  });
+
+  it('phone installed (iOS flag or display mode), or an Android tablet: straight in when sideways', async () => {
     for (const device of [
       { standalone: true },
       { displayMode: 'fullscreen' },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TouchControls,
   touchModeFromUrl,
@@ -105,5 +105,116 @@ describe('touch stick', () => {
     running = false; // already paused, or in a menu: nothing toggles
     touch.pauseRun();
     expect(emitted).toEqual(['toggle-pause']);
+  });
+});
+
+// A car's or a touch laptop's browser declares a mouse (no coarse pointer):
+// the last device used rules there, and ?touch=force pins touch play on.
+describe('touch play on a screen that declares a mouse', () => {
+  let listeners;
+  let bodyClasses;
+
+  beforeEach(() => {
+    vi.resetModules();
+    listeners = {};
+    bodyClasses = {};
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('document', {
+      body: {
+        classList: { toggle: (name, on) => (bodyClasses[name] = on) },
+      },
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function computer(search = '', touchControls = 'auto') {
+    vi.stubGlobal('window', {
+      location: { search },
+      innerWidth: 1440,
+      innerHeight: 900,
+      matchMedia: () => ({ matches: false }),
+      addEventListener: (type, handler) => (listeners[type] = handler),
+    });
+    const guard = await import('../../../src/bootstrap/mobileGuard.js');
+    const { TouchControls: Controls } = await import(
+      '../../../src/modules/input/touchControls.js'
+    );
+    expect(await guard.mobileGuard()).toEqual({ touch: false });
+    const handlers = {};
+    const input = {
+      device: 'keyboard',
+      getActiveDevice() {
+        return this.device;
+      },
+      setActiveDevice(device) {
+        if (device === this.device) return;
+        this.device = device;
+        handlers['input-device-changed']?.({ device });
+      },
+    };
+    const settings = {
+      value: touchControls,
+      getSetting: () => settings.value,
+    };
+    const shown = [];
+    const touch = new Controls({
+      input,
+      player: facingRight,
+      eventBus: { on: (name, handler) => (handlers[name] = handler) },
+      settings,
+      onShow: () => shown.push(touch.on),
+    });
+    touch.layer = { hidden: true }; // built already: no DOM here
+    touch.start();
+    // Settings' Touch Controls changed to `value`.
+    const choose = (value) => {
+      settings.value = value;
+      handlers['settings-changed']({ category: 'controls' });
+    };
+    return { touch, input, shown, choose, touchScreen: guard.touchScreen };
+  }
+
+  it('a finger turns it on, a key turns it off, a mouse click never does', async () => {
+    const { touch, input, shown, touchScreen } = await computer();
+    listeners.pointerdown({ pointerType: 'mouse' });
+    expect([touch.on, touchScreen()]).toEqual([false, null]);
+    listeners.pointerdown({ pointerType: 'touch' });
+    expect([touch.on, bodyClasses['touch-play'], touchScreen()]).toEqual([
+      true,
+      true,
+      'tablet',
+    ]);
+    input.setActiveDevice('keyboard');
+    expect([touch.on, bodyClasses['touch-play'], touchScreen()]).toEqual([
+      false,
+      false,
+      null,
+    ]);
+    // The HUD followed each turn.
+    expect(shown).toEqual([true, false]);
+  });
+
+  it('?touch=force keeps it on whatever is pressed; ?desktop=force never turns', async () => {
+    const pinned = await computer('?touch=force');
+    pinned.input.setActiveDevice('keyboard');
+    expect(pinned.touch.on).toBe(true);
+
+    vi.resetModules();
+    const desktop = await computer('?desktop=force');
+    listeners.pointerdown({ pointerType: 'touch' });
+    expect(desktop.touch.on).toBe(false);
+  });
+
+  it("Settings' Touch Controls on Always pins it; back on Auto the last device rules", async () => {
+    const { touch, input, choose } = await computer();
+    choose('always');
+    input.setActiveDevice('keyboard');
+    expect(touch.on).toBe(true);
+    choose('auto');
+    expect(touch.on).toBe(false);
+
+    vi.resetModules();
+    const saved = await computer('', 'always');
+    expect(saved.touch.on).toBe(true);
   });
 });
