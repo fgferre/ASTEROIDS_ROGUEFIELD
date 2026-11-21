@@ -11,8 +11,10 @@
 // ('roguefield:records:v1' → 'roguefield:slot2:records:v1'). The active slot
 // is read once, as the page loads: a tab keeps its pilot until it reloads.
 // Deleting a pilot is counted in the slots index (`deleted`, per slot), and a
-// page keeps its own pilot's count from its load: a tab still playing a pilot
-// another tab deleted writes none of it back.
+// page keeps its own pilot's count from its load. A page whose pilot another
+// tab deleted or wrote since (a 'storage' event reaches only the other tabs)
+// holds an old copy of it: it writes none of it back, and going on with it
+// reloads the page (pilotSelect.js, loadingScreen.js).
 
 export const SLOT_COUNT = 3;
 export const SLOTS_STORAGE_KEY = 'roguefield:slots:v1';
@@ -49,10 +51,25 @@ function readActiveSlot() {
     : 1;
 }
 
-const deletions = (slot) => readIndex().deleted?.[slot] ?? 0;
+/** How many times `slot`'s pilot was deleted: a new count, a new pilot. */
+export const slotDeletions = (slot) => readIndex().deleted?.[slot] ?? 0;
 
 let activeSlot = readActiveSlot();
-let loadedDeletions = deletions(activeSlot);
+let loadedDeletions = slotDeletions(activeSlot);
+let changedElsewhere = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener?.('storage', ({ key }) => {
+    // null: another tab cleared the whole storage.
+    if (key === null || SLOT_KEYS.some((k) => slotStorageKey(k) === key)) {
+      changedElsewhere = true;
+    }
+  });
+}
+
+/** True once another tab deleted or wrote the pilot this page holds. */
+export function isPilotStale() {
+  return changedElsewhere || slotDeletions(activeSlot) !== loadedDeletions;
+}
 
 /** The slot this page plays (1..SLOT_COUNT). */
 export function getActiveSlot() {
@@ -62,7 +79,8 @@ export function getActiveSlot() {
 /** Reads the slots index again (a page load does it; tests call it). */
 export function resolveActiveSlot() {
   activeSlot = readActiveSlot();
-  loadedDeletions = deletions(activeSlot);
+  loadedDeletions = slotDeletions(activeSlot);
+  changedElsewhere = false;
   return activeSlot;
 }
 
@@ -82,8 +100,13 @@ export function chooseSlot(slot) {
   return readActiveSlot() === slot;
 }
 
-/** Removes `slot`'s pilot: exactly its SLOT_KEYS, nothing shared. */
-export function deleteSlot(slot) {
+/**
+ * Removes `slot`'s pilot: exactly its SLOT_KEYS, nothing shared. `seen`: the
+ * pilot's deletion count when the player was asked; another tab that deleted
+ * it since (and maybe made a new one there) leaves it be: false.
+ */
+export function deleteSlot(slot, seen = slotDeletions(slot)) {
+  if (slotDeletions(slot) !== seen) return false;
   SLOT_KEYS.forEach((key) => {
     try {
       browserStorage()?.removeItem(slotStorageKey(key, slot));
@@ -92,8 +115,9 @@ export function deleteSlot(slot) {
     }
   });
   const index = readIndex();
-  const deleted = { ...index.deleted, [slot]: deletions(slot) + 1 };
+  const deleted = { ...index.deleted, [slot]: slotDeletions(slot) + 1 };
   saveJSON(SLOTS_STORAGE_KEY, { ...index, deleted });
+  return true;
 }
 
 /** `slot`: another pilot's copy of a pilot's key (the pilots screen). */
@@ -138,10 +162,7 @@ export function saveJSON(key, value) {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
-    // This pilot was deleted (in another tab) after this page loaded.
-    if (SLOT_KEYS.includes(key) && deletions(activeSlot) !== loadedDeletions) {
-      return;
-    }
+    if (SLOT_KEYS.includes(key) && isPilotStale()) return;
     window.localStorage.setItem(slotStorageKey(key), JSON.stringify(value));
   } catch (error) {
     console.warn(`[storage] Failed to save "${key}":`, error);

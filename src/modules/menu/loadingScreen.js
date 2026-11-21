@@ -22,6 +22,7 @@
 import { LOADING_JOKES, loadingStep } from '../../data/loadingLines.js';
 import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
 import { openPilotSelect } from './pilotSelect.js';
+import { isPilotStale } from '../../core/storage.js';
 import { menuHome } from '../ui/gamepadNav.js';
 
 const WAKE_HINT = 'Press any key';
@@ -143,9 +144,12 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       ?.addEventListener('click', () => {
         if (onMenu() && !panelOpen()) backToGate();
       });
+    // A pilot another tab deleted or wrote: back to the gate, whose press
+    // goes through the pilots, where Continue loads it again.
     setInterval(() => {
       if (!onMenu() || panelOpen() || padActive()) input();
-      else if (performance.now() - lastInput >= MENU_IDLE_MS) backToGate();
+      else if (isPilotStale() || performance.now() - lastInput >= MENU_IDLE_MS)
+        backToGate();
     }, IDLE_CHECK_MS);
   }
 

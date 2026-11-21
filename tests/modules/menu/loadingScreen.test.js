@@ -5,6 +5,7 @@ import {
 } from '../../../src/modules/menu/loadingScreen.js';
 import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
 import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
+import { isPilotStale } from '../../../src/core/storage.js';
 
 // The morph draws on a real page; here it either declines (null) or hands
 // back a stand-in overlay.
@@ -13,6 +14,10 @@ vi.mock('../../../src/modules/menu/openingMorph.js', () => ({
   morphIntoTitle: vi.fn(() => null),
 }));
 // The pilots screen draws on a real page; here the pilot in play goes on.
+vi.mock('../../../src/core/storage.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isPilotStale: vi.fn(() => false),
+}));
 vi.mock('../../../src/modules/menu/pilotSelect.js', () => ({
   openPilotSelect: vi.fn((onContinue) => onContinue()),
 }));
@@ -410,6 +415,16 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
     clock.now += 1000;
     vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
+  it('a pilot another tab deleted or wrote takes the menu back to the gate', () => {
+    const { menu } = inMenu();
+    vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    isPilotStale.mockReturnValue(true);
+    vi.advanceTimersByTime(1000);
+    isPilotStale.mockReturnValue(false);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
   });
 
