@@ -447,3 +447,48 @@ describe('campaign map', () => {
     ).toBeNull();
   });
 });
+
+describe('campaign map focus', () => {
+  it('a pad passing over a locked row leaves Launch alone; the keyboard still selects it', () => {
+    const body = { dataset: { inputDevice: 'gamepad' } };
+    vi.stubGlobal('document', { body, addEventListener: () => {} });
+    const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
+    const text = () => ({ textContent: '', hidden: false });
+    let onFocusIn;
+    const refs = {
+      root: {
+        addEventListener: (name, fn) => {
+          if (name === 'focusin') onFocusIn = fn;
+        },
+      },
+      nodes: list(),
+      sectors: list(),
+      detailTitle: text(),
+      detailHeadStart: text(),
+      launchBtn: { dataset: {}, disabled: false },
+    };
+    const map = new CampaignMap({ refs, prepareTravel: () => {} });
+    map.bindCampaignControls();
+    map.chapters = campaignChapters(records(['debris-wake']));
+    const focusRow = (id, locked) =>
+      onFocusIn({
+        target: {
+          closest: () => ({
+            dataset: { campaignRow: id },
+            classList: { contains: (name) => locked && name === 'is-locked' },
+          }),
+        },
+      });
+
+    map.selectSector('salvage-lanes');
+    focusRow('prime-gate', true);
+    expect(refs.launchBtn.dataset.sector).toBe('salvage-lanes');
+    expect(refs.launchBtn.disabled).toBe(false);
+
+    body.dataset.inputDevice = 'keyboard';
+    focusRow('prime-gate', true);
+    expect(refs.launchBtn.dataset.sector).toBe('prime-gate');
+    expect(refs.launchBtn.disabled).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});

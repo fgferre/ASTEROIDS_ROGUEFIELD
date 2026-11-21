@@ -119,6 +119,7 @@ export function buildMovementCommandPayload(frame, bindingState) {
     moveY: frame.moveY,
     aimX: frame.aimX,
     aimY: frame.aimY,
+    pad: frame.pad,
   };
   const stick = Math.hypot(analog.moveX, analog.moveY);
   const vector =

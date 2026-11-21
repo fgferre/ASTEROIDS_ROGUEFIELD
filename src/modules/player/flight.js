@@ -27,7 +27,7 @@ import {
   DASH_DECAY_SECONDS,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../../data/constants/gameplay.js';
-import { getModernMove } from './movementInput.js';
+import { getModernMove, padForce } from './movementInput.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -97,25 +97,40 @@ export class PlayerFlight {
 
     const move = modern ? getModernMove(input) : null;
 
+    // The pilot's asks, 0..1: a key or the d-pad is full; a pad's sticks
+    // (Felipe's two-stick scheme) push as far as they lean: classic, the
+    // left one thrusts (up) and backs (down), the right one turns; modern,
+    // the left one's lean is the push along where it points.
+    const stickY = Number(input.moveY) || 0;
+    const stickTurn = Number(input.aimX) || 0;
+    const thrustIn = Math.max(input.up ? 1 : 0, padForce(input, -stickY));
+    const backIn = Math.max(input.down ? 1 : 0, padForce(input, stickY));
+    const leftIn = Math.max(input.left ? 1 : 0, padForce(input, -stickTurn));
+    const rightIn = Math.max(input.right ? 1 : 0, padForce(input, stickTurn));
+    const moveForce =
+      move && input.pad
+        ? padForce(input, Math.hypot(Number(input.moveX) || 0, stickY))
+        : 1;
+
     // The thrusters' forces (lógica do original); what they show is at the end.
-    let thrMain = input.up ? 1 : 0;
-    let thrAux = input.down ? (glide ? GLIDE_RETRO_SHARE : 1) : 0;
+    let thrMain = thrustIn;
+    let thrAux = backIn * (glide ? GLIDE_RETRO_SHARE : 1);
     // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
-    let thrSideR = input.left ? 1 : 0; // CCW torque
-    let thrSideL = input.right ? 1 : 0; // CW torque
+    let thrSideR = leftIn; // CCW torque
+    let thrSideL = rightIn; // CW torque
     if (modern) {
       // Main push while moving (the hull turns onto the motion); side push
       // on the part of the move off the nose.
       const lateral = move ? move.x * right.x + move.y * right.y : 0;
-      thrMain = move ? 1 : 0;
+      thrMain = move ? moveForce : 0;
       thrAux = 0;
       thrSideL = Math.max(0, lateral);
       thrSideR = Math.max(0, -lateral);
     }
 
     // The pilot's own thrust (the Reactor's idle bonus, the coast brake's arming).
-    const isMainManual = modern ? Boolean(move) : input.up;
-    const isAuxManual = !modern && input.down;
+    const isMainManual = modern ? Boolean(move) : thrustIn > 0;
+    const isAuxManual = !modern && backIn > 0;
     const noManualThrust = !isMainManual && !isAuxManual;
     const dashing = this.maneuvers.dashTimer > 0;
     // RCS System: under thrust, push and drag both scale, so the same top
@@ -133,7 +148,7 @@ export class PlayerFlight {
       this.acceleration * (glide ? GLIDE_ACCEL_SCALE : 1) * push * deltaTime;
 
     // Auto-brake quando não há input linear
-    const noLinearInput = modern ? !move : !input.up && !input.down;
+    const noLinearInput = modern ? !move : !thrustIn && !backIn;
     const speed = Math.hypot(this.ship.velocity.vx, this.ship.velocity.vy);
     const velocityAlongNose =
       this.ship.velocity.vx * fwd.x + this.ship.velocity.vy * fwd.y;
@@ -180,7 +195,7 @@ export class PlayerFlight {
     // Aplicar forças dos thrusters
     if (move) {
       // Along the WASD direction.
-      const moveStep = accelStep * MODERN_MOVE_ACCEL;
+      const moveStep = accelStep * MODERN_MOVE_ACCEL * moveForce;
       this.ship.velocity.vx += move.x * moveStep;
       this.ship.velocity.vy += move.y * moveStep;
     } else {
@@ -246,8 +261,8 @@ export class PlayerFlight {
       const rotationAccel =
         this.rotationSpeed * (glide ? this.agility : 1) * deltaTime;
       let angularAccel = 0;
-      if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
-      if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
+      angularAccel -= rotationAccel * thrSideR; // 'a' ou 'arrowleft'
+      angularAccel += rotationAccel * thrSideL; // 'd' ou 'arrowright'
 
       this.ship.angularVelocity += angularAccel;
 
@@ -268,9 +283,9 @@ export class PlayerFlight {
 
     // What the thrusters show and sound for this step (thrusters.js): what
     // the pilot asked for, never the solver's corrections above.
-    let pilotMain = input.up ? 1 : 0;
-    let pilotAux = input.down ? 1 : 0;
-    let pilotTurn = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    let pilotMain = thrustIn;
+    let pilotAux = backIn;
+    let pilotTurn = rightIn - leftIn;
     if (modern) {
       // Main flame once the nose is near the move, retro first on a reversal;
       // the turn jets follow the nose's own swing.

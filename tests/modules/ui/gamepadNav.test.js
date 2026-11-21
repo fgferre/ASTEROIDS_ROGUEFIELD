@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
-import UISystem from '../../../src/modules/UISystem.js';
-import { pickFocusTarget } from '../../../src/modules/ui/gamepadNav.js';
+import {
+  GamepadMenuNav,
+  pickFocusTarget,
+} from '../../../src/modules/ui/gamepadNav.js';
 
 const rect = (left, top, width = 100, height = 40) => ({
   left,
@@ -34,9 +36,16 @@ describe('gamepad focus navigation', () => {
     expect(pickFocusTarget(null, GRID, 'down')).toBe(0);
     expect(pickFocusTarget(null, [], 'down')).toBe(-1);
   });
+
+  it('goes down from a small tab to the wide row under it, not a nearer-centred field', () => {
+    const tab = rect(32, 100, 68, 36);
+    const row = rect(32, 185, 824, 38);
+    const field = rect(32, 391, 176, 40);
+    expect(pickFocusTarget(tab, [field, row], 'down')).toBe(1);
+  });
 });
 
-describe('UISystem gamepad navigation', () => {
+describe('GamepadMenuNav', () => {
   let restoreDom;
   beforeEach(() => {
     restoreDom = installDomStubs();
@@ -50,6 +59,7 @@ describe('UISystem gamepad navigation', () => {
       index,
       getBoundingClientRect: () => box,
       getClientRects: () => [box],
+      contains: () => false,
       focus() {
         document.activeElement = this;
       },
@@ -61,22 +71,21 @@ describe('UISystem gamepad navigation', () => {
       querySelectorAll: () => buttons,
     };
     document.getElementById = (id) => (id === 'menu-screen' ? screen : null);
-    const ui = {
+    const ui = new GamepadMenuNav({
       settingsPanel: { capturing: false },
       hudEditor: { isOpen: false },
-    };
-    Object.setPrototypeOf(ui, UISystem.prototype);
+    });
     return { ui, clicks };
   }
 
   it('moves the focus with the d-pad and activates it with A', () => {
     const { ui, clicks } = menuWithButtons();
-    ui.handleGamepadNav('down');
+    ui.handle('down');
     expect(document.activeElement.index).toBe(0);
-    ui.handleGamepadNav('right');
-    ui.handleGamepadNav('down');
+    ui.handle('right');
+    ui.handle('down');
     expect(document.activeElement.index).toBe(3);
-    ui.handleGamepadNav('confirm');
+    ui.handle('confirm');
     expect(clicks).toEqual([3]);
   });
 
@@ -84,8 +93,8 @@ describe('UISystem gamepad navigation', () => {
     const shown = { classList: { contains: () => false } };
     document.getElementById = (id) =>
       id === 'levelup-screen' || id === 'gameover-screen' ? shown : null;
-    const ui = Object.setPrototypeOf({}, UISystem.prototype);
-    expect(ui.getGamepadNavScreen().id).toBe('gameover');
+    const ui = new GamepadMenuNav({});
+    expect(ui.screen().id).toBe('gameover');
   });
 
   it('closes Settings with pad back instead of operating a covered screen', () => {
@@ -93,16 +102,81 @@ describe('UISystem gamepad navigation', () => {
     const settings = { classList: { contains: () => false } };
     document.getElementById = (id) =>
       id === 'settings-screen' || id === 'levelup-screen' ? settings : null;
-    const ui = Object.setPrototypeOf(
-      {
-        settingsPanel: { capturing: false, closeSettingsPanel },
-        hudEditor: { isOpen: false },
-      },
-      UISystem.prototype
-    );
+    const ui = new GamepadMenuNav({
+      settingsPanel: { capturing: false, closeSettingsPanel },
+      hudEditor: { isOpen: false },
+    });
 
-    ui.handleGamepadNav('back');
+    ui.handle('back');
 
     expect(closeSettingsPanel).toHaveBeenCalledOnce();
+  });
+
+  // The menu screen showing, with `active` focused in it.
+  function menuNav(active, ui = {}) {
+    const menu = {
+      id: 'menu-screen',
+      classList: { contains: () => false },
+      contains: (element) => element === active,
+      querySelectorAll: () => [],
+    };
+    document.getElementById = (id) => (id === 'menu-screen' ? menu : null);
+    document.activeElement = active;
+    return new GamepadMenuNav({
+      settingsPanel: { capturing: false },
+      hudEditor: { isOpen: false },
+      ...ui,
+    });
+  }
+
+  it('changes a list only after A, and leaves it with B', () => {
+    const changes = [];
+    const classes = new Set();
+    const select = {
+      tagName: 'SELECT',
+      isConnected: true,
+      options: ['pilot', 'veteran', 'warden'],
+      selectedIndex: 1,
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+      },
+      dispatchEvent: (event) => changes.push(event.type),
+      getBoundingClientRect: () => rect(0, 0),
+    };
+    const ui = menuNav(select);
+
+    ui.handle('right');
+    expect(select.selectedIndex).toBe(1);
+
+    ui.handle('confirm');
+    expect(classes.has('is-pad-editing')).toBe(true);
+    ui.handle('right');
+    expect(select.selectedIndex).toBe(2);
+    expect(changes).toEqual(['change']);
+
+    ui.handle('back');
+    expect(classes.has('is-pad-editing')).toBe(false);
+    expect(ui.editing).toBeNull();
+  });
+
+  it('takes the menu back to the title with B', () => {
+    const emit = vi.fn();
+    const ui = menuNav(null, { eventBus: { emit } });
+    ui.handle('back');
+    expect(emit).toHaveBeenCalledWith('gamepad-menu-back');
+  });
+
+  it('gives up waiting for a key with B', () => {
+    const cancelBindingCapture = vi.fn();
+    const ui = menuNav(null, {
+      settingsPanel: {
+        capturing: true,
+        captureDevice: 'keyboard',
+        cancelBindingCapture,
+      },
+    });
+    ui.handle('back');
+    expect(cancelBindingCapture).toHaveBeenCalledOnce();
   });
 });

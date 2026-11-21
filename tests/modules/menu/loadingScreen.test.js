@@ -379,6 +379,16 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
+  it("the game's name on the menu brings the gate back, by touch or click, unless a panel is open", () => {
+    const { menu, menuButton, page } = inMenu();
+    page.overlays = [{ closest: () => null }];
+    menuButton.listeners.click();
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    page.overlays = [];
+    menuButton.listeners.click();
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
   it('the menu left idle goes back to the gate; any input restarts the wait', () => {
     const { menu, winListeners } = inMenu();
     clock.now += MENU_IDLE_MS - 1000;

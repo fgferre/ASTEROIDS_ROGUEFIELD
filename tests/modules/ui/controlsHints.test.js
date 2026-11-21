@@ -48,3 +48,28 @@ describe('Keyboard controls hints', () => {
     });
   });
 });
+
+describe('Gamepad controls hints', () => {
+  it('name the stick scheme per flight mode and RB/LB for dash and shield', () => {
+    const lists = [
+      ...html.matchAll(
+        /<ul\s+class="controls-hints"\s+data-device="gamepad"[\s\S]*?<\/ul>/g
+      ),
+    ].map(([list]) => list);
+    expect(lists).toHaveLength(2);
+    lists.forEach((list) => {
+      expect(items(list, 'classic')).toEqual(
+        expect.arrayContaining([
+          'L-Stick ↑ thrust ↓ reverse',
+          'R-Stick ← → turn',
+          'RB dash',
+          'LB shield',
+        ])
+      );
+      expect(items(list, 'modern')).toEqual(
+        expect.arrayContaining(['L-Stick move', 'R-Stick aim', 'RB dash'])
+      );
+      expect(list).not.toMatch(/<kbd>(RT|LT)<\/kbd>/);
+    });
+  });
+});

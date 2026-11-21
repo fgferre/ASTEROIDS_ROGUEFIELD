@@ -6,7 +6,10 @@
 // owns one.
 
 import { resolveService } from '../../core/serviceUtils.js';
-import { GAMEPAD_AIM_ENGAGE } from '../../data/constants/gamepad.js';
+import {
+  GAMEPAD_AIM_ENGAGE,
+  GAMEPAD_STICK_CURVE,
+} from '../../data/constants/gamepad.js';
 
 /**
  * Modern WASD, or the left stick's direction, as a unit vector on the
@@ -23,6 +26,14 @@ export function getModernMove(input) {
   const y = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   const length = Math.hypot(x, y);
   return length > 0 ? { x: x / length, y: y / length } : null;
+}
+
+/**
+ * A pad stick's force 0..1 one way: `value` is the stick past its deadzone
+ * (+ that way). Keys, the d-pad and touch are not `pad` frames: 0.
+ */
+export function padForce(input, value) {
+  return input.pad && value > 0 ? value ** GAMEPAD_STICK_CURVE : 0;
 }
 
 /** The right stick's unit direction past the engage, or null. */
@@ -146,6 +157,7 @@ export class MovementInput {
           movement.moveY = Number(payload.analog.moveY) || 0;
           movement.aimX = Number(payload.analog.aimX) || 0;
           movement.aimY = Number(payload.analog.aimY) || 0;
+          movement.pad = Boolean(payload.analog.pad);
         }
         return movement;
       }

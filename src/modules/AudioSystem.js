@@ -35,6 +35,10 @@ import {
 } from '../data/audio/mix.js';
 import { dbToGain } from './audio/MusicThemes.js';
 
+// The longest the picked sector's music waits for the menu's (see
+// _afterMenuMusic): on a network where the menu track never arrives.
+const PREFETCH_GATE_MS = 30000;
+
 const MENU_SCREEN_TRACKS = Object.freeze({
   menu: FILE_TRACK_MANAGER_IDS.MENU_OPENING,
   campaign: FILE_TRACK_MANAGER_IDS.CAMPAIGN_MAP,
@@ -207,7 +211,9 @@ class AudioSystem extends BaseSystem {
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
     this._setupEarlyInit();
+    this._prefetchGate = null; // open
     this._warmupEagerFileTracks();
+    this._closePrefetchGate(this.menuTrackState?.audioElement);
     // The SFX samples, the engine and the voices' manifest load with the
     // boot (a page only: node tests have none).
     if (typeof document !== 'undefined') {
@@ -281,6 +287,36 @@ class AudioSystem extends BaseSystem {
         }
       }
     );
+  }
+
+  /**
+   * The menu's music downloads alone first: the picked sector's prefetch
+   * (sectorScorePrefetch) waits until it can play through (or failed), the
+   * opening is left, or PREFETCH_GATE_MS pass. No element (node tests): open.
+   */
+  _closePrefetchGate(element) {
+    if (!element?.addEventListener || element.readyState >= 4) return;
+    const open = () => this._openPrefetchGate();
+    this._prefetchGate = {
+      pending: null,
+      timer: setTimeout(open, PREFETCH_GATE_MS),
+    };
+    element.addEventListener('canplaythrough', open, { once: true });
+    element.addEventListener('error', open, { once: true });
+  }
+
+  _openPrefetchGate() {
+    const gate = this._prefetchGate;
+    if (!gate) return;
+    this._prefetchGate = null;
+    clearTimeout(gate.timer);
+    gate.pending?.();
+  }
+
+  /** Runs `prefetch` now, or once the gate opens (only the latest waits). */
+  _afterMenuMusic(prefetch) {
+    if (this._prefetchGate) this._prefetchGate.pending = prefetch;
+    else prefetch();
   }
 
   // ---------------------------------------------------------------------------

@@ -303,7 +303,7 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   setupLoadingScreen() {
-    loadingScreen.setupLoadingScreen(
+    this.gate = loadingScreen.setupLoadingScreen(
       (onProgress, hide) => {
         this.loadingState.covered = true;
         // The frame the screen fades onto is drawn before it starts to fade.
@@ -618,6 +618,9 @@ class MenuBackgroundSystem extends BaseSystem {
     window.addEventListener('resize', this.handleResize, { passive: true });
 
     this.registerEventListener('screen-changed', this.handleScreenChanged);
+    this.registerEventListener('gamepad-menu-back', () =>
+      this.gate?.leaveMenu()
+    );
     this.registerEventListener('ui-overlay-visibility-changed', (event) => {
       if (event?.overlay !== 'hangar') return;
       this.hangarOpen = event.isOpen;

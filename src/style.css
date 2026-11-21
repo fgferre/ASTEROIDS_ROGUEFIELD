@@ -193,6 +193,82 @@ select {
   outline: none;
 }
 
+/* The pad's highlight, drawn by the game in every browser (gamepadNav.js;
+   Felipe's card controle-1, 20/11). Keyboard and mouse keep the ring above. */
+[data-input-device='gamepad'] :focus:not([tabindex='-1']) {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 7px rgba(0, 242, 255, 0.35),
+    0 0 26px 6px rgba(0, 242, 255, 0.55);
+}
+
+/* A list entered with A: the d-pad changes its value. */
+[data-input-device='gamepad'] .is-pad-editing:focus {
+  outline-color: #ffb347;
+  box-shadow:
+    0 0 0 7px rgba(255, 179, 71, 0.35),
+    0 0 26px 6px rgba(255, 179, 71, 0.5);
+}
+
+/* The buttons that work on the screen, while the pad is in use. */
+/* Centred under the overlays' panels; on the menu, in the header's gap. */
+.pad-hints {
+  position: fixed;
+  left: 50%;
+  bottom: 2px;
+  z-index: 10002;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 2px 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(0, 242, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(5, 10, 14, 0.8);
+  color: #cfe9ee;
+  font: 600 13px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.pad-hints[hidden] {
+  display: none;
+}
+
+.pad-hints[data-screen='menu'] {
+  top: 28px;
+  bottom: auto;
+  padding: 6px 10px;
+}
+
+.pad-hints__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pad-hints__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  border: 1.5px solid #00f2ff;
+  border-radius: 50%;
+  color: #00f2ff;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.pad-hints__glyph--wide {
+  min-width: 36px;
+  padding: 0 6px;
+  border-radius: 7px;
+}
+
 #game-container {
   width: 100vw;
   height: 100vh;
@@ -612,6 +688,7 @@ select {
 
 /* The mark, sized by the screen's height so it clears the route. */
 .opening__brand {
+  position: relative;
   height: min(150px, 28vh);
 }
 
@@ -620,12 +697,58 @@ select {
   visibility: hidden;
 }
 
+/* The stage: the drawing's units as px, its origin at the drawing's 0 0,
+   scaled as a whole as the old viewBox (-135 -133 532 361) was fitted to
+   the mark's 430:361 box: to its width, centred in its height. */
+.opening__brand .om-stage {
+  height: 100%;
+  /* --om-s: the mark's height in the drawing's units (index.html sets it
+     before the first paint); without it, the full-height mark's. */
+  transform: translateY(50%) scale(var(--om-s, 0.3358))
+    translate(135px, -47.5px);
+}
+
+/* Each piece is a box at its parent's origin; its drawing an <svg> that
+   shows all around that point. */
+.opening__brand div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.opening__brand svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+.opening__brand .om-word svg {
+  fill: none;
+  stroke: #eaf3f7;
+  stroke-width: 24px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The face shows only inside the head's oval. */
+.opening__brand .om-ball {
+  left: -52px;
+  top: -60px;
+  width: 104px;
+  height: 120px;
+  clip-path: ellipse(52px 60px);
+}
+
 /* The mark's scene while the game loads (Felipe's concept, 19/11), 7.3 s,
    one timeline: the "o" is the robot from behind, closed and white; it turns
    (its hollow face comes round, the antenna springs up), tilts its head and
    blinks twice into smiling eyes, then hops off over the letters (each dips,
    the i's dot springs), round now and shrinking to its place before the "p".
-   At rest every part shows the end (the round shape is in the drawing). */
+   At rest every part shows the end. */
 .opening__brand
   :is(
     .om-rx,
@@ -647,8 +770,6 @@ select {
     .om-p2,
     .om-idot
   ) {
-  transform-box: view-box;
-  transform-origin: 0 0;
   animation: 7.3s both;
 }
 
@@ -683,18 +804,23 @@ select {
 }
 
 .opening__brand .om-shell {
+  transform: scale(1, 0.871);
   animation-name: om-shell;
 }
 
 .opening__brand .om-hole {
+  transform: scale(1.4, 1.105);
   animation-name: om-hole;
 }
 
 .opening__brand .om-antpos {
+  transform: translateY(8px);
   animation-name: om-antpos;
 }
 
 .opening__brand .om-face {
+  left: 52px;
+  top: 60px;
   animation-name: om-face;
 }
 
@@ -703,6 +829,7 @@ select {
 }
 
 .opening__brand .om-smile {
+  opacity: 0;
   animation-name: om-smile;
 }
 
@@ -1908,6 +2035,49 @@ html[data-motion='reduced'] .opening__brand * {
   font-size: var(--text-md);
   font-weight: 600;
   letter-spacing: 0.08em;
+}
+
+/* The name is a button back to the title (Felipe's pick B, 20/11): the back
+   mark on its left, the small line under it. */
+.menu-title-back {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: start;
+  column-gap: var(--space-2);
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.menu-title-back__mark {
+  grid-row: 1 / span 2;
+  font-size: 2.4em;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.menu-title-back__tip {
+  grid-column: 2;
+  margin-top: 3px;
+  font: 600 9px / 1.4 var(--font-ui);
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.menu-title-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 /* Records strip under the top bar (ui/menuStatus.js): one small dim line */

@@ -4,9 +4,26 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 39.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
 
-## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `controle/toque-em-computador` (o toque em computador, 20/11)
+## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `jogo/conjunto-2` (os consertos juntos, 21/11)
+
+**21/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** os consertos de 20–21/11 vão ao ar juntos, por
+ordem dele — primeiro _"vamos esperar as outras conversas volgtarem para publicar todos os consertos junto"_, depois, à
+pergunta "Publico o jogo com tudo junto?", _"Sim, publica"_ — pela PR do `jogo/conjunto-2` para a `main`. Entra: a
+volta à tela inicial pelo nome do jogo no menu, no iPad, no iPhone e no computador (_"B, nome do jogo"_); a abertura
+com o robozinho em camadas na pista separada, que parou de travar no iPhone simulado, e a música chegando mais cedo
+numa rede fraca (ele tinha dito: _"aquela página que tem a animação do People Studio Labs, ela fica engasgando"_ e
+_"Eu acho que a graça dessa tela era justamente dela servir como uma animação que distrai, né?"_); o controle de Xbox
+— o menu inteiro alcançável com destaque de console e LB/RB entre as abas, os dois analógicos com força (_"B, dois
+analógicos"_), dash e escudo nos ombros (_"ok com a sugestao"_); a marca da contagem no lugar das luzes soltas das
+placas da primeira fase (_"B, marca da contagem"_; ele tinha dito _"Tem umas luzes, né, azuis, vermelhas, e elas tão
+estranhas"_). Só ele confere: o controle de verdade e o robozinho num iPhone de verdade; o Tesla, só depois de
+publicar. **Fica de fora:** os cristais do fundo da Crystal Choir (cartão `cenario-3`: _"A minha crítica é quanto ao
+cenário 3D, aqueles cristais que ficam ao fundo"_); a cena no celular e a música do menu numa rede fraca (cartão
+`abertura-7`, as duas perguntas dele); a segunda parte da abertura (o carregamento em fatias, espera o teste dele no
+Tesla); o planeta (36); o tiro na pedra e a cor da luz (35, 38); as vozes (37); as naves do jogador, que ele vai levar
+a outra AI (20).
 
 **20/11, à noite (vale sobre o que estiver mais abaixo e disser outra coisa):** o toque em telas que se dizem
 computador vai ao ar por ordem dele — à pergunta "Publico já estes quatro itens do toque?", _"Sim, publica"_ — pela
@@ -152,6 +169,18 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   pedra se moviemntar, seja rodando um pouco, tem que ter uma física do impacto do tiro (memso que seja fake para
   efeitos de arcade) o incandescente tem que ser aonde o tiro efetivamente tocou a pedra."_ Fecha quando ele aprovar
   jogando.
+- **(39)** O controle de videogame (20/11, fim da noite, com o controle do Xbox): _"A movimentação em menus por
+  controle de videogame, eu estou testando no do Xbox, mas deve ser igual em qualquer controle, ela é impossível pelos
+  menus. Simplesmente não funciona. […] a gente tinha que repensar essa navegação como se esse jogo fosse meio que
+  nativo pro videogame […] quando é por ficha, às vezes os jogos fazem alguns para passar de uma ficha para outra,
+  usando o LB e o RB. […] Tem jogos que usam até um mouse, né, como o Halo […] a gente tem que ter sensibilidade de
+  quanto que a gente está apertando. […] num controle, o controle ele pode jogar pouca potência ou muita potência, né?
+  […] a gente pode criar um controle padrão, né, quando está usando o controle, em que a aceleração fica num analógico
+  e virar para a direita e para a esquerda fica em outro analógico. […] Acionar escudo, qual que seria a tecla mais
+  comum, o dash, qual que seria a tecla mais comum, né?"_ Texto inteiro em `quadro/respostas/controle-20-11.txt`.
+  Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
+  entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
+  fecha quando ele aprovar jogando com o controle de verdade.
 
 ## Som (palavras dele, 19/11)
 
@@ -182,11 +211,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
-- **(36)** Planeta e placas de luz (ao planeta da Quarantine Grid e ao creme do Crisol, _"Precisa mexer"_): _"acho
-  que tem umas oportunidades para deixar com cara mais de planeta, talvez nao tao proximo. QUe tipo de planeta é esse?
-  ele é 3d? ele tem rotacao? Ele era habitaado ou é? Ele está destruído? Pensar e resolver. Tem umas telas tb de outras
-  fases que tem umas placas de metal que parece que tem uma luz, mas essa luz é estranha nao parece acoplada direito
-  nas placas e confunde com orbes. (talvez na primeira fase, nao lembrio)"_ Imagem antes de código; fecha quando ele
+- **(36)** Planeta (ao planeta da Quarantine Grid e ao creme do Crisol, _"Precisa mexer"_): _"acho que tem umas
+  oportunidades para deixar com cara mais de planeta, talvez nao tao proximo. QUe tipo de planeta é esse? ele é 3d?
+  ele tem rotacao? Ele era habitaado ou é? Ele está destruído? Pensar e resolver."_ (As placas de luz da primeira fase,
+  a outra metade deste item, saíram em 21/11 com a marca da contagem.) Imagem antes de código; fecha quando ele
   aprovar por imagem.
 - **(38)** A cor da luz (20/11, depois de publicar): _"eu percebi que hoje parte dos elementos luminosos nas pedras
   não estão sendo refletidos com a cor certa, né? Eu percebi que o tiro é de uma cor e a sombra a iluminação que vai é

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import { MainMenu } from '../../../src/modules/ui/MainMenu.js';
 
@@ -239,5 +239,35 @@ describe('Main menu launch row', () => {
       target: { closest: () => ({}) },
     });
     expect(calls.hangarClicks).toBe(1);
+  });
+});
+
+describe('Main menu pad tabs', () => {
+  it('LB/RB step through the enabled mode tabs and wrap round', () => {
+    const tab = (prepTab, disabled = false) => ({
+      dataset: { prepTab },
+      disabled,
+    });
+    const [campaign, descent, daily, endless] = [
+      tab('campaign'),
+      tab('descent', true),
+      tab('daily'),
+      tab('endless'),
+    ];
+    const menu = new MainMenu({
+      refs: {
+        tabs: {
+          querySelectorAll: () =>
+            [campaign, descent, daily, endless].filter((b) => !b.disabled),
+        },
+      },
+    });
+    menu.setPrepTab = vi.fn((name) => (menu.prepTab = name));
+
+    expect(menu.cyclePrepTab(1)).toBe(daily);
+    expect(menu.setPrepTab).toHaveBeenCalledWith('daily');
+    menu.prepTab = 'campaign';
+    expect(menu.cyclePrepTab(-1)).toBe(endless);
+    expect(menu.prepTab).toBe('endless');
   });
 });

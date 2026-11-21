@@ -140,6 +140,9 @@ class SectorScore {
     this._loadStingers((this._stingers = {}));
     try {
       const bytes = await this._takePrefetch(sectorId);
+      // A campaign run's first wave asks for the layer's chapter score just
+      // before its start names the sector (same instant): never fetched.
+      if (token !== this._token) return;
       [stage, boss] = await Promise.all([
         this.load(context, score.stage, bytes?.[0]),
         this.load(context, score.boss, bytes?.[1]),

@@ -298,8 +298,27 @@ export function morphIntoTitle(loadingScreen) {
   );
   loadingScreen.classList.remove('loading-screen--measure');
 
-  // Each piece where the scene has it now: a <use> of #pipo-brand's path(s),
-  // mapped by its own screen matrix (the scene's motion included).
+  // Each piece where the scene has it now: its boxes' transforms (the
+  // scene's motion included), down from the mark's stage, whose 0 0 is the
+  // drawing's (the boxes' own matrices: Safari's getScreenCTM leaves out the
+  // boxes around an <svg>).
+  const stage = brand.querySelector('.om-stage');
+  const frame = (el) => {
+    let m = new DOMMatrix();
+    for (let e = el; e !== stage; e = e.parentElement) {
+      if (e.tagName === 'svg') continue;
+      const css = getComputedStyle(e);
+      const [ox, oy] = css.transformOrigin.split(' ').map(parseFloat);
+      m = new DOMMatrix()
+        .translate(parseFloat(css.left) + ox, parseFloat(css.top) + oy)
+        .multiply(new DOMMatrix(css.transform === 'none' ? '' : css.transform))
+        .translate(-ox, -oy)
+        .multiply(m);
+    }
+    const at = stage.getBoundingClientRect();
+    const k = new DOMMatrix(getComputedStyle(stage).transform).a;
+    return new DOMMatrix([k, 0, 0, k, at.left, at.top]).multiply(m);
+  };
   const ref = (use) =>
     document.getElementById(use.getAttribute('href').slice(1));
   const paths = (use) => {
@@ -311,13 +330,14 @@ export function morphIntoTitle(loadingScreen) {
   const strokes = (sel) =>
     [...brand.querySelectorAll(sel)].flatMap((use) =>
       paths(use).map((p) =>
-        toScreen(use.getScreenCTM(), pathPoints(p.getAttribute('d')))
+        toScreen(frame(use.parentElement), pathPoints(p.getAttribute('d')))
       )
     );
-  const scale = (el) => Math.hypot(el.getScreenCTM().a, el.getScreenCTM().b);
-  const width = (sel, units) => units * scale(brand.querySelector(sel));
+  const scale = (el) => Math.hypot(frame(el).a, frame(el).b);
+  const width = (sel, units) =>
+    units * scale(brand.querySelector(sel).parentElement);
   const matrix = (el) => {
-    const m = el.getScreenCTM();
+    const m = frame(el);
     return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`;
   };
 
@@ -388,7 +408,7 @@ export function morphIntoTitle(loadingScreen) {
   const smallStroke = small.cap * 0.15;
   travel(
     pairStrokes(
-      strokes('.om-word use:not(.om-idot)'),
+      strokes('.om-word use:not(.om-idot use)'),
       fitWord('ROGUEFIELD', big, bigStroke)
     ),
     width('.om-o use', 24),
@@ -406,8 +426,8 @@ export function morphIntoTitle(loadingScreen) {
 
   // The dots go out; the robot crouches, then flies off the top right.
   const dots = svg('g', {}, overlay);
-  brand.querySelectorAll('.om-idot, .om-tdot').forEach((use) => {
-    const g = svg('g', { transform: matrix(use) }, dots);
+  brand.querySelectorAll('.om-idot use, .om-tdot').forEach((use) => {
+    const g = svg('g', { transform: matrix(use.parentElement) }, dots);
     g.appendChild(ref(use).cloneNode());
   });
   animate(dots, { attributeName: 'opacity', values: '1;0', dur: '0.35s' });
@@ -417,15 +437,13 @@ export function morphIntoTitle(loadingScreen) {
     { transform: matrix(brand.querySelector('.om-rs')) },
     flight
   );
-  const body = robot.appendChild(
-    brand.querySelector('.om-body').cloneNode(true)
-  );
   // Facing us now, round and truly hollow over the game: the shell becomes
-  // its ring and the dark hole goes (the hidden mark's clip would hide the
-  // face).
-  body.querySelector('[clip-path]').removeAttribute('clip-path');
-  body.querySelector('.om-hole').remove();
-  const shell = body.querySelector('.om-shell');
+  // its ring, the dark hole goes, the eyes and the antenna stay at rest.
+  const art = (sel) =>
+    [...brand.querySelector(`${sel} svg`).children].map((el) =>
+      el.cloneNode(true)
+    );
+  const [shell] = art('.om-shell');
   for (const [k, v] of Object.entries({
     rx: 48,
     ry: 48,
@@ -435,7 +453,9 @@ export function morphIntoTitle(loadingScreen) {
   })) {
     shell.setAttribute(k, v);
   }
-  shell.removeAttribute('transform');
+  robot.append(shell);
+  svg('g', { fill: '#eaf3f7' }, robot).append(...art('.om-eyes'));
+  svg('g', { transform: 'translate(0 8)' }, robot).append(...art('.om-ant'));
   const fly = svg(
     'animateTransform',
     {
