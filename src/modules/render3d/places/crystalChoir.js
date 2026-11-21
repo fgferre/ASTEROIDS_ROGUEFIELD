@@ -15,8 +15,8 @@ import { SEAM_LIGHT, crack, crystal, seams, under } from './pieces.js';
 const SEAM = { half: 360, step: 250, drop: 270, tiers: 3, floor: -1150 };
 // A cluster's fan: `shards` round its tall crystals, which stand `grow` times
 // what they did, their scatter from a draw of its own (`seed`) so the rest of
-// the place keeps its layout; every other shard is detail, left out on the
-// low quality preset (PlaceSets.setDetail). The violet clusters: `count`,
+// the place keeps its layout; every other shard is detail, built only when
+// the quality preset asks for it (PlaceSets.setDetail: not on low). The violet clusters: `count`,
 // their crystals, size and scatter `seed`. A faint `glow` at each foot.
 const FAN = { shards: 12, grow: 1.2, seed: 31 };
 const VIOLET = { count: 8, crystals: 4, size: 170, seed: 77 };
@@ -27,7 +27,7 @@ export function buildCrystalChoir(THREE, kit) {
   const rock = kit.parts();
   const glow = kit.parts();
   const crystals = kit.parts();
-  const detail = kit.parts();
+  const later = [];
   const walls = [
     tone('#20252b'),
     tone('#262c33'),
@@ -92,6 +92,8 @@ export function buildCrystalChoir(THREE, kit) {
   // the floor standing up into it. Each is a fan of thin shards spread round
   // its lean, the longest in the middle, then its few tall crystals.
   const shard = createSeededRandom(FAN.seed);
+  const put = (parts, length0, radius, at, turn, body) =>
+    kit.put(parts, crystal(THREE, length0, radius, 6, 0.08), body, at, 1, turn);
   const fan = (foot, lean, scale, body) => {
     for (let i = 0; i < FAN.shards; i += 1) {
       const t = i / FAN.shards;
@@ -99,22 +101,23 @@ export function buildCrystalChoir(THREE, kit) {
         scale * (0.18 + shard() ** 1.5 * 0.55) * (1 - 0.35 * Math.abs(t - 0.5));
       const radius = length0 * (0.06 + shard() * 0.05);
       const spread = (t - 0.5) * 1.9 + (shard() - 0.5) * 0.35;
-      kit.put(
-        i % 2 ? detail : crystals,
-        crystal(THREE, length0, radius, 6, 0.08),
-        body,
+      const shape = [
+        length0,
+        radius,
         [
           foot[0] + (shard() - 0.5) * scale * 0.22,
           foot[1],
           foot[2] + (shard() - 0.5) * scale * 0.4,
         ],
-        1,
         [
           (shard() - 0.5) * 1.1 + spread * 0.5,
           (shard() - 0.5) * 0.6,
           lean + spread,
-        ]
-      );
+        ],
+        body,
+      ];
+      if (i % 2) later.push(shape);
+      else put(crystals, ...shape);
     }
   };
   const cluster = (foot, lean, count, scale, body = ice, draw = random) => {
@@ -216,18 +219,22 @@ export function buildCrystalChoir(THREE, kit) {
   cracks.object.rotation.y = Math.PI / 2;
 
   const object = new THREE.Group();
-  const fine = kit.mesh(detail, 'gem');
   object.add(
     kit.mesh(rock),
     kit.mesh(crystals, 'gem'),
-    fine,
     kit.mesh(glow, 'glow'),
     cracks.object
   );
   object.rotation.set(0, 0.32, 0);
   return {
     layers: [{ object, anchor: under(1000), follow: 0.4 }],
-    detail: [fine],
+    detail() {
+      const fine = kit.parts();
+      later.forEach((shape) => put(fine, ...shape));
+      const mesh = kit.mesh(fine, 'gem');
+      object.add(mesh);
+      return [mesh];
+    },
     update: cracks.give,
   };
 }

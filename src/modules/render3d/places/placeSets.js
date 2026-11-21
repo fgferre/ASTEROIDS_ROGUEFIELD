@@ -26,8 +26,9 @@ export class PlaceSets {
     this.arrival = 1;
     // The Ring's wake (FieldBackdrop.setWake), for sets whose lights follow it.
     this.wake = 0;
-    // Whether the sets show their finer parts (setDetail).
-    this.detail = true;
+    // Whether the sets show their finer parts: none until the quality preset
+    // says (setDetail), which builds them then (a set's `detail()`).
+    this.detail = false;
     // Share of the view whose set hides the broken Ring / the intact arcs.
     this.hidesRing = 0;
     this.hidesStructures = 0;
@@ -125,10 +126,13 @@ export class PlaceSets {
     }
   }
 
-  /** The quality preset's `placeDetail`: a set's `detail` parts shown. */
+  /** The quality preset's `placeDetail`: a set's finer parts, built on first use. */
   setDetail(on) {
     this.detail = on;
-    this.list.forEach((set) => set.detail?.forEach((o) => (o.visible = on)));
+    this.list.forEach((set) => {
+      if (on && set.detail && !set.fine) set.fine = set.detail();
+      set.fine?.forEach((part) => (part.visible = on));
+    });
   }
 
   build(id) {
@@ -146,7 +150,6 @@ export class PlaceSets {
       layer.holder.add(layer.object);
       set.object.add(layer.holder);
     });
-    set.detail?.forEach((o) => (o.visible = this.detail));
     set.object.visible = false;
     this.object.add(set.object);
     this.built.set(id, set);
