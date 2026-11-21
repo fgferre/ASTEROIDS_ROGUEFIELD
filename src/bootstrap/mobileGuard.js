@@ -86,7 +86,8 @@ export function screenReport() {
   const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
   return {
     pointer: coarse ? 'touch' : 'mouse',
-    touchPoints: navigator.maxTouchPoints ?? 0,
+    touchPoints:
+      typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0,
     lastPress: lastPress ?? 'none',
   };
 }
