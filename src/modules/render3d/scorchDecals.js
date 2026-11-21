@@ -7,7 +7,9 @@
 // (one draw call) of quads; each mark keeps its pose in its rock's local
 // space, so it turns and drifts with the rock and dies with its view. The
 // mark sits where a ray from above the hit side meets the real (displaced)
-// rock surface, leaning toward the camera so the burn reads from above.
+// rock surface, leaning toward the camera so the burn reads from above; on a
+// rock, where the player sees the shot touch it (21/11, 35): the ray comes
+// from the camera, aimed just inside the rock's edge at the contact.
 
 // proposta 18/10: pool, life, size (× rock radius, clamped) and the burn.
 export const DECAL_CAP = 64;
@@ -17,6 +19,12 @@ const DECAL_MIN = 5;
 const DECAL_MAX = 14;
 const DECAL_LIFT = 0.35; // world units off the surface
 const DECAL_LEAN = 0.8; // how far the mark climbs toward the rock's top
+// how far inside the edge the camera's ray aims (× the contact's distance
+// from the centre): at the very edge it grazes the rock and the mark is a
+// sliver; further in, the burn creeps away from where the shot touched
+const CONTACT_INSET = 0.12;
+// how much a contact mark turns from the surface toward the camera
+const CONTACT_FACE = 0.5;
 // proposta 17/11 (efeito/impacto, was a 0.5 s ember on rock only): the
 // heat of each material and how much of its spot it covers.
 export const DECAL_KIND = Object.freeze({ rock: 0, metal: 1, burn: 2 });
@@ -31,6 +39,8 @@ const KIND_CHAR = [0.8, 0.45]; // how dark the burn
 const CHAR_ALPHA = 1;
 // at most this many new marks a frame: each one casts a ray at its target
 const HITS_PER_FRAME = 6;
+
+import { HALF_H, HALF_W } from './batches.js';
 
 const DECAL_VERTEX = `
 attribute float aFade;
@@ -94,8 +104,9 @@ void main() {
 }`;
 
 export class ScorchDecals {
-  constructor(THREE, scene) {
+  constructor(THREE, scene, camera) {
     this.THREE = THREE;
+    this.camera = camera;
     this.slots = [];
     for (let i = 0; i < DECAL_CAP; i += 1) {
       this.slots.push({
@@ -191,9 +202,10 @@ export class ScorchDecals {
    * A shot hit `view` (an EnemyMirror view) made of `kind` (DECAL_KIND):
    * `nx, ny` the logical direction from its centre to the hit. False when
    * the ray finds no surface (the target is gone or the call came before
-   * its first frame) or this frame's marks are spent.
+   * its first frame) or this frame's marks are spent. `at`: where the shot
+   * touched it (logical), seen from the camera.
    */
-  hit(view, nx, ny, kind = DECAL_KIND.rock) {
+  hit(view, nx, ny, kind = DECAL_KIND.rock, at = null) {
     if (!this.enabled || !view?.object?.visible || this.budget <= 0)
       return false;
     this.budget -= 1;
@@ -201,31 +213,36 @@ export class ScorchDecals {
     const len = Math.hypot(nx, ny) || 1;
     // `reach`: a view's size when its object is not scaled by it (the ship)
     const radius = view.reach || object.scale.x || 1;
-    this.dir
-      .set(
-        (nx / len) * (1 - DECAL_LEAN * 0.5),
-        DECAL_LEAN,
-        (ny / len) * (1 - DECAL_LEAN * 0.5)
-      )
-      .normalize();
     object.updateMatrixWorld();
-    this.origin.copy(object.position).addScaledVector(this.dir, radius * 3);
-    this.raycaster.set(this.origin, this.dir.negate());
-    this.hits.length = 0;
-    // a rock is one mesh; a machine is a group of parts
-    if (kind === DECAL_KIND.rock) object.raycast(this.raycaster, this.hits);
-    else this.raycaster.intersectObject(object, true, this.hits);
     let best = null;
-    for (let i = 0; i < this.hits.length; i += 1) {
-      const h = this.hits[i];
-      if (!h.face || !h.object.visible || h.object.material?.transparent)
-        continue;
-      if (!best || h.distance < best.distance) best = h;
+    if (at && this.camera) {
+      this.camera.getWorldPosition(this.origin);
+      this.dir
+        .set(at.x - HALF_W, 0, at.y - HALF_H)
+        .lerp(object.position, CONTACT_INSET)
+        .sub(this.origin)
+        .normalize();
+      this.raycaster.set(this.origin, this.dir);
+      best = this.nearest(object, kind);
+    }
+    const seen = Boolean(best);
+    if (!best) {
+      this.dir
+        .set(
+          (nx / len) * (1 - DECAL_LEAN * 0.5),
+          DECAL_LEAN,
+          (ny / len) * (1 - DECAL_LEAN * 0.5)
+        )
+        .normalize();
+      this.origin.copy(object.position).addScaledVector(this.dir, radius * 3);
+      this.raycaster.set(this.origin, this.dir.negate());
+      best = this.nearest(object, kind);
     }
     if (!best) return false;
     this.normal
       .copy(best.face.normal)
       .transformDirection(best.object.matrixWorld);
+    if (seen) this.normal.lerp(this.dir.negate(), CONTACT_FACE).normalize();
 
     // a machine's group is scaled by its radius; a rock's mesh by ~1.08 ×
     const size =
@@ -258,6 +275,22 @@ export class ScorchDecals {
       .copy(this.inverse.copy(object.matrixWorld).invert())
       .multiply(this.world);
     return true;
+  }
+
+  // The ray's first solid surface on `object` (a rock is one mesh; a
+  // machine is a group of parts), or null.
+  nearest(object, kind) {
+    this.hits.length = 0;
+    if (kind === DECAL_KIND.rock) object.raycast(this.raycaster, this.hits);
+    else this.raycaster.intersectObject(object, true, this.hits);
+    let best = null;
+    for (let i = 0; i < this.hits.length; i += 1) {
+      const h = this.hits[i];
+      if (!h.face || !h.object.visible || h.object.material?.transparent)
+        continue;
+      if (!best || h.distance < best.distance) best = h;
+    }
+    return best;
   }
 
   /**

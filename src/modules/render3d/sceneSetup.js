@@ -320,7 +320,7 @@ export function setupThree(seeded) {
   const player = new PlayerMirror(THREE, scene, seeded);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
-  const decals = new ScorchDecals(THREE, scene);
+  const decals = new ScorchDecals(THREE, scene, camera);
   const blasts = new Blasts(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
