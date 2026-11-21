@@ -433,14 +433,6 @@ export class SettingsPanel {
     const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
     this.setHudBaseScale(baseScale);
-
-    const body = document.body;
-    if (body) {
-      const damageFlashEnabled =
-        derived?.damageFlash ?? values.damageFlash !== false;
-
-      body.classList.toggle('damage-flash-disabled', !damageFlashEnabled);
-    }
   }
 
   deriveVisualPreferences(

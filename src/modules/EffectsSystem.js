@@ -199,17 +199,6 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   applyVideoPreferences(values = {}) {
-    if (Number.isFinite(values.screenShakeIntensity)) {
-      const normalized = Math.max(
-        0,
-        Math.min(1.5, Number(values.screenShakeIntensity))
-      );
-      this.screenShakeScale = normalized;
-      if (this.screenShakeScale <= 0) {
-        this.screenShake.reset();
-      }
-    }
-
     this.damageFlashEnabled = values.damageFlash !== false;
     if (!this.damageFlashEnabled) {
       this.screenFlash.timer = 0;
