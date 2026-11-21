@@ -620,7 +620,6 @@ class SettingsSystem {
         hudScale,
         screenShake,
         damageFlash: video.damageFlash !== false,
-        reducedParticles: Boolean(graphics.reducedParticles),
         postProcessing: graphics.postProcessing !== false,
         bloom: graphics.bloom !== false,
         chromaticAberration: graphics.chromaticAberration !== false,

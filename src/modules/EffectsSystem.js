@@ -100,7 +100,6 @@ export default class EffectsSystem extends BaseSystem {
       randomFloat: randomHelpers.randomFloat,
       getScaledParticleCount: (count, options) =>
         this.getScaledParticleCount(count, options),
-      particleDensity: () => this.particleDensity,
       addScreenShake: (presetOrIntensity, durationOrOptions) =>
         this.screenFeedback.addScreenShake(
           presetOrIntensity,
@@ -123,8 +122,6 @@ export default class EffectsSystem extends BaseSystem {
       ...burstDependencies,
       randomRange: randomHelpers.randomRange,
       getRandomFork: (name) => this.getRandomFork(name),
-      getScaledProbability: (probability) =>
-        this.getScaledProbability(probability),
       motionReduced: () => this.motionReduced,
       addHitStop: (kind) => this.gameTime.addHitStop(kind),
     });
@@ -140,7 +137,6 @@ export default class EffectsSystem extends BaseSystem {
     this.flashingReduced = false;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
-    this.particleDensity = 1;
 
     this.setupSettingsIntegration();
   }
@@ -202,10 +198,6 @@ export default class EffectsSystem extends BaseSystem {
       this.screenFlash.timer = 0;
       this.screenFlash.intensity = 0;
     }
-
-    if (typeof values.reducedParticles === 'boolean') {
-      this.particleDensity = values.reducedParticles ? 0.55 : 1;
-    }
   }
 
   applyGameplayPreferences(values = {}) {
@@ -231,22 +223,12 @@ export default class EffectsSystem extends BaseSystem {
       return allowZero ? 0 : minimum;
     }
 
-    const scaled = Math.round(numeric * this.particleDensity);
+    const scaled = Math.round(numeric);
     if (allowZero) {
       return Math.max(0, scaled);
     }
 
     return Math.max(minimum, scaled);
-  }
-
-  getScaledProbability(probability) {
-    const numeric = Number(probability);
-    if (!Number.isFinite(numeric)) {
-      return 0;
-    }
-
-    const clamped = Math.max(0, Math.min(1, numeric));
-    return Math.max(0, Math.min(1, clamped * this.particleDensity));
   }
 
   setupEventListeners() {

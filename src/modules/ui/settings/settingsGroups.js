@@ -106,11 +106,7 @@ export const SETTINGS_SECTIONS = [
     groups: [
       {
         title: 'Display',
-        fields: [
-          'video.fullscreen',
-          'graphics.quality',
-          'graphics.reducedParticles',
-        ],
+        fields: ['video.fullscreen', 'graphics.quality'],
         folds: [
           {
             title: 'Individual effects',

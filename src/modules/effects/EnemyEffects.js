@@ -50,8 +50,7 @@ export class EnemyEffects {
    * `createParticle(x, y, vx, vy, color, size, life, type)`: the effects' createParticle, not Particles' own, as in PlayerEffects.
    * `randomFloat(fork)`, `randomRange(min, max, fork)`: the effects' random helpers; rolls draw from 'muzzleFlash', 'boss', 'explosions' and 'volatility'.
    * `getRandomFork(name)`: the effects' random fork; a SpaceParticle built here rolls its spin from it.
-   * `getScaledParticleCount(count, options)`, `getScaledProbability(probability)`: the effects' Reduced Particles scaling.
-   * `particleDensity()`: the Reduced Particles density, read live; it thins the cracks a stage change shows.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `motionReduced()`: the Reduced Motion setting, read live; on means no crack sparks.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addHitStop(kind)`: the effects' game time.
@@ -63,8 +62,6 @@ export class EnemyEffects {
     randomRange,
     getRandomFork,
     getScaledParticleCount,
-    getScaledProbability,
-    particleDensity,
     motionReduced,
     addScreenShake,
     addScreenFlash,
@@ -93,7 +90,6 @@ export class EnemyEffects {
       randomFloat,
       getRandomFork,
       getScaledParticleCount,
-      particleDensity,
       motionReduced,
     });
     this.volatileEffects = new VolatileEffects({
@@ -103,7 +99,6 @@ export class EnemyEffects {
       randomRange,
       getRandomFork,
       getScaledParticleCount,
-      getScaledProbability,
       addScreenShake,
       addScreenFlash,
     });

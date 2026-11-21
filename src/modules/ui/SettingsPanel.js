@@ -448,8 +448,6 @@ export class SettingsPanel {
       ? Number(video.hudScale)
       : 1;
     const damageFlash = video.damageFlash !== false;
-    const reducedParticles =
-      Boolean(video.reducedParticles) || Boolean(graphics?.reducedParticles);
 
     const screenShake = Number.isFinite(Number(gameplay?.screenShake))
       ? Number(gameplay.screenShake)
@@ -461,7 +459,6 @@ export class SettingsPanel {
       colorVision,
       hudScale,
       damageFlash,
-      reducedParticles,
 
       screenShake,
       postProcessing: graphics?.postProcessing !== false,

@@ -430,14 +430,6 @@ const SETTINGS_SCHEMA = [
         optionLabels: { dynamic: 'Dynamic', classic: 'Classic' },
         default: 'dynamic',
       },
-      {
-        key: 'reducedParticles',
-        type: 'toggle',
-        label: 'Reduced Particles',
-        description:
-          'Simplifies intense visual effects like sparks and debris.',
-        default: false,
-      },
     ],
   },
   {

@@ -32,7 +32,7 @@ export class BossTransitions {
   /**
    * `particleEffects`: the effects' Particles; every burst and shockwave lands there.
    * `randomFloat(fork)`, `randomRange(min, max, fork)`, `randomCentered(span, fork)`: the effects' random helpers; every roll here draws from 'boss'.
-   * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling of a burst's count.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addFreezeFrame(duration, fade)`, `applyTimeDilation(scale, options)`: the effects' game time.
    */

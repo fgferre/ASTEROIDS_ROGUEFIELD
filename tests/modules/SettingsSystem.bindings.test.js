@@ -68,7 +68,7 @@ describe('SettingsSystem dash binding migration', () => {
   });
 });
 
-describe('SettingsSystem with a save from before Damage Numbers left', () => {
+describe('SettingsSystem with a save holding options that left', () => {
   let restoreDom;
 
   beforeEach(() => {
@@ -91,5 +91,19 @@ describe('SettingsSystem with a save from before Damage Numbers left', () => {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)).gameplay;
     expect(saved.hitMarkers).toBe(false);
     expect(saved).not.toHaveProperty('damageNumbers');
+  });
+
+  it('loads a saved Reduced Particles, keeps Bloom off and drops it on the next save', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ graphics: { reducedParticles: true, bloom: false } })
+    );
+    const settings = new SettingsSystem({ eventBus: createEventBusMock() });
+    expect(settings.getSetting('graphics', 'bloom')).toBe(false);
+
+    settings.setSetting('graphics', 'postProcessing', false);
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)).graphics;
+    expect(saved.bloom).toBe(false);
+    expect(saved).not.toHaveProperty('reducedParticles');
   });
 });
