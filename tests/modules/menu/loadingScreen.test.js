@@ -89,7 +89,7 @@ function boot(
   });
   let complete;
   let progress;
-  setupLoadingScreen(
+  const gate = setupLoadingScreen(
     (onProgress, onComplete) => {
       progress = onProgress;
       complete = onComplete;
@@ -109,6 +109,7 @@ function boot(
   }
   if (via !== 'none') vi.advanceTimersByTime(600);
   return {
+    gate,
     screen,
     menu,
     menuButton,
@@ -410,6 +411,15 @@ describe('loading screen PRESS START gate', () => {
     clock.now += 1000;
     vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
+  it('a pad press on the menu restarts the idle wait, even one quicker than the idle check', () => {
+    const { gate, menu } = inMenu();
+    clock.now += MENU_IDLE_MS - 500;
+    gate.noteInput();
+    clock.now += 1000;
+    vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(

@@ -116,14 +116,15 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
   // back to the gate. Capture phase: a panel's own Escape closes it first,
   // and only that.
   let watching = false;
+  let lastInput = 0;
+  const input = () => (lastInput = performance.now());
   const onMenu = () =>
     !menuScreen.classList.contains('hidden') &&
     !menuScreen.classList.contains('menu-screen--gated');
   function watchMenu() {
     if (watching) return;
     watching = true;
-    let lastInput = performance.now();
-    const input = () => (lastInput = performance.now());
+    input();
     window.addEventListener(
       'keydown',
       (event) => {
@@ -318,6 +319,9 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     leaveMenu() {
       if (watching && onMenu() && !panelOpen()) backToGate();
     },
+    // A pad press or scroll on the menu: the idle check only samples the pad,
+    // and a quick tap falls between its samples.
+    noteInput: input,
   };
 }
 
