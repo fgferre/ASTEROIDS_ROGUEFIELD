@@ -1,13 +1,14 @@
 // Debris Wake (docs/ROTEIRO.md "Os lugares" 1): far outside the Ring, in the
 // tail of its wreckage. The whole Ring small and broken in the distance, a
 // cold small star off in a corner, and what the Ring let go of — torn
-// panels, trusses, a module — drifting between them and the field. The
-// pieces carry the count's tags: small lights ticking through the wreck,
-// depth after depth, as the Quarry Maw tallies it; when the Maw goes
-// offline they go out, the nearest first (the stone goes uncounted).
+// panels, trusses, a module — drifting between them and the field. One piece
+// in three carries the count's mark, a band across it, dark until the count
+// passes: the Quarry Maw tallying the wreck piece by piece, left to right;
+// when the Maw goes offline they give a last flash and go out, the nearest
+// first (the stone goes uncounted).
 
 import { gradientDisc } from './kit.js';
-import { lightPoint, ringBand, under } from './pieces.js';
+import { ringBand, under } from './pieces.js';
 
 // proposta 12/11: the Ring's radius and its gap (radians), and the wreck's
 // three depths (depth, follow, pieces, spread [x, z]).
@@ -17,19 +18,31 @@ const WRECK = [
   { depth: 1500, follow: 0.32, count: 16, spread: [2800, 2000] },
   { depth: 2300, follow: 0.55, count: 20, spread: [3400, 2400] },
 ];
-// proposta 12/11: the tags — one every `every` pieces, `size` (+ `grow` per
-// depth); their tick (per second, a depth's `low` light flaring by `blip`
-// for `flare` of each tick, the depths a third of a tick apart); and the
-// wake at which each depth's tags give a last `flash` and fade out over
-// `fade` (`out` + `step` per depth).
-const TAGS = { every: 3, size: 9, grow: 4 };
-const TICK = { rate: 0.7, low: 0.6, blip: 0.9, flare: 0.25 };
+// The count's marks (his pick on cenario-1, 20/11): one every `every`
+// pieces; the count crosses the wreck `rate` times a second, from `margin`
+// short of its left side to `margin` past its right, in `groups` steps
+// across; a mark comes up over `rise` of the crossing as the count reaches
+// it, at `peak`, and fades over `fade` behind it. proposta 12/11: the wake
+// at which each depth's marks give a last `flash` and fade out over `fade`
+// (`out` + `step` per depth).
+const MARKS = {
+  every: 3,
+  groups: 6,
+  rate: 0.16,
+  margin: 0.25,
+  rise: 0.08,
+  fade: 0.3,
+  peak: 1.25,
+};
 const DARK = { out: 0.1, step: 0.2, fade: 0.25, flash: 2.6 };
 
 // One wreck piece in its own frame, `size` across: a torn panel (plate, a
 // lighter rim along one edge, ribs under it), a truss (two rails, braces) or
-// a module (a drum with an end plate).
-function piece(kit, shades, kind, size) {
+// a module (a drum with an end plate). `mark` (parts, or null) takes the
+// count's mark in the same frame, in `glow`: a band across the panel near
+// its rim, a sleeve on a rail, a ring round the drum — thicker than what it
+// is on, so it shows from either side.
+function piece(kit, shades, kind, size, mark, glow) {
   const { random } = kit;
   const [body, dark, rim] = shades;
   const out = kit.parts();
@@ -46,6 +59,14 @@ function piece(kit, shades, kind, size) {
         [x + size * 0.11, 0, 0],
         [size * 0.03, size * 0.03, size * 0.34],
         [0, 0.9, 0]
+      );
+    }
+    if (mark) {
+      kit.box(
+        mark,
+        glow,
+        [size * 0.3, 0, size * 0.12],
+        [size * 0.3, size * 0.075, size * 0.075]
       );
     }
   } else if (kind === 'module') {
@@ -69,6 +90,16 @@ function piece(kit, shades, kind, size) {
       [-size * 0.3, size * 0.3, 0],
       [size * 0.5, size * 0.06, size * 0.9]
     );
+    if (mark) {
+      kit.put(
+        mark,
+        kit.unit.drum(8),
+        glow,
+        [size * 0.18, 0, 0],
+        [size * 0.32, size * 0.13, size * 0.32],
+        [0, 0, Math.PI / 2]
+      );
+    }
   } else {
     const d = size * (0.4 + random() * 0.4);
     kit.box(out, body, [0, 0, 0], [size, size * 0.05, d]);
@@ -84,6 +115,14 @@ function piece(kit, shades, kind, size) {
         dark,
         [x, -size * 0.05, 0],
         [size * 0.05, size * 0.07, d * 0.95]
+      );
+    }
+    if (mark) {
+      kit.box(
+        mark,
+        glow,
+        [0, 0, d / 2 - size * 0.14],
+        [size * 0.92, size * 0.075, size * 0.11]
       );
     }
   }
@@ -141,13 +180,14 @@ export function buildDebrisWake(THREE, kit) {
   );
 
   // The wreck, at three depths: dark, quiet, edges a shade lighter so the
-  // shapes read, a few dead lights, cold mostly.
+  // shapes read; the marks a cold pale blue, far from the orbs' gold.
   const shades = [tone('#2a2f37'), tone('#1c1f25'), tone('#4b5361')];
-  const dead = [tone('#8fbcff', 0.55), tone('#ff8a50', 0.45)];
+  const markTone = tone('#a9c6ff');
   const kinds = ['panel', 'panel', 'truss', 'panel', 'module'];
+  const marks = [];
   const layers = WRECK.map(({ depth, follow, count, spread }, n) => {
     const wreck = kit.parts();
-    const glints = kit.parts();
+    const groups = Array.from({ length: MARKS.groups }, () => kit.parts());
     for (let i = 0; i < count; i += 1) {
       const size = (70 + random() ** 2 * 120) * (1 - n * 0.15);
       const at = [
@@ -156,23 +196,26 @@ export function buildDebrisWake(THREE, kit) {
         (random() - 0.5) * spread[1],
       ];
       const turn = [random() * 6, random() * 6, random() * 6];
-      const out = piece(kit, shades, kinds[(i + n) % kinds.length], size);
+      const mark = i % MARKS.every === 1 ? kit.parts() : null;
+      const kind = kinds[(i + n) % kinds.length];
+      const out = piece(kit, shades, kind, size, mark, markTone);
       wreck.push(...kit.moved(out, at, turn));
-      if (i % TAGS.every === 1) {
-        lightPoint(
-          kit,
-          glints,
-          dead[i % (TAGS.every * 3) === 1 ? 1 : 0],
-          [at[0], at[1] + size * 0.1, at[2]],
-          TAGS.size + n * TAGS.grow
-        );
+      if (mark) {
+        const across = at[0] / spread[0] + 0.5;
+        const g = Math.min(MARKS.groups - 1, Math.floor(across * MARKS.groups));
+        groups[g].push(...kit.moved(mark, at, turn));
       }
     }
     const object = new THREE.Group();
-    object.add(kit.mesh(wreck), kit.mesh(glints, 'glow', `tags-${n}`));
+    object.add(kit.mesh(wreck));
+    groups.forEach((parts, g) => {
+      if (!parts.length) return;
+      const name = `marks-${n}-${g}`;
+      object.add(kit.mesh(parts, 'glow', name));
+      marks.push({ material: kit.materials.get(name), n, g });
+    });
     return { object, anchor: under(depth), follow };
   });
-  const tags = WRECK.map((_, n) => kit.materials.get(`tags-${n}`));
 
   return {
     layers: [
@@ -185,15 +228,23 @@ export function buildDebrisWake(THREE, kit) {
       ...layers,
     ],
     update(time, wake) {
-      for (let n = 0; n < tags.length; n += 1) {
-        const phase = (time * TICK.rate + n / 3) % 1;
-        const blip = Math.max(0, 1 - phase / TICK.flare);
+      const { margin, groups, rise, fade, peak } = MARKS;
+      const count = ((time * MARKS.rate) % 1) * (1 + 2 * margin) - margin;
+      for (let k = 0; k < marks.length; k += 1) {
+        const { material, n, g } = marks[k];
         const out = (wake - DARK.out - n * DARK.step) / DARK.fade;
-        tags[n].color.setScalar(
-          out <= 0
-            ? TICK.low + TICK.blip * blip
-            : DARK.flash * Math.max(0, 1 - out) ** 2
-        );
+        if (out > 0) {
+          material.color.setScalar(DARK.flash * Math.max(0, 1 - out) ** 2);
+          continue;
+        }
+        const since = count - (g + 0.5) / groups;
+        const lit =
+          since < -rise
+            ? 0
+            : since < 0
+              ? 1 + since / rise
+              : Math.max(0, 1 - since / fade);
+        material.color.setScalar(peak * lit);
       }
     },
   };
