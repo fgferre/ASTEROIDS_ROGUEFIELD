@@ -4,9 +4,9 @@
 // run's seed, difficulty and Daily Field day come from the difficulty service,
 // its mode from the session and its control scheme from the player. An armed
 // recording sets that service's difficulty and day and the session's start mode
-// before its run begins, and its hull and control scheme once the run has
+// and hull before its run begins, and its control scheme once the run has
 // started; its Hangar setup stands in for the viewer's until the run's reset
-// has read it. The recorder lives on the session
+// and hull have read it. The recorder lives on the session
 // (`session.replayRecorder`). Input is captured and substituted at
 // InputSystem's per-step seam (`setInputSource`); level-up
 // picks (and the rerolls/banishes before them) are recorded in order and
@@ -89,12 +89,11 @@ export function createReplayController({
   eventBus.on('game-started', ({ carried = false } = {}) => {
     runStartStep = getStep();
     pickPending = false;
-    // The run's reset has read the setup: the viewer's own is back.
+    // The run's reset and hull have read the setup: the viewer's own is back.
     hangar.useReplaySetup(null);
 
     if (armedRecording) {
       player = createPlayer(armedRecording);
-      session.applyConfiguredPlayerHull({ hullId: armedRecording.hull });
       if (['modern', 'classic'].includes(armedRecording.controls)) {
         viewerControls ??= playerService.controlScheme;
         playerService.controlScheme = armedRecording.controls;
@@ -200,6 +199,7 @@ export function createReplayController({
         daily: recording.mode === 'daily',
         bossRush: recording.mode === 'bossRush',
         sector: recording.sector ?? null,
+        hull: recording.hull,
       };
     },
     /**

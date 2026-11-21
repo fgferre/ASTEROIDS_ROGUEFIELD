@@ -539,14 +539,16 @@ export default class GameSessionService {
    * sector id) starts a sector run, never daily nor Boss Rush; null any other
    * run; undefined keeps the last one, unless `daily` or `bossRush` is given
    * (a mode picked without a sector). An armed replay
-   * (`replayStart`) starts in its recorded mode, whatever started the run, and
-   * announces itself with `replay: true` on 'game-started': a replayed run has
-   * no side effects on the viewer's save (Salvage) or pad (rumble).
+   * (`replayStart`) starts in its recorded mode and hull, whatever started the
+   * run, and announces itself with `replay: true` on 'game-started': a
+   * replayed run has no side effects on the viewer's save (Salvage) or pad
+   * (rumble).
    */
   startNewRun({ source = 'unknown', daily, bossRush, sector, carry } = {}) {
     const replay = Boolean(this.replayStart);
+    let hullId;
     if (replay) {
-      ({ daily, bossRush, sector } = this.replayStart);
+      ({ daily, bossRush, sector, hull: hullId } = this.replayStart);
       this.replayStart = null;
     }
     if (sector !== undefined || daily !== undefined || bossRush !== undefined) {
@@ -602,7 +604,7 @@ export default class GameSessionService {
       );
     }
 
-    this.applyConfiguredPlayerHull();
+    this.applyConfiguredPlayerHull({ hullId });
     // A carried build already holds its starting card.
     if (build) this.snapshots.restoreBuild(build);
     else this.resolveServiceInstance('progression').applyStartingCard();

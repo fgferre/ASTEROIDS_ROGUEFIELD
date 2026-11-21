@@ -78,6 +78,9 @@ function snap(game, label) {
     applied: [...progression.appliedUpgrades.keys()].join(','),
     pos: `${player.position.x.toFixed(3)},${player.position.y.toFixed(3)}`,
     level: progression.level,
+    hull: player.currentHull.id,
+    acceleration: player.flight.acceleration,
+    maxSpeed: player.flight.maxSpeed,
   };
   return s;
 }
@@ -85,6 +88,31 @@ function pick(game) {
   if (game.takeOfferedUpgrade()) {
     const { progression } = game.services;
     progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+  }
+}
+
+// The recorder's run: SCRIPT's keys, one entry every 30 steps.
+function flyScript(game) {
+  const input = game.services.input;
+  const press = (l) => input.onKeyDown(keyEvent(KEY[l]));
+  const release = (l) => input.onKeyUp(keyEvent(KEY[l]));
+  let held = [];
+  let taps = [];
+  for (let i = 0; i < STEPS; i += 1) {
+    pick(game);
+    if (i % 30 === 0) {
+      const keys = [...SCRIPT[i / 30]];
+      const nh = keys.filter((k) => k === k.toUpperCase());
+      held.filter((k) => !nh.includes(k)).forEach(release);
+      nh.filter((k) => !held.includes(k)).forEach(press);
+      held = nh;
+      taps = keys.filter((k) => k !== k.toUpperCase());
+      taps.forEach(press);
+    } else if (taps.length) {
+      taps.forEach(release);
+      taps = [];
+    }
+    game.step();
   }
 }
 
@@ -96,27 +124,7 @@ describe('replay Hangar setup', () => {
     live.services.progression.levelCost = () => 10;
     live.services.progression.experienceToNext = 10;
     const a0 = snap(live, 'A start');
-    const input = live.services.input;
-    const press = (l) => input.onKeyDown(keyEvent(KEY[l]));
-    const release = (l) => input.onKeyUp(keyEvent(KEY[l]));
-    let held = [];
-    let taps = [];
-    for (let i = 0; i < STEPS; i += 1) {
-      pick(live);
-      if (i % 30 === 0) {
-        const keys = [...SCRIPT[i / 30]];
-        const nh = keys.filter((k) => k === k.toUpperCase());
-        held.filter((k) => !nh.includes(k)).forEach(release);
-        nh.filter((k) => !held.includes(k)).forEach(press);
-        held = nh;
-        taps = keys.filter((k) => k !== k.toUpperCase());
-        taps.forEach(press);
-      } else if (taps.length) {
-        taps.forEach(release);
-        taps = [];
-      }
-      live.step();
-    }
+    flyScript(live);
     const aEnd = snap(live, 'A end');
     const recording = deserialize(
       serialize(live.session.replayRecorder.toJSON())
@@ -148,5 +156,45 @@ describe('replay Hangar setup', () => {
     expect(bEnd).toEqual({ ...aEnd, label: bEnd.label });
     expect(a0.maxHealth).toBe(105);
     expect(a0.rerolls).toBe(3);
+  });
+
+  it("starts a recorded hull on the recorder's setup when the viewer flies another", () => {
+    const live = createHeadlessGame();
+    profileA(live);
+    live.session.resolveServiceInstance('hangar').owned['bastion-hull'] = true;
+    live.services.settings.setSetting('gameplay', 'selectedHull', 'bastion');
+    live.session.startNewRun({ source: 'test' });
+    live.services.progression.levelCost = () => 10;
+    live.services.progression.experienceToNext = 10;
+    const a0 = snap(live, 'A start');
+    flyScript(live);
+    const aEnd = snap(live, 'A end');
+    const recording = deserialize(
+      serialize(live.session.replayRecorder.toJSON())
+    );
+
+    restoreDom();
+    restoreDom = installDomStubs();
+    const viewer = createHeadlessGame();
+    viewer.controller.arm(recording);
+    viewer.session.startNewRun({ source: 'test' });
+    viewer.services.progression.levelCost = () => 10;
+    viewer.services.progression.experienceToNext = 10;
+    const b0 = snap(viewer, 'B start');
+    for (let i = 0; i < STEPS; i += 1) {
+      viewer.controller.tick();
+      viewer.step();
+    }
+    const bEnd = snap(viewer, 'B end');
+
+    expect(viewer.session.getConfiguredHullId()).not.toBe('bastion');
+    expect(
+      viewer.session.resolveServiceInstance('hangar').getModifiers()
+        .hullMultiplier
+    ).toBe(1);
+    expect(a0.hull).toBe('bastion');
+    expect(a0.maxHealth).toBe(142);
+    expect(b0).toEqual({ ...a0, label: b0.label });
+    expect(bEnd).toEqual({ ...aEnd, label: bEnd.label });
   });
 });
