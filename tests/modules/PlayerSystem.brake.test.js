@@ -209,6 +209,27 @@ describe('Braking System 3: emergency brake', () => {
     expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(5);
   });
 
+  it('Classic on a pad: the left stick held back brakes, like S', () => {
+    const { player, brakes } = makePlayer(-150);
+    player.controlScheme = 'classic';
+    player.angle = -Math.PI / 2; // nose up, along the motion
+    const stickBack = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      pad: true,
+      moveX: 0,
+      moveY: 0.8,
+      aimX: 0,
+      aimY: 0,
+    };
+    for (let i = 0; i < holdSteps; i += 1) {
+      player.maneuvers.updateEmergencyBrake(DELTA_TIME, stickBack);
+    }
+    expect(brakes()).toBe(1);
+  });
+
   it('fires once per press, waits out its cooldown, and never fires along the motion', () => {
     const { player, movement, brakes } = makePlayer(-150);
     movement.down = true;

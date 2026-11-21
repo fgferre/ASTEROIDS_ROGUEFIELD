@@ -15,7 +15,7 @@ import {
   DASH_IMPULSE,
   DASH_INVULNERABILITY,
 } from '../../data/constants/gameplay.js';
-import { getModernMove } from './movementInput.js';
+import { classicAsks, getModernMove } from './movementInput.js';
 
 // Emergency brake: how far off straight back a held direction may point and
 // still brake, and how far it may wander (cosine) and still be the same press.
@@ -81,7 +81,8 @@ export class PlayerManeuvers {
   }
 
   /**
-   * Classic: forward along the nose, or backward while only S/↓ is held.
+   * Classic: forward along the nose, or backward while only S/↓ (or the
+   * left stick pulled back) is held.
    * Modern: along the held WASD direction, else along the nose. Takes the
    * main charge if it is ready, else a spare.
    */
@@ -91,7 +92,8 @@ export class PlayerManeuvers {
     if (this.ship.controlScheme === 'modern') {
       direction = getModernMove(movement) || fwd;
     } else {
-      const sign = movement.down && !movement.up ? -1 : 1;
+      const { up, down } = classicAsks(movement);
+      const sign = down && !up ? -1 : 1;
       direction = { x: fwd.x * sign, y: fwd.y * sign };
     }
     const impulse = DASH_IMPULSE * this.dashDistanceMultiplier;
@@ -178,12 +180,13 @@ export class PlayerManeuvers {
   /**
    * The direction the held keys thrust along, or null. Modern: the WASD (or
    * stick) direction. Classic: along the nose with W alone, against it with S
-   * alone, not while turning.
+   * alone, not while turning (classicAsks: the sticks count too).
    */
   getThrustDirection(input) {
     if (this.ship.controlScheme === 'modern') return getModernMove(input);
-    if (input.up === input.down || input.left || input.right) return null;
-    const sign = input.up ? 1 : -1;
+    const { up, down, left, right } = classicAsks(input);
+    if (Boolean(up) === Boolean(down) || left || right) return null;
+    const sign = up ? 1 : -1;
     return {
       x: Math.cos(this.ship.angle) * sign,
       y: Math.sin(this.ship.angle) * sign,
