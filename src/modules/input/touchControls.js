@@ -189,9 +189,14 @@ export class TouchControls {
     requestAnimationFrame(() => this.placePause());
   }
 
-  /** The device's step values with the touch stick added (pad sticks win). */
+  /**
+   * The device's step values with the touch stick added (pad sticks win). A
+   * hidden stick adds nothing, though a finger still dragging since a key hid
+   * it (Auto) keeps reporting.
+   */
   merge(values) {
-    const touch = touchMovement(this.stick, this.mode, this.player);
+    const stick = this.layer?.hidden ? CENTRED : this.stick;
+    const touch = touchMovement(stick, this.mode, this.player);
     const padCentred = !values.moveX && !values.moveY;
     return {
       ...values,

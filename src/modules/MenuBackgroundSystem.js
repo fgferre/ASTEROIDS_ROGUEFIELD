@@ -621,6 +621,9 @@ class MenuBackgroundSystem extends BaseSystem {
     this.registerEventListener('gamepad-menu-back', () =>
       this.gate?.leaveMenu()
     );
+    for (const name of ['gamepad-ui-nav', 'gamepad-ui-scroll']) {
+      this.registerEventListener(name, () => this.gate?.noteInput());
+    }
     this.registerEventListener('ui-overlay-visibility-changed', (event) => {
       if (event?.overlay !== 'hangar') return;
       this.hangarOpen = event.isOpen;

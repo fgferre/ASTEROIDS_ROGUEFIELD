@@ -89,6 +89,27 @@ describe('touch stick', () => {
     });
   });
 
+  it('a hidden stick moves nothing while the finger still drags (Auto: a key took over)', () => {
+    const touch = new TouchControls({
+      input: null,
+      player: facingRight,
+      eventBus: null,
+      mode: 'teclas',
+    });
+    touch.layer = { hidden: true };
+    touch.stick = UP; // nipplejs still reports the drag
+    expect(
+      touch.merge({
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        moveX: 0,
+        moveY: 0,
+      })
+    ).toMatchObject({ up: false, moveX: 0, moveY: 0 });
+  });
+
   it('lets go and pauses a running run when the app leaves the screen', () => {
     const emitted = [];
     let running = true;

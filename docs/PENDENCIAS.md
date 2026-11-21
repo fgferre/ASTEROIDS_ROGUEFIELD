@@ -6,7 +6,33 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
 
-## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `jogo/conjunto-2` (os consertos juntos, 21/11)
+## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `jogo/conjunto-3` (a quinta auditoria e os cristais, 21/11)
+
+**21/11, mais tarde (vale sobre o que estiver mais abaixo e disser outra coisa):** a quinta auditoria de fora e os
+cristais vão ao ar por ordem dele — à pergunta "Publico os consertos do Codex com os cristais novos?", _"Sim,
+publica"_ — pela PR do `jogo/conjunto-3` para a `main`. Ao relatório ele tinha dito _"o codex (chatgpt astra high)
+achou alguns problemas:"_ e depois _"Não vamos esperar eu jogar, não. Vamos saber se é um problema mesmo antes de
+jogar e vamos resolver. Não vamos ter preguiça, não. Vamos resolver os problemas todos, verifica se são problemas
+mesmo e resolva."_ Entra:
+
+- o dash para trás com o analógico do Xbox no voo Classic, e o freio de emergência que reconhece a ré pelo analógico;
+- a mira com o analógico direito sem zerar a aceleração do direcional, no voo Modern;
+- no toque, o dedo que movia a nave depois de uma tecla esconder o direcional;
+- o Esc segurado em Settings que levava direto à tela inicial;
+- o toque rápido no RB que mudava a aba sem renovar o prazo de inatividade;
+- o piloto apagado numa aba que voltava quando a outra aba comprava no Hangar;
+- o replay que começava com os números da nave de quem assiste (142 de casco virava 135, e a carta inicial sumia);
+- o escudo do Hunter Elite quebrado que voltava cheio no "tentar de novo";
+- a música da campanha trocada quando se escolhe rápido um setor e depois outro;
+- os cristais do fundo da Crystal Choir com a cor B e os leques (_"B e a forma"_, _"Forma 1, leques"_; ele tinha
+  dito _"A minha crítica é quanto ao cenário 3D, aqueles cristais que ficam ao fundo"_), com o custo de construí-los reduzido;
+- as ferramentas de teste atualizadas: o `npm audit` não acusa nenhum alerta (antes eram 14, três críticos; nada
+  disso ia para quem joga).
+
+Só ele confere: o controle de verdade, o iPhone de verdade e o Tesla. **Fica de fora:** as duas perguntas da abertura
+(cartão `abertura-7`); a segunda parte da abertura (o carregamento em fatias, espera o teste dele no Tesla); o planeta
+(36); o tiro na pedra com a cor da luz e a morte do chefe que treme duas vezes (35, 38); as vozes (37); as naves do
+jogador (20); as cartas por arma.
 
 **21/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** os consertos de 20–21/11 vão ao ar juntos, por
 ordem dele — primeiro _"vamos esperar as outras conversas volgtarem para publicar todos os consertos junto"_, depois, à

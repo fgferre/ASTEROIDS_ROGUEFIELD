@@ -6,6 +6,7 @@ import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
 import { buildCrystalChoir } from '../../../src/modules/render3d/places/crystalChoir.js';
 import { PLACE_SETS } from '../../../src/modules/render3d/places/index.js';
 import { createPlaceKit } from '../../../src/modules/render3d/places/kit.js';
+import { crystal } from '../../../src/modules/render3d/places/pieces.js';
 
 const THREE = {};
 new Function(
@@ -58,6 +59,31 @@ describe('place backdrop sets', () => {
     built.forEach((set) => expect(set.object.visible).toBe(false));
     expect(backdrop.ring.object.visible).toBe(true);
     expect(backdrop.structures.group.visible).toBe(true);
+  });
+
+  it("builds the Crystal Choir's finer shards only when the quality preset asks, never on low", () => {
+    const backdrop = new FieldBackdrop(THREE, new THREE.Scene());
+    const choir = backdrop.places.built.get('crystal-choir');
+    const meshes = () => {
+      let n = 0;
+      choir.object.traverse((o) => (n += o.isMesh ? 1 : 0));
+      return n;
+    };
+    const plain = meshes();
+
+    backdrop.places.setDetail(false);
+    expect(meshes()).toBe(plain);
+    backdrop.places.setDetail(true);
+    expect(meshes()).toBe(plain + 1);
+    choir.fine.forEach((part) => expect(part.visible).toBe(true));
+    backdrop.places.setDetail(false);
+    expect(meshes()).toBe(plain + 1);
+    choir.fine.forEach((part) => expect(part.visible).toBe(false));
+  });
+
+  it('colours a crystal from its foot to its point with no gaps', () => {
+    const colors = crystal(THREE, 300, 27, 6, 0.08).getAttribute('color').array;
+    expect(colors.every(Number.isFinite)).toBe(true);
   });
 
   it("draws the Crystal Choir's crystals polished, lit from inside, their sheen capped", () => {

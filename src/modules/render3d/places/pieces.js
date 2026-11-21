@@ -165,60 +165,71 @@ export function lightPoint(kit, parts, color, at, size) {
  * from inside toward its point.
  */
 export function crystal(THREE, length, radius, sides = 6, foot = 0.25) {
+  // Written out triangle by triangle (an open cylinder for the body, an open
+  // cone for the point, as three lays them, less the cone's empty
+  // triangles): the Crystal Choir makes hundreds of these as the game loads.
   const tip = Math.min(length * 0.3, radius * 2.2);
-  const body = new THREE.CylinderGeometry(
-    radius * 0.9,
-    radius,
-    length - tip,
-    sides,
-    1,
-    true
-  ).translate(0, (length - tip) / 2, 0);
-  const point = new THREE.ConeGeometry(
-    radius * 0.9,
-    tip,
-    sides,
-    1,
-    true
-  ).translate(0, length - tip / 2, 0);
-  const geometry = mergeGeometries(THREE, [body, point]);
-  const position = geometry.getAttribute('position');
-  const colors = new Float32Array(position.count * 3);
-  // Each facet a shade of its own, so the faces read.
-  const a = new THREE.Vector3();
-  const b = new THREE.Vector3();
-  const c = new THREE.Vector3();
-  for (let i = 0; i < position.count; i += 3) {
-    a.fromBufferAttribute(position, i);
-    b.fromBufferAttribute(position, i + 1);
-    c.fromBufferAttribute(position, i + 2);
-    const facing = c.sub(b).cross(a.sub(b)).normalize();
-    const facet = 0.35 + 0.65 * Math.abs(facing.x * 0.8 + facing.z * 0.6);
-    for (let v = 0; v < 3; v += 1) {
-      const k =
-        (foot + (1 - foot) * (position.getY(i + v) / length) ** 1.5) * facet;
-      colors.set([k, k, k], (i + v) * 3);
+  const top = length - tip;
+  const count = sides * 9;
+  const positions = new Float32Array(count * 3);
+  const normals = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  let o = 0;
+  const vertex = (x, y, z) => {
+    positions[o] = x;
+    positions[o + 1] = y;
+    positions[o + 2] = z;
+    o += 3;
+  };
+  for (let j = 0; j < sides; j += 1) {
+    const a0 = (j / sides) * Math.PI * 2;
+    const a1 = ((j + 1) / sides) * Math.PI * 2;
+    const [s0, c0, s1, c1] = [
+      Math.sin(a0),
+      Math.cos(a0),
+      Math.sin(a1),
+      Math.cos(a1),
+    ];
+    const [upper, lower] = [radius * 0.9, radius];
+    vertex(upper * s0, top, upper * c0);
+    vertex(lower * s0, 0, lower * c0);
+    vertex(upper * s1, top, upper * c1);
+    vertex(lower * s0, 0, lower * c0);
+    vertex(lower * s1, 0, lower * c1);
+    vertex(upper * s1, top, upper * c1);
+  }
+  for (let j = 0; j < sides; j += 1) {
+    const a0 = (j / sides) * Math.PI * 2;
+    const a1 = ((j + 1) / sides) * Math.PI * 2;
+    const upper = radius * 0.9;
+    vertex(upper * Math.sin(a0), top, upper * Math.cos(a0));
+    vertex(upper * Math.sin(a1), top, upper * Math.cos(a1));
+    vertex(0, length, 0);
+  }
+  // Each facet a shade of its own, so the faces read; the colour runs up
+  // from `foot` toward the point.
+  const p = positions;
+  for (let i = 0; i < count * 3; i += 9) {
+    const [bx, by, bz] = [p[i + 3], p[i + 4], p[i + 5]];
+    const [cbx, cby, cbz] = [p[i + 6] - bx, p[i + 7] - by, p[i + 8] - bz];
+    const [abx, aby, abz] = [p[i] - bx, p[i + 1] - by, p[i + 2] - bz];
+    let nx = cby * abz - cbz * aby;
+    let ny = cbz * abx - cbx * abz;
+    let nz = cbx * aby - cby * abx;
+    const size = Math.hypot(nx, ny, nz) || 1;
+    [nx, ny, nz] = [nx / size, ny / size, nz / size];
+    const facet = 0.35 + 0.65 * Math.abs(nx * 0.8 + nz * 0.6);
+    for (let v = 0; v < 9; v += 3) {
+      normals[i + v] = nx;
+      normals[i + v + 1] = ny;
+      normals[i + v + 2] = nz;
+      const k = (foot + (1 - foot) * (p[i + v + 1] / length) ** 1.5) * facet;
+      colors.fill(k, i + v, i + v + 3);
     }
   }
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return geometry;
-}
-
-// Non-indexed geometries (position, normal) joined into one.
-function mergeGeometries(THREE, list) {
-  const flat = list.map((g) => (g.index ? g.toNonIndexed() : g));
-  const join = (name) => {
-    const arrays = flat.map((g) => g.getAttribute(name).array);
-    const out = new Float32Array(arrays.reduce((n, a) => n + a.length, 0));
-    let o = 0;
-    arrays.forEach((a) => {
-      out.set(a, o);
-      o += a.length;
-    });
-    return new THREE.BufferAttribute(out, 3);
-  };
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', join('position'));
-  geometry.setAttribute('normal', join('normal'));
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }

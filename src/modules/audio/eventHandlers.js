@@ -152,6 +152,7 @@ export const AUDIO_EVENT_HANDLERS = {
   // A sector is picked (the map, the result screen): its music and its
   // journey's cue are fetched, after the menu's music (_afterMenuMusic).
   sectorScorePrefetch(audio, payload) {
+    audio.sectorScore.pickedSectorId = payload?.sector;
     audio._afterMenuMusic(() => {
       // What plays first downloads first: the story's music (the first
       // campaign launch tells it, under its own) and the journey's, small
@@ -163,8 +164,12 @@ export const AUDIO_EVENT_HANDLERS = {
         }),
       ];
       Promise.all(cues).then(() => {
-        // A run started meanwhile has fetched its score itself.
-        if (audio.sectorScore.sectorId !== payload?.sector) {
+        // A run started meanwhile has fetched its score itself; a later
+        // pick keeps its own.
+        if (
+          audio.sectorScore.pickedSectorId === payload?.sector &&
+          audio.sectorScore.sectorId !== payload?.sector
+        ) {
           audio.sectorScore.prefetch(payload?.sector);
         }
       });

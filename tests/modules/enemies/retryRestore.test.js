@@ -98,4 +98,20 @@ describe('retry restore', () => {
     retry(game);
     expect(alive(game, 'hunter').map(pick)).toEqual(before);
   });
+
+  it('a broken Elite shield stays broken, a worn one keeps its points', () => {
+    const game = newGame();
+    onlyEnemy(game, 'hunter', { elite: true, affixes: ['shielded'] });
+    const [hunter] = alive(game, 'hunter');
+    hunter.shieldHealth = 0;
+    hunter.shieldBroken = true;
+    retry(game);
+    const [broken] = alive(game, 'hunter');
+    expect(broken.shieldHealth).toBe(0);
+    expect(broken.shieldBroken).toBe(true);
+
+    broken.shieldHealth = 25;
+    retry(game);
+    expect(alive(game, 'hunter')[0].shieldHealth).toBe(25);
+  });
 });

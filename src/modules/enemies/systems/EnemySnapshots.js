@@ -257,6 +257,11 @@ export class EnemySnapshots {
       elite: Boolean(enemy.elite),
       affixes: [...(enemy.affixes ?? [])],
       heraldKind: enemy.heraldKind ?? null,
+      // A frontal shield's points left (a broken plate stays broken).
+      shieldHealth: Number.isFinite(enemy.shieldHealth)
+        ? enemy.shieldHealth
+        : null,
+      shieldBroken: Boolean(enemy.shieldBroken),
     };
   }
 
@@ -574,6 +579,10 @@ export class EnemySnapshots {
     }
     if (Number.isFinite(snapshot.health)) {
       enemy.health = snapshot.health;
+    }
+    if (Number.isFinite(snapshot.shieldHealth)) {
+      enemy.shieldHealth = snapshot.shieldHealth;
+      enemy.shieldBroken = Boolean(snapshot.shieldBroken);
     }
     if (snapshot.spawnedBy !== undefined) {
       enemy.spawnedBy = snapshot.spawnedBy;

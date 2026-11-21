@@ -57,6 +57,9 @@ class SectorScore {
     this.fetchBytes = fetchFile;
     // The one sector picked, its two files fetched and not yet decoded.
     this._prefetch = null;
+    // The sector picked last (eventHandlers): an earlier pick's late
+    // prefetch must not replace its own.
+    this.pickedSectorId = null;
     this.context = null;
     this.target = null;
     this._chapterId = null; // the chapter score of a sectorless run
