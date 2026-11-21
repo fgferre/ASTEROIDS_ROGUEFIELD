@@ -2,8 +2,8 @@
 // placed by any transform and merged into one static mesh per material, in
 // the four materials every set shares the look of — `matte` (lit by the
 // field's lights, the hard surfaces), `lamp` (unlit and opaque, a surface
-// that glows from inside: a dark planet), `gem` (polished, lit from inside
-// and catching the field's lights: crystals) and `glow` (added light:
+// that glows from inside: a dark planet), `gem` (cut crystal: a saturated
+// body lit from inside, glints off its facets) and `glow` (added light:
 // running lights, cracks, a star) — all sinking into the place's haze with
 // their depth under the field, as the broken Ring does (ring/ringMaterial.js),
 // so the far shapes sit low in contrast behind the play. Seen through the
@@ -18,14 +18,28 @@ import { mergeStatic } from '../mergeStatic.js';
 // The hard surfaces' finish is worn metal and stone (hullModel.js SHINE: a
 // set seen under the haze shows no finer shine); a glow loses `glowHaze`
 // of its light where the haze is full.
-// proposta 13/11: a gem's polished facets (SHINE.crystal) — `glow` of its
-// vertex colour lit from inside, `body` of it taking the field's lights, its
-// sheen capped at `cap` (direct, reflected) as the ship's is (hullModel.js
-// SPECULAR_CAP_GLSL), higher because the haze takes most of it.
+// A gem (his pick B on cenario-3, 21/11): its own light kept under the
+// tone curve's knee, so it stays a saturated colour and never washes white —
+// `base` of its vertex colour, plus `face` more where a facet faces the eye
+// (light seen through it, sharpened by `facePow`); a `rim` of cyan where the
+// surface turns away (`rimPow`); `body` of the field's light on it, `diffuse`
+// of that kept, its glints (`finish`, sharper than SHINE.crystal) capped at `cap` (direct,
+// reflected): white only in those small glints. It sinks `haze` as far into
+// the place's haze, and under the arena it darkens to `under` instead of
+// fading into the haze, so the field reads over it.
 const GEM = {
-  body: 0.3,
-  glow: 0.7,
-  cap: [0.7, 0.3],
+  base: 0.22,
+  face: 0.5,
+  facePow: 3,
+  rim: [0.1, 0.62, 1],
+  rimK: 0.45,
+  rimPow: 2.5,
+  body: 0.12,
+  diffuse: 0.4,
+  finish: { metalness: 0.05, roughness: 0.16, envMapIntensity: 2.4 },
+  cap: [1.6, 0.4],
+  haze: 0.35,
+  under: 0.42,
 };
 const GLOW_HAZE = 0.55;
 // The field's half extents in world units, and the soft edge (inside,
@@ -62,10 +76,18 @@ gl_FragColor.rgb = mix(uHaze, mix(gl_FragColor.rgb, uHaze, vPlaceHaze),
 const LIGHT = `
 gl_FragColor.rgb *= (1.0 - uGlowHaze * vPlaceHaze) * vPlaceUnder;`;
 const GEM_GLOW = `
-totalEmissiveRadiance += vColor.rgb * ${GEM.glow.toFixed(2)};`;
+float gemFacing = clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0);
+totalEmissiveRadiance += vColor.rgb * (${GEM.base.toFixed(2)}
+    + ${GEM.face.toFixed(2)} * pow(gemFacing, ${GEM.facePow.toFixed(1)}))
+  + vec3(${GEM.rim.map((v) => v.toFixed(2)).join(', ')}) * ${GEM.rimK.toFixed(2)}
+    * pow(1.0 - gemFacing, ${GEM.rimPow.toFixed(1)});`;
 const GEM_CAP = `
 reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${GEM.cap[0].toFixed(2)}));
-reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(${GEM.cap[1].toFixed(2)}));`;
+reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(${GEM.cap[1].toFixed(2)}));
+reflectedLight.directDiffuse *= ${GEM.diffuse.toFixed(2)};`;
+const GEM_SURFACE = `
+gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, vPlaceHaze * ${GEM.haze.toFixed(2)})
+  * mix(${GEM.under.toFixed(2)}, 1.0, vPlaceUnder);`;
 
 function hazed(material, uniforms, kind) {
   material.onBeforeCompile = (shader) => {
@@ -85,7 +107,7 @@ function hazed(material, uniforms, kind) {
       )
       .replace(
         '#include <fog_fragment>',
-        `#include <fog_fragment>${kind === 'glow' ? LIGHT : SURFACE}`
+        `#include <fog_fragment>${{ glow: LIGHT, gem: GEM_SURFACE }[kind] ?? SURFACE}`
       );
   };
   material.customProgramCacheKey = () => `place-${kind}`;
@@ -101,12 +123,12 @@ function makeMaterial(THREE, kind, uniforms) {
     );
   }
   if (kind === 'gem') {
-    const { body } = GEM;
+    const { body, finish } = GEM;
     return hazed(
       new THREE.MeshStandardMaterial({
         vertexColors: true,
         color: new THREE.Color(body, body, body),
-        ...SHINE.crystal,
+        ...finish,
       }),
       uniforms,
       kind

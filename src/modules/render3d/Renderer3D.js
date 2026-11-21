@@ -563,6 +563,7 @@ class Renderer3D extends BaseSystem {
     setRimLight(q.rimLight);
     t.decals.setEnabled(q.decals);
     t.space.setLayers(q.spaceLayers);
+    t.backdrop.places.setDetail(q.placeDetail);
     this.syncPasses();
   }
 
