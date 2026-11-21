@@ -152,6 +152,21 @@ describe('save slots', () => {
     expect(getActiveSlot()).toBe(1);
   });
 
+  it('a tab still playing a pilot another tab deleted does not bring it back', () => {
+    playSlot(2);
+    saveProgress('roguefield:hangar:v2', { salvage: 100 });
+    // Another tab, on its pilots screen, deletes pilot 2 (the same storage);
+    // this one buys in its Hangar and finishes the tutorial.
+    deleteSlot(2);
+    saveProgress('roguefield:hangar:v2', { salvage: 40 });
+    saveJSON('roguefield:onboarding:v1', { done: true });
+    expect(keys().filter((key) => key.includes(':slot2:'))).toEqual([]);
+    // A page loaded after the deletion plays the new, empty pilot 2.
+    resolveActiveSlot();
+    saveProgress('roguefield:hangar:v2', { salvage: 5 });
+    expect(loadJSON('roguefield:hangar:v2')).toEqual({ salvage: 5 });
+  });
+
   it('says whether a chosen slot was kept, so a refused one is not reloaded into', () => {
     expect(chooseSlot(2)).toBe(true);
     const set = localStorage.setItem;

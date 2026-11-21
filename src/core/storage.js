@@ -10,6 +10,9 @@
 // before slots is slot 1 untouched; slots 2 and 3 prefix them
 // ('roguefield:records:v1' → 'roguefield:slot2:records:v1'). The active slot
 // is read once, as the page loads: a tab keeps its pilot until it reloads.
+// Deleting a pilot is counted in the slots index (`deleted`, per slot), and a
+// page keeps its own pilot's count from its load: a tab still playing a pilot
+// another tab deleted writes none of it back.
 
 export const SLOT_COUNT = 3;
 export const SLOTS_STORAGE_KEY = 'roguefield:slots:v1';
@@ -28,22 +31,28 @@ function browserStorage() {
   return typeof window === 'undefined' ? null : window.localStorage ?? null;
 }
 
-// A missing, broken or out-of-range index is slot 1: a player from before
-// slots always opens on their own pilot.
-function readActiveSlot() {
+function readIndex() {
   try {
-    const active = JSON.parse(
-      browserStorage()?.getItem(SLOTS_STORAGE_KEY)
-    )?.active;
-    return Number.isInteger(active) && active >= 1 && active <= SLOT_COUNT
-      ? active
-      : 1;
+    const index = JSON.parse(browserStorage()?.getItem(SLOTS_STORAGE_KEY));
+    return index && typeof index === 'object' ? index : {};
   } catch {
-    return 1;
+    return {};
   }
 }
 
+// A missing, broken or out-of-range index is slot 1: a player from before
+// slots always opens on their own pilot.
+function readActiveSlot() {
+  const { active } = readIndex();
+  return Number.isInteger(active) && active >= 1 && active <= SLOT_COUNT
+    ? active
+    : 1;
+}
+
+const deletions = (slot) => readIndex().deleted?.[slot] ?? 0;
+
 let activeSlot = readActiveSlot();
+let loadedDeletions = deletions(activeSlot);
 
 /** The slot this page plays (1..SLOT_COUNT). */
 export function getActiveSlot() {
@@ -53,6 +62,7 @@ export function getActiveSlot() {
 /** Reads the slots index again (a page load does it; tests call it). */
 export function resolveActiveSlot() {
   activeSlot = readActiveSlot();
+  loadedDeletions = deletions(activeSlot);
   return activeSlot;
 }
 
@@ -68,7 +78,7 @@ export function slotStorageKey(key, slot = activeSlot) {
  * services read their pilot as they are built.
  */
 export function chooseSlot(slot) {
-  saveJSON(SLOTS_STORAGE_KEY, { active: slot });
+  saveJSON(SLOTS_STORAGE_KEY, { ...readIndex(), active: slot });
   return readActiveSlot() === slot;
 }
 
@@ -81,6 +91,9 @@ export function deleteSlot(slot) {
       console.warn(`[storage] Failed to delete "${key}":`, error);
     }
   });
+  const index = readIndex();
+  const deleted = { ...index.deleted, [slot]: deletions(slot) + 1 };
+  saveJSON(SLOTS_STORAGE_KEY, { ...index, deleted });
 }
 
 /** `slot`: another pilot's copy of a pilot's key (the pilots screen). */
@@ -123,6 +136,10 @@ export function saveProgress(key, value) {
 export function saveJSON(key, value) {
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    // This pilot was deleted (in another tab) after this page loaded.
+    if (SLOT_KEYS.includes(key) && deletions(activeSlot) !== loadedDeletions) {
       return;
     }
     window.localStorage.setItem(slotStorageKey(key), JSON.stringify(value));
