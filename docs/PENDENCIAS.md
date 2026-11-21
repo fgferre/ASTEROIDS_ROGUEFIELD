@@ -4,9 +4,25 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 38.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 39.**
 
-## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `piloto/saves` (os save games, 20/11)
+## O BASTÃO — onde as sessões pararam (20/11) — a `main` está publicada até a PR do `controle/toque-em-computador` (o toque em computador, 20/11)
+
+**20/11, à noite (vale sobre o que estiver mais abaixo e disser outra coisa):** o toque em telas que se dizem
+computador vai ao ar por ordem dele — à pergunta "Publico já estes quatro itens do toque?", _"Sim, publica"_ — pela
+PR do `controle/toque-em-computador` para a `main`. Ele tinha perguntado: _"Eu tentei fazer funcionar a tela touch no
+browser do meu Tesla, que é um modelo 3, e não funcionou o touch"_ e _"como que a gente faria para contornar isso? Até
+porque diversos computadores hoje têm tela touch."_ Entra: num computador, o primeiro toque de dedo traz o direcional,
+o DASH, o SHIELD e a pausa, e uma tecla ou o controle devolvem ao teclado (um clique de mouse nunca liga o toque); a
+chave "Touch Controls: Auto / Always" em Settings → Controls, só no computador, com a linha do que a tela diz ao
+navegador (_"A, só nos ajustes"_); instalar como aplicativo — no iPhone e, pela primeira vez, no iPad, o aviso da
+entrada com os dois passos desenhados (_"gostei desse que vc coloca os simbolos"_), no Android o botão Install do
+próprio navegador na entrada e no computador no alto do menu, depois de Settings (_"gostei do A"_); o ícone, uma pedra
+de veios dourados fotografada no jogo (_"gostei mais do foto do jogo"_), e o nome inteiro embaixo dele, "Asteroid
+Roguefield", que o celular corta (_"Asteroid Roguefiled"_). Limites ditos a ele: a confirmação de instalar de verdade
+e o teste no Tesla só depois de publicar; o ícone grande (512 px) sai um pouco mais macio. **Fica de fora:** a volta à
+tela inicial pelo toque (cartão `volta-1`, A ou B, sem resposta; hoje, pelo toque, só os 2 minutos parado no menu);
+as naves do jogador, que ele vai levar a outra AI (20); a rodada seguinte (35, 36, 37 e a luz, 38).
 
 **20/11, mais tarde (vale sobre o que estiver mais abaixo e disser outra coisa):** os save games vão ao ar por ordem
 dele — à pergunta "Publico os save games e a volta à tela inicial?", _"Sim, publica"_ — pela PR do `piloto/saves`
@@ -172,3 +188,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   fases que tem umas placas de metal que parece que tem uma luz, mas essa luz é estranha nao parece acoplada direito
   nas placas e confunde com orbes. (talvez na primeira fase, nao lembrio)"_ Imagem antes de código; fecha quando ele
   aprovar por imagem.
+- **(38)** A cor da luz (20/11, depois de publicar): _"eu percebi que hoje parte dos elementos luminosos nas pedras
+  não estão sendo refletidos com a cor certa, né? Eu percebi que o tiro é de uma cor e a sombra a iluminação que vai é
+  de outra. Então, eu acho que tem uma oportunidade aí na questão da iluminação do jogo, do algoritmo ler exatamente
+  qual é a cor da luminosidade que está batendo em aonde, né?"_ Imagem antes de código; fecha quando ele aprovar por
+  imagem.
