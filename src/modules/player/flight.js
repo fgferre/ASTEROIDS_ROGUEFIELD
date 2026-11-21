@@ -27,7 +27,7 @@ import {
   DASH_DECAY_SECONDS,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../../data/constants/gameplay.js';
-import { getModernMove, padForce } from './movementInput.js';
+import { classicAsks, getModernMove, padForce } from './movementInput.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -97,20 +97,17 @@ export class PlayerFlight {
 
     const move = modern ? getModernMove(input) : null;
 
-    // The pilot's asks, 0..1: a key or the d-pad is full; a pad's sticks
-    // (Felipe's two-stick scheme) push as far as they lean: classic, the
-    // left one thrusts (up) and backs (down), the right one turns; modern,
-    // the left one's lean is the push along where it points.
-    const stickY = Number(input.moveY) || 0;
-    const stickTurn = Number(input.aimX) || 0;
-    const thrustIn = Math.max(input.up ? 1 : 0, padForce(input, -stickY));
-    const backIn = Math.max(input.down ? 1 : 0, padForce(input, stickY));
-    const leftIn = Math.max(input.left ? 1 : 0, padForce(input, -stickTurn));
-    const rightIn = Math.max(input.right ? 1 : 0, padForce(input, stickTurn));
-    const moveForce =
-      move && input.pad
-        ? padForce(input, Math.hypot(Number(input.moveX) || 0, stickY))
-        : 1;
+    // The pilot's asks, 0..1 (classicAsks); modern, the left stick's lean is
+    // the push along where it points, and the d-pad is full (a pad frame
+    // whose right stick aims still moves at full push on the d-pad).
+    const {
+      up: thrustIn,
+      down: backIn,
+      left: leftIn,
+      right: rightIn,
+    } = classicAsks(input);
+    const lean = Math.hypot(Number(input.moveX) || 0, Number(input.moveY) || 0);
+    const moveForce = move && input.pad && lean > 0 ? padForce(input, lean) : 1;
 
     // The thrusters' forces (lógica do original); what they show is at the end.
     let thrMain = thrustIn;

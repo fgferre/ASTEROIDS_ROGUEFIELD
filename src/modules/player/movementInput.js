@@ -36,6 +36,23 @@ export function padForce(input, value) {
   return input.pad && value > 0 ? value ** GAMEPAD_STICK_CURVE : 0;
 }
 
+/**
+ * Classic's asks, 0..1: a key or the d-pad is full; a pad's sticks (Felipe's
+ * two-stick scheme) push as far as they lean: the left one thrusts (up) and
+ * backs (down), the right one turns. The flight, the dash and the brake all
+ * read these.
+ */
+export function classicAsks(input) {
+  const stickY = Number(input.moveY) || 0;
+  const turn = Number(input.aimX) || 0;
+  return {
+    up: Math.max(input.up ? 1 : 0, padForce(input, -stickY)),
+    down: Math.max(input.down ? 1 : 0, padForce(input, stickY)),
+    left: Math.max(input.left ? 1 : 0, padForce(input, -turn)),
+    right: Math.max(input.right ? 1 : 0, padForce(input, turn)),
+  };
+}
+
 /** The right stick's unit direction past the engage, or null. */
 export function getAimStickDirection(input) {
   const x = Number(input.aimX) || 0;

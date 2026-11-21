@@ -89,7 +89,7 @@ function boot(
   });
   let complete;
   let progress;
-  setupLoadingScreen(
+  const gate = setupLoadingScreen(
     (onProgress, onComplete) => {
       progress = onProgress;
       complete = onComplete;
@@ -109,6 +109,7 @@ function boot(
   }
   if (via !== 'none') vi.advanceTimersByTime(600);
   return {
+    gate,
     screen,
     menu,
     menuButton,
@@ -379,6 +380,17 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
+  it('Escape held to close a panel does not go on to the gate (key repeat)', () => {
+    const { menu, winListeners, page } = inMenu();
+    page.overlays = [{ closest: () => null }];
+    winListeners.keydown({ key: 'Escape', repeat: false });
+    page.overlays = []; // the panel's own Escape closed it
+    winListeners.keydown({ key: 'Escape', repeat: true });
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+    winListeners.keydown({ key: 'Escape', repeat: false });
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
   it("the game's name on the menu brings the gate back, by touch or click, unless a panel is open", () => {
     const { menu, menuButton, page } = inMenu();
     page.overlays = [{ closest: () => null }];
@@ -399,6 +411,15 @@ describe('loading screen PRESS START gate', () => {
     clock.now += 1000;
     vi.advanceTimersByTime(1000);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
+  });
+
+  it('a pad press on the menu restarts the idle wait, even one quicker than the idle check', () => {
+    const { gate, menu } = inMenu();
+    clock.now += MENU_IDLE_MS - 500;
+    gate.noteInput();
+    clock.now += 1000;
+    vi.advanceTimersByTime(1000);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it.each(['?profile=x', '?scene=ring', '?content=a', '?replay=u'])(

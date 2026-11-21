@@ -104,6 +104,23 @@ describe('PlayerSystem dash', () => {
     expect(Math.abs(player.velocity.vx)).toBeLessThan(1e-6);
   });
 
+  it('Classic on a pad: the left stick held back dashes backward, like S', () => {
+    const { player } = makePlayer();
+    player.controlScheme = 'classic';
+    player.maneuvers.startDash({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      pad: true,
+      moveX: 0,
+      moveY: 0.6,
+      aimX: 0,
+      aimY: 0,
+    });
+    expect(player.velocity.vx).toBeLessThan(-SHIP_MAX_SPEED);
+  });
+
   it('dashes left on the screen while only A is held', () => {
     const { player, eventBus } = makePlayer({ left: true });
     eventBus.emit('dash-pressed');
