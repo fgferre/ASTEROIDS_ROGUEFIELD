@@ -19,12 +19,12 @@ import { PALETTE } from '../data/constants/palette.js';
 import { HullArt } from './player/hullArt.js';
 import { colorOf } from './render3d/batches.js';
 import {
-  CANOPY_GLASS,
   HULL_FINISHES,
   NOZZLE_HEIGHT,
   SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
+  buildSensorGlass,
   buildTurret,
   edgeLines,
   hullTones,
@@ -105,7 +105,6 @@ export class MenuHullPreview {
       material.onBeforeCompile = patchHull;
       return material;
     };
-    const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
     this.materials = {
       // one per finish, as in the game
       hull: HULL_FINISHES.map((finish) =>
@@ -113,14 +112,7 @@ export class MenuHullPreview {
           new THREE.MeshStandardMaterial({ vertexColors: true, ...finish })
         )
       ),
-      // Dark glass with a dim cyan glow, as in the game.
-      canopy: studio(
-        new THREE.MeshStandardMaterial({
-          color: colorOf(THREE, PALETTE.rockShadow),
-          emissive: colorOf(THREE, PALETTE.player).multiplyScalar(canopyGlow),
-          ...glass,
-        })
-      ),
+      canopy: buildSensorGlass(THREE),
       edge: new THREE.LineBasicMaterial({
         color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       }),

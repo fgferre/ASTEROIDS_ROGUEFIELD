@@ -32,12 +32,12 @@ import { getHullThrusterPort } from '../player/hullShape.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import { DissolvePool } from './dissolve.js';
 import {
-  CANOPY_GLASS,
   HULL_FINISHES,
   NOZZLE_HEIGHT,
   SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
+  buildSensorGlass,
   buildTurret,
   buildTurretLayer,
   edgeLines,
@@ -289,14 +289,7 @@ export class PlayerMirror {
     this.surfaceMaps = true;
     this.blink = blink;
     this.blinkHeldUntil = -Infinity;
-    const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
-    this.canopyMaterial = addRimLight(
-      new THREE.MeshStandardMaterial({
-        color: colorOf(THREE, PALETTE.rockShadow),
-        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(canopyGlow),
-        ...glass,
-      })
-    );
+    this.canopyMaterial = buildSensorGlass(THREE);
     this.edgeMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       toneMapped: false,

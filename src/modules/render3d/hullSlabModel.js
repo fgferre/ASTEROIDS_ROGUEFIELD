@@ -4,7 +4,7 @@
 // spine with vents; wings cut from the fin panels with an armour plate on top,
 // a fence and a weapon rail at the tip; canards and canted tail fins; a banded
 // nacelle with an intake and a bell round every nozzle; and an opaque remote
-// sensor with an optical window. Each part has a finish: satin paint, glossier accent
+// sensor below a smoked glass cover. Each part has a finish: satin paint, glossier accent
 // panels (shoulder and wing armour, tail fins, flaps) or polished steel
 // (nozzle bells and bands, intake rims, the weapon rail's barrel, trim
 // strips, the antenna and the chin sensor). hullModel.js calls it and merges
@@ -224,9 +224,17 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
       );
       // the weapon rail along the tip
       if (form.pods) {
+        const cap = [
+          [x - 0.65, y - 0.36],
+          [x + 6.94, y - 0.36],
+          [x + 7.28, y - 0.2],
+          [x + 7.28, y + 0.2],
+          [x + 6.94, y + 0.36],
+          [x - 0.65, y + 0.36],
+        ];
         raised.push(
           part(box(8.5, 0.75, 0.8, [x + 3.2, WING[0] + 0.2, y]), DEEP),
-          part(box(7.5, 0.12, 0.6, [x + 3.15, WING[0] + 0.62, y]), FIN, GLOSS),
+          part(slab(cap, WING[0] + 0.48, WING[0] + 0.66, 0.07), STEEL, METAL),
           part(
             drum(x + 9.6, x + 7.4, 0.26, 0.26, WING[0] + 0.2, y, 6),
             STEEL,
@@ -350,20 +358,45 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
   };
   const seat = SHOULDER[1] * tall((front + back) / 2);
   const lift = (form.canopy ?? 0.1) * S * 0.7;
-  const apertureX = front - (front - back) * 0.28;
+  const apertureX = front - (front - back) * 0.45;
   raised.push(
-    part(slab(canopyOutline(1.25), seat - 0.5, seat + 0.25, 0.12), DEEP),
+    part(slab(canopyOutline(1.12), seat - 0.5, seat + 0.33, 0.13), DEEP),
     part(
-      slab(canopyOutline(1), seat - 0.2, seat + lift, 0.25),
-      geometry.blades ? BASE : SPINE
+      box(length * 0.7, 0.25, half * 0.72, [apertureX, seat + 0.36, 0]),
+      BASE
     ),
-    part(box(0.42, 0.1, half * 0.97, [apertureX, seat + lift - 0.01, 0]), DEEP)
+    part(
+      box(0.24, 0.16, half * 0.49, [apertureX + length * 0.35, seat + 0.38, 0]),
+      ACCENT
+    )
   );
-  const canopy = box(0.16, 0.08, half * 0.74, [
-    apertureX,
-    seat + lift + 0.04,
-    0,
-  ]);
+
+  // An arched optical cover gives the glass a moving reflection across its
+  // surface. Its rim meets the opaque sensor mount at the original seat.
+  const sections = canopyOutline(1).slice(0, 4);
+  const rise = [0.22, 1, 0.83, 0.3];
+  const arc = [-1, -0.65, 0, 0.65, 1];
+  const positions = sections.flatMap(([x, width], row) =>
+    arc.flatMap((s) => [
+      x,
+      seat + 0.29 + (lift - 0.29) * rise[row] * (1 - s * s),
+      width * s,
+    ])
+  );
+  const indices = [];
+  for (let row = 0; row < sections.length - 1; row += 1) {
+    for (let column = 0; column < arc.length - 1; column += 1) {
+      const a = row * arc.length + column;
+      const b = a + arc.length;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const canopy = new THREE.BufferGeometry();
+  canopy.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(positions, 3)
+  );
+  canopy.setIndex(indices);
   canopy.computeVertexNormals();
   canopy.computeBoundingSphere();
 

@@ -195,11 +195,34 @@ export function shiny(material) {
   return material;
 }
 
-/**
- * The canopy's dark glass: a tight highlight over a faint cyan glow.
- * proposta 12/11.
- */
-export const CANOPY_GLASS = Object.freeze({ ...SHINE.glass, glow: 0.14 });
+/** Blue smoked optics with a broad reflection that stays legible in space. */
+export function buildSensorGlass(THREE) {
+  const material = new THREE.MeshPhysicalMaterial({
+    color: colorOf(THREE, '#2a6280'),
+    emissive: colorOf(THREE, '#12334c'),
+    roughness: 0.14,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.1,
+    envMapIntensity: 1.8,
+    transparent: true,
+    opacity: 0.84,
+    depthWrite: false,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>
+      vec3 reflectedView = reflect(-normalize(vViewPosition), normal);
+      float sky = smoothstep(-0.55, 0.6, reflectedView.y);
+      float panel = 1.0 - smoothstep(0.06, 0.26,
+        abs(reflectedView.x + 0.37 * reflectedView.y + 0.16));
+      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.42));
+      reflectedLight.indirectSpecular += sky *
+        (vec3(0.025, 0.085, 0.14) + panel * vec3(0.18, 0.24, 0.3));`
+    );
+  };
+  return material;
+}
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (u, v) => [
