@@ -25,6 +25,7 @@ import {
 } from '../../data/constants/gameplay.js';
 import { pilotShown, wrapAngle } from './flight.js';
 import { classicAsks, getModernMove, padForce } from './movementInput.js';
+import { MODERN_TRIALS, turboScale } from './modernTrial.js';
 
 // B: the retro and a flank's pair each push this share of the main engine;
 // the Braking System multiplies the retro, the RCS System the side jets.
@@ -183,19 +184,31 @@ export function flyByJets(flight, deltaTime, input) {
     retro: main * JET_RETRO_SHARE * braking,
     flank: main * JET_FLANK_SHARE * flight.agility,
   };
-  const top = flight.maxSpeed * (modern ? MODERN_TOP_SHARE : GLIDE_SPEED_SCALE);
+  // A modern proposal (modernTrial.js) cruises at × the start's top speed.
+  const trial = modern ? MODERN_TRIALS[flight.modernTrial] : null;
+  const top =
+    flight.maxSpeed *
+    (trial
+      ? GLIDE_SPEED_SCALE *
+        trial.top *
+        turboScale(flight, trial, move, deltaTime)
+      : modern
+        ? MODERN_TOP_SHARE
+        : GLIDE_SPEED_SCALE);
 
   const v = ship.velocity;
   const speed = Math.hypot(v.vx, v.vy);
   const isMainManual = modern ? Boolean(move) : asks.up > 0;
   const isAuxManual = !modern && asks.down > 0;
   const noLinearInput = modern ? !move : !asks.up && !asks.down;
-  // The auto-brake: modern always; classic with the Braking System (glide's
-  // start has none: stopping is the pilot's).
+  // The auto-brake: modern always (not a proposal that keeps its momentum);
+  // else with the Braking System (glide's start has none: stopping is the
+  // pilot's).
   const autoBrake =
     noLinearInput &&
     speed > 0 &&
-    (modern || !flight.glide || flight.brakingDamping > 0);
+    ((trial ? trial.coastBrake : modern || !flight.glide) ||
+      flight.brakingDamping > 0);
 
   // The push wanted, world px/s².
   let wantX = 0;
@@ -203,7 +216,7 @@ export function flyByJets(flight, deltaTime, input) {
   let reach = 1;
   if (easing) {
     // A dash and its ease-off fly as today; the jets show the maneuver.
-  } else if (modern && move) {
+  } else if (modern && move && (!trial || trial.coastBrake)) {
     // The flight computer flies the ship onto the stick's velocity.
     wantX = (move.x * top * moveForce - v.vx) / deltaTime;
     wantY = (move.y * top * moveForce - v.vy) / deltaTime;
@@ -214,10 +227,15 @@ export function flyByJets(flight, deltaTime, input) {
       BRAKE_FLOOR,
       Math.min(1, speed / (top * BRAKE_FULL_SHARE))
     );
-  } else if (!modern) {
-    const push = asks.up * forces.main - asks.down * forces.retro;
-    wantX = fwd.x * push;
-    wantY = fwd.y * push;
+  } else if (!modern || move) {
+    // The pilot's push: classic along the nose; a modern proposal that keeps
+    // its momentum along the keys.
+    const push = modern
+      ? forces.main * moveForce
+      : asks.up * forces.main - asks.down * forces.retro;
+    const way = modern ? move : fwd;
+    wantX = way.x * push;
+    wantY = way.y * push;
     // The flight computer never pushes past the top speed; the rest of the
     // push still bends the path.
     if (speed > 0) {
@@ -275,7 +293,7 @@ export function flyByJets(flight, deltaTime, input) {
     // The nose turns as today (the classic pair would take over a second
     // to swing it 90°); the pair shows the push that takes.
     const w = ship.angularVelocity;
-    flight.updateFacing(deltaTime, move);
+    flight.updateFacing(deltaTime, move, trial ? flight.agility : 1);
     spin = (ship.angularVelocity - w) / deltaTime;
     spinShown = MODERN_TURN_SHOWN;
   } else {

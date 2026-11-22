@@ -102,7 +102,8 @@ export function decodeInputFrame(mask, analog = []) {
  * hull control scheme flown, 'modern' or 'classic'; `hangar` is the run's
  * start-of-run Hangar setup (JSON-safe HangarService modifiers). `jets` is
  * the one-algorithm variant flown (`?voo=`, 'a' or 'b'), only when one was:
- * a recording without it flies today's flight.
+ * a recording without it flies today's flight. `modernTrial` likewise: the
+ * modern-flight proposal flown (`?moderno=`, 1 to 3).
  */
 export function createRecorder({
   seed,
@@ -115,6 +116,7 @@ export function createRecorder({
   hangar = null,
   stick = 'medium',
   jets = null,
+  modernTrial = null,
   version = REPLAY_VERSION,
 }) {
   const inputs = [];
@@ -170,6 +172,7 @@ export function createRecorder({
         hangar,
         stick: sticks.map((entry) => [...entry]),
         ...(jets && { jets }),
+        ...(modernTrial && { modernTrial }),
         steps,
         inputs: inputs.map((entry) => [...entry]),
         upgrades: upgrades.map(([step, entry]) => [
@@ -256,6 +259,7 @@ export function deserialize(text) {
     // Before the setting (21/11) every pad run flew Medium.
     stick: Array.isArray(data.stick) ? data.stick : [[0, 'medium']],
     ...(data.jets && { jets: data.jets }),
+    ...(data.modernTrial && { modernTrial: data.modernTrial }),
     steps: data.steps,
     inputs: data.inputs,
     upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],

@@ -118,6 +118,9 @@ describe('replay recording', () => {
     expect(today).not.toHaveProperty('jets');
     expect(deserialize(serialize(today))).not.toHaveProperty('jets');
     expect(deserialize(serialize(flown)).jets).toBe('b');
+    const trial = createRecorder({ seed: 1, modernTrial: 3 }).toJSON();
+    expect(today).not.toHaveProperty('modernTrial');
+    expect(deserialize(serialize(trial)).modernTrial).toBe(3);
   });
 
   it('records dash presses as bit 7', () => {

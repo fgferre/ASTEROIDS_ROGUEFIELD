@@ -8,7 +8,12 @@ import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 const DT = 1 / 60;
 const IDLE = { up: false, down: false, left: false, right: false };
 
-function makePlayer(jets, scheme = 'classic', glide = true) {
+function makePlayer(
+  jets,
+  scheme = 'classic',
+  glide = true,
+  modernTrial = null
+) {
   const eventBus = createEventBusMock();
   const player = new PlayerSystem({
     eventBus,
@@ -18,6 +23,7 @@ function makePlayer(jets, scheme = 'classic', glide = true) {
   });
   player.setFlightScheme(scheme, glide);
   player.flight.jets = jets;
+  player.flight.modernTrial = modernTrial;
   player.position = { x: 400, y: 300 };
   player.velocity = { vx: 0, vy: 0 };
   player.angle = 0;
@@ -101,5 +107,47 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     expect(retro.length).toBeGreaterThan(20);
     expect(retro.every((e) => e.isAutomatic)).toBe(true);
     expect(lit(brake, 'main')).toEqual([]);
+  });
+
+  // The start's top speed with no cards: 220 × 0.6.
+  const START_TOP = 132;
+  const speedOf = (player) =>
+    Math.hypot(player.velocity.vx, player.velocity.vy);
+
+  it("modern proposals 1 and 3 cruise above the start's top speed and stop on letting go, today's jets or B's", () => {
+    [null, 'b'].forEach((jets) => {
+      [1, 3].forEach((trial) => {
+        const { player, fly } = makePlayer(jets, 'modern', false, trial);
+        fly({ right: true }, 120);
+        expect(speedOf(player), `${jets} ${trial}`).toBeGreaterThanOrEqual(
+          START_TOP * 1.2 - 0.01
+        );
+        fly({}, 240); // B brakes on the retro's own force: longer
+        expect(speedOf(player), `${jets} ${trial}`).toBeLessThan(2);
+      });
+    });
+  });
+
+  it('modern proposal 2 keeps its momentum on letting go, as the start does', () => {
+    // Today's jets: the start's light drag (×0.70 a second); B: no drag.
+    [
+      [null, 0.65],
+      ['b', 0.99],
+    ].forEach(([jets, kept]) => {
+      const { player, fly } = makePlayer(jets, 'modern', false, 2);
+      fly({ right: true }, 120);
+      fly({}, 60);
+      expect(speedOf(player), String(jets)).toBeGreaterThan(
+        START_TOP * 1.2 * kept
+      );
+    });
+  });
+
+  it('modern proposal 3 builds speed on a straight run and drops it on a turn', () => {
+    const { player, fly } = makePlayer(null, 'modern', false, 3);
+    fly({ right: true }, 150);
+    expect(speedOf(player)).toBeGreaterThan(START_TOP * 1.2 * 1.35);
+    fly({ up: true }, 24); // the turbo fades over 0.4 s
+    expect(speedOf(player)).toBeLessThan(START_TOP * 1.2 * 1.05);
   });
 });

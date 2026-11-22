@@ -69,9 +69,10 @@ export function createReplayController({
   // the recorded ones.
   let viewerControls = null;
   let viewerStick = null;
-  // The viewer's own `?voo=` variant while a replay flies the recorded one
-  // (undefined: none held).
+  // The viewer's own `?voo=` variant and `?moderno=` proposal while a replay
+  // flies the recorded ones (undefined: none held).
   let viewerJets;
+  let viewerTrial;
   const difficulty = session.resolveServiceInstance('difficulty');
   const playerService = session.resolveServiceInstance('player');
   const hangar = session.resolveServiceInstance('hangar');
@@ -103,6 +104,10 @@ export function createReplayController({
       viewerStick ??= playerService.stickSensitivity;
       if (viewerJets === undefined) viewerJets = playerService.flight.jets;
       playerService.flight.jets = armedRecording.jets ?? null;
+      if (viewerTrial === undefined) {
+        viewerTrial = playerService.flight.modernTrial;
+      }
+      playerService.flight.modernTrial = armedRecording.modernTrial ?? null;
       if (['modern', 'classic'].includes(armedRecording.controls)) {
         viewerControls ??= playerService.controlScheme;
         playerService.controlScheme = armedRecording.controls;
@@ -126,6 +131,10 @@ export function createReplayController({
       playerService.flight.jets = viewerJets;
       viewerJets = undefined;
     }
+    if (viewerTrial !== undefined) {
+      playerService.flight.modernTrial = viewerTrial;
+      viewerTrial = undefined;
+    }
     // A run that carries a build from the sector before cannot be played
     // back from its seed alone: it is not recorded.
     if (carried) {
@@ -148,6 +157,7 @@ export function createReplayController({
       controls: playerService.controlScheme,
       stick: playerService.stickSensitivity,
       jets: playerService.flight.jets,
+      modernTrial: playerService.flight.modernTrial,
       hangar: hangar.getRunSetup(),
     });
     session.replayRecorder = recorder;

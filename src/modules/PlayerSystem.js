@@ -8,6 +8,7 @@ import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
 import { newFlightFromUrl } from './player/newFlight.js';
 import { jetsFromUrl } from './player/jetFlight.js';
+import { modernTrialFromUrl } from './player/modernTrial.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
@@ -186,6 +187,7 @@ class PlayerSystem extends BaseSystem {
       maneuvers: this.maneuvers,
       glide: glideFromUrl(),
       jets: jetsFromUrl(),
+      modernTrial: modernTrialFromUrl(),
     });
     if (this.newFlight) this.beginNewFlight();
     exposeFields(this, this.flight, [
@@ -981,6 +983,8 @@ class PlayerSystem extends BaseSystem {
     this.steadyGuard = false;
     this.controlHoldTimer = 0;
     this.flight.driftFactor = 0;
+    this.flight.turbo = 0;
+    this.flight.turboDir = null;
 
     // Reset visual upgrade levels
     this.thrusters.thrusterVisualLevel = 0;

@@ -29,6 +29,7 @@ import {
 } from '../../data/constants/gameplay.js';
 import { classicAsks, getModernMove, padForce } from './movementInput.js';
 import { flyByJets, showNetJets } from './jetFlight.js';
+import { MODERN_TRIALS, turboScale } from './modernTrial.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -84,12 +85,22 @@ export class PlayerFlight {
    * `maneuvers`: the player's PlayerManeuvers; a dash in progress or easing off lifts the speed cap.
    * `glide`: glide flight (?flight=glide) in either scheme: no auto-brake, light drag, a lower top speed.
    * `jets`: Felipe's one-algorithm variant flown beside today's (`?voo=`, jetFlight.js): 'a', 'b' or null.
+   * `modernTrial`: a proposal for the modern flight (`?moderno=`, modernTrial.js): 1, 2, 3 or null.
    */
-  constructor({ ship, maneuvers, glide = false, jets = null }) {
+  constructor({
+    ship,
+    maneuvers,
+    glide = false,
+    jets = null,
+    modernTrial = null,
+  }) {
     this.ship = ship;
     this.maneuvers = maneuvers;
     this.glide = glide;
     this.jets = jets;
+    this.modernTrial = modernTrial;
+    this.turbo = 0;
+    this.turboDir = null;
     this.driftFactor = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
@@ -210,8 +221,11 @@ export class PlayerFlight {
     // them, at the end).
     let brakeAlong = 0;
     let brakeAcross = 0;
-    // Auto-damping thrusters (activate without manual input); glide has none.
-    if (noLinearInput && speed > 2 && !glide) {
+    // The modern proposal flown, if any (modernTrial.js).
+    const trial = modern ? MODERN_TRIALS[this.modernTrial] : null;
+    // Auto-damping thrusters (activate without manual input); glide has none,
+    // nor a modern proposal that keeps its momentum.
+    if (noLinearInput && speed > 2 && !glide && (!trial || trial.coastBrake)) {
       const proj = velocityAlongNose;
       const kBase = Math.max(
         0.35,
@@ -264,10 +278,14 @@ export class PlayerFlight {
     // upgrade's "Paradas mais rápidas" intent without making active flight
     // sluggish. The auto-damping thrusters (above) still fire during coast;
     // brakingDamping is the additive component layered on top of base.
+    // A modern proposal flies under the glide's light drag, today's when its
+    // letting go stops the ship.
+    const baseDamping =
+      glide || (trial && !(trial.coastBrake && noManualThrust))
+        ? GLIDE_LINEAR_DAMPING
+        : this.baseLinearDamping;
     const effectiveDamping =
-      ((glide ? GLIDE_LINEAR_DAMPING : this.baseLinearDamping) +
-        (noManualThrust ? this.brakingDamping : 0)) *
-      agility;
+      (baseDamping + (noManualThrust ? this.brakingDamping : 0)) * agility;
     // A dash carries its burst undamped, under a raised speed cap.
     if (!dashing) {
       const linearDamp = Math.exp(-effectiveDamping * deltaTime);
@@ -281,10 +299,15 @@ export class PlayerFlight {
       : this.maneuvers.dashDecayTimer / DASH_DECAY_SECONDS;
     const dashCap =
       DASH_SPEED_CAP_MULTIPLIER * this.maneuvers.dashDistanceMultiplier;
-    const speedCap =
-      this.maxSpeed *
-      (glide ? GLIDE_SPEED_SCALE : 1) *
-      (1 + (dashCap - 1) * dashCapFraction);
+    // A modern proposal cruises at × the start's top speed (its turbo on
+    // top); a dash peaks as today's.
+    const flightTop = glide ? GLIDE_SPEED_SCALE : 1;
+    const top =
+      trial &&
+      GLIDE_SPEED_SCALE * trial.top * turboScale(this, trial, move, deltaTime);
+    const speedCap = trial
+      ? this.maxSpeed * (top + (dashCap - top) * dashCapFraction)
+      : this.maxSpeed * flightTop * (1 + (dashCap - 1) * dashCapFraction);
     const currentSpeed = Math.hypot(
       this.ship.velocity.vx,
       this.ship.velocity.vy
@@ -297,7 +320,7 @@ export class PlayerFlight {
 
     // === MOVIMENTO ANGULAR ===
     if (modern) {
-      this.updateFacing(deltaTime, move);
+      this.updateFacing(deltaTime, move, trial ? this.agility : 1);
     } else {
       // Restaurando a lógica de aceleração e amortecimento angular do app.js original
       // In glide the RCS System turns the hull quicker too: its pull and its
@@ -366,7 +389,8 @@ export class PlayerFlight {
 
   // Modern scheme: nose onto the WASD direction, else onto the motion, else
   // hold. Exponential approach under a rate cap, so it never overshoots.
-  updateFacing(deltaTime, move) {
+  // `quick`: × the rate and the approach (a modern proposal's RCS System).
+  updateFacing(deltaTime, move, quick = 1) {
     let heading = null;
     let rate = 0;
     if (move) {
@@ -383,13 +407,13 @@ export class PlayerFlight {
       this.ship.angularVelocity = 0;
       return;
     }
-    const maxStep = rate * deltaTime;
+    const maxStep = rate * quick * deltaTime;
     const error = wrapAngle(heading - this.ship.angle);
     const step = Math.max(
       -maxStep,
       Math.min(
         maxStep,
-        error * (1 - Math.exp(-SHIP_FACING_RESPONSE * deltaTime))
+        error * (1 - Math.exp(-SHIP_FACING_RESPONSE * quick * deltaTime))
       )
     );
     this.ship.angle = wrapAngle(this.ship.angle + step);
