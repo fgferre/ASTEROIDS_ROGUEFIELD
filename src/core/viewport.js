@@ -73,6 +73,32 @@ export function applyCanvasResolution(
   return state;
 }
 
+/**
+ * Every size listener hangs on the window's resize event, but iOS can settle
+ * the page's size without one (an icon opened sideways right after "Add to
+ * Home Screen": the game stayed drawn for the old size, Felipe's iPhone,
+ * 21/11). There the game box takes its size first and the window's reported
+ * size follows up to a second later, so each size of the box becomes that
+ * event once the window reports the same size (or after ~2 s of frames).
+ */
+export function watchGameBox(box) {
+  new ResizeObserver(([entry]) => {
+    const width = Math.round(entry.contentRect.width);
+    const height = Math.round(entry.contentRect.height);
+    let frames = 120;
+    const settle = () => {
+      const caughtUp =
+        window.innerWidth === width && window.innerHeight === height;
+      if (caughtUp || --frames === 0) {
+        window.dispatchEvent(new Event('resize'));
+      } else {
+        window.requestAnimationFrame(settle);
+      }
+    };
+    settle();
+  }).observe(box);
+}
+
 /** Backing pixels per logical unit (uniform while the 4:3 box is preserved). */
 export function getRenderScale() {
   return state.scaleX;
