@@ -195,10 +195,10 @@ const HULL_SKY_STRIPS = [
 
 /**
  * A reflection sky for the player's hull only (rocks and machines keep the
- * scene's dim one): built once per renderer, and again after a lost
- * graphics context comes back. useHullEnvironment hands it to materials.
+ * scene's dim one), from the caller's PMREMGenerator `pmrem` (it disposes
+ * it). useHullEnvironment hands it to materials.
  */
-export function buildHullEnvironment(THREE, renderer) {
+export function buildHullEnvironment(THREE, pmrem) {
   const scene = new THREE.Scene();
   const sky = new THREE.SphereGeometry(100, 48, 24);
   const position = sky.getAttribute('position');
@@ -231,40 +231,12 @@ export function buildHullEnvironment(THREE, renderer) {
     strip.rotateZ(roll);
     scene.add(strip);
   });
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  // far past the sky (radius 100): at the default 100 it clipped away
-  const texture = pmrem.fromScene(scene, 0.02, 0.1, 400).texture;
-  pmrem.dispose();
+  const texture = pmrem.fromScene(scene, 0.02).texture;
   scene.traverse((node) => {
     node.geometry?.dispose();
     node.material?.dispose();
   });
   return texture;
-}
-
-/**
- * Whether a sky from buildHullEnvironment came out lit: built at some moments
- * (while the scene was set up, before a frame, in the warm-up) it came out
- * black, cause not found (22/11). Reads it back through a 4×4 target, once.
- */
-export function hullSkyIsLit(THREE, renderer, texture) {
-  const scene = new THREE.Scene();
-  const quad = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ map: texture })
-  );
-  scene.add(quad);
-  const target = new THREE.WebGLRenderTarget(4, 4);
-  const previous = renderer.getRenderTarget();
-  renderer.setRenderTarget(target);
-  renderer.render(scene, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
-  const pixels = new Uint8Array(4 * 4 * 4);
-  renderer.readRenderTargetPixels(target, 0, 0, 4, 4, pixels);
-  renderer.setRenderTarget(previous);
-  target.dispose();
-  quad.geometry.dispose();
-  quad.material.dispose();
-  return pixels.some((value, i) => i % 4 !== 3 && value > 0);
 }
 
 /** Gives `materials` (a hull's and its glass's) the hull's sky. */

@@ -726,8 +726,6 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
-      // the hull's reflection sky (~25 ms), after a frame, not mid-run
-      () => this.three.dressHull(),
       // The story's freighter (seconds): only for a player yet to see it.
       () => storyTold() || this.warmStory(),
     ];
@@ -805,9 +803,6 @@ class Renderer3D extends BaseSystem {
     this.applyPoses(alpha);
     try {
       this.drawFrame();
-      // the hull's sky, if the warm-up's came out black or the context was
-      // lost since (sceneSetup.js dressHull)
-      this.three.dressHull();
     } finally {
       this.restorePoses();
     }

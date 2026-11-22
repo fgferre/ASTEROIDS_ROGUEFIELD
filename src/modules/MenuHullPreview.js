@@ -29,7 +29,6 @@ import {
   buildSensorGlass,
   buildTurret,
   edgeLines,
-  hullSkyIsLit,
   hullTones,
   seatTurret,
   throatGeometry,
@@ -150,8 +149,6 @@ export class MenuHullPreview {
     this.radius = 1;
     this.depth = 0;
     this.time = 0;
-    // the reflection sky (useSky), once a frame is drawn
-    this.sky = null;
   }
 
   /**
@@ -172,33 +169,24 @@ export class MenuHullPreview {
   }
 
   /**
-   * The hull's own reflection sky (hullModel.js), as in the game: built once
-   * a frame is drawn with the menu's `renderer`, again while it comes out
-   * black (hullSkyIsLit), and again after a lost graphics context.
+   * The hull's own reflection sky (hullModel.js), as in the game, from the
+   * menu's `renderer` (its own generator), and again after a lost context.
    */
   useSky(renderer) {
-    if (this.sky) return;
     const { hull, canopy } = this.materials;
-    const sky = buildHullEnvironment(this.THREE, renderer);
-    if (!hullSkyIsLit(this.THREE, renderer, sky)) {
-      sky.dispose(); // black (hullSkyIsLit): again on the next frame
-      return;
-    }
-    this.sky = sky;
     // not the turret: its dome mirrored the softboxes vivid blue (22/11)
     const materials = [...hull, canopy];
-    useHullEnvironment(materials, sky);
-    // the menu draws without tone mapping: the sky's softboxes at full
-    // strength burned the turret's dome blue (22/11)
+    // the menu draws without tone mapping: the sky at the game's strength
+    // burned to white (22/11)
     materials.forEach((material) => (material.envMapIntensity *= MENU_SKY));
-    renderer.domElement.addEventListener(
-      'webglcontextrestored',
-      () => {
-        this.sky.dispose();
-        this.sky = null;
-      },
-      { once: true }
-    );
+    const dress = () => {
+      hull[0].envMap?.dispose();
+      const pmrem = new this.THREE.PMREMGenerator(renderer);
+      useHullEnvironment(materials, buildHullEnvironment(this.THREE, pmrem));
+      pmrem.dispose();
+    };
+    dress();
+    renderer.domElement.addEventListener('webglcontextrestored', dress);
   }
 
   build(definition) {

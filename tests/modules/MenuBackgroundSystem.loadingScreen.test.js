@@ -11,7 +11,7 @@ function menuReadyToAnimate() {
     stats: null,
     updateAdaptiveQuality: vi.fn(),
     opening: { update: vi.fn(), render: vi.fn() },
-    hullPreview: { update: vi.fn(), useSky: vi.fn() },
+    hullPreview: { update: vi.fn() },
     camera: { position: { x: 0, y: 0, z: 0 }, lookAt: vi.fn() },
   });
   return system;
