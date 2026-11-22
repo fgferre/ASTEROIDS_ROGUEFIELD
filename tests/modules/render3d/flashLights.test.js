@@ -35,7 +35,7 @@ describe('FlashLights', () => {
 
 describe('VeinLights', () => {
   const rock = (glow, radius, hex) => ({
-    look: { vein: hex },
+    look: { vein: hex, veinGlow: glow },
     hidden: false,
     radius,
     object: { visible: true, position: new THREE.Vector3(radius, 0, 0) },
