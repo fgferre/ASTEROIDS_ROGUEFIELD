@@ -204,10 +204,11 @@ class CombatSystem extends BaseSystem {
       if (this.cards.cardEffects.dashFire) this.cards.startDashFire();
     });
 
-    // The trails drop from the pilot's own main thrust, never the coast brake.
+    // The trails drop from the pilot's own main thrust, never the coast brake
+    // (`pilot`: that burn, under `?voo=` where the flame shows the real push).
     this.registerEventListener('thruster-effect', (data = {}) => {
-      if (data.type !== 'main' || !(data.intensity > 0) || data.isAutomatic)
-        return;
+      const burning = data.pilot ?? (data.intensity > 0 && !data.isAutomatic);
+      if (data.type !== 'main' || !burning) return;
       const cards = this.cards;
       const { cinderTrail, ionTrail } = cards.cardEffects;
       if (cinderTrail) cards.dropTrailPoint(cards.cinders, cinderTrail, data);

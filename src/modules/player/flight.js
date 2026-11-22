@@ -28,6 +28,7 @@ import {
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../../data/constants/gameplay.js';
 import { classicAsks, getModernMove, padForce } from './movementInput.js';
+import { flyByJets, showNetJets } from './jetFlight.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -50,16 +51,45 @@ export function wrapAngle(angle) {
   return angle;
 }
 
+/**
+ * What the thrusters show and sound for the pilot's own asks (thrusters.js),
+ * never the solver's corrections: classic, the asks; modern, the main flame
+ * once the nose is near the move, the retro first on a reversal, the turn
+ * jets following the nose's own swing. `asks`: classicAsks' up/down/left/right.
+ */
+export function pilotShown(flight, move, fwd, asks) {
+  if (flight.ship.controlScheme !== 'modern') {
+    return {
+      pilotMain: asks.up,
+      pilotAux: asks.down,
+      pilotTurn: asks.right - asks.left,
+    };
+  }
+  const cos = move ? move.x * fwd.x + move.y * fwd.y : 0;
+  return {
+    pilotMain: clamp01(cos * SHOWN_MAIN_GAIN),
+    pilotAux: clamp01(-cos) * SHOWN_RETRO_SHARE,
+    pilotTurn: move
+      ? Math.max(
+          -1,
+          Math.min(1, flight.ship.angularVelocity / SHIP_HEADING_TURN_RATE)
+        )
+      : 0,
+  };
+}
+
 export class PlayerFlight {
   /**
    * `ship`: the player's velocity, angle, angularVelocity and controlScheme, read and set live.
    * `maneuvers`: the player's PlayerManeuvers; a dash in progress or easing off lifts the speed cap.
    * `glide`: glide flight (?flight=glide) in either scheme: no auto-brake, light drag, a lower top speed.
+   * `jets`: Felipe's one-algorithm variant flown beside today's (`?voo=`, jetFlight.js): 'a', 'b' or null.
    */
-  constructor({ ship, maneuvers, glide = false }) {
+  constructor({ ship, maneuvers, glide = false, jets = null }) {
     this.ship = ship;
     this.maneuvers = maneuvers;
     this.glide = glide;
+    this.jets = jets;
     this.driftFactor = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
@@ -85,6 +115,15 @@ export class PlayerFlight {
   }
 
   updateMovement(deltaTime, input) {
+    if (this.jets === 'b') return flyByJets(this, deltaTime, input);
+    const before =
+      this.jets === 'a'
+        ? {
+            vx: this.ship.velocity.vx,
+            vy: this.ship.velocity.vy,
+            w: this.ship.angularVelocity,
+          }
+        : null;
     // COPIAR EXATAMENTE da função updatePlayerMovement() original
     const modern = this.ship.controlScheme === 'modern';
     const glide = this.glide;
@@ -286,24 +325,6 @@ export class PlayerFlight {
       );
     }
 
-    // What the thrusters show and sound for this step (thrusters.js): what
-    // the pilot asked for, never the solver's corrections above.
-    let pilotMain = thrustIn;
-    let pilotAux = backIn;
-    let pilotTurn = rightIn - leftIn;
-    if (modern) {
-      // Main flame once the nose is near the move, retro first on a reversal;
-      // the turn jets follow the nose's own swing.
-      const cos = move ? move.x * fwd.x + move.y * fwd.y : 0;
-      pilotMain = clamp01(cos * SHOWN_MAIN_GAIN);
-      pilotAux = clamp01(-cos) * SHOWN_RETRO_SHARE;
-      pilotTurn = move
-        ? Math.max(
-            -1,
-            Math.min(1, this.ship.angularVelocity / SHIP_HEADING_TURN_RATE)
-          )
-        : 0;
-    }
     // Glide has no auto-brake but the Braking System's drag: it shows along
     // the nose, as strong as the speed is near the glide's top.
     if (noLinearInput && speed > 2 && glide && this.brakingDamping > 0) {
@@ -323,17 +344,23 @@ export class PlayerFlight {
     };
     return {
       fwd,
-      pilotMain,
-      pilotAux,
+      ...pilotShown(this, move, fwd, {
+        up: thrustIn,
+        down: backIn,
+        left: leftIn,
+        right: rightIn,
+      }),
       // Modern on a pad: the left stick's push (1 for keys, the d-pad and
       // touch); Classic's asks are already the push.
       pilotForce: modern ? moveForce : 1,
-      pilotTurn,
       brake,
       speed,
       dashing,
       isMainManual,
       isAuxManual,
+      ...(before && {
+        jets: showNetJets(this, before, deltaTime, fwd, right, input),
+      }),
     };
   }
 

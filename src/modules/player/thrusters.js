@@ -70,6 +70,8 @@ export class PlayerThrusters {
   // dash, coasting shows the auto-brake's own push on each jet it fires
   // (flight.js `brake`): the retro or the main engine along the nose, the
   // flank jets across, sparking like any jet (automatic: no engine puff).
+  // `jets` (`?voo=`, jetFlight.js): each jet's real push instead, the trail
+  // cards still dropping where today's main flame burns.
   emitThrusterEffects({
     fwd,
     pilotMain,
@@ -81,6 +83,7 @@ export class PlayerThrusters {
     dashing,
     isMainManual,
     isAuxManual,
+    jets,
   }) {
     if (isMainManual || isAuxManual || dashing) this.coastArmed = true;
     else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
@@ -91,6 +94,10 @@ export class PlayerThrusters {
     // cards drop on any burn of the main engine.
     const main = shown(coasting ? braked(brake.main) : pilotMain) * pilotForce;
     const aux = shown(coasting ? braked(brake.aux) : pilotAux) * pilotForce;
+    if (jets) {
+      this.emitJets(fwd, jets, !coasting && main > 0);
+      return;
+    }
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
@@ -106,10 +113,55 @@ export class PlayerThrusters {
     this.emitTurn('brakePort', port, 'left', 'noseLeft', true);
   }
 
+  // `?voo=`: every jet at its push this step (jetFlight.js); a crossed pair
+  // turns the hull, a flank's pair pushes it sideways. `trail`: today's
+  // pilot main burn, which the trail cards drop on (CombatSystem).
+  emitJets(fwd, jets, trail) {
+    this.emitJet(
+      'main',
+      shown(jets.main),
+      fwd,
+      'main',
+      1,
+      jets.mainAuto,
+      trail
+    );
+    this.emitJet('aux', shown(jets.aux), fwd, 'aux', -1, jets.auxAuto);
+    this.emitTurn(
+      'turnR',
+      shown(jets.turn),
+      'right',
+      'noseLeft',
+      jets.turnAuto
+    );
+    this.emitTurn(
+      'turnL',
+      shown(-jets.turn),
+      'left',
+      'noseRight',
+      jets.turnAuto
+    );
+    this.emitTurn(
+      'brakeStarboard',
+      shown(jets.toPort),
+      'right',
+      'noseRight',
+      jets.sideAuto
+    );
+    this.emitTurn(
+      'brakePort',
+      shown(jets.toStarboard),
+      'left',
+      'noseLeft',
+      jets.sideAuto
+    );
+  }
+
   // One jet's event while it burns, and a last one at 0 when it stops.
-  // `sign`: along the nose (main) or against it (retro).
-  emitJet(key, intensity, fwd, type, sign, isAutomatic) {
-    if (intensity > 0 || this.lastThrusterState[key] > 0) {
+  // `sign`: along the nose (main) or against it (retro). `pilot` (`?voo=`
+  // only): the trail cards' burn, sent even while the jet shows nothing.
+  emitJet(key, intensity, fwd, type, sign, isAutomatic, pilot) {
+    if (intensity > 0 || this.lastThrusterState[key] > 0 || pilot) {
       const port = this.getThrusterPort(type);
       this.getEventBus()?.emit?.('thruster-effect', {
         position: this.getLocalToWorld(port.x, port.y),
@@ -120,6 +172,7 @@ export class PlayerThrusters {
           type === 'main' ? this.thrusterVisualLevel : this.brakingVisualLevel,
         isAutomatic, // the coast brake sounds softer than the pilot's thrust
         accent: this.getAccent(),
+        ...(pilot !== undefined && { pilot }),
       });
       this.lastThrusterState[key] = intensity;
     }

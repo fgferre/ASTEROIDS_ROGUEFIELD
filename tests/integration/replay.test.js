@@ -103,11 +103,11 @@ describe('run replay', () => {
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
   // `hull` is flown unlocked; `bossRush` starts a Boss Rush; `controls` sets
-  // the player's control scheme.
+  // the player's control scheme; `jets` the `?voo=` flight flown.
   function recordRun(
     beforePick = () => {},
     difficulty = 'veteran',
-    { hull, bossRush, controls } = {}
+    { hull, bossRush, controls, jets } = {}
   ) {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
@@ -117,6 +117,7 @@ describe('run replay', () => {
       live.services.settings.setSetting('gameplay', 'selectedHull', hull);
     }
     if (controls) live.services.player.controlScheme = controls;
+    if (jets) live.services.player.flight.jets = jets;
     live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
     cheapLevels(progression);
@@ -425,6 +426,18 @@ describe('run replay', () => {
     // The viewer's next own run flies their scheme again.
     replay.session.startNewRun({ source: 'test' });
     expect(replay.services.player.controlScheme).toBe('modern');
+  });
+
+  it("replays a run flown on ?voo=b on that flight, whatever the viewer's, then gives the viewer theirs back", () => {
+    const { live, recording } = recordRun(() => {}, 'veteran', { jets: 'b' });
+    const recorded = live.snapshot();
+    expect(recording.jets).toBe('b');
+
+    const replay = replayRun(recording);
+    expect(replay.snapshot()).toEqual(recorded);
+
+    replay.session.startNewRun({ source: 'test' });
+    expect(replay.services.player.flight.jets).toBe(null);
   });
 
   it("leaves the viewer's Salvage and pad alone, then pays and rumbles for their own run", () => {

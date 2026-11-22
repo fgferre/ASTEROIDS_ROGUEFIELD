@@ -7,6 +7,7 @@ import { computeHullMetrics, getHullThrusterPort } from './player/hullShape.js';
 import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
 import { newFlightFromUrl } from './player/newFlight.js';
+import { jetsFromUrl } from './player/jetFlight.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
@@ -184,6 +185,7 @@ class PlayerSystem extends BaseSystem {
       ship,
       maneuvers: this.maneuvers,
       glide: glideFromUrl(),
+      jets: jetsFromUrl(),
     });
     if (this.newFlight) this.beginNewFlight();
     exposeFields(this, this.flight, [

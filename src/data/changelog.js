@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "Two trial flights only the address turns on (?voo=a and ?voo=b), where the ship moves by its own thrusters, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
+  ],
 };
 
 export const RELEASES = [
