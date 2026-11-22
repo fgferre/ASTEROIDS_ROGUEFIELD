@@ -231,9 +231,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 - **(40)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
   inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
   radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
-  está no cartão `cartas-por-arma-1`. Buracos: a Harmonic não tem versão própria em família nenhuma; a Scatter e a
-  Seeker usam a da Lance em várias; a Overcharge Coil não faz nada na Harmonic e enfraquece a Seeker. Fecha quando as
-  cartas que faltam estiverem no jogo e ele aprovar jogando.
+  está no cartão `cartas-por-arma-1`. Fecha quando as cartas que faltam estiverem no jogo e ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 

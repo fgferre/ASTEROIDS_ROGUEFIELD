@@ -34,6 +34,15 @@ const SECONDS = Number(process.env.CARD_BENCH_SECONDS || 10);
 const OUT = process.env.CARD_BENCH_OUT || '';
 const ONLY = process.env.CARD_BENCH_ONLY || '';
 const CARDS = (process.env.CARD_BENCH_CARDS || '').split(',').filter(Boolean);
+const FIELDS = (process.env.CARD_BENCH_FIELDS || 'tank,crowd,pack').split(',');
+// World seeds, one run each: '1' or a range '1-3' (moving targets differ by seed).
+const [seedFrom, seedTo = seedFrom] = (process.env.CARD_BENCH_SEEDS || '1')
+  .split('-')
+  .map(Number);
+const SEEDS = Array.from(
+  { length: seedTo - seedFrom + 1 },
+  (_, i) => seedFrom + i
+);
 const SHIP = { x: 160, y: 300 };
 const realTimeout = globalThis.setTimeout;
 const breathe = () => new Promise((resolve) => realTimeout(resolve, 0));
@@ -63,6 +72,17 @@ for (let row = -2; row <= 2; row += 1) {
   for (let col = 0; col < 4; col += 1)
     PACK.push([330 + col * 34, 300 + row * 34]);
 }
+// Machines that fly and shoot (the ship cannot die): a target that moves.
+const DRONES = [
+  [420, 160],
+  [420, 440],
+  [560, 300],
+  [300, 120],
+  [300, 480],
+  [650, 200],
+  [650, 400],
+  [240, 300],
+];
 const CROWD = [];
 for (let row = 0; row < 6; row += 1) {
   for (let col = 0; col < 7; col += 1) {
@@ -118,10 +138,19 @@ function count(map, key, by = 1) {
   map[key] = (map[key] || 0) + by;
 }
 
-function run({ weapon, cards = [], family = null, stage = 0, field, moving }) {
+function run({
+  weapon,
+  cards = [],
+  family = null,
+  stage = 0,
+  field,
+  moving,
+  seed = 1,
+}) {
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression, combat } = services;
+  session.resolveServiceInstance('difficulty').runSeed = seed;
   session.startNewRun({ source: 'test', sector: SECTORS[0].id });
   progression.experienceToNext = NO_LEVEL_UP_XP;
   enemies.releaseAllAsteroidsToPool();
@@ -144,8 +173,14 @@ function run({ weapon, cards = [], family = null, stage = 0, field, moving }) {
   m.evolutions = [...combat.weapons.evolutions];
   m.synergies = [...progression.activeSynergies];
 
-  const layout = { crowd: CROWD, pack: PACK }[field] ?? TANK;
+  const layout = { crowd: CROWD, pack: PACK, drones: DRONES }[field] ?? TANK;
   const rocks = layout.map(([x, y]) => {
+    if (field === 'drones') {
+      const drone = spawnViaFactory(enemies, 'drone', { x, y });
+      drone.maxHealth = 4e5;
+      drone.health = 1e5;
+      return { rock: drone, x, y };
+    }
     const rock = spawnViaFactory(enemies, 'asteroid', {
       size: field === 'crowd' ? 'small' : 'medium',
       variant: 'common',
@@ -246,6 +281,9 @@ const chosenWeapons = weapons
 const benchCards = UPGRADE_LIBRARY.filter(
   (card) => !card.weaponId && (!CARDS.length || CARDS.includes(card.id))
 ).map((card) => card.id);
+// 'a+b+c' in CARD_BENCH_CARDS: one case with those cards together (a family
+// reached by real cards).
+const combos = CARDS.filter((id) => id.includes('+'));
 const families = ['thermal', 'kinetic', 'arc', 'field', 'salvage'].filter(
   (f) => !CARDS.length || CARDS.includes(`family:${f}`)
 );
@@ -279,13 +317,15 @@ describe('card bench', () => {
 
   const cases = [];
   for (const weapon of chosenWeapons) {
-    for (const field of ['tank', 'crowd', 'pack']) {
-      for (const id of benchCards) {
-        cases.push({ weapon, field, card: id });
-      }
-      for (const family of families) {
-        for (const stage of [3, 5])
-          cases.push({ weapon, field, family, stage });
+    for (const field of FIELDS) {
+      for (const seed of SEEDS) {
+        for (const id of [...benchCards, ...combos]) {
+          cases.push({ weapon, field, seed, card: id });
+        }
+        for (const family of families) {
+          for (const stage of [3, 5])
+            cases.push({ weapon, field, seed, family, stage });
+        }
       }
     }
     if (benchCards.includes('momentum_rounds')) {
@@ -299,14 +339,22 @@ describe('card bench', () => {
   }
   it.each(cases.map((c) => [JSON.stringify(c), c]))('%s', async (_, c) => {
     await breathe();
-    const base = c.card ? prerequisitesOf(c.card) : [];
-    const common = { weapon: c.weapon, field: c.field, moving: c.moving };
+    const own = c.card ? c.card.split('+') : [];
+    const base = [...new Set(own.flatMap((id) => prerequisitesOf(id)))].filter(
+      (id) => !own.includes(id)
+    );
+    const common = {
+      weapon: c.weapon,
+      field: c.field,
+      moving: c.moving,
+      seed: c.seed,
+    };
     const key = JSON.stringify({ ...common, base });
     if (!baselines.has(key))
       baselines.set(key, run({ ...common, cards: base }));
     const without = baselines.get(key);
     const withIt = c.card
-      ? run({ ...common, cards: [...base, c.card] })
+      ? run({ ...common, cards: [...base, ...own] })
       : run({ ...common, cards: base, family: c.family, stage: c.stage });
     results.push({ ...c, prerequisites: base, without, with: withIt });
   });
