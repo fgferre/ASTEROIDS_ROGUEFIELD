@@ -241,8 +241,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   tem que repensar o modo com o computador de manobra [...] tinha que estar ter uma sensação de que a nave está mais
   poderosa, mais rápida, mais manobrável."_ Análise e três propostas de moderno (`?moderno=1|2|3`) no cartão `voo-4`.
   Ao voo-4 (22/11): _"Eu gostei do Turbo."_, a chama com _"um estouro"_ e depois _"uma chama constante"_, e o começo
-  sem atrito: _"o modo inicial, ele é o modo simulação"_. O voo que fica (`?voo=c`) no cartão `voo-5`. Fecha quando
-  ele aprovar voando.
+  sem atrito: _"o modo inicial, ele é o modo simulação"_. O voo que fica (`?voo=c`) no cartão `voo-5`. Depois (22/11): _"Quando a gente faz o giro da
+  nave, ela também deveria ter momentum, né? E quando a gente solta, imediatamente ela para o giro."_ e _"o que faz
+  parar o giro de forma automática não é o RCS, é as cartas [...] de freio"_: giro com momento no voo que fica.
+  Fecha quando ele aprovar voando.
 
 ## Som (palavras dele, 19/11)
 
