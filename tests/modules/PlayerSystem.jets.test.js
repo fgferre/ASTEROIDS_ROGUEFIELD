@@ -175,4 +175,41 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     fly({}, 45);
     expect(speedOf(player)).toBeLessThan(2);
   });
+
+  it('C: a released turn keeps spinning until the pilot turns back, or the Braking System stops it', () => {
+    const { player, fly } = makePlayer('c');
+    fly({ right: true }, 60);
+    const spin = player.angularVelocity;
+    expect(spin).toBeGreaterThan(1);
+    fly({}, 60);
+    expect(player.angularVelocity).toBeCloseTo(spin, 9);
+    fly({ left: true }, 30);
+    expect(player.angularVelocity).toBeLessThan(spin);
+
+    const braked = makePlayer('c');
+    braked.player.flight.brakingDamping =
+      braked.player.flight.baseLinearDamping;
+    braked.fly({ right: true }, 60);
+    const stop = braked.fly({}, 30);
+    expect(braked.player.angularVelocity).toBe(0);
+    const pair = stop.filter((e) => e.type === 'side' && e.intensity > 0);
+    expect(pair.length).toBeGreaterThan(0);
+    expect(pair.every((e) => e.isAutomatic)).toBe(true);
+  });
+
+  it('C modern: the nose swings onto the keys with weight, a touch past and back', () => {
+    const { player, fly } = makePlayer('c', 'modern', false);
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
+    const angles = [];
+    for (let i = 0; i < 60; i += 1) {
+      fly({ up: true }, 1);
+      angles.push(player.angle);
+    }
+    const goal = -Math.PI / 2;
+    const past = Math.min(...angles) - goal;
+    expect(past).toBeLessThan(0); // swung past the heading
+    expect(past).toBeGreaterThan(-0.2);
+    expect(angles.findIndex((a) => a <= goal + 0.05)).toBeLessThan(24);
+    expect(Math.abs(angles[angles.length - 1] - goal)).toBeLessThan(0.02);
+  });
 });
