@@ -39,6 +39,10 @@ const KIND_CHAR = [0.8, 0.45]; // how dark the burn
 const CHAR_ALPHA = 1;
 // at most this many new marks a frame: each one casts a ray at its target
 const HITS_PER_FRAME = 6;
+// proposta 21/11 (38): a shot's mark is first white-hot in the shot's own
+// colour (TINT_MIX of the way from white-hot), then cools as lava does
+const WHITE_HOT = [2.9, 2.35, 1.5];
+const TINT_MIX = 0.75;
 
 import { HALF_H, HALF_W } from './batches.js';
 
@@ -47,7 +51,9 @@ attribute float aFade;
 attribute float aHeat;
 attribute float aSeed;
 attribute float aKind;
+attribute vec3 aTint;
 varying vec2 vUv;
+varying vec3 vTint;
 varying float vFade;
 varying float vHeat;
 varying float vSeed;
@@ -58,6 +64,7 @@ void main() {
   vHeat = aHeat;
   vSeed = aSeed;
   vKind = aKind;
+  vTint = aTint;
   gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
 }`;
 
@@ -70,6 +77,7 @@ varying float vFade;
 varying float vHeat;
 varying float vSeed;
 varying float vKind;
+varying vec3 vTint;
 float decalHash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7)) + vSeed * 43.7) * 43758.5453);
 }
@@ -93,7 +101,7 @@ void main() {
   float a = shape * uChar * vFade * mix(${KIND_CHAR[0].toFixed(2)}, ${KIND_CHAR[1].toFixed(2)}, metal);
   float h = vHeat;
   vec3 heat = mix(vec3(0.5, 0.035, 0.0), vec3(2.3, 0.72, 0.15), smoothstep(0.0, 0.55, h));
-  heat = mix(heat, vec3(2.9, 2.35, 1.5), smoothstep(0.72, 1.0, h));
+  heat = mix(heat, vTint, smoothstep(0.72, 1.0, h));
   float core = 1.0 - smoothstep(0.0, mix(0.62, 0.7, metal), r + (n - 0.5) * 0.3);
   // molten veins through the patch: they stay lit after the crust darkens
   float veins = 1.0 - smoothstep(0.0, 0.16, abs(decalNoise(vUv * 4.5 + vSeed * 3.0) - 0.5));
@@ -114,6 +122,7 @@ export class ScorchDecals {
         age: 0,
         seed: 0,
         kind: 0,
+        tint: [...WHITE_HOT],
         local: new THREE.Matrix4(),
       });
     }
@@ -140,13 +149,18 @@ export class ScorchDecals {
       new Float32Array(DECAL_CAP),
       1
     );
-    [this.fade, this.heat, this.seed, this.kind].forEach((attribute) =>
-      attribute.setUsage(THREE.DynamicDrawUsage)
+    this.tint = new THREE.InstancedBufferAttribute(
+      new Float32Array(DECAL_CAP * 3),
+      3
+    );
+    [this.fade, this.heat, this.seed, this.kind, this.tint].forEach(
+      (attribute) => attribute.setUsage(THREE.DynamicDrawUsage)
     );
     geometry.setAttribute('aFade', this.fade);
     geometry.setAttribute('aHeat', this.heat);
     geometry.setAttribute('aSeed', this.seed);
     geometry.setAttribute('aKind', this.kind);
+    geometry.setAttribute('aTint', this.tint);
     this.mesh = new THREE.InstancedMesh(
       geometry,
       new THREE.ShaderMaterial({
@@ -203,9 +217,9 @@ export class ScorchDecals {
    * `nx, ny` the logical direction from its centre to the hit. False when
    * the ray finds no surface (the target is gone or the call came before
    * its first frame) or this frame's marks are spent. `at`: where the shot
-   * touched it (logical), seen from the camera.
+   * touched it (logical), seen from the camera; `rgb` the shot's colour.
    */
-  hit(view, nx, ny, kind = DECAL_KIND.rock, at = null) {
+  hit(view, nx, ny, kind = DECAL_KIND.rock, at = null, rgb = null) {
     if (!this.enabled || !view?.object?.visible || this.budget <= 0)
       return false;
     this.budget -= 1;
@@ -271,6 +285,13 @@ export class ScorchDecals {
     slot.age = 0;
     slot.seed = this.rand();
     slot.kind = kind;
+    const top = rgb ? Math.max(rgb[0], rgb[1], rgb[2], 1e-3) : 1;
+    for (let c = 0; c < 3; c += 1) {
+      slot.tint[c] = rgb
+        ? WHITE_HOT[c] +
+          (rgb[c] * (WHITE_HOT[0] / top) - WHITE_HOT[c]) * TINT_MIX
+        : WHITE_HOT[c];
+    }
     slot.local
       .copy(this.inverse.copy(object.matrixWorld).invert())
       .multiply(this.world);
@@ -323,6 +344,7 @@ export class ScorchDecals {
       this.heat.array[n] = Math.max(0, 1 - slot.age / EMBER_TIME[slot.kind]);
       this.seed.array[n] = slot.seed;
       this.kind.array[n] = slot.kind;
+      this.tint.array.set(slot.tint, n * 3);
       n += 1;
     }
     this.mesh.count = n;
@@ -331,6 +353,7 @@ export class ScorchDecals {
       this.mesh.instanceMatrix,
       this.fade,
       this.heat,
+      this.tint,
       this.seed,
       this.kind,
     ];
