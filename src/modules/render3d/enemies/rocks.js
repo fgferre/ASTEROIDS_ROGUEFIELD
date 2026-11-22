@@ -10,7 +10,7 @@ import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
 import { SPARK_KIND } from '../hitSparks.js';
 import { RockInstances } from '../rockInstances.js';
-import { createRockBreak } from './rockBreak.js';
+import { createRockBreak, lookOf } from './rockBreak.js';
 import {
   FOG_DIM,
   FOG_FADE_SECONDS,
@@ -110,7 +110,7 @@ export const VARIANT_LOOKS = {
 // scorchDecals DECAL_KIND where it leaves a mark): iron is metal, crystal
 // glass (cold glints, no scorch); the rest stone. pedras, 17/11.
 const STRIKE = { iron: 'metal', crystal: 'shield' };
-export const strikeOf = (enemy) => STRIKE[enemy.variant] || 'rock';
+export const strikeOf = (enemy) => STRIKE[lookOf(enemy)] || 'rock';
 
 // A Parasite's pulse is at its fastest within this many logical pixels.
 const PARASITE_NEAR = 80;
@@ -337,9 +337,9 @@ export function createRockViews(kit) {
     view.spinRate = (0.25 + random() * 0.5) * (random() < 0.5 ? -1 : 1);
     view.spinPhase = random() * Math.PI * 2;
     view.lean = (random() - 0.5) * 1.2;
-    const look = VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common;
+    const look = VARIANT_LOOKS[lookOf(enemy)] || VARIANT_LOOKS.common;
     view.look = look;
-    view.variant = enemy.variant;
+    view.variant = lookOf(enemy);
     view.pulse = view.spinPhase;
     view.lastTime = null;
     view.family = look.crystal ? 'crystal' : 'stone';
@@ -416,7 +416,7 @@ export function createRockViews(kit) {
 
   function updateRock(view, enemy, time, flash) {
     // a rock can change variant alive (the Herald of Heat ignites it)
-    if (view.look !== (VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common)) {
+    if (view.look !== (VARIANT_LOOKS[lookOf(enemy)] || VARIANT_LOOKS.common)) {
       bindRock(view, enemy);
     }
     const { object, look } = view;
