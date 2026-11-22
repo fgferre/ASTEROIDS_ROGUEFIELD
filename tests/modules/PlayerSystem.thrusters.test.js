@@ -53,7 +53,7 @@ describe('PlayerSystem thrusters show the pilot, not the solver', () => {
     expect(Math.abs(player.velocity.vx)).toBeLessThan(kicked);
   });
 
-  it('A2: after the pilot thrusts, the coast shows one automatic brake jet along the nose that fades and disarms', () => {
+  it("A2: after the pilot thrusts, the coast shows the auto-brake's own push on the jet along the nose until the ship stops, then disarms", () => {
     ['modern', 'classic'].forEach((scheme) => {
       const { player, fly } = makePlayer(scheme);
       fly(scheme === 'modern' ? { right: true } : { up: true }, 60);
@@ -63,16 +63,46 @@ describe('PlayerSystem thrusters show the pilot, not the solver', () => {
         new Set(['aux'])
       );
       expect(coast.every((e) => e.isAutomatic)).toBe(true);
-      // no floor: it fades with the speed down to the disarm
+      // the brake's push: it eases with the speed but stays lit (its least
+      // push, eased by the drift) as long as it brakes
       const levels = coast.map((e) => e.intensity);
       expect(levels[levels.length - 1]).toBeLessThan(levels[0]);
-      expect(Math.min(...levels), scheme).toBeLessThan(0.1);
+      expect(Math.min(...levels.slice(0, -1)), scheme).toBeGreaterThan(0.2);
       fly({}, 120);
       expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(
-        12
+        2
       );
       expect(fly({}, 30), scheme).toEqual([]);
     });
+  });
+
+  it('A2b: the auto-brake lights the jets that push against the motion, whatever way the hull points', () => {
+    const brakeAt = (scheme, angle) => {
+      const { player, fly } = makePlayer(scheme);
+      player.angle = angle;
+      player.velocity = { vx: 150, vy: 0 }; // moving to screen +x
+      player.thrusters.coastArmed = true;
+      fly({}, 1);
+      const { main, aux, brakeStarboard, brakePort } = player.lastThrusterState;
+      return { main, aux, brakeStarboard, brakePort };
+    };
+    ['modern', 'classic'].forEach((scheme) => {
+      // Nose-first: the retro. Tail-first: the main engine.
+      expect(brakeAt(scheme, 0).aux, scheme).toBeGreaterThan(0.3);
+      expect(brakeAt(scheme, 0).main, scheme).toBe(0);
+      expect(brakeAt(scheme, Math.PI).main, scheme).toBeGreaterThan(0.3);
+      expect(brakeAt(scheme, Math.PI).aux, scheme).toBe(0);
+    });
+    // Modern brakes across the hull too: drifting to starboard (nose up the
+    // screen), the starboard flank; on a diagonal, flank and retro both.
+    const side = brakeAt('modern', -Math.PI / 2);
+    expect(side.brakeStarboard).toBeGreaterThan(0.3);
+    expect(side.brakePort).toBe(0);
+    const diagonal = brakeAt('modern', -Math.PI / 4);
+    expect(diagonal.brakeStarboard).toBeGreaterThan(0.3);
+    expect(diagonal.aux).toBeGreaterThan(0.3);
+    // Classic has no brake across the hull: no flank jet.
+    expect(brakeAt('classic', -Math.PI / 2).brakeStarboard).toBe(0);
   });
 
   it('A3: a modern reversal shows the retro first and the flame once the nose arrives; a 45° change keeps the flame', () => {

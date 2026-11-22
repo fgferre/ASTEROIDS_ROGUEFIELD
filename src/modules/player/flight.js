@@ -149,6 +149,8 @@ export class PlayerFlight {
     const speed = Math.hypot(this.ship.velocity.vx, this.ship.velocity.vy);
     const velocityAlongNose =
       this.ship.velocity.vx * fwd.x + this.ship.velocity.vy * fwd.y;
+    const velocityAcross =
+      this.ship.velocity.vx * right.x + this.ship.velocity.vy * right.y;
 
     if (noLinearInput) {
       this.driftFactor = Math.min(
@@ -165,6 +167,10 @@ export class PlayerFlight {
     const driftBrakeScale =
       1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
 
+    // The auto-brake's push along the nose and across it (thrusters.js shows
+    // them, at the end).
+    let brakeAlong = 0;
+    let brakeAcross = 0;
     // Auto-damping thrusters (activate without manual input); glide has none.
     if (noLinearInput && speed > 2 && !glide) {
       const proj = velocityAlongNose;
@@ -173,6 +179,7 @@ export class PlayerFlight {
         Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8))
       );
       const k = kBase * driftBrakeScale;
+      brakeAlong = k;
       if (proj > 0) thrAux = Math.max(thrAux, k);
       else if (proj < 0) thrMain = Math.max(thrMain, k);
       if (modern) {
@@ -184,6 +191,7 @@ export class PlayerFlight {
             0.35,
             Math.min(1, Math.abs(lateral) / (this.maxSpeed * 0.8))
           ) * driftBrakeScale;
+        brakeAcross = kLateral;
         if (lateral > 0) thrSideR = Math.max(thrSideR, kLateral);
         else if (lateral < 0) thrSideL = Math.max(thrSideL, kLateral);
       }
@@ -296,17 +304,23 @@ export class PlayerFlight {
           )
         : 0;
     }
-    // The auto-brake, when it acts: + on the retro (moving nose-first), - on
-    // the main engine, as strong as the speed is near the top. Glide has none
-    // but the Braking System's, which shows the same way.
-    const brakes = !glide || this.brakingDamping > 0;
-    const coastBrake =
-      noLinearInput && speed > 2 && brakes
-        ? (velocityAlongNose < 0 ? -1 : 1) *
-          clamp01(
-            speed / (this.maxSpeed * (glide ? GLIDE_SPEED_SCALE : 1) * 0.8)
-          )
-        : 0;
+    // Glide has no auto-brake but the Braking System's drag: it shows along
+    // the nose, as strong as the speed is near the glide's top.
+    if (noLinearInput && speed > 2 && glide && this.brakingDamping > 0) {
+      brakeAlong = clamp01(speed / (this.maxSpeed * GLIDE_SPEED_SCALE * 0.8));
+    }
+    // Each jet the brake fires shows its push as much as the motion runs its
+    // way (Felipe, 21/11): the retro nose-first, the main engine tail-first,
+    // a flank's jets sideways (Modern), a mix on a diagonal; the solver's
+    // least push on an axis the ship barely moves along shows nothing.
+    const along = speed > 0 ? velocityAlongNose / speed : 0;
+    const across = speed > 0 ? velocityAcross / speed : 0;
+    const brake = {
+      aux: brakeAlong * Math.max(0, along),
+      main: brakeAlong * Math.max(0, -along),
+      starboard: brakeAcross * Math.max(0, across),
+      port: brakeAcross * Math.max(0, -across),
+    };
     return {
       fwd,
       pilotMain,
@@ -315,7 +329,7 @@ export class PlayerFlight {
       // touch); Classic's asks are already the push.
       pilotForce: modern ? moveForce : 1,
       pilotTurn,
-      coastBrake,
+      brake,
       speed,
       dashing,
       isMainManual,

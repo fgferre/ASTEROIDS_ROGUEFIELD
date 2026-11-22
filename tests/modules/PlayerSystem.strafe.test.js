@@ -205,7 +205,7 @@ describe('PlayerSystem control schemes', () => {
       player.flight.brakingDamping = brakingDamping;
       player.angle = 0;
       player.velocity = { vx: 100, vy: 0 };
-      return player.flight.updateMovement(DELTA_TIME, {}).coastBrake;
+      return player.flight.updateMovement(DELTA_TIME, {}).brake.aux;
     };
 
     expect(coastBrake(0)).toBe(0);

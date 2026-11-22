@@ -6,8 +6,9 @@
 // the thruster, RCS and braking visual levels the cards raise. PlayerSystem
 // owns one and tells it each step's thrust.
 
-// Below this speed the coast brake disarms until the pilot thrusts again.
-const COAST_DISARM_SPEED = 12; // px/s
+// Below this speed the auto-brake stops (flight.js), and the coast brake
+// disarms until the pilot thrusts again: it shows until the ship stops.
+const COAST_DISARM_SPEED = 2; // px/s
 // A jet under this share is off (proposta 16/11). The nose settles onto its
 // heading asymptotically, so the turn share never reaches zero by itself, and
 // a burning jet throws at least one spark a step: flying straight, the side
@@ -47,7 +48,14 @@ export class PlayerThrusters {
     // === THRUSTER STATE TRACKING (for audio) ===
     // What the thrusters show this step (0..1): the main engine, the retro,
     // and the turn couple swinging the nose to port (turnL) or starboard (turnR).
-    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      turnL: 0,
+      turnR: 0,
+      brakeStarboard: 0,
+      brakePort: 0,
+    };
     this.thrusterVisual = { main: 0, aux: 0, turnL: 0, turnR: 0 };
     // The coast brake shows only after the pilot's own thrust or a dash.
     this.coastArmed = false;
@@ -59,14 +67,16 @@ export class PlayerThrusters {
   // `step`: flight.js updateMovement's display fields. The thrusters show what
   // the pilot asked for: idle, a shot's recoil or a knockback show nothing
   // (the auto-brake still acts, silently); after the pilot's own thrust or a
-  // dash, coasting shows one brake jet along the nose that fades with speed.
+  // dash, coasting shows the auto-brake's own push on each jet it fires
+  // (flight.js `brake`): the retro or the main engine along the nose, the
+  // flank jets across (drawing only: the flank jets send no event).
   emitThrusterEffects({
     fwd,
     pilotMain,
     pilotAux,
     pilotForce,
     pilotTurn,
-    coastBrake,
+    brake,
     speed,
     dashing,
     isMainManual,
@@ -74,12 +84,15 @@ export class PlayerThrusters {
   }) {
     if (isMainManual || isAuxManual || dashing) this.coastArmed = true;
     else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
-    const coasting = coastBrake !== 0;
-    const brake = coasting && this.coastArmed && !dashing ? coastBrake : 0;
+    const coasting = brake.main + brake.aux + brake.starboard + brake.port > 0;
+    const shows = coasting && this.coastArmed && !dashing;
+    const braked = (push) => (shows ? push : 0);
     // A stick's push scales a jet that burns, never puts one out: the trail
     // cards drop on any burn of the main engine.
-    const main = shown(coasting ? -brake : pilotMain) * pilotForce;
-    const aux = shown(coasting ? brake : pilotAux) * pilotForce;
+    const main = shown(coasting ? braked(brake.main) : pilotMain) * pilotForce;
+    const aux = shown(coasting ? braked(brake.aux) : pilotAux) * pilotForce;
+    this.lastThrusterState.brakeStarboard = shown(braked(brake.starboard));
+    this.lastThrusterState.brakePort = shown(braked(brake.port));
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
@@ -198,7 +211,14 @@ export class PlayerThrusters {
 
   /** Nothing burning, the coast brake disarmed (death, reset, respawn). */
   resetState() {
-    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      turnL: 0,
+      turnR: 0,
+      brakeStarboard: 0,
+      brakePort: 0,
+    };
     this.coastArmed = false;
   }
 }
