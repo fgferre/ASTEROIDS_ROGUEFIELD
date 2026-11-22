@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 41.**
 
 ## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
 
@@ -228,6 +228,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
   entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
   fecha quando ele aprovar jogando com o controle de verdade.
+- **(40)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
+  inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
+  radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
+  está no cartão `cartas-por-arma-1`. Buracos: a Harmonic não tem versão própria em família nenhuma; a Scatter e a
+  Seeker usam a da Lance em várias; a Overcharge Coil não faz nada na Harmonic e enfraquece a Seeker. Fecha quando as
+  cartas que faltam estiverem no jogo e ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 
