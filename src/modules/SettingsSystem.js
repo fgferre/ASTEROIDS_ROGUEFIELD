@@ -515,30 +515,11 @@ class SettingsSystem {
 
     eventBus.emit('settings-changed', change);
 
-    if (change.category === 'audio') {
-      eventBus.emit('settings-audio-changed', {
-        values: this.getCategoryValues('audio'),
-        change,
-      });
-    }
-
-    if (change.category === 'controls') {
-      eventBus.emit('settings-controls-changed', {
-        values: this.getCategoryValues('controls'),
-        change,
-      });
-    }
-
-    if (change.category === 'accessibility') {
-      eventBus.emit('settings-accessibility-changed', {
-        values: this.getCategoryValues('accessibility'),
-        change,
-      });
-    }
-
-    if (change.category === 'video') {
-      eventBus.emit('settings-video-changed', {
-        values: this.getCategoryValues('video'),
+    // Every category, as at startup (broadcastInitialCategories): gameplay and
+    // graphics edits mid-run used to wait for the next page load.
+    if (change.category) {
+      eventBus.emit(`settings-${change.category}-changed`, {
+        values: this.getCategoryValues(change.category),
         change,
       });
     }

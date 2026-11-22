@@ -210,8 +210,8 @@ class Renderer3D extends BaseSystem {
     const menu = resolveService('menu-background', this.dependencies);
     this.seeded = (fn) => menu.withSeededMathRandom(fn);
 
-    // SettingsSystem emits 'settings-graphics-changed' only at startup; live
-    // edits arrive as 'settings-changed' with the category.
+    // 'settings-graphics-changed' comes at startup, on every graphics edit and
+    // after Reset All; accessibility edits arrive as 'settings-changed'.
     const settings = resolveService('settings', this.dependencies);
     if (settings) {
       this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
@@ -228,12 +228,6 @@ class Renderer3D extends BaseSystem {
       if (payload?.values) this.camera.setLead(payload.values.cameraLead);
     });
     this.registerEventListener('settings-changed', (change = {}) => {
-      if (
-        settings &&
-        (change.category === 'graphics' || change.type === 'reset-all')
-      ) {
-        this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
-      }
       if (
         settings &&
         (change.category === 'accessibility' || change.type === 'reset-all')
