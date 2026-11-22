@@ -1,6 +1,6 @@
 {
   "name": "asteroids_roguefield",
-  "version": "1.0.0",
+  "version": "0.6.1",
   "description": "Roguelike game inspired by Asteroids mechanics",
   "type": "module",
   "main": "app.js",
