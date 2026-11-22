@@ -21,14 +21,8 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [
-    'Every hull shows its years of service: worn leading edges, grime, scorched engines, hull codes and warning stripes, and rust on the old Bastion.', // not confirmed
-    'Navigation lights: red and green at the wingtips and a white strobe on the antenna.', // not confirmed
-  ],
-  improved: [
-    'The Interceptor, Solar Slicer and Bastion have new hulls: curved bodies, a blue glass dome over the sensor, satin paint and brass trim.', // not confirmed
-    'Paint, metal and glass catch the light as your ship turns.', // not confirmed
-  ],
+  new: [],
+  improved: [],
   fixed: [],
   unseen: [],
 };
@@ -36,12 +30,15 @@ export const NEXT = {
 export const RELEASES = [
   {
     version: '0.7.0',
-    date: '2026-11-21',
+    date: '2026-11-22',
     new: [
       'Stick Sensitivity in Settings → Controls: Low, Medium or High, for how hard a half-tilted stick pushes.',
       'Shots now push and spin the rock they hit.',
       'Every shot lights what it hits in its own color. The burn mark starts white-hot in that color and cools to lava, and glowing veins light the rocks around them.',
       'The Quarantine Grid’s planet is now a whole cracked world hanging in the distance, its night side dotted with dead cities.',
+      'The version number sits in the menu’s corner: open it to see What’s new in each version.',
+      'Every hull shows its years of service: worn leading edges, grime, scorched engines, hull codes and warning stripes, and rust on the old Bastion.',
+      'Navigation lights: red and green at the wingtips and a white strobe on the antenna.',
     ],
     improved: [
       'The Crucible’s star now boils, with sunspots and a fiery rim, and is a little darker so the fight reads on top of it.',
@@ -50,6 +47,8 @@ export const RELEASES = [
       'Screen Shake Intensity and Hit Markers now take effect at once, even mid-run.',
       'Damage Numbers and Reduced Particles left Settings: they never did anything.',
       'With a controller, the story scene says PRESS Ⓐ TO SKIP.',
+      'The Interceptor, Solar Slicer and Bastion have new hulls: curved bodies, a blue glass dome over the sensor, satin paint and brass trim.',
+      'Paint, metal and glass catch the light as your ship turns.',
     ],
     fixed: [
       'iPhone: the game added to the Home Screen and opened sideways no longer plays in a small square.',
