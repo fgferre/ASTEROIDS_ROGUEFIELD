@@ -173,9 +173,13 @@ export function flyByJets(flight, deltaTime, input) {
   const dashing = maneuvers.dashTimer > 0;
   const easing = dashing || maneuvers.dashDecayTimer > 0;
 
+  // A modern proposal (modernTrial.js): its own cruise, and the flight
+  // computer drawing more from the same jets.
+  const trial = modern ? MODERN_TRIALS[flight.modernTrial] : null;
   // One main engine for both flights (the hull's and Main Thrusters'); the
   // Braking System's levels multiply the retro, the RCS System's the flanks.
-  const main = flight.acceleration * GLIDE_ACCEL_SCALE;
+  const main =
+    flight.acceleration * GLIDE_ACCEL_SCALE * (trial ? trial.jets : 1);
   const braking =
     (flight.baseLinearDamping + flight.brakingDamping) /
     flight.baseLinearDamping;
@@ -184,8 +188,7 @@ export function flyByJets(flight, deltaTime, input) {
     retro: main * JET_RETRO_SHARE * braking,
     flank: main * JET_FLANK_SHARE * flight.agility,
   };
-  // A modern proposal (modernTrial.js) cruises at × the start's top speed.
-  const trial = modern ? MODERN_TRIALS[flight.modernTrial] : null;
+  // A modern proposal cruises at × the start's top speed.
   const top =
     flight.maxSpeed *
     (trial

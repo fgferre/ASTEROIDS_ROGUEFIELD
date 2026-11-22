@@ -13,13 +13,16 @@
 // `coastBrake`: letting go stops the ship (today's modern); without it the
 // ship keeps its momentum as in the start, the Braking System's drag only.
 // `turbo`: holding one direction builds the cruise up to this × `top`.
+// `jets` (`?voo=b` only): × every jet's force, so the faster ship still
+// reaches its cruise and stops no later than the start does (measured 22/11:
+// at ×1 it took longer and stopped farther).
 export const MODERN_TRIALS = Object.freeze({
   // 1, "rápida e firme": today's grip, the start's speed and more.
-  1: Object.freeze({ top: 1.2, coastBrake: true, turbo: 1 }),
+  1: Object.freeze({ top: 1.2, coastBrake: true, turbo: 1, jets: 1.5 }),
   // 2, "deslize com vetor": the start's momentum, thrust in any direction.
-  2: Object.freeze({ top: 1.2, coastBrake: false, turbo: 1 }),
+  2: Object.freeze({ top: 1.2, coastBrake: false, turbo: 1, jets: 1.5 }),
   // 3, "turbo": 1's grip, and a straight run builds speed.
-  3: Object.freeze({ top: 1.2, coastBrake: true, turbo: 1.4 }),
+  3: Object.freeze({ top: 1.2, coastBrake: true, turbo: 1.4, jets: 1.5 }),
 });
 // Turbo: from nothing to full over this (s) while the keys hold one way; it
 // fades over TURBO_FADE_S when they let go or turn more than TURBO_TURN off.
