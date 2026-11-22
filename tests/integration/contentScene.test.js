@@ -174,6 +174,22 @@ describe('content scene on a live run', () => {
     });
   });
 
+  it('gives the ship the cards= build, the cards they require first', () => {
+    game.services.player.setFlightScheme('classic', true); // the new flight's start
+    const { services } = play('hulls', getItem('hulls', 'default-hull'), {
+      cards: [
+        { id: 'propulsors', level: 5 },
+        { id: 'flight_computer', level: 1 },
+      ],
+    });
+    const count = (id) => services.progression.getUpgradeCount(id);
+    expect(count('propulsors')).toBe(5);
+    expect(count('braking_system')).toBe(3);
+    expect(count('rcs_system')).toBe(3);
+    expect(count('flight_computer')).toBe(1);
+    expect(services.player.controlScheme).toBe('modern');
+  });
+
   describe.each(idsOf('stages'))('stage %s', (id, item) => {
     it('plays the layer, its spawner running', () => {
       const { services } = play('stages', item);

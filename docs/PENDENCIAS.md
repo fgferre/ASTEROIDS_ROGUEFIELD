@@ -235,8 +235,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   acordo com os thrusters que já existem hoje na nave. A gente não vai desenhar nada novo, né?"_ Texto inteiro em
   `quadro/respostas/freio-automatico-21-11.txt`. Em 22/11 ele mandou tocar a frente. Ramo `voo/um-algoritmo`: estudo
   entregue (cartão `voo-1`). Ao estudo ele disse (22/11): _"vamos deixar a e b printos para testrar."_ As duas
-  estão prontas ao lado do voo de hoje, pelo endereço (`?voo=a`, `?voo=b`; cartão `voo-2`). Fecha quando ele
-  escolher voando.
+  estão prontas ao lado do voo de hoje, pelo endereço (`?voo=a`, `?voo=b`; cartão `voo-2`). Depois (22/11): _"Ainda não consegui decidir.
+  Eu acho que eu preciso fazer um teste com os upgrades para entender como que é a evolução em cada modo."_ Os
+  endereços de teste com as cartas em cinco degraus estão no cartão `voo-3`. Fecha quando ele escolher voando.
 
 ## Som (palavras dele, 19/11)
 

@@ -26,6 +26,7 @@ export const NEXT = {
   fixed: [],
   unseen: [
     "Two trial flights only the address turns on (?voo=a and ?voo=b), where the ship moves by its own thrusters, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
+    'The test address that starts a run with one item (?content=) can now give the ship several cards at chosen levels (&cards=), so Felipe can fly each flight with its upgrades; normal runs are the same.', // not confirmed
   ],
 };
 

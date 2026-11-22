@@ -30,7 +30,19 @@ describe('parseContentParams', () => {
       ref: 'drone',
       count: 1,
       fire: false,
+      cards: [],
     });
+  });
+
+  it('reads cards= as cards and levels, level 1 when none is given', () => {
+    expect(
+      parseContentParams(
+        '?content=hulls/default-hull&cards=braking_system:3,auto_aim'
+      ).cards
+    ).toEqual([
+      { id: 'braking_system', level: 3 },
+      { id: 'auto_aim', level: 1 },
+    ]);
   });
 
   it('keeps a kind/id reference whole', () => {
@@ -221,7 +233,7 @@ const makeServices = () => ({
     },
   },
   combat: { weapons: { handleShooting: vi.fn() } },
-  progression: { experienceToNext: 100 },
+  progression: { experienceToNext: 100, getUpgradeCount: () => 0 },
 });
 
 describe('composeContentScene', () => {
