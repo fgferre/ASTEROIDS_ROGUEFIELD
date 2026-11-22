@@ -38,6 +38,7 @@ export const SETTINGS_SECTIONS = [
           'controls.hullControl',
           ...(declaresTouch() ? [] : ['controls.touchControls']),
           'controls.vibration',
+          'controls.stickSensitivity',
         ],
       },
       {

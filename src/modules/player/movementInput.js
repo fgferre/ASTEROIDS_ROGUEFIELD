@@ -8,7 +8,7 @@
 import { resolveService } from '../../core/serviceUtils.js';
 import {
   GAMEPAD_AIM_ENGAGE,
-  GAMEPAD_STICK_CURVE,
+  GAMEPAD_STICK_CURVES,
 } from '../../data/constants/gamepad.js';
 
 /**
@@ -30,10 +30,14 @@ export function getModernMove(input) {
 
 /**
  * A pad stick's force 0..1 one way: `value` is the stick past its deadzone
- * (+ that way). Keys, the d-pad and touch are not `pad` frames: 0.
+ * (+ that way), curved by the frame's `sensitivity` (the player stamps the
+ * setting on each step's frame; Medium without one). Keys, the d-pad and
+ * touch are not `pad` frames: 0.
  */
 export function padForce(input, value) {
-  return input.pad && value > 0 ? value ** GAMEPAD_STICK_CURVE : 0;
+  const curve =
+    GAMEPAD_STICK_CURVES[input.sensitivity] ?? GAMEPAD_STICK_CURVES.medium;
+  return input.pad && value > 0 ? value ** curve : 0;
 }
 
 /**

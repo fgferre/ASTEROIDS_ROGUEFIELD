@@ -1010,7 +1010,9 @@ export class PlayerMirror {
       const target = state[TURN_KEYS[i]] || 0;
       if (target > 0.02) {
         if (jet.amount < 0.05) jet.snap = RCS_SNAP_S;
-        jet.amount = 0.5 + 0.5 * Math.min(1, target);
+        // As strong as the turn asks (a part-tilted stick, a light swing);
+        // a full key is a full jet (Felipe, 21/11).
+        jet.amount = Math.min(1, target);
         jet.hold = RCS_HOLD_S;
       } else if (jet.hold > 0) {
         jet.hold -= dt;
@@ -1018,7 +1020,7 @@ export class PlayerMirror {
         jet.amount =
           jet.amount < 0.05 ? 0 : jet.amount * Math.exp(-dt / RCS_FADE_S);
       }
-      jet.material.opacity = Math.min(1, jet.amount * 1.2);
+      jet.material.opacity = jet.amount;
       snap = Math.max(snap, jet.snap);
     }
     this.snapMaterial.opacity = snap / RCS_SNAP_S;
@@ -1033,7 +1035,7 @@ export class PlayerMirror {
         snap: flash,
       } = this.puffs[i];
       const jet = turnL ? this.rcsJets.turnL : this.rcsJets.turnR;
-      const reach = length * (0.55 + 0.45 * jet.amount);
+      const reach = length * jet.amount;
       puff.visible = jet.amount > 0.02;
       puff.scale.set(reach, radius, radius);
       if (twin) {
@@ -1104,7 +1106,11 @@ export class PlayerMirror {
       mesh.visible = aux > 0.02;
       mesh.scale.set(length * (0.6 + 0.4 * aux), radius, radius);
     }
-    this.retroMaterial.opacity = Math.min(1, aux * 2.5);
+    // Brighter as the brake pushes harder (Felipe, 21/11), full from the
+    // Modern flight's whole retro share (flight.js), so a full key on either
+    // flight still burns full.
+    const fullRetro = 0.7;
+    this.retroMaterial.opacity = Math.min(1, aux / fullRetro);
     const f = this.flare / RETRO_FLARE_S;
     this.flare = Math.max(0, this.flare - dt);
     this.flareFan.visible = f > 0;

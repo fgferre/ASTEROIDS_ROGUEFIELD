@@ -306,6 +306,26 @@ describe('PlayerMirror', () => {
     expect(watch(0, 0.2).embers).toBeGreaterThan(0);
   });
 
+  it('burns the turn jets and the retro as hard as the pilot pushes; a full key burns full', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const at = (turn, aux) => {
+      player.lastThrusterState.turnR = turn;
+      player.lastThrusterState.aux = aux;
+      for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
+      return {
+        jet: mirror.rcsJets.turnR.material.opacity,
+        retro: mirror.retroMaterial.opacity,
+      };
+    };
+    expect(at(1, 1)).toEqual({ jet: 1, retro: 1 });
+    // The Modern flight's whole retro share, on a key.
+    expect(at(1, 0.7).retro).toBeCloseTo(1, 2);
+    const part = at(0.3, 0.3);
+    expect(part.jet).toBeCloseTo(0.3, 2);
+    expect(part.retro).toBeCloseTo(0.3 / 0.7, 2);
+    expect(at(0.6, 0.6).retro).toBeGreaterThan(part.retro + 0.3);
+  });
+
   it('lights the retro flames with the brake, longer and doubled with the Braking System', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const retrosAt = (level, aux) => {

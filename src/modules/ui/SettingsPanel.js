@@ -102,10 +102,13 @@ export class SettingsPanel {
     );
   }
 
-  /** Redraws the section on screen when it shows a field of `categoryId`. */
+  /**
+   * Redraws the section on screen when it shows a field of `categoryId`; a
+   * pad's focus stays on the choice it just made.
+   */
   refreshCategory(categoryId) {
     if (this.settingsState.isOpen && this.showsCategory(categoryId)) {
-      this.renderSettingsPanel();
+      this.redrawKeepingFocus();
     }
   }
 

@@ -106,7 +106,7 @@ describe('Settings panel', () => {
         .map((field) => `${category.id}.${field.key}`)
     );
     expect(SECTION_IDS).toHaveLength(6);
-    expect(visible).toHaveLength(43);
+    expect(visible).toHaveLength(44);
     expect([...shown].sort()).toEqual([...visible].sort());
   });
 
@@ -190,6 +190,14 @@ describe('Settings panel', () => {
     expect(settings.getSetting('controls', 'dash')).not.toEqual(moved);
     expect(settings.getSetting('controls', 'vibration')).toBe(true);
     expect(settings.getSetting('graphics', 'quality')).toBe('low');
+  });
+
+  it("a Controls change from the game redraws keeping the pad's focus on its choice", () => {
+    const { panel } = renderSection('controls');
+    panel.settingsState.isOpen = true;
+    const keep = vi.spyOn(panel, 'redrawKeepingFocus');
+    panel.refreshCategory('controls');
+    expect(keep).toHaveBeenCalledOnce();
   });
 
   it('greys Camera Lead with the Classic camera, with its reason', () => {
