@@ -241,7 +241,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
   Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
   antes de código; fecha quando ele aprovar as naves novas. Na conferência de 19/11, "As naves do jogador estão
-  bonitas?": _"Precisa mexer"_.
+  bonitas?": _"Precisa mexer"_. Em 21/11 ele trouxe o redesenho dos três cascos feito em outra AI e escolheu a V3:
+  _"Integre ao Asteroid Roguefield a V3 dos modelos 3D da Interceptor, Solar Slicer e Bastion. Vi a comparação e
+  prefiro a V3."_ Integrada no ramo local `naves/cascos-v3`, esperando ele jogar; _"A publicação fica para depois da
+  minha aprovação."_
 
 ## Campanha (palavras dele, 12/11, jogando no site)
 
