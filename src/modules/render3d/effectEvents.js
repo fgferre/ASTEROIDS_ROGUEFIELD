@@ -94,7 +94,10 @@ export function registerEffectEvents(r) {
     const color =
       r.three && bullet && combat ? shotColor(combat, bullet) : null;
     const rgb = color ? rgbOf(r.three.THREE, color) : null;
-    if (rgb && enemy) r.three.flashes.hit(x, y, rgb, data.damage);
+    // (Reduce Flashing dims it as it dims the screen's flashes)
+    if (rgb && enemy) {
+      r.three.flashes.hit(x, y, rgb, data.damage * (r.flashScale ?? 1));
+    }
     // what survives the hit keeps its heat where it was struck: a rock a
     // patch of lava, a machine a white-hot spot, and the machine jolts; a
     // machine it kills breaks with the shot's push

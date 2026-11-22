@@ -109,24 +109,24 @@ export class VeinLights {
     this.picked = [];
   }
 
-  /** Puts the lights on the brightest veined rocks of `views` (id → view). */
+  /**
+   * Puts the lights on the veined rocks of `views` (id → view) that glow
+   * most at their peak (their look's veinGlow × radius, so a pulse does not
+   * move a light from rock to rock).
+   */
   update(views) {
     const picked = this.picked;
     picked.length = 0;
+    const rank = (view) => view.look.veinGlow * view.radius;
     if (this.enabled) {
       for (const view of views.values()) {
         if (!view.look?.vein || view.hidden || !view.object.visible) continue;
-        const glow = view.rock.glow[0] * view.radius;
-        if (picked.length < VEIN_COUNT) picked.push(view);
-        else if (
-          glow >
-          picked[VEIN_COUNT - 1].rock.glow[0] * picked[VEIN_COUNT - 1].radius
-        ) {
-          picked[VEIN_COUNT - 1] = view;
-        } else continue;
-        picked.sort(
-          (a, b) => b.rock.glow[0] * b.radius - a.rock.glow[0] * a.radius
-        );
+        if (picked.length === VEIN_COUNT) {
+          if (rank(view) <= rank(picked[VEIN_COUNT - 1])) continue;
+          picked.pop();
+        }
+        picked.push(view);
+        picked.sort((a, b) => rank(b) - rank(a));
       }
     }
     this.lights.forEach((light, i) => {
