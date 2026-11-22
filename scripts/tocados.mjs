@@ -4,7 +4,7 @@
 //
 // "Touched" = changed since the point where this branch left main (committed,
 // staged or unstaged) + untracked; on main itself, or with no local main, since
-// HEAD. A touched test runs itself; a touched src file runs every test that
+// HEAD. The changelog's check (tests/process/changelogLine.test.js) uses the same. A touched test runs itself; a touched src file runs every test that
 // reaches it by following imports through src/ and the test helpers (tests live
 // under tests/, not beside sources, so coverage is found by following imports,
 // including the files an import.meta.glob pattern lists).
@@ -27,16 +27,21 @@ function git(args) {
   }).trim();
 }
 
-function baseRef() {
+// On a GitHub pull request the branch is compared with its target (origin/main;
+// the workflow checks out the whole history for it).
+export function baseRef() {
+  const main = process.env.GITHUB_BASE_REF
+    ? `origin/${process.env.GITHUB_BASE_REF}`
+    : 'main';
   try {
-    const base = git(['merge-base', 'HEAD', 'main']);
+    const base = git(['merge-base', 'HEAD', main]);
     return base === git(['rev-parse', 'HEAD']) ? 'HEAD' : base;
   } catch {
     return 'HEAD';
   }
 }
 
-function touched(base) {
+export function touched(base) {
   const sinceBase = git(['diff', '--name-only', base]);
   const untracked = git(['ls-files', '--others', '--exclude-standard']);
   return [

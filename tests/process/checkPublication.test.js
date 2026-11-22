@@ -36,4 +36,13 @@ describe('the publication check', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain('1 linha');
   });
+
+  it('counts the unseen sentences too: they go with the list into the new version', () => {
+    const problems = publicationProblems({
+      version: '0.7.1',
+      previousVersion: '0.7.0',
+      next: { ...EMPTY, unseen: ['A sentence.'] },
+    });
+    expect(problems).toHaveLength(1);
+  });
 });

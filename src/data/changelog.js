@@ -12,13 +12,19 @@
 //
 // NEXT collects the lines for the coming publication; the game never shows it.
 // One item per line, a line per change, added when the work is done. A line
-// still waiting for Felipe's word ends with `// not confirmed`. At publication
-// NEXT becomes the new first entry of RELEASES, with its number and date.
+// still waiting for Felipe's word ends with `// not confirmed`. A branch that
+// changes the game must add something here (tests/process/changelogLine.test.js
+// fails otherwise): a line in new, improved or fixed, or, when a player notices
+// nothing, a sentence in `unseen` saying what changed and why nobody sees it.
+// `unseen` never shows in the game; it goes with the list to Felipe when asking
+// to publish. At publication NEXT becomes the new first entry of RELEASES, with
+// its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
+  unseen: [],
 };
 
 export const RELEASES = [

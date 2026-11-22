@@ -22,11 +22,13 @@ export function publicationProblems({ version, previousVersion, next }) {
         'rode "npm version <número novo> --no-git-tag-version" e publique de novo.'
     );
   }
-  const waiting = ['new', 'improved', 'fixed'].flatMap((g) => next[g]);
+  const waiting = ['new', 'improved', 'fixed', 'unseen'].flatMap(
+    (g) => next[g] ?? []
+  );
   if (waiting.length > 0) {
     problems.push(
       `A lista da próxima versão (NEXT, em src/data/changelog.js) ainda tem ${waiting.length} linha(s). ` +
-        'Passe-as para uma versão nova no topo de RELEASES, com o número e a data, e deixe NEXT vazio.'
+        'Passe-as para uma versão nova no topo de RELEASES, com o número e a data (as de unseen vão junto, em unseen), e deixe NEXT vazio.'
     );
   }
   return problems;

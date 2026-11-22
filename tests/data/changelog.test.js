@@ -8,6 +8,8 @@ import { NEXT, RELEASES } from '../../src/data/changelog.js';
 const GROUPS = ['new', 'improved', 'fixed'];
 const numbers = (v) => v.split('.').map(Number);
 const lines = (entry) => GROUPS.flatMap((g) => entry[g]);
+// The sentences for changes nobody sees: never in the game, kept for Felipe.
+const unseen = (entry) => entry.unseen ?? [];
 
 describe('the changelog', () => {
   it("tops with the game's own version (package.json, as the menu shows it)", () => {
@@ -31,13 +33,15 @@ describe('the changelog', () => {
   it('gives every publication at least one line, and only the three groups', () => {
     for (const entry of [NEXT, ...RELEASES]) {
       for (const g of GROUPS) expect(Array.isArray(entry[g])).toBe(true);
+      expect(Array.isArray(unseen(entry))).toBe(true);
     }
+    expect(Array.isArray(NEXT.unseen)).toBe(true);
     for (const entry of RELEASES)
       expect(lines(entry).length).toBeGreaterThan(0);
   });
 
   it('never lists a line twice (a branch merged after a publication brings old lines back)', () => {
-    const all = [NEXT, ...RELEASES].flatMap(lines);
+    const all = [NEXT, ...RELEASES].flatMap((e) => [...lines(e), ...unseen(e)]);
     const twice = all.filter((line, i) => all.indexOf(line) !== i);
     expect(twice).toEqual([]);
   });
