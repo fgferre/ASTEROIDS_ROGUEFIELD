@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 41.**
 
 ## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
 
@@ -228,6 +228,14 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
   entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
   fecha quando ele aprovar jogando com o controle de verdade.
+- **(40)** O voo, um algoritmo só (21/11, à noite, na conversa do controle): _"o algoritmo ele é um só para tudo,
+  né? Para movimento, o que que faz a nave se movimentar? É o thruster. [...] A nave ela é movimentada porque está
+  ligado um thruster. E o thruster ele faz o movimento real da nave. Então, se ela precisa parar, seja por freio
+  automático, seja pela ação do usuário, né, é, isso é refletido, obviamente, no thruster da forma física realista, de
+  acordo com os thrusters que já existem hoje na nave. A gente não vai desenhar nada novo, né?"_ Texto inteiro em
+  `quadro/respostas/freio-automatico-21-11.txt`. Em 22/11 ele mandou tocar a frente. Ramo `voo/um-algoritmo`: estudo
+  entregue (cartão `voo-1`); a variante que ele voa ao lado do voo de hoje vem depois. Fecha quando ele escolher
+  voando.
 
 ## Som (palavras dele, 19/11)
 
