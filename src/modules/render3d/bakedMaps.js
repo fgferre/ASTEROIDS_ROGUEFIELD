@@ -46,8 +46,8 @@ function blur(src, size, radius) {
   return out;
 }
 
-function dataTexture(THREE, data, size) {
-  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+function dataTexture(THREE, data, size, height = size) {
+  const texture = new THREE.DataTexture(data, size, height, THREE.RGBAFormat);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
@@ -363,5 +363,125 @@ export function bakePlateMaps(THREE, seed, size = 256) {
       { strength: size / 80, occlusion: 3, aoRadius: Math.round(size / 90) },
       (i, cavity) => Math.min(1, 0.84 + cavity * 1.2)
     );
+  });
+}
+
+/**
+ * A planet's night side (places/quarantineGrid.js), equirectangular: u the
+ * longitude, v the latitude, `size` × size/2. R: the ground's albedo (dark
+ * basins, paler highlands); G: dead cities, specks along the coasts; B: the
+ * glow of one great crack, a wandering great circle round most of the globe.
+ * The relief is sampled on the sphere (no seam), baked at a quarter size and
+ * read bilinear: it is smooth, and the bake runs as the game loads.
+ */
+export function bakePlanetMap(THREE, seed, size = 512) {
+  return cached('planet', seed, size, () => {
+    const W = size;
+    const H = size / 2;
+    const salt = Math.floor(createSeededRandom(seed)() * 2147483647);
+    const relief = new SimplexNoise(createSeededRandom(seed + 1));
+    const cw = W / 4;
+    const ch = H / 4;
+    const coarse = new Float32Array(cw * ch);
+    const dir = (u, v) => {
+      const lat = (v - 0.5) * Math.PI;
+      const lon = u * Math.PI * 2 - Math.PI;
+      return [
+        Math.cos(lat) * Math.cos(lon),
+        Math.sin(lat),
+        Math.cos(lat) * Math.sin(lon),
+      ];
+    };
+    for (let j = 0; j < ch; j += 1) {
+      for (let i = 0; i < cw; i += 1) {
+        const [x, y, z] = dir((i + 0.5) / cw, (j + 0.5) / ch);
+        coarse[i + j * cw] = relief.fbm(x * 1.6 + 3, y * 1.6, z * 1.6, 4);
+      }
+    }
+    // the relief read bilinear from the coarse bake (wrapping in longitude)
+    const coarseAt = (i, j) => coarse[wrap(i, cw) + j * cw];
+    const land = (x, y) => {
+      const fx = (x + 0.5) / 4 - 0.5;
+      const fy = Math.max(0, Math.min(ch - 1, (y + 0.5) / 4 - 0.5));
+      const ix = Math.floor(fx);
+      const iy = Math.min(ch - 2, Math.floor(fy));
+      const tx = fx - ix;
+      const ty = fy - iy;
+      return (
+        (coarseAt(ix, iy) * (1 - tx) + coarseAt(ix + 1, iy) * tx) * (1 - ty) +
+        (coarseAt(ix, iy + 1) * (1 - tx) + coarseAt(ix + 1, iy + 1) * tx) * ty
+      );
+    };
+    // the crack's great circle (its pole `a`, its plane b, c) and its gap
+    const a = [0.9, 0.25, 0.35];
+    const an = Math.hypot(...a);
+    a.forEach((k, i) => (a[i] = k / an));
+    const b = [0, -a[2], a[1]];
+    const bn = Math.hypot(...b);
+    b.forEach((k, i) => (b[i] = k / bn));
+    const c = [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ];
+    const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+    const reach = 5.6;
+    // white grain from an integer hash of a texel (a seeded random per
+    // texel cost more than the rest of the bake)
+    const hash = (i, j) => {
+      let h = Math.imul(i + 1, 374761393) + Math.imul(j + 1, 668265263) + salt;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    };
+    const cosLon = new Float32Array(W);
+    const sinLon = new Float32Array(W);
+    for (let x = 0; x < W; x += 1) {
+      const lon = ((x + 0.5) / W) * Math.PI * 2 - Math.PI;
+      cosLon[x] = Math.cos(lon);
+      sinLon[x] = Math.sin(lon);
+    }
+    const p = [0, 0, 0];
+    const data = new Uint8Array(W * H * 4);
+    for (let y = 0; y < H; y += 1) {
+      const lat = ((y + 0.5) / H - 0.5) * Math.PI;
+      const cosLat = Math.cos(lat);
+      p[1] = Math.sin(lat);
+      const polar = Math.abs(p[1]) > 0.8;
+      for (let x = 0; x < W; x += 1) {
+        p[0] = cosLat * cosLon[x];
+        p[2] = cosLat * sinLon[x];
+        const l = land(x, y);
+        const grain = hash(x, y);
+        const albedo =
+          0.35 + 0.65 * smoothstep(-0.15, 0.3, l) * (0.82 + 0.18 * grain);
+        // cities: the brightest specks of grain, only on the coasts
+        let city = 0;
+        if (!polar && grain > 0.84 && Math.abs(l - 0.05) < 0.25) {
+          city =
+            Math.exp(-(((l - 0.05) / 0.1) ** 2)) *
+            smoothstep(0.84, 0.97, grain);
+        }
+        // the crack: only texels near its circle carry any glow
+        const pole = dot(p, a);
+        let glow = 0;
+        if (Math.abs(pole) < 0.3) {
+          let t = Math.atan2(dot(p, c), dot(p, b));
+          if (t < 0) t += Math.PI * 2;
+          const off = pole - 0.06 * Math.sin(t * 9) - 0.03 * Math.sin(t * 23);
+          const along =
+            smoothstep(0, 0.08, t) * smoothstep(reach, reach - 0.08, t);
+          glow =
+            along *
+            (Math.exp(-(off * off) / 0.0009) +
+              0.25 * Math.exp(-(off * off) / 0.012));
+        }
+        const o = (x + y * W) * 4;
+        data[o] = Math.round(255 * albedo);
+        data[o + 1] = Math.round(255 * Math.min(1, city));
+        data[o + 2] = Math.round(255 * Math.min(1, glow));
+        data[o + 3] = 255;
+      }
+    }
+    return dataTexture(THREE, data, W, H);
   });
 }

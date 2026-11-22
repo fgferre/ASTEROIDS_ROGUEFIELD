@@ -102,4 +102,26 @@ describe('place backdrop sets', () => {
       'min(reflectedLight.directSpecular'
     );
   });
+
+  it("fades the Quarantine Grid's planet with its set and turns its ground under a fixed sun", () => {
+    const backdrop = new FieldBackdrop(THREE, new THREE.Scene());
+    const grid = backdrop.places.built.get('quarantine-grid');
+    const ground = backdrop.places.built
+      .get('quarantine-grid')
+      .materials.find((m) => m.uniforms?.uMap);
+    expect(ground).toBeTruthy();
+
+    backdrop.places.setLook({
+      from: 'x',
+      to: { backdrop: 'quarantine-grid' },
+      mix: 0.4,
+    });
+    expect(ground.opacity).toBeCloseTo(0.4);
+    const sun = ground.uniforms.uSun.value.clone();
+    grid.update(10, 0);
+    const spin = ground.uniforms.uSpin.value;
+    grid.update(30, 0);
+    expect(ground.uniforms.uSpin.value).toBeGreaterThan(spin);
+    expect(ground.uniforms.uSun.value.equals(sun)).toBe(true);
+  });
 });
