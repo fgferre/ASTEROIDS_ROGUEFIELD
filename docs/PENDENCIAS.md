@@ -240,7 +240,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   endereços de teste com as cartas em cinco degraus estão no cartão `voo-3`. Voando os degraus (22/11): _"a gente
   tem que repensar o modo com o computador de manobra [...] tinha que estar ter uma sensação de que a nave está mais
   poderosa, mais rápida, mais manobrável."_ Análise e três propostas de moderno (`?moderno=1|2|3`) no cartão `voo-4`.
-  Fecha quando ele escolher voando.
+  Ao voo-4 (22/11): _"Eu gostei do Turbo."_, a chama com _"um estouro"_ e depois _"uma chama constante"_, e o começo
+  sem atrito: _"o modo inicial, ele é o modo simulação"_. O voo que fica (`?voo=c`) no cartão `voo-5`. Fecha quando
+  ele aprovar voando.
 
 ## Som (palavras dele, 19/11)
 

@@ -28,6 +28,7 @@ export const NEXT = {
     "Two trial flights only the address turns on (?voo=a and ?voo=b), where the ship moves by its own thrusters, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
     'The test address that starts a run with one item (?content=) can now give the ship several cards at chosen levels (&cards=), so Felipe can fly each flight with its upgrades; normal runs are the same.', // not confirmed
     "Three trial versions of the Flight Computer's modern flight only the address turns on (?moderno=1, 2 or 3), faster than the start with the same cards, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
+    'The flight that stays, as Felipe drew it (?voo=c): no drag at the start, the cards as jets the computer lights, the turbo at the Flight Computer, a burst then a steady flame; only the address turns it on.', // not confirmed
   ],
 };
 
