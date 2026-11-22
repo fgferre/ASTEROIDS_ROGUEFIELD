@@ -18,7 +18,7 @@ import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { HeartTokens, OrbCrystals } from './fieldTokens.js';
 import { createFieldVeil } from './fieldVeil.js';
-import { FlashLights } from './flashLights.js';
+import { FlashLights, VeinLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
@@ -313,6 +313,7 @@ export function setupThree(seeded) {
     space,
   });
   const flashes = new FlashLights(THREE, scene);
+  const veins = new VeinLights(THREE, scene);
   const debris = new DebrisChunks(THREE, scene);
   const bodies = new WeaponBodies(THREE, scene);
   const bursts = new DeathBursts(debris, flashes);
@@ -404,6 +405,7 @@ export function setupThree(seeded) {
     veil,
     biomes,
     flashes,
+    veins,
     enemies,
     player,
     pickups,

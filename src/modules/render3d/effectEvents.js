@@ -6,6 +6,7 @@ import { rgbOf } from './batches.js';
 import { BLAST_LOOK } from './blasts.js';
 import { SPARK_KIND } from './hitSparks.js';
 import { DECAL_KIND } from './scorchDecals.js';
+import { shotColor } from './weaponMirror.js';
 import { strikeOf } from './enemies/rocks.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
 
@@ -88,6 +89,12 @@ export function registerEffectEvents(r) {
       Boolean(data.killed),
       SPARK_KIND[strike]
     );
+    // the hit lights what it struck in the shot's own colour
+    const combat = r.cachedCombat;
+    const color =
+      r.three && bullet && combat ? shotColor(combat, bullet) : null;
+    const rgb = color ? rgbOf(r.three.THREE, color) : null;
+    if (rgb && enemy) r.three.flashes.hit(x, y, rgb, data.damage);
     // what survives the hit keeps its heat where it was struck: a rock a
     // patch of lava, a machine a white-hot spot, and the machine jolts; a
     // machine it kills breaks with the shot's push
@@ -100,14 +107,14 @@ export function registerEffectEvents(r) {
     }
     if (rock) {
       if (DECAL_KIND[strike] !== undefined) {
-        r.three.decals.hit(view, nx, ny, DECAL_KIND[strike], { x, y });
+        r.three.decals.hit(view, nx, ny, DECAL_KIND[strike], { x, y }, rgb);
       }
       r.three.enemies.rockViews.struck(view, nx, ny);
       if (!r.reducedMotion) {
         r.three.enemies.rockViews.kick(view, nx, ny, vx, vy, data.damage);
       }
     } else if (!view.kind.startsWith('herald')) {
-      r.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
+      r.three.decals.hit(view, nx, ny, DECAL_KIND.metal, null, rgb);
       if (!r.reducedMotion) {
         r.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);
       }
