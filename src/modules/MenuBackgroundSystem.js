@@ -508,6 +508,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     if (!this.loadingState.covered) {
       this.renderFrame();
+      this.hullPreview.useSky(this.renderer);
     }
 
     this.stats?.end();

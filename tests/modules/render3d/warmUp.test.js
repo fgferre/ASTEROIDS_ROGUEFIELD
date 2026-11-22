@@ -84,6 +84,7 @@ function warmable() {
     bloomUrl: true,
     enemies: new EnemyMirror(THREE, scene, seeded, null),
     player: new PlayerMirror(THREE, scene, seeded),
+    dressHull: vi.fn(),
   };
   return { renderer, compiled, batches, variants };
 }
@@ -177,6 +178,8 @@ describe('Renderer3D.warmUp', () => {
     expect(enemies.views.size).toBe(0);
     expect(enemies.dissolve.count).toBe(0);
     expect(composer.render).toHaveBeenCalledTimes(1);
+    // the hull's reflection sky, after that frame
+    expect(renderer.three.dressHull).toHaveBeenCalledTimes(1);
 
     expect(progress.at(-1)).toBe(1);
     progress.forEach((value, i) =>

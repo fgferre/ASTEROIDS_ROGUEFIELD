@@ -152,11 +152,10 @@ const HULL_NORMAL_SCALE = 0.5;
 const HULL_AO = 0.8;
 const HULL_MAP_SEED = 3131.9;
 
-// The hull's specular cap (hullModel.js), its livery (hullLivery.js; not on
-// the turret), then the cyan fresnel rim on the hull (a
-// tight band on the silhouette against the dark field) plus the white
-// invulnerability pulse, both as emissive; the pulse is weighted to the rim
-// so the panels stay readable while it blinks.
+// The hull's specular cap (hullModel.js), its livery (hullLivery.js; not the
+// turret's), the cyan fresnel rim (a tight band on the silhouette against the
+// dark field) and the white invulnerability pulse, both emissive, the pulse
+// weighted to the rim so the panels stay readable while it blinks.
 function patchHull(shader) {
   const { uRim, uBlink, livery } = this.userData;
   if (livery) hullLivery.patch(shader, livery);
@@ -256,10 +255,9 @@ export class PlayerMirror {
     this.breaking = false;
     this.wasDead = false;
 
-    // One material per finish (HULL_FINISHES: satin paint, glossy accents,
-    // polished steel); the tones ride in the vertex colours, the paint and
-    // the accents carry the baked panel maps. All take the rim and blink;
-    // the hull's set also its livery, the turret's set not.
+    // One material per finish (HULL_FINISHES), tones in the vertex colours,
+    // the paint and accents with the baked panel maps; all take the rim and
+    // blink, the hull's set its livery too (not the turret's).
     const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
     const blink = { value: 0 };
     const maps = bakeHullMaps(THREE, HULL_MAP_SEED);
@@ -269,10 +267,7 @@ export class PlayerMirror {
     this.livery = hullLivery.uniforms(THREE);
     const finishes = (livery) =>
       HULL_FINISHES.map((finish) => {
-        const material = new THREE.MeshStandardMaterial({
-          vertexColors: true,
-          ...finish,
-        });
+        const material = new THREE.MeshStandardMaterial(finish);
         Object.assign(material.userData, { uRim: rim, uBlink: blink, livery });
         material.onBeforeCompile = patchHull;
         return addRimLight(material);

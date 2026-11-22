@@ -21,8 +21,14 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
-  improved: [],
+  new: [
+    'Every hull shows its years of service: worn leading edges, grime, scorched engines, hull codes and warning stripes, and rust on the old Bastion.', // not confirmed
+    'Navigation lights: red and green at the wingtips and a white strobe on the antenna.', // not confirmed
+  ],
+  improved: [
+    'The Interceptor, Solar Slicer and Bastion have new hulls: curved bodies, a blue glass dome over the sensor, satin paint and brass trim.', // not confirmed
+    'Paint, metal and glass catch the light as your ship turns.', // not confirmed
+  ],
   fixed: [],
   unseen: [],
 };

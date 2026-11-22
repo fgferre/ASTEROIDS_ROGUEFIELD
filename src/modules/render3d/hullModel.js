@@ -136,15 +136,30 @@ export const SHINE = Object.freeze({
  * panel maps (their roughness map is about 1, so `roughness` is what the
  * surface gets).
  */
+// Every hull finish takes its tones from the vertex colours.
+const VERTEX_TONED = { vertexColors: true };
 export const HULL_FINISHES = Object.freeze([
   // The player's hulls shine more than the table's paint and accents, each
   // by its material (the owner, 21/11: "dependendo do material ali do
-  // casco, tem que ter brilho"): satin paint with a real sheen, lacquered
-  // accents, and the ship's own steel (13/11: he preferred its barrels as
-  // they were to the shared steel), its highlight a little tighter.
-  Object.freeze({ metalness: 0.2, roughness: 0.5, envMapIntensity: 1 }),
-  Object.freeze({ metalness: 0.2, roughness: 0.32, envMapIntensity: 1.2 }),
-  Object.freeze({ metalness: 1, roughness: 0.34, envMapIntensity: 2.5 }),
+  // casco, tem que ter brilho"): satin paint and lacquered accents smooth
+  // enough to mirror the hull's own sky (buildHullEnvironment), and the
+  // ship's own steel (13/11: he preferred its barrels as they were to the
+  // shared steel), its highlight tighter, its reflection held back so it
+  // keeps its brass and gold instead of turning white. The owner's pick,
+  // 22/11: the medium of three reflection strengths.
+  Object.freeze({ ...VERTEX_TONED, metalness: 0.2, roughness: 0.42 }),
+  Object.freeze({
+    ...VERTEX_TONED,
+    metalness: 0.2,
+    roughness: 0.3,
+    envMapIntensity: 1.2,
+  }),
+  Object.freeze({
+    ...VERTEX_TONED,
+    metalness: 1,
+    roughness: 0.34,
+    envMapIntensity: 0.45,
+  }),
 ]);
 
 /**
@@ -158,13 +173,107 @@ export const SPECULAR_CAP_GLSL = `
       reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.2));`;
 
 /**
- * The player hull's own cap (playerMirror.js, MenuHullPreview.js): about
- * twice the machines', so its sheen runs along the curves as it turns; at
- * 1.2 a hull facing the key light blew out to white (21/11).
+ * The player hull's own cap (playerMirror.js, MenuHullPreview.js): the key
+ * light's highlight a little over the machines' (higher, the flat Solar
+ * Slicer blades flashed white), its sky's reflection three times theirs, so
+ * the reflection runs along the curves as it turns.
  */
 export const HULL_SPECULAR_CAP_GLSL = `
-      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.62));
-      reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.34));`;
+      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.34));
+      reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.6));`;
+
+// The hull's sky (buildHullEnvironment): a dim cool gradient, so the hull's
+// diffuse light hardly changes, and a few small bright softboxes, which are
+// what the paint, steel and glass mirror: [width, height, colour, gain,
+// position, roll]. proposta 22/11 (the owner's "médio").
+const HULL_SKY_STRIPS = [
+  [70, 7, '#dfe9ff', 6, [0, 80, 10], 0],
+  [40, 5, '#dfe9ff', 4.2, [55, 55, -20], 0.6],
+  [26, 26, '#fff1e2', 4.8, [-60, 45, -40], 0],
+  [60, 3, '#7fe6ff', 3.6, [-20, 20, 85], 0.2],
+];
+
+/**
+ * A reflection sky for the player's hull only (rocks and machines keep the
+ * scene's dim one): built once per renderer, and again after a lost
+ * graphics context comes back. useHullEnvironment hands it to materials.
+ */
+export function buildHullEnvironment(THREE, renderer) {
+  const scene = new THREE.Scene();
+  const sky = new THREE.SphereGeometry(100, 48, 24);
+  const position = sky.getAttribute('position');
+  const colors = new Float32Array(position.count * 3);
+  const dir = new THREE.Vector3();
+  for (let i = 0; i < position.count; i += 1) {
+    dir.fromBufferAttribute(position, i).normalize();
+    const up = Math.max(0, dir.y);
+    const horizon = 1 - Math.abs(dir.y);
+    colors[i * 3] = 0.02 + 0.06 * up + 0.03 * horizon;
+    colors[i * 3 + 1] = 0.025 + 0.08 * up + 0.04 * horizon;
+    colors[i * 3 + 2] = 0.04 + 0.12 * up + 0.06 * horizon;
+  }
+  sky.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const side = THREE.DoubleSide;
+  scene.add(
+    new THREE.Mesh(
+      sky,
+      new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })
+    )
+  );
+  HULL_SKY_STRIPS.forEach(([width, height, hex, gain, at, roll]) => {
+    const color = new THREE.Color(hex).multiplyScalar(gain);
+    const strip = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({ color, side })
+    );
+    strip.position.set(...at);
+    strip.lookAt(0, 0, 0);
+    strip.rotateZ(roll);
+    scene.add(strip);
+  });
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  // far past the sky (radius 100): at the default 100 it clipped away
+  const texture = pmrem.fromScene(scene, 0.02, 0.1, 400).texture;
+  pmrem.dispose();
+  scene.traverse((node) => {
+    node.geometry?.dispose();
+    node.material?.dispose();
+  });
+  return texture;
+}
+
+/**
+ * Whether a sky from buildHullEnvironment came out lit: built at some moments
+ * (while the scene was set up, before a frame, in the warm-up) it came out
+ * black, cause not found (22/11). Reads it back through a 4×4 target, once.
+ */
+export function hullSkyIsLit(THREE, renderer, texture) {
+  const scene = new THREE.Scene();
+  const quad = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: texture })
+  );
+  scene.add(quad);
+  const target = new THREE.WebGLRenderTarget(4, 4);
+  const previous = renderer.getRenderTarget();
+  renderer.setRenderTarget(target);
+  renderer.render(scene, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
+  const pixels = new Uint8Array(4 * 4 * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, 4, 4, pixels);
+  renderer.setRenderTarget(previous);
+  target.dispose();
+  quad.geometry.dispose();
+  quad.material.dispose();
+  return pixels.some((value, i) => i % 4 !== 3 && value > 0);
+}
+
+/** Gives `materials` (a hull's and its glass's) the hull's sky. */
+export function useHullEnvironment(materials, texture) {
+  materials.forEach((material) => {
+    material.envMap = texture;
+    material.needsUpdate = true;
+  });
+}
 
 /**
  * A MeshStandardMaterial's onBeforeCompile (set it before addRimLight, which

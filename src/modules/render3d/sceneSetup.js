@@ -23,6 +23,11 @@ import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
+import {
+  buildHullEnvironment,
+  hullSkyIsLit,
+  useHullEnvironment,
+} from './hullModel.js';
 import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
@@ -316,6 +321,26 @@ export function setupThree(seeded) {
   const bursts = new DeathBursts(debris, flashes);
   const enemies = new EnemyMirror(THREE, scene, seeded, bursts);
   const player = new PlayerMirror(THREE, scene, seeded);
+  // its reflection sky, built again after a lost context
+  // (not the turret's: its dome mirrored the softboxes vivid blue, 22/11)
+  const hullMaterials = [...player.hullMaterials, player.canopyMaterial];
+  // Built in the warm-up, or after a frame; one that comes out black
+  // (hullSkyIsLit) is thrown away and built again on the next frame.
+  let hullSky = null;
+  const dressHull = () => {
+    if (hullSky) return;
+    const sky = buildHullEnvironment(THREE, renderer);
+    if (!hullSkyIsLit(THREE, renderer, sky)) {
+      sky.dispose();
+      return;
+    }
+    hullSky = sky;
+    useHullEnvironment(hullMaterials, hullSky);
+  };
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    hullSky?.dispose();
+    hullSky = null;
+  });
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
   const decals = new ScorchDecals(THREE, scene, camera);
@@ -404,6 +429,7 @@ export function setupThree(seeded) {
     veins,
     enemies,
     player,
+    dressHull,
     pickups,
     chests,
     decals,

@@ -288,6 +288,23 @@ function paint(THREE, geometry, livery) {
     }
   });
 
+  // The Solar Slicer's blades are wide flat plates: under a glossy coat the
+  // whole blade mirrored the key light white at once (22/11); theirs is
+  // duller, the colour unchanged.
+  m.globalCompositeOperation = 'lighter';
+  if (geometry.blades) {
+    geometry.panels
+      .filter((panel) => panel.rcsPort)
+      .forEach(({ points }) => {
+        m.fillStyle = 'rgba(0,150,0,1)';
+        m.beginPath();
+        points.forEach((p, i) =>
+          (i ? m.lineTo : m.moveTo).call(m, X(p.x), Z(p.y))
+        );
+        m.fill();
+      });
+  }
+
   // Markings.
   c.textAlign = 'center';
   c.textBaseline = 'middle';

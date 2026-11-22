@@ -24,13 +24,16 @@ import {
   HULL_SPECULAR_CAP_GLSL,
   NOZZLE_HEIGHT,
   VISUAL_SCALE,
+  buildHullEnvironment,
   buildHullModel,
   buildSensorGlass,
   buildTurret,
   edgeLines,
+  hullSkyIsLit,
   hullTones,
   seatTurret,
   throatGeometry,
+  useHullEnvironment,
 } from './render3d/hullModel.js';
 import * as hullLivery from './render3d/hullLivery.js';
 
@@ -46,6 +49,8 @@ const REST_ANGLE = 0.7;
 // Share of the stage box the hull may fill at its widest turn (12 % margin).
 const FILL = 0.88;
 const PLUME_LENGTH = 3.5;
+// The hull's reflection sky's strength here, against the game's (useSky).
+const MENU_SKY = 0.35;
 // Studio light: view-space direction (upper left, toward the viewer) and
 // strength, added to the hull's own shading only.
 const STUDIO_GLSL = 'vec3(-0.45, 0.7, 0.55)';
@@ -145,6 +150,8 @@ export class MenuHullPreview {
     this.radius = 1;
     this.depth = 0;
     this.time = 0;
+    // the reflection sky (useSky), once a frame is drawn
+    this.sky = null;
   }
 
   /**
@@ -162,6 +169,36 @@ export class MenuHullPreview {
     }
     this.hull = this.build(getShipModelById(hullId));
     this.spin.add(this.hull);
+  }
+
+  /**
+   * The hull's own reflection sky (hullModel.js), as in the game: built once
+   * a frame is drawn with the menu's `renderer`, again while it comes out
+   * black (hullSkyIsLit), and again after a lost graphics context.
+   */
+  useSky(renderer) {
+    if (this.sky) return;
+    const { hull, canopy } = this.materials;
+    const sky = buildHullEnvironment(this.THREE, renderer);
+    if (!hullSkyIsLit(this.THREE, renderer, sky)) {
+      sky.dispose(); // black (hullSkyIsLit): again on the next frame
+      return;
+    }
+    this.sky = sky;
+    // not the turret: its dome mirrored the softboxes vivid blue (22/11)
+    const materials = [...hull, canopy];
+    useHullEnvironment(materials, sky);
+    // the menu draws without tone mapping: the sky's softboxes at full
+    // strength burned the turret's dome blue (22/11)
+    materials.forEach((material) => (material.envMapIntensity *= MENU_SKY));
+    renderer.domElement.addEventListener(
+      'webglcontextrestored',
+      () => {
+        this.sky.dispose();
+        this.sky = null;
+      },
+      { once: true }
+    );
   }
 
   build(definition) {
