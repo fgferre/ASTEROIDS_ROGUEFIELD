@@ -10,6 +10,13 @@
 // - `?voo=b`: the jets alone move and turn the ship, each within its own force
 //   (flyByJets): no drag, the top speed a rule of the flight computer, the
 //   brake the jets that point against the motion until the ship stops.
+// - `?voo=c`, "o voo que fica" (Felipe, 22/11, after flying the steps): B from
+//   the start, no drag at all ("o modo inicial, ele é o modo simulação"); each
+//   braking and agility card the computer lighting jets for the pilot; the
+//   Flight Computer the modern proposal 3, the turbo ("Eu gostei do Turbo"),
+//   braking as firmly as today's hand; the main flame a burst off the line,
+//   then a steady flame while the key holds ("não precisa ser esse jato da
+//   explosão").
 // The six jets every hull has: the main engine (forward), the retro (back), a
 // flank's two side jets (the whole hull sideways) and a crossed pair (a turn).
 
@@ -46,14 +53,20 @@ const BRAKE_FLOOR = 0.5;
 // The modern nose turns by the flight computer at today's rate; its turn
 // pair shows full at this spin-up (rad/s²).
 const MODERN_TURN_SHOWN = 60;
+// `?voo=c`: its modern proposal; the main flame while the key holds at the
+// top speed (where the engine no longer pushes); the modern auto-brake's
+// force × B's, so a turbo run stops about as firmly as today's hand.
+const STAYING_TRIAL = 3;
+const CRUISE_FLAME = 0.35;
+const STAYING_MODERN_BRAKE = 1.5;
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
-/** 'a' or 'b' from `?voo=`, else null (today's flight). */
+/** 'a', 'b' or 'c' from `?voo=`, else null (today's flight). */
 export function jetsFromUrl() {
   try {
     const value = new URLSearchParams(window.location.search).get('voo');
-    return value === 'a' || value === 'b' ? value : null;
+    return ['a', 'b', 'c'].includes(value) ? value : null;
   } catch {
     return null; // no window (Node tests)
   }
@@ -175,7 +188,10 @@ export function flyByJets(flight, deltaTime, input) {
 
   // A modern proposal (modernTrial.js): its own cruise, and the flight
   // computer drawing more from the same jets.
-  const trial = modern ? MODERN_TRIALS[flight.modernTrial] : null;
+  const staying = flight.jets === 'c';
+  const trial = modern
+    ? MODERN_TRIALS[flight.modernTrial ?? (staying ? STAYING_TRIAL : null)]
+    : null;
   // One main engine for both flights (the hull's and Main Thrusters'); the
   // Braking System's levels multiply the retro, the RCS System's the flanks.
   const main =
@@ -226,10 +242,9 @@ export function flyByJets(flight, deltaTime, input) {
   } else if (autoBrake) {
     wantX = -v.vx / deltaTime;
     wantY = -v.vy / deltaTime;
-    reach = Math.max(
-      BRAKE_FLOOR,
-      Math.min(1, speed / (top * BRAKE_FULL_SHARE))
-    );
+    reach =
+      Math.max(BRAKE_FLOOR, Math.min(1, speed / (top * BRAKE_FULL_SHARE))) *
+      (staying && modern ? STAYING_MODERN_BRAKE : 1);
   } else if (!modern || move) {
     // The pilot's push: classic along the nose; a modern proposal that keeps
     // its momentum along the keys.
@@ -312,10 +327,19 @@ export function flyByJets(flight, deltaTime, input) {
     ship.angle = wrapAngle(ship.angle + ship.angularVelocity * deltaTime);
   }
 
+  const shown = pilotShown(flight, move, fwd, asks);
+  const pilotForce = modern ? moveForce : 1;
+  // `?voo=c`: the flame holds while the key does, past the burst.
+  if (staying) {
+    jets.main = Math.max(
+      jets.main,
+      CRUISE_FLAME * shown.pilotMain * pilotForce
+    );
+  }
   return {
     fwd,
-    ...pilotShown(flight, move, fwd, asks),
-    pilotForce: modern ? moveForce : 1,
+    ...shown,
+    pilotForce,
     brake: { aux: 0, main: 0, starboard: 0, port: 0 },
     speed,
     dashing,

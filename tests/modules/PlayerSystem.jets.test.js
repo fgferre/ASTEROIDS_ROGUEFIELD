@@ -150,4 +150,29 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     fly({ up: true }, 24); // the turbo fades over 0.4 s
     expect(speedOf(player)).toBeLessThan(START_TOP * 1.2 * 1.05);
   });
+
+  it('C, the flight that stays: no drag at the start, a burst then a steady flame while W holds', () => {
+    const { player, fly } = makePlayer('c');
+    const burst = fly({ up: true }, 20).filter((e) => e.type === 'main');
+    expect(Math.max(...burst.map((e) => e.intensity))).toBe(1);
+    fly({ up: true }, 60); // at the top speed
+    const held = fly({ up: true }, 10).filter((e) => e.type === 'main');
+    expect(held.every((e) => e.intensity > 0.3 && e.intensity < 0.4)).toBe(
+      true
+    );
+    const top = speedOf(player);
+    fly({}, 120);
+    expect(speedOf(player)).toBeCloseTo(top, 6);
+  });
+
+  it('C: the Flight Computer brings the turbo, and letting go stops it firmly', () => {
+    const { player, fly } = makePlayer('c', 'modern', false);
+    // what the Flight Computer always comes with: Braking System 3, RCS 3
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
+    player.flight.agility = 1.9;
+    fly({ right: true }, 150);
+    expect(speedOf(player)).toBeGreaterThan(START_TOP * 1.2 * 1.35);
+    fly({}, 45);
+    expect(speedOf(player)).toBeLessThan(2);
+  });
 });
