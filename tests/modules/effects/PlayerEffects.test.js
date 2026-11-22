@@ -29,4 +29,30 @@ describe('PlayerEffects', () => {
       expect(p.material).toBe('metal');
     });
   });
+
+  it("keeps a fusion off the screen while a boss's fall shakes it", () => {
+    const addScreenShake = vi.fn();
+    const addScreenFlash = vi.fn();
+    const effects = new PlayerEffects({
+      particleEffects: { particles: [] },
+      createParticle: () => ({}),
+      randomFloat: () => 0.5,
+      getScaledParticleCount: (count) => Math.round(count),
+      particleDensity: () => 1,
+      addScreenShake,
+      addScreenFlash,
+      addFreezeFrame: () => {},
+      playSlowMotion: () => {},
+      emit: () => {},
+      player: () => null,
+    });
+    const fusion = { position: { x: 10, y: 10 }, tier: 2 };
+
+    effects.createOrbFusionEffect(fusion, { screen: false });
+    expect(addScreenShake).not.toHaveBeenCalled();
+    expect(addScreenFlash).not.toHaveBeenCalled();
+    effects.createOrbFusionEffect(fusion);
+    expect(addScreenShake).toHaveBeenCalledTimes(1);
+    expect(addScreenFlash).toHaveBeenCalledTimes(1);
+  });
 });

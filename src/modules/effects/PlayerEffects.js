@@ -462,7 +462,9 @@ export class PlayerEffects {
     }
   }
 
-  createOrbFusionEffect(data) {
+  // `screen`: false while a boss's fall shakes the screen, which the fusion
+  // must not lift again.
+  createOrbFusionEffect(data, { screen = true } = {}) {
     const tier = data?.tier || 1;
     const consumed = data?.consumed || 0;
     const particleColor = data?.color || PALETTE.xp;
@@ -522,6 +524,7 @@ export class PlayerEffects {
       this.particleEffects.particles.push(particle);
     }
 
+    if (!screen) return;
     this.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
     this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
   }

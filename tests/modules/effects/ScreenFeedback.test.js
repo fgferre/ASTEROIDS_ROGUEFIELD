@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import RandomService from '../../../src/core/RandomService.js';
 import {
+  BOSS_LOOT_FUSION_GAP,
   PLAYER_HIT_SHAKE,
   ScreenFeedback,
   hullFlashIntensity,
@@ -40,5 +41,21 @@ describe('ScreenFeedback', () => {
     expect(hullFlashIntensity(3, 100)).toBeLessThan(0.3);
     expect(hullFlashIntensity(30, 100)).toBeGreaterThan(0.3);
     expect(hullFlashIntensity(100, 100)).toBeLessThanOrEqual(0.45);
+  });
+
+  it("lets a boss's fall hold the screen only as long as it was given", () => {
+    const feedback = new ScreenFeedback({
+      random: () => new RandomService('screen-feedback-test'),
+      screenShakeScale: () => 1,
+      motionReduced: () => false,
+      flashingReduced: () => false,
+      damageFlashEnabled: () => true,
+    });
+    feedback.bossFallHold = BOSS_LOOT_FUSION_GAP;
+    // other shakes do not stretch it
+    feedback.addScreenShake('bossDefeated');
+    feedback.update(BOSS_LOOT_FUSION_GAP);
+    expect(feedback.screenShake.trauma).toBeGreaterThan(0);
+    expect(feedback.bossFallHold).toBe(0);
   });
 });

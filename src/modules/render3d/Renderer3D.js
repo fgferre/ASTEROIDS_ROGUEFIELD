@@ -852,6 +852,7 @@ class Renderer3D extends BaseSystem {
     t.bodies.begin();
 
     const warden = t.enemies.update(enemyList, time, dt, this.hitSparks);
+    t.veins.update(t.enemies.views);
     if (t.key.castShadow) {
       t.enemies.budgetShadows(t.key.target.position.x, t.key.target.position.z);
     }

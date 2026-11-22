@@ -6,8 +6,32 @@ import { rgbOf } from './batches.js';
 import { BLAST_LOOK } from './blasts.js';
 import { SPARK_KIND } from './hitSparks.js';
 import { DECAL_KIND } from './scorchDecals.js';
+import { shotColor } from './weaponMirror.js';
 import { strikeOf } from './enemies/rocks.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
+
+// Where a shot entered a rock (21/11, 35: "o incandescente tem que ser
+// aonde o tiro efetivamente tocou a pedra"), from its centre: back along the
+// shot's flight from where it was caught, inside the rock, to its edge;
+// straight out from the centre for a hit with no flight.
+export function shotContact(enemy, position, vx, vy) {
+  const radius = enemy.radius || 12;
+  const px = position.x - enemy.x;
+  const py = position.y - enemy.y;
+  const speed = Math.hypot(vx, vy);
+  if (speed > 1e-3) {
+    const ux = vx / speed;
+    const uy = vy / speed;
+    const along = px * ux + py * uy;
+    const room = along * along - (px * px + py * py - radius * radius);
+    if (room >= 0) {
+      const back = along + Math.sqrt(room);
+      return { x: px - ux * back, y: py - uy * back };
+    }
+  }
+  const out = Math.hypot(px, py) || 1;
+  return { x: (px / out) * radius, y: (py / out) * radius };
+}
 
 /** Registers the effect listeners on the renderer `r`. */
 export function registerEffectEvents(r) {
@@ -47,18 +71,33 @@ export function registerEffectEvents(r) {
     const rock = enemy?.type === 'asteroid';
     // what a rock is made of: stone, metal (iron) or glass (crystal)
     const strike = rock ? strikeOf(enemy) : 'metal';
-    const nx = enemy ? position.x - enemy.x : 0;
-    const ny = enemy ? position.y - enemy.y : 0;
+    const vx = bullet?.vx || 0;
+    const vy = bullet?.vy || 0;
+    // on a rock everything starts where the shot touched it
+    const at = rock ? shotContact(enemy, position, vx, vy) : null;
+    const nx = at ? at.x : enemy ? position.x - enemy.x : 0;
+    const ny = at ? at.y : enemy ? position.y - enemy.y : 0;
+    const x = at ? enemy.x + at.x : position.x;
+    const y = at ? enemy.y + at.y : position.y;
     r.hitSparks.emit(
-      position.x,
-      position.y,
+      x,
+      y,
       nx,
       ny,
-      bullet?.vx || 0,
-      bullet?.vy || 0,
+      vx,
+      vy,
       Boolean(data.killed),
       SPARK_KIND[strike]
     );
+    // the hit lights what it struck in the shot's own colour
+    const combat = r.cachedCombat;
+    const color =
+      r.three && bullet && combat ? shotColor(combat, bullet) : null;
+    const rgb = color ? rgbOf(r.three.THREE, color) : null;
+    // (Reduce Flashing dims it as it dims the screen's flashes)
+    if (rgb && enemy) {
+      r.three.flashes.hit(x, y, rgb, data.damage * (r.flashScale ?? 1));
+    }
     // what survives the hit keeps its heat where it was struck: a rock a
     // patch of lava, a machine a white-hot spot, and the machine jolts; a
     // machine it kills breaks with the shot's push
@@ -71,11 +110,14 @@ export function registerEffectEvents(r) {
     }
     if (rock) {
       if (DECAL_KIND[strike] !== undefined) {
-        r.three.decals.hit(view, nx, ny, DECAL_KIND[strike]);
+        r.three.decals.hit(view, nx, ny, DECAL_KIND[strike], { x, y }, rgb);
       }
       r.three.enemies.rockViews.struck(view, nx, ny);
+      if (!r.reducedMotion) {
+        r.three.enemies.rockViews.kick(view, nx, ny, vx, vy, data.damage);
+      }
     } else if (!view.kind.startsWith('herald')) {
-      r.three.decals.hit(view, nx, ny, DECAL_KIND.metal);
+      r.three.decals.hit(view, nx, ny, DECAL_KIND.metal, null, rgb);
       if (!r.reducedMotion) {
         r.three.enemies.jolt(view, bullet.vx, bullet.vy, data.damage);
       }

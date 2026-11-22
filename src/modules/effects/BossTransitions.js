@@ -655,10 +655,10 @@ export class BossTransitions {
     const config = this.getBossEffectConfig('defeated') || {};
     const palette = BOSS_FX;
 
-    this.addFreezeFrame(0.5, 0.3);
-    this.addScreenShake(20, 1.0);
-    this.addScreenFlash(PALETTE.text, 0.8, 0.3);
-
+    // The stop, the shake and the flash come once, from the defeat's config
+    // (applyBossScreenShake and applyBossEffectTimings below); a second set
+    // here landed on the same frame and only overrode the Screen Shake and
+    // Reduced Motion settings (21/11).
     const burstColor = palette.core;
     const burstCount = 50;
 
@@ -829,8 +829,7 @@ export class BossTransitions {
     this.applyBossEffectTimings(config, palette, 'boss-defeated');
 
     GameDebugLogger.log('STATE', 'Boss defeat effects created', {
-      freezeDuration: 0.5,
-      shakeIntensity: 20,
+      freezeDuration: config.freezeFrame?.duration,
       particleCount: burstCount,
     });
   }

@@ -7,6 +7,10 @@
 import { createSeededRandom } from '../asteroidMesh.js';
 import { cutRock } from './rockCut.js';
 
+// The variant a rock looks like: a gold or crystal rock's pieces look like
+// it (Asteroid's `look`), the rest like their own.
+export const lookOf = (enemy) => enemy.look || enemy.variant;
+
 // The colour each variant's inside glows in when it breaks (rockShader.js
 // ROCK_TINT): lava, a dense core's cold light, blood, gold, lit glass.
 const CUT_TINTS = { denseCore: 1, parasite: 2, gold: 3, crystal: 4 };
@@ -151,7 +155,7 @@ export function createRockBreak(kit, rocks) {
    */
   function split(view, enemy, fragments) {
     if (!view || !fragments.length) return;
-    const whole = { variant: enemy.variant, x: enemy.x, y: enemy.y };
+    const whole = { variant: lookOf(enemy), x: enemy.x, y: enemy.y };
     const parts = fragments.map((f) => {
       const piece = { waiting: true, born: clock };
       pending.set(f.id, piece);
@@ -202,7 +206,7 @@ export function createRockBreak(kit, rocks) {
         geometry: piece.geometry,
         turn: object.quaternion.clone(),
         world,
-        tint: CUT_TINTS[enemy.variant] || 0,
+        tint: CUT_TINTS[lookOf(enemy)] || 0,
         born: clock,
       });
     });
