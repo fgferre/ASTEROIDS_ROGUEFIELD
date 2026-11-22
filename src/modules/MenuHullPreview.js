@@ -4,11 +4,11 @@
 // (render3d/hullModel.js, laid out as render3d/playerMirror.js draws it, at
 // the hull's base upgrade levels) under menu materials: the game's finishes
 // (satin paint, glossy accents, polished steel) on the vertex-coloured hull
-// and turret and the dark glass canopy, edge lines, glowing
+// and turret and the blue glass over the sensor, edge lines, glowing
 // throats and a thruster plume in the hull accent (cyan Interceptor, amber
 // Solar Slicer and Bastion). The menu's key light circles the hull as the
-// camera orbits, so a fixed screen-space studio light (hull and canopy
-// shaders only) keeps it readable when the key light is behind it. A locked
+// camera orbits, so a fixed screen-space studio light (hull shaders only)
+// keeps it readable when the key light is behind it. A locked
 // hull is one dark silhouette, without lines, glows or plume. It hangs off
 // the menu camera, framed into the #menu-hull-stage box (#hangar-hull-stage
 // while the Hangar is open), and turns slowly on its own axis (still with
@@ -97,8 +97,8 @@ export class MenuHullPreview {
     this.root.visible = false;
     camera.add(this.root);
 
-    // The game's hull tones (scaled per hull by its `albedo` in the model)
-    // and its upgrade-applied panels.
+    // The turret's tones (each hull paints its own) and the hull's
+    // upgrade-applied panels.
     this.tones = hullTones(THREE);
     this.hullArt = new HullArt();
     const studio = (material) => {
@@ -156,7 +156,7 @@ export class MenuHullPreview {
     const { visual } = definition;
     const dark = this.silhouette && materials.silhouette;
     const geometry = this.hullArt.getHullGeometry(definition, BASE_LEVELS);
-    const model = buildHullModel(THREE, geometry, this.tones);
+    const model = buildHullModel(THREE, geometry);
 
     // The game's layout: the hull at VISUAL_SCALE, the turret unscaled on
     // its deck; the ship's up turned onto the spin axis (+z).

@@ -3,7 +3,7 @@
 // the RCS upgrade, tail fins, nacelles, intakes, pods, canopy, edge lines,
 // turret), in three vertex-coloured finishes (satin paint and glossier
 // accent panels with baked panel maps, polished steel) under a cyan fresnel
-// rim, with a dark glass canopy, cached per hull and upgrade levels. The only
+// rim, with blue glass over the sensor, cached per hull and upgrade levels. The only
 // strong light is the thrusters (hull accent: cyan Interceptor, amber Solar
 // Slicer): glowing throats, cones with a white core that stretch with
 // thrust, turn-jet needles at the RCS ports, retro flames at the nose, a
@@ -510,7 +510,7 @@ export class PlayerMirror {
 
     const key = hullKeyOf(hull, levels);
     if (!this.hullCache.has(key)) {
-      const model = buildHullModel(THREE, geometry, this.tones);
+      const model = buildHullModel(THREE, geometry);
       model.hull.userData.cached = true;
       model.canopy.userData.cached = true;
       this.hullCache.set(key, model);

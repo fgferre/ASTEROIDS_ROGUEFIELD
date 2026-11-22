@@ -425,8 +425,8 @@ const boxAlongX = (x, y, z, p, squash) => (along, r, a) => {
 };
 
 /**
- * The hull tones by DEEP, BASE, FIN, SPINE and STEEL (linear), before a
- * hull's albedo.
+ * The turret tones by DEEP, BASE, FIN, SPINE and STEEL (linear); each hull
+ * paints its own (its `form.tones`).
  */
 export function hullTones(THREE) {
   const tone = (from, to, t) =>
@@ -614,8 +614,8 @@ export function edgeLines(THREE, model, materials) {
 
 /**
  * A hull's model from its geometry (hullArt.js: panels with the upgrades
- * applied, nozzles, cockpit, `form` in SHIP_SIZE units) and `tones`
- * (overridden by the hull's livery), shaped by hullSlabModel.js.
+ * applied, nozzles, cockpit, `form` in SHIP_SIZE units, painted in its
+ * `form.tones`), shaped by hullSlabModel.js.
  * Returns { hull, ghost, canopy, edges, tips, deckY }: the static parts as
  * one vertex-coloured geometry with a draw group per finish (HULL_FINISHES
  * materials), fuselage and wings first, then the raised parts; `ghost`
@@ -625,10 +625,8 @@ export function edgeLines(THREE, model, materials) {
  * deck height at the turret pivot; `noseTop`, the hull's top over its last
  * NOSE_SPAN on the centreline.
  */
-export function buildHullModel(THREE, geometry, tones) {
-  const colors = geometry.form.tones
-    ? geometry.form.tones.map((hex) => colorOf(THREE, hex))
-    : tones.map((color) => color.clone().multiplyScalar(geometry.albedo));
+export function buildHullModel(THREE, geometry) {
+  const colors = geometry.form.tones.map((hex) => colorOf(THREE, hex));
   colors.push(colorOf(THREE, geometry.accent).lerp(colors[1], 0.45));
   const { plates, raised, ...rest } = buildSlabHull(
     THREE,
