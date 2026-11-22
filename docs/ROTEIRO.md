@@ -39,7 +39,7 @@ seu centro.
 | 5. Crystal Choir      | Uma fenda na estrutura do Anel              | Formações gigantes de cristal; a fenda acesa por dentro                |
 | 6. Resonance Chamber  | Uma câmara imensa no interior do Anel       | Paredes e costelas da estrutura em volta; rachaduras brilhando         |
 | 7. Assembly Graveyard | Os estaleiros                               | Esqueletos de naves gigantes inacabadas presos em andaimes             |
-| 8. Quarantine Grid    | À sombra de um planeta escuro               | O planeta próximo, quase preto; a malha de balizas de quarentena       |
+| 8. Quarantine Grid    | À sombra de um planeta escuro               | O planeta ao longe, quase preto; a malha de balizas de quarentena      |
 | 9. Null Boundary      | A ruptura: as pontas quebradas do Anel      | As duas pontas do Anel e o vão; um disco de matéria moída girando      |
 | 10. The Crucible      | O centro: o coletor em volta da estrela     | A estrela muito perto; arcos do Anel sendo refeitos em volta dela      |
 

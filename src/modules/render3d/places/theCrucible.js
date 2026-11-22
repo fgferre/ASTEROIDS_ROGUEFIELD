@@ -1,6 +1,7 @@
 // The Crucible (docs/ROTEIRO.md "Os lugares" 10): the centre, the collector
-// round the star. The star very close under the field, brighter and nearer
-// than from the Furnace; round it arcs of the Ring being rebuilt at several
+// round the star. The star very close under the field, nearer than from the
+// Furnace: a surface that boils slowly, a few spots, a limb going to red
+// and a short corona with tongues of fire; round it arcs of the Ring being rebuilt at several
 // depths — some stretches whole, some bare frames and gaps — turning
 // slowly about it. Their running lights follow the Ring's wake (lit while
 // it wakes, dim when it does not), and the set answers the campaign's
@@ -9,7 +10,8 @@
 // from full (Severance) puts the lights out, stops the arcs and dims the
 // star, until the set has been out of view.
 
-import { lightPoint, starGlow, under } from './pieces.js';
+import { bakeStarMap } from '../bakedMaps.js';
+import { lightPoint, under } from './pieces.js';
 
 // proposta 12/11: the arcs (radius, height over the star, tilt, the stretch built and the
 // stretch still bare, radians) in two groups turning at `spin` rad/s; the
@@ -53,6 +55,21 @@ const ARCS = [
   },
 ];
 const SPIN = [0.012, -0.008];
+// proposta 21/11 ("Estrela de verdade"): the star's disc (its corona
+// reaches `size`, the surface a `disc` share of it), its colours at the
+// centre, the limb and in the corona (the shader's own levels), how much
+// the cells show, the corona's fall and the whole's level (kept well under
+// the field: it was a cream that washed out the gold boss and the orbs).
+const STAR = {
+  size: 3800,
+  disc: 0.4,
+  core: ['#ff9a2a', 1],
+  edge: ['#d02a08', 0.9],
+  corona: ['#ff5a14', 0.9],
+  grain: 0.45,
+  fall: 7,
+  level: 0.23,
+};
 const LIGHTS = { low: 0.4, high: 1.4 };
 // proposta 12/11: the wake past 1 that plates every bare stretch (the
 // Stewardship's own), the new plates' glow, the star's level once severed
@@ -61,6 +78,77 @@ const PLATED_AT = 1.25;
 const PLATING = 0.9;
 const SEVERED_STAR = 0.45;
 const FORGET = 1;
+
+const STAR_VERTEX = `
+varying vec2 vAt;
+void main() {
+  vAt = position.xz / ${STAR.size.toFixed(1)};
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+// Two reads of the cells drifting apart make them seem to boil; the limb
+// darkens toward red; past it a corona with a few tongues standing off it.
+const STAR_FRAGMENT = `
+precision highp float;
+uniform sampler2D uMap;
+uniform float uTime;
+uniform float uLevel;
+uniform float uOpacity;
+uniform vec3 uCore;
+uniform vec3 uEdge;
+uniform vec3 uCorona;
+varying vec2 vAt;
+void main() {
+  float disc = ${STAR.disc.toFixed(2)};
+  float r = length(vAt);
+  vec3 color;
+  if (r < disc) {
+    float mu = sqrt(max(0.0, 1.0 - (r / disc) * (r / disc)));
+    vec2 p = vAt / disc;
+    float a = texture2D(uMap, p + vec2(uTime * 0.004, uTime * 0.0025)).r;
+    float b = texture2D(uMap, p * 1.37 + vec2(-uTime * 0.003, uTime * 0.0035)).r;
+    float cells = mix(1.0, a * 0.6 + b * 0.4, ${STAR.grain.toFixed(2)});
+    color = mix(uEdge, uCore, pow(mu, 0.6)) * (0.35 + 0.65 * sqrt(mu)) * cells;
+  } else {
+    float t = (r - disc) / disc;
+    float angle = atan(vAt.y, vAt.x);
+    float tongue = pow(max(0.0, sin(angle * 5.0 + 1.3) * sin(angle * 3.0 - 0.4)), 6.0);
+    color = uCorona * (0.42 * exp(-t * ${STAR.fall.toFixed(1)}) + 0.5 * tongue * exp(-t * 14.0));
+  }
+  gl_FragColor = vec4(color * ${STAR.level.toFixed(2)} * uLevel * uOpacity, 1.0);
+  #include <tonemapping_fragment>
+  #include <encodings_fragment>
+}`;
+
+// The star, faded with the set like its other materials (PlaceSets.apply
+// sets `opacity`; the mesh hands it to the shader as it draws).
+function star(THREE, kit) {
+  const color = ([css, k]) => new THREE.Color(css).multiplyScalar(k);
+  const material = new THREE.ShaderMaterial({
+    vertexShader: STAR_VERTEX,
+    fragmentShader: STAR_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uMap: { value: bakeStarMap(THREE, 5) },
+      uTime: { value: 0 },
+      uLevel: { value: 1 },
+      uOpacity: { value: 1 },
+      uCore: { value: color(STAR.core) },
+      uEdge: { value: color(STAR.edge) },
+      uCorona: { value: color(STAR.corona) },
+    },
+  });
+  kit.materials.set('crucible-star', material);
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(STAR.size, 96).rotateX(-Math.PI / 2),
+    material
+  );
+  mesh.onBeforeRender = () => {
+    material.uniforms.uOpacity.value = material.opacity;
+  };
+  return mesh;
+}
 
 // One arc of modules round the star's axis: built decks with a keel, and
 // in its bare stretch only the frames and two rails, waiting for plates.
@@ -126,25 +214,7 @@ function arc(kit, hull, lights, plating, { radius, from, to, bare }) {
 }
 
 export function buildTheCrucible(THREE, kit) {
-  const { tone } = kit;
-
-  // The star: a bright disc, gently limb-darkened, in a wide corona.
-  const star = kit.parts();
-  kit.put(
-    star,
-    starGlow(THREE, {
-      limb: 0.35,
-      // proposta 12/11: a tight corona (it was 0.38, 5 and a 0.05 tail,
-      // which washed the whole arena cream under a gold boss)
-      falloff: 9,
-      tail: 0.015,
-      rings: 20,
-      sides: 56,
-    }),
-    tone('#ffdca0', 0.7),
-    [0, 0, 0],
-    3800
-  );
+  const sun = star(THREE, kit);
 
   const groups = [0, 1].map((g) => {
     const lists = [kit.parts(), kit.parts(), kit.parts()];
@@ -171,10 +241,10 @@ export function buildTheCrucible(THREE, kit) {
     return group;
   });
   const object = new THREE.Group();
-  object.add(kit.mesh(star, 'glow', 'crucible-star'), ...groups);
+  object.add(sun, ...groups);
   const lights = kit.materials.get('crucible-lights');
   const plating = kit.materials.get('crucible-plating');
-  const starLight = kit.materials.get('crucible-star');
+  const starLight = sun.material.uniforms;
   plating.color.setScalar(0);
   // The ending's memory: the wake has been full, and how far it fell since.
   let woke = false;
@@ -199,7 +269,8 @@ export function buildTheCrucible(THREE, kit) {
       });
       const lit = LIGHTS.low + (LIGHTS.high - LIGHTS.low) * wake;
       lights.color.setScalar(lit * (1 - severed));
-      starLight.color.setScalar(1 - (1 - SEVERED_STAR) * severed);
+      starLight.uTime.value = time;
+      starLight.uLevel.value = 1 - (1 - SEVERED_STAR) * severed;
       const plated = Math.min(1, Math.max(0, (wake - 1) / (PLATED_AT - 1)));
       plating.color.setScalar(PLATING * plated);
     },
