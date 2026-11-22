@@ -1237,26 +1237,36 @@ select {
   }
 }
 
+/* The blinks and the ring's return are 0.01% ramps, not step-end: Safari
+   holds a stepped animation while the game loads (the ring showed ~1 s late
+   on an iPhone, 21/11); a ramp runs on with the robot. */
 @keyframes om-eyes {
   0.00% {
     opacity: 1;
-    animation-timing-function: step-end;
+  }
+  49.58% {
+    opacity: 1;
   }
   49.59% {
     opacity: 0;
-    animation-timing-function: step-end;
+  }
+  52.04% {
+    opacity: 0;
   }
   52.05% {
     opacity: 1;
-    animation-timing-function: step-end;
+  }
+  54.51% {
+    opacity: 1;
   }
   54.52% {
     opacity: 0;
-    animation-timing-function: step-end;
+  }
+  57.25% {
+    opacity: 0;
   }
   57.26% {
     opacity: 1;
-    animation-timing-function: step-end;
   }
   100.00% {
     opacity: 1;
@@ -1266,23 +1276,30 @@ select {
 @keyframes om-smile {
   0.00% {
     opacity: 0;
-    animation-timing-function: step-end;
+  }
+  49.58% {
+    opacity: 0;
   }
   49.59% {
     opacity: 1;
-    animation-timing-function: step-end;
+  }
+  52.04% {
+    opacity: 1;
   }
   52.05% {
     opacity: 0;
-    animation-timing-function: step-end;
+  }
+  54.51% {
+    opacity: 0;
   }
   54.52% {
     opacity: 1;
-    animation-timing-function: step-end;
+  }
+  57.25% {
+    opacity: 1;
   }
   57.26% {
     opacity: 0;
-    animation-timing-function: step-end;
   }
   100.00% {
     opacity: 0;
@@ -1380,7 +1397,9 @@ select {
 @keyframes om-oring {
   0.00% {
     opacity: 0;
-    animation-timing-function: step-end;
+  }
+  64.92% {
+    opacity: 0;
   }
   64.93% {
     opacity: 1;
