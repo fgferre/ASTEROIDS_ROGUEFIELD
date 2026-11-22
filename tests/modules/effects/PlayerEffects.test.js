@@ -38,7 +38,6 @@ describe('PlayerEffects', () => {
       createParticle: () => ({}),
       randomFloat: () => 0.5,
       getScaledParticleCount: (count) => Math.round(count),
-      particleDensity: () => 1,
       addScreenShake,
       addScreenFlash,
       addFreezeFrame: () => {},
