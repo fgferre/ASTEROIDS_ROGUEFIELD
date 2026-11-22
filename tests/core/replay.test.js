@@ -166,4 +166,26 @@ describe('replay recording', () => {
     const json = createRecorder({ seed: 9, controls: 'classic' }).toJSON();
     expect(deserialize(serialize(json)).controls).toBe('classic');
   });
+
+  it('records the stick sensitivity at the start and at each change; an older recording flies Medium', () => {
+    const recorder = createRecorder({ seed: 9, stick: 'high' });
+    recorder.record(0, createInputFrame({}));
+    recorder.recordStick(120, 'low');
+    recorder.recordStick(130, 'low');
+    const json = recorder.toJSON();
+    const recording = deserialize(serialize(json));
+    expect(recording.stick).toEqual([
+      [0, 'high'],
+      [120, 'low'],
+    ]);
+    const player = createPlayer(recording);
+    expect(player.stickAt(0)).toBe('high');
+    expect(player.stickAt(119)).toBe('high');
+    expect(player.stickAt(120)).toBe('low');
+
+    delete json.stick;
+    expect(createPlayer(deserialize(serialize(json))).stickAt(50)).toBe(
+      'medium'
+    );
+  });
 });

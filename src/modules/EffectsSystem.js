@@ -7,9 +7,11 @@ import { EnemyEffects } from './effects/EnemyEffects.js';
 import { GameTime } from './effects/GameTime.js';
 import { Particles } from './effects/Particles.js';
 import { PlayerEffects } from './effects/PlayerEffects.js';
+import { ShakePresets } from '../utils/ScreenShake.js';
 import {
   PLAYER_HIT_SHAKE,
   SHIELD_SOAK_SHAKE,
+  BOSS_LOOT_FUSION_GAP,
   ScreenFeedback,
   hullFlashIntensity,
   hullLoss,
@@ -62,7 +64,6 @@ export default class EffectsSystem extends BaseSystem {
       randomCentered: randomHelpers.randomCentered,
       createMuzzleFlash: (x, y, dirX, dirY) =>
         this.playerEffects.createMuzzleFlash(x, y, dirX, dirY),
-      damageNumbersEnabled: () => this.damageNumbersEnabled,
     });
 
     this.screenFeedback = new ScreenFeedback({
@@ -101,7 +102,6 @@ export default class EffectsSystem extends BaseSystem {
       randomFloat: randomHelpers.randomFloat,
       getScaledParticleCount: (count, options) =>
         this.getScaledParticleCount(count, options),
-      particleDensity: () => this.particleDensity,
       addScreenShake: (presetOrIntensity, durationOrOptions) =>
         this.screenFeedback.addScreenShake(
           presetOrIntensity,
@@ -124,8 +124,6 @@ export default class EffectsSystem extends BaseSystem {
       ...burstDependencies,
       randomRange: randomHelpers.randomRange,
       getRandomFork: (name) => this.getRandomFork(name),
-      getScaledProbability: (probability) =>
-        this.getScaledProbability(probability),
       motionReduced: () => this.motionReduced,
       addHitStop: (kind) => this.gameTime.addHitStop(kind),
     });
@@ -137,12 +135,10 @@ export default class EffectsSystem extends BaseSystem {
       'EffectsSystem'
     );
     this.hitMarkersEnabled = true;
-    this.damageNumbersEnabled = true;
     this.motionReduced = false;
     this.flashingReduced = false;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
-    this.particleDensity = 1;
 
     this.setupSettingsIntegration();
   }
@@ -199,31 +195,15 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   applyVideoPreferences(values = {}) {
-    if (Number.isFinite(values.screenShakeIntensity)) {
-      const normalized = Math.max(
-        0,
-        Math.min(1.5, Number(values.screenShakeIntensity))
-      );
-      this.screenShakeScale = normalized;
-      if (this.screenShakeScale <= 0) {
-        this.screenShake.reset();
-      }
-    }
-
     this.damageFlashEnabled = values.damageFlash !== false;
     if (!this.damageFlashEnabled) {
       this.screenFlash.timer = 0;
       this.screenFlash.intensity = 0;
     }
-
-    if (typeof values.reducedParticles === 'boolean') {
-      this.particleDensity = values.reducedParticles ? 0.55 : 1;
-    }
   }
 
   applyGameplayPreferences(values = {}) {
     this.hitMarkersEnabled = values.hitMarkers !== false;
-    this.damageNumbersEnabled = values.damageNumbers !== false;
 
     if (Number.isFinite(values.screenShake)) {
       this.screenShakeScale = Math.max(
@@ -245,22 +225,12 @@ export default class EffectsSystem extends BaseSystem {
       return allowZero ? 0 : minimum;
     }
 
-    const scaled = Math.round(numeric * this.particleDensity);
+    const scaled = Math.round(numeric);
     if (allowZero) {
       return Math.max(0, scaled);
     }
 
     return Math.max(minimum, scaled);
-  }
-
-  getScaledProbability(probability) {
-    const numeric = Number(probability);
-    if (!Number.isFinite(numeric)) {
-      return 0;
-    }
-
-    const clamped = Math.max(0, Math.min(1, numeric));
-    return Math.max(0, Math.min(1, clamped * this.particleDensity));
   }
 
   setupEventListeners() {
@@ -301,9 +271,10 @@ export default class EffectsSystem extends BaseSystem {
       this.bossTransitions.onPhaseChanged(payload)
     );
 
-    registerBossEvent('boss-defeated', (payload = {}) =>
-      this.bossTransitions.onDefeated(payload)
-    );
+    registerBossEvent('boss-defeated', (payload = {}) => {
+      this.bossTransitions.onDefeated(payload);
+      this.screenFeedback.bossFallHold = ShakePresets.bossDefeated.duration;
+    });
 
     this.registerEventListener('bullet-created', (data) =>
       this.playerEffects.onBulletCreated(data)
@@ -373,7 +344,15 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('xp-orb-fused', (data) => {
-      if (data?.position) this.playerEffects.createOrbFusionEffect(data);
+      if (!data?.position) return;
+      const quiet = this.screenFeedback.bossFallHold > 0;
+      if (quiet) {
+        this.screenFeedback.bossFallHold = Math.max(
+          this.screenFeedback.bossFallHold,
+          BOSS_LOOT_FUSION_GAP
+        );
+      }
+      this.playerEffects.createOrbFusionEffect(data, { screen: !quiet });
     });
 
     this.registerEventListener('player-took-damage', (payload = {}) => {
@@ -401,17 +380,6 @@ export default class EffectsSystem extends BaseSystem {
 
       // Brief freeze frame for impact
       this.gameTime.addFreezeFrame(0.12, 0.15);
-    });
-
-    this.registerEventListener('enemy-took-damage', (data) => {
-      if (data?.enemy && Number.isFinite(data.damage)) {
-        this.particleEffects.createFloatingDamageText(
-          data.enemy.x,
-          data.enemy.y,
-          data.damage,
-          data.isCritical || false
-        );
-      }
     });
 
     this.registerEventListener('shield-deflective-explosion', (data) =>
@@ -452,7 +420,6 @@ export default class EffectsSystem extends BaseSystem {
 
     this.particleEffects.updateParticles(effectDelta);
     this.particleEffects.updateShockwaves(effectDelta);
-    this.particleEffects.updateDamageTexts(effectDelta);
     this.bossTransitions.updateBossTransitions(effectDelta);
     this.particleEffects.updateAmbient(effectDelta);
 
@@ -478,10 +445,6 @@ export default class EffectsSystem extends BaseSystem {
 
   get shockwaves() {
     return this.particleEffects.shockwaves;
-  }
-
-  get damageTexts() {
-    return this.particleEffects.damageTexts;
   }
 
   get ambientChips() {

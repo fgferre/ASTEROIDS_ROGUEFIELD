@@ -26,6 +26,14 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { PALETTE } from '../../../data/constants/palette.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
 
+// A gold or crystal rock's pieces keep its look (21/11, his "Ok, aceito sua
+// sugestão" to: the pieces take the mother's look, the reward stays as it
+// is): `look` is drawing only; each piece keeps the variant it is dealt, so
+// its health, speed and what it drops do not change. A piece dealt a variant
+// of its own that warns or pays (volatile, parasite, gold) shows that one.
+const PASSED_LOOKS = new Set(['gold', 'crystal']);
+const PLAIN_VARIANTS = new Set(['common', 'iron', 'denseCore']);
+
 /**
  * Asteroid Enemy Type
  *
@@ -210,6 +218,8 @@ export class Asteroid extends BaseEnemy {
       this.variant = 'common';
     }
 
+    this.look = PLAIN_VARIANTS.has(this.variant) ? options.look ?? null : null;
+
     this.radius = ASTEROID_SIZES[this.size] || 12;
     this.variantConfig =
       ASTEROID_VARIANTS[this.variant] || ASTEROID_VARIANTS.common;
@@ -362,6 +372,7 @@ export class Asteroid extends BaseEnemy {
     this.id = 0;
     this.size = null;
     this.variant = null;
+    this.look = null;
     this.wave = 1;
     this.spawnedBy = null;
     this.generation = 0;
@@ -1066,7 +1077,14 @@ export class Asteroid extends BaseEnemy {
   }
 
   generateFragments() {
-    return FragmentationSystem.generateFragments(this, this.fragmentProfile);
+    const pieces = FragmentationSystem.generateFragments(
+      this,
+      this.fragmentProfile
+    );
+    const look =
+      this.look || (PASSED_LOOKS.has(this.variant) ? this.variant : null);
+    if (look) pieces.forEach((piece) => (piece.look = look));
+    return pieces;
   }
 
   captureRandomScopeSeed(scope, generator) {

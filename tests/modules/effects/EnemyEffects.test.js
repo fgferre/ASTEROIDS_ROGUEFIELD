@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EnemyEffects } from '../../../src/modules/effects/EnemyEffects.js';
 
-const createEnemyEffects = (
-  density = 1,
-  hitStops = [],
-  randomFloat = () => 0.5
-) => {
+const createEnemyEffects = (hitStops = [], randomFloat = () => 0.5) => {
   const particleEffects = {
     particles: [],
     createShockwaveEffect: () => {},
@@ -24,9 +20,7 @@ const createEnemyEffects = (
     randomFloat,
     randomRange: (min) => min,
     getRandomFork: () => null,
-    getScaledParticleCount: (count) => Math.round(count * density),
-    getScaledProbability: (probability) => probability * density,
-    particleDensity: () => density,
+    getScaledParticleCount: (count) => Math.round(count),
     motionReduced: () => false,
     addScreenShake: () => {},
     addScreenFlash: () => {},
@@ -64,7 +58,7 @@ describe('EnemyEffects', () => {
 
   it('plays the death each enemy file names; one that names none dies as debris', () => {
     const hitStops = [];
-    const { effects, particleEffects } = createEnemyEffects(1, hitStops);
+    const { effects, particleEffects } = createEnemyEffects(hitStops);
     ['drone', 'hunter', 'mine'].forEach((type) =>
       effects.createAsteroidExplosion({ type, x: 10, y: 10 })
     );
@@ -101,7 +95,7 @@ describe('EnemyEffects', () => {
 
   it('gives a big machine’s fall a heavy stop; a small machine and a rock keep theirs', () => {
     const hitStops = [];
-    const { effects } = createEnemyEffects(1, hitStops);
+    const { effects } = createEnemyEffects(hitStops);
     effects.createAsteroidExplosion({
       type: 'anvil',
       x: 10,
@@ -122,23 +116,21 @@ describe('EnemyEffects', () => {
     expect(hitStops).toEqual(['large']);
   });
 
-  it('scales an asteroid burst by the particle density it is given', () => {
-    const asteroid = { size: 'medium', radius: 22, x: 50, y: 50 };
-    const full = createEnemyEffects(1);
-    const reduced = createEnemyEffects(0.5);
-
-    full.effects.createAsteroidExplosion(asteroid);
-    reduced.effects.createAsteroidExplosion(asteroid);
-
-    // a medium rock: 8 chips at full density, each with a lit chip beside it
-    expect(full.particleEffects.particles).toHaveLength(16);
-    expect(reduced.particleEffects.particles).toHaveLength(8);
+  it('throws a medium asteroid apart in 8 chips, each with a lit chip beside it', () => {
+    const { effects, particleEffects } = createEnemyEffects();
+    effects.createAsteroidExplosion({
+      size: 'medium',
+      radius: 22,
+      x: 50,
+      y: 50,
+    });
+    expect(particleEffects.particles).toHaveLength(16);
   });
 
   it('throws a broken plate’s pieces of metal out of its front, toward the shot', () => {
     let roll = 0;
     const cycle = () => ((roll += 1) * 0.37) % 1;
-    const { effects, particleEffects } = createEnemyEffects(1, [], cycle);
+    const { effects, particleEffects } = createEnemyEffects([], cycle);
     const facing = Math.PI / 2; // the plate faces +y
     effects.createPlateBreak({
       enemy: { x: 100, y: 100, vx: 0, vy: 0, radius: 22, facing },

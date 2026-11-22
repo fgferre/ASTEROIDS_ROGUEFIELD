@@ -3,6 +3,7 @@
  * DOM-bound services (UI, audio) stubbed, stepped like app.js gameLoop.
  */
 
+import { afterEach } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
@@ -90,6 +91,15 @@ export function installDomStubs() {
  * One game instance: real simulation services, stubbed UI and audio.
  * `seedSource` is the boot's ('profile-harness' boots a demo page).
  */
+// Each game's garbage collector queues its first pool pass on a 150 ms real
+// timer; left running, it logged after the test, sometimes while the worker
+// closed (stray errors under load). Every importing file shuts them at the end
+// of each test.
+const collectors = [];
+afterEach(() => {
+  while (collectors.length) collectors.pop().shutdown();
+});
+
 export function createHeadlessGame({ seedSource = 'test' } = {}) {
   GamePools.releaseAll();
 
@@ -144,6 +154,7 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
   for (const name of SIMULATION_SERVICES) {
     services[name] = container.resolve(name);
   }
+  collectors.push(services['garbage-collector']);
   const session = services['game-session'];
   session.initialize({ seedInfo: { seed: SEED, source: 'test' } });
 

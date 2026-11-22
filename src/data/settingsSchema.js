@@ -58,13 +58,6 @@ const SETTINGS_SCHEMA = [
         default: DEFAULT_DIFFICULTY,
       },
       {
-        key: 'damageNumbers',
-        type: 'toggle',
-        label: 'Damage Numbers',
-        description: 'Display floating numeric values when hitting enemies.',
-        default: true,
-      },
-      {
         key: 'hitMarkers',
         type: 'toggle',
         label: 'Hit Markers',
@@ -309,6 +302,17 @@ const SETTINGS_SCHEMA = [
           'Rumble on hull hits, dashes and Warden arrivals. Off with Reduce Motion.',
         default: true,
       },
+      {
+        key: 'stickSensitivity',
+        type: 'select',
+        control: 'segmented',
+        label: 'Stick Sensitivity',
+        description:
+          'Gamepad: how hard the engines push with the stick part-way. Low: gentler at small tilts, for fine moves. High: the push grows as far as the stick leans. Full tilt is full push on all three.',
+        options: ['low', 'medium', 'high'],
+        optionLabels: { low: 'Low', medium: 'Medium', high: 'High' },
+        default: 'medium',
+      },
     ],
   },
   {
@@ -436,14 +440,6 @@ const SETTINGS_SCHEMA = [
         options: ['dynamic', 'classic'],
         optionLabels: { dynamic: 'Dynamic', classic: 'Classic' },
         default: 'dynamic',
-      },
-      {
-        key: 'reducedParticles',
-        type: 'toggle',
-        label: 'Reduced Particles',
-        description:
-          'Simplifies intense visual effects like sparks and debris.',
-        default: false,
       },
     ],
   },

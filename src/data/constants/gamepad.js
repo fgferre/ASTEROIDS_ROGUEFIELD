@@ -95,11 +95,17 @@ export const PAD_BINDINGS_1810 = Object.freeze({
 /** Radial deadzone of both sticks; the rest is rescaled to 0..1. */
 export const GAMEPAD_STICK_DEADZONE = 0.2;
 /**
- * A stick's force past the deadzone: rescaled tilt ^ this. 1.5, PROPOSAL
- * 20/11: half the throw gives about a third of the push, for fine control;
- * Felipe judges it on his Xbox pad.
+ * A stick's force past the deadzone: rescaled tilt ^ the curve of the Stick
+ * Sensitivity setting (Controls). Medium is the 20/11 curve (half the throw,
+ * about a third of the push, for fine control); Low is finer still at small
+ * tilts, High pushes as far as the stick leans. Full tilt is full push on
+ * all three. PROPOSAL 21/11: Felipe judges them on his Xbox pad.
  */
-export const GAMEPAD_STICK_CURVE = 1.5;
+export const GAMEPAD_STICK_CURVES = Object.freeze({
+  low: 2,
+  medium: 1.5,
+  high: 1,
+});
 /** Right stick past this magnitude aims the turret by hand (no lock). */
 export const GAMEPAD_AIM_ENGAGE = 0.35;
 /** Left stick past this moves the menu focus once per push. */

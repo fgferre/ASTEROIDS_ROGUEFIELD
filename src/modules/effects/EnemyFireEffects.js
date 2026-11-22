@@ -20,7 +20,7 @@ export class EnemyFireEffects {
    * `particleEffects`: the effects' Particles; every particle lands in its list.
    * `createParticle(x, y, vx, vy, color, size, life, type)`: the effects' createParticle, not Particles' own, as in PlayerEffects.
    * `randomFloat(fork)`: the effects' random helper; rolls draw from 'muzzleFlash' and 'boss'.
-   * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    */
   constructor({

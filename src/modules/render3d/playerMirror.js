@@ -1003,6 +1003,7 @@ export class PlayerMirror {
 
   // Each side's needles at the pilot's turn (the raw step state, not
   // the eased one): on at once, held RCS_HOLD_S, then out in RCS_FADE_S.
+  // The auto-brake's push across the hull lights a whole flank (thrusters.js).
   lightNeedles(state, dt) {
     let snap = 0;
     for (let i = 0; i < TURN_KEYS.length; i += 1) {
@@ -1010,7 +1011,8 @@ export class PlayerMirror {
       const target = state[TURN_KEYS[i]] || 0;
       if (target > 0.02) {
         if (jet.amount < 0.05) jet.snap = RCS_SNAP_S;
-        jet.amount = 0.5 + 0.5 * Math.min(1, target);
+        // As strong as the turn asks; a full key, full (Felipe, 21/11).
+        jet.amount = Math.min(1, target);
         jet.hold = RCS_HOLD_S;
       } else if (jet.hold > 0) {
         jet.hold -= dt;
@@ -1018,10 +1020,11 @@ export class PlayerMirror {
         jet.amount =
           jet.amount < 0.05 ? 0 : jet.amount * Math.exp(-dt / RCS_FADE_S);
       }
-      jet.material.opacity = Math.min(1, jet.amount * 1.2);
+      jet.material.opacity = jet.amount;
       snap = Math.max(snap, jet.snap);
     }
     this.snapMaterial.opacity = snap / RCS_SNAP_S;
+    const flank = [state.brakePort || 0, state.brakeStarboard || 0];
     for (let i = 0; i < this.puffs.length; i += 1) {
       const {
         puff,
@@ -1033,8 +1036,10 @@ export class PlayerMirror {
         snap: flash,
       } = this.puffs[i];
       const jet = turnL ? this.rcsJets.turnL : this.rcsJets.turnR;
-      const reach = length * (0.55 + 0.45 * jet.amount);
-      puff.visible = jet.amount > 0.02;
+      const amount = Math.max(jet.amount, flank[+(puff.position.z > 0)]);
+      jet.material.opacity = Math.max(jet.material.opacity, amount);
+      const reach = length * amount;
+      puff.visible = amount > 0.02;
       puff.scale.set(reach, radius, radius);
       if (twin) {
         twin.visible = puff.visible;
@@ -1104,7 +1109,8 @@ export class PlayerMirror {
       mesh.visible = aux > 0.02;
       mesh.scale.set(length * (0.6 + 0.4 * aux), radius, radius);
     }
-    this.retroMaterial.opacity = Math.min(1, aux * 2.5);
+    // Full from the Modern retro's whole share (0.7): a full key burns full.
+    this.retroMaterial.opacity = Math.min(1, aux / 0.7);
     const f = this.flare / RETRO_FLARE_S;
     this.flare = Math.max(0, this.flare - dt);
     this.flareFan.visible = f > 0;

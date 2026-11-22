@@ -278,6 +278,51 @@ describe('run replay', () => {
     }
   });
 
+  it('replays a pad run at the stick sensitivity it was flown, a change from the pause included, whatever the viewer has', () => {
+    const fake = installFakeGamepad();
+    const half = STEPS / 2;
+    try {
+      const live = createHeadlessGame();
+      const { settings } = live.services;
+      settings.setSetting('controls', 'stickSensitivity', 'high');
+      live.session.startNewRun({ source: 'test' });
+      cheapLevels(live.services.progression);
+      for (let step = 0; step < STEPS; step += 1) {
+        if (live.takeOfferedUpgrade()) {
+          const { progression } = live.services;
+          progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+        }
+        if (step === half)
+          settings.setSetting('controls', 'stickSensitivity', 'low');
+        // Part tilts all along: the sensitivity decides every push.
+        const t = step / 60;
+        fake.set({ axes: [0.55 * Math.cos(t), 0.55 * Math.sin(t), 0.6, 0] });
+        live.step();
+      }
+      const recording = deserialize(
+        serialize(live.session.replayRecorder.toJSON())
+      );
+      const recorded = live.snapshot();
+      expect(recording.stick).toEqual([
+        [0, 'high'],
+        [half, 'low'],
+      ]);
+
+      fake.disconnect();
+      // The viewer flies Medium (the settings are shared storage).
+      settings.setSetting('controls', 'stickSensitivity', 'medium');
+      const replay = replayRun(recording);
+      expect(replay.snapshot()).toEqual(recorded);
+      expect(replay.services.player.stickSensitivity).toBe('low');
+
+      // The viewer's next own run flies their sensitivity again.
+      replay.session.startNewRun({ source: 'test' });
+      expect(replay.services.player.stickSensitivity).toBe('medium');
+    } finally {
+      fake.restore();
+    }
+  });
+
   it('replays level-up rerolls and banishes to the same upgrades', () => {
     const { live, recording } = recordRun((progression, levelUpIndex) => {
       if (levelUpIndex === 0) progression.rerollUpgradeOptions();

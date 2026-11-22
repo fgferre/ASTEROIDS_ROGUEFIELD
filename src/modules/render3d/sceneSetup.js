@@ -18,7 +18,7 @@ import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { HeartTokens, OrbCrystals } from './fieldTokens.js';
 import { createFieldVeil } from './fieldVeil.js';
-import { FlashLights } from './flashLights.js';
+import { FlashLights, VeinLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
@@ -27,7 +27,6 @@ import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
-import { TextSprites } from './textSprites.js';
 import { WeaponBodies } from './weaponBodies.js';
 
 export const FOV = 38;
@@ -38,7 +37,6 @@ export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
-const MAX_DAMAGE_TEXTS = 16;
 // proposta 18/10: the key light's shadow box follows the camera target: the
 // light sits KEY_SHADOW.distance away along its direction, the box spans the
 // shot (`span` × the camera range, clamped) and the biases keep rocks from
@@ -293,9 +291,8 @@ export function setupThree(seeded) {
   composer.addPass(smaaPass);
   displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 
-  // Drawn after the composer: text stays crisp, never bloomed.
+  // Drawn after the composer, never bloomed (the travel veil).
   const overlay = new THREE.Scene();
-  const texts = new TextSprites(THREE, overlay, seeded, MAX_DAMAGE_TEXTS);
 
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
@@ -313,6 +310,7 @@ export function setupThree(seeded) {
     space,
   });
   const flashes = new FlashLights(THREE, scene);
+  const veins = new VeinLights(THREE, scene);
   const debris = new DebrisChunks(THREE, scene);
   const bodies = new WeaponBodies(THREE, scene);
   const bursts = new DeathBursts(debris, flashes);
@@ -320,7 +318,7 @@ export function setupThree(seeded) {
   const player = new PlayerMirror(THREE, scene, seeded);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
-  const decals = new ScorchDecals(THREE, scene);
+  const decals = new ScorchDecals(THREE, scene, camera);
   const blasts = new Blasts(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
@@ -392,7 +390,6 @@ export function setupThree(seeded) {
     bloomScale: bloomUrl.scale,
     bloomSet: bloomUrl.set,
     overlay,
-    texts,
     bossFlash,
     bossFlashKey: '',
     key,
@@ -404,6 +401,7 @@ export function setupThree(seeded) {
     veil,
     biomes,
     flashes,
+    veins,
     enemies,
     player,
     pickups,

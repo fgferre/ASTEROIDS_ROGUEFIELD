@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
-import { mirrorWeaponEffects } from '../../../src/modules/render3d/weaponMirror.js';
+import {
+  mirrorWeaponEffects,
+  shotColor,
+} from '../../../src/modules/render3d/weaponMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 
 const THREE = {};
@@ -124,5 +127,19 @@ describe('weapon mirror', () => {
     const [nose] = glows;
     expect(nose.x).toBeGreaterThan(100);
     expect(nose.x - nose.size).toBeGreaterThan(100); // clear of the ship
+  });
+});
+
+describe('shotColor', () => {
+  it('gives each shot the colour it is drawn in, and none to a bolt', () => {
+    const combat = { weaponId: 'scatter', lanceLook: { trail: '#b38cff' } };
+    expect(shotColor(combat, { kind: 'lance' })).toBe('#b38cff');
+    expect(
+      shotColor(combat, { kind: 'flak', colors: { tracer: '#ffb347' } })
+    ).toBe('#ffb347');
+    expect(
+      shotColor({ ...combat, weaponId: 'harmonic' }, { kind: 'beam' })
+    ).toBe('#ffb347');
+    expect(shotColor(combat, { kind: 'arc' })).toBe(null);
   });
 });

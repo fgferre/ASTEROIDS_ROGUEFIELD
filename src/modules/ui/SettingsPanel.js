@@ -102,10 +102,13 @@ export class SettingsPanel {
     );
   }
 
-  /** Redraws the section on screen when it shows a field of `categoryId`. */
+  /**
+   * Redraws the section on screen when it shows a field of `categoryId`; a
+   * pad's focus stays on the choice it just made.
+   */
   refreshCategory(categoryId) {
     if (this.settingsState.isOpen && this.showsCategory(categoryId)) {
-      this.renderSettingsPanel();
+      this.redrawKeepingFocus();
     }
   }
 
@@ -433,14 +436,6 @@ export class SettingsPanel {
     const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
     this.setHudBaseScale(baseScale);
-
-    const body = document.body;
-    if (body) {
-      const damageFlashEnabled =
-        derived?.damageFlash ?? values.damageFlash !== false;
-
-      body.classList.toggle('damage-flash-disabled', !damageFlashEnabled);
-    }
   }
 
   deriveVisualPreferences(
@@ -456,8 +451,6 @@ export class SettingsPanel {
       ? Number(video.hudScale)
       : 1;
     const damageFlash = video.damageFlash !== false;
-    const reducedParticles =
-      Boolean(video.reducedParticles) || Boolean(graphics?.reducedParticles);
 
     const screenShake = Number.isFinite(Number(gameplay?.screenShake))
       ? Number(gameplay.screenShake)
@@ -469,14 +462,12 @@ export class SettingsPanel {
       colorVision,
       hudScale,
       damageFlash,
-      reducedParticles,
 
       screenShake,
       postProcessing: graphics?.postProcessing !== false,
       bloom: graphics?.bloom !== false,
       chromaticAberration: graphics?.chromaticAberration !== false,
       antialiasing: graphics?.antialiasing || 'SMAA',
-      damageNumbers: gameplay?.damageNumbers !== false,
       hitMarkers: gameplay?.hitMarkers !== false,
     };
   }

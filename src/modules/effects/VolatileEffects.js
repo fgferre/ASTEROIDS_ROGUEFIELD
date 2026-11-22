@@ -21,7 +21,7 @@ export class VolatileEffects {
    * `createParticle(x, y, vx, vy, color, size, life, type)`: the effects' createParticle, not Particles' own, as in PlayerEffects.
    * `randomFloat(fork)`, `randomRange(min, max, fork)`: the effects' random helpers; rolls draw from 'volatility'.
    * `getRandomFork(name)`: the effects' random fork; a SpaceParticle built here rolls its spin from it.
-   * `getScaledParticleCount(count, options)`, `getScaledProbability(probability)`: the effects' Reduced Particles scaling.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    */
   constructor({
@@ -31,7 +31,6 @@ export class VolatileEffects {
     randomRange,
     getRandomFork,
     getScaledParticleCount,
-    getScaledProbability,
     addScreenShake,
     addScreenFlash,
   }) {
@@ -41,7 +40,6 @@ export class VolatileEffects {
     this.randomRange = randomRange;
     this.getRandomFork = getRandomFork;
     this.getScaledParticleCount = getScaledParticleCount;
-    this.getScaledProbability = getScaledProbability;
     this.addScreenShake = addScreenShake;
     this.addScreenFlash = addScreenFlash;
   }
@@ -157,7 +155,7 @@ export class VolatileEffects {
       );
       this.particleEffects.particles.push(core);
 
-      if (this.randomFloat('volatility') < this.getScaledProbability(0.55)) {
+      if (this.randomFloat('volatility') < 0.55) {
         const smoke = new SpaceParticle(
           spawnX,
           spawnY,
@@ -172,7 +170,7 @@ export class VolatileEffects {
         this.particleEffects.particles.push(smoke);
       }
 
-      if (this.randomFloat('volatility') < this.getScaledProbability(0.3)) {
+      if (this.randomFloat('volatility') < 0.3) {
         const glint = new SpaceParticle(
           spawnX,
           spawnY,
