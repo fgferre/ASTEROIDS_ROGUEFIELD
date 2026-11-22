@@ -17,16 +17,14 @@
 //   braking as firmly as today's hand; the main flame a burst off the line,
 //   then a steady flame while the key holds ("não precisa ser esse jato da
 //   explosão"). The spin keeps its momentum too (Felipe, 22/11: "quando a
-//   gente solta, imediatamente ela para o giro"): let go, the hull keeps
-//   turning until the pilot turns the other way, or the Braking System's
-//   computer stops it ("o que faz parar o giro de forma automática [...] é
-//   as cartas [...] de freio") and so does the RCS System (he took one and
-//   expected the turn better: "peguei um UCS e nao melhorou o giro"); the
-//   modern nose swings with weight.
-// - `?voo=d` and `?voo=e`: C with a gentle help from the start (Felipe flew
-//   C: "está bem difícil"): `d` stops a released spin slowly, the travel still
-//   a simulation; `e` also slows the ship slowly when the keys let go, as
-//   today's start does, on the jets against the motion.
+//   gente solta, imediatamente ela para o giro"), worked off slowly from the
+//   start, since the start's cannon is the nose (he flew it with none: "está
+//   bem difícil"); the RCS System owns the spin, each level stopping it
+//   firmer, the Braking System the travel (agreed with him, 22/11: "concordo,
+//   faz assim", after "peguei um UCS e nao melhorou o giro"); the modern nose
+//   swings with weight.
+// - `?voo=e`: C whose travel slows slowly from the start too, as today's
+//   start does, on the jets against the motion; for comparison only.
 // The six jets every hull has: the main engine (forward), the retro (back), a
 // flank's two side jets (the whole hull sideways) and a crossed pair (a turn).
 
@@ -74,30 +72,30 @@ const STAYING_MODERN_BRAKE = 1.5;
 // `?voo=c`'s modern nose: a spring onto the heading (s^-2 and its damping
 // ratio, under 1 so it swings past and back), its push (rad/s²), all × the
 // RCS System; capped at today's turn rate. With no heading, the spin is
-// worked off at NOSE_STOP_ACCEL (× the RCS and Braking Systems).
+// worked off at NOSE_STOP_ACCEL (× the RCS System's levels, squared).
 const NOSE_STIFFNESS = 100;
 const NOSE_DAMPING_RATIO = 0.55;
 const NOSE_SPIN_ACCEL = 150;
 const NOSE_STOP_ACCEL = 12;
-// `?voo=c` classic: the Braking System's computer stops a released spin with
-// this share of the turn pair's push (× its levels): about half a second,
-// worked off steadily, not snapped.
+// `?voo=c` classic: a released spin is worked off at SPIN_ASSIST (rad/s²)
+// with no card, about 0.8 s from the top turn rate; with the RCS System, at
+// this share of the turn pair's push × its level (the pair is already ×
+// it): from half a second at level 1 to a fifth at 5, steadily, not snapped.
+const SPIN_ASSIST = 1.5;
 const SPIN_STOP_SHARE = 0.5;
-// `?voo=d|e`: a released spin is stopped at this (rad/s²) with no card;
 // `?voo=e`: with no Braking System, the jets against the motion brake at this
 // share of their push (about today's start's slow loss, ~0.2 naves/s²).
-const SPIN_ASSIST = 1.5;
 const TRAVEL_ASSIST_SHARE = 0.25;
 
-/** C and its two helped doses, D and E: the flight that stays. */
-const isStayingFlight = (jets) => ['c', 'd', 'e'].includes(jets);
+/** C, and E beside it: the flight that stays. */
+const isStayingFlight = (jets) => ['c', 'e'].includes(jets);
 
 /**
  * `?voo=c`'s modern nose: onto the keys' direction, else onto the motion,
  * else the spin brought to a stop (the Braking System the Flight Computer
  * always comes with). Returns the spin's change this step (rad/s²).
  */
-function swingNose(ship, deltaTime, move, quick, braking) {
+function swingNose(ship, deltaTime, move, quick) {
   const v = ship.velocity;
   let heading = null;
   if (move) heading = Math.atan2(move.y, move.x);
@@ -108,7 +106,7 @@ function swingNose(ship, deltaTime, move, quick, braking) {
   const w = ship.angularVelocity;
   let spin;
   if (heading === null) {
-    const stop = NOSE_STOP_ACCEL * quick * braking;
+    const stop = NOSE_STOP_ACCEL * quick * quick;
     spin = -Math.sign(w) * Math.min(Math.abs(w) / deltaTime, stop);
   } else {
     const most = NOSE_SPIN_ACCEL * quick;
@@ -128,11 +126,11 @@ function swingNose(ship, deltaTime, move, quick, braking) {
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
-/** 'a' to 'e' from `?voo=`, else null (today's flight). */
+/** 'a', 'b', 'c' or 'e' from `?voo=`, else null (today's flight). */
 export function jetsFromUrl() {
   try {
     const value = new URLSearchParams(window.location.search).get('voo');
-    return ['a', 'b', 'c', 'd', 'e'].includes(value) ? value : null;
+    return ['a', 'b', 'c', 'e'].includes(value) ? value : null;
   } catch {
     return null; // no window (Node tests)
   }
@@ -378,7 +376,7 @@ export function flyByJets(flight, deltaTime, input) {
   let spinShown;
   if (modern && staying) {
     const quick = flight.agility;
-    spin = swingNose(ship, deltaTime, move, quick, braking);
+    spin = swingNose(ship, deltaTime, move, quick);
     spinShown = NOSE_SPIN_ACCEL * quick;
   } else if (modern) {
     // The nose turns as today (the classic pair would take over a second
@@ -395,16 +393,12 @@ export function flyByJets(flight, deltaTime, input) {
     let goal = turn * JET_TURN_TOP * flight.agility;
     let pair = spinShown;
     if (staying && !turn) {
-      // Let go: the spin keeps on, unless the Braking System or the RCS
-      // System stops it (each level firmer, the two together firmer still),
-      // or D and E's gentle help does.
-      const cards =
-        flight.brakingDamping > 0 || flight.agility > 1
-          ? spinShown * SPIN_STOP_SHARE * braking * flight.agility
-          : 0;
-      const stop = Math.max(cards, flight.jets === 'c' ? 0 : SPIN_ASSIST);
-      if (stop > 0) pair = stop;
-      else goal = ship.angularVelocity;
+      // Let go: the spin is worked off, slowly with no card, firmer with
+      // each level of the RCS System.
+      pair = Math.max(
+        SPIN_ASSIST,
+        flight.agility > 1 ? spinShown * SPIN_STOP_SHARE * flight.agility : 0
+      );
     }
     spin = Math.max(
       -pair,

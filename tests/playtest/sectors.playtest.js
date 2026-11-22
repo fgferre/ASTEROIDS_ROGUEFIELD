@@ -5,7 +5,7 @@
  * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
  * PLAYTEST_FLIGHT=old flies the old flight (`?direcao=antiga`); by default it
  * flies the new one (classic glide, cannon on the nose, the default of the game).
- * PLAYTEST_VOO=a|b|c|d|e flies Felipe's one-algorithm variant (`?voo=`); the bot
+ * PLAYTEST_VOO=a|b|c|e flies Felipe's one-algorithm variant (`?voo=`); the bot
  * still plans with today's flight.
  * PLAYTEST_SEED may be a range ('1-10'); PLAYTEST_OUT names a JSON file the
  * rows are written to.
@@ -33,7 +33,7 @@ const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
 const FLIGHT = process.env.PLAYTEST_FLIGHT === 'old' ? 'old' : 'new';
-const VOO = ['a', 'b', 'c', 'd', 'e'].includes(process.env.PLAYTEST_VOO)
+const VOO = ['a', 'b', 'c', 'e'].includes(process.env.PLAYTEST_VOO)
   ? process.env.PLAYTEST_VOO
   : '';
 const FLIGHT_SEARCH =

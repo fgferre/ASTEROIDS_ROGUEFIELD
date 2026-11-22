@@ -176,25 +176,32 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     expect(speedOf(player)).toBeLessThan(2);
   });
 
-  it('C: a released turn keeps spinning until the pilot turns back, or the Braking System stops it', () => {
-    const { player, fly } = makePlayer('c');
-    fly({ right: true }, 60);
-    const spin = player.angularVelocity;
-    expect(spin).toBeGreaterThan(1);
-    fly({}, 60);
-    expect(player.angularVelocity).toBeCloseTo(spin, 9);
-    fly({ left: true }, 30);
-    expect(player.angularVelocity).toBeLessThan(spin);
-
-    const braked = makePlayer('c');
-    braked.player.flight.brakingDamping =
-      braked.player.flight.baseLinearDamping;
-    braked.fly({ right: true }, 60);
-    const stop = braked.fly({}, 30);
-    expect(braked.player.angularVelocity).toBe(0);
-    const pair = stop.filter((e) => e.type === 'side' && e.intensity > 0);
-    expect(pair.length).toBeGreaterThan(0);
+  it('C: a released turn keeps its momentum, worked off slowly; the RCS System stops it firmer, the Braking System not at all', () => {
+    const turnThenLetGo = (setup) => {
+      const { player, fly } = makePlayer('c');
+      setup(player.flight);
+      fly({ right: true }, 60);
+      const spin = player.angularVelocity;
+      const steps = [];
+      for (let i = 0; i < 90 && player.angularVelocity > 0; i += 1) {
+        steps.push(fly({}, 1));
+      }
+      return { spin, stopSteps: steps.length, lit: steps.flat() };
+    };
+    const bare = turnThenLetGo(() => {});
+    expect(bare.stopSteps).toBeGreaterThan(30); // more than half a second
+    const pair = bare.lit.filter((e) => e.type === 'side' && e.intensity > 0);
     expect(pair.every((e) => e.isAutomatic)).toBe(true);
+    const braked = turnThenLetGo((f) => {
+      f.brakingDamping = f.baseLinearDamping;
+    });
+    expect(braked.stopSteps).toBe(bare.stopSteps);
+    // RCS System 1: a faster spin, stopped sooner
+    const rcs = turnThenLetGo((f) => {
+      f.agility = 1.3;
+    });
+    expect(rcs.spin).toBeGreaterThan(bare.spin);
+    expect(rcs.stopSteps).toBeLessThan(bare.stopSteps);
   });
 
   it('C modern: the nose swings onto the keys with weight, a touch past and back', () => {
@@ -213,22 +220,12 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     expect(Math.abs(angles[angles.length - 1] - goal)).toBeLessThan(0.02);
   });
 
-  it('C: the RCS System stops a released spin too, from its first level', () => {
-    const { player, fly } = makePlayer('c');
-    player.flight.agility = 1.3; // RCS System 1
-    fly({ right: true }, 60);
-    fly({}, 60);
-    expect(player.angularVelocity).toBe(0);
-  });
-
-  it('D helps the spin stop from the start, the travel still a simulation; E slows the travel too', () => {
-    const d = makePlayer('d');
-    d.fly({ up: true }, 60);
-    d.fly({ right: true }, 60);
-    const speed = speedOf(d.player);
-    d.fly({}, 90);
-    expect(d.player.angularVelocity).toBe(0);
-    expect(speedOf(d.player)).toBeCloseTo(speed, 6);
+  it('E slows the travel gently from the start; C keeps it', () => {
+    const c = makePlayer('c');
+    c.fly({ up: true }, 90);
+    const cTop = speedOf(c.player);
+    c.fly({}, 60);
+    expect(speedOf(c.player)).toBeCloseTo(cTop, 6);
 
     const e = makePlayer('e');
     e.fly({ up: true }, 90);

@@ -101,7 +101,7 @@ export function decodeInputFrame(mask, analog = []) {
  * sector run's sector id (a 'normal' run), null on any other. `controls` is the
  * hull control scheme flown, 'modern' or 'classic'; `hangar` is the run's
  * start-of-run Hangar setup (JSON-safe HangarService modifiers). `jets` is
- * the one-algorithm variant flown (`?voo=`, 'a' to 'e'), only when one was:
+ * the one-algorithm variant flown (`?voo=`, 'a', 'b', 'c' or 'e'), only when one was:
  * a recording without it flies today's flight. `modernTrial` likewise: the
  * modern-flight proposal flown (`?moderno=`, 1 to 3).
  */
