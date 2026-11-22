@@ -84,7 +84,7 @@ export class PlayerFlight {
    * `ship`: the player's velocity, angle, angularVelocity and controlScheme, read and set live.
    * `maneuvers`: the player's PlayerManeuvers; a dash in progress or easing off lifts the speed cap.
    * `glide`: glide flight (?flight=glide) in either scheme: no auto-brake, light drag, a lower top speed.
-   * `jets`: Felipe's one-algorithm variant flown beside today's (`?voo=`, jetFlight.js): 'a', 'b', 'c' or null.
+   * `jets`: Felipe's one-algorithm variant flown beside today's (`?voo=`, jetFlight.js): 'a' to 'e', or null.
    * `modernTrial`: a proposal for the modern flight (`?moderno=`, modernTrial.js): 1, 2, 3 or null.
    */
   constructor({
@@ -126,7 +126,7 @@ export class PlayerFlight {
   }
 
   updateMovement(deltaTime, input) {
-    if (this.jets === 'b' || this.jets === 'c') {
+    if (this.jets && this.jets !== 'a') {
       return flyByJets(this, deltaTime, input);
     }
     const before =

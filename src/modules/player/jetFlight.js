@@ -20,7 +20,13 @@
 //   gente solta, imediatamente ela para o giro"): let go, the hull keeps
 //   turning until the pilot turns the other way, or the Braking System's
 //   computer stops it ("o que faz parar o giro de forma automática [...] é
-//   as cartas [...] de freio"); the modern nose swings with weight.
+//   as cartas [...] de freio") and so does the RCS System (he took one and
+//   expected the turn better: "peguei um UCS e nao melhorou o giro"); the
+//   modern nose swings with weight.
+// - `?voo=d` and `?voo=e`: C with a gentle help from the start (Felipe flew
+//   C: "está bem difícil"): `d` stops a released spin slowly, the travel still
+//   a simulation; `e` also slows the ship slowly when the keys let go, as
+//   today's start does, on the jets against the motion.
 // The six jets every hull has: the main engine (forward), the retro (back), a
 // flank's two side jets (the whole hull sideways) and a crossed pair (a turn).
 
@@ -77,6 +83,14 @@ const NOSE_STOP_ACCEL = 12;
 // this share of the turn pair's push (× its levels): about half a second,
 // worked off steadily, not snapped.
 const SPIN_STOP_SHARE = 0.5;
+// `?voo=d|e`: a released spin is stopped at this (rad/s²) with no card;
+// `?voo=e`: with no Braking System, the jets against the motion brake at this
+// share of their push (about today's start's slow loss, ~0.2 naves/s²).
+const SPIN_ASSIST = 1.5;
+const TRAVEL_ASSIST_SHARE = 0.25;
+
+/** C and its two helped doses, D and E: the flight that stays. */
+const isStayingFlight = (jets) => ['c', 'd', 'e'].includes(jets);
 
 /**
  * `?voo=c`'s modern nose: onto the keys' direction, else onto the motion,
@@ -114,11 +128,11 @@ function swingNose(ship, deltaTime, move, quick, braking) {
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
-/** 'a', 'b' or 'c' from `?voo=`, else null (today's flight). */
+/** 'a' to 'e' from `?voo=`, else null (today's flight). */
 export function jetsFromUrl() {
   try {
     const value = new URLSearchParams(window.location.search).get('voo');
-    return ['a', 'b', 'c'].includes(value) ? value : null;
+    return ['a', 'b', 'c', 'd', 'e'].includes(value) ? value : null;
   } catch {
     return null; // no window (Node tests)
   }
@@ -240,7 +254,8 @@ export function flyByJets(flight, deltaTime, input) {
 
   // A modern proposal (modernTrial.js): its own cruise, and the flight
   // computer drawing more from the same jets.
-  const staying = flight.jets === 'c';
+  const staying = isStayingFlight(flight.jets);
+  const travelAssist = flight.jets === 'e' && !(flight.brakingDamping > 0);
   const trial = modern
     ? MODERN_TRIALS[flight.modernTrial ?? (staying ? STAYING_TRIAL : null)]
     : null;
@@ -279,7 +294,8 @@ export function flyByJets(flight, deltaTime, input) {
     noLinearInput &&
     speed > 0 &&
     ((trial ? trial.coastBrake : modern || !flight.glide) ||
-      flight.brakingDamping > 0);
+      flight.brakingDamping > 0 ||
+      travelAssist);
 
   // The push wanted, world px/s².
   let wantX = 0;
@@ -296,7 +312,8 @@ export function flyByJets(flight, deltaTime, input) {
     wantY = -v.vy / deltaTime;
     reach =
       Math.max(BRAKE_FLOOR, Math.min(1, speed / (top * BRAKE_FULL_SHARE))) *
-      (staying && modern ? STAYING_MODERN_BRAKE : 1);
+      (staying && modern ? STAYING_MODERN_BRAKE : 1) *
+      (travelAssist && !modern ? TRAVEL_ASSIST_SHARE : 1);
   } else if (!modern || move) {
     // The pilot's push: classic along the nose; a modern proposal that keeps
     // its momentum along the keys.
@@ -378,8 +395,15 @@ export function flyByJets(flight, deltaTime, input) {
     let goal = turn * JET_TURN_TOP * flight.agility;
     let pair = spinShown;
     if (staying && !turn) {
-      // Let go: the spin keeps on, unless the Braking System stops it.
-      if (flight.brakingDamping > 0) pair *= SPIN_STOP_SHARE * braking;
+      // Let go: the spin keeps on, unless the Braking System or the RCS
+      // System stops it (each level firmer, the two together firmer still),
+      // or D and E's gentle help does.
+      const cards =
+        flight.brakingDamping > 0 || flight.agility > 1
+          ? spinShown * SPIN_STOP_SHARE * braking * flight.agility
+          : 0;
+      const stop = Math.max(cards, flight.jets === 'c' ? 0 : SPIN_ASSIST);
+      if (stop > 0) pair = stop;
       else goal = ship.angularVelocity;
     }
     spin = Math.max(

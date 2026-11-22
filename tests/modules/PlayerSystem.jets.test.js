@@ -212,4 +212,32 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
     expect(angles.findIndex((a) => a <= goal + 0.05)).toBeLessThan(24);
     expect(Math.abs(angles[angles.length - 1] - goal)).toBeLessThan(0.02);
   });
+
+  it('C: the RCS System stops a released spin too, from its first level', () => {
+    const { player, fly } = makePlayer('c');
+    player.flight.agility = 1.3; // RCS System 1
+    fly({ right: true }, 60);
+    fly({}, 60);
+    expect(player.angularVelocity).toBe(0);
+  });
+
+  it('D helps the spin stop from the start, the travel still a simulation; E slows the travel too', () => {
+    const d = makePlayer('d');
+    d.fly({ up: true }, 60);
+    d.fly({ right: true }, 60);
+    const speed = speedOf(d.player);
+    d.fly({}, 90);
+    expect(d.player.angularVelocity).toBe(0);
+    expect(speedOf(d.player)).toBeCloseTo(speed, 6);
+
+    const e = makePlayer('e');
+    e.fly({ up: true }, 90);
+    const top = speedOf(e.player);
+    const coast = e.fly({}, 60);
+    expect(speedOf(e.player)).toBeLessThan(top * 0.9);
+    expect(speedOf(e.player)).toBeGreaterThan(top * 0.5);
+    const retro = lit(coast, 'aux');
+    expect(retro.length).toBeGreaterThan(0);
+    expect(retro.every((ev) => ev.isAutomatic)).toBe(true);
+  });
 });
