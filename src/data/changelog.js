@@ -16,33 +16,40 @@
 // NEXT becomes the new first entry of RELEASES, with its number and date.
 
 export const NEXT = {
-  new: [
-    'Stick Sensitivity in Settings → Controls: Low, Medium or High, for how hard a half-tilted stick pushes.',
-    'Shots now push and spin the rock they hit.',
-    'Every shot lights what it hits in its own color. The burn mark starts white-hot in that color and cools to lava, and glowing veins light the rocks around them.',
-    'The Quarantine Grid’s planet is now a whole cracked world hanging in the distance, its night side dotted with dead cities.',
-  ],
-  improved: [
-    'The Crucible’s star now boils, with sunspots and a fiery rim, and is a little darker so the fight reads on top of it.',
-    'On a controller, the engine flame, its sound and the side jets follow how far you push the stick.',
-    'The menu music arrives sooner on a weak connection.',
-    'Screen Shake Intensity and Hit Markers now take effect at once, even mid-run.',
-    'Damage Numbers and Reduced Particles left Settings: they never did anything.',
-    'With a controller, the story scene says PRESS Ⓐ TO SKIP.',
-  ],
-  fixed: [
-    'iPhone: the game added to the Home Screen and opened sideways no longer plays in a small square.',
-    'On a phone, the robot’s opening scene now waits for the install screen to close.',
-    'iPhone: the “o” of the opening no longer goes blank after the robot hops out.',
-    'Choosing an option in Settings → Controls with a controller no longer loses the highlight.',
-    'Gold and crystal rocks break into gold and crystal pieces, not plain stone.',
-    'A Warden’s death shakes the screen once, not seven times, and follows Screen Shake Intensity and Reduce Motion.',
-    'The light of a hit now dims with Reduce Flashing.',
-    'During the automatic brake, the jets that really slow the ship light up (nose, tail or sides) until it stops, not always the nose ones.',
-  ],
+  new: [],
+  improved: [],
+  fixed: [],
 };
 
 export const RELEASES = [
+  {
+    version: '0.7.0',
+    date: '2026-11-21',
+    new: [
+      'Stick Sensitivity in Settings → Controls: Low, Medium or High, for how hard a half-tilted stick pushes.',
+      'Shots now push and spin the rock they hit.',
+      'Every shot lights what it hits in its own color. The burn mark starts white-hot in that color and cools to lava, and glowing veins light the rocks around them.',
+      'The Quarantine Grid’s planet is now a whole cracked world hanging in the distance, its night side dotted with dead cities.',
+    ],
+    improved: [
+      'The Crucible’s star now boils, with sunspots and a fiery rim, and is a little darker so the fight reads on top of it.',
+      'On a controller, the engine flame, its sound and the side jets follow how far you push the stick.',
+      'The menu music arrives sooner on a weak connection.',
+      'Screen Shake Intensity and Hit Markers now take effect at once, even mid-run.',
+      'Damage Numbers and Reduced Particles left Settings: they never did anything.',
+      'With a controller, the story scene says PRESS Ⓐ TO SKIP.',
+    ],
+    fixed: [
+      'iPhone: the game added to the Home Screen and opened sideways no longer plays in a small square.',
+      'On a phone, the robot’s opening scene now waits for the install screen to close.',
+      'iPhone: the “o” of the opening no longer goes blank after the robot hops out.',
+      'Choosing an option in Settings → Controls with a controller no longer loses the highlight.',
+      'Gold and crystal rocks break into gold and crystal pieces, not plain stone.',
+      'A Warden’s death shakes the screen once, not seven times, and follows Screen Shake Intensity and Reduce Motion.',
+      'The light of a hit now dims with Reduce Flashing.',
+      'During the automatic brake, the jets that really slow the ship light up (nose, tail or sides) until it stops, not always the nose ones.',
+    ],
+  },
   {
     version: '0.6.1',
     date: '2026-11-21',
