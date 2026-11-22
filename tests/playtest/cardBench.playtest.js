@@ -83,6 +83,14 @@ const DRONES = [
   [650, 400],
   [240, 300],
 ];
+// Elite machines (or plain ones, `ring`) and a herald held round the ship, in reach of every weapon
+// (the threat focus of the Targeting Matrix only counts on these).
+const RING = [
+  [240, 300],
+  [160, 215],
+  [160, 385],
+  [90, 300],
+];
 const CROWD = [];
 for (let row = 0; row < 6; row += 1) {
   for (let col = 0; col < 7; col += 1) {
@@ -173,29 +181,55 @@ function run({
   m.evolutions = [...combat.weapons.evolutions];
   m.synergies = [...progression.activeSynergies];
 
-  const layout = { crowd: CROWD, pack: PACK, drones: DRONES }[field] ?? TANK;
-  const rocks = layout.map(([x, y]) => {
-    if (field === 'drones') {
-      const drone = spawnViaFactory(enemies, 'drone', { x, y });
-      drone.maxHealth = 4e5;
-      drone.health = 1e5;
-      return { rock: drone, x, y };
+  const layout =
+    {
+      crowd: CROWD,
+      pack: PACK,
+      drones: DRONES,
+      elites: RING,
+      ring: RING,
+      herald: RING,
+    }[field] ?? TANK;
+  const held = ['elites', 'ring', 'herald'].includes(field);
+  const rocks = (field === 'herald' ? RING.slice(0, 1) : layout).map(
+    ([x, y]) => {
+      if (field === 'herald') {
+        const herald = spawnViaFactory(enemies, 'herald', {
+          heraldKind: 'dust',
+          x,
+          y,
+        });
+        herald.maxHealth = 4e5;
+        herald.health = 1e5;
+        return { rock: herald, x, y };
+      }
+      if (['drones', 'elites', 'ring'].includes(field)) {
+        const drone = spawnViaFactory(enemies, 'drone', {
+          x,
+          y,
+          elite: field === 'elites',
+        });
+        drone.maxHealth = 4e5;
+        drone.health = 1e5;
+        return { rock: drone, x, y };
+      }
+      const rock = spawnViaFactory(enemies, 'asteroid', {
+        size: field === 'crowd' ? 'small' : 'medium',
+        variant: 'common',
+        x,
+        y,
+        vx: 0,
+        vy: 0,
+      });
+      if (field !== 'crowd') {
+        rock.maxHealth = 4e5;
+        rock.health = 1e5;
+      }
+      return { rock, x, y };
     }
-    const rock = spawnViaFactory(enemies, 'asteroid', {
-      size: field === 'crowd' ? 'small' : 'medium',
-      variant: 'common',
-      x,
-      y,
-      vx: 0,
-      vy: 0,
-    });
-    if (field !== 'crowd') {
-      rock.maxHealth = 4e5;
-      rock.health = 1e5;
-    }
-    return { rock, x, y };
-  });
+  );
 
+  m.elites = rocks.filter(({ rock }) => rock.elite).length;
   const applyDamage = enemies.applyDamage.bind(enemies);
   const hitSet = new Set();
   m.damage = 0;
@@ -256,6 +290,12 @@ function run({
     player.velocity.vy = 0;
     if (frame > 0 && frame % Math.round(2 / STEP_SECONDS) === 0) {
       eventBus.emit('player-dashed', {});
+    }
+    if (held) {
+      for (const { rock, x, y } of rocks) {
+        rock.x = x;
+        rock.y = y;
+      }
     }
     game.step();
     m.wells = Math.max(m.wells, fx.wells.length);
