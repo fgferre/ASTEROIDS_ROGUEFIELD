@@ -21,7 +21,7 @@ import { ChestCeremony } from './ui/ChestCeremony.js';
 import { FlightBriefing } from './ui/FlightBriefing.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
-import { CreditsOverlay } from './ui/CreditsOverlay.js';
+import { CreditsOverlay, fillChangelog } from './ui/CreditsOverlay.js';
 import { TacticalHud } from './ui/TacticalHud.js';
 import { HudEditor } from './ui/hud/editor/HudEditor.js';
 import {
@@ -212,6 +212,14 @@ class UISystem extends BaseSystem {
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('credits', isOpen, payload),
     });
+    this.changelogOverlay = new CreditsOverlay({
+      name: 'changelog',
+      refs: this.domRefs.changelog,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      showScreen: (name, options) => this.showScreen(name, options),
+      announceVisibility: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('changelog', isOpen, payload),
+    });
     this.mainMenu = new MainMenu({
       refs: this.domRefs.menu,
       settings: this.settings,
@@ -280,6 +288,8 @@ class UISystem extends BaseSystem {
     this.chestCeremony.bindControls();
     this.settingsPanel.bindSettingsControls();
     this.creditsOverlay.bindCreditsControls();
+    this.changelogOverlay.bindCreditsControls();
+    fillChangelog(this.domRefs.changelog);
     this.codexScreen.bindCodexControls();
     this.hangarScreen.bindHangarControls();
     this.campaignMap.bindCampaignControls();
@@ -747,6 +757,10 @@ class UISystem extends BaseSystem {
       this.creditsOverlay.handleCreditsMenuRequest(payload);
     });
 
+    this.registerEventListener('changelog-menu-requested', (payload = {}) => {
+      this.changelogOverlay.handleCreditsMenuRequest(payload);
+    });
+
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
       if (payload?.values) {
         this.settingsPanel.refreshCategory('controls');
@@ -946,18 +960,20 @@ class UISystem extends BaseSystem {
       const pauseOverlay = document.getElementById('pause-screen');
       if (pauseOverlay) pauseOverlay.classList.add('hidden');
 
-      const creditsOverlay = document.getElementById('credits-screen');
-      if (creditsOverlay) {
-        creditsOverlay.classList.add('hidden');
-        creditsOverlay.setAttribute('aria-hidden', 'true');
-      }
+      ['credits', 'changelog'].forEach((name) => {
+        const overlay = document.getElementById(`${name}-screen`);
+        if (overlay) {
+          overlay.classList.add('hidden');
+          overlay.setAttribute('aria-hidden', 'true');
+        }
+        document.body?.classList.remove(`is-${name}-open`);
+      });
 
       this.creditsOverlay.markClosed();
+      this.changelogOverlay.markClosed();
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
-
-      document.body?.classList.remove('is-credits-open');
 
       if (screenName === 'menu') {
         this.mainMenu.requestMenuShipSelectorRefresh();

@@ -1,11 +1,14 @@
 import { SUPPORT_EMAIL } from '../../data/credits.js';
+import { RELEASES } from '../../data/changelog.js';
 import { asArray } from '../upgradeCatalog.js';
 
 // src/modules/ui/CreditsOverlay.js
 //
 // The Credits overlay over the main menu: opens on request, closes on its
 // buttons, a backdrop click or Escape, and gives the focus back to its opener.
-// The menu's Support button opens it at its support section.
+// The menu's Support button opens it at its support section. What's new (the
+// changelog, opened by the version in the menu's corner) is the same kind of
+// window: a second CreditsOverlay named 'changelog'.
 
 /** Every `[data-support-email]` link shows the support address and opens the player's mail program on it. */
 export function fillSupportEmail(root = document) {
@@ -15,14 +18,67 @@ export function fillSupportEmail(root = document) {
   });
 }
 
+const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
+const GROUPS = [
+  ['new', 'New'],
+  ['improved', 'Improved'],
+  ['fixed', 'Fixed'],
+];
+const escapeText = (text) =>
+  text.replace(
+    /[&<>]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]
+  );
+
+/** What's new: every published version, newest first, with its date and its New, Improved and Fixed lines. */
+export function changelogMarkup(releases = RELEASES) {
+  return releases
+    .map(({ version, date, ...lines }, i) => {
+      const [year, month, day] = date.split('-').map(Number);
+      const when = `${day} ${MONTHS[month - 1]} ${year}${i === 0 ? ' · this version' : ''}`;
+      const groups = GROUPS.filter(([key]) => lines[key].length)
+        .map(
+          ([key, label]) =>
+            `<div class="credits-entry"><dt>${label}</dt><dd><ul class="changelog-lines">${lines[
+              key
+            ]
+              .map((line) => `<li>${escapeText(line)}</li>`)
+              .join('')}</ul></dd></div>`
+        )
+        .join('');
+      return `<section class="changelog-version"><h3 class="changelog-version__title">${version}<span class="changelog-version__date">${when}</span></h3><dl class="credits-list">${groups}</dl></section>`;
+    })
+    .join('');
+}
+
+/** The menu's corner shows the game's version (package.json); What's new gets its list. */
+export function fillChangelog({ body, versionButton }) {
+  if (body) body.innerHTML = changelogMarkup();
+  if (versionButton) {
+    versionButton.textContent = `v${__GAME_VERSION__}`;
+    versionButton.setAttribute(
+      'aria-label',
+      `Version ${__GAME_VERSION__}: what's new`
+    );
+  }
+}
+
 export class CreditsOverlay {
   /**
    * `refs`: the overlay's nodes { overlay, primaryAction, closeButtons }.
    * `emit(name, payload)`: sends ui-hover.
    * `showScreen(name, options)`: shows or hides the overlay.
    * `announceVisibility(isOpen, payload)`: the overlay opened or closed.
+   * `name`: the screen, `#<name>-screen` ('credits' or 'changelog').
    */
-  constructor({ refs, emit, showScreen, announceVisibility }) {
+  constructor({
+    refs,
+    emit,
+    showScreen,
+    announceVisibility,
+    name = 'credits',
+  }) {
+    this.name = name;
     this.refs = refs;
     this.emit = emit;
     this.showScreen = showScreen;
@@ -66,7 +122,7 @@ export class CreditsOverlay {
           return;
         }
         this.emit('ui-hover', {
-          source: 'credits-menu',
+          source: `${this.name}-menu`,
           element: 'close',
         });
       });
@@ -120,9 +176,9 @@ export class CreditsOverlay {
 
     this.creditsState.isOpen = true;
 
-    this.showScreen('credits', { overlay: true, show: true });
+    this.showScreen(this.name, { overlay: true, show: true });
     overlay.setAttribute('aria-hidden', 'false');
-    document.body?.classList.add('is-credits-open');
+    document.body?.classList.add(`is-${this.name}-open`);
     this.announceVisibility(true, { source: 'menu' });
 
     const support =
@@ -155,12 +211,12 @@ export class CreditsOverlay {
 
     const overlay = this.refs.overlay;
 
-    this.showScreen('credits', { overlay: true, show: false });
+    this.showScreen(this.name, { overlay: true, show: false });
     if (overlay) {
       overlay.setAttribute('aria-hidden', 'true');
     }
 
-    document.body?.classList.remove('is-credits-open');
+    document.body?.classList.remove(`is-${this.name}-open`);
     this.announceVisibility(false, { source: 'menu' });
 
     this.creditsState.isOpen = false;
