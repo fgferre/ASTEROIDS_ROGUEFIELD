@@ -15,6 +15,10 @@ const smoothstep = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 const wrap = (i, n) => ((i % n) + n) % n;
+const normalize = (v) => {
+  const n = Math.hypot(...v);
+  return v.map((k) => k / n);
+};
 
 // Box blur with wrap-around, two separable passes (local mean height).
 function blur(src, size, radius) {
@@ -374,7 +378,7 @@ export function bakePlateMaps(THREE, seed, size = 256) {
  * The relief is sampled on the sphere (no seam), baked at a quarter size and
  * read bilinear: it is smooth, and the bake runs as the game loads.
  */
-export function bakePlanetMap(THREE, seed, size = 512) {
+export function bakePlanetMap(THREE, seed, size = 256) {
   return cached('planet', seed, size, () => {
     const W = size;
     const H = size / 2;
@@ -395,63 +399,57 @@ export function bakePlanetMap(THREE, seed, size = 512) {
     for (let j = 0; j < ch; j += 1) {
       for (let i = 0; i < cw; i += 1) {
         const [x, y, z] = dir((i + 0.5) / cw, (j + 0.5) / ch);
-        coarse[i + j * cw] = relief.fbm(x * 1.6 + 3, y * 1.6, z * 1.6, 4);
+        coarse[i + j * cw] = relief.fbm(x * 1.6 + 3, y * 1.6, z * 1.6, 3);
       }
     }
-    // the relief read bilinear from the coarse bake (wrapping in longitude)
-    const coarseAt = (i, j) => coarse[wrap(i, cw) + j * cw];
-    const land = (x, y) => {
-      const fx = (x + 0.5) / 4 - 0.5;
-      const fy = Math.max(0, Math.min(ch - 1, (y + 0.5) / 4 - 0.5));
-      const ix = Math.floor(fx);
-      const iy = Math.min(ch - 2, Math.floor(fy));
-      const tx = fx - ix;
-      const ty = fy - iy;
-      return (
-        (coarseAt(ix, iy) * (1 - tx) + coarseAt(ix + 1, iy) * tx) * (1 - ty) +
-        (coarseAt(ix, iy + 1) * (1 - tx) + coarseAt(ix + 1, iy + 1) * tx) * ty
-      );
-    };
-    // the crack's great circle (its pole `a`, its plane b, c) and its gap
-    const a = [0.9, 0.25, 0.35];
-    const an = Math.hypot(...a);
-    a.forEach((k, i) => (a[i] = k / an));
-    const b = [0, -a[2], a[1]];
-    const bn = Math.hypot(...b);
-    b.forEach((k, i) => (b[i] = k / bn));
-    const c = [
-      a[1] * b[2] - a[2] * b[1],
-      a[2] * b[0] - a[0] * b[2],
-      a[0] * b[1] - a[1] * b[0],
-    ];
-    const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+    // the crack's great circle (its pole a, its plane b, c) and its gap
+    const [a0, a1, a2] = normalize([0.9, 0.25, 0.35]);
+    const [b0, b1, b2] = normalize([0, -a2, a1]);
+    const c0 = a1 * b2 - a2 * b1;
+    const c1 = a2 * b0 - a0 * b2;
+    const c2 = a0 * b1 - a1 * b0;
     const reach = 5.6;
-    // white grain from an integer hash of a texel (a seeded random per
-    // texel cost more than the rest of the bake)
-    const hash = (i, j) => {
-      let h = Math.imul(i + 1, 374761393) + Math.imul(j + 1, 668265263) + salt;
-      h = Math.imul(h ^ (h >>> 13), 1274126177);
-      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-    };
+    // per column: the longitude's cos/sin and where it reads the coarse
+    // relief (bilinear, wrapping round the globe)
     const cosLon = new Float32Array(W);
     const sinLon = new Float32Array(W);
+    const left = new Int32Array(W);
+    const right = new Int32Array(W);
+    const share = new Float32Array(W);
     for (let x = 0; x < W; x += 1) {
       const lon = ((x + 0.5) / W) * Math.PI * 2 - Math.PI;
       cosLon[x] = Math.cos(lon);
       sinLon[x] = Math.sin(lon);
+      const fx = (x + 0.5) / 4 - 0.5;
+      const ix = Math.floor(fx);
+      left[x] = wrap(ix, cw);
+      right[x] = wrap(ix + 1, cw);
+      share[x] = fx - ix;
     }
-    const p = [0, 0, 0];
+    const row = new Float32Array(cw);
     const data = new Uint8Array(W * H * 4);
     for (let y = 0; y < H; y += 1) {
       const lat = ((y + 0.5) / H - 0.5) * Math.PI;
       const cosLat = Math.cos(lat);
-      p[1] = Math.sin(lat);
-      const polar = Math.abs(p[1]) > 0.8;
+      const py = Math.sin(lat);
+      const polar = Math.abs(py) > 0.8;
+      const fy = Math.max(0, Math.min(ch - 1, (y + 0.5) / 4 - 0.5));
+      const iy = Math.min(ch - 2, Math.floor(fy));
+      const ty = fy - iy;
+      for (let i = 0; i < cw; i += 1) {
+        row[i] =
+          coarse[i + iy * cw] * (1 - ty) + coarse[i + (iy + 1) * cw] * ty;
+      }
       for (let x = 0; x < W; x += 1) {
-        p[0] = cosLat * cosLon[x];
-        p[2] = cosLat * sinLon[x];
-        const l = land(x, y);
-        const grain = hash(x, y);
+        const px = cosLat * cosLon[x];
+        const pz = cosLat * sinLon[x];
+        const l = row[left[x]] * (1 - share[x]) + row[right[x]] * share[x];
+        // white grain from an integer hash of the texel (a seeded random
+        // per texel cost more than the rest of the bake)
+        let h =
+          Math.imul(x + 1, 374761393) + Math.imul(y + 1, 668265263) + salt;
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        const grain = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
         const albedo =
           0.35 + 0.65 * smoothstep(-0.15, 0.3, l) * (0.82 + 0.18 * grain);
         // cities: the brightest specks of grain, only on the coasts
@@ -462,23 +460,25 @@ export function bakePlanetMap(THREE, seed, size = 512) {
             smoothstep(0.84, 0.97, grain);
         }
         // the crack: only texels near its circle carry any glow
-        const pole = dot(p, a);
+        const pole = px * a0 + py * a1 + pz * a2;
         let glow = 0;
-        if (Math.abs(pole) < 0.3) {
-          let t = Math.atan2(dot(p, c), dot(p, b));
+        if (pole < 0.3 && pole > -0.3) {
+          let t = Math.atan2(
+            px * c0 + py * c1 + pz * c2,
+            px * b0 + py * b1 + pz * b2
+          );
           if (t < 0) t += Math.PI * 2;
           const off = pole - 0.06 * Math.sin(t * 9) - 0.03 * Math.sin(t * 23);
           const along =
             smoothstep(0, 0.08, t) * smoothstep(reach, reach - 0.08, t);
+          const o2 = off * off;
           glow =
-            along *
-            (Math.exp(-(off * off) / 0.0009) +
-              0.25 * Math.exp(-(off * off) / 0.012));
+            along * (Math.exp(-o2 / 0.0009) + 0.25 * Math.exp(-o2 / 0.012));
         }
         const o = (x + y * W) * 4;
-        data[o] = Math.round(255 * albedo);
-        data[o + 1] = Math.round(255 * Math.min(1, city));
-        data[o + 2] = Math.round(255 * Math.min(1, glow));
+        data[o] = 255 * albedo + 0.5;
+        data[o + 1] = 255 * Math.min(1, city) + 0.5;
+        data[o + 2] = 255 * Math.min(1, glow) + 0.5;
         data[o + 3] = 255;
       }
     }
