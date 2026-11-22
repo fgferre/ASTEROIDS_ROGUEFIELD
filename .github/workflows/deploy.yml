@@ -20,14 +20,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Depth 2: the version check compares with the main published before.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           cache: npm
           node-version: 20.x
+
+      # Every publication has its own number and its list of what changed
+      # (src/data/changelog.js); without them the site stays as it was.
+      - name: Check the version number and its list
+        run: node scripts/check-publication.mjs
 
       - name: Install dependencies
         run: npm ci

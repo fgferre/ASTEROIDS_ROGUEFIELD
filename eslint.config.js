@@ -53,6 +53,7 @@ export default [
         lucide: 'readonly',
         Stats: 'readonly',
         __AUDIO_DEBUG_BUILD__: 'readonly',
+        __GAME_VERSION__: 'readonly',
       },
     },
     linterOptions: {
