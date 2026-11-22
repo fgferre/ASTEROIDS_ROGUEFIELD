@@ -6,8 +6,9 @@
 // the thruster, RCS and braking visual levels the cards raise. PlayerSystem
 // owns one and tells it each step's thrust.
 
-// Below this speed the coast brake disarms until the pilot thrusts again.
-const COAST_DISARM_SPEED = 12; // px/s
+// Below this speed the auto-brake stops (flight.js), and the coast brake
+// disarms until the pilot thrusts again: it shows until the ship stops.
+const COAST_DISARM_SPEED = 2; // px/s
 // A jet under this share is off (proposta 16/11). The nose settles onto its
 // heading asymptotically, so the turn share never reaches zero by itself, and
 // a burning jet throws at least one spark a step: flying straight, the side
@@ -47,7 +48,14 @@ export class PlayerThrusters {
     // === THRUSTER STATE TRACKING (for audio) ===
     // What the thrusters show this step (0..1): the main engine, the retro,
     // and the turn couple swinging the nose to port (turnL) or starboard (turnR).
-    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      turnL: 0,
+      turnR: 0,
+      brakeStarboard: 0,
+      brakePort: 0,
+    };
     this.thrusterVisual = { main: 0, aux: 0, turnL: 0, turnR: 0 };
     // The coast brake shows only after the pilot's own thrust or a dash.
     this.coastArmed = false;
@@ -59,14 +67,16 @@ export class PlayerThrusters {
   // `step`: flight.js updateMovement's display fields. The thrusters show what
   // the pilot asked for: idle, a shot's recoil or a knockback show nothing
   // (the auto-brake still acts, silently); after the pilot's own thrust or a
-  // dash, coasting shows one brake jet along the nose that fades with speed.
+  // dash, coasting shows the auto-brake's own push on each jet it fires
+  // (flight.js `brake`): the retro or the main engine along the nose, the
+  // flank jets across, sparking like any jet (automatic: no engine puff).
   emitThrusterEffects({
     fwd,
     pilotMain,
     pilotAux,
     pilotForce,
     pilotTurn,
-    coastBrake,
+    brake,
     speed,
     dashing,
     isMainManual,
@@ -74,12 +84,13 @@ export class PlayerThrusters {
   }) {
     if (isMainManual || isAuxManual || dashing) this.coastArmed = true;
     else if (speed < COAST_DISARM_SPEED) this.coastArmed = false;
-    const coasting = coastBrake !== 0;
-    const brake = coasting && this.coastArmed && !dashing ? coastBrake : 0;
+    const coasting = brake.main + brake.aux + brake.starboard + brake.port > 0;
+    const shows = coasting && this.coastArmed && !dashing;
+    const braked = (push) => (shows ? push : 0);
     // A stick's push scales a jet that burns, never puts one out: the trail
     // cards drop on any burn of the main engine.
-    const main = shown(coasting ? -brake : pilotMain) * pilotForce;
-    const aux = shown(coasting ? brake : pilotAux) * pilotForce;
+    const main = shown(coasting ? braked(brake.main) : pilotMain) * pilotForce;
+    const aux = shown(coasting ? braked(brake.aux) : pilotAux) * pilotForce;
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
@@ -88,6 +99,11 @@ export class PlayerThrusters {
     // outboard; mirrored to port. The sound pans to the turn's side.
     this.emitTurn('turnR', shown(pilotTurn), 'right', 'noseLeft');
     this.emitTurn('turnL', shown(-pilotTurn), 'left', 'noseRight');
+    // The auto-brake across the hull: a whole flank, aft and nose jets.
+    const starboard = shown(braked(brake.starboard));
+    const port = shown(braked(brake.port));
+    this.emitTurn('brakeStarboard', starboard, 'right', 'noseRight', true);
+    this.emitTurn('brakePort', port, 'left', 'noseLeft', true);
   }
 
   // One jet's event while it burns, and a last one at 0 when it stops.
@@ -109,9 +125,10 @@ export class PlayerThrusters {
     }
   }
 
-  // The turn couple's two jets: the aft wingtip on `side` and the nose jet
-  // on the other flank, each blowing outboard.
-  emitTurn(key, intensity, side, nosePort) {
+  // Two side jets, each blowing outboard: a turn's couple is the aft wingtip
+  // on `side` and the nose jet on the other flank; the auto-brake's
+  // (`isAutomatic`) is a whole flank.
+  emitTurn(key, intensity, side, nosePort, isAutomatic = false) {
     if (intensity > 0 || this.lastThrusterState[key] > 0) {
       [side, nosePort].forEach((kind) => {
         const port = this.getThrusterPort(kind);
@@ -123,7 +140,7 @@ export class PlayerThrusters {
           type: 'side',
           side, // the engine sound pans its puffs by it
           visualLevel: this.rcsVisualLevel,
-          isAutomatic: false,
+          isAutomatic,
           accent: this.getAccent(),
         });
       });
@@ -181,7 +198,9 @@ export class PlayerThrusters {
 
     const sideIntensity = Math.max(
       this.lastThrusterState.turnL,
-      this.lastThrusterState.turnR
+      this.lastThrusterState.turnR,
+      this.lastThrusterState.brakeStarboard,
+      this.lastThrusterState.brakePort
     );
     if (sideIntensity > 0) {
       eventBus.emit('thruster-effect', {
@@ -198,7 +217,14 @@ export class PlayerThrusters {
 
   /** Nothing burning, the coast brake disarmed (death, reset, respawn). */
   resetState() {
-    this.lastThrusterState = { main: 0, aux: 0, turnL: 0, turnR: 0 };
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      turnL: 0,
+      turnR: 0,
+      brakeStarboard: 0,
+      brakePort: 0,
+    };
     this.coastArmed = false;
   }
 }

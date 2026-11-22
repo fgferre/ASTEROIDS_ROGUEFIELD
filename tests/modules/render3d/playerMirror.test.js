@@ -326,6 +326,25 @@ describe('PlayerMirror', () => {
     expect(at(0.6, 0.6).retro).toBeGreaterThan(part.retro + 0.3);
   });
 
+  it("lights a whole flank's jets, fore and aft, for the auto-brake's push across the hull", () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.lastThrusterState.brakeStarboard = 0.5;
+    mirror.update(player, ribbons, 0);
+    const shown = mirror.puffs
+      .filter(({ puff }) => puff.visible)
+      .map(({ puff }) => ({
+        fore: puff.position.x > 0,
+        starboard: puff.position.z > 0,
+      }));
+    expect(shown).toEqual(
+      expect.arrayContaining([
+        { fore: false, starboard: true },
+        { fore: true, starboard: true },
+      ])
+    );
+    expect(shown).toHaveLength(2);
+  });
+
   it('lights the retro flames with the brake, longer and doubled with the Braking System', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const retrosAt = (level, aux) => {
