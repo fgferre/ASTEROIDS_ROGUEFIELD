@@ -604,8 +604,9 @@ export class PlayerMirror {
   /**
    * The ship's death (docs/NORTE.md: every hit is physical): its solid parts
    * come apart into the pieces of its own build and burn away (the machines'
-   * break, dissolve.js), carried by its momentum; its flames, glows and light
-   * go out at once.
+   * break, dissolve.js), carried by its momentum, the sensor's glass with
+   * them though it is see-through; its flames, glows and light go out at
+   * once.
    */
   startBreak(player) {
     this.breaking = true;
@@ -617,7 +618,9 @@ export class PlayerMirror {
       if (!node.isMesh) return;
       node.castShadow = false;
       const material = [].concat(node.material)[0];
-      const solid = material?.isMeshStandardMaterial && !material.transparent;
+      const solid =
+        material === this.canopyMaterial ||
+        (material?.isMeshStandardMaterial && !material.transparent);
       if (solid || !node.visible) return;
       node.visible = false;
       this.breakHidden.push(node);

@@ -417,6 +417,9 @@ describe('PlayerMirror', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const hull = mirror.ship.children.find((child) => child.name === 'hull');
     const whole = hull.geometry;
+    const glass = mirror.ship.children.find(
+      (child) => child.material === mirror.canopyMaterial
+    );
     const [flame] = mirror.flames;
     player.velocity = { vx: 50, vy: 0 };
     player.markDead();
@@ -425,6 +428,9 @@ describe('PlayerMirror', () => {
     expect(mirror.breaking).toBe(true);
     expect(mirror.group.visible).toBe(true);
     expect(hull.geometry.getAttribute('aPiece')).toBeDefined();
+    // the sensor's see-through glass breaks with it
+    expect(glass.visible).toBe(true);
+    expect(glass.geometry.getAttribute('aPiece')).toBeDefined();
     expect(Array.isArray(hull.material)).toBe(true); // its finishes' twins
     expect(flame.flame.visible).toBe(false);
     expect(hull.castShadow).toBe(false);
