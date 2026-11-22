@@ -773,6 +773,13 @@ select {
   animation: 7.3s both;
 }
 
+/* Behind a phone's door (mobileGuard) the scene waits, and starts from its
+   beginning when the door leaves and the opening shows (Felipe, abertura-7,
+   21/11). */
+#game-container:has(> .door-notice) .opening__brand * {
+  animation: none;
+}
+
 .opening__brand .om-rx {
   transform: translateX(-92px);
   animation-name: om-rx;
