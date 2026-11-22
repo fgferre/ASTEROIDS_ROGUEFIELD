@@ -35,7 +35,7 @@ const TAU = Math.PI * 2;
 // where it was struck at KICK_SPIN rad/s, which dies out over
 // KICK_SPIN_DECAY s, its new pose kept. Both for one Lance shot
 // (KICK_DAMAGE) on a large rock (KICK_RADIUS), more for a harder hit or a
-// smaller rock (spin × KICK_RADIUS / radius, reach × its square root).
+// smaller rock (both × the square root of KICK_RADIUS / radius).
 const KICK_DAMAGE = 25;
 const KICK_RADIUS = 35;
 const KICK_REACH = 2.4;
@@ -364,11 +364,8 @@ export function createRockViews(kit) {
     const uz = vy / speed;
     const hard = (damage || 0) / KICK_DAMAGE;
     const r = Math.max(4, view.radius || 12);
-    const small = KICK_RADIUS / r;
-    const reach = Math.min(
-      KICK_REACH_MAX,
-      KICK_REACH * hard * Math.sqrt(small)
-    );
+    const small = Math.sqrt(KICK_RADIUS / r);
+    const reach = Math.min(KICK_REACH_MAX, KICK_REACH * hard * small);
     view.kickX = ux * reach;
     view.kickZ = uz * reach;
     view.kickAt = view.lastTime ?? 0;
