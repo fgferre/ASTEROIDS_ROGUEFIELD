@@ -17,6 +17,7 @@ import { HALF_H, HALF_W } from '../../../src/modules/render3d/batches.js';
 import { BREAK_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
   cleanupGlobalState,
   setupGlobalMocks,
@@ -50,8 +51,15 @@ function mirrorFor(hull) {
 }
 
 describe('PlayerMirror', () => {
-  beforeEach(() => setupGlobalMocks());
-  afterEach(() => cleanupGlobalState());
+  beforeEach(() => {
+    setupGlobalMocks();
+    // the hull's livery paints in a canvas
+    vi.stubGlobal('document', createCanvasDocumentStub());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    cleanupGlobalState();
+  });
 
   it('burns cyan on the Interceptor and amber on the Solar Slicer', () => {
     const cyan = mirrorFor(defaultHull).mirror.flameMaterial.color;
@@ -154,13 +162,35 @@ describe('PlayerMirror', () => {
       });
       // hull + canopy + per nozzle (throat, flame, core) + one puff per
       // wingtip port + the two nose jets + the two retro flames + the six
-      // sputter embers
+      // sputter embers + the navigation lights (one per wingtip, the strobe,
+      // the sensor's glow)
       const { nozzles, rcsPorts } = mirror.geometry;
       expect(meshes, hull.id).toBe(
-        2 + 3 * nozzles.length + rcsPorts.length + 2 + 2 + 6
+        2 +
+          3 * nozzles.length +
+          rcsPorts.length +
+          2 +
+          2 +
+          6 +
+          rcsPorts.length +
+          2
       );
       expect(lines, hull.id).toBeLessThanOrEqual(3);
     });
+  });
+
+  it("wears each hull's own livery, never on the turret, and flashes its strobe", () => {
+    const { player, mirror } = mirrorFor(bastion);
+    const bastionCoat = mirror.livery.uLivery.value;
+    expect(bastionCoat.isTexture).toBe(true);
+    expect(mirror.hullMaterial.userData.livery).toBe(mirror.livery);
+    expect(mirror.turretMaterials[0].userData.livery).toBeNull();
+    player.setHull(defaultHull);
+    mirror.update(player, ribbons, 0.5);
+    expect(mirror.livery.uLivery.value).not.toBe(bastionCoat);
+    expect(mirror.strobe.visible).toBe(false);
+    mirror.update(player, ribbons, 1.21);
+    expect(mirror.strobe.visible).toBe(true);
   });
 
   it('caches the merged hull and shares its buffers with the dash ghosts', () => {

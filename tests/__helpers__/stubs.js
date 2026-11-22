@@ -433,3 +433,17 @@ export function createOscillatorStub(options = {}) {
     },
   };
 }
+
+/**
+ * A `document` whose canvases take every 2D draw call (gradients included)
+ * and draw nothing: for code that paints textures (render3d/hullLivery.js).
+ */
+export function createCanvasDocumentStub() {
+  const context = new Proxy(
+    {},
+    { get: (target, key) => target[key] ?? (() => context) }
+  );
+  return {
+    createElement: () => ({ width: 0, height: 0, getContext: () => context }),
+  };
+}

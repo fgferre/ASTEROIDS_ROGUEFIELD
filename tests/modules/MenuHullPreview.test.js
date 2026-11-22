@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MenuHullPreview } from '../../src/modules/MenuHullPreview.js';
+import { createCanvasDocumentStub } from '../__helpers__/stubs.js';
 
 const THREE = {};
 new Function(
@@ -101,4 +102,6 @@ describe('MenuHullPreview', () => {
   );
 });
 
+// the hull's livery paints in a canvas
+beforeEach(() => vi.stubGlobal('document', createCanvasDocumentStub()));
 afterEach(() => vi.unstubAllGlobals());

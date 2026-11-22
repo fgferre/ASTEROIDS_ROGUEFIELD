@@ -137,11 +137,14 @@ export const SHINE = Object.freeze({
  * surface gets).
  */
 export const HULL_FINISHES = Object.freeze([
-  SHINE.paint,
-  SHINE.gloss,
-  // The ship's own steel, not the table's: the owner saw its barrels in the
-  // shared steel (13/11) and preferred them as they were.
-  Object.freeze({ metalness: 1, roughness: 0.45, envMapIntensity: 2.5 }),
+  // The player's hulls shine more than the table's paint and accents, each
+  // by its material (the owner, 21/11: "dependendo do material ali do
+  // casco, tem que ter brilho"): satin paint with a real sheen, lacquered
+  // accents, and the ship's own steel (13/11: he preferred its barrels as
+  // they were to the shared steel), its highlight a little tighter.
+  Object.freeze({ metalness: 0.2, roughness: 0.5, envMapIntensity: 1 }),
+  Object.freeze({ metalness: 0.2, roughness: 0.32, envMapIntensity: 1.2 }),
+  Object.freeze({ metalness: 1, roughness: 0.34, envMapIntensity: 2.5 }),
 ]);
 
 /**
@@ -153,6 +156,15 @@ export const HULL_FINISHES = Object.freeze([
 export const SPECULAR_CAP_GLSL = `
       reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.3));
       reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.2));`;
+
+/**
+ * The player hull's own cap (playerMirror.js, MenuHullPreview.js): about
+ * twice the machines', so its sheen runs along the curves as it turns; at
+ * 1.2 a hull facing the key light blew out to white (21/11).
+ */
+export const HULL_SPECULAR_CAP_GLSL = `
+      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.62));
+      reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.34));`;
 
 /**
  * A MeshStandardMaterial's onBeforeCompile (set it before addRimLight, which
@@ -200,10 +212,10 @@ export function buildSensorGlass(THREE) {
   const material = new THREE.MeshPhysicalMaterial({
     color: colorOf(THREE, '#2a6280'),
     emissive: colorOf(THREE, '#12334c'),
-    roughness: 0.14,
+    roughness: 0.05,
     clearcoat: 0.9,
-    clearcoatRoughness: 0.1,
-    envMapIntensity: 1.8,
+    clearcoatRoughness: 0.04,
+    envMapIntensity: 2.6,
     transparent: true,
     opacity: 0.84,
     depthWrite: false,
@@ -216,7 +228,8 @@ export function buildSensorGlass(THREE) {
       float sky = smoothstep(-0.55, 0.6, reflectedView.y);
       float panel = 1.0 - smoothstep(0.06, 0.26,
         abs(reflectedView.x + 0.37 * reflectedView.y + 0.16));
-      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(0.42));
+      // a sharp glint of the key light (21/11: "o vidro, eu não vejo brilho")
+      reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(6.0));
       reflectedLight.indirectSpecular += sky *
         (vec3(0.025, 0.085, 0.14) + panel * vec3(0.18, 0.24, 0.3));`
     );

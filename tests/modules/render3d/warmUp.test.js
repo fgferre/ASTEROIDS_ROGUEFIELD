@@ -16,6 +16,7 @@ import {
 } from '../../../src/modules/render3d/enemyMirror.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
   cleanupGlobalState,
   setupGlobalMocks,
@@ -91,14 +92,8 @@ function warmable() {
 describe('Renderer3D.warmUp', () => {
   beforeEach(() => {
     setupGlobalMocks();
-    // the affix badges bake into canvases: a 2D context that takes any draw
-    const ctx = new Proxy(
-      {},
-      { get: (target, key) => target[key] ?? (() => {}) }
-    );
-    vi.stubGlobal('document', {
-      createElement: () => ({ getContext: () => ctx }),
-    });
+    // the affix badges and the hull liveries bake into canvases
+    vi.stubGlobal('document', createCanvasDocumentStub());
   });
   afterEach(() => {
     vi.unstubAllGlobals();

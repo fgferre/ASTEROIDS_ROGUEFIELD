@@ -4,7 +4,8 @@
 // (render3d/hullModel.js, laid out as render3d/playerMirror.js draws it, at
 // the hull's base upgrade levels) under menu materials: the game's finishes
 // (satin paint, glossy accents, polished steel) on the vertex-coloured hull
-// and turret and the blue glass over the sensor, edge lines, glowing
+// and turret, its worn livery and navigation lights (render3d/hullLivery.js)
+// and the blue glass over the sensor, edge lines, glowing
 // throats and a thruster plume in the hull accent (cyan Interceptor, amber
 // Solar Slicer and Bastion). The menu's key light circles the hull as the
 // camera orbits, so a fixed screen-space studio light (hull shaders only)
@@ -20,8 +21,8 @@ import { HullArt } from './player/hullArt.js';
 import { colorOf } from './render3d/batches.js';
 import {
   HULL_FINISHES,
+  HULL_SPECULAR_CAP_GLSL,
   NOZZLE_HEIGHT,
-  SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
   buildSensorGlass,
@@ -31,6 +32,7 @@ import {
   seatTurret,
   throatGeometry,
 } from './render3d/hullModel.js';
+import * as hullLivery from './render3d/hullLivery.js';
 
 // The menu shows each hull as it starts a run.
 const BASE_LEVELS = Object.freeze({ thruster: 0, rcs: 0, braking: 0 });
@@ -66,10 +68,11 @@ void main() {
 }`;
 
 function patchHull(shader) {
+  if (this.userData.livery) hullLivery.patch(shader, this.userData.livery);
   shader.fragmentShader = shader.fragmentShader
     .replace(
       '#include <lights_fragment_end>',
-      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
+      `#include <lights_fragment_end>${HULL_SPECULAR_CAP_GLSL}`
     )
     .replace(
       '#include <emissivemap_fragment>',
@@ -101,13 +104,23 @@ export class MenuHullPreview {
     // upgrade-applied panels.
     this.tones = hullTones(THREE);
     this.hullArt = new HullArt();
-    const studio = (material) => {
+    // the hull's livery (hullLivery.js)
+    this.livery = hullLivery.uniforms(THREE);
+    const studio = (material, livery = null) => {
+      material.userData.livery = livery;
       material.onBeforeCompile = patchHull;
       return material;
     };
     this.materials = {
       // one per finish, as in the game
       hull: HULL_FINISHES.map((finish) =>
+        studio(
+          new THREE.MeshStandardMaterial({ vertexColors: true, ...finish }),
+          this.livery
+        )
+      ),
+      // the turret's: no livery (it is painted for the hull's own shape)
+      turret: HULL_FINISHES.map((finish) =>
         studio(
           new THREE.MeshStandardMaterial({ vertexColors: true, ...finish })
         )
@@ -169,7 +182,7 @@ export class MenuHullPreview {
     ship.add(body, new THREE.Mesh(model.canopy, dark || materials.canopy));
     const turret = buildTurret(
       THREE,
-      dark || materials.hull,
+      dark || materials.turret,
       this.tones,
       dark || materials.lens
     );
@@ -186,7 +199,12 @@ export class MenuHullPreview {
     hull.userData.materials = [];
     this.plumes = [];
 
+    this.strobe = null;
     if (!dark) {
+      const { livery } = visual;
+      hullLivery.show(this.livery, THREE, geometry, livery, definition.id);
+      this.strobe = hullLivery.lights(THREE, model, geometry, ship);
+      this.strobe.visible = false;
       const accent = colorOf(THREE, PALETTE[visual.accent] ?? PALETTE.player);
       const bladeEdge = new THREE.LineBasicMaterial({
         color: accent.clone().multiplyScalar(1.3),
@@ -297,5 +315,6 @@ export class MenuHullPreview {
     this.spin.rotation.z += SPIN_RADIANS_PER_S * dt;
     const flicker = 1 + Math.sin(this.time * 31) * 0.06;
     this.plumes.forEach((plume) => plume.scale.set(1, flicker, 1));
+    if (this.strobe) this.strobe.visible = hullLivery.strobeOn(this.time);
   }
 }

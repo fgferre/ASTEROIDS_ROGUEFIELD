@@ -69,6 +69,10 @@ const visual = {
   flame: { length: 0.75, width: 1.3 },
   retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
   cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
+  // its worn coat and markings (render3d/hullLivery.js): the most worn,
+  // rust round its screws and in its seams; chip, the colour under its
+  // chipped paint
+  livery: { code: 'BX-03', wear: 1, rust: 1, chip: [168, 170, 172] },
   // a blunt, slab-sided body on a flat belly, thick delta wings, armour
   // slabs on the shoulders, stabilisers with the braking upgrade
   form: {

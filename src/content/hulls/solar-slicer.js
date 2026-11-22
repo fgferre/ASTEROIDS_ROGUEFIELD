@@ -67,6 +67,9 @@ const visual = {
   flame: { length: 1.5, width: 0.6 },
   retroPorts: [pt(0.55, -0.12), pt(0.55, 0.12)],
   cockpit: { from: pt(0.72, 0), to: pt(1.02, 0), width: 0.06 * S },
+  // its worn coat and markings (render3d/hullLivery.js): some wear, a
+  // little rust; chip, the colour under its chipped paint
+  livery: { code: 'SS-12', wear: 0.7, rust: 0.35, chip: [150, 154, 160] },
   // a long ridged needle, thin lens-section blades, engine pods riding the
   // blade roots, tail fins with the braking upgrade
   form: {
