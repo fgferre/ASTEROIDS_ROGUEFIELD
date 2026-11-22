@@ -2,8 +2,8 @@
 // from the hull's art data (lofted fuselage, airfoil wings that grow with
 // the RCS upgrade, tail fins, nacelles, intakes, pods, canopy, edge lines,
 // turret), in three vertex-coloured finishes (satin paint and glossier
-// accent panels with baked panel maps, polished steel) under a cyan fresnel
-// rim, with a dark glass canopy, cached per hull and upgrade levels. The only
+// accent panels with baked maps and a worn livery, polished steel) under
+// a cyan rim, blue glass, nav lights; cached per hull and levels. The only
 // strong light is the thrusters (hull accent: cyan Interceptor, amber Solar
 // Slicer): glowing throats, cones with a white core that stretch with
 // thrust, turn-jet needles at the RCS ports, retro flames at the nose, a
@@ -32,12 +32,12 @@ import { getHullThrusterPort } from '../player/hullShape.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import { DissolvePool } from './dissolve.js';
 import {
-  CANOPY_GLASS,
   HULL_FINISHES,
+  HULL_SPECULAR_CAP_GLSL,
   NOZZLE_HEIGHT,
-  SPECULAR_CAP_GLSL,
   VISUAL_SCALE,
   buildHullModel,
+  buildSensorGlass,
   buildTurret,
   buildTurretLayer,
   edgeLines,
@@ -46,6 +46,7 @@ import {
   seatTurret,
   throatGeometry,
 } from './hullModel.js';
+import * as hullLivery from './hullLivery.js';
 import { addRimLight } from './rimLight.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
@@ -151,12 +152,13 @@ const HULL_NORMAL_SCALE = 0.5;
 const HULL_AO = 0.8;
 const HULL_MAP_SEED = 3131.9;
 
-// The specular cap (hullModel.js), then the cyan fresnel rim on the hull (a
-// tight band on the silhouette against the dark field) plus the white
-// invulnerability pulse, both as emissive; the pulse is weighted to the rim
-// so the panels stay readable while it blinks.
+// The hull's specular cap (hullModel.js), its livery (hullLivery.js; not the
+// turret's), the cyan fresnel rim (a tight band on the silhouette against the
+// dark field) and the white invulnerability pulse, both emissive, the pulse
+// weighted to the rim so the panels stay readable while it blinks.
 function patchHull(shader) {
-  const { uRim, uBlink } = this.userData;
+  const { uRim, uBlink, livery } = this.userData;
+  if (livery) hullLivery.patch(shader, livery);
   shader.uniforms.uRim = uRim;
   shader.uniforms.uBlink = uBlink;
   shader.fragmentShader = shader.fragmentShader
@@ -166,7 +168,7 @@ function patchHull(shader) {
     )
     .replace(
       '#include <lights_fragment_end>',
-      `#include <lights_fragment_end>${SPECULAR_CAP_GLSL}`
+      `#include <lights_fragment_end>${HULL_SPECULAR_CAP_GLSL}`
     )
     .replace(
       '#include <emissivemap_fragment>',
@@ -253,27 +255,29 @@ export class PlayerMirror {
     this.breaking = false;
     this.wasDead = false;
 
-    // One material per finish (HULL_FINISHES: satin paint, glossy accents,
-    // polished steel); the tones ride in the vertex colours, the paint and
-    // the accents carry the baked panel maps. All take the rim and blink.
+    // One material per finish (HULL_FINISHES), tones in the vertex colours,
+    // the paint and accents with the baked panel maps; all take the rim and
+    // blink, the hull's set its livery too (not the turret's).
     const rim = { value: colorOf(THREE, PALETTE.player).multiplyScalar(0.45) };
     const blink = { value: 0 };
     const maps = bakeHullMaps(THREE, HULL_MAP_SEED);
     Object.values(maps).forEach((map) =>
       map.repeat.set(1 / HULL_TILE, 1 / HULL_TILE)
     );
-    this.hullMaterials = HULL_FINISHES.map((finish) => {
-      const material = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        ...finish,
+    this.livery = hullLivery.uniforms(THREE);
+    const finishes = (livery) =>
+      HULL_FINISHES.map((finish) => {
+        const material = new THREE.MeshStandardMaterial(finish);
+        Object.assign(material.userData, { uRim: rim, uBlink: blink, livery });
+        material.onBeforeCompile = patchHull;
+        return addRimLight(material);
       });
-      material.userData.uRim = rim;
-      material.userData.uBlink = blink;
-      material.onBeforeCompile = patchHull;
-      return addRimLight(material);
-    });
+    this.hullMaterials = finishes(this.livery);
+    this.turretMaterials = finishes(null);
     // the painted finishes: the ones with the panel maps
-    this.mappedMaterials = this.hullMaterials.slice(0, 2);
+    this.mappedMaterials = [this.hullMaterials, this.turretMaterials].flatMap(
+      (set) => set.slice(0, 2)
+    );
     this.mappedMaterials.forEach((material) =>
       Object.assign(material, maps, {
         normalScale: new THREE.Vector2(HULL_NORMAL_SCALE, HULL_NORMAL_SCALE),
@@ -289,14 +293,7 @@ export class PlayerMirror {
     this.surfaceMaps = true;
     this.blink = blink;
     this.blinkHeldUntil = -Infinity;
-    const { glow: canopyGlow, ...glass } = CANOPY_GLASS;
-    this.canopyMaterial = addRimLight(
-      new THREE.MeshStandardMaterial({
-        color: colorOf(THREE, PALETTE.rockShadow),
-        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(canopyGlow),
-        ...glass,
-      })
-    );
+    this.canopyMaterial = buildSensorGlass(THREE);
     this.edgeMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       toneMapped: false,
@@ -440,7 +437,7 @@ export class PlayerMirror {
     this.trailHead = 0;
     this.thrustRgb = rgbOf(THREE, PALETTE.player);
     // The turret, in the hull finishes; rebuild() seats it on each hull.
-    this.turretParts = buildTurret(THREE, this.hullMaterials, this.tones);
+    this.turretParts = buildTurret(THREE, this.turretMaterials, this.tones);
     ({
       group: this.turret,
       housing: this.turretHousing,
@@ -517,12 +514,13 @@ export class PlayerMirror {
 
     const key = hullKeyOf(hull, levels);
     if (!this.hullCache.has(key)) {
-      const model = buildHullModel(THREE, geometry, this.tones);
+      const model = buildHullModel(THREE, geometry);
       model.hull.userData.cached = true;
       model.canopy.userData.cached = true;
       this.hullCache.set(key, model);
     }
     const built = this.hullCache.get(key);
+    hullLivery.show(this.livery, THREE, geometry, hull.visual.livery, key);
     this.built = built;
     this.seatGun(player.noseAim, hull);
 
@@ -532,6 +530,7 @@ export class PlayerMirror {
     };
     edgeLines(THREE, built, lines).forEach((line) => this.ship.add(line));
     this.ship.add(new THREE.Mesh(built.canopy, this.canopyMaterial));
+    this.strobe = hullLivery.lights(THREE, built, geometry, this.ship);
 
     geometry.nozzles.forEach((nozzle) => {
       // Hot throat: a glowing lens in the bell's mouth, lit even at idle.
@@ -611,8 +610,9 @@ export class PlayerMirror {
   /**
    * The ship's death (docs/NORTE.md: every hit is physical): its solid parts
    * come apart into the pieces of its own build and burn away (the machines'
-   * break, dissolve.js), carried by its momentum; its flames, glows and light
-   * go out at once.
+   * break, dissolve.js), carried by its momentum, the sensor's glass with
+   * them though it is see-through; its flames, glows and light go out at
+   * once.
    */
   startBreak(player) {
     this.breaking = true;
@@ -624,7 +624,9 @@ export class PlayerMirror {
       if (!node.isMesh) return;
       node.castShadow = false;
       const material = [].concat(node.material)[0];
-      const solid = material?.isMeshStandardMaterial && !material.transparent;
+      const solid =
+        material === this.canopyMaterial ||
+        (material?.isMeshStandardMaterial && !material.transparent);
       if (solid || !node.visible) return;
       node.visible = false;
       this.breakHidden.push(node);
@@ -696,6 +698,7 @@ export class PlayerMirror {
     this.barrels.position.x =
       this.barrelsX + (this.muzzleFrames > 0 ? -TURRET_RECOIL : 0);
     this.updateLayers(player.turretLayers, angle);
+    this.strobe.visible = hullLivery.strobeOn(time);
 
     const main = thrust.main || 0;
     this.lightEngines(main, levels.thruster, time, {
@@ -897,7 +900,7 @@ export class PlayerMirror {
     while (this.layers.length < headings.length) {
       const layer = buildTurretLayer(
         this.THREE,
-        this.hullMaterials,
+        this.turretMaterials,
         this.tones,
         this.layers.length + 1
       );
@@ -1003,6 +1006,7 @@ export class PlayerMirror {
 
   // Each side's needles at the pilot's turn (the raw step state, not
   // the eased one): on at once, held RCS_HOLD_S, then out in RCS_FADE_S.
+  // The auto-brake's push across the hull lights a whole flank (thrusters.js).
   lightNeedles(state, dt) {
     let snap = 0;
     for (let i = 0; i < TURN_KEYS.length; i += 1) {
@@ -1010,7 +1014,8 @@ export class PlayerMirror {
       const target = state[TURN_KEYS[i]] || 0;
       if (target > 0.02) {
         if (jet.amount < 0.05) jet.snap = RCS_SNAP_S;
-        jet.amount = 0.5 + 0.5 * Math.min(1, target);
+        // As strong as the turn asks; a full key, full (Felipe, 21/11).
+        jet.amount = Math.min(1, target);
         jet.hold = RCS_HOLD_S;
       } else if (jet.hold > 0) {
         jet.hold -= dt;
@@ -1018,10 +1023,11 @@ export class PlayerMirror {
         jet.amount =
           jet.amount < 0.05 ? 0 : jet.amount * Math.exp(-dt / RCS_FADE_S);
       }
-      jet.material.opacity = Math.min(1, jet.amount * 1.2);
+      jet.material.opacity = jet.amount;
       snap = Math.max(snap, jet.snap);
     }
     this.snapMaterial.opacity = snap / RCS_SNAP_S;
+    const flank = [state.brakePort || 0, state.brakeStarboard || 0];
     for (let i = 0; i < this.puffs.length; i += 1) {
       const {
         puff,
@@ -1033,8 +1039,10 @@ export class PlayerMirror {
         snap: flash,
       } = this.puffs[i];
       const jet = turnL ? this.rcsJets.turnL : this.rcsJets.turnR;
-      const reach = length * (0.55 + 0.45 * jet.amount);
-      puff.visible = jet.amount > 0.02;
+      const amount = Math.max(jet.amount, flank[+(puff.position.z > 0)]);
+      jet.material.opacity = Math.max(jet.material.opacity, amount);
+      const reach = length * amount;
+      puff.visible = amount > 0.02;
       puff.scale.set(reach, radius, radius);
       if (twin) {
         twin.visible = puff.visible;
@@ -1104,7 +1112,8 @@ export class PlayerMirror {
       mesh.visible = aux > 0.02;
       mesh.scale.set(length * (0.6 + 0.4 * aux), radius, radius);
     }
-    this.retroMaterial.opacity = Math.min(1, aux * 2.5);
+    // Full from the Modern retro's whole share (0.7): a full key burns full.
+    this.retroMaterial.opacity = Math.min(1, aux / 0.7);
     const f = this.flare / RETRO_FLARE_S;
     this.flare = Math.max(0, this.flare - dt);
     this.flareFan.visible = f > 0;

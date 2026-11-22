@@ -1,4 +1,4 @@
-// The overlays (hit markers, damage numbers, the boss-transition border,
+// The overlays (hit markers, the boss-transition border,
 // the lock marks, the magnetism field), mirrored every frame into
 // Renderer3D's WebGL kit (`t`) and its DOM boss flash.
 
@@ -20,20 +20,6 @@ export function mirrorOverlays(t, player, effects, xpOrbs, combat, flashScale) {
     player.position;
 
   if (effects) {
-    const texts = effects.damageTexts || [];
-    for (let i = 0; i < texts.length; i += 1) {
-      const d = texts[i];
-      if (!d) continue;
-      t.texts.push(
-        d.damage,
-        d.x,
-        d.y,
-        d.size,
-        d.color,
-        Math.min(1, d.life * 2)
-      );
-    }
-
     mirrorBossTransitions(t, effects.bossTransitionEffects, flashScale);
   }
 

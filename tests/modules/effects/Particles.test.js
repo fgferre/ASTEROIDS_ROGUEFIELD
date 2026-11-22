@@ -7,7 +7,6 @@ describe('Particles', () => {
     randomRange: () => 0,
     randomCentered: () => 0,
     createMuzzleFlash: () => {},
-    damageNumbersEnabled: () => true,
   });
 
   beforeAll(() => {

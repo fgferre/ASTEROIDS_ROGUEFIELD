@@ -339,6 +339,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.keyLight = rendering.createLighting(THREE, this.scene);
 
     this.hullPreview = new MenuHullPreview(THREE, this.camera);
+    this.hullPreview.useSky(this.renderer);
     this.hullStage = document.getElementById('menu-hull-stage');
     // While the Hangar is open the hull frames into its stage instead, and
     // that patch of the menu canvas is copied into it (the overlay hides the

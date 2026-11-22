@@ -32,7 +32,7 @@ export class BossTransitions {
   /**
    * `particleEffects`: the effects' Particles; every burst and shockwave lands there.
    * `randomFloat(fork)`, `randomRange(min, max, fork)`, `randomCentered(span, fork)`: the effects' random helpers; every roll here draws from 'boss'.
-   * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling of a burst's count.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addFreezeFrame(duration, fade)`, `applyTimeDilation(scale, options)`: the effects' game time.
    */
@@ -655,10 +655,10 @@ export class BossTransitions {
     const config = this.getBossEffectConfig('defeated') || {};
     const palette = BOSS_FX;
 
-    this.addFreezeFrame(0.5, 0.3);
-    this.addScreenShake(20, 1.0);
-    this.addScreenFlash(PALETTE.text, 0.8, 0.3);
-
+    // The stop, the shake and the flash come once, from the defeat's config
+    // (applyBossScreenShake and applyBossEffectTimings below); a second set
+    // here landed on the same frame and only overrode the Screen Shake and
+    // Reduced Motion settings (21/11).
     const burstColor = palette.core;
     const burstCount = 50;
 
@@ -829,8 +829,7 @@ export class BossTransitions {
     this.applyBossEffectTimings(config, palette, 'boss-defeated');
 
     GameDebugLogger.log('STATE', 'Boss defeat effects created', {
-      freezeDuration: 0.5,
-      shakeIntensity: 20,
+      freezeDuration: config.freezeFrame?.duration,
       particleCount: burstCount,
     });
   }

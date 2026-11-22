@@ -1,15 +1,13 @@
 // src/modules/effects/Particles.js
 //
 // The pooled particles and what lives beside them: shockwave rings, hit
-// markers, floating damage numbers, the muzzle-flash queue and the ambient
-// field drift. EffectsSystem owns it; PlayerEffects, EnemyEffects and
+// markers, the muzzle-flash queue and the ambient field drift. EffectsSystem owns it; PlayerEffects, EnemyEffects and
 // BossTransitions build their bursts on top of it; EffectsSystem ticks it; Renderer3D reads these lists through
 // same-name getters on the effects object.
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { GamePools } from '../../core/GamePools.js';
 import { SHIELD_SHOCKWAVE_RADIUS } from '../../data/constants/gameplay.js';
-import { DamageText } from '../EffectEntities.js';
 
 // Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
 // and a few faint amber crystal motes drifting through the camera view, so the
@@ -43,22 +41,14 @@ export class Particles {
   /**
    * `randomRange(min, max, fork)`, `randomCentered(span, fork)`: the effects' random helpers; a particle's spin rolls from 'particles', the ambient drift from 'colors'.
    * `createMuzzleFlash(x, y, dirX, dirY)`: the effects' muzzle-flash burst; the queue flushes into it.
-   * `damageNumbersEnabled()`: the damage numbers setting; off means no floating numbers.
    */
-  constructor({
-    randomRange,
-    randomCentered,
-    createMuzzleFlash,
-    damageNumbersEnabled,
-  }) {
+  constructor({ randomRange, randomCentered, createMuzzleFlash }) {
     this.randomRange = randomRange;
     this.randomCentered = randomCentered;
     this.createMuzzleFlash = createMuzzleFlash;
-    this.damageNumbersEnabled = damageNumbersEnabled;
 
     this.particles = [];
     this.shockwaves = [];
-    this.damageTexts = [];
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
     this.ambientMotes = [];
@@ -73,7 +63,6 @@ export class Particles {
     for (const particle of this.particles) this.releaseParticle(particle);
     this.particles = [];
     this.shockwaves = [];
-    this.damageTexts = [];
     this.muzzleFlashQueue = [];
     this.ambientChips = [];
     this.ambientMotes = [];
@@ -300,25 +289,6 @@ export class Particles {
     }
 
     shockwaves.length = writeIndex;
-  }
-
-  createFloatingDamageText(x, y, damage, isCritical = false) {
-    if (!this.damageNumbersEnabled()) return;
-    this.damageTexts.push(new DamageText(x, y, damage, isCritical));
-  }
-
-  updateDamageTexts(deltaTime) {
-    const texts = this.damageTexts;
-    let writeIndex = 0;
-
-    for (let i = 0; i < texts.length; i += 1) {
-      const text = texts[i];
-      if (text && text.update(deltaTime)) {
-        texts[writeIndex++] = text;
-      }
-    }
-
-    texts.length = writeIndex;
   }
 
   // Spawns inside the view on the first fill, then just outside an edge,

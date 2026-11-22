@@ -18,16 +18,16 @@ import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { HeartTokens, OrbCrystals } from './fieldTokens.js';
 import { createFieldVeil } from './fieldVeil.js';
-import { FlashLights } from './flashLights.js';
+import { FlashLights, VeinLights } from './flashLights.js';
 import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
+import { buildHullEnvironment, useHullEnvironment } from './hullModel.js';
 import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
-import { TextSprites } from './textSprites.js';
 import { WeaponBodies } from './weaponBodies.js';
 
 export const FOV = 38;
@@ -38,7 +38,6 @@ export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
-const MAX_DAMAGE_TEXTS = 16;
 // proposta 18/10: the key light's shadow box follows the camera target: the
 // light sits KEY_SHADOW.distance away along its direction, the box spans the
 // shot (`span` × the camera range, clamped) and the biases keep rocks from
@@ -244,7 +243,8 @@ export function setupThree(seeded) {
     2
   );
   scene.add(key, key.target, fill, hemi, wardenLight);
-  scene.environment = buildEnvironment(THREE, renderer);
+  const skies = buildSkies(THREE, renderer);
+  scene.environment = skies.scene;
 
   const width = Math.max(1, canvas.width);
   const height = Math.max(1, canvas.height);
@@ -293,13 +293,11 @@ export function setupThree(seeded) {
   composer.addPass(smaaPass);
   displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 
-  // Drawn after the composer: text stays crisp, never bloomed.
+  // Drawn after the composer, never bloomed (the travel veil).
   const overlay = new THREE.Scene();
-  const texts = new TextSprites(THREE, overlay, seeded, MAX_DAMAGE_TEXTS);
 
   const backdrop = new FieldBackdrop(THREE, scene);
   const space = new SpaceField(THREE, scene);
-  watchContextRestore(THREE, renderer, scene, space);
   // The arena's border, shown when the camera looks past it (fieldVeil.js).
   const veil = createFieldVeil(THREE, scene);
   const biomes = new BiomeController(THREE, {
@@ -313,14 +311,20 @@ export function setupThree(seeded) {
     space,
   });
   const flashes = new FlashLights(THREE, scene);
+  const veins = new VeinLights(THREE, scene);
   const debris = new DebrisChunks(THREE, scene);
   const bodies = new WeaponBodies(THREE, scene);
   const bursts = new DeathBursts(debris, flashes);
   const enemies = new EnemyMirror(THREE, scene, seeded, bursts);
   const player = new PlayerMirror(THREE, scene, seeded);
+  // its own reflection sky (not the turret's: its dome mirrored the
+  // softboxes vivid blue, 22/11)
+  const hullMaterials = [...player.hullMaterials, player.canopyMaterial];
+  useHullEnvironment(hullMaterials, skies.hull);
+  watchContextRestore(THREE, renderer, scene, space, hullMaterials);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
-  const decals = new ScorchDecals(THREE, scene);
+  const decals = new ScorchDecals(THREE, scene, camera);
   const blasts = new Blasts(THREE, scene);
   const shield = new ShieldMirror(
     THREE,
@@ -392,7 +396,6 @@ export function setupThree(seeded) {
     bloomScale: bloomUrl.scale,
     bloomSet: bloomUrl.set,
     overlay,
-    texts,
     bossFlash,
     bossFlashKey: '',
     key,
@@ -404,6 +407,7 @@ export function setupThree(seeded) {
     veil,
     biomes,
     flashes,
+    veins,
     enemies,
     player,
     pickups,
@@ -439,18 +443,44 @@ export function setupThree(seeded) {
 }
 
 // After a lost graphics context comes back, what was generated on the GPU is
-// empty: the reflection map is built again, the nebula's maps bake again.
-export function watchContextRestore(THREE, renderer, scene, space) {
+// empty: the reflection maps (the scene's, the player hull's on its
+// `hullMaterials`) are built again, the nebula's maps bake again.
+export function watchContextRestore(
+  THREE,
+  renderer,
+  scene,
+  space,
+  hullMaterials
+) {
   renderer.domElement.addEventListener('webglcontextrestored', () => {
     scene.environment?.dispose();
-    scene.environment = buildEnvironment(THREE, renderer);
+    hullMaterials[0].envMap?.dispose();
+    const skies = buildSkies(THREE, renderer);
+    scene.environment = skies.scene;
+    useHullEnvironment(hullMaterials, skies.hull);
     space.invalidateBakes();
   });
 }
 
+// The scene's and the player hull's reflection skies from one PMREMGenerator,
+// disposed once after both. Its blur planes are shared by every generator
+// and disposed with any; the renderer sends a geometry once per frame count,
+// which only Renderer3D's frame advances (info.autoReset is off), so a
+// second generator after a dispose in the same count drew unsent planes:
+// a black sky (22/11).
+function buildSkies(THREE, renderer) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const skies = {
+    scene: buildEnvironment(THREE, pmrem),
+    hull: buildHullEnvironment(THREE, pmrem),
+  };
+  pmrem.dispose();
+  return skies;
+}
+
 // A dim reflection environment so metal reads as metal: black below, a
 // cool sky, one warm patch where the key light is.
-function buildEnvironment(THREE, renderer) {
+function buildEnvironment(THREE, pmrem) {
   const sky = new THREE.SphereGeometry(100, 32, 16);
   const position = sky.getAttribute('position');
   const colors = new Float32Array(position.count * 3);
@@ -479,8 +509,5 @@ function buildEnvironment(THREE, renderer) {
       })
     )
   );
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const texture = pmrem.fromScene(envScene, 0.02).texture;
-  pmrem.dispose();
-  return texture;
+  return pmrem.fromScene(envScene, 0.02).texture;
 }

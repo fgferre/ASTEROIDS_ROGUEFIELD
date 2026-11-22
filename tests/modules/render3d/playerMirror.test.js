@@ -17,6 +17,7 @@ import { HALF_H, HALF_W } from '../../../src/modules/render3d/batches.js';
 import { BREAK_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
   cleanupGlobalState,
   setupGlobalMocks,
@@ -50,8 +51,15 @@ function mirrorFor(hull) {
 }
 
 describe('PlayerMirror', () => {
-  beforeEach(() => setupGlobalMocks());
-  afterEach(() => cleanupGlobalState());
+  beforeEach(() => {
+    setupGlobalMocks();
+    // the hull's livery paints in a canvas
+    vi.stubGlobal('document', createCanvasDocumentStub());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    cleanupGlobalState();
+  });
 
   it('burns cyan on the Interceptor and amber on the Solar Slicer', () => {
     const cyan = mirrorFor(defaultHull).mirror.flameMaterial.color;
@@ -154,13 +162,35 @@ describe('PlayerMirror', () => {
       });
       // hull + canopy + per nozzle (throat, flame, core) + one puff per
       // wingtip port + the two nose jets + the two retro flames + the six
-      // sputter embers
+      // sputter embers + the navigation lights (one per wingtip, the strobe,
+      // the sensor's glow)
       const { nozzles, rcsPorts } = mirror.geometry;
       expect(meshes, hull.id).toBe(
-        2 + 3 * nozzles.length + rcsPorts.length + 2 + 2 + 6
+        2 +
+          3 * nozzles.length +
+          rcsPorts.length +
+          2 +
+          2 +
+          6 +
+          rcsPorts.length +
+          2
       );
       expect(lines, hull.id).toBeLessThanOrEqual(3);
     });
+  });
+
+  it("wears each hull's own livery, never on the turret, and flashes its strobe", () => {
+    const { player, mirror } = mirrorFor(bastion);
+    const bastionCoat = mirror.livery.uLivery.value;
+    expect(bastionCoat.isTexture).toBe(true);
+    expect(mirror.hullMaterial.userData.livery).toBe(mirror.livery);
+    expect(mirror.turretMaterials[0].userData.livery).toBeNull();
+    player.setHull(defaultHull);
+    mirror.update(player, ribbons, 0.5);
+    expect(mirror.livery.uLivery.value).not.toBe(bastionCoat);
+    expect(mirror.strobe.visible).toBe(false);
+    mirror.update(player, ribbons, 1.21);
+    expect(mirror.strobe.visible).toBe(true);
   });
 
   it('caches the merged hull and shares its buffers with the dash ghosts', () => {
@@ -306,6 +336,45 @@ describe('PlayerMirror', () => {
     expect(watch(0, 0.2).embers).toBeGreaterThan(0);
   });
 
+  it('burns the turn jets and the retro as hard as the pilot pushes; a full key burns full', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const at = (turn, aux) => {
+      player.lastThrusterState.turnR = turn;
+      player.lastThrusterState.aux = aux;
+      for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
+      return {
+        jet: mirror.rcsJets.turnR.material.opacity,
+        retro: mirror.retroMaterial.opacity,
+      };
+    };
+    expect(at(1, 1)).toEqual({ jet: 1, retro: 1 });
+    // The Modern flight's whole retro share, on a key.
+    expect(at(1, 0.7).retro).toBeCloseTo(1, 2);
+    const part = at(0.3, 0.3);
+    expect(part.jet).toBeCloseTo(0.3, 2);
+    expect(part.retro).toBeCloseTo(0.3 / 0.7, 2);
+    expect(at(0.6, 0.6).retro).toBeGreaterThan(part.retro + 0.3);
+  });
+
+  it("lights a whole flank's jets, fore and aft, for the auto-brake's push across the hull", () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.lastThrusterState.brakeStarboard = 0.5;
+    mirror.update(player, ribbons, 0);
+    const shown = mirror.puffs
+      .filter(({ puff }) => puff.visible)
+      .map(({ puff }) => ({
+        fore: puff.position.x > 0,
+        starboard: puff.position.z > 0,
+      }));
+    expect(shown).toEqual(
+      expect.arrayContaining([
+        { fore: false, starboard: true },
+        { fore: true, starboard: true },
+      ])
+    );
+    expect(shown).toHaveLength(2);
+  });
+
   it('lights the retro flames with the brake, longer and doubled with the Braking System', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const retrosAt = (level, aux) => {
@@ -417,6 +486,9 @@ describe('PlayerMirror', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const hull = mirror.ship.children.find((child) => child.name === 'hull');
     const whole = hull.geometry;
+    const glass = mirror.ship.children.find(
+      (child) => child.material === mirror.canopyMaterial
+    );
     const [flame] = mirror.flames;
     player.velocity = { vx: 50, vy: 0 };
     player.markDead();
@@ -425,6 +497,9 @@ describe('PlayerMirror', () => {
     expect(mirror.breaking).toBe(true);
     expect(mirror.group.visible).toBe(true);
     expect(hull.geometry.getAttribute('aPiece')).toBeDefined();
+    // the sensor's see-through glass breaks with it
+    expect(glass.visible).toBe(true);
+    expect(glass.geometry.getAttribute('aPiece')).toBeDefined();
     expect(Array.isArray(hull.material)).toBe(true); // its finishes' twins
     expect(flame.flame.visible).toBe(false);
     expect(hull.castShadow).toBe(false);

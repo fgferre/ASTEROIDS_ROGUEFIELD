@@ -1,0 +1,182 @@
+// src/data/changelog.js
+//
+// What changed in each published version of the game, newest first, in the
+// player's words (what you notice playing, with the names the game shows). The
+// in-game changelog reads RELEASES; the version in the menu corner is
+// package.json's, and RELEASES[0].version must be that same number.
+//
+// Numbers while in beta: 0.MIDDLE.LAST. Every publication changes the number.
+// MIDDLE goes up (LAST back to 0) when the player gets something new to see or
+// do: content, a screen, a mechanic, a new look. Only LAST goes up for fixes and
+// tuning. 1.0.0 only when Felipe says so.
+//
+// NEXT collects the lines for the coming publication; the game never shows it.
+// One item per line, a line per change, added when the work is done. A line
+// still waiting for Felipe's word ends with `// not confirmed`. A branch that
+// changes the game must add something here (tests/process/changelogLine.test.js
+// fails otherwise): a line in new, improved or fixed, or, when a player notices
+// nothing, a sentence in `unseen` saying what changed and why nobody sees it.
+// `unseen` never shows in the game; it goes with the list to Felipe when asking
+// to publish. At publication NEXT becomes the new first entry of RELEASES, with
+// its number and date (its `unseen` kept there), and NEXT is left empty.
+
+export const NEXT = {
+  new: [],
+  improved: [],
+  fixed: [],
+  unseen: [],
+};
+
+export const RELEASES = [
+  {
+    version: '0.7.0',
+    date: '2026-11-22',
+    new: [
+      'Stick Sensitivity in Settings → Controls: Low, Medium or High, for how hard a half-tilted stick pushes.',
+      'Shots now push and spin the rock they hit.',
+      'Every shot lights what it hits in its own color. The burn mark starts white-hot in that color and cools to lava, and glowing veins light the rocks around them.',
+      'The Quarantine Grid’s planet is now a whole cracked world hanging in the distance, its night side dotted with dead cities.',
+      'The version number sits in the menu’s corner: open it to see What’s new in each version.',
+      'Every hull shows its years of service: worn leading edges, grime, scorched engines, hull codes and warning stripes, and rust on the old Bastion.',
+      'Navigation lights: red and green at the wingtips and a white strobe on the antenna.',
+    ],
+    improved: [
+      'The Crucible’s star now boils, with sunspots and a fiery rim, and is a little darker so the fight reads on top of it.',
+      'On a controller, the engine flame, its sound and the side jets follow how far you push the stick.',
+      'The menu music arrives sooner on a weak connection.',
+      'Screen Shake Intensity and Hit Markers now take effect at once, even mid-run.',
+      'Damage Numbers and Reduced Particles left Settings: they never did anything.',
+      'With a controller, the story scene says PRESS Ⓐ TO SKIP.',
+      'The Interceptor, Solar Slicer and Bastion have new hulls: curved bodies, a blue glass dome over the sensor, satin paint and brass trim.',
+      'Paint, metal and glass catch the light as your ship turns.',
+    ],
+    fixed: [
+      'iPhone: the game added to the Home Screen and opened sideways no longer plays in a small square.',
+      'On a phone, the robot’s opening scene now waits for the install screen to close.',
+      'iPhone: the “o” of the opening no longer goes blank after the robot hops out.',
+      'Choosing an option in Settings → Controls with a controller no longer loses the highlight.',
+      'Gold and crystal rocks break into gold and crystal pieces, not plain stone.',
+      'A Warden’s death shakes the screen once, not seven times, and follows Screen Shake Intensity and Reduce Motion.',
+      'The light of a hit now dims with Reduce Flashing.',
+      'During the automatic brake, the jets that really slow the ship light up (nose, tail or sides) until it stops, not always the nose ones.',
+    ],
+  },
+  {
+    version: '0.6.1',
+    date: '2026-11-21',
+    new: [],
+    improved: [],
+    fixed: [
+      'The same pilot open in two tabs no longer overwrites itself: a tab whose pilot changed elsewhere goes back to the title.',
+      'Deleting a pilot from an old tab only deletes the pilot it asked about.',
+      'Retry after dying in a replay keeps the recorded upgrades.',
+      'Replays recorded before this version can no longer be played; the game tells you so.',
+    ],
+  },
+  {
+    version: '0.6.0',
+    date: '2026-11-21',
+    new: [],
+    improved: [
+      'The Crystal Choir’s crystals have a new look: fans of deep cyan shards, darker under the arena so the fight reads on top. The sector also loads lighter.',
+    ],
+    fixed: [
+      'Controller, Classic flight: pulling the left stick back dashes backward and brakes, like S.',
+      'Controller, Modern flight: the D-pad keeps full thrust while the right stick aims.',
+      'Holding Escape to close Settings no longer throws you back to the title.',
+      'A quick press on the controller restarts the two-minute wait on the menu.',
+      'A pilot deleted in one tab no longer comes back from another tab.',
+      'A replay recorded with another pilot’s ship plays with that ship.',
+      'An Elite’s broken front shield no longer comes back whole on Retry.',
+      'Picking two sectors quickly on the map no longer keeps the first one’s music.',
+      'With Touch Controls on Auto, a finger still on the screen no longer steers after you press a key.',
+    ],
+  },
+  {
+    version: '0.5.0',
+    date: '2026-11-21',
+    new: [
+      'Xbox controller in the menus: everything is reachable with a console highlight. LB and RB switch tabs, B goes back.',
+      'Tap or click the game’s name on the menu to go back to the title and switch pilot.',
+    ],
+    improved: [
+      'Xbox controller in flight: the sticks now push as hard as you lean them, with dash and shield on the shoulders.',
+      'Music arrives sooner on a weak connection.',
+      'The count marks on the Debris Wake’s wreck plates are now part of the plates, lighting up as the Quarry Maw counts.',
+    ],
+    fixed: [
+      'iPhone: the opening’s robot no longer freezes mid-hop.',
+      'Safari: the opening mark no longer shows upside down.',
+    ],
+  },
+  {
+    version: '0.4.0',
+    date: '2026-11-20',
+    new: [
+      'Install the game as an app: an Install button on Android and on computers, and the two steps drawn for you on iPhone and iPad.',
+      'A new icon, a gold-cracked rock, with the full name Asteroid Roguefield under it.',
+      'Touch Controls in Settings → Controls on touch-screen computers: Auto or Always.',
+    ],
+    improved: [],
+    fixed: [
+      'Touch now works on screens that say they are a computer, like a Tesla’s or a touch laptop.',
+    ],
+  },
+  {
+    version: '0.3.0',
+    date: '2026-11-20',
+    new: [
+      'Three pilots, each with their own progress. Choose your pilot after PRESS START; if you already played, you are Pilot 1 with everything kept.',
+      'Delete a pilot, through a box that starts on Cancel.',
+      'Escape on the menu, or two minutes without a touch, goes back to the title screen.',
+    ],
+    improved: [],
+    fixed: [
+      'If the browser refuses to save a pilot, the game says so instead of playing the wrong one.',
+    ],
+  },
+  {
+    version: '0.2.0',
+    date: '2026-11-20',
+    new: [
+      'Play by touch on iPhone and iPad held sideways: a thumb stick where your thumb lands, and DASH, SHIELD and pause buttons.',
+      'Every screen works by finger, and the HUD has its own layout on phones and tablets.',
+      'Add the game to your Home Screen and play it full screen.',
+      'A new Pipo Studio Labs opening: the little robot hops over the letters before the title appears.',
+      'Loading lines that say what is loading, with a few jokes in between.',
+      'The freighter scene has its own music and engine sounds.',
+    ],
+    improved: [
+      'Upgrade cards fit a phone held sideways, no scrolling.',
+      'Pressing the shield before you have it now answers with a small shake and a beep.',
+      'The Amber Lance goes straight on to the next enemy.',
+      'No more dark bands behind the texts over the scene.',
+    ],
+    fixed: [
+      'Every new mission really is different, and the Daily Field is the same for everyone.',
+      'The game no longer gets stuck loading when the browser blocks site data or a font fails.',
+      'Music no longer stops for good after a death and Retry.',
+      'Boss Rush shows New best again, and a tie no longer counts as one.',
+      'Sector and Boss Rush times stop when the Warden dies.',
+      'Dash or shield pressed during the pause no longer fire on resume.',
+      'Replays play with the recorded Hangar setup, not yours.',
+    ],
+  },
+  {
+    version: '0.1.0',
+    date: '2026-11-18',
+    new: [
+      'First beta shared with friends.',
+      'Ten campaign sectors, from the Debris Wake to The Crucible, each guarded by a Warden.',
+      'Four ways to play: Campaign, Descent, Daily Field and Boss Rush.',
+      'Three ships (Interceptor, Solar Slicer, Bastion) and seven weapons.',
+      'Upgrade cards every second level, ten per run, with piloting cards that take you from a simple glide to full flight.',
+      'The Hangar: medals that pay Salvage, licenses, and the Pressure ladder above Warden.',
+      'A story scene aboard the Wake on your first campaign launch.',
+      'Recorded music for every sector and boss.',
+      'Every hit is physical: rocks break along their own cracks and machines come apart piece by piece.',
+    ],
+    improved: [],
+    fixed: [],
+  },
+];

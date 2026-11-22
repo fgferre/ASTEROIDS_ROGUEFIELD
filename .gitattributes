@@ -1,0 +1,4 @@
+# Several branches add lines to the coming version's list at once: keep
+# both sides instead of a conflict (tests/data/changelog.test.js catches a line
+# a merge brings back after a publication).
+src/data/changelog.js merge=union

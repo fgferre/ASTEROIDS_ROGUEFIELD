@@ -63,10 +63,15 @@ const visual = {
   flame: { length: 1, width: 1 },
   retroPorts: [pt(0.3, -0.21), pt(0.3, 0.21)],
   cockpit: { from: pt(0.4, 0), to: pt(0.66, 0), width: 0.07 * S },
+  // its worn coat and markings (render3d/hullLivery.js): kept clean, no
+  // rust; chip, the colour under its chipped paint
+  livery: { code: 'IC-07', wear: 0.45, rust: 0, chip: [92, 98, 106] },
   // layered plates: a needle prow, armoured shoulders and a vented spine,
   // swept blades with a weapon rail at each tip, canards, canted tail fins,
   // twin nacelles
   form: {
+    // Recess, wing, body, upper plate and exposed metal (sRGB).
+    tones: ['#222d3a', '#536677', '#8797a5', '#bbc7cc', '#d79a4e'],
     body: [
       [1.0, 0, 0.15, 0, 0],
       [0.94, 0.028, 0.152, 0.022, 0.016],

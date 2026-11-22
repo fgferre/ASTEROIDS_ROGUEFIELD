@@ -15,7 +15,11 @@ jobs:
         node-version: [20.x, 22.x] # Vite 7 needs Node 20.19+
 
     steps:
+      # Whole history: the changelog's check compares a pull request with the
+      # point where it left main (tests/process/changelogLine.test.js).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4

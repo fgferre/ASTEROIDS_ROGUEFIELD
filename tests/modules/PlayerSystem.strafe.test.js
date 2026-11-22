@@ -7,6 +7,7 @@ import {
   TURRET_PIVOT_X,
 } from '../../src/data/constants/physics.js';
 import shipModels from '../../src/data/shipModels.js';
+import { padForce } from '../../src/modules/player/movementInput.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -94,6 +95,32 @@ describe('PlayerSystem control schemes', () => {
     expect(halfLean).toBeLessThan(dpad * 0.6);
   });
 
+  it('Modern on a pad: the flame (and its sound) burns as hard as the stick pushes; keys and the d-pad stay full', () => {
+    const shownMain = (input) => {
+      const player = makePlayer();
+      player.angle = -Math.PI / 2; // nose up the screen, along the move
+      for (let i = 0; i < 20; i += 1) {
+        player.updateMovement(DELTA_TIME, {
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          ...input,
+        });
+        player.updatePosition(DELTA_TIME);
+      }
+      return player.lastThrusterState.main;
+    };
+    expect(shownMain({ up: true })).toBe(1);
+    expect(shownMain({ pad: true, moveX: 0, moveY: 0, up: true })).toBe(1);
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.5 })).toBeCloseTo(
+      0.5 ** 1.5,
+      2
+    );
+    // A barely leaning stick still burns (the trail cards drop on any burn).
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.05 })).toBeGreaterThan(0);
+  });
+
   it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
     const speedAfterRelease = (scheme, glide) => {
       const player = makePlayer({}, scheme);
@@ -178,7 +205,7 @@ describe('PlayerSystem control schemes', () => {
       player.flight.brakingDamping = brakingDamping;
       player.angle = 0;
       player.velocity = { vx: 100, vy: 0 };
-      return player.flight.updateMovement(DELTA_TIME, {}).coastBrake;
+      return player.flight.updateMovement(DELTA_TIME, {}).brake.aux;
     };
 
     expect(coastBrake(0)).toBe(0);
@@ -242,6 +269,36 @@ describe('PlayerSystem control schemes', () => {
 
     expect(player.angle).toBeGreaterThan(0.3); // the hull turned clockwise
     expect(player.getTurretAngle()).toBeCloseTo(-Math.PI / 2, 2);
+  });
+
+  it('the Stick Sensitivity setting sets how far a part-tilted stick pushes, mid-run too; full tilt is full push', () => {
+    const eventBus = createEventBusMock();
+    const player = new PlayerSystem({
+      eventBus,
+      input: { getMovementInput: vi.fn(() => ({})) },
+      'command-queue': null,
+      settings: {
+        getCategoryValues: (id) =>
+          id === 'controls' ? { stickSensitivity: 'high' } : null,
+      },
+    });
+    expect(player.stickSensitivity).toBe('high');
+    // The new flight (the default) takes it too, from the pause menu.
+    eventBus.emit('settings-controls-changed', {
+      values: { stickSensitivity: 'low' },
+    });
+    expect(player.stickSensitivity).toBe('low');
+
+    const push = (sensitivity, tilt) =>
+      padForce({ pad: true, sensitivity }, tilt);
+    expect(push('medium', 0.5)).toBeCloseTo(0.5 ** 1.5, 9);
+    expect(push('low', 0.5)).toBeLessThan(push('medium', 0.5));
+    expect(push('high', 0.5)).toBeCloseTo(0.5, 9);
+    for (const step of ['low', 'medium', 'high']) {
+      expect(push(step, 1)).toBe(1);
+    }
+    // A frame without the setting (no player stamped it) flies Medium.
+    expect(padForce({ pad: true }, 0.5)).toBeCloseTo(0.5 ** 1.5, 9);
   });
 
   it('flies the Hull Control setting, and ?controls=classic wins over it', () => {

@@ -16,6 +16,7 @@ import {
 } from '../../../src/modules/render3d/enemyMirror.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
   cleanupGlobalState,
   setupGlobalMocks,
@@ -81,7 +82,6 @@ function warmable() {
     smaaPass: pass(),
     impactPass: pass(),
     bloomUrl: true,
-    texts: { begin: vi.fn(), push: vi.fn(), end: vi.fn() },
     enemies: new EnemyMirror(THREE, scene, seeded, null),
     player: new PlayerMirror(THREE, scene, seeded),
   };
@@ -91,14 +91,8 @@ function warmable() {
 describe('Renderer3D.warmUp', () => {
   beforeEach(() => {
     setupGlobalMocks();
-    // the affix badges bake into canvases: a 2D context that takes any draw
-    const ctx = new Proxy(
-      {},
-      { get: (target, key) => target[key] ?? (() => {}) }
-    );
-    vi.stubGlobal('document', {
-      createElement: () => ({ getContext: () => ctx }),
-    });
+    // the affix badges and the hull liveries bake into canvases
+    vi.stubGlobal('document', createCanvasDocumentStub());
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -142,6 +136,18 @@ describe('Renderer3D.warmUp', () => {
     // the instanced rocks' shared materials, the rim and glow batches
     // the affix badges, baked before the first Elite shows them
     expect(Object.keys(enemies.badges).sort()).toEqual([...AFFIX_IDS].sort());
+    // and their sprite program, built here: the first Elite draws no new one
+    const badgeSprites = [];
+    scene.traverse((object) => object.isSprite && badgeSprites.push(object));
+    expect(badgeSprites.length).toBeGreaterThan(0);
+    badgeSprites.forEach((sprite) =>
+      expect(compiled.has(sprite.material)).toBe(true)
+    );
+    expect(
+      badgeSprites.some((sprite) =>
+        Object.values(enemies.badges).includes(sprite.material)
+      )
+    ).toBe(true);
     Object.values(enemies.rockFamilies).forEach((material) =>
       expect(compiled.has(material)).toBe(true)
     );

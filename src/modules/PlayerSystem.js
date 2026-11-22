@@ -121,13 +121,15 @@ class PlayerSystem extends BaseSystem {
       dependencies: this.dependencies,
     });
     exposeFields(this, this.movementInput, ['cachedMovementInput']);
+    const controls = resolveService(
+      'settings',
+      this.dependencies
+    )?.getCategoryValues('controls');
     this.controlScheme =
-      config?.controlScheme ||
-      resolveControlScheme(
-        resolveService('settings', this.dependencies)?.getCategoryValues(
-          'controls'
-        )?.hullControl
-      );
+      config?.controlScheme || resolveControlScheme(controls?.hullControl);
+    // Stick Sensitivity (Controls): the pad sticks' curve; a replay flies
+    // its recording's (replaySession.js).
+    this.stickSensitivity = controls?.stickSensitivity ?? 'medium';
     this.noseAim = noseAimFromUrl();
     // The new flight (the default; ?direcao=antiga is the old flight): each run starts classic, gliding, aimed
     // by the nose; cards lift each of the three (beginNewFlight).
@@ -273,8 +275,10 @@ class PlayerSystem extends BaseSystem {
       this.maneuvers.dashRequested = true;
     });
 
-    // Hull Control applies live, mid-run too.
+    // Hull Control and Stick Sensitivity apply live, mid-run too.
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
+      this.stickSensitivity =
+        payload?.values?.stickSensitivity ?? this.stickSensitivity;
       // The new flight's scheme is the cards' (beginNewFlight), not the setting's.
       if (payload?.values && !this.newFlight) {
         this.setFlightScheme(
@@ -516,6 +520,7 @@ class PlayerSystem extends BaseSystem {
     }
 
     let movement = this.movementInput.readMovement(commandQueue, inputSystem);
+    movement.sensitivity = this.stickSensitivity;
     // In the two-stick classic the right stick turns the hull: no hand aim.
     this.aimStick =
       movement.pad && this.controlScheme !== 'modern'

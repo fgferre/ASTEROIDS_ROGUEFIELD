@@ -16,7 +16,6 @@ describe('HV-06: Thruster particle determinism', () => {
       random,
       settings: createSettingsStub(),
     });
-    system.particleDensity = 1;
 
     // Stub createParticle to avoid GamePools dependency — returns plain object
     // Must NOT consume any random numbers to avoid contaminating fork state

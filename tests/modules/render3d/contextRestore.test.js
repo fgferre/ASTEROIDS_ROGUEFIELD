@@ -18,7 +18,7 @@ new Function(
 )(THREE, {});
 
 describe('a restored graphics context', () => {
-  it('bakes the far nebula again and rebuilds the reflection map', () => {
+  it('bakes the far nebula again and rebuilds both reflection skies with one generator', () => {
     const scene = new THREE.Scene();
     const space = new SpaceField(THREE, scene);
     space.setLayers(QUALITY_PRESETS.low.spaceLayers);
@@ -42,7 +42,9 @@ describe('a restored graphics context', () => {
     });
     const first = { dispose: vi.fn() };
     scene.environment = first;
-    watchContextRestore(fake, renderer, scene, space);
+    const hullFirst = { dispose: vi.fn() };
+    const hull = [{ envMap: hullFirst }, { envMap: hullFirst }];
+    watchContextRestore(fake, renderer, scene, space, hull);
 
     const camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, CAMERA_FAR);
     camera.position.set(0, 550, 180);
@@ -60,6 +62,11 @@ describe('a restored graphics context', () => {
     listeners.webglcontextrestored();
     expect(scene.environment.fresh).toBe(true);
     expect(first.dispose).toHaveBeenCalled();
+    expect(hull.every((m) => m.envMap.fresh)).toBe(true);
+    expect(hullFirst.dispose).toHaveBeenCalled();
+    // One generator for both skies: a second one after a dispose in the same
+    // renderer frame drew the shared blur planes unsent, black (sceneSetup.js)
+    expect(pmrem).toHaveBeenCalledTimes(1);
     scene.onBeforeRender(renderer, scene, camera);
     expect(farBakes()).toBe(2);
   });

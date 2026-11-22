@@ -143,6 +143,16 @@ export function cacheStaticNodes() {
         document.getElementById('credits-back-btn'),
       ].filter(Boolean),
     },
+    changelog: {
+      overlay: document.getElementById('changelog-screen') || null,
+      primaryAction: document.getElementById('changelog-back-btn') || null,
+      closeButtons: [
+        document.getElementById('changelog-close-btn'),
+        document.getElementById('changelog-back-btn'),
+      ].filter(Boolean),
+      body: document.getElementById('changelog-body') || null,
+      versionButton: document.getElementById('menu-version-btn') || null,
+    },
     minimap: {
       container: document.getElementById('hud-minimap') || null,
       canvas: document.getElementById('minimap-canvas') || null,

@@ -14,8 +14,7 @@ export class CrackEffects {
    * `createParticle(x, y, vx, vy, color, size, life, type)`: the effects' createParticle, not Particles' own, as in PlayerEffects.
    * `randomFloat(fork)`: the effects' random helper; rolls draw from 'explosions'.
    * `getRandomFork(name)`: the effects' random fork; a SpaceParticle built here rolls its spin from it.
-   * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling.
-   * `particleDensity()`: the Reduced Particles density, read live; it thins the cracks a stage change shows.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `motionReduced()`: the Reduced Motion setting, read live; on means no crack sparks.
    */
   constructor({
@@ -24,7 +23,6 @@ export class CrackEffects {
     randomFloat,
     getRandomFork,
     getScaledParticleCount,
-    particleDensity,
     motionReduced,
   }) {
     this.particleEffects = particleEffects;
@@ -32,7 +30,6 @@ export class CrackEffects {
     this.randomFloat = randomFloat;
     this.getRandomFork = getRandomFork;
     this.getScaledParticleCount = getScaledParticleCount;
-    this.particleDensity = particleDensity;
     this.motionReduced = motionReduced;
   }
 
@@ -159,10 +156,7 @@ export class CrackEffects {
 
     segments.sort((a, b) => b.length - a.length);
 
-    const baseCrackCount = Math.max(
-      1,
-      Math.round(segments.length * (0.65 + this.particleDensity() * 0.45))
-    );
+    const baseCrackCount = Math.max(1, Math.round(segments.length * 1.1));
 
     const cracksToSpawn = Math.max(
       1,

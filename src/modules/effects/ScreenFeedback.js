@@ -11,6 +11,8 @@ import { ScreenShake, ShakePresets } from '../../utils/ScreenShake.js';
 // Hits feel like hits (PLAN.md step 5). PROPOSAL from 17/10, judged by playing.
 // Numeric shake intensity becomes trauma as intensity / divisor (was 15).
 const SHAKE_INTENSITY_DIVISOR = 10;
+// How long a boss's loot may go without fusing before the screen is free again
+export const BOSS_LOOT_FUSION_GAP = 0.5;
 export const PLAYER_HIT_SHAKE = { intensity: 7, duration: 0.35 }; // was 8 / 0.3 s; 7 keeps a hit (trauma 0.7) below death/boss (1.0)
 // One signal for each thing (proposta 17/11, efeito/impacto): the red flash
 // only when the hull loses, and stronger the more it loses — a typical hit
@@ -67,6 +69,12 @@ export class ScreenFeedback {
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(random());
     this.screenShakeSeedState = this.screenShake.captureSeedState();
+    // A boss's fall owns the screen for its shake's length and until its
+    // loot has stopped fusing (21/11): the fusions, one every 0.3 s for about
+    // 3.5 s, lifted the shake back to full twice, cut its flash short, then
+    // shook on their own. Seconds left; EffectsSystem sets it on
+    // boss-defeated and stretches it on each fusion it keeps quiet.
+    this.bossFallHold = 0;
     this.screenFlash = {
       timer: 0,
       duration: 0,
@@ -94,6 +102,7 @@ export class ScreenFeedback {
       seedState: this.screenShakeSeedState,
     });
     this.flashGap = 0;
+    this.bossFallHold = 0;
     this.screenFlash = {
       timer: 0,
       duration: 0,
@@ -106,6 +115,7 @@ export class ScreenFeedback {
   update(deltaTime) {
     // Update screen shake (new trauma-based system)
     this.screenShake.update(deltaTime);
+    this.bossFallHold = Math.max(0, this.bossFallHold - deltaTime);
 
     if (this.screenFlash.timer > 0) {
       this.screenFlash.timer -= deltaTime;

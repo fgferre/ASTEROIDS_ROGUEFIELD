@@ -212,7 +212,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 - **(35)** Impacto do tiro na pedra (19/11, na conferência): _"acho que tem que ter um impacto do tiro que faça a
   pedra se moviemntar, seja rodando um pouco, tem que ter uma física do impacto do tiro (memso que seja fake para
   efeitos de arcade) o incandescente tem que ser aonde o tiro efetivamente tocou a pedra."_ Fecha quando ele aprovar
-  jogando.
+  jogando. 21/11, ramo `tiro/na-pedra` (cartão `tiro-1`): a marca nasce onde o tiro toca e a pedra dá um tranco e gira,
+  só no desenho. Resposta dele (21/11, à noite): _"Tiro 1.1 — Quanto a pedra pula e gira com cada tiro? Como nos
+  filmes"_ e _"Tiro 1.5 — Depois de matar o chefe, a câmera lenta de subir de nível fica? Fica como está"_. Fecha quando
+  ele aprovar jogando.
 - **(39)** O controle de videogame (20/11, fim da noite, com o controle do Xbox): _"A movimentação em menus por
   controle de videogame, eu estou testando no do Xbox, mas deve ser igual em qualquer controle, ela é impossível pelos
   menus. Simplesmente não funciona. […] a gente tinha que repensar essa navegação como se esse jogo fosse meio que
@@ -241,7 +244,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   naves do jogador: _"o próprio modelo das naves do player… tem algumas oportunidades também. Aos moldes do que faz o
   Elite Dangerous, aquele jogo de nave também chamado Chorus, tem modelos muito legais. De naves. Everspace."_ → imagem
   antes de código; fecha quando ele aprovar as naves novas. Na conferência de 19/11, "As naves do jogador estão
-  bonitas?": _"Precisa mexer"_.
+  bonitas?": _"Precisa mexer"_. Em 21/11 ele trouxe o redesenho dos três cascos feito em outra AI e escolheu a V3:
+  _"Integre ao Asteroid Roguefield a V3 dos modelos 3D da Interceptor, Solar Slicer e Bastion. Vi a comparação e
+  prefiro a V3."_ Integrada no ramo local `naves/cascos-v3`, esperando ele jogar; _"A publicação fica para depois da
+  minha aprovação."_
 
 ## Campanha (palavras dele, 12/11, jogando no site)
 
@@ -264,4 +270,6 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   não estão sendo refletidos com a cor certa, né? Eu percebi que o tiro é de uma cor e a sombra a iluminação que vai é
   de outra. Então, eu acho que tem uma oportunidade aí na questão da iluminação do jogo, do algoritmo ler exatamente
   qual é a cor da luminosidade que está batendo em aonde, né?"_ Imagem antes de código; fecha quando ele aprovar por
-  imagem.
+  imagem. 21/11, cartão `tiro-1`, aprovado por imagem: _"Tiro 1.2 — A luz do tiro na cor do próprio tiro entra no
+  jogo? Sim, como nas imagens"_, _"Tiro 1.3 — O primeiro brilho da marca na cor do tiro? Na cor do tiro, esfriando para
+  lava"_, _"Tiro 1.4 — As pedras com veios iluminam as vizinhas? Sim, como na imagem"_. Juntado ao ramo `tiro/na-pedra`.

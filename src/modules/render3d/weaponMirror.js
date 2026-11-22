@@ -13,6 +13,7 @@ import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { SHOT_SHAPES, rgbOf } from './batches.js';
 import { hashId } from './enemyMirror.js';
+import { getContent } from '../../content/registry.js';
 
 const LANCE_H = 3;
 const BEAM_H = 3.2;
@@ -175,6 +176,27 @@ function pushStatic(ribbons, enemy, rgb, white, strength) {
   }
 }
 
+/**
+ * The colour a player's shot is drawn in, which its hit lights and its burn
+ * first glows in (21/11, 38: "o tiro é de uma cor e a ... iluminação que vai
+ * é de outra"): a lance its look's trail, a weapon's own shots their
+ * colours. Null for a bolt, which lights where it strikes in its own colour
+ * (pushBolt, pushRail).
+ */
+export function shotColor(combat, bullet) {
+  if (bullet.kind === 'arc' || bullet.kind === 'chain') return null;
+  const colors =
+    bullet.colors || getContent('weapons', combat.weaponId)?.colors || {};
+  const own = {
+    flak: colors.tracer,
+    seeker: colors.burst,
+    beam: colors.glow,
+    heat: colors.heat,
+    blade: colors.edge,
+  }[bullet.kind];
+  return own || combat.lanceLook?.trail || PALETTE.shot;
+}
+
 // The bolt's strike lights the hull round it, once.
 function lightStrike(flashes, arc, x, y, rgb, intensity) {
   if (lit.has(arc)) return;
@@ -257,7 +279,7 @@ function pushBolt(batches, flashes, arc, n, k, s, rgb, familyRgb, white) {
   const end = points[points.length - 1];
   glow.push(end.x, ARC_H, end.y, BOLT_HOT, BOLT_FLARE[0] * s, k, 2.2);
   glow.push(end.x, ARC_H, end.y, familyRgb, BOLT_FLARE[1] * s, 0.35 * k, 1.4);
-  lightStrike(flashes, arc, end.x, end.y, [0.9, 0.95, 1], BOLT_LIGHT);
+  lightStrike(flashes, arc, end.x, end.y, familyRgb, BOLT_LIGHT);
 }
 
 // A rail from `arc`'s first point to its last (see RAIL_*).
@@ -303,7 +325,7 @@ function pushRail(batches, flashes, arc, k, s, railRgb, white) {
     );
   }
   glow.push(end.x, ARC_H, end.y, BOLT_HOT, RAIL_FLARE * s * k, 1, 2.2);
-  lightStrike(flashes, arc, end.x, end.y, [0.7, 0.95, 1], RAIL_LIGHT);
+  lightStrike(flashes, arc, end.x, end.y, railRgb, RAIL_LIGHT);
 }
 
 /**
