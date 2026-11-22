@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+// The game's version lives only in package.json (src/data/changelog.js says how
+// it moves); the menu shows it through __GAME_VERSION__.
+const { version } = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+);
 
 export default defineConfig(({ mode }) => ({
   root: 'src', // Define a pasta raiz do projeto
@@ -17,6 +23,7 @@ export default defineConfig(({ mode }) => ({
   // available at test time.
   define: {
     __AUDIO_DEBUG_BUILD__: JSON.stringify(mode !== 'production'),
+    __GAME_VERSION__: JSON.stringify(version),
   },
   build: {
     outDir: '../dist', // Build para a pasta dist na raiz

@@ -10,7 +10,7 @@ import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
 import { SPARK_KIND } from '../hitSparks.js';
 import { RockInstances } from '../rockInstances.js';
-import { createRockBreak } from './rockBreak.js';
+import { createRockBreak, lookOf } from './rockBreak.js';
 import {
   FOG_DIM,
   FOG_FADE_SECONDS,
@@ -28,6 +28,24 @@ const ROCK_SCALE = 1.08;
 const CRACK_GLOW = [0, 0.8, 1.15, 1.4];
 const CRACK_REVEAL = [0, 0.35, 0.65, 1];
 const TAU = Math.PI * 2;
+// proposta 21/11 (35, tiro/na-pedra): a shot knocks the rock it hits, in
+// the picture only, as the machines' jolt (the sim keeps its path, so
+// replays and the balance stay): the rock jumps back along the shot by
+// KICK_REACH world units and settles in KICK_TIME s, and it turns about
+// where it was struck at KICK_SPIN rad/s, which dies out over
+// KICK_SPIN_DECAY s, its new pose kept. Both for one Lance shot
+// (KICK_DAMAGE) on a large rock (KICK_RADIUS), more for a harder hit or a
+// smaller rock (both × the square root of KICK_RADIUS / radius).
+const KICK_DAMAGE = 25;
+const KICK_RADIUS = 35;
+const KICK_REACH = 2.4;
+const KICK_REACH_MAX = 5;
+const KICK_TIME = 0.16;
+const KICK_SPIN = 0.6;
+const KICK_SPIN_MAX = 3;
+const KICK_SPIN_DECAY = 0.7;
+// how high on the rock a hit lands (× its radius): where its burn shows
+const KICK_LEVER = 0.5;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
 // Variant looks (§3 "Fragmento do Anel"): `base` (sRGB) multiplies the baked
@@ -92,7 +110,7 @@ export const VARIANT_LOOKS = {
 // scorchDecals DECAL_KIND where it leaves a mark): iron is metal, crystal
 // glass (cold glints, no scorch); the rest stone. pedras, 17/11.
 const STRIKE = { iron: 'metal', crystal: 'shield' };
-export const strikeOf = (enemy) => STRIKE[enemy.variant] || 'rock';
+export const strikeOf = (enemy) => STRIKE[lookOf(enemy)] || 'rock';
 
 // A Parasite's pulse is at its fastest within this many logical pixels.
 const PARASITE_NEAR = 80;
@@ -157,6 +175,8 @@ export function createRockViews(kit) {
     rockGeometries.push(geometry);
   }
   const rockMaps = bakeRockMaps(THREE, kit.mapSeed);
+  const turnAxis = new THREE.Vector3();
+  const turnStep = new THREE.Quaternion();
   const rockNormal = {
     uRockNormalMap: { value: rockMaps.normalMap },
     uRockTile: { value: ROCK_TILE },
@@ -221,6 +241,12 @@ export function createRockViews(kit) {
     return {
       kind: 'asteroid',
       object,
+      // the shots' knock (kick()): the jump, the spin and the pose it left
+      kickX: 0,
+      kickZ: 0,
+      kickAt: -Infinity,
+      spin: new THREE.Vector3(),
+      turn: new THREE.Quaternion(),
       id: null,
       shape: 0,
       family: 'stone',
@@ -299,6 +325,9 @@ export function createRockViews(kit) {
     if (view.boundId !== enemy.id) {
       view.boundId = enemy.id;
       breaks.adopt(view, enemy);
+      view.kickAt = -Infinity;
+      view.spin.set(0, 0, 0);
+      view.turn.identity();
     }
     if (view.cut === undefined) {
       view.shape = seed % ROCK_SHAPES;
@@ -308,9 +337,9 @@ export function createRockViews(kit) {
     view.spinRate = (0.25 + random() * 0.5) * (random() < 0.5 ? -1 : 1);
     view.spinPhase = random() * Math.PI * 2;
     view.lean = (random() - 0.5) * 1.2;
-    const look = VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common;
+    const look = VARIANT_LOOKS[lookOf(enemy)] || VARIANT_LOOKS.common;
     view.look = look;
-    view.variant = enemy.variant;
+    view.variant = lookOf(enemy);
     view.pulse = view.spinPhase;
     view.lastTime = null;
     view.family = look.crystal ? 'crystal' : 'stone';
@@ -324,6 +353,49 @@ export function createRockViews(kit) {
     rock.surface[0] = look.roughness;
     rock.surface[1] = look.metalness;
     rock.seed.set(random() * 50, random() * 50, random() * 50);
+  }
+
+  // A shot hit `view`'s rock at (dx, dy) from its centre (logical), flying
+  // along (vx, vy) with `damage`: it jumps and turns (KICK_*).
+  function kick(view, dx, dy, vx, vy, damage) {
+    const speed = Math.hypot(vx, vy);
+    if (speed < 1e-3) return;
+    const ux = vx / speed;
+    const uz = vy / speed;
+    const hard = (damage || 0) / KICK_DAMAGE;
+    const r = Math.max(4, view.radius || 12);
+    const small = Math.sqrt(KICK_RADIUS / r);
+    const reach = Math.min(KICK_REACH_MAX, KICK_REACH * hard * small);
+    view.kickX = ux * reach;
+    view.kickZ = uz * reach;
+    view.kickAt = view.lastTime ?? 0;
+    // the turn is the hit's lever (where it struck, raised to its burn)
+    // crossed with the shot, per radius
+    const ly = KICK_LEVER * r;
+    turnAxis.set(ly * uz, dy * ux - dx * uz, -ly * ux).divideScalar(r);
+    view.spin.addScaledVector(turnAxis, KICK_SPIN * hard * small);
+    if (view.spin.length() > KICK_SPIN_MAX) view.spin.setLength(KICK_SPIN_MAX);
+  }
+
+  // The knock on the pose just set: the turn so far, the jump settling.
+  function settleKick(view, time, dt) {
+    const { object, spin } = view;
+    const rate = spin.length();
+    if (rate > 1e-4 && dt > 0) {
+      turnStep.setFromAxisAngle(
+        turnAxis.copy(spin).divideScalar(rate),
+        rate * dt
+      );
+      view.turn.premultiply(turnStep);
+      spin.multiplyScalar(Math.exp(-dt / KICK_SPIN_DECAY));
+    }
+    object.quaternion.premultiply(view.turn);
+    const since = time - view.kickAt;
+    if (since >= 0 && since < KICK_TIME) {
+      const k = (1 - since / KICK_TIME) ** 2;
+      object.position.x += view.kickX * k;
+      object.position.z += view.kickZ * k;
+    }
   }
 
   // Vein pulse rate (Hz) from the live variant state.
@@ -344,7 +416,7 @@ export function createRockViews(kit) {
 
   function updateRock(view, enemy, time, flash) {
     // a rock can change variant alive (the Herald of Heat ignites it)
-    if (view.look !== (VARIANT_LOOKS[enemy.variant] || VARIANT_LOOKS.common)) {
+    if (view.look !== (VARIANT_LOOKS[lookOf(enemy)] || VARIANT_LOOKS.common)) {
       bindRock(view, enemy);
     }
     const { object, look } = view;
@@ -353,6 +425,7 @@ export function createRockViews(kit) {
     object.rotation.x = view.spinPhase + time * view.spinRate;
     object.rotation.z = view.lean;
     const dt = view.lastTime === null ? 0 : Math.max(0, time - view.lastTime);
+    settleKick(view, time, dt);
     breaks.settle(view, enemy, dt);
     const stage = Math.max(0, Math.min(3, enemy.crackStage || 0));
     let glow = CRACK_GLOW[stage];
@@ -401,6 +474,7 @@ export function createRockViews(kit) {
     updateRock,
     updateFog,
     refreshSurfaceMaps,
+    kick,
     struck: breaks.struck,
     split: breaks.split,
     crumble: breaks.crumble,

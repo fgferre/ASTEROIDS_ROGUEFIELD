@@ -4,11 +4,12 @@
 // (Descent, Daily Field, Boss Rush), a sector (the campaign map's Launch, the
 // victory screen's Next Chapter), New Mission, Retry, Quit (the final
 // card's Campaign and Main menu too), the victory screen's continue, and the
-// menu's settings and credits.
+// menu's settings, credits and version (What's new).
 
 export class MenuButtons {
   /**
-   * `eventBus`: emits 'credits-menu-requested' and 'settings-menu-requested'.
+   * `eventBus`: emits 'credits-menu-requested', 'changelog-menu-requested'
+   * and 'settings-menu-requested'.
    * `startNewRun({ source, daily, bossRush, sector })`, `requestRetry({ source })`,
    * `exitToMenu({ source })`, `continueBeyondVictory()`: the session's flows.
    * `linkIn(options, start, button)`: plays the way into a run started from
@@ -168,6 +169,15 @@ export class MenuButtons {
           open: true,
           source: 'menu',
           triggerId: 'menu-credits-btn',
+        });
+        break;
+      }
+      case 'menu-version-btn': {
+        preventDefault();
+        this.eventBus.emit('changelog-menu-requested', {
+          open: true,
+          source: 'menu',
+          triggerId: 'menu-version-btn',
         });
         break;
       }

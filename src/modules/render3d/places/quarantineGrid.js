@@ -1,16 +1,44 @@
 // Quarantine Grid (docs/ROTEIRO.md "Os lugares" 8): in the shadow of a dark
-// planet. Its limb fills a corner of the view, near black, a thin crescent
-// lit along its far edge; across it, at two depths, the quarantine lattice,
-// its beacons pulsing amber at the nodes. When the Interdictor goes offline
-// the boundary opens: the beacons go out and the lattices sag away into the
-// dark, the nearer first.
+// planet. The planet hangs whole in a corner, far off: its night side turned
+// to the field, a thin crescent where the sun is behind it, thin air round
+// its limb; on the dark side the specks of dead cities and one hot crack
+// round most of the globe; it turns slowly. Across it, at two depths, the
+// quarantine lattice, its beacons pulsing amber at the nodes. When the
+// Interdictor goes offline the boundary opens: the beacons go out and the
+// lattices sag away into the dark, the nearer first.
 
-import { gradientDisc } from './kit.js';
+import { bakePlanetMap } from '../bakedMaps.js';
 import { lightPoint, under } from './pieces.js';
 
-// proposta 12/11: the planet's radius and the depth of its top under the
-// field; the lattices' spacing and depth; the beacons' pulse (seconds).
-const PLANET = { radius: 2000, depth: 2300 };
+// proposta 21/11 ("B · Mundo que teve gente, rachado"): the planet's radius,
+// the depth of its top under the field (above the far nebula, which hides
+// what is deeper) and its place off the view's middle; the share of the
+// camera's travel it follows (near 1: far off); its turn (rad/s) and tilt.
+const PLANET = {
+  radius: 680,
+  depth: 2550,
+  at: [-1500, -700],
+  follow: 0.97,
+  spin: 0.015,
+  tilt: [0.5, 0, 0.35],
+  air: 1.035,
+};
+// The sun behind it (the direction its lit ground faces) and its look: rock
+// albedo, day side, the night's faint fill and the glow toward the
+// terminator, dead cities, the crack, the limb and the air, the haze.
+const SUN = [0.42, -0.8, -0.45];
+const LOOK = {
+  rock: ['#6e6860', 1],
+  day: 0.7,
+  fill: 0.035,
+  term: 0.2,
+  city: ['#bfe4ff', 0.16],
+  crack: ['#ff4a1c', 0.55],
+  rim: ['#ffc890', 0.4],
+  air: 0.5,
+  haze: 0.1,
+};
+// the lattices' spacing and depth; the beacons' pulse (seconds).
 const LATTICES = [
   { depth: 1000, spacing: 340, lines: [9, 7], follow: 0.3 },
   { depth: 1700, spacing: 520, lines: [9, 7], follow: 0.5 },
@@ -21,6 +49,137 @@ const PULSE = { period: 2.6, low: 0.45 };
 // the farther `step` later; it sinks
 // `sink` (a share of its depth) and tips `tip` radians as it goes.
 const FALL = { span: 0.55, step: 0.25, sink: 0.35, tip: 0.1 };
+
+const VERTEX = `
+varying vec3 vNormal;
+varying vec3 vLocal;
+varying vec3 vView;
+void main() {
+  vLocal = normal;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vec4 world = modelMatrix * vec4(position, 1.0);
+  vView = normalize(cameraPosition - world.xyz);
+  gl_Position = projectionMatrix * viewMatrix * world;
+}`;
+// The ground: the map read in the planet's own turning frame, lit by the
+// fixed sun; cities only on the night side, the crack everywhere.
+const GROUND = `
+uniform sampler2D uMap;
+uniform vec3 uSun;
+uniform float uSpin;
+uniform float uOpacity;
+uniform vec3 uRock;
+uniform vec3 uCity;
+uniform vec3 uCrack;
+uniform vec3 uRim;
+uniform vec3 uHaze;
+varying vec3 vNormal;
+varying vec3 vLocal;
+varying vec3 vView;
+void main() {
+  vec3 n = normalize(vNormal);
+  float c = cos(uSpin);
+  float s = sin(uSpin);
+  vec3 p = normalize(vec3(c * vLocal.x - s * vLocal.z, vLocal.y,
+    s * vLocal.x + c * vLocal.z));
+  vec2 uv = vec2(atan(p.z, p.x) / 6.2831853 + 0.5,
+    asin(clamp(p.y, -1.0, 1.0)) / 3.1415927 + 0.5);
+  vec4 ground = texture2D(uMap, uv);
+  float lit = dot(n, uSun);
+  float day = smoothstep(-0.02, 0.35, lit);
+  float night = 1.0 - smoothstep(-0.2, 0.02, lit);
+  float near = smoothstep(-0.55, 0.15, lit);
+  vec3 color = uRock * ground.r * (${LOOK.day.toFixed(2)} * day
+    + ${LOOK.fill.toFixed(3)} + ${LOOK.term.toFixed(2)} * near * near);
+  color += uCity * ground.g * night + uCrack * ground.b;
+  float edge = pow(1.0 - max(dot(n, vView), 0.0), 3.0);
+  float toward = smoothstep(-0.35, 0.5, lit);
+  color += uRim * edge * mix(0.03, 1.0, toward * toward);
+  gl_FragColor = vec4(mix(color, uHaze, ${LOOK.haze.toFixed(2)}), uOpacity);
+  #include <tonemapping_fragment>
+  #include <encodings_fragment>
+}`;
+// The air outside the limb: a back-face shell, brightest toward the sun.
+const AIR = `
+uniform vec3 uSun;
+uniform vec3 uRim;
+uniform float uOpacity;
+varying vec3 vNormal;
+varying vec3 vLocal;
+varying vec3 vView;
+void main() {
+  vec3 n = normalize(vNormal);
+  float inner = sqrt(1.0 - 1.0 / ${(PLANET.air * PLANET.air).toFixed(4)});
+  float k = pow(smoothstep(0.0, inner, max(dot(-n, vView), 0.0)), 5.0);
+  float toward = smoothstep(-0.35, 0.55, dot(n, uSun));
+  gl_FragColor = vec4(uRim * ${LOOK.air.toFixed(2)} * k
+    * mix(0.04, 1.0, toward * toward) * uOpacity, 1.0);
+  #include <tonemapping_fragment>
+  #include <encodings_fragment>
+}`;
+
+// A shader material the set fades like its others (PlaceSets.apply sets
+// `opacity`; the mesh hands it to the shader as it draws).
+function faded(THREE, kit, name, options) {
+  const material = new THREE.ShaderMaterial({
+    vertexShader: VERTEX,
+    transparent: true,
+    ...options,
+  });
+  material.uniforms.uOpacity = { value: 1 };
+  kit.materials.set(name, material);
+  return material;
+}
+
+function planet(THREE, kit) {
+  // the shader's own levels, as the approved mock-up set them (not sRGB)
+  const color = ([css, k]) => new THREE.Color(css).multiplyScalar(k);
+  const sun = { value: new THREE.Vector3(...SUN).normalize() };
+  const rim = { value: color(LOOK.rim) };
+  const ground = faded(THREE, kit, 'planet', {
+    fragmentShader: GROUND,
+    uniforms: {
+      uMap: { value: bakePlanetMap(THREE, 18) },
+      uSun: sun,
+      uSpin: { value: 0 },
+      uRock: { value: color(LOOK.rock) },
+      uCity: { value: color(LOOK.city) },
+      uCrack: { value: color(LOOK.crack) },
+      uRim: rim,
+      uHaze: { value: kit.haze },
+    },
+  });
+  // it draws after the space behind it (its stars and clouds, which would
+  // ghost through it), still behind the lattices and the play
+  ground.userData.blended = true;
+  const air = faded(THREE, kit, 'planet-air', {
+    fragmentShader: AIR,
+    depthWrite: false,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uSun: sun, uRim: rim },
+  });
+  const sphere = new THREE.SphereGeometry(1, 48, 32);
+  const body = new THREE.Mesh(sphere, ground);
+  body.scale.setScalar(PLANET.radius);
+  body.renderOrder = -7.5;
+  const shell = new THREE.Mesh(sphere, air);
+  shell.scale.setScalar(PLANET.radius * PLANET.air);
+  shell.renderOrder = -7;
+  [body, shell].forEach((mesh) => {
+    const { uniforms } = mesh.material;
+    mesh.onBeforeRender = () => {
+      uniforms.uOpacity.value = mesh.material.opacity;
+    };
+  });
+  const turned = new THREE.Group();
+  turned.rotation.set(...PLANET.tilt);
+  turned.add(body, shell);
+  turned.position.y = -PLANET.radius;
+  const object = new THREE.Group();
+  object.add(turned);
+  return { object, spin: ground.uniforms.uSpin };
+}
 
 function lattice(kit, beams, beacons, { spacing, lines: [nx, nz] }, level) {
   const { tone, random } = kit;
@@ -48,71 +207,13 @@ function lattice(kit, beams, beacons, { spacing, lines: [nx, nz] }, level) {
 }
 
 export function buildQuarantineGrid(THREE, kit) {
-  const { tone } = kit;
-  const R = PLANET.radius;
-
-  // The planet: a near-black night side with faint banding, a lighter
-  // haze round its whole limb and the lit crescent along its far edge.
-  const sphere = new THREE.SphereGeometry(1, 64, 36).toNonIndexed();
-  const normal = sphere.getAttribute('normal');
-  const shade = new Float32Array(normal.count * 3);
-  const toward = new THREE.Vector3(0.62, -0.35, -0.7).normalize();
-  const axis = new THREE.Vector3(0.3, 0.2, 0.93).normalize();
-  const n = new THREE.Vector3();
-  for (let i = 0; i < normal.count; i += 1) {
-    n.fromBufferAttribute(normal, i);
-    const lit = Math.max(0, n.dot(toward));
-    const along = n.dot(axis);
-    const band = 0.5 + 0.5 * Math.sin(along * 21 + 0.8 * Math.sin(along * 6));
-    const rim = (1 - Math.max(0, n.y)) ** 4;
-    // proposta 12/11: the night side as dark as the sky it hides.
-    const k =
-      0.012 * (0.6 + 0.8 * band) +
-      0.025 * rim +
-      0.04 * lit ** 3 +
-      0.45 * lit ** 6 * (1 - Math.abs(n.y)) ** 1.5;
-    shade.set([k, k, k], i * 3);
-  }
-  sphere.setAttribute('color', new THREE.BufferAttribute(shade, 3));
-  sphere.userData.smooth = true;
-  const planet = kit.parts();
-  kit.put(planet, sphere, tone('#c89468'), [0, -R, 0], R);
-  // The limb as the camera sees it: a circle raised toward it off the
-  // equator (its radius `limb` × R): the crescent, and thin air all round.
-  const limb = 0.95;
-  const rise = R * Math.sqrt(1 - limb * limb);
-  const crest = Math.atan2(-0.7, 0.62);
-  const air = kit.parts();
-  kit.put(
-    air,
-    gradientDisc(
-      THREE,
-      (r, a) => {
-        const edge = Math.exp(-(((r - 0.99) / 0.008) ** 2));
-        const lit = Math.max(0, Math.cos(a - crest)) ** 3;
-        const haze = Math.exp(-(((r - 1.0) / 0.02) ** 2)) * 0.02;
-        return edge * lit ** 2 + haze;
-      },
-      { rings: 12, sides: 120, hole: 0.94 }
-    ),
-    tone('#ffc080', 0.9),
-    [0, -R + rise, 0],
-    [R * limb * 1.04, 1, R * limb * 1.04]
-  );
-
-  // The disc draws after the space behind it (its stars and clouds, which
-  // would ghost through it), still behind the lattices and the play.
-  const body = kit.mesh(planet, 'lamp', 'planet');
-  body.material.transparent = true;
-  body.material.userData.blended = true;
-  body.renderOrder = -7.5;
-  const crescent = kit.mesh(air, 'glow');
-  crescent.renderOrder = -7;
-  const world = new THREE.Group();
-  world.add(body, crescent);
-
+  const world = planet(THREE, kit);
   const layers = [
-    { object: world, anchor: under(PLANET.depth, -600, 450), follow: 0.94 },
+    {
+      object: world.object,
+      anchor: under(PLANET.depth, ...PLANET.at),
+      follow: PLANET.follow,
+    },
   ];
   const fences = LATTICES.map((spec, level) => {
     const beams = kit.parts();
@@ -131,6 +232,7 @@ export function buildQuarantineGrid(THREE, kit) {
   return {
     layers,
     update(time, wake) {
+      world.spin.value = time * PLANET.spin;
       const wave = 0.5 + 0.5 * Math.sin((time * Math.PI * 2) / PULSE.period);
       const pulse = PULSE.low + (1 - PULSE.low) * wave;
       for (let level = 0; level < fences.length; level += 1) {

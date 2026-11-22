@@ -106,7 +106,7 @@ describe('Settings panel', () => {
         .map((field) => `${category.id}.${field.key}`)
     );
     expect(SECTION_IDS).toHaveLength(6);
-    expect(visible).toHaveLength(45);
+    expect(visible).toHaveLength(44);
     expect([...shown].sort()).toEqual([...visible].sort());
   });
 
@@ -192,6 +192,14 @@ describe('Settings panel', () => {
     expect(settings.getSetting('graphics', 'quality')).toBe('low');
   });
 
+  it("a Controls change from the game redraws keeping the pad's focus on its choice", () => {
+    const { panel } = renderSection('controls');
+    panel.settingsState.isOpen = true;
+    const keep = vi.spyOn(panel, 'redrawKeepingFocus');
+    panel.refreshCategory('controls');
+    expect(keep).toHaveBeenCalledOnce();
+  });
+
   it('greys Camera Lead with the Classic camera, with its reason', () => {
     expect(isGreyed(renderSection('game').row('cameraLead'))).toBe(false);
 
@@ -232,12 +240,10 @@ describe('Settings panel', () => {
     ]);
   });
 
-  it('greys Damage Numbers while the game draws none', () => {
+  it('shows Hit Markers in HUD & text, live, and no Damage Numbers row', () => {
     const { row } = renderSection('hud');
-    expect(isGreyed(row('damageNumbers'))).toBe(true);
-    expect(reasonOf(row('damageNumbers'))).toBe(
-      'The game shows no damage numbers for now.'
-    );
+    expect(row('damageNumbers')).toBeUndefined();
+    expect(row('hitMarkers')).toBeDefined();
     expect(isGreyed(row('hitMarkers'))).toBe(false);
   });
 

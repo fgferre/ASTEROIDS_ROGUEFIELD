@@ -57,6 +57,23 @@ describe('ScorchDecals', () => {
     expect(moved.x).toBeLessThan(0);
   });
 
+  it('puts a mark where the camera sees the shot touch the rock', () => {
+    const { rock, view } = setup();
+    const camera = new THREE.PerspectiveCamera(40, 4 / 3, 10, 2000);
+    camera.position.set(50, 600, 170);
+    camera.lookAt(rock.position);
+    const decals = new ScorchDecals(THREE, rock.parent, camera);
+    // the rock's left edge, logical (world x + HALF_W, z + HALF_H); the
+    // direction given (0, 1) is the old aim, and loses to the contact
+    expect(decals.hit(view, 0, 1, 0, { x: 50 - 20 + 400, y: -30 + 300 })).toBe(
+      true
+    );
+    decals.update(0, new Map([[7, view]]));
+    const p = instancePosition(decals, 0).sub(rock.position);
+    expect(p.x).toBeLessThan(-10);
+    expect(Math.abs(p.z)).toBeLessThan(8);
+  });
+
   it('fades out over its life and drops marks whose rock is gone', () => {
     const { decals, view, views } = setup();
     decals.hit(view, 0, 1);

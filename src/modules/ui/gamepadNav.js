@@ -14,6 +14,7 @@ export const GAMEPAD_NAV_SCREENS = Object.freeze([
   'codex',
   'hangar',
   'credits',
+  'changelog',
   'gameover',
   'levelup',
   'pause',
@@ -173,6 +174,7 @@ const HINTS = {
     ['LB RB', 'Section'],
   ],
   credits: [['B', 'Back']],
+  changelog: [['B', 'Back']],
   pause: [['B', 'Resume']],
   'end-credits': [['B', 'Continue']],
 };
@@ -281,6 +283,8 @@ export class GamepadMenuNav {
     else if (id === 'hangar') ui.hangarScreen.closeHangar();
     else if (id === 'credits') {
       ui.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
+    } else if (id === 'changelog') {
+      ui.changelogOverlay.closeCreditsOverlay({ restoreFocus: true });
     } else if (id === 'pause') ui.eventBus?.emit?.('toggle-pause');
     else if (id === 'end-credits') ui.runEndScreens.endCredits.finish();
     else if (id === 'menu') ui.eventBus?.emit?.('gamepad-menu-back');

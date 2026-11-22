@@ -32,8 +32,7 @@ export class PlayerEffects {
    * `particleEffects`: the effects' Particles; every particle lands in its list, and its shockwaves, hit markers and muzzle-flash queue are used directly.
    * `createParticle(x, y, vx, vy, color, size, life, type)`: the effects' createParticle, not Particles' own: the thruster determinism suite stubs it on the effects object.
    * `randomFloat(fork)`: the effects' random helper; rolls draw from 'thrusters', 'muzzleFlash', 'hits' and 'explosions'.
-   * `getScaledParticleCount(count, options)`: the effects' Reduced Particles scaling of a burst's count.
-   * `particleDensity()`: the Reduced Particles density, read live; below 0.1 the thrusters stop.
+   * `getScaledParticleCount(count, options)`: the effects' count of a burst: rounded, never below `minimum` (1) unless `allowZero`.
    * `addScreenShake(presetOrIntensity, durationOrOptions)`, `addScreenFlash(color, duration, intensity)`: the effects' screen feedback.
    * `addFreezeFrame(duration, fade)`, `playSlowMotion(preset)`: the effects' game time.
    * `emit(name, payload)`: the effects' event bus; the deflective blast asks for its damage through it.
@@ -44,7 +43,6 @@ export class PlayerEffects {
     createParticle,
     randomFloat,
     getScaledParticleCount,
-    particleDensity,
     addScreenShake,
     addScreenFlash,
     addFreezeFrame,
@@ -56,7 +54,6 @@ export class PlayerEffects {
     this.createParticle = createParticle;
     this.randomFloat = randomFloat;
     this.getScaledParticleCount = getScaledParticleCount;
-    this.particleDensity = particleDensity;
     this.addScreenShake = addScreenShake;
     this.addScreenFlash = addScreenFlash;
     this.addFreezeFrame = addFreezeFrame;
@@ -170,8 +167,6 @@ export class PlayerEffects {
     visualLevel = 0,
     accent = PALETTE.player
   ) {
-    if (this.particleDensity() < 0.1) return; // Optimization
-
     const thrusterFork = 'thrusters';
 
     // === UPGRADE SCALING: SPRAY -> AFTERBURNER ===
@@ -467,7 +462,9 @@ export class PlayerEffects {
     }
   }
 
-  createOrbFusionEffect(data) {
+  // `screen`: false while a boss's fall shakes the screen, which the fusion
+  // must not lift again.
+  createOrbFusionEffect(data, { screen = true } = {}) {
     const tier = data?.tier || 1;
     const consumed = data?.consumed || 0;
     const particleColor = data?.color || PALETTE.xp;
@@ -527,6 +524,7 @@ export class PlayerEffects {
       this.particleEffects.particles.push(particle);
     }
 
+    if (!screen) return;
     this.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
     this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
   }

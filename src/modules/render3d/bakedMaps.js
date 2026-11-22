@@ -15,6 +15,10 @@ const smoothstep = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 const wrap = (i, n) => ((i % n) + n) % n;
+const normalize = (v) => {
+  const n = Math.hypot(...v);
+  return v.map((k) => k / n);
+};
 
 // Box blur with wrap-around, two separable passes (local mean height).
 function blur(src, size, radius) {
@@ -46,8 +50,8 @@ function blur(src, size, radius) {
   return out;
 }
 
-function dataTexture(THREE, data, size) {
-  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+function dataTexture(THREE, data, size, height = size) {
+  const texture = new THREE.DataTexture(data, size, height, THREE.RGBAFormat);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
@@ -363,5 +367,170 @@ export function bakePlateMaps(THREE, seed, size = 256) {
       { strength: size / 80, occlusion: 3, aoRadius: Math.round(size / 90) },
       (i, cavity) => Math.min(1, 0.84 + cavity * 1.2)
     );
+  });
+}
+
+/**
+ * A planet's night side (places/quarantineGrid.js), equirectangular: u the
+ * longitude, v the latitude, `size` × size/2. R: the ground's albedo (dark
+ * basins, paler highlands); G: dead cities, specks along the coasts; B: the
+ * glow of one great crack, a wandering great circle round most of the globe.
+ * The relief is sampled on the sphere (no seam), baked at a quarter size and
+ * read bilinear: it is smooth, and the bake runs as the game loads.
+ */
+export function bakePlanetMap(THREE, seed, size = 256) {
+  return cached('planet', seed, size, () => {
+    const W = size;
+    const H = size / 2;
+    const salt = Math.floor(createSeededRandom(seed)() * 2147483647);
+    const relief = new SimplexNoise(createSeededRandom(seed + 1));
+    const cw = W / 4;
+    const ch = H / 4;
+    const coarse = new Float32Array(cw * ch);
+    const dir = (u, v) => {
+      const lat = (v - 0.5) * Math.PI;
+      const lon = u * Math.PI * 2 - Math.PI;
+      return [
+        Math.cos(lat) * Math.cos(lon),
+        Math.sin(lat),
+        Math.cos(lat) * Math.sin(lon),
+      ];
+    };
+    for (let j = 0; j < ch; j += 1) {
+      for (let i = 0; i < cw; i += 1) {
+        const [x, y, z] = dir((i + 0.5) / cw, (j + 0.5) / ch);
+        coarse[i + j * cw] = relief.fbm(x * 1.6 + 3, y * 1.6, z * 1.6, 3);
+      }
+    }
+    // the crack's great circle (its pole a, its plane b, c) and its gap
+    const [a0, a1, a2] = normalize([0.9, 0.25, 0.35]);
+    const [b0, b1, b2] = normalize([0, -a2, a1]);
+    const c0 = a1 * b2 - a2 * b1;
+    const c1 = a2 * b0 - a0 * b2;
+    const c2 = a0 * b1 - a1 * b0;
+    const reach = 5.6;
+    // per column: the longitude's cos/sin and where it reads the coarse
+    // relief (bilinear, wrapping round the globe)
+    const cosLon = new Float32Array(W);
+    const sinLon = new Float32Array(W);
+    const left = new Int32Array(W);
+    const right = new Int32Array(W);
+    const share = new Float32Array(W);
+    for (let x = 0; x < W; x += 1) {
+      const lon = ((x + 0.5) / W) * Math.PI * 2 - Math.PI;
+      cosLon[x] = Math.cos(lon);
+      sinLon[x] = Math.sin(lon);
+      const fx = (x + 0.5) / 4 - 0.5;
+      const ix = Math.floor(fx);
+      left[x] = wrap(ix, cw);
+      right[x] = wrap(ix + 1, cw);
+      share[x] = fx - ix;
+    }
+    const row = new Float32Array(cw);
+    const data = new Uint8Array(W * H * 4);
+    for (let y = 0; y < H; y += 1) {
+      const lat = ((y + 0.5) / H - 0.5) * Math.PI;
+      const cosLat = Math.cos(lat);
+      const py = Math.sin(lat);
+      const polar = Math.abs(py) > 0.8;
+      const fy = Math.max(0, Math.min(ch - 1, (y + 0.5) / 4 - 0.5));
+      const iy = Math.min(ch - 2, Math.floor(fy));
+      const ty = fy - iy;
+      for (let i = 0; i < cw; i += 1) {
+        row[i] =
+          coarse[i + iy * cw] * (1 - ty) + coarse[i + (iy + 1) * cw] * ty;
+      }
+      for (let x = 0; x < W; x += 1) {
+        const px = cosLat * cosLon[x];
+        const pz = cosLat * sinLon[x];
+        const l = row[left[x]] * (1 - share[x]) + row[right[x]] * share[x];
+        // white grain from an integer hash of the texel (a seeded random
+        // per texel cost more than the rest of the bake)
+        let h =
+          Math.imul(x + 1, 374761393) + Math.imul(y + 1, 668265263) + salt;
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        const grain = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+        const albedo =
+          0.35 + 0.65 * smoothstep(-0.15, 0.3, l) * (0.82 + 0.18 * grain);
+        // cities: the brightest specks of grain, only on the coasts
+        let city = 0;
+        if (!polar && grain > 0.84 && Math.abs(l - 0.05) < 0.25) {
+          city =
+            Math.exp(-(((l - 0.05) / 0.1) ** 2)) *
+            smoothstep(0.84, 0.97, grain);
+        }
+        // the crack: only texels near its circle carry any glow
+        const pole = px * a0 + py * a1 + pz * a2;
+        let glow = 0;
+        if (pole < 0.3 && pole > -0.3) {
+          let t = Math.atan2(
+            px * c0 + py * c1 + pz * c2,
+            px * b0 + py * b1 + pz * b2
+          );
+          if (t < 0) t += Math.PI * 2;
+          const off = pole - 0.06 * Math.sin(t * 9) - 0.03 * Math.sin(t * 23);
+          const along =
+            smoothstep(0, 0.08, t) * smoothstep(reach, reach - 0.08, t);
+          const o2 = off * off;
+          glow =
+            along * (Math.exp(-o2 / 0.0009) + 0.25 * Math.exp(-o2 / 0.012));
+        }
+        const o = (x + y * W) * 4;
+        data[o] = 255 * albedo + 0.5;
+        data[o + 1] = 255 * Math.min(1, city) + 0.5;
+        data[o + 2] = 255 * Math.min(1, glow) + 0.5;
+        data[o + 3] = 255;
+      }
+    }
+    return dataTexture(THREE, data, W, H);
+  });
+}
+
+/**
+ * A star's surface (places/theCrucible.js), tileable: granulation — bright
+ * cells, darker lanes between them — and a few dark spot groups. The shader
+ * reads it twice, at two scales drifting apart, so the cells seem to boil.
+ */
+export function bakeStarMap(THREE, seed, size = 128) {
+  return cached('star', seed, size, () => {
+    const lanes = cellular(createSeededRandom(seed), 18);
+    const shade = new Float32Array(size * size);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const k = smoothstep(0, 1, lanes(x / size, y / size) * 2.2);
+        shade[x + y * size] = 0.72 + 0.28 * k;
+      }
+    }
+    // spot groups (u, v, radius), each darkening only its own neighbourhood
+    const spots = [
+      [0.3, 0.62, 0.03],
+      [0.34, 0.6, 0.018],
+      [0.27, 0.65, 0.014],
+      [0.71, 0.28, 0.022],
+      [0.74, 0.31, 0.012],
+    ];
+    for (const [sx, sy, r] of spots) {
+      const reach = Math.ceil(r * 2.2 * size);
+      for (let y = -reach; y <= reach; y += 1) {
+        for (let x = -reach; x <= reach; x += 1) {
+          const d = Math.hypot(x, y) / (r * size);
+          if (d >= 2.2) continue;
+          const i =
+            wrap(Math.round(sx * size) + x, size) +
+            wrap(Math.round(sy * size) + y, size) * size;
+          shade[i] *=
+            1 -
+            0.85 * Math.exp(-d * d * 1.2) -
+            0.25 * Math.exp(-((d / 2) ** 2));
+        }
+      }
+    }
+    const data = new Uint8Array(size * size * 4);
+    for (let i = 0; i < shade.length; i += 1) {
+      const g = Math.round(255 * Math.max(0, shade[i]));
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = g;
+      data[i * 4 + 3] = 255;
+    }
+    return dataTexture(THREE, data, size);
   });
 }

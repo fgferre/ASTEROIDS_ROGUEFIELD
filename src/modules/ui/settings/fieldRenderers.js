@@ -332,9 +332,5 @@ export function formatRangeValue(field, value) {
     return `${Math.round(value * 100)}%`;
   }
 
-  if (field.key === 'screenShakeIntensity') {
-    return `${Math.round(value * 100)}%`;
-  }
-
   return value.toFixed(2).replace(/\.00$/, '');
 }

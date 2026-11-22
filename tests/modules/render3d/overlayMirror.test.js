@@ -27,7 +27,7 @@ describe('magnetRingGain', () => {
 describe('mirrorOverlays magnet ring', () => {
   const draw = (orbX) => {
     const circle = vi.fn();
-    const t = { ribbons: { circle }, accentRgb: [1, 1, 1], texts: [] };
+    const t = { ribbons: { circle }, accentRgb: [1, 1, 1] };
     const player = {
       position: { x: 0, y: 0 },
       getMagnetismRadius: () => 100,

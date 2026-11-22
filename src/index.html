@@ -687,6 +687,14 @@
                 </button>
               </div>
             </footer>
+            <!-- The game's version, small in the corner (Felipe's card versoes-1,
+                 21/11: "B, só no canto"); it opens What's new. -->
+            <button
+              id="menu-version-btn"
+              class="menu-version"
+              type="button"
+              data-hint="What changed in each version of the game."
+            ></button>
           </div>
         </div>
       </div>
@@ -1085,6 +1093,40 @@
           <footer class="credits-footer">
             <button
               id="credits-back-btn"
+              class="btn btn--secondary"
+              type="button"
+            >
+              Back to Menu
+            </button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- What's new: the changelog, newest version first (ui/CreditsOverlay.js,
+           data/changelog.js); the Credits window's frame. -->
+      <div
+        id="changelog-screen"
+        class="screen screen--overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="changelog-title"
+      >
+        <div class="credits-dialog">
+          <header class="credits-header">
+            <h2 id="changelog-title" class="credits-title">What's new</h2>
+            <button
+              id="changelog-close-btn"
+              class="credits-close-btn"
+              type="button"
+              aria-label="Close what's new"
+            >
+              ✕
+            </button>
+          </header>
+          <div id="changelog-body" class="credits-body" tabindex="0"></div>
+          <footer class="credits-footer">
+            <button
+              id="changelog-back-btn"
               class="btn btn--secondary"
               type="button"
             >

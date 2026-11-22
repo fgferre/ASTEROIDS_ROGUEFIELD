@@ -210,8 +210,8 @@ class Renderer3D extends BaseSystem {
     const menu = resolveService('menu-background', this.dependencies);
     this.seeded = (fn) => menu.withSeededMathRandom(fn);
 
-    // SettingsSystem emits 'settings-graphics-changed' only at startup; live
-    // edits arrive as 'settings-changed' with the category.
+    // 'settings-graphics-changed' comes at startup, on every graphics edit and
+    // after Reset All; accessibility edits arrive as 'settings-changed'.
     const settings = resolveService('settings', this.dependencies);
     if (settings) {
       this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
@@ -228,12 +228,6 @@ class Renderer3D extends BaseSystem {
       if (payload?.values) this.camera.setLead(payload.values.cameraLead);
     });
     this.registerEventListener('settings-changed', (change = {}) => {
-      if (
-        settings &&
-        (change.category === 'graphics' || change.type === 'reset-all')
-      ) {
-        this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
-      }
       if (
         settings &&
         (change.category === 'accessibility' || change.type === 'reset-all')
@@ -786,10 +780,6 @@ class Renderer3D extends BaseSystem {
       object.visible = true;
       object.frustumCulled = false;
     });
-    // a damage number: the sprite program takes its map
-    t.texts.begin();
-    t.texts.push('0', 0, 0, 10, PALETTE.text, 1);
-    t.texts.end();
     t.bloomPass.enabled = true;
     t.smaaPass.enabled = true;
     t.impactPass.enabled = true;
@@ -797,8 +787,6 @@ class Renderer3D extends BaseSystem {
     // UUID the first time it draws.
     this.seeded(() => t.composer.render(0));
     t.renderer.render(t.overlay, t.camera);
-    t.texts.begin();
-    t.texts.end();
     for (let i = 0; i < saved.length; i += 3) {
       saved[i].visible = saved[i + 1];
       saved[i].frustumCulled = saved[i + 2];
@@ -860,11 +848,11 @@ class Renderer3D extends BaseSystem {
     t.glow.begin();
     t.matte.begin();
     t.smoke.begin();
-    t.texts.begin();
     t.debris.begin();
     t.bodies.begin();
 
     const warden = t.enemies.update(enemyList, time, dt, this.hitSparks);
+    t.veins.update(t.enemies.views);
     if (t.key.castShadow) {
       t.enemies.budgetShadows(t.key.target.position.x, t.key.target.position.z);
     }
@@ -955,7 +943,6 @@ class Renderer3D extends BaseSystem {
     t.glow.end(pointScale);
     t.matte.end(pointScale);
     t.smoke.end(pointScale);
-    t.texts.end();
     t.debris.end();
     t.bodies.end();
     this.aimLens(

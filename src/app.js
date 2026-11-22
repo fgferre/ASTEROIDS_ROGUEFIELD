@@ -14,6 +14,7 @@ import { IS_DEV } from './core/env.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
+import { watchGameBox } from './core/viewport.js';
 import { TouchControls } from './modules/input/touchControls.js';
 import {
   activateProfileHarness,
@@ -592,6 +593,7 @@ function renderGame(alpha) {
 document.addEventListener('DOMContentLoaded', () => {
   void (async () => {
     bootstrapDebugLogging();
+    watchGameBox(document.getElementById('game-container'));
 
     // A touch device plays by touch, held sideways (waits while in portrait).
     const { touch } = await mobileGuard();
