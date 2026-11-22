@@ -485,3 +485,52 @@ export function bakePlanetMap(THREE, seed, size = 512) {
     return dataTexture(THREE, data, W, H);
   });
 }
+
+/**
+ * A star's surface (places/theCrucible.js), tileable: granulation — bright
+ * cells, darker lanes between them — and a few dark spot groups. The shader
+ * reads it twice, at two scales drifting apart, so the cells seem to boil.
+ */
+export function bakeStarMap(THREE, seed, size = 128) {
+  return cached('star', seed, size, () => {
+    const lanes = cellular(createSeededRandom(seed), 18);
+    const shade = new Float32Array(size * size);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const k = smoothstep(0, 1, lanes(x / size, y / size) * 2.2);
+        shade[x + y * size] = 0.72 + 0.28 * k;
+      }
+    }
+    // spot groups (u, v, radius), each darkening only its own neighbourhood
+    const spots = [
+      [0.3, 0.62, 0.03],
+      [0.34, 0.6, 0.018],
+      [0.27, 0.65, 0.014],
+      [0.71, 0.28, 0.022],
+      [0.74, 0.31, 0.012],
+    ];
+    for (const [sx, sy, r] of spots) {
+      const reach = Math.ceil(r * 2.2 * size);
+      for (let y = -reach; y <= reach; y += 1) {
+        for (let x = -reach; x <= reach; x += 1) {
+          const d = Math.hypot(x, y) / (r * size);
+          if (d >= 2.2) continue;
+          const i =
+            wrap(Math.round(sx * size) + x, size) +
+            wrap(Math.round(sy * size) + y, size) * size;
+          shade[i] *=
+            1 -
+            0.85 * Math.exp(-d * d * 1.2) -
+            0.25 * Math.exp(-((d / 2) ** 2));
+        }
+      }
+    }
+    const data = new Uint8Array(size * size * 4);
+    for (let i = 0; i < shade.length; i += 1) {
+      const g = Math.round(255 * Math.max(0, shade[i]));
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = g;
+      data[i * 4 + 3] = 255;
+    }
+    return dataTexture(THREE, data, size);
+  });
+}

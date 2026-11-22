@@ -4,6 +4,7 @@ import { biomeForLayer } from '../../../src/data/biomes.js';
 import { SECTORS, sectorById } from '../../../src/data/sectors.js';
 import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
 import { buildCrystalChoir } from '../../../src/modules/render3d/places/crystalChoir.js';
+import { buildTheCrucible } from '../../../src/modules/render3d/places/theCrucible.js';
 import { PLACE_SETS } from '../../../src/modules/render3d/places/index.js';
 import { createPlaceKit } from '../../../src/modules/render3d/places/kit.js';
 import { crystal } from '../../../src/modules/render3d/places/pieces.js';
@@ -123,5 +124,20 @@ describe('place backdrop sets', () => {
     grid.update(30, 0);
     expect(ground.uniforms.uSpin.value).toBeGreaterThan(spin);
     expect(ground.uniforms.uSun.value.equals(sun)).toBe(true);
+  });
+
+  it("dims the Crucible's star once a full wake falls back, and plates its arcs past it", () => {
+    const kit = createPlaceKit(THREE, new THREE.Color(), {});
+    const set = buildTheCrucible(THREE, kit);
+    const star = kit.materials.get('crucible-star').uniforms;
+    const plating = kit.materials.get('crucible-plating');
+
+    set.update(1, 0.5);
+    expect(star.uLevel.value).toBe(1);
+    set.update(1.05, 1.25);
+    expect(plating.color.r).toBeGreaterThan(0.5);
+    set.update(1.1, 1);
+    set.update(1.15, 0);
+    expect(star.uLevel.value).toBeLessThan(0.5);
   });
 });
