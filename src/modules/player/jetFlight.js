@@ -66,18 +66,24 @@ const STAYING_TRIAL = 3;
 const CRUISE_FLAME = 0.35;
 const STAYING_MODERN_BRAKE = 1.5;
 // `?voo=c`'s modern nose: a spring onto the heading (s^-2 and its damping
-// ratio, a little under 1 so it swings a touch past and back), its push
-// (rad/s²), all × the RCS System; capped at today's turn rate.
-const NOSE_STIFFNESS = 144;
-const NOSE_DAMPING_RATIO = 0.7;
+// ratio, under 1 so it swings past and back), its push (rad/s²), all × the
+// RCS System; capped at today's turn rate. With no heading, the spin is
+// worked off at NOSE_STOP_ACCEL (× the RCS and Braking Systems).
+const NOSE_STIFFNESS = 100;
+const NOSE_DAMPING_RATIO = 0.55;
 const NOSE_SPIN_ACCEL = 150;
+const NOSE_STOP_ACCEL = 12;
+// `?voo=c` classic: the Braking System's computer stops a released spin with
+// this share of the turn pair's push (× its levels): about half a second,
+// worked off steadily, not snapped.
+const SPIN_STOP_SHARE = 0.5;
 
 /**
  * `?voo=c`'s modern nose: onto the keys' direction, else onto the motion,
  * else the spin brought to a stop (the Braking System the Flight Computer
  * always comes with). Returns the spin's change this step (rad/s²).
  */
-function swingNose(ship, deltaTime, move, quick) {
+function swingNose(ship, deltaTime, move, quick, braking) {
   const v = ship.velocity;
   let heading = null;
   if (move) heading = Math.atan2(move.y, move.x);
@@ -85,16 +91,18 @@ function swingNose(ship, deltaTime, move, quick) {
     heading = Math.atan2(v.vy, v.vx);
   }
   const stiffness = NOSE_STIFFNESS * quick;
-  const error = heading === null ? 0 : wrapAngle(heading - ship.angle);
-  const most = NOSE_SPIN_ACCEL * quick;
-  const spin = Math.max(
-    -most,
-    Math.min(
-      most,
-      stiffness * error -
-        2 * NOSE_DAMPING_RATIO * Math.sqrt(stiffness) * ship.angularVelocity
-    )
-  );
+  const w = ship.angularVelocity;
+  let spin;
+  if (heading === null) {
+    const stop = NOSE_STOP_ACCEL * quick * braking;
+    spin = -Math.sign(w) * Math.min(Math.abs(w) / deltaTime, stop);
+  } else {
+    const most = NOSE_SPIN_ACCEL * quick;
+    const pull =
+      stiffness * wrapAngle(heading - ship.angle) -
+      2 * NOSE_DAMPING_RATIO * Math.sqrt(stiffness) * w;
+    spin = Math.max(-most, Math.min(most, pull));
+  }
   const top = SHIP_HEADING_TURN_RATE * quick;
   ship.angularVelocity = Math.max(
     -top,
@@ -353,7 +361,7 @@ export function flyByJets(flight, deltaTime, input) {
   let spinShown;
   if (modern && staying) {
     const quick = flight.agility;
-    spin = swingNose(ship, deltaTime, move, quick);
+    spin = swingNose(ship, deltaTime, move, quick, braking);
     spinShown = NOSE_SPIN_ACCEL * quick;
   } else if (modern) {
     // The nose turns as today (the classic pair would take over a second
@@ -371,7 +379,7 @@ export function flyByJets(flight, deltaTime, input) {
     let pair = spinShown;
     if (staying && !turn) {
       // Let go: the spin keeps on, unless the Braking System stops it.
-      if (flight.brakingDamping > 0) pair *= braking;
+      if (flight.brakingDamping > 0) pair *= SPIN_STOP_SHARE * braking;
       else goal = ship.angularVelocity;
     }
     spin = Math.max(
