@@ -69,7 +69,7 @@ export class PlayerThrusters {
   // (the auto-brake still acts, silently); after the pilot's own thrust or a
   // dash, coasting shows the auto-brake's own push on each jet it fires
   // (flight.js `brake`): the retro or the main engine along the nose, the
-  // flank jets across (drawing only: the flank jets send no event).
+  // flank jets across, sparking like any jet (automatic: no engine puff).
   emitThrusterEffects({
     fwd,
     pilotMain,
@@ -91,8 +91,6 @@ export class PlayerThrusters {
     // cards drop on any burn of the main engine.
     const main = shown(coasting ? braked(brake.main) : pilotMain) * pilotForce;
     const aux = shown(coasting ? braked(brake.aux) : pilotAux) * pilotForce;
-    this.lastThrusterState.brakeStarboard = shown(braked(brake.starboard));
-    this.lastThrusterState.brakePort = shown(braked(brake.port));
 
     this.emitJet('main', main, fwd, 'main', 1, coasting);
     this.emitJet('aux', aux, fwd, 'aux', -1, coasting);
@@ -101,6 +99,11 @@ export class PlayerThrusters {
     // outboard; mirrored to port. The sound pans to the turn's side.
     this.emitTurn('turnR', shown(pilotTurn), 'right', 'noseLeft');
     this.emitTurn('turnL', shown(-pilotTurn), 'left', 'noseRight');
+    // The auto-brake across the hull: a whole flank, aft and nose jets.
+    const starboard = shown(braked(brake.starboard));
+    const port = shown(braked(brake.port));
+    this.emitTurn('brakeStarboard', starboard, 'right', 'noseRight', true);
+    this.emitTurn('brakePort', port, 'left', 'noseLeft', true);
   }
 
   // One jet's event while it burns, and a last one at 0 when it stops.
@@ -122,9 +125,10 @@ export class PlayerThrusters {
     }
   }
 
-  // The turn couple's two jets: the aft wingtip on `side` and the nose jet
-  // on the other flank, each blowing outboard.
-  emitTurn(key, intensity, side, nosePort) {
+  // Two side jets, each blowing outboard: a turn's couple is the aft wingtip
+  // on `side` and the nose jet on the other flank; the auto-brake's
+  // (`isAutomatic`) is a whole flank.
+  emitTurn(key, intensity, side, nosePort, isAutomatic = false) {
     if (intensity > 0 || this.lastThrusterState[key] > 0) {
       [side, nosePort].forEach((kind) => {
         const port = this.getThrusterPort(kind);
@@ -136,7 +140,7 @@ export class PlayerThrusters {
           type: 'side',
           side, // the engine sound pans its puffs by it
           visualLevel: this.rcsVisualLevel,
-          isAutomatic: false,
+          isAutomatic,
           accent: this.getAccent(),
         });
       });
@@ -194,7 +198,9 @@ export class PlayerThrusters {
 
     const sideIntensity = Math.max(
       this.lastThrusterState.turnL,
-      this.lastThrusterState.turnR
+      this.lastThrusterState.turnR,
+      this.lastThrusterState.brakeStarboard,
+      this.lastThrusterState.brakePort
     );
     if (sideIntensity > 0) {
       eventBus.emit('thruster-effect', {

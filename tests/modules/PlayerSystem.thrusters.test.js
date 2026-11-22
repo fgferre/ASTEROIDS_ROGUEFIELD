@@ -101,6 +101,15 @@ describe('PlayerSystem thrusters show the pilot, not the solver', () => {
     const diagonal = brakeAt('modern', -Math.PI / 4);
     expect(diagonal.brakeStarboard).toBeGreaterThan(0.3);
     expect(diagonal.aux).toBeGreaterThan(0.3);
+    // The flank jets spark like any jet: automatic side events, aft and nose
+    // on the same flank.
+    const { player, fly } = makePlayer('modern');
+    player.angle = -Math.PI / 2;
+    player.velocity = { vx: 150, vy: 0 };
+    player.thrusters.coastArmed = true;
+    const flank = fly({}, 1).filter((e) => e.type === 'side');
+    expect(flank).toHaveLength(2);
+    expect(flank.every((e) => e.isAutomatic && e.side === 'right')).toBe(true);
     // Classic has no brake across the hull: no flank jet.
     expect(brakeAt('classic', -Math.PI / 2).brakeStarboard).toBe(0);
   });
@@ -126,8 +135,9 @@ describe('PlayerSystem thrusters show the pilot, not the solver', () => {
     const turn = modern.fly({ down: true }, 6).filter((e) => e.type === 'side');
     expect(turn.length).toBeGreaterThan(0);
     expect(turn.every((e) => e.side === 'right')).toBe(true);
+    // Coasting, the side jets that burn are the auto-brake's, not a turn's.
     const swinging = modern.fly({}, 30).filter((e) => e.type === 'side');
-    expect(swinging).toEqual([]);
+    expect(swinging.filter((e) => !e.isAutomatic)).toEqual([]);
 
     const classic = makePlayer('classic');
     const left = classic
