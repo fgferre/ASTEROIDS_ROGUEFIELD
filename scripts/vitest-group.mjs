@@ -4,13 +4,20 @@
 // playtest launcher once left a vitest worker stuck in a loop spinning a core
 // for twelve hours (22/11). SIGKILL, because a worker stuck in a loop never
 // runs a handler for a gentler signal. Used by scripts/playtest.mjs and
-// scripts/tocados.mjs. Not covered: a kill -9 of this process gives it no
-// chance to clean up, and the group runs on.
+// scripts/tocados.mjs, and from the command line by npm test and the other
+// non-interactive test scripts:
+//
+//   node scripts/vitest-group.mjs run [vitest args...]
+//
+// test:watch and test:ui start vitest directly instead: in a group of its own
+// it would lose the terminal's keyboard. Not covered: a kill -9 of this
+// process gives it no chance to clean up, and the group runs on.
 
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VITEST = resolve(ROOT, 'node_modules/vitest/vitest.mjs');
@@ -54,4 +61,19 @@ export function runVitest(args, { stdio = 'inherit', env = process.env } = {}) {
       done(code);
     });
   });
+}
+
+// import.meta.url is the real path; argv[1] may come through a symlink.
+function calledDirectly() {
+  try {
+    return (
+      import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (calledDirectly()) {
+  process.exit((await runVitest(process.argv.slice(2))) ?? 1);
 }
