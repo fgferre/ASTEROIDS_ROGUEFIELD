@@ -32,8 +32,8 @@ export const CARDS_TIP_TEXT_TOUCH = 'Pick a card.';
 
 /**
  * The menu's first-visit lines (Felipe's pick B, 23/11), each in its place
- * and done once the player does what it says: `menu` under Launch until a
- * first launch, `hangar` in the Hangar until it closes, `salvage` by the
+ * and done once the player does what it says: `menu` on Mission Control until
+ * a first launch, `hangar` in the Hangar until it closes, `salvage` by the
  * Hangar button once the first purchase is within reach, until it opens.
  */
 export const MENU_TIPS = {

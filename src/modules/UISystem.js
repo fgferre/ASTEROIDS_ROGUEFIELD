@@ -1112,7 +1112,7 @@ class UISystem extends BaseSystem {
    * The menu's first-visit lines (ui/onboarding.js MENU_TIPS). Mission
    * Control shows one at a time: the Launch line before the first flight,
    * then, with nothing bought yet, the Hangar button's once Salvage buys
-   * something; the open Hangar shows its own until the first purchase.
+   * something; the open Hangar shows its own, true for any pilot.
    */
   refreshMenuTips(hangarOpen = this.hangarScreen.hangarState.isOpen) {
     const on = this.isOnboardingEnabled();
@@ -1124,7 +1124,7 @@ class UISystem extends BaseSystem {
       'salvage',
       !launch && !hangarOpen && !bought && affordable
     );
-    const hangar = tip('hangar', hangarOpen && !bought);
+    const hangar = tip('hangar', hangarOpen);
     const { menu, hangar: hangarRefs } = this.domRefs;
     this.showMenuTip(menu.tip, launch);
     this.showMenuTip(menu.hangarTip, salvage);

@@ -291,7 +291,7 @@ describe('Onboarding', () => {
     expect(tips.menuTip('hangar', true)).toBe(MENU_TIPS.hangar);
   });
 
-  it('shows Mission Control one line at a time, and the Hangar its own before a purchase', () => {
+  it('shows Mission Control one line at a time, and the Hangar its own once', () => {
     const node = () => ({
       hidden: true,
       dataset: {},
