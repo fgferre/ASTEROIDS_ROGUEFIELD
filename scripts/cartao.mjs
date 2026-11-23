@@ -88,7 +88,7 @@ const checaEndereco = (url, onde) => {
 };
 const varre = (v, onde) => {
   if (typeof v === 'string') {
-    for (const m of v.match(/https?:\/\/[^\s"'<>)]+/g) || [])
+    for (const m of v.match(/https?:\/\/[^\s"'<>)]+/gi) || [])
       checaEndereco(m, onde);
   } else if (v && typeof v === 'object') {
     for (const [k, x] of Object.entries(v)) varre(x, `${onde}.${k}`);
@@ -96,6 +96,9 @@ const varre = (v, onde) => {
 };
 varre(c, 'cartão');
 if (c.endereco) checaEndereco(c.endereco, '"endereco"');
+secoes.forEach((s, i) => {
+  if (s.endereco) checaEndereco(s.endereco, `secoes[${i}].endereco`);
+});
 
 const checaItem = (m, onde) => {
   if (!['imagem', 'video', 'audio'].includes(m.tipo))
@@ -230,7 +233,7 @@ button{background:var(--accent);color:#001215;border:0;border-radius:8px;padding
 #count{color:var(--dim)} #ok{color:var(--amber)} ul{margin:6px 0;padding-left:20px}`;
 
 const js = `const D = ${JSON.stringify(D).replace(/</g, '\\u003c')};
-const KEY = ${JSON.stringify(id)}; const NOME = ${JSON.stringify(plano(c.nome || c.titulo)).replace(/</g, '\\u003c')}; let pick = {}; try { pick = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+const KEY = ${JSON.stringify(id).replace(/</g, '\\u003c')}; const NOME = ${JSON.stringify(plano(c.nome || c.titulo)).replace(/</g, '\\u003c')}; let pick = {}; try { pick = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(pick)); } catch (e) {} sum(); };
 const root = document.getElementById('root');
 root.querySelectorAll('input[type=radio]').forEach((r) => { if (pick[r.name] === r.value) r.checked = true; r.onchange = () => { pick[r.name] = r.value; save(); }; });
@@ -239,7 +242,8 @@ root.querySelectorAll('textarea').forEach((t) => { const k = 'nota:' + t.dataset
 function text() { return D.filter((d) => pick[d.id] || pick['nota:' + d.id]).map((d) => { const n = pick['nota:' + d.id];
   return NOME + ' — ' + d.t + ': ' + (d.o[pick[d.id]] || '(sem opção marcada)') + (n ? ' — obs: ' + n : ''); }).join('\\n'); }
 function sum() { const n = D.filter((d) => pick[d.id]).length; document.getElementById('count').textContent = n + ' de ' + D.length + ' respondidas';
-  D.forEach((d) => root.querySelector('section[data-id="' + d.id + '"]').classList.toggle('done', Boolean(pick[d.id]))); }
+  const byId = (id) => [...root.querySelectorAll('section[data-id]')].find((s) => s.dataset.id === id);
+  D.forEach((d) => byId(d.id)?.classList.toggle('done', Boolean(pick[d.id]))); }
 document.getElementById('copy').onclick = () => { const t = text() || 'Nenhuma resposta marcada.'; const ok = document.getElementById('ok');
   const done = () => { ok.textContent = 'Copiado. Cole na conversa.'; setTimeout(() => (ok.textContent = ''), 4000); };
   let a = document.getElementById('manual'); if (!a) { a = document.createElement('textarea'); a.id = 'manual'; a.readOnly = true; a.style.cssText = 'display:block;width:100%;min-height:5em;margin:8px auto 0;font:inherit'; document.getElementById('out').appendChild(a); } a.value = t; a.select();
