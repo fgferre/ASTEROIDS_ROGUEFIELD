@@ -211,6 +211,21 @@ select {
     0 0 26px 6px rgba(255, 179, 71, 0.5);
 }
 
+/* The pad's pointer (ui/padPointer.js): over everything, never in the way. */
+.pad-pointer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10010;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.65));
+  will-change: transform;
+}
+
+.pad-pointer[hidden] {
+  display: none;
+}
+
 /* The buttons that work on the screen, while the pad is in use. */
 /* Centred under the overlays' panels; on the menu, in the header's gap. */
 .pad-hints {
@@ -218,6 +233,8 @@ select {
   left: 50%;
   bottom: 2px;
   z-index: 10002;
+  /* Read, never clicked: the pad's pointer clicks what lies under it. */
+  pointer-events: none;
   display: flex;
   gap: 12px;
   align-items: center;

@@ -55,6 +55,9 @@ export function applyStickDeadzone(x = 0, y = 0) {
   return { x: x * scaled, y: y * scaled };
 }
 
+// The pad's pointer (ui/padPointer.js) marks the page 'on' or 'shown'.
+const padPointerState = () => globalThis.document?.body?.dataset.padPointer;
+
 /** The dominant direction of a raw stick past the menu threshold, or null. */
 function stickNavDirection(x = 0, y = 0) {
   if (Math.hypot(x, y) < GAMEPAD_NAV_STICK_THRESHOLD) {
@@ -851,13 +854,15 @@ class InputSystem {
     };
     if (pad) this.setActiveDevice('gamepad');
 
-    const direction = stickNavDirection(axes[0], axes[1]);
+    // With the pad's pointer the left stick moves it.
+    const pointer = padPointerState();
+    const direction = pointer ? null : stickNavDirection(axes[0], axes[1]);
     if (direction !== this.padNavDirection) {
       this.padNavDirection = direction;
       this.emitPadNav(direction);
     }
     // Off play, the right stick scrolls the menu's lists (gamepadNav.js).
-    if (aim.y && !this.isGameRunning()) {
+    if (aim.y && !this.isGameRunning() && pointer !== 'shown') {
       this.getEventBus()?.emit?.('gamepad-ui-scroll', { y: aim.y });
     }
   }
@@ -867,6 +872,8 @@ class InputSystem {
     if (!action || this.isGameRunning()) {
       return;
     }
+    // A clicks under the pad's pointer while it shows (ui/padPointer.js).
+    if (action === 'confirm' && padPointerState() === 'shown') return;
     this.getEventBus()?.emit?.('gamepad-ui-nav', { action });
   }
 

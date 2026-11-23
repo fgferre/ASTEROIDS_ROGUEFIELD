@@ -47,6 +47,7 @@ import {
   wardenTransmission,
 } from './ui/transmissions.js';
 import { GamepadMenuNav } from './ui/gamepadNav.js';
+import { PAD_POINTER_ON, PadPointer } from './ui/padPointer.js';
 
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
@@ -233,6 +234,7 @@ class UISystem extends BaseSystem {
     });
     this.padNav = new GamepadMenuNav(this);
     this.padNav.watchScreens();
+    if (PAD_POINTER_ON) this.padPointer = new PadPointer(this);
     this.hangarScreen = new HangarScreen({
       refs: this.domRefs.hangar,
       settings: this.settings,
@@ -794,6 +796,14 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
+      // The d-pad steps item by item: the pad's pointer goes (not while it
+      // changes a list the pointer opened).
+      if (
+        ['up', 'down', 'left', 'right'].includes(payload.action) &&
+        !this.padNav.editing
+      ) {
+        this.padPointer?.hide();
+      }
       this.padNav.handle(payload.action);
     });
     this.registerEventListener('gamepad-ui-scroll', (payload = {}) => {

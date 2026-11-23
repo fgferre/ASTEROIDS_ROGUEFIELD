@@ -23,6 +23,7 @@ import {
 } from '../../core/storage.js';
 import { pilotSummaries } from '../../services/pilots.js';
 import { localDay } from '../../services/runRecords.js';
+import { PAD_POINTER_ON, padPointerShown } from '../ui/padPointer.js';
 
 // Set across the reload a choice makes: that entry goes straight on.
 const CHOSEN_KEY = 'roguefield:pilot-chosen';
@@ -97,13 +98,16 @@ export function justChosen() {
   }
 }
 
-// Pad: Ⓐ, Start, and left/right on the d-pad or the left stick.
+// Pad: Ⓐ, Start, and left/right on the d-pad or the left stick (the d-pad
+// alone with the pad's pointer, whose A clicks under it).
 function padState() {
   const pads = Array.from(navigator.getGamepads?.() ?? []).filter(Boolean);
   const pressed = (index) => pads.some((pad) => pad.buttons[index]?.pressed);
-  const axis = pads.reduce((sum, pad) => sum + (pad.axes[0] ?? 0), 0);
+  const axis = PAD_POINTER_ON
+    ? 0
+    : pads.reduce((sum, pad) => sum + (pad.axes[0] ?? 0), 0);
   return {
-    go: pressed(0) || pressed(9),
+    go: (pressed(0) && !padPointerShown()) || pressed(9),
     back: pressed(1),
     left: pressed(14) || axis < -0.5,
     right: pressed(15) || axis > 0.5,
