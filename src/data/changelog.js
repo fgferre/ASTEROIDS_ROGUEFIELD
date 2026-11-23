@@ -27,7 +27,9 @@ export const NEXT = {
     'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed
   ],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",
+  ],
 };
 
 export const RELEASES = [

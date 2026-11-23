@@ -126,6 +126,8 @@ function glideOf(player, combat) {
       ((flight.baseLinearDamping + flight.brakingDamping) /
         flight.baseLinearDamping),
     autoBrake: flight.brakingDamping > 0,
+    // how long the pilot has touched no key, for the brake's wait
+    idle: flight.idle,
     maxSpeed,
     // No drag: the shared loot terms' terminal speed (push ÷ drag) is the
     // top speed.
