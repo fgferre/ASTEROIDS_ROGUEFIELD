@@ -376,6 +376,19 @@
               </button>
             </h1>
             <p id="menu-status" class="menu-status" aria-label="Records"></p>
+            <!-- First-visit lines (ui/onboarding.js MENU_TIPS), one at a time -->
+            <p
+              id="menu-tip"
+              class="menu-tip menu-tip--row"
+              role="status"
+              hidden
+            ></p>
+            <p
+              id="menu-hangar-tip"
+              class="menu-tip menu-tip--row"
+              role="status"
+              hidden
+            ></p>
             <div
               id="menu-prep-tabs"
               class="prep-tabs"
@@ -484,6 +497,10 @@
                 <h2 id="campaign-detail-title" class="campaign-detail__title">
                   —
                 </h2>
+                <p class="prep-panel__objective">
+                  Ten sectors, one at a time; each win is kept and opens the
+                  next.
+                </p>
                 <div
                   id="campaign-sectors"
                   class="campaign-sectors"
@@ -562,6 +579,9 @@
                   >
                 </button>
               </div>
+              <p class="prep-difficulty-line">
+                Pilot is gentler. Warden hits harder and pays more Salvage.
+              </p>
             </div>
             <div class="prep-side">
               <div
@@ -1270,6 +1290,7 @@
             </button>
           </div>
           <div class="credits-body" data-hangar-panel="ship">
+            <p class="pressure-note">Upgrades and hulls, kept for every run.</p>
             <ul
               id="hangar-list"
               class="hangar-list"
@@ -1320,6 +1341,9 @@
             <div id="hangar-launch" class="hangar-launch"></div>
           </div>
           <div class="credits-body" data-hangar-panel="medals" hidden>
+            <p class="pressure-note">
+              Goals that pay Salvage or a licence, once each.
+            </p>
             <ul id="hangar-medals" class="medal-wall" aria-label="Medals"></ul>
           </div>
           <div class="credits-body" data-hangar-panel="pressure" hidden>
@@ -1331,6 +1355,7 @@
             ></ul>
           </div>
           <footer class="credits-footer">
+            <p id="hangar-tip" class="menu-tip" role="status" hidden></p>
             <button
               id="hangar-back-btn"
               class="btn btn--secondary"

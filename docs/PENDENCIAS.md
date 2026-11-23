@@ -290,6 +290,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   apertasse B aqui, ele deveria voltar para a tela de Press Start."_ No ramo `conserto/voltar-do-menu`: B e ESC na
   tela dos pilotos voltam para Press Start (com a caixa de apagar aberta, só fecham a caixa). Fecha quando ele aprovar
   jogando.
+- **(46)** Onboarding do menu para quem chega (23/11, à coordenadora): _"Será que a gente tinha que fazer um pequeno
+  onboarding para quem chega a primeira vez? Saber que tem todas as sessões que tem, como que monta a sessão, o que
+  que faz cada modo, é, falar sobre o hangar, o que que tem dentro do hangar, o que que você acha?"_ No cartão
+  `onboarding-do-menu-1`: _"Cada tela se explica numa linha na primeira vez, uma linha fixa na dificuldade, e a linha
+  quando o Salvage dá para comprar a primeira coisa"_ e, dos textos, _"Bons assim"_. No ramo `menu/onboarding`: as três
+  linhas da primeira vez e as frases fixas (Campaign, dificuldade, abas Ship e Medals). Fecha quando ele aprovar vendo
+  como quem chega.
 
 ## Som (palavras dele, 19/11)
 
