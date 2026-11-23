@@ -32,7 +32,7 @@ import { requireRandom } from '../../../utils/randomHelpers.js';
 // its health, speed and what it drops do not change. A piece dealt a variant
 // of its own that warns or pays (volatile, parasite, gold) shows that one.
 const PASSED_LOOKS = new Set(['gold', 'crystal']);
-const PLAIN_VARIANTS = new Set(['common', 'iron', 'denseCore']);
+export const PLAIN_VARIANTS = new Set(['common', 'iron', 'denseCore']);
 
 /**
  * Asteroid Enemy Type

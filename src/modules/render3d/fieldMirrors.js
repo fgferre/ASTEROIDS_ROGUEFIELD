@@ -14,6 +14,7 @@ import {
   pushLance,
   pushSeeker,
 } from './weaponMirror.js';
+import { pushScrap } from './fanMirror.js';
 
 const MAX_TRAIL_POINTS = 64;
 // Lot 5 (efeito/impacto): a hull loss reddens the screen's edges and darkens
@@ -54,7 +55,8 @@ export function mirrorProjectiles(t, combat) {
   for (let i = 0; i < bullets.length; i += 1) {
     const b = bullets[i];
     if (!b || b.hit) continue;
-    if (b.kind === 'flak') pushFlakBolt(t.THREE, t, b, trail);
+    if (b.kind === 'flak' && b.volley?.scrap) pushScrap(t.THREE, t, b, trail);
+    else if (b.kind === 'flak') pushFlakBolt(t.THREE, t, b, trail);
     else if (b.kind === 'seeker') pushSeeker(t.THREE, t, b, trail);
     else pushLance(t.THREE, t, look, evolved, b, trail);
   }

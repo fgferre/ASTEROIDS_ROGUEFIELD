@@ -8,7 +8,8 @@
 // and resolves the collisions through it after the shots move; the weapons
 // and the card effects land their hits here too. The lance evolutions come
 // on a lance, beam or flak hit only (see `lanceHit`), and a family the held
-// weapon evolves on itself brings none of its lance evolution here.
+// weapon evolves on itself brings none of its lance evolution here (the
+// Harmonic's lances keep it: its own forms are its beam's).
 
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
@@ -23,6 +24,9 @@ import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
 import { burstFlak } from './beamAndFan.js';
+import { flingFragments } from './beamForms.js';
+import { fanHit, glance } from './fanForms.js';
+import { lodge } from './missileForms.js';
 import { breedSeekers } from './firePatterns.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
@@ -79,12 +83,16 @@ export class HitResolution {
         bullet.kind === 'blade' ||
         bullet.kind === 'arc');
     // Chain Capacitor without the Chain Lance: some projectiles, pulses and
-    // cuts hit twice.
+    // cuts hit twice, unless the weapon has its own version (a volley or a
+    // beam fires twice, a missile splits: beamAndFan.js, firePatterns.js).
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
       (bullet.projectile || (familyHit && bullet.kind !== 'arc')) &&
       !weapons.hasEvolution('arc') &&
+      !weapons.weapon.fire.some(
+        (entry) => entry.capacitorTwice || entry.capacitorSplit
+      ) &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
       requestedDamage *= 2;
@@ -199,12 +207,21 @@ export class HitResolution {
         this.applyKnockback(bullet, enemy, effectiveDamage);
       }
       if (beamSplit && damageResult.killed) {
-        spawnBeamFragments(
+        const spawned = spawnBeamFragments(
           enemiesSystem,
           enemy,
           beamSplit,
           bullet.extraFragments
         );
+        if (bullet.fling) {
+          flingFragments(
+            weapons,
+            beamSplit,
+            bullet.fling,
+            damageResult.fragments,
+            spawned
+          );
+        }
       }
       if (rewards && damageResult.killed) {
         this.dropProspectorOrbs(
@@ -232,11 +249,24 @@ export class HitResolution {
         cards.sparkFrom(enemy, requestedDamage * spark.damageFraction, link);
       }
     }
+    // The fan's own forms count its flak and shrapnel hits (fanForms.js).
+    if (
+      !blockedByInvulnerability &&
+      weapons.weapon.familyForms?.fan &&
+      (bullet.kind === 'flak' || bullet.kind === 'shrapnel')
+    ) {
+      fanHit(weapons, bullet, enemy, damageResult);
+    }
     // A projectile with a `burst` bursts on its first hit, blocked or not;
-    // its shrapnel spares the enemy it struck.
+    // its shrapnel spares the enemy it struck. Thermite's missile lodges in
+    // it and bursts later (missileForms.js); Grapeshot's bolt glances on
+    // into the next enemy ahead.
     if (bullet.projectile?.burst) {
       bullet.volley.struck.push(enemy);
-      burstFlak(weapons, bullet);
+      if (!lodge(weapons, bullet, enemy, damageResult)) {
+        burstFlak(weapons, bullet);
+      }
+      if (bullet.ricochets > 0) glance(weapons, bullet, enemy);
     }
 
     return damageResult;
@@ -299,9 +329,25 @@ export class HitResolution {
     const cards = this.cards();
     if (!weapons.evolutions.length) return;
     // A projectile, beam or flak hit runs every family's form, whatever the
-    // weapon's `familyForms` carries.
+    // weapon's `familyForms` carries, but a beam hit none the beam forms on
+    // its own (`familyForms.beam`, run once a beam in beamForms.js), a flak
+    // or shrapnel hit none the fan forms on its own (`familyForms.fan`,
+    // fanForms.js), and a missile or its shrapnel none the missile forms on
+    // its own (`familyForms.missile`, missileForms.js).
     const forms = lanceHit ? null : weapons.weapon.familyForms;
-    const carries = (family) => !forms || forms.carries.includes(family);
+    const own = weapons.weapon.familyForms;
+    const ownForms =
+      hit.kind === 'beam'
+        ? own?.beam
+        : hit.kind === 'flak'
+          ? own?.fan
+          : hit.kind === 'seeker'
+            ? own?.missile
+            : hit.kind === 'shrapnel'
+              ? own?.fan ?? own?.missile
+              : null;
+    const carries = (family) =>
+      (!forms || forms.carries.includes(family)) && !ownForms?.includes(family);
     // A chain or a well costs the shot one; with no `shot` they are free.
     const spend = (key) => {
       if (!hit.shot) return true;
@@ -350,6 +396,7 @@ export class HitResolution {
     const result = enemiesSystem.applyDamage(enemy, damage, { source });
     return {
       killed: !!result?.killed,
+      fragments: result?.fragments ?? [],
       remainingHealth: Math.max(
         0,
         result?.remainingHealth ?? enemy.health ?? 0

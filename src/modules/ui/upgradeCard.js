@@ -78,7 +78,8 @@ export function weaponOfCard(cardId) {
 
 /**
  * A family's evolution (or Apex) as the held weapon has it: the weapon's own
- * `evolution`/`apex` on its card's family, else the lance's; Maneuver's are
+ * `evolution`/`apex` on its card's family, else the lance's, under the name
+ * the weapon gives it (`familyForms.names`, the Scatter's); Maneuver's are
  * the dash's (its bonus and its Apex).
  */
 export function familyForm(family, weaponId, apex = false) {
@@ -88,10 +89,11 @@ export function familyForm(family, weaponId, apex = false) {
       ? weapon[apex ? 'apex' : 'evolution']
       : null;
   const lance = (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family];
+  const named = weapon?.familyForms?.names?.[family]?.[apex ? 1 : 0];
   const dash = apex
     ? UPGRADE_FAMILIES[family].apex
     : UPGRADE_FAMILIES[family].bonus;
-  return own ?? lance ?? dash;
+  return own ?? (lance && named ? { ...lance, name: named } : lance) ?? dash;
 }
 
 // The patterns whose hits carry the lance evolutions (HitResolution's

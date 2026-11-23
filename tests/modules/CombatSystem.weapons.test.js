@@ -9,10 +9,12 @@ import {
 } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
+import XPOrbSystem from '../../src/modules/XPOrbSystem.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
 import { fireBeam, fireFan } from '../../src/modules/combat/beamAndFan.js';
+import { tickWeaponField } from '../../src/modules/combat/firePatterns.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
 import { TURRET_BARREL_LENGTH } from '../../src/data/constants/physics.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
@@ -94,6 +96,26 @@ function lockOnMany(combat, eventBus, multishot) {
   expect(combat.currentTargetLocks).toHaveLength(multishot);
 }
 
+// The Overcharge Coil at all three ranks (+52% lance speed).
+function fullCoil(eventBus) {
+  [1, 2, 3].forEach((level) =>
+    eventBus.emit('upgrade-weapon-tuning', {
+      upgradeId: 'overcharge_coil',
+      level,
+      bulletSpeedMultiplier: 1.15,
+    })
+  );
+}
+
+// The Chain Capacitor whose next roll lands.
+function landingCapacitor(combat) {
+  combat.cards.cardEffects.chainCapacitor = {
+    extraJumps: 1,
+    doubleHitChance: 0.1,
+  };
+  combat.cards.rollCardChance = vi.fn(() => true);
+}
+
 // A lance round, as Projectiles fires it.
 const lance = (overrides = {}) => ({
   kind: 'lance',
@@ -150,6 +172,49 @@ describe('Harmonic Plasma Lance', () => {
 
     combat.updateWeaponEffects(BEAM.duration + 0.01);
     expect(combat.beams).toHaveLength(0);
+  });
+
+  it('with the Overcharge Coil the beam comes every 3rd shot', () => {
+    const { combat, eventBus } = makeCombat([]);
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+    fullCoil(eventBus);
+    const stats = { multishot: 1, damage: DAMAGE };
+    combat.handleShooting(1, stats);
+    combat.handleShooting(1, stats);
+    expect(combat.getWeaponState().shotsToBeam).toBe(1);
+    expect(combat.beams).toHaveLength(0);
+    combat.handleShooting(1, stats);
+    expect(combat.beams).toHaveLength(1);
+    expect(combat.bullets).toHaveLength(2);
+    expect(combat.getWeaponState().shotsToBeam).toBe(3);
+  });
+
+  it('Chain Capacitor: a beam that rolls fires again along the same line 0.1 s later; lances never hit twice', () => {
+    const near = makeEnemy('near', 200, 300);
+    const { combat, eventBus, enemies } = makeCombat([near]);
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+    landingCapacitor(combat);
+    const stats = { multishot: 1, damage: DAMAGE };
+    for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+    const hit = DAMAGE * BEAM.damageMultiplier;
+    expect(near.health).toBeCloseTo(100 - hit, 6);
+    const [first] = combat.beams;
+
+    tickWeaponField(combat.weapons, 0.05, stats);
+    expect(combat.beams).toHaveLength(1);
+    tickWeaponField(combat.weapons, 0.06, stats);
+    expect(combat.beams).toHaveLength(2);
+    expect(combat.beams[1]).toMatchObject({
+      x: first.x,
+      y: first.y,
+      angle: first.angle,
+    });
+    expect(near.health).toBeCloseTo(100 - 2 * hit, 6);
+
+    // The lances between beams take no double hit.
+    const health = near.health;
+    combat.processBulletHit(lance(), near, enemies);
+    expect(near.health).toBeCloseTo(health - DAMAGE, 6);
   });
 
   it('with several locks fires one beam at each lock and hits every locked enemy; the penalty comes once', () => {
@@ -249,6 +314,8 @@ describe('Harmonic Plasma Lance', () => {
     for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
     expect(combat.beams).toHaveLength(1);
     expect(hits.mock.calls.map(([data]) => data.enemy.id)).toEqual(['solid']);
+    // The beam's own Thermal form: its scar sets alight what lies on it.
+    combat.updateWeaponEffects(0.01);
     expect(combat.burns.has(phased)).toBe(false);
     expect(combat.burns.has(solid)).toBe(true);
     // The solid one's arc has nothing else within 140 px.
@@ -257,6 +324,243 @@ describe('Harmonic Plasma Lance', () => {
     combat.updateWeaponEffects(2);
     expect(phased.health).toBe(100);
     expect(aside.health).toBe(100);
+  });
+});
+
+// The Harmonic with a family's own beam form: four shots, the 4th a beam.
+function harmonicBeam(combat, eventBus, family, apex = false) {
+  eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+  eventBus.emit('synergy-unlocked', { family });
+  if (apex) eventBus.emit('apex-unlocked', { family });
+  const stats = { multishot: 1, damage: DAMAGE };
+  for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+  expect(combat.beams).toHaveLength(1);
+}
+
+describe('Harmonic beam forms', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => {
+    GamePools.releaseAll();
+    cleanupGlobalState();
+  });
+  const beamHit = DAMAGE * BEAM.damageMultiplier;
+
+  it('Searing Beam (Thermal ×3): the line burns 1 s and sets alight what crosses it; the lances still burn', () => {
+    const near = makeEnemy('near', 200, 300);
+    const late = makeEnemy('late', 260, 420); // off the line as it fires
+    const { combat, eventBus, enemies } = makeCombat([near, late]);
+    harmonicBeam(combat, eventBus, 'thermal');
+    expect(combat.getWeaponState().evolutions).toMatchObject([
+      { family: 'thermal', name: 'Searing Beam' },
+    ]);
+    // The beam hit lands no lance burn; its scar touches on the next tick.
+    expect(combat.burns.size).toBe(0);
+    expect(combat.scars).toHaveLength(1);
+    combat.updateWeaponEffects(0.01);
+    expect(combat.burns.has(near)).toBe(true);
+    expect(combat.burns.has(late)).toBe(false);
+
+    late.y = 300;
+    combat.updateWeaponEffects(0.2);
+    expect(combat.burns.has(late)).toBe(true);
+    combat.updateWeaponEffects(0.8);
+    expect(combat.scars).toHaveLength(0);
+
+    const other = makeEnemy('other', 0, 0);
+    combat.processBulletHit(lance(), other, enemies);
+    expect(combat.burns.has(other)).toBe(true);
+  });
+
+  it('Sunspear (Thermal ×5): the beam reaches 50% further and stays 0.5 s; its line burns 2 s', () => {
+    const far = makeEnemy('far', 116 + 300, 300); // past 220 px, inside 330
+    const { combat, eventBus } = makeCombat([far]);
+    harmonicBeam(combat, eventBus, 'thermal', true);
+    expect(far.health).toBeCloseTo(100 - beamHit, 6);
+    combat.updateWeaponEffects(0.4);
+    expect(combat.beams).toHaveLength(1);
+    combat.updateWeaponEffects(0.2);
+    expect(combat.beams).toHaveLength(0);
+    expect(combat.scars).toHaveLength(1);
+    combat.updateWeaponEffects(1.5);
+    expect(combat.scars).toHaveLength(0);
+  });
+
+  it('Arc: at 3 the beam arcs from its far end to the 2 nearest off it; at 5 each enemy it crosses starts a chain of 3', () => {
+    const { arc } = WEAPONS.harmonic.familyForms;
+    const a = makeEnemy('a', 200, 300);
+    const b = makeEnemy('b', 300, 300);
+    const up = makeEnemy('up', 300, 200); // 100 px from b
+    const down = makeEnemy('down', 300, 410); // 110 px
+    const third = makeEnemy('third', 300, 430); // 130 px, third nearest
+    const three = makeCombat([a, b, up, down, third]);
+    harmonicBeam(three.combat, three.eventBus, 'arc');
+    // No Chain Lance off the beam's hits: only its own two bolts.
+    expect(a.health).toBeCloseTo(100 - beamHit, 6);
+    expect(b.health).toBeCloseTo(100 - beamHit, 6);
+    const bolt = beamHit * arc.damageFraction[0];
+    expect(up.health).toBeCloseTo(100 - bolt, 6);
+    expect(down.health).toBeCloseTo(100 - bolt, 6);
+    expect(third.health).toBe(100);
+    expect(three.combat.arcs.map((x) => x.bolt)).toEqual([true, true]);
+
+    // At 5: from the one enemy it crosses, a chain jumping 3 times.
+    const start = makeEnemy('start', 200, 300);
+    const hops = [200, 90, -20, -130].map((y, i) => makeEnemy(`h${i}`, 200, y));
+    const five = makeCombat([start, ...hops]);
+    harmonicBeam(five.combat, five.eventBus, 'arc', true);
+    const heavy = beamHit * arc.damageFraction[1];
+    hops
+      .slice(0, 3)
+      .forEach((hop) => expect(hop.health).toBeCloseTo(100 - heavy, 6));
+    expect(hops[3].health).toBe(100);
+    expect(start.health).toBeCloseTo(100 - beamHit, 6);
+    expect(five.combat.arcs).toHaveLength(3);
+  });
+
+  it('Salvage: orbs from beam kills fly to the ship; at 5 the beam also sends every orb it crosses', () => {
+    const run = (apex) => {
+      const rock = makeEnemy('rock', 200, 300, { health: 5 });
+      const enemies = makeEnemies([rock]);
+      // Just the orb state sendHome and updateHoming read.
+      const orbs = {
+        xpOrbs: [],
+        homing: new Set(),
+        resolvePlayer: () => ({ getPosition: () => ({ x: 100, y: 300 }) }),
+        isOrbActive: (orb) => !orb.collected,
+        invalidateSpatialIndex() {},
+        sendHome: XPOrbSystem.prototype.sendHome,
+      };
+      const orbAt = (x, y) => {
+        const orb = { x, y, home: null, collected: false, isFusing: false };
+        orbs.xpOrbs.push(orb);
+        return orb;
+      };
+      enemies.rewardManager = {
+        stats: { totalOrbsDropped: 0 },
+        createXPOrbs: (enemy, count) => {
+          for (let i = 0; i < count; i += 1) orbAt(enemy.x, enemy.y);
+        },
+        getXPOrbSystem: () => orbs,
+      };
+      const applyDamage = enemies.applyDamage.bind(enemies);
+      enemies.applyDamage = (enemy, damage) => {
+        const result = applyDamage(enemy, damage);
+        if (result.killed) enemies.rewardManager.createXPOrbs(enemy, 2);
+        return result;
+      };
+      const onLine = orbAt(260, 305); // on the field before the beam
+      const aside = orbAt(260, 340);
+      const { combat, eventBus } = makeCombat([], { enemies });
+      harmonicBeam(combat, eventBus, 'salvage', apex);
+      const dropped = orbs.xpOrbs.filter((o) => o !== onLine && o !== aside);
+      return { orbs, dropped, onLine, aside };
+    };
+    const three = run(false);
+    expect(three.dropped).toHaveLength(2);
+    three.dropped.forEach((orb) => expect(orb.home).not.toBeNull());
+    expect(three.onLine.home).toBeNull();
+    // Straight to the ship, faster each second.
+    XPOrbSystem.prototype.updateHoming.call(three.orbs, 0.1);
+    expect(three.dropped[0]).toMatchObject({ x: 200 - 40, y: 300 });
+
+    const five = run(true);
+    expect(five.onLine.home).not.toBeNull();
+    expect(five.aside.home).toBeNull();
+  });
+
+  it('Kinetic ×3: a machine the beam strikes is thrown back along it, a boss is not; the fragments of a rock it kills fly out, then settle', () => {
+    const { kinetic } = WEAPONS.harmonic.familyForms;
+    const drone = makeEnemy('drone', 200, 300);
+    const boss = makeEnemy('boss', 250, 300, { type: 'boss' });
+    const rock = makeEnemy('rock', 300, 300, {
+      type: 'asteroid',
+      size: 'large',
+      health: 5,
+      generateFragments: () => [],
+    });
+    const fragments = [
+      makeEnemy('f1', 310, 300, { type: 'asteroid', vx: 20 }),
+      makeEnemy('f2', 300, 290, { type: 'asteroid', vy: -20 }),
+    ];
+    const enemies = makeEnemies([drone, boss, rock]);
+    const applyDamage = enemies.applyDamage.bind(enemies);
+    enemies.applyDamage = (enemy, damage) => {
+      const result = applyDamage(enemy, damage);
+      return { ...result, fragments: result.killed ? fragments : [] };
+    };
+    const { combat, eventBus } = makeCombat([], { enemies });
+    harmonicBeam(combat, eventBus, 'kinetic');
+    expect(rock.destroyed).toBe(true);
+    expect(fragments[0].vx).toBe(kinetic.fling.speed);
+    expect(fragments[1].vy).toBe(-kinetic.fling.speed);
+
+    combat.updateWeaponEffects(1.5);
+    expect(drone.x).toBeGreaterThan(200 + kinetic.knock.distance - 2);
+    expect(drone.y).toBe(300);
+    expect(boss.x).toBe(250);
+    // Back to its own drift after three time constants.
+    expect(fragments[0].vx).toBeCloseTo(20 + 220 * Math.exp(-3), 6);
+    expect(combat.flung).toHaveLength(0);
+  });
+
+  it('Kinetic ×5: a rock the beam kills bursts into shards that hit what lies on along the beam', () => {
+    const { cone } = WEAPONS.harmonic.familyForms.kinetic;
+    const rock = makeEnemy('rock', 200, 300, {
+      type: 'asteroid',
+      size: 'small',
+      health: 5,
+    });
+    const behind = makeEnemy('behind', 380, 300); // past the beam's end
+    const aside = makeEnemy('aside', 300, 400); // 45° off the beam
+    const { combat, eventBus } = makeCombat([rock, behind, aside]);
+    harmonicBeam(combat, eventBus, 'kinetic', true);
+    expect(combat.shards).toHaveLength(1);
+    expect(behind.health).toBeCloseTo(
+      100 - DAMAGE * BEAM.damageMultiplier * cone.damageFraction,
+      6
+    );
+    expect(aside.health).toBe(100);
+  });
+
+  it('Field ×3: what lies near the beam is tugged onto its line and held; what it struck is held; a boss is left', () => {
+    const struck = makeEnemy('struck', 200, 300);
+    const near = makeEnemy('near', 250, 335); // inside the 40 px band
+    const far = makeEnemy('far', 250, 380);
+    const boss = makeEnemy('boss', 300, 330, { type: 'boss' });
+    const { combat, eventBus } = makeCombat([struck, near, far, boss]);
+    harmonicBeam(combat, eventBus, 'field');
+    combat.updateWeaponEffects(0.2);
+    // The Singularity's pull speed, 160 px/s, for the 0.2 s tug.
+    expect(near.y).toBeCloseTo(335 - 32, 6);
+    expect(struck.y).toBe(300);
+    expect(far.y).toBe(380);
+    expect(boss.y).toBe(330);
+    expect([...combat.slows.keys()]).toEqual([struck, near]);
+  });
+
+  it('Field ×5: the beam leaves one trench on its line that drags what is in reach toward it for 1.2 s', () => {
+    const { trench } = WEAPONS.harmonic.familyForms.field;
+    const inReach = makeEnemy('in', 250, 360);
+    const out = makeEnemy('out', 250, 390);
+    const boss = makeEnemy('boss', 300, 340, { type: 'boss' });
+    const { combat, eventBus } = makeCombat([inReach, out, boss]);
+    harmonicBeam(combat, eventBus, 'field', true);
+    const first = combat.trench;
+    expect(first).toMatchObject({ y: 300, ey: 300, reach: trench.reach });
+    combat.updateWeaponEffects(trench.tau);
+    expect(inReach.y).toBeCloseTo(300 + 60 * Math.exp(-1), 6);
+    expect(out.y).toBe(390);
+    expect(boss.y).toBe(340);
+
+    // A new beam's trench replaces the last.
+    combat.beams.length = 0;
+    harmonicBeam(combat, eventBus, 'field', true);
+    expect(combat.trench).not.toBe(first);
+    combat.updateWeaponEffects(trench.life);
+    expect(combat.trench).toBeNull();
   });
 });
 
@@ -339,6 +643,50 @@ describe('Scatter Coil', () => {
     combat.bullets = [];
     combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
     expect(combat.bullets).toHaveLength(FAN.maxBolts);
+  });
+
+  it('Overcharge Coil at rank 3: bolts fly 50% faster and burst 80 px further', () => {
+    const { combat, eventBus } = scatter([]);
+    fullCoil(eventBus);
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    const [bolt] = combat.bullets;
+    const speed = Math.hypot(bolt.vx, bolt.vy);
+    expect(speed).toBeCloseTo(
+      (combat.bulletSpeed / 1.15 ** 3) * 1.5 * BOLT.speedMultiplier,
+      6
+    );
+    expect(bolt.life * speed).toBeCloseTo(BOLT.range + 80, 6);
+  });
+
+  it('Thermal Lens: the fan is 20% narrower and each bolt hits 15% harder', () => {
+    const { combat, eventBus } = scatter([]);
+    eventBus.emit('upgrade-thermal-lens', {
+      beamLengthMultiplier: 1.4,
+      lanceDamageMultiplier: 1.15,
+    });
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    const half = (FAN.fan * 0.8 * Math.PI) / 360;
+    expect(angles[0]).toBeCloseTo(-half, 6);
+    expect(angles.at(-1)).toBeCloseTo(half, 6);
+    expect(combat.bullets[0].damage).toBeCloseTo(
+      DAMAGE * 1.15 * BOLT.damageMultiplier,
+      6
+    );
+  });
+
+  it('Chain Capacitor: a volley that rolls fires again 0.1 s later, which keeps the cooldown and never rolls', () => {
+    const { combat } = scatter([]);
+    landingCapacitor(combat);
+    const stats = { multishot: 1, damage: DAMAGE };
+    combat.handleShooting(1, stats);
+    const wait = combat.lastShotTime;
+    expect(combat.bullets).toHaveLength(FAN.bolts);
+
+    tickWeaponField(combat.weapons, 0.11, stats);
+    expect(combat.bullets).toHaveLength(2 * FAN.bolts);
+    expect(combat.lastShotTime).toBe(wait);
+    expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(1);
   });
 
   it('with several locks splits its bolts over the locks, earlier locks first, each a small fan on its lock', () => {
@@ -449,7 +797,7 @@ describe('Scatter Coil', () => {
     expect(combat.flakBursts).toHaveLength(0);
   });
 
-  it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the evolution procs on both', () => {
+  it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the fan runs its own Thermal (no lance burn)', () => {
     const target = makeEnemy('target', 200, 300);
     const near = makeEnemy('near', 190, 300 + BOLT.burst.radius);
     const phased = makeEnemy('phased', 190, 290, {
@@ -473,9 +821,7 @@ describe('Scatter Coil', () => {
       6
     );
     expect(phased.health).toBe(100);
-    expect(combat.burns.has(target)).toBe(true);
-    expect(combat.burns.has(near)).toBe(true);
-    expect(combat.burns.has(phased)).toBe(false);
+    expect(combat.burns.size).toBe(0);
   });
 });
 
@@ -680,8 +1026,9 @@ describe('weapon evolutions', () => {
     expect(evolved).toHaveBeenCalledTimes(1);
     expect(combat.getWeaponState()).toMatchObject({
       weaponId: 'harmonic',
-      evolutions: [{ family: 'thermal', name: 'Incendiary Lance' }],
+      evolutions: [{ family: 'thermal', name: 'Searing Beam' }],
     });
+    // The Harmonic's own form is its beam's: its lances still evolve.
     expect(combat.trailLength).toBeGreaterThan(6);
 
     combat.reset();

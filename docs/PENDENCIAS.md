@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 41.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
 
 ## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
 
@@ -251,6 +251,14 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   melhora."_ e a chama constante _"Assim, um terço do estouro"_. A ajuda do giro no começo ficou a metade. Em 22/11,
   20h30, a coordenadora mandou o voo que fica virar o único voo neste ramo (sem juntar nem publicar). Fecha quando
   ele aprovar voando.
+- **(41)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
+  inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
+  radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
+  está no cartão `cartas-por-arma-1`. Respostas dele aos cartões 2 e 3 (22/11): tudo _"Gostei: pode construir"_; a Scatter
+  e a Seeker ganham versão própria _"aos poucos, depois da Harmonic"_; os números da Scatter, _"Decido jogando"_. No ramo:
+  as cartas de número e as cinco famílias próprias da Harmonic. Em 23/11 a Scatter e a Seeker ganharam as delas, com
+  os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
+  Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 

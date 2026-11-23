@@ -59,7 +59,7 @@ export class Weapons {
    * `player()`: the player service (position, muzzle point, turret angle).
    * `enemies()`: the enemy service (forEachActiveEnemy).
    * `targeting()`: the Targeting instance (locks, lead points, aim mode, right stick).
-   * `createBullet(fromPos, toPos, damage, volley)`: launches the weapon's projectile (Projectiles).
+   * `createBullet(fromPos, toPos, damage, volley, entry)`: launches the weapon's projectile (Projectiles).
    * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
    * `cardEffects()`: the cards in play (the beam reads the Thermal Lens).
@@ -119,11 +119,18 @@ export class Weapons {
     // The first pattern due fires: one with `every: n` on every nth shot.
     this.shots += 1;
     const pattern = this.weapon.fire.find(
-      (entry) => !entry.every || this.shots % entry.every === 0
+      (entry) => !entry.every || this.shots % this.everyOf(entry) === 0
     );
     this.instantShot = INSTANT_PATTERNS.has(pattern.pattern);
     FIRE_PATTERNS[pattern.pattern](this, pattern, playerPos, playerStats);
     this.instantShot = false;
+  }
+
+  // An `every` entry's n: `coilEvery` with the Overcharge Coil.
+  everyOf(entry) {
+    return entry.coilEvery && this.bulletSpeed > BULLET_SPEED
+      ? entry.coilEvery
+      : entry.every;
   }
 
   // Where a shot at `enemy` goes: where it is now for an instant pattern,
@@ -533,6 +540,29 @@ export class Weapons {
     this.evolutions = [];
     this.apexes = [];
     this.beams = [];
+    this.scars = []; // beamForms.js: the lines a Searing Beam left burning
+    this.scarSeed = 0;
+    // beamForms.js: Kinetic throws, flung fragments' trails and shard bursts,
+    // the Field trench.
+    this.knocks = [];
+    this.flung = [];
+    this.shards = [];
+    this.shardSeed = 0;
+    this.trench = null;
+    // fanForms.js: Grapeshot's glances, Kindling's burning rocks, the
+    // implosions waiting to burst, the scrap waiting to fire.
+    this.glances = [];
+    this.kindled = [];
+    this.implosions = [];
+    this.scraps = [];
+    // missileForms.js: Thermite's lodged missiles, its pieces and the molten
+    // pieces of a rock it killed cooling, the Storm Warhead's leaping bolts,
+    // the Gravity Warhead's wells.
+    this.lodged = [];
+    this.thermite = [];
+    this.cooling = [];
+    this.storms = [];
+    this.gravityWells = [];
     this.flakBursts = [];
     // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
     this.blades = [];
@@ -546,6 +576,7 @@ export class Weapons {
     this.aura = null;
     this.pulses = [];
     this.broods = [];
+    this.echo = null; // a Chain Capacitor volley or beam due again
     this.refreshLanceLook();
   }
 
@@ -566,13 +597,24 @@ export class Weapons {
     return forms.evolution ? forms.base.card.family : null;
   }
 
-  /** The family's lance evolution is on (not the held weapon's own family). */
+  /**
+   * The family's lance evolution is on: not on the held weapon's own family,
+   * unless only its beam takes the own form (`familyForms.beam`: the
+   * Harmonic's lances keep theirs).
+   */
   hasEvolution(family) {
-    return family !== this.ownFamily && this.evolutions.includes(family);
+    return this.evolutions.includes(family) && !this.ownsLanceForm(family);
   }
 
   hasApex(family) {
-    return family !== this.ownFamily && this.apexes.includes(family);
+    return this.apexes.includes(family) && !this.ownsLanceForm(family);
+  }
+
+  ownsLanceForm(family) {
+    return (
+      family === this.ownFamily &&
+      !this.weapon.familyForms?.beam?.includes(family)
+    );
   }
 
   /** A weapon card swaps the cannon for its weapon; an unknown id is ignored. */
@@ -669,7 +711,11 @@ export class Weapons {
       weaponId: this.weaponId,
       name,
       chip,
-      shotsToBeam: beam?.every ? beam.every - (this.shots % beam.every) : null,
+      // The beam's live interval (the Overcharge Coil can shorten it).
+      beamEvery: beam?.every ? this.everyOf(beam) : null,
+      shotsToBeam: beam?.every
+        ? this.everyOf(beam) - (this.shots % this.everyOf(beam))
+        : null,
       evolutions: this.evolutions.map((family) => ({
         family,
         ...this.evolutionOf(family),

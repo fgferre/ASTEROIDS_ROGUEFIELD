@@ -5,11 +5,17 @@
 // shot like Weapons.fireStream, the Weapons instance first (as in
 // firePatterns.js); hits land through Weapons.hitEnemy.
 
+import { beamFling, orbsBeforeBeam, runBeamForms } from './beamForms.js';
+import { discharge, implodeFirst } from './fanForms.js';
+import { missileBurst } from './missileForms.js';
+import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
+
 // `beam`: damage lands on everything in the segment on the firing frame;
 // the beam stays on screen for `beam.duration`. Aimed like the lances: from
 // the muzzle onto the primary lock's lead point in auto, along the turret
 // otherwise. With multi-lock, one beam per lock from its turret layer's
-// barrel; the cooldown penalty comes once per volley.
+// barrel; the cooldown penalty comes once per volley. The Chain Capacitor
+// may fire the volley again along the same lines (`capacitorTwice`).
 export function fireBeam(w, beam, playerPos, playerStats) {
   const muzzle = w.player().getMuzzlePoint();
   const lockAims = w.getLockAims();
@@ -17,9 +23,13 @@ export function fireBeam(w, beam, playerPos, playerStats) {
     { origin: muzzle, angle: w.getWeaponAngle(muzzle) },
   ];
   // The primary lock's beam stands for the volley in the event.
-  const [end] = shots.map(({ origin, angle }) =>
-    fireBeamAlong(w, beam, origin, angle, playerStats, Boolean(lockAims))
-  );
+  const stats = { ...playerStats };
+  const along = () =>
+    shots.map(({ origin, angle }) =>
+      fireBeamAlong(w, beam, origin, angle, stats, Boolean(lockAims))
+    );
+  const [end] = along();
+  if (capacitorRoll(w, beam.capacitorTwice)) echoShot(w, along);
   w.lastShotTime = -beam.cooldownPenalty;
   const targeting = w.targeting();
 
@@ -82,13 +92,50 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
 
   const vx = dirX * w.bulletSpeed;
   const vy = dirY * w.bulletSpeed;
+  const orbsBefore = orbsBeforeBeam(w);
+  // Kinetic: a rock it kills splits more and its fragments fly out.
+  const fling = beamFling(w);
+  const split = extraFragments + (fling ? fling.extra : 0);
+  const kills = []; // where the rocks it killed were (the Kinetic shards)
   struck.forEach(({ enemy, x, y }) => {
     if (enemy.destroyed) return;
-    w.hitEnemy(
-      { kind: 'beam', x, y, vx, vy, damage, extraFragments, hit: false },
+    const { x: rockX, y: rockY, type } = enemy;
+    const result = w.hitEnemy(
+      {
+        kind: 'beam',
+        x,
+        y,
+        vx,
+        vy,
+        damage,
+        extraFragments: split,
+        fling,
+        hit: false,
+      },
       enemy
     );
+    if (result?.killed && type === 'asteroid') {
+      kills.push({ x: rockX, y: rockY });
+    }
   });
+  // The beam's own family forms (beamForms.js), once its hits landed.
+  runBeamForms(
+    w,
+    beam,
+    {
+      x: origin.x,
+      y: origin.y,
+      ex: end.x,
+      ey: end.y,
+      dirX,
+      dirY,
+      width,
+      damage,
+    },
+    struck,
+    kills,
+    orbsBefore
+  );
 
   w.beams.push({
     x: origin.x,
@@ -120,18 +167,32 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
 // `fan.cooldownMultiplier` × the lance's cooldown. With multi-lock the same
 // bolts are split over the locks, earlier locks first, each lock getting a
 // small fan of its own (same bolt spacing) centred on its lead point, from
-// its turret layer's barrel.
-export function fireFan(w, fan, playerPos, playerStats) {
+// its turret layer's barrel. The Thermal Lens narrows a fan with
+// `lensSpread`; the Chain Capacitor may fire a volley twice
+// (`capacitorTwice`): its `echo`, re-aimed, keeps the cooldown and never
+// rolls.
+export function fireFan(w, fan, playerPos, playerStats, echo = false) {
   const origin = w.player().getMuzzlePoint();
   const angle = w.getWeaponAngle(origin);
   const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
   const bolts = Math.min(fan.maxBolts, fan.bolts + extra);
-  const spread = (fan.fan * Math.PI) / 180;
-  // Where the bolts are aimed: the end of their range, else of a lance's.
-  const reach = w.weapon.projectile.range ?? w.bulletSpeed * w.bulletLifetime;
-  // Shared by the volley's bolts: who its shrapnel already hit, and how
-  // many bursts it has had (only the first lights the 3D scene).
-  const volley = { struck: [], bursts: 0 };
+  const focus = w.cardEffects().thermalLens ? fan.lensSpread ?? 1 : 1;
+  const spread = (fan.fan * focus * Math.PI) / 180;
+  // Where the bolts are aimed: the end of their range (the Overcharge Coil
+  // adds `coilRange`), else of a lance's.
+  const { range } = w.weapon.projectile;
+  const reach = range
+    ? range + (fan.coilRange ?? 0) * coilShare(w.bulletSpeed)
+    : w.bulletSpeed * w.bulletLifetime;
+  // Shared by the volley's bolts: who its shrapnel already hit, how many
+  // bursts it has had (only the first lights the 3D scene), and the damage
+  // and entry it was fired with (a Scrap Rounds shard is a bolt of its own).
+  const volley = {
+    struck: [],
+    bursts: 0,
+    damage: playerStats.damage,
+    entry: fan,
+  };
   const lockAims = w.getLockAims();
   const predictedPoints = [];
   const launch = (a, from = origin) => {
@@ -139,7 +200,7 @@ export function fireFan(w, fan, playerPos, playerStats) {
       x: from.x + Math.cos(a) * reach,
       y: from.y + Math.sin(a) * reach,
     };
-    w.createBullet(from, end, playerStats.damage, volley);
+    w.createBullet(from, end, playerStats.damage, volley, fan);
     return end;
   };
   if (lockAims) {
@@ -162,7 +223,13 @@ export function fireFan(w, fan, playerPos, playerStats) {
       predictedPoints.push({ enemyId: null, position: launch(a) });
     }
   }
-  w.lastShotTime = -w.shootCooldown * (fan.cooldownMultiplier - 1);
+  if (!echo) {
+    w.lastShotTime = -w.shootCooldown * (fan.cooldownMultiplier - 1);
+    if (capacitorRoll(w, fan.capacitorTwice)) {
+      const stats = { ...playerStats };
+      echoShot(w, () => fireFan(w, fan, w.player().getPosition(), stats, true));
+    }
+  }
   const targeting = w.targeting();
 
   const centre = {
@@ -188,8 +255,12 @@ export function fireFan(w, fan, playerPos, playerStats) {
 
 // A projectile's `burst`: shrapnel hits every solid enemy whose rim is
 // within `burst.radius`, at most once per volley, through the same hit path
-// as the bolts (so the evolutions apply).
+// as the bolts (so the evolutions apply). The fan's Field form may hold it
+// a beat first, its Arc form discharges from it (fanForms.js); a missile's
+// sets off its Arc and Field forms (missileForms.js). `burstScale`: a
+// Thermite burst's own widening.
 export function burstFlak(w, bolt) {
+  if (implodeFirst(w, bolt)) return;
   const { x, y, volley } = bolt;
   const { burst } = bolt.projectile;
   const { duration } = burst;
@@ -199,7 +270,8 @@ export function burstFlak(w, bolt) {
   const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
   const radius =
     (burst.radius + (burst.burstReach ?? 0) * w.cards().pierceBonus) *
-    (scales && stage >= 0 ? scales[stage] : 1);
+    (scales && stage >= 0 ? scales[stage] : 1) *
+    (bolt.burstScale ?? 1);
   const struck = [];
   w.forEachSolidEnemy((enemy) => {
     if (volley.struck.includes(enemy)) return;
@@ -223,11 +295,14 @@ export function burstFlak(w, bolt) {
         vx: (dx / distance) * w.bulletSpeed,
         vy: (dy / distance) * w.bulletSpeed,
         damage: bolt.shrapnel,
+        volley,
         hit: false,
       },
       enemy
     );
   });
+  discharge(w, bolt, x, y, radius);
+  missileBurst(w, bolt, x, y, struck);
 
   const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
   w.flakBursts.push({

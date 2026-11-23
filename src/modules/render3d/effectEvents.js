@@ -45,6 +45,17 @@ export function registerEffectEvents(r) {
     const kind = look === 'seeker' ? (missile ? 'seeker' : 'spent') : 'flak';
     burst(r, position, radius || 30, kind, angle || 0, missile);
   });
+  // a Grapeshot bolt glances off what it struck: a spray of hot metal
+  r.registerEventListener('flak-glanced', (data) => {
+    const { position: p, normal: n, direction: d } = data || {};
+    if (!p) return;
+    r.hitSparks.emit(p.x, p.y, n.x, n.y, d.x, d.y, true, SPARK_KIND.metal);
+  });
+  // Thermite's slag spat out of the hole, the Storm Warhead's bolt striking
+  r.registerEventListener('missile-sparks', (data) => {
+    const { x, y, nx, ny, heavy, kind } = data || {};
+    r.hitSparks.emit(x, y, nx, ny, 0, 0, heavy, SPARK_KIND[kind]);
+  });
   // a Caster's shell lands in fire, smoke and pieces of its casing
   r.registerEventListener('caster-shell-landed', (data) => {
     if (data?.position) burst(r, data.position, data.radius, 'shell', 0);

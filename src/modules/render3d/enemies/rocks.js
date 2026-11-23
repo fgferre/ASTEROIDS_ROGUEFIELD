@@ -95,6 +95,20 @@ export const VARIANT_LOOKS = {
     reveal: 0.5,
     width: 0.05,
   },
+  // The Scatter's Kindling (approved 23/11): a rock burning inside, its
+  // crust charred dark and every crack running molten, breathing slowly;
+  // `veinLight` false: it lights no rocks round it (they went pink).
+  kindled: {
+    base: '#6a5850',
+    ...SHINE.rock,
+    vein: '#ff4a12',
+    veinGlow: 2.2,
+    floor: 1.3,
+    rate: 0.55,
+    reveal: 1,
+    width: 0.1,
+    veinLight: false,
+  },
   crystal: {
     base: '#86b8e8',
     ...SHINE.crystal,

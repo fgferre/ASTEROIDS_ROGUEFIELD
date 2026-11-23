@@ -31,6 +31,26 @@ export const NEXT = {
     'Settings → Controls: Hull Control is gone; your cards choose the flight.', // not confirmed
     'The key hints and the first tip say S brakes; the piloting cards and the Flight Computer briefing describe the new flight.', // not confirmed
     'The engine sound follows how near you fly to your top speed, with no jump when you reach it.', // not confirmed
+    'Harmonic Plasma Lance has its own Thermal forms: Searing Beam (3 cards) leaves the beam’s line burning for 1 s and sets alight anything that crosses it; Sunspear (5 cards) makes the beam 50% longer, stays 0.5 s, and its line burns for 2 s.', // not confirmed
+    'Three Arc cards make the Harmonic’s beam arc from its far end to the 2 nearest enemies; with five, every enemy the beam crosses starts a lightning chain of 3 jumps.', // not confirmed
+    'Three Salvage cards make the orbs from Harmonic beam kills fly straight back to your ship; with five, the beam also sends every orb it crosses to you.', // not confirmed
+    'Three Kinetic cards make the Harmonic’s beam throw the machines it hits back along its line and fling the fragments of rocks it kills outward; with five, rocks it kills also burst into shards that fly on along the beam and hit what is behind.', // not confirmed
+    'Three Field cards make the Harmonic’s beam tug enemies near its line onto it and hold them for 0.5 s; with five, the beam leaves a gravity trench on its line for 1.2 s that drags nearby enemies onto it.', // not confirmed
+    'Scatter Coil has its own Kinetic forms: Grapeshot (3 cards) makes a bolt that hits glance off into the next enemy ahead and burst again; Hailstorm (5 cards) hits 25% harder and glances twice.', // not confirmed
+    'Three Thermal cards make a rock hit 3 times by one Scatter Coil volley catch fire inside and die into burning pieces; with five, machines catch fire too and each one set alight passes it to a neighbour.', // not confirmed
+    'Three Arc cards make each Scatter Coil burst discharge into the 2 nearest enemies outside it, up to 4 bolts a volley; with five, into 3, each bolt jumping on once more and hitting much harder.', // not confirmed
+    'Three Field cards make each Scatter Coil burst pull enemies within 60 px into its centre, then explode on the clump; with five, it pulls from 90 px and holds them 0.5 s.', // not confirmed
+    'Three Salvage cards make a Scatter Coil kill throw a scrap shard that fires itself at the nearest enemy (orbs as before); with five, two shards.', // not confirmed
+    'Seeker Swarm has its own Thermal form, Thermite: three cards make a missile lodge in what it hits, burn inside it for 1 s, then burst 60% bigger; with five, that burst throws thermite at 3 neighbours that sticks and burns.', // not confirmed
+    'Seeker Swarm has its own Arc form, Storm Warhead: three cards make each missile burst throw a heavy bolt that leaps across 3 enemies; with five, across 5.', // not confirmed
+    'Seeker Swarm has its own Field form, Gravity Warhead: three cards make each missile burst leave a gravity well for 0.6 s that pulls nearby enemies into it; with five, the well is bigger and the salvo’s other missiles home on it.', // not confirmed
+  ],
+  improved: [
+    'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.', // not confirmed
+    'Thermal Lens has its own version for two weapons: it focuses the Scatter Coil’s fan (bolts closer together, +15% damage), and Seeker Swarm missiles find targets further away and hit harder on a direct hit.', // not confirmed
+    'Chain Capacitor has its own version for three weapons: 1 Scatter Coil volley in 10 fires twice, 1 Seeker Swarm missile in 10 splits in two when it locks on, and 1 Harmonic beam in 5 fires twice along the same line.', // not confirmed
+    'Recoil Dampers make Scatter Coil and Seeker Swarm bursts reach 25 px further (was 10 px).', // not confirmed
+    'Three Kinetic cards make Seeker Swarm bursts 80% wider (was 50%); five, 120%.', // not confirmed
   ],
   fixed: [],
   unseen: [

@@ -5,9 +5,11 @@
 // so the output pass only runs on frames it does not (sceneSetup.js).
 // The same pass bends space round the ship while the Gravity Brake is held
 // (a lens: the band between LENS_INNER and its reach is pulled inward, red
-// a little more than blue). ImpactKick holds the decaying strength, the
-// lens and the grain's per-frame seed (plain JS, so it runs in Node tests);
-// createImpactPass builds the pass.
+// a little more than blue), and along a line while a Field trench holds
+// (the Harmonic's, beamForms.js: the band each side of it pulled toward it,
+// every colour alike, so the long seam shows no colour bars). ImpactKick
+// holds the decaying strength, the lenses and the grain's per-frame seed
+// (plain JS, so it runs in Node tests); createImpactPass builds the pass.
 
 // proposta 17/10: peak values (subtle by design) and decay.
 export const IMPACT_MAX_ABERRATION_PX = 3;
@@ -27,6 +29,12 @@ export const LENS_INNER = 0.2;
 const LENS_PULL = [0.155, 0.21];
 const LENS_SLOW = [0.2, 0.5];
 const LENS_SPLIT = 0.1;
+// The trench's line lens (approved 22/11 from the mock-up, at the Gravity
+// Brake's strength): its own seam (× the reach) left whole, the pull fading
+// out over the line's ends (× its half length).
+export const TRENCH_PULL = 0.19;
+const LINE_INNER = 0.08;
+const LINE_ENDS = [0.8, 1.15];
 
 /** The lens's pull for a Gravity Brake that slows by `slowFraction`. */
 export function lensPull(slowFraction) {
@@ -66,6 +74,11 @@ const IMPACT_SHADER = {
     uLensAt: { value: null },
     uLensReach: { value: null },
     uLens: { value: 0 },
+    uLineAt: { value: null },
+    uLineDir: { value: null },
+    uLineHalf: { value: 1 },
+    uLineReach: { value: 1 },
+    uLine: { value: 0 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -84,7 +97,26 @@ uniform float uVignette;
 uniform vec2 uLensAt;
 uniform vec2 uLensReach;
 uniform float uLens;
+uniform vec2 uLineAt;
+uniform vec2 uLineDir;
+uniform float uLineHalf;
+uniform float uLineReach;
+uniform float uLine;
 varying vec2 vUv;
+// Where the trench's lens shows uv from: within its reach of the line (px),
+// a point pulled toward it, across the line only.
+vec2 lineUv(vec2 uv) {
+  if (uLine <= 0.0) return uv;
+  vec2 px = (uv - uLineAt) / uTexel;
+  float a = dot(px, uLineDir);
+  float b = dot(px, vec2(-uLineDir.y, uLineDir.x));
+  float r = abs(b) / uLineReach;
+  if (r >= 1.0 || r <= ${LINE_INNER.toFixed(2)}) return uv;
+  float ends = 1.0 - smoothstep(uLineHalf * ${LINE_ENDS[0].toFixed(2)}, uLineHalf * ${LINE_ENDS[1].toFixed(2)}, abs(a));
+  float band = (r - ${LINE_INNER.toFixed(2)}) / ${(1 - LINE_INNER).toFixed(2)};
+  float pull = uLine * ends * sin(3.14159265 * band);
+  return uv - vec2(-uLineDir.y, uLineDir.x) * sign(b) * pull * uLineReach * uTexel;
+}
 // Where the lens shows uv from: inside its band, a point pulled toward
 // its centre (\`k\` scales the pull per colour).
 vec2 lensUv(vec2 uv, float k) {
@@ -108,17 +140,18 @@ void main() {
     vec2 shift = dir * 2.0 * uAberration * uTexel;
     vec3 sum = vec3(0.0);
     for (int i = 0; i < 6; i++) {
-      vec2 uv = vUv - dir * uBlur * float(i) / 5.0;
+      vec2 uv = lineUv(vUv - dir * uBlur * float(i) / 5.0);
       sum.r += sceneAt(lensUv(uv, ${(1 + LENS_SPLIT).toFixed(2)}) + shift).r;
       sum.g += sceneAt(lensUv(uv, 1.0)).g;
       sum.b += sceneAt(lensUv(uv, ${(1 - LENS_SPLIT).toFixed(2)}) - shift).b;
     }
     color = sum / 6.0;
-  } else if (uLens > 0.0) {
+  } else if (uLens > 0.0 || uLine > 0.0) {
+    vec2 uv = lineUv(vUv);
     color = vec3(
-      sceneAt(lensUv(vUv, ${(1 + LENS_SPLIT).toFixed(2)})).r,
-      sceneAt(lensUv(vUv, 1.0)).g,
-      sceneAt(lensUv(vUv, ${(1 - LENS_SPLIT).toFixed(2)})).b
+      sceneAt(lensUv(uv, ${(1 + LENS_SPLIT).toFixed(2)})).r,
+      sceneAt(lensUv(uv, 1.0)).g,
+      sceneAt(lensUv(uv, ${(1 - LENS_SPLIT).toFixed(2)})).b
     );
   } else {
     color = sceneAt(vUv);
@@ -140,6 +173,8 @@ export function createImpactPass(THREE) {
   pass.uniforms.uTexel.value = new THREE.Vector2(1, 1);
   pass.uniforms.uLensAt.value = new THREE.Vector2(0.5, 0.5);
   pass.uniforms.uLensReach.value = new THREE.Vector2(0.1, 0.1);
+  pass.uniforms.uLineAt.value = new THREE.Vector2(0.5, 0.5);
+  pass.uniforms.uLineDir.value = new THREE.Vector2(1, 0);
   pass.enabled = false;
   return pass;
 }
@@ -156,6 +191,13 @@ export class ImpactKick {
     this.lensAt = [0.5, 0.5];
     this.lensReach = [0.1, 0.1];
     this.lensPull = 0;
+    // the trench's line lens: centre (uv), direction (px), half length and
+    // reach (px), pull
+    this.lineAt = [0.5, 0.5];
+    this.lineDir = [1, 0];
+    this.lineHalf = 1;
+    this.lineReach = 1;
+    this.linePull = 0;
   }
 
   /** Bends space round (x, y) out to (rx, ry), screen uv; pull 0 is none. */
@@ -165,6 +207,22 @@ export class ImpactKick {
     this.lensReach[0] = Math.max(1e-4, rx);
     this.lensReach[1] = Math.max(1e-4, ry);
     this.lensPull = pull;
+  }
+
+  /**
+   * Bends space toward the line through (x, y) (screen uv) along (dx, dy),
+   * `half` its half length and `reach` how far each side, render px; pull 0
+   * is none.
+   */
+  line(x, y, dx, dy, half, reach, pull) {
+    const length = Math.hypot(dx, dy) || 1;
+    this.lineAt[0] = x;
+    this.lineAt[1] = y;
+    this.lineDir[0] = dx / length;
+    this.lineDir[1] = dy / length;
+    this.lineHalf = Math.max(1, half);
+    this.lineReach = Math.max(1, reach);
+    this.linePull = pull;
   }
 
   /** Spikes the kick to `strength` (0..1); never lowers a running one. */
@@ -192,9 +250,14 @@ export class ImpactKick {
    * vignette (with post-processing on). The pass runs for either.
    */
   apply(pass, width, height, active, grain = false) {
-    pass.enabled = active || grain || this.lensPull > 0;
+    pass.enabled = active || grain || this.lensPull > 0 || this.linePull > 0;
     if (!pass.enabled) return;
     const { uniforms } = pass;
+    uniforms.uLine.value = this.linePull;
+    uniforms.uLineAt.value.set(this.lineAt[0], this.lineAt[1]);
+    uniforms.uLineDir.value.set(this.lineDir[0], this.lineDir[1]);
+    uniforms.uLineHalf.value = this.lineHalf;
+    uniforms.uLineReach.value = this.lineReach;
     uniforms.uLens.value = this.lensPull;
     uniforms.uLensAt.value.set(this.lensAt[0], this.lensAt[1]);
     uniforms.uLensReach.value.set(this.lensReach[0], this.lensReach[1]);

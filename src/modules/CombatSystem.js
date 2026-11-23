@@ -7,6 +7,8 @@ import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
 import { burstFlak } from './combat/beamAndFan.js';
+import { kindledDied } from './combat/fanForms.js';
+import { thermiteDied } from './combat/missileForms.js';
 import {
   applyConcentratedFire,
   computeParallelOffset,
@@ -228,6 +230,13 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
       this.evolveWeapon(data.family);
+    });
+    // Kindling: a burning rock that dies flies apart in burning pieces;
+    // Thermite: a molten one's pieces cool off.
+    this.registerEventListener('enemy-destroyed', (data = {}) => {
+      if (!data.enemy) return;
+      kindledDied(this.weapons, data.enemy, data.fragments);
+      thermiteDied(this.weapons, data.enemy, data.fragments);
     });
     this.registerEventListener('apex-unlocked', (data = {}) => {
       this.weapons.apexWeapon(data.family);
@@ -536,8 +545,52 @@ class CombatSystem extends BaseSystem {
     return this.weapons.beams;
   }
 
+  get scars() {
+    return this.weapons.scars;
+  }
+
+  get flung() {
+    return this.weapons.flung;
+  }
+
+  get shards() {
+    return this.weapons.shards;
+  }
+
+  get trench() {
+    return this.weapons.trench;
+  }
+
   get flakBursts() {
     return this.weapons.flakBursts;
+  }
+
+  get glances() {
+    return this.weapons.glances;
+  }
+
+  get kindled() {
+    return this.weapons.kindled;
+  }
+
+  get implosions() {
+    return this.weapons.implosions;
+  }
+
+  get scraps() {
+    return this.weapons.scraps;
+  }
+
+  get lodged() {
+    return this.weapons.lodged;
+  }
+
+  get thermite() {
+    return this.weapons.thermite;
+  }
+
+  get gravityWells() {
+    return this.weapons.gravityWells;
   }
 
   // firePatterns.js: the 3D weapon mirror draws them.

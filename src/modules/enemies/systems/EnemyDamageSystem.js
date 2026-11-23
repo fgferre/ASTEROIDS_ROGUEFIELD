@@ -704,14 +704,15 @@ class EnemyDamageSystem {
  * turned half a step from it so it does not overlap its siblings, given a
  * variant, taken from the pool, registered, and added to the layer's rock
  * plan (WaveManager.addExtraRocks). `enemies` is the enemy service; `split`
- * is { x, y, wave, descriptors }.
+ * is { x, y, wave, descriptors }. Returns the fragments it spawned.
  *
  * Mirrors the fragment half of destroyAsteroid one fragment at a time;
  * unifying the two pipelines is a later cleanup.
  */
 function spawnBeamFragments(enemies, parent, split, count) {
   const { descriptors } = split;
-  if (!descriptors.length) return;
+  const spawned = [];
+  if (!descriptors.length) return spawned;
   const base = descriptors[0];
   const wave = enemies.waveState?.current || split.wave || 1;
   for (let k = 0; k < count; k += 1) {
@@ -746,7 +747,9 @@ function spawnBeamFragments(enemies, parent, split, count) {
       fragment
     );
     enemies.waveManager.addExtraRocks(1);
+    spawned.push(fragment);
   }
+  return spawned;
 }
 
 export { EnemyDamageSystem, spawnBeamFragments };
