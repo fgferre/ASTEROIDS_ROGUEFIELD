@@ -22,7 +22,9 @@
 
 export const NEXT = {
   new: [],
-  improved: [],
+  improved: [
+    'The death screen and the run\'s timeline name a special rock\'s kind, its blast included: "Killed by a Volatile Ring Fragment", "an Armored Ring Fragment"; a plain rock is still a Ring Fragment.', // not confirmed
+  ],
   fixed: [
     'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed
   ],

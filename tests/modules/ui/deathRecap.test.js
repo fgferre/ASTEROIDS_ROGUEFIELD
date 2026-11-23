@@ -50,8 +50,29 @@ describe('death recap', () => {
       displayName: 'Elite Hunter',
       elite: true,
       bossKind: null,
+      variant: null,
     });
     expect(`Killed by ${killerName(source)}`).toBe('Killed by Elite Hunter');
+  });
+
+  it("names a special rock's kind, its blast included; a common rock none", () => {
+    const source = killedBy(({ services: { enemies, player } }) => {
+      const rock = enemies.acquireAsteroid({
+        size: 'small',
+        variant: 'volatile',
+        wave: 1,
+        x: player.position.x + 10,
+        y: player.position.y,
+        vx: 0,
+        vy: 0,
+      });
+      enemies.registerActiveEnemy(rock);
+      enemies.applyDamage(rock, 1e6);
+    });
+    expect(killerName(source)).toBe('Volatile Ring Fragment');
+    expect(killerName({ type: 'asteroid', variant: 'common' })).toBe(
+      'Ring Fragment'
+    );
   });
 
   it('names the Warden by kind when its snapshot carries no display name', () => {
