@@ -24,13 +24,6 @@ export const NEXT = {
   new: [
     'The ship now flies on its own thrusters: at the start nothing slows it, so it glides until you fire the retro (S) or turn and burn, and a spin keeps turning a while after you let go.', // not confirmed
     "The Flight Computer's flight is faster than the start, with a turbo that builds on a straight run, and the nose swings onto your keys with weight.", // not confirmed
-  ],
-  improved: [
-    'Braking System now brakes your travel with the thrusters when you let go of the keys; RCS System steadies a spin, firmer at each level.', // not confirmed
-    'The main flame bursts off the line, then holds a steady third while you keep the key down.', // not confirmed
-    'Settings → Controls: Hull Control is gone; your cards choose the flight.', // not confirmed
-    'The key hints and the first tip say S brakes; the piloting cards and the Flight Computer briefing describe the new flight.', // not confirmed
-    'The engine sound follows how near you fly to your top speed, with no jump when you reach it.', // not confirmed
     'Harmonic Plasma Lance has its own Thermal forms: Searing Beam (3 cards) leaves the beam’s line burning for 1 s and sets alight anything that crosses it; Sunspear (5 cards) makes the beam 50% longer, stays 0.5 s, and its line burns for 2 s.', // not confirmed
     'Three Arc cards make the Harmonic’s beam arc from its far end to the 2 nearest enemies; with five, every enemy the beam crosses starts a lightning chain of 3 jumps.', // not confirmed
     'Three Salvage cards make the orbs from Harmonic beam kills fly straight back to your ship; with five, the beam also sends every orb it crosses to you.', // not confirmed
@@ -46,6 +39,11 @@ export const NEXT = {
     'Seeker Swarm has its own Field form, Gravity Warhead: three cards make each missile burst leave a gravity well for 0.6 s that pulls nearby enemies into it; with five, the well is bigger and the salvo’s other missiles home on it.', // not confirmed
   ],
   improved: [
+    'Braking System now brakes your travel with the thrusters when you let go of the keys; RCS System steadies a spin, firmer at each level.', // not confirmed
+    'The main flame bursts off the line, then holds a steady third while you keep the key down.', // not confirmed
+    'Settings → Controls: Hull Control is gone; your cards choose the flight.', // not confirmed
+    'The key hints and the first tip say S brakes; the piloting cards and the Flight Computer briefing describe the new flight.', // not confirmed
+    'The engine sound follows how near you fly to your top speed, with no jump when you reach it.', // not confirmed
     'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.', // not confirmed
     'Thermal Lens has its own version for two weapons: it focuses the Scatter Coil’s fan (bolts closer together, +15% damage), and Seeker Swarm missiles find targets further away and hit harder on a direct hit.', // not confirmed
     'Chain Capacitor has its own version for three weapons: 1 Scatter Coil volley in 10 fires twice, 1 Seeker Swarm missile in 10 splits in two when it locks on, and 1 Harmonic beam in 5 fires twice along the same line.', // not confirmed
