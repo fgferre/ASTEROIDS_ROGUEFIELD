@@ -111,18 +111,6 @@ describe('replay recording', () => {
     ).toThrow(/version/);
   });
 
-  it('marks a run flown on a ?voo= variant, and only such a run', () => {
-    const today = createRecorder({ seed: 1 }).toJSON();
-    const flown = createRecorder({ seed: 1, jets: 'b' }).toJSON();
-
-    expect(today).not.toHaveProperty('jets');
-    expect(deserialize(serialize(today))).not.toHaveProperty('jets');
-    expect(deserialize(serialize(flown)).jets).toBe('b');
-    const trial = createRecorder({ seed: 1, modernTrial: 3 }).toJSON();
-    expect(today).not.toHaveProperty('modernTrial');
-    expect(deserialize(serialize(trial)).modernTrial).toBe(3);
-  });
-
   it('records dash presses as bit 7', () => {
     expect(REPLAY_VERSION).toBeGreaterThanOrEqual(2);
     expect(encodeInputFrame(createInputFrame({ dash: true }))).toBe(128);

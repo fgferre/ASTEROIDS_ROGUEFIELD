@@ -10,7 +10,6 @@
 //                                          pressure-1..5 (none = the game's default)
 //   npm run playtest -- --flight=old       the old flight (?direcao=antiga); the
 //                                          default is the new one (glide, cannon on the nose)
-//   npm run playtest -- --voo=b            Felipe's one-algorithm variant (?voo=a|b|c|e)
 //   npm run playtest -- debris-wake --table 1-10
 //       the comparison table: both skills, the new flight and the old one,
 //       seeds 1 to 10, one sector (default debris-wake)
@@ -37,7 +36,6 @@ if (!FLIGHTS.includes(flight)) {
   );
 }
 const difficulty = flag('difficulty') || '';
-const voo = flag('voo') || '';
 const table = args.includes('--table');
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
 const [sector = '', seed = ''] = args.filter(
@@ -140,7 +138,6 @@ if (table) {
 const result = run({
   PLAYTEST_PRESET: preset,
   PLAYTEST_FLIGHT: flight,
-  PLAYTEST_VOO: voo,
   PLAYTEST_SECTOR: sector,
   PLAYTEST_SEED: seed,
 });

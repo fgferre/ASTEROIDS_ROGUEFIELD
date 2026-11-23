@@ -7,8 +7,6 @@ import { computeHullMetrics, getHullThrusterPort } from './player/hullShape.js';
 import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
 import { newFlightFromUrl } from './player/newFlight.js';
-import { jetsFromUrl } from './player/jetFlight.js';
-import { modernTrialFromUrl } from './player/modernTrial.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
@@ -186,12 +184,9 @@ class PlayerSystem extends BaseSystem {
       ship,
       maneuvers: this.maneuvers,
       glide: glideFromUrl(),
-      jets: jetsFromUrl(),
-      modernTrial: modernTrialFromUrl(),
     });
     if (this.newFlight) this.beginNewFlight();
     exposeFields(this, this.flight, [
-      'driftFactor',
       'maxSpeed',
       'acceleration',
       'brakingDamping',
@@ -982,7 +977,6 @@ class PlayerSystem extends BaseSystem {
     this.invulnerableTimer = 0;
     this.steadyGuard = false;
     this.controlHoldTimer = 0;
-    this.flight.driftFactor = 0;
     this.flight.turbo = 0;
     this.flight.turboDir = null;
 
@@ -1039,7 +1033,6 @@ class PlayerSystem extends BaseSystem {
     this.aimPoint = null;
     this.aimStick = null;
     this.enginesIdle = true;
-    this.flight.driftFactor = 0;
     this.maneuvers.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
     this.lastDamageSource = null;
@@ -1076,7 +1069,6 @@ class PlayerSystem extends BaseSystem {
     this.lockAims = null;
     this.aimPoint = null;
     this.aimStick = null;
-    this.flight.driftFactor = 0;
     this.maneuvers.resetDashState();
 
     // Reset thruster state to stop any active sounds
