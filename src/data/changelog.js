@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'Moved a helper only the tests use out of the game code and into the tests; the game looks and plays the same.',
+  ],
 };
 
 export const RELEASES = [
