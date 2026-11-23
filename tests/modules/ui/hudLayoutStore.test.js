@@ -16,7 +16,7 @@ import {
   storePreset,
   withModel,
 } from '../../../src/modules/ui/hud/editor/layoutStore.js';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 
 const catalog = instrumentCatalog();

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import InputSystem from '../../src/modules/InputSystem.js';
-import { installDomStubs, keyEvent } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 describe('InputSystem focus loss', () => {
   let restoreDom;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
-import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import AchievementService from '../../src/services/AchievementService.js';
 

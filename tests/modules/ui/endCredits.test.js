@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { EndCredits } from '../../../src/modules/ui/EndCredits.js';
 
 describe('End credits', () => {

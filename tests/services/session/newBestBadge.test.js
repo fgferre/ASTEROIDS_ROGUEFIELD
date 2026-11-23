@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RunEnd } from '../../../src/services/session/runEnd.js';
 import { updateRecords } from '../../../src/services/runRecords.js';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 function clearIn(seconds) {
   const runEnd = new RunEnd({});

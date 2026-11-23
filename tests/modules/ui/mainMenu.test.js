@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { MainMenu } from '../../../src/modules/ui/MainMenu.js';
 
 // A container that keeps its listeners, so a test can fire them.

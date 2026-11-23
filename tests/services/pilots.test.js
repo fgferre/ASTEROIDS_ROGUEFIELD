@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { chooseSlot, resolveActiveSlot } from '../../src/core/storage.js';
 import { pilotSummaries } from '../../src/services/pilots.js';
 import { localDay, updateRecords } from '../../src/services/runRecords.js';
