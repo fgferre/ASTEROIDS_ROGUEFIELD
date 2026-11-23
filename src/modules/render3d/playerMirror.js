@@ -43,7 +43,6 @@ import {
   addFlames,
   createEngines,
   createTrail,
-  lightEmbers,
   lightEngines,
   startBurst,
   updateTrail,
@@ -54,8 +53,6 @@ import {
   createGuns,
   lockLineOrigin,
   recoilToward,
-  seatGun,
-  updateLayers,
 } from './player/guns.js';
 import {
   buildHull,
@@ -66,8 +63,6 @@ import {
 import {
   TURN_KEYS,
   addJets,
-  addNeedles,
-  addRetros,
   createJets,
   lightNeedles,
   lightRetros,
@@ -224,7 +219,7 @@ export class PlayerMirror {
     this.light.intensity = 0;
     this.blink.value = 0;
     this.flareFan.visible = false;
-    this.hideGhosts();
+    hideGhosts(this);
     this.group.traverse((node) => {
       if (!node.isMesh) return;
       node.castShadow = false;
@@ -277,7 +272,7 @@ export class PlayerMirror {
       this.light.intensity = 0;
       this.trailCount = 0;
       player?.dashGhosts?.forEach((ghost) => this.hiddenGhosts.add(ghost));
-      this.hideGhosts();
+      hideGhosts(this);
       this.flareFan.visible = false;
       return;
     }
@@ -297,43 +292,27 @@ export class PlayerMirror {
     this.strobe.visible = hullLivery.strobeOn(time);
 
     const main = thrust.main || 0;
-    this.lightEngines(main, levels.thruster, time, {
-      burst: this.startBurst(player, cos, sin),
+    lightEngines(this, main, levels.thruster, time, {
+      burst: startBurst(this, player, cos, sin),
       hull: player.maxHealth > 0 ? player.health / player.maxHealth : 1,
       cruise: CRUISE_SCALE,
     });
     const dt =
       this.fxTime === null ? 0 : Math.min(0.1, Math.max(0, time - this.fxTime));
     this.fxTime = time;
-    this.lightNeedles(player.lastThrusterState, dt);
-    this.lightRetros(player, geometry, thrust.aux || 0, dt);
+    lightNeedles(this, player.lastThrusterState, dt);
+    lightRetros(this, player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     updateGuard(this, player, time);
 
-    this.updateGhosts(player.dashGhosts);
+    updateGhosts(this, player.dashGhosts);
 
     updateTrail(this, player, ribbons, geometry, main, cos, sin);
   }
 
   lightEngines(main, level, time, options) {
     lightEngines(this, main, level, time, options);
-  }
-
-  startBurst(player, cos, sin) {
-    return startBurst(this, player, cos, sin);
-  }
-
-  lightEmbers(danger, time) {
-    lightEmbers(this, danger, time);
-  }
-
-  seatGun(nose, hull) {
-    seatGun(this, nose, hull);
-  }
-
-  updateLayers(headings, angle) {
-    updateLayers(this, headings, angle);
   }
 
   recoilToward(player, vx, vy) {
@@ -366,30 +345,6 @@ export class PlayerMirror {
     return this.bank;
   }
 
-  addNeedles(position, port, size, turnL, level) {
-    addNeedles(this, position, port, size, turnL, level);
-  }
-
-  lightNeedles(state, dt) {
-    lightNeedles(this, state, dt);
-  }
-
-  addRetros(hull, level) {
-    addRetros(this, hull, level);
-  }
-
-  lightRetros(player, geometry, aux, dt) {
-    lightRetros(this, player, geometry, aux, dt);
-  }
-
-  updateGhosts(list) {
-    updateGhosts(this, list);
-  }
-
-  hideGhosts() {
-    hideGhosts(this);
-  }
-
   /** A shot left the nose: bump the ship light for a few frames. */
   flashMuzzle() {
     this.muzzleFrames = MUZZLE_LIGHT_FRAMES;
@@ -408,7 +363,7 @@ export class PlayerMirror {
     this.bank = 0;
     this.bankTime = null;
     this.dashGuard = false;
-    this.hideGhosts();
+    hideGhosts(this);
     this.flare = 0;
     this.flareFan.visible = false;
     this.braking = false;

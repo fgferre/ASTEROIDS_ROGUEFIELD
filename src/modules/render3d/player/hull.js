@@ -16,6 +16,7 @@ import {
 } from '../hullModel.js';
 import * as hullLivery from '../hullLivery.js';
 import { addRimLight } from '../rimLight.js';
+import { seatGun } from './guns.js';
 
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the hull's UVs are planar, in hull units). proposta 18/10: strengths.
@@ -121,7 +122,7 @@ export function buildHull(mirror, player, hull, levels, geometry) {
   const built = mirror.hullCache.get(key);
   hullLivery.show(mirror.livery, THREE, geometry, hull.visual.livery, key);
   mirror.built = built;
-  mirror.seatGun(player.noseAim, hull);
+  seatGun(mirror, player.noseAim, hull);
 
   const lines = {
     edge: mirror.edgeMaterial,

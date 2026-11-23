@@ -46,11 +46,11 @@ export function aimGuns(mirror, player, angle) {
   mirror.turret.position.x = TURRET_PIVOT_X + mirror.ship.position.x;
   mirror.turret.rotation.y = -(player.turretAngle - angle);
   if (player.noseAim !== mirror.noseGun) {
-    mirror.seatGun(player.noseAim, player.currentHull);
+    seatGun(mirror, player.noseAim, player.currentHull);
   }
   mirror.barrels.position.x =
     mirror.barrelsX + (mirror.muzzleFrames > 0 ? -TURRET_RECOIL : 0);
-  mirror.updateLayers(player.turretLayers, angle);
+  updateLayers(mirror, player.turretLayers, angle);
 }
 
 // The turret seated on the current hull or, with the cannon on the nose
@@ -66,7 +66,7 @@ export function seatGun(mirror, nose, hull) {
 
 // One layer per sim heading (PlayerSystem turretLayers), turned like the
 // turret; the rest hide.
-export function updateLayers(mirror, headings, angle) {
+function updateLayers(mirror, headings, angle) {
   while (mirror.layers.length < headings.length) {
     const layer = buildTurretLayer(
       mirror.THREE,

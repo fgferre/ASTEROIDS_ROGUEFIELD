@@ -203,7 +203,7 @@ export function lightEngines(
       shock.scale.set(length * 0.06, size, size);
     }
   }
-  mirror.lightEmbers(danger, time);
+  lightEmbers(mirror, danger, time);
   mirror.flameMaterial.opacity = Math.min(1, main * 1.2);
   mirror.coreMaterial.opacity =
     Math.min(1, main * 1.1) * (1 - LEVEL_THIN * level);
@@ -243,7 +243,7 @@ export function startBurst(mirror, player, cos, sin) {
  * Dying embers spat from the nozzles on a failing hull: each lives
  * EMBER_LIFE, drifting aft and shrinking; more of them as `danger` rises.
  */
-export function lightEmbers(mirror, danger, time) {
+function lightEmbers(mirror, danger, time) {
   for (let j = 0; j < mirror.embers.length; j += 1) {
     const ember = mirror.embers[j];
     const u = time / EMBER_LIFE + j / mirror.embers.length;

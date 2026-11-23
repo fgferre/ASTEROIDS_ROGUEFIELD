@@ -116,11 +116,12 @@ export function addJets(mirror, geometry, hull, built, levels) {
   // the wingtip on the port flank and the starboard nose jet turn the nose
   // to port
   geometry.rcsPorts.forEach((port, i) =>
-    mirror.addNeedles(built.tips[i], port.y < 0, 1, port.y < 0, levels.rcs)
+    addNeedles(mirror, built.tips[i], port.y < 0, 1, port.y < 0, levels.rcs)
   );
   ['noseLeft', 'noseRight'].forEach((kind) => {
     const { x, y } = getHullThrusterPort(kind, hull);
-    mirror.addNeedles(
+    addNeedles(
+      mirror,
       [x / VISUAL_SCALE, NOZZLE_HEIGHT, y / VISUAL_SCALE],
       y < 0,
       NOSE_PUFF,
@@ -128,12 +129,12 @@ export function addJets(mirror, geometry, hull, built, levels) {
       levels.rcs
     );
   });
-  mirror.addRetros(hull, levels.braking);
+  addRetros(mirror, hull, levels.braking);
 }
 
 // One RCS port's needles, blowing outboard: the jet, a shorter twin
 // inboard of it from level 3 and the ignition snap at level 5.
-export function addNeedles(mirror, position, port, size, turnL, level) {
+function addNeedles(mirror, position, port, size, turnL, level) {
   const { THREE } = mirror;
   const jet = mirror.rcsJets[turnL ? 'turnL' : 'turnR'];
   const make = (material, dx) => {
@@ -220,7 +221,7 @@ export function lightNeedles(mirror, state, dt) {
 // The retro pair at the nose ports, splayed outboard and blowing
 // forward, longer, wider and splayed more per Braking System level (a
 // second, outer pair from 2); at 3 the emergency brake's fan is armed.
-export function addRetros(mirror, hull, level) {
+function addRetros(mirror, hull, level) {
   const { THREE } = mirror;
   const add = (x, z, angle, length, radius) => {
     const mesh = new THREE.Mesh(mirror.needle, mirror.retroMaterial);
