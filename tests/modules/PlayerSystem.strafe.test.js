@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PlayerSystem, {
-  resolveControlScheme,
-} from '../../src/modules/PlayerSystem.js';
+import PlayerSystem from '../../src/modules/PlayerSystem.js';
 import {
   TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
@@ -32,9 +30,10 @@ describe('PlayerSystem control schemes', () => {
       eventBus,
       input,
       'command-queue': null,
-      newFlight: false,
-      controlScheme,
     });
+    // The Auto Turret taken; modern is the Flight Computer's flight.
+    player.setFlightScheme(controlScheme, controlScheme === 'classic');
+    player.noseAim = false;
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     return player;
@@ -48,22 +47,17 @@ describe('PlayerSystem control schemes', () => {
     const player = makePlayer({ right: true });
     player.angle = -Math.PI / 2; // nose up the screen
     player.setAimPoint({ x: 400, y: -1e6 }); // target straight up
-    let maxAngle = -Math.PI / 2;
-    for (let i = 0; i < 60; i += 1) {
-      player.update(DELTA_TIME);
-      maxAngle = Math.max(maxAngle, player.angle);
-    }
+    steps(player, 60);
 
     expect(player.velocity.vx).toBeGreaterThan(50);
     expect(Math.abs(player.velocity.vy)).toBeLessThan(5);
     expect(player.angle).toBeCloseTo(0, 2);
-    expect(maxAngle).toBeLessThanOrEqual(1e-9);
   });
 
   it('W moves up the screen whatever the hull heading', () => {
     const player = makePlayer({ up: true });
     player.angle = 0;
-    steps(player, 30);
+    steps(player, 60); // the nose swings past and settles (flight.test.js)
 
     expect(player.velocity.vy).toBeLessThan(-50);
     expect(Math.abs(player.velocity.vx)).toBeLessThan(20);
@@ -96,8 +90,14 @@ describe('PlayerSystem control schemes', () => {
   });
 
   it('Modern on a pad: the flame (and its sound) burns as hard as the stick pushes; keys and the d-pad stay full', () => {
+    // The main flame shown after 20 steps, and whether its last event is
+    // the pilot's own burn (the one the trail cards drop on).
     const shownMain = (input) => {
       const player = makePlayer();
+      let pilot = false;
+      player.eventBus.on('thruster-effect', (event) => {
+        if (event.type === 'main') pilot = event.pilot;
+      });
       player.angle = -Math.PI / 2; // nose up the screen, along the move
       for (let i = 0; i < 20; i += 1) {
         player.updateMovement(DELTA_TIME, {
@@ -109,35 +109,22 @@ describe('PlayerSystem control schemes', () => {
         });
         player.updatePosition(DELTA_TIME);
       }
-      return player.lastThrusterState.main;
+      return { main: player.lastThrusterState.main, pilot };
     };
-    expect(shownMain({ up: true })).toBe(1);
-    expect(shownMain({ pad: true, moveX: 0, moveY: 0, up: true })).toBe(1);
-    expect(shownMain({ pad: true, moveX: 0, moveY: -0.5 })).toBeCloseTo(
-      0.5 ** 1.5,
+    expect(shownMain({ up: true }).main).toBe(1);
+    expect(shownMain({ pad: true, moveX: 0, moveY: 0, up: true }).main).toBe(1);
+    // At its speed a half-leaned stick holds the steady flame (a third of
+    // the burst, flight.js CRUISE_FLAME) × its push.
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.5 }).main).toBeCloseTo(
+      0.35 * 0.5 ** 1.5,
       2
     );
-    // A barely leaning stick still burns (the trail cards drop on any burn).
-    expect(shownMain({ pad: true, moveX: 0, moveY: -0.05 })).toBeGreaterThan(0);
+    // A barely leaning stick still burns for the trail cards, though its
+    // flame is too faint to show.
+    expect(shownMain({ pad: true, moveX: 0, moveY: -0.05 }).pilot).toBe(true);
   });
 
-  it('glide flight (?flight=glide) keeps the momentum once the keys are let go', () => {
-    const speedAfterRelease = (scheme, glide) => {
-      const player = makePlayer({}, scheme);
-      player.flight.glide = glide;
-      player.angle = 0;
-      player.velocity = { vx: 100, vy: 0 };
-      steps(player, 60);
-      return Math.hypot(player.velocity.vx, player.velocity.vy);
-    };
-
-    for (const scheme of ['modern', 'classic']) {
-      expect(speedAfterRelease(scheme, false)).toBeLessThan(5);
-      expect(speedAfterRelease(scheme, true)).toBeGreaterThan(65);
-    }
-  });
-
-  it('nose aim (?aim=nose) holds the cannon on the nose, whatever the aim point', () => {
+  it("a run's start holds the cannon on the nose, whatever the aim point", () => {
     const player = makePlayer({ left: true }, 'classic');
     player.noseAim = true;
     player.angle = 0;
@@ -154,7 +141,6 @@ describe('PlayerSystem control schemes', () => {
       eventBus,
       input: { getMovementInput: vi.fn(() => ({})) },
       'command-queue': null,
-      newFlight: true,
     });
     player.setHull(shipModels.bastion);
     player.position = { x: 400, y: 300 };
@@ -174,14 +160,12 @@ describe('PlayerSystem control schemes', () => {
     ]);
   });
 
-  it('the new flight (the default) starts every run classic, gliding and aimed by the nose; its cards lift each', () => {
+  it('every run starts classic, gliding and aimed by the nose; its cards lift each', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
       input: { getMovementInput: vi.fn(() => ({})) },
       'command-queue': null,
-      controlScheme: 'modern',
-      newFlight: true,
     });
     const flying = () => [
       player.controlScheme,
@@ -196,20 +180,6 @@ describe('PlayerSystem control schemes', () => {
 
     player.reset();
     expect(flying()).toEqual(['classic', true, true]);
-  });
-
-  it('in glide only the Braking System lights the retro once the thrust is let go', () => {
-    const coastBrake = (brakingDamping) => {
-      const player = makePlayer({}, 'classic');
-      player.flight.glide = true;
-      player.flight.brakingDamping = brakingDamping;
-      player.angle = 0;
-      player.velocity = { vx: 100, vy: 0 };
-      return player.flight.updateMovement(DELTA_TIME, {}).brake.aux;
-    };
-
-    expect(coastBrake(0)).toBe(0);
-    expect(coastBrake(2)).toBeGreaterThan(0.5);
   });
 
   it('in glide the RCS System turns the hull quicker too', () => {
@@ -283,7 +253,7 @@ describe('PlayerSystem control schemes', () => {
       },
     });
     expect(player.stickSensitivity).toBe('high');
-    // The new flight (the default) takes it too, from the pause menu.
+    // From the pause menu too.
     eventBus.emit('settings-controls-changed', {
       values: { stickSensitivity: 'low' },
     });
@@ -299,24 +269,5 @@ describe('PlayerSystem control schemes', () => {
     }
     // A frame without the setting (no player stamped it) flies Medium.
     expect(padForce({ pad: true }, 0.5)).toBeCloseTo(0.5 ** 1.5, 9);
-  });
-
-  it('flies the Hull Control setting, and ?controls=classic wins over it', () => {
-    const settings = (hullControl) => ({
-      getCategoryValues: (id) => (id === 'controls' ? { hullControl } : null),
-    });
-    const player = new PlayerSystem({
-      eventBus: createEventBusMock(),
-      input: { getMovementInput: vi.fn(() => ({})) },
-      'command-queue': null,
-      newFlight: false,
-      settings: settings('classic'),
-    });
-    expect(player.controlScheme).toBe('classic');
-    expect(resolveControlScheme(undefined)).toBe('modern');
-    expect(resolveControlScheme('modern')).toBe('modern');
-
-    vi.stubGlobal('window', { location: { search: '?controls=classic' } });
-    expect(resolveControlScheme('modern')).toBe('classic');
   });
 });

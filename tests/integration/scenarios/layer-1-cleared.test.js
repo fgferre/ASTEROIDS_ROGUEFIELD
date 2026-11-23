@@ -22,7 +22,6 @@ describe('layer 1 scenario', () => {
   let restoreDom;
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
   });
   afterEach(() => {
     GamePools.releaseAll();
@@ -34,6 +33,8 @@ describe('layer 1 scenario', () => {
     game.session.startNewRun({ source: 'test' });
     const { player, enemies, input } = game.services;
     player.setInvulnerableTimer(1e9);
+    // Auto-aim is the Auto Turret card's (a run starts on the nose cannon).
+    game.eventBus.emit('upgrade-auto-aim', {});
     input.onKeyDown(keyEvent('KeyW'));
     input.onKeyDown(keyEvent('KeyA'));
 

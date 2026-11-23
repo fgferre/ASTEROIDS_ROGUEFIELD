@@ -398,7 +398,14 @@ export function composeContentScene({ scene, services }) {
   }
 
   const undo = [];
-  if (scene.kind !== 'stages') undo.push(freezeSpawner(enemies.waveManager));
+  if (scene.kind !== 'stages') {
+    undo.push(freezeSpawner(enemies.waveManager));
+    // The scene's own rocks are outside the layer's rock plan: the dev-only
+    // count check would warn at every kill.
+    undo.push(
+      override(enemies.waveManager, 'assertAccountingConsistency', () => {})
+    );
+  }
   if (!scene.fire && ['enemies', 'bosses'].includes(scene.kind)) {
     undo.push(override(combat.weapons, 'handleShooting', () => {}));
   }

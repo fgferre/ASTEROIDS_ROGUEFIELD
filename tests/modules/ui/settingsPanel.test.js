@@ -106,7 +106,7 @@ describe('Settings panel', () => {
         .map((field) => `${category.id}.${field.key}`)
     );
     expect(SECTION_IDS).toHaveLength(6);
-    expect(visible).toHaveLength(44);
+    expect(visible).toHaveLength(43);
     expect([...shown].sort()).toEqual([...visible].sort());
   });
 
@@ -159,14 +159,6 @@ describe('Settings panel', () => {
     expect(settingPreview('bloom', true)).toMatchObject({ glow: true });
     expect(settingPreview('bloom', false)).toMatchObject({ glow: false });
     expect(settingPreview('masterVolume', 1)).toBeNull();
-  });
-
-  it('names the thumb, not keys, under Hull Control by touch', () => {
-    expect(settingPreview('hullControl', 'classic').text).toMatch(/A\/D/);
-    vi.stubGlobal('document', { body: { dataset: { inputDevice: 'touch' } } });
-    expect(settingPreview('hullControl', 'classic').text).toMatch(/thumb/);
-    expect(settingPreview('hullControl', 'modern').text).not.toMatch(/WASD/);
-    vi.unstubAllGlobals();
   });
 
   it('resets exactly what the section shows, bindings included', () => {
@@ -223,21 +215,6 @@ describe('Settings panel', () => {
     );
     expect(isGreyed(row('postProcessing'))).toBe(false);
     expect(isGreyed(row('quality'))).toBe(false);
-  });
-
-  it('greys Hull Control in the new flight and shows the flight in use', () => {
-    const { row } = renderSection('controls', {}, [
-      ['controls', 'hullControl', 'modern'],
-    ]);
-    const walk = (node) => [node, ...(node.children || []).flatMap(walk)];
-    const pressed = walk(row('hullControl')).filter(
-      (node) =>
-        node.dataset?.segmentValue && node.attributes['aria-pressed'] === 'true'
-    );
-    expect(isGreyed(row('hullControl'))).toBe(true);
-    expect(pressed.map((node) => node.dataset.segmentValue)).toEqual([
-      'classic',
-    ]);
   });
 
   it('shows Hit Markers in HUD & text, live, and no Damage Numbers row', () => {

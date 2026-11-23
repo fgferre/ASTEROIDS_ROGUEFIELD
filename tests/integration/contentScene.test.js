@@ -50,7 +50,6 @@ describe('content scene on a live run', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     vi.useFakeTimers();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -251,9 +250,10 @@ describe('content scene on a live run', () => {
       expect(player.position.x).toBeGreaterThan(550);
 
       const before = player.position.x;
-      input.onKeyDown(keyEvent('KeyD'));
+      // The start's classic: W thrusts along the nose, +x.
+      input.onKeyDown(keyEvent('KeyW'));
       for (let step = 0; step < 30; step += 1) frame();
-      input.onKeyUp(keyEvent('KeyD'));
+      input.onKeyUp(keyEvent('KeyW'));
       expect(player.position.x).toBeGreaterThan(before + 10);
     });
 

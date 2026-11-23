@@ -17,7 +17,7 @@ export const SHIP_MOVE_TURN_RATE = 6; // rad/s cap turning onto the velocity (no
 export const SHIP_FACE_VELOCITY_MIN_SPEED = 20; // px/s; slower than this, hold heading
 export const SHIP_FACING_RESPONSE = 14; // s^-1 exponential approach (no overshoot)
 
-// === GLIDE FLIGHT === (?flight=glide) PROPOSAL 16/11 ("proposta 16/11"), judged by playing.
+// === GLIDE FLIGHT === (every run's start) PROPOSAL 16/11 ("proposta 16/11"), judged by playing.
 // The hull keeps its momentum: no auto-brake, nearly no drag; stopping is the pilot's.
 export const GLIDE_LINEAR_DAMPING = 0.35; // s^-1 (the Braking System's adds on while coasting)
 export const GLIDE_ACCEL_SCALE = 0.7; // × ship acceleration

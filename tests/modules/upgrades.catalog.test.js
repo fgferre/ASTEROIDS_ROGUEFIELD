@@ -174,7 +174,12 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     const rock = makeEnemy('rock', 200, 300);
     const { combat, eventBus } = makeCombat([rock]);
     takeCard(eventBus, 'cinder_trail', 2);
-    const thrust = { type: 'main', intensity: 1, position: { x: 205, y: 300 } };
+    const thrust = {
+      type: 'main',
+      intensity: 1,
+      pilot: true, // the pilot's own burn (thrusters.js)
+      position: { x: 205, y: 300 },
+    };
     eventBus.emit('thruster-effect', thrust);
     combat.updateWeaponEffects(0.2);
     expect(rock.health).toBe(100 - 12);
@@ -208,6 +213,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
       eventBus.emit('thruster-effect', {
         type: 'main',
         intensity: 1,
+        pilot: true,
         position: { x, y: 300 },
       })
     );

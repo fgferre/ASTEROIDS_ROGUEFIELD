@@ -90,31 +90,31 @@ describe('upgrade families', () => {
     });
   });
 
-  it("the new flight (the default) adds its own cards and reads the glide texts; with ?direcao=antiga the catalog is today's", () => {
-    const ids = (newFlight) =>
-      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
-    expect(ids(false)).not.toContain('auto_aim');
-    expect(ids(false)).not.toContain('flight_computer');
-    expect(ids(true)).toEqual(
-      expect.arrayContaining(['auto_aim', 'flight_computer'])
+  it('the catalog holds every card, the ones once marked for the new flight too, with the glide texts', () => {
+    const cards = cardsForFlight(listContent('cards'));
+    const ids = cards.map((card) => card.id);
+    const marked = listContent('cards')
+      .filter((card) => card.newFlight)
+      .map((card) => card.id);
+    expect(marked).toEqual(
+      expect.arrayContaining([
+        'auto_aim',
+        'flight_computer',
+        'momentum_rounds',
+        'close_quarters',
+      ])
     );
+    expect(ids).toEqual(expect.arrayContaining(marked));
 
-    const braking = (newFlight) =>
-      cardsForFlight(listContent('cards'), newFlight).find(
-        (card) => card.id === 'braking_system'
-      ).text;
-    expect(braking(false)).toBe(
-      listContent('cards').find((card) => card.id === 'braking_system').text
-    );
-    expect(braking(true).name).toBe('Braking System');
-    expect(braking(true).summary).toMatch(/glide/);
+    const braking = cards.find((card) => card.id === 'braking_system').text;
+    expect(braking.name).toBe('Braking System');
+    expect(braking.summary).toMatch(/glide/);
   });
 
-  it('the piloting cards are the Flight Computer and every card on its way; none without the new flight', () => {
-    const pilots = (newFlight) =>
-      pilotCardIds(cardsForFlight(listContent('cards'), newFlight));
-    expect(pilots(false)).toEqual([]);
-    expect([...pilots(true)].sort()).toEqual([
+  it('the piloting cards are the Flight Computer and every card on its way', () => {
+    expect(
+      [...pilotCardIds(cardsForFlight(listContent('cards')))].sort()
+    ).toEqual([
       'auto_aim',
       'braking_system',
       'flight_computer',
@@ -136,16 +136,6 @@ describe('the piloting trail and the families', () => {
     expect(progression.getFamilyCounts()[family]).toBe(0);
     progression.pilotCardIds = [];
     expect(progression.getFamilyCounts()[family]).toBe(1);
-  });
-
-  it('the new kinetic cards exist only with the new flight', () => {
-    const ids = (newFlight) =>
-      cardsForFlight(listContent('cards'), newFlight).map((card) => card.id);
-    expect(ids(false)).not.toContain('momentum_rounds');
-    expect(ids(false)).not.toContain('close_quarters');
-    expect(ids(true)).toEqual(
-      expect.arrayContaining(['momentum_rounds', 'close_quarters'])
-    );
   });
 });
 

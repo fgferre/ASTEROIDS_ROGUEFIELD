@@ -42,8 +42,8 @@ function mirrorFor(hull) {
     eventBus: createEventBusMock(),
     input: { getMovementInput: () => ({}) },
     'command-queue': null,
-    newFlight: false,
   });
+  player.noseAim = false; // the Auto Turret taken: the turret on its pivot
   player.setHull(hull);
   const mirror = new PlayerMirror(THREE, new THREE.Scene(), (fn) => fn());
   mirror.update(player, ribbons, 0);

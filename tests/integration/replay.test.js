@@ -33,32 +33,33 @@ import {
 
 const STEPS = 600; // 10 s at 60 Hz
 
-// Keys held during each half-second of the run (WASD moves on the screen
-// axes); lowercase letters are taps (e shield, g spread toggle, t aim toggle,
-// h dash). The route is picked so the run levels up at least twice (four
-// times since the orbs burst out of kills, 20/10).
+// Keys held during each half-second of the run (the start's classic: A/D
+// turn the hull, W/S thrust along it, the cannon on the nose); lowercase
+// letters are taps (e shield, g spread toggle, t aim toggle, h dash). The
+// route is picked so the nose sweeps the rocks and the run levels up at least
+// twice (three times on 22/11, with the one flight).
 const SEGMENT_STEPS = 30;
 const SCRIPT = [
   '',
+  'D',
+  'D',
+  'De',
+  '',
   'W',
-  'W',
-  'WAe',
-  'WA',
-  'Wh',
-  'S',
-  'A',
-  'A',
+  '',
+  '',
+  '',
   'W',
   'g',
-  'A',
-  'W',
-  'WDh',
-  'WDt',
-  'WA',
-  'WD',
-  'WAe',
-  'A',
-  'At',
+  '',
+  '',
+  'Ah',
+  't',
+  '',
+  'D',
+  'De',
+  '',
+  'St',
 ];
 // Low enough that the scripted run levels up, so level-up picks are replayed.
 const TEST_XP_TO_LEVEL = 10;
@@ -92,7 +93,6 @@ describe('run replay', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
   });
 
   afterEach(() => {
@@ -102,12 +102,11 @@ describe('run replay', () => {
 
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
-  // `hull` is flown unlocked; `bossRush` starts a Boss Rush; `controls` sets
-  // the player's control scheme.
+  // `hull` is flown unlocked; `bossRush` starts a Boss Rush.
   function recordRun(
     beforePick = () => {},
     difficulty = 'veteran',
-    { hull, bossRush, controls } = {}
+    { hull, bossRush } = {}
   ) {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
@@ -116,7 +115,6 @@ describe('run replay', () => {
         true;
       live.services.settings.setSetting('gameplay', 'selectedHull', hull);
     }
-    if (controls) live.services.player.controlScheme = controls;
     live.session.startNewRun({ source: 'test', bossRush });
     const { progression } = live.services;
     cheapLevels(progression);
@@ -408,23 +406,6 @@ describe('run replay', () => {
     });
     expect(replay.services.difficulty.isDaily()).toBe(true);
     expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
-  });
-
-  it('replays a Classic-controls run with Classic controls, whatever the replaying scheme', () => {
-    const { live, recording } = recordRun(() => {}, 'veteran', {
-      controls: 'classic',
-    });
-    const recorded = live.snapshot();
-    expect(recording.controls).toBe('classic');
-
-    // The replaying game flies Modern, as a viewer's default Settings would.
-    const replay = replayRun(recording);
-    expect(replay.services.player.controlScheme).toBe('classic');
-    expect(replay.snapshot()).toEqual(recorded);
-
-    // The viewer's next own run flies their scheme again.
-    replay.session.startNewRun({ source: 'test' });
-    expect(replay.services.player.controlScheme).toBe('modern');
   });
 
   it("leaves the viewer's Salvage and pad alone, then pays and rumbles for their own run", () => {

@@ -266,7 +266,8 @@ class CombatSystem extends BaseSystem {
       if (screen !== 'playing') {
         return;
       }
-      // Nose aim (?aim=nose) has no auto aim to toggle to.
+      // The cannon on the nose (until the Auto Turret) has no auto aim to
+      // toggle to.
       if (this.cachedPlayer.noseAim) {
         return;
       }

@@ -81,8 +81,7 @@ camada 15 (modo infinito só se ele pedir).
   entidades em malhas. O jogo 2D original fica como peça de museu em `/classic/`.
 - **Câmera dinâmica:** follow com dead zone e antecipação, dolly que afasta na velocidade e aproxima no combate,
   shake por deslocamento da câmera. Mesma lógica de `src/core/camera.js`, agora dirigindo uma câmera perspectiva.
-- **Pilotagem que se conquista (direção nova, escolhida por ele jogando em 16/11; atrás de `?direcao=nova` até ele
-  mandar publicar):** a partida começa no voo clássico com deslize — A/D giram o casco, W acelera, S dá ré, e a
+- **Pilotagem que se conquista (direção nova, escolhida por ele jogando em 16/11):** a partida começa no voo clássico com deslize — A/D giram o casco, W acelera, S dá ré, e a
   nave não para sozinha — e o tiro sai do nariz, mirado girando a nave. As cartas tiram uma muleta de cada vez:
   Braking System freia ao soltar (no nível 3, o freio de emergência é a parada rápida), RCS System gira e acelera
   mais rápido, Main Thrusters dá empuxo e velocidade, Auto Turret solta o canhão para mirar sozinho. A carta final,

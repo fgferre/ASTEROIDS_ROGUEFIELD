@@ -259,7 +259,7 @@ class UISystem extends BaseSystem {
       achievements: () => this.getService('achievements'),
     });
     // The static keyboard hints show the scheme the ship flies (style.css):
-    // the player's, which the new flight starts classic whatever the setting.
+    // the player's, which every run starts classic.
     document.body.dataset.controls = this.getService('player').controlScheme;
 
     // Direct AAA HUD Activation, in the HUD Layout setting's layout

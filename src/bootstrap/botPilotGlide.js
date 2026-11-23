@@ -2,7 +2,7 @@
 //
 // The playtest bot's classic glide: A/D turn the hull, W pushes along the
 // nose, S pushes against it, nothing brakes by itself, and the cannon sits on
-// the nose (?controls=classic&flight=glide&aim=nose). Where botPilot.js
+// the nose (every run's start). Where botPilot.js
 // rolls the ship along 8 directions, this rolls it along key sequences (turn
 // left / none / right × push forward / none / back) through the same
 // physics the game runs (player/flight.js, read as numbers by

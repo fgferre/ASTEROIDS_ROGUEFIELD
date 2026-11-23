@@ -30,12 +30,11 @@ export const SETTINGS_SECTIONS = [
     id: 'controls',
     title: 'Controls',
     sub: 'Movement and bindings',
-    intro: 'Choose how the hull moves, then assign keyboard or gamepad inputs.',
+    intro: 'Assign keyboard or gamepad inputs.',
     groups: [
       {
         title: 'Handling',
         fields: [
-          'controls.hullControl',
           ...(declaresTouch() ? [] : ['controls.touchControls']),
           'controls.vibration',
           'controls.stickSensitivity',
@@ -188,7 +187,7 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 
 /**
  * Why a field is greyed, or null. `state`: { value(category, key),
- * pressureRung, newFlight, aimByNose }, read afresh at every render.
+ * pressureRung, aimByNose }, read afresh at every render.
  */
 export function inactiveReason(ref, state) {
   switch (ref) {
@@ -219,14 +218,8 @@ export function inactiveReason(ref, state) {
         ? `Pressure ${ROMAN[rung] ?? rung} is on, set in the Hangar. Turn it off there to use this.`
         : null;
     }
-    case 'controls.hullControl':
-      return state.newFlight
-        ? 'Your cards choose the flight: every run starts in Classic glide; the Flight Computer card switches to Modern.'
-        : null;
     case 'controls.toggleAimMode':
-      return state.newFlight && state.aimByNose
-        ? 'Works after the Auto Turret card.'
-        : null;
+      return state.aimByNose ? 'Works after the Auto Turret card.' : null;
     default:
       return null;
   }

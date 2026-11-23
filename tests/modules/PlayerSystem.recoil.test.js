@@ -14,8 +14,9 @@ describe('PlayerSystem shot recoil', () => {
       eventBus,
       input: { getMovementInput: () => ({}) },
       'command-queue': null,
-      newFlight: false,
     });
+    // Modern flight: gliding, nothing would bleed the kick off, so none.
+    player.setFlightScheme('modern', false);
     player.velocity = { vx: 0, vy: 0 };
     const shot = {
       position: { x: 400, y: 300 },
