@@ -26,10 +26,8 @@ import {
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
 import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
-import {
-  CHEST_REVEAL_MS,
-  ChestCeremony,
-} from '../../src/modules/ui/ChestCeremony.js';
+import { CHEST_REVEAL_MS } from '../../src/data/pickups.js';
+import { ChestCeremony } from '../../src/modules/ui/ChestCeremony.js';
 
 const STEPS = 600; // 10 s at 60 Hz
 

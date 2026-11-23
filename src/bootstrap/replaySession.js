@@ -19,7 +19,7 @@
 // moment they go does not change it.
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
-import { CHEST_REVEAL_MS } from '../modules/ui/ChestCeremony.js';
+import { CHEST_REVEAL_MS } from '../data/pickups.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {

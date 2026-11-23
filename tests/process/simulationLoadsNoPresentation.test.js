@@ -45,8 +45,6 @@ const ALLOWED = {
     'familyForm names the evolution a run summary records',
   'src/services/GameSessionService.js → src/modules/ui/remoteLink.js':
     'playRemoteLink and remoteLinkLines play the link into a run from the menu',
-  'src/bootstrap/replaySession.js → src/modules/ui/ChestCeremony.js':
-    'CHEST_REVEAL_MS; leaves when that constant moves to a data file',
 };
 
 function walk(dir, out = []) {
