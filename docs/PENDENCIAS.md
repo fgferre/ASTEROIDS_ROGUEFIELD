@@ -244,7 +244,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   sem atrito: _"o modo inicial, ele é o modo simulação"_. O voo que fica (`?voo=c`) no cartão `voo-5`. Depois (22/11): _"Quando a gente faz o giro da
   nave, ela também deveria ter momentum, né? E quando a gente solta, imediatamente ela para o giro."_ e _"o que faz
   parar o giro de forma automática não é o RCS, é as cartas [...] de freio"_: giro com momento no voo que fica.
-  Fecha quando ele aprovar voando.
+  Voou (22/11): _"voei, fica com ajustes, está bem difícil, mas peguei um UCS e nao melhorou o giro"_; combinado com
+  ele (_"concordo, faz assim"_): a RCS é a dona do giro, o freio da viagem, e o giro do começo para sozinho devagar.
+  Cartão `voo-7`. Fecha quando ele aprovar voando.
 
 ## Som (palavras dele, 19/11)
 
