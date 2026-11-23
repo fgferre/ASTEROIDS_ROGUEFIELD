@@ -1,6 +1,6 @@
 // Every service the game registers, in registration order, except the four
 // that show, sound or draw it (audio, ui, menu-background, renderer): those
-// are slots filled from `presentation` by name and left out when absent.
+// are slots filled from `presentation` by name, and a missing one throws.
 // serviceManifest.js fills them with the real systems; the headless test game
 // registers doubles instead, so loading this file never loads those systems.
 
@@ -255,8 +255,17 @@ function createRandomService(context = {}) {
   return service;
 }
 
-export function createSimulationManifest(context = {}, presentation = {}) {
+export function createSimulationManifest(context = {}, presentation) {
   const { gameState, poolConfig, garbageCollectorOptions } = context;
+  const slot = (name) => {
+    const entry = presentation?.[name];
+    if (!entry) {
+      throw new Error(
+        `[simulationManifest] Missing presentation slot '${name}'`
+      );
+    }
+    return entry;
+  };
 
   return [
     {
@@ -343,7 +352,7 @@ export function createSimulationManifest(context = {}, presentation = {}) {
           achievements: resolved['achievements'],
         }),
     },
-    presentation.audio,
+    slot('audio'),
     {
       name: 'command-queue',
       singleton: true,
@@ -442,7 +451,7 @@ export function createSimulationManifest(context = {}, presentation = {}) {
         return physics;
       },
     },
-    presentation.ui,
+    slot('ui'),
     {
       name: 'effects',
       singleton: true,
@@ -641,8 +650,8 @@ export function createSimulationManifest(context = {}, presentation = {}) {
         return world;
       },
     },
-    presentation['menu-background'],
-    presentation.renderer,
+    slot('menu-background'),
+    slot('renderer'),
     // Last: an eager service can only resolve dependencies registered above it.
     {
       name: 'game-session',
@@ -703,5 +712,5 @@ export function createSimulationManifest(context = {}, presentation = {}) {
         return instance;
       },
     },
-  ].filter(Boolean);
+  ];
 }

@@ -2,9 +2,10 @@
 // simulation with doubles for the systems that show, sound and draw it, so it
 // never loads them: editing a screen, a sound or a model then does not select
 // its full-game tests in test:tocados, nor make them import that code. This
-// walks every file the headless game reaches from its two src imports and
-// fails on each import that crosses into presentation code, unless the edge is
-// listed below with its reason.
+// walks every file the headless game reaches, starting from the harness
+// itself, and fails on each import that crosses into presentation code unless
+// the edge is listed below with its reason, and on any of the four systems
+// reached at all, even through a listed edge.
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -14,10 +15,7 @@ import { buildGraph } from '../../scripts/tocados.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const ROOTS = [
-  'src/bootstrap/simulationManifest.js',
-  'src/bootstrap/replaySession.js',
-];
+const HARNESS = 'tests/__helpers__/headlessGame.js';
 
 const PRESENTATION_DIRS = [
   'src/modules/ui/',
@@ -77,18 +75,13 @@ for (const [target, importers] of buildGraph(sources)) {
   for (const importer of importers) imports.get(importer).push(target);
 }
 
-// Every file reached from `roots`, mapped to the file that first imported it.
-function closure(roots) {
-  const via = new Map();
-  for (const root of roots) {
-    if (!imports.has(root)) {
-      throw new Error(
-        `${root} is gone: point ROOTS at what the headless game imports now`
-      );
-    }
-    via.set(root, null);
+// Every file reached from `root`, mapped to the file that first imported it.
+function closure(root) {
+  if (!imports.has(root)) {
+    throw new Error(`${root} is gone: point HARNESS at the headless game`);
   }
-  const queue = [...roots];
+  const via = new Map([[root, null]]);
+  const queue = [root];
   while (queue.length) {
     const file = queue.shift();
     for (const target of imports.get(file)) {
@@ -108,7 +101,7 @@ function chain(via, file) {
 
 describe('the headless game loads no presentation code', () => {
   it('crosses into presentation only by the listed imports', () => {
-    const reached = closure(ROOTS);
+    const reached = closure(HARNESS);
     const crossings = [];
     for (const file of reached.keys()) {
       if (isPresentation(file)) continue;
@@ -127,13 +120,14 @@ describe('the headless game loads no presentation code', () => {
   });
 
   it('never reaches the systems it replaces with doubles', () => {
-    const reached = closure([ROOTS[0]]);
+    const reached = closure(HARNESS);
     const loaded = SYSTEMS.filter((system) => reached.has(system));
     expect(
       loaded,
-      `${ROOTS[0]} loads a system the headless game replaces with a double:\n` +
+      `The headless game loads a system it replaces with a double:\n` +
         loaded.map((system) => `  ${chain(reached, system)}`).join('\n') +
-        `\nKeep that system's entry in serviceManifest.js and cut the import chain.`
+        `\nCut that import chain: the headless game builds createSimulationManifest, ` +
+        `and only serviceManifest.js may import the four systems.`
     ).toEqual([]);
   });
 });
