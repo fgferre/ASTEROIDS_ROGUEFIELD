@@ -276,6 +276,18 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
   da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
 
+- **(45)** O corpo da nave (23/11, jogando a 0.8.0): _"essa tremida que a nave dá a cada tiro, ela não tá boa.
+  [...] fazer os canos das armas sofrerem esse recuo, ao invés do corpo inteiro da arma ficar quicando."_ Do casco:
+  _"quando a gente olha a nave de cima e a nave está fazendo movimentos de thruster [...] o casco fica completamente
+  still."_ E: _"a gente poderia introduzir o movimento strafe."_ Texto inteiro em `quadro/respostas/corpo-da-nave-23-11.txt`.
+  Do freio (23/11): _"me parece que as cartas de freio [...] freiam a nave até mesmo quando a gente está usando os
+  thrusters para acelerar ela. [...] O freio só entra quando nenhum controle está sendo acionado."_
+  (`quadro/respostas/freio-com-motor-23-11.txt`); medido: com o motor apertado a carta não freia, entra nos toques de W
+  e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
+  inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
+  inclinação construídos (só desenho). O strafe, o coice de verdade e as cartas de mobilidade vêm depois. Fecha quando
+  ele aprovar voando.
+
 ## Som (palavras dele, 19/11)
 
 - **(37)** Vozes e roteiro (19/11, na conferência): _"sinto quie poderia ter mais efeito nessas vozes e acho que

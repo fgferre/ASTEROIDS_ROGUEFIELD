@@ -21,12 +21,8 @@
 // the trail), jets.js (turn jets, retro flames and the flare fan), guns.js
 // (turret, nose cannon, layers, recoil) and dash.js (dash ring, afterimages,
 // blink). Each takes the mirror as its first argument; the mirror keeps the
-// creation order, the frame's order, the ship's death and its bank.
+// creation order, the frame's order, the ship's death and its tilt.
 
-import {
-  SHIP_HEADING_TURN_RATE,
-  SHIP_ROTATION_SPEED,
-} from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { DissolvePool } from './dissolve.js';
 import { NOZZLE_HEIGHT, VISUAL_SCALE } from './hullModel.js';
@@ -53,6 +49,7 @@ import {
   createGuns,
   lockLineOrigin,
   recoilToward,
+  resetRecoil,
 } from './player/guns.js';
 import {
   buildHull,
@@ -72,13 +69,17 @@ import {
 // of its own build, thrown as a machine of SHIP_BREAK_RADIUS would be.
 const SHIP_PIECES = 14;
 const SHIP_BREAK_RADIUS = 18;
-// Banking (PLAN.md R5.9, proposta 18/10): roll into the modern strafe (the
-// nose swinging onto the move) and the yaw rate, eased with a time constant so it saturates and relaxes smoothly.
-// Both come from the simulation (input, angular velocity), never from the
-// interpolated pose.
-const BANK_STRAFE = (22 * Math.PI) / 180;
-const BANK_YAW = (8 * Math.PI) / 180;
-const BANK_SMOOTH_S = 0.18;
+// The tilt (Felipe's pick, corpo-da-nave-1, 23/11: "Média"): the hull rolls
+// toward the lit turn couple or flank push, the stronger of the two, lifts
+// its nose under the main engine and dips it under the retro. From the jets
+// lit this sim step (lastThrusterState), never the interpolated pose, on a
+// spring with a little sway; level under reduced motion.
+const TILT_ROLL = (25 * Math.PI) / 180;
+const TILT_PITCH = (8 * Math.PI) / 180;
+// A flank's push leans the hull almost as far as the turn couple.
+const TILT_FLANK = 0.8;
+const TILT_OMEGA = 11; // rad/s
+const TILT_DAMPING = 0.72;
 
 export class PlayerMirror {
   constructor(THREE, scene, seeded) {
@@ -106,8 +107,7 @@ export class PlayerMirror {
     scene.add(this.standIn);
 
     this.muzzleFrames = 0;
-    this.bank = 0;
-    this.bankTime = null;
+    this.tilt = { roll: 0, rollRate: 0, pitch: 0, pitchRate: 0 };
 
     createDash(this, THREE, scene, rim);
 
@@ -247,8 +247,11 @@ export class PlayerMirror {
     this.breakHidden.length = 0;
   }
 
-  /** `worldDt`: the world's step in s (slow motion included), for the death's break. */
-  update(player, ribbons, time, worldDt = 0) {
+  /**
+   * `worldDt`: the world's step in s (slow motion included), for the death's
+   * break; `reducedMotion`: the hull neither gives to a shot nor tilts.
+   */
+  update(player, ribbons, time, worldDt = 0, reducedMotion = false) {
     const dead = Boolean(player?.isDead);
     if (dead && !this.wasDead && this.group.visible && !this.breaking) {
       this.startBreak(player);
@@ -284,11 +287,15 @@ export class PlayerMirror {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
 
+    const dt =
+      this.fxTime === null ? 0 : Math.min(0.1, Math.max(0, time - this.fxTime));
+    this.fxTime = time;
+
     this.group.position.set(x - HALF_W, 0, y - HALF_H);
     this.group.rotation.y = -angle;
-    // Bank into turns and strafes (the sim stays flat; this is only visual).
-    this.group.rotation.x = this.updateBank(player, time);
-    aimGuns(this, player, angle);
+    // The sim stays flat; the tilt and the recoil are only drawn.
+    this.updateTilt(player, dt, reducedMotion);
+    aimGuns(this, player, angle, dt, reducedMotion);
     this.strobe.visible = hullLivery.strobeOn(time);
 
     const main = thrust.main || 0;
@@ -297,9 +304,6 @@ export class PlayerMirror {
       hull: player.maxHealth > 0 ? player.health / player.maxHealth : 1,
       cruise: CRUISE_SCALE,
     });
-    const dt =
-      this.fxTime === null ? 0 : Math.min(0.1, Math.max(0, time - this.fxTime));
-    this.fxTime = time;
     lightNeedles(this, player.lastThrusterState, dt);
     lightRetros(this, player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
@@ -315,8 +319,8 @@ export class PlayerMirror {
     lightEngines(this, main, level, time, options);
   }
 
-  recoilToward(player, vx, vy) {
-    recoilToward(this, player, vx, vy);
+  recoilToward(player, vx, vy, from) {
+    recoilToward(this, player, vx, vy, from);
   }
 
   lockLineOrigin(index) {
@@ -324,25 +328,36 @@ export class PlayerMirror {
   }
 
   /**
-   * Roll target: in the modern scheme the nose's swing onto the move (the
-   * strafe share, full at SHIP_HEADING_TURN_RATE), plus the yaw rate in both,
-   * eased toward with BANK_SMOOTH_S. Returns radians.
+   * Rolls and pitches the hull toward the jets lit this step (TILT_*), on a
+   * spring over `dt` s; level under reduced motion.
    */
-  updateBank(player, time) {
-    const dt =
-      this.bankTime === null
-        ? 0
-        : Math.min(0.1, Math.max(0, time - this.bankTime));
-    this.bankTime = time;
-    const turn = player.angularVelocity || 0;
-    const strafe =
-      player.controlScheme === 'modern'
-        ? Math.max(-1, Math.min(1, turn / SHIP_HEADING_TURN_RATE))
-        : 0;
-    const yaw = Math.max(-1, Math.min(1, turn / SHIP_ROTATION_SPEED));
-    const target = BANK_STRAFE * strafe + BANK_YAW * yaw;
-    this.bank += (target - this.bank) * (1 - Math.exp(-dt / BANK_SMOOTH_S));
-    return this.bank;
+  updateTilt(player, dt, reduced) {
+    const jets = player.lastThrusterState;
+    const turn = jets.turnR - jets.turnL;
+    const flank = TILT_FLANK * (jets.brakePort - jets.brakeStarboard);
+    const lean = Math.abs(turn) >= Math.abs(flank) ? turn : flank;
+    const rollGoal = reduced ? 0 : TILT_ROLL * Math.max(-1, Math.min(1, lean));
+    const pitchGoal = reduced
+      ? 0
+      : TILT_PITCH * Math.max(-1, Math.min(1, jets.main - jets.aux));
+    const tilt = this.tilt;
+    const steps = Math.max(1, Math.ceil(dt / 0.004));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i += 1) {
+      tilt.rollRate +=
+        (TILT_OMEGA * TILT_OMEGA * (rollGoal - tilt.roll) -
+          2 * TILT_DAMPING * TILT_OMEGA * tilt.rollRate) *
+        h;
+      tilt.roll += tilt.rollRate * h;
+      tilt.pitchRate +=
+        (TILT_OMEGA * TILT_OMEGA * (pitchGoal - tilt.pitch) -
+          2 * TILT_DAMPING * TILT_OMEGA * tilt.pitchRate) *
+        h;
+      tilt.pitch += tilt.pitchRate * h;
+    }
+    // x: roll (positive lowers the starboard wing); z: the nose (positive up)
+    this.group.rotation.x = tilt.roll;
+    this.group.rotation.z = tilt.pitch;
   }
 
   /** A shot left the nose: bump the ship light for a few frames. */
@@ -357,11 +372,8 @@ export class PlayerMirror {
   reset() {
     this.trailCount = 0;
     this.muzzleFrames = 0;
-    this.layers.forEach((layer) => {
-      layer.frames = 0;
-    });
-    this.bank = 0;
-    this.bankTime = null;
+    resetRecoil(this);
+    Object.assign(this.tilt, { roll: 0, rollRate: 0, pitch: 0, pitchRate: 0 });
     this.dashGuard = false;
     hideGhosts(this);
     this.flare = 0;

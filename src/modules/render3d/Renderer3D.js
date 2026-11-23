@@ -920,7 +920,8 @@ class Renderer3D extends BaseSystem {
       player,
       t.ribbons,
       time,
-      dt * (effects?.gameTime?.scale ?? 1)
+      dt * (effects?.gameTime?.scale ?? 1),
+      this.reducedMotion
     );
     if (story) {
       story.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
