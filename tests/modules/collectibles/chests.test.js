@@ -10,8 +10,8 @@ import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
   STEP_SECONDS,
   createHeadlessGame,
-  installDomStubs,
 } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const kill = (elite, type = 'drone') => ({
   enemy: { id: 'test-kill', type, elite, x: 200, y: 200 },

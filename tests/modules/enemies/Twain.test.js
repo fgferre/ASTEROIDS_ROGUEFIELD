@@ -4,10 +4,8 @@ import { getContent } from '../../../src/content/registry.js';
 import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import RandomService from '../../../src/core/RandomService.js';
 import { GamePools } from '../../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const recipe = getContent('enemies', 'twain');
 const Twain = recipeEnemyClass(recipe);

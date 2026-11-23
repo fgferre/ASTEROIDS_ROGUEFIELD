@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { PROGRESSION_UPGRADE_REROLLS_PER_RUN } from '../../src/core/GameConstants.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { holdProgress } from '../../src/core/storage.js';
 import HangarService, {
   HANGAR_STORAGE_KEY,

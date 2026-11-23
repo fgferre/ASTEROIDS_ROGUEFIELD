@@ -6,10 +6,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const SPAWN_STEPS = 20 * 60;
 const KILL_STEPS = 10 * 60;

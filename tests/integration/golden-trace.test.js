@@ -17,10 +17,9 @@ import { GamePools } from '../../src/core/GamePools.js';
 import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import {
   createHeadlessGame,
-  installDomStubs,
-  keyEvent,
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 const FIXTURE = fileURLToPath(
   new URL('../__fixtures__/golden-trace.json', import.meta.url)

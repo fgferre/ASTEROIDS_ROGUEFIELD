@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 // A headless game must not outlive its test: its garbage collector's first
 // pool pass ran on a 150 ms real timer and logged after the test had ended,

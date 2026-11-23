@@ -19,9 +19,9 @@ import {
 } from '../../src/bootstrap/botPilotAdapter.js';
 import {
   createHeadlessGame,
-  installDomStubs,
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 const print = (text) => process.stdout.write(`${text}\n`);
 const FPS = Math.round(1 / STEP_SECONDS);

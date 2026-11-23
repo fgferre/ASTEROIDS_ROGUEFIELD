@@ -5,10 +5,8 @@ import { getContent } from '../../../src/content/registry.js';
 import { ORB_VALUE } from '../../../src/data/enemies/asteroid-configs.js';
 import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
 import { grow } from '../../../src/modules/enemies/behaviors/forage.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const STEP = 1 / 60;
 

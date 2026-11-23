@@ -13,10 +13,8 @@ import {
   enemiesFor,
   nextBossRushLayer,
 } from '../../src/data/layers.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 const rolesOf = (layer) => [
   ...layer.roster.map(({ role }) => role),

@@ -13,10 +13,8 @@ import { BOSS_PHYSICS_CONFIG } from '../../src/data/enemies/boss.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
 import { createRandomServiceStatefulStub } from '../__helpers__/stubs.js';

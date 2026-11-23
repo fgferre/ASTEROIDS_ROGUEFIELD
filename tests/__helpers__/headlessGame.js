@@ -13,9 +13,6 @@ import { createSimulationManifest } from '../../src/bootstrap/simulationManifest
 import { createFixedStepper } from '../../src/core/fixedStep.js';
 import { createReplayController } from '../../src/bootstrap/replaySession.js';
 
-// The files that boot the game (and two that another branch edits) still import them from here.
-export { installDomStubs, keyEvent } from './domStubs.js';
-
 export const SEED = 0x5eed;
 export const STEP_SECONDS = createFixedStepper().step;
 

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import { BASE_MODIFIERS } from '../../src/data/hangar.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import RandomService from '../../src/core/RandomService.js';
 import { listContent } from '../../src/content/registry.js';
 import { WEAPON_CARD_IDS } from '../../src/data/upgrades/index.js';

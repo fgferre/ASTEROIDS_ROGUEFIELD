@@ -16,8 +16,8 @@ import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import {
   STEP_SECONDS,
   createHeadlessGame,
-  installDomStubs,
 } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 // The R5.4 cards: each one's effect, observed through its own data.
 const DAMAGE = 10;

@@ -26,9 +26,9 @@ import { SECTORS } from '../../src/data/sectors.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import {
   createHeadlessGame,
-  installDomStubs,
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 const SECONDS = Number(process.env.CARD_BENCH_SECONDS || 10);
 const OUT = process.env.CARD_BENCH_OUT || '';

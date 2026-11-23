@@ -6,11 +6,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 const PRIME_LAYER = 5;
 const MAX_STEPS = 300;

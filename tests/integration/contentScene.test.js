@@ -12,11 +12,8 @@ import {
 import { listContent } from '../../src/content/registry.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 const STEPS = 60;
 

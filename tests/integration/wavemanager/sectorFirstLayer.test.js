@@ -7,10 +7,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import { SECTORS } from '../../../src/data/sectors.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const PICK_STEPS = 60 * 120;
 

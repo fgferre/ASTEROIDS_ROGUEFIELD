@@ -11,12 +11,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-  SEED,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame, SEED } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import {
   createInputFrame,
   createRecorder,
