@@ -278,7 +278,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
               'button:not([disabled]):not(.menu-title-back)'
             )
           )?.focus();
-        });
+        }, backToGate);
       }, START_EFFECT_MS);
     }
 

@@ -10,7 +10,9 @@
 // 3): deleting the one in play reloads back to this screen. Another tab can
 // change the pilots under it: the screen shows them again as they are, a box
 // about a pilot deleted meanwhile deletes nothing, and Continue on a pilot this
-// page holds an old copy of reloads it (core/storage.js).
+// page holds an old copy of reloads it (core/storage.js). Escape or pad Ⓑ
+// goes back to PRESS START (the owner, 23/11: "Se eu apertasse B aqui, ele
+// deveria voltar para a tela de Press Start"); with the box up, they cancel it.
 
 import {
   chooseSlot,
@@ -111,9 +113,9 @@ function padState() {
 /**
  * Shows the pilots and calls `onContinue` when the pilot in play goes on;
  * another pilot reloads the page instead. Straight to `onContinue` on the
- * entry a choice reloaded into.
+ * entry a choice reloaded into. `onBack`: Escape or Ⓑ left the screen.
  */
-export function openPilotSelect(onContinue) {
+export function openPilotSelect(onContinue, onBack) {
   if (justChosen()) {
     onContinue();
     return;
@@ -154,6 +156,7 @@ export function openPilotSelect(onContinue) {
             pilotCardMarkup(summary, i + 1, i + 1 === active)
           )
           .join('')}</ul>
+        <p class="pilot-hint"><span data-device="keyboard"><kbd>Esc</kbd> Back</span><span data-device="gamepad"><kbd>B</kbd> Back</span></p>
       </div>${
         confirming
           ? `<div class="pilot-confirm__veil">${deleteConfirmMarkup(summaries[confirming - 1], confirming)}</div>`
@@ -205,6 +208,12 @@ export function openPilotSelect(onContinue) {
       // No session storage: the reloaded entry shows the pilots once more.
     }
     window.location.reload();
+  }
+
+  function back() {
+    leave();
+    screen.remove();
+    onBack();
   }
 
   function ask(slot) {
@@ -259,8 +268,10 @@ export function openPilotSelect(onContinue) {
       event.key
     ];
     if (step) move(step);
-    else if (event.key === 'Escape' && confirming) answer(false);
-    else if (event.key === 'Enter' || event.key === ' ') {
+    else if (event.key === 'Escape') {
+      if (confirming) answer(false);
+      else back();
+    } else if (event.key === 'Enter' || event.key === ' ') {
       const own = focusable().includes(document.activeElement);
       activate(own ? document.activeElement : focusable()[0]);
     }
@@ -271,8 +282,10 @@ export function openPilotSelect(onContinue) {
     if (now.go && !held.go) {
       const own = focusable().includes(document.activeElement);
       activate(own ? document.activeElement : focusable()[0]);
-    } else if (now.back && !held.back && confirming) answer(false);
-    else if (now.left && !held.left) move(-1);
+    } else if (now.back && !held.back) {
+      if (confirming) answer(false);
+      else back();
+    } else if (now.left && !held.left) move(-1);
     else if (now.right && !held.right) move(1);
     held = now;
     if (!done) rafId = requestAnimationFrame(pollPad);

@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 43.**
 
 ## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
 
@@ -275,6 +275,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
   Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
   da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
+- **(42)** Voltar com B e ESC no menu (23/11, jogando a 0.8.0, dito na conversa da fase presa): _"Agora eu estou na
+  tela de Choose Your Pilot, eu não consigo dar B para voltar para a tela de Start do menu inicial. Deveria ser
+  possível, você não acha? Ele está preso nessa tela, eu sou obrigado a escolher um piloto nesse momento. Se eu
+  apertasse B aqui, ele deveria voltar para a tela de Press Start."_ No ramo `conserto/voltar-do-menu`: B e ESC na
+  tela dos pilotos voltam para Press Start (com a caixa de apagar aberta, só fecham a caixa). Fecha quando ele aprovar
+  jogando.
 
 ## Som (palavras dele, 19/11)
 

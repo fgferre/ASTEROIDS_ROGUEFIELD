@@ -23,7 +23,9 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).', // not confirmed
+  ],
   unseen: [],
 };
 
