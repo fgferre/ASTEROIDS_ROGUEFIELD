@@ -22,7 +22,8 @@
 // - The main flame: a burst off the line, then a steady third while the key
 //   holds ("Assim, um terço do estouro").
 // PlayerSystem owns one; its updateMovement runs this, then the turret, then
-// the thruster events with the step this returns.
+// the thruster events with the step this returns. The playtest bot's start
+// (bootstrap/botPilotGlide.js) plans with the exported numbers.
 
 import {
   GLIDE_ACCEL_SCALE,
@@ -43,22 +44,22 @@ import { classicAsks, getModernMove, padForce } from './movementInput.js';
 
 // The retro and a flank's pair each push this share of the main engine; the
 // Braking System multiplies the retro, the RCS System the side jets.
-const RETRO_SHARE = 0.5;
+export const RETRO_SHARE = 0.5;
 const FLANK_SHARE = 0.5;
 // Classic: the turn pair spins the hull up and back down at this (rad/s²), to
 // the top turn rate (≈70°/s); the RCS System multiplies both.
-const TURN_ACCEL = 4;
-const TURN_TOP = SHIP_ROTATION_SPEED / SHIP_ANGULAR_DAMPING;
+export const TURN_ACCEL = 4;
+export const TURN_TOP = SHIP_ROTATION_SPEED / SHIP_ANGULAR_DAMPING;
 // A released classic spin is worked off at SPIN_ASSIST (rad/s²) with no card,
 // about 1.7 s from the top turn rate; with the RCS System, at this share of
 // the turn pair's push × its level (the pair is already × it): from half a
 // second at level 1 to a fifth at 5, steadily, not snapped.
-const SPIN_ASSIST = 0.75;
-const SPIN_STOP_SHARE = 0.5;
+export const SPIN_ASSIST = 0.75;
+export const SPIN_STOP_SHARE = 0.5;
 // The auto-brake: full push above this share of the top speed; slower, ever
 // gentler, never under BRAKE_FLOOR of it, until the ship stops.
-const BRAKE_FULL_SHARE = 0.5;
-const BRAKE_FLOOR = 0.5;
+export const BRAKE_FULL_SHARE = 0.5;
+export const BRAKE_FLOOR = 0.5;
 // The Flight Computer: its cruise × the start's top speed; the turbo × that;
 // the jets' force and the auto-brake's, × the start's.
 const MODERN_TOP = 1.2;

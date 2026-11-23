@@ -21,14 +21,19 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
-  improved: [],
+  new: [
+    'The ship now flies on its own thrusters: at the start nothing slows it, so it glides until you fire the retro (S) or turn and burn, and a spin keeps turning a while after you let go.', // not confirmed
+    "The Flight Computer's flight is faster than the start, with a turbo that builds on a straight run, and the nose swings onto your keys with weight.", // not confirmed
+  ],
+  improved: [
+    'Braking System now brakes your travel with the thrusters when you let go of the keys; RCS System steadies a spin, firmer at each level.', // not confirmed
+    'The main flame bursts off the line, then holds a steady third while you keep the key down.', // not confirmed
+    'Settings → Controls: Hull Control is gone; your cards choose the flight.', // not confirmed
+  ],
   fixed: [],
   unseen: [
-    "Two trial flights only the address turns on (?voo=a and ?voo=b), where the ship moves by its own thrusters, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
     'The test address that starts a run with one item (?content=) can now give the ship several cards at chosen levels (&cards=), so Felipe can fly each flight with its upgrades; normal runs are the same.', // not confirmed
-    "Three trial versions of the Flight Computer's modern flight only the address turns on (?moderno=1, 2 or 3), faster than the start with the same cards, for Felipe to fly beside today's; without the address the flight is the same.", // not confirmed
-    'The flight that stays, as Felipe drew it (?voo=c): no drag at the start, the cards as jets the computer lights, the turbo at the Flight Computer, a burst then a steady flame; only the address turns it on.', // not confirmed
+    'Replays recorded before this version no longer play (the flight changed); progress, pilots and the Hangar are untouched.', // not confirmed
   ],
 };
 
