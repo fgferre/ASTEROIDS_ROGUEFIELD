@@ -26,11 +26,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      # The Node pinned in .nvmrc, for every step below (the 2D game's build too).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           cache: npm
-          node-version: 20.x
+          node-version-file: .nvmrc
 
       # Every publication has its own number and its list of what changed
       # (src/data/changelog.js); without them the site stays as it was.

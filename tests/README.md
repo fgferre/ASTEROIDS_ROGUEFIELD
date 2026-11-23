@@ -4,9 +4,9 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 
 ## How to run
 
-- `npm test`: the whole suite. `npm run done`: lint, format check, the changelog test, then suite and build unless exactly this content already passed them (`scripts/done.mjs`), once at the end of a task. `node scripts/ci-node.mjs` runs the suite again on GitHub's oldest Node, by hand.
+- `npm test`: the whole suite. `npm run done`: lint, format check, the changelog test, then suite and build unless exactly this content already passed them (`scripts/done.mjs`), once at the end of a task. The tests run on the Node pinned in `.nvmrc`, the one GitHub uses: `npm test` and the other test scripts start it (`scripts/pinned-node.mjs`), and vitest started on another Node stops at once.
 - `npm run test:tocados`: the tests that cover the files you touched (see Selection). `npm run gate` is lint plus that.
-- `npx vitest run <file or folder>` for one thing; `npm run test:<domain>` per top-level folder (core, modules, utils, services, integration, balance, visual, physics).
+- `npm test -- <file or folder>` for one thing; `npm run test:<domain>` per top-level folder (core, modules, utils, services, integration, balance, visual, physics).
 
 ## Layout: a mirror of `src/` by domain
 

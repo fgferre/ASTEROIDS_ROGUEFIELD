@@ -47,6 +47,7 @@ function committedRepo() {
   mkdirSync(join(repo, 'node_modules'));
   mkdirSync(join(repo, 'src'));
   writeFileSync(join(repo, '.gitignore'), 'node_modules\ndist/\n');
+  writeFileSync(join(repo, '.nvmrc'), '24.0.0\n');
   writeFileSync(
     join(repo, 'package-lock.json'),
     JSON.stringify({ packages: { '': { name: 'game' } } })
@@ -137,15 +138,17 @@ describe('done: the content key', () => {
     expect(inKey('src/main.js')).toBe(true);
   });
 
-  it("follows Node's version and the installed lock", () => {
+  it("follows Node's version, the tests' pinned one and the installed lock", () => {
     const entries = [`100644 ${'1'.repeat(40)} 0\tsrc/a.js`];
-    const key = keyFromParts(entries, 'v25.0.0', '{}');
-    expect(keyFromParts(entries, 'v22.0.0', '{}')).not.toBe(key);
-    expect(keyFromParts(entries, 'v25.0.0', '{ }')).not.toBe(key);
+    const key = keyFromParts(entries, 'v25.0.0', 'v24.0.0', '{}');
+    expect(keyFromParts(entries, 'v22.0.0', 'v24.0.0', '{}')).not.toBe(key);
+    expect(keyFromParts(entries, 'v25.0.0', 'v24.0.1', '{}')).not.toBe(key);
+    expect(keyFromParts(entries, 'v25.0.0', 'v24.0.0', '{ }')).not.toBe(key);
     expect(
       keyFromParts(
         [...entries, `100644 ${'2'.repeat(40)} 0\tREADME.md`],
         'v25.0.0',
+        'v24.0.0',
         '{}'
       )
     ).toBe(key);
@@ -159,6 +162,7 @@ describe('done: the content key', () => {
     mkdirSync(join(repo, 'node_modules'));
     mkdirSync(join(repo, 'src', 'public'), { recursive: true });
     writeFileSync(join(repo, '.gitignore'), 'node_modules\n');
+    writeFileSync(join(repo, '.nvmrc'), '24.0.0\n');
     writeFileSync(join(repo, 'node_modules', '.package-lock.json'), '{}');
     const js = join(repo, 'src', 'a.js');
     // The index is written in the same second as a.js, which is then edited

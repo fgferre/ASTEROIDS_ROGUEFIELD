@@ -1,10 +1,12 @@
 /**
  * Golden trace: fixed headless runs, hashed second by second, must match the fixture byte for byte.
- * Regenerate: GOLDEN_UPDATE=1 npx vitest run tests/integration/golden-trace.test.js
+ * Regenerate: GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js
  * The fixture changes only in a commit that means to change behavior; a refactor must leave it alone.
  * It holds on the CPU architecture it was recorded on (`arch`, today the owner's arm64 Mac): Math.sin,
  * cos, exp and friends may differ in the last bit on another architecture (CI runs on x64), and a
  * minute of play amplifies that into a different run. There, each scenario must play the same twice.
+ * On the same architecture it holds only on the Node it was recorded on (`node`, the one pinned in
+ * .nvmrc): another Node fails the run before any play, and is not compared.
  */
 
 import { createHash } from 'node:crypto';
@@ -228,6 +230,12 @@ function traceAgain(scenario) {
 
 const golden = JSON.parse(readFileSync(FIXTURE, 'utf8'));
 const SAME_ARCH = golden.arch === process.arch;
+const SAME_NODE = golden.node === process.version;
+if (SAME_ARCH && !SAME_NODE && !UPDATE) {
+  throw new Error(
+    `golden-trace.json was recorded on Node ${golden.node}, this is ${process.version}: run it through npm test (the Node pinned in .nvmrc), or re-record it on purpose: GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js`
+  );
+}
 const traced = {};
 
 describe('golden trace', () => {
@@ -248,9 +256,10 @@ describe('golden trace', () => {
 
   afterAll(() => {
     if (!UPDATE) return;
-    const fixture = { arch: process.arch };
+    const fixture = { arch: process.arch, node: process.version };
+    const keep = SAME_ARCH && SAME_NODE;
     for (const { name } of SCENARIOS) {
-      const trace = traced[name] ?? (SAME_ARCH ? golden[name] : undefined);
+      const trace = traced[name] ?? (keep ? golden[name] : undefined);
       if (trace) fixture[name] = trace;
     }
     writeFileSync(FIXTURE, `${JSON.stringify(fixture, null, 2)}\n`);

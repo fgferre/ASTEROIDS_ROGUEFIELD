@@ -7,11 +7,14 @@
 // 1. The installed tools must match package-lock.json, or nothing runs.
 // 2. Lint, format check and the changelog test always run (that test compares
 //    with the point where the branch left main, which the key leaves out).
+//    Lint, format and build run on this Node; the tests, through npm test, on
+//    the one pinned in .nvmrc (scripts/pinned-node.mjs).
 // 3. Key = the tree as `git add -A` would stage it (built in a temporary copy
 //    of the index; *.md left out except under src/public/, which ships) +
-//    Node's version + the installed lockfile. A stamp for the key skips the
-//    tests and the build. Stamps live in the git common dir, shared by every
-//    worktree, one file per key; every run appends a line to done-log there.
+//    this Node's version + the tests' pinned one + the installed lockfile. A
+//    stamp for the key skips the tests and the build. Stamps live in the git
+//    common dir, shared by every worktree, one file per key; every run
+//    appends a line to done-log there.
 // GOLDEN_UPDATE in the environment runs everything and never stamps.
 
 import {
@@ -34,6 +37,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { pinnedVersion } from './pinned-node.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -104,12 +108,20 @@ export function inKey(path) {
 }
 
 // entries: `git ls-files -s` records ("mode blob stage\tpath").
-export function keyFromParts(entries, nodeVersion, installedLockText) {
+export function keyFromParts(
+  entries,
+  nodeVersion,
+  pinnedNode,
+  installedLockText
+) {
   const kept = entries.filter((e) => inKey(e.slice(e.indexOf('\t') + 1)));
   return sha256(
-    [...kept, `node ${nodeVersion}`, `lock ${sha256(installedLockText)}`].join(
-      '\0'
-    )
+    [
+      ...kept,
+      `node ${nodeVersion}`,
+      `tests on node ${pinnedNode}`,
+      `lock ${sha256(installedLockText)}`,
+    ].join('\0')
   );
 }
 
@@ -143,6 +155,7 @@ export function contentKey(root) {
   return keyFromParts(
     stagedEntries(root),
     process.version,
+    pinnedVersion(root),
     readFileSync(join(root, 'node_modules', '.package-lock.json'))
   );
 }
@@ -193,7 +206,7 @@ export function main({
   for (const [step, command] of [
     ['lint', 'npm run lint'],
     ['format', 'npm run format:check'],
-    ['changelog', 'npx vitest run tests/process/changelogLine.test.js'],
+    ['changelog', 'npm test -- tests/process/changelogLine.test.js'],
   ]) {
     const status = run(step, command, root);
     if (status !== 0) return finish(`fail at ${step}`, status);

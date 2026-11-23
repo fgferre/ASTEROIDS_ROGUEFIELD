@@ -1,18 +1,13 @@
 name: Node.js CI
 
+# Pull requests only: on main, deploy.yml runs the same gates before publishing.
 on:
-  push:
-    branches: ['main']
   pull_request:
     branches: ['main']
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x] # Vite 7 needs Node 20.19+
 
     steps:
       # Whole history: the changelog's check compares a pull request with the
@@ -21,11 +16,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      # The Node pinned in .nvmrc, the one the tests run on at home too.
+      - name: Use the Node pinned in .nvmrc
         uses: actions/setup-node@v4
         with:
           cache: npm
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .nvmrc
 
       - name: Install dependencies
         run: npm ci

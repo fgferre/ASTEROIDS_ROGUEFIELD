@@ -1,6 +1,6 @@
 // Fast commit gate: run the tests that cover the files you touched.
 //
-//   node scripts/tocados.mjs
+//   npm run test:tocados   (on the Node pinned in .nvmrc: scripts/pinned-node.mjs)
 //
 // "Touched" = changed since the point where this branch left main (committed,
 // staged or unstaged) + untracked; on main itself, or with no local main, since
@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const VITEST = resolve(ROOT, 'node_modules/vitest/vitest.mjs');
 
 function git(args) {
   return execFileSync('git', args, {
@@ -182,10 +183,9 @@ function main() {
     process.stdout.write(
       'shared test infra touched: running the whole suite\n'
     );
-    const r = spawnSync('npx', ['vitest', 'run'], {
+    const r = spawnSync(process.execPath, [VITEST, 'run'], {
       cwd: ROOT,
       stdio: 'inherit',
-      shell: true,
     });
     process.exit(r.status ?? 1);
   }
@@ -221,10 +221,9 @@ function main() {
   process.stdout.write(
     `tests for touched files (${list.length}):\n${list.map((t) => `  ${t}`).join('\n')}\n`
   );
-  const r = spawnSync('npx', ['vitest', 'run', ...list], {
+  const r = spawnSync(process.execPath, [VITEST, 'run', ...list], {
     cwd: ROOT,
     stdio: 'inherit',
-    shell: true,
   });
   process.exit(r.status ?? 1);
 }
