@@ -68,8 +68,8 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
-    // Railshot widens the Scatter's own flak bursts.
-    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
+    // Kinetic is the Scatter's own family: its own form.
+    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Grapeshot.');
   });
 
   it('a new card short of a milestone shows where its family leads', () => {
@@ -110,10 +110,10 @@ describe('upgrade card build line', () => {
       'pulses hit 15% harder and throw further',
       'pulses hit 30% harder and throw twice as far',
     ]);
-    // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
+    // Kinetic is the Scatter's own: its forms, Grapeshot and Hailstorm.
     expect(what('multishot', 0, 'scatter')).toEqual([
-      'flak bursts 60% wider',
-      'flak bursts 90% wider, bolts 25% harder',
+      'bolts glance off what they hit',
+      'bolts glance twice',
     ]);
     // Its own family evolves the weapon itself.
     expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(

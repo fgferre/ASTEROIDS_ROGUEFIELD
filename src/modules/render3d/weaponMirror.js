@@ -11,7 +11,13 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
-import { SHOT_SHAPES, rgbOf } from './batches.js';
+import { SHOT_SHAPES, glint, rgbOf } from './batches.js';
+import {
+  mirrorGlances,
+  mirrorKindled,
+  mirrorScraps,
+  pushBurningPiece,
+} from './fanMirror.js';
 import { hashId } from './enemyMirror.js';
 import { getContent } from '../../content/registry.js';
 
@@ -142,12 +148,6 @@ const SEEKER_LENGTH = 6;
 const SEEKER_WIDTH = 2;
 const SEEKER_FLAME = 3;
 const SEEKER_GLOW = 4;
-
-// Deterministic 0..1 per trail point, for the Motherlode glints (render only).
-const glint = (x, y) => {
-  const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 
 // Violet static over a hull a field holds (`strength` ~1): short kinked
 // sparks laid across it, re-struck every few frames, in place of a ring.
@@ -724,6 +724,10 @@ function mirrorShards(THREE, combat, batches) {
     const ux = (enemy.vx || 0) / speed;
     const uy = (enemy.vy || 0) / speed;
     const r = (enemy.radius || 8) * 0.6;
+    if (flung.fire) {
+      pushBurningPiece(THREE, batches, flung, ux, uy, k);
+      return;
+    }
     // never longer than the way it has flown: it does not reach back to
     // the rock it came from
     const len = Math.min(14 + 26 * k, 0.6 * speed * flung.age);
@@ -822,6 +826,19 @@ function mirrorTrench(THREE, trench, batches, white) {
   ribbons.tube(x, y, ex, ey, ARC_H + 0.5, white, 0.4, 0.6 * grow);
 }
 
+// Implosion: what a burst drags in crackles in the Singularity's violet
+// while it falls (the well spirals at the centre: CardEffects' wells).
+function mirrorImplosions(THREE, implosions, ribbons, white) {
+  const rgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);
+  implosions.forEach((imp) =>
+    imp.caught.forEach(({ enemy, id }) => {
+      if (!enemy.destroyed && enemy.id === id) {
+        pushStatic(ribbons, enemy, rgb, white, 1.4);
+      }
+    })
+  );
+}
+
 /**
  * Beams, flak bursts, arcs, blades, the aura and marks; `flashes` lights each
  * new beam and aura pulse once and each flak volley's first burst once.
@@ -836,6 +853,14 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
     mirrorShards(THREE, combat, batches);
   }
   if (combat.trench) mirrorTrench(THREE, combat.trench, batches, white);
+  if (combat.glances.length) mirrorGlances(THREE, combat.glances, ribbons);
+  if (combat.kindled.length) {
+    mirrorKindled(THREE, combat.kindled, batches, staticFrame / 60);
+  }
+  if (combat.scraps.length) mirrorScraps(THREE, combat.scraps, batches);
+  if (combat.implosions.length) {
+    mirrorImplosions(THREE, combat.implosions, ribbons, white);
+  }
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);

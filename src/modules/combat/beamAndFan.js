@@ -6,6 +6,7 @@
 // firePatterns.js); hits land through Weapons.hitEnemy.
 
 import { beamFling, orbsBeforeBeam, runBeamForms } from './beamForms.js';
+import { discharge, implodeFirst } from './fanForms.js';
 import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
 
 // `beam`: damage lands on everything in the segment on the firing frame;
@@ -182,9 +183,15 @@ export function fireFan(w, fan, playerPos, playerStats, echo = false) {
   const reach = range
     ? range + (fan.coilRange ?? 0) * coilShare(w.bulletSpeed)
     : w.bulletSpeed * w.bulletLifetime;
-  // Shared by the volley's bolts: who its shrapnel already hit, and how
-  // many bursts it has had (only the first lights the 3D scene).
-  const volley = { struck: [], bursts: 0 };
+  // Shared by the volley's bolts: who its shrapnel already hit, how many
+  // bursts it has had (only the first lights the 3D scene), and the damage
+  // and entry it was fired with (a Scrap Rounds shard is a bolt of its own).
+  const volley = {
+    struck: [],
+    bursts: 0,
+    damage: playerStats.damage,
+    entry: fan,
+  };
   const lockAims = w.getLockAims();
   const predictedPoints = [];
   const launch = (a, from = origin) => {
@@ -247,8 +254,10 @@ export function fireFan(w, fan, playerPos, playerStats, echo = false) {
 
 // A projectile's `burst`: shrapnel hits every solid enemy whose rim is
 // within `burst.radius`, at most once per volley, through the same hit path
-// as the bolts (so the evolutions apply).
+// as the bolts (so the evolutions apply). The fan's Field form may hold it
+// a beat first, its Arc form discharges from it (fanForms.js).
 export function burstFlak(w, bolt) {
+  if (implodeFirst(w, bolt)) return;
   const { x, y, volley } = bolt;
   const { burst } = bolt.projectile;
   const { duration } = burst;
@@ -282,11 +291,13 @@ export function burstFlak(w, bolt) {
         vx: (dx / distance) * w.bulletSpeed,
         vy: (dy / distance) * w.bulletSpeed,
         damage: bolt.shrapnel,
+        volley,
         hit: false,
       },
       enemy
     );
   });
+  discharge(w, bolt, x, y, radius);
 
   const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
   w.flakBursts.push({

@@ -27,13 +27,18 @@ export const NEXT = {
     'Three Salvage cards make the orbs from Harmonic beam kills fly straight back to your ship; with five, the beam also sends every orb it crosses to you.', // not confirmed
     'Three Kinetic cards make the Harmonic’s beam throw the machines it hits back along its line and fling the fragments of rocks it kills outward; with five, rocks it kills also burst into shards that fly on along the beam and hit what is behind.', // not confirmed
     'Three Field cards make the Harmonic’s beam tug enemies near its line onto it and hold them for 0.5 s; with five, the beam leaves a gravity trench on its line for 1.2 s that drags nearby enemies onto it.', // not confirmed
+    'Scatter Coil has its own Kinetic forms: Grapeshot (3 cards) makes a bolt that hits glance off into the next enemy ahead and burst again; Hailstorm (5 cards) hits 25% harder and glances twice.', // not confirmed
+    'Three Thermal cards make a rock hit 3 times by one Scatter Coil volley catch fire inside and die into burning pieces; with five, machines catch fire too and each one set alight passes it to a neighbour.', // not confirmed
+    'Three Arc cards make each Scatter Coil burst discharge into the 2 nearest enemies outside it, up to 4 bolts a volley; with five, into 3, each bolt jumping on once more and hitting much harder.', // not confirmed
+    'Three Field cards make each Scatter Coil burst pull enemies within 60 px into its centre, then explode on the clump; with five, it pulls from 90 px and holds them 0.5 s.', // not confirmed
+    'Three Salvage cards make a Scatter Coil kill throw a scrap shard that fires itself at the nearest enemy (orbs as before); with five, two shards.', // not confirmed
   ],
   improved: [
     'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.', // not confirmed
     'Thermal Lens has its own version for two weapons: it focuses the Scatter Coil’s fan (bolts closer together, +15% damage), and Seeker Swarm missiles find targets further away and hit harder on a direct hit.', // not confirmed
     'Chain Capacitor has its own version for three weapons: 1 Scatter Coil volley in 10 fires twice, 1 Seeker Swarm missile in 10 splits in two when it locks on, and 1 Harmonic beam in 5 fires twice along the same line.', // not confirmed
     'Recoil Dampers make Scatter Coil and Seeker Swarm bursts reach 25 px further (was 10 px).', // not confirmed
-    'Three Kinetic cards make Scatter Coil bursts 60% wider and Seeker Swarm bursts 80% wider (was 30% and 50%); five, 90% and 120%.', // not confirmed
+    'Three Kinetic cards make Seeker Swarm bursts 80% wider (was 50%); five, 120%.', // not confirmed
   ],
   fixed: [],
   unseen: [],

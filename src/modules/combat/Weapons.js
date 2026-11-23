@@ -549,6 +549,12 @@ export class Weapons {
     this.shards = [];
     this.shardSeed = 0;
     this.trench = null;
+    // fanForms.js: Grapeshot's glances, Kindling's burning rocks, the
+    // implosions waiting to burst, the scrap waiting to fire.
+    this.glances = [];
+    this.kindled = [];
+    this.implosions = [];
+    this.scraps = [];
     this.flakBursts = [];
     // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
     this.blades = [];

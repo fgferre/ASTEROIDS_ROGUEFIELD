@@ -126,6 +126,7 @@ function setVelocity(enemy, vx, vy) {
  * Kinetic: the fragments of a rock the beam killed (`spawned` and the split's
  * own `fragments`) fly out from where it was at `fling.speed`, a grit trail
  * behind each (HitResolution, on the kill), then settle to their own drift.
+ * A `fling.fire` trail is flame (the Scatter's Kindling, fanForms.js).
  */
 export function flingFragments(w, rock, fling, ...lists) {
   lists.forEach((list) =>
@@ -142,6 +143,7 @@ export function flingFragments(w, rock, fling, ...lists) {
         age: 0,
         settle: fling.settle,
         trail: fling.trail,
+        fire: Boolean(fling.fire),
         seed: w.shardSeed,
       });
       setVelocity(fragment, (dx / d) * fling.speed, (dy / d) * fling.speed);
@@ -337,24 +339,7 @@ function arcOff(w, stage, seg, struck) {
   };
   const strike = (source, target) => {
     taken.add(target);
-    const from = { x: source.x, y: source.y, radius: source.radius };
-    w.cards().addArc(from, target, { bolt: true, life, heavy: stage === 1 });
-    const dx = target.x - from.x;
-    const dy = target.y - from.y;
-    const d = Math.hypot(dx, dy) || 1;
-    const r = target.radius || 0;
-    w.hitEnemy(
-      {
-        kind: 'chain',
-        x: target.x - (dx / d) * r,
-        y: target.y - (dy / d) * r,
-        vx: (dx / d) * w.bulletSpeed,
-        vy: (dy / d) * w.bulletSpeed,
-        damage,
-        hit: false,
-      },
-      target
-    );
+    arcStrike(w, source, target, damage, life, stage === 1);
   };
   if (stage === 0) {
     const along = ({ enemy }) =>
@@ -376,6 +361,33 @@ function arcOff(w, stage, seg, struck) {
       from = target;
     }
   });
+}
+
+/**
+ * A weapon's bolt from `source` to `target` (CardEffects.addArc, `heavy` the
+ * thicker one) and its hit, kind `chain`: no form procs off it. `push`
+ * false: it does not shove what it strikes (a hit's knockback follows its
+ * flight).
+ */
+export function arcStrike(w, source, target, damage, life, heavy, push = true) {
+  const from = { x: source.x, y: source.y, radius: source.radius };
+  w.cards().addArc(from, target, { bolt: true, life, heavy });
+  const dx = target.x - from.x;
+  const dy = target.y - from.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const r = target.radius || 0;
+  w.hitEnemy(
+    {
+      kind: 'chain',
+      x: target.x - (dx / d) * r,
+      y: target.y - (dy / d) * r,
+      vx: push ? (dx / d) * w.bulletSpeed : 0,
+      vy: push ? (dy / d) * w.bulletSpeed : 0,
+      damage,
+      hit: false,
+    },
+    target
+  );
 }
 
 // Salvage: the orbs the beam's kills dropped fly to the ship; at the Apex

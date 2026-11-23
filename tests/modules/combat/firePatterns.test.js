@@ -984,13 +984,13 @@ describe("a weapon's own evolution and Apex", () => {
       expect(burstRadius('seeker-swarm', dampers)).toBe(53);
     });
 
-    it('Scatter: Railshot widens the flak burst by 60%, the Apex by 90%', () => {
+    it('Scatter: Kinetic is its own (Grapeshot, Hailstorm): the flak burst keeps its width', () => {
       expect(
         burstRadius('scatter', (c) => c.weapons.evolveWeapon('kinetic'))
-      ).toBeCloseTo(64, 9);
+      ).toBe(40);
       expect(
         burstRadius('scatter', (c) => c.weapons.apexWeapon('kinetic'))
-      ).toBeCloseTo(76, 9);
+      ).toBe(40);
     });
 
     it('Seeker: Railshot widens the missile burst by 80%, the Apex by 120%', () => {

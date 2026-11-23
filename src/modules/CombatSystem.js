@@ -7,6 +7,7 @@ import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
 import { burstFlak } from './combat/beamAndFan.js';
+import { kindledDied } from './combat/fanForms.js';
 import {
   applyConcentratedFire,
   computeParallelOffset,
@@ -228,6 +229,10 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
       this.evolveWeapon(data.family);
+    });
+    // Kindling: a burning rock that dies flies apart in burning pieces.
+    this.registerEventListener('enemy-destroyed', (data = {}) => {
+      if (data.enemy) kindledDied(this.weapons, data.enemy, data.fragments);
     });
     this.registerEventListener('apex-unlocked', (data = {}) => {
       this.weapons.apexWeapon(data.family);
@@ -553,6 +558,22 @@ class CombatSystem extends BaseSystem {
 
   get flakBursts() {
     return this.weapons.flakBursts;
+  }
+
+  get glances() {
+    return this.weapons.glances;
+  }
+
+  get kindled() {
+    return this.weapons.kindled;
+  }
+
+  get implosions() {
+    return this.weapons.implosions;
+  }
+
+  get scraps() {
+    return this.weapons.scraps;
   }
 
   // firePatterns.js: the 3D weapon mirror draws them.

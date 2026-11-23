@@ -797,7 +797,7 @@ describe('Scatter Coil', () => {
     expect(combat.flakBursts).toHaveLength(0);
   });
 
-  it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the evolution procs on both', () => {
+  it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the fan runs its own Thermal (no lance burn)', () => {
     const target = makeEnemy('target', 200, 300);
     const near = makeEnemy('near', 190, 300 + BOLT.burst.radius);
     const phased = makeEnemy('phased', 190, 290, {
@@ -821,9 +821,7 @@ describe('Scatter Coil', () => {
       6
     );
     expect(phased.health).toBe(100);
-    expect(combat.burns.has(target)).toBe(true);
-    expect(combat.burns.has(near)).toBe(true);
-    expect(combat.burns.has(phased)).toBe(false);
+    expect(combat.burns.size).toBe(0);
   });
 });
 

@@ -111,6 +111,12 @@ export class Projectiles {
     bullet.kind = projectile.look;
     bullet.offscreenTimer = 0;
     bullet.seeker = null;
+    // Grapeshot: the entry's `ricochet`, how many times it still glances
+    // off, and its line (fanForms.js)
+    bullet.ricochet = entry?.ricochet ?? null;
+    bullet.ricochets = bullet.ricochet?.times ?? 0;
+    bullet.glance = null;
+    bullet.scrapAge = 0; // a Scrap Rounds shard's tumble before it fired
     bullet.pierceLeft = projectile.pierce
       ? weapon.lancePierce + weapon.pierceBonus
       : 0;

@@ -17,7 +17,9 @@ import {
   COMBAT_AIMING_UPGRADE_CONFIG,
 } from '../../data/constants/gameplay.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
+import { burstFlak } from './beamAndFan.js';
 import { burnScars, updateBeamForms } from './beamForms.js';
+import { updateFanForms } from './fanForms.js';
 
 const AIMING_CONFIG = COMBAT_AIMING_UPGRADE_CONFIG || {};
 // Gyro Servos' burst rides the fire-rate tuning under this key.
@@ -523,6 +525,7 @@ export class CardEffects {
     }
     fade(weapons.shards);
     updateBeamForms(weapons, deltaTime);
+    updateFanForms(weapons, deltaTime, burstFlak);
     fade(weapons.flakBursts);
     fade(weapons.pulses);
     fade(this.arcs);

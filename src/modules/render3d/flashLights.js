@@ -120,7 +120,8 @@ export class VeinLights {
     const rank = (view) => view.look.veinGlow * view.radius;
     if (this.enabled) {
       for (const view of views.values()) {
-        if (!view.look?.vein || view.hidden || !view.object.visible) continue;
+        if (!view.look?.vein || view.look.veinLight === false) continue;
+        if (view.hidden || !view.object.visible) continue;
         if (picked.length === VEIN_COUNT) {
           if (rank(view) <= rank(picked[VEIN_COUNT - 1])) continue;
           picked.pop();
