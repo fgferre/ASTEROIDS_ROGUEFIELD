@@ -45,6 +45,13 @@ const SIMULATION_SERVICES = [
   'game-session',
 ];
 
+// The renderer's double. GameSessionService resets it with the other systems,
+// and the real one then announces renderer-reset, an event the golden trace
+// records (tests/modules/render3d/rendererDouble.test.js keeps the two alike).
+export function createRendererDouble(eventBus) {
+  return { reset: () => eventBus.emit('renderer-reset') };
+}
+
 /**
  * One game instance: real simulation services, presentation doubles.
  * `seedSource` is the boot's ('profile-harness' boots a demo page).
@@ -81,9 +88,7 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
   const presentation = {
     audio: { init() {}, reseedRandomScopes() {} },
     ui,
-    // GameSessionService resets it with the other systems; the real one then
-    // announces renderer-reset, an event the golden trace records.
-    renderer: { reset: () => eventBus.emit('renderer-reset') },
+    renderer: createRendererDouble(eventBus),
     // Only the real renderer reads it.
     'menu-background': {},
   };
