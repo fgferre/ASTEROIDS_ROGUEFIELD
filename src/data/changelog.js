@@ -23,7 +23,9 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed
+  ],
   unseen: [],
 };
 

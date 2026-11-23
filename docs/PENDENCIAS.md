@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 44.**
 
 ## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
 
@@ -275,6 +275,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
   Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
   da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
+- **(43)** A fase que não avança (23/11, jogando a 0.8.0, Layer 4 do Capítulo I, semente 2058876584, VETERAN): _"o
+  jogo ficou preso na layer 4 - chapter I"_ e _"eu matei todos os inimigos e ele não conseguiu avançar a fase,
+  entendeu? Não sei se era para entrar agora algum inimigo, coisa do gênero, boss, mas enfim, tá parado aí, matei tudo
+  que tinha na tela e não tem mais nada para matar."_ Texto inteiro em `quadro/respostas/fase-presa-23-11.txt`. Causa,
+  provada no jogo sem janela com a semente, a dificuldade e as cartas dele: quando a explosão de uma pedra volátil ou
+  de uma mina Tether mata a nave, a cópia para o Retry sai sem a morte desse inimigo na conta, e a fase volta esperando
+  uma morte que não vem mais. Já existia na 0.7.0. Ramo `conserto/fase-presa`. Fecha quando ele jogar sem travar.
 
 ## Som (palavras dele, 19/11)
 

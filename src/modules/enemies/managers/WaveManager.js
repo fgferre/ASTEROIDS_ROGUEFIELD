@@ -148,6 +148,8 @@ export class WaveManager {
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
+    // The lives whose kill this layer counted (captureLayerProgress).
+    this._countedKills = new WeakMap();
 
     // The layer's rocks: EnemySystem builds each one, WaveManager trickles
     // them in and keeps the counts EnemySystem.waveState reports. rockLayer
@@ -508,6 +510,7 @@ export class WaveManager {
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
+    this._countedKills = new WeakMap();
 
     const waveNumber = this.currentWave;
     const director = this.layerEvents.applyHuntersMoon(
@@ -700,8 +703,26 @@ export class WaveManager {
     this.rockLayer = this.currentWave;
   }
 
-  /** The layer's clock, schedule and counts, for a snapshot (exportState). */
+  /**
+   * The layer's clock, schedule and counts, for a snapshot (exportState). A
+   * death snapshot can be taken inside a kill: a Volatile rock's or a
+   * Tether's blast kills the ship after the enemy died but before its kill is
+   * counted. The snapshot leaves that enemy off the field, so its kill counts
+   * here, or the retried layer stays one kill short for good.
+   */
   captureLayerProgress() {
+    let pendingKills = 0;
+    let pendingRocks = 0;
+    if (this.waveInProgress) {
+      for (const enemy of this.enemySystem.asteroids) {
+        if (!enemy || !(enemy.destroyed || enemy.alive === false)) continue;
+        if (isRegisteredLife(this._countedKills, enemy)) continue;
+        pendingKills += 1;
+        if (this.schedule.isAsteroidType(this.getNormalizedEnemyType(enemy))) {
+          pendingRocks += 1;
+        }
+      }
+    }
     return {
       wave: this.currentWave,
       inProgress: this.waveInProgress,
@@ -710,10 +731,10 @@ export class WaveManager {
       elapsed: this.layerElapsed,
       schedule: [...this.layerSchedule],
       enemiesSpawned: this.enemiesSpawnedThisWave,
-      enemiesKilled: this.enemiesKilledThisWave,
+      enemiesKilled: this.enemiesKilledThisWave + pendingKills,
       enemiesTotal: this.totalEnemiesThisWave,
       asteroidsSpawned: this.asteroidsSpawnedThisWave,
-      asteroidsKilled: this.asteroidsKilledThisWave,
+      asteroidsKilled: this.asteroidsKilledThisWave + pendingRocks,
       asteroidsTotal: this.totalAsteroidEnemiesThisWave,
     };
   }
@@ -750,6 +771,7 @@ export class WaveManager {
     this.asteroidsSpawnedThisWave = progress.asteroidsSpawned;
     this.asteroidsKilledThisWave = progress.asteroidsKilled;
     this.totalAsteroidEnemiesThisWave = progress.asteroidsTotal;
+    this._countedKills = new WeakMap();
   }
 
   /**
@@ -854,6 +876,9 @@ export class WaveManager {
     this.enemiesKilledThisWave++;
 
     const destroyedEnemy = data?.enemy || null;
+    if (destroyedEnemy) {
+      this._countedKills.set(destroyedEnemy, destroyedEnemy.id);
+    }
     const isBossMinion = this.isBossMinionEnemy(destroyedEnemy);
 
     const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
@@ -1074,6 +1099,7 @@ export class WaveManager {
     this.spawner.spawnDelayMultiplier = 1;
     this._legacyRegisteredEnemies = new WeakMap();
     this._trackedDynamicMinions = new WeakMap();
+    this._countedKills = new WeakMap();
     // The run's first layer starts from the session (startLayerFromSession)
     // on this plan.
     this.rockLayer = 1;
