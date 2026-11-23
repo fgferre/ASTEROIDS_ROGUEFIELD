@@ -231,7 +231,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
 - **(40)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
   inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
   radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
-  está no cartão `cartas-por-arma-1`. Fecha quando as cartas que faltam estiverem no jogo e ele aprovar jogando.
+  está no cartão `cartas-por-arma-1`. Respostas dele aos cartões 2 e 3 (22/11): tudo _"Gostei: pode construir"_; a Scatter
+  e a Seeker ganham versão própria _"aos poucos, depois da Harmonic"_; os números da Scatter, _"Decido jogando"_. No ramo:
+  as cartas de número e as cinco famílias próprias da Harmonic. Fecha quando ele aprovar jogando e a Scatter e a Seeker
+  tiverem as delas.
 
 ## Som (palavras dele, 19/11)
 
