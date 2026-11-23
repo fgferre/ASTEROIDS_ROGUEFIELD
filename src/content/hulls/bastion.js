@@ -65,7 +65,7 @@ const visual = {
   ],
   nozzleLength: 0.13 * S,
   nozzleLengthPerLevel: 0.025 * S,
-  // main flame proportions (playerMirror.js, maquete 16/11): wide, short, heavy
+  // main flame proportions (render3d/player/engines.js, maquete 16/11): wide, short, heavy
   flame: { length: 0.75, width: 1.3 },
   retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
   cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
@@ -118,7 +118,7 @@ export default {
   shieldPadding: 14,
   // The new flight's nose cannon (PlayerSystem.getMuzzlePoint): its muzzle,
   // px ahead of the hull centre, 1.25 past the 3D nose tip (the form's first
-  // station × VISUAL_SCALE); playerMirror.js lays its barrels there.
+  // station × VISUAL_SCALE); render3d/player/guns.js lays its barrels there.
   noseMuzzle: 21.2,
   // Logical units: the 3D hull's own points × VISUAL_SCALE (render3d/hullModel.js),
   // so the sparks leave the drawn ports; left/right are the aft wingtip jets,

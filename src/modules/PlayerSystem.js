@@ -803,7 +803,7 @@ class PlayerSystem extends BaseSystem {
 
   /**
    * The win's protection (runEnd.js): invulnerable for at least `seconds`,
-   * the ship steady instead of a hit's blink (playerMirror.js).
+   * the ship steady instead of a hit's blink (render3d/player/dash.js).
    */
   guardSteadily(seconds) {
     this.invulnerableTimer = Math.max(this.invulnerableTimer, seconds);
