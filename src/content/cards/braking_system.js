@@ -16,38 +16,14 @@ export default {
       text: 'Requires Main Thrusters installed (Lv. 1).',
     },
   ],
+  // The computer's brake on the jets when the thrust is let go (player/
+  // flight.js; measured 22/11 from top speed, 132 px/s, to under 10 px/s:
+  // never bare, 1.23 / 1.02 / 0.80 s per level).
   text: {
     name: 'Braking System',
-    summary: 'Installs inertial brakes for quick stops and precise control.',
-    lore: 'Mining technology adapted for combat. Allows impossible stops and sharp direction changes.',
-    levels: [
-      {
-        title: 'Inertial Brakes',
-        description: 'Linear damping +30%. Faster stops.',
-        highlights: [
-          'Reduces inertia when releasing movement keys. Improved control.',
-        ],
-      },
-      {
-        title: 'Retro Thrusters',
-        description: 'Linear damping +60%. Near-instant reversals.',
-        highlights: ['Very fast stops. Ideal for close-quarters combat.'],
-      },
-      {
-        title: 'Emergency Brake',
-        description: 'Linear damping +100%. Unlocks the emergency brake.',
-        highlights: [
-          'Hold a direction against your motion for 0.25 s: full stop and a shockwave that shoves enemies back.',
-        ],
-      },
-    ],
-  },
-  // The game reads this over `text`: the computer's brake on the jets when
-  // the thrust is let go (flight.js; measured 22/11 from top speed, 132 px/s,
-  // to under 10 px/s: never bare, 1.23 / 1.02 / 0.80 s per level).
-  newFlightText: {
     summary:
       'The computer brakes for you: let go of the thrust and the retro and side jets stop the ship.',
+    lore: 'Mining technology adapted for combat. Allows impossible stops and sharp direction changes.',
     levels: [
       {
         title: 'Inertial Brakes',

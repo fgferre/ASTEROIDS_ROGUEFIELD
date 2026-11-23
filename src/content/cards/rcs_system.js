@@ -1,7 +1,7 @@
 // The side jets (numbers: proposta 20/10): their push and the turn × the
 // level's `multiplier`, and the computer stops a released spin firmer each
-// level (player/flight.js). The game reads `newFlightText` over `text`, which
-// is what the cards said before the jets' flight (22/11).
+// level (player/flight.js). Measured 22/11: turn rate 74°/s bare, then 96,
+// 118, 140, 163, 192; a released spin stops in 1.7 s bare, 0.5 s at level 1.
 export default {
   id: 'rcs_system',
   order: 22,
@@ -23,43 +23,8 @@ export default {
   text: {
     name: 'RCS System',
     summary:
-      'Maneuvering thrusters bite harder: the ship gets to speed, turns and reverses sooner, at the same top speed.',
-    lore: 'Reaction Control System salvaged from abandoned space stations. Allows maneuvers impossible for conventional ships.',
-    levels: [
-      {
-        title: 'Basic RCS',
-        description:
-          'Under thrust, changes of speed and direction are 30% quicker: a full reversal in 0.6 s instead of 0.75 s.',
-        highlights: ['Top speed is unchanged: that is Main Thrusters.'],
-      },
-      {
-        title: 'Active RCS',
-        description: '60% quicker: a full reversal in 0.5 s.',
-        highlights: ['Full speed from a standstill in a third of a second.'],
-      },
-      {
-        title: 'Enhanced RCS',
-        description: '90% quicker: a full reversal in 0.4 s.',
-        highlights: ['Dodge back the way you came.'],
-      },
-      {
-        title: 'Vector RCS',
-        description: '2.2 times as quick: a full reversal in 0.35 s.',
-        highlights: ['The ship goes where the keys point.'],
-      },
-      {
-        title: 'Omni-directional RCS',
-        description: '2.6 times as quick: a full reversal in 0.3 s.',
-        highlights: ['Starts, stops and turns all but instant.'],
-      },
-    ],
-  },
-  // The game reads this over `text`: the side jets (flight.js), turning and
-  // stopping a released spin. Measured 22/11: turn rate 74°/s bare, 96, 118,
-  // 140, 163, 192 per level; a released spin stops in 1.7 s bare, 0.5 s at 1.
-  newFlightText: {
-    summary:
       'Side thrusters bite harder: the hull turns faster, and the computer stops a spin for you when you let go.',
+    lore: 'Reaction Control System salvaged from abandoned space stations. Allows maneuvers impossible for conventional ships.',
     levels: [
       {
         title: 'Basic RCS',
