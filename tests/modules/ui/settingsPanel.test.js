@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { SettingsPanel } from '../../../src/modules/ui/SettingsPanel.js';
 import SETTINGS_SCHEMA from '../../../src/data/settingsSchema.js';
 import { settingPreview } from '../../../src/modules/ui/settingsPreview.js';
