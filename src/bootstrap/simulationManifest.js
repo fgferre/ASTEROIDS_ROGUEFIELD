@@ -1,0 +1,707 @@
+// Every service the game registers, in registration order, except the four
+// that show, sound or draw it (audio, ui, menu-background, renderer): those
+// are slots filled from `presentation` by name and left out when absent.
+// serviceManifest.js fills them with the real systems; the headless test game
+// registers doubles instead, so loading this file never loads those systems.
+
+import SettingsSystem from '../modules/SettingsSystem.js';
+import InputSystem from '../modules/InputSystem.js';
+import PlayerSystem from '../modules/PlayerSystem.js';
+import CombatSystem from '../modules/CombatSystem.js';
+import { EnemySystem } from '../modules/EnemySystem.js';
+import PhysicsSystem from '../modules/PhysicsSystem.js';
+import XPOrbSystem from '../modules/XPOrbSystem.js';
+import HealthHeartSystem from '../modules/collectibles/HealthHeartSystem.js';
+import PickupSystem from '../modules/collectibles/PickupSystem.js';
+import ProgressionSystem from '../modules/ProgressionSystem.js';
+import EffectsSystem from '../modules/EffectsSystem.js';
+import WorldSystem from '../modules/WorldSystem.js';
+import { GamePools } from '../core/GamePools.js';
+import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
+import RandomService from '../core/RandomService.js';
+import { gameEvents } from '../core/EventBus.js';
+import { createServiceResolver } from '../core/serviceUtils.js';
+import GameSessionService from '../services/GameSessionService.js';
+import CommandQueueService from '../services/CommandQueueService.js';
+import CodexService from '../services/CodexService.js';
+import AchievementService from '../services/AchievementService.js';
+import HangarService from '../services/HangarService.js';
+import DifficultyService from '../services/DifficultyService.js';
+
+export const DEFAULT_POOL_CONFIG = {
+  bullets: { initial: 25, max: 120 },
+  particles: { initial: 60, max: 400 },
+  asteroids: { initial: 20, max: 100 },
+  xpOrbs: { initial: 40, max: 250 },
+  shockwaves: { initial: 8, max: 25 },
+  tempObjects: { initial: 15, max: 60 },
+};
+
+export const DEFAULT_GC_OPTIONS = {
+  defaultInterval: 4500,
+  idleTimeout: 120,
+  maxTasksPerFrame: 2,
+};
+
+function ensureGameStateService(gameState) {
+  if (!gameState || typeof gameState !== 'object') {
+    throw new Error('[serviceManifest] Missing game state reference');
+  }
+
+  let sessionDelegate = null;
+
+  const service = {
+    isPaused: () => {
+      if (sessionDelegate && typeof sessionDelegate.isPaused === 'function') {
+        try {
+          return Boolean(sessionDelegate.isPaused());
+        } catch (error) {
+          console.warn(
+            '[serviceManifest] Falling back to raw pause state:',
+            error
+          );
+        }
+      }
+      return Boolean(gameState.isPaused);
+    },
+    getScreen: () => {
+      if (sessionDelegate && typeof sessionDelegate.getScreen === 'function') {
+        try {
+          return sessionDelegate.getScreen();
+        } catch (error) {
+          console.warn(
+            '[serviceManifest] Falling back to raw screen state:',
+            error
+          );
+        }
+      }
+      return gameState.screen;
+    },
+    setScreen: (screen) => {
+      if (sessionDelegate && typeof sessionDelegate.setScreen === 'function') {
+        sessionDelegate.setScreen(screen);
+        const delegatedScreen =
+          typeof sessionDelegate.getScreen === 'function'
+            ? sessionDelegate.getScreen()
+            : undefined;
+        if (delegatedScreen !== undefined) {
+          gameState.screen = delegatedScreen;
+          return;
+        }
+      }
+
+      gameState.screen = screen;
+    },
+    setPaused: (value) => {
+      if (sessionDelegate && typeof sessionDelegate.setPaused === 'function') {
+        sessionDelegate.setPaused(value);
+        const delegatedState =
+          typeof sessionDelegate.isPaused === 'function'
+            ? sessionDelegate.isPaused()
+            : undefined;
+        if (delegatedState !== undefined) {
+          gameState.isPaused = Boolean(delegatedState);
+          return;
+        }
+      }
+
+      gameState.isPaused = Boolean(value);
+    },
+    getRawState: () => gameState,
+  };
+
+  Object.defineProperty(service, '__attachSessionService', {
+    value: (sessionService) => {
+      sessionDelegate = sessionService || null;
+
+      if (sessionDelegate) {
+        if (typeof sessionDelegate.getScreen === 'function') {
+          const screen = sessionDelegate.getScreen();
+          if (screen !== undefined) {
+            gameState.screen = screen;
+          }
+        }
+
+        if (typeof sessionDelegate.isPaused === 'function') {
+          const paused = sessionDelegate.isPaused();
+          if (paused !== undefined) {
+            gameState.isPaused = Boolean(paused);
+          }
+        }
+      }
+    },
+    enumerable: false,
+    writable: false,
+  });
+
+  return service;
+}
+
+function initializeGamePools(config) {
+  const poolConfig = { ...DEFAULT_POOL_CONFIG, ...config };
+  if (!GamePools.initialized) {
+    GamePools.initialize(poolConfig);
+  }
+  return GamePools;
+}
+
+function createGarbageCollector(options) {
+  const gcOptions = { ...DEFAULT_GC_OPTIONS, ...options };
+  const manager = new GarbageCollectionManager(gcOptions);
+  manager.initialize();
+
+  manager.registerPeriodicTask(
+    'pool-auto-manage',
+    () => GamePools.autoManageAll(),
+    { interval: 5000, priority: 2, runImmediately: true }
+  );
+
+  manager.registerPeriodicTask(
+    'temp-pool-trim',
+    () => {
+      const tempPool = GamePools.tempObjects;
+      if (tempPool && typeof tempPool.autoManage === 'function') {
+        tempPool.autoManage({
+          targetUtilization: 0.55,
+          maxShrinkage: 10,
+          maxExpansion: 6,
+        });
+      }
+    },
+    { interval: 7000, priority: 1 }
+  );
+
+  return manager;
+}
+
+function createRandomService(context = {}) {
+  const { randomOverrides, seed } = context;
+
+  const baseSeed =
+    randomOverrides &&
+    typeof randomOverrides === 'object' &&
+    'seed' in randomOverrides
+      ? randomOverrides.seed
+      : seed;
+
+  if (typeof randomOverrides === 'function') {
+    const result = randomOverrides({
+      seed: baseSeed,
+      context,
+      RandomService,
+    });
+
+    if (result) {
+      return result;
+    }
+  }
+
+  if (randomOverrides && typeof randomOverrides === 'object') {
+    if (typeof randomOverrides.factory === 'function') {
+      const factoryResult = randomOverrides.factory({
+        seed: baseSeed,
+        context,
+        RandomService,
+      });
+
+      if (factoryResult) {
+        return factoryResult;
+      }
+    }
+
+    if (randomOverrides.instance) {
+      return randomOverrides.instance;
+    }
+
+    if (typeof randomOverrides.create === 'function') {
+      const created = randomOverrides.create({
+        seed: baseSeed,
+        context,
+        RandomService,
+      });
+
+      if (created) {
+        return created;
+      }
+    }
+  }
+
+  const ServiceCtor =
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.Service) ||
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.RandomService) ||
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.constructorOverride) ||
+    RandomService;
+
+  const service = new ServiceCtor(baseSeed);
+
+  if (
+    randomOverrides &&
+    typeof randomOverrides === 'object' &&
+    typeof randomOverrides.configure === 'function'
+  ) {
+    randomOverrides.configure(service, {
+      seed: baseSeed,
+      context,
+      RandomService,
+    });
+  }
+
+  return service;
+}
+
+export function createSimulationManifest(context = {}, presentation = {}) {
+  const { gameState, poolConfig, garbageCollectorOptions } = context;
+
+  return [
+    {
+      name: 'event-bus',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: () => gameEvents,
+    },
+    {
+      name: 'random',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: ({ context: manifestContext }) =>
+        createRandomService({ ...manifestContext }),
+    },
+    {
+      name: 'game-state',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: () => ensureGameStateService(gameState),
+    },
+    {
+      name: 'game-pools',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: () => initializeGamePools(poolConfig),
+    },
+    {
+      name: 'garbage-collector',
+      singleton: true,
+      lazy: false,
+      dependencies: ['game-pools'],
+      factory: () => createGarbageCollector(garbageCollectorOptions),
+    },
+    {
+      name: 'settings',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new SettingsSystem({ eventBus: resolved['event-bus'] }),
+    },
+    {
+      name: 'codex',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new CodexService({ eventBus: resolved['event-bus'] }),
+    },
+    {
+      name: 'achievements',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new AchievementService({ eventBus: resolved['event-bus'] }),
+    },
+    {
+      name: 'difficulty',
+      singleton: true,
+      lazy: false,
+      dependencies: ['settings'],
+      factory: ({ resolved, context: manifestContext }) =>
+        new DifficultyService({
+          settings: resolved['settings'],
+          bootSeed: manifestContext.seed,
+          bootSeedSource: manifestContext.randomSeedSource,
+        }),
+    },
+    {
+      name: 'hangar',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'difficulty', 'achievements'],
+      factory: ({ resolved }) =>
+        new HangarService({
+          eventBus: resolved['event-bus'],
+          difficulty: resolved['difficulty'],
+          achievements: resolved['achievements'],
+        }),
+    },
+    presentation.audio,
+    {
+      name: 'command-queue',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: ({ context: manifestContext }) =>
+        new CommandQueueService({
+          initialFrame: Number.isFinite(manifestContext?.initialFrame)
+            ? manifestContext.initialFrame
+            : 0,
+          frameSource: manifestContext?.frameSource,
+          hooks: manifestContext?.metrics?.commandQueue,
+        }),
+    },
+
+    {
+      name: 'input',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'settings', 'command-queue', 'game-state'],
+      factory: ({ resolved }) =>
+        new InputSystem({
+          eventBus: resolved['event-bus'],
+          settings: resolved['settings'],
+          'command-queue': resolved['command-queue'],
+          'game-state': resolved['game-state'],
+        }),
+    },
+    {
+      name: 'player',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'input',
+        'command-queue',
+        'hangar',
+        'difficulty',
+        'settings',
+      ],
+      factory: ({ resolved }) =>
+        new PlayerSystem({
+          eventBus: resolved['event-bus'],
+          input: resolved['input'],
+          'command-queue': resolved['command-queue'],
+          hangar: resolved['hangar'],
+          difficulty: resolved['difficulty'],
+          settings: resolved['settings'],
+        }),
+    },
+    {
+      name: 'xp-orbs',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'player', 'random'],
+      factory: ({ resolved }) =>
+        new XPOrbSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          random: resolved['random'],
+        }),
+    },
+    {
+      name: 'healthHearts',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'player'],
+      factory: ({ resolved }) =>
+        new HealthHeartSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+        }),
+    },
+    {
+      name: 'physics',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        const physics = new PhysicsSystem({
+          eventBus: resolved['event-bus'],
+          serviceResolver,
+        });
+
+        const enemyInstance =
+          typeof container?.isInstantiated === 'function' &&
+          container.isInstantiated('enemies')
+            ? container.resolve('enemies')
+            : null;
+
+        if (enemyInstance && typeof physics.attachEnemySystem === 'function') {
+          physics.attachEnemySystem(enemyInstance);
+        }
+
+        return physics;
+      },
+    },
+    presentation.ui,
+    {
+      name: 'effects',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'settings', 'random'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new EffectsSystem({
+          eventBus: resolved['event-bus'],
+          settings: resolved['settings'],
+          random: resolved['random'],
+          serviceResolver,
+        });
+      },
+    },
+    {
+      name: 'progression',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'xp-orbs',
+        'player',
+        'ui',
+        'effects',
+        'random',
+        'hangar',
+        'difficulty',
+      ],
+      factory: ({ resolved }) => {
+        const progression = new ProgressionSystem({
+          eventBus: resolved['event-bus'],
+          'xp-orbs': resolved['xp-orbs'],
+          player: resolved['player'],
+          ui: resolved['ui'],
+          effects: resolved['effects'],
+          random: resolved['random'],
+          hangar: resolved['hangar'],
+          difficulty: resolved['difficulty'],
+        });
+
+        const xpOrbSystem = resolved['xp-orbs'];
+        if (
+          xpOrbSystem &&
+          typeof xpOrbSystem.attachProgression === 'function'
+        ) {
+          xpOrbSystem.attachProgression(progression);
+        }
+
+        return progression;
+      },
+    },
+    {
+      name: 'enemies',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'xp-orbs',
+        'progression',
+        'physics',
+        'healthHearts',
+        'random',
+        'difficulty',
+      ],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        const enemySystem = new EnemySystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          'xp-orbs': resolved['xp-orbs'],
+          progression: resolved['progression'],
+          physics: resolved['physics'],
+          healthHearts: resolved['healthHearts'],
+          random: resolved['random'],
+          difficulty: resolved['difficulty'],
+          serviceResolver,
+        });
+
+        if (
+          resolved['progression'] &&
+          typeof enemySystem.attachProgression === 'function'
+        ) {
+          enemySystem.attachProgression(resolved['progression']);
+        }
+
+        if (
+          resolved['physics'] &&
+          typeof resolved['physics'].attachEnemySystem === 'function'
+        ) {
+          resolved['physics'].attachEnemySystem(enemySystem);
+        }
+
+        return enemySystem;
+      },
+    },
+    {
+      name: 'pickups',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'xp-orbs',
+        'enemies',
+        'effects',
+        'progression',
+        'random',
+      ],
+      // `combat` once it is built (Motherlode follows the held weapon).
+      factory: ({ resolved, container }) =>
+        new PickupSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          'xp-orbs': resolved['xp-orbs'],
+          enemies: resolved['enemies'],
+          effects: resolved['effects'],
+          progression: resolved['progression'],
+          random: resolved['random'],
+          serviceResolver: createServiceResolver(container),
+        }),
+    },
+    {
+      name: 'enemy-spawn',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.spawnSystem : null;
+      },
+    },
+    {
+      name: 'enemy-damage',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.damageSystem : null;
+      },
+    },
+    {
+      name: 'enemy-update',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.updateSystem : null;
+      },
+    },
+    {
+      name: 'combat',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'player', 'enemies', 'physics'],
+      factory: ({ resolved }) =>
+        new CombatSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          enemies: resolved['enemies'],
+          physics: resolved['physics'],
+        }),
+    },
+    {
+      name: 'world',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'enemies',
+        'physics',
+        'progression',
+        'combat',
+      ],
+      factory: ({ resolved }) => {
+        const world = new WorldSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          enemies: resolved['enemies'],
+          physics: resolved['physics'],
+          progression: resolved['progression'],
+          combat: resolved['combat'],
+        });
+
+        if (
+          resolved['enemies'] &&
+          typeof resolved['enemies'].attachWorld === 'function'
+        ) {
+          resolved['enemies'].attachWorld(world);
+        }
+
+        return world;
+      },
+    },
+    presentation['menu-background'],
+    presentation.renderer,
+    // Last: an eager service can only resolve dependencies registered above it.
+    {
+      name: 'game-session',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'random',
+        'game-state',
+        'audio',
+        'ui',
+        'player',
+        'progression',
+        'enemies',
+        'physics',
+        'xp-orbs',
+        'healthHearts',
+        'world',
+        'effects',
+        'combat',
+        'renderer',
+        'settings',
+        'hangar',
+        'difficulty',
+      ],
+      factory: ({ resolved, context }) => {
+        const instance = new GameSessionService({
+          eventBus: resolved['event-bus'],
+          random: resolved['random'],
+          gameStateFacade: resolved['game-state'],
+          services: {
+            audio: resolved['audio'],
+            ui: resolved['ui'],
+            player: resolved['player'],
+            progression: resolved['progression'],
+            enemies: resolved['enemies'],
+            physics: resolved['physics'],
+            xpOrbs: resolved['xp-orbs'],
+            healthHearts: resolved['healthHearts'],
+            world: resolved['world'],
+            effects: resolved['effects'],
+            combat: resolved['combat'],
+            renderer: resolved['renderer'],
+            settings: resolved['settings'],
+            hangar: resolved['hangar'],
+            difficulty: resolved['difficulty'],
+          },
+          gameState: context.gameState,
+        });
+
+        if (
+          resolved['game-state'] &&
+          typeof resolved['game-state'].__attachSessionService === 'function'
+        ) {
+          resolved['game-state'].__attachSessionService(instance);
+        }
+
+        return instance;
+      },
+    },
+  ].filter(Boolean);
+}

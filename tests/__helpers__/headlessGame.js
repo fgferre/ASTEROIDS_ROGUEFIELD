@@ -1,13 +1,15 @@
 /**
- * Headless game harness: the production service manifest with only the
- * DOM-bound services (UI, audio) stubbed, stepped like app.js gameLoop.
+ * Headless game harness: the production simulation (simulationManifest.js)
+ * with doubles in the presentation slots (UI, audio, renderer, menu
+ * background), stepped like app.js gameLoop. It never loads the presentation
+ * systems (tests/process/simulationLoadsNoPresentation.test.js guards it).
  */
 
 import { afterEach } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import { createServiceManifest } from '../../src/bootstrap/serviceManifest.js';
+import { createSimulationManifest } from '../../src/bootstrap/simulationManifest.js';
 import { createFixedStepper } from '../../src/core/fixedStep.js';
 import { createReplayController } from '../../src/bootstrap/replaySession.js';
 
@@ -44,7 +46,7 @@ const SIMULATION_SERVICES = [
 ];
 
 /**
- * One game instance: real simulation services, stubbed UI and audio.
+ * One game instance: real simulation services, presentation doubles.
  * `seedSource` is the boot's ('profile-harness' boots a demo page).
  */
 // Each game's garbage collector queues its first pool pass on a 150 ms real
@@ -75,14 +77,21 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
     update() {},
     reset() {},
   };
-  const stubs = {
-    'event-bus': eventBus,
+  // Each double holds only what the simulation calls on it.
+  const presentation = {
     audio: { init() {}, reseedRandomScopes() {} },
     ui,
+    // GameSessionService resets it with the other systems; the real one then
+    // announces renderer-reset, an event the golden trace records.
+    renderer: { reset: () => eventBus.emit('renderer-reset') },
+    // Only the real renderer reads it.
+    'menu-background': {},
   };
+  const stubs = { 'event-bus': eventBus, ...presentation };
 
   // Same registration as ServiceRegistry.setupServices, with the stubs above
-  // and everything lazy so only the services resolved below are built.
+  // (the doubles in their slots) and everything lazy so only the services
+  // resolved below are built.
   const context = {
     gameState,
     seed: SEED,
@@ -91,7 +100,10 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
   };
   const container = new DIContainer();
   container.verbose = false;
-  for (const entry of createServiceManifest(context)) {
+  const slots = Object.fromEntries(
+    Object.keys(presentation).map((name) => [name, { name }])
+  );
+  for (const entry of createSimulationManifest(context, slots)) {
     const { name, dependencies = [] } = entry;
     const factory = stubs[name]
       ? () => stubs[name]
