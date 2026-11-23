@@ -285,7 +285,7 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   (`quadro/respostas/freio-com-motor-23-11.txt`); medido: com o motor apertado a carta não freia, entra nos toques de W
   e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
   inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
-  inclinação construídos (só desenho). O strafe, o coice de verdade e as cartas de mobilidade vêm depois. Fecha quando
+  inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). O strafe, o coice de verdade e as cartas de mobilidade vêm depois. Fecha quando
   ele aprovar voando.
 
 ## Som (palavras dele, 19/11)

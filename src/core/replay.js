@@ -10,13 +10,14 @@
 // integers replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 11;
-// Recordings before version 11 are refused, as they no longer play back the
+export const REPLAY_VERSION = 12;
+// Recordings before version 12 are refused, as they no longer play back the
 // same: 8 drew its random streams from the page's boot seed, before 9 none
 // stored the run's Hangar setup, in 9 a pad's left stick held back fired the
 // dash forward and its D-pad lost thrust while the right stick aimed
-// (outside audit 5, 21/11), and 10 flew the drag flight the jets' flight
-// replaced (22/11).
+// (outside audit 5, 21/11), 10 flew the drag flight the jets' flight
+// replaced (22/11), and 11's Braking System braked the start's flight with a
+// turn key held or right after a tap of thrust (23/11).
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the

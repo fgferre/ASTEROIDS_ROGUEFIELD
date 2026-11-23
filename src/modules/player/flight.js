@@ -60,6 +60,10 @@ export const SPIN_STOP_SHARE = 0.5;
 // gentler, never under BRAKE_FLOOR of it, until the ship stops.
 export const BRAKE_FULL_SHARE = 0.5;
 export const BRAKE_FLOOR = 0.5;
+// The start's auto-brake waits for every key to be let go, the turn's too,
+// and this long more (s), so a tap of W keeps the speed (Felipe's pick,
+// corpo-da-nave-1, 23/11: "A + espera um instante").
+export const BRAKE_WAIT_S = 0.25;
 // The Flight Computer: its cruise × the start's top speed; the turbo × that;
 // the jets' force and the auto-brake's, × the start's.
 const MODERN_TOP = 1.2;
@@ -243,6 +247,8 @@ export class PlayerFlight {
     // with any level the auto-brake on the travel.
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
+    // How long the start's pilot has touched no key (s), for BRAKE_WAIT_S.
+    this.idle = 0;
   }
 
   // The combined total, for readers of the old shape (snapshot, tooltip).
@@ -305,9 +311,12 @@ export class PlayerFlight {
     const speed = Math.hypot(v.vx, v.vy);
     const isMainManual = modern ? Boolean(move) : asks.up > 0;
     const isAuxManual = !modern && asks.down > 0;
-    const noLinearInput = modern ? !move : !asks.up && !asks.down;
+    const command = asks.up || asks.down || asks.left || asks.right;
+    this.idle = command ? 0 : this.idle + deltaTime;
+    const noLinearInput = modern ? !move : this.idle >= BRAKE_WAIT_S;
     // The auto-brake: the Flight Computer's always; the start's with the
-    // Braking System (without it, stopping is the pilot's).
+    // Braking System (without it, stopping is the pilot's), once every key
+    // has been let go for BRAKE_WAIT_S.
     const autoBrake =
       noLinearInput && speed > 0 && (modern || this.brakingDamping > 0);
 

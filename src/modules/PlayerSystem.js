@@ -925,6 +925,7 @@ class PlayerSystem extends BaseSystem {
     this.controlHoldTimer = 0;
     this.flight.turbo = 0;
     this.flight.turboDir = null;
+    this.flight.idle = 0;
 
     // Reset visual upgrade levels
     this.thrusters.thrusterVisualLevel = 0;
@@ -1012,6 +1013,7 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = 0;
     this.flight.turbo = 0;
     this.flight.turboDir = null;
+    this.flight.idle = 0;
     this.turretAngle = this.angle;
     this.turretLayers.fill(this.angle);
     this.lockAims = null;

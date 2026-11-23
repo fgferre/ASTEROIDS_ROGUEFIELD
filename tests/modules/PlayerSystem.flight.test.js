@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import PlayerSystem from '../../src/modules/PlayerSystem.js';
+import { BRAKE_WAIT_S } from '../../src/modules/player/flight.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -73,6 +74,27 @@ describe('PlayerSystem flight by the jets', () => {
     const retro = lit(coast, 'aux');
     expect(retro.length).toBeGreaterThan(20);
     expect(retro.every((e) => e.isAutomatic && !e.pilot)).toBe(true);
+  });
+
+  it('the Braking System waits for every key, the turn included, and a beat more: a turn or a tap of W keeps the speed', () => {
+    const { player, fly } = makePlayer();
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
+    fly({ up: true }, 90);
+    fly({ right: true }, 60);
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    for (let i = 0; i < 8; i += 1) {
+      fly({ up: true }, 6);
+      fly({}, 9);
+    }
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    // the last tap's 9 idle frames count toward the wait
+    fly({}, Math.round(BRAKE_WAIT_S / DT) - 10);
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    fly({}, 6);
+    expect(speedOf(player)).toBeLessThan(START_TOP - 1);
+    // drifting across the nose after the turn: the flanks stop it
+    fly({}, 180);
+    expect(speedOf(player)).toBe(0);
   });
 
   it('a released turn keeps its momentum, worked off slowly; the RCS System stops it firmer, the Braking System not at all', () => {
