@@ -12,21 +12,14 @@
 //       the table: both skills, seeds 1 to 10, one sector (default debris-wake)
 //
 // Hands the choice to tests/playtest/sectors.playtest.js through the
-// environment and runs it under vitest.playtest.config.js.
-//
-// vitest runs as a process group of its own, and the launcher kills the whole
-// group when it exits, Ctrl+C, kill and pkill included: killing the launcher
-// once left a vitest worker stuck in a loop spinning a core for twelve hours
-// (22/11). Not covered: a kill -9 of the launcher gives it no chance to clean
-// up, and the group runs on.
+// environment and runs it under vitest.playtest.config.js, as a process group
+// that dies with the launcher (scripts/vitest-group.mjs).
 
-import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
-import { constants, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { runVitest } from './vitest-group.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PRESETS = ['average', 'good'];
 const args = process.argv.slice(2);
 const flag = (name) =>
@@ -38,46 +31,11 @@ const [sector = '', seed = ''] = args.filter(
   (arg) => !PRESETS.includes(arg) && !arg.startsWith('--')
 );
 
-// The running vitest's process group (its pid), or null. SIGKILL, because a
-// worker stuck in a loop never runs a handler for a gentler signal.
-let group = null;
-const killGroup = () => {
-  try {
-    if (group) process.kill(-group, 'SIGKILL');
-  } catch {
-    // the group is already gone
-  }
-};
-process.on('exit', killGroup);
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-  process.on(signal, () => process.exit(128 + constants.signals[signal]));
-}
-
 /** One vitest run; resolves to its exit code (null when a signal ended it). */
 function run(env) {
-  const child = spawn(
-    process.execPath,
-    [
-      resolve(ROOT, 'node_modules/vitest/vitest.mjs'),
-      'run',
-      '--config',
-      'vitest.playtest.config.js',
-    ],
-    {
-      cwd: ROOT,
-      detached: true,
-      stdio: table ? 'ignore' : 'inherit',
-      env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
-    }
-  );
-  group = child.pid;
-  return new Promise((done, fail) => {
-    child.on('error', fail);
-    child.on('exit', (code) => {
-      killGroup(); // a worker left behind by vitest
-      group = null;
-      done(code);
-    });
+  return runVitest(['run', '--config', 'vitest.playtest.config.js'], {
+    stdio: table ? 'ignore' : 'inherit',
+    env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
   });
 }
 
