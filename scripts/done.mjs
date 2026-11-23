@@ -22,6 +22,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -146,18 +147,29 @@ export function contentKey(root) {
   );
 }
 
-function run(command) {
+function runCommand(step, command, root) {
   process.stdout.write(`\n> ${command}\n`);
-  return spawnSync(command, { cwd: ROOT, stdio: 'inherit', shell: true });
+  return (
+    spawnSync(command, { cwd: root, stdio: 'inherit', shell: true }).status ?? 1
+  );
 }
 
-function main() {
+// The whole run, steps injectable for the test: run(step, command, root)
+// returns the command's exit status. Returns { outcome, code }; the CLI below
+// exits with code.
+export function main({
+  root = ROOT,
+  argv = process.argv.slice(2),
+  env = process.env,
+  run = runCommand,
+  print = (text, stream = process.stdout) => stream.write(text),
+} = {}) {
   const started = Date.now();
-  const force = process.argv.includes('--force');
-  const golden = process.env.GOLDEN_UPDATE !== undefined;
+  const force = argv.includes('--force');
+  const golden = env.GOLDEN_UPDATE !== undefined;
   const common = resolve(
-    ROOT,
-    git(ROOT, ['rev-parse', '--git-common-dir']).trim()
+    root,
+    git(root, ['rev-parse', '--git-common-dir']).trim()
   );
   let key = '-';
 
@@ -165,17 +177,17 @@ function main() {
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     appendFileSync(
       join(common, 'done-log'),
-      `${[new Date().toISOString(), `${seconds}s`, outcome, key.slice(0, 12), basename(ROOT)].join('\t')}\n`
+      `${[new Date().toISOString(), `${seconds}s`, outcome, key.slice(0, 12), basename(root)].join('\t')}\n`
     );
-    process.exit(code);
+    return { outcome, code };
   };
 
-  const diffs = checkInstall(ROOT);
+  const diffs = checkInstall(root);
   if (diffs.length) {
     const shown = diffs.slice(0, 5).map((d) => `  ${d}`);
     if (diffs.length > 5) shown.push(`  ... e mais ${diffs.length - 5}`);
-    process.stderr.write(`${shown.join('\n')}\n${installMessage(ROOT)}\n`);
-    finish('fail at install', 1);
+    print(`${shown.join('\n')}\n${installMessage(root)}\n`, process.stderr);
+    return finish('fail at install', 1);
   }
 
   for (const [step, command] of [
@@ -183,59 +195,63 @@ function main() {
     ['format', 'npm run format:check'],
     ['changelog', 'npx vitest run tests/process/changelogLine.test.js'],
   ]) {
-    const r = run(command);
-    if (r.status !== 0) finish(`fail at ${step}`, r.status ?? 1);
+    const status = run(step, command, root);
+    if (status !== 0) return finish(`fail at ${step}`, status);
   }
 
-  key = contentKey(ROOT);
+  key = contentKey(root);
   const stamp = join(common, 'done-stamps', key);
   if (!force && !golden && existsSync(stamp)) {
     const at = new Date(readFileSync(stamp, 'utf8').split('\n')[0]);
     const hhmm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-    process.stdout.write(
+    print(
       `\njá verificado às ${hhmm} para exatamente este conteúdo (testes e build pulados; --force roda tudo)\n`
     );
-    finish('hit', 0);
+    return finish('hit', 0);
   }
 
   for (const [step, command] of [
     ['test', 'npm test'],
     ['build', 'npm run build'],
   ]) {
-    const r = run(command);
-    if (r.status !== 0) finish(`fail at ${step}`, r.status ?? 1);
+    const status = run(step, command, root);
+    if (status !== 0) return finish(`fail at ${step}`, status);
   }
 
   if (golden) {
-    process.stdout.write(
+    print(
       '\npassou, não carimbado: GOLDEN_UPDATE está ligado (referências regravadas)\n'
     );
-    finish('pass-not-stamped (GOLDEN_UPDATE)', 0);
+    return finish('pass-not-stamped (GOLDEN_UPDATE)', 0);
   }
   let after = null;
   try {
-    after = contentKey(ROOT);
+    after = contentKey(root);
   } catch {
     // a file vanished under another edit: the content changed
   }
   if (after !== key) {
-    process.stdout.write(
-      '\npassou, não carimbado: o conteúdo mudou durante a verificação\n'
-    );
-    finish('pass-not-stamped (changed)', 0);
+    print('\npassou, não carimbado: o conteúdo mudou durante a verificação\n');
+    return finish('pass-not-stamped (changed)', 0);
   }
   mkdirSync(dirname(stamp), { recursive: true });
-  const head = git(ROOT, ['rev-parse', '--short', 'HEAD']).trim();
+  const head = git(root, ['rev-parse', '--short', 'HEAD']).trim();
   const temp = `${stamp}.${process.pid}.tmp`;
-  writeFileSync(temp, `${new Date().toISOString()}\n${ROOT}\nHEAD ${head}\n`);
+  writeFileSync(temp, `${new Date().toISOString()}\n${root}\nHEAD ${head}\n`);
   renameSync(temp, stamp);
-  process.stdout.write(`\npassou e carimbado (${key.slice(0, 12)})\n`);
-  finish('pass+stamped', 0);
+  print(`\npassou e carimbado (${key.slice(0, 12)})\n`);
+  return finish('pass+stamped', 0);
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  main();
+// import.meta.url is the real path; argv[1] may come through a symlink.
+function calledDirectly() {
+  try {
+    return (
+      import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+    );
+  } catch {
+    return false;
+  }
 }
+
+if (calledDirectly()) process.exit(main().code);

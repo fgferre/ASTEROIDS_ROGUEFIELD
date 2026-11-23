@@ -7,6 +7,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -24,6 +25,7 @@ import {
   installMessage,
   keyFromParts,
   lockDifferences,
+  main,
 } from '../../scripts/done.mjs';
 
 const dirs = [];
@@ -35,6 +37,33 @@ function tempDir() {
 afterAll(() =>
   dirs.forEach((d) => rmSync(d, { recursive: true, force: true }))
 );
+
+// A committed temp repo with matching lockfiles; dist/ is ignored.
+function committedRepo() {
+  const repo = tempDir();
+  const gitHere = (...args) =>
+    execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+  gitHere('init', '-q');
+  mkdirSync(join(repo, 'node_modules'));
+  mkdirSync(join(repo, 'src'));
+  writeFileSync(join(repo, '.gitignore'), 'node_modules\ndist/\n');
+  writeFileSync(
+    join(repo, 'package-lock.json'),
+    JSON.stringify({ packages: { '': { name: 'game' } } })
+  );
+  writeFileSync(
+    join(repo, 'node_modules', '.package-lock.json'),
+    JSON.stringify({ packages: {} })
+  );
+  writeFileSync(join(repo, 'src', 'a.js'), 'export const a = 1;\n');
+  gitHere('add', '-A');
+  gitHere(
+    ...['-c', 'user.name=done', '-c', 'user.email=done@test'],
+    ...['-c', 'commit.gpgsign=false', 'commit', '-q', '--no-verify'],
+    ...['-m', 'start']
+  );
+  return repo;
+}
 
 const a = { version: '1.0.0', integrity: 'sha512-a' };
 const lock = {
@@ -157,5 +186,118 @@ describe('done: the content key', () => {
     writeFileSync(join(repo, 'src', 'public', 'notes.md'), 'two\n');
     expect(contentKey(repo)).not.toBe(before);
     expect(readFileSync(join(repo, '.git', 'index'))).toEqual(index);
+  });
+
+  it('changes with an untracked or a deleted file, not with an ignored one', () => {
+    const repo = committedRepo();
+    const key = contentKey(repo);
+    mkdirSync(join(repo, 'dist'));
+    writeFileSync(join(repo, 'dist', 'out.js'), 'built');
+    expect(contentKey(repo)).toBe(key);
+    writeFileSync(join(repo, 'src', 'b.js'), 'new');
+    expect(contentKey(repo)).not.toBe(key);
+    rmSync(join(repo, 'src', 'b.js'));
+    expect(contentKey(repo)).toBe(key);
+    rmSync(join(repo, 'src', 'a.js'));
+    expect(contentKey(repo)).not.toBe(key);
+  });
+});
+
+// main() with fake steps: run() records the step and returns its status.
+const ALL = ['lint', 'format', 'changelog', 'test', 'build'];
+function runDone(repo, { argv = [], env = {}, failAt, during } = {}) {
+  const steps = [];
+  const printed = [];
+  const result = main({
+    root: repo,
+    argv,
+    env,
+    run: (step) => {
+      steps.push(step);
+      if (step === 'test') during?.();
+      return step === failAt ? 2 : 0;
+    },
+    print: (text) => printed.push(text),
+  });
+  return { ...result, steps, printed: printed.join('') };
+}
+const stampDir = (repo) => join(repo, '.git', 'done-stamps');
+
+describe('done: the run', () => {
+  it('skips the tests and the build on a stamp, and --force runs them', () => {
+    const repo = committedRepo();
+    expect(runDone(repo)).toMatchObject({
+      outcome: 'pass+stamped',
+      code: 0,
+      steps: ALL,
+    });
+    expect(existsSync(join(stampDir(repo), contentKey(repo)))).toBe(true);
+    const hit = runDone(repo);
+    expect(hit).toMatchObject({
+      outcome: 'hit',
+      code: 0,
+      steps: ['lint', 'format', 'changelog'],
+    });
+    expect(hit.printed).toMatch(
+      /já verificado às \d\d:\d\d para exatamente este conteúdo/
+    );
+    expect(runDone(repo, { argv: ['--force'] })).toMatchObject({
+      outcome: 'pass+stamped',
+      steps: ALL,
+    });
+    const log = readFileSync(join(repo, '.git', 'done-log'), 'utf8');
+    expect(log.trim().split('\n')).toHaveLength(3);
+  });
+
+  it('never stamps under GOLDEN_UPDATE, and runs everything despite a stamp', () => {
+    const repo = committedRepo();
+    expect(runDone(repo, { env: { GOLDEN_UPDATE: '' } })).toMatchObject({
+      outcome: 'pass-not-stamped (GOLDEN_UPDATE)',
+      code: 0,
+      steps: ALL,
+    });
+    expect(existsSync(stampDir(repo))).toBe(false);
+    runDone(repo);
+    expect(runDone(repo, { env: { GOLDEN_UPDATE: '1' } })).toMatchObject({
+      outcome: 'pass-not-stamped (GOLDEN_UPDATE)',
+      steps: ALL,
+    });
+  });
+
+  it('does not stamp content that changed during the run', () => {
+    const repo = committedRepo();
+    const changed = runDone(repo, {
+      during: () => writeFileSync(join(repo, 'src', 'b.js'), 'mid-run'),
+    });
+    expect(changed).toMatchObject({
+      outcome: 'pass-not-stamped (changed)',
+      code: 0,
+    });
+    expect(changed.printed).toMatch(/não carimbado/);
+    expect(existsSync(stampDir(repo))).toBe(false);
+  });
+
+  it('returns a failing step’s status and stamps nothing', () => {
+    const repo = committedRepo();
+    expect(runDone(repo, { failAt: 'build' })).toMatchObject({
+      outcome: 'fail at build',
+      code: 2,
+      steps: ALL,
+    });
+    expect(runDone(repo, { failAt: 'lint' })).toMatchObject({
+      outcome: 'fail at lint',
+      code: 2,
+      steps: ['lint'],
+    });
+    writeFileSync(
+      join(repo, 'node_modules', '.package-lock.json'),
+      JSON.stringify({ packages: { 'node_modules/x': a } })
+    );
+    expect(runDone(repo)).toMatchObject({
+      outcome: 'fail at install',
+      code: 1,
+      steps: [],
+    });
+    expect(existsSync(stampDir(repo))).toBe(false);
   });
 });
