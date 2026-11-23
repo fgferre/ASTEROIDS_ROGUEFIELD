@@ -43,7 +43,7 @@ describe('Keyboard controls hints', () => {
       );
       expect(modern.join(' ')).not.toMatch(/turn|thrust/);
       expect(items(list, 'classic')).toEqual(
-        expect.arrayContaining(['W ↑ thrust', 'A D turn'])
+        expect.arrayContaining(['W ↑ thrust', 'S ↓ brake', 'A D turn'])
       );
     });
   });
@@ -60,7 +60,7 @@ describe('Gamepad controls hints', () => {
     lists.forEach((list) => {
       expect(items(list, 'classic')).toEqual(
         expect.arrayContaining([
-          'L-Stick ↑ thrust ↓ reverse',
+          'L-Stick ↑ thrust ↓ brake',
           'R-Stick ← → turn',
           'RB dash',
           'LB shield',
