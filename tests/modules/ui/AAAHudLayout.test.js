@@ -90,10 +90,11 @@ describe('AAAHudLayout classic build panel', () => {
   const filledPips = () =>
     pips.filter((pip) => pip.classList.contains('is-filled')).length;
 
-  const weaponState = (weaponId, shotsToBeam = null) => ({
+  const weaponState = (weaponId, shotsToBeam = null, beamEvery = null) => ({
     weaponId,
     name: WEAPONS[weaponId].name,
     chip: WEAPONS[weaponId].chip,
+    beamEvery,
     shotsToBeam,
     evolutions: [],
   });
@@ -115,12 +116,21 @@ describe('AAAHudLayout classic build panel', () => {
 
     // Beam every 4th shot: shotsToBeam 4 → 1 fills 0 → 3 pips.
     const pipsAt = (shotsToBeam) => {
-      update(weaponState('harmonic', shotsToBeam));
+      update(weaponState('harmonic', shotsToBeam, 4));
       return filledPips();
     };
     expect([4, 3, 2, 1].map(pipsAt)).toEqual([0, 1, 2, 3]);
     expect(part('#ui-weapon-name').textContent).toBe('HARMONIC');
     expect(part('#ui-beam-pips').classList.contains('is-hidden')).toBe(false);
+  });
+
+  it('shows two pips when the Overcharge Coil brings the beam every 3rd shot', () => {
+    update(weaponState('harmonic', 3, 3));
+    const shown = pips.filter((pip) => !pip.classList.contains('is-hidden'));
+    expect(shown).toHaveLength(2);
+    expect(filledPips()).toBe(0);
+    update(weaponState('harmonic', 1, 3));
+    expect(filledPips()).toBe(2);
   });
 
   it('reads the weapon name from the weapon state: the Scatter Coil has no pips', () => {

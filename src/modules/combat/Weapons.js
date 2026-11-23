@@ -677,6 +677,8 @@ export class Weapons {
       weaponId: this.weaponId,
       name,
       chip,
+      // The beam's live interval (the Overcharge Coil can shorten it).
+      beamEvery: beam?.every ? this.everyOf(beam) : null,
       shotsToBeam: beam?.every
         ? this.everyOf(beam) - (this.shots % this.everyOf(beam))
         : null,
