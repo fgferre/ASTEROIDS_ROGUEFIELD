@@ -6,7 +6,22 @@ história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `gr
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
 
-## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
+## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
+
+**23/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.0 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.0 com esta lista, trocando a configuração de checagens do GitHub?", _"Sim, publica"_ —
+pela PR do `publicar/conjunto` para a `main`. Entra:
+
+- o voo, um algoritmo só (40);
+- as cartas por arma (41): a Harmonic e a Scatter nas cinco famílias, a Seeker em três; dos números da Scatter e da
+  Seeker, jogando o conjunto, ele disse _"Ficam como estão"_;
+- as ferramentas das rodadas mais rápidas: a checagem que não repete o que já passou e os testes no Node fixo
+  (24.22.3, o mesmo no GitHub, que passa a exigir a checagem `validate`).
+
+Os replays gravados antes desta versão deixam de tocar (o voo mudou); progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** o equilíbrio completo (27), que ele deixou para depois desta publicação (_"Sim, fica para depois"_);
+as vozes (37); a segunda parte da abertura (o carregamento em fatias, espera o teste dele no Tesla).
 
 **21/11, à noite (vale sobre o que estiver mais abaixo e disser outra coisa):** a sexta auditoria de fora vai ao ar
 por ordem dele — à pergunta "Publico os cinco consertos de pilotos e replays?", _"Sim, publica"_ — pela PR do
@@ -249,8 +264,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Cartão `voo-7`. Ao `voo-7` (22/11): _"Ficou bom: o voo que fica — obs: acho que o giro pode ter um pouco de
   assitencia desde o inicio, mas muito pouco no inicio para ter mais dificuldade no voo. a medida que evoluir
   melhora."_ e a chama constante _"Assim, um terço do estouro"_. A ajuda do giro no começo ficou a metade. Em 22/11,
-  20h30, a coordenadora mandou o voo que fica virar o único voo neste ramo (sem juntar nem publicar). Fecha quando
-  ele aprovar voando.
+  20h30, a coordenadora mandou o voo que fica virar o único voo neste ramo (sem juntar nem publicar). Publicado na
+  0.8.0 em 23/11. Fecha quando ele aprovar voando.
 - **(41)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
   inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
   radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
@@ -258,7 +273,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   e a Seeker ganham versão própria _"aos poucos, depois da Harmonic"_; os números da Scatter, _"Decido jogando"_. No ramo:
   as cartas de número e as cinco famílias próprias da Harmonic. Em 23/11 a Scatter e a Seeker ganharam as delas, com
   os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
-  Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Fecha quando ele aprovar jogando.
+  Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
+  da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
 
 ## Som (palavras dele, 19/11)
 
