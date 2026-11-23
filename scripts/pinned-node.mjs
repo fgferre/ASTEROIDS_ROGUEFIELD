@@ -11,7 +11,12 @@
 // never the network) and runs the script itself: no npx stays in between.
 // The exit code is the script's, or 128 + the signal's number when a signal
 // ended it; SIGINT, SIGTERM and SIGHUP sent here are passed on to the script,
-// and this process exits after it.
+// and this process exits after it. The script owns its vitest's cleanup
+// (scripts/vitest-group.mjs for npm test, test:tocados and playtest). Not
+// covered: a kill -9 of npm or of this process passes nothing on, so the
+// script it started, and that script's vitest group, run on; and a kill of
+// scripts/done.mjs itself (it runs its steps with spawnSync) reaches none of
+// its steps, so its npm test runs to its end before cleaning up.
 
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
