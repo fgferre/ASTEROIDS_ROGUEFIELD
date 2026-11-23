@@ -29,6 +29,10 @@
  *            orbita becomes one slow turn around the subject.
  * --saida    output file: .jpg/.jpeg or .png for pictures, .webm for --filme.
  *
+ * It needs the dev server (npm run dev, or vite on a port of your own): it finds
+ * the camera's module among the files the page loaded, which a built site
+ * bundles away.
+ *
  * Playwright comes from the Homebrew @playwright/cli install (not a project
  * dependency; the owner decided against one). Node built-ins only otherwise.
  */
