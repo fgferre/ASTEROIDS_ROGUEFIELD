@@ -9,6 +9,7 @@ import {
 } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
+import XPOrbSystem from '../../src/modules/XPOrbSystem.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
@@ -313,6 +314,8 @@ describe('Harmonic Plasma Lance', () => {
     for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
     expect(combat.beams).toHaveLength(1);
     expect(hits.mock.calls.map(([data]) => data.enemy.id)).toEqual(['solid']);
+    // The beam's own Thermal form: its scar sets alight what lies on it.
+    combat.updateWeaponEffects(0.01);
     expect(combat.burns.has(phased)).toBe(false);
     expect(combat.burns.has(solid)).toBe(true);
     // The solid one's arc has nothing else within 140 px.
@@ -321,6 +324,151 @@ describe('Harmonic Plasma Lance', () => {
     combat.updateWeaponEffects(2);
     expect(phased.health).toBe(100);
     expect(aside.health).toBe(100);
+  });
+});
+
+// The Harmonic with a family's own beam form: four shots, the 4th a beam.
+function harmonicBeam(combat, eventBus, family, apex = false) {
+  eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+  eventBus.emit('synergy-unlocked', { family });
+  if (apex) eventBus.emit('apex-unlocked', { family });
+  const stats = { multishot: 1, damage: DAMAGE };
+  for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+  expect(combat.beams).toHaveLength(1);
+}
+
+describe('Harmonic beam forms', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => {
+    GamePools.releaseAll();
+    cleanupGlobalState();
+  });
+  const beamHit = DAMAGE * BEAM.damageMultiplier;
+
+  it('Searing Beam (Thermal ×3): the line burns 1 s and sets alight what crosses it; the lances still burn', () => {
+    const near = makeEnemy('near', 200, 300);
+    const late = makeEnemy('late', 260, 420); // off the line as it fires
+    const { combat, eventBus, enemies } = makeCombat([near, late]);
+    harmonicBeam(combat, eventBus, 'thermal');
+    expect(combat.getWeaponState().evolutions).toMatchObject([
+      { family: 'thermal', name: 'Searing Beam' },
+    ]);
+    // The beam hit lands no lance burn; its scar touches on the next tick.
+    expect(combat.burns.size).toBe(0);
+    expect(combat.scars).toHaveLength(1);
+    combat.updateWeaponEffects(0.01);
+    expect(combat.burns.has(near)).toBe(true);
+    expect(combat.burns.has(late)).toBe(false);
+
+    late.y = 300;
+    combat.updateWeaponEffects(0.2);
+    expect(combat.burns.has(late)).toBe(true);
+    combat.updateWeaponEffects(0.8);
+    expect(combat.scars).toHaveLength(0);
+
+    const other = makeEnemy('other', 0, 0);
+    combat.processBulletHit(lance(), other, enemies);
+    expect(combat.burns.has(other)).toBe(true);
+  });
+
+  it('Sunspear (Thermal ×5): the beam reaches 50% further and stays 0.5 s; its line burns 2 s', () => {
+    const far = makeEnemy('far', 116 + 300, 300); // past 220 px, inside 330
+    const { combat, eventBus } = makeCombat([far]);
+    harmonicBeam(combat, eventBus, 'thermal', true);
+    expect(far.health).toBeCloseTo(100 - beamHit, 6);
+    combat.updateWeaponEffects(0.4);
+    expect(combat.beams).toHaveLength(1);
+    combat.updateWeaponEffects(0.2);
+    expect(combat.beams).toHaveLength(0);
+    expect(combat.scars).toHaveLength(1);
+    combat.updateWeaponEffects(1.5);
+    expect(combat.scars).toHaveLength(0);
+  });
+
+  it('Arc: at 3 the beam arcs from its far end to the 2 nearest off it; at 5 each enemy it crosses starts a chain of 3', () => {
+    const { arc } = WEAPONS.harmonic.familyForms;
+    const a = makeEnemy('a', 200, 300);
+    const b = makeEnemy('b', 300, 300);
+    const up = makeEnemy('up', 300, 200); // 100 px from b
+    const down = makeEnemy('down', 300, 410); // 110 px
+    const third = makeEnemy('third', 300, 430); // 130 px, third nearest
+    const three = makeCombat([a, b, up, down, third]);
+    harmonicBeam(three.combat, three.eventBus, 'arc');
+    // No Chain Lance off the beam's hits: only its own two bolts.
+    expect(a.health).toBeCloseTo(100 - beamHit, 6);
+    expect(b.health).toBeCloseTo(100 - beamHit, 6);
+    const bolt = beamHit * arc.damageFraction[0];
+    expect(up.health).toBeCloseTo(100 - bolt, 6);
+    expect(down.health).toBeCloseTo(100 - bolt, 6);
+    expect(third.health).toBe(100);
+    expect(three.combat.arcs.map((x) => x.bolt)).toEqual([true, true]);
+
+    // At 5: from the one enemy it crosses, a chain jumping 3 times.
+    const start = makeEnemy('start', 200, 300);
+    const hops = [200, 90, -20, -130].map((y, i) => makeEnemy(`h${i}`, 200, y));
+    const five = makeCombat([start, ...hops]);
+    harmonicBeam(five.combat, five.eventBus, 'arc', true);
+    const heavy = beamHit * arc.damageFraction[1];
+    hops
+      .slice(0, 3)
+      .forEach((hop) => expect(hop.health).toBeCloseTo(100 - heavy, 6));
+    expect(hops[3].health).toBe(100);
+    expect(start.health).toBeCloseTo(100 - beamHit, 6);
+    expect(five.combat.arcs).toHaveLength(3);
+  });
+
+  it('Salvage: orbs from beam kills fly to the ship; at 5 the beam also sends every orb it crosses', () => {
+    const run = (apex) => {
+      const rock = makeEnemy('rock', 200, 300, { health: 5 });
+      const enemies = makeEnemies([rock]);
+      // Just the orb state sendHome and updateHoming read.
+      const orbs = {
+        xpOrbs: [],
+        homing: new Set(),
+        resolvePlayer: () => ({ getPosition: () => ({ x: 100, y: 300 }) }),
+        isOrbActive: (orb) => !orb.collected,
+        invalidateSpatialIndex() {},
+        sendHome: XPOrbSystem.prototype.sendHome,
+      };
+      const orbAt = (x, y) => {
+        const orb = { x, y, home: null, collected: false, isFusing: false };
+        orbs.xpOrbs.push(orb);
+        return orb;
+      };
+      enemies.rewardManager = {
+        stats: { totalOrbsDropped: 0 },
+        createXPOrbs: (enemy, count) => {
+          for (let i = 0; i < count; i += 1) orbAt(enemy.x, enemy.y);
+        },
+        getXPOrbSystem: () => orbs,
+      };
+      const applyDamage = enemies.applyDamage.bind(enemies);
+      enemies.applyDamage = (enemy, damage) => {
+        const result = applyDamage(enemy, damage);
+        if (result.killed) enemies.rewardManager.createXPOrbs(enemy, 2);
+        return result;
+      };
+      const onLine = orbAt(260, 305); // on the field before the beam
+      const aside = orbAt(260, 340);
+      const { combat, eventBus } = makeCombat([], { enemies });
+      harmonicBeam(combat, eventBus, 'salvage', apex);
+      const dropped = orbs.xpOrbs.filter((o) => o !== onLine && o !== aside);
+      return { orbs, dropped, onLine, aside };
+    };
+    const three = run(false);
+    expect(three.dropped).toHaveLength(2);
+    three.dropped.forEach((orb) => expect(orb.home).not.toBeNull());
+    expect(three.onLine.home).toBeNull();
+    // Straight to the ship, faster each second.
+    XPOrbSystem.prototype.updateHoming.call(three.orbs, 0.1);
+    expect(three.dropped[0]).toMatchObject({ x: 200 - 40, y: 300 });
+
+    const five = run(true);
+    expect(five.onLine.home).not.toBeNull();
+    expect(five.aside.home).toBeNull();
   });
 });
 
@@ -788,8 +936,9 @@ describe('weapon evolutions', () => {
     expect(evolved).toHaveBeenCalledTimes(1);
     expect(combat.getWeaponState()).toMatchObject({
       weaponId: 'harmonic',
-      evolutions: [{ family: 'thermal', name: 'Incendiary Lance' }],
+      evolutions: [{ family: 'thermal', name: 'Searing Beam' }],
     });
+    // The Harmonic's own form is its beam's: its lances still evolve.
     expect(combat.trailLength).toBeGreaterThan(6);
 
     combat.reset();

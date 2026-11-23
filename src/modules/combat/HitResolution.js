@@ -8,7 +8,8 @@
 // and resolves the collisions through it after the shots move; the weapons
 // and the card effects land their hits here too. The lance evolutions come
 // on a lance, beam or flak hit only (see `lanceHit`), and a family the held
-// weapon evolves on itself brings none of its lance evolution here.
+// weapon evolves on itself brings none of its lance evolution here (the
+// Harmonic's lances keep it: its own forms are its beam's).
 
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
@@ -303,9 +304,13 @@ export class HitResolution {
     const cards = this.cards();
     if (!weapons.evolutions.length) return;
     // A projectile, beam or flak hit runs every family's form, whatever the
-    // weapon's `familyForms` carries.
+    // weapon's `familyForms` carries, but a beam hit none the beam forms on
+    // its own (`familyForms.beam`, run once a beam in beamForms.js).
     const forms = lanceHit ? null : weapons.weapon.familyForms;
-    const carries = (family) => !forms || forms.carries.includes(family);
+    const ownBeam =
+      hit.kind === 'beam' ? weapons.weapon.familyForms?.beam : null;
+    const carries = (family) =>
+      (!forms || forms.carries.includes(family)) && !ownBeam?.includes(family);
     // A chain or a well costs the shot one; with no `shot` they are free.
     const spend = (key) => {
       if (!hit.shot) return true;

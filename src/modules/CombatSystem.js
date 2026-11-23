@@ -535,6 +535,10 @@ class CombatSystem extends BaseSystem {
     return this.weapons.beams;
   }
 
+  get scars() {
+    return this.weapons.scars;
+  }
+
   get flakBursts() {
     return this.weapons.flakBursts;
   }

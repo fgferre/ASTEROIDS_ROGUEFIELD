@@ -44,6 +44,8 @@ class XPOrbSystem extends BaseSystem {
     this.drift = null;
     // Wide Net: { interval, timer }, or null without the card.
     this.towPulse = null;
+    // Harmonic Salvage (beamForms.js): orbs flying to the ship.
+    this.homing = new Set();
 
     this.tuning = new OrbTuning();
     this.field = new OrbField({ tuning: this.tuning });
@@ -366,6 +368,7 @@ class XPOrbSystem extends BaseSystem {
     orb.vx = options.vx ?? 0;
     orb.vy = options.vy ?? 0;
     orb.steered = false;
+    orb.home = null;
     orb.value = Number.isFinite(value) ? value : this.tuning.baseOrbValue;
     orb.class = resolvedConfig.name;
     orb.tier = resolvedConfig.tier;
@@ -402,6 +405,7 @@ class XPOrbSystem extends BaseSystem {
     if (this.xpOrbs.length) {
       this.advanceOrbAges(deltaTime);
       if (this.drift) this.updateDrift(deltaTime);
+      if (this.homing.size) this.updateHoming(deltaTime);
       this.magnet.updateShipMagnetism(deltaTime);
       this.updateFlight(deltaTime);
       this.spacing.updateOrbSoftBounds(deltaTime);
@@ -460,6 +464,47 @@ class XPOrbSystem extends BaseSystem {
       moved = true;
     }
     if (moved) this.invalidateSpatialIndex();
+  }
+
+  // Harmonic Salvage: `orb` flies straight to the ship at `speed` px/s,
+  // faster by `acceleration` px/s each second, till the ship collects it.
+  sendHome(orb, speed, acceleration) {
+    if (orb.collected || orb.home) return;
+    orb.home = { speed, acceleration, age: 0 };
+    this.homing.add(orb);
+  }
+
+  // The orbs sent home move as a pull moves them (steered, their velocity
+  // for the streak); one collected or recycled leaves the set. A wrecked
+  // ship draws none (as the magnet).
+  updateHoming(deltaTime) {
+    const player = this.resolvePlayer();
+    if (player.isDead || player.isRetrying || player._quitExplosionHidden) {
+      return;
+    }
+    const target = player.getPosition();
+    if (!(deltaTime > 0) || !target) return;
+    for (const orb of this.homing) {
+      if (!orb.home || !this.isOrbActive(orb)) {
+        this.homing.delete(orb);
+        continue;
+      }
+      if (orb.isFusing) continue;
+      const home = orb.home;
+      home.age += deltaTime;
+      const dx = target.x - orb.x;
+      const dy = target.y - orb.y;
+      const distance = Math.hypot(dx, dy);
+      orb.steered = true;
+      if (distance === 0) continue;
+      const step = (home.speed + home.acceleration * home.age) * deltaTime;
+      const move = Math.min(step, distance) / distance;
+      orb.x += dx * move;
+      orb.y += dy * move;
+      orb.vx = (dx * move) / deltaTime;
+      orb.vy = (dy * move) / deltaTime;
+    }
+    this.invalidateSpatialIndex();
   }
 
   // Magnet pickup: every orb flies to the ship, faster each second; the
@@ -626,6 +671,7 @@ class XPOrbSystem extends BaseSystem {
     this.globalPull = null;
     this.drift = null;
     this.towPulse = null;
+    this.homing.clear();
 
     this.tuning.reset();
     this.field.invalidateSpatialIndex();

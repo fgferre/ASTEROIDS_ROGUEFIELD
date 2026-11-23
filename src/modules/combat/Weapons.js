@@ -540,6 +540,8 @@ export class Weapons {
     this.evolutions = [];
     this.apexes = [];
     this.beams = [];
+    this.scars = []; // beamForms.js: the lines a Searing Beam left burning
+    this.scarSeed = 0;
     this.flakBursts = [];
     // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
     this.blades = [];
@@ -574,13 +576,24 @@ export class Weapons {
     return forms.evolution ? forms.base.card.family : null;
   }
 
-  /** The family's lance evolution is on (not the held weapon's own family). */
+  /**
+   * The family's lance evolution is on: not on the held weapon's own family,
+   * unless only its beam takes the own form (`familyForms.beam`: the
+   * Harmonic's lances keep theirs).
+   */
   hasEvolution(family) {
-    return family !== this.ownFamily && this.evolutions.includes(family);
+    return this.evolutions.includes(family) && !this.ownsLanceForm(family);
   }
 
   hasApex(family) {
-    return family !== this.ownFamily && this.apexes.includes(family);
+    return this.apexes.includes(family) && !this.ownsLanceForm(family);
+  }
+
+  ownsLanceForm(family) {
+    return (
+      family === this.ownFamily &&
+      !this.weapon.familyForms?.beam?.includes(family)
+    );
   }
 
   /** A weapon card swaps the cannon for its weapon; an unknown id is ignored. */

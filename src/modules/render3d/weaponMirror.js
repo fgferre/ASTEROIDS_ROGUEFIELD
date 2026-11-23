@@ -548,6 +548,124 @@ function mirrorAura(THREE, combat, batches, flashes) {
   });
 }
 
+// Searing Beam's scar (approved 22/11): a ragged molten seam left in space,
+// its pieces cooling unevenly (some already dark crust), slag beads where it
+// glows hottest, embers lifting off it and a little soot. No ring or cross:
+// what it burns shows its own burn marks.
+const SCAR_H = 2.4;
+const SCAR_PIECES = 22;
+const SCAR_EMBERS = 28;
+const SCAR_SOOT = [0.1, 0.085, 0.08];
+const SCAR_COLORS = {
+  red: '#b02a08',
+  orange: '#ff5a12',
+  hot: '#ffc98a',
+  ember: '#ff8a2a',
+};
+
+function mirrorScars(THREE, scars, batches) {
+  const { ribbons, glow, smoke } = batches;
+  const red = rgbOf(THREE, SCAR_COLORS.red);
+  const orange = rgbOf(THREE, SCAR_COLORS.orange);
+  const hot = rgbOf(THREE, SCAR_COLORS.hot);
+  const ember = rgbOf(THREE, SCAR_COLORS.ember);
+  scars.forEach((scar) => {
+    const k = scar.life / scar.maxLife;
+    const age = scar.maxLife - scar.life;
+    const dx = scar.ex - scar.x;
+    const dy = scar.ey - scar.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const at = (t, i) => {
+      // a gentle wander, not a zigzag
+      const off =
+        i === 0 || i === SCAR_PIECES
+          ? 0
+          : Math.sin(t * 9 + scar.seed * 2.3) * 2.2 +
+            (glint(scar.seed, i) - 0.5) * 1.2;
+      // the seam starts a little ahead of the muzzle, clear of the ship
+      const u = 0.1 + 0.9 * t;
+      return [scar.x + dx * u + nx * off, scar.y + dy * u + ny * off];
+    };
+    let [ax, ay] = at(0, 0);
+    for (let i = 1; i <= SCAR_PIECES; i += 1) {
+      const [bx, by] = at(i / SCAR_PIECES, i);
+      // each piece cools at its own pace; some are already dark crust
+      const lag = 0.45 * glint(scar.seed + 7, i);
+      const ki = Math.max(0, Math.min(1, (k - lag) / (1 - lag)));
+      const heat = 0.35 + 0.65 * glint(scar.seed + 3, i) ** 2;
+      if (glint(scar.seed + 5, i) >= 0.22) {
+        const w = scar.width;
+        ribbons.tube(
+          ax,
+          ay,
+          bx,
+          by,
+          SCAR_H,
+          red,
+          w * 1.6,
+          0.28 * Math.min(1, k * 1.4)
+        );
+        if (ki > 0) {
+          ribbons.tube(
+            ax,
+            ay,
+            bx,
+            by,
+            SCAR_H,
+            orange,
+            w * 0.6,
+            1.1 * heat * ki
+          );
+          ribbons.tube(
+            ax,
+            ay,
+            bx,
+            by,
+            SCAR_H,
+            hot,
+            w * 0.22,
+            1.8 * heat * ki ** 2
+          );
+          if (heat > 0.8)
+            glow.push(bx, SCAR_H, by, orange, w * 1.6, 0.6 * ki, 1.4);
+        }
+      }
+      ax = bx;
+      ay = by;
+    }
+    for (let j = 0; j < SCAR_EMBERS; j += 1) {
+      const t = 0.1 + 0.9 * glint(scar.seed + 11, j);
+      const life = age - glint(scar.seed + 13, j) * 0.6 * scar.maxLife;
+      if (life < 0) continue;
+      const side = (glint(scar.seed + 17, j) - 0.5) * 2 * (2 + life * 22);
+      const fade = Math.max(0, 1 - life / (0.55 * scar.maxLife + 0.3));
+      const flicker = 0.6 + 0.4 * glint(j * 1.7, Math.floor(life * 14));
+      glow.push(
+        scar.x + dx * t + nx * side,
+        SCAR_H + 1 + life * 14,
+        scar.y + dy * t + ny * side,
+        ember,
+        3 + 3 * glint(j, scar.seed),
+        fade * flicker,
+        2.2
+      );
+    }
+    for (let j = 0; j < 4; j += 1) {
+      const t = (j + 0.5) / 4 + (glint(scar.seed, j + 30) - 0.5) * 0.15;
+      smoke.push(
+        scar.x + dx * t,
+        SCAR_H + 3 + age * 8,
+        scar.y + dy * t,
+        SCAR_SOOT,
+        7 + age * 10,
+        0.35 * k
+      );
+    }
+  });
+}
+
 /**
  * Beams, flak bursts, arcs, blades, the aura and marks; `flashes` lights each
  * new beam and aura pulse once and each flak volley's first burst once.
@@ -557,6 +675,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const white = rgbOf(THREE, PALETTE.text);
   mirrorBlades(THREE, combat, batches);
   mirrorAura(THREE, combat, batches, flashes);
+  if (combat.scars.length) mirrorScars(THREE, combat.scars, batches);
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);

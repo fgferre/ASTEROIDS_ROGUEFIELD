@@ -5,6 +5,7 @@
 // shot like Weapons.fireStream, the Weapons instance first (as in
 // firePatterns.js); hits land through Weapons.hitEnemy.
 
+import { orbsBeforeBeam, runBeamForms } from './beamForms.js';
 import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
 
 // `beam`: damage lands on everything in the segment on the firing frame;
@@ -89,6 +90,7 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
 
   const vx = dirX * w.bulletSpeed;
   const vy = dirY * w.bulletSpeed;
+  const orbsBefore = orbsBeforeBeam(w);
   struck.forEach(({ enemy, x, y }) => {
     if (enemy.destroyed) return;
     w.hitEnemy(
@@ -96,6 +98,23 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
       enemy
     );
   });
+  // The beam's own family forms (beamForms.js), once its hits landed.
+  runBeamForms(
+    w,
+    beam,
+    {
+      x: origin.x,
+      y: origin.y,
+      ex: end.x,
+      ey: end.y,
+      dirX,
+      dirY,
+      width,
+      damage,
+    },
+    struck,
+    orbsBefore
+  );
 
   w.beams.push({
     x: origin.x,
