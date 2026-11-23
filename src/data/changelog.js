@@ -22,7 +22,9 @@
 
 export const NEXT = {
   new: [],
-  improved: [],
+  improved: [
+    'The dark, flat stones in the menu’s background are now real rocks, small and far off by the Ring.', // not confirmed
+  ],
   fixed: [],
   unseen: [],
 };
