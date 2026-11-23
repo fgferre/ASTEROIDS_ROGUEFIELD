@@ -183,13 +183,13 @@ describe('PlayerSystem one flight algorithm (?voo=)', () => {
       fly({ right: true }, 60);
       const spin = player.angularVelocity;
       const steps = [];
-      for (let i = 0; i < 90 && player.angularVelocity > 0; i += 1) {
+      for (let i = 0; i < 150 && player.angularVelocity > 0; i += 1) {
         steps.push(fly({}, 1));
       }
       return { spin, stopSteps: steps.length, lit: steps.flat() };
     };
     const bare = turnThenLetGo(() => {});
-    expect(bare.stopSteps).toBeGreaterThan(30); // more than half a second
+    expect(bare.stopSteps).toBeGreaterThan(90); // more than a second and a half
     const pair = bare.lit.filter((e) => e.type === 'side' && e.intensity > 0);
     expect(pair.every((e) => e.isAutomatic)).toBe(true);
     const braked = turnThenLetGo((f) => {

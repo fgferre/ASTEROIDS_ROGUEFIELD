@@ -78,10 +78,11 @@ const NOSE_DAMPING_RATIO = 0.55;
 const NOSE_SPIN_ACCEL = 150;
 const NOSE_STOP_ACCEL = 12;
 // `?voo=c` classic: a released spin is worked off at SPIN_ASSIST (rad/s²)
-// with no card, about 0.8 s from the top turn rate; with the RCS System, at
+// with no card, about 1.7 s from the top turn rate (Felipe, 22/11: "um pouco
+// de assitencia desde o inicio, mas muito pouco"); with the RCS System, at
 // this share of the turn pair's push × its level (the pair is already ×
 // it): from half a second at level 1 to a fifth at 5, steadily, not snapped.
-const SPIN_ASSIST = 1.5;
+const SPIN_ASSIST = 0.75;
 const SPIN_STOP_SHARE = 0.5;
 // `?voo=e`: with no Braking System, the jets against the motion brake at this
 // share of their push (about today's start's slow loss, ~0.2 naves/s²).

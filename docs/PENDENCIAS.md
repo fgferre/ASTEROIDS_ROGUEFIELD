@@ -246,7 +246,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   parar o giro de forma automática não é o RCS, é as cartas [...] de freio"_: giro com momento no voo que fica.
   Voou (22/11): _"voei, fica com ajustes, está bem difícil, mas peguei um UCS e nao melhorou o giro"_; combinado com
   ele (_"concordo, faz assim"_): a RCS é a dona do giro, o freio da viagem, e o giro do começo para sozinho devagar.
-  Cartão `voo-7`. Fecha quando ele aprovar voando.
+  Cartão `voo-7`. Ao `voo-7` (22/11): _"Ficou bom: o voo que fica — obs: acho que o giro pode ter um pouco de
+  assitencia desde o inicio, mas muito pouco no inicio para ter mais dificuldade no voo. a medida que evoluir
+  melhora."_ e a chama constante _"Assim, um terço do estouro"_. A ajuda do giro no começo ficou a metade. Fecha
+  quando ele aprovar voando.
 
 ## Som (palavras dele, 19/11)
 
