@@ -470,6 +470,98 @@ describe('Harmonic beam forms', () => {
     expect(five.onLine.home).not.toBeNull();
     expect(five.aside.home).toBeNull();
   });
+
+  it('Kinetic ×3: a machine the beam strikes is thrown back along it, a boss is not; the fragments of a rock it kills fly out, then settle', () => {
+    const { kinetic } = WEAPONS.harmonic.familyForms;
+    const drone = makeEnemy('drone', 200, 300);
+    const boss = makeEnemy('boss', 250, 300, { type: 'boss' });
+    const rock = makeEnemy('rock', 300, 300, {
+      type: 'asteroid',
+      size: 'large',
+      health: 5,
+      generateFragments: () => [],
+    });
+    const fragments = [
+      makeEnemy('f1', 310, 300, { type: 'asteroid', vx: 20 }),
+      makeEnemy('f2', 300, 290, { type: 'asteroid', vy: -20 }),
+    ];
+    const enemies = makeEnemies([drone, boss, rock]);
+    const applyDamage = enemies.applyDamage.bind(enemies);
+    enemies.applyDamage = (enemy, damage) => {
+      const result = applyDamage(enemy, damage);
+      return { ...result, fragments: result.killed ? fragments : [] };
+    };
+    const { combat, eventBus } = makeCombat([], { enemies });
+    harmonicBeam(combat, eventBus, 'kinetic');
+    expect(rock.destroyed).toBe(true);
+    expect(fragments[0].vx).toBe(kinetic.fling.speed);
+    expect(fragments[1].vy).toBe(-kinetic.fling.speed);
+
+    combat.updateWeaponEffects(1.5);
+    expect(drone.x).toBeGreaterThan(200 + kinetic.knock.distance - 2);
+    expect(drone.y).toBe(300);
+    expect(boss.x).toBe(250);
+    // Back to its own drift after three time constants.
+    expect(fragments[0].vx).toBeCloseTo(20 + 220 * Math.exp(-3), 6);
+    expect(combat.flung).toHaveLength(0);
+  });
+
+  it('Kinetic ×5: a rock the beam kills bursts into shards that hit what lies on along the beam', () => {
+    const { cone } = WEAPONS.harmonic.familyForms.kinetic;
+    const rock = makeEnemy('rock', 200, 300, {
+      type: 'asteroid',
+      size: 'small',
+      health: 5,
+    });
+    const behind = makeEnemy('behind', 380, 300); // past the beam's end
+    const aside = makeEnemy('aside', 300, 400); // 45° off the beam
+    const { combat, eventBus } = makeCombat([rock, behind, aside]);
+    harmonicBeam(combat, eventBus, 'kinetic', true);
+    expect(combat.shards).toHaveLength(1);
+    expect(behind.health).toBeCloseTo(
+      100 - DAMAGE * BEAM.damageMultiplier * cone.damageFraction,
+      6
+    );
+    expect(aside.health).toBe(100);
+  });
+
+  it('Field ×3: what lies near the beam is tugged onto its line and held; what it struck is held; a boss is left', () => {
+    const struck = makeEnemy('struck', 200, 300);
+    const near = makeEnemy('near', 250, 335); // inside the 40 px band
+    const far = makeEnemy('far', 250, 380);
+    const boss = makeEnemy('boss', 300, 330, { type: 'boss' });
+    const { combat, eventBus } = makeCombat([struck, near, far, boss]);
+    harmonicBeam(combat, eventBus, 'field');
+    combat.updateWeaponEffects(0.2);
+    // The Singularity's pull speed, 160 px/s, for the 0.2 s tug.
+    expect(near.y).toBeCloseTo(335 - 32, 6);
+    expect(struck.y).toBe(300);
+    expect(far.y).toBe(380);
+    expect(boss.y).toBe(330);
+    expect([...combat.slows.keys()]).toEqual([struck, near]);
+  });
+
+  it('Field ×5: the beam leaves one trench on its line that drags what is in reach toward it for 1.2 s', () => {
+    const { trench } = WEAPONS.harmonic.familyForms.field;
+    const inReach = makeEnemy('in', 250, 360);
+    const out = makeEnemy('out', 250, 390);
+    const boss = makeEnemy('boss', 300, 340, { type: 'boss' });
+    const { combat, eventBus } = makeCombat([inReach, out, boss]);
+    harmonicBeam(combat, eventBus, 'field', true);
+    const first = combat.trench;
+    expect(first).toMatchObject({ y: 300, ey: 300, reach: trench.reach });
+    combat.updateWeaponEffects(trench.tau);
+    expect(inReach.y).toBeCloseTo(300 + 60 * Math.exp(-1), 6);
+    expect(out.y).toBe(390);
+    expect(boss.y).toBe(340);
+
+    // A new beam's trench replaces the last.
+    combat.beams.length = 0;
+    harmonicBeam(combat, eventBus, 'field', true);
+    expect(combat.trench).not.toBe(first);
+    combat.updateWeaponEffects(trench.life);
+    expect(combat.trench).toBeNull();
+  });
 });
 
 describe('Scatter Coil', () => {

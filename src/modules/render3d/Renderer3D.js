@@ -53,7 +53,7 @@ import { BurnMarks } from './burnMarks.js';
 import { DECAL_KIND, SHIP_DECAL_ID } from './scorchDecals.js';
 import { hullLoss } from '../effects/ScreenFeedback.js';
 import { registerEffectEvents } from './effectEvents.js';
-import { ImpactKick, lensPull } from './impactPass.js';
+import { ImpactKick, TRENCH_PULL, lensPull } from './impactPass.js';
 import {
   mirrorBossTransitions,
   mirrorLocks,
@@ -178,6 +178,11 @@ class Renderer3D extends BaseSystem {
     this.impact = new ImpactKick();
     this.lensSide = { x: 0, y: 0 };
     this.lensAhead = { x: 0, y: 0 };
+    this.trenchEnds = [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ];
     this.hitSparks = new HitSparks();
     this.burnMarks = new BurnMarks();
     this.killPops = new KillPops();
@@ -411,6 +416,42 @@ class Renderer3D extends BaseSystem {
       Math.hypot(side.x - at.x, side.y - at.y) / GAME_WIDTH,
       Math.hypot(ahead.x - at.x, ahead.y - at.y) / GAME_HEIGHT,
       lensPull(brake.slowFraction)
+    );
+  }
+
+  // A Field trench (the Harmonic's, beamForms.js) bends space toward its
+  // line out to its reach, at the Gravity Brake's strength: in fast, letting
+  // go over its last third; `allowed` with the screen pass on.
+  aimTrench(allowed) {
+    const trench = this.cachedCombat?.trench;
+    if (!allowed || !trench) {
+      this.impact.line(0.5, 0.5, 1, 0, 1, 1, 0);
+      return;
+    }
+    const t = this.three;
+    const [a, b, side] = this.trenchEnds;
+    this.worldToScreen(trench.x, trench.y, a);
+    this.worldToScreen(trench.ex, trench.ey, b);
+    const length = Math.hypot(trench.ex - trench.x, trench.ey - trench.y) || 1;
+    this.worldToScreen(
+      trench.x - ((trench.ey - trench.y) / length) * trench.reach,
+      trench.y + ((trench.ex - trench.x) / length) * trench.reach,
+      side
+    );
+    const sx = t.width / GAME_WIDTH;
+    const sy = t.height / GAME_HEIGHT;
+    const dx = (b.x - a.x) * sx;
+    const dy = -(b.y - a.y) * sy;
+    const k = trench.life / trench.maxLife;
+    const strength = Math.min(1, (1 - k) * 8) * Math.min(1, k * 3);
+    this.impact.line(
+      (a.x + b.x) / 2 / GAME_WIDTH,
+      1 - (a.y + b.y) / 2 / GAME_HEIGHT,
+      dx,
+      dy,
+      Math.hypot(dx, dy) / 2,
+      Math.hypot((side.x - a.x) * sx, (side.y - a.y) * sy),
+      TRENCH_PULL * strength
     );
   }
 
@@ -947,6 +988,9 @@ class Renderer3D extends BaseSystem {
     t.bodies.end();
     this.aimLens(
       player,
+      this.graphics.postProcessing && this.quality.settings.impactPass
+    );
+    this.aimTrench(
       this.graphics.postProcessing && this.quality.settings.impactPass
     );
     this.impact.apply(

@@ -539,6 +539,18 @@ class CombatSystem extends BaseSystem {
     return this.weapons.scars;
   }
 
+  get flung() {
+    return this.weapons.flung;
+  }
+
+  get shards() {
+    return this.weapons.shards;
+  }
+
+  get trench() {
+    return this.weapons.trench;
+  }
+
   get flakBursts() {
     return this.weapons.flakBursts;
   }

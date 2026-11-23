@@ -60,7 +60,30 @@ export default {
   // every lance form, Thermal's too. `arc` and `salvage` read [at 3, at 5].
   familyForms: {
     carries: [],
-    beam: ['thermal', 'arc', 'salvage'],
+    beam: ['thermal', 'kinetic', 'arc', 'field', 'salvage'],
+    // Kinetic (approved 22/11): a machine the beam strikes is thrown
+    // `knock.distance` px back along it, easing out with time constant
+    // `knock.tau` s (bosses and heralds keep only the hit's own push); a
+    // large or medium rock it kills splits `fling.extra` more, and the
+    // fragments of a rock it kills fly out at `fling.speed` px/s, easing back
+    // to their own drift with time constant `fling.settle` s (rocks keep
+    // their speed forever: 240 px/s would wrap round the field), a grit
+    // trail behind them for `fling.trail` s. At 5 a rock
+    // it kills bursts into shards on along the beam (`cone`): what lies
+    // within `halfAngle` of it and `reach` px takes `damageFraction` × the
+    // beam's damage. (Card bench, 22/11: the mock-up's extra 320 px/s shove
+    // on top of the throw cost a third of the damage on flying machines.)
+    kinetic: {
+      knock: { distance: 90, tau: 0.08 },
+      fling: { extra: 1, speed: 240, settle: 0.5, trail: 0.5 },
+      cone: {
+        halfAngle: (20 * Math.PI) / 180,
+        reach: 175,
+        damageFraction: 0.45,
+        life: 0.5,
+        max: 6,
+      },
+    },
     // At 3, `arcs` bolts from the farthest enemy the beam crossed; at 5, a
     // chain of up to `jumps` bolts off the beam from each enemy it crossed,
     // at most `cap` (damage tuned on the card bench, 22/11: not below the
@@ -76,7 +99,28 @@ export default {
     // Orbs of beam kills fly to the ship (px/s, gaining px/s each second); at
     // 5 the beam also sends every orb within `drag` px of it.
     salvage: { speed: 260, acceleration: 1400, drag: 14 },
+    // Field (approved 22/11): at 3, what lies within `band` px of the beam is
+    // tugged onto its line for `tug` s (at the Singularity's pull speed) and
+    // slowed `hold` s with what it struck; at 5 the beam leaves a trench on
+    // its line for `trench.life` s that drags what is within `reach` px
+    // toward it, the gap closing with time constant `tau` s; one trench at a
+    // time. No boss. (Card bench, 22/11: the mock-up's 85 px at 150 px/s
+    // held the bench's rocks on the line, +178% against +102% today.)
+    field: {
+      band: 40,
+      tug: 0.25,
+      hold: 0.5,
+      trench: { life: 1.2, reach: 70, tau: 0.7 },
+    },
     lines: {
+      kinetic: [
+        'lances pierce one extra target; the beam throws machines back and flings rock fragments out',
+        'lances pierce everything for +25% damage; rocks the beam kills burst into shards that fly on along it',
+      ],
+      field: [
+        'hits slow; the beam tugs enemies near its line onto it and holds them 0.5 s',
+        'hits pull enemies in; the beam leaves a gravity trench on its line for 1.2 s that drags enemies onto it',
+      ],
       arc: [
         'lances arc to the nearest enemy; the beam arcs to 2 near its far end',
         'lances arc 3 times; every enemy the beam crosses arcs on 3 times',

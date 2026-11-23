@@ -542,6 +542,13 @@ export class Weapons {
     this.beams = [];
     this.scars = []; // beamForms.js: the lines a Searing Beam left burning
     this.scarSeed = 0;
+    // beamForms.js: Kinetic throws, flung fragments' trails and shard bursts,
+    // the Field trench.
+    this.knocks = [];
+    this.flung = [];
+    this.shards = [];
+    this.shardSeed = 0;
+    this.trench = null;
     this.flakBursts = [];
     // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
     this.blades = [];

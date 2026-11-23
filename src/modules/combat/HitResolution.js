@@ -24,6 +24,7 @@ import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { spawnBeamFragments } from '../enemies/systems/EnemyDamageSystem.js';
 import { isBossEnemy } from '../physics/bossTuning.js';
 import { burstFlak } from './beamAndFan.js';
+import { flingFragments } from './beamForms.js';
 import { breedSeekers } from './firePatterns.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
@@ -204,12 +205,21 @@ export class HitResolution {
         this.applyKnockback(bullet, enemy, effectiveDamage);
       }
       if (beamSplit && damageResult.killed) {
-        spawnBeamFragments(
+        const spawned = spawnBeamFragments(
           enemiesSystem,
           enemy,
           beamSplit,
           bullet.extraFragments
         );
+        if (bullet.fling) {
+          flingFragments(
+            weapons,
+            beamSplit,
+            bullet.fling,
+            damageResult.fragments,
+            spawned
+          );
+        }
       }
       if (rewards && damageResult.killed) {
         this.dropProspectorOrbs(
@@ -359,6 +369,7 @@ export class HitResolution {
     const result = enemiesSystem.applyDamage(enemy, damage, { source });
     return {
       killed: !!result?.killed,
+      fragments: result?.fragments ?? [],
       remainingHealth: Math.max(
         0,
         result?.remainingHealth ?? enemy.health ?? 0

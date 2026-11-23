@@ -21,6 +21,10 @@ function makeCards(list = []) {
   const weapons = {
     beams: [],
     scars: [],
+    knocks: [],
+    flung: [],
+    shards: [],
+    trench: null,
     flakBursts: [],
     pulses: [],
     apexes: [],

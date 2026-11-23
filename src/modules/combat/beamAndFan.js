@@ -5,7 +5,7 @@
 // shot like Weapons.fireStream, the Weapons instance first (as in
 // firePatterns.js); hits land through Weapons.hitEnemy.
 
-import { orbsBeforeBeam, runBeamForms } from './beamForms.js';
+import { beamFling, orbsBeforeBeam, runBeamForms } from './beamForms.js';
 import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
 
 // `beam`: damage lands on everything in the segment on the firing frame;
@@ -91,12 +91,30 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
   const vx = dirX * w.bulletSpeed;
   const vy = dirY * w.bulletSpeed;
   const orbsBefore = orbsBeforeBeam(w);
+  // Kinetic: a rock it kills splits more and its fragments fly out.
+  const fling = beamFling(w);
+  const split = extraFragments + (fling ? fling.extra : 0);
+  const kills = []; // where the rocks it killed were (the Kinetic shards)
   struck.forEach(({ enemy, x, y }) => {
     if (enemy.destroyed) return;
-    w.hitEnemy(
-      { kind: 'beam', x, y, vx, vy, damage, extraFragments, hit: false },
+    const { x: rockX, y: rockY, type } = enemy;
+    const result = w.hitEnemy(
+      {
+        kind: 'beam',
+        x,
+        y,
+        vx,
+        vy,
+        damage,
+        extraFragments: split,
+        fling,
+        hit: false,
+      },
       enemy
     );
+    if (result?.killed && type === 'asteroid') {
+      kills.push({ x: rockX, y: rockY });
+    }
   });
   // The beam's own family forms (beamForms.js), once its hits landed.
   runBeamForms(
@@ -113,6 +131,7 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
       damage,
     },
     struck,
+    kills,
     orbsBefore
   );
 
