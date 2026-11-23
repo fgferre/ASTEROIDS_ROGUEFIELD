@@ -5,6 +5,8 @@ import lance from './lance.js';
 const beam = {
   pattern: 'beam',
   every: 4, // shots; the 4th is the beam
+  coilEvery: 3, // with the Overcharge Coil (the cards' own version, proposta 22/11)
+  capacitorTwice: 0.2, // the Chain Capacitor's chance a beam fires twice
   length: 220, // logical px from the nose
   width: 10, // logical px
   duration: 0.18, // seconds on screen (damage lands on the first frame)

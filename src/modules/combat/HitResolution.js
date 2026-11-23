@@ -79,12 +79,16 @@ export class HitResolution {
         bullet.kind === 'blade' ||
         bullet.kind === 'arc');
     // Chain Capacitor without the Chain Lance: some projectiles, pulses and
-    // cuts hit twice.
+    // cuts hit twice, unless the weapon has its own version (a volley or a
+    // beam fires twice, a missile splits: beamAndFan.js, firePatterns.js).
     const capacitor = cards.cardEffects.chainCapacitor;
     if (
       capacitor &&
       (bullet.projectile || (familyHit && bullet.kind !== 'arc')) &&
       !weapons.hasEvolution('arc') &&
+      !weapons.weapon.fire.some(
+        (entry) => entry.capacitorTwice || entry.capacitorSplit
+      ) &&
       cards.rollCardChance(capacitor.doubleHitChance)
     ) {
       requestedDamage *= 2;

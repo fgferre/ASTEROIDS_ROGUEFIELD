@@ -13,6 +13,7 @@ import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import { WEAPONS, WEAPON_APEX, firePattern } from '../../src/data/weapons.js';
 import { fireBeam, fireFan } from '../../src/modules/combat/beamAndFan.js';
+import { tickWeaponField } from '../../src/modules/combat/firePatterns.js';
 import { ORB_VALUE } from '../../src/data/enemies/asteroid-configs.js';
 import { TURRET_BARREL_LENGTH } from '../../src/data/constants/physics.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
@@ -94,6 +95,26 @@ function lockOnMany(combat, eventBus, multishot) {
   expect(combat.currentTargetLocks).toHaveLength(multishot);
 }
 
+// The Overcharge Coil at all three ranks (+52% lance speed).
+function fullCoil(eventBus) {
+  [1, 2, 3].forEach((level) =>
+    eventBus.emit('upgrade-weapon-tuning', {
+      upgradeId: 'overcharge_coil',
+      level,
+      bulletSpeedMultiplier: 1.15,
+    })
+  );
+}
+
+// The Chain Capacitor whose next roll lands.
+function landingCapacitor(combat) {
+  combat.cards.cardEffects.chainCapacitor = {
+    extraJumps: 1,
+    doubleHitChance: 0.1,
+  };
+  combat.cards.rollCardChance = vi.fn(() => true);
+}
+
 // A lance round, as Projectiles fires it.
 const lance = (overrides = {}) => ({
   kind: 'lance',
@@ -150,6 +171,49 @@ describe('Harmonic Plasma Lance', () => {
 
     combat.updateWeaponEffects(BEAM.duration + 0.01);
     expect(combat.beams).toHaveLength(0);
+  });
+
+  it('with the Overcharge Coil the beam comes every 3rd shot', () => {
+    const { combat, eventBus } = makeCombat([]);
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+    fullCoil(eventBus);
+    const stats = { multishot: 1, damage: DAMAGE };
+    combat.handleShooting(1, stats);
+    combat.handleShooting(1, stats);
+    expect(combat.getWeaponState().shotsToBeam).toBe(1);
+    expect(combat.beams).toHaveLength(0);
+    combat.handleShooting(1, stats);
+    expect(combat.beams).toHaveLength(1);
+    expect(combat.bullets).toHaveLength(2);
+    expect(combat.getWeaponState().shotsToBeam).toBe(3);
+  });
+
+  it('Chain Capacitor: a beam that rolls fires again along the same line 0.1 s later; lances never hit twice', () => {
+    const near = makeEnemy('near', 200, 300);
+    const { combat, eventBus, enemies } = makeCombat([near]);
+    eventBus.emit('upgrade-weapon', { weaponId: 'harmonic' });
+    landingCapacitor(combat);
+    const stats = { multishot: 1, damage: DAMAGE };
+    for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+    const hit = DAMAGE * BEAM.damageMultiplier;
+    expect(near.health).toBeCloseTo(100 - hit, 6);
+    const [first] = combat.beams;
+
+    tickWeaponField(combat.weapons, 0.05, stats);
+    expect(combat.beams).toHaveLength(1);
+    tickWeaponField(combat.weapons, 0.06, stats);
+    expect(combat.beams).toHaveLength(2);
+    expect(combat.beams[1]).toMatchObject({
+      x: first.x,
+      y: first.y,
+      angle: first.angle,
+    });
+    expect(near.health).toBeCloseTo(100 - 2 * hit, 6);
+
+    // The lances between beams take no double hit.
+    const health = near.health;
+    combat.processBulletHit(lance(), near, enemies);
+    expect(near.health).toBeCloseTo(health - DAMAGE, 6);
   });
 
   it('with several locks fires one beam at each lock and hits every locked enemy; the penalty comes once', () => {
@@ -339,6 +403,50 @@ describe('Scatter Coil', () => {
     combat.bullets = [];
     combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
     expect(combat.bullets).toHaveLength(FAN.maxBolts);
+  });
+
+  it('Overcharge Coil at rank 3: bolts fly 50% faster and burst 80 px further', () => {
+    const { combat, eventBus } = scatter([]);
+    fullCoil(eventBus);
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    const [bolt] = combat.bullets;
+    const speed = Math.hypot(bolt.vx, bolt.vy);
+    expect(speed).toBeCloseTo(
+      (combat.bulletSpeed / 1.15 ** 3) * 1.5 * BOLT.speedMultiplier,
+      6
+    );
+    expect(bolt.life * speed).toBeCloseTo(BOLT.range + 80, 6);
+  });
+
+  it('Thermal Lens: the fan is 20% narrower and each bolt hits 15% harder', () => {
+    const { combat, eventBus } = scatter([]);
+    eventBus.emit('upgrade-thermal-lens', {
+      beamLengthMultiplier: 1.4,
+      lanceDamageMultiplier: 1.15,
+    });
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    const half = (FAN.fan * 0.8 * Math.PI) / 360;
+    expect(angles[0]).toBeCloseTo(-half, 6);
+    expect(angles.at(-1)).toBeCloseTo(half, 6);
+    expect(combat.bullets[0].damage).toBeCloseTo(
+      DAMAGE * 1.15 * BOLT.damageMultiplier,
+      6
+    );
+  });
+
+  it('Chain Capacitor: a volley that rolls fires again 0.1 s later, which keeps the cooldown and never rolls', () => {
+    const { combat } = scatter([]);
+    landingCapacitor(combat);
+    const stats = { multishot: 1, damage: DAMAGE };
+    combat.handleShooting(1, stats);
+    const wait = combat.lastShotTime;
+    expect(combat.bullets).toHaveLength(FAN.bolts);
+
+    tickWeaponField(combat.weapons, 0.11, stats);
+    expect(combat.bullets).toHaveLength(2 * FAN.bolts);
+    expect(combat.lastShotTime).toBe(wait);
+    expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(1);
   });
 
   it('with several locks splits its bolts over the locks, earlier locks first, each a small fan on its lock', () => {

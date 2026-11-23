@@ -8,6 +8,13 @@ const fan = {
   maxBolts: 9,
   fan: 26, // degrees, edge bolt to edge bolt
   cooldownMultiplier: 1.6, // × the lance's cooldown between volleys
+  // The cards' own version (proposta 22/11). At the Overcharge Coil's third
+  // rank the bolts fly 50% faster and 80 px further (the ranks before, a
+  // share).
+  coilSpeed: 0.5,
+  coilRange: 80,
+  lensSpread: 0.8, // × the fan with the Thermal Lens
+  capacitorTwice: 0.1, // the Chain Capacitor's chance a volley fires twice
 };
 
 const bolt = {
@@ -19,7 +26,7 @@ const bolt = {
   trailPoints: 4, // a short tracer, not a lance trail
   burst: {
     radius: 40, // logical px, to the enemy's rim
-    burstReach: 10, // px more per Recoil Dampers pierce (proposta 17/11)
+    burstReach: 25, // px more per Recoil Dampers pierce (proposta 22/11)
     damageMultiplier: 0.6, // × lance damage, once per enemy per volley
     duration: 0.22, // seconds on screen
   },
@@ -46,11 +53,11 @@ export default {
   // Coilgun widen the bursts instead (proposta 17/11).
   familyForms: {
     carries: [],
-    kinetic: { burstScale: [1.3, 1.6] },
+    kinetic: { burstScale: [1.6, 1.9] }, // proposta 22/11
     lines: {
       kinetic: [
-        'flak bursts 30% wider',
-        'flak bursts 60% wider, bolts 25% harder',
+        'flak bursts 60% wider',
+        'flak bursts 90% wider, bolts 25% harder',
       ],
     },
   },

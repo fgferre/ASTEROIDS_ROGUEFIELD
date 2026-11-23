@@ -781,6 +781,76 @@ describe('fire patterns', () => {
     combat.bullets.forEach((m) => expect(m.seeker.target).toBe(next));
   });
 
+  it('seeker: with the Overcharge Coil at rank 3 missiles fly 30% faster and turn 60% tighter', () => {
+    const salvo = firstOf('seeker-swarm');
+    const below = enemy('below', MUZZLE.x, MUZZLE.y + 200);
+    const { combat, eventBus } = armed('seeker-swarm', [below]);
+    [1, 2, 3].forEach((level) =>
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'overcharge_coil',
+        level,
+        bulletSpeedMultiplier: 1.15,
+      })
+    );
+    combat.handleShooting(1, STATS);
+    const [missile] = combat.bullets;
+    const base = combat.bulletSpeed / 1.15 ** 3;
+    expect(Math.hypot(missile.vx, missile.vy)).toBeCloseTo(
+      base * 1.3 * WEAPON_FORMS['seeker-swarm'].base.projectile.speedMultiplier,
+      6
+    );
+    expect(missile.seeker.turn).toBeCloseTo(salvo.turn * 1.6, 6);
+  });
+
+  it('seeker: with the Thermal Lens missiles find targets 40% further and a direct hit deals +25%; the burst gains nothing', () => {
+    const salvo = firstOf('seeker-swarm');
+    const { projectile } = WEAPON_FORMS['seeker-swarm'].base;
+    const far = enemy('far', MUZZLE.x + salvo.acquire * 1.3, MUZZLE.y);
+    const { combat, eventBus } = armed('seeker-swarm', [far]);
+    eventBus.emit('upgrade-thermal-lens', {
+      beamLengthMultiplier: 1.4,
+      lanceDamageMultiplier: 1.15,
+    });
+    combat.handleShooting(1, STATS);
+    const [missile] = combat.bullets;
+    expect(missile.seeker.target).toBe(far);
+    const shot = DAMAGE * salvo.damageMultiplier;
+    expect(missile.damage).toBeCloseTo(
+      shot * 1.25 * projectile.damageMultiplier,
+      6
+    );
+    expect(missile.shrapnel).toBeCloseTo(
+      shot * projectile.burst.damageMultiplier,
+      6
+    );
+  });
+
+  it('seeker: with the Chain Capacitor a missile that rolls splits as it locks on; its twin goes for another target and never splits', () => {
+    const ahead = enemy('ahead', MUZZLE.x + 200, MUZZLE.y);
+    const other = enemy('other', MUZZLE.x + 220, MUZZLE.y + 60);
+    const { combat } = armed('seeker-swarm', [ahead, other]);
+    combat.cards.cardEffects.chainCapacitor = {
+      extraJumps: 1,
+      doubleHitChance: 0.1,
+    };
+    combat.cards.rollCardChance = vi.fn(() => true);
+    combat.handleShooting(1, { multishot: 0, damage: DAMAGE });
+    const salvo = combat.bullets.length;
+    // Each missile locks on within a few frames: one roll each, a twin each.
+    for (let frame = 0; frame < 30; frame += 1) {
+      combat.updateBullets(1 / 60);
+      tickWeaponField(combat.weapons, 1 / 60, STATS);
+    }
+    expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(salvo);
+    const twins = combat.bullets.slice(salvo);
+    expect(twins).toHaveLength(salvo);
+    twins.forEach((twin) => expect(twin.seeker.splits).toBe(false));
+    // The two missiles chase one enemy each, so each twin takes the other.
+    expect(new Set(twins.map((twin) => twin.seeker.target))).toEqual(
+      new Set([ahead, other])
+    );
+  });
+
   it("seeker: the Apex's killing missile releases two more that do not breed", () => {
     const weak = enemy('weak', 300, 300, { health: 1 });
     const other = enemy('other', 360, 330);
@@ -884,7 +954,7 @@ describe("a weapon's own evolution and Apex", () => {
     expect(combat.getWeaponState().name).toBe('Forked Arc');
     expect(combat.weapons.hasEvolution('arc')).toBe(false);
   });
-  describe('burst width (proposta 17/11)', () => {
+  describe('burst width (proposta 22/11)', () => {
     const burstRadius = (weaponId, setup) => {
       const { combat, eventBus } = armed(weaponId, []);
       setup(combat, eventBus);
@@ -907,42 +977,42 @@ describe("a weapon's own evolution and Apex", () => {
         pierceBonus: 1,
       });
 
-    it('Recoil Dampers: the Scatter flak bursts 10 px further, the Seeker missile bursts 10 px further', () => {
+    it('Recoil Dampers: the Scatter flak bursts 25 px further, the Seeker missile bursts 25 px further', () => {
       expect(burstRadius('scatter', () => {})).toBe(40);
-      expect(burstRadius('scatter', dampers)).toBe(50);
+      expect(burstRadius('scatter', dampers)).toBe(65);
       expect(burstRadius('seeker-swarm', () => {})).toBe(28);
-      expect(burstRadius('seeker-swarm', dampers)).toBe(38);
+      expect(burstRadius('seeker-swarm', dampers)).toBe(53);
     });
 
-    it('Scatter: Railshot widens the flak burst by 30%, the Apex by 60%', () => {
+    it('Scatter: Railshot widens the flak burst by 60%, the Apex by 90%', () => {
       expect(
         burstRadius('scatter', (c) => c.weapons.evolveWeapon('kinetic'))
-      ).toBeCloseTo(52, 9);
+      ).toBeCloseTo(64, 9);
       expect(
         burstRadius('scatter', (c) => c.weapons.apexWeapon('kinetic'))
-      ).toBeCloseTo(64, 9);
+      ).toBeCloseTo(76, 9);
     });
 
-    it('Seeker: Railshot widens the missile burst by 50%, the Apex doubles it', () => {
+    it('Seeker: Railshot widens the missile burst by 80%, the Apex by 120%', () => {
       expect(
         burstRadius('seeker-swarm', (c) => c.weapons.evolveWeapon('kinetic'))
-      ).toBeCloseTo(42, 9);
+      ).toBeCloseTo(50.4, 9);
       expect(
         burstRadius('seeker-swarm', (c) => c.weapons.apexWeapon('kinetic'))
-      ).toBe(56);
+      ).toBeCloseTo(61.6, 9);
       expect(
         burstRadius('seeker-swarm', (c, bus) => {
           c.weapons.evolveWeapon('kinetic');
           dampers(c, bus);
         })
-      ).toBeCloseTo(57, 9);
+      ).toBeCloseTo(95.4, 9);
     });
 
     it('Seeker: its kinetic family line is its own, and the other families keep the lance wording', () => {
       expect(familyLine('kinetic', 'seeker-swarm')).toBe(
-        'missile bursts 50% wider'
+        'missile bursts 80% wider'
       );
-      expect(familyLine('kinetic', 'seeker-swarm', true)).toMatch(/twice/);
+      expect(familyLine('kinetic', 'seeker-swarm', true)).toMatch(/120%/);
       expect(familyLine('thermal', 'seeker-swarm')).toBeNull();
       expect(notWithWeapon('kinetic', 'seeker-swarm')).toBeNull();
     });

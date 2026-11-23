@@ -112,8 +112,8 @@ describe('upgrade card build line', () => {
     ]);
     // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
     expect(what('multishot', 0, 'scatter')).toEqual([
-      'flak bursts 30% wider',
-      'flak bursts 60% wider, bolts 25% harder',
+      'flak bursts 60% wider',
+      'flak bursts 90% wider, bolts 25% harder',
     ]);
     // Its own family evolves the weapon itself.
     expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
@@ -121,8 +121,8 @@ describe('upgrade card build line', () => {
     );
     // The Seeker Swarm's missiles burst: its own kinetic wording.
     expect(what('multishot', 0, 'seeker-swarm')).toEqual([
-      'missile bursts 50% wider',
-      'missile bursts twice as wide, missiles 25% harder',
+      'missile bursts 80% wider',
+      'missile bursts 120% wider, missiles 25% harder',
     ]);
   });
 

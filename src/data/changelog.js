@@ -22,7 +22,13 @@
 
 export const NEXT = {
   new: [],
-  improved: [],
+  improved: [
+    'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.', // not confirmed
+    'Thermal Lens has its own version for two weapons: it focuses the Scatter Coil’s fan (bolts closer together, +15% damage), and Seeker Swarm missiles find targets further away and hit harder on a direct hit.', // not confirmed
+    'Chain Capacitor has its own version for three weapons: 1 Scatter Coil volley in 10 fires twice, 1 Seeker Swarm missile in 10 splits in two when it locks on, and 1 Harmonic beam in 5 fires twice along the same line.', // not confirmed
+    'Recoil Dampers make Scatter Coil and Seeker Swarm bursts reach 25 px further (was 10 px).', // not confirmed
+    'Three Kinetic cards make Scatter Coil bursts 60% wider and Seeker Swarm bursts 80% wider (was 30% and 50%); five, 90% and 120%.', // not confirmed
+  ],
   fixed: [],
   unseen: [],
 };

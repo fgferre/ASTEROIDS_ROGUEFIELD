@@ -12,6 +12,15 @@ const salvo = {
   breed: 0, // missiles a kill releases from the wreck
   damageMultiplier: 1, // × the missile's damage
   cooldownMultiplier: 2.4, // × the lance's cooldown between salvos
+  // The cards' own version (proposta 22/11). At the Overcharge Coil's third
+  // rank the missiles fly 30% faster and turn 60% tighter (the ranks before,
+  // a share).
+  coilSpeed: 0.3,
+  coilTurn: 0.6,
+  lensAcquire: 1.4, // × acquire with the Thermal Lens
+  lensHit: 1.25, // × a direct hit with the Thermal Lens; the burst gains nothing
+  lensBurst: 1,
+  capacitorSplit: 0.1, // the Chain Capacitor's chance a missile splits as it locks on
 };
 
 // Salvage ×3: every 3rd salvo is a ring of micro-missiles all round.
@@ -34,7 +43,7 @@ const missile = {
   trailPoints: 12,
   burst: {
     radius: 28, // px, to the enemy's rim
-    burstReach: 10, // px more per Recoil Dampers pierce (proposta 17/11)
+    burstReach: 25, // px more per Recoil Dampers pierce (proposta 22/11)
     damageMultiplier: 0.4, // × lance damage, to what is round the hit
     duration: 0.25, // seconds on screen
   },
@@ -57,11 +66,11 @@ export default {
   // [3] or the Coilgun [5] (proposta 17/11).
   familyForms: {
     carries: [],
-    kinetic: { burstScale: [1.5, 2] },
+    kinetic: { burstScale: [1.8, 2.2] }, // proposta 22/11
     lines: {
       kinetic: [
-        'missile bursts 50% wider',
-        'missile bursts twice as wide, missiles 25% harder',
+        'missile bursts 80% wider',
+        'missile bursts 120% wider, missiles 25% harder',
       ],
     },
   },

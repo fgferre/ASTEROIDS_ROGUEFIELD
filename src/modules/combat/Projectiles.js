@@ -13,12 +13,14 @@ import {
 import { GamePools } from '../../core/GamePools.js';
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
+  BULLET_SPEED,
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../../data/constants/gameplay.js';
 import { BOSS_CONFIG } from '../../data/constants/visual.js';
 import { getContent } from '../../content/registry.js';
 import { firePattern } from '../../data/weapons.js';
+import { coilShare } from './firePatterns.js';
 
 export class Projectiles {
   /**
@@ -50,8 +52,10 @@ export class Projectiles {
 
   // The weapon's projectile (its content file, in the weapon's current form).
   // `volley`: the fan's volley it belongs to; a projectile with a `burst`
-  // fired alone is a volley of one. Returns the shot (a seeker steers it).
-  createBullet(fromPos, toPos, damage, volley = null) {
+  // fired alone is a volley of one. `entry`: the fire entry that launched
+  // it, whose `coil*` and `lens*` numbers it takes. Returns the shot (a
+  // seeker steers it).
+  createBullet(fromPos, toPos, damage, volley = null, entry = null) {
     const dx = toPos.x - fromPos.x;
     const dy = toPos.y - fromPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -71,22 +75,31 @@ export class Projectiles {
     // Where it left the muzzle: Afterburn Lance counts the flight.
     bullet.originX = fromPos.x;
     bullet.originY = fromPos.y;
-    const speed = weapon.bulletSpeed * projectile.speedMultiplier;
+    // The Overcharge Coil speeds it up, or as the entry's `coilSpeed` and
+    // `coilRange` say.
+    const { coilSpeed, coilRange = 0, lensHit, lensBurst } = entry ?? {};
+    const coil = coilShare(weapon.bulletSpeed);
+    const speed =
+      (coilSpeed === undefined
+        ? weapon.bulletSpeed
+        : BULLET_SPEED * (1 + coilSpeed * coil)) * projectile.speedMultiplier;
     bullet.vx = (dx / distance) * speed;
     bullet.vy = (dy / distance) * speed;
-    // Thermal Lens boosts the shot only while no beam is there to take it.
-    const lens =
-      weapon.thermalLens && !firePattern(definition, 'beam')
-        ? weapon.thermalLens.lanceDamageMultiplier
-        : 1;
-    const shotDamage = damage * lens * weapon.lanceApexDamage;
+    // Thermal Lens boosts the shot only while no beam is there to take it,
+    // its hit and burst as the entry's `lensHit` and `lensBurst` say.
+    const lensOn = weapon.thermalLens && !firePattern(definition, 'beam');
+    const lens = (own) =>
+      lensOn ? own ?? weapon.thermalLens.lanceDamageMultiplier : 1;
+    const shotDamage = damage * weapon.lanceApexDamage;
     // A projectile with a range lives until the end of it.
     const life = projectile.range
-      ? projectile.range / speed
+      ? (projectile.range + coilRange * coil) / speed
       : weapon.bulletLifetime;
     const { burst } = projectile;
-    bullet.damage = shotDamage * projectile.damageMultiplier;
-    bullet.shrapnel = burst ? shotDamage * burst.damageMultiplier : 0;
+    bullet.damage = shotDamage * lens(lensHit) * projectile.damageMultiplier;
+    bullet.shrapnel = burst
+      ? shotDamage * lens(lensBurst) * burst.damageMultiplier
+      : 0;
     bullet.volley = volley ?? (burst ? { struck: [], bursts: 0 } : null);
     bullet.projectile = projectile;
     bullet.colors = definition.colors;

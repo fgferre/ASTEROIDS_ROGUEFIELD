@@ -63,10 +63,13 @@ export default {
         },
       ],
     },
+    // proposta 22/11 (the fan's `lensSpread`, the salvo's `lensAcquire`,
+    // the missile's `lensHit` and `lensBurst`)
     scatter: {
       levels: [
         {
-          description: 'Flak bolt and shrapnel damage +15%.',
+          description:
+            'Focuses the fan: the bolts fly 20% closer together and deal +15% damage.',
           highlights: ['Every bolt and its burst hit harder.'],
         },
       ],
@@ -74,7 +77,8 @@ export default {
     'seeker-swarm': {
       levels: [
         {
-          description: 'Missile and burst damage +15%.',
+          description:
+            'Missiles find targets 40% further away; a direct hit deals +25%.',
           highlights: ['Missiles bred from a wreck too.'],
         },
       ],

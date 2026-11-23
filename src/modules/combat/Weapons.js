@@ -59,7 +59,7 @@ export class Weapons {
    * `player()`: the player service (position, muzzle point, turret angle).
    * `enemies()`: the enemy service (forEachActiveEnemy).
    * `targeting()`: the Targeting instance (locks, lead points, aim mode, right stick).
-   * `createBullet(fromPos, toPos, damage, volley)`: launches the weapon's projectile (Projectiles).
+   * `createBullet(fromPos, toPos, damage, volley, entry)`: launches the weapon's projectile (Projectiles).
    * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
    * `cardEffects()`: the cards in play (the beam reads the Thermal Lens).
@@ -119,11 +119,18 @@ export class Weapons {
     // The first pattern due fires: one with `every: n` on every nth shot.
     this.shots += 1;
     const pattern = this.weapon.fire.find(
-      (entry) => !entry.every || this.shots % entry.every === 0
+      (entry) => !entry.every || this.shots % this.everyOf(entry) === 0
     );
     this.instantShot = INSTANT_PATTERNS.has(pattern.pattern);
     FIRE_PATTERNS[pattern.pattern](this, pattern, playerPos, playerStats);
     this.instantShot = false;
+  }
+
+  // An `every` entry's n: `coilEvery` with the Overcharge Coil.
+  everyOf(entry) {
+    return entry.coilEvery && this.bulletSpeed > BULLET_SPEED
+      ? entry.coilEvery
+      : entry.every;
   }
 
   // Where a shot at `enemy` goes: where it is now for an instant pattern,
@@ -546,6 +553,7 @@ export class Weapons {
     this.aura = null;
     this.pulses = [];
     this.broods = [];
+    this.echo = null; // a Chain Capacitor volley or beam due again
     this.refreshLanceLook();
   }
 
@@ -669,7 +677,9 @@ export class Weapons {
       weaponId: this.weaponId,
       name,
       chip,
-      shotsToBeam: beam?.every ? beam.every - (this.shots % beam.every) : null,
+      shotsToBeam: beam?.every
+        ? this.everyOf(beam) - (this.shots % this.everyOf(beam))
+        : null,
       evolutions: this.evolutions.map((family) => ({
         family,
         ...this.evolutionOf(family),

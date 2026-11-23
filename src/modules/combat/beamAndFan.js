@@ -5,11 +5,14 @@
 // shot like Weapons.fireStream, the Weapons instance first (as in
 // firePatterns.js); hits land through Weapons.hitEnemy.
 
+import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
+
 // `beam`: damage lands on everything in the segment on the firing frame;
 // the beam stays on screen for `beam.duration`. Aimed like the lances: from
 // the muzzle onto the primary lock's lead point in auto, along the turret
 // otherwise. With multi-lock, one beam per lock from its turret layer's
-// barrel; the cooldown penalty comes once per volley.
+// barrel; the cooldown penalty comes once per volley. The Chain Capacitor
+// may fire the volley again along the same lines (`capacitorTwice`).
 export function fireBeam(w, beam, playerPos, playerStats) {
   const muzzle = w.player().getMuzzlePoint();
   const lockAims = w.getLockAims();
@@ -17,9 +20,13 @@ export function fireBeam(w, beam, playerPos, playerStats) {
     { origin: muzzle, angle: w.getWeaponAngle(muzzle) },
   ];
   // The primary lock's beam stands for the volley in the event.
-  const [end] = shots.map(({ origin, angle }) =>
-    fireBeamAlong(w, beam, origin, angle, playerStats, Boolean(lockAims))
-  );
+  const stats = { ...playerStats };
+  const along = () =>
+    shots.map(({ origin, angle }) =>
+      fireBeamAlong(w, beam, origin, angle, stats, Boolean(lockAims))
+    );
+  const [end] = along();
+  if (capacitorRoll(w, beam.capacitorTwice)) echoShot(w, along);
   w.lastShotTime = -beam.cooldownPenalty;
   const targeting = w.targeting();
 
@@ -120,15 +127,23 @@ function fireBeamAlong(w, beam, origin, angle, playerStats, layered) {
 // `fan.cooldownMultiplier` × the lance's cooldown. With multi-lock the same
 // bolts are split over the locks, earlier locks first, each lock getting a
 // small fan of its own (same bolt spacing) centred on its lead point, from
-// its turret layer's barrel.
-export function fireFan(w, fan, playerPos, playerStats) {
+// its turret layer's barrel. The Thermal Lens narrows a fan with
+// `lensSpread`; the Chain Capacitor may fire a volley twice
+// (`capacitorTwice`): its `echo`, re-aimed, keeps the cooldown and never
+// rolls.
+export function fireFan(w, fan, playerPos, playerStats, echo = false) {
   const origin = w.player().getMuzzlePoint();
   const angle = w.getWeaponAngle(origin);
   const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
   const bolts = Math.min(fan.maxBolts, fan.bolts + extra);
-  const spread = (fan.fan * Math.PI) / 180;
-  // Where the bolts are aimed: the end of their range, else of a lance's.
-  const reach = w.weapon.projectile.range ?? w.bulletSpeed * w.bulletLifetime;
+  const focus = w.cardEffects().thermalLens ? fan.lensSpread ?? 1 : 1;
+  const spread = (fan.fan * focus * Math.PI) / 180;
+  // Where the bolts are aimed: the end of their range (the Overcharge Coil
+  // adds `coilRange`), else of a lance's.
+  const { range } = w.weapon.projectile;
+  const reach = range
+    ? range + (fan.coilRange ?? 0) * coilShare(w.bulletSpeed)
+    : w.bulletSpeed * w.bulletLifetime;
   // Shared by the volley's bolts: who its shrapnel already hit, and how
   // many bursts it has had (only the first lights the 3D scene).
   const volley = { struck: [], bursts: 0 };
@@ -139,7 +154,7 @@ export function fireFan(w, fan, playerPos, playerStats) {
       x: from.x + Math.cos(a) * reach,
       y: from.y + Math.sin(a) * reach,
     };
-    w.createBullet(from, end, playerStats.damage, volley);
+    w.createBullet(from, end, playerStats.damage, volley, fan);
     return end;
   };
   if (lockAims) {
@@ -162,7 +177,13 @@ export function fireFan(w, fan, playerPos, playerStats) {
       predictedPoints.push({ enemyId: null, position: launch(a) });
     }
   }
-  w.lastShotTime = -w.shootCooldown * (fan.cooldownMultiplier - 1);
+  if (!echo) {
+    w.lastShotTime = -w.shootCooldown * (fan.cooldownMultiplier - 1);
+    if (capacitorRoll(w, fan.capacitorTwice)) {
+      const stats = { ...playerStats };
+      echoShot(w, () => fireFan(w, fan, w.player().getPosition(), stats, true));
+    }
+  }
   const targeting = w.targeting();
 
   const centre = {
