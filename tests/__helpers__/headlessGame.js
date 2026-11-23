@@ -1,15 +1,20 @@
 /**
- * Headless game harness: the production service manifest with only the
- * DOM-bound services (UI, audio) stubbed, stepped like app.js gameLoop.
+ * Headless game harness: the production simulation (simulationManifest.js)
+ * with doubles in the presentation slots (UI, audio, renderer, menu
+ * background), stepped like app.js gameLoop. It never loads the presentation
+ * systems (tests/process/simulationLoadsNoPresentation.test.js guards it).
  */
 
 import { afterEach } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
-import { createServiceManifest } from '../../src/bootstrap/serviceManifest.js';
+import { createSimulationManifest } from '../../src/bootstrap/simulationManifest.js';
 import { createFixedStepper } from '../../src/core/fixedStep.js';
 import { createReplayController } from '../../src/bootstrap/replaySession.js';
+
+// The files that boot the game (and two that another branch edits) still import them from here.
+export { installDomStubs, keyEvent } from './domStubs.js';
 
 export const SEED = 0x5eed;
 export const STEP_SECONDS = createFixedStepper().step;
@@ -40,55 +45,15 @@ const SIMULATION_SERVICES = [
   'game-session',
 ];
 
-export function keyEvent(code) {
-  return {
-    key: code.slice(3).toLowerCase(),
-    code,
-    preventDefault() {},
-    stopPropagation() {},
-  };
-}
-
-export function installDomStubs() {
-  const previous = {
-    document: globalThis.document,
-    window: globalThis.window,
-    localStorage: globalThis.localStorage,
-  };
-  const noop = () => {};
-  const storage = new Map();
-  globalThis.localStorage = {
-    getItem: (key) => (storage.has(key) ? storage.get(key) : null),
-    setItem: (key, value) => storage.set(key, String(value)),
-    removeItem: (key) => storage.delete(key),
-    key: (index) => [...storage.keys()][index] ?? null,
-    get length() {
-      return storage.size;
-    },
-  };
-  globalThis.document = {
-    addEventListener: noop,
-    removeEventListener: noop,
-    getElementById: () => null,
-    querySelector: () => null,
-    activeElement: null,
-  };
-  globalThis.window = {
-    addEventListener: noop,
-    removeEventListener: noop,
-    location: { search: previous.window?.location?.search ?? '' },
-    localStorage: globalThis.localStorage,
-  };
-  return () => {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete globalThis[key];
-      else globalThis[key] = value;
-    }
-  };
+// The renderer's double. GameSessionService resets it with the other systems,
+// and the real one then announces renderer-reset, an event the golden trace
+// records (tests/modules/render3d/rendererDouble.test.js keeps the two alike).
+export function createRendererDouble(eventBus) {
+  return { reset: () => eventBus.emit('renderer-reset') };
 }
 
 /**
- * One game instance: real simulation services, stubbed UI and audio.
+ * One game instance: real simulation services, presentation doubles.
  * `seedSource` is the boot's ('profile-harness' boots a demo page).
  */
 // Each game's garbage collector queues its first pool pass on a 150 ms real
@@ -119,14 +84,19 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
     update() {},
     reset() {},
   };
-  const stubs = {
-    'event-bus': eventBus,
+  // Each double holds only what the simulation calls on it.
+  const presentation = {
     audio: { init() {}, reseedRandomScopes() {} },
     ui,
+    renderer: createRendererDouble(eventBus),
+    // Only the real renderer reads it.
+    'menu-background': {},
   };
+  const stubs = { 'event-bus': eventBus, ...presentation };
 
   // Same registration as ServiceRegistry.setupServices, with the stubs above
-  // and everything lazy so only the services resolved below are built.
+  // (the doubles in their slots) and everything lazy so only the services
+  // resolved below are built.
   const context = {
     gameState,
     seed: SEED,
@@ -135,7 +105,10 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
   };
   const container = new DIContainer();
   container.verbose = false;
-  for (const entry of createServiceManifest(context)) {
+  const slots = Object.fromEntries(
+    Object.keys(presentation).map((name) => [name, { name }])
+  );
+  for (const entry of createSimulationManifest(context, slots)) {
     const { name, dependencies = [] } = entry;
     const factory = stubs[name]
       ? () => stubs[name]

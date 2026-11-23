@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import { LEVEL_UP_SCREEN_DELAY_SECONDS } from '../../../src/core/GameConstants.js';
 import RandomService from '../../../src/core/RandomService.js';

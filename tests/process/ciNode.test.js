@@ -1,4 +1,4 @@
-// npm run done (scripts/ci-node.mjs): the suite runs again on GitHub's oldest
+// scripts/ci-node.mjs, run by hand: the suite runs again on GitHub's oldest
 // Node when this machine's is newer, read from the workflows themselves.
 
 import { describe, it, expect } from 'vitest';

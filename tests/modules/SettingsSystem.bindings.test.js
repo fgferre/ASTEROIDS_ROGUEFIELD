@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import SettingsSystem from '../../src/modules/SettingsSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
-import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 const STORAGE_KEY = 'astro:settings:v1';
 

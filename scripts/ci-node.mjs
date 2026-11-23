@@ -1,4 +1,4 @@
-// Part of npm run done: GitHub tests on older Node versions than this Mac's
+// Run by hand (no longer part of npm run done): GitHub tests on older Node versions than this Mac's
 // (PR 318 passed here and failed there: Node 21+ has a global `navigator`).
 // When this machine's Node is newer than the oldest one any workflow names,
 // the suite runs again on that version through npx, without installing

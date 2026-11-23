@@ -41,7 +41,10 @@ export const NEXT = {
     'Three Kinetic cards make Seeker Swarm bursts 80% wider (was 50%); five, 120%.', // not confirmed
   ],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'Moved a helper only the tests use out of the game code and into the tests; the game looks and plays the same.',
+    'Split the list of game services in two files, the game itself and what shows, sounds and draws it, so the tests stop loading the screens; the game looks and plays the same.',
+  ],
 };
 
 export const RELEASES = [
