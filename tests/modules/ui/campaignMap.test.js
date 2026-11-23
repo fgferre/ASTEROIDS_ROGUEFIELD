@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { updateRecords } from '../../../src/services/runRecords.js';
 import {
   CampaignMap,

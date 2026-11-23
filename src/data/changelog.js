@@ -36,6 +36,8 @@ export const NEXT = {
   unseen: [
     'The test address that starts a run with one item (?content=) can now give the ship several cards at chosen levels (&cards=), so Felipe can fly each flight with its upgrades; normal runs are the same.', // not confirmed
     'Replays recorded before this version no longer play (the flight changed); progress, pilots and the Hangar are untouched.', // not confirmed
+    'Moved a helper only the tests use out of the game code and into the tests; the game looks and plays the same.',
+    'Split the list of game services in two files, the game itself and what shows, sounds and draws it, so the tests stop loading the screens; the game looks and plays the same.',
   ],
 };
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { MainMenu } from '../../../src/modules/ui/MainMenu.js';
 import { RECORDS_STORAGE_KEY } from '../../../src/services/runRecords.js';
 import {
