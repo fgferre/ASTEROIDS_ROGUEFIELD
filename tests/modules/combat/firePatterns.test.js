@@ -1008,22 +1008,15 @@ describe("a weapon's own evolution and Apex", () => {
       ).toBeCloseTo(95.4, 9);
     });
 
-    it('Seeker: its kinetic family line is its own, and the other families keep the lance wording', () => {
+    it('Seeker: its kinetic, thermal, arc and field lines are its own (its missile forms: CombatSystem.seekerForms.test.js)', () => {
       expect(familyLine('kinetic', 'seeker-swarm')).toBe(
         'missile bursts 80% wider'
       );
       expect(familyLine('kinetic', 'seeker-swarm', true)).toMatch(/120%/);
-      expect(familyLine('thermal', 'seeker-swarm')).toBeNull();
+      expect(familyLine('thermal', 'seeker-swarm')).toMatch(/lodges/);
+      expect(familyLine('arc', 'seeker-swarm', true)).toMatch(/5 enemies/);
+      expect(familyLine('field', 'seeker-swarm')).toMatch(/gravity well/);
       expect(notWithWeapon('kinetic', 'seeker-swarm')).toBeNull();
-    });
-
-    it('Seeker: a missile hit still runs the other families (burn from Incendiary)', () => {
-      const target = enemy('t', 300, 300);
-      const { combat, enemies } = armed('seeker-swarm', [target]);
-      combat.weapons.evolveWeapon('thermal');
-      combat.handleShooting(1, STATS);
-      combat.processBulletHit(combat.bullets[0], target, enemies);
-      expect(combat.burns.has(target)).toBe(true);
     });
   });
 });

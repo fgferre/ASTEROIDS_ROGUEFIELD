@@ -160,7 +160,12 @@ export default {
       const chip = document.createElement('span');
       chip.className = 'evo-chip';
       chip.classList.toggle('is-apex', Boolean(apex));
-      chip.textContent = apex ? `APEX ${short}` : id.toUpperCase();
+      // A weapon's own name for a lance form (familyForms.names) wins.
+      const named = WEAPONS[state.weaponId]?.familyForms?.names?.[family];
+      const label = named?.[apex ? 1 : 0]?.toUpperCase();
+      chip.textContent = apex
+        ? `APEX ${label ?? short}`
+        : label ?? id.toUpperCase();
       chip.style.setProperty('--family-color', familyAccent(family));
       els.evolutions.appendChild(chip);
       this.evolutionChips.set(id, chip);

@@ -26,6 +26,7 @@ import { isBossEnemy } from '../physics/bossTuning.js';
 import { burstFlak } from './beamAndFan.js';
 import { flingFragments } from './beamForms.js';
 import { fanHit, glance } from './fanForms.js';
+import { lodge } from './missileForms.js';
 import { breedSeekers } from './firePatterns.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
@@ -257,11 +258,14 @@ export class HitResolution {
       fanHit(weapons, bullet, enemy, damageResult);
     }
     // A projectile with a `burst` bursts on its first hit, blocked or not;
-    // its shrapnel spares the enemy it struck. Grapeshot's bolt then glances
-    // on into the next enemy ahead.
+    // its shrapnel spares the enemy it struck. Thermite's missile lodges in
+    // it and bursts later (missileForms.js); Grapeshot's bolt glances on
+    // into the next enemy ahead.
     if (bullet.projectile?.burst) {
       bullet.volley.struck.push(enemy);
-      burstFlak(weapons, bullet);
+      if (!lodge(weapons, bullet, enemy, damageResult)) {
+        burstFlak(weapons, bullet);
+      }
       if (bullet.ricochets > 0) glance(weapons, bullet, enemy);
     }
 
@@ -326,17 +330,22 @@ export class HitResolution {
     if (!weapons.evolutions.length) return;
     // A projectile, beam or flak hit runs every family's form, whatever the
     // weapon's `familyForms` carries, but a beam hit none the beam forms on
-    // its own (`familyForms.beam`, run once a beam in beamForms.js), and a
-    // flak or shrapnel hit none the fan forms on its own (`familyForms.fan`,
-    // fanForms.js).
+    // its own (`familyForms.beam`, run once a beam in beamForms.js), a flak
+    // or shrapnel hit none the fan forms on its own (`familyForms.fan`,
+    // fanForms.js), and a missile or its shrapnel none the missile forms on
+    // its own (`familyForms.missile`, missileForms.js).
     const forms = lanceHit ? null : weapons.weapon.familyForms;
     const own = weapons.weapon.familyForms;
     const ownForms =
       hit.kind === 'beam'
         ? own?.beam
-        : hit.kind === 'flak' || hit.kind === 'shrapnel'
+        : hit.kind === 'flak'
           ? own?.fan
-          : null;
+          : hit.kind === 'seeker'
+            ? own?.missile
+            : hit.kind === 'shrapnel'
+              ? own?.fan ?? own?.missile
+              : null;
     const carries = (family) =>
       (!forms || forms.carries.includes(family)) && !ownForms?.includes(family);
     // A chain or a well costs the shot one; with no `shot` they are free.

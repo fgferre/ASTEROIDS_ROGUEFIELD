@@ -555,6 +555,14 @@ export class Weapons {
     this.kindled = [];
     this.implosions = [];
     this.scraps = [];
+    // missileForms.js: Thermite's lodged missiles, its pieces and the molten
+    // pieces of a rock it killed cooling, the Storm Warhead's leaping bolts,
+    // the Gravity Warhead's wells.
+    this.lodged = [];
+    this.thermite = [];
+    this.cooling = [];
+    this.storms = [];
+    this.gravityWells = [];
     this.flakBursts = [];
     // firePatterns.js: blades and cuts, aura ring and pulses, bred missiles.
     this.blades = [];

@@ -18,6 +18,7 @@ import {
   mirrorScraps,
   pushBurningPiece,
 } from './fanMirror.js';
+import { mirrorLodged, mirrorThermite } from './missileMirror.js';
 import { hashId } from './enemyMirror.js';
 import { getContent } from '../../content/registry.js';
 
@@ -826,8 +827,9 @@ function mirrorTrench(THREE, trench, batches, white) {
   ribbons.tube(x, y, ex, ey, ARC_H + 0.5, white, 0.4, 0.6 * grow);
 }
 
-// Implosion: what a burst drags in crackles in the Singularity's violet
-// while it falls (the well spirals at the centre: CardEffects' wells).
+// Implosion and the Gravity Warhead: what a burst drags in crackles in the
+// Singularity's violet while it falls (the well spirals at the centre:
+// CardEffects' wells).
 function mirrorImplosions(THREE, implosions, ribbons, white) {
   const rgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);
   implosions.forEach((imp) =>
@@ -861,6 +863,11 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   if (combat.implosions.length) {
     mirrorImplosions(THREE, combat.implosions, ribbons, white);
   }
+  if (combat.gravityWells.length) {
+    mirrorImplosions(THREE, combat.gravityWells, ribbons, white);
+  }
+  if (combat.lodged.length) mirrorLodged(THREE, combat.lodged, batches);
+  if (combat.thermite.length) mirrorThermite(THREE, combat.thermite, batches);
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);

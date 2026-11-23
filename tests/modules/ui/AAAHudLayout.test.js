@@ -124,6 +124,18 @@ describe('AAAHudLayout classic build panel', () => {
     expect(part('#ui-beam-pips').classList.contains('is-hidden')).toBe(false);
   });
 
+  it('names a lance form by the held weapon’s own name for it', () => {
+    update({
+      ...weaponState('seeker-swarm'),
+      evolutions: [
+        { id: 'incendiary', family: 'thermal', apex: false, short: 'INC' },
+      ],
+    });
+    expect(part('#ui-evolutions').children.map((c) => c.textContent)).toEqual([
+      'THERMITE',
+    ]);
+  });
+
   it('shows two pips when the Overcharge Coil brings the beam every 3rd shot', () => {
     update(weaponState('harmonic', 3, 3));
     const shown = pips.filter((pip) => !pip.classList.contains('is-hidden'));

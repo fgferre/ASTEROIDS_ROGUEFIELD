@@ -458,6 +458,8 @@ export function fireSeeker(w, seeker, playerPos, playerStats) {
   );
   const targets = seekerTargets(w, origin, acquireOf(w, seeker), count);
   const damage = damageOf(playerStats, seeker);
+  // shared by the salvo's missiles (the Gravity Warhead's `well`)
+  const salvo = { well: null };
   for (let i = 0; i < count; i += 1) {
     const a =
       seeker.spread >= 360
@@ -465,7 +467,8 @@ export function fireSeeker(w, seeker, playerPos, playerStats) {
         : count === 1
           ? angle
           : angle + seeker.spread * DEG * (i / (count - 1) - 0.5);
-    launchSeeker(w, seeker, origin, a, damage, targets[i % targets.length]);
+    const target = targets[i % targets.length];
+    launchSeeker(w, seeker, origin, a, damage, target, undefined, salvo);
   }
   setCooldown(w, seeker);
   const first = targets[0];
@@ -494,8 +497,18 @@ function seekerTargets(w, origin, acquire, count, skip = null) {
 const acquireOf = (w, seeker) =>
   seeker.acquire * (w.cardEffects().thermalLens ? seeker.lensAcquire ?? 1 : 1);
 
-// `breed` given: a brood or a twin, which never splits.
-function launchSeeker(w, seeker, from, angle, damage, target, breed) {
+// `breed` given: a brood or a twin, which never splits; `salvo`: what the
+// missiles fired together share (a brood or a twin, its own).
+function launchSeeker(
+  w,
+  seeker,
+  from,
+  angle,
+  damage,
+  target,
+  breed,
+  salvo = { well: null }
+) {
   const bullet = w.createBullet(
     from,
     { x: from.x + Math.cos(angle), y: from.y + Math.sin(angle) },
@@ -515,13 +528,16 @@ function launchSeeker(w, seeker, from, angle, damage, target, breed) {
     entry: seeker,
     damage,
     splits: breed === undefined,
+    salvo,
   };
 }
 
 /**
- * Turns a missile toward its target, taking the nearest when it is gone. The
- * first time it steers onto one (locks on), the Chain Capacitor may split
- * it: a twin leaves next tick for another target, or the same one.
+ * Turns a missile toward its target, taking the nearest when it is gone, or
+ * toward the Gravity Warhead's well its salvo opened while it holds
+ * (missileForms.js). The first time it steers onto a target (locks on), the
+ * Chain Capacitor may split it: a twin leaves next tick for another target,
+ * or the same one.
  */
 export function steerSeeker(w, bullet, deltaTime) {
   const seeker = bullet.seeker;
@@ -552,12 +568,14 @@ export function steerSeeker(w, bullet, deltaTime) {
       });
     }
   }
+  const { well } = seeker.salvo;
+  const aim = well?.timer > 0 ? well : target;
   const limit = seeker.turn * deltaTime;
   const turn = Math.max(
     -limit,
     Math.min(
       limit,
-      wrapAngle(Math.atan2(target.y - bullet.y, target.x - bullet.x) - heading)
+      wrapAngle(Math.atan2(aim.y - bullet.y, aim.x - bullet.x) - heading)
     )
   );
   const speed = Math.hypot(bullet.vx, bullet.vy);

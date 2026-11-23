@@ -117,6 +117,15 @@ describe('HUD instrument models', () => {
       'arc-caster'
     );
     expect(part('.bd-evo').textContent).toBe('Storm Crown');
+    // ...and a weapon that names the lance's forms its own way, those names.
+    at({ thermal: 2 }, [], 'seeker-swarm');
+    expect(part('.bd-evo').textContent).toBe('Thermite at 3');
+    at(
+      { field: 5 },
+      [{ family: 'field', id: 'singularity', apex: true }],
+      'seeker-swarm'
+    );
+    expect(part('.bd-evo').textContent).toBe('Gravity Warhead');
   });
 
   it('recharges: the dash arc shows while it recharges and pulses 0.5 s once ready', () => {

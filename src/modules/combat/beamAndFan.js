@@ -7,6 +7,7 @@
 
 import { beamFling, orbsBeforeBeam, runBeamForms } from './beamForms.js';
 import { discharge, implodeFirst } from './fanForms.js';
+import { missileBurst } from './missileForms.js';
 import { capacitorRoll, coilShare, echoShot } from './firePatterns.js';
 
 // `beam`: damage lands on everything in the segment on the firing frame;
@@ -255,7 +256,9 @@ export function fireFan(w, fan, playerPos, playerStats, echo = false) {
 // A projectile's `burst`: shrapnel hits every solid enemy whose rim is
 // within `burst.radius`, at most once per volley, through the same hit path
 // as the bolts (so the evolutions apply). The fan's Field form may hold it
-// a beat first, its Arc form discharges from it (fanForms.js).
+// a beat first, its Arc form discharges from it (fanForms.js); a missile's
+// sets off its Arc and Field forms (missileForms.js). `burstScale`: a
+// Thermite burst's own widening.
 export function burstFlak(w, bolt) {
   if (implodeFirst(w, bolt)) return;
   const { x, y, volley } = bolt;
@@ -267,7 +270,8 @@ export function burstFlak(w, bolt) {
   const stage = w.hasApex('kinetic') ? 1 : w.hasEvolution('kinetic') ? 0 : -1;
   const radius =
     (burst.radius + (burst.burstReach ?? 0) * w.cards().pierceBonus) *
-    (scales && stage >= 0 ? scales[stage] : 1);
+    (scales && stage >= 0 ? scales[stage] : 1) *
+    (bolt.burstScale ?? 1);
   const struck = [];
   w.forEachSolidEnemy((enemy) => {
     if (volley.struck.includes(enemy)) return;
@@ -298,6 +302,7 @@ export function burstFlak(w, bolt) {
     );
   });
   discharge(w, bolt, x, y, radius);
+  missileBurst(w, bolt, x, y, struck);
 
   const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
   w.flakBursts.push({

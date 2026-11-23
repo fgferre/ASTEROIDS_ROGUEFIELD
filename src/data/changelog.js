@@ -32,6 +32,9 @@ export const NEXT = {
     'Three Arc cards make each Scatter Coil burst discharge into the 2 nearest enemies outside it, up to 4 bolts a volley; with five, into 3, each bolt jumping on once more and hitting much harder.', // not confirmed
     'Three Field cards make each Scatter Coil burst pull enemies within 60 px into its centre, then explode on the clump; with five, it pulls from 90 px and holds them 0.5 s.', // not confirmed
     'Three Salvage cards make a Scatter Coil kill throw a scrap shard that fires itself at the nearest enemy (orbs as before); with five, two shards.', // not confirmed
+    'Seeker Swarm has its own Thermal form, Thermite: three cards make a missile lodge in what it hits, burn inside it for 1 s, then burst 60% bigger; with five, that burst throws thermite at 3 neighbours that sticks and burns.', // not confirmed
+    'Seeker Swarm has its own Arc form, Storm Warhead: three cards make each missile burst throw a heavy bolt that leaps across 3 enemies; with five, across 5.', // not confirmed
+    'Seeker Swarm has its own Field form, Gravity Warhead: three cards make each missile burst leave a gravity well for 0.6 s that pulls nearby enemies into it; with five, the well is bigger and the salvo’s other missiles home on it.', // not confirmed
   ],
   improved: [
     'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.', // not confirmed

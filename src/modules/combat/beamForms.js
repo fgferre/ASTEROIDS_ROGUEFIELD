@@ -367,11 +367,20 @@ function arcOff(w, stage, seg, struck) {
  * A weapon's bolt from `source` to `target` (CardEffects.addArc, `heavy` the
  * thicker one) and its hit, kind `chain`: no form procs off it. `push`
  * false: it does not shove what it strikes (a hit's knockback follows its
- * flight).
+ * flight). `bolt` false: the Storm Lance's jagged arc, not a weapon's bolt.
  */
-export function arcStrike(w, source, target, damage, life, heavy, push = true) {
+export function arcStrike(
+  w,
+  source,
+  target,
+  damage,
+  life,
+  heavy,
+  push = true,
+  bolt = true
+) {
   const from = { x: source.x, y: source.y, radius: source.radius };
-  w.cards().addArc(from, target, { bolt: true, life, heavy });
+  w.cards().addArc(from, target, { bolt, life, heavy });
   const dx = target.x - from.x;
   const dy = target.y - from.y;
   const d = Math.hypot(dx, dy) || 1;

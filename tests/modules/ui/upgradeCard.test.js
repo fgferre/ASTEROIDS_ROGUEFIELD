@@ -43,6 +43,20 @@ describe('upgrade card build line', () => {
     expect(title('multishot', 4)).toBe('Hailstorm');
   });
 
+  it("with the Seeker Swarm a family completes under the Seeker's own form name, never the lance's", () => {
+    const swarm = { weaponId: 'seeker-swarm', chip: 'SEEKER' };
+    const title = (id, owned) =>
+      buildLine(card(id), { rank: 1, owned, weapon: swarm }).title;
+    expect(title('afterburn_lance', 2)).toBe('Thermite');
+    expect(title('afterburn_lance', 4)).toBe('Thermite');
+    expect(title('arc_lattice', 2)).toBe('Storm Warhead');
+    expect(title('arc_lattice', 4)).toBe('Storm Warhead');
+    expect(title('shield', 2)).toBe('Gravity Warhead');
+    expect(title('shield', 4)).toBe('Gravity Warhead');
+    expect(title('magfield', 2)).toBe('Swarm Rack');
+    expect(title('magfield', 4)).toBe('Locust Hive');
+  });
+
   it('a fifth completes its Apex', () => {
     expect(line('afterburn_lance', 1, 4)).toMatchObject({
       label: 'Completes · Apex',
