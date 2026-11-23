@@ -13,10 +13,16 @@
 //
 // Hands the choice to tests/playtest/sectors.playtest.js through the
 // environment and runs it under vitest.playtest.config.js.
+//
+// vitest runs as a process group of its own, and the launcher kills the whole
+// group when it exits, Ctrl+C, kill and pkill included: killing the launcher
+// once left a vitest worker stuck in a loop spinning a core for twelve hours
+// (22/11). Not covered: a kill -9 of the launcher gives it no chance to clean
+// up, and the group runs on.
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,8 +38,24 @@ const [sector = '', seed = ''] = args.filter(
   (arg) => !PRESETS.includes(arg) && !arg.startsWith('--')
 );
 
+// The running vitest's process group (its pid), or null. SIGKILL, because a
+// worker stuck in a loop never runs a handler for a gentler signal.
+let group = null;
+const killGroup = () => {
+  try {
+    if (group) process.kill(-group, 'SIGKILL');
+  } catch {
+    // the group is already gone
+  }
+};
+process.on('exit', killGroup);
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => process.exit(128 + constants.signals[signal]));
+}
+
+/** One vitest run; resolves to its exit code (null when a signal ended it). */
 function run(env) {
-  return spawnSync(
+  const child = spawn(
     process.execPath,
     [
       resolve(ROOT, 'node_modules/vitest/vitest.mjs'),
@@ -43,10 +65,20 @@ function run(env) {
     ],
     {
       cwd: ROOT,
+      detached: true,
       stdio: table ? 'ignore' : 'inherit',
       env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
     }
   );
+  group = child.pid;
+  return new Promise((done, fail) => {
+    child.on('error', fail);
+    child.on('exit', (code) => {
+      killGroup(); // a worker left behind by vitest
+      group = null;
+      done(code);
+    });
+  });
 }
 
 const pad = (text, width) => String(text).padEnd(width);
@@ -66,12 +98,12 @@ const runText = (r) =>
   `${r.seconds}s ${r.kills}k w${r.wave} ${r.outcome === 'died' ? (r.cause || '?').replace(/^shot /, 'tiro ') : r.outcome}`;
 
 /** Both skills, one after the other: the table. */
-function compare() {
+async function compare() {
   const dir = mkdtempSync(join(tmpdir(), 'playtest-'));
   for (const p of PRESETS) {
     const out = join(dir, `${p}.json`);
     process.stdout.write(`running ${p}...\n`);
-    run({
+    await run({
       PLAYTEST_PRESET: p,
       PLAYTEST_SECTOR: sector || 'debris-wake',
       PLAYTEST_SEED: seed || '1-10',
@@ -104,13 +136,13 @@ function compare() {
 }
 
 if (table) {
-  compare();
+  await compare();
   process.exit(0);
 }
 
-const result = run({
+const status = await run({
   PLAYTEST_PRESET: preset,
   PLAYTEST_SECTOR: sector,
   PLAYTEST_SEED: seed,
 });
-process.exit(result.status ?? 1);
+process.exit(status ?? 1);
