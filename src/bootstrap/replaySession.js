@@ -19,7 +19,7 @@
 // moment they go does not change it.
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
-import { CHEST_REVEAL_MS } from '../modules/ui/ChestCeremony.js';
+import { CHEST_REVEAL_MS } from '../data/pickups.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {
@@ -65,9 +65,7 @@ export function createReplayController({
   let pickPending = false;
   // When a replay's chest cards, all revealed, go (Date.now ms), or null.
   let chestDoneAt = null;
-  // The viewer's own control scheme and Stick Sensitivity while a replay flies
-  // the recorded ones.
-  let viewerControls = null;
+  // The viewer's own Stick Sensitivity while a replay flies the recorded one.
   let viewerStick = null;
   const difficulty = session.resolveServiceInstance('difficulty');
   const playerService = session.resolveServiceInstance('player');
@@ -98,10 +96,6 @@ export function createReplayController({
     if (armedRecording) {
       player = createPlayer(armedRecording);
       viewerStick ??= playerService.stickSensitivity;
-      if (['modern', 'classic'].includes(armedRecording.controls)) {
-        viewerControls ??= playerService.controlScheme;
-        playerService.controlScheme = armedRecording.controls;
-      }
       armedRecording = null;
       recorder = null;
       input.setInputSource(replaySource);
@@ -109,10 +103,6 @@ export function createReplayController({
     }
 
     player = null;
-    if (viewerControls) {
-      playerService.controlScheme = viewerControls;
-      viewerControls = null;
-    }
     if (viewerStick) {
       playerService.stickSensitivity = viewerStick;
       viewerStick = null;
@@ -136,7 +126,6 @@ export function createReplayController({
           : 'normal',
       date: difficulty.dateKey,
       sector: session.sector?.id ?? null,
-      controls: playerService.controlScheme,
       stick: playerService.stickSensitivity,
       hangar: hangar.getRunSetup(),
     });

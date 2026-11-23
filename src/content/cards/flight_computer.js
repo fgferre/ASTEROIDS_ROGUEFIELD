@@ -1,4 +1,4 @@
-// The new flight only (`newFlight`, the default; `?direcao=antiga` is the old one): the last piloting card.
+// A piloting card (`newFlight`): the last one.
 // The run starts in classic glide flight; this card brings today's modern
 // flight, after a briefing that pauses the run and waits for Enter
 // (ui/FlightBriefing.js). What it asks for is a balance number (proposta
@@ -40,13 +40,13 @@ export default {
   text: {
     name: 'Flight Computer',
     summary:
-      'Takes the helm: fly in any direction with the keys, the hull holds still when you let go.',
+      'Takes the helm: fly in any direction with the keys, faster, with a turbo on a straight run; the hull holds still when you let go.',
     lore: 'The last piece of the salvaged cockpit. Every thruster answers one hand at last.',
     levels: [
       {
         title: 'Vector Flight',
         description:
-          'W A S D move the ship up, left, down and right, wherever the nose points. No more drifting: letting go stops the ship.',
+          'W A S D move the ship up, left, down and right, wherever the nose points, faster than before; hold one way and a turbo builds up. No more drifting: letting go stops the ship.',
         highlights: ['A briefing shows the new keys before the fight goes on.'],
       },
     ],

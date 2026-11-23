@@ -19,6 +19,13 @@ const colorCache = new Map();
 // Particles carry a random alpha in theirs, so it is emptied when it fills.
 const rawCache = new Map();
 const RAW_CACHE_MAX = 4096;
+// Deterministic 0..1 from two numbers (render-only jitter: glints, kinks,
+// flicker).
+export const glint = (x, y) => {
+  const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
 export function rgbOf(THREE, css) {
   const hit = rawCache.get(css);
   if (hit) return hit;
@@ -534,9 +541,11 @@ export const SHOT_SHAPES = Object.freeze({
   needle: 2, // an Apex's white-hot spike through the head
   flak: 3, // a scatter slug: short, blunt, faceted
   dart: 4, // an enemy shot: a three-sided shard with three barbs
+  scrap: 5, // a Scrap Rounds shard: a torn, jagged piece of plate
 });
-// How white-hot each kind's core runs (0 keeps its colour).
-const SHOT_HEAT = [0.6, 0.5, 1, 0.8, 0.35];
+// How white-hot each kind's core runs (0 keeps its colour); below 0 the
+// kind is matte, its facets shaded by how they face the eye (dull metal).
+const SHOT_HEAT = [0.6, 0.5, 1, 0.8, 0.35, -1];
 
 // Every shape lives in one geometry, tagged with its kind; each instance
 // draws only its own kind (the others collapse outside the clip volume), so
@@ -575,7 +584,9 @@ void main() {
   float facing = abs(dot(normalize(vNormal), normalize(vView)));
   float hot = max(vColor.r, max(vColor.g, vColor.b));
   float core = vHeat * facing * facing * facing;
-  gl_FragColor = vec4(mix(vColor * 0.7, vec3(hot), core), 1.0);
+  gl_FragColor = vHeat < 0.0
+    ? vec4(vColor * (0.25 + 0.75 * facing), 1.0)
+    : vec4(mix(vColor * 0.7, vec3(hot), core), 1.0);
   #include <encodings_fragment>
 }`;
 
@@ -652,7 +663,7 @@ function shotShapes() {
     ]);
   };
 
-  const { bolt, head, needle, flak, dart } = SHOT_SHAPES;
+  const { bolt, head, needle, flak, dart, scrap } = SHOT_SHAPES;
   lathe(
     bolt,
     [
@@ -695,6 +706,14 @@ function shotShapes() {
   pyramid(dart, [1, 0, 0], shard);
   pyramid(dart, [-0.7, 0, 0], [...shard].reverse());
   edges.forEach((a) => barb(dart, a, -0.35, 0.1, 0.4, -1, 1, 0.45));
+  // scrap: a flat, torn plate, its rim notched at uneven radii, bent off
+  // true at both ends
+  const plate = [0.95, 0.45, 0.85, 0.3, 0.75, 0.5, 1, 0.35].map((r, k) =>
+    at((k % 3) * 0.12 - 0.1, r, (k * Math.PI * 2) / 8)
+  );
+  const flat = plate.map(([x, y, z]) => [x, y * 0.35, z]);
+  pyramid(scrap, [1, 0.1, 0.25], flat);
+  pyramid(scrap, [-1, 0.15, -0.2], [...flat].reverse());
   return { position, normal, part };
 }
 

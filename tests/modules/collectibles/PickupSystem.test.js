@@ -8,8 +8,8 @@ import {
 import {
   STEP_SECONDS,
   createHeadlessGame,
-  installDomStubs,
 } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 const secondsToSteps = (seconds) => Math.ceil(seconds / STEP_SECONDS);
 

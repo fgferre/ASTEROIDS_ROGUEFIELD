@@ -5,10 +5,8 @@ import {
   createBotDriver,
   readWorld,
 } from '../../src/bootstrap/botPilotAdapter.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { sectorById } from '../../src/data/sectors.js';
 
 describe('bot driver', () => {

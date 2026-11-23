@@ -12,13 +12,9 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../../../../data/upgrades/families.js';
-import {
-  WEAPON_APEX,
-  WEAPON_EVOLUTIONS,
-  WEAPON_FORMS,
-} from '../../../../../data/weapons.js';
+import { WEAPON_EVOLUTIONS } from '../../../../../data/weapons.js';
 import { onDemand, replay } from '../../hudCommon.js';
-import { familyAccent } from '../../../upgradeCard.js';
+import { familyAccent, familyForm } from '../../../upgradeCard.js';
 
 const CELLS = Array.from({ length: FAMILY_APEX_THRESHOLD }, (_, i) =>
   i === FAMILY_SYNERGY_THRESHOLD
@@ -70,15 +66,10 @@ const CSS = `
 
 const shortName = (name) => name.replace(/ Lance$/, '');
 
-// The family's evolution (or Apex) as the held weapon has it: its own form
-// on its card's family, else the lance's.
-function evolutionName(weaponId, family, apex) {
-  const forms = WEAPON_FORMS[weaponId];
-  if (forms?.evolution && forms.base.card.family === family) {
-    return (apex ? forms.apex : forms.evolution).name;
-  }
-  return (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family].name;
-}
+// The family's evolution (or Apex) as the held weapon has it and names it
+// (upgradeCard's familyForm, as the cards).
+const evolutionName = (weaponId, family, apex) =>
+  familyForm(family, weaponId, apex).name;
 
 /**
  * The family the track follows: the most cards among the families with a

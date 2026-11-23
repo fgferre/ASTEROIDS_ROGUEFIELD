@@ -30,7 +30,6 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: legacyInputService,
       'command-queue': legacyQueue,
-      newFlight: false,
     });
 
     baselinePlayer.position = { x: 320, y: 240 };
@@ -76,7 +75,6 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: commandInputService,
       'command-queue': commandQueue,
-      newFlight: false,
     });
 
     queuePlayer.position = { x: 320, y: 240 };
@@ -136,10 +134,9 @@ describe('PlayerSystem command queue integration', () => {
       eventBus: gameEventsMock,
       input: inputService,
       'command-queue': commandQueue,
-      newFlight: false,
     });
 
-    player.angle = 0;
+    player.angle = -Math.PI / 2; // nose up the screen
     player.position = { x: 200, y: 180 };
     player.velocity = { vx: 0, vy: 0 };
 
@@ -163,7 +160,7 @@ describe('PlayerSystem command queue integration', () => {
 
     player.update(DELTA_TIME);
 
-    // Modern W moves up the screen.
+    // Classic W thrusts along the nose: up the screen.
     expect(player.velocity.vy).toBeLessThan(velocityAfterCommand.vy);
     expect(thrusterEvents.length).toBeGreaterThan(0);
     expect(player.cachedMovementInput.up).toBe(true);

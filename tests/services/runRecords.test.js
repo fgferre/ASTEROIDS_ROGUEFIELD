@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installDomStubs } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { sectorById } from '../../src/data/sectors.js';
 import {
   isBossRushUnlocked,

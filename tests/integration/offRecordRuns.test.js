@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import CodexService from '../../src/services/CodexService.js';
 import { HANGAR_STORAGE_KEY } from '../../src/services/HangarService.js';
 import { ACHIEVEMENTS_STORAGE_KEY } from '../../src/services/AchievementService.js';

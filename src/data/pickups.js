@@ -118,3 +118,7 @@ export const CHEST = deepFreeze({
   spentTime: 1.2, // s the open, empty chest stays before it is gone
   color: PALETTE.shot, // its seams, beam and burst
 });
+
+// One card's reveal when the chest's cards are shown big (ui/ChestCeremony.js);
+// the next starts when it ends. A replay waits on it too (replaySession.js).
+export const CHEST_REVEAL_MS = 420;

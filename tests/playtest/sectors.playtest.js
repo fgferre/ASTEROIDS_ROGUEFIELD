@@ -3,8 +3,6 @@
  * with a mortal ship, one life each, and prints a report per sector and a
  * summary table. Not part of `npm test`: run it with `npm run playtest`
  * (scripts/playtest.mjs), optionally `-- <sector-id> [average|good] [seed]`.
- * PLAYTEST_FLIGHT=old flies the old flight (`?direcao=antiga`); by default it
- * flies the new one (classic glide, cannon on the nose, the default of the game).
  * PLAYTEST_SEED may be a range ('1-10'); PLAYTEST_OUT names a JSON file the
  * rows are written to.
  */
@@ -21,17 +19,15 @@ import {
 } from '../../src/bootstrap/botPilotAdapter.js';
 import {
   createHeadlessGame,
-  installDomStubs,
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 const print = (text) => process.stdout.write(`${text}\n`);
 const FPS = Math.round(1 / STEP_SECONDS);
 const LIMIT_MINUTES = 25;
 const PRESET = process.env.PLAYTEST_PRESET || 'average';
 const ONLY = process.env.PLAYTEST_SECTOR || '';
-const FLIGHT = process.env.PLAYTEST_FLIGHT === 'old' ? 'old' : 'new';
-const FLIGHT_SEARCH = FLIGHT === 'old' ? '?direcao=antiga' : '';
 const OUT = process.env.PLAYTEST_OUT || '';
 // Seeds both the bot's miss rolls and the world (the run's seed): one, or a
 // range like '1-10'.
@@ -112,14 +108,6 @@ async function playSector(sector, seed) {
     session
       .resolveServiceInstance('settings')
       .setSetting('gameplay', 'difficulty', DIFFICULTY);
-  }
-  const onGlide = Boolean(
-    player.noseAim && player.flight.glide && player.controlScheme === 'classic'
-  );
-  if (onGlide !== (FLIGHT === 'new')) {
-    throw new Error(
-      `playtest: the address did not switch to the ${FLIGHT} flight`
-    );
   }
   const driver = createBotDriver({
     services,
@@ -284,7 +272,6 @@ function toRow(r) {
     sector: r.sector.id,
     seed: r.seed,
     preset: PRESET,
-    flight: FLIGHT,
     difficulty: r.difficulty,
     outcome: r.outcome.kind,
     seconds: Math.round(r.frames / FPS),
@@ -379,11 +366,7 @@ function printSummary(reports) {
   );
   const line = (cells) => cells.map((c, i) => c.padEnd(widths[i])).join('  ');
   print(
-    [
-      `\nSUMMARY — bot ${PRESET}, flight ${FLIGHT}`,
-      line(head),
-      ...rows.map(line),
-    ].join('\n')
+    [`\nSUMMARY — bot ${PRESET}`, line(head), ...rows.map(line)].join('\n')
   );
 }
 
@@ -394,7 +377,6 @@ const reports = [];
 describe(`playtest (${PRESET})`, () => {
   beforeEach(() => {
     const restoreDom = installDomStubs();
-    globalThis.window.location.search = FLIGHT_SEARCH;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
       vi.spyOn(console, method).mockImplementation(() => {});

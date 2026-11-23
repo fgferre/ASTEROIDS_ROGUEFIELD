@@ -1,8 +1,9 @@
 // src/bootstrap/botPilotGlide.js
 //
 // The playtest bot's classic glide: A/D turn the hull, W pushes along the
-// nose, S pushes against it, nothing brakes by itself, and the cannon sits on
-// the nose (?controls=classic&flight=glide&aim=nose). Where botPilot.js
+// nose, S pushes against it, nothing brakes by itself before the Braking
+// System, and the cannon sits on
+// the nose (every run's start). Where botPilot.js
 // rolls the ship along 8 directions, this rolls it along key sequences (turn
 // left / none / right × push forward / none / back) through the same
 // physics the game runs (player/flight.js, read as numbers by
@@ -16,6 +17,14 @@ import {
   DASH_INVULNERABILITY,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../data/constants/gameplay.js';
+import {
+  BRAKE_FLOOR,
+  BRAKE_FULL_SHARE,
+  SPIN_ASSIST,
+  SPIN_STOP_SHARE,
+  TURN_ACCEL,
+  TURN_TOP,
+} from '../modules/player/flight.js';
 import { intentScore, pathDanger } from './botPilot.js';
 
 const AIM_WEIGHT = 7;
@@ -51,43 +60,59 @@ export function glideKeys(index) {
 
 const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
 
-// One step of the ship (player/flight.js's glide, A/D torque and W/S push),
-// for the state { x, y, vx, vy, angle, spin, dashLeft, decayLeft }.
+// One step of the ship (player/flight.js's start: no drag, W the engine, S
+// the retro, the top speed a limit on the push, the Braking System's brake
+// when the keys let go; A/D the turn pair, a released spin worked off), for
+// the state { x, y, vx, vy, angle, spin, dashLeft, decayLeft }. The brake is
+// taken as the retro's push whatever way the ship slides.
 function step(world, state, combo, dt) {
   const { glide } = world.ship;
   const dashing = state.dashLeft > 0;
-  // The RCS System: under a push (not in a dash) push and drag scale, and the
-  // turn is quicker at all times (player/flight.js).
-  const agility =
-    !combo.push || dashing || state.decayLeft > 0 ? 1 : glide.agility;
-  if (combo.push) {
-    const push = combo.push > 0 ? 1 : glide.retro;
-    const drag = glide.baseDamping * dt;
-    const scale =
-      agility === 1 ? 1 : Math.expm1(drag * agility) / Math.expm1(drag);
-    const accel = glide.accel * push * scale * dt;
-    state.vx += Math.cos(state.angle) * accel * Math.sign(combo.push);
-    state.vy += Math.sin(state.angle) * accel * Math.sign(combo.push);
-  }
-  if (!dashing) {
-    const keep = Math.exp(
-      -(glide.damping + (combo.push ? 0 : glide.braking)) * agility * dt
-    );
-    state.vx *= keep;
-    state.vy *= keep;
+  const speed = Math.hypot(state.vx, state.vy);
+  if (!dashing && state.decayLeft <= 0) {
+    if (combo.push) {
+      const push = combo.push > 0 ? glide.accel : -glide.retro;
+      let ax = Math.cos(state.angle) * push;
+      let ay = Math.sin(state.angle) * push;
+      if (speed > 0) {
+        const along = (ax * state.vx + ay * state.vy) / speed;
+        const room = Math.max(0, (glide.maxSpeed - speed) / dt);
+        if (along > room) {
+          ax -= ((along - room) * state.vx) / speed;
+          ay -= ((along - room) * state.vy) / speed;
+        }
+      }
+      state.vx += ax * dt;
+      state.vy += ay * dt;
+    } else if (glide.autoBrake && speed > 0) {
+      const reach = Math.max(
+        BRAKE_FLOOR,
+        Math.min(1, speed / (glide.maxSpeed * BRAKE_FULL_SHARE))
+      );
+      const keep = 1 - Math.min(speed, glide.retro * reach * dt) / speed;
+      state.vx *= keep;
+      state.vy *= keep;
+    }
   }
   const fraction = dashing
     ? 1
     : Math.max(0, state.decayLeft / DASH_DECAY_SECONDS);
   const cap = glide.maxSpeed * (1 + (DASH_SPEED_CAP_MULTIPLIER - 1) * fraction);
-  const speed = Math.hypot(state.vx, state.vy);
-  if (speed > cap) {
-    state.vx *= cap / speed;
-    state.vy *= cap / speed;
+  const after = Math.hypot(state.vx, state.vy);
+  if (after > cap) {
+    state.vx *= cap / after;
+    state.vy *= cap / after;
   }
-  state.spin += combo.turn * glide.turn * glide.agility * dt;
-  state.spin *= Math.exp(-glide.turnDamping * dt);
-  state.spin = Math.max(-glide.turn, Math.min(glide.turn, state.spin));
+  const pair = combo.turn
+    ? TURN_ACCEL * glide.agility
+    : Math.max(
+        SPIN_ASSIST,
+        glide.agility > 1
+          ? TURN_ACCEL * glide.agility * SPIN_STOP_SHARE * glide.agility
+          : 0
+      );
+  const goal = combo.turn * TURN_TOP * glide.agility;
+  state.spin += Math.max(-pair, Math.min(pair, (goal - state.spin) / dt)) * dt;
   state.angle = wrapAngle(state.angle + state.spin * dt);
   state.x = (state.x + state.vx * dt + world.width) % world.width;
   state.y = (state.y + state.vy * dt + world.height) % world.height;

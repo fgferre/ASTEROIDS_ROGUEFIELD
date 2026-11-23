@@ -29,6 +29,46 @@ export const NEXT = {
 
 export const RELEASES = [
   {
+    version: '0.8.0',
+    date: '2026-11-23',
+    new: [
+      'The ship now flies on its own thrusters: at the start nothing slows it, so it glides until you fire the retro (S) or turn and burn, and a spin keeps turning a while after you let go.',
+      "The Flight Computer's flight is faster than the start, with a turbo that builds on a straight run, and the nose swings onto your keys with weight.",
+      'Harmonic Plasma Lance has its own Thermal forms: Searing Beam (3 cards) leaves the beam’s line burning for 1 s and sets alight anything that crosses it; Sunspear (5 cards) makes the beam 50% longer, stays 0.5 s, and its line burns for 2 s.',
+      'Three Arc cards make the Harmonic’s beam arc from its far end to the 2 nearest enemies; with five, every enemy the beam crosses starts a lightning chain of 3 jumps.',
+      'Three Salvage cards make the orbs from Harmonic beam kills fly straight back to your ship; with five, the beam also sends every orb it crosses to you.',
+      'Three Kinetic cards make the Harmonic’s beam throw the machines it hits back along its line and fling the fragments of rocks it kills outward; with five, rocks it kills also burst into shards that fly on along the beam and hit what is behind.',
+      'Three Field cards make the Harmonic’s beam tug enemies near its line onto it and hold them for 0.5 s; with five, the beam leaves a gravity trench on its line for 1.2 s that drags nearby enemies onto it.',
+      'Scatter Coil has its own Kinetic forms: Grapeshot (3 cards) makes a bolt that hits glance off into the next enemy ahead and burst again; Hailstorm (5 cards) hits 25% harder and glances twice.',
+      'Three Thermal cards make a rock hit 3 times by one Scatter Coil volley catch fire inside and die into burning pieces; with five, machines catch fire too and each one set alight passes it to a neighbour.',
+      'Three Arc cards make each Scatter Coil burst discharge into the 2 nearest enemies outside it, up to 4 bolts a volley; with five, into 3, each bolt jumping on once more and hitting much harder.',
+      'Three Field cards make each Scatter Coil burst pull enemies within 60 px into its centre, then explode on the clump; with five, it pulls from 90 px and holds them 0.5 s.',
+      'Three Salvage cards make a Scatter Coil kill throw a scrap shard that fires itself at the nearest enemy (orbs as before); with five, two shards.',
+      'Seeker Swarm has its own Thermal form, Thermite: three cards make a missile lodge in what it hits, burn inside it for 1 s, then burst 60% bigger; with five, that burst throws thermite at 3 neighbours that sticks and burns.',
+      'Seeker Swarm has its own Arc form, Storm Warhead: three cards make each missile burst throw a heavy bolt that leaps across 3 enemies; with five, across 5.',
+      'Seeker Swarm has its own Field form, Gravity Warhead: three cards make each missile burst leave a gravity well for 0.6 s that pulls nearby enemies into it; with five, the well is bigger and the salvo’s other missiles home on it.',
+    ],
+    improved: [
+      'Braking System now brakes your travel with the thrusters when you let go of the keys; RCS System steadies a spin, firmer at each level.',
+      'The main flame bursts off the line, then holds a steady third while you keep the key down.',
+      'Settings → Controls: Hull Control is gone; your cards choose the flight.',
+      'The key hints and the first tip say S brakes; the piloting cards and the Flight Computer briefing describe the new flight.',
+      'The engine sound follows how near you fly to your top speed, with no jump when you reach it.',
+      'Overcharge Coil has its own version for three weapons: Seeker Swarm missiles fly faster and turn tighter, Scatter Coil flak bolts fly faster and further before they burst, and the Harmonic fires its beam every 3rd shot instead of every 4th.',
+      'Thermal Lens has its own version for two weapons: it focuses the Scatter Coil’s fan (bolts closer together, +15% damage), and Seeker Swarm missiles find targets further away and hit harder on a direct hit.',
+      'Chain Capacitor has its own version for three weapons: 1 Scatter Coil volley in 10 fires twice, 1 Seeker Swarm missile in 10 splits in two when it locks on, and 1 Harmonic beam in 5 fires twice along the same line.',
+      'Recoil Dampers make Scatter Coil and Seeker Swarm bursts reach 25 px further (was 10 px).',
+      'Three Kinetic cards make Seeker Swarm bursts 80% wider (was 50%); five, 120%.',
+    ],
+    fixed: [],
+    unseen: [
+      'The test address that starts a run with one item (?content=) can now give the ship several cards at chosen levels (&cards=), so Felipe can fly each flight with its upgrades; normal runs are the same.',
+      'Replays recorded before this version no longer play (the flight changed); progress, pilots and the Hangar are untouched.',
+      'Moved a helper only the tests use out of the game code and into the tests; the game looks and plays the same.',
+      'Split the list of game services in two files, the game itself and what shows, sounds and draws it, so the tests stop loading the screens; the game looks and plays the same.',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-11-22',
     new: [

@@ -7,12 +7,13 @@ Commands
 * Setup: `npm ci`. Dev server: `npm run dev` (port 5500). Headless Chromium + Playwright is the screenshot tool; a visual change ends with a capture, not a description.
 * Done means: `npm run done` (lint + format check + tests + build — the same gates as CI) passes. Run it once, at the end, before you say a task is finished.
 * While working, run only the tests for what you touched: `npm run test:tocados` picks them from the files you changed (`npm run gate` = lint + tocados). Only commands with non-obvious arguments go here; the rest is in package.json.
+* Tools: `npm run capture -- --url <address> --saida <file>` shoots the running dev server headless (views jogo/perto/topo/orbita, `--content <id>`, `--filme <s>`: see the script's header); `npm run cartao <card>.json` builds a decision page for the owner — a taste question shows three variants side by side, and it refuses fewer without `--uma "reason"`.
 
 How to work
 
 * Before starting: if the request seems mistaken, has a simpler path, or misses something (existing code, an edge case, a trap below), say so in one or two sentences. Then do what was asked, unless it's on the ask list. State any assumption.
 * Do what was asked, no more. If you spot a bug or an improvement nearby, leave it and add one line to `BACKLOG.md`.
-* Before writing a helper, system, or util, look for an existing one and extend it. One way to do each thing (this repo already has three ways to resolve a service and four ways to detect dev mode — don't add a fifth).
+* Before writing a helper, system, or util, look for an existing one and extend it. One way to do each thing (this repo already has three ways to resolve a service — don't add a fourth).
 * Do the simplest thing that works. No abstractions, options, or config for needs that don't exist yet. No defensive `typeof x === 'function'` around a dependency the manifest guarantees.
 * Change as little as possible: targeted edits, not whole-file rewrites. Match the patterns already in the file; formatting is Prettier's job.
 * When you replace something, delete the old version. No commented-out code, unused functions, legacy flags, or leftover files.

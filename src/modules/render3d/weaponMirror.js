@@ -11,7 +11,14 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
 import { WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
-import { SHOT_SHAPES, rgbOf } from './batches.js';
+import { SHOT_SHAPES, glint, rgbOf } from './batches.js';
+import {
+  mirrorGlances,
+  mirrorKindled,
+  mirrorScraps,
+  pushBurningPiece,
+} from './fanMirror.js';
+import { mirrorLodged, mirrorThermite } from './missileMirror.js';
 import { hashId } from './enemyMirror.js';
 import { getContent } from '../../content/registry.js';
 
@@ -142,12 +149,6 @@ const SEEKER_LENGTH = 6;
 const SEEKER_WIDTH = 2;
 const SEEKER_FLAME = 3;
 const SEEKER_GLOW = 4;
-
-// Deterministic 0..1 per trail point, for the Motherlode glints (render only).
-const glint = (x, y) => {
-  const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 
 // Violet static over a hull a field holds (`strength` ~1): short kinked
 // sparks laid across it, re-struck every few frames, in place of a ring.
@@ -548,6 +549,298 @@ function mirrorAura(THREE, combat, batches, flashes) {
   });
 }
 
+// Searing Beam's scar (approved 22/11): a ragged molten seam left in space,
+// its pieces cooling unevenly (some already dark crust), slag beads where it
+// glows hottest, embers lifting off it and a little soot. No ring or cross:
+// what it burns shows its own burn marks.
+const SCAR_H = 2.4;
+const SCAR_PIECES = 22;
+const SCAR_EMBERS = 28;
+const SCAR_SOOT = [0.1, 0.085, 0.08];
+const SCAR_COLORS = {
+  red: '#b02a08',
+  orange: '#ff5a12',
+  hot: '#ffc98a',
+  ember: '#ff8a2a',
+};
+
+function mirrorScars(THREE, scars, batches) {
+  const { ribbons, glow, smoke } = batches;
+  const red = rgbOf(THREE, SCAR_COLORS.red);
+  const orange = rgbOf(THREE, SCAR_COLORS.orange);
+  const hot = rgbOf(THREE, SCAR_COLORS.hot);
+  const ember = rgbOf(THREE, SCAR_COLORS.ember);
+  scars.forEach((scar) => {
+    const k = scar.life / scar.maxLife;
+    const age = scar.maxLife - scar.life;
+    const dx = scar.ex - scar.x;
+    const dy = scar.ey - scar.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const at = (t, i) => {
+      // a gentle wander, not a zigzag
+      const off =
+        i === 0 || i === SCAR_PIECES
+          ? 0
+          : Math.sin(t * 9 + scar.seed * 2.3) * 2.2 +
+            (glint(scar.seed, i) - 0.5) * 1.2;
+      // the seam starts a little ahead of the muzzle, clear of the ship
+      const u = 0.1 + 0.9 * t;
+      return [scar.x + dx * u + nx * off, scar.y + dy * u + ny * off];
+    };
+    let [ax, ay] = at(0, 0);
+    for (let i = 1; i <= SCAR_PIECES; i += 1) {
+      const [bx, by] = at(i / SCAR_PIECES, i);
+      // each piece cools at its own pace; some are already dark crust
+      const lag = 0.45 * glint(scar.seed + 7, i);
+      const ki = Math.max(0, Math.min(1, (k - lag) / (1 - lag)));
+      const heat = 0.35 + 0.65 * glint(scar.seed + 3, i) ** 2;
+      if (glint(scar.seed + 5, i) >= 0.22) {
+        const w = scar.width;
+        ribbons.tube(
+          ax,
+          ay,
+          bx,
+          by,
+          SCAR_H,
+          red,
+          w * 1.6,
+          0.28 * Math.min(1, k * 1.4)
+        );
+        if (ki > 0) {
+          ribbons.tube(
+            ax,
+            ay,
+            bx,
+            by,
+            SCAR_H,
+            orange,
+            w * 0.6,
+            1.1 * heat * ki
+          );
+          ribbons.tube(
+            ax,
+            ay,
+            bx,
+            by,
+            SCAR_H,
+            hot,
+            w * 0.22,
+            1.8 * heat * ki ** 2
+          );
+          if (heat > 0.8)
+            glow.push(bx, SCAR_H, by, orange, w * 1.6, 0.6 * ki, 1.4);
+        }
+      }
+      ax = bx;
+      ay = by;
+    }
+    for (let j = 0; j < SCAR_EMBERS; j += 1) {
+      const t = 0.1 + 0.9 * glint(scar.seed + 11, j);
+      const life = age - glint(scar.seed + 13, j) * 0.6 * scar.maxLife;
+      if (life < 0) continue;
+      const side = (glint(scar.seed + 17, j) - 0.5) * 2 * (2 + life * 22);
+      const fade = Math.max(0, 1 - life / (0.55 * scar.maxLife + 0.3));
+      const flicker = 0.6 + 0.4 * glint(j * 1.7, Math.floor(life * 14));
+      glow.push(
+        scar.x + dx * t + nx * side,
+        SCAR_H + 1 + life * 14,
+        scar.y + dy * t + ny * side,
+        ember,
+        3 + 3 * glint(j, scar.seed),
+        fade * flicker,
+        2.2
+      );
+    }
+    for (let j = 0; j < 4; j += 1) {
+      const t = (j + 0.5) / 4 + (glint(scar.seed, j + 30) - 0.5) * 0.15;
+      smoke.push(
+        scar.x + dx * t,
+        SCAR_H + 3 + age * 8,
+        scar.y + dy * t,
+        SCAR_SOOT,
+        7 + age * 10,
+        0.35 * k
+      );
+    }
+  });
+}
+
+// The Harmonic beam's Kinetic form (approved 22/11): ×5, a rock it killed
+// bursts into SHARD_COUNT heavy shards, hot at the head, flying on along the
+// beam within SHARD_SPREAD rad over SHARD_REACH px; ×3/×5, grit streaming
+// off each fragment it flung.
+const SHARD_COUNT = 11;
+const SHARD_SPREAD = 0.7;
+const SHARD_REACH = 175;
+const SHARD_COLORS = { tail: '#ff5a14', head: '#ffd2a0' };
+
+function mirrorShards(THREE, combat, batches) {
+  const { ribbons, glow } = batches;
+  const tail = rgbOf(THREE, SHARD_COLORS.tail);
+  const head = rgbOf(THREE, SHARD_COLORS.head);
+  combat.shards.forEach((burst) => {
+    const k = burst.life / burst.maxLife;
+    const gain = Math.min(1, k * 2);
+    const t = Math.sqrt(1 - k);
+    for (let i = 0; i < SHARD_COUNT; i += 1) {
+      const angle = burst.angle + (glint(burst.seed, i) - 0.5) * SHARD_SPREAD;
+      const r0 = 10 + SHARD_REACH * (0.55 + 0.45 * glint(i, burst.seed)) * t;
+      const r1 = Math.max(0, r0 - (14 + 34 * k));
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const x = burst.x + c * r0;
+      const y = burst.y + s * r0;
+      ribbons.streak(
+        burst.x + c * r1,
+        burst.y + s * r1,
+        x,
+        y,
+        ARC_H,
+        tail,
+        5,
+        1.8 * gain
+      );
+      ribbons.streak(
+        x - c * 8,
+        y - s * 8,
+        x,
+        y,
+        ARC_H + 0.2,
+        head,
+        3,
+        2.4 * gain
+      );
+      glow.push(x, ARC_H + 0.4, y, tail, 6, 0.8 * gain, 1.6);
+    }
+  });
+  combat.flung.forEach((flung) => {
+    const { enemy } = flung;
+    if (enemy.destroyed || enemy.id !== flung.id) return;
+    const speed = Math.hypot(enemy.vx || 0, enemy.vy || 0);
+    if (speed < 1) return;
+    const k = 1 - flung.age / flung.trail;
+    if (k <= 0) return;
+    const ux = (enemy.vx || 0) / speed;
+    const uy = (enemy.vy || 0) / speed;
+    const r = (enemy.radius || 8) * 0.6;
+    if (flung.fire) {
+      pushBurningPiece(THREE, batches, flung, ux, uy, k);
+      return;
+    }
+    // never longer than the way it has flown: it does not reach back to
+    // the rock it came from
+    const len = Math.min(14 + 26 * k, 0.6 * speed * flung.age);
+    if (len < 2) return;
+    ribbons.streak(
+      enemy.x - ux * (r + len),
+      enemy.y - uy * (r + len),
+      enemy.x - ux * r,
+      enemy.y - uy * r,
+      ARC_H,
+      tail,
+      4,
+      1.2 * k
+    );
+    for (let j = 0; j < 4; j += 1) {
+      const back = r + len * (0.2 + 0.25 * j);
+      const side = (glint(flung.seed, j) - 0.5) * 8;
+      glow.push(
+        enemy.x - ux * back - uy * side,
+        ARC_H,
+        enemy.y - uy * back + ux * side,
+        head,
+        2.5,
+        0.7 * k * glint(j, flung.seed + 1),
+        2
+      );
+    }
+  });
+}
+
+// The Harmonic beam's Field ×5 trench (approved 22/11; Renderer3D bends
+// space toward it): matter falling in from both sides onto a dark seam.
+// TRENCH_MOTES motes a side, each falling square onto the seam from the
+// reach over 1 / TRENCH_RATE s, faster and brighter as it nears (a streak
+// TRENCH_TAIL of its fall long), then again from a new point along it; the
+// seam a violet tube, a white core and dark smoke.
+const TRENCH_MOTES = 15;
+const TRENCH_RATE = 1.3;
+const TRENCH_TAIL = 0.35; // of the fall
+const TRENCH_SLANT = 0.15; // the most a fall leans along the seam, per px
+const TRENCH_SMOKE = 7;
+
+function mirrorTrench(THREE, trench, batches, white) {
+  const { ribbons, smoke } = batches;
+  const violet = rgbOf(THREE, WEAPON_APEX.field.look.outer);
+  const k = trench.life / trench.maxLife;
+  const age = trench.maxLife - trench.life;
+  const grow = Math.min(1, (1 - k) * 8) * Math.min(1, k * 3);
+  const dx = trench.ex - trench.x;
+  const dy = trench.ey - trench.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  // how far a mote is from the seam at `p` of its fall (accelerating in)
+  const fall = (p) => trench.reach * (1 - Math.max(0, p) ** 2);
+  for (let side = -1; side <= 1; side += 2) {
+    for (let m = 0; m < TRENCH_MOTES; m += 1) {
+      const clock = glint(m, side * 3.7) + age * TRENCH_RATE;
+      const p = clock % 1;
+      const fallSeed = m * 1.3 + side + Math.floor(clock) * 7.1;
+      // the seam starts a little ahead of the muzzle
+      const u = 0.1 + 0.88 * glint(fallSeed, 2.9);
+      const lean = TRENCH_SLANT * (glint(fallSeed, 5.3) - 0.5) * 2;
+      const px = trench.x + dx * u;
+      const py = trench.y + dy * u;
+      const ox = -uy * side + ux * lean;
+      const oy = ux * side + uy * lean;
+      const head = fall(p);
+      const tail = fall(p - TRENCH_TAIL);
+      const gain = grow * Math.min(1, p * 3) * (0.3 + p);
+      ribbons.streak(
+        px + ox * tail,
+        py + oy * tail,
+        px + ox * head,
+        py + oy * head,
+        ARC_H,
+        violet,
+        1.5,
+        1.4 * gain
+      );
+    }
+  }
+  for (let j = 0; j < TRENCH_SMOKE; j += 1) {
+    const t = (j + 0.5) / TRENCH_SMOKE;
+    smoke.push(
+      trench.x + dx * t,
+      ARC_H,
+      trench.y + dy * t,
+      WELL_DARK,
+      12,
+      0.7 * grow
+    );
+  }
+  const { x, y, ex, ey } = trench;
+  ribbons.tube(x, y, ex, ey, ARC_H + 0.5, violet, 2.4, 0.7 * grow);
+  ribbons.tube(x, y, ex, ey, ARC_H + 0.5, white, 0.4, 0.6 * grow);
+}
+
+// Implosion and the Gravity Warhead: what a burst drags in crackles in the
+// Singularity's violet while it falls (the well spirals at the centre:
+// CardEffects' wells).
+function mirrorImplosions(THREE, implosions, ribbons, white) {
+  const rgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);
+  implosions.forEach((imp) =>
+    imp.caught.forEach(({ enemy, id }) => {
+      if (!enemy.destroyed && enemy.id === id) {
+        pushStatic(ribbons, enemy, rgb, white, 1.4);
+      }
+    })
+  );
+}
+
 /**
  * Beams, flak bursts, arcs, blades, the aura and marks; `flashes` lights each
  * new beam and aura pulse once and each flak volley's first burst once.
@@ -557,6 +850,24 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const white = rgbOf(THREE, PALETTE.text);
   mirrorBlades(THREE, combat, batches);
   mirrorAura(THREE, combat, batches, flashes);
+  if (combat.scars.length) mirrorScars(THREE, combat.scars, batches);
+  if (combat.shards.length || combat.flung.length) {
+    mirrorShards(THREE, combat, batches);
+  }
+  if (combat.trench) mirrorTrench(THREE, combat.trench, batches, white);
+  if (combat.glances.length) mirrorGlances(THREE, combat.glances, ribbons);
+  if (combat.kindled.length) {
+    mirrorKindled(THREE, combat.kindled, batches, staticFrame / 60);
+  }
+  if (combat.scraps.length) mirrorScraps(THREE, combat.scraps, batches);
+  if (combat.implosions.length) {
+    mirrorImplosions(THREE, combat.implosions, ribbons, white);
+  }
+  if (combat.gravityWells.length) {
+    mirrorImplosions(THREE, combat.gravityWells, ribbons, white);
+  }
+  if (combat.lodged.length) mirrorLodged(THREE, combat.lodged, batches);
+  if (combat.thermite.length) mirrorThermite(THREE, combat.thermite, batches);
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);

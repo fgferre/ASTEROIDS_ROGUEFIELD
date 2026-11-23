@@ -21,7 +21,6 @@ import {
   sectionFieldRefs,
   splitFieldRef,
 } from './settings/settingsGroups.js';
-import { newFlightFromUrl } from '../player/newFlight.js';
 import { asArray } from '../upgradeCatalog.js';
 
 export class SettingsPanel {
@@ -722,16 +721,10 @@ export class SettingsPanel {
     return {
       value: (categoryId, key) => valuesByCategory[categoryId]?.[key],
       pressureRung: this.getService?.('difficulty')?.getPressure() ?? 0,
-      newFlight: newFlightFromUrl(),
       // Out of a run (opened from the menu) there is no cannon: counts as nose.
       aimByNose:
         this.settingsState.source === 'menu' ||
         (this.getService?.('player')?.noseAim ?? true),
-      // The flight the cards gave this run (every run starts classic).
-      flightInUse:
-        (this.settingsState.source !== 'menu' &&
-          this.getService?.('player')?.controlScheme) ||
-        'classic',
     };
   }
 
@@ -829,13 +822,7 @@ export class SettingsPanel {
     const field = this.getFieldDefinition(categoryId, key);
     const values = valuesByCategory[categoryId];
     const inactive = inactiveReason(ref, state);
-    // Greyed by the new flight, Hull Control shows the flight in use, not the
-    // stored choice (kept for ?direcao=antiga).
-    const shown =
-      inactive && ref === 'controls.hullControl'
-        ? state.flightInUse
-        : values[key];
-    const element = renderSettingField(categoryId, field, shown, values, {
+    const element = renderSettingField(categoryId, field, values[key], values, {
       device: this.settingsState.bindingDevice,
       inactive,
     });

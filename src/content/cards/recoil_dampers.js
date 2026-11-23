@@ -41,10 +41,10 @@ export default {
       ],
     },
     scatter: {
-      levels: [{ description: 'Flak bursts reach 10 px further.' }],
+      levels: [{ description: 'Flak bursts reach 25 px further.' }],
     },
     'seeker-swarm': {
-      levels: [{ description: 'Missile bursts reach 10 px further.' }],
+      levels: [{ description: 'Missile bursts reach 25 px further.' }],
     },
     'furnace-corona': {
       levels: [

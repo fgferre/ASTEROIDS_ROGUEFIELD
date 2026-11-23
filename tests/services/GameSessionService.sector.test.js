@@ -8,10 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { directorFor } from '../../src/data/layers.js';
 import { loadRecords } from '../../src/services/runRecords.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { sectorById } from '../../src/data/sectors.js';
 
 const SPAWN_STEPS = 20 * 60;

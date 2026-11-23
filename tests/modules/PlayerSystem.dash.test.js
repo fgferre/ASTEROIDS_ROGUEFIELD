@@ -36,8 +36,8 @@ describe('PlayerSystem dash', () => {
       eventBus,
       input,
       'command-queue': null,
-      newFlight: false,
     });
+    player.setFlightScheme('modern', false); // the Flight Computer's flight
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     player.angle = 0;
@@ -87,7 +87,9 @@ describe('PlayerSystem dash', () => {
     for (let i = 0; i < decaySteps; i += 1) {
       player.update(DELTA_TIME);
       const now = speed();
-      expect(now).toBeLessThan(previous);
+      // The first step still holds the dash's cap (its decay starts full).
+      if (i === 0) expect(now).toBeLessThanOrEqual(previous);
+      else expect(now).toBeLessThan(previous);
       drops.push(previous - now);
       previous = now;
     }
@@ -162,8 +164,8 @@ describe('Maneuver cards on the dash', () => {
       eventBus,
       input,
       'command-queue': null,
-      newFlight: false,
     });
+    player.setFlightScheme('modern', false); // the Flight Computer's flight
     player.position = { x: 400, y: 300 };
     player.velocity = { vx: 0, vy: 0 };
     player.angle = 0;

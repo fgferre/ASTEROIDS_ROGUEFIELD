@@ -8,33 +8,22 @@
 //   npm run playtest -- debris-wake average 1-10 --difficulty=pressure-5
 //                                          difficulty: pilot, veteran, warden,
 //                                          pressure-1..5 (none = the game's default)
-//   npm run playtest -- --flight=old       the old flight (?direcao=antiga); the
-//                                          default is the new one (glide, cannon on the nose)
 //   npm run playtest -- debris-wake --table 1-10
-//       the comparison table: both skills, the new flight and the old one,
-//       seeds 1 to 10, one sector (default debris-wake)
+//       the table: both skills, seeds 1 to 10, one sector (default debris-wake)
 //
 // Hands the choice to tests/playtest/sectors.playtest.js through the
-// environment and runs it under vitest.playtest.config.js.
+// environment and runs it under vitest.playtest.config.js, as a process group
+// that dies with the launcher (scripts/vitest-group.mjs).
 
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { runVitest } from './vitest-group.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PRESETS = ['average', 'good'];
-const FLIGHTS = ['new', 'old'];
 const args = process.argv.slice(2);
 const flag = (name) =>
   args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
-const flight = flag('flight') || 'new';
-if (!FLIGHTS.includes(flight)) {
-  throw new Error(
-    `playtest: --flight is ${FLIGHTS.join(' or ')} (default new)`
-  );
-}
 const difficulty = flag('difficulty') || '';
 const table = args.includes('--table');
 const preset = args.find((arg) => PRESETS.includes(arg)) || 'average';
@@ -42,21 +31,12 @@ const [sector = '', seed = ''] = args.filter(
   (arg) => !PRESETS.includes(arg) && !arg.startsWith('--')
 );
 
+/** One vitest run; resolves to its exit code (null when a signal ended it). */
 function run(env) {
-  return spawnSync(
-    process.execPath,
-    [
-      resolve(ROOT, 'node_modules/vitest/vitest.mjs'),
-      'run',
-      '--config',
-      'vitest.playtest.config.js',
-    ],
-    {
-      cwd: ROOT,
-      stdio: table ? 'ignore' : 'inherit',
-      env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
-    }
-  );
+  return runVitest(['run', '--config', 'vitest.playtest.config.js'], {
+    stdio: table ? 'ignore' : 'inherit',
+    env: { ...process.env, PLAYTEST_DIFFICULTY: difficulty, ...env },
+  });
 }
 
 const pad = (text, width) => String(text).padEnd(width);
@@ -75,70 +55,52 @@ const trailText = (r) =>
 const runText = (r) =>
   `${r.seconds}s ${r.kills}k w${r.wave} ${r.outcome === 'died' ? (r.cause || '?').replace(/^shot /, 'tiro ') : r.outcome}`;
 
-/** Both skills, both ways of flying, one after the other: the side-by-side table. */
-function compare() {
+/** Both skills, one after the other: the table. */
+async function compare() {
   const dir = mkdtempSync(join(tmpdir(), 'playtest-'));
-  const rows = {};
   for (const p of PRESETS) {
-    for (const f of FLIGHTS) {
-      const out = join(dir, `${p}-${f}.json`);
-      process.stdout.write(`running ${p} / ${f}...\n`);
-      run({
-        PLAYTEST_PRESET: p,
-        PLAYTEST_FLIGHT: f,
-        PLAYTEST_SECTOR: sector || 'debris-wake',
-        PLAYTEST_SEED: seed || '1-10',
-        PLAYTEST_OUT: out,
-      });
-      rows[`${p}/${f}`] = JSON.parse(readFileSync(out, 'utf8'));
-    }
-  }
-  for (const p of PRESETS) {
-    const old = rows[`${p}/old`];
-    const glide = rows[`${p}/new`];
+    const out = join(dir, `${p}.json`);
+    process.stdout.write(`running ${p}...\n`);
+    await run({
+      PLAYTEST_PRESET: p,
+      PLAYTEST_SECTOR: sector || 'debris-wake',
+      PLAYTEST_SEED: seed || '1-10',
+      PLAYTEST_OUT: out,
+    });
+    const runs = JSON.parse(readFileSync(out, 'utf8'));
     const med = (list, key) => median(list.map((r) => r[key]));
     const lines = [
-      `\n== bot ${p}: ${old[0].sector}, old flight | new flight (glide, nose cannon) ==`,
-      `${pad('seed', 5)}${pad('old: time kills wave, death', 46)}new: time kills wave, death`,
-      ...old.map(
-        (m, i) => `${pad(m.seed, 5)}${pad(runText(m), 46)}${runText(glide[i])}`
-      ),
-      `${pad('mid', 5)}${pad(`${med(old, 'seconds')}s ${med(old, 'kills')}k w${med(old, 'wave')}`, 46)}${med(glide, 'seconds')}s ${med(glide, 'kills')}k w${med(glide, 'wave')}`,
-      `new: Auto Turret taken in ${glide.filter((r) => r.autoAim).length} of ${glide.length} runs, Flight Computer in ${glide.filter((r) => r.flightComputer).length}`,
-      `new-flight watch (median): turning ${med(glide, 'turningPct')}%, pushing ${med(glide, 'pushPct')}%, back key ${med(glide, 'reversePct')}%, braking ${med(glide, 'brakePct')}%; aimed at a foe in reach ${med(glide, 'aimedPct')}%, near an edge ${med(glide, 'edgePct')}%, mean speed ${med(glide, 'meanSpeed')} px/s`,
+      `\n== bot ${p}: ${runs[0].sector} ==`,
+      `${pad('seed', 5)}time kills wave, death`,
+      ...runs.map((m) => `${pad(m.seed, 5)}${runText(m)}`),
+      `${pad('mid', 5)}${med(runs, 'seconds')}s ${med(runs, 'kills')}k w${med(runs, 'wave')}`,
+      `Auto Turret taken in ${runs.filter((r) => r.autoAim).length} of ${runs.length} runs, Flight Computer in ${runs.filter((r) => r.flightComputer).length}`,
+      `flight watch (median): turning ${med(runs, 'turningPct')}%, pushing ${med(runs, 'pushPct')}%, back key ${med(runs, 'reversePct')}%, braking ${med(runs, 'brakePct')}%; aimed at a foe in reach ${med(runs, 'aimedPct')}%, near an edge ${med(runs, 'edgePct')}%, mean speed ${med(runs, 'meanSpeed')} px/s`,
     ];
-    const taken = (list, key) => list.filter((r) => r.trail[key]);
-    const when = (list, key) => {
-      const hit = taken(list, key);
+    const when = (key) => {
+      const hit = runs.filter((r) => r.trail[key]);
       if (!hit.length) return '-';
       const level = median(hit.map((r) => r.trail[key].level));
       const seconds = median(hit.map((r) => r.trail[key].seconds));
-      return `${hit.length}/${list.length}, mid L${level} @${seconds}s`;
+      return `${hit.length}/${runs.length}, mid L${level} @${seconds}s`;
     };
     lines.push(
-      `trail (${p}), new flight: ${glide.map((r) => `seed ${r.seed}: ${trailText(r)}`).join('\n  ')}`,
-      ...[
-        ['old', old],
-        ['new', glide],
-      ].map(
-        ([name, list]) =>
-          `trail taken, ${name} flight: motor ${when(list, 'motor')}; brake/agility ${when(list, 'brake')}; Auto Turret ${when(list, 'aim')}`
-      ),
-      `wins: old ${old.filter((r) => r.outcome === 'won').length}/${old.length}, new ${glide.filter((r) => r.outcome === 'won').length}/${glide.length}`
+      `trail (${p}): ${runs.map((r) => `seed ${r.seed}: ${trailText(r)}`).join('\n  ')}`,
+      `trail taken: motor ${when('motor')}; brake/agility ${when('brake')}; Auto Turret ${when('aim')}`,
+      `wins: ${runs.filter((r) => r.outcome === 'won').length}/${runs.length}`
     );
     process.stdout.write(`${lines.join('\n')}\n`);
   }
 }
 
 if (table) {
-  compare();
+  await compare();
   process.exit(0);
 }
 
-const result = run({
+const status = await run({
   PLAYTEST_PRESET: preset,
-  PLAYTEST_FLIGHT: flight,
   PLAYTEST_SECTOR: sector,
   PLAYTEST_SEED: seed,
 });
-process.exit(result.status ?? 1);
+process.exit(status ?? 1);

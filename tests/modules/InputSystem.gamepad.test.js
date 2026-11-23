@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import InputSystem from '../../src/modules/InputSystem.js';
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
-import { installDomStubs, keyEvent } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 
 describe('InputSystem gamepad', () => {

@@ -12,11 +12,8 @@ import {
 import { listContent } from '../../src/content/registry.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 const STEPS = 60;
 
@@ -50,7 +47,6 @@ describe('content scene on a live run', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     vi.useFakeTimers();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -174,6 +170,22 @@ describe('content scene on a live run', () => {
     });
   });
 
+  it('gives the ship the cards= build, the cards they require first', () => {
+    game.services.player.setFlightScheme('classic', true); // the new flight's start
+    const { services } = play('hulls', getItem('hulls', 'default-hull'), {
+      cards: [
+        { id: 'propulsors', level: 5 },
+        { id: 'flight_computer', level: 1 },
+      ],
+    });
+    const count = (id) => services.progression.getUpgradeCount(id);
+    expect(count('propulsors')).toBe(5);
+    expect(count('braking_system')).toBe(3);
+    expect(count('rcs_system')).toBe(3);
+    expect(count('flight_computer')).toBe(1);
+    expect(services.player.controlScheme).toBe('modern');
+  });
+
   describe.each(idsOf('stages'))('stage %s', (id, item) => {
     it('plays the layer, its spawner running', () => {
       const { services } = play('stages', item);
@@ -235,9 +247,10 @@ describe('content scene on a live run', () => {
       expect(player.position.x).toBeGreaterThan(550);
 
       const before = player.position.x;
-      input.onKeyDown(keyEvent('KeyD'));
+      // The start's classic: W thrusts along the nose, +x.
+      input.onKeyDown(keyEvent('KeyW'));
       for (let step = 0; step < 30; step += 1) frame();
-      input.onKeyUp(keyEvent('KeyD'));
+      input.onKeyUp(keyEvent('KeyW'));
       expect(player.position.x).toBeGreaterThan(before + 10);
     });
 

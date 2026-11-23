@@ -14,7 +14,8 @@ import { replay } from '../../hudCommon.js';
 import { familyAccent } from '../../../upgradeCard.js';
 
 // A weapon with an every-nth-shot beam shows one pip per shot before it (the
-// beam is the last shot). The markup holds the most any weapon needs.
+// beam is the last shot; the weapon state gives the live n). The markup holds
+// the most any weapon needs.
 const beamPips = (weapon) => (firePattern(weapon, 'beam')?.every ?? 1) - 1;
 const BEAM_PIPS = Math.max(0, ...Object.values(WEAPONS).map(beamPips));
 
@@ -134,7 +135,7 @@ export default {
   // only when something changed.
   updateWeapon(state) {
     const { els } = this;
-    const pips = beamPips(WEAPONS[state.weaponId]);
+    const pips = state.beamEvery ? state.beamEvery - 1 : 0;
     const filled = pips ? pips + 1 - state.shotsToBeam : 0;
     const key = `${state.weaponId}:${filled}:${state.evolutions.map((evolution) => evolution.id).join(',')}`;
     if (key === this.lastWeaponKey) return;
@@ -159,7 +160,12 @@ export default {
       const chip = document.createElement('span');
       chip.className = 'evo-chip';
       chip.classList.toggle('is-apex', Boolean(apex));
-      chip.textContent = apex ? `APEX ${short}` : id.toUpperCase();
+      // A weapon's own name for a lance form (familyForms.names) wins.
+      const named = WEAPONS[state.weaponId]?.familyForms?.names?.[family];
+      const label = named?.[apex ? 1 : 0]?.toUpperCase();
+      chip.textContent = apex
+        ? `APEX ${label ?? short}`
+        : label ?? id.toUpperCase();
       chip.style.setProperty('--family-color', familyAccent(family));
       els.evolutions.appendChild(chip);
       this.evolutionChips.set(id, chip);

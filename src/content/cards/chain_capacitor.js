@@ -26,8 +26,10 @@ export default {
       },
     ],
   },
-  // Who hits twice with each weapon (HitResolution), or the Arc Caster's
-  // extra jump (firePatterns.js).
+  // Who hits twice with each weapon (HitResolution), the Arc Caster's extra
+  // jump (firePatterns.js), or the weapon's own version: the Scatter's volley
+  // and the Harmonic's beam fire twice, a Seeker missile splits (proposta
+  // 22/11, `capacitorTwice` and `capacitorSplit` in the weapon files).
   weaponText: {
     'shard-halo': {
       levels: [
@@ -49,7 +51,7 @@ export default {
       levels: [
         {
           description:
-            'With the Chain Lance: each chain jumps once more. Otherwise: flak bolts have a 10% chance to hit twice; their shrapnel never does.',
+            'With the Chain Lance: each chain jumps once more. Otherwise: 1 volley in 10 fires twice.',
         },
       ],
     },
@@ -57,7 +59,7 @@ export default {
       levels: [
         {
           description:
-            'With the Chain Lance: each chain jumps once more. Otherwise: lances have a 10% chance to hit twice; the beam never does.',
+            'With the Chain Lance: each chain jumps once more. Otherwise: 1 beam in 5 fires twice along the same line.',
         },
       ],
     },
@@ -65,7 +67,7 @@ export default {
       levels: [
         {
           description:
-            'With the Chain Lance: each chain jumps once more. Otherwise: missiles have a 10% chance to hit twice; their burst never does.',
+            'With the Chain Lance: each chain jumps once more. Otherwise: 1 missile in 10 splits in two when it locks on.',
         },
       ],
     },

@@ -1,4 +1,4 @@
-// The new flight only (`newFlight`; ?direcao=antiga leaves it out). The numbers are proposals
+// A piloting-flight card (`newFlight`). The numbers are proposals
 // (16/11), the owner's to judge by playing.
 import { PALETTE } from '../../data/constants/palette.js';
 

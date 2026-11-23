@@ -144,6 +144,7 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
     automatic = 0,
     levels = {},
     velocity = { vx: 0, vy: 0 },
+    topSpeed = 132,
   } = {}) {
     const visualLevels = { thruster: 0, rcs: 0, braking: 0, ...levels };
     const thruster = (type, intensity, extra) =>
@@ -164,6 +165,7 @@ async function makeAudio({ fetchFile = fetchFor(MANIFEST) } = {}) {
       position: { x: 400, y: 300 },
       velocity,
       angle: 0,
+      topSpeed,
       visualLevels,
     });
   }
@@ -267,20 +269,14 @@ describe('ship engine', () => {
     expect(panner.pan.value).toBeLessThan(0);
     expect(played(from).filter((f) => /puff/.test(f)).length).toBe(1);
 
-    // Whatever the push, the share is the true one: from rest near none of
-    // the top speed, at it all.
-    [280, 560].forEach((push) => {
-      const top = push / 60 / Math.expm1(3.1 / 60);
-      const after = (v) => (v + push / 60) * Math.exp(-3.1 / 60);
-      [0, 0.5, 0.9].forEach((part) => {
-        const v = part * top;
-        expect(speedShare(v, after(v))).toBeCloseTo(after(v) / top, 9);
-      });
-      expect(speedShare(0, after(0))).toBeLessThan(0.06);
-      expect(speedShare(top, after(top))).toBeCloseTo(1, 9);
-    });
-    // Flying against the push: far from its top speed.
-    expect(speedShare(-80, -78)).toBe(0);
+    // The share is the true one: the speed along the push over the flight's
+    // top speed now, none at rest, all at it.
+    expect(speedShare(0, 132)).toBe(0);
+    expect(speedShare(66, 132)).toBeCloseTo(0.5, 9);
+    expect(speedShare(132, 132)).toBe(1);
+    // Flying against the push, or no top speed known: none.
+    expect(speedShare(-80, 132)).toBe(0);
+    expect(speedShare(80, 0)).toBe(0);
   });
 
   it('the stabilizer answers a shot with puffs as strong as its correction, never the same variation twice', async () => {

@@ -8,7 +8,7 @@
 // multi-lock layers (thin discs stacked on its axis, one thin barrel each).
 // Each solid draws in three finishes (HULL_FINISHES: satin paint, glossier
 // accent panels, polished steel), one draw group each in finish order.
-// One way to build the ship: the game's render3d/playerMirror.js and the
+// One way to build the ship: the game's render3d/player/hull.js and the
 // menu's MenuHullPreview.js both call it, with their own materials made
 // from HULL_FINISHES.
 // Ship-local points are [x, height, y] in hull units (ship y → world z); the
@@ -173,7 +173,7 @@ export const SPECULAR_CAP_GLSL = `
       reflectedLight.indirectSpecular = min(reflectedLight.indirectSpecular, vec3(0.2));`;
 
 /**
- * The player hull's own cap (playerMirror.js, MenuHullPreview.js): the key
+ * The player hull's own cap (render3d/player/hull.js, MenuHullPreview.js): the key
  * light's highlight a little over the machines' (higher, the flat Solar
  * Slicer blades flashed white), its sky's reflection three times theirs, so
  * the reflection runs along the curves as it turns.

@@ -50,7 +50,7 @@ Read this before touching code. Each row points a subject to the file to open fi
 - Dev mode is one switch: `IS_DEV` from `src/core/env.js`.
 - Data files hold tables and tuning only, frozen at export (`deepFreeze` from `src/utils/deepFreeze.js`); systems read them and own the behaviour. A new enemy, weapon, card, hull, stage, biome or boss starts as one file under `src/content/<kind>/`, not as an edit to the engine.
 - A content file imports only constants (`src/data/constants/`), `src/utils/deepFreeze.js`, `src/data/layerParts.js` and other content files, never `GameConstants` nor a module that reads the registry: that is an import cycle and the game fails to load.
-- A refactor must leave play unchanged, and `tests/integration/golden-trace.test.js` is the proof: it plays fixed headless runs and compares per-second hashes of state and events with `tests/__fixtures__/golden-trace.json`. Regenerate the fixture only in a commit that means to change behavior (command in the test's header: `GOLDEN_UPDATE=1 npx vitest run tests/integration/golden-trace.test.js`).
+- A refactor must leave play unchanged, and `tests/integration/golden-trace.test.js` is the proof: it plays fixed headless runs and compares per-second hashes of state and events with `tests/__fixtures__/golden-trace.json`. Regenerate the fixture only in a commit that means to change behavior (command in the test's header: `GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js`).
 - Generated artifacts are not source: `npm run analyze:deps` writes the dependency graph under `docs/architecture/`, which is git-ignored. Regenerate it; never edit it or treat an old copy as current.
 
 ## History

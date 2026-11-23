@@ -4,9 +4,9 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 
 ## How to run
 
-- `npm test`: the whole suite. `npm run done`: lint, format check, suite (again on GitHub's oldest Node, golden trace aside, when this machine's is newer) and build, once at the end of a task.
+- `npm test`: the whole suite. `npm run done`: lint, format check, the changelog test, then suite and build unless exactly this content already passed them (`scripts/done.mjs`), once at the end of a task. The tests run on the Node pinned in `.nvmrc`, the one GitHub uses: `npm test` and the other test scripts start it (`scripts/pinned-node.mjs`), and vitest started on another Node stops at once.
 - `npm run test:tocados`: the tests that cover the files you touched (see Selection). `npm run gate` is lint plus that.
-- `npx vitest run <file or folder>` for one thing; `npm run test:<domain>` per top-level folder (core, modules, utils, services, integration, balance, visual, physics).
+- `npm test -- <file or folder>` for one thing; `npm run test:<domain>` per top-level folder (core, modules, utils, services, integration, balance, visual, physics).
 
 ## Layout: a mirror of `src/` by domain
 
@@ -25,7 +25,7 @@ Vitest, node environment, no browser. Passing tests print nothing; only failures
 
 - `npm run playtest` flies all nine sector runs headless with the bot pilot (`src/bootstrap/botPilot.js`, fed by `botPilotAdapter.js`), a mortal ship and one life each, and prints a report per sector and a summary table. About 3 minutes (a better bot lives longer, so it runs longer).
 - `npm run playtest -- good` picks the `good` bot (default `average`); `npm run playtest -- <sector-id> [average|good] [seed]` flies one sector; the seed (default 1, env `PLAYTEST_SEED`) seeds both the world and the bot, so a sector is judged over several seeds. `PLAYTEST_CARRY=1` makes the bot win the chapter's earlier sectors first and arrive with that build, as in the campaign.
-- The pilot flies the new flight by default (classic glide, cannon on the nose, `src/bootstrap/botPilotGlide.js`; it takes the Auto Turret and Flight Computer cards as they come and presses Enter on the briefing). `--flight=old` flies the old flight (`?direcao=antiga`). The seed may be a range (`1-10`). `npm run playtest -- debris-wake --table 1-10` runs both skills in both flights, one after the other, and prints the old and the new side by side.
+- The pilot flies the game's start (classic glide, cannon on the nose, `src/bootstrap/botPilotGlide.js`; it takes the Auto Turret and Flight Computer cards as they come and presses Enter on the briefing). The seed may be a range (`1-10`). `npm run playtest -- debris-wake --table 1-10` runs both skills, one after the other, and prints a table for each.
 - It runs `tests/playtest/*.playtest.js` through `vitest.playtest.config.js` (`scripts/playtest.mjs` passes the choice and the seed in the environment), so `npm test` and the gate never run it.
 - The bot reads only what the screen shows (bodies, bullets, telegraphs and their timers, a boss's open plates); its skill is the named knobs in `PRESETS`. Its numbers are a probe, not a verdict: the owner's play judges difficulty.
 

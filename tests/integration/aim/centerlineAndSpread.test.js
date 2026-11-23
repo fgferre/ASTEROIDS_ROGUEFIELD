@@ -86,8 +86,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const player = new PlayerSystem({
         position: { x: 100, y: 200 },
         dependencies: { eventBus },
-        newFlight: false,
       });
+      player.noseAim = false; // the Auto Turret taken
       player.angle = 0;
       player.turretAngle = Math.PI / 2;
 

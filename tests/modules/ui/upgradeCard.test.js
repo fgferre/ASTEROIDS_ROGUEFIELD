@@ -30,6 +30,33 @@ describe('upgrade card build line', () => {
     });
   });
 
+  it("with the Scatter Coil a family completes under the Scatter's own form name, never the lance's", () => {
+    const scatter = { weaponId: 'scatter', chip: 'SCATTER' };
+    const title = (id, owned) =>
+      buildLine(card(id), { rank: 1, owned, weapon: scatter }).title;
+    expect(title('afterburn_lance', 2)).toBe('Kindling');
+    expect(title('afterburn_lance', 4)).toBe('Kindling');
+    expect(title('arc_lattice', 2)).toBe('Discharge');
+    expect(title('shield', 2)).toBe('Implosion');
+    expect(title('magfield', 2)).toBe('Scrap Rounds');
+    expect(title('multishot', 2)).toBe('Grapeshot');
+    expect(title('multishot', 4)).toBe('Hailstorm');
+  });
+
+  it("with the Seeker Swarm a family completes under the Seeker's own form name, never the lance's", () => {
+    const swarm = { weaponId: 'seeker-swarm', chip: 'SEEKER' };
+    const title = (id, owned) =>
+      buildLine(card(id), { rank: 1, owned, weapon: swarm }).title;
+    expect(title('afterburn_lance', 2)).toBe('Thermite');
+    expect(title('afterburn_lance', 4)).toBe('Thermite');
+    expect(title('arc_lattice', 2)).toBe('Storm Warhead');
+    expect(title('arc_lattice', 4)).toBe('Storm Warhead');
+    expect(title('shield', 2)).toBe('Gravity Warhead');
+    expect(title('shield', 4)).toBe('Gravity Warhead');
+    expect(title('magfield', 2)).toBe('Swarm Rack');
+    expect(title('magfield', 4)).toBe('Locust Hive');
+  });
+
   it('a fifth completes its Apex', () => {
     expect(line('afterburn_lance', 1, 4)).toMatchObject({
       label: 'Completes · Apex',
@@ -68,8 +95,8 @@ describe('upgrade card build line', () => {
       to: 'SCATTER COIL',
       note: 'One weapon card per run.',
     });
-    // Railshot widens the Scatter's own flak bursts.
-    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Railshot.');
+    // Kinetic is the Scatter's own family: its own form.
+    expect(line('scatter_coil', 1, 2).note).toBe('Also completes Grapeshot.');
   });
 
   it('a new card short of a milestone shows where its family leads', () => {
@@ -110,10 +137,10 @@ describe('upgrade card build line', () => {
       'pulses hit 15% harder and throw further',
       'pulses hit 30% harder and throw twice as far',
     ]);
-    // Flak bolts do not pierce: the Scatter's own wording, wider bursts.
+    // Kinetic is the Scatter's own: its forms, Grapeshot and Hailstorm.
     expect(what('multishot', 0, 'scatter')).toEqual([
-      'flak bursts 30% wider',
-      'flak bursts 60% wider, bolts 25% harder',
+      'bolts glance off what they hit',
+      'bolts glance twice',
     ]);
     // Its own family evolves the weapon itself.
     expect(what('heat_sink', 0, 'furnace-corona')[0]).toBe(
@@ -121,8 +148,8 @@ describe('upgrade card build line', () => {
     );
     // The Seeker Swarm's missiles burst: its own kinetic wording.
     expect(what('multishot', 0, 'seeker-swarm')).toEqual([
-      'missile bursts 50% wider',
-      'missile bursts twice as wide, missiles 25% harder',
+      'missile bursts 80% wider',
+      'missile bursts 120% wider, missiles 25% harder',
     ]);
   });
 

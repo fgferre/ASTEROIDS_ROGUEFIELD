@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 
 const AIM = Math.atan2(0.7, -0.7); // right stick down-left
@@ -14,7 +12,6 @@ describe('right-stick manual aim', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     fake = installFakeGamepad();
   });
 
@@ -40,6 +37,9 @@ describe('right-stick manual aim', () => {
   it('aims the turret and the shots along the held stick, without a lock, then back to auto', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test' });
+    // The Auto Turret and the Flight Computer: the right stick aims.
+    game.eventBus.emit('upgrade-auto-aim', {});
+    game.eventBus.emit('modern-flight-engaged');
     const { combat, player } = game.services;
     steps(game, 150);
     expect(combat.currentTarget).not.toBeNull();

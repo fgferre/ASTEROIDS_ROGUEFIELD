@@ -85,7 +85,7 @@ export function onboardingPrompts(
     scheme === 'classic'
       ? {
           keys: ['L-Stick', 'R-Stick'],
-          text: 'Thrust with the left stick, turn with the right. The cannon fires on its own.',
+          text: 'Thrust with the left stick, pull it back to brake, turn with the right. The cannon fires on its own.',
         }
       : {
           keys: ['L-Stick'],
@@ -94,8 +94,8 @@ export function onboardingPrompts(
   const keyboardMove =
     scheme === 'classic'
       ? {
-          keys: [keys.moveLeft, keys.moveUp, keys.moveRight],
-          text: 'Turn and thrust. The cannon fires on its own.',
+          keys: [keys.moveLeft, keys.moveUp, keys.moveDown, keys.moveRight],
+          text: `Turn and thrust; ${keys.moveDown} brakes, nothing else slows you. The cannon fires on its own.`,
         }
       : {
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
@@ -106,7 +106,7 @@ export function onboardingPrompts(
     keys: [],
     text:
       scheme === 'classic'
-        ? 'Put your left thumb down and point where to fly. The cannon fires on its own.'
+        ? 'Put your left thumb down and point where to fly; pull back to brake. The cannon fires on its own.'
         : 'Put your left thumb down and drag to move. The cannon fires on its own.',
   };
   const touch = device === 'touch';

@@ -1,26 +1,39 @@
 // src/modules/player/flight.js
 //
-// How the hull flies: thrust and auto-braking from the move input in both
-// schemes (modern: WASD on the screen axes, the nose turning onto the
-// motion; classic: A/D rotate, W thrusts), damping, the speed cap a dash
-// raises, and the flight stats the hull, the Hangar and the cards set.
+// How the hull flies: one algorithm, the jets the hull already has (Felipe,
+// 21/11: "A nave ela é movimentada porque está ligado um thruster [...] de
+// acordo com os thrusters que já existem hoje na nave"; flown and kept 22/11:
+// "Ficou bom: o voo que fica"). The six jets: the main engine (forward), the
+// retro (back), a flank's two side jets (the whole hull sideways) and a
+// crossed pair (a turn). Every change of motion is a jet that shows.
+// - The start (classic, gliding): a simulation, no drag ("o modo inicial, ele é
+//   o modo simulação"). W and S fire the main engine and the retro; let go,
+//   the ship keeps its speed until the pilot stops it. A released spin keeps
+//   its momentum, worked off slowly ("um pouco de assitencia desde o inicio,
+//   mas muito pouco").
+// - The cards are the computer lighting jets for the pilot: the Braking System
+//   stops the travel when the keys let go (and strengthens the retro), the RCS
+//   System stops the spin, firmer each level (and strengthens the side jets),
+//   Main Thrusters is the engine and its top speed.
+// - The Flight Computer: modern flight with the turbo ("Eu gostei do Turbo"):
+//   the computer flies the ship onto the keys' velocity, 1.2× the start's top
+//   speed, a straight run building up to 1.4× that; it draws 1.5× from the
+//   same jets and brakes 1.5× firmer still; the nose swings with weight.
+// - The main flame: a burst off the line, then a steady third while the key
+//   holds ("Assim, um terço do estouro").
 // PlayerSystem owns one; its updateMovement runs this, then the turret, then
-// the thruster events with the thrust this returns.
+// the thruster events with the step this returns. The playtest bot's start
+// (bootstrap/botPilotGlide.js) plans with the exported numbers.
 
 import {
   GLIDE_ACCEL_SCALE,
-  GLIDE_LINEAR_DAMPING,
-  GLIDE_RETRO_SHARE,
   GLIDE_SPEED_SCALE,
-  MODERN_MOVE_ACCEL,
   SHIP_ACCELERATION,
   SHIP_ANGULAR_DAMPING,
   SHIP_FACE_VELOCITY_MIN_SPEED,
-  SHIP_FACING_RESPONSE,
   SHIP_HEADING_TURN_RATE,
   SHIP_LINEAR_DAMPING,
   SHIP_MAX_SPEED,
-  SHIP_MOVE_TURN_RATE,
   SHIP_ROTATION_SPEED,
 } from '../../data/constants/physics.js';
 import {
@@ -29,17 +42,53 @@ import {
 } from '../../data/constants/gameplay.js';
 import { classicAsks, getModernMove, padForce } from './movementInput.js';
 
-const DRIFT_SETTINGS = {
-  rampSpeed: 2.8,
-  decaySpeed: 5.2,
-  brakeReduction: 0.4,
-};
-
-// Shown thrust only (proposta 15/11, the owner judges by playing): in the
-// modern scheme the main flame is full within ~50° of the move, and the
-// retro shows this much of a straight reversal.
+// The retro and a flank's pair each push this share of the main engine; the
+// Braking System multiplies the retro, the RCS System the side jets.
+export const RETRO_SHARE = 0.5;
+const FLANK_SHARE = 0.5;
+// Classic: the turn pair spins the hull up and back down at this (rad/s²), to
+// the top turn rate (≈70°/s); the RCS System multiplies both.
+export const TURN_ACCEL = 4;
+export const TURN_TOP = SHIP_ROTATION_SPEED / SHIP_ANGULAR_DAMPING;
+// A released classic spin is worked off at SPIN_ASSIST (rad/s²) with no card,
+// about 1.7 s from the top turn rate; with the RCS System, at this share of
+// the turn pair's push × its level (the pair is already × it): from half a
+// second at level 1 to a fifth at 5, steadily, not snapped.
+export const SPIN_ASSIST = 0.75;
+export const SPIN_STOP_SHARE = 0.5;
+// The auto-brake: full push above this share of the top speed; slower, ever
+// gentler, never under BRAKE_FLOOR of it, until the ship stops.
+export const BRAKE_FULL_SHARE = 0.5;
+export const BRAKE_FLOOR = 0.5;
+// The Flight Computer: its cruise × the start's top speed; the turbo × that;
+// the jets' force and the auto-brake's, × the start's.
+const MODERN_TOP = 1.2;
+const TURBO = 1.4;
+const MODERN_JETS = 1.5;
+const MODERN_BRAKE = 1.5;
+// Turbo: from nothing to full over this (s) while the keys hold one way; it
+// fades over TURBO_FADE_S when they let go or turn more than TURBO_TURN off.
+const TURBO_RAMP_S = 1.2;
+const TURBO_FADE_S = 0.4;
+// (less a hair, so W then W+D, exactly 45°, keeps it).
+const TURBO_TURN = Math.cos(Math.PI / 4) - 1e-9;
+// The modern nose: a spring onto the heading (s^-2 and its damping ratio,
+// under 1 so it swings past and back), its push (rad/s²), all × the RCS
+// System; capped at the heading turn rate. With no heading, the spin is worked
+// off at NOSE_STOP_ACCEL (× the RCS System's level, squared).
+const NOSE_STIFFNESS = 100;
+const NOSE_DAMPING_RATIO = 0.55;
+const NOSE_SPIN_ACCEL = 150;
+const NOSE_STOP_ACCEL = 12;
+// Over the cap by less than this (px/s, a sideways push at the top speed
+// nudges it by a hair), the speed is trimmed with no jet shown.
+const CAP_SHOWN_OVER = 1;
+// The main flame while the key holds at the top speed, where the engine no
+// longer pushes.
+const CRUISE_FLAME = 0.35;
+// Modern: the main flame is full within ~50° of the move (the pilot's own
+// burn, which the trail cards drop on).
 const SHOWN_MAIN_GAIN = 1.6;
-const SHOWN_RETRO_SHARE = 0.7;
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
@@ -50,322 +99,329 @@ export function wrapAngle(angle) {
   return angle;
 }
 
+/**
+ * Each jet's share of `forces` (px/s²: main, retro, flank) giving the push
+ * `ax` along the nose and `ay` to starboard: the retro pushes aft, the port
+ * flank's pair to starboard, the starboard pair to port.
+ */
+function jetShares(ax, ay, forces) {
+  return {
+    main: ax > 0 ? clamp01(ax / forces.main) : 0,
+    aux: ax < 0 ? clamp01(-ax / forces.retro) : 0,
+    toStarboard: ay > 0 ? clamp01(ay / forces.flank) : 0,
+    toPort: ay < 0 ? clamp01(-ay / forces.flank) : 0,
+  };
+}
+
+/**
+ * The part of the push (`ax`, `ay`, hull frame) the jets can give: the whole
+ * push shrinks together, so it keeps its direction.
+ */
+function withinJets(ax, ay, forces) {
+  let scale = 1;
+  if (ax !== 0) {
+    scale = Math.min(
+      scale,
+      (ax > 0 ? forces.main : forces.retro) / Math.abs(ax)
+    );
+  }
+  if (ay !== 0) scale = Math.min(scale, forces.flank / Math.abs(ay));
+  return { ax: ax * scale, ay: ay * scale };
+}
+
+function mergeJets(jets, more) {
+  if (!more) return jets;
+  ['main', 'aux', 'toStarboard', 'toPort'].forEach((key) => {
+    jets[key] = Math.max(jets[key], more[key]);
+  });
+  return jets;
+}
+
+// A dash and the emergency brake's stop keep their own push (gameplay.js,
+// maneuvers.js); they show at full on the jets pointing their way.
+function maneuverJets(maneuvers, fwd, right) {
+  let x;
+  let y;
+  if (maneuvers.dashTimer > 0 && maneuvers.dashDirection) {
+    ({ x, y } = maneuvers.dashDirection);
+  } else if (maneuvers.brakeTimer > 0 && maneuvers.brakeFrom) {
+    x = -maneuvers.brakeFrom.vx;
+    y = -maneuvers.brakeFrom.vy;
+  } else {
+    return null;
+  }
+  const ax = x * fwd.x + y * fwd.y;
+  const ay = x * right.x + y * right.y;
+  const most = Math.max(Math.abs(ax), Math.abs(ay)) || 1;
+  return jetShares(ax / most, ay / most, { main: 1, retro: 1, flank: 1 });
+}
+
+// Which jets the pilot's own keys or stick lit (they sound louder); the rest
+// are the brake's and the flight computer's.
+function pilotFlags(modern, move, { up, down, left, right }) {
+  return {
+    mainAuto: modern ? !move : !up,
+    auxAuto: modern ? !move : !down,
+    sideAuto: !(modern && move),
+    turnAuto: modern ? !move : !left && !right,
+  };
+}
+
+// The classic turn pair's push stopping a released spin (rad/s²): slowly
+// with no card, firmer with each level of the RCS System (`agility`).
+function spinStop(agility) {
+  return Math.max(
+    SPIN_ASSIST,
+    agility > 1 ? TURN_ACCEL * agility * SPIN_STOP_SHARE * agility : 0
+  );
+}
+
+/**
+ * How far (rad, signed) a classic spin `spin` still turns if the pilot turns
+ * against it now (the turn pair, × the RCS System's `agility`): the touch
+ * controls' "aponta" mode counter-steers from there.
+ */
+export function spinCoast(spin, agility = 1) {
+  return (Math.sign(spin) * spin * spin) / (2 * TURN_ACCEL * agility);
+}
+
+/**
+ * The modern nose: onto the keys' direction, else onto the motion, else the
+ * spin brought to a stop. Returns the spin's change this step (rad/s²).
+ */
+function swingNose(ship, deltaTime, move, quick) {
+  const v = ship.velocity;
+  let heading = null;
+  if (move) heading = Math.atan2(move.y, move.x);
+  else if (Math.hypot(v.vx, v.vy) > SHIP_FACE_VELOCITY_MIN_SPEED) {
+    heading = Math.atan2(v.vy, v.vx);
+  }
+  const stiffness = NOSE_STIFFNESS * quick;
+  const w = ship.angularVelocity;
+  let spin;
+  if (heading === null) {
+    const stop = NOSE_STOP_ACCEL * quick * quick;
+    spin = -Math.sign(w) * Math.min(Math.abs(w) / deltaTime, stop);
+  } else {
+    const most = NOSE_SPIN_ACCEL * quick;
+    const pull =
+      stiffness * wrapAngle(heading - ship.angle) -
+      2 * NOSE_DAMPING_RATIO * Math.sqrt(stiffness) * w;
+    spin = Math.max(-most, Math.min(most, pull));
+  }
+  const top = SHIP_HEADING_TURN_RATE * quick;
+  ship.angularVelocity = Math.max(
+    -top,
+    Math.min(top, ship.angularVelocity + spin * deltaTime)
+  );
+  ship.angle = wrapAngle(ship.angle + ship.angularVelocity * deltaTime);
+  return spin;
+}
+
 export class PlayerFlight {
   /**
    * `ship`: the player's velocity, angle, angularVelocity and controlScheme, read and set live.
    * `maneuvers`: the player's PlayerManeuvers; a dash in progress or easing off lifts the speed cap.
-   * `glide`: glide flight (?flight=glide) in either scheme: no auto-brake, light drag, a lower top speed.
+   * `glide`: the start's classic flight (true until the Flight Computer).
    */
   constructor({ ship, maneuvers, glide = false }) {
     this.ship = ship;
     this.maneuvers = maneuvers;
     this.glide = glide;
-    this.driftFactor = 0;
+    // The turbo's charge (0..1) and the direction it builds along.
+    this.turbo = 0;
+    this.turboDir = null;
+    // The top speed of the last step (px/s), the engine sound's measure.
+    this.topSpeed = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
-    // Usar constantes do arquivo separado
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
-    this.rotationSpeed = SHIP_ROTATION_SPEED;
-    // RCS System: under thrust, push and drag × this (1: off).
+    // RCS System's level (1: none): × the side jets and the turn.
     this.agility = 1;
-    // FIX-02: split damping into base (always) + braking (no-thrust frames only).
+    // The Braking System's level: (base + braking) ÷ base × the retro, and
+    // with any level the auto-brake on the travel.
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
-    this.angularDamping = SHIP_ANGULAR_DAMPING;
   }
 
-  // Backward-compat read shape: `linearDamping` returns the combined total
-  // so any external reader (snapshot / serialize / UI tooltip) keeps a sensible
-  // value. No setter — writes that previously hit `linearDamping` must
-  // route through the upgrade-linear-damping handler or mutate `brakingDamping`
-  // directly; any other writer is a latent bug.
+  // The combined total, for readers of the old shape (snapshot, tooltip).
   get linearDamping() {
     return this.baseLinearDamping + this.brakingDamping;
   }
 
+  // The turbo's multiplier this step (`move`: the keys' unit direction or null).
+  turboScale(move, deltaTime) {
+    const held =
+      move &&
+      this.turboDir &&
+      move.x * this.turboDir.x + move.y * this.turboDir.y >= TURBO_TURN;
+    if (held) {
+      this.turbo = Math.min(1, this.turbo + deltaTime / TURBO_RAMP_S);
+    } else {
+      this.turbo = Math.max(0, this.turbo - deltaTime / TURBO_FADE_S);
+      if (move && this.turbo === 0) this.turboDir = move;
+    }
+    return 1 + (TURBO - 1) * this.turbo;
+  }
+
+  /**
+   * One step of flight by the jets. Returns what the thrusters show
+   * (thrusters.js): `jets`, each jet's push 0..1 and who lit it; `pilotMain`
+   * × `pilotForce`, the pilot's own main burn the trail cards drop on.
+   */
   updateMovement(deltaTime, input) {
-    // COPIAR EXATAMENTE da função updatePlayerMovement() original
-    const modern = this.ship.controlScheme === 'modern';
-    const glide = this.glide;
-    const fwd = {
-      x: Math.cos(this.ship.angle),
-      y: Math.sin(this.ship.angle),
-    };
-    // Ship's starboard (screen y points down).
+    const { ship, maneuvers } = this;
+    const modern = ship.controlScheme === 'modern';
+    const fwd = { x: Math.cos(ship.angle), y: Math.sin(ship.angle) };
     const right = { x: -fwd.y, y: fwd.x };
-
+    const asks = classicAsks(input);
     const move = modern ? getModernMove(input) : null;
-
-    // The pilot's asks, 0..1 (classicAsks); modern, the left stick's lean is
-    // the push along where it points, and the d-pad is full (a pad frame
-    // whose right stick aims still moves at full push on the d-pad).
-    const {
-      up: thrustIn,
-      down: backIn,
-      left: leftIn,
-      right: rightIn,
-    } = classicAsks(input);
     const lean = Math.hypot(Number(input.moveX) || 0, Number(input.moveY) || 0);
     const moveForce = move && input.pad && lean > 0 ? padForce(input, lean) : 1;
+    const dashing = maneuvers.dashTimer > 0;
+    const easing = dashing || maneuvers.dashDecayTimer > 0;
 
-    // The thrusters' forces (lógica do original); what they show is at the end.
-    let thrMain = thrustIn;
-    let thrAux = backIn * (glide ? GLIDE_RETRO_SHARE : 1);
-    // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
-    let thrSideR = leftIn; // CCW torque
-    let thrSideL = rightIn; // CW torque
-    if (modern) {
-      // Main push while moving (the hull turns onto the motion); side push
-      // on the part of the move off the nose.
-      const lateral = move ? move.x * right.x + move.y * right.y : 0;
-      thrMain = move ? moveForce : 0;
-      thrAux = 0;
-      thrSideL = Math.max(0, lateral);
-      thrSideR = Math.max(0, -lateral);
-    }
+    // One main engine (the hull's and Main Thrusters'), the Flight Computer
+    // drawing more from it; the Braking System's levels multiply the retro,
+    // the RCS System's the flanks.
+    const main =
+      this.acceleration * GLIDE_ACCEL_SCALE * (modern ? MODERN_JETS : 1);
+    const braking =
+      (this.baseLinearDamping + this.brakingDamping) / this.baseLinearDamping;
+    const forces = {
+      main,
+      retro: main * RETRO_SHARE * braking,
+      flank: main * FLANK_SHARE * this.agility,
+    };
+    const top =
+      this.maxSpeed *
+      (modern
+        ? GLIDE_SPEED_SCALE * MODERN_TOP * this.turboScale(move, deltaTime)
+        : GLIDE_SPEED_SCALE);
 
-    // The pilot's own thrust (the Reactor's idle bonus, the coast brake's arming).
-    const isMainManual = modern ? Boolean(move) : thrustIn > 0;
-    const isAuxManual = !modern && backIn > 0;
-    const noManualThrust = !isMainManual && !isAuxManual;
-    const dashing = this.maneuvers.dashTimer > 0;
-    // RCS System: under thrust, push and drag both scale, so the same top
-    // speed comes (and turns round) sooner; a dash and its ease-off keep
-    // their own.
-    const agility =
-      noManualThrust || dashing || this.maneuvers.dashDecayTimer > 0
-        ? 1
-        : this.agility;
-    // The push matches the stepped drag, so the top speed stays put.
-    const drag = this.baseLinearDamping * deltaTime;
-    const push =
-      agility === 1 ? 1 : Math.expm1(drag * agility) / Math.expm1(drag);
-    const accelStep =
-      this.acceleration * (glide ? GLIDE_ACCEL_SCALE : 1) * push * deltaTime;
+    this.topSpeed = top;
+    const v = ship.velocity;
+    const speed = Math.hypot(v.vx, v.vy);
+    const isMainManual = modern ? Boolean(move) : asks.up > 0;
+    const isAuxManual = !modern && asks.down > 0;
+    const noLinearInput = modern ? !move : !asks.up && !asks.down;
+    // The auto-brake: the Flight Computer's always; the start's with the
+    // Braking System (without it, stopping is the pilot's).
+    const autoBrake =
+      noLinearInput && speed > 0 && (modern || this.brakingDamping > 0);
 
-    // Auto-brake quando não há input linear
-    const noLinearInput = modern ? !move : !thrustIn && !backIn;
-    const speed = Math.hypot(this.ship.velocity.vx, this.ship.velocity.vy);
-    const velocityAlongNose =
-      this.ship.velocity.vx * fwd.x + this.ship.velocity.vy * fwd.y;
-    const velocityAcross =
-      this.ship.velocity.vx * right.x + this.ship.velocity.vy * right.y;
-
-    if (noLinearInput) {
-      this.driftFactor = Math.min(
-        1,
-        this.driftFactor + DRIFT_SETTINGS.rampSpeed * deltaTime
-      );
-    } else {
-      this.driftFactor = Math.max(
-        0,
-        this.driftFactor - DRIFT_SETTINGS.decaySpeed * deltaTime
-      );
-    }
-
-    const driftBrakeScale =
-      1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
-
-    // The auto-brake's push along the nose and across it (thrusters.js shows
-    // them, at the end).
-    let brakeAlong = 0;
-    let brakeAcross = 0;
-    // Auto-damping thrusters (activate without manual input); glide has none.
-    if (noLinearInput && speed > 2 && !glide) {
-      const proj = velocityAlongNose;
-      const kBase = Math.max(
-        0.35,
-        Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8))
-      );
-      const k = kBase * driftBrakeScale;
-      brakeAlong = k;
-      if (proj > 0) thrAux = Math.max(thrAux, k);
-      else if (proj < 0) thrMain = Math.max(thrMain, k);
-      if (modern) {
-        // Coasting with the nose off the motion: brake the drift too.
-        const lateral =
-          this.ship.velocity.vx * right.x + this.ship.velocity.vy * right.y;
-        const kLateral =
-          Math.max(
-            0.35,
-            Math.min(1, Math.abs(lateral) / (this.maxSpeed * 0.8))
-          ) * driftBrakeScale;
-        brakeAcross = kLateral;
-        if (lateral > 0) thrSideR = Math.max(thrSideR, kLateral);
-        else if (lateral < 0) thrSideL = Math.max(thrSideL, kLateral);
+    // The push wanted, world px/s².
+    let wantX = 0;
+    let wantY = 0;
+    let reach = 1;
+    if (easing) {
+      // A dash and its ease-off fly on their own; the jets show the maneuver.
+    } else if (modern && move) {
+      // The flight computer flies the ship onto the stick's velocity.
+      wantX = (move.x * top * moveForce - v.vx) / deltaTime;
+      wantY = (move.y * top * moveForce - v.vy) / deltaTime;
+    } else if (autoBrake) {
+      wantX = -v.vx / deltaTime;
+      wantY = -v.vy / deltaTime;
+      reach =
+        Math.max(BRAKE_FLOOR, Math.min(1, speed / (top * BRAKE_FULL_SHARE))) *
+        (modern ? MODERN_BRAKE : 1);
+    } else if (!modern) {
+      const push = asks.up * forces.main - asks.down * forces.retro;
+      wantX = fwd.x * push;
+      wantY = fwd.y * push;
+      // The engine never pushes past the top speed; the rest of the push still
+      // bends the path.
+      if (speed > 0) {
+        const along = (wantX * v.vx + wantY * v.vy) / speed;
+        const room = Math.max(0, (top - speed) / deltaTime);
+        if (along > room) {
+          wantX -= ((along - room) * v.vx) / speed;
+          wantY -= ((along - room) * v.vy) / speed;
+        }
       }
     }
 
-    // Aplicar forças dos thrusters
-    if (move) {
-      // Along the WASD direction.
-      const moveStep = accelStep * MODERN_MOVE_ACCEL * moveForce;
-      this.ship.velocity.vx += move.x * moveStep;
-      this.ship.velocity.vy += move.y * moveStep;
-    } else {
-      if (thrMain > 0) {
-        this.ship.velocity.vx += fwd.x * accelStep * thrMain;
-        this.ship.velocity.vy += fwd.y * accelStep * thrMain;
+    const given = withinJets(
+      wantX * fwd.x + wantY * fwd.y,
+      wantX * right.x + wantY * right.y,
+      {
+        main: forces.main * reach,
+        retro: forces.retro * reach,
+        flank: forces.flank * reach,
       }
-      if (thrAux > 0) {
-        this.ship.velocity.vx -= fwd.x * accelStep * thrAux;
-        this.ship.velocity.vy -= fwd.y * accelStep * thrAux;
-      }
-      if (modern) {
-        const strafeStep = accelStep * MODERN_MOVE_ACCEL;
-        this.ship.velocity.vx += right.x * strafeStep * (thrSideL - thrSideR);
-        this.ship.velocity.vy += right.y * strafeStep * (thrSideL - thrSideR);
-      }
-    }
+    );
+    v.vx += (fwd.x * given.ax + right.x * given.ay) * deltaTime;
+    v.vy += (fwd.y * given.ax + right.y * given.ay) * deltaTime;
+    const jets = jetShares(given.ax, given.ay, forces);
 
-    // Amortecimento ambiente — FIX-02: split damping with conditional gate.
-    // baseLinearDamping always applies; brakingDamping applies ONLY on frames
-    // where no manual thrust input is active. This preserves the braking
-    // upgrade's "Paradas mais rápidas" intent without making active flight
-    // sluggish. The auto-damping thrusters (above) still fire during coast;
-    // brakingDamping is the additive component layered on top of base.
-    const effectiveDamping =
-      ((glide ? GLIDE_LINEAR_DAMPING : this.baseLinearDamping) +
-        (noManualThrust ? this.brakingDamping : 0)) *
-      agility;
-    // A dash carries its burst undamped, under a raised speed cap.
-    if (!dashing) {
-      const linearDamp = Math.exp(-effectiveDamping * deltaTime);
-      this.ship.velocity.vx *= linearDamp;
-      this.ship.velocity.vy *= linearDamp;
-    }
-
-    // Limitar velocidade máxima — after a dash the cap eases back down.
+    // A dash lifts the cap, which eases back to the top speed.
     const dashCapFraction = dashing
       ? 1
-      : this.maneuvers.dashDecayTimer / DASH_DECAY_SECONDS;
-    const dashCap =
-      DASH_SPEED_CAP_MULTIPLIER * this.maneuvers.dashDistanceMultiplier;
-    const speedCap =
+      : maneuvers.dashDecayTimer / DASH_DECAY_SECONDS;
+    const dashTop =
       this.maxSpeed *
-      (glide ? GLIDE_SPEED_SCALE : 1) *
-      (1 + (dashCap - 1) * dashCapFraction);
-    const currentSpeed = Math.hypot(
-      this.ship.velocity.vx,
-      this.ship.velocity.vy
-    );
-    if (currentSpeed > speedCap) {
-      const scale = speedCap / currentSpeed;
-      this.ship.velocity.vx *= scale;
-      this.ship.velocity.vy *= scale;
-    }
-
-    // === MOVIMENTO ANGULAR ===
-    if (modern) {
-      this.updateFacing(deltaTime, move);
-    } else {
-      // Restaurando a lógica de aceleração e amortecimento angular do app.js original
-      // In glide the RCS System turns the hull quicker too: its pull and its
-      // top turn rate (pull ÷ angular damping) both × agility.
-      const rotationAccel =
-        this.rotationSpeed * (glide ? this.agility : 1) * deltaTime;
-      let angularAccel = 0;
-      angularAccel -= rotationAccel * thrSideR; // 'a' ou 'arrowleft'
-      angularAccel += rotationAccel * thrSideL; // 'd' ou 'arrowright'
-
-      this.ship.angularVelocity += angularAccel;
-
-      // Amortecimento angular
-      const angularDamp = Math.exp(-this.angularDamping * deltaTime);
-      this.ship.angularVelocity *= angularDamp;
-
-      // Limitar velocidade angular (clamp)
-      const maxAng = this.rotationSpeed;
-      if (this.ship.angularVelocity > maxAng)
-        this.ship.angularVelocity = maxAng;
-      if (this.ship.angularVelocity < -maxAng)
-        this.ship.angularVelocity = -maxAng;
-      this.ship.angle = wrapAngle(
-        this.ship.angle + this.ship.angularVelocity * deltaTime
+      (this.glide ? GLIDE_SPEED_SCALE : 1) *
+      DASH_SPEED_CAP_MULTIPLIER *
+      maneuvers.dashDistanceMultiplier;
+    const cap = top + Math.max(0, dashTop - top) * dashCapFraction;
+    // Above it (the dash easing off, a knock), the jets against the motion
+    // burn at full.
+    const after = Math.hypot(v.vx, v.vy);
+    if (after > cap + CAP_SHOWN_OVER) {
+      const ax = -(v.vx * fwd.x + v.vy * fwd.y) / after;
+      const ay = -(v.vx * right.x + v.vy * right.y) / after;
+      const most = Math.max(Math.abs(ax), Math.abs(ay));
+      mergeJets(
+        jets,
+        jetShares(ax / most, ay / most, { main: 1, retro: 1, flank: 1 })
       );
     }
+    if (after > cap) {
+      v.vx *= cap / after;
+      v.vy *= cap / after;
+    }
+    mergeJets(jets, maneuverJets(maneuvers, fwd, right));
 
-    // What the thrusters show and sound for this step (thrusters.js): what
-    // the pilot asked for, never the solver's corrections above.
-    let pilotMain = thrustIn;
-    let pilotAux = backIn;
-    let pilotTurn = rightIn - leftIn;
+    let spin;
+    let spinShown;
     if (modern) {
-      // Main flame once the nose is near the move, retro first on a reversal;
-      // the turn jets follow the nose's own swing.
-      const cos = move ? move.x * fwd.x + move.y * fwd.y : 0;
-      pilotMain = clamp01(cos * SHOWN_MAIN_GAIN);
-      pilotAux = clamp01(-cos) * SHOWN_RETRO_SHARE;
-      pilotTurn = move
-        ? Math.max(
-            -1,
-            Math.min(1, this.ship.angularVelocity / SHIP_HEADING_TURN_RATE)
-          )
-        : 0;
+      spin = swingNose(ship, deltaTime, move, this.agility);
+      spinShown = NOSE_SPIN_ACCEL * this.agility;
+    } else {
+      // The pilot's turn to the pair's top rate; let go, the spin is worked
+      // off, slowly with no card, firmer with each level of the RCS System.
+      spinShown = TURN_ACCEL * this.agility;
+      const turn = asks.right - asks.left;
+      const goal = turn * TURN_TOP * this.agility;
+      const pair = turn ? spinShown : spinStop(this.agility);
+      spin = Math.max(
+        -pair,
+        Math.min(pair, (goal - ship.angularVelocity) / deltaTime)
+      );
+      ship.angularVelocity += spin * deltaTime;
+      ship.angle = wrapAngle(ship.angle + ship.angularVelocity * deltaTime);
     }
-    // Glide has no auto-brake but the Braking System's drag: it shows along
-    // the nose, as strong as the speed is near the glide's top.
-    if (noLinearInput && speed > 2 && glide && this.brakingDamping > 0) {
-      brakeAlong = clamp01(speed / (this.maxSpeed * GLIDE_SPEED_SCALE * 0.8));
-    }
-    // Each jet the brake fires shows its push as much as the motion runs its
-    // way (Felipe, 21/11): the retro nose-first, the main engine tail-first,
-    // a flank's jets sideways (Modern), a mix on a diagonal; the solver's
-    // least push on an axis the ship barely moves along shows nothing.
-    const along = speed > 0 ? velocityAlongNose / speed : 0;
-    const across = speed > 0 ? velocityAcross / speed : 0;
-    const brake = {
-      aux: brakeAlong * Math.max(0, along),
-      main: brakeAlong * Math.max(0, -along),
-      starboard: brakeAcross * Math.max(0, across),
-      port: brakeAcross * Math.max(0, -across),
-    };
+
+    // The pilot's own main burn: classic, W; modern, the keys once the nose is
+    // near them. The flame holds a third of the burst while the key does.
+    const pilotForce = modern ? moveForce : 1;
+    const pilotMain = modern
+      ? clamp01((move ? move.x * fwd.x + move.y * fwd.y : 0) * SHOWN_MAIN_GAIN)
+      : asks.up;
+    jets.main = Math.max(jets.main, CRUISE_FLAME * pilotMain * pilotForce);
     return {
       fwd,
       pilotMain,
-      pilotAux,
-      // Modern on a pad: the left stick's push (1 for keys, the d-pad and
-      // touch); Classic's asks are already the push.
-      pilotForce: modern ? moveForce : 1,
-      pilotTurn,
-      brake,
-      speed,
-      dashing,
+      pilotForce,
       isMainManual,
       isAuxManual,
+      jets: {
+        ...jets,
+        turn: Math.max(-1, Math.min(1, spin / spinShown)),
+        ...pilotFlags(modern, move, asks),
+      },
     };
-  }
-
-  // Modern scheme: nose onto the WASD direction, else onto the motion, else
-  // hold. Exponential approach under a rate cap, so it never overshoots.
-  updateFacing(deltaTime, move) {
-    let heading = null;
-    let rate = 0;
-    if (move) {
-      heading = Math.atan2(move.y, move.x);
-      rate = SHIP_HEADING_TURN_RATE;
-    } else if (
-      Math.hypot(this.ship.velocity.vx, this.ship.velocity.vy) >
-      SHIP_FACE_VELOCITY_MIN_SPEED
-    ) {
-      heading = Math.atan2(this.ship.velocity.vy, this.ship.velocity.vx);
-      rate = SHIP_MOVE_TURN_RATE;
-    }
-    if (heading === null) {
-      this.ship.angularVelocity = 0;
-      return;
-    }
-    const maxStep = rate * deltaTime;
-    const error = wrapAngle(heading - this.ship.angle);
-    const step = Math.max(
-      -maxStep,
-      Math.min(
-        maxStep,
-        error * (1 - Math.exp(-SHIP_FACING_RESPONSE * deltaTime))
-      )
-    );
-    this.ship.angle = wrapAngle(this.ship.angle + step);
-    this.ship.angularVelocity = step / deltaTime;
   }
 }

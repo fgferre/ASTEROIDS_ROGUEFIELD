@@ -9,20 +9,15 @@ export const SHIP_ROTATION_SPEED = 8; // rad/s
 export const SHIP_ANGULAR_DAMPING = 6.2; // s^-1
 export const SHIP_MASS = 60;
 
-// === MODERN CONTROLS === (NORTE §4b) PROPOSAL 18/10 ("proposta 18/10"), judged by playing.
+// === MODERN CONTROLS === (NORTE §4b; the Flight Computer card, player/flight.js)
 // WASD moves on the screen axes; the hull faces the motion; a turret aims.
-export const MODERN_MOVE_ACCEL = 1; // × ship acceleration along the WASD direction
-export const SHIP_HEADING_TURN_RATE = 10; // rad/s cap turning onto the WASD direction
-export const SHIP_MOVE_TURN_RATE = 6; // rad/s cap turning onto the velocity (no input)
-export const SHIP_FACE_VELOCITY_MIN_SPEED = 20; // px/s; slower than this, hold heading
-export const SHIP_FACING_RESPONSE = 14; // s^-1 exponential approach (no overshoot)
+export const SHIP_HEADING_TURN_RATE = 10; // rad/s cap on the nose's spin
+export const SHIP_FACE_VELOCITY_MIN_SPEED = 20; // px/s; slower than this, no heading to face
 
-// === GLIDE FLIGHT === (?flight=glide) PROPOSAL 16/11 ("proposta 16/11"), judged by playing.
-// The hull keeps its momentum: no auto-brake, nearly no drag; stopping is the pilot's.
-export const GLIDE_LINEAR_DAMPING = 0.35; // s^-1 (the Braking System's adds on while coasting)
-export const GLIDE_ACCEL_SCALE = 0.7; // × ship acceleration
-export const GLIDE_SPEED_SCALE = 0.6; // × top speed: 132 px/s (the damped flight levels off near 92)
-export const GLIDE_RETRO_SHARE = 0.5; // classic S: retro thrust × the main engine's
+// === THE JETS' FLIGHT === (player/flight.js) The hull keeps its momentum; only its
+// jets move it. The main engine and the top speed, × the ship's numbers above:
+export const GLIDE_ACCEL_SCALE = 0.7; // × ship acceleration: the main engine's push
+export const GLIDE_SPEED_SCALE = 0.6; // × top speed: 132 px/s at the start
 export const TURRET_TURN_RATE = 14; // rad/s cap turning onto the aim point
 export const TURRET_RESPONSE = 30; // s^-1 exponential approach (no overshoot)
 export const TURRET_PIVOT_X = 2.5; // px ahead of the hull centre, behind the cockpit

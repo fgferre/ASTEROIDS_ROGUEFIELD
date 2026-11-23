@@ -6,11 +6,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 
 const PRIME_LAYER = 5;
 const MAX_STEPS = 300;
@@ -20,7 +17,6 @@ describe('Warden entrance', () => {
 
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
     for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
       vi.spyOn(console, method).mockImplementation(() => {});
     }
@@ -116,7 +112,7 @@ describe('Warden entrance', () => {
 
   it('ends once: inside the field, in the fight, the ship free again', () => {
     const { game, boss, player, arrived, hold } = prime();
-    hold('KeyD');
+    hold('KeyW'); // the start's classic: thrust along the nose, +x
 
     let steps = 0;
     while (boss.arrival && steps < MAX_STEPS) {

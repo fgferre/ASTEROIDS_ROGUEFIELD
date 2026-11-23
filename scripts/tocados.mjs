@@ -1,6 +1,6 @@
 // Fast commit gate: run the tests that cover the files you touched.
 //
-//   node scripts/tocados.mjs
+//   npm run test:tocados   (on the Node pinned in .nvmrc: scripts/pinned-node.mjs)
 //
 // "Touched" = changed since the point where this branch left main (committed,
 // staged or unstaged) + untracked; on main itself, or with no local main, since
@@ -11,11 +11,13 @@
 // Touching a shared test helper or fixture runs the whole suite. Any src change
 // also runs tests/process/, which watches the whole tree (dev globals leaking to
 // prod). A touched src file with no test is reported, so you know it is unguarded.
+// vitest runs as a process group that dies with this script (scripts/vitest-group.mjs).
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { runVitest } from './vitest-group.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -168,7 +170,7 @@ function readSources() {
   return sources;
 }
 
-function main() {
+async function main() {
   const base = baseRef();
   const files = touched(base);
   if (files.length === 0) {
@@ -182,12 +184,7 @@ function main() {
     process.stdout.write(
       'shared test infra touched: running the whole suite\n'
     );
-    const r = spawnSync('npx', ['vitest', 'run'], {
-      cwd: ROOT,
-      stdio: 'inherit',
-      shell: true,
-    });
-    process.exit(r.status ?? 1);
+    process.exit((await runVitest(['run'])) ?? 1);
   }
 
   const tests = new Set();
@@ -221,17 +218,12 @@ function main() {
   process.stdout.write(
     `tests for touched files (${list.length}):\n${list.map((t) => `  ${t}`).join('\n')}\n`
   );
-  const r = spawnSync('npx', ['vitest', 'run', ...list], {
-    cwd: ROOT,
-    stdio: 'inherit',
-    shell: true,
-  });
-  process.exit(r.status ?? 1);
+  process.exit((await runVitest(['run', ...list])) ?? 1);
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  main();
+  await main();
 }

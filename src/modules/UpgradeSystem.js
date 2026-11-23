@@ -174,8 +174,8 @@ class UpgradeSystem extends BaseSystem {
   // === SISTEMA DE UPGRADES ===
   // `exclude`: ids drawn only if the rest of the pool runs out (reroll).
   // `level`: the pilot level the offer is for; at UPGRADE_WEAPON_OFFER_LEVELS
-  // one slot, at random, holds a weapon card while the run has none; in the
-  // new flight, at every UPGRADE_PILOT_OFFER_EVERY levels, a piloting card.
+  // one slot, at random, holds a weapon card while the run has none; at
+  // every UPGRADE_PILOT_OFFER_EVERY levels, a piloting card.
   // The piloting trail comes only through that slot, never the regular draw.
   prepareUpgradeOptions(
     count = PROGRESSION_UPGRADE_ROLL_COUNT,
@@ -328,7 +328,7 @@ class UpgradeSystem extends BaseSystem {
     return Boolean(stats) && stats.health < stats.maxHealth;
   }
 
-  // The cap is the new flight's: the old one has no piloting trail.
+  // No cap for a catalog without a piloting trail.
   slotsFull() {
     const { used, max } = this.getCardSlots();
     return this.pilotCardIds.length > 0 && used >= max;

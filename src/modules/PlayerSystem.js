@@ -6,7 +6,6 @@ import { HullArt } from './player/hullArt.js';
 import { computeHullMetrics, getHullThrusterPort } from './player/hullShape.js';
 import { PlayerFlight, wrapAngle } from './player/flight.js';
 import { PlayerManeuvers } from './player/maneuvers.js';
-import { newFlightFromUrl } from './player/newFlight.js';
 import { getAimStickDirection, MovementInput } from './player/movementInput.js';
 import { PlayerShield } from './player/shield.js';
 import { PlayerThrusters } from './player/thrusters.js';
@@ -15,10 +14,8 @@ import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
   GLIDE_SPEED_SCALE,
   SHIP_ACCELERATION,
-  SHIP_ANGULAR_DAMPING,
   SHIP_LINEAR_DAMPING,
   SHIP_MAX_SPEED,
-  SHIP_ROTATION_SPEED,
   TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
   TURRET_RESPONSE,
@@ -31,52 +28,13 @@ import {
   SHOT_RECOIL_IMPULSE,
 } from '../data/constants/gameplay.js';
 
-// 'modern' (NORTE §4b): WASD moves on the screen axes and the hull faces the
-// motion. 'classic': A/D rotate, W thrusts, Asteroids-style. The turret aims
-// on its own in both. Settings → Controls → Hull Control, or ?controls=classic.
+// 'classic' (every run's start): A/D rotate, W thrusts, Asteroids-style.
+// 'modern' (the Flight Computer card, NORTE §4b): WASD moves on the screen
+// axes and the hull faces the motion.
 
-// 'classic' for `?controls=classic`, else null.
 // Momentum Rounds: the share of the top speed that switches it on (proposta
 // 16/11).
 const MOMENTUM_SPEED_FRACTION = 0.6;
-
-function controlSchemeFromUrl() {
-  try {
-    const value = new URLSearchParams(window.location.search).get('controls');
-    if (value === 'classic') return 'classic';
-  } catch {
-    // no window (Node tests)
-  }
-  return null;
-}
-
-// Glide flight for `?flight=glide` (proposta 16/11, the owner judges by playing).
-function glideFromUrl() {
-  try {
-    return (
-      new URLSearchParams(window.location.search).get('flight') === 'glide'
-    );
-  } catch {
-    return false; // no window (Node tests)
-  }
-}
-
-// Nose aim for `?aim=nose` (proposta 16/11): the cannon fixed on the nose,
-// aimed by turning the hull; CombatSystem holds the manual aim mode for it.
-function noseAimFromUrl() {
-  try {
-    return new URLSearchParams(window.location.search).get('aim') === 'nose';
-  } catch {
-    return false; // no window (Node tests)
-  }
-}
-
-/** The scheme to fly: the URL flag wins over the Hull Control setting. */
-export function resolveControlScheme(setting) {
-  return (
-    controlSchemeFromUrl() || (setting === 'classic' ? 'classic' : 'modern')
-  );
-}
 
 // Each of `names` on `target` reads and sets that field on `owner`, live: a
 // player module's fields other systems and tests still use on the player,
@@ -125,15 +83,9 @@ class PlayerSystem extends BaseSystem {
       'settings',
       this.dependencies
     )?.getCategoryValues('controls');
-    this.controlScheme =
-      config?.controlScheme || resolveControlScheme(controls?.hullControl);
     // Stick Sensitivity (Controls): the pad sticks' curve; a replay flies
     // its recording's (replaySession.js).
     this.stickSensitivity = controls?.stickSensitivity ?? 'medium';
-    this.noseAim = noseAimFromUrl();
-    // The new flight (the default; ?direcao=antiga is the old flight): each run starts classic, gliding, aimed
-    // by the nose; cards lift each of the three (beginNewFlight).
-    this.newFlight = config?.newFlight ?? newFlightFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
     // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
@@ -183,11 +135,11 @@ class PlayerSystem extends BaseSystem {
     this.flight = new PlayerFlight({
       ship,
       maneuvers: this.maneuvers,
-      glide: glideFromUrl(),
     });
-    if (this.newFlight) this.beginNewFlight();
+    // Each run starts classic, gliding, aimed by the nose; cards lift each of
+    // the three.
+    this.beginNewFlight();
     exposeFields(this, this.flight, [
-      'driftFactor',
       'maxSpeed',
       'acceleration',
       'brakingDamping',
@@ -275,20 +227,13 @@ class PlayerSystem extends BaseSystem {
       this.maneuvers.dashRequested = true;
     });
 
-    // Hull Control and Stick Sensitivity apply live, mid-run too.
+    // Stick Sensitivity applies live, mid-run too.
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
       this.stickSensitivity =
         payload?.values?.stickSensitivity ?? this.stickSensitivity;
-      // The new flight's scheme is the cards' (beginNewFlight), not the setting's.
-      if (payload?.values && !this.newFlight) {
-        this.setFlightScheme(
-          resolveControlScheme(payload.values.hullControl),
-          this.flight.glide
-        );
-      }
     });
 
-    // The new flight's cards: the turret turns on its own (CombatSystem goes
+    // The piloting cards: the turret turns on its own (CombatSystem goes
     // back to auto aim on the same event)...
     this.registerEventListener('upgrade-auto-aim', () => {
       this.noseAim = false;
@@ -573,6 +518,8 @@ class PlayerSystem extends BaseSystem {
       position: { ...this.position },
       velocity: { ...this.velocity },
       angle: this.angle,
+      // The flight's top speed this step (the engine sound's share of it).
+      topSpeed: this.flight.topSpeed,
       // The propulsion cards' levels every step, firing or not (the engine's tier).
       visualLevels: this.thrusters.getHullVisualLevels(),
     });
@@ -856,7 +803,7 @@ class PlayerSystem extends BaseSystem {
 
   /**
    * The win's protection (runEnd.js): invulnerable for at least `seconds`,
-   * the ship steady instead of a hit's blink (playerMirror.js).
+   * the ship steady instead of a hit's blink (render3d/player/dash.js).
    */
   guardSteadily(seconds) {
     this.invulnerableTimer = Math.max(this.invulnerableTimer, seconds);
@@ -967,18 +914,17 @@ class PlayerSystem extends BaseSystem {
     this.resetCardStats();
     this.flight.maxSpeed = SHIP_MAX_SPEED * hull.maxSpeed;
     this.flight.acceleration = SHIP_ACCELERATION * hull.acceleration;
-    this.flight.rotationSpeed = SHIP_ROTATION_SPEED;
     this.flight.agility = 1;
     // FIX-02: split damping — reset both components. baseLinearDamping returns
     // to ship default; brakingDamping clears any accumulated braking_system
     // upgrade contribution.
     this.flight.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.flight.brakingDamping = 0;
-    this.flight.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
     this.steadyGuard = false;
     this.controlHoldTimer = 0;
-    this.flight.driftFactor = 0;
+    this.flight.turbo = 0;
+    this.flight.turboDir = null;
 
     // Reset visual upgrade levels
     this.thrusters.thrusterVisualLevel = 0;
@@ -1000,7 +946,7 @@ class PlayerSystem extends BaseSystem {
     this.bossRepairFraction = 0;
   }
 
-  /** The new flight's start: classic, gliding, the cannon on the nose. */
+  /** A run's start: classic, gliding, the cannon on the nose. */
   beginNewFlight() {
     this.noseAim = true;
     this.setFlightScheme('classic', true);
@@ -1033,13 +979,12 @@ class PlayerSystem extends BaseSystem {
     this.aimPoint = null;
     this.aimStick = null;
     this.enginesIdle = true;
-    this.flight.driftFactor = 0;
     this.maneuvers.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
     this.lastDamageSource = null;
     this.isDead = false;
     this.isRetrying = false;
-    if (this.newFlight) this.beginNewFlight();
+    this.beginNewFlight();
   }
 
   markDead() {
@@ -1065,12 +1010,13 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vx = 0;
     this.velocity.vy = 0;
     this.angularVelocity = 0;
+    this.flight.turbo = 0;
+    this.flight.turboDir = null;
     this.turretAngle = this.angle;
     this.turretLayers.fill(this.angle);
     this.lockAims = null;
     this.aimPoint = null;
     this.aimStick = null;
-    this.flight.driftFactor = 0;
     this.maneuvers.resetDashState();
 
     // Reset thruster state to stop any active sounds

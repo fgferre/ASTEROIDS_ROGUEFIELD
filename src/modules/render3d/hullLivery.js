@@ -9,7 +9,7 @@
 // wing, NO STEP on the wing root, warning chevrons by the tip jets, an
 // accent stripe down the spine). A second canvas, the mask, tells the
 // shader what each mark is made of: bare metal (red: shiny, metallic),
-// grime (green: dull), rust (blue: dull, not metal). playerMirror.js and
+// grime (green: dull), rust (blue: dull, not metal). render3d/player/hull.js and
 // MenuHullPreview.js patch their hull materials with patch().
 // `visual.livery` per hull: { code, wear 0..1, rust 0..1, chip [r, g, b] }.
 

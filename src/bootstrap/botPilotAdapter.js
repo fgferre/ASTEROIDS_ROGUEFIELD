@@ -9,10 +9,9 @@ import { BOSS_KINDS } from '../data/enemies/boss.js';
 import { DASH_IMPULSE } from '../data/constants/gameplay.js';
 import {
   GLIDE_ACCEL_SCALE,
-  GLIDE_LINEAR_DAMPING,
-  GLIDE_RETRO_SHARE,
   GLIDE_SPEED_SCALE,
 } from '../data/constants/physics.js';
+import { RETRO_SHARE } from '../modules/player/flight.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { FIXED_STEP_SECONDS, createFixedStepper } from '../core/fixedStep.js';
 import { createBotPilot, pickCard } from './botPilot.js';
@@ -112,18 +111,25 @@ export function weaponReach(combat) {
 // rollouts (botPilotGlide.js): push and drag, the cap, the turn, the shot.
 function glideOf(player, combat) {
   const { flight } = player;
+  const accel = flight.acceleration * GLIDE_ACCEL_SCALE;
+  const maxSpeed = flight.maxSpeed * GLIDE_SPEED_SCALE;
+  // The start's jets (player/flight.js): the engine, the retro (× the
+  // Braking System's level), the computer's brake with the Braking System.
   return {
     step: FIXED_STEP_SECONDS,
     noseAim: player.noseAim,
     agility: flight.agility,
-    baseDamping: flight.baseLinearDamping,
-    accel: flight.acceleration * GLIDE_ACCEL_SCALE,
-    retro: GLIDE_RETRO_SHARE,
-    damping: GLIDE_LINEAR_DAMPING,
-    braking: flight.brakingDamping,
-    maxSpeed: flight.maxSpeed * GLIDE_SPEED_SCALE,
-    turn: flight.rotationSpeed,
-    turnDamping: flight.angularDamping,
+    accel,
+    retro:
+      accel *
+      RETRO_SHARE *
+      ((flight.baseLinearDamping + flight.brakingDamping) /
+        flight.baseLinearDamping),
+    autoBrake: flight.brakingDamping > 0,
+    maxSpeed,
+    // No drag: the shared loot terms' terminal speed (push ÷ drag) is the
+    // top speed.
+    damping: accel / maxSpeed,
     bulletSpeed: combat.bulletSpeed,
   };
 }

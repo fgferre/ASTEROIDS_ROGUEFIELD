@@ -6,11 +6,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-  keyEvent,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../../__helpers__/domStubs.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../src/core/GameConstants.js';
 
 const MAX_STEPS = 90 * 60;
@@ -22,7 +19,6 @@ describe('layer 1 scenario', () => {
   let restoreDom;
   beforeEach(() => {
     restoreDom = installDomStubs();
-    window.location.search = '?direcao=antiga'; // these runs fly today's flight
   });
   afterEach(() => {
     GamePools.releaseAll();
@@ -34,6 +30,8 @@ describe('layer 1 scenario', () => {
     game.session.startNewRun({ source: 'test' });
     const { player, enemies, input } = game.services;
     player.setInvulnerableTimer(1e9);
+    // Auto-aim is the Auto Turret card's (a run starts on the nose cannon).
+    game.eventBus.emit('upgrade-auto-aim', {});
     input.onKeyDown(keyEvent('KeyW'));
     input.onKeyDown(keyEvent('KeyA'));
 

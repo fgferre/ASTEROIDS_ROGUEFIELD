@@ -11,7 +11,7 @@ import { createFixedStepper } from '../../../src/core/fixedStep.js';
 import { createReplayController } from '../../../src/bootstrap/replaySession.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deserialize, serialize } from '../../../src/core/replay.js';
-import { installDomStubs, keyEvent } from '../../__helpers__/headlessGame.js';
+import { installDomStubs, keyEvent } from '../../__helpers__/domStubs.js';
 
 const STEP_SECONDS = createFixedStepper().step;
 

@@ -7,6 +7,8 @@ import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
 import { burstFlak } from './combat/beamAndFan.js';
+import { kindledDied } from './combat/fanForms.js';
+import { thermiteDied } from './combat/missileForms.js';
 import {
   applyConcentratedFire,
   computeParallelOffset,
@@ -204,10 +206,10 @@ class CombatSystem extends BaseSystem {
       if (this.cards.cardEffects.dashFire) this.cards.startDashFire();
     });
 
-    // The trails drop from the pilot's own main thrust, never the coast brake.
+    // The trails drop from the pilot's own main burn (`pilot`), never the
+    // computer's brake, even while the flame shows only its steady third.
     this.registerEventListener('thruster-effect', (data = {}) => {
-      if (data.type !== 'main' || !(data.intensity > 0) || data.isAutomatic)
-        return;
+      if (data.type !== 'main' || !data.pilot) return;
       const cards = this.cards;
       const { cinderTrail, ionTrail } = cards.cardEffects;
       if (cinderTrail) cards.dropTrailPoint(cards.cinders, cinderTrail, data);
@@ -228,6 +230,13 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
       this.evolveWeapon(data.family);
+    });
+    // Kindling: a burning rock that dies flies apart in burning pieces;
+    // Thermite: a molten one's pieces cool off.
+    this.registerEventListener('enemy-destroyed', (data = {}) => {
+      if (!data.enemy) return;
+      kindledDied(this.weapons, data.enemy, data.fragments);
+      thermiteDied(this.weapons, data.enemy, data.fragments);
     });
     this.registerEventListener('apex-unlocked', (data = {}) => {
       this.weapons.apexWeapon(data.family);
@@ -266,7 +275,8 @@ class CombatSystem extends BaseSystem {
       if (screen !== 'playing') {
         return;
       }
-      // Nose aim (?aim=nose) has no auto aim to toggle to.
+      // The cannon on the nose (until the Auto Turret) has no auto aim to
+      // toggle to.
       if (this.cachedPlayer.noseAim) {
         return;
       }
@@ -535,8 +545,52 @@ class CombatSystem extends BaseSystem {
     return this.weapons.beams;
   }
 
+  get scars() {
+    return this.weapons.scars;
+  }
+
+  get flung() {
+    return this.weapons.flung;
+  }
+
+  get shards() {
+    return this.weapons.shards;
+  }
+
+  get trench() {
+    return this.weapons.trench;
+  }
+
   get flakBursts() {
     return this.weapons.flakBursts;
+  }
+
+  get glances() {
+    return this.weapons.glances;
+  }
+
+  get kindled() {
+    return this.weapons.kindled;
+  }
+
+  get implosions() {
+    return this.weapons.implosions;
+  }
+
+  get scraps() {
+    return this.weapons.scraps;
+  }
+
+  get lodged() {
+    return this.weapons.lodged;
+  }
+
+  get thermite() {
+    return this.weapons.thermite;
+  }
+
+  get gravityWells() {
+    return this.weapons.gravityWells;
   }
 
   // firePatterns.js: the 3D weapon mirror draws them.

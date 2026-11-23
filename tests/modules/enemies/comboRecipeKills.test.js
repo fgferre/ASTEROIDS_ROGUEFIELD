@@ -3,10 +3,8 @@ import {
   setupGlobalMocks,
   cleanupGlobalState,
 } from '../../__helpers__/setup.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 
 let restore;
 beforeEach(() => {

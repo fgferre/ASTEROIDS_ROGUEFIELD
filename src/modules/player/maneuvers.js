@@ -96,6 +96,8 @@ export class PlayerManeuvers {
       const sign = down && !up ? -1 : 1;
       direction = { x: fwd.x * sign, y: fwd.y * sign };
     }
+    // The dash shows on the jets pointing its way (flight.js).
+    this.dashDirection = direction;
     const impulse = DASH_IMPULSE * this.dashDistanceMultiplier;
     this.ship.velocity.vx += direction.x * impulse;
     this.ship.velocity.vy += direction.y * impulse;

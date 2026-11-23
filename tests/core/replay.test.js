@@ -162,11 +162,6 @@ describe('replay recording', () => {
     expect(() => deserialize({ ...old, version: 1 })).toThrow(/version/);
   });
 
-  it('records the control scheme', () => {
-    const json = createRecorder({ seed: 9, controls: 'classic' }).toJSON();
-    expect(deserialize(serialize(json)).controls).toBe('classic');
-  });
-
   it('records the stick sensitivity at the start and at each change; an older recording flies Medium', () => {
     const recorder = createRecorder({ seed: 9, stick: 'high' });
     recorder.record(0, createInputFrame({}));

@@ -7,8 +7,8 @@
 // missiles that turn onto their targets. Each `fire*` runs on a shot like
 // Weapons.fireStream, the Weapons instance first; `tickWeaponField` moves
 // what lives between shots (the blades, the aura's ring, the missiles a kill
-// breeds) and `steerSeeker` turns a missile in flight. Hits land through
-// Weapons.hitEnemy, like a beam's.
+// breeds, a Chain Capacitor echo) and `steerSeeker` turns a missile in
+// flight. Hits land through Weapons.hitEnemy, like a beam's.
 
 import { BULLET_SPEED } from '../../data/constants/gameplay.js';
 
@@ -19,14 +19,42 @@ const DEG = Math.PI / 180;
 const FIZZLE = 0.5;
 const BOLT_LIFE = 0.1;
 // Missiles a kill breeds fan out over this arc round the dying missile's
-// heading.
+// heading; a missile's twin leaves this far off its heading.
 const BROOD_SPREAD = 120 * DEG;
+const SPLIT_ANGLE = 25 * DEG;
+// Seconds after a volley or a beam its Chain Capacitor echo fires.
+const ECHO = 0.1;
+// The Overcharge Coil's speed gain at its third rank (+15% a rank).
+const FULL_COIL = 1.15 ** 3;
 
 const extraShots = (stats) =>
   Math.max(0, Math.floor(stats?.multishot ?? 1) - 1);
 const damageOf = (stats, entry) =>
   (Number(stats?.damage) || 0) * entry.damageMultiplier;
 const wrapAngle = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
+
+/**
+ * How much of the Overcharge Coil the ship has: 0 without it, 1/3, 2/3 and 1
+ * at its ranks. A weapon's `coil*` numbers are what it does at rank 3.
+ */
+export const coilShare = (bulletSpeed) =>
+  Math.log(bulletSpeed / BULLET_SPEED) / Math.log(FULL_COIL);
+
+/**
+ * The Chain Capacitor's own version on a weapon that declares one (a volley
+ * or a beam fires twice, a missile splits): the card's roll at `chance`, off
+ * with the Chain Lance, which takes the extra jump instead.
+ */
+export const capacitorRoll = (w, chance) =>
+  Boolean(chance) &&
+  Boolean(w.cardEffects().chainCapacitor) &&
+  !w.hasEvolution('arc') &&
+  w.cards().rollCardChance(chance);
+
+/** `fire` comes again ECHO s later (the Chain Capacitor's second volley or beam). */
+export function echoShot(w, fire) {
+  w.echo = { wait: ECHO, fire };
+}
 
 // The next shot waits `cooldownMultiplier` × the lance's cooldown.
 function setCooldown(w, entry) {
@@ -428,8 +456,10 @@ export function fireSeeker(w, seeker, playerPos, playerStats) {
     seeker.maxMissiles,
     seeker.missiles + extraShots(playerStats)
   );
-  const targets = seekerTargets(w, origin, seeker.acquire, count);
+  const targets = seekerTargets(w, origin, acquireOf(w, seeker), count);
   const damage = damageOf(playerStats, seeker);
+  // shared by the salvo's missiles (the Gravity Warhead's `well`)
+  const salvo = { well: null };
   for (let i = 0; i < count; i += 1) {
     const a =
       seeker.spread >= 360
@@ -437,7 +467,8 @@ export function fireSeeker(w, seeker, playerPos, playerStats) {
         : count === 1
           ? angle
           : angle + seeker.spread * DEG * (i / (count - 1) - 0.5);
-    launchSeeker(w, seeker, origin, a, damage, targets[i % targets.length]);
+    const target = targets[i % targets.length];
+    launchSeeker(w, seeker, origin, a, damage, target, undefined, salvo);
   }
   setCooldown(w, seeker);
   const first = targets[0];
@@ -462,25 +493,52 @@ function seekerTargets(w, origin, acquire, count, skip = null) {
   return [...chosen, ...rest.slice(0, count - chosen.length)];
 }
 
-function launchSeeker(w, seeker, from, angle, damage, target, breed) {
+// Thermal Lens: a salvo with `lensAcquire` finds targets further away.
+const acquireOf = (w, seeker) =>
+  seeker.acquire * (w.cardEffects().thermalLens ? seeker.lensAcquire ?? 1 : 1);
+
+// `breed` given: a brood or a twin, which never splits; `salvo`: what the
+// missiles fired together share (a brood or a twin, its own).
+function launchSeeker(
+  w,
+  seeker,
+  from,
+  angle,
+  damage,
+  target,
+  breed,
+  salvo = { well: null }
+) {
   const bullet = w.createBullet(
     from,
     { x: from.x + Math.cos(angle), y: from.y + Math.sin(angle) },
-    damage
+    damage,
+    null,
+    seeker
   );
   if (!bullet) return;
+  // Overcharge Coil: a salvo with `coilTurn` turns tighter.
+  const coilTurn = (seeker.coilTurn ?? 0) * coilShare(w.bulletSpeed);
   bullet.seeker = {
     target: target ?? null,
     id: target?.id ?? null,
-    turn: seeker.turn,
-    acquire: seeker.acquire,
+    turn: seeker.turn * (1 + coilTurn),
+    acquire: acquireOf(w, seeker),
     breed: breed ?? seeker.breed,
     entry: seeker,
     damage,
+    splits: breed === undefined,
+    salvo,
   };
 }
 
-/** Turns a missile toward its target, taking the nearest when it is gone. */
+/**
+ * Turns a missile toward its target, taking the nearest when it is gone, or
+ * toward the Gravity Warhead's well its salvo opened while it holds
+ * (missileForms.js). The first time it steers onto a target (locks on), the
+ * Chain Capacitor may split it: a twin leaves next tick for another target,
+ * or the same one.
+ */
 export function steerSeeker(w, bullet, deltaTime) {
   const seeker = bullet.seeker;
   let { target } = seeker;
@@ -496,12 +554,28 @@ export function steerSeeker(w, bullet, deltaTime) {
   }
   if (!target) return;
   const heading = Math.atan2(bullet.vy, bullet.vx);
+  if (seeker.splits) {
+    seeker.splits = false;
+    if (capacitorRoll(w, seeker.entry.capacitorSplit)) {
+      w.broods.push({
+        x: bullet.x,
+        y: bullet.y,
+        heading: heading + SPLIT_ANGLE,
+        seeker,
+        skip: [target],
+        count: 1,
+        breed: seeker.breed,
+      });
+    }
+  }
+  const { well } = seeker.salvo;
+  const aim = well?.timer > 0 ? well : target;
   const limit = seeker.turn * deltaTime;
   const turn = Math.max(
     -limit,
     Math.min(
       limit,
-      wrapAngle(Math.atan2(target.y - bullet.y, target.x - bullet.x) - heading)
+      wrapAngle(Math.atan2(aim.y - bullet.y, aim.x - bullet.x) - heading)
     )
   );
   const speed = Math.hypot(bullet.vx, bullet.vy);
@@ -516,16 +590,19 @@ export function breedSeekers(w, bullet, enemy) {
     y: enemy.y,
     heading: Math.atan2(bullet.vy, bullet.vx),
     seeker: bullet.seeker,
-    dead: enemy,
+    skip: [enemy],
+    count: bullet.seeker.breed,
+    breed: 0,
   });
 }
 
+// The missiles kills bred and the Chain Capacitor's twins: `count` from
+// (x, y) round `heading`, each breeding `breed`, aimed past `skip`.
 function launchBroods(w) {
   const broods = w.broods.splice(0);
-  broods.forEach(({ x, y, heading, seeker, dead }) => {
-    const count = seeker.breed;
+  broods.forEach(({ x, y, heading, seeker, skip, count, breed }) => {
     const from = { x, y };
-    const targets = seekerTargets(w, from, seeker.acquire, count, [dead]);
+    const targets = seekerTargets(w, from, seeker.acquire, count, skip);
     for (let i = 0; i < count; i += 1) {
       const a =
         count === 1
@@ -538,7 +615,7 @@ function launchBroods(w) {
         a,
         seeker.damage,
         targets[i % targets.length],
-        0
+        breed
       );
     }
   });
@@ -546,7 +623,8 @@ function launchBroods(w) {
 
 /**
  * What lives between shots, every frame the ship may fire: the blades of
- * each `orbit` ring, the `aura` ring, the missiles kills bred.
+ * each `orbit` ring, the `aura` ring, the missiles kills bred and the
+ * Chain Capacitor's twins, its echo when due.
  */
 export function tickWeaponField(w, deltaTime, playerStats) {
   const { fire } = w.weapon;
@@ -558,10 +636,19 @@ export function tickWeaponField(w, deltaTime, playerStats) {
   if (aura) tickAura(w, aura, centre, playerStats);
   else w.aura = null;
   if (w.broods.length) launchBroods(w);
+  if (w.echo && (w.echo.wait -= deltaTime) <= 0) {
+    const { fire } = w.echo;
+    w.echo = null;
+    fire();
+  }
 }
 
-/** The ship cannot fire (dead, gone, held): no blades and no ring show. */
+/**
+ * The ship cannot fire (dead, gone, held): no blades and no ring show, and
+ * a pending echo is lost.
+ */
 export function holsterWeaponField(w) {
   w.blades.length = 0;
   w.aura = null;
+  w.echo = null;
 }

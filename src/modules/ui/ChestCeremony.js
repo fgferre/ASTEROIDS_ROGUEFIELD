@@ -8,6 +8,7 @@
 // A chest that finishes while a card choice is open waits for it; chests
 // that finish together show one after the other.
 
+import { CHEST_REVEAL_MS } from '../../data/pickups.js';
 import {
   SCREEN_INPUT_LOCKOUT_MS,
   liftHudInstruments,
@@ -19,8 +20,6 @@ import {
   familyColor,
 } from './upgradeCard.js';
 
-// One card's reveal; the next starts when it ends.
-export const CHEST_REVEAL_MS = 420;
 // A chest of this many cards is the Warden's jackpot.
 const JACKPOT_CARDS = 5;
 

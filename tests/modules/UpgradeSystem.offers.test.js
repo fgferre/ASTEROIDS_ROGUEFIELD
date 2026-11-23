@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import { BASE_MODIFIERS } from '../../src/data/hangar.js';
-import {
-  createHeadlessGame,
-  installDomStubs,
-} from '../__helpers__/headlessGame.js';
+import { createHeadlessGame } from '../__helpers__/headlessGame.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 import RandomService from '../../src/core/RandomService.js';
 import { listContent } from '../../src/content/registry.js';
 import { WEAPON_CARD_IDS } from '../../src/data/upgrades/index.js';
@@ -421,7 +419,7 @@ describe('level-up offers', () => {
         highlights: ['On top of the jumps Multishot adds.'],
       });
       const scatter = shown('chain_capacitor', 'scatter');
-      expect(scatter.description).toContain('flak bolts have a 10% chance');
+      expect(scatter.description).toContain('1 volley in 10 fires twice');
       expect(scatter.highlights).toEqual(shown('chain_capacitor').highlights);
       // Another weapon reads the base text.
       expect(shown('chain_capacitor', 'lance').description).toBe(
@@ -456,9 +454,9 @@ describe('level-up offers', () => {
       );
     });
 
-    it('Thermal Lens names the flak with the Scatter Coil', () => {
+    it('Thermal Lens focuses the fan with the Scatter Coil', () => {
       expect(shown('thermal_lens', 'scatter').description).toBe(
-        'Flak bolt and shrapnel damage +15%.'
+        'Focuses the fan: the bolts fly 20% closer together and deal +15% damage.'
       );
     });
 

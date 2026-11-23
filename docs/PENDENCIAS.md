@@ -4,9 +4,24 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 40.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
 
-## O BASTÃO — onde as sessões pararam (21/11) — a `main` está publicada até a PR do `auditoria/seis` (a sexta auditoria, 21/11)
+## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
+
+**23/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.0 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.0 com esta lista, trocando a configuração de checagens do GitHub?", _"Sim, publica"_ —
+pela PR do `publicar/conjunto` para a `main`. Entra:
+
+- o voo, um algoritmo só (40);
+- as cartas por arma (41): a Harmonic e a Scatter nas cinco famílias, a Seeker em três; dos números da Scatter e da
+  Seeker, jogando o conjunto, ele disse _"Ficam como estão"_;
+- as ferramentas das rodadas mais rápidas: a checagem que não repete o que já passou e os testes no Node fixo
+  (24.22.3, o mesmo no GitHub, que passa a exigir a checagem `validate`).
+
+Os replays gravados antes desta versão deixam de tocar (o voo mudou); progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** o equilíbrio completo (27), que ele deixou para depois desta publicação (_"Sim, fica para depois"_);
+as vozes (37); a segunda parte da abertura (o carregamento em fatias, espera o teste dele no Tesla).
 
 **21/11, à noite (vale sobre o que estiver mais abaixo e disser outra coisa):** a sexta auditoria de fora vai ao ar
 por ordem dele — à pergunta "Publico os cinco consertos de pilotos e replays?", _"Sim, publica"_ — pela PR do
@@ -228,6 +243,38 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
   entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
   fecha quando ele aprovar jogando com o controle de verdade.
+- **(40)** O voo, um algoritmo só (21/11, à noite, na conversa do controle): _"o algoritmo ele é um só para tudo,
+  né? Para movimento, o que que faz a nave se movimentar? É o thruster. [...] A nave ela é movimentada porque está
+  ligado um thruster. E o thruster ele faz o movimento real da nave. Então, se ela precisa parar, seja por freio
+  automático, seja pela ação do usuário, né, é, isso é refletido, obviamente, no thruster da forma física realista, de
+  acordo com os thrusters que já existem hoje na nave. A gente não vai desenhar nada novo, né?"_ Texto inteiro em
+  `quadro/respostas/freio-automatico-21-11.txt`. Em 22/11 ele mandou tocar a frente. Ramo `voo/um-algoritmo`: estudo
+  entregue (cartão `voo-1`). Ao estudo ele disse (22/11): _"vamos deixar a e b printos para testrar."_ As duas
+  estão prontas ao lado do voo de hoje, pelo endereço (`?voo=a`, `?voo=b`; cartão `voo-2`). Depois (22/11): _"Ainda não consegui decidir.
+  Eu acho que eu preciso fazer um teste com os upgrades para entender como que é a evolução em cada modo."_ Os
+  endereços de teste com as cartas em cinco degraus estão no cartão `voo-3`. Voando os degraus (22/11): _"a gente
+  tem que repensar o modo com o computador de manobra [...] tinha que estar ter uma sensação de que a nave está mais
+  poderosa, mais rápida, mais manobrável."_ Análise e três propostas de moderno (`?moderno=1|2|3`) no cartão `voo-4`.
+  Ao voo-4 (22/11): _"Eu gostei do Turbo."_, a chama com _"um estouro"_ e depois _"uma chama constante"_, e o começo
+  sem atrito: _"o modo inicial, ele é o modo simulação"_. O voo que fica (`?voo=c`) no cartão `voo-5`. Depois (22/11): _"Quando a gente faz o giro da
+  nave, ela também deveria ter momentum, né? E quando a gente solta, imediatamente ela para o giro."_ e _"o que faz
+  parar o giro de forma automática não é o RCS, é as cartas [...] de freio"_: giro com momento no voo que fica.
+  Voou (22/11): _"voei, fica com ajustes, está bem difícil, mas peguei um UCS e nao melhorou o giro"_; combinado com
+  ele (_"concordo, faz assim"_): a RCS é a dona do giro, o freio da viagem, e o giro do começo para sozinho devagar.
+  Cartão `voo-7`. Ao `voo-7` (22/11): _"Ficou bom: o voo que fica — obs: acho que o giro pode ter um pouco de
+  assitencia desde o inicio, mas muito pouco no inicio para ter mais dificuldade no voo. a medida que evoluir
+  melhora."_ e a chama constante _"Assim, um terço do estouro"_. A ajuda do giro no começo ficou a metade. Em 22/11,
+  20h30, a coordenadora mandou o voo que fica virar o único voo neste ramo (sem juntar nem publicar). Publicado na
+  0.8.0 em 23/11. Fecha quando ele aprovar voando.
+- **(41)** Cartas por arma (21/11): _"Está faltando criar cartas para cada tipo de arma, é isso? Isso seria um ramo
+  inteiro, né, para a gente repensar."_ e _"vamos manter ele no nosso backlog por enquanto, mas não vamos tirar do
+  radar. Em breve a gente retoma esse trabalho."_ Retomado em 22/11 (ramo `cartas/por-arma`): o mapa, medido no jogo,
+  está no cartão `cartas-por-arma-1`. Respostas dele aos cartões 2 e 3 (22/11): tudo _"Gostei: pode construir"_; a Scatter
+  e a Seeker ganham versão própria _"aos poucos, depois da Harmonic"_; os números da Scatter, _"Decido jogando"_. No ramo:
+  as cartas de número e as cinco famílias próprias da Harmonic. Em 23/11 a Scatter e a Seeker ganharam as delas, com
+  os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
+  Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
+  da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
 
 ## Som (palavras dele, 19/11)
 

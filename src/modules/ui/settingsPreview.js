@@ -58,20 +58,6 @@ export function settingPreview(key, value, context = {}) {
           : 'Dynamic: leads your aim, zooms out in crowds, frames bosses.',
     };
   }
-  if (key === 'hullControl') {
-    // By touch the left thumb is the stick: no keys to name.
-    const touch = globalThis.document?.body?.dataset.inputDevice === 'touch';
-    return {
-      text:
-        value === 'classic'
-          ? touch
-            ? 'Classic: the thumb turns the nose and thrusts along it.'
-            : 'Classic: A/D turn, W thrusts along the nose.'
-          : touch
-            ? 'Modern: the thumb moves the ship on the screen.'
-            : 'Modern: WASD moves on the screen.',
-    };
-  }
   if (key === 'cameraLead') {
     return {
       text:

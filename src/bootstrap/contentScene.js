@@ -4,6 +4,10 @@
  * seen (and captured) without a custom script. `?content=<kind>/<id>` forces a
  * registry kind, `&count=N` spawns N of an enemy (1..300), `&fire=1` lets the
  * ship shoot at enemies and bosses (it holds fire there, so they stay alive).
+ * `&cards=<id>:<level>,…` also gives the ship those cards at those levels (the
+ * cards they require first), to fly a build without a run (Felipe, 22/11:
+ * "preciso fazer um teste com os upgrades para entender como que é a evolução
+ * em cada modo").
  *
  * profileHarness.js reads the URL and starts the run; this file composes the
  * scene through the public spawn paths (factory, upgrade system, game session).
@@ -67,8 +71,9 @@ const DRONES = Object.freeze([
 const HULL_ROCK_COUNT = 3;
 
 /**
- * Reads `?content=…&count=…&fire=…`. Null when there is no `content` flag.
- * The id is not looked up here (see resolveContent).
+ * Reads `?content=…&count=…&fire=…&cards=…`. Null when there is no `content`
+ * flag. The ids are not looked up here (see resolveContent); a card without a
+ * level is level 1.
  */
 export function parseContentParams(search) {
   const params = new URLSearchParams(search);
@@ -76,10 +81,19 @@ export function parseContentParams(search) {
   if (ref === null) return null;
 
   const count = Number.parseInt(params.get('count'), 10);
+  const cards = (params.get('cards') ?? '')
+    .split(',')
+    .map((entry) => entry.trim().split(':'))
+    .filter(([id]) => id)
+    .map(([id, level]) => ({
+      id,
+      level: Math.max(1, Number.parseInt(level, 10) || 1),
+    }));
   return {
     ref: ref.trim(),
     count: Number.isFinite(count) ? Math.min(MAX_COUNT, Math.max(1, count)) : 1,
     fire: params.get('fire') === '1',
+    cards,
   };
 }
 
@@ -122,7 +136,12 @@ export function readContentScene(search) {
     );
     return null;
   }
-  return { ...found, count: params.count, fire: params.fire };
+  return {
+    ...found,
+    count: params.count,
+    fire: params.fire,
+    cards: params.cards,
+  };
 }
 
 /**
@@ -362,9 +381,31 @@ export function composeContentScene({ scene, services }) {
   enemies.releaseAllAsteroidsToPool();
 
   COMPOSERS[scene.kind](scene, services);
+  (scene.cards ?? []).forEach(({ id, level }) => {
+    if (!findCard(id)) {
+      console.warn(`[contentScene] Unknown card "${id}" in cards=.`);
+      return;
+    }
+    while (
+      progression.getUpgradeCount(id) < level &&
+      applyCard(progression, id)
+    );
+  });
+  // A build with the Flight Computer flies modern at once, as a retried one
+  // does (its briefing waits for a card screen this scene never shows).
+  if (progression.getUpgradeCount('flight_computer') > 0) {
+    player.setFlightScheme('modern', false);
+  }
 
   const undo = [];
-  if (scene.kind !== 'stages') undo.push(freezeSpawner(enemies.waveManager));
+  if (scene.kind !== 'stages') {
+    undo.push(freezeSpawner(enemies.waveManager));
+    // The scene's own rocks are outside the layer's rock plan: the dev-only
+    // count check would warn at every kill.
+    undo.push(
+      override(enemies.waveManager, 'assertAccountingConsistency', () => {})
+    );
+  }
   if (!scene.fire && ['enemies', 'bosses'].includes(scene.kind)) {
     undo.push(override(combat.weapons, 'handleShooting', () => {}));
   }

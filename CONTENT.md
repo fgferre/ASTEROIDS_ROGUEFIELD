@@ -162,4 +162,4 @@ A new enemy writes no render code. Give it one of:
 
 - See it: `npm run dev`, then `/?content=<id>&desktop=force&debugLogging=0` (also `<kind>/<id>`; enemies, bosses, weapons, hulls, cards, stages, not biomes). `&count=N` (1 to 300) spawns N of an enemy; `&fire=1` lets the ship shoot enemies and bosses.
 - Run: `npm run test:tocados` while working, `npm run done` at the end. `tests/content/` checks every item's fields (`registry`, `enemies`, `weapons`); `tests/data/` checks stages and biomes.
-- `tests/integration/golden-trace.test.js` hashes full runs. It changes only when a change is meant to change play: a new enemy in an existing role (the spawns change), a new card or a boss tweak can change it. Then regenerate it in the same commit: `GOLDEN_UPDATE=1 npx vitest run tests/integration/golden-trace.test.js`.
+- `tests/integration/golden-trace.test.js` hashes full runs. It changes only when a change is meant to change play: a new enemy in an existing role (the spawns change), a new card or a boss tweak can change it. Then regenerate it in the same commit: `GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js`.

@@ -53,6 +53,8 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     // The game logs every event; only failing tests print their console.
     silent: 'passed-only',
+    // Stops vitest on any Node but the one pinned in .nvmrc.
+    globalSetup: ['tests/__helpers__/pinned-node-guard.js'],
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
     setupFiles: ['tests/__helpers__/global-setup.js'],
     coverage: {

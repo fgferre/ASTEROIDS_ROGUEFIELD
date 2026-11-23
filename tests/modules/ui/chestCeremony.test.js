@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStubs } from '../../__helpers__/headlessGame.js';
+import { installDomStubs } from '../../__helpers__/domStubs.js';
 import UPGRADE_LIBRARY from '../../../src/data/upgrades/index.js';
-import {
-  CHEST_REVEAL_MS,
-  ChestCeremony,
-} from '../../../src/modules/ui/ChestCeremony.js';
+import { CHEST_REVEAL_MS } from '../../../src/data/pickups.js';
+import { ChestCeremony } from '../../../src/modules/ui/ChestCeremony.js';
 import { SCREEN_INPUT_LOCKOUT_MS } from '../../../src/modules/ui/LevelUpScreen.js';
 
 function node() {

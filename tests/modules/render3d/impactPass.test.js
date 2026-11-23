@@ -46,6 +46,11 @@ describe('ImpactKick grain and vignette', () => {
       uLens: { value: 0 },
       uLensAt: { value: { set() {} } },
       uLensReach: { value: { set() {} } },
+      uLine: { value: 0 },
+      uLineAt: { value: { set() {} } },
+      uLineDir: { value: { set() {} } },
+      uLineHalf: { value: 1 },
+      uLineReach: { value: 1 },
     },
   });
 
@@ -85,6 +90,19 @@ describe('ImpactKick grain and vignette', () => {
     expect(p.uniforms.uLens.value).toBeGreaterThan(0);
     expect(lensPull(0.5)).toBeGreaterThan(lensPull(0.2));
     impact.lens(0.5, 0.5, 0.1, 0.1, 0);
+    impact.apply(p, 800, 600, false, false);
+    expect(p.enabled).toBe(false);
+  });
+
+  it('runs the pass for a Field trench alone', () => {
+    const impact = new ImpactKick();
+    const p = pass();
+    impact.line(0.4, 0.5, 300, 0, 150, 90, 0.19);
+    impact.apply(p, 800, 600, false, false);
+    expect(p.enabled).toBe(true);
+    expect(p.uniforms.uLine.value).toBe(0.19);
+    expect(p.uniforms.uLineReach.value).toBe(90);
+    impact.line(0.5, 0.5, 1, 0, 1, 1, 0);
     impact.apply(p, 800, 600, false, false);
     expect(p.enabled).toBe(false);
   });
