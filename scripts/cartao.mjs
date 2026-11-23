@@ -6,6 +6,7 @@
  *
  * Esquema do JSON (textos aceitam **negrito**; o resto é escapado):
  *   titulo      texto     título da página (obrigatório)
+ *   nome        texto     nome curto que abre cada resposta copiada (padrão: titulo)
  *   data        texto     ex. "2026-11-23"
  *   contexto    texto | [texto]   parágrafos de abertura
  *   tipo        "gosto" (faz pergunta, tem respostas) | "conferencia" (só para ver: sem pergunta)
@@ -22,7 +23,7 @@
  *   id, titulo, texto (texto|[texto]), lista [texto], nota (texto|[texto], depois da lista), endereco, tabela, midia [item],
  *   variantes [{letra:"A", titulo, texto, midia: item|[item]}]   lado a lado
  *   pergunta?  texto da pergunta
- *   opcoes     [{letra:"A", texto, recomendada:true}]   respostas por letra (só em "gosto")
+ *   opcoes     [{letra:"A", texto, recomendada:true}]   marca-se a letra; a resposta copiada sai por frase (só em "gosto")
  * Recusas (saída 1, nada escrito): "gosto" com menos de 3 variantes em todas as seções
  * (a maior seção conta), a não ser com --uma "motivo" (o motivo vai impresso no cartão);
  * endereço (em qualquer texto) cujo host não seja 192.168.1.185; caminho de mídia que não existe.
@@ -190,7 +191,19 @@ const secao = (s) =>
 
 const perguntas =
   tipo === 'gosto' ? secoes.filter((s) => lista(s.opcoes).length) : [];
-const D = perguntas.map((s) => ({ id: s.id, t: s.titulo || s.id }));
+// The copied answer is his words, readable on its own later:
+// "<nome> — <question title>: <chosen option> (minha sugestão)? — obs: <note>?".
+const plano = (t) => String(t).replace(/\*\*/g, '');
+const D = perguntas.map((s) => ({
+  id: s.id,
+  t: plano(s.titulo || s.id),
+  o: Object.fromEntries(
+    lista(s.opcoes).map((o) => [
+      o.letra,
+      plano(o.texto) + (o.recomendada ? ' (minha sugestão)' : ''),
+    ])
+  ),
+}));
 
 const css = `:root{--bg:#0d0f12;--card:#171a1f;--line:#262b33;--text:#e6e9ee;--dim:#8b93a1;--accent:#00f2ff;--amber:#ffb347}
 *{box-sizing:border-box}
@@ -217,14 +230,14 @@ button{background:var(--accent);color:#001215;border:0;border-radius:8px;padding
 #count{color:var(--dim)} #ok{color:var(--amber)} ul{margin:6px 0;padding-left:20px}`;
 
 const js = `const D = ${JSON.stringify(D).replace(/</g, '\\u003c')};
-const KEY = ${JSON.stringify(id)}; let pick = {}; try { pick = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+const KEY = ${JSON.stringify(id)}; const NOME = ${JSON.stringify(plano(c.nome || c.titulo)).replace(/</g, '\\u003c')}; let pick = {}; try { pick = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(pick)); } catch (e) {} sum(); };
 const root = document.getElementById('root');
 root.querySelectorAll('input[type=radio]').forEach((r) => { if (pick[r.name] === r.value) r.checked = true; r.onchange = () => { pick[r.name] = r.value; save(); }; });
 root.querySelectorAll('textarea').forEach((t) => { const k = 'nota:' + t.dataset.note; t.value = pick[k] || '';
   t.oninput = () => { if (t.value.trim()) pick[k] = t.value.trim(); else delete pick[k]; save(); }; });
 function text() { return D.filter((d) => pick[d.id] || pick['nota:' + d.id]).map((d) => { const n = pick['nota:' + d.id];
-  return KEY + (D.length > 1 ? ' / ' + d.id : '') + ': ' + (pick[d.id] || '(sem letra)') + (n ? ' — obs: ' + n : ''); }).join('\\n'); }
+  return NOME + ' — ' + d.t + ': ' + (d.o[pick[d.id]] || '(sem opção marcada)') + (n ? ' — obs: ' + n : ''); }).join('\\n'); }
 function sum() { const n = D.filter((d) => pick[d.id]).length; document.getElementById('count').textContent = n + ' de ' + D.length + ' respondidas';
   D.forEach((d) => root.querySelector('section[data-id="' + d.id + '"]').classList.toggle('done', Boolean(pick[d.id]))); }
 document.getElementById('copy').onclick = () => { const t = text() || 'Nenhuma resposta marcada.'; const ok = document.getElementById('ok');
