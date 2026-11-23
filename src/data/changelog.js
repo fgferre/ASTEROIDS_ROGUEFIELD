@@ -21,7 +21,9 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
+  new: [
+    'A pad now drives a pointer on every menu and overlay, as a mouse: the left stick moves the round reticle (slower over anything you can click), A clicks and drags, the right stick scrolls what is under it; the d-pad still steps item by item, B goes back and LB/RB switch tabs.', // not confirmed
+  ],
   improved: [],
   fixed: [
     'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).', // not confirmed

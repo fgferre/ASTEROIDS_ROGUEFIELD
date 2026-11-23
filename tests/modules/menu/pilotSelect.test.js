@@ -31,7 +31,7 @@ function openScreen(onContinue = vi.fn(), onBack = vi.fn()) {
   vi.stubGlobal('requestAnimationFrame', (fn) => ((frame = fn), 1));
   vi.stubGlobal('document', {
     createElement: () => screen,
-    body: { appendChild() {} },
+    body: { appendChild() {}, dataset: {} },
     addEventListener: (type, fn) => type === 'keydown' && (onKey = fn),
     removeEventListener() {},
     activeElement: null,

@@ -1,69 +1,28 @@
 // src/modules/ui/padPointer.js
 //
 // The pad's pointer on the menus, the owner's "modelo do Halo" (23/11: "o
-// mouse vai ser controlado pelo controle, quando o controle tiver"): the left
+// mouse vai ser controlado pelo controle, quando o controle tiver"; card
+// apontador-1: the round reticle, the middle speed, a light snap). The left
 // stick moves it, A clicks what is under it (held, it drags), the right stick
 // scrolls what is under it. It sends the mouse's own events where it stands,
 // so every screen answers it as it answers the mouse. The d-pad still steps
-// item by item (gamepadNav.js) and hides it, as the mouse and the keys do; B
-// and LB/RB keep their jobs.
-//
-// For him to try first, behind the test address only: ?pointer=a|b|c picks
-// its look, ?pointerSpeed=slow|good|fast its speed, ?pointerSnap=1 slows it
-// over anything clickable.
+// item by item (gamepadNav.js) and hides it, as the mouse, the keys and a
+// touch do; B and LB/RB keep their jobs. Never during the flight itself.
 
 import { applyStickDeadzone } from '../InputSystem.js';
 import { GAMEPAD_FOCUSABLE_SELECTOR } from './gamepadNav.js';
 
-const params =
-  typeof window === 'undefined'
-    ? new URLSearchParams()
-    : new URLSearchParams(window.location.search);
-const LOOK = params.get('pointer');
-
-/** The pointer replaces the left stick's item-by-item steps. */
-export const PAD_POINTER_ON = ['a', 'b', 'c'].includes(LOOK);
-
-// Full tilt, in screen heights per second.
-export const POINTER_SPEEDS = { slow: 0.7, good: 1.1, fast: 1.6 };
-const SPEED = POINTER_SPEEDS[params.get('pointerSpeed')] ?? POINTER_SPEEDS.good;
-// Over something clickable, with the snap on, it moves this much slower.
-const SNAP_SLOWDOWN = 0.4;
-const SNAP = params.get('pointerSnap') === '1';
+// Full tilt crosses the screen's height in 0.9 s. Not confirmed: felt on
+// his pad first.
+export const POINTER_SPEED = 1.1;
+// Over anything clickable it moves this much slower, so it stops there.
+export const POINTER_SNAP = 0.4;
 // Full tilt of the right stick, in px per second.
 const SCROLL_SPEED = 1400;
-
-// The three looks; `hot` is the point that clicks, in the 40 px box.
-const LOOKS = {
-  // Arrow: a ship's chevron, cyan edge on a dark body.
-  a: {
-    hot: [6, 4],
-    svg: `<path d="M6 4 L6 31 L13.5 24 L19 35 L24 32.5 L18.5 22 L29 21 Z" fill="rgba(4,14,20,0.82)" stroke="#5ff4ff" stroke-width="2" stroke-linejoin="round"/><path d="M9 11 L9 24 L13 20.5" fill="none" stroke="#5ff4ff" stroke-opacity="0.45" stroke-width="1.5"/>`,
-  },
-  // Reticle: a ring with four ticks and a centre dot. Each line is drawn
-  // dark and wide first, so it reads on the cyan buttons too.
-  b: {
-    hot: [20, 20],
-    svg: `<g fill="none" stroke-linecap="round"><g stroke="rgba(2,8,12,0.9)" stroke-width="5.5"><circle cx="20" cy="20" r="11"/><path d="M20 3 V10 M20 30 V37 M3 20 H10 M30 20 H37"/></g><g stroke="#5ff4ff"><circle cx="20" cy="20" r="11" stroke-width="2"/><path d="M20 3 V10 M20 30 V37 M3 20 H10 M30 20 H37" stroke-width="2.5"/></g></g><circle cx="20" cy="20" r="3.5" fill="rgba(2,8,12,0.9)"/><circle cx="20" cy="20" r="2.2" fill="#ffffff"/>`,
-  },
-  // Brackets: four corners round a lit dot, a target lock.
-  c: {
-    hot: [20, 20],
-    svg: `<g fill="none" stroke-linecap="square"><path d="M8 15 V8 H15 M25 8 H32 V15 M32 25 V32 H25 M15 32 H8 V25" stroke="rgba(2,8,12,0.9)" stroke-width="6"/><path d="M8 15 V8 H15 M25 8 H32 V15 M32 25 V32 H25 M15 32 H8 V25" stroke="#5ff4ff" stroke-width="2.5"/></g><circle cx="20" cy="20" r="5.5" fill="rgba(2,8,12,0.9)"/><circle cx="20" cy="20" r="3.8" fill="#5ff4ff"/>`,
-  },
-};
-
-let shown = false;
-
-/** True while the pointer is on screen: A and the right stick are its. The
- * page carries it too (body data-pad-pointer), for InputSystem. */
-export function padPointerShown() {
-  return shown;
-}
-
-function mark(state) {
-  document.body.dataset.padPointer = state;
-}
+// The reticle: a ring, four ticks and a centre dot (the point that clicks),
+// each line drawn dark and wide first so it reads on the cyan buttons too.
+const HOT = 20;
+const RETICLE = `<g fill="none" stroke-linecap="round"><g stroke="rgba(2,8,12,0.9)" stroke-width="5.5"><circle cx="20" cy="20" r="11"/><path d="M20 3 V10 M20 30 V37 M3 20 H10 M30 20 H37"/></g><g stroke="#5ff4ff"><circle cx="20" cy="20" r="11" stroke-width="2"/><path d="M20 3 V10 M20 30 V37 M3 20 H10 M30 20 H37" stroke-width="2.5"/></g></g><circle cx="20" cy="20" r="3.5" fill="rgba(2,8,12,0.9)"/><circle cx="20" cy="20" r="2.2" fill="#ffffff"/>`;
 
 /** Something under `el` that scrolls, or null. */
 function scrollerUnder(el) {
@@ -82,39 +41,31 @@ function scrollerUnder(el) {
   return null;
 }
 
-/** Started by UISystem with itself (`ui`), only on the test address. */
+/** Built by UISystem with itself (`ui`: padNav, hudEditor). */
 export class PadPointer {
   constructor(ui) {
     this.ui = ui;
     this.x = window.innerWidth / 2;
     this.y = window.innerHeight / 2;
+    this.shown = false;
     this.placed = false;
     this.under = null; // the element under the pointer
     this.down = null; // where A went down, while held
     this.slider = null; // a range input A is dragging
     this.held = false;
     this.last = performance.now();
-    const look = LOOKS[LOOK];
-    this.hot = look.hot;
     this.el = document.createElement('div');
     this.el.id = 'pad-pointer';
     this.el.className = 'pad-pointer';
     this.el.hidden = true;
-    this.el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">${look.svg}</svg>`;
+    this.el.innerHTML = `<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">${RETICLE}</svg>`;
     document.body.appendChild(this.el);
-    mark('on');
-    // The real mouse or a key takes over: the pointer goes.
-    window.addEventListener(
-      'mousemove',
-      (event) => event.isTrusted && this.hide(),
-      true
-    );
-    window.addEventListener(
-      'keydown',
-      (event) => event.isTrusted && this.hide(),
-      true
-    );
-    requestAnimationFrame(() => this.frame());
+    // The real mouse, a key or a touch takes over: the pointer goes.
+    const leave = (event) => event.isTrusted && this.hide();
+    window.addEventListener('mousemove', leave, true);
+    window.addEventListener('keydown', leave, true);
+    window.addEventListener('touchstart', leave, true);
+    requestAnimationFrame(() => this.tick());
   }
 
   /** A menu or overlay is up (not the flight itself). */
@@ -129,19 +80,23 @@ export class PadPointer {
   }
 
   hide() {
-    if (!shown) return;
-    shown = false;
-    mark('on');
+    if (!this.shown) return;
+    this.shown = false;
+    delete document.body.dataset.padPointer;
     this.el.hidden = true;
     this.release(false);
   }
 
-  frame() {
-    requestAnimationFrame(() => this.frame());
+  tick() {
+    requestAnimationFrame(() => this.tick());
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    const pad = Array.from(navigator.getGamepads?.() ?? []).find(Boolean);
+    this.step(Array.from(navigator.getGamepads?.() ?? []).find(Boolean), dt);
+  }
+
+  /** One frame of the first pad (or none) over `dt` seconds. */
+  step(pad, dt) {
     if (!pad || !this.menuUp()) {
       this.hide();
       return;
@@ -149,8 +104,8 @@ export class PadPointer {
     const move = applyStickDeadzone(pad.axes[0], pad.axes[1]);
     const scroll = applyStickDeadzone(pad.axes[2], pad.axes[3]).y;
     const a = Boolean(pad.buttons[0]?.pressed);
-    if ((move.x || move.y) && !shown) this.show();
-    if (!shown) {
+    if ((move.x || move.y) && !this.shown) this.show();
+    if (!this.shown) {
       this.held = a;
       return;
     }
@@ -162,13 +117,14 @@ export class PadPointer {
   }
 
   show() {
-    shown = true;
-    mark('shown');
+    this.shown = true;
+    // InputSystem leaves A and the right stick to the pointer meanwhile.
+    document.body.dataset.padPointer = 'shown';
     this.el.hidden = false;
     if (!this.placed) {
       // First time: on the highlighted control, else mid-screen.
       const rect = document.activeElement?.getBoundingClientRect?.();
-      if (rect && rect.width) {
+      if (rect?.width) {
         this.x = rect.left + rect.width / 2;
         this.y = rect.top + rect.height / 2;
       }
@@ -180,10 +136,8 @@ export class PadPointer {
 
   move({ x, y }, dt) {
     // Tilt squared: a light lean is fine aim, a full one crosses the screen.
-    let step = SPEED * window.innerHeight * Math.hypot(x, y) * dt;
-    if (SNAP && this.under?.closest(GAMEPAD_FOCUSABLE_SELECTOR)) {
-      step *= SNAP_SLOWDOWN;
-    }
+    let step = POINTER_SPEED * window.innerHeight * Math.hypot(x, y) * dt;
+    if (this.under?.closest(GAMEPAD_FOCUSABLE_SELECTOR)) step *= POINTER_SNAP;
     this.x = Math.min(window.innerWidth - 1, Math.max(0, this.x + x * step));
     this.y = Math.min(window.innerHeight - 1, Math.max(0, this.y + y * step));
     this.draw();
@@ -191,10 +145,10 @@ export class PadPointer {
   }
 
   draw() {
-    this.el.style.transform = `translate(${this.x - this.hot[0]}px, ${this.y - this.hot[1]}px)`;
+    this.el.style.transform = `translate(${this.x - HOT}px, ${this.y - HOT}px)`;
   }
 
-  mouse(type, target, extra = {}) {
+  mouse(type, target) {
     const init = {
       bubbles: true,
       cancelable: true,
@@ -204,20 +158,17 @@ export class PadPointer {
       clientY: this.y,
       button: 0,
       buttons: this.down ? 1 : 0,
-      ...extra,
     };
-    if (type.startsWith('pointer')) {
-      target.dispatchEvent(
-        new PointerEvent(type, {
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-          ...init,
-        })
-      );
-    } else {
-      target.dispatchEvent(new MouseEvent(type, init));
-    }
+    target.dispatchEvent(
+      type.startsWith('pointer')
+        ? new PointerEvent(type, {
+            ...init,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        : new MouseEvent(type, init)
+    );
   }
 
   /** The element under the pointer hears it come, move and go; the control
@@ -255,7 +206,7 @@ export class PadPointer {
       return;
     }
     if (el.tagName === 'SELECT') {
-      // A list: the d-pad changes it, as the highlight's A already does.
+      // A list: A opens it for the d-pad and closes it, as the highlight's A.
       el.focus({ preventScroll: true });
       this.ui.padNav.handle('confirm');
       return;
