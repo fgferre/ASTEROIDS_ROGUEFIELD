@@ -416,7 +416,6 @@ describe('run replay', () => {
         hull: DEFAULT_HULL_ID,
         difficulty: 'veteran',
         mode: 'normal',
-        controls: 'modern',
       });
       recorder.record(0, createInputFrame());
       const replay = createHeadlessGame();

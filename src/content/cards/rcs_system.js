@@ -1,7 +1,7 @@
-// Snappier thrust (numbers: proposta 20/10): under thrust the push and the
-// drag both scale by `multiplier`, so the top speed stays and everything that
-// leads to it is that much quicker. Measured (modern, base hull): full speed
-// from a standstill in 0.53 s and a full reversal in 0.75 s without the card.
+// The side jets (numbers: proposta 20/10): their push and the turn × the
+// level's `multiplier`, and the computer stops a released spin firmer each
+// level (player/flight.js). The game reads `newFlightText` over `text`, which
+// is what the cards said before the jets' flight (22/11).
 export default {
   id: 'rcs_system',
   order: 22,
@@ -54,41 +54,40 @@ export default {
       },
     ],
   },
-  // The new flight (the default; ?direcao=antiga is the old flight) reads this over `text`: in glide the RCS
-  // also turns the hull quicker (flight.js). Measured 16/11: turn rate 70°/s
-  // bare; top speed (132 px/s) from a standstill in 0.72 s bare.
+  // The game reads this over `text`: the side jets (flight.js), turning and
+  // stopping a released spin. Measured 22/11: turn rate 74°/s bare, 96, 118,
+  // 140, 163, 192 per level; a released spin stops in 1.7 s bare, 0.5 s at 1.
   newFlightText: {
     summary:
-      'Maneuvering thrusters bite harder: the hull turns faster and gets to speed sooner, at the same top speed.',
+      'Side thrusters bite harder: the hull turns faster, and the computer stops a spin for you when you let go.',
     levels: [
       {
         title: 'Basic RCS',
         description:
-          'Turns 30% faster (90° a second instead of 70°) and reaches top speed in 0.55 s instead of 0.7 s.',
-        highlights: ['Top speed is unchanged: that is Main Thrusters.'],
+          'Turns 30% faster (96° a second instead of 74°), and a spin stops half a second after you let go instead of drifting on.',
+        highlights: ['Line the nose up and it stays there.'],
       },
       {
         title: 'Active RCS',
-        description: '60% faster: turns at 110° a second, top speed in 0.45 s.',
+        description: 'Turns at 118° a second; a spin stops in 0.4 s.',
         highlights: ['Swing the nose onto a target before it moves.'],
       },
       {
         title: 'Enhanced RCS',
-        description: '90% faster: turns at 135° a second, top speed in 0.35 s.',
+        description: 'Turns at 140° a second; a spin stops in 0.35 s.',
         highlights: [
           'With Braking System 3 too, the Flight Computer can show up.',
         ],
       },
       {
         title: 'Vector RCS',
-        description:
-          '2.2 times as fast: turns at 155° a second, top speed in 0.3 s.',
+        description: 'Turns at 163° a second; a spin stops in 0.3 s.',
         highlights: ['Spin round and fire back the way you came.'],
       },
       {
         title: 'Omni-directional RCS',
         description:
-          '2.6 times as fast: turns at 180° a second, top speed in 0.27 s.',
+          'Turns at 192° a second; a spin stops in a quarter of a second.',
         highlights: ['A half turn in just over a second from a standstill.'],
       },
     ],

@@ -108,7 +108,7 @@ describe('upgrade families', () => {
 
     const braking = cards.find((card) => card.id === 'braking_system').text;
     expect(braking.name).toBe('Braking System');
-    expect(braking.summary).toMatch(/glide/);
+    expect(braking.summary).toMatch(/computer brakes for you/);
   });
 
   it('the piloting cards are the Flight Computer and every card on its way', () => {

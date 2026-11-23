@@ -1,4 +1,4 @@
-// The new flight only (`newFlight`, the default; `?direcao=antiga` is the old one): the run starts with the
+// A piloting card (`newFlight`): the run starts with the
 // cannon fixed on the nose, aimed by turning the hull; this card frees the
 // turret onto today's auto aim. Family, rarity and level: proposta 16/11, the
 // cards' own conversation settles where it sits in a run.

@@ -99,8 +99,7 @@ export function decodeInputFrame(mask, analog = []) {
  * starting at 0 for the first simulated step of the run. `mode` is 'normal',
  * 'daily' or 'bossRush'; `date` is the Daily Field's UTC day ('YYYY-MM-DD'),
  * which its seed is drawn from, and null on any other run. `sector` is a
- * sector run's sector id (a 'normal' run), null on any other. `controls` is the
- * hull control scheme flown, 'modern' or 'classic'; `hangar` is the run's
+ * sector run's sector id (a 'normal' run), null on any other. `hangar` is the run's
  * start-of-run Hangar setup (JSON-safe HangarService modifiers).
  */
 export function createRecorder({
@@ -110,7 +109,6 @@ export function createRecorder({
   mode = 'normal',
   date = null,
   sector = null,
-  controls = null,
   hangar = null,
   stick = 'medium',
   version = REPLAY_VERSION,
@@ -164,7 +162,6 @@ export function createRecorder({
         mode,
         date,
         sector,
-        controls,
         hangar,
         stick: sticks.map((entry) => [...entry]),
         steps,
@@ -248,7 +245,6 @@ export function deserialize(text) {
     mode: data.mode,
     date: data.date ?? null,
     sector: data.sector ?? null,
-    controls: data.controls ?? null,
     hangar: data.hangar ?? null,
     // Before the setting (21/11) every pad run flew Medium.
     stick: Array.isArray(data.stick) ? data.stick : [[0, 'medium']],

@@ -29,6 +29,8 @@ export const NEXT = {
     'Braking System now brakes your travel with the thrusters when you let go of the keys; RCS System steadies a spin, firmer at each level.', // not confirmed
     'The main flame bursts off the line, then holds a steady third while you keep the key down.', // not confirmed
     'Settings → Controls: Hull Control is gone; your cards choose the flight.', // not confirmed
+    'The key hints and the first tip say S brakes; the piloting cards and the Flight Computer briefing describe the new flight.', // not confirmed
+    'The engine sound follows how near you fly to your top speed, with no jump when you reach it.', // not confirmed
   ],
   fixed: [],
   unseen: [

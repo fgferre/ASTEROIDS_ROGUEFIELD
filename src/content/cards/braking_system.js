@@ -42,27 +42,27 @@ export default {
       },
     ],
   },
-  // The new flight (the default; ?direcao=antiga is the old flight) reads this over `text`: in glide the
-  // brakes act when the thrust is let go (measured 16/11 from top speed,
-  // 132 px/s, to under 10 px/s: 7.4 s bare, 2.0 / 1.2 / 0.75 s per level).
+  // The game reads this over `text`: the computer's brake on the jets when
+  // the thrust is let go (flight.js; measured 22/11 from top speed, 132 px/s,
+  // to under 10 px/s: never bare, 1.23 / 1.02 / 0.80 s per level).
   newFlightText: {
     summary:
-      'Brakes for the glide: let go of the thrust and the ship slows down by itself.',
+      'The computer brakes for you: let go of the thrust and the retro and side jets stop the ship.',
     levels: [
       {
         title: 'Inertial Brakes',
         description:
-          'Let go of the thrust and the ship comes to a stop in 2 s instead of 7 s.',
+          'Let go of the thrust and the ship stops in 1.2 s, where it used to glide on forever. S pulls harder too.',
         highlights: ['Turning without thrust bleeds speed too.'],
       },
       {
         title: 'Retro Thrusters',
-        description: 'Stronger brakes: a stop in 1.2 s.',
+        description: 'Stronger brakes: a stop in 1 s.',
         highlights: ['Thrust carries you; letting go settles you.'],
       },
       {
         title: 'Emergency Brake',
-        description: 'A stop in 0.75 s. Unlocks the emergency brake.',
+        description: 'A stop in 0.8 s. Unlocks the emergency brake.',
         highlights: [
           'Hold reverse (S) against your drift for 0.25 s: a dead stop and a shockwave that shoves enemies back.',
           'With RCS System 3 too, the Flight Computer can show up.',

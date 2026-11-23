@@ -12,8 +12,8 @@
 // player-moved; on player-moved the engine gets:
 //   thrust   the main engine's manual push, or the retro's (classic S) at RETRO_THRUST
 //   lateral  the manual side thrusters: the right one +, the left one -
-//   speed    how near the ship flies to the top speed its push holds, along
-//            the push, from two steps of velocity (speedShare)
+//   speed    the ship's speed along the push, as a share of the flight's top
+//            speed now (player-moved's topSpeed; speedShare)
 //   tier     the propulsion cards' ranks (player-moved's visualLevels, every
 //            step, firing or not) against TIER_RANKS
 // and the player's own shot (weapon-fired) ducks it on the next step, with
@@ -23,27 +23,19 @@
 import { createEngineModel } from './engineModel.js';
 import { fetchAudioFile } from './samplePlayer.js';
 import { dbToGain } from './MusicThemes.js';
-import { FIXED_STEP_SECONDS } from '../../core/fixedStep.js';
-import { SHIP_LINEAR_DAMPING } from '../../data/constants/physics.js';
 
 // proposta 20/10, for the owner to judge by playing:
 const RETRO_THRUST = 0.6; // the retro nozzle spins the turbine, never the roar (above 0.6)
 const TIER_RANKS = [1, 4, 8]; // Main Thrusters + RCS System + Braking System ranks for tiers 1, 2, 3
-const STABILIZER_FLOOR = 0.35; // the auto-damper's least push (flight.js); from it the puffs are full
+const STABILIZER_FLOOR = 0.35; // the computer's jets' share from which a shot's puffs are full
 export const ENGINE_IDLE_MS = 150; // the old loop's inactivity timeout
 
-// One step of flight.js: v' = (v + push * dt) * e^(-k * dt).
-const STEP_DAMPING = Math.exp(SHIP_LINEAR_DAMPING * FIXED_STEP_SECONDS);
-
 /**
- * Of the top speed the push holds, the share the ship flies at along it,
- * from its speed along the push one step `before` and `after`. That top
- * speed is (e^(k*dt) * after - before) / (e^(k*dt) - 1), whatever the hull
- * and the cards make the push. Flying against the push, or no push: 0.
+ * The share of the flight's top speed `top` the ship flies at along its push
+ * (`along`, px/s). Flying against the push, or no top speed known: 0.
  */
-export function speedShare(before, after) {
-  const top = (STEP_DAMPING * after - before) / (STEP_DAMPING - 1);
-  return top > 0 ? Math.min(1, Math.max(0, after / top)) : 0;
+export function speedShare(along, top) {
+  return top > 0 ? Math.min(1, Math.max(0, along / top)) : 0;
 }
 
 /** The engine tier (0-3) for the propulsion cards' summed ranks. */
@@ -68,7 +60,6 @@ export function createShipEngine(sfx) {
   let model = null;
   let disposed = false; // torn down: a fetch or decode still in flight builds nothing
   let step = idleStep(); // this step's thrusters, until player-moved
-  let before = null; // last step's velocity
   let share = 0; // last speedShare
   let clock = null; // audio time of the last update
   let lastStepAt = null; // performance.now() of the last step; null at rest
@@ -166,16 +157,14 @@ export function createShipEngine(sfx) {
   }
 
   /** The step's flight (player-moved): the engine's inputs, then its update. */
-  function flightStep({ velocity, angle, visualLevels: levels }) {
+  function flightStep({ velocity, angle, topSpeed, visualLevels: levels }) {
     if (!model) return;
     const retro = step.retro * RETRO_THRUST > step.main;
     const sign = retro ? -1 : 1;
     const along = (v) =>
       sign * (v.vx * Math.cos(angle) + v.vy * Math.sin(angle));
     // The recoil's kick is no push: the step after a shot keeps the share.
-    if (before && !shotPending) {
-      share = speedShare(along(before), along(velocity));
-    }
+    if (!shotPending) share = speedShare(along(velocity), topSpeed);
     model.set({
       thrust: Math.max(step.main, step.retro * RETRO_THRUST),
       lateral: step.right - step.left,
@@ -190,7 +179,6 @@ export function createShipEngine(sfx) {
     model.update(clock === null ? 0 : now - clock);
     clock = now;
     lastStepAt = performance.now();
-    before = { ...velocity };
     step = idleStep();
   }
 
@@ -238,7 +226,6 @@ export function createShipEngine(sfx) {
   function stop() {
     model?.stop();
     step = idleStep();
-    before = null;
     share = 0;
     clock = null;
     lastStepAt = null;

@@ -276,6 +276,7 @@ describe('Onboarding', () => {
     expect(onboardingPrompts(keys, 'classic').move.keys).toEqual([
       'A',
       'W',
+      'S',
       'D',
     ]);
     expect(onboardingPrompts(keys).dash.keys).toEqual(['⇧ Shift']);

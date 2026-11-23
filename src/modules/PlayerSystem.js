@@ -518,6 +518,8 @@ class PlayerSystem extends BaseSystem {
       position: { ...this.position },
       velocity: { ...this.velocity },
       angle: this.angle,
+      // The flight's top speed this step (the engine sound's share of it).
+      topSpeed: this.flight.topSpeed,
       // The propulsion cards' levels every step, firing or not (the engine's tier).
       visualLevels: this.thrusters.getHullVisualLevels(),
     });

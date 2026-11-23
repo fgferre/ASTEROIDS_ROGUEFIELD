@@ -231,6 +231,8 @@ export class PlayerFlight {
     // The turbo's charge (0..1) and the direction it builds along.
     this.turbo = 0;
     this.turboDir = null;
+    // The top speed of the last step (px/s), the engine sound's measure.
+    this.topSpeed = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
     this.maxSpeed = SHIP_MAX_SPEED;
@@ -298,6 +300,7 @@ export class PlayerFlight {
         ? GLIDE_SPEED_SCALE * MODERN_TOP * this.turboScale(move, deltaTime)
         : GLIDE_SPEED_SCALE);
 
+    this.topSpeed = top;
     const v = ship.velocity;
     const speed = Math.hypot(v.vx, v.vy);
     const isMainManual = modern ? Boolean(move) : asks.up > 0;
