@@ -130,4 +130,21 @@ describe('PlayerSystem flight by the jets', () => {
     expect(angles.findIndex((a) => a <= goal + 0.05)).toBeLessThan(24);
     expect(Math.abs(angles[angles.length - 1] - goal)).toBeLessThan(0.02);
   });
+
+  it('at the top speed, W with a turn lights no jet against the motion (the cap trims a hair, silently)', () => {
+    const { fly } = makePlayer();
+    fly({ up: true }, 90);
+    const turning = fly({ up: true, right: true }, 60);
+    expect(lit(turning, 'aux')).toEqual([]);
+  });
+
+  it('the turbo holds when a second key makes the run diagonal (45°)', () => {
+    const { player, fly } = makePlayer('modern');
+    flightComputerCards(player.flight);
+    fly({ up: true }, 45); // part charged (full at 1.2 s)
+    const charge = player.flight.turbo;
+    expect(charge).toBeGreaterThan(0.5);
+    fly({ up: true, right: true }, 12);
+    expect(player.flight.turbo).toBeGreaterThan(charge);
+  });
 });

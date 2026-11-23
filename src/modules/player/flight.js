@@ -70,7 +70,8 @@ const MODERN_BRAKE = 1.5;
 // fades over TURBO_FADE_S when they let go or turn more than TURBO_TURN off.
 const TURBO_RAMP_S = 1.2;
 const TURBO_FADE_S = 0.4;
-const TURBO_TURN = Math.cos(Math.PI / 4);
+// (less a hair, so W then W+D, exactly 45°, keeps it).
+const TURBO_TURN = Math.cos(Math.PI / 4) - 1e-9;
 // The modern nose: a spring onto the heading (s^-2 and its damping ratio,
 // under 1 so it swings past and back), its push (rad/s²), all × the RCS
 // System; capped at the heading turn rate. With no heading, the spin is worked
@@ -79,6 +80,9 @@ const NOSE_STIFFNESS = 100;
 const NOSE_DAMPING_RATIO = 0.55;
 const NOSE_SPIN_ACCEL = 150;
 const NOSE_STOP_ACCEL = 12;
+// Over the cap by less than this (px/s, a sideways push at the top speed
+// nudges it by a hair), the speed is trimmed with no jet shown.
+const CAP_SHOWN_OVER = 1;
 // The main flame while the key holds at the top speed, where the engine no
 // longer pushes.
 const CRUISE_FLAME = 0.35;
@@ -163,6 +167,24 @@ function pilotFlags(modern, move, { up, down, left, right }) {
   };
 }
 
+// The classic turn pair's push stopping a released spin (rad/s²): slowly
+// with no card, firmer with each level of the RCS System (`agility`).
+function spinStop(agility) {
+  return Math.max(
+    SPIN_ASSIST,
+    agility > 1 ? TURN_ACCEL * agility * SPIN_STOP_SHARE * agility : 0
+  );
+}
+
+/**
+ * How far (rad, signed) a classic spin `spin` still turns if the pilot turns
+ * against it now (the turn pair, × the RCS System's `agility`): the touch
+ * controls' "aponta" mode counter-steers from there.
+ */
+export function spinCoast(spin, agility = 1) {
+  return (Math.sign(spin) * spin * spin) / (2 * TURN_ACCEL * agility);
+}
+
 /**
  * The modern nose: onto the keys' direction, else onto the motion, else the
  * spin brought to a stop. Returns the spin's change this step (rad/s²).
@@ -213,14 +235,12 @@ export class PlayerFlight {
     // === CONFIGURAÇÕES DE MOVIMENTO ===
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
-    this.rotationSpeed = SHIP_ROTATION_SPEED;
     // RCS System's level (1: none): × the side jets and the turn.
     this.agility = 1;
     // The Braking System's level: (base + braking) ÷ base × the retro, and
     // with any level the auto-brake on the travel.
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
-    this.angularDamping = SHIP_ANGULAR_DAMPING;
   }
 
   // The combined total, for readers of the old shape (snapshot, tooltip).
@@ -286,9 +306,7 @@ export class PlayerFlight {
     // The auto-brake: the Flight Computer's always; the start's with the
     // Braking System (without it, stopping is the pilot's).
     const autoBrake =
-      noLinearInput &&
-      speed > 0 &&
-      (modern || !this.glide || this.brakingDamping > 0);
+      noLinearInput && speed > 0 && (modern || this.brakingDamping > 0);
 
     // The push wanted, world px/s².
     let wantX = 0;
@@ -348,7 +366,7 @@ export class PlayerFlight {
     // Above it (the dash easing off, a knock), the jets against the motion
     // burn at full.
     const after = Math.hypot(v.vx, v.vy);
-    if (after > cap) {
+    if (after > cap + CAP_SHOWN_OVER) {
       const ax = -(v.vx * fwd.x + v.vy * fwd.y) / after;
       const ay = -(v.vx * right.x + v.vy * right.y) / after;
       const most = Math.max(Math.abs(ax), Math.abs(ay));
@@ -356,6 +374,8 @@ export class PlayerFlight {
         jets,
         jetShares(ax / most, ay / most, { main: 1, retro: 1, flank: 1 })
       );
+    }
+    if (after > cap) {
       v.vx *= cap / after;
       v.vy *= cap / after;
     }
@@ -372,12 +392,7 @@ export class PlayerFlight {
       spinShown = TURN_ACCEL * this.agility;
       const turn = asks.right - asks.left;
       const goal = turn * TURN_TOP * this.agility;
-      const pair = turn
-        ? spinShown
-        : Math.max(
-            SPIN_ASSIST,
-            this.agility > 1 ? spinShown * SPIN_STOP_SHARE * this.agility : 0
-          );
+      const pair = turn ? spinShown : spinStop(this.agility);
       spin = Math.max(
         -pair,
         Math.min(pair, (goal - ship.angularVelocity) / deltaTime)

@@ -24,8 +24,7 @@ import {
   setTouchShown,
   waitAtDoor,
 } from '../../bootstrap/mobileGuard.js';
-import { SHIP_ANGULAR_DAMPING } from '../../data/constants/physics.js';
-import { wrapAngle } from '../player/flight.js';
+import { spinCoast, wrapAngle } from '../player/flight.js';
 import {
   DEFAULT_GAMEPAD_AXIS_THRESHOLD,
   applyStickDeadzone,
@@ -72,8 +71,9 @@ export function touchMovement({ x, y }, mode, ship) {
     return { ...move, left: x <= -t, right: x >= t, up: y <= -t, down: y >= t };
   }
   const heading = Math.atan2(stick.y, stick.x);
-  // Where the nose comes to rest if no turn is held (the spin decays).
-  const coast = ship.angle + (ship.angularVelocity || 0) / SHIP_ANGULAR_DAMPING;
+  // Where the nose comes to rest if the thumb turns against the spin now.
+  const coast =
+    ship.angle + spinCoast(ship.angularVelocity || 0, ship.flight?.agility);
   const turn = wrapAngle(heading - coast);
   return {
     ...move,

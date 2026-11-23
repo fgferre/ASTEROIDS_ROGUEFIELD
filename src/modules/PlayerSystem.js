@@ -14,10 +14,8 @@ import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
   GLIDE_SPEED_SCALE,
   SHIP_ACCELERATION,
-  SHIP_ANGULAR_DAMPING,
   SHIP_LINEAR_DAMPING,
   SHIP_MAX_SPEED,
-  SHIP_ROTATION_SPEED,
   TURRET_BARREL_LENGTH,
   TURRET_PIVOT_X,
   TURRET_RESPONSE,
@@ -914,14 +912,12 @@ class PlayerSystem extends BaseSystem {
     this.resetCardStats();
     this.flight.maxSpeed = SHIP_MAX_SPEED * hull.maxSpeed;
     this.flight.acceleration = SHIP_ACCELERATION * hull.acceleration;
-    this.flight.rotationSpeed = SHIP_ROTATION_SPEED;
     this.flight.agility = 1;
     // FIX-02: split damping — reset both components. baseLinearDamping returns
     // to ship default; brakingDamping clears any accumulated braking_system
     // upgrade contribution.
     this.flight.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.flight.brakingDamping = 0;
-    this.flight.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
     this.steadyGuard = false;
     this.controlHoldTimer = 0;
@@ -1012,6 +1008,8 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vx = 0;
     this.velocity.vy = 0;
     this.angularVelocity = 0;
+    this.flight.turbo = 0;
+    this.flight.turboDir = null;
     this.turretAngle = this.angle;
     this.turretLayers.fill(this.angle);
     this.lockAims = null;

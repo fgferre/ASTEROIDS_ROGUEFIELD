@@ -118,7 +118,7 @@ export class PlayerThrusters {
         type,
         visualLevel:
           type === 'main' ? this.thrusterVisualLevel : this.brakingVisualLevel,
-        isAutomatic, // the coast brake sounds softer than the pilot's thrust
+        isAutomatic, // the computer's jets sound softer than the pilot's thrust
         accent: this.getAccent(),
         ...(pilot !== undefined && { pilot }),
       });
@@ -127,8 +127,8 @@ export class PlayerThrusters {
   }
 
   // Two side jets, each blowing outboard: a turn's couple is the aft wingtip
-  // on `side` and the nose jet on the other flank; the auto-brake's
-  // (`isAutomatic`) is a whole flank.
+  // on `side` and the nose jet on the other flank; a push sideways is a whole
+  // flank.
   emitTurn(key, intensity, side, nosePort, isAutomatic = false) {
     if (intensity > 0 || this.lastThrusterState[key] > 0) {
       [side, nosePort].forEach((kind) => {
