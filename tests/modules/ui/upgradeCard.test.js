@@ -30,6 +30,19 @@ describe('upgrade card build line', () => {
     });
   });
 
+  it("with the Scatter Coil a family completes under the Scatter's own form name, never the lance's", () => {
+    const scatter = { weaponId: 'scatter', chip: 'SCATTER' };
+    const title = (id, owned) =>
+      buildLine(card(id), { rank: 1, owned, weapon: scatter }).title;
+    expect(title('afterburn_lance', 2)).toBe('Kindling');
+    expect(title('afterburn_lance', 4)).toBe('Kindling');
+    expect(title('arc_lattice', 2)).toBe('Discharge');
+    expect(title('shield', 2)).toBe('Implosion');
+    expect(title('magfield', 2)).toBe('Scrap Rounds');
+    expect(title('multishot', 2)).toBe('Grapeshot');
+    expect(title('multishot', 4)).toBe('Hailstorm');
+  });
+
   it('a fifth completes its Apex', () => {
     expect(line('afterburn_lance', 1, 4)).toMatchObject({
       label: 'Completes · Apex',

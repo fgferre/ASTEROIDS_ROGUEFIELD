@@ -110,6 +110,14 @@ export default {
     // enemy within `range` px, a bolt of the volley's own (a scrap kill
     // throws none).
     salvage: { shards: [1, 2], delay: 0.15, toss: 70, range: 190 },
+    // The form's name on the cards and the HUD, at 3 and 5 cards, in place
+    // of the lance form's.
+    names: {
+      thermal: ['Kindling', 'Kindling'],
+      arc: ['Discharge', 'Discharge'],
+      field: ['Implosion', 'Implosion'],
+      salvage: ['Scrap Rounds', 'Scrap Rounds'],
+    },
     lines: {
       thermal: [
         'a rock hit 3 times by one volley catches fire and dies into burning pieces',
