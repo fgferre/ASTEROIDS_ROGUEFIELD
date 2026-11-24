@@ -688,6 +688,7 @@ class UISystem extends BaseSystem {
       // After startNewRun has unpaused: the intro holds the first step.
       queueMicrotask(() => this.cinematics.startIntro());
       this.removeOnboardingCardsTip();
+      this.onboarding.menuActed('menu');
       if (this.isOnboardingEnabled()) {
         this.onboarding.start();
       } else {
@@ -714,6 +715,15 @@ class UISystem extends BaseSystem {
       this.onboarding.cardPicked();
       this.removeOnboardingCardsTip();
     });
+    // Opening the Hangar answers the line by its button; closing it, its own.
+    this.registerEventListener(
+      'ui-overlay-visibility-changed',
+      ({ overlay, isOpen } = {}) => {
+        if (overlay !== 'hangar') return;
+        this.onboarding.menuActed(isOpen ? 'salvage' : 'hangar');
+        this.refreshMenuTips(isOpen);
+      }
+    );
     // No cards once the run has ended: over the victory or under the game
     // over; a run's first cards wait for its journey and intro.
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
@@ -850,6 +860,7 @@ class UISystem extends BaseSystem {
       } else if (change.previous === false) {
         this.onboarding.replay();
       }
+      this.refreshMenuTips();
     }
   }
 
@@ -990,6 +1001,7 @@ class UISystem extends BaseSystem {
         this.mainMenu.refreshMenuStatus();
         this.mainMenu.refreshBossRushLock();
         this.campaignMap.menuShown();
+        this.refreshMenuTips();
       }
 
       if (emitEvent) {
@@ -1094,6 +1106,39 @@ class UISystem extends BaseSystem {
 
   removeOnboardingCardsTip() {
     document.querySelector('.onboarding-cards-tip')?.remove();
+  }
+
+  /**
+   * The menu's first-visit lines (ui/onboarding.js MENU_TIPS). Mission
+   * Control shows one at a time: the Launch line before the first flight,
+   * then, with nothing bought yet, the Hangar button's once Salvage buys
+   * something; the open Hangar shows its own, true for any pilot.
+   */
+  refreshMenuTips(hangarOpen = this.hangarScreen.hangarState.isOpen) {
+    const on = this.isOnboardingEnabled();
+    const { bought = true, affordable = false } =
+      this.getService('hangar')?.purchaseState() ?? {};
+    const tip = (id, ready) => this.onboarding.menuTip(id, on && ready);
+    const launch = tip('menu', !this.onboarding.flown);
+    const salvage = tip(
+      'salvage',
+      !launch && !hangarOpen && !bought && affordable
+    );
+    const hangar = tip('hangar', hangarOpen);
+    const { menu, hangar: hangarRefs } = this.domRefs;
+    this.showMenuTip(menu.tip, launch);
+    this.showMenuTip(menu.hangarTip, salvage);
+    menu.hangarBtn?.classList.toggle('is-pointed', Boolean(salvage));
+    this.showMenuTip(hangarRefs.tip, hangar);
+  }
+
+  showMenuTip(node, tip) {
+    if (!node || node.dataset.tip === (tip?.text ?? '')) return;
+    node.dataset.tip = tip?.text ?? '';
+    node.hidden = !tip;
+    node.innerHTML = tip
+      ? `<span class="menu-tip__label">${tip.label}</span> <span class="menu-tip__text">${tip.text}</span>`
+      : '';
   }
 }
 

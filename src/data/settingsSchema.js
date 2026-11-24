@@ -81,7 +81,7 @@ const SETTINGS_SCHEMA = [
         type: 'toggle',
         label: 'Show Onboarding Tips',
         description:
-          'Thrust, turn and dash tips on your first runs. Turning this back on shows them again.',
+          'Menu and flight tips on your first visits and runs. Turning this back on shows them again.',
         default: true,
       },
     ],

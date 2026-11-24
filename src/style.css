@@ -4571,6 +4571,88 @@ button.campaign-node {
   cursor: not-allowed;
 }
 
+/* The difficulty's fixed line under Launch; Daily Field is always Veteran. */
+.prep-difficulty-line {
+  max-width: 34rem;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.menu-screen__content[data-active-tab='daily'] .prep-difficulty-line {
+  display: none;
+}
+
+/* The menu's first-visit lines (ui/onboarding.js MENU_TIPS), in the in-play
+   tips' look: an accent rule, a label and one line, never in the way. */
+.menu-tip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: max-content;
+  max-width: 100%;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-4);
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(90deg, rgb(6 10 18 / 0.86), rgb(6 10 18 / 0.55));
+  pointer-events: none;
+}
+
+.menu-tip[hidden] {
+  display: none;
+}
+
+.menu-tip__label {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+
+.menu-tip__text {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-shadow: var(--text-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .menu-tip:not([hidden]) {
+    animation: menu-tip-in var(--motion-base) var(--ease-out);
+  }
+}
+
+@keyframes menu-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Mission Control's lines take the free end of the tabs' row (under Launch a
+   tablet's panel hides them); the Hangar's own takes the footer's empty left. */
+.menu-tip--row {
+  z-index: 1;
+  grid-area: tabs;
+  align-self: center;
+  justify-self: end;
+  max-width: min(48rem, 100% - 26rem);
+  margin: 0;
+}
+
+#menu-hangar-btn.is-pointed {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.credits-footer .menu-tip {
+  align-self: center;
+  max-width: 34rem;
+  margin: 0 auto 0 0;
+}
+
 .prep-side {
   grid-area: side;
   display: flex;
@@ -4960,6 +5042,49 @@ body.touch-play .menu-ship-selector__name {
 
   body.touch-play .prep-panel__objective {
     font-size: 18px;
+  }
+
+  /* No room for the fixed lines: the hint under the Ring says Campaign's, and
+     the difficulty is the list itself. A first-visit line takes the records'
+     row while it shows; the Hangar's, the free middle of its title row. */
+  body.touch-play
+    :is(
+      .prep-difficulty-line,
+      [data-prep-for='campaign'] .prep-panel__objective
+    ) {
+    display: none;
+  }
+
+  body.touch-play :is(#menu-tip, #menu-hangar-tip) {
+    z-index: 1;
+    grid-area: status;
+    align-self: center;
+    justify-self: stretch;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding-block: 2px;
+    background: rgb(6 10 18 / 0.94);
+  }
+
+  body.touch-play .menu-tip__text {
+    font-size: var(--text-sm);
+  }
+
+  body.touch-play .hangar-dialog {
+    position: relative;
+  }
+
+  body.touch-play #hangar-tip {
+    position: absolute;
+    top: var(--space-2);
+    right: 200px;
+    left: 150px;
+    z-index: 2;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding-block: 2px;
   }
 
   body.touch-play .menu-hull-stage {

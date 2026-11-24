@@ -10,6 +10,7 @@ import {
   CARDS_TIP_TEXT_HEAD_START_GAMEPAD,
   CARDS_TIP_TEXT_TOUCH,
   DASH_TIP_SECONDS,
+  MENU_TIPS,
   MOVE_HOLD_SECONDS,
   ONBOARDING_GAP_SECONDS,
   ONBOARDING_STORAGE_KEY,
@@ -261,6 +262,85 @@ describe('Onboarding', () => {
     const again = new Onboarding(fakeView());
     again.start();
     expect(again.current).toBe('move');
+  });
+
+  it('keeps a menu line until the player does what it says, then never again', () => {
+    const tips = new Onboarding(fakeView());
+    expect(tips.menuTip('menu', true)).toBe(MENU_TIPS.menu);
+    tips.menuActed('salvage'); // never on screen: not learned
+    expect(tips.menuTip('salvage', false)).toBeNull();
+    tips.menuActed('salvage');
+    tips.menuActed('menu');
+    expect(saved()).toEqual(['menu']);
+    expect(new Onboarding(fakeView()).menuTip('menu', true)).toBeNull();
+  });
+
+  it('keeps the menu lines apart from the in-play tips, and replays them too', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({
+        done: ['move', 'dash', 'shield', 'cards', 'cardsHeadStart', 'hangar'],
+      })
+    );
+    const tips = new Onboarding(fakeView());
+    expect(tips.complete).toBe(true);
+    expect(tips.flown).toBe(true);
+    expect(tips.menuTip('salvage', true)).toBe(MENU_TIPS.salvage);
+    expect(tips.menuTip('hangar', true)).toBeNull();
+    tips.replay();
+    expect(tips.menuTip('hangar', true)).toBe(MENU_TIPS.hangar);
+  });
+
+  it('shows Mission Control one line at a time, and the Hangar its own once', () => {
+    const node = () => ({
+      hidden: true,
+      dataset: {},
+      innerHTML: '',
+      classList: {
+        lit: false,
+        toggle(_, on) {
+          this.lit = on;
+        },
+      },
+    });
+    let purchase = { bought: false, affordable: false };
+    const ui = {
+      onboarding: new Onboarding(fakeView()),
+      isOnboardingEnabled: () => true,
+      getService: () => ({ purchaseState: () => purchase }),
+      hangarScreen: { hangarState: { isOpen: false } },
+      domRefs: {
+        menu: { tip: node(), hangarTip: node(), hangarBtn: node() },
+        hangar: { tip: node() },
+      },
+      showMenuTip: UISystem.prototype.showMenuTip,
+    };
+    const refresh = (open) => UISystem.prototype.refreshMenuTips.call(ui, open);
+    const { menu, hangar } = ui.domRefs;
+
+    refresh();
+    expect(menu.tip.hidden).toBe(false);
+    expect(menu.tip.innerHTML).toContain(MENU_TIPS.menu.text);
+    purchase = { bought: false, affordable: true };
+    refresh();
+    expect(menu.hangarTip.hidden).toBe(true); // waits for the Launch line
+
+    ui.onboarding.menuActed('menu'); // launched
+    refresh();
+    expect(menu.tip.hidden).toBe(true);
+    expect(menu.hangarTip.hidden).toBe(false);
+    expect(menu.hangarBtn.classList.lit).toBe(true);
+
+    ui.onboarding.menuActed('salvage'); // the Hangar opens
+    refresh(true);
+    expect(menu.hangarTip.hidden).toBe(true);
+    expect(hangar.tip.innerHTML).toContain(MENU_TIPS.hangar.text);
+
+    ui.onboarding.menuActed('hangar'); // and closes
+    refresh(false);
+    expect([menu.tip, menu.hangarTip, hangar.tip].every((n) => n.hidden)).toBe(
+      true
+    );
   });
 
   it('names the bound keys for each control scheme', () => {
