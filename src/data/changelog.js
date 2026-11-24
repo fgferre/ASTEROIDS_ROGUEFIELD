@@ -23,7 +23,9 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
+  ],
   unseen: [],
 };
 

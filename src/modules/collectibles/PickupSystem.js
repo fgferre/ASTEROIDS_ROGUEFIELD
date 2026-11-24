@@ -322,6 +322,39 @@ export class PickupSystem extends BaseSystem {
     return tokens.concat(this.chests.snapshots());
   }
 
+  // The pickups and chests on the field as plain data (the chest opening by
+  // index), the Overcharge left and the two streams: the death snapshot
+  // (session/deathSnapshot.js) puts them back on a retry.
+  getSnapshotState() {
+    const { list, opening } = this.chests;
+    return {
+      pickups: this.pickups.map((pickup) => ({ ...pickup })),
+      chests: list.map((chest) => ({ ...chest })),
+      opening: list.indexOf(opening),
+      overchargeRemaining: this.overchargeRemaining,
+      rockDropChance: this.rockDropChance,
+      layer: this.layer,
+      random: this.random.serialize(),
+      chestRandom: this.chestRandom.serialize(),
+    };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.pickups = snapshot.pickups.map((pickup) => ({ ...pickup }));
+    this.chests.list = snapshot.chests.map((chest) => ({ ...chest }));
+    this.chests.opening = this.chests.list[snapshot.opening] ?? null;
+    this.rockDropChance = snapshot.rockDropChance;
+    this.layer = snapshot.layer;
+    this.random.restore(snapshot.random);
+    this.chestRandom.restore(snapshot.chestRandom);
+    // The boost may have run out while the ship lay wrecked.
+    this.overchargeRemaining = snapshot.overchargeRemaining;
+    if (this.overchargeRemaining > 0) {
+      this.setOvercharge(PICKUP_KINDS.overcharge.cooldownMultiplier);
+    }
+    return true;
+  }
+
   onReset() {
     this.pickups = [];
     this.chests.reset();

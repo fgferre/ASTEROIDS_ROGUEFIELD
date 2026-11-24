@@ -314,6 +314,17 @@ export class CardEffects {
     });
   }
 
+  // The card-roll count at death: kills after it roll on, and a retry
+  // (session/deathSnapshot.js) puts it back.
+  getSnapshotState() {
+    return { cardRolls: this.cardRolls };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.cardRolls = snapshot.cardRolls;
+    return true;
+  }
+
   // Deterministic card roll (no game RNG here, like the arc jitter).
   rollCardChance(chance) {
     this.cardRolls += 1;

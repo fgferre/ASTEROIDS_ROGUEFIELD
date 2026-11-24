@@ -2,7 +2,8 @@
  * Health Heart System
  *
  * Manages health heart collectibles.
- * Hearts persist until collected or game over (not cleared on death/retry).
+ * Hearts persist until collected or game over; a retry puts back the ones
+ * on the field at death.
  */
 
 import {
@@ -125,6 +126,28 @@ export class HealthHeartSystem {
     if (!this.cachedPlayer) {
       this.cachedPlayer = resolveService('player', this.dependencies);
     }
+  }
+
+  // The hearts on the field as plain data: the death snapshot
+  // (session/deathSnapshot.js) puts them back on a retry.
+  getSnapshotState() {
+    return this.hearts.map(({ x, y, pulsePhase, collected, lifetime }) => ({
+      x,
+      y,
+      pulsePhase,
+      collected,
+      lifetime,
+    }));
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.hearts = snapshot.map(({ x, y, pulsePhase, collected, lifetime }) =>
+      Object.assign(new HealthHeart(x, y, { pulsePhase }), {
+        collected,
+        lifetime,
+      })
+    );
+    return true;
   }
 
   reset() {
