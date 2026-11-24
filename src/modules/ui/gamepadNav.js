@@ -452,7 +452,16 @@ export class GamepadMenuNav {
           : screen.id === 'end-credits'
             ? 'Continue'
             : 'Select';
-      items = [['A', press], ...(HINTS[screen.id] ?? [])];
+      // The pad's pointer (padPointer.js) works on every screen but the
+      // credits that roll.
+      const sticks =
+        screen.id === 'end-credits'
+          ? []
+          : [
+              ['L-Stick', 'Point'],
+              ['R-Stick', 'Scroll'],
+            ];
+      items = [['A', press], ...(HINTS[screen.id] ?? []), ...sticks];
       if (active?.type === 'range') items.unshift(['◀ ▶', 'Adjust']);
     }
     this.hints.dataset.screen = screen.id;

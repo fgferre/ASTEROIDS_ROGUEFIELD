@@ -243,6 +243,15 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
   entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
   fecha quando ele aprovar jogando com o controle de verdade.
+  Jogando a 0.8.0 (23/11): _"Percebi também um problema de navegação dos menus do lugar, que é possível selecionar
+  alguns itens para serem comprados no controle. […] Talvez a saída seja realmente a gente ir para o modelo do Halo,
+  que cria um mouse pointer que é controlado pelo controle. E a gente desiste de fazer esse trabalho, que parece que é
+  muito complexo. Vamos deixar tudo adaptado para o mouse, só que o mouse vai ser controlado pelo controle, quando o
+  controle tiver. E a gente tem que criar um pointer bonito, né?"_ e _"E aí a gente teria que direcionais analógicos
+  para mexer no mouse, né? E um outro direcional, ele mexeria no page up, page down, de onde o mouse estiver com foco.
+  […] E a gente continua funcionando também o LB, o RB, essas coisas."_ No cartão `apontador-1`: _"A mira redonda"_,
+  _"Boa (0,9 s)"_, _"Sim, gruda de leve"_. No ramo `controle/apontador`: o apontador em todos os menus; a velocidade e
+  o grude esperam ele usar com o controle dele.
 - **(40)** O voo, um algoritmo só (21/11, à noite, na conversa do controle): _"o algoritmo ele é um só para tudo,
   né? Para movimento, o que que faz a nave se movimentar? É o thruster. [...] A nave ela é movimentada porque está
   ligado um thruster. E o thruster ele faz o movimento real da nave. Então, se ela precisa parar, seja por freio
@@ -275,6 +284,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
   Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
   da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
+- **(42)** Voltar com B e ESC no menu (23/11, jogando a 0.8.0, dito na conversa da fase presa): _"Agora eu estou na
+  tela de Choose Your Pilot, eu não consigo dar B para voltar para a tela de Start do menu inicial. Deveria ser
+  possível, você não acha? Ele está preso nessa tela, eu sou obrigado a escolher um piloto nesse momento. Se eu
+  apertasse B aqui, ele deveria voltar para a tela de Press Start."_ No ramo `conserto/voltar-do-menu`: B e ESC na
+  tela dos pilotos voltam para Press Start (com a caixa de apagar aberta, só fecham a caixa). Fecha quando ele aprovar
+  jogando.
 - **(43)** A fase que não avança (23/11, jogando a 0.8.0, Layer 4 do Capítulo I, semente 2058876584, VETERAN): _"o
   jogo ficou preso na layer 4 - chapter I"_ e _"eu matei todos os inimigos e ele não conseguiu avançar a fase,
   entendeu? Não sei se era para entrar agora algum inimigo, coisa do gênero, boss, mas enfim, tá parado aí, matei tudo

@@ -275,6 +275,23 @@ describe('loading screen PRESS START gate', () => {
     expect(menuButton.focus).toHaveBeenCalledTimes(1);
   });
 
+  it('back from the pilots shows the gate again, whose press reopens them', () => {
+    let goBack = null;
+    openPilotSelect.mockImplementationOnce((_, onBack) => (goBack = onBack));
+    const { screen, menu, docListeners } = boot('');
+    docListeners.keydown(enter());
+    vi.advanceTimersByTime(1000);
+    goBack();
+    expect(screen.classes.has('hidden')).toBe(false);
+    expect(screen.classes.has('loading-screen--starting')).toBe(false);
+    expect(menu.classes.has('menu-screen--gated')).toBe(true);
+    openPilotSelect.mockClear();
+    docListeners.keydown(enter());
+    vi.advanceTimersByTime(1000);
+    expect(openPilotSelect).toHaveBeenCalledTimes(1);
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+  });
+
   it('opens the menu on a click', () => {
     const { screen, menu } = boot('');
     screen.listeners.click();

@@ -110,7 +110,7 @@ describe('InputSystem gamepad', () => {
     expect(devices).toEqual(['gamepad', 'keyboard', 'gamepad']);
   });
 
-  it('navigates menus with the d-pad, stick and face buttons, not during play', () => {
+  it('navigates menus with the d-pad and face buttons, not during play; the left stick steps nothing', () => {
     const nav = [];
     eventBus.on('gamepad-ui-nav', ({ action }) => nav.push(action));
 
@@ -127,15 +127,10 @@ describe('InputSystem gamepad', () => {
     input.pollGamepad();
     fake.set({ pressed: [PAD_BUTTON.B, PAD_BUTTON.RB] });
     input.pollGamepad();
-    // The stick moves once per push, then again after it comes back.
+    // The left stick moves the pad's pointer (ui/padPointer.js).
     fake.set({ axes: [0, -0.9, 0, 0] });
     input.pollGamepad();
-    input.pollGamepad();
-    fake.set();
-    input.pollGamepad();
-    fake.set({ axes: [0.8, 0.1, 0, 0] });
-    input.pollGamepad();
-    expect(nav).toEqual(['down', 'back', 'tabNext', 'up', 'right']);
+    expect(nav).toEqual(['down', 'back', 'tabNext']);
   });
 
   it('rumbles on hull damage, Warden arrival and dash, unless turned off', () => {

@@ -66,8 +66,8 @@ export const GAMEPAD_BINDINGS = Object.freeze({
 });
 
 /**
- * Menu and overlay navigation (fixed, not remappable). The left stick also
- * moves the focus (GAMEPAD_NAV_STICK_THRESHOLD).
+ * Menu and overlay navigation (fixed, not remappable). The left stick moves
+ * the pad's pointer instead (ui/padPointer.js).
  */
 export const GAMEPAD_NAV_BUTTONS = Object.freeze({
   [PAD_BUTTON.A]: 'confirm',
@@ -108,8 +108,6 @@ export const GAMEPAD_STICK_CURVES = Object.freeze({
 });
 /** Right stick past this magnitude aims the turret by hand (no lock). */
 export const GAMEPAD_AIM_ENGAGE = 0.35;
-/** Left stick past this moves the menu focus once per push. */
-export const GAMEPAD_NAV_STICK_THRESHOLD = 0.5;
 
 /** `vibrationActuator.playEffect('dual-rumble', …)` parameters, ms and 0..1. */
 export const GAMEPAD_RUMBLE = Object.freeze({

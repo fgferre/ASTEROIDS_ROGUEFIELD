@@ -21,13 +21,16 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
+  new: [
+    'A pad now drives a pointer on every menu and overlay, as a mouse: the left stick moves the round reticle (slower over anything you can click), A clicks and drags, the right stick scrolls what is under it; the d-pad still steps item by item, B goes back and LB/RB switch tabs.', // not confirmed
+  ],
   improved: [
     'The death screen and the run\'s timeline name a special rock\'s kind, its blast included: "Killed by a Volatile Ring Fragment", "an Armored Ring Fragment"; a plain rock is still a Ring Fragment.', // not confirmed
     'The dark, flat stones in the menu’s background are now real rocks, small and far off by the Ring.', // not confirmed
   ],
   fixed: [
     'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed
+    'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).', // not confirmed
   ],
   unseen: [],
 };
