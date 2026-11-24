@@ -642,11 +642,12 @@ class AudioSystem extends BaseSystem {
     const isOpen = Boolean(payload?.isOpen);
     const source = typeof payload?.source === 'string' ? payload.source : null;
 
-    // The endings' own music: the choice plays until one is picked, the credits
-    // from their roll until the menu takes over (_handleScreenChanged).
+    // The endings' own music: the choice's plays on through the ending picked
+    // until the credits' starts in its place (FileTrackManager stops the track
+    // it replaces), which plays until the menu takes over
+    // (_handleScreenChanged).
     if (overlay === 'ending') {
       if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
-      else this.stopFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
       return;
     }
     if (overlay === 'end-credits') {

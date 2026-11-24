@@ -455,11 +455,39 @@ export const STORY = deepFreeze({
       },
     },
   },
+  // The truth told before the choice (PLAN.md, the campaign's ending, act
+  // 1; approved 24/11, "Serve assim"): after Sovereign's last words these
+  // play in order, one a shot, the Quarantine Grid's third-stage line played
+  // again between the third and the fourth (core/cinematics.js
+  // REVELATION_BEATS).
+  revelation: [
+    {
+      speaker: 'ring',
+      text: 'Citizens stored: eleven million. Citizens living: forty. All forty aboard the Wake.',
+    },
+    {
+      speaker: 'wake',
+      text: "It means us. We're the ones Continuance was built to keep.",
+    },
+    {
+      speaker: 'wake',
+      text: 'It took the living as material. The operators got us out and broke the Ring.',
+    },
+    {
+      speaker: 'wake',
+      text: 'The Wardens were the lock that kept it asleep. We broke them, one by one.',
+    },
+    {
+      speaker: 'wake',
+      text: 'We came for power, and kept going when it called. Now we know who we are.',
+    },
+  ],
   // The campaign's ending (docs/ROTEIRO.md, "A escolha"): after Sovereign
-  // falls in ENDING_SECTOR the pilot picks one, by its `choice` and its
-  // `stakes` (what becomes of the Ring, of the archive of its citizens and
-  // of the Wake); its `lines` play in order over the held epilogue shot and
-  // its `epitaph` stands under the final card's title.
+  // falls in ENDING_SECTOR and the truth is told (`revelation`) the pilot
+  // picks one, by its `choice` and its `stakes` (what becomes of the Ring,
+  // of the archive of its citizens and of the Wake); its `lines` open the
+  // shots of its answer (core/cinematics.js endingBeats) and its `epitaph`
+  // stands under the final card's title.
   ending: {
     severance: {
       title: 'Severance',

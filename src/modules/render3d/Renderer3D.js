@@ -15,7 +15,13 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath } from '../../core/cinematics.js';
+import {
+  EPILOGUE_MS,
+  REVELATION_BEATS,
+  endingPath,
+  epiloguePath,
+  introPath,
+} from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -527,6 +533,27 @@ class Renderer3D extends BaseSystem {
   /** The victory pull-back; it holds its last shot until endCinematic(). */
   playEpilogue(durationMs) {
     return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
+  }
+
+  /**
+   * Beat `id` of the campaign's ending (ui/runCinematics.js; the beats are
+   * core/cinematics.js's), `durationMs` long, `ending` the one picked in act
+   * 2. Until the beats have their own pictures: act 1 is the victory
+   * pull-back, started on its first beat and held on the others; act 2 the
+   * ending's path, started on `answer` and held after. False when nothing
+   * would move, as playIntro.
+   */
+  playEndingBeat(id, durationMs, ending) {
+    if (id === REVELATION_BEATS[0].id) return this.playEpilogue(EPILOGUE_MS);
+    if (id === 'answer') {
+      return this.startCinematic(
+        endingPath(ending),
+        durationMs,
+        true,
+        'ending'
+      );
+    }
+    return !this.failed && this.camera.isEnabled() && !this.reducedMotion;
   }
 
   startCinematic(path, durationMs, hold, kind) {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   FOLLOW_TILT,
+  REVELATION_BEATS,
   blendPose,
+  endingBeats,
   epiloguePath,
   followPose,
   introPath,
@@ -44,5 +46,47 @@ describe('cinematic camera paths', () => {
     expect(blendPose(from, followPose(), 0.5).tilt).toBeGreaterThan(
       FOLLOW_TILT
     );
+  });
+});
+
+describe("the campaign ending's beats", () => {
+  it('tells act 1 in seven beats of at least 5 s, one line each, in order', () => {
+    expect(REVELATION_BEATS.map(({ id }) => id)).toEqual([
+      'opens',
+      'count',
+      'recoil',
+      'rupture',
+      'fences',
+      'lock',
+      'known',
+    ]);
+    REVELATION_BEATS.forEach((beat, i) => {
+      expect(beat.line).toBe(i);
+      expect(beat.minMs).toBeGreaterThanOrEqual(5000);
+    });
+  });
+
+  it("plays act 2's answer and home, then each ending's own shots and the last image", () => {
+    const ids = (ending) => endingBeats(ending).map(({ id }) => id);
+    expect(ids('severance')).toEqual([
+      'answer',
+      'home',
+      'steady',
+      'return',
+      'depart',
+      'twin',
+    ]);
+    expect(ids('stewardship')).toEqual([
+      'answer',
+      'home',
+      'steady',
+      'watch',
+      'twin',
+    ]);
+    expect(
+      endingBeats('severance')
+        .map(({ line }) => line)
+        .filter((l) => l !== null)
+    ).toEqual([0, 1]);
   });
 });

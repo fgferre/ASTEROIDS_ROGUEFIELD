@@ -302,7 +302,7 @@ class InputSystem {
       // A cinematic holds the run (ui/runCinematics.js): Start is its skip
       // key there, never the pause (that would let the run go under it).
       eventBus.on('cinematic-started', ({ kind } = {}) => {
-        this.cinematicHold = ['story', 'travel', 'intro'].includes(kind);
+        this.cinematicHold = kind !== 'epilogue' && kind !== 'arrival';
       });
       eventBus.on('cinematic-ended', () => (this.cinematicHold = false));
 

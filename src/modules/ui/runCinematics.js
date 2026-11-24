@@ -11,9 +11,12 @@
 // so replays stay exact); the layer banner — the title card — shows once,
 // when it ends. Epilogue: the renderer pulls back as the
 // Ring wakes, the victory line plays over it, and the victory screen waits
-// for it to end. Ending (the campaign's last win, after the choice): the
-// epilogue's shot holds while the ending's lines play and the Ring answers
-// through its wake; then the final card. Warden entrance: letterbox bars
+// for it to end. The campaign's ending plays in beats (core/cinematics.js),
+// each asking the renderer for its picture (playEndingBeat) and speaking its
+// line as it starts, timed by the beats even when the renderer draws none:
+// act 1, the revelation, replaces the epilogue on the win that opens the
+// choice, and the choice waits for it; act 2, the ending picked, plays its
+// own beats, then the credits and the final card. Warden entrance: letterbox bars
 // over the live shot until
 // the Warden closes up ('boss-arrived'); the run plays on, slowed (no hold,
 // no skip). A renderer that can't move the camera (2D, reduced motion,
@@ -24,19 +27,21 @@
 // render3d/storyScene.js): six shots of the Wake under the letterbox, a line
 // opening each; a skip goes on to the journey.
 // Skipping (ui/skipHold.js): the skip key held skips the scene playing (the
-// story, the journey, the intro, the ending's lines); a tap goes to its next
-// line — the story's next shot, the journey's or the ending's next line —
-// and with none left, or in the intro, to the next scene.
+// story, the journey, the intro, an act of the ending: act 1 to the choice,
+// act 2 to the credits); a tap goes to its next line — the story's next
+// shot, the journey's next line, the ending's next beat — and with none
+// left, or in the intro, to the next scene.
 
 import {
   EPILOGUE_MS,
   INTRO_MS,
+  REVELATION_BEATS,
   STORY_LINE_LEAD_MS,
   STORY_MS,
   STORY_SHOT_MS,
   TRAVEL,
   cinematicFreezeFromUrl,
-  endingPath,
+  endingBeats,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
@@ -46,6 +51,7 @@ import {
   endingTransmissions,
   holdMsFor,
   prologueTransmissions,
+  revelationTransmissions,
   runVoiceLines,
   travelTransmissions,
 } from './transmissions.js';
@@ -107,11 +113,26 @@ export function travelDurationMs(lines) {
   );
 }
 
+/**
+ * A beat of the ending (core/cinematics.js) with its act's `lines`: its
+ * line, held to stay up through the beat (null without one), and the beat's
+ * length — the line typed and held (longer for its recording, as a
+ * journey's), never less than the beat's minimum.
+ */
+export function beatTiming(beat, lines) {
+  const line = lines[beat.line];
+  if (!line) return { entry: null, durationMs: beat.minMs };
+  const typing = (line.text.length / TRANSMISSION_CHARS_PER_SECOND) * 1000;
+  const holdMs = Math.max(TRAVEL.lineHoldMs, beat.minMs - typing);
+  const entry = { ...line, holdMs };
+  return { entry, durationMs: typing + holdMsFor(entry, typing) };
+}
+
 export class RunCinematics {
   /**
    * `renderer()`/`hud()` resolve the current ones (playTravel, endTravel,
-   * playIntro, playEpilogue, playArrival, playStory, seekStory, endCinematic
-   * / cancelBanner, showLetterbox). `holdSim(flag)` stops or restarts the
+   * playIntro, playEpilogue, playEndingBeat, playArrival, playStory,
+   * seekStory, endCinematic / cancelBanner, showLetterbox). `holdSim(flag)` stops or restarts the
    * fixed step; `bindSkip(skip, next)` listens for the skip and the tap and
    * returns the unbind; `onIntroEnd()` shows the layer banner; `speak(entry)`
    * queues a transmission, `hush()` drops them all and `nextLine()` ends the
@@ -143,6 +164,8 @@ export class RunCinematics {
     this.unbindSkip = null;
     this.afterEpilogue = null;
     this.afterEnding = null;
+    // The act of the ending playing: { beats, lines, ending, onEnd, at }.
+    this.act = null;
     this.travelTo = null;
     // A campaign launch's journey tells the story first (startStory).
     this.tellsStory = false;
@@ -329,12 +352,13 @@ export class RunCinematics {
   /**
    * Ends the scene playing now (one scene per hold, Felipe 23/11): the
    * story's or the journey's lines drop and the next scene plays; the
-   * intro's camera eases back to the ship and the run starts.
+   * intro's camera eases back to the ship and the run starts; an act of the
+   * ending drops its line and ends (to the choice, to the credits).
    */
   skip() {
-    if (this.kind === 'ending') {
+    if (this.act) {
       this.hush();
-      this.endEnding();
+      this.act.onEnd();
       return;
     }
     if (this.kind === 'story') {
@@ -355,10 +379,16 @@ export class RunCinematics {
   }
 
   /**
-   * A tap of the skip key: the story's next shot, the journey's or the
-   * ending's next line; with none left (or in the intro), the next scene.
+   * A tap of the skip key: the story's next shot, the journey's next line,
+   * the ending's next beat (its line on air dropped); with none left (or in
+   * the intro), the next scene.
    */
   next() {
+    if (this.act) {
+      this.hush();
+      this.playBeat(this.act.at + 1);
+      return;
+    }
     if (this.kind === 'story') {
       const elapsed = performance.now() - this.storyStartedAt;
       let end = 0;
@@ -369,7 +399,7 @@ export class RunCinematics {
         this.renderer()?.seekStory(performance.now() - this.storyStartedAt);
         return;
       }
-    } else if (['travel', 'ending'].includes(this.kind) && this.nextLine()) {
+    } else if (this.kind === 'travel' && this.nextLine()) {
       return;
     }
     this.skip();
@@ -382,37 +412,81 @@ export class RunCinematics {
     }
     // Nothing on the banner may hold back the victory line.
     this.hud()?.cancelBanner();
-    this.begin('epilogue', EPILOGUE_MS, () => {
-      const show = this.afterEpilogue;
-      this.finish();
-      show?.();
-    });
+    this.begin('epilogue', EPILOGUE_MS, () => this.endEpilogue());
     return true;
   }
 
+  // The win's scene is over: the screen it held back opens.
+  endEpilogue() {
+    const show = this.afterEpilogue;
+    this.finish();
+    show?.();
+  }
+
   /**
-   * The ending picked (data/story.js STORY.ending): its lines play, timed
-   * as a journey's, while the held shot's wake eases to the ending's own
-   * (none without the 3D camera); `onEnd` runs once, when they are done
+   * Act 1 of the campaign's ending, in the epilogue's place on the win that
+   * opens the choice (RunEndScreens.opensChoice): the truth, beat by beat
+   * (REVELATION_BEATS), from Sovereign's last words on; the choice waits
+   * for its end (deferUntilEpilogueEnds). It plays, and speaks every line,
+   * whether or not the renderer draws it.
+   */
+  startRevelation() {
+    this.stop();
+    const lines = revelationTransmissions();
+    // The fence line is no line of this run's: its recording loads now.
+    this.eventBus.emit('voice-lines-coming', { entries: lines });
+    // Nothing on the banner or on air may hold back Sovereign's last words.
+    this.hud()?.cancelBanner();
+    this.hush();
+    this.startAct('revelation', REVELATION_BEATS, lines, null, () =>
+      this.endEpilogue()
+    );
+  }
+
+  /**
+   * Act 2: the ending picked (data/story.js STORY.ending), its beats
+   * (endingBeats) with its two lines; `onEnd` runs once, when they are done
    * or skipped. The press that picked it has gone by when the skip binds.
    */
   playEnding(ending, onEnd) {
     this.stop();
-    const lines = endingTransmissions(ending, TRAVEL.lineHoldMs);
-    const durationMs = travelDurationMs(lines);
-    this.renderer()?.startCinematic?.(
-      endingPath(ending),
-      durationMs,
-      true,
-      'ending'
-    );
-    lines.forEach((entry) => this.speak(entry));
     this.afterEnding = onEnd;
-    this.begin('ending', durationMs, () => this.endEnding());
+    this.startAct(
+      'ending',
+      endingBeats(ending),
+      endingTransmissions(ending),
+      ending,
+      () => this.endEnding()
+    );
+  }
+
+  // An act of the ending (kind 'revelation' or 'ending') from its first beat.
+  startAct(kind, beats, lines, ending, onEnd) {
+    this.begin(kind);
+    this.act = { beats, lines, ending, onEnd, at: 0 };
+    this.playBeat(0);
     this.unbindSkip = this.bindSkip(
       () => this.skip(),
       () => this.next()
     );
+  }
+
+  /**
+   * The act's beat `i`, now: its picture asked of the renderer, its line
+   * spoken; the next beat when it is over, the act's end after the last.
+   */
+  playBeat(i) {
+    const { beats, lines, ending, onEnd } = this.act;
+    if (i >= beats.length) {
+      onEnd();
+      return;
+    }
+    const { entry, durationMs } = beatTiming(beats[i], lines);
+    this.act.at = i;
+    this.renderer()?.playEndingBeat?.(beats[i].id, durationMs, ending);
+    if (entry) this.speak(entry);
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.playBeat(i + 1), durationMs);
   }
 
   endEnding() {
@@ -443,9 +517,12 @@ export class RunCinematics {
     if (this.kind === 'arrival') this.finish();
   }
 
-  /** Runs `show` when the epilogue ends; false (run it now) without one. */
+  /**
+   * Runs `show` when the win's scene (the epilogue, or the ending's act 1)
+   * ends; false (run it now) without one.
+   */
   deferUntilEpilogueEnds(show) {
-    if (this.kind !== 'epilogue') {
+    if (this.kind !== 'epilogue' && this.kind !== 'revelation') {
       return false;
     }
     this.afterEpilogue = show;
@@ -470,9 +547,10 @@ export class RunCinematics {
     }
   }
 
+  // `onEnd` after `durationMs`; an act of the ending times its own beats.
   begin(kind, durationMs, onEnd) {
     this.kind = kind;
-    this.timer = setTimeout(onEnd, durationMs);
+    if (onEnd) this.timer = setTimeout(onEnd, durationMs);
     this.eventBus.emit('cinematic-started', { kind });
   }
 
@@ -504,6 +582,7 @@ export class RunCinematics {
     this.unbindSkip = null;
     this.afterEpilogue = null;
     this.afterEnding = null;
+    this.act = null;
     this.kind = null;
     this.eventBus.emit('cinematic-ended', { kind });
   }

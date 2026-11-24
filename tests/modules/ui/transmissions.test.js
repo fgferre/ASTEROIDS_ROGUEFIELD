@@ -10,6 +10,7 @@ import {
   deathTransmission,
   hangarTransmission,
   heraldTransmission,
+  revelationTransmissions,
   runVoiceLines,
   travelTransmissions,
   sightingTransmission,
@@ -224,6 +225,30 @@ describe('winTransmissions', () => {
     expect(keys(winTransmissions(20, 'sovereign'))).toEqual([
       'boss:sovereign:defeated',
     ]);
+  });
+});
+
+describe('revelationTransmissions', () => {
+  it("tells the truth after Sovereign's last words, the fence line again under its own key before the fourth", () => {
+    const lines = revelationTransmissions();
+    expect(lines.map(({ key }) => key)).toEqual([
+      'boss:sovereign:defeated',
+      'revelation:0',
+      'revelation:1',
+      'revelation:2',
+      'stage:quarantine-grid:3',
+      'revelation:3',
+      'revelation:4',
+    ]);
+    expect(lines[0].text).toBe(STORY.boss.sovereign.defeated);
+    expect(lines[4]).toMatchObject({
+      speaker: 'WAKE',
+      text: STORY.stage['quarantine-grid'][3].text,
+    });
+    expect(lines[1].speaker).toBe('THE RING');
+    expect(lines.slice(5).map(({ text }) => text)).toEqual(
+      STORY.revelation.slice(3).map(({ text }) => text)
+    );
   });
 });
 

@@ -672,6 +672,11 @@ class UISystem extends BaseSystem {
       this.runWon = true;
       this.chestCeremony.clear();
       this.lastTransmission = null;
+      // The ending's act 1 says Sovereign's last words itself.
+      if (this.runEndScreens.opensChoice(sector)) {
+        this.cinematics.startRevelation();
+        return;
+      }
       this.cinematics.startEpilogue();
       const [last, ...after] = winTransmissions(wave, sectorById(sector)?.boss);
       this.queueTransmission(last, { interrupt: true });

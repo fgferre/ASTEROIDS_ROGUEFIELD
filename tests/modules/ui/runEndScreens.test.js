@@ -215,8 +215,13 @@ describe('Run end screens', () => {
       show: true,
     });
 
+    // The same test tells act 1 of the ending before it (UISystem 'run-won').
+    expect(screens.opensChoice('the-crucible')).toBe(true);
+    expect(screens.opensChoice('wardens-reach')).toBe(false);
+
     const replay = victoryScreen();
     replay.screens.noteRunStart({ replay: true });
+    expect(replay.screens.opensChoice('the-crucible')).toBe(false);
     replay.win(CRUCIBLE);
     expect(replay.screens.choice).toBe(null);
     expect(replay.victory.body.innerHTML).toContain('The end');

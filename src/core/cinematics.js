@@ -131,6 +131,43 @@ export function endingPath(ending) {
   };
 }
 
+// The campaign's ending in beats (PLAN.md; ui/runCinematics.js plays them,
+// Renderer3D.playEndingBeat draws each). `line`: the index of the beat's
+// line in its act's lines (ui/transmissions.js revelationTransmissions,
+// endingTransmissions), spoken as it starts, or null; a beat lasts as long
+// as its line needs, never less than `minMs`. Act 1, before the choice:
+// Sovereign opens, then the truth.
+export const REVELATION_BEATS = Object.freeze([
+  { id: 'opens', line: 0, minMs: 5000 }, // PLAN.md 24/11
+  { id: 'count', line: 1, minMs: 5000 },
+  { id: 'recoil', line: 2, minMs: 5000 },
+  { id: 'rupture', line: 3, minMs: 5000 },
+  { id: 'fences', line: 4, minMs: 5000 },
+  { id: 'lock', line: 5, minMs: 5000 },
+  { id: 'known', line: 6, minMs: 5000 },
+]);
+
+// Act 2, after the choice: the answer, home, then each ending's own shots
+// and the last image (the rough cut the owner approved, 24/11).
+const ENDING_OPENING_BEATS = [
+  { id: 'answer', line: 0, minMs: 6000 },
+  { id: 'home', line: null, minMs: 4000 },
+  { id: 'steady', line: 1, minMs: 5000 },
+];
+const ENDING_OWN_BEATS = {
+  severance: [
+    { id: 'return', line: null, minMs: 6000 },
+    { id: 'depart', line: null, minMs: 6000 },
+  ],
+  stewardship: [{ id: 'watch', line: null, minMs: 9000 }],
+};
+const TWIN_BEAT = { id: 'twin', line: null, minMs: 7000 };
+
+/** Act 2's beats for `ending` ('severance' or 'stewardship'), in order. */
+export function endingBeats(ending) {
+  return [...ENDING_OPENING_BEATS, ...ENDING_OWN_BEATS[ending], TWIN_BEAT];
+}
+
 /** The follow camera's own pose: what a cinematic hands back to. */
 export function followPose() {
   return { distance: 1, tilt: FOLLOW_TILT, offsetX: 0, offsetY: 0, wake: 0 };

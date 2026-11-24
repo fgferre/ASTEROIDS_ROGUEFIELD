@@ -22,6 +22,7 @@ const allLines = () => [
   ...Object.values(STORY.travel).flatMap((lines) =>
     lines.map((line) => line.text)
   ),
+  ...STORY.revelation.map((line) => line.text),
   ...Object.values(STORY.ending).flatMap(
     ({ choice, stakes, epitaph, lines }) => [
       choice,

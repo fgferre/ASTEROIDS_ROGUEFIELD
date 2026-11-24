@@ -350,6 +350,10 @@ describe('AudioSystem random scope synchronization', () => {
     expect(played('victory-final')).toBe(1);
     overlay('ending', true);
     expect(played('ending-choice')).toBe(1);
+    // It plays on through the ending picked, until the credits' starts.
+    const stopTrack = vi.spyOn(audio, 'stopFileTrack');
+    overlay('ending', false);
+    expect(stopTrack).not.toHaveBeenCalled();
     overlay('end-credits', true);
     expect(played('end-credits')).toBe(1);
   });

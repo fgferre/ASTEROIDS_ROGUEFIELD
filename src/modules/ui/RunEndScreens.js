@@ -276,7 +276,7 @@ export class RunEndScreens {
   showVictoryScreen(payload, ending = null) {
     const data = payload?.data || {};
     const finale = data.sector?.id === ENDING_SECTOR;
-    if (finale && !ending && !this.replay) {
+    if (!ending && this.opensChoice(data.sector?.id)) {
       this.showEndingChoice(payload);
       return;
     }
@@ -356,6 +356,15 @@ export class RunEndScreens {
   }
 
   /**
+   * Whether a win in sector `sectorId` opens the choice between the endings
+   * (and is told the truth before it, ui/runCinematics.js): the campaign's
+   * last sector, never on a replay.
+   */
+  opensChoice(sectorId) {
+    return sectorId === ENDING_SECTOR && !this.replay;
+  }
+
+  /**
    * The choice between the endings, after the campaign's last win: no other
    * way out; its options wake after the screens' lockout, the first focused.
    */
@@ -387,9 +396,9 @@ export class RunEndScreens {
 
   /**
    * An ending picked on the choice: recorded once, the choice leaves, its
-   * lines play over the held shot, the HUD down to its transmission, as the
-   * Ring answers (Severance also dims the field), then the end credits and
-   * the final card.
+   * beats play (the ending's act 2), the HUD down to its transmission, as
+   * the Ring answers (Severance also dims the field), then the end credits
+   * and the final card.
    * False when no choice is open.
    */
   chooseEnding(ending) {

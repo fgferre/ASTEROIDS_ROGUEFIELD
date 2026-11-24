@@ -3,17 +3,20 @@ The campaign's ending as a three-act cinematic (owner's item 49), 24/11/2026. BU
 Chosen by the owner (his words in the notes file below): the truth is "A, um de nós" (24/11, 00h58) and the staging is the single combined ending, "Serve: é este" (24/11, card `final-do-jogo-4`). He also approved the wording of the five new lines as written on that card ("Serve assim", 24/11); the exact texts are in the notes file below and in the card's "falas-novas" section. Nothing is pending with him on this subject.
 
 Where everything is (outside git, read first):
+
 - Notes and his words: /Users/fgferre/Library/Application Support/Claude/side-session-notes/local_9d07932b-48e8-46ae-8de5-d2d16c8eadac/final-do-jogo-notas.md
 - The script, beat by beat, with places, lines and timings: .../final-ferramentas/corte-epico.md
 - The logic test of the story against every line of the game (five passes): .../final-ferramentas/furos.md
 - The rough cuts he approved: src/exported-assets/quadro/cartoes/final-do-jogo-4/final-severance.mp4 and final-stewardship.mp4 (main checkout); capture scripts that pose each shot in the running game: .../final-ferramentas/e1.mjs, e2.mjs, e3.mjs, a-casa.mjs (they are the reference for camera poses, lights and what each shot shows).
 
 The sequence (13 beats; five new lines, the rest exist and are voiced):
+
 - Act 1, before the choice (about 39 s from Sovereign's fall): Sovereign, beaten, opens its shells (its existing "…Operator: you. Choose."); slow orbit, the Ring's count (new); pull-back over the Crucible (new Wake line); cut to the Null Boundary's rupture (new); cut to the Quarantine Grid (existing voiced line `stage:quarantine-grid:3`, replayed); cut to the Crucible's star and arcs (new); the pilot's ship before the open Sovereign (new). Then the choice screen, text unchanged.
 - Act 2, after the choice (about 34 s): the Crucible answers (existing first ending line); the opening's first shot of the Wake, same camera; the opening's reactor shot, all engines steady (existing second ending line); Severance only: the interceptor comes home into the hangar (the opening's launch reversed), then the Ring goes dark and the Wake turns away; Stewardship: no hangar shot ("Nobody goes home"), the Wake faces the lit Ring.
 - Coda: at the Crucible, on a rebuilt arc out of the fight's view, a slip holding a Wake identical to ours: finished, empty, silent, one window lit. Nobody watches, no line. Severance: everything goes dark, the window last, and it goes out before the black. Stewardship: the arcs light and the window stays. Black, then the credits as today.
 
 Steps, in order:
+
 1. Check first, before any design: what Sovereign's body does when it is defeated today (the cinematic needs it whole and still, then opening past the fight's `plateOpen`), and whether the place sets of other sectors can be shown from a Crucible run (act 1 cuts to two other places).
 2. Agree the hand-over with the cutscenes work: act 1 replaces the 4 s epilogue pull-back for the ending sector only (`src/modules/ui/runCinematics.js` `startEpilogue`, `EPILOGUE_MS`), the stretch the branch `historia/pular-e-repetir` is editing; skip is theirs (hold to skip: before the choice it jumps to the choice, after it to the credits).
 3. Text: the five approved new lines in `src/data/story.js` and their transmissions (`src/modules/ui/transmissions.js`); each stays under 90 characters; lines without a recording already play as text.
@@ -26,6 +29,7 @@ Steps, in order:
 Out of scope: changing any existing line, the two endings' stakes or epitaphs, the credits, a third ending, new Settings options, generating voices, re-recording replays, and the three contradictions already in today's text (Choir three or six, where the foundry is, Null's old Codex text): the coordinator holds those.
 
 What step 1 found (24/11), and the design that follows:
+
 - Sovereign today: at zero health it leaves the active list at once (EnemyBossSystem.handleBossDefeated) and its view breaks into pieces in 1.1 s (enemyMirror.die/breakOf, BOSS_PIECES). The ending needs it whole, still, then opening: for Sovereign only the defeat keeps the model (flash and bursts stay, no break) and the cinematic drives a husk. AGREED by the coordinator (24/11), who tells the owner in one line; it is a consequence of the film he approved, not a new question. Conditions: only the drawing changes (the enemy leaves the list in the same step, same events, rewards and achievements; recorded runs identical, stop if one changes); the final blow's flash and bursts stay; every other boss keeps breaking into pieces; where the ending does not play (replay, Descent or Deep Field if Sovereign appears there, the content scene, a renderer that refuses cinematics) the whole body must not stay on screen nor cover the victory screen: there it burns away in place (the mirror's plain dissolve, no pieces), shown in a photo; the conference card carries the before and after of Sovereign's defeat at the same instant. When the ending follows, the cinematic's own husk takes the model's place in the same pose and frame, so nothing is seen to change hands.
 - Other places can show during a Crucible run: all ten sets are built at start; `PlaceSets.setFlight(id, share, x, z, slot)` shows any set (the journeys use it). The opening scene is never disposed.
 - Today's win flow: 'run-won' → 4 s epilogue (not skippable) while runEnd waits 6 s of spoils (XP pull; the ship guarded 9 s) → the choice → `playEnding` (lines over the held shot) → credits. Music: VICTORY_FINAL from 'run-won', ENDING_CHOICE while the choice is open (stops at the pick), END_CREDITS at the credits.
@@ -34,9 +38,10 @@ What step 1 found (24/11), and the design that follows:
 - Music: ENDING_CHOICE keeps playing through act 2 and gives way to END_CREDITS.
 
 Progress:
+
 - [x] 0. Branch fast-forwarded to d422eb19.
 - [x] 1. Checked Sovereign's defeat and the place sets (above).
-- [ ] 2. Text + sequencing + screens + fallback + tests (no new pictures yet).
+- [x] 2. Text + sequencing + screens + fallback + tests (no new pictures yet).
 - [ ] 3. Act 1 pictures and Sovereign's husk.
 - [ ] 4. Act 2 pictures and the coda.
 - [ ] 5. Sound cues, music hand-over, NEXT, item (49), done.
