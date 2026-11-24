@@ -58,6 +58,19 @@ export function timeToHit(dx, dy, vx, vy, reach) {
   return (-b - Math.sqrt(disc)) / a;
 }
 
+/** Whether `thing` ({ x, y, vx, vy, radius }) reaches `ship` ({ x, y, vx, vy }) within `seconds`. */
+export function hitsWithin(ship, thing, seconds) {
+  return (
+    timeToHit(
+      thing.x - ship.x,
+      thing.y - ship.y,
+      (thing.vx || 0) - ship.vx,
+      (thing.vy || 0) - ship.vy,
+      SHIP_RADIUS + (thing.radius || 0)
+    ) <= seconds
+  );
+}
+
 /** An empty scene (camera.js readCameraScene fills it). */
 export function createDirectorScene() {
   return {
@@ -70,8 +83,9 @@ export function createDirectorScene() {
     hasAim: false,
     aimX: 0,
     aimY: 0,
-    // The look-ahead the camera asks for, up and down (camera.js
-    // lookAheadFor).
+    // The look-ahead the camera asks for (camera.js lookAheadFor): up and
+    // down, and sideways (used only where the near view follows sideways).
+    leadX: 0,
     leadY: 0,
     // Live lists, read in place: enemies (x, y, vx, vy, radius, type,
     // destroyed), hostile shots (x, y, vx, vy, radius, active, hit) and XP
@@ -142,10 +156,16 @@ export function createDirector({
     // How close, as the farthest in-field shot at this tilt over the
     // distance (1 = that shot; the wide view is under 1).
     zoom: 1,
+    // How much closer the near view comes on a small screen (1: not).
+    closer: 1,
   };
   const probe = { x: 0, y: 0, distance: 1, tilt: 0, yaw: 0, roll: 0 };
   const near = { x: 0, y: 0, distance: 1 };
+  // The near shot a wide screen would have (the field's width across): what
+  // it leaves out opens the wide view, whatever the screen.
+  const full = { x: 0, y: 0, distance: 1 };
   const extent = {};
+  const fullExtent = {};
   const screen = { x: 0, y: 0, front: true };
 
   function onScreen(shot, angles, x, y, margin) {
@@ -206,17 +226,30 @@ export function createDirector({
 
   // The near shot: the field's width fills the screen across its middle,
   // centred; up and down it follows the ship a little ahead, at most
-  // `beyondEdge` of the half-view past the field's top or bottom edge. In a
-  // dive it leans toward the boss that fell.
+  // `beyondEdge` of the half-view past the field's top or bottom edge. On a
+  // small screen (T.small) it comes closer and follows sideways too, never
+  // past the field's sides. In a dive it leans toward the boss that fell.
   function updateNear(scene) {
-    near.distance = fieldWidth / 2 / (lens.tanV * lens.aspect);
-    const e = shotExtent(near.distance, nearAngles, lens, extent);
-    const y = scene.y + (reducedMotion ? 0 : scene.leadY);
+    const lead = reducedMotion ? 0 : 1;
     const keep = 1 - T.near.beyondEdge;
-    const low = e.up * keep;
-    const high = fieldHeight - e.down * keep;
-    near.x = fieldWidth / 2;
-    near.y = low >= high ? (low + high) / 2 : Math.max(low, Math.min(high, y));
+    const within = (low, high, v) =>
+      low >= high ? (low + high) / 2 : Math.max(low, Math.min(high, v));
+    const y = scene.y + lead * scene.leadY;
+    full.distance = fieldWidth / 2 / (lens.tanV * lens.aspect);
+    const f = shotExtent(full.distance, nearAngles, lens, fullExtent);
+    full.x = fieldWidth / 2;
+    full.y = within(f.up * keep, fieldHeight - f.down * keep, y);
+    pose.closer =
+      lens.width > 0
+        ? Math.min(T.small.most, Math.max(1, T.small.width / lens.width))
+        : 1;
+    near.distance = full.distance / pose.closer;
+    const e = shotExtent(near.distance, nearAngles, lens, extent);
+    near.x =
+      pose.closer > 1
+        ? within(e.left, fieldWidth - e.right, scene.x + lead * scene.leadX)
+        : full.x;
+    near.y = within(e.up * keep, fieldHeight - e.down * keep, y);
     if (diveFor > 0 && fallen.radius > 0) towardFoe(scene, fallen);
   }
 
@@ -253,6 +286,8 @@ export function createDirector({
   }
 
   // --- what opens the wide view -------------------------------------------
+  // Judged on the full-width near shot (`full`), so a small screen's closer
+  // view opens it for the same things a wide screen would.
 
   function threatOffNear(scene) {
     const sx = scene.x;
@@ -262,7 +297,7 @@ export function createDirector({
       const e = enemies[i];
       if (!e || e.destroyed) continue;
       if (e.type === 'boss' || e.type === 'herald') {
-        if (!bodyIn(near, e, 1)) return true;
+        if (!bodyIn(full, e, 1)) return true;
         continue;
       }
       const dx = e.x - sx;
@@ -275,7 +310,7 @@ export function createDirector({
       const t = timeToHit(dx, dy, rvx, rvy, SHIP_RADIUS + (e.radius || 0));
       if (
         t <= T.threatHorizon &&
-        !onScreen(near, nearAngles, e.x, e.y, SHOWN)
+        !onScreen(full, nearAngles, e.x, e.y, SHOWN)
       ) {
         return true;
       }
@@ -293,7 +328,7 @@ export function createDirector({
       );
       if (
         t <= T.threatHorizon &&
-        !onScreen(near, nearAngles, s.x, s.y, SHOWN)
+        !onScreen(full, nearAngles, s.x, s.y, SHOWN)
       ) {
         return true;
       }
@@ -301,7 +336,7 @@ export function createDirector({
     return false;
   }
 
-  // Enemies close, out of the near shot, on at least `surroundSides` of the
+  // Enemies close, out of the full-width near shot, on at least `surroundSides` of the
   // four sides of the ship.
   function surrounded(scene) {
     let sides = 0;
@@ -313,7 +348,7 @@ export function createDirector({
       const dx = e.x - scene.x;
       const dy = e.y - scene.y;
       if (dx * dx + dy * dy > r2) continue;
-      if (onScreen(near, nearAngles, e.x, e.y, SHOWN)) continue;
+      if (onScreen(full, nearAngles, e.x, e.y, SHOWN)) continue;
       if (Math.abs(dx) >= Math.abs(dy)) sides |= dx >= 0 ? 1 : 4;
       else sides |= dy >= 0 ? 8 : 2;
     }
@@ -477,7 +512,7 @@ export function createDirector({
       }
       const seconds = T.glance[kind];
       if (seconds === undefined) return;
-      if (target && onScreen(near, nearAngles, target.x, target.y, SHOWN)) {
+      if (target && onScreen(full, nearAngles, target.x, target.y, SHOWN)) {
         return;
       }
       glanceFor = Math.max(glanceFor, seconds);

@@ -24,6 +24,7 @@ export const NEXT = {
   new: [],
   improved: [
     'The camera has a narrower lens: the ship no longer seems to lean as it nears the sides of the screen (about half the lean it had there, and phones had the most), with the same part of the field in view.', // not confirmed
+    'On a phone the camera comes closer, so the ship and the enemies look about as big as on a tablet, and it follows the ship sideways; red arrows at the screen edge point to enemy ships out of view and to any rock or shot that will hit you within two seconds. The wide view still opens when it did.', // not confirmed
   ],
   fixed: [],
   unseen: [],

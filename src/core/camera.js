@@ -197,6 +197,7 @@ export function createCamera({
       advancePulse(dt);
       if (mode === 'dynamic' && scene.hasShip) {
         lookAheadFor(scene, targetX, targetY, leadOut, lead);
+        scene.leadX = leadOut.x;
         scene.leadY = leadOut.y;
         directed = director.update(scene, dt, pulseFactor);
         camera.x = directed.x;

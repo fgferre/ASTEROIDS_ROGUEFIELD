@@ -282,7 +282,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Porque a gente não vê quase detalhe nenhum, fica muito pequeno."_ Textos inteiros em
   `quadro/respostas/nave-inclinada-lente-23-11.txt` e `zoom-telas-pequenas-23-11.txt`. Respostas dele ao cartão
   `camera-1` (23/11): a lente _"A · lente fechada (20°)"_; a tela pequena _"C · mais perto + setas na borda (a vista
-  aberta abre como hoje)"_. Ramo `camera/lente-e-zoom`: a lente A construída. Fecha quando ele aprovar jogando, no
+  aberta abre como hoje)"_. Ramo `camera/lente-e-zoom`: a lente A e a tela pequena C construídas (abaixo de 1155 pontos
+  de largura a câmera chega mais perto, no máximo 1,6 vez; números de sensação). Fecha quando ele aprovar jogando, no
   computador e no celular dele.
 
 ## Som (palavras dele, 19/11)

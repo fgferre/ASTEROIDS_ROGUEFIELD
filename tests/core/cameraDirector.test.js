@@ -462,3 +462,44 @@ describe('camera director, a Warden’s entrance', () => {
     }
   });
 });
+
+describe('camera director, a small screen', () => {
+  const PHONE = 844 / 390;
+  const FULL = W / 2 / (tanV * PHONE);
+
+  function phone(width) {
+    const d = createDirector({ fieldWidth: W, fieldHeight: H });
+    d.setLens({ tanV, aspect: PHONE, width });
+    return d;
+  }
+
+  it('comes closer as if 1155 points wide, at most 1.6 times, not on a wide screen', () => {
+    for (const [width, closer] of [
+      [844, 1155 / 844],
+      [600, 1.6],
+      [1155, 1],
+      [1920, 1],
+    ]) {
+      const pose = run(phone(width), scene(400, 300), 3);
+      expect(pose.closer, `${width}`).toBeCloseTo(closer, 5);
+      expect(pose.distance / (FULL / closer), `${width}`).toBeCloseTo(1, 2);
+    }
+  });
+
+  it('follows the ship sideways when closer, never past the field’s side', () => {
+    const left = run(phone(844), scene(60, 300), 4);
+    expect(left.x).toBeLessThan(360);
+    expect(screenOf(left, PHONE, 0, 300).x).toBeLessThan(-0.99);
+    expect(run(phone(1920), scene(60, 300), 4).x).toBeCloseTo(400, 0);
+  });
+
+  it('opens the wide view for what a wide screen would, not for what it leaves out', () => {
+    // Inside the full-width view, outside the closer one; then outside both.
+    const d = phone(844);
+    run(d, scene(400, 300), 2);
+    run(d, scene(400, 300, { shots: [shotAt(400, 300, 1.6, 0, 200)] }), 0.2);
+    expect(d.moment).toBe('near');
+    run(d, scene(400, 300, { shots: [shotAt(400, 300, 1.9, 0, 250)] }), 0.2);
+    expect(d.moment).toBe('wide');
+  });
+});
