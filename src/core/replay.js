@@ -18,8 +18,8 @@ export const REPLAY_VERSION = 12;
 // (outside audit 5, 21/11), 10 flew the drag flight the jets' flight
 // replaced (22/11), and 11's Braking System braked the start's flight with a
 // turn key held or right after a tap of thrust (23/11). 12 also records the
-// strafe (Z and C, the strafe hold), and with the RCS System a pad's left
-// stick pushed sideways strafes the start's flight.
+// strafe (Z and C, the strafe hold); a pad's left stick pushed sideways
+// strafes the start's flight.
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the

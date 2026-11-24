@@ -124,7 +124,7 @@ export class TouchControls {
     this.declared = declared;
     this.onShow = onShow;
     this.stick = CENTRED;
-    // STRAFE is held down (with the RCS System).
+    // STRAFE is held down.
     this.strafing = false;
     this.on = false;
     this.pinned = false;
@@ -264,15 +264,11 @@ export class TouchControls {
     this.eventBus.on('shield-activation-failed', ({ reason } = {}) => {
       if (reason === 'locked') refuse(shield);
     });
-    // STRAFE is held, not tapped; with no RCS System it shakes instead.
+    // STRAFE is held, not tapped.
     const strafe = this.layer.querySelector('.touch-btn--strafe');
     strafe.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       this.input.setActiveDevice('touch');
-      if (!this.player.flight.canStrafe) {
-        refuse(strafe);
-        return;
-      }
       this.strafing = true;
       strafe.setPointerCapture(event.pointerId);
     });

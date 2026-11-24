@@ -24,7 +24,7 @@ export const NEXT = {
   new: [
     'A pad now drives a pointer on every menu and overlay, as a mouse: the left stick moves the round reticle (slower over anything you can click), A clicks and drags, the right stick scrolls what is under it; the d-pad still steps item by item, B goes back and LB/RB switch tabs.', // not confirmed
     "The menu explains itself on a first visit, one line at a time in the flight tips' look: how to set up a run on Mission Control, where Salvage comes from in the Hangar, and a pointer to the Hangar once your Salvage first buys something. Campaign, the difficulty and the Hangar's Ship and Medals tabs gain a line of their own; Show Onboarding Tips brings the first-visit lines back.", // not confirmed
-    'With the RCS System the ship can strafe: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, harder with each level of the card. The shield moves to LT on a controller.', // not confirmed
+    'The ship can strafe from the start: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, and the RCS System makes them push harder. The shield moves to LT on a controller.', // not confirmed
   ],
   improved: [
     'The death screen and the run\'s timeline name a special rock\'s kind, its blast included: "Killed by a Volatile Ring Fragment", "an Armored Ring Fragment"; a plain rock is still a Ring Fragment.', // not confirmed

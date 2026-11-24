@@ -312,6 +312,20 @@ describe('composeContentScene', () => {
     vi.advanceTimersByTime(50);
     expect(player.position.x).toBe(400);
   });
+
+  it('lets the ship go on a strafe key or a pad stick too, not only a move key', () => {
+    [{ strafeLeft: true }, { moveX: 0.6 }].forEach((flown) => {
+      const { player, ...rest } = makeServices();
+      composeContentScene({
+        scene: enemyScene(),
+        services: { player, ...rest },
+      });
+      Object.assign(player.cachedMovementInput, flown);
+      player.position.x = 400;
+      vi.advanceTimersByTime(50);
+      expect(player.position.x).toBe(400);
+    });
+  });
 });
 
 describe('leaving the scene', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { splitStrafe } from '../../../src/modules/player/movementInput.js';
 
-// The strafe's input (the flight asks only with the RCS System).
+// The strafe's input (every ship strafes; the RCS System pushes harder).
 const IDLE = { up: false, down: false, left: false, right: false };
 
 describe('the strafe input', () => {

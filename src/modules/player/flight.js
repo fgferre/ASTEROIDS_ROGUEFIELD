@@ -263,17 +263,13 @@ export class PlayerFlight {
     return this.baseLinearDamping + this.brakingDamping;
   }
 
-  // The strafe comes with the RCS System: its flank jets push it.
-  get canStrafe() {
-    return this.agility > 1;
-  }
-
   /**
    * This step's strafe and the input left to steer by (splitStrafe); `hold`:
-   * the strafe hold is down. With no RCS System, none, and the input as is.
+   * the strafe hold is down. Every ship strafes from the start (Felipe,
+   * 23/11: "o Strafe deveria funcionar independente do RSS"); the RCS
+   * System makes its flank jets push harder.
    */
   strafeOf(input) {
-    if (!this.canStrafe) return { strafe: 0, steer: input, hold: false };
     const modern = this.ship.controlScheme === 'modern';
     return { ...splitStrafe(input, modern), hold: Boolean(input.strafeHold) };
   }

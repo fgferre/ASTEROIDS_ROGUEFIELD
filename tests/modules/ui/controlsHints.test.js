@@ -36,7 +36,7 @@ describe('Keyboard controls hints', () => {
           'WASD move',
           'Shift dash',
           'E shield',
-          'Z C strafe (RCS)',
+          'Z C strafe',
           'R reroll',
           'B banish',
           'Shooting is automatic',
@@ -63,7 +63,7 @@ describe('Gamepad controls hints', () => {
         expect.arrayContaining([
           'L-Stick ↑ thrust ↓ brake',
           'R-Stick ← → turn',
-          'L-Stick ← → strafe (RCS)',
+          'L-Stick ← → strafe',
           'RB dash',
           'LT shield',
         ])
