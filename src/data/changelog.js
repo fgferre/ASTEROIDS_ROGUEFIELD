@@ -22,32 +22,8 @@
 
 export const NEXT = {
   new: [
-    'A pad now drives a pointer on every menu and overlay, as a mouse: the left stick moves the round reticle (slower over anything you can click), A clicks and drags, the right stick scrolls what is under it; the d-pad still steps item by item, B goes back and LB/RB switch tabs.', // not confirmed
-    "The menu explains itself on a first visit, one line at a time in the flight tips' look: how to set up a run on Mission Control, where Salvage comes from in the Hangar, and a pointer to the Hangar once your Salvage first buys something. Campaign, the difficulty and the Hangar's Ship and Medals tabs gain a line of their own; Show Onboarding Tips brings the first-visit lines back.", // not confirmed
-    'The ship can strafe from the start: Z and C, or A and D while you hold Space, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, and the RCS System makes them push harder. The shield moves to LT on a controller.', // not confirmed
     "The campaign's ending now tells you the truth of the Ring before you choose: when Sovereign falls, the Ring and the Wake say what it kept and who it was keeping, one scene at a time; after the choice your ending plays scene by scene before the credits. Hold to skip to the choice or to the credits; a tap goes to the next scene.", // not confirmed
   ],
-  improved: [
-    'The death screen and the run\'s timeline name a special rock\'s kind, its blast included: "Killed by a Volatile Ring Fragment", "an Armored Ring Fragment"; a plain rock is still a Ring Fragment.', // not confirmed
-    'The dark, flat stones in the menu’s background are now real rocks, small and far off by the Ring.', // not confirmed
-    'Every shot now pushes the ship back a little, in every flight, and a slower gun kicks harder per shot: with no cards you correct it on the thrusters; the Braking System and the Flight Computer hold the ship in place.', // not confirmed
-    'The Braking System waits until you let go of every key, a beat longer: a turn or a quick tap of thrust no longer bleeds your speed.', // not confirmed
-    'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed
-    'The camera has a narrower lens: the ship no longer seems to lean as it nears the sides of the screen (about half the lean it had there, and phones had the most), with the same part of the field in view.', // not confirmed
-    'On a phone the camera comes closer, so the ship and the enemies look about as big as on a tablet, and it follows the ship sideways; red arrows at the screen edge point to enemy ships out of view and to any rock or shot that will hit you within two seconds. The wide view still opens when it did.', // not confirmed
-    'The story aboard the Wake now plays at every campaign launch from Mission Control, not only the first; skip it if you have seen it. Next Sector after a win still flies straight to the journey.', // not confirmed
-    'Skipping a scene is now deliberate: hold Space, Start (Options on a PlayStation pad) or the SKIP button on screen for 1.5 s, its outline filling as you hold, and it skips that scene for the next; a quick tap jumps to the next line. Any other key just shows how.', // not confirmed
-  ],
-  fixed: [
-    'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed
-    'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).', // not confirmed
-    "The Flight Computer's briefing lines its keys up with their text again when you play on the keyboard or by touch.", // not confirmed
-    'B on the pad or Esc pressed right after Launch, while the Wake’s link comes up, no longer brings PRESS START back over the run that is starting.', // not confirmed
-  ],
-  unseen: [
-    "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",
-  ],
-  new: [],
   improved: [],
   fixed: [],
   unseen: [],
