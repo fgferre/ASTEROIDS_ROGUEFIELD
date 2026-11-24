@@ -39,6 +39,7 @@ export const NEXT = {
     'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed
     'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).', // not confirmed
     "The Flight Computer's briefing lines its keys up with their text again when you play on the keyboard or by touch.", // not confirmed
+    'B on the pad or Esc pressed right after Launch, while the Wake’s link comes up, no longer brings PRESS START back over the run that is starting.', // not confirmed
   ],
   unseen: [
     "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",

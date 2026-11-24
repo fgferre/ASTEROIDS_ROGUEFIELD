@@ -167,6 +167,14 @@ describe('GamepadMenuNav', () => {
     expect(emit).toHaveBeenCalledWith('gamepad-menu-back');
   });
 
+  it('leaves the menu alone while the remote link covers it', () => {
+    const emit = vi.fn();
+    const ui = menuNav(null, { eventBus: { emit } });
+    document.getElementById('menu-screen').inert = true; // remoteLink.js
+    ui.handle('back');
+    expect(emit).not.toHaveBeenCalled();
+  });
+
   it('gives up waiting for a key with B', () => {
     const cancelBindingCapture = vi.fn();
     const ui = menuNav(null, {

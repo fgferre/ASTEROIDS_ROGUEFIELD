@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 48.** (45 e 47 já são de ramos abertos: `nave/corpo` e `camera/lente-e-zoom`.)
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (45, 47 e 48 já são de ramos abertos: `nave/corpo`, `camera/lente-e-zoom` e `historia/pular-e-repetir`; 49 é do final do jogo.)
 
 ## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
 
@@ -329,6 +329,16 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   aberta abre como hoje)"_. Ramo `camera/lente-e-zoom`: a lente A e a tela pequena C construídas (abaixo de 1155 pontos
   de largura a câmera chega mais perto, no máximo 1,6 vez; números de sensação). Fecha quando ele aprovar jogando, no
   computador e no celular dele.
+- **(48)** As cutscenes (23/11, jogando o conjunto com o controle). O defeito: _"Percebi um bug. Se eu começar o jogo e
+  enquanto tá no cutscene, eu apertar o B rápido e voltar para o start screen, a tela de fundo continua sendo o jogo
+  rodando."_ Tocar sempre: _"toda vez que começarmos qq fase, deve-se tocar os cutscenes, em algum momento decidimos
+  que no replay o cutscne incial da wake nao seria tocado, mas acho bobagem, tem que se tocar sim. A pessoa se quiser
+  pula."_ Pular: _"para pular tem que ser uma tecla especifica que tem que ficar apertada uns 2 a 3 seg [...] Se qq
+  tecla for pressiponada durante um cutscne aparece o hint de como pular e um contador em circular q contarna em volta
+  do botao sendo pressionado"_. Textos inteiros em `quadro/respostas/b-na-cutscene-23-11.txt` e
+  `endgame-e-cutscenes-23-11.txt`. Ramo `historia/pular-e-repetir`: o defeito consertado (o B do controle e o Esc do
+  teclado, apertados na passagem "WAKE · REMOTE LINK" logo depois do Launch, levavam o menu que estava por baixo de
+  volta à tela de início enquanto a partida começava; já existia na 0.8.0). Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 

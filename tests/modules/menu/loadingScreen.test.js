@@ -395,6 +395,14 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
+  it('Escape and pad B leave the menu alone while the remote link covers it', () => {
+    const { gate, menu, winListeners } = inMenu();
+    menu.inert = true; // remoteLink.js, until the run starts
+    winListeners.keydown(escape());
+    gate.leaveMenu();
+    expect(menu.classes.has('menu-screen--gated')).toBe(false);
+  });
+
   it('Escape with a panel open leaves the menu to the panel', () => {
     const { menu, winListeners, page } = inMenu();
     page.overlays = [{ closest: () => null }];

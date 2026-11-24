@@ -1,0 +1,43 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { playRemoteLink } from '../../../src/modules/ui/remoteLink.js';
+
+// Just enough of a page for the link's static and lines.
+const node = () => ({
+  style: { setProperty() {} },
+  classList: { add() {}, remove() {} },
+  append() {},
+  addEventListener() {},
+  remove() {},
+  getContext: () => ({
+    createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+    putImageData() {},
+  }),
+  toDataURL: () => 'data:,',
+});
+
+describe('remote link', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('document', {
+      createElement: node,
+      body: { append() {} },
+      addEventListener() {},
+      removeEventListener() {},
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the menu under it from taking input until the run starts', () => {
+    const menu = { inert: false };
+    const button = { ...node(), closest: () => menu };
+    let inertAtConnect = null;
+    const onConnect = () => (inertAtConnect = menu.inert);
+    playRemoteLink({ lines: [['WAKE · REMOTE LINK']], button, onConnect });
+    expect(menu.inert).toBe(true);
+    vi.advanceTimersByTime(1400);
+    expect(inertAtConnect).toBe(false);
+  });
+});

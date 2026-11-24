@@ -76,6 +76,10 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
   });
   root.append(panel);
   button?.classList.add('is-launching');
+  // The menu stays under the static but takes no input until the run
+  // starts: its way back (Escape, pad B) would bring the title over the run.
+  const menu = button?.closest('.screen');
+  if (menu) menu.inert = true;
   document.body.append(root);
   eventBus?.emit('remote-link-opened');
 
@@ -88,6 +92,7 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
     clearTimeout(timer);
     document.removeEventListener('keydown', skip, true);
     button?.classList.remove('is-launching');
+    if (menu) menu.inert = false;
     onConnect();
     root.style.setProperty('--clear', `${clearMs}ms`);
     root.classList.add('remote-link--clearing');

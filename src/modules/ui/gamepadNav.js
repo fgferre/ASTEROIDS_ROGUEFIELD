@@ -202,12 +202,14 @@ export class GamepadMenuNav {
   }
 
   /** The topmost visible screen a pad can navigate, or null (also while the
-   * PRESS START gate or the pilots cover the menu: they read the pad). */
+   * PRESS START gate or the pilots cover the menu: they read the pad; and
+   * while the remote link covers it, inert: the run is starting). */
   screen() {
     for (const id of GAMEPAD_NAV_SCREENS) {
       const element = document.getElementById(`${id}-screen`);
       if (
         element &&
+        !element.inert &&
         !element.classList.contains('hidden') &&
         !element.classList.contains('menu-screen--gated')
       ) {
