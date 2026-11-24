@@ -3,6 +3,7 @@
 import { biomeForLayer } from '../../data/biomes.js';
 import { localLayer } from '../../data/sectors.js';
 import { CODEX_ENTRIES, codexIdOf } from '../../data/codex.js';
+import { ASTEROID_VARIANTS } from '../../data/enemies/asteroid-configs.js';
 import {
   FAMILY_APEX_THRESHOLD,
   FAMILY_SYNERGY_THRESHOLD,
@@ -24,12 +25,20 @@ import {
 // and the build, the same block on the run end and the pause panel
 // (endBuildMarkup).
 
-/** "Elite Ram", "Warden Choir"; "the Field" when the last hit had no source. */
+/**
+ * "Elite Ram", "Volatile Ring Fragment", "Warden Choir"; "the Field" when the
+ * last hit had no source. A rock of a special kind leads with its kind's name.
+ */
 export function killerName(source) {
   const id = codexIdOf(source);
   const name =
     source?.displayName || CODEX_ENTRIES.find((entry) => entry.id === id)?.name;
   if (!name) return 'the Field';
+  const kind =
+    source.type === 'asteroid' &&
+    source.variant !== 'common' &&
+    ASTEROID_VARIANTS[source.variant]?.displayName;
+  if (kind) return `${kind} ${name}`;
   return source.elite && !name.startsWith('Elite ') ? `Elite ${name}` : name;
 }
 

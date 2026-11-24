@@ -786,6 +786,7 @@ class PlayerSystem extends BaseSystem {
             displayName: source.displayName ?? null,
             elite: Boolean(source.elite),
             bossKind: source.bossKind ?? null,
+            variant: source.variant ?? null,
           }
         : null;
       this.eventBus?.emit?.('player-health-changed', {
