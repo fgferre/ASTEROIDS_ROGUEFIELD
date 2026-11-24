@@ -10,9 +10,7 @@ class AudioPool {
     this.maxPoolSize = maxPoolSize;
 
     // Pools separados por tipo de node
-    this.oscillatorPool = [];
     this.gainPool = [];
-    this.bufferSourcePool = [];
     this.biquadFilterPool = [];
 
     // Tracking de nodes ativos
@@ -30,24 +28,13 @@ class AudioPool {
   }
 
   /**
-   * Obtém um OscillatorNode do pool ou cria um novo
+   * Cria um OscillatorNode (descartável por especificação, não há pool)
    */
   getOscillator() {
-    let oscillator;
-
-    if (this.oscillatorPool.length > 0) {
-      oscillator = this.oscillatorPool.pop();
-      this.stats.reused++;
-      this.stats.poolHits++;
-    } else {
-      oscillator = this.context.createOscillator();
-      this.stats.created++;
-      this.stats.poolMisses++;
-    }
-
+    const oscillator = this.context.createOscillator();
+    this.stats.created++;
     this.activeNodes.add(oscillator);
     this._setupOscillatorCleanup(oscillator);
-
     return oscillator;
   }
 
@@ -59,7 +46,8 @@ class AudioPool {
 
     if (this.gainPool.length > 0) {
       gain = this.gainPool.pop();
-      // Reset gain value
+      // Drop automation left by the previous user, then reset the value
+      gain.gain.cancelScheduledValues(0);
       gain.gain.value = 1;
       this.stats.reused++;
       this.stats.poolHits++;
@@ -74,24 +62,13 @@ class AudioPool {
   }
 
   /**
-   * Obtém um AudioBufferSourceNode do pool ou cria um novo
+   * Cria um AudioBufferSourceNode (descartável por especificação, não há pool)
    */
   getBufferSource() {
-    let source;
-
-    if (this.bufferSourcePool.length > 0) {
-      source = this.bufferSourcePool.pop();
-      this.stats.reused++;
-      this.stats.poolHits++;
-    } else {
-      source = this.context.createBufferSource();
-      this.stats.created++;
-      this.stats.poolMisses++;
-    }
-
+    const source = this.context.createBufferSource();
+    this.stats.created++;
     this.activeNodes.add(source);
     this._setupBufferSourceCleanup(source);
-
     return source;
   }
 
@@ -103,6 +80,15 @@ class AudioPool {
 
     if (this.biquadFilterPool.length > 0) {
       filter = this.biquadFilterPool.pop();
+      // Drop automation left by the previous user, back to Web Audio defaults
+      for (const param of ['frequency', 'Q', 'gain', 'detune']) {
+        filter[param].cancelScheduledValues(0);
+      }
+      filter.type = 'lowpass';
+      filter.frequency.value = 350;
+      filter.Q.value = 1;
+      filter.gain.value = 0;
+      filter.detune.value = 0;
       this.stats.reused++;
       this.stats.poolHits++;
     } else {
@@ -235,9 +221,7 @@ class AudioPool {
     }
 
     this.activeNodes.clear();
-    this.oscillatorPool = [];
     this.gainPool = [];
-    this.bufferSourcePool = [];
     this.biquadFilterPool = [];
   }
 
@@ -254,9 +238,7 @@ class AudioPool {
       poolEfficiency: isFinite(poolEfficiency) ? poolEfficiency : 0,
       activeNodes: this.activeNodes.size,
       poolSizes: {
-        oscillator: this.oscillatorPool.length,
         gain: this.gainPool.length,
-        bufferSource: this.bufferSourcePool.length,
         biquadFilter: this.biquadFilterPool.length,
       },
     };

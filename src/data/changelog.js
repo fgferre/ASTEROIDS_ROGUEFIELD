@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "A reused sound node now drops the fade left over from the sound that used it before, and two pools that could never hold anything are gone; nobody notices because no audible case was found, it only removes a way for a sound to start with the tail of the previous sound's fade.", // not confirmed
+  ],
 };
 
 export const RELEASES = [
