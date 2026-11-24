@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { splitStrafe } from '../../../src/modules/player/movementInput.js';
+import {
+  STRAFE_STICK_DEADZONE,
+  splitStrafe,
+} from '../../../src/modules/player/movementInput.js';
 
 // The strafe's input (every ship strafes; the RCS System pushes harder).
 const IDLE = { up: false, down: false, left: false, right: false };
@@ -15,10 +18,15 @@ describe('the strafe input', () => {
     }
   });
 
-  it("classic on a pad: the left stick sideways strafes as far as it leans; modern's and touch's stick do not", () => {
-    const pad = { ...IDLE, pad: true, moveX: -0.5, moveY: -1 };
-    expect(splitStrafe(pad, false).strafe).toBeCloseTo(-(0.5 ** 1.5), 9);
+  it("classic on a pad: the left stick strafes as far as it leans clearly sideways; modern's and touch's stick do not", () => {
+    const pad = { ...IDLE, pad: true, moveX: -0.7, moveY: -0.7 };
+    const past = (0.7 - STRAFE_STICK_DEADZONE) / (1 - STRAFE_STICK_DEADZONE);
+    expect(splitStrafe(pad, false).strafe).toBeCloseTo(-(past ** 1.5), 9);
     expect(splitStrafe(pad, false).steer).toBe(pad); // it still thrusts
+    // pushed forward 20° off straight: no slide
+    const crooked = { ...IDLE, pad: true, moveX: Math.sin(0.35), moveY: -1 };
+    expect(splitStrafe(crooked, false).strafe).toBe(0);
+    expect(splitStrafe({ ...pad, moveX: 1, moveY: 0 }, false).strafe).toBe(1);
     expect(splitStrafe(pad, true).strafe).toBe(0); // modern: it steers
     expect(splitStrafe({ ...IDLE, moveX: -0.5 }, false).strafe).toBe(0);
   });
