@@ -13,6 +13,8 @@ import { STORY } from '../../data/story.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
 import { buildRadarState, createRadarMemory } from './hud/radar.js';
+import { hitsWithin } from '../../core/cameraDirector.js';
+import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 
 /**
  * The deflector's state for the vitals (player/shield.js, read as it runs):
@@ -338,8 +340,9 @@ export class TacticalHud {
       );
     }
 
-    // Off-screen arrows (Wardens, Heralds, then pickups) as field points,
-    // which placeOnField projects; and the Herald's bar.
+    // Off-screen arrows (Wardens, Heralds, on a small screen the enemies,
+    // then pickups) as field points, which placeOnField projects; and the
+    // Herald's bar.
     const arrowTargets = [];
     let herald = null;
     if (player && enemies) {
@@ -365,6 +368,33 @@ export class TacticalHud {
           toTarget('herald', enemy, null, true);
           herald = herald || enemy;
         }
+      }
+      // A small screen's closer view (camera.js `small`) leaves part of the
+      // field out: arrows for the enemy ships there and for any rock or shot
+      // that will hit within the threat horizon, nearest first.
+      if (renderer?.camera?.directed?.closer > 1) {
+        const v = player.velocity || { vx: 0, vy: 0 };
+        const ship = {
+          x: playerPosition.x,
+          y: playerPosition.y,
+          vx: v.vx,
+          vy: v.vy,
+        };
+        const horizon = CAMERA_DIRECTOR.threatHorizon;
+        const out = [];
+        for (let i = 0; i < active.length; i += 1) {
+          const e = active[i];
+          if (e.destroyed || e.type === 'boss' || e.type === 'herald') continue;
+          if (e.type !== 'asteroid' || hitsWithin(ship, e, horizon))
+            out.push(e);
+        }
+        for (const shot of combat?.enemyBullets || []) {
+          if (shot.active === false || shot.hit) continue;
+          if (hitsWithin(ship, shot, horizon)) out.push(shot);
+        }
+        const away = (e) => Math.hypot(e.x - ship.x, e.y - ship.y);
+        out.sort((a, b) => away(a) - away(b));
+        for (const e of out) toTarget('enemy', e, null, true);
       }
       const pickups = this.pickups()?.getActivePickups() || [];
       for (let i = 0; i < pickups.length; i += 1) {

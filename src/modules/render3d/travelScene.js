@@ -327,6 +327,9 @@ export class TravelScene {
     this.planned = false;
     this.rise = FLIGHT.rise;
     this.baseFov = null;
+    // How far the camera has risen into the intro's pose, 0..1: the lens the
+    // points are sized for follows it (Renderer3D).
+    this.risen = 0;
     this.identity = new THREE.Matrix4();
     this.pose4 = new THREE.Matrix4();
     this.home4 = new THREE.Matrix4();
@@ -479,6 +482,7 @@ export class TravelScene {
       .multiply(this.home4)
       .decompose(this.leftPos, this.leftQuat, this.leftScale);
     this.baseFov = null;
+    this.risen = 0;
     this.active = true;
     this.streaks.visible = true;
   }
@@ -666,6 +670,7 @@ export class TravelScene {
       camera.fov = fov;
       camera.updateProjectionMatrix();
     }
+    this.risen = k;
 
     // The field's border and drifting fragments fade in over the last
     // second; the place's own set already stands ahead.

@@ -15,6 +15,7 @@ import {
 } from '../../core/cinematics.js';
 import { dampTo } from '../../core/dampTo.js';
 import { IS_DEV } from '../../core/env.js';
+import { getViewport } from '../../core/viewport.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
 import { HALF_H, HALF_W } from './batches.js';
@@ -85,8 +86,9 @@ export class CameraRig {
     this.focus = { x: 0, z: 0 };
     // The shot's footprint this frame, as the logical camera's reach.
     this.reach = {};
-    // The lens the director frames with, and its shot as posed this frame.
-    this.lens = { tanV: TAN_V, aspect: 4 / 3 };
+    // The lens the director frames with (and the screen's width in CSS
+    // points, for small screens), and its shot as posed this frame.
+    this.lens = { tanV: TAN_V, aspect: 4 / 3, width: 0 };
     this.shot = { x: 0, y: 0, distance: 1, tilt: TILT, yaw: 0, roll: 0 };
     this.extent = {};
   }
@@ -150,6 +152,7 @@ export class CameraRig {
     // Poses are interpolated by now (render → applyPoses), so is the scene.
     const position = player?.position;
     this.lens.aspect = t.camera.aspect;
+    this.lens.width = getViewport().cssWidth;
     this.camera.setLens(this.lens);
     if (position) {
       if (snap) this.camera.snapTo(position.x, position.y);
@@ -297,7 +300,7 @@ export class CameraRig {
     if (!key.castShadow) return;
     const half = Math.min(
       KEY_SHADOW.max,
-      Math.max(KEY_SHADOW.min, range * KEY_SHADOW.span)
+      Math.max(KEY_SHADOW.min, range * TAN_V * KEY_SHADOW.span)
     );
     const texel = (2 * half) / key.shadow.mapSize.x;
     const x = Math.round(tx / texel) * texel;

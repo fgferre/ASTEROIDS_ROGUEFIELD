@@ -15,6 +15,14 @@ export const CAMERA_DIRECTOR = deepFreeze({
   // much of the half-view may show past the field's top or bottom edge.
   near: { tilt: 18, beyondEdge: 0.4 },
 
+  // Small screens (Felipe's pick on 23/11/2026, camera-1 "C"): on a screen
+  // narrower than `width` points the near view comes closer, as if the screen
+  // were that wide (the ship as big as on an 11" tablet held sideways), at most
+  // `most` times, and follows the ship sideways too; edge arrows point at what
+  // it leaves out, and the wide view opens for what would open it on a wide
+  // screen. Feel numbers: not confirmed until he plays it on his phone.
+  small: { width: 1155, most: 1.6 },
+
   // Wide: nearly straight down, the whole field and some space around it;
   // `margin` is the share of the screen kept free around the field.
   wide: { tilt: 5, margin: 0.05 },

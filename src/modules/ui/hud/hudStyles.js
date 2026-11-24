@@ -74,6 +74,7 @@ export function getHudCss() {
             .edge-arrow > * { box-sizing: border-box; }
             .edge-arrow[data-kind='warden'] { --arrow-tone: var(--danger); }
             .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
+            .edge-arrow[data-kind='enemy'] { --arrow-tone: var(--danger); }
             .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
             .edge-arrow[data-kind='pickup'] .edge-arrow__glyph { transform-origin: 50% 50%; scale: 0.7; }
             .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: var(--text-ink); white-space: nowrap; }

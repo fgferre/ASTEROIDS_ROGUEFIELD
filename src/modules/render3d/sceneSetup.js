@@ -30,7 +30,14 @@ import { ShieldMirror } from './shieldMirror.js';
 import { CAMERA_FAR, SpaceField } from './spaceField.js';
 import { WeaponBodies } from './weaponBodies.js';
 
-export const FOV = 38;
+// The play lens (vertical, degrees). Felipe's pick on 23/11/2026 (camera-1,
+// "lente fechada"): at 38° the ship looked tilted by where it sat on the
+// screen (26° at the sides, 33° on a phone); at 20° it is 14° and 18°. The
+// camera director frames the same slice of the field from about twice as far.
+export const FOV = 20;
+// The lens the journey and the story scenes were made with: their shots set
+// the camera's own lens, and the points in them are sized for this one.
+export const SCENE_FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
 export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 // proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
@@ -40,12 +47,13 @@ const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
 // proposta 18/10: the key light's shadow box follows the camera target: the
 // light sits KEY_SHADOW.distance away along its direction, the box spans the
-// shot (`span` × the camera range, clamped) and the biases keep rocks from
+// shot (`span` × the view's half-height at its target, clamped: the same box
+// at any lens) and the biases keep rocks from
 // shadowing themselves in stripes.
 export const KEY_SHADOW = {
   distance: 1000,
   depth: 500,
-  span: 0.62,
+  span: 1.8,
   min: 380,
   max: 1400,
   bias: -0.0006,

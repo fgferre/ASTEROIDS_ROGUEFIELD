@@ -61,7 +61,7 @@ import {
   WardLinks,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
-import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
 
@@ -969,7 +969,14 @@ class Renderer3D extends BaseSystem {
       this.flashScale
     );
 
-    const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
+    // The journey's points are sized for its lens until it rises into the
+    // intro's pose, which is the play lens.
+    const lens = story
+      ? SCENE_FOV
+      : travel
+        ? SCENE_FOV + (FOV - SCENE_FOV) * travel.risen
+        : FOV;
+    const pointScale = t.height / (2 * Math.tan((lens * Math.PI) / 360));
     this.biome.update(dt);
     t.biomes.update(travel ? travel.look : this.biome, fog);
     const ship = t.player.group.visible && (travel?.focus || player?.position);

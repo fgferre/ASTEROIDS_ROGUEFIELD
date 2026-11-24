@@ -28,8 +28,9 @@ describe('Renderer3D camera clamp', () => {
   it('keeps the dollied-out follow point inside the field', () => {
     const renderer = new Renderer3D();
     renderer.camera.snapTo(20, 20);
-    const near = { ...renderer.clampToField(700, 4 / 3) };
-    const far = renderer.clampToField(900, 4 / 3);
+    // distances at the play lens (20°): the shot shows past the flat view
+    const near = { ...renderer.clampToField(1400, 4 / 3) };
+    const far = renderer.clampToField(1800, 4 / 3);
     expect(near.x).toBeGreaterThan(20);
     expect(near.y).toBeGreaterThan(20);
     // further out shows more, so the follow point sits further from the edge

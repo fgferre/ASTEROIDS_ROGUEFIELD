@@ -319,6 +319,16 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora). Respostas dele ao cartão `corpo-da-nave-3`
   (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
   de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta.
+- **(47)** A câmera: a lente e a tela pequena (23/11, jogando a 0.8.0). Da lente: _"tem momentos em que a nave parece
+  que está levemente inclinada no eixo X dela. [...] se isso não é alguma coisa a ver com Field of View, o FOV, que cria
+  um efeito de lente estranho, de acordo com a posição da nave dentro da tela."_ Da tela pequena: _"quando a gente está
+  jogando em telas muito pequenas, será que a gente não tinha que pensar nesse zoom dinâmico para ele se adaptar a isso?
+  Porque a gente não vê quase detalhe nenhum, fica muito pequeno."_ Textos inteiros em
+  `quadro/respostas/nave-inclinada-lente-23-11.txt` e `zoom-telas-pequenas-23-11.txt`. Respostas dele ao cartão
+  `camera-1` (23/11): a lente _"A · lente fechada (20°)"_; a tela pequena _"C · mais perto + setas na borda (a vista
+  aberta abre como hoje)"_. Ramo `camera/lente-e-zoom`: a lente A e a tela pequena C construídas (abaixo de 1155 pontos
+  de largura a câmera chega mais perto, no máximo 1,6 vez; números de sensação). Fecha quando ele aprovar jogando, no
+  computador e no celular dele.
 
 ## Som (palavras dele, 19/11)
 

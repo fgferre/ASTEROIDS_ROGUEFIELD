@@ -123,6 +123,77 @@ describe('Tactical HUD', () => {
     expect(layout.showDamageFrom).toHaveBeenCalledTimes(1);
   });
 
+  it('points edge arrows at enemies and coming hits only while a small screen is closer', () => {
+    const drone = { type: 'drone', x: 2000, y: 300 };
+    const coming = {
+      type: 'asteroid',
+      x: 900,
+      y: 300,
+      vx: -300,
+      vy: 0,
+      radius: 20,
+    };
+    const leaving = {
+      type: 'asteroid',
+      x: 900,
+      y: 300,
+      vx: 300,
+      vy: 0,
+      radius: 20,
+    };
+    const shot = { x: 500, y: 700, vx: 0, vy: -300, radius: 4, active: true };
+    const kinds = (closer) => {
+      const renderer = {
+        camera: { directed: { closer } },
+        shipOnScreen: { x: 400, y: 300 },
+        worldToScreen: (x, y) => ({ x, y }),
+      };
+      const tacticalHud = new TacticalHud({
+        refs: {},
+        player: () => ({
+          getDashCooldownFraction: () => 0,
+          getPosition: () => ({ x: 500, y: 300 }),
+          velocity: { vx: 0, vy: 0 },
+        }),
+        enemies: () => ({
+          getActiveEnemies: () => [drone, coming, leaving],
+        }),
+        progression: () => null,
+        combat: () => ({
+          enemyBullets: [shot],
+          getWeaponState: () => null,
+          getSpreadMode: () => null,
+          getAimMode: () => null,
+        }),
+        pickups: () => null,
+        renderer: () => renderer,
+        shieldKey: () => 'E',
+      });
+      const layout = {
+        updateShip: vi.fn(),
+        updateBuild: vi.fn(),
+        updateNextWaveTimer: vi.fn(),
+        updateBoss: vi.fn(),
+        tickBuffs: vi.fn(),
+        updateEdgeArrows: vi.fn(),
+        showDamageFrom: vi.fn(),
+        placeOnShip: vi.fn(),
+      };
+      tacticalHud.layout = layout;
+      tacticalHud.update(0.016);
+      tacticalHud.placeOnField();
+      return layout.updateEdgeArrows.mock.lastCall[0].map((a) => [a.kind, a.x]);
+    };
+    // nearest first: the coming rock and the shot (both 400 away), the drone;
+    // not the rock flying away
+    expect(kinds(1.37)).toEqual([
+      ['enemy', 900],
+      ['enemy', 500],
+      ['enemy', 2000],
+    ]);
+    expect(kinds(1)).toEqual([]);
+  });
+
   it('clears the previous Warden bar when a new run starts', () => {
     const tacticalHud = new TacticalHud({
       refs: {},
