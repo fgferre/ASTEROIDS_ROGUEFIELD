@@ -29,7 +29,9 @@ export const NEXT = {
     'The Braking System waits until you let go of every key, a beat longer: a turn or a quick tap of thrust no longer bleeds your speed.', // not confirmed
     'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed
   ],
-  fixed: [],
+  fixed: [
+    "The Flight Computer's briefing lines its keys up with their text again when you play on the keyboard or by touch.", // not confirmed
+  ],
   unseen: [
     "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",
   ],
