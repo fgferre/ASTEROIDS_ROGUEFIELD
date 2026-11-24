@@ -13,8 +13,9 @@
 //   mas muito pouco").
 // - The cards are the computer lighting jets for the pilot: the Braking System
 //   stops the travel when the keys let go (and strengthens the retro), the RCS
-//   System stops the spin, firmer each level (and strengthens the side jets),
-//   Main Thrusters is the engine and its top speed.
+//   System stops the spin, firmer each level (and strengthens the side jets,
+//   which then strafe at the pilot's word: the whole hull sideways, the nose
+//   kept; approved 23/11), Main Thrusters is the engine and its top speed.
 // - The Flight Computer: modern flight with the turbo ("Eu gostei do Turbo"):
 //   the computer flies the ship onto the keys' velocity, 1.2× the start's top
 //   speed, a straight run building up to 1.4× that; it draws 1.5× from the
@@ -40,7 +41,12 @@ import {
   DASH_DECAY_SECONDS,
   DASH_SPEED_CAP_MULTIPLIER,
 } from '../../data/constants/gameplay.js';
-import { classicAsks, getModernMove, padForce } from './movementInput.js';
+import {
+  classicAsks,
+  getModernMove,
+  padForce,
+  splitStrafe,
+} from './movementInput.js';
 
 // The retro and a flank's pair each push this share of the main engine; the
 // Braking System multiplies the retro, the RCS System the side jets.
@@ -60,6 +66,10 @@ export const SPIN_STOP_SHARE = 0.5;
 // gentler, never under BRAKE_FLOOR of it, until the ship stops.
 export const BRAKE_FULL_SHARE = 0.5;
 export const BRAKE_FLOOR = 0.5;
+// The start's auto-brake waits for every key to be let go, the turn's too,
+// and this long more (s), so a tap of W keeps the speed (Felipe's pick,
+// corpo-da-nave-1, 23/11: "A + espera um instante").
+export const BRAKE_WAIT_S = 0.25;
 // The Flight Computer: its cruise × the start's top speed; the turbo × that;
 // the jets' force and the auto-brake's, × the start's.
 const MODERN_TOP = 1.2;
@@ -158,11 +168,11 @@ function maneuverJets(maneuvers, fwd, right) {
 
 // Which jets the pilot's own keys or stick lit (they sound louder); the rest
 // are the brake's and the flight computer's.
-function pilotFlags(modern, move, { up, down, left, right }) {
+function pilotFlags(modern, move, strafe, { up, down, left, right }) {
   return {
     mainAuto: modern ? !move : !up,
     auxAuto: modern ? !move : !down,
-    sideAuto: !(modern && move),
+    sideAuto: !((modern && move) || strafe),
     turnAuto: modern ? !move : !left && !right,
   };
 }
@@ -186,8 +196,9 @@ export function spinCoast(spin, agility = 1) {
 }
 
 /**
- * The modern nose: onto the keys' direction, else onto the motion, else the
- * spin brought to a stop. Returns the spin's change this step (rad/s²).
+ * The modern nose: onto the keys' direction (strafing, its own), else onto
+ * the motion, else the spin brought to a stop. Returns the spin's change this
+ * step (rad/s²).
  */
 function swingNose(ship, deltaTime, move, quick) {
   const v = ship.velocity;
@@ -243,11 +254,28 @@ export class PlayerFlight {
     // with any level the auto-brake on the travel.
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
+    // How long the start's pilot has touched no key (s), for BRAKE_WAIT_S.
+    this.idle = 0;
   }
 
   // The combined total, for readers of the old shape (snapshot, tooltip).
   get linearDamping() {
     return this.baseLinearDamping + this.brakingDamping;
+  }
+
+  // The strafe comes with the RCS System: its flank jets push it.
+  get canStrafe() {
+    return this.agility > 1;
+  }
+
+  /**
+   * This step's strafe and the input left to steer by (splitStrafe); `hold`:
+   * the strafe hold is down. With no RCS System, none, and the input as is.
+   */
+  strafeOf(input) {
+    if (!this.canStrafe) return { strafe: 0, steer: input, hold: false };
+    const modern = this.ship.controlScheme === 'modern';
+    return { ...splitStrafe(input, modern), hold: Boolean(input.strafeHold) };
   }
 
   // The turbo's multiplier this step (`move`: the keys' unit direction or null).
@@ -275,10 +303,12 @@ export class PlayerFlight {
     const modern = ship.controlScheme === 'modern';
     const fwd = { x: Math.cos(ship.angle), y: Math.sin(ship.angle) };
     const right = { x: -fwd.y, y: fwd.x };
-    const asks = classicAsks(input);
-    const move = modern ? getModernMove(input) : null;
-    const lean = Math.hypot(Number(input.moveX) || 0, Number(input.moveY) || 0);
-    const moveForce = move && input.pad && lean > 0 ? padForce(input, lean) : 1;
+    // -1 (to port) .. 1 (to starboard), on the flank jets, without turning.
+    const { strafe, steer, hold } = this.strafeOf(input);
+    const asks = classicAsks(steer);
+    const move = modern ? getModernMove(steer) : null;
+    const lean = Math.hypot(Number(steer.moveX) || 0, Number(steer.moveY) || 0);
+    const moveForce = move && steer.pad && lean > 0 ? padForce(steer, lean) : 1;
     const dashing = maneuvers.dashTimer > 0;
     const easing = dashing || maneuvers.dashDecayTimer > 0;
 
@@ -305,9 +335,12 @@ export class PlayerFlight {
     const speed = Math.hypot(v.vx, v.vy);
     const isMainManual = modern ? Boolean(move) : asks.up > 0;
     const isAuxManual = !modern && asks.down > 0;
-    const noLinearInput = modern ? !move : !asks.up && !asks.down;
+    const command = asks.up || asks.down || asks.left || asks.right || strafe;
+    this.idle = command ? 0 : this.idle + deltaTime;
+    const noLinearInput = modern ? !move && !strafe : this.idle >= BRAKE_WAIT_S;
     // The auto-brake: the Flight Computer's always; the start's with the
-    // Braking System (without it, stopping is the pilot's).
+    // Braking System (without it, stopping is the pilot's), once every key
+    // has been let go for BRAKE_WAIT_S.
     const autoBrake =
       noLinearInput && speed > 0 && (modern || this.brakingDamping > 0);
 
@@ -327,10 +360,18 @@ export class PlayerFlight {
       reach =
         Math.max(BRAKE_FLOOR, Math.min(1, speed / (top * BRAKE_FULL_SHARE))) *
         (modern ? MODERN_BRAKE : 1);
-    } else if (!modern) {
-      const push = asks.up * forces.main - asks.down * forces.retro;
+    } else if (!modern || strafe) {
+      // Classic, the main engine and the retro along the nose; in both
+      // flights the strafe, the flank jets across it.
+      const push = modern
+        ? 0
+        : asks.up * forces.main - asks.down * forces.retro;
       wantX = fwd.x * push;
       wantY = fwd.y * push;
+      if (strafe) {
+        wantX += right.x * strafe * forces.flank;
+        wantY += right.y * strafe * forces.flank;
+      }
       // The engine never pushes past the top speed; the rest of the push still
       // bends the path.
       if (speed > 0) {
@@ -387,7 +428,9 @@ export class PlayerFlight {
     let spin;
     let spinShown;
     if (modern) {
-      spin = swingNose(ship, deltaTime, move, this.agility);
+      // Strafing, or holding to, the nose holds where it points.
+      const heading = !move && (strafe || hold) ? fwd : move;
+      spin = swingNose(ship, deltaTime, heading, this.agility);
       spinShown = NOSE_SPIN_ACCEL * this.agility;
     } else {
       // The pilot's turn to the pair's top rate; let go, the spin is worked
@@ -420,7 +463,7 @@ export class PlayerFlight {
       jets: {
         ...jets,
         turn: Math.max(-1, Math.min(1, spin / spinShown)),
-        ...pilotFlags(modern, move, asks),
+        ...pilotFlags(modern, move, strafe, asks),
       },
     };
   }

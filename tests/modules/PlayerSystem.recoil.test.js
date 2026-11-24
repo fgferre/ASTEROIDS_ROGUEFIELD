@@ -8,27 +8,30 @@ describe('PlayerSystem shot recoil', () => {
   beforeEach(() => setupGlobalMocks());
   afterEach(() => cleanupGlobalState());
 
-  it('kicks the hull against the aim once per weapon-fired', () => {
+  it('kicks the hull against the aim once per shot in either flight, a slower gun harder per shot', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
       input: { getMovementInput: () => ({}) },
       'command-queue': null,
     });
-    // Modern flight: gliding, nothing would bleed the kick off, so none.
-    player.setFlightScheme('modern', false);
-    player.velocity = { vx: 0, vy: 0 };
-    const shot = {
+    const shot = (cooldownMultiplier) => ({
+      cooldownMultiplier,
       position: { x: 400, y: 300 },
       target: { x: 400, y: 0 },
       centerlineTarget: { x: 700, y: 300 },
-    };
-
-    eventBus.emit('weapon-fired', shot);
+    });
+    // The start's flight: nothing bleeds the kick off but the pilot.
+    player.setFlightScheme('classic', true);
+    player.velocity = { vx: 0, vy: 0 };
+    eventBus.emit('weapon-fired', shot(1));
     expect(player.velocity.vx).toBeCloseTo(-SHOT_RECOIL_IMPULSE, 6);
     expect(player.velocity.vy).toBeCloseTo(0, 6);
 
-    eventBus.emit('weapon-fired', shot);
-    expect(player.velocity.vx).toBeCloseTo(-2 * SHOT_RECOIL_IMPULSE, 6);
+    // The Scatter Coil waits 1.6× the Lance's cooldown: 1.6× the kick.
+    player.setFlightScheme('modern', false);
+    player.velocity = { vx: 0, vy: 0 };
+    eventBus.emit('weapon-fired', shot(1.6));
+    expect(player.velocity.vx).toBeCloseTo(-1.6 * SHOT_RECOIL_IMPULSE, 6);
   });
 });

@@ -106,7 +106,7 @@ describe('Settings panel', () => {
         .map((field) => `${category.id}.${field.key}`)
     );
     expect(SECTION_IDS).toHaveLength(6);
-    expect(visible).toHaveLength(43);
+    expect(visible).toHaveLength(46);
     expect([...shown].sort()).toEqual([...visible].sort());
   });
 

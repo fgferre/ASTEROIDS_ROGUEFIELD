@@ -66,6 +66,10 @@ describe('endless run past the final Warden', () => {
     game.session.startNewRun({ source: 'test' });
     const { player, enemies } = game.services;
     player.setInvulnerableTimer(1e9);
+    // No pilot here: the Braking System holds the ship against its own
+    // guns' kick, or five layers of fire drive it backward into a rock once
+    // a layer's change has cut the invulnerability short.
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
 
     const won = [];
     const victories = [];

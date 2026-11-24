@@ -208,6 +208,15 @@ describe('Braking System 3: emergency brake', () => {
     expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(5);
   });
 
+  it('with the strafe hold down (RCS System) a direction held against the motion never brakes', () => {
+    const { player, movement, brakes } = makePlayer(-150);
+    player.flight.agility = 1.9;
+    movement.down = true;
+    movement.strafeHold = true;
+    steps(player, holdSteps * 2);
+    expect(brakes()).toBe(0);
+  });
+
   it('Classic on a pad: the left stick held back brakes, like S', () => {
     const { player, brakes } = makePlayer(-150);
     player.controlScheme = 'classic';

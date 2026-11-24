@@ -52,6 +52,9 @@ export const SETTINGS_SECTIONS = [
               'controls.moveDown',
               'controls.moveLeft',
               'controls.moveRight',
+              'controls.strafeLeft',
+              'controls.strafeRight',
+              'controls.strafeHold',
             ],
           },
           {

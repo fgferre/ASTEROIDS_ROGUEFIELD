@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import PlayerSystem from '../../src/modules/PlayerSystem.js';
+import { BRAKE_WAIT_S } from '../../src/modules/player/flight.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 
@@ -75,6 +76,27 @@ describe('PlayerSystem flight by the jets', () => {
     expect(retro.every((e) => e.isAutomatic && !e.pilot)).toBe(true);
   });
 
+  it('the Braking System waits for every key, the turn included, and a beat more: a turn or a tap of W keeps the speed', () => {
+    const { player, fly } = makePlayer();
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
+    fly({ up: true }, 90);
+    fly({ right: true }, 60);
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    for (let i = 0; i < 8; i += 1) {
+      fly({ up: true }, 6);
+      fly({}, 9);
+    }
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    // the last tap's 9 idle frames count toward the wait
+    fly({}, Math.round(BRAKE_WAIT_S / DT) - 10);
+    expect(speedOf(player)).toBeCloseTo(START_TOP, 3);
+    fly({}, 6);
+    expect(speedOf(player)).toBeLessThan(START_TOP - 1);
+    // drifting across the nose after the turn: the flanks stop it
+    fly({}, 180);
+    expect(speedOf(player)).toBe(0);
+  });
+
   it('a released turn keeps its momentum, worked off slowly; the RCS System stops it firmer, the Braking System not at all', () => {
     const turnThenLetGo = (setup) => {
       const { player, fly } = makePlayer();
@@ -136,6 +158,59 @@ describe('PlayerSystem flight by the jets', () => {
     fly({ up: true }, 90);
     const turning = fly({ up: true, right: true }, 60);
     expect(lit(turning, 'aux')).toEqual([]);
+  });
+
+  it('the strafe comes with the RCS System: the flank jets push the whole hull sideways, the nose kept, harder each level', () => {
+    const strafe = (agility) => {
+      const { player, fly } = makePlayer();
+      player.flight.agility = agility;
+      return { player, events: fly({ strafeRight: true }, 20) };
+    };
+    expect(speedOf(strafe(1).player)).toBe(0);
+    const rcs1 = strafe(1.3);
+    // Nose along +x: starboard is down the screen.
+    expect(rcs1.player.velocity.vy).toBeGreaterThan(30);
+    expect(rcs1.player.velocity.vx).toBe(0);
+    expect(rcs1.player.angle).toBe(0);
+    const sideJets = lit(rcs1.events, 'side');
+    expect(sideJets.length).toBeGreaterThan(0);
+    expect(sideJets.every((e) => !e.isAutomatic)).toBe(true);
+    expect(strafe(1.9).player.velocity.vy).toBeGreaterThan(
+      rcs1.player.velocity.vy * 1.4
+    );
+  });
+
+  it('a strafe is a key for the Braking System: let go, it slides on until the wait is over', () => {
+    const { player, fly } = makePlayer();
+    player.flight.agility = 1.3;
+    player.flight.brakingDamping = player.flight.baseLinearDamping;
+    fly({ strafeLeft: true }, 60);
+    const sliding = speedOf(player);
+    expect(sliding).toBeGreaterThan(100);
+    fly({}, Math.round(BRAKE_WAIT_S / DT) - 1);
+    expect(speedOf(player)).toBeCloseTo(sliding, 6);
+    fly({}, 180);
+    expect(speedOf(player)).toBe(0);
+  });
+
+  it('the Flight Computer strafes with the nose held: Z and C, or LB with the stick sideways', () => {
+    const strafe = (input) => {
+      const { player, fly } = makePlayer('modern');
+      flightComputerCards(player.flight);
+      player.angle = -Math.PI / 2; // nose up: starboard is right on the screen
+      fly(input, 45);
+      return player;
+    };
+    const keys = strafe({ strafeRight: true });
+    expect(keys.velocity.vx).toBeGreaterThan(100);
+    expect(keys.angle).toBeCloseTo(-Math.PI / 2, 9);
+    const held = strafe({ strafeHold: true, pad: true, moveX: 1, moveY: 0 });
+    expect(held.velocity.vx).toBeCloseTo(keys.velocity.vx, 6);
+    expect(held.angle).toBeCloseTo(-Math.PI / 2, 9);
+    // Without LB the stick flies the ship and the nose swings onto it.
+    expect(strafe({ pad: true, moveX: 1, moveY: 0 }).angle).toBeGreaterThan(
+      -0.5
+    );
   });
 
   it('the turbo holds when a second key makes the run diagonal (45°)', () => {

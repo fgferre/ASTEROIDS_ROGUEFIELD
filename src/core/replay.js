@@ -10,13 +10,16 @@
 // integers replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 11;
-// Recordings before version 11 are refused, as they no longer play back the
+export const REPLAY_VERSION = 12;
+// Recordings before version 12 are refused, as they no longer play back the
 // same: 8 drew its random streams from the page's boot seed, before 9 none
 // stored the run's Hangar setup, in 9 a pad's left stick held back fired the
 // dash forward and its D-pad lost thrust while the right stick aimed
-// (outside audit 5, 21/11), and 10 flew the drag flight the jets' flight
-// replaced (22/11).
+// (outside audit 5, 21/11), 10 flew the drag flight the jets' flight
+// replaced (22/11), and 11's Braking System braked the start's flight with a
+// turn key held or right after a tap of thrust (23/11). 12 also records the
+// strafe (Z and C, the strafe hold), and with the RCS System a pad's left
+// stick pushed sideways strafes the start's flight.
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -34,6 +37,10 @@ export const INPUT_FRAME_FIELDS = Object.freeze([
   // The sticks are a pad's (Felipe's two-stick scheme, controle-1, 20/11):
   // their tilt is the force. Last, so older recordings read it false.
   'pad',
+  // The strafe (23/11): Z and C held, and the strafe hold (LB, touch).
+  'strafeLeft',
+  'strafeRight',
+  'strafeHold',
 ]);
 
 // Held stick axes in -1..1 (screen axes, y down): left stick move, right

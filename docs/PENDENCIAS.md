@@ -305,6 +305,21 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   linhas da primeira vez e as frases fixas (Campaign, dificuldade, abas Ship e Medals). Fecha quando ele aprovar vendo
   como quem chega.
 
+- **(45)** O corpo da nave (23/11, jogando a 0.8.0): _"essa tremida que a nave dá a cada tiro, ela não tá boa.
+  [...] fazer os canos das armas sofrerem esse recuo, ao invés do corpo inteiro da arma ficar quicando."_ Do casco:
+  _"quando a gente olha a nave de cima e a nave está fazendo movimentos de thruster [...] o casco fica completamente
+  still."_ E: _"a gente poderia introduzir o movimento strafe."_ Texto inteiro em `quadro/respostas/corpo-da-nave-23-11.txt`.
+  Do freio (23/11): _"me parece que as cartas de freio [...] freiam a nave até mesmo quando a gente está usando os
+  thrusters para acelerar ela. [...] O freio só entra quando nenhum controle está sendo acionado."_
+  (`quadro/respostas/freio-com-motor-23-11.txt`); medido: com o motor apertado a carta não freia, entra nos toques de W
+  e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
+  inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
+  inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). Fecha quando
+  ele aprovar voando. O strafe construído com a RCS System: teclas Z e C, LB no controle (no voo do começo, o analógico
+  esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora). Respostas dele ao cartão `corpo-da-nave-3`
+  (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
+  de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta.
+
 ## Som (palavras dele, 19/11)
 
 - **(37)** Vozes e roteiro (19/11, na conferência): _"sinto quie poderia ter mais efeito nessas vozes e acho que

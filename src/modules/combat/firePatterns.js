@@ -97,12 +97,22 @@ function enemiesNear(w, x, y, reach, skip = null) {
   return near.sort((a, b) => a.sq - b.sq).map(({ enemy }) => enemy);
 }
 
-function emitFired(w, pattern, position, target = null, lockCount = 0) {
+// `cooldownMultiplier`: the fire entry's cadence, × the lance's cooldown (the
+// hull's kick per shot grows with it: PlayerSystem).
+function emitFired(
+  w,
+  pattern,
+  position,
+  target = null,
+  lockCount = 0,
+  cooldownMultiplier = 1
+) {
   w.emit('weapon-fired', {
     position,
     target,
     centerlineTarget: target,
     pattern,
+    cooldownMultiplier,
     weaponId: w.weaponId,
     primaryTargetId: w.targeting().currentTarget?.id ?? null,
     targeting: {
@@ -203,7 +213,14 @@ export function fireChain(w, chain, playerPos, playerStats) {
   setCooldown(w, {
     cooldownMultiplier: chain.cooldownMultiplier / charge,
   });
-  emitFired(w, chain.pattern, playerPos, end, firsts.length);
+  emitFired(
+    w,
+    chain.pattern,
+    playerPos,
+    end,
+    firsts.length,
+    chain.cooldownMultiplier / charge
+  );
 }
 
 // The chain's first targets: in range and inside the cone, nearest first;
@@ -477,7 +494,8 @@ export function fireSeeker(w, seeker, playerPos, playerStats) {
     seeker.pattern,
     playerPos,
     first ? { x: first.x, y: first.y } : null,
-    targets.length
+    targets.length,
+    seeker.cooldownMultiplier
   );
 }
 

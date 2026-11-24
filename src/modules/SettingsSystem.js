@@ -26,6 +26,9 @@ const PRE_1810_PAD_BINDINGS = {
   toggleSpreadMode: [],
   toggleAimMode: [],
 };
+// The shield's pad default before the strafe (23/11): LB, now the strafe hold.
+const PRE_STRAFE_SHIELD = ['button:4'];
+const STRAFE_ACTIONS = ['strafeLeft', 'strafeRight', 'strafeHold'];
 
 function deepClone(value) {
   if (value === undefined) {
@@ -157,6 +160,40 @@ class SettingsSystem {
     this.migrateShiftFromShieldToDash(stored.controls);
     this.migratePadBindings(stored.controls);
     this.migrateTwoStickPad(stored.controls);
+    this.migrateStrafe(stored.controls);
+  }
+
+  // Before 23/11 the pad raised the shield on LB, which now holds the strafe
+  // (Z and C on the keys). A save from then (no strafe binding) moves a
+  // shield still on LB to LT, unless another action already holds LT (then it
+  // stays on LB); the strafe's new bindings start without any key or button
+  // another action holds, so no button does two things.
+  migrateStrafe(storedControls) {
+    if (!storedControls || storedControls.strafeHold) {
+      return;
+    }
+    const controls = this.values.controls;
+    const heldByOthers = (action, device) =>
+      Object.entries(controls)
+        .filter(([key]) => key !== action)
+        .flatMap(([, value]) => value?.[device] ?? []);
+    const shield = controls.activateShield;
+    const lt = this.findField('controls', 'activateShield').default.gamepad;
+    const othersOnPad = heldByOthers('activateShield', 'gamepad');
+    if (
+      JSON.stringify(shield.gamepad) === JSON.stringify(PRE_STRAFE_SHIELD) &&
+      !lt.some((button) => othersOnPad.includes(button))
+    ) {
+      shield.gamepad = [...lt];
+    }
+    STRAFE_ACTIONS.forEach((action) => {
+      ['keyboard', 'gamepad'].forEach((device) => {
+        const taken = heldByOthers(action, device);
+        controls[action][device] = controls[action][device].filter(
+          (input) => !taken.includes(input)
+        );
+      });
+    });
   }
 
   // Before 20/11 the left stick turned and thrust through bindings, with the

@@ -145,7 +145,7 @@ export const DASH_SHAKE = Object.freeze({ intensity: 3, duration: 0.12 });
 export const ION_TRAIL_GAP = 30;
 
 // === HIT FEEL === (PLAN.md R5.9) PROPOSAL 18/10 ("proposta 18/10"), judged by playing.
-export const SHOT_RECOIL_IMPULSE = 8; // px/s against the aim, once per weapon-fired
+export const SHOT_RECOIL_IMPULSE = 1.5; // px/s against the aim per weapon-fired, × the shot's cadence (its cooldownMultiplier)
 // Knockback along the bullet: base × (damage / reference), clamped; asteroids
 // keep their linear drift (an impulse there would never decay).
 export const KNOCKBACK_BASE = 60; // px/s at the reference damage
