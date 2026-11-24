@@ -41,7 +41,7 @@ function scrollerUnder(el) {
   return null;
 }
 
-/** Built by UISystem with itself (`ui`: padNav, hudEditor). */
+/** Built by UISystem with itself (`ui`: padNav, hudEditor, getService). */
 export class PadPointer {
   constructor(ui) {
     this.ui = ui;
@@ -92,10 +92,12 @@ export class PadPointer {
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    this.step(Array.from(navigator.getGamepads?.() ?? []).find(Boolean), dt);
+    // The pad the game reads (InputSystem), not the browser's first: a PC
+    // can list an idle device before the one in the hand.
+    this.step(this.ui.getService('input')?.gamepad, dt);
   }
 
-  /** One frame of the first pad (or none) over `dt` seconds. */
+  /** One frame of `pad` (or none) over `dt` seconds. */
   step(pad, dt) {
     if (!pad || !this.menuUp()) {
       this.hide();

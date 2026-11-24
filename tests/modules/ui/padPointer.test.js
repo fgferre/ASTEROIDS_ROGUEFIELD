@@ -135,6 +135,18 @@ describe('the pad pointer', () => {
     expect(pointer.shown).toBe(false);
   });
 
+  it("follows the pad the game reads, not the first in the browser's list", () => {
+    // A PC can list an idle device first (the owner's Xbox pad, 23/11).
+    const idle = pad();
+    const played = pad(1, 0);
+    vi.stubGlobal('navigator', { getGamepads: () => [idle, played] });
+    vi.stubGlobal('performance', { now: () => 0 });
+    ui.getService = (name) => (name === 'input' ? { gamepad: played } : null);
+    const pointer = new PadPointer(ui);
+    pointer.tick();
+    expect(pointer.shown).toBe(true);
+  });
+
   it('stays hidden without a pad, or while A alone is pressed', () => {
     const pointer = new PadPointer(ui);
     pointer.step(undefined, 0.01);
