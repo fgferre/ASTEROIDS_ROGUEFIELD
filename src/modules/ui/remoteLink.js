@@ -7,6 +7,7 @@
 // .remote-link.
 
 import { sectorById } from '../../data/sectors.js';
+import { SKIP_TRIAL, listenForHold, queueSkipToRun } from './skipHold.js';
 
 const LINE_STEP_MS = 250;
 const CONNECT_MS = 1400;
@@ -85,11 +86,20 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
 
   let connected = false;
   const timer = setTimeout(() => connect(CLEAR_MS), CONNECT_MS);
+  // TRIAL (skipHold.js): a press only shows the hint; the hold connects at
+  // once, and with ?skipAll skips the run's opening too.
+  const unbindHold = SKIP_TRIAL
+    ? listenForHold(() => {
+        if (SKIP_TRIAL.all) queueSkipToRun();
+        connect(QUICK_CLEAR_MS);
+      })
+    : null;
 
   function connect(clearMs) {
     if (connected) return;
     connected = true;
     clearTimeout(timer);
+    unbindHold?.();
     document.removeEventListener('keydown', skip, true);
     button?.classList.remove('is-launching');
     if (menu) menu.inert = false;
@@ -105,6 +115,7 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
     connect(QUICK_CLEAR_MS);
   }
 
+  if (unbindHold) return;
   document.addEventListener('keydown', skip, true);
   root.addEventListener('pointerdown', skip);
 }

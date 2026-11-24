@@ -48,6 +48,7 @@ import {
 } from './ui/transmissions.js';
 import { GamepadMenuNav } from './ui/gamepadNav.js';
 import { PadPointer } from './ui/padPointer.js';
+import { setSkipPad } from './ui/skipHold.js';
 
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
@@ -94,6 +95,8 @@ class UISystem extends BaseSystem {
       speak: (entry) => this.queueTransmission(entry),
       hush: () => this.transmissions?.clear(),
     });
+    // TRIAL (skipHold.js): Start is read on the pad the game reads.
+    setSkipPad(() => this.getService('input')?.gamepadIndex ?? 0);
     this.onboarding = new Onboarding(
       {
         showTip: (id) => this.showOnboardingTip(id),

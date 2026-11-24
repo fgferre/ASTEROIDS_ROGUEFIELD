@@ -46,6 +46,7 @@ import {
   runVoiceLines,
   travelTransmissions,
 } from './transmissions.js';
+import { SKIP_TRIAL, listenForHold, takeQueuedSkip } from './skipHold.js';
 
 // The bars leave when the Warden closes up; this only covers one that never
 // does (released mid-entrance).
@@ -175,7 +176,7 @@ export class RunCinematics {
     renderer,
     hud,
     holdSim,
-    bindSkip = listenForSkip,
+    bindSkip = SKIP_TRIAL ? listenForHold : listenForSkip,
     onIntroEnd,
     speak = () => {},
     hush = () => {},
@@ -271,6 +272,13 @@ export class RunCinematics {
 
   /** False (nothing happens) when the renderer can't play it. */
   startIntro() {
+    const playing = this.openRun();
+    // TRIAL (skipHold.js): a hold that filled in the remote link.
+    if (takeQueuedSkip() && playing) this.skipToRun();
+    return playing;
+  }
+
+  openRun() {
     this.stop();
     const to = this.travelTo;
     this.travelTo = null;
@@ -296,7 +304,7 @@ export class RunCinematics {
     this.hud()?.cancelBanner();
     this.hud()?.showCinematicHint(true);
     this.holdSim(true);
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(() => this.skipHeld());
     return true;
   }
 
@@ -317,7 +325,7 @@ export class RunCinematics {
     );
     this.holdSim(true);
     lines.forEach((entry) => this.speak(entry));
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(() => this.skipHeld());
     return true;
   }
 
@@ -338,7 +346,7 @@ export class RunCinematics {
       this.lineTimers.push(setTimeout(() => this.speak(entry), shotAt));
       shotAt += STORY_SHOT_MS[i];
     });
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(() => this.skipHeld());
     return true;
   }
 
@@ -382,6 +390,19 @@ export class RunCinematics {
     this.endIntro();
   }
 
+  /**
+   * TRIAL (skipHold.js): the hold filled. With ?skipAll (the default) one
+   * hold ends the whole opening, the run starts; else this scene only.
+   */
+  skipHeld() {
+    if (SKIP_TRIAL?.all && this.introActive) this.skipToRun();
+    else this.skip();
+  }
+
+  skipToRun() {
+    for (let i = 0; i < 4 && this.introActive; i += 1) this.skip();
+  }
+
   startEpilogue() {
     this.stop();
     if (!this.renderer()?.playEpilogue?.(EPILOGUE_MS)) {
@@ -417,7 +438,7 @@ export class RunCinematics {
     this.afterEnding = onEnd;
     this.begin('ending', durationMs, () => this.endEnding());
     this.hud()?.showCinematicHint(true);
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(() => this.skipHeld());
   }
 
   endEnding() {
