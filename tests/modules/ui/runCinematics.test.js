@@ -191,8 +191,10 @@ describe('RunCinematics', () => {
   });
 
   it("tells act 1's truth beat by beat, Sovereign's last words first, and the choice opens only after the last", () => {
-    const { ui, renderer, spoken, hush, events } = setup();
+    const { ui, hud, renderer, spoken, hush, events } = setup();
+    const bars = hud.els.letterbox.classList;
     ui.cinematics.startRevelation();
+    expect(bars.contains('is-showing')).toBe(true);
     expect(hush).toHaveBeenCalledTimes(1);
     expect(events).toEqual([['cinematic-started', 'revelation']]);
     const show = vi.fn();
@@ -220,11 +222,13 @@ describe('RunCinematics', () => {
     vi.advanceTimersByTime(1);
     expect(show).toHaveBeenCalledTimes(1);
     expect(events.at(-1)).toEqual(['cinematic-ended', 'revelation']);
+    expect(bars.contains('is-showing')).toBe(false);
   });
 
   it("a renderer that draws none of it still says every line of act 1 before the choice, on the beats' time", () => {
-    const { ui, spoken } = setup({ plays: false });
+    const { ui, hud, spoken } = setup({ plays: false });
     ui.cinematics.startRevelation();
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
     const show = vi.fn();
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
     const lines = revelationTransmissions();

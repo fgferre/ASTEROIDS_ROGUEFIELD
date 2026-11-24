@@ -21,7 +21,7 @@ Steps, in order:
 2. Agree the hand-over with the cutscenes work: act 1 replaces the 4 s epilogue pull-back for the ending sector only (`src/modules/ui/runCinematics.js` `startEpilogue`, `EPILOGUE_MS`), the stretch the branch `historia/pular-e-repetir` is editing; skip is theirs (hold to skip: before the choice it jumps to the choice, after it to the credits).
 3. Text: the five approved new lines in `src/data/story.js` and their transmissions (`src/modules/ui/transmissions.js`); each stays under 90 characters; lines without a recording already play as text.
 4. Act 1 and the coda in the game's own scene: Sovereign's cinematic opening (`render3d/enemies/sentinels/sovereign.js`), camera paths (`src/core/cinematics.js`), the cuts to the two places, the twin Wake and its slip in the Crucible set (`render3d/places/theCrucible.js`, the Wake model `render3d/travel/wake.js`), and the Crucible's Stewardship answer made visible (today it does not show in frame).
-5. Act 2 in the opening's scene (`render3d/storyScene.js`: it is disposed once told, so it must build again): the two mirrored shots, the launch reversed, the Wake turning and moving, the Ring going fully dark on the horizon.
+5. Act 2 in the opening's scene (`render3d/storyScene.js`; it stays built, as the check below found): the two mirrored shots, the launch reversed, the Wake turning and moving, the Ring going fully dark on the horizon.
 6. Sequencing and screens: the choice opens after act 1 (`src/modules/ui/RunEndScreens.js`, `UISystem.js` 'run-won'); act 2 replaces today's held shot under the ending's lines (`playEnding`); a renderer that refuses cinematics (2D, reduced motion, `?camera=0`) must still say the lines before the choice.
 7. Sound: the ending-choice music has to start with act 1 (today it starts with the choice overlay, `AudioSystem.js`); a cue per shot (`src/data/audio/eventCues.js`); voices for the five lines belong to the voices work.
 8. Tests under `tests/` for the new order of screens and the new transmissions; `NEXT` in `src/data/changelog.js` with `// not confirmed`; item (49) in `docs/PENDENCIAS.md` in his words; `npm run done` once at the end; a before/after capture and a film of each ending from the built game.
@@ -42,7 +42,8 @@ Progress:
 - [x] 0. Branch fast-forwarded to d422eb19.
 - [x] 1. Checked Sovereign's defeat and the place sets (above).
 - [x] 2. Text + sequencing + screens + fallback + tests (no new pictures yet).
-- [ ] 3. Act 1 pictures and Sovereign's husk.
-- [ ] 4. Act 2 pictures and the coda.
+- [x] 3. Act 1 pictures and Sovereign's husk (`render3d/endingScene.js`; checked in the running game: the hand-over, the seven beats, the choice over `known`, hold-to-skip inside a cut, tap across the cuts, the burn where no ending follows; the spoils countdown hidden under the bars).
+- [ ] 4a. At the Crucible: `answer` and `twin` (the brief is `encomenda-4a.md` in the notes' `final-ferramentas/`). Decided: every beat of both acts goes through `EndingScene.start`; Sovereign stays as it stands through `answer` (no new behaviour); the slip and the twin Wake are part of the Crucible's place, on a stretch no other shot shows, hidden outside `twin`, built when the ending begins; `EndingScene.stop()` is the one clean-up owner; the black after `twin` is the scene's.
+- [ ] 4b. At home, in the opening's scene: `home`, `steady`, Severance `return` and `depart`, Stewardship `watch`. After 4a, never at the same time (both touch `endingScene.js` and a `Renderer3D.js` at the 1200-line limit).
 - [ ] 5. Sound cues, music hand-over, NEXT, item (49), done.
 - [ ] 6. Films of both endings from the built game, conference card.

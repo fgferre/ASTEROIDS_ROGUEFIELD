@@ -59,19 +59,24 @@ const WAKE_START = 0.2;
  * cinematic's camera at t while it plays. `?cinematic=travel&t=0.4` makes
  * any run start fly the journey, frozen at t, to `&sector=<id>` (the opening
  * to the first sector without it); without `t` that journey plays on
- * (to film it). `?cinematic=story&t=` does the same with the story before it. Null without the flag.
+ * (to film it). `?cinematic=story&t=` does the same with the story before it.
+ * `?cinematic=ending&beat=<id>&t=` holds act 1's beat `id` (REVELATION_BEATS)
+ * at t once the ending starts. Null without the flag.
  */
 export function cinematicFreezeFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
     const kind = params.get('cinematic');
     const t = Number(params.get('t'));
-    if (!['intro', 'epilogue', 'travel', 'story'].includes(kind)) return null;
+    if (!['intro', 'epilogue', 'travel', 'story', 'ending'].includes(kind)) {
+      return null;
+    }
     const plays = ['travel', 'story'].includes(kind) && !params.has('t');
     return {
       kind,
       t: plays ? null : Number.isFinite(t) ? t : 0.5,
       sector: params.get('sector'),
+      beat: params.get('beat'),
     };
   } catch {
     return null;
@@ -110,8 +115,13 @@ export function epiloguePath(t) {
     tilt: lerp(FOLLOW_TILT, EPILOGUE_TILT, k),
     offsetX: 0,
     offsetY: lerp(0, EPILOGUE_OFFSET_Y, k),
-    wake: easeInOut((clamp01(t) - WAKE_START) / (1 - WAKE_START)),
+    wake: wakeAt(t),
   };
+}
+
+/** The Ring's wake t of the way through a pull-back that wakes it. */
+export function wakeAt(t) {
+  return easeInOut((clamp01(t) - WAKE_START) / (1 - WAKE_START));
 }
 
 // The ending (ui/runCinematics.js playEnding): the epilogue's last shot
@@ -146,6 +156,52 @@ export const REVELATION_BEATS = Object.freeze([
   { id: 'lock', line: 5, minMs: 5000 },
   { id: 'known', line: 6, minMs: 5000 },
 ]);
+
+// Act 1's pictures (render3d/endingScene.js), posed on the rough cut the
+// owner approved (24/11, card final-do-jogo-4). World units, y up. `hero`:
+// the close three-quarter view, eye and aim about Sovereign, the Crucible's
+// star held behind it along the view; `opens` sees it turned `orbit` rad
+// about Sovereign and `pull` × as far, `count` turns it home; `ship`: where
+// the interceptor stands about Sovereign, facing it. The shells hold sealed
+// for `sealed` of `opens`, then open to `open` (the fight's widest is 1).
+// `recoil`: the pull-back's last pose, `range` out at `tilt`° from straight
+// down over a point `ahead` down the field of Sovereign, in the play lens.
+// The cuts: `sector` (whose place and look show), eye and aim about the
+// field's middle, the eye moving by `drift` over the beat, `exposure` ×.
+// `known`: the hero view from `pull` × as far, closing in.
+export const REVELATION_SHOTS = Object.freeze({
+  hero: { eye: [-360, 430, 210], aim: [-80, 0, -40], fov: 40 },
+  ship: [-200, 0, -110],
+  open: 1.4,
+  opens: { orbit: -Math.PI / 2, pull: [1.18, 1.08], sealed: 0.3 },
+  count: { pull: [1.08, 1] },
+  recoil: { range: 3400, tilt: 26, ahead: 40, fov: 20 },
+  rupture: {
+    sector: 'wardens-reach',
+    eye: [-1196, -350, -763],
+    aim: [-576, -720, 57],
+    drift: [160, 40, -90],
+    fov: 45,
+    exposure: 1.3,
+  },
+  fences: {
+    sector: 'quarantine-grid',
+    eye: [140, 1189, 1073],
+    aim: [12, 345, 552],
+    drift: [-30, -45, -45],
+    fov: 42,
+    exposure: 1.6,
+  },
+  lock: {
+    sector: 'the-crucible',
+    eye: [2800, -1200, 1800],
+    aim: [250, -4500, -920],
+    drift: [-220, 0, 205],
+    fov: 50,
+    exposure: 1,
+  },
+  known: { pull: [1.12, 1] },
+});
 
 // Act 2, after the choice: the answer, home, then each ending's own shots
 // and the last image (the rough cut the owner approved, 24/11).

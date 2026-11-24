@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   FOLLOW_TILT,
   REVELATION_BEATS,
   blendPose,
+  cinematicFreezeFromUrl,
   endingBeats,
   epiloguePath,
   followPose,
@@ -88,5 +89,17 @@ describe("the campaign ending's beats", () => {
         .map(({ line }) => line)
         .filter((l) => l !== null)
     ).toEqual([0, 1]);
+  });
+
+  it('holds one beat of act 1 for captures: ?cinematic=ending&beat=&t=', () => {
+    vi.stubGlobal('window', {
+      location: { search: '?cinematic=ending&beat=fences&t=0.25' },
+    });
+    expect(cinematicFreezeFromUrl()).toMatchObject({
+      kind: 'ending',
+      beat: 'fences',
+      t: 0.25,
+    });
+    vi.unstubAllGlobals();
   });
 });

@@ -602,6 +602,8 @@ export function createSovereign(sk) {
     view.ring.rotation.y = -turn;
     view.heart.rotation.y = time * 0.7;
     const open = clamp01(boss.plateOpen ?? 0);
+    // the ending opens the shells past the fight's widest (endingScene.js)
+    const shells = Math.max(0, boss.plateOpen ?? 0);
     const order = boss.order ?? 'protect';
     const both = order === 'both';
     for (const p of view.plates) {
@@ -609,7 +611,7 @@ export function createSovereign(sk) {
       const half = both
         ? clamp01(0.5 + 2 * Math.sin(turn + p.angle - split))
         : 1;
-      const amount = open * half;
+      const amount = shells * half;
       p.hinge.position.x = SHELL_SLIDE * amount;
       p.tilt.rotation.z = -SHELL_TILT * amount;
     }

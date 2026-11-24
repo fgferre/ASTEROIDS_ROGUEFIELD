@@ -15,13 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import {
-  EPILOGUE_MS,
-  REVELATION_BEATS,
-  endingPath,
-  epiloguePath,
-  introPath,
-} from '../../core/cinematics.js';
+import { endingPath, epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -40,6 +34,7 @@ import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
+import { EndingScene, isRevelationBeat } from './endingScene.js';
 import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import {
   mirrorEffects,
@@ -536,15 +531,16 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * Beat `id` of the campaign's ending (ui/runCinematics.js; the beats are
-   * core/cinematics.js's), `durationMs` long, `ending` the one picked in act
-   * 2. Until the beats have their own pictures: act 1 is the victory
-   * pull-back, started on its first beat and held on the others; act 2 the
-   * ending's path, started on `answer` and held after. False when nothing
-   * would move, as playIntro.
+   * Beat `id` of the campaign's ending (ui/runCinematics.js), `durationMs`
+   * long, `ending` the one picked in act 2: act 1's drawn by endingScene.js
+   * (to act 2), act 2's still the ending's path, started on `answer`, held.
+   * False when nothing would move, as playIntro.
    */
   playEndingBeat(id, durationMs, ending) {
-    if (id === REVELATION_BEATS[0].id) return this.playEpilogue(EPILOGUE_MS);
+    if (isRevelationBeat(id)) {
+      const drawn = this.startCinematic(holdIntroStart, 1, true, 'revelation');
+      return drawn && this.ending.start(id, durationMs);
+    }
     if (id === 'answer') {
       return this.startCinematic(
         endingPath(ending),
@@ -740,6 +736,7 @@ class Renderer3D extends BaseSystem {
     this.three?.backdrop.setWake(0);
     this.travel?.stop();
     this.story?.stop();
+    this.ending?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -767,6 +764,7 @@ class Renderer3D extends BaseSystem {
     this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
+    this.ending = new EndingScene(this.three, this.eventBus);
     this.applyQuality();
   }
 
@@ -913,6 +911,7 @@ class Renderer3D extends BaseSystem {
     const t = this.three;
     travel?.frame(t.camera, t.height);
     story?.frame(t.camera, time);
+    this.ending?.frame(t.camera);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -964,7 +963,7 @@ class Renderer3D extends BaseSystem {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
     } else {
-      this.trackShip(player);
+      this.trackShip(this.ending?.active ? null : player);
     }
     this.mirrorShield(player, time);
     // a breaking ship casts none: the depth pass draws it whole
@@ -1009,10 +1008,10 @@ class Renderer3D extends BaseSystem {
       ? SCENE_FOV
       : travel
         ? SCENE_FOV + (FOV - SCENE_FOV) * travel.risen
-        : FOV;
+        : t.camera.fov;
     const pointScale = t.height / (2 * Math.tan((lens * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(travel ? travel.look : this.biome, fog);
+    t.biomes.update(travel?.look ?? this.ending?.look ?? this.biome, fog);
     const ship = t.player.group.visible && (travel?.focus || player?.position);
     const view = travel?.focus || this.camera;
     t.space.update(view.x, view.y, dt, {
@@ -1053,8 +1052,10 @@ class Renderer3D extends BaseSystem {
     // The story draws its own scene in the field's place.
     const drawn = story ? story.scene : t.scene;
     t.composer.passes[0].scene = drawn;
+    this.ending?.pose(time);
     if (this.graphics.postProcessing) t.composer.render(dt);
     else t.renderer.render(drawn, t.camera);
+    this.ending?.showField();
     t.renderer.autoClear = false;
     t.renderer.render(t.overlay, t.camera);
     t.renderer.autoClear = true;

@@ -483,7 +483,15 @@ export class RunCinematics {
     }
     const { entry, durationMs } = beatTiming(beats[i], lines);
     this.act.at = i;
-    this.renderer()?.playEndingBeat?.(beats[i].id, durationMs, ending);
+    const drawn = this.renderer()?.playEndingBeat?.(
+      beats[i].id,
+      durationMs,
+      ending
+    );
+    // act 1's pictures play under the bars, the instruments away
+    if (drawn && this.kind === 'revelation') {
+      this.hud()?.showLetterbox(true, true);
+    }
     if (entry) this.speak(entry);
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.playBeat(i + 1), durationMs);
@@ -569,7 +577,7 @@ export class RunCinematics {
 
   finish() {
     const { kind } = this;
-    if (kind === 'arrival' || kind === 'travel' || kind === 'story') {
+    if (['arrival', 'travel', 'story', 'revelation'].includes(kind)) {
       this.hud()?.showLetterbox(false);
     }
     clearTimeout(this.timer);
