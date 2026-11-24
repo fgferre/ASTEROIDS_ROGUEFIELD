@@ -25,6 +25,7 @@ export const NEXT = {
     'With the RCS System the ship can strafe: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, harder with each level of the card. The shield moves to LT on a controller.', // not confirmed
   ],
   improved: [
+    'Every shot now pushes the ship back a little, in every flight, and a slower gun kicks harder per shot: with no cards you correct it on the thrusters; the Braking System and the Flight Computer hold the ship in place.', // not confirmed
     'The Braking System waits until you let go of every key, a beat longer: a turn or a quick tap of thrust no longer bleeds your speed.', // not confirmed
     'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed
   ],

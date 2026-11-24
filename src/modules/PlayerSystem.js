@@ -439,12 +439,16 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
-          // ...and a small kick to the hull, the same path as the dash;
-          // none in glide, where nothing would bleed it off.
-          if (!this.flight.glide) {
-            this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
-            this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
-          }
+          // ...and a kick to the hull, the same path as the dash, in every
+          // flight (Felipe's pick, corpo-da-nave-3, 23/11: "Leve"): the
+          // pilot corrects it by hand, the Braking System's and the Flight
+          // Computer's jets hold the ship against it.
+          // × the shot's cadence (`cooldownMultiplier`, how much longer than
+          // the Lance it waits): a slower gun kicks harder per shot, every
+          // gun pushes the same per second.
+          const kick = SHOT_RECOIL_IMPULSE * (data.cooldownMultiplier ?? 1);
+          this.velocity.vx -= (dx / distance) * kick;
+          this.velocity.vy -= (dy / distance) * kick;
         }
       }
     });

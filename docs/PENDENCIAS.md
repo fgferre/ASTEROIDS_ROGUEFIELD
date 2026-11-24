@@ -285,9 +285,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   (`quadro/respostas/freio-com-motor-23-11.txt`); medido: com o motor apertado a carta não freia, entra nos toques de W
   e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
   inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
-  inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). O strafe, o coice de verdade e as cartas de mobilidade vêm depois. Fecha quando
+  inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). Fecha quando
   ele aprovar voando. O strafe construído com a RCS System: teclas Z e C, LB no controle (no voo do começo, o analógico
-  esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora).
+  esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora). Respostas dele ao cartão `corpo-da-nave-3`
+  (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
+  de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta.
 
 ## Som (palavras dele, 19/11)
 
