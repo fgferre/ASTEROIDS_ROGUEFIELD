@@ -1,4 +1,4 @@
-// The story before the first campaign's journey (ui/runCinematics.js):
+// The story before a campaign launch's journey (ui/runCinematics.js):
 // the Wake, an old freighter, waits at the Field's edge over a sea of dust
 // under a low orange star (story/storySky.js); its reactors stutter, a
 // signal pulses in the Field, the broken Ring stands on the horizon, and an
@@ -279,30 +279,6 @@ export class StoryScene {
       t.camera.far = this.baseFar;
       t.camera.updateProjectionMatrix();
     }
-  }
-
-  /**
-   * Lets go of what build() made, once it has been told (it plays once per
-   * player); build() makes it anew.
-   */
-  dispose() {
-    if (!this.built) return;
-    const { environment } = this.scene;
-    this.scene.traverse((object) => {
-      // A sprite's quad is three's own, shared by every sprite.
-      if (!object.isSprite) object.geometry?.dispose();
-      [object.material].flat().forEach((material) => {
-        if (!material) return;
-        Object.values(material).forEach((value) => {
-          if (value?.isTexture && value !== environment) value.dispose();
-        });
-        material.dispose();
-      });
-    });
-    this.rig.sun.shadow.map?.dispose();
-    this.scene = null;
-    this.wake = null;
-    this.built = false;
   }
 
   get progress() {

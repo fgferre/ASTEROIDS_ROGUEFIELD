@@ -483,7 +483,7 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * The story before the first campaign's journey (ui/runCinematics.js),
+   * The story before a campaign launch's journey (ui/runCinematics.js),
    * in its own scene. False when nothing would move, as playIntro.
    */
   playStory() {
@@ -495,10 +495,12 @@ class Renderer3D extends BaseSystem {
     return true;
   }
 
-  /** The story is over: the field's scene is drawn again. */
+  /**
+   * The story is over: the field's scene is drawn again. The Wake stays
+   * built for the next launch (rebuilding it stalled the start a second).
+   */
   endStory() {
     this.story?.stop();
-    this.story?.dispose();
   }
 
   // Seeded: three names what the story builds and draws with Math.random.
