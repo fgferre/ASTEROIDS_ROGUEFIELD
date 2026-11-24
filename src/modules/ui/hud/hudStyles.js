@@ -107,8 +107,6 @@ export function getHudCss() {
             .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
-            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: var(--text-ink); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
-            .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
             /* Under the panels (z-index -1 in the HUD layer), over the field. */
             .letterbox { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
             .letterbox::before, .letterbox::after { content: ''; position: absolute; left: 0; width: 100%; height: ${WARDEN_ARRIVAL.barHeight}%; background: #000; }

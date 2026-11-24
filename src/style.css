@@ -1840,6 +1840,120 @@ html[data-motion='reduced'] .opening__brand * {
   box-shadow: 0 0 34px rgba(170, 250, 255, 0.95);
 }
 
+/* The skip hint (ui/skipHold.js, Felipe's card cutscenes-pular-1, 23/11):
+   in the corner, over every cinematic and the remote link; the outline round
+   what is pressed (the key, the pad's Menu or Options button, the touch
+   button) fills while it is held. */
+.skip-hold {
+  position: fixed;
+  right: max(28px, env(safe-area-inset-right));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 16px));
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--text-dim);
+  text-shadow: var(--text-ink);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s,
+    visibility 0s 0.3s;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.skip-hold.is-showing {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s;
+}
+
+body.motion-reduced .skip-hold {
+  transition: none;
+}
+
+.skip-hold__button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 30px;
+  padding: 0 14px;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* Xbox's Menu button is round; PlayStation's Options, a small capsule. */
+.skip-hold[data-glyph='xbox'] .skip-hold__button {
+  min-width: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.skip-hold[data-glyph='playstation'] .skip-hold__button {
+  min-width: 0;
+  width: 22px;
+  height: 34px;
+  padding: 0;
+}
+
+.skip-hold[data-glyph='touch'] .skip-hold__button {
+  min-width: 76px;
+  height: 44px;
+}
+
+.skip-hold__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.skip-hold__track {
+  fill: rgba(2, 4, 8, 0.5);
+  stroke: rgba(230, 238, 248, 0.35);
+  stroke-width: 1.5;
+}
+
+.skip-hold__fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+
+.skip-hold__glyph {
+  position: relative;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+.skip-hold__glyph svg {
+  width: 12px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.skip-hold.is-holding .skip-hold__glyph {
+  color: var(--accent);
+}
+
 .remote-link {
   position: fixed;
   inset: 0;
@@ -5620,8 +5734,8 @@ body.touch-play #perf-overlay {
   display: none;
 }
 
-/* While a scene plays and a tap skips it, the fight's buttons step aside. */
-body.touch-play:has(.cinematic-hint.is-showing) .touch-layer {
+/* While a scene plays, the fight's buttons step aside (ui/skipHold.js). */
+body.touch-play.is-cinematic .touch-layer {
   visibility: hidden;
 }
 

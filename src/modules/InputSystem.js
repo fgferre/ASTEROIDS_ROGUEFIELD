@@ -298,6 +298,13 @@ class InputSystem {
         this.replaying = Boolean(payload.replay);
       });
 
+      // A cinematic holds the run (ui/runCinematics.js): Start is its skip
+      // key there, never the pause (that would let the run go under it).
+      eventBus.on('cinematic-started', ({ kind } = {}) => {
+        this.cinematicHold = ['story', 'travel', 'intro'].includes(kind);
+      });
+      eventBus.on('cinematic-ended', () => (this.cinematicHold = false));
+
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
           this.rumble(GAMEPAD_RUMBLE.hullHit);
@@ -648,7 +655,7 @@ class InputSystem {
 
     switch (action) {
       case 'pause':
-        eventBus?.emit?.('toggle-pause');
+        if (!this.cinematicHold) eventBus?.emit?.('toggle-pause');
         break;
       case 'openSettings':
         eventBus?.emit?.('settings-menu-requested', {

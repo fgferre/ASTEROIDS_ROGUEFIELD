@@ -8,14 +8,13 @@
 // cards dealt at the start (a head start, owed picks) wait for the intro's
 // end. It ends on the intro's first pose and the intro follows. Intro: the
 // renderer descends to the ship while the simulation is held (no step runs,
-// so replays stay exact), a skip hint shows and any key, click or pad button
-// skips (the journey and the intro together); the layer banner — the title
-// card — shows once, when it ends. Epilogue: the renderer pulls back as the
+// so replays stay exact); the layer banner — the title card — shows once,
+// when it ends. Epilogue: the renderer pulls back as the
 // Ring wakes, the victory line plays over it, and the victory screen waits
 // for it to end. Ending (the campaign's last win, after the choice): the
 // epilogue's shot holds while the ending's lines play and the Ring answers
-// through its wake, under the skip hint; any key, click or pad button drops
-// the lines left; then the final card. Warden entrance: letterbox bars over the live shot until
+// through its wake; then the final card. Warden entrance: letterbox bars
+// over the live shot until
 // the Warden closes up ('boss-arrived'); the run plays on, slowed (no hold,
 // no skip). A renderer that can't move the camera (2D, reduced motion,
 // `?camera=0`) refuses them all, and the run keeps the plain banner; a
@@ -24,6 +23,10 @@
 // 23/11: "tem que se tocar sim. A pessoa se quiser pula";
 // render3d/storyScene.js): six shots of the Wake under the letterbox, a line
 // opening each; a skip goes on to the journey.
+// Skipping (ui/skipHold.js): the skip key held skips the scene playing (the
+// story, the journey, the intro, the ending's lines); a tap goes to its next
+// line — the story's next shot, the journey's or the ending's next line —
+// and with none left, or in the intro, to the next scene.
 
 import {
   EPILOGUE_MS,
@@ -46,6 +49,7 @@ import {
   runVoiceLines,
   travelTransmissions,
 } from './transmissions.js';
+import { listenForHold } from './skipHold.js';
 
 // The bars leave when the Warden closes up; this only covers one that never
 // does (released mid-entrance).
@@ -103,82 +107,26 @@ export function travelDurationMs(lines) {
   );
 }
 
-/**
- * Skips on any key (a held key's repeats are swallowed too), click or newly
- * pressed pad button; returns the unbind. Capture on window runs before
- * every other handler: the input only skips. A key still held after the
- * unbind stays swallowed until it is released, so its repeats never reach
- * the game as a fresh press (Escape would pause).
- */
-export function listenForSkip(skip) {
-  const keys = new Set();
-  let live = true;
-  const onInput = (event) => {
-    if (!live && !(event.repeat && keys.has(event.code))) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (event.type === 'keydown') keys.add(event.code);
-    if (live && !event.repeat) skip();
-  };
-  const detachKeys = () => {
-    window.removeEventListener('keydown', onInput, true);
-    window.removeEventListener('keyup', onKeyUp, true);
-  };
-  const onKeyUp = (event) => {
-    keys.delete(event.code);
-    if (!live && keys.size === 0) detachKeys();
-  };
-  // Pad buttons held when it starts (the press that started the run) wait
-  // for their release.
-  const held = [0, 0, 0, 0];
-  let first = true;
-  let frame = 0;
-  const poll = () => {
-    const pads = navigator.getGamepads?.() ?? [];
-    let pressedNow = false;
-    for (let p = 0; p < held.length; p += 1) {
-      let mask = 0;
-      const buttons = pads[p]?.buttons ?? [];
-      for (let b = 0; b < buttons.length && b < 31; b += 1) {
-        if (buttons[b].pressed) mask |= 1 << b;
-      }
-      if (!first && mask & ~held[p]) pressedNow = true;
-      held[p] = mask;
-    }
-    first = false;
-    if (pressedNow) skip();
-    else frame = window.requestAnimationFrame(poll);
-  };
-  window.addEventListener('keydown', onInput, true);
-  window.addEventListener('keyup', onKeyUp, true);
-  window.addEventListener('pointerdown', onInput, true);
-  frame = window.requestAnimationFrame(poll);
-  return () => {
-    live = false;
-    if (keys.size === 0) detachKeys();
-    window.removeEventListener('pointerdown', onInput, true);
-    window.cancelAnimationFrame(frame);
-  };
-}
-
 export class RunCinematics {
   /**
    * `renderer()`/`hud()` resolve the current ones (playTravel, endTravel,
-   * playIntro, playEpilogue, playArrival, endCinematic / cancelBanner,
-   * showCinematicHint, showLetterbox). `holdSim(flag)` stops or restarts
-   * the fixed step; `bindSkip(fn)` listens for the skip and returns the
-   * unbind; `onIntroEnd()` shows the layer banner; `speak(entry)` queues a
-   * transmission and `hush()` drops them all.
+   * playIntro, playEpilogue, playArrival, playStory, seekStory, endCinematic
+   * / cancelBanner, showLetterbox). `holdSim(flag)` stops or restarts the
+   * fixed step; `bindSkip(skip, next)` listens for the skip and the tap and
+   * returns the unbind; `onIntroEnd()` shows the layer banner; `speak(entry)`
+   * queues a transmission, `hush()` drops them all and `nextLine()` ends the
+   * one on air, false when none waits after it.
    */
   constructor({
     eventBus,
     renderer,
     hud,
     holdSim,
-    bindSkip = listenForSkip,
+    bindSkip = listenForHold,
     onIntroEnd,
     speak = () => {},
     hush = () => {},
+    nextLine = () => false,
   }) {
     this.eventBus = eventBus;
     this.renderer = renderer;
@@ -188,6 +136,7 @@ export class RunCinematics {
     this.onIntroEnd = onIntroEnd;
     this.speak = speak;
     this.hush = hush;
+    this.nextLine = nextLine;
     this.kind = null;
     this.timer = null;
     this.handOff = null;
@@ -198,6 +147,7 @@ export class RunCinematics {
     // A campaign launch's journey tells the story first (startStory).
     this.tellsStory = false;
     this.storyTo = null;
+    this.storyStartedAt = 0;
     this.lineTimers = [];
     // Cards dealt while a journey is armed or plays, shown after the intro.
     this.cards = null;
@@ -294,9 +244,11 @@ export class RunCinematics {
     }
     this.begin('intro', INTRO_MS, () => this.endIntro());
     this.hud()?.cancelBanner();
-    this.hud()?.showCinematicHint(true);
     this.holdSim(true);
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(
+      () => this.skip(),
+      () => this.next()
+    );
     return true;
   }
 
@@ -308,7 +260,6 @@ export class RunCinematics {
     }
     this.begin('travel', durationMs, () => this.endTravel());
     this.hud()?.cancelBanner();
-    this.hud()?.showCinematicHint(true);
     this.hud()?.showLetterbox(true, true);
     // The instruments fade back in under the bars over the last second.
     this.handOff = setTimeout(
@@ -317,7 +268,10 @@ export class RunCinematics {
     );
     this.holdSim(true);
     lines.forEach((entry) => this.speak(entry));
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(
+      () => this.skip(),
+      () => this.next()
+    );
     return true;
   }
 
@@ -327,19 +281,35 @@ export class RunCinematics {
     if (!this.renderer()?.playStory?.()) return false;
     this.begin('story', STORY_MS, () => this.endStory(to));
     this.hud()?.cancelBanner();
-    this.hud()?.showCinematicHint(true);
     this.hud()?.showLetterbox(true, true);
     this.holdSim(true);
     this.storyTo = to;
-    // Each line opens its shot, held short so the next shot's finds the
-    // channel clear.
+    this.tellFrom(0);
+    this.unbindSkip = this.bindSkip(
+      () => this.skip(),
+      () => this.next()
+    );
+    return true;
+  }
+
+  /**
+   * The story from shot `first` on, now: each line opens its shot, held
+   * short so the next shot's finds the channel clear.
+   */
+  tellFrom(first) {
+    const from = STORY_SHOT_MS.slice(0, first).reduce((a, b) => a + b, 0);
+    this.storyStartedAt = performance.now() - from;
+    this.lineTimers.forEach(clearTimeout);
+    this.lineTimers = [];
     let shotAt = STORY_LINE_LEAD_MS;
     prologueTransmissions(STORY_LINE_HOLD_MS).forEach((entry, i) => {
-      this.lineTimers.push(setTimeout(() => this.speak(entry), shotAt));
-      shotAt += STORY_SHOT_MS[i];
+      if (i >= first) {
+        this.lineTimers.push(setTimeout(() => this.speak(entry), shotAt));
+        shotAt += STORY_SHOT_MS[i];
+      }
     });
-    this.unbindSkip = this.bindSkip(() => this.skip());
-    return true;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.endStory(this.storyTo), STORY_MS - from);
   }
 
   // The story is told: the journey flies on from it.
@@ -357,8 +327,9 @@ export class RunCinematics {
   }
 
   /**
-   * Ends the opening now: the journey's remaining lines drop and the camera
-   * eases from the intro's pose back to the ship.
+   * Ends the scene playing now (one scene per hold, Felipe 23/11): the
+   * story's or the journey's lines drop and the next scene plays; the
+   * intro's camera eases back to the ship and the run starts.
    */
   skip() {
     if (this.kind === 'ending') {
@@ -374,12 +345,34 @@ export class RunCinematics {
     if (this.kind === 'travel') {
       this.hush();
       this.endTravel();
+      return;
     }
     if (this.kind !== 'intro') {
       return;
     }
     this.renderer()?.endCinematic();
     this.endIntro();
+  }
+
+  /**
+   * A tap of the skip key: the story's next shot, the journey's or the
+   * ending's next line; with none left (or in the intro), the next scene.
+   */
+  next() {
+    if (this.kind === 'story') {
+      const elapsed = performance.now() - this.storyStartedAt;
+      let end = 0;
+      const shot = STORY_SHOT_MS.findIndex((ms) => (end += ms) > elapsed);
+      if (shot >= 0 && shot < STORY_SHOT_MS.length - 1) {
+        this.hush();
+        this.tellFrom(shot + 1);
+        this.renderer()?.seekStory(performance.now() - this.storyStartedAt);
+        return;
+      }
+    } else if (['travel', 'ending'].includes(this.kind) && this.nextLine()) {
+      return;
+    }
+    this.skip();
   }
 
   startEpilogue() {
@@ -416,8 +409,10 @@ export class RunCinematics {
     lines.forEach((entry) => this.speak(entry));
     this.afterEnding = onEnd;
     this.begin('ending', durationMs, () => this.endEnding());
-    this.hud()?.showCinematicHint(true);
-    this.unbindSkip = this.bindSkip(() => this.skip());
+    this.unbindSkip = this.bindSkip(
+      () => this.skip(),
+      () => this.next()
+    );
   }
 
   endEnding() {
@@ -465,10 +460,7 @@ export class RunCinematics {
 
   /** Drops whatever plays, without its ending (a new run, a reset). */
   stop() {
-    if (this.introActive) {
-      this.hud()?.showCinematicHint(false);
-      this.holdSim(false);
-    }
+    if (this.introActive) this.holdSim(false);
     if (this.kind === 'travel') {
       this.renderer()?.endTravel();
     }
@@ -485,7 +477,6 @@ export class RunCinematics {
   }
 
   endIntro() {
-    this.hud()?.showCinematicHint(false);
     this.holdSim(false);
     if (this.kind) this.finish();
     this.onIntroEnd();
@@ -503,7 +494,6 @@ export class RunCinematics {
     if (kind === 'arrival' || kind === 'travel' || kind === 'story') {
       this.hud()?.showLetterbox(false);
     }
-    if (kind === 'ending') this.hud()?.showCinematicHint(false);
     clearTimeout(this.timer);
     clearTimeout(this.handOff);
     this.lineTimers.forEach(clearTimeout);

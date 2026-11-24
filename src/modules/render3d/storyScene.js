@@ -249,6 +249,11 @@ export class StoryScene {
     this.active = true;
   }
 
+  /** Plays on from `ms` in. */
+  seek(ms) {
+    this.startedAt = performance.now() - ms;
+  }
+
   // The Ring and the player's ship stand in the story's scene meanwhile.
   borrow() {
     const { t } = this;

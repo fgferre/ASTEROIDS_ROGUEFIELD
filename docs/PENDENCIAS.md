@@ -342,7 +342,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   teclado, apertados na passagem "WAKE · REMOTE LINK" logo depois do Launch, levavam o menu que estava por baixo de
   volta à tela de início enquanto a partida começava; já existia na 0.8.0); a história da Wake toca em todo lançamento
   da campanha pelo Mission Control (não no Retry, não no "próximo setor" depois de vencer; Descent, Daily Field e Boss
-  Rush como antes). Fecha quando ele aprovar jogando.
+  Rush como antes). Ao cartão `cutscenes-pular-1` (23/11): _"A tecla se contorna, no canto — obs: só escreve skip, nao
+  precisa de hold to"_; _"1,5 segundo"_; _"Não, uma cena por segurar — obs: vai para proxima cutscne e só apertar rápido
+  pulo de fala em fala."_; _"Espaço (minha sugestão) — obs: ficou flantando os botos no controle, mas segue a mesma
+  ideia, só que vai contronar um botaozinho de xbox ou ps. ao inves de contornar uma tecla de teclado, segue o formato
+  da tecla/botao o contorno. nem precisa montar regua para isso so fazer o que pedi simples assim"_. Construído: segurar
+  1,5 s o Espaço, o Start (Options no PlayStation) ou o botão SKIP na tela pula a cena; um toque rápido vai para a
+  próxima fala. Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 
