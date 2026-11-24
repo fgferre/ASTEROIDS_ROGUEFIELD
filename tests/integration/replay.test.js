@@ -14,6 +14,7 @@ import { GamePools } from '../../src/core/GamePools.js';
 import { createHeadlessGame, SEED } from '../__helpers__/headlessGame.js';
 import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import {
+  INPUT_FRAME_FIELDS,
   createInputFrame,
   createRecorder,
   deserialize,
@@ -145,8 +146,9 @@ describe('run replay', () => {
   }
 
   // Replays `recording` in a fresh instance: no key events, only the recording.
-  // `start` is what starts the run (the browser clicks Start).
-  function replayRun(recording, start = { source: 'test' }) {
+  // `start` is what starts the run (the browser clicks Start); `setup(game)`
+  // runs once it has started.
+  function replayRun(recording, start = { source: 'test' }, setup = () => {}) {
     const replay = createHeadlessGame();
     // The hull setting is shared storage: the replay must ignore it.
     replay.services.settings.setSetting(
@@ -157,6 +159,7 @@ describe('run replay', () => {
     replay.controller.arm(recording);
     replay.session.startNewRun(start);
     cheapLevels(replay.services.progression);
+    setup(replay);
     for (let step = 0; step < STEPS; step += 1) {
       replay.controller.tick();
       replay.step();
@@ -268,6 +271,51 @@ describe('run replay', () => {
     } finally {
       fake.restore();
     }
+  });
+
+  it('replays a strafing run (Z and C, the RCS System on) to the same end state', () => {
+    // RCS System 1, the strafe's card, on both runs.
+    const rcs = (game) => {
+      game.services.player.flight.agility = 1.3;
+    };
+    const live = createHeadlessGame();
+    live.session.startNewRun({ source: 'test' });
+    cheapLevels(live.services.progression);
+    rcs(live);
+    const { input, player } = live.services;
+    let toPort = 0;
+    for (let step = 0; step < STEPS; step += 1) {
+      if (live.takeOfferedUpgrade()) {
+        const { progression } = live.services;
+        progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+      }
+      // Z for two seconds, then C for two, and so on.
+      if (step % 120 === 0) {
+        const [held, freed] =
+          (step / 120) % 2 === 0 ? ['KeyZ', 'KeyC'] : ['KeyC', 'KeyZ'];
+        input.onKeyUp(keyEvent(freed));
+        input.onKeyDown(keyEvent(held));
+      }
+      live.step();
+      if (step === 59) {
+        // The motion along starboard, a second into Z.
+        const { vx, vy } = player.velocity;
+        toPort = vx * Math.sin(player.angle) - vy * Math.cos(player.angle);
+      }
+    }
+    expect(toPort).toBeGreaterThan(50);
+    const recorded = live.snapshot();
+    const recording = deserialize(
+      serialize(live.session.replayRecorder.toJSON())
+    );
+    const bit = (field) => 1 << INPUT_FRAME_FIELDS.indexOf(field);
+    for (const field of ['strafeLeft', 'strafeRight']) {
+      expect(recording.inputs.some(([, mask]) => mask & bit(field))).toBe(true);
+    }
+
+    expect(replayRun(recording, { source: 'test' }, rcs).snapshot()).toEqual(
+      recorded
+    );
   });
 
   it('replays a pad run at the stick sensitivity it was flown, a change from the pause included, whatever the viewer has', () => {

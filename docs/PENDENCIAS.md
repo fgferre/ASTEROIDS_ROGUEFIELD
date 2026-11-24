@@ -286,7 +286,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
   inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
   inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). O strafe, o coice de verdade e as cartas de mobilidade vêm depois. Fecha quando
-  ele aprovar voando.
+  ele aprovar voando. O strafe construído com a RCS System: teclas Z e C, LB no controle (no voo do começo, o analógico
+  esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora).
 
 ## Som (palavras dele, 19/11)
 

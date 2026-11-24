@@ -489,12 +489,14 @@ class PlayerSystem extends BaseSystem {
       dashRequested = false;
     }
 
+    // The dash and the brake steer by what a strafe hold leaves (flight.js).
+    const { steer } = this.flight.strafeOf(movement);
     if (dashRequested && this.maneuvers.canDash()) {
-      this.maneuvers.startDash(movement);
+      this.maneuvers.startDash(steer);
     }
 
     this.updateMovement(deltaTime, movement);
-    this.maneuvers.updateEmergencyBrake(deltaTime, movement);
+    this.maneuvers.updateEmergencyBrake(deltaTime, steer);
     this.updatePosition(deltaTime);
     this.maneuvers.updateDash(deltaTime);
     this.updateHullDrain(deltaTime);

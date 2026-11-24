@@ -46,7 +46,7 @@ describe('SettingsSystem dash binding migration', () => {
       toggleSpreadMode: { keyboard: ['KeyG'], gamepad: [] },
       toggleAimMode: { keyboard: ['KeyT'], gamepad: [] },
     });
-    expect(controls.activateShield.gamepad).toEqual(['button:4']);
+    expect(controls.activateShield.gamepad).toEqual(['button:6']);
     expect(controls.dash.gamepad).toEqual(['button:1']);
     expect(controls.toggleSpreadMode.gamepad).toEqual(['button:2']);
     expect(controls.toggleAimMode.gamepad).toEqual(['button:3']);
@@ -63,8 +63,66 @@ describe('SettingsSystem dash binding migration', () => {
     });
     expect(controls.moveUp.gamepad).toEqual(['button:12']);
     expect(controls.moveLeft.gamepad).toEqual(['button:14']);
-    expect(controls.activateShield.gamepad).toEqual(['button:4']);
+    expect(controls.activateShield.gamepad).toEqual(['button:6']);
     expect(controls.dash.gamepad).toEqual(['button:0']);
+  });
+
+  // LB (button 4) became the strafe hold and the shield's default LT (6).
+  const pad = (gamepad) => ({ keyboard: [], gamepad });
+
+  it('moves a shield still on LB to LT, and LB holds the strafe', () => {
+    const controls = load({
+      activateShield: { keyboard: ['KeyE'], gamepad: ['button:4'] },
+      vibration: true,
+    });
+    expect(controls.activateShield.gamepad).toEqual(['button:6']);
+    expect(controls.strafeHold.gamepad).toEqual(['button:4']);
+    expect(controls.strafeLeft.keyboard).toEqual(['KeyZ']);
+    expect(controls.strafeRight.keyboard).toEqual(['KeyC']);
+  });
+
+  it('keeps a shield remapped elsewhere', () => {
+    const controls = load({
+      activateShield: pad(['button:11']),
+      vibration: true,
+    });
+    expect(controls.activateShield.gamepad).toEqual(['button:11']);
+    expect(controls.strafeHold.gamepad).toEqual(['button:4']);
+  });
+
+  it('with LT already taken, the shield stays on LB and the strafe hold starts unbound', () => {
+    const controls = load({
+      activateShield: pad(['button:4']),
+      dash: pad(['button:6']),
+      vibration: true,
+    });
+    expect(controls.activateShield.gamepad).toEqual(['button:4']);
+    expect(controls.dash.gamepad).toEqual(['button:6']);
+    expect(controls.strafeHold.gamepad).toEqual([]);
+  });
+
+  it('the strafe takes no key or button another action holds', () => {
+    const controls = load({
+      activateShield: pad(['button:11']),
+      dash: pad(['button:4']),
+      toggleAimMode: { keyboard: ['KeyC'], gamepad: [] },
+      vibration: true,
+    });
+    expect(controls.dash.gamepad).toEqual(['button:4']);
+    expect(controls.strafeHold.gamepad).toEqual([]);
+    expect(controls.toggleAimMode.keyboard).toEqual(['KeyC']);
+    expect(controls.strafeRight.keyboard).toEqual([]);
+    expect(controls.strafeLeft.keyboard).toEqual(['KeyZ']);
+  });
+
+  it('leaves a save made with the strafe as it is', () => {
+    const controls = load({
+      activateShield: pad(['button:4']),
+      strafeHold: pad(['button:10']),
+      vibration: true,
+    });
+    expect(controls.activateShield.gamepad).toEqual(['button:4']);
+    expect(controls.strafeHold.gamepad).toEqual(['button:10']);
   });
 });
 

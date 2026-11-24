@@ -5464,7 +5464,8 @@ body.is-paused #game-canvas {
 }
 
 /* Touch play (input/touchControls.js): the stick is born in the left half,
-   DASH and SHIELD sit by the right thumb, pause by the clock; flat plates. */
+   DASH, SHIELD and STRAFE sit by the right thumb, pause by the clock; flat
+   plates. */
 body.touch-play {
   touch-action: none;
   -webkit-user-select: none;
@@ -5552,19 +5553,35 @@ body.is-paused .touch-layer {
   font-size: calc(var(--tu) * 12);
 }
 
-/* Pressed with no shield card: one small shake (Reduce Motion: it lights amber). */
-.touch-btn--shield.is-refused {
+/* Held, not tapped: centred over DASH, a SHIELD-sized plate. */
+.touch-btn--strafe {
+  right: max(
+    calc(var(--tu) * 71),
+    calc(env(safe-area-inset-right) + 16px + var(--tu) * 7)
+  );
+  bottom: max(
+    calc(var(--tu) * 140),
+    calc(env(safe-area-inset-bottom) + 16px + var(--tu) * 76)
+  );
+  width: calc(var(--tu) * 50);
+  height: calc(var(--tu) * 50);
+  font-size: calc(var(--tu) * 12);
+}
+
+/* Pressed with no card for it (SHIELD, STRAFE): one small shake (Reduce
+   Motion: it lights amber). */
+.touch-btn.is-refused {
   animation: touch-refuse-shake 600ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .touch-btn--shield.is-refused {
+  .touch-btn.is-refused {
     animation-name: touch-refuse-glow;
   }
 }
 
-html[data-motion='reduced'] .touch-btn--shield.is-refused,
-body.motion-reduced .touch-btn--shield.is-refused {
+html[data-motion='reduced'] .touch-btn.is-refused,
+body.motion-reduced .touch-btn.is-refused {
   animation: touch-refuse-glow 600ms ease-out !important;
 }
 

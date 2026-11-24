@@ -78,14 +78,24 @@ describe('InputSystem gamepad', () => {
     });
   });
 
-  it('maps RB to dash, LB to shield and X/Y to the toggles, once per press', () => {
-    let frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
+  it('maps RB to dash, LT to shield and X/Y to the toggles, once per press', () => {
+    let frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LT] });
     expect(frame.dash && frame.shield).toBe(true);
-    frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
+    frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LT] });
     expect(frame.dash || frame.shield).toBe(false);
 
     frame = step({ pressed: [PAD_BUTTON.X, PAD_BUTTON.Y] });
     expect(frame.spread && frame.aim).toBe(true);
+  });
+
+  it('holds the strafe while LB is down, every step, for the ship', () => {
+    expect(step({ pressed: [PAD_BUTTON.LB] })).toMatchObject({
+      strafeHold: true,
+      shield: false,
+    });
+    expect(step({ pressed: [PAD_BUTTON.LB] }).strafeHold).toBe(true);
+    expect(input.lastMovementCommand.binary.strafeHold).toBe(true);
+    expect(step({ pressed: [] }).strafeHold).toBe(false);
   });
 
   it('ignores pad presses on the pause screen', () => {

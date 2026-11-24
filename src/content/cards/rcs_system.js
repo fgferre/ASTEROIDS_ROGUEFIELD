@@ -23,14 +23,17 @@ export default {
   text: {
     name: 'RCS System',
     summary:
-      'Side thrusters bite harder: the hull turns faster, and the computer stops a spin for you when you let go.',
+      'Side thrusters bite harder: the hull turns faster, the computer stops a spin for you when you let go, and you can strafe.',
     lore: 'Reaction Control System salvaged from abandoned space stations. Allows maneuvers impossible for conventional ships.',
     levels: [
       {
         title: 'Basic RCS',
         description:
           'Turns 30% faster (96° a second instead of 74°), and a spin stops half a second after you let go instead of drifting on.',
-        highlights: ['Line the nose up and it stays there.'],
+        highlights: [
+          'Line the nose up and it stays there.',
+          'Strafe: Z and C push the hull sideways without turning it (on a controller, the left stick sideways, or LB held with the Flight Computer); harder with each level.',
+        ],
       },
       {
         title: 'Active RCS',

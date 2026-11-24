@@ -36,6 +36,7 @@ describe('Keyboard controls hints', () => {
           'WASD move',
           'Shift dash',
           'E shield',
+          'Z C strafe (RCS)',
           'R reroll',
           'B banish',
           'Shooting is automatic',
@@ -50,7 +51,7 @@ describe('Keyboard controls hints', () => {
 });
 
 describe('Gamepad controls hints', () => {
-  it('name the stick scheme per flight mode and RB/LB for dash and shield', () => {
+  it('name the stick scheme per flight mode, the strafe, and RB/LT for dash and shield', () => {
     const lists = [
       ...html.matchAll(
         /<ul\s+class="controls-hints"\s+data-device="gamepad"[\s\S]*?<\/ul>/g
@@ -62,14 +63,21 @@ describe('Gamepad controls hints', () => {
         expect.arrayContaining([
           'L-Stick ↑ thrust ↓ brake',
           'R-Stick ← → turn',
+          'L-Stick ← → strafe (RCS)',
           'RB dash',
-          'LB shield',
+          'LT shield',
         ])
       );
       expect(items(list, 'modern')).toEqual(
-        expect.arrayContaining(['L-Stick move', 'R-Stick aim', 'RB dash'])
+        expect.arrayContaining([
+          'L-Stick move',
+          'R-Stick aim',
+          'LB + L-Stick strafe',
+          'RB dash',
+          'LT shield',
+        ])
       );
-      expect(list).not.toMatch(/<kbd>(RT|LT)<\/kbd>/);
+      expect(list).not.toMatch(/<kbd>LB<\/kbd> shield/);
     });
   });
 });

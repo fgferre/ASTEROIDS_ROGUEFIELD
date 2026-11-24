@@ -1084,6 +1084,9 @@ class InputSystem {
       down: this.isActionActive('moveDown'),
       left: this.isActionActive('moveLeft'),
       right: this.isActionActive('moveRight'),
+      strafeLeft: this.isActionActive('strafeLeft'),
+      strafeRight: this.isActionActive('strafeRight'),
+      strafeHold: this.isActionActive('strafeHold'),
     };
   }
 

@@ -160,6 +160,51 @@ const SETTINGS_SCHEMA = [
         },
       },
       {
+        key: 'strafeLeft',
+        type: 'binding',
+        label: 'Strafe Left',
+        description:
+          'With the RCS System: the side jets push the hull to port, the nose held.',
+        default: {
+          keyboard: ['KeyZ'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'strafeRight',
+        type: 'binding',
+        label: 'Strafe Right',
+        description:
+          'With the RCS System: the side jets push the hull to starboard, the nose held.',
+        default: {
+          keyboard: ['KeyC'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'strafeHold',
+        type: 'binding',
+        label: 'Strafe Hold',
+        description:
+          'With the RCS System: while held, left and right strafe instead of turning or steering. In Classic flight the left stick strafes sideways on its own.',
+        default: {
+          keyboard: [],
+          gamepad: GAMEPAD_BINDINGS.strafeHold,
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
         key: 'activateShield',
         type: 'binding',
         label: 'Activate Shield',

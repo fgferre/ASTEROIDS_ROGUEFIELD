@@ -46,17 +46,20 @@ export const PAD_STICK_GLYPHS = Object.freeze(['L-Stick', 'R-Stick']);
 
 /**
  * Default gamepad bindings of the remappable actions (settings `controls`):
- * Felipe's picks on controle-1 (20/11), dash on RB and the shield on LB. The
- * sticks fly by their tilt (flight.js, `pad` frames), not through bindings:
- * classic, the left stick thrusts (up) and backs (down), the right one turns;
- * modern, the left one points the way and the right one aims.
+ * Felipe's picks on controle-1 (20/11), dash on RB; the shield moved from LB
+ * to LT when LB became the strafe hold (23/11). The sticks fly by their tilt
+ * (flight.js, `pad` frames), not through bindings: classic, the left stick
+ * thrusts (up), backs (down) and, with the RCS System, strafes (sideways), the
+ * right one turns; modern, the left one points the way (with LB held, it
+ * strafes) and the right one aims.
  */
 export const GAMEPAD_BINDINGS = Object.freeze({
   moveUp: [`button:${PAD_BUTTON.UP}`],
   moveDown: [`button:${PAD_BUTTON.DOWN}`],
   moveLeft: [`button:${PAD_BUTTON.LEFT}`],
   moveRight: [`button:${PAD_BUTTON.RIGHT}`],
-  activateShield: [`button:${PAD_BUTTON.LB}`],
+  strafeHold: [`button:${PAD_BUTTON.LB}`],
+  activateShield: [`button:${PAD_BUTTON.LT}`],
   dash: [`button:${PAD_BUTTON.RB}`],
   pause: [`button:${PAD_BUTTON.START}`],
   openSettings: [`button:${PAD_BUTTON.VIEW}`],

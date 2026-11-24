@@ -21,7 +21,9 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
+  new: [
+    'With the RCS System the ship can strafe: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, harder with each level of the card. The shield moves to LT on a controller.', // not confirmed
+  ],
   improved: [
     'The Braking System waits until you let go of every key, a beat longer: a turn or a quick tap of thrust no longer bleeds your speed.', // not confirmed
     'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed

@@ -57,6 +57,37 @@ export function classicAsks(input) {
   };
 }
 
+/**
+ * The pilot's strafe, -1 (to port) .. 1 (to starboard), and the input left to
+ * steer by. Z and C strafe in both flights. Held (LB, the touch STRAFE), the
+ * sideways keys, d-pad and stick strafe instead of turning, and modern flight
+ * lets go of the steering (the nose holds). In classic flight the pad's left
+ * stick strafes sideways on its own, as far as it leans. The flight asks only
+ * with the RCS System.
+ */
+export function splitStrafe(input, modern) {
+  const keys = (input.strafeRight ? 1 : 0) - (input.strafeLeft ? 1 : 0);
+  const stickX = Number(input.moveX) || 0;
+  // `|| 0` folds -0 into 0.
+  const stick = Math.sign(stickX) * padForce(input, Math.abs(stickX)) || 0;
+  if (!input.strafeHold) {
+    return { strafe: keys || (modern ? 0 : stick), steer: input };
+  }
+  const sideways = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  const steer = modern
+    ? {
+        ...input,
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        moveX: 0,
+        moveY: 0,
+      }
+    : { ...input, left: false, right: false };
+  return { strafe: keys || sideways || stick, steer };
+}
+
 /** The right stick's unit direction past the engage, or null. */
 export function getAimStickDirection(input) {
   const x = Number(input.aimX) || 0;
@@ -210,6 +241,9 @@ export class MovementInput {
       down: Boolean(binary.down),
       left: Boolean(binary.left),
       right: Boolean(binary.right),
+      strafeLeft: Boolean(binary.strafeLeft),
+      strafeRight: Boolean(binary.strafeRight),
+      strafeHold: Boolean(binary.strafeHold),
     };
   }
 
@@ -219,6 +253,9 @@ export class MovementInput {
       down: false,
       left: false,
       right: false,
+      strafeLeft: false,
+      strafeRight: false,
+      strafeHold: false,
     };
   }
 
