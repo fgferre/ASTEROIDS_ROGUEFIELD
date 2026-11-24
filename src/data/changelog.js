@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'A few pieces of dead or duplicated code were removed (an empty boss hook, a repeated crack clean-up, a missing source-map line, two unused settings fallbacks); nothing changes for the player.', // not confirmed
+  ],
 };
 
 export const RELEASES = [

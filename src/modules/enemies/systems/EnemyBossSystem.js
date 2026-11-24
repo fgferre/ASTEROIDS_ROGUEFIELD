@@ -327,15 +327,6 @@ export class EnemyBossSystem {
     return this.bossHudState;
   }
 
-  forwardBossEvent() {
-    // Raw boss events (boss-spawned, boss-phase-changed, boss-defeated) are
-    // already emitted by BossEnemy / EnemySpawnSystem and consumed directly
-    // by EffectsSystem, AudioSystem and UISystem via their own listeners.
-    // This method previously duplicated that processing via direct calls
-    // AND secondary event emissions (effects-boss-*, audio-boss-*, ui-boss-*).
-    // Kept as a no-op hook for any future per-event bookkeeping in EnemySystem.
-  }
-
   dropBossRewards(boss, rewards = {}) {
     return this.rewards.dropBossRewards(boss, rewards);
   }
@@ -401,7 +392,6 @@ export class EnemyBossSystem {
 
     if (!boss) {
       console.warn('[EnemySystem] boss-spawned event missing enemy reference');
-      this.forwardBossEvent('boss-spawned', data);
       return;
     }
 
@@ -469,18 +459,6 @@ export class EnemyBossSystem {
     };
 
     this.emitBossHudUpdate();
-    this.forwardBossEvent('boss-spawned', {
-      ...data,
-      enemy: boss,
-      wave: waveNumber,
-      phase,
-      health,
-      maxHealth,
-      color,
-      phaseColors,
-      invulnerable,
-      invulnerabilityTimer,
-    });
   }
 
   handleBossPhaseChange(data = {}) {
@@ -542,25 +520,12 @@ export class EnemyBossSystem {
     };
 
     this.emitBossHudUpdate();
-    this.forwardBossEvent('boss-phase-changed', {
-      ...data,
-      enemy: boss,
-      wave: waveNumber,
-      phase,
-      health,
-      maxHealth,
-      color,
-      phaseColors,
-      invulnerable,
-      invulnerabilityTimer,
-    });
   }
 
   handleBossDefeated(data = {}) {
     const boss = this.resolveBossReference(data);
 
     if (!boss) {
-      this.forwardBossEvent('boss-defeated', data);
       return;
     }
 
@@ -571,7 +536,6 @@ export class EnemyBossSystem {
       : boss.wave ?? this.waveState?.current ?? null;
 
     const rewards = this.dropBossRewards(boss, data.rewards || {});
-    const position = data.position || { x: boss.x ?? 0, y: boss.y ?? 0 };
 
     boss.destroyed = true;
 
@@ -613,18 +577,6 @@ export class EnemyBossSystem {
 
     this.bossHudState = nextHudState;
     this.emitBossHudUpdate();
-
-    this.forwardBossEvent('boss-defeated', {
-      ...data,
-      enemy: boss,
-      rewards,
-      wave: waveNumber,
-      position,
-      color: nextHudState.color,
-      phaseColors,
-      invulnerable: false,
-      invulnerabilityTimer: null,
-    });
 
     this.releaseAsteroid(boss);
 
@@ -677,14 +629,6 @@ export class EnemyBossSystem {
     });
 
     this.emitBossHudUpdate();
-    this.forwardBossEvent('boss-invulnerability-changed', {
-      ...data,
-      enemy: boss,
-      wave: waveNumber,
-      invulnerable,
-      invulnerabilityTimer,
-      invulnerabilitySource: source,
-    });
   }
 
   handleEnemyDamaged(data = {}) {

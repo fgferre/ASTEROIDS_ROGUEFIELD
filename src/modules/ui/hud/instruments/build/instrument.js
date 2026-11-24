@@ -12,9 +12,9 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
   UPGRADE_FAMILIES,
 } from '../../../../../data/upgrades/families.js';
-import { WEAPON_EVOLUTIONS } from '../../../../../data/weapons.js';
+import { familyForm, WEAPON_EVOLUTIONS } from '../../../../../data/weapons.js';
 import { onDemand, replay } from '../../hudCommon.js';
-import { familyAccent, familyForm } from '../../../upgradeCard.js';
+import { familyAccent } from '../../../upgradeCard.js';
 
 const CELLS = Array.from({ length: FAMILY_APEX_THRESHOLD }, (_, i) =>
   i === FAMILY_SYNERGY_THRESHOLD

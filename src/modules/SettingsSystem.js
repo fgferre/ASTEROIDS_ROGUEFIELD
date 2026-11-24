@@ -649,7 +649,7 @@ class SettingsSystem {
         postProcessing: graphics.postProcessing !== false,
         bloom: graphics.bloom !== false,
         chromaticAberration: graphics.chromaticAberration !== false,
-        antialiasing: graphics.antialiasing || 'None',
+        antialiasing: graphics.antialiasing,
         hitMarkers: gameplay.hitMarkers !== false,
       },
     };
