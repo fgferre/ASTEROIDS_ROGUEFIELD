@@ -297,7 +297,7 @@ export class CameraRig {
     if (!key.castShadow) return;
     const half = Math.min(
       KEY_SHADOW.max,
-      Math.max(KEY_SHADOW.min, range * KEY_SHADOW.span)
+      Math.max(KEY_SHADOW.min, range * TAN_V * KEY_SHADOW.span)
     );
     const texel = (2 * half) / key.shadow.mapSize.x;
     const x = Math.round(tx / texel) * texel;

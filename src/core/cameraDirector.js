@@ -28,6 +28,10 @@ const DEG = Math.PI / 180;
 // The ship counts with this radius on screen.
 const SHIP_RADIUS = 24;
 const BISECT_STEPS = 12;
+// A Warden's entrance shots (content/bosses, `arrival.shot`) give their
+// distances for the 38° lens they were framed with; another lens moves the
+// camera in proportion, so the Warden fills the same share of the screen.
+const ARRIVAL_TAN_V = Math.tan(19 * DEG);
 // Where things must sit on screen to count as shown (share of the half-screen).
 const SHOWN = 0.9;
 const SHIP_SHOWN = 0.95;
@@ -190,7 +194,8 @@ export function createDirector({
       );
     };
     let lo = 1;
-    let hi = 4 * Math.max(fieldWidth, fieldHeight);
+    // Far enough for the whole field at any screen shape, at any lens.
+    let hi = (1.4 * Math.max(fieldWidth, fieldHeight)) / lens.tanV;
     for (let i = 0; i < 40; i += 1) {
       const mid = (lo + hi) / 2;
       if (fits(mid)) hi = mid;
@@ -346,7 +351,7 @@ export function createDirector({
     const side = a.edge === 'left' ? -1 : 1;
     goal.x = a.to.x + (boss.x - a.to.x) * shot.look;
     goal.y = a.to.y + (boss.y - a.to.y) * shot.look;
-    goal.distance = along(shot.distance);
+    goal.distance = (along(shot.distance) * ARRIVAL_TAN_V) / lens.tanV;
     goal.tilt = along(shot.tilt) * DEG;
     goal.yaw = side * (90 + along(shot.turn)) * DEG;
   }

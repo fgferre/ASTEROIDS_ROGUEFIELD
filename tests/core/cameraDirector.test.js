@@ -270,7 +270,7 @@ describe('camera director', () => {
     run(d, scene(400, 300), 0.2);
     expect(d.moment).toBe('near');
     const pose = run(d, scene(400, 300), 3);
-    expect(pose.distance).toBeCloseTo(NEAR_DISTANCE, -1);
+    expect(Math.abs(pose.distance / NEAR_DISTANCE - 1)).toBeLessThan(0.01);
   });
 
   it('a threat keeps the view open a while after it is gone', () => {
@@ -419,6 +419,19 @@ describe('camera director, a Warden’s entrance', () => {
         1
       );
     }
+  });
+
+  it('frames the entrance as its recipe did at 38°, from farther at the play lens', () => {
+    const at = (lens) => {
+      const d = createDirector({ fieldWidth: W, fieldHeight: H });
+      d.setLens({ tanV: lens, aspect: 16 / 9 });
+      run(d, scene(400, 300), 1);
+      return run(d, scene(400, 300, { enemies: [arriving('right')] }), 3)
+        .distance;
+    };
+    const old = Math.tan(19 * DEG);
+    expect(at(old)).toBeCloseTo(RECIPE.shot.distance[0], 0);
+    expect(at(tanV) / at(old)).toBeCloseTo(old / tanV, 2);
   });
 
   it('hands back to the play view once the entrance ends, the yaw back to 0', () => {

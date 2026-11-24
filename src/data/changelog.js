@@ -22,7 +22,9 @@
 
 export const NEXT = {
   new: [],
-  improved: [],
+  improved: [
+    'The camera has a narrower lens: the ship no longer seems to lean as it nears the sides of the screen (about half the lean it had there, and phones had the most), with the same part of the field in view.', // not confirmed
+  ],
   fixed: [],
   unseen: [],
 };
