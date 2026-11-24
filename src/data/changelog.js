@@ -47,9 +47,42 @@ export const NEXT = {
   unseen: [
     "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",
   ],
+  new: [],
+  improved: [],
+  fixed: [],
+  unseen: [],
 };
 
 export const RELEASES = [
+  {
+    version: '0.8.1',
+    date: '2026-11-24',
+    new: [
+      'A pad now drives a pointer on every menu and overlay, as a mouse: the left stick moves the round reticle (slower over anything you can click), A clicks and drags, the right stick scrolls what is under it; the d-pad still steps item by item, B goes back and LB/RB switch tabs.',
+      "The menu explains itself on a first visit, one line at a time in the flight tips' look: how to set up a run on Mission Control, where Salvage comes from in the Hangar, and a pointer to the Hangar once your Salvage first buys something. Campaign, the difficulty and the Hangar's Ship and Medals tabs gain a line of their own; Show Onboarding Tips brings the first-visit lines back.",
+      'The ship can strafe from the start: Z and C, or A and D while you hold Space, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, and the RCS System makes them push harder. The shield moves to LT on a controller.',
+    ],
+    improved: [
+      'The death screen and the run\'s timeline name a special rock\'s kind, its blast included: "Killed by a Volatile Ring Fragment", "an Armored Ring Fragment"; a plain rock is still a Ring Fragment.',
+      'The dark, flat stones in the menu’s background are now real rocks, small and far off by the Ring.',
+      'Every shot now pushes the ship back a little, in every flight, and a slower gun kicks harder per shot: with no cards you correct it on the thrusters; the Braking System and the Flight Computer hold the ship in place.',
+      'The Braking System waits until you let go of every key, a beat longer: a turn or a quick tap of thrust no longer bleeds your speed.',
+      'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).',
+      'The camera has a narrower lens: the ship no longer seems to lean as it nears the sides of the screen (about half the lean it had there, and phones had the most), with the same part of the field in view.',
+      'On a phone the camera comes closer, so the ship and the enemies look about as big as on a tablet, and it follows the ship sideways; red arrows at the screen edge point to enemy ships out of view and to any rock or shot that will hit you within two seconds. The wide view still opens when it did.',
+      'The story aboard the Wake now plays at every campaign launch from Mission Control, not only the first; skip it if you have seen it. Next Sector after a win still flies straight to the journey.',
+      'Skipping a scene is now deliberate: hold Space, Start (Options on a PlayStation pad) or the SKIP button on screen for 1.5 s, its outline filling as you hold, and it skips that scene for the next; a quick tap jumps to the next line. Any other key just shows how.',
+    ],
+    fixed: [
+      'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.',
+      'Choose your pilot is no longer a dead end: Esc on the keyboard or B on the pad goes back to PRESS START (with the delete box open, they only close the box).',
+      "The Flight Computer's briefing lines its keys up with their text again when you play on the keyboard or by touch.",
+      'B on the pad or Esc pressed right after Launch, while the Wake’s link comes up, no longer brings PRESS START back over the run that is starting.',
+    ],
+    unseen: [
+      "The playtest bot's model of the start's flight brakes the way the Braking System now does (only once every key is let go, a beat later); the game plays the same.",
+    ],
+  },
   {
     version: '0.8.0',
     date: '2026-11-23',
