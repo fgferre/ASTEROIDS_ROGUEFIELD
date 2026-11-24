@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isPilotStale } from '../../src/core/storage.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { PROGRESSION_UPGRADE_REROLLS_PER_RUN } from '../../src/core/GameConstants.js';
@@ -22,6 +23,11 @@ import {
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
 } from '../../src/data/shipModels.js';
+
+vi.mock('../../src/core/storage.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isPilotStale: vi.fn(() => false),
+}));
 
 const atRate = (salvage) => ({
   getModifiers: () => ({ salvage }),
@@ -48,6 +54,16 @@ describe('HangarService', () => {
   afterEach(() => {
     GamePools.releaseAll();
     restoreDom();
+  });
+
+  it('sells nothing while another tab has changed the pilot', () => {
+    stock(200);
+    const hangar = new HangarService({ ...base, eventBus: new EventBus() });
+    isPilotStale.mockReturnValue(true);
+    expect(hangar.buy('salvage-magnet')).toBe(false);
+    isPilotStale.mockReturnValue(false);
+    expect(hangar.salvage).toBe(200);
+    expect(hangar.owned['salvage-magnet']).toBeUndefined();
   });
 
   const stock = (salvage, owned = {}) =>

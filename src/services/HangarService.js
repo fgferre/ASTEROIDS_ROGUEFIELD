@@ -16,7 +16,12 @@ import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { sectorById } from '../data/sectors.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
-import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
+import {
+  isPilotStale,
+  isProgressHeld,
+  loadJSON,
+  saveProgress,
+} from '../core/storage.js';
 
 /** The first save: `{ salvage, owned }`. Read once, never written again. */
 export const HANGAR_STORAGE_KEY_V1 = 'roguefield:hangar:v1';
@@ -266,6 +271,8 @@ export default class HangarService {
     const item = ITEMS_BY_ID.get(id);
     if (!item || this.owned[id] || this.salvage < item.cost) return false;
     if (this.lockOf(item)) return false;
+    // Another tab changed this pilot: the write would be dropped, so sell nothing.
+    if (isPilotStale()) return false;
     this.salvage -= item.cost;
     this.owned[id] = true;
     this.persist();

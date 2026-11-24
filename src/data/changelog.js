@@ -23,8 +23,12 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
-  unseen: [],
+  fixed: [
+    'If the same pilot was changed in another tab, buying in the Hangar now closes it and takes the game back to the start screen, instead of selling something that would not be saved.', // not confirmed
+  ],
+  unseen: [
+    'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
+  ],
 };
 
 export const RELEASES = [

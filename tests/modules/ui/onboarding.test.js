@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
+import { holdProgress } from '../../../src/core/storage.js';
 import SettingsSystem from '../../../src/modules/SettingsSystem.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import {
@@ -50,6 +51,16 @@ describe('Onboarding', () => {
     restoreDom = installDomStubs();
   });
   afterEach(() => restoreDom());
+
+  it('writes nothing to the pilot while progress is held', () => {
+    holdProgress(true);
+    try {
+      new Onboarding(fakeView()).markDone('move');
+    } finally {
+      holdProgress(false);
+    }
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
+  });
 
   it('teaches move, dash, shield in order, each after a gap', () => {
     const view = fakeView();

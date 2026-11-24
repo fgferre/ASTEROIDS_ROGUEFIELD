@@ -19,6 +19,7 @@ import {
   pressureNoteText,
   salvageBalanceText,
 } from './hangar.js';
+import { isPilotStale } from '../../core/storage.js';
 import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
@@ -168,7 +169,12 @@ export class HangarScreen {
       if (buy) {
         const id = buy.dataset.hangarBuy;
         const list = buy.closest('.hangar-list');
-        this.hangar().buy(id);
+        // Another tab changed this pilot: the buy was refused, so leave the
+        // Hangar and let the menu send the tab back to the start gate.
+        if (!this.hangar().buy(id) && isPilotStale()) {
+          this.closeHangar();
+          return;
+        }
         this.renderHangar();
         list
           .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
