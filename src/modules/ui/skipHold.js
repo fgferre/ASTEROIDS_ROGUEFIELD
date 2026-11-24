@@ -9,7 +9,10 @@
 // other key, click, touch or pad button only shows the hint, which fades
 // once nothing is pressed for a while. A hold outlives the scene it began
 // in (or the remote link): the next scene's listener goes on filling the
-// same outline; one that skipped counts again only once let go.
+// same outline; one that skipped counts again only once let go. A Space
+// already down when no hold was running (the strafe held in flight as the
+// scene starts) skips nothing: only a fresh press starts a hold, never a
+// key's repeat.
 
 import { PAD_BUTTON } from '../../data/constants/gamepad.js';
 
@@ -171,7 +174,7 @@ export function listenForHold(onSkip, onNext) {
     if (!live) return;
     keys.add(event.code);
     reveal();
-    if (event.code === SKIP_CODE && !hold.key) press('key');
+    if (event.code === SKIP_CODE && !event.repeat && !hold.key) press('key');
   };
   const detachKeys = () => {
     window.removeEventListener('keydown', onKeyDown, true);

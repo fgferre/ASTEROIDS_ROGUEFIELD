@@ -164,7 +164,7 @@ const SETTINGS_SCHEMA = [
         type: 'binding',
         label: 'Strafe Left',
         description:
-          'The side jets push the hull to port, the nose held; harder with the RCS System.',
+          'The side jets push the hull to port, the nose held; harder with the RCS System. Holding Space, A does it too.',
         default: {
           keyboard: ['KeyZ'],
           gamepad: [],
@@ -179,7 +179,7 @@ const SETTINGS_SCHEMA = [
         type: 'binding',
         label: 'Strafe Right',
         description:
-          'The side jets push the hull to starboard, the nose held; harder with the RCS System.',
+          'The side jets push the hull to starboard, the nose held; harder with the RCS System. Holding Space, D does it too.',
         default: {
           keyboard: ['KeyC'],
           gamepad: [],
@@ -194,9 +194,9 @@ const SETTINGS_SCHEMA = [
         type: 'binding',
         label: 'Strafe Hold',
         description:
-          'While held, left and right strafe instead of turning or steering. In Classic flight the left stick strafes sideways on its own.',
+          'While held (Space on the keys, LB on a pad), left and right strafe instead of turning or steering. In Classic flight the left stick strafes sideways on its own.',
         default: {
-          keyboard: [],
+          keyboard: ['Space'],
           gamepad: GAMEPAD_BINDINGS.strafeHold,
         },
         metadata: {

@@ -133,6 +133,21 @@ describe('holding the skip key', () => {
     expect(onSkip).not.toHaveBeenCalled();
   });
 
+  it('a Space already held as the scene starts (the strafe) skips nothing until pressed again', () => {
+    const { onSkip, onNext } = bind();
+    fire('keydown', 'Space', true);
+    vi.advanceTimersByTime(HOLD_MS + 50);
+    fire('keydown', 'Space', true);
+    fire('keyup');
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
+
+    fire('keydown');
+    vi.advanceTimersByTime(100);
+    fire('keyup');
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   it("reads Start on the game's pad, held or tapped, and names the pad's own button", () => {
     const { onSkip, onNext } = bind();
     const start = pad.buttons[PAD_BUTTON.START];

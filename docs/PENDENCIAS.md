@@ -320,7 +320,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
   de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta. Testando o conjunto (23/11):
   _"no teste que fiz o strafe nao funcionou..."_ e _"Eu acho que o Strafe deveria funcionar independente do RSS, você não
-  acha?"_. O strafe passou a existir desde o começo; a RCS System só o deixa mais forte.
+  acha?"_. O strafe passou a existir desde o começo; a RCS System só o deixa mais forte. Depois: _"funcionou, mas acho
+  que no teclado pode ter uma ativsacao tb alternativa segurando um modificador de direita esquerda comom no controle.
+  pode deixar o z e c, mas essa opcao adicional é otima tb."_ e, à sugestão do Espaço, _"Sim, Espaço"_; o Espaço
+  segurado faz o strafe com A e D.
 - **(47)** A câmera: a lente e a tela pequena (23/11, jogando a 0.8.0). Da lente: _"tem momentos em que a nave parece
   que está levemente inclinada no eixo X dela. [...] se isso não é alguma coisa a ver com Field of View, o FOV, que cria
   um efeito de lente estranho, de acordo com a posição da nave dentro da tela."_ Da tela pequena: _"quando a gente está

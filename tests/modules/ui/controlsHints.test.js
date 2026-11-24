@@ -37,6 +37,7 @@ describe('Keyboard controls hints', () => {
           'Shift dash',
           'E shield',
           'Z C strafe',
+          'Space + A D strafe',
           'R reroll',
           'B banish',
           'Shooting is automatic',
@@ -44,7 +45,12 @@ describe('Keyboard controls hints', () => {
       );
       expect(modern.join(' ')).not.toMatch(/turn|thrust/);
       expect(items(list, 'classic')).toEqual(
-        expect.arrayContaining(['W ↑ thrust', 'S ↓ brake', 'A D turn'])
+        expect.arrayContaining([
+          'W ↑ thrust',
+          'S ↓ brake',
+          'A D turn',
+          'Space + A D strafe',
+        ])
       );
     });
   });

@@ -104,6 +104,7 @@ class InputSystem {
     this.inputSource = null;
     // The run is a replay ('game-started' says so): the pad stays quiet.
     this.replaying = false;
+    this.spaceFromFlight = false;
     // Pad sticks after the deadzone, read at each poll (see sampleInputFrame).
     this.padSticks = CENTRED_STICKS;
     // TouchControls on a touch device (app.js): its stick joins each step.
@@ -424,6 +425,12 @@ class InputSystem {
     if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
       event.preventDefault();
     }
+    // A Space's repeats arm no button, nor does the release of one begun in
+    // flight (the strafe) on a screen opened under it: pressed again, it does.
+    if (code === 'space') {
+      if (!event.repeat) this.spaceFromFlight = this.isGameRunning();
+      if (this.spaceFromFlight || event.repeat) event.preventDefault();
+    }
 
     const normalizedKey = this.normalizeKeyboardBinding(event.key);
     const normalizedCode = this.normalizeKeyboardBinding(event.code);
@@ -432,6 +439,8 @@ class InputSystem {
 
     if (!wasPressed) {
       actions.forEach((action) => {
+        // A repeat (the keys dropped on a focus loss) never confirms.
+        if (event.repeat && action === 'confirm') return;
         this.handleActionPress(action, 'keyboard', {
           event,
           device: 'keyboard',
@@ -458,6 +467,7 @@ class InputSystem {
 
     if (key) this.keys[key] = false;
     if (code) this.codes[code] = false;
+    if (code === 'space' && this.spaceFromFlight) event.preventDefault();
 
     const normalizedKey = this.normalizeKeyboardBinding(event.key);
     const normalizedCode = this.normalizeKeyboardBinding(event.code);
@@ -666,10 +676,10 @@ class InputSystem {
         eventBus?.emit?.('toggle-fullscreen');
         break;
       case 'confirm':
-        eventBus?.emit?.('input-confirmed', {
-          source,
-          context,
-        });
+        // Nothing in flight takes it: no select sound on each Space strafe.
+        if (!this.isGameRunning()) {
+          eventBus?.emit?.('input-confirmed', { source, context });
+        }
         break;
       default:
         break;

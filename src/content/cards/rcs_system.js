@@ -32,7 +32,7 @@ export default {
           'Turns 30% faster (96° a second instead of 74°), and a spin stops half a second after you let go instead of drifting on.',
         highlights: [
           'Line the nose up and it stays there.',
-          'The strafe (Z and C) slides the hull sideways harder, more with each level.',
+          'The strafe (Z and C, or Space held with A and D) slides the hull sideways harder, more with each level.',
         ],
       },
       {

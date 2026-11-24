@@ -124,6 +124,39 @@ describe('SettingsSystem dash binding migration', () => {
     expect(controls.activateShield.gamepad).toEqual(['button:4']);
     expect(controls.strafeHold.gamepad).toEqual(['button:10']);
   });
+
+  // Space holds the strafe on the keys; confirm (menus only) keeps it too.
+  it('gives Space to the hold in a save from before the strafe', () => {
+    const controls = load({ vibration: true });
+    expect(controls.strafeHold.keyboard).toEqual(['Space']);
+    expect(controls.confirm.keyboard).toEqual(['Enter', 'Space']);
+  });
+
+  it('gives Space to a hold saved without a key', () => {
+    const controls = load({ strafeHold: pad(['button:4']), vibration: true });
+    expect(controls.strafeHold.keyboard).toEqual(['Space']);
+    expect(controls.strafeHold.gamepad).toEqual(['button:4']);
+  });
+
+  it('with Space on another flight action, the hold stays without a key', () => {
+    const dash = { keyboard: ['Space'], gamepad: [] };
+    [
+      { dash, vibration: true },
+      { dash, strafeHold: pad(['button:4']), vibration: true },
+    ].forEach((saved) => {
+      const controls = load(saved);
+      expect(controls.dash.keyboard).toEqual(['Space']);
+      expect(controls.strafeHold.keyboard).toEqual([]);
+    });
+  });
+
+  it('keeps a key the player set for the hold', () => {
+    const controls = load({
+      strafeHold: { keyboard: ['KeyX'], gamepad: ['button:4'] },
+      vibration: true,
+    });
+    expect(controls.strafeHold.keyboard).toEqual(['KeyX']);
+  });
 });
 
 describe('SettingsSystem with a save holding options that left', () => {

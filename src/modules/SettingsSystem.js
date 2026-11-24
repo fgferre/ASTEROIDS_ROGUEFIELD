@@ -29,6 +29,8 @@ const PRE_1810_PAD_BINDINGS = {
 // The shield's pad default before the strafe (23/11): LB, now the strafe hold.
 const PRE_STRAFE_SHIELD = ['button:4'];
 const STRAFE_ACTIONS = ['strafeLeft', 'strafeRight', 'strafeHold'];
+// Read only off the run: may share a key with a flight action.
+const MENU_ACTIONS = ['confirm'];
 
 function deepClone(value) {
   if (value === undefined) {
@@ -164,30 +166,36 @@ class SettingsSystem {
   }
 
   // Before 23/11 the pad raised the shield on LB, which now holds the strafe
-  // (Z and C on the keys). A save from then (no strafe binding) moves a
-  // shield still on LB to LT, unless another action already holds LT (then it
-  // stays on LB); the strafe's new bindings start without any key or button
-  // another action holds, so no button does two things.
+  // (Z and C on the keys, Space held). A save from then (no strafe binding)
+  // moves a shield still on LB to LT, unless another action already holds LT
+  // (then it stays on LB). A strafe binding the save leaves empty (none at
+  // all, or the keys' hold from before Space held it) takes its default
+  // without any key or button another action holds, so none does two things
+  // in flight; the menus' confirm may share it (Space confirms there). One
+  // the player set stays as it is.
   migrateStrafe(storedControls) {
-    if (!storedControls || storedControls.strafeHold) {
+    if (!storedControls) {
       return;
     }
     const controls = this.values.controls;
     const heldByOthers = (action, device) =>
       Object.entries(controls)
-        .filter(([key]) => key !== action)
+        .filter(([key]) => key !== action && !MENU_ACTIONS.includes(key))
         .flatMap(([, value]) => value?.[device] ?? []);
-    const shield = controls.activateShield;
-    const lt = this.findField('controls', 'activateShield').default.gamepad;
-    const othersOnPad = heldByOthers('activateShield', 'gamepad');
-    if (
-      JSON.stringify(shield.gamepad) === JSON.stringify(PRE_STRAFE_SHIELD) &&
-      !lt.some((button) => othersOnPad.includes(button))
-    ) {
-      shield.gamepad = [...lt];
+    if (!storedControls.strafeHold) {
+      const shield = controls.activateShield;
+      const lt = this.findField('controls', 'activateShield').default.gamepad;
+      const othersOnPad = heldByOthers('activateShield', 'gamepad');
+      if (
+        JSON.stringify(shield.gamepad) === JSON.stringify(PRE_STRAFE_SHIELD) &&
+        !lt.some((button) => othersOnPad.includes(button))
+      ) {
+        shield.gamepad = [...lt];
+      }
     }
     STRAFE_ACTIONS.forEach((action) => {
       ['keyboard', 'gamepad'].forEach((device) => {
+        if (storedControls[action]?.[device]?.length) return;
         const taken = heldByOthers(action, device);
         controls[action][device] = controls[action][device].filter(
           (input) => !taken.includes(input)
