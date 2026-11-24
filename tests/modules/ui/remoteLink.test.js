@@ -20,9 +20,14 @@ describe('remote link', () => {
     vi.useFakeTimers();
     vi.stubGlobal('document', {
       createElement: node,
-      body: { append() {} },
+      body: { append() {}, classList: { add() {}, remove() {} } },
+    });
+    // The skip key's listener (skipHold.js).
+    vi.stubGlobal('window', {
       addEventListener() {},
       removeEventListener() {},
+      requestAnimationFrame: () => 1,
+      cancelAnimationFrame() {},
     });
   });
   afterEach(() => {

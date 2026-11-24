@@ -98,6 +98,24 @@ describe('InputSystem gamepad', () => {
     expect(step({ pressed: [] }).strafeHold).toBe(false);
   });
 
+  it('leaves Start to the skip while a cinematic holds the run, and pauses again after', () => {
+    const pauses = [];
+    eventBus.on('toggle-pause', () => pauses.push(gameState.paused));
+    const tapStart = () => {
+      fake.set({ pressed: [PAD_BUTTON.START] });
+      input.pollGamepad();
+      fake.set();
+      input.pollGamepad();
+    };
+    gameState.paused = true;
+    eventBus.emit('cinematic-started', { kind: 'story' });
+    tapStart();
+    expect(pauses).toEqual([]);
+    eventBus.emit('cinematic-ended', { kind: 'story' });
+    tapStart();
+    expect(pauses).toEqual([true]);
+  });
+
   it('ignores pad presses on the pause screen', () => {
     gameState.paused = true;
     input.pollGamepad();

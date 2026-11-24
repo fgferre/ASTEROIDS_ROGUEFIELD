@@ -495,6 +495,11 @@ class Renderer3D extends BaseSystem {
     return true;
   }
 
+  /** The story goes on from `ms` in (a tap of the skip key). */
+  seekStory(ms) {
+    this.story?.seek(ms);
+  }
+
   /**
    * The story is over: the field's scene is drawn again. The Wake stays
    * built for the next launch (rebuilding it stalled the start a second).
