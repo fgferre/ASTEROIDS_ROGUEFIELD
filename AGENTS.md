@@ -38,7 +38,7 @@ Traps (not obvious from the code, caused a mistake before; one line each, with t
 * The 2D canvases and the 3D canvas follow the window and are DPR-aware (`src/core/viewport.js`, capped at 2×, `?renderScale=1` forces 1×); the 3D scene draws at the window × min(DPR, the preset's cap: ultra 2, high 1.5, medium 1.25, low 1) and its last pass scales up (`Renderer3D.syncSize`): softness in the game is systemic (preset cap or `?renderScale`), not one model's fault — never fix it per sprite or per model.
 * Dev mode is one switch: `IS_DEV` from `src/core/env.js`. Never test `process.env.NODE_ENV` (Vite only replaces it in dev builds) or add a second helper.
 * Debug logging is on by default in dev and prints every EventBus emit (dozens per frame): profile with `?debugLogging=0`, or the DevTools trace measures `console.log`, not the game.
-* `mobileGuard` blocks a browser whose primary pointer is coarse and that has touch (phones, tablets); some automated browsers report that too, so captures and probes still pass `?desktop=force`.
+* `mobileGuard` is a gate, not a block: phones and tablets play by touch, held sideways (upright it asks to turn the device), so every plan counts them as platforms; some automated browsers look like one, so captures and probes still pass `?desktop=force`.
 * `.planning/` and `.claude/settings.local.json` are gitignored on purpose; never `git add -f` them (the hook blocks force-add).
 
 Memory

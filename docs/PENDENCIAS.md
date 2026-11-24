@@ -4,9 +4,33 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (45, 47 e 48 já são de ramos abertos: `nave/corpo`, `camera/lente-e-zoom` e `historia/pular-e-repetir`; 49 é do final do jogo.)
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (49 é do final do jogo, ramo `historia/final`.)
 
-## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
+## O BASTÃO — onde as sessões pararam (24/11) — a `main` está publicada até a versão 0.8.1 (PR do `publicar/0.8.1`, 24/11)
+
+**24/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.1 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.1 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ — pela PR do
+`publicar/0.8.1` para a `main`. Do número ele tinha dito: _"acho que mesmo todas essas mudanças nao fazem subir para
+0.9.0... ainda assim com tudo que fizmeos deixaria como 0.8.1"_; e antes, _"Espera tudo junto"_. Entra:
+
+- o controle nos menus (39): a mira redonda do apontador, e o B e o Esc que voltam da tela dos pilotos (42);
+- a fase que não avançava depois do Retry e o tipo da pedra na tela de morte (43);
+- as pedras do fundo do menu (44);
+- o corpo da nave (45): o coice nos canos, a inclinação do casco, o freio que espera, o coice leve, e o strafe desde o
+  começo (Z e C, A e D com o Espaço, o analógico de lado, o LB com o Flight Computer; o escudo no LT);
+- o menu que se explica para quem chega (46);
+- a câmera (47): a lente fechada e a câmera mais perto, com setas, na tela pequena;
+- as cutscenes (48): o B logo depois do Launch, a história da Wake em todo lançamento, e pular segurando 1,5 s.
+
+Nenhum desses itens fecha com a publicação: cada um fecha quando ele aprovar jogando. Ele ainda não conferiu num
+controle e num celular de verdade o LB com o Flight Computer, o escudo no LT, o pular segurando, a câmera de perto e os
+botões de toque; os números de sensação seguem dele.
+
+Os replays gravados antes desta versão deixam de tocar (o voo mudou); progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** o final novo (49), que ele aprovou em três atos com cinco falas novas e está sendo construído no
+ramo `historia/final`; o equilíbrio completo (27); as vozes (37); a segunda parte da abertura (o carregamento em
+fatias, espera o teste dele no Tesla).
 
 **23/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.0 vai ao ar por ordem dele — à
 pergunta "Publico a versão 0.8.0 com esta lista, trocando a configuração de checagens do GitHub?", _"Sim, publica"_ —
