@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
+  ],
 };
 
 export const RELEASES = [
