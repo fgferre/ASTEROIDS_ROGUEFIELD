@@ -60,13 +60,17 @@ function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
-    else if (name.endsWith('.js')) out.push(full);
+    else if (/\.(js|mjs|css|html)$/.test(name)) out.push(full);
   }
   return out;
 }
 
 const isTest = (f) => /^tests\/.*\.(test|spec)\.js$/.test(f);
-const isSrc = (f) => f.startsWith('src/') && f.endsWith('.js');
+// Files a test can reach: src code, the page's HTML and stylesheets, and the
+// tools under scripts/ (a test names them by an import or new URL('...', import.meta.url)).
+const isSrc = (f) =>
+  (f.startsWith('src/') && /\.(js|css|html)$/.test(f)) ||
+  (f.startsWith('scripts/') && f.endsWith('.mjs'));
 const isSharedTestInfra = (f) =>
   f.startsWith('tests/__helpers__/') ||
   f.startsWith('tests/__fixtures__/') ||
@@ -77,6 +81,7 @@ const SPECIFIER_RES = [
   /\b(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
   /\bimport\s*['"]([^'"]+)['"]/g,
   /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  /\bnew\s+URL\s*\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url/g,
   /\bvi\.(?:mock|doMock)\s*\(\s*['"]([^'"]+)['"]/g,
 ];
 
@@ -159,7 +164,7 @@ export function selectTests(graph, touchedPaths) {
 
 function readSources() {
   const sources = {};
-  for (const dir of ['src', 'tests']) {
+  for (const dir of ['src', 'tests', 'scripts']) {
     for (const file of walk(resolve(ROOT, dir))) {
       sources[relative(ROOT, file).replace(/\\/g, '/')] = readFileSync(
         file,
@@ -198,8 +203,10 @@ async function main() {
       if (covering.length) covering.forEach((t) => tests.add(t));
       else unguarded.push(f);
     }
-    for (const f of Object.keys(sources)) {
-      if (f.startsWith('tests/process/') && isTest(f)) tests.add(f);
+    if (srcTouched.some((f) => f.startsWith('src/'))) {
+      for (const f of Object.keys(sources)) {
+        if (f.startsWith('tests/process/') && isTest(f)) tests.add(f);
+      }
     }
   }
   files.filter(isTest).forEach((t) => tests.add(t));

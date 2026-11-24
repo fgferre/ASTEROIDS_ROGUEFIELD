@@ -97,3 +97,31 @@ describe('tocados test selection', () => {
     ]);
   });
 });
+
+describe('tocados: files that are not src js', () => {
+  const files = buildGraph({
+    'scripts/tool.mjs': 'export const t = 1;',
+    'src/index.html': '<html></html>',
+    'src/style.css': 'body {}',
+    'tests/process/tool.test.js': "import { t } from '../../scripts/tool.mjs';",
+    'tests/process/page.test.js':
+      "const page = new URL('../../src/index.html', import.meta.url);",
+    'tests/process/css.test.js':
+      "readFileSync(new URL('../../src/style.css', import.meta.url));",
+  });
+
+  it('selects the tests that import a touched script', () => {
+    expect(selectTests(files, ['scripts/tool.mjs'])).toEqual([
+      'tests/process/tool.test.js',
+    ]);
+  });
+
+  it('selects the tests that read a touched html or stylesheet by URL', () => {
+    expect(selectTests(files, ['src/index.html'])).toEqual([
+      'tests/process/page.test.js',
+    ]);
+    expect(selectTests(files, ['src/style.css'])).toEqual([
+      'tests/process/css.test.js',
+    ]);
+  });
+});
