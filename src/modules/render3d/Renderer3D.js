@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath, storyTold } from '../../core/cinematics.js';
+import { epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -767,8 +767,8 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
-      // The story's freighter (seconds): only for a player yet to see it.
-      () => storyTold() || this.warmStory(),
+      // The story's freighter (seconds): every campaign launch tells it.
+      () => this.warmStory(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();

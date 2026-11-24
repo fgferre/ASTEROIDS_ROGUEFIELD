@@ -9,8 +9,6 @@
 // journey between sectors flies its own camera (render3d/travelScene.js)
 // and ends on the intro's first pose.
 
-import { loadJSON, saveProgress } from './storage.js';
-
 export const INTRO_MS = 3000;
 export const EPILOGUE_MS = 4000;
 
@@ -36,7 +34,7 @@ export const TRAVEL = Object.freeze({
   handOffMs: 1000, // proposta 12/11
 });
 
-// The story before the first campaign's journey (render3d/storyScene.js):
+// The story before a campaign launch's journey (render3d/storyScene.js):
 // its six shots' lengths, ms, in order. proposta 18/11.
 export const STORY_SHOT_MS = Object.freeze([
   4500, 4300, 4300, 4300, 4000, 4000,
@@ -44,12 +42,6 @@ export const STORY_SHOT_MS = Object.freeze([
 export const STORY_MS = STORY_SHOT_MS.reduce((sum, ms) => sum + ms, 0);
 // Each shot's line (data/story.js STORY.prologue) starts this far into it.
 export const STORY_LINE_LEAD_MS = 400; // proposta 18/11
-
-// The story is told once per player (the owner's choice): on the first
-// campaign launch; every later one flies straight to its journey.
-const STORY_TOLD_KEY = 'roguefield:story-told:v1';
-export const storyTold = () => loadJSON(STORY_TOLD_KEY) === true;
-export const markStoryTold = () => saveProgress(STORY_TOLD_KEY, true);
 
 export const FOLLOW_TILT = 18;
 const INTRO_DISTANCE = 3.2;

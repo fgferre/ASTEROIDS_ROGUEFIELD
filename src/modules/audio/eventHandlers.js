@@ -10,7 +10,6 @@ import {
   STORY_CUE,
   chapterScoreForLayer,
 } from '../../data/audio/sectorScores.js';
-import { storyTold } from '../../core/cinematics.js';
 import { sectorById } from '../../data/sectors.js';
 import { ENDING_SECTOR } from '../../data/story.js';
 import { FILE_TRACK_IDS } from './FileTrackManager.js';
@@ -154,11 +153,11 @@ export const AUDIO_EVENT_HANDLERS = {
   sectorScorePrefetch(audio, payload) {
     audio.sectorScore.pickedSectorId = payload?.sector;
     audio._afterMenuMusic(() => {
-      // What plays first downloads first: the story's music (the first
-      // campaign launch tells it, under its own) and the journey's, small
-      // files, then the sector's, which waits behind both.
+      // What plays first downloads first: the story's music (a campaign
+      // launch tells it, under its own) and the journey's, small files, then
+      // the sector's, which waits behind both.
       const cues = [
-        !storyTold() && audio.journeyCue.prefetch({ url: STORY_CUE }),
+        audio.journeyCue.prefetch({ url: STORY_CUE }),
         audio.journeyCue.prefetch({
           chapter: sectorById(payload?.sector)?.chapter,
         }),

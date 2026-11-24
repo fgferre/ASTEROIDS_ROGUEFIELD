@@ -20,9 +20,10 @@
 // no skip). A renderer that can't move the camera (2D, reduced motion,
 // `?camera=0`) refuses them all, and the run keeps the plain banner; a
 // journey's lines then play as ordinary transmissions.
-// Story: the first campaign launch (once per player) tells it before its
-// journey (render3d/storyScene.js): six shots of the Wake under the
-// letterbox, a line opening each; a skip goes on to the journey.
+// Story: every campaign launch tells it before its journey (the owner,
+// 23/11: "tem que se tocar sim. A pessoa se quiser pula";
+// render3d/storyScene.js): six shots of the Wake under the letterbox, a line
+// opening each; a skip goes on to the journey.
 
 import {
   EPILOGUE_MS,
@@ -33,8 +34,6 @@ import {
   TRAVEL,
   cinematicFreezeFromUrl,
   endingPath,
-  markStoryTold,
-  storyTold,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
@@ -74,14 +73,14 @@ export function travelDestination(
 }
 
 /**
- * Whether a run `start` flying to `to` tells the story first: the first
- * campaign launch (the story untold), or any start under a dev `freeze` of
- * kind 'story'.
+ * Whether a run `start` flying to `to` tells the story first: a campaign
+ * launch (never the victory screen's Next Sector), or any start under a dev
+ * `freeze` of kind 'story'.
  */
 export function tellsStory({ source } = {}, to, freeze = null) {
   if (!to) return false;
   if (freeze?.kind === 'story') return true;
-  return source === 'campaign-launch-btn' && !storyTold();
+  return source === 'campaign-launch-btn';
 }
 
 /**
@@ -196,7 +195,7 @@ export class RunCinematics {
     this.afterEpilogue = null;
     this.afterEnding = null;
     this.travelTo = null;
-    // The first campaign's journey tells the story first (startStory).
+    // A campaign launch's journey tells the story first (startStory).
     this.tellsStory = false;
     this.storyTo = null;
     this.lineTimers = [];
@@ -322,11 +321,10 @@ export class RunCinematics {
     return true;
   }
 
-  /** The story before the first journey, to sector `to`; false without 3D. */
+  /** The story before the journey to sector `to`; false without 3D. */
   startStory(to) {
     this.tellsStory = false;
     if (!this.renderer()?.playStory?.()) return false;
-    markStoryTold();
     this.begin('story', STORY_MS, () => this.endStory(to));
     this.hud()?.cancelBanner();
     this.hud()?.showCinematicHint(true);

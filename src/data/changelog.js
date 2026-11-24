@@ -34,6 +34,7 @@ export const NEXT = {
     'Firing no longer shakes the whole ship: the barrels kick back and spring home, and the hull gives a little against the shot and settles. The hull also leans into turns and side pushes, and lifts its nose under the engine and dips it under the retro (none of it with Reduce Motion on).', // not confirmed
     'The camera has a narrower lens: the ship no longer seems to lean as it nears the sides of the screen (about half the lean it had there, and phones had the most), with the same part of the field in view.', // not confirmed
     'On a phone the camera comes closer, so the ship and the enemies look about as big as on a tablet, and it follows the ship sideways; red arrows at the screen edge point to enemy ships out of view and to any rock or shot that will hit you within two seconds. The wide view still opens when it did.', // not confirmed
+    'The story aboard the Wake now plays at every campaign launch from Mission Control, not only the first; skip it if you have seen it. Next Sector after a win still flies straight to the journey.', // not confirmed
   ],
   fixed: [
     'A layer no longer stalls after a Retry when the ship died in the blast of a Volatile rock or a Tether: clearing the field ends the layer again.', // not confirmed

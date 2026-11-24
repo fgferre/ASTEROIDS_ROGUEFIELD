@@ -38,8 +38,8 @@ describe('pilots', () => {
       JSON.stringify({ unlocked: { survivor: '2026-11-01', gone: 'x' } })
     );
     localStorage.setItem(
-      'roguefield:slot3:story-told:v1',
-      JSON.stringify(true)
+      'roguefield:slot3:onboarding:v1',
+      JSON.stringify({ done: ['move'], expired: {} })
     );
 
     const [one, two, three] = pilotSummaries();

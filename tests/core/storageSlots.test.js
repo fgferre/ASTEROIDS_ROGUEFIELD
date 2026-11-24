@@ -13,7 +13,6 @@ import {
   saveProgress,
 } from '../../src/core/storage.js';
 import { loadRecords, updateRecords } from '../../src/services/runRecords.js';
-import { storyTold } from '../../src/core/cinematics.js';
 
 // The save from before slots, as a player has it today: records, the old
 // Hangar (v1), a medal, the story seen, and settings.
@@ -74,7 +73,6 @@ describe('save slots', () => {
     seedToday();
     const before = keys();
     expect(loadJSON('roguefield:hangar:v1').salvage).toBe(340);
-    expect(storyTold()).toBe(true);
     playSlot(2);
     expect(loadRecords().bestLayer).toBe(0);
     expect(loadJSON('roguefield:hangar:v1')).toBeNull();
@@ -95,14 +93,6 @@ describe('save slots', () => {
     ).toMatchObject({ bestLayer: 3 });
     playSlot(1);
     expect(loadRecords().bestLayer).toBe(15);
-  });
-
-  it('tells the story again to a new pilot, not to one who saw it', () => {
-    seedToday();
-    playSlot(2);
-    expect(storyTold()).toBe(false);
-    playSlot(1);
-    expect(storyTold()).toBe(true);
   });
 
   it('takes progress only for the listed keys, and keeps settings shared', () => {
@@ -146,7 +136,6 @@ describe('save slots', () => {
     resolveActiveSlot();
     expect(loadJSON('roguefield:hangar:v1')).toBeNull();
     expect(loadRecords().bestLayer).toBe(0);
-    expect(storyTold()).toBe(false);
     expect(localStorage.getItem('astro:settings:v1')).not.toBeNull();
     expect(localStorage.getItem('roguefield:slot2:records:v1')).not.toBeNull();
     expect(getActiveSlot()).toBe(1);

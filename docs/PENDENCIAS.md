@@ -338,7 +338,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   do botao sendo pressionado"_. Textos inteiros em `quadro/respostas/b-na-cutscene-23-11.txt` e
   `endgame-e-cutscenes-23-11.txt`. Ramo `historia/pular-e-repetir`: o defeito consertado (o B do controle e o Esc do
   teclado, apertados na passagem "WAKE · REMOTE LINK" logo depois do Launch, levavam o menu que estava por baixo de
-  volta à tela de início enquanto a partida começava; já existia na 0.8.0). Fecha quando ele aprovar jogando.
+  volta à tela de início enquanto a partida começava; já existia na 0.8.0); a história da Wake toca em todo lançamento
+  da campanha pelo Mission Control (não no Retry, não no "próximo setor" depois de vencer; Descent, Daily Field e Boss
+  Rush como antes). Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 

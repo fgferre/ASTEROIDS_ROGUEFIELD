@@ -25,7 +25,6 @@ export const SLOT_KEYS = Object.freeze([
   'roguefield:achievements:v1',
   'roguefield:codex:v1',
   'roguefield:daily:v1',
-  'roguefield:story-told:v1',
   'roguefield:onboarding:v1',
 ]);
 

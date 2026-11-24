@@ -317,7 +317,7 @@ describe('RunCinematics', () => {
     const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
     cinematics.prepareTravel(launch);
     expect(emit.mock.lastCall[0]).toBe('voice-lines-coming');
-    // The story is untold: its lines come too.
+    // A campaign launch tells the story: its lines come too.
     expect(keys()).toEqual([
       ...travelTransmissions('debris-wake').map((entry) => entry.key),
       ...prologueTransmissions().map((entry) => entry.key),
@@ -375,16 +375,7 @@ describe('RunCinematics', () => {
     expect(card).toHaveBeenCalledTimes(1);
   });
 
-  it('tells the story on the first campaign launch only, a line opening each shot; a skip flies on to the journey', () => {
-    const stored = new Map();
-    vi.stubGlobal('window', {
-      setTimeout: (fn, ms) => setTimeout(fn, ms),
-      clearTimeout: (id) => clearTimeout(id),
-      localStorage: {
-        getItem: (key) => stored.get(key) ?? null,
-        setItem: (key, value) => stored.set(key, value),
-      },
-    });
+  it('tells the story on every campaign launch, a line opening each shot; a skip flies on to the journey', () => {
     const { ui, renderer, spoken, hush, skip } = setup();
     renderer.playStory = vi.fn(() => true);
     renderer.endStory = vi.fn();
@@ -404,12 +395,17 @@ describe('RunCinematics', () => {
     const told = spoken.filter(({ key }) => key.startsWith('prologue'));
     expect(told).toHaveLength(2);
 
-    // Told: the next campaign launch flies straight to its journey.
+    // The next campaign launch tells it again; the victory screen's Next
+    // Sector flies straight to its journey.
     ui.cinematics.stop();
     ui.cinematics.armTravel(launch);
     ui.cinematics.startIntro();
+    expect(ui.cinematics.kind).toBe('story');
+    ui.cinematics.stop();
+    ui.cinematics.armTravel({ sector: 'salvage-lanes', carried: true });
+    ui.cinematics.startIntro();
     expect(ui.cinematics.kind).toBe('travel');
-    expect(renderer.playStory).toHaveBeenCalledTimes(1);
+    expect(renderer.playStory).toHaveBeenCalledTimes(2);
   });
 
   it('plays a journey as plain lines when the camera cannot move', () => {
