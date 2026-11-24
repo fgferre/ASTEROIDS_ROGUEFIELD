@@ -57,6 +57,13 @@ export function classicAsks(input) {
   };
 }
 
+// The start's left stick leaning sideways strafes, but a thumb pushing it
+// forward a little crooked slid the ship (measured 23/11: 23 units in 5 s at
+// 10° off, 68 at 20°): its sideways part under this share is ignored and the
+// rest rescaled, so up to some 20° off straight nothing slides and a lean
+// clearly sideways still strafes. Not the keys, the strafe hold or touch.
+export const STRAFE_STICK_DEADZONE = 0.4;
+
 /**
  * The pilot's strafe, -1 (to port) .. 1 (to starboard), and the input left to
  * steer by. Z and C strafe in both flights. Held (LB, the touch STRAFE), the
@@ -70,7 +77,13 @@ export function splitStrafe(input, modern) {
   // `|| 0` folds -0 into 0.
   const stick = Math.sign(stickX) * padForce(input, Math.abs(stickX)) || 0;
   if (!input.strafeHold) {
-    return { strafe: keys || (modern ? 0 : stick), steer: input };
+    // On its own the stick strafes only past STRAFE_STICK_DEADZONE sideways.
+    const side = Math.max(
+      0,
+      (Math.abs(stickX) - STRAFE_STICK_DEADZONE) / (1 - STRAFE_STICK_DEADZONE)
+    );
+    const free = Math.sign(stickX) * padForce(input, side) || 0;
+    return { strafe: keys || (modern ? 0 : free), steer: input };
   }
   const sideways = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const steer = modern
