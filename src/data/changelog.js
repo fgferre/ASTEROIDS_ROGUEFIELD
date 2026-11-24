@@ -23,7 +23,9 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
+  ],
   unseen: [],
 };
 
