@@ -14,7 +14,7 @@ export function getEditorCss() {
     body.is-hud-editing #game-canvas { filter: saturate(0.55) brightness(0.5); }
     body.is-hud-editing #game-ui { filter: none; }
     #hud-layer.is-editing .ins-glance, #hud-layer.is-editing .ins-demand { opacity: 1; }
-    #hud-layer.is-editing :is(.layer-banner, .boss-intro, .transmission, .onboarding-tip, .next-wave-box, .cinematic-hint, .hud-direction) { visibility: hidden; }
+    #hud-layer.is-editing :is(.layer-banner, .boss-intro, .transmission, .onboarding-tip, .next-wave-box, .hud-direction) { visibility: hidden; }
 
     /* STAGE (inside #hud-layer: a preview scales it with the HUD) */
     .hed-stage { position: absolute; inset: 0; z-index: 300; pointer-events: auto; cursor: default; user-select: none; -webkit-user-select: none; touch-action: none; }

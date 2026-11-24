@@ -110,6 +110,39 @@ describe('touch stick', () => {
     ).toMatchObject({ up: false, moveX: 0, moveY: 0 });
   });
 
+  it('STRAFE held is the strafe hold, the stick read sideways as left and right; hidden, nothing', () => {
+    const touch = new TouchControls({
+      input: null,
+      player: facingRight,
+      eventBus: null,
+      mode: 'aponta',
+    });
+    const centred = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      moveX: 0,
+      moveY: 0,
+    };
+    touch.stick = { x: 0.9, y: 0 };
+    // 'aponta' thrusts toward the thumb...
+    expect(touch.merge(centred)).toMatchObject({
+      strafeHold: false,
+      up: true,
+      right: false,
+    });
+    // ...held, the thumb's sideways part is the strafe's right.
+    touch.strafing = true;
+    expect(touch.merge(centred)).toMatchObject({
+      strafeHold: true,
+      up: false,
+      right: true,
+    });
+    touch.layer = { hidden: true };
+    expect(touch.merge(centred).strafeHold).toBe(false);
+  });
+
   it('lets go and pauses a running run when the app leaves the screen', () => {
     const emitted = [];
     let running = true;
@@ -120,8 +153,10 @@ describe('touch stick', () => {
       mode: 'teclas',
     });
     touch.stick = UP;
+    touch.strafing = true;
     touch.pauseRun();
     expect(touch.stick).toEqual({ x: 0, y: 0 });
+    expect(touch.strafing).toBe(false);
     expect(emitted).toEqual(['toggle-pause']);
     running = false; // already paused, or in a menu: nothing toggles
     touch.pauseRun();

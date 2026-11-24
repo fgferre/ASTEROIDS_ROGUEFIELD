@@ -4,9 +4,33 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 42.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (49 é do final do jogo, ramo `historia/final`.)
 
-## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
+## O BASTÃO — onde as sessões pararam (24/11) — a `main` está publicada até a versão 0.8.1 (PR do `publicar/0.8.1`, 24/11)
+
+**24/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.1 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.1 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ — pela PR do
+`publicar/0.8.1` para a `main`. Do número ele tinha dito: _"acho que mesmo todas essas mudanças nao fazem subir para
+0.9.0... ainda assim com tudo que fizmeos deixaria como 0.8.1"_; e antes, _"Espera tudo junto"_. Entra:
+
+- o controle nos menus (39): a mira redonda do apontador, e o B e o Esc que voltam da tela dos pilotos (42);
+- a fase que não avançava depois do Retry e o tipo da pedra na tela de morte (43);
+- as pedras do fundo do menu (44);
+- o corpo da nave (45): o coice nos canos, a inclinação do casco, o freio que espera, o coice leve, e o strafe desde o
+  começo (Z e C, A e D com o Espaço, o analógico de lado, o LB com o Flight Computer; o escudo no LT);
+- o menu que se explica para quem chega (46);
+- a câmera (47): a lente fechada e a câmera mais perto, com setas, na tela pequena;
+- as cutscenes (48): o B logo depois do Launch, a história da Wake em todo lançamento, e pular segurando 1,5 s.
+
+Nenhum desses itens fecha com a publicação: cada um fecha quando ele aprovar jogando. Ele ainda não conferiu num
+controle e num celular de verdade o LB com o Flight Computer, o escudo no LT, o pular segurando, a câmera de perto e os
+botões de toque; os números de sensação seguem dele.
+
+Os replays gravados antes desta versão deixam de tocar (o voo mudou); progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** o final novo (49), que ele aprovou em três atos com cinco falas novas e está sendo construído no
+ramo `historia/final`; o equilíbrio completo (27); as vozes (37); a segunda parte da abertura (o carregamento em
+fatias, espera o teste dele no Tesla).
 
 **23/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.0 vai ao ar por ordem dele — à
 pergunta "Publico a versão 0.8.0 com esta lista, trocando a configuração de checagens do GitHub?", _"Sim, publica"_ —
@@ -243,6 +267,15 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   Feito e publicado em 21/11 (ramo `controle/videogame`, cartão `controle-1`): destaque de console nos menus, LB/RB
   entre as abas, dois analógicos com força, dash e escudo nos ombros; conferido com um controle imitado. Falta só ele:
   fecha quando ele aprovar jogando com o controle de verdade.
+  Jogando a 0.8.0 (23/11): _"Percebi também um problema de navegação dos menus do lugar, que é possível selecionar
+  alguns itens para serem comprados no controle. […] Talvez a saída seja realmente a gente ir para o modelo do Halo,
+  que cria um mouse pointer que é controlado pelo controle. E a gente desiste de fazer esse trabalho, que parece que é
+  muito complexo. Vamos deixar tudo adaptado para o mouse, só que o mouse vai ser controlado pelo controle, quando o
+  controle tiver. E a gente tem que criar um pointer bonito, né?"_ e _"E aí a gente teria que direcionais analógicos
+  para mexer no mouse, né? E um outro direcional, ele mexeria no page up, page down, de onde o mouse estiver com foco.
+  […] E a gente continua funcionando também o LB, o RB, essas coisas."_ No cartão `apontador-1`: _"A mira redonda"_,
+  _"Boa (0,9 s)"_, _"Sim, gruda de leve"_. No ramo `controle/apontador`: o apontador em todos os menus; a velocidade e
+  o grude esperam ele usar com o controle dele.
 - **(40)** O voo, um algoritmo só (21/11, à noite, na conversa do controle): _"o algoritmo ele é um só para tudo,
   né? Para movimento, o que que faz a nave se movimentar? É o thruster. [...] A nave ela é movimentada porque está
   ligado um thruster. E o thruster ele faz o movimento real da nave. Então, se ela precisa parar, seja por freio
@@ -275,6 +308,74 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   os nomes que ele escolheu: Kindling, Discharge, Implosion e Scrap Rounds na Scatter; Thermite, Storm Warhead e
   Gravity Warhead na Seeker (cartões `cartas-por-arma-7` e `cartas-por-arma-9`). Jogando o conjunto (23/11), dos números
   da Scatter e da Seeker: _"Ficam como estão"_. Publicado na 0.8.0 em 23/11.
+- **(42)** Voltar com B e ESC no menu (23/11, jogando a 0.8.0, dito na conversa da fase presa): _"Agora eu estou na
+  tela de Choose Your Pilot, eu não consigo dar B para voltar para a tela de Start do menu inicial. Deveria ser
+  possível, você não acha? Ele está preso nessa tela, eu sou obrigado a escolher um piloto nesse momento. Se eu
+  apertasse B aqui, ele deveria voltar para a tela de Press Start."_ No ramo `conserto/voltar-do-menu`: B e ESC na
+  tela dos pilotos voltam para Press Start (com a caixa de apagar aberta, só fecham a caixa). Fecha quando ele aprovar
+  jogando.
+- **(43)** A fase que não avança (23/11, jogando a 0.8.0, Layer 4 do Capítulo I, semente 2058876584, VETERAN): _"o
+  jogo ficou preso na layer 4 - chapter I"_ e _"eu matei todos os inimigos e ele não conseguiu avançar a fase,
+  entendeu? Não sei se era para entrar agora algum inimigo, coisa do gênero, boss, mas enfim, tá parado aí, matei tudo
+  que tinha na tela e não tem mais nada para matar."_ Texto inteiro em `quadro/respostas/fase-presa-23-11.txt`. Causa,
+  provada no jogo sem janela com a semente, a dificuldade e as cartas dele: quando a explosão de uma pedra volátil ou
+  de uma mina Tether mata a nave, a cópia para o Retry sai sem a morte desse inimigo na conta, e a fase volta esperando
+  uma morte que não vem mais. Já existia na 0.7.0. Ramo `conserto/fase-presa`. Fecha quando ele jogar sem travar.
+- **(46)** Onboarding do menu para quem chega (23/11, à coordenadora): _"Será que a gente tinha que fazer um pequeno
+  onboarding para quem chega a primeira vez? Saber que tem todas as sessões que tem, como que monta a sessão, o que
+  que faz cada modo, é, falar sobre o hangar, o que que tem dentro do hangar, o que que você acha?"_ No cartão
+  `onboarding-do-menu-1`: _"Cada tela se explica numa linha na primeira vez, uma linha fixa na dificuldade, e a linha
+  quando o Salvage dá para comprar a primeira coisa"_ e, dos textos, _"Bons assim"_. No ramo `menu/onboarding`: as três
+  linhas da primeira vez e as frases fixas (Campaign, dificuldade, abas Ship e Medals). Fecha quando ele aprovar vendo
+  como quem chega.
+
+- **(45)** O corpo da nave (23/11, jogando a 0.8.0): _"essa tremida que a nave dá a cada tiro, ela não tá boa.
+  [...] fazer os canos das armas sofrerem esse recuo, ao invés do corpo inteiro da arma ficar quicando."_ Do casco:
+  _"quando a gente olha a nave de cima e a nave está fazendo movimentos de thruster [...] o casco fica completamente
+  still."_ E: _"a gente poderia introduzir o movimento strafe."_ Texto inteiro em `quadro/respostas/corpo-da-nave-23-11.txt`.
+  Do freio (23/11): _"me parece que as cartas de freio [...] freiam a nave até mesmo quando a gente está usando os
+  thrusters para acelerar ela. [...] O freio só entra quando nenhum controle está sendo acionado."_
+  (`quadro/respostas/freio-com-motor-23-11.txt`); medido: com o motor apertado a carta não freia, entra nos toques de W
+  e ao soltar o W para virar. Respostas dele ao cartão `corpo-da-nave-1` (23/11): o coice _"Canos + o casco cede"_, a
+  inclinação _"Média"_, o freio _"A + espera um instante (toques de W não freiam)"_. Ramo `nave/corpo`: o coice e a
+  inclinação construídos (só desenho); o freio construído (espera todas as teclas e mais 0,25 s). Fecha quando
+  ele aprovar voando. O strafe construído com a RCS System: teclas Z e C, LB no controle (no voo do começo, o analógico
+  esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora). Respostas dele ao cartão `corpo-da-nave-3`
+  (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
+  de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta. Testando o conjunto (23/11):
+  _"no teste que fiz o strafe nao funcionou..."_ e _"Eu acho que o Strafe deveria funcionar independente do RSS, você não
+  acha?"_. O strafe passou a existir desde o começo; a RCS System só o deixa mais forte. Depois: _"funcionou, mas acho
+  que no teclado pode ter uma ativsacao tb alternativa segurando um modificador de direita esquerda comom no controle.
+  pode deixar o z e c, mas essa opcao adicional é otima tb."_ e, à sugestão do Espaço, _"Sim, Espaço"_; o Espaço
+  segurado faz o strafe com A e D.
+- **(47)** A câmera: a lente e a tela pequena (23/11, jogando a 0.8.0). Da lente: _"tem momentos em que a nave parece
+  que está levemente inclinada no eixo X dela. [...] se isso não é alguma coisa a ver com Field of View, o FOV, que cria
+  um efeito de lente estranho, de acordo com a posição da nave dentro da tela."_ Da tela pequena: _"quando a gente está
+  jogando em telas muito pequenas, será que a gente não tinha que pensar nesse zoom dinâmico para ele se adaptar a isso?
+  Porque a gente não vê quase detalhe nenhum, fica muito pequeno."_ Textos inteiros em
+  `quadro/respostas/nave-inclinada-lente-23-11.txt` e `zoom-telas-pequenas-23-11.txt`. Respostas dele ao cartão
+  `camera-1` (23/11): a lente _"A · lente fechada (20°)"_; a tela pequena _"C · mais perto + setas na borda (a vista
+  aberta abre como hoje)"_. Ramo `camera/lente-e-zoom`: a lente A e a tela pequena C construídas (abaixo de 1155 pontos
+  de largura a câmera chega mais perto, no máximo 1,6 vez; números de sensação). Fecha quando ele aprovar jogando, no
+  computador e no celular dele.
+- **(48)** As cutscenes (23/11, jogando o conjunto com o controle). O defeito: _"Percebi um bug. Se eu começar o jogo e
+  enquanto tá no cutscene, eu apertar o B rápido e voltar para o start screen, a tela de fundo continua sendo o jogo
+  rodando."_ Tocar sempre: _"toda vez que começarmos qq fase, deve-se tocar os cutscenes, em algum momento decidimos
+  que no replay o cutscne incial da wake nao seria tocado, mas acho bobagem, tem que se tocar sim. A pessoa se quiser
+  pula."_ Pular: _"para pular tem que ser uma tecla especifica que tem que ficar apertada uns 2 a 3 seg [...] Se qq
+  tecla for pressiponada durante um cutscne aparece o hint de como pular e um contador em circular q contarna em volta
+  do botao sendo pressionado"_. Textos inteiros em `quadro/respostas/b-na-cutscene-23-11.txt` e
+  `endgame-e-cutscenes-23-11.txt`. Ramo `historia/pular-e-repetir`: o defeito consertado (o B do controle e o Esc do
+  teclado, apertados na passagem "WAKE · REMOTE LINK" logo depois do Launch, levavam o menu que estava por baixo de
+  volta à tela de início enquanto a partida começava; já existia na 0.8.0); a história da Wake toca em todo lançamento
+  da campanha pelo Mission Control (não no Retry, não no "próximo setor" depois de vencer; Descent, Daily Field e Boss
+  Rush como antes). Ao cartão `cutscenes-pular-1` (23/11): _"A tecla se contorna, no canto — obs: só escreve skip, nao
+  precisa de hold to"_; _"1,5 segundo"_; _"Não, uma cena por segurar — obs: vai para proxima cutscne e só apertar rápido
+  pulo de fala em fala."_; _"Espaço (minha sugestão) — obs: ficou flantando os botos no controle, mas segue a mesma
+  ideia, só que vai contronar um botaozinho de xbox ou ps. ao inves de contornar uma tecla de teclado, segue o formato
+  da tecla/botao o contorno. nem precisa montar regua para isso so fazer o que pedi simples assim"_. Construído: segurar
+  1,5 s o Espaço, o Start (Options no PlayStation) ou o botão SKIP na tela pula a cena; um toque rápido vai para a
+  próxima fala. Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 
@@ -320,3 +421,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   imagem. 21/11, cartão `tiro-1`, aprovado por imagem: _"Tiro 1.2 — A luz do tiro na cor do próprio tiro entra no
   jogo? Sim, como nas imagens"_, _"Tiro 1.3 — O primeiro brilho da marca na cor do tiro? Na cor do tiro, esfriando para
   lava"_, _"Tiro 1.4 — As pedras com veios iluminam as vizinhas? Sim, como na imagem"_. Juntado ao ramo `tiro/na-pedra`.
+- **(44)** Pedras escuras no fundo do menu (23/11, na versão 0.8.0): _"outro defeito visualo que é essa forma
+  geométrica flutuando? seria um asteroide defeituoso?"_, _"isso é na tela de findpo do mission control é um objeto 3d
+  flutando"_, _"apareceu mais um agora"_, _"Talvez isso faça parte do cenário do Rain, que está no fundo. E eu nunca
+  tenha reparado, mas isso devem ser asteroides, né? Se são asteroides, eu acho que isso deveria estar no cenário do
+  Rain. A gente tem os próprios asteroides desenhados, né?"_ Eram os pedaços escuros do cenário do Anel. Cartão
+  `lascas-do-menu-1`: _"Pedras escuras do menu — Três jeitos, o mesmo instante: Nossos asteroides, pequenos e ao
+  longe"_. Só no menu; no jogo os pedaços ficam como estão (coordenadora, 23/11). Ramo `conserto/lascas-do-menu`;
+  fecha quando ele conferir.

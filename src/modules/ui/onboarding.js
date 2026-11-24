@@ -2,7 +2,8 @@
 
 // First-run tips taught in play (NORTE §7 pillar 5): one small prompt at a
 // time, each dismissed by doing the thing. Finished steps persist, so a tip
-// never shows again until the Settings toggle replays them. A dash or shield
+// never shows again until the Settings toggle replays them. The menu has its
+// own first-visit lines (MENU_TIPS), kept in the same record. A dash or shield
 // tip that runs out unused is only set aside for the run: it comes back on
 // the next one, until it has run out TIP_EXPIRIES_TO_DONE times.
 
@@ -28,6 +29,27 @@ export const CARDS_TIP_TEXT_HEAD_START_GAMEPAD =
   'Pick a card. X rerolls, Y banishes, RB equips the rest.';
 /** By touch the actions are the buttons under the cards: no keys to name. */
 export const CARDS_TIP_TEXT_TOUCH = 'Pick a card.';
+
+/**
+ * The menu's first-visit lines (Felipe's pick B, 23/11), each in its place
+ * and done once the player does what it says: `menu` on Mission Control until
+ * a first launch, `hangar` in the Hangar until it closes, `salvage` by the
+ * Hangar button once the first purchase is within reach, until it opens.
+ */
+export const MENU_TIPS = {
+  menu: {
+    label: 'New here',
+    text: 'Pick a mode, a sector and a difficulty, then Launch.',
+  },
+  hangar: {
+    label: 'New here',
+    text: 'Every run pays Salvage, won or lost. Spend it in the Hangar on upgrades, hulls and licences.',
+  },
+  salvage: {
+    label: 'Back from your run',
+    text: 'Enough Salvage for your first upgrade. Spend it in the Hangar.',
+  },
+};
 
 /**
  * In-play tips in order; `cards` lives on the level-up screen instead, and
@@ -141,6 +163,8 @@ export class Onboarding {
     this.active = false;
     /** The cards variant on screen this run ('cards' | 'cardsHeadStart'). */
     this.cardsShown = null;
+    /** The menu lines on screen now (MENU_TIPS ids). */
+    this.menuShown = new Set();
     this.reset();
   }
 
@@ -164,6 +188,31 @@ export class Onboarding {
       PLAY_STEPS.find((id) => !this.done.has(id) && !this.setAside.has(id)) ||
       null
     );
+  }
+
+  /** A ship has flown under this record: the menu's Launch line is past. */
+  get flown() {
+    return this.done.has('move');
+  }
+
+  /**
+   * The menu line `id` ({ label, text }) while `ready` and not done, else
+   * null; what it returns is on screen until the next call.
+   */
+  menuTip(id, ready) {
+    if (!ready || this.done.has(id)) {
+      this.menuShown.delete(id);
+      return null;
+    }
+    this.menuShown.add(id);
+    return MENU_TIPS[id];
+  }
+
+  /** The player did what the menu line `id` says: done if it was on screen. */
+  menuActed(id) {
+    if (this.menuShown.delete(id)) {
+      this.markDone(id);
+    }
   }
 
   /** A run starts: teach whatever is left. */

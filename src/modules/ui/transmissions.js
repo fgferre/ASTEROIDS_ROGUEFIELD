@@ -264,6 +264,20 @@ export class TransmissionQueue {
     }
   }
 
+  /**
+   * Ends the line on air now (a tap of the skip key); the next one waiting
+   * plays. False when none waits.
+   */
+  next() {
+    const { current } = this;
+    if (current) {
+      this.current = null;
+      this.view.hideTransmission();
+      this.onFinished(current.entry);
+    }
+    return this.pending.length > 0;
+  }
+
   /** Drops what is queued or playing and plays `entry` next. */
   interrupt(entry) {
     this.clear();

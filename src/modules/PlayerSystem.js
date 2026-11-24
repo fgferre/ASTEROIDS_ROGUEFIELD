@@ -439,12 +439,16 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
-          // ...and a small kick to the hull, the same path as the dash;
-          // none in glide, where nothing would bleed it off.
-          if (!this.flight.glide) {
-            this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
-            this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
-          }
+          // ...and a kick to the hull, the same path as the dash, in every
+          // flight (Felipe's pick, corpo-da-nave-3, 23/11: "Leve"): the
+          // pilot corrects it by hand, the Braking System's and the Flight
+          // Computer's jets hold the ship against it.
+          // × the shot's cadence (`cooldownMultiplier`, how much longer than
+          // the Lance it waits): a slower gun kicks harder per shot, every
+          // gun pushes the same per second.
+          const kick = SHOT_RECOIL_IMPULSE * (data.cooldownMultiplier ?? 1);
+          this.velocity.vx -= (dx / distance) * kick;
+          this.velocity.vy -= (dy / distance) * kick;
         }
       }
     });
@@ -489,12 +493,14 @@ class PlayerSystem extends BaseSystem {
       dashRequested = false;
     }
 
+    // The dash and the brake steer by what a strafe hold leaves (flight.js).
+    const { steer } = this.flight.strafeOf(movement);
     if (dashRequested && this.maneuvers.canDash()) {
-      this.maneuvers.startDash(movement);
+      this.maneuvers.startDash(steer);
     }
 
     this.updateMovement(deltaTime, movement);
-    this.maneuvers.updateEmergencyBrake(deltaTime, movement);
+    this.maneuvers.updateEmergencyBrake(deltaTime, steer);
     this.updatePosition(deltaTime);
     this.maneuvers.updateDash(deltaTime);
     this.updateHullDrain(deltaTime);
@@ -786,6 +792,7 @@ class PlayerSystem extends BaseSystem {
             displayName: source.displayName ?? null,
             elite: Boolean(source.elite),
             bossKind: source.bossKind ?? null,
+            variant: source.variant ?? null,
           }
         : null;
       this.eventBus?.emit?.('player-health-changed', {
@@ -925,6 +932,7 @@ class PlayerSystem extends BaseSystem {
     this.controlHoldTimer = 0;
     this.flight.turbo = 0;
     this.flight.turboDir = null;
+    this.flight.idle = 0;
 
     // Reset visual upgrade levels
     this.thrusters.thrusterVisualLevel = 0;
@@ -1012,6 +1020,7 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = 0;
     this.flight.turbo = 0;
     this.flight.turboDir = null;
+    this.flight.idle = 0;
     this.turretAngle = this.angle;
     this.turretLayers.fill(this.angle);
     this.lockAims = null;

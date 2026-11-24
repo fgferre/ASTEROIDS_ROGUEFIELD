@@ -27,6 +27,10 @@ function clearField(enemies) {
 // retry count and countdown live in the DOM, absent here.
 function dieAndRetry(game) {
   game.services.world.handlePlayerDeath();
+  retryDeadShip(game);
+}
+
+function retryDeadShip(game) {
   for (let step = 0; step < DEATH_STEPS; step += 1) game.step();
   vi.advanceTimersByTime(3000);
   expect(game.session.getScreen()).toBe('gameover');
@@ -108,6 +112,74 @@ describe('retry after death', () => {
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('Accounting discrepancy')
     );
+  });
+
+  // The blast goes off between the enemy's death and its kill being counted:
+  // the death snapshot must count that kill, or the layer stays one short.
+  it.each([
+    [
+      'a Volatile rock',
+      ({ enemies }, at) => {
+        const rock = enemies.acquireAsteroid({
+          size: 'small',
+          variant: 'volatile',
+          wave: 1,
+          vx: 0,
+          vy: 0,
+          ...at,
+        });
+        enemies.registerActiveEnemy(rock);
+        return rock;
+      },
+    ],
+    [
+      'a Tether',
+      ({ enemies }, at) => {
+        const mine = enemies.acquireEnemyViaFactory('mine', { wave: 1, ...at });
+        enemies.waveManager.registerDynamicMinion(mine);
+        return mine;
+      },
+    ],
+  ])('completes the layer after %s blew up the ship', (_, place) => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { player, enemies } = game.services;
+    const waveManager = enemies.waveManager;
+    player.setInvulnerableTimer(1e9);
+    const completed = [];
+    game.eventBus.on('wave-complete', (payload) => completed.push(payload));
+
+    for (
+      let step = 0;
+      step < LAYER_STEPS &&
+      (waveManager.rocksPending() || waveManager.layerSchedule.length > 0);
+      step += 1
+    ) {
+      clearField(enemies);
+      game.step();
+    }
+
+    const enemy = place(game.services, {
+      x: player.position.x + 10,
+      y: player.position.y,
+    });
+    player.setInvulnerableTimer(0);
+    player.health = 1;
+    enemies.applyDamage(enemy, 1e6);
+    expect(player.isDead).toBe(true);
+
+    retryDeadShip(game);
+    player.setInvulnerableTimer(1e9);
+    for (
+      let step = 0;
+      step < LAYER_STEPS && completed.length === 0;
+      step += 1
+    ) {
+      clearField(enemies);
+      game.step();
+    }
+
+    expect(completed.map(({ wave }) => wave)).toEqual([1]);
   });
 
   it('keeps the build the ship died with across two retries, at full hull', () => {

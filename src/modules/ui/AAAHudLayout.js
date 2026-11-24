@@ -371,11 +371,6 @@ export class AAAHudLayout {
     this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
   }
 
-  /** The "press any key to skip" line under a cinematic. */
-  showCinematicHint(show) {
-    this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
-  }
-
   /**
    * The letterbox bars of a Warden's arrival or a journey, sliding in or
    * out; a `journey` also clears the instruments off the screen.
@@ -615,7 +610,6 @@ export class AAAHudLayout {
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
       layerBannerNote: query('#ui-layer-banner-note'),
-      cinematicHint: query('#ui-cinematic-hint'),
       letterbox: query('#ui-letterbox'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),

@@ -81,7 +81,7 @@ const SETTINGS_SCHEMA = [
         type: 'toggle',
         label: 'Show Onboarding Tips',
         description:
-          'Thrust, turn and dash tips on your first runs. Turning this back on shows them again.',
+          'Menu and flight tips on your first visits and runs. Turning this back on shows them again.',
         default: true,
       },
     ],
@@ -153,6 +153,51 @@ const SETTINGS_SCHEMA = [
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
           gamepad: GAMEPAD_BINDINGS.moveRight,
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'strafeLeft',
+        type: 'binding',
+        label: 'Strafe Left',
+        description:
+          'The side jets push the hull to port, the nose held; harder with the RCS System. Holding Space, A does it too.',
+        default: {
+          keyboard: ['KeyZ'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'strafeRight',
+        type: 'binding',
+        label: 'Strafe Right',
+        description:
+          'The side jets push the hull to starboard, the nose held; harder with the RCS System. Holding Space, D does it too.',
+        default: {
+          keyboard: ['KeyC'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'strafeHold',
+        type: 'binding',
+        label: 'Strafe Hold',
+        description:
+          'While held (Space on the keys, LB on a pad), left and right strafe instead of turning or steering. In Classic flight the left stick strafes sideways on its own.',
+        default: {
+          keyboard: ['Space'],
+          gamepad: GAMEPAD_BINDINGS.strafeHold,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },

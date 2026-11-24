@@ -105,6 +105,24 @@ describe('glideRollout', () => {
     const coast = glideRollout(drifting, idle, idle, KNOBS, false, idle).at(-1);
     expect(coast.vx).toBeGreaterThan(70);
   });
+
+  it('with the Braking System brakes only once every key is let go, a beat later, as the game does', () => {
+    const world = makeWorld({ vx: 100 });
+    world.ship.glide = {
+      ...world.ship.glide,
+      autoBrake: true,
+      retro: 196,
+      idle: 0,
+    };
+    const idle = KEY_COMBOS[COAST];
+    const turn = KEY_COMBOS[combo(1, 0)];
+    const turning = glideRollout(world, turn, turn, KNOBS, false, idle).at(-1);
+    expect(Math.hypot(turning.vx, turning.vy)).toBeCloseTo(100, 6);
+    const path = glideRollout(world, idle, idle, KNOBS, false, idle);
+    const early = path.filter((p) => p.t < 0.25);
+    expect(early.every((p) => Math.hypot(p.vx, p.vy) === 100)).toBe(true);
+    expect(Math.hypot(path.at(-1).vx, path.at(-1).vy)).toBeLessThan(90);
+  });
 });
 
 describe('decideGlide', () => {

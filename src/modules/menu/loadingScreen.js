@@ -115,11 +115,13 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
 
   // Escape with nothing open, the game's name or the idle time takes the menu
   // back to the gate. Capture phase: a panel's own Escape closes it first,
-  // and only that.
+  // and only that. Not while the remote link covers the menu (inert): the
+  // run is starting.
   let watching = false;
   let lastInput = 0;
   const input = () => (lastInput = performance.now());
   const onMenu = () =>
+    !menuScreen.inert &&
     !menuScreen.classList.contains('hidden') &&
     !menuScreen.classList.contains('menu-screen--gated');
   function watchMenu() {
@@ -278,7 +280,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
               'button:not([disabled]):not(.menu-title-back)'
             )
           )?.focus();
-        });
+        }, backToGate);
       }, START_EFFECT_MS);
     }
 

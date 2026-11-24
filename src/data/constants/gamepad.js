@@ -46,17 +46,20 @@ export const PAD_STICK_GLYPHS = Object.freeze(['L-Stick', 'R-Stick']);
 
 /**
  * Default gamepad bindings of the remappable actions (settings `controls`):
- * Felipe's picks on controle-1 (20/11), dash on RB and the shield on LB. The
- * sticks fly by their tilt (flight.js, `pad` frames), not through bindings:
- * classic, the left stick thrusts (up) and backs (down), the right one turns;
- * modern, the left one points the way and the right one aims.
+ * Felipe's picks on controle-1 (20/11), dash on RB; the shield moved from LB
+ * to LT when LB became the strafe hold (23/11). The sticks fly by their tilt
+ * (flight.js, `pad` frames), not through bindings: classic, the left stick
+ * thrusts (up), backs (down) and strafes (sideways), the
+ * right one turns; modern, the left one points the way (with LB held, it
+ * strafes) and the right one aims.
  */
 export const GAMEPAD_BINDINGS = Object.freeze({
   moveUp: [`button:${PAD_BUTTON.UP}`],
   moveDown: [`button:${PAD_BUTTON.DOWN}`],
   moveLeft: [`button:${PAD_BUTTON.LEFT}`],
   moveRight: [`button:${PAD_BUTTON.RIGHT}`],
-  activateShield: [`button:${PAD_BUTTON.LB}`],
+  strafeHold: [`button:${PAD_BUTTON.LB}`],
+  activateShield: [`button:${PAD_BUTTON.LT}`],
   dash: [`button:${PAD_BUTTON.RB}`],
   pause: [`button:${PAD_BUTTON.START}`],
   openSettings: [`button:${PAD_BUTTON.VIEW}`],
@@ -66,8 +69,8 @@ export const GAMEPAD_BINDINGS = Object.freeze({
 });
 
 /**
- * Menu and overlay navigation (fixed, not remappable). The left stick also
- * moves the focus (GAMEPAD_NAV_STICK_THRESHOLD).
+ * Menu and overlay navigation (fixed, not remappable). The left stick moves
+ * the pad's pointer instead (ui/padPointer.js).
  */
 export const GAMEPAD_NAV_BUTTONS = Object.freeze({
   [PAD_BUTTON.A]: 'confirm',
@@ -108,8 +111,6 @@ export const GAMEPAD_STICK_CURVES = Object.freeze({
 });
 /** Right stick past this magnitude aims the turret by hand (no lock). */
 export const GAMEPAD_AIM_ENGAGE = 0.35;
-/** Left stick past this moves the menu focus once per push. */
-export const GAMEPAD_NAV_STICK_THRESHOLD = 0.5;
 
 /** `vibrationActuator.playEffect('dual-rumble', …)` parameters, ms and 0..1. */
 export const GAMEPAD_RUMBLE = Object.freeze({

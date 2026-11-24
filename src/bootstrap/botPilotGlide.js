@@ -20,6 +20,7 @@ import {
 import {
   BRAKE_FLOOR,
   BRAKE_FULL_SHARE,
+  BRAKE_WAIT_S,
   SPIN_ASSIST,
   SPIN_STOP_SHARE,
   TURN_ACCEL,
@@ -62,11 +63,13 @@ const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
 
 // One step of the ship (player/flight.js's start: no drag, W the engine, S
 // the retro, the top speed a limit on the push, the Braking System's brake
-// when the keys let go; A/D the turn pair, a released spin worked off), for
-// the state { x, y, vx, vy, angle, spin, dashLeft, decayLeft }. The brake is
-// taken as the retro's push whatever way the ship slides.
+// once every key has been let go for BRAKE_WAIT_S; A/D the turn pair, a
+// released spin worked off), for the state { x, y, vx, vy, angle, spin,
+// dashLeft, decayLeft, idle }. The brake is taken as the retro's push
+// whatever way the ship slides.
 function step(world, state, combo, dt) {
   const { glide } = world.ship;
+  state.idle = combo.push || combo.turn ? 0 : state.idle + dt;
   const dashing = state.dashLeft > 0;
   const speed = Math.hypot(state.vx, state.vy);
   if (!dashing && state.decayLeft <= 0) {
@@ -84,7 +87,7 @@ function step(world, state, combo, dt) {
       }
       state.vx += ax * dt;
       state.vy += ay * dt;
-    } else if (glide.autoBrake && speed > 0) {
+    } else if (glide.autoBrake && speed > 0 && state.idle >= BRAKE_WAIT_S) {
       const reach = Math.max(
         BRAKE_FLOOR,
         Math.min(1, speed / (glide.maxSpeed * BRAKE_FULL_SHARE))
@@ -142,6 +145,7 @@ export function glideRollout(world, first, second, knobs, dash, held) {
     spin: world.ship.spin,
     dashLeft: 0,
     decayLeft: 0,
+    idle: world.ship.glide.idle,
   };
   const lead = (knobs.reactionMs || 0) / 1000;
   const leadSteps = Math.round(lead / dt);

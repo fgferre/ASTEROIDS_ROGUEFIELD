@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { epiloguePath, introPath, storyTold } from '../../core/cinematics.js';
+import { epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -61,7 +61,7 @@ import {
   WardLinks,
 } from './overlayMirror.js';
 import { setRimLight } from './rimLight.js';
-import { BLOOM, FOV, setupThree } from './sceneSetup.js';
+import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
 
@@ -483,7 +483,7 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
-   * The story before the first campaign's journey (ui/runCinematics.js),
+   * The story before a campaign launch's journey (ui/runCinematics.js),
    * in its own scene. False when nothing would move, as playIntro.
    */
   playStory() {
@@ -495,10 +495,17 @@ class Renderer3D extends BaseSystem {
     return true;
   }
 
-  /** The story is over: the field's scene is drawn again. */
+  /** The story goes on from `ms` in (a tap of the skip key). */
+  seekStory(ms) {
+    this.story?.seek(ms);
+  }
+
+  /**
+   * The story is over: the field's scene is drawn again. The Wake stays
+   * built for the next launch (rebuilding it stalled the start a second).
+   */
   endStory() {
     this.story?.stop();
-    this.story?.dispose();
   }
 
   // Seeded: three names what the story builds and draws with Math.random.
@@ -767,8 +774,8 @@ class Renderer3D extends BaseSystem {
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
       () => this.drawEverything(),
-      // The story's freighter (seconds): only for a player yet to see it.
-      () => storyTold() || this.warmStory(),
+      // The story's freighter (seconds): every campaign launch tells it.
+      () => this.warmStory(),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();
@@ -920,7 +927,8 @@ class Renderer3D extends BaseSystem {
       player,
       t.ribbons,
       time,
-      dt * (effects?.gameTime?.scale ?? 1)
+      dt * (effects?.gameTime?.scale ?? 1),
+      this.reducedMotion
     );
     if (story) {
       story.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
@@ -968,7 +976,14 @@ class Renderer3D extends BaseSystem {
       this.flashScale
     );
 
-    const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
+    // The journey's points are sized for its lens until it rises into the
+    // intro's pose, which is the play lens.
+    const lens = story
+      ? SCENE_FOV
+      : travel
+        ? SCENE_FOV + (FOV - SCENE_FOV) * travel.risen
+        : FOV;
+    const pointScale = t.height / (2 * Math.tan((lens * Math.PI) / 360));
     this.biome.update(dt);
     t.biomes.update(travel ? travel.look : this.biome, fog);
     const ship = t.player.group.visible && (travel?.focus || player?.position);

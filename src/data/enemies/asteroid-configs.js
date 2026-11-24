@@ -753,7 +753,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   gold: {
     key: 'gold',
-    displayName: 'Golden Treasure 💰',
+    displayName: 'Golden',
     allowedSizes: ['medium', 'small'],
     hpMultiplier: 0.4, // ULTRA FRÁGIL (vidro!)
     speedMultiplier: 1.8, // ULTRA RÁPIDO (foge!)
@@ -794,7 +794,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   volatile: {
     key: 'volatile',
-    displayName: 'Volatile Fragment',
+    displayName: 'Volatile',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.6,
     speedMultiplier: 1.4,
@@ -928,7 +928,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   crystal: {
     key: 'crystal',
-    displayName: 'Energy Crystal',
+    displayName: 'Crystal',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.7,
     speedMultiplier: 1.3, // AUMENTADO de 0.8 para 1.3 (ágil!)

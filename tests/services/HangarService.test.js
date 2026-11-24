@@ -302,6 +302,22 @@ describe('HangarService', () => {
     expect(next.owned).toEqual({ 'salvage-magnet': true });
   });
 
+  it('tells the menu whether a first purchase is made, or within reach', () => {
+    const state = (salvage, owned) => {
+      stock(salvage, owned);
+      return new HangarService({
+        ...base,
+        eventBus: new EventBus(),
+      }).purchaseState();
+    };
+    expect(state(119)).toEqual({ bought: false, affordable: false });
+    expect(state(120)).toEqual({ bought: false, affordable: true });
+    expect(state(0, { 'reinforced-plating': true })).toEqual({
+      bought: true,
+      affordable: false,
+    });
+  });
+
   it('turns owned items into run modifiers and gates the bought hulls', () => {
     const none = new HangarService({ ...base, eventBus: new EventBus() });
     expect(none.getModifiers()).toMatchObject({

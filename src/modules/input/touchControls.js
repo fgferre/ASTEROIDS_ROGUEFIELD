@@ -3,7 +3,8 @@
 // Touch play, for a phone or tablet held sideways (mobileGuard lets it in):
 // a stick born where the left thumb lands in the left half (nipplejs, one at
 // a time: a second finger there is ignored), DASH and SHIELD by the right
-// thumb, a pause button by the clock, and the HUD's mode words toggle the
+// thumb, STRAFE above them (held: the stick's sideways part strafes, as LB on
+// a pad), a pause button by the clock, and the HUD's mode words toggle the
 // modes. Styles: style.css, body.touch-play. The stick feeds the same step
 // input as the pad's left stick (InputSystem.sampleInputFrame -> merge). In
 // classic flight `?toque=` picks how it flies the ship: 'teclas' (default)
@@ -89,7 +90,15 @@ const LAYER_HTML = `
   <div class="touch-zone"></div>
   <button type="button" class="touch-btn touch-btn--dash" data-touch-action="dash">DASH</button>
   <button type="button" class="touch-btn touch-btn--shield" data-touch-action="activateShield">SHIELD</button>
+  <button type="button" class="touch-btn touch-btn--strafe">STRAFE</button>
   <button type="button" class="touch-btn touch-btn--pause" data-touch-action="pause" aria-label="Pause"></button>`;
+
+// No card for the button yet: it shakes once per press, like the vitals.
+function refuse(button) {
+  button.classList.remove('is-refused');
+  void button.offsetWidth;
+  button.classList.add('is-refused');
+}
 
 export class TouchControls {
   /**
@@ -115,6 +124,8 @@ export class TouchControls {
     this.declared = declared;
     this.onShow = onShow;
     this.stick = CENTRED;
+    // STRAFE is held down.
+    this.strafing = false;
     this.on = false;
     this.pinned = false;
     this.screen = null;
@@ -185,6 +196,7 @@ export class TouchControls {
     this.layer.hidden = !this.on || this.screen !== 'playing';
     if (this.layer.hidden) {
       this.stick = CENTRED;
+      this.strafing = false;
     }
     requestAnimationFrame(() => this.placePause());
   }
@@ -192,11 +204,18 @@ export class TouchControls {
   /**
    * The device's step values with the touch stick added (pad sticks win). A
    * hidden stick adds nothing, though a finger still dragging since a key hid
-   * it (Auto) keeps reporting.
+   * it (Auto) keeps reporting. STRAFE held is the strafe hold, the stick read
+   * as in 'teclas' so its sideways part is left and right.
    */
   merge(values) {
-    const stick = this.layer?.hidden ? CENTRED : this.stick;
-    const touch = touchMovement(stick, this.mode, this.player);
+    const hidden = this.layer?.hidden;
+    const stick = hidden ? CENTRED : this.stick;
+    const strafing = !hidden && this.strafing;
+    const touch = touchMovement(
+      stick,
+      strafing ? 'teclas' : this.mode,
+      this.player
+    );
     const padCentred = !values.moveX && !values.moveY;
     return {
       ...values,
@@ -206,6 +225,7 @@ export class TouchControls {
       right: values.right || touch.right,
       moveX: padCentred ? touch.moveX : values.moveX,
       moveY: padCentred ? touch.moveY : values.moveY,
+      strafeHold: values.strafeHold || strafing,
     };
   }
 
@@ -240,14 +260,23 @@ export class TouchControls {
       this.input.handleActionRelease(action, 'touch', { device: 'touch' });
     });
 
-    // No shield card yet: the button shakes once per press, like the vitals.
     const shield = this.layer.querySelector('.touch-btn--shield');
     this.eventBus.on('shield-activation-failed', ({ reason } = {}) => {
-      if (reason !== 'locked') return;
-      shield.classList.remove('is-refused');
-      void shield.offsetWidth;
-      shield.classList.add('is-refused');
+      if (reason === 'locked') refuse(shield);
     });
+    // STRAFE is held, not tapped.
+    const strafe = this.layer.querySelector('.touch-btn--strafe');
+    strafe.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      this.input.setActiveDevice('touch');
+      this.strafing = true;
+      strafe.setPointerCapture(event.pointerId);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((type) =>
+      strafe.addEventListener(type, () => {
+        this.strafing = false;
+      })
+    );
     window.addEventListener('resize', () => {
       this.placePause();
       this.holdWhileUpright();
@@ -294,6 +323,7 @@ export class TouchControls {
   /** The thumb lets go and a running run pauses (upright, or app left). */
   pauseRun() {
     this.stick = CENTRED;
+    this.strafing = false;
     if (this.input.isGameRunning()) {
       this.eventBus.emit('toggle-pause');
     }

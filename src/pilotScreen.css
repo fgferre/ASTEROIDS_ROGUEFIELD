@@ -25,6 +25,24 @@
   font-size: 15px;
 }
 
+/* Escape / Ⓑ back to PRESS START, for the device in use (data-device). */
+.pilot-hint {
+  margin: 0;
+  text-align: right;
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.pilot-hint kbd {
+  margin-right: 0.4em;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 12px;
+}
+
 .pilot-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

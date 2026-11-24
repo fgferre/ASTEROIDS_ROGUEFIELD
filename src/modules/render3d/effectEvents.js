@@ -162,7 +162,7 @@ export function registerEffectEvents(r) {
     const speed = Math.hypot(bullet.vx || 0, bullet.vy || 0);
     if (speed <= 0) return;
     r.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
-    r.three?.player.recoilToward(r.cachedPlayer, bullet.vx, bullet.vy);
+    r.three?.player.recoilToward(r.cachedPlayer, bullet.vx, bullet.vy, from);
   });
 }
 

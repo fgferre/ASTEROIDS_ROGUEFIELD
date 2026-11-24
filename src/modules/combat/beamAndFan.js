@@ -237,6 +237,8 @@ export function fireFan(w, fan, playerPos, playerStats, echo = false) {
     y: origin.y + Math.sin(angle) * reach,
   };
   w.emit('weapon-fired', {
+    // the volley's cadence: the hull's kick per shot (PlayerSystem)
+    cooldownMultiplier: fan.cooldownMultiplier,
     position: playerPos,
     target: centre,
     centerlineTarget: centre,

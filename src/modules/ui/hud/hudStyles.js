@@ -74,6 +74,7 @@ export function getHudCss() {
             .edge-arrow > * { box-sizing: border-box; }
             .edge-arrow[data-kind='warden'] { --arrow-tone: var(--danger); }
             .edge-arrow[data-kind='herald'] { --arrow-tone: var(--boss); }
+            .edge-arrow[data-kind='enemy'] { --arrow-tone: var(--danger); }
             .edge-arrow__glyph { position: absolute; left: -9px; top: -8px; width: 18px; height: 16px; background: var(--arrow-tone); clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%); filter: drop-shadow(0 0 4px var(--arrow-tone)); }
             .edge-arrow[data-kind='pickup'] .edge-arrow__glyph { transform-origin: 50% 50%; scale: 0.7; }
             .edge-arrow__label { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em; color: var(--arrow-tone); text-shadow: var(--text-ink); white-space: nowrap; }
@@ -106,8 +107,6 @@ export function getHudCss() {
             .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
-            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: var(--text-ink); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
-            .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
             /* Under the panels (z-index -1 in the HUD layer), over the field. */
             .letterbox { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
             .letterbox::before, .letterbox::after { content: ''; position: absolute; left: 0; width: 100%; height: ${WARDEN_ARRIVAL.barHeight}%; background: #000; }

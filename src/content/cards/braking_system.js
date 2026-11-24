@@ -16,29 +16,30 @@ export default {
       text: 'Requires Main Thrusters installed (Lv. 1).',
     },
   ],
-  // The computer's brake on the jets when the thrust is let go (player/
+  // The computer's brake on the jets once every key is let go (player/
   // flight.js; measured 22/11 from top speed, 132 px/s, to under 10 px/s:
-  // never bare, 1.23 / 1.02 / 0.80 s per level).
+  // never bare, 1.23 / 1.02 / 0.80 s per level; since 23/11 it waits
+  // BRAKE_WAIT_S, 0.25 s, first: 1.48 / 1.27 / 1.05 s).
   text: {
     name: 'Braking System',
     summary:
-      'The computer brakes for you: let go of the thrust and the retro and side jets stop the ship.',
+      'The computer brakes for you: let go of every key and the retro and side jets stop the ship.',
     lore: 'Mining technology adapted for combat. Allows impossible stops and sharp direction changes.',
     levels: [
       {
         title: 'Inertial Brakes',
         description:
-          'Let go of the thrust and the ship stops in 1.2 s, where it used to glide on forever. S pulls harder too.',
-        highlights: ['Turning without thrust bleeds speed too.'],
+          'Let go of every key and the ship stops in 1.5 s, where it used to glide on forever. S pulls harder too.',
+        highlights: ['A turn or a quick tap of thrust keeps your speed.'],
       },
       {
         title: 'Retro Thrusters',
-        description: 'Stronger brakes: a stop in 1 s.',
+        description: 'Stronger brakes: a stop in 1.3 s.',
         highlights: ['Thrust carries you; letting go settles you.'],
       },
       {
         title: 'Emergency Brake',
-        description: 'A stop in 0.8 s. Unlocks the emergency brake.',
+        description: 'A stop in 1.1 s. Unlocks the emergency brake.',
         highlights: [
           'Hold reverse (S) against your drift for 0.25 s: a dead stop and a shockwave that shoves enemies back.',
           'With RCS System 3 too, the Flight Computer can show up.',

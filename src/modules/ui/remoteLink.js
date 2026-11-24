@@ -3,10 +3,12 @@
 // The way into a run from the menu (the owner's card, 17/11): the pressed
 // button lights, the screen goes dark with static while the Wake's link writes
 // its lines, then the run starts behind the static and the signal clears onto
-// it (about 2 s). Any key or click connects at once. Styles: style.css
+// it (about 2 s). The skip key, held or tapped, connects at once
+// (ui/skipHold.js); any other press only shows how. Styles: style.css
 // .remote-link.
 
 import { sectorById } from '../../data/sectors.js';
+import { listenForHold } from './skipHold.js';
 
 const LINE_STEP_MS = 250;
 const CONNECT_MS = 1400;
@@ -76,30 +78,28 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
   });
   root.append(panel);
   button?.classList.add('is-launching');
+  // The menu stays under the static but takes no input until the run
+  // starts: its way back (Escape, pad B) would bring the title over the run.
+  const menu = button?.closest('.screen');
+  if (menu) menu.inert = true;
   document.body.append(root);
   eventBus?.emit('remote-link-opened');
 
   let connected = false;
   const timer = setTimeout(() => connect(CLEAR_MS), CONNECT_MS);
+  const skip = () => connect(QUICK_CLEAR_MS);
+  const unbindSkip = listenForHold(skip, skip);
 
   function connect(clearMs) {
     if (connected) return;
     connected = true;
     clearTimeout(timer);
-    document.removeEventListener('keydown', skip, true);
+    unbindSkip();
     button?.classList.remove('is-launching');
+    if (menu) menu.inert = false;
     onConnect();
     root.style.setProperty('--clear', `${clearMs}ms`);
     root.classList.add('remote-link--clearing');
     setTimeout(() => root.remove(), clearMs);
   }
-
-  function skip(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    connect(QUICK_CLEAR_MS);
-  }
-
-  document.addEventListener('keydown', skip, true);
-  root.addEventListener('pointerdown', skip);
 }

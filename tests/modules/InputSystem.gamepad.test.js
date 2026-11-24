@@ -78,14 +78,42 @@ describe('InputSystem gamepad', () => {
     });
   });
 
-  it('maps RB to dash, LB to shield and X/Y to the toggles, once per press', () => {
-    let frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
+  it('maps RB to dash, LT to shield and X/Y to the toggles, once per press', () => {
+    let frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LT] });
     expect(frame.dash && frame.shield).toBe(true);
-    frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LB] });
+    frame = step({ pressed: [PAD_BUTTON.RB, PAD_BUTTON.LT] });
     expect(frame.dash || frame.shield).toBe(false);
 
     frame = step({ pressed: [PAD_BUTTON.X, PAD_BUTTON.Y] });
     expect(frame.spread && frame.aim).toBe(true);
+  });
+
+  it('holds the strafe while LB is down, every step, for the ship', () => {
+    expect(step({ pressed: [PAD_BUTTON.LB] })).toMatchObject({
+      strafeHold: true,
+      shield: false,
+    });
+    expect(step({ pressed: [PAD_BUTTON.LB] }).strafeHold).toBe(true);
+    expect(input.lastMovementCommand.binary.strafeHold).toBe(true);
+    expect(step({ pressed: [] }).strafeHold).toBe(false);
+  });
+
+  it('leaves Start to the skip while a cinematic holds the run, and pauses again after', () => {
+    const pauses = [];
+    eventBus.on('toggle-pause', () => pauses.push(gameState.paused));
+    const tapStart = () => {
+      fake.set({ pressed: [PAD_BUTTON.START] });
+      input.pollGamepad();
+      fake.set();
+      input.pollGamepad();
+    };
+    gameState.paused = true;
+    eventBus.emit('cinematic-started', { kind: 'story' });
+    tapStart();
+    expect(pauses).toEqual([]);
+    eventBus.emit('cinematic-ended', { kind: 'story' });
+    tapStart();
+    expect(pauses).toEqual([true]);
   });
 
   it('ignores pad presses on the pause screen', () => {
@@ -110,7 +138,7 @@ describe('InputSystem gamepad', () => {
     expect(devices).toEqual(['gamepad', 'keyboard', 'gamepad']);
   });
 
-  it('navigates menus with the d-pad, stick and face buttons, not during play', () => {
+  it('navigates menus with the d-pad and face buttons, not during play; the left stick steps nothing', () => {
     const nav = [];
     eventBus.on('gamepad-ui-nav', ({ action }) => nav.push(action));
 
@@ -127,15 +155,10 @@ describe('InputSystem gamepad', () => {
     input.pollGamepad();
     fake.set({ pressed: [PAD_BUTTON.B, PAD_BUTTON.RB] });
     input.pollGamepad();
-    // The stick moves once per push, then again after it comes back.
+    // The left stick moves the pad's pointer (ui/padPointer.js).
     fake.set({ axes: [0, -0.9, 0, 0] });
     input.pollGamepad();
-    input.pollGamepad();
-    fake.set();
-    input.pollGamepad();
-    fake.set({ axes: [0.8, 0.1, 0, 0] });
-    input.pollGamepad();
-    expect(nav).toEqual(['down', 'back', 'tabNext', 'up', 'right']);
+    expect(nav).toEqual(['down', 'back', 'tabNext']);
   });
 
   it('rumbles on hull damage, Warden arrival and dash, unless turned off', () => {

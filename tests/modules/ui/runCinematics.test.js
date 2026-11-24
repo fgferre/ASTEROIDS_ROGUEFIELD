@@ -11,7 +11,6 @@ import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import {
   RunCinematics,
-  listenForSkip,
   travelDestination,
 } from '../../../src/modules/ui/runCinematics.js';
 import {
@@ -51,7 +50,6 @@ function setup({ plays = true } = {}) {
     layerBannerTitle: fakeElement(),
     layerBannerSub: fakeElement(),
     layerBannerNote: fakeElement(),
-    cinematicHint: fakeElement(),
     letterbox: fakeElement(),
   };
   const renderer = {
@@ -65,6 +63,8 @@ function setup({ plays = true } = {}) {
   const events = [];
   const held = [];
   let skipKey = null;
+  let nextKey = null;
+  const nextLine = vi.fn(() => false);
   const ui = {
     tacticalHud: { layout: hud },
     transmissionLayer: 1,
@@ -82,10 +82,12 @@ function setup({ plays = true } = {}) {
     renderer: () => renderer,
     hud: () => hud,
     holdSim: (flag) => held.push(flag),
-    bindSkip: (skip) => {
+    bindSkip: (skip, next) => {
       skipKey = skip;
+      nextKey = next;
       return () => {
         skipKey = null;
+        nextKey = null;
       };
     },
     onIntroEnd: () =>
@@ -94,6 +96,7 @@ function setup({ plays = true } = {}) {
       }),
     speak: (entry) => spoken.push(entry),
     hush,
+    nextLine,
   });
   // A run start: wave 1 starts (its banner queued), then the intro.
   const startRun = () => {
@@ -111,6 +114,8 @@ function setup({ plays = true } = {}) {
     spoken,
     hush,
     skip: () => skipKey?.(),
+    next: () => nextKey?.(),
+    nextLine,
   };
 }
 
@@ -128,19 +133,16 @@ describe('RunCinematics', () => {
   });
 
   it('holds the run through the intro, and a skip ends it with one title card', () => {
-    const { ui, hud, renderer, banners, events, held, startRun, skip } =
-      setup();
+    const { ui, renderer, banners, events, held, startRun, skip } = setup();
     startRun();
     vi.advanceTimersByTime(500);
     expect(banners).toEqual([]);
     expect(held).toEqual([true]);
-    expect(hud.els.cinematicHint.classList.contains('is-showing')).toBe(true);
 
     skip();
     vi.advanceTimersByTime(INTRO_MS * 2);
     expect(renderer.endCinematic).toHaveBeenCalledTimes(1);
     expect(held).toEqual([true, false]);
-    expect(hud.els.cinematicHint.classList.contains('is-showing')).toBe(false);
     expect(banners).toEqual(['CHAPTER I — THE OUTER RING']);
     expect(ui.queueTransmission).toHaveBeenCalledTimes(2);
     expect(ui.queueTransmission.mock.calls[1][0].key).toBe(
@@ -207,31 +209,30 @@ describe('RunCinematics', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  it("a skip drops the ending's lines and shows the final card once, leaving no hint", () => {
-    const { ui, hud, hush, skip } = setup();
-    const hint = () => hud.els.cinematicHint.classList.contains('is-showing');
+  it("a skip drops the ending's lines and shows the final card once; a tap drops a line, the last one ends it", () => {
+    const { ui, hush, skip, next, nextLine } = setup();
     const onEnd = vi.fn();
     ui.cinematics.playEnding('stewardship', onEnd);
-    expect(hint()).toBe(true);
-
     skip();
     expect(hush).toHaveBeenCalledTimes(1);
     expect(onEnd).toHaveBeenCalledTimes(1);
-    expect(hint()).toBe(false);
     skip();
     vi.advanceTimersByTime(60_000);
     expect(onEnd).toHaveBeenCalledTimes(1);
 
-    // Played out, it hides the hint too; a new run's stop drops it unseen.
-    ui.cinematics.playEnding('stewardship', onEnd);
-    vi.advanceTimersByTime(60_000);
-    expect(onEnd).toHaveBeenCalledTimes(2);
-    expect(hint()).toBe(false);
+    // A new run's stop drops it unseen.
     ui.cinematics.playEnding('stewardship', onEnd);
     ui.cinematics.stop();
     vi.advanceTimersByTime(60_000);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+
+    ui.cinematics.playEnding('stewardship', onEnd);
+    nextLine.mockReturnValueOnce(true);
+    next();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    next();
+    expect(nextLine).toHaveBeenCalledTimes(2);
     expect(onEnd).toHaveBeenCalledTimes(2);
-    expect(hint()).toBe(false);
   });
 
   it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {
@@ -317,7 +318,7 @@ describe('RunCinematics', () => {
     const launch = { sector: 'debris-wake', source: 'campaign-launch-btn' };
     cinematics.prepareTravel(launch);
     expect(emit.mock.lastCall[0]).toBe('voice-lines-coming');
-    // The story is untold: its lines come too.
+    // A campaign launch tells the story: its lines come too.
     expect(keys()).toEqual([
       ...travelTransmissions('debris-wake').map((entry) => entry.key),
       ...prologueTransmissions().map((entry) => entry.key),
@@ -349,7 +350,7 @@ describe('RunCinematics', () => {
     ]);
   });
 
-  it('holds the run through a journey, cards wait for the intro, and a skip drops the lines', () => {
+  it('holds the run through a journey, cards wait for the intro, and a skip drops the lines for the descent', () => {
     const { ui, renderer, held, spoken, hush, banners, skip } = setup();
     ui.cinematics.armTravel({ sector: 'salvage-lanes', carried: true });
     const card = vi.fn();
@@ -368,6 +369,9 @@ describe('RunCinematics', () => {
     expect(hush).toHaveBeenCalledTimes(1);
     expect(renderer.endTravel).toHaveBeenCalledTimes(1);
     expect(renderer.playIntro).toHaveBeenCalledTimes(1);
+    expect(ui.cinematics.kind).toBe('intro');
+    expect(card).not.toHaveBeenCalled();
+    skip();
     expect(ui.cinematics.kind).toBe(null);
     expect(held.at(-1)).toBe(false);
     vi.advanceTimersByTime(500);
@@ -375,16 +379,7 @@ describe('RunCinematics', () => {
     expect(card).toHaveBeenCalledTimes(1);
   });
 
-  it('tells the story on the first campaign launch only, a line opening each shot; a skip flies on to the journey', () => {
-    const stored = new Map();
-    vi.stubGlobal('window', {
-      setTimeout: (fn, ms) => setTimeout(fn, ms),
-      clearTimeout: (id) => clearTimeout(id),
-      localStorage: {
-        getItem: (key) => stored.get(key) ?? null,
-        setItem: (key, value) => stored.set(key, value),
-      },
-    });
+  it('tells the story on every campaign launch, a line opening each shot; a skip flies on to the journey', () => {
     const { ui, renderer, spoken, hush, skip } = setup();
     renderer.playStory = vi.fn(() => true);
     renderer.endStory = vi.fn();
@@ -404,12 +399,56 @@ describe('RunCinematics', () => {
     const told = spoken.filter(({ key }) => key.startsWith('prologue'));
     expect(told).toHaveLength(2);
 
-    // Told: the next campaign launch flies straight to its journey.
+    // The next campaign launch tells it again; the victory screen's Next
+    // Sector flies straight to its journey.
     ui.cinematics.stop();
     ui.cinematics.armTravel(launch);
     ui.cinematics.startIntro();
+    expect(ui.cinematics.kind).toBe('story');
+    ui.cinematics.stop();
+    ui.cinematics.armTravel({ sector: 'salvage-lanes', carried: true });
+    ui.cinematics.startIntro();
     expect(ui.cinematics.kind).toBe('travel');
-    expect(renderer.playStory).toHaveBeenCalledTimes(1);
+    expect(renderer.playStory).toHaveBeenCalledTimes(2);
+  });
+
+  it("a tap goes to the story's next shot, its line first; on the last shot, to the journey", () => {
+    const { ui, renderer, spoken, hush, next } = setup();
+    renderer.playStory = vi.fn(() => true);
+    renderer.seekStory = vi.fn();
+    renderer.endStory = vi.fn();
+    ui.cinematics.armTravel({
+      sector: 'debris-wake',
+      source: 'campaign-launch-btn',
+    });
+    ui.cinematics.startIntro();
+    vi.advanceTimersByTime(1000);
+    next();
+    expect(hush).toHaveBeenCalledTimes(1);
+    expect(renderer.seekStory).toHaveBeenLastCalledWith(STORY_SHOT_MS[0]);
+    vi.advanceTimersByTime(500);
+    expect(spoken.map(({ key }) => key)).toEqual(['prologue:0', 'prologue:1']);
+
+    for (let shot = 2; shot < STORY_SHOT_MS.length; shot += 1) next();
+    expect(ui.cinematics.kind).toBe('story');
+    next();
+    expect(ui.cinematics.kind).toBe('travel');
+    expect(renderer.endStory).toHaveBeenCalledTimes(1);
+  });
+
+  it("a tap drops the journey's line on air; with none waiting, the descent; there, the run", () => {
+    const { ui, renderer, held, next, nextLine } = setup();
+    ui.cinematics.armTravel({ sector: 'salvage-lanes', carried: true });
+    ui.cinematics.startIntro();
+    nextLine.mockReturnValueOnce(true);
+    next();
+    expect(ui.cinematics.kind).toBe('travel');
+    next();
+    expect(renderer.endTravel).toHaveBeenCalledTimes(1);
+    expect(ui.cinematics.kind).toBe('intro');
+    next();
+    expect(ui.cinematics.kind).toBe(null);
+    expect(held.at(-1)).toBe(false);
   });
 
   it('plays a journey as plain lines when the camera cannot move', () => {
@@ -448,84 +487,71 @@ describe('RunCinematics', () => {
     expect(banners.length).toBeGreaterThan(0);
   });
 
-  it('the press that picked the ending does not skip it; the next press does', () => {
+  it('the press that picked the ending is no tap; a hold of the skip key skips it', () => {
     // Window capture listeners run first on each event, as in the browser:
     // one bound during an event's own handler misses that event.
     const listeners = new Map();
     vi.stubGlobal('window', {
       setTimeout: (fn, ms) => setTimeout(fn, ms),
       clearTimeout: (id) => clearTimeout(id),
-      addEventListener: (type, fn) => listeners.set(type, fn),
-      removeEventListener: (type, fn) => {
-        if (listeners.get(type) === fn) listeners.delete(type);
-      },
-      requestAnimationFrame: () => 1,
-      cancelAnimationFrame: () => {},
+      addEventListener: (type, fn) =>
+        listeners.set(type, [...(listeners.get(type) ?? []), fn]),
+      removeEventListener: (type, fn) =>
+        listeners.set(
+          type,
+          (listeners.get(type) ?? []).filter((other) => other !== fn)
+        ),
+      requestAnimationFrame: (fn) => setTimeout(fn, 16),
+      cancelAnimationFrame: (id) => clearTimeout(id),
     });
+    const body = fakeElement();
+    body.dataset = {};
+    const hint = {
+      ...fakeElement(),
+      dataset: {},
+      setAttribute() {},
+      querySelector() {
+        return this;
+      },
+      querySelectorAll: () => [],
+      getBoundingClientRect: () => ({ width: 0 }),
+    };
+    body.append = () => {};
+    vi.stubGlobal('document', { body, createElement: () => hint });
+    vi.stubGlobal('performance', { now: () => Date.now() });
+    const nextLine = vi.fn(() => true);
     const cinematics = new RunCinematics({
       eventBus: { emit: () => {} },
       renderer: () => null,
       hud: () => null,
       holdSim: () => {},
       hush: () => {},
+      nextLine,
     });
     const onEnd = vi.fn();
-    const dispatch = (type, repeat = false, target = () => {}) => {
-      listeners.get(type)?.({
-        type,
-        code: 'Enter',
-        repeat,
-        preventDefault() {},
-        stopImmediatePropagation() {},
-      });
+    const dispatch = (type, target = () => {}) => {
+      (listeners.get(type) ?? []).forEach((fn) =>
+        fn({
+          type,
+          code: 'Space',
+          repeat: false,
+          preventDefault() {},
+          stopImmediatePropagation() {},
+        })
+      );
       target();
     };
 
-    // Enter on the choice button: its keydown picks the ending, then is held.
-    dispatch('keydown', false, () => cinematics.playEnding('severance', onEnd));
-    dispatch('keydown', true);
-    dispatch('keyup');
-    expect(onEnd).not.toHaveBeenCalled();
-    // A click that picks it: its pointerdown came before the click.
-    cinematics.stop();
-    dispatch('pointerdown');
-    cinematics.playEnding('severance', onEnd);
-    expect(onEnd).not.toHaveBeenCalled();
+    // Space on the choice button: its keyup clicks it and picks the ending.
+    dispatch('keydown');
+    dispatch('keyup', () => cinematics.playEnding('severance', onEnd));
+    vi.advanceTimersByTime(100);
+    expect(nextLine).not.toHaveBeenCalled();
 
-    dispatch('pointerdown');
+    dispatch('keydown');
+    vi.advanceTimersByTime(1600);
     expect(onEnd).toHaveBeenCalledTimes(1);
-  });
-
-  it("swallows a skip key's repeats after the skip until it is released", () => {
-    const listeners = new Map();
-    vi.stubGlobal('window', {
-      addEventListener: (type, fn) => listeners.set(type, fn),
-      removeEventListener: (type, fn) => {
-        if (listeners.get(type) === fn) listeners.delete(type);
-      },
-      requestAnimationFrame: () => 1,
-      cancelAnimationFrame: () => {},
-    });
-    const key = (type, repeat = false) => {
-      const event = {
-        type,
-        code: 'Escape',
-        repeat,
-        preventDefault: vi.fn(),
-        stopImmediatePropagation: vi.fn(),
-      };
-      listeners.get(type)?.(event);
-      return event.stopImmediatePropagation.mock.calls.length > 0;
-    };
-    let unbind = null;
-    const skip = vi.fn(() => unbind());
-    unbind = listenForSkip(skip);
-
-    expect(key('keydown')).toBe(true);
-    expect(skip).toHaveBeenCalledTimes(1);
-    expect(key('keydown', true)).toBe(true);
-    key('keyup');
-    expect(listeners.has('keydown')).toBe(false);
-    expect(skip).toHaveBeenCalledTimes(1);
+    dispatch('keyup');
+    expect(nextLine).not.toHaveBeenCalled();
   });
 });

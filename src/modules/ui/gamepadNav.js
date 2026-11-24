@@ -202,12 +202,14 @@ export class GamepadMenuNav {
   }
 
   /** The topmost visible screen a pad can navigate, or null (also while the
-   * PRESS START gate or the pilots cover the menu: they read the pad). */
+   * PRESS START gate or the pilots cover the menu: they read the pad; and
+   * while the remote link covers it, inert: the run is starting). */
   screen() {
     for (const id of GAMEPAD_NAV_SCREENS) {
       const element = document.getElementById(`${id}-screen`);
       if (
         element &&
+        !element.inert &&
         !element.classList.contains('hidden') &&
         !element.classList.contains('menu-screen--gated')
       ) {
@@ -452,7 +454,16 @@ export class GamepadMenuNav {
           : screen.id === 'end-credits'
             ? 'Continue'
             : 'Select';
-      items = [['A', press], ...(HINTS[screen.id] ?? [])];
+      // The pad's pointer (padPointer.js) works on every screen but the
+      // credits that roll.
+      const sticks =
+        screen.id === 'end-credits'
+          ? []
+          : [
+              ['L-Stick', 'Point'],
+              ['R-Stick', 'Scroll'],
+            ];
+      items = [['A', press], ...(HINTS[screen.id] ?? []), ...sticks];
       if (active?.type === 'range') items.unshift(['◀ ▶', 'Adjust']);
     }
     this.hints.dataset.screen = screen.id;

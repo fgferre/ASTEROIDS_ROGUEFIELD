@@ -270,7 +270,7 @@ describe('camera director', () => {
     run(d, scene(400, 300), 0.2);
     expect(d.moment).toBe('near');
     const pose = run(d, scene(400, 300), 3);
-    expect(pose.distance).toBeCloseTo(NEAR_DISTANCE, -1);
+    expect(Math.abs(pose.distance / NEAR_DISTANCE - 1)).toBeLessThan(0.01);
   });
 
   it('a threat keeps the view open a while after it is gone', () => {
@@ -421,6 +421,19 @@ describe('camera director, a Warden’s entrance', () => {
     }
   });
 
+  it('frames the entrance as its recipe did at 38°, from farther at the play lens', () => {
+    const at = (lens) => {
+      const d = createDirector({ fieldWidth: W, fieldHeight: H });
+      d.setLens({ tanV: lens, aspect: 16 / 9 });
+      run(d, scene(400, 300), 1);
+      return run(d, scene(400, 300, { enemies: [arriving('right')] }), 3)
+        .distance;
+    };
+    const old = Math.tan(19 * DEG);
+    expect(at(old)).toBeCloseTo(RECIPE.shot.distance[0], 0);
+    expect(at(tanV) / at(old)).toBeCloseTo(old / tanV, 2);
+  });
+
   it('hands back to the play view once the entrance ends, the yaw back to 0', () => {
     const d = director();
     run(d, scene(400, 300), 1);
@@ -447,5 +460,46 @@ describe('camera director, a Warden’s entrance', () => {
       expect(d.moment).not.toBe('arrival');
       expect(pose.yaw).toBe(0);
     }
+  });
+});
+
+describe('camera director, a small screen', () => {
+  const PHONE = 844 / 390;
+  const FULL = W / 2 / (tanV * PHONE);
+
+  function phone(width) {
+    const d = createDirector({ fieldWidth: W, fieldHeight: H });
+    d.setLens({ tanV, aspect: PHONE, width });
+    return d;
+  }
+
+  it('comes closer as if 1155 points wide, at most 1.6 times, not on a wide screen', () => {
+    for (const [width, closer] of [
+      [844, 1155 / 844],
+      [600, 1.6],
+      [1155, 1],
+      [1920, 1],
+    ]) {
+      const pose = run(phone(width), scene(400, 300), 3);
+      expect(pose.closer, `${width}`).toBeCloseTo(closer, 5);
+      expect(pose.distance / (FULL / closer), `${width}`).toBeCloseTo(1, 2);
+    }
+  });
+
+  it('follows the ship sideways when closer, never past the field’s side', () => {
+    const left = run(phone(844), scene(60, 300), 4);
+    expect(left.x).toBeLessThan(360);
+    expect(screenOf(left, PHONE, 0, 300).x).toBeLessThan(-0.99);
+    expect(run(phone(1920), scene(60, 300), 4).x).toBeCloseTo(400, 0);
+  });
+
+  it('opens the wide view for what a wide screen would, not for what it leaves out', () => {
+    // Inside the full-width view, outside the closer one; then outside both.
+    const d = phone(844);
+    run(d, scene(400, 300), 2);
+    run(d, scene(400, 300, { shots: [shotAt(400, 300, 1.6, 0, 200)] }), 0.2);
+    expect(d.moment).toBe('near');
+    run(d, scene(400, 300, { shots: [shotAt(400, 300, 1.9, 0, 250)] }), 0.2);
+    expect(d.moment).toBe('wide');
   });
 });

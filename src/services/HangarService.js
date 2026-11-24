@@ -301,6 +301,24 @@ export default class HangarService {
     return this.getItems(CONTROL_ITEMS);
   }
 
+  /**
+   * For the menu's first-purchase lines (ui/onboarding.js): whether anything
+   * on sale was bought yet, and whether the Salvage buys something on sale now.
+   */
+  purchaseState() {
+    const onSale = [
+      ...this.getItems(),
+      ...this.getControlItems(),
+      ...this.getLicenses().filter((entry) => entry.cost !== undefined),
+    ];
+    return {
+      bought: onSale.some((entry) => entry.owned),
+      affordable: onSale.some(
+        (entry) => !entry.owned && entry.affordable && !entry.lock
+      ),
+    };
+  }
+
   /** Buys a licence on sale; it starts switched on. */
   buyLicense(id) {
     const entry = LICENSES_BY_ID.get(id);

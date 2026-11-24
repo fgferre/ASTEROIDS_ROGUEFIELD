@@ -59,6 +59,10 @@ describe('run end headline', () => {
       lead: 'Killed by an',
       name: 'Elite Ram',
     });
+    expect(killedByLine({ type: 'asteroid', variant: 'iron' })).toEqual({
+      lead: 'Killed by an',
+      name: 'Armored Ring Fragment',
+    });
     expect(killedByLine({ type: 'boss', bossKind: 'choir' }).lead).toBe(
       'Killed by'
     );

@@ -96,6 +96,7 @@ export function cacheStaticNodes() {
       balance: document.getElementById('hangar-balance') || null,
       openBtn: document.getElementById('menu-hangar-btn') || null,
       backBtn: document.getElementById('hangar-back-btn') || null,
+      tip: document.getElementById('hangar-tip') || null,
       closeBtn: document.getElementById('hangar-close-btn') || null,
       tabs: Array.from(document.querySelectorAll('[data-hangar-tab]')),
       panels: Array.from(document.querySelectorAll('[data-hangar-panel]')),
@@ -184,6 +185,8 @@ export function cacheStaticNodes() {
       prepDifficulty: document.getElementById('prep-difficulty') || null,
       beforeLaunch: document.getElementById('prep-before-launch') || null,
       hangarBtn: document.getElementById('menu-hangar-btn') || null,
+      tip: document.getElementById('menu-tip') || null,
+      hangarTip: document.getElementById('menu-hangar-tip') || null,
     },
   };
 }

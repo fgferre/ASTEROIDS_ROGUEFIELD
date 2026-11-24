@@ -113,6 +113,9 @@ export function buildMovementCommandPayload(frame, bindingState) {
     down: frame.down,
     left: frame.left,
     right: frame.right,
+    strafeLeft: frame.strafeLeft,
+    strafeRight: frame.strafeRight,
+    strafeHold: frame.strafeHold,
   };
   const analog = {
     moveX: frame.moveX,

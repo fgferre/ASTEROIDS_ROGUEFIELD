@@ -1,10 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import {
-  SHIP_HEADING_TURN_RATE,
-  TURRET_BARREL_LENGTH,
-} from '../../../src/data/constants/physics.js';
+import { TURRET_BARREL_LENGTH } from '../../../src/data/constants/physics.js';
 import {
   ALL_HULLS,
   bastion,
@@ -410,35 +407,89 @@ describe('PlayerMirror', () => {
     }
   });
 
-  it('banks into a full modern swing up to 22° plus the 8° of yaw, then relaxes level', () => {
+  it('rolls toward the lit turn couple or flank and pitches with the engine, then settles level', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.controlScheme = 'modern';
-    player.angularVelocity = SHIP_HEADING_TURN_RATE;
+    const jets = player.lastThrusterState;
+    const deg = (d) => (d * Math.PI) / 180;
     let time = 0;
-    for (let i = 0; i < 120; i += 1) {
-      time += 1 / 60;
-      mirror.update(player, ribbons, time);
-    }
-    expect(mirror.group.rotation.x).toBeCloseTo((30 * Math.PI) / 180, 3);
-
-    player.angularVelocity = 0;
-    for (let i = 0; i < 120; i += 1) {
-      time += 1 / 60;
-      mirror.update(player, ribbons, time);
-    }
-    expect(Math.abs(mirror.group.rotation.x)).toBeLessThan(1e-3);
+    const fly = (state) => {
+      Object.assign(jets, state);
+      for (let i = 0; i < 120; i += 1) {
+        time += 1 / 60;
+        mirror.update(player, ribbons, time);
+      }
+      return [mirror.group.rotation.x, mirror.group.rotation.z];
+    };
+    const [roll, nose] = fly({ turnR: 1, main: 1 });
+    expect(roll).toBeCloseTo(deg(25), 3);
+    expect(nose).toBeCloseTo(deg(8), 3);
+    // a flank pushing to port leans the hull to port; the retro dips the nose
+    const [lean, dip] = fly({ turnR: 0, main: 0, brakeStarboard: 1, aux: 1 });
+    expect(lean).toBeCloseTo(deg(-20), 3);
+    expect(dip).toBeCloseTo(deg(-8), 3);
+    const level = fly({ brakeStarboard: 0, aux: 0 });
+    expect(level.map(Math.abs).every((a) => a < 1e-3)).toBe(true);
   });
 
-  it('banks only on the yaw rate in classic controls', () => {
+  it('springs the barrels back from a shot while the hull gives against it and returns, never jumping', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.controlScheme = 'classic';
-    player.angularVelocity = -100;
+    const rest = mirror.barrels.position.x;
+    const hullOff = () => [
+      mirror.group.position.x - (player.position.x - HALF_W),
+      mirror.group.position.z - (player.position.y - HALF_H),
+    ];
     let time = 0;
-    for (let i = 0; i < 120; i += 1) {
+    const step = (frames = 1) => {
+      for (let i = 0; i < frames; i += 1) {
+        time += 1 / 60;
+        mirror.update(player, ribbons, time);
+      }
+    };
+    step();
+    mirror.flashMuzzle();
+    mirror.recoilToward(player, 1, 0, player.position);
+    step();
+    expect(mirror.barrels.position.x).toBeCloseTo(rest - 1.7, 5);
+    expect(mirror.ship.position.x).toBe(0);
+    step(3);
+    const [back, side] = hullOff();
+    expect(back).toBeLessThan(-1);
+    expect(Math.abs(side)).toBeLessThan(1e-6);
+    step(60);
+    expect(mirror.barrels.position.x).toBeCloseTo(rest, 2);
+    expect(Math.abs(hullOff()[0])).toBeLessThan(0.02);
+    // a shot every frame: the kicks pile up to a cap, never further
+    for (let i = 0; i < 60; i += 1) {
+      mirror.recoilToward(player, 1, 0, player.position);
+      step();
+      expect(Math.hypot(...hullOff())).toBeLessThanOrEqual(1.5 + 1e-9);
+    }
+  });
+
+  it('keeps the hull still and level under reduced motion and takes no kick from a shard fired away from the ship', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const rest = mirror.barrels.position.x;
+    player.lastThrusterState.turnR = 1;
+    let time = 0;
+    for (let i = 0; i < 30; i += 1) {
+      if (i === 10) mirror.recoilToward(player, 0, 1, player.position);
+      time += 1 / 60;
+      mirror.update(player, ribbons, time, 0, true);
+      if (i === 10) expect(mirror.barrels.position.x).toBeLessThan(rest - 1);
+      expect(mirror.group.position.z).toBeCloseTo(
+        player.position.y - HALF_H,
+        6
+      );
+      expect(mirror.group.rotation.x).toBe(0);
+    }
+    // a Scrap Rounds shard leaves its rock, far from the ship
+    const shard = { x: player.position.x + 200, y: player.position.y };
+    for (let i = 0; i < 30; i += 1) {
+      if (i === 10) mirror.recoilToward(player, 1, 0, shard);
       time += 1 / 60;
       mirror.update(player, ribbons, time);
+      if (i >= 10) expect(mirror.barrels.position.x).toBeCloseTo(rest, 2);
     }
-    expect(mirror.group.rotation.x).toBeCloseTo((-8 * Math.PI) / 180, 3);
   });
 
   it('shows the dash ring and a brighter rim only through dash i-frames', () => {

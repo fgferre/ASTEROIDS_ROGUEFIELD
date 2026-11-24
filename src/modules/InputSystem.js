@@ -10,7 +10,6 @@ import {
 import { createInputFrame } from '../core/replay.js';
 import {
   GAMEPAD_NAV_BUTTONS,
-  GAMEPAD_NAV_STICK_THRESHOLD,
   GAMEPAD_RUMBLE,
   GAMEPAD_STICK_DEADZONE,
 } from '../data/constants/gamepad.js';
@@ -55,16 +54,10 @@ export function applyStickDeadzone(x = 0, y = 0) {
   return { x: x * scaled, y: y * scaled };
 }
 
-/** The dominant direction of a raw stick past the menu threshold, or null. */
-function stickNavDirection(x = 0, y = 0) {
-  if (Math.hypot(x, y) < GAMEPAD_NAV_STICK_THRESHOLD) {
-    return null;
-  }
-  if (Math.abs(x) > Math.abs(y)) {
-    return x > 0 ? 'right' : 'left';
-  }
-  return y > 0 ? 'down' : 'up';
-}
+// The pad's pointer (ui/padPointer.js) marks the page while it shows: its
+// A clicks and its right stick scrolls under it.
+const padPointerShown = () =>
+  globalThis.document?.body?.dataset.padPointer === 'shown';
 
 function clone(value) {
   if (value === undefined) {
@@ -111,9 +104,9 @@ class InputSystem {
     this.inputSource = null;
     // The run is a replay ('game-started' says so): the pad stays quiet.
     this.replaying = false;
+    this.spaceFromFlight = false;
     // Pad sticks after the deadzone, read at each poll (see sampleInputFrame).
     this.padSticks = CENTRED_STICKS;
-    this.padNavDirection = null;
     // TouchControls on a touch device (app.js): its stick joins each step.
     this.touch = null;
     // Last device used: 'keyboard', 'gamepad' or 'touch' (tips and hints follow it).
@@ -306,6 +299,13 @@ class InputSystem {
         this.replaying = Boolean(payload.replay);
       });
 
+      // A cinematic holds the run (ui/runCinematics.js): Start is its skip
+      // key there, never the pause (that would let the run go under it).
+      eventBus.on('cinematic-started', ({ kind } = {}) => {
+        this.cinematicHold = ['story', 'travel', 'intro'].includes(kind);
+      });
+      eventBus.on('cinematic-ended', () => (this.cinematicHold = false));
+
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
           this.rumble(GAMEPAD_RUMBLE.hullHit);
@@ -425,6 +425,12 @@ class InputSystem {
     if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
       event.preventDefault();
     }
+    // A Space's repeats arm no button, nor does the release of one begun in
+    // flight (the strafe) on a screen opened under it: pressed again, it does.
+    if (code === 'space') {
+      if (!event.repeat) this.spaceFromFlight = this.isGameRunning();
+      if (this.spaceFromFlight || event.repeat) event.preventDefault();
+    }
 
     const normalizedKey = this.normalizeKeyboardBinding(event.key);
     const normalizedCode = this.normalizeKeyboardBinding(event.code);
@@ -433,6 +439,8 @@ class InputSystem {
 
     if (!wasPressed) {
       actions.forEach((action) => {
+        // A repeat (the keys dropped on a focus loss) never confirms.
+        if (event.repeat && action === 'confirm') return;
         this.handleActionPress(action, 'keyboard', {
           event,
           device: 'keyboard',
@@ -459,6 +467,7 @@ class InputSystem {
 
     if (key) this.keys[key] = false;
     if (code) this.codes[code] = false;
+    if (code === 'space' && this.spaceFromFlight) event.preventDefault();
 
     const normalizedKey = this.normalizeKeyboardBinding(event.key);
     const normalizedCode = this.normalizeKeyboardBinding(event.code);
@@ -656,7 +665,7 @@ class InputSystem {
 
     switch (action) {
       case 'pause':
-        eventBus?.emit?.('toggle-pause');
+        if (!this.cinematicHold) eventBus?.emit?.('toggle-pause');
         break;
       case 'openSettings':
         eventBus?.emit?.('settings-menu-requested', {
@@ -667,10 +676,10 @@ class InputSystem {
         eventBus?.emit?.('toggle-fullscreen');
         break;
       case 'confirm':
-        eventBus?.emit?.('input-confirmed', {
-          source,
-          context,
-        });
+        // Nothing in flight takes it: no select sound on each Space strafe.
+        if (!this.isGameRunning()) {
+          eventBus?.emit?.('input-confirmed', { source, context });
+        }
         break;
       default:
         break;
@@ -851,13 +860,9 @@ class InputSystem {
     };
     if (pad) this.setActiveDevice('gamepad');
 
-    const direction = stickNavDirection(axes[0], axes[1]);
-    if (direction !== this.padNavDirection) {
-      this.padNavDirection = direction;
-      this.emitPadNav(direction);
-    }
-    // Off play, the right stick scrolls the menu's lists (gamepadNav.js).
-    if (aim.y && !this.isGameRunning()) {
+    // Off play the left stick moves the pad's pointer (ui/padPointer.js) and
+    // the right stick scrolls the menu's lists (gamepadNav.js).
+    if (aim.y && !this.isGameRunning() && !padPointerShown()) {
       this.getEventBus()?.emit?.('gamepad-ui-scroll', { y: aim.y });
     }
   }
@@ -867,6 +872,8 @@ class InputSystem {
     if (!action || this.isGameRunning()) {
       return;
     }
+    // A clicks under the pad's pointer while it shows (ui/padPointer.js).
+    if (action === 'confirm' && padPointerShown()) return;
     this.getEventBus()?.emit?.('gamepad-ui-nav', { action });
   }
 
@@ -898,7 +905,6 @@ class InputSystem {
     this.previousGamepadButtons = [];
     this.previousGamepadAxes = [];
     this.padSticks = CENTRED_STICKS;
-    this.padNavDirection = null;
   }
 
   parseGamepadBinding(binding) {
@@ -1084,6 +1090,9 @@ class InputSystem {
       down: this.isActionActive('moveDown'),
       left: this.isActionActive('moveLeft'),
       right: this.isActionActive('moveRight'),
+      strafeLeft: this.isActionActive('strafeLeft'),
+      strafeRight: this.isActionActive('strafeRight'),
+      strafeHold: this.isActionActive('strafeHold'),
     };
   }
 

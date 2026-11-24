@@ -262,6 +262,7 @@ export function createOpeningScene(menu, random, shotName = null) {
     field: shot.field,
     rockViews,
     random,
+    debris: backdrop.debris,
   });
   const shake = new THREE.Vector3();
 
