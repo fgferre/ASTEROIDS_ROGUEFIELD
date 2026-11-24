@@ -91,6 +91,12 @@ const WAVES = { pool: 4, life: 0.4, reach: 3.2 };
 const LIGHTS = { pool: 3, peak: 6, reach: 14, decay: 0.2 };
 // Camera shake: units per unit of burst size and power, its cap and decay (s).
 const SHAKE = { amount: 0.05, max: 4, decay: 0.35 };
+// The backdrop's far fragments (fieldBackdrop.js) are plain dark solids made
+// to be specks below the game's field; the shots pass close to them and
+// they read as broken rocks. The owner chose (23/11, "Nossos asteroides,
+// pequenos e ao longe"): the game's own rocks where they stand, at this
+// share of their size, still.
+const FAR_ROCK_SCALE = 0.35;
 
 const EMBER_VERTEX = `
 attribute float aAge;
@@ -137,7 +143,8 @@ void main() {
 /**
  * `frame`: the held shot's camera matrix (the box's frame); `fov` degrees
  * and `aspect` of the shot; `field`: { near, far, count, scale };
- * `rockViews`: the game's rock views; `random`: a seeded () => [0, 1).
+ * `rockViews`: the game's rock views; `random`: a seeded () => [0, 1);
+ * `debris`: the backdrop's far fragments, hidden and drawn as rocks.
  */
 export function createOpeningRocks({
   THREE,
@@ -148,6 +155,7 @@ export function createOpeningRocks({
   field,
   rockViews,
   random,
+  debris,
 }) {
   const between = ([a, b]) => a + (b - a) * random();
   const tan = Math.tan((fov * Math.PI) / 360);
@@ -271,6 +279,31 @@ export function createOpeningRocks({
     )
       continue;
     addRock({ position, velocity: drift(), radius });
+  }
+
+  // The far rocks (FAR_ROCK_SCALE), one per fragment the biome shows; their
+  // seeds are fixed, so the field's own stream is untouched.
+  debris.visible = false;
+  debris.updateMatrixWorld();
+  const shrink = new THREE.Matrix4().makeScale(
+    FAR_ROCK_SCALE,
+    FAR_ROCK_SCALE,
+    FAR_ROCK_SCALE
+  );
+  const pose = new THREE.Matrix4();
+  const farRocks = [];
+  for (let i = 0; i < debris.count; i += 1) {
+    debris.getMatrixAt(i, pose);
+    if (pose.determinant() === 0) continue;
+    const view = rockViews.createRock();
+    view.seed = 900 + i * 37;
+    rockViews.bindRock(view, { variant: 'common' });
+    view.object.matrixAutoUpdate = false;
+    view.object.matrixWorld
+      .multiplyMatrices(debris.matrixWorld, pose)
+      .multiply(shrink);
+    view.rock.glow.splice(0, 4, 0, 0, 0.035, 0);
+    farRocks.push(view);
   }
 
   // A rock drifting in from just past an edge, out of view.
@@ -677,6 +710,7 @@ export function createOpeningRocks({
         g[3] = rock.flash > 0 ? 0.2 : 0;
         rockViews.rocks.push(view);
       });
+      farRocks.forEach((view) => rockViews.rocks.push(view));
       rockViews.rocks.end();
 
       const step = still ? 0 : dt;

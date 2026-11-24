@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 44.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 45.**
 
 ## O BASTÃO — onde as sessões pararam (23/11) — a `main` está publicada até a versão 0.8.0 (PR do `publicar/conjunto`, 23/11)
 
@@ -327,3 +327,11 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   imagem. 21/11, cartão `tiro-1`, aprovado por imagem: _"Tiro 1.2 — A luz do tiro na cor do próprio tiro entra no
   jogo? Sim, como nas imagens"_, _"Tiro 1.3 — O primeiro brilho da marca na cor do tiro? Na cor do tiro, esfriando para
   lava"_, _"Tiro 1.4 — As pedras com veios iluminam as vizinhas? Sim, como na imagem"_. Juntado ao ramo `tiro/na-pedra`.
+- **(44)** Pedras escuras no fundo do menu (23/11, na versão 0.8.0): _"outro defeito visualo que é essa forma
+  geométrica flutuando? seria um asteroide defeituoso?"_, _"isso é na tela de findpo do mission control é um objeto 3d
+  flutando"_, _"apareceu mais um agora"_, _"Talvez isso faça parte do cenário do Rain, que está no fundo. E eu nunca
+  tenha reparado, mas isso devem ser asteroides, né? Se são asteroides, eu acho que isso deveria estar no cenário do
+  Rain. A gente tem os próprios asteroides desenhados, né?"_ Eram os pedaços escuros do cenário do Anel. Cartão
+  `lascas-do-menu-1`: _"Pedras escuras do menu — Três jeitos, o mesmo instante: Nossos asteroides, pequenos e ao
+  longe"_. Só no menu; no jogo os pedaços ficam como estão (coordenadora, 23/11). Ramo `conserto/lascas-do-menu`;
+  fecha quando ele conferir.
