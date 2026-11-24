@@ -357,11 +357,23 @@ function placeShip(player) {
 // The ship stays where it was put (a ram or a Warden's charge cannot push it
 // off the picture) until the pilot steers; then it is his. Returns the call
 // that lets go.
+// The ship waits where placeShip puts it until the pilot flies: a move key,
+// a strafe key or a pad's left stick (Felipe pressed only Z on a test page
+// and saw nothing, 23/11).
 function holdShip(player) {
   let steered = false;
   const intervalId = setInterval(() => {
     const input = player.cachedMovementInput;
-    if (input?.up || input?.down || input?.left || input?.right) {
+    if (
+      input?.up ||
+      input?.down ||
+      input?.left ||
+      input?.right ||
+      input?.strafeLeft ||
+      input?.strafeRight ||
+      input?.moveX ||
+      input?.moveY
+    ) {
       steered = true;
     }
     if (!steered) placeShip(player);

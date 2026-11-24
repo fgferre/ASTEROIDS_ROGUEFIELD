@@ -49,7 +49,7 @@ export const PAD_STICK_GLYPHS = Object.freeze(['L-Stick', 'R-Stick']);
  * Felipe's picks on controle-1 (20/11), dash on RB; the shield moved from LB
  * to LT when LB became the strafe hold (23/11). The sticks fly by their tilt
  * (flight.js, `pad` frames), not through bindings: classic, the left stick
- * thrusts (up), backs (down) and, with the RCS System, strafes (sideways), the
+ * thrusts (up), backs (down) and strafes (sideways), the
  * right one turns; modern, the left one points the way (with LB held, it
  * strafes) and the right one aims.
  */

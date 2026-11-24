@@ -160,14 +160,17 @@ describe('PlayerSystem flight by the jets', () => {
     expect(lit(turning, 'aux')).toEqual([]);
   });
 
-  it('the strafe comes with the RCS System: the flank jets push the whole hull sideways, the nose kept, harder each level', () => {
+  it('every ship strafes: the flank jets push the whole hull sideways, the nose kept, harder with each RCS System level', () => {
     const strafe = (agility) => {
       const { player, fly } = makePlayer();
       player.flight.agility = agility;
       return { player, events: fly({ strafeRight: true }, 20) };
     };
-    expect(speedOf(strafe(1).player)).toBe(0);
+    const bare = strafe(1).player;
+    expect(bare.velocity.vy).toBeGreaterThan(20);
+    expect(bare.angle).toBe(0);
     const rcs1 = strafe(1.3);
+    expect(rcs1.player.velocity.vy).toBeGreaterThan(bare.velocity.vy * 1.2);
     // Nose along +x: starboard is down the screen.
     expect(rcs1.player.velocity.vy).toBeGreaterThan(30);
     expect(rcs1.player.velocity.vx).toBe(0);

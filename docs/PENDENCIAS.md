@@ -289,7 +289,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   ele aprovar voando. O strafe construído com a RCS System: teclas Z e C, LB no controle (no voo do começo, o analógico
   esquerdo de lado), e o escudo passou para o LT (decisão da coordenadora). Respostas dele ao cartão `corpo-da-nave-3`
   (23/11): o empurrão do tiro _"Leve"_, o strafe _"Com a RCS System"_, o botão _"LB, como você sugeriu, e o escudo muda
-  de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta.
+  de botão"_. O coice leve construído: todo tiro empurra a nave em qualquer voo, mais por tiro numa arma mais lenta. Testando o conjunto (23/11):
+  _"no teste que fiz o strafe nao funcionou..."_ e _"Eu acho que o Strafe deveria funcionar independente do RSS, você não
+  acha?"_. O strafe passou a existir desde o começo; a RCS System só o deixa mais forte.
 
 ## Som (palavras dele, 19/11)
 

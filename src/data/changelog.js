@@ -22,7 +22,7 @@
 
 export const NEXT = {
   new: [
-    'With the RCS System the ship can strafe: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, harder with each level of the card. The shield moves to LT on a controller.', // not confirmed
+    'The ship can strafe from the start: Z and C, or the left stick sideways (with the Flight Computer, hold LB; by touch, hold STRAFE). The side jets slide the whole hull without turning the nose, and the RCS System makes them push harder. The shield moves to LT on a controller.', // not confirmed
   ],
   improved: [
     'Every shot now pushes the ship back a little, in every flight, and a slower gun kicks harder per shot: with no cards you correct it on the thrusters; the Braking System and the Flight Computer hold the ship in place.', // not confirmed

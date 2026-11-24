@@ -62,8 +62,7 @@ export function classicAsks(input) {
  * steer by. Z and C strafe in both flights. Held (LB, the touch STRAFE), the
  * sideways keys, d-pad and stick strafe instead of turning, and modern flight
  * lets go of the steering (the nose holds). In classic flight the pad's left
- * stick strafes sideways on its own, as far as it leans. The flight asks only
- * with the RCS System.
+ * stick strafes sideways on its own, as far as it leans.
  */
 export function splitStrafe(input, modern) {
   const keys = (input.strafeRight ? 1 : 0) - (input.strafeLeft ? 1 : 0);
