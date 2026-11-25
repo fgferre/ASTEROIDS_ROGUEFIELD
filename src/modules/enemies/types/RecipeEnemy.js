@@ -121,6 +121,13 @@ export class RecipeEnemy extends BaseEnemy {
   resetForPool() {
     super.resetForPool();
     this.random = null;
+    // No plate (the Shielded affix and the frontalShield behavior set one) and
+    // no weapon pattern (EnemyFactory.applyComponents sets it) from its last life.
+    this.facing = 0;
+    this.shieldHealth = 0;
+    this.maxShieldHealth = 0;
+    this.shieldBroken = false;
+    this.weaponPattern = null;
     this.run('reset');
     this.destroyed = false;
   }
