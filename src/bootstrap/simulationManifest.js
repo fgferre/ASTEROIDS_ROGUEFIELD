@@ -652,7 +652,6 @@ export function createSimulationManifest(context = {}, presentation) {
     },
     slot('menu-background'),
     slot('renderer'),
-    // Last: an eager service can only resolve dependencies registered above it.
     {
       name: 'game-session',
       singleton: true,

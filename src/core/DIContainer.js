@@ -69,7 +69,7 @@ export class DIContainer {
    * @param {Object} [options={}] - Configuration options (factory pattern only)
    * @param {Array<string>} [options.dependencies=[]] - List of dependency service names
    * @param {boolean} [options.singleton=true] - Whether to cache as singleton
-   * @param {boolean} [options.lazy=true] - Whether to initialize lazily or immediately
+   * @param {boolean} [options.lazy=true] - false: created by createEagerServices()
    * @returns {DIContainer} This container for chaining
    * @throws {Error} If service name is invalid or already registered
    */
@@ -120,19 +120,30 @@ export class DIContainer {
       console.log(`[DIContainer] Registered '${name}'${depsStr}`);
     }
 
-    // Initialize immediately if not lazy
-    if (!lazy && singleton) {
+    return this;
+  }
+
+  /**
+   * Creates every eager (`lazy: false`) singleton, in registration order.
+   * Called once everything is registered, so an eager service may depend on
+   * one registered after it. A failure is thrown, naming the service.
+   *
+   * @returns {Object<string, any>} The eager services by name
+   */
+  createEagerServices() {
+    const services = {};
+    for (const [name, { lazy, singleton }] of this.factories) {
+      if (lazy || !singleton) continue;
       try {
-        this.resolve(name);
+        services[name] = this.resolve(name);
       } catch (error) {
-        console.error(
-          `[DIContainer] Failed to eagerly initialize '${name}':`,
-          error
+        throw new Error(
+          `[DIContainer] Failed to create eager service '${name}': ${error.message}`,
+          { cause: error }
         );
       }
     }
-
-    return this;
+    return services;
   }
 
   /**

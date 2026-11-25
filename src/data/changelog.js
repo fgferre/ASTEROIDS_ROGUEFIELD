@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'The game now registers all its services before creating any, and a service that fails to start stops the load instead of logging an error and being retried; nobody notices because every service is still created in the same order and none fails today.', // not confirmed
+  ],
 };
 
 export const RELEASES = [

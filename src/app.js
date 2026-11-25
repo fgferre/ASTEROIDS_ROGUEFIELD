@@ -251,7 +251,6 @@ function init(recording = null, touch = false) {
 
     const { services } = bootstrapServices({
       container: diContainer,
-      manifestContext,
     });
 
     // Store services for use in game loop
