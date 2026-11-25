@@ -15,7 +15,12 @@ import {
   UPGRADE_FAMILIES,
 } from '../../data/upgrades/families.js';
 import { textForWeapon } from '../../data/upgrades/index.js';
-import { WEAPON_APEX, WEAPON_EVOLUTIONS, WEAPONS } from '../../data/weapons.js';
+import {
+  familyForm,
+  WEAPON_APEX,
+  WEAPON_EVOLUTIONS,
+  WEAPONS,
+} from '../../data/weapons.js';
 
 // Each family's shape, 12 × 12: thermal a drop, kinetic a disc, arc a bolt,
 // field a hexagon, salvage a diamond, maneuver a chevron.
@@ -74,26 +79,6 @@ export function weaponOfCard(cardId) {
   return (
     Object.values(WEAPONS).find((weapon) => weapon.card?.id === cardId) ?? null
   );
-}
-
-/**
- * A family's evolution (or Apex) as the held weapon has it: the weapon's own
- * `evolution`/`apex` on its card's family, else the lance's, under the name
- * the weapon gives it (`familyForms.names`, the Scatter's); Maneuver's are
- * the dash's (its bonus and its Apex).
- */
-export function familyForm(family, weaponId, apex = false) {
-  const weapon = WEAPONS[weaponId];
-  const own =
-    weapon?.card?.family === family
-      ? weapon[apex ? 'apex' : 'evolution']
-      : null;
-  const lance = (apex ? WEAPON_APEX : WEAPON_EVOLUTIONS)[family];
-  const named = weapon?.familyForms?.names?.[family]?.[apex ? 1 : 0];
-  const dash = apex
-    ? UPGRADE_FAMILIES[family].apex
-    : UPGRADE_FAMILIES[family].bonus;
-  return own ?? (lance && named ? { ...lance, name: named } : lance) ?? dash;
 }
 
 // The patterns whose hits carry the lance evolutions (HitResolution's

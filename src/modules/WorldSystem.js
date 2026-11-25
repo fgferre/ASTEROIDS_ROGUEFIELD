@@ -1,6 +1,6 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
-import { familyForm } from './ui/upgradeCard.js';
+import { familyForm } from '../data/weapons.js';
 
 const WORLD_SERVICE_MAP = {
   player: 'player',
