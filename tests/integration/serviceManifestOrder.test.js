@@ -1,7 +1,10 @@
 /**
- * An eager (lazy: false) service is built the moment it is registered, so
- * every dependency it names must be registered above it in the manifest;
- * otherwise the container logs an error at load and builds it later.
+ * The eager (lazy: false) services are created in manifest order, once all are
+ * registered. A dependency registered below its eager service would still
+ * work, but it would be created early, out of that order; and the order of
+ * creation decides the order listeners attach and random streams fork, so the
+ * simulation. Every dependency above keeps creation order equal to the
+ * manifest's.
  */
 
 import { describe, expect, it } from 'vitest';
