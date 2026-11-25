@@ -16,6 +16,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Kiln Engine',
   subtitle: 'The fire was never told to stop',
+  codex: {
+    lore: 'The Core was told to burn and nothing has told it to stop. The Kiln keeps the fire fed and the slag moving, for a foundry that has poured nothing in a thousand years.',
+    hint: 'Stand in the cool wedges; they move. Fire while its fins are open.',
+    glyph:
+      '<polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(0)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(60)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(120)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(180)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(240)"/><rect x="-2" y="-15" width="4" height="5" transform="rotate(300)"/><circle class="eye" r="3.5"/>',
+  },
   layer: 10, // proposta 12/11: the layer it fights on (health scales by it)
   // 55 % of Warden Choir's health on the same layer: Choir is Prime's base ×
   // its 1.1 (choir.js), so 0.55 × 1.1 (was 65 %: the first Sentinel of

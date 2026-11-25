@@ -1,13 +1,26 @@
 // A Warden: the first one, on layer 5 (BOSS_BY_LAYER). `displayName` and
 // `subtitle` are its WARDEN_KINDS entry; `config` and `components` are the
 // base every Warden is built from (choir and null override part of it).
-// Listed by src/data/enemies/boss.js. Numbers: proposta 18/10 — the owner's
+// Listed by src/data/enemies/boss.js from its `tier`. Numbers: proposta 18/10 — the owner's
 // play decides.
 export default {
   id: 'prime',
   order: 1,
+  // Its list, every boss and Herald names one: 'warden' (WARDEN_KINDS),
+  // 'sentinel' or 'sovereign' (SENTINEL_KINDS), 'herald' (HERALD_KINDS);
+  // `order` is its place in it.
+  tier: 'warden',
   displayName: 'Warden Prime',
   subtitle: 'Guardian of the Ring',
+  // Its Codex entry (src/data/codex.js), every boss and Herald has one:
+  // lore, a hint, and its glyph, an SVG body in a -16..16 box whose
+  // `eye` part is lit.
+  codex: {
+    lore: 'The first gate of the Ring, six plates around a violet core. It keeps the count of everything that enters: stone, light, pilot. Breaking it does not close the ledger; it turns the page.',
+    hint: 'Each phase breaks a plate. The red band warns of its charge.',
+    glyph:
+      '<circle r="11" fill="none" stroke-width="5" stroke-dasharray="9.5 2"/><circle class="eye" r="4.5"/>',
+  },
   // Its health is config.health × healthScaling per layer past the first ×
   // this, the same whatever cards the run owns: aimed at a 60-90 s fight on
   // its layer. Numbers: proposta 20/10 — the owner's play decides.

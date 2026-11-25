@@ -5,8 +5,15 @@
 export default {
   id: 'null',
   order: 3,
+  tier: 'warden',
   displayName: 'Warden Null',
   subtitle: 'The silence at the center',
+  codex: {
+    lore: 'The stillness the Ring kept for its ending. It opens the Ring itself. Everything that falls through the Field falls toward it, and for a thousand years nothing has arrived still burning.',
+    hint: 'Pulls the sparks back. Its plates burn when the shell is open.',
+    glyph:
+      '<circle r="13" fill="none" stroke-width="2"/><circle r="7"/><circle class="eye" r="3"/>',
+  },
   healthFactor: 1.35, // proposta 20/10: explained in prime.js
   // Its entrance, the weight: slow and heavy with its plates spread wide,
   // and they shut at once when it stops. The camera hugs the field. The

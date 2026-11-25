@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "The lists of bosses and Heralds (and their Codex pages) are now built from each boss's own file instead of being typed out again in several places, so adding a boss touches fewer files; every boss, its order and its words are exactly as before, so nothing changes in play.", // not confirmed
+  ],
 };
 
 export const RELEASES = [
