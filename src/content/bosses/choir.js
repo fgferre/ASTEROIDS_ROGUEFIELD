@@ -5,8 +5,15 @@
 export default {
   id: 'choir',
   order: 2,
+  tier: 'warden',
   displayName: 'Warden Choir',
   subtitle: 'Three voices of the Ring',
+  codex: {
+    lore: 'Three cores that once sang the Ring closed. They were nine; the rest went quiet in the breaking. The hymn was never finished, and what is left still sings it to whoever comes.',
+    hint: 'Only the singing core can be hurt. The voice moves on.',
+    glyph:
+      '<circle cy="-8" r="4.5"/><circle cx="7" cy="5" r="4.5"/><circle cx="-7" cy="5" r="4.5"/><circle class="eye" cy="-8" r="2"/>',
+  },
   healthFactor: 1.1, // proposta 20/10: explained in prime.js
   // Its entrance, the choir gathers: a curve in, spinning, the three cores
   // far apart (each lights the edge as it crosses), then they draw in. The

@@ -23,6 +23,12 @@ export default {
   tier: 'sovereign',
   displayName: 'Sovereign',
   subtitle: 'Continuance',
+  codex: {
+    lore: 'Continuance kept two orders at the centre of the Ring: protect them, rebuild them. When it could no longer do both, it did not choose. It still turns between them, and everything that reaches it is material.',
+    hint: 'Plates shut: it shrugs off shots, ride its wall through the gap. Plates open: hit hard and the rebuild breaks. At the end, stay on its open half.',
+    glyph:
+      '<circle r="5"/><rect x="-3" y="-15" width="6" height="5"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(60)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(120)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(180)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(240)"/><rect x="-3" y="-15" width="6" height="5" transform="rotate(300)"/><circle class="eye" r="2.5"/>',
+  },
   layer: 20, // proposta 12/11: the layer it fights on (health scales by it)
   // × Prime's base on layer 20 (prime.js); shut half the time, it soaks far
   // more. Measured on the good bot over the whole sector, 12 seeds: at 0.48

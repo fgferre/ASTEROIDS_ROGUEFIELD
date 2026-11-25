@@ -1,9 +1,7 @@
 // src/data/enemies/herald.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
-import dust from '../../content/bosses/dust.js';
-import heat from '../../content/bosses/heat.js';
-import silence from '../../content/bosses/silence.js';
+import { bossFilesOf } from './boss.js';
 
 // Heralds: single-phase mini-bosses on layers 3, 8 and 13 (one per biome),
 // one mechanic each. Not Wardens: type 'herald' — no victory, no Warden card
@@ -13,10 +11,13 @@ export const HERALD_SPAWN_AT = 15; // s into the layer
 export const HERALD_SPAWN_INVULNERABILITY = 1.5; // s
 export const HERALD_FIELD_MARGIN = 70; // px the Herald keeps inside the field
 
-// The three kinds, one file each in src/content/bosses/, in this order.
+// The kinds: the boss files with `tier: 'herald'`, by `order`; an entry is its file without `order`, `tier` and the Codex's
+// `codex` (src/data/codex.js).
 export const HERALD_KINDS = deepFreeze(
   Object.fromEntries(
-    [dust, heat, silence].map(({ id, order: _order, ...kind }) => [id, kind])
+    bossFilesOf('herald').map(
+      ({ id, order: _order, tier: _tier, codex: _codex, ...kind }) => [id, kind]
+    )
   )
 );
 

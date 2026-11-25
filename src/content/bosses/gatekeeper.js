@@ -16,6 +16,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Gatekeeper',
   subtitle: 'The lane is closed',
+  codex: {
+    lore: 'The lane to Prime was closed before the breaking and never reopened. The Gatekeeper holds it shut for a traffic that ended a thousand years ago. It has not been told.',
+    hint: 'Cross its barrier through the gap. Shoot its back while it recovers.',
+    glyph:
+      '<rect x="5" y="-13" width="5" height="26"/><circle cx="-1" cy="-10" r="4"/><circle cx="-1" cy="10" r="4"/><rect x="-12" y="-6" width="11" height="12"/><rect class="eye" x="-11" y="-2" width="4" height="4"/>',
+  },
   layer: 5, // proposta 12/11: the layer it fights on (health scales by it)
   // 80 % of Warden Prime's health on the same layer (prime.js).
   healthFactor: 0.8, // proposta 12/11

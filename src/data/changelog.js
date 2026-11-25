@@ -35,6 +35,7 @@ export const NEXT = {
     "A reused sound node now drops the fade left over from the sound that used it before, and two pools that could never hold anything are gone; nobody notices because no audible case was found, it only removes a way for a sound to start with the tail of the previous sound's fade.", // not confirmed
     'A shot now reuses the trail list of the bullet it recycles instead of making a new one, so nobody notices: measured at well under a tenth of a millisecond a frame.', // not confirmed
     'A few pieces of dead or duplicated code were removed (an empty boss hook, a repeated crack clean-up, a missing source-map line, two unused settings fallbacks); nothing changes for the player.', // not confirmed
+    "The lists of bosses and Heralds (and their Codex pages) are now built from each boss's own file instead of being typed out again in several places, so adding a boss touches fewer files; every boss, its order and its words are exactly as before, so nothing changes in play.", // not confirmed
   ],
 };
 

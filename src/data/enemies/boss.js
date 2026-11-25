@@ -1,16 +1,16 @@
 // src/data/enemies/boss.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
-import prime from '../../content/bosses/prime.js';
-import choir from '../../content/bosses/choir.js';
-import nullWarden from '../../content/bosses/null.js';
-import quarryMaw from '../../content/bosses/quarry-maw.js';
-import gatekeeper from '../../content/bosses/gatekeeper.js';
-import kilnEngine from '../../content/bosses/kiln-engine.js';
-import prismCrown from '../../content/bosses/prism-crown.js';
-import foundryMother from '../../content/bosses/foundry-mother.js';
-import interdictor from '../../content/bosses/interdictor.js';
-import sovereign from '../../content/bosses/sovereign.js';
+import { getContent, listContent } from '../../content/registry.js';
+
+/**
+ * The files in src/content/bosses/ of the given tiers, by `order`: each file
+ * names its list with `tier` ('warden', 'sentinel', 'sovereign', 'herald').
+ */
+export const bossFilesOf = (...tiers) =>
+  listContent('bosses').filter(({ tier }) => tiers.includes(tier));
+
+const prime = getContent('bosses', 'prime');
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -103,14 +103,16 @@ export function bossKindForLayer(layer) {
   return WARDEN_CYCLE[slot % WARDEN_CYCLE.length];
 }
 
-// A boss kind's entry: its content file without the registry's `order` and
-// Prime's shared `config` and `components`.
+// A boss kind's entry: its content file without the registry's `order`, the
+// Codex's `codex` (src/data/codex.js) and Prime's shared `config` and
+// `components`.
 const kindsOf = (files) =>
   Object.fromEntries(
     files.map(
       ({
         id,
         order: _order,
+        codex: _codex,
         config: _config,
         components: _components,
         ...kind
@@ -118,26 +120,21 @@ const kindsOf = (files) =>
     )
   );
 
-// The three kinds, one file each in src/content/bosses/, in this order. Prime
-// also carries the shared `config` and `components` (BOSS_CONFIG and
-// BOSS_COMPONENTS above), which are not part of a kind's entry.
-export const WARDEN_KINDS = deepFreeze(kindsOf([prime, choir, nullWarden]));
+// The three kinds, `tier: 'warden'` in their files, by `order`. A Warden's
+// entry has no `tier` (bossTier reads none as 'warden'). Prime also carries
+// the shared `config` and `components` (BOSS_CONFIG and BOSS_COMPONENTS
+// above), which are not part of a kind's entry.
+export const WARDEN_KINDS = deepFreeze(
+  kindsOf(bossFilesOf('warden').map(({ tier: _tier, ...warden }) => warden))
+);
 
 // Sentinels: the boss that ends a sector (CONTENT.md "Boss"). Same `type:
 // 'boss'` as a Warden, `tier: 'sentinel'` in its file; never in BOSS_BY_LAYER,
 // the cycle, Boss Rush or the Warden achievements: a sector asks for one by
 // kind (`bossKind`). Sovereign, the campaign's last boss, is asked for the
-// same way and ranks above the Wardens (`tier: 'sovereign'`).
+// same way and ranks above the Wardens (`tier: 'sovereign'`). By `order`.
 export const SENTINEL_KINDS = deepFreeze(
-  kindsOf([
-    quarryMaw,
-    gatekeeper,
-    kilnEngine,
-    prismCrown,
-    foundryMother,
-    interdictor,
-    sovereign,
-  ])
+  kindsOf(bossFilesOf('sentinel', 'sovereign'))
 );
 
 /** Every boss kind, Wardens and Sentinels: what a `bossKind` can name. */
