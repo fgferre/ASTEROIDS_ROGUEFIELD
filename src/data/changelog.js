@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'The run session no longer forwards about twenty calls to its own parts; the tests reach the part directly, so the file stays under its size limit and the game plays the same.', // not confirmed
+  ],
 };
 
 export const RELEASES = [

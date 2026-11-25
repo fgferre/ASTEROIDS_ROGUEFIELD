@@ -52,7 +52,7 @@ function clearUntilLayer(game, layer) {
 // A menu click, without the remote link's screen (remoteLink.js) between.
 const click = (game, id) => {
   game.session.menuButtons.linkIn = (options, start) => start();
-  game.session.handleDocumentClick({
+  game.session.menuButtons.handleDocumentClick({
     target: { closest: () => ({ id }) },
     preventDefault() {},
   });
@@ -113,7 +113,7 @@ describe('Boss Rush', () => {
       bossRush.bestTime + 1
     );
     expect(bossRush.newBest).toBe(true);
-    expect(game.session.continueBeyondVictory()).toBe(false);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(false);
     // The layer records only count full runs.
     expect(loadRecords()).toMatchObject({
       bestLayer: 0,
