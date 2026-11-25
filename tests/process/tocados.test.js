@@ -3,11 +3,15 @@
 // the disk. importTargets is the one reader of imports, shared with the
 // dependency analyzer.
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   buildGraph,
   importTargets,
   selectTests,
+  walk,
 } from '../../scripts/tocados.mjs';
 
 const graph = buildGraph({
@@ -123,5 +127,20 @@ describe('tocados: files that are not src js', () => {
     expect(selectTests(files, ['src/style.css'])).toEqual([
       'tests/process/css.test.js',
     ]);
+  });
+});
+
+describe('walk', () => {
+  it('leaves out the gitignored exported-assets folder', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tocados-'));
+    try {
+      mkdirSync(join(dir, 'exported-assets', 'deep'), { recursive: true });
+      writeFileSync(join(dir, 'exported-assets', 'page.html'), '');
+      writeFileSync(join(dir, 'exported-assets', 'deep', 'old.js'), '');
+      writeFileSync(join(dir, 'game.js'), '');
+      expect(walk(dir)).toEqual([join(dir, 'game.js')]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -56,8 +56,11 @@ export function touched(base) {
   ];
 }
 
-function walk(dir, out = []) {
+// src/exported-assets/ is gitignored: pages and builds the owner keeps on his
+// machine (thousands of files there), none of it the game's code.
+export function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
+    if (name === 'exported-assets') continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else if (/\.(js|mjs|css|html)$/.test(name)) out.push(full);
