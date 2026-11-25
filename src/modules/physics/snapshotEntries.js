@@ -1,8 +1,8 @@
 // src/modules/physics/snapshotEntries.js
 //
-// One enemy in a physics snapshot: the entry PhysicsSystem's exportState
+// One enemy in a physics snapshot: the entry PhysicsSystem's getSnapshotState
 // writes for it (pool id, position, motion, random seeds), and putting an
-// entry back on the pooled enemy importState matches it to.
+// entry back on the pooled enemy restoreSnapshotState matches it to.
 
 import { safeNumber, shallowClone } from '../../utils/StateManager.js';
 

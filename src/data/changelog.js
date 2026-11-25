@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'The physics, enemy and progression systems keep one name for saving and restoring a snapshot instead of several that did the same; the game looks and plays the same.', // not confirmed
+  ],
 };
 
 export const RELEASES = [
