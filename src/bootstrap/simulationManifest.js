@@ -17,7 +17,6 @@ import ProgressionSystem from '../modules/ProgressionSystem.js';
 import EffectsSystem from '../modules/EffectsSystem.js';
 import WorldSystem from '../modules/WorldSystem.js';
 import { GamePools } from '../core/GamePools.js';
-import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
 import { gameEvents } from '../core/EventBus.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
@@ -35,12 +34,6 @@ export const DEFAULT_POOL_CONFIG = {
   xpOrbs: { initial: 40, max: 250 },
   shockwaves: { initial: 8, max: 25 },
   tempObjects: { initial: 15, max: 60 },
-};
-
-export const DEFAULT_GC_OPTIONS = {
-  defaultInterval: 4500,
-  idleTimeout: 120,
-  maxTasksPerFrame: 2,
 };
 
 function ensureGameStateService(gameState) {
@@ -145,35 +138,6 @@ function initializeGamePools(config) {
   return GamePools;
 }
 
-function createGarbageCollector(options) {
-  const gcOptions = { ...DEFAULT_GC_OPTIONS, ...options };
-  const manager = new GarbageCollectionManager(gcOptions);
-  manager.initialize();
-
-  manager.registerPeriodicTask(
-    'pool-auto-manage',
-    () => GamePools.autoManageAll(),
-    { interval: 5000, priority: 2, runImmediately: true }
-  );
-
-  manager.registerPeriodicTask(
-    'temp-pool-trim',
-    () => {
-      const tempPool = GamePools.tempObjects;
-      if (tempPool && typeof tempPool.autoManage === 'function') {
-        tempPool.autoManage({
-          targetUtilization: 0.55,
-          maxShrinkage: 10,
-          maxExpansion: 6,
-        });
-      }
-    },
-    { interval: 7000, priority: 1 }
-  );
-
-  return manager;
-}
-
 function createRandomService(context = {}) {
   const { randomOverrides, seed } = context;
 
@@ -256,7 +220,7 @@ function createRandomService(context = {}) {
 }
 
 export function createSimulationManifest(context = {}, presentation) {
-  const { gameState, poolConfig, garbageCollectorOptions } = context;
+  const { gameState, poolConfig } = context;
   const slot = (name) => {
     const entry = presentation?.[name];
     if (!entry) {
@@ -296,13 +260,6 @@ export function createSimulationManifest(context = {}, presentation) {
       lazy: false,
       dependencies: [],
       factory: () => initializeGamePools(poolConfig),
-    },
-    {
-      name: 'garbage-collector',
-      singleton: true,
-      lazy: false,
-      dependencies: ['game-pools'],
-      factory: () => createGarbageCollector(garbageCollectorOptions),
     },
     {
       name: 'settings',

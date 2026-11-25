@@ -27,7 +27,9 @@ export const NEXT = {
     'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
     'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
   ],
-  unseen: [],
+  unseen: [
+    'The garbage-collection manager is gone: the pools already trim themselves on the same schedule, so nothing in the game changes.', // not confirmed
+  ],
 };
 
 export const RELEASES = [
