@@ -994,28 +994,12 @@ class EnemySystem extends BaseSystem {
     return this.field.usesAsteroidPool;
   }
 
-  exportState() {
+  getSnapshotState() {
     return this.snapshots.exportState();
   }
 
-  importState(snapshot) {
-    return this.snapshots.importState(snapshot);
-  }
-
-  getSnapshotState() {
-    return this.exportState();
-  }
-
-  captureSnapshot() {
-    return this.exportState();
-  }
-
   restoreSnapshotState(snapshot) {
-    return this.importState(snapshot);
-  }
-
-  applySnapshot(snapshot) {
-    return this.importState(snapshot);
+    return this.snapshots.importState(snapshot);
   }
 
   // === RESET E CLEANUP ===

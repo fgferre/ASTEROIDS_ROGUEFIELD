@@ -252,12 +252,12 @@ describe('boss damage feedback', () => {
     enemySystem.asteroids = [boss, support];
     enemySystem.invalidateActiveEnemyCache();
 
-    const snapshot = enemySystem.exportState();
+    const snapshot = enemySystem.getSnapshotState();
 
     expect(snapshot.bosses[0].poolId).toBe(41);
     expect(snapshot.supportEnemies[0].poolId).toBe(42);
 
-    const restored = enemySystem.importState(snapshot);
+    const restored = enemySystem.restoreSnapshotState(snapshot);
     expect(restored).toBe(true);
 
     const activeEnemies = enemySystem.getActiveEnemies();

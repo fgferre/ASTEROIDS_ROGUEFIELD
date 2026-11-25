@@ -572,7 +572,7 @@ class PhysicsSystem extends BaseSystem {
     }
   }
 
-  exportState() {
+  getSnapshotState() {
     const asteroids = [];
     for (const asteroid of this.activeEnemies) {
       const snapshot = serializeAsteroidForSnapshot(asteroid);
@@ -587,7 +587,7 @@ class PhysicsSystem extends BaseSystem {
     };
   }
 
-  importState(snapshot) {
+  restoreSnapshotState(snapshot) {
     if (!validateSnapshot(snapshot, ['asteroids'])) {
       return this._handleSnapshotFallback('invalid snapshot payload');
     }
@@ -653,22 +653,6 @@ class PhysicsSystem extends BaseSystem {
     this._snapshotFallbackWarningIssued = false;
     this.warnOnBossTrackingMismatch({ reason: 'snapshot-import' });
     return true;
-  }
-
-  getSnapshotState() {
-    return this.exportState();
-  }
-
-  captureSnapshot() {
-    return this.exportState();
-  }
-
-  restoreSnapshotState(snapshot) {
-    return this.importState(snapshot);
-  }
-
-  applySnapshot(snapshot) {
-    return this.importState(snapshot);
   }
 
   update() {

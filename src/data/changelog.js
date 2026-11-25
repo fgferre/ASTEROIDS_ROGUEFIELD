@@ -38,6 +38,7 @@ export const NEXT = {
     "The lists of bosses and Heralds (and their Codex pages) are now built from each boss's own file instead of being typed out again in several places, so adding a boss touches fewer files; every boss, its order and its words are exactly as before, so nothing changes in play.", // not confirmed
     "Each card now says in its own file how it is unlocked (from the start, on the piloting track, by a Hangar licence with its price, or by a medal), and the Hangar's lists are built from those files, so a new card can no longer be left out of every list by mistake; the lists, their order and the prices are the same as before, so nobody notices.", // not confirmed
     'The game now registers all its services before creating any, and a service that fails to start stops the load instead of logging an error and being retried; nobody notices because every service is still created in the same order and none fails today.', // not confirmed
+    'The physics, enemy and progression systems keep one name for saving and restoring a snapshot instead of several that did the same; the game looks and plays the same.', // not confirmed
   ],
 };
 
