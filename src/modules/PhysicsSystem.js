@@ -34,6 +34,17 @@ import {
   serializeAsteroidForSnapshot,
 } from './physics/snapshotEntries.js';
 
+// Who a hit, a blast or a push can reach: a live enemy, and never a phased
+// Shade (`intangible`), which touches nothing; the radar still asks for it
+// with `includeIntangible`.
+export function isReachableEnemy(enemy, includeIntangible = false) {
+  return (
+    Boolean(enemy) &&
+    !enemy.destroyed &&
+    (includeIntangible || !enemy.intangible)
+  );
+}
+
 class PhysicsSystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -700,15 +711,8 @@ class PhysicsSystem extends BaseSystem {
     // Use SpatialHash for efficient nearby object retrieval
     const searchRadius = Math.max(radius, this.maxEnemyRadius);
     const candidates = this.spatialHash.query(x, y, searchRadius, {
-      filter: (obj) => {
-        // Active enemies only; a phased Shade (`intangible`) touches nothing
-        // (the radar still asks for it with `includeIntangible`).
-        return (
-          this.activeEnemies.has(obj) &&
-          !obj.destroyed &&
-          (includeIntangible || !obj.intangible)
-        );
-      },
+      filter: (obj) =>
+        this.activeEnemies.has(obj) && isReachableEnemy(obj, includeIntangible),
       sorted: false,
     });
 
@@ -723,10 +727,8 @@ class PhysicsSystem extends BaseSystem {
 
     for (const boss of this.activeBosses) {
       if (
-        !boss ||
-        boss.destroyed ||
         !this.activeEnemies.has(boss) ||
-        (boss.intangible && !includeIntangible)
+        !isReachableEnemy(boss, includeIntangible)
       ) {
         continue;
       }

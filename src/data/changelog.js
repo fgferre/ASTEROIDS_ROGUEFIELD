@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    'A shield blast, a mine blast or the Reactive Brake no longer nudges a phased Shade when nothing else is in range (it already ignored it when another enemy was near); the Shade is invisible then and steers itself again the next frame, so nobody sees it.', // not confirmed
+  ],
 };
 
 export const RELEASES = [
