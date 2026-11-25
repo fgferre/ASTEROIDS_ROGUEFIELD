@@ -162,6 +162,7 @@ export default {
     icon: '🎆',
     themeColor: colors.burst,
     unlockLevel: 3,
+    unlock: { by: 'start', at: 25 },
     tags: ['weapon', 'weaponry'],
     text: {
       name: 'Scatter Coil',

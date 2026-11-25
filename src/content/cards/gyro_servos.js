@@ -11,6 +11,7 @@ export default {
   icon: '🔄',
   themeColor: PALETTE.boss,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 18 },
   tags: ['dash', 'fire-rate'],
   text: {
     name: 'Gyro Servos',

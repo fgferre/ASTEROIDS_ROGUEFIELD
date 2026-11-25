@@ -14,6 +14,7 @@ export default {
   icon: '🔋',
   themeColor: PALETTE.status,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 11 },
   tags: ['chain', 'crowd'],
   text: {
     name: 'Capacitor Bank',

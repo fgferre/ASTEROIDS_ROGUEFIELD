@@ -36,6 +36,7 @@ export const NEXT = {
     'A shot now reuses the trail list of the bullet it recycles instead of making a new one, so nobody notices: measured at well under a tenth of a millisecond a frame.', // not confirmed
     'A few pieces of dead or duplicated code were removed (an empty boss hook, a repeated crack clean-up, a missing source-map line, two unused settings fallbacks); nothing changes for the player.', // not confirmed
     "The lists of bosses and Heralds (and their Codex pages) are now built from each boss's own file instead of being typed out again in several places, so adding a boss touches fewer files; every boss, its order and its words are exactly as before, so nothing changes in play.", // not confirmed
+    "Each card now says in its own file how it is unlocked (from the start, on the piloting track, by a Hangar licence with its price, or by a medal), and the Hangar's lists are built from those files, so a new card can no longer be left out of every list by mistake; the lists, their order and the prices are the same as before, so nobody notices.", // not confirmed
   ],
 };
 

@@ -160,6 +160,7 @@ export default {
     icon: '🚀',
     themeColor: PALETTE.xp,
     unlockLevel: 3,
+    unlock: { by: 'license', at: 4, cost: 325 },
     tags: ['weapon', 'weaponry'],
     text: {
       name: 'Seeker Swarm',

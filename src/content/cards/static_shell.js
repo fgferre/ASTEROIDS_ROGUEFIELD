@@ -10,6 +10,7 @@ export default {
   icon: '⚡',
   themeColor: PALETTE.status,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 10 },
   tags: ['retaliation', 'hull'],
   text: {
     name: 'Static Shell',

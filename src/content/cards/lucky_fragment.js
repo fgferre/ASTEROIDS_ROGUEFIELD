@@ -10,6 +10,7 @@ export default {
   icon: '🍀',
   themeColor: PALETTE.xp,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'apex-predator' },
   tags: ['pickups', 'collection'],
   text: {
     name: 'Lucky Fragment',

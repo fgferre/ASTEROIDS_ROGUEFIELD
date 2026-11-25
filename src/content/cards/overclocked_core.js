@@ -11,6 +11,7 @@ export default {
   icon: '⏱️',
   themeColor: PALETTE.boss,
   unlockLevel: 4,
+  unlock: { by: 'license', at: 10, cost: 250 },
   tags: ['fire-rate', 'cursed'],
   text: {
     name: 'Overclocked Core',

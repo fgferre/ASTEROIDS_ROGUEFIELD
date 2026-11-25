@@ -10,6 +10,7 @@ export default {
   icon: '🔗',
   themeColor: PALETTE.status,
   unlockLevel: 3,
+  unlock: { by: 'license', at: 5, cost: 250 },
   tags: ['chain', 'weaponry'],
   text: {
     name: 'Chain Capacitor',
