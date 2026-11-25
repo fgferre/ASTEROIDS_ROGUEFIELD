@@ -32,15 +32,60 @@ export function getReplayUrl() {
 /** A replay link that never answers must not hold the game at "Loading the game". */
 export const REPLAY_FETCH_TIMEOUT_MS = 10000;
 
+/** A recording is a few hundred KB at most; a body past this is refused. */
+export const REPLAY_MAX_BYTES = 5 * 1024 * 1024;
+
+// Same-origin or https only: a link may not make the page read a local or
+// plain-http address, nor a data/blob/file URL.
+function resolveReplayUrl(url) {
+  const target = new URL(url, window.location.href);
+  if (
+    target.origin !== window.location.origin &&
+    target.protocol !== 'https:'
+  ) {
+    throw new Error(`[replay] ${target.protocol} links are not allowed`);
+  }
+  return target.href;
+}
+
+async function readCapped(response) {
+  const declared = Number(response.headers?.get('content-length'));
+  if (declared > REPLAY_MAX_BYTES) {
+    throw new Error('[replay] Recording is too large');
+  }
+  if (!response.body) {
+    const text = await response.text();
+    if (text.length > REPLAY_MAX_BYTES) {
+      throw new Error('[replay] Recording is too large');
+    }
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    received += value.byteLength;
+    if (received > REPLAY_MAX_BYTES) {
+      await reader.cancel();
+      throw new Error('[replay] Recording is too large');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
 export async function fetchRecording(url) {
+  const href = resolveReplayUrl(url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REPLAY_FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(href, { signal: controller.signal });
     if (!response.ok) {
-      throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+      throw new Error(`[replay] ${href}: HTTP ${response.status}`);
     }
-    return deserialize(await response.text());
+    return deserialize(await readCapped(response));
   } finally {
     clearTimeout(timer);
   }
