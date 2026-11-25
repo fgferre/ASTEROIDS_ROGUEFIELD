@@ -178,14 +178,10 @@ class SettingsSystem {
       return;
     }
     const controls = this.values.controls;
-    const heldByOthers = (action, device) =>
-      Object.entries(controls)
-        .filter(([key]) => key !== action && !MENU_ACTIONS.includes(key))
-        .flatMap(([, value]) => value?.[device] ?? []);
     if (!storedControls.strafeHold) {
       const shield = controls.activateShield;
       const lt = this.findField('controls', 'activateShield').default.gamepad;
-      const othersOnPad = heldByOthers('activateShield', 'gamepad');
+      const othersOnPad = this.heldByOthers('activateShield', 'gamepad');
       if (
         JSON.stringify(shield.gamepad) === JSON.stringify(PRE_STRAFE_SHIELD) &&
         !lt.some((button) => othersOnPad.includes(button))
@@ -196,9 +192,40 @@ class SettingsSystem {
     STRAFE_ACTIONS.forEach((action) => {
       ['keyboard', 'gamepad'].forEach((device) => {
         if (storedControls[action]?.[device]?.length) return;
-        const taken = heldByOthers(action, device);
-        controls[action][device] = controls[action][device].filter(
-          (input) => !taken.includes(input)
+        const taken = this.heldByOthers(action, device);
+        controls[action][device] = this.findField('controls', action).default[
+          device
+        ].filter((input) => !taken.includes(input));
+      });
+    });
+  }
+
+  // The actions that may not share a key or button with this one: in flight
+  // no key does two things, while a menu action (confirm, read only off the
+  // run) shares freely (Space confirms in the menus and holds the strafe).
+  rivalsOf(action) {
+    if (MENU_ACTIONS.includes(action)) return [];
+    return Object.keys(this.values.controls).filter(
+      (key) => key !== action && !MENU_ACTIONS.includes(key)
+    );
+  }
+
+  heldByOthers(action, device) {
+    return this.rivalsOf(action).flatMap(
+      (key) => this.values.controls[key]?.[device] ?? []
+    );
+  }
+
+  // A key or button given to an action leaves its rivals (the owner, 24/11:
+  // the one that had it loses it, no dialog, no swap), even if one is left
+  // with none.
+  releaseFromRivals(action, binding) {
+    this.rivalsOf(action).forEach((key) => {
+      const rival = this.values.controls[key];
+      ['keyboard', 'gamepad'].forEach((device) => {
+        if (!Array.isArray(rival?.[device])) return;
+        rival[device] = rival[device].filter(
+          (input) => !binding[device]?.includes(input)
         );
       });
     });
@@ -353,10 +380,6 @@ class SettingsSystem {
         cleaned.push(trimmed);
       });
 
-      if (cleaned.length === 0 && Array.isArray(defaultValue[device])) {
-        cleaned.push(...defaultValue[device]);
-      }
-
       normalized[device] = cleaned.slice(0, maxBindings);
     });
 
@@ -392,6 +415,9 @@ class SettingsSystem {
     }
 
     this.values[categoryId][key] = normalized;
+    if (field.type === 'binding') {
+      this.releaseFromRivals(key, normalized);
+    }
     if (!options.skipPersist) {
       this.persist();
     }
