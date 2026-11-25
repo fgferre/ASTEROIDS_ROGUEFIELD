@@ -218,6 +218,10 @@ function runDone(repo, { argv = [], env = {}, failAt, during } = {}) {
     env,
     run: (step) => {
       steps.push(step);
+      if (step === 'build') {
+        mkdirSync(join(repo, 'dist'), { recursive: true });
+        writeFileSync(join(repo, 'dist', 'index.html'), '');
+      }
       if (step === 'test') during?.();
       return step === failAt ? 2 : 0;
     },
@@ -251,6 +255,23 @@ describe('done: the run', () => {
     });
     const log = readFileSync(join(repo, '.git', 'done-log'), 'utf8');
     expect(log.trim().split('\n')).toHaveLength(3);
+  });
+
+  it('rebuilds on a stamp when dist/index.html is gone, and fails if that build fails', () => {
+    const repo = committedRepo();
+    runDone(repo);
+    rmSync(join(repo, 'dist'), { recursive: true });
+    expect(runDone(repo)).toMatchObject({
+      outcome: 'hit+rebuilt',
+      code: 0,
+      steps: ['lint', 'format', 'changelog', 'build'],
+    });
+    expect(existsSync(join(repo, 'dist', 'index.html'))).toBe(true);
+    rmSync(join(repo, 'dist'), { recursive: true });
+    expect(runDone(repo, { failAt: 'build' })).toMatchObject({
+      outcome: 'fail at build',
+      code: 2,
+    });
   });
 
   it('never stamps under GOLDEN_UPDATE, and runs everything despite a stamp', () => {
