@@ -27,10 +27,7 @@ import {
   getReplayUrl,
   showReplayNotice,
 } from './bootstrap/replaySession.js';
-import {
-  DEFAULT_POOL_CONFIG,
-  DEFAULT_GC_OPTIONS,
-} from './bootstrap/serviceManifest.js';
+import { DEFAULT_POOL_CONFIG } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
 import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
@@ -52,8 +49,6 @@ const gameState = {
   randomSnapshot: null,
   randomScope: 'uninitialized',
 };
-
-let garbageCollectionManager = null;
 
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
@@ -231,7 +226,6 @@ function init(recording = null, touch = false) {
           { ...value },
         ])
       ),
-      garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS },
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
@@ -301,9 +295,6 @@ function init(recording = null, touch = false) {
         console.warn('[App] ⚠️ Missing required services:', missingServices);
       }
     }
-
-    garbageCollectionManager =
-      services['garbage-collector'] || garbageCollectionManager;
 
     let resolvedGameSession = null;
     if (diContainer && typeof diContainer.resolve === 'function') {
@@ -472,7 +463,6 @@ function gameLoop(currentTime) {
       // remaining steps must not depend on how frames were batched.
       for (let i = 0; i < steps && gameSessionService.isRunning(); i += 1) {
         GamePools.update(stepSeconds);
-        garbageCollectionManager.update(stepSeconds);
         // Effects own freeze frames and time dilation: they return the
         // simulation delta the game systems should actually advance by.
         const adjustedDelta = effects.update(stepSeconds);
