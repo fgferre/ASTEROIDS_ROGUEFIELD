@@ -84,7 +84,7 @@ function kit() {
   places.object.add(holder);
   const rock = new THREE.Mesh();
   const structures = { group: new THREE.Group() };
-  const player = { group: new THREE.Group() };
+  const player = { group: new THREE.Group(), standIn: new THREE.PointLight() };
   const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(-300, 800, 200);
   const fill = new THREE.HemisphereLight(0xffffff, 0x000000, 0.3);
@@ -247,6 +247,7 @@ describe("the ending's act 1", () => {
     // the ship stands before it, level and dark, the field's roots out
     expect(t.player.group.visible).toBe(true);
     expect(t.player.still).toHaveBeenCalledWith(1);
+    expect(t.player.standIn.visible).toBe(false);
     expect(rock.visible).toBe(false);
     expect(t.backdrop.ring.object.visible).toBe(true);
     expect(t.wardenLight.intensity).toBeGreaterThan(0);
@@ -268,6 +269,8 @@ describe("the ending's act 1", () => {
     expect(t.renderer.toneMappingExposure).toBe(1.3);
     expect(view.object.visible).toBe(false);
     expect(t.player.group.visible).toBe(false);
+    // its stand-in light keeps the count of lights the programs were built for
+    expect(t.player.standIn.visible).toBe(true);
 
     // a reset gives everything back, Sovereign's view to its pool
     ending.stop();

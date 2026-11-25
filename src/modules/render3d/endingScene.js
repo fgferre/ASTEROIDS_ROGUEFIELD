@@ -504,6 +504,9 @@ export class EndingScene {
     const ship = t.player.group;
     view.object.visible = !this.cut;
     t.wardenLight.intensity = this.cut ? 0 : BOSS_LIGHT;
+    // the ship's stand-in light while it is out of a cut: the lit programs
+    // are keyed on the count of lights shown (playerMirror.js standIn)
+    t.player.standIn.visible = this.cut;
     if (this.cut) ship.visible = false;
     else {
       mirror.sentinelViews.update(view, this.boss, time);
