@@ -68,14 +68,14 @@ export default class GameSessionService {
       togglePause: (payload) => this.handleTogglePauseEvent(payload),
       // The window lost focus mid-run (InputSystem released the keys): pause.
       inputFocusLost: () => {
-        if (this.isRunning() && !this.isRetryCountdownActive) {
+        if (this.isRunning() && !this.retry.isRetryCountdownActive) {
           this.togglePause({ source: 'focus-lost' });
         }
       },
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
-      bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
+      bossDefeated: (payload) => this.runEnd.handleBossDefeatedEvent(payload),
       // A sector run is not a deep run: it raises no layer record.
       waveStarted: (payload) =>
         this.sector ||
@@ -85,10 +85,10 @@ export default class GameSessionService {
             : { layer: payload?.wave }
         ),
       transmissionShown: () => {
-        this.transmissionOnAir = true;
+        this.runEnd.transmissionOnAir = true;
       },
       transmissionFinished: () => {
-        this.transmissionOnAir = false;
+        this.runEnd.transmissionOnAir = false;
         this.runEnd.openRunEndScreen?.();
       },
     };
@@ -122,7 +122,7 @@ export default class GameSessionService {
       setScreen: (screen) => this.setScreen(screen),
       emitScreenChanged: (screen, meta) => this.emitScreenChanged(screen, meta),
       getConfiguredHullId: () => this.getConfiguredHullId(),
-      findSafeSpawnPoint: () => this.findSafeSpawnPoint(),
+      findSafeSpawnPoint: () => this.retry.findSafeSpawnPoint(),
     });
     this.headStart = new HeadStart({
       eventBus: this.eventBus,
@@ -133,9 +133,10 @@ export default class GameSessionService {
       gameState: this.gameState,
       canvas: () => this.canvas,
       resolveServiceInstance: (name) => this.resolveServiceInstance(name),
-      hasDeathSnapshot: () => this.hasDeathSnapshot(),
+      hasDeathSnapshot: () => this.snapshots.hasDeathSnapshot(),
       getDeathSnapshot: () => this.snapshots.getDeathSnapshot(),
-      restoreFromSnapshot: (options) => this.restoreFromSnapshot(options),
+      restoreFromSnapshot: (options) =>
+        this.snapshots.restoreFromSnapshot(options),
       prepareRandomForScope: (scope, options) =>
         this.prepareRandomForScope(scope, options),
       clearPendingGameOverTransition: () =>
@@ -147,9 +148,9 @@ export default class GameSessionService {
     this.menuButtons = new MenuButtons({
       eventBus: this.eventBus,
       startNewRun: (options) => this.startNewRun(options),
-      requestRetry: (options) => this.requestRetry(options),
+      requestRetry: (options) => this.retry.requestRetry(options),
       exitToMenu: (payload) => this.exitToMenu(payload),
-      continueBeyondVictory: () => this.continueBeyondVictory(),
+      continueBeyondVictory: () => this.runEnd.continueBeyondVictory(),
       linkIn: (options, start, button) =>
         playRemoteLink({
           lines: remoteLinkLines(options, this.resolveHullDefinition()?.name),
@@ -573,11 +574,11 @@ export default class GameSessionService {
 
     this.retry.clearRetryCountdownTimers();
     this.runEnd.clearPendingGameOverTransition();
-    this.transmissionOnAir = false;
-    this.isRetryCountdownActive = false;
+    this.runEnd.transmissionOnAir = false;
+    this.retry.isRetryCountdownActive = false;
     this.snapshots.clearDeathSnapshot();
     this.retry.hideRetryCountdown();
-    this.setRetryCount(1);
+    this.retry.setRetryCount(1);
     this.retry.setRetryButtonEnabled(true);
 
     // The reset below must not start the first layer (a progression reset
@@ -692,7 +693,7 @@ export default class GameSessionService {
       this.emitPauseState({ source: 'player-died' });
     }
 
-    if (!this.hasDeathSnapshot()) {
+    if (!this.snapshots.hasDeathSnapshot()) {
       this.snapshots.createDeathSnapshot();
     }
 
@@ -701,10 +702,10 @@ export default class GameSessionService {
       ...this.runEnd.recordRunReached(data),
     });
 
-    const retriesRemaining = this.getRetryCount();
+    const retriesRemaining = this.retry.getRetryCount();
     if (retriesRemaining <= 0) {
       if (retriesRemaining < 0) {
-        this.setRetryCount(0);
+        this.retry.setRetryCount(0);
       }
       this.retry.setRetryButtonEnabled(false);
     } else {
@@ -1053,10 +1054,10 @@ export default class GameSessionService {
   resetForMenu() {
     this.retry.clearRetryCountdownTimers();
     this.runEnd.clearPendingGameOverTransition();
-    this.transmissionOnAir = false;
-    this.isRetryCountdownActive = false;
+    this.runEnd.transmissionOnAir = false;
+    this.retry.isRetryCountdownActive = false;
     this.retry.hideRetryCountdown();
-    this.setRetryCount(0);
+    this.retry.setRetryCount(0);
     this.retry.setRetryButtonEnabled(false);
     this.snapshots.clearDeathSnapshot();
 
@@ -1065,8 +1066,9 @@ export default class GameSessionService {
     }
   }
 
-  // What moved to src/services/session/ keeps its name here for the callers
-  // outside the session (app, replay glue, game-state stub, tests).
+  // What moved to src/services/session/ and is still called from outside the
+  // session (app, replay glue, the UI) keeps its name here; the rest is
+  // reached through its part (this.retry, this.snapshots, this.runEnd).
 
   getSeedInfo() {
     return this.randomScopes.getSeedInfo();
@@ -1078,22 +1080,6 @@ export default class GameSessionService {
 
   prepareRandomForScope(scope, options) {
     return this.randomScopes.prepareRandomForScope(scope, options);
-  }
-
-  get deathSnapshot() {
-    return this.snapshots.deathSnapshot;
-  }
-
-  set deathSnapshot(value) {
-    this.snapshots.deathSnapshot = value;
-  }
-
-  hasDeathSnapshot() {
-    return this.snapshots.hasDeathSnapshot();
-  }
-
-  restoreFromSnapshot(options) {
-    return this.snapshots.restoreFromSnapshot(options);
   }
 
   get bossRush() {
@@ -1111,82 +1097,6 @@ export default class GameSessionService {
 
   set sector(value) {
     this.runEnd.sector = value;
-  }
-
-  get transmissionOnAir() {
-    return this.runEnd.transmissionOnAir;
-  }
-
-  set transmissionOnAir(value) {
-    this.runEnd.transmissionOnAir = value;
-  }
-
-  handleBossDefeatedEvent(payload) {
-    return this.runEnd.handleBossDefeatedEvent(payload);
-  }
-
-  continueBeyondVictory() {
-    return this.runEnd.continueBeyondVictory();
-  }
-
-  get isRetryCountdownActive() {
-    return this.retry.isRetryCountdownActive;
-  }
-
-  set isRetryCountdownActive(value) {
-    this.retry.isRetryCountdownActive = value;
-  }
-
-  get retryCountdownElement() {
-    return this.retry.retryCountdownElement;
-  }
-
-  set retryCountdownElement(element) {
-    this.retry.retryCountdownElement = element;
-  }
-
-  get retryButtonElement() {
-    return this.retry.retryButtonElement;
-  }
-
-  set retryButtonElement(element) {
-    this.retry.retryButtonElement = element;
-  }
-
-  get retryCountElement() {
-    return this.retry.retryCountElement;
-  }
-
-  set retryCountElement(element) {
-    this.retry.retryCountElement = element;
-  }
-
-  requestRetry(options) {
-    return this.retry.requestRetry(options);
-  }
-
-  beginRetryCountdown(options) {
-    return this.retry.beginRetryCountdown(options);
-  }
-
-  completeRetryRespawn() {
-    return this.retry.completeRetryRespawn();
-  }
-
-  getRetryCount() {
-    return this.retry.getRetryCount();
-  }
-
-  setRetryCount(value) {
-    return this.retry.setRetryCount(value);
-  }
-
-  findSafeSpawnPoint() {
-    return this.retry.findSafeSpawnPoint();
-  }
-
-  handleDocumentClick(event) {
-    return this.menuButtons.handleDocumentClick(event);
   }
 
   static deriveInitialSeed() {
