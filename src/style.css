@@ -3099,8 +3099,8 @@ kbd {
 }
 
 /* First slot of an action with no key on this device: amber, dashed (shape
-   cue besides colour), like the solid glow of is-listening. */
-.settings-binding-btn.is-unbound {
+   cue besides colour), until it listens (is-listening has its own look). */
+.settings-binding-btn.is-unbound:not(.is-listening) {
   border: 1px dashed var(--amber);
   color: var(--amber);
 }
