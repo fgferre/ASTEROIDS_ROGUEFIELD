@@ -83,8 +83,11 @@ describe('death snapshot of the field rewards', () => {
 
     vi.advanceTimersByTime(3000);
     expect(game.session.getScreen()).toBe('gameover');
-    game.session.retryCountElement = { textContent: '1', isConnected: true };
-    game.session.retryCountdownElement = {
+    game.session.retry.retryCountElement = {
+      textContent: '1',
+      isConnected: true,
+    };
+    game.session.retry.retryCountdownElement = {
       textContent: '',
       isConnected: true,
       classList: { add() {}, remove() {} },
