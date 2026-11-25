@@ -184,3 +184,78 @@ describe('replay recording', () => {
     );
   });
 });
+
+describe('deserialize rejects damaged recordings', () => {
+  const made = () => {
+    const recorder = createRecorder({
+      seed: 7,
+      hull: 'interceptor',
+      mode: 'daily',
+      date: '2026-11-24',
+      hangar: {
+        hullMultiplier: 1.05,
+        openCards: ['multishot'],
+        sealed: [],
+        holds: 0,
+        startingCard: null,
+      },
+    });
+    recorder.record(0, createInputFrame({ up: true, moveX: 0.5 }));
+    recorder.record(5, createInputFrame());
+    recorder.recordReroll(10);
+    recorder.recordBanish(10, 'multishot');
+    recorder.recordHold(10, 'shield');
+    recorder.recordUpgrade(10, 'shield');
+    recorder.recordStick(20, 'high');
+    return JSON.parse(serialize(recorder.toJSON()));
+  };
+
+  it('accepts what the recorder writes', () => {
+    const json = made();
+    expect(deserialize(JSON.stringify(json))).toEqual(json);
+  });
+
+  it.each([
+    ['stick: []', { stick: [] }],
+    ['stick not starting at 0', { stick: [[5, 'low']] }],
+    ['unknown stick value', { stick: [[0, 'ludicrous']] }],
+    ['upgrade entry null', { upgrades: [[0, null]] }],
+    ['upgrades a string', { upgrades: 'x' }],
+    ['banish without id', { upgrades: [[0, { type: 'banish' }]] }],
+    ['input null', { inputs: [null] }],
+    ['input mask not a number', { inputs: [[0, 'a']] }],
+    ['input with half an analog', { inputs: [[0, 1, 5]] }],
+    [
+      'inputs out of order',
+      {
+        inputs: [
+          [3, 0],
+          [1, 0],
+        ],
+      },
+    ],
+    ['negative steps', { steps: -1 }],
+    ['absurd steps', { steps: Number.MAX_SAFE_INTEGER }],
+    ['daily date a number', { date: 123 }],
+    ['daily date missing', { date: null }],
+    ['unknown mode', { mode: 'chaos' }],
+    ['seed an object', { seed: {} }],
+    ['sector a number', { sector: 3 }],
+    ['openCards a number', { hangar: { openCards: 5 } }],
+    ['openCards a string', { hangar: { openCards: 'abc' } }],
+    ['sealed an object', { hangar: { sealed: {} } }],
+    ['hangar field not a number', { hangar: { holds: 'many' } }],
+    ['hangar an array', { hangar: [] }],
+  ])('rejects %s', (_name, patch) => {
+    expect(() => deserialize({ ...made(), ...patch })).toThrow(/replay/);
+  });
+
+  it('allows a missing stick and upgrades, and any string date outside the Daily Field', () => {
+    const json = made();
+    delete json.stick;
+    delete json.upgrades;
+    const read = deserialize({ ...json, mode: 'normal', date: 'whenever' });
+    expect(read.stick).toEqual([[0, 'medium']]);
+    expect(read.upgrades).toEqual([]);
+  });
+});
