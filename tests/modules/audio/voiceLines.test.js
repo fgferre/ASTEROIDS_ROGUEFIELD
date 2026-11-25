@@ -23,6 +23,7 @@ import {
   deathTransmission,
   endingTransmissions,
   prologueTransmissions,
+  revelationTransmissions,
   hangarTransmission,
   heraldTransmission,
   holdMsFor,
@@ -82,6 +83,7 @@ function everyLine() {
     lines.push(...endingTransmissions(ending))
   );
   lines.push(...prologueTransmissions());
+  lines.push(...revelationTransmissions());
   lines.push(bossRushTransmission(), victoryTransmission());
   return lines.filter(Boolean);
 }

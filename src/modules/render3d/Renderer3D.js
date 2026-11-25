@@ -34,6 +34,7 @@ import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
+import { EndingScene, isRevelationBeat } from './endingScene.js';
 import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import {
   mirrorEffects,
@@ -529,6 +530,17 @@ class Renderer3D extends BaseSystem {
     return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
   }
 
+  /**
+   * Beat `id` of the campaign's ending (ui/runCinematics.js), `durationMs`
+   * long, `ending` the one picked in act 2: every beat of both acts drawn
+   * by endingScene.js. False when nothing would move, as playIntro.
+   */
+  playEndingBeat(id, durationMs, ending) {
+    const kind = isRevelationBeat(id) ? 'revelation' : 'ending';
+    const drawn = this.startCinematic(holdIntroStart, 1, true, kind);
+    return drawn && this.ending.start(id, durationMs, ending);
+  }
+
   startCinematic(path, durationMs, hold, kind) {
     if (this.failed || !this.camera.isEnabled() || this.reducedMotion) {
       return false;
@@ -713,6 +725,7 @@ class Renderer3D extends BaseSystem {
     this.three?.backdrop.setWake(0);
     this.travel?.stop();
     this.story?.stop();
+    this.ending?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -740,6 +753,7 @@ class Renderer3D extends BaseSystem {
     this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
+    this.ending = new EndingScene(this.three, this.eventBus, this.story);
     this.applyQuality();
   }
 
@@ -773,9 +787,14 @@ class Renderer3D extends BaseSystem {
       () => this.three.player.warm(this.cachedPlayer, compile),
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
+      // The ending's last image: its slip and twin Wake (seeded: three
+      // names programs with Math.random).
+      () => this.seeded(() => this.ending.warm(compile)),
       () => this.drawEverything(),
       // The story's freighter (seconds): every campaign launch tells it.
       () => this.warmStory(),
+      // The ending's beats at home, in the story's scene.
+      () => this.seeded(() => this.ending.warmHome(this.three.camera)),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();
@@ -886,6 +905,7 @@ class Renderer3D extends BaseSystem {
     const t = this.three;
     travel?.frame(t.camera, t.height);
     story?.frame(t.camera, time);
+    this.ending?.frame(t.camera);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -937,7 +957,7 @@ class Renderer3D extends BaseSystem {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
     } else {
-      this.trackShip(player);
+      this.trackShip(this.ending?.active ? null : player);
     }
     this.mirrorShield(player, time);
     // a breaking ship casts none: the depth pass draws it whole
@@ -982,10 +1002,10 @@ class Renderer3D extends BaseSystem {
       ? SCENE_FOV
       : travel
         ? SCENE_FOV + (FOV - SCENE_FOV) * travel.risen
-        : FOV;
+        : t.camera.fov;
     const pointScale = t.height / (2 * Math.tan((lens * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(travel ? travel.look : this.biome, fog);
+    t.biomes.update(travel?.look ?? this.ending?.look ?? this.biome, fog);
     const ship = t.player.group.visible && (travel?.focus || player?.position);
     const view = travel?.focus || this.camera;
     t.space.update(view.x, view.y, dt, {
@@ -1023,11 +1043,14 @@ class Renderer3D extends BaseSystem {
     );
 
     t.renderer.info.reset();
-    // The story draws its own scene in the field's place.
-    const drawn = story ? story.scene : t.scene;
+    // The story draws its own scene in the field's place (the ending's
+    // black, an empty one).
+    const drawn = story ? story.scene : this.ending?.scene ?? t.scene;
     t.composer.passes[0].scene = drawn;
+    this.ending?.pose(time);
     if (this.graphics.postProcessing) t.composer.render(dt);
     else t.renderer.render(drawn, t.camera);
+    this.ending?.showField();
     t.renderer.autoClear = false;
     t.renderer.render(t.overlay, t.camera);
     t.renderer.autoClear = true;

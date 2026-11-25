@@ -138,6 +138,22 @@ export function endingTransmissions(ending, holdMs) {
   return spokenInOrder(STORY.ending[ending].lines, `ending:${ending}`, holdMs);
 }
 
+/**
+ * The truth before the ending's choice, in order (core/cinematics.js
+ * REVELATION_BEATS): Sovereign's last words, the new lines (STORY.revelation)
+ * and, before the fourth, the Quarantine Grid's fence line under its own key
+ * (its recording plays again).
+ */
+export function revelationTransmissions() {
+  const told = spokenInOrder(STORY.revelation, 'revelation');
+  return [
+    wardenTransmission(0, 'defeated', 'sovereign'),
+    ...told.slice(0, 3),
+    stageTransmission('quarantine-grid', 3),
+    ...told.slice(3),
+  ];
+}
+
 /** The line a sector's `stage` (1-based) opens with, or null. */
 export function stageTransmission(sectorId, stage) {
   const line = STORY.stage[sectorId]?.[stage];

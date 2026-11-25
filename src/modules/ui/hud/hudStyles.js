@@ -114,7 +114,7 @@ export function getHudCss() {
             .letterbox::after { bottom: 0; transform: translateY(100%); }
             .letterbox.is-showing::before, .letterbox.is-showing::after { transform: translateY(0); }
             .hud-frame, [data-slot='hull-ring'], [data-slot='recharges'], .hud-direction { transition: opacity 0.6s; }
-            #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction { opacity: 0; }
+            #hud-layer.is-journey .hud-frame, #hud-layer.is-journey [data-slot='hull-ring'], #hud-layer.is-journey [data-slot='recharges'], #hud-layer.is-journey .hud-direction, #hud-layer.is-journey .next-wave-box { opacity: 0; }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 92vw; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }

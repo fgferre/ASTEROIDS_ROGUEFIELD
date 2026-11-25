@@ -607,6 +607,11 @@ export class EnemyMirror {
     this.pruneDead = (key) => {
       if (!this.views.has(key)) this.dead.delete(key);
     };
+    // Sovereign's fall (PLAN.md 24/11): its view kept whole while the
+    // ending holds it (keepFallen, render3d/endingScene.js), out of `views`
+    // and of the burns.
+    this.keepFallen = false;
+    this.husk = null;
 
     this.kit = createKit(THREE, scene, seeded, this.dissolve);
     this.rockViews = createRockViews(this.kit);
@@ -936,9 +941,10 @@ export class EnemyMirror {
   }
 
   // A machine breaks into its own pieces as it burns, and hull plates fly out;
-  // a rock falls apart into pieces of itself (rockBreak.js); a boss burns in
-  // place. The Warden's phase breaks have their own pieces: only its final
-  // death bursts, bigger, lit.
+  // a rock falls apart into pieces of itself (rockBreak.js); a boss breaks
+  // too, but Sovereign falls whole: the ending keeps it as it stands
+  // (keepFallen), and without one it burns in place. The Warden's phase
+  // breaks have their own pieces: only its final death bursts, bigger, lit.
   die(key, view) {
     this.views.delete(key);
     if (view.kind === 'asteroid') {
@@ -952,7 +958,10 @@ export class EnemyMirror {
     // an Elite's blades fly off with its pieces (Renderer3D's gold sparks)
     if (view.eliteRing) view.eliteRing.visible = false;
     const accent = this.kit.accentOf(view);
-    this.dissolve.start(view, accent, view.radius, this.breakOf(view));
+    if (view.kind !== 'boss-sovereign') {
+      this.dissolve.start(view, accent, view.radius, this.breakOf(view));
+    } else if (this.keepFallen) this.husk = view;
+    else this.dissolve.start(view, accent, view.radius, null);
     view.shotX = 0;
     view.shotY = 0;
     const x = view.object.position.x + HALF_W;
@@ -1061,7 +1070,16 @@ export class EnemyMirror {
     pool.push(view);
   }
 
+  /** The ending is over: Sovereign's kept view goes back to its pool. */
+  releaseHusk() {
+    if (!this.husk) return;
+    this.husk.object.visible = false;
+    this.pool(this.husk);
+    this.husk = null;
+  }
+
   clear() {
+    this.releaseHusk();
     this.views.forEach((view, key) => this.release(key, view));
     this.dissolve.clear();
     this.dead.clear();

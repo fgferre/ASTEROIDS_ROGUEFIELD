@@ -2,20 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   EPILOGUE_MS,
   INTRO_MS,
+  REVELATION_BEATS,
   STORY_MS,
   STORY_SHOT_MS,
-  endingPath,
-  epiloguePath,
+  endingBeats,
 } from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
+import { RunEndScreens } from '../../../src/modules/ui/RunEndScreens.js';
 import {
   RunCinematics,
+  beatTiming,
   travelDestination,
 } from '../../../src/modules/ui/runCinematics.js';
 import {
   endingTransmissions,
   prologueTransmissions,
+  revelationTransmissions,
   runVoiceLines,
   travelTransmissions,
 } from '../../../src/modules/ui/transmissions.js';
@@ -55,12 +58,14 @@ function setup({ plays = true } = {}) {
   const renderer = {
     playIntro: vi.fn(() => plays),
     playEpilogue: vi.fn(() => plays),
+    playEndingBeat: vi.fn(() => plays),
     playArrival: vi.fn(() => plays),
     playTravel: vi.fn(() => plays),
     endTravel: vi.fn(),
     endCinematic: vi.fn(),
   };
   const events = [];
+  const beatEvents = [];
   const held = [];
   let skipKey = null;
   let nextKey = null;
@@ -76,8 +81,10 @@ function setup({ plays = true } = {}) {
   ui.cinematics = new RunCinematics({
     // The cinematics' own events (each layer also readies its voices).
     eventBus: {
-      emit: (name, payload) =>
-        name.startsWith('cinematic') && events.push([name, payload.kind]),
+      emit: (name, payload) => {
+        if (name.startsWith('cinematic')) events.push([name, payload.kind]);
+        if (name === 'ending-beat') beatEvents.push(payload);
+      },
     },
     renderer: () => renderer,
     hud: () => hud,
@@ -109,6 +116,7 @@ function setup({ plays = true } = {}) {
     renderer,
     banners,
     events,
+    beatEvents,
     held,
     startRun,
     spoken,
@@ -186,53 +194,264 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
   });
 
-  it("plays an ending's two lines while the Ring's wake eases to its own, then the final card", () => {
-    const { ui, renderer, spoken } = setup();
-    renderer.startCinematic = vi.fn();
-    const onEnd = vi.fn();
-    ui.cinematics.playEnding('severance', onEnd);
+  it("tells act 1's truth beat by beat, Sovereign's last words first, and the choice opens only after the last", () => {
+    const { ui, hud, renderer, spoken, hush, events } = setup();
+    const bars = hud.els.letterbox.classList;
+    ui.cinematics.startRevelation();
+    expect(bars.contains('is-showing')).toBe(true);
+    expect(hush).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([['cinematic-started', 'revelation']]);
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
 
+    const lines = revelationTransmissions();
+    const lengths = REVELATION_BEATS.map(
+      (beat) => beatTiming(beat, lines).durationMs
+    );
+    lengths.forEach((ms) => expect(ms).toBeGreaterThanOrEqual(5000));
+    vi.advanceTimersByTime(lengths.reduce((a, b) => a + b, 0) - 1);
+    expect(spoken.map(({ key }) => key)).toEqual([
+      'boss:sovereign:defeated',
+      'revelation:0',
+      'revelation:1',
+      'revelation:2',
+      'stage:quarantine-grid:3',
+      'revelation:3',
+      'revelation:4',
+    ]);
+    expect(renderer.playEndingBeat.mock.calls.map(([id]) => id)).toEqual(
+      REVELATION_BEATS.map(({ id }) => id)
+    );
+    expect(show).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toEqual(['cinematic-ended', 'revelation']);
+    expect(bars.contains('is-showing')).toBe(false);
+  });
+
+  it("a renderer that draws none of it still says every line of act 1 before the choice, on the beats' time", () => {
+    const { ui, hud, spoken } = setup({ plays: false });
+    ui.cinematics.startRevelation();
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
+    const lines = revelationTransmissions();
+    const total = REVELATION_BEATS.reduce(
+      (sum, beat) => sum + beatTiming(beat, lines).durationMs,
+      0
+    );
+    vi.advanceTimersByTime(total - 1);
+    expect(spoken).toHaveLength(REVELATION_BEATS.length);
+    expect(show).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it('in act 1 a tap drops the line on air for the next beat, a hold goes to the choice', () => {
+    const { ui, renderer, spoken, hush, skip, next } = setup();
+    ui.cinematics.startRevelation();
+    const show = vi.fn();
+    ui.cinematics.deferUntilEpilogueEnds(show);
+    next();
+    expect(hush).toHaveBeenCalledTimes(2);
+    expect(spoken.map(({ key }) => key)).toEqual([
+      'boss:sovereign:defeated',
+      'revelation:0',
+    ]);
+    expect(renderer.playEndingBeat.mock.lastCall[0]).toBe('count');
+    expect(show).not.toHaveBeenCalled();
+
+    skip();
+    expect(hush).toHaveBeenCalledTimes(3);
+    expect(show).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_000);
+    expect(spoken).toHaveLength(2);
+    // Skipped before the session opens its screen: it opens at once then.
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
+  });
+
+  it('act 1 skipped before the choice is due holds its last picture under the bars, then opens the choice the moment it is asked for', () => {
+    const { ui, hud, renderer, spoken, events, skip } = setup();
+    const bars = hud.els.letterbox.classList;
+    ui.cinematics.startRevelation();
+    skip();
+    expect(renderer.playEndingBeat.mock.lastCall).toEqual(['known', 1, null]);
+    expect(bars.contains('is-showing')).toBe(true);
+    expect(events).toEqual([['cinematic-started', 'revelation']]);
+    // the skip does nothing more, no beat or line follows
+    skip();
+    vi.advanceTimersByTime(60_000);
+    expect(spoken).toHaveLength(1);
+    expect(renderer.playEndingBeat).toHaveBeenCalledTimes(2);
+
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toEqual(['cinematic-ended', 'revelation']);
+    expect(bars.contains('is-showing')).toBe(false);
+  });
+
+  it('announces each drawn beat of an act with its id and ending, and none the renderer does not draw', () => {
+    const { ui, beatEvents } = setup();
+    ui.cinematics.startRevelation();
+    expect(beatEvents).toEqual([{ id: REVELATION_BEATS[0].id, ending: null }]);
+    ui.cinematics.playEnding('severance', vi.fn());
+    const ids = endingBeats('severance').map(({ id }) => id);
+    expect(beatEvents.at(-1)).toEqual({ id: ids[0], ending: 'severance' });
+
+    const undrawn = setup({ plays: false });
+    undrawn.ui.cinematics.startRevelation();
+    undrawn.ui.cinematics.playEnding('severance', vi.fn());
+    expect(undrawn.beatEvents).toEqual([]);
+  });
+
+  it('act 1 skipped early holds its last beat without announcing a beat', () => {
+    const { ui, beatEvents, skip } = setup();
+    ui.cinematics.startRevelation();
+    const before = beatEvents.length;
+    skip();
+    expect(beatEvents).toHaveLength(before);
+  });
+
+  it('a renderer that draws none of act 1 still opens the choice when asked after an early skip', () => {
+    const { ui, skip } = setup({ plays: false });
+    ui.cinematics.startRevelation();
+    skip();
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it("plays act 2's beats under the bars for the ending picked, its two lines as theirs start, then the credits", () => {
+    const { ui, hud, renderer, spoken } = setup();
+    const bars = hud.els.letterbox.classList;
+    const onEnd = vi.fn();
+    // it says the renderer draws it (the page's own dim stays off)
+    expect(ui.cinematics.playEnding('severance', onEnd)).toBe(true);
+    expect(bars.contains('is-showing')).toBe(true);
+    const beats = endingBeats('severance');
+    const lines = endingTransmissions('severance');
+    const total = beats.reduce(
+      (sum, beat) => sum + beatTiming(beat, lines).durationMs,
+      0
+    );
+    vi.advanceTimersByTime(total - 1);
     expect(spoken.map(({ key, speaker }) => [key, speaker])).toEqual([
       ['ending:severance:0', 'THE RING'],
       ['ending:severance:1', 'WAKE'],
     ]);
-    const [path, durationMs, hold] = renderer.startCinematic.mock.calls[0];
-    expect(hold).toBe(true);
-    expect(path(0).wake).toBe(1);
-    expect(path(1).wake).toBe(0);
-    expect(path(1).distance).toBe(epiloguePath(1).distance);
-    expect(endingPath('stewardship')(1).wake).toBeGreaterThan(1);
+    expect(renderer.playEndingBeat.mock.calls).toEqual(
+      beats.map((beat) => [
+        beat.id,
+        beatTiming(beat, lines).durationMs,
+        'severance',
+      ])
+    );
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(bars.contains('is-showing')).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    // the bars come off where the credits take over
+    expect(bars.contains('is-showing')).toBe(false);
+    expect(endingBeats('stewardship').map(({ id }) => id)).toContain('watch');
+  });
 
-    vi.advanceTimersByTime(durationMs - 1);
+  it('a renderer that draws none of act 2 says so', () => {
+    const { ui, hud } = setup({ plays: false });
+    expect(ui.cinematics.playEnding('severance', vi.fn())).toBe(false);
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
+  });
+
+  it('a renderer that draws none of act 2 says its two lines and goes to the credits, with no wait on the beats that have no line', () => {
+    const { ui, spoken } = setup({ plays: false });
+    const onEnd = vi.fn();
+    ui.cinematics.playEnding('severance', onEnd);
+    const lines = endingTransmissions('severance');
+    const spokenBeats = endingBeats('severance').filter(
+      (beat) => beatTiming(beat, lines).entry
+    );
+    const total = spokenBeats.reduce(
+      (sum, beat) => sum + beatTiming(beat, lines).durationMs,
+      0
+    );
+    vi.advanceTimersByTime(total - 1);
+    expect(spoken.map(({ key }) => key)).toEqual([
+      'ending:severance:0',
+      'ending:severance:1',
+    ]);
     expect(onEnd).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  it("a skip drops the ending's lines and shows the final card once; a tap drops a line, the last one ends it", () => {
-    const { ui, hush, skip, next, nextLine } = setup();
+  it("in act 2 a hold goes to the credits once, a tap to the next beat; the last beat's tap ends it", () => {
+    const { ui, renderer, hush, skip, next } = setup();
     const onEnd = vi.fn();
     ui.cinematics.playEnding('stewardship', onEnd);
     skip();
     expect(hush).toHaveBeenCalledTimes(1);
     expect(onEnd).toHaveBeenCalledTimes(1);
     skip();
-    vi.advanceTimersByTime(60_000);
+    vi.advanceTimersByTime(120_000);
     expect(onEnd).toHaveBeenCalledTimes(1);
 
     // A new run's stop drops it unseen.
     ui.cinematics.playEnding('stewardship', onEnd);
     ui.cinematics.stop();
-    vi.advanceTimersByTime(60_000);
+    vi.advanceTimersByTime(120_000);
     expect(onEnd).toHaveBeenCalledTimes(1);
 
+    renderer.playEndingBeat.mockClear();
     ui.cinematics.playEnding('stewardship', onEnd);
-    nextLine.mockReturnValueOnce(true);
-    next();
+    const ids = endingBeats('stewardship').map(({ id }) => id);
+    ids.slice(1).forEach(() => next());
+    expect(renderer.playEndingBeat.mock.calls.map(([id]) => id)).toEqual(ids);
     expect(onEnd).toHaveBeenCalledTimes(1);
     next();
-    expect(nextLine).toHaveBeenCalledTimes(2);
     expect(onEnd).toHaveBeenCalledTimes(2);
+  });
+
+  it("the win that opens the choice plays act 1 in the epilogue's place and says Sovereign's words once; any other win, or a replay of it, keeps the epilogue", () => {
+    const handlers = new Map();
+    const cinematics = {
+      startRevelation: vi.fn(),
+      startEpilogue: vi.fn(),
+    };
+    const runEndScreens = Object.setPrototypeOf(
+      { replay: false },
+      RunEndScreens.prototype
+    );
+    const queueTransmission = vi.fn();
+    UISystem.prototype.setupEventListeners.call(
+      Object.setPrototypeOf(
+        {
+          cinematics,
+          runEndScreens,
+          queueTransmission,
+          chestCeremony: { clear: () => {} },
+          registerEventListener: (name, fn) => handlers.set(name, fn),
+        },
+        UISystem.prototype
+      )
+    );
+    const won = handlers.get('run-won');
+
+    won({ wave: 20, sector: 'the-crucible' });
+    expect(cinematics.startRevelation).toHaveBeenCalledTimes(1);
+    expect(cinematics.startEpilogue).not.toHaveBeenCalled();
+    expect(queueTransmission).not.toHaveBeenCalled();
+
+    won({ wave: 18, sector: 'wardens-reach' });
+    expect(cinematics.startEpilogue).toHaveBeenCalledTimes(1);
+    expect(queueTransmission).toHaveBeenCalledTimes(1);
+
+    runEndScreens.replay = true;
+    won({ wave: 20, sector: 'the-crucible' });
+    expect(cinematics.startRevelation).toHaveBeenCalledTimes(1);
+    expect(cinematics.startEpilogue).toHaveBeenCalledTimes(2);
+    expect(queueTransmission.mock.lastCall[0].key).toBe(
+      'boss:sovereign:defeated'
+    );
   });
 
   it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {
@@ -519,14 +738,14 @@ describe('RunCinematics', () => {
     body.append = () => {};
     vi.stubGlobal('document', { body, createElement: () => hint });
     vi.stubGlobal('performance', { now: () => Date.now() });
-    const nextLine = vi.fn(() => true);
+    // A tap drops the line on air for the next beat; a hold, the act.
+    const hush = vi.fn();
     const cinematics = new RunCinematics({
       eventBus: { emit: () => {} },
       renderer: () => null,
       hud: () => null,
       holdSim: () => {},
-      hush: () => {},
-      nextLine,
+      hush,
     });
     const onEnd = vi.fn();
     const dispatch = (type, target = () => {}) => {
@@ -546,12 +765,13 @@ describe('RunCinematics', () => {
     dispatch('keydown');
     dispatch('keyup', () => cinematics.playEnding('severance', onEnd));
     vi.advanceTimersByTime(100);
-    expect(nextLine).not.toHaveBeenCalled();
+    expect(hush).not.toHaveBeenCalled();
 
     dispatch('keydown');
     vi.advanceTimersByTime(1600);
     expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(hush).toHaveBeenCalledTimes(1);
     dispatch('keyup');
-    expect(nextLine).not.toHaveBeenCalled();
+    expect(hush).toHaveBeenCalledTimes(1);
   });
 });

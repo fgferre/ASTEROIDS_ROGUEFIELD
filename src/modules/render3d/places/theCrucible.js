@@ -5,12 +5,16 @@
 // depths — some stretches whole, some bare frames and gaps — turning
 // slowly about it. Their running lights follow the Ring's wake (lit while
 // it wakes, dim when it does not), and the set answers the campaign's
-// ending (core/cinematics.js endingPath): past a full wake (Stewardship)
-// the bare stretches are plated over in light; a wake that falls back
-// from full (Severance) puts the lights out, stops the arcs and dims the
-// star, until the set has been out of view.
+// ending (render3d/endingScene.js): past a full wake (Stewardship) the bare
+// stretches are plated over in light; a wake that falls back from full
+// (Severance) puts the lights out, stops the arcs and dims the star, until
+// the set has been out of view — or at once, whatever came before, while
+// the ending holds the set (`ending(true)`). The last image's slip
+// (crucibleSlip.js) is built on one arc on the loading screen (`slip()`,
+// endingTwin.js warm).
 
 import { bakeStarMap } from '../bakedMaps.js';
+import { buildSlip } from './crucibleSlip.js';
 import { lightPoint, under } from './pieces.js';
 
 // proposta 12/11: the arcs (radius, height over the star, tilt, the stretch built and the
@@ -72,12 +76,16 @@ const STAR = {
 };
 const LIGHTS = { low: 0.4, high: 1.4 };
 // proposta 12/11: the wake past 1 that plates every bare stretch (the
-// Stewardship's own), the new plates' glow, the star's level once severed
-// and the seconds out of view after which a severed set is whole again.
+// Stewardship's own), the new plates' glow (proposta 24/11: brighter, so
+// the answer reads in the ending's wide view), the star's level once
+// severed and the seconds out of view after which a severed set is whole
+// again.
 const PLATED_AT = 1.25;
-const PLATING = 0.9;
+const PLATING = 1.6;
 const SEVERED_STAR = 0.45;
 const FORGET = 1;
+// The arc the last image's slip is built on (crucibleSlip.js).
+const SLIP_ARC = 1;
 
 const STAR_VERTEX = `
 varying vec2 vAt;
@@ -251,11 +259,27 @@ export function buildTheCrucible(THREE, kit) {
   let severed = 0;
   let last = 0;
   const turned = [0, 0];
+  let held = false;
+  let slip = null;
   return {
     layers: [{ object, anchor: under(3600, 250, 250), follow: 0.9 }],
+    /** Whether the ending holds the set: a wake under full severs it. */
+    ending(on) {
+      held = on;
+    },
+    /** The last image's slip, built on its arc on the first call. */
+    slip() {
+      if (!slip) {
+        const spec = ARCS[SLIP_ARC];
+        slip = buildSlip(THREE, kit, spec);
+        groups[spec.group].add(slip.object);
+      }
+      return slip;
+    },
     update(time, wake) {
       const dt = Math.max(0, time - last);
-      if (dt > FORGET) {
+      if (held) woke = true;
+      else if (dt > FORGET) {
         woke = false;
         severed = 0;
       }

@@ -215,8 +215,13 @@ describe('Run end screens', () => {
       show: true,
     });
 
+    // The same test tells act 1 of the ending before it (UISystem 'run-won').
+    expect(screens.opensChoice('the-crucible')).toBe(true);
+    expect(screens.opensChoice('wardens-reach')).toBe(false);
+
     const replay = victoryScreen();
     replay.screens.noteRunStart({ replay: true });
+    expect(replay.screens.opensChoice('the-crucible')).toBe(false);
     replay.win(CRUCIBLE);
     expect(replay.screens.choice).toBe(null);
     expect(replay.victory.body.innerHTML).toContain('The end');
@@ -254,6 +259,31 @@ describe('Run end screens', () => {
     expect(victory.menuBtn.classList.contains('hidden')).toBe(false);
     expect(victory.restartBtn.classList.contains('hidden')).toBe(true);
     expect(victory.nextBtn.classList.contains('hidden')).toBe(true);
+  });
+
+  it('dims the field for Severance only where the scene draws no pictures of it', () => {
+    const field = () => {
+      const names = new Set();
+      return {
+        classList: {
+          add: (name) => names.add(name),
+          toggle: (name, on) => (on ? names.add(name) : names.delete(name)),
+          contains: (name) => names.has(name),
+        },
+      };
+    };
+    const pick = (ending, drawn) => {
+      const { victory, win, screens, cinematics } = victoryScreen();
+      victory.field = field();
+      cinematics.playEnding.mockReturnValue(drawn);
+      win(CRUCIBLE);
+      screens.chooseEnding(ending);
+      return victory.field.classList;
+    };
+    expect(pick('severance', true).contains('is-severed')).toBe(false);
+    expect(pick('severance', false).contains('is-severed')).toBe(true);
+    expect(pick('stewardship', false).contains('is-severed')).toBe(false);
+    expect(pick('severance', true).contains('is-ending')).toBe(true);
   });
 
   it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {

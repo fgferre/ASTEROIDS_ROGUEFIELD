@@ -21,8 +21,12 @@
 // its number and date (its `unseen` kept there), and NEXT is left empty.
 
 export const NEXT = {
-  new: [],
-  improved: [],
+  new: [
+    "The campaign's ending now tells you the truth of the Ring before you choose: when Sovereign falls, the Ring and the Wake say what it kept and who it was keeping, one scene at a time; after the choice your ending plays scene by scene before the credits. Hold to skip to the choice or to the credits; a tap goes to the next scene.", // not confirmed
+  ],
+  improved: [
+    'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
+  ],
   fixed: [
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
     'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
@@ -34,6 +38,7 @@ export const NEXT = {
     "The Herald of Silence's shards all turn after the ship at the same rate; now and then one turned twice as sharply and was harder to dodge.", // not confirmed
   ],
   unseen: [
+    "The ending's last image is built on the loading screen (about one second more of loading), so nothing stalls when the choice opens or at any cut.",
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
     "A reused sound node now drops the fade left over from the sound that used it before, and two pools that could never hold anything are gone; nobody notices because no audible case was found, it only removes a way for a sound to start with the tail of the previous sound's fade.", // not confirmed

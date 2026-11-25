@@ -157,6 +157,16 @@ export const SAMPLE_CUES = deepFreeze({
     },
     bus: 'ambient',
   },
+  // The ending's beats (eventCues `ending-beat`, by the beat's id): only
+  // these three have a sound, one-shots of samples the game already has.
+  playEndingBeat: {
+    sample: {
+      opens: 'sovereign-protect',
+      return: 'hatch-open',
+      depart: 'travel-ignite',
+    },
+    bus: 'ambient',
+  },
   playStoryReactor: { sample: 'reactor-stutter', bus: 'ambient', loop: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
   playUISelect: { sample: 'ui-select', bus: 'ambient' },
