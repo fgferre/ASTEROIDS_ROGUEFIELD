@@ -362,6 +362,28 @@ describe('RunCinematics', () => {
     expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
   });
 
+  it('a renderer that draws none of act 2 says its two lines and goes to the credits, with no wait on the beats that have no line', () => {
+    const { ui, spoken } = setup({ plays: false });
+    const onEnd = vi.fn();
+    ui.cinematics.playEnding('severance', onEnd);
+    const lines = endingTransmissions('severance');
+    const spokenBeats = endingBeats('severance').filter(
+      (beat) => beatTiming(beat, lines).entry
+    );
+    const total = spokenBeats.reduce(
+      (sum, beat) => sum + beatTiming(beat, lines).durationMs,
+      0
+    );
+    vi.advanceTimersByTime(total - 1);
+    expect(spoken.map(({ key }) => key)).toEqual([
+      'ending:severance:0',
+      'ending:severance:1',
+    ]);
+    expect(onEnd).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
   it("in act 2 a hold goes to the credits once, a tap to the next beat; the last beat's tap ends it", () => {
     const { ui, renderer, hush, skip, next } = setup();
     const onEnd = vi.fn();

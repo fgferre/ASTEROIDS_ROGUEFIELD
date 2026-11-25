@@ -513,6 +513,9 @@ export class RunCinematics {
       durationMs,
       ending
     );
+    // Nothing to show (a renderer that draws no scene) and nothing to say:
+    // no wait on an empty beat.
+    if (!drawn && !entry) return this.playBeat(i + 1);
     // both acts' pictures play under the bars, the instruments away
     if (drawn) this.hud()?.showLetterbox(true, true);
     if (drawn) {
