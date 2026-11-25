@@ -298,8 +298,8 @@ export default class EffectsSystem extends BaseSystem {
       }
     });
 
-    this.registerEventListener('enemy-spawned', (payload = {}) =>
-      this.enemyEffects.onEnemySpawned(payload)
+    this.registerEventListener('machine-spawned', (payload = {}) =>
+      this.enemyEffects.onMachineSpawned(payload)
     );
 
     this.registerEventListener('mine-exploded', (payload = {}) =>

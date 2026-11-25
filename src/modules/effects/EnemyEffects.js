@@ -103,8 +103,8 @@ export class EnemyEffects {
       addScreenFlash,
     });
 
-    // Enemies whose blast already played; one leaving the pool again is
-    // forgotten in onEnemySpawned.
+    // Mines whose blast already played; one leaving the pool again is
+    // forgotten in onMachineSpawned ('machine-spawned' announces mines).
     this.processedMineExplosions = new WeakSet();
   }
 
@@ -127,7 +127,7 @@ export class EnemyEffects {
     }
   }
 
-  onEnemySpawned(payload = {}) {
+  onMachineSpawned(payload = {}) {
     if (payload?.enemy) {
       this.processedMineExplosions.delete(payload.enemy);
     }

@@ -23,7 +23,10 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
+    'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
+  ],
   unseen: [],
 };
 
