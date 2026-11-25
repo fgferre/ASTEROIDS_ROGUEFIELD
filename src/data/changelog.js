@@ -23,7 +23,9 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
+  fixed: [
+    'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set), so one key never does two things in flight.', // not confirmed
+  ],
   unseen: [],
 };
 
