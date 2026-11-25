@@ -109,7 +109,7 @@ export class GamePools {
         color: '#FFFF00',
         active: true,
         type: 'player',
-        trail: null,
+        trail: [],
       }),
 
       // Reset function
@@ -127,7 +127,7 @@ export class GamePools {
         bullet.color = '#FFFF00';
         bullet.active = true;
         bullet.type = 'player';
-        bullet.trail = null;
+        bullet.trail.length = 0;
       },
 
       config.initial,
