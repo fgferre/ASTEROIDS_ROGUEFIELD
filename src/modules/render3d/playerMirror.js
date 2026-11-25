@@ -65,6 +65,8 @@ import {
   lightRetros,
 } from './player/jets.js';
 
+// No jet lit (still).
+const STILL_JETS = Object.freeze({});
 // proposta 17/11 (efeito/impacto): the ship's death breaks it into SHIP_PIECES
 // of its own build, thrown as a machine of SHIP_BREAK_RADIUS would be.
 const SHIP_PIECES = 14;
@@ -358,6 +360,30 @@ export class PlayerMirror {
     // x: roll (positive lowers the starboard wing); z: the nose (positive up)
     this.group.rotation.x = tilt.roll;
     this.group.rotation.z = tilt.pitch;
+  }
+
+  /**
+   * A ship posed by a cinematic (the ending), after update(): level, its
+   * engines idle (no flame), no side jet, retro or brake flare, no muzzle
+   * flash, whatever the pilot holds; the simulation is untouched.
+   */
+  still(time) {
+    this.group.rotation.x = 0;
+    this.group.rotation.z = 0;
+    this.muzzleFrames = 0;
+    for (let i = 0; i < TURN_KEYS.length; i += 1) {
+      const jet = this.rcsJets[TURN_KEYS[i]];
+      jet.amount = 0;
+      jet.hold = 0;
+      jet.snap = 0;
+    }
+    lightNeedles(this, STILL_JETS, 0);
+    for (let i = 0; i < this.retros.length; i += 1) {
+      this.retros[i].mesh.visible = false;
+    }
+    this.flare = 0;
+    this.flareFan.visible = false;
+    lightEngines(this, 0, 0, time);
   }
 
   /** A shot left the nose: bump the ship light for a few frames. */

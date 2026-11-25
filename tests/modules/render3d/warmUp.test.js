@@ -116,6 +116,10 @@ describe('Renderer3D.warmUp', () => {
         expect(composer.render).not.toHaveBeenCalled();
         compile();
       }),
+      // its beats at home, in the story's scene, once the story is made
+      warmHome: vi.fn(() => {
+        expect(renderer.story.warm).toHaveBeenCalledTimes(1);
+      }),
     };
 
     const done = renderer.warmUp((value) => progress.push(value));
@@ -124,6 +128,7 @@ describe('Renderer3D.warmUp', () => {
     vi.useRealTimers();
     expect(renderer.story.warm).toHaveBeenCalledTimes(1);
     expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
 
     const kinds = create.mock.calls.map(([kind]) => kind);
     for (const kind of [...KNOWN_KINDS, 'boss-choir', 'boss-null']) {

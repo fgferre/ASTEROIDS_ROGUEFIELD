@@ -13,6 +13,10 @@ import {
 } from '../../../src/modules/render3d/endingScene.js';
 import { twinAt } from '../../../src/modules/render3d/endingTwin.js';
 import { RING } from '../../../src/modules/render3d/ring/ringShape.js';
+import {
+  STORY_FAR,
+  StoryScene,
+} from '../../../src/modules/render3d/storyScene.js';
 
 const THREE = {};
 new Function(
@@ -27,14 +31,24 @@ new Function(
 // Just enough of Renderer3D's kit: a real scene and enemy mirror, the
 // backdrop's Ring and place sets as plain parts (the Crucible's slip a
 // plain cradle frame, its lamps, pane and glow), the key and a fill light,
-// a bus.
+// a bus, and the opening's scene as built (its Wake a plain group, its own
+// borrow and giveBack).
 function kit() {
   const scene = new THREE.Scene();
   const enemies = new EnemyMirror(THREE, scene, (fn) => fn(), {
     spawn: () => {},
     flash: () => {},
   });
-  const ring = { object: new THREE.Group(), follow: RING.follow };
+  const ring = {
+    object: new THREE.Group(),
+    follow: RING.follow,
+    offset: new THREE.Vector3(),
+    uniforms: {
+      uWake: { value: 0 },
+      uIdle: { value: new THREE.Color(0.2, 0.3, 0.4) },
+    },
+    material: { opacity: 1, transparent: false },
+  };
   const holder = new THREE.Group();
   const slip = {
     object: new THREE.Group(),
@@ -87,16 +101,44 @@ function kit() {
     enemies,
     camera: new THREE.PerspectiveCamera(20, 16 / 9, 10, 20000),
     renderer: { toneMappingExposure: 1, compile: vi.fn() },
-    backdrop: { ring, places, structures, setWake: vi.fn() },
+    backdrop: {
+      ring,
+      places,
+      structures,
+      setWake: vi.fn(),
+      applyStructures: vi.fn(),
+    },
     space: {},
     key,
     debris: { meshes: [], plates: [] },
     wardenLight: new THREE.PointLight(),
     player,
   };
-  const ending = new EndingScene(t, bus);
+  player.lightEngines = vi.fn();
+  player.still = vi.fn();
+  const story = Object.create(StoryScene.prototype);
+  const engine = () =>
+    new THREE.Group().add(
+      new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial())
+    );
+  Object.assign(story, {
+    t,
+    scene: new THREE.Scene(),
+    build: vi.fn(),
+    origin: new THREE.Vector3(),
+    hangar: new THREE.Vector3(-260, -90, 0),
+    sky: { place: vi.fn() },
+    signal: { visible: true },
+    bay: { intensity: 0 },
+    wake: {
+      group: new THREE.Group(),
+      lights: { engines: [engine(), engine(), engine()] },
+    },
+    rig: { sun: { shadow: { needsUpdate: false } } },
+  });
+  const ending = new EndingScene(t, bus, story);
   ending.warm(() => {});
-  return { t, bus, rock, crucible, slip, fill, ending };
+  return { t, bus, rock, crucible, slip, fill, ending, story };
 }
 
 const sovereign = {
@@ -202,8 +244,9 @@ describe("the ending's act 1", () => {
     expect(view.object.visible).toBe(true);
     expect(ending.centre.toArray()).toEqual([120, 0, -60]);
     expect(ending.boss.plateTurn).toBe(sovereign.plateTurn);
-    // the ship stands before it, the field's roots are out of the frame
+    // the ship stands before it, level and dark, the field's roots out
     expect(t.player.group.visible).toBe(true);
+    expect(t.player.still).toHaveBeenCalledWith(1);
     expect(rock.visible).toBe(false);
     expect(t.backdrop.ring.object.visible).toBe(true);
     expect(t.wardenLight.intensity).toBeGreaterThan(0);
@@ -281,12 +324,79 @@ describe("the ending's act 1", () => {
     expect(t.backdrop.setWake).toHaveBeenLastCalledWith(1.25);
     expect(t.camera.fov).toBe(ENDING_SHOTS.answer.fov);
     expect(t.camera.position.y).toBeGreaterThan(known.y);
-    // a beat at home not drawn yet holds the answer's last picture
-    const answered = t.camera.position.clone();
-    ending.start('steady', 5000, 'stewardship');
-    ending.frame(t.camera);
-    expect(t.camera.position.distanceTo(answered)).toBeLessThan(1e-6);
     now.mockRestore();
+  });
+
+  it("goes home into the opening's scene, borrowing the Ring and the ship, and gives them back for the last image", () => {
+    const { t, crucible, ending, story } = kit();
+    const engines = story.wake.lights.engines;
+    const level = (i) => engines[i].children[0].material.color.r;
+    ending.start('answer', 6000, 'severance');
+    ending.frame(t.camera);
+    ending.start('home', 4000, 'severance');
+    ending.frame(t.camera);
+    ending.pose(1);
+    // the opening's scene in the field's place, its first shot's lens
+    expect(ending.scene).toBe(story.scene);
+    expect(t.backdrop.ring.object.parent).toBe(story.scene);
+    expect(t.player.group.parent).toBe(story.scene);
+    expect(t.camera.fov).toBe(36);
+    expect(t.camera.far).toBe(STORY_FAR);
+    expect(t.backdrop.ring.follow).toBe(0);
+    // in the run's own look, as its launch told the opening
+    expect(ending.look).toBeNull();
+    expect(story.signal.visible).toBe(false);
+    [0, 1, 2].forEach((i) => expect(level(i)).toBe(1));
+    // the horizon Ring lit; the Crucible's left as the answer left it
+    expect(t.backdrop.ring.uniforms.uWake.value).toBe(1);
+    expect(t.backdrop.setWake).toHaveBeenLastCalledWith(0);
+    expect(crucible.ending).toHaveBeenLastCalledWith(true);
+    expect(t.player.group.visible).toBe(false);
+
+    // depart: the Wake turned and under way, the Ring dark
+    ending.start('depart', 6000, 'severance');
+    ending.hold('depart', 6000, 1);
+    ending.frame(t.camera);
+    ending.pose(2);
+    expect(story.wake.group.rotation.y).toBeGreaterThan(0.5);
+    expect(story.wake.group.position.length()).toBeGreaterThan(0);
+    expect(t.backdrop.ring.uniforms.uWake.value).toBe(0);
+    expect(t.backdrop.ring.uniforms.uIdle.value.r).toBe(0);
+
+    // the last image: all of it back where it was
+    ending.start('twin', 7000, 'severance');
+    ending.frame(t.camera);
+    expect(ending.scene).toBe(null);
+    expect(t.backdrop.ring.object.parent).toBe(t.scene);
+    expect(t.player.group.parent).toBe(t.scene);
+    expect(t.backdrop.ring.offset.length()).toBe(0);
+    expect(t.backdrop.ring.object.scale.x).toBe(1);
+    expect(t.backdrop.ring.uniforms.uIdle.value.r).toBeCloseTo(0.2);
+    expect(t.backdrop.applyStructures).toHaveBeenCalled();
+    expect(t.camera.far).toBe(20000);
+    expect(story.wake.group.rotation.y).toBe(0);
+    expect(story.wake.group.position.length()).toBe(0);
+    expect(story.signal.visible).toBe(true);
+    ending.stop();
+    expect(t.backdrop.ring.object.parent).toBe(t.scene);
+  });
+
+  it('puts the opening back on a reset from any beat at home', () => {
+    const { t, ending, story } = kit();
+    ending.start('return', 6000, 'severance');
+    ending.hold('return', 6000, 0.9);
+    ending.frame(t.camera);
+    ending.pose(1);
+    expect(t.player.group.visible).toBe(true);
+    expect(story.bay.intensity).toBeGreaterThan(0);
+    ending.stop();
+    expect(ending.scene).toBe(null);
+    expect(t.player.group.parent).toBe(t.scene);
+    expect(t.backdrop.ring.object.parent).toBe(t.scene);
+    expect(t.backdrop.ring.follow).toBe(RING.follow);
+    expect(story.bay.intensity).toBe(0);
+    expect(t.camera.far).toBe(20000);
+    expect(t.camera.fov).toBe(20);
   });
 
   it('builds the last image on the loading screen, shown only while its programs compile', () => {

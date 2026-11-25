@@ -236,6 +236,75 @@ export const ENDING_SHOTS = Object.freeze({
   },
 });
 
+// Act 2 at home (render3d/endingHome.js), in the opening's scene
+// (render3d/storyScene.js: world units about the Wake, +x her bow, y up,
+// −z port), proposta 24/11 on the rough cut the owner approved. `home` and
+// `steady` play the opening's own shot `story` (its camera), every engine
+// steady. `return` is the opening's last two shots played backwards: its
+// launch over the first `cut` of the beat (the interceptor in from `from`
+// of the launch's path, nose on a point `nose` × the hangar's depth
+// inside, pitch held within `pitch` rad, its thrust `thrust[0]` to
+// `thrust[1]`), then its hangar shot as the interceptor goes in over
+// `enter` (shares of that shot); the hangar's light rises to `bay[0]` over
+// `lamp` and to `bay[1]` as it goes in. `depart`: the approved wide view,
+// the eye drifting `eye[0]` to `eye[1]` and the aim panning `aim[0]` to
+// `aim[1]` toward the dark Ring; the Wake turns to port `yaw` rad over
+// `turn`, slow off the mark and still turning at the end, and gets under
+// way, `travel` world units along her heading over `go` (gathering way),
+// her engines to `engines`. `watch`: the same view, still, the lens
+// closing `fov[0]` to `fov[1]`; the interceptor at `ship` (world) between
+// the eye and the Wake, nose to the horizon under the aim, engines idle at
+// `thrust`. The horizon Ring (`ring`: its wake and its idle lights ×): in
+// Severance lit at home, dying over `return` to `dying`, dark by `darkBy`
+// of `depart`; in Stewardship lit a little brighter throughout.
+export const HOME_SHOTS = Object.freeze({
+  home: { story: 'wake' },
+  steady: { story: 'reactors' },
+  return: {
+    cut: 0.45,
+    from: 0.85,
+    nose: 4,
+    pitch: 0.3,
+    thrust: [0.35, 0.12],
+    enter: [0.1, 0.8],
+    bay: [1.4, 2.2],
+    lamp: [0.2, 0.45],
+  },
+  depart: {
+    eye: [
+      [-5000, 1000, -1950],
+      [-4800, 980, -1880],
+    ],
+    aim: [
+      [30000, -2600, 9500],
+      [30000, -2600, 14500],
+    ],
+    fov: [38, 38],
+    yaw: 1.9,
+    turn: [0.12, 1],
+    travel: 2600,
+    go: [0.3, 1],
+    engines: 1.4,
+  },
+  watch: {
+    eye: [
+      [-5000, 900, -1950],
+      [-4960, 895, -1935],
+    ],
+    aim: [
+      [30000, -2600, 9500],
+      [30000, -2600, 9500],
+    ],
+    fov: [38, 35],
+    ship: [-4367, 795, -1804],
+    thrust: 0.15,
+  },
+  ring: {
+    severance: { wake: 1, idle: 1, dying: 0.45, darkBy: 0.5 },
+    stewardship: { wake: 1.25, idle: 1.6 },
+  },
+});
+
 // Act 2, after the choice: the answer, home, then each ending's own shots
 // and the last image (the rough cut the owner approved, 24/11).
 const ENDING_OPENING_BEATS = [

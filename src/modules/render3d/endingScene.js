@@ -17,8 +17,8 @@
 // theCrucible.js); `twin`, the last image (endingTwin.js), goes on from
 // it at the slip of an arc no other shot shows (places/crucibleSlip.js),
 // a Wake identical to ours, empty, one window lit. The black holds after the act (its end, or a skip) until the
-// scene resets (stop). The beats between, in the opening's scene, are not
-// drawn yet: they hold `answer`'s last picture.
+// scene resets (stop). The beats between are drawn at home, in the
+// opening's scene (endingHome.js).
 // Each beat sets its whole state from scratch, a function of its progress:
 // `?cinematic=ending&beat=<id>&t=&ending=` holds one (core/cinematics.js).
 // Nothing is allocated per frame.
@@ -37,6 +37,7 @@ import { IS_DEV } from '../../core/env.js';
 import { biomeForLayer } from '../../data/biomes.js';
 import { sectorById } from '../../data/sectors.js';
 import { HALF_H, HALF_W } from './batches.js';
+import { EndingHome, isHomeBeat } from './endingHome.js';
 import { LastImage } from './endingTwin.js';
 import { RING } from './ring/ringShape.js';
 
@@ -82,10 +83,11 @@ function lerp(a, b, k) {
 
 export class EndingScene {
   /**
-   * `t`: Renderer3D's WebGL kit. Act 1 ends (or is skipped) on
-   * 'cinematic-ended', act 2 starts on 'cinematic-started' (`eventBus`).
+   * `t`: Renderer3D's WebGL kit; `story`: the opening (storyScene.js),
+   * whose scene the beats at home borrow. Each beat comes through start();
+   * an act's end (or skip) arrives as 'cinematic-ended' (`eventBus`).
    */
-  constructor(t, eventBus) {
+  constructor(t, eventBus, story) {
     const { THREE } = t;
     this.t = t;
     this.mirror = t.enemies;
@@ -123,6 +125,7 @@ export class EndingScene {
     // whether the picture is black.
     this.ending = null;
     this.last = new LastImage(t);
+    this.home = new EndingHome(t, story);
     this.black = false;
     this.blank = new THREE.Scene();
     // Where Sovereign fell (world) and how, and the stand-in boss that
@@ -261,6 +264,11 @@ export class EndingScene {
     this.last.warm(compile);
   }
 
+  /** Loading screen, after the opening's: the beats at home drawn once. */
+  warmHome(camera) {
+    this.home.warm(camera);
+  }
+
   stop() {
     if (!this.active) return;
     const t = this.t;
@@ -274,6 +282,7 @@ export class EndingScene {
     this.mirror.releaseHusk();
     this.ending = null;
     this.black = false;
+    this.home.leave();
     this.last.show(false);
     t.backdrop.places.built.get(CRUCIBLE).ending(false);
     t.backdrop.places.setFlight(null);
@@ -282,9 +291,14 @@ export class EndingScene {
     this.setFov(this.baseFov);
   }
 
-  /** The scene drawn instead of the field's: an empty one while black. */
+  /**
+   * The scene drawn instead of the field's: an empty one while black, the
+   * opening's at home.
+   */
   get scene() {
-    return this.active && this.black ? this.blank : null;
+    if (!this.active) return null;
+    if (this.black) return this.blank;
+    return isHomeBeat(this.beat) ? this.home.scene : null;
   }
 
   get progress() {
@@ -304,6 +318,8 @@ export class EndingScene {
     const { beat, boss } = this;
     const t = this.t;
     const revelation = isRevelationBeat(beat);
+    const home = isHomeBeat(beat);
+    if (!home) this.home.leave();
     // Sovereign: as it fell, shut, then open; its orders turn to REBUILD's
     // once sealed (both orders would open only half the shells); it stays
     // open after
@@ -320,9 +336,13 @@ export class EndingScene {
     t.renderer.toneMappingExposure = this.exposure;
     let wake;
     if (beat === 'twin') wake = this.poseTwin(camera, u);
-    else if (!revelation) {
-      // answer; the beats at home hold its last picture until drawn
-      const k = easeInOut(beat === 'answer' ? u : 1);
+    else if (home) {
+      // the Crucible as the answer left it; the horizon Ring is home's;
+      // the look stays the run's, as its launch told the opening
+      this.home.frame(camera, beat, u, this.ending);
+      wake = ENDING_WAKE[this.ending] ?? 1;
+    } else if (!revelation) {
+      const k = easeInOut(u);
       this.poseRise(camera, k, ENDING_SHOTS.answer);
       wake = lerp(1, ENDING_WAKE[this.ending] ?? 1, k);
     } else if (this.cut) wake = this.poseCut(camera, SHOTS[beat], u);
@@ -471,6 +491,10 @@ export class EndingScene {
    */
   pose(time) {
     if (!this.active) return;
+    if (isHomeBeat(this.beat) && !this.black) {
+      this.home.pose(time);
+      return;
+    }
     const { mirror, t } = this;
     if (!mirror.husk) {
       mirror.husk = mirror.acquire('boss-sovereign');
@@ -488,6 +512,8 @@ export class EndingScene {
       const [x, , z] = SHOTS.ship;
       ship.position.set(this.centre.x + x, 0, this.centre.z + z);
       ship.rotation.y = -Math.atan2(-z, -x);
+      // level and dark whatever the pilot holds (the spoils still step)
+      t.player.still(time);
     }
     this.hideField();
     if (this.beat === 'twin' && !this.black) this.last.light(this.ending);

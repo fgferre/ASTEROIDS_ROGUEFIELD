@@ -112,7 +112,7 @@ const RIG = {
 // scale, where its centre stands, its tilt (radians about x, z).
 const RING_POSE = { scale: 20, at: [62000, -30000, 22000], tilt: [0, 1.3] };
 // The lens's far plane while it plays (the field's is 20000).
-const FAR = 160000;
+export const STORY_FAR = 160000;
 // The signal: a point in the Field ahead that pulses every `period` s.
 const SIGNAL = {
   at: [15000, 150, -1500],
@@ -121,7 +121,7 @@ const SIGNAL = {
   period: 1.4,
 };
 // The interceptor: where it drops to under the hangar, how far it flies.
-const LAUNCH = {
+export const LAUNCH = {
   inside: [-160, 0, 0],
   out: [2600, 80],
   dive: -420,
@@ -254,7 +254,8 @@ export class StoryScene {
     this.startedAt = performance.now() - ms;
   }
 
-  // The Ring and the player's ship stand in the story's scene meanwhile.
+  // The Ring and the player's ship stand in the story's scene meanwhile
+  // (the ending's beats at home borrow them too: endingHome.js).
   borrow() {
     const { t } = this;
     const ring = t.backdrop.ring;
@@ -273,17 +274,22 @@ export class StoryScene {
     this.active = false;
     if (this.cued) this.emit('story-moment', { id: 'end' });
     const { t } = this;
-    const ring = t.backdrop.ring;
-    ring.follow = this.ringWas.follow;
-    ring.offset.set(0, 0, 0);
-    ring.object.scale.setScalar(1);
-    this.ringWas.parent.add(ring.object);
-    this.shipWas.add(t.player.group);
+    this.giveBack();
     if (this.baseFov !== null) {
       t.camera.fov = this.baseFov;
       t.camera.far = this.baseFar;
       t.camera.updateProjectionMatrix();
     }
+  }
+
+  /** The Ring and the player's ship back where borrow() found them. */
+  giveBack() {
+    const ring = this.t.backdrop.ring;
+    ring.follow = this.ringWas.follow;
+    ring.offset.set(0, 0, 0);
+    ring.object.scale.setScalar(1);
+    this.ringWas.parent.add(ring.object);
+    this.shipWas.add(this.t.player.group);
   }
 
   get progress() {
@@ -325,7 +331,7 @@ export class StoryScene {
       this.baseFov = camera.fov;
       this.baseFar = camera.far;
       // The Ring stands far out: the lens sees past the field's far plane.
-      camera.far = FAR;
+      camera.far = STORY_FAR;
       camera.updateProjectionMatrix();
     }
     if (camera.fov !== shot.fov) {

@@ -116,6 +116,28 @@ describe('InputSystem gamepad', () => {
     expect(pauses).toEqual([true]);
   });
 
+  it("opens no Settings over the ending's acts, as before over the other cinematics", () => {
+    const opened = [];
+    eventBus.on('settings-menu-requested', () => opened.push(true));
+    const tapView = () => {
+      fake.set({ pressed: [PAD_BUTTON.VIEW] });
+      input.pollGamepad();
+      fake.set();
+      input.pollGamepad();
+    };
+    ['revelation', 'ending'].forEach((kind) => {
+      eventBus.emit('cinematic-started', { kind });
+      tapView();
+      eventBus.emit('cinematic-ended', { kind });
+    });
+    expect(opened).toEqual([]);
+    eventBus.emit('cinematic-started', { kind: 'story' });
+    tapView();
+    eventBus.emit('cinematic-ended', { kind: 'story' });
+    tapView();
+    expect(opened).toEqual([true, true]);
+  });
+
   it('ignores pad presses on the pause screen', () => {
     gameState.paused = true;
     input.pollGamepad();

@@ -439,8 +439,29 @@ export class RunCinematics {
     this.hud()?.cancelBanner();
     this.hush();
     this.startAct('revelation', REVELATION_BEATS, lines, null, () =>
-      this.endEpilogue()
+      this.endRevelation()
     );
+  }
+
+  /**
+   * Act 1 is over (or skipped): the choice opens if it is due; if the
+   * victory screen has not asked for it yet (the spoils still coming in),
+   * the act's last picture holds at its end under the bars, the skip
+   * unbound, and the choice opens the moment it is asked for
+   * (deferUntilEpilogueEnds).
+   */
+  endRevelation() {
+    if (this.afterEpilogue) {
+      this.endEpilogue();
+      return;
+    }
+    const { beats } = this.act;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.unbindSkip?.();
+    this.unbindSkip = null;
+    this.act = null;
+    this.renderer()?.playEndingBeat?.(beats[beats.length - 1].id, 1, null);
   }
 
   /**
@@ -537,6 +558,8 @@ export class RunCinematics {
       return false;
     }
     this.afterEpilogue = show;
+    // act 1 already over, holding its last picture: the choice opens now
+    if (this.kind === 'revelation' && !this.act) this.endEpilogue();
     return true;
   }
 

@@ -431,6 +431,31 @@ describe('PlayerMirror', () => {
     expect(level.map(Math.abs).every((a) => a < 1e-3)).toBe(true);
   });
 
+  it('holds a ship posed by a cinematic level and dark, whatever the pilot holds', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const lit = [
+      ...mirror.flames.flatMap(({ flame, core }) => [flame, core]),
+      ...mirror.puffs.map(({ puff }) => puff),
+      ...mirror.retros.map(({ mesh }) => mesh),
+      mirror.flareFan,
+    ];
+    player.enginesIdle = false;
+    Object.assign(player.lastThrusterState, { main: 1, turnR: 1, aux: 1 });
+    for (let i = 0; i < 60; i += 1) {
+      const time = i / 60;
+      mirror.update(player, ribbons, time);
+      mirror.flashMuzzle();
+      mirror.still(time);
+      expect(lit.filter((mesh) => mesh.visible)).toEqual([]);
+      expect(mirror.light.intensity).toBe(0);
+      expect(mirror.group.rotation.x).toBe(0);
+      expect(mirror.group.rotation.z).toBe(0);
+    }
+    // the pilot's own flame was lit under it
+    mirror.update(player, ribbons, 1);
+    expect(mirror.flames[0].flame.visible).toBe(true);
+  });
+
   it('springs the barrels back from a shot while the hull gives against it and returns, never jumping', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const rest = mirror.barrels.position.x;

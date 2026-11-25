@@ -753,7 +753,7 @@ class Renderer3D extends BaseSystem {
     this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
-    this.ending = new EndingScene(this.three, this.eventBus);
+    this.ending = new EndingScene(this.three, this.eventBus, this.story);
     this.applyQuality();
   }
 
@@ -793,6 +793,8 @@ class Renderer3D extends BaseSystem {
       () => this.drawEverything(),
       // The story's freighter (seconds): every campaign launch tells it.
       () => this.warmStory(),
+      // The ending's beats at home, in the story's scene.
+      () => this.seeded(() => this.ending.warmHome(this.three.camera)),
     ];
     for (let i = 0; i < steps.length; i += 1) {
       if (!this.failed) steps[i]();

@@ -266,6 +266,36 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
   });
 
+  it('act 1 skipped before the choice is due holds its last picture under the bars, then opens the choice the moment it is asked for', () => {
+    const { ui, hud, renderer, spoken, events, skip } = setup();
+    const bars = hud.els.letterbox.classList;
+    ui.cinematics.startRevelation();
+    skip();
+    expect(renderer.playEndingBeat.mock.lastCall).toEqual(['known', 1, null]);
+    expect(bars.contains('is-showing')).toBe(true);
+    expect(events).toEqual([['cinematic-started', 'revelation']]);
+    // the skip does nothing more, no beat or line follows
+    skip();
+    vi.advanceTimersByTime(60_000);
+    expect(spoken).toHaveLength(1);
+    expect(renderer.playEndingBeat).toHaveBeenCalledTimes(2);
+
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toEqual(['cinematic-ended', 'revelation']);
+    expect(bars.contains('is-showing')).toBe(false);
+  });
+
+  it('a renderer that draws none of act 1 still opens the choice when asked after an early skip', () => {
+    const { ui, skip } = setup({ plays: false });
+    ui.cinematics.startRevelation();
+    skip();
+    const show = vi.fn();
+    expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(true);
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
   it("plays act 2's beats under the bars for the ending picked, its two lines as theirs start, then the credits", () => {
     const { ui, hud, renderer, spoken } = setup();
     const bars = hud.els.letterbox.classList;

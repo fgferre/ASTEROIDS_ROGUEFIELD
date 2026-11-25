@@ -300,11 +300,9 @@ class InputSystem {
       });
 
       // A cinematic holds the run (ui/runCinematics.js): Start is its skip
-      // key there, never the pause (that would let the run go under it).
-      eventBus.on('cinematic-started', ({ kind } = {}) => {
-        this.cinematicHold = kind !== 'epilogue' && kind !== 'arrival';
-      });
-      eventBus.on('cinematic-ended', () => (this.cinematicHold = false));
+      // key, never the pause; the ending's acts (they play on) no Settings.
+      eventBus.on('cinematic-started', (e) => (this.cinematic = e?.kind));
+      eventBus.on('cinematic-ended', () => (this.cinematic = null));
 
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
@@ -665,9 +663,11 @@ class InputSystem {
 
     switch (action) {
       case 'pause':
-        if (!this.cinematicHold) eventBus?.emit?.('toggle-pause');
+        if (!this.cinematic || ['epilogue', 'arrival'].includes(this.cinematic))
+          eventBus?.emit?.('toggle-pause');
         break;
       case 'openSettings':
+        if (['revelation', 'ending'].includes(this.cinematic)) break;
         eventBus?.emit?.('settings-menu-requested', {
           source: context.device || source || 'input',
         });
