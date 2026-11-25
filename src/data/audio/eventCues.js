@@ -266,6 +266,32 @@ export const AUDIO_EVENT_CUES = Object.freeze([
   { on: 'remote-link-opened', cue: 'playRemoteLink' },
   { on: 'game-started', run: 'sectorScoreStart' },
   { on: 'run-won', run: 'runWon' },
+  // The ending's act 1 (ui/runCinematics.js): the choice's music from its
+  // start; and each drawn beat's sample, the rest silent.
+  { on: 'cinematic-started', run: 'endingScore', when: { kind: 'revelation' } },
+  {
+    on: 'cinematic-ended',
+    run: 'endingScoreOver',
+    when: { kind: 'revelation' },
+  },
+  {
+    on: 'ending-beat',
+    cue: 'playEndingBeat',
+    arg: 'id',
+    when: { id: 'opens' },
+  },
+  {
+    on: 'ending-beat',
+    cue: 'playEndingBeat',
+    arg: 'id',
+    when: { id: 'return' },
+  },
+  {
+    on: 'ending-beat',
+    cue: 'playEndingBeat',
+    arg: 'id',
+    when: { id: 'depart' },
+  },
   { on: 'sector-picked', run: 'sectorScorePrefetch' },
 
   // The journey between sectors (render3d/travel/moments.js): each moment's

@@ -515,6 +515,9 @@ export class RunCinematics {
     );
     // both acts' pictures play under the bars, the instruments away
     if (drawn) this.hud()?.showLetterbox(true, true);
+    if (drawn) {
+      this.eventBus.emit('ending-beat', { id: beats[i].id, ending });
+    }
     if (entry) this.speak(entry);
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.playBeat(i + 1), durationMs);

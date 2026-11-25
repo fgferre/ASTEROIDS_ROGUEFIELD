@@ -406,6 +406,22 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
   (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
   lá, não calibrar a campanha para ser vencível sem loja.
+- **(49)** O final da campanha (23/11, depois de zerar): _"Decidi uma coisa, precisamos pensar em um endgame mais
+  interessante. Tem que ter uma animação um fechamento melhor para história, um cutscne mais poderoso."_ Ao primeiro
+  cartão: _"pense numa coisa menos maluca e mais reveladora de plot twist para o final. mas está mutio etéreo e sem pé
+  nem cabeça demais, menos mistério agora e mais um pouco de relsolucao, mas sem perder o ar de david lynch...."_ A
+  verdade escolhida (24/11): _"A, um de nós"_. A encenação: _"por que que a gente não aproveita tudo e faz o final mais
+  épico? Eu gostei de todas as tomadas que você fez. [...] não vamos desperdiçar esses trabalhos"_; ao filme-rascunho
+  do final inteiro: _"Serve: é este"_; às cinco falas novas: _"Serve assim"_. Textos inteiros em
+  `quadro/respostas/endgame-e-cutscenes-23-11.txt`, `final-do-jogo-1-23-11.txt`, `final-do-jogo-2-24-11.txt` e
+  `final-do-jogo-3-e-4-24-11.txt`. Construído no ramo `historia/final`, em três atos. Antes da escolha: Sovereign
+  vencido fica inteiro, se fecha e se abre, e a verdade é dita em sete falas sobre os lugares que provam cada uma (o
+  Anel foi feito para guardar a gente; os quarenta vivos estão a bordo do Wake); a escolha vem depois, com o texto de
+  sempre. Depois da escolha: o Crisol responde à vista, a volta para casa (o Wake inteiro, os reatores firmes; em
+  Severance a nave entra no hangar, o Anel apaga e o Wake vai embora; em Stewardship ninguém vai para casa) e a última
+  imagem (outro Wake num berço do Crisol, vazio, uma janela acesa). Cinco falas são novas e ainda não têm voz gravada
+  (37). Fora das cenas, só a morte de Sovereign mudou: ele não se quebra em pedaços (onde não há final depois,
+  queima no lugar). Fecha quando ele aprovar jogando.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 

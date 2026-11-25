@@ -348,6 +348,10 @@ describe('AudioSystem random scope synchronization', () => {
     expect(played('victory-final')).toBeUndefined();
     eventBus.emit('run-won', { sector: 'the-crucible' });
     expect(played('victory-final')).toBe(1);
+    // Act 1 starts it in the victory's place; the choice does not restart it.
+    eventBus.emit('cinematic-started', { kind: 'revelation' });
+    expect(played('ending-choice')).toBe(1);
+    await Promise.resolve();
     overlay('ending', true);
     expect(played('ending-choice')).toBe(1);
     // It plays on through the ending picked, until the credits' starts.

@@ -24,9 +24,13 @@ export const NEXT = {
   new: [
     "The campaign's ending now tells you the truth of the Ring before you choose: when Sovereign falls, the Ring and the Wake say what it kept and who it was keeping, one scene at a time; after the choice your ending plays scene by scene before the credits. Hold to skip to the choice or to the credits; a tap goes to the next scene.", // not confirmed
   ],
-  improved: [],
+  improved: [
+    'Sovereign, beaten, no longer breaks into pieces: it burns away where it fell.', // not confirmed
+  ],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "The ending's last image is built on the loading screen (about one second more of loading), so nothing stalls when the choice opens or at any cut.",
+  ],
 };
 
 export const RELEASES = [

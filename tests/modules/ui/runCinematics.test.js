@@ -65,6 +65,7 @@ function setup({ plays = true } = {}) {
     endCinematic: vi.fn(),
   };
   const events = [];
+  const beatEvents = [];
   const held = [];
   let skipKey = null;
   let nextKey = null;
@@ -80,8 +81,10 @@ function setup({ plays = true } = {}) {
   ui.cinematics = new RunCinematics({
     // The cinematics' own events (each layer also readies its voices).
     eventBus: {
-      emit: (name, payload) =>
-        name.startsWith('cinematic') && events.push([name, payload.kind]),
+      emit: (name, payload) => {
+        if (name.startsWith('cinematic')) events.push([name, payload.kind]);
+        if (name === 'ending-beat') beatEvents.push(payload);
+      },
     },
     renderer: () => renderer,
     hud: () => hud,
@@ -113,6 +116,7 @@ function setup({ plays = true } = {}) {
     renderer,
     banners,
     events,
+    beatEvents,
     held,
     startRun,
     spoken,
@@ -285,6 +289,28 @@ describe('RunCinematics', () => {
     expect(show).toHaveBeenCalledTimes(1);
     expect(events.at(-1)).toEqual(['cinematic-ended', 'revelation']);
     expect(bars.contains('is-showing')).toBe(false);
+  });
+
+  it('announces each drawn beat of an act with its id and ending, and none the renderer does not draw', () => {
+    const { ui, beatEvents } = setup();
+    ui.cinematics.startRevelation();
+    expect(beatEvents).toEqual([{ id: REVELATION_BEATS[0].id, ending: null }]);
+    ui.cinematics.playEnding('severance', vi.fn());
+    const ids = endingBeats('severance').map(({ id }) => id);
+    expect(beatEvents.at(-1)).toEqual({ id: ids[0], ending: 'severance' });
+
+    const undrawn = setup({ plays: false });
+    undrawn.ui.cinematics.startRevelation();
+    undrawn.ui.cinematics.playEnding('severance', vi.fn());
+    expect(undrawn.beatEvents).toEqual([]);
+  });
+
+  it('act 1 skipped early holds its last beat without announcing a beat', () => {
+    const { ui, beatEvents, skip } = setup();
+    ui.cinematics.startRevelation();
+    const before = beatEvents.length;
+    skip();
+    expect(beatEvents).toHaveLength(before);
   });
 
   it('a renderer that draws none of act 1 still opens the choice when asked after an early skip', () => {
