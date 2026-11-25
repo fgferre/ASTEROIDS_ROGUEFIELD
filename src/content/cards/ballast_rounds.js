@@ -12,6 +12,7 @@ export default {
   icon: '🪨',
   themeColor: PALETTE.player,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 6 },
   tags: ['damage', 'finisher'],
   text: {
     name: 'Ballast Rounds',

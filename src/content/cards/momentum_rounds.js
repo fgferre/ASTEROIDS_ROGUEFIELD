@@ -12,6 +12,7 @@ export default {
   icon: '💨',
   themeColor: PALETTE.shot,
   unlockLevel: 2,
+  unlock: { by: 'license', at: 6, cost: 250 },
   tags: ['damage', 'speed'],
   text: {
     name: 'Momentum Rounds',

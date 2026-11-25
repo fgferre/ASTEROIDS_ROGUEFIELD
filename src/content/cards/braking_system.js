@@ -7,6 +7,7 @@ export default {
   icon: '⚙️',
   themeColor: '#5DADE2',
   unlockLevel: 3,
+  unlock: { by: 'pilot', at: 2 },
   tags: ['control', 'braking', 'precision'],
   prerequisites: [
     {

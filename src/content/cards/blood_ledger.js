@@ -10,6 +10,7 @@ export default {
   icon: '🩸',
   themeColor: PALETTE.boss,
   unlockLevel: 4,
+  unlock: { by: 'license', at: 11, cost: 250 },
   tags: ['xp', 'cursed'],
   text: {
     name: 'Blood Ledger',

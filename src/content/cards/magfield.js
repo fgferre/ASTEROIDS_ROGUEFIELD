@@ -7,6 +7,7 @@ export default {
   icon: '🧲',
   themeColor: '#C08BFF',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 21 },
   tags: ['collection', 'magnetism'],
   text: {
     name: 'Magnetic Field',

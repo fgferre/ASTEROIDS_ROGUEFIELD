@@ -9,6 +9,7 @@ export default {
   icon: '⚓',
   themeColor: PALETTE.text,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 15 },
   tags: ['damage reduction', 'trade-off'],
   text: {
     name: 'Grav Anchor',

@@ -13,6 +13,7 @@ export default {
   icon: '🕸️',
   themeColor: PALETTE.status,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'choir-silenced' },
   tags: ['chain', 'auto-attack'],
   text: {
     name: 'Arc Lattice',

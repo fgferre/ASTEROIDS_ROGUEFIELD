@@ -9,6 +9,7 @@ export default {
   icon: '🌫️',
   themeColor: PALETTE.boss,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'untouchable' },
   tags: ['dash', 'charges'],
   text: {
     name: 'Ghost Drive',

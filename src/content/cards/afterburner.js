@@ -10,6 +10,7 @@ export default {
   icon: '💨',
   themeColor: PALETTE.boss,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 17 },
   tags: ['dash', 'cooldown'],
   text: {
     name: 'Afterburner',

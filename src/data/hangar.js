@@ -3,6 +3,7 @@
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { bastion, solarSlicer } from './shipModels.js';
 import { RUN_FINAL_LAYER } from './constants/gameplay.js';
+import { cardsUnlockedBy } from './upgrades/index.js';
 
 // The Hangar (docs/NORTE.md §7 pillar 7): Salvage earned per run buys small
 // permanent upgrades. Every number here is "proposta 18/10" — the owner
@@ -194,62 +195,32 @@ export const CONTROL_ITEMS = deepFreeze([
   },
 ]);
 
+// The three lists below are built from each card's own `unlock` (its file in
+// src/content/cards/, or its weapon's `card`), in `unlock.at` order.
+
 // The piloting track (plan): outside the card slots, never in the starting
 // draw, a licence or a seal. The Flight School starts a run on one of its
-// first steps (the ones with no prerequisite).
-export const PILOT_TRACK = deepFreeze([
-  'propulsors',
-  'braking_system',
-  'rcs_system',
-  'auto_aim',
-  'flight_computer',
-]);
+// first steps (the ones with no prerequisite). `unlock: { by: 'pilot' }`.
+export const PILOT_TRACK = deepFreeze(
+  cardsUnlockedBy('pilot').map(({ id }) => id)
+);
 
 // The starting draw (plan, decided by the lead): four combat cards a family,
 // the ones that close its bonus of 3, and the Scatter and Arc Caster weapons.
 // Every other card comes from a licence, bought or paid by a medal.
-export const STARTING_DRAW = deepFreeze([
-  'plasma',
-  'heat_sink',
-  'afterburn_lance',
-  'cinder_trail',
-  'multishot',
-  'ballast_rounds',
-  'recoil_dampers',
-  'close_quarters',
-  'overcharge_coil',
-  'static_shell',
-  'capacitor_bank',
-  'targeting_suite',
-  'shield',
-  'ablative_plating',
-  'grav_anchor',
-  'gravity_brake',
-  'afterburner',
-  'gyro_servos',
-  'inertial_dampers',
-  'ram_plating',
-  'magfield',
-  'core_extractor',
-  'wide_net',
-  'scrap_compactor',
-  'scatter_coil',
-  'arc_caster',
-]);
+// `unlock: { by: 'start' }`.
+export const STARTING_DRAW = deepFreeze(
+  cardsUnlockedBy('start').map(({ id }) => id)
+);
 
 // Licences (plan H3): the weapons and cards left out of the starting draw.
 // A licence bought stays; switching it off (free) takes the card out of the
-// draw. Seven more cards are licensed by medals (data/achievements.js).
-export const LICENSES = deepFreeze([
-  { id: 'furnace_corona', kind: 'weapon', cost: 325 },
-  { id: 'shard_halo', kind: 'weapon', cost: 325 },
-  { id: 'harmonic_resonator', kind: 'weapon', cost: 325 },
-  { id: 'seeker_swarm', kind: 'weapon', cost: 325 },
-  { id: 'chain_capacitor', kind: 'card', cost: 250 },
-  { id: 'momentum_rounds', kind: 'card', cost: 250 },
-  { id: 'phase_skin', kind: 'card', cost: 250 },
-  { id: 'reactive_brake', kind: 'card', cost: 250 },
-  { id: 'glass_cannon', kind: 'card', cost: 250 },
-  { id: 'overclocked_core', kind: 'card', cost: 250 },
-  { id: 'blood_ledger', kind: 'card', cost: 250 },
-]);
+// draw. `unlock: { by: 'license', cost }`; the cards a medal licenses
+// (`by: 'medal'`) are paid by it (data/achievements.js).
+export const LICENSES = deepFreeze(
+  cardsUnlockedBy('license').map(({ id, kind, unlock }) => ({
+    id,
+    kind,
+    cost: unlock.cost,
+  }))
+);

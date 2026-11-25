@@ -24,7 +24,9 @@ export const NEXT = {
   new: [],
   improved: [],
   fixed: [],
-  unseen: [],
+  unseen: [
+    "Each card now says in its own file how it is unlocked (from the start, on the piloting track, by a Hangar licence with its price, or by a medal), and the Hangar's lists are built from those files, so a new card can no longer be left out of every list by mistake; the lists, their order and the prices are the same as before, so nobody notices.", // not confirmed
+  ],
 };
 
 export const RELEASES = [

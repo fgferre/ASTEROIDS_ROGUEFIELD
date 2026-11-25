@@ -10,6 +10,7 @@ export default {
   icon: '🐏',
   themeColor: PALETTE.boss,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 20 },
   tags: ['dash', 'contact damage'],
   text: {
     name: 'Ram Plating',

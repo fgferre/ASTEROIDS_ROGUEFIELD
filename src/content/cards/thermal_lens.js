@@ -10,6 +10,7 @@ export default {
   icon: '🔍',
   themeColor: PALETTE.shot,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'full-set' },
   tags: ['damage', 'weapon'],
   text: {
     name: 'Thermal Lens',

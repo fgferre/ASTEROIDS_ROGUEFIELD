@@ -9,6 +9,7 @@ export default {
   icon: '💎',
   themeColor: PALETTE.xp,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 22 },
   tags: ['xp', 'collection'],
   text: {
     name: 'Core Extractor',

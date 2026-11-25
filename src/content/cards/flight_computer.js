@@ -14,6 +14,7 @@ export default {
   icon: '🧭',
   themeColor: '#5DADE2',
   unlockLevel: 1,
+  unlock: { by: 'pilot', at: 5 },
   tags: ['control', 'maneuvers'],
   prerequisites: [
     {

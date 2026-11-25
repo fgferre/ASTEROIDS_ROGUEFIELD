@@ -7,6 +7,7 @@ export default {
   icon: '🚀',
   themeColor: '#5DADE2',
   unlockLevel: 1,
+  unlock: { by: 'pilot', at: 1 },
   tags: ['speed', 'mobility', 'acceleration'],
   text: {
     name: 'Main Thrusters',

@@ -10,6 +10,7 @@ export default {
   icon: '🔥',
   themeColor: PALETTE.shot,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 4 },
   tags: ['thrusters', 'burn'],
   text: {
     name: 'Cinder Trail',
