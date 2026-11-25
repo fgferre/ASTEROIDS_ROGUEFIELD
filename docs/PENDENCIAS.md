@@ -422,8 +422,8 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   imagem (outro Wake num berço do Crisol, vazio, uma janela acesa). Cinco falas são novas e ainda não têm voz gravada
   (37). Fora das cenas, só a morte de Sovereign mudou: ele não se quebra em pedaços (onde a cena não é desenhada,
   como com movimento reduzido, queima no lugar). Toda vitória no Crisol toca o final, também para quem já venceu.
-  Cartão de conferência `final-do-jogo-5` (25/11) com os dois finais filmados pelo jogo. Fecha quando ele aprovar
-  jogando.
+  Cartão de conferência `final-do-jogo-5` (25/11) com os dois finais filmados pelo jogo; à pergunta "o final está
+  como queria?", depois de ver o cartão: _"Está bom"_. Ele não disse que jogou. Fecha quando ele aprovar jogando.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
