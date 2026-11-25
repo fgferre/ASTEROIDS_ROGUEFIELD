@@ -23,13 +23,11 @@
 export const NEXT = {
   new: [],
   improved: [],
-  fixed: [],
-  unseen: [
-    'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
   fixed: [
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
   ],
   unseen: [
+    'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
   ],
 };
