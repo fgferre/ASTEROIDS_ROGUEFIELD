@@ -6,6 +6,7 @@ import {
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
 } from '../../../data/constants/gameplay.js';
+import { isReachableEnemy } from '../../PhysicsSystem.js';
 
 export class EnemyCombatRelay {
   /**
@@ -170,7 +171,8 @@ export class EnemyCombatRelay {
 
     for (let i = 0; i < nearbyEnemies.length; i += 1) {
       const asteroid = nearbyEnemies[i];
-      if (!asteroid || asteroid.destroyed) {
+      // The full list (the fallback) holds phased Shades the query leaves out.
+      if (!isReachableEnemy(asteroid)) {
         continue;
       }
 

@@ -40,6 +40,9 @@ export const NEXT = {
     'The game now registers all its services before creating any, and a service that fails to start stops the load instead of logging an error and being retried; nobody notices because every service is still created in the same order and none fails today.', // not confirmed
     'The physics, enemy and progression systems keep one name for saving and restoring a snapshot instead of several that did the same; the game looks and plays the same.', // not confirmed
     'The run session no longer forwards about twenty calls to its own parts; the tests reach the part directly, so the file stays under its size limit and the game plays the same.', // not confirmed
+  fixed: [],
+  unseen: [
+    'A shield blast, a mine blast or the Reactive Brake no longer nudges a phased Shade when nothing else is in range (it already ignored it when another enemy was near); the Shade is invisible then and steers itself again the next frame, so nobody sees it.', // not confirmed
   ],
 };
 

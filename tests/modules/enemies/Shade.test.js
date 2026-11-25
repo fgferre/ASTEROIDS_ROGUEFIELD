@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../src/core/GameConstants.js';
 import { getContent } from '../../../src/content/registry.js';
 import { recipeEnemyClass } from '../../../src/modules/enemies/types/RecipeEnemy.js';
+import { EnemyCombatRelay } from '../../../src/modules/enemies/systems/EnemyCombatRelay.js';
+import { EnemyDamageSystem } from '../../../src/modules/enemies/systems/EnemyDamageSystem.js';
+import PhysicsSystem from '../../../src/modules/PhysicsSystem.js';
 
 const Shade = recipeEnemyClass(getContent('enemies', 'shade'));
 const { phase, 'fan-shot': fan } = getContent('enemies', 'shade').behaviors;
@@ -33,6 +36,29 @@ const setup = (at) => {
 const step = (shade, seconds, dt = 1 / 60) => {
   for (let t = 0; t < seconds - 1e-9; t += dt) shade.update(dt);
 };
+
+// A phased Shade beside a blast at (100, 100), tracked by physics; `company`
+// adds a solid rock in range too (the spatial query then answers non-empty).
+const blastScene = (company) => {
+  const { shade } = setup({ x: 400, y: 100 });
+  while (shade.phase !== 'phased') shade.update(1 / 60);
+  Object.assign(shade, { x: 120, y: 100, vx: 0, vy: 0, rotationSpeed: 0 });
+  const rock = { x: 90, y: 100, radius: 10, mass: 1, vx: 0, vy: 0 };
+  rock.takeDamage = () => false;
+  const enemies = company ? [shade, rock] : [shade];
+  const physics = new PhysicsSystem({});
+  enemies.forEach((enemy) => physics.registerEnemy(enemy));
+  physics.updateSpatialHash();
+  const random = { range: () => 0.5, float: () => 0.5 };
+  return { shade, enemies, physics, random };
+};
+
+const untouched = (shade) => ({
+  health: shade.health,
+  vx: shade.vx,
+  vy: shade.vy,
+  rotationSpeed: shade.rotationSpeed,
+});
 
 const shotsOf = (eventBus) =>
   eventBus.emit.mock.calls.filter(([name]) => name === 'enemy-fired');
@@ -127,6 +153,44 @@ describe('Shade', () => {
     shade.takeDamage(10);
     expect(shade.health).toBe(shade.maxHealth - 10);
   });
+
+  it.each([false, true])(
+    'phased, a shield blast leaves it alone (another enemy in range: %s)',
+    (company) => {
+      const { shade, enemies, physics, random } = blastScene(company);
+      const before = untouched(shade);
+      new EnemyDamageSystem({
+        facade: {
+          asteroids: enemies,
+          getCachedPhysics: () => physics,
+          getRandomScope: () => random,
+        },
+      }).handleShieldExplosionDamage({
+        position: { x: 100, y: 100 },
+        radius: 200,
+        damage: 50,
+      });
+      expect(untouched(shade)).toEqual(before);
+    }
+  );
+
+  it.each([false, true])(
+    'phased, a shield shockwave leaves it alone (another enemy in range: %s)',
+    (company) => {
+      const { shade, enemies, physics, random } = blastScene(company);
+      const before = untouched(shade);
+      new EnemyCombatRelay({
+        getAsteroids: () => enemies,
+        getPhysics: () => physics,
+        enemyRandom: {
+          getRandomScope: () => random,
+          getRandomService: () => random,
+        },
+        bosses: {},
+      }).handleShockwave({ position: { x: 100, y: 100 }, radius: 200 });
+      expect(untouched(shade)).toEqual(before);
+    }
+  );
 
   it('with the ship along a wall, it flanks from the open side, never on top of the ship', () => {
     // Seeded onto the wall side, where the clamped flank point is 10 px away.
