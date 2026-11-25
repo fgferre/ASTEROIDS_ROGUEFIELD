@@ -95,4 +95,19 @@ describe('death snapshot of the field rewards', () => {
 
     expect(readRewards(game.services)).toEqual(atDeath);
   });
+
+  it('ends an Overcharge started after the snapshot when it is put back', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    const { pickups, combat } = game.services;
+    const snapshot = pickups.getSnapshotState();
+    expect(snapshot.overchargeRemaining).toBe(0);
+
+    pickups.collect({ kind: 'overcharge', x: 0, y: 0 });
+    expect(combat.cards.cooldownTuning).toBeLessThan(1);
+
+    pickups.restoreSnapshotState(snapshot);
+    expect(pickups.overchargeRemaining).toBe(0);
+    expect(combat.cards.cooldownTuning).toBe(1);
+  });
 });

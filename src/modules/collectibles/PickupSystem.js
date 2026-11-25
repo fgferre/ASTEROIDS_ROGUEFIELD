@@ -349,9 +349,11 @@ export class PickupSystem extends BaseSystem {
     this.chestRandom.restore(snapshot.chestRandom);
     // The boost may have run out while the ship lay wrecked.
     this.overchargeRemaining = snapshot.overchargeRemaining;
-    if (this.overchargeRemaining > 0) {
-      this.setOvercharge(PICKUP_KINDS.overcharge.cooldownMultiplier);
-    }
+    this.setOvercharge(
+      this.overchargeRemaining > 0
+        ? PICKUP_KINDS.overcharge.cooldownMultiplier
+        : 1
+    );
     return true;
   }
 
