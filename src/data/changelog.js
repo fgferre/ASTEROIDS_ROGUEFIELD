@@ -25,6 +25,7 @@ export const NEXT = {
   improved: [],
   fixed: [
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
+    'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
   ],
   unseen: [
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed

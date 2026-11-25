@@ -652,19 +652,46 @@
                   data-device="keyboard"
                   aria-label="Controls"
                 >
-                  <li data-scheme="modern"><kbd>WASD</kbd> move</li>
-                  <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-                  <li data-scheme="classic"><kbd>S</kbd><kbd>↓</kbd> brake</li>
-                  <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
-                  <li><kbd>Z</kbd><kbd>C</kbd> strafe</li>
-                  <li><kbd>Space</kbd> + <kbd>A</kbd><kbd>D</kbd> strafe</li>
-                  <li><kbd>Shift</kbd> dash</li>
-                  <li><kbd>E</kbd> shield</li>
-                  <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
-                  <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
+                  <li data-scheme="modern">
+                    <kbd data-binding="moveUp moveLeft moveDown moveRight"
+                      >WASD</kbd
+                    >
+                    move
+                  </li>
+                  <li data-scheme="classic">
+                    <kbd data-binding="moveUp">W</kbd
+                    ><kbd data-binding="moveUp" data-binding-slot="1">↑</kbd>
+                    thrust
+                  </li>
+                  <li data-scheme="classic">
+                    <kbd data-binding="moveDown">S</kbd
+                    ><kbd data-binding="moveDown" data-binding-slot="1">↓</kbd>
+                    brake
+                  </li>
+                  <li data-scheme="classic">
+                    <kbd data-binding="moveLeft">A</kbd
+                    ><kbd data-binding="moveRight">D</kbd> turn
+                  </li>
+                  <li>
+                    <kbd data-binding="strafeLeft">Z</kbd
+                    ><kbd data-binding="strafeRight">C</kbd> strafe
+                  </li>
+                  <li>
+                    <kbd data-binding="strafeHold">Space</kbd> +
+                    <kbd data-binding="moveLeft">A</kbd
+                    ><kbd data-binding="moveRight">D</kbd> strafe
+                  </li>
+                  <li><kbd data-binding="dash">Shift</kbd> dash</li>
+                  <li><kbd data-binding="activateShield">E</kbd> shield</li>
+                  <li data-scheme="classic">
+                    <kbd data-binding="toggleSpreadMode">G</kbd> spread mode
+                  </li>
+                  <li data-scheme="classic">
+                    <kbd data-binding="toggleAimMode">T</kbd> aim mode
+                  </li>
                   <li><kbd>R</kbd> reroll</li>
                   <li><kbd>B</kbd> banish</li>
-                  <li><kbd>Esc</kbd> pause</li>
+                  <li><kbd data-binding="pause">Esc</kbd> pause</li>
                   <li class="controls-hints__note" data-scheme="modern">
                     Shooting is automatic
                   </li>
@@ -685,13 +712,16 @@
                   <li data-scheme="classic"><kbd>R-Stick</kbd> ← → turn</li>
                   <li data-scheme="classic"><kbd>L-Stick</kbd> ← → strafe</li>
                   <li data-scheme="modern">
-                    <kbd>LB</kbd> + <kbd>L-Stick</kbd> strafe
+                    <kbd data-binding="strafeHold">LB</kbd> +
+                    <kbd>L-Stick</kbd> strafe
                   </li>
-                  <li><kbd>RB</kbd> dash</li>
-                  <li><kbd>LT</kbd> shield</li>
-                  <li><kbd>X</kbd> spread mode</li>
-                  <li><kbd>Y</kbd> aim mode</li>
-                  <li><kbd>Start</kbd> pause</li>
+                  <li><kbd data-binding="dash">RB</kbd> dash</li>
+                  <li><kbd data-binding="activateShield">LT</kbd> shield</li>
+                  <li>
+                    <kbd data-binding="toggleSpreadMode">X</kbd> spread mode
+                  </li>
+                  <li><kbd data-binding="toggleAimMode">Y</kbd> aim mode</li>
+                  <li><kbd data-binding="pause">Start</kbd> pause</li>
                   <li class="controls-hints__note">Shooting is automatic</li>
                 </ul>
               </div>
@@ -840,7 +870,7 @@
             type="button"
             tabindex="-1"
           >
-            <kbd data-device="keyboard">⏎</kbd>
+            <kbd data-device="keyboard" data-binding="confirm">⏎</kbd>
             <kbd data-device="gamepad">A</kbd>
             Continue
           </button>
@@ -865,7 +895,10 @@
           <dl class="flight-keys">
             <dt>
               <span data-device="keyboard"
-                ><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span
+                ><kbd data-binding="moveUp">W</kbd>
+                <kbd data-binding="moveLeft">A</kbd>
+                <kbd data-binding="moveDown">S</kbd>
+                <kbd data-binding="moveRight">D</kbd></span
               >
               <span data-device="gamepad">Left stick</span>
               <span data-device="touch">Left thumb</span>
@@ -880,8 +913,11 @@
             </dd>
             <dt>
               <span data-device="keyboard"
-                ><kbd>Z</kbd> <kbd>C</kbd> or <kbd>Space</kbd> + <kbd>A</kbd>
-                <kbd>D</kbd></span
+                ><kbd data-binding="strafeLeft">Z</kbd>
+                <kbd data-binding="strafeRight">C</kbd> or
+                <kbd data-binding="strafeHold">Space</kbd> +
+                <kbd data-binding="moveLeft">A</kbd>
+                <kbd data-binding="moveRight">D</kbd></span
               >
               <span data-device="gamepad">LB + left stick</span>
               <span data-device="touch">STRAFE + left thumb</span>
@@ -903,7 +939,7 @@
             type="button"
             tabindex="-1"
           >
-            <kbd data-device="keyboard">⏎</kbd>
+            <kbd data-device="keyboard" data-binding="confirm">⏎</kbd>
             <kbd data-device="gamepad">A</kbd>
             Fly
           </button>
@@ -964,19 +1000,42 @@
             data-device="keyboard"
             aria-label="Controls"
           >
-            <li data-scheme="modern"><kbd>WASD</kbd> move</li>
-            <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-            <li data-scheme="classic"><kbd>S</kbd><kbd>↓</kbd> brake</li>
-            <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
-            <li><kbd>Z</kbd><kbd>C</kbd> strafe</li>
-            <li><kbd>Space</kbd> + <kbd>A</kbd><kbd>D</kbd> strafe</li>
-            <li><kbd>Shift</kbd> dash</li>
-            <li><kbd>E</kbd> shield</li>
-            <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
-            <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
+            <li data-scheme="modern">
+              <kbd data-binding="moveUp moveLeft moveDown moveRight">WASD</kbd>
+              move
+            </li>
+            <li data-scheme="classic">
+              <kbd data-binding="moveUp">W</kbd
+              ><kbd data-binding="moveUp" data-binding-slot="1">↑</kbd> thrust
+            </li>
+            <li data-scheme="classic">
+              <kbd data-binding="moveDown">S</kbd
+              ><kbd data-binding="moveDown" data-binding-slot="1">↓</kbd> brake
+            </li>
+            <li data-scheme="classic">
+              <kbd data-binding="moveLeft">A</kbd
+              ><kbd data-binding="moveRight">D</kbd> turn
+            </li>
+            <li>
+              <kbd data-binding="strafeLeft">Z</kbd
+              ><kbd data-binding="strafeRight">C</kbd> strafe
+            </li>
+            <li>
+              <kbd data-binding="strafeHold">Space</kbd> +
+              <kbd data-binding="moveLeft">A</kbd
+              ><kbd data-binding="moveRight">D</kbd> strafe
+            </li>
+            <li><kbd data-binding="dash">Shift</kbd> dash</li>
+            <li><kbd data-binding="activateShield">E</kbd> shield</li>
+            <li data-scheme="classic">
+              <kbd data-binding="toggleSpreadMode">G</kbd> spread mode
+            </li>
+            <li data-scheme="classic">
+              <kbd data-binding="toggleAimMode">T</kbd> aim mode
+            </li>
             <li><kbd>R</kbd> reroll</li>
             <li><kbd>B</kbd> banish</li>
-            <li><kbd>Esc</kbd> resume</li>
+            <li><kbd data-binding="pause">Esc</kbd> resume</li>
             <li class="controls-hints__note" data-scheme="modern">
               Shooting is automatic
             </li>
@@ -992,13 +1051,14 @@
             <li data-scheme="classic"><kbd>R-Stick</kbd> ← → turn</li>
             <li data-scheme="classic"><kbd>L-Stick</kbd> ← → strafe</li>
             <li data-scheme="modern">
-              <kbd>LB</kbd> + <kbd>L-Stick</kbd> strafe
+              <kbd data-binding="strafeHold">LB</kbd> +
+              <kbd>L-Stick</kbd> strafe
             </li>
-            <li><kbd>RB</kbd> dash</li>
-            <li><kbd>LT</kbd> shield</li>
-            <li><kbd>X</kbd> spread mode</li>
-            <li><kbd>Y</kbd> aim mode</li>
-            <li><kbd>Start</kbd> resume</li>
+            <li><kbd data-binding="dash">RB</kbd> dash</li>
+            <li><kbd data-binding="activateShield">LT</kbd> shield</li>
+            <li><kbd data-binding="toggleSpreadMode">X</kbd> spread mode</li>
+            <li><kbd data-binding="toggleAimMode">Y</kbd> aim mode</li>
+            <li><kbd data-binding="pause">Start</kbd> resume</li>
           </ul>
         </div>
       </div>

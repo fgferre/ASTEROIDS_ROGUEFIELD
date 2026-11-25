@@ -8,6 +8,7 @@
 // the next one, until it has run out TIP_EXPIRIES_TO_DONE times.
 
 import { loadJSON, saveProgress } from '../../core/storage.js';
+import { joinKeyLabels } from './bindingHints.js';
 
 export const ONBOARDING_STORAGE_KEY = 'roguefield:onboarding:v1';
 /** Pause between one tip finishing and the next appearing. */
@@ -113,6 +114,7 @@ export function onboardingPrompts(
           keys: ['L-Stick'],
           text: 'Move with the left stick. The cannon fires on its own.',
         };
+  const wasd = [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight];
   const keyboardMove =
     scheme === 'classic'
       ? {
@@ -120,8 +122,8 @@ export function onboardingPrompts(
           text: `Turn and thrust; ${keys.moveDown} brakes, nothing else slows you. The cannon fires on its own.`,
         }
       : {
-          keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
-          text: 'Move with WASD. The cannon fires on its own.',
+          keys: wasd,
+          text: `Move with ${joinKeyLabels(wasd)}. The cannon fires on its own.`,
         };
   // Touch: the gesture, and the on-screen buttons' own names.
   const touchMove = {
