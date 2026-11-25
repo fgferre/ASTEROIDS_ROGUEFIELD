@@ -284,4 +284,54 @@ describe('Hangar pad tabs', () => {
     expect(screen.renderHangar).toHaveBeenCalledTimes(1);
     expect(hangar.owned).toEqual({});
   });
+
+  it('a click on any pilot-changing button with a stale pilot closes the Hangar and changes nothing', () => {
+    let click;
+    const hangar = {
+      setPressure: vi.fn(),
+      buyLicense: vi.fn(),
+      setLicenseOn: vi.fn(),
+      toggleSeal: vi.fn(),
+      setStartingCard: vi.fn(),
+      buy: vi.fn(),
+    };
+    const screen = new HangarScreen({
+      refs: {
+        overlay: {
+          addEventListener: (type, fn) => type === 'click' && (click = fn),
+        },
+        hulls: { addEventListener: vi.fn() },
+      },
+      hangar: () => hangar,
+      emit: vi.fn(),
+    });
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+    screen.bindHangarControls();
+    vi.unstubAllGlobals();
+    screen.renderHangar = vi.fn();
+    screen.closeHangar = vi.fn();
+    const buttons = [
+      ['data-hangar-pressure', { hangarPressure: '1' }],
+      ['data-hangar-license-buy', { hangarLicenseBuy: 'shard_halo' }],
+      ['data-hangar-license-on', { hangarLicenseOn: 'shard_halo' }],
+      ['data-hangar-seal', { hangarSeal: 'plasma' }],
+      ['data-hangar-start', { hangarStart: 'propulsors' }],
+      ['data-hangar-buy', { hangarBuy: 'x' }],
+    ];
+    isPilotStale.mockReturnValue(true);
+    buttons.forEach(([attr, dataset]) =>
+      click({
+        target: {
+          closest: (sel) =>
+            sel.includes(attr)
+              ? { dataset, getAttribute: () => 'false', closest: () => null }
+              : null,
+        },
+      })
+    );
+    isPilotStale.mockReturnValue(false);
+    expect(screen.closeHangar).toHaveBeenCalledTimes(buttons.length);
+    expect(screen.renderHangar).not.toHaveBeenCalled();
+    Object.values(hangar).forEach((fn) => expect(fn).not.toHaveBeenCalled());
+  });
 });

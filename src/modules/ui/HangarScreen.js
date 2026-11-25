@@ -106,6 +106,12 @@ export class HangarScreen {
       button?.addEventListener('click', () => this.closeHangar())
     );
     refs.overlay.addEventListener('click', (event) => {
+      // Another tab changed this pilot: nothing here may change it, so leave
+      // the Hangar and let the menu send the tab back to the start gate.
+      if (isPilotStale()) {
+        this.closeHangar();
+        return;
+      }
       if (event.target === refs.overlay) {
         this.closeHangar();
         return;
@@ -169,12 +175,7 @@ export class HangarScreen {
       if (buy) {
         const id = buy.dataset.hangarBuy;
         const list = buy.closest('.hangar-list');
-        // Another tab changed this pilot: the buy was refused, so leave the
-        // Hangar and let the menu send the tab back to the start gate.
-        if (!this.hangar().buy(id) && isPilotStale()) {
-          this.closeHangar();
-          return;
-        }
+        this.hangar().buy(id);
         this.renderHangar();
         list
           .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)

@@ -194,6 +194,7 @@ export default class HangarService {
 
   /** The rung the next runs fly (0 for none), if it is open. */
   setPressure(rung) {
+    if (isPilotStale()) return false;
     if (rung < 0 || rung > this.pressure.open) return false;
     this.pressure.selected = rung;
     this.difficulty.setPressure(rung);
@@ -328,6 +329,7 @@ export default class HangarService {
 
   /** Buys a licence on sale; it starts switched on. */
   buyLicense(id) {
+    if (isPilotStale()) return false;
     const entry = LICENSES_BY_ID.get(id);
     if (!entry || this.licenses[id] || this.salvage < entry.cost) return false;
     this.salvage -= entry.cost;
@@ -339,6 +341,7 @@ export default class HangarService {
 
   /** Switches a held licence on or off, free: off takes the card out of the draw. */
   setLicenseOn(id, on) {
+    if (isPilotStale()) return false;
     if (!this.licenses[id]) return false;
     if (on) delete this.licensesOff[id];
     else this.licensesOff[id] = true;
@@ -393,6 +396,7 @@ export default class HangarService {
 
   /** Seals an open card out of the next runs' draw, or unseals it. */
   toggleSeal(id) {
+    if (isPilotStale()) return false;
     if (this.sealed.includes(id)) {
       this.sealed = this.sealed.filter((entry) => entry !== id);
     } else if (
@@ -414,6 +418,7 @@ export default class HangarService {
 
   /** Picks the Flight School's card (null for none); needs the item owned. */
   setStartingCard(id) {
+    if (isPilotStale()) return false;
     if (!this.owned['flight-school']) return false;
     if (id !== null && !FLIGHT_SCHOOL_CARDS.includes(id)) return false;
     this.startingCard = id;
