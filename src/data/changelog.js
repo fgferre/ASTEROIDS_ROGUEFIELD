@@ -28,6 +28,8 @@ export const NEXT = {
     'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
     'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set), so one key never does two things in flight.', // not confirmed
     'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
+    'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
+    'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
   ],
   unseen: [
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
@@ -42,10 +44,6 @@ export const NEXT = {
     'The run session no longer forwards about twenty calls to its own parts; the tests reach the part directly, so the file stays under its size limit and the game plays the same.', // not confirmed
     'A shield blast, a mine blast or the Reactive Brake no longer nudges a phased Shade when nothing else is in range (it already ignored it when another enemy was near); the Shade is invisible then and steers itself again the next frame, so nobody sees it.', // not confirmed
   ],
-    'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
-    'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
-  ],
-  unseen: [],
 };
 
 export const RELEASES = [
