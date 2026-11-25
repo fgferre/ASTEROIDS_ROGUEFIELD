@@ -14,6 +14,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Quarry Maw',
   subtitle: 'It still eats stone',
+  codex: {
+    lore: 'We built the Maw to feed the Ring its own stone. The Ring broke; the order to feed it did not. It still eats what drifts past and gives it back smaller, and counted.',
+    hint: 'Shut jaws shrug off shots. Fire into the open mouth, from its flank.',
+    glyph:
+      '<path d="M-12,-9 L2,-11 L12,-3 L3,-3 L-3,-5 L-12,-5Z"/><path d="M-12,9 L2,11 L12,3 L3,3 L-3,5 L-12,5Z"/><circle class="eye" cx="3" r="2.5"/>',
+  },
   layer: 5, // proposta 12/11: the layer it fights on (health scales by it)
   // 70 % of Warden Prime's health on the same layer (prime.js).
   healthFactor: 0.7, // proposta 12/11

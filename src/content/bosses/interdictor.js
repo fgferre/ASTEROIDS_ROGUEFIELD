@@ -22,6 +22,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Interdictor',
   subtitle: 'The boundary was drawn on purpose',
+  codex: {
+    lore: 'The Reach was sealed on purpose. The Interdictor drew the lines and has enforced them since, against machines that wandered and now against a pilot who was never on any list.',
+    hint: 'When its line stops following you, step off it. Leave the cage by the open side. Strike while it cools.',
+    glyph:
+      '<rect x="-15" y="-15" width="2" height="30"/><rect x="-15" y="-15" width="30" height="2"/><rect x="13" y="-15" width="2" height="30"/><rect x="-7" y="-4" width="14" height="8"/><circle class="eye" r="2"/>',
+  },
   layer: 15, // proposta 12/11: the layer it fights on (health scales by it)
   // 60 % of Warden Null's health on the same layer: Null is Prime's base ×
   // its 1.35 (null.js), so 0.6 × 1.35.
