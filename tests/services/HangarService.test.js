@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isPilotStale } from '../../src/core/storage.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
 import { PROGRESSION_UPGRADE_REROLLS_PER_RUN } from '../../src/core/GameConstants.js';
@@ -22,6 +23,11 @@ import {
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
 } from '../../src/data/shipModels.js';
+
+vi.mock('../../src/core/storage.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isPilotStale: vi.fn(() => false),
+}));
 
 const atRate = (salvage) => ({
   getModifiers: () => ({ salvage }),
@@ -48,6 +54,62 @@ describe('HangarService', () => {
   afterEach(() => {
     GamePools.releaseAll();
     restoreDom();
+  });
+
+  it('sells nothing while another tab has changed the pilot', () => {
+    stock(200);
+    const hangar = new HangarService({ ...base, eventBus: new EventBus() });
+    isPilotStale.mockReturnValue(true);
+    expect(hangar.buy('salvage-magnet')).toBe(false);
+    isPilotStale.mockReturnValue(false);
+    expect(hangar.salvage).toBe(200);
+    expect(hangar.owned['salvage-magnet']).toBeUndefined();
+  });
+
+  describe('with the pilot changed in another tab', () => {
+    const stale = (run) => {
+      isPilotStale.mockReturnValue(true);
+      try {
+        return run();
+      } finally {
+        isPilotStale.mockReturnValue(false);
+      }
+    };
+    const open = (stored) => {
+      localStorage.setItem(HANGAR_STORAGE_KEY, JSON.stringify(stored));
+      return new HangarService({ ...base, eventBus: new EventBus() });
+    };
+
+    it('setPressure refuses and leaves the rung', () => {
+      const hangar = open({ salvage: 0, pressure: { open: 2, selected: 1 } });
+      expect(stale(() => hangar.setPressure(2))).toBe(false);
+      expect(hangar.pressure.selected).toBe(1);
+    });
+
+    it('buyLicense refuses and keeps the Salvage and the licences', () => {
+      const hangar = open({ salvage: 500 });
+      expect(stale(() => hangar.buyLicense('shard_halo'))).toBe(false);
+      expect(hangar.salvage).toBe(500);
+      expect(hangar.licenses).toEqual({});
+    });
+
+    it('setLicenseOn refuses and leaves the licence as it was', () => {
+      const hangar = open({ salvage: 500, licenses: { shard_halo: true } });
+      expect(stale(() => hangar.setLicenseOn('shard_halo', false))).toBe(false);
+      expect(hangar.licensesOff).toEqual({});
+    });
+
+    it('toggleSeal refuses and leaves the seals', () => {
+      const hangar = open({ salvage: 0, owned: { 'seal-1': true } });
+      expect(stale(() => hangar.toggleSeal('plasma'))).toBe(false);
+      expect(hangar.sealed).toEqual([]);
+    });
+
+    it('setStartingCard refuses and leaves the starting card', () => {
+      const hangar = open({ salvage: 0, owned: { 'flight-school': true } });
+      expect(stale(() => hangar.setStartingCard('propulsors'))).toBe(false);
+      expect(hangar.startingCard).toBeNull();
+    });
   });
 
   const stock = (salvage, owned = {}) =>
